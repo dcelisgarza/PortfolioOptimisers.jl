@@ -185,6 +185,7 @@ RelativeDrawdownSeries
 calibration_series
 calibration_series_vec
 calibration_series_matrix
+calibration_series_dispersion
 ScenarioCount
 RateSignificance
 EntropyBudget

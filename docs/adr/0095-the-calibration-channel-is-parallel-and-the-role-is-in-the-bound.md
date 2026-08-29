@@ -281,3 +281,49 @@ term and a CVaR of the *returns* on a drawdown owner, and `ConcentrationRadius` 
 `DualNormRadius` read a returns scale there. Their families carry no series field yet, and the
 open question of this ADR records the `DualNormRadius` case already. The mechanism above is what
 they would use.
+
+## Amendment (2026-08-29) — from issue #623, the ambiguity families take the marker
+
+**The programme decides which quantity the ball is drawn around, and it is not a matter of taste.**
+The amendment above left the ambiguity families out, because a radius is the coefficient of a norm
+penalty on the weight vector and nobody had written down whether an Esfahani-Kuhn radius under a
+drawdown owner belongs on the asset-return scale or on a drawdown scale. `set_risk_constraints!`
+for `DistributionallyRobustConditionalDrawdownatRisk` answers it. That method measures the
+transport cost of its own programme against `set_portfolio_drawdowns_plus_one!(model, pr.X)`, which
+is `absolute_drawdown_arr(X) .+ 1`, and that matrix is `calibration_series_matrix` under
+`AbsoluteDrawdownSeries` shifted by the support offset. So the scenarios the ball is drawn around
+are the **per-asset drawdowns**, the radius is a distance between two such vectors, and it carries
+drawdown units. Two docstrings had stated the two readings against each other, and the model
+settles which one was right.
+
+**Four rules take a `series` field, and one verb parts the two readings.** `TailTermParity`,
+`ConcentrationRadius`, `DimensionalRateRadius` and `DualNormRadius` each gain the field and a
+`bind_series` method, and the two ambiguity roles gain one each.
+`calibration_series_dispersion(series, pr)` is the per-asset dispersion the three radius rules read:
+`sqrt.(diag(pr.sigma))` on a returns series, and the sample dispersion of the drawdown columns on a
+drawdown marker. `TailTermParity` substitutes `calibration_series_matrix(series, pr.X)` for `pr.X`
+and nothing else, because the `ConditionalValueatRisk` kernel over a non-positive drawdown column
+**is** the `ConditionalDrawdownatRisk` of that column, so the rule still carries no second encoding
+of the measure it calibrates.
+
+**`DimensionalRateRadius` carried the same defect and is corrected here.** Issue #623 names three
+rules. The fourth reads `mean(sqrt, diag(pr.sigma))` on the same terms as `ConcentrationRadius`, and
+its `scale` field documented the gap as a workaround: *a drawdown slot needs a stated scale*. It no
+longer does.
+
+**The ground metric does not move with the series.** `DualNormRadius` reads `key` for the ground
+metric and `series` for the vector it takes that norm of. The two are independent: `:r` is the
+1-norm under every marker, and only the error vector moves.
+
+**The drawdown error scale is a floor, and the rule says so rather than correcting it.** A drawdown
+is a running functional, so its entries are dependent down a column and `s / sqrt(T_e)` prices a
+record of independent draws that the sample does not hold. A correction needs a model of that
+dependence, and the sample states none. This is the same refusal the rule already makes for the
+number of assets.
+
+**One asymmetry is left open, and it is filed.** Under a returns marker the dispersion comes off
+`pr.sigma`, so a shrunk or a robust covariance reaches it. Under a drawdown marker it comes off
+`Statistics.std` of the drawdown sample, so the caller's own estimator does not. `radial_series_inputs`
+carries the same asymmetry, from the amendment above. Closing it needs a rule that holds a **prior
+estimator** and fits it to the drawdown sample, which is a design the maintainer has raised and
+which this ADR does not decide.

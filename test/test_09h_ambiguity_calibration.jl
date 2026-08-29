@@ -471,12 +471,14 @@ end
     @test bout.l ≈
           TailTermParity(; ratio = 1, alpha = bout.alpha)(:l, PRDAY, nothing, nothing)
 
-    # The drawdown measure carries the same pair. Its tail term is a drawdown and the rule
-    # reads the returns, so the weight overstates the parity it names. The limit is stated
-    # in the docstring, and the number is the asset-column one.
+    # The drawdown measure carries the same pair, and it hands its own SERIES over beside
+    # the probability. #623 corrected this: the number was the asset-column one, and the
+    # tail term this measure prices is a CDaR of the drawdown series.
     dd = DistributionallyRobustConditionalDrawdownatRisk(; alpha = 0.05, l = role)
-    @test PO.resolve_deferred_quantities(dd, PRDAY).l ≈
-          TailTermParity(; ratio = 1, alpha = 0.05)(:l, PRDAY, nothing, nothing)
+    ddl = PO.resolve_deferred_quantities(dd, PRDAY).l
+    @test ddl ≈ PO.bind_series(TailTermParity(; ratio = 1, alpha = 0.05),
+                               AbsoluteDrawdownSeries())(:l, PRDAY, nothing, nothing)
+    @test ddl != TailTermParity(; ratio = 1, alpha = 0.05)(:l, PRDAY, nothing, nothing)
 
     # A measure whose slots all hold numbers is still returned unchanged, so the binding
     # costs nothing where no rule reads a sibling.
@@ -948,8 +950,14 @@ end
     @test PO.resolve_deferred_quantities(m, PR60).r ≈ r_num
     @test PO.factory(m, PR60).r ≈ r_num
 
+    # The drawdown owner hands its own series over, so the error scale comes off the
+    # drawdown sample. #623 corrected this: the number was the asset-return one.
     dd = DistributionallyRobustConditionalDrawdownatRisk(; r = role)
-    @test PO.resolve_deferred_quantities(dd, PR60).r ≈ r_num
+    ddr = PO.resolve_deferred_quantities(dd, PR60).r
+    @test ddr ≈
+          PO.bind_series(DualNormRadius(), AbsoluteDrawdownSeries())(:r, PR60, nothing,
+                                                                     nothing)
+    @test ddr != r_num
 
     # Both ends of the Range twin carry the same ground metric, so one rule on both ends
     # gives one number. The two ends of a radius are not two tails.
@@ -1037,4 +1045,206 @@ end
     # The gap grows with the universe, because the 1-norm of the error vector sums over the
     # assets and the ∞-norm does not.
     @test c_linf / c_l1 > 1
+end
+
+#=
+Issue #623. Three rules of the two ambiguity families read a RETURNS quantity when their
+slot owner prices a DRAWDOWN, and `DimensionalRateRadius` reads the same one. The mechanism
+that closes the gap is the one commit 7e51431c45 built for the deformation family:
+`calibration_series(x)` is the trait the owner answers, and `bind_series(slot, series)`
+carries the answer into the rule.
+
+The reading is not a matter of taste. `set_risk_constraints!` for
+`DistributionallyRobustConditionalDrawdownatRisk` measures the transport cost of its own
+programme against `set_portfolio_drawdowns_plus_one!(model, pr.X)`, which is the per-asset
+absolute drawdown sample plus one. So the ball is a ball over DRAWDOWN scenarios, the radius
+is a distance between two such vectors, and the tail term the weight prices is a CDaR. The
+first testset below pins that matrix against `calibration_series_matrix`, so the reading and
+the model cannot part company.
+=#
+const XDDA = 0.0005 .+ 0.01 .* rand(StableRNG(717171), Distributions.TDist(4), 1500, 5)
+const PRDDA = prior(EmpiricalPrior(), XDDA)
+const DDA = PO.calibration_series_matrix(AbsoluteDrawdownSeries(), XDDA)
+
+@testset "Ambiguity calibration: the model measures its ball over the drawdowns" begin
+    # The matrix the transport cost is measured against IS the drawdown sample, shifted by
+    # the support offset. This is the whole of the argument that a radius under this owner
+    # carries drawdown units.
+    model = JuMP.Model()
+    ddap1 = PO.set_portfolio_drawdowns_plus_one!(model, XDDA)
+    @test JuMP.value.(ddap1) ≈ DDA .+ 1
+    @test DDA ≈ PO.absolute_drawdown_arr(XDDA)
+
+    # A drawdown series is non-positive and its dispersion is the LARGER of the two, so
+    # every rule below returns a larger number under the drawdown marker.
+    @test all(<=(0), DDA)
+    sr = PO.calibration_series_dispersion(ReturnsSeries(), PRDDA)
+    sd = PO.calibration_series_dispersion(AbsoluteDrawdownSeries(), PRDDA)
+    @test sr ≈ sqrt.(diag(PRDDA.sigma))
+    @test sd ≈ vec(std(DDA; dims = 1))
+    @test all(sd .> sr)
+
+    # The relative marker is a third number, not a rescaling of the absolute one.
+    sdr = PO.calibration_series_dispersion(RelativeDrawdownSeries(), PRDDA)
+    @test sdr != sd
+    @test length(sdr) == size(XDDA, 2)
+end
+
+@testset "Ambiguity calibration: the three radius rules read the owner's series" begin
+    # Each rule multiplies ONE scale by a factor that no marker touches, so the ratio of
+    # the two readings is the ratio of the two scales, and it is one number for all three.
+    sr = mean(PO.calibration_series_dispersion(ReturnsSeries(), PRDDA))
+    sd = mean(PO.calibration_series_dispersion(AbsoluteDrawdownSeries(), PRDDA))
+
+    for alg in (ConcentrationRadius(), DimensionalRateRadius())
+        r = alg(:r, PRDDA, nothing, nothing)
+        d = PO.bind_series(alg, AbsoluteDrawdownSeries())(:r, PRDDA, nothing, nothing)
+        @test d > r
+        @test d / r ≈ sd / sr
+    end
+
+    # `DualNormRadius` takes a NORM of the error vector rather than its mean, so it moves
+    # with the vector and not with the mean. The ground metric does not move with the
+    # series: `:r` is the 1-norm under both markers.
+    e_r = PO.calibration_series_dispersion(ReturnsSeries(), PRDDA) / sqrt(size(XDDA, 1))
+    e_d = PO.calibration_series_dispersion(AbsoluteDrawdownSeries(), PRDDA) /
+          sqrt(size(XDDA, 1))
+    z = Distributions.quantile(Distributions.Normal(), 0.95)
+    @test DualNormRadius()(:r, PRDDA, nothing, nothing) ≈ z * norm(e_r, 1)
+    @test PO.bind_series(DualNormRadius(), AbsoluteDrawdownSeries())(:r, PRDDA, nothing,
+                                                                     nothing) ≈
+          z * norm(e_d, 1)
+    dn = PO.bind_series(DualNormRadius(), AbsoluteDrawdownSeries())
+    @test dn(:l1, PRDDA, nothing, nothing) ≈ z * norm(e_d, Inf)
+    @test dn(:r, PRDDA, nothing, nothing) > dn(:l1, PRDDA, nothing, nothing)
+
+    # A STATED scale is the whole of the units, so it overrides the reading and the marker
+    # then changes nothing.
+    for alg in (ConcentrationRadius(; scale = 0.03), DimensionalRateRadius(; scale = 0.03))
+        @test PO.bind_series(alg, AbsoluteDrawdownSeries())(:r, PRDDA, nothing, nothing) ==
+              alg(:r, PRDDA, nothing, nothing)
+    end
+
+    # `bind_series` keeps every other field, and `bind_norm_order` keeps the marker.
+    a = ConcentrationRadius(; confidence = 0.9, scale = 0.02)
+    b = PO.bind_series(a, RelativeDrawdownSeries())
+    @test b.confidence == a.confidence
+    @test b.scale == a.scale
+    @test b.series == RelativeDrawdownSeries()
+    c = PO.bind_norm_order(PO.bind_series(DualNormRadius(; confidence = 0.9),
+                                          AbsoluteDrawdownSeries()), 3)
+    @test c.p == 3
+    @test c.series == AbsoluteDrawdownSeries()
+    @test c.confidence == 0.9
+end
+
+@testset "TailTermParity: the drawdown owner prices a drawdown against a CDaR" begin
+    alpha = 0.05
+    ret = TailTermParity(; alpha = alpha)
+    dd = PO.bind_series(ret, AbsoluteDrawdownSeries())
+
+    # The tail term of the drawdown reading IS the mean of the per-column CDaR. The CVaR
+    # kernel over a non-positive drawdown column is that measure's own reading, so the rule
+    # carries no second encoding of it.
+    cdar = mean(j -> ConditionalDrawdownatRisk(; alpha = alpha)(view(XDDA, :, j)),
+                axes(XDDA, 2))
+    cvar_of_dd = mean(j -> ConditionalValueatRisk(; alpha = alpha)(view(DDA, :, j)),
+                      axes(DDA, 2))
+    @test cdar ≈ cvar_of_dd
+
+    m = -mean(DDA)
+    @test dd(:l, PRDDA, nothing, nothing) ≈ abs(m) / cdar
+
+    # The defect #623 names: the returns reading UNDERSTATES the weight on this owner,
+    # because the drawdown mean term is the far larger of the two relative to its own tail.
+    @test dd(:l, PRDDA, nothing, nothing) > ret(:l, PRDDA, nothing, nothing)
+
+    # `ratio` scales the answer under every marker.
+    @test PO.bind_series(TailTermParity(; ratio = 3, alpha = alpha),
+                         AbsoluteDrawdownSeries())(:l, PRDDA, nothing, nothing) ≈
+          3 * dd(:l, PRDDA, nothing, nothing)
+
+    # The two markers name two different series of one column, so the relative reading is
+    # its own number.
+    rel = PO.bind_series(ret, RelativeDrawdownSeries())(:l, PRDDA, nothing, nothing)
+    @test rel != dd(:l, PRDDA, nothing, nothing)
+
+    # `bind_alpha` and `bind_series` compose in either order, and neither drops the other's
+    # field.
+    bare = TailTermParity(; ratio = 2)
+    both = PO.bind_series(PO.bind_alpha(bare, alpha), AbsoluteDrawdownSeries())
+    @test both.ratio == 2
+    @test both.alpha == alpha
+    @test both.series == AbsoluteDrawdownSeries()
+    @test PO.bind_alpha(PO.bind_series(bare, AbsoluteDrawdownSeries()), alpha) == both
+
+    # The weighted reading moves to the drawdown sample too.
+    w = pweights(range(; start = 1, stop = 2, length = size(XDDA, 1)))
+    @test dd(:l, PRDDA, w, nothing) != dd(:l, PRDDA, nothing, nothing)
+end
+
+@testset "Ambiguity calibration: the drawdown owner hands its own series over" begin
+    @test PO.calibration_series(DistributionallyRobustConditionalDrawdownatRisk()) ==
+          AbsoluteDrawdownSeries()
+    @test PO.calibration_series(DistributionallyRobustConditionalValueatRisk()) ==
+          ReturnsSeries()
+
+    lrole = AmbiguityTailWeightCalibration(; alg = TailTermParity())
+    rrole = AmbiguityRadiusCalibration(; alg = ConcentrationRadius())
+
+    dr = PO.resolve_deferred_quantities(DistributionallyRobustConditionalDrawdownatRisk(;
+                                                                                        alpha = 0.05,
+                                                                                        l = lrole,
+                                                                                        r = rrole),
+                                        PRDDA)
+    vr = PO.resolve_deferred_quantities(DistributionallyRobustConditionalValueatRisk(;
+                                                                                     alpha = 0.05,
+                                                                                     l = lrole,
+                                                                                     r = rrole),
+                                        PRDDA)
+
+    @test dr.l ≈
+          PO.bind_series(TailTermParity(; alpha = 0.05), AbsoluteDrawdownSeries())(:l,
+                                                                                   PRDDA,
+                                                                                   nothing,
+                                                                                   nothing)
+    @test dr.r ≈ PO.bind_series(ConcentrationRadius(), AbsoluteDrawdownSeries())(:r, PRDDA,
+                                                                                 nothing, nothing)
+    @test vr.l ≈ TailTermParity(; alpha = 0.05)(:l, PRDDA, nothing, nothing)
+    @test vr.r ≈ ConcentrationRadius()(:r, PRDDA, nothing, nothing)
+
+    # The two owners resolve the SAME two keys and part company on the series alone.
+    @test dr.l != vr.l
+    @test dr.r != vr.r
+
+    # A MARKER STATED ON THE RULE IS OVERWRITTEN by the measure that resolves it.
+    wrong = AmbiguityRadiusCalibration(;
+                                       alg = ConcentrationRadius(;
+                                                                 series = AbsoluteDrawdownSeries()))
+    o = PO.resolve_deferred_quantities(DistributionallyRobustConditionalValueatRisk(;
+                                                                                    alpha = 0.05,
+                                                                                    r = wrong),
+                                       PRDDA)
+    @test o.r ≈ vr.r
+
+    # The Range measure prices ONE series over its two ends, so all four slots take the
+    # same marker and the two ends part company through their probabilities alone.
+    rg = PO.resolve_deferred_quantities(DistributionallyRobustConditionalValueatRiskRange(;
+                                                                                          alpha = 0.05,
+                                                                                          l_a = lrole,
+                                                                                          r_a = rrole,
+                                                                                          beta = 0.1,
+                                                                                          l_b = lrole,
+                                                                                          r_b = rrole),
+                                        PRDDA)
+    @test rg.r_a ≈ vr.r
+    @test rg.r_b ≈ vr.r
+    @test rg.l_a ≈ vr.l
+    @test rg.l_b ≈ TailTermParity(; alpha = 0.1)(:l_b, PRDDA, nothing, nothing)
+    @test rg.l_a != rg.l_b
+
+    # A measure whose slots all hold numbers is returned unchanged, so the new call
+    # allocates no rebuild in the common case.
+    plain = DistributionallyRobustConditionalDrawdownatRisk()
+    @test PO.resolve_deferred_quantities(plain, PRDDA) === plain
 end

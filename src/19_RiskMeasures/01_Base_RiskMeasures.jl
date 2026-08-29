@@ -2546,7 +2546,7 @@ Names the series a calibration rule reads, so that a rule reads the quantity its
 
 A rule gets no portfolio, which [`resolve_calibration_slot`](@ref) states, so it cannot form the loss series of a portfolio that does not exist until the solver returns. What it can form is the series of each **column** of `pr.X`. This family names which one: the column itself, or the drawdown series that column carries. [`calibration_series`](@ref) is the trait a slot owner answers, and [`bind_series`](@ref) carries the answer into the rule.
 
-The marker states the **quantity** and not the estimator, so each rule reads it on its own terms. [`HillTailDecay`](@ref) forms the series and estimates its tail index. [`RadialTailDecay`](@ref) cannot form it, because a Mahalanobis distance carries no path, so it shifts the index of the returns instead.
+The marker states the **quantity** and not the estimator, so each rule reads it on its own terms. [`HillTailDecay`](@ref) forms the series and estimates its tail index. [`RadialTailDecay`](@ref) cannot form it, because a Mahalanobis distance carries no path, so it whitens the drawdown sample instead. The three radius rules read the per-asset dispersion of the series, which [`calibration_series_dispersion`](@ref) takes, and [`TailTermParity`](@ref) reads both terms of its ratio over it.
 
 # Related
 
@@ -2713,6 +2713,42 @@ function calibration_series_matrix(series::AbstractDrawdownSeries,
         Y[:, j] = calibration_series_vec(series, view(X, :, j))
     end
     return Y
+end
+"""
+    calibration_series_dispersion(series::AbstractCalibrationSeries, pr::AbstractPriorResult)
+
+Return the per-asset dispersion of the series that `series` names, one entry per column of the sample.
+
+A [`ReturnsSeries`](@ref) reads it off `pr.sigma`, as the square root of that matrix's diagonal. That is the reading the radius family has always carried, so a prior that states a shrunk or a robust covariance matrix is read through it, and this verb leaves that untouched.
+
+A drawdown series reads it off the **drawdown sample** instead, because a prior result states no drawdown moment. [`calibration_series_matrix`](@ref) builds the sample, and the dispersion is the sample dispersion of each of its columns. This is the reading [`radial_series_inputs`](@ref) takes a centre and a whitening factor by, and it parts from the returns reading for the same reason: `pr.sigma` is a moment of the returns, and no scaling of it states a moment of a drawdown.
+
+A radius is a distance in the space of the scenarios the model prices, so this vector carries its units. [`ConcentrationRadius`](@ref) and [`DimensionalRateRadius`](@ref) average it into one scale, and [`DualNormRadius`](@ref) divides it by the square root of the effective sample size and takes a norm of the result.
+
+# Arguments
+
+  - `series`: The series the slot owner prices.
+  - `pr`: Prior result the covariance matrix is read off on a returns series, and the sample on a drawdown series.
+
+# Returns
+
+  - `s::AbstractVector`: The per-asset dispersion of that series, `N × 1`.
+
+# Related
+
+  - [`AbstractCalibrationSeries`](@ref)
+  - [`calibration_series_matrix`](@ref)
+  - [`radial_series_inputs`](@ref)
+  - [`ConcentrationRadius`](@ref)
+  - [`DimensionalRateRadius`](@ref)
+  - [`DualNormRadius`](@ref)
+"""
+function calibration_series_dispersion(::ReturnsSeries, pr::AbstractPriorResult)
+    return sqrt.(LinearAlgebra.diag(pr.sigma))
+end
+function calibration_series_dispersion(series::AbstractDrawdownSeries,
+                                       pr::AbstractPriorResult)
+    return vec(Statistics.std(calibration_series_matrix(series, pr.X); dims = 1))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -3694,7 +3730,9 @@ A rule gets a prior result and no portfolio, so the quantity it can read is the 
 
 The owner's series **wins**, on the terms [`bind_norm_order`](@ref) states. A rule that already carries a marker has it replaced, because the quantity belongs to the measure and a rule cannot know which measure it reached. So a stated `series` serves a caller who runs the rule by hand, and nothing else.
 
-The default is the identity, so a stated number, a travelling role, a plain function and a rule that reads no series all pass through untouched. [`EntropyBudget`](@ref) needs no method: it reads the sample length and the sibling `alpha`, and neither moves with the series. The significance, radius, tail-weight and norm-ceiling families need none either, which the open question of ADR 0095 records.
+The default is the identity, so a stated number, a travelling role, a plain function and a rule that reads no series all pass through untouched. [`EntropyBudget`](@ref) needs no method: it reads the sample length and the sibling `alpha`, and neither moves with the series. The significance and norm-ceiling families need none either. A significance level is a probability and carries no units, and a norm ceiling is a bound on the weight vector rather than on the sample.
+
+**The radius and tail-weight families do need one, and it is the units that say so.** A radius is a distance in the space of the scenarios the model prices, and a tail weight is the exchange rate between two terms of a loss, so both are read off a scale of that quantity. Under [`DistributionallyRobustConditionalDrawdownatRisk`](@ref) the quantity is a per-asset drawdown, which is what the transport cost of its own programme is measured against.
 
 The slot owner's own resolution method calls this beside [`bind_alpha`](@ref):
 
@@ -3721,6 +3759,10 @@ kappa = resolve_calibration_slot(bind_series(bind_alpha(x.kappa, alpha),
   - [`bind_norm_order`](@ref)
   - [`HillTailDecay`](@ref)
   - [`RadialTailDecay`](@ref)
+  - [`ConcentrationRadius`](@ref)
+  - [`DimensionalRateRadius`](@ref)
+  - [`DualNormRadius`](@ref)
+  - [`TailTermParity`](@ref)
   - [`DeformationTailCalibration`](@ref)
   - [`DeformationHeadCalibration`](@ref)
   - [`resolve_calibration_slot`](@ref)
@@ -3740,6 +3782,9 @@ end
 function bind_series(alg::RadialTailDecay, series::AbstractCalibrationSeries)
     return RadialTailDecay(; kmin = alg.kmin, alpha = alg.alpha, series = series)
 end
+# The two ambiguity roles and their rules stand below the deformation pair for the reason
+# the two `bind_alpha` methods above them do: the types are declared further down the file,
+# and the role is rebuilt around the bound rule on the same terms.
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -4089,9 +4134,11 @@ $(DocStringExtensions.TYPEDEF)
 
 Computes an ambiguity radius from the concentration of measure, so that the ball shrinks as the sample grows.
 
-The radius is the Blanchet-Kang-Murthy form, a scale in the units of the returns times the square root of a chi-squared quantile over the sample size. The chi-squared factor is dimensionless and grows with the number of assets, so a wider universe buys a wider ball at a fixed confidence level, and a longer sample shrinks it.
+The radius is the Blanchet-Kang-Murthy form, a scale in the units of the series the slot owner prices times the square root of a chi-squared quantile over the sample size. The chi-squared factor is dimensionless and grows with the number of assets, so a wider universe buys a wider ball at a fixed confidence level, and a longer sample shrinks it.
 
-`scale` states the units. A radius multiplies a norm of the weight vector, so it is in the units of the returns, and no caller can intuit that number from the confidence level alone. `scale = nothing` reads the average asset volatility off the prior result instead, which is the first pass the form's source recommends, and it moves with the sample the way the rest of the rule does.
+`scale` states the units. A radius multiplies a norm of the weight vector, so it is in the units of the loss the ball is drawn around, and no caller can intuit that number from the confidence level alone. `scale = nothing` reads the average per-asset dispersion of the series the slot owner prices instead, which is the first pass the form's source recommends, and it moves with the sample the way the rest of the rule does.
+
+**A drawdown owner is read on a drawdown scale.** [`DistributionallyRobustConditionalDrawdownatRisk`](@ref) measures the transport cost of its own programme against the per-asset drawdown sample, so the ball it prices is a ball over drawdown scenarios and the radius carries drawdown units. `series` names that quantity, [`calibration_series_dispersion`](@ref) takes the dispersion off the drawdown sample, and `pr.sigma` reaches nothing there: it is a moment of the returns.
 
 `T` is the effective sample size when observation weights are stated, and the raw row count when they are not, on the same terms as [`ScenarioCount`](@ref). The radius prices estimation error, and the error of a weighted estimate falls with Kish's effective sample size rather than with the number of rows. [`RateRadius`](@ref) reads the raw row count instead, because a rate speaks of the length of the record.
 
@@ -4105,10 +4152,11 @@ $(DocStringExtensions.FIELDS)
 
     ConcentrationRadius(;
         confidence::Number = 0.95,
-        scale::Option{<:Number} = nothing
+        scale::Option{<:Number} = nothing,
+        series::AbstractCalibrationSeries = ReturnsSeries()
     ) -> ConcentrationRadius
 
-Keywords correspond to the struct's fields. `confidence` defaults to `0.95`, and `scale` defaults to `nothing`, which reads the average asset volatility off the prior result.
+Keywords correspond to the struct's fields. `confidence` defaults to `0.95`, `scale` defaults to `nothing`, which reads the average per-asset dispersion off the sample, and `series` defaults to [`ReturnsSeries`](@ref), and every slot owner overwrites it through [`bind_series`](@ref).
 
 ## Validation
 
@@ -4120,6 +4168,8 @@ Keywords correspond to the struct's fields. `confidence` defaults to `0.95`, and
   - [`AbstractAmbiguityRadiusCalibrationAlgorithm`](@ref)
   - [`RateRadius`](@ref)
   - [`DimensionalRateRadius`](@ref)
+  - [`bind_series`](@ref)
+  - [`calibration_series_dispersion`](@ref)
   - [`DualNormRadius`](@ref): answers what the sampling error is in the ground metric the slot names, so its number changes with the key while this one's does not.
   - [`AmbiguityRadiusCalibration`](@ref)
   - [`resolve_calibration_slot`](@ref)
@@ -4133,14 +4183,21 @@ Keywords correspond to the struct's fields. `confidence` defaults to `0.95`, and
     $(field_dict[:cal_scale])
     """
     scale
-    function ConcentrationRadius(confidence::Number, scale::Option{<:Number})
+    """
+    $(field_dict[:cal_series_scale])
+    """
+    series
+    function ConcentrationRadius(confidence::Number, scale::Option{<:Number},
+                                 series::AbstractCalibrationSeries)
         assert_unit_interval(confidence, :confidence)
         assert_nonempty_gt0_finite_val(scale, :scale)
-        return new{typeof(confidence), typeof(scale)}(confidence, scale)
+        return new{typeof(confidence), typeof(scale), typeof(series)}(confidence, scale,
+                                                                      series)
     end
 end
-function ConcentrationRadius(; confidence::Number = 0.95, scale::Option{<:Number} = nothing)
-    return ConcentrationRadius(confidence, scale)
+function ConcentrationRadius(; confidence::Number = 0.95, scale::Option{<:Number} = nothing,
+                             series::AbstractCalibrationSeries = ReturnsSeries())
+    return ConcentrationRadius(confidence, scale, series)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -4153,7 +4210,7 @@ Compute the ambiguity radius that the concentration of measure gives on the samp
 \\begin{align}
 r &= s \\sqrt{\\dfrac{\\chi^{2}_{N,\\, q}}{T_{e}}}\\,,\\\\
 s &= \\begin{cases}
-\\dfrac{1}{N} \\sum\\limits_{i=1}^{N} \\sqrt{\\hat{\\mathbf{\\Sigma}}_{ii}} & \\textrm{if } \\texttt{scale} \\textrm{ is } \\texttt{nothing}\\\\
+\\dfrac{1}{N} \\sum\\limits_{i=1}^{N} \\hat{s}_{i} & \\textrm{if } \\texttt{scale} \\textrm{ is } \\texttt{nothing}\\\\
 \\texttt{scale} & \\textrm{otherwise}
 \\end{cases}\\,,\\\\
 T_{e} &= \\begin{cases}
@@ -4169,16 +4226,16 @@ Where:
   - $(math_dict[:cal_s_radius])
   - ``\\chi^{2}_{N,\\, q}``: Quantile of the chi-squared distribution with ``N`` degrees of freedom at confidence level ``q``.
   - $(math_dict[:N])
-  - $(math_dict[:Sigma_hat_ii])
+  - $(math_dict[:cal_s_i_series])
   - $(math_dict[:T])
   - $(math_dict[:cal_T_e])
   - $(math_dict[:cal_w_i])
 
 # Arguments
 
-  - `alg`: The rule.
+  - `alg`: The rule. Its `series` field names the quantity the ball is drawn around, which [`bind_series`](@ref) puts there.
   - `key`: Name of the slot that is being resolved. The radius is the same for every key, so the two tails of a Range measure that carry one rule resolve to one number.
-  - `pr`: Prior result the sample size, the asset count and the covariance matrix are read off.
+  - `pr`: Prior result the sample size, the asset count and, on a returns series, the covariance matrix are read off. A drawdown series reads the sample instead.
   - `w`: Effective observation weights, or `nothing`.
   - `slv`: Effective solver. This rule needs none.
 
@@ -4191,13 +4248,15 @@ Where:
   - [`ConcentrationRadius`](@ref)
   - [`RateRadius`](@ref)
   - [`DimensionalRateRadius`](@ref)
+  - [`bind_series`](@ref)
+  - [`calibration_series_dispersion`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
 function (alg::ConcentrationRadius)(::Symbol, pr::AbstractPriorResult, w, ::Any)
     N = size(pr.X, 2)
     T = isnothing(w) ? size(pr.X, 1) : sum(w)^2 / sum(abs2, w)
     scale = if isnothing(alg.scale)
-        Statistics.mean(sqrt, LinearAlgebra.diag(pr.sigma))
+        Statistics.mean(calibration_series_dispersion(alg.series, pr))
     else
         alg.scale
     end
@@ -4302,7 +4361,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Computes an ambiguity radius that shrinks at the dimensional rate a Wasserstein ball earns, not at the square-root rate.
 
-The radius is the Esfahani-Kuhn [drcvar](@cite) form, a scale in the units of the returns times the sample factor `log(1 / (1 - confidence)) / T` raised to the power `1 / max(N, 2)`. A ball of probability measures must hold the true **measure**, and not merely the true mean, and the measure-concentration result the form is read off charges that exponent for it. At `N = 2` the rule returns the square-root rate that [`ConcentrationRadius`](@ref) and [`RateRadius`](@ref) both carry, so the family's existing behaviour is the two-dimensional corner of this one.
+The radius is the Esfahani-Kuhn [drcvar](@cite) form, a scale in the units of the series the slot owner prices times the sample factor `log(1 / (1 - confidence)) / T` raised to the power `1 / max(N, 2)`. A ball of probability measures must hold the true **measure**, and not merely the true mean, and the measure-concentration result the form is read off charges that exponent for it. At `N = 2` the rule returns the square-root rate that [`ConcentrationRadius`](@ref) and [`RateRadius`](@ref) both carry, so the family's existing behaviour is the two-dimensional corner of this one.
 
 **The ball hardly shrinks over a wide universe, and that is the model speaking rather than a defect.** At `N = 20` and `T = 250` the factor `T^(-1/20)` is `0.76`, so a record ten times longer buys almost nothing. This is the curse of dimensionality of the Wasserstein ball. A caller who reads a square-root rate and expects an estimation error reads a statement about a *mean*, and this rule makes one about a *measure*.
 
@@ -4312,7 +4371,7 @@ The source result carries a second branch for a short record, whose exponent is 
 
 `N` is the asset count, `size(pr.X, 2)`, because the ball is over the assets. A factor prior carries a smaller effective dimension, and the ball is still over the assets, so a factor prior does not move `N`.
 
-`scale` states the units. A radius multiplies a norm of the weight vector, so it is in the units of the returns, and no caller can intuit that number from the confidence level alone. `scale = nothing` reads the average asset volatility off the prior result instead, on the same terms as [`ConcentrationRadius`](@ref).
+`scale` states the units. A radius multiplies a norm of the weight vector, so it is in the units of the loss the ball is drawn around, and no caller can intuit that number from the confidence level alone. `scale = nothing` reads the average per-asset dispersion of the series the slot owner prices instead, on the same terms as [`ConcentrationRadius`](@ref), and a drawdown owner is read on a drawdown scale there for the reason that rule states.
 
 [`DistributionallyRobustConditionalDrawdownatRisk`](@ref) prices a ball around the drawdown scenarios. The scenario dimension there is still `N`, so the rate carries, but the reading off `pr.sigma` is a return volatility and a drawdown is not a return. State `scale` on a drawdown slot rather than leave it `nothing`.
 
@@ -4328,10 +4387,11 @@ $(DocStringExtensions.FIELDS)
 
     DimensionalRateRadius(;
         confidence::Number = 0.95,
-        scale::Option{<:Number} = nothing
+        scale::Option{<:Number} = nothing,
+        series::AbstractCalibrationSeries = ReturnsSeries()
     ) -> DimensionalRateRadius
 
-Keywords correspond to the struct's fields. `confidence` defaults to `0.95`, and `scale` defaults to `nothing`, which reads the average asset volatility off the prior result.
+Keywords correspond to the struct's fields. `confidence` defaults to `0.95`, `scale` defaults to `nothing`, which reads the average per-asset dispersion off the sample, and `series` defaults to [`ReturnsSeries`](@ref), and every slot owner overwrites it through [`bind_series`](@ref).
 
 ## Validation
 
@@ -4344,6 +4404,8 @@ Keywords correspond to the struct's fields. `confidence` defaults to `0.95`, and
   - [`ConcentrationRadius`](@ref)
   - [`RateRadius`](@ref)
   - [`AmbiguityRadiusCalibration`](@ref)
+  - [`bind_series`](@ref)
+  - [`calibration_series_dispersion`](@ref)
   - [`resolve_calibration_slot`](@ref)
 
 # References
@@ -4359,15 +4421,22 @@ Keywords correspond to the struct's fields. `confidence` defaults to `0.95`, and
     $(field_dict[:cal_dim_scale])
     """
     scale
-    function DimensionalRateRadius(confidence::Number, scale::Option{<:Number})
+    """
+    $(field_dict[:cal_series_scale])
+    """
+    series
+    function DimensionalRateRadius(confidence::Number, scale::Option{<:Number},
+                                   series::AbstractCalibrationSeries)
         assert_unit_interval(confidence, :confidence)
         assert_nonempty_gt0_finite_val(scale, :scale)
-        return new{typeof(confidence), typeof(scale)}(confidence, scale)
+        return new{typeof(confidence), typeof(scale), typeof(series)}(confidence, scale,
+                                                                      series)
     end
 end
 function DimensionalRateRadius(; confidence::Number = 0.95,
-                               scale::Option{<:Number} = nothing)
-    return DimensionalRateRadius(confidence, scale)
+                               scale::Option{<:Number} = nothing,
+                               series::AbstractCalibrationSeries = ReturnsSeries())
+    return DimensionalRateRadius(confidence, scale, series)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -4380,7 +4449,7 @@ Compute the ambiguity radius that the measure-concentration bound gives on the s
 \\begin{align}
 r &= s \\left(\\dfrac{\\ln\\left(\\dfrac{1}{1 - q}\\right)}{T_{e}}\\right)^{\\frac{1}{\\max(N,\\, 2)}}\\,,\\\\
 s &= \\begin{cases}
-\\dfrac{1}{N} \\sum\\limits_{i=1}^{N} \\sqrt{\\hat{\\mathbf{\\Sigma}}_{ii}} & \\textrm{if } \\texttt{scale} \\textrm{ is } \\texttt{nothing}\\\\
+\\dfrac{1}{N} \\sum\\limits_{i=1}^{N} \\hat{s}_{i} & \\textrm{if } \\texttt{scale} \\textrm{ is } \\texttt{nothing}\\\\
 \\texttt{scale} & \\textrm{otherwise}
 \\end{cases}\\,,\\\\
 T_{e} &= \\begin{cases}
@@ -4396,7 +4465,7 @@ Where:
   - $(math_dict[:cal_s_radius])
   - ``q``: Confidence level the bound is read at.
   - $(math_dict[:N])
-  - $(math_dict[:Sigma_hat_ii])
+  - $(math_dict[:cal_s_i_series])
   - $(math_dict[:T])
   - $(math_dict[:cal_T_e])
   - $(math_dict[:cal_w_i])
@@ -4405,9 +4474,9 @@ The exponent is floored at one half, so a universe of one or two assets returns 
 
 # Arguments
 
-  - `alg`: The rule.
+  - `alg`: The rule. Its `series` field names the quantity the ball is drawn around, which [`bind_series`](@ref) puts there.
   - `key`: Name of the slot that is being resolved. The radius is the same for every key, so the two tails of a Range measure that carry one rule resolve to one number.
-  - `pr`: Prior result the sample size, the asset count and the covariance matrix are read off.
+  - `pr`: Prior result the sample size, the asset count and, on a returns series, the covariance matrix are read off. A drawdown series reads the sample instead.
   - `w`: Effective observation weights, or `nothing`.
   - `slv`: Effective solver. This rule needs none.
 
@@ -4420,13 +4489,15 @@ The exponent is floored at one half, so a universe of one or two assets returns 
   - [`DimensionalRateRadius`](@ref)
   - [`ConcentrationRadius`](@ref)
   - [`RateRadius`](@ref)
+  - [`bind_series`](@ref)
+  - [`calibration_series_dispersion`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
 function (alg::DimensionalRateRadius)(::Symbol, pr::AbstractPriorResult, w, ::Any)
     N = size(pr.X, 2)
     T = isnothing(w) ? size(pr.X, 1) : sum(w)^2 / sum(abs2, w)
     scale = if isnothing(alg.scale)
-        Statistics.mean(sqrt, LinearAlgebra.diag(pr.sigma))
+        Statistics.mean(calibration_series_dispersion(alg.series, pr))
     else
         alg.scale
     end
@@ -4439,7 +4510,7 @@ Computes an ambiguity radius in the ground metric that the slot it stands in nam
 
 The eight radius slots of the library do not measure distance in one norm. A radius multiplies a norm of the weight vector, and the ground metric of the ball is the dual of that norm, so the `l1` coefficient of [`JuMPOptimiser`](@ref) is a distance in the ∞-norm while its `linf` coefficient is a distance in the 1-norm. This rule reads `key`, picks the ground metric of that slot, and returns the sampling error of the empirical measure in it. [`ConcentrationRadius`](@ref) and [`RateRadius`](@ref) return one number for every key, which is right inside one measure and wrong across the eight slots.
 
-The sampling error of the mean vector is the part a linear loss sees, and its per-asset scale is the asset's volatility over the square root of the effective sample size. The radius is a norm of that error vector, at the confidence level `confidence` states.
+The sampling error of the mean vector is the part a linear loss sees, and its per-asset scale is the dispersion of the series the slot owner prices over the square root of the effective sample size. The radius is a norm of that error vector, at the confidence level `confidence` states.
 
 `confidence` is a **per-coordinate** level, and it is not corrected for the number of assets. The ∞-norm case is a maximum over `N` coordinates, so a per-coordinate level understates it, and a caller who wants a level over the whole vector states the corrected number themselves, as `1 - (1 - c) / N`.
 
@@ -4447,7 +4518,9 @@ The 1-norm case sums the per-asset errors, which prices them as if they moved to
 
 `p` serves the `:lpreg_val` slot alone. The ground metric of [`LpRegularisation`](@ref) is the type-``q`` metric with ``1/p + 1/q = 1``, and `key` names the slot rather than the norm order. The order belongs to the penalty, so that site fills this field through [`bind_norm_order`](@ref) before it resolves the slot, and the call **overwrites** whatever the field holds. A stated `p` therefore serves a caller who runs the rule outside that site, and nothing else. Every other key ignores the field.
 
-The drawdown owner is served on the asset-return scale and no other. [`DistributionallyRobustConditionalDrawdownatRisk`](@ref) prices a ball around the drawdown scenarios, and no rule can form the drawdown series, so the number this rule returns on `:r` understates the drawdown error scale. It is a floor for that slot, not the radius the measure would price.
+**The drawdown owner is served on a drawdown scale, and `series` is what says so.** [`DistributionallyRobustConditionalDrawdownatRisk`](@ref) measures the transport cost of its own programme against the per-asset drawdown sample, so the ball it prices is a ball over drawdown scenarios and the ground metric is a distance between two such vectors. [`calibration_series_dispersion`](@ref) reads the error scale off that sample under a drawdown marker, and `pr.sigma` reaches nothing there: it is a moment of the returns, and no scaling of it states a moment of a drawdown. The ground metric does not move with the series, only the vector it is taken of.
+
+**The error scale of a drawdown series is a floor, and the record is the reason.** A drawdown is a running functional, so its entries are strongly dependent down a column, and ``\\hat{s}_{i} / \\sqrt{T_{e}}`` prices a record of ``T_{e}`` independent draws that a drawdown sample does not hold. The rule states no correction for it, on the same terms it states none for the number of assets: a correction needs a model of the dependence, and the sample states none. So the reading is the honest scale of the quantity, taken as if the record were independent.
 
 `T_e` is Kish's effective sample size when observation weights are stated, and the raw row count when they are not, on the same terms as [`ConcentrationRadius`](@ref).
 
@@ -4461,10 +4534,11 @@ $(DocStringExtensions.FIELDS)
 
     DualNormRadius(;
         confidence::Number = 0.95,
-        p::Option{<:Number} = nothing
+        p::Option{<:Number} = nothing,
+        series::AbstractCalibrationSeries = ReturnsSeries()
     ) -> DualNormRadius
 
-Keywords correspond to the struct's fields. `confidence` defaults to `0.95`, and `p` defaults to `nothing`, which serves every slot but `:lpreg_val`.
+Keywords correspond to the struct's fields. `confidence` defaults to `0.95`, `p` defaults to `nothing`, which serves every slot but `:lpreg_val`, and `series` defaults to [`ReturnsSeries`](@ref), and every slot owner overwrites it through [`bind_series`](@ref).
 
 ## Validation
 
@@ -4477,6 +4551,9 @@ Keywords correspond to the struct's fields. `confidence` defaults to `0.95`, and
   - [`ConcentrationRadius`](@ref): answers how wide the ball is at a confidence level, in one dimensionless factor that no norm enters.
   - [`RateRadius`](@ref): answers how fast the ball shrinks with the record, and leaves the coefficient to a cross-validation.
   - [`AmbiguityRadiusCalibration`](@ref)
+  - [`bind_series`](@ref)
+  - [`bind_norm_order`](@ref)
+  - [`calibration_series_dispersion`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
 @concrete struct DualNormRadius <: AbstractAmbiguityRadiusCalibrationAlgorithm
@@ -4488,17 +4565,23 @@ Keywords correspond to the struct's fields. `confidence` defaults to `0.95`, and
     `p`: Norm order of the [`LpRegularisation`](@ref) penalty the radius stands in, or `nothing`. It is read for the `:lpreg_val` key alone, where the ground metric is the type-``q`` metric with ``1/p + 1/q = 1`` and no key can name ``q``. The penalty site overwrites it through [`bind_norm_order`](@ref), so state it only to run the rule outside that site.
     """
     p
-    function DualNormRadius(confidence::Number, p::Option{<:Number})
+    """
+    $(field_dict[:cal_series_scale])
+    """
+    series
+    function DualNormRadius(confidence::Number, p::Option{<:Number},
+                            series::AbstractCalibrationSeries)
         assert_unit_interval(confidence, :confidence)
         if !isnothing(p)
             @argcheck(isfinite(p), IsNonFiniteError)
             @argcheck(p > one(p), DomainError)
         end
-        return new{typeof(confidence), typeof(p)}(confidence, p)
+        return new{typeof(confidence), typeof(p), typeof(series)}(confidence, p, series)
     end
 end
-function DualNormRadius(; confidence::Number = 0.95, p::Option{<:Number} = nothing)
-    return DualNormRadius(confidence, p)
+function DualNormRadius(; confidence::Number = 0.95, p::Option{<:Number} = nothing,
+                        series::AbstractCalibrationSeries = ReturnsSeries())
+    return DualNormRadius(confidence, p, series)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -4510,7 +4593,7 @@ Compute the ambiguity radius of the slot `key` names, in the ground metric of th
 ```math
 \\begin{align}
 r &= z_{c} \\lVert \\boldsymbol{e} \\rVert_{g}\\,,\\\\
-e_{i} &= \\dfrac{\\hat{\\sigma}_{i}}{\\sqrt{T_{e}}}\\,,\\\\
+e_{i} &= \\dfrac{\\hat{s}_{i}}{\\sqrt{T_{e}}}\\,,\\\\
 T_{e} &= \\begin{cases}
 T & \\textrm{if } w \\textrm{ is } \\texttt{nothing}\\\\
 \\dfrac{\\left(\\sum\\limits_{i=1}^{T} w_{i}\\right)^{2}}{\\sum\\limits_{i=1}^{T} w_{i}^{2}} & \\textrm{otherwise}
@@ -4523,9 +4606,9 @@ Where:
 
   - $(math_dict[:cal_r_radius])
   - ``z_{c}``: Quantile of the standard normal distribution at the per-coordinate confidence level ``c``.
-  - ``\\boldsymbol{e}``: Per-asset scale of the sampling error of the mean vector, in the units of the returns.
+  - ``\\boldsymbol{e}``: Per-asset scale of the sampling error of the mean vector, in the units of the series the slot owner prices.
   - ``g``: Order of the ground metric, which `key` names.
-  - $(math_dict[:sigma_hat_i])
+  - $(math_dict[:cal_s_i_series])
   - $(math_dict[:T])
   - $(math_dict[:cal_T_e])
   - $(math_dict[:cal_w_i])
@@ -4547,9 +4630,9 @@ The two ends of a Range measure carry one ground metric, so a rule stated on bot
 
 # Arguments
 
-  - `alg`: The rule.
+  - `alg`: The rule. Its `series` field names the quantity the ball is drawn around, which [`bind_series`](@ref) puts there.
   - `key`: Name of the slot that is being resolved. It selects the ground metric, so this is the one rule of its family for which the key carries meaning.
-  - `pr`: Prior result the sample size and the covariance matrix are read off.
+  - `pr`: Prior result the sample size and, on a returns series, the covariance matrix are read off. A drawdown series reads the sample instead.
   - `w`: Effective observation weights, or `nothing`.
   - `slv`: Effective solver. This rule needs none.
 
@@ -4567,11 +4650,13 @@ The two ends of a Range measure carry one ground metric, so a rule stated on bot
   - [`DualNormRadius`](@ref)
   - [`ConcentrationRadius`](@ref)
   - [`RateRadius`](@ref)
+  - [`bind_series`](@ref)
+  - [`calibration_series_dispersion`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
 function (alg::DualNormRadius)(key::Symbol, pr::AbstractPriorResult, w, ::Any)
     T = isnothing(w) ? size(pr.X, 1) : sum(w)^2 / sum(abs2, w)
-    e = sqrt.(LinearAlgebra.diag(pr.sigma) / T)
+    e = calibration_series_dispersion(alg.series, pr) ./ sqrt(T)
     z = Distributions.quantile(Distributions.Normal(), alg.confidence)
     return z * dual_norm_radius_scale(alg, key, e)
 end
@@ -4623,7 +4708,7 @@ At ``r \\to 0`` the loss of [`DistributionallyRobustConditionalValueatRisk`](@re
 
 The rule carries the sample's own units and nothing else, so the preference stays the caller's. `ratio` states how many mean terms one tail term is worth, and the rule returns the `l` that prices it so on the sample the prior result carries. `ratio = 1` is parity, and `ratio = 2` prices the tail term at twice the mean term on every sample.
 
-A rule reads no portfolio, so it cannot form ``\\boldsymbol{w}^{\\intercal} \\boldsymbol{\\xi}``. The series it reads is the cross-section of the per-asset losses ``-\\mathbf{X}``: the mean-term scale ``m`` is the mean of that pool, and the tail-term scale ``c`` is the mean of the per-column ``\\mathrm{CVaR}_{\\alpha}``. **The mean of the per-column values is not the pooled ``\\mathrm{CVaR}_{\\alpha}``, and the difference is deliberate.** A pooled tail is drawn from the worst columns, so it is dominated by the most volatile assets and gives a smaller weight. The measure prices a portfolio rather than a single asset, so the per-column mean is the reading that answers it.
+A rule reads no portfolio, so it cannot form ``\\boldsymbol{w}^{\\intercal} \\boldsymbol{\\xi}``. The series it reads is the cross-section of the per-asset losses of the quantity the slot owner prices: the mean-term scale ``m`` is the mean of that pool, and the tail-term scale ``c`` is the mean of the per-column ``\\mathrm{CVaR}_{\\alpha}``. **The mean of the per-column values is not the pooled ``\\mathrm{CVaR}_{\\alpha}``, and the difference is deliberate.** A pooled tail is drawn from the worst columns, so it is dominated by the most volatile assets and gives a smaller weight. The measure prices a portfolio rather than a single asset, so the per-column mean is the reading that answers it.
 
 ``m`` is negative for a sample of positive expected return, and the rule takes ``\\lvert m \\rvert``. No field states the sign: a negative weight is not admissible in the slot, and a sample of negative expected return does not turn the trade-off around.
 
@@ -4631,7 +4716,7 @@ The rule reads its sibling `alpha`, because ``c`` is a ``\\mathrm{CVaR}`` at the
 
 **Both scales read the observation weights.** They are sample statistics rather than counts, so a weighted sample is read weighted. [`RateRadius`](@ref) and [`RateSignificance`](@ref) ignore `w` because a rate speaks of the length of the record, and that reading does not carry to a moment.
 
-[`DistributionallyRobustConditionalDrawdownatRisk`](@ref) carries the key `:l` as well, and its tail term is a ``\\mathrm{CDaR}`` of the portfolio drawdown series. A rule is given no portfolio and cannot form that series, so the number the rule returns there is the ratio of the asset columns. A drawdown tail is the larger quantity, so the rule **overstates** `l` on that measure. Read it as the shape a grid moves over rather than as the answer.
+**`series` says which quantity both terms are read over, and the slot owner states it.** [`DistributionallyRobustConditionalDrawdownatRisk`](@ref) carries the key `:l` as well, and its tail term is a ``\\mathrm{CDaR}`` of the portfolio drawdown series. A rule is given no portfolio, but it can form the drawdown series of each **column**, and [`bind_series`](@ref) puts the marker there at the resolution site. Both terms then move together: the mean term is the mean drawdown of the pool, and the tail term is the mean of the per-column ``\\mathrm{CDaR}_{\\alpha}``. The same [`ConditionalValueatRisk`](@ref) reading forms it, because the tail mean of a non-positive drawdown column **is** the ``\\mathrm{CDaR}`` of that column, so the rule and the measure it calibrates still cannot drift apart.
 
 A second reading of `l` exists, and this rule does not take it. `l` can be read as a risk-aversion coefficient and mapped from a mean-variance one, but a variance penalty is quadratic in the weight vector and a ``\\mathrm{CVaR}`` term is positively homogeneous, so the two objectives are not comparable term by term. The map holds at one reference portfolio and nowhere else, and a rule gets no portfolio.
 
@@ -4645,10 +4730,11 @@ $(DocStringExtensions.FIELDS)
 
     TailTermParity(;
         ratio::Number = 1,
-        alpha::Option{<:Number} = nothing
+        alpha::Option{<:Number} = nothing,
+        series::AbstractCalibrationSeries = ReturnsSeries()
     ) -> TailTermParity
 
-Keywords correspond to the struct's fields. `ratio` defaults to `1`, which is parity between the two terms. `alpha` defaults to `nothing`, which is the state a rule stands in a slot in.
+Keywords correspond to the struct's fields. `ratio` defaults to `1`, which is parity between the two terms. `alpha` defaults to `nothing`, which is the state a rule stands in a slot in. `series` defaults to [`ReturnsSeries`](@ref), and every slot owner overwrites it through [`bind_series`](@ref).
 
 ## Validation
 
@@ -4678,13 +4764,19 @@ Keywords correspond to the struct's fields. `ratio` defaults to `1`, which is pa
     $(field_dict[:cal_alpha_sib])
     """
     alpha
-    function TailTermParity(ratio::Number, alpha::Option{<:Number})
+    """
+    $(field_dict[:cal_series_twt])
+    """
+    series
+    function TailTermParity(ratio::Number, alpha::Option{<:Number},
+                            series::AbstractCalibrationSeries)
         assert_nonempty_gt0_finite_val(ratio, :ratio)
-        return new{typeof(ratio), typeof(alpha)}(ratio, alpha)
+        return new{typeof(ratio), typeof(alpha), typeof(series)}(ratio, alpha, series)
     end
 end
-function TailTermParity(; ratio::Number = 1, alpha::Option{<:Number} = nothing)
-    return TailTermParity(ratio, alpha)
+function TailTermParity(; ratio::Number = 1, alpha::Option{<:Number} = nothing,
+                        series::AbstractCalibrationSeries = ReturnsSeries())
+    return TailTermParity(ratio, alpha, series)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -4696,8 +4788,9 @@ Compute the tail weight that prices the tail term at `ratio` mean terms on the s
 ```math
 \\begin{align}
 l &= \\rho \\dfrac{\\lvert m \\rvert}{c}\\,,\\\\
-m &= -\\dfrac{\\sum\\limits_{t=1}^{T} \\sum\\limits_{j=1}^{N} w_{t} r_{tj}}{N \\sum\\limits_{t=1}^{T} w_{t}}\\,,\\\\
-c &= \\dfrac{1}{N} \\sum\\limits_{j=1}^{N} \\mathrm{CVaR}_{\\alpha}\\left(\\boldsymbol{r}_{j}\\right)\\,.
+y_{tj} &= \\left(\\mathcal{S}\\left(\\boldsymbol{r}_{j}\\right)\\right)_{t}\\,,\\\\
+m &= -\\dfrac{\\sum\\limits_{t=1}^{T} \\sum\\limits_{j=1}^{N} w_{t} y_{tj}}{N \\sum\\limits_{t=1}^{T} w_{t}}\\,,\\\\
+c &= \\dfrac{1}{N} \\sum\\limits_{j=1}^{N} \\mathrm{CVaR}_{\\alpha}\\left(\\boldsymbol{y}_{j}\\right)\\,.
 \\end{align}
 ```
 
@@ -4708,6 +4801,9 @@ Where:
   - ``m``: Mean-term scale, the mean of the pooled cross-section of the per-asset losses.
   - ``c``: Tail-term scale, the mean of the per-column ``\\mathrm{CVaR}_{\\alpha}`` of the loss.
   - ``\\boldsymbol{r}_{j}``: Column ``j`` of the returns matrix.
+  - ``\\mathcal{S}``: The series `alg.series` names, built from one column. It is the identity on a [`ReturnsSeries`](@ref), and a drawdown series on the two markers of [`AbstractDrawdownSeries`](@ref).
+  - ``y_{tj}``: Entry ``t`` of the series of column ``j``.
+  - ``\\boldsymbol{y}_{j}``: The series of column ``j``. A ``\\mathrm{CVaR}_{\\alpha}`` of a non-positive drawdown series is the ``\\mathrm{CDaR}_{\\alpha}`` of that column.
   - ``w_{t}``: Observation weight of period ``t``. Every weight is one when none is stated.
   - $(math_dict[:alpha_rm])
   - $(math_dict[:T])
@@ -4718,16 +4814,16 @@ Every column holds ``T`` entries, so the pooled mean and the mean of the per-col
 
 # Algorithm
 
- 1. Read the returns matrix off `pr` into `X`, and the effective observation weights off `w`.
+ 1. Build the sample `alg.series` names with [`calibration_series_matrix`](@ref) into `X`, and read the effective observation weights off `w`. A [`ReturnsSeries`](@ref) returns `pr.X` itself.
  2. Form the mean-term scale `m`, the negated weighted mean of the pooled cross-section of `X`.
  3. Build a [`ConditionalValueatRisk`](@ref) at `alg.alpha` carrying the same weights, and form the tail-term scale `c`, the mean over the columns of `X` of the value that measure takes on each. The measure's own reading is the one used, so the rule and the measure it calibrates cannot drift apart.
  4. Return `alg.ratio * abs(m) / c`.
 
 # Arguments
 
-  - `alg`: The rule. Its `alpha` field must hold a number, which [`bind_alpha`](@ref) puts there.
+  - `alg`: The rule. Its `alpha` field must hold a number, which [`bind_alpha`](@ref) puts there, and its `series` field names the quantity, which [`bind_series`](@ref) puts there.
   - `key`: Name of the slot that is being resolved. The scales are read off the asset columns, so the key never selects the value, and the two ends of a Range measure part company through their two probabilities alone.
-  - `pr`: Prior result the returns matrix is read off.
+  - `pr`: Prior result the returns matrix is read off. The series is built from its columns.
   - `w`: Effective observation weights, or `nothing`. Both scales are sample statistics, so this rule reads them.
   - `slv`: Effective solver. This rule needs none, because both scales are closed forms.
 
@@ -4745,14 +4841,21 @@ Every column holds ``T`` entries, so the pooled mean and the mean of the per-col
 
   - [`TailTermParity`](@ref)
   - [`bind_alpha`](@ref)
+  - [`bind_series`](@ref)
+  - [`calibration_series_matrix`](@ref)
   - [`ConditionalValueatRisk`](@ref)
+  - [`ConditionalDrawdownatRisk`](@ref)
   - [`DistributionallyRobustConditionalValueatRisk`](@ref)
+  - [`DistributionallyRobustConditionalDrawdownatRisk`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
 function (alg::TailTermParity)(::Symbol, pr::AbstractPriorResult, w, ::Any)
     @argcheck(!isnothing(alg.alpha),
               IsNothingError("`TailTermParity.alpha` is `nothing`, so the rule cannot form the tail-term scale `c`, which is a CVaR at the measure's own significance level. The probability travels to the rule through `bind_alpha`, which the slot owner calls after it resolves `alpha`. State `alpha` on the rule itself to run it outside a measure."))
-    X = pr.X
+    # Both scales are read over the series the OWNER prices. Under a returns marker this is
+    # `pr.X` itself, and under a drawdown marker the tail term is a CDaR: the CVaR kernel
+    # over a non-positive drawdown column is the mean of its worst `alpha`.
+    X = calibration_series_matrix(alg.series, pr.X)
     N = size(X, 2)
     ws = get_observation_weights(w, view(X, :, 1))
     m = if isnothing(ws)
@@ -4780,7 +4883,30 @@ function bind_alpha(r::AmbiguityTailWeightCalibration, alpha::Number)
     return AmbiguityTailWeightCalibration(; alg = bind_alpha(r.alg, alpha))
 end
 function bind_alpha(alg::TailTermParity, alpha::Number)
-    return TailTermParity(; ratio = alg.ratio, alpha = alpha)
+    return TailTermParity(; ratio = alg.ratio, alpha = alpha, series = alg.series)
+end
+# The same holds for the six `bind_series` methods below. The two ambiguity families are
+# declared between the verb and this point, so their methods cannot stand beside the
+# deformation pair the verb was written for.
+function bind_series(r::AmbiguityRadiusCalibration, series::AbstractCalibrationSeries)
+    return AmbiguityRadiusCalibration(; alg = bind_series(r.alg, series))
+end
+function bind_series(r::AmbiguityTailWeightCalibration, series::AbstractCalibrationSeries)
+    return AmbiguityTailWeightCalibration(; alg = bind_series(r.alg, series))
+end
+function bind_series(alg::ConcentrationRadius, series::AbstractCalibrationSeries)
+    return ConcentrationRadius(; confidence = alg.confidence, scale = alg.scale,
+                               series = series)
+end
+function bind_series(alg::DimensionalRateRadius, series::AbstractCalibrationSeries)
+    return DimensionalRateRadius(; confidence = alg.confidence, scale = alg.scale,
+                                 series = series)
+end
+function bind_series(alg::DualNormRadius, series::AbstractCalibrationSeries)
+    return DualNormRadius(; confidence = alg.confidence, p = alg.p, series = series)
+end
+function bind_series(alg::TailTermParity, series::AbstractCalibrationSeries)
+    return TailTermParity(; ratio = alg.ratio, alpha = alg.alpha, series = series)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -4942,7 +5068,7 @@ function bind_norm_order(r::AmbiguityRadiusCalibration, p::Number)
     return AmbiguityRadiusCalibration(; alg = bind_norm_order(r.alg, p))
 end
 function bind_norm_order(alg::DualNormRadius, p::Number)
-    return DualNormRadius(; confidence = alg.confidence, p = p)
+    return DualNormRadius(; confidence = alg.confidence, p = p, series = alg.series)
 end
 """
     sigma_chol_selector(sigma, chol, pr::AbstractPriorResult)
