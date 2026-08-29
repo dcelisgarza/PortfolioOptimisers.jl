@@ -182,6 +182,9 @@ RateSignificance
 EntropyBudget
 hill_tail_index
 HillTailDecay
+whitening_factor
+radial_tail_index
+RadialTailDecay
 bind_alpha
 AbstractAmbiguityRadiusCalibrationAlgorithm
 AbstractAmbiguityTailWeightCalibrationAlgorithm

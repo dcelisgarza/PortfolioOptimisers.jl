@@ -2738,6 +2738,7 @@ Keywords correspond to the struct's fields. `target` has no default, because the
   - [`DeformationHeadCalibration`](@ref)
   - [`HillTailDecay`](@ref)
   - [`kappa_log`](@ref)
+  - [`RadialTailDecay`](@ref)
   - [`RRM`](@ref)
 """
 @concrete struct EntropyBudget <: AbstractDeformationCalibrationAlgorithm
@@ -2903,7 +2904,7 @@ Computes the Kaniadakis deformation parameter whose tail decays at the rate the 
 
 The inverse of [`kappa_log`](@ref) is the ``\\kappa``-exponential ``\\exp_{\\kappa}(x) = \\left(\\kappa x + \\sqrt{1 + \\kappa^{2} x^{2}}\\right)^{1/\\kappa}``, which goes to ``(2 \\kappa x)^{1/\\kappa}`` for large ``x``. A ``\\kappa``-deformed exponential tail is therefore a power law of index ``1/\\kappa``, and ``\\kappa`` is a reciprocal tail index. So the rule estimates the sample's tail index ``\\hat{a}`` and returns ``1/\\hat{a}``, which makes the deformation decay at the rate the sample decays at. The band the slot admits, ``(0,\\, 1)``, reads as ``\\hat{a} > 1``, and that is the condition for a finite mean. The refusal is built into the reading, on the same terms as the band of [`EntropyBudget`](@ref).
 
-The estimator is Hill's, over the worst `k` order statistics of a **pool**. Every column of `pr.X` is centred and divided by its own sample dispersion, the standardised values are signed to the end the slot prices, and the `T * N` of them are pooled. **The rule reads `pr.X` alone, and never `pr.sigma`.** A column's dispersion comes from that column, which is the line that separates this rule from a rule that whitens with the covariance matrix.
+The estimator is Hill's, over the worst `k` order statistics of a **pool**. Every column of `pr.X` is centred and divided by its own sample dispersion, the standardised values are signed to the end the slot prices, and the `T * N` of them are pooled. **The rule reads `pr.X` alone, and never `pr.sigma`.** A column's dispersion comes from that column, which is the line that separates this rule from [`RadialTailDecay`](@ref). The two answer two questions: this rule asks how far one end of one column moves, and its sibling asks how far the whole cross-section moves. So this rule keeps the sign of the end and answers per end, and its sibling reads a distance and answers one number for both.
 
 The pool carries two assumptions, and both are stated rather than hidden. The columns share one tail index after standardisation, which is what lets one estimate stand for the whole sample. The columns are also cross-correlated, so the pool holds far fewer than `T * N` independent points and the estimator's spread is wider than the nominal one of `k` points. The median of `N` per-asset estimates drops both assumptions, and pays for it in noise: at `alpha = 0.05` and `T = 250` a column leaves 12 tail points, and a Hill estimate on 12 points moves from fold to fold for no reason in the data.
 
@@ -2941,6 +2942,7 @@ Keywords correspond to the struct's fields. `kmin` defaults to `30`, which is th
   - [`EntropyBudget`](@ref)
   - [`hill_tail_index`](@ref)
   - [`kappa_log`](@ref)
+  - [`RadialTailDecay`](@ref)
 """
 @concrete struct HillTailDecay <: AbstractDeformationCalibrationAlgorithm
     """
@@ -3029,6 +3031,7 @@ Where:
   - [`EntropyBudget`](@ref)
   - [`hill_tail_index`](@ref)
   - [`kappa_log`](@ref)
+  - [`RadialTailDecay`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
 function (alg::HillTailDecay)(key::Symbol, pr::AbstractPriorResult, ::Any, ::Any)
@@ -3054,11 +3057,275 @@ function (alg::HillTailDecay)(key::Symbol, pr::AbstractPriorResult, ::Any, ::Any
     return inv(a)
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the square factor of the covariance matrix that `pr` states, so that the factor's transpose whitens a centred observation.
+
+The factor ``\\mathbf{U}`` satisfies ``\\mathbf{U}^{\\top} \\mathbf{U} = \\hat{\\mathbf{\\Sigma}}``, which is the convention a prior result's `chol` carries and the one the variance constraint layer reads. **`chol` takes precedence over `sigma`**, which is the rule the `chol` field states, so a prior that carries a factor is whitened by that factor and never by a factorisation of `sigma`. `chol` is optional, so the common case is a `sigma` this verb factorises itself.
+
+`chol` is checked against the length of `mu` alone, so it can be ``K \\times N`` rather than square. A rectangular factor has no inverse. A tall factor states a covariance matrix all the same, because ``\\mathbf{U}^{\\top} \\mathbf{U}`` is ``N \\times N`` at any ``K``, and the ``\\mathbf{R}`` factor of its QR factorisation is the square factor of that same matrix. A wide factor states a singular covariance matrix, and no whitening exists for it.
+
+[`RadialTailDecay`](@ref) is the caller. The verb is separate because the precedence rule and its two refusals are a statement about a prior result rather than about a tail index.
+
+# Algorithm
+
+ 1. Read `pr.chol` into `F`.
+ 2. When `F` is `nothing`, factorise `pr.sigma` with a Cholesky factorisation that reports rather than raises, and return its upper factor.
+ 3. Otherwise refuse a wide `F`, and take `F` itself when it is square and the `R` factor of its QR factorisation when it is tall.
+ 4. Refuse a zero on the diagonal of that factor, which is the rank of a triangular factor, and return the factor.
+
+# Arguments
+
+  - `pr`: Prior result the covariance matrix is read off.
+
+# Validation
+
+  - `pr.sigma` must be positive definite, when `pr.chol` is `nothing`.
+  - `pr.chol` must have at least as many rows as columns.
+  - The diagonal of the square factor must carry no zero.
+
+# Returns
+
+  - `U::AbstractMatrix`: Square factor of the covariance matrix, upper triangular whenever the prior's own factor is.
+
+# Related
+
+  - [`RadialTailDecay`](@ref)
+  - [`radial_tail_index`](@ref)
+"""
+function whitening_factor(pr::AbstractPriorResult)
+    F = pr.chol
+    if isnothing(F)
+        f = LinearAlgebra.cholesky(pr.sigma; check = false)
+        @argcheck(LinearAlgebra.issuccess(f),
+                  DomainError(f.info,
+                              "The Cholesky factorisation of `pr.sigma` failed at pivot $(f.info), so the covariance matrix the prior states is not positive definite and no whitening of the sample exists. A shrunk or a factor-model covariance matrix reaches this. Fit a prior whose covariance matrix is positive definite, or state the factor in `pr.chol`."))
+        return f.U
+    end
+    @argcheck(size(F, 1) >= size(F, 2),
+              DimensionMismatch("`pr.chol` is $(size(F, 1)) × $(size(F, 2)), so the covariance matrix `pr.chol' * pr.chol` it states has rank at most $(size(F, 1)) over $(size(F, 2)) assets and is singular. No whitening of the sample exists. `pr.chol` takes precedence over `pr.sigma` at every consumer, so dropping to `pr.sigma` here would state something the prior does not."))
+    U = size(F, 1) == size(F, 2) ? F : LinearAlgebra.UpperTriangular(LinearAlgebra.qr(F).R)
+    j = findfirst(iszero, LinearAlgebra.diag(U))
+    @argcheck(isnothing(j),
+              DomainError(j,
+                          "Entry $j of the diagonal of the square factor of `pr.chol` is zero, so the covariance matrix it states is singular and no whitening of the sample exists. The diagonal is the rank of a triangular factor, which is what `pr.chol` carries."))
+    return U
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Estimate the tail index of the radial series of `X`, over the largest `k` order statistics of that series.
+
+Every row is centred on `mu` and whitened by `U`, and the norm of the whitened row is one entry of the radial series. Hill's estimator then reads the `k` entries that lie furthest out. [`RadialTailDecay`](@ref) states the reading the series carries. This verb is the estimate alone.
+
+The element type is bound by the signature, so the series and the sum it feeds are concrete. A rule reads `pr.X` off an [`AbstractPriorResult`](@ref), whose field types no signature states, and this is the boundary that type crosses at.
+
+# Algorithm
+
+ 1. Solve `transpose(U) \\ transpose(X .- transpose(mu))`, giving the whitened observations as the columns of `Z`.
+ 2. Walk the columns of `Z`, and write the negated Euclidean norm of each into the series `d`.
+ 3. Partially sort `d` about its `k + 1`-th smallest value, giving `vkp1`. The negation of step 2 puts the largest distances at the front, so the `k` entries before `vkp1` are the ones the estimate reads.
+ 4. Return `k` over the sum of `log(d[i] / vkp1)` across those `k` entries. Both terms of each ratio are negative, so the ratio is one of magnitudes and the sum is Hill's with no further sign.
+
+# Arguments
+
+  - `X`: Returns matrix, `T × N`.
+  - `mu`: Expected returns vector, `N × 1`. The rows are centred on it.
+  - `U`: Square factor of the covariance matrix, which [`whitening_factor`](@ref) returns.
+  - `k`: Number of order statistics the estimate reads. The caller states it, and the caller keeps the floor under it.
+
+# Validation
+
+  - The `k + 1`-th largest radial distance must be positive.
+
+# Returns
+
+  - `a::Number`: The Hill estimate of the tail index of the radial series.
+
+# Related
+
+  - [`RadialTailDecay`](@ref)
+  - [`whitening_factor`](@ref)
+"""
+function radial_tail_index(X::AbstractMatrix{E}, mu::AbstractVector, U::AbstractMatrix,
+                           k::Integer) where {E <: Number}
+    Z = transpose(U) \ transpose(X .- transpose(mu))
+    d = Vector{float(E)}(undef, size(X, 1))
+    for t in axes(X, 1)
+        # The series is negated so that the end of it the estimate reads is the LOWER tail,
+        # which lets the selection below run without `rev = true`. `hill_tail_index` signs
+        # its pool for the same reason, so the two verbs read their series the same way.
+        d[t] = -LinearAlgebra.norm(view(Z, :, t))
+    end
+    vkp1 = partialsort!(d, k + 1)
+    dkp1 = -vkp1
+    @argcheck(dkp1 > 0,
+              DomainError(dkp1,
+                          "The $(k + 1)-th largest radial distance is $dkp1, which is not positive, so there is no Hill estimate: the estimator reads `log(d_i / d_(k+1))`, which needs a positive ratio. The sample holds fewer than $(k + 1) observations away from `pr.mu`. Lower the count `k`."))
+    return k / sum(i -> log(d[i] / vkp1), 1:k)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Computes the Kaniadakis deformation parameter whose tail decays at the rate the sample's radial series decays at.
+
+The inverse of [`kappa_log`](@ref) is the ``\\kappa``-exponential ``\\exp_{\\kappa}(x) = \\left(\\kappa x + \\sqrt{1 + \\kappa^{2} x^{2}}\\right)^{1/\\kappa}``, which goes to ``(2 \\kappa x)^{1/\\kappa}`` for large ``x``. A ``\\kappa``-deformed exponential tail is therefore a power law of index ``1/\\kappa``, and ``\\kappa`` is a reciprocal tail index. So the rule estimates a tail index ``\\hat{a}`` and returns ``1/\\hat{a}``, which makes the deformation decay at the rate the sample decays at. The band the slot admits, ``(0,\\, 1)``, reads as ``\\hat{a} > 1``, and that is the condition for a finite mean. The refusal is built into the reading, on the same terms as the band of [`EntropyBudget`](@ref).
+
+**The series the rule reads is radial.** A covariance matrix is a scale and ``\\kappa`` is a shape, so a rule that turns the one into the other needs a second quantity to fix the units, and the sample is the only one a prior result carries. The covariance matrix is what turns the ``T \\times N`` sample into **one** univariate series: [`whitening_factor`](@ref) gives the factor of ``\\hat{\\mathbf{\\Sigma}}``, each row is centred and whitened, and the Euclidean norm of the whitened row is that observation's Mahalanobis distance. Under an elliptical scale mixture that series carries the mixture's tail index, and the whole cross-section stands behind every entry of it. A per-column standardisation drops every off-diagonal term, so [`HillTailDecay`](@ref) cannot buy that reading and this rule cannot buy the per-column one.
+
+**The rule is direction-blind, and that is a statement.** A distance has no sign, so one ``\\kappa`` answers both ends of a Range measure and `key` is ignored. [`HillTailDecay`](@ref) answers per end, and the difference is the whole of what the two rules say: a radial reading asks how far the cross-section moves, and a per-column reading asks how far one end of one column moves. [`mirror_role`](@ref) is therefore trivially correct for this rule, because a head role holding it returns the number a tail role holding it returns.
+
+The series holds `T` entries where the pool of [`HillTailDecay`](@ref) holds `T N`, so this rule reads **fewer** tail points from the same sample: `alpha = 0.05` at `T = 250` leaves 12 of them. `kmin` is the floor under that count, and it is stated in the same units as its sibling's, so the floor binds harder here. A count below it is refused rather than estimated. The points the series does hold are one per observation rather than `N` per observation, so they carry none of the cross-correlation the pool carries.
+
+The rule reads the returns of `pr.X`, so it is exact for [`RelativisticValueatRisk`](@ref) and [`RelativisticValueatRiskRange`](@ref), and approximate for [`RelativisticDrawdownatRisk`](@ref) and [`RelativeRelativisticDrawdownatRisk`](@ref). Those two carry the key `:kappa` as well, so `key` does not say whether the owner prices returns or drawdowns, and a rule is given no portfolio and cannot form the drawdown series. A drawdown tail is heavier than the returns tail it is built from, so the parameter this rule returns to a drawdown measure is a reading of the returns.
+
+A third reading of ``\\kappa`` exists and this rule does not take it. The excess kurtosis ``g`` of a Student-t gives ``\\nu = 4 + 6/g``, and ``\\kappa = 1/\\nu`` follows. It reads the whole sample rather than the tail, so it is steady where a Hill estimate is noisy, and it pays for that with an assumption about the shape of the whole distribution rather than of its tail.
+
+The rule carries no range check on the parameter it returns. The slot owner's constructor keeps that job, as it does for every calibration rule. Its checks are statements that the estimate exists at all. A near-singular covariance matrix is not among them: the whitening then reads the sample's smallest eigen-direction, the radial series follows it, and that is the covariance matrix speaking rather than a defect.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    RadialTailDecay(;
+        kmin::Integer = 30,
+        alpha::Option{<:Number} = nothing
+    ) -> RadialTailDecay
+
+Keywords correspond to the struct's fields. `kmin` defaults to `30`, which is the floor under the count of order statistics the estimate reads. `alpha` defaults to `nothing`, which is the state a rule stands in a slot in.
+
+## Validation
+
+  - `kmin > 0`.
+
+# Related
+
+  - [`AbstractDeformationCalibrationAlgorithm`](@ref)
+  - [`bind_alpha`](@ref)
+  - [`DeformationTailCalibration`](@ref)
+  - [`DeformationHeadCalibration`](@ref)
+  - [`EntropyBudget`](@ref)
+  - [`HillTailDecay`](@ref)
+  - [`kappa_log`](@ref)
+  - [`radial_tail_index`](@ref)
+  - [`whitening_factor`](@ref)
+"""
+@concrete struct RadialTailDecay <: AbstractDeformationCalibrationAlgorithm
+    """
+    $(field_dict[:cal_kmin_rad])
+    """
+    kmin
+    """
+    $(field_dict[:cal_alpha_sib])
+    """
+    alpha
+    function RadialTailDecay(kmin::Integer, alpha::Option{<:Number})
+        assert_gt0(kmin, :kmin)
+        return new{typeof(kmin), typeof(alpha)}(kmin, alpha)
+    end
+end
+function RadialTailDecay(; kmin::Integer = 30, alpha::Option{<:Number} = nothing)
+    return RadialTailDecay(kmin, alpha)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Compute the deformation parameter whose reciprocal is the Hill tail index of the radial series of the sample that `pr` carries.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\hat{\\mathbf{\\Sigma}} &= \\mathbf{U}^{\\top} \\mathbf{U}\\,,\\\\
+\\boldsymbol{z}_{t} &= \\mathbf{U}^{-\\top} \\left(\\boldsymbol{x}_{t} - \\hat{\\boldsymbol{\\mu}}\\right)\\,,\\\\
+d_{t} &= \\left\\lVert \\boldsymbol{z}_{t} \\right\\rVert_{2}\\,,\\\\
+k &= \\left\\lceil \\alpha T \\right\\rceil\\,,\\\\
+\\hat{a} &= \\dfrac{k}{\\sum\\limits_{i=1}^{k} \\ln\\left(\\dfrac{d_{(i)}}{d_{(k+1)}}\\right)}\\,,\\\\
+\\kappa &= \\dfrac{1}{\\hat{a}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:kappa_rm])
+  - $(math_dict[:alpha_rm]) It is the probability of the end the slot prices, and the count it fixes is the same for both ends because the series has no sign.
+  - $(math_dict[:T])
+  - $(math_dict[:x_t_obs])
+  - $(math_dict[:mu_hat_shrink])
+  - $(math_dict[:Sigma_hat])
+  - ``\\mathbf{U}``: Square factor of ``\\hat{\\mathbf{\\Sigma}}``, which is `pr.chol` when the prior carries one.
+  - ``\\boldsymbol{z}_{t}``: Whitened observation ``t``.
+  - ``d_{t}``: Mahalanobis distance of observation ``t``, the ``t``-th entry of the radial series.
+  - ``d_{(i)}``: ``i``-th largest entry of the radial series, so that ``d_{(1)} \\geq \\ldots \\geq d_{(k+1)}``.
+  - ``k``: Number of order statistics the estimate reads.
+  - ``\\hat{a}``: Hill estimate of the tail index of the radial series.
+
+# Algorithm
+
+ 1. Read the returns matrix off `pr` into `X`, and its row count into `T`.
+ 2. Form the count `k = ceil(Int, alg.alpha * T)`, the number of order statistics the estimate reads.
+ 3. Take the square factor of the covariance matrix with [`whitening_factor`](@ref).
+ 4. Estimate the tail index of the radial series with [`radial_tail_index`](@ref), giving `a`.
+ 5. Return `inv(a)`, which is the deformation parameter.
+
+# Arguments
+
+  - `alg`: The rule. Its `alpha` field must hold a number, which [`bind_alpha`](@ref) puts there.
+  - `key`: Name of the slot that is being resolved. The radial series has no sign, so this rule reads no end from it and returns one number for every key.
+  - `pr`: Prior result the returns matrix, the expected returns vector and the covariance matrix are read off.
+  - `w`: Effective observation weights. A tail index is a statement about the shape of a series rather than about the count of observations behind it, so this rule ignores them.
+  - `slv`: Effective solver. This rule needs none, because the estimate is a closed form.
+
+# Validation
+
+  - `alg.alpha` must not be `nothing`.
+  - `k` must be at least `alg.kmin`.
+  - The series must hold at least `k + 1` entries.
+  - The covariance matrix must state a whitening, which [`whitening_factor`](@ref) checks.
+  - ``d_{(k+1)}`` must be positive, which [`radial_tail_index`](@ref) checks.
+  - ``\\hat{a}`` must be greater than one, which is the band ``\\kappa \\in (0,\\, 1)`` read as a tail index.
+
+# Returns
+
+  - `kappa::Number`: The deformation parameter.
+
+# Related
+
+  - [`RadialTailDecay`](@ref)
+  - [`bind_alpha`](@ref)
+  - [`EntropyBudget`](@ref)
+  - [`HillTailDecay`](@ref)
+  - [`kappa_log`](@ref)
+  - [`radial_tail_index`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+  - [`whitening_factor`](@ref)
+"""
+function (alg::RadialTailDecay)(::Symbol, pr::AbstractPriorResult, ::Any, ::Any)
+    @argcheck(!isnothing(alg.alpha),
+              IsNothingError("`RadialTailDecay.alpha` is `nothing`, so the rule cannot form the count `k = ceil(alpha * T)`. The probability of the end travels to the rule through `bind_alpha`, which the slot owner calls after it resolves that end's own probability. State `alpha` on the rule itself to run it outside a measure."))
+    X = pr.X
+    T = size(X, 1)
+    k = ceil(Int, alg.alpha * T)
+    @argcheck(k >= alg.kmin,
+              DomainError(k,
+                          "`RadialTailDecay` reads the largest `k = ceil(alpha * T) = $k` of the $T radial distances, and `RadialTailDecay.kmin` puts the floor at $(alg.kmin). A Hill estimate over fewer order statistics moves from fold to fold for no reason in the data, and the deformation parameter moves with it. The radial series holds one entry per observation where the pool of `HillTailDecay` holds `N`, so the same floor binds harder here. Lengthen the sample, widen `alpha`, or lower `kmin` and take the noise."))
+    @argcheck(k + 1 <= T,
+              DomainError(k,
+                          "`RadialTailDecay` needs $(k + 1) radial distances to form the estimate, and the series holds one per observation, which is $T. The count is `k = ceil(alpha * T)` at `alpha = $(alg.alpha)`, so only a probability that takes the whole sample reaches this. Lower `alpha`."))
+    a = radial_tail_index(X, pr.mu, whitening_factor(pr), k)
+    @argcheck(a > 1,
+              DomainError(a,
+                          "`RadialTailDecay` estimated a tail index of $a on the radial series, so `kappa = 1 / a` is $(inv(a)) and lies outside the (0, 1) the slot admits. An index of one or less is a tail with no finite mean, so no admissible deformation parameter reads it. The sample is heavier-tailed than the measure can price."))
+    return inv(a)
+end
+"""
     bind_alpha(slot, alpha::Number)
 
 Hand a resolved `alpha` to the rule that reads it, and return the slot's occupant with the number in place.
 
-Two pairs **travel** through this verb. `alpha` and `kappa`: [`EntropyBudget`](@ref) and [`HillTailDecay`](@ref) each read the significance level of a sibling slot. `alpha` and `l`: [`TailTermParity`](@ref) prices a tail term at the measure's own significance level. [`resolve_calibration_slot`](@ref) carries a `Symbol` and no number, so the number travels through the rule itself. The slot owner's own resolution method resolves `alpha` first, calls this verb on the slot that reads it, and resolves the result:
+Two pairs **travel** through this verb. `alpha` and `kappa`: [`EntropyBudget`](@ref), [`HillTailDecay`](@ref) and [`RadialTailDecay`](@ref) each read the significance level of a sibling slot. `alpha` and `l`: [`TailTermParity`](@ref) prices a tail term at the measure's own significance level. [`resolve_calibration_slot`](@ref) carries a `Symbol` and no number, so the number travels through the rule itself. The slot owner's own resolution method resolves `alpha` first, calls this verb on the slot that reads it, and resolves the result:
 
 ```julia
 alpha = resolve_calibration_slot(x.alpha, :alpha, pr, w, slv)
@@ -3080,6 +3347,7 @@ The default is the identity, so a stated number, a plain function and a rule tha
 
   - [`EntropyBudget`](@ref)
   - [`HillTailDecay`](@ref)
+  - [`RadialTailDecay`](@ref)
   - [`TailTermParity`](@ref)
   - [`DeformationTailCalibration`](@ref)
   - [`DeformationHeadCalibration`](@ref)
@@ -3100,6 +3368,9 @@ function bind_alpha(alg::EntropyBudget, alpha::Number)
 end
 function bind_alpha(alg::HillTailDecay, alpha::Number)
     return HillTailDecay(; kmin = alg.kmin, alpha = alpha)
+end
+function bind_alpha(alg::RadialTailDecay, alpha::Number)
+    return RadialTailDecay(; kmin = alg.kmin, alpha = alpha)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -4517,7 +4788,7 @@ export Frontier, RiskMeasureSettings, HierarchicalRiskMeasureSettings, SumScalar
        expected_risk_from_returns, RiskMeasure, HierarchicalRiskMeasure, SquareRootBound,
        LinearBound, SquaredBound, SignificanceTailCalibration, SignificanceHeadCalibration,
        DeformationTailCalibration, DeformationHeadCalibration, ScenarioCount,
-       RateSignificance, EntropyBudget, HillTailDecay, AmbiguityRadiusCalibration,
-       AmbiguityTailWeightCalibration, ConcentrationRadius, RateRadius,
-       DimensionalRateRadius, DualNormRadius, TailTermParity, NormCeilingCalibration,
-       EffectiveAssetFloor
+       RateSignificance, EntropyBudget, HillTailDecay, RadialTailDecay,
+       AmbiguityRadiusCalibration, AmbiguityTailWeightCalibration, ConcentrationRadius,
+       RateRadius, DimensionalRateRadius, DualNormRadius, TailTermParity,
+       NormCeilingCalibration, EffectiveAssetFloor

@@ -1,23 +1,25 @@
 #=
-Four **Calibration Rules** stand in the `alg` field of a role type, and each one computes the
+Five **Calibration Rules** stand in the `alg` field of a role type, and each one computes the
 quantity of the slot its role addresses. `test_09f_calibration_slot.jl` covers the mechanism
 that carries them; this file covers the rules themselves.
 
-`ScenarioCount` and `RateSignificance` compute a significance level, and `EntropyBudget` and
-`HillTailDecay` compute a Kaniadakis deformation parameter. The first reads the effective
-observation weights, the second reads the raw row count, and the last two read the
-probability of their own slot's end through `bind_alpha`.
+`ScenarioCount` and `RateSignificance` compute a significance level, and `EntropyBudget`,
+`HillTailDecay` and `RadialTailDecay` compute a Kaniadakis deformation parameter. The first
+reads the effective observation weights, the second reads the raw row count, and the last
+three read the probability of their own slot's end through `bind_alpha`.
 
 No rule carries a range check of its own. Each returns the quantity of the slot it stands in,
 so the slot owner's constructor is the whole validation and a value outside the slot's range
-is refused there, at fold time. The two deformation rules carry the only checks any of them
+is refused there, at fold time. The three deformation rules carry the only checks any of them
 carry, and each is a different claim: that the quantity exists at all. A target the band does
 not reach leaves `EntropyBudget`'s sweep at an end of the interval, where the parameter is
 far too small or too large to be the answer and yet still inside the range the slot owner
-admits. A pool with no Hill estimate leaves `HillTailDecay` with nothing to invert.
+admits. A pool with no Hill estimate leaves `HillTailDecay` with nothing to invert, and a
+covariance matrix that states no whitening leaves `RadialTailDecay` with no series to read.
 
-Issue #582 ships the first three rules, and #611 ships `HillTailDecay`. Issue #583 widens the
-slots that hold them, so every call below states the resolution by hand.
+Issue #582 ships the first three rules, #611 ships `HillTailDecay` and #612 ships
+`RadialTailDecay`. Issue #583 widens the slots that hold them, so every call below states the
+resolution by hand.
 =#
 const PO = PortfolioOptimisers
 using Distributions
@@ -29,14 +31,16 @@ const PR60 = prior(EmpiricalPrior(), X60)
 const PR70 = prior(EmpiricalPrior(), randn(RNG, 70, 4))
 const PR120 = prior(EmpiricalPrior(), randn(RNG, 120, 4))
 
-@testset "Calibration rules: the four rules join the two families" begin
+@testset "Calibration rules: the five rules join the two families" begin
     # Each rule subtypes the family whose quantity it computes, and no rule subtypes both.
     @test ScenarioCount <: PO.AbstractSignificanceCalibrationAlgorithm
     @test RateSignificance <: PO.AbstractSignificanceCalibrationAlgorithm
     @test EntropyBudget <: PO.AbstractDeformationCalibrationAlgorithm
     @test HillTailDecay <: PO.AbstractDeformationCalibrationAlgorithm
+    @test RadialTailDecay <: PO.AbstractDeformationCalibrationAlgorithm
     @test !(EntropyBudget <: PO.AbstractSignificanceCalibrationAlgorithm)
     @test !(HillTailDecay <: PO.AbstractSignificanceCalibrationAlgorithm)
+    @test !(RadialTailDecay <: PO.AbstractSignificanceCalibrationAlgorithm)
     @test !(ScenarioCount <: PO.AbstractDeformationCalibrationAlgorithm)
 
     # The family is what the `alg` bound checks, so each rule is admitted by one bound only.
@@ -44,9 +48,11 @@ const PR120 = prior(EmpiricalPrior(), randn(RNG, 120, 4))
     @test isa(RateSignificance(), PO.Func_SigCal)
     @test isa(EntropyBudget(; target = -1.3), PO.Func_DefCal)
     @test isa(HillTailDecay(), PO.Func_DefCal)
+    @test isa(RadialTailDecay(), PO.Func_DefCal)
     @test !isa(ScenarioCount(; n = 25), PO.Func_DefCal)
     @test !isa(EntropyBudget(; target = -1.3), PO.Func_SigCal)
     @test !isa(HillTailDecay(), PO.Func_SigCal)
+    @test !isa(RadialTailDecay(), PO.Func_SigCal)
 
     # A rule goes inside a role, and both roles of its family take it.
     @test SignificanceTailCalibration(; alg = ScenarioCount(; n = 25)).alg ==
@@ -58,18 +64,22 @@ const PR120 = prior(EmpiricalPrior(), randn(RNG, 120, 4))
               EntropyBudget)
     @test isa(DeformationTailCalibration(; alg = HillTailDecay()).alg, HillTailDecay)
     @test isa(DeformationHeadCalibration(; alg = HillTailDecay()).alg, HillTailDecay)
+    @test isa(DeformationTailCalibration(; alg = RadialTailDecay()).alg, RadialTailDecay)
+    @test isa(DeformationHeadCalibration(; alg = RadialTailDecay()).alg, RadialTailDecay)
 
     # The wrong family is refused at construction, by the role's own bound.
     @test_throws TypeError SignificanceTailCalibration(; alg = EntropyBudget(; target = -1))
     @test_throws TypeError DeformationTailCalibration(; alg = ScenarioCount(; n = 25))
     @test_throws TypeError SignificanceHeadCalibration(; alg = HillTailDecay())
+    @test_throws TypeError SignificanceTailCalibration(; alg = RadialTailDecay())
 
-    # The three rules are caller-facing, because a caller states one directly.
+    # The five rules are caller-facing, because a caller states one directly.
     exported = names(PortfolioOptimisers)
     @test :ScenarioCount in exported
     @test :RateSignificance in exported
     @test :EntropyBudget in exported
     @test :HillTailDecay in exported
+    @test :RadialTailDecay in exported
 
     # The positional inner constructor is the route a rebuild takes.
     @test ScenarioCount(25).n == 25
@@ -77,11 +87,14 @@ const PR120 = prior(EmpiricalPrior(), randn(RNG, 120, 4))
     @test EntropyBudget(-1.3, 0.05).alpha == 0.05
     @test HillTailDecay(12, 0.05).kmin == 12
     @test HillTailDecay(12, 0.05).alpha == 0.05
+    @test RadialTailDecay(12, 0.05).kmin == 12
+    @test RadialTailDecay(12, 0.05).alpha == 0.05
 
     # `kmin` is a count of order statistics, so a rule that states none is refused at
     # construction. It is a check on the rule's OWN parameter, and not on the parameter the
     # rule returns.
     @test_throws DomainError HillTailDecay(; kmin = 0)
+    @test_throws DomainError RadialTailDecay(; kmin = 0)
 end
 
 @testset "Calibration rules: `ScenarioCount` fixes the count, not the probability" begin
@@ -507,4 +520,329 @@ const PRHEAVY = prior(EmpiricalPrior(),
     end
     @test occursin("tail index of 0.6", msg)
     @test occursin("(0, 1)", msg)
+end
+
+#=
+`RadialTailDecay` is the rule of issue #612, and it is the sibling of `HillTailDecay`. It
+reads the same quantity, the reciprocal of a tail index, off a different series. Every row of
+`pr.X` is centred on `pr.mu` and whitened by the factor of `pr.sigma`, and the norm of the
+whitened row is that observation's Mahalanobis distance. The `T` distances are ONE series,
+and under an elliptical scale mixture that series carries the mixture's tail index. So a
+multivariate Student-t draw of ν degrees of freedom is a sample whose answer is known before
+the rule runs, on the same terms as the univariate draws above.
+
+The series has no sign, so the rule answers ONE number for both ends of a Range measure where
+its sibling answers two. It also holds `T` entries where the pool of the sibling holds `T N`,
+so the same `alpha` leaves far fewer order statistics and the draws below are long.
+=#
+function mvt_prior(seed, nu, T, N)
+    rng = StableRNG(seed)
+    A = randn(rng, N, N)
+    S = A * A' / N + 0.5I
+    d = Distributions.MvTDist(float(nu), zeros(N), Matrix(S))
+    return prior(EmpiricalPrior(), permutedims(rand(rng, d, T)))
+end
+const PRMVT3 = mvt_prior(1003, 3, 4000, 8)
+const PRMVT4 = mvt_prior(1004, 4, 4000, 8)
+const PRMVT4S = mvt_prior(1004, 4, 2000, 8)
+const PRMVT6 = mvt_prior(1006, 6, 4000, 8)
+
+@testset "Calibration rules: `RadialTailDecay` returns the reciprocal tail index" begin
+    rule = RadialTailDecay(; alpha = 0.05)
+
+    # The answer is `1 / ν`, and the band holds the Hill bias. It is the band the sibling's
+    # own draws are read in, and both rules estimate the same quantity.
+    k3 = rule(:kappa, PRMVT3, nothing, nothing)
+    k4 = rule(:kappa, PRMVT4, nothing, nothing)
+    k6 = rule(:kappa, PRMVT6, nothing, nothing)
+    for (kap, nu) in ((k3, 3), (k4, 4), (k6, 6))
+        @test 0 < kap < 1
+        @test 0.75 / nu <= kap <= 1.6 / nu
+    end
+
+    # The ORDER carries no bias: a heavier tail returns a larger κ, and the three draws
+    # separate. This is the reading the rule claims, stated without a tolerance.
+    @test k3 > k4 > k6
+
+    # The same tail index at a second sample length. `T` moves the series and the count with
+    # it, and both readings hold the band.
+    k4s = rule(:kappa, PRMVT4S, nothing, nothing)
+    @test 0.75 / 4 <= k4s <= 1.6 / 4
+    @test k4s != k4
+
+    # The rule IS the Hill estimate of the Mahalanobis distances, so the number comes back
+    # from `X`, `mu` and `sigma` by hand. This is the whole of what the rule computes.
+    U = cholesky(PRMVT4.sigma).U
+    d = [norm(transpose(U) \ (PRMVT4.X[t, :] .- PRMVT4.mu)) for t in axes(PRMVT4.X, 1)]
+    k = ceil(Int, 0.05 * length(d))
+    u = sort(d; rev = true)
+    ahat = k / sum(log(u[i] / u[k + 1]) for i in 1:k)
+    @test k4 ≈ inv(ahat)
+    @test k == 200
+
+    # A tail index is a statement about the shape of a series rather than about the count of
+    # observations behind it, so the rule ignores the observation weights.
+    @test rule(:kappa, PRMVT4, pweights([fill(3.0, 2000); fill(1.0, 2000)]), nothing) == k4
+
+    # The solver reaches the rule and this one needs none: the estimate is a closed form.
+    @test rule(:kappa, PRMVT4, nothing, Solver(; name = :probe, solver = nothing)) == k4
+
+    # `alpha` sets the DEPTH as well as the count, on the same terms as the sibling.
+    @test RadialTailDecay(; alpha = 0.01)(:kappa, PRMVT4, nothing, nothing) != k4
+end
+
+@testset "Calibration rules: `RadialTailDecay` reads the covariance matrix" begin
+    rule = RadialTailDecay(; kmin = 5, alpha = 0.05)
+
+    # The line that separates this rule from `HillTailDecay`: the shape of the covariance
+    # matrix reaches the answer. The sibling standardises each column on its own, so a
+    # covariance matrix with the same diagonal and no off-diagonal term leaves it unmoved.
+    diagonal = LowOrderPrior(; X = PRMVT4.X, mu = PRMVT4.mu,
+                             sigma = Matrix(Diagonal(diag(PRMVT4.sigma))))
+    @test rule(:kappa, diagonal, nothing, nothing) != rule(:kappa, PRMVT4, nothing, nothing)
+    @test HillTailDecay(; kmin = 5, alpha = 0.05)(:kappa, diagonal, nothing, nothing) ==
+          HillTailDecay(; kmin = 5, alpha = 0.05)(:kappa, PRMVT4, nothing, nothing)
+
+    # `chol` and `sigma` state the same factorisation, so they give the same number.
+    both = LowOrderPrior(; X = PRMVT4.X, mu = PRMVT4.mu, sigma = PRMVT4.sigma,
+                         chol = cholesky(PRMVT4.sigma).U)
+    @test rule(:kappa, both, nothing, nothing) == rule(:kappa, PRMVT4, nothing, nothing)
+
+    # **`chol` takes precedence over `sigma`**, which is the rule the `chol` field states. A
+    # carrier whose two fields disagree is read by its `chol`, and the identity `sigma` it
+    # also carries reaches nothing.
+    A = randn(StableRNG(99), 8, 8)
+    other = A * A' + 8I
+    precedence = LowOrderPrior(; X = PRMVT4.X, mu = PRMVT4.mu, sigma = Matrix(1.0I, 8, 8),
+                               chol = cholesky(other).U)
+    stated = LowOrderPrior(; X = PRMVT4.X, mu = PRMVT4.mu, sigma = other)
+    identity_sigma = LowOrderPrior(; X = PRMVT4.X, mu = PRMVT4.mu,
+                                   sigma = Matrix(1.0I, 8, 8))
+    @test rule(:kappa, precedence, nothing, nothing) ==
+          rule(:kappa, stated, nothing, nothing)
+    @test rule(:kappa, precedence, nothing, nothing) !=
+          rule(:kappa, identity_sigma, nothing, nothing)
+
+    # A TALL `chol` states a covariance matrix all the same, and the `R` factor of its QR
+    # factorisation is the square factor of that same matrix. `chol` is checked against the
+    # length of `mu` alone, so a carrier can hold one.
+    F = randn(StableRNG(4242), 20, 8)
+    tall = LowOrderPrior(; X = PRMVT4.X, mu = PRMVT4.mu, sigma = F' * F, chol = F)
+    square = LowOrderPrior(; X = PRMVT4.X, mu = PRMVT4.mu, sigma = F' * F)
+    @test rule(:kappa, tall, nothing, nothing) ≈ rule(:kappa, square, nothing, nothing)
+
+    # The verb that picks the factor is separate, and it returns the prior's own factor
+    # untouched when there is one.
+    @test PO.whitening_factor(both) === both.chol
+    @test PO.whitening_factor(PRMVT4) == cholesky(PRMVT4.sigma).U
+    @test size(PO.whitening_factor(tall)) == (8, 8)
+end
+
+@testset "Calibration rules: `RadialTailDecay` answers one number for both ends" begin
+    rule = RadialTailDecay(; kmin = 5, alpha = 0.01)
+
+    # A distance has no sign, so every key gives the same number. The sibling gives two on
+    # the same sample, which is the whole difference between what the two rules say.
+    ka = rule(:kappa_a, PRSKEW, nothing, nothing)
+    @test rule(:kappa, PRSKEW, nothing, nothing) == ka
+    @test rule(:kappa_b, PRSKEW, nothing, nothing) == ka
+    @test rule(:anything_at_all, PRSKEW, nothing, nothing) == ka
+    hill = HillTailDecay(; kmin = 5, alpha = 0.01)
+    @test hill(:kappa_a, PRSKEW, nothing, nothing) !=
+          hill(:kappa_b, PRSKEW, nothing, nothing)
+
+    # `mirror_role` is therefore trivially correct for this rule: the head role it builds
+    # holds the same rule, and the same rule answers the head key with the tail's number.
+    tail = DeformationTailCalibration(; alg = rule)
+    head = PO.mirror_role(tail)
+    @test isa(head, DeformationHeadCalibration)
+    @test head.alg === rule
+    @test PO.resolve_calibration_slot(head, :kappa_b, PRSKEW, nothing) ==
+          PO.resolve_calibration_slot(tail, :kappa_a, PRSKEW, nothing)
+
+    # Through a Range measure the two ends read their OWN probabilities, so the two numbers
+    # part when the two probabilities differ. The count `k` moves, not the end.
+    rg = RelativisticValueatRiskRange(; alpha = 0.01,
+                                      kappa_a = DeformationTailCalibration(;
+                                                                           alg = RadialTailDecay(;
+                                                                                                 kmin = 5)),
+                                      beta = 0.02,
+                                      kappa_b = DeformationHeadCalibration(;
+                                                                           alg = RadialTailDecay(;
+                                                                                                 kmin = 5)))
+    og = PO.resolve_deferred_quantities(rg, PRSKEW)
+    @test og.kappa_a == ka
+    @test og.kappa_b ==
+          RadialTailDecay(; kmin = 5, alpha = 0.02)(:kappa_b, PRSKEW, nothing, nothing)
+    @test og.kappa_a != og.kappa_b
+    @test 0 < og.kappa_a < 1
+    @test 0 < og.kappa_b < 1
+
+    # The two ends of one probability DO agree, which is the statement the rule makes.
+    eq = RelativisticValueatRiskRange(; alpha = 0.01,
+                                      kappa_a = DeformationTailCalibration(;
+                                                                           alg = RadialTailDecay(;
+                                                                                                 kmin = 5)),
+                                      beta = 0.01,
+                                      kappa_b = DeformationHeadCalibration(;
+                                                                           alg = RadialTailDecay(;
+                                                                                                 kmin = 5)))
+    oeq = PO.resolve_deferred_quantities(eq, PRSKEW)
+    @test oeq.kappa_a == oeq.kappa_b
+
+    # `bind_alpha` reaches the rule through both roles of the family, and through the rule
+    # itself.
+    @test PO.bind_alpha(RadialTailDecay(; kmin = 7), 0.03) ==
+          RadialTailDecay(; kmin = 7, alpha = 0.03)
+    @test PO.bind_alpha(DeformationTailCalibration(; alg = RadialTailDecay(; kmin = 7)),
+                        0.03).alg.alpha == 0.03
+    @test PO.bind_alpha(DeformationHeadCalibration(; alg = RadialTailDecay(; kmin = 7)),
+                        0.03).alg.kmin == 7
+end
+
+#=
+The refusals of `RadialTailDecay`. Three of them are the sibling's, stated in the units of a
+radial series. Three more belong to the covariance matrix, and each names the field it read:
+`pr.sigma` when the prior carries no factor, and `pr.chol` when it does. A refusal that names
+the field is the answer here, and a numerical guard on a near-singular covariance matrix is
+not: the whitening then follows the sample's smallest eigen-direction, which is the
+covariance matrix speaking rather than a defect.
+=#
+# 104 rows that sit exactly at the mean, and 96 rows of ±1 square waves of four periods.
+# Every column holds 48 of each sign, so `mu` is exactly zero and 104 of the 200 radial
+# distances are exactly zero. The four periods divide 96, so the sign block is orthogonal and
+# the covariance matrix is a positive multiple of the identity.
+const XZERO = let S = [iseven((t - 1) >> (j - 1)) ? 1.0 : -1.0 for t in 1:96, j in 1:4]
+    [zeros(104, 4); S]
+end
+const PRZERO = prior(EmpiricalPrior(), XZERO)
+# A radial series with a tail index at or below one, which is a tail with no finite mean.
+const PRMVHEAVY = let rng = StableRNG(13579)
+    d = Distributions.MvTDist(0.7, zeros(4), Matrix(1.0I, 4, 4))
+    prior(EmpiricalPrior(), permutedims(rand(rng, d, 600)))
+end
+# A carrier whose covariance matrix is singular, whose factor is wide, and whose factor
+# carries a zero on its diagonal. The three are stated by hand, because a fitted prior
+# repairs what it can.
+const XSING = randn(StableRNG(24680), 200, 4)
+const PRSING = LowOrderPrior(; X = XSING, mu = zeros(4),
+                             sigma = cov([XSING[:, 1:3] XSING[:, 1]]))
+const PRWIDE = LowOrderPrior(; X = XSING, mu = zeros(4), sigma = Matrix(1.0I, 4, 4),
+                             chol = randn(StableRNG(1), 2, 4))
+const PRZDIAG = LowOrderPrior(; X = XSING, mu = zeros(4), sigma = Matrix(1.0I, 4, 4),
+                              chol = UpperTriangular([1.0 0.2 0.3 0.4; 0 1.0 0.1 0.2;
+                                                      0 0 0.0 0.5; 0 0 0 1.0]))
+
+@testset "Calibration rules: `RadialTailDecay` refuses an estimate it cannot form" begin
+    # A rule whose sibling never arrived cannot form the count, and it says so.
+    unbound = RadialTailDecay()
+    @test isnothing(unbound.alpha)
+    @test unbound.kmin == 30
+    @test_throws PO.IsNothingError unbound(:kappa, PR60, nothing, nothing)
+    msg = try
+        unbound(:kappa, PR60, nothing, nothing)
+        ""
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("RadialTailDecay.alpha", msg)
+    @test occursin("bind_alpha", msg)
+
+    # The floor. The series holds ONE entry per observation, so `PR60` leaves three order
+    # statistics at `alpha = 0.05` where the pool of the sibling leaves twelve. The same
+    # floor therefore binds harder here, and the message says which count it refused.
+    @test_throws DomainError RadialTailDecay(; alpha = 0.05)(:kappa, PR60, nothing, nothing)
+    msg = try
+        RadialTailDecay(; alpha = 0.05)(:kappa, PR60, nothing, nothing)
+        ""
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("kmin", msg)
+    @test occursin("floor at 30", msg)
+    @test occursin("= 3` of the 60", msg)
+
+    # A floor the sample clears returns a number, so the refusal is the floor's and not the
+    # sample's.
+    @test 0 < RadialTailDecay(; kmin = 3, alpha = 0.05)(:kappa, PR60, nothing, nothing) < 1
+
+    # A probability that takes the whole sample leaves no `k + 1`-th distance to divide by.
+    @test_throws DomainError RadialTailDecay(; kmin = 5, alpha = 0.999)(:kappa, PR60,
+                                                                        nothing, nothing)
+    msg = try
+        RadialTailDecay(; kmin = 5, alpha = 0.999)(:kappa, PR60, nothing, nothing)
+        ""
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("needs 61 radial distances", msg)
+    @test occursin("which is 60", msg)
+
+    # The series holds fewer positive entries than the count asks for, so there is no Hill
+    # estimate at all. A sample that sits exactly at its own mean produces it.
+    @test PRZERO.mu == zeros(4)
+    @test_throws DomainError RadialTailDecay(; kmin = 5, alpha = 0.6)(:kappa, PRZERO,
+                                                                      nothing, nothing)
+    msg = try
+        RadialTailDecay(; kmin = 5, alpha = 0.6)(:kappa, PRZERO, nothing, nothing)
+        ""
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("121-th largest radial distance is 0.0", msg)
+    @test occursin("not positive", msg)
+
+    # An estimate at or below one is a tail with no finite mean, and no admissible κ reads
+    # it. The band `(0, 1)` the slot admits IS the condition `â > 1`, so the refusal is the
+    # reading rather than a guard bolted onto it.
+    @test_throws DomainError RadialTailDecay(; kmin = 5, alpha = 0.05)(:kappa, PRMVHEAVY,
+                                                                       nothing, nothing)
+    msg = try
+        RadialTailDecay(; kmin = 5, alpha = 0.05)(:kappa, PRMVHEAVY, nothing, nothing)
+        ""
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("tail index of 0.8", msg)
+    @test occursin("(0, 1)", msg)
+
+    # A covariance matrix that is not positive definite states no whitening, and the message
+    # names the field it was read off.
+    @test_throws DomainError RadialTailDecay(; kmin = 5, alpha = 0.05)(:kappa, PRSING,
+                                                                       nothing, nothing)
+    msg = try
+        PO.whitening_factor(PRSING)
+        ""
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("`pr.sigma`", msg)
+    @test occursin("not positive definite", msg)
+
+    # A wide factor states a singular covariance matrix. Dropping to `pr.sigma` would state
+    # something the prior does not, because `chol` takes precedence at every consumer.
+    @test_throws DimensionMismatch RadialTailDecay(; kmin = 5, alpha = 0.05)(:kappa, PRWIDE,
+                                                                             nothing,
+                                                                             nothing)
+    msg = try
+        PO.whitening_factor(PRWIDE)
+        ""
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("`pr.chol` is 2 × 4", msg)
+    @test occursin("takes precedence", msg)
+
+    # A zero on the diagonal of a triangular factor is a rank statement, so it is refused
+    # rather than solved against.
+    @test_throws DomainError RadialTailDecay(; kmin = 5, alpha = 0.05)(:kappa, PRZDIAG,
+                                                                       nothing, nothing)
+    msg = try
+        PO.whitening_factor(PRZDIAG)
+        ""
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("Entry 3 of the diagonal", msg)
+    @test occursin("`pr.chol`", msg)
 end
