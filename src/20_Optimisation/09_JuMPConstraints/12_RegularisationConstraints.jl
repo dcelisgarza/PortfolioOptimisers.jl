@@ -694,7 +694,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolve the ambiguity radius in `val` against prior result `pr`, and return an [`LpRegularisation`](@ref) holding the number.
 
-It carries the reading of [`factory`](@ref) on [`L2Regularisation`](@ref) unchanged. The estimator has one norm order and no formulation slot, so no pairing can be wrong and no guard runs: `val` multiplies `norm(w, p)` and never its square.
+It carries the reading of [`factory`](@ref) on [`L2Regularisation`](@ref) unchanged. The estimator has one norm order and no formulation slot, so no pairing of a rule with a formulation can be wrong and [`assert_ambiguity_radius_formulation`](@ref) never runs here: `val` multiplies `norm(w, p)` and never its square. The role guard below is a different check.
 
 The same estimator also serves as a norm *constraint* through the `lpc` field of [`JuMPOptimiser`](@ref), where `val` is an upper bound and not a coefficient. Both routes share one field and one bound, so the route settles the reading: this method refuses a norm-ceiling role through [`assert_penalty_coefficient_role`](@ref), and [`norm_ceiling_factory`](@ref) refuses a radius role on the other side.
 
@@ -734,11 +734,19 @@ end
 
 Resolve the norm ceiling in `val` against prior result `pr`, and return an [`LpRegularisation`](@ref) holding the number.
 
-It is the norm-constraint counterpart of [`factory`](@ref) on the same type, and it is a second verb because the two routes read one field as two quantities. A `factory` call on the `lpc` field would resolve a radius rule that has no reading there, and would bind no norm order.
+It is the norm-constraint counterpart of [`factory`](@ref) on the same type, and it is a second verb because the two routes read one field as two quantities. A `factory` call on the `lpc` field would refuse the ceiling role that belongs there, and would resolve the rule under `:lpreg_val`, the key of the penalty slot.
 
-This route does two things the penalty route does not. It refuses a radius role through [`assert_norm_ceiling_role`](@ref). It also hands the term's own norm order to the rule with [`bind_norm_order`](@ref) before it resolves the slot, because one rule placed in `lpc` serves every term and each term carries its own `p`.
+The two verbs differ in the guard and in the key, and in nothing else. Each refuses the role that has no reading on its own route, this one through [`assert_norm_ceiling_role`](@ref). Each hands the term's own norm order to the rule with [`bind_norm_order`](@ref) before it resolves the slot, because one rule placed in `lp` or in `lpc` serves every term and each term carries its own `p`.
 
-The fallback returns its argument unchanged, so `nothing` and a stated number both cross untouched.
+The fallback carries its argument through unchanged, which is the route `nothing` takes. A term whose `val` is already a number is returned by identity instead, because the resolution gives back the number it holds.
+
+# Algorithm
+
+ 1. The argument is neither a term nor a vector of them: return it unchanged.
+ 2. The argument is a vector of terms: resolve each of them, and return the vector of the results.
+ 3. The argument is one term: refuse a radius role with [`assert_norm_ceiling_role`](@ref).
+ 4. Bind the term's own `p` into the rule with [`bind_norm_order`](@ref), then resolve the slot under the key `:lpc`, giving `val`.
+ 5. `val` is the number the term already holds: return the term itself. Otherwise rebuild the term through the keyword constructor.
 
 # Arguments
 
@@ -756,6 +764,7 @@ The fallback returns its argument unchanged, so `nothing` and a stated number bo
   - [`factory`](@ref)
   - [`assert_norm_ceiling_role`](@ref)
   - [`bind_norm_order`](@ref)
+  - [`resolve_calibration_slot`](@ref)
   - [`set_weight_norm_p_constraints!`](@ref)
   - [`assemble_jump_model!`](@ref)
 """

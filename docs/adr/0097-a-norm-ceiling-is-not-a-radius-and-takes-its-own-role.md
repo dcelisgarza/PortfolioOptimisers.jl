@@ -123,8 +123,10 @@ is the point ADR 0095 insists on, and it is as early as any check can be for thi
 factory halves are the backstop for a term assembled by another path.
 
 `norm_ceiling_factory` is a second verb rather than a `factory` method because the two routes
-read one field as two quantities: the constraint route refuses a radius and binds a norm
-order, and the penalty route does neither.
+read one field as two quantities. Each refuses the role that has no reading on its own route,
+and each resolves the slot under its own key: `:lpreg_val` for the penalty and `:lpc` for the
+constraint. Both bind the term's own norm order first, because a rule placed in either field
+serves every term and each term carries its own `p`.
 
 ### The three ceilings resolve at the constraint site
 

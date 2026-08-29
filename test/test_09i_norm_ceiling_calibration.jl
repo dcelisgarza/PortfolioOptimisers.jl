@@ -15,7 +15,7 @@ a norm constraint in `JuMPOptimiser.lpc`, so its `val` cannot be bounded to one 
 bound admits both, and the FIELD THAT HOLDS THE TERM refuses the role that has no reading
 there. That is the one place in the library where a role is settled after construction.
 =#
-using Clarabel, JuMP
+using Clarabel, JuMP, InteractiveUtils
 const PO = PortfolioOptimisers
 
 const RNG = StableRNG(246813579)
@@ -386,4 +386,147 @@ calibration resolution runs at assembly, against the prior of the period that wa
     # A schedule is not a role, so the constructor's range check skips it and the field
     # falls back to its own default outside every fold loop.
     @test PO.reset_time_dependent_fields(opt).l2c == 0.6
+end
+
+#=
+Issue #618 sweeps the three units that #616 added to this file: the two role guards and
+`norm_ceiling_factory`. The ticket asks four questions, and each is answered below with a
+run rather than a read.
+
+ADR 0095 rules that a slot bound pairs `Number` with ONE role, and that the bound is the
+whole of the role validation. `LpRegularisation.val` is the one slot that breaks the rule,
+because one type serves two readings. The first section is the ratchet that keeps the
+exception on that one slot: a second slot of the same shape would be a second exception,
+and ADR 0095 grants none.
+=#
+@testset "Sweep #618: the two role guards on LpRegularisation" begin
+    crole = NormCeilingCalibration(; alg = EffectiveAssetFloor(; fraction = 0.5))
+    rrole = AmbiguityRadiusCalibration(; alg = RateRadius(; c = 0.2))
+    root = pkgdir(PortfolioOptimisers)
+    srcfiles = String[]
+    for (d, _, fs) in walkdir(joinpath(root, "src")), f in fs
+        endswith(f, ".jl") && push!(srcfiles, joinpath(d, f))
+    end
+
+    # -- The one exception. Each alias that pairs `Number` with a calibration role, against
+    # the number of roles it admits. An alias that admits the whole root names no role, so
+    # it bounds no slot and is skipped.
+    roles = filter(T -> parentmodule(T) === PO,
+                   InteractiveUtils.subtypes(PO.AbstractCalibrationEstimator))
+    @test length(roles) == 7
+    counted = Dict{Symbol, Int}()
+    for n in names(PO; all = true)
+        isdefined(PO, n) || continue
+        v = getfield(PO, n)
+        isa(v, Type) || continue
+        isa(Base.unwrap_unionall(v), Union) || continue
+        Number <: v || continue
+        PO.AbstractCalibrationEstimator <: v && continue
+        c = count(R -> R <: v, roles)
+        if c >= 1
+            counted[n] = c
+        end
+    end
+    @test length(counted) == 8
+    @test sort([k for (k, c) in counted if c > 1]) == [:Num_AmbRadNormCeilCal]
+    @test counted[:Num_AmbRadNormCeilCal] == 2
+    @test all(==(1), [c for (k, c) in counted if k !== :Num_AmbRadNormCeilCal])
+
+    # The dual-use alias bounds one slot, and that slot is `LpRegularisation.val`. The
+    # three sites are the struct's field list and its two constructors.
+    bound = [relpath(f, root) for f in srcfiles
+             for l in eachline(f) if occursin("::Num_AmbRadNormCeilCal", l)]
+    @test length(bound) == 3
+    @test unique(bound) == [joinpath("src", "20_Optimisation", "09_JuMPConstraints",
+                                     "12_RegularisationConstraints.jl")]
+
+    # -- Both entry points, and no third path. Each builder is called from one site, and
+    # each site wraps the term in its own route's verb, so no term reaches a builder
+    # unchecked. A definition line and a docstring signature both carry `::`, so the filter
+    # keeps the calls alone.
+    calls(tok) = [strip(l) for f in srcfiles
+                  for l in eachline(f) if occursin(tok, l) && !occursin("::", l)]
+    lp_calls = calls("set_lp_regularisation!(model")
+    lpc_calls = calls("set_weight_norm_p_constraints!(model")
+    @test length(lp_calls) == 1
+    @test length(lpc_calls) == 1
+    @test occursin("factory(opt.lp,", only(lp_calls))
+    @test occursin("norm_ceiling_factory(opt.lpc,", only(lpc_calls))
+
+    # -- The `TimeDependent` case. The constructor calls the two guards with no wrapper
+    # check, because a schedule is not a term and meets the permissive fallback. It is the
+    # test-substitution that carries each entry back through the same constructor, so a
+    # wrong role inside a schedule is refused where a wrong role in a bare field is.
+    @test isnothing(PO.assert_penalty_coefficient_role(TimeDependent([LpRegularisation(;
+                                                                                       val = crole)];
+                                                                     default = LpRegularisation(;
+                                                                                                val = rrole))))
+    @test_throws ArgumentError JuMPOptimiser(; slv = SLV,
+                                             lp = TimeDependent([LpRegularisation(;
+                                                                                  val = crole),
+                                                                 LpRegularisation(;
+                                                                                  val = rrole)];
+                                                                default = LpRegularisation(;
+                                                                                           val = rrole)))
+    @test_throws ArgumentError JuMPOptimiser(; slv = SLV,
+                                             lp = TimeDependent([LpRegularisation(;
+                                                                                  val = rrole)];
+                                                                default = LpRegularisation(;
+                                                                                           val = crole)))
+    @test_throws ArgumentError JuMPOptimiser(; slv = SLV,
+                                             lpc = TimeDependent([LpRegularisation(;
+                                                                                   val = rrole),
+                                                                  LpRegularisation(;
+                                                                                   val = crole)];
+                                                                 default = LpRegularisation(;
+                                                                                            val = crole)))
+    @test_throws ArgumentError JuMPOptimiser(; slv = SLV,
+                                             lpc = TimeDependent([LpRegularisation(;
+                                                                                   val = crole)];
+                                                                 default = LpRegularisation(;
+                                                                                            val = rrole)))
+
+    # A schedule whose entry is a VECTOR of terms is substituted the same way, so the guard
+    # reaches the term through the vector method rather than through a wrapper of its own.
+    @test_throws ArgumentError JuMPOptimiser(; slv = SLV,
+                                             lp = TimeDependent([[LpRegularisation(;
+                                                                                   val = crole)]];
+                                                                default = [LpRegularisation(;
+                                                                                            val = rrole)]))
+
+    # The correct pairing crosses, so the guard refuses the role and not the schedule.
+    opt = JuMPOptimiser(; slv = SLV,
+                        lp = TimeDependent([LpRegularisation(; val = rrole),
+                                            LpRegularisation(; val = 1e-3)];
+                                           default = LpRegularisation(; val = rrole)),
+                        lpc = TimeDependent([LpRegularisation(; val = crole),
+                                             LpRegularisation(; val = 0.6)];
+                                            default = LpRegularisation(; val = crole)))
+    @test isa(opt.lp, TimeDependent)
+    @test isa(opt.lpc, TimeDependent)
+    @test PO.reset_time_dependent_fields(opt).lp.val == rrole
+
+    # -- The two verbs differ in the guard and in the key, and in nothing else. Both bind
+    # the term's own order, so a rule that reads the order gives a different number at a
+    # different `p`. `DualNormRadius` refuses an unbound order, so a penalty route that
+    # bound nothing would throw here instead of returning a number.
+    dnr = AmbiguityRadiusCalibration(; alg = DualNormRadius())
+    @test_throws ArgumentError PO.resolve_calibration_slot(dnr, :lpreg_val, PR60, PR60.w,
+                                                           SLV)
+    e = sqrt.(diag(PR60.sigma)) ./ sqrt(60)
+    p3 = PO.factory(LpRegularisation(; p = 3, val = dnr), PR60, SLV)
+    p5 = PO.factory(LpRegularisation(; p = 5, val = dnr), PR60, SLV)
+    @test p3.val != p5.val
+    @test p3.val / p5.val ≈ norm(e, 3 / 2) / norm(e, 5 / 4)
+
+    # A term whose `val` is already a number is returned by identity on this route too,
+    # so the penalty verb and the ceiling verb agree on the case that resolves nothing.
+    stated = LpRegularisation(; p = 3, val = 1e-3)
+    @test PO.factory(stated, PR60, SLV) === stated
+
+    # The keys are two readings rather than two names for one. A radius rule bound to an
+    # order still has no reading under the ceiling key, which is why a `factory` call on
+    # `lpc` would be wrong even after the role guard.
+    @test_throws ArgumentError PO.resolve_calibration_slot(PO.bind_norm_order(dnr, 3), :lpc,
+                                                           PR60, PR60.w, SLV)
 end
