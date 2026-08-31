@@ -745,6 +745,23 @@
             # The full-shape radius is the hand computation against the full shape.
             d2_full = [LinearAlgebra.dot(Xd[t, :], cv \ Xd[t, :]) for t in axes(Xd, 1)]
             @test e_full.k ≈ sqrt(quantile(d2_full, 0.95))
+            # The docstrings of `NormalKUncertaintyAlgorithm` and `ellipsoidal_set` quote
+            # this pair as the illustration of the difference, so pin it here: the prose
+            # and the suite cannot then drift apart.
+            @test round(e_full.k; digits = 4) == 3.4463
+            @test round(e_diag.k; digits = 4) == 3.4407
+            # Those same two docstrings say that neither shape is reliably the larger, so
+            # a reader must not read an ordering rule out of the single pair above.
+            n_diag_larger = count(1:60) do s
+                Xs = randn(StableRNG(s), 252, 5) * 0.01
+                cvs = Statistics.cov(Xs)
+                kf = PortfolioOptimisers.ellipsoidal_set(false, km, 0.05, Xs, cvs,
+                                                         MuEllipsoidalUncertaintySet()).k
+                kd = PortfolioOptimisers.ellipsoidal_set(true, km, 0.05, Xs, cvs,
+                                                         MuEllipsoidalUncertaintySet()).k
+                return kd > kf
+            end
+            @test n_diag_larger == 34
         end
         @testset "vec_quantile_bounds reads rows, so its input is N x n_sim" begin
             # A rectangular sample settles the axis: three components, four hundred draws.
