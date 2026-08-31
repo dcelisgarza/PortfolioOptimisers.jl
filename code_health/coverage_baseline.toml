@@ -70,7 +70,7 @@ commit = "a6d87c6"
 "src/12_ConstraintGeneration/03_RiskBudgetConstraintGeneration.jl" = { lines = 25, misses = 0 }
 "src/12_ConstraintGeneration/04_PhylogenyConstraintGeneration.jl" = { lines = 92, misses = 0 }
 "src/12_ConstraintGeneration/05_WeightBoundsConstraintGeneration.jl" = { lines = 60, misses = 0 }
-"src/12_ConstraintGeneration/06_AssetSetsMatrix.jl" = { lines = 174, misses = 13 }
+"src/12_ConstraintGeneration/06_AssetSetsMatrix.jl" = { lines = 174, misses = 1 }
 "src/12_ConstraintGeneration/07_ThresholdConstraintGeneration.jl" = { lines = 18, misses = 0 }
 "src/12_ConstraintGeneration/08_ExposureConstraintGeneration.jl" = { lines = 41, misses = 0 }
 "src/13_Prior/01_Base_Prior.jl" = { lines = 179, misses = 0 }

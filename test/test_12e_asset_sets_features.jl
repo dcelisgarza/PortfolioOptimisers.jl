@@ -764,3 +764,30 @@ end
     res = @test_throws ArgumentError asset_sets_features(miss, GSETS; strict = true)
     @test occursin("group value `Zzz` of taxonomy key `nx_sector`", res.value.msg)
 end
+@testset "port_opt_view over a vector of estimators, the method that breaks the tie" begin
+    # An `AssetSetsMatrixEstimator` holds a key *name*, so an asset view leaves it alone. A
+    # vector of them alone matches both `port_opt_view(::VecMatNum_ASetMatE, ...)` and the
+    # generic vector method in `02_Tools.jl`, and neither is more specific: `MatNum` is
+    # outside the generic's element union and `Nothing` is outside this one's. The method
+    # that takes that intersection is what makes this call resolve rather than raise.
+    e1 = AssetSetsMatrixEstimator(; val = "nx_sector")
+    e2 = AssetSetsMatrixEstimator(; val = "nx_industry")
+    i = [1, 3, 5]
+    v = PortfolioOptimisers.port_opt_view([e1, e2], i)
+    @test v == [e1, e2]
+    @test v[1] === e1
+    @test v[2] === e2
+    # The array is concretely typed, which is the whole reason the intersection method
+    # repeats the body rather than falling back: a membership matrix and its estimator must
+    # produce the same element type.
+    @test isconcretetype(eltype(v))
+    @test v isa Vector{AssetSetsMatrixEstimator{String}}
+    # The matrix side of the same union slices its columns, and its vector method gives one
+    # such view per entry.
+    smtx = asset_sets_matrix("nx_sector", TAX)
+    mv = PortfolioOptimisers.port_opt_view([smtx, smtx], i)
+    @test length(mv) == 2
+    @test isconcretetype(eltype(mv))
+    @test all(m -> m == smtx[:, i], mv)
+    @test size(mv[1]) == (size(smtx, 1), length(i))
+end
