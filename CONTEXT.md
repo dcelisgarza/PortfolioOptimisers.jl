@@ -14,6 +14,9 @@ A configuration object encoding a statistical or mathematical method together wi
 **Algorithm**
 A type held inside an Estimator that selects or modifies its computational behaviour. Consumed through an Estimator, never used on its own.
 
+**Selector tag**
+An Algorithm that carries no field, and whose only job is to name the branch a caller takes. Dispatch on the type is the whole of its behaviour: `SpectralDenoise` selects the spectral branch of `denoise!`. Most subtypes of `AbstractAlgorithm` are selector tags.
+
 **Result**
 A plain data struct holding the computed output of a function applied to an Estimator: *the answer for the input it was computed on*. Never callable.
 
