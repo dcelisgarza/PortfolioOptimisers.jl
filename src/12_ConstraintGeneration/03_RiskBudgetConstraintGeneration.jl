@@ -132,7 +132,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     RiskBudgetEstimator(;
-        val::EstValType,
+        val::EstValType{<:VectorAbstractEstimatorValueAlgorithm},
         dval::Option{<:Number} = nothing
     ) -> RiskBudgetEstimator
 
@@ -194,14 +194,14 @@ RiskBudget
     $(field_dict[:dval])
     """
     dval
-    function RiskBudgetEstimator(val::EstValType,
+    function RiskBudgetEstimator(val::EstValType{<:VectorAbstractEstimatorValueAlgorithm},
                                  dval::Option{<:Number})::RiskBudgetEstimator
         assert_nonempty_nonneg_finite_val(val, :val)
         assert_nonempty_nonneg_finite_val(dval, :dval)
         return new{typeof(val), typeof(dval)}(val, dval)
     end
 end
-function RiskBudgetEstimator(; val::EstValType,
+function RiskBudgetEstimator(; val::EstValType{<:VectorAbstractEstimatorValueAlgorithm},
                              dval::Option{<:Number} = nothing)::RiskBudgetEstimator
     return RiskBudgetEstimator(val, dval)
 end
@@ -313,8 +313,8 @@ function risk_budget_constraints(rb::RiskBudget, args...; kwargs...)::RiskBudget
     return rb
 end
 """
-    risk_budget_constraints(rb::EstValType, sets::UniverseSets,
-                            dval::Option{<:Number} = nothing,
+    risk_budget_constraints(rb::EstValType{<:VectorAbstractEstimatorValueAlgorithm},
+                            sets::UniverseSets, dval::Option{<:Number} = nothing,
                             key::Option{<:AbstractString} = nothing; strict::Bool = false,
                             kwargs...)
 
@@ -379,8 +379,8 @@ RiskBudget
   - [`risk_budget_constraints`](@ref)
   - [`FactorRiskBudgeting`](@ref)
 """
-function risk_budget_constraints(rb::EstValType, sets::UniverseSets,
-                                 dval::Option{<:Number} = nothing,
+function risk_budget_constraints(rb::EstValType{<:VectorAbstractEstimatorValueAlgorithm},
+                                 sets::UniverseSets, dval::Option{<:Number} = nothing,
                                  key::Option{<:AbstractString} = nothing;
                                  strict::Bool = false, kwargs...)::RiskBudget
     if isnothing(dval)

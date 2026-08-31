@@ -3758,9 +3758,11 @@ Abstract supertype for all estimator value algorithm types.
 
 Subtypes of `AbstractEstimatorValueAlgorithm` implement algorithms for computing constraint result values. These are used to extend or modify the behavior of estimators in a composable and modular fashion.
 
+The family is split by the shape of the value the algorithm returns, because a slot admits one shape and refuses the others. [`VectorAbstractEstimatorValueAlgorithm`](@ref) is the branch that returns a `Num_VecNum`, and [`EstValType`](@ref) takes the branch a slot admits as its type parameter. A slot that parses equations, such as [`LinearConstraintEstimator`](@ref)'s `val`, takes an [`EqnType`](@ref), and no branch of this family is an `EqnType`.
+
 # Interfaces
 
-In order to implement a new estimator value algorithm which will work seamlessly with the library, subtype `AbstractEstimatorValueAlgorithm` with all necessary parameters struct, and implement the following method:
+In order to implement a new estimator value algorithm which will work seamlessly with the library, subtype the branch of `AbstractEstimatorValueAlgorithm` whose value shape the algorithm returns with all necessary parameters struct, and implement the following method:
 
   - `estimator_to_val(alg::AbstractEstimatorValueAlgorithm, sets::UniverseSets, val::Option{<:Number} = nothing, key::Option{<:AbstractString} = nothing; datatype::DataType = Float64, strict::Bool = false) -> Num_VecNum`: Converts an estimator value dictionary to a numeric or vector of numeric value. Usually this should compute some version of:
       + `val = ifelse(isnothing(val), <default value use with datatype element type>, val)`: Computes the default value to use if `val` is `nothing`.
@@ -3768,7 +3770,7 @@ In order to implement a new estimator value algorithm which will work seamlessly
 
 ## Arguments
 
-  - `alg`: Concrete subtype of `AbstractEstimatorValueAlgorithm`.
+  - `alg`: Concrete subtype of a branch of `AbstractEstimatorValueAlgorithm`.
   - $(arg_dict[:sets])
   - $(arg_dict[:val])
   - $(arg_dict[:ekey])
@@ -3784,7 +3786,7 @@ In order to implement a new estimator value algorithm which will work seamlessly
 We can create a dummy estimator value algorithm as follows:
 
 ```jldoctest
-julia> struct MyIncreasingValue <: PortfolioOptimisers.AbstractEstimatorValueAlgorithm end
+julia> struct MyIncreasingValue <: PortfolioOptimisers.VectorAbstractEstimatorValueAlgorithm end
 
 julia> function PortfolioOptimisers.estimator_to_val(alg::MyIncreasingValue, sets::UniverseSets,
                                                      val::PortfolioOptimisers.Option{<:Number} = nothing,
@@ -3812,15 +3814,38 @@ julia> estimator_to_val(MyIncreasingValue(), sets)
 
 # Related
 
+  - [`VectorAbstractEstimatorValueAlgorithm`](@ref)
   - [`EstValType`](@ref)
   - [`estimator_to_val`](@ref)
 """
 abstract type AbstractEstimatorValueAlgorithm <: AbstractAlgorithm end
 """
-    const EstValType = Union{<:Num_VecNum, <:MatNum, <:PairStrNum, <:MultiEstValType,
-                             <:AbstractEstimatorValueAlgorithm}
+$(DocStringExtensions.TYPEDEF)
 
-Alias for a union of numeric, vector of numeric, matrix of numeric, string-number pair, or multi-estimator value types.
+Abstract supertype for the estimator value algorithms that return a numeric or a vector of numeric value.
+
+A slot that holds a number, or a vector of numbers, over the universe admits this branch of [`AbstractEstimatorValueAlgorithm`](@ref) and no other. The slot writes that bound as `EstValType{<:VectorAbstractEstimatorValueAlgorithm}`, so the branch a slot admits is part of the slot's type, not a check made when the value is resolved.
+
+# Interfaces
+
+Subtype `VectorAbstractEstimatorValueAlgorithm`, and implement the `estimator_to_val` method that [`AbstractEstimatorValueAlgorithm`](@ref) documents. The method must return a `Num_VecNum`.
+
+# Related
+
+  - [`AbstractEstimatorValueAlgorithm`](@ref)
+  - [`EstValType`](@ref)
+  - [`estimator_to_val`](@ref)
+  - [`UniformValues`](@ref)
+"""
+abstract type VectorAbstractEstimatorValueAlgorithm <: AbstractEstimatorValueAlgorithm end
+"""
+    const EstValType{T <: AbstractEstimatorValueAlgorithm} = Union{<:Num_VecNum, <:MatNum,
+                                                                   <:PairStrNum,
+                                                                   <:MultiEstValType, T}
+
+Alias for a union of numeric, vector of numeric, matrix of numeric, string-number pair, or multi-estimator value types, and the branch `T` of [`AbstractEstimatorValueAlgorithm`](@ref) that computes such a value.
+
+`T` names the branch the slot admits, so a slot states in its own type which algorithms it can resolve. A slot that holds a number, or a vector of numbers, writes `EstValType{<:VectorAbstractEstimatorValueAlgorithm}`. The alias written without a parameter admits every branch, which is the widest bound the family gives.
 
 # Related
 
@@ -3828,9 +3853,11 @@ Alias for a union of numeric, vector of numeric, matrix of numeric, string-numbe
   - [`PairStrNum`](@ref)
   - [`MultiEstValType`](@ref)
   - [`AbstractEstimatorValueAlgorithm`](@ref)
+  - [`VectorAbstractEstimatorValueAlgorithm`](@ref)
 """
-const EstValType = Union{<:Num_VecNum, <:MatNum, <:PairStrNum, <:MultiEstValType,
-                         <:AbstractEstimatorValueAlgorithm}
+const EstValType{T <: AbstractEstimatorValueAlgorithm} = Union{<:Num_VecNum, <:MatNum,
+                                                               <:PairStrNum,
+                                                               <:MultiEstValType, T}
 """
     const Str_Expr = Union{<:AbstractString, Expr}
 
@@ -3854,18 +3881,20 @@ Alias for an abstract vector of strings or Julia expressions.
 """
 const VecStr_Expr = AbstractVector{<:Str_Expr}
 """
-    const EqnType = Union{<:AbstractString, Expr, <:VecStr_Expr,
-                          <:AbstractEstimatorValueAlgorithm}
+    const EqnType = Union{<:AbstractString, Expr, <:VecStr_Expr}
 
 Alias for a union of string, Julia expression, or vector of strings/expressions.
+
+Every consumer of this alias parses the value with [`parse_equation`](@ref), so the alias holds equation text and nothing else. No branch of [`AbstractEstimatorValueAlgorithm`](@ref) is an `EqnType`: an algorithm computes a value over the universe, and a value carries neither a comparison operator nor a side, so no constraint row can be assembled from it. A slot that admits an algorithm is an [`EstValType`](@ref).
 
 # Related
 
   - [`Str_Expr`](@ref)
   - [`VecStr_Expr`](@ref)
+  - [`EstValType`](@ref)
+  - [`parse_equation`](@ref)
 """
-const EqnType = Union{<:AbstractString, Expr, <:VecStr_Expr,
-                      <:AbstractEstimatorValueAlgorithm}
+const EqnType = Union{<:AbstractString, Expr, <:VecStr_Expr}
 """
     const VecVecNum = AbstractVector{<:VecNum}
 

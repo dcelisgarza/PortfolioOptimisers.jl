@@ -123,7 +123,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     PortfolioTarget(;
-        w::Option{<:EstValType} = nothing
+        w::Option{<:EstValType{<:VectorAbstractEstimatorValueAlgorithm}} = nothing
     ) -> PortfolioTarget
 
 Keywords correspond to the struct's fields.
@@ -152,14 +152,15 @@ PortfolioTarget
     $(field_dict[:ra_w])
     """
     w
-    function PortfolioTarget(w::Option{<:EstValType})
+    function PortfolioTarget(w::Option{<:EstValType{<:VectorAbstractEstimatorValueAlgorithm}})
         if isa(w, AbstractVector)
             @argcheck(!isempty(w), IsEmptyError("w cannot be empty"))
         end
         return new{typeof(w)}(w)
     end
 end
-function PortfolioTarget(; w::Option{<:EstValType} = nothing)::PortfolioTarget
+function PortfolioTarget(;
+                         w::Option{<:EstValType{<:VectorAbstractEstimatorValueAlgorithm}} = nothing)::PortfolioTarget
     return PortfolioTarget(w)
 end
 """

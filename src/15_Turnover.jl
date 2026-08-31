@@ -15,7 +15,7 @@ $(DocStringExtensions.FIELDS)
 
     TurnoverEstimator(;
         w::VecNum,
-        val::EstValType,
+        val::EstValType{<:VectorAbstractEstimatorValueAlgorithm},
         dval::Option{<:Number} = nothing,
         fixed::Bool = false
     ) -> TurnoverEstimator
@@ -79,8 +79,9 @@ TurnoverEstimator
     $(field_dict[:fixed])
     """
     fixed
-    function TurnoverEstimator(w::VecNum, val::EstValType, dval::Option{<:Number},
-                               fixed::Bool)::TurnoverEstimator
+    function TurnoverEstimator(w::VecNum,
+                               val::EstValType{<:VectorAbstractEstimatorValueAlgorithm},
+                               dval::Option{<:Number}, fixed::Bool)::TurnoverEstimator
         assert_nonempty_finite_val(w, :w)
         assert_nonempty_nonneg_finite_val(val, :val)
         if !isnothing(dval)
@@ -89,7 +90,9 @@ TurnoverEstimator
         return new{typeof(w), typeof(val), typeof(dval), typeof(fixed)}(w, val, dval, fixed)
     end
 end
-function TurnoverEstimator(; w::VecNum, val::EstValType, dval::Option{<:Number} = nothing,
+function TurnoverEstimator(; w::VecNum,
+                           val::EstValType{<:VectorAbstractEstimatorValueAlgorithm},
+                           dval::Option{<:Number} = nothing,
                            fixed::Bool = false)::TurnoverEstimator
     return TurnoverEstimator(w, val, dval, fixed)
 end

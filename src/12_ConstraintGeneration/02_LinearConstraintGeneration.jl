@@ -1041,11 +1041,12 @@ StepRangeLen(0.3333333333333333, 0.0, 3)
 
 # Related
 
+  - [`VectorAbstractEstimatorValueAlgorithm`](@ref)
   - [`AbstractEstimatorValueAlgorithm`](@ref)
   - [`WeightBoundsEstimator`](@ref)
   - [`WeightBounds`](@ref)
 """
-struct UniformValues <: AbstractEstimatorValueAlgorithm end
+struct UniformValues <: VectorAbstractEstimatorValueAlgorithm end
 """
     estimator_to_val(::UniformValues, sets::UniverseSets, ::Any = nothing,
                      key::Option{<:AbstractString} = nothing;
@@ -2385,14 +2386,6 @@ function linear_constraints(eqn::EqnType, sets::UniverseSets,
     lcs = replace_group_by_assets(lcs, sets, bl_flag)
     return get_linear_constraints(lcs, sets, key; datatype = datatype, strict = strict,
                                   rr = rr)
-end
-function linear_constraints(lcs::LinearConstraintEstimator{<:AbstractEstimatorValueAlgorithm},
-                            sets::UniverseSets, key::Option{<:AbstractString} = nothing;
-                            datatype::DataType = Float64, strict::Bool = false,
-                            args...)::Option{<:LinearConstraint}
-    return estimator_to_val(lcs.val, sets,
-                            !hasproperty(lcs.val, :default) ? nothing : lcs.val.default,
-                            key; datatype = datatype, strict = strict)
 end
 """
     linear_constraints(lcs::LinearConstraintEstimator, sets::UniverseSets;

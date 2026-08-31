@@ -892,3 +892,43 @@ end
     @test PortfolioOptimisers.estimator_to_val(["g2" => 2.0, "g1" => 1.0], osets) ==
           [1.0, 1.0, 2.0]
 end
+@testset "An estimator value algorithm is a value, not an equation (issue #633)" begin
+    #=
+    `AbstractEstimatorValueAlgorithm` splits by the shape of the value the algorithm
+    returns. `UniformValues` returns a `Num_VecNum`, so it sits under
+    `VectorAbstractEstimatorValueAlgorithm`, and a slot that resolves a value admits that
+    branch by writing it into its own bound.
+
+    An equation slot admits no branch at all. `LinearConstraintEstimator` used to accept
+    one, because `EqnType` carried the family root, and the method that answered the
+    resulting estimator returned the numeric value `estimator_to_val` computes. That value
+    is not a `LinearConstraint`: it carries neither a comparison operator nor a side, so no
+    constraint row can be assembled from it. The return annotation refused it, and the
+    estimator raised on every call it could receive. The bound now refuses the estimator
+    itself, at the slot the caller wrote.
+    =#
+    sets = UniverseSets(; xkey = "nx", dict = Dict("nx" => ["A", "B", "C", "D"]))
+    @test UniformValues <: PortfolioOptimisers.VectorAbstractEstimatorValueAlgorithm
+    @test UniformValues <: PortfolioOptimisers.AbstractEstimatorValueAlgorithm
+    @test UniformValues <:
+          PortfolioOptimisers.EstValType{<:PortfolioOptimisers.VectorAbstractEstimatorValueAlgorithm}
+    @test !(UniformValues <: PortfolioOptimisers.EqnType)
+    # The keyword route names the slot that refused the value; the positional route has no
+    # method for it.
+    @test_throws TypeError LinearConstraintEstimator(; val = UniformValues())
+    @test_throws MethodError LinearConstraintEstimator(UniformValues())
+    # Equation text is unaffected, and so is a precomputed constraint.
+    lce = LinearConstraintEstimator(; val = ["A + B == 1", "A >= 0.1"])
+    @test linear_constraints(lce, sets) isa LinearConstraint
+    # Every slot that resolves a value keeps the algorithm, and resolves it to the uniform
+    # vector over the universe.
+    wb = weight_bounds_constraints(WeightBoundsEstimator(; ub = UniformValues()), sets)
+    @test isapprox(collect(wb.ub), fill(0.25, 4))
+    rkb = risk_budget_constraints(RiskBudgetEstimator(; val = UniformValues()), sets)
+    @test isapprox(collect(rkb.val), fill(0.25, 4))
+    @test ThresholdEstimator(; val = UniformValues()).val === UniformValues()
+    @test TurnoverEstimator(; w = fill(0.25, 4), val = UniformValues()).val ===
+          UniformValues()
+    @test FeesEstimator(; l = UniformValues()).l === UniformValues()
+    @test PortfolioOptimisers.PortfolioTarget(; w = UniformValues()).w === UniformValues()
+end

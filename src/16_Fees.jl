@@ -17,10 +17,10 @@ $(DocStringExtensions.FIELDS)
 
     FeesEstimator(;
         tn::Option{<:TnE_Tn} = nothing,
-        l::Option{<:EstValType} = nothing,
-        s::Option{<:EstValType} = nothing,
-        fl::Option{<:EstValType} = nothing,
-        fs::Option{<:EstValType} = nothing,
+        l::Option{<:EstValType{<:VectorAbstractEstimatorValueAlgorithm}} = nothing,
+        s::Option{<:EstValType{<:VectorAbstractEstimatorValueAlgorithm}} = nothing,
+        fl::Option{<:EstValType{<:VectorAbstractEstimatorValueAlgorithm}} = nothing,
+        fs::Option{<:EstValType{<:VectorAbstractEstimatorValueAlgorithm}} = nothing,
         dl::Option{<:Number} = nothing,
         ds::Option{<:Number} = nothing,
         dfl::Option{<:Number} = nothing,
@@ -120,11 +120,13 @@ FeesEstimator
     $(field_dict[:kwargs_fee])
     """
     kwargs
-    function FeesEstimator(tn::Option{<:TnE_Tn}, l::Option{<:EstValType},
-                           s::Option{<:EstValType}, fl::Option{<:EstValType},
-                           fs::Option{<:EstValType}, dl::Option{<:Number} = nothing,
-                           ds::Option{<:Number} = nothing, dfl::Option{<:Number} = nothing,
-                           dfs::Option{<:Number} = nothing,
+    function FeesEstimator(tn::Option{<:TnE_Tn},
+                           l::Option{<:EstValType{<:VectorAbstractEstimatorValueAlgorithm}},
+                           s::Option{<:EstValType{<:VectorAbstractEstimatorValueAlgorithm}},
+                           fl::Option{<:EstValType{<:VectorAbstractEstimatorValueAlgorithm}},
+                           fs::Option{<:EstValType{<:VectorAbstractEstimatorValueAlgorithm}},
+                           dl::Option{<:Number} = nothing, ds::Option{<:Number} = nothing,
+                           dfl::Option{<:Number} = nothing, dfs::Option{<:Number} = nothing,
                            kwargs::NamedTuple = (; atol = 1e-8))::FeesEstimator
         assert_nonempty_nonneg_finite_val(l, :l)
         assert_nonempty_nonneg_finite_val(s, :s)
@@ -140,12 +142,13 @@ FeesEstimator
                                                                          kwargs)
     end
 end
-function FeesEstimator(; tn::Option{<:TnE_Tn} = nothing, l::Option{<:EstValType} = nothing,
-                       s::Option{<:EstValType} = nothing,
-                       fl::Option{<:EstValType} = nothing,
-                       fs::Option{<:EstValType} = nothing, dl::Option{<:Number} = nothing,
-                       ds::Option{<:Number} = nothing, dfl::Option{<:Number} = nothing,
-                       dfs::Option{<:Number} = nothing,
+function FeesEstimator(; tn::Option{<:TnE_Tn} = nothing,
+                       l::Option{<:EstValType{<:VectorAbstractEstimatorValueAlgorithm}} = nothing,
+                       s::Option{<:EstValType{<:VectorAbstractEstimatorValueAlgorithm}} = nothing,
+                       fl::Option{<:EstValType{<:VectorAbstractEstimatorValueAlgorithm}} = nothing,
+                       fs::Option{<:EstValType{<:VectorAbstractEstimatorValueAlgorithm}} = nothing,
+                       dl::Option{<:Number} = nothing, ds::Option{<:Number} = nothing,
+                       dfl::Option{<:Number} = nothing, dfs::Option{<:Number} = nothing,
                        kwargs::NamedTuple = (; atol = 1e-8))::FeesEstimator
     return FeesEstimator(tn, l, s, fl, fs, dl, ds, dfl, dfs, kwargs)
 end

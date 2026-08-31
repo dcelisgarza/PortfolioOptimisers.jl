@@ -14,7 +14,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     ThresholdEstimator(;
-        val::EstValType,
+        val::EstValType{<:VectorAbstractEstimatorValueAlgorithm},
         key::Option{<:AbstractString} = nothing,
         dval::Option{<:Number} = nothing
     ) -> ThresholdEstimator
@@ -95,7 +95,8 @@ ThresholdEstimator
     $(field_dict[:dval])
     """
     dval
-    function ThresholdEstimator(val::EstValType, key::Option{<:AbstractString} = nothing,
+    function ThresholdEstimator(val::EstValType{<:VectorAbstractEstimatorValueAlgorithm},
+                                key::Option{<:AbstractString} = nothing,
                                 dval::Option{<:Number} = nothing)::ThresholdEstimator
         assert_nonempty_nonneg_finite_val(val, :val)
         assert_nonempty_nonneg_finite_val(dval, :dval)
@@ -105,7 +106,8 @@ ThresholdEstimator
         return new{typeof(val), typeof(key), typeof(dval)}(val, key, dval)
     end
 end
-function ThresholdEstimator(; val::EstValType, key::Option{<:AbstractString} = nothing,
+function ThresholdEstimator(; val::EstValType{<:VectorAbstractEstimatorValueAlgorithm},
+                            key::Option{<:AbstractString} = nothing,
                             dval::Option{<:Number} = nothing)::ThresholdEstimator
     return ThresholdEstimator(val, key, dval)
 end

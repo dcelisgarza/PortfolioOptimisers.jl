@@ -61,6 +61,7 @@ DynamicAbstractWeights
 AbstractCustomValue
 VecScalar
 AbstractEstimatorValueAlgorithm
+VectorAbstractEstimatorValueAlgorithm
 get_observation_weights
 NormError
 L2Norm

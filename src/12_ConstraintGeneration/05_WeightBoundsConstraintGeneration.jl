@@ -201,8 +201,8 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     WeightBoundsEstimator(;
-        lb::Option{<:EstValType} = 0.0,
-        ub::Option{<:EstValType} = 1.0,
+        lb::Option{<:EstValType{<:VectorAbstractEstimatorValueAlgorithm}} = 0.0,
+        ub::Option{<:EstValType{<:VectorAbstractEstimatorValueAlgorithm}} = 1.0,
         dlb::Option{<:Number} = nothing,
         dub::Option{<:Number} = nothing
     ) -> WeightBoundsEstimator
@@ -269,7 +269,8 @@ WeightBoundsEstimator
     $(field_dict[:dub])
     """
     dub
-    function WeightBoundsEstimator(lb::Option{<:EstValType}, ub::Option{<:EstValType},
+    function WeightBoundsEstimator(lb::Option{<:EstValType{<:VectorAbstractEstimatorValueAlgorithm}},
+                                   ub::Option{<:EstValType{<:VectorAbstractEstimatorValueAlgorithm}},
                                    dlb::Option{<:Number} = nothing,
                                    dub::Option{<:Number} = nothing)::WeightBoundsEstimator
         if isa(lb, Dict_Vec)
@@ -291,8 +292,9 @@ WeightBoundsEstimator
         return new{typeof(lb), typeof(ub), typeof(dlb), typeof(dub)}(lb, ub, dlb, dub)
     end
 end
-function WeightBoundsEstimator(; lb::Option{<:EstValType} = 0.0,
-                               ub::Option{<:EstValType} = 1.0,
+function WeightBoundsEstimator(;
+                               lb::Option{<:EstValType{<:VectorAbstractEstimatorValueAlgorithm}} = 0.0,
+                               ub::Option{<:EstValType{<:VectorAbstractEstimatorValueAlgorithm}} = 1.0,
                                dlb::Option{<:Number} = nothing,
                                dub::Option{<:Number} = nothing)::WeightBoundsEstimator
     return WeightBoundsEstimator(lb, ub, dlb, dub)
