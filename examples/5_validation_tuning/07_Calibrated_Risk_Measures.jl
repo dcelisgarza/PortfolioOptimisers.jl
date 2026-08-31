@@ -19,7 +19,7 @@ This example shows the slot from the caller's side.
 
  1. A stated number and a rule side by side on the same measure.
  2. The refit per fold, over folds of unequal length.
- 3. The three rules that ship, and the reading that makes each one the right choice.
+ 3. Three of the rules that ship, and the reading that makes each one the right choice.
  4. The travelling pair, where `alpha` resolves first and its number reaches the ``\kappa`` rule.
  5. A plain function as a rule, which is the case that has no type.
  6. The role bounds, which refuse a head rule in a tail slot at construction.
@@ -28,7 +28,9 @@ This example shows the slot from the caller's side.
 The regularisation coefficients `l1`, `linf`, [`L2Regularisation`](@ref) and
 [`LpRegularisation`](@ref) are ambiguity radii too, and they take the same role. They belong to
 the [regularisation example](../4_constraints_costs/07_Regularisation.md), which owns those
-slots; this example stays on the slots that sit on a risk measure.
+slots. The three norm ceilings `l2c`, `lpc` and `linfc` of [`JuMPOptimiser`](@ref) bound a norm
+rather than price one, so they are a different quantity and take a role of their own,
+[`NormCeilingCalibration`](@ref). This example stays on the slots that sit on a risk measure.
 =#
 
 using PortfolioOptimisers, PrettyTables, DataFrames, StatsBase, Statistics
@@ -189,9 +191,11 @@ pretty_table(hcat(DataFrame(:tickers => rd.nx),
                             Symbol.(1:length(pred_rule.res)))); formatters = [resfmt])
 
 #=
-## 4. The three rules
+## 4. Three of the rules
 
-Three rules ship, and each answers a different question about the sample.
+Eleven rules ship over the five families. Five of them compute a significance level or a
+deformation parameter, and three of those five are the ones this section reads. Each answers a
+different question about the sample.
 
   - [`ScenarioCount`](@ref) answers *how many observations must the tail hold*. It reads Kish's
     effective sample size when observation weights are stated, because a weighted tail holds
@@ -200,8 +204,16 @@ Three rules ship, and each answers a different question about the sample.
     leaves `c * sqrt(T)` observations in the tail, which grows with the sample but more slowly
     than the sample does. That is the rate at which a sample mean's own error falls. It reads the
     raw row count, because a rate is a statement about the length of the record.
-  - [`EntropyBudget`](@ref) answers *what may the deformation cost*. It is the deformation family's
-    rule, and section 5 puts it on a ``\kappa`` slot.
+  - [`EntropyBudget`](@ref) answers *what may the deformation cost*. Section 5 puts it on a
+    ``\kappa`` slot.
+
+The deformation family holds two more rules, and both answer a different question:
+*how fast does this sample's tail decay*. Each estimates a tail index and returns its
+reciprocal. [`HillTailDecay`](@ref) standardises every column by its own dispersion and keeps
+the sign of the end, so a skewed sample gives one number for the loss end and another for the
+gain end. [`RadialTailDecay`](@ref) whitens each observation with the covariance matrix and
+reads a distance, so it returns one number for both ends. They take a ``\kappa`` slot on the
+same terms [`EntropyBudget`](@ref) does.
 =#
 
 count_rule = ConditionalValueatRisk(;
@@ -374,7 +386,7 @@ around the empirical one. Its `r` is the radius of that ball and its `l` is the 
 tail term, and both are calibration slots beside `alpha`. So one measure can refit all three
 quantities per fold.
 
-Two radius rules ship.
+Four radius rules ship. The two below are the two this section runs.
 
   - [`ConcentrationRadius`](@ref) is the Blanchet-Kang-Murthy form: a scale in the units of the
     returns times the square root of a chi-squared quantile over the sample size. A wider universe
@@ -383,8 +395,15 @@ Two radius rules ship.
   - [`RateRadius`](@ref) is `c / sqrt(T)`. The rate is the part of the form to trust and `c` is the
     part to calibrate, so a cross-validation over `c` is the honest route to a radius.
 
-The tail-weight family ships no rule. A caller's own function is the whole of its population, which
-is the case section 6 covers.
+The other two answer a question these two do not. [`DimensionalRateRadius`](@ref) shrinks the
+ball at the rate the number of assets sets rather than at the square-root rate of the sample
+length, which is far slower over a wide universe. [`DualNormRadius`](@ref) reads the slot's own
+key, picks the ground metric that slot names, and returns the sampling error in it, so two
+slots of two different norms get two different numbers.
+
+The tail-weight family ships one rule, [`TailTermParity`](@ref), which prices the tail term of
+the loss at a stated multiple of its mean term. The `l` below takes a caller's own function
+instead, which is the case section 6 covers.
 =#
 
 drcvar = DistributionallyRobustConditionalValueatRisk(; alpha = count_rule.alpha,
@@ -433,8 +452,8 @@ println("robust out-of-sample variance = $(expected_risk(var_rm, pred_drcvar))")
     with the square root of the record, and an entropy budget fixes the price of a deformation.
   - `alpha` and ``\kappa`` travel together, so a scenario count on `alpha` holds the entropy band
     still and a stated `alpha` does not.
-  - A plain function of `(key, pr, w, slv)` is a rule, which covers the one-off case and the
-    tail-weight family that ships no rule of its own.
+  - A plain function of `(key, pr, w, slv)` is a rule, which covers the one-off case in every
+    family.
   - A role names an end of the distribution, and its slot's type bound refuses the other end at
     construction.
 =#
