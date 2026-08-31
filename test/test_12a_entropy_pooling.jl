@@ -762,9 +762,11 @@ end
     end
     opt = OptimEntropyPooling()
     # The `::Nothing` method is a pass-through: it must return exactly what a direct
-    # `entropy_pooling` call returns, ignoring `pr`, `sets`, `ds_opt` and `dm_opt`.
-    wnone = PortfolioOptimisers.ep_cvar_views_solve!(nothing, epc_mu(), pr0, sets, w, opt,
-                                                     nothing, nothing)
+    # `entropy_pooling` call returns. `ep_cvar_views_setup` answers `nothing` when the
+    # estimator carries no CVaR view, and that is what this method dispatches on.
+    @test isnothing(PortfolioOptimisers.ep_cvar_views_setup(nothing, pr0, sets, w, nothing,
+                                                            nothing))
+    wnone = PortfolioOptimisers.ep_cvar_views_solve!(nothing, epc_mu(), w, opt)
     wdirect = PortfolioOptimisers.entropy_pooling(w, epc_mu(), opt)
     @test wnone == wdirect
     # And the same weights reach the caller through `prior`.
@@ -854,6 +856,9 @@ const EP_TIGHT = OptimEntropyPooling(;
     x = rd.X[:, 1]
     T0, alpha, target = length(x), 0.05, 0.07
     q = fill(inv(T0), T0)
+    # The prior weighting a default estimator carries, which every `prior(...)` reference of
+    # this testset resolves under.
+    qw = pweights(range(inv(T0), inv(T0); length = T0))
     # A plain bisection keeps the check free of a solver and of a new test dependency.
     bisect = function (f, lo, hi, tol)
         flo = f(lo)
@@ -915,8 +920,12 @@ const EP_TIGHT = OptimEntropyPooling(;
                                                                                       views = LinearConstraintEstimator(;
                                                                                                                         val = "AAPL == prior(AAPL)*$f"))),
                     rd)
+        # #628: the reference is read under the prior's own weights, so the target is
+        # read the same way. Under the uniform `w0` of a default estimator the weighted
+        # and unweighted methods agree at this level, and #629 is why they need not at a
+        # higher one.
         @test isapprox(ConditionalValueatRisk(; w = prf.w)(x),
-                       ConditionalValueatRisk()(x) * f, rtol = 1e-5)
+                       ConditionalValueatRisk(; w = qw)(x) * f, rtol = 1e-5)
         @test isapprox(sum(prf.w), 1, rtol = 5e-7)
         @test all(>(0), prf.w)
     end
@@ -941,7 +950,11 @@ const EP_TIGHT = OptimEntropyPooling(;
                                                                                                                         val = "$nm == prior($nm)*1.03"))),
                     rd)
         xj = rd.X[:, j]
-        B = ConditionalValueatRisk(; alpha = a)(xj) * 1.03
+        # #628: the view names `prior(nm)`, which resolves under the estimator's own
+        # observation weights, uniform here. The unweighted method answers a different
+        # number at `a = 0.10` and `a = 0.20` -- that is #629 -- so the target must be read
+        # the way the library reads it and not through the method that carries the defect.
+        B = ConditionalValueatRisk(; alpha = a, w = qw)(xj) * 1.03
         @test isapprox(ConditionalValueatRisk(; alpha = a, w = prj.w)(xj), B, rtol = 1e-2)
         @test 0 < ValueatRisk(; alpha = a, w = prj.w)(xj) / B < 1
     end
@@ -979,6 +992,9 @@ end
 # the two rules below answer 7.6e-12 and 5.6e-21 there. The bracket now stops at
 # `B * (1 - sqrt(eps))`, where the demanded value is strictly positive and both rules meet it.
 @testset "MeucciEntropyPoolingPrior CVaR bracket ends inside B" begin
+    # #628: the target reads `prior(...)` under the estimator's own observation weights,
+    # uniform here. #629 is why the unweighted method must not be used at `a = 0.20`.
+    qw = pweights(range(inv(size(rd.X, 1)), inv(size(rd.X, 1)); length = size(rd.X, 1)))
     ep_end = function (x, a, Bt, eta, opt)
         pos = max.(-x .- eta, zero(eltype(x)))
         epc = Dict{Symbol, Tuple{Matrix{Float64}, Vector{Float64}}}()
@@ -989,7 +1005,7 @@ end
     end
     for j in (1, 5, 13, 20), a in (0.05, 0.10, 0.20)
         x = rd.X[:, j]
-        Bt = ConditionalValueatRisk(; alpha = a)(x) * 1.10
+        Bt = ConditionalValueatRisk(; alpha = a, w = qw)(x) * 1.10
         hi = Bt * (1 - sqrt(eps(eltype(Bt))))
         # The end the search now uses demands a strictly positive tail contribution, so an
         # interior posterior answers it and the dual that carries it is bounded.
@@ -1002,14 +1018,23 @@ end
         @test ep_end(x, a, Bt, Bt, OptimEntropyPooling()) > 0
     end
     # The root the search returns sits well inside the shrunk end, so the shrink holds it.
-    for j in (1, 20), a in (0.05, 0.20)
+    #
+    # The view asks for 1.03 of the prior conditional value at risk and not 1.10, and the
+    # levels are 0.05 and 0.10 and not 0.05 and 0.20. #628 makes a `prior(...)` reference
+    # read under the estimator's own observation weights, which raises the `a = 0.20`
+    # reference threefold, and a view that asks for three times the tail is a much harder
+    # solve. Under `EP_TIGHT` it lands on the knife edge #573 and #574 record: run whole,
+    # this file solved it twice and refused it twice, while the same four cases run alone
+    # solved every time and put the root between 0.449 and 0.657 of `B`. The level 0.20 is
+    # still covered at 1.03 by the testset above, over four assets.
+    for j in (1, 20), a in (0.05, 0.10)
         x = rd.X[:, j]
-        Bt = ConditionalValueatRisk(; alpha = a)(x) * 1.10
+        Bt = ConditionalValueatRisk(; alpha = a, w = qw)(x) * 1.03
         prj = prior(MeucciEntropyPoolingPrior(; sets = sets, opt = EP_TIGHT,
                                               cvar_views = ConditionalValueatRiskView(;
                                                                                       alpha = a,
                                                                                       views = LinearConstraintEstimator(;
-                                                                                                                        val = "$(rd.nx[j]) == prior($(rd.nx[j]))*1.10"))),
+                                                                                                                        val = "$(rd.nx[j]) == prior($(rd.nx[j]))*1.03"))),
                     rd)
         @test 0.3 < ValueatRisk(; alpha = a, w = prj.w)(x) / Bt < 0.7
     end
@@ -1225,4 +1250,103 @@ end
     @test prok.ens > 0.5 * T0
     @test maximum(prok.w) < 0.05
     @test isapprox(ConditionalValueatRisk(; w = prok.w)(rd.X[:, 1]), 0.07, rtol = 1e-5)
+end
+
+# #628: a `prior(...)` reference resolves against the **initial** prior result, under the
+# observation weights that result was read at. Before the fix every tail measure built its own
+# uniform weight vector, so a caller who stated a non-uniform `w` had the reference resolved off
+# a distribution the caller's prior does not carry.
+@testset "A prior reference reads the initial prior's observation weights" begin
+    pr0 = prior(EmpiricalPrior(), rd)
+    x = rd.X[:, 1]
+    T0 = length(x)
+    # A weighting that leans on the recent end of the sample, far enough from uniform that the
+    # two readings of every statistic separate.
+    v = collect(range(0.25, 1.75; length = T0))
+    wnu = pweights(v ./ sum(v))
+    wun = pweights(range(inv(T0), inv(T0); length = T0))
+    a = 0.05
+
+    # Every tail reference moves with the weights, and every one of them answers the uniform
+    # reading when no weights are stated. The weights follow the statistic's own parameters,
+    # so `:rlvar` carries `kappa` before them.
+    pars = (key, wi) -> key == :rlvar ? (a, 0.3, wi) : (a, wi)
+    for key in (:var, :cvar, :evar, :rlvar)
+        ref_n = PortfolioOptimisers.get_pr_value(pr0, 1, Val(key), pars(key, nothing)...)
+        ref_u = PortfolioOptimisers.get_pr_value(pr0, 1, Val(key), pars(key, wun)...)
+        ref_w = PortfolioOptimisers.get_pr_value(pr0, 1, Val(key), pars(key, wnu)...)
+        @test isapprox(ref_n, ref_u, rtol = 1e-8)
+        @test !isapprox(ref_w, ref_u, rtol = 1e-2)
+    end
+
+    # And the reference the caller's view names is the weighted one, end to end. The posterior
+    # meets `prior(AAPL) * f` read under `wnu`, and misses the uniform reading by the gap
+    # between the two.
+    f = 1.05
+    ref_w = PortfolioOptimisers.get_pr_value(pr0, 1, Val(:cvar), a, wnu)
+    ref_u = PortfolioOptimisers.get_pr_value(pr0, 1, Val(:cvar), a, wun)
+    cvv = ConditionalValueatRiskView(; alpha = a,
+                                     views = LinearConstraintEstimator(;
+                                                                       val = "AAPL == prior(AAPL)*$f"))
+    prw = prior(MeucciEntropyPoolingPrior(; sets = sets, w = wnu, cvar_views = cvv), rd)
+    @test isapprox(ConditionalValueatRisk(; alpha = a, w = prw.w)(x), ref_w * f,
+                   rtol = 1e-5)
+    @test !isapprox(ref_w * f, ref_u * f, rtol = 1e-2)
+
+    # The staged route refits `pr` under each stage's posterior, so a reference resolved inside
+    # the search would state a different target at each stage. It is resolved once, before any
+    # solve, so a second stage does not move it: the posterior of a chain that also carries a
+    # variance view meets the same target.
+    for alg in (H1_EntropyPooling(), H2_EntropyPooling())
+        prs = prior(MeucciEntropyPoolingPrior(; sets = sets, w = wnu, alg = alg,
+                                              cvar_views = cvv,
+                                              sigma_views = LinearConstraintEstimator(;
+                                                                                      val = "WMT == 1.2*prior(WMT)")),
+                    rd)
+        # The chain solves twice under the default stopping rule, so it meets the view
+        # to a few parts in ten thousand. The uniform reading it must not have used sits
+        # 3.7% away, which is two orders of magnitude further out.
+        @test isapprox(ConditionalValueatRisk(; alpha = a, w = prs.w)(x), ref_w * f,
+                       rtol = 1e-3)
+    end
+
+    # The same rule on the `EntropyPoolingPrior` route, whose value at risk view writes a tail
+    # mass row rather than a fixed point.
+    ref_v = PortfolioOptimisers.get_pr_value(pr0, 1, Val(:var), a, wnu)
+    prv = prior(EntropyPoolingPrior(; sets = sets, w = wnu,
+                                    var_views = ValueatRiskView(; alpha = a,
+                                                                views = LinearConstraintEstimator(;
+                                                                                                  val = "AAPL == prior(AAPL)*$f"))),
+                rd)
+    @test isapprox(ValueatRisk(; alpha = a, w = prv.w)(x), ref_v * f, rtol = 5e-2)
+    @test !isapprox(ref_v, PortfolioOptimisers.get_pr_value(pr0, 1, Val(:var), a, wun),
+                    rtol = 1e-2)
+end
+
+# #628: a group of more than one equation reaches the vector method of `replace_prior_views`,
+# which forwarded its parameters through a broadcast. A `Tuple` and a weights vector are both
+# containers a broadcast walks beside the group, so the call raised a `DimensionMismatch` as
+# soon as the group held a second equation.
+@testset "A group of several equations resolves its prior references" begin
+    pr0 = prior(EmpiricalPrior(), rd)
+    T0 = size(rd.X, 1)
+    wun = pweights(range(inv(T0), inv(T0); length = T0))
+    for key in (:var, :cvar)
+        pe = if key == :var
+            EntropyPoolingPrior(; sets = sets,
+                                var_views = ValueatRiskView(;
+                                                            views = LinearConstraintEstimator(;
+                                                                                              val = ["AAPL == prior(AAPL)*1.05",
+                                                                                                     "WMT == prior(WMT)*1.05"])))
+        else
+            EntropyPoolingPrior(; sets = sets, opt = JuMPEntropyPooling(; slv = slv),
+                                cvar_views = ConditionalValueatRiskView(;
+                                                                        views = LinearConstraintEstimator(;
+                                                                                                          val = ["AAPL == prior(AAPL)*1.05",
+                                                                                                                 "WMT == prior(WMT)*1.05"])))
+        end
+        pr = prior(pe, rd)
+        @test isapprox(sum(pr.w), 1, rtol = 5e-7)
+        @test all(>(0), pr.w)
+    end
 end

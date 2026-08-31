@@ -311,30 +311,165 @@ The group exists because a caller that pools opinions holds many estimators rath
 """
 const VecMeucciEP = AbstractVector{<:MeucciEntropyPoolingPrior}
 """
-    ep_cvar_views_solve!(cvar_views::Nothing, epc::AbstractDict, ::Any, ::Any,
-                         w::StatsBase.ProbabilityWeights, opt::AbstractEntropyPoolingOptimiser, ::Any, ::Any;
-                         kwargs...)
+    ep_cvar_views_setup(cvar_views::Nothing, args...; kwargs...)
+
+No-op pass-through for conditional value at risk view constraints when none are specified.
+
+# Arguments
+
+  - `cvar_views::Nothing`: Indicates that no CVaR view constraints are specified.
+  - `args...`: Additional positional arguments (ignored).
+  - `kwargs...`: Additional keyword arguments (ignored).
+
+# Returns
+
+  - `nothing`: There is no search to prepare, which [`ep_cvar_views_solve!`](@ref) dispatches on.
+
+# Related
+
+  - [`ep_cvar_views_setup`](@ref)
+  - [`ep_cvar_views_solve!`](@ref)
+  - [`MeucciEntropyPoolingPrior`](@ref)
+"""
+function ep_cvar_views_setup(cvar_views::Nothing, args...; kwargs...)
+    return nothing
+end
+"""
+    ep_cvar_views_setup(cvar_views::CVV_VecCVV, pr::AbstractPriorResult,
+                        sets::UniverseSets, w::StatsBase.ProbabilityWeights,
+                        ds_opt::Option{<:ConditionalValueatRiskEntropyPooling},
+                        dm_opt::Option{<:OptimEntropyPooling}; strict::Bool = false)
+
+Resolve the **conditional value at risk** views once, into the data one search reads.
+
+`ep_cvar_views_setup` parses and validates the CVaR view groups, resolves every `prior(...)` reference against `pr` under `w`, and flattens the groups into one loss matrix, one target vector and one level vector. It also chooses the search the targets need. [`ep_cvar_views_solve!`](@ref) reads that answer and adds nothing to it.
+
+The staged route of [`ep_prior`](@ref) searches up to three times, once per stage, and the reference each stage reads must be the same number. This verb is therefore called **once**, before any solve, against the first fit of the wrapped estimator and the prior probabilities that fit was read at. A later stage carries a refit `pr` whose weights are the previous stage's posterior, so a reference resolved there would state a different target at each stage, and the view the caller wrote would move under it. Resolving once also lifts the whole parse out of the search, which repeated it at every stage. Issue #628 owns that rule.
+
+# Algorithm
+
+ 1. Wrap `cvar_views` in a vector when it is a single view, so one loop serves both shapes.
+ 2. For each view group, read its significance level into `alpha`, and parse its equations accepting `==` alone.
+ 3. Replace every group name by the assets it spans, and every `prior(...)` reference by the prior conditional value at risk at `alpha` under `w`, through [`replace_prior_views`](@ref).
+ 4. Turn the parsed views into the equality block `lcs`, and check the two preconditions of the section below that read it.
+ 5. For each row of the block, read the asset it names into `cols`, its target into `B`, its level into `alphas` and its text into `eqns`. The groups flatten into one search: each level enters only as the divisor of its own view's positive part.
+ 6. Read the worst realisation of every named asset into `min_X`, and raise when any target reaches it.
+ 7. Choose the search `d_opt`. One view takes `ds_opt`, or a default [`ConditionalValueatRiskEntropyPooling`](@ref). More than one takes `dm_opt`, or a default [`OptimEntropyPooling`](@ref) over `Optim.Fminbox`.
+ 8. Return the loss columns `X`, the targets `B`, the levels `alphas` and the search `d_opt`.
+
+# Arguments
+
+  - `cvar_views`: CVaR view constraints.
+  - `pr`: Prior result the `prior(...)` references are read from. It is the first fit of the wrapped estimator, not a refit of a later stage.
+  - `sets`: Asset set mapping asset names to indices.
+  - `w`: Observation weights `pr` was read at, which the `prior(...)` references resolve under.
+  - `ds_opt`: CVaR-specific optimiser (for single view).
+  - `dm_opt`: General optimiser (for multiple views).
+  - `strict`: If `true`, throws error for missing assets; otherwise, issue warnings.
+
+# Validation
+
+  - No view group declares a view formulation. A group whose `alg` is not `nothing` raises an `ArgumentError`: this route writes no constraint formulation, so it has nothing to apply the declaration to.
+  - Every view names one asset. A view over more than one asset raises an `ArgumentError`.
+  - Every target is non-negative. A negative target raises a `DomainError`.
+  - Every target stays below the worst realisation of the asset it names. A target that reaches it raises an `ArgumentError` naming every offending view beside the largest target its asset admits.
+
+# Returns
+
+  - `cvv::NamedTuple`: The search data, carrying the loss columns `X`, the targets `B`, the levels `alphas` and the search `d_opt`.
+
+# Related
+
+  - [`ep_cvar_views_solve!`](@ref): runs the search this verb prepares.
+  - [`replace_prior_views`](@ref): resolves the `prior(...)` reference a target may carry.
+  - [`get_pr_value`](@ref): reads the prior conditional value at risk that reference resolves to.
+  - [`ConditionalValueatRiskEntropyPooling`](@ref)
+  - [`OptimEntropyPooling`](@ref)
+  - [`MeucciEntropyPoolingPrior`](@ref)
+
+# References
+
+  - $(ref_dict[:meucciardiakeel2011])
+"""
+function ep_cvar_views_setup(cvar_views::CVV_VecCVV, pr::AbstractPriorResult,
+                             sets::UniverseSets, w::StatsBase.ProbabilityWeights,
+                             ds_opt::Option{<:ConditionalValueatRiskEntropyPooling},
+                             dm_opt::Option{<:OptimEntropyPooling}; strict::Bool = false)
+    X0 = pr.X
+    # Each group is parsed under its own significance level, because a `prior(...)`
+    # reference resolves to the prior CVaR at that level. The groups are then flattened
+    # into one root-find: the recursive algorithm carries one `eta` per view already, and
+    # the level enters only as the divisor of that view's positive part.
+    cols = Vector{Int}(undef, 0)
+    B = Vector{eltype(X0)}(undef, 0)
+    alphas = Vector{eltype(X0)}(undef, 0)
+    eqns = Vector{String}(undef, 0)
+    for cvar_view in cvar_views
+        @argcheck(isnothing(cvar_view.alg),
+                  ArgumentError("The recursive CVaR route of `MeucciEntropyPoolingPrior` writes no constraint formulation, so a view group carrying `alg` has nothing to apply it to. Leave `alg` as `nothing`, or use `EntropyPoolingPrior`."))
+        alpha = cvar_view.alpha
+        views = parse_equation(cvar_view.views.val; ops1 = ("==",), ops2 = (:call, :(==)),
+                               datatype = eltype(X0))
+        views = replace_group_by_assets(views, sets, false, true, false)
+        views = replace_prior_views(views, pr, sets, :cvar, alpha, w; strict = strict)
+        lcs = get_linear_constraints(views, sets; datatype = eltype(X0), strict = strict)
+        @argcheck(!any(x -> x != 1, count(!iszero, lcs.A_eq; dims = 2)),
+                  ArgumentError("Cannot mix multiple assets in a single cvar_view.\n$(views)"))
+        @argcheck(!any(x -> x < zero(eltype(x)), lcs.A_eq .* lcs.B_eq),
+                  DomainError("cvar_views cannot be negative.\n$(views)"))
+        if !isa(views, AbstractVector)
+            views = [views]
+        end
+        for i in axes(lcs.A_eq, 1)
+            j = findfirst(!iszero, view(lcs.A_eq, i, :))
+            push!(cols, j)
+            push!(B, lcs.B_eq[i] / lcs.A_eq[i, j])
+            push!(alphas, alpha)
+            push!(eqns, views[i].eqn)
+        end
+    end
+    X = view(X0, :, cols)
+    min_X = dropdims(-minimum(X; dims = 1); dims = 1)
+    invalid = B .>= min_X
+    if any(invalid)
+        msg = "The following views are too extreme, the maximum viable view for a given asset is its worst realisation:"
+        for (v, m) in zip(eqns[invalid], min_X[invalid])
+            msg *= "\n$v\t(> $m)."
+        end
+        msg *= "\nPlease lower the views or use a different prior with fatter tails."
+        throw(ArgumentError(msg))
+    end
+    d_opt = if isone(length(B))
+        ifelse(!isnothing(ds_opt), ds_opt, ConditionalValueatRiskEntropyPooling())
+    else
+        ifelse(!isnothing(dm_opt), dm_opt,
+               OptimEntropyPooling(;
+                                   args = (Optim.Fminbox(),
+                                           Optim.Options(; outer_x_abstol = 1e-4,
+                                                         x_abstol = 1e-4))))
+    end
+    return (; X = X, B = B, alphas = alphas, d_opt = d_opt)
+end
+"""
+    ep_cvar_views_solve!(cvv::Nothing, epc::AbstractDict,
+                         w::StatsBase.ProbabilityWeights,
+                         opt::AbstractEntropyPoolingOptimiser)
 
 Solve the entropy pooling problem when no CVaR views are specified.
 
-`ep_cvar_views_solve!` is an internal API compatibility method that solves the entropy pooling problem when no conditional value at risk (CVaR) view constraints are present (`cvar_views = nothing`). It delegates to the main entropy pooling solver using the provided prior weights, constraint dictionary, and optimiser.
+`ep_cvar_views_solve!` is an internal API compatibility method that solves the entropy pooling problem when [`ep_cvar_views_setup`](@ref) prepared no search, which happens when no conditional value at risk view constraint is present. It delegates to the main entropy pooling solver using the provided prior weights, constraint dictionary, and optimiser.
 
 # Algorithm
 
  1. Call [`entropy_pooling`](@ref) with the prior weights `w`, the constraint dictionary `epc` and the optimiser `opt`, giving the posterior probability weights `pw`.
- 2. Return `pw`. Every other argument is ignored: with no conditional value at risk view there is no value at risk to search over, so the whole staged solve collapses to the one call of step 1.
+ 2. Return `pw`. With no conditional value at risk view there is no value at risk to search over, so the whole staged solve collapses to the one call of step 1.
 
 # Arguments
 
-  - `cvar_views`: Indicates that no CVaR view constraints are specified.
+  - `cvv`: Indicates that [`ep_cvar_views_setup`](@ref) prepared no search.
   - `epc`: Dictionary of entropy pooling constraints, mapping keys to `(lhs, rhs)` pairs.
-  - `::Any`: Prior result, ignored on this path.
-  - `::Any`: Asset set, ignored on this path.
   - `w`: Prior probability weights.
   - `opt`: Entropy pooling optimiser.
-  - `::Any`: CVaR-specific optimiser, ignored on this path.
-  - `::Any`: General optimiser, ignored on this path.
-  - `kwargs...`: Additional keyword arguments forwarded to the solver.
 
 # Returns
 
@@ -343,26 +478,25 @@ Solve the entropy pooling problem when no CVaR views are specified.
 # Related
 
   - [`entropy_pooling`](@ref)
+  - [`ep_cvar_views_setup`](@ref)
   - [`OptimEntropyPooling`](@ref)
   - [`JuMPEntropyPooling`](@ref)
   - [`ConditionalValueatRiskEntropyPooling`](@ref)
   - [`MeucciEntropyPoolingPrior`](@ref)
 """
-function ep_cvar_views_solve!(cvar_views::Nothing, epc::AbstractDict, ::Any, ::Any,
+function ep_cvar_views_solve!(cvv::Nothing, epc::AbstractDict,
                               w::StatsBase.ProbabilityWeights,
-                              opt::AbstractEntropyPoolingOptimiser, ::Any, ::Any; kwargs...)
+                              opt::AbstractEntropyPoolingOptimiser)
     return entropy_pooling(w, epc, opt)
 end
 """
-    ep_cvar_views_solve!(cvar_views::CVV_VecCVV, epc::AbstractDict,
-                         pr::AbstractPriorResult, sets::UniverseSets,
-                         w::StatsBase.ProbabilityWeights, opt::AbstractEntropyPoolingOptimiser,
-                         ds_opt::Option{<:ConditionalValueatRiskEntropyPooling},
-                         dm_opt::Option{<:OptimEntropyPooling}; strict::Bool = false)
+    ep_cvar_views_solve!(cvv::NamedTuple, epc::AbstractDict,
+                         w::StatsBase.ProbabilityWeights,
+                         opt::AbstractEntropyPoolingOptimiser)
 
 Solve the entropy pooling problem with Conditional Value-at-Risk (CVaR) view constraints.
 
-`ep_cvar_views_solve!` parses and validates CVaR view constraints, replaces prior references, and constructs the corresponding entropy pooling constraint system. It then solves for posterior probability weights using either root-finding (for single CVaR view) or optimisation (for multiple views), depending on the number of constraints and the provided optimiser. Throws informative errors if views are infeasible or too extreme.
+`ep_cvar_views_solve!` reads the targets, the levels and the search that [`ep_cvar_views_setup`](@ref) resolved, and solves for the posterior probability weights by either root-finding (for a single CVaR view) or optimisation (for more than one). It parses nothing and resolves nothing: the staged route calls it once per stage, and every stage must read the same targets.
 
 The search runs over the value at risk levels `etas`, one per view, each bounded by `[0, B]`. This is a continuous relaxation of the recursive algorithm, which searches over discrete tail sizes instead; it reaches the same target and it takes more than one view.
 
@@ -395,35 +529,20 @@ Where:
 
 # Algorithm
 
- 1. Wrap `cvar_views` in a vector when it is a single view, so one loop serves both shapes.
- 2. For each view group, read its significance level into `alpha`, and parse its equations accepting `==` alone.
- 3. Replace every group name by the assets it spans, and every `prior(...)` reference by the prior conditional value at risk at `alpha`, through [`replace_prior_views`](@ref).
- 4. Turn the parsed views into the equality block `lcs`, and check the two preconditions of the section below that read it.
- 5. For each row of the block, read the asset it names into `cols`, its target into `B`, its level into `alphas` and its text into `eqns`. The groups flatten into one search: each level enters only as the divisor of its own view's positive part.
- 6. Read the worst realisation of every named asset into `min_X`, and raise when any target reaches it.
- 7. Choose the search `d_opt`. One view takes `ds_opt`, or a default [`ConditionalValueatRiskEntropyPooling`](@ref). More than one takes `dm_opt`, or a default [`OptimEntropyPooling`](@ref) over `Optim.Fminbox`.
- 8. Define `func(etas)`. It writes the second line above into `epc` under the key `:cvar_eq` at the candidate `etas`, solves the whole constraint set with [`entropy_pooling`](@ref) into `wi`, and returns `wi` beside the residual of the third line. One view residual is the posterior tail mass minus `alpha`. More than one is the [`norm_error`](@ref) of the posterior conditional value at risk minus the target, over the views.
- 9. Search for the value at risk `res`. One view root-finds the residual of `func` over `[0, B[1] * (1 - sqrt(eps))]` with `Roots.find_zero`. More than one minimises it over the box `[0, B]` from the start `0.5 * B` with `Optim.optimize`.
-10. Call `func(res)` once more, and return the posterior probability weights it produces.
+ 1. Read the loss columns `X`, the targets `B`, the levels `alphas` and the search `d_opt` off `cvv`.
+ 2. Define `func(etas)`. It writes the second line above into `epc` under the key `:cvar_eq` at the candidate `etas`, solves the whole constraint set with [`entropy_pooling`](@ref) into `wi`, and returns `wi` beside the residual of the third line. One view residual is the posterior tail mass minus `alpha`. More than one is the [`norm_error`](@ref) of the posterior conditional value at risk minus the target, over the views.
+ 3. Search for the value at risk `res`. One view root-finds the residual of `func` over `[0, B[1] * (1 - sqrt(eps))]` with `Roots.find_zero`. More than one minimises it over the box `[0, B]` from the start `0.5 * B` with `Optim.optimize`.
+ 4. Call `func(res)` once more, and return the posterior probability weights it produces.
 
 # Arguments
 
-  - `cvar_views`: CVaR view constraints.
+  - `cvv`: Search data, answered by [`ep_cvar_views_setup`](@ref).
   - `epc`: Dictionary of entropy pooling constraints, mapping keys to `(lhs, rhs)` pairs.
-  - `pr`: Prior result containing asset return information.
-  - `sets`: Asset set mapping asset names to indices.
-  - `w`: Prior probability weights.
+  - `w`: Prior probability weights the stage projects.
   - `opt`: Main entropy pooling optimiser.
-  - `ds_opt`: CVaR-specific optimiser (for single view).
-  - `dm_opt`: General optimiser (for multiple views).
-  - `strict`: If `true`, throws error for missing assets; otherwise, issue warnings.
 
 # Validation
 
-  - No view group declares a view formulation. A group whose `alg` is not `nothing` raises an `ArgumentError`: this route writes no constraint formulation, so it has nothing to apply the declaration to.
-  - Every view names one asset. A view over more than one asset raises an `ArgumentError`.
-  - Every target is non-negative. A negative target raises a `DomainError`.
-  - Every target stays below the worst realisation of the asset it names. A target that reaches it raises an `ArgumentError` naming every offending view beside the largest target its asset admits.
   - Every candidate value at risk stays in `[0, B]`. A candidate outside the box raises a `DomainError`.
   - The search must succeed. A `Roots.find_zero` that raises is rethrown as an `ErrorException`, and an `Optim.optimize` that `Optim.converged` reports as failed raises an `ErrorException`.
   - An infeasible view set is **not** caught. The residual this search minimises is the posterior tail mass minus `alpha`, and a posterior that sits on one observation carries a small residual while it misses the view by any margin. The summary paragraph of [`MeucciEntropyPoolingPrior`](@ref) states how to recognise that answer.
@@ -434,11 +553,11 @@ Where:
 
 # Related
 
+  - [`ep_cvar_views_setup`](@ref): resolves the targets this search reads.
   - [`ConditionalValueatRiskEntropyPooling`](@ref)
   - [`OptimEntropyPooling`](@ref): its stopping rule sets how closely each inner solve meets the constraint this search re-solves, and its own tip states the size of that.
   - [`MeucciEntropyPoolingPrior`](@ref)
   - [`entropy_pooling`](@ref)
-  - [`replace_prior_views`](@ref): resolves the `prior(...)` reference a target may carry.
   - [`norm_error`](@ref): scores the residual of a search over more than one view.
   - [`ConditionalValueatRisk`](@ref): reads the posterior statistic that residual scores.
 
@@ -446,66 +565,11 @@ Where:
 
   - $(ref_dict[:meucciardiakeel2011])
 """
-function ep_cvar_views_solve!(cvar_views::CVV_VecCVV, epc::AbstractDict,
-                              pr::AbstractPriorResult, sets::UniverseSets,
+function ep_cvar_views_solve!(cvv::NamedTuple, epc::AbstractDict,
                               w::StatsBase.ProbabilityWeights,
-                              opt::AbstractEntropyPoolingOptimiser,
-                              ds_opt::Option{<:ConditionalValueatRiskEntropyPooling},
-                              dm_opt::Option{<:OptimEntropyPooling}; strict::Bool = false)
-    X0 = pr.X
-    # Each group is parsed under its own significance level, because a `prior(...)`
-    # reference resolves to the prior CVaR at that level. The groups are then flattened
-    # into one root-find: the recursive algorithm carries one `eta` per view already, and
-    # the level enters only as the divisor of that view's positive part.
-    cols = Vector{Int}(undef, 0)
-    B = Vector{eltype(X0)}(undef, 0)
-    alphas = Vector{eltype(X0)}(undef, 0)
-    eqns = Vector{String}(undef, 0)
-    for cvar_view in cvar_views
-        @argcheck(isnothing(cvar_view.alg),
-                  ArgumentError("The recursive CVaR route of `MeucciEntropyPoolingPrior` writes no constraint formulation, so a view group carrying `alg` has nothing to apply it to. Leave `alg` as `nothing`, or use `EntropyPoolingPrior`."))
-        alpha = cvar_view.alpha
-        views = parse_equation(cvar_view.views.val; ops1 = ("==",), ops2 = (:call, :(==)),
-                               datatype = eltype(X0))
-        views = replace_group_by_assets(views, sets, false, true, false)
-        views = replace_prior_views(views, pr, sets, :cvar, alpha; strict = strict)
-        lcs = get_linear_constraints(views, sets; datatype = eltype(X0), strict = strict)
-        @argcheck(!any(x -> x != 1, count(!iszero, lcs.A_eq; dims = 2)),
-                  ArgumentError("Cannot mix multiple assets in a single cvar_view.\n$(views)"))
-        @argcheck(!any(x -> x < zero(eltype(x)), lcs.A_eq .* lcs.B_eq),
-                  DomainError("cvar_views cannot be negative.\n$(views)"))
-        if !isa(views, AbstractVector)
-            views = [views]
-        end
-        for i in axes(lcs.A_eq, 1)
-            j = findfirst(!iszero, view(lcs.A_eq, i, :))
-            push!(cols, j)
-            push!(B, lcs.B_eq[i] / lcs.A_eq[i, j])
-            push!(alphas, alpha)
-            push!(eqns, views[i].eqn)
-        end
-    end
-    X = view(X0, :, cols)
-    min_X = dropdims(-minimum(X; dims = 1); dims = 1)
-    invalid = B .>= min_X
-    if any(invalid)
-        msg = "The following views are too extreme, the maximum viable view for a given asset is its worst realisation:"
-        for (v, m) in zip(eqns[invalid], min_X[invalid])
-            msg *= "\n$v\t(> $m)."
-        end
-        msg *= "\nPlease lower the views or use a different prior with fatter tails."
-        throw(ArgumentError(msg))
-    end
+                              opt::AbstractEntropyPoolingOptimiser)
+    (; X, B, alphas, d_opt) = cvv
     N = length(B)
-    d_opt = if N == 1
-        ifelse(!isnothing(ds_opt), ds_opt, ConditionalValueatRiskEntropyPooling())
-    else
-        ifelse(!isnothing(dm_opt), dm_opt,
-               OptimEntropyPooling(;
-                                   args = (Optim.Fminbox(),
-                                           Optim.Options(; outer_x_abstol = 1e-4,
-                                                         x_abstol = 1e-4))))
-    end
     function func(etas)
         delete!(epc, :cvar_eq)
         @argcheck(all(zero(eltype(etas)) .<= etas .<= B),
@@ -526,15 +590,16 @@ function ep_cvar_views_solve!(cvar_views::CVV_VecCVV, epc::AbstractDict,
     res = if N == 1
         #! The constraint at `eta = B[1]` reads `E_p[(-x - eta)^+] / alpha = 0`, and the
         #! positive part is non-zero on the observations worse than `-B[1]`, a non-empty set
-        #! under the guard above. No interior posterior carries a tail contribution of
-        #! exactly zero, so the problem there is degenerate: its dual is unbounded, and a
-        #! tighter stopping rule only runs the dual further. `Roots` evaluates both ends of
-        #! a bracket, so every single-view search would run that problem once. `sqrt(eps)`
-        #! is the smallest shrink that bounds it. Over the twelve cases of
-        #! `test_12a_entropy_pooling.jl` two stopping rules stop the dual a factor of 1.4 to
-        #! 2.4 apart at `B[1]`, and still 1.2 to 1.9 apart at `B[1] * (1 - eps)`, where at
-        #! `B[1] * (1 - sqrt(eps))` they agree to four significant digits. The root sits
-        #! between 0.32 and 0.64 of `B[1]`, so the shrink does not move it. See issue #574.
+        #! under the guard in `ep_cvar_views_setup`. No interior posterior carries a tail
+        #! contribution of exactly zero, so the problem there is degenerate: its dual is
+        #! unbounded, and a tighter stopping rule only runs the dual further. `Roots`
+        #! evaluates both ends of a bracket, so every single-view search would run that
+        #! problem once. `sqrt(eps)` is the smallest shrink that bounds it. Over the twelve
+        #! cases of `test_12a_entropy_pooling.jl` two stopping rules stop the dual a factor
+        #! of 1.4 to 2.4 apart at `B[1]`, and still 1.2 to 1.9 apart at `B[1] * (1 - eps)`,
+        #! where at `B[1] * (1 - sqrt(eps))` they agree to four significant digits. The root
+        #! sits between 0.32 and 0.64 of `B[1]`, so the shrink does not move it. See issue
+        #! #574.
         hi = B[1] * (one(eltype(B)) - sqrt(eps(eltype(B))))
         try
             [Roots.find_zero(x -> func(x)[2], (zero(eltype(B)), hi), d_opt.args...;
@@ -634,12 +699,13 @@ Posterior moments are then read as probability-weighted sample statistics under 
 
  1. Read the prior probabilities into `w0`. When `pe.w` is `nothing` they are the uniform `1/T`, and otherwise they are `pe.w`, whose length must match `T`.
  2. Build the empty constraint dictionary `epc`, the fixing ledger `fixed`, and fit the wrapped estimator under `w0` into the prior result `pr`.
- 3. Stage one, the mean and the value at risk. Write the `mu_views` and `var_views` rows into `epc`. When any of `mu_views`, `var_views` and `cvar_views` is present, solve through [`ep_cvar_views_solve!`](@ref) into `w1`, and refit `pr` under it.
- 4. Stage two, the variance and the covariance. Write the `sigma_views` and `cov_views` rows into `epc`, and pin the mean of every asset those rows read with [`fix_mu!`](@ref), so the stage cannot move a moment an earlier stage set. Solve into `w1`, and refit `pr` under it.
- 5. Stage three, the correlation, the skewness and the kurtosis. Write the `sk_views`, `kt_views` and `rho_views` rows into `epc`, and pin the mean and the variance of every asset those rows read with [`fix_mu!`](@ref) and [`fix_sigma!`](@ref). Solve into `w1`, and refit `pr` under it.
- 6. Read the reference each of steps 4 and 5 solves from: `w0` under [`H1_EntropyPooling`](@ref), and the previous stage's `w1` under [`H2_EntropyPooling`](@ref).
- 7. Read the effective number of scenarios `ens` as the exponential of the entropy of `w1`, and the divergence `kld` as the Kullback-Leibler divergence of `w1` from `w0`.
- 8. Return a [`LowOrderPrior`](@ref) carrying the last refit's moments, `w1`, `ens` and `kld`. The feature matrix `Z` and the factor block `fpr` are forwarded from that refit unchanged.
+ 3. Resolve the `cvar_views` once against that first fit under `w0`, through [`ep_cvar_views_setup`](@ref) into `cvv`. Every stage searches the targets it holds, so a `prior(...)` reference states one number for the whole chain.
+ 4. Stage one, the mean and the value at risk. Write the `mu_views` and `var_views` rows into `epc`. When any of `mu_views`, `var_views` and `cvar_views` is present, solve through [`ep_cvar_views_solve!`](@ref) into `w1`, and refit `pr` under it.
+ 5. Stage two, the variance and the covariance. Write the `sigma_views` and `cov_views` rows into `epc`, and pin the mean of every asset those rows read with [`fix_mu!`](@ref), so the stage cannot move a moment an earlier stage set. Solve into `w1`, and refit `pr` under it.
+ 6. Stage three, the correlation, the skewness and the kurtosis. Write the `sk_views`, `kt_views` and `rho_views` rows into `epc`, and pin the mean and the variance of every asset those rows read with [`fix_mu!`](@ref) and [`fix_sigma!`](@ref). Solve into `w1`, and refit `pr` under it.
+ 7. Read the reference each of steps 5 and 6 solves from: `w0` under [`H1_EntropyPooling`](@ref), and the previous stage's `w1` under [`H2_EntropyPooling`](@ref).
+ 8. Read the effective number of scenarios `ens` as the exponential of the entropy of `w1`, and the divergence `kld` as the Kullback-Leibler divergence of `w1` from `w0`.
+ 9. Return a [`LowOrderPrior`](@ref) carrying the last refit's moments, `w1`, `ens` and `kld`. The feature matrix `Z` and the factor block `fpr` are forwarded from that refit unchanged.
 
 # Arguments
 
@@ -670,6 +736,7 @@ Posterior moments are then read as probability-weighted sample statistics under 
   - [`H2_EntropyPooling`](@ref)
   - [`ep_mu_views!`](@ref)
   - [`ep_var_views!`](@ref)
+  - [`ep_cvar_views_setup`](@ref)
   - [`ep_cvar_views_solve!`](@ref)
   - [`ep_sigma_views!`](@ref)
   - [`ep_sk_views!`](@ref)
@@ -695,11 +762,15 @@ function ep_prior(alg::StagedEP, pe::MeucciEntropyPoolingPrior, X::MatNum,
     # mu and VaR
     pe = factory(pe, w0)
     pr = prior(pe.pe, X, F; strict = strict, kwargs...)
+    # Every `prior(...)` reference resolves against this first fit, under `w0`. The CVaR
+    # search runs once per stage against a refit `pr`, so resolving inside it would state a
+    # different target at each stage. It is resolved once, here, and the stages read it.
+    cvv = ep_cvar_views_setup(pe.cvar_views, pr, pe.sets, w0, pe.ds_opt, pe.dm_opt;
+                              strict = strict)
     ep_mu_views!(pe.mu_views, epc, pr, pe.sets; strict = strict)
-    ep_var_views!(pe.var_views, epc, pr, pe.sets; strict = strict)
+    ep_var_views!(pe.var_views, epc, pr, pe.sets, w0; strict = strict)
     if !isnothing(pe.mu_views) || !isnothing(pe.var_views) || !isnothing(pe.cvar_views)
-        w1 = ep_cvar_views_solve!(pe.cvar_views, epc, pr, pe.sets, w0, pe.opt, pe.ds_opt,
-                                  pe.dm_opt; strict = strict)
+        w1 = ep_cvar_views_solve!(cvv, epc, w0, pe.opt)
         pe = factory(pe, w1)
         pr = prior(pe.pe, X, F; strict = strict, kwargs...)
     end
@@ -714,9 +785,8 @@ function ep_prior(alg::StagedEP, pe::MeucciEntropyPoolingPrior, X::MatNum,
             to_fix = ep_cov_views!(pe.cov_views, epc, pr, pe.sets; strict = strict)
             fix_mu!(epc, view(fixed, :, 1), to_fix, pr)
         end
-        w1 = ep_cvar_views_solve!(pe.cvar_views, epc, pr, pe.sets,
-                                  ifelse(isa(alg, H1_EntropyPooling), w0, w1), pe.opt,
-                                  pe.ds_opt, pe.dm_opt; strict = strict)
+        w1 = ep_cvar_views_solve!(cvv, epc, ifelse(isa(alg, H1_EntropyPooling), w0, w1),
+                                  pe.opt)
         pe = factory(pe, w1)
         pr = prior(pe.pe, X, F; strict = strict, kwargs...)
     end
@@ -739,9 +809,8 @@ function ep_prior(alg::StagedEP, pe::MeucciEntropyPoolingPrior, X::MatNum,
             fix_mu!(epc, view(fixed, :, 1), to_fix, pr)
             fix_sigma!(epc, view(fixed, :, 2), to_fix, pr)
         end
-        w1 = ep_cvar_views_solve!(pe.cvar_views, epc, pr, pe.sets,
-                                  ifelse(isa(alg, H1_EntropyPooling), w0, w1), pe.opt,
-                                  pe.ds_opt, pe.dm_opt; strict = strict)
+        w1 = ep_cvar_views_solve!(cvv, epc, ifelse(isa(alg, H1_EntropyPooling), w0, w1),
+                                  pe.opt)
         pe = factory(pe, w1)
         pr = prior(pe.pe, X, F; strict = strict, kwargs...)
     end
@@ -795,12 +864,13 @@ Posterior moments are then read as probability-weighted sample statistics under 
 
  1. Read the prior probabilities into `w0`. When `pe.w` is `nothing` they are the uniform `1/T`, and otherwise they are `pe.w`, whose length must match `T`.
  2. Build the empty constraint dictionary `epc`, and fit the wrapped estimator under `w0` into the prior result `pr`.
- 3. Write the `mu_views` and `var_views` rows into `epc`.
- 4. Write the `sigma_views` and `cov_views` rows into `epc`. No moment is pinned, so [`fix_mu!`](@ref) is never called on this route.
- 5. Write the `sk_views`, `kt_views` and `rho_views` rows into `epc`.
- 6. Solve the whole accumulated set once through [`ep_cvar_views_solve!`](@ref) into `w1`, and refit `pr` under it.
- 7. Read the effective number of scenarios `ens` as the exponential of the entropy of `w1`, and the divergence `kld` as the Kullback-Leibler divergence of `w1` from `w0`.
- 8. Return a [`LowOrderPrior`](@ref) carrying the refit's moments, `w1`, `ens` and `kld`. The feature matrix `Z` and the factor block `fpr` are forwarded from that refit unchanged.
+ 3. Resolve the `cvar_views` once against that fit under `w0`, through [`ep_cvar_views_setup`](@ref) into `cvv`.
+ 4. Write the `mu_views` and `var_views` rows into `epc`.
+ 5. Write the `sigma_views` and `cov_views` rows into `epc`. No moment is pinned, so [`fix_mu!`](@ref) is never called on this route.
+ 6. Write the `sk_views`, `kt_views` and `rho_views` rows into `epc`.
+ 7. Solve the whole accumulated set once through [`ep_cvar_views_solve!`](@ref) into `w1`, and refit `pr` under it.
+ 8. Read the effective number of scenarios `ens` as the exponential of the entropy of `w1`, and the divergence `kld` as the Kullback-Leibler divergence of `w1` from `w0`.
+ 9. Return a [`LowOrderPrior`](@ref) carrying the refit's moments, `w1`, `ens` and `kld`. The feature matrix `Z` and the factor block `fpr` are forwarded from that refit unchanged.
 
 # Arguments
 
@@ -829,6 +899,7 @@ Posterior moments are then read as probability-weighted sample statistics under 
   - [`H0_EntropyPooling`](@ref)
   - [`ep_mu_views!`](@ref)
   - [`ep_var_views!`](@ref)
+  - [`ep_cvar_views_setup`](@ref)
   - [`ep_cvar_views_solve!`](@ref)
   - [`ep_sigma_views!`](@ref)
   - [`ep_sk_views!`](@ref)
@@ -851,8 +922,11 @@ function ep_prior(alg::H0_EntropyPooling, pe::MeucciEntropyPoolingPrior, X::MatN
     # mu and VaR
     pe = factory(pe, w0)
     pr = prior(pe.pe, X, F; strict = strict, kwargs...)
+    # Every `prior(...)` reference resolves against this fit, under `w0`.
+    cvv = ep_cvar_views_setup(pe.cvar_views, pr, pe.sets, w0, pe.ds_opt, pe.dm_opt;
+                              strict = strict)
     ep_mu_views!(pe.mu_views, epc, pr, pe.sets; strict = strict)
-    ep_var_views!(pe.var_views, epc, pr, pe.sets; strict = strict)
+    ep_var_views!(pe.var_views, epc, pr, pe.sets, w0; strict = strict)
     if !isnothing(pe.sigma_views) || !isnothing(pe.cov_views)
         # sigma
         if !isnothing(pe.sigma_views)
@@ -877,8 +951,7 @@ function ep_prior(alg::H0_EntropyPooling, pe::MeucciEntropyPoolingPrior, X::MatN
             ep_rho_views!(pe.rho_views, epc, pr, pe.sets; strict = strict)
         end
     end
-    w1 = ep_cvar_views_solve!(pe.cvar_views, epc, pr, pe.sets, w0, pe.opt, pe.ds_opt,
-                              pe.dm_opt; strict = strict)
+    w1 = ep_cvar_views_solve!(cvv, epc, w0, pe.opt)
     pe = factory(pe, w1)
     pr = prior(pe.pe, X, F; strict = strict, kwargs...)
     # Entropy pooling reweights observations without touching either axis of `Z`, so the

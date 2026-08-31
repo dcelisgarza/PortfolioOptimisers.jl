@@ -651,7 +651,7 @@ Where:
 
   - `alpha`: Optional confidence level for VaR/CVaR views.
 
-  - `params...`: Further parameters of the statistic, forwarded to [`get_pr_value`](@ref). A relativistic value-at-risk view passes its deformation parameter here.
+  - `params...`: Further parameters of the statistic, forwarded to [`get_pr_value`](@ref). A tail risk view passes the observation weights the reference is read under here, and a relativistic value-at-risk view its deformation parameter.
 
   - `strict`: If `true`, throws error for missing assets; otherwise, issue warnings.
 
@@ -712,13 +712,15 @@ end
 """
     replace_prior_views(res::VecPR, args...; kwargs...)
 
-Broadcast prior reference replacement across multiple view constraints.
+Replace the prior references of every view constraint of a group.
 
 `replace_prior_views` applies [`replace_prior_views`](@ref) to each element of a vector of parsed view constraints, replacing prior references with their corresponding prior values. [`parse_equation`](@ref) answers a group of view equations with a vector of results, so this is the shape every caller in this file meets.
 
+The loop is a comprehension rather than a broadcast. Every parameter after `res` is one value for the whole group, and a broadcast reads a `Tuple` or a vector of observation weights as a container to walk beside `res` instead. That raises a `DimensionMismatch` whenever a group holds more than one equation, which is the shape this method exists for.
+
 # Algorithm
 
- 1. Broadcast the single-view method over `res`, forwarding `args...` and `kwargs...` to each call.
+ 1. Call the single-view method once per element of `res`, forwarding `args...` and `kwargs...` to each call.
  2. Return the vector of the results, one per element of `res`, in the order of `res`.
 
 # Arguments
@@ -738,7 +740,7 @@ Broadcast prior reference replacement across multiple view constraints.
   - [`UniverseSets`](@ref)
 """
 function replace_prior_views(res::VecPR, args...; kwargs...)
-    return replace_prior_views.(res, args...; kwargs...)
+    return [replace_prior_views(resi, args...; kwargs...) for resi in res]
 end
 """
     get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:mu}, args...)
@@ -931,11 +933,12 @@ function fix_mu!(epc::AbstractDict, fixed::AbstractVector, to_fix::BitVector,
     return nothing
 end
 """
-    get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:var}, alpha::Number)
+    get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:var}, alpha::Number,
+                 w::Option{<:ObsWeights} = nothing)
 
 Read the prior **value at risk** of asset `i` at the level `alpha`.
 
-`get_pr_value` is the dispatch table that resolves a `prior(...)` reference inside a view. This method reads the statistic the tag `Val(:var)` names, by applying [`ValueatRisk`](@ref) to the `i`-th column of `pr.X`. That is the empirical ``\\alpha``-quantile of the loss series, and it ignores `pr.w`: the counterpart in [`ep_var_views!`](@ref) writes an unweighted tail mass, so a weighted quantile here would state a different row.
+`get_pr_value` is the dispatch table that resolves a `prior(...)` reference inside a view. This method reads the statistic the tag `Val(:var)` names, by applying [`ValueatRisk`](@ref) to the `i`-th column of `pr.X`. That is the ``\\alpha``-quantile of the loss series under `w`, the observation weights the initial prior result was read at. A caller who states a non-uniform `w` reads the reference off the distribution that caller's own prior carries.
 
 # Arguments
 
@@ -943,6 +946,7 @@ Read the prior **value at risk** of asset `i` at the level `alpha`.
   - `i`: Index of the asset.
   - `::Val{:var}`: Dispatch tag for VaR extraction.
   - `alpha`: Confidence level (e.g., `0.05` for 5% VaR).
+  - $(arg_dict[:oow])
 
 # Returns
 
@@ -955,9 +959,9 @@ Read the prior **value at risk** of asset `i` at the level `alpha`.
   - [`AbstractPriorResult`](@ref)
   - [`get_pr_value`](@ref)
 """
-function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:var}, alpha::Number)
-    #! Including pr.w needs the counterpart in ep_var_views! to be implemented.
-    return ValueatRisk(; alpha = alpha)(view(pr.X, :, i))
+function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:var}, alpha::Number,
+                      w::Option{<:ObsWeights} = nothing)
+    return ValueatRisk(; alpha = alpha, w = w)(view(pr.X, :, i))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -2192,10 +2196,11 @@ function ep_var_views!(var_views::Nothing, args...; kwargs...)
 end
 """
     ep_var_views!(var_views::ValueatRiskView, epc::AbstractDict,
-                  pr::AbstractPriorResult, sets::UniverseSets; strict::Bool = false)
+                  pr::AbstractPriorResult, sets::UniverseSets,
+                  w::Option{<:ObsWeights} = nothing; strict::Bool = false)
     ep_var_views!(var_views::LinearConstraintEstimator, epc::AbstractDict,
-                  pr::AbstractPriorResult, sets::UniverseSets, alpha::Number;
-                  strict::Bool = false)
+                  pr::AbstractPriorResult, sets::UniverseSets, alpha::Number,
+                  w::Option{<:ObsWeights} = nothing; strict::Bool = false)
 
 Add the **value at risk** views of a group to the entropy pooling constraint dictionary.
 
@@ -2229,7 +2234,7 @@ Where:
 
  1. Parse the view equations of `var_views.val`, accepting `==` and `>=` alone.
  2. Replace every group name by the assets it spans.
- 3. Replace every `prior(...)` reference by the prior value at risk at `alpha`, through [`replace_prior_views`](@ref).
+ 3. Replace every `prior(...)` reference by the prior value at risk at `alpha`, read under `w`, through [`replace_prior_views`](@ref).
  4. Turn the parsed views into the linear constraint blocks `lcs`, one for `:ineq` and one for `:eq`.
  5. Check the three preconditions of the section below.
  6. For each block present, and each row `i` of it, read the asset the row names into `j`, and the observations of `view(X, :, j)` at or below `-abs(B[i])` into `idx`.
@@ -2244,6 +2249,7 @@ Where:
   - `pr`: Prior result containing asset return information.
   - `sets`: Asset set mapping asset names to indices.
   - `alpha`: Confidence level for VaR.
+  - $(arg_dict[:oow])
   - `strict`: If `true`, throws error for missing assets; otherwise, issue warnings.
 
 # Validation
@@ -2266,8 +2272,10 @@ Where:
   - [`MeucciEntropyPoolingPrior`](@ref)
 """
 function ep_var_views!(var_views::ValueatRiskView, epc::AbstractDict,
-                       pr::AbstractPriorResult, sets::UniverseSets; strict::Bool = false)
-    return ep_var_views!(var_views.views, epc, pr, sets, var_views.alpha; strict = strict)
+                       pr::AbstractPriorResult, sets::UniverseSets,
+                       w::Option{<:ObsWeights} = nothing; strict::Bool = false)
+    return ep_var_views!(var_views.views, epc, pr, sets, var_views.alpha, w;
+                         strict = strict)
 end
 """
     ep_var_views!(var_views::AbstractVector{<:ValueatRiskView}, args...; kwargs...)
@@ -2303,13 +2311,13 @@ function ep_var_views!(var_views::AbstractVector{<:ValueatRiskView}, args...; kw
     return nothing
 end
 function ep_var_views!(var_views::LinearConstraintEstimator, epc::AbstractDict,
-                       pr::AbstractPriorResult, sets::UniverseSets, alpha::Number;
-                       strict::Bool = false)
+                       pr::AbstractPriorResult, sets::UniverseSets, alpha::Number,
+                       w::Option{<:ObsWeights} = nothing; strict::Bool = false)
     X = pr.X
     var_views = parse_equation(var_views.val; ops1 = ("==", ">="),
                                ops2 = (:call, :(==), :(>=)), datatype = eltype(X))
     var_views = replace_group_by_assets(var_views, sets, false, true, false)
-    var_views = replace_prior_views(var_views, pr, sets, :var, alpha; strict = strict)
+    var_views = replace_prior_views(var_views, pr, sets, :var, alpha, w; strict = strict)
     lcs = get_linear_constraints(var_views, sets; datatype = eltype(X), strict = strict)
     #! `all`, not `any`: a row of a universe of more than one asset always carries a zero,
     #! so `any` held for every view and the guard never fired. The body then read the
@@ -2336,7 +2344,6 @@ function ep_var_views!(var_views::LinearConstraintEstimator, epc::AbstractDict,
         B = getproperty(lcs, p).B
         for i in eachindex(B)
             j = .!iszero.(A[i, :])
-            #! Figure out a way to include pr.w, probably see how it's implemented in ValueatRisk.
             idx = findall(x -> x <= -abs(B[i]), view(X, :, j))
             @argcheck(!isempty(idx),
                       DomainError("View $(i) = $(var_views[i].eqn) is too extreme, the maximum viable for asset $(findfirst(x -> x == true, j)) is $(-minimum(X[:,j])). Please lower it or use a different prior with fatter tails."))
@@ -2649,11 +2656,12 @@ function entropy_pooling(w::VecNum, epc::AbstractDict, opt::JuMPEntropyPooling)
     return entropy_pooling(w, epc, AbstractEntropyPoolingTailView[], opt)
 end
 """
-    get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:cvar}, alpha::Number)
+    get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:cvar}, alpha::Number,
+                 w::Option{<:ObsWeights} = nothing)
 
 Read the prior **conditional value at risk** of asset `i` at the level `alpha`.
 
-`get_pr_value` is the dispatch table that resolves a `prior(...)` reference inside a view. This method reads the statistic the tag `Val(:cvar)` names, by applying [`ConditionalValueatRisk`](@ref) to the `i`-th column of `pr.X`. That is the sample conditional value at risk of the loss series, and it rests on no distributional assumption. It ignores `pr.w`, on the reasoning [`get_pr_value`](@ref) gives for the value at risk.
+`get_pr_value` is the dispatch table that resolves a `prior(...)` reference inside a view. This method reads the statistic the tag `Val(:cvar)` names, by applying [`ConditionalValueatRisk`](@ref) to the `i`-th column of `pr.X`. That is the conditional value at risk of the loss series under `w`, the observation weights the initial prior result was read at, and it rests on no distributional assumption. It reads `w` on the reasoning [`get_pr_value`](@ref) gives for the value at risk.
 
 # Arguments
 
@@ -2661,6 +2669,7 @@ Read the prior **conditional value at risk** of asset `i` at the level `alpha`.
   - `i`: Index of the asset.
   - `::Val{:cvar}`: Dispatch tag for CVaR computation.
   - `alpha`: Confidence level.
+  - $(arg_dict[:oow])
 
 # Returns
 
@@ -2673,9 +2682,9 @@ Read the prior **conditional value at risk** of asset `i` at the level `alpha`.
   - [`AbstractPriorResult`](@ref)
   - [`get_pr_value`](@ref)
 """
-function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:cvar}, alpha::Number)
-    #! Including pr.w needs the counterpart in ep_var_views! to be implemented.
-    return ConditionalValueatRisk(; alpha = alpha)(view(pr.X, :, i))
+function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:cvar}, alpha::Number,
+                      w::Option{<:ObsWeights} = nothing)
+    return ConditionalValueatRisk(; alpha = alpha, w = w)(view(pr.X, :, i))
 end
 """
     get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:sigma}, args...)

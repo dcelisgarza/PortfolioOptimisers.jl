@@ -1295,19 +1295,20 @@ function add_ep_tail_view!(model::JuMP.Model, pw,
 end
 """
     get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:evar}, alpha::Number,
-                 args::Tuple = (), kwargs::NamedTuple = (;),
-                 zlo::Option{<:Number} = nothing)
+                 w::Option{<:ObsWeights} = nothing, args::Tuple = (),
+                 kwargs::NamedTuple = (;), zlo::Option{<:Number} = nothing)
 
 Extract the Entropic Value-at-Risk (EVaR) for asset `i` from a prior result.
 
-`get_pr_value` computes the EVaR at confidence level `alpha` for the asset indexed by `i` from the prior result object `pr`, by minimising the scalar objective of the sample EVaR formula with [`ep_evar`](@ref).
+`get_pr_value` computes the EVaR at confidence level `alpha` for the asset indexed by `i` from the prior result object `pr`, by minimising the scalar objective of the sample EVaR formula with [`ep_evar`](@ref). The observations carry `w`, the weights the initial prior result was read at. A `w` of `nothing` leaves them uniform.
 
 # Arguments
 
-  - `pr`: Prior result containing asset return information. Only its returns matrix is read: the observations carry uniform weights, not `pr.w`, which is what every `get_pr_value` method of a tail risk measure does.
+  - `pr`: Prior result containing asset return information. Only its returns matrix is read, under the weights `w` names.
   - `i`: Index of the asset.
   - `::Val{:evar}`: Dispatch tag for EVaR extraction.
   - `alpha`: Confidence level (e.g. `0.05` for 5% EVaR).
+  - $(arg_dict[:oow])
   - $(arg_dict[:optargs])
   - $(arg_dict[:optkwargs])
   - `zlo`: Lower end of the bracket, forwarded to [`ep_evar`](@ref).
@@ -1323,30 +1324,31 @@ Extract the Entropic Value-at-Risk (EVaR) for asset `i` from a prior result.
   - [`get_pr_value`](@ref)
 """
 function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:evar}, alpha::Number,
-                      args::Tuple = (), kwargs::NamedTuple = (;),
-                      zlo::Option{<:Number} = nothing)
-    #! Including pr.w needs the counterpart in ep_var_views! to be implemented.
+                      w::Option{<:ObsWeights} = nothing, args::Tuple = (),
+                      kwargs::NamedTuple = (;), zlo::Option{<:Number} = nothing)
     T = size(pr.X, 1)
     iT = inv(T)
-    return ep_evar(-view(pr.X, :, i), range(iT, iT; length = T), alpha; args = args,
-                   kwargs = kwargs, zlo = zlo).evar
+    w = isnothing(w) ? range(iT, iT; length = T) : w
+    return ep_evar(-view(pr.X, :, i), w, alpha; args = args, kwargs = kwargs, zlo = zlo).evar
 end
 """
     get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:rlvar}, alpha::Number,
-                 kappa::Number, args::Tuple = (), kwargs::NamedTuple = (;),
+                 kappa::Number, w::Option{<:ObsWeights} = nothing, args::Tuple = (),
+                 kwargs::NamedTuple = (;),
                  bracket::Option{<:RelativisticValueatRiskViewBracket} = nothing)
 
 Extract the Relativistic Value-at-Risk (RLVaR) for asset `i` from a prior result.
 
-`get_pr_value` computes the RLVaR at confidence level `alpha` and deformation parameter `kappa` for the asset indexed by `i` from the prior result object `pr`, by minimising the primal objective of the sample RLVaR with [`ep_rlvar`](@ref).
+`get_pr_value` computes the RLVaR at confidence level `alpha` and deformation parameter `kappa` for the asset indexed by `i` from the prior result object `pr`, by minimising the primal objective of the sample RLVaR with [`ep_rlvar`](@ref). The observations carry `w`, the weights the initial prior result was read at, on the reasoning the entropic value at risk method above gives.
 
 # Arguments
 
-  - `pr`: Prior result containing asset return information. Only its returns matrix is read: the observations carry uniform weights, not `pr.w`, which is what every `get_pr_value` method of a tail risk measure does.
+  - `pr`: Prior result containing asset return information. Only its returns matrix is read, under the weights `w` names.
   - `i`: Index of the asset.
   - `::Val{:rlvar}`: Dispatch tag for RLVaR extraction.
   - `alpha`: Confidence level (e.g. `0.05` for 5% RLVaR).
   - `kappa`: Deformation parameter, in `(0, 1)`.
+  - $(arg_dict[:oow])
   - $(arg_dict[:optargs])
   - $(arg_dict[:optkwargs])
   - `bracket`: Spans of the searches, forwarded to [`ep_rlvar`](@ref) and [`ep_rlvar_shift`](@ref).
@@ -1362,13 +1364,14 @@ Extract the Relativistic Value-at-Risk (RLVaR) for asset `i` from a prior result
   - [`get_pr_value`](@ref)
 """
 function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:rlvar}, alpha::Number,
-                      kappa::Number, args::Tuple = (), kwargs::NamedTuple = (;),
+                      kappa::Number, w::Option{<:ObsWeights} = nothing, args::Tuple = (),
+                      kwargs::NamedTuple = (;),
                       bracket::Option{<:RelativisticValueatRiskViewBracket} = nothing)
-    #! Including pr.w needs the counterpart in ep_var_views! to be implemented.
     T = size(pr.X, 1)
     iT = inv(T)
-    return ep_rlvar(-view(pr.X, :, i), range(iT, iT; length = T), alpha, kappa; args = args,
-                    kwargs = kwargs, bracket = bracket).rlvar
+    w = isnothing(w) ? range(iT, iT; length = T) : w
+    return ep_rlvar(-view(pr.X, :, i), w, alpha, kappa; args = args, kwargs = kwargs,
+                    bracket = bracket).rlvar
 end
 """
     ep_view_terms(res::ParsingResult, sets::UniverseSets, X::MatNum; strict::Bool = false)
@@ -2118,7 +2121,8 @@ function ep_cvar_views!(cvar_views::LinearConstraintEstimator, epc::AbstractDict
     views = parse_equation(cvar_views.val; ops1 = ("==", ">=", "<="),
                            ops2 = (:call, :(==), :(>=), :(<=)), datatype = eltype(X))
     views = replace_group_by_assets(views, sets, false, true, false)
-    views = replace_prior_views(views, pr, sets, :cvar, alpha; strict = strict)
+    views = replace_prior_views(views, pr, sets, :cvar, alpha, StatsBase.pweights(w);
+                                strict = strict)
     if !isa(views, AbstractVector)
         views = [views]
     end
@@ -2256,8 +2260,8 @@ function ep_evar_views!(evar_views::LinearConstraintEstimator, epc::AbstractDict
     views = parse_equation(evar_views.val; ops1 = ("==", ">=", "<="),
                            ops2 = (:call, :(==), :(>=), :(<=)), datatype = eltype(X))
     views = replace_group_by_assets(views, sets, false, true, false)
-    views = replace_prior_views(views, pr, sets, :evar, alpha, args, kwargs, zlo;
-                                strict = strict)
+    views = replace_prior_views(views, pr, sets, :evar, alpha, StatsBase.pweights(w), args,
+                                kwargs, zlo; strict = strict)
     if !isa(views, AbstractVector)
         views = [views]
     end
@@ -2403,8 +2407,9 @@ function ep_rlvar_views!(rlvar_views::LinearConstraintEstimator, epc::AbstractDi
     views = parse_equation(rlvar_views.val; ops1 = ("==", ">=", "<="),
                            ops2 = (:call, :(==), :(>=), :(<=)), datatype = eltype(X))
     views = replace_group_by_assets(views, sets, false, true, false)
-    views = replace_prior_views(views, pr, sets, :rlvar, alpha, kappa, args, kwargs,
-                                bracket; strict = strict)
+    views = replace_prior_views(views, pr, sets, :rlvar, alpha, kappa,
+                                StatsBase.pweights(w), args, kwargs, bracket;
+                                strict = strict)
     if !isa(views, AbstractVector)
         views = [views]
     end
@@ -2874,7 +2879,7 @@ function ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<
     pe = factory(pe, w0)
     pr = prior(pe.pe, X, F; strict = strict, kwargs...)
     ep_mu_views!(pe.mu_views, epc, pr, pe.sets; strict = strict)
-    ep_var_views!(pe.var_views, epc, pr, pe.sets; strict = strict)
+    ep_var_views!(pe.var_views, epc, pr, pe.sets, w0; strict = strict)
     ep_cvar_views!(pe.cvar_views, epc, tvs, pr, pe.sets, w0; strict = strict)
     ep_evar_views!(pe.evar_views, epc, tvs, pr, pe.sets, w0; strict = strict)
     ep_rlvar_views!(pe.rlvar_views, epc, tvs, pr, pe.sets, w0; strict = strict)
@@ -2984,7 +2989,7 @@ function ep_prior(alg::H0_EntropyPooling, pe::EntropyPoolingPrior, X::MatNum,
     pr = prior(pe.pe, X, F; strict = strict, kwargs...)
     # mu, VaR, CVaR, EVaR and RLVaR
     ep_mu_views!(pe.mu_views, epc, pr, pe.sets; strict = strict)
-    ep_var_views!(pe.var_views, epc, pr, pe.sets; strict = strict)
+    ep_var_views!(pe.var_views, epc, pr, pe.sets, w0; strict = strict)
     ep_cvar_views!(pe.cvar_views, epc, tvs, pr, pe.sets, w0; strict = strict)
     ep_evar_views!(pe.evar_views, epc, tvs, pr, pe.sets, w0; strict = strict)
     ep_rlvar_views!(pe.rlvar_views, epc, tvs, pr, pe.sets, w0; strict = strict)
