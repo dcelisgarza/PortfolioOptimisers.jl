@@ -3074,7 +3074,7 @@ The element type is bound by the signature, so the pool and the sum it feeds are
 
  1. Read the shape of `X` into `T` and `N`, and allocate the pool `pool` of `T * N` values.
  2. Walk the columns of `X`. Build each column's series with [`calibration_series_vec`](@ref), take its sample mean `mu` and its sample dispersion `sd`, and write `-s * (col[t] - mu) / sd` into `pool`.
- 3. Partially sort `pool` about its `k + 1`-th smallest value, giving `vkp1`. The sign of step 2 puts the end the caller prices in the **lower** tail of the pool, so the `k` entries before `vkp1` are the ones the estimate reads.
+ 3. Partially sort `pool` so that its `k + 1` smallest values sit in order at the front, and read the last of them into `vkp1`. `partialsort!` places one index alone, and it makes no promise about the rest of the vector, so the range is what puts the `k` entries the estimate reads before `vkp1`. The sign of step 2 puts the end the caller prices in the **lower** tail of the pool.
  4. Return `k` over the sum of `log(pool[i] / vkp1)` across those `k` entries. Both terms of each ratio are negative, so the ratio is one of magnitudes and the sum is Hill's with no further sign.
 
 # Arguments
@@ -3115,7 +3115,8 @@ function hill_tail_index(series::AbstractCalibrationSeries, X::AbstractMatrix{E}
     # reads the `k + 1` smallest. The ratio of two negatives is the ratio of their
     # magnitudes, so the sum below is Hill's with no further sign, and the message reads the
     # magnitude the caller thinks in.
-    vkp1 = partialsort!(pool, k + 1)
+    partialsort!(pool, 1:(k + 1))
+    vkp1 = pool[k + 1]
     ukp1 = -vkp1
     @argcheck(ukp1 > 0,
               DomainError(ukp1,
@@ -3410,7 +3411,7 @@ The element type is bound by the signature, so the series and the sum it feeds a
 
  1. Solve `transpose(U) \\ transpose(X .- transpose(mu))`, giving the whitened observations as the columns of `Z`.
  2. Walk the columns of `Z`, and write the negated Euclidean norm of each into the series `d`.
- 3. Partially sort `d` about its `k + 1`-th smallest value, giving `vkp1`. The negation of step 2 puts the largest distances at the front, so the `k` entries before `vkp1` are the ones the estimate reads.
+ 3. Partially sort `d` so that its `k + 1` smallest values sit in order at the front, and read the last of them into `vkp1`. `partialsort!` places one index alone, and it makes no promise about the rest of the vector, so the range is what puts the `k` entries the estimate reads before `vkp1`. The negation of step 2 puts the largest distances at the front.
  4. Return `k` over the sum of `log(d[i] / vkp1)` across those `k` entries. Both terms of each ratio are negative, so the ratio is one of magnitudes and the sum is Hill's with no further sign.
 
 # Arguments
@@ -3443,7 +3444,8 @@ function radial_tail_index(X::AbstractMatrix{E}, mu::AbstractVector, U::Abstract
         # its pool for the same reason, so the two verbs read their series the same way.
         d[t] = -LinearAlgebra.norm(view(Z, :, t))
     end
-    vkp1 = partialsort!(d, k + 1)
+    partialsort!(d, 1:(k + 1))
+    vkp1 = d[k + 1]
     dkp1 = -vkp1
     @argcheck(dkp1 > 0,
               DomainError(dkp1,

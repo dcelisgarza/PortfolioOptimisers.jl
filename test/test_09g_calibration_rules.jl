@@ -1175,3 +1175,66 @@ end
     @test rg.kappa_a == rlvar.kappa
     @test 0 < rg.kappa_b < 1
 end
+
+@testset "Calibration rules: the two Hill verbs read the k largest (#629)" begin
+    # `partialsort!(v, k)` places the value at index `k` in the position it holds in a fully
+    # sorted vector, and it promises nothing about the rest of the vector. Julia switches
+    # selection strategy above a size threshold, and above it `v[1:k - 1]` is not the
+    # `k - 1` smallest values. Both verbs sum `log(v[i] / v[k + 1])` over that prefix, so
+    # each returned a number that is not the estimate once `k` cleared the threshold.
+    #
+    # The counts below straddle the threshold on purpose. `hill_tail_index` pools `T * N`
+    # values, so a pool of 4000 reaches it at a few hundred; `radial_tail_index` reads one
+    # distance per observation, so a series of 1000 reaches it at 117. The samples the rest
+    # of this file reads are 60 to 120 rows long, where no count goes wrong at all, so a
+    # short sample would have proved nothing. Each pair below is one count over the
+    # threshold and one control under it.
+    #
+    # The reference sorts the whole series, so it rests on no prefix.
+    X629 = randn(StableRNG(987654321), 1000, 4)
+    PR629 = prior(EmpiricalPrior(), X629)
+
+    function hill_reference(v, k)
+        vs = sort(v)
+        return k / sum(i -> log(vs[i] / vs[k + 1]), 1:k)
+    end
+
+    # `hill_tail_index` pools the standardised columns, and the sign puts the end it prices
+    # in the lower tail of the pool.
+    function hill_pool(X, s)
+        T, N = size(X)
+        pool = Vector{Float64}(undef, T * N)
+        for j in axes(X, 2)
+            col = view(X, :, j)
+            m = mean(col)
+            sd = std(col; mean = m)
+            pool[((j - 1) * T + 1):(j * T)] .= -s .* (col .- m) ./ sd
+        end
+        return pool
+    end
+
+    for s in (1, -1), k in (600, 100)
+        @test isapprox(PO.hill_tail_index(ReturnsSeries(), X629, s, k),
+                       hill_reference(hill_pool(X629, s), k))
+    end
+
+    # `radial_tail_index` whitens the sample and negates the norm of each row, so the same
+    # reading serves it.
+    Y629, mu629, U629 = PO.radial_series_inputs(ReturnsSeries(), PR629)
+    Z629 = transpose(U629) \ transpose(Y629 .- transpose(mu629))
+    d629 = [-norm(view(Z629, :, t)) for t in axes(Y629, 1)]
+    for k in (200, 50)
+        @test isapprox(PO.radial_tail_index(Y629, mu629, U629, k), hill_reference(d629, k))
+    end
+
+    # The two rules reach the verbs through a count of their own, and the count clears the
+    # threshold at a level a slot admits. `alpha = 0.15` reads 600 of the 4000 pooled values
+    # and 150 of the 1000 distances.
+    skappa = PO.series_end_sign(ReturnsSeries(), :kappa)
+    @test isapprox(HillTailDecay(; kmin = 30, alpha = 0.15)(:kappa, PR629, nothing,
+                                                            nothing),
+                   inv(hill_reference(hill_pool(X629, skappa), 600)))
+    @test isapprox(RadialTailDecay(; kmin = 30, alpha = 0.15)(:kappa, PR629, nothing,
+                                                              nothing),
+                   inv(hill_reference(d629, 150)))
+end

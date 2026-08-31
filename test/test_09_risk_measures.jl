@@ -572,4 +572,68 @@
         @test isnothing(MaxRiskMeasureSettings().lb)
         @test isa(MaxRiskMeasureSettings(; lb = Frontier(; N = 3)).lb, Frontier)
     end
+    @testset "The unweighted tail statistics read the k smallest (#629)" begin
+        # `partialsort!(v, k)` places the value at index `k` in the position it holds in a
+        # fully sorted vector, and it promises nothing about the rest of the vector. Julia
+        # switches selection strategy above a size threshold, and above it `v[1:k - 1]` is
+        # not the `k - 1` smallest values. Four sites read that prefix as if it were, so
+        # each returned a number that is not the statistic once `k` clears the threshold.
+        # At `alpha = 0.5` the conditional value at risk came out negative, which is below
+        # the value at risk it averages past.
+        #
+        # The series has to be long enough to reach the threshold. On a vector of 1008 the
+        # prefix first goes wrong at `k = 117`, which is `alpha = 0.116`; on a vector of
+        # 252 no `k` goes wrong at all, so the 252 rows the rest of this file reads would
+        # have proved nothing. The levels below straddle 0.116 on purpose, and 0.05 is the
+        # control that read correctly even before the fix.
+        #
+        # The weighted method of each measure sorts with `sortperm` and walks the
+        # cumulative weights, so it rests on no prefix. Under uniform weights the two
+        # methods price the same quantity, and that equality is what pins each site.
+        rdl = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__,
+                                                            "./assets/SP500.csv.gz"));
+                                          timestamp = :Date))
+        xl = rdl.X * fill(inv(size(rdl.X, 2)), size(rdl.X, 2))
+        Tl = length(xl)
+        @test Tl >= 500
+        wl = StatsBase.pweights(fill(inv(Tl), Tl))
+
+        # The definition: the mean of the losses past the value at risk, with the boundary
+        # scenario carrying only the part of its mass the level leaves.
+        function cvar_reference(x, alpha)
+            xs = sort(x)
+            aT = alpha * length(x)
+            idx = ceil(Int, aT)
+            return -(sum(view(xs, 1:(idx - 1))) + xs[idx] * (aT - (idx - 1))) / aT
+        end
+
+        for a in (0.05, 0.15, 0.2, 0.3, 0.5)
+            # `ConditionalValueatRisk` and its distributionally robust twin are one method.
+            cv = ConditionalValueatRisk(; alpha = a)(xl)
+            @test isapprox(cv, cvar_reference(xl, a))
+            @test isapprox(cv, ConditionalValueatRisk(; alpha = a, w = wl)(xl))
+            # A conditional value at risk averages the losses past the value at risk, so it
+            # can never sit below it.
+            @test cv >= ValueatRisk(; alpha = a)(xl)
+            @test isapprox(DistributionallyRobustConditionalValueatRisk(; alpha = a)(xl),
+                           DistributionallyRobustConditionalValueatRisk(; alpha = a,
+                                                                        w = wl)(xl))
+
+            # Both ends of the range read a prefix, so the level sets `alpha` and `beta`.
+            @test isapprox(ConditionalValueatRiskRange(; alpha = a, beta = a)(xl),
+                           ConditionalValueatRiskRange(; alpha = a, beta = a, w = wl)(xl))
+            @test isapprox(DistributionallyRobustConditionalValueatRiskRange(; alpha = a,
+                                                                             beta = a)(xl),
+                           DistributionallyRobustConditionalValueatRiskRange(; alpha = a,
+                                                                             beta = a,
+                                                                             w = wl)(xl))
+
+            # `conditional_drawdown_at_risk` is the fourth site, and it reads a drawdown
+            # series rather than the returns series.
+            @test isapprox(ConditionalDrawdownatRisk(; alpha = a)(xl),
+                           ConditionalDrawdownatRisk(; alpha = a, w = wl)(xl))
+            @test isapprox(RelativeConditionalDrawdownatRisk(; alpha = a)(xl),
+                           RelativeConditionalDrawdownatRisk(; alpha = a, w = wl)(xl))
+        end
+    end
 end
