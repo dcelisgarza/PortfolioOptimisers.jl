@@ -86,7 +86,7 @@ per-type method is exactly what states it. That is the reason ADR 0051 already g
 ### The role names the quantity, and the bound is the whole validation
 
 A **Calibration Rule** computes a number. A **Calibration Role** places that rule in the slot of one
-quantity and names the quantity. Six roles ship, over four rule families:
+quantity and names the quantity. Seven roles ship, over five rule families:
 
 | Role | Rule family | Slots it stands in |
 | :--- | :--- | :--- |
@@ -96,6 +96,7 @@ quantity and names the quantity. Six roles ship, over four rule families:
 | `DeformationHeadCalibration` | `AbstractDeformationCalibrationAlgorithm` | `kappa_b` |
 | `AmbiguityRadiusCalibration` | `AbstractAmbiguityRadiusCalibrationAlgorithm` | `r`, `r_a`, `r_b`, `val`, `l1`, `linf` |
 | `AmbiguityTailWeightCalibration` | `AbstractAmbiguityTailWeightCalibrationAlgorithm` | `l`, `l_a`, `l_b` |
+| `NormCeilingCalibration` | `AbstractNormCeilingCalibrationAlgorithm` | `l2c`, `linfc`, `val` |
 
 [#593](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/593) split the root in two: a
 role is an Estimator under `AbstractCalibrationEstimator`, and only a rule is an Algorithm under
@@ -103,15 +104,23 @@ role is an Estimator under `AbstractCalibrationEstimator`, and only a rule is an
 whole of the validation.
 
 - A **slot** bound is `Num_SigTailCal`, `Num_SigHeadCal`, `Num_DefTailCal`, `Num_DefHeadCal`,
-  `Num_AmbRadCal` or `Num_AmbTwtCal`, each pairing `Number` with **one** concrete role. A head role
-  in a tail slot, or an ambiguity role in a significance slot, is refused **at construction**.
-- An **`alg`** bound is `Func_SigCal`, `Func_DefCal`, `Func_AmbRadCal` or `Func_AmbTwtCal`, each
-  pairing `Function` with one rule family. No role subtypes a rule family, so a role nested inside
-  another role's `alg` is refused by the same route.
+  `Num_AmbRadCal`, `Num_AmbTwtCal` or `Num_NormCeilCal`, each pairing `Number` with **one** concrete
+  role. A head role in a tail slot, or an ambiguity role in a significance slot, is refused **at
+  construction**.
+- An **`alg`** bound is `Func_SigCal`, `Func_DefCal`, `Func_AmbRadCal`, `Func_AmbTwtCal` or
+  `Func_NormCeilCal`, each pairing `Function` with one rule family. No role subtypes a rule family,
+  so a role nested inside another role's `alg` is refused by the same route.
 
 Refusal by the bound is **earlier than any `assert_` method could be**: it fires where the caller
 wrote the mistake, not at the fold where the value is read. So no guard method is written for either
 mismatch, and neither refusal has a message that must be kept in step with a bound.
+
+**One bound names two roles, and two `assert_` methods part them.** `LpRegularisation.val` is a
+penalty coefficient in `JuMPOptimiser.lp` and a norm ceiling in `JuMPOptimiser.lpc`, so the field
+cannot name its reading from the type alone. `Num_AmbRadNormCeilCal` admits both roles, and
+`assert_penalty_coefficient_role` and `assert_norm_ceiling_role` settle the reading per field. Both
+run in `JuMPOptimiser`'s own constructor, so the refusal still fires where the caller wrote the
+field. ADR 0097 carries that decision, and every other bound names one role.
 
 ### No ordering guard, and no reordering
 
@@ -130,8 +139,15 @@ about which of the two the caller meant to hold still.
 
 A rule is run by calling it, so a callable Estimator and a plain `Function` of `(key, pr, w, slv)`
 are the same thing to the resolver. Every `alg` bound admits a `Function`, and there is no
-`calibrate` verb. Five rules ship: `ScenarioCount`, `RateSignificance`, `EntropyBudget`,
-`ConcentrationRadius` and `RateRadius`.
+`calibrate` verb. Eleven rules ship, over the five families:
+
+| Rule family | Rules |
+| :--- | :--- |
+| `AbstractSignificanceCalibrationAlgorithm` | `ScenarioCount`, `RateSignificance` |
+| `AbstractDeformationCalibrationAlgorithm` | `EntropyBudget`, `HillTailDecay`, `RadialTailDecay` |
+| `AbstractAmbiguityRadiusCalibrationAlgorithm` | `ConcentrationRadius`, `RateRadius`, `DimensionalRateRadius`, `DualNormRadius` |
+| `AbstractAmbiguityTailWeightCalibrationAlgorithm` | `TailTermParity` |
+| `AbstractNormCeilingCalibrationAlgorithm` | `EffectiveAssetFloor` |
 
 A rule sees the effective solver on both of the routes that resolve a measure. On the `factory`
 route `@propagatable` runs every selection before the resolution, so the solver is already on the
@@ -144,7 +160,68 @@ settles it as `sel(x.slv, slv)`
 A rule gets **no portfolio**. A prior result carries no weight vector, so the "the `alpha` whose CVaR
 meets a target loss" candidate stays refused.
 
-### Two verbs carry what no derivation can find
+### A slot key names no quantity, so the owner hands its series over
+
+`RelativisticValueatRisk` and `RelativisticDrawdownatRisk` both resolve the key `:kappa`, and the two
+price two different series. A rule that reads the **shape** of a series therefore cannot tell from
+the key which quantity it stands in front of. `calibration_series(x)` is the trait each owner
+answers, and `bind_series(slot, series)` carries the answer into the rule. The owner's series
+**overwrites** one the rule carries: the quantity belongs to the measure, and a rule cannot know
+which measure it reached.
+
+`AbstractCalibrationSeries` names three markers: `ReturnsSeries`, and `AbsoluteDrawdownSeries` and
+`RelativeDrawdownSeries` under `AbstractDrawdownSeries`. Six rules carry a `series` field —
+`HillTailDecay`, `RadialTailDecay`, `TailTermParity`, `ConcentrationRadius`, `DimensionalRateRadius`
+and `DualNormRadius` — and the marker moves the sample each of them reads.
+
+**The reading does not move, only the sample it reads.** `HillTailDecay` pools the drawdown series of
+each column in place of the columns, with the same standardisation, the same count and the same
+estimator. `RadialTailDecay` whitens the rows of the drawdown sample in place of the rows of `pr.X`.
+`TailTermParity` substitutes `calibration_series_matrix(series, pr.X)` for `pr.X` and nothing else,
+because the `ConditionalValueatRisk` kernel over a non-positive drawdown column **is** the
+`ConditionalDrawdownatRisk` of that column, so the rule still carries no second encoding of the
+measure it calibrates. No rule forms a portfolio, and none needs one: a drawdown series is formed per
+column, and it holds one entry per observation, so every count a rule forms on `pr.X` is the count it
+reads.
+
+**A drawdown sample carries its own moments.** `pr.mu` and `pr.sigma` are moments of the returns, and
+no scaling of them states the moments of a drawdown. So under a drawdown marker `RadialTailDecay`
+centres on the column means of the drawdown sample and whitens by the Cholesky factor of its
+covariance matrix, through `radial_series_inputs`, and the three radius rules read their per-asset
+dispersion through `calibration_series_dispersion`: `sqrt.(diag(pr.sigma))` on a returns series, and
+the sample dispersion of the drawdown columns on a drawdown marker. The precedence of `pr.chol` over
+`pr.sigma`, which [#612](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/612) records,
+therefore governs the returns reading alone.
+
+**The ambiguity families take the marker too, and the programme decides why.** A radius is the
+coefficient of a norm penalty on the weight vector, so whether an Esfahani-Kuhn radius under a
+drawdown owner belongs on the asset-return scale or on a drawdown scale is not a matter of taste.
+`set_risk_constraints!` for `DistributionallyRobustConditionalDrawdownatRisk` answers it. That method
+measures the transport cost of its own programme against
+`set_portfolio_drawdowns_plus_one!(model, pr.X)`, which is `absolute_drawdown_arr(X) .+ 1`, and that
+matrix is `calibration_series_matrix` under `AbsoluteDrawdownSeries` shifted by the support offset.
+So the scenarios the ball is drawn around are the **per-asset drawdowns**, the radius is a distance
+between two such vectors, and it carries drawdown units.
+
+**The ground metric does not move with the series.** `DualNormRadius` reads `key` for the ground
+metric and `series` for the vector it takes that norm of. The two are independent: `:r` is the 1-norm
+under every marker, and only the error vector moves.
+
+**A drawdown series has one end.** It is non-positive, so `:kappa_b` names nothing on it and
+`series_end_sign` refuses that key under `AbstractDrawdownSeries`. No drawdown Range measure ships,
+so only a caller who runs a rule by hand reaches the refusal.
+
+**The drawdown error scale is a floor, and a rule says so rather than correcting it.** A drawdown is
+a running functional, so its entries are dependent down a column and `s / sqrt(T_e)` prices a record
+of independent draws that the sample does not hold. A correction needs a model of that dependence,
+and the sample states none. This is the same refusal `DualNormRadius` already makes for the number of
+assets.
+
+**Five rules read no series.** `EntropyBudget` reads the sample length and its sibling `alpha`, and
+neither moves with the series, so the identity default of `bind_series` serves it. `ScenarioCount`,
+`RateSignificance`, `RateRadius` and `EffectiveAssetFloor` need no method either.
+
+### Four verbs carry what no derivation can find
 
 - **`mirror_role(x)`** is the default of the head slot on the two ordered-weights Range types. A
   number crosses unchanged and a tail role crosses as the head role of the same family holding the
@@ -152,8 +229,39 @@ meets a target loss" candidate stays refused.
 - **`bind_alpha(slot, alpha)`** carries a **travelling pair**. `EntropyBudget` reads its sibling
   `alpha`, and `resolve_calibration_slot` carries a `Symbol` and no number, so the number travels
   through the rule itself: the owner resolves `alpha`, calls `bind_alpha` on the `kappa` slot, and
-  resolves the result. The default is the identity, and the significance family needs no method
-  because no significance rule reads a sibling.
+  resolves the result. `TailTermParity` takes the same pair, because its tail-term scale is a CVaR at
+  the slot owner's own significance level. The default is the identity, and the significance and
+  radius families need no method because no rule of either reads a sibling.
+- **`bind_norm_order(slot, p)`** carries a constraint's norm order into the rule that computes its
+  ceiling, on the shape `bind_alpha` gives. It differs in one respect: an order is a property of the
+  constraint rather than of a sibling slot, so the constraint site's order overwrites one the rule
+  already carries.
+- **`bind_series(slot, series)`** carries the owner's series marker, and overwrites one the rule
+  carries, for the reason `bind_norm_order` does.
+
+Every method of the three `bind_` verbs preserves every other field of the slot it rebuilds, so the
+rebuilds compose in either order and a call site may nest them freely. `mirror_role` is the one that
+changes the type, and it does so by design: it carries the `alg` across and nothing else.
+
+### A schedule reaches the host, and no further
+
+A `TimeDependent` wrapping a rule is refused, and no channel is missing.
+
+**A rule is never standalone.** It stands in a slot of a host, so the host is the thing a schedule
+swaps, and the host already carries the channel. Where the host is a `JuMPOptimiser`, the four norm
+fields are themselves schedulable, and a schedule over one of them selects a rule per fold. Where the
+host is a risk measure, the slot's own bound admits no schedule, and the caller varies the whole
+measure instead, through the schedulable risk-measure field of the optimiser.
+
+**The two run at two points of the pipeline, and neither knows about the other.** The selection runs
+in `update_time_dependent_fields`, before any prior is fitted. The resolution runs at assembly,
+against the prior of the period that was selected. So a schedule and a rule compose, and the order
+falls out of the pipeline rather than being invented for it.
+
+So the `Num_` and `Func_` bounds of the seven roles stay free of `TimeDependent`. A generic
+resolution is possible in principle: nothing in the mechanism stops a schedule from being resolved
+wherever it stands. It buys no reading that the host's own channel does not already give, so it is
+not built.
 
 ## Rejected alternatives
 
@@ -178,14 +286,23 @@ duplicate the refusal without widening what is caught.
 **An ordering guard on the calibrated pair, or a silent reorder.** Rejected: the joint `@argcheck` is
 the whole validation and it already runs on the rebuilt struct, and a reorder invents an intent.
 
+**A stated `scale` field in place of the series marker.** `DimensionalRateRadius` reads
+`mean(sqrt, diag(pr.sigma))` on the same terms as `ConcentrationRadius`, and its `scale` field was
+the workaround a drawdown slot needed. Rejected once the programme settled the units: a caller who
+must state a scale is stating what the model already knows. A stated `scale` survives as the way to
+price a ball whose units are neither.
+
+**A schedule inside a rule.** Rejected: it would name a fold the rule cannot see, and it would give a
+second channel for what the host already varies.
+
 ## Consequences
 
-- **Thirty types declare `calibration_slots`**, across the six `XatRisk` and ordered-weights files of
-  `src/19_RiskMeasures/` and the two regularisation estimators. A container declares the child it
-  wraps rather than a quantity, which is how `reverse ∘ owa_tg` reaches its inner builder.
-- **`JuMPOptimiser` declares none.** Its `l1` and `linf` resolve at their constraint site, through
-  `resolve_calibration_slot(opt.l1, :l1, pr, pr.w, opt.slv)`. The optimiser has no value-level entry
-  point, so `assert_calibrated_slots` has nothing to say about it.
+- **Thirty-two types declare `calibration_slots`**, across the six `XatRisk` and ordered-weights
+  files of `src/19_RiskMeasures/` and the two regularisation estimators. A container declares the
+  child it wraps rather than a quantity, which is how `reverse ∘ owa_tg` reaches its inner builder.
+- **`JuMPOptimiser` declares none.** Its `l1`, `linf`, `l2c` and `linfc` resolve at their constraint
+  site, through `resolve_calibration_slot(opt.l1, :l1, pr, pr.w, opt.slv)` and its siblings. The
+  optimiser has no value-level entry point, so `assert_calibrated_slots` has nothing to say about it.
 - **`resolve_deferred_quantities` is no longer only about Deferred Quantities.** The name is now
   narrower than the method, and a reader who takes it literally will miss the calibration resolution
   beside it. ADR 0051 carries the amendment.
@@ -203,153 +320,13 @@ the whole validation and it already runs on the rebuilt struct, and a reorder in
 - **Three inner slots keep `::Number`.** `alpha_i` and `beta_i` on the two tail-Gini types are
   starting points, not estimates. A reading under which an inner starting point is itself calibrated
   would have to say what the joint check means when both sides move, and nothing has examined it.
-- **No rule computes an Esfahani-Kuhn tail weight.** `AmbiguityTailWeightCalibration` and its family
-  ship with no member, so the slot admits a caller's `Function` and nothing else. ADR 0070 recorded
-  the same gap and it is unchanged.
-- **A `TD_` wrapper holding a rule is still unspecified.** `JuMPOptimiser.l1` and `.linf` are
-  `TD_Option{<:Num_AmbRadCal}`, so one field carries two deferral channels and ADR 0030 never
-  considered a second. The case arises nowhere in `src/19_RiskMeasures/`.
-
-## Amendment (2026-08-29) — from ADR 0097
-
-**One bound names two roles.** The decision above states that a slot bound pairs `Number`
-with **one** concrete role, and that the bound is the whole of the role validation. ADR 0097
-adds the one exception: `LpRegularisation.val` is a penalty coefficient in
-`JuMPOptimiser.lp` and a norm ceiling in `JuMPOptimiser.lpc`, so `Num_AmbRadNormCeilCal`
-admits both roles and two `assert_` methods settle the reading. Those checks run in
-`JuMPOptimiser`'s own constructor, so the refusal still fires where the caller wrote the
-field. Every other bound is unchanged.
-
-**A seventh role ships.** `NormCeilingCalibration` stands in `l2c`, `linfc` and the `val`
-that `lpc` reads, over the rule family `AbstractNormCeilingCalibrationAlgorithm`, whose one
-member is `EffectiveAssetFloor`. It carries one role rather than two, for the reason
-`AmbiguityRadiusCalibration` does: a ceiling names no end of a distribution.
-
-**A second travelling pair ships.** `bind_norm_order(slot, p)` carries a constraint's norm
-order into the rule that computes its ceiling, on the shape `bind_alpha` gives. The two
-differ in one respect: an order is a property of the constraint rather than of a sibling
-slot, so the constraint site's order overwrites one the rule already carries.
-
-## Amendment (2026-08-29) — from issue #613
-
-**A rule computes an Esfahani-Kuhn tail weight.** The open question above records that
-`AmbiguityTailWeightCalibration` and its family ship with no member. `TailTermParity` is that
-member: it returns the weight that prices the tail term of the loss at a stated multiple of
-its mean term, on the sample the prior result carries. The slot still admits a caller's
-`Function` beside it, and the bound is unchanged.
-
-**The tail-weight role travels, and the radius role does not.** `bind_alpha` gains a method
-for `AmbiguityTailWeightCalibration` and one for the rule inside it, because the tail-term
-scale is a CVaR at the slot owner's own significance level. The radius family needs none.
-
-## Amendment (2026-08-29) — the series a rule reads
-
-**A slot key names no quantity, so the owner hands its series over.** `RelativisticValueatRisk`
-and `RelativisticDrawdownatRisk` both resolve the key `:kappa`, and the two price two different
-series. A rule that reads the *shape* of a series therefore cannot tell from the key which
-quantity it stands in front of, and before this amendment both owners got a reading of the
-returns. `calibration_series(x)` is the trait each owner answers, and `bind_series(slot, series)`
-carries the answer into the rule, on the shape `bind_alpha` and `bind_norm_order` already give.
-The owner's series **overwrites** one the rule carries, for the reason a constraint's norm order
-does: the quantity belongs to the measure, and a rule cannot know which measure it reached.
-
-**The reading does not move, only the sample it reads.** `AbstractCalibrationSeries` names three
-markers: `ReturnsSeries`, and `AbsoluteDrawdownSeries` and `RelativeDrawdownSeries` under
-`AbstractDrawdownSeries`. `HillTailDecay` pools the drawdown series of each column in place of the
-columns, with the same standardisation, the same count and the same estimator. `RadialTailDecay`
-whitens the rows of the drawdown sample in place of the rows of `pr.X`. Neither rule forms a
-portfolio, and neither needs one: a drawdown series is formed per column, and it holds one entry
-per observation, so every count a rule forms on `pr.X` is the count it reads.
-
-**A drawdown sample carries its own moments.** `pr.mu` and `pr.sigma` are moments of the returns,
-and no scaling of them states the moments of a drawdown, so under a drawdown marker
-`RadialTailDecay` centres on the column means of the drawdown sample and whitens by the Cholesky
-factor of its covariance matrix. The precedence of `pr.chol` over `pr.sigma`, which ADR 0095 and
-issue #612 record, therefore governs the returns reading alone. This is the one place where the
-change of series changes what a rule reads off the prior result.
-
-**A drawdown series has one end.** It is non-positive, so `:kappa_b` names nothing on it and
-`series_end_sign` refuses that key under `AbstractDrawdownSeries`. No drawdown Range measure
-ships, so only a caller who runs a rule by hand reaches the refusal.
-
-**Three rules still read no series.** `EntropyBudget` reads the sample length and its sibling
-`alpha`, and neither moves with the series, so it needs no `bind_series` method and the identity
-default serves it. The significance and norm-ceiling families need none either.
-
-**Two rules of other families keep the gap this amendment closes.** `TailTermParity` prices a mean
-term and a CVaR of the *returns* on a drawdown owner, and `ConcentrationRadius` and
-`DualNormRadius` read a returns scale there. Their families carry no series field yet, and the
-open question of this ADR records the `DualNormRadius` case already. The mechanism above is what
-they would use.
-
-## Amendment (2026-08-29) — from issue #623, the ambiguity families take the marker
-
-**The programme decides which quantity the ball is drawn around, and it is not a matter of taste.**
-The amendment above left the ambiguity families out, because a radius is the coefficient of a norm
-penalty on the weight vector and nobody had written down whether an Esfahani-Kuhn radius under a
-drawdown owner belongs on the asset-return scale or on a drawdown scale. `set_risk_constraints!`
-for `DistributionallyRobustConditionalDrawdownatRisk` answers it. That method measures the
-transport cost of its own programme against `set_portfolio_drawdowns_plus_one!(model, pr.X)`, which
-is `absolute_drawdown_arr(X) .+ 1`, and that matrix is `calibration_series_matrix` under
-`AbsoluteDrawdownSeries` shifted by the support offset. So the scenarios the ball is drawn around
-are the **per-asset drawdowns**, the radius is a distance between two such vectors, and it carries
-drawdown units. Two docstrings had stated the two readings against each other, and the model
-settles which one was right.
-
-**Four rules take a `series` field, and one verb parts the two readings.** `TailTermParity`,
-`ConcentrationRadius`, `DimensionalRateRadius` and `DualNormRadius` each gain the field and a
-`bind_series` method, and the two ambiguity roles gain one each.
-`calibration_series_dispersion(series, pr)` is the per-asset dispersion the three radius rules read:
-`sqrt.(diag(pr.sigma))` on a returns series, and the sample dispersion of the drawdown columns on a
-drawdown marker. `TailTermParity` substitutes `calibration_series_matrix(series, pr.X)` for `pr.X`
-and nothing else, because the `ConditionalValueatRisk` kernel over a non-positive drawdown column
-**is** the `ConditionalDrawdownatRisk` of that column, so the rule still carries no second encoding
-of the measure it calibrates.
-
-**`DimensionalRateRadius` carried the same defect and is corrected here.** Issue #623 names three
-rules. The fourth reads `mean(sqrt, diag(pr.sigma))` on the same terms as `ConcentrationRadius`, and
-its `scale` field documented the gap as a workaround: *a drawdown slot needs a stated scale*. It no
-longer does.
-
-**The ground metric does not move with the series.** `DualNormRadius` reads `key` for the ground
-metric and `series` for the vector it takes that norm of. The two are independent: `:r` is the
-1-norm under every marker, and only the error vector moves.
-
-**The drawdown error scale is a floor, and the rule says so rather than correcting it.** A drawdown
-is a running functional, so its entries are dependent down a column and `s / sqrt(T_e)` prices a
-record of independent draws that the sample does not hold. A correction needs a model of that
-dependence, and the sample states none. This is the same refusal the rule already makes for the
-number of assets.
-
-**One asymmetry is left open, and it is filed.** Under a returns marker the dispersion comes off
-`pr.sigma`, so a shrunk or a robust covariance reaches it. Under a drawdown marker it comes off
-`Statistics.std` of the drawdown sample, so the caller's own estimator does not. `radial_series_inputs`
-carries the same asymmetry, from the amendment above. Closing it needs a rule that holds a **prior
-estimator** and fits it to the drawdown sample, which is a design the maintainer has raised and
-which this ADR does not decide.
-
-## Amendment (2026-08-29) — a schedule reaches the host, and no further
-
-Every calibration rule shipped so far carries the same open question in its charter: whether a
-`TimeDependent` wrapping the rule is meaningful. Issues #617, #619, #620 and #621 each restate it.
-It is settled here, and the answer is that no channel is missing.
-
-**A rule is never standalone.** It stands in a slot of a host, so the host is the thing a schedule
-swaps, and the host already carries the channel. Where the host is a `JuMPOptimiser`, the four norm
-fields are themselves schedulable, and a schedule over one of them selects a rule per fold. Where
-the host is a risk measure, the slot's own bound admits no schedule, and the caller varies the whole
-measure instead, through the schedulable risk-measure field of the optimiser.
-
-**The two run at two points of the pipeline, and neither knows about the other.** The selection runs
-in `update_time_dependent_fields`, before any prior is fitted. The resolution runs at assembly,
-against the prior of the period that was selected. So a schedule and a rule compose, and the order
-falls out of the pipeline rather than being invented for it.
-
-**A schedule inside a rule would be a duplicate, not a widening.** It would name a fold the rule
-cannot see, and it would give a second channel for what the host already varies. So the `Num_` and
-`Func_` bounds of the six roles stay free of `TimeDependent`, and the rules' charters no longer
-carry the question.
-
-A generic resolution is possible in principle: nothing in the mechanism stops a schedule from being
-resolved wherever it stands. It buys no reading that the host's own channel does not already give,
-so it is not built.
+- **A `TD_` wrapper holding a rule is the host's own channel.** `JuMPOptimiser.l1`, `.linf`, `.l2c`
+  and `.linfc` are `TD_Option{<:Num_AmbRadCal}` or `TD_Option{<:Num_NormCeilCal}`, so one field
+  carries two deferral channels and ADR 0030 never considered a second. The two resolve at two points
+  of the pipeline, so they compose rather than compete.
+- **One asymmetry in the dispersion reading is left open, and it is filed.** Under a returns marker
+  the dispersion comes off `pr.sigma`, so a shrunk or a robust covariance reaches it. Under a
+  drawdown marker it comes off `Statistics.std` of the drawdown sample, so the caller's own estimator
+  does not. `radial_series_inputs` carries the same asymmetry. Closing it needs a rule that holds a
+  **prior estimator** and fits it to the drawdown sample, which is a design the maintainer has raised
+  and which this ADR does not decide.

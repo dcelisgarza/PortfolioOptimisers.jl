@@ -1147,6 +1147,15 @@ end
     op = OpinionPoolingPrior(; pes = pes)
     @test [p.cvar_views.views.val for p in op.pes] ==
           ["AAPL == 0.06", "AAPL == 0.07", "AAPL == 0.08"]
+    # `rtol` is 5e-4 here and 1e-5 in the testsets above, because these three estimators carry
+    # the DEFAULT optimiser and not `EP_TIGHT`. This is #573: under the default stopping rule the
+    # root the CVaR search lands on depends on what solved before it in the process, so the miss
+    # is a property of the run and not of the estimator. Standalone in a bare process the three
+    # cases meet their targets to 1.3e-7, 1.3e-8 and 1.9e-8 relative. In the full-file run on
+    # `ubuntu-latest` the `t = 0.07` case gave 0.06997809186508146, a relative miss of 3.1e-4,
+    # which is what raised the tolerance. `EP_TIGHT` would restore 1e-5 at the cost of three
+    # tight solves, and this testset checks that the view reaches each member of the pool rather
+    # than how tightly the search closes on it, so the wider tolerance is the cheaper answer.
     for (p, t) in zip(op.pes, (0.06, 0.07, 0.08))
         @test isapprox(ConditionalValueatRisk(; w = prior(p, rd).w)(rd.X[:, 1]), t,
                        rtol = 5e-4)

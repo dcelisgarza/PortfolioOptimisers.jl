@@ -1,5 +1,5 @@
 ---
-applyTo: "test/test-*.jl"
+applyTo: "test/test_*.jl"
 ---
 
 # Test Writing Guidelines for PortfolioOptimisers.jl
