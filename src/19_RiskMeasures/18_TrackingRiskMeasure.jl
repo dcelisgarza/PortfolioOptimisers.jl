@@ -610,7 +610,7 @@ vector and always requires explicit portfolio weights.
   - [`TrackingRiskMeasure`](@ref)
   - [`WeightsTracking`](@ref)
 """
-supports_precomputed_returns(::TrackingRiskMeasure{<:Any, <:WeightsTracking}) = false
+supports_precomputed_returns(::TrackingRiskMeasure{<:Any, <:WeightsTracking})::Bool = false
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -623,7 +623,7 @@ series and its risk is a function of the net-return series alone.
   - [`TrackingRiskMeasure`](@ref)
   - [`ReturnsTracking`](@ref)
 """
-supports_precomputed_returns(::TrackingRiskMeasure{<:Any, <:ReturnsTracking}) = true
+supports_precomputed_returns(::TrackingRiskMeasure{<:Any, <:ReturnsTracking})::Bool = true
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -638,6 +638,6 @@ Its `tr` slot is a [`WeightsTracking`](@ref), and both functors read the benchma
   - [`WeightsTracking`](@ref)
   - [`expected_risk_from_returns`](@ref): the contract entry this predicate gates.
 """
-supports_precomputed_returns(::RiskTrackingRiskMeasure) = false
+supports_precomputed_returns(::RiskTrackingRiskMeasure)::Bool = false
 
 export TrackingRiskMeasure, RiskTrackingRiskMeasure, RiskTrackingError

@@ -89,6 +89,10 @@ function raised_message(f)
     end
 end
 
+# A decay that implements no `regenerate_decay` of its own. It reaches the fallback that the
+# `GerberIQDecayEstimator` interface documents for an extension author.
+struct UnresolvedDecay <: PO.GerberIQDecayEstimator end
+
 @testset "GerberIQCovariance" begin
     rng = StableRNG(987654321)
     X = randn(rng, 60, 5) .* 0.02
@@ -207,6 +211,13 @@ end
         # A single asset is the other degenerate window, and it divides by nothing either.
         d1c = PO.regenerate_decay(ExpGerberIQDecay(), reshape([0.01], 1, 1))
         @test isfinite(d1c.e) && isfinite(d1c.y)
+
+        # A subtype that implements no `regenerate_decay` reaches the fallback of the
+        # abstract type, which reads both parameters off `X` with the source's own defaults.
+        dfb = PO.regenerate_decay(UnresolvedDecay(), X)
+        @test dfb isa ExpGerberIQDecay
+        @test dfb.e == PO.gerber_iq_eps(nothing, X)
+        @test dfb.y == PO.gerber_iq_gamma(nothing, X)
     end
 
     @testset "gerber_iq_eps and gerber_iq_gamma" begin

@@ -137,6 +137,27 @@ beside it carries 51 and every other line of the file is covered. The four malfo
 itself is reached and only its last line is not. Deleting the line would buy the number by making \
 one of three methods shaped unlike its siblings."""
 
+[rationale.a-closure-inside-a-top-level-const]
+text = """
+A top-level `const` whose value is built by a higher-order call carries an anonymous function, and \
+that closure runs once, when the module is defined. Definition happens in the precompile process, \
+whose coverage the test job discards, so the test process allocates the line no counter at all. \
+`CoverageTools` then reads the line as code and writes a synthetic `0` over it while it converts \
+the `.cov` files into `lcov.info`, and the gate reads that `0` as a miss. No test can move it. \
+Measured by the review of PR #625, piece P11, on the two `Union{map(c -> Val{c}, …)...}` \
+constants of `src/08_Moments/21_Base_Regression.jl`. A targeted run of \
+`test_08j_base_regression.jl` under `--code-coverage` hits all 68 executable lines of the file and \
+leaves no zero, and lines 649 and 667 carry a bare `-`. `CoverageTools.process_file` over the same \
+source answers `0` on exactly those two lines and `nothing` on the three neighbouring constants, \
+which is the synthetic zero the CI artifact then carries as `DA:649,0` and `DA:667,0`. The union \
+each line builds is nevertheless correct, which is the proof that the closure ran: \
+`MinValStepwiseRegressionCriterion` is `Union{Val{:aic}, Val{:aicc}, Val{:bic}}`, \
+`MaxValStepwiseRegressionCriterion` is `Union{Val{:r2}, Val{:adjr2}}`, and the file dispatches on \
+both. The closure and not the `const` is the shape that draws the zero, which those three \
+neighbours show: `MIN_VAL_STEPWISE_REGRESSION_CRITERIA` and `MAX_VAL_STEPWISE_REGRESSION_CRITERIA` \
+hold a tuple literal, `STEPWISE_REGRESSION_CRITERIA` holds a splat of the two, none of them holds \
+a function body, and none of them reaches `lcov.info`."""
+
 # --- exemptions ------------------------------------------------------------
 #
 # Keyed (path, definition, metric), dropped before the file's maximum is taken. An Exemption binds
@@ -303,3 +324,17 @@ path = "src/12_ConstraintGeneration/06_AssetSetsMatrix.jl"
 definition = "feature_target!"
 misses = 1
 rationale = "a-return-after-an-unconditional-throw"
+
+# Two constants of one shape, one row each. The `const` line of each holds the `map` closure that
+# builds the union, and the count of 1 is the synthetic zero that the line draws.
+[[coverage_exemption]]
+path = "src/08_Moments/21_Base_Regression.jl"
+definition = "MinValStepwiseRegressionCriterion"
+misses = 1
+rationale = "a-closure-inside-a-top-level-const"
+
+[[coverage_exemption]]
+path = "src/08_Moments/21_Base_Regression.jl"
+definition = "MaxValStepwiseRegressionCriterion"
+misses = 1
+rationale = "a-closure-inside-a-top-level-const"

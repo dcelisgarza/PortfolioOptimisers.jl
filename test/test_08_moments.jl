@@ -478,7 +478,8 @@
         =#
         let aw492 = aweights(ew),
             aw492b = aweights(reverse(collect(ew))),
-            mu492 = mean(SimpleExpectedReturns(), rd.X; dims = 1)
+            mu492 = mean(SimpleExpectedReturns(), rd.X; dims = 1),
+            muw492 = mean(SimpleExpectedReturns(; w = aw492), rd.X; dims = 1)
 
             for malg in (FullMoment(), SemiMoment())
                 @test isapprox(cov(Covariance(; alg = malg, w = aw492), rd.X),
@@ -497,6 +498,21 @@
                             coskewness(Coskewness(; w = aw492), rd.X; mean = mu492)[1])
             @test !isapprox(cokurtosis(Cokurtosis(; w = aw492), rd.X),
                             cokurtosis(Cokurtosis(; w = aw492), rd.X; mean = mu492))
+            # The `mean` keyword reaches the semi-moment method of each as well. Handing it
+            # the centre the estimator would compute itself changes nothing, and handing it
+            # the unweighted centre changes which observations fall below the centre.
+            @test isapprox(coskewness(Coskewness(; alg = SemiMoment(), w = aw492), rd.X;
+                                      mean = muw492)[1],
+                           coskewness(Coskewness(; alg = SemiMoment(), w = aw492), rd.X)[1])
+            @test isapprox(cokurtosis(Cokurtosis(; alg = SemiMoment(), w = aw492), rd.X;
+                                      mean = muw492),
+                           cokurtosis(Cokurtosis(; alg = SemiMoment(), w = aw492), rd.X))
+            @test !isapprox(coskewness(Coskewness(; alg = SemiMoment(), w = aw492), rd.X;
+                                       mean = mu492)[1],
+                            coskewness(Coskewness(; alg = SemiMoment(), w = aw492), rd.X)[1])
+            @test !isapprox(cokurtosis(Cokurtosis(; alg = SemiMoment(), w = aw492), rd.X;
+                                       mean = mu492),
+                            cokurtosis(Cokurtosis(; alg = SemiMoment(), w = aw492), rd.X))
             # `w` wins over the weights that `me` and `ce` carry, which is what `factory`
             # does on every other path.
             @test isapprox(cov(Covariance(; me = SimpleExpectedReturns(; w = aw492b),

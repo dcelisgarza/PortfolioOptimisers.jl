@@ -899,7 +899,7 @@ To score a bare return series, name [`MeanReturn`](@ref) or [`MeanReturnRiskRati
   - [`MeanReturn`](@ref): the [`NetReturnsInput`](@ref) measure that does score a bare series.
   - [`expected_risk_from_returns`](@ref): the contract entry this predicate gates.
 """
-supports_precomputed_returns(::PrRM) = false
+supports_precomputed_returns(::PrRM)::Bool = false
 """
     expected_risk(r::PrRM, w::VecVecNum, pr::AbstractPriorResult,
                   fees::Option{<:Fees} = nothing; kwargs...)

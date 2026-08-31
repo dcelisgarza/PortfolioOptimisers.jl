@@ -784,7 +784,7 @@ The generic method answers `true`, so a new algorithm is asked for a score until
   - [`AbstractRedundancyAlgorithm`](@ref)
   - [`RedundancySelector`](@ref)
 """
-requires_score(::AbstractRedundancyAlgorithm) = true
+requires_score(::AbstractRedundancyAlgorithm)::Bool = true
 """
     redundancy_keep(alg::AbstractRedundancyAlgorithm, rd, scores, bib) -> BitVector
 
@@ -994,7 +994,7 @@ function PairwiseCorrelation(;
                              measure::Num_VecToScaM = MeanValue())::PairwiseCorrelation
     return PairwiseCorrelation(ce, t, absolute, measure)
 end
-requires_score(::PairwiseCorrelation) = false
+requires_score(::PairwiseCorrelation)::Bool = false
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -1118,7 +1118,7 @@ function CorrelationComponents(;
                                measure::Num_VecToScaM = MeanValue())::CorrelationComponents
     return CorrelationComponents(ce, t, absolute, measure)
 end
-requires_score(::CorrelationComponents) = false
+requires_score(::CorrelationComponents)::Bool = false
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
