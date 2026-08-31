@@ -3,12 +3,23 @@
 # The deciding half of the scheduled sweep job of ADR 0084.
 #
 #     julia --project=code_health code_health/sweep_triage.jl --maps <tsv> --existing <tsv>
+#     julia --project=code_health code_health/sweep_triage.jl --fetch
+#     julia --project=code_health code_health/sweep_triage.jl --fetch --file src/26_New.jl
 #
 # It reconciles `sweep/manifest.toml` against the tracker, finds every file whose row still reads
 # `swept = false` under a CLOSED child map of #404, and writes a plan: the maps to reopen and the
 # sub-issues to open. **It opens nothing, it reopens nothing and it writes no row.** The tracker is
-# read and written by `gh` in the workflow around it, so every decision this job makes lives here,
+# read and written by `code_health/sweep_issues.sh`, so every decision this job makes lives here,
 # in one place a person can run and read.
+#
+# Three ways to run it, and all three take the same code path to the same plan:
+#
+#   - The weekly job. `.github/workflows/Sweep.yml` dumps the tracker, runs this, and applies.
+#   - By hand, whole. `--fetch` dumps the tracker itself, so no argument is needed at all. Follow
+#     it with `code_health/sweep_issues.sh apply --dry-run`, then without the flag.
+#   - By hand, one file. `--file <path>` plans that path whatever the state of its child map. This
+#     is the one thing the weekly job cannot do, and the case it cannot reach: a forgotten step 4
+#     under an OPEN child map. ADR 0084's amendment of 2026-08-31 records it.
 #
 # It is a sibling of `triage.jl`, not a fifth instrument. The four instruments measure the tree and
 # hold a baseline; this one measures nothing. It reads two committed files and a dump of the
@@ -196,7 +207,16 @@ struct Candidate
 end
 
 """
-    candidates(rows, maps, coverage, existing) -> Vector{Candidate}, Vector{Tuple{String, String}}
+    reopens(candidate) -> Bool
+
+Whether filing this candidate reopens its child map. It is true for every candidate the weekly
+trigger picks, because that trigger reads a closed map. It is false for a `--file` candidate under
+a map that is already open, and the body says so rather than claiming a reopen that never happened.
+"""
+reopens(c::Candidate) = !(c.map.open)
+
+"""
+    candidates(rows, maps, coverage, existing, forced) -> Vector{Candidate}, Vector{Tuple{String, String}}
 
 Every file the trigger fires on, and the files it fired on that the safeguard then skipped.
 
@@ -209,15 +229,29 @@ safeguard on top of it, never the mechanism.
 backlog that the ratchet already holds still. These are not: each one is a file that entered the
 library after its child map finished, and the first run is the only run that sees the trigger true.
 Capping the run would drop the remainder for ever, because run 2 sees the map it just reopened.
+
+`forced` holds the paths a person named with `--file`, and it **replaces the closed-map half of the
+trigger for those paths alone**. Nothing else about them is relaxed: the row must exist, it must
+read `swept = false`, and `already_filed` still skips a path an open sweep issue names. The weekly
+job passes an empty set, so its trigger is exactly what ADR 0084 decided.
 """
-function candidates(rows, maps, coverage, existing)
+function candidates(rows, maps, coverage, existing, forced = Set{String}())
+    for path in sort(collect(forced))
+        if !(haskey(rows, path))
+            error("`$path` has no row in `sweep/manifest.toml`. Add the row first: " *
+                  "`test/test_45_sweep_census.jl` prints the line to paste.")
+        elseif rows[path]["swept"]
+            error("`$path` reads `swept = true`, so it is already swept and there is " *
+                  "nothing to file. Set it to `false` first if the sweep must run again.")
+        end
+    end
     chosen, skipped = Candidate[], Tuple{String, String}[]
     for (path, row) in sort(collect(rows); by = first)
         if row["swept"]
             continue
         end
         m = maps[string(row["map"])]
-        if m.open
+        if m.open && !(path in forced)
             continue
         end
         if already_filed(existing, path)
@@ -286,8 +320,13 @@ function body_of(c::Candidate, commit::AbstractString)
     io = IOBuffer()
     println(io, ROUTING)
     println(io, "## Destination\n")
-    println(io, "This file is swept. It joined child map ", c.map.number,
-            " after that map closed, so the map and #", UMBRELLA, " were reopened.\n")
+    if reopens(c)
+        println(io, "This file is swept. It joined child map ", c.map.number,
+                " after that map closed, so the map and #", UMBRELLA, " were reopened.\n")
+    else
+        println(io, "This file is swept. It joined child map ", c.map.number,
+                " after that map was charted, and it is filed under it now.\n")
+    end
     println(io, "| File | Units | Misses | Lines |")
     println(io, "| --- | ---: | ---: | ---: |")
     println(io, "| `", c.path, "` | ", c.units, " | ", number_or_dash(c.misses), " | ",
@@ -302,8 +341,8 @@ function body_of(c::Candidate, commit::AbstractString)
     println(io, "Every rule for this effort lives on #", UMBRELLA,
             ". Read it first. This ticket closes when the file's row reads `swept = true`.\n")
     println(io, "---\n")
-    println(io, "Filed by the sweep job against `", commit, "`, under child map #",
-            c.map.issue, ".")
+    println(io, "Filed by `code_health/sweep_triage.jl` against `", commit,
+            "`, under child map #", c.map.issue, ".")
     return String(take!(io))
 end
 
@@ -317,8 +356,9 @@ reads and nothing more.
 
   - `plan.tsv` — one row per issue, as `stem<TAB>path<TAB>parent issue`. It is not called
     `manifest.tsv`, as `triage.jl`'s is, because `sweep/manifest.toml` already owns that noun here.
-  - `reopen.tsv` — the issues to reopen, one number per line, **each of them closed**. `gh issue reopen` fails on an issue that is already open, so an open umbrella is left out rather than
-    reopened defensively.
+  - `reopen.tsv` — the issues to reopen, one number per line, **each of them closed**. `gh issue reopen` fails on an issue that is already open, so an open map and an open umbrella are left out
+    rather than reopened defensively. A `--file` candidate under an open map therefore contributes
+    no line at all, and its plan row stands alone.
 
 An empty plan writes an empty `plan.tsv` and an empty `reopen.tsv`, which is the first run's own
 outcome: all thirteen child maps are open today.
@@ -342,12 +382,14 @@ function write_plan(dir::AbstractString, chosen, umbrella_open, commit::Abstract
     end
     write(joinpath(dir, "plan.tsv"), String(take!(plan)))
     reopen = IOBuffer()
-    if !(isempty(chosen))
-        for issue in sort(unique(c.map.issue for c in chosen))
+    closed = sort(unique(c.map.issue for c in chosen if reopens(c)))
+    if !(isempty(closed))
+        for issue in closed
             println(reopen, issue)
         end
         # The umbrella closes only when the last child map closes, so a child map that reopens
-        # makes its terminal condition false again.
+        # makes its terminal condition false again. A candidate under an OPEN map reopens no map,
+        # so it cannot have closed the umbrella either.
         if umbrella_open === false
             println(reopen, UMBRELLA)
         end
@@ -374,12 +416,12 @@ function summarise(io::IO, rows, chosen, skipped, maps, umbrella_open)
     println(io, "| to open | ", length(chosen), " |")
     println(io)
     if !(isempty(chosen))
-        println(io, "| file | child map | units | misses | lines |")
-        println(io, "| --- | --- | ---: | ---: | ---: |")
+        println(io, "| file | child map | reopened | units | misses | lines |")
+        println(io, "| --- | --- | --- | ---: | ---: | ---: |")
         for c in chosen
             println(io, "| `", c.path, "` | #", c.map.issue, " map ", c.map.number, " | ",
-                    c.units, " | ", number_or_dash(c.misses), " | ",
-                    number_or_dash(c.lines), " |")
+                    reopens(c) ? "yes" : "no, already open", " | ", c.units, " | ",
+                    number_or_dash(c.misses), " | ", number_or_dash(c.lines), " |")
         end
         println(io)
     end
@@ -400,41 +442,88 @@ struct Options
     maps::String
     existing::String
     out::String
+    fetch::Bool
+    files::Vector{String}
 end
+
+const USAGE = """
+usage: sweep_triage.jl --maps <tsv> [--existing <tsv>] [--out <dir>] [--file <path>]...
+       sweep_triage.jl --fetch [--out <dir>] [--file <path>]...
+
+  --maps <tsv>      the `wayfinder:map` dump. Required unless --fetch is given.
+  --existing <tsv>  the `sweep` dump. Optional; an absent one reads as an empty tracker.
+  --out <dir>       the plan directory. Default: code_health/_sweep.
+  --fetch           run `code_health/sweep_issues.sh dump` first, and read what it wrote.
+  --file <path>     plan this path whatever the state of its child map. Repeatable.
+"""
 
 """
     parse_options(args) -> Options
 
-`--maps` is the only required input: without the tracker's state no file can be a candidate, and an
-absent dump would make every run vacuously empty rather than loud.
+The tracker's state is the only required input: without it no file can be a candidate, and an
+absent dump would make every run vacuously empty rather than loud. It arrives either as `--maps`,
+which is what the weekly job passes, or as `--fetch`, which reads it from the tracker directly.
+
+`--file` is repeatable, and each path is taken exactly as `sweep/manifest.toml` spells it. A path
+that has no row, or whose row reads `swept = true`, throws in `candidates` rather than here, so the
+message can name the manifest and the census that prints the missing line.
 """
 function parse_options(args)
-    usage = "usage: sweep_triage.jl --maps <tsv> [--existing <tsv>] [--out <dir>]"
-    maps, existing, out = "", "", PLAN_DIR
+    maps, existing, out, fetch = "", "", PLAN_DIR, false
+    files = String[]
     i = 1
     while i <= length(args)
         a = args[i]
-        if a in ("--maps", "--existing", "--out") && i < length(args)
+        if a == "--fetch"
+            fetch = true
+            i += 1
+        elseif a in ("--maps", "--existing", "--out", "--file") && i < length(args)
             if a == "--maps"
                 (maps = args[i + 1])
             elseif a == "--existing"
                 (existing = args[i + 1])
+            elseif a == "--file"
+                push!(files, args[i + 1])
             else
                 (out = args[i + 1])
             end
             i += 2
         else
-            error(usage)
+            error(USAGE)
         end
     end
-    if isempty(maps)
-        error(usage)
+    if isempty(maps) && !(fetch)
+        error(USAGE)
     end
-    return Options(maps, existing, out)
+    return Options(maps, existing, out, fetch, files)
+end
+
+"""
+    fetch_dumps(opts) -> Options
+
+Run the tracker's own half and read back what it wrote. The two dumps land in the plan directory,
+which is where the weekly job puts them too, so the code below cannot tell the two runs apart.
+
+An explicit `--maps` wins over the fetched one. That combination is not useful, but silently
+overwriting a path the caller named would be worse than honouring it.
+"""
+function fetch_dumps(opts::Options)
+    script = joinpath(CodeHealth.DIR, "sweep_issues.sh")
+    mkpath(opts.out)
+    run(`bash $script dump --out $(opts.out)`)
+    return Options(isempty(opts.maps) ? joinpath(opts.out, "maps.tsv") : opts.maps,
+                   if isempty(opts.existing)
+                       joinpath(opts.out, "existing.tsv")
+                   else
+                       opts.existing
+                   end, opts.out, opts.fetch, opts.files)
 end
 
 function main(args)
     opts = parse_options(args)
+    if opts.fetch
+        opts = fetch_dumps(opts)
+    end
     manifest = CodeHealth.read_toml(MANIFEST_PATH)
     rows = get(manifest, "file", Dict{String, Any}())
     map_names = get(manifest, "map", Dict{String, Any}())
@@ -443,16 +532,21 @@ function main(args)
     existing = read_existing(opts.existing)
 
     reconcile(rows, map_names, maps)
-    chosen, skipped = candidates(rows, maps, coverage, existing)
+    chosen, skipped = candidates(rows, maps, coverage, existing, Set(opts.files))
     write_plan(opts.out, chosen, umbrella_open, CodeHealth.git_short_commit())
 
     println(length(rows), " file(s) in the manifest, ", count(m -> !(m.open), values(maps)),
             " child map(s) closed, ", length(chosen), " sub-issue(s) to open.")
     for c in chosen
-        println("  ", c.path, " — child map ", c.map.number, ", issue #", c.map.issue)
+        println("  ", c.path, " — child map ", c.map.number, ", issue #", c.map.issue,
+                reopens(c) ? " (closed, so it is reopened)" : " (already open)")
     end
     for (path, reason) in skipped
         println("  skipped ", path, " — ", reason)
+    end
+    if !(isempty(chosen))
+        println("Apply the plan with `code_health/sweep_issues.sh apply --out ", opts.out,
+                "`, or read it first with `--dry-run`.")
     end
     io = IOBuffer()
     summarise(io, rows, chosen, skipped, maps, umbrella_open)

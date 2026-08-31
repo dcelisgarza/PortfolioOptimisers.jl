@@ -28,3 +28,4 @@ __pycache__/
 # committed; the contributor puts the downloaded file at its committed path instead.
 code_health/_refresh/
 code_health/_triage/
+code_health/_sweep/

@@ -281,7 +281,7 @@
     # ----------------------------------------------------- check 1a: a path resolves
 
     path_exts = (".jl", ".md", ".toml", ".yml", ".yaml", ".json", ".typ", ".cff", ".bib",
-                 ".ipynb")
+                 ".ipynb", ".sh")
 
     function is_path_citation(s)
         occursin(r"\s", s) && return false

@@ -92,6 +92,12 @@
 
     # ------------------------------------------------------------------- the measurement
 
+    #=
+    `CodeHealth.documented_units` holds a second copy of the next fifteen lines, because
+    `code_health/sweep_check.jl` measures the same number before the commit and this test may not
+    depend on `code_health/`. THIS FILE IS THE AUTHORITY for the definition. A change here changes
+    that copy in the same edit.
+    =#
     doc_macro = GlobalRef(Core, Symbol("@doc"))
     isdocstring(x) = Meta.isexpr(x, :macrocall) &&
                      !isempty(x.args) &&

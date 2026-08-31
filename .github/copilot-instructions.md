@@ -158,7 +158,8 @@ Before completing any task or creating a pull request, **ALWAYS**:
  4. **Verify changes**: Ensure all file changes align with the task requirements.
  5. **Update documentation**: If adding new features, update relevant docstrings and docs.
  6. **Update the Capability Catalogue**: Any new estimator, algorithm, or exported function must be placed in `docs/capability_catalogue.jl` (or listed in `NOT_A_FEATURE`, for a function, or `NOT_A_CHOICE`, for a type the library constructs for itself, with a reason). Do not write a description — it comes from the first sentence of the docstring. `test/test_26_docs.jl` fails if you skip this. See ADR 0040.
- 7. **Check code quality**: Ensure code follows established patterns and conventions.
+ 7. **Conform an addition to the sweep**: A file added or changed under `src/` or `ext/` owes the four steps of `CLAUDE.md` § *Functionality you add*. Run `julia --project=code_health code_health/sweep_check.jl --fetch`, which reports every one of them and prints the manifest line to paste. See ADR 0084.
+ 8. **Check code quality**: Ensure code follows established patterns and conventions.
 
 * * *
 

@@ -127,6 +127,11 @@ Wire your addition into the audit in the same change:
 4. Open one sub-issue of that child map for the addition, so it is swept as systematically as the
    code it joins.
 
+`julia --project=code_health code_health/sweep_check.jl --fetch` reports all four steps for the
+files your branch touches, and prints the line to paste for step 1. It measures and writes nothing.
+The `sweep-conform` skill runs it before the commit, and the `sweep-file-issues` skill does steps 3
+and 4.
+
 Defer a feature whose design is not settled. Leave its row at `swept = false`, record it in the
 child map's *Not yet specified* section, and take steps 3 and 4 when the design settles.
 

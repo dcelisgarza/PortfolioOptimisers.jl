@@ -192,6 +192,43 @@ function git_short_commit()
     end
 end
 
+# --- the sweep manifest ----------------------------------------------------
+
+"""
+    documented_units(path) -> Int
+
+The file's count of documented units: a docstring that attaches to a binding, counted from the
+source text by parsing with `Meta.parseall` and counting the `Core.@doc` macrocalls at any depth.
+It is the `units` key of a `sweep/manifest.toml` row.
+
+**`test/test_45_sweep_census.jl` is the Authority for this definition**, and it holds a second copy
+of these lines. That test loads no file of `code_health/`, deliberately, so `code_health` may not
+become a dependency of the test suite. The two copies must move together, and the comment beside
+the test's copy says so.
+
+A field docstring is NOT a unit: inside a struct body a docstring parses as a bare string literal
+rather than as a macrocall, so it never reaches this count.
+"""
+function documented_units(path::AbstractString)
+    doc_macro = GlobalRef(Core, Symbol("@doc"))
+    isdocstring(x) = Meta.isexpr(x, :macrocall) &&
+                     !(isempty(x.args)) &&
+                     (x.args[1] === doc_macro || x.args[1] === Symbol("@doc"))
+    n = 0
+    function walk(node)
+        if !(node isa Expr)
+            return nothing
+        end
+        if isdocstring(node)
+            (n += 1)
+        end
+        foreach(walk, node.args)
+        return nothing
+    end
+    walk(Meta.parseall(read(path, String)))
+    return n
+end
+
 # --- TOML rendering --------------------------------------------------------
 #
 # ADR 0073 rules that the generator prints the lines itself. `TOML.print` emits one line per key in

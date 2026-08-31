@@ -175,3 +175,95 @@ their pointer to it.
 
 The same block was back-filled by hand into the 30 open tickets of child maps 1 to 4. #478 is the
 map that asked for this, ADR 0085 records the decision, and #484 is the ticket that carried it out.
+
+## Amendment (2026-08-31)
+
+The job runs by hand as well as on the schedule, and a third instrument measures the same duties
+before the commit rather than a week after it.
+
+### The tracker half is `code_health/sweep_issues.sh`
+
+Every `gh` call the job makes moves out of `.github/workflows/Sweep.yml` and into that script, with
+two subcommands: `dump` writes the two dumps, and `apply` reopens `reopen.tsv` and then opens and
+parents `plan.tsv`. `apply --dry-run` prints the plan and touches nothing. The workflow calls the
+script, so **CI and a person run one copy**. A second copy of `gh issue create` written into a
+runbook would drift from the workflow in silence, and the drift would show only as a wrongly
+parented issue somebody has to undo.
+
+The script refuses any repository but `dcelisgarza/PortfolioOptimisers.jl`. The workflow's fork
+guard is a job condition, and a hand run has no job condition between the person and the tracker.
+
+### `--fetch` reads the tracker, and `--file` names a path
+
+`sweep_triage.jl --fetch` runs `sweep_issues.sh dump` and reads what it wrote, so a hand run needs
+no argument at all and no hand-made TSV.
+
+`--file <path>` plans that path **whatever the state of its child map**. This is the one thing the
+weekly job cannot do, because the closed-map half of its trigger is also its deduplication. The
+Consequences section above names that gap: *a forgotten step 4 under an open child map is caught by
+nothing*. It is now caught by a person who runs one command, and it is no longer fog on #404.
+
+Nothing else is relaxed for a `--file` path. The row must exist and must read `swept = false`, and
+`already_filed` still skips a path an open sweep issue names. Each refusal names the census that
+prints the missing line. The weekly job passes an empty set, so **its trigger is exactly what this
+ADR decided**.
+
+Two consequences follow in the plan. `reopen.tsv` now lists a candidate's map only when the dump
+reported it closed, because a `--file` candidate under an open map must reopen nothing. And the
+sub-issue body says *"it joined child map N after that map was charted"* in that case, rather than
+claiming a reopen that never happened.
+
+### `code_health/sweep_check.jl` measures the duties before the commit
+
+A third sweep script, beside the deciding half and the tracker half. It takes the files a branch
+added or changed under `src/` and `ext/` — the diff **and the untracked ones**, because a brand-new
+file appears in no diff until it is added — and reports each duty the sweep places on them: the
+manifest row and its unit count, the child map, the coverage entry, the `include` line, the swept
+standard when the row is already `swept = true`, and, with `--fetch`, the map's state and whether a
+sub-issue names the path. It prints the line to paste and the command to run, and exits non-zero on
+an unmet duty.
+
+It measures and writes nothing, and **it is a convenience, never an Authority**. Each rule it
+reports is owned by a file it names on the line. A green run is not a green build.
+
+Two rules keep its levels honest. It reads the tracker **only when this run fetched it**, because a
+dump left in the plan directory answers every question with the state of an earlier day and answers
+it silently. And a missing sub-issue is a failure for a file the branch touched, a note under
+`--all`: most unswept rows in the manifest are the standing backlog of an open child map, which the
+sweeper files as the map progresses, and reporting that backlog as a failure would teach the reader
+to ignore the level. A closed child map is a failure in every scope, because that is this decision's
+own trigger.
+
+`CodeHealth.documented_units` holds the unit counter it needs. `test/test_45_sweep_census.jl`
+remains the Authority for that definition and keeps its own copy, because the test suite may not
+take `code_health/` as a dependency. A comment beside each copy names the other.
+
+### The rule in `CLAUDE.md` gains a check, not a backstop
+
+The decision above left `CLAUDE.md` unchanged, because naming a weekly backstop inside the rule
+invites the reader to skip a step. A check that runs before the commit is the opposite: it makes
+the four steps harder to skip, not easier. So the section now names it, and the four steps stand
+exactly as they were.
+
+Two skills route to the three scripts. `sweep-conform` runs the check before the commit.
+`sweep-file-issues` plans and applies steps 3 and 4.
+
+### Verification
+
+`sweep_check.jl --all --fetch` over every row reports no failure, no drifted unit count and no
+missing `include` line, which is the clean tree's predicted outcome.
+
+Against a scratch file `src/26_ScratchProbe.jl` holding two docstrings:
+
+| Tree state | Reported |
+| --- | --- |
+| untracked, no row | no row; the paste line, and candidates 1, 2, 8, 10 and 13 |
+| a row added, `map = 1` | the row is current; no coverage row; no `include` line |
+| the same, with `--fetch` | child map 1 is issue #415 and is CLOSED; no sweep issue names it |
+
+`sweep_triage.jl --fetch` then planned that one file, reopening #415 and not #404, which is open.
+`sweep_issues.sh apply --dry-run` printed the plan and touched nothing.
+
+`--file src/19_RiskMeasures/02_Variance.jl`, whose child map 9 is issue #423 and open, planned the
+file, added no line to `reopen.tsv`, and wrote the was-charted sentence. `--file` on a swept path
+and on a path with no row each threw with the message that names the fix.
