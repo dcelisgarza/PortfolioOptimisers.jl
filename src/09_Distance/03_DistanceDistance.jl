@@ -125,7 +125,7 @@ Compute the distance-of-distances matrix from a covariance estimator and data ma
 
 An `alg` of [`CanonicalDistance`](@ref) redirects inside step 1, by the type of `ce`, so the algorithm that produces `D` is chosen before the metric is applied. [`distance`](@ref) carries the redirect table.
 
-`Distances.pairwise` treats a **column** of `D` as one observation. Nothing but `de.kwargs` sets `dims`, so the call takes the implicit `dims = 2` that `Distances.pairwise` supplies for a matrix. Which axis is read does not change the answer here, because a base distance matrix is symmetric; it matters only when `de.args` supplies a second matrix of a different shape.
+`Distances.pairwise` treats a **column** of `D` as one observation. The call passes `dims = 2` itself, before the splat of `de.kwargs`, so a `dims` in `de.kwargs` overrides it. Which axis is read does not change the answer here, because a base distance matrix is symmetric. It matters only when `de.args` supplies a second matrix of a different shape.
 
 # Arguments
 
@@ -148,7 +148,7 @@ An `alg` of [`CanonicalDistance`](@ref) redirects inside step 1, by the type of 
 function distance(de::DistanceDistance, ce::StatsBase.CovarianceEstimator, X::MatNum;
                   dims::Int = 1, kwargs...)
     D = distance(Distance(; power = de.power, alg = de.alg), ce, X; dims = dims, kwargs...)
-    return Distances.pairwise(de.metric, D, de.args...; de.kwargs...)
+    return Distances.pairwise(de.metric, D, de.args...; dims = 2, de.kwargs...)
 end
 """
     distance(de::DistanceDistance, rho::MatNum, args...; kwargs...)
@@ -162,7 +162,7 @@ Compute the distance-of-distances matrix from a correlation or covariance matrix
 
 An `alg` of [`CanonicalDistance`](@ref) takes one step before step 1, and rebuilds itself with [`SimpleDistance`](@ref). There is no covariance estimator on this route, so the redirect table cannot select a row and its fallback is taken.
 
-`Distances.pairwise` reads the columns of `D`, as it does on the covariance-estimator route above.
+`Distances.pairwise` reads the columns of `D`, as it does on the covariance-estimator route above. The call passes `dims = 2` itself, and a `dims` in `de.kwargs` overrides it.
 
 # Arguments
 
@@ -183,7 +183,7 @@ An `alg` of [`CanonicalDistance`](@ref) takes one step before step 1, and rebuil
 """
 function distance(de::DistanceDistance, rho::MatNum, args...; kwargs...)
     D = distance(Distance(; power = de.power, alg = de.alg), rho, args...; kwargs...)
-    return Distances.pairwise(de.metric, D, de.args...; de.kwargs...)
+    return Distances.pairwise(de.metric, D, de.args...; dims = 2, de.kwargs...)
 end
 """
     cor_and_dist(de::DistanceDistance, ce::StatsBase.CovarianceEstimator, X::MatNum;
@@ -221,7 +221,7 @@ function cor_and_dist(de::DistanceDistance, ce::StatsBase.CovarianceEstimator, X
                       dims::Int = 1, kwargs...)
     rho, D = cor_and_dist(Distance(; power = de.power, alg = de.alg), ce, X; dims = dims,
                           kwargs...)
-    return rho, Distances.pairwise(de.metric, D, de.args...; de.kwargs...)
+    return rho, Distances.pairwise(de.metric, D, de.args...; dims = 2, de.kwargs...)
 end
 
 export DistanceDistance

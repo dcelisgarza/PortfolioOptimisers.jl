@@ -4406,3 +4406,35 @@ end
     @test_throws ArgumentError SemiDefinitePhylogeny(; A = [0.0 1.0; 0.0 0.0])
     @test_throws ArgumentError SemiDefinitePhylogeny(; A = [1.0 1.0; 1.0 1.0])
 end
+# `DistanceDistance` passes `dims = 2` to `Distances.pairwise` itself, issue #634. The
+# implicit `dims` of `Distances.pairwise` is a deprecation, so the call must state the axis.
+# The literal sits before the splat of `de.kwargs`, so a caller's own `dims` still wins.
+# Defined at top level because a `@testset` body becomes a function.
+@testset "DistanceDistance states the pairwise axis (#634)" begin
+    using PortfolioOptimisers, Test, StableRNGs, Statistics
+    rng = StableRNG(987654321)
+    X634 = randn(rng, 60, 5)
+    rho634 = cor(X634)
+    ce634 = PortfolioOptimisersCovariance()
+    metric634 = PortfolioOptimisers.Distances.Euclidean()
+    # A second matrix that is square and not symmetric. The two axes then give two
+    # different answers, so the axis the call takes is observable.
+    B634 = randn(rng, 5, 5)
+    de2 = DistanceDistance(; metric = metric634, args = (B634,))
+    # A `dims` in the estimator's own `kwargs` must override the literal.
+    de1 = DistanceDistance(; metric = metric634, args = (B634,), kwargs = (; dims = 1))
+    base = Distance()
+    for (Dbase, res2, res1) in
+        ((distance(base, rho634), distance(de2, rho634), distance(de1, rho634)),
+         (distance(base, ce634, X634), distance(de2, ce634, X634),
+          distance(de1, ce634, X634)),
+         (cor_and_dist(base, ce634, X634)[2], cor_and_dist(de2, ce634, X634)[2],
+          cor_and_dist(de1, ce634, X634)[2]))
+        d2 = PortfolioOptimisers.Distances.pairwise(metric634, Dbase, B634; dims = 2)
+        d1 = PortfolioOptimisers.Distances.pairwise(metric634, Dbase, B634; dims = 1)
+        # The axes disagree, so the two assertions below each pin one axis.
+        @test !isapprox(d1, d2)
+        @test isapprox(res2, d2)
+        @test isapprox(res1, d1)
+    end
+end
