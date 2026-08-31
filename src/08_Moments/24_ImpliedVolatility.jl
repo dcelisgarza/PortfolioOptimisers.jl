@@ -560,7 +560,9 @@ julia> PortfolioOptimisers.predict_realised_vols(ImpliedVolatilityPremium(),
 """
 function predict_realised_vols(::ImpliedVolatilityPremium, iv::MatNum, ::Any,
                                ivpa::Num_VecNum)
-    @argcheck(all(x -> isfinite(x) && x > zero(x), ivpa), DomainError)
+    @argcheck(all(x -> isfinite(x) && x > zero(x), ivpa),
+              DomainError(ivpa,
+                          "every entry of `ivpa` must be finite and strictly positive. A non-positive factor turns the predicted realised volatility negative, and `StatsBase.cor2cov!` hides the sign, so no later step sees the defect"))
     return view(iv, size(iv, 1), :) ⊘ ivpa
 end
 """
