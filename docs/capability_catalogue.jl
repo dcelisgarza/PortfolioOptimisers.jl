@@ -16,10 +16,15 @@
 #
 # COVERAGE
 #
-# Every concrete leaf subtype of `AbstractEstimator` / `AbstractAlgorithm` must
-# appear in at least one `Cap`, or be listed in `NOT_A_CHOICE` with a reason.
-# Adding a new estimator therefore forces a placement decision here rather than
-# letting the page quietly fall behind.
+# Every name on the Choice Surface must appear in at least one `Cap`, or be
+# listed in `NOT_A_CHOICE` with a reason. A concrete type the package declares
+# is on the surface when it is a leaf subtype of `AbstractEstimator`, of
+# `AbstractAlgorithm` or of `AbstractCovarianceEstimator`, or when the package
+# exports it under its own name; a Result and an error are then subtracted,
+# because a caller receives them and never chooses them. `choice_surface_names`
+# in `docs/generate_capability_catalogue.jl` is the one statement of that rule,
+# and `test/test_26_docs.jl` calls it. Adding a new type therefore forces a
+# placement decision here rather than letting the page quietly fall behind.
 
 """
     Cap(names...; label = nothing)
@@ -151,16 +156,19 @@ const NOT_A_FEATURE = Dict{Symbol, Symbol}(
 """
     NOT_A_CHOICE
 
-Estimator and Algorithm leaf types that deliberately have no catalogue entry,
-each with the reason it is off the choice surface.
+Types on the Choice Surface that deliberately have no catalogue entry, each with
+the reason it is off the surface after all.
 
-The coverage rule is that every leaf `AbstractEstimator` / `AbstractAlgorithm`
-is catalogued, because those two families *are* what a user chooses (CONTEXT.md).
-A type the library constructs for itself is not a choice, so listing it here is
-a statement about the domain, not a hole cut in the check.
+The coverage rule is `choice_surface_names` in
+`docs/generate_capability_catalogue.jl`: a concrete type the package declares is
+a choice when it is a leaf `AbstractEstimator`, a leaf `AbstractAlgorithm`, a
+leaf `AbstractCovarianceEstimator`, or an export under its own name, and it is
+not a Result and not an error (CONTEXT.md § 1). A type the library constructs
+for itself is not a choice, so listing it here is a statement about the domain,
+not a hole cut in the check.
 
 Checked in both directions, like `NOT_A_FEATURE`: a name here that is no longer
-a leaf estimator or algorithm fails just as loudly as an uncatalogued one, so an
+on the choice surface fails just as loudly as an uncatalogued one, so an
 exemption cannot outlive the type it was written for.
 
   - `:internal` -- constructed inside the library, never by a caller. It is
@@ -599,9 +607,10 @@ const CATALOGUE = [Section("Core abstractions",
                             Group("Norm tracking algorithms",
                                   [Cap(:L1Norm), Cap(:L2Norm), Cap(:SquaredL2Norm),
                                    Cap(:LpNorm), Cap(:LInfNorm)]),
-                            Prose("It is also possible to track the error in with risk measures [`RiskTrackingError`](@ref) using [`WeightsTracking`](@ref), which allows for two approaches."),
-                            Cap(:DependentVariableTracking),
-                            Cap(:IndependentVariableTracking)]),
+                            Prose("The distance may also be a risk distance rather than a norm of the return difference, measured against a [`WeightsTracking`](@ref) benchmark. Two approaches are available."),
+                            Group(Cap(:RiskTrackingError),
+                                  [Cap(:DependentVariableTracking),
+                                   Cap(:IndependentVariableTracking)])]),
                    Section("Risk measures",
                            [Prose("`PortfolioOptimisers.jl` provides a wide range of risk measures. These are broadly categorised into two types based on the type of optimisations that support them."),
                             Prose("Every prior-derived slot on a risk measure -- `mu`, `sigma`, `kt`, `sk` -- takes the value itself or the estimator that computes it, a [`DeferredQuantity`](@ref). The estimator is resolved against the optimisation's own prior, so it refits per cross-validation fold and per meta-optimiser subset where a pasted matrix cannot. A measure with two or more deferrable slots names one prior estimator in `pe` instead, and one fit fills every slot the measure leaves unstated. See ADR 0051."),

@@ -2559,7 +2559,7 @@ The marker states the **quantity** and not the estimator, so each rule reads it 
   - [`calibration_series_vec`](@ref)
   - [`bind_series`](@ref)
 """
-abstract type AbstractCalibrationSeries end
+abstract type AbstractCalibrationSeries <: AbstractEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 

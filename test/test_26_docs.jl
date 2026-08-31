@@ -66,56 +66,36 @@ function -- cannot host.
         return nothing
     end
 
-    # A leaf is a non-abstract type with no subtypes. Note `!isabstracttype` rather
-    # than `isconcretetype`: nearly every struct here is `@concrete`, so the bare
-    # name is a `UnionAll` and `isconcretetype` is false for every one of them.
-    #
-    # The runner gives each test file its own module, but not its own process. An
-    # estimator that another file declares therefore stays in the worker, and
-    # `subtypes` finds it here. The catalogue is about the shipped universe, so a
-    # leaf from another module is not one of its members: keep only what
-    # `PortfolioOptimisers` itself declares. Which files share a worker changes
-    # from run to run, so without this filter the test is a scheduling flake.
-    function leaf_types(T, acc = Set{Type}())
-        subs = subtypes(T)
-        if isempty(subs)
-            if !isabstracttype(T) && parentmodule(T) === PortfolioOptimisers
-                push!(acc, T)
-            else
-                false
-            end
-        else
-            foreach(S -> leaf_types(S, acc), subs)
-        end
-        return acc
-    end
-
     @testset "Capability catalogue" begin
         PO = PortfolioOptimisers
         catalogued = catalogued_names(CATALOGUE)
 
-        @testset "every estimator and algorithm is catalogued" begin
-            # Estimators and Algorithms are the user's choice surface (CONTEXT.md);
-            # Results are outputs nobody constructs, so they are not required here.
-            required = Set(nameof.(collect(union(leaf_types(PO.AbstractEstimator),
-                                                 leaf_types(PO.AbstractAlgorithm)))))
+        @testset "every choice is catalogued" begin
+            # `choice_surface_names` comes from the generator this file includes, so
+            # the coverage rule is stated once and the docs build cannot disagree
+            # with the test. It is the Choice Surface of CONTEXT.md § 1: every
+            # concrete type the package declares that is a leaf estimator, a leaf
+            # algorithm, a leaf covariance estimator, or an export under its own
+            # name, less the Results and the errors, which a caller receives
+            # rather than chooses.
+            required = choice_surface_names()
             # A type the library constructs for itself is not a choice, so it is
             # exempt by name and with a reason -- see `NOT_A_CHOICE`.
             uncatalogued = sort(collect(setdiff(required, catalogued, keys(NOT_A_CHOICE))))
             if !isempty(uncatalogued)
-                @warn """$(length(uncatalogued)) estimator(s)/algorithm(s) are missing from the
-                         Capability Catalogue. Add each to `docs/capability_catalogue.jl` under
-                         the group it belongs to, or list it in `NOT_A_CHOICE` with a reason
+                @warn """$(length(uncatalogued)) choice(s) are missing from the Capability
+                         Catalogue. Add each to `docs/capability_catalogue.jl` under the group
+                         it belongs to, or list it in `NOT_A_CHOICE` with a reason
                          (`:internal`):\n  $(join(uncatalogued, "\n  "))"""
             end
             @test isempty(uncatalogued)
 
             # The other direction, as for `NOT_A_FEATURE`: an exemption for a type
-            # that is no longer a leaf estimator or algorithm is stale, and would
-            # silently exempt whatever later takes that name.
+            # that is no longer on the choice surface is stale, and would silently
+            # exempt whatever later takes that name.
             stale = sort([n for n in keys(NOT_A_CHOICE) if !(n in required)])
             if !isempty(stale)
-                @warn "Stale `NOT_A_CHOICE` entries (no longer a leaf estimator/algorithm): $(join(stale, ", "))"
+                @warn "Stale `NOT_A_CHOICE` entries (no longer on the choice surface): $(join(stale, ", "))"
             end
             @test isempty(stale)
 

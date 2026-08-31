@@ -195,7 +195,7 @@ The maintenance loop that drives these numbers down, rather than merely holding 
 
 The [capability catalogue](@ref capability-catalogue) is the user-facing inventory of everything the package can do, grouped by the job each thing does. It is generated: `docs/capability_catalogue.jl` curates only the **grouping**, and every description is the first sentence of the corresponding docstring, so a description cannot drift from the type it describes.
 
-**Adding a new estimator, algorithm, or exported function means adding it here too.** This is enforced, not merely requested — `test/test_26_docs.jl` fails if any concrete leaf subtype of `AbstractEstimator` or `AbstractAlgorithm` is missing, and the docs build refuses to render an incomplete page.
+**Adding a new type or exported function means adding it here too.** This is enforced, not merely requested — `test/test_26_docs.jl` fails if any name on the Choice Surface is missing, and the docs build refuses to render an incomplete page. A concrete type the package declares is on the surface when it is a leaf subtype of `AbstractEstimator`, of `AbstractAlgorithm` or of `AbstractCovarianceEstimator`, or when it is an export under its own name; a Result and an error are subtracted, because a caller receives them and never chooses them. `choice_surface_names` in `docs/generate_capability_catalogue.jl` is the one statement of that rule, and both the test and the docs build call it.
 
 - Add a `Cap(:YourType)` to the group it belongs to, chosen by what it *does* rather than which file it lives in.
 - Do **not** write a description. It comes from the docstring. Pass `label` only where the docstring genuinely reads worse as a bullet — for instance when every sibling in a group would repeat the same prefix.
