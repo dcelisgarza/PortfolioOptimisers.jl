@@ -4164,6 +4164,44 @@ Defined at top level because a `@testset` body becomes a function.
         @test isapprox(inv(lpm), 0.16194564468998124)
         @test inv(lpm) < 0.3
 
+        #=
+        `EigenvectorCentrality`: the two measured claims of its docstring, over the same
+        triangulated maximally filtered graph. The type declares `SimilarityPolarity`, so
+        the default scores the graph WEIGHTED by the similarities that selected its edges,
+        and `TopologyOnly` withdraws the declaration and scores the plain `gpm` above. The
+        docstring pair that stood before the P4 review of #625 -- a maximum absolute
+        `0.009892049284000948` and a correlation of `0.9985` -- reproduces on neither
+        route, and on no window or similarity of this fixture. The eigensolver moves by
+        about `6e-16` between calls on one graph, so each claim is pinned to the digits it
+        holds, and the residual is pinned as a bound.
+        =#
+        ntepm = NetworkEstimator(; alg = MaximumDistanceSimilarity())
+        gpmw = PortfolioOptimisers.centrality_graph(ntepm, EigenvectorCentrality(), Xt)
+        Aw = Matrix{Float64}(Gr472.adjacency_matrix(gpmw))
+        @test Gr472.nv(gpmw) == 20
+        @test Gr472.ne(gpmw) == 3 * 20 - 6
+        # The weighted route carries the similarities, so its matrix is not binary.
+        @test !all(a -> a in (0.0, 1.0), Aw)
+        lw = maximum(abs.(eigvals(Aw)))
+        @test isapprox(lw, 4.844612909369407)
+        qw = cc(EigenvectorCentrality(), gpmw)
+        # The formula is `EC = A q / lambda_max`, whose value is `q` itself.
+        @test maximum(abs.(Aw * qw / lw - qw)) < 1e-15
+        @test isapprox(norm(qw), 1)
+        @test round(minimum(qw); digits = 5) == 0.07199
+        @test round(maximum(qw); digits = 5) == 0.40756
+        # `TopologyOnly` routes to the plain graph, which is `gpm` and its own `lambda_max`.
+        gpmu = PortfolioOptimisers.centrality_graph(ntepm,
+                                                    EigenvectorCentrality(;
+                                                                          ov = TopologyOnly()),
+                                                    Xt)
+        @test Gr472.adjacency_matrix(gpmu) == Gr472.adjacency_matrix(gpm)
+        qu = cc(EigenvectorCentrality(), gpmu)
+        @test round(maximum(abs.(qw - qu)); digits = 5) == 0.02561
+        @test round(cor(qw, qu); digits = 5) == 0.99361
+        @test round(median(qw); digits = 4) == 0.1969
+        @test round(median(qu); digits = 4) == 0.1969
+
         # `_phylogeny_matrix`: the shell-by-shell form and the power sum agree, over these
         # related-pair counts.
         for (n, want) in zip(1:4, (19, 48, 84, 115))
