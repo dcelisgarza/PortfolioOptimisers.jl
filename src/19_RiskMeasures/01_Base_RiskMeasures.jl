@@ -2040,9 +2040,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Computes a calibrated quantity — a tail probability, a deformation parameter, an ambiguity radius or an Esfahani-Kuhn tail weight — from the data a prior result carries, so that the quantity refits whenever the sample moves.
+Computes a calibrated quantity — a tail probability, a deformation parameter, an ambiguity radius, an Esfahani-Kuhn tail weight or a norm ceiling — from the data a prior result carries, so that the quantity refits whenever the sample moves.
 
-All concrete subtypes should subtype one of the four families under this root rather than the root itself. A plain number in place of a rule is the quantity itself, exactly as it is today.
+All concrete subtypes should subtype one of the families under this root rather than the root itself, and `# Related` names them. A plain number in place of a rule is the quantity itself, exactly as it is today.
 
 This root carries the **rules** alone. A **role**, the type that places a rule in the slot of one quantity, is an Estimator under [`AbstractCalibrationEstimator`](@ref) and subtypes nothing here, so a role placed inside another role's `alg` field is refused by the field's bound.
 
@@ -2055,6 +2055,7 @@ A **Calibration Rule** is not a [`DeferredQuantity`](@ref), and the two mechanis
   - [`AbstractDeformationCalibrationAlgorithm`](@ref)
   - [`AbstractAmbiguityRadiusCalibrationAlgorithm`](@ref)
   - [`AbstractAmbiguityTailWeightCalibrationAlgorithm`](@ref)
+  - [`AbstractNormCeilingCalibrationAlgorithm`](@ref)
   - [`resolve_calibration_slot`](@ref)
   - [`DeferredQuantity`](@ref)
 """
@@ -2403,7 +2404,7 @@ A slot that holds a role type is unwrapped, and the rule in its `alg` field is *
 
 A rule gets no portfolio. A prior result carries no portfolio weight vector, so no rule can measure a portfolio's own loss series. What it can measure is the series of each **column** of the sample, and [`bind_series`](@ref) tells it which series the slot owner prices. It does get the solver, on both of the routes that resolve a measure, so a rule may call [`ERM`](@ref) or [`RRM`](@ref). On the [`factory`](@ref) route [`@propagatable`](@ref) runs the `@cprop` selection before the resolution, so the solver is on the struct. On the `JuMP` route no selection runs, so [`set_risk_constraints!`](@ref) threads it into [`resolve_deferred_quantities`](@ref) and the owner settles it as `sel(x.slv, slv)`.
 
-This is the parallel of [`resolve_slot`](@ref), and it is a second verb rather than a widening of the first for two reasons. `resolve_slot`'s body is `deferred_quantity(fit_deferred_quantity(dq, pr), key)`, a fit followed by an extraction, and a rule fits nothing. `resolve_slot` also carries neither `w` nor `slv`, which a rule needs. So the six role types stay **out** of the [`DeferredQuantity`](@ref) union.
+This is the parallel of [`resolve_slot`](@ref), and it is a second verb rather than a widening of the first for two reasons. `resolve_slot`'s body is `deferred_quantity(fit_deferred_quantity(dq, pr), key)`, a fit followed by an extraction, and a rule fits nothing. `resolve_slot` also carries neither `w` nor `slv`, which a rule needs. So the role types stay **out** of the [`DeferredQuantity`](@ref) union.
 
 The caller computes `w` itself, as `sel(r.w, pr.w)`, and threads it with the measure's own `slv`. A parent that carries no observation weights of its own passes `pr.w`, and one that carries no solver leaves `slv` at its default.
 
@@ -2417,7 +2418,7 @@ The caller computes `w` itself, as `sel(r.w, pr.w)`, and threads it with the mea
 
 # Arguments
 
-  - `slot`: The slot's occupant: a number, or one of the six role types.
+  - `slot`: The slot's occupant: a number, or a role under [`AbstractCalibrationEstimator`](@ref).
   - `key`: Name of the slot that is being resolved.
   - `pr`: Prior result the rule reads.
   - `w`: Effective observation weights, or `nothing`.
@@ -2513,7 +2514,7 @@ end
 
 Carry the occupant of a lower-tail slot across to its upper-tail counterpart, and keep the rule.
 
-A Range measure defaults its head slot to whatever its tail slot holds. A number crosses unchanged, and a tail role crosses as the head role of the same family holding the same `alg`, so the default survives the widening and no stated number moves.
+The two ordered-weights Range types default their head slot to whatever their tail slot holds, and this verb is what carries the occupant across. A number crosses unchanged, and a tail role crosses as the head role of the same family holding the same `alg`, so the default survives the widening and no stated number moves. Every other Range type defaults its head slot to a number of its own, so a rule stated on one end of one of those is not carried to the other.
 
 The two role families are the whole domain of the second and third methods, because a head slot's bound admits nothing else.
 
@@ -3326,7 +3327,7 @@ function (alg::HillTailDecay)(key::Symbol, pr::AbstractPriorResult, ::Any, ::Any
     @argcheck(!isnothing(alg.alpha),
               IsNothingError("`HillTailDecay.alpha` is `nothing`, so the rule cannot form the count `k = ceil(alpha * T * N)`. The probability of the end travels to the rule through `bind_alpha`, which the slot owner calls after it resolves that end's own probability. State `alpha` on the rule itself to run it outside a measure."))
     X = pr.X
-    # The sign puts the end the slot prices in the UPPER tail of the pool, and one estimator
+    # The sign puts the end the slot prices in the LOWER tail of the pool, and one estimator
     # then serves both ends. The series decides which ends there are to price.
     s = series_end_sign(alg.series, key)
     np = prod(size(X))

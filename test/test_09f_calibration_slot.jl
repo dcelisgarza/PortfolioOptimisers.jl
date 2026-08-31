@@ -7,7 +7,7 @@ plain number.
 The mechanism is parallel to the Deferred Quantity one, not shared with it, and
 `test_09e_deferred_quantity.jl` covers that other half. A Deferred Quantity is fitted and a
 quantity is read off the fit; a rule fits nothing and reads the sample size, the moments and
-the effective observation weights. So the four role types stay out of the `DeferredQuantity`
+the effective observation weights. So the role types stay out of the `DeferredQuantity`
 union, and the resolver, the declaration and the refusal each take their own verb.
 
 A rule is run by CALLING it. A callable struct and a plain function are therefore the same
@@ -106,7 +106,7 @@ const KRULE = ProbeEntropyBudget(0.3)
     @test !isa(DeformationTailCalibration(; alg = KRULE), PO.DeferredQuantity)
     @test !isa(DeformationHeadCalibration(; alg = KRULE), PO.DeferredQuantity)
 
-    # The four abstract types stay unexported; the four role types are caller-facing.
+    # The abstract types stay unexported; the role types are caller-facing.
     exported = names(PortfolioOptimisers)
     @test !(:AbstractCalibrationAlgorithm in exported)
     @test !(:AbstractCalibrationEstimator in exported)
@@ -311,6 +311,65 @@ end
                                                 CalibratedProbe(; alpha = 0.1)]))
     @test_throws ArgumentError PO.assert_calibrated_slots([CalibratedProbe(; alpha = 0.05),
                                                            probe])
+end
+
+@testset "Calibration slot: every container refuses a rule its child holds" begin
+    # A container holds risk measures, and one of them may hold a rule. Two routes reach
+    # that rule. A container whose own evaluation runs each child through `expected_risk`
+    # is covered by the child's entry point. A container that calls its children directly
+    # is covered by its own `calibration_slots` declaration, and by nothing else.
+    #
+    # `GenericValueatRiskRange` is the second kind: its functor calls `r.loss(x)` and
+    # `r.gain(-x)`. It declared `deferred_slots` alone, so `assert_calibrated_slots` walked
+    # an empty tuple and the role reached the kernel, where `alpha * length(x)` raised a
+    # `MethodError` naming neither the slot nor the role. The declaration below is the fix.
+    rng = StableRNG(987654321)
+    X = randn(rng, 200, 4) / 100
+    w = fill(0.25, 4)
+    role = SignificanceTailCalibration(; alg = RULE)
+    cvar = ConditionalValueatRisk(; alpha = role)
+
+    # The declaration names both children, so the walk reaches the rule in either of them.
+    # The constructor strips each child's risk-expression contribution, so the slots are
+    # the fields the container holds and not the measures the caller wrote.
+    gvr = GenericValueatRiskRange(; loss = cvar, gain = ConditionalValueatRisk())
+    @test PO.calibration_slots(gvr) == (; loss = gvr.loss, gain = gvr.gain)
+    @test PO.calibration_slots(gvr) == PO.deferred_slots(gvr)
+    @test isnothing(PO.assert_calibrated_slots(GenericValueatRiskRange()))
+    @test_throws ArgumentError PO.assert_calibrated_slots(GenericValueatRiskRange(;
+                                                                                  loss = cvar))
+    @test_throws ArgumentError PO.assert_calibrated_slots(GenericValueatRiskRange(;
+                                                                                  gain = cvar))
+
+    # The message the caller reads names the child's slot, the role standing in it and the
+    # way out, on the same terms as a leaf measure's.
+    function refusal(r)
+        return try
+            expected_risk(r, w, X)
+            ""
+        catch e
+            sprint(showerror, e)
+        end
+    end
+    owacvar = OrderedWeightsArrayConditionalValueatRisk(; alpha = role)
+    for (r, slot) in
+        ((GenericValueatRiskRange(; loss = cvar), "ConditionalValueatRisk.alpha"),
+         (RiskRatio(; r1 = cvar, r2 = Variance()), "ConditionalValueatRisk.alpha"),
+         (NonOptimisationRiskRatio(; r1 = cvar, r2 = StandardDeviation()),
+          "ConditionalValueatRisk.alpha"),
+         (MeanReturnRiskRatio(; rk = cvar), "ConditionalValueatRisk.alpha"),
+         (RiskTrackingRiskMeasure(; r = cvar, tr = WeightsTracking(; w = w)),
+          "ConditionalValueatRisk.alpha"),
+         (OrderedWeightsArray(; w = owacvar),
+          "OrderedWeightsArrayConditionalValueatRisk.alpha"),
+         (OrderedWeightsArrayRange(; w1 = owacvar,
+                                   w2 = OrderedWeightsArrayConditionalValueatRisk()),
+          "OrderedWeightsArrayConditionalValueatRisk.alpha"))
+        msg = refusal(r)
+        @test occursin("Calibration Role", msg)
+        @test occursin(slot, msg)
+        @test occursin("factory(r, pr)", msg)
+    end
 end
 
 @testset "Calibration slot: `mirror_role` carries the tail across to the head" begin
