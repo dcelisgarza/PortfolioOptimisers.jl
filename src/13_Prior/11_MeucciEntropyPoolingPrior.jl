@@ -17,6 +17,14 @@ The comparison operator a view accepts depends on the moment it constrains: `var
 
     A runaway dual sometimes overflows before it settles, and the view set then raises rather than answering. The staged route reaches the moment estimators with non-finite weights, which raise an `ArgumentError` naming Infs or NaNs. The single-shot route raises the CVaR search's own `ErrorException`. Neither raise detects the infeasibility. Both are the same runaway dual met further along, and which of the three a given view set gives is not stable: the search over an infeasible set is chaotic, so a change in the sequence of candidate value at risk levels moves the answer between them. Treat any of the three as the same finding, and read the views rather than the message.
 
+!!! warning "A feasible view can be missed in silence"
+
+    The CVaR search reports on its own variable, and the view rides on a solve it never reads. With one view `Roots.find_zero` root-finds the posterior tail mass minus `alpha` over the candidate value at risk, and it stops when that residual is small. The view itself is the constraint the inner [`entropy_pooling`](@ref) solve carries, and how closely that solve met it is read nowhere. With more than one view the guard is `Optim.converged`, which accepts a solve that stopped on the step in `x` rather than on stationarity. A **feasible** view set can therefore return a posterior that misses its target, with no raise. It is not the answer the warning above describes: `ens` is healthy, `kld` is small, and the statistic the view named is the only thing that is short.
+
+    The size of the miss is a property of the run and not of the estimator. Under the default [`OptimEntropyPooling`](@ref) stopping rule a single-view case solved alone meets its target to about `1e-7` relative. The same case solved after other cases in the same process has been measured at `3.1e-4` on `ubuntu-latest`, and at `5.5e-3` in a probe over twenty assets. Issue #573 also records a residual that moves when 200 lines of comment are added to a file, so the cause is not the search alone and it is not settled.
+
+    Read the result rather than the flag. Measure the posterior with [`ConditionalValueatRisk`](@ref) at the view's own `alpha`, and compare it with the target the view names. Where the answer has to be repeatable, pass a tighter `Optim.Options` in the optimiser's `args`, which holds the same cases to about `1e-11`; [`OptimEntropyPooling`](@ref) gives the block. No tolerance of the library's own is read on the residual: a threshold that decides whether a solve really succeeded is a policy this library does not set.
+
 # Algorithm
 
 The constructor derives the prior probabilities, and validates everything else.
@@ -546,6 +554,7 @@ Where:
   - Every candidate value at risk stays in `[0, B]`. A candidate outside the box raises a `DomainError`.
   - The search must succeed. A `Roots.find_zero` that raises is rethrown as an `ErrorException`, and an `Optim.optimize` that `Optim.converged` reports as failed raises an `ErrorException`.
   - An infeasible view set is **not** caught. The residual this search minimises is the posterior tail mass minus `alpha`, and a posterior that sits on one observation carries a small residual while it misses the view by any margin. The summary paragraph of [`MeucciEntropyPoolingPrior`](@ref) states how to recognise that answer.
+  - A missed **feasible** view is **not** caught either. The search reads its own residual, and never how closely the inner [`entropy_pooling`](@ref) solve met the constraint that carries the view. With more than one view `Optim.converged` accepts a solve that stopped on the step in `x` rather than on stationarity. The warning of [`MeucciEntropyPoolingPrior`](@ref) states the mechanism, the measured sizes and how to read the answer. See issue #573.
 
 # Returns
 

@@ -1252,6 +1252,51 @@ end
     @test isapprox(ConditionalValueatRisk(; w = prok.w)(rd.X[:, 1]), 0.07, rtol = 1e-5)
 end
 
+# #573: a **feasible** view can be missed in silence, and this testset pins what that looks
+# like. The outer CVaR search root-finds the posterior tail mass and never reads how closely the
+# inner entropy pooling solve met the constraint that carries the view, so an inner solve that
+# stops early moves the root the search returns, and nothing raises. This is not the infeasible
+# answer the testset above pins: it is the other silent one. A loose `Optim.Options` reproduces
+# it on demand, with the same estimator and the same feasible view, and only the stopping rule
+# moved. The posterior comes back healthy by every sign the infeasible answer is degenerate by,
+# and the statistic the view named is the only thing that is short, so no reading of the weights
+# separates the two. Acting on the miss needs a tolerance on a residual, which is a policy this
+# library does not set, so the docstrings state the failure and the signs instead. Change this
+# testset in the commit that changes that decision.
+@testset "MeucciEntropyPoolingPrior misses a feasible CVaR view in silence" begin
+    target, T0 = 0.07, size(rd.X, 1)
+    mkpe = opt -> MeucciEntropyPoolingPrior(; sets = sets, opt = opt,
+                                            cvar_views = ConditionalValueatRiskView(;
+                                                                                    views = LinearConstraintEstimator(;
+                                                                                                                      val = "AAPL == $target")))
+    # Only the stopping rule separates the two runs. `Fminbox` carries its `mu0` because a
+    # non-empty `args` replaces the one `entropy_pooling` supplies.
+    loose = OptimEntropyPooling(;
+                                args = (PortfolioOptimisers.Optim.Fminbox(; mu0 = 1e-5),
+                                        PortfolioOptimisers.Optim.Options(; x_abstol = 1e-3,
+                                                                          f_reltol = 1e-3,
+                                                                          g_abstol = 1e-3,
+                                                                          outer_x_abstol = 1e-3)))
+    prl = prior(mkpe(loose), rd)
+    prt = prior(mkpe(EP_TIGHT), rd)
+    cl = ConditionalValueatRisk(; w = prl.w)(rd.X[:, 1])
+    ct = ConditionalValueatRisk(; w = prt.w)(rd.X[:, 1])
+
+    # The view is feasible. Driven to stationarity the same view meets its target: the tight
+    # run reads 2.2e-12 of it.
+    @test isapprox(ct, target, rtol = 1e-5)
+    # The loose run raises nothing and misses, by 1.1e-2 relative as measured.
+    @test !isapprox(cl, target, rtol = 1e-3)
+    @test abs(cl - target) > 100 * abs(ct - target)
+    # It is a shortfall and not a collapse. The posterior passes both tests the degenerate
+    # answer above fails, and its divergence from the prior is the same order as the tight
+    # run's, so `ens`, `kld` and the largest weight all report a healthy solve.
+    @test isapprox(cl, target, rtol = 5e-2)
+    @test prl.ens > 0.9 * T0
+    @test maximum(prl.w) < 0.05
+    @test prl.kld < 2 * prt.kld
+end
+
 # #628: a `prior(...)` reference resolves against the **initial** prior result, under the
 # observation weights that result was read at. Before the fix every tail measure built its own
 # uniform weight vector, so a caller who stated a non-uniform `w` had the reference resolved off
