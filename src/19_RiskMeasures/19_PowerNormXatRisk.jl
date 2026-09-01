@@ -259,9 +259,9 @@ $(DocStringExtensions.FIELDS)
         settings::RiskMeasureSettings = RiskMeasureSettings(),
         slv::Option{<:Slv_VecSlv} = nothing,
         alpha::Num_SigTailCal = 0.05,
-        beta::Num_SigHeadCal = 0.05,
+        beta::Num_SigHeadCal = mirror_role(alpha),
         pa::Number = 2.0,
-        pb::Number = 2.0,
+        pb::Number = pa,
         w::Option{<:ObsWeights} = nothing
     ) -> PowerNormValueatRiskRange
 
@@ -360,8 +360,8 @@ end
 function PowerNormValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                    slv::Option{<:Slv_VecSlv} = nothing,
                                    alpha::Num_SigTailCal = 0.05,
-                                   beta::Num_SigHeadCal = 0.05, pa::Number = 2.0,
-                                   pb::Number = 2.0,
+                                   beta::Num_SigHeadCal = mirror_role(alpha),
+                                   pa::Number = 2.0, pb::Number = pa,
                                    w::Option{<:ObsWeights} = nothing)::PowerNormValueatRiskRange
     return PowerNormValueatRiskRange(settings, slv, alpha, beta, pa, pb, w)
 end
@@ -370,7 +370,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolve the two significance levels of a [`PowerNormValueatRiskRange`](@ref) against prior result `pr`.
 
-Each end carries its own slot and its own bound, so a tail rule and a head rule resolve independently. `pa` and `pb` are the two norm orders and stay numbers, on the terms the scalar measure states.
+Each end carries its own slot and its own bound, so a stated tail rule and a stated head rule resolve independently. `beta` defaults to [`mirror_role`](@ref) of `alpha` and `pb` to `pa`, so a rule stated on the loss side alone reaches both ends. `pa` and `pb` are the two norm orders and stay numbers, on the terms the scalar measure states.
 
 The solver is settled once and handed to both rules, so the two ends of one measure are priced by one solver.
 

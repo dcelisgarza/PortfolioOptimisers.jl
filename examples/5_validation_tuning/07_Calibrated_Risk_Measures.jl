@@ -417,8 +417,8 @@ vrr_res = factory(vrr, fold_prior(first_idx))
 println("alpha = $(vrr_res.alpha), beta = $(vrr_res.beta)")
 
 #=
-The two ordered-weights Range measures default `beta` to `alpha`, and [`mirror_role`](@ref) keeps
-that default alive: a tail role crosses over as the head role holding the same rule.
+Every Range measure defaults `beta` to `alpha`, and [`mirror_role`](@ref) is what carries the
+occupant across: a tail role crosses over as the head role holding the same rule.
 =#
 
 owa_range = OrderedWeightsArrayConditionalValueatRiskRange(; alpha = count_rule.alpha)

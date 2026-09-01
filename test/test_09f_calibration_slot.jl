@@ -394,6 +394,68 @@ end
     @test isa(kmirrored, PO.Num_DefHeadCal)
 end
 
+@testset "Calibration slot: every Range head slot defaults through `mirror_role`" begin
+    # One rule for a head slot, and every Range type states it the same way: the head slot
+    # defaults to `mirror_role` of its tail counterpart. A stated number crosses unchanged,
+    # so the default pair of each type is the pair it carried before the rule became one.
+    sig = SignificanceTailCalibration(; alg = RULE)
+    def = DeformationTailCalibration(; alg = KRULE)
+    ranges = (ValueatRiskRange(), ConditionalValueatRiskRange(),
+              DistributionallyRobustConditionalValueatRiskRange(),
+              EntropicValueatRiskRange(), RelativisticValueatRiskRange(),
+              PowerNormValueatRiskRange(), OrderedWeightsArrayConditionalValueatRiskRange(),
+              OrderedWeightsArrayTailGiniRange())
+    for r in ranges
+        @test r.alpha === 0.05
+        @test r.beta === 0.05
+    end
+
+    # A stated number reaches the head slot, where six of the eight held a literal of their
+    # own. The head slot of a Range measure is now the tail slot's occupant in all eight.
+    @test ValueatRiskRange(; alpha = 0.01).beta === 0.01
+    @test ConditionalValueatRiskRange(; alpha = 0.01).beta === 0.01
+    @test DistributionallyRobustConditionalValueatRiskRange(; alpha = 0.01).beta === 0.01
+    @test EntropicValueatRiskRange(; alpha = 0.01).beta === 0.01
+    @test RelativisticValueatRiskRange(; alpha = 0.01).beta === 0.01
+    @test PowerNormValueatRiskRange(; alpha = 0.01).beta === 0.01
+    @test OrderedWeightsArrayConditionalValueatRiskRange(; alpha = 0.01).beta === 0.01
+    @test OrderedWeightsArrayTailGiniRange(; alpha = 0.01).beta === 0.01
+
+    # A stated tail ROLE crosses as the head role of the same family, in all eight.
+    for r in (ValueatRiskRange(; alpha = sig), ConditionalValueatRiskRange(; alpha = sig),
+              DistributionallyRobustConditionalValueatRiskRange(; alpha = sig),
+              EntropicValueatRiskRange(; alpha = sig),
+              RelativisticValueatRiskRange(; alpha = sig),
+              PowerNormValueatRiskRange(; alpha = sig),
+              OrderedWeightsArrayConditionalValueatRiskRange(; alpha = sig),
+              OrderedWeightsArrayTailGiniRange(; alpha = sig))
+        @test isa(r.beta, SignificanceHeadCalibration)
+        @test r.beta.alg === RULE
+    end
+
+    # The deformation mirror has a caller in `src/`, and this is it. The gain-side pair of
+    # the relativistic Range measure defaults to the loss-side pair, both halves of it.
+    rl = RelativisticValueatRiskRange(; alpha = sig, kappa_a = def)
+    @test isa(rl.kappa_b, DeformationHeadCalibration)
+    @test rl.kappa_b.alg === KRULE
+    @test RelativisticValueatRiskRange(; kappa_a = 0.5).kappa_b === 0.5
+
+    # The two norm orders take the same rule. They stay numbers, so they mirror by plain
+    # assignment, the way `beta_i` mirrors `alpha_i`.
+    @test PowerNormValueatRiskRange(; pa = 3.0).pb === 3.0
+    @test OrderedWeightsArrayTailGiniRange(; alpha_i = 1e-3).beta_i === 1e-3
+
+    # An ambiguity role names no end of the distribution, so `mirror_role` has no method for
+    # one and the two ambiguity slots of the range keep the numbers they declare.
+    dr = DistributionallyRobustConditionalValueatRiskRange(; l_a = 2.0, r_a = 0.05)
+    @test dr.l_b === 1.0
+    @test dr.r_b === 0.02
+
+    # A stated head slot wins over the mirror, and the two ends then stand apart.
+    @test ValueatRiskRange(; alpha = 0.01, beta = 0.02).beta === 0.02
+    @test RelativisticValueatRiskRange(; kappa_a = 0.5, kappa_b = 0.6).kappa_b === 0.6
+end
+
 @testset "Calibration slot: `sel` keeps a rule rather than filling from the prior" begin
     # A slot the caller filled with the rule that computes the value is a STATED slot, so
     # the prior must not fill it. The resolution that follows replaces it with the number

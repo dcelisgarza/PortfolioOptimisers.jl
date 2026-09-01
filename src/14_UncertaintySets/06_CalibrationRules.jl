@@ -475,9 +475,9 @@ end
 
 Carry the occupant of a lower-tail slot across to its upper-tail counterpart, and keep the rule.
 
-The two ordered-weights Range types default their head slot to whatever their tail slot holds, and this verb is what carries the occupant across. A number crosses unchanged, and a tail role crosses as the head role of the same family holding the same `alg`, so the default survives the widening and no stated number moves. Every other Range type defaults its head slot to a number of its own, so a rule stated on one end of one of those is not carried to the other.
+Every Range type defaults its head slot to whatever its tail slot holds, and this verb is what carries the occupant across. A number crosses unchanged, and a tail role crosses as the head role of the same family holding the same `alg`, so a rule stated on one end reaches both ends and no stated number moves. A caller who states the head slot themselves gets their own occupant, and the two ends then resolve independently.
 
-The two role families are the whole domain of the second and third methods, because a head slot's bound admits nothing else.
+The two role families are the whole domain of the second and third methods, because a head slot's bound admits nothing else. An ambiguity role names no end of the distribution, so it takes no method here, and the ambiguity slots of a Range type keep numbers of their own.
 
 # Arguments
 

@@ -344,8 +344,8 @@ $(DocStringExtensions.FIELDS)
         slv::Option{<:Slv_VecSlv} = nothing,
         alpha::Num_SigTailCal = 0.05,
         kappa_a::Num_DefTailCal = 0.3,
-        beta::Num_SigHeadCal = 0.05,
-        kappa_b::Num_DefHeadCal = 0.3,
+        beta::Num_SigHeadCal = mirror_role(alpha),
+        kappa_b::Num_DefHeadCal = mirror_role(kappa_a),
         w::Option{<:ObsWeights} = nothing
     ) -> RelativisticValueatRiskRange
 
@@ -447,8 +447,8 @@ function RelativisticValueatRiskRange(;
                                       slv::Option{<:Slv_VecSlv} = nothing,
                                       alpha::Num_SigTailCal = 0.05,
                                       kappa_a::Num_DefTailCal = 0.3,
-                                      beta::Num_SigHeadCal = 0.05,
-                                      kappa_b::Num_DefHeadCal = 0.3,
+                                      beta::Num_SigHeadCal = mirror_role(alpha),
+                                      kappa_b::Num_DefHeadCal = mirror_role(kappa_a),
                                       w::Option{<:ObsWeights} = nothing)::RelativisticValueatRiskRange
     return RelativisticValueatRiskRange(settings, slv, alpha, kappa_a, beta, kappa_b, w)
 end
@@ -457,7 +457,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolve the two significance levels and the two deformation parameters of a [`RelativisticValueatRiskRange`](@ref) against prior result `pr`.
 
-Each end carries a **travelling pair** of its own: `kappa_a` reads `alpha` and `kappa_b` reads `beta`. So the resolution runs the pair of the loss side and then the pair of the gain side, and neither side reads the other's number. That is the pairing [`range_tails`](@ref) builds and the functor evaluates.
+Each end carries a **travelling pair** of its own: `kappa_a` reads `alpha` and `kappa_b` reads `beta`. The gain-side pair defaults to the loss-side pair, through [`mirror_role`](@ref) of `alpha` and of `kappa_a`, so a pair stated on the loss side alone reaches both ends. The resolution runs the pair of the loss side and then the pair of the gain side, and neither side reads the other's number. That is the pairing [`range_tails`](@ref) builds and the functor evaluates.
 
 The four slots carry four different bounds, so a rule of the wrong end or the wrong family is refused at construction. The solver is settled once and handed to all four rules.
 

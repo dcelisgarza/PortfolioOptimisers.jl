@@ -268,7 +268,7 @@ $(DocStringExtensions.FIELDS)
         settings::RiskMeasureSettings = RiskMeasureSettings(),
         slv::Option{<:Slv_VecSlv} = nothing,
         alpha::Num_SigTailCal = 0.05,
-        beta::Num_SigHeadCal = 0.05,
+        beta::Num_SigHeadCal = mirror_role(alpha),
         w::Option{<:ObsWeights} = nothing
     ) -> EntropicValueatRiskRange
 
@@ -329,7 +329,8 @@ Keywords correspond to the struct's fields.
 end
 function EntropicValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                   slv::Option{<:Slv_VecSlv} = nothing,
-                                  alpha::Num_SigTailCal = 0.05, beta::Num_SigHeadCal = 0.05,
+                                  alpha::Num_SigTailCal = 0.05,
+                                  beta::Num_SigHeadCal = mirror_role(alpha),
                                   w::Option{<:ObsWeights} = nothing)::EntropicValueatRiskRange
     return EntropicValueatRiskRange(settings, slv, alpha, beta, w)
 end
@@ -338,7 +339,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolve the two significance levels of an [`EntropicValueatRiskRange`](@ref) against prior result `pr`.
 
-Each end carries its own slot and its own bound, so a tail rule and a head rule resolve independently. The solver is settled once, as `sel(x.slv, slv)`, and handed to both rules: the two ends of one measure are priced by one solver.
+Each end carries its own slot and its own bound, so a stated tail rule and a stated head rule resolve independently. `beta` defaults to [`mirror_role`](@ref) of `alpha`, so a rule stated on the loss side alone reaches both ends. The solver is settled once, as `sel(x.slv, slv)`, and handed to both rules: the two ends of one measure are priced by one solver.
 
 The rebuild goes through [`rebuild_with_slots`](@ref), whose positional call runs the inner constructor and re-runs both range checks on the calibrated numbers.
 

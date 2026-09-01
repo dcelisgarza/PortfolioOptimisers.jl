@@ -648,7 +648,7 @@ $(DocStringExtensions.FIELDS)
     ValueatRiskRange(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
         alpha::Num_SigTailCal = 0.05,
-        beta::Num_SigHeadCal = 0.05,
+        beta::Num_SigHeadCal = mirror_role(alpha),
         w::Option{<:ObsWeights} = nothing,
         alg::ValueatRiskFormulation = MIPValueatRisk()
     ) -> ValueatRiskRange
@@ -750,7 +750,8 @@ ValueatRiskRange
     end
 end
 function ValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                          alpha::Num_SigTailCal = 0.05, beta::Num_SigHeadCal = 0.05,
+                          alpha::Num_SigTailCal = 0.05,
+                          beta::Num_SigHeadCal = mirror_role(alpha),
                           w::Option{<:ObsWeights} = nothing,
                           alg::ValueatRiskFormulation = MIPValueatRisk())::ValueatRiskRange
     return ValueatRiskRange(settings, alpha, beta, w, alg)
@@ -760,7 +761,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolve the two significance levels of a [`ValueatRiskRange`](@ref) against prior result `pr`, and resolve the formulation `alg` beside them.
 
-Each tail carries its own slot and its own bound, so a tail rule and a head rule resolve independently and neither is mirrored onto the other. The rebuild goes through [`rebuild_with_slots`](@ref), whose positional call runs the inner constructor and re-runs both range checks on the calibrated numbers.
+Each tail carries its own slot and its own bound, so a stated tail rule and a stated head rule resolve independently. `beta` defaults to [`mirror_role`](@ref) of `alpha`, so a rule stated on the loss side alone reaches both ends. The rebuild goes through [`rebuild_with_slots`](@ref), whose positional call runs the inner constructor and re-runs both range checks on the calibrated numbers.
 
 This method is more specific than the derived recursion, so it takes over the `alg` slot that [`deferred_slots`](@ref) declares, through [`resolve_deferred_child`](@ref).
 

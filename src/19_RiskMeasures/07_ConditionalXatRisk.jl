@@ -413,7 +413,7 @@ $(DocStringExtensions.FIELDS)
     ConditionalValueatRiskRange(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
         alpha::Num_SigTailCal = 0.05,
-        beta::Num_SigHeadCal = 0.05,
+        beta::Num_SigHeadCal = mirror_role(alpha),
         w::Option{<:ObsWeights} = nothing
     ) -> ConditionalValueatRiskRange
 
@@ -492,7 +492,7 @@ end
 function ConditionalValueatRiskRange(;
                                      settings::RiskMeasureSettings = RiskMeasureSettings(),
                                      alpha::Num_SigTailCal = 0.05,
-                                     beta::Num_SigHeadCal = 0.05,
+                                     beta::Num_SigHeadCal = mirror_role(alpha),
                                      w::Option{<:ObsWeights} = nothing)::ConditionalValueatRiskRange
     return ConditionalValueatRiskRange(settings, alpha, beta, w)
 end
@@ -501,7 +501,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolve the two significance levels of a [`ConditionalValueatRiskRange`](@ref) against prior result `pr`.
 
-The measure is the sum of a loss-side CVaR at `alpha` and a gain-side CVaR at `beta`, and each end carries its own slot and its own bound. So a rule stated on one end is not carried to the other: [`mirror_role`](@ref) is the default of the two ordered-weights Range types and not of this one, whose two levels default to numbers.
+The measure is the sum of a loss-side CVaR at `alpha` and a gain-side CVaR at `beta`, and each end carries its own slot and its own bound. `beta` defaults to [`mirror_role`](@ref) of `alpha`, so a rule stated on the loss side alone reaches both ends, and a caller who states `beta` themselves gets two ends that resolve independently.
 
 The rebuild goes through [`rebuild_with_slots`](@ref), whose positional call runs the inner constructor and re-runs both range checks on the calibrated numbers.
 
@@ -563,7 +563,7 @@ $(DocStringExtensions.FIELDS)
         alpha::Num_SigTailCal = 0.05,
         l_a::Num_AmbTwtCal = 1.0,
         r_a::Num_AmbRadCal = 0.02,
-        beta::Num_SigHeadCal = 0.05,
+        beta::Num_SigHeadCal = mirror_role(alpha),
         l_b::Num_AmbTwtCal = 1.0,
         r_b::Num_AmbRadCal = 0.02,
         w::Option{<:ObsWeights} = nothing
@@ -681,7 +681,7 @@ function DistributionallyRobustConditionalValueatRiskRange(;
                                                            alpha::Num_SigTailCal = 0.05,
                                                            l_a::Num_AmbTwtCal = 1.0,
                                                            r_a::Num_AmbRadCal = 0.02,
-                                                           beta::Num_SigHeadCal = 0.05,
+                                                           beta::Num_SigHeadCal = mirror_role(alpha),
                                                            l_b::Num_AmbTwtCal = 1.0,
                                                            r_b::Num_AmbRadCal = 0.02,
                                                            w::Option{<:ObsWeights} = nothing)::DistributionallyRobustConditionalValueatRiskRange

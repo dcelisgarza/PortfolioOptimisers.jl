@@ -225,9 +225,13 @@ neither moves with the series, so the identity default of `bind_series` serves i
 
 ### Four verbs carry what no derivation can find
 
-- **`mirror_role(x)`** is the default of the head slot on the two ordered-weights Range types. A
-  number crosses unchanged and a tail role crosses as the head role of the same family holding the
-  same `alg`, so `beta = alpha` survives the widening and no stated number moves.
+- **`mirror_role(x)`** is the default of the head slot on every Range type. A number crosses
+  unchanged and a tail role crosses as the head role of the same family holding the same `alg`, so
+  a rule stated on one end reaches both and no stated number moves. The two ordered-weights Range
+  types already read `beta = alpha`, and the widening kept that default alive. The six that held a
+  literal of their own now read the same default, which is the same number at the default
+  arguments and the tail slot's occupant otherwise. `RelativisticValueatRiskRange` is what gives
+  the deformation method a caller: its gain-side pair defaults to its loss-side pair, both halves.
 - **`bind_alpha(slot, alpha)`** carries a **travelling pair**. `EntropyBudget` reads its sibling
   `alpha`, and `resolve_calibration_slot` carries a `Symbol` and no number, so the number travels
   through the rule itself: the owner resolves `alpha`, calls `bind_alpha` on the `kappa` slot, and
