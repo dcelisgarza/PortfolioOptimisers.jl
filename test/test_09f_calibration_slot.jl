@@ -73,8 +73,35 @@ struct DeformationProbe{T} <: PO.AbstractAlgorithm
     end
 end
 
+# A rule that reports the context it was handed, as a number the slot bounds admit. The four
+# states of the pair map to 0.1, 0.3, 0.5 and 0.7, so the derived reading of the effective
+# observation weights and the effective solver is asserted rather than assumed.
+struct ProbeContext <: PO.AbstractSignificanceCalibrationAlgorithm end
+function (::ProbeContext)(::Symbol, ::PO.AbstractPriorResult, w, slv)
+    return (1 + 2 * !isnothing(w) + 4 * !isnothing(slv)) / 10
+end
+
+# Carries both context fields, so the derivation settles each against the caller's.
+struct ContextProbe{T1, T2, T3} <: PO.AbstractAlgorithm
+    alpha::T1
+    w::T2
+    slv::T3
+end
+function ContextProbe(; alpha::PO.Num_SigTailCal = 0.05, w = nothing, slv = nothing)
+    return ContextProbe(alpha, w, slv)
+end
+PortfolioOptimisers.calibration_slots(x::ContextProbe) = (; alpha = x.alpha)
+
+# Carries neither, so the derivation hands the rule `pr.w` and the caller's own solver.
+struct BareProbe{T1} <: PO.AbstractAlgorithm
+    alpha::T1
+end
+BareProbe(; alpha::PO.Num_SigTailCal = 0.05) = BareProbe(alpha)
+PortfolioOptimisers.calibration_slots(x::BareProbe) = (; alpha = x.alpha)
+
 const RULE = ProbeScenarioCount(25)
 const KRULE = ProbeEntropyBudget(0.3)
+const CTX = SignificanceTailCalibration(; alg = ProbeContext())
 
 @testset "Calibration slot: the taxonomy" begin
     # TWO roots, which is what #593 settled. A rule is an Algorithm, and the role that
@@ -719,6 +746,11 @@ reached a value-level entry point, and this one names the library's own missing 
 
 # A risk measure that declares its slot and resolves it nowhere. It is the failure the
 # pairing exists to catch, and no shipped type is in this state.
+#
+# The declaration alone no longer reaches that state: `resolve_calibration_slots` derives the
+# resolution from it, so a type that writes nothing is resolved rather than refused. The
+# probe therefore opts out, which is what `L2Regularisation` and `LpRegularisation` do for
+# their own reasons, and it then writes none of the resolution the opt-out promises.
 PortfolioOptimisers.@propagatable struct UnpairedProbe{T1, T2, T3} <: PO.RiskMeasure
     settings::T1
     @pprop w::T2
@@ -731,6 +763,11 @@ end
 (::UnpairedProbe)(x::PO.VecNum) = sqrt(sum(abs2, x) / length(x))
 PortfolioOptimisers.risk_input_kind(::UnpairedProbe) = PO.NetReturnsInput()
 PortfolioOptimisers.calibration_slots(x::UnpairedProbe) = (; alpha = x.alpha)
+function PortfolioOptimisers.resolve_calibration_slots(x::UnpairedProbe,
+                                                       ::PO.AbstractPriorResult,
+                                                       ::Any = nothing)
+    return x
+end
 function PortfolioOptimisers.set_risk_constraints!(model::JuMP.Model, ::Any,
                                                    r::UnpairedProbe,
                                                    opt::PO.RiskJuMPOptimisationEstimator,
@@ -805,9 +842,21 @@ end
     end
     @test !isempty(declared)
 
-    # A declaration is served by one of three verbs. `factory` and `norm_ceiling_factory`
-    # are the two routes ADR 0097 names, and `resolve_deferred_quantities` is the one every
-    # risk measure writes beside its declaration.
+    # A declaration is served by the derivation unless the type opts out, so the census reads
+    # the opt-outs rather than the declarations. `resolve_calibration_slots` has one untyped
+    # method that does the work, and every other method of it is a type saying that its slot
+    # is resolved somewhere else.
+    optouts = Any[]
+    for m in methods(PO.resolve_calibration_slots)
+        m.module === PortfolioOptimisers || continue
+        T = Base.unwrap_unionall(m.sig).parameters[2]
+        T === Any && continue
+        push!(optouts, T)
+    end
+
+    # A type that opts out names its own resolver. `factory` and `norm_ceiling_factory` are
+    # the two routes ADR 0097 names, and `resolve_deferred_quantities` is the one an ordered
+    # measure writes beside its declaration.
     resolvers = Any[]
     for f in (PO.resolve_deferred_quantities, PO.factory, PO.norm_ceiling_factory)
         for m in methods(f)
@@ -819,8 +868,12 @@ end
             push!(resolvers, R)
         end
     end
-    unpaired = [T for T in declared if !any(R -> T <: R, resolvers)]
+    unpaired = [T for T in optouts if !any(R -> T <: R, resolvers)]
     @test isempty(unpaired)
+
+    # The two opt-outs that ship are the two regularisation terms, and both are declared
+    # types rather than an accident of the walk.
+    @test all(T -> any(D -> D <: T || T <: D, declared), optouts)
 end
 
 @testset "Calibration slot: an unreachable slot fails loudly on the JuMP route" begin
@@ -860,6 +913,68 @@ end
     ok = MeanRisk(; r = UnpairedProbe(; alpha = 0.05),
                   opt = JuMPOptimiser(; slv = slv, pe = pr))
     @test isa(optimise(ok, rd).retcode, PO.OptimisationSuccess)
+end
+
+@testset "Calibration slot: the resolution is derived from the declaration" begin
+    rng = StableRNG(192837465)
+    X = randn(rng, 60, 4)
+    pr = prior(EmpiricalPrior(), X)
+    ws = pweights(range(1, 2; length = 60))
+    slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                 settings = "verbose" => false)
+
+    # The declaration is the whole statement. A type that writes no resolution of its own is
+    # resolved from `calibration_slots`, and the rebuild carries the number the rule gave.
+    @test PO.resolve_deferred_quantities(ContextProbe(; alpha = CTX), pr).alpha == 0.1
+
+    # The effective observation weights and the effective solver are read off the two fields
+    # the library names everywhere. A type that carries the field settles it against the
+    # caller's; a type that carries none takes the prior's and the caller's as they came.
+    @test PO.resolve_deferred_quantities(ContextProbe(; alpha = CTX, w = ws), pr).alpha ==
+          0.3
+    @test PO.resolve_deferred_quantities(ContextProbe(; alpha = CTX, slv = slv), pr).alpha ==
+          0.5
+    @test PO.resolve_deferred_quantities(ContextProbe(; alpha = CTX, w = ws, slv = slv),
+                                         pr).alpha == 0.7
+
+    # A type with neither field reads both off its caller, which is the OWA weight builders'
+    # state.
+    @test PO.resolve_deferred_quantities(BareProbe(; alpha = CTX), pr).alpha == 0.1
+    @test PO.resolve_deferred_quantities(BareProbe(; alpha = CTX), pr, slv).alpha == 0.5
+
+    # A stated number resolves to itself, so the walk rebuilds nothing and returns the object
+    # the caller handed in.
+    stated = ContextProbe(; alpha = 0.05)
+    @test PO.resolve_deferred_quantities(stated, pr) === stated
+
+    # Every shipped measure whose slots carry no order between them takes the same route.
+    # `ConditionalValueatRisk` carries `w` and no solver, and the four `PowerNorm` measures
+    # carry both.
+    @test PO.resolve_deferred_quantities(ConditionalValueatRisk(; alpha = CTX), pr).alpha ==
+          0.1
+    @test PO.resolve_deferred_quantities(ConditionalValueatRisk(; alpha = CTX, w = ws),
+                                         pr).alpha == 0.3
+    @test PO.resolve_deferred_quantities(PowerNormValueatRisk(; alpha = CTX, w = ws,
+                                                              slv = slv), pr).alpha == 0.7
+
+    # A weight builder carries neither field, so it reads the prior's weights and the solver
+    # its container was given.
+    @test PO.resolve_deferred_quantities(OrderedWeightsArrayTailGini(; alpha = CTX), pr,
+                                         slv).alpha == 0.5
+
+    # The container reaches the builder through the deferred recursion, and the calibration
+    # walk then sees a resolved child and rebuilds nothing a second time.
+    owa = OrderedWeightsArray(; w = OrderedWeightsArrayTailGini(; alpha = CTX))
+    @test PO.resolve_deferred_quantities(owa, pr, slv).w.alpha == 0.5
+
+    # The rebuild runs the inner constructor, so a joint bound that construction could not
+    # check runs again on the calibrated number. `0 < alpha_i < alpha < 1` is that bound, and
+    # a rule that returns a value at or below the stated `alpha_i` is refused at fold time
+    # rather than stored.
+    @test_throws DomainError PO.resolve_deferred_quantities(OrderedWeightsArrayTailGini(;
+                                                                                        alpha_i = 0.2,
+                                                                                        alpha = CTX),
+                                                            pr)
 end
 
 @testset "Calibration slot: the three regularisation keys each reach the declaration" begin

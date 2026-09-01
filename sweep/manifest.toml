@@ -163,16 +163,16 @@
 "src/16_Fees.jl" = { map = 8, units = 20, algorithm = 17, swept = true }
 "src/17_NetReturnsDrawdowns.jl" = { map = 8, units = 8, algorithm = 8, swept = true }
 "src/18_Tracking.jl" = { map = 8, units = 14, algorithm = 4, swept = true }
-"src/19_RiskMeasures/01_Base_RiskMeasures.jl" = { map = 9, units = 88, swept = false }
+"src/19_RiskMeasures/01_Base_RiskMeasures.jl" = { map = 9, units = 89, swept = false }
 "src/19_RiskMeasures/02_Variance.jl" = { map = 9, units = 24, swept = false }
 "src/19_RiskMeasures/03_MomentRiskMeasures.jl" = { map = 9, units = 32, swept = false }
 "src/19_RiskMeasures/04_Kurtosis.jl" = { map = 9, units = 9, swept = false }
 "src/19_RiskMeasures/05_NegativeSkewness.jl" = { map = 9, units = 5, swept = false }
-"src/19_RiskMeasures/06_XatRisk.jl" = { map = 9, units = 21, swept = false }
-"src/19_RiskMeasures/07_ConditionalXatRisk.jl" = { map = 9, units = 18, swept = false }
-"src/19_RiskMeasures/08_EntropicXatRisk.jl" = { map = 9, units = 9, swept = false }
+"src/19_RiskMeasures/06_XatRisk.jl" = { map = 9, units = 19, swept = false }
+"src/19_RiskMeasures/07_ConditionalXatRisk.jl" = { map = 9, units = 14, swept = false }
+"src/19_RiskMeasures/08_EntropicXatRisk.jl" = { map = 9, units = 5, swept = false }
 "src/19_RiskMeasures/09_RelativisticXatRisk.jl" = { map = 9, units = 9, swept = false }
-"src/19_RiskMeasures/10_OWARiskMeasures.jl" = { map = 9, units = 50, swept = false }
+"src/19_RiskMeasures/10_OWARiskMeasures.jl" = { map = 9, units = 46, swept = false }
 "src/19_RiskMeasures/11_AverageDrawdown.jl" = { map = 9, units = 3, swept = false }
 "src/19_RiskMeasures/12_UlcerIndex.jl" = { map = 9, units = 2, swept = false }
 "src/19_RiskMeasures/13_MaximumDrawdown.jl" = { map = 9, units = 2, swept = false }
@@ -182,7 +182,7 @@
 "src/19_RiskMeasures/16_Range.jl" = { map = 9, units = 1, swept = false }
 "src/19_RiskMeasures/17_TurnoverRiskMeasure.jl" = { map = 9, units = 4, swept = false }
 "src/19_RiskMeasures/18_TrackingRiskMeasure.jl" = { map = 9, units = 17, swept = false }
-"src/19_RiskMeasures/19_PowerNormXatRisk.jl" = { map = 9, units = 9, swept = false }
+"src/19_RiskMeasures/19_PowerNormXatRisk.jl" = { map = 9, units = 5, swept = false }
 "src/19_RiskMeasures/20_VarianceSkewKurtosis.jl" = { map = 9, units = 16, swept = false }
 "src/19_RiskMeasures/21_GenericValueatRiskRange.jl" = { map = 9, units = 2, swept = false }
 "src/19_RiskMeasures/22_RatioRiskMeasure.jl" = { map = 9, units = 2, swept = false }

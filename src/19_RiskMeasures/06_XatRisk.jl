@@ -994,28 +994,6 @@ function DrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                         s::Option{<:Number} = nothing)::DrawdownatRisk
     return DrawdownatRisk(settings, alpha, w, b, s)
 end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Resolve the significance level `alpha` of a [`DrawdownatRisk`](@ref) against prior result `pr`.
-
-The measure reads the drawdown series of the sample, so a rule that counts scenarios counts the same rows the drawdown is taken over. The rebuild goes through [`rebuild_with_slots`](@ref), whose positional call runs the inner constructor and re-runs `0 < alpha < 1` and the `b > s` pairing on the calibrated measure.
-
-The effective observation weights are computed locally as `sel(x.w, pr.w)` and threaded to the rule.
-
-# Related
-
-  - [`DrawdownatRisk`](@ref)
-  - [`resolve_calibration_slot`](@ref)
-  - [`calibration_slots`](@ref)
-  - [`SignificanceTailCalibration`](@ref)
-"""
-function resolve_deferred_quantities(x::DrawdownatRisk, pr::AbstractPriorResult,
-                                     slv = nothing)
-    ws = sel(x.w, pr.w)
-    alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, slv)
-    return rebuild_with_slots(x, (; alpha = alpha))
-end
 # Calibration slots — see `calibration_slots`.
 calibration_slots(x::DrawdownatRisk) = (; alpha = x.alpha)
 """
@@ -1220,28 +1198,6 @@ function RelativeDrawdownatRisk(;
                                 alpha::Num_SigTailCal = 0.05,
                                 w::Option{<:ObsWeights} = nothing)::RelativeDrawdownatRisk
     return RelativeDrawdownatRisk(settings, alpha, w)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Resolve the significance level `alpha` of a [`RelativeDrawdownatRisk`](@ref) against prior result `pr`.
-
-The measure is a hierarchical one, so it reaches no `JuMP` model and the [`factory`](@ref) route is its only resolution. The rebuild goes through [`rebuild_with_slots`](@ref), whose positional call runs the inner constructor and re-runs `0 < alpha < 1` on the calibrated number.
-
-The effective observation weights are computed locally as `sel(x.w, pr.w)` and threaded to the rule.
-
-# Related
-
-  - [`RelativeDrawdownatRisk`](@ref)
-  - [`resolve_calibration_slot`](@ref)
-  - [`calibration_slots`](@ref)
-  - [`SignificanceTailCalibration`](@ref)
-"""
-function resolve_deferred_quantities(x::RelativeDrawdownatRisk, pr::AbstractPriorResult,
-                                     slv = nothing)
-    ws = sel(x.w, pr.w)
-    alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, slv)
-    return rebuild_with_slots(x, (; alpha = alpha))
 end
 # Calibration slots — see `calibration_slots`.
 calibration_slots(x::RelativeDrawdownatRisk) = (; alpha = x.alpha)

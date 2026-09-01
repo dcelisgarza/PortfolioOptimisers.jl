@@ -2,16 +2,9 @@
 
 ```@docs
 EntropicValueatRisk
-resolve_deferred_quantities(x::EntropicValueatRisk, pr::AbstractPriorResult)
 EntropicValueatRiskRange
-resolve_deferred_quantities(x::EntropicValueatRiskRange,
-                            pr::AbstractPriorResult)
 EntropicDrawdownatRisk
-resolve_deferred_quantities(x::EntropicDrawdownatRisk,
-                            pr::AbstractPriorResult)
 RelativeEntropicDrawdownatRisk
-resolve_deferred_quantities(x::RelativeEntropicDrawdownatRisk,
-                            pr::AbstractPriorResult)
 ERM
 ```
 

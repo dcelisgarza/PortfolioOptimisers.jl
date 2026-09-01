@@ -204,29 +204,6 @@ function EntropicValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettin
                              w::Option{<:ObsWeights} = nothing)::EntropicValueatRisk
     return EntropicValueatRisk(settings, slv, alpha, w)
 end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Resolve the significance level `alpha` of an [`EntropicValueatRisk`](@ref) against prior result `pr`.
-
-The measure carries a solver, so the resolution settles one as `sel(x.slv, slv)` and hands it to the rule. A rule may therefore call [`ERM`](@ref) itself. On the [`factory`](@ref) route the `@cprop` selection has already put the effective solver on the struct, so the local `sel` reads the struct; on the `JuMP` route it reads the one [`set_risk_constraints!`](@ref) threaded. Both routes resolve one measure against one solver.
-
-The rebuild goes through [`rebuild_with_slots`](@ref), whose positional call runs the inner constructor and re-runs `0 < alpha < 1` on the calibrated number.
-
-# Related
-
-  - [`EntropicValueatRisk`](@ref)
-  - [`resolve_calibration_slot`](@ref)
-  - [`calibration_slots`](@ref)
-  - [`ERM`](@ref)
-"""
-function resolve_deferred_quantities(x::EntropicValueatRisk, pr::AbstractPriorResult,
-                                     slv = nothing)
-    ws = sel(x.w, pr.w)
-    sv = sel(x.slv, slv)
-    alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, sv)
-    return rebuild_with_slots(x, (; alpha = alpha))
-end
 # Calibration slots — see `calibration_slots`.
 calibration_slots(x::EntropicValueatRisk) = (; alpha = x.alpha)
 function (r::EntropicValueatRisk)(x::VecNum)
@@ -333,30 +310,6 @@ function EntropicValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasureS
                                   beta::Num_SigHeadCal = mirror_role(alpha),
                                   w::Option{<:ObsWeights} = nothing)::EntropicValueatRiskRange
     return EntropicValueatRiskRange(settings, slv, alpha, beta, w)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Resolve the two significance levels of an [`EntropicValueatRiskRange`](@ref) against prior result `pr`.
-
-Each end carries its own slot and its own bound, so a stated tail rule and a stated head rule resolve independently. `beta` defaults to [`mirror_role`](@ref) of `alpha`, so a rule stated on the loss side alone reaches both ends. The solver is settled once, as `sel(x.slv, slv)`, and handed to both rules: the two ends of one measure are priced by one solver.
-
-The rebuild goes through [`rebuild_with_slots`](@ref), whose positional call runs the inner constructor and re-runs both range checks on the calibrated numbers.
-
-# Related
-
-  - [`EntropicValueatRiskRange`](@ref)
-  - [`EntropicValueatRisk`](@ref)
-  - [`resolve_calibration_slot`](@ref)
-  - [`calibration_slots`](@ref)
-"""
-function resolve_deferred_quantities(x::EntropicValueatRiskRange, pr::AbstractPriorResult,
-                                     slv = nothing)
-    ws = sel(x.w, pr.w)
-    sv = sel(x.slv, slv)
-    alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, sv)
-    beta = resolve_calibration_slot(x.beta, :beta, pr, ws, sv)
-    return rebuild_with_slots(x, (; alpha = alpha, beta = beta))
 end
 # Calibration slots — see `calibration_slots`. One slot per tail, each with its own role.
 calibration_slots(x::EntropicValueatRiskRange) = (; alpha = x.alpha, beta = x.beta)
@@ -506,27 +459,6 @@ function EntropicDrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSet
                                 w::Option{<:ObsWeights} = nothing)::EntropicDrawdownatRisk
     return EntropicDrawdownatRisk(settings, slv, alpha, w)
 end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Resolve the significance level `alpha` of an [`EntropicDrawdownatRisk`](@ref) against prior result `pr`.
-
-It carries the reading of [`resolve_deferred_quantities`](@ref) on the value-at-risk twin unchanged. The drawdown series has one entry per row of the sample, so a rule reads the same sample size here as it does there, and the settled solver reaches it on the same terms.
-
-# Related
-
-  - [`EntropicDrawdownatRisk`](@ref)
-  - [`EntropicValueatRisk`](@ref)
-  - [`resolve_calibration_slot`](@ref)
-  - [`calibration_slots`](@ref)
-"""
-function resolve_deferred_quantities(x::EntropicDrawdownatRisk, pr::AbstractPriorResult,
-                                     slv = nothing)
-    ws = sel(x.w, pr.w)
-    sv = sel(x.slv, slv)
-    alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, sv)
-    return rebuild_with_slots(x, (; alpha = alpha))
-end
 # Calibration slots — see `calibration_slots`.
 calibration_slots(x::EntropicDrawdownatRisk) = (; alpha = x.alpha)
 function (r::EntropicDrawdownatRisk)(x::VecNum)
@@ -663,27 +595,6 @@ function RelativeEntropicDrawdownatRisk(;
                                         alpha::Num_SigTailCal = 0.05,
                                         w::Option{<:ObsWeights} = nothing)::RelativeEntropicDrawdownatRisk
     return RelativeEntropicDrawdownatRisk(settings, slv, alpha, w)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Resolve the significance level `alpha` of a [`RelativeEntropicDrawdownatRisk`](@ref) against prior result `pr`.
-
-The measure is a hierarchical one, so it reaches no `JuMP` model and the [`factory`](@ref) route is its only resolution. The solver is settled as `sel(x.slv, slv)` and handed to the rule, on the terms the absolute twin states.
-
-# Related
-
-  - [`RelativeEntropicDrawdownatRisk`](@ref)
-  - [`EntropicDrawdownatRisk`](@ref)
-  - [`resolve_calibration_slot`](@ref)
-  - [`calibration_slots`](@ref)
-"""
-function resolve_deferred_quantities(x::RelativeEntropicDrawdownatRisk,
-                                     pr::AbstractPriorResult, slv = nothing)
-    ws = sel(x.w, pr.w)
-    sv = sel(x.slv, slv)
-    alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, sv)
-    return rebuild_with_slots(x, (; alpha = alpha))
 end
 # Calibration slots — see `calibration_slots`.
 calibration_slots(x::RelativeEntropicDrawdownatRisk) = (; alpha = x.alpha)

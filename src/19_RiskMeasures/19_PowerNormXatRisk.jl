@@ -196,29 +196,6 @@ function PowerNormValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSetti
                               w::Option{<:ObsWeights} = nothing)::PowerNormValueatRisk
     return PowerNormValueatRisk(settings, slv, alpha, p, w)
 end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Resolve the significance level `alpha` of a [`PowerNormValueatRisk`](@ref) against prior result `pr`.
-
-`p` is the order of the norm and not a quantity of the sample, so it stays a number: nothing in a prior result says which order a caller meant. The solver is settled as `sel(x.slv, slv)` and handed to the rule, so a rule may call [`PRM`](@ref) itself.
-
-The rebuild goes through [`rebuild_with_slots`](@ref), whose positional call runs the inner constructor and re-runs `0 < alpha < 1` and `p >= 1` on the calibrated measure.
-
-# Related
-
-  - [`PowerNormValueatRisk`](@ref)
-  - [`resolve_calibration_slot`](@ref)
-  - [`calibration_slots`](@ref)
-  - [`PRM`](@ref)
-"""
-function resolve_deferred_quantities(x::PowerNormValueatRisk, pr::AbstractPriorResult,
-                                     slv = nothing)
-    ws = sel(x.w, pr.w)
-    sv = sel(x.slv, slv)
-    alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, sv)
-    return rebuild_with_slots(x, (; alpha = alpha))
-end
 # Calibration slots — see `calibration_slots`. `p` is the order of the norm, not a quantity
 # of the sample, so it is not one of them.
 calibration_slots(x::PowerNormValueatRisk) = (; alpha = x.alpha)
@@ -364,30 +341,6 @@ function PowerNormValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasure
                                    pa::Number = 2.0, pb::Number = pa,
                                    w::Option{<:ObsWeights} = nothing)::PowerNormValueatRiskRange
     return PowerNormValueatRiskRange(settings, slv, alpha, beta, pa, pb, w)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Resolve the two significance levels of a [`PowerNormValueatRiskRange`](@ref) against prior result `pr`.
-
-Each end carries its own slot and its own bound, so a stated tail rule and a stated head rule resolve independently. `beta` defaults to [`mirror_role`](@ref) of `alpha` and `pb` to `pa`, so a rule stated on the loss side alone reaches both ends. `pa` and `pb` are the two norm orders and stay numbers, on the terms the scalar measure states.
-
-The solver is settled once and handed to both rules, so the two ends of one measure are priced by one solver.
-
-# Related
-
-  - [`PowerNormValueatRiskRange`](@ref)
-  - [`PowerNormValueatRisk`](@ref)
-  - [`resolve_calibration_slot`](@ref)
-  - [`calibration_slots`](@ref)
-"""
-function resolve_deferred_quantities(x::PowerNormValueatRiskRange, pr::AbstractPriorResult,
-                                     slv = nothing)
-    ws = sel(x.w, pr.w)
-    sv = sel(x.slv, slv)
-    alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, sv)
-    beta = resolve_calibration_slot(x.beta, :beta, pr, ws, sv)
-    return rebuild_with_slots(x, (; alpha = alpha, beta = beta))
 end
 # Calibration slots — see `calibration_slots`. One slot per tail, each with its own role.
 calibration_slots(x::PowerNormValueatRiskRange) = (; alpha = x.alpha, beta = x.beta)
@@ -549,27 +502,6 @@ function PowerNormDrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSe
                                  w::Option{<:ObsWeights} = nothing)::PowerNormDrawdownatRisk
     return PowerNormDrawdownatRisk(settings, slv, alpha, p, w)
 end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Resolve the significance level `alpha` of a [`PowerNormDrawdownatRisk`](@ref) against prior result `pr`.
-
-It carries the reading of [`resolve_deferred_quantities`](@ref) on the value-at-risk twin unchanged. The drawdown series has one entry per row of the sample, so a rule reads the same sample size here as it does there.
-
-# Related
-
-  - [`PowerNormDrawdownatRisk`](@ref)
-  - [`PowerNormValueatRisk`](@ref)
-  - [`resolve_calibration_slot`](@ref)
-  - [`calibration_slots`](@ref)
-"""
-function resolve_deferred_quantities(x::PowerNormDrawdownatRisk, pr::AbstractPriorResult,
-                                     slv = nothing)
-    ws = sel(x.w, pr.w)
-    sv = sel(x.slv, slv)
-    alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, sv)
-    return rebuild_with_slots(x, (; alpha = alpha))
-end
 # Calibration slots — see `calibration_slots`.
 calibration_slots(x::PowerNormDrawdownatRisk) = (; alpha = x.alpha)
 function (r::PowerNormDrawdownatRisk)(x::VecNum)
@@ -718,27 +650,6 @@ function RelativePowerNormDrawdownatRisk(;
                                          alpha::Num_SigTailCal = 0.05, p::Number = 2.0,
                                          w::Option{<:ObsWeights} = nothing)::RelativePowerNormDrawdownatRisk
     return RelativePowerNormDrawdownatRisk(settings, slv, alpha, p, w)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Resolve the significance level `alpha` of a [`RelativePowerNormDrawdownatRisk`](@ref) against prior result `pr`.
-
-The measure is a hierarchical one, so it reaches no `JuMP` model and the [`factory`](@ref) route is its only resolution. The solver is settled as `sel(x.slv, slv)` and handed to the rule, on the terms the absolute twin states.
-
-# Related
-
-  - [`RelativePowerNormDrawdownatRisk`](@ref)
-  - [`PowerNormDrawdownatRisk`](@ref)
-  - [`resolve_calibration_slot`](@ref)
-  - [`calibration_slots`](@ref)
-"""
-function resolve_deferred_quantities(x::RelativePowerNormDrawdownatRisk,
-                                     pr::AbstractPriorResult, slv = nothing)
-    ws = sel(x.w, pr.w)
-    sv = sel(x.slv, slv)
-    alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, sv)
-    return rebuild_with_slots(x, (; alpha = alpha))
 end
 # Calibration slots — see `calibration_slots`.
 calibration_slots(x::RelativePowerNormDrawdownatRisk) = (; alpha = x.alpha)

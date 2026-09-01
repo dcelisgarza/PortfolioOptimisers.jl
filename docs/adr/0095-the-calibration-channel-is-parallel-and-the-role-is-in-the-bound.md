@@ -41,7 +41,7 @@ validate.
 
 ### The channel is parallel, and a role stays out of the `DeferredQuantity` union
 
-Four verbs are new. Each names its counterpart in
+Five verbs are new. Each names its counterpart in
 [`src/19_RiskMeasures/01_Base_RiskMeasures.jl`](../../src/19_RiskMeasures/01_Base_RiskMeasures.jl),
 and the calibration half of each pair lives in
 [`src/14_UncertaintySets/06_CalibrationRules.jl`](../../src/14_UncertaintySets/06_CalibrationRules.jl).
@@ -50,6 +50,7 @@ and the calibration half of each pair lives in
 | :--- | :--- | :--- |
 | `resolve_calibration_slot(slot, key, pr, w, slv = nothing)` | `resolve_slot(slot, key, pr)` | resolve one slot |
 | `calibration_slots(x)` | `deferred_slots(x)` | declare the slots, as a `NamedTuple` |
+| `resolve_calibration_slots(x, pr, slv = nothing)` | `resolve_deferred_quantities(x, pr, slv = nothing)` | derive the resolution from the declaration |
 | `assert_calibrated_slots(x)` | `assert_resolved_slots(x)` | refuse at a value-level entry point |
 | `assert_declared_calibration_resolver(x, slots)` | `assert_declared_slot_resolver(x, slots)` | refuse a declared slot that no resolver reaches |
 
@@ -74,11 +75,28 @@ measure meets a consumer that cannot resolve: `set_risk_constraints!` on the `Ju
 three regularisation factories. `assert_calibrated_slots` covers the value-level route already, so
 each route now names the failure in its own words.
 
-**The per-type entry point is shared.** A type's own `resolve_deferred_quantities` method resolves
-both kinds of slot and rebuilds once, because a measure that carries both must not be rebuilt twice
-and because the two resolutions have an order between them. Only the declaration and the resolver
-are parallel, and ADR 0051's statement that the entry point resolves the deferred state and nothing
-else is amended there.
+**The entry point is shared.** `resolve_deferred_quantities` resolves both kinds of slot, and
+ADR 0051's statement that it resolves the deferred state and nothing else is amended there. The
+deferred step runs first and the calibration step runs on its result, which is what lets a container
+name one key in both declarations: the child resolves through the deferred recursion, and the
+calibration walk then sees a resolved child and rebuilds nothing.
+
+**The resolution is derived from the declaration.** For most types the declaration is the whole
+statement. `resolve_calibration_slots` reads `calibration_slots`, settles the effective observation
+weights and the effective solver off the two fields the library names everywhere, resolves each slot
+under its own name, and rebuilds. Eighteen of the twenty-seven calibrated measures write nothing at
+all, and a nineteenth added tomorrow writes nothing either.
+
+Two readings put a type outside the derivation, and nothing else does.
+
+1. **An order between the slots.** `bind_alpha`, `bind_series` and `bind_norm_order` are what such an
+   order looks like: the slot is bound before it resolves, so it reads a sibling. A derivation cannot
+   know which sibling, so those types write their own method. The travelling pair below is the whole
+   of that set.
+2. **A key that is not the field's name.** The three regularisation keys are three quantities under
+   one field, which ADR 0097 settles, so a derivation that reads the field name would hand the rule
+   the wrong key. Those two terms declare a `resolve_calibration_slots` method returning `x`, and
+   their own factories stay the one route.
 
 ### A tag row was refused
 
@@ -88,11 +106,12 @@ separate end to end.
 
 A tag row emits **one generated method per struct** that rewrites each tagged field from a source of
 the channel's choosing. A calibration slot has no such source. Its value comes from calling a rule
-the caller put in the slot, and the order in which two slots of one type resolve is a property of
-the rules rather than of the fields: a deformation rule reads the significance level of a sibling
-slot, so `alpha` must resolve before `kappa`. A generated method cannot know that order, and a
-per-type method is exactly what states it. That is the reason ADR 0051 already gives for writing
-`resolve_deferred_quantities` per type rather than deriving it from a field walk.
+the caller put in the slot, and a tag row would emit the method whether or not the type needed one.
+
+`resolve_calibration_slots` carries the same saving without the row. It derives the resolution from
+the declaration the type already writes, it is one method rather than one per struct, and a type
+that needs an order of its own overrides it. Where a tag row would have to state the order it cannot
+know, a method is simply shadowed by the more specific one beside the declaration.
 
 ### The role names the quantity, and the bound is the whole validation
 
@@ -287,7 +306,14 @@ The two mechanisms would read as one and behave as two.
 
 **A `PROP_TAG_CHANNELS` row plus a stub macro.** The cheapest possible wiring, and ADR 0061 exists to
 make it cheap. Rejected for the reason above: a generated method rewrites a field from a source, and
-a calibration slot has a rule and an order instead of a source.
+a calibration slot has a rule instead of a source. `resolve_calibration_slots` gives the same saving
+from one method, and a type that needs its own order shadows it.
+
+**One hand-written resolution per calibrated type.** The shape the channel shipped in, and the shape
+ADR 0051 gives the Deferred-Quantity side. Rejected once the numbers were counted: eighteen of the
+twenty-seven bodies stated the slot list a second and a third time, beside the declaration that
+already held it, and none of them stated an order. A field added to such a type and missed at one of
+the three sites moved the number the measure priced and broke no test.
 
 **One role type per family, with a field naming the end.** `SignificanceCalibration(; end = :tail)`
 halves the type count. Rejected because the end would then be data rather than type, so a tail rule

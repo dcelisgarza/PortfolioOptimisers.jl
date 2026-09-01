@@ -119,28 +119,6 @@ function ConditionalValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSet
                                 w::Option{<:ObsWeights} = nothing)::ConditionalValueatRisk
     return ConditionalValueatRisk(settings, alpha, w)
 end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Resolve the significance level `alpha` of a [`ConditionalValueatRisk`](@ref) against prior result `pr`.
-
-The measure averages the losses beyond the `alpha`-quantile, so the tail it prices holds `ceil(alpha * T)` of the sample's scenarios. A [`ScenarioCount`](@ref) rule fixes that count instead of the probability, which is what makes the tail hold the same number of scenarios at every fold length.
-
-The rebuild goes through [`rebuild_with_slots`](@ref), whose positional call runs the inner constructor and re-runs `0 < alpha < 1` on the calibrated number. The effective observation weights are computed locally as `sel(x.w, pr.w)` and threaded to the rule.
-
-# Related
-
-  - [`ConditionalValueatRisk`](@ref)
-  - [`resolve_calibration_slot`](@ref)
-  - [`calibration_slots`](@ref)
-  - [`ScenarioCount`](@ref)
-"""
-function resolve_deferred_quantities(x::ConditionalValueatRisk, pr::AbstractPriorResult,
-                                     slv = nothing)
-    ws = sel(x.w, pr.w)
-    alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, slv)
-    return rebuild_with_slots(x, (; alpha = alpha))
-end
 # Calibration slots — see `calibration_slots`.
 calibration_slots(x::ConditionalValueatRisk) = (; alpha = x.alpha)
 """
@@ -495,29 +473,6 @@ function ConditionalValueatRiskRange(;
                                      beta::Num_SigHeadCal = mirror_role(alpha),
                                      w::Option{<:ObsWeights} = nothing)::ConditionalValueatRiskRange
     return ConditionalValueatRiskRange(settings, alpha, beta, w)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Resolve the two significance levels of a [`ConditionalValueatRiskRange`](@ref) against prior result `pr`.
-
-The measure is the sum of a loss-side CVaR at `alpha` and a gain-side CVaR at `beta`, and each end carries its own slot and its own bound. `beta` defaults to [`mirror_role`](@ref) of `alpha`, so a rule stated on the loss side alone reaches both ends, and a caller who states `beta` themselves gets two ends that resolve independently.
-
-The rebuild goes through [`rebuild_with_slots`](@ref), whose positional call runs the inner constructor and re-runs both range checks on the calibrated numbers.
-
-# Related
-
-  - [`ConditionalValueatRiskRange`](@ref)
-  - [`resolve_calibration_slot`](@ref)
-  - [`calibration_slots`](@ref)
-  - [`SignificanceHeadCalibration`](@ref)
-"""
-function resolve_deferred_quantities(x::ConditionalValueatRiskRange,
-                                     pr::AbstractPriorResult, slv = nothing)
-    ws = sel(x.w, pr.w)
-    alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, slv)
-    beta = resolve_calibration_slot(x.beta, :beta, pr, ws, slv)
-    return rebuild_with_slots(x, (; alpha = alpha, beta = beta))
 end
 # Calibration slots — see `calibration_slots`. One slot per tail, each with its own role.
 calibration_slots(x::ConditionalValueatRiskRange) = (; alpha = x.alpha, beta = x.beta)
@@ -949,28 +904,6 @@ function ConditionalDrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasure
                                    w::Option{<:ObsWeights} = nothing)::ConditionalDrawdownatRisk
     return ConditionalDrawdownatRisk(settings, alpha, w)
 end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Resolve the significance level `alpha` of a [`ConditionalDrawdownatRisk`](@ref) against prior result `pr`.
-
-The drawdown series has one entry per row of the sample, so a rule that counts scenarios counts the same rows here as it does on the return series.
-
-The rebuild goes through [`rebuild_with_slots`](@ref), whose positional call runs the inner constructor and re-runs `0 < alpha < 1` on the calibrated number.
-
-# Related
-
-  - [`ConditionalDrawdownatRisk`](@ref)
-  - [`resolve_calibration_slot`](@ref)
-  - [`calibration_slots`](@ref)
-  - [`SignificanceTailCalibration`](@ref)
-"""
-function resolve_deferred_quantities(x::ConditionalDrawdownatRisk, pr::AbstractPriorResult,
-                                     slv = nothing)
-    ws = sel(x.w, pr.w)
-    alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, slv)
-    return rebuild_with_slots(x, (; alpha = alpha))
-end
 # Calibration slots — see `calibration_slots`.
 calibration_slots(x::ConditionalDrawdownatRisk) = (; alpha = x.alpha)
 """
@@ -1350,26 +1283,6 @@ function RelativeConditionalDrawdownatRisk(;
                                            alpha::Num_SigTailCal = 0.05,
                                            w::Option{<:ObsWeights} = nothing)::RelativeConditionalDrawdownatRisk
     return RelativeConditionalDrawdownatRisk(settings, alpha, w)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Resolve the significance level `alpha` of a [`RelativeConditionalDrawdownatRisk`](@ref) against prior result `pr`.
-
-The measure is a hierarchical one, so it reaches no `JuMP` model and the [`factory`](@ref) route is its only resolution. The relative drawdown series has one entry per row of the sample, so a rule reads the same sample size here as on the absolute twin.
-
-# Related
-
-  - [`RelativeConditionalDrawdownatRisk`](@ref)
-  - [`ConditionalDrawdownatRisk`](@ref)
-  - [`resolve_calibration_slot`](@ref)
-  - [`calibration_slots`](@ref)
-"""
-function resolve_deferred_quantities(x::RelativeConditionalDrawdownatRisk,
-                                     pr::AbstractPriorResult, slv = nothing)
-    ws = sel(x.w, pr.w)
-    alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, slv)
-    return rebuild_with_slots(x, (; alpha = alpha))
 end
 # Calibration slots — see `calibration_slots`.
 calibration_slots(x::RelativeConditionalDrawdownatRisk) = (; alpha = x.alpha)

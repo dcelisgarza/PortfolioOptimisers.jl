@@ -21,17 +21,9 @@ MinimumSumSquares
 NormalisedConstantRelativeRiskAversion
 LinearMoment
 OrderedWeightsArrayConditionalValueatRisk
-resolve_deferred_quantities(x::OrderedWeightsArrayConditionalValueatRisk,
-                            pr::AbstractPriorResult)
 OrderedWeightsArrayTailGini
-resolve_deferred_quantities(x::OrderedWeightsArrayTailGini,
-                            pr::AbstractPriorResult)
 OrderedWeightsArrayConditionalValueatRiskRange
-resolve_deferred_quantities(x::OrderedWeightsArrayConditionalValueatRiskRange,
-                            pr::AbstractPriorResult)
 OrderedWeightsArrayTailGiniRange
-resolve_deferred_quantities(x::OrderedWeightsArrayTailGiniRange,
-                            pr::AbstractPriorResult)
 OWA_Func_VecNum
 OrderedWeightsArrayFormulation
 ExactOrderedWeightsArray

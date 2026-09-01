@@ -410,9 +410,11 @@ end
 
 Declare the slots of `x` that may hold a **Calibration Rule**, as a `NamedTuple` mapping each slot's name to its current value. The default is empty: a type with no calibration slot needs no method.
 
-This is the parallel of [`deferred_slots`](@ref), and [`assert_calibrated_slots`](@ref) reads it. A type that names its slots here writes the resolution beside them, because a rule that reads a sibling slot must be resolved after that sibling and no derivation can know the order.
+This is the parallel of [`deferred_slots`](@ref). Three consumers read it: [`assert_calibrated_slots`](@ref) refuses a role that reached a value-level entry point, [`assert_declared_calibration_resolver`](@ref) refuses a role the library itself left unresolved, and [`resolve_calibration_slots`](@ref) resolves the slots.
 
-A slot that holds a child measure is declared here too, so a container names its children and each child names its own slots.
+For most types the declaration is the whole statement, and the resolution is derived from it. A type whose slots carry an **order** between them writes its own [`resolve_deferred_quantities`](@ref) method instead, and [`bind_alpha`](@ref), [`bind_series`](@ref) and [`bind_norm_order`](@ref) are what such an order looks like: a slot that is bound before it resolves reads a sibling, and no derivation can know which sibling. A slot that names a quantity under a key of its own also writes its own resolution, which is what the three regularisation keys do.
+
+A slot that holds a child measure is declared here too, so a container names its children and each child names its own slots. Such a slot is declared in [`deferred_slots`](@ref) as well, and the deferred recursion is what resolves the child.
 
 # Related
 
@@ -420,6 +422,7 @@ A slot that holds a child measure is declared here too, so a container names its
   - [`assert_calibrated_slots`](@ref)
   - [`assert_declared_calibration_resolver`](@ref)
   - [`resolve_calibration_slot`](@ref)
+  - [`resolve_calibration_slots`](@ref)
   - [`deferred_slots`](@ref)
 """
 calibration_slots(::Any) = (;)

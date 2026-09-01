@@ -100,6 +100,19 @@ const CENSUS = [(; T = ValueatRisk, tail = (:alpha,), head = (), dtail = (), dhe
                 (; T = RelativePowerNormDrawdownatRisk, tail = (:alpha,), head = (),
                  dtail = (), dhead = ())]
 
+# The nine rows of the census that write a resolution of their own. Two readings put a type
+# here and nothing else does. Seven carry an order between their slots, which a `bind_` verb
+# states: a deformation rule reads the significance level of a sibling, and a tail weight
+# reads the probability of its own end. Two carry a second mechanism beside the calibration,
+# a formulation child that the Deferred-Quantity recursion resolves. Every other row is
+# derived from its declaration alone.
+const ORDERED = [ValueatRisk, ValueatRiskRange,
+                 DistributionallyRobustConditionalValueatRisk,
+                 DistributionallyRobustConditionalValueatRiskRange,
+                 DistributionallyRobustConditionalDrawdownatRisk, RelativisticValueatRisk,
+                 RelativisticValueatRiskRange, RelativisticDrawdownatRisk,
+                 RelativeRelativisticDrawdownatRisk]
+
 kw(slot, val) = NamedTuple{(slot,)}((val,))
 
 @testset "Significance calibration: the census is twenty-seven types and forty slots" begin
@@ -122,11 +135,17 @@ kw(slot, val) = NamedTuple{(slot,)}((val,))
         declared = keys(PO.calibration_slots(row.T()))
         @test issubset(slots, declared)
         @test all(s -> hasproperty(row.T(), s), slots)
-        # A resolver stands beside every declaration, and it takes the effective solver as a
-        # third positional argument. `nargs` counts the function itself.
+        # A resolution stands beside every declaration, and it takes the effective solver as
+        # a third positional argument. It is the derivation for a type whose slots carry no
+        # order between them, and a per-type method for one whose slots do, so the census
+        # reads that a method applies rather than which of the two it is. The testset
+        # "the resolution of every slot" then runs each row and reads the number back.
         ms = methods(PO.resolve_deferred_quantities, (row.T, PO.AbstractPriorResult, Any))
         @test !isempty(ms)
-        @test Base.unwrap_unionall(first(ms).sig).parameters[2] !== Any
+        # A per-type method exists where, and only where, a `bind_` verb carries a sibling's
+        # value into the slot. The travelling pair is the whole of that set.
+        own = Base.unwrap_unionall(first(ms).sig).parameters[2] !== Any
+        @test own == (row.T in ORDERED)
     end
 
     # The three inner starting points do NOT widen, so no rule may stand in them.

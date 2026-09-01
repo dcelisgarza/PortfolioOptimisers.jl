@@ -1956,23 +1956,71 @@ function assert_declared_slot_resolver(x, slots::NamedTuple)
     return nothing
 end
 """
+    resolve_calibration_slots(x, pr::AbstractPriorResult, slv = nothing)
+
+Resolve the slots that [`calibration_slots`](@ref) declared, and return `x` itself when none of them held a **Calibration Role**.
+
+This is the derived half of the calibration channel, and it is the parallel of the container recursion in [`resolve_deferred_quantities`](@ref). A type whose slots carry no order between them declares them once and writes no resolution: the declaration is the whole statement, and this method reads it.
+
+A type whose slots **do** carry an order writes its own [`resolve_deferred_quantities`](@ref) method instead, and that method is more specific, so it wins. [`bind_alpha`](@ref), [`bind_series`](@ref) and [`bind_norm_order`](@ref) are what an order looks like: a slot that is bound before it resolves reads a sibling, and no derivation can know which sibling or in which direction. ADR 0095 states that rule, and it reaches the slots that are bound and no others.
+
+A type whose slot key is **not** the field's name declares a method of this verb returning `x`, which takes it out of the derivation. The three regularisation keys are the one case that ships: `val` is one field under three quantities, which ADR 0097 settles, and a derivation that read the field name would hand the rule the wrong key.
+
+The effective observation weights and the effective solver are the two quantities a rule reads beyond the prior, and both are read off `x` by the names the library gives them everywhere: `w` holds the measure's own observation weights and `slv` its own solver. A type that carries the field settles it against the caller's with [`sel`](@ref); a type that carries none takes `pr.w` and `slv` as they came. The read is skipped where no slot holds a role, so a container whose `w` names a child rather than a weight vector never reaches it.
+
+# Algorithm
+
+ 1. Read the slots `x` declares with [`calibration_slots`](@ref), giving `slots`.
+ 2. Return `x` unchanged when no entry of `slots` holds an [`AbstractCalibrationEstimator`](@ref). A stated number resolves to itself, so the walk would rebuild nothing.
+ 3. Settle the effective observation weights `w`, as `sel(x.w, pr.w)` where `x` carries the field and `pr.w` where it does not.
+ 4. Settle the effective solver `sv`, as `sel(x.slv, slv)` where `x` carries the field and `slv` where it does not.
+ 5. Resolve every entry of `slots` with [`resolve_calibration_slot`](@ref), giving each its own name as the key and threading `pr`, `w` and `sv`.
+ 6. Hand the result to [`rebuild_with_slots`](@ref), which returns `x` itself when no entry moved and a rebuilt copy when one did.
+
+# Returns
+
+  - `x` itself when no slot moved, and a rebuilt copy of `x` when one did.
+
+# Related
+
+  - [`calibration_slots`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+  - [`resolve_deferred_quantities`](@ref)
+  - [`rebuild_with_slots`](@ref)
+  - [`AbstractCalibrationEstimator`](@ref)
+"""
+function resolve_calibration_slots(x, pr::AbstractPriorResult, slv = nothing)
+    slots = calibration_slots(x)
+    if !any(map(slot -> isa(slot, AbstractCalibrationEstimator), values(slots)))
+        return x
+    end
+    w = hasfield(typeof(x), :w) ? sel(getfield(x, :w), pr.w) : pr.w
+    sv = hasfield(typeof(x), :slv) ? sel(getfield(x, :slv), slv) : slv
+    resolved = map((key, slot) -> resolve_calibration_slot(slot, key, pr, w, sv),
+                   keys(slots), values(slots))
+    return rebuild_with_slots(x, NamedTuple{keys(slots)}(resolved))
+end
+"""
     resolve_deferred_quantities(x, pr::AbstractPriorResult, slv = nothing)
 
-Resolve the children that [`deferred_slots`](@ref) declared, and return `x` itself when none of them changed.
+Resolve the children that [`deferred_slots`](@ref) declared and the slots that [`calibration_slots`](@ref) declared, and return `x` itself when none of them changed.
 
 This is the derived half of the resolution rule. A container declares its children once and both entry points follow: [`factory`](@ref) reaches them through [`@fprop`](@ref), and the `JuMP` builders reach them through this method. Neither needs a forwarding method per container.
 
 A type that resolves a quantity of its own overrides this with its own method, which is more specific. So the derivation carries container recursion alone, and never guesses how a matrix, a tensor or the centre a moment was taken about comes out of a fit.
+
+The calibration step runs last and on the result of the first, which is what lets a container declare one key in both channels. The child resolves through the deferred recursion, and the calibration walk then sees the resolved child, holds no role, and rebuilds nothing. [`resolve_calibration_slots`](@ref) carries that step and states its own rule.
 
 `slv` is the effective solver, and the recursion threads it to every child. A container states no solver of its own, so it changes none: each child settles the one it was handed against the one it carries.
 
 # Algorithm
 
  1. Read the slots `x` declares with [`deferred_slots`](@ref), giving `slots`.
- 2. Return `x` unchanged when `slots` is empty. A type with no deferrable slot needs no method of its own.
+ 2. Hand `x` straight to [`resolve_calibration_slots`](@ref) when `slots` is empty. A type with no deferrable slot needs no recursion of its own.
  3. Resolve every entry of `slots` with [`resolve_deferred_child`](@ref), threading `pr` and `slv` to each, giving `resolved`.
  4. Refuse a slot the recursion left unresolved with [`assert_declared_slot_resolver`](@ref).
  5. Hand `resolved` to [`rebuild_with_slots`](@ref), which returns `x` itself when no entry moved and a rebuilt copy when one did.
+ 6. Hand that result to [`resolve_calibration_slots`](@ref).
 
 # Returns
 
@@ -1982,17 +2030,18 @@ A type that resolves a quantity of its own overrides this with its own method, w
 
   - [`deferred_slots`](@ref)
   - [`resolve_deferred_child`](@ref)
+  - [`resolve_calibration_slots`](@ref)
   - [`assert_declared_slot_resolver`](@ref)
   - [`set_risk_constraints!`](@ref)
 """
 function resolve_deferred_quantities(x, pr::AbstractPriorResult, slv = nothing)
     slots = deferred_slots(x)
     if isempty(slots)
-        return x
+        return resolve_calibration_slots(x, pr, slv)
     end
     resolved = map(slot -> resolve_deferred_child(slot, pr, slv), slots)
     assert_declared_slot_resolver(x, resolved)
-    return rebuild_with_slots(x, resolved)
+    return resolve_calibration_slots(rebuild_with_slots(x, resolved), pr, slv)
 end
 """
     assert_resolved_slots(x)
