@@ -6,7 +6,7 @@
 [provenance]
 julia = "1.12.7"
 julia_syntax = "1.0.2"
-commit = "d8b2ae65b2"
+commit = "6aff04f92b"
 
 [file]
 "ext/PortfolioOptimisersImputeExt.jl" = { code = 6, doc = 0, comment = 3, blank = 3, total = 12 }
@@ -125,21 +125,21 @@ commit = "d8b2ae65b2"
 "src/14_UncertaintySets/03_NormalUncertaintySets.jl" = { code = 205, doc = 731, comment = 4, blank = 254, total = 1194 }
 "src/14_UncertaintySets/04_BootstrapUncertaintySets.jl" = { code = 213, doc = 572, comment = 0, blank = 199, total = 984 }
 "src/14_UncertaintySets/05_L1UncertaintySets.jl" = { code = 235, doc = 576, comment = 5, blank = 248, total = 1064 }
-"src/14_UncertaintySets/06_CalibrationRules.jl" = { code = 620, doc = 1760, comment = 32, blank = 765, total = 3177 }
+"src/14_UncertaintySets/06_CalibrationRules.jl" = { code = 618, doc = 1764, comment = 32, blank = 766, total = 3180 }
 "src/15_Turnover.jl" = { code = 81, doc = 458, comment = 0, blank = 184, total = 723 }
 "src/16_Fees.jl" = { code = 240, doc = 839, comment = 0, blank = 321, total = 1400 }
 "src/17_NetReturnsDrawdowns.jl" = { code = 44, doc = 288, comment = 0, blank = 122, total = 454 }
 "src/18_Tracking.jl" = { code = 70, doc = 438, comment = 0, blank = 177, total = 685 }
-"src/19_RiskMeasures/01_Base_RiskMeasures.jl" = { code = 403, doc = 1259, comment = 2, blank = 593, total = 2257 }
+"src/19_RiskMeasures/01_Base_RiskMeasures.jl" = { code = 414, doc = 1285, comment = 2, blank = 605, total = 2306 }
 "src/19_RiskMeasures/02_Variance.jl" = { code = 228, doc = 678, comment = 6, blank = 254, total = 1166 }
 "src/19_RiskMeasures/03_MomentRiskMeasures.jl" = { code = 293, doc = 916, comment = 5, blank = 353, total = 1567 }
 "src/19_RiskMeasures/04_Kurtosis.jl" = { code = 160, doc = 219, comment = 3, blank = 78, total = 460 }
 "src/19_RiskMeasures/05_NegativeSkewness.jl" = { code = 88, doc = 135, comment = 3, blank = 48, total = 274 }
-"src/19_RiskMeasures/06_XatRisk.jl" = { code = 375, doc = 646, comment = 39, blank = 267, total = 1327 }
-"src/19_RiskMeasures/07_ConditionalXatRisk.jl" = { code = 407, doc = 699, comment = 26, blank = 261, total = 1393 }
-"src/19_RiskMeasures/08_EntropicXatRisk.jl" = { code = 189, doc = 364, comment = 7, blank = 142, total = 702 }
+"src/19_RiskMeasures/06_XatRisk.jl" = { code = 363, doc = 624, comment = 39, blank = 257, total = 1283 }
+"src/19_RiskMeasures/07_ConditionalXatRisk.jl" = { code = 382, doc = 656, comment = 26, blank = 242, total = 1306 }
+"src/19_RiskMeasures/08_EntropicXatRisk.jl" = { code = 160, doc = 322, comment = 7, blank = 124, total = 613 }
 "src/19_RiskMeasures/09_RelativisticXatRisk.jl" = { code = 287, doc = 432, comment = 13, blank = 154, total = 886 }
-"src/19_RiskMeasures/10_OWARiskMeasures.jl" = { code = 573, doc = 1255, comment = 35, blank = 534, total = 2397 }
+"src/19_RiskMeasures/10_OWARiskMeasures.jl" = { code = 551, doc = 1211, comment = 35, blank = 514, total = 2311 }
 "src/19_RiskMeasures/11_AverageDrawdown.jl" = { code = 41, doc = 153, comment = 1, blank = 72, total = 267 }
 "src/19_RiskMeasures/12_UlcerIndex.jl" = { code = 30, doc = 117, comment = 1, blank = 56, total = 204 }
 "src/19_RiskMeasures/13_MaximumDrawdown.jl" = { code = 31, doc = 115, comment = 1, blank = 56, total = 203 }
@@ -149,7 +149,7 @@ commit = "d8b2ae65b2"
 "src/19_RiskMeasures/16_Range.jl" = { code = 15, doc = 44, comment = 1, blank = 22, total = 82 }
 "src/19_RiskMeasures/17_TurnoverRiskMeasure.jl" = { code = 32, doc = 84, comment = 1, blank = 40, total = 157 }
 "src/19_RiskMeasures/18_TrackingRiskMeasure.jl" = { code = 128, doc = 373, comment = 5, blank = 137, total = 643 }
-"src/19_RiskMeasures/19_PowerNormXatRisk.jl" = { code = 212, doc = 396, comment = 10, blank = 139, total = 757 }
+"src/19_RiskMeasures/19_PowerNormXatRisk.jl" = { code = 183, doc = 354, comment = 10, blank = 121, total = 668 }
 "src/19_RiskMeasures/20_VarianceSkewKurtosis.jl" = { code = 181, doc = 408, comment = 15, blank = 136, total = 740 }
 "src/19_RiskMeasures/21_GenericValueatRiskRange.jl" = { code = 30, doc = 98, comment = 9, blank = 30, total = 167 }
 "src/19_RiskMeasures/22_RatioRiskMeasure.jl" = { code = 44, doc = 140, comment = 4, blank = 42, total = 230 }
@@ -188,7 +188,7 @@ commit = "d8b2ae65b2"
 "src/20_Optimisation/09_JuMPConstraints/09_TurnoverConstraints.jl" = { code = 29, doc = 41, comment = 0, blank = 20, total = 90 }
 "src/20_Optimisation/09_JuMPConstraints/10_FeesConstraints.jl" = { code = 74, doc = 147, comment = 0, blank = 65, total = 286 }
 "src/20_Optimisation/09_JuMPConstraints/11_TrackingErrorConstraints.jl" = { code = 176, doc = 63, comment = 3, blank = 22, total = 264 }
-"src/20_Optimisation/09_JuMPConstraints/12_RegularisationConstraints.jl" = { code = 213, doc = 442, comment = 2, blank = 205, total = 862 }
+"src/20_Optimisation/09_JuMPConstraints/12_RegularisationConstraints.jl" = { code = 215, doc = 442, comment = 11, blank = 205, total = 873 }
 "src/20_Optimisation/09_JuMPConstraints/13_WeightNormConstraints.jl" = { code = 59, doc = 124, comment = 0, blank = 55, total = 238 }
 "src/20_Optimisation/10_JuMPOptimiser.jl" = { code = 725, doc = 672, comment = 32, blank = 165, total = 1594 }
 "src/20_Optimisation/11_MeanRisk.jl" = { code = 247, doc = 419, comment = 0, blank = 117, total = 783 }

@@ -57,14 +57,20 @@ between a file's maximum and its sums.
 A line is **code** when it carries one byte that is neither whitespace, nor inside a comment, nor
 inside a docstring. The four kinds partition the file, so they always sum to `total`.
 
-**The classification is a tokeniser and a parse, not a line scan.** A scan for `"""` and `#` gets
-two things wrong that this library does constantly. It reads a long string literal inside a
-function as a docstring, and it reads a **field docstring** as code. A field docstring parses to a
-bare string literal standing as a statement, because a struct body binds nothing for `Core.@doc` to
-attach to, and most of this library's prose is written that way. So `code_health/size.jl` marks
-comment bytes from `JuliaSyntax.tokenize` and docstring bytes from the `SyntaxNode` tree, and
-classifies a line from what is left. Like the complexity measurement it loads no package under
-measurement, and it costs about five seconds.
+**The classification is a tokeniser and a parse, not a line scan.** A scan for `"""` and `#`
+reads a long string literal inside a function as a docstring, and this library writes many. So
+`code_health/size.jl` marks comment bytes from `JuliaSyntax.tokenize` and docstring bytes from the
+`SyntaxNode` tree, and classifies a line from what is left. Like the complexity measurement it
+loads no package under measurement, and it costs about five seconds.
+
+**The parser is `JuliaSyntax.parseall(SyntaxNode, …)` rather than `Meta.parseall`, and a field
+docstring is why.** Most of this library's prose is written as a field docstring, and a struct body
+binds nothing for `Core.@doc` to attach to, so the `Expr` front end that `CodeHealth.isdocstring`
+reads drops the wrapper and leaves a bare string literal. The `SyntaxNode` tree keeps the `doc`
+node in both places, so one rule reads both shapes. A second rule for a bare string literal in a
+block is not merely unnecessary. It is wrong: a string literal in any other block is a **value**,
+and reading one as prose undercounted `src/01_Base/09_ObservationWeights.jl` by two lines.
+`test/test_52_size_classification_census.jl` holds every case.
 
 ### A file's ceiling is the greater of the threshold and its recorded number
 

@@ -75,9 +75,10 @@ picking a side — a contradiction between standards files is itself a defect.
 | Running Julia or the test suite | [`CLAUDE.md`](CLAUDE.md) § Running Julia | none — unenforced |
 | Running doctests | the `run-doctests` skill | `.github/workflows/Docs.yml` (`doctest` job) |
 | The line coverage of a file in `src/` or `ext/` | [ADR 0082](docs/adr/0082-the-coverage-terminal-condition-is-a-per-file-ratchet-and-a-named-exemption.md) | `.github/workflows/ReusableTest.yml` (`coverage` job) |
-| The size of a file in `src/` or `ext/` | [ADR 0101](docs/adr/0101-the-size-gate-counts-code-lines-and-binds-over-a-threshold.md) — code lines bind, a docstring line does not, and the ceiling is the greater of 500 and the recorded number | `.github/workflows/Complexity.yml` (`Size ratchet` step), or `julia --project=code_health code_health/size.jl check` |
+| The size of a file in `src/` or `ext/` | [ADR 0101](docs/adr/0101-the-size-gate-counts-code-lines-and-binds-over-a-threshold.md) — code lines bind, a docstring line does not, and the ceiling is the greater of 500 and the recorded number | `.github/workflows/Complexity.yml` (`Size ratchet` step), or `julia --project=code_health code_health/size.jl check`; `test/test_52_size_classification_census.jl` for the classification itself |
 | A Coverage Exemption | [ADR 0082](docs/adr/0082-the-coverage-terminal-condition-is-a-per-file-ratchet-and-a-named-exemption.md), `code_health/rulings.toml` | `.github/workflows/ReusableTest.yml` (`coverage` job) for the count it stands for; `test/test_49_coverage_attribution_census.jl` for the definition it names |
 | A `COV_EXCL` marker in `src/` or `ext/` | [ADR 0082](docs/adr/0082-the-coverage-terminal-condition-is-a-per-file-ratchet-and-a-named-exemption.md) — it is not admitted, and a Coverage Exemption is the one mechanism | `test/test_49_coverage_attribution_census.jl` |
+| `test/test_52_size_classification_census.jl` | `code_health/size.jl` reads a docstring and a field docstring as prose and a value string as code, the four kinds partition every file in scope, and a file's code-line ceiling is the greater of the threshold and its recorded number | run the file |
 
 ## The standards files
 

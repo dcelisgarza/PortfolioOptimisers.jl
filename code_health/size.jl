@@ -23,7 +23,7 @@ if !(isdefined(Main, :CodeHealth))
 end
 
 using Main.CodeHealth
-using JuliaSyntax, Pkg, TOML
+using JuliaSyntax, TOML
 
 const NAME = "size_baseline.toml"
 
@@ -32,12 +32,6 @@ The four kinds a line falls into, in the order a baseline row prints them, follo
 The kinds partition the file, so the four always sum to `total`.
 """
 const KINDS = ("code", "doc", "comment", "blank")
-
-"""
-The metric the ratchet compares. Only `code` binds, and it binds only where it stands over the
-threshold. See [`ceiling`](@ref).
-"""
-const BINDING = ("code",)
 
 """
 Every number a row carries. A rename pairs on all of them, which cannot pair two files that merely
@@ -49,8 +43,8 @@ const ROW_NUMBERS = ("code", "doc", "comment", "blank", "total")
 #
 # The classification reads the SOURCE TEXT twice, once as tokens and once as a tree, and never a
 # loaded binding. A line-by-line scan for `\"\"\"` and `#` cannot do this job: it reads a long
-# string literal in the middle of a function as a docstring, and it reads a field docstring as
-# code. Both mistakes are common in this library.
+# string literal in the middle of a function as a docstring. That mistake is common in this
+# library, and the tree knows the difference.
 
 """
     mark!(flags, range)
@@ -84,25 +78,24 @@ function walk_syntax(f, node)
     return nothing
 end
 
-is_string_literal(n) = kind(n) === K"string" || kind(n) === K"String"
-
 """
     mark_documentation!(isdoc, tree)
 
-Flag the bytes of every docstring in `tree`.
+Flag the bytes of every docstring in `tree`. A docstring is a `doc` node, and its first child is
+the string.
 
-A docstring reaches the tree in two shapes, and both are documentation.
+**One rule covers a FIELD docstring too, and that is a property of this parser.**
+`CodeHealth.isdocstring` reads a tree from `Meta.parseall`, where a field docstring is a bare
+string literal: a struct body binds nothing for `Core.@doc` to attach to, so the `Expr` front end
+drops the wrapper. `JuliaSyntax.parseall(SyntaxNode, …)` keeps the `doc` node in both places, so
+this reader needs no second shape. Measured over the whole tree: adding a rule for a string
+literal standing in a struct body moves no line.
 
- 1. A docstring on a binding parses to a `doc` node whose first child is the string. This is what
-    `Core.@doc` becomes, and it is what `CodeHealth.isdocstring` recognises.
- 2. A FIELD docstring parses to a bare string literal standing in a struct body, because a struct
-    body binds nothing for `@doc` to attach to. It is documentation all the same, and this library
-    writes most of its prose that way.
-
-**Shape 2 is read from the struct body alone, and not from every block.** A string literal in any
-other block is a VALUE. Reading one as documentation undercounted
-`src/01_Base/09_ObservationWeights.jl` by two lines, where the two branches of an `if` block each
-return a message string.
+A second rule is not merely unnecessary here. It is **harmful** if it is written for any block
+rather than for a struct body, because a string literal in any other block is a VALUE. Reading one
+as documentation undercounted `src/01_Base/09_ObservationWeights.jl` by two lines, where the two
+branches of an `if` block each build a message string.
+`test/test_52_size_classification_census.jl` holds that case.
 """
 function mark_documentation!(isdoc::BitVector, tree)
     walk_syntax(tree) do n
@@ -110,17 +103,6 @@ function mark_documentation!(isdoc::BitVector, tree)
             cs = JuliaSyntax.children(n)
             if !(cs === nothing || isempty(cs))
                 mark!(isdoc, JuliaSyntax.byte_range(first(cs)))
-            end
-        elseif kind(n) === K"struct"
-            for body in something(JuliaSyntax.children(n), ())
-                if kind(body) !== K"block"
-                    continue
-                end
-                for c in something(JuliaSyntax.children(body), ())
-                    if is_string_literal(c)
-                        mark!(isdoc, JuliaSyntax.byte_range(c))
-                    end
-                end
             end
         end
         return nothing
@@ -207,10 +189,19 @@ function measure()
     return (; files, counts, provenance = provenance())
 end
 
+"""
+    provenance() -> Vector{Pair{String, String}}
+
+What measured the numbers. The analyser's version is read with `pkgversion` rather than with
+`Pkg.dependencies`, which is what `complexity.jl` and `expansion.jl` use.
+
+The reading is the same and the cost is not. `Pkg` is a dependency of `code_health/Project.toml`
+alone, so a script that loads it cannot be loaded from `test/`, and
+`test/test_52_size_classification_census.jl` is the fixture adapter for this gate. `pkgversion` is
+in `Base`, so the gate loads under any environment that carries `JuliaSyntax` and `TOML`.
+"""
 function provenance()
-    deps = Pkg.dependencies()
-    version(name) = string(only(v.version for v in values(deps) if v.name == name))
-    return ["julia" => string(VERSION), "julia_syntax" => version("JuliaSyntax"),
+    return ["julia" => string(VERSION), "julia_syntax" => string(pkgversion(JuliaSyntax)),
             "commit" => CodeHealth.git_short_commit()]
 end
 
