@@ -105,6 +105,19 @@ end
     @test_throws DomainError EffectiveAssetFloor(; fraction = Inf)
     @test EffectiveAssetFloor(; fraction = 1).fraction == 1
 
+    # The ceiling guard names the quantity, the value and the range, rather than printing
+    # the source expression it was written from.
+    msg = try
+        EffectiveAssetFloor(; fraction = 1.5)
+        ""
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("EffectiveAssetFloor.fraction", msg)
+    @test occursin("1.5", msg)
+    @test occursin("(0, 1]", msg)
+    @test !occursin("one(fraction)", msg)
+
     # A norm order below 1 is not a norm order. The order lives in the context now, so
     # the rule that reads it is what refuses one.
     @test_throws DomainError EffectiveAssetFloor(; fraction = 0.5)(:l2c, PR60, nothing,

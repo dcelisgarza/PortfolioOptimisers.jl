@@ -2962,7 +2962,9 @@ Keywords correspond to the struct's fields. `fraction` defaults to `0.5`, which 
     fraction
     function EffectiveAssetFloor(fraction::Number)
         assert_nonempty_gt0_finite_val(fraction, :fraction)
-        @argcheck(fraction <= one(fraction), DomainError)
+        @argcheck(fraction <= one(fraction),
+                  DomainError(fraction,
+                              "`EffectiveAssetFloor.fraction` is $fraction, and a fraction of the universe is at most one. The rule multiplies it by the asset count of the prior result to get the effective number of assets it holds as a floor, so a fraction above one names a floor above the universe, which no portfolio meets. State a value in `(0, 1]`."))
         return new{typeof(fraction)}(fraction)
     end
 end
