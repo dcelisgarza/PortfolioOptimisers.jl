@@ -198,7 +198,7 @@ RankRule
     """
     worst
     """
-    `:keep` retains the taken assets, `:drop` retains everything else.
+    $(field_dict[:pre_action])
     """
     action
     function RankRule(best::Option{<:Integer}, worst::Option{<:Integer}, action::Symbol)
@@ -281,7 +281,7 @@ QuantileRule
     """
     worst
     """
-    `:keep` retains the taken assets, `:drop` retains everything else.
+    $(field_dict[:pre_action])
     """
     action
     function QuantileRule(best::Option{<:Real}, worst::Option{<:Real}, action::Symbol)
@@ -965,19 +965,19 @@ Keywords correspond to the struct's fields.
 """
 @concrete struct PairwiseCorrelation <: AbstractRedundancyAlgorithm
     """
-    Covariance estimator supplying the correlation matrix.
+    $(field_dict[:pre_ce_corr])
     """
     ce
     """
-    Correlation at or above which two assets are considered redundant.
+    $(field_dict[:pre_t_corr])
     """
     t
     """
-    Whether to compare the absolute value of the correlation.
+    $(field_dict[:pre_absolute])
     """
     absolute
     """
-    Reducer producing the fallback drop score from each column of the correlation matrix; ignored when the selector carries a `score`.
+    $(field_dict[:pre_measure])
     """
     measure
     function PairwiseCorrelation(ce::StatsBase.CovarianceEstimator, t::Number,
@@ -1089,19 +1089,19 @@ Keywords correspond to the struct's fields.
 """
 @concrete struct CorrelationComponents <: AbstractRedundancyAlgorithm
     """
-    Covariance estimator supplying the correlation matrix.
+    $(field_dict[:pre_ce_corr])
     """
     ce
     """
-    Correlation at or above which two assets share an edge.
+    $(field_dict[:pre_t_corr])
     """
     t
     """
-    Whether to compare the absolute value of the correlation.
+    $(field_dict[:pre_absolute])
     """
     absolute
     """
-    Reducer producing the fallback score from each column of the correlation matrix; ignored when the selector carries a `score`. Lower is better, so the surviving representative is the least redundant member of its component.
+    $(field_dict[:pre_measure]) Lower is better, so the surviving representative is the least redundant member of its component.
     """
     measure
     function CorrelationComponents(ce::StatsBase.CovarianceEstimator, t::Number,

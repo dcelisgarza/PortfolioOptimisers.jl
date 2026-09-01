@@ -775,6 +775,15 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :strict_opt => "`strict`: Whether to strictly enforce weight bounds.",#
                                  :strict_conv => "`strict`: Whether to raise an error if convergence is not achieved.",#
                                  :schalg => "`alg`: Schur complement algorithm variant.",#
+                                 # Preselection. `22_Preselection.jl` pairs two redundancy
+                                 # algorithms over one correlation matrix, and two selection
+                                 # rules over one taken set, so each of the five descriptions
+                                 # below is shared by two fields of that file.
+                                 :pre_ce_corr => "`ce`: Covariance estimator supplying the correlation matrix.",#
+                                 :pre_t_corr => "`t`: Correlation at or above which two assets are redundant.",#
+                                 :pre_absolute => "`absolute`: Whether to compare the absolute value of the correlation.",#
+                                 :pre_action => "`action`: `:keep` retains the taken assets, `:drop` retains everything else.",#
+                                 :pre_measure => "`measure`: Reducer producing the fallback drop score from each column of the correlation matrix; ignored when the selector carries a `score`.",#
                                  :ps_n_periods => "`n_periods`: Number of observations in the return series.",#
                                  :ps_ppy => "`periods_per_year`: Annualisation factor. 252 for daily, 52 for weekly, 12 for monthly returns.",#
                                  :ps_alpha => "`alpha`: Tail probability used for the CVaR, ``\\alpha \\in (0, 1)``.",#
