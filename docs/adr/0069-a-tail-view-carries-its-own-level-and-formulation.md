@@ -129,3 +129,43 @@ observations. `test/test_12h_entropy_pooling_tail_views.jl` holds the check.
 mechanism; the collision is inherited from the entropy pooling literature, in which every
 `*_views` field is a statement about the distribution. `CONTEXT.md` holds both terms and the
 warning.
+
+## Amendment (2026-09-01)
+
+### The bracket is the third setting, and its name states its reading
+
+This ADR placed the **level** and the **formulation**. A tail view whose measure is computed by a
+scalar search carries a third setting, the **Search Bracket** the search runs over, and the ADR did
+not place it. Two families placed it in two shapes, and both called the lower end `zlo`:
+
+| Family | Field | Reading | Default |
+| --- | --- | --- | --- |
+| `EntropicValueatRiskView` | `zlo` | a fraction of the upper end, in `(0, 1)` | `nothing` |
+| `RelativisticValueatRiskViewBracket` | `zlo` | an additive offset on the logarithm of the loss range | `-20` |
+
+One name carried two parameterisations, and neither guard refuses the other's number: `zlo = 0.5`
+on the relativistic bracket passes `zlo < zhi` and runs a search over a bracket four orders of
+magnitude away from the one the caller meant. The two readings therefore take two names:
+
+- `EntropicValueatRiskView.zlo_frac`, and the `zlo_frac` keyword of `ep_evar` and everything that
+  forwards it.
+- `RelativisticValueatRiskViewBracket.log_zlo` and `.log_zhi`.
+
+`zlo` names nothing in the library.
+
+### The shape follows the default
+
+A search bracket takes one of two shapes, and the default decides which:
+
+ 1. **A field on the view estimator, defaulting to `nothing`**, where the default follows from the
+    data. `EntropicValueatRiskView.zlo_frac` is one. Its default is `sqrt(eps(T))` for the element
+    type `T` of the loss series, which a caller holding no data cannot write, so `nothing` resolves
+    in `ep_evar`, where the data is.
+ 2. **Its own `AbstractAlgorithm` type**, where the defaults are plain numbers the caller can
+    write. `RelativisticValueatRiskViewBracket` is one. Its three settings are data-independent,
+    two searches read them, and a rule pairs two of them (`log_zlo < log_zhi`), so they earn a type
+    whose constructor states that rule once.
+
+A fourth tail-view family takes shape 1 for a knob whose default needs the data, and shape 2 for a
+group of knobs whose defaults do not. `CONTEXT.md` holds the **Search Bracket** term and the
+warning that its two readings are not interchangeable.

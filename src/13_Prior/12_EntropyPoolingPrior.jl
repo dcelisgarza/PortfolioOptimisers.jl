@@ -1,6 +1,6 @@
 """
     ep_evar(x::VecNum, w::VecNum, alpha::Number; args::Tuple = (),
-            kwargs::NamedTuple = (;), zlo::Option{<:Number} = nothing)
+            kwargs::NamedTuple = (;), zlo_frac::Option{<:Number} = nothing)
 
 Compute the sample entropic value at risk of a loss series and the dual variable that attains it.
 
@@ -15,7 +15,7 @@ Compute the sample entropic value at risk of a loss series and the dual variable
 # Algorithm
 
  1. Normalise the observation probabilities in the logarithmic domain, giving `lw`.
- 2. Bracket the dual variable. The upper end `hi` is `(maximum(x) - dot(w, x)) / log(inv(alpha))`, replaced by `eps` of its own type where that is not positive, and the lower end is `hi * zlo`.
+ 2. Bracket the dual variable. The upper end `hi` is `(maximum(x) - dot(w, x)) / log(inv(alpha))`, replaced by `eps` of its own type where that is not positive, and the lower end is `hi * zlo_frac`.
  3. Minimise the objective over the bracket with [`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl). Each evaluation goes through `LogExpFunctions.logsumexp`, so a small `z` does not overflow.
  4. Return the minimum as `evar`, and the minimiser as `z`.
 
@@ -26,11 +26,11 @@ Compute the sample entropic value at risk of a loss series and the dual variable
   - `alpha`: Significance level.
   - $(arg_dict[:optargs]) Left empty it takes `Optim.Brent()`, which is what `Optim.optimize` selects for a bracketed scalar minimisation.
   - $(arg_dict[:optkwargs])
-  - `zlo`: Lower end of the bracket of the dual variable, as a fraction of the upper end. `nothing` takes `sqrt(eps(T))` for the element type `T`, which the caller cannot state because the type follows from the data. The upper end is `(maximum(x) - dot(w, x)) / log(inv(alpha))`, above which the objective already exceeds `maximum(x)`, which bounds the EVaR from above. That is a proof, so the upper end is not a knob and only the lower one is.
+  - `zlo_frac`: Lower end of the bracket of the dual variable, as a fraction of the upper end. `nothing` takes `sqrt(eps(T))` for the element type `T`, which the caller cannot state because the type follows from the data. The upper end is `(maximum(x) - dot(w, x)) / log(inv(alpha))`, above which the objective already exceeds `maximum(x)`, which bounds the EVaR from above. That is a proof, so the upper end is not a knob and only the lower one is.
 
 # Validation
 
-  - `0 < zlo < 1`.
+  - `0 < zlo_frac < 1`.
   - The search converges. It is a bracketed scalar minimisation of a convex function, so it fails only under `args` or `kwargs` that stop it early.
 
 # Returns
@@ -49,7 +49,7 @@ Compute the sample entropic value at risk of a loss series and the dual variable
   - $(ref_dict[:EPTail])
 """
 function ep_evar(x::VecNum, w::VecNum, alpha::Number; args::Tuple = (),
-                 kwargs::NamedTuple = (;), zlo::Option{<:Number} = nothing)
+                 kwargs::NamedTuple = (;), zlo_frac::Option{<:Number} = nothing)
     lw = log.(w)
     lw .-= LogExpFunctions.logsumexp(lw)
     ila = -log(alpha)
@@ -61,9 +61,10 @@ function ep_evar(x::VecNum, w::VecNum, alpha::Number; args::Tuple = (),
     hi = ifelse(hi > zero(hi), hi, ehi)
     # The default lower end is the one the element type states, which a caller that holds no
     # data cannot, so `nothing` resolves here rather than in the view that carries it.
-    zlo = isnothing(zlo) ? sqrt(ehi) : zlo
-    @argcheck(zero(zlo) < zlo < one(zlo), DomainError(zlo, "zlo must be in (0, 1)"))
-    lo = hi * zlo
+    zlo_frac = isnothing(zlo_frac) ? sqrt(ehi) : zlo_frac
+    @argcheck(zero(zlo_frac) < zlo_frac < one(zlo_frac),
+              DomainError(zlo_frac, "zlo_frac must be in (0, 1)"))
+    lo = hi * zlo_frac
     res = Optim.optimize(f, lo, hi, args...; kwargs...)
     @argcheck(Optim.converged(res),
               ErrorException("The search for the sample EVaR did not converge. Relax the `args` and `kwargs` of the view group, or leave them empty to take the defaults."))
@@ -277,7 +278,7 @@ Where:
   - `kappa`: Deformation parameter, in `(0, 1)`.
   - $(arg_dict[:optargs]) It reaches both searches. Left empty it takes `Optim.Brent()`, which is what `Optim.optimize` selects for a bracketed scalar minimisation.
   - $(arg_dict[:optkwargs]) They reach both searches.
-  - `bracket`: Spans of the searches, or `nothing` to take the one [`RelativisticValueatRiskViewBracket`](@ref) states. This function reads `zlo` and `zhi`, the ends of the bracket of the logarithm of the dual variable, as offsets from the logarithm of the loss range. They are a margin, not a proof, so widen one where the minimising dual variable lands on an end of the bracket. [`ep_rlvar_shift`](@ref) reads `tspan`.
+  - `bracket`: Spans of the searches, or `nothing` to take the one [`RelativisticValueatRiskViewBracket`](@ref) states. This function reads `log_zlo` and `log_zhi`, the ends of the bracket of the logarithm of the dual variable, as offsets from the logarithm of the loss range. They are a margin, not a proof, so widen one where the minimising dual variable lands on an end of the bracket. [`ep_rlvar_shift`](@ref) reads `tspan`.
 
 # Validation
 
@@ -289,7 +290,7 @@ Where:
 
 # Algorithm
 
- 1. Minimise over the logarithm of the dual variable with [`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl), over a bracket running from `exp(zlo)` to `exp(zhi)` times the loss range, which is about `2e-9` to about `2e4` under the default bracket. The objective is convex in the pair, so the partial minimum over the shift is convex in the dual variable, and the logarithm is increasing, so the outer minimisation sees a unimodal function.
+ 1. Minimise over the logarithm of the dual variable with [`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl), over a bracket running from `exp(log_zlo)` to `exp(log_zhi)` times the loss range, which is about `2e-9` to about `2e4` under the default bracket. The objective is convex in the pair, so the partial minimum over the shift is convex in the dual variable, and the logarithm is increasing, so the outer minimisation sees a unimodal function.
  2. Minimise over the shift at each candidate dual variable with [`ep_rlvar_shift`](@ref).
  3. Re-run the inner minimisation at the minimising dual variable, so the shift returned is the one that attains the value.
 
@@ -312,7 +313,7 @@ function ep_rlvar(x::VecNum, w::VecNum, alpha::Number, kappa::Number; args::Tupl
     # `nothing` resolves to the default bracket rather than to bare numbers, so the spans
     # are written once, in the constructor that validates them.
     bkt = something(bracket, RelativisticValueatRiskViewBracket())
-    zlo, zhi = bkt.zlo, bkt.zhi
+    log_zlo, log_zhi = bkt.log_zlo, bkt.log_zhi
     T = length(x)
     wi = w ./ sum(w)
     lnk = kappa_log(inv(alpha * T), kappa)
@@ -322,7 +323,7 @@ function ep_rlvar(x::VecNum, w::VecNum, alpha::Number, kappa::Number; args::Tupl
     lspan = log(span)
     res = Optim.optimize(u -> ep_rlvar_shift(x, wi, kappa, lnk, exp(u); args = args,
                                              kwargs = kwargs, bracket = bracket).risk,
-                         lspan + zlo, lspan + zhi, args...; kwargs...)
+                         lspan + log_zlo, lspan + log_zhi, args...; kwargs...)
     @argcheck(Optim.converged(res),
               ErrorException("The search for the dual variable of the sample RLVaR did not converge. Relax the `args` and `kwargs` of the view group, or leave them empty to take the defaults."))
     z = exp(Optim.minimizer(res))
@@ -453,7 +454,7 @@ end
     ep_evar_anchor(x::VecNum, w::VecNum, alpha::Number, rhs::Number, z::Number;
                    iters::Integer = 50, tol::Number = 1e-10, tilt_iters::Integer = 200,
                    args::Tuple = (), kwargs::NamedTuple = (;),
-                   zlo::Option{<:Number} = nothing)
+                   zlo_frac::Option{<:Number} = nothing)
 
 Find the dual variable of the entropic value at risk that a posterior meeting an upper-bound view attains.
 
@@ -471,7 +472,7 @@ A grid point states the view as one row, and a posterior that makes the row tigh
   - `tilt_iters::Integer = 200`: Largest number of bisection steps the tilt of one row takes (see [`ep_row_tilt`](@ref)).
   - $(arg_dict[:optargs])
   - $(arg_dict[:optkwargs])
-  - `zlo`: Lower end of the bracket, forwarded to [`ep_evar`](@ref).
+  - `zlo_frac`: Lower end of the bracket of the dual variable, as a fraction of the upper end, forwarded to [`ep_evar`](@ref).
 
 # Returns
 
@@ -499,7 +500,7 @@ A grid point states the view as one row, and a posterior that makes the row tigh
 function ep_evar_anchor(x::VecNum, w::VecNum, alpha::Number, rhs::Number, z::Number;
                         iters::Integer = 50, tol::Number = 1e-10, tilt_iters::Integer = 200,
                         args::Tuple = (), kwargs::NamedTuple = (;),
-                        zlo::Option{<:Number} = nothing)
+                        zlo_frac::Option{<:Number} = nothing)
     for _ in 1:iters
         c, isc = ep_evar_grid_row(x, rhs, z)
         b = alpha * isc
@@ -510,7 +511,7 @@ function ep_evar_anchor(x::VecNum, w::VecNum, alpha::Number, rhs::Number, z::Num
         if isnothing(q)
             return nothing
         end
-        res = ep_evar(x, q, alpha; args = args, kwargs = kwargs, zlo = zlo)
+        res = ep_evar(x, q, alpha; args = args, kwargs = kwargs, zlo_frac = zlo_frac)
         if abs(res.evar - rhs) <= tol * abs(rhs)
             return (; z = res.z, w = q)
         end
@@ -522,7 +523,7 @@ end
     ep_evar_grid(x::VecNum, w::VecNum, alpha::Number, op::Symbol, rhs::Number,
                  zstar::Number, pct::Number, K::Integer; iters::Integer = 50,
                  tol::Number = 1e-10, tilt_iters::Integer = 200, args::Tuple = (),
-                 kwargs::NamedTuple = (;), zlo::Option{<:Number} = nothing)
+                 kwargs::NamedTuple = (;), zlo_frac::Option{<:Number} = nothing)
 
 Build the grid of dual variables an entropic value-at-risk view is written on.
 
@@ -543,7 +544,7 @@ A view that carries an upper-bound half is centred on the dual variable [`ep_eva
   - `tilt_iters::Integer = 200`: Largest number of bisection steps the tilt of one row takes (see [`ep_row_tilt`](@ref)).
   - $(arg_dict[:optargs])
   - $(arg_dict[:optkwargs])
-  - `zlo`: Lower end of the bracket, forwarded to [`ep_evar`](@ref).
+  - `zlo_frac`: Lower end of the bracket of the dual variable, as a fraction of the upper end, forwarded to [`ep_evar`](@ref).
 
 # Returns
 
@@ -569,7 +570,7 @@ A view that carries an upper-bound half is centred on the dual variable [`ep_eva
 function ep_evar_grid(x::VecNum, w::VecNum, alpha::Number, op::Symbol, rhs::Number,
                       zstar::Number, pct::Number, K::Integer; iters::Integer = 50,
                       tol::Number = 1e-10, tilt_iters::Integer = 200, args::Tuple = (),
-                      kwargs::NamedTuple = (;), zlo::Option{<:Number} = nothing)
+                      kwargs::NamedTuple = (;), zlo_frac::Option{<:Number} = nothing)
     # EVaR is translation-equivariant and its dual variable is translation-invariant, so
     # the row of a grid point already carries the whole of the translation to the target.
     # The upper-bound half needs more: it reaches the target only where the grid holds the
@@ -580,7 +581,8 @@ function ep_evar_grid(x::VecNum, w::VecNum, alpha::Number, op::Symbol, rhs::Numb
         nothing
     else
         ep_evar_anchor(x, w, alpha, rhs, zstar; iters = iters, tol = tol,
-                       tilt_iters = tilt_iters, args = args, kwargs = kwargs, zlo = zlo)
+                       tilt_iters = tilt_iters, args = args, kwargs = kwargs,
+                       zlo_frac = zlo_frac)
     end
     if !isnothing(anc)
         zc = anc.z
@@ -1296,7 +1298,7 @@ end
 """
     get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:evar}, alpha::Number,
                  w::Option{<:ObsWeights} = nothing, args::Tuple = (),
-                 kwargs::NamedTuple = (;), zlo::Option{<:Number} = nothing)
+                 kwargs::NamedTuple = (;), zlo_frac::Option{<:Number} = nothing)
 
 Extract the Entropic Value-at-Risk (EVaR) for asset `i` from a prior result.
 
@@ -1311,7 +1313,7 @@ Extract the Entropic Value-at-Risk (EVaR) for asset `i` from a prior result.
   - $(arg_dict[:oow])
   - $(arg_dict[:optargs])
   - $(arg_dict[:optkwargs])
-  - `zlo`: Lower end of the bracket, forwarded to [`ep_evar`](@ref).
+  - `zlo_frac`: Lower end of the bracket of the dual variable, as a fraction of the upper end, forwarded to [`ep_evar`](@ref).
 
 # Returns
 
@@ -1325,11 +1327,12 @@ Extract the Entropic Value-at-Risk (EVaR) for asset `i` from a prior result.
 """
 function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:evar}, alpha::Number,
                       w::Option{<:ObsWeights} = nothing, args::Tuple = (),
-                      kwargs::NamedTuple = (;), zlo::Option{<:Number} = nothing)
+                      kwargs::NamedTuple = (;), zlo_frac::Option{<:Number} = nothing)
     T = size(pr.X, 1)
     iT = inv(T)
     w = isnothing(w) ? range(iT, iT; length = T) : w
-    return ep_evar(-view(pr.X, :, i), w, alpha; args = args, kwargs = kwargs, zlo = zlo).evar
+    return ep_evar(-view(pr.X, :, i), w, alpha; args = args, kwargs = kwargs,
+                   zlo_frac = zlo_frac).evar
 end
 """
     get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:rlvar}, alpha::Number,
@@ -1815,7 +1818,7 @@ end
                       alg::AbstractEntropicValueatRiskViewFormulation, x::VecNum, alpha::Number,
                       op::Symbol, rhs::Number, w::VecNum, zstar::Number, pv::Number,
                       eqn::AbstractString; args::Tuple = (), kwargs::NamedTuple = (;),
-                      zlo::Option{<:Number} = nothing)
+                      zlo_frac::Option{<:Number} = nothing)
 
 Lower one entropic value-at-risk view into the constraints its formulation needs.
 
@@ -1845,7 +1848,7 @@ Lower one entropic value-at-risk view into the constraints its formulation needs
   - `eqn`: Equation of the view, used in the error messages.
   - $(arg_dict[:optargs])
   - $(arg_dict[:optkwargs])
-  - `zlo`: Lower end of the bracket, forwarded to [`ep_evar`](@ref).
+  - `zlo_frac`: Lower end of the bracket of the dual variable, as a fraction of the upper end, forwarded to [`ep_evar`](@ref).
 
 # Validation
 
@@ -1868,7 +1871,7 @@ function ep_add_evar_view!(epc::AbstractDict, tvs::AbstractVector,
                            ::ConicEntropicValueatRiskView, x::VecNum, alpha::Number,
                            op::Symbol, rhs::Number, w::VecNum, zstar::Number, pv::Number,
                            eqn::AbstractString; args::Tuple = (), kwargs::NamedTuple = (;),
-                           zlo::Option{<:Number} = nothing)
+                           zlo_frac::Option{<:Number} = nothing)
     @argcheck(op != :leq,
               ArgumentError("View `$(eqn)` is an upper bound. `ConicEntropicValueatRiskView` bounds the EVaR from below only; use `GridEntropicValueatRiskView`."))
     @argcheck(op != :eq || rhs >= pv,
@@ -1880,11 +1883,12 @@ function ep_add_evar_view!(epc::AbstractDict, tvs::AbstractVector,
                            alg::GridEntropicValueatRiskView, x::VecNum, alpha::Number,
                            op::Symbol, rhs::Number, w::VecNum, zstar::Number, pv::Number,
                            eqn::AbstractString; args::Tuple = (), kwargs::NamedTuple = (;),
-                           zlo::Option{<:Number} = nothing)
+                           zlo_frac::Option{<:Number} = nothing)
     (; pct, K, M, iters, tol, tilt_iters) = alg
     wi = w ./ sum(w)
     z = ep_evar_grid(x, wi, alpha, op, rhs, zstar, pct, K; iters = iters, tol = tol,
-                     tilt_iters = tilt_iters, args = args, kwargs = kwargs, zlo = zlo)
+                     tilt_iters = tilt_iters, args = args, kwargs = kwargs,
+                     zlo_frac = zlo_frac)
     function row(zk)
         c, isc = ep_evar_grid_row(x, rhs, zk)
         return c, alpha * isc
@@ -2078,7 +2082,7 @@ function ep_tail_view_prior_args(tail_views::ConditionalValueatRiskView, w::VecN
 end
 function ep_tail_view_prior_args(tail_views::EntropicValueatRiskView, w::VecNum)
     return (:evar, tail_views.alpha, StatsBase.pweights(w), tail_views.args,
-            tail_views.kwargs, tail_views.zlo)
+            tail_views.kwargs, tail_views.zlo_frac)
 end
 function ep_tail_view_prior_args(tail_views::RelativisticValueatRiskView, w::VecNum)
     return (:rlvar, tail_views.alpha, tail_views.kappa, StatsBase.pweights(w),
@@ -2233,14 +2237,14 @@ end
 function ep_add_tail_view!(epc::AbstractDict, tvs::AbstractVector,
                            tail_views::EntropicValueatRiskView, alg, X::MatNum,
                            terms::NamedTuple, eqn::AbstractString, w::VecNum)
-    (; alpha, args, kwargs, zlo) = tail_views
+    (; alpha, args, kwargs, zlo_frac) = tail_views
     ep_assert_absolute_view(terms.idx, eqn, "EVaR")
     x, op, rhs = ep_normalise_absolute_view(terms, X, eqn, "EVaR")
-    evr = ep_evar(x, w, alpha; args = args, kwargs = kwargs, zlo = zlo)
+    evr = ep_evar(x, w, alpha; args = args, kwargs = kwargs, zlo_frac = zlo_frac)
     pv, zstar = evr.evar, evr.z
     alg = ep_evar_formulation(alg, op, rhs, pv)
     ep_add_evar_view!(epc, tvs, alg, x, alpha, op, rhs, w, zstar, pv, eqn; args = args,
-                      kwargs = kwargs, zlo = zlo)
+                      kwargs = kwargs, zlo_frac = zlo_frac)
     return nothing
 end
 function ep_add_tail_view!(epc::AbstractDict, tvs::AbstractVector,

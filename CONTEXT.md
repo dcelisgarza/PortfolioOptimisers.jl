@@ -193,6 +193,10 @@ An entropy pooling correlation or covariance view whose two sides are groups rat
 A view on a quantile risk measure of the posterior — CVaR, EVaR or RLVaR — as opposed to a view on a moment. It is the one view family that is not a linear function of the posterior probabilities, and the one family `ep_tail_views!` lowers. A VaR view is not one: it constrains the tail mass, which is linear in the posterior probabilities, and `ep_var_views!` lowers it on its own.
 *Avoid*: confusing it with a **View** (§1), which is the index-selection mechanism.
 
+**Search Bracket**
+The span a scalar search of a **Tail View** runs over. It is stated in the units the search works in, and the name says which: `zlo_frac` is a fraction of an upper end that is proven, and `log_zlo` and `log_zhi` are additive offsets on the logarithm of the loss range. A knob whose default follows from the data is a field on the view estimator defaulting to `nothing`, and a group of knobs whose defaults are plain numbers is its own algorithm type. See ADR 0069.
+*Avoid*: reading one family's number under another's rule. A fraction written where an offset is read passes every guard and searches the wrong span.
+
 **Risk-Free Shift**
 The one place a Black-Litterman prior reads its `rf` field. The update blends the prior mean against the view returns, so it runs on the total-return scale those are written on. A prior mean taken from a wrapped estimator is on that scale already and is left alone; an equilibrium mean from `EquilibriumExpectedReturns` is a bare risk premium, and the rate converts it *before* the update. A member with no equilibrium branch has nothing to convert, and adds the rate to the posterior asset mean instead.
 *Avoid*: calling it a round trip. Nothing subtracts the rate, and the update is affine rather than a translation, so a conversion and its inverse around the update would not cancel.

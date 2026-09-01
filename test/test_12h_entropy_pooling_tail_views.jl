@@ -1256,8 +1256,9 @@ end
     @test r == PO.ep_rlvar(x, ep_w0, ep_a, ep_k; args = (PO.Optim.Brent(),),
                            bracket = RelativisticValueatRiskViewBracket())
     @test r == PO.ep_rlvar(x, ep_w0, ep_a, ep_k;
-                           bracket = RelativisticValueatRiskViewBracket(; tspan = 2, zlo = -20,
-                                                                        zhi = 10))
+                           bracket = RelativisticValueatRiskViewBracket(; tspan = 2,
+                                                                        log_zlo = -20,
+                                                                        log_zhi = 10))
     # A search stopped before it converges raises, rather than answering with the point it
     # reached.
     @test_throws ErrorException PO.ep_evar(x, ep_w0, ep_a; kwargs = (; iterations = 1))
@@ -1266,28 +1267,28 @@ end
     # The constructor of the bracket holds the defaults and the validation, so a span the
     # search cannot use never reaches it.
     @test RelativisticValueatRiskViewBracket().tspan == 2
-    @test RelativisticValueatRiskViewBracket().zlo == -20
-    @test RelativisticValueatRiskViewBracket().zhi == 10
+    @test RelativisticValueatRiskViewBracket().log_zlo == -20
+    @test RelativisticValueatRiskViewBracket().log_zhi == 10
     @test_throws DomainError RelativisticValueatRiskViewBracket(; tspan = 0)
-    @test_throws DomainError RelativisticValueatRiskViewBracket(; zlo = 20)
-    @test_throws DomainError RelativisticValueatRiskViewBracket(; zlo = 5, zhi = 5)
+    @test_throws DomainError RelativisticValueatRiskViewBracket(; log_zlo = 20)
+    @test_throws DomainError RelativisticValueatRiskViewBracket(; log_zlo = 5, log_zhi = 5)
     # The EVaR carries one number rather than a struct, and the view group validates it.
-    @test_throws DomainError PO.ep_evar(x, ep_w0, ep_a; zlo = 2.0)
-    @test_throws DomainError PO.ep_evar(x, ep_w0, ep_a; zlo = 0.0)
+    @test_throws DomainError PO.ep_evar(x, ep_w0, ep_a; zlo_frac = 2.0)
+    @test_throws DomainError PO.ep_evar(x, ep_w0, ep_a; zlo_frac = 0.0)
     # A wider span answers the same value, because the default already holds the minimiser.
-    @test isapprox(PO.ep_evar(x, ep_w0, ep_a; zlo = 1e-6).evar, ep_pevar, rtol = 1e-10)
+    @test isapprox(PO.ep_evar(x, ep_w0, ep_a; zlo_frac = 1e-6).evar, ep_pevar, rtol = 1e-10)
     @test isapprox(PO.ep_rlvar(x, ep_w0, ep_a, ep_k;
                                bracket = RelativisticValueatRiskViewBracket(; tspan = 5)).rlvar,
                    r.rlvar, rtol = 1e-8)
     # The fields carry the settings, and both spans default to `nothing`.
     v = LinearConstraintEstimator(; val = "AAPL >= $(1.2 * ep_pevar)")
     ev = EntropicValueatRiskView(; views = v, args = (PO.Optim.Brent(),),
-                                 kwargs = (; abs_tol = 1e-10), zlo = 1e-6)
+                                 kwargs = (; abs_tol = 1e-10), zlo_frac = 1e-6)
     @test ev.args == (PO.Optim.Brent(),)
     @test ev.kwargs == (; abs_tol = 1e-10)
-    @test ev.zlo == 1e-6
-    @test isnothing(EntropicValueatRiskView(; views = v).zlo)
-    @test_throws DomainError EntropicValueatRiskView(; views = v, zlo = 1.5)
+    @test ev.zlo_frac == 1e-6
+    @test isnothing(EntropicValueatRiskView(; views = v).zlo_frac)
+    @test_throws DomainError EntropicValueatRiskView(; views = v, zlo_frac = 1.5)
     bkt = RelativisticValueatRiskViewBracket(; tspan = 3)
     rv = RelativisticValueatRiskView(; views = v, bracket = bkt)
     @test rv.bracket === bkt
@@ -1308,7 +1309,7 @@ end
                                                                          alg = GridEntropicValueatRiskView(),
                                                                          views = v,
                                                                          args = (PO.Optim.Brent(),),
-                                                                         zlo = sqrt(eps(Float64)))),
+                                                                         zlo_frac = sqrt(eps(Float64)))),
                 rd)
     @test isapprox(pr.w, pr2.w, rtol = 1e-10)
     # A group that moves the span answers near the same place, and not at the same place:
@@ -1318,7 +1319,8 @@ end
                                     evar_views = EntropicValueatRiskView(;
                                                                          alg = GridEntropicValueatRiskView(),
                                                                          views = v,
-                                                                         zlo = 1e-8)), rd)
+                                                                         zlo_frac = 1e-8)),
+                rd)
     @test isapprox(pr.w, pr3.w, rtol = 1e-3)
     @test !isapprox(pr.w, pr3.w, rtol = 1e-9)
     # A group whose search cannot converge raises rather than building a wrong grid.

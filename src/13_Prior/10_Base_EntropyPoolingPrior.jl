@@ -1756,8 +1756,8 @@ $(DocStringExtensions.FIELDS)
 
     RelativisticValueatRiskViewBracket(;
         tspan::Number = 2,
-        zlo::Number = -20,
-        zhi::Number = 10
+        log_zlo::Number = -20,
+        log_zhi::Number = 10
     ) -> RelativisticValueatRiskViewBracket
 
 Keywords correspond to the struct's fields.
@@ -1765,16 +1765,16 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - `tspan > 0`.
-  - `zlo < zhi`.
+  - `log_zlo < log_zhi`.
 
 # Examples
 
 ```jldoctest
 julia> RelativisticValueatRiskViewBracket()
 RelativisticValueatRiskViewBracket
-  tspan ┼ Int64: 2
-    zlo ┼ Int64: -20
-    zhi ┴ Int64: 10
+    tspan ┼ Int64: 2
+  log_zlo ┼ Int64: -20
+  log_zhi ┴ Int64: 10
 ```
 
 # Related
@@ -1793,22 +1793,24 @@ RelativisticValueatRiskViewBracket
     """
     tspan
     """
-    $(field_dict[:ep_bracket_rlvar_zlo])
+    $(field_dict[:ep_bracket_rlvar_log_zlo])
     """
-    zlo
+    log_zlo
     """
-    $(field_dict[:ep_bracket_rlvar_zhi])
+    $(field_dict[:ep_bracket_rlvar_log_zhi])
     """
-    zhi
-    function RelativisticValueatRiskViewBracket(tspan::Number, zlo::Number, zhi::Number)
+    log_zhi
+    function RelativisticValueatRiskViewBracket(tspan::Number, log_zlo::Number,
+                                                log_zhi::Number)
         @argcheck(tspan > zero(tspan), DomainError(tspan, "tspan must be > 0"))
-        @argcheck(zlo < zhi, DomainError((zlo, zhi), "zlo must be < zhi"))
-        return new{typeof(tspan), typeof(zlo), typeof(zhi)}(tspan, zlo, zhi)
+        @argcheck(log_zlo < log_zhi,
+                  DomainError((log_zlo, log_zhi), "log_zlo must be < log_zhi"))
+        return new{typeof(tspan), typeof(log_zlo), typeof(log_zhi)}(tspan, log_zlo, log_zhi)
     end
 end
-function RelativisticValueatRiskViewBracket(; tspan::Number = 2, zlo::Number = -20,
-                                            zhi::Number = 10)::RelativisticValueatRiskViewBracket
-    return RelativisticValueatRiskViewBracket(tspan, zlo, zhi)
+function RelativisticValueatRiskViewBracket(; tspan::Number = 2, log_zlo::Number = -20,
+                                            log_zhi::Number = 10)::RelativisticValueatRiskViewBracket
+    return RelativisticValueatRiskViewBracket(tspan, log_zlo, log_zhi)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1927,7 +1929,7 @@ $(DocStringExtensions.FIELDS)
         alg::Option{<:EVaRVF_VecEVaRVF} = nothing,
         args::Tuple = (),
         kwargs::NamedTuple = (;),
-        zlo::Option{<:Number} = nothing
+        zlo_frac::Option{<:Number} = nothing
     ) -> EntropicValueatRiskView
 
 Keywords correspond to the struct's fields.
@@ -1936,7 +1938,7 @@ Keywords correspond to the struct's fields.
 
   - `0 < alpha < 1`.
   - If `alg` is a vector, `!isempty(alg)`.
-  - If `zlo` is a number, `0 < zlo < 1`.
+  - If `zlo_frac` is a number, `0 < zlo_frac < 1`.
 
 # Examples
 
@@ -1945,20 +1947,20 @@ julia> EntropicValueatRiskView(; alpha = 0.01,
                                views = LinearConstraintEstimator(; val = \"A <= 0.09\"),
                                alg = GridEntropicValueatRiskView(; pct = 0.8, K = 21))
 EntropicValueatRiskView
-   views ┼ LinearConstraintEstimator
-         │   val ┼ String: "A <= 0.09"
-         │   key ┴ nothing
-   alpha ┼ Float64: 0.01
-     alg ┼ GridEntropicValueatRiskView
-         │          pct ┼ Float64: 0.8
-         │            K ┼ Int64: 21
-         │            M ┼ Int64: 10
-         │        iters ┼ Int64: 50
-         │          tol ┼ Float64: 1.0e-10
-         │   tilt_iters ┴ Int64: 200
-    args ┼ Tuple{}: ()
-  kwargs ┼ @NamedTuple{}: NamedTuple()
-     zlo ┴ nothing
+     views ┼ LinearConstraintEstimator
+           │   val ┼ String: "A <= 0.09"
+           │   key ┴ nothing
+     alpha ┼ Float64: 0.01
+       alg ┼ GridEntropicValueatRiskView
+           │          pct ┼ Float64: 0.8
+           │            K ┼ Int64: 21
+           │            M ┼ Int64: 10
+           │        iters ┼ Int64: 50
+           │          tol ┼ Float64: 1.0e-10
+           │   tilt_iters ┴ Int64: 200
+      args ┼ Tuple{}: ()
+    kwargs ┼ @NamedTuple{}: NamedTuple()
+  zlo_frac ┴ nothing
 ```
 
 # Related
@@ -1995,28 +1997,29 @@ EntropicValueatRiskView
     """
     kwargs
     """
-    $(field_dict[:ep_tv_evar_zlo])
+    $(field_dict[:ep_tv_evar_zlo_frac])
     """
-    zlo
+    zlo_frac
     function EntropicValueatRiskView(views::LinearConstraintEstimator, alpha::Number,
                                      alg::Option{<:EVaRVF_VecEVaRVF}, args::Tuple,
-                                     kwargs::NamedTuple, zlo::Option{<:Number})
+                                     kwargs::NamedTuple, zlo_frac::Option{<:Number})
         assert_unit_interval(alpha, :alpha)
         if isa(alg, AbstractVector)
             @argcheck(!isempty(alg), IsEmptyError("alg cannot be empty"))
         end
-        if !isnothing(zlo)
-            @argcheck(zero(zlo) < zlo < one(zlo), DomainError(zlo, "zlo must be in (0, 1)"))
+        if !isnothing(zlo_frac)
+            @argcheck(zero(zlo_frac) < zlo_frac < one(zlo_frac),
+                      DomainError(zlo_frac, "zlo_frac must be in (0, 1)"))
         end
         return new{typeof(views), typeof(alpha), typeof(alg), typeof(args), typeof(kwargs),
-                   typeof(zlo)}(views, alpha, alg, args, kwargs, zlo)
+                   typeof(zlo_frac)}(views, alpha, alg, args, kwargs, zlo_frac)
     end
 end
 function EntropicValueatRiskView(; views::LinearConstraintEstimator, alpha::Number = 0.05,
                                  alg::Option{<:EVaRVF_VecEVaRVF} = nothing,
                                  args::Tuple = (), kwargs::NamedTuple = (;),
-                                 zlo::Option{<:Number} = nothing)::EntropicValueatRiskView
-    return EntropicValueatRiskView(views, alpha, alg, args, kwargs, zlo)
+                                 zlo_frac::Option{<:Number} = nothing)::EntropicValueatRiskView
+    return EntropicValueatRiskView(views, alpha, alg, args, kwargs, zlo_frac)
 end
 """
 $(DocStringExtensions.TYPEDEF)
