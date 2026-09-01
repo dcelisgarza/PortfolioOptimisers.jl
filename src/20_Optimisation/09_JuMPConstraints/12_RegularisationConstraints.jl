@@ -399,7 +399,7 @@ calibration_slots(x::L2Regularisation) = (; val = x.val)
 # `:l2reg_val`, which ADR 0097 parts from the other three. A derivation reads the field name
 # and would hand a rule the wrong key, so this term opts out and `factory` stays the one
 # route.
-resolve_calibration_slots(x::L2Regularisation, ::AbstractPriorResult, ::Any = nothing) = x
+resolve_calibration_slots(::L2Regularisation, ::AbstractPriorResult, ::Any = nothing) = (;)
 """
     const VecL2Reg = AbstractVector{<:L2Regularisation}
 
@@ -802,7 +802,7 @@ calibration_slots(x::LpRegularisation) = (; val = x.val)
 # This slot carries two readings and two keys, `:lpreg_val` and `:lpc`, and the caller's own
 # norm order reaches the rule through `bind_norm_order` first. A derivation states neither
 # the key nor the binding, so this term opts out and the two factories stay the two routes.
-resolve_calibration_slots(x::LpRegularisation, ::AbstractPriorResult, ::Any = nothing) = x
+resolve_calibration_slots(::LpRegularisation, ::AbstractPriorResult, ::Any = nothing) = (;)
 """
     const VecLpReg = AbstractVector{<:LpRegularisation}
 

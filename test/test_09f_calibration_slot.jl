@@ -763,10 +763,10 @@ end
 (::UnpairedProbe)(x::PO.VecNum) = sqrt(sum(abs2, x) / length(x))
 PortfolioOptimisers.risk_input_kind(::UnpairedProbe) = PO.NetReturnsInput()
 PortfolioOptimisers.calibration_slots(x::UnpairedProbe) = (; alpha = x.alpha)
-function PortfolioOptimisers.resolve_calibration_slots(x::UnpairedProbe,
+function PortfolioOptimisers.resolve_calibration_slots(::UnpairedProbe,
                                                        ::PO.AbstractPriorResult,
                                                        ::Any = nothing)
-    return x
+    return (;)
 end
 function PortfolioOptimisers.set_risk_constraints!(model::JuMP.Model, ::Any,
                                                    r::UnpairedProbe,
