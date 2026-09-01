@@ -1673,8 +1673,9 @@
         end
         @test isnothing(PortfolioOptimisers.logo!(nothing))
     end
-    # The three defects that the documentation sweep of `src/11_Phylogeny/04_DBHT.jl`, issue
-    # #469, found on the `EqualRoot` path: #507, #508 and #509. The reference implementation
+    # The three defects that the documentation sweep of the DBHT family, issue #469, found on
+    # the `EqualRoot` path: #507, #508 and #509. That path is now
+    # `src/11_Phylogeny/09_CliqueHierarchy.jl`. The reference implementation
     # is `DBHTs.m`, MATLAB Central File Exchange submission 46750 by Won-Min Song and Tomaso
     # Aste, and it carries all three. The papers it cites are Song, Di Matteo and Aste,
     # *Nested hierarchies in planar graphs*, Discrete Applied Mathematics 159 (2011)
@@ -3352,7 +3353,7 @@ end
     end
 end
 
-# The numbers that `src/11_Phylogeny/04_DBHT.jl` claims, run rather than read. This is
+# The numbers that the DBHT files of `src/11_Phylogeny/` claim, run rather than read. This is
 # condition 2 of the sweep of #470, under child map #418 of the map of maps #404. The file is
 # a port, so the check that carries weight is a number from a hand-computed answer set beside
 # the number the code returns. The sources are `DBHTs.m`, MATLAB Central File Exchange
@@ -3723,8 +3724,8 @@ end
     end
 end
 
-# The four branches of `src/11_Phylogeny/04_DBHT.jl` that the suite left uncovered when #470
-# measured it, and the input that reaches each. Condition 3 of the sweep. Defined at top
+# The four branches of the DBHT files of `src/11_Phylogeny/` that the suite left uncovered
+# when #470 measured them, and the input that reaches each. Condition 3 of the sweep. Defined at top
 # level because a `@testset` body becomes a function.
 @testset "The DBHT branches the suite did not reach (#470)" begin
     using PortfolioOptimisers, Test, Clustering, CSV, DataFrames, TimeSeries, StatsBase,
@@ -3833,7 +3834,8 @@ end
 end
 
 #=
-Condition 2 of the sweep of `src/11_Phylogeny/06_Phylogeny.jl`, issue #472. The file was
+Condition 2 of the sweep of the phylogeny family, issue #472. The eight centrality algorithms
+now live in `src/11_Phylogeny/14_Centrality.jl`. The file that held them was
 coverage terminal before this testset was written -- 319 executable lines, 0 misses -- and
 every check below exists because the line it covers was already executed and asserted
 nothing about the value it produced.

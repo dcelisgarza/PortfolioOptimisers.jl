@@ -1,10 +1,8 @@
-# Direct Bubble Hierarchy Tree
+# Centrality Estimator
 
 ```@docs
-UniqueRoot
-EqualRoot
-DBHT
-DBHTRootMethod
+AbstractCentralityEstimator
+CentralityEstimator
 ```
 
 ## References

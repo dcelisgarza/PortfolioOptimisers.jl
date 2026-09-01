@@ -1126,7 +1126,7 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        :d_sep => "``d``: Separation between two assets.",#
                        # Network centrality. The eight members of
                        # `AbstractCentralityAlgorithm` each state a closed form over the
-                       # same network, so `06_Phylogeny.jl` shares these symbols between
+                       # same network, so `14_Centrality.jl` shares these symbols between
                        # eight Units.
                        :A_network => "``\\mathbf{A}``: Adjacency matrix of the network. It is binary on the unweighted route, and carries the edge weights of its own branch where the algorithm declares a polarity.",#
                        :n_network => "``n``: Number of assets, which is the number of vertices of the network.",#

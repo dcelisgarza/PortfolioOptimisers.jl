@@ -1,10 +1,8 @@
-# Direct Bubble Hierarchy Tree
+# Planar Maximally Filtered Graph
 
 ```@docs
-UniqueRoot
-EqualRoot
-DBHT
-DBHTRootMethod
+PMFG_T2s
+assert_pmfg_weights
 ```
 
 ## References
