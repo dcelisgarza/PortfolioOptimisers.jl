@@ -20,11 +20,11 @@ records the gate that reads true.
 Four measurements over the 227 files of `src/` and `ext/` decide the shape. They were taken on
 `dev` at `5a90c100`.
 
- 1. **The tree is mostly prose.** Of 143042 lines, 73442 are docstring, 37925 are code, 29753 are
+ 1. **The tree is mostly prose.** Of 143042 lines, 73417 are docstring, 37950 are code, 29753 are
     blank and 1922 are comment. Docstring is **64.8 %** of every non-blank line.
  2. **A total-line gate at 1000 flags 40 files, and 25 of them carry under 500 code lines.**
     `src/19_RiskMeasures/01_Base_RiskMeasures.jl` is 2257 lines and 403 of them are code.
-    `src/22_Preselection.jl`, one of the four the review named, is 1438 lines and 311 of them are
+    `src/22_Preselection.jl`, one of the four the review named, is 1438 lines and 313 of them are
     code. The gate would fire on the documentation that [issue #404](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/404)
     asks for.
  3. **A code-line gate at 500 flags 15 files, and every one of them the total-line gate flags
@@ -48,7 +48,7 @@ against a committed baseline.
 One row per file in scope, in `code_health/size_baseline.toml`:
 
 ```toml
-"src/22_Preselection.jl" = { code = 311, doc = 763, comment = 0, blank = 364, total = 1438 }
+"src/22_Preselection.jl" = { code = 313, doc = 761, comment = 0, blank = 364, total = 1438 }
 ```
 
 `code` binds. The other four are context and never bind, on the same split `complexity.jl` draws

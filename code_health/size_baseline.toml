@@ -6,7 +6,7 @@
 [provenance]
 julia = "1.12.7"
 julia_syntax = "1.0.2"
-commit = "20276bd3d2"
+commit = "d8b2ae65b2"
 
 [file]
 "ext/PortfolioOptimisersImputeExt.jl" = { code = 6, doc = 0, comment = 3, blank = 3, total = 12 }
@@ -16,16 +16,16 @@ commit = "20276bd3d2"
 "src/01_Base/03_PrettyShow.jl" = { code = 107, doc = 102, comment = 0, blank = 58, total = 267 }
 "src/01_Base/04_ScopedConfig.jl" = { code = 128, doc = 393, comment = 2, blank = 180, total = 703 }
 "src/01_Base/05_Preferences.jl" = { code = 109, doc = 101, comment = 0, blank = 44, total = 254 }
-"src/01_Base/06_Messages.jl" = { code = 76, doc = 223, comment = 0, blank = 114, total = 413 }
+"src/01_Base/06_Messages.jl" = { code = 80, doc = 219, comment = 0, blank = 114, total = 413 }
 "src/01_Base/07_Errors.jl" = { code = 26, doc = 176, comment = 0, blank = 75, total = 277 }
 "src/01_Base/08_TypeAliases.jl" = { code = 49, doc = 384, comment = 0, blank = 159, total = 592 }
-"src/01_Base/09_ObservationWeights.jl" = { code = 15, doc = 42, comment = 0, blank = 22, total = 79 }
+"src/01_Base/09_ObservationWeights.jl" = { code = 17, doc = 40, comment = 0, blank = 22, total = 79 }
 "src/01_Base/10_Assertions.jl" = { code = 168, doc = 352, comment = 0, blank = 182, total = 702 }
 "src/01_Base/11_VecScalar.jl" = { code = 16, doc = 46, comment = 0, blank = 20, total = 82 }
 "src/01_Base/12_NormError.jl" = { code = 106, doc = 313, comment = 0, blank = 129, total = 548 }
 "src/01_Base/13_KappaLog.jl" = { code = 3, doc = 36, comment = 0, blank = 18, total = 57 }
 "src/02_Tools.jl" = { code = 808, doc = 2044, comment = 46, blank = 867, total = 3765 }
-"src/03_Preprocessing.jl" = { code = 717, doc = 1312, comment = 11, blank = 536, total = 2576 }
+"src/03_Preprocessing.jl" = { code = 719, doc = 1310, comment = 11, blank = 536, total = 2576 }
 "src/04_PosdefMatrix.jl" = { code = 44, doc = 155, comment = 0, blank = 73, total = 272 }
 "src/05_Denoise.jl" = { code = 132, doc = 535, comment = 34, blank = 196, total = 897 }
 "src/06_Detone.jl" = { code = 46, doc = 188, comment = 0, blank = 81, total = 315 }
@@ -71,7 +71,7 @@ commit = "20276bd3d2"
 "src/09_Distance/02_Distance.jl" = { code = 158, doc = 350, comment = 0, blank = 157, total = 665 }
 "src/09_Distance/03_DistanceDistance.jl" = { code = 37, doc = 132, comment = 0, blank = 58, total = 227 }
 "src/09_Distance/04_Similarity.jl" = { code = 61, doc = 354, comment = 0, blank = 159, total = 574 }
-"src/09_Distance/05_FeatureDistance.jl" = { code = 222, doc = 619, comment = 2, blank = 293, total = 1136 }
+"src/09_Distance/05_FeatureDistance.jl" = { code = 227, doc = 614, comment = 2, blank = 293, total = 1136 }
 "src/10_JuMPModelOptimisation.jl" = { code = 91, doc = 206, comment = 2, blank = 92, total = 391 }
 "src/11_Phylogeny/01_Base_Phylogeny.jl" = { code = 121, doc = 585, comment = 10, blank = 278, total = 994 }
 "src/11_Phylogeny/02_Clusters.jl" = { code = 107, doc = 456, comment = 0, blank = 180, total = 743 }
@@ -79,7 +79,7 @@ commit = "20276bd3d2"
 "src/11_Phylogeny/04_DBHT.jl" = { code = 16, doc = 74, comment = 0, blank = 31, total = 121 }
 "src/11_Phylogeny/05_NonHierarchicalClustering.jl" = { code = 87, doc = 140, comment = 0, blank = 70, total = 297 }
 "src/11_Phylogeny/06_Phylogeny.jl" = { code = 21, doc = 73, comment = 0, blank = 37, total = 131 }
-"src/11_Phylogeny/07_PMFG.jl" = { code = 91, doc = 96, comment = 13, blank = 61, total = 261 }
+"src/11_Phylogeny/07_PMFG.jl" = { code = 94, doc = 93, comment = 13, blank = 61, total = 261 }
 "src/11_Phylogeny/08_GraphTraversal.jl" = { code = 63, doc = 67, comment = 15, blank = 40, total = 185 }
 "src/11_Phylogeny/09_CliqueHierarchy.jl" = { code = 163, doc = 167, comment = 0, blank = 95, total = 425 }
 "src/11_Phylogeny/10_BubbleTree.jl" = { code = 132, doc = 133, comment = 4, blank = 85, total = 354 }
@@ -98,7 +98,7 @@ commit = "20276bd3d2"
 "src/11_Phylogeny/23_CentralityQueries.jl" = { code = 46, doc = 147, comment = 1, blank = 67, total = 261 }
 "src/11_Phylogeny/24_AssetPhylogeny.jl" = { code = 13, doc = 64, comment = 0, blank = 33, total = 110 }
 "src/12_ConstraintGeneration/01_Base_ConstraintGeneration.jl" = { code = 39, doc = 169, comment = 0, blank = 94, total = 302 }
-"src/12_ConstraintGeneration/02_LinearConstraintGeneration.jl" = { code = 662, doc = 1214, comment = 45, blank = 533, total = 2454 }
+"src/12_ConstraintGeneration/02_LinearConstraintGeneration.jl" = { code = 665, doc = 1211, comment = 45, blank = 533, total = 2454 }
 "src/12_ConstraintGeneration/03_RiskBudgetConstraintGeneration.jl" = { code = 50, doc = 263, comment = 10, blank = 119, total = 442 }
 "src/12_ConstraintGeneration/04_PhylogenyConstraintGeneration.jl" = { code = 190, doc = 585, comment = 5, blank = 210, total = 990 }
 "src/12_ConstraintGeneration/05_WeightBoundsConstraintGeneration.jl" = { code = 124, doc = 385, comment = 0, blank = 163, total = 672 }
@@ -145,7 +145,7 @@ commit = "20276bd3d2"
 "src/19_RiskMeasures/13_MaximumDrawdown.jl" = { code = 31, doc = 115, comment = 1, blank = 56, total = 203 }
 "src/19_RiskMeasures/14_BrownianDistanceVariance.jl" = { code = 32, doc = 119, comment = 1, blank = 49, total = 201 }
 "src/19_RiskMeasures/15_WorstRealisation.jl" = { code = 15, doc = 46, comment = 1, blank = 24, total = 86 }
-"src/19_RiskMeasures/16_NoRisk.jl" = { code = 47, doc = 128, comment = 1, blank = 60, total = 236 }
+"src/19_RiskMeasures/16_NoRisk.jl" = { code = 49, doc = 126, comment = 1, blank = 60, total = 236 }
 "src/19_RiskMeasures/16_Range.jl" = { code = 15, doc = 44, comment = 1, blank = 22, total = 82 }
 "src/19_RiskMeasures/17_TurnoverRiskMeasure.jl" = { code = 32, doc = 84, comment = 1, blank = 40, total = 157 }
 "src/19_RiskMeasures/18_TrackingRiskMeasure.jl" = { code = 128, doc = 373, comment = 5, blank = 137, total = 643 }
@@ -190,7 +190,7 @@ commit = "20276bd3d2"
 "src/20_Optimisation/09_JuMPConstraints/11_TrackingErrorConstraints.jl" = { code = 176, doc = 63, comment = 3, blank = 22, total = 264 }
 "src/20_Optimisation/09_JuMPConstraints/12_RegularisationConstraints.jl" = { code = 213, doc = 442, comment = 2, blank = 205, total = 862 }
 "src/20_Optimisation/09_JuMPConstraints/13_WeightNormConstraints.jl" = { code = 59, doc = 124, comment = 0, blank = 55, total = 238 }
-"src/20_Optimisation/10_JuMPOptimiser.jl" = { code = 723, doc = 674, comment = 32, blank = 165, total = 1594 }
+"src/20_Optimisation/10_JuMPOptimiser.jl" = { code = 725, doc = 672, comment = 32, blank = 165, total = 1594 }
 "src/20_Optimisation/11_MeanRisk.jl" = { code = 247, doc = 419, comment = 0, blank = 117, total = 783 }
 "src/20_Optimisation/12_FactorRiskContribution.jl" = { code = 151, doc = 207, comment = 2, blank = 63, total = 423 }
 "src/20_Optimisation/13_NearOptimalCentering.jl" = { code = 599, doc = 580, comment = 10, blank = 190, total = 1379 }
@@ -227,7 +227,7 @@ commit = "20276bd3d2"
 "src/20_Optimisation/23_GreedyFiniteAllocation.jl" = { code = 114, doc = 180, comment = 8, blank = 73, total = 375 }
 "src/20_Optimisation/24_RiskMeasureCompatibility.jl" = { code = 42, doc = 61, comment = 4, blank = 20, total = 127 }
 "src/21_ExpectedReturns.jl" = { code = 272, doc = 825, comment = 24, blank = 287, total = 1408 }
-"src/22_Preselection.jl" = { code = 311, doc = 763, comment = 0, blank = 364, total = 1438 }
+"src/22_Preselection.jl" = { code = 313, doc = 761, comment = 0, blank = 364, total = 1438 }
 "src/23_Pipeline/01_Base_Pipeline.jl" = { code = 154, doc = 348, comment = 0, blank = 152, total = 654 }
 "src/23_Pipeline/02_StepExecution.jl" = { code = 189, doc = 181, comment = 2, blank = 95, total = 467 }
 "src/23_Pipeline/03_Pipeline.jl" = { code = 404, doc = 399, comment = 6, blank = 215, total = 1024 }

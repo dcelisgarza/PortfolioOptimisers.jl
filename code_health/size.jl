@@ -95,9 +95,14 @@ A docstring reaches the tree in two shapes, and both are documentation.
 
  1. A docstring on a binding parses to a `doc` node whose first child is the string. This is what
     `Core.@doc` becomes, and it is what `CodeHealth.isdocstring` recognises.
- 2. A FIELD docstring parses to a bare string literal standing as a statement in a block, because
-    a struct body binds nothing for `@doc` to attach to. It is documentation all the same, and
-    this library writes most of its prose that way.
+ 2. A FIELD docstring parses to a bare string literal standing in a struct body, because a struct
+    body binds nothing for `@doc` to attach to. It is documentation all the same, and this library
+    writes most of its prose that way.
+
+**Shape 2 is read from the struct body alone, and not from every block.** A string literal in any
+other block is a VALUE. Reading one as documentation undercounted
+`src/01_Base/09_ObservationWeights.jl` by two lines, where the two branches of an `if` block each
+return a message string.
 """
 function mark_documentation!(isdoc::BitVector, tree)
     walk_syntax(tree) do n
@@ -106,10 +111,12 @@ function mark_documentation!(isdoc::BitVector, tree)
             if !(cs === nothing || isempty(cs))
                 mark!(isdoc, JuliaSyntax.byte_range(first(cs)))
             end
-        elseif kind(n) === K"block" || kind(n) === K"toplevel"
-            cs = JuliaSyntax.children(n)
-            if cs !== nothing
-                for c in cs
+        elseif kind(n) === K"struct"
+            for body in something(JuliaSyntax.children(n), ())
+                if kind(body) !== K"block"
+                    continue
+                end
+                for c in something(JuliaSyntax.children(body), ())
                     if is_string_literal(c)
                         mark!(isdoc, JuliaSyntax.byte_range(c))
                     end
