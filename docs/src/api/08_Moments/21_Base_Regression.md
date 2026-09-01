@@ -28,6 +28,7 @@ AbstractRegressionTarget
 port_opt_view(re::Regression, i, args...)
 default_regression_criterion_variant
 regression_criterion_func
+regression_polarity
 regression_threshold
 ```
 

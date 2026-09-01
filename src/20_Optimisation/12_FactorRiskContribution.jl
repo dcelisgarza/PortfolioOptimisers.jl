@@ -153,7 +153,7 @@ $(DocStringExtensions.FIELDS)
         re::TD{<:RegE_Reg} = StepwiseRegression(),
         r::TD{<:RM_VecRM} = Variance(),
         obj::TD{<:ObjectiveFunction} = MinimumRisk(),
-        frc_ple::TD_Option{<:PlCE_PhC_VecPlCE_PlC} = nothing,
+        frc_ple::TD_Option{<:PlCE_PlC_VecPlCE_PlC} = nothing,
         sets::TD_Option{<:UniverseSets} = nothing,
         wi::TD_Option{<:VecNum} = nothing,
         flag::Bool = false,
@@ -245,7 +245,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
     @fprop fb
     function FactorRiskContribution(opt::JuMPOptimiser, re::TD{<:RegE_Reg},
                                     r::TD{<:RM_VecRM}, obj::TD{<:ObjectiveFunction},
-                                    frc_ple::TD_Option{<:PlCE_PhC_VecPlCE_PlC},
+                                    frc_ple::TD_Option{<:PlCE_PlC_VecPlCE_PlC},
                                     sets::TD_Option{<:UniverseSets},
                                     wi::TD_Option{<:VecNum}, flag::Bool,
                                     fb::TDO_Option{<:OptE_Opt})
@@ -271,7 +271,7 @@ function FactorRiskContribution(; opt::JuMPOptimiser,
                                 re::TD{<:RegE_Reg} = StepwiseRegression(),
                                 r::TD{<:RM_VecRM} = Variance(),
                                 obj::TD{<:ObjectiveFunction} = MinimumRisk(),
-                                frc_ple::TD_Option{<:PlCE_PhC_VecPlCE_PlC} = nothing,
+                                frc_ple::TD_Option{<:PlCE_PlC_VecPlCE_PlC} = nothing,
                                 sets::TD_Option{<:UniverseSets} = nothing,
                                 wi::TD_Option{<:VecNum} = nothing, flag::Bool = false,
                                 fb::TDO_Option{<:OptE_Opt} = nothing)::FactorRiskContribution

@@ -794,7 +794,9 @@ end
     catch e
         e
     end
-    @test isa(err, ArgumentError)
+    # The batched raise and the per-view `ep_assert_reachable_view` raise one type, so a
+    # caller that catches `DomainError` reads both routes.
+    @test isa(err, DomainError)
     @test occursin("too extreme", err.msg)
     @test occursin(string(worst), err.msg)
     # A `ds_opt` that stops after one iteration cannot bracket the root, so the catch rethrows

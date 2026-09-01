@@ -212,7 +212,7 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - If `lb` or `ub` is a `AbstractDict` or `AbstractVector`, it must be non-empty, `IsEmptyError` otherwise.
-  - Two vector bounds must have the same length, `DimensionMismatch` otherwise.
+  - Two vector bounds must have the same length, `DimensionMismatch` otherwise, through [`validate_bounds`](@ref).
   - Where both bounds are numbers or vectors of numbers, `lb` is not above `ub`, through [`validate_bounds`](@ref), `DomainError` otherwise.
   - Where one side is a `AbstractDict`, a `Pair` or an algorithmic rule, the two sides are not compared here, because neither side is resolved yet. [`weight_bounds_constraints`](@ref) builds a [`WeightBounds`](@ref) from the resolved pair, and that constructor compares them.
   - If neither `dlb` nor `dub` is `nothing`, `dlb <= dub`, `DomainError` otherwise.
@@ -274,16 +274,12 @@ WeightBoundsEstimator
                                    dlb::Option{<:Number} = nothing,
                                    dub::Option{<:Number} = nothing)::WeightBoundsEstimator
         if isa(lb, Dict_Vec)
-            @argcheck(!isempty(lb), IsEmptyError)
+            @argcheck(!isempty(lb), IsEmptyError("lb cannot be empty"))
         end
         if isa(ub, Dict_Vec)
-            @argcheck(!isempty(ub), IsEmptyError)
+            @argcheck(!isempty(ub), IsEmptyError("ub cannot be empty"))
         end
-        if isa(lb, VecNum) && isa(ub, VecNum)
-            @argcheck(length(lb) == length(ub),
-                      DimensionMismatch("lb ($(length(lb))) and ub ($(length(ub))) must have the same length"))
-            validate_bounds(lb, ub)
-        elseif isa(lb, Num_VecNum) && isa(ub, Num_VecNum)
+        if isa(lb, Num_VecNum) && isa(ub, Num_VecNum)
             validate_bounds(lb, ub)
         end
         if !isnothing(dlb) && !isnothing(dub)

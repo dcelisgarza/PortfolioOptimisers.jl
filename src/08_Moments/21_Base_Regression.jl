@@ -776,11 +776,45 @@ function regression_criterion_func(crit::Val{:adjr2}, tgt::GeneralisedLinearMode
     return model -> StatsAPI.adjr2(model, variant)
 end
 """
+    regression_polarity(crit::MinMaxValStepwiseRegressionCriterion)
+
+Return the three functions that state which direction of a stepwise criterion is better.
+
+A stepwise search asks the same three questions of every criterion: which entry of a score vector is the best one, whether a candidate score improves on the score in hand, and what the worst score of a type is. Each answer is one function under a minimised criterion and its opposite under a maximised one. This is the only method pair in the library that states the pairing, so [`regression_threshold`](@ref), [`get_forward_reg_incl_excl!`](@ref), [`get_backward_reg_incl!`](@ref) and the two `_regression` methods that seed a score vector all read it rather than restate it.
+
+# Arguments
+
+  - `crit`: Criterion, as the `Val` the `crit` field of [`StepwiseRegression`](@ref) holds.
+
+# Returns
+
+  - `polarity::NamedTuple`: Three functions.
+
+      + `best`: `findmin` under a minimised criterion, `findmax` under a maximised one. Returns the best entry of a score vector and its index.
+      + `improves`: `<` under a minimised criterion, `>` under a maximised one. Answers whether the first score is better than the second.
+      + `worst`: `typemax` under a minimised criterion, `typemin` under a maximised one. Returns the worst score of the type it is given.
+
+# Related
+
+  - [`MinValStepwiseRegressionCriterion`](@ref)
+  - [`MaxValStepwiseRegressionCriterion`](@ref)
+  - [`STEPWISE_REGRESSION_CRITERIA`](@ref)
+  - [`regression_threshold`](@ref)
+  - [`get_forward_reg_incl_excl!`](@ref)
+  - [`get_backward_reg_incl!`](@ref)
+"""
+function regression_polarity(::MinValStepwiseRegressionCriterion)
+    return (; best = findmin, improves = <, worst = typemax)
+end
+function regression_polarity(::MaxValStepwiseRegressionCriterion)
+    return (; best = findmax, improves = >, worst = typemin)
+end
+"""
     regression_threshold(crit::MinMaxValStepwiseRegressionCriterion)
 
 Return the starting threshold for a forward stepwise regression search.
 
-The value is the worst score the criterion can take, so the first candidate model always improves on it. Dispatches on the polarity of the criterion. Only [`ForwardSelection`](@ref) reads it: [`BackwardElimination`](@ref) starts from the score of the full model instead, because its first move must beat a model that already exists.
+The value is the worst score the criterion can take, so the first candidate model always improves on it. [`regression_polarity`](@ref) states which of `typemax` and `typemin` that is, and `typemax(Float64)` is `Inf`. Only [`ForwardSelection`](@ref) reads it: [`BackwardElimination`](@ref) starts from the score of the full model instead, because its first move must beat a model that already exists.
 
 # Arguments
 
@@ -792,17 +826,15 @@ The value is the worst score the criterion can take, so the first candidate mode
 
 # Related
 
+  - [`regression_polarity`](@ref) — the pairing this method reads.
   - [`MinValStepwiseRegressionCriterion`](@ref)
   - [`MaxValStepwiseRegressionCriterion`](@ref)
   - [`STEPWISE_REGRESSION_CRITERIA`](@ref)
   - [`ForwardSelection`](@ref) — the only caller.
   - [`BackwardElimination`](@ref) — starts from the score of the full model, never from this value.
 """
-function regression_threshold(::MinValStepwiseRegressionCriterion)
-    return Inf
-end
-function regression_threshold(::MaxValStepwiseRegressionCriterion)
-    return -Inf
+function regression_threshold(crit::MinMaxValStepwiseRegressionCriterion)
+    return regression_polarity(crit).worst(Float64)
 end
 """
 $(DocStringExtensions.TYPEDEF)

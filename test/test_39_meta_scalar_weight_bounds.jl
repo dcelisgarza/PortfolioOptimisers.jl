@@ -261,19 +261,41 @@ end
     end
 
     @testset "the estimator compares two vector bounds" begin
-        #= The branch the estimator's constructor takes when BOTH sides are vectors of
-        numbers. It is the only branch that checks a length, and it is the one branch a
-        `Dict`, a `Pair` or an algorithmic rule never reaches. =#
+        #= The branch the estimator's constructor takes when both sides are numbers or
+        vectors of numbers. A `Dict`, a `Pair` or an algorithmic rule never reaches it.
+        The constructor states no check of its own here: it hands the pair to
+        `validate_bounds`, which owns the length check and the entry-by-entry
+        comparison. =#
         both = WeightBoundsEstimator(; lb = [0.0, 0.1], ub = [0.8, 0.9])
         @test both.lb == [0.0, 0.1]
         @test both.ub == [0.8, 0.9]
         @test_throws DimensionMismatch WeightBoundsEstimator(; lb = [0.0, 0.1], ub = [0.8])
         @test_throws DomainError WeightBoundsEstimator(; lb = [0.9, 0.1], ub = [0.8, 0.9])
 
-        # A scalar pair takes the other branch, and it is compared too.
+        # A scalar pair reaches the same branch, and `validate_bounds` compares it too.
         @test_throws DomainError WeightBoundsEstimator(; lb = 0.9, ub = 0.5)
         # `dlb` and `dub` are compared with each other whenever both are given.
         @test_throws DomainError WeightBoundsEstimator(; dlb = 0.9, dub = 0.5)
+
+        #= The constructor's own empty guards name the side they refuse, the way the
+        `validate_bounds` siblings do. A bare exception type leaves that to ArgCheck's
+        generated text, and the two shapes then read differently for one rule. =#
+        err_lb = try
+            WeightBoundsEstimator(; lb = Float64[])
+            nothing
+        catch e
+            e
+        end
+        @test isa(err_lb, PortfolioOptimisers.IsEmptyError)
+        @test err_lb.msg == "lb cannot be empty"
+        err_ub = try
+            WeightBoundsEstimator(; ub = Float64[])
+            nothing
+        catch e
+            e
+        end
+        @test isa(err_ub, PortfolioOptimisers.IsEmptyError)
+        @test err_ub.msg == "ub cannot be empty"
     end
 
     @testset "the default asset count builds empty bounds and is refused" begin

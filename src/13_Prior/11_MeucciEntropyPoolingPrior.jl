@@ -380,7 +380,7 @@ The staged route of [`ep_prior`](@ref) searches up to three times, once per stag
   - No view group declares a view formulation. A group whose `alg` is not `nothing` raises an `ArgumentError`: this route writes no constraint formulation, so it has nothing to apply the declaration to.
   - Every view names one asset. A view over more than one asset raises an `ArgumentError`.
   - Every target is non-negative. A negative target raises a `DomainError`.
-  - Every target stays below the worst realisation of the asset it names. A target that reaches it raises an `ArgumentError` naming every offending view beside the largest target its asset admits.
+  - Every target stays below the worst realisation of the asset it names. A target that reaches it raises a `DomainError` naming every offending view beside the largest target its asset admits. The per-view route of [`ep_assert_reachable_view`](@ref) raises the same type, so one `catch` reads both.
 
 # Returns
 
@@ -445,7 +445,7 @@ function ep_cvar_views_setup(cvar_views::CVV_VecCVV, pr::AbstractPriorResult,
             msg *= "\n$v\t(> $m)."
         end
         msg *= "\nPlease lower the views or use a different prior with fatter tails."
-        throw(ArgumentError(msg))
+        throw(DomainError(B[invalid], msg))
     end
     d_opt = if isone(length(B))
         ifelse(!isnothing(ds_opt), ds_opt, ConditionalValueatRiskEntropyPooling())

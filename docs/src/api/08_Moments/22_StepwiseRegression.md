@@ -11,10 +11,8 @@ _regression(re::StepwiseRegression{<:MinMaxValStepwiseRegressionCriterion, <:For
 _regression(re::StepwiseRegression{<:PValue, <:BackwardElimination}, x::VecNum, F::MatNum)
 _regression(re::StepwiseRegression{<:MinMaxValStepwiseRegressionCriterion, <:BackwardElimination}, x::VecNum, F::MatNum)
 add_best_factor_after_pval_failure!
-get_forward_reg_incl_excl!(::MinValStepwiseRegressionCriterion, value::VecNum, excluded::VecInt, included::VecInt, t::Number)
-get_forward_reg_incl_excl!(::MaxValStepwiseRegressionCriterion, value::VecNum, excluded::VecInt, included::VecInt, t::Number)
-get_backward_reg_incl!(::MinValStepwiseRegressionCriterion, value::VecNum, included::VecInt, t::Number)
-get_backward_reg_incl!(::MaxValStepwiseRegressionCriterion, value::VecNum, included::VecInt, t::Number)
+get_forward_reg_incl_excl!
+get_backward_reg_incl!
 ```
 
 ## References

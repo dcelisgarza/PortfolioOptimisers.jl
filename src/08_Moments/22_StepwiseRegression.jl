@@ -321,23 +321,24 @@ function _regression(re::StepwiseRegression{<:PValue, <:ForwardSelection}, x::Ve
     return included
 end
 """
-    get_forward_reg_incl_excl!(::MinValStepwiseRegressionCriterion,
+    get_forward_reg_incl_excl!(crit::MinMaxValStepwiseRegressionCriterion,
                                value::VecNum, excluded::VecInt,
                                included::VecInt, t::Number)
 
-Moves the best excluded factor into `included` when it lowers a minimised criterion.
+Moves the best excluded factor into `included` when it improves the criterion.
 
-`findmin` searches the **whole** `value` vector, and the answer is still the best **excluded** factor. An entry of an included factor holds the score that selected it; `t` is that same score, and it only falls, so every included entry is at or above the current `t`. A score strictly below `t` therefore belongs to an excluded factor, and `searchsortedfirst` always finds its index in `excluded`.
+[`regression_polarity`](@ref) states the direction: `findmin` and `<` under a minimised criterion, `findmax` and `>` under a maximised one. The search reads the **whole** `value` vector, and the answer is still the best **excluded** factor. An entry of an included factor holds the score that selected it; `t` is that same score, and it only moves in the improving direction, so no included entry improves on the current `t`. A score that does improve on `t` therefore belongs to an excluded factor, and `searchsortedfirst` always finds its index in `excluded`.
 
 # Algorithm
 
- 1. Find the smallest entry of `value`, giving `val` and its index `idx`.
- 2. Return `t` unchanged when `val` is not below `t`.
- 3. Otherwise find the position of `idx` in `excluded`, move that entry to the end of `included`, and set `t` to `val`.
+ 1. Read `best` and `improves` from [`regression_polarity`](@ref).
+ 2. Find the best entry of `value` with `best`, giving `val` and its index `idx`.
+ 3. Return `t` unchanged when `val` does not improve on `t`.
+ 4. Otherwise find the position of `idx` in `excluded`, move that entry to the end of `included`, and set `t` to `val`.
 
 # Arguments
 
-  - `::MinValStepwiseRegressionCriterion`: Stepwise regression criterion whose lower values are better.
+  - `crit`: Stepwise regression criterion, whose polarity states which direction is better.
   - `value`: Criterion score of each factor. Entry `i` is the score of the model that **adds** factor `i` to `included`.
   - `excluded`: Indices of the factors outside the model, in ascending order. Written in place.
   - `included`: Indices of the factors inside the model, in the order the search added them. Written in place.
@@ -350,58 +351,18 @@ Moves the best excluded factor into `included` when it lowers a minimised criter
 # Related
 
   - [`StepwiseRegression`](@ref)
+  - [`regression_polarity`](@ref)
   - [`MinValStepwiseRegressionCriterion`](@ref)
-  - [`get_backward_reg_incl!`](@ref)
-  - [`regression`](@ref)
-"""
-function get_forward_reg_incl_excl!(::MinValStepwiseRegressionCriterion, value::VecNum,
-                                    excluded::VecInt, included::VecInt, t::Number)
-    val, idx = findmin(value)
-    if val < t
-        i = searchsortedfirst(excluded, idx)
-        push!(included, popat!(excluded, i))
-        t = val
-    end
-    return t
-end
-"""
-    get_forward_reg_incl_excl!(::MaxValStepwiseRegressionCriterion,
-                               value::VecNum, excluded::VecInt,
-                               included::VecInt, t::Number)
-
-Moves the best excluded factor into `included` when it raises a maximised criterion.
-
-`findmax` searches the **whole** `value` vector, and the answer is still the best **excluded** factor. An entry of an included factor holds the score that selected it; `t` is that same score, and it only rises, so every included entry is at or below the current `t`. A score strictly above `t` therefore belongs to an excluded factor, and `searchsortedfirst` always finds its index in `excluded`.
-
-# Algorithm
-
- 1. Find the largest entry of `value`, giving `val` and its index `idx`.
- 2. Return `t` unchanged when `val` is not above `t`.
- 3. Otherwise find the position of `idx` in `excluded`, move that entry to the end of `included`, and set `t` to `val`.
-
-# Arguments
-
-  - `::MaxValStepwiseRegressionCriterion`: Stepwise regression criterion whose higher values are better.
-  - `value`: Criterion score of each factor. Entry `i` is the score of the model that **adds** factor `i` to `included`.
-  - `excluded`: Indices of the factors outside the model, in ascending order. Written in place.
-  - `included`: Indices of the factors inside the model, in the order the search added them. Written in place.
-  - $(arg_dict[:t])
-
-# Returns
-
-  - `t::Number`: The score of the factor that moved, or the input `t` when no factor moved.
-
-# Related
-
-  - [`StepwiseRegression`](@ref)
   - [`MaxValStepwiseRegressionCriterion`](@ref)
   - [`get_backward_reg_incl!`](@ref)
   - [`regression`](@ref)
 """
-function get_forward_reg_incl_excl!(::MaxValStepwiseRegressionCriterion, value::VecNum,
-                                    excluded::VecInt, included::VecInt, t::Number)
-    val, idx = findmax(value)
-    if val > t
+function get_forward_reg_incl_excl!(crit::MinMaxValStepwiseRegressionCriterion,
+                                    value::VecNum, excluded::VecInt, included::VecInt,
+                                    t::Number)
+    (; best, improves) = regression_polarity(crit)
+    val, idx = best(value)
+    if improves(val, t)
         i = searchsortedfirst(excluded, idx)
         push!(included, popat!(excluded, i))
         t = val
@@ -414,7 +375,7 @@ end
 
 Grows a factor set from empty, adding the factor whose model scores best.
 
-The starting score is the worst value the criterion can take, so the first addition always happens and the selection is never empty. [`get_forward_reg_incl_excl!`](@ref) dispatches on the direction, so one loop serves a minimised and a maximised criterion alike.
+The starting score is the worst value the criterion can take, so the first addition always happens and the selection is never empty. [`get_forward_reg_incl_excl!`](@ref) reads the direction from [`regression_polarity`](@ref), so one loop serves a minimised and a maximised criterion alike.
 
 # Algorithm
 
@@ -455,9 +416,7 @@ function _regression(re::StepwiseRegression{<:MinMaxValStepwiseRegressionCriteri
     t = regression_threshold(re.crit)
     included = Vector{eltype(indices)}(undef, 0)
     excluded = collect(indices)
-    value = fill(ifelse(isa(re.crit, MinValStepwiseRegressionCriterion),
-                        typemax(promote_type(eltype(F), eltype(x))),
-                        typemin(promote_type(eltype(F), eltype(x)))), N)
+    value = fill(regression_polarity(re.crit).worst(promote_type(eltype(F), eltype(x))), N)
     for _ in eachindex(x)
         ni = length(excluded)
         for i in excluded
@@ -531,22 +490,23 @@ function _regression(re::StepwiseRegression{<:PValue, <:BackwardElimination}, x:
     return included
 end
 """
-    get_backward_reg_incl!(::MinValStepwiseRegressionCriterion, value::VecNum,
+    get_backward_reg_incl!(crit::MinMaxValStepwiseRegressionCriterion, value::VecNum,
                            included::VecInt, t::Number)
 
-Removes the best included factor from `included` when its removal lowers a minimised criterion.
+Removes the best included factor from `included` when its removal improves the criterion.
 
-`findmin` searches the **whole** `value` vector, and the answer is still the best **included** factor. An entry of a removed factor holds the score that removed it; `t` is that same score, and it only falls, so every removed entry is at or above the current `t`. A score strictly below `t` therefore belongs to an included factor, and `searchsortedfirst` always finds its index in `included`.
+[`regression_polarity`](@ref) states the direction: `findmin` and `<` under a minimised criterion, `findmax` and `>` under a maximised one. The search reads the **whole** `value` vector, and the answer is still the best **included** factor. An entry of a removed factor holds the score that removed it; `t` is that same score, and it only moves in the improving direction, so no removed entry improves on the current `t`. A score that does improve on `t` therefore belongs to an included factor, and `searchsortedfirst` always finds its index in `included`.
 
 # Algorithm
 
- 1. Find the smallest entry of `value`, giving `val` and its index `idx`. That is the best model reachable by one removal.
- 2. Return `t` unchanged when `val` is not below `t`.
- 3. Otherwise find the position of `idx` in `included`, remove that entry, and set `t` to `val`.
+ 1. Read `best` and `improves` from [`regression_polarity`](@ref).
+ 2. Find the best entry of `value` with `best`, giving `val` and its index `idx`. That is the best model reachable by one removal.
+ 3. Return `t` unchanged when `val` does not improve on `t`.
+ 4. Otherwise find the position of `idx` in `included`, remove that entry, and set `t` to `val`.
 
 # Arguments
 
-  - `::MinValStepwiseRegressionCriterion`: Stepwise regression criterion whose lower values are better.
+  - `crit`: Stepwise regression criterion, whose polarity states which direction is better.
   - `value`: Criterion score of each factor. Entry `j` is the score of the model that **omits** factor `j`, so the best entry names the removal that helps most.
   - `included`: Indices of the factors inside the model, in ascending order. Written in place.
   - $(arg_dict[:t])
@@ -558,56 +518,17 @@ Removes the best included factor from `included` when its removal lowers a minim
 # Related
 
   - [`StepwiseRegression`](@ref)
+  - [`regression_polarity`](@ref)
   - [`MinValStepwiseRegressionCriterion`](@ref)
-  - [`get_forward_reg_incl_excl!`](@ref)
-  - [`regression`](@ref)
-"""
-function get_backward_reg_incl!(::MinValStepwiseRegressionCriterion, value::VecNum,
-                                included::VecInt, t::Number)
-    val, idx = findmin(value)
-    if val < t
-        i = searchsortedfirst(included, idx)
-        popat!(included, i)
-        t = val
-    end
-    return t
-end
-"""
-    get_backward_reg_incl!(::MaxValStepwiseRegressionCriterion, value::VecNum,
-                           included::VecInt, t::Number)
-
-Removes the best included factor from `included` when its removal raises a maximised criterion.
-
-`findmax` searches the **whole** `value` vector, and the answer is still the best **included** factor. An entry of a removed factor holds the score that removed it; `t` is that same score, and it only rises, so every removed entry is at or below the current `t`. A score strictly above `t` therefore belongs to an included factor, and `searchsortedfirst` always finds its index in `included`.
-
-# Algorithm
-
- 1. Find the largest entry of `value`, giving `val` and its index `idx`. That is the best model reachable by one removal.
- 2. Return `t` unchanged when `val` is not above `t`.
- 3. Otherwise find the position of `idx` in `included`, remove that entry, and set `t` to `val`.
-
-# Arguments
-
-  - `::MaxValStepwiseRegressionCriterion`: Stepwise regression criterion whose higher values are better.
-  - `value`: Criterion score of each factor. Entry `j` is the score of the model that **omits** factor `j`, so the best entry names the removal that helps most.
-  - `included`: Indices of the factors inside the model, in ascending order. Written in place.
-  - $(arg_dict[:t])
-
-# Returns
-
-  - `t::Number`: The score of the model left by the removal, or the input `t` when no factor was removed.
-
-# Related
-
-  - [`StepwiseRegression`](@ref)
   - [`MaxValStepwiseRegressionCriterion`](@ref)
   - [`get_forward_reg_incl_excl!`](@ref)
   - [`regression`](@ref)
 """
-function get_backward_reg_incl!(::MaxValStepwiseRegressionCriterion, value::VecNum,
+function get_backward_reg_incl!(crit::MinMaxValStepwiseRegressionCriterion, value::VecNum,
                                 included::VecInt, t::Number)
-    val, idx = findmax(value)
-    if val > t
+    (; best, improves) = regression_polarity(crit)
+    val, idx = best(value)
+    if improves(val, t)
         i = searchsortedfirst(included, idx)
         popat!(included, i)
         t = val
@@ -660,9 +581,7 @@ function _regression(re::StepwiseRegression{<:MinMaxValStepwiseRegressionCriteri
     fri = StatsAPI.fit(re.tgt, [ovec F], x)
     criterion_func = regression_criterion_func(re.crit, re.tgt)
     t = criterion_func(fri)
-    value = fill(ifelse(isa(re.crit, MinValStepwiseRegressionCriterion),
-                        typemax(promote_type(eltype(F), eltype(x))),
-                        typemin(promote_type(eltype(F), eltype(x)))), N)
+    value = fill(regression_polarity(re.crit).worst(promote_type(eltype(F), eltype(x))), N)
     for _ in eachindex(x)
         ni = length(included)
         for (i, factor) in pairs(included)

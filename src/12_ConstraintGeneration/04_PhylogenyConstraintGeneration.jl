@@ -56,7 +56,7 @@ Represents a collection of [`PlCE_PlC`](@ref) objects, enabling batch processing
 """
 const VecPlCE_PlC = AbstractVector{<:PlCE_PlC}
 """
-    const PlCE_PhC_VecPlCE_PlC = Union{<:PlCE_PlC, <:VecPlCE_PlC}
+    const PlCE_PlC_VecPlCE_PlC = Union{<:PlCE_PlC, <:VecPlCE_PlC}
 
 Alias for a single or vector of phylogeny constraint estimators or results.
 
@@ -67,7 +67,7 @@ Matches either a single [`PlCE_PlC`](@ref) or a vector of them ([`VecPlCE_PlC`](
   - [`PlCE_PlC`](@ref)
   - [`VecPlCE_PlC`](@ref)
 """
-const PlCE_PhC_VecPlCE_PlC = Union{<:PlCE_PlC, <:VecPlCE_PlC}
+const PlCE_PlC_VecPlCE_PlC = Union{<:PlCE_PlC, <:VecPlCE_PlC}
 """
     const VecPlC = AbstractVector{<:AbstractPhylogenyConstraintResult}
 

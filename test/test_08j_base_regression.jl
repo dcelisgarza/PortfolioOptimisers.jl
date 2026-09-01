@@ -221,6 +221,25 @@ const StatsAPI = PortfolioOptimisers.StatsAPI
               StatsAPI.adjr2(gm, :McFadden)
     end
 
+    @testset "regression_polarity" begin
+        #= The one place the direction of "better" is written. `regression_threshold`, the
+        two `get_*_reg_incl*!` verbs and the two `_regression` methods that seed a score
+        vector all read this pairing, so a criterion cannot be minimised in one of the five
+        and maximised in another. =#
+        for c in PO.MIN_VAL_STEPWISE_REGRESSION_CRITERIA
+            p = PO.regression_polarity(Val(c))
+            @test p.best === findmin
+            @test p.improves === (<)
+            @test p.worst === typemax
+        end
+        for c in PO.MAX_VAL_STEPWISE_REGRESSION_CRITERIA
+            p = PO.regression_polarity(Val(c))
+            @test p.best === findmax
+            @test p.improves === (>)
+            @test p.worst === typemin
+        end
+    end
+
     @testset "regression_threshold" begin
         # The worst score the criterion can take, so the first addition always improves on
         # it. `Inf` under minimisation, `-Inf` under maximisation.

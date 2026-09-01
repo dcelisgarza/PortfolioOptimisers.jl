@@ -14,7 +14,7 @@ include(joinpath(@__DIR__, "..", "code_health", "CodeHealth.jl"))
 end
 
 @testset "Alias census: every alias of src/25_Aliases.jl keeps its claim" begin
-    using Test
+    using Test, TOML
 
     #=
     `src/25_Aliases.jl` is 132 units and 43 executable lines, and it is the only file under
@@ -49,8 +49,7 @@ end
     ROOT = normpath(joinpath(@__DIR__, ".."))
     ALIAS_FILE = joinpath(ROOT, "src", "25_Aliases.jl")
 
-    # The two kinds this file holds. Both numbers are gated: `test_45_sweep_census.jl` holds
-    # their sum at the manifest row's 132 units, and a new alias must land in one of them.
+    # The two kinds this file holds. A new alias must land in one of them.
     ACRONYM_TOTAL = 111
     FACTORY_TOTAL = 21
 
@@ -112,6 +111,15 @@ end
     @testset "the file holds the two kinds, and nothing else" begin
         @test length(acronyms) == ACRONYM_TOTAL
         @test length(factories) == FACTORY_TOTAL
+
+        #= The same two counts are the record in three places: here, in the file's
+        `sweep/manifest.toml` row, and in ADR 0086. The manifest row is the one of the
+        three a test can read, so this ties the pair to it. Without the tie, an alias
+        added to one kind and dropped from the other leaves both this file and the sweep
+        census green while the two records disagree. `docs/adr/` is outside the citation
+        census's scope, so the ADR stays a prose copy. =#
+        manifest = TOML.parsefile(joinpath(ROOT, "sweep", "manifest.toml"))["file"]
+        @test ACRONYM_TOTAL + FACTORY_TOTAL == manifest["src/25_Aliases.jl"]["units"]
 
         # A third kind would be a dispatch alias, which ADR 0086 permits in any file. It
         # carries `# Related`, and this file's sweep recorded none, so one arriving here
