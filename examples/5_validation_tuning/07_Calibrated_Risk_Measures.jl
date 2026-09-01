@@ -89,6 +89,14 @@ cvar_rule = ConditionalValueatRisk(;
                                                                                            n = 25)))
 
 #=
+The slot already names the end of the distribution, so the role may be left out. The slot puts it
+on, and the two forms build the same measure. The rest of this page writes the role out, because
+the role is what the page is about, but a caller need not.
+=#
+
+ConditionalValueatRisk(; alpha = ScenarioCount(; n = 25)).alpha
+
+#=
 [`ScenarioCount`](@ref) states the tail's population rather than its probability: `alpha = n / T`
 leaves `n` observations in the tail whatever the sample length is.
 
