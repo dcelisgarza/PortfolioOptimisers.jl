@@ -538,7 +538,16 @@ Where:
 
 The conversion is the square root, it carries no dependence on `T`, and the two norms then write the **same** cone bound. [`tracking_error_soc_factor`](@ref) is where they meet: on `T = 252` it returned `0.04752893855326458` for both `(SquaredL2Norm(), 9e-6)` and `(L2Norm(), 3e-3)`. Two minimum-variance models over 252 observations of 20 assets, tracking an index series under those two settings, returned **identical** weight vectors, and their realised deviations satisfied the square exactly: `9.0e-6` against `3.0e-3` squared, both measured `8.999996766182225e-6`. The `ddof` field of `alg` moves that bound. At `ddof = 0` the same problem realised `0.04762352278968468` and at `ddof = 1` it realised `0.047528930014379016`, each matching its cone bound to eight digits.
 
-The model registers the tracking rows under `:t_te_`, `:te_`, `:cte_soc_` and `:cte_`, each with the constraint index appended. It registers no `:tracking_risk_` and no `:sq_tracking_risk_`: those two keys belong to [`TrackingRiskMeasure`](@ref), which measures a risk difference rather than a return-series deviation.
+The keys the model registers are picked by `alg`, and each carries the constraint index appended. Every branch registers `:t_te_` for the cone variable, `:te_` for the deviation expression ``\\mathbf{X}\\boldsymbol{w} - \\boldsymbol{b}k``, and `:cte_` for the row that holds the cone variable below the scaled tolerance. The cone, its row, and the rows a branch adds beyond those three, are:
+
+| `alg`                                     | Cone                        | Cone row        | Rows the branch adds |
+|:----------------------------------------- |:--------------------------- |:--------------- |:-------------------- |
+| [`L1Norm`](@ref)                          | `JuMP.MOI.NormOneCone`      | `:cte_noc_`     | none                 |
+| [`L2Norm`](@ref), [`SquaredL2Norm`](@ref) | `JuMP.SecondOrderCone`      | `:cte_soc_`     | none                 |
+| [`LpNorm`](@ref)                          | `JuMP.MOI.PowerCone`        | `:cte_pnorm_`   | `:r_te_`, `:cste_`   |
+| [`LInfNorm`](@ref)                        | `JuMP.MOI.NormInfinityCone` | `:cte_infnorm_` | none                 |
+
+`:cte_soc_` is therefore the key of the default `alg = L2Norm()` and of [`SquaredL2Norm`](@ref) alone. The model registers no `:tracking_risk_` and no `:sq_tracking_risk_`: those two keys belong to [`TrackingRiskMeasure`](@ref), which measures a risk difference rather than a return-series deviation.
 
 # Fields
 
