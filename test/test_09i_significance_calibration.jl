@@ -30,7 +30,8 @@ const W4 = fill(0.25, 4)
 # that cannot be given one, and it is why the `alg` bound admits a bare `Function`. It
 # reports what it was handed, so the resolver's argument order is asserted.
 const SIG_SEEN = Ref{Any}(nothing)
-function probe_significance(key::Symbol, pr::PO.AbstractPriorResult, w, slv)
+function probe_significance(key::Symbol, pr::PO.AbstractPriorResult, w, slv,
+                            ::PO.CalibrationContext)
     SIG_SEEN[] = (; key = key, weighted = !isnothing(w), solved = !isnothing(slv))
     return 4 / size(pr.X, 1)
 end
@@ -213,7 +214,7 @@ end
     end
 end
 
-@testset "Significance calibration: a plain function is a rule, and it sees four arguments" begin
+@testset "Significance calibration: a plain function is a rule, and it sees five arguments" begin
     SIG_SEEN[] = nothing
     role = SignificanceTailCalibration(; alg = probe_significance)
     @test isa(probe_significance, PO.Func_SigCal)
@@ -280,26 +281,27 @@ end
 
 @testset "Significance calibration: alpha and kappa are a travelling pair" begin
     # `EntropyBudget` reads the significance level of its sibling slot, so the owner
-    # resolves `alpha` first and hands the number over with `bind_alpha`. Without the
-    # handover the rule has nothing to invert and refuses by name.
+    # resolves `alpha` first and states the number in the context. Without it the rule has
+    # nothing to invert and refuses by name.
     lone = EntropyBudget(; target = -1.2)
-    @test isnothing(lone.alpha)
+    @test !hasfield(EntropyBudget, :alpha)
     err = try
-        lone(:kappa, PR60, nothing, nothing)
+        lone(:kappa, PR60, nothing, nothing, CalibrationContext())
         nothing
     catch e
         e
     end
     @test isa(err, PO.IsNothingError)
-    @test occursin("bind_alpha", sprint(showerror, err))
+    @test occursin("CalibrationContext.alpha", sprint(showerror, err))
 
     # Inside the measure the pair resolves together, and the κ it produces is the one the
     # rule gives when the caller states the same `alpha` themselves.
     r = RelativisticValueatRisk(; alpha = sig_tail(), kappa = def_tail(-1.2))
     out = PO.resolve_deferred_quantities(r, PR60)
     @test out.alpha ≈ 3 / 60
-    bound = EntropyBudget(; target = -1.2, alpha = out.alpha)
-    @test out.kappa ≈ bound(:kappa, PR60, nothing, nothing)
+    bound = EntropyBudget(; target = -1.2)
+    @test out.kappa ≈
+          bound(:kappa, PR60, nothing, nothing, CalibrationContext(; alpha = out.alpha))
     @test 0 < out.kappa < 1
 
     # The Range type carries one pair per tail, and neither side reads the other's number.
@@ -312,30 +314,36 @@ end
     og = PO.resolve_deferred_quantities(rg, PR60)
     @test og.alpha ≈ 3 / 60
     @test og.beta ≈ 6 / 60
-    @test og.kappa_a ≈
-          EntropyBudget(; target = -1.2, alpha = og.alpha)(:kappa_a, PR60, nothing, nothing)
-    @test og.kappa_b ≈
-          EntropyBudget(; target = -2.0, alpha = og.beta)(:kappa_b, PR60, nothing, nothing)
+    @test og.kappa_a ≈ EntropyBudget(; target = -1.2)(:kappa_a, PR60, nothing, nothing,
+                                                      CalibrationContext(; alpha = og.alpha))
+    @test og.kappa_b ≈ EntropyBudget(; target = -2.0)(:kappa_b, PR60, nothing, nothing,
+                                                      CalibrationContext(; alpha = og.beta))
     @test og.kappa_a != og.kappa_b
 
     # The head end really reads its own `beta`. The head's target lies outside the band the
     # tail's level reaches, so the same target bound to `alpha` has no answer at all: the
     # pairing is not an accident of the two ends holding one number.
-    @test_throws DomainError EntropyBudget(; target = -2.0, alpha = og.alpha)(:kappa_b,
-                                                                              PR60, nothing,
-                                                                              nothing)
+    @test_throws DomainError EntropyBudget(; target = -2.0)(:kappa_b, PR60, nothing,
+                                                            nothing,
+                                                            CalibrationContext(;
+                                                                               alpha = og.alpha))
 
-    # `bind_alpha` is the identity on everything that reads no sibling, so a stated number
-    # and a rule of the significance family pass through untouched.
-    @test PO.bind_alpha(0.3, 0.05) == 0.3
+    # The context reaches the rule through the resolver, and a stated number ignores it.
+    # No significance rule reads a sibling, so the field is dead weight for that family.
+    ctx = CalibrationContext(; alpha = 0.05)
+    @test PO.resolve_calibration_slot(0.3, :kappa, PR60, nothing, nothing, ctx) == 0.3
     st = sig_tail()
-    @test PO.bind_alpha(st, 0.05) === st
-    # A deformation role is rebuilt around the bound rule, which is what lets the verb take
-    # the slot rather than the rule a per-type method would have to unwrap first.
+    @test PO.resolve_calibration_slot(st, :alpha, PR60, nothing, nothing, ctx) ==
+          PO.resolve_calibration_slot(st, :alpha, PR60, nothing, nothing)
+    # The role is not rebuilt on the way in: the resolver unwraps it and hands the context
+    # to the rule, so the occupant a per-type method compares against never moves.
     dt = def_tail(-1.2)
-    @test isnothing(dt.alg.alpha)
-    @test PO.bind_alpha(dt, 0.05).alg.alpha == 0.05
-    @test PO.bind_alpha(def_head(-1.2), 0.05).alg.alpha == 0.05
+    @test !hasfield(typeof(dt.alg), :alpha)
+    @test PO.resolve_calibration_slot(dt, :kappa, PR60, nothing, nothing, ctx) ≈
+          dt.alg(:kappa, PR60, nothing, nothing, ctx)
+    @test PO.resolve_calibration_slot(def_head(-1.2), :kappa_b, PR60, nothing, nothing,
+                                      ctx) ≈
+          EntropyBudget(; target = -1.2)(:kappa_b, PR60, nothing, nothing, ctx)
 end
 
 @testset "Significance calibration: the ordered-weights builders and their containers" begin

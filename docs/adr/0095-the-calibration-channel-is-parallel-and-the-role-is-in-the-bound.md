@@ -48,13 +48,13 @@ and the calibration half of each pair lives in
 
 | Calibration | Deferred Quantity | What it does |
 | :--- | :--- | :--- |
-| `resolve_calibration_slot(slot, key, pr, w, slv = nothing)` | `resolve_slot(slot, key, pr)` | resolve one slot |
+| `resolve_calibration_slot(slot, key, pr, w, slv = nothing, ctx = CalibrationContext())` | `resolve_slot(slot, key, pr)` | resolve one slot |
 | `calibration_slots(x)` | `deferred_slots(x)` | declare the slots, as a `NamedTuple` |
 | `resolve_calibration_slots(x, pr, slv = nothing)` | `resolve_deferred_quantities(x, pr, slv = nothing)` | derive the resolution from the declaration |
 | `assert_calibrated_slots(x)` | `assert_resolved_slots(x)` | refuse at a value-level entry point |
 | `assert_declared_calibration_resolver(x, slots)` | `assert_declared_slot_resolver(x, slots)` | refuse a declared slot that no resolver reaches |
 
-`resolve_calibration_slot` runs a rule by **calling** it, `r.alg(key, pr, w, slv)`, and its fallback
+`resolve_calibration_slot` runs a rule by **calling** it, `r.alg(key, pr, w, slv, ctx)`, and its fallback
 method returns a stated number unchanged. Three facts make it a separate verb rather than a widening
 of `resolve_slot`:
 
@@ -89,8 +89,8 @@ all, and a nineteenth added tomorrow writes nothing either.
 
 Two readings put a type outside the derivation, and nothing else does.
 
-1. **An order between the slots.** `bind_alpha`, `bind_series` and `bind_norm_order` are what such an
-   order looks like: the slot is bound before it resolves, so it reads a sibling. A derivation cannot
+1. **An order between the slots.** A `CalibrationContext` built from a sibling's resolved number is
+   what such an order looks like: the slot reads that number off the context. A derivation cannot
    know which sibling, so those types write their own method. The travelling pair below is the whole
    of that set.
 2. **A key that is not the field's name.** The three regularisation keys are three quantities under
@@ -167,7 +167,7 @@ about which of the two the caller meant to hold still.
 
 ### A rule is a callable, and it gets the solver on both routes
 
-A rule is run by calling it, so a callable Estimator and a plain `Function` of `(key, pr, w, slv)`
+A rule is run by calling it, so a callable Estimator and a plain `Function` of `(key, pr, w, slv, ctx)`
 are the same thing to the resolver. Every `alg` bound admits a `Function`, and there is no
 `calibrate` verb. Eleven rules ship, over the five families:
 
@@ -195,9 +195,9 @@ meets a target loss" candidate stays refused.
 `RelativisticValueatRisk` and `RelativisticDrawdownatRisk` both resolve the key `:kappa`, and the two
 price two different series. A rule that reads the **shape** of a series therefore cannot tell from
 the key which quantity it stands in front of. `calibration_series(x)` is the trait each owner
-answers, and `bind_series(slot, series)` carries the answer into the rule. The owner's series
-**overwrites** one the rule carries: the quantity belongs to the measure, and a rule cannot know
-which measure it reached.
+answers, and the `series` field of the `CalibrationContext` carries the answer into the rule. **No
+rule holds a series of its own**: the quantity belongs to the measure, a rule cannot know which
+measure it reached, so there is nothing for the owner's answer to overwrite.
 
 `AbstractCalibrationSeries` names three markers: `ReturnsSeries`, and `AbsoluteDrawdownSeries` and
 `RelativeDrawdownSeries` under `AbstractDrawdownSeries`. Six rules carry a `series` field —
@@ -248,10 +248,10 @@ and the sample states none. This is the same refusal `DualNormRadius` already ma
 assets.
 
 **Five rules read no series.** `EntropyBudget` reads the sample length and its sibling `alpha`, and
-neither moves with the series, so the identity default of `bind_series` serves it. `ScenarioCount`,
+neither moves with the series, so it never reads `ctx.series`. `ScenarioCount`,
 `RateSignificance`, `RateRadius` and `EffectiveAssetFloor` need no method either.
 
-### Four verbs carry what no derivation can find
+### Two carriers hold what no derivation can find
 
 - **`mirror_role(x)`** is the default of the head slot on every Range type. A number crosses
   unchanged and a tail role crosses as the head role of the same family holding the same `alg`, so
@@ -260,22 +260,23 @@ neither moves with the series, so the identity default of `bind_series` serves i
   literal of their own now read the same default, which is the same number at the default
   arguments and the tail slot's occupant otherwise. `RelativisticValueatRiskRange` is what gives
   the deformation method a caller: its gain-side pair defaults to its loss-side pair, both halves.
-- **`bind_alpha(slot, alpha)`** carries a **travelling pair**. `EntropyBudget` reads its sibling
-  `alpha`, and `resolve_calibration_slot` carries a `Symbol` and no number, so the number travels
-  through the rule itself: the owner resolves `alpha`, calls `bind_alpha` on the `kappa` slot, and
-  resolves the result. `TailTermParity` takes the same pair, because its tail-term scale is a CVaR at
-  the slot owner's own significance level. The default is the identity, and the significance and
-  radius families need no method because no rule of either reads a sibling.
-- **`bind_norm_order(slot, p)`** carries a constraint's norm order into the rule that computes its
-  ceiling, on the shape `bind_alpha` gives. It differs in one respect: an order is a property of the
-  constraint rather than of a sibling slot, so the constraint site's order overwrites one the rule
-  already carries.
-- **`bind_series(slot, series)`** carries the owner's series marker, and overwrites one the rule
-  carries, for the reason `bind_norm_order` does.
+- **`CalibrationContext(; alpha, series, p)`** is the second, and it carries everything the site
+  knows that `key` does not. `resolve_calibration_slot` takes it as a sixth argument and hands it
+  to the rule, which is called as `alg(key, pr, w, slv, ctx)`.
+  - `alpha` is a **travelling pair**. `EntropyBudget` reads its sibling `alpha`, so the owner
+    resolves `alpha` first and states it in the context of the `kappa` slot. `TailTermParity` takes
+    the same pair, because its tail-term scale is a CVaR at the slot owner's own significance
+    level. The significance and radius families never read it, because no rule of either reads a
+    sibling.
+  - `series` is the owner's marker, which `calibration_series(x)` answers.
+  - `p` is the norm order of the constraint or of the penalty the quantity stands in.
 
-Every method of the three `bind_` verbs preserves every other field of the slot it rebuilds, so the
-rebuilds compose in either order and a call site may nest them freely. `mirror_role` is the one that
-changes the type, and it does so by design: it carries the `alg` across and nothing else.
+**No rule holds a field for any of the three.** Each belongs to the site, and a rule cannot know
+which site it reached, so there is no value on the rule for the site to overwrite, no precedence
+between the two to state, and no occupant to rebuild on the way in. A caller who runs a rule
+outside a measure builds the context the site would have built. `mirror_role` is therefore the one
+verb that changes a value, and it does so by design: it carries the `alg` across and nothing
+else.
 
 ### A schedule reaches the host, and no further
 

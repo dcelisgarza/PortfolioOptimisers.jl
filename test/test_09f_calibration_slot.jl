@@ -25,22 +25,27 @@ const PO = PortfolioOptimisers
 struct ProbeScenarioCount{T} <: PO.AbstractSignificanceCalibrationAlgorithm
     n::T
 end
-function (alg::ProbeScenarioCount)(key::Symbol, pr::PO.AbstractPriorResult, w, slv)
+function (alg::ProbeScenarioCount)(key::Symbol, pr::PO.AbstractPriorResult, w, slv,
+                                   ctx::PO.CalibrationContext)
     return (; key = key, alpha = alg.n / size(pr.X, 1), weighted = !isnothing(w),
-            solved = !isnothing(slv))
+            solved = !isnothing(slv), series = ctx.series)
 end
 
 # A deformation rule, so that the family bound is checked against a real second family.
 struct ProbeEntropyBudget{T} <: PO.AbstractDeformationCalibrationAlgorithm
     target::T
 end
-function (alg::ProbeEntropyBudget)(::Symbol, ::PO.AbstractPriorResult, ::Any, ::Any)
+function (alg::ProbeEntropyBudget)(::Symbol, ::PO.AbstractPriorResult, ::Any, ::Any,
+                                   ::PO.CalibrationContext)
     return alg.target
 end
 
 # The same rule with no type at all. A closure over the caller's own data is the case that
 # cannot be given one, and it is why both `alg` bounds admit a bare `Function`.
-probe_rate(::Symbol, pr::PO.AbstractPriorResult, ::Any, ::Any) = inv(sqrt(size(pr.X, 1)))
+function probe_rate(::Symbol, pr::PO.AbstractPriorResult, ::Any, ::Any,
+                    ::PO.CalibrationContext)
+    return inv(sqrt(size(pr.X, 1)))
+end
 
 # Stands in for a measure whose tail slot has been widened. #583 widens the real ones.
 struct CalibratedProbe{T1, T2} <: PO.AbstractAlgorithm
@@ -77,7 +82,8 @@ end
 # states of the pair map to 0.1, 0.3, 0.5 and 0.7, so the derived reading of the effective
 # observation weights and the effective solver is asserted rather than assumed.
 struct ProbeContext <: PO.AbstractSignificanceCalibrationAlgorithm end
-function (::ProbeContext)(::Symbol, ::PO.AbstractPriorResult, w, slv)
+function (::ProbeContext)(::Symbol, ::PO.AbstractPriorResult, w, slv,
+                          ::PO.CalibrationContext)
     return (1 + 2 * !isnothing(w) + 4 * !isnothing(slv)) / 10
 end
 
@@ -573,7 +579,8 @@ const BUILT_ALPHA = Ref{Any}(nothing)
 
 # A rule whose value depends on the solver it is handed, so the number a route produced
 # names the solver that route resolved against.
-function probe_solver_rule(key::Symbol, pr::PO.AbstractPriorResult, w, slv)
+function probe_solver_rule(key::Symbol, pr::PO.AbstractPriorResult, w, slv,
+                           ::PO.CalibrationContext)
     SLV_SEEN[] = (; key = key, weighted = !isnothing(w), slv = slv)
     return isnothing(slv) ? 0.1 : 0.05
 end

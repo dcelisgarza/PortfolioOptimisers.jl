@@ -97,13 +97,14 @@ so an `AmbiguityRadiusCalibration` in `l2c` is a `TypeError` at construction, an
 
 A ceiling is read against one norm order, and that order belongs to the **constraint** rather
 than to the rule. One rule placed in `lpc` serves every term, and each term carries its own
-`p`. `resolve_calibration_slot` carries a `Symbol` and no number, so `bind_norm_order(slot, p)`
-carries the order into the rule before the slot resolves. This is ADR 0095's travelling-pair
-shape, and `bind_alpha` is its precedent.
+`p`. `key` names the slot and not the order, so the order reaches the rule as `ctx.p`, the
+norm-order field of the `CalibrationContext` each constraint site builds. This is ADR 0095's
+travelling shape, and the sibling significance level is its precedent.
 
-The constraint's order **wins** over a stated one. A rule cannot know which of the three
-sites it reached, so a `p` a caller states serves only a caller who runs the rule outside
-those sites.
+**No rule carries an order of its own.** A rule cannot know which of the three sites it
+reached, so there is no field for the site's order to overwrite and no precedence between the
+two to state. A caller who runs the rule outside those sites builds the context the site
+would have built.
 
 ### The dual-use slot is settled by the field that holds the term, not by its bound
 
@@ -144,10 +145,10 @@ would no longer name the quantity, the bound's name would contradict its slot, a
 would need an amendment saying so. The saving is a type and a `const`; the cost is the one
 rule that makes every other bound in the mechanism readable.
 
-**One `NormCeilingCalibration` with a `p` field the caller states.** No `bind_norm_order`,
-and the rule carries its own order. Rejected because `lpc` holds several terms with several
-orders and one rule serves them all, so a caller-stated order would be wrong for every term
-but one. It would also let a caller state `p = 3` in `l2c`, where the answer would be a
+**One `NormCeilingCalibration` with a `p` field the caller states.** No order in the context,
+and the rule carries its own. Rejected because `lpc` holds several terms with several orders
+and one rule serves them all, so a caller-stated order would be wrong for every term but
+one. It would also let a caller state `p = 3` in `l2c`, where the answer would be a
 ceiling for the wrong norm and nothing would catch it.
 
 **Leaving `lpc` alone and only fixing its resolution.** Smaller, and it closes the reported
@@ -175,9 +176,9 @@ Prior instead of pasted.
 - **ADR 0095's rule gains one stated exception.** Every bound but `Num_AmbRadNormCeilCal`
     still pairs `Number` with one role. That one is dual-use because the type it belongs to
     is, and the exception is confined to it.
-- **The order a rule reads is not the order it was constructed with.** `bind_norm_order`
-    overwrites. A caller who states `p` and then places the rule in a constraint gets the
-    constraint's order, which is the right answer and a surprising one.
+- **The order a rule reads is never on the rule.** A caller who wants a particular order
+    states it in a `CalibrationContext` and runs the rule by hand; inside a constraint the
+    site's order is the only one there is.
 - **A `TD_` wrapper holding a rule is still unspecified.** `l2c` and `linfc` join `l1` and
     `linf` as fields with two deferral channels, and ADR 0030 still considered only one.
     `test_09i_norm_ceiling_calibration.jl` records what the code does rather than ratifying

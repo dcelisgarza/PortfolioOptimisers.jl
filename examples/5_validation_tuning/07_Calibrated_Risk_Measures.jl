@@ -397,19 +397,23 @@ end
 
 A rule is run by calling it, so a callable struct and a plain function are the same thing to the
 resolver. A closure over a caller's own data is the case that has no type, and it is the shortest
-way to state a one-off rule. The signature is `(key, pr, w, slv)`:
+way to state a one-off rule. The signature is `(key, pr, w, slv, ctx)`:
 
   - `key`: name of the slot being resolved;
   - `pr`: prior result the rule reads the sample size and the moments off;
   - `w`: effective observation weights, or `nothing`;
-  - `slv`: effective solver, or `nothing`.
+  - `slv`: effective solver, or `nothing`;
+  - `ctx`: a [`CalibrationContext`](@ref), which carries what the site knows and `key` does not:
+    the significance level of a sibling slot, the series the owner prices, and the norm order of
+    the constraint the quantity stands in. A rule that reads none of the three names the type and
+    ignores it, as this one does.
 
 `key` earns its keep on a Range measure, where one function serves both ends and reads its own
 budget for each.
 =#
 
 tail_budget = Dict(:alpha => 25, :beta => 50)
-budgeted(key, pr, w, slv) = tail_budget[key] / size(pr.X, 1)
+budgeted(key, pr, w, slv, ctx) = tail_budget[key] / size(pr.X, 1)
 
 vrr = ValueatRiskRange(; alpha = SignificanceTailCalibration(; alg = budgeted),
                        beta = SignificanceHeadCalibration(; alg = budgeted))
@@ -541,7 +545,7 @@ println("robust out-of-sample variance = $(expected_risk(var_rm, pred_drcvar))")
     still and a stated `alpha` does not.
   - The two tail-decay rules read two different quantities. [`HillTailDecay`](@ref) answers per
     end, and [`RadialTailDecay`](@ref) answers once for both.
-  - A plain function of `(key, pr, w, slv)` is a rule, which covers the one-off case in every
+  - A plain function of `(key, pr, w, slv, ctx)` is a rule, which covers the one-off case in every
     family.
   - A role names an end of the distribution, and its slot's type bound refuses the other end at
     construction.

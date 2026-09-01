@@ -1650,6 +1650,10 @@ end
     # type, so no site can drop a field.
     root = normpath(joinpath(@__DIR__, ".."))
     call = r"^\s+(?:return |\w+ = )?[A-Z]\w*\(;"
+    # A `CalibrationContext` is not a rebuild of the measure. It carries what the site
+    # knows into the rule, it names no field of the type the resolver rebuilds, and so it
+    # cannot drop one. ADR 0095 owns it.
+    exempt = r"CalibrationContext\(;"
     offenders = String[]
     for (dir, _, files) in walkdir(joinpath(root, "src"))
         for file in files
@@ -1661,7 +1665,7 @@ end
                     inside = true
                 elseif inside && line == "end"
                     inside = false
-                elseif inside && occursin(call, line)
+                elseif inside && occursin(call, line) && !occursin(exempt, line)
                     push!(offenders,
                           relpath(path, root) * ":" * string(n) * ": " * strip(line))
                 end

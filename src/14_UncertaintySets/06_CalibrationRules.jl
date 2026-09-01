@@ -47,7 +47,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Computes a significance level, the tail probability that an `alpha` or a `beta` slot holds.
 
-All concrete subtypes should subtype `AbstractSignificanceCalibrationAlgorithm`, and should be **callable**, because [`resolve_calibration_slot`](@ref) runs a rule by calling it. A plain `Function` of the same four arguments is therefore a rule as well, and needs no type at all. The family's two role types, [`SignificanceTailCalibration`](@ref) and [`SignificanceHeadCalibration`](@ref), subtype [`AbstractCalibrationEstimator`](@ref) instead: a role names the end of the distribution the slot addresses and holds the rule in its `alg` field, and the same rule serves both ends. Neither role subtypes this family, so neither is admitted by [`Func_SigCal`](@ref).
+All concrete subtypes should subtype `AbstractSignificanceCalibrationAlgorithm`, and should be **callable**, because [`resolve_calibration_slot`](@ref) runs a rule by calling it. A plain `Function` of the same five arguments is therefore a rule as well, and needs no type at all. The family's two role types, [`SignificanceTailCalibration`](@ref) and [`SignificanceHeadCalibration`](@ref), subtype [`AbstractCalibrationEstimator`](@ref) instead: a role names the end of the distribution the slot addresses and holds the rule in its `alg` field, and the same rule serves both ends. Neither role subtypes this family, so neither is admitted by [`Func_SigCal`](@ref).
 
 # Interfaces
 
@@ -55,7 +55,7 @@ In order to implement a new concrete type that works seamlessly with the library
 
 ## The functor
 
-  - `(alg::AbstractSignificanceCalibrationAlgorithm)(key::Symbol, pr::AbstractPriorResult, w, slv) -> Number`: Returns the significance level.
+  - `(alg::AbstractSignificanceCalibrationAlgorithm)(key::Symbol, pr::AbstractPriorResult, w, slv, ctx::CalibrationContext) -> Number`: Returns the significance level.
 
 ### Arguments
 
@@ -63,6 +63,7 @@ In order to implement a new concrete type that works seamlessly with the library
   - `pr`: Prior result the rule reads its sample size and moments off.
   - `w`: Effective observation weights, or `nothing` when neither the measure nor the prior names any.
   - `slv`: Effective solver, or `nothing` when the measure carries none.
+  - `ctx`: What the site knows and `key` does not, as a [`CalibrationContext`](@ref). A rule reads the fields it needs off it, and one that reads none writes `::CalibrationContext`.
 
 ### Returns
 
@@ -90,7 +91,7 @@ In order to implement a new concrete type that works seamlessly with the library
 
 ## The functor
 
-  - `(alg::AbstractDeformationCalibrationAlgorithm)(key::Symbol, pr::AbstractPriorResult, w, slv) -> Number`: Returns the deformation parameter.
+  - `(alg::AbstractDeformationCalibrationAlgorithm)(key::Symbol, pr::AbstractPriorResult, w, slv, ctx::CalibrationContext) -> Number`: Returns the deformation parameter.
 
 ### Arguments
 
@@ -98,6 +99,7 @@ In order to implement a new concrete type that works seamlessly with the library
   - `pr`: Prior result the rule reads its sample size and moments off.
   - `w`: Effective observation weights, or `nothing` when neither the measure nor the prior names any.
   - `slv`: Effective solver, or `nothing` when the measure carries none.
+  - `ctx`: What the site knows and `key` does not, as a [`CalibrationContext`](@ref). A rule reads the fields it needs off it, and one that reads none writes `::CalibrationContext`.
 
 ### Returns
 
@@ -105,13 +107,13 @@ In order to implement a new concrete type that works seamlessly with the library
 
 ## The series
 
-A deformation slot sits on a measure of the return distribution and on a drawdown measure alike, and both resolve the key `:kappa`, so `key` does not say which quantity the owner prices. A rule whose answer moves with that quantity should carry a `series` field and implement a [`bind_series`](@ref) method, which each slot owner calls before it resolves the slot. A rule whose answer does not move with it needs no method, and [`EntropyBudget`](@ref) is that case.
+A deformation slot sits on a measure of the return distribution and on a drawdown measure alike, and both resolve the key `:kappa`, so `key` does not say which quantity the owner prices. A rule whose answer moves with that quantity reads `ctx.series`, which each slot owner states in the [`CalibrationContext`](@ref) it hands over. A rule whose answer does not move with it reads no field of the context, and [`EntropyBudget`](@ref) is that case.
 
 # Related
 
   - [`AbstractCalibrationAlgorithm`](@ref)
   - [`AbstractCalibrationSeries`](@ref)
-  - [`bind_series`](@ref)
+  - [`CalibrationContext`](@ref)
   - [`DeformationTailCalibration`](@ref)
   - [`DeformationHeadCalibration`](@ref)
   - [`Func_DefCal`](@ref)
@@ -121,7 +123,7 @@ abstract type AbstractDeformationCalibrationAlgorithm <: AbstractCalibrationAlgo
 """
     const Func_SigCal = Union{<:Function, <:AbstractSignificanceCalibrationAlgorithm}
 
-Field bound for the `alg` field of a significance role: a rule of the family, or a plain function of the same four arguments.
+Field bound for the `alg` field of a significance role: a rule of the family, or a plain function of the same five arguments.
 
 A rule is run by calling it, so a function and a callable struct are the same thing to [`resolve_calibration_slot`](@ref). The struct earns its keep by carrying parameters and a name that a docstring can describe; the function is the shortest way to state a one-off rule, and a closure over a caller's own data is the case that has no type.
 
@@ -137,7 +139,7 @@ const Func_SigCal = Union{<:Function, <:AbstractSignificanceCalibrationAlgorithm
 """
     const Func_DefCal = Union{<:Function, <:AbstractDeformationCalibrationAlgorithm}
 
-Field bound for the `alg` field of a deformation role: a rule of the family, or a plain function of the same four arguments. It is the counterpart of [`Func_SigCal`](@ref), and carries its reading unchanged.
+Field bound for the `alg` field of a deformation role: a rule of the family, or a plain function of the same five arguments. It is the counterpart of [`Func_SigCal`](@ref), and carries its reading unchanged.
 
 # Related
 
@@ -357,62 +359,13 @@ Field bound for an upper-tail deformation slot: the deformation parameter itself
 """
 const Num_DefHeadCal = Union{<:DeformationHeadCalibration, <:Number}
 """
-    resolve_calibration_slot(slot, key::Symbol, pr::AbstractPriorResult, w, slv = nothing)
-
-Resolve one calibration slot against prior result `pr`, the effective observation weights `w` and the effective solver `slv`, and return a plain number.
-
-A slot that holds a role type is unwrapped, and the rule in its `alg` field is **called** as `alg(key, pr, w, slv)`. So a callable rule and a plain function are the same thing here, and a rule never sees the role it was placed in. Anything else, a stated number above all, is returned unchanged.
-
-A rule gets no portfolio. A prior result carries no portfolio weight vector, so no rule can measure a portfolio's own loss series. What it can measure is the series of each **column** of the sample, and [`bind_series`](@ref) tells it which series the slot owner prices. It does get the solver, on both of the routes that resolve a measure, so a rule may call [`ERM`](@ref) or [`RRM`](@ref). On the [`factory`](@ref) route [`@propagatable`](@ref) runs the `@cprop` selection before the resolution, so the solver is on the struct. On the `JuMP` route no selection runs, so [`set_risk_constraints!`](@ref) threads it into [`resolve_deferred_quantities`](@ref) and the owner settles it as `sel(x.slv, slv)`.
-
-This is the parallel of [`resolve_slot`](@ref), and it is a second verb rather than a widening of the first for two reasons. `resolve_slot`'s body is `deferred_quantity(fit_deferred_quantity(dq, pr), key)`, a fit followed by an extraction, and a rule fits nothing. `resolve_slot` also carries neither `w` nor `slv`, which a rule needs. So the role types stay **out** of the [`DeferredQuantity`](@ref) union.
-
-The caller computes `w` itself, as `sel(r.w, pr.w)`, and threads it with the measure's own `slv`. A parent that carries no observation weights of its own passes `pr.w`, and one that carries no solver leaves `slv` at its default.
-
-**A [`TimeDependent`](@ref) reaches the host that holds the slot, and no further.** A schedule varies a *field of an estimator*, and it is consumed by [`update_time_dependent_fields`](@ref) before any prior is fitted. A rule is never standalone: it stands in a slot of a host, so the host is what a schedule swaps. Where the host is a [`JuMPOptimiser`](@ref) the four norm fields are themselves schedulable, and a schedule over them selects a rule per fold. Where the host is a risk measure the slot's own bound admits no schedule, and the caller varies the whole measure instead, through the schedulable risk-measure field of the optimiser. Both routes land in the same place, because the selection runs first and the rule then resolves against the prior of the period that was selected. A schedule *inside* a rule is therefore not a gap: it would name a fold the rule cannot see, and it would duplicate the channel the host already carries.
-
-# Algorithm
-
- 1. Return `slot` unchanged when it is not an [`AbstractCalibrationEstimator`](@ref). A stated number takes that arm.
- 2. Read the rule out of the role's `alg` field.
- 3. Call the rule as `alg(key, pr, w, slv)`, and return the number it gives. A callable struct and a plain function are the same thing here, so a rule never sees the role it was placed in.
-
-# Arguments
-
-  - `slot`: The slot's occupant: a number, or a role under [`AbstractCalibrationEstimator`](@ref).
-  - `key`: Name of the slot that is being resolved.
-  - `pr`: Prior result the rule reads.
-  - `w`: Effective observation weights, or `nothing`.
-  - `slv`: Effective solver, or `nothing` when the measure carries none.
-
-# Returns
-
-  - `val::Number`: The calibrated quantity, or the stated value unchanged.
-
-# Related
-
-  - [`AbstractCalibrationEstimator`](@ref)
-  - [`AbstractCalibrationAlgorithm`](@ref)
-  - [`calibration_slots`](@ref)
-  - [`Func_SigCal`](@ref)
-  - [`resolve_slot`](@ref)
-"""
-function resolve_calibration_slot(slot, ::Symbol, ::AbstractPriorResult, ::Any,
-                                  ::Any = nothing)
-    return slot
-end
-function resolve_calibration_slot(r::AbstractCalibrationEstimator, key::Symbol,
-                                  pr::AbstractPriorResult, w, slv = nothing)
-    return r.alg(key, pr, w, slv)
-end
-"""
     calibration_slots(x)
 
 Declare the slots of `x` that may hold a **Calibration Rule**, as a `NamedTuple` mapping each slot's name to its current value. The default is empty: a type with no calibration slot needs no method.
 
 This is the parallel of [`deferred_slots`](@ref). Three consumers read it: [`assert_calibrated_slots`](@ref) refuses a role that reached a value-level entry point, [`assert_declared_calibration_resolver`](@ref) refuses a role the library itself left unresolved, and [`resolve_calibration_slots`](@ref) resolves the slots.
 
-For most types the declaration is the whole statement, and the resolution is derived from it. A type whose slots carry an **order** between them writes its own [`resolve_deferred_quantities`](@ref) method instead, and [`bind_alpha`](@ref), [`bind_series`](@ref) and [`bind_norm_order`](@ref) are what such an order looks like: a slot that is bound before it resolves reads a sibling, and no derivation can know which sibling. A slot that names a quantity under a key of its own also writes its own resolution, which is what the three regularisation keys do.
+For most types the declaration is the whole statement, and the resolution is derived from it. A type whose slots carry an **order** between them writes its own [`resolve_deferred_quantities`](@ref) method instead, and a [`CalibrationContext`](@ref) built from a sibling's resolved number is what such an order looks like: the slot reads that number off the context, and no derivation can know which sibling. A slot that names a quantity under a key of its own also writes its own resolution, which is what the three regularisation keys do.
 
 A slot that holds a child measure is declared here too, so a container names its children and each child names its own slots. Such a slot is declared in [`deferred_slots`](@ref) as well, and the deferred recursion is what resolves the child.
 
@@ -577,7 +530,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Names the series a calibration rule reads, so that a rule reads the quantity its slot owner prices.
 
-A rule gets no portfolio, which [`resolve_calibration_slot`](@ref) states, so it cannot form the loss series of a portfolio that does not exist until the solver returns. What it can form is the series of each **column** of `pr.X`. This family names which one: the column itself, or the drawdown series that column carries. [`calibration_series`](@ref) is the trait a slot owner answers, and [`bind_series`](@ref) carries the answer into the rule.
+A rule gets no portfolio, which [`resolve_calibration_slot`](@ref) states, so it cannot form the loss series of a portfolio that does not exist until the solver returns. What it can form is the series of each **column** of `pr.X`. This family names which one: the column itself, or the drawdown series that column carries. [`calibration_series`](@ref) is the trait a slot owner answers, and the [`CalibrationContext`](@ref) carries the answer into the rule.
 
 The marker states the **quantity** and not the estimator, so each rule reads it on its own terms. [`HillTailDecay`](@ref) forms the series and estimates its tail index. [`RadialTailDecay`](@ref) cannot form it, because a Mahalanobis distance carries no path, so it whitens the drawdown sample instead. The three radius rules read the per-asset dispersion of the series, which [`calibration_series_dispersion`](@ref) takes, and [`TailTermParity`](@ref) reads both terms of its ratio over it.
 
@@ -587,7 +540,7 @@ The marker states the **quantity** and not the estimator, so each rule reads it 
   - [`AbstractDrawdownSeries`](@ref)
   - [`calibration_series`](@ref)
   - [`calibration_series_vec`](@ref)
-  - [`bind_series`](@ref)
+  - [`CalibrationContext`](@ref)
 """
 abstract type AbstractCalibrationSeries <: AbstractEstimator end
 """
@@ -660,7 +613,7 @@ Declare the series that `x` prices, so that a rule in one of its calibration slo
 
 The default is [`ReturnsSeries`](@ref), so a type that prices the return distribution needs no method. The two relativistic drawdown measures write one, because the series they price is not the sample they carry.
 
-This is a trait on the **slot owner** and not a field on the rule, for the reason [`bind_norm_order`](@ref) carries a norm order rather than reading one off the rule: the quantity belongs to the measure, and a rule cannot know which measure it reached. So a marker a caller states on a rule is overwritten wherever a measure resolves it, and it serves a caller who runs the rule by hand.
+This is a trait on the **slot owner** and not a field on the rule, for the reason the [`CalibrationContext`](@ref) carries a norm order rather than a rule holding one: the quantity belongs to the measure, and a rule cannot know which measure it reached. No rule holds a marker of its own, so there is nothing for the owner's answer to overwrite, and a caller who runs a rule by hand states the marker in the context.
 
 # Arguments
 
@@ -673,7 +626,7 @@ This is a trait on the **slot owner** and not a field on the rule, for the reaso
 # Related
 
   - [`AbstractCalibrationSeries`](@ref)
-  - [`bind_series`](@ref)
+  - [`CalibrationContext`](@ref)
   - [`calibration_slots`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
@@ -782,6 +735,127 @@ end
 function calibration_series_dispersion(series::AbstractDrawdownSeries,
                                        pr::AbstractPriorResult)
     return vec(Statistics.std(calibration_series_matrix(series, pr.X); dims = 1))
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Carries what a calibration site knows and the slot's key does not, from [`resolve_calibration_slot`](@ref) into the rule it runs.
+
+A rule is run by calling it, as `alg(key, pr, w, slv, ctx)`. `key` names the **slot** and not the quantity: `:kappa` serves both [`RelativisticValueatRisk`](@ref) and [`RelativisticDrawdownatRisk`](@ref), and those two price different series. Three quantities a rule may read are therefore properties of the site rather than of the key, and this type is how the site states them.
+
+| Field    | The site that states it                                  | The rules that read it                                                                                                                                                 |
+|:-------- |:-------------------------------------------------------- |:---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `alpha`  | the slot owner, off a **sibling slot** it resolved first | [`EntropyBudget`](@ref), [`HillTailDecay`](@ref), [`RadialTailDecay`](@ref), [`TailTermParity`](@ref)                                                                  |
+| `series` | the slot owner, through [`calibration_series`](@ref)     | [`HillTailDecay`](@ref), [`RadialTailDecay`](@ref), [`ConcentrationRadius`](@ref), [`DimensionalRateRadius`](@ref), [`DualNormRadius`](@ref), [`TailTermParity`](@ref) |
+| `p`      | the constraint or the penalty the quantity stands in     | [`EffectiveAssetFloor`](@ref), [`DualNormRadius`](@ref)                                                                                                                |
+
+**No rule holds a field for any of the three.** Each belongs to the site, and a rule cannot know which site it reached, so there is no value on the rule for a site to overwrite and no precedence between the two to state. A caller who runs a rule outside a measure builds the context the site would have built, and that context is the only place the three are ever written.
+
+The default is the context a site with nothing to say hands over: no sibling significance level, no norm order, and the [`ReturnsSeries`](@ref) that [`calibration_series`](@ref) answers for every owner that names no other. A rule that needs a field the default leaves at `nothing` refuses, and its message names the field it wanted.
+
+**The order between two slots of one owner is what makes `alpha` reachable.** A deformation rule reads the significance level of a sibling slot, so the owner's own [`resolve_deferred_quantities`](@ref) method resolves `alpha` first and puts the number in the context of the slot that reads it. No derivation can find that order, which is the reason the resolution is written per type.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    CalibrationContext(;
+        alpha::Option{<:Number} = nothing,
+        series::AbstractCalibrationSeries = ReturnsSeries(),
+        p::Option{<:Number} = nothing
+    ) -> CalibrationContext
+
+Keywords correspond to the struct's fields. Every field defaults to the state a site that names nothing hands over.
+
+# Related
+
+  - [`resolve_calibration_slot`](@ref)
+  - [`AbstractCalibrationAlgorithm`](@ref)
+  - [`AbstractCalibrationSeries`](@ref)
+  - [`calibration_series`](@ref)
+  - [`calibration_slots`](@ref)
+  - [`ReturnsSeries`](@ref)
+"""
+@concrete struct CalibrationContext <: AbstractResult
+    """
+    $(field_dict[:cal_ctx_alpha])
+    """
+    alpha
+    """
+    $(field_dict[:cal_ctx_series])
+    """
+    series
+    """
+    $(field_dict[:cal_ctx_p])
+    """
+    p
+    function CalibrationContext(alpha::Option{<:Number}, series::AbstractCalibrationSeries,
+                                p::Option{<:Number})
+        return new{typeof(alpha), typeof(series), typeof(p)}(alpha, series, p)
+    end
+end
+function CalibrationContext(; alpha::Option{<:Number} = nothing,
+                            series::AbstractCalibrationSeries = ReturnsSeries(),
+                            p::Option{<:Number} = nothing)
+    return CalibrationContext(alpha, series, p)
+end
+"""
+    resolve_calibration_slot(slot, key::Symbol, pr::AbstractPriorResult, w, slv = nothing,
+                             ctx::CalibrationContext = CalibrationContext())
+
+Resolve one calibration slot against prior result `pr`, the effective observation weights `w`, the effective solver `slv` and the site's context `ctx`, and return a plain number.
+
+A slot that holds a role type is unwrapped, and the rule in its `alg` field is **called** as `alg(key, pr, w, slv, ctx)`. So a callable rule and a plain function are the same thing here, and a rule never sees the role it was placed in. Anything else, a stated number above all, is returned unchanged.
+
+A rule gets no portfolio. A prior result carries no portfolio weight vector, so no rule can measure a portfolio's own loss series. What it can measure is the series of each **column** of the sample, and `ctx.series` tells it which series the slot owner prices. It does get the solver, on both of the routes that resolve a measure, so a rule may call [`ERM`](@ref) or [`RRM`](@ref). On the [`factory`](@ref) route [`@propagatable`](@ref) runs the `@cprop` selection before the resolution, so the solver is on the struct. On the `JuMP` route no selection runs, so [`set_risk_constraints!`](@ref) threads it into [`resolve_deferred_quantities`](@ref) and the owner settles it as `sel(x.slv, slv)`.
+
+**The context is the whole of what the site says, and nothing is rebuilt here.** `key` names the slot rather than the quantity, so a rule that reads the shape of a series, the significance level of a sibling slot, or the norm order of the constraint it stands in reads it off `ctx`. No rule carries a field for any of the three, so no occupant is rebuilt on the way in and nothing a caller stated is overwritten. [`CalibrationContext`](@ref) states which rule reads which field.
+
+This is the parallel of [`resolve_slot`](@ref), and it is a second verb rather than a widening of the first for two reasons. `resolve_slot`'s body is `deferred_quantity(fit_deferred_quantity(dq, pr), key)`, a fit followed by an extraction, and a rule fits nothing. `resolve_slot` also carries neither `w` nor `slv`, which a rule needs. So the role types stay **out** of the [`DeferredQuantity`](@ref) union.
+
+The caller computes `w` itself, as `sel(r.w, pr.w)`, and threads it with the measure's own `slv`. A parent that carries no observation weights of its own passes `pr.w`, and one that carries no solver leaves `slv` at its default.
+
+**A [`TimeDependent`](@ref) reaches the host that holds the slot, and no further.** A schedule varies a *field of an estimator*, and it is consumed by [`update_time_dependent_fields`](@ref) before any prior is fitted. A rule is never standalone: it stands in a slot of a host, so the host is what a schedule swaps. Where the host is a [`JuMPOptimiser`](@ref) the four norm fields are themselves schedulable, and a schedule over them selects a rule per fold. Where the host is a risk measure the slot's own bound admits no schedule, and the caller varies the whole measure instead, through the schedulable risk-measure field of the optimiser. Both routes land in the same place, because the selection runs first and the rule then resolves against the prior of the period that was selected. A schedule *inside* a rule is therefore not a gap: it would name a fold the rule cannot see, and it would duplicate the channel the host already carries.
+
+# Algorithm
+
+ 1. Return `slot` unchanged when it is not an [`AbstractCalibrationEstimator`](@ref). A stated number takes that arm.
+ 2. Read the rule out of the role's `alg` field.
+ 3. Call the rule as `alg(key, pr, w, slv, ctx)`, and return the number it gives. A callable struct and a plain function are the same thing here, so a rule never sees the role it was placed in.
+
+# Arguments
+
+  - `slot`: The slot's occupant: a number, or a role under [`AbstractCalibrationEstimator`](@ref).
+  - `key`: Name of the slot that is being resolved.
+  - `pr`: Prior result the rule reads.
+  - `w`: Effective observation weights, or `nothing`.
+  - `slv`: Effective solver, or `nothing` when the measure carries none.
+  - `ctx`: What the site knows and `key` does not, as a [`CalibrationContext`](@ref). The default names no sibling significance level, no norm order, and the returns series.
+
+# Returns
+
+  - `val::Number`: The calibrated quantity, or the stated value unchanged.
+
+# Related
+
+  - [`AbstractCalibrationEstimator`](@ref)
+  - [`AbstractCalibrationAlgorithm`](@ref)
+  - [`CalibrationContext`](@ref)
+  - [`calibration_slots`](@ref)
+  - [`Func_SigCal`](@ref)
+  - [`resolve_slot`](@ref)
+"""
+function resolve_calibration_slot(slot, ::Symbol, ::AbstractPriorResult, ::Any,
+                                  ::Any = nothing,
+                                  ::CalibrationContext = CalibrationContext())
+    return slot
+end
+function resolve_calibration_slot(r::AbstractCalibrationEstimator, key::Symbol,
+                                  pr::AbstractPriorResult, w, slv = nothing,
+                                  ctx::CalibrationContext = CalibrationContext())
+    return r.alg(key, pr, w, slv, ctx)
 end
 """
     effective_sample_size(pr::AbstractPriorResult, w::Option{<:ObsWeights})
@@ -907,6 +981,7 @@ Where:
   - `pr`: Prior result the sample length is read off.
   - `w`: Effective observation weights, or `nothing`.
   - `slv`: Effective solver. This rule needs none.
+  - `ctx`: The site's [`CalibrationContext`](@ref). This rule reads no field of it.
 
 # Returns
 
@@ -918,7 +993,8 @@ Where:
   - [`effective_sample_size`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
-function (alg::ScenarioCount)(::Symbol, pr::AbstractPriorResult, w, ::Any)
+function (alg::ScenarioCount)(::Symbol, pr::AbstractPriorResult, w, ::Any,
+                              ::CalibrationContext)
     T = effective_sample_size(pr, w)
     return alg.n / T
 end
@@ -996,6 +1072,7 @@ Where:
   - `pr`: Prior result the sample length is read off.
   - `w`: Effective observation weights. This rule reads the raw row count, so it ignores them.
   - `slv`: Effective solver. This rule needs none.
+  - `ctx`: The site's [`CalibrationContext`](@ref). This rule reads no field of it.
 
 # Returns
 
@@ -1006,7 +1083,8 @@ Where:
   - [`RateSignificance`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
-function (alg::RateSignificance)(::Symbol, pr::AbstractPriorResult, ::Any, ::Any)
+function (alg::RateSignificance)(::Symbol, pr::AbstractPriorResult, ::Any, ::Any,
+                                 ::CalibrationContext)
     return alg.c / sqrt(size(pr.X, 1))
 end
 """
@@ -1016,7 +1094,7 @@ Computes the Kaniadakis deformation parameter that makes a relativistic measure 
 
 [`RRM`](@ref) multiplies its dual variable by `kappa_log(inv(alpha * T), kappa)`, so that coefficient is the price the model pays for the deformation, and `target` states it directly. The rule returns the ``\\kappa`` that meets it. A stated `kappa` fixes the shape of the deformation and lets the price move with the sample; this rule fixes the price and lets the shape move.
 
-The two quantities travel together. The rule reads its sibling `alpha`, which is why the `alpha` field exists: [`bind_alpha`](@ref) fills it with the number the slot owner resolved, and the owner's own resolution method resolves `alpha` first for that reason. A caller who runs the rule outside a measure states `alpha` instead.
+The two quantities travel together. The rule reads its sibling `alpha` off `ctx.alpha`, so the owner's own resolution method resolves `alpha` first and puts the number in the context of the slot that reads it. A caller who runs the rule outside a measure states `alpha` in the context.
 
 The inversion is monotone, and it is solved by bisection over ``(0, 1)``. Writing ``l = \\ln(u)``, the coefficient is ``l \\sinh(\\kappa l) / (\\kappa l)``, and ``\\sinh(x)/x`` rises with ``|x|``, so the coefficient walks once from ``l`` at ``\\kappa \\to 0`` to ``\\sinh(l)`` at ``\\kappa = 1``. There is no elementary inverse of ``\\sinh(x)/x``, so the solve is a fixed sweep of 64 halvings rather than a formula.
 
@@ -1042,7 +1120,7 @@ Keywords correspond to the struct's fields. `target` has no default, because the
 # Related
 
   - [`AbstractDeformationCalibrationAlgorithm`](@ref)
-  - [`bind_alpha`](@ref)
+  - [`CalibrationContext`](@ref)
   - [`DeformationTailCalibration`](@ref)
   - [`DeformationHeadCalibration`](@ref)
   - [`HillTailDecay`](@ref)
@@ -1055,17 +1133,13 @@ Keywords correspond to the struct's fields. `target` has no default, because the
     $(field_dict[:cal_target])
     """
     target
-    """
-    $(field_dict[:cal_alpha_sib])
-    """
-    alpha
-    function EntropyBudget(target::Number, alpha::Option{<:Number})
+    function EntropyBudget(target::Number)
         assert_nonempty_finite_val(target, :target)
-        return new{typeof(target), typeof(alpha)}(target, alpha)
+        return new{typeof(target)}(target)
     end
 end
-function EntropyBudget(; target::Number, alpha::Option{<:Number} = nothing)
-    return EntropyBudget(target, alpha)
+function EntropyBudget(; target::Number)
+    return EntropyBudget(target)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1093,7 +1167,7 @@ Where:
 # Algorithm
 
  1. Read the sample length `T` off `pr.X`.
- 2. Form the argument `u = inv(alg.alpha * T)`, and its plain logarithm `l = log(u)`.
+ 2. Form the argument `u = inv(ctx.alpha * T)`, and its plain logarithm `l = log(u)`.
  3. Form the band `(lo_b, hi_b)` as the ordered pair of `l` and `(u - inv(u)) / 2`, which are the values the Kaniadakis logarithm reaches at the two ends of ``\\kappa \\in (0,\\, 1)``. `# Validation` states the refusal this band carries.
  4. Normalise the target as `target = alg.target / l`. The normalised coefficient rises once from `1`, so one comparison carries both signs of `l` and the sweep needs no sign branch.
  5. Bracket the answer with `lo = 0` and `hi = 1`.
@@ -1102,15 +1176,16 @@ Where:
 
 # Arguments
 
-  - `alg`: The rule. Its `alpha` field must hold a number, which [`bind_alpha`](@ref) puts there.
+  - `alg`: The rule.
   - `key`: Name of the slot that is being resolved. The budget is the same for every key.
   - `pr`: Prior result the sample length is read off.
   - `w`: Effective observation weights. This rule reads the raw row count, so it ignores them.
   - `slv`: Effective solver. This rule needs none, because the inversion is a scalar one.
+  - `ctx`: The site's [`CalibrationContext`](@ref). `ctx.alpha` is the sibling significance level, and it must hold a number.
 
 # Validation
 
-  - `alg.alpha` must not be `nothing`.
+  - `ctx.alpha` must not be `nothing`.
   - `alg.target` must lie strictly between ``\\ln(u)`` and ``\\sinh(\\ln(u))``, which is the band the coefficient reaches over ``\\kappa \\in (0,\\, 1)``.
 
 # Returns
@@ -1120,20 +1195,21 @@ Where:
 # Related
 
   - [`EntropyBudget`](@ref)
-  - [`bind_alpha`](@ref)
+  - [`CalibrationContext`](@ref)
   - [`kappa_log`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
-function (alg::EntropyBudget)(::Symbol, pr::AbstractPriorResult, ::Any, ::Any)
-    @argcheck(!isnothing(alg.alpha),
-              IsNothingError("`EntropyBudget.alpha` is `nothing`, so the rule cannot form `inv(alpha * T)`. The sibling `alpha` travels to the rule through `bind_alpha`, which the slot owner calls after it resolves `alpha`. State `alpha` on the rule itself to run it outside a measure."))
+function (alg::EntropyBudget)(::Symbol, pr::AbstractPriorResult, ::Any, ::Any,
+                              ctx::CalibrationContext)
+    @argcheck(!isnothing(ctx.alpha),
+              IsNothingError("`CalibrationContext.alpha` is `nothing`, so `EntropyBudget` cannot form `inv(alpha * T)`. The sibling `alpha` reaches the rule in the context the slot owner builds, after it resolves `alpha`. State `alpha` in the context to run the rule outside a measure."))
     T = size(pr.X, 1)
-    u = inv(alg.alpha * T)
+    u = inv(ctx.alpha * T)
     l = log(u)
     lo_b, hi_b = minmax(l, (u - inv(u)) / 2)
     @argcheck(lo_b < alg.target < hi_b,
               DomainError(alg.target,
-                          "`EntropyBudget.target` must lie in ($lo_b, $hi_b), the band that `kappa_log(inv(alpha * T), kappa)` reaches over `kappa` in (0, 1) at `alpha = $(alg.alpha)` and `T = $T`. No deformation parameter meets a target outside it, so the rule has nothing to return. The band moves with the sample, so a target that suits one fold need not suit another."))
+                          "`EntropyBudget.target` must lie in ($lo_b, $hi_b), the band that `kappa_log(inv(alpha * T), kappa)` reaches over `kappa` in (0, 1) at `alpha = $(ctx.alpha)` and `T = $T`. No deformation parameter meets a target outside it, so the rule has nothing to return. The band moves with the sample, so a target that suits one fold need not suit another."))
     target = alg.target / l
     lo = zero(target)
     hi = one(target)
@@ -1266,7 +1342,7 @@ The pool carries two assumptions, and both are stated rather than hidden. The co
 
 `key` says which end the slot prices, and **the answer is not the same for every key**. `:kappa` and `:kappa_a` read the loss tail, and `:kappa_b` reads the gain tail. This is the opposite of [`EntropyBudget`](@ref), whose budget is a price the model pays and is therefore one number for both ends. A tail index is a statement about a tail, and a skewed sample has two different ones, which is the whole point of the rule on a Range measure.
 
-**`series` says which quantity the pool holds, and the slot owner states it.** A measure of the return distribution pools the columns of `pr.X`. A drawdown measure pools the per-column drawdown series of `pr.X` instead, because that is the quantity it prices, and [`bind_series`](@ref) puts the marker there at the resolution site. Nothing else in the reading moves: the same standardisation, the same count and the same estimator run over the drawdown sample. The estimate the pool then carries is the index of the drawdown series rather than of the returns, and the two are different numbers. [`AbstractDrawdownSeries`](@ref) states which way they part, and it is the record that decides.
+**`ctx.series` says which quantity the pool holds, and the slot owner states it.** A measure of the return distribution pools the columns of `pr.X`. A drawdown measure pools the per-column drawdown series of `pr.X` instead, because that is the quantity it prices, and the resolution site names the marker in `ctx.series`. Nothing else in the reading moves: the same standardisation, the same count and the same estimator run over the drawdown sample. The estimate the pool then carries is the index of the drawdown series rather than of the returns, and the two are different numbers. [`AbstractDrawdownSeries`](@ref) states which way they part, and it is the record that decides.
 
 **The per-column reading stands for the portfolio's own drawdown**, under the assumption the pool already states. The rule forms no portfolio, so it reads the drawdown series of each column and pools them, exactly as it pools the columns themselves on a returns series. The columns share one tail index after standardisation, and one map carries a column to its drawdown series, so the reading the pool gives is the reading the portfolio's own drawdown series would give. A portfolio drawdown is shallower than the average asset drawdown, and that is a statement about the **scale**, which a tail index does not read.
 
@@ -1290,7 +1366,7 @@ $(DocStringExtensions.FIELDS)
         series::AbstractCalibrationSeries = ReturnsSeries()
     ) -> HillTailDecay
 
-Keywords correspond to the struct's fields. `kmin` defaults to `30`, which is the floor under the count of order statistics the estimate reads. `alpha` defaults to `nothing`, which is the state a rule stands in a slot in. `series` defaults to [`ReturnsSeries`](@ref), and every slot owner overwrites it through [`bind_series`](@ref).
+Keywords correspond to the struct's fields. `kmin` defaults to `30`, which is the floor under the count of order statistics the estimate reads. The significance level and the series the estimate is taken over are not fields of the rule: both reach it in the [`CalibrationContext`](@ref) the site hands over.
 
 ## Validation
 
@@ -1300,8 +1376,7 @@ Keywords correspond to the struct's fields. `kmin` defaults to `30`, which is th
 
   - [`AbstractDeformationCalibrationAlgorithm`](@ref)
   - [`AbstractCalibrationSeries`](@ref)
-  - [`bind_alpha`](@ref)
-  - [`bind_series`](@ref)
+  - [`CalibrationContext`](@ref)
   - [`DeformationTailCalibration`](@ref)
   - [`DeformationHeadCalibration`](@ref)
   - [`EntropyBudget`](@ref)
@@ -1315,28 +1390,18 @@ Keywords correspond to the struct's fields. `kmin` defaults to `30`, which is th
     $(field_dict[:cal_kmin])
     """
     kmin
-    """
-    $(field_dict[:cal_alpha_sib])
-    """
-    alpha
-    """
-    $(field_dict[:cal_series])
-    """
-    series
-    function HillTailDecay(kmin::Integer, alpha::Option{<:Number},
-                           series::AbstractCalibrationSeries)
+    function HillTailDecay(kmin::Integer)
         assert_gt0(kmin, :kmin)
-        return new{typeof(kmin), typeof(alpha), typeof(series)}(kmin, alpha, series)
+        return new{typeof(kmin)}(kmin)
     end
 end
-function HillTailDecay(; kmin::Integer = 30, alpha::Option{<:Number} = nothing,
-                       series::AbstractCalibrationSeries = ReturnsSeries())
-    return HillTailDecay(kmin, alpha, series)
+function HillTailDecay(; kmin::Integer = 30)
+    return HillTailDecay(kmin)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Compute the deformation parameter whose reciprocal is the Hill tail index of the series that `alg.series` names, over the sample that `pr` carries.
+Compute the deformation parameter whose reciprocal is the Hill tail index of the series that `ctx.series` names, over the sample that `pr` carries.
 
 # Mathematical definition
 
@@ -1362,7 +1427,7 @@ Where:
   - $(math_dict[:N])
   - $(math_dict[:r_tj])
   - ``\\boldsymbol{r}_{j}``: Column ``j`` of the sample.
-  - ``\\mathcal{S}``: The series `alg.series` names, built from one column. It is the identity on a [`ReturnsSeries`](@ref), and a drawdown series on the two markers of [`AbstractDrawdownSeries`](@ref).
+  - ``\\mathcal{S}``: The series `ctx.series` names, built from one column. It is the identity on a [`ReturnsSeries`](@ref), and a drawdown series on the two markers of [`AbstractDrawdownSeries`](@ref).
   - ``y_{tj}``: Entry ``t`` of the series of column ``j``.
   - ``\\hat{\\mu}_{j}``: Sample mean of the series of column ``j``, and not of the column under a drawdown marker.
   - ``\\hat{\\sigma}_{j}``: Sample dispersion of the series of column ``j``, read off that series alone and never off ``\\hat{\\mathbf{\\Sigma}}``.
@@ -1375,22 +1440,23 @@ Where:
 # Algorithm
 
  1. Read the returns matrix off `pr` into `X`, and its element count into `np`.
- 2. Take the sign `s` from `key` and `alg.series` with [`series_end_sign`](@ref). A drawdown series carries one end, so it refuses the head key rather than signing it.
- 3. Form the count `k = ceil(Int, alg.alpha * np)`, the number of order statistics the estimate reads.
- 4. Estimate the tail index of the pool with [`hill_tail_index`](@ref), giving `a`. The pool holds the series `alg.series` names, one entry per observation per column under every marker.
+ 2. Take the sign `s` from `key` and `ctx.series` with [`series_end_sign`](@ref). A drawdown series carries one end, so it refuses the head key rather than signing it.
+ 3. Form the count `k = ceil(Int, ctx.alpha * np)`, the number of order statistics the estimate reads.
+ 4. Estimate the tail index of the pool with [`hill_tail_index`](@ref), giving `a`. The pool holds the series `ctx.series` names, one entry per observation per column under every marker.
  5. Return `inv(a)`, which is the deformation parameter.
 
 # Arguments
 
-  - `alg`: The rule. Its `alpha` field must hold a number, which [`bind_alpha`](@ref) puts there, and its `series` field names the quantity, which [`bind_series`](@ref) puts there.
+  - `alg`: The rule.
   - `key`: Name of the slot that is being resolved. It names the end, so `:kappa` and `:kappa_a` read the loss tail and `:kappa_b` reads the gain tail. A skewed sample therefore resolves the two ends of a Range measure to two different numbers.
   - `pr`: Prior result the returns matrix is read off.
   - `w`: Effective observation weights. A tail index is a statement about the shape of a series rather than about the count of observations behind it, so this rule ignores them.
   - `slv`: Effective solver. This rule needs none, because the estimate is a closed form.
+  - `ctx`: The site's [`CalibrationContext`](@ref). `ctx.alpha` is the significance level of the end, and it must hold a number. `ctx.series` names the quantity the pool holds.
 
 # Validation
 
-  - `alg.alpha` must not be `nothing`.
+  - `ctx.alpha` must not be `nothing`.
   - `key` must name an end the series has, which [`series_end_sign`](@ref) checks.
   - `k` must be at least `alg.kmin`.
   - The pool must hold at least `k + 1` values.
@@ -1404,8 +1470,7 @@ Where:
 # Related
 
   - [`HillTailDecay`](@ref)
-  - [`bind_alpha`](@ref)
-  - [`bind_series`](@ref)
+  - [`CalibrationContext`](@ref)
   - [`EntropyBudget`](@ref)
   - [`hill_tail_index`](@ref)
   - [`kappa_log`](@ref)
@@ -1413,25 +1478,26 @@ Where:
   - [`resolve_calibration_slot`](@ref)
   - [`series_end_sign`](@ref)
 """
-function (alg::HillTailDecay)(key::Symbol, pr::AbstractPriorResult, ::Any, ::Any)
-    @argcheck(!isnothing(alg.alpha),
-              IsNothingError("`HillTailDecay.alpha` is `nothing`, so the rule cannot form the count `k = ceil(alpha * T * N)`. The probability of the end travels to the rule through `bind_alpha`, which the slot owner calls after it resolves that end's own probability. State `alpha` on the rule itself to run it outside a measure."))
+function (alg::HillTailDecay)(key::Symbol, pr::AbstractPriorResult, ::Any, ::Any,
+                              ctx::CalibrationContext)
+    @argcheck(!isnothing(ctx.alpha),
+              IsNothingError("`CalibrationContext.alpha` is `nothing`, so `HillTailDecay` cannot form the count `k = ceil(alpha * T * N)`. The probability of the end reaches the rule in the context the slot owner builds, after it resolves that end's own probability. State `alpha` in the context to run the rule outside a measure."))
     X = pr.X
     # The sign puts the end the slot prices in the LOWER tail of the pool, and one estimator
     # then serves both ends. The series decides which ends there are to price.
-    s = series_end_sign(alg.series, key)
+    s = series_end_sign(ctx.series, key)
     np = prod(size(X))
-    k = ceil(Int, alg.alpha * np)
+    k = ceil(Int, ctx.alpha * np)
     @argcheck(k >= alg.kmin,
               DomainError(k,
                           "`HillTailDecay` reads the worst `k = ceil(alpha * T * N) = $k` of the $np pooled standardised values, and `HillTailDecay.kmin` puts the floor at $(alg.kmin). A Hill estimate over fewer order statistics moves from fold to fold for no reason in the data, and the deformation parameter moves with it. Lengthen the sample, widen `alpha`, or lower `kmin` and take the noise."))
     @argcheck(k + 1 <= np,
               DomainError(k,
-                          "`HillTailDecay` needs $(k + 1) pooled values to form the estimate, and the pool of `T * N` holds $np. The count is `k = ceil(alpha * T * N)` at `alpha = $(alg.alpha)`, so only a probability that takes the whole sample reaches this. Lower `alpha`."))
-    a = hill_tail_index(alg.series, X, s, k)
+                          "`HillTailDecay` needs $(k + 1) pooled values to form the estimate, and the pool of `T * N` holds $np. The count is `k = ceil(alpha * T * N)` at `alpha = $(ctx.alpha)`, so only a probability that takes the whole sample reaches this. Lower `alpha`."))
+    a = hill_tail_index(ctx.series, X, s, k)
     @argcheck(a > 1,
               DomainError(a,
-                          "`HillTailDecay` estimated a tail index of $a on the pool of the $(nameof(typeof(alg.series))), so `kappa = 1 / a` is $(inv(a)) and lies outside the (0, 1) the slot admits. An index of one or less is a tail with no finite mean, so no admissible deformation parameter reads it. The series is heavier-tailed than the measure can price."))
+                          "`HillTailDecay` estimated a tail index of $a on the pool of the $(nameof(typeof(ctx.series))), so `kappa = 1 / a` is $(inv(a)) and lies outside the (0, 1) the slot admits. An index of one or less is a tail with no finite mean, so no admissible deformation parameter reads it. The series is heavier-tailed than the measure can price."))
     return inv(a)
 end
 """
@@ -1576,7 +1642,7 @@ $(DocStringExtensions.FIELDS)
         series::AbstractCalibrationSeries = ReturnsSeries()
     ) -> RadialTailDecay
 
-Keywords correspond to the struct's fields. `kmin` defaults to `30`, which is the floor under the count of order statistics the estimate reads. `alpha` defaults to `nothing`, which is the state a rule stands in a slot in. `series` defaults to [`ReturnsSeries`](@ref), and every slot owner overwrites it through [`bind_series`](@ref).
+Keywords correspond to the struct's fields. `kmin` defaults to `30`, which is the floor under the count of order statistics the estimate reads. The significance level and the series the estimate is taken over are not fields of the rule: both reach it in the [`CalibrationContext`](@ref) the site hands over.
 
 ## Validation
 
@@ -1586,8 +1652,7 @@ Keywords correspond to the struct's fields. `kmin` defaults to `30`, which is th
 
   - [`AbstractDeformationCalibrationAlgorithm`](@ref)
   - [`AbstractCalibrationSeries`](@ref)
-  - [`bind_alpha`](@ref)
-  - [`bind_series`](@ref)
+  - [`CalibrationContext`](@ref)
   - [`DeformationTailCalibration`](@ref)
   - [`DeformationHeadCalibration`](@ref)
   - [`EntropyBudget`](@ref)
@@ -1602,23 +1667,13 @@ Keywords correspond to the struct's fields. `kmin` defaults to `30`, which is th
     $(field_dict[:cal_kmin_rad])
     """
     kmin
-    """
-    $(field_dict[:cal_alpha_sib])
-    """
-    alpha
-    """
-    $(field_dict[:cal_series_rad])
-    """
-    series
-    function RadialTailDecay(kmin::Integer, alpha::Option{<:Number},
-                             series::AbstractCalibrationSeries)
+    function RadialTailDecay(kmin::Integer)
         assert_gt0(kmin, :kmin)
-        return new{typeof(kmin), typeof(alpha), typeof(series)}(kmin, alpha, series)
+        return new{typeof(kmin)}(kmin)
     end
 end
-function RadialTailDecay(; kmin::Integer = 30, alpha::Option{<:Number} = nothing,
-                         series::AbstractCalibrationSeries = ReturnsSeries())
-    return RadialTailDecay(kmin, alpha, series)
+function RadialTailDecay(; kmin::Integer = 30)
+    return RadialTailDecay(kmin)
 end
 """
     radial_series_inputs(series::AbstractCalibrationSeries, pr::AbstractPriorResult)
@@ -1670,7 +1725,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Compute the deformation parameter whose reciprocal is the Hill tail index of the radial series of the sample that `alg.series` names.
+Compute the deformation parameter whose reciprocal is the Hill tail index of the radial series of the sample that `ctx.series` names.
 
 # Mathematical definition
 
@@ -1692,7 +1747,7 @@ Where:
   - $(math_dict[:alpha_rm]) It is the probability of the end the slot prices, and the count it fixes is the same for both ends because the series has no sign.
   - $(math_dict[:T])
   - $(math_dict[:x_t_obs])
-  - ``\\mathcal{S}``: The sample `alg.series` names, built one column at a time. It is the identity on a [`ReturnsSeries`](@ref), and a drawdown series on the two markers of [`AbstractDrawdownSeries`](@ref).
+  - ``\\mathcal{S}``: The sample `ctx.series` names, built one column at a time. It is the identity on a [`ReturnsSeries`](@ref), and a drawdown series on the two markers of [`AbstractDrawdownSeries`](@ref).
   - ``\\boldsymbol{y}_{t}``: Row ``t`` of that sample.
   - ``\\hat{\\boldsymbol{\\mu}}_{y}``: Centre of that sample. It is `pr.mu` on a returns series, and the column means of the drawdown sample on a drawdown series.
   - ``\\hat{\\mathbf{\\Sigma}}_{y}``: Covariance matrix of that sample. It is `pr.sigma` on a returns series, and the covariance matrix of the drawdown sample on a drawdown series.
@@ -1706,22 +1761,23 @@ Where:
 # Algorithm
 
  1. Read the returns matrix off `pr` into `X`, and its row count into `T`.
- 2. Form the count `k = ceil(Int, alg.alpha * T)`, the number of order statistics the estimate reads. A drawdown series holds one entry per observation, so the count is the same count under every marker.
+ 2. Form the count `k = ceil(Int, ctx.alpha * T)`, the number of order statistics the estimate reads. A drawdown series holds one entry per observation, so the count is the same count under every marker.
  3. Take the sample, its centre and its whitening factor with [`radial_series_inputs`](@ref).
  4. Estimate the tail index of the radial series with [`radial_tail_index`](@ref), giving `a`.
  5. Return `inv(a)`, which is the deformation parameter.
 
 # Arguments
 
-  - `alg`: The rule. Its `alpha` field must hold a number, which [`bind_alpha`](@ref) puts there, and its `series` field names the quantity, which [`bind_series`](@ref) puts there.
+  - `alg`: The rule.
   - `key`: Name of the slot that is being resolved. The radial series has no sign, so this rule reads no end from it and returns one number for every key.
   - `pr`: Prior result the returns matrix, the expected returns vector and the covariance matrix are read off.
   - `w`: Effective observation weights. A tail index is a statement about the shape of a series rather than about the count of observations behind it, so this rule ignores them.
   - `slv`: Effective solver. This rule needs none, because the estimate is a closed form.
+  - `ctx`: The site's [`CalibrationContext`](@ref). `ctx.alpha` is the significance level of the end, and it must hold a number. `ctx.series` names the sample the radial series is built from.
 
 # Validation
 
-  - `alg.alpha` must not be `nothing`.
+  - `ctx.alpha` must not be `nothing`.
   - `k` must be at least `alg.kmin`.
   - The series must hold at least `k + 1` entries.
   - The sample must state a whitening, which [`radial_series_inputs`](@ref) checks on both readings.
@@ -1735,8 +1791,7 @@ Where:
 # Related
 
   - [`RadialTailDecay`](@ref)
-  - [`bind_alpha`](@ref)
-  - [`bind_series`](@ref)
+  - [`CalibrationContext`](@ref)
   - [`EntropyBudget`](@ref)
   - [`HillTailDecay`](@ref)
   - [`kappa_log`](@ref)
@@ -1745,141 +1800,26 @@ Where:
   - [`resolve_calibration_slot`](@ref)
   - [`whitening_factor`](@ref)
 """
-function (alg::RadialTailDecay)(::Symbol, pr::AbstractPriorResult, ::Any, ::Any)
-    @argcheck(!isnothing(alg.alpha),
-              IsNothingError("`RadialTailDecay.alpha` is `nothing`, so the rule cannot form the count `k = ceil(alpha * T)`. The probability of the end travels to the rule through `bind_alpha`, which the slot owner calls after it resolves that end's own probability. State `alpha` on the rule itself to run it outside a measure."))
+function (alg::RadialTailDecay)(::Symbol, pr::AbstractPriorResult, ::Any, ::Any,
+                                ctx::CalibrationContext)
+    @argcheck(!isnothing(ctx.alpha),
+              IsNothingError("`CalibrationContext.alpha` is `nothing`, so `RadialTailDecay` cannot form the count `k = ceil(alpha * T)`. The probability of the end reaches the rule in the context the slot owner builds, after it resolves that end's own probability. State `alpha` in the context to run the rule outside a measure."))
     X = pr.X
     T = size(X, 1)
-    k = ceil(Int, alg.alpha * T)
+    k = ceil(Int, ctx.alpha * T)
     @argcheck(k >= alg.kmin,
               DomainError(k,
                           "`RadialTailDecay` reads the largest `k = ceil(alpha * T) = $k` of the $T radial distances, and `RadialTailDecay.kmin` puts the floor at $(alg.kmin). A Hill estimate over fewer order statistics moves from fold to fold for no reason in the data, and the deformation parameter moves with it. The radial series holds one entry per observation where the pool of `HillTailDecay` holds `N`, so the same floor binds harder here. Lengthen the sample, widen `alpha`, or lower `kmin` and take the noise."))
     @argcheck(k + 1 <= T,
               DomainError(k,
-                          "`RadialTailDecay` needs $(k + 1) radial distances to form the estimate, and the series holds one per observation, which is $T. The count is `k = ceil(alpha * T)` at `alpha = $(alg.alpha)`, so only a probability that takes the whole sample reaches this. Lower `alpha`."))
-    Y, mu, U = radial_series_inputs(alg.series, pr)
+                          "`RadialTailDecay` needs $(k + 1) radial distances to form the estimate, and the series holds one per observation, which is $T. The count is `k = ceil(alpha * T)` at `alpha = $(ctx.alpha)`, so only a probability that takes the whole sample reaches this. Lower `alpha`."))
+    Y, mu, U = radial_series_inputs(ctx.series, pr)
     a = radial_tail_index(Y, mu, U, k)
     @argcheck(a > 1,
               DomainError(a,
-                          "`RadialTailDecay` estimated a tail index of $a on the radial series of the $(nameof(typeof(alg.series))), so `kappa = 1 / a` is $(inv(a)) and lies outside the (0, 1) the slot admits. An index of one or less is a tail with no finite mean, so no admissible deformation parameter reads it. The series is heavier-tailed than the measure can price."))
+                          "`RadialTailDecay` estimated a tail index of $a on the radial series of the $(nameof(typeof(ctx.series))), so `kappa = 1 / a` is $(inv(a)) and lies outside the (0, 1) the slot admits. An index of one or less is a tail with no finite mean, so no admissible deformation parameter reads it. The series is heavier-tailed than the measure can price."))
     return inv(a)
 end
-"""
-    bind_alpha(slot, alpha::Number)
-
-Hand a resolved `alpha` to the rule that reads it, and return the slot's occupant with the number in place.
-
-Two pairs **travel** through this verb. `alpha` and `kappa`: [`EntropyBudget`](@ref), [`HillTailDecay`](@ref) and [`RadialTailDecay`](@ref) each read the significance level of a sibling slot. `alpha` and `l`: [`TailTermParity`](@ref) prices a tail term at the measure's own significance level. [`resolve_calibration_slot`](@ref) carries a `Symbol` and no number, so the number travels through the rule itself. The slot owner's own resolution method resolves `alpha` first, calls this verb on the slot that reads it, and resolves the result:
-
-```julia
-alpha = resolve_calibration_slot(x.alpha, :alpha, pr, w, slv)
-kappa = resolve_calibration_slot(bind_alpha(x.kappa, alpha), :kappa, pr, w, slv)
-```
-
-The default is the identity, so a stated number, a plain function and a rule that reads no sibling all pass through untouched. A travelling role is rebuilt around the bound rule, which is what lets the verb take the slot rather than the rule the caller has to unwrap first. The significance family and the radius family need no method, because no rule of either reads a sibling and the identity is already the right answer for both.
-
-# Arguments
-
-  - `slot`: The slot's occupant: a number, a travelling role, or a rule.
-  - `alpha`: The sibling slot's resolved significance level.
-
-# Returns
-
-  - `bound`: The occupant, with `alpha` in place wherever a rule reads it.
-
-# Related
-
-  - [`EntropyBudget`](@ref)
-  - [`HillTailDecay`](@ref)
-  - [`RadialTailDecay`](@ref)
-  - [`TailTermParity`](@ref)
-  - [`DeformationTailCalibration`](@ref)
-  - [`DeformationHeadCalibration`](@ref)
-  - [`AmbiguityTailWeightCalibration`](@ref)
-  - [`resolve_calibration_slot`](@ref)
-"""
-function bind_alpha(slot, ::Number)
-    return slot
-end
-function bind_alpha(r::DeformationTailCalibration, alpha::Number)
-    return DeformationTailCalibration(; alg = bind_alpha(r.alg, alpha))
-end
-function bind_alpha(r::DeformationHeadCalibration, alpha::Number)
-    return DeformationHeadCalibration(; alg = bind_alpha(r.alg, alpha))
-end
-function bind_alpha(alg::EntropyBudget, alpha::Number)
-    return EntropyBudget(; target = alg.target, alpha = alpha)
-end
-function bind_alpha(alg::HillTailDecay, alpha::Number)
-    return HillTailDecay(; kmin = alg.kmin, alpha = alpha, series = alg.series)
-end
-function bind_alpha(alg::RadialTailDecay, alpha::Number)
-    return RadialTailDecay(; kmin = alg.kmin, alpha = alpha, series = alg.series)
-end
-"""
-    bind_series(slot, series::AbstractCalibrationSeries)
-
-Hand the series a slot owner prices to the rule that reads it, and return the slot's occupant with the marker in place.
-
-A rule gets a prior result and no portfolio, so the quantity it can read is the sample the prior carries. Which series of that sample is the right one is a property of the **owner**: [`RelativisticValueatRisk`](@ref) prices the returns and [`RelativisticDrawdownatRisk`](@ref) prices a drawdown series of them. [`resolve_calibration_slot`](@ref) carries a `Symbol` and no marker, and the key `:kappa` serves both owners, so the marker travels through the rule itself. This is the shape [`bind_alpha`](@ref) uses to carry a significance level, and the shape [`bind_norm_order`](@ref) uses to carry a norm order.
-
-The owner's series **wins**, on the terms [`bind_norm_order`](@ref) states. A rule that already carries a marker has it replaced, because the quantity belongs to the measure and a rule cannot know which measure it reached. So a stated `series` serves a caller who runs the rule by hand, and nothing else.
-
-The default is the identity, so a stated number, a travelling role, a plain function and a rule that reads no series all pass through untouched. [`EntropyBudget`](@ref) needs no method: it reads the sample length and the sibling `alpha`, and neither moves with the series. The significance and norm-ceiling families need none either. A significance level is a probability and carries no units, and a norm ceiling is a bound on the weight vector rather than on the sample.
-
-**The radius and tail-weight families do need one, and it is the units that say so.** A radius is a distance in the space of the scenarios the model prices, and a tail weight is the exchange rate between two terms of a loss, so both are read off a scale of that quantity. Under [`DistributionallyRobustConditionalDrawdownatRisk`](@ref) the quantity is a per-asset drawdown, which is what the transport cost of its own programme is measured against.
-
-The slot owner's own resolution method calls this beside [`bind_alpha`](@ref):
-
-```julia
-alpha = resolve_calibration_slot(x.alpha, :alpha, pr, w, slv)
-kappa = resolve_calibration_slot(bind_series(bind_alpha(x.kappa, alpha),
-                                             calibration_series(x)), :kappa, pr, w, slv)
-```
-
-# Arguments
-
-  - `slot`: The slot's occupant: a number, a travelling role, or a rule.
-  - `series`: The series the slot owner prices, which [`calibration_series`](@ref) states.
-
-# Returns
-
-  - `bound`: The occupant, with `series` in place wherever a rule reads one.
-
-# Related
-
-  - [`AbstractCalibrationSeries`](@ref)
-  - [`calibration_series`](@ref)
-  - [`bind_alpha`](@ref)
-  - [`bind_norm_order`](@ref)
-  - [`HillTailDecay`](@ref)
-  - [`RadialTailDecay`](@ref)
-  - [`ConcentrationRadius`](@ref)
-  - [`DimensionalRateRadius`](@ref)
-  - [`DualNormRadius`](@ref)
-  - [`TailTermParity`](@ref)
-  - [`DeformationTailCalibration`](@ref)
-  - [`DeformationHeadCalibration`](@ref)
-  - [`resolve_calibration_slot`](@ref)
-"""
-function bind_series(slot, ::AbstractCalibrationSeries)
-    return slot
-end
-function bind_series(r::DeformationTailCalibration, series::AbstractCalibrationSeries)
-    return DeformationTailCalibration(; alg = bind_series(r.alg, series))
-end
-function bind_series(r::DeformationHeadCalibration, series::AbstractCalibrationSeries)
-    return DeformationHeadCalibration(; alg = bind_series(r.alg, series))
-end
-function bind_series(alg::HillTailDecay, series::AbstractCalibrationSeries)
-    return HillTailDecay(; kmin = alg.kmin, alpha = alg.alpha, series = series)
-end
-function bind_series(alg::RadialTailDecay, series::AbstractCalibrationSeries)
-    return RadialTailDecay(; kmin = alg.kmin, alpha = alg.alpha, series = series)
-end
-# The two ambiguity roles and their rules stand below the deformation pair for the reason
-# the two `bind_alpha` methods above them do: the types are declared further down the file,
-# and the role is rebuilt around the bound rule on the same terms.
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -1895,7 +1835,7 @@ In order to implement a new concrete type that works seamlessly with the library
 
 ## The functor
 
-  - `(alg::AbstractAmbiguityRadiusCalibrationAlgorithm)(key::Symbol, pr::AbstractPriorResult, w, slv) -> Number`: Returns the ambiguity radius.
+  - `(alg::AbstractAmbiguityRadiusCalibrationAlgorithm)(key::Symbol, pr::AbstractPriorResult, w, slv, ctx::CalibrationContext) -> Number`: Returns the ambiguity radius.
 
 ### Arguments
 
@@ -1903,6 +1843,7 @@ In order to implement a new concrete type that works seamlessly with the library
   - `pr`: Prior result the rule reads its sample size and moments off.
   - `w`: Effective observation weights, or `nothing` when neither the owner nor the prior names any.
   - `slv`: Effective solver, or `nothing` when the owner carries none.
+  - `ctx`: What the site knows and `key` does not, as a [`CalibrationContext`](@ref). A rule reads the fields it needs off it, and one that reads none writes `::CalibrationContext`.
 
 ### Returns
 
@@ -1933,7 +1874,7 @@ In order to implement a new concrete type that works seamlessly with the library
 
 ## The functor
 
-  - `(alg::AbstractAmbiguityTailWeightCalibrationAlgorithm)(key::Symbol, pr::AbstractPriorResult, w, slv) -> Number`: Returns the tail weight.
+  - `(alg::AbstractAmbiguityTailWeightCalibrationAlgorithm)(key::Symbol, pr::AbstractPriorResult, w, slv, ctx::CalibrationContext) -> Number`: Returns the tail weight.
 
 ### Arguments
 
@@ -1941,6 +1882,7 @@ In order to implement a new concrete type that works seamlessly with the library
   - `pr`: Prior result the rule reads its sample size and moments off.
   - `w`: Effective observation weights, or `nothing` when neither the owner nor the prior names any.
   - `slv`: Effective solver, or `nothing` when the owner carries none.
+  - `ctx`: What the site knows and `key` does not, as a [`CalibrationContext`](@ref). A rule reads the fields it needs off it, and one that reads none writes `::CalibrationContext`.
 
 ### Returns
 
@@ -1971,7 +1913,7 @@ In order to implement a new concrete type that works seamlessly with the library
 
 ## The functor
 
-  - `(alg::AbstractNormCeilingCalibrationAlgorithm)(key::Symbol, pr::AbstractPriorResult, w, slv) -> Number`: Returns the norm ceiling.
+  - `(alg::AbstractNormCeilingCalibrationAlgorithm)(key::Symbol, pr::AbstractPriorResult, w, slv, ctx::CalibrationContext) -> Number`: Returns the norm ceiling.
 
 ### Arguments
 
@@ -1979,6 +1921,7 @@ In order to implement a new concrete type that works seamlessly with the library
   - `pr`: Prior result the rule reads its asset count and sample size off.
   - `w`: Effective observation weights, or `nothing` when neither the owner nor the prior names any.
   - `slv`: Effective solver, or `nothing` when the owner carries none.
+  - `ctx`: What the site knows and `key` does not, as a [`CalibrationContext`](@ref). A rule reads the fields it needs off it, and one that reads none writes `::CalibrationContext`.
 
 ### Returns
 
@@ -1986,21 +1929,21 @@ In order to implement a new concrete type that works seamlessly with the library
 
 ## The norm order
 
-A ceiling is read against one norm order, and that order belongs to the constraint rather than to the rule. A rule that needs the order should implement a [`bind_norm_order`](@ref) method, which each constraint site calls before it resolves the slot. A rule that needs no order needs no method.
+A ceiling is read against one norm order, and that order belongs to the constraint rather than to the rule. A rule that needs the order reads `ctx.p`, which each constraint site states in the [`CalibrationContext`](@ref) it hands over. A rule that needs no order reads no field of the context.
 
 # Related
 
   - [`AbstractCalibrationAlgorithm`](@ref)
   - [`NormCeilingCalibration`](@ref)
   - [`Func_NormCeilCal`](@ref)
-  - [`bind_norm_order`](@ref)
+  - [`CalibrationContext`](@ref)
   - [`EffectiveAssetFloor`](@ref)
 """
 abstract type AbstractNormCeilingCalibrationAlgorithm <: AbstractCalibrationAlgorithm end
 """
     const Func_AmbRadCal = Union{<:Function, <:AbstractAmbiguityRadiusCalibrationAlgorithm}
 
-Field bound for the `alg` field of an ambiguity-radius role: a rule of the family, or a plain function of the same four arguments. It is the counterpart of [`Func_SigCal`](@ref), and carries its reading unchanged.
+Field bound for the `alg` field of an ambiguity-radius role: a rule of the family, or a plain function of the same five arguments. It is the counterpart of [`Func_SigCal`](@ref), and carries its reading unchanged.
 
 # Related
 
@@ -2013,7 +1956,7 @@ const Func_AmbRadCal = Union{<:Function, <:AbstractAmbiguityRadiusCalibrationAlg
     const Func_AmbTwtCal = Union{<:Function,
                                  <:AbstractAmbiguityTailWeightCalibrationAlgorithm}
 
-Field bound for the `alg` field of an ambiguity-tail-weight role: a rule of the family, or a plain function of the same four arguments. [`TailTermParity`](@ref) is the rule the family ships, and the plain function carries a caller's own.
+Field bound for the `alg` field of an ambiguity-tail-weight role: a rule of the family, or a plain function of the same five arguments. [`TailTermParity`](@ref) is the rule the family ships, and the plain function carries a caller's own.
 
 # Related
 
@@ -2027,7 +1970,7 @@ const Func_AmbTwtCal = Union{<:Function, <:AbstractAmbiguityTailWeightCalibratio
     const Func_NormCeilCal = Union{<:Function,
                                    <:AbstractNormCeilingCalibrationAlgorithm}
 
-Field bound for the `alg` field of a norm-ceiling role: a rule of the family, or a plain function of the same four arguments. It is the counterpart of [`Func_AmbRadCal`](@ref), and carries its reading unchanged.
+Field bound for the `alg` field of a norm-ceiling role: a rule of the family, or a plain function of the same five arguments. It is the counterpart of [`Func_AmbRadCal`](@ref), and carries its reading unchanged.
 
 # Related
 
@@ -2087,7 +2030,7 @@ Places a tail-weight rule in a slot that holds the weight of the tail term of an
 
 It is the counterpart of [`AmbiguityRadiusCalibration`](@ref), and carries the same shape. Its `alg` holds [`TailTermParity`](@ref) or a caller's own function.
 
-The role **travels**, and the radius role does not. A tail weight prices a tail at the measure's own significance level, so [`bind_alpha`](@ref) rebuilds the role around the bound rule before the slot is resolved, on the same terms as the two deformation roles.
+The rule reads a **travelling pair**, and a radius rule does not. A tail weight prices a tail at the measure's own significance level, so the slot owner states that level in `ctx.alpha` before the slot is resolved, on the same terms as the two deformation roles.
 
 # Fields
 
@@ -2109,7 +2052,7 @@ Keywords correspond to the struct's fields. `alg` has no default, because the ru
   - [`Num_AmbTwtCal`](@ref)
   - [`Func_AmbTwtCal`](@ref)
   - [`TailTermParity`](@ref)
-  - [`bind_alpha`](@ref)
+  - [`CalibrationContext`](@ref)
 """
 @concrete struct AmbiguityTailWeightCalibration <: AbstractCalibrationEstimator
     """
@@ -2251,7 +2194,7 @@ $(DocStringExtensions.FIELDS)
         series::AbstractCalibrationSeries = ReturnsSeries()
     ) -> ConcentrationRadius
 
-Keywords correspond to the struct's fields. `confidence` defaults to `0.95`, `scale` defaults to `nothing`, which reads the average per-asset dispersion off the sample, and `series` defaults to [`ReturnsSeries`](@ref), and every slot owner overwrites it through [`bind_series`](@ref).
+Keywords correspond to the struct's fields. `confidence` defaults to `0.95`, and `scale` defaults to `nothing`, which reads the average per-asset dispersion off the sample. The series that dispersion is read over is not a field of the rule: it reaches the rule in the [`CalibrationContext`](@ref) the site hands over.
 
 ## Validation
 
@@ -2263,7 +2206,7 @@ Keywords correspond to the struct's fields. `confidence` defaults to `0.95`, `sc
   - [`AbstractAmbiguityRadiusCalibrationAlgorithm`](@ref)
   - [`RateRadius`](@ref)
   - [`DimensionalRateRadius`](@ref)
-  - [`bind_series`](@ref)
+  - [`CalibrationContext`](@ref)
   - [`calibration_series_dispersion`](@ref)
   - [`DualNormRadius`](@ref): answers what the sampling error is in the ground metric the slot names, so its number changes with the key while this one's does not.
   - [`AmbiguityRadiusCalibration`](@ref)
@@ -2278,21 +2221,14 @@ Keywords correspond to the struct's fields. `confidence` defaults to `0.95`, `sc
     $(field_dict[:cal_scale])
     """
     scale
-    """
-    $(field_dict[:cal_series_scale])
-    """
-    series
-    function ConcentrationRadius(confidence::Number, scale::Option{<:Number},
-                                 series::AbstractCalibrationSeries)
+    function ConcentrationRadius(confidence::Number, scale::Option{<:Number})
         assert_unit_interval(confidence, :confidence)
         assert_nonempty_gt0_finite_val(scale, :scale)
-        return new{typeof(confidence), typeof(scale), typeof(series)}(confidence, scale,
-                                                                      series)
+        return new{typeof(confidence), typeof(scale)}(confidence, scale)
     end
 end
-function ConcentrationRadius(; confidence::Number = 0.95, scale::Option{<:Number} = nothing,
-                             series::AbstractCalibrationSeries = ReturnsSeries())
-    return ConcentrationRadius(confidence, scale, series)
+function ConcentrationRadius(; confidence::Number = 0.95, scale::Option{<:Number} = nothing)
+    return ConcentrationRadius(confidence, scale)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -2324,11 +2260,12 @@ Where:
 
 # Arguments
 
-  - `alg`: The rule. Its `series` field names the quantity the ball is drawn around, which [`bind_series`](@ref) puts there.
+  - `alg`: The rule.
   - `key`: Name of the slot that is being resolved. The radius is the same for every key, so the two tails of a Range measure that carry one rule resolve to one number.
   - `pr`: Prior result the sample size, the asset count and, on a returns series, the covariance matrix are read off. A drawdown series reads the sample instead.
   - `w`: Effective observation weights, or `nothing`.
   - `slv`: Effective solver. This rule needs none.
+  - `ctx`: The site's [`CalibrationContext`](@ref). `ctx.series` names the quantity the ball is drawn around, and the per-asset dispersion is read off it when `scale` is `nothing`.
 
 # Returns
 
@@ -2339,16 +2276,17 @@ Where:
   - [`ConcentrationRadius`](@ref)
   - [`RateRadius`](@ref)
   - [`DimensionalRateRadius`](@ref)
-  - [`bind_series`](@ref)
+  - [`CalibrationContext`](@ref)
   - [`calibration_series_dispersion`](@ref)
   - [`effective_sample_size`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
-function (alg::ConcentrationRadius)(::Symbol, pr::AbstractPriorResult, w, ::Any)
+function (alg::ConcentrationRadius)(::Symbol, pr::AbstractPriorResult, w, ::Any,
+                                    ctx::CalibrationContext)
     N = size(pr.X, 2)
     T = effective_sample_size(pr, w)
     scale = if isnothing(alg.scale)
-        Statistics.mean(calibration_series_dispersion(alg.series, pr))
+        Statistics.mean(calibration_series_dispersion(ctx.series, pr))
     else
         alg.scale
     end
@@ -2433,6 +2371,7 @@ Where:
   - `pr`: Prior result the sample length is read off.
   - `w`: Effective observation weights. This rule reads the raw row count, so it ignores them.
   - `slv`: Effective solver. This rule needs none.
+  - `ctx`: The site's [`CalibrationContext`](@ref). This rule reads no field of it.
 
 # Returns
 
@@ -2445,7 +2384,8 @@ Where:
   - [`DimensionalRateRadius`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
-function (alg::RateRadius)(::Symbol, pr::AbstractPriorResult, ::Any, ::Any)
+function (alg::RateRadius)(::Symbol, pr::AbstractPriorResult, ::Any, ::Any,
+                           ::CalibrationContext)
     return alg.c / sqrt(size(pr.X, 1))
 end
 """
@@ -2467,7 +2407,7 @@ The source result carries a second branch for a short record, whose exponent is 
 
 `scale` states the units. A radius multiplies a norm of the weight vector, so it is in the units of the loss the ball is drawn around, and no caller can intuit that number from the confidence level alone. `scale = nothing` reads the average per-asset dispersion of the series the slot owner prices instead, on the same terms as [`ConcentrationRadius`](@ref), and a drawdown owner is read on a drawdown scale there for the reason that rule states.
 
-[`DistributionallyRobustConditionalDrawdownatRisk`](@ref) prices a ball around the drawdown scenarios. The scenario dimension there is still `N`, so the rate carries, and the scale moves with the series: [`bind_series`](@ref) puts the owner's marker on the rule, and [`calibration_series_dispersion`](@ref) then reads the per-asset dispersion off the drawdown sample rather than off `pr.sigma`. A drawdown column is a running functional of its returns, so its dispersion is the wider of the two, and a `scale` of `nothing` therefore gives a wider ball on that owner than on a returns owner of the same sample. A stated `scale` still wins, and it is the way to price a ball whose units are neither.
+[`DistributionallyRobustConditionalDrawdownatRisk`](@ref) prices a ball around the drawdown scenarios. The scenario dimension there is still `N`, so the rate carries, and the scale moves with the series: the site states the owner's marker in `ctx.series`, and [`calibration_series_dispersion`](@ref) then reads the per-asset dispersion off the drawdown sample rather than off `pr.sigma`. A drawdown column is a running functional of its returns, so its dispersion is the wider of the two, and a `scale` of `nothing` therefore gives a wider ball on that owner than on a returns owner of the same sample. A stated `scale` still wins, and it is the way to price a ball whose units are neither.
 
 `T` is the effective sample size when observation weights are stated, and the raw row count when they are not, on the same terms as [`ConcentrationRadius`](@ref) and [`ScenarioCount`](@ref). The rate is a concentration statement, so the record it prices is the one Kish's count measures. [`RateRadius`](@ref) reads the raw row count instead, because its rate speaks of the length of the record.
 
@@ -2485,7 +2425,7 @@ $(DocStringExtensions.FIELDS)
         series::AbstractCalibrationSeries = ReturnsSeries()
     ) -> DimensionalRateRadius
 
-Keywords correspond to the struct's fields. `confidence` defaults to `0.95`, `scale` defaults to `nothing`, which reads the average per-asset dispersion off the sample, and `series` defaults to [`ReturnsSeries`](@ref), and every slot owner overwrites it through [`bind_series`](@ref).
+Keywords correspond to the struct's fields. `confidence` defaults to `0.95`, and `scale` defaults to `nothing`, which reads the average per-asset dispersion off the sample. The series that dispersion is read over is not a field of the rule: it reaches the rule in the [`CalibrationContext`](@ref) the site hands over.
 
 ## Validation
 
@@ -2498,7 +2438,7 @@ Keywords correspond to the struct's fields. `confidence` defaults to `0.95`, `sc
   - [`ConcentrationRadius`](@ref)
   - [`RateRadius`](@ref)
   - [`AmbiguityRadiusCalibration`](@ref)
-  - [`bind_series`](@ref)
+  - [`CalibrationContext`](@ref)
   - [`calibration_series_dispersion`](@ref)
   - [`resolve_calibration_slot`](@ref)
 
@@ -2515,22 +2455,15 @@ Keywords correspond to the struct's fields. `confidence` defaults to `0.95`, `sc
     $(field_dict[:cal_dim_scale])
     """
     scale
-    """
-    $(field_dict[:cal_series_scale])
-    """
-    series
-    function DimensionalRateRadius(confidence::Number, scale::Option{<:Number},
-                                   series::AbstractCalibrationSeries)
+    function DimensionalRateRadius(confidence::Number, scale::Option{<:Number})
         assert_unit_interval(confidence, :confidence)
         assert_nonempty_gt0_finite_val(scale, :scale)
-        return new{typeof(confidence), typeof(scale), typeof(series)}(confidence, scale,
-                                                                      series)
+        return new{typeof(confidence), typeof(scale)}(confidence, scale)
     end
 end
 function DimensionalRateRadius(; confidence::Number = 0.95,
-                               scale::Option{<:Number} = nothing,
-                               series::AbstractCalibrationSeries = ReturnsSeries())
-    return DimensionalRateRadius(confidence, scale, series)
+                               scale::Option{<:Number} = nothing)
+    return DimensionalRateRadius(confidence, scale)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -2564,11 +2497,12 @@ The exponent is floored at one half, so a universe of one or two assets returns 
 
 # Arguments
 
-  - `alg`: The rule. Its `series` field names the quantity the ball is drawn around, which [`bind_series`](@ref) puts there.
+  - `alg`: The rule.
   - `key`: Name of the slot that is being resolved. The radius is the same for every key, so the two tails of a Range measure that carry one rule resolve to one number.
   - `pr`: Prior result the sample size, the asset count and, on a returns series, the covariance matrix are read off. A drawdown series reads the sample instead.
   - `w`: Effective observation weights, or `nothing`.
   - `slv`: Effective solver. This rule needs none.
+  - `ctx`: The site's [`CalibrationContext`](@ref). `ctx.series` names the quantity the ball is drawn around, and the per-asset dispersion is read off it when `scale` is `nothing`.
 
 # Returns
 
@@ -2579,16 +2513,17 @@ The exponent is floored at one half, so a universe of one or two assets returns 
   - [`DimensionalRateRadius`](@ref)
   - [`ConcentrationRadius`](@ref)
   - [`RateRadius`](@ref)
-  - [`bind_series`](@ref)
+  - [`CalibrationContext`](@ref)
   - [`calibration_series_dispersion`](@ref)
   - [`effective_sample_size`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
-function (alg::DimensionalRateRadius)(::Symbol, pr::AbstractPriorResult, w, ::Any)
+function (alg::DimensionalRateRadius)(::Symbol, pr::AbstractPriorResult, w, ::Any,
+                                      ctx::CalibrationContext)
     N = size(pr.X, 2)
     T = effective_sample_size(pr, w)
     scale = if isnothing(alg.scale)
-        Statistics.mean(calibration_series_dispersion(alg.series, pr))
+        Statistics.mean(calibration_series_dispersion(ctx.series, pr))
     else
         alg.scale
     end
@@ -2613,7 +2548,7 @@ The 1-norm case sums the per-asset errors, which prices them as if they moved to
 
 **The worst case is the reading a radius wants, so the correlation-aware form stays out.** A radius that understates the ball gives a model that is robust to less than the caller asked for, and the failure is silent: the optimisation solves and the weights are not robust. A radius that overstates it is visible, because the portfolio moves towards cash. The two errors are not symmetric, so the rule takes the one a caller can see.
 
-`p` serves the `:lpreg_val` slot alone. The ground metric of [`LpRegularisation`](@ref) is the type-``q`` metric with ``1/p + 1/q = 1``, and `key` names the slot rather than the norm order. The order belongs to the penalty, so that site fills this field through [`bind_norm_order`](@ref) before it resolves the slot, and the call **overwrites** whatever the field holds. A stated `p` therefore serves a caller who runs the rule outside that site, and nothing else. Every other key ignores the field.
+`ctx.p` serves the `:lpreg_val` slot alone. The ground metric of [`LpRegularisation`](@ref) is the type-``q`` metric with ``1/p + 1/q = 1``, and `key` names the slot rather than the norm order. The order belongs to the penalty, so that site states it in the [`CalibrationContext`](@ref) before it resolves the slot. The rule holds no order of its own, so a caller who runs it outside that site states the order in the context. Every other key ignores it.
 
 **The drawdown owner is served on a drawdown scale, and `series` is what says so.** [`DistributionallyRobustConditionalDrawdownatRisk`](@ref) measures the transport cost of its own programme against the per-asset drawdown sample, so the ball it prices is a ball over drawdown scenarios and the ground metric is a distance between two such vectors. [`calibration_series_dispersion`](@ref) reads the error scale off that sample under a drawdown marker, and `pr.sigma` reaches nothing there: it is a moment of the returns, and no scaling of it states a moment of a drawdown. The ground metric does not move with the series, only the vector it is taken of.
 
@@ -2637,7 +2572,7 @@ $(DocStringExtensions.FIELDS)
         series::AbstractCalibrationSeries = ReturnsSeries()
     ) -> DualNormRadius
 
-Keywords correspond to the struct's fields. `confidence` defaults to `0.95`, `p` defaults to `nothing`, which serves every slot but `:lpreg_val`, and `series` defaults to [`ReturnsSeries`](@ref), and every slot owner overwrites it through [`bind_series`](@ref).
+Keywords correspond to the struct's fields. `confidence` defaults to `0.95`. The norm order and the series are not fields of the rule: both reach it in the [`CalibrationContext`](@ref) the site hands over.
 
 ## Validation
 
@@ -2650,8 +2585,7 @@ Keywords correspond to the struct's fields. `confidence` defaults to `0.95`, `p`
   - [`ConcentrationRadius`](@ref): answers how wide the ball is at a confidence level, in one dimensionless factor that no norm enters.
   - [`RateRadius`](@ref): answers how fast the ball shrinks with the record, and leaves the coefficient to a cross-validation.
   - [`AmbiguityRadiusCalibration`](@ref)
-  - [`bind_series`](@ref)
-  - [`bind_norm_order`](@ref)
+  - [`CalibrationContext`](@ref)
   - [`calibration_series_dispersion`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
@@ -2660,27 +2594,13 @@ Keywords correspond to the struct's fields. `confidence` defaults to `0.95`, `p`
     `confidence`: Per-coordinate confidence level of the normal quantile the error scale is multiplied by. It is not corrected for the number of assets, so the ∞-norm case reads a level over one coordinate and not over the vector.
     """
     confidence
-    """
-    `p`: Norm order of the [`LpRegularisation`](@ref) penalty the radius stands in, or `nothing`. It is read for the `:lpreg_val` key alone, where the ground metric is the type-``q`` metric with ``1/p + 1/q = 1`` and no key can name ``q``. The penalty site overwrites it through [`bind_norm_order`](@ref), so state it only to run the rule outside that site.
-    """
-    p
-    """
-    $(field_dict[:cal_series_scale])
-    """
-    series
-    function DualNormRadius(confidence::Number, p::Option{<:Number},
-                            series::AbstractCalibrationSeries)
+    function DualNormRadius(confidence::Number)
         assert_unit_interval(confidence, :confidence)
-        if !isnothing(p)
-            @argcheck(isfinite(p), IsNonFiniteError)
-            @argcheck(p > one(p), DomainError)
-        end
-        return new{typeof(confidence), typeof(p), typeof(series)}(confidence, p, series)
+        return new{typeof(confidence)}(confidence)
     end
 end
-function DualNormRadius(; confidence::Number = 0.95, p::Option{<:Number} = nothing,
-                        series::AbstractCalibrationSeries = ReturnsSeries())
-    return DualNormRadius(confidence, p, series)
+function DualNormRadius(; confidence::Number = 0.95)
+    return DualNormRadius(confidence)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -2725,11 +2645,12 @@ The two ends of a Range measure carry one ground metric, so a rule stated on bot
 
 # Arguments
 
-  - `alg`: The rule. Its `series` field names the quantity the ball is drawn around, which [`bind_series`](@ref) puts there.
+  - `alg`: The rule.
   - `key`: Name of the slot that is being resolved. It selects the ground metric, so this is the one rule of its family for which the key carries meaning.
   - `pr`: Prior result the sample size and, on a returns series, the covariance matrix are read off. A drawdown series reads the sample instead.
   - `w`: Effective observation weights, or `nothing`.
   - `slv`: Effective solver. This rule needs none.
+  - `ctx`: The site's [`CalibrationContext`](@ref). `ctx.series` names the quantity the error vector is measured in, and `ctx.p` is the penalty's norm order, which the `:lpreg_val` key alone reads.
 
 # Validation
 
@@ -2745,16 +2666,17 @@ The two ends of a Range measure carry one ground metric, so a rule stated on bot
   - [`DualNormRadius`](@ref)
   - [`ConcentrationRadius`](@ref)
   - [`RateRadius`](@ref)
-  - [`bind_series`](@ref)
+  - [`CalibrationContext`](@ref)
   - [`calibration_series_dispersion`](@ref)
   - [`effective_sample_size`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
-function (alg::DualNormRadius)(key::Symbol, pr::AbstractPriorResult, w, ::Any)
+function (alg::DualNormRadius)(key::Symbol, pr::AbstractPriorResult, w, ::Any,
+                               ctx::CalibrationContext)
     T = effective_sample_size(pr, w)
-    e = calibration_series_dispersion(alg.series, pr) ./ sqrt(T)
+    e = calibration_series_dispersion(ctx.series, pr) ./ sqrt(T)
     z = Distributions.quantile(Distributions.Normal(), alg.confidence)
-    return z * dual_norm_radius_scale(alg, key, e)
+    return z * dual_norm_radius_scale(key, ctx.p, e)
 end
 """
     dual_norm_radius_scale(alg::DualNormRadius, key::Symbol, e::AbstractVector)
@@ -2772,7 +2694,7 @@ This is the whole of the key's meaning, held apart from the functor. Six of the 
 # Validation
 
   - `key` is one of the seven [`DualNormRadius`](@ref) serves, else an `ArgumentError`.
-  - `alg.p` is stated when `key` is `:lpreg_val`, else an `ArgumentError`.
+  - `ctx.p` is stated when `key` is `:lpreg_val`, else an `ArgumentError`. It is then finite and above one, so that the conjugate order `q = p / (p - 1)` exists.
 
 # Returns
 
@@ -2783,12 +2705,15 @@ This is the whole of the key's meaning, held apart from the functor. Six of the 
   - [`DualNormRadius`](@ref)
   - [`LpRegularisation`](@ref)
 """
-function dual_norm_radius_scale(alg::DualNormRadius, key::Symbol, e::AbstractVector)
+function dual_norm_radius_scale(key::Symbol, p::Option{<:Number}, e::AbstractVector)
     metrics = (; l1 = Inf, linf = 1, r = 1, r_a = 1, r_b = 1, l2reg_val = 2)
     g = if key === :lpreg_val
-        @argcheck(!isnothing(alg.p),
-                  ArgumentError("`DualNormRadius.p` is `nothing` while the `:lpreg_val` slot is being resolved. That slot's ground metric is the type-`q` metric of an `LpRegularisation` penalty, with `1/p + 1/q = 1`, and the order belongs to the penalty. The penalty site fills the field through `bind_norm_order`, so a `nothing` here means the rule was resolved somewhere that binds no order. Place the rule in the `val` field of an `LpRegularisation`, or state `p` on the rule."))
-        alg.p / (alg.p - one(alg.p))
+        @argcheck(!isnothing(p),
+                  ArgumentError("`CalibrationContext.p` is `nothing` while the `:lpreg_val` slot is being resolved. That slot's ground metric is the type-`q` metric of an `LpRegularisation` penalty, with `1/p + 1/q = 1`, and the order belongs to the penalty. The penalty site states it in the context, so a `nothing` here means the rule was resolved somewhere that states no order. Place the rule in the `val` field of an `LpRegularisation`, or state `p` in the context."))
+        @argcheck(isfinite(p) && p > one(p),
+                  DomainError(p,
+                              "`CalibrationContext.p` is $p, and the type-`q` ground metric of an `LpRegularisation` penalty needs a finite order above one, because `q = p / (p - 1)` is what `DualNormRadius` takes the norm in. An order of one, or an infinite one, names no conjugate the rule can read."))
+        p / (p - one(p))
     else
         get(() -> throw(ArgumentError("`DualNormRadius` reads `key` to pick the ground metric of the slot it stands in, and it received `:$key`, which names no slot it serves. The keys it serves are `:l1`, `:linf`, `:r`, `:r_a`, `:r_b`, `:l2reg_val` and `:lpreg_val`. A measure of your own that holds a radius resolves its slot under one of those keys, or carries a rule of its own.")),
             metrics, key)
@@ -2810,11 +2735,11 @@ A rule reads no portfolio, so it cannot form ``\\boldsymbol{w}^{\\intercal} \\bo
 
 ``m`` is negative for a sample of positive expected return, and the rule takes ``\\lvert m \\rvert``. No field states the sign: a negative weight is not admissible in the slot, and a sample of negative expected return does not turn the trade-off around.
 
-The rule reads its sibling `alpha`, because ``c`` is a ``\\mathrm{CVaR}`` at the measure's own significance level. `alpha` and `l` are a **travelling pair**, on the same terms as `alpha` and `kappa`: [`bind_alpha`](@ref) fills the `alpha` field with the number the slot owner resolved, and the owner's own resolution method resolves `alpha` first for that reason. A caller who runs the rule outside a measure states `alpha` instead.
+The rule reads its sibling `alpha`, because ``c`` is a ``\\mathrm{CVaR}`` at the measure's own significance level. `alpha` and `l` are a **travelling pair**, on the same terms as `alpha` and `kappa`: the rule reads `ctx.alpha`, and the owner's own resolution method resolves `alpha` first for that reason. A caller who runs the rule outside a measure states `alpha` in the context.
 
 **Both scales read the observation weights.** They are sample statistics rather than counts, so a weighted sample is read weighted. [`RateRadius`](@ref) and [`RateSignificance`](@ref) ignore `w` because a rate speaks of the length of the record, and that reading does not carry to a moment.
 
-**`series` says which quantity both terms are read over, and the slot owner states it.** [`DistributionallyRobustConditionalDrawdownatRisk`](@ref) carries the key `:l` as well, and its tail term is a ``\\mathrm{CDaR}`` of the portfolio drawdown series. A rule is given no portfolio, but it can form the drawdown series of each **column**, and [`bind_series`](@ref) puts the marker there at the resolution site. Both terms then move together: the mean term is the mean drawdown of the pool, and the tail term is the mean of the per-column ``\\mathrm{CDaR}_{\\alpha}``. The same [`ConditionalValueatRisk`](@ref) reading forms it, because the tail mean of a non-positive drawdown column **is** the ``\\mathrm{CDaR}`` of that column, so the rule and the measure it calibrates still cannot drift apart.
+**`ctx.series` says which quantity both terms are read over, and the slot owner states it.** [`DistributionallyRobustConditionalDrawdownatRisk`](@ref) carries the key `:l` as well, and its tail term is a ``\\mathrm{CDaR}`` of the portfolio drawdown series. A rule is given no portfolio, but it can form the drawdown series of each **column**, and the resolution site names the marker in `ctx.series`. Both terms then move together: the mean term is the mean drawdown of the pool, and the tail term is the mean of the per-column ``\\mathrm{CDaR}_{\\alpha}``. The same [`ConditionalValueatRisk`](@ref) reading forms it, because the tail mean of a non-positive drawdown column **is** the ``\\mathrm{CDaR}`` of that column, so the rule and the measure it calibrates still cannot drift apart.
 
 A second reading of `l` exists, and this rule does not take it. `l` can be read as a risk-aversion coefficient and mapped from a mean-variance one, but a variance penalty is quadratic in the weight vector and a ``\\mathrm{CVaR}`` term is positively homogeneous, so the two objectives are not comparable term by term. The map holds at one reference portfolio and nowhere else, and a rule gets no portfolio.
 
@@ -2832,7 +2757,7 @@ $(DocStringExtensions.FIELDS)
         series::AbstractCalibrationSeries = ReturnsSeries()
     ) -> TailTermParity
 
-Keywords correspond to the struct's fields. `ratio` defaults to `1`, which is parity between the two terms. `alpha` defaults to `nothing`, which is the state a rule stands in a slot in. `series` defaults to [`ReturnsSeries`](@ref), and every slot owner overwrites it through [`bind_series`](@ref).
+Keywords correspond to the struct's fields. `ratio` defaults to `1`, which is parity between the two terms. The significance level and the series both terms are read over are not fields of the rule: both reach it in the [`CalibrationContext`](@ref) the site hands over.
 
 ## Validation
 
@@ -2842,7 +2767,7 @@ Keywords correspond to the struct's fields. `ratio` defaults to `1`, which is pa
 
   - [`AbstractAmbiguityTailWeightCalibrationAlgorithm`](@ref)
   - [`AmbiguityTailWeightCalibration`](@ref)
-  - [`bind_alpha`](@ref)
+  - [`CalibrationContext`](@ref)
   - [`ConditionalValueatRisk`](@ref)
   - [`DistributionallyRobustConditionalValueatRisk`](@ref)
   - [`DistributionallyRobustConditionalDrawdownatRisk`](@ref)
@@ -2858,23 +2783,13 @@ Keywords correspond to the struct's fields. `ratio` defaults to `1`, which is pa
     $(field_dict[:cal_ratio])
     """
     ratio
-    """
-    $(field_dict[:cal_alpha_sib])
-    """
-    alpha
-    """
-    $(field_dict[:cal_series_twt])
-    """
-    series
-    function TailTermParity(ratio::Number, alpha::Option{<:Number},
-                            series::AbstractCalibrationSeries)
+    function TailTermParity(ratio::Number)
         assert_nonempty_gt0_finite_val(ratio, :ratio)
-        return new{typeof(ratio), typeof(alpha), typeof(series)}(ratio, alpha, series)
+        return new{typeof(ratio)}(ratio)
     end
 end
-function TailTermParity(; ratio::Number = 1, alpha::Option{<:Number} = nothing,
-                        series::AbstractCalibrationSeries = ReturnsSeries())
-    return TailTermParity(ratio, alpha, series)
+function TailTermParity(; ratio::Number = 1)
+    return TailTermParity(ratio)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -2899,7 +2814,7 @@ Where:
   - ``m``: Mean-term scale, the mean of the pooled cross-section of the per-asset losses.
   - ``c``: Tail-term scale, the mean of the per-column ``\\mathrm{CVaR}_{\\alpha}`` of the loss.
   - ``\\boldsymbol{r}_{j}``: Column ``j`` of the returns matrix.
-  - ``\\mathcal{S}``: The series `alg.series` names, built from one column. It is the identity on a [`ReturnsSeries`](@ref), and a drawdown series on the two markers of [`AbstractDrawdownSeries`](@ref).
+  - ``\\mathcal{S}``: The series `ctx.series` names, built from one column. It is the identity on a [`ReturnsSeries`](@ref), and a drawdown series on the two markers of [`AbstractDrawdownSeries`](@ref).
   - ``y_{tj}``: Entry ``t`` of the series of column ``j``.
   - ``\\boldsymbol{y}_{j}``: The series of column ``j``. A ``\\mathrm{CVaR}_{\\alpha}`` of a non-positive drawdown series is the ``\\mathrm{CDaR}_{\\alpha}`` of that column.
   - $(math_dict[:w_t_obs])
@@ -2912,22 +2827,23 @@ Every observation weight is one when none is stated. Every column holds ``T`` en
 
 # Algorithm
 
- 1. Build the sample `alg.series` names with [`calibration_series_matrix`](@ref) into `X`, and read the effective observation weights off `w`. A [`ReturnsSeries`](@ref) returns `pr.X` itself.
+ 1. Build the sample `ctx.series` names with [`calibration_series_matrix`](@ref) into `X`, and read the effective observation weights off `w`. A [`ReturnsSeries`](@ref) returns `pr.X` itself.
  2. Form the mean-term scale `m`, the negated weighted mean of the pooled cross-section of `X`.
- 3. Build a [`ConditionalValueatRisk`](@ref) at `alg.alpha` carrying the same weights, and form the tail-term scale `c`, the mean over the columns of `X` of the value that measure takes on each. The measure's own reading is the one used, so the rule and the measure it calibrates cannot drift apart.
+ 3. Build a [`ConditionalValueatRisk`](@ref) at `ctx.alpha` carrying the same weights, and form the tail-term scale `c`, the mean over the columns of `X` of the value that measure takes on each. The measure's own reading is the one used, so the rule and the measure it calibrates cannot drift apart.
  4. Return `alg.ratio * abs(m) / c`.
 
 # Arguments
 
-  - `alg`: The rule. Its `alpha` field must hold a number, which [`bind_alpha`](@ref) puts there, and its `series` field names the quantity, which [`bind_series`](@ref) puts there.
+  - `alg`: The rule.
   - `key`: Name of the slot that is being resolved. The scales are read off the asset columns, so the key never selects the value, and the two ends of a Range measure part company through their two probabilities alone.
   - `pr`: Prior result the returns matrix is read off. The series is built from its columns.
   - `w`: Effective observation weights, or `nothing`. Both scales are sample statistics, so this rule reads them.
   - `slv`: Effective solver. This rule needs none, because both scales are closed forms.
+  - `ctx`: The site's [`CalibrationContext`](@ref). `ctx.alpha` is the measure's own significance level, and it must hold a number. `ctx.series` names the quantity both terms are read over.
 
 # Validation
 
-  - `alg.alpha` must not be `nothing`.
+  - `ctx.alpha` must not be `nothing`.
   - ``\\lvert m \\rvert`` must be positive.
   - ``c`` must be positive.
 
@@ -2938,8 +2854,7 @@ Every observation weight is one when none is stated. Every column holds ``T`` en
 # Related
 
   - [`TailTermParity`](@ref)
-  - [`bind_alpha`](@ref)
-  - [`bind_series`](@ref)
+  - [`CalibrationContext`](@ref)
   - [`calibration_series_matrix`](@ref)
   - [`ConditionalValueatRisk`](@ref)
   - [`ConditionalDrawdownatRisk`](@ref)
@@ -2947,13 +2862,14 @@ Every observation weight is one when none is stated. Every column holds ``T`` en
   - [`DistributionallyRobustConditionalDrawdownatRisk`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
-function (alg::TailTermParity)(::Symbol, pr::AbstractPriorResult, w, ::Any)
-    @argcheck(!isnothing(alg.alpha),
-              IsNothingError("`TailTermParity.alpha` is `nothing`, so the rule cannot form the tail-term scale `c`, which is a CVaR at the measure's own significance level. The probability travels to the rule through `bind_alpha`, which the slot owner calls after it resolves `alpha`. State `alpha` on the rule itself to run it outside a measure."))
+function (alg::TailTermParity)(::Symbol, pr::AbstractPriorResult, w, ::Any,
+                               ctx::CalibrationContext)
+    @argcheck(!isnothing(ctx.alpha),
+              IsNothingError("`CalibrationContext.alpha` is `nothing`, so `TailTermParity` cannot form the tail-term scale `c`, which is a CVaR at the measure's own significance level. The probability reaches the rule in the context the slot owner builds, after it resolves `alpha`. State `alpha` in the context to run the rule outside a measure."))
     # Both scales are read over the series the OWNER prices. Under a returns marker this is
     # `pr.X` itself, and under a drawdown marker the tail term is a CDaR: the CVaR kernel
     # over a non-positive drawdown column is the mean of its worst `alpha`.
-    X = calibration_series_matrix(alg.series, pr.X)
+    X = calibration_series_matrix(ctx.series, pr.X)
     N = size(X, 2)
     ws = get_observation_weights(w, view(X, :, 1))
     m = if isnothing(ws)
@@ -2967,44 +2883,12 @@ function (alg::TailTermParity)(::Symbol, pr::AbstractPriorResult, w, ::Any)
     # The tail term the weight scales is a CVaR, so the reading is the measure's own rather
     # than a second encoding of it here. A rule that carried its own copy would drift from
     # the measure it calibrates the moment either moved.
-    rm = ConditionalValueatRisk(; alpha = alg.alpha, w = w)
+    rm = ConditionalValueatRisk(; alpha = ctx.alpha, w = w)
     c = Statistics.mean(j -> rm(view(X, :, j)), axes(X, 2))
     @argcheck(c > 0,
               DomainError(c,
-                          "`TailTermParity` read a tail-term scale of $c at `alpha = $(alg.alpha)`, which is not positive, so the ratio `ratio * abs(m) / c` has no admissible value. The scale is the mean of the per-column CVaR of the loss, and a non-positive one is a sample whose worst `alpha` of every column holds no loss at all. Widen `alpha`, or state `l` on the slot."))
+                          "`TailTermParity` read a tail-term scale of $c at `alpha = $(ctx.alpha)`, which is not positive, so the ratio `ratio * abs(m) / c` has no admissible value. The scale is the mean of the per-column CVaR of the loss, and a non-positive one is a sample whose worst `alpha` of every column holds no loss at all. Widen `alpha`, or state `l` on the slot."))
     return alg.ratio * abs(m) / c
-end
-# The other methods of `bind_alpha` stand beside the deformation rules, which are the pair
-# the verb was built for. These two stand here because the types they name are declared
-# above them, and the role is rebuilt around the bound rule on the same terms.
-function bind_alpha(r::AmbiguityTailWeightCalibration, alpha::Number)
-    return AmbiguityTailWeightCalibration(; alg = bind_alpha(r.alg, alpha))
-end
-function bind_alpha(alg::TailTermParity, alpha::Number)
-    return TailTermParity(; ratio = alg.ratio, alpha = alpha, series = alg.series)
-end
-# The same holds for the six `bind_series` methods below. The two ambiguity families are
-# declared between the verb and this point, so their methods cannot stand beside the
-# deformation pair the verb was written for.
-function bind_series(r::AmbiguityRadiusCalibration, series::AbstractCalibrationSeries)
-    return AmbiguityRadiusCalibration(; alg = bind_series(r.alg, series))
-end
-function bind_series(r::AmbiguityTailWeightCalibration, series::AbstractCalibrationSeries)
-    return AmbiguityTailWeightCalibration(; alg = bind_series(r.alg, series))
-end
-function bind_series(alg::ConcentrationRadius, series::AbstractCalibrationSeries)
-    return ConcentrationRadius(; confidence = alg.confidence, scale = alg.scale,
-                               series = series)
-end
-function bind_series(alg::DimensionalRateRadius, series::AbstractCalibrationSeries)
-    return DimensionalRateRadius(; confidence = alg.confidence, scale = alg.scale,
-                                 series = series)
-end
-function bind_series(alg::DualNormRadius, series::AbstractCalibrationSeries)
-    return DualNormRadius(; confidence = alg.confidence, p = alg.p, series = series)
-end
-function bind_series(alg::TailTermParity, series::AbstractCalibrationSeries)
-    return TailTermParity(; ratio = alg.ratio, alpha = alg.alpha, series = series)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -3013,7 +2897,7 @@ Computes a norm ceiling that holds a stated fraction of the universe effective, 
 
 A norm ceiling and the effective number of assets are reciprocally related, so a bound on the norm is a floor on that count. This rule states the floor as a **fraction of the universe** rather than as a count. The asset count comes off the prior result, so a subset view, a cluster and a cross-validation fold each get the floor their own universe earns, and no number is pinned to the universe it was written for.
 
-`p` is the norm order the ceiling is read against, and it belongs to the constraint. Each of the three constraint sites calls [`bind_norm_order`](@ref) before it resolves the slot, and that call **overwrites** whatever this field holds. So a stated `p` serves a caller who runs the rule outside those sites, and nothing else.
+`ctx.p` is the norm order the ceiling is read against, and it belongs to the constraint. Each of the three constraint sites states it in the [`CalibrationContext`](@ref) before it resolves the slot. The rule holds no order of its own, so a caller who runs it outside those sites states the order in the context.
 
 The rule carries no range check on its answer, on the same terms as [`ConcentrationRadius`](@ref). It returns the quantity of the slot it stands in, so the slot owner is the whole validation.
 
@@ -3063,7 +2947,7 @@ Keywords correspond to the struct's fields. `fraction` defaults to `0.5`, which 
 
   - [`AbstractNormCeilingCalibrationAlgorithm`](@ref)
   - [`NormCeilingCalibration`](@ref)
-  - [`bind_norm_order`](@ref)
+  - [`CalibrationContext`](@ref)
   - [`number_effective_assets`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
@@ -3072,21 +2956,14 @@ Keywords correspond to the struct's fields. `fraction` defaults to `0.5`, which 
     $(field_dict[:cal_fraction])
     """
     fraction
-    """
-    $(field_dict[:cal_norm_order])
-    """
-    p
-    function EffectiveAssetFloor(fraction::Number, p::Option{<:Number})
+    function EffectiveAssetFloor(fraction::Number)
         assert_nonempty_gt0_finite_val(fraction, :fraction)
         @argcheck(fraction <= one(fraction), DomainError)
-        if !isnothing(p)
-            @argcheck(p >= one(p), DomainError)
-        end
-        return new{typeof(fraction), typeof(p)}(fraction, p)
+        return new{typeof(fraction)}(fraction)
     end
 end
-function EffectiveAssetFloor(; fraction::Number = 0.5, p::Option{<:Number} = nothing)
-    return EffectiveAssetFloor(fraction, p)
+function EffectiveAssetFloor(; fraction::Number = 0.5)
+    return EffectiveAssetFloor(fraction)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -3102,10 +2979,11 @@ The universe is the column count of the prior result's returns matrix, so the ce
   - `pr`: Prior result the asset count is read off.
   - `w`: Effective observation weights. A universe count is not a sample count, so this rule ignores them.
   - `slv`: Effective solver. This rule needs none.
+  - `ctx`: The site's [`CalibrationContext`](@ref). `ctx.p` is the norm order the ceiling is read against, and it must hold a number.
 
 # Validation
 
-  - `alg.p` is not `nothing`. Every constraint site fills it through [`bind_norm_order`](@ref), so a `nothing` here means the rule was resolved somewhere that binds no order.
+  - `ctx.p` is not `nothing`, and it is one or more. Every constraint site states it, so a `nothing` here means the rule was resolved from a context that names no order.
 
 # Returns
 
@@ -3114,67 +2992,25 @@ The universe is the column count of the prior result's returns matrix, so the ce
 # Related
 
   - [`EffectiveAssetFloor`](@ref)
-  - [`bind_norm_order`](@ref)
+  - [`CalibrationContext`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
-function (alg::EffectiveAssetFloor)(key::Symbol, pr::AbstractPriorResult, ::Any, ::Any)
-    p = alg.p
+function (alg::EffectiveAssetFloor)(key::Symbol, pr::AbstractPriorResult, ::Any, ::Any,
+                                    ctx::CalibrationContext)
+    p = ctx.p
+    @argcheck(isnothing(p) || p >= one(p),
+              DomainError(p,
+                          "`CalibrationContext.p` is $p, and a norm ceiling is read against an order of one or more. The three constraint sites state `2`, `Inf` and the order of their own term, so an order below one reaches this rule only from a context a caller built by hand."))
     @argcheck(!isnothing(p),
-              ArgumentError("`$(nameof(EffectiveAssetFloor)).p` is `nothing` while the rule in `$key` is being resolved. A ceiling is read against one norm order, the order belongs to the constraint, and each constraint site fills it through `bind_norm_order`. Place the rule in `l2c`, `lpc` or `linfc`, or state `p` on the rule."))
+              ArgumentError("`$(nameof(CalibrationContext)).p` is `nothing` while the rule in `$key` is being resolved. A ceiling is read against one norm order, the order belongs to the constraint, and each constraint site states it in the context. Place the rule in `l2c`, `lpc` or `linfc`, or state `p` in the context."))
     m = alg.fraction * size(pr.X, 2)
     return isinf(p) ? inv(m) : m^(inv(p) - one(p))
 end
-"""
-    bind_norm_order(slot, p::Number)
 
-Hand the norm order of a weight-norm constraint to the rule that computes its ceiling.
-
-A **Norm Ceiling** is read against one norm order, and that order is a property of the constraint rather than of the rule: one rule placed in `lpc` serves every term, and each term carries its own `p`. [`resolve_calibration_slot`](@ref) carries a `Symbol` and no number, so the order travels through the rule itself. This is the shape [`bind_alpha`](@ref) already uses to carry a significance level to a deformation rule.
-
-An **Ambiguity Radius** on the `val` field of [`LpRegularisation`](@ref) reads the same order, and reads it for the same reason. The ground metric of that penalty is the type-``q`` metric with ``1/p + 1/q = 1``, so [`DualNormRadius`](@ref) needs the owner's `p`, and `key` names the slot rather than the norm order. So that site binds too, and the radius family carries the same pair of methods the ceiling family carries.
-
-The default is the identity, so a stated number crosses unchanged, and so does a caller's own plain function. A plain function reads the slot's name from `key` instead.
-
-The order the constraint site holds **wins**. A rule that already carries one has it replaced, because the constraint is the thing the quantity is read against and the rule cannot know which site it reached.
-
-# Arguments
-
-  - `slot`: The slot's occupant: a number, a [`NormCeilingCalibration`](@ref), or an [`AmbiguityRadiusCalibration`](@ref).
-  - `p`: Norm order of the constraint or penalty the quantity stands in.
-
-# Returns
-
-  - `y`: The occupant, with the order filled wherever it holds a rule that reads one.
-
-# Related
-
-  - [`NormCeilingCalibration`](@ref)
-  - [`EffectiveAssetFloor`](@ref)
-  - [`AmbiguityRadiusCalibration`](@ref)
-  - [`DualNormRadius`](@ref)
-  - [`bind_alpha`](@ref)
-  - [`resolve_calibration_slot`](@ref)
-"""
-function bind_norm_order(slot, ::Number)
-    return slot
-end
-function bind_norm_order(r::NormCeilingCalibration, p::Number)
-    return NormCeilingCalibration(; alg = bind_norm_order(r.alg, p))
-end
-function bind_norm_order(alg::EffectiveAssetFloor, p::Number)
-    return EffectiveAssetFloor(; fraction = alg.fraction, p = p)
-end
-function bind_norm_order(r::AmbiguityRadiusCalibration, p::Number)
-    return AmbiguityRadiusCalibration(; alg = bind_norm_order(r.alg, p))
-end
-function bind_norm_order(alg::DualNormRadius, p::Number)
-    return DualNormRadius(; confidence = alg.confidence, p = p, series = alg.series)
-end
-
-export SignificanceTailCalibration, SignificanceHeadCalibration, DeformationTailCalibration,
-       DeformationHeadCalibration, ReturnsSeries, AbsoluteDrawdownSeries,
-       RelativeDrawdownSeries, ScenarioCount, RateSignificance, EntropyBudget,
-       HillTailDecay, RadialTailDecay, AmbiguityRadiusCalibration,
+export CalibrationContext, SignificanceTailCalibration, SignificanceHeadCalibration,
+       DeformationTailCalibration, DeformationHeadCalibration, ReturnsSeries,
+       AbsoluteDrawdownSeries, RelativeDrawdownSeries, ScenarioCount, RateSignificance,
+       EntropyBudget, HillTailDecay, RadialTailDecay, AmbiguityRadiusCalibration,
        AmbiguityTailWeightCalibration, ConcentrationRadius, RateRadius,
        DimensionalRateRadius, DualNormRadius, TailTermParity, NormCeilingCalibration,
        EffectiveAssetFloor

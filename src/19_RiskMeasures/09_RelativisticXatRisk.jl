@@ -276,9 +276,9 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolve the significance level `alpha` and the deformation parameter `kappa` of a [`RelativisticValueatRisk`](@ref) against prior result `pr`.
 
-`alpha` and `kappa` are a **travelling pair**: [`EntropyBudget`](@ref) reads the significance level of its sibling slot. So `alpha` resolves first, and the number it produced is handed to the `kappa` slot through [`bind_alpha`](@ref) before that slot is resolved. A stated number, a plain function and a rule that reads no sibling all pass through `bind_alpha` untouched, so the order costs nothing where no rule reads a sibling.
+`alpha` and `kappa` are a **travelling pair**: [`EntropyBudget`](@ref) reads the significance level of its sibling slot. So `alpha` resolves first, and the number it produced is stated in the [`CalibrationContext`](@ref) of the `kappa` slot before that slot is resolved. A stated number, a plain function and a rule that reads no sibling all ignore the field, so the order costs nothing where no rule reads a sibling.
 
-The series this measure prices travels the same way, through [`bind_series`](@ref). It is the returns, which is the default [`calibration_series`](@ref) states, so the call binds what a rule already carries and is written for the reason every site writes it: the marker belongs to the measure, and a rule that carries a drawdown marker into this slot is corrected rather than obeyed.
+The series this measure prices travels in the same context. It is the returns, which is the default [`calibration_series`](@ref) states, so this site names what the default context already holds. It is written all the same, for the reason every site writes it: the marker belongs to the measure, and no rule carries one of its own to be corrected.
 
 The solver is settled once, as `sel(x.slv, slv)`, and handed to both rules, so a rule may call [`RRM`](@ref) itself. The rebuild goes through [`rebuild_with_slots`](@ref), whose positional call runs the inner constructor and re-runs both range checks on the calibrated numbers.
 
@@ -286,8 +286,7 @@ The solver is settled once, as `sel(x.slv, slv)`, and handed to both rules, so a
 
   - [`RelativisticValueatRisk`](@ref)
   - [`resolve_calibration_slot`](@ref)
-  - [`bind_alpha`](@ref)
-  - [`bind_series`](@ref)
+  - [`CalibrationContext`](@ref)
   - [`calibration_series`](@ref)
   - [`EntropyBudget`](@ref)
 """
@@ -297,8 +296,8 @@ function resolve_deferred_quantities(x::RelativisticValueatRisk, pr::AbstractPri
     sv = sel(x.slv, slv)
     s = calibration_series(x)
     alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, sv)
-    kappa = resolve_calibration_slot(bind_series(bind_alpha(x.kappa, alpha), s), :kappa, pr,
-                                     ws, sv)
+    kappa = resolve_calibration_slot(x.kappa, :kappa, pr, ws, sv,
+                                     CalibrationContext(; alpha = alpha, series = s))
     return rebuild_with_slots(x, (; alpha = alpha, kappa = kappa))
 end
 # Calibration slots — see `calibration_slots`. The two travel together, and the resolution
@@ -461,14 +460,13 @@ Each end carries a **travelling pair** of its own: `kappa_a` reads `alpha` and `
 
 The four slots carry four different bounds, so a rule of the wrong end or the wrong family is refused at construction. The solver is settled once and handed to all four rules.
 
-Both ends price one series, which is the returns, so [`bind_series`](@ref) carries the same marker to both `kappa` slots. The series is a property of the measure and not of an end, where the significance level is a property of the end.
+Both ends price one series, which is the returns, so the same marker stands in the context of both `kappa` slots. The series is a property of the measure and not of an end, where the significance level is a property of the end.
 
 # Related
 
   - [`RelativisticValueatRiskRange`](@ref)
   - [`RelativisticValueatRisk`](@ref)
-  - [`bind_alpha`](@ref)
-  - [`bind_series`](@ref)
+  - [`CalibrationContext`](@ref)
   - [`calibration_series`](@ref)
   - [`EntropyBudget`](@ref)
 """
@@ -478,11 +476,11 @@ function resolve_deferred_quantities(x::RelativisticValueatRiskRange,
     sv = sel(x.slv, slv)
     s = calibration_series(x)
     alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, sv)
-    kappa_a = resolve_calibration_slot(bind_series(bind_alpha(x.kappa_a, alpha), s),
-                                       :kappa_a, pr, ws, sv)
+    kappa_a = resolve_calibration_slot(x.kappa_a, :kappa_a, pr, ws, sv,
+                                       CalibrationContext(; alpha = alpha, series = s))
     beta = resolve_calibration_slot(x.beta, :beta, pr, ws, sv)
-    kappa_b = resolve_calibration_slot(bind_series(bind_alpha(x.kappa_b, beta), s),
-                                       :kappa_b, pr, ws, sv)
+    kappa_b = resolve_calibration_slot(x.kappa_b, :kappa_b, pr, ws, sv,
+                                       CalibrationContext(; alpha = beta, series = s))
     return rebuild_with_slots(x,
                               (; alpha = alpha, kappa_a = kappa_a, beta = beta,
                                kappa_b = kappa_b))
@@ -656,17 +654,16 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolve the significance level `alpha` and the deformation parameter `kappa` of a [`RelativisticDrawdownatRisk`](@ref) against prior result `pr`.
 
-It carries the reading of [`resolve_deferred_quantities`](@ref) on the value-at-risk twin unchanged: `alpha` resolves first and travels to the `kappa` slot through [`bind_alpha`](@ref). The drawdown series has one entry per row of the sample, so a rule reads the same sample size here as it does there.
+It carries the reading of [`resolve_deferred_quantities`](@ref) on the value-at-risk twin unchanged: `alpha` resolves first and reaches the `kappa` slot in its [`CalibrationContext`](@ref). The drawdown series has one entry per row of the sample, so a rule reads the same sample size here as it does there.
 
-**The series does not carry over, and [`bind_series`](@ref) is what says so.** This measure prices the absolute drawdown series of the portfolio, so [`calibration_series`](@ref) states [`AbsoluteDrawdownSeries`](@ref) and the marker travels beside `alpha`. A rule that reads the shape of a series then reads the drawdown series of each column of the sample, in place of the columns themselves, and the `alpha` it reads is the level of that same drawdown series. The key `:kappa` names this slot and the twin's slot alike, so nothing else could have told the rule which quantity it stands in front of.
+**The series does not carry over, and the context is what says so.** This measure prices the absolute drawdown series of the portfolio, so [`calibration_series`](@ref) states [`AbsoluteDrawdownSeries`](@ref) and the marker travels beside `alpha`. A rule that reads the shape of a series then reads the drawdown series of each column of the sample, in place of the columns themselves, and the `alpha` it reads is the level of that same drawdown series. The key `:kappa` names this slot and the twin's slot alike, so nothing else could have told the rule which quantity it stands in front of.
 
 # Related
 
   - [`RelativisticDrawdownatRisk`](@ref)
   - [`RelativisticValueatRisk`](@ref)
   - [`AbsoluteDrawdownSeries`](@ref)
-  - [`bind_alpha`](@ref)
-  - [`bind_series`](@ref)
+  - [`CalibrationContext`](@ref)
   - [`calibration_series`](@ref)
   - [`calibration_slots`](@ref)
 """
@@ -676,8 +673,8 @@ function resolve_deferred_quantities(x::RelativisticDrawdownatRisk, pr::Abstract
     sv = sel(x.slv, slv)
     s = calibration_series(x)
     alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, sv)
-    kappa = resolve_calibration_slot(bind_series(bind_alpha(x.kappa, alpha), s), :kappa, pr,
-                                     ws, sv)
+    kappa = resolve_calibration_slot(x.kappa, :kappa, pr, ws, sv,
+                                     CalibrationContext(; alpha = alpha, series = s))
     return rebuild_with_slots(x, (; alpha = alpha, kappa = kappa))
 end
 # Calibration slots — see `calibration_slots`.
@@ -842,15 +839,14 @@ Resolve the significance level `alpha` and the deformation parameter `kappa` of 
 
 The measure is a hierarchical one, so it reaches no `JuMP` model and the [`factory`](@ref) route is its only resolution. The travelling pair is resolved in the order the absolute twin states.
 
-The series is the twin's reading in its own units: this measure compounds the path, so [`calibration_series`](@ref) states [`RelativeDrawdownSeries`](@ref) and [`bind_series`](@ref) carries it. The two markers name two different series of the same column, and a rule that reads the shape of a series answers differently on each.
+The series is the twin's reading in its own units: this measure compounds the path, so [`calibration_series`](@ref) states [`RelativeDrawdownSeries`](@ref) and the context carries it. The two markers name two different series of the same column, and a rule that reads the shape of a series answers differently on each.
 
 # Related
 
   - [`RelativeRelativisticDrawdownatRisk`](@ref)
   - [`RelativisticDrawdownatRisk`](@ref)
   - [`RelativeDrawdownSeries`](@ref)
-  - [`bind_alpha`](@ref)
-  - [`bind_series`](@ref)
+  - [`CalibrationContext`](@ref)
   - [`calibration_series`](@ref)
   - [`calibration_slots`](@ref)
 """
@@ -860,8 +856,8 @@ function resolve_deferred_quantities(x::RelativeRelativisticDrawdownatRisk,
     sv = sel(x.slv, slv)
     s = calibration_series(x)
     alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, sv)
-    kappa = resolve_calibration_slot(bind_series(bind_alpha(x.kappa, alpha), s), :kappa, pr,
-                                     ws, sv)
+    kappa = resolve_calibration_slot(x.kappa, :kappa, pr, ws, sv,
+                                     CalibrationContext(; alpha = alpha, series = s))
     return rebuild_with_slots(x, (; alpha = alpha, kappa = kappa))
 end
 # Calibration slots — see `calibration_slots`.

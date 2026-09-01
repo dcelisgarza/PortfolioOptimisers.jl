@@ -249,23 +249,24 @@ numfmt = (v, i, j) -> begin
 end;
 
 dnr = DualNormRadius(; confidence = 0.95)
-dnr_p = DualNormRadius(; confidence = 0.95, p = 5)
+lp5 = CalibrationContext(; p = 5)
 
 radius_table = DataFrame(:slot => ["l1", "linf", "l2, val", "lp, val, p = 5"],
                          :penalised_norm => ["1", "Inf", "2", "5"],
                          :ground_metric => ["Inf", "1", "2", "1.25"],
-                         :radius => [dnr(:l1, pr, nothing, nothing),
-                                     dnr(:linf, pr, nothing, nothing),
-                                     dnr(:l2reg_val, pr, nothing, nothing),
-                                     dnr_p(:lpreg_val, pr, nothing, nothing)])
+                         :radius => [dnr(:l1, pr, nothing, nothing, CalibrationContext()),
+                                     dnr(:linf, pr, nothing, nothing, CalibrationContext()),
+                                     dnr(:l2reg_val, pr, nothing, nothing, CalibrationContext()),
+                                     dnr(:lpreg_val, pr, nothing, nothing, lp5)])
 pretty_table(radius_table; formatters = [numfmt])
 
 #=
 The `l1` and `linf` rows are the reading to take away. One rule, one sample and one confidence
 level give two coefficients an order of magnitude apart, because an L1 penalty is priced in the
 ∞-norm of the error and an L-Inf penalty in its 1-norm. The `lp` row needs the penalty's own `p`,
-because no key can name the conjugate order. The penalty site fills it, and the `p` above is
-stated only because the rule runs outside that site here.
+because no key can name the conjugate order. The rule holds no order of its own: the penalty
+site states it in a `CalibrationContext`, and the `lp5` context above stands in for that site
+because the rule runs outside it here.
 
 The slot takes the role, and the coefficient appears when the model is built. The two runs below
 differ only in what stands in `l1`, and they hold the same weights.
@@ -275,7 +276,7 @@ l1_rule = JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 
                         sbgt = 1, bgt = 1,
                         l1 = AmbiguityRadiusCalibration(; alg = DualNormRadius()))
 l1_num = JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
-                       bgt = 1, l1 = dnr(:l1, pr, nothing, nothing))
+                       bgt = 1, l1 = dnr(:l1, pr, nothing, nothing, CalibrationContext()))
 res_rule = optimise(MeanRisk(; opt = l1_rule))
 res_num = optimise(MeanRisk(; opt = l1_num))
 println("largest weight difference = $(maximum(abs, res_rule.w - res_num.w))")
@@ -296,9 +297,10 @@ for T in (252, 630, 1260)
     pr_T = prior(EmpiricalPrior(), prices_to_returns(X_all[(end - T):end]))
     push!(rate_table,
           (; T = size(pr_T.X, 1), N = size(pr_T.X, 2),
-           rate = RateRadius(; c = 0.02)(:l1, pr_T, nothing, nothing),
+           rate = RateRadius(; c = 0.02)(:l1, pr_T, nothing, nothing, CalibrationContext()),
            dimensional = DimensionalRateRadius(; confidence = 0.95)(:l1, pr_T, nothing,
-                                                                    nothing)))
+                                                                    nothing,
+                                                                    CalibrationContext())))
 end
 pretty_table(rate_table; formatters = [numfmt])
 
@@ -315,25 +317,23 @@ universe to hold effective, and returns the ceiling on the norm that meets it. T
 effective number of assets is `(sum(abs.(w) .^ p))^(1 / (1 - p))`, and the ceiling is the number
 that holds it at or above `fraction * N`.
 
-The order belongs to the constraint rather than to the rule, so each site fills it. A rule run
-outside a site needs `p` stated, exactly as the `lp` radius above did.
+The order belongs to the constraint rather than to the rule, so each site states it in a
+`CalibrationContext`. A rule run outside a site needs a context that names `p`, exactly as the
+`lp` radius above did.
 =#
 
 N = size(pr.X, 2)
 println("universe = $N assets, floor = $(0.5 * N) effective assets")
 
+eaf = EffectiveAssetFloor(; fraction = 0.5)
+
 ceiling_table = DataFrame(:slot => ["l2c", "lpc, p = 5", "linfc"],
                           :norm_order => ["2", "5", "Inf"],
                           :ceiling =>
-                              [EffectiveAssetFloor(; fraction = 0.5, p = 2)(:l2c, pr,
-                                                                            nothing,
-                                                                            nothing),
-                               EffectiveAssetFloor(; fraction = 0.5, p = 5)(:lpc, pr,
-                                                                            nothing,
-                                                                            nothing),
-                               EffectiveAssetFloor(; fraction = 0.5, p = Inf)(:linfc, pr,
-                                                                              nothing,
-                                                                              nothing)])
+                              [eaf(:l2c, pr, nothing, nothing, CalibrationContext(; p = 2)),
+                               eaf(:lpc, pr, nothing, nothing, CalibrationContext(; p = 5)),
+                               eaf(:linfc, pr, nothing, nothing,
+                                   CalibrationContext(; p = Inf))])
 pretty_table(ceiling_table; formatters = [numfmt])
 
 #=
@@ -368,12 +368,12 @@ read against the order its ceiling was written for. The two columns are one numb
 and two numbers on the others, and that is a statement about which order the reading uses rather
 than about a ceiling that missed.
 
-The rule refuses a resolution that no site bound an order to, and the message names the three
-slots that bind one.
+The rule refuses a resolution whose context names no order, and the message names the three
+slots that state one.
 =#
 
 try
-    EffectiveAssetFloor(; fraction = 0.5)(:l2c, pr, nothing, nothing)
+    eaf(:l2c, pr, nothing, nothing, CalibrationContext())
 catch e
     println(sprint(showerror, e))
 end

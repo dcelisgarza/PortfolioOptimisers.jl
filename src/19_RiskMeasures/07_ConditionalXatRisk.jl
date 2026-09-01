@@ -281,11 +281,11 @@ Resolve the significance level `alpha`, the ambiguity radius `r` and the tail we
 
 All three slots take a **Calibration Rule** in place of the number, so all three resolve here. The struct is rebuilt through [`rebuild_with_slots`](@ref), and the inner constructor it calls is what re-runs the positivity check on the calibrated number: a rule that returns a value the slot does not admit is refused at fold time, by the same guard a caller's own number meets.
 
-`alpha` resolves first, because the tail weight reads it. [`TailTermParity`](@ref) prices a tail term at the measure's own significance level, so `alpha` and `l` are a **travelling pair** and the number reaches the `l` slot through [`bind_alpha`](@ref). A stated number, a plain function and a rule that reads no sibling all pass through `bind_alpha` untouched, so the order costs nothing where no rule reads a sibling. The radius reads neither of the two, so its own order is free.
+`alpha` resolves first, because the tail weight reads it. [`TailTermParity`](@ref) prices a tail term at the measure's own significance level, so `alpha` and `l` are a **travelling pair** and the number reaches the `l` slot in its [`CalibrationContext`](@ref). A stated number, a plain function and a rule that reads no sibling all ignore the field, so the order costs nothing where no rule reads a sibling. The radius reads neither of the two, so its own order is free.
 
 The effective observation weights are computed locally as `sel(r.w, pr.w)` and threaded to the rule, so a rule that reads a weighted sample size sees the weights the optimisation settled on. The measure carries no solver, so the rule receives none. That holds on both routes: the third argument carries the effective solver for a measure that has a slot for one, and this measure has none.
 
-The series both slots price travels the same way, through [`bind_series`](@ref). It is the returns, which is the default [`calibration_series`](@ref) states, so the call binds what a rule already carries. It is written all the same, for the reason every site writes it: the marker belongs to the measure, and a rule that carries a drawdown marker into this slot is corrected rather than obeyed.
+The series both slots price travels in the same context. It is the returns, which is the default [`calibration_series`](@ref) states, so this site names what the default context already holds. It is written all the same, for the reason every site writes it: the marker belongs to the measure, and no rule carries one of its own to be corrected.
 
 A measure whose two slots both hold numbers is returned unchanged, so the common case allocates nothing.
 
@@ -295,8 +295,7 @@ A measure whose two slots both hold numbers is returned unchanged, so the common
   - [`resolve_calibration_slot`](@ref)
   - [`calibration_slots`](@ref)
   - [`AmbiguityRadiusCalibration`](@ref)
-  - [`bind_alpha`](@ref)
-  - [`bind_series`](@ref)
+  - [`CalibrationContext`](@ref)
   - [`calibration_series`](@ref)
   - [`TailTermParity`](@ref)
 """
@@ -305,8 +304,9 @@ function resolve_deferred_quantities(x::DistributionallyRobustConditionalValueat
     ws = sel(x.w, pr.w)
     s = calibration_series(x)
     alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, slv)
-    l = resolve_calibration_slot(bind_series(bind_alpha(x.l, alpha), s), :l, pr, ws, slv)
-    r = resolve_calibration_slot(bind_series(x.r, s), :r, pr, ws, slv)
+    l = resolve_calibration_slot(x.l, :l, pr, ws, slv,
+                                 CalibrationContext(; alpha = alpha, series = s))
+    r = resolve_calibration_slot(x.r, :r, pr, ws, slv, CalibrationContext(; series = s))
     return rebuild_with_slots(x, (; alpha = alpha, l = l, r = r))
 end
 # Calibration slots — see `calibration_slots`. The significance level, the radius and the
@@ -650,11 +650,11 @@ Resolve the two ambiguity radii and the two tail weights of a [`Distributionally
 
 Each tail keeps its own pair, so four slots resolve here. It carries the reading of the scalar measure's method unchanged: the rebuild re-runs every positivity check, the effective observation weights are computed locally, and a measure whose four slots all hold numbers is returned unchanged.
 
-**Each end's tail weight reads that end's own probability.** `alpha` and `beta` resolve first, and each travels to the tail weight beside it through [`bind_alpha`](@ref): `l_a` reads `alpha` and `l_b` reads `beta`. A skewed sample therefore resolves the two tail weights to two different numbers, which is the whole point of [`TailTermParity`](@ref) on a Range measure. The two radii read neither probability, so the four remaining slots resolve in one pass.
+**Each end's tail weight reads that end's own probability.** `alpha` and `beta` resolve first, and each is stated in the context of the tail weight beside it: `l_a` reads `alpha` and `l_b` reads `beta`. A skewed sample therefore resolves the two tail weights to two different numbers, which is the whole point of [`TailTermParity`](@ref) on a Range measure. The two radii read neither probability, so the four remaining slots resolve in one pass.
 
 The two tails take one role and not two. A radius names no end of the distribution, so a rule placed in the loss-side pair and the same rule placed in the gain-side pair resolve independently, and [`mirror_role`](@ref) has nothing to carry across.
 
-Both ends price one series, which is the returns, so [`bind_series`](@ref) carries the same marker to all four slots. The series is a property of the measure and not of an end, where the significance level is a property of the end.
+Both ends price one series, which is the returns, so the same marker stands in the context of all four slots. The series is a property of the measure and not of an end, where the significance level is a property of the end.
 
 # Related
 
@@ -662,9 +662,8 @@ Both ends price one series, which is the returns, so [`bind_series`](@ref) carri
   - [`DistributionallyRobustConditionalValueatRisk`](@ref)
   - [`resolve_calibration_slot`](@ref)
   - [`calibration_slots`](@ref)
-  - [`bind_series`](@ref)
+  - [`CalibrationContext`](@ref)
   - [`calibration_series`](@ref)
-  - [`bind_alpha`](@ref)
   - [`TailTermParity`](@ref)
 """
 function resolve_deferred_quantities(x::DistributionallyRobustConditionalValueatRiskRange,
@@ -673,15 +672,17 @@ function resolve_deferred_quantities(x::DistributionallyRobustConditionalValueat
     se = calibration_series(x)
     alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, slv)
     beta = resolve_calibration_slot(x.beta, :beta, pr, ws, slv)
-    # Each tail weight is bound to the probability of its OWN end before it resolves, and
-    # the two radii read neither. Both ends price one series, so `bind_series` carries the
-    # same marker to all four slots. The bound slot is never compared against: `bind_alpha`
-    # builds a new role, so `rebuild_with_slots` compares each resolved value against the
-    # field of `x`, which holds the measure's own occupant.
-    l_a, r_a, l_b, r_b = map((slot, key) -> resolve_calibration_slot(bind_series(slot, se),
-                                                                     key, pr, ws, slv),
-                             (bind_alpha(x.l_a, alpha), x.r_a, bind_alpha(x.l_b, beta),
-                              x.r_b), (:l_a, :r_a, :l_b, :r_b))
+    # Each tail weight reads the probability of its OWN end, and the two radii read
+    # neither, so the four slots take three contexts. Both ends price one series, so the
+    # same marker stands in all three. The occupant itself is passed through untouched, so
+    # `rebuild_with_slots` compares each resolved value against the field of `x`.
+    cs = CalibrationContext(; series = se)
+    ca = CalibrationContext(; alpha = alpha, series = se)
+    cb = CalibrationContext(; alpha = beta, series = se)
+    l_a, r_a, l_b, r_b = map((slot, key, ctx) -> resolve_calibration_slot(slot, key, pr, ws,
+                                                                          slv, ctx),
+                             (x.l_a, x.r_a, x.l_b, x.r_b), (:l_a, :r_a, :l_b, :r_b),
+                             (ca, cs, cb, cs))
     return rebuild_with_slots(x,
                               (; alpha = alpha, l_a = l_a, r_a = r_a, beta = beta,
                                l_b = l_b, r_b = r_b))
@@ -1048,9 +1049,9 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolve the significance level `alpha`, the ambiguity radius `r` and the tail weight `l` of a [`DistributionallyRobustConditionalDrawdownatRisk`](@ref) against prior result `pr`.
 
-It carries the reading of [`resolve_deferred_quantities`](@ref) on the value-at-risk measure unchanged, `alpha` first and the tail weight bound to it through [`bind_alpha`](@ref). A drawdown series holds one entry per observation, so a rule reads the same sample size here as it does there.
+It carries the reading of [`resolve_deferred_quantities`](@ref) on the value-at-risk measure unchanged, `alpha` first and the tail weight reading it off its own [`CalibrationContext`](@ref). A drawdown series holds one entry per observation, so a rule reads the same sample size here as it does there.
 
-**The series does not carry over, and [`bind_series`](@ref) is what says so.** This measure prices the absolute drawdown series, so [`calibration_series`](@ref) states [`AbsoluteDrawdownSeries`](@ref) and the marker travels beside `alpha` to both ambiguity slots. [`TailTermParity`](@ref) then prices the mean drawdown of each column against the ``\\mathrm{CDaR}_{\\alpha}`` of that column, and the radius rules read the error scale off the drawdown sample. The keys `:l` and `:r` name this measure's slots and the value-at-risk twin's slots alike, so nothing else could have told a rule which quantity it stands in front of.
+**The series does not carry over, and the context is what says so.** This measure prices the absolute drawdown series, so [`calibration_series`](@ref) states [`AbsoluteDrawdownSeries`](@ref) and the marker travels beside `alpha` to both ambiguity slots. [`TailTermParity`](@ref) then prices the mean drawdown of each column against the ``\\mathrm{CDaR}_{\\alpha}`` of that column, and the radius rules read the error scale off the drawdown sample. The keys `:l` and `:r` name this measure's slots and the value-at-risk twin's slots alike, so nothing else could have told a rule which quantity it stands in front of.
 
 # Related
 
@@ -1058,8 +1059,7 @@ It carries the reading of [`resolve_deferred_quantities`](@ref) on the value-at-
   - [`DistributionallyRobustConditionalValueatRisk`](@ref)
   - [`resolve_calibration_slot`](@ref)
   - [`calibration_slots`](@ref)
-  - [`bind_alpha`](@ref)
-  - [`bind_series`](@ref)
+  - [`CalibrationContext`](@ref)
   - [`calibration_series`](@ref)
   - [`AbsoluteDrawdownSeries`](@ref)
   - [`TailTermParity`](@ref)
@@ -1069,8 +1069,9 @@ function resolve_deferred_quantities(x::DistributionallyRobustConditionalDrawdow
     ws = sel(x.w, pr.w)
     s = calibration_series(x)
     alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, slv)
-    l = resolve_calibration_slot(bind_series(bind_alpha(x.l, alpha), s), :l, pr, ws, slv)
-    r = resolve_calibration_slot(bind_series(x.r, s), :r, pr, ws, slv)
+    l = resolve_calibration_slot(x.l, :l, pr, ws, slv,
+                                 CalibrationContext(; alpha = alpha, series = s))
+    r = resolve_calibration_slot(x.r, :r, pr, ws, slv, CalibrationContext(; series = s))
     return rebuild_with_slots(x, (; alpha = alpha, l = l, r = r))
 end
 # Calibration slots — see `calibration_slots`.

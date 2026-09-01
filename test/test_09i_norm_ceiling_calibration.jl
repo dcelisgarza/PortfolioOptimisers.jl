@@ -28,8 +28,10 @@ const SLV = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
 # A ceiling rule with no type at all. The `alg` bound admits a bare `Function` for exactly
 # this case, and this one reports its arguments so the resolver's order is asserted.
 const CEIL_SEEN = Ref{Any}(nothing)
-function probe_ceiling(key::Symbol, pr::PO.AbstractPriorResult, w, slv)
-    CEIL_SEEN[] = (; key = key, weighted = !isnothing(w), solved = !isnothing(slv))
+function probe_ceiling(key::Symbol, pr::PO.AbstractPriorResult, w, slv,
+                       ctx::PO.CalibrationContext)
+    CEIL_SEEN[] = (; key = key, weighted = !isnothing(w), solved = !isnothing(slv),
+                   order = ctx.p)
     return 1 / sqrt(size(pr.X, 2))
 end
 
@@ -96,43 +98,51 @@ end
 @testset "Norm ceiling calibration: EffectiveAssetFloor reads the universe" begin
     # `fraction` is checked, and it is a fraction rather than a count.
     @test EffectiveAssetFloor().fraction == 0.5
-    @test isnothing(EffectiveAssetFloor().p)
+    @test !hasfield(EffectiveAssetFloor, :p)
     @test_throws DomainError EffectiveAssetFloor(; fraction = 0)
     @test_throws DomainError EffectiveAssetFloor(; fraction = -0.1)
     @test_throws DomainError EffectiveAssetFloor(; fraction = 1.5)
     @test_throws DomainError EffectiveAssetFloor(; fraction = Inf)
     @test EffectiveAssetFloor(; fraction = 1).fraction == 1
 
-    # A norm order below 1 is not a norm order.
-    @test_throws DomainError EffectiveAssetFloor(; fraction = 0.5, p = 0.5)
-    @test EffectiveAssetFloor(; fraction = 0.5, p = 3).p == 3
+    # A norm order below 1 is not a norm order. The order lives in the context now, so
+    # the rule that reads it is what refuses one.
+    @test_throws DomainError EffectiveAssetFloor(; fraction = 0.5)(:l2c, PR60, nothing,
+                                                                   nothing,
+                                                                   CalibrationContext(;
+                                                                                      p = 0.5))
+    @test EffectiveAssetFloor(; fraction = 0.5)(:lpc, PR60, nothing, nothing,
+                                                CalibrationContext(; p = 3)) ≈ 2^(1 / 3 - 1)
 
     # The prior carries four assets, so half of the universe is two effective assets. The
     # ceiling is the order-`p` effective-asset reading the constraint's own docstring
     # states: `m^(1/p - 1)` for a finite order, and `1/m` for the infinite one.
-    f2 = EffectiveAssetFloor(; fraction = 0.5, p = 2)
-    f3 = EffectiveAssetFloor(; fraction = 0.5, p = 3)
-    fi = EffectiveAssetFloor(; fraction = 0.5, p = Inf)
-    @test f2(:l2c, PR60, PR60.w, nothing) ≈ 2^(-1 / 2)
-    @test f3(:lpc, PR60, PR60.w, nothing) ≈ 2^(1 / 3 - 1)
-    @test fi(:linfc, PR60, PR60.w, nothing) ≈ 1 / 2
+    f2 = EffectiveAssetFloor(; fraction = 0.5)
+    f3 = EffectiveAssetFloor(; fraction = 0.5)
+    fi = EffectiveAssetFloor(; fraction = 0.5)
+    @test f2(:l2c, PR60, PR60.w, nothing, CalibrationContext(; p = 2)) ≈ 2^(-1 / 2)
+    @test f3(:lpc, PR60, PR60.w, nothing, CalibrationContext(; p = 3)) ≈ 2^(1 / 3 - 1)
+    @test fi(:linfc, PR60, PR60.w, nothing, CalibrationContext(; p = Inf)) ≈ 1 / 2
 
     # The whole universe is the whole universe, so an equally weighted portfolio is the
     # only point the 2-norm ceiling admits.
-    @test EffectiveAssetFloor(; fraction = 1, p = 2)(:l2c, PR60, nothing, nothing) ≈ 1 / 2
+    @test EffectiveAssetFloor(; fraction = 1)(:l2c, PR60, nothing, nothing,
+                                              CalibrationContext(; p = 2)) ≈ 1 / 2
 
     # The floor moves with the universe rather than with a count the caller pinned. That is
     # the whole reason a rule beats a number.
     pr2 = prior(EmpiricalPrior(), randn(RNG, 60, 9))
-    @test f2(:l2c, pr2, nothing, nothing) ≈ (0.5 * 9)^(-1 / 2)
+    @test f2(:l2c, pr2, nothing, nothing, CalibrationContext(; p = 2)) ≈ (0.5 * 9)^(-1 / 2)
 
     # A universe count is not a sample count, so the rule ignores the observation weights.
     wts = pweights(range(; start = 1, stop = 2, length = 60))
-    @test f2(:l2c, PR60, wts, nothing) == f2(:l2c, PR60, nothing, nothing)
+    @test f2(:l2c, PR60, wts, nothing, CalibrationContext(; p = 2)) ==
+          f2(:l2c, PR60, nothing, nothing, CalibrationContext(; p = 2))
 
-    # The order belongs to the constraint. A rule resolved where nothing bound one names
-    # the verb that should have filled it.
-    @test_throws ArgumentError EffectiveAssetFloor()(:l2c, PR60, nothing, nothing)
+    # The order belongs to the constraint. A rule resolved against a context that names
+    # no order says which field it wanted.
+    @test_throws ArgumentError EffectiveAssetFloor()(:l2c, PR60, nothing, nothing,
+                                                     CalibrationContext())
 end
 
 #=
@@ -163,8 +173,8 @@ to the infinite arm.
     #    `m = 2` here and `pr9` below carries nine.
     pr9 = prior(EmpiricalPrior(), randn(RNG, 60, 9))
     for p in (1.5, 2.0, 3.0, Inf)
-        alg = EffectiveAssetFloor(; fraction = 1 / 3, p = p)
-        val = alg(:lpc, pr9, nothing, nothing)
+        alg = EffectiveAssetFloor(; fraction = 1 / 3)
+        val = alg(:lpc, pr9, nothing, nothing, CalibrationContext(; p = p))
         @test ena(fill(1 / 3, 3), p) ≈ 3
         @test LinearAlgebra.norm(fill(1 / 3, 3), p) ≈ val
         @test LinearAlgebra.norm(fill(1 / 2, 2), p) > val
@@ -174,56 +184,66 @@ to the infinite arm.
     # 3. The infinite arm is the LIMIT of the finite one rather than a second reading, so
     #    the ceiling moves towards `1/m` as the order grows instead of away from it.
     m = 2
-    fi = EffectiveAssetFloor(; fraction = 0.5, p = Inf)(:linfc, PR60, nothing, nothing)
+    fi = EffectiveAssetFloor(; fraction = 0.5)(:linfc, PR60, nothing, nothing,
+                                               CalibrationContext(; p = Inf))
     @test fi ≈ inv(m)
     prev = Inf
     for p in (2.0, 5.0, 20.0, 100.0, 1000.0)
-        val = EffectiveAssetFloor(; fraction = 0.5, p = p)(:lpc, PR60, nothing, nothing)
+        val = EffectiveAssetFloor(; fraction = 0.5)(:lpc, PR60, nothing, nothing,
+                                                    CalibrationContext(; p = p))
         @test val > fi
         @test val < prev
         prev = val
     end
-    far = EffectiveAssetFloor(; fraction = 0.5, p = 1e6)(:lpc, PR60, nothing, nothing)
+    far = EffectiveAssetFloor(; fraction = 0.5)(:lpc, PR60, nothing, nothing,
+                                                CalibrationContext(; p = 1e6))
     @test isapprox(far, fi; rtol = 1e-5)
 
     # At `p = 2` the two readings are one number, which is why the defect survived the
     # first draft: every test of the family stood at that order.
-    @test EffectiveAssetFloor(; fraction = 0.5, p = 2)(:l2c, PR60, nothing, nothing) ≈
-          2^(-1 / 2)
+    @test EffectiveAssetFloor(; fraction = 0.5)(:l2c, PR60, nothing, nothing,
+                                                CalibrationContext(; p = 2)) ≈ 2^(-1 / 2)
     @test 2^(1 / 2 - 1) ≈ 2^(-1 / 2)
 
     # A 1-norm ceiling is one, which is the budget itself: the 1-norm of a fully invested
     # long-only portfolio is one whatever it holds, so no floor on it binds.
-    @test EffectiveAssetFloor(; fraction = 0.5, p = 1)(:lpc, PR60, nothing, nothing) ≈ 1
+    @test EffectiveAssetFloor(; fraction = 0.5)(:lpc, PR60, nothing, nothing,
+                                                CalibrationContext(; p = 1)) ≈ 1
 end
 
-@testset "Norm ceiling calibration: bind_norm_order carries the constraint's order" begin
+@testset "Norm ceiling calibration: the context carries the constraint's order" begin
     crole = NormCeilingCalibration(; alg = EffectiveAssetFloor(; fraction = 0.5))
+    ctx3 = CalibrationContext(; p = 3)
 
-    # A stated number crosses unchanged, and so does a caller's own plain function: neither
-    # reads an order, and the default is the identity.
-    @test PO.bind_norm_order(0.4, 2) == 0.4
-    @test isnothing(PO.bind_norm_order(nothing, 2))
+    # A stated number ignores the context, and so does a caller's own plain function that
+    # reads no order. Nothing is rebuilt on the way in.
+    @test PO.resolve_calibration_slot(0.4, :l2c, PR60, nothing, nothing, ctx3) == 0.4
+    @test isnothing(PO.resolve_calibration_slot(nothing, :l2c, PR60, nothing, nothing,
+                                                ctx3))
     fn_role = NormCeilingCalibration(; alg = probe_ceiling)
-    @test PO.bind_norm_order(fn_role, 2).alg === probe_ceiling
+    @test fn_role.alg === probe_ceiling
 
-    # The role is rebuilt around the bound rule, so the rule never sees the role it stands
-    # in and the role never has to know what the rule reads.
-    bound = PO.bind_norm_order(crole, 3)
-    @test isa(bound, NormCeilingCalibration)
-    @test bound.alg.p == 3
-    @test bound.alg.fraction == 0.5
+    # The order reaches the rule through the role, and the role itself never moves: the
+    # resolver unwraps it and hands the context on.
+    @test PO.resolve_calibration_slot(crole, :lpc, PR60, nothing, nothing, ctx3) ≈
+          crole.alg(:lpc, PR60, nothing, nothing, ctx3)
+    @test crole.alg.fraction == 0.5
+    @test !hasfield(EffectiveAssetFloor, :p)
 
-    # The constraint's order WINS. A rule that already carries one has it replaced, because
-    # the rule cannot know which of the three sites it reached.
-    @test PO.bind_norm_order(EffectiveAssetFloor(; p = 2), Inf).p == Inf
+    # No rule carries an order of its own, so the site's order is the only one there is.
+    # One rule therefore serves the three sites, and each reads it at its own order.
+    eaf = EffectiveAssetFloor(; fraction = 0.5)
+    @test eaf(:l2c, PR60, nothing, nothing, CalibrationContext(; p = 2)) !=
+          eaf(:linfc, PR60, nothing, nothing, CalibrationContext(; p = Inf))
 
-    # Binding then resolving is the whole of the channel, and the key reaches the rule.
+    # Resolving against the context is the whole of the channel, and the key and the order
+    # both reach the rule.
     CEIL_SEEN[] = nothing
-    @test PO.resolve_calibration_slot(PO.bind_norm_order(fn_role, 2), :l2c, PR60, PR60.w,
-                                      SLV) ≈ 1 / 2
+    @test PO.resolve_calibration_slot(fn_role, :l2c, PR60, PR60.w, SLV,
+                                      CalibrationContext(; p = 2)) ≈ 1 / 2
     @test CEIL_SEEN[].key == :l2c
     @test CEIL_SEEN[].solved
+    @test CEIL_SEEN[].order == 2
 end
 
 @testset "Norm ceiling calibration: the LpRegularisation route settles the reading" begin
@@ -380,8 +400,9 @@ calibration resolution runs at assembly, against the prior of the period that wa
 
     # The selected rule then resolves against whichever prior the fold produced, so a
     # schedule and a rule compose rather than fight.
-    sel = PO.bind_norm_order(PO.time_dependent_value(td, ctx1), 2)
-    @test PO.resolve_calibration_slot(sel, :l2c, PR60, nothing) ≈ 2^(-1 / 2)
+    sel = PO.time_dependent_value(td, ctx1)
+    @test PO.resolve_calibration_slot(sel, :l2c, PR60, nothing, nothing,
+                                      CalibrationContext(; p = 2)) ≈ 2^(-1 / 2)
 
     # A schedule is not a role, so the constructor's range check skips it and the field
     # falls back to its own default outside every fold loop.
@@ -524,11 +545,11 @@ and ADR 0095 grants none.
     stated = LpRegularisation(; p = 3, val = 1e-3)
     @test PO.factory(stated, PR60, SLV) === stated
 
-    # The keys are two readings rather than two names for one. A radius rule bound to an
+    # The keys are two readings rather than two names for one. A radius rule given an
     # order still has no reading under the ceiling key, which is why a `factory` call on
     # `lpc` would be wrong even after the role guard.
-    @test_throws ArgumentError PO.resolve_calibration_slot(PO.bind_norm_order(dnr, 3), :lpc,
-                                                           PR60, PR60.w, SLV)
+    @test_throws ArgumentError PO.resolve_calibration_slot(dnr, :lpc, PR60, PR60.w, SLV,
+                                                           CalibrationContext(; p = 3))
 end
 
 #=

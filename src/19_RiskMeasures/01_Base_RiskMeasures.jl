@@ -1962,7 +1962,7 @@ Resolve the slots that [`calibration_slots`](@ref) declared, and return them as 
 
 This is the derived half of the calibration channel, and it is the parallel of the container recursion in [`resolve_deferred_quantities`](@ref). A type whose slots carry no order between them declares them once and writes no resolution: the declaration is the whole statement, and this method reads it.
 
-A type whose slots **do** carry an order writes its own [`resolve_deferred_quantities`](@ref) method instead, and that method is more specific, so it wins. [`bind_alpha`](@ref), [`bind_series`](@ref) and [`bind_norm_order`](@ref) are what an order looks like: a slot that is bound before it resolves reads a sibling, and no derivation can know which sibling or in which direction. ADR 0095 states that rule, and it reaches the slots that are bound and no others.
+A type whose slots **do** carry an order writes its own [`resolve_deferred_quantities`](@ref) method instead, and that method is more specific, so it wins. A [`CalibrationContext`](@ref) built from a sibling's resolved number is what an order looks like: the slot reads that number off the context, and no derivation can know which sibling or in which direction. ADR 0095 states that rule, and it reaches the slots that read a sibling and no others.
 
 A type whose slot key is **not** the field's name declares a method of this verb returning an empty `NamedTuple`, which takes it out of the derivation. The three regularisation keys are the one case that ships: `val` is one field under three quantities, which ADR 0097 settles, and a derivation that read the field name would hand the rule the wrong key.
 

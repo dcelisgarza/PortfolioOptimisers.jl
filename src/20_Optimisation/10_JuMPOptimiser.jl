@@ -1487,8 +1487,8 @@ and can be capped.
     reaches the model builders, so they are resolved against `attrs.pr` here rather than
     by [`processed_jump_optimiser_attributes`](@ref): the bundle carries no slot for them
     and this is where both the prior result and the optimiser are in hand. A ceiling is
-    read against one norm order, so each of the three sites binds its own order into the
-    rule with [`bind_norm_order`](@ref) before it resolves the slot.
+    read against one norm order, so each of the three sites states its own order in the
+    [`CalibrationContext`](@ref) it resolves the slot against.
   - `attrs::ProcessedJuMPOptimiserAttributes`: Pre-computed constraint and prior bundle
     produced by [`processed_jump_optimiser_attributes`](@ref).
   - $(arg_dict[:rd])
@@ -1533,16 +1533,15 @@ function assemble_jump_model!(model::JuMP.Model, optimiser::JuMPOptimisationEsti
     set_tracking_error_constraints!(model, pr, opt.tr, optimiser, plr, fees, b1; rd = rd)
     # The three norm ceilings each take a Calibration Rule, and each resolves here. A
     # ceiling is read against one norm order, which belongs to the constraint and not to
-    # the rule, so each site binds its own order first. `lpc` holds estimators and carries
-    # one order per term, so it goes through `norm_ceiling_factory`.
-    set_weight_norm_2_constraints!(model,
-                                   resolve_calibration_slot(bind_norm_order(opt.l2c, 2),
-                                                            :l2c, pr, pr.w, opt.slv))
+    # the rule, so each site states its own order in the context. `lpc` holds estimators
+    # and carries one order per term, so it goes through `norm_ceiling_factory`.
+    l2c = resolve_calibration_slot(opt.l2c, :l2c, pr, pr.w, opt.slv,
+                                   CalibrationContext(; p = 2))
+    linfc = resolve_calibration_slot(opt.linfc, :linfc, pr, pr.w, opt.slv,
+                                     CalibrationContext(; p = Inf))
+    set_weight_norm_2_constraints!(model, l2c)
     set_weight_norm_p_constraints!(model, norm_ceiling_factory(opt.lpc, pr, opt.slv))
-    set_weight_norm_inf_constraints!(model,
-                                     resolve_calibration_slot(bind_norm_order(opt.linfc,
-                                                                              Inf), :linfc,
-                                                              pr, pr.w, opt.slv))
+    set_weight_norm_inf_constraints!(model, linfc)
     # The four regularisation coefficients are the ambiguity radii of the four ground
     # metrics, so each takes a Calibration Rule and each resolves here, against the
     # optimisation's own prior result and effective solver. `l2` and `lp` hold estimators,

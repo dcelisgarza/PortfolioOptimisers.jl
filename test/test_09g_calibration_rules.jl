@@ -6,7 +6,7 @@ that carries them; this file covers the rules themselves.
 `ScenarioCount` and `RateSignificance` compute a significance level, and `EntropyBudget`,
 `HillTailDecay` and `RadialTailDecay` compute a Kaniadakis deformation parameter. The first
 reads the effective observation weights, the second reads the raw row count, and the last
-three read the probability of their own slot's end through `bind_alpha`.
+three read the probability of their own slot's end off the `CalibrationContext`.
 
 No rule carries a range check of its own. Each returns the quantity of the slot it stands in,
 so the slot owner's constructor is the whole validation and a value outside the slot's range
@@ -21,8 +21,8 @@ Two of the five read the SHAPE of a series, and a slot owner tells them which se
 A drawdown measure prices the drawdown series of the portfolio and resolves the key `:kappa`,
 which the value-at-risk twin resolves as well, so the key names no quantity and the marker
 travels through the rule itself. `calibration_series` is the trait the owner answers and
-`bind_series` is the verb that carries it, on the shape `bind_alpha` and `bind_norm_order`
-already carry. The reading itself does not move: the same standardisation, the same count and
+`CalibrationContext.series` is the field that carries it, beside the significance level and
+the norm order the same context carries. The reading itself does not move: the same standardisation, the same count and
 the same estimator run over the drawdown series of each column, in place of the columns.
 
 Issue #582 ships the first three rules, #611 ships `HillTailDecay` and #612 ships
@@ -89,23 +89,25 @@ const PR120 = prior(EmpiricalPrior(), randn(RNG, 120, 4))
     @test :HillTailDecay in exported
     @test :RadialTailDecay in exported
 
-    # The positional inner constructor is the route a rebuild takes.
+    # The positional inner constructor is the route a rebuild takes. Each rule holds its
+    # own parameters and nothing of the site's, so the five constructors are short.
     @test ScenarioCount(25).n == 25
     @test RateSignificance(2).c == 2
-    @test EntropyBudget(-1.3, 0.05).alpha == 0.05
-    @test HillTailDecay(12, 0.05, ReturnsSeries()).kmin == 12
-    @test HillTailDecay(12, 0.05, ReturnsSeries()).alpha == 0.05
-    @test isa(HillTailDecay(12, 0.05, AbsoluteDrawdownSeries()).series,
-              AbsoluteDrawdownSeries)
-    @test RadialTailDecay(12, 0.05, ReturnsSeries()).kmin == 12
-    @test RadialTailDecay(12, 0.05, ReturnsSeries()).alpha == 0.05
-    @test isa(RadialTailDecay(12, 0.05, RelativeDrawdownSeries()).series,
-              RelativeDrawdownSeries)
+    @test EntropyBudget(-1.3).target == -1.3
+    @test HillTailDecay(12).kmin == 12
+    @test RadialTailDecay(12).kmin == 12
+    @test fieldnames(HillTailDecay) == (:kmin,)
+    @test fieldnames(RadialTailDecay) == (:kmin,)
+    @test fieldnames(EntropyBudget) == (:target,)
 
     # The series defaults to the returns, which is what every rule read before the marker
-    # existed. A rule that never leaves it reads what it read then.
-    @test isa(HillTailDecay().series, ReturnsSeries)
-    @test isa(RadialTailDecay().series, ReturnsSeries)
+    # existed. It lives on the context, so a site that names no other reads what it read
+    # then.
+    @test isa(CalibrationContext().series, ReturnsSeries)
+    @test isnothing(CalibrationContext().alpha)
+    @test isnothing(CalibrationContext().p)
+    @test isa(CalibrationContext(-1, AbsoluteDrawdownSeries(), 2).series,
+              AbsoluteDrawdownSeries)
 
     # `kmin` is a count of order statistics, so a rule that states none is refused at
     # construction. It is a check on the rule's OWN parameter, and not on the parameter the
@@ -138,8 +140,8 @@ end
 
     # The tail holds `n` observations, so `alpha * T` is the count the caller stated and
     # `ceil(alpha * T)` returns it whatever `T` is.
-    a60 = rule(:alpha, PR60, nothing, nothing)
-    a120 = rule(:alpha, PR120, nothing, nothing)
+    a60 = rule(:alpha, PR60, nothing, nothing, CalibrationContext())
+    a120 = rule(:alpha, PR120, nothing, nothing, CalibrationContext())
     @test a60 == 15 / 60
     @test a120 == 15 / 120
     @test ceil(a60 * 60) == 15
@@ -151,26 +153,29 @@ end
 
     # The key does not change the count, so a tail slot and a head slot that carry one rule
     # resolve to one number.
-    @test rule(:beta, PR60, nothing, nothing) == a60
+    @test rule(:beta, PR60, nothing, nothing, CalibrationContext()) == a60
 
     # Uniform weights carry the same information as the unweighted sample, so Kish's
     # effective sample size is the row count and the answer does not move.
-    @test rule(:alpha, PR60, pweights(fill(1 / 60, 60)), nothing) ≈ a60
+    @test rule(:alpha, PR60, pweights(fill(1 / 60, 60)), nothing, CalibrationContext()) ≈
+          a60
 
     # Uneven weights carry less, so the effective sample is shorter and the tail must take a
     # larger share of it to hold the same 15 observations.
     uneven = pweights([fill(3.0, 30); fill(1.0, 30)])
-    aw = rule(:alpha, PR60, uneven, nothing)
+    aw = rule(:alpha, PR60, uneven, nothing, CalibrationContext())
     @test aw ≈ 15 / (sum(uneven)^2 / sum(abs2, uneven))
     @test aw > a60
 
     # The solver reaches the rule and this one ignores it, which is the fourth argument's
     # whole contract here.
-    @test rule(:alpha, PR60, nothing, Solver(; name = :probe, solver = nothing)) == a60
+    @test rule(:alpha, PR60, nothing, Solver(; name = :probe, solver = nothing),
+               CalibrationContext()) == a60
 
     # The rule carries no range check, so a count larger than the sample returns a value the
     # slot owner refuses rather than one the rule refuses.
-    @test ScenarioCount(; n = 90)(:alpha, PR60, nothing, nothing) == 1.5
+    @test ScenarioCount(; n = 90)(:alpha, PR60, nothing, nothing, CalibrationContext()) ==
+          1.5
 end
 
 @testset "Calibration rules: `RateSignificance` falls with the square root of `T`" begin
@@ -178,8 +183,8 @@ end
 
     # The default coefficient is the plain `1/sqrt(T)` rate.
     @test rule.c == 1
-    a60 = rule(:alpha, PR60, nothing, nothing)
-    a120 = rule(:alpha, PR120, nothing, nothing)
+    a60 = rule(:alpha, PR60, nothing, nothing, CalibrationContext())
+    a120 = rule(:alpha, PR120, nothing, nothing, CalibrationContext())
     @test a60 == inv(sqrt(60))
     @test a120 == inv(sqrt(120))
 
@@ -189,29 +194,31 @@ end
     @test a120 * 120 ≈ sqrt(2) * (a60 * 60)
 
     # The coefficient scales the rate.
-    @test RateSignificance(; c = 2)(:alpha, PR60, nothing, nothing) == 2 * a60
+    @test RateSignificance(; c = 2)(:alpha, PR60, nothing, nothing, CalibrationContext()) ==
+          2 * a60
 
     # The rule reads the RAW row count, so the weights do not move it. That is the stated
     # difference from `ScenarioCount`: a rate speaks of the length of the record.
-    @test rule(:alpha, PR60, pweights([fill(3.0, 30); fill(1.0, 30)]), nothing) == a60
+    @test rule(:alpha, PR60, pweights([fill(3.0, 30); fill(1.0, 30)]), nothing,
+               CalibrationContext()) == a60
 
     # The key does not change the rate either.
-    @test rule(:beta, PR60, nothing, nothing) == a60
+    @test rule(:beta, PR60, nothing, nothing, CalibrationContext()) == a60
 end
 
 @testset "Calibration rules: `EntropyBudget` inverts the Kaniadakis logarithm" begin
     target = -1.3
-    rule = EntropyBudget(; target = target, alpha = 0.05)
+    rule = EntropyBudget(; target = target)
 
     # The returned parameter meets the target: it is the coefficient `RRM` multiplies its
     # dual variable by, and the rule solves for the deformation that prices it.
-    k60 = rule(:kappa, PR60, nothing, nothing)
+    k60 = rule(:kappa, PR60, nothing, nothing, CalibrationContext(; alpha = 0.05))
     @test 0 < k60 < 1
     @test PO.kappa_log(inv(0.05 * 60), k60) ≈ target
 
     # The same budget on a longer sample. The band the logarithm reaches moves with `T`, so
     # the two samples are 60 and 70 rather than 60 and 120.
-    k70 = rule(:kappa, PR70, nothing, nothing)
+    k70 = rule(:kappa, PR70, nothing, nothing, CalibrationContext(; alpha = 0.05))
     @test 0 < k70 < 1
     @test PO.kappa_log(inv(0.05 * 70), k70) ≈ target
 
@@ -220,14 +227,16 @@ end
     @test k70 < k60
 
     # A larger `alpha` widens the tail and moves the answer on one sample.
-    @test EntropyBudget(; target = target, alpha = 0.06)(:kappa, PR60, nothing, nothing) !=
-          k60
+    @test EntropyBudget(; target = target)(:kappa, PR60, nothing, nothing,
+                                           CalibrationContext(; alpha = 0.06)) != k60
 
     # The key does not change the budget, and the solver is not needed: the inversion is a
     # scalar one, so this rule never reaches `RRM` itself.
-    @test rule(:kappa_a, PR60, nothing, nothing) == k60
-    @test rule(:kappa, PR60, nothing, Solver(; name = :probe, solver = nothing)) == k60
-    @test rule(:kappa, PR60, pweights(fill(1 / 60, 60)), nothing) == k60
+    @test rule(:kappa_a, PR60, nothing, nothing, CalibrationContext(; alpha = 0.05)) == k60
+    @test rule(:kappa, PR60, nothing, Solver(; name = :probe, solver = nothing),
+               CalibrationContext(; alpha = 0.05)) == k60
+    @test rule(:kappa, PR60, pweights(fill(1 / 60, 60)), nothing,
+               CalibrationContext(; alpha = 0.05)) == k60
 
     # The band the coefficient reaches over `(0, 1)` runs from `log(u)` to `sinh(log(u))`,
     # and it moves with the sample. A target past either end has no root, so the rule
@@ -236,12 +245,15 @@ end
     # admits, so the slot owner cannot catch it.
     band = (PO.kappa_log(inv(0.05 * 60), 1), log(inv(0.05 * 60)))
     @test band[1] < target < band[2]
-    @test_throws DomainError EntropyBudget(; target = -0.5, alpha = 0.05)(:kappa, PR60,
-                                                                          nothing, nothing)
-    @test_throws DomainError EntropyBudget(; target = -5.0, alpha = 0.05)(:kappa, PR60,
-                                                                          nothing, nothing)
+    @test_throws DomainError EntropyBudget(; target = -0.5)(:kappa, PR60, nothing, nothing,
+                                                            CalibrationContext(;
+                                                                               alpha = 0.05))
+    @test_throws DomainError EntropyBudget(; target = -5.0)(:kappa, PR60, nothing, nothing,
+                                                            CalibrationContext(;
+                                                                               alpha = 0.05))
     msg = try
-        EntropyBudget(; target = -0.5, alpha = 0.05)(:kappa, PR60, nothing, nothing)
+        EntropyBudget(; target = -0.5)(:kappa, PR60, nothing, nothing,
+                                       CalibrationContext(; alpha = 0.05))
         ""
     catch e
         sprint(showerror, e)
@@ -251,65 +263,76 @@ end
 
     # The band moves with the sample, so the target that suits 60 and 70 observations lies
     # outside the band of 120. That is what the message warns about.
-    @test_throws DomainError rule(:kappa, PR120, nothing, nothing)
+    @test_throws DomainError rule(:kappa, PR120, nothing, nothing,
+                                  CalibrationContext(; alpha = 0.05))
 
     # A rule whose sibling never arrived cannot form `inv(alpha * T)`, and it says so.
     unbound = EntropyBudget(; target = target)
-    @test isnothing(unbound.alpha)
-    @test_throws PO.IsNothingError unbound(:kappa, PR60, nothing, nothing)
+    @test !hasfield(EntropyBudget, :alpha)
+    @test_throws PO.IsNothingError unbound(:kappa, PR60, nothing, nothing,
+                                           CalibrationContext())
     msg = try
-        unbound(:kappa, PR60, nothing, nothing)
+        unbound(:kappa, PR60, nothing, nothing, CalibrationContext())
         ""
     catch e
         sprint(showerror, e)
     end
-    @test occursin("EntropyBudget.alpha", msg)
-    @test occursin("bind_alpha", msg)
+    @test occursin("CalibrationContext.alpha", msg)
+    @test occursin("EntropyBudget", msg)
 end
 
-@testset "Calibration rules: `bind_alpha` hands the sibling over" begin
+@testset "Calibration rules: the context hands the sibling over" begin
     rule = EntropyBudget(; target = -1.3)
+    ctx = CalibrationContext(; alpha = 0.05)
 
-    # The rule itself takes the number, and nothing else about it moves.
-    bound = PO.bind_alpha(rule, 0.05)
-    @test isa(bound, EntropyBudget)
-    @test bound.alpha == 0.05
-    @test bound.target == rule.target
+    # The number lives in the context and nowhere else. The rule holds no field for it, so
+    # there is no copy to keep in step and nothing to rebuild on the way in.
+    @test !hasfield(EntropyBudget, :alpha)
+    @test ctx.alpha == 0.05
+    @test rule(:kappa, PR60, nothing, nothing, ctx) ==
+          EntropyBudget(; target = -1.3)(:kappa, PR60, nothing, nothing, ctx)
 
-    # A role is rebuilt around the bound rule, so the verb takes the SLOT and the caller
-    # unwraps nothing. Both deformation roles carry it, because a head slot holds a rule too.
-    tail = PO.bind_alpha(DeformationTailCalibration(; alg = rule), 0.05)
-    @test isa(tail, DeformationTailCalibration)
-    @test tail.alg.alpha == 0.05
-    head = PO.bind_alpha(DeformationHeadCalibration(; alg = rule), 0.05)
-    @test isa(head, DeformationHeadCalibration)
-    @test head.alg.alpha == 0.05
+    # The resolver unwraps the role and hands the context to the rule, so the SLOT is what
+    # a per-type method passes and the occupant never moves. Both deformation roles take
+    # it, because a head slot holds a rule too.
+    tail = DeformationTailCalibration(; alg = rule)
+    head = DeformationHeadCalibration(; alg = rule)
+    @test PO.resolve_calibration_slot(tail, :kappa, PR60, nothing, nothing, ctx) ==
+          rule(:kappa, PR60, nothing, nothing, ctx)
+    @test PO.resolve_calibration_slot(head, :kappa_b, PR60, nothing, nothing, ctx) ==
+          rule(:kappa_b, PR60, nothing, nothing, ctx)
+    @test tail.alg === rule
+    @test head.alg === rule
 
-    # The second rule that reads a sibling takes the number the same way, and keeps its
-    # own field. A head slot's number is the `beta` of its end, and the field is named for
-    # the sibling's ROLE rather than for the sibling's spelling.
-    hill = PO.bind_alpha(HillTailDecay(; kmin = 12), 0.02)
-    @test isa(hill, HillTailDecay)
-    @test hill.alpha == 0.02
-    @test hill.kmin == 12
-    @test PO.bind_alpha(DeformationHeadCalibration(; alg = HillTailDecay()), 0.02).alg.alpha ==
-          0.02
+    # The second rule that reads a sibling reads the same field. A head slot's number is
+    # the `beta` of its end, and the context names the reading rather than the spelling.
+    hill = HillTailDecay(; kmin = 3)
+    @test !hasfield(HillTailDecay, :alpha)
+    @test hill.kmin == 3
+    hctx = CalibrationContext(; alpha = 0.05)
+    @test PO.resolve_calibration_slot(DeformationHeadCalibration(; alg = hill), :kappa_b,
+                                      PR60, nothing, nothing, hctx) ==
+          hill(:kappa_b, PR60, nothing, nothing, hctx)
 
-    # The default is the identity, so a stated number passes through untouched. That is what
-    # lets the slot owner call the verb on every `kappa` slot rather than on some of them.
-    @test PO.bind_alpha(0.3, 0.05) === 0.3
-    @test PO.bind_alpha(nothing, 0.05) === nothing
+    # A stated number passes through untouched. That is what lets the slot owner build one
+    # context for every `kappa` slot rather than for some of them.
+    @test PO.resolve_calibration_slot(0.3, :kappa, PR60, nothing, nothing, ctx) === 0.3
+    @test PO.resolve_calibration_slot(nothing, :kappa, PR60, nothing, nothing, ctx) ===
+          nothing
 
-    # A rule that reads no sibling passes through as well, whether it is typed or a plain
+    # A rule that reads no sibling ignores the field, whether it is typed or a plain
     # function, and so does the role it stands in.
-    probe(::Symbol, ::PO.AbstractPriorResult, ::Any, ::Any) = 0.3
-    @test PO.bind_alpha(probe, 0.05) === probe
-    @test PO.bind_alpha(DeformationTailCalibration(; alg = probe), 0.05).alg === probe
+    probe(::Symbol, ::PO.AbstractPriorResult, ::Any, ::Any, ::PO.CalibrationContext) = 0.3
+    @test PO.resolve_calibration_slot(DeformationTailCalibration(; alg = probe), :kappa,
+                                      PR60, nothing, nothing, ctx) == 0.3
+    @test PO.resolve_calibration_slot(DeformationTailCalibration(; alg = probe), :kappa,
+                                      PR60, nothing, nothing, CalibrationContext()) == 0.3
 
-    # The significance family needs no method of its own: no significance rule reads a
-    # sibling, so the identity is already the right answer for it.
+    # No significance rule reads a sibling, so the whole family answers the same number
+    # under a context that names one and under the default.
     role = SignificanceTailCalibration(; alg = ScenarioCount(; n = 25))
-    @test PO.bind_alpha(role, 0.05) === role
+    @test PO.resolve_calibration_slot(role, :alpha, PR60, nothing, nothing, ctx) ==
+          PO.resolve_calibration_slot(role, :alpha, PR60, nothing, nothing)
 end
 
 @testset "Calibration rules: the resolver runs each rule" begin
@@ -320,7 +343,8 @@ end
     @test alpha == 3 / 60
 
     kslot = DeformationTailCalibration(; alg = EntropyBudget(; target = -1.3))
-    kappa = PO.resolve_calibration_slot(PO.bind_alpha(kslot, alpha), :kappa, PR60, nothing)
+    kappa = PO.resolve_calibration_slot(kslot, :kappa, PR60, nothing, nothing,
+                                        CalibrationContext(; alpha = alpha))
     @test 0 < kappa < 1
     @test PO.kappa_log(inv(alpha * 60), kappa) ≈ -1.3
 
@@ -369,13 +393,13 @@ end
 const PRSKEW = prior(EmpiricalPrior(), XSKEW)
 
 @testset "Calibration rules: `HillTailDecay` returns the reciprocal tail index" begin
-    rule = HillTailDecay(; kmin = 30, alpha = 0.01)
+    rule = HillTailDecay(; kmin = 30)
 
     # The answer is `1 / ν`, and the band holds the Hill bias, which is upward at this
     # depth on a t draw.
-    k3 = rule(:kappa, PRT3, nothing, nothing)
-    k4 = rule(:kappa, PRT4, nothing, nothing)
-    k6 = rule(:kappa, PRT6, nothing, nothing)
+    k3 = rule(:kappa, PRT3, nothing, nothing, CalibrationContext(; alpha = 0.01))
+    k4 = rule(:kappa, PRT4, nothing, nothing, CalibrationContext(; alpha = 0.01))
+    k6 = rule(:kappa, PRT6, nothing, nothing, CalibrationContext(; alpha = 0.01))
     for (kap, nu) in ((k3, 3), (k4, 4), (k6, 6))
         @test 0 < kap < 1
         @test 0.75 / nu <= kap <= 1.6 / nu
@@ -387,14 +411,15 @@ const PRSKEW = prior(EmpiricalPrior(), XSKEW)
 
     # The same tail index at two sample lengths, which is the pair `test_09f` and #582 are
     # stated at. `T` moves the pool and the count with it, and both readings hold the band.
-    k4s = rule(:kappa, PRT4S, nothing, nothing)
+    k4s = rule(:kappa, PRT4S, nothing, nothing, CalibrationContext(; alpha = 0.01))
     @test 0.75 / 4 <= k4s <= 1.6 / 4
     @test k4s != k4
 
     # `alpha` sets the DEPTH as well as the count. A shallower reading takes in more of the
     # body, which a Student-t makes look heavier than its tail is, so the deeper reading
     # sits closer to the truth.
-    shallow = HillTailDecay(; kmin = 30, alpha = 0.05)(:kappa, PRT4, nothing, nothing)
+    shallow = HillTailDecay(; kmin = 30)(:kappa, PRT4, nothing, nothing,
+                                         CalibrationContext(; alpha = 0.05))
     @test shallow > k4
     @test abs(k4 - 1 / 4) < abs(shallow - 1 / 4)
 
@@ -402,44 +427,46 @@ const PRSKEW = prior(EmpiricalPrior(), XSKEW)
     # returns the same number, because a column's dispersion comes from that column. This
     # is the line that separates the rule from one that whitens with `sigma`.
     scaled = LowOrderPrior(; X = PRT4.X, mu = PRT4.mu, sigma = 100 .* PRT4.sigma)
-    @test rule(:kappa, scaled, nothing, nothing) == k4
+    @test rule(:kappa, scaled, nothing, nothing, CalibrationContext(; alpha = 0.01)) == k4
 
     # A tail index is a statement about the shape of a series rather than about the count of
     # observations behind it, so the rule ignores the observation weights. `ScenarioCount`
     # reads Kish's effective sample size and `RateSignificance` reads the raw row count;
     # this rule reads neither.
-    @test rule(:kappa, PRT4, pweights([fill(3.0, 500); fill(1.0, 500)]), nothing) == k4
+    @test rule(:kappa, PRT4, pweights([fill(3.0, 500); fill(1.0, 500)]), nothing,
+               CalibrationContext(; alpha = 0.01)) == k4
 
     # The solver reaches the rule and this one needs none: the estimate is a closed form.
-    @test rule(:kappa, PRT4, nothing, Solver(; name = :probe, solver = nothing)) == k4
+    @test rule(:kappa, PRT4, nothing, Solver(; name = :probe, solver = nothing),
+               CalibrationContext(; alpha = 0.01)) == k4
 end
 
 @testset "Calibration rules: `HillTailDecay` answers per end" begin
-    rule = HillTailDecay(; kmin = 20, alpha = 0.01)
+    rule = HillTailDecay(; kmin = 20)
 
     # `key` says which end the slot prices, so the two ends of a skewed sample resolve to
     # two different numbers. This is the OPPOSITE of the other three rules, and the reason
     # is that a tail index is a statement about ONE tail.
-    ka = rule(:kappa_a, PRSKEW, nothing, nothing)
-    kb = rule(:kappa_b, PRSKEW, nothing, nothing)
+    ka = rule(:kappa_a, PRSKEW, nothing, nothing, CalibrationContext(; alpha = 0.01))
+    kb = rule(:kappa_b, PRSKEW, nothing, nothing, CalibrationContext(; alpha = 0.01))
     @test ka > kb
     @test 0.75 / 3 <= ka <= 1.6 / 3
     @test 0.75 / 9 <= kb <= 1.6 / 9
 
     # `:kappa` is a loss key, so the scalar measures read the loss tail.
-    @test rule(:kappa, PRSKEW, nothing, nothing) == ka
+    @test rule(:kappa, PRSKEW, nothing, nothing, CalibrationContext(; alpha = 0.01)) == ka
 
     # `EntropyBudget` states the opposite in its own docstring: a budget is a price the
     # model pays, so it is one number for both ends of the same sample.
-    budget = EntropyBudget(; target = -1.3, alpha = 0.05)
-    @test budget(:kappa_a, PR60, nothing, nothing) ==
-          budget(:kappa_b, PR60, nothing, nothing)
+    budget = EntropyBudget(; target = -1.3)
+    @test budget(:kappa_a, PR60, nothing, nothing, CalibrationContext(; alpha = 0.05)) ==
+          budget(:kappa_b, PR60, nothing, nothing, CalibrationContext(; alpha = 0.05))
 end
 
 @testset "Calibration rules: `HillTailDecay` gives a Range measure two ends" begin
-    # The travelling pair costs nothing new: `RelativisticValueatRiskRange` already binds
-    # `alpha` to the tail slot and `beta` to the head slot, so the rule needs one `alpha`
-    # field and one `bind_alpha` method.
+    # The travelling pair costs nothing new: `RelativisticValueatRiskRange` already puts
+    # `alpha` in the tail slot's context and `beta` in the head slot's, so the rule reads
+    # one field and holds none.
     rg = RelativisticValueatRiskRange(; alpha = 0.01,
                                       kappa_a = DeformationTailCalibration(;
                                                                            alg = HillTailDecay(;
@@ -449,10 +476,10 @@ end
                                                                            alg = HillTailDecay(;
                                                                                                kmin = 20)))
     og = PO.resolve_deferred_quantities(rg, PRSKEW)
-    @test og.kappa_a ≈
-          HillTailDecay(; kmin = 20, alpha = 0.01)(:kappa_a, PRSKEW, nothing, nothing)
-    @test og.kappa_b ≈
-          HillTailDecay(; kmin = 20, alpha = 0.02)(:kappa_b, PRSKEW, nothing, nothing)
+    @test og.kappa_a ≈ HillTailDecay(; kmin = 20)(:kappa_a, PRSKEW, nothing, nothing,
+                                                  CalibrationContext(; alpha = 0.01))
+    @test og.kappa_b ≈ HillTailDecay(; kmin = 20)(:kappa_b, PRSKEW, nothing, nothing,
+                                                  CalibrationContext(; alpha = 0.02))
     @test og.kappa_a != og.kappa_b
     @test 0 < og.kappa_a < 1
     @test 0 < og.kappa_b < 1
@@ -460,8 +487,8 @@ end
     # The head end really reads its OWN probability. The same rule bound to the tail's
     # `alpha` answers differently, so the pairing is not an accident of the two ends holding
     # one number.
-    @test og.kappa_b !=
-          HillTailDecay(; kmin = 20, alpha = 0.01)(:kappa_b, PRSKEW, nothing, nothing)
+    @test og.kappa_b != HillTailDecay(; kmin = 20)(:kappa_b, PRSKEW, nothing, nothing,
+                                                   CalibrationContext(; alpha = 0.01))
 end
 
 #=
@@ -481,24 +508,26 @@ const PRHEAVY = prior(EmpiricalPrior(),
     # A rule whose sibling never arrived cannot form the count, and it says so. This is the
     # message `EntropyBudget` carries, in the words of this rule's own count.
     unbound = HillTailDecay()
-    @test isnothing(unbound.alpha)
+    @test !hasfield(typeof(unbound), :alpha)
     @test unbound.kmin == 30
-    @test_throws PO.IsNothingError unbound(:kappa, PR60, nothing, nothing)
+    @test_throws PO.IsNothingError unbound(:kappa, PR60, nothing, nothing,
+                                           CalibrationContext())
     msg = try
-        unbound(:kappa, PR60, nothing, nothing)
+        unbound(:kappa, PR60, nothing, nothing, CalibrationContext())
         ""
     catch e
         sprint(showerror, e)
     end
-    @test occursin("HillTailDecay.alpha", msg)
-    @test occursin("bind_alpha", msg)
+    @test occursin("CalibrationContext.alpha", msg)
+    @test occursin("HillTailDecay", msg)
 
     # The floor. `PR60` pools 240 values, so `alpha = 0.05` leaves 12 order statistics and
     # the default floor of 30 refuses them. A Hill estimate on 12 points moves from fold to
     # fold for no reason in the data.
-    @test_throws DomainError HillTailDecay(; alpha = 0.05)(:kappa, PR60, nothing, nothing)
+    @test_throws DomainError HillTailDecay()(:kappa, PR60, nothing, nothing,
+                                             CalibrationContext(; alpha = 0.05))
     msg = try
-        HillTailDecay(; alpha = 0.05)(:kappa, PR60, nothing, nothing)
+        HillTailDecay()(:kappa, PR60, nothing, nothing, CalibrationContext(; alpha = 0.05))
         ""
     catch e
         sprint(showerror, e)
@@ -509,13 +538,17 @@ const PRHEAVY = prior(EmpiricalPrior(),
 
     # A floor the sample clears returns a number, so the refusal is the floor's and not the
     # sample's.
-    @test 0 < HillTailDecay(; kmin = 5, alpha = 0.05)(:kappa, PR60, nothing, nothing) < 1
+    @test 0 <
+          HillTailDecay(; kmin = 5)(:kappa, PR60, nothing, nothing,
+                                    CalibrationContext(; alpha = 0.05)) <
+          1
 
     # A probability that takes the whole sample leaves no `k + 1`-th value to divide by.
-    @test_throws DomainError HillTailDecay(; kmin = 5, alpha = 0.999)(:kappa, PR60, nothing,
-                                                                      nothing)
+    @test_throws DomainError HillTailDecay(; kmin = 5)(:kappa, PR60, nothing, nothing,
+                                                       CalibrationContext(; alpha = 0.999))
     msg = try
-        HillTailDecay(; kmin = 5, alpha = 0.999)(:kappa, PR60, nothing, nothing)
+        HillTailDecay(; kmin = 5)(:kappa, PR60, nothing, nothing,
+                                  CalibrationContext(; alpha = 0.999))
         ""
     catch e
         sprint(showerror, e)
@@ -525,10 +558,11 @@ const PRHEAVY = prior(EmpiricalPrior(),
 
     # The pool holds fewer positive values than the count asks for, so there is no Hill
     # estimate at all. A sample with fewer losses than `k + 1` is the case that produces it.
-    @test_throws DomainError HillTailDecay(; kmin = 5, alpha = 0.95)(:kappa, PRSPIKE,
-                                                                     nothing, nothing)
+    @test_throws DomainError HillTailDecay(; kmin = 5)(:kappa, PRSPIKE, nothing, nothing,
+                                                       CalibrationContext(; alpha = 0.95))
     msg = try
-        HillTailDecay(; kmin = 5, alpha = 0.95)(:kappa, PRSPIKE, nothing, nothing)
+        HillTailDecay(; kmin = 5)(:kappa, PRSPIKE, nothing, nothing,
+                                  CalibrationContext(; alpha = 0.95))
         ""
     catch e
         sprint(showerror, e)
@@ -540,16 +574,17 @@ const PRHEAVY = prior(EmpiricalPrior(),
     # holds 40 values above the column mean and 360 below it, so neither count reaches 381.
     # The refusal is the count's, and the floor case above is where a sample that clears it
     # returns a number.
-    @test_throws DomainError HillTailDecay(; kmin = 5, alpha = 0.95)(:kappa_b, PRSPIKE,
-                                                                     nothing, nothing)
+    @test_throws DomainError HillTailDecay(; kmin = 5)(:kappa_b, PRSPIKE, nothing, nothing,
+                                                       CalibrationContext(; alpha = 0.95))
 
     # An estimate at or below one is a tail with no finite mean, and no admissible κ reads
     # it. The band `(0, 1)` the slot admits IS the condition `â > 1`, so the refusal is the
     # reading rather than a guard bolted onto it.
-    @test_throws DomainError HillTailDecay(; kmin = 5, alpha = 0.05)(:kappa, PRHEAVY,
-                                                                     nothing, nothing)
+    @test_throws DomainError HillTailDecay(; kmin = 5)(:kappa, PRHEAVY, nothing, nothing,
+                                                       CalibrationContext(; alpha = 0.05))
     msg = try
-        HillTailDecay(; kmin = 5, alpha = 0.05)(:kappa, PRHEAVY, nothing, nothing)
+        HillTailDecay(; kmin = 5)(:kappa, PRHEAVY, nothing, nothing,
+                                  CalibrationContext(; alpha = 0.05))
         ""
     catch e
         sprint(showerror, e)
@@ -584,13 +619,13 @@ const PRMVT4S = mvt_prior(1004, 4, 2000, 8)
 const PRMVT6 = mvt_prior(1006, 6, 4000, 8)
 
 @testset "Calibration rules: `RadialTailDecay` returns the reciprocal tail index" begin
-    rule = RadialTailDecay(; alpha = 0.05)
+    rule = RadialTailDecay()
 
     # The answer is `1 / ν`, and the band holds the Hill bias. It is the band the sibling's
     # own draws are read in, and both rules estimate the same quantity.
-    k3 = rule(:kappa, PRMVT3, nothing, nothing)
-    k4 = rule(:kappa, PRMVT4, nothing, nothing)
-    k6 = rule(:kappa, PRMVT6, nothing, nothing)
+    k3 = rule(:kappa, PRMVT3, nothing, nothing, CalibrationContext(; alpha = 0.05))
+    k4 = rule(:kappa, PRMVT4, nothing, nothing, CalibrationContext(; alpha = 0.05))
+    k6 = rule(:kappa, PRMVT6, nothing, nothing, CalibrationContext(; alpha = 0.05))
     for (kap, nu) in ((k3, 3), (k4, 4), (k6, 6))
         @test 0 < kap < 1
         @test 0.75 / nu <= kap <= 1.6 / nu
@@ -602,7 +637,7 @@ const PRMVT6 = mvt_prior(1006, 6, 4000, 8)
 
     # The same tail index at a second sample length. `T` moves the series and the count with
     # it, and both readings hold the band.
-    k4s = rule(:kappa, PRMVT4S, nothing, nothing)
+    k4s = rule(:kappa, PRMVT4S, nothing, nothing, CalibrationContext(; alpha = 0.05))
     @test 0.75 / 4 <= k4s <= 1.6 / 4
     @test k4s != k4
 
@@ -618,31 +653,38 @@ const PRMVT6 = mvt_prior(1006, 6, 4000, 8)
 
     # A tail index is a statement about the shape of a series rather than about the count of
     # observations behind it, so the rule ignores the observation weights.
-    @test rule(:kappa, PRMVT4, pweights([fill(3.0, 2000); fill(1.0, 2000)]), nothing) == k4
+    @test rule(:kappa, PRMVT4, pweights([fill(3.0, 2000); fill(1.0, 2000)]), nothing,
+               CalibrationContext(; alpha = 0.05)) == k4
 
     # The solver reaches the rule and this one needs none: the estimate is a closed form.
-    @test rule(:kappa, PRMVT4, nothing, Solver(; name = :probe, solver = nothing)) == k4
+    @test rule(:kappa, PRMVT4, nothing, Solver(; name = :probe, solver = nothing),
+               CalibrationContext(; alpha = 0.05)) == k4
 
     # `alpha` sets the DEPTH as well as the count, on the same terms as the sibling.
-    @test RadialTailDecay(; alpha = 0.01)(:kappa, PRMVT4, nothing, nothing) != k4
+    @test RadialTailDecay()(:kappa, PRMVT4, nothing, nothing,
+                            CalibrationContext(; alpha = 0.01)) != k4
 end
 
 @testset "Calibration rules: `RadialTailDecay` reads the covariance matrix" begin
-    rule = RadialTailDecay(; kmin = 5, alpha = 0.05)
+    rule = RadialTailDecay(; kmin = 5)
 
     # The line that separates this rule from `HillTailDecay`: the shape of the covariance
     # matrix reaches the answer. The sibling standardises each column on its own, so a
     # covariance matrix with the same diagonal and no off-diagonal term leaves it unmoved.
     diagonal = LowOrderPrior(; X = PRMVT4.X, mu = PRMVT4.mu,
                              sigma = Matrix(Diagonal(diag(PRMVT4.sigma))))
-    @test rule(:kappa, diagonal, nothing, nothing) != rule(:kappa, PRMVT4, nothing, nothing)
-    @test HillTailDecay(; kmin = 5, alpha = 0.05)(:kappa, diagonal, nothing, nothing) ==
-          HillTailDecay(; kmin = 5, alpha = 0.05)(:kappa, PRMVT4, nothing, nothing)
+    @test rule(:kappa, diagonal, nothing, nothing, CalibrationContext(; alpha = 0.05)) !=
+          rule(:kappa, PRMVT4, nothing, nothing, CalibrationContext(; alpha = 0.05))
+    @test HillTailDecay(; kmin = 5)(:kappa, diagonal, nothing, nothing,
+                                    CalibrationContext(; alpha = 0.05)) ==
+          HillTailDecay(; kmin = 5)(:kappa, PRMVT4, nothing, nothing,
+                                    CalibrationContext(; alpha = 0.05))
 
     # `chol` and `sigma` state the same factorisation, so they give the same number.
     both = LowOrderPrior(; X = PRMVT4.X, mu = PRMVT4.mu, sigma = PRMVT4.sigma,
                          chol = cholesky(PRMVT4.sigma).U)
-    @test rule(:kappa, both, nothing, nothing) == rule(:kappa, PRMVT4, nothing, nothing)
+    @test rule(:kappa, both, nothing, nothing, CalibrationContext(; alpha = 0.05)) ==
+          rule(:kappa, PRMVT4, nothing, nothing, CalibrationContext(; alpha = 0.05))
 
     # **`chol` takes precedence over `sigma`**, which is the rule the `chol` field states. A
     # carrier whose two fields disagree is read by its `chol`, and the identity `sigma` it
@@ -654,10 +696,10 @@ end
     stated = LowOrderPrior(; X = PRMVT4.X, mu = PRMVT4.mu, sigma = other)
     identity_sigma = LowOrderPrior(; X = PRMVT4.X, mu = PRMVT4.mu,
                                    sigma = Matrix(1.0I, 8, 8))
-    @test rule(:kappa, precedence, nothing, nothing) ==
-          rule(:kappa, stated, nothing, nothing)
-    @test rule(:kappa, precedence, nothing, nothing) !=
-          rule(:kappa, identity_sigma, nothing, nothing)
+    @test rule(:kappa, precedence, nothing, nothing, CalibrationContext(; alpha = 0.05)) ==
+          rule(:kappa, stated, nothing, nothing, CalibrationContext(; alpha = 0.05))
+    @test rule(:kappa, precedence, nothing, nothing, CalibrationContext(; alpha = 0.05)) !=
+          rule(:kappa, identity_sigma, nothing, nothing, CalibrationContext(; alpha = 0.05))
 
     # A TALL `chol` states a covariance matrix all the same, and the `R` factor of its QR
     # factorisation is the square factor of that same matrix. `chol` is checked against the
@@ -665,7 +707,8 @@ end
     F = randn(StableRNG(4242), 20, 8)
     tall = LowOrderPrior(; X = PRMVT4.X, mu = PRMVT4.mu, sigma = F' * F, chol = F)
     square = LowOrderPrior(; X = PRMVT4.X, mu = PRMVT4.mu, sigma = F' * F)
-    @test rule(:kappa, tall, nothing, nothing) ≈ rule(:kappa, square, nothing, nothing)
+    @test rule(:kappa, tall, nothing, nothing, CalibrationContext(; alpha = 0.05)) ≈
+          rule(:kappa, square, nothing, nothing, CalibrationContext(; alpha = 0.05))
 
     # The verb that picks the factor is separate, and it returns the prior's own factor
     # untouched when there is one.
@@ -675,17 +718,18 @@ end
 end
 
 @testset "Calibration rules: `RadialTailDecay` answers one number for both ends" begin
-    rule = RadialTailDecay(; kmin = 5, alpha = 0.01)
+    rule = RadialTailDecay(; kmin = 5)
 
     # A distance has no sign, so every key gives the same number. The sibling gives two on
     # the same sample, which is the whole difference between what the two rules say.
-    ka = rule(:kappa_a, PRSKEW, nothing, nothing)
-    @test rule(:kappa, PRSKEW, nothing, nothing) == ka
-    @test rule(:kappa_b, PRSKEW, nothing, nothing) == ka
-    @test rule(:anything_at_all, PRSKEW, nothing, nothing) == ka
-    hill = HillTailDecay(; kmin = 5, alpha = 0.01)
-    @test hill(:kappa_a, PRSKEW, nothing, nothing) !=
-          hill(:kappa_b, PRSKEW, nothing, nothing)
+    ka = rule(:kappa_a, PRSKEW, nothing, nothing, CalibrationContext(; alpha = 0.01))
+    @test rule(:kappa, PRSKEW, nothing, nothing, CalibrationContext(; alpha = 0.01)) == ka
+    @test rule(:kappa_b, PRSKEW, nothing, nothing, CalibrationContext(; alpha = 0.01)) == ka
+    @test rule(:anything_at_all, PRSKEW, nothing, nothing,
+               CalibrationContext(; alpha = 0.01)) == ka
+    hill = HillTailDecay(; kmin = 5)
+    @test hill(:kappa_a, PRSKEW, nothing, nothing, CalibrationContext(; alpha = 0.01)) !=
+          hill(:kappa_b, PRSKEW, nothing, nothing, CalibrationContext(; alpha = 0.01))
 
     # `mirror_role` is therefore trivially correct for this rule: the head role it builds
     # holds the same rule, and the same rule answers the head key with the tail's number.
@@ -693,8 +737,9 @@ end
     head = PO.mirror_role(tail)
     @test isa(head, DeformationHeadCalibration)
     @test head.alg === rule
-    @test PO.resolve_calibration_slot(head, :kappa_b, PRSKEW, nothing) ==
-          PO.resolve_calibration_slot(tail, :kappa_a, PRSKEW, nothing)
+    mctx = CalibrationContext(; alpha = 0.01)
+    @test PO.resolve_calibration_slot(head, :kappa_b, PRSKEW, nothing, nothing, mctx) ==
+          PO.resolve_calibration_slot(tail, :kappa_a, PRSKEW, nothing, nothing, mctx)
 
     # Through a Range measure the two ends read their OWN probabilities, so the two numbers
     # part when the two probabilities differ. The count `k` moves, not the end.
@@ -708,8 +753,8 @@ end
                                                                                                  kmin = 5)))
     og = PO.resolve_deferred_quantities(rg, PRSKEW)
     @test og.kappa_a == ka
-    @test og.kappa_b ==
-          RadialTailDecay(; kmin = 5, alpha = 0.02)(:kappa_b, PRSKEW, nothing, nothing)
+    @test og.kappa_b == RadialTailDecay(; kmin = 5)(:kappa_b, PRSKEW, nothing, nothing,
+                                                    CalibrationContext(; alpha = 0.02))
     @test og.kappa_a != og.kappa_b
     @test 0 < og.kappa_a < 1
     @test 0 < og.kappa_b < 1
@@ -726,14 +771,15 @@ end
     oeq = PO.resolve_deferred_quantities(eq, PRSKEW)
     @test oeq.kappa_a == oeq.kappa_b
 
-    # `bind_alpha` reaches the rule through both roles of the family, and through the rule
-    # itself.
-    @test PO.bind_alpha(RadialTailDecay(; kmin = 7), 0.03) ==
-          RadialTailDecay(; kmin = 7, alpha = 0.03)
-    @test PO.bind_alpha(DeformationTailCalibration(; alg = RadialTailDecay(; kmin = 7)),
-                        0.03).alg.alpha == 0.03
-    @test PO.bind_alpha(DeformationHeadCalibration(; alg = RadialTailDecay(; kmin = 7)),
-                        0.03).alg.kmin == 7
+    # The context reaches the rule through both roles of the family, and through the rule
+    # itself. The role is never rebuilt, so `alg` is the object the caller put there.
+    rad = RadialTailDecay(; kmin = 7)
+    c03 = CalibrationContext(; alpha = 0.03)
+    @test PO.resolve_calibration_slot(DeformationTailCalibration(; alg = rad), :kappa,
+                                      PRSKEW, nothing, nothing, c03) ==
+          rad(:kappa, PRSKEW, nothing, nothing, c03)
+    @test DeformationTailCalibration(; alg = rad).alg === rad
+    @test DeformationHeadCalibration(; alg = rad).alg.kmin == 7
 end
 
 #=
@@ -772,24 +818,27 @@ const PRZDIAG = LowOrderPrior(; X = XSING, mu = zeros(4), sigma = Matrix(1.0I, 4
 @testset "Calibration rules: `RadialTailDecay` refuses an estimate it cannot form" begin
     # A rule whose sibling never arrived cannot form the count, and it says so.
     unbound = RadialTailDecay()
-    @test isnothing(unbound.alpha)
+    @test !hasfield(typeof(unbound), :alpha)
     @test unbound.kmin == 30
-    @test_throws PO.IsNothingError unbound(:kappa, PR60, nothing, nothing)
+    @test_throws PO.IsNothingError unbound(:kappa, PR60, nothing, nothing,
+                                           CalibrationContext())
     msg = try
-        unbound(:kappa, PR60, nothing, nothing)
+        unbound(:kappa, PR60, nothing, nothing, CalibrationContext())
         ""
     catch e
         sprint(showerror, e)
     end
-    @test occursin("RadialTailDecay.alpha", msg)
-    @test occursin("bind_alpha", msg)
+    @test occursin("CalibrationContext.alpha", msg)
+    @test occursin("RadialTailDecay", msg)
 
     # The floor. The series holds ONE entry per observation, so `PR60` leaves three order
     # statistics at `alpha = 0.05` where the pool of the sibling leaves twelve. The same
     # floor therefore binds harder here, and the message says which count it refused.
-    @test_throws DomainError RadialTailDecay(; alpha = 0.05)(:kappa, PR60, nothing, nothing)
+    @test_throws DomainError RadialTailDecay()(:kappa, PR60, nothing, nothing,
+                                               CalibrationContext(; alpha = 0.05))
     msg = try
-        RadialTailDecay(; alpha = 0.05)(:kappa, PR60, nothing, nothing)
+        RadialTailDecay()(:kappa, PR60, nothing, nothing,
+                          CalibrationContext(; alpha = 0.05))
         ""
     catch e
         sprint(showerror, e)
@@ -800,13 +849,18 @@ const PRZDIAG = LowOrderPrior(; X = XSING, mu = zeros(4), sigma = Matrix(1.0I, 4
 
     # A floor the sample clears returns a number, so the refusal is the floor's and not the
     # sample's.
-    @test 0 < RadialTailDecay(; kmin = 3, alpha = 0.05)(:kappa, PR60, nothing, nothing) < 1
+    @test 0 <
+          RadialTailDecay(; kmin = 3)(:kappa, PR60, nothing, nothing,
+                                      CalibrationContext(; alpha = 0.05)) <
+          1
 
     # A probability that takes the whole sample leaves no `k + 1`-th distance to divide by.
-    @test_throws DomainError RadialTailDecay(; kmin = 5, alpha = 0.999)(:kappa, PR60,
-                                                                        nothing, nothing)
+    @test_throws DomainError RadialTailDecay(; kmin = 5)(:kappa, PR60, nothing, nothing,
+                                                         CalibrationContext(;
+                                                                            alpha = 0.999))
     msg = try
-        RadialTailDecay(; kmin = 5, alpha = 0.999)(:kappa, PR60, nothing, nothing)
+        RadialTailDecay(; kmin = 5)(:kappa, PR60, nothing, nothing,
+                                    CalibrationContext(; alpha = 0.999))
         ""
     catch e
         sprint(showerror, e)
@@ -817,10 +871,11 @@ const PRZDIAG = LowOrderPrior(; X = XSING, mu = zeros(4), sigma = Matrix(1.0I, 4
     # The series holds fewer positive entries than the count asks for, so there is no Hill
     # estimate at all. A sample that sits exactly at its own mean produces it.
     @test PRZERO.mu == zeros(4)
-    @test_throws DomainError RadialTailDecay(; kmin = 5, alpha = 0.6)(:kappa, PRZERO,
-                                                                      nothing, nothing)
+    @test_throws DomainError RadialTailDecay(; kmin = 5)(:kappa, PRZERO, nothing, nothing,
+                                                         CalibrationContext(; alpha = 0.6))
     msg = try
-        RadialTailDecay(; kmin = 5, alpha = 0.6)(:kappa, PRZERO, nothing, nothing)
+        RadialTailDecay(; kmin = 5)(:kappa, PRZERO, nothing, nothing,
+                                    CalibrationContext(; alpha = 0.6))
         ""
     catch e
         sprint(showerror, e)
@@ -831,10 +886,12 @@ const PRZDIAG = LowOrderPrior(; X = XSING, mu = zeros(4), sigma = Matrix(1.0I, 4
     # An estimate at or below one is a tail with no finite mean, and no admissible κ reads
     # it. The band `(0, 1)` the slot admits IS the condition `â > 1`, so the refusal is the
     # reading rather than a guard bolted onto it.
-    @test_throws DomainError RadialTailDecay(; kmin = 5, alpha = 0.05)(:kappa, PRMVHEAVY,
-                                                                       nothing, nothing)
+    @test_throws DomainError RadialTailDecay(; kmin = 5)(:kappa, PRMVHEAVY, nothing,
+                                                         nothing,
+                                                         CalibrationContext(; alpha = 0.05))
     msg = try
-        RadialTailDecay(; kmin = 5, alpha = 0.05)(:kappa, PRMVHEAVY, nothing, nothing)
+        RadialTailDecay(; kmin = 5)(:kappa, PRMVHEAVY, nothing, nothing,
+                                    CalibrationContext(; alpha = 0.05))
         ""
     catch e
         sprint(showerror, e)
@@ -844,8 +901,8 @@ const PRZDIAG = LowOrderPrior(; X = XSING, mu = zeros(4), sigma = Matrix(1.0I, 4
 
     # A covariance matrix that is not positive definite states no whitening, and the message
     # names the field it was read off.
-    @test_throws DomainError RadialTailDecay(; kmin = 5, alpha = 0.05)(:kappa, PRSING,
-                                                                       nothing, nothing)
+    @test_throws DomainError RadialTailDecay(; kmin = 5)(:kappa, PRSING, nothing, nothing,
+                                                         CalibrationContext(; alpha = 0.05))
     msg = try
         PO.whitening_factor(PRSING)
         ""
@@ -857,9 +914,10 @@ const PRZDIAG = LowOrderPrior(; X = XSING, mu = zeros(4), sigma = Matrix(1.0I, 4
 
     # A wide factor states a singular covariance matrix. Dropping to `pr.sigma` would state
     # something the prior does not, because `chol` takes precedence at every consumer.
-    @test_throws DimensionMismatch RadialTailDecay(; kmin = 5, alpha = 0.05)(:kappa, PRWIDE,
-                                                                             nothing,
-                                                                             nothing)
+    @test_throws DimensionMismatch RadialTailDecay(; kmin = 5)(:kappa, PRWIDE, nothing,
+                                                               nothing,
+                                                               CalibrationContext(;
+                                                                                  alpha = 0.05))
     msg = try
         PO.whitening_factor(PRWIDE)
         ""
@@ -871,8 +929,8 @@ const PRZDIAG = LowOrderPrior(; X = XSING, mu = zeros(4), sigma = Matrix(1.0I, 4
 
     # A zero on the diagonal of a triangular factor is a rank statement, so it is refused
     # rather than solved against.
-    @test_throws DomainError RadialTailDecay(; kmin = 5, alpha = 0.05)(:kappa, PRZDIAG,
-                                                                       nothing, nothing)
+    @test_throws DomainError RadialTailDecay(; kmin = 5)(:kappa, PRZDIAG, nothing, nothing,
+                                                         CalibrationContext(; alpha = 0.05))
     msg = try
         PO.whitening_factor(PRZDIAG)
         ""
@@ -886,9 +944,9 @@ end
 #=
 The **series** a rule reads. A drawdown measure prices the drawdown series of the portfolio,
 and a rule forms no portfolio, so it reads the drawdown series of each COLUMN in place of the
-column. Nothing else in either reading moves. `bind_series` carries the marker from the owner
-to the rule, and the owner's marker wins, because the quantity belongs to the measure and a
-rule cannot know which measure it reached.
+column. Nothing else in either reading moves. `CalibrationContext.series` carries the marker
+from the owner to the rule, and it is the only place the marker is ever written, because the
+quantity belongs to the measure and a rule cannot know which measure it reached.
 
 The fixture is a drifted Student-t draw. The drift matters to what a drawdown series says: a
 drawdown is a running functional, so a sample whose drift is strong enough for the drawdown
@@ -956,45 +1014,64 @@ const PRDD = prior(EmpiricalPrior(), XDD)
     @test any(>(0), XDD)
 end
 
-@testset "Calibration series: `bind_series` carries the owner's series" begin
-    rule = HillTailDecay(; kmin = 12, alpha = 0.02)
+@testset "Calibration series: the context carries the owner's series" begin
+    rule = HillTailDecay(; kmin = 12)
+    abs_ctx = CalibrationContext(; alpha = 0.02, series = AbsoluteDrawdownSeries())
+    rel_ctx = CalibrationContext(; alpha = 0.02, series = RelativeDrawdownSeries())
+    ret_ctx = CalibrationContext(; alpha = 0.02)
 
-    # The verb reaches the rule, and through both roles of the family.
-    @test isa(PO.bind_series(rule, AbsoluteDrawdownSeries()).series, AbsoluteDrawdownSeries)
-    @test isa(PO.bind_series(DeformationTailCalibration(; alg = rule),
-                             RelativeDrawdownSeries()).alg.series, RelativeDrawdownSeries)
-    @test isa(PO.bind_series(DeformationHeadCalibration(; alg = rule),
-                             AbsoluteDrawdownSeries()).alg.series, AbsoluteDrawdownSeries)
-    @test isa(PO.bind_series(RadialTailDecay(; kmin = 7), AbsoluteDrawdownSeries()).series,
-              AbsoluteDrawdownSeries)
+    # The marker reaches the rule, and through both roles of the family. The role is not
+    # rebuilt, so the occupant of the slot is the object the caller put there.
+    @test PO.resolve_calibration_slot(DeformationTailCalibration(; alg = rule), :kappa,
+                                      PRDD, nothing, nothing, abs_ctx) ==
+          rule(:kappa, PRDD, nothing, nothing, abs_ctx)
+    @test PO.resolve_calibration_slot(DeformationHeadCalibration(; alg = rule), :kappa,
+                                      PRDD, nothing, nothing, rel_ctx) ==
+          rule(:kappa, PRDD, nothing, nothing, rel_ctx)
+    @test isa(abs_ctx.series, AbsoluteDrawdownSeries)
+    @test isa(rel_ctx.series, RelativeDrawdownSeries)
 
-    # It carries the rule's other fields over untouched, and it commutes with `bind_alpha`:
-    # the two verbs fill two different fields.
-    bound = PO.bind_series(rule, AbsoluteDrawdownSeries())
-    @test bound.kmin == 12
-    @test bound.alpha == 0.02
-    @test PO.bind_alpha(PO.bind_series(HillTailDecay(; kmin = 12),
-                                       AbsoluteDrawdownSeries()), 0.02) == bound
-    @test PO.bind_series(PO.bind_alpha(HillTailDecay(; kmin = 12), 0.02),
-                         AbsoluteDrawdownSeries()) == bound
+    # The three markers name three different quantities of one sample, so a rule that reads
+    # the shape of a series answers three different numbers.
+    @test rule(:kappa, PRDD, nothing, nothing, abs_ctx) !=
+          rule(:kappa, PRDD, nothing, nothing, ret_ctx)
+    @test rule(:kappa, PRDD, nothing, nothing, rel_ctx) !=
+          rule(:kappa, PRDD, nothing, nothing, ret_ctx)
 
-    # THE OWNER'S SERIES WINS. A rule that already carries a marker has it replaced, because
-    # the quantity belongs to the measure. This is the reading `bind_norm_order` states for
-    # a norm order, and it is the opposite of `bind_alpha`, whose number no rule holds.
-    stated = HillTailDecay(; kmin = 12, alpha = 0.02, series = RelativeDrawdownSeries())
-    @test isa(PO.bind_series(stated, ReturnsSeries()).series, ReturnsSeries)
+    # THE OWNER'S SERIES IS THE ONLY SERIES. No rule carries a marker of its own, so there
+    # is nothing for the owner's answer to overwrite and no precedence to state. This is
+    # the reading the norm order takes too, and the significance level with it.
+    @test !hasfield(HillTailDecay, :series)
+    @test !hasfield(RadialTailDecay, :series)
+    @test !hasfield(EffectiveAssetFloor, :p)
 
-    # The default is the identity, so everything that reads no series crosses unchanged.
-    @test PO.bind_series(0.3, AbsoluteDrawdownSeries()) === 0.3
-    @test PO.bind_series(nothing, AbsoluteDrawdownSeries()) === nothing
-    budget = EntropyBudget(; target = -1.3, alpha = 0.05)
-    @test PO.bind_series(budget, AbsoluteDrawdownSeries()) === budget
-    probe = (key, pr, w, slv) -> 0.4
-    @test PO.bind_series(probe, AbsoluteDrawdownSeries()) === probe
-    @test PO.bind_series(DeformationTailCalibration(; alg = probe),
-                         AbsoluteDrawdownSeries()).alg === probe
-    @test PO.bind_series(SignificanceTailCalibration(; alg = RateSignificance()),
-                         AbsoluteDrawdownSeries()).alg == RateSignificance()
+    # The default is `ReturnsSeries`, which is what `calibration_series` answers for every
+    # owner that names no other.
+    @test isa(CalibrationContext().series, ReturnsSeries)
+    @test rule(:kappa, PRDD, nothing, nothing,
+               CalibrationContext(; alpha = 0.02, series = ReturnsSeries())) ==
+          rule(:kappa, PRDD, nothing, nothing, ret_ctx)
+
+    # Everything that reads no series ignores the field: a stated number, a rule of another
+    # reading, a plain function, and the role each of them stands in.
+    @test PO.resolve_calibration_slot(0.3, :kappa, PRDD, nothing, nothing, abs_ctx) === 0.3
+    @test PO.resolve_calibration_slot(nothing, :kappa, PRDD, nothing, nothing, abs_ctx) ===
+          nothing
+    # The band moves with the sample, and PRDD is long, so the target is one that lies
+    # inside the band at this length.
+    budget = EntropyBudget(; target = -10.0)
+    bctx = CalibrationContext(; alpha = 0.05, series = AbsoluteDrawdownSeries())
+    @test budget(:kappa, PRDD, nothing, nothing, bctx) ==
+          budget(:kappa, PRDD, nothing, nothing, CalibrationContext(; alpha = 0.05))
+    probe = (key, pr, w, slv, ctx) -> 0.4
+    @test PO.resolve_calibration_slot(DeformationTailCalibration(; alg = probe), :kappa,
+                                      PRDD, nothing, nothing, abs_ctx) == 0.4
+    @test PO.resolve_calibration_slot(SignificanceTailCalibration(;
+                                                                  alg = RateSignificance()),
+                                      :alpha, PRDD, nothing, nothing, abs_ctx) ==
+          PO.resolve_calibration_slot(SignificanceTailCalibration(;
+                                                                  alg = RateSignificance()),
+                                      :alpha, PRDD, nothing, nothing)
 end
 
 @testset "Calibration series: `HillTailDecay` pools the drawdowns" begin
@@ -1018,22 +1095,22 @@ end
     end
     for (s, f) in ((AbsoluteDrawdownSeries(), PO.absolute_drawdown_vec),
                    (RelativeDrawdownSeries(), PO.relative_drawdown_vec), (ReturnsSeries(), identity))
-        rule = HillTailDecay(; kmin = 20, alpha = alpha, series = s)
-        @test rule(:kappa, PRDD, nothing, nothing) ≈ inv(hill_by_hand(f, XDD, k))
+        rule = HillTailDecay(; kmin = 20)
+        @test rule(:kappa, PRDD, nothing, nothing,
+                   CalibrationContext(; alpha = alpha, series = s)) ≈
+              inv(hill_by_hand(f, XDD, k))
     end
 
     # The three markers name three series of one sample, so they answer three numbers.
-    ka = HillTailDecay(; kmin = 20, alpha = alpha, series = ReturnsSeries())(:kappa, PRDD,
-                                                                             nothing,
-                                                                             nothing)
-    kb = HillTailDecay(; kmin = 20, alpha = alpha, series = AbsoluteDrawdownSeries())(:kappa,
-                                                                                      PRDD,
-                                                                                      nothing,
-                                                                                      nothing)
-    kc = HillTailDecay(; kmin = 20, alpha = alpha, series = RelativeDrawdownSeries())(:kappa,
-                                                                                      PRDD,
-                                                                                      nothing,
-                                                                                      nothing)
+    ka = HillTailDecay(; kmin = 20)(:kappa, PRDD, nothing, nothing,
+                                    CalibrationContext(; alpha = alpha,
+                                                       series = ReturnsSeries()))
+    kb = HillTailDecay(; kmin = 20)(:kappa, PRDD, nothing, nothing,
+                                    CalibrationContext(; alpha = alpha,
+                                                       series = AbsoluteDrawdownSeries()))
+    kc = HillTailDecay(; kmin = 20)(:kappa, PRDD, nothing, nothing,
+                                    CalibrationContext(; alpha = alpha,
+                                                       series = RelativeDrawdownSeries()))
     @test ka != kb
     @test kb != kc
     @test all(k -> 0 < k < 1, (ka, kb, kc))
@@ -1045,11 +1122,10 @@ end
     @test PO.series_end_sign(AbsoluteDrawdownSeries(), :kappa) == -1
     @test PO.series_end_sign(RelativeDrawdownSeries(), :kappa_a) == -1
     @test_throws ArgumentError PO.series_end_sign(AbsoluteDrawdownSeries(), :kappa_b)
-    @test_throws ArgumentError HillTailDecay(; kmin = 20, alpha = alpha,
-                                             series = AbsoluteDrawdownSeries())(:kappa_b,
-                                                                                PRDD,
-                                                                                nothing,
-                                                                                nothing)
+    @test_throws ArgumentError HillTailDecay(; kmin = 20)(:kappa_b, PRDD, nothing, nothing,
+                                                          CalibrationContext(;
+                                                                             alpha = alpha,
+                                                                             series = AbsoluteDrawdownSeries()))
     msg = try
         PO.series_end_sign(AbsoluteDrawdownSeries(), :kappa_b)
         ""
@@ -1062,7 +1138,7 @@ end
 
 @testset "Calibration series: `RadialTailDecay` whitens the drawdowns" begin
     alpha = 0.05
-    rule = RadialTailDecay(; kmin = 20, alpha = alpha, series = AbsoluteDrawdownSeries())
+    rule = RadialTailDecay(; kmin = 20)
 
     # The reading is the returns reading over the drawdown sample: the rows of that sample
     # are centred on ITS column means and whitened by the factor of ITS covariance matrix,
@@ -1074,8 +1150,13 @@ end
     k = ceil(Int, alpha * length(d))
     u = sort(d; rev = true)
     ahat = k / sum(log(u[i] / u[k + 1]) for i in 1:k)
-    @test rule(:kappa, PRDD, nothing, nothing) ≈ inv(ahat)
-    @test 0 < rule(:kappa, PRDD, nothing, nothing) < 1
+    @test rule(:kappa, PRDD, nothing, nothing,
+               CalibrationContext(; alpha = alpha, series = AbsoluteDrawdownSeries())) ≈
+          inv(ahat)
+    @test 0 <
+          rule(:kappa, PRDD, nothing, nothing,
+               CalibrationContext(; alpha = alpha, series = AbsoluteDrawdownSeries())) <
+          1
 
     # The verb that picks the three inputs is separate, and it states which reading is which.
     Y, m, F = PO.radial_series_inputs(AbsoluteDrawdownSeries(), PRDD)
@@ -1090,7 +1171,10 @@ end
     # `pr.sigma` IS THE COVARIANCE MATRIX OF THE RETURNS, so it reaches nothing under a
     # drawdown marker: a change of it leaves the drawdown reading exactly where it stands.
     scaled = LowOrderPrior(; X = PRDD.X, mu = PRDD.mu, sigma = 100 .* PRDD.sigma)
-    @test rule(:kappa, scaled, nothing, nothing) == rule(:kappa, PRDD, nothing, nothing)
+    @test rule(:kappa, scaled, nothing, nothing,
+               CalibrationContext(; alpha = alpha, series = AbsoluteDrawdownSeries())) ==
+          rule(:kappa, PRDD, nothing, nothing,
+               CalibrationContext(; alpha = alpha, series = AbsoluteDrawdownSeries()))
 
     # The returns reading DOES read `pr.sigma`, but only through the SHAPE of the whitening.
     # A hundredfold scaling of the covariance matrix scales every radial distance alike, and
@@ -1098,8 +1182,9 @@ end
     # returns reading holds to rounding. Do not tighten this to an equality: the two sides
     # take different roundings through the Cholesky factorisation, and CI has returned both
     # the same last bit and a different one.
-    ret = RadialTailDecay(; kmin = 20, alpha = alpha)
-    @test ret(:kappa, scaled, nothing, nothing) ≈ ret(:kappa, PRDD, nothing, nothing)
+    ret = RadialTailDecay(; kmin = 20)
+    @test ret(:kappa, scaled, nothing, nothing, CalibrationContext(; alpha = alpha)) ≈
+          ret(:kappa, PRDD, nothing, nothing, CalibrationContext(; alpha = alpha))
 
     # A per-asset stretch is not a uniform scaling: it moves the relative dispersion of the
     # columns, so the whitening reorders the distances and the returns reading moves. This
@@ -1117,13 +1202,23 @@ end
     stretched = LowOrderPrior(; X = PRDD.X, mu = PRDD.mu,
                               sigma = PRDD.sigma .* (d6 * transpose(d6)))
     @test issymmetric(stretched.sigma)
-    @test ret(:kappa, stretched, nothing, nothing) != ret(:kappa, PRDD, nothing, nothing)
-    @test rule(:kappa, stretched, nothing, nothing) == rule(:kappa, PRDD, nothing, nothing)
+    @test ret(:kappa, stretched, nothing, nothing, CalibrationContext(; alpha = alpha)) !=
+          ret(:kappa, PRDD, nothing, nothing, CalibrationContext(; alpha = alpha))
+    @test rule(:kappa, stretched, nothing, nothing,
+               CalibrationContext(; alpha = alpha, series = AbsoluteDrawdownSeries())) ==
+          rule(:kappa, PRDD, nothing, nothing,
+               CalibrationContext(; alpha = alpha, series = AbsoluteDrawdownSeries()))
 
     # The distance still has no sign, so the rule answers one number for every key. The
     # marker moves the sample the distance is taken over, and not what a distance is.
-    @test rule(:kappa_a, PRDD, nothing, nothing) == rule(:kappa, PRDD, nothing, nothing)
-    @test rule(:kappa_b, PRDD, nothing, nothing) == rule(:kappa, PRDD, nothing, nothing)
+    @test rule(:kappa_a, PRDD, nothing, nothing,
+               CalibrationContext(; alpha = alpha, series = AbsoluteDrawdownSeries())) ==
+          rule(:kappa, PRDD, nothing, nothing,
+               CalibrationContext(; alpha = alpha, series = AbsoluteDrawdownSeries()))
+    @test rule(:kappa_b, PRDD, nothing, nothing,
+               CalibrationContext(; alpha = alpha, series = AbsoluteDrawdownSeries())) ==
+          rule(:kappa, PRDD, nothing, nothing,
+               CalibrationContext(; alpha = alpha, series = AbsoluteDrawdownSeries()))
 
     # A drawdown sample states its own covariance matrix, so a sample that states a singular
     # one is refused there rather than in `whitening_factor`. Two columns with one path
@@ -1131,7 +1226,9 @@ end
     twice = [XDD[:, 1] XDD[:, 1]]
     prtwice = LowOrderPrior(; X = twice, mu = vec(mean(twice; dims = 1)),
                             sigma = Matrix(1.0I, 2, 2))
-    @test_throws DomainError rule(:kappa, prtwice, nothing, nothing)
+    @test_throws DomainError rule(:kappa, prtwice, nothing, nothing,
+                                  CalibrationContext(; alpha = alpha,
+                                                     series = AbsoluteDrawdownSeries()))
     msg = try
         PO.radial_series_inputs(AbsoluteDrawdownSeries(), prtwice)
         ""
@@ -1141,7 +1238,9 @@ end
     @test occursin("AbsoluteDrawdownSeries", msg)
     @test occursin("not positive definite", msg)
     # The same carrier passes the returns reading, because `pr.sigma` states a whitening.
-    @test 0 < ret(:kappa, prtwice, nothing, nothing) < 1
+    @test 0 <
+          ret(:kappa, prtwice, nothing, nothing, CalibrationContext(; alpha = alpha)) <
+          1
 end
 
 @testset "Calibration series: a measure hands its own series over" begin
@@ -1156,20 +1255,15 @@ end
                                                                                alpha = 0.05,
                                                                                kappa = hill),
                                             PRDD)
-    @test rlvar.kappa ==
-          HillTailDecay(; kmin = 20, alpha = 0.05, series = ReturnsSeries())(:kappa, PRDD,
-                                                                             nothing,
-                                                                             nothing)
-    @test rldar.kappa ==
-          HillTailDecay(; kmin = 20, alpha = 0.05, series = AbsoluteDrawdownSeries())(:kappa,
-                                                                                      PRDD,
-                                                                                      nothing,
-                                                                                      nothing)
-    @test rrldar.kappa ==
-          HillTailDecay(; kmin = 20, alpha = 0.05, series = RelativeDrawdownSeries())(:kappa,
-                                                                                      PRDD,
-                                                                                      nothing,
-                                                                                      nothing)
+    @test rlvar.kappa == HillTailDecay(; kmin = 20)(:kappa, PRDD, nothing, nothing,
+                                                    CalibrationContext(; alpha = 0.05,
+                                                                       series = ReturnsSeries()))
+    @test rldar.kappa == HillTailDecay(; kmin = 20)(:kappa, PRDD, nothing, nothing,
+                                                    CalibrationContext(; alpha = 0.05,
+                                                                       series = AbsoluteDrawdownSeries()))
+    @test rrldar.kappa == HillTailDecay(; kmin = 20)(:kappa, PRDD, nothing, nothing,
+                                                     CalibrationContext(; alpha = 0.05,
+                                                                        series = RelativeDrawdownSeries()))
     @test rlvar.kappa != rldar.kappa
     @test rldar.kappa != rrldar.kappa
 
@@ -1177,20 +1271,16 @@ end
     radial = DeformationTailCalibration(; alg = RadialTailDecay(; kmin = 20))
     rdar = PO.resolve_deferred_quantities(RelativisticDrawdownatRisk(; alpha = 0.05,
                                                                      kappa = radial), PRDD)
-    @test rdar.kappa ==
-          RadialTailDecay(; kmin = 20, alpha = 0.05, series = AbsoluteDrawdownSeries())(:kappa,
-                                                                                        PRDD,
-                                                                                        nothing,
-                                                                                        nothing)
+    @test rdar.kappa == RadialTailDecay(; kmin = 20)(:kappa, PRDD, nothing, nothing,
+                                                     CalibrationContext(; alpha = 0.05,
+                                                                        series = AbsoluteDrawdownSeries()))
     @test rdar.kappa != rldar.kappa
 
-    # A MARKER STATED ON THE RULE IS OVERWRITTEN by the measure that resolves it. It serves
-    # a caller who runs the rule by hand, and nothing else.
-    wrong = DeformationTailCalibration(;
-                                       alg = HillTailDecay(; kmin = 20,
-                                                           series = AbsoluteDrawdownSeries()))
+    # NO MARKER CAN BE STATED ON THE RULE, so the measure that resolves it names the only
+    # one there is and no caller can put a second one anywhere.
+    @test !hasfield(HillTailDecay, :series)
     o = PO.resolve_deferred_quantities(RelativisticValueatRisk(; alpha = 0.05,
-                                                               kappa = wrong), PRDD)
+                                                               kappa = hill), PRDD)
     @test o.kappa == rlvar.kappa
 
     # Both ends of a Range measure price ONE series, where each end prices its own
@@ -1259,10 +1349,10 @@ end
     # threshold at a level a slot admits. `alpha = 0.15` reads 600 of the 4000 pooled values
     # and 150 of the 1000 distances.
     skappa = PO.series_end_sign(ReturnsSeries(), :kappa)
-    @test isapprox(HillTailDecay(; kmin = 30, alpha = 0.15)(:kappa, PR629, nothing,
-                                                            nothing),
+    @test isapprox(HillTailDecay(; kmin = 30)(:kappa, PR629, nothing, nothing,
+                                              CalibrationContext(; alpha = 0.15)),
                    inv(hill_reference(hill_pool(X629, skappa), 600)))
-    @test isapprox(RadialTailDecay(; kmin = 30, alpha = 0.15)(:kappa, PR629, nothing,
-                                                              nothing),
+    @test isapprox(RadialTailDecay(; kmin = 30)(:kappa, PR629, nothing, nothing,
+                                                CalibrationContext(; alpha = 0.15)),
                    inv(hill_reference(d629, 150)))
 end

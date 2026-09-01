@@ -29,6 +29,7 @@ calibration_series
 calibration_series_vec
 calibration_series_matrix
 calibration_series_dispersion
+CalibrationContext
 effective_sample_size
 ScenarioCount
 RateSignificance
@@ -40,8 +41,6 @@ whitening_factor
 radial_tail_index
 radial_series_inputs
 RadialTailDecay
-bind_alpha
-bind_series
 AbstractAmbiguityRadiusCalibrationAlgorithm
 AbstractAmbiguityTailWeightCalibrationAlgorithm
 Func_AmbRadCal
@@ -62,7 +61,6 @@ NormCeilingCalibration
 Num_NormCeilCal
 Num_AmbRadNormCeilCal
 EffectiveAssetFloor
-bind_norm_order
 ```
 
 ## References

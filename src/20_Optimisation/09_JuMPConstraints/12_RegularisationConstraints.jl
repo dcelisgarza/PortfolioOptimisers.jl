@@ -708,7 +708,7 @@ The same estimator also serves as a norm *constraint* through the `lpc` field of
 
 The slot is named `val` and its key is `:lpreg_val`, because [`L2Regularisation`](@ref) names its own coefficient `val` too and the two carry two different ground metrics. The two keys are the two names [`field_dict`](@ref) already uses for the two slots.
 
-The key still names no norm order, because `p` lives on this estimator and one rule may stand in several terms. So this route hands the term's own order to the rule with [`bind_norm_order`](@ref) before it resolves the slot, on the same terms as [`norm_ceiling_factory`](@ref). [`DualNormRadius`](@ref) is the rule that reads it.
+The key still names no norm order, because `p` lives on this estimator and one rule may stand in several terms. So this route states the term's own order in the [`CalibrationContext`](@ref) it resolves the slot against, on the same terms as [`norm_ceiling_factory`](@ref). [`DualNormRadius`](@ref) is the rule that reads it.
 
 # Arguments
 
@@ -732,7 +732,8 @@ The key still names no norm order, because `p` lives on this estimator and one r
 """
 function factory(x::LpRegularisation, pr::AbstractPriorResult, slv = nothing)
     assert_penalty_coefficient_role(x.val)
-    val = resolve_calibration_slot(bind_norm_order(x.val, x.p), :lpreg_val, pr, pr.w, slv)
+    val = resolve_calibration_slot(x.val, :lpreg_val, pr, pr.w, slv,
+                                   CalibrationContext(; p = x.p))
     assert_declared_calibration_resolver(x, (; val = val))
     if val === x.val
         return x
@@ -746,7 +747,7 @@ Resolve the norm ceiling in `val` against prior result `pr`, and return an [`LpR
 
 It is the norm-constraint counterpart of [`factory`](@ref) on the same type, and it is a second verb because the two routes read one field as two quantities. A `factory` call on the `lpc` field would refuse the ceiling role that belongs there, and would resolve the rule under `:lpreg_val`, the key of the penalty slot.
 
-The two verbs differ in the guard and in the key, and in nothing else. Each refuses the role that has no reading on its own route, this one through [`assert_norm_ceiling_role`](@ref). Each hands the term's own norm order to the rule with [`bind_norm_order`](@ref) before it resolves the slot, because one rule placed in `lp` or in `lpc` serves every term and each term carries its own `p`.
+The two verbs differ in the guard and in the key, and in nothing else. Each refuses the role that has no reading on its own route, this one through [`assert_norm_ceiling_role`](@ref). Each states the term's own norm order in the [`CalibrationContext`](@ref) it resolves the slot against, because one rule placed in `lp` or in `lpc` serves every term and each term carries its own `p`.
 
 The fallback carries its argument through unchanged, which is the route `nothing` takes. A term whose `val` is already a number is returned by identity instead, because the resolution gives back the number it holds.
 
@@ -755,7 +756,7 @@ The fallback carries its argument through unchanged, which is the route `nothing
  1. The argument is neither a term nor a vector of them: return it unchanged.
  2. The argument is a vector of terms: resolve each of them, and return the vector of the results.
  3. The argument is one term: refuse a radius role with [`assert_norm_ceiling_role`](@ref).
- 4. Bind the term's own `p` into the rule with [`bind_norm_order`](@ref), then resolve the slot under the key `:lpc`, giving `val`.
+ 4. State the term's own `p` in a [`CalibrationContext`](@ref), then resolve the slot under the key `:lpc` against it, giving `val`.
  5. Pair the declaration with this resolver through [`assert_declared_calibration_resolver`](@ref), which refuses the declared slot when the resolution above did not reach it.
  6. `val` is the number the term already holds: return the term itself. Otherwise rebuild the term through the keyword constructor.
 
@@ -774,7 +775,7 @@ The fallback carries its argument through unchanged, which is the route `nothing
   - [`LpRegularisation`](@ref)
   - [`factory`](@ref)
   - [`assert_norm_ceiling_role`](@ref)
-  - [`bind_norm_order`](@ref)
+  - [`CalibrationContext`](@ref)
   - [`resolve_calibration_slot`](@ref)
   - [`assert_declared_calibration_resolver`](@ref)
   - [`set_weight_norm_p_constraints!`](@ref)
@@ -785,7 +786,8 @@ function norm_ceiling_factory(x, ::AbstractPriorResult, ::Any = nothing)
 end
 function norm_ceiling_factory(x::LpRegularisation, pr::AbstractPriorResult, slv = nothing)
     assert_norm_ceiling_role(x.val)
-    val = resolve_calibration_slot(bind_norm_order(x.val, x.p), :lpc, pr, pr.w, slv)
+    val = resolve_calibration_slot(x.val, :lpc, pr, pr.w, slv,
+                                   CalibrationContext(; p = x.p))
     assert_declared_calibration_resolver(x, (; val = val))
     if val === x.val
         return x
@@ -800,8 +802,8 @@ end
 calibration_slots(x::LpRegularisation) = (; val = x.val)
 # The derived calibration recursion does not own this slot — see `resolve_calibration_slots`.
 # This slot carries two readings and two keys, `:lpreg_val` and `:lpc`, and the caller's own
-# norm order reaches the rule through `bind_norm_order` first. A derivation states neither
-# the key nor the binding, so this term opts out and the two factories stay the two routes.
+# norm order reaches the rule in a `CalibrationContext`. A derivation states neither the
+# key nor the context, so this term opts out and the two factories stay the two routes.
 resolve_calibration_slots(::LpRegularisation, ::AbstractPriorResult, ::Any = nothing) = (;)
 """
     const VecLpReg = AbstractVector{<:LpRegularisation}

@@ -77,13 +77,18 @@ end
 
 # A radius rule with no type at all. A closure over a caller's own number is the case that
 # cannot be given one, and it is why the `alg` bound admits a bare `Function`.
-probe_radius(::Symbol, pr::PO.AbstractPriorResult, ::Any, ::Any) = 3 / size(pr.X, 1)
+function probe_radius(::Symbol, pr::PO.AbstractPriorResult, ::Any, ::Any,
+                      ::PO.CalibrationContext)
+    return 3 / size(pr.X, 1)
+end
 
 # The tail-weight family ships `TailTermParity`, and a caller's own function stands beside
 # it. This one reports the key, so the resolver's argument order is asserted.
 const TWT_SEEN = Ref{Any}(nothing)
-function probe_tail_weight(key::Symbol, pr::PO.AbstractPriorResult, w, slv)
-    TWT_SEEN[] = (; key = key, weighted = !isnothing(w), solved = !isnothing(slv))
+function probe_tail_weight(key::Symbol, pr::PO.AbstractPriorResult, w, slv,
+                           ctx::PO.CalibrationContext)
+    TWT_SEEN[] = (; key = key, weighted = !isnothing(w), solved = !isnothing(slv),
+                  series = ctx.series)
     return 2 / sqrt(size(pr.X, 1))
 end
 
@@ -191,38 +196,43 @@ end
     # A stated scale is used as given, and the chi-squared factor is dimensionless.
     alg = ConcentrationRadius(; confidence = 0.95, scale = 0.5)
     q = Distributions.cquantile(Distributions.Chisq(4), 0.05)
-    @test alg(:r, PR60, nothing, nothing) ≈ 0.5 * sqrt(q / 60)
+    @test alg(:r, PR60, nothing, nothing, CalibrationContext()) ≈ 0.5 * sqrt(q / 60)
 
     # A longer sample shrinks the ball, at the square-root rate.
-    @test alg(:r, PR120, nothing, nothing) ≈ 0.5 * sqrt(q / 120)
-    @test alg(:r, PR60, nothing, nothing) / alg(:r, PR120, nothing, nothing) ≈ sqrt(2)
+    @test alg(:r, PR120, nothing, nothing, CalibrationContext()) ≈ 0.5 * sqrt(q / 120)
+    @test alg(:r, PR60, nothing, nothing, CalibrationContext()) /
+          alg(:r, PR120, nothing, nothing, CalibrationContext()) ≈ sqrt(2)
 
     # A higher confidence level buys a larger ball.
-    @test ConcentrationRadius(; confidence = 0.99, scale = 0.5)(:r, PR60, nothing,
-                                                                nothing) >
-          alg(:r, PR60, nothing, nothing)
+    @test ConcentrationRadius(; confidence = 0.99, scale = 0.5)(:r, PR60, nothing, nothing,
+                                                                CalibrationContext()) >
+          alg(:r, PR60, nothing, nothing, CalibrationContext())
 
     # `scale = nothing` reads the average asset volatility off the prior result, so the
     # radius carries the units of the returns without the caller naming a number.
     auto = ConcentrationRadius()
     scale = mean(sqrt, diag(PR60.sigma))
-    @test auto(:r, PR60, nothing, nothing) ≈ scale * sqrt(q / 60)
-    @test auto(:r, PR60, nothing, nothing) != auto(:r, PR120, nothing, nothing)
+    @test auto(:r, PR60, nothing, nothing, CalibrationContext()) ≈ scale * sqrt(q / 60)
+    @test auto(:r, PR60, nothing, nothing, CalibrationContext()) !=
+          auto(:r, PR120, nothing, nothing, CalibrationContext())
 
     # The key never selects the value, so one rule in two slots resolves to one number.
-    @test alg(:r, PR60, nothing, nothing) == alg(:r_a, PR60, nothing, nothing)
-    @test alg(:r, PR60, nothing, nothing) == alg(:l2reg_val, PR60, nothing, nothing)
+    @test alg(:r, PR60, nothing, nothing, CalibrationContext()) ==
+          alg(:r_a, PR60, nothing, nothing, CalibrationContext())
+    @test alg(:r, PR60, nothing, nothing, CalibrationContext()) ==
+          alg(:l2reg_val, PR60, nothing, nothing, CalibrationContext())
 
     # Stated weights move `T` to Kish's effective sample size, which is smaller than the
     # row count for any weights that are not equal, so the ball widens.
     kish = sum(WTS)^2 / sum(abs2, WTS)
     @test kish < 60
-    @test alg(:r, PR60, WTS, nothing) ≈ 0.5 * sqrt(q / kish)
-    @test alg(:r, PR60, WTS, nothing) > alg(:r, PR60, nothing, nothing)
+    @test alg(:r, PR60, WTS, nothing, CalibrationContext()) ≈ 0.5 * sqrt(q / kish)
+    @test alg(:r, PR60, WTS, nothing, CalibrationContext()) >
+          alg(:r, PR60, nothing, nothing, CalibrationContext())
 
     # The rule needs no solver, so it ignores the one the resolution threads.
-    @test alg(:r, PR60, nothing, Solver(; solver = nothing)) ==
-          alg(:r, PR60, nothing, nothing)
+    @test alg(:r, PR60, nothing, Solver(; solver = nothing), CalibrationContext()) ==
+          alg(:r, PR60, nothing, nothing, CalibrationContext())
 
     # Construction validation. The confidence level is a probability; the scale is a
     # positive, finite number when it is stated at all.
@@ -237,18 +247,19 @@ end
 
 @testset "RateRadius: the square-root rate" begin
     alg = RateRadius(; c = 0.2)
-    @test alg(:r, PR60, nothing, nothing) ≈ 0.2 / sqrt(60)
-    @test alg(:r, PR120, nothing, nothing) ≈ 0.2 / sqrt(120)
+    @test alg(:r, PR60, nothing, nothing, CalibrationContext()) ≈ 0.2 / sqrt(60)
+    @test alg(:r, PR120, nothing, nothing, CalibrationContext()) ≈ 0.2 / sqrt(120)
     @test RateRadius().c == 1
-    @test RateRadius()(:r, PR60, nothing, nothing) ≈ inv(sqrt(60))
+    @test RateRadius()(:r, PR60, nothing, nothing, CalibrationContext()) ≈ inv(sqrt(60))
 
     # The rule reads the raw row count, so stated weights change nothing. That is the one
     # place it parts company with `ConcentrationRadius`.
-    @test alg(:r, PR60, WTS, nothing) == alg(:r, PR60, nothing, nothing)
+    @test alg(:r, PR60, WTS, nothing, CalibrationContext()) ==
+          alg(:r, PR60, nothing, nothing, CalibrationContext())
 
     # The key and the solver never select the value.
-    @test alg(:r_b, PR60, nothing, Solver(; solver = nothing)) ==
-          alg(:r, PR60, nothing, nothing)
+    @test alg(:r_b, PR60, nothing, Solver(; solver = nothing), CalibrationContext()) ==
+          alg(:r, PR60, nothing, nothing, CalibrationContext())
 
     @test_throws DomainError RateRadius(; c = 0.0)
     @test_throws DomainError RateRadius(; c = -1.0)
@@ -261,16 +272,18 @@ end
     alg = DimensionalRateRadius(; confidence = 0.95, scale = 0.5)
     lq = log(1 / 0.05)
     @test size(PR60_2.X, 2) == 2
-    @test alg(:r, PR60_2, nothing, nothing) ≈ 0.5 * sqrt(lq / 60)
+    @test alg(:r, PR60_2, nothing, nothing, CalibrationContext()) ≈ 0.5 * sqrt(lq / 60)
 
     # A wide universe flattens the rate, and that difference is the whole content of the
     # rule. Over a doubling of the record `RateRadius` shrinks by `sqrt(2)` and this rule
     # shrinks by `2^(1/20)`.
     @test size(PR125_20.X, 2) == 20
     @test size(PR250_20.X, 2) == 20
-    dim_ratio = alg(:r, PR125_20, nothing, nothing) / alg(:r, PR250_20, nothing, nothing)
+    dim_ratio = alg(:r, PR125_20, nothing, nothing, CalibrationContext()) /
+                alg(:r, PR250_20, nothing, nothing, CalibrationContext())
     rate = RateRadius(; c = 0.5)
-    rate_ratio = rate(:r, PR125_20, nothing, nothing) / rate(:r, PR250_20, nothing, nothing)
+    rate_ratio = rate(:r, PR125_20, nothing, nothing, CalibrationContext()) /
+                 rate(:r, PR250_20, nothing, nothing, CalibrationContext())
     @test dim_ratio ≈ 2^(1 / 20)
     @test rate_ratio ≈ sqrt(2)
     @test dim_ratio < rate_ratio
@@ -280,38 +293,44 @@ end
 
     # A higher confidence level buys a larger ball, through `log(1 / (1 - confidence))`.
     @test DimensionalRateRadius(; confidence = 0.99, scale = 0.5)(:r, PR60_2, nothing,
-                                                                  nothing) >
-          alg(:r, PR60_2, nothing, nothing)
+                                                                  nothing,
+                                                                  CalibrationContext()) >
+          alg(:r, PR60_2, nothing, nothing, CalibrationContext())
 
     # `scale = nothing` reads the average asset volatility off the prior result, and a
     # stated scale overrides it. That is the pair `ConcentrationRadius` is tested on.
     auto = DimensionalRateRadius()
     scale = mean(sqrt, diag(PR60_2.sigma))
-    @test auto(:r, PR60_2, nothing, nothing) ≈ scale * sqrt(lq / 60)
-    @test auto(:r, PR60_2, nothing, nothing) != alg(:r, PR60_2, nothing, nothing)
+    @test auto(:r, PR60_2, nothing, nothing, CalibrationContext()) ≈ scale * sqrt(lq / 60)
+    @test auto(:r, PR60_2, nothing, nothing, CalibrationContext()) !=
+          alg(:r, PR60_2, nothing, nothing, CalibrationContext())
     @test isnothing(auto.scale)
     @test DimensionalRateRadius(; scale = 0.1).scale == 0.1
     @test DimensionalRateRadius().confidence == 0.95
 
     # The key never selects the value, so one rule in two slots resolves to one number.
-    @test alg(:r, PR60_2, nothing, nothing) == alg(:r_a, PR60_2, nothing, nothing)
-    @test alg(:r, PR60_2, nothing, nothing) == alg(:val, PR60_2, nothing, nothing)
+    @test alg(:r, PR60_2, nothing, nothing, CalibrationContext()) ==
+          alg(:r_a, PR60_2, nothing, nothing, CalibrationContext())
+    @test alg(:r, PR60_2, nothing, nothing, CalibrationContext()) ==
+          alg(:val, PR60_2, nothing, nothing, CalibrationContext())
 
     # Stated weights move `T` to Kish's effective sample size, on the same terms as
     # `ConcentrationRadius` and unlike `RateRadius`. This rule is a concentration
     # statement, so it prices the record that Kish's count measures.
     kish = sum(WTS)^2 / sum(abs2, WTS)
     @test kish < 60
-    @test alg(:r, PR60_2, WTS, nothing) ≈ 0.5 * sqrt(lq / kish)
-    @test alg(:r, PR60_2, WTS, nothing) > alg(:r, PR60_2, nothing, nothing)
+    @test alg(:r, PR60_2, WTS, nothing, CalibrationContext()) ≈ 0.5 * sqrt(lq / kish)
+    @test alg(:r, PR60_2, WTS, nothing, CalibrationContext()) >
+          alg(:r, PR60_2, nothing, nothing, CalibrationContext())
 
     # The rule needs no solver, so it ignores the one the resolution threads.
-    @test alg(:r, PR60_2, nothing, Solver(; solver = nothing)) ==
-          alg(:r, PR60_2, nothing, nothing)
+    @test alg(:r, PR60_2, nothing, Solver(; solver = nothing), CalibrationContext()) ==
+          alg(:r, PR60_2, nothing, nothing, CalibrationContext())
 
     # A four-asset universe already leaves the square-root corner.
-    @test alg(:r, PR60, nothing, nothing) ≈ 0.5 * (lq / 60)^(1 / 4)
-    @test alg(:r, PR60, nothing, nothing) != alg(:r, PR60_2, nothing, nothing)
+    @test alg(:r, PR60, nothing, nothing, CalibrationContext()) ≈ 0.5 * (lq / 60)^(1 / 4)
+    @test alg(:r, PR60, nothing, nothing, CalibrationContext()) !=
+          alg(:r, PR60_2, nothing, nothing, CalibrationContext())
 
     # Construction validation, on the terms `ConcentrationRadius` writes.
     @test_throws DomainError DimensionalRateRadius(; confidence = 1.0)
@@ -328,8 +347,8 @@ end
 end
 
 @testset "TailTermParity: the tail term at a stated multiple of the mean term" begin
-    alg = TailTermParity(; ratio = 1, alpha = 0.05)
-    l = alg(:l, PRDAY, nothing, nothing)
+    alg = TailTermParity(; ratio = 1)
+    l = alg(:l, PRDAY, nothing, nothing, CalibrationContext(; alpha = 0.05))
 
     # The two scales, each read off the sample without the rule. The tail-term scale is
     # written out here rather than taken off the measure, so the two encodings are checked
@@ -345,8 +364,10 @@ end
     @test l * c ≈ abs(m)
 
     # `ratio` is the caller's preference, and it scales the weight exactly.
-    @test TailTermParity(; ratio = 2, alpha = 0.05)(:l, PRDAY, nothing, nothing) ≈ 2 * l
-    @test TailTermParity(; ratio = 0.5, alpha = 0.05)(:l, PRDAY, nothing, nothing) ≈ l / 2
+    @test TailTermParity(; ratio = 2)(:l, PRDAY, nothing, nothing,
+                                      CalibrationContext(; alpha = 0.05)) ≈ 2 * l
+    @test TailTermParity(; ratio = 0.5)(:l, PRDAY, nothing, nothing,
+                                        CalibrationContext(; alpha = 0.05)) ≈ l / 2
 
     # The tail-term scale is the MEAN of the per-column CVaR and not the POOLED one. A
     # pooled tail is drawn from the worst columns, so a universe of unequal volatilities
@@ -359,27 +380,29 @@ end
 
     # The key never selects the value: the scales are read off the asset columns, so the
     # two ends of a Range measure part company through their two probabilities alone.
-    @test alg(:l_a, PRDAY, nothing, nothing) == l
-    @test alg(:l_b, PRDAY, nothing, nothing) == l
+    @test alg(:l_a, PRDAY, nothing, nothing, CalibrationContext(; alpha = 0.05)) == l
+    @test alg(:l_b, PRDAY, nothing, nothing, CalibrationContext(; alpha = 0.05)) == l
 
     # `alpha` fixes the depth of the tail, so a wider probability reads a smaller scale
     # and returns a larger weight.
-    @test TailTermParity(; ratio = 1, alpha = 0.2)(:l, PRDAY, nothing, nothing) > l
+    @test TailTermParity(; ratio = 1)(:l, PRDAY, nothing, nothing,
+                                      CalibrationContext(; alpha = 0.2)) > l
 
     # The rule needs no solver, so it ignores the one the resolution threads.
-    @test alg(:l, PRDAY, nothing, Solver(; solver = nothing)) == l
+    @test alg(:l, PRDAY, nothing, Solver(; solver = nothing),
+              CalibrationContext(; alpha = 0.05)) == l
 
     # Both scales are sample statistics rather than counts, so stated weights move them.
     # That is where the rule parts company with `RateRadius`, which reads a raw row count.
     mw = -sum(j -> dot(view(XDAY, :, j), WDAY), axes(XDAY, 2)) / (4 * sum(WDAY))
     cw = mean(j -> ConditionalValueatRisk(; alpha = 0.05, w = WDAY)(view(XDAY, :, j)),
               axes(XDAY, 2))
-    @test alg(:l, PRDAY, WDAY, nothing) ≈ abs(mw) / cw
-    @test alg(:l, PRDAY, WDAY, nothing) != l
+    @test alg(:l, PRDAY, WDAY, nothing, CalibrationContext(; alpha = 0.05)) ≈ abs(mw) / cw
+    @test alg(:l, PRDAY, WDAY, nothing, CalibrationContext(; alpha = 0.05)) != l
 
     # Construction validation, on the terms `RateRadius` writes.
     @test TailTermParity().ratio == 1
-    @test isnothing(TailTermParity().alpha)
+    @test !hasfield(TailTermParity, :alpha)
     @test_throws DomainError TailTermParity(; ratio = 0.0)
     @test_throws DomainError TailTermParity(; ratio = -1.0)
     @test_throws DomainError TailTermParity(; ratio = Inf)
@@ -393,9 +416,9 @@ end
 end
 
 @testset "TailTermParity: one stated tail weight is two trade-offs" begin
-    alg = TailTermParity(; ratio = 1, alpha = 0.05)
-    l_day = alg(:l, PRDAY, nothing, nothing)
-    l_mon = alg(:l, PRMON, nothing, nothing)
+    alg = TailTermParity(; ratio = 1)
+    l_day = alg(:l, PRDAY, nothing, nothing, CalibrationContext(; alpha = 0.05))
+    l_mon = alg(:l, PRMON, nothing, nothing, CalibrationContext(; alpha = 0.05))
 
     # The monthly sample sums 21 daily rows. A mean scales with the horizon and a
     # dispersion scales with its square root, so the parity weight rises by about
@@ -413,8 +436,9 @@ end
     @test PO.resolve_calibration_slot(1.0, :l, PRDAY, nothing) ==
           PO.resolve_calibration_slot(1.0, :l, PRMON, nothing)
     role = AmbiguityTailWeightCalibration(; alg = alg)
-    @test PO.resolve_calibration_slot(role, :l, PRDAY, nothing) !=
-          PO.resolve_calibration_slot(role, :l, PRMON, nothing)
+    lctx = CalibrationContext(; alpha = 0.05)
+    @test PO.resolve_calibration_slot(role, :l, PRDAY, nothing, nothing, lctx) !=
+          PO.resolve_calibration_slot(role, :l, PRMON, nothing, nothing, lctx)
 end
 
 @testset "TailTermParity: `alpha` and `l` travel together" begin
@@ -424,30 +448,38 @@ end
     # The rule cannot run until the probability reaches it, and the message names the verb
     # that carries it.
     err = try
-        alg(:l, PRDAY, nothing, nothing)
+        alg(:l, PRDAY, nothing, nothing, CalibrationContext())
         nothing
     catch e
         e
     end
     @test isa(err, PO.IsNothingError)
-    @test occursin("bind_alpha", err.msg)
+    @test occursin("CalibrationContext.alpha", err.msg)
 
-    # `bind_alpha` fills the field, and it takes the ROLE as well as the rule. A stated
-    # number and a plain function pass through untouched, so no existing behaviour moved.
-    @test PO.bind_alpha(alg, 0.05).alpha == 0.05
-    @test PO.bind_alpha(TailTermParity(; ratio = 3), 0.05).ratio == 3
-    @test PO.bind_alpha(role, 0.05).alg.alpha == 0.05
-    @test PO.bind_alpha(1.0, 0.05) === 1.0
-    @test PO.bind_alpha(probe_tail_weight, 0.05) === probe_tail_weight
+    # The context carries the number, and the resolver hands it through the ROLE as well as
+    # to a bare rule. A stated number and a plain function ignore the field, so no existing
+    # behaviour moved.
+    c05 = CalibrationContext(; alpha = 0.05)
+    @test !hasfield(TailTermParity, :alpha)
+    @test TailTermParity(; ratio = 3).ratio == 3
+    @test PO.resolve_calibration_slot(role, :l, PRDAY, nothing, nothing, c05) ≈
+          alg(:l, PRDAY, nothing, nothing, c05)
+    @test PO.resolve_calibration_slot(1.0, :l, PRDAY, nothing, nothing, c05) === 1.0
+    @test PO.resolve_calibration_slot(AmbiguityTailWeightCalibration(;
+                                                                     alg = probe_tail_weight),
+                                      :l, PRDAY, nothing, nothing, c05) ≈
+          2 / sqrt(size(PRDAY.X, 1))
 
     # The scalar measure resolves `alpha` first, so the slot reads the measure's own
     # probability and two measures give two weights.
     m1 = DistributionallyRobustConditionalValueatRisk(; alpha = 0.05, l = role)
     m2 = DistributionallyRobustConditionalValueatRisk(; alpha = 0.2, l = role)
     @test PO.resolve_deferred_quantities(m1, PRDAY).l ≈
-          TailTermParity(; ratio = 1, alpha = 0.05)(:l, PRDAY, nothing, nothing)
+          TailTermParity(; ratio = 1)(:l, PRDAY, nothing, nothing,
+                                      CalibrationContext(; alpha = 0.05))
     @test PO.resolve_deferred_quantities(m2, PRDAY).l ≈
-          TailTermParity(; ratio = 1, alpha = 0.2)(:l, PRDAY, nothing, nothing)
+          TailTermParity(; ratio = 1)(:l, PRDAY, nothing, nothing,
+                                      CalibrationContext(; alpha = 0.2))
     @test PO.resolve_deferred_quantities(m1, PRDAY).l !=
           PO.resolve_deferred_quantities(m2, PRDAY).l
 
@@ -456,8 +488,10 @@ end
     rg = DistributionallyRobustConditionalValueatRiskRange(; alpha = 0.05, beta = 0.2,
                                                            l_a = role, l_b = role)
     out = PO.resolve_deferred_quantities(rg, PRDAY)
-    @test out.l_a ≈ TailTermParity(; ratio = 1, alpha = 0.05)(:l_a, PRDAY, nothing, nothing)
-    @test out.l_b ≈ TailTermParity(; ratio = 1, alpha = 0.2)(:l_b, PRDAY, nothing, nothing)
+    @test out.l_a ≈ TailTermParity(; ratio = 1)(:l_a, PRDAY, nothing, nothing,
+                                                CalibrationContext(; alpha = 0.05))
+    @test out.l_b ≈ TailTermParity(; ratio = 1)(:l_b, PRDAY, nothing, nothing,
+                                                CalibrationContext(; alpha = 0.2))
     @test out.l_a != out.l_b
     @test out.alpha == 0.05
     @test out.beta == 0.2
@@ -468,19 +502,21 @@ end
     both = DistributionallyRobustConditionalValueatRisk(; alpha = srole, l = role)
     bout = PO.resolve_deferred_quantities(both, PRDAY)
     @test bout.alpha ≈ 0.5 / sqrt(2520)
-    @test bout.l ≈
-          TailTermParity(; ratio = 1, alpha = bout.alpha)(:l, PRDAY, nothing, nothing)
+    @test bout.l ≈ TailTermParity(; ratio = 1)(:l, PRDAY, nothing, nothing,
+                                               CalibrationContext(; alpha = bout.alpha))
 
     # The drawdown measure carries the same pair, and it hands its own SERIES over beside
     # the probability. #623 corrected this: the number was the asset-column one, and the
     # tail term this measure prices is a CDaR of the drawdown series.
     dd = DistributionallyRobustConditionalDrawdownatRisk(; alpha = 0.05, l = role)
     ddl = PO.resolve_deferred_quantities(dd, PRDAY).l
-    @test ddl ≈ PO.bind_series(TailTermParity(; ratio = 1, alpha = 0.05),
-                               AbsoluteDrawdownSeries())(:l, PRDAY, nothing, nothing)
-    @test ddl != TailTermParity(; ratio = 1, alpha = 0.05)(:l, PRDAY, nothing, nothing)
+    @test ddl ≈ TailTermParity(; ratio = 1)(:l, PRDAY, nothing, nothing,
+                                            CalibrationContext(; alpha = 0.05,
+                                                               series = AbsoluteDrawdownSeries()))
+    @test ddl != TailTermParity(; ratio = 1)(:l, PRDAY, nothing, nothing,
+                                             CalibrationContext(; alpha = 0.05))
 
-    # A measure whose slots all hold numbers is still returned unchanged, so the binding
+    # A measure whose slots all hold numbers is still returned unchanged, so the context
     # costs nothing where no rule reads a sibling.
     plain = DistributionallyRobustConditionalValueatRisk()
     @test PO.resolve_deferred_quantities(plain, PRDAY) === plain
@@ -489,12 +525,12 @@ end
 end
 
 @testset "TailTermParity: the two refusals" begin
-    alg = TailTermParity(; ratio = 1, alpha = 0.05)
+    alg = TailTermParity(; ratio = 1)
 
     # A sample of strictly positive returns holds no loss in the worst `alpha` of any
     # column, so it has no tail-term scale and no weight prices one term against the other.
     err = try
-        alg(:l, PRPOS, nothing, nothing)
+        alg(:l, PRPOS, nothing, nothing, CalibrationContext(; alpha = 0.05))
         nothing
     catch e
         e
@@ -506,7 +542,7 @@ end
     # terms: every weight prices a mean term of zero alike.
     @test mean(XZERO) == 0
     err = try
-        alg(:l, PRZERO, nothing, nothing)
+        alg(:l, PRZERO, nothing, nothing, CalibrationContext(; alpha = 0.05))
         nothing
     catch e
         e
@@ -526,12 +562,13 @@ end
     @test PO.resolve_calibration_slot(0.02, :r, PR60, nothing) == 0.02
     @test isnothing(PO.resolve_calibration_slot(nothing, :l1, PR60, nothing))
 
-    # The four arguments arrive in the stated order, and the last two are the effective
-    # observation weights and the effective solver.
+    # The five arguments arrive in the stated order, and the last three are the effective
+    # observation weights, the effective solver and the site context.
     TWT_SEEN[] = nothing
     slv = Solver(; name = :probe, solver = nothing)
     @test PO.resolve_calibration_slot(trole, :l, PR60, WTS, slv) ≈ 2 / sqrt(60)
-    @test TWT_SEEN[] == (; key = :l, weighted = true, solved = true)
+    @test TWT_SEEN[] ==
+          (; key = :l, weighted = true, solved = true, series = ReturnsSeries())
 
     # A plain function in the `alg` field is a rule on the same terms.
     @test PO.resolve_calibration_slot(AmbiguityRadiusCalibration(; alg = probe_radius), :r,
@@ -807,8 +844,8 @@ already uses for the two slots, so a caller's own function placed in an
 `AmbiguityRadiusCalibration` now receives one of those in place of `:val`.
 
 The `:lpreg_val` key still names no norm order, because `p` lives on the owner. The order
-travels to the rule through `bind_norm_order`, which #615's sibling ticket already built
-for the norm-ceiling family, so the caller states the order once and on the penalty.
+travels to the rule in the `CalibrationContext` the penalty site builds, so the caller states
+the order once and on the penalty.
 
 The prior below carries a DIAGONAL covariance matrix, so every norm of the per-asset error
 vector has a closed form and no test reads a number off the implementation.
@@ -831,8 +868,8 @@ const DNR_KISH = sum(WTS)^2 / sum(abs2, WTS)
     # The defaults: a per-coordinate 95% level, and no norm order, which serves every slot
     # but `:lpreg_val`.
     @test DualNormRadius().confidence == 0.95
-    @test isnothing(DualNormRadius().p)
-    @test DualNormRadius(; p = 3).p == 3
+    @test !hasfield(DualNormRadius, :p)
+    @test isnothing(CalibrationContext().p)
 
     alg = DualNormRadius()
     e = DNR_SD / sqrt(60)
@@ -840,66 +877,75 @@ const DNR_KISH = sum(WTS)^2 / sum(abs2, WTS)
     # --- the four closed forms, on a diagonal covariance matrix -------------------------
     # The `l1` coefficient multiplies the 1-norm of the weights, so its ground metric is
     # the ∞-norm and the radius is the largest per-asset error.
-    @test alg(:l1, PRDIAG, nothing, nothing) ≈ DNR_Z * maximum(e)
+    @test alg(:l1, PRDIAG, nothing, nothing, CalibrationContext()) ≈ DNR_Z * maximum(e)
 
     # The `linf` coefficient and the three DR radii all multiply the ∞-norm, so their
     # ground metric is the 1-norm and the radius is the sum of the per-asset errors.
-    @test alg(:linf, PRDIAG, nothing, nothing) ≈ DNR_Z * sum(e)
-    @test alg(:r, PRDIAG, nothing, nothing) ≈ DNR_Z * sum(e)
+    @test alg(:linf, PRDIAG, nothing, nothing, CalibrationContext()) ≈ DNR_Z * sum(e)
+    @test alg(:r, PRDIAG, nothing, nothing, CalibrationContext()) ≈ DNR_Z * sum(e)
 
     # The L2 penalty is its own dual, so the radius is the 2-norm.
-    @test alg(:l2reg_val, PRDIAG, nothing, nothing) ≈ DNR_Z * norm(e, 2)
+    @test alg(:l2reg_val, PRDIAG, nothing, nothing, CalibrationContext()) ≈
+          DNR_Z * norm(e, 2)
 
     # The Lp penalty's ground metric is the type-`q` metric with `1/p + 1/q = 1`. The
-    # penalty site fills `p` through `bind_norm_order`, and a stated `p` runs the rule on
-    # its own, outside that site.
-    @test DualNormRadius(; p = 3)(:lpreg_val, PRDIAG, nothing, nothing) ≈
-          DNR_Z * norm(e, 1.5)
-    @test DualNormRadius(; p = 1.25)(:lpreg_val, PRDIAG, nothing, nothing) ≈
-          DNR_Z * norm(e, 5)
+    # penalty site states `p` in the context, and a context a caller builds runs the rule
+    # on its own, outside that site.
+    @test DualNormRadius()(:lpreg_val, PRDIAG, nothing, nothing,
+                           CalibrationContext(; p = 3)) ≈ DNR_Z * norm(e, 1.5)
+    @test DualNormRadius()(:lpreg_val, PRDIAG, nothing, nothing,
+                           CalibrationContext(; p = 1.25)) ≈ DNR_Z * norm(e, 5)
 
     # --- the defect the rule fixes ------------------------------------------------------
     # One rule, two slots, two numbers. That is the whole point: `ConcentrationRadius` and
     # `RateRadius` cannot tell the two apart, and this rule can.
-    @test alg(:l1, PRDIAG, nothing, nothing) != alg(:linf, PRDIAG, nothing, nothing)
-    @test alg(:linf, PRDIAG, nothing, nothing) > alg(:l1, PRDIAG, nothing, nothing)
-    @test alg(:l2reg_val, PRDIAG, nothing, nothing) !=
-          alg(:l1, PRDIAG, nothing, nothing) !=
-          alg(:linf, PRDIAG, nothing, nothing)
+    @test alg(:l1, PRDIAG, nothing, nothing, CalibrationContext()) !=
+          alg(:linf, PRDIAG, nothing, nothing, CalibrationContext())
+    @test alg(:linf, PRDIAG, nothing, nothing, CalibrationContext()) >
+          alg(:l1, PRDIAG, nothing, nothing, CalibrationContext())
+    @test alg(:l2reg_val, PRDIAG, nothing, nothing, CalibrationContext()) !=
+          alg(:l1, PRDIAG, nothing, nothing, CalibrationContext()) !=
+          alg(:linf, PRDIAG, nothing, nothing, CalibrationContext())
 
     # A radius names no end of the distribution, so the two ends of a Range twin resolve to
     # one number and both agree with the scalar measure's own slot.
-    @test alg(:r_a, PRDIAG, nothing, nothing) == alg(:r_b, PRDIAG, nothing, nothing)
-    @test alg(:r_a, PRDIAG, nothing, nothing) == alg(:r, PRDIAG, nothing, nothing)
+    @test alg(:r_a, PRDIAG, nothing, nothing, CalibrationContext()) ==
+          alg(:r_b, PRDIAG, nothing, nothing, CalibrationContext())
+    @test alg(:r_a, PRDIAG, nothing, nothing, CalibrationContext()) ==
+          alg(:r, PRDIAG, nothing, nothing, CalibrationContext())
 
     # --- the confidence level -----------------------------------------------------------
     # A higher level buys a larger ball, and the level scales the whole vector, so the
     # ratio of two levels is the ratio of the two quantiles in every ground metric.
     hi = DualNormRadius(; confidence = 0.99)
     z99 = Distributions.quantile(Distributions.Normal(), 0.99)
-    @test hi(:l1, PRDIAG, nothing, nothing) > alg(:l1, PRDIAG, nothing, nothing)
-    @test hi(:linf, PRDIAG, nothing, nothing) / alg(:linf, PRDIAG, nothing, nothing) ≈
-          z99 / DNR_Z
+    @test hi(:l1, PRDIAG, nothing, nothing, CalibrationContext()) >
+          alg(:l1, PRDIAG, nothing, nothing, CalibrationContext())
+    @test hi(:linf, PRDIAG, nothing, nothing, CalibrationContext()) /
+          alg(:linf, PRDIAG, nothing, nothing, CalibrationContext()) ≈ z99 / DNR_Z
 
     # --- the sample size ----------------------------------------------------------------
     # With no weights the rule reads the raw row count, and stated weights move it to
     # Kish's effective sample size, which is smaller for any weights that are not equal.
     @test DNR_KISH < 60
-    @test alg(:l1, PRDIAG, WTS, nothing) ≈ DNR_Z * maximum(DNR_SD) / sqrt(DNR_KISH)
-    @test alg(:l1, PRDIAG, WTS, nothing) > alg(:l1, PRDIAG, nothing, nothing)
-    @test alg(:linf, PRDIAG, WTS, nothing) ≈ DNR_Z * sum(DNR_SD) / sqrt(DNR_KISH)
-    @test alg(:linf, PRDIAG, WTS, nothing) / alg(:linf, PRDIAG, nothing, nothing) ≈
-          sqrt(60 / DNR_KISH)
+    @test alg(:l1, PRDIAG, WTS, nothing, CalibrationContext()) ≈
+          DNR_Z * maximum(DNR_SD) / sqrt(DNR_KISH)
+    @test alg(:l1, PRDIAG, WTS, nothing, CalibrationContext()) >
+          alg(:l1, PRDIAG, nothing, nothing, CalibrationContext())
+    @test alg(:linf, PRDIAG, WTS, nothing, CalibrationContext()) ≈
+          DNR_Z * sum(DNR_SD) / sqrt(DNR_KISH)
+    @test alg(:linf, PRDIAG, WTS, nothing, CalibrationContext()) /
+          alg(:linf, PRDIAG, nothing, nothing, CalibrationContext()) ≈ sqrt(60 / DNR_KISH)
 
     # The rule needs no solver, so it ignores the one the resolution threads.
-    @test alg(:l1, PRDIAG, nothing, Solver(; solver = nothing)) ==
-          alg(:l1, PRDIAG, nothing, nothing)
+    @test alg(:l1, PRDIAG, nothing, Solver(; solver = nothing), CalibrationContext()) ==
+          alg(:l1, PRDIAG, nothing, nothing, CalibrationContext())
 
     # --- the two refusals ---------------------------------------------------------------
     # An unrecognised key is the one refusal the rule owes: a caller who writes their own
     # measure hits it first, so the message names the key it got and the keys it serves.
     err = try
-        alg(:alpha, PRDIAG, nothing, nothing)
+        alg(:alpha, PRDIAG, nothing, nothing, CalibrationContext())
         nothing
     catch e
         e
@@ -914,36 +960,39 @@ const DNR_KISH = sum(WTS)^2 / sum(abs2, WTS)
     # the field, so a `nothing` here means the rule ran outside that site, and the message
     # names both the field and the verb that fills it.
     perr = try
-        alg(:lpreg_val, PRDIAG, nothing, nothing)
+        alg(:lpreg_val, PRDIAG, nothing, nothing, CalibrationContext())
         nothing
     catch e
         e
     end
     @test isa(perr, ArgumentError)
     @test occursin("lpreg_val", perr.msg)
-    @test occursin("DualNormRadius.p", perr.msg)
-    @test occursin("bind_norm_order", perr.msg)
+    @test occursin("CalibrationContext.p", perr.msg)
 
     # The scale function is the whole of the key's meaning, and it is reachable on its own.
-    @test PO.dual_norm_radius_scale(alg, :l1, DNR_SD) == maximum(DNR_SD)
-    @test PO.dual_norm_radius_scale(alg, :linf, DNR_SD) == sum(DNR_SD)
-    @test_throws ArgumentError PO.dual_norm_radius_scale(alg, :beta, DNR_SD)
+    # It takes the order rather than the rule, because the order is the site's.
+    @test PO.dual_norm_radius_scale(:l1, nothing, DNR_SD) == maximum(DNR_SD)
+    @test PO.dual_norm_radius_scale(:linf, nothing, DNR_SD) == sum(DNR_SD)
+    @test_throws ArgumentError PO.dual_norm_radius_scale(:beta, nothing, DNR_SD)
 
-    # --- construction validation --------------------------------------------------------
-    # The confidence level is a probability, and the norm order meets the check its owner
-    # makes: finite and greater than one.
+    # --- validation ---------------------------------------------------------------------
+    # The confidence level is a probability, and it is the rule's own. The norm order is
+    # the site's, so the rule that READS it is what refuses one with no conjugate.
     @test_throws DomainError DualNormRadius(; confidence = 1.0)
     @test_throws DomainError DualNormRadius(; confidence = 0.0)
-    @test_throws DomainError DualNormRadius(; p = 1.0)
-    @test_throws DomainError DualNormRadius(; p = 0.5)
-    @test_throws PO.IsNonFiniteError DualNormRadius(; p = Inf)
+    @test_throws DomainError DualNormRadius()(:lpreg_val, PRDIAG, nothing, nothing,
+                                              CalibrationContext(; p = 1.0))
+    @test_throws DomainError DualNormRadius()(:lpreg_val, PRDIAG, nothing, nothing,
+                                              CalibrationContext(; p = 0.5))
+    @test_throws DomainError DualNormRadius()(:lpreg_val, PRDIAG, nothing, nothing,
+                                              CalibrationContext(; p = Inf))
 end
 
 @testset "DualNormRadius: the three distributionally robust radius slots" begin
     role = AmbiguityRadiusCalibration(; alg = DualNormRadius())
     # The measures resolve against the empirical prior, so the number is read from the same
     # rule rather than written out twice.
-    r_num = DualNormRadius()(:r, PR60, nothing, nothing)
+    r_num = DualNormRadius()(:r, PR60, nothing, nothing, CalibrationContext())
     @test r_num > 0
 
     m = DistributionallyRobustConditionalValueatRisk(; r = role)
@@ -954,9 +1003,8 @@ end
     # drawdown sample. #623 corrected this: the number was the asset-return one.
     dd = DistributionallyRobustConditionalDrawdownatRisk(; r = role)
     ddr = PO.resolve_deferred_quantities(dd, PR60).r
-    @test ddr ≈
-          PO.bind_series(DualNormRadius(), AbsoluteDrawdownSeries())(:r, PR60, nothing,
-                                                                     nothing)
+    @test ddr ≈ DualNormRadius()(:r, PR60, nothing, nothing,
+                                 CalibrationContext(; series = AbsoluteDrawdownSeries()))
     @test ddr != r_num
 
     # Both ends of the Range twin carry the same ground metric, so one rule on both ends
@@ -976,8 +1024,8 @@ end
     @test PO.factory(l2, PRDIAG).val ≈ DNR_Z * norm(DNR_SD / sqrt(60), 2)
 
     # The Lp term reads the type-`q` metric of its own norm order. The order belongs to the
-    # penalty, so the site hands it over with `bind_norm_order` and the caller states
-    # nothing: the rule below carries no `p` of its own.
+    # penalty, so the site states it in the context and the caller states nothing: no rule
+    # carries a `p` of its own.
     lprole = AmbiguityRadiusCalibration(; alg = DualNormRadius())
     lp = LpRegularisation(; p = 3, val = lprole)
     @test PO.factory(lp, PRDIAG).val ≈ DNR_Z * norm(DNR_SD / sqrt(60), 1.5)
@@ -989,29 +1037,25 @@ end
     @test PO.factory(lp2, PRDIAG).val ≈ DNR_Z * norm(DNR_SD / sqrt(60), 5)
     @test PO.factory(lp, PRDIAG).val != PO.factory(lp2, PRDIAG).val
 
-    # The order the site holds wins, so a rule that already carries one has it replaced.
-    stated = LpRegularisation(; p = 3,
-                              val = AmbiguityRadiusCalibration(;
-                                                               alg = DualNormRadius(;
-                                                                                    p = 1.25)))
-    @test PO.factory(stated, PRDIAG).val ≈ PO.factory(lp, PRDIAG).val
-
     # The two keys reach two different numbers from one rule, which is what the widening
     # bought. A rule that read `:val` for both could not tell them apart.
     @test PO.factory(l2, PRDIAG).val != PO.factory(lp, PRDIAG).val
 
-    # `bind_norm_order` fills the order through the role, and leaves everything else where
-    # it was: a number, a plain function, and a rule that reads no order all cross whole.
-    @test PO.bind_norm_order(l2role, 3).alg.p == 3
-    @test PO.bind_norm_order(l2role, 3).alg.confidence == l2role.alg.confidence
-    @test PO.bind_norm_order(0.3, 3) == 0.3
+    # The order reaches the rule through the role, and leaves everything else where it
+    # was: a number, and a rule that reads no order, both cross whole and nothing is
+    # rebuilt on the way in.
+    c3 = CalibrationContext(; p = 3)
+    @test l2role.alg.confidence == DualNormRadius().confidence
+    @test PO.resolve_calibration_slot(0.3, :lpreg_val, PRDIAG, nothing, nothing, c3) == 0.3
     cr_role = AmbiguityRadiusCalibration(; alg = ConcentrationRadius())
-    @test PO.bind_norm_order(cr_role, 3).alg === cr_role.alg
+    @test PO.resolve_calibration_slot(cr_role, :r, PRDIAG, nothing, nothing, c3) ==
+          cr_role.alg(:r, PRDIAG, nothing, nothing, c3)
+    @test cr_role.alg === cr_role.alg
 
     # The three older rules read no key, so the widening moved nothing for them.
     cr = ConcentrationRadius(; scale = 0.5)
-    @test cr(:l2reg_val, PRDIAG, nothing, nothing) ==
-          cr(:lpreg_val, PRDIAG, nothing, nothing)
+    @test cr(:l2reg_val, PRDIAG, nothing, nothing, CalibrationContext()) ==
+          cr(:lpreg_val, PRDIAG, nothing, nothing, CalibrationContext())
 end
 
 @testset "DualNormRadius: l1 and linf reach the model with two coefficients" begin
@@ -1038,8 +1082,8 @@ end
     # The defect #614 fixes: the two penalties bound distance in two different norms, so
     # one rule must give them two coefficients. Under either older rule these are equal.
     @test c_l1 != c_linf
-    @test c_l1 ≈ DualNormRadius()(:l1, PR60, PR60.w, slv)
-    @test c_linf ≈ DualNormRadius()(:linf, PR60, PR60.w, slv)
+    @test c_l1 ≈ DualNormRadius()(:l1, PR60, PR60.w, slv, CalibrationContext())
+    @test c_linf ≈ DualNormRadius()(:linf, PR60, PR60.w, slv, CalibrationContext())
     @test c_linf > c_l1
 
     # The gap grows with the universe, because the 1-norm of the error vector sums over the
@@ -1051,7 +1095,7 @@ end
 Issue #623. Three rules of the two ambiguity families read a RETURNS quantity when their
 slot owner prices a DRAWDOWN, and `DimensionalRateRadius` reads the same one. The mechanism
 that closes the gap is the one commit 7e51431c45 built for the deformation family:
-`calibration_series(x)` is the trait the owner answers, and `bind_series(slot, series)`
+`calibration_series(x)` is the trait the owner answers, and `CalibrationContext.series`
 carries the answer into the rule.
 
 The reading is not a matter of taste. `set_risk_constraints!` for
@@ -1097,8 +1141,9 @@ end
     sd = mean(PO.calibration_series_dispersion(AbsoluteDrawdownSeries(), PRDDA))
 
     for alg in (ConcentrationRadius(), DimensionalRateRadius())
-        r = alg(:r, PRDDA, nothing, nothing)
-        d = PO.bind_series(alg, AbsoluteDrawdownSeries())(:r, PRDDA, nothing, nothing)
+        r = alg(:r, PRDDA, nothing, nothing, CalibrationContext())
+        d = alg(:r, PRDDA, nothing, nothing,
+                PO.CalibrationContext(; series = AbsoluteDrawdownSeries()))
         @test d > r
         @test d / r ≈ sd / sr
     end
@@ -1110,38 +1155,43 @@ end
     e_d = PO.calibration_series_dispersion(AbsoluteDrawdownSeries(), PRDDA) /
           sqrt(size(XDDA, 1))
     z = Distributions.quantile(Distributions.Normal(), 0.95)
-    @test DualNormRadius()(:r, PRDDA, nothing, nothing) ≈ z * norm(e_r, 1)
-    @test PO.bind_series(DualNormRadius(), AbsoluteDrawdownSeries())(:r, PRDDA, nothing,
-                                                                     nothing) ≈
-          z * norm(e_d, 1)
-    dn = PO.bind_series(DualNormRadius(), AbsoluteDrawdownSeries())
-    @test dn(:l1, PRDDA, nothing, nothing) ≈ z * norm(e_d, Inf)
-    @test dn(:r, PRDDA, nothing, nothing) > dn(:l1, PRDDA, nothing, nothing)
+    @test DualNormRadius()(:r, PRDDA, nothing, nothing, CalibrationContext()) ≈
+          z * norm(e_r, 1)
+    ddctx = PO.CalibrationContext(; series = AbsoluteDrawdownSeries())
+    @test DualNormRadius()(:r, PRDDA, nothing, nothing, ddctx) ≈ z * norm(e_d, 1)
+    dn = DualNormRadius()
+    @test dn(:l1, PRDDA, nothing, nothing, ddctx) ≈ z * norm(e_d, Inf)
+    @test dn(:r, PRDDA, nothing, nothing, ddctx) > dn(:l1, PRDDA, nothing, nothing, ddctx)
 
     # A STATED scale is the whole of the units, so it overrides the reading and the marker
     # then changes nothing.
     for alg in (ConcentrationRadius(; scale = 0.03), DimensionalRateRadius(; scale = 0.03))
-        @test PO.bind_series(alg, AbsoluteDrawdownSeries())(:r, PRDDA, nothing, nothing) ==
-              alg(:r, PRDDA, nothing, nothing)
+        @test alg(:r, PRDDA, nothing, nothing,
+                  PO.CalibrationContext(; series = AbsoluteDrawdownSeries())) ==
+              alg(:r, PRDDA, nothing, nothing, CalibrationContext())
     end
 
-    # `bind_series` keeps every other field, and `bind_norm_order` keeps the marker.
+    # One context carries the marker and the order together, and neither displaces the
+    # other. The rule keeps its own fields, because nothing rebuilds it.
     a = ConcentrationRadius(; confidence = 0.9, scale = 0.02)
-    b = PO.bind_series(a, RelativeDrawdownSeries())
-    @test b.confidence == a.confidence
-    @test b.scale == a.scale
-    @test b.series == RelativeDrawdownSeries()
-    c = PO.bind_norm_order(PO.bind_series(DualNormRadius(; confidence = 0.9),
-                                          AbsoluteDrawdownSeries()), 3)
+    @test a.confidence == 0.9
+    @test a.scale == 0.02
+    @test !hasfield(ConcentrationRadius, :series)
+    c = CalibrationContext(; series = AbsoluteDrawdownSeries(), p = 3)
     @test c.p == 3
     @test c.series == AbsoluteDrawdownSeries()
-    @test c.confidence == 0.9
+    @test isnothing(c.alpha)
+    @test DualNormRadius(; confidence = 0.9)(:lpreg_val, PRDDA, nothing, nothing, c) ≈
+          Distributions.quantile(Distributions.Normal(), 0.9) *
+          norm(PO.calibration_series_dispersion(AbsoluteDrawdownSeries(), PRDDA) /
+               sqrt(size(XDDA, 1)), 1.5)
 end
 
 @testset "TailTermParity: the drawdown owner prices a drawdown against a CDaR" begin
     alpha = 0.05
-    ret = TailTermParity(; alpha = alpha)
-    dd = PO.bind_series(ret, AbsoluteDrawdownSeries())
+    ret = TailTermParity()
+    dd_ctx = CalibrationContext(; alpha = alpha, series = AbsoluteDrawdownSeries())
+    dd = (key, pr, w, slv, ctx = dd_ctx) -> ret(key, pr, w, slv, ctx)
 
     # The tail term of the drawdown reading IS the mean of the per-column CDaR. The CVaR
     # kernel over a non-positive drawdown column is that measure's own reading, so the rule
@@ -1157,26 +1207,27 @@ end
 
     # The defect #623 names: the returns reading UNDERSTATES the weight on this owner,
     # because the drawdown mean term is the far larger of the two relative to its own tail.
-    @test dd(:l, PRDDA, nothing, nothing) > ret(:l, PRDDA, nothing, nothing)
+    @test dd(:l, PRDDA, nothing, nothing) >
+          ret(:l, PRDDA, nothing, nothing, CalibrationContext(; alpha = alpha))
 
     # `ratio` scales the answer under every marker.
-    @test PO.bind_series(TailTermParity(; ratio = 3, alpha = alpha),
-                         AbsoluteDrawdownSeries())(:l, PRDDA, nothing, nothing) ≈
+    @test TailTermParity(; ratio = 3)(:l, PRDDA, nothing, nothing, dd_ctx) ≈
           3 * dd(:l, PRDDA, nothing, nothing)
 
     # The two markers name two different series of one column, so the relative reading is
     # its own number.
-    rel = PO.bind_series(ret, RelativeDrawdownSeries())(:l, PRDDA, nothing, nothing)
+    rel = ret(:l, PRDDA, nothing, nothing,
+              CalibrationContext(; alpha = alpha, series = RelativeDrawdownSeries()))
     @test rel != dd(:l, PRDDA, nothing, nothing)
 
-    # `bind_alpha` and `bind_series` compose in either order, and neither drops the other's
-    # field.
+    # One context carries the significance level and the marker together, so there are no
+    # two verbs to compose and no order between them to get wrong.
     bare = TailTermParity(; ratio = 2)
-    both = PO.bind_series(PO.bind_alpha(bare, alpha), AbsoluteDrawdownSeries())
-    @test both.ratio == 2
+    both = CalibrationContext(; alpha = alpha, series = AbsoluteDrawdownSeries())
+    @test bare.ratio == 2
     @test both.alpha == alpha
     @test both.series == AbsoluteDrawdownSeries()
-    @test PO.bind_alpha(PO.bind_series(bare, AbsoluteDrawdownSeries()), alpha) == both
+    @test bare(:l, PRDDA, nothing, nothing, both) ≈ 2 * dd(:l, PRDDA, nothing, nothing)
 
     # The weighted reading moves to the drawdown sample too.
     w = pweights(range(; start = 1, stop = 2, length = size(XDDA, 1)))
@@ -1203,27 +1254,25 @@ end
                                                                                      r = rrole),
                                         PRDDA)
 
-    @test dr.l ≈
-          PO.bind_series(TailTermParity(; alpha = 0.05), AbsoluteDrawdownSeries())(:l,
-                                                                                   PRDDA,
-                                                                                   nothing,
-                                                                                   nothing)
-    @test dr.r ≈ PO.bind_series(ConcentrationRadius(), AbsoluteDrawdownSeries())(:r, PRDDA,
-                                                                                 nothing, nothing)
-    @test vr.l ≈ TailTermParity(; alpha = 0.05)(:l, PRDDA, nothing, nothing)
-    @test vr.r ≈ ConcentrationRadius()(:r, PRDDA, nothing, nothing)
+    @test dr.l ≈ TailTermParity()(:l, PRDDA, nothing, nothing,
+                                  CalibrationContext(; alpha = 0.05,
+                                                     series = AbsoluteDrawdownSeries()))
+    @test dr.r ≈ ConcentrationRadius()(:r, PRDDA, nothing, nothing,
+                                       CalibrationContext(; series = AbsoluteDrawdownSeries()))
+    @test vr.l ≈
+          TailTermParity()(:l, PRDDA, nothing, nothing, CalibrationContext(; alpha = 0.05))
+    @test vr.r ≈ ConcentrationRadius()(:r, PRDDA, nothing, nothing, CalibrationContext())
 
     # The two owners resolve the SAME two keys and part company on the series alone.
     @test dr.l != vr.l
     @test dr.r != vr.r
 
-    # A MARKER STATED ON THE RULE IS OVERWRITTEN by the measure that resolves it.
-    wrong = AmbiguityRadiusCalibration(;
-                                       alg = ConcentrationRadius(;
-                                                                 series = AbsoluteDrawdownSeries()))
+    # NO MARKER CAN BE STATED ON THE RULE, so the measure that resolves it is the only
+    # thing that names one and there is no precedence to get wrong.
+    @test !hasfield(ConcentrationRadius, :series)
     o = PO.resolve_deferred_quantities(DistributionallyRobustConditionalValueatRisk(;
                                                                                     alpha = 0.05,
-                                                                                    r = wrong),
+                                                                                    r = rrole),
                                        PRDDA)
     @test o.r ≈ vr.r
 
@@ -1240,7 +1289,8 @@ end
     @test rg.r_a ≈ vr.r
     @test rg.r_b ≈ vr.r
     @test rg.l_a ≈ vr.l
-    @test rg.l_b ≈ TailTermParity(; alpha = 0.1)(:l_b, PRDDA, nothing, nothing)
+    @test rg.l_b ≈
+          TailTermParity()(:l_b, PRDDA, nothing, nothing, CalibrationContext(; alpha = 0.1))
     @test rg.l_a != rg.l_b
 
     # A measure whose slots all hold numbers is returned unchanged, so the new call
@@ -1268,13 +1318,15 @@ tests pin numbers and refusals rather than types.
     PR60_1 = prior(EmpiricalPrior(), X60_1)
     dim = DimensionalRateRadius(; confidence = 0.95, scale = 0.5)
     @test size(PR60_1.X, 2) == 1
-    @test dim(:r, PR60_1, nothing, nothing) ≈ 0.5 * sqrt(lq / 60)
-    @test dim(:r, PR60_1, nothing, nothing) ≈ dim(:r, PR60_2, nothing, nothing)
+    @test dim(:r, PR60_1, nothing, nothing, CalibrationContext()) ≈ 0.5 * sqrt(lq / 60)
+    @test dim(:r, PR60_1, nothing, nothing, CalibrationContext()) ≈
+          dim(:r, PR60_2, nothing, nothing, CalibrationContext())
 
     # -- #619. The radius is positive and finite at both ends of the admissible confidence
     # interval, so nothing re-checks it after resolution.
     for c in (1e-8, 0.5, 1 - 1e-8)
-        v = DimensionalRateRadius(; confidence = c, scale = 1)(:r, PR60, nothing, nothing)
+        v = DimensionalRateRadius(; confidence = c, scale = 1)(:r, PR60, nothing, nothing,
+                                                               CalibrationContext())
         @test v > 0
         @test isfinite(v)
     end
@@ -1285,7 +1337,7 @@ tests pin numbers and refusals rather than types.
     # rather than an exact zero, so the slot's `> 0` check passes and the model prices it.
     Xflat = repeat([0.01 0.02 0.03], 60)
     PRFLAT = prior(EmpiricalPrior(), Xflat)
-    vflat = DualNormRadius()(:r, PRFLAT, nothing, nothing)
+    vflat = DualNormRadius()(:r, PRFLAT, nothing, nothing, CalibrationContext())
     @test vflat >= 0
     @test vflat < 1e-12
     @test isa(DistributionallyRobustConditionalValueatRisk(; r = vflat).r, Number)
@@ -1297,19 +1349,23 @@ tests pin numbers and refusals rather than types.
     z_coord = Distributions.quantile(Distributions.Normal(), 0.95)
     z_vec = Distributions.quantile(Distributions.Normal(), 1 - 0.05 / N)
     @test z_vec / z_coord > 1.3
-    @test DualNormRadius(; confidence = 0.95)(:l1, PR60, nothing, nothing) * z_vec /
-          z_coord ≈ DualNormRadius(; confidence = 1 - 0.05 / N)(:l1, PR60, nothing, nothing)
+    @test DualNormRadius(; confidence = 0.95)(:l1, PR60, nothing, nothing,
+                                              CalibrationContext()) * z_vec / z_coord ≈
+          DualNormRadius(; confidence = 1 - 0.05 / N)(:l1, PR60, nothing, nothing,
+                                                      CalibrationContext())
 
     # -- #620. The 1-norm arm sums the per-asset errors, so it prices them as if they moved
     # together. That is the LARGEST of the seven readings, and the ∞-norm arm is the
     # smallest, so the conservative reading is the one the rule takes.
     e = sqrt.(diag(PR60.sigma)) ./ sqrt(60)
-    @test DualNormRadius()(:r, PR60, nothing, nothing) ≈ z_coord * sum(e)
-    @test DualNormRadius()(:r, PR60, nothing, nothing) >
-          DualNormRadius()(:l2reg_val, PR60, nothing, nothing)
-    @test DualNormRadius()(:l2reg_val, PR60, nothing, nothing) >
-          DualNormRadius()(:l1, PR60, nothing, nothing)
-    @test DualNormRadius()(:l1, PR60, nothing, nothing) ≈ z_coord * maximum(e)
+    @test DualNormRadius()(:r, PR60, nothing, nothing, CalibrationContext()) ≈
+          z_coord * sum(e)
+    @test DualNormRadius()(:r, PR60, nothing, nothing, CalibrationContext()) >
+          DualNormRadius()(:l2reg_val, PR60, nothing, nothing, CalibrationContext())
+    @test DualNormRadius()(:l2reg_val, PR60, nothing, nothing, CalibrationContext()) >
+          DualNormRadius()(:l1, PR60, nothing, nothing, CalibrationContext())
+    @test DualNormRadius()(:l1, PR60, nothing, nothing, CalibrationContext()) ≈
+          z_coord * maximum(e)
 
     # -- #621. `c` is the mean of the per-column CVaR and NOT the pooled one. A pooled tail
     # is drawn from the worst columns, so on a universe of unequal volatilities it is the
@@ -1320,7 +1376,8 @@ tests pin numbers and refusals rather than types.
     c_col = mean(hand_cvar(view(Xuneq, :, j), alpha) for j in axes(Xuneq, 2))
     c_pool = hand_cvar(vec(Xuneq), alpha)
     @test c_pool > c_col
-    l_col = TailTermParity(; ratio = 1, alpha = alpha)(:l, PRUNEQ, nothing, nothing)
+    l_col = TailTermParity(; ratio = 1)(:l, PRUNEQ, nothing, nothing,
+                                        CalibrationContext(; alpha = alpha))
     @test l_col ≈ abs(-mean(Xuneq)) / c_col
     @test l_col > abs(-mean(Xuneq)) / c_pool
 
@@ -1329,15 +1386,18 @@ tests pin numbers and refusals rather than types.
     m = -mean(XDAY)
     c = mean(hand_cvar(view(XDAY, :, j), alpha) for j in axes(XDAY, 2))
     for ratio in (0.5, 1.0, 2.0)
-        l = TailTermParity(; ratio = ratio, alpha = alpha)(:l, PRDAY, nothing, nothing)
+        l = TailTermParity(; ratio = ratio)(:l, PRDAY, nothing, nothing,
+                                            CalibrationContext(; alpha = alpha))
         @test l * c / abs(m) ≈ ratio
     end
 
     # -- #621. A stated `l = 1.0` is two trade-offs across the frequency pair: about forty
     # mean terms on the daily sample and under ten on the monthly one, the two numbers the
     # docstring names.
-    l_day = TailTermParity(; ratio = 1, alpha = alpha)(:l, PRDAY, nothing, nothing)
-    l_mon = TailTermParity(; ratio = 1, alpha = alpha)(:l, PRMON, nothing, nothing)
+    l_day = TailTermParity(; ratio = 1)(:l, PRDAY, nothing, nothing,
+                                        CalibrationContext(; alpha = alpha))
+    l_mon = TailTermParity(; ratio = 1)(:l, PRMON, nothing, nothing,
+                                        CalibrationContext(; alpha = alpha))
     @test 35 < inv(l_day) < 50
     @test inv(l_mon) < 10
 end
@@ -1374,26 +1434,35 @@ struct CalibrationNoWeights <: PortfolioOptimisers.DynamicAbstractWeights end
     # -- The four rules read the one definition, so each returns what it returned before.
     q = Distributions.cquantile(Distributions.Chisq(4), 0.05)
     kish = sum(WTS)^2 / sum(abs2, WTS)
-    @test ConcentrationRadius(; confidence = 0.95, scale = 0.5)(:r, PR60, WTS, nothing) ≈
+    @test ConcentrationRadius(; confidence = 0.95, scale = 0.5)(:r, PR60, WTS, nothing,
+                                                                CalibrationContext()) ≈
           0.5 * sqrt(q / kish)
-    @test ScenarioCount(; n = 6)(:alpha, PR60, WTS, nothing) ≈ 6 / kish
-    @test DimensionalRateRadius(; confidence = 0.95, scale = 0.5)(:r, PR60, WTS, nothing) ≈
+    @test ScenarioCount(; n = 6)(:alpha, PR60, WTS, nothing, CalibrationContext()) ≈
+          6 / kish
+    @test DimensionalRateRadius(; confidence = 0.95, scale = 0.5)(:r, PR60, WTS, nothing,
+                                                                  CalibrationContext()) ≈
           0.5 * (log(inv(0.05)) / kish)^inv(4)
-    @test DualNormRadius(; confidence = 0.95)(:r, PR60, WTS, nothing) >
-          DualNormRadius(; confidence = 0.95)(:r, PR60, nothing, nothing)
+    @test DualNormRadius(; confidence = 0.95)(:r, PR60, WTS, nothing,
+                                              CalibrationContext()) >
+          DualNormRadius(; confidence = 0.95)(:r, PR60, nothing, nothing,
+                                              CalibrationContext())
 
     # -- A `DynamicAbstractWeights` that states the vector arity now resolves, in every one
     # of the four rules, to the count its weights carry.
     dyn = CalibrationEWeights()
     dyn_kish = sum(WTS)^2 / sum(abs2, WTS)
     @test PO.effective_sample_size(PR60, dyn) ≈ dyn_kish
-    @test ScenarioCount(; n = 6)(:alpha, PR60, dyn, nothing) ≈ 6 / dyn_kish
-    @test ConcentrationRadius(; confidence = 0.95, scale = 0.5)(:r, PR60, dyn, nothing) ≈
+    @test ScenarioCount(; n = 6)(:alpha, PR60, dyn, nothing, CalibrationContext()) ≈
+          6 / dyn_kish
+    @test ConcentrationRadius(; confidence = 0.95, scale = 0.5)(:r, PR60, dyn, nothing,
+                                                                CalibrationContext()) ≈
           0.5 * sqrt(q / dyn_kish)
-    @test DimensionalRateRadius(; confidence = 0.95, scale = 0.5)(:r, PR60, dyn, nothing) ≈
+    @test DimensionalRateRadius(; confidence = 0.95, scale = 0.5)(:r, PR60, dyn, nothing,
+                                                                  CalibrationContext()) ≈
           0.5 * (log(inv(0.05)) / dyn_kish)^inv(4)
-    @test DualNormRadius(; confidence = 0.95)(:r, PR60, dyn, nothing) ≈
-          DualNormRadius(; confidence = 0.95)(:r, PR60, WTS, nothing)
+    @test DualNormRadius(; confidence = 0.95)(:r, PR60, dyn, nothing,
+                                              CalibrationContext()) ≈
+          DualNormRadius(; confidence = 0.95)(:r, PR60, WTS, nothing, CalibrationContext())
 
     # -- The defect. A `DynamicAbstractWeights` that states no arity raises the library's
     # own named error in all four rules. Before this change, only `TailTermParity` did, and
@@ -1401,19 +1470,23 @@ struct CalibrationNoWeights <: PortfolioOptimisers.DynamicAbstractWeights end
     none = CalibrationNoWeights()
     @test_throws PO.ObservationWeightsError PO.effective_sample_size(PR60, none)
     @test_throws PO.ObservationWeightsError ScenarioCount(; n = 6)(:alpha, PR60, none,
-                                                                   nothing)
+                                                                   nothing,
+                                                                   CalibrationContext())
     @test_throws PO.ObservationWeightsError ConcentrationRadius(; confidence = 0.95,
                                                                 scale = 0.5)(:r, PR60, none,
-                                                                             nothing)
+                                                                             nothing,
+                                                                             CalibrationContext())
     @test_throws PO.ObservationWeightsError DimensionalRateRadius(; confidence = 0.95,
                                                                   scale = 0.5)(:r, PR60,
                                                                                none,
-                                                                               nothing)
+                                                                               nothing,
+                                                                               CalibrationContext())
     @test_throws PO.ObservationWeightsError DualNormRadius(; confidence = 0.95)(:r, PR60,
                                                                                 none,
-                                                                                nothing)
+                                                                                nothing,
+                                                                                CalibrationContext())
     err = try
-        ScenarioCount(; n = 6)(:alpha, PR60, none, nothing)
+        ScenarioCount(; n = 6)(:alpha, PR60, none, nothing, CalibrationContext())
     catch e
         e
     end
