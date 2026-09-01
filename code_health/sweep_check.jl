@@ -33,12 +33,13 @@ include(joinpath(@__DIR__, "CodeHealth.jl"))
 using .CodeHealth
 using TOML
 
-const UMBRELLA = 404
-const LABEL = "sweep"
-const PLAN_DIR = joinpath(CodeHealth.DIR, "_sweep")
+# The five names below and the two printers are `CodeHealth`'s. `code_health/sweep_triage.jl` reads
+# the same two files and writes into the same tracker, so a value written down twice is a value the
+# two jobs can disagree about.
+using .CodeHealth: SWEEP_UMBRELLA as UMBRELLA, SWEEP_LABEL as LABEL,
+                   SWEEP_PLAN_DIR as PLAN_DIR, MANIFEST_PATH,
+                   COVERAGE_BASELINE_PATH as COVERAGE_PATH, row_line, candidate_maps
 
-const MANIFEST_PATH = joinpath(CodeHealth.REPO_ROOT, "sweep", "manifest.toml")
-const COVERAGE_PATH = joinpath(CodeHealth.DIR, "coverage_baseline.toml")
 const ENTRY_PATH = joinpath(CodeHealth.REPO_ROOT, "src", "PortfolioOptimisers.jl")
 
 # --- what is in scope ------------------------------------------------------
@@ -92,35 +93,6 @@ function changed_files(base::AbstractString)
     append!(files, git_lines(`git diff --name-only --cached $ref --`))
     append!(files, git_lines(`git ls-files --others --exclude-standard -- '*.jl'`))
     return sort!(unique!(filter!(in_scope, files))), ref
-end
-
-# --- the manifest row ------------------------------------------------------
-
-"""
-    row_line(f, m, u, s; algorithm) -> String
-
-The manifest line a person pastes. It mirrors the printer of `test/test_45_sweep_census.jl`,
-including its `algorithm` clause: a swept row carries that key, and a line pasted without it would
-delete the floor `test/test_26_docs.jl` holds, where the deletion would read as a correction.
-"""
-function row_line(f, m, u, s; algorithm = nothing)
-    a = isnothing(algorithm) ? "" : string(", algorithm = ", algorithm)
-    return string("\"", f, "\" = { map = ", m, ", units = ", u, a, ", swept = ", s, " }")
-end
-
-"""
-    candidate_maps(rows, map_names, f) -> Vector{Int}
-
-The child maps a file's own directory already uses, which is what the census prints and for the
-same reason: **`map` is not derivable from a path**. Each of the nine subdirectories of `src/` and
-`ext/` uses exactly one map, and there the answer is an answer. The top level of `src/` holds files
-across five maps, and the numeric prefix does not rescue the lookup. A file in a brand-new
-directory has no sibling row, and then every map is a candidate.
-"""
-function candidate_maps(rows, map_names, f::AbstractString)
-    d = dirname(f)
-    ms = sort(unique(r["map"] for (g, r) in rows if dirname(g) == d))
-    return isempty(ms) ? sort(parse.(Int, collect(keys(map_names)))) : ms
 end
 
 # --- the tracker, when it was read -----------------------------------------

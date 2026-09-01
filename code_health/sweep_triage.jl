@@ -34,17 +34,11 @@ include(joinpath(@__DIR__, "CodeHealth.jl"))
 using .CodeHealth
 using TOML
 
-const PLAN_DIR = joinpath(CodeHealth.DIR, "_sweep")
-const LABEL = "sweep"
-
-"""
-The umbrella of the map of maps. It is reopened with every child map the job reopens, because a
-child map that reopens makes the umbrella's own terminal condition false again.
-"""
-const UMBRELLA = 404
-
-const MANIFEST_PATH = joinpath(CodeHealth.REPO_ROOT, "sweep", "manifest.toml")
-const COVERAGE_PATH = joinpath(CodeHealth.DIR, "coverage_baseline.toml")
+# The five names below are `CodeHealth`'s. `code_health/sweep_check.jl` runs the same reconciliation
+# before the commit, so a value written down twice is a value the two jobs can disagree about.
+using .CodeHealth: SWEEP_UMBRELLA as UMBRELLA, SWEEP_LABEL as LABEL,
+                   SWEEP_PLAN_DIR as PLAN_DIR, MANIFEST_PATH,
+                   COVERAGE_BASELINE_PATH as COVERAGE_PATH
 
 # --- the tracker's side, as data -------------------------------------------
 
@@ -76,22 +70,14 @@ separately as its own open flag.
 
 The umbrella's state is read here rather than assumed, because `gh issue reopen` fails on an issue
 that is already open. The plan lists a number only when reopening it is a real act.
+
+`CodeHealth.read_tracker_dump` does the reading, which is where an absent file becomes an empty
+tracker and where a line of the wrong width raises.
 """
 function read_maps(path::AbstractString)
     out = Dict{String, ChildMap}()
     umbrella = nothing
-    if !(isfile(path))
-        return out, umbrella
-    end
-    for (i, line) in enumerate(eachline(path))
-        if isempty(strip(line))
-            continue
-        end
-        parts = split(line, '\t')
-        if !(length(parts) == 3)
-            error("$path line $i has $(length(parts)) fields, not 3: " * repr(line))
-        end
-        number, state, title = parts
+    for (number, state, title) in CodeHealth.read_tracker_dump(path, 3)
         issue = parse(Int, number)
         isopen = uppercase(state) == "OPEN"
         if issue == UMBRELLA
@@ -112,25 +98,12 @@ end
     read_existing(path) -> Vector{Tuple{Bool, String}}
 
 The `sweep` issues the workflow dumped, one per line as `number<TAB>state<TAB>title`, reduced to
-what the safeguard reads: whether each is open, and its title. An absent file means an empty
-tracker, which is what the first run sees.
+what the safeguard reads: whether each is open, and its title. `CodeHealth.read_tracker_dump` does
+the reading, so this job and `code_health/triage.jl` parse a dump the same way.
 """
 function read_existing(path::AbstractString)
-    out = Tuple{Bool, String}[]
-    if !(isfile(path))
-        return out
-    end
-    for (i, line) in enumerate(eachline(path))
-        if isempty(strip(line))
-            continue
-        end
-        parts = split(line, '\t')
-        if !(length(parts) == 3)
-            error("$path line $i has $(length(parts)) fields, not 3: " * repr(line))
-        end
-        push!(out, (uppercase(parts[2]) == "OPEN", String(parts[3])))
-    end
-    return out
+    return [(uppercase(r[2]) == "OPEN", r[3])
+            for r in CodeHealth.read_tracker_dump(path, 3)]
 end
 
 """

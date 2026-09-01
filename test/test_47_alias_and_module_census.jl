@@ -1,3 +1,18 @@
+#=
+`code_health/CodeHealth.jl` is a module rather than a script, and it loads only `TOML`, which
+`test/Project.toml` already carries. It holds the one parser every census in this repository reads
+the source text with: `walk_ast`, `isdocstring` and `documented_units`.
+`test_45_sweep_census.jl` states what those measure, and
+`test_49_coverage_attribution_census.jl` loads `code_health/coverage.jl` the same way.
+
+The load sits OUTSIDE the `@testset` on purpose. `include` defines methods, and a method defined
+inside one top-level statement is not visible to a call in that same statement. The module wrapper
+keeps that module's own names out of the worker module.
+=#
+module AliasCensusHealth
+include(joinpath(@__DIR__, "..", "code_health", "CodeHealth.jl"))
+end
+
 @testset "Alias census: every alias of src/25_Aliases.jl keeps its claim" begin
     using Test
 
@@ -42,11 +57,10 @@
     # ------------------------------------------------------------------ the parse
 
     # The same instrument `test_26_docs.jl` and `test_45_sweep_census.jl` read the file with:
-    # one parse, no package needed, and a reading that cannot move under a reformat.
-    doc_macro = GlobalRef(Core, Symbol("@doc"))
-    isdocstring(x) = Meta.isexpr(x, :macrocall) &&
-                     !isempty(x.args) &&
-                     (x.args[1] === doc_macro || x.args[1] === Symbol("@doc"))
+    # one parse, no package needed, and a reading that cannot move under a reformat. It is
+    # `CodeHealth`'s, so all three read one predicate.
+    CH = AliasCensusHealth.CodeHealth
+    isdocstring = CH.isdocstring
 
     # A docstring that interpolates parses to an `Expr(:string, ...)`; the literal pieces
     # carry every heading and every `@ref`.
@@ -81,8 +95,9 @@
     # so a keyword's default value is not mistaken for part of the composition.
     acronyms = Tuple{Symbol, Symbol, String}[]
     factories = Tuple{Symbol, String, Set{Symbol}}[]
-    let src = read(ALIAS_FILE, String)
-        for node in Meta.parseall(src).args
+    let
+        # Only the top level: ADR 0086 scopes both kinds of alias to this file's top level.
+        for node in CH.parse_file(ALIAS_FILE).args
             (isdocstring(node) && length(node.args) >= 4) || continue
             text, d = docstring_text(node), node.args[4]
             if Meta.isexpr(d, :const) && Meta.isexpr(d.args[1], :(=))
@@ -366,6 +381,8 @@ end
 @testset "Module census: src/PortfolioOptimisers.jl reaches every source file" begin
     using Test
 
+    CH = AliasCensusHealth.CodeHealth
+
     #=
     `src/PortfolioOptimisers.jl` is the module file, and it is the second file issue #442
     sweeps. It carries ONE documented unit, the module docstring, and ZERO executable lines,
@@ -389,19 +406,14 @@ end
     # Every path an `include` call names, in source order. The commented-out `walkdir` block
     # at the head of the file is inside a `#= =#`, so the parse never sees it.
     included = String[]
-    let node = Meta.parseall(read(MODULE_FILE, String))
-        function walk(x)
-            x isa Expr || return nothing
-            if Meta.isexpr(x, :call) &&
-               length(x.args) == 2 &&
-               x.args[1] === :include &&
-               x.args[2] isa AbstractString
-                push!(included, String(x.args[2]))
-            end
-            foreach(walk, x.args)
-            return nothing
+    CH.walk_ast(CH.parse_file(MODULE_FILE)) do x
+        if Meta.isexpr(x, :call) &&
+           length(x.args) == 2 &&
+           x.args[1] === :include &&
+           x.args[2] isa AbstractString
+            push!(included, String(x.args[2]))
         end
-        walk(node)
+        return nothing
     end
 
     # Every `.jl` file under `src/`, module file excluded, as a path relative to `src/`.

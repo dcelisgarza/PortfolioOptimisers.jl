@@ -1,5 +1,22 @@
+#=
+`code_health/CodeHealth.jl` is a module rather than a script, and it loads only `TOML`, which
+`test/Project.toml` already carries. So this census reads the source text with the SAME parser
+`code_health/sweep_check.jl` runs before the commit, and neither reading can drift from the other.
+`test_49_coverage_attribution_census.jl` loads `code_health/coverage.jl` the same way, and for the
+same reason.
+
+The load sits OUTSIDE the `@testset` on purpose. `include` defines methods, and a method defined
+inside one top-level statement is not visible to a call in that same statement. The module wrapper
+keeps that module's own names out of the worker module.
+=#
+module SweepCensusHealth
+include(joinpath(@__DIR__, "..", "code_health", "CodeHealth.jl"))
+end
+
 @testset "Sweep census: every source file carries a row, and its unit count holds" begin
     using Test, TOML
+
+    CH = SweepCensusHealth.CodeHealth
 
     #=
     The map of maps, issue #404, sweeps every file under `src/` and `ext/` for three things
@@ -28,6 +45,9 @@
     A UNIT is a docstring that attaches to a binding: a type, a function, a method, a
     constant, a macro or a module. The count is taken from the file's SOURCE TEXT, by
     parsing with `Meta.parseall` and counting the `Core.@doc` macrocalls at any depth.
+    `CodeHealth.documented_units` is that count and `CodeHealth.isdocstring` is that
+    predicate. THIS FILE STATES THE DEFINITION; that module holds the one implementation of
+    it, and every other census in the repository reads the source through the same two.
 
     Three properties earn it the row.
 
@@ -74,77 +94,34 @@
     two SETS, rather than inventing a number for a file it has never measured. A deleted
     file and an added file then share one rule.
 
-    `git ls-files` is used rather than `walkdir`, for the reason `code_health/CodeHealth.jl`
-    gives: `walkdir` ignores `.gitignore` and picks up the untracked `NOTRACK_*` scratch
-    files. Those three lines are repeated here rather than included, because that module
-    lives in its own environment and pulls JET and CodeComplexity in with it.
+    `CodeHealth.source_files` answers it, and it reads `git ls-files` rather than `walkdir`:
+    `walkdir` ignores `.gitignore` and picks up the untracked `NOTRACK_*` scratch files
+    (issue #336).
     =#
-    function tracked_sources(dir)
-        out = read(Cmd(`git ls-files -z -- '*.jl'`; dir = dir), String)
-        fs = filter!(!isempty, split(out, '\0'))
-        filter!(f -> startswith(f, "src/") || startswith(f, "ext/"), fs)
-        return sort!(String.(fs))
-    end
-
-    expected = tracked_sources(root)
+    expected = CH.source_files()
     # A `git` that answers nothing would make every check below vacuously green.
     @test !isempty(expected)
 
     # ------------------------------------------------------------------- the measurement
 
     #=
-    `CodeHealth.documented_units` holds a second copy of the next fifteen lines, because
-    `code_health/sweep_check.jl` measures the same number before the commit and this test may not
-    depend on `code_health/`. THIS FILE IS THE AUTHORITY for the definition. A change here changes
-    that copy in the same edit.
+    The measurement and the two printers below are `CodeHealth`'s, so the number this
+    census reds the build on is the number `code_health/sweep_check.jl` prints before the
+    commit.
+
+      - `count_units` counts the documented units of one file.
+      - `row_line` prints the manifest row a person pastes back. A swept row also carries
+        the `algorithm` key that `test_26_docs.jl` ratchets, so the printer takes it: a
+        line pasted without it would delete the ratchet's floor and the deletion would read
+        as a correction. An unswept row has no such key, and a file that has no row at all
+        is never swept.
+      - `candidate_maps` lists the child maps a file's own directory already uses, because
+        the map a file belongs to is NOT derivable from its path. A person chooses by
+        subject. #428 measured why the numeric prefix does not rescue the lookup.
     =#
-    doc_macro = GlobalRef(Core, Symbol("@doc"))
-    isdocstring(x) = Meta.isexpr(x, :macrocall) &&
-                     !isempty(x.args) &&
-                     (x.args[1] === doc_macro || x.args[1] === Symbol("@doc"))
-
-    function count_units(path::AbstractString)
-        n = 0
-        function walk(node)
-            node isa Expr || return nothing
-            isdocstring(node) && (n += 1)
-            foreach(walk, node.args)
-            return nothing
-        end
-        walk(Meta.parseall(read(path, String)))
-        return n
-    end
-
-    #=
-    Print the row a human must paste back into the manifest. A swept row also carries the
-    `algorithm` key that `test_26_docs.jl` ratchets, so the printer takes it: a line pasted
-    without it would delete the ratchet's floor and the deletion would read as a correction.
-    An unswept row has no such key, and a file that has no row at all is never swept.
-    =#
-    function row_line(f, m, u, s; algorithm = nothing)
-        a = isnothing(algorithm) ? "" : string(", algorithm = ", algorithm)
-        return string("\"", f, "\" = { map = ", m, ", units = ", u, a, ", swept = ", s,
-                      " }")
-    end
-
-    #=
-    The map a file belongs to is NOT derivable from its path, so the census prints the
-    CANDIDATES and a person chooses by subject. Each of the nine subdirectories of `src/`
-    and `ext/` maps to exactly one child map, and there the answer is printed outright. The
-    top level of `src/` holds sixteen files across FIVE maps, and the numeric prefix does
-    not rescue the lookup: the blocks are not contiguous. `10_` sits between map 2 and map
-    8, and `25_` returns to map 1. #428 measured this.
-
-    The candidates are the maps the file's own directory already uses, so nothing here
-    repeats the cut. A brand-new directory has no sibling row, and then every map is a
-    candidate.
-    =#
-    all_maps() = sort(parse.(Int, collect(keys(map_names))))
-    function candidate_maps(f)
-        d = dirname(f)
-        ms = sort(unique(r["map"] for (g, r) in rows if dirname(g) == d))
-        return isempty(ms) ? all_maps() : ms
-    end
+    count_units(path::AbstractString) = CH.documented_units(path)
+    row_line(f, m, u, s; algorithm = nothing) = CH.row_line(f, m, u, s; algorithm)
+    candidate_maps(f) = CH.candidate_maps(rows, map_names, f)
 
     # The printer below runs only when the census is already red, so these two hold it to
     # its contract on a green run. A file's own directory must offer that file's map, and

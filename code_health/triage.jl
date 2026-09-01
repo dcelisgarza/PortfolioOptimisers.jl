@@ -108,27 +108,17 @@ tracker, which is what the first run sees.
 `closed_at` stays the string GitHub printed. It is fixed-width ISO-8601 in UTC, so it sorts
 lexicographically and `git rev-list --before=` reads it as it stands. Parsing it would buy nothing
 and would add a dependency to a job that needs none.
+
+`CodeHealth.read_tracker_dump` does the reading, so this job and `code_health/sweep_triage.jl`
+parse a dump the same way. Only the four-column shape is this job's own.
 """
 function read_existing(path::AbstractString)
     out = Existing[]
-    if !(isfile(path))
-        return out
-    end
-    for (i, line) in enumerate(eachline(path))
-        if isempty(strip(line))
-            continue
-        end
-        parts = split(line, '\t')
-        if !(length(parts) == 4)
-            error("$path line $i has $(length(parts)) fields, not 4: " * repr(line))
-        end
-        number, state, closed, title = parts
+    for (number, state, closed, title) in CodeHealth.read_tracker_dump(path, 4)
         if closed in ("null", "0001-01-01T00:00:00Z")
             (closed = "")
         end
-        push!(out,
-              Existing(parse(Int, number), uppercase(state) == "OPEN", String(closed),
-                       String(title)))
+        push!(out, Existing(parse(Int, number), uppercase(state) == "OPEN", closed, title))
     end
     return out
 end

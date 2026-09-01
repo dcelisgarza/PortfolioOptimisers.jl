@@ -1,3 +1,18 @@
+#=
+`code_health/CodeHealth.jl` is a module rather than a script, and it loads only `TOML`, which
+`test/Project.toml` already carries. It holds the one parser every census in this repository reads
+the source text with: `walk_ast`, `isdocstring` and `documented_units`.
+`test_45_sweep_census.jl` states what those measure, and
+`test_49_coverage_attribution_census.jl` loads `code_health/coverage.jl` the same way.
+
+The load sits OUTSIDE the `@testset` on purpose. `include` defines methods, and a method defined
+inside one top-level statement is not visible to a call in that same statement. The module wrapper
+keeps that module's own names out of the worker module.
+=#
+module DocsCensusHealth
+include(joinpath(@__DIR__, "..", "code_health", "CodeHealth.jl"))
+end
+
 @testset "Docs completeness" begin
     using PortfolioOptimisers, Test
     all_names = Base.undocumented_names(PortfolioOptimisers; private = true)
@@ -670,11 +685,10 @@ in the sense of `STANDARDS.md`.
     swept = sort([f for (f, r) in rows if r["swept"]])
 
     # The same instrument `test_45_sweep_census.jl` counts units with: one parse per file,
-    # no package loaded, and a count that cannot move under a reformat.
-    doc_macro = GlobalRef(Core, Symbol("@doc"))
-    isdocstring(x) = Meta.isexpr(x, :macrocall) &&
-                     !isempty(x.args) &&
-                     (x.args[1] === doc_macro || x.args[1] === Symbol("@doc"))
+    # no package loaded, and a count that cannot move under a reformat. It is
+    # `CodeHealth`'s, so the three walks below and that census read one predicate.
+    CH = DocsCensusHealth.CodeHealth
+    isdocstring = CH.isdocstring
 
     # A definition, not a local assignment. `Au = ...` inside a body whose right-hand side
     # holds a `JuMP.@constraint` is a local, and reading it as a definition attributes the
@@ -817,8 +831,7 @@ in the sense of `STANDARDS.md`.
         names, texts = Symbol[], String[]
         demanded = Dict{Int, Set{String}}()
         in_force = Dict{Symbol, Int}()
-        function walk(node)
-            node isa Expr || return nothing
+        CH.walk_ast(CH.parse_file(path)) do node
             if isdocstring(node)
                 d = length(node.args) >= 4 ? node.args[4] : nothing
                 nm = isnothing(d) ? nothing : bound_name(d)
@@ -835,10 +848,8 @@ in the sense of `STANDARDS.md`.
                         union!(get!(demanded, in_force[nm], Set{String}()), subs)
                 end
             end
-            foreach(walk, node.args)
             return nothing
         end
-        walk(Meta.parseall(read(path, String)))
         return names, texts, demanded
     end
 
@@ -1054,8 +1065,7 @@ in the sense of `STANDARDS.md`.
         # Every alias of a file: its name, its kind, and the sections its docstring carries.
         function scan_aliases(path)
             found = Tuple{Symbol, Symbol, Vector{String}}[]
-            function walk(node)
-                node isa Expr || return nothing
+            CH.walk_ast(CH.parse_file(path)) do node
                 if isdocstring(node) && length(node.args) >= 4
                     d = node.args[4]
                     k = alias_kind(d, path)
@@ -1067,10 +1077,8 @@ in the sense of `STANDARDS.md`.
                         isnothing(nm) || push!(found, (nm, k, secs))
                     end
                 end
-                foreach(walk, node.args)
                 return nothing
             end
-            walk(Meta.parseall(read(path, String)))
             return found
         end
 
@@ -1207,8 +1215,7 @@ in the sense of `STANDARDS.md`.
         =#
         function math_dict_values(path)
             acc = Dict{String, Symbol}()
-            function walk(node)
-                node isa Expr || return nothing
+            CH.walk_ast(CH.parse_file(path)) do node
                 if Meta.isexpr(node, :(=)) &&
                    node.args[1] === :math_dict &&
                    node.args[2] isa Expr
@@ -1221,12 +1228,11 @@ in the sense of `STANDARDS.md`.
                             acc[strip(p.args[3])] = p.args[2].value
                         end
                     end
-                    return nothing
+                    # The table is read, so nothing below it can add to `acc`.
+                    return CH.PRUNE
                 end
-                foreach(walk, node.args)
                 return nothing
             end
-            walk(Meta.parseall(read(path, String)))
             return acc
         end
 

@@ -1,5 +1,22 @@
+#=
+`code_health/CodeHealth.jl` is a module rather than a script, and it loads only `TOML`, which
+`test/Project.toml` already carries. It holds the one parser every census in this repository reads
+the source text with: `walk_ast`, `isdocstring` and `documented_units`.
+`test_45_sweep_census.jl` states what those measure, and
+`test_49_coverage_attribution_census.jl` loads `code_health/coverage.jl` the same way.
+
+The load sits OUTSIDE the `@testset` on purpose. `include` defines methods, and a method defined
+inside one top-level statement is not visible to a call in that same statement. The module wrapper
+keeps that module's own names out of the worker module.
+=#
+module DriftCensusHealth
+include(joinpath(@__DIR__, "..", "code_health", "CodeHealth.jl"))
+end
+
 @testset "Constructor docstrings do not drift from the signatures they copy" begin
     using Test
+
+    CH = DriftCensusHealth.CodeHealth
 
     # `field_dict` in `01_Base.jl` centralises the PROSE of a field, but the keyword
     # SIGNATURE of a constructor is copied by hand into each type's `# Constructors`
@@ -180,14 +197,13 @@
     # ------------------------------------------------------------- the code side
 
     function collect_defs!(out, ex)
-        isa(ex, Expr) || return nothing
-        if ex.head === :function || ex.head === :(=)
-            c = unwrap_sig(ex.args[1])
-            k = kwspec(c)
-            k === nothing || push!(out, k)
-        end
-        for a in ex.args
-            collect_defs!(out, a)
+        CH.walk_ast(ex) do e
+            if e.head === :function || e.head === :(=)
+                c = unwrap_sig(e.args[1])
+                k = kwspec(c)
+                k === nothing || push!(out, k)
+            end
+            return nothing
         end
         return nothing
     end

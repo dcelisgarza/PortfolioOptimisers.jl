@@ -75,6 +75,80 @@ in_scope(path::AbstractString) = any(r -> startswith(path, r), MEASURED_ROOTS)
 
 is_ci() = haskey(ENV, "GITHUB_ACTIONS")
 
+# --- reading source text ---------------------------------------------------
+#
+# Every census in this repository reads the SOURCE TEXT rather than a loaded binding: one parse per
+# file, no package loaded, and a reading that cannot move under a reformat. The recursion and the
+# docstring predicate are written once here. `code_health/`, `test/test_26_docs.jl`,
+# `test/test_41_constructor_docstring_drift.jl`, `test/test_45_sweep_census.jl` and
+# `test/test_47_alias_and_module_census.jl` all cross this seam to reach them.
+#
+# This module loads only `TOML`, which is stdlib and which `test/Project.toml` already carries, so
+# a test file includes this one file at no dependency cost. `test/test_49_coverage_attribution_
+# census.jl` loads `code_health/coverage.jl` the same way.
+
+"""
+    parse_file(file) -> Expr
+
+Parse one file with `Meta.parseall`. A relative `file` is read from the repository root. An
+absolute one is read as it stands, which is what a test file under `test/` passes.
+"""
+parse_file(file) = Meta.parseall(read(joinpath(REPO_ROOT, file), String); filename = file)
+
+"""
+    Prune
+
+The one value a [`walk_ast`](@ref) visitor returns to stop the descent below the node it was given.
+It is a type of its own rather than `false`, because a visitor's last expression is whatever its
+body happened to leave behind, and a stray `false` must never prune the walk.
+"""
+struct Prune end
+
+"""
+The single [`Prune`](@ref).
+"""
+const PRUNE = Prune()
+
+"""
+    walk_ast(f, node)
+
+Apply `f` to `node` and to every `Expr` under it, parents before children and in source order. A
+non-`Expr` is skipped, so a visitor never sees a `Symbol`, a literal or a `LineNumberNode`.
+
+Return [`PRUNE`](@ref) from `f` to leave the subtree below that node unvisited. Every other return
+value is ignored.
+"""
+function walk_ast(f, node)
+    if !(node isa Expr)
+        return nothing
+    end
+    if f(node) === PRUNE
+        return nothing
+    end
+    for a in node.args
+        walk_ast(f, a)
+    end
+    return nothing
+end
+
+"""
+The `Core.@doc` macro, as the parser writes it. A docstring at the top level of a file parses to
+this `GlobalRef`. One inside a `module` block parses to the bare `Symbol`.
+"""
+const DOC_MACRO = GlobalRef(Core, Symbol("@doc"))
+
+"""
+    isdocstring(x) -> Bool
+
+Whether `x` is the macrocall a docstring parses to. A FIELD docstring is not one: inside a struct
+body a docstring parses as a bare string literal, so it never answers `true` here.
+"""
+function isdocstring(x)
+    return Meta.isexpr(x, :macrocall) &&
+           !(isempty(x.args)) &&
+           (x.args[1] === DOC_MACRO || x.args[1] === Symbol("@doc"))
+end
+
 # --- Declaration Macros ----------------------------------------------------
 #
 # Found by parsing alone, so `complexity.jl` stays a pure parser and loads no package.
@@ -84,8 +158,6 @@ macro_name(x::Expr) = x.head === :. ? macro_name(x.args[end]) : ""
 macro_name(x::QuoteNode) = macro_name(x.value)
 macro_name(x) = ""
 
-parse_file(file) = Meta.parseall(read(joinpath(REPO_ROOT, file), String); filename = file)
-
 """
     declared_macros(file) -> Vector{String}
 
@@ -93,17 +165,16 @@ The macros a file declares.
 """
 function declared_macros(file)
     names = String[]
-    walk(x) = nothing
-    function walk(e::Expr)
+    walk_ast(parse_file(file)) do e
         if e.head === :macro
             sig = e.args[1]
             n = sig isa Expr ? sig.args[1] : sig
-            n isa Symbol && push!(names, "@" * String(n))
+            if n isa Symbol
+                push!(names, "@" * String(n))
+            end
         end
-        foreach(walk, e.args)
         return nothing
     end
-    walk(parse_file(file))
     return names
 end
 
@@ -117,19 +188,18 @@ Declaration Macros of ADR 0072.
 """
 function macro_call_sites(file)
     found = Tuple{String, Expr}[]
-    walk(x) = nothing
-    function walk(e::Expr)
+    walk_ast(parse_file(file)) do e
         if e.head === :struct
-            return nothing
+            return PRUNE
         end
         if e.head === :macrocall
             n = macro_name(e.args[1])
-            isempty(n) || push!(found, (n, e))
+            if !(isempty(n))
+                push!(found, (n, e))
+            end
         end
-        foreach(walk, e.args)
         return nothing
     end
-    walk(parse_file(file))
     return found
 end
 
@@ -184,6 +254,15 @@ function tracked_jl_files()
     return sort!(filter!(!isempty, split(out, '\0')))
 end
 
+"""
+    source_files() -> Vector{String}
+
+Every tracked `.jl` file under the measured roots, as a path relative to the repository root. This
+is ADR 0074's expected row set for `sweep/manifest.toml`, and `test/test_45_sweep_census.jl`
+compares it against the rows the manifest holds.
+"""
+source_files() = String[f for f in tracked_jl_files() if in_scope(f)]
+
 function git_short_commit()
     try
         return strip(read(Cmd(`git rev-parse --short HEAD`; dir = REPO_ROOT), String))
@@ -201,32 +280,119 @@ The file's count of documented units: a docstring that attaches to a binding, co
 source text by parsing with `Meta.parseall` and counting the `Core.@doc` macrocalls at any depth.
 It is the `units` key of a `sweep/manifest.toml` row.
 
-**`test/test_45_sweep_census.jl` is the Authority for this definition**, and it holds a second copy
-of these lines. That test loads no file of `code_health/`, deliberately, so `code_health` may not
-become a dependency of the test suite. The two copies must move together, and the comment beside
-the test's copy says so.
+**This is the one definition.** `test/test_45_sweep_census.jl` states what a unit is and why, and
+`code_health/sweep_check.jl` measures the same number before the commit. Both call this function,
+so the rule moves in one edit.
 
 A field docstring is NOT a unit: inside a struct body a docstring parses as a bare string literal
 rather than as a macrocall, so it never reaches this count.
 """
 function documented_units(path::AbstractString)
-    doc_macro = GlobalRef(Core, Symbol("@doc"))
-    isdocstring(x) = Meta.isexpr(x, :macrocall) &&
-                     !(isempty(x.args)) &&
-                     (x.args[1] === doc_macro || x.args[1] === Symbol("@doc"))
     n = 0
-    function walk(node)
-        if !(node isa Expr)
-            return nothing
-        end
+    walk_ast(parse_file(path)) do node
         if isdocstring(node)
             (n += 1)
         end
-        foreach(walk, node.args)
         return nothing
     end
-    walk(Meta.parseall(read(path, String)))
     return n
+end
+
+"""
+    row_line(f, m, u, s; algorithm) -> String
+
+The `sweep/manifest.toml` line a person pastes back. A swept row also carries the `algorithm` key
+that `test/test_26_docs.jl` ratchets, so the printer takes it: a line pasted without that key would
+delete the ratchet's floor, and the deletion would read as a correction. An unswept row has no such
+key, and a file that has no row at all is never swept.
+
+`test/test_45_sweep_census.jl` and `code_health/sweep_check.jl` both print this line, before the
+commit and after it, so the two printers are one printer.
+"""
+function row_line(f, m, u, s; algorithm = nothing)
+    a = isnothing(algorithm) ? "" : string(", algorithm = ", algorithm)
+    return string("\"", f, "\" = { map = ", m, ", units = ", u, a, ", swept = ", s, " }")
+end
+
+"""
+    candidate_maps(rows, map_names, f) -> Vector{Int}
+
+The child maps a file's own directory already uses. **A `map` is not derivable from a path**, so the
+census prints the candidates and a person chooses by subject. Each of the nine subdirectories of
+`src/` and `ext/` uses exactly one map, and there the answer is an answer. The top level of `src/`
+holds sixteen files across five maps, and the numeric prefix does not rescue the lookup: the blocks
+are not contiguous. `10_` sits between map 2 and map 8, and `25_` returns to map 1. #428 measured
+this.
+
+A file in a brand-new directory has no sibling row, and then every map is a candidate.
+"""
+function candidate_maps(rows, map_names, f::AbstractString)
+    d = dirname(f)
+    ms = sort(unique(r["map"] for (g, r) in rows if dirname(g) == d))
+    return isempty(ms) ? sort(parse.(Int, collect(keys(map_names)))) : ms
+end
+
+# --- the sweep, as the two scheduled jobs name it ---------------------------
+#
+# `code_health/sweep_check.jl` runs before the commit and `code_health/sweep_triage.jl` runs on a
+# schedule. They read the same two files and write into the same tracker, so the five names below
+# are stated here once and aliased into each script.
+
+"""
+The umbrella of the map of maps. It is reopened with every child map either job reopens, because a
+child map that reopens makes the umbrella's own terminal condition false again.
+"""
+const SWEEP_UMBRELLA = 404
+
+"""
+The label ADR 0084 puts on every sweep issue. Both jobs search the titles that carry it.
+"""
+const SWEEP_LABEL = "sweep"
+
+"""
+Where the sweep jobs write their plan.
+"""
+const SWEEP_PLAN_DIR = joinpath(DIR, "_sweep")
+
+"""
+The sweep manifest of ADR 0074: one row per file under the measured roots.
+"""
+const MANIFEST_PATH = joinpath(REPO_ROOT, "sweep", "manifest.toml")
+
+"""
+The coverage baseline of ADR 0082, which both sweep jobs read for a file's coverage row.
+"""
+const COVERAGE_BASELINE_PATH = joinpath(DIR, "coverage_baseline.toml")
+
+# --- the tracker dump ------------------------------------------------------
+
+"""
+    read_tracker_dump(path, fields) -> Vector{Vector{String}}
+
+The issues a workflow dumped, one per line, as `fields` tab-separated columns. An absent file means
+an empty tracker, which is what the first run sees. A blank line is skipped, and a line of the
+wrong width raises with its number, because a short line would otherwise be read as a missing issue
+and the job would file a duplicate.
+
+`code_health/triage.jl` dumps four columns and `code_health/sweep_triage.jl` dumps three, so the
+width is an argument. The parse is the same parse.
+"""
+function read_tracker_dump(path::AbstractString, fields::Integer)
+    out = Vector{String}[]
+    if !(isfile(path))
+        return out
+    end
+    for (i, line) in enumerate(eachline(path))
+        if isempty(strip(line))
+            continue
+        end
+        parts = split(line, '\t')
+        if !(length(parts) == fields)
+            error("$path line $i has $(length(parts)) fields, not $fields: " * repr(line))
+        end
+        push!(out, String.(parts))
+    end
+    return out
 end
 
 # --- TOML rendering --------------------------------------------------------
