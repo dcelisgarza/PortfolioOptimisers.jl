@@ -125,10 +125,10 @@ Where:
 
   - $(math_dict[:zbar_ik_feature])
   - $(math_dict[:z_tik_feature])
-  - $(math_dict[:w_t_obsweight])
+  - $(math_dict[:w_t_obs])
   - $(math_dict[:T])
 
-The weights are non-negative and the denominator normalises them, so the aggregate is a convex combination of the window. That is what makes it a metric when it is applied to distance matrices.
+An unweighted collapse sets every ``w_{t}`` to ``1``. The weights are non-negative and the denominator normalises them, so the aggregate is a convex combination of the window. That is what makes it a metric when it is applied to distance matrices.
 
 # Algorithm
 
@@ -164,9 +164,11 @@ Where:
 
   - $(math_dict[:zbar_ik_feature])
   - $(math_dict[:z_tik_feature])
-  - $(math_dict[:w_t_obsweight])
+  - $(math_dict[:w_t_obs])
   - $(math_dict[:T])
   - ``Q_{0.5}``: The ``0.5``-quantile of the window under those weights.
+
+An unweighted collapse sets every ``w_{t}`` to ``1``.
 
 # Algorithm
 

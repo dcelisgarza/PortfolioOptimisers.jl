@@ -96,7 +96,7 @@ Five dictionaries in `src/01_Base/01_DocstringDictionaries.jl` provide standardi
 - `ret_dict` — return value descriptions. Use as `$(ret_dict[:key])` in `# Returns` sections.
 - `math_dict` — LaTeX mathematical notation. Use as `$(math_dict[:key])` in the `Where:` list of a `# Mathematical definition` or `# JuMP formulation` section.
 
-If a needed key is missing, add it to the appropriate dictionary in `01_Base/01_DocstringDictionaries.jl` before writing the docstring.
+If a needed key is missing, add it to the appropriate dictionary in `src/01_Base/01_DocstringDictionaries.jl` before writing the docstring.
 
 ### Inline field docstrings
 
@@ -687,7 +687,11 @@ A new description is a **new** key. Editing a value already in `math_dict` moves
 
 **A key owns a definition, not a glyph.** One glyph carries different quantities in different families: ``\boldsymbol{w}`` is the portfolio weights vector in a risk measure and the observation weights in a moment estimator. A key is therefore claimed by the whole definition — the symbol together with the sentence that defines it — and a second quantity on the same glyph takes its own key under its own symbol. It never takes a second meaning on the first.
 
-**Gate.** `test/test_26_docs.jl` reds when a `Where:` bullet copies a `math_dict` value instead of interpolating it. It matches the whole bullet against the whole value, so it fires on a copy and never on a glyph that two families share. A file marked `swept = true` in [`sweep/manifest.toml`](../../sweep/manifest.toml) carries no such copy, and the library-wide count may not rise. The copies that remain migrate file by file, inside each file's own sweep ticket of issue #404.
+**One quantity takes one key.** The converse of the rule above. Two keys that define one quantity are drift inside the table that exists to stop drift, and the docstrings that read them state one thing in two spellings. `:w_t_moment`, `:w_t_obsweight` and `:cal_w_i` each defined the observation weight, under ``w_t``, ``w_{t}`` and ``w_{i}``, and as "observation ``t``" against "period ``i``". They are one key, `:w_t_obs`. A new key states a quantity the table does not already carry; a new *description* of a quantity it does carry is a change to the key that owns it, under the rule above.
+
+**Gate.** Two checks in `test/test_26_docs.jl`, one for each direction. The first reds when a `Where:` bullet copies a `math_dict` value instead of interpolating it. It matches the whole bullet against the whole value, so it fires on a copy and never on a glyph that two families share. A file marked `swept = true` in [`sweep/manifest.toml`](../../sweep/manifest.toml) carries no such copy, and the library-wide count may not rise. The copies that remain migrate file by file, inside each file's own sweep ticket of issue #404.
+
+The second reads the table itself, and reds when two keys open with one definition head — the noun phrase before the first punctuation mark and the first function word. A head that several keys share is recorded in that testset with the reason the keys are not one, so a new key may not restate a definition the table already carries. A head is a coarse instrument: two keys worded differently do not match, and the per-file sweep ticket reads that pair by hand.
 
 **Siblings of one Family state a shared quantity in the same form.** Not the same symbol alone — the same shape of equation. A condition that one sibling writes in a parenthesis, the second in set notation and the third in its `Where:` list is one fact written three ways, and the three do not read as one Family. Take the shape from the sibling that states it most completely, and write the others to match it.
 

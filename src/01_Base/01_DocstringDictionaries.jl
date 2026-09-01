@@ -959,10 +959,11 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        :x => "``\\boldsymbol{x}``: Constrained variable.",#
                        :ineq => "``\\text{ineq}``: Subscript for inequality constraints.",#
                        :eq => "``\\text{eq}``: Subscript for equality constraints.",#
-                       # Portfolio returns and dimensions.
+                       # Portfolio returns, dimensions and observation weights.
                        :xret => "``\\boldsymbol{x}``: Portfolio returns vector ``T \\times 1``.",#
                        :T => "``T``: Number of observations.",#
                        :x_t_obs => "``\\boldsymbol{x}_t``: Asset returns for observation ``t``, the ``t``-th row of the returns matrix.",#
+                       :w_t_obs => "``w_{t}``: Observation weight of observation ``t``.",#
                        :N => "``N``: Number of assets.",#
                        # Sample moments of the returns matrix.
                        :r_tj => "``r_{tj}``: Return of asset ``j`` at time ``t``.",#
@@ -973,7 +974,6 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        :Sigma_hat => "``\\hat{\\mathbf{\\Sigma}}``: Estimated covariance matrix.",#
                        :Sigma_hat_ii => "``\\hat{\\mathbf{\\Sigma}}_{ii}``: ``i``-th diagonal entry of ``\\hat{\\mathbf{\\Sigma}}``.",#
                        :Sigma_hat_ij => "``\\hat{\\mathbf{\\Sigma}}_{ij}``: Estimated covariance between assets ``i`` and ``j``.",#
-                       :w_t_moment => "``w_t``: Observation weight of observation ``t``.",#
                        :c_weight_bias => "``c``: Bias correction of the weighted denominator. It is fixed by the **type** of the weights, never by the estimator: `corrected = false` gives ``c = 0`` for every type, and `corrected = true` gives ``c = 1`` for `StatsBase.FrequencyWeights`, ``c = \\sum_t w_t^2 / \\sum_t w_t`` for `StatsBase.AnalyticWeights` and ``c = \\sum_t w_t / T`` for `StatsBase.ProbabilityWeights`.",#
                        # Shrinkage of the sample expected returns.
                        :mu_hat_shrink => "``\\hat{\\boldsymbol{\\mu}}``: ``N \\times 1`` vector of sample expected returns, whose ``i``-th entry is ``\\hat{\\mu}_i``.",#
@@ -1058,7 +1058,6 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        :z_i_feature => "``\\boldsymbol{z}_{i}``: Feature vector of asset ``i``, its row of the feature matrix.",#
                        :z_tik_feature => "``z_{t,\\,i,\\,k}``: Feature window entry: feature ``k`` of asset ``i`` at observation ``t``.",#
                        :zbar_ik_feature => "``\\bar{z}_{i,\\,k}``: Collapsed feature ``k`` of asset ``i``, the aggregate of ``z_{t,\\,i,\\,k}`` over the observation axis.",#
-                       :w_t_obsweight => "``w_{t}``: Observation weight of observation ``t``. An unweighted collapse sets every ``w_{t}`` to ``1``.",#
                        # Spectral denoising: the Marcenko-Pastur split of a spectrum.
                        :lambda_i_eig => "``\\lambda_i``: ``i``-th eigenvalue of the input matrix.",#
                        :lambda_plus_mp => "``\\lambda_+``: Marčenko-Pastur upper bound of the noise band. An eigenvalue is noise when ``\\lambda_i \\leq \\lambda_+``, and signal when ``\\lambda_i > \\lambda_+``.",#
@@ -1154,8 +1153,7 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        :cal_r_radius => "``r``: Ambiguity radius.",#
                        :cal_s_radius => "``s``: Scale of the radius, in the units of the series the slot owner prices.",#
                        :cal_s_i_series => "``\\hat{s}_{i}``: Sample dispersion of the series the slot owner prices, over column ``i``. It is ``\\sqrt{\\hat{\\mathbf{\\Sigma}}_{ii}}`` under a [`ReturnsSeries`](@ref), and the dispersion of column ``i`` of the drawdown sample under a drawdown marker.",#
-                       :cal_T_e => "``T_{e}``: Effective sample size, which is Kish's when the observation weights are stated.",#
-                       :cal_w_i => "``w_{i}``: Observation weight of period ``i``.")
+                       :cal_T_e => "``T_{e}``: Effective sample size, which is Kish's when the observation weights are stated.")
 """
     ref_dict
 

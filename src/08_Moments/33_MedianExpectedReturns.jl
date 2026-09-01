@@ -107,7 +107,7 @@ k &= \\max \\left\\lbrace m : S_m \\leq h \\right\\rbrace\\,, \\\\
 
 Where:
 
-  - ``w_t``: Observation weight at time ``t``.
+  - $(math_dict[:w_t_obs])
   - ``w_{(t)}``: Weight of the ``t``-th smallest return, so the weights are permuted with the returns.
   - ``r_{(t)j}``: ``t``-th smallest return of asset ``j``.
   - ``S_m``: Cumulative weight of the ``m`` smallest returns.

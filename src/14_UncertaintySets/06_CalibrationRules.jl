@@ -728,7 +728,7 @@ The weights are read through [`get_observation_weights`](@ref), so the whole of 
 ```math
 T_{e} = \\begin{cases}
 T & \\textrm{if } w \\textrm{ is } \\texttt{nothing}\\\\
-\\dfrac{\\left(\\sum\\limits_{i=1}^{T} w_{i}\\right)^{2}}{\\sum\\limits_{i=1}^{T} w_{i}^{2}} & \\textrm{otherwise}
+\\dfrac{\\left(\\sum\\limits_{t=1}^{T} w_{t}\\right)^{2}}{\\sum\\limits_{t=1}^{T} w_{t}^{2}} & \\textrm{otherwise}
 \\end{cases}\\,.
 ```
 
@@ -736,7 +736,7 @@ Where:
 
   - $(math_dict[:T])
   - $(math_dict[:cal_T_e])
-  - $(math_dict[:cal_w_i])
+  - $(math_dict[:w_t_obs])
 
 # Arguments
 
@@ -829,7 +829,7 @@ Where:
   - ``n``: Number of observations the tail is to hold.
   - $(math_dict[:T])
   - $(math_dict[:cal_T_e])
-  - $(math_dict[:cal_w_i])
+  - $(math_dict[:w_t_obs])
 
 # Arguments
 
@@ -2251,7 +2251,7 @@ Where:
   - $(math_dict[:cal_s_i_series])
   - $(math_dict[:T])
   - $(math_dict[:cal_T_e])
-  - $(math_dict[:cal_w_i])
+  - $(math_dict[:w_t_obs])
 
 # Arguments
 
@@ -2489,7 +2489,7 @@ Where:
   - $(math_dict[:cal_s_i_series])
   - $(math_dict[:T])
   - $(math_dict[:cal_T_e])
-  - $(math_dict[:cal_w_i])
+  - $(math_dict[:w_t_obs])
 
 The exponent is floored at one half, so a universe of one or two assets returns the square-root rate rather than a faster one. The bound states no rate above that floor.
 
@@ -2637,7 +2637,7 @@ Where:
   - $(math_dict[:cal_s_i_series])
   - $(math_dict[:T])
   - $(math_dict[:cal_T_e])
-  - $(math_dict[:cal_w_i])
+  - $(math_dict[:w_t_obs])
   - ``p``: Norm order of the penalty, the `p` field.
   - ``q``: Order of the type-``q`` ground metric of that penalty.
 
@@ -2833,13 +2833,13 @@ Where:
   - ``\\mathcal{S}``: The series `alg.series` names, built from one column. It is the identity on a [`ReturnsSeries`](@ref), and a drawdown series on the two markers of [`AbstractDrawdownSeries`](@ref).
   - ``y_{tj}``: Entry ``t`` of the series of column ``j``.
   - ``\\boldsymbol{y}_{j}``: The series of column ``j``. A ``\\mathrm{CVaR}_{\\alpha}`` of a non-positive drawdown series is the ``\\mathrm{CDaR}_{\\alpha}`` of that column.
-  - ``w_{t}``: Observation weight of period ``t``. Every weight is one when none is stated.
+  - $(math_dict[:w_t_obs])
   - $(math_dict[:alpha_rm])
   - $(math_dict[:T])
   - $(math_dict[:N])
   - $(math_dict[:r_tj])
 
-Every column holds ``T`` entries, so the pooled mean and the mean of the per-column means are one number, and the pooled form is the one written.
+Every observation weight is one when none is stated. Every column holds ``T`` entries, so the pooled mean and the mean of the per-column means are one number, and the pooled form is the one written.
 
 # Algorithm
 

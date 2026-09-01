@@ -387,7 +387,7 @@ Where:
   - $(math_dict[:r_tj])
   - $(math_dict[:mu_hat_j])
   - $(math_dict[:T])
-  - $(math_dict[:w_t_moment])
+  - $(math_dict[:w_t_obs])
   - $(math_dict[:c_weight_bias])
 
 # Algorithm

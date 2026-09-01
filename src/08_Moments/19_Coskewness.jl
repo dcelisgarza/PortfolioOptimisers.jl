@@ -346,7 +346,7 @@ Where:
   - $(math_dict[:y_t_dev])
   - $(math_dict[:Z_pairprod])
   - $(math_dict[:w_obs_vec])
-  - $(math_dict[:w_t_moment])
+  - $(math_dict[:w_t_obs])
   - $(math_dict[:T])
   - $(math_dict[:N])
   - ``\\boldsymbol{1}``: ``N \\times 1`` vector of ones.

@@ -102,7 +102,7 @@ end
   function foo(x::Option{<:VecNum} = nothing) ...
   ```
 
-- **Common type aliases** defined in `01_Base/08_TypeAliases.jl` — always prefer them over writing out the full union/abstract type:
+- **Common type aliases** defined in `src/01_Base/08_TypeAliases.jl` — always prefer them over writing out the full union/abstract type:
 
   | Alias | Meaning |
   | --- | --- |
@@ -128,7 +128,7 @@ This avoids duplicating method definitions. A union alias is a **dispatch alias*
 
 ## Docstrings
 
-[`julia-docstrings.instructions.md`](julia-docstrings.instructions.md) is the Authority for every docstring rule. It states which sections each kind of unit carries, what each section holds, the dictionaries in `01_Base/01_DocstringDictionaries.jl` that a description interpolates from, the mathematical notation, and the `jldoctest` blocks. Read it before you write a docstring, and change a docstring rule there and nowhere else.
+[`julia-docstrings.instructions.md`](julia-docstrings.instructions.md) is the Authority for every docstring rule. It states which sections each kind of unit carries, what each section holds, the dictionaries in `src/01_Base/01_DocstringDictionaries.jl` that a description interpolates from, the mathematical notation, and the `jldoctest` blocks. Read it before you write a docstring, and change a docstring rule there and nowhere else.
 
 An **alias** is the case to check first. Its docstring carries a different set of sections from the unit it names, the set differs by kind of alias, and `test/test_26_docs.jl` reds the file over a section outside that set. See § *Section Structure for Aliases*.
 
@@ -182,7 +182,7 @@ An **alias** is the case to check first. Its docstring carries a different set o
 
 ## Code Organization
 
-- **File naming**: Source files are prefixed numerically to indicate load order (e.g., `01_Base/01_DocstringDictionaries.jl`).
+- **File naming**: Source files are prefixed numerically to indicate load order (e.g., `src/01_Base/01_DocstringDictionaries.jl`).
 - **Module structure**: Each submodule focuses on a specific domain (moments, risk, priors, etc.).
 - **Type hierarchy**: Subtype the appropriate abstract type (`AbstractEstimator`, `AbstractAlgorithm`, `AbstractResult`).
 - **Exports**: Every source file ends with an `export` line listing all public symbols it defines. Do not export internal helpers.

@@ -1142,6 +1142,37 @@ in the sense of `STANDARDS.md`.
     end
 
     #=
+    `math_dict` is read from source with the same instrument the rest of this file uses, so
+    the checks below load no package either. The table is built by a bare `Dict` call, so
+    each of its entries parses to `Expr(:call, :(=>), QuoteNode(key), value)`.
+    =#
+    function math_dict_pairs(path)
+        acc = Tuple{Symbol, String}[]
+        CH.walk_ast(CH.parse_file(path)) do node
+            if Meta.isexpr(node, :(=)) &&
+               node.args[1] === :math_dict &&
+               node.args[2] isa Expr
+                for p in node.args[2].args
+                    if Meta.isexpr(p, :call) &&
+                       length(p.args) == 3 &&
+                       p.args[1] === :(=>) &&
+                       p.args[2] isa QuoteNode &&
+                       p.args[3] isa AbstractString
+                        push!(acc, (p.args[2].value, strip(p.args[3])))
+                    end
+                end
+                # The table is read, so nothing below it can add to `acc`.
+                return CH.PRUNE
+            end
+            return nothing
+        end
+        return acc
+    end
+
+    math_pairs = math_dict_pairs(joinpath(ROOT, "src", "01_Base",
+                                          "01_DocstringDictionaries.jl"))
+
+    #=
     The notation contract (issue #481, under the standards-hardening map #478).
 
     ADR 0085 records the decision and
@@ -1198,36 +1229,7 @@ in the sense of `STANDARDS.md`.
     @testset "a math_dict value is interpolated, never copied" begin
         MATH_COPY_TOTAL = 7
 
-        #=
-        `math_dict` is read from source with the same instrument the rest of this testset
-        uses, so this check loads no package either. The table is built by a bare `Dict`
-        call, so each of its entries parses to `Expr(:call, :(=>), QuoteNode(key), value)`.
-        =#
-        function math_dict_values(path)
-            acc = Dict{String, Symbol}()
-            CH.walk_ast(CH.parse_file(path)) do node
-                if Meta.isexpr(node, :(=)) &&
-                   node.args[1] === :math_dict &&
-                   node.args[2] isa Expr
-                    for p in node.args[2].args
-                        if Meta.isexpr(p, :call) &&
-                           length(p.args) == 3 &&
-                           p.args[1] === :(=>) &&
-                           p.args[2] isa QuoteNode &&
-                           p.args[3] isa AbstractString
-                            acc[strip(p.args[3])] = p.args[2].value
-                        end
-                    end
-                    # The table is read, so nothing below it can add to `acc`.
-                    return CH.PRUNE
-                end
-                return nothing
-            end
-            return acc
-        end
-
-        mvals = math_dict_values(joinpath(ROOT, "src", "01_Base",
-                                          "01_DocstringDictionaries.jl"))
+        mvals = Dict{String, Symbol}(v => k for (k, v) in math_pairs)
         @test !isempty(mvals)
 
         # Every bullet of the docstring, stripped of its marker. A `math_dict` value is one
@@ -1289,6 +1291,110 @@ in the sense of `STANDARDS.md`.
                         " over ", length(per), " file(s). Lower the number in the same ",
                         "commit that paid it, and retire this testset at zero:")
                 println("        MATH_COPY_TOTAL = ", measured)
+            end
+        end
+    end
+
+    #=
+    The other half of the notation contract. The check above reads `src/` for a docstring
+    that writes out a table value; this one reads the TABLE for two keys that write out one
+    quantity.
+
+    Finding 9 of the maintainability review of PR 625 is what it pays. `:w_t_moment`,
+    `:w_t_obsweight` and `:cal_w_i` each defined the observation weight, in three spellings
+    of the glyph and in two wordings of the quantity, "observation ``t``" and "period
+    ``i``". The docstring of `math_dict` licenses a second key only when the glyph carries a
+    DIFFERENT quantity, so the three were drift inside the table that exists to stop drift.
+    They are one key, `:w_t_obs`.
+
+    ---------------------------------------------------------- what this check matches
+
+    THE HEAD OF THE DEFINITION, never the glyph.
+
+    A glyph collides for a licensed reason, and 21 of the 148 keys did: matching on the
+    glyph reports the licence and not the drift, exactly as the copy check above found when
+    it matched on a symbol. The head is the noun phrase the definition opens with -- the
+    text after the glyph, cut at the first punctuation mark and at the first function word.
+    Two keys that share a head name one thing. Either the debt list below says why they are
+    two, or a merge pays them off.
+
+    The cost of the trade is the one the copy check also makes: two heads that are worded
+    differently -- "observation weight" against "weight of an observation" -- do not match,
+    and a per-file sweep ticket reads that pair by hand.
+
+    -------------------------------------------------------------------- the debt list
+
+    Every group that stands today is recorded with the reason it is two keys and not one. A
+    head that is not recorded, and a recorded head that gains a key, red this check: a new
+    key may not restate a definition the table already carries. A merge that pays a row off
+    prints the row to correct or to delete.
+    =#
+    @testset "two math_dict keys do not state one quantity" begin
+        recorded = [# The observation SETS of a pair, against the SCORES read off them.
+                    "concordant" => [:CDN_sb, :pqu_sb],
+                    # One quantity under two glyphs, ``s_{c1}`` and ``s_c``. A merge
+                    # candidate: the entropy pooling optimiser states its own scale.
+                    "constraint scale" => [:ep_sc1, :sc_scale],
+                    # Six counts of six different things.
+                    "number" => [:N, :T, :k_tail_count, :n_network, :sigma_st_i_paths,
+                                 :sigma_st_paths],
+                    # As `constraint scale`, and the same merge candidate.
+                    "objective scale" => [:ep_so, :so_scale],
+                    # The weights an optimisation produced, against the weights themselves.
+                    "portfolio weights vector ``n \\times 1``" => [:w_0_finaliser, :w_port],
+                    # One quantity under two glyphs, ``r_{tj}`` and ``x_{t,\,i}``. A merge
+                    # candidate, and the wider of the two.
+                    "return" => [:r_tj, :x_ti_ret],
+                    # The equality subscript and the inequality subscript.
+                    "subscript" => [:eq, :ineq]]
+
+        # A function word ends the head, so the noun phrase is what precedes it.
+        head_stop = r"\b(a|an|at|between|for|from|in|is|it|its|of|on|over|that|the|to|under|which|whose|with)\b"
+        function definition_head(v)
+            m = match(r"^``.*?``:\s*(.*)$", v)
+            isnothing(m) && return nothing
+            d = lowercase(strip(first(split(m.captures[1], r"[.,;:]"))))
+            f = match(head_stop, d)
+            isnothing(f) || (d = strip(d[1:prevind(d, f.offset)]))
+            return isempty(d) ? nothing : String(d)
+        end
+
+        groups = Dict{String, Vector{Symbol}}()
+        for (k, v) in math_pairs
+            h = definition_head(v)
+            isnothing(h) || push!(get!(groups, h, Symbol[]), k)
+        end
+        measured = Dict(h => sort(ks) for (h, ks) in groups if length(ks) > 1)
+        debt = Dict(recorded)
+
+        offenders = String[]
+        for h in sort(collect(keys(measured)))
+            added = setdiff(measured[h], get(debt, h, Symbol[]))
+            isempty(added) || push!(offenders, string(h, "  ", join(added, ", ")))
+        end
+        if !isempty(offenders)
+            @warn """$(length(offenders)) definition head(s) of `math_dict` are stated by a
+                     key this testset does not record, so a key restates a quantity the
+                     table already carries. Interpolate the key that owns the quantity, or
+                     record the head with the reason the two are different quantities, under
+                     `Notation is fixed by symbol and by family` in
+                     `.github/instructions/julia-docstrings.instructions.md`. The columns are
+                     the head and the unrecorded key(s):\n  $(join(offenders, "\n  "))"""
+        end
+        @test isempty(offenders)
+
+        stale = [h for (h, ks) in recorded if get(measured, h, Symbol[]) != ks]
+        if !isempty(stale)
+            println("The debt list of `math_dict` definition heads carries ", length(stale),
+                    " stale row(s). Correct them in the same commit that paid them, and ",
+                    "retire this list when no row is left:")
+            for h in sort(stale)
+                ks = get(measured, h, Symbol[])
+                println("        \"", h, "\" => ", if isempty(ks)
+                            "DELETE THIS ROW"
+                        else
+                            string("[:", join(ks, ", :"), "]")
+                        end)
             end
         end
     end
