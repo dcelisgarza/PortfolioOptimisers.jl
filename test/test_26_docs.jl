@@ -692,7 +692,9 @@ in the sense of `STANDARDS.md`.
 
     # A definition, not a local assignment. `Au = ...` inside a body whose right-hand side
     # holds a `JuMP.@constraint` is a local, and reading it as a definition attributes the
-    # row to a name no docstring can ever carry.
+    # row to a name no docstring can ever carry. A short form that declares a return type,
+    # `f(x)::Bool = true`, is a definition and not an assignment, and `CH.is_signature` is
+    # the one place that tells the two apart. Issue #521.
     function isdefinition(x)
         Meta.isexpr(x, :function) && return true
         # A `macro` is a definition and it binds a name, so its body reaches
@@ -700,40 +702,28 @@ in the sense of `STANDARDS.md`.
         # documented macro as a unit, and these two checks read the same units it does.
         Meta.isexpr(x, :macro) && return true
         Meta.isexpr(x, :(=)) || return false
-        lhs = x.args[1]
-        while Meta.isexpr(lhs, :where)
-            lhs = lhs.args[1]
-        end
-        return Meta.isexpr(lhs, :call)
+        return CH.is_signature(x.args[1])
     end
 
-    # The name a definition binds. A definition reaches here through five declaration forms:
-    # bare, `@concrete struct`, a short form, a macro-prefixed one, and a qualified one. A
-    # `macro` declaration binds its name through its `:call` node, exactly as a `function`
-    # does, and it is named here without its `@`.
+    #=
+    The name a definition binds, as a Symbol, or `nothing` when the expression binds none.
+
+    `CH.definition_name` is the one resolver, and `code_health/coverage.jl` writes the
+    `definition` key of a Coverage Exemption with the same answer. It reads the five
+    declaration forms a definition arrives in -- bare, `@concrete struct`, a short form, a
+    macro-prefixed one and a qualified one -- and it names a `macro` without its `@`.
+
+    A qualified method, `Statistics.mean(...)`, is one of the five, and it is not rare: four
+    files under `src/` carried a `# Details` section that no count below could see, and four
+    more carried one the count read short.
+
+    A functor method, `(alg::HopCountQuantile)(x)`, is named after its TYPE and not after its
+    receiver variable. The copy that stood here named it `alg`, so every functor in a file
+    that shares a receiver name collapsed onto one key. Issue #521.
+    =#
     function bound_name(x)
-        x isa Symbol && return x
-        x isa Expr || return nothing
-        if Meta.isexpr(x, :macrocall)
-            for a in x.args[2:end]
-                n = bound_name(a)
-                isnothing(n) || return n
-            end
-            return nothing
-        end
-        # A method of a function another module owns is declared `Statistics.mean(...)`, so
-        # the callee of its `:call` is an `Expr(:., :Statistics, QuoteNode(:mean))` and not a
-        # Symbol. Reading only the Symbol forms dropped every such docstring, and the shape is
-        # not rare: four files under `src/` carried a `# Details` section that no count below
-        # could see, and four more carried one the count read short. The `# Algorithm` floor
-        # and the `# JuMP formulation` rule read the same units, so both were blind to the
-        # same docstrings. The name is taken bare, exactly as a `macro` is.
-        Meta.isexpr(x, :.) && x.args[end] isa QuoteNode && return x.args[end].value
-        x.head === :struct && return bound_name(x.args[2])
-        x.head in
-        (:function, :macro, :(=), :call, :where, :(::), :const, :abstract, :curly, :(<:)) &&
-            return bound_name(x.args[1])
-        return nothing
+        n = CH.definition_name(x)
+        return isempty(n) ? nothing : Symbol(n)
     end
 
     # A docstring that interpolates parses to an `Expr(:string, ...)`, and a section heading

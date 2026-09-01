@@ -18,6 +18,9 @@ if !(isdefined(Main, :CodeHealth))
 end
 
 using Main.CodeHealth
+# The name a definition binds is `CodeHealth`'s, so this file and `test/test_26_docs.jl` write one
+# answer. `test/test_49_coverage_attribution_census.jl` reads these four names through this file.
+using Main.CodeHealth: definition_name, defname, is_signature, unwrap
 using TOML
 
 const NAME = "coverage_baseline.toml"
@@ -116,119 +119,6 @@ function parse_lcov(path::AbstractString)
 end
 
 # --- attributing a line to a definition ------------------------------------
-
-"""
-    is_signature(e) -> Bool
-
-Whether an expression is the left side of a **definition** rather than the left side of an
-assignment. `f(x)`, `f(x) where {T}` and `f(x)::T` are signatures. `x` and `x::T` are not.
-
-A return type is what makes the two hard to tell apart, and telling them apart is the whole of issue
-#521. `f(x)::T` and the receiver slot `r::T` of a functor method are the same `Expr` head, so the
-side that carries the name differs between them, and `x::T = 1` is an assignment that looks like
-both.
-"""
-function is_signature(e)
-    if !(e isa Expr)
-        return false
-    end
-    if e.head === :call || e.head === :where
-        return true
-    end
-    if e.head === :(::)
-        return is_signature(e.args[1])
-    end
-    return false
-end
-
-defname(x::Symbol) = String(x)
-defname(x::QuoteNode) = defname(x.value)
-# A docstring parses to `Expr(:macrocall, GlobalRef(Core, Symbol("@doc")), …)`, and a `GlobalRef`
-# is neither a `Symbol` nor an `Expr`. Without this method every documented definition in the
-# library falls to the empty default and is attributed to `<toplevel>`.
-defname(x::GlobalRef) = defname(x.name)
-function defname(e::Expr)
-    if isempty(e.args)
-        return ""
-    end
-    if e.head === :call
-        return defname(e.args[1])
-    end
-    if e.head === :where
-        return defname(e.args[1])
-    end
-    if e.head === :(<:)
-        return defname(e.args[1])
-    end
-    if e.head === :(::)
-        # The two shapes a `::` node arrives in are named from opposite sides. A signature with a
-        # declared return type, `f(x)::T`, is named `f`, because `T` names no method and one file
-        # holds many methods that return the same type. A receiver slot, `(r::T)(x)`, is named `T`,
-        # because that is what a reader calls the functor method. Issue #521.
-        return defname(is_signature(e.args[1]) ? e.args[1] : e.args[end])
-    end
-    if e.head === :curly
-        return defname(e.args[1])
-    end
-    if e.head === :.
-        return defname(e.args[end])
-    end
-    if e.head === :macrocall
-        return defname(e.args[1])
-    end
-    return ""
-end
-defname(x) = ""
-
-"""
-    unwrap(e) -> Expr
-
-A docstring parses as a `Core.@doc` macro call wrapping the definition, so a documented definition
-would otherwise be named after the doc macro. Nearly every definition in this library is documented,
-so dropping the wrapper is not a corner case.
-"""
-function unwrap(e)
-    if e isa Expr && e.head === :macrocall && defname(e.args[1]) == "@doc"
-        return unwrap(e.args[end])
-    end
-    return e
-end
-
-"""
-    definition_name(e) -> String
-
-The name a Coverage Exemption row writes for one top-level expression, or `""` when the expression
-declares nothing a reader would name.
-"""
-function definition_name(e0)
-    e = unwrap(e0)
-    if !(e isa Expr)
-        return ""
-    end
-    if e.head in (:function, :macro)
-        return defname(e.args[1])
-    elseif e.head === :(=) && is_signature(e.args[1])
-        # A short form that declares a return type, `f(x)::Bool = true`, is a definition and not an
-        # assignment. Reading it as an assignment attributed its lines to `<toplevel>`, which is the
-        # second face of issue #521: a Coverage Exemption could name neither method.
-        return defname(e.args[1])
-    elseif e.head === :struct
-        # `Expr(:struct, mutable, name, body)`.
-        return length(e.args) >= 2 ? defname(e.args[2]) : ""
-    elseif e.head in (:abstract, :primitive)
-        # `Expr(:abstract, :(T <: S))` carries one argument, not the three a struct carries.
-        return isempty(e.args) ? "" : defname(e.args[1])
-    elseif e.head === :const
-        return e.args[1] isa Expr ? defname(e.args[1].args[1]) : defname(e.args[1])
-    elseif e.head === :macrocall
-        # A Declaration Macro wraps the definition it declares, so name the definition. Naming the
-        # macro instead would collapse every `@concrete` call in a file onto one ambiguous key.
-        # A macro that declares nothing, such as `@define_pretty_show T`, keeps its own name.
-        inner = definition_name(e.args[end])
-        return isempty(inner) ? defname(e.args[1]) : inner
-    end
-    return ""
-end
 
 function line_numbers!(acc::Vector{Int}, e)
     if e isa LineNumberNode
