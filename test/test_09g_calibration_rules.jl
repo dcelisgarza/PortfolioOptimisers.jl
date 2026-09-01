@@ -936,10 +936,19 @@ const PRDD = prior(EmpiricalPrior(), XDD)
         @test size(PO.calibration_series_matrix(s, XDD)) == size(XDD)
     end
 
-    # The matrix is the vector over the columns, and the returns matrix is passed through.
+    # The matrix is the array builder of its own convention, and the returns matrix is
+    # passed through.
     @test PO.calibration_series_matrix(ReturnsSeries(), XDD) === XDD
     D = PO.calibration_series_matrix(AbsoluteDrawdownSeries(), XDD)
+    @test D == PO.absolute_drawdown_arr(XDD; dims = 1)
+    @test PO.calibration_series_matrix(RelativeDrawdownSeries(), XDD) ==
+          PO.relative_drawdown_arr(XDD; dims = 1)
+
+    # The matrix reading and the vector reading state one definition of a drawdown, so the
+    # column of the matrix is the vector of the column.
     @test all(j -> view(D, :, j) == PO.absolute_drawdown_vec(view(XDD, :, j)), axes(XDD, 2))
+    @test all(j -> view(PO.calibration_series_matrix(RelativeDrawdownSeries(), XDD), :,
+                        j) == PO.relative_drawdown_vec(view(XDD, :, j)), axes(XDD, 2))
 
     # A drawdown series is non-positive and the returns are not, which is the whole reason
     # the two readings differ.

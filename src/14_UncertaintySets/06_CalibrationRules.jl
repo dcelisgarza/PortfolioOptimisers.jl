@@ -714,7 +714,7 @@ end
 
 Return the sample that `series` names, one series per column of `X`.
 
-It is [`calibration_series_vec`](@ref) over the columns, and it holds the same shape as `X`: a drawdown series carries one entry per observation, so no observation is lost and the count of a tail is the count the caller formed on `X`.
+A drawdown series reaches the array builder of its own convention along `dims = 1`, which is the observations dimension: [`absolute_drawdown_arr`](@ref) for [`AbsoluteDrawdownSeries`](@ref), and [`relative_drawdown_arr`](@ref) for [`RelativeDrawdownSeries`](@ref). Those builders hold the running-peak convention, so the matrix reading and the vector reading state one definition of a drawdown and cannot drift apart. The result holds the same shape as `X`: a drawdown series carries one entry per observation, so no observation is lost and the count of a tail is the count the caller formed on `X`.
 
 [`ReturnsSeries`](@ref) returns `X` itself, so the returns reading allocates nothing. A rule that walks the columns one at a time should call [`calibration_series_vec`](@ref) instead, and allocate one column rather than a matrix.
 
@@ -731,18 +731,18 @@ It is [`calibration_series_vec`](@ref) over the columns, and it holds the same s
 
   - [`AbstractCalibrationSeries`](@ref)
   - [`calibration_series_vec`](@ref)
+  - [`absolute_drawdown_arr`](@ref)
+  - [`relative_drawdown_arr`](@ref)
   - [`radial_series_inputs`](@ref)
 """
 function calibration_series_matrix(::ReturnsSeries, X::AbstractMatrix)
     return X
 end
-function calibration_series_matrix(series::AbstractDrawdownSeries,
-                                   X::AbstractMatrix{E}) where {E <: Number}
-    Y = Matrix{float(E)}(undef, size(X))
-    for j in axes(X, 2)
-        Y[:, j] = calibration_series_vec(series, view(X, :, j))
-    end
-    return Y
+function calibration_series_matrix(::AbsoluteDrawdownSeries, X::AbstractMatrix{<:Number})
+    return absolute_drawdown_arr(X; dims = 1)
+end
+function calibration_series_matrix(::RelativeDrawdownSeries, X::AbstractMatrix{<:Number})
+    return relative_drawdown_arr(X; dims = 1)
 end
 """
     calibration_series_dispersion(series::AbstractCalibrationSeries, pr::AbstractPriorResult)
