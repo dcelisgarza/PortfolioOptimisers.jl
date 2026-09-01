@@ -607,3 +607,72 @@ three now agree: a vector must carry at least one term.
                                                                                     default = [LpRegularisation(;
                                                                                                                 val = 0.6)]))
 end
+
+#=
+A rule states no number at construction, so the constructor guard on `l2c` and `linfc` reads
+a role, selects the permissive fallback of the validator, and checks nothing. Neither field
+holds a term, so no rebuild states the range downstream either. The check therefore belongs
+to `resolve_calibration_slot`, which is the one place the rule runs, and the role's own
+method there refuses the values a stated ceiling is refused. It is paid on the calibrated
+path alone: a stated ceiling takes the fallback method and meets no check.
+=#
+@testset "Norm ceiling calibration: a calibrated ceiling meets the stated ceiling's check" begin
+    function assemble_with(opt)
+        mr = MeanRisk(; r = Variance(), opt = opt)
+        attrs = PO.processed_jump_optimiser_attributes(mr.opt, RD60)
+        model = JuMP.Model()
+        PO.set_model_scales!(model, mr.opt.sc, mr.opt.so)
+        PO.set_maximum_ratio_factor_variables!(model, mr.obj)
+        PO.set_w!(model, attrs.pr.X, mr.wi)
+        PO.set_weight_constraints!(model, attrs.wb, mr.opt)
+        PO.assemble_jump_model!(model, mr, mr.opt, attrs, RD60, mr.r, mr.obj)
+        return model
+    end
+
+    # A stated ceiling of each shape is refused where the caller wrote it.
+    @test_throws DomainError JuMPOptimiser(; slv = SLV, pe = PR60, l2c = -1.0)
+    @test_throws DomainError JuMPOptimiser(; slv = SLV, pe = PR60, l2c = 0.0)
+    @test_throws DomainError JuMPOptimiser(; slv = SLV, pe = PR60, linfc = NaN)
+    @test_throws DomainError JuMPOptimiser(; slv = SLV, pe = PR60, linfc = Inf)
+
+    # The same four numbers, computed by a rule, are refused by the resolver, under the key
+    # of the slot the role stands in.
+    for bad in (-1.0, 0.0, NaN, Inf)
+        crole = NormCeilingCalibration(; alg = (key, pr, w, slv, ctx) -> bad)
+        for key in (:l2c, :linfc, :lpc)
+            @test_throws DomainError PO.resolve_calibration_slot(crole, key, PR60, PR60.w,
+                                                                 SLV,
+                                                                 CalibrationContext(;
+                                                                                    p = 2))
+        end
+        err = try
+            PO.resolve_calibration_slot(crole, :l2c, PR60, PR60.w, SLV,
+                                        CalibrationContext(; p = 2))
+        catch e
+            e
+        end
+        @test occursin("l2c", sprint(showerror, err))
+
+        # So the whole route refuses it too, at assembly and at the term's own factory.
+        @test_throws DomainError assemble_with(JuMPOptimiser(; slv = SLV, pe = PR60,
+                                                             l2c = crole))
+        @test_throws DomainError assemble_with(JuMPOptimiser(; slv = SLV, pe = PR60,
+                                                             linfc = crole))
+        @test_throws DomainError PO.norm_ceiling_factory(LpRegularisation(; p = 3,
+                                                                          val = crole),
+                                                         PR60)
+    end
+
+    # A stated ceiling reaches the fallback method, which checks nothing: the cost is paid
+    # on the calibrated path alone, and a number the constructor already admitted is not
+    # measured twice.
+    @test PO.resolve_calibration_slot(1 / 2, :l2c, PR60, PR60.w, SLV,
+                                      CalibrationContext(; p = 2)) == 1 / 2
+
+    # A rule that answers a legal ceiling still reaches the model, so the check refuses
+    # nothing a caller could have stated by hand.
+    good = NormCeilingCalibration(; alg = (key, pr, w, slv, ctx) -> 1 / 2)
+    model = assemble_with(JuMPOptimiser(; slv = SLV, pe = PR60, l2c = good, linfc = good))
+    @test JuMP.normalized_rhs(model[:cl2c]) ≈ 1 / 2
+    @test JuMP.normalized_rhs(model[:clinfc]) ≈ 1 / 2
+end

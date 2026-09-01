@@ -600,9 +600,9 @@ end
     # optimisation itself uses.
     @test PO.factory(m, PR60).r ≈ r_num
 
-    # The rebuild goes through the keyword constructor, so the positivity check re-runs on
-    # the calibrated number: a rule that returns a value the slot does not admit is
-    # refused at fold time, by the check a caller's own number meets.
+    # The resolver checks the number the rule returned, so a rule that returns a value the
+    # slot does not admit is refused at fold time, by the check a caller's own number
+    # meets. The rebuild through the keyword constructor states the same rule again.
     neg = AmbiguityRadiusCalibration(; alg = (args...) -> -1.0)
     @test_throws DomainError PO.resolve_deferred_quantities(DistributionallyRobustConditionalValueatRisk(;
                                                                                                          r = neg),
@@ -713,7 +713,7 @@ end
     @test occursin("norm(w, 2)^2", PO.squared_norm_radius_msg(QuadRiskExpr()))
     @test occursin("QuadRiskExpr", PO.squared_norm_radius_msg(QuadRiskExpr()))
 
-    # The rebuild re-runs the positivity check on the calibrated number.
+    # The resolver checks the calibrated number, and the rebuild states the rule again.
     neg = L2Regularisation(; val = AmbiguityRadiusCalibration(; alg = (args...) -> -1.0))
     @test_throws DomainError PO.factory(neg, PR60)
 
@@ -1491,4 +1491,71 @@ struct CalibrationNoWeights <: PortfolioOptimisers.DynamicAbstractWeights end
         e
     end
     @test occursin("CalibrationNoWeights is a DynamicAbstractWeights", err.msg)
+end
+
+#=
+The two bare radius fields of the optimiser, `l1` and `linf`, hold the number itself rather
+than a term, so no rebuild re-runs a constructor's check on a calibrated radius. The check
+therefore belongs to `resolve_calibration_slot`, which is the one place the rule runs, and
+the role's own method there refuses the values a stated radius is refused. It is paid on
+the calibrated path alone: a stated number takes the fallback method and meets no check.
+=#
+@testset "Ambiguity calibration: a calibrated radius meets the stated radius's check" begin
+    slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                 check_sol = (; allow_local = true, allow_almost = true),
+                 settings = "verbose" => false)
+    rd = ReturnsResult(; nx = string.(1:4), X = X60)
+    function assemble_with(opt)
+        mr = MeanRisk(; r = Variance(), opt = opt)
+        attrs = PO.processed_jump_optimiser_attributes(mr.opt, rd)
+        model = JuMP.Model()
+        PO.set_model_scales!(model, mr.opt.sc, mr.opt.so)
+        PO.set_maximum_ratio_factor_variables!(model, mr.obj)
+        PO.set_w!(model, attrs.pr.X, mr.wi)
+        PO.set_weight_constraints!(model, attrs.wb, mr.opt)
+        PO.assemble_jump_model!(model, mr, mr.opt, attrs, rd, mr.r, mr.obj)
+        return model
+    end
+
+    # A stated radius of each shape is refused where the caller wrote it.
+    @test_throws DomainError JuMPOptimiser(; slv = slv, pe = PR60, l1 = -1.0)
+    @test_throws DomainError JuMPOptimiser(; slv = slv, pe = PR60, l1 = 0.0)
+    @test_throws DomainError JuMPOptimiser(; slv = slv, pe = PR60, linf = NaN)
+    @test_throws DomainError JuMPOptimiser(; slv = slv, pe = PR60, linf = Inf)
+
+    # The same four numbers, computed by a rule, are refused by the resolver, under the
+    # key of the slot the role stands in.
+    for bad in (-1.0, 0.0, NaN, Inf)
+        rrole = AmbiguityRadiusCalibration(; alg = (key, pr, w, slv, ctx) -> bad)
+        for key in (:l1, :linf, :r, :l2reg_val, :lpreg_val)
+            @test_throws DomainError PO.resolve_calibration_slot(rrole, key, PR60, PR60.w,
+                                                                 slv)
+        end
+        err = try
+            PO.resolve_calibration_slot(rrole, :l1, PR60, PR60.w, slv)
+        catch e
+            e
+        end
+        @test occursin("l1", sprint(showerror, err))
+
+        # So the whole route refuses it too, at assembly and at the term's own factory.
+        @test_throws DomainError assemble_with(JuMPOptimiser(; slv = slv, pe = PR60,
+                                                             l1 = rrole))
+        @test_throws DomainError assemble_with(JuMPOptimiser(; slv = slv, pe = PR60,
+                                                             linf = rrole))
+        @test_throws DomainError PO.factory(L2Regularisation(; val = rrole), PR60)
+        @test_throws DomainError PO.factory(LpRegularisation(; val = rrole), PR60)
+    end
+
+    # A stated number reaches the fallback method, which checks nothing: the cost is paid
+    # on the calibrated path alone, and a number the constructor already admitted is not
+    # measured twice.
+    @test PO.resolve_calibration_slot(1e-3, :l1, PR60, PR60.w, slv) == 1e-3
+
+    # A rule that answers a legal radius still reaches the model, so the check refuses
+    # nothing a caller could have stated by hand.
+    good = AmbiguityRadiusCalibration(; alg = (key, pr, w, slv, ctx) -> 1e-3)
+    model = assemble_with(JuMPOptimiser(; slv = slv, pe = PR60, l1 = good, linf = good))
+    @test JuMP.coefficient(model[:l1], model[:t_l1]) ≈ 1e-3
+    @test JuMP.coefficient(model[:linf], model[:t_linf]) ≈ 1e-3
 end

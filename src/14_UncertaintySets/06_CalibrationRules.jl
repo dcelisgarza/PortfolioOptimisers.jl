@@ -904,6 +904,8 @@ A rule gets no portfolio. A prior result carries no portfolio weight vector, so 
 
 **The context is the whole of what the site says, and nothing is rebuilt here.** `key` names the slot rather than the quantity, so a rule that reads the shape of a series, the significance level of a sibling slot, or the norm order of the constraint it stands in reads it off `ctx`. No rule carries a field for any of the three, so no occupant is rebuilt on the way in and nothing a caller stated is overwritten. [`CalibrationContext`](@ref) states which rule reads which field.
 
+**A ceiling and a radius are checked here, and the five other roles are not.** [`NormCeilingCalibration`](@ref) and [`AmbiguityRadiusCalibration`](@ref) each take their own method, which runs [`assert_nonempty_gt0_finite_val`](@ref) on the number the rule returned, under the slot's own `key`. Both quantities reach a JuMP model from a bare field of [`JuMPOptimiser`](@ref) — `l2c` and `linfc` for the ceiling, `l1` and `linf` for the radius — where no term is rebuilt, so nothing downstream would state the range. The five other roles stand only in slots their owner rebuilds, and the rebuild runs the owner's constructor on the calibrated number, so a second check here would restate a rule that file already owns. The cost is paid on the calibrated path alone: a stated number takes the first method and meets no check here at all.
+
 This is the parallel of [`resolve_slot`](@ref), and it is a second verb rather than a widening of the first for two reasons. `resolve_slot`'s body is `deferred_quantity(fit_deferred_quantity(dq, pr), key)`, a fit followed by an extraction, and a rule fits nothing. `resolve_slot` also carries neither `w` nor `slv`, which a rule needs. So the role types stay **out** of the [`DeferredQuantity`](@ref) union.
 
 The caller computes `w` itself, as `sel(r.w, pr.w)`, and threads it with the measure's own `slv`. A parent that carries no observation weights of its own passes `pr.w`, and one that carries no solver leaves `slv` at its default.
@@ -915,6 +917,7 @@ The caller computes `w` itself, as `sel(r.w, pr.w)`, and threads it with the mea
  1. Return `slot` unchanged when it is not an [`AbstractCalibrationEstimator`](@ref). A stated number takes that arm.
  2. Read the rule out of the role's `alg` field.
  3. Call the rule as `alg(key, pr, w, slv, ctx)`, and return the number it gives. A callable struct and a plain function are the same thing here, so a rule never sees the role it was placed in.
+ 4. A [`NormCeilingCalibration`](@ref) or an [`AmbiguityRadiusCalibration`](@ref) takes a more specific method, which checks that number before it returns.
 
 # Arguments
 
@@ -924,6 +927,10 @@ The caller computes `w` itself, as `sel(r.w, pr.w)`, and threads it with the mea
   - `w`: Effective observation weights, or `nothing`.
   - `slv`: Effective solver, or `nothing` when the measure carries none.
   - `ctx`: What the site knows and `key` does not, as a [`CalibrationContext`](@ref). The default names no sibling significance level, no norm order, and the returns series.
+
+# Validation
+
+  - A [`NormCeilingCalibration`](@ref) or an [`AmbiguityRadiusCalibration`](@ref) returns a number that is `> 0` and finite, checked by [`assert_nonempty_gt0_finite_val`](@ref) under `key`. Every other occupant is returned unchecked, and the owner of its slot states the range when it rebuilds.
 
 # Returns
 
@@ -937,6 +944,7 @@ The caller computes `w` itself, as `sel(r.w, pr.w)`, and threads it with the mea
   - [`calibration_slots`](@ref)
   - [`Func_SigCal`](@ref)
   - [`resolve_slot`](@ref)
+  - [`assert_nonempty_gt0_finite_val`](@ref)
 """
 function resolve_calibration_slot(slot, ::Symbol, ::AbstractPriorResult, ::Any,
                                   ::Any = nothing,
@@ -2294,6 +2302,27 @@ end
 function bind_role(alg::AbstractNormCeilingCalibrationAlgorithm)
     return NormCeilingCalibration(alg)
 end
+# The two roles below name a quantity that reaches a JuMP model from a bare field of
+# `JuMPOptimiser`: the ceiling from `l2c` and `linfc`, the radius from `l1` and `linf`.
+# There is no term to rebuild on that route, and the constructor's guard read a role rather
+# than a number, so it selected the permissive fallback of the validator and stated nothing.
+# The range of the quantity is therefore checked here, on the number the rule returned, and
+# only on the calibrated path. The five other roles stand only in slots their owner
+# rebuilds, and that rebuild states their range.
+function resolve_calibration_slot(r::NormCeilingCalibration, key::Symbol,
+                                  pr::AbstractPriorResult, w, slv = nothing,
+                                  ctx::CalibrationContext = CalibrationContext())
+    val = r.alg(key, pr, w, slv, ctx)
+    assert_nonempty_gt0_finite_val(val, key)
+    return val
+end
+function resolve_calibration_slot(r::AmbiguityRadiusCalibration, key::Symbol,
+                                  pr::AbstractPriorResult, w, slv = nothing,
+                                  ctx::CalibrationContext = CalibrationContext())
+    val = r.alg(key, pr, w, slv, ctx)
+    assert_nonempty_gt0_finite_val(val, key)
+    return val
+end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -2307,7 +2336,7 @@ The radius is the Blanchet-Kang-Murthy form, a scale in the units of the series 
 
 `T` is the effective sample size when observation weights are stated, and the raw row count when they are not, on the same terms as [`ScenarioCount`](@ref). The radius prices estimation error, and the error of a weighted estimate falls with Kish's effective sample size rather than with the number of rows. [`RateRadius`](@ref) reads the raw row count instead, because a rate speaks of the length of the record.
 
-The rule carries no range check of its own. It returns the quantity of the slot it stands in, so the slot owner's constructor is the whole validation, and a radius outside the slot's range is refused there, at fold time.
+The rule carries no range check of its own. It returns the quantity of the slot it stands in, so the range is checked where the number lands. [`resolve_calibration_slot`](@ref) refuses a radius that is not `> 0` and finite, and the owner of a slot that rebuilds a term refuses one outside that owner's range at fold time.
 
 # Fields
 
@@ -2537,7 +2566,7 @@ The source result carries a second branch for a short record, whose exponent is 
 
 `T` is the effective sample size when observation weights are stated, and the raw row count when they are not, on the same terms as [`ConcentrationRadius`](@ref) and [`ScenarioCount`](@ref). The rate is a concentration statement, so the record it prices is the one Kish's count measures. [`RateRadius`](@ref) reads the raw row count instead, because its rate speaks of the length of the record.
 
-The rule carries no range check of its own, on the same terms as [`ConcentrationRadius`](@ref). It returns the quantity of the slot it stands in, so the slot owner's constructor is the whole validation, and a radius outside the slot's range is refused there, at fold time.
+The rule carries no range check of its own, on the same terms as [`ConcentrationRadius`](@ref). It returns the quantity of the slot it stands in, so the range is checked where the number lands, by [`resolve_calibration_slot`](@ref) and by the owner of a slot that rebuilds a term.
 
 # Fields
 

@@ -419,7 +419,7 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
   - If `cte` is a vector: `!isempty(cte)`.
   - If `card` is provided: `card > 0` and finite.
   - If `tn` or `tr` is a vector: each must be non-empty.
-  - If `l2c`, `linfc`, `l1`, or `linf` is provided as a number: each must be `> 0` and finite. `l1` and `linf` also take an [`AmbiguityRadiusCalibration`](@ref), and `l2c` and `linfc` a [`NormCeilingCalibration`](@ref). A role carries no such check until it resolves.
+  - If `l2c`, `linfc`, `l1`, or `linf` is provided as a number: each must be `> 0` and finite. `l1` and `linf` also take an [`AmbiguityRadiusCalibration`](@ref), and `l2c` and `linfc` a [`NormCeilingCalibration`](@ref). A role states no number here, so the check runs on the number its rule returns, in [`resolve_calibration_slot`](@ref).
   - The role in each [`LpRegularisation`](@ref) is checked against the field that holds it: `lp` is a penalty, so it refuses a [`NormCeilingCalibration`](@ref), and `lpc` is a constraint, so it refuses an [`AmbiguityRadiusCalibration`](@ref). The term itself carries one bound for both readings, so this is the point at which the reading is known.
   - If `l2`, `lp` or `lpc` is a vector: each must be non-empty. An empty vector builds no term, which is what `nothing` already spells.
   - `l2`, `lp` and `lpc` are validated by their own estimator constructors ([`L2Regularisation`](@ref), [`LpRegularisation`](@ref)).
