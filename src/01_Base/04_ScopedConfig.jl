@@ -505,7 +505,7 @@ Draw counts, subset counts, frontier-sweep lengths and histogram bin counts are 
 
 There is **one cap per sink**, each named to mirror the field it guards. Reuse across sinks is deliberately avoided: a *linear* cap cannot bound a *quadratic* sink, which is why the `bins × bins` histogram gets its own [`max_bins`](@ref ResourceLimits) rather than sharing the linear draw cap.
 
-The values are conservative static defaults, deliberately far above legitimate use: they exist to convert an OOM kill into a typed error, not to second-guess a sizing choice. Immutable; held in the [`RESOURCE_LIMITS`](@ref) [`ScopedConfig`](@ref). Set the global default via [`set_resource_limits!`](@ref), override per scope via [`with_resource_limits`](@ref). Prefer the keyword constructor `ResourceLimits(; …)` — the six caps are same-typed and four share the value `100_000`, so positional construction is error-prone.
+The values are conservative static defaults, deliberately far above legitimate use: they exist to convert an OOM kill into a typed error, not to second-guess a sizing choice. Immutable; held in the [`RESOURCE_LIMITS`](@ref) [`ScopedConfig`](@ref). Set the global default via [`set_resource_limits!`](@ref), override per scope via [`with_resource_limits`](@ref). Prefer the keyword constructor `ResourceLimits(; …)` — the seven caps are same-typed and four share the value `100_000`, so positional construction is error-prone.
 
 # Fields
 
@@ -514,8 +514,8 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     ResourceLimits(max_n_sim::Integer, max_n_subsets::Integer, max_frontier::Integer,
-                   max_bins::Integer, max_hop_count::Integer,
-                   max_search_grid::Integer) -> ResourceLimits
+                   max_bins::Integer, max_hop_count::Integer, max_search_grid::Integer,
+                   max_ep_grid::Integer) -> ResourceLimits
 
     ResourceLimits(;
         max_n_sim::Integer = 1_000_000,
@@ -523,14 +523,15 @@ $(DocStringExtensions.FIELDS)
         max_frontier::Integer = 100_000,
         max_bins::Integer = 10_000,
         max_hop_count::Integer = 100_000,
-        max_search_grid::Integer = 100_000
+        max_search_grid::Integer = 100_000,
+        max_ep_grid::Integer = 10_000
     ) -> ResourceLimits
 
 Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `max_n_sim > 0 && max_n_subsets > 0 && max_frontier > 0 && max_bins > 0 && max_hop_count > 0 && max_search_grid > 0`.
+  - `max_n_sim > 0 && max_n_subsets > 0 && max_frontier > 0 && max_bins > 0 && max_hop_count > 0 && max_search_grid > 0 && max_ep_grid > 0`.
 
 # Related
 
@@ -565,31 +566,37 @@ struct ResourceLimits
     Maximum search-grid candidates accepted by [`GridSearchCrossValidation`](@ref) and [`RandomisedSearchCrossValidation`](@ref). The default is `100_000`. Every candidate runs a full cross-validated fit, so this is *compute*-bound like `max_n_subsets`. The grid is an `Iterators.product` materialised by `collect`, so `k` parameters of `N` values cost `N^k` candidates: the cap is asserted on the **product** by [`assert_search_grid_cap`](@ref) where the grid is formed, because a per-parameter check can never see it.
     """
     max_search_grid::Int
+    """
+    Maximum grid points (`K`) accepted by [`GridEntropicValueatRiskView`](@ref) and [`GridRelativisticValueatRiskView`](@ref). The default is `10_000`. Every grid point is one binary variable of the mixed-integer program an upper-bound or equality view builds, and one dense row over the `T` posterior probabilities, so the sink is a *mixed-integer* one: linear in `K` in memory at `K · T` coefficients, and a branch-and-bound tree over `K` binaries in compute. It therefore sits far below the compute ceilings that bound a plain solve, and far above the shipped `K = 11`.
+    """
+    max_ep_grid::Int
     function ResourceLimits(max_n_sim::Integer, max_n_subsets::Integer,
                             max_frontier::Integer, max_bins::Integer,
-                            max_hop_count::Integer, max_search_grid::Integer)
+                            max_hop_count::Integer, max_search_grid::Integer,
+                            max_ep_grid::Integer)
         @argcheck(max_n_sim > 0 &&
                   max_n_subsets > 0 &&
                   max_frontier > 0 &&
                   max_bins > 0 &&
                   max_hop_count > 0 &&
-                  max_search_grid > 0,
-                  ArgumentError("max_n_sim, max_n_subsets, max_frontier, max_bins, max_hop_count and max_search_grid must be positive."))
+                  max_search_grid > 0 &&
+                  max_ep_grid > 0,
+                  ArgumentError("max_n_sim, max_n_subsets, max_frontier, max_bins, max_hop_count, max_search_grid and max_ep_grid must be positive."))
         return new(Int(max_n_sim), Int(max_n_subsets), Int(max_frontier), Int(max_bins),
-                   Int(max_hop_count), Int(max_search_grid))
+                   Int(max_hop_count), Int(max_search_grid), Int(max_ep_grid))
     end
 end
 function ResourceLimits(; max_n_sim::Integer = 1_000_000, max_n_subsets::Integer = 100_000,
                         max_frontier::Integer = 100_000, max_bins::Integer = 10_000,
                         max_hop_count::Integer = 100_000,
-                        max_search_grid::Integer = 100_000)
+                        max_search_grid::Integer = 100_000, max_ep_grid::Integer = 10_000)
     return ResourceLimits(max_n_sim, max_n_subsets, max_frontier, max_bins, max_hop_count,
-                          max_search_grid)
+                          max_search_grid, max_ep_grid)
 end
 """
     RESOURCE_LIMITS = ScopedConfig(ResourceLimits())
 
-Default global resource caps for the sampling- and sweep-based estimators, guarding the config→allocation trust boundary against memory and compute exhaustion. Read as `RESOURCE_LIMITS[]`; the defaults may be seeded per project at load time via the `"max_n_sim"` / `"max_n_subsets"` / `"max_frontier"` / `"max_bins"` / `"max_hop_count"` / `"max_search_grid"` preferences (see [`apply_preferences!`](@ref)).
+Default global resource caps for the sampling- and sweep-based estimators, guarding the config→allocation trust boundary against memory and compute exhaustion. Read as `RESOURCE_LIMITS[]`; the defaults may be seeded per project at load time via the `"max_n_sim"` / `"max_n_subsets"` / `"max_frontier"` / `"max_bins"` / `"max_hop_count"` / `"max_search_grid"` / `"max_ep_grid"` preferences (see [`apply_preferences!`](@ref)).
 
 # Related
 
@@ -602,7 +609,8 @@ const RESOURCE_LIMITS = ScopedConfig(ResourceLimits())
 """
     set_resource_limits!(; max_n_sim::Integer, max_n_subsets::Integer,
                          max_frontier::Integer, max_bins::Integer,
-                         max_hop_count::Integer, max_search_grid::Integer)
+                         max_hop_count::Integer, max_search_grid::Integer,
+                         max_ep_grid::Integer)
 
 Configure the global default resource caps read at the config→allocation trust boundary (see [`RESOURCE_LIMITS`](@ref)).
 
@@ -611,7 +619,7 @@ Raise them for a genuinely large machine-authored run on a machine sized for it,
 # Algorithm
 
  1. Default each keyword the caller omits to the field of the current global default, read atomically. A scoped override is not read, so the call configures the global default alone.
- 2. Build a [`ResourceLimits`](@ref) from the six keywords, which is where the validation below runs.
+ 2. Build a [`ResourceLimits`](@ref) from the seven keywords, which is where the validation below runs.
  3. Store it as the global default of [`RESOURCE_LIMITS`](@ref) through [`set_default!`](@ref).
 
 # Arguments
@@ -622,6 +630,7 @@ Raise them for a genuinely large machine-authored run on a machine sized for it,
   - `max_bins::Integer`: Maximum `bins` accepted by the mutual-information estimators.
   - `max_hop_count::Integer`: Maximum `n` accepted by [`HopCount`](@ref), stated or resolved from a rule.
   - `max_search_grid::Integer`: Maximum total candidates in a search cross-validation grid.
+  - `max_ep_grid::Integer`: Maximum `K` accepted by the grid formulations of the entropic and relativistic value-at-risk views.
 
 # Validation
 
@@ -643,10 +652,11 @@ function set_resource_limits!(;
                               max_frontier::Integer = (@atomic RESOURCE_LIMITS.default).max_frontier,
                               max_bins::Integer = (@atomic RESOURCE_LIMITS.default).max_bins,
                               max_hop_count::Integer = (@atomic RESOURCE_LIMITS.default).max_hop_count,
-                              max_search_grid::Integer = (@atomic RESOURCE_LIMITS.default).max_search_grid)
+                              max_search_grid::Integer = (@atomic RESOURCE_LIMITS.default).max_search_grid,
+                              max_ep_grid::Integer = (@atomic RESOURCE_LIMITS.default).max_ep_grid)
     return set_default!(RESOURCE_LIMITS,
                         ResourceLimits(; max_n_sim, max_n_subsets, max_frontier, max_bins,
-                                       max_hop_count, max_search_grid))
+                                       max_hop_count, max_search_grid, max_ep_grid))
 end
 """
     with_resource_limits(f; max_n_sim::Integer = RESOURCE_LIMITS[].max_n_sim,
@@ -654,16 +664,17 @@ end
                          max_frontier::Integer = RESOURCE_LIMITS[].max_frontier,
                          max_bins::Integer = RESOURCE_LIMITS[].max_bins,
                          max_hop_count::Integer = RESOURCE_LIMITS[].max_hop_count,
-                         max_search_grid::Integer = RESOURCE_LIMITS[].max_search_grid)
+                         max_search_grid::Integer = RESOURCE_LIMITS[].max_search_grid,
+                         max_ep_grid::Integer = RESOURCE_LIMITS[].max_ep_grid)
 
 Run `f()` with the resource caps (see [`RESOURCE_LIMITS`](@ref)) overridden for the dynamic extent of the call, restoring the previous caps on exit. Task-scoped and thread-safe (see [`ScopedConfig`](@ref)); the global default is untouched. Unspecified keywords inherit from the currently active value, so nested overrides compose.
 
-Useful to raise the ceiling for one deliberately large run without loosening the boundary for other concurrent work. Note the cap is read where the value is *resolved*: `n_sim`, `N` and `bins` at estimator construction, `n_subsets` when the optimisation resolves its (possibly [`TimeDependent`](@ref)) schedule — so wrap the constructor call in the former cases and the `optimise` call in the latter.
+Useful to raise the ceiling for one deliberately large run without loosening the boundary for other concurrent work. Note the cap is read where the value is *resolved*: `n_sim`, `N`, `bins` and `K` at estimator construction, `n_subsets` when the optimisation resolves its (possibly [`TimeDependent`](@ref)) schedule — so wrap the constructor call in the former cases and the `optimise` call in the latter.
 
 # Algorithm
 
  1. Default each keyword the caller omits to the field of the currently active value, so that a nested override inherits from the enclosing one instead of from the global default.
- 2. Build a [`ResourceLimits`](@ref) from the six keywords, which is where the validation below runs.
+ 2. Build a [`ResourceLimits`](@ref) from the seven keywords, which is where the validation below runs.
  3. Run `f()` with [`RESOURCE_LIMITS`](@ref) bound to that value through [`with_config`](@ref).
 
 # Arguments
@@ -675,6 +686,7 @@ Useful to raise the ceiling for one deliberately large run without loosening the
   - `max_bins::Integer`: Maximum `bins` accepted by the mutual-information estimators.
   - `max_hop_count::Integer`: Maximum `n` accepted by [`HopCount`](@ref), stated or resolved from a rule.
   - `max_search_grid::Integer`: Maximum total candidates in a search cross-validation grid.
+  - `max_ep_grid::Integer`: Maximum `K` accepted by the grid formulations of the entropic and relativistic value-at-risk views.
 
 # Validation
 
@@ -696,8 +708,9 @@ function with_resource_limits(f; max_n_sim::Integer = RESOURCE_LIMITS[].max_n_si
                               max_frontier::Integer = RESOURCE_LIMITS[].max_frontier,
                               max_bins::Integer = RESOURCE_LIMITS[].max_bins,
                               max_hop_count::Integer = RESOURCE_LIMITS[].max_hop_count,
-                              max_search_grid::Integer = RESOURCE_LIMITS[].max_search_grid)
+                              max_search_grid::Integer = RESOURCE_LIMITS[].max_search_grid,
+                              max_ep_grid::Integer = RESOURCE_LIMITS[].max_ep_grid)
     return with_config(f, RESOURCE_LIMITS,
                        ResourceLimits(; max_n_sim, max_n_subsets, max_frontier, max_bins,
-                                      max_hop_count, max_search_grid))
+                                      max_hop_count, max_search_grid, max_ep_grid))
 end

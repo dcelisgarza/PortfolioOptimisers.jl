@@ -185,6 +185,37 @@ function assert_resource_cap(val::Integer, cap::Integer, sym::Sym_Str,
     return nothing
 end
 """
+    assert_ep_grid_size(K::Integer)
+
+Assert that `K`, the number of grid points of a grid tail view formulation, is odd, positive and within the active [`RESOURCE_LIMITS`](@ref) ceiling `max_ep_grid`.
+
+Every grid point is one binary variable of the mixed-integer program an upper-bound or equality view builds, and one dense row over the posterior probabilities, so `K` is an untrusted sizing integer of the class [`assert_resource_cap`](@ref) guards. The parity rule keeps the centre of the grid a point of the grid. Both grid formulations state one rule, so both call this one assertion.
+
+# Arguments
+
+  - `K`: The requested number of grid points.
+
+# Validation
+
+  - $(val_dict[:ep_gridK])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`assert_resource_cap`](@ref)
+  - [`RESOURCE_LIMITS`](@ref)
+  - [`GridEntropicValueatRiskView`](@ref)
+  - [`GridRelativisticValueatRiskView`](@ref)
+"""
+function assert_ep_grid_size(K::Integer)::Nothing
+    @argcheck(K >= one(K) && isodd(K), DomainError(K, "K must be odd and >= 1"))
+    assert_resource_cap(K, RESOURCE_LIMITS[].max_ep_grid, :K, :max_ep_grid)
+    return nothing
+end
+"""
     resolve_rng(rng::Random.AbstractRNG, seed::Option{<:Integer})
 
 Resolve which random number generator to draw from given an optional `seed`.

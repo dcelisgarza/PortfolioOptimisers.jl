@@ -32,6 +32,7 @@ PREFERENCE_DISTANCES
 RESOURCE_LIMITS
 ResourceLimits
 assert_resource_cap
+assert_ep_grid_size
 set_resource_limits!
 with_resource_limits
 ```

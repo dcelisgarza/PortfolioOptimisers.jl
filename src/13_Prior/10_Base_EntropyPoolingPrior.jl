@@ -1396,7 +1396,7 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - `0 < pct < 1`.
-  - `K >= 1` and `isodd(K)`.
+  - $(val_dict[:ep_gridK])
   - `M > 0`.
   - `iters >= 1`.
   - `tol >= 0`.
@@ -1455,7 +1455,7 @@ GridEntropicValueatRiskView
     function GridEntropicValueatRiskView(pct::Number, K::Integer, M::Number, iters::Integer,
                                          tol::Number, tilt_iters::Integer)
         assert_unit_interval(pct, :pct)
-        @argcheck(K >= one(K) && isodd(K), DomainError(K, "K must be odd and >= 1"))
+        assert_ep_grid_size(K)
         @argcheck(M > zero(M), DomainError(M, "M must be > 0"))
         @argcheck(iters >= one(iters), DomainError(iters, "iters must be >= 1"))
         @argcheck(tol >= zero(tol), DomainError(tol, "tol must be >= 0"))
@@ -1625,7 +1625,7 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - `0 < pct < 1`.
-  - `K >= 1` and `isodd(K)`.
+  - $(val_dict[:ep_gridK])
   - `M > 0`.
   - `iters >= 1`.
   - `tol >= 0`.
@@ -1689,7 +1689,7 @@ GridRelativisticValueatRiskView
                                              iters::Integer, tol::Number,
                                              tilt_iters::Integer)
         assert_unit_interval(pct, :pct)
-        @argcheck(K >= one(K) && isodd(K), DomainError(K, "K must be odd and >= 1"))
+        assert_ep_grid_size(K)
         @argcheck(M > zero(M), DomainError(M, "M must be > 0"))
         @argcheck(iters >= one(iters), DomainError(iters, "iters must be >= 1"))
         @argcheck(tol >= zero(tol), DomainError(tol, "tol must be >= 0"))

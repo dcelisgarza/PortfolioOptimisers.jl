@@ -845,7 +845,6 @@ Validation rules for certain arg_dict terms used in the documentation of `Portfo
 """
 const val_dict = unique_key_dict(:val_dict,
                                  :oow => "If `w` is not `nothing`, `!isempty(w)`.",
-                                 :oidx => "If `idx` is not `nothing`, `!isempty(idx)` and all indices are positive integers.",
                                  :gerbt => "`0 <= t`.",#
                                  :t => "`0 < t < 1`.",#
                                  :c1 => "`0 <= c1`.",#
@@ -857,6 +856,7 @@ const val_dict = unique_key_dict(:val_dict,
                                  :alpha => "`0 < alpha < 1`.",#
                                  :beta => "`0 < beta < 1`.",#
                                  :bins => "If `bins` is an integer, `0 < bins <= RESOURCE_LIMITS[].max_bins` (the joint histogram is `bins × bins`; see [`RESOURCE_LIMITS`](@ref)).",#
+                                 :ep_gridK => "`isodd(K)` and `1 <= K <= RESOURCE_LIMITS[].max_ep_grid` (every grid point is one binary variable of the mixed-integer program an upper-bound or equality view builds; see [`RESOURCE_LIMITS`](@ref)).",#
                                  :dopower => "If `power` is not `nothing`, `power >= 1`.",#
                                  :p_owa => "`!isempty(p)` and `all(x -> x > 1, p)`.",#
                                  :settings => "If not `nothing`, `!isempty(settings)`.",#

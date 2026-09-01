@@ -242,15 +242,16 @@ end
 @testset "Resource caps fail closed" begin
     using PortfolioOptimisers, Test
     pe = PortfolioOptimisers
-    # One cap per sink (ADR 0041); the keyword constructor is the safe path since the six
-    # fields are same-typed and four share the value 100_000.
+    # One cap per sink (ADR 0041); the keyword constructor is the safe path since the
+    # seven fields are same-typed and four share the value 100_000.
     @test pe.RESOURCE_LIMITS[] ==
-          pe.ResourceLimits(1_000_000, 100_000, 100_000, 10_000, 100_000, 100_000)
+          pe.ResourceLimits(1_000_000, 100_000, 100_000, 10_000, 100_000, 100_000, 10_000)
     @test pe.ResourceLimits() ==
-          pe.ResourceLimits(1_000_000, 100_000, 100_000, 10_000, 100_000, 100_000)
+          pe.ResourceLimits(1_000_000, 100_000, 100_000, 10_000, 100_000, 100_000, 10_000)
     @test pe.ResourceLimits(; max_bins = 500).max_bins == 500
     @test pe.ResourceLimits(; max_hop_count = 7).max_hop_count == 7
     @test pe.ResourceLimits(; max_search_grid = 9).max_search_grid == 9
+    @test pe.ResourceLimits(; max_ep_grid = 21).max_ep_grid == 21
     # Every field must be positive, like EquationLimits.
     @test_throws ArgumentError pe.ResourceLimits(; max_n_sim = 0)
     @test_throws ArgumentError pe.ResourceLimits(; max_n_subsets = -1)
@@ -258,12 +259,14 @@ end
     @test_throws ArgumentError pe.ResourceLimits(; max_bins = -1)
     @test_throws ArgumentError pe.ResourceLimits(; max_hop_count = 0)
     @test_throws ArgumentError pe.ResourceLimits(; max_search_grid = -1)
+    @test_throws ArgumentError pe.ResourceLimits(; max_ep_grid = 0)
     @test_throws ArgumentError pe.set_resource_limits!(max_n_sim = 0)
     @test_throws ArgumentError pe.set_resource_limits!(max_n_subsets = -1)
     @test_throws ArgumentError pe.set_resource_limits!(max_frontier = 0)
     @test_throws ArgumentError pe.set_resource_limits!(max_bins = -1)
     @test_throws ArgumentError pe.set_resource_limits!(max_hop_count = 0)
     @test_throws ArgumentError pe.set_resource_limits!(max_search_grid = -1)
+    @test_throws ArgumentError pe.set_resource_limits!(max_ep_grid = -1)
     # n_sim sizes an N^2 * n_sim array in both uncertainty-set estimators; the ceiling
     # converts an OOM kill into a typed DomainError naming the knob that raises it.
     @test_throws DomainError NormalUncertaintySet(; n_sim = 10_000_000_000)
@@ -360,6 +363,20 @@ end
                                                    ["a" => collect(1:10),
                                                     "b" => collect(1:10)]])
     end
+    # K sizes a binary block of the mixed-integer program an upper-bound or equality
+    # tail view builds, so the grid formulations take a cap of their own. The parity
+    # check alone admitted a grid of ten million binaries from one view.
+    @test_throws DomainError GridEntropicValueatRiskView(; K = 10_000_001)
+    @test_throws DomainError GridRelativisticValueatRiskView(; K = 10_000_001)
+    kerr = try
+        GridRelativisticValueatRiskView(; K = 10_000_001)
+        nothing
+    catch e
+        e
+    end
+    @test kerr isa DomainError
+    @test occursin("max_ep_grid", kerr.msg)
+    @test GridEntropicValueatRiskView(; K = 21).K == 21
     # A raised ceiling is honoured, and scoped overrides restore on exit.
     pe.with_resource_limits(; max_n_sim = 20_000_000_000) do
         @test NormalUncertaintySet(; n_sim = 10_000_000_000).n_sim == 10_000_000_000
@@ -377,6 +394,9 @@ end
         @test length(pe.lens_val_grid(["a" => collect(1:100), "b" => collect(1:100)])[2]) ==
               10_000
     end
+    pe.with_resource_limits(; max_ep_grid = 20_000_000) do
+        @test GridRelativisticValueatRiskView(; K = 10_000_001).K == 10_000_001
+    end
     @test pe.RESOURCE_LIMITS[].max_n_sim == 1_000_000
     # Preferences fail closed at load, like the equation caps.
     pe.apply_preferences!(Dict{String, Any}("max_n_subsets" => 1_234, "max_bins" => 321))
@@ -384,9 +404,12 @@ end
     @test pe.RESOURCE_LIMITS[].max_bins == 321
     @test pe.RESOURCE_LIMITS[].max_n_sim == 1_000_000  # unset key keeps its default
     @test pe.RESOURCE_LIMITS[].max_frontier == 100_000  # unset key keeps its default
-    pe.apply_preferences!(Dict{String, Any}("max_hop_count" => 12, "max_search_grid" => 34))
+    pe.apply_preferences!(Dict{String, Any}("max_hop_count" => 12, "max_search_grid" => 34,
+                                            "max_ep_grid" => 56))
     @test pe.RESOURCE_LIMITS[].max_hop_count == 12
     @test pe.RESOURCE_LIMITS[].max_search_grid == 34
+    @test pe.RESOURCE_LIMITS[].max_ep_grid == 56
+    @test_throws ArgumentError pe.apply_preferences!(Dict{String, Any}("max_ep_grid" => 0))
     @test_throws ArgumentError pe.apply_preferences!(Dict{String, Any}("max_hop_count" => 0))
     @test_throws ArgumentError pe.apply_preferences!(Dict{String, Any}("max_search_grid" =>
                                                                            2.5))
@@ -397,7 +420,8 @@ end
     @test_throws ArgumentError pe.apply_preferences!(Dict{String, Any}("max_bins" => 1.5))
     pe.set_resource_limits!(max_n_sim = 1_000_000, max_n_subsets = 100_000,
                             max_frontier = 100_000, max_bins = 10_000,
-                            max_hop_count = 100_000, max_search_grid = 100_000)  # restore
+                            max_hop_count = 100_000, max_search_grid = 100_000,
+                            max_ep_grid = 10_000)  # restore
 end
 @testset "A preference that widens a guard is announced" begin
     using PortfolioOptimisers, Test
@@ -431,7 +455,8 @@ end
     @test pe.RESOURCE_LIMITS[].max_bins == 100  # the value is applied either way
     pe.set_resource_limits!(max_n_sim = 1_000_000, max_n_subsets = 100_000,
                             max_frontier = 100_000, max_bins = 10_000,
-                            max_hop_count = 100_000, max_search_grid = 100_000)  # restore
+                            max_hop_count = 100_000, max_search_grid = 100_000,
+                            max_ep_grid = 10_000)  # restore
     pe.set_equation_limits!(max_length = 4096, max_depth = 256)
     pe.set_string_distance!(dist = pe.StringDistances.Levenshtein(), min_score = 0.7)
 end

@@ -26,7 +26,7 @@ const PREFERENCE_DISTANCES = Dict{String, StringDistances.StringDistance}("leven
 The Preferences.jl keys read at package load to seed the global config defaults (see [`apply_preferences!`](@ref)):
 
   - `"equation_max_length"` / `"equation_max_depth"`: positive integers for [`EQUATION_LIMITS`](@ref).
-  - `"max_n_sim"` / `"max_n_subsets"` / `"max_frontier"` / `"max_bins"` / `"max_hop_count"` / `"max_search_grid"`: positive integers for [`RESOURCE_LIMITS`](@ref).
+  - `"max_n_sim"` / `"max_n_subsets"` / `"max_frontier"` / `"max_bins"` / `"max_hop_count"` / `"max_search_grid"` / `"max_ep_grid"`: positive integers for [`RESOURCE_LIMITS`](@ref).
   - `"suggestion_min_score"`: real number for the [`STRING_DISTANCE`](@ref) threshold.
   - `"suggestion_distance"`: a [`PREFERENCE_DISTANCES`](@ref) name for the [`STRING_DISTANCE`](@ref) metric.
   - `"compact_show"`: boolean or integer for [`COMPACT_SHOW`](@ref).
@@ -42,8 +42,8 @@ A valid value is applied, but a value that *widens* a guard is announced with a 
 """
 const PREFERENCE_KEYS = ("equation_max_length", "equation_max_depth", "max_n_sim",
                          "max_n_subsets", "max_frontier", "max_bins", "max_hop_count",
-                         "max_search_grid", "suggestion_min_score", "suggestion_distance",
-                         "compact_show")
+                         "max_search_grid", "max_ep_grid", "suggestion_min_score",
+                         "suggestion_distance", "compact_show")
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -102,6 +102,7 @@ max_frontier = 1_000
 max_bins = 500
 max_hop_count = 100
 max_search_grid = 10_000
+max_ep_grid = 500
 suggestion_min_score = 0.8
 suggestion_distance = "damerau_levenshtein"
 compact_show = 4
@@ -111,7 +112,7 @@ compact_show = 4
 
  1. Start `relaxations` empty. It collects one `(key, default, value)` triple per guard the preferences widen.
  2. Read the two equation keys. When either is set, check that every set value is a positive integer, read the current [`EQUATION_LIMITS`](@ref) default, record a triple for each value above its default, and apply both through [`set_equation_limits!`](@ref). A key the project left unset keeps the value it already has.
- 3. Read the six resource keys and repeat step 2 against [`RESOURCE_LIMITS`](@ref) and [`set_resource_limits!`](@ref).
+ 3. Read the seven resource keys and repeat step 2 against [`RESOURCE_LIMITS`](@ref) and [`set_resource_limits!`](@ref).
  4. Read `"suggestion_min_score"`. When it is set, check that it is a real number, record a triple when it is below the current threshold, and apply it through [`set_string_distance!`](@ref). A lower threshold widens the guard, which is the opposite direction from a cap.
  5. Read `"suggestion_distance"`. When it is set, check that it is a string, and look it up in [`PREFERENCE_DISTANCES`](@ref). An unknown name raises, and the message carries a [`did_you_mean`](@ref) suggestion. Apply the resolved distance through [`set_string_distance!`](@ref).
  6. Read `"compact_show"`. When it is set, check that it is a boolean or an integer, and apply it through [`set_compact_show!`](@ref). This key guards nothing, so it records no triple.
@@ -123,7 +124,7 @@ compact_show = 4
 
 # Validation
 
-  - Each of the eight cap keys is a positive integer that is not a `Bool`.
+  - Each of the nine cap keys is a positive integer that is not a `Bool`.
   - `"suggestion_min_score"` is a real number that is not a `Bool`.
   - `"suggestion_distance"` is a string, and it names an entry of [`PREFERENCE_DISTANCES`](@ref).
   - `"compact_show"` is a `Bool` or an `Integer`.
@@ -168,9 +169,11 @@ function apply_preferences!(prefs::AbstractDict{<:AbstractString, <:Any})
     xn = get(prefs, "max_bins", nothing)
     xh = get(prefs, "max_hop_count", nothing)
     xg = get(prefs, "max_search_grid", nothing)
-    if !all(isnothing, (xs, xb, xf, xn, xh, xg))
+    xe = get(prefs, "max_ep_grid", nothing)
+    if !all(isnothing, (xs, xb, xf, xn, xh, xg, xe))
         for (key, val) in ("max_n_sim" => xs, "max_n_subsets" => xb, "max_frontier" => xf,
-                           "max_bins" => xn, "max_hop_count" => xh, "max_search_grid" => xg)
+                           "max_bins" => xn, "max_hop_count" => xh, "max_search_grid" => xg,
+                           "max_ep_grid" => xe)
             @argcheck(isnothing(val) || val isa Integer && !(val isa Bool) && val > 0,
                       ArgumentError("preference `$(key) = $(repr(val))` must be a positive integer."))
         end
@@ -179,7 +182,8 @@ function apply_preferences!(prefs::AbstractDict{<:AbstractString, <:Any})
             (("max_n_sim", xs, rlim.max_n_sim), ("max_n_subsets", xb, rlim.max_n_subsets),
              ("max_frontier", xf, rlim.max_frontier), ("max_bins", xn, rlim.max_bins),
              ("max_hop_count", xh, rlim.max_hop_count),
-             ("max_search_grid", xg, rlim.max_search_grid))
+             ("max_search_grid", xg, rlim.max_search_grid),
+             ("max_ep_grid", xe, rlim.max_ep_grid))
             if !isnothing(val) && val > default
                 push!(relaxations, (key, default, val))
             end
@@ -189,7 +193,8 @@ function apply_preferences!(prefs::AbstractDict{<:AbstractString, <:Any})
                              max_frontier = something(xf, rlim.max_frontier),
                              max_bins = something(xn, rlim.max_bins),
                              max_hop_count = something(xh, rlim.max_hop_count),
-                             max_search_grid = something(xg, rlim.max_search_grid))
+                             max_search_grid = something(xg, rlim.max_search_grid),
+                             max_ep_grid = something(xe, rlim.max_ep_grid))
     end
     ms = get(prefs, "suggestion_min_score", nothing)
     if !isnothing(ms)

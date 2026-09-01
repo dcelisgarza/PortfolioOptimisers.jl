@@ -687,6 +687,10 @@ end
     # The anchor that centres the grid runs from a grid formulation alone, so its number of
     # steps and its tolerance live there rather than on the view group.
     for T in (GridEntropicValueatRiskView, GridRelativisticValueatRiskView)
+        # `K` sizes a binary block of the mixed-integer program an upper-bound or equality
+        # view builds, so it takes a resource cap of its own (ADR 0041). The parity check
+        # alone admitted a grid of ten million binaries from one view.
+        @test_throws DomainError T(; K = 10_000_001)
         @test T().iters == 50
         @test T().tol == 1e-10
         @test T().tilt_iters == 200

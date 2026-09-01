@@ -13,7 +13,7 @@ commit = "2107fc7a40"
 "src/01_Base/01_DocstringDictionaries.jl" = { cyc = 3, cog = 3, arg = 2, cyc_sum = 3, cog_sum = 3, arg_sum = 2, macros = [] }
 "src/01_Base/02_TypeRoots.jl" = { cyc = 2, cog = 2, arg = 2, cyc_sum = 4, cog_sum = 4, arg_sum = 4, macros = [] }
 "src/01_Base/03_PrettyShow.jl" = { cyc = 27, cog = 50, arg = 2, cyc_sum = 35, cog_sum = 59, arg_sum = 6, macros = ["@define_pretty_show"] }
-"src/01_Base/04_ScopedConfig.jl" = { cyc = 6, cog = 6, arg = 7, cyc_sum = 31, cog_sum = 9, arg_sum = 54, macros = [] }
+"src/01_Base/04_ScopedConfig.jl" = { cyc = 7, cog = 6, arg = 8, cyc_sum = 32, cog_sum = 9, arg_sum = 58, macros = [] }
 "src/01_Base/05_Preferences.jl" = { cyc = 26, cog = 33, arg = 1, cyc_sum = 29, cog_sum = 34, arg_sum = 2, macros = [] }
 "src/01_Base/06_Messages.jl" = { cyc = 5, cog = 9, arg = 5, cyc_sum = 26, cog_sum = 27, arg_sum = 36, macros = [] }
 "src/01_Base/07_Errors.jl" = { cyc = 2, cog = 1, arg = 2, cyc_sum = 2, cog_sum = 1, arg_sum = 2, macros = [] }
