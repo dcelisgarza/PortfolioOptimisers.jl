@@ -5,6 +5,10 @@ Computes a calibrated quantity — a tail probability, a deformation parameter, 
 
 All concrete subtypes should subtype one of the families under this root rather than the root itself, and `# Related` names them. A plain number in place of a rule is the quantity itself, exactly as it is today.
 
+A rule is named for the **method** it runs, and carries the name of the quantity as a suffix only where the bare method word is already claimed. [`ScenarioCount`](@ref), [`EntropyBudget`](@ref), [`HillTailDecay`](@ref), [`RadialTailDecay`](@ref), [`TailTermParity`](@ref) and [`EffectiveAssetFloor`](@ref) name a method and stop there. Five names carry the quantity, and each of the five earns it. [`RateSignificance`](@ref) and [`RateRadius`](@ref) are one method over two quantities, so neither may hold the bare word `Rate`, and [`DimensionalRateRadius`](@ref) carries that same stem under a prefix. [`ConcentrationRadius`](@ref) and [`DualNormRadius`](@ref) are each named after a mathematical object, so the bare word would name the object rather than the rule. ADR 0015 is the Authority for the reading, and ADR 0095 owns the list.
+
+A rule states a default for every keyword it can, so a bare call constructs. Two rules state none, because the quantity the keyword takes is the whole content of the rule and no value suits every sample. [`ScenarioCount`](@ref) and [`EntropyBudget`](@ref) are those two. The keyword of each stands at `nothing`, which is not a value of the quantity, so a bare call is refused with a message that names the quantity, the reason there is no default, and a value to start from.
+
 This root carries the **rules** alone. A **role**, the type that places a rule in the slot of one quantity, is an Estimator under [`AbstractCalibrationEstimator`](@ref) and subtypes nothing here, so a role placed inside another role's `alg` field is refused by the field's bound.
 
 A **Calibration Rule** is not a [`DeferredQuantity`](@ref), and the two mechanisms stay parallel end to end. A Deferred Quantity is *fitted* and the quantity is read off the fit; a rule fits nothing, and reads the sample size and the moments the prior result already carries. A rule also sees the effective observation weights, which [`resolve_slot`](@ref) does not carry. So a rule resolves through [`resolve_calibration_slot`](@ref), is declared through [`calibration_slots`](@ref), and is refused at a value-level entry point by [`assert_calibrated_slots`](@ref).
@@ -930,13 +934,14 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     ScenarioCount(;
-        n::Number
+        n::Option{<:Number} = nothing
     ) -> ScenarioCount
 
-Keywords correspond to the struct's fields. `n` has no default, because a scenario count that suits every sample does not exist.
+Keywords correspond to the struct's fields. `n` has no default a rule could use, because a scenario count that suits every sample does not exist. It stands at `nothing`, which is not a count, so a bare `ScenarioCount()` is refused with a message that names the count and says why the rule asks for one. This is the whole reason the keyword admits `nothing`: the field itself never holds it.
 
 ## Validation
 
+  - `n` is stated, else an `ArgumentError`.
   - `n > 0` and finite.
 
 # Related
@@ -957,7 +962,9 @@ Keywords correspond to the struct's fields. `n` has no default, because a scenar
         return new{typeof(n)}(n)
     end
 end
-function ScenarioCount(; n::Number)
+function ScenarioCount(; n::Option{<:Number} = nothing)
+    @argcheck(!isnothing(n),
+              ArgumentError("`ScenarioCount` states no default for `n`, the number of observations the tail is to hold. It is a count and not a probability, and no count suits every sample and every measure, so the rule asks for one: `ScenarioCount(; n = 15)`. `RateSignificance` is the rule of this family that computes a significance level from a rate instead, and it constructs bare."))
     return ScenarioCount(n)
 end
 """
@@ -1112,14 +1119,14 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     EntropyBudget(;
-        target::Number,
-        alpha::Option{<:Number} = nothing
+        target::Option{<:Number} = nothing
     ) -> EntropyBudget
 
-Keywords correspond to the struct's fields. `target` has no default, because the budget is the whole content of the rule. `alpha` defaults to `nothing`, which is the state a rule stands in a slot in.
+Keywords correspond to the struct's fields. `target` has no default a rule could use, because the budget is the whole content of the rule and the band it must lie in moves with the sample. It stands at `nothing`, which is not a budget, so a bare `EntropyBudget()` is refused with a message that names the budget and says why the rule asks for one. This is the whole reason the keyword admits `nothing`: the field itself never holds it.
 
 ## Validation
 
+  - `target` is stated, else an `ArgumentError`.
   - `target` is finite. The band the target must lie in moves with the sample, so the rule checks the band when it runs, not here.
 
 # Related
@@ -1143,7 +1150,9 @@ Keywords correspond to the struct's fields. `target` has no default, because the
         return new{typeof(target)}(target)
     end
 end
-function EntropyBudget(; target::Number)
+function EntropyBudget(; target::Option{<:Number} = nothing)
+    @argcheck(!isnothing(target),
+              ArgumentError("`EntropyBudget` states no default for `target`, the value of the Kaniadakis logarithm the measure is to spend. The band that value must lie in moves with the sample, so no default states anything and the rule asks for one: `EntropyBudget(; target = -1.3)`. `HillTailDecay` and `RadialTailDecay` are the rules of this family that read the tail of the sample instead, and both construct bare."))
     return EntropyBudget(target)
 end
 """
@@ -1366,9 +1375,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     HillTailDecay(;
-        kmin::Integer = 30,
-        alpha::Option{<:Number} = nothing,
-        series::AbstractCalibrationSeries = ReturnsSeries()
+        kmin::Integer = 30
     ) -> HillTailDecay
 
 Keywords correspond to the struct's fields. `kmin` defaults to `30`, which is the floor under the count of order statistics the estimate reads. The significance level and the series the estimate is taken over are not fields of the rule: both reach it in the [`CalibrationContext`](@ref) the site hands over.
@@ -1642,9 +1649,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     RadialTailDecay(;
-        kmin::Integer = 30,
-        alpha::Option{<:Number} = nothing,
-        series::AbstractCalibrationSeries = ReturnsSeries()
+        kmin::Integer = 30
     ) -> RadialTailDecay
 
 Keywords correspond to the struct's fields. `kmin` defaults to `30`, which is the floor under the count of order statistics the estimate reads. The significance level and the series the estimate is taken over are not fields of the rule: both reach it in the [`CalibrationContext`](@ref) the site hands over.
@@ -2196,8 +2201,7 @@ $(DocStringExtensions.FIELDS)
 
     ConcentrationRadius(;
         confidence::Number = 0.95,
-        scale::Option{<:Number} = nothing,
-        series::AbstractCalibrationSeries = ReturnsSeries()
+        scale::Option{<:Number} = nothing
     ) -> ConcentrationRadius
 
 Keywords correspond to the struct's fields. `confidence` defaults to `0.95`, and `scale` defaults to `nothing`, which reads the average per-asset dispersion off the sample. The series that dispersion is read over is not a field of the rule: it reaches the rule in the [`CalibrationContext`](@ref) the site hands over.
@@ -2427,8 +2431,7 @@ $(DocStringExtensions.FIELDS)
 
     DimensionalRateRadius(;
         confidence::Number = 0.95,
-        scale::Option{<:Number} = nothing,
-        series::AbstractCalibrationSeries = ReturnsSeries()
+        scale::Option{<:Number} = nothing
     ) -> DimensionalRateRadius
 
 Keywords correspond to the struct's fields. `confidence` defaults to `0.95`, and `scale` defaults to `nothing`, which reads the average per-asset dispersion off the sample. The series that dispersion is read over is not a field of the rule: it reaches the rule in the [`CalibrationContext`](@ref) the site hands over.
@@ -2573,9 +2576,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     DualNormRadius(;
-        confidence::Number = 0.95,
-        p::Option{<:Number} = nothing,
-        series::AbstractCalibrationSeries = ReturnsSeries()
+        confidence::Number = 0.95
     ) -> DualNormRadius
 
 Keywords correspond to the struct's fields. `confidence` defaults to `0.95`. The norm order and the series are not fields of the rule: both reach it in the [`CalibrationContext`](@ref) the site hands over.
@@ -2583,7 +2584,7 @@ Keywords correspond to the struct's fields. `confidence` defaults to `0.95`. The
 ## Validation
 
   - `0 < confidence < 1`.
-  - If `p` is not `nothing`: `isfinite(p)` and `p > 1`, on the same terms as [`LpRegularisation`](@ref).
+  - The norm order is not a field, so the constructor cannot check it. [`dual_norm_radius_scale`](@ref) checks `ctx.p` when the `:lpreg_val` slot is resolved: it is stated, finite and above one, on the same terms as [`LpRegularisation`](@ref).
 
 # Related
 
@@ -2685,7 +2686,7 @@ function (alg::DualNormRadius)(key::Symbol, pr::AbstractPriorResult, w, ::Any,
     return z * dual_norm_radius_scale(key, ctx.p, e)
 end
 """
-    dual_norm_radius_scale(alg::DualNormRadius, key::Symbol, e::AbstractVector)
+    dual_norm_radius_scale(key::Symbol, p::Option{<:Number}, e::AbstractVector)
 
 Reduce the per-asset error vector `e` to one number, in the ground metric that `key` names.
 
@@ -2693,8 +2694,8 @@ This is the whole of the key's meaning, held apart from the functor. Six of the 
 
 # Arguments
 
-  - `alg`: The rule, read for `p` on the `:lpreg_val` arm alone.
   - `key`: Name of the slot that is being resolved.
+  - `p`: Norm order the site states in its [`CalibrationContext`](@ref), read on the `:lpreg_val` arm alone.
   - `e`: Per-asset scale of the sampling error of the mean vector.
 
 # Validation
@@ -2758,9 +2759,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     TailTermParity(;
-        ratio::Number = 1,
-        alpha::Option{<:Number} = nothing,
-        series::AbstractCalibrationSeries = ReturnsSeries()
+        ratio::Number = 1
     ) -> TailTermParity
 
 Keywords correspond to the struct's fields. `ratio` defaults to `1`, which is parity between the two terms. The significance level and the series both terms are read over are not fields of the rule: both reach it in the [`CalibrationContext`](@ref) the site hands over.
@@ -2938,16 +2937,15 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     EffectiveAssetFloor(;
-        fraction::Number = 0.5,
-        p::Option{<:Number} = nothing
+        fraction::Number = 0.5
     ) -> EffectiveAssetFloor
 
-Keywords correspond to the struct's fields. `fraction` defaults to `0.5`, which holds half of the universe effective, and `p` defaults to `nothing`, which every constraint site fills.
+Keywords correspond to the struct's fields. `fraction` defaults to `0.5`, which holds half of the universe effective. The norm order the ceiling is read against is not a field of the rule: it reaches the rule as `ctx.p` in the [`CalibrationContext`](@ref) the constraint site hands over.
 
 ## Validation
 
   - `0 < fraction <= 1`.
-  - If `p` is not `nothing`: `p >= 1`.
+  - The norm order is not a field, so the constructor cannot check it. The rule checks `ctx.p` when it runs: it is stated, and it is one or more.
 
 # Related
 

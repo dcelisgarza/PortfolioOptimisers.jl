@@ -190,6 +190,63 @@ settles it as `sel(x.slv, slv)`
 A rule gets **no portfolio**. A prior result carries no weight vector, so the "the `alpha` whose CVaR
 meets a target loss" candidate stays refused.
 
+### A rule is named for its method, and it constructs bare where it can
+
+An ergonomics pass read the eleven names as one family and found a convention in four of them:
+`ConcentrationRadius`, `RateRadius`, `DimensionalRateRadius` and `DualNormRadius` each end in the
+quantity the rule computes, and six of the remaining seven do not. Read that way the family is
+inconsistent in six places. The reading is the wrong one, and ADR 0015 is the Authority that says so:
+a name is the bare concept word, and a role suffix is added only to earn back clarity the bare word
+would lose, never as a blanket category marker. A quantity on every rule is that marker, and it
+spells `EffectiveAssetFloorNormCeiling`.
+
+**A rule is named for the method it runs.** It carries the name of the quantity only where the bare
+method word is already claimed. Six rules name a method and stop there: `ScenarioCount`,
+`EntropyBudget`, `HillTailDecay`, `RadialTailDecay`, `TailTermParity` and `EffectiveAssetFloor`.
+Five carry the quantity, and each of the five earns it.
+
+| Rule | What claims the bare word |
+| :--- | :--- |
+| `RateSignificance` | `Rate` is one method over two quantities. This rule and `RateRadius` share the closed form `c` over the square root of the sample length, so neither may hold the word. |
+| `RateRadius` | The same collision, read from the other end. |
+| `DimensionalRateRadius` | The same `Rate` stem under a prefix, and a prefix does not free the stem. |
+| `ConcentrationRadius` | `Concentration` names the weight concentration of a portfolio in this library's own prose, so the bare word would read as a property of the portfolio rather than as a ball read off a concentration inequality. |
+| `DualNormRadius` | `DualNorm` names a mathematical object, and the library already names norms in `LpRegularisation` and in the three norm-ceiling slots, so the bare word would read as the object rather than as the rule. |
+
+The four ambiguity radius rules carry the suffix for four separate reasons, and one cause stands
+behind all four: a radius is a distance, and each method that computes one is named after a standard
+mathematical construct whose word already names that construct. The six bare rules are named by a
+descriptive phrase that reads as a rule on its own. `EffectiveAssetFloor` is the sharpest case of the
+reading, and it is correct under it. The rule's method **is** a floor on the effective number of
+assets, the norm ceiling is what that floor converts into, and ADR 0097 is where the two are held
+apart.
+
+`test_09g_calibration_rules.jl` gates the list. A rule whose name ends in the word for a quantity of
+this channel and stands outside the table reds the census, and so does a name in the table that no
+rule carries.
+
+**A rule constructs bare where it can.** Nine of the eleven state a default for every keyword, so a
+bare call constructs and a caller reads the rule's shape before choosing a value. `ScenarioCount`
+and `EntropyBudget` state none, because the keyword each takes is the whole content of the rule: a
+scenario count that suits every sample does not exist, and the band an entropy budget must land in
+moves with the sample. Both keep the keyword mandatory rather than invent a value a caller would
+inherit without reading it.
+
+Neither refusal is left to `UndefKeywordError`, which names the keyword and nothing else. The keyword
+of each of the two stands at `nothing` and the constructor refuses that with an `@argcheck`, so the
+message names the quantity, the reason there is no default, a value to start from, and the rule of
+the same family that does construct bare. The bound is not weakened by the sentinel:
+`Option{<:Number}` admits a number and `nothing`, so `ScenarioCount(; n = "a")` still raises
+`TypeError` where it always did, and the field itself never holds `nothing`, because the inner
+constructor takes `n::Number`.
+
+A zero-argument method carrying the message was written first and does not work. Julia generates the
+zero-argument method of a keyword constructor itself, a second definition of it overwrites the
+generated one, and **method overwriting is an error during precompilation**. The sentinel is the
+shape that survives the load, and it is the shape `dual_norm_radius_scale` already uses for the
+sibling failure: a site that states no norm order reaches the same `@argcheck` with the same kind of
+message.
+
 ### A slot key names no quantity, so the owner hands its series over
 
 `RelativisticValueatRisk` and `RelativisticDrawdownatRisk` both resolve the key `:kappa`, and the two

@@ -28,6 +28,11 @@ the same estimator run over the drawdown series of each column, in place of the 
 Issue #582 ships the first three rules, #611 ships `HillTailDecay` and #612 ships
 `RadialTailDecay`. Issue #583 widens the slots that hold them, so every call below states the
 resolution by hand.
+
+The last two testsets read all ELEVEN rules rather than these five, because both gate a rule of
+the whole family: a name states the method and carries the quantity only where the bare word is
+taken, and a rule constructs bare unless the keyword it takes is the whole content of the rule.
+ADR 0095 owns both lists.
 =#
 const PO = PortfolioOptimisers
 using Distributions
@@ -1355,4 +1360,125 @@ end
     @test isapprox(RadialTailDecay(; kmin = 30)(:kappa, PR629, nothing, nothing,
                                                 CalibrationContext(; alpha = 0.15)),
                    inv(hill_reference(d629, 150)))
+end
+
+@testset "Calibration rules: a name states the method, and the quantity where the word is taken" begin
+    #=
+    An ergonomics pass read the eleven names as one family and found a convention in four
+    of them: `ConcentrationRadius`, `RateRadius`, `DimensionalRateRadius` and
+    `DualNormRadius` each end in the quantity the rule computes, and six of the remaining
+    seven do not. ADR 0015 is the naming Authority and says the reading is the wrong one:
+    a name is the bare concept word, and a suffix is added only to earn back clarity the
+    bare word would lose, never as a category marker.
+
+    So a rule is named for the METHOD it runs, and carries the quantity only where the
+    bare method word is already claimed. ADR 0095 holds the list and the reason for each
+    entry, and this census gates it. A rule whose name ends in the word for a quantity of
+    this channel and stands outside the list reds the census, and so does a list entry
+    that no rule carries.
+    =#
+    earns_the_quantity = Dict(:RateSignificance => "`Rate` is one method over two quantities.",
+                              :RateRadius => "The same collision, read from the other end.",
+                              :DimensionalRateRadius => "The same `Rate` stem under a prefix.",
+                              :ConcentrationRadius => "`Concentration` names the weight concentration of a portfolio.",
+                              :DualNormRadius => "`DualNorm` names a mathematical object.")
+
+    # The words the five families name their quantities with. A rule that ends in one of
+    # them states the quantity, whatever method word stands in front of it.
+    quantity_words = ("Significance", "Deformation", "Radius", "TailWeight", "NormCeiling")
+
+    # `traverse_concrete_subtypes` walks the whole root, and `parentmodule` drops the probe
+    # rules that `test_09f_calibration_slot.jl` defines, which reach this census whenever
+    # the two files share a process.
+    rule_types = filter(T -> parentmodule(T) === PortfolioOptimisers,
+                        PO.traverse_concrete_subtypes(PO.AbstractCalibrationAlgorithm))
+    rule_names = Set(nameof.(rule_types))
+    @test ("the rules this census reads", length(rule_names)) ==
+          ("the rules this census reads", 11)
+
+    stated = Set(n for n in rule_names if any(w -> endswith(string(n), w), quantity_words))
+    named = Set(keys(earns_the_quantity))
+
+    # Both directions are named, so a failure says which name moved and which way. A rule
+    # added with a quantity in its name states in ADR 0095 what claims the bare word, and
+    # adds the row here.
+    unearned = sort!(collect(setdiff(stated, named)))
+    @test ("names that state the quantity and earn it nowhere", unearned) ==
+          ("names that state the quantity and earn it nowhere", Symbol[])
+    stale = sort!(collect(setdiff(named, stated)))
+    @test ("list entries that no rule carries", stale) ==
+          ("list entries that no rule carries", Symbol[])
+
+    # The other six name a method and stop there, which is the default the rule states.
+    @test ("rules named for the method alone",
+           sort!(collect(setdiff(rule_names, stated)))) ==
+          ("rules named for the method alone",
+           [:EffectiveAssetFloor, :EntropyBudget, :HillTailDecay, :RadialTailDecay,
+            :ScenarioCount, :TailTermParity])
+end
+
+@testset "Calibration rules: nine construct bare, and two name the quantity they refuse" begin
+    #=
+    A caller who meets nine rules that construct bare learns that a rule constructs bare.
+    Two cannot, because the keyword each takes is the whole content of the rule, and a
+    mandatory keyword then fails with an `UndefKeywordError` that names the keyword and
+    nothing else -- no quantity, no reason, no value to start from. The keyword of each of
+    the two stands at `nothing` instead, and the `@argcheck` that refuses it says all
+    three. ADR 0095 owns the rule.
+
+    A zero-argument method carrying the message was written first and does not work: Julia
+    generates that method for a keyword constructor itself, and overwriting it is an ERROR
+    during precompilation. The sentinel keeps the type refusal, because `Option{<:Number}`
+    admits a number and `nothing` and nothing else.
+    =#
+    for R in
+        (RateSignificance, HillTailDecay, RadialTailDecay, ConcentrationRadius, RateRadius,
+         DimensionalRateRadius, DualNormRadius, TailTermParity, EffectiveAssetFloor)
+        @test isa(R(), R)
+    end
+
+    @test_throws ArgumentError ScenarioCount()
+    @test_throws ArgumentError EntropyBudget()
+
+    function refusal_text(f)
+        return try
+            f()
+            ""
+        catch e
+            sprint(showerror, e)
+        end
+    end
+
+    # The message names the quantity, the reason there is no default, a value to start
+    # from, and the rule of the same family that does construct bare.
+    scmsg = refusal_text(ScenarioCount)
+    @test occursin("number of observations the tail is to hold", scmsg)
+    @test occursin("no count suits every sample", scmsg)
+    @test occursin("ScenarioCount(; n = 15)", scmsg)
+    @test occursin("RateSignificance", scmsg)
+
+    ebmsg = refusal_text(EntropyBudget)
+    @test occursin("value of the Kaniadakis logarithm", ebmsg)
+    @test occursin("moves with the sample", ebmsg)
+    @test occursin("EntropyBudget(; target = -1.3)", ebmsg)
+    @test occursin("HillTailDecay", ebmsg)
+
+    # The sentinel widens the keyword to `Option{<:Number}` and nothing further, so a value
+    # that is neither a number nor `nothing` is refused where it always was.
+    @test ScenarioCount(; n = 15).n == 15
+    @test EntropyBudget(; target = -1.3).target == -1.3
+    @test_throws TypeError ScenarioCount(; n = "a")
+    @test_throws TypeError EntropyBudget(; target = "a")
+
+    # A caller who states the sentinel by hand meets the same refusal, so the keyword
+    # route never puts it in the field.
+    @test_throws ArgumentError ScenarioCount(; n = nothing)
+    @test_throws ArgumentError EntropyBudget(; target = nothing)
+
+    # The POSITIONAL route is not refused, and that is not this decision's doing: the
+    # constructor `ConcreteStructs.@concrete` emits is broader than the hand-written inner
+    # one on every type in the library, so it bypasses the inner `::Number` as it bypasses
+    # every other bound. Issue #264 carries the hole and ADR 0095's Consequences record it.
+    @test ScenarioCount(15).n == 15
+    @test EntropyBudget(-1.3).target == -1.3
 end

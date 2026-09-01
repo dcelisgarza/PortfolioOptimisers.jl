@@ -283,7 +283,7 @@ The upper bound on a norm of the weight vector, in a constraint rather than in t
 *Avoid*: Ambiguity Radius (above), which is the coefficient of the norm rather than a bound on it.
 
 **Calibration Rule**
-A value in a slot that computes its own number from the Prior instead of stating one, resolved by Factory on the clustering route and by the risk-constraint route inside a JuMP build, so the containing type's constructor validates the result. Both routes hand the rule the same effective solver. A stated number holds the quantity still across a refit; a rule holds whatever the rule is defined in terms of still, and lets the quantity move.
+A value in a slot that computes its own number from the Prior instead of stating one, resolved by Factory on the clustering route and by the risk-constraint route inside a JuMP build, so the containing type's constructor validates the result. Both routes hand the rule the same effective solver. A stated number holds the quantity still across a refit; a rule holds whatever the rule is defined in terms of still, and lets the quantity move. A rule is named for the method it runs, and carries the name of the quantity as a suffix only where the bare method word is already claimed by another rule or by a mathematical object. A rule states a default for every keyword it can, so a bare call constructs; the two rules whose keyword is the whole content of the rule state none, and each refuses a bare call with a message that names the quantity. ADR 0095 owns both lists.
 *Avoid*: Radius Calibration (above), which is one specific conversion rather than the mechanism.
 
 **Calibration Role**
