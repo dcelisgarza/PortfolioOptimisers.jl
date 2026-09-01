@@ -268,8 +268,7 @@ function resolve_deferred_quantities(rt::ArithmeticReturn, pr::AbstractPriorResu
     if !isa(rt.mu, DeferredQuantity)
         return rt
     end
-    return ArithmeticReturn(; settings = rt.settings, ucs = rt.ucs,
-                            mu = resolve_slot(rt.mu, :mu, pr))
+    return rebuild_with_slots(rt, (; mu = resolve_slot(rt.mu, :mu, pr)))
 end
 # Deferrable slots — see `deferred_slots`. `ucs` holds an Estimator by design, not a Deferred
 # Quantity, so it is not declared here. The declaration is what carries this slot into the

@@ -1641,3 +1641,32 @@ end
     @test isempty(undeclared)
     @test isempty(unbounded)
 end
+
+@testset "Deferred Quantity: every resolver rebuilds through `rebuild_with_slots`" begin
+    # One rebuild for the whole channel. A method that names its own constructor restates
+    # the field list, so a field added to the type later reaches the struct and not the
+    # rebuild: the resolved measure then carries that field's default in silence, and no
+    # compiler and no test catches it. `rebuild_with_slots` derives the field list from the
+    # type, so no site can drop a field.
+    root = normpath(joinpath(@__DIR__, ".."))
+    call = r"^\s+(?:return |\w+ = )?[A-Z]\w*\(;"
+    offenders = String[]
+    for (dir, _, files) in walkdir(joinpath(root, "src"))
+        for file in files
+            endswith(file, ".jl") || continue
+            path = joinpath(dir, file)
+            inside = false
+            for (n, line) in pairs(readlines(path))
+                if startswith(line, "function resolve_deferred_quantities(")
+                    inside = true
+                elseif inside && line == "end"
+                    inside = false
+                elseif inside && occursin(call, line)
+                    push!(offenders,
+                          relpath(path, root) * ":" * string(n) * ": " * strip(line))
+                end
+            end
+        end
+    end
+    @test isempty(offenders)
+end

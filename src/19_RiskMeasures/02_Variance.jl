@@ -411,8 +411,9 @@ function resolve_deferred_quantities(r::Variance, pr::AbstractPriorResult, ::Any
         return r
     end
     fitted = fit_deferred_quantity(r.sigma, pr)
-    return Variance(; settings = r.settings, sigma = deferred_quantity(fitted, :sigma),
-                    chol = deferred_derived_quantity(fitted, :chol), rc = r.rc, alg = r.alg)
+    return rebuild_with_slots(r,
+                              (; sigma = deferred_quantity(fitted, :sigma),
+                               chol = deferred_derived_quantity(fitted, :chol)))
 end
 # Deferrable slots — see `deferred_slots`. `chol` is derived and never defers on its own.
 deferred_slots(r::Variance) = (; sigma = r.sigma)
@@ -614,9 +615,9 @@ function resolve_deferred_quantities(r::StandardDeviation, pr::AbstractPriorResu
         return r
     end
     fitted = fit_deferred_quantity(r.sigma, pr)
-    return StandardDeviation(; settings = r.settings,
-                             sigma = deferred_quantity(fitted, :sigma),
-                             chol = deferred_derived_quantity(fitted, :chol))
+    return rebuild_with_slots(r,
+                              (; sigma = deferred_quantity(fitted, :sigma),
+                               chol = deferred_derived_quantity(fitted, :chol)))
 end
 # Deferrable slots — see `deferred_slots`.
 deferred_slots(r::StandardDeviation) = (; sigma = r.sigma)
@@ -895,8 +896,7 @@ function resolve_deferred_quantities(r::UncertaintySetVariance, pr::AbstractPrio
     if !isa(r.sigma, DeferredQuantity)
         return r
     end
-    return UncertaintySetVariance(; settings = r.settings, ucs = r.ucs,
-                                  sigma = resolve_slot(r.sigma, :sigma, pr))
+    return rebuild_with_slots(r, (; sigma = resolve_slot(r.sigma, :sigma, pr)))
 end
 # Deferrable slots — see `deferred_slots`. `ucs` holds an Estimator by design, not a
 # Deferred Quantity, so it is not declared here.

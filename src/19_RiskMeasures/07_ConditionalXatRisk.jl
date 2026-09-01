@@ -126,7 +126,7 @@ Resolve the significance level `alpha` of a [`ConditionalValueatRisk`](@ref) aga
 
 The measure averages the losses beyond the `alpha`-quantile, so the tail it prices holds `ceil(alpha * T)` of the sample's scenarios. A [`ScenarioCount`](@ref) rule fixes that count instead of the probability, which is what makes the tail hold the same number of scenarios at every fold length.
 
-The rebuild goes through the ordinary keyword constructor, which re-runs `0 < alpha < 1` on the calibrated number. The effective observation weights are computed locally as `sel(x.w, pr.w)` and threaded to the rule.
+The rebuild goes through [`rebuild_with_slots`](@ref), whose positional call runs the inner constructor and re-runs `0 < alpha < 1` on the calibrated number. The effective observation weights are computed locally as `sel(x.w, pr.w)` and threaded to the rule.
 
 # Related
 
@@ -139,11 +139,7 @@ function resolve_deferred_quantities(x::ConditionalValueatRisk, pr::AbstractPrio
                                      slv = nothing)
     ws = sel(x.w, pr.w)
     alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, slv)
-    return if alpha === x.alpha
-        x
-    else
-        ConditionalValueatRisk(; settings = x.settings, alpha = alpha, w = x.w)
-    end
+    return rebuild_with_slots(x, (; alpha = alpha))
 end
 # Calibration slots — see `calibration_slots`.
 calibration_slots(x::ConditionalValueatRisk) = (; alpha = x.alpha)
@@ -305,7 +301,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolve the significance level `alpha`, the ambiguity radius `r` and the tail weight `l` of a [`DistributionallyRobustConditionalValueatRisk`](@ref) against prior result `pr`.
 
-All three slots take a **Calibration Rule** in place of the number, so all three resolve here. The struct is rebuilt through its ordinary keyword constructor, and that call is what re-runs the positivity check on the calibrated number: a rule that returns a value the slot does not admit is refused at fold time, by the same constructor a caller's own number meets.
+All three slots take a **Calibration Rule** in place of the number, so all three resolve here. The struct is rebuilt through [`rebuild_with_slots`](@ref), and the inner constructor it calls is what re-runs the positivity check on the calibrated number: a rule that returns a value the slot does not admit is refused at fold time, by the same guard a caller's own number meets.
 
 `alpha` resolves first, because the tail weight reads it. [`TailTermParity`](@ref) prices a tail term at the measure's own significance level, so `alpha` and `l` are a **travelling pair** and the number reaches the `l` slot through [`bind_alpha`](@ref). A stated number, a plain function and a rule that reads no sibling all pass through `bind_alpha` untouched, so the order costs nothing where no rule reads a sibling. The radius reads neither of the two, so its own order is free.
 
@@ -333,12 +329,7 @@ function resolve_deferred_quantities(x::DistributionallyRobustConditionalValueat
     alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, slv)
     l = resolve_calibration_slot(bind_series(bind_alpha(x.l, alpha), s), :l, pr, ws, slv)
     r = resolve_calibration_slot(bind_series(x.r, s), :r, pr, ws, slv)
-    return if alpha === x.alpha && l === x.l && r === x.r
-        x
-    else
-        DistributionallyRobustConditionalValueatRisk(; settings = x.settings, alpha = alpha,
-                                                     l = l, r = r, w = x.w)
-    end
+    return rebuild_with_slots(x, (; alpha = alpha, l = l, r = r))
 end
 # Calibration slots — see `calibration_slots`. The significance level, the radius and the
 # tail weight are the three quantities of the Esfahani-Kuhn loss that a rule may compute.
@@ -512,7 +503,7 @@ Resolve the two significance levels of a [`ConditionalValueatRiskRange`](@ref) a
 
 The measure is the sum of a loss-side CVaR at `alpha` and a gain-side CVaR at `beta`, and each end carries its own slot and its own bound. So a rule stated on one end is not carried to the other: [`mirror_role`](@ref) is the default of the two ordered-weights Range types and not of this one, whose two levels default to numbers.
 
-The rebuild goes through the ordinary keyword constructor, which re-runs both range checks on the calibrated numbers.
+The rebuild goes through [`rebuild_with_slots`](@ref), whose positional call runs the inner constructor and re-runs both range checks on the calibrated numbers.
 
 # Related
 
@@ -526,12 +517,7 @@ function resolve_deferred_quantities(x::ConditionalValueatRiskRange,
     ws = sel(x.w, pr.w)
     alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, slv)
     beta = resolve_calibration_slot(x.beta, :beta, pr, ws, slv)
-    return if alpha === x.alpha && beta === x.beta
-        x
-    else
-        ConditionalValueatRiskRange(; settings = x.settings, alpha = alpha, beta = beta,
-                                    w = x.w)
-    end
+    return rebuild_with_slots(x, (; alpha = alpha, beta = beta))
 end
 # Calibration slots — see `calibration_slots`. One slot per tail, each with its own role.
 calibration_slots(x::ConditionalValueatRiskRange) = (; alpha = x.alpha, beta = x.beta)
@@ -730,28 +716,20 @@ function resolve_deferred_quantities(x::DistributionallyRobustConditionalValueat
                                      pr::AbstractPriorResult, slv = nothing)
     ws = sel(x.w, pr.w)
     se = calibration_series(x)
-    slots = (x.alpha, x.l_a, x.r_a, x.beta, x.l_b, x.r_b)
     alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, slv)
     beta = resolve_calibration_slot(x.beta, :beta, pr, ws, slv)
     # Each tail weight is bound to the probability of its OWN end before it resolves, and
     # the two radii read neither. Both ends price one series, so `bind_series` carries the
     # same marker to all four slots. The bound slot is never compared against: `bind_alpha`
-    # builds a new role, so the comparison below reads `slots`, which holds the measure's
-    # own occupants.
+    # builds a new role, so `rebuild_with_slots` compares each resolved value against the
+    # field of `x`, which holds the measure's own occupant.
     l_a, r_a, l_b, r_b = map((slot, key) -> resolve_calibration_slot(bind_series(slot, se),
                                                                      key, pr, ws, slv),
                              (bind_alpha(x.l_a, alpha), x.r_a, bind_alpha(x.l_b, beta),
                               x.r_b), (:l_a, :r_a, :l_b, :r_b))
-    # The comparison is the one `resolve_deferred_quantities` makes over its derived slots:
-    # a measure whose six slots all resolved to themselves is returned unchanged.
-    return if all(map(===, (alpha, l_a, r_a, beta, l_b, r_b), slots))
-        x
-    else
-        DistributionallyRobustConditionalValueatRiskRange(; settings = x.settings,
-                                                          alpha = alpha, l_a = l_a,
-                                                          r_a = r_a, beta = beta, l_b = l_b,
-                                                          r_b = r_b, w = x.w)
-    end
+    return rebuild_with_slots(x,
+                              (; alpha = alpha, l_a = l_a, r_a = r_a, beta = beta,
+                               l_b = l_b, r_b = r_b))
 end
 # Calibration slots — see `calibration_slots`. Each tail carries its own significance level
 # and its own ambiguity pair.
@@ -978,7 +956,7 @@ Resolve the significance level `alpha` of a [`ConditionalDrawdownatRisk`](@ref) 
 
 The drawdown series has one entry per row of the sample, so a rule that counts scenarios counts the same rows here as it does on the return series.
 
-The rebuild goes through the ordinary keyword constructor, which re-runs `0 < alpha < 1` on the calibrated number.
+The rebuild goes through [`rebuild_with_slots`](@ref), whose positional call runs the inner constructor and re-runs `0 < alpha < 1` on the calibrated number.
 
 # Related
 
@@ -991,11 +969,7 @@ function resolve_deferred_quantities(x::ConditionalDrawdownatRisk, pr::AbstractP
                                      slv = nothing)
     ws = sel(x.w, pr.w)
     alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, slv)
-    return if alpha === x.alpha
-        x
-    else
-        ConditionalDrawdownatRisk(; settings = x.settings, alpha = alpha, w = x.w)
-    end
+    return rebuild_with_slots(x, (; alpha = alpha))
 end
 # Calibration slots — see `calibration_slots`.
 calibration_slots(x::ConditionalDrawdownatRisk) = (; alpha = x.alpha)
@@ -1164,13 +1138,7 @@ function resolve_deferred_quantities(x::DistributionallyRobustConditionalDrawdow
     alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, slv)
     l = resolve_calibration_slot(bind_series(bind_alpha(x.l, alpha), s), :l, pr, ws, slv)
     r = resolve_calibration_slot(bind_series(x.r, s), :r, pr, ws, slv)
-    return if alpha === x.alpha && l === x.l && r === x.r
-        x
-    else
-        DistributionallyRobustConditionalDrawdownatRisk(; settings = x.settings,
-                                                        alpha = alpha, l = l, r = r,
-                                                        w = x.w)
-    end
+    return rebuild_with_slots(x, (; alpha = alpha, l = l, r = r))
 end
 # Calibration slots — see `calibration_slots`.
 function calibration_slots(x::DistributionallyRobustConditionalDrawdownatRisk)
@@ -1401,11 +1369,7 @@ function resolve_deferred_quantities(x::RelativeConditionalDrawdownatRisk,
                                      pr::AbstractPriorResult, slv = nothing)
     ws = sel(x.w, pr.w)
     alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, slv)
-    return if alpha === x.alpha
-        x
-    else
-        RelativeConditionalDrawdownatRisk(; settings = x.settings, alpha = alpha, w = x.w)
-    end
+    return rebuild_with_slots(x, (; alpha = alpha))
 end
 # Calibration slots — see `calibration_slots`.
 calibration_slots(x::RelativeConditionalDrawdownatRisk) = (; alpha = x.alpha)

@@ -203,7 +203,7 @@ Resolve the significance level `alpha` of a [`PowerNormValueatRisk`](@ref) again
 
 `p` is the order of the norm and not a quantity of the sample, so it stays a number: nothing in a prior result says which order a caller meant. The solver is settled as `sel(x.slv, slv)` and handed to the rule, so a rule may call [`PRM`](@ref) itself.
 
-The rebuild goes through the ordinary keyword constructor, which re-runs `0 < alpha < 1` and `p >= 1` on the calibrated measure.
+The rebuild goes through [`rebuild_with_slots`](@ref), whose positional call runs the inner constructor and re-runs `0 < alpha < 1` and `p >= 1` on the calibrated measure.
 
 # Related
 
@@ -217,12 +217,7 @@ function resolve_deferred_quantities(x::PowerNormValueatRisk, pr::AbstractPriorR
     ws = sel(x.w, pr.w)
     sv = sel(x.slv, slv)
     alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, sv)
-    return if alpha === x.alpha
-        x
-    else
-        PowerNormValueatRisk(; settings = x.settings, slv = x.slv, alpha = alpha, p = x.p,
-                             w = x.w)
-    end
+    return rebuild_with_slots(x, (; alpha = alpha))
 end
 # Calibration slots — see `calibration_slots`. `p` is the order of the norm, not a quantity
 # of the sample, so it is not one of them.
@@ -392,12 +387,7 @@ function resolve_deferred_quantities(x::PowerNormValueatRiskRange, pr::AbstractP
     sv = sel(x.slv, slv)
     alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, sv)
     beta = resolve_calibration_slot(x.beta, :beta, pr, ws, sv)
-    return if alpha === x.alpha && beta === x.beta
-        x
-    else
-        PowerNormValueatRiskRange(; settings = x.settings, slv = x.slv, alpha = alpha,
-                                  beta = beta, pa = x.pa, pb = x.pb, w = x.w)
-    end
+    return rebuild_with_slots(x, (; alpha = alpha, beta = beta))
 end
 # Calibration slots — see `calibration_slots`. One slot per tail, each with its own role.
 calibration_slots(x::PowerNormValueatRiskRange) = (; alpha = x.alpha, beta = x.beta)
@@ -578,12 +568,7 @@ function resolve_deferred_quantities(x::PowerNormDrawdownatRisk, pr::AbstractPri
     ws = sel(x.w, pr.w)
     sv = sel(x.slv, slv)
     alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, sv)
-    return if alpha === x.alpha
-        x
-    else
-        PowerNormDrawdownatRisk(; settings = x.settings, slv = x.slv, alpha = alpha,
-                                p = x.p, w = x.w)
-    end
+    return rebuild_with_slots(x, (; alpha = alpha))
 end
 # Calibration slots — see `calibration_slots`.
 calibration_slots(x::PowerNormDrawdownatRisk) = (; alpha = x.alpha)
@@ -753,12 +738,7 @@ function resolve_deferred_quantities(x::RelativePowerNormDrawdownatRisk,
     ws = sel(x.w, pr.w)
     sv = sel(x.slv, slv)
     alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, sv)
-    return if alpha === x.alpha
-        x
-    else
-        RelativePowerNormDrawdownatRisk(; settings = x.settings, slv = x.slv, alpha = alpha,
-                                        p = x.p, w = x.w)
-    end
+    return rebuild_with_slots(x, (; alpha = alpha))
 end
 # Calibration slots — see `calibration_slots`.
 calibration_slots(x::RelativePowerNormDrawdownatRisk) = (; alpha = x.alpha)

@@ -211,7 +211,7 @@ Resolve the significance level `alpha` of an [`EntropicValueatRisk`](@ref) again
 
 The measure carries a solver, so the resolution settles one as `sel(x.slv, slv)` and hands it to the rule. A rule may therefore call [`ERM`](@ref) itself. On the [`factory`](@ref) route the `@cprop` selection has already put the effective solver on the struct, so the local `sel` reads the struct; on the `JuMP` route it reads the one [`set_risk_constraints!`](@ref) threaded. Both routes resolve one measure against one solver.
 
-The rebuild goes through the ordinary keyword constructor, which re-runs `0 < alpha < 1` on the calibrated number.
+The rebuild goes through [`rebuild_with_slots`](@ref), whose positional call runs the inner constructor and re-runs `0 < alpha < 1` on the calibrated number.
 
 # Related
 
@@ -225,11 +225,7 @@ function resolve_deferred_quantities(x::EntropicValueatRisk, pr::AbstractPriorRe
     ws = sel(x.w, pr.w)
     sv = sel(x.slv, slv)
     alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, sv)
-    return if alpha === x.alpha
-        x
-    else
-        EntropicValueatRisk(; settings = x.settings, slv = x.slv, alpha = alpha, w = x.w)
-    end
+    return rebuild_with_slots(x, (; alpha = alpha))
 end
 # Calibration slots — see `calibration_slots`.
 calibration_slots(x::EntropicValueatRisk) = (; alpha = x.alpha)
@@ -344,7 +340,7 @@ Resolve the two significance levels of an [`EntropicValueatRiskRange`](@ref) aga
 
 Each end carries its own slot and its own bound, so a tail rule and a head rule resolve independently. The solver is settled once, as `sel(x.slv, slv)`, and handed to both rules: the two ends of one measure are priced by one solver.
 
-The rebuild goes through the ordinary keyword constructor, which re-runs both range checks on the calibrated numbers.
+The rebuild goes through [`rebuild_with_slots`](@ref), whose positional call runs the inner constructor and re-runs both range checks on the calibrated numbers.
 
 # Related
 
@@ -359,12 +355,7 @@ function resolve_deferred_quantities(x::EntropicValueatRiskRange, pr::AbstractPr
     sv = sel(x.slv, slv)
     alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, sv)
     beta = resolve_calibration_slot(x.beta, :beta, pr, ws, sv)
-    return if alpha === x.alpha && beta === x.beta
-        x
-    else
-        EntropicValueatRiskRange(; settings = x.settings, slv = x.slv, alpha = alpha,
-                                 beta = beta, w = x.w)
-    end
+    return rebuild_with_slots(x, (; alpha = alpha, beta = beta))
 end
 # Calibration slots — see `calibration_slots`. One slot per tail, each with its own role.
 calibration_slots(x::EntropicValueatRiskRange) = (; alpha = x.alpha, beta = x.beta)
@@ -533,11 +524,7 @@ function resolve_deferred_quantities(x::EntropicDrawdownatRisk, pr::AbstractPrio
     ws = sel(x.w, pr.w)
     sv = sel(x.slv, slv)
     alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, sv)
-    return if alpha === x.alpha
-        x
-    else
-        EntropicDrawdownatRisk(; settings = x.settings, slv = x.slv, alpha = alpha, w = x.w)
-    end
+    return rebuild_with_slots(x, (; alpha = alpha))
 end
 # Calibration slots — see `calibration_slots`.
 calibration_slots(x::EntropicDrawdownatRisk) = (; alpha = x.alpha)
@@ -695,12 +682,7 @@ function resolve_deferred_quantities(x::RelativeEntropicDrawdownatRisk,
     ws = sel(x.w, pr.w)
     sv = sel(x.slv, slv)
     alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, sv)
-    return if alpha === x.alpha
-        x
-    else
-        RelativeEntropicDrawdownatRisk(; settings = x.settings, slv = x.slv, alpha = alpha,
-                                       w = x.w)
-    end
+    return rebuild_with_slots(x, (; alpha = alpha))
 end
 # Calibration slots — see `calibration_slots`.
 calibration_slots(x::RelativeEntropicDrawdownatRisk) = (; alpha = x.alpha)

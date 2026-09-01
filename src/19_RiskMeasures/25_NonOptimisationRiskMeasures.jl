@@ -384,8 +384,7 @@ function resolve_deferred_quantities(r::ThirdCentralMoment, pr::AbstractPriorRes
     if !isa(r.mu, DeferredQuantity)
         return r
     end
-    return ThirdCentralMoment(; settings = r.settings, w = r.w,
-                              mu = resolve_slot(r.mu, :mu, pr))
+    return rebuild_with_slots(r, (; mu = resolve_slot(r.mu, :mu, pr)))
 end
 # Deferrable slots — see `deferred_slots`.
 deferred_slots(r::ThirdCentralMoment) = (; mu = r.mu)

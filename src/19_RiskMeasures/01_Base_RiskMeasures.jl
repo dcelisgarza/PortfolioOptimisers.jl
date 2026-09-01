@@ -1882,29 +1882,42 @@ end
 """
     rebuild_with_slots(x, slots::NamedTuple)
 
-Return a copy of `x` whose fields named by `slots` hold the values in `slots`.
+Return `x` itself when every field named by `slots` already holds the value `slots` gives it, and a copy of `x` carrying those values when one of them moved.
 
-The field list is derived from the type and the constructor is recovered from it, so nothing is written per type. The call is positional, so the inner constructor runs and every guard the type states is re-applied to the rebuilt value.
+This is the one rebuild of the resolution channel. The field list is derived from the type and the constructor is recovered from it, so nothing is written per type: a field added to the type joins the rebuild on its own, and no site can drop one. Every [`resolve_deferred_quantities`](@ref) method ends here, the derived recursion and the per-type overrides alike.
+
+The call is positional, so the inner constructor runs and every guard the type states is re-applied to the rebuilt value. A **Calibration Rule** that returns a value the slot does not admit is therefore refused at fold time, by the guard a caller's own number meets.
 
 # Algorithm
 
  1. Read the type of `x` into `T`.
  2. Read every field of `x` into the named tuple `props`, in declaration order.
- 3. Merge `slots` over `props`, so a named slot carries its new value and every other field survives.
- 4. Call `T.name.wrapper` positionally on the merged values, so the inner constructor runs and re-applies every guard the type states.
+ 3. Return `x` itself when every entry of `slots` is the value the field of that name already held, so the common case allocates nothing.
+ 4. Merge `slots` over `props`, so a named slot carries its new value and every other field survives.
+ 5. Call `T.name.wrapper` positionally on the merged values, so the inner constructor runs and re-applies every guard the type states.
+
+# Validation
+
+  - Throws whatever the inner constructor of `T` throws for the merged values, so a slot that moved out of its admitted range is refused here.
 
 # Returns
 
-  - A value of the same type as `x`, holding the values in `slots`.
+  - `x` itself when no slot moved, and a value of the same type as `x` holding the values in `slots` when one did.
 
 # Related
 
   - [`resolve_deferred_quantities`](@ref)
   - [`deferred_slots`](@ref)
+  - [`calibration_slots`](@ref)
 """
 function rebuild_with_slots(x, slots::NamedTuple)
     T = typeof(x)
     props = NamedTuple{fieldnames(T)}(ntuple(i -> getfield(x, i), Val(fieldcount(T))))
+    # A rebuild whose every slot holds the value its field already held returns `x` itself,
+    # so the common case allocates nothing and the constructor runs only where a slot moved.
+    if all(map(===, values(slots), values(props[keys(slots)])))
+        return x
+    end
     return T.name.wrapper(values(merge(props, slots))...)
 end
 """
@@ -1958,8 +1971,7 @@ A type that resolves a quantity of its own overrides this with its own method, w
  2. Return `x` unchanged when `slots` is empty. A type with no deferrable slot needs no method of its own.
  3. Resolve every entry of `slots` with [`resolve_deferred_child`](@ref), threading `pr` and `slv` to each, giving `resolved`.
  4. Refuse a slot the recursion left unresolved with [`assert_declared_slot_resolver`](@ref).
- 5. Return `x` itself when every entry of `resolved` is the entry `slots` held, so the common case allocates nothing.
- 6. Otherwise rebuild `x` around `resolved` with [`rebuild_with_slots`](@ref), and return the rebuilt value.
+ 5. Hand `resolved` to [`rebuild_with_slots`](@ref), which returns `x` itself when no entry moved and a rebuilt copy when one did.
 
 # Returns
 
@@ -1979,13 +1991,7 @@ function resolve_deferred_quantities(x, pr::AbstractPriorResult, slv = nothing)
     end
     resolved = map(slot -> resolve_deferred_child(slot, pr, slv), slots)
     assert_declared_slot_resolver(x, resolved)
-    # A container whose children resolved to themselves is returned unchanged, so the common
-    # case allocates nothing and the rebuild runs only where a slot really moved.
-    return if all(map(===, values(resolved), values(slots)))
-        x
-    else
-        rebuild_with_slots(x, resolved)
-    end
+    return rebuild_with_slots(x, resolved)
 end
 """
     assert_resolved_slots(x)

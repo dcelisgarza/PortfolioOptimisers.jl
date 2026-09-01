@@ -1134,11 +1134,7 @@ The parent declares this object in [`deferred_slots`](@ref), so the recursion of
 function resolve_deferred_quantities(x::OrderedWeightsArrayConditionalValueatRisk,
                                      pr::AbstractPriorResult, slv = nothing)
     alpha = resolve_calibration_slot(x.alpha, :alpha, pr, pr.w, slv)
-    return if alpha === x.alpha
-        x
-    else
-        OrderedWeightsArrayConditionalValueatRisk(; alpha = alpha)
-    end
+    return rebuild_with_slots(x, (; alpha = alpha))
 end
 # Calibration slots — see `calibration_slots`.
 calibration_slots(x::OrderedWeightsArrayConditionalValueatRisk) = (; alpha = x.alpha)
@@ -1311,7 +1307,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolve the outer integration bound `alpha` of an [`OrderedWeightsArrayTailGini`](@ref) against prior result `pr`.
 
-`alpha_i` is the starting point of the inner integration and not a quantity to estimate, so it keeps its number. Only `alpha` widens, and the rebuild goes through the ordinary keyword constructor: that call is where `0 < alpha_i < alpha < 1` runs on the calibrated number, so a rule that returns a value at or below the stated `alpha_i` is refused at fold time.
+`alpha_i` is the starting point of the inner integration and not a quantity to estimate, so it keeps its number. Only `alpha` widens, and the rebuild goes through [`rebuild_with_slots`](@ref): the inner constructor it calls is where `0 < alpha_i < alpha < 1` runs on the calibrated number, so a rule that returns a value at or below the stated `alpha_i` is refused at fold time.
 
 The type is a weight builder, so the rule is handed `pr.w` and the solver the container was given.
 
@@ -1325,11 +1321,7 @@ The type is a weight builder, so the rule is handed `pr.w` and the solver the co
 function resolve_deferred_quantities(x::OrderedWeightsArrayTailGini,
                                      pr::AbstractPriorResult, slv = nothing)
     alpha = resolve_calibration_slot(x.alpha, :alpha, pr, pr.w, slv)
-    return if alpha === x.alpha
-        x
-    else
-        OrderedWeightsArrayTailGini(; alpha_i = x.alpha_i, alpha = alpha, a_sim = x.a_sim)
-    end
+    return rebuild_with_slots(x, (; alpha = alpha))
 end
 # Calibration slots — see `calibration_slots`. `alpha_i` is a starting point of the inner
 # integration, not a quantity to estimate, so it is not one of them.
@@ -1501,11 +1493,7 @@ function resolve_deferred_quantities(x::OrderedWeightsArrayConditionalValueatRis
                                      pr::AbstractPriorResult, slv = nothing)
     alpha = resolve_calibration_slot(x.alpha, :alpha, pr, pr.w, slv)
     beta = resolve_calibration_slot(x.beta, :beta, pr, pr.w, slv)
-    return if alpha === x.alpha && beta === x.beta
-        x
-    else
-        OrderedWeightsArrayConditionalValueatRiskRange(; alpha = alpha, beta = beta)
-    end
+    return rebuild_with_slots(x, (; alpha = alpha, beta = beta))
 end
 # Calibration slots — see `calibration_slots`. One slot per tail, each with its own role.
 function calibration_slots(x::OrderedWeightsArrayConditionalValueatRiskRange)
@@ -1702,7 +1690,7 @@ Resolve the two outer integration bounds of an [`OrderedWeightsArrayTailGiniRang
 
 `alpha_i` and `beta_i` are the starting points of the two inner integrations and not quantities to estimate, so both keep their numbers. `beta` defaults to [`mirror_role`](@ref) of `alpha`, and `beta_i` to `alpha_i`, so a rule stated once reaches both ends and neither inner bound moves.
 
-The rebuild goes through the ordinary keyword constructor, so each joint bound runs on the calibrated number at fold time.
+The rebuild goes through [`rebuild_with_slots`](@ref), so each joint bound runs on the calibrated number at fold time.
 
 # Related
 
@@ -1715,13 +1703,7 @@ function resolve_deferred_quantities(x::OrderedWeightsArrayTailGiniRange,
                                      pr::AbstractPriorResult, slv = nothing)
     alpha = resolve_calibration_slot(x.alpha, :alpha, pr, pr.w, slv)
     beta = resolve_calibration_slot(x.beta, :beta, pr, pr.w, slv)
-    return if alpha === x.alpha && beta === x.beta
-        x
-    else
-        OrderedWeightsArrayTailGiniRange(; alpha_i = x.alpha_i, alpha = alpha,
-                                         a_sim = x.a_sim, beta_i = x.beta_i, beta = beta,
-                                         b_sim = x.b_sim)
-    end
+    return rebuild_with_slots(x, (; alpha = alpha, beta = beta))
 end
 # Calibration slots — see `calibration_slots`. The two inner starting points are not
 # quantities to estimate, so neither is one of them.

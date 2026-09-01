@@ -520,3 +520,24 @@ end
         @test isapprox(res.pred[i].res.w, optimise(mri, rdi).w; rtol = 1e-5)
     end
 end
+
+@testset "Significance calibration: the rebuild keeps every field the rule did not move" begin
+    # The rebuild is derived from the type, so a field the resolution never names survives
+    # it. The two Range builders carry four such fields between them, and each was retyped
+    # by hand at the rebuild before the channel went through `rebuild_with_slots`.
+    role = sig_tail(3)
+    tg = OrderedWeightsArrayTailGiniRange(; alpha_i = 1e-4, alpha = role, beta_i = 2e-4,
+                                          beta = sig_head(3), a_sim = 77, b_sim = 88)
+    out = PO.resolve_deferred_quantities(tg, PR60)
+    @test out.alpha ≈ 0.05
+    @test out.beta ≈ 0.05
+    @test out.alpha_i === tg.alpha_i
+    @test out.beta_i === tg.beta_i
+    @test out.a_sim === tg.a_sim
+    @test out.b_sim === tg.b_sim
+
+    # A measure whose slots all resolved to themselves is the object the caller passed in,
+    # so the common case allocates nothing.
+    stated = OrderedWeightsArrayTailGiniRange(; alpha = 0.05, beta = 0.05)
+    @test PO.resolve_deferred_quantities(stated, PR60) === stated
+end

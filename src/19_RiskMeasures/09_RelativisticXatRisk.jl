@@ -280,7 +280,7 @@ Resolve the significance level `alpha` and the deformation parameter `kappa` of 
 
 The series this measure prices travels the same way, through [`bind_series`](@ref). It is the returns, which is the default [`calibration_series`](@ref) states, so the call binds what a rule already carries and is written for the reason every site writes it: the marker belongs to the measure, and a rule that carries a drawdown marker into this slot is corrected rather than obeyed.
 
-The solver is settled once, as `sel(x.slv, slv)`, and handed to both rules, so a rule may call [`RRM`](@ref) itself. The rebuild goes through the ordinary keyword constructor, which re-runs both range checks on the calibrated numbers.
+The solver is settled once, as `sel(x.slv, slv)`, and handed to both rules, so a rule may call [`RRM`](@ref) itself. The rebuild goes through [`rebuild_with_slots`](@ref), whose positional call runs the inner constructor and re-runs both range checks on the calibrated numbers.
 
 # Related
 
@@ -299,12 +299,7 @@ function resolve_deferred_quantities(x::RelativisticValueatRisk, pr::AbstractPri
     alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, sv)
     kappa = resolve_calibration_slot(bind_series(bind_alpha(x.kappa, alpha), s), :kappa, pr,
                                      ws, sv)
-    return if alpha === x.alpha && kappa === x.kappa
-        x
-    else
-        RelativisticValueatRisk(; settings = x.settings, slv = x.slv, alpha = alpha,
-                                kappa = kappa, w = x.w)
-    end
+    return rebuild_with_slots(x, (; alpha = alpha, kappa = kappa))
 end
 # Calibration slots — see `calibration_slots`. The two travel together, and the resolution
 # above is what orders them.
@@ -488,16 +483,9 @@ function resolve_deferred_quantities(x::RelativisticValueatRiskRange,
     beta = resolve_calibration_slot(x.beta, :beta, pr, ws, sv)
     kappa_b = resolve_calibration_slot(bind_series(bind_alpha(x.kappa_b, beta), s),
                                        :kappa_b, pr, ws, sv)
-    return if alpha === x.alpha &&
-              kappa_a === x.kappa_a &&
-              beta === x.beta &&
-              kappa_b === x.kappa_b
-        x
-    else
-        RelativisticValueatRiskRange(; settings = x.settings, slv = x.slv, alpha = alpha,
-                                     kappa_a = kappa_a, beta = beta, kappa_b = kappa_b,
-                                     w = x.w)
-    end
+    return rebuild_with_slots(x,
+                              (; alpha = alpha, kappa_a = kappa_a, beta = beta,
+                               kappa_b = kappa_b))
 end
 # Calibration slots — see `calibration_slots`. One travelling pair per tail.
 function calibration_slots(x::RelativisticValueatRiskRange)
@@ -690,12 +678,7 @@ function resolve_deferred_quantities(x::RelativisticDrawdownatRisk, pr::Abstract
     alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, sv)
     kappa = resolve_calibration_slot(bind_series(bind_alpha(x.kappa, alpha), s), :kappa, pr,
                                      ws, sv)
-    return if alpha === x.alpha && kappa === x.kappa
-        x
-    else
-        RelativisticDrawdownatRisk(; settings = x.settings, slv = x.slv, alpha = alpha,
-                                   kappa = kappa, w = x.w)
-    end
+    return rebuild_with_slots(x, (; alpha = alpha, kappa = kappa))
 end
 # Calibration slots — see `calibration_slots`.
 calibration_slots(x::RelativisticDrawdownatRisk) = (; alpha = x.alpha, kappa = x.kappa)
@@ -879,12 +862,7 @@ function resolve_deferred_quantities(x::RelativeRelativisticDrawdownatRisk,
     alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, sv)
     kappa = resolve_calibration_slot(bind_series(bind_alpha(x.kappa, alpha), s), :kappa, pr,
                                      ws, sv)
-    return if alpha === x.alpha && kappa === x.kappa
-        x
-    else
-        RelativeRelativisticDrawdownatRisk(; settings = x.settings, slv = x.slv,
-                                           alpha = alpha, kappa = kappa, w = x.w)
-    end
+    return rebuild_with_slots(x, (; alpha = alpha, kappa = kappa))
 end
 # Calibration slots — see `calibration_slots`.
 function calibration_slots(x::RelativeRelativisticDrawdownatRisk)

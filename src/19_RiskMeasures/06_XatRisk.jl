@@ -383,16 +383,16 @@ function resolve_deferred_quantities(alg::DistributionValueatRisk, pr::AbstractP
     end
     mu = resolve_slot(alg.mu, :mu, pr)
     if isnothing(alg.pe)
-        return DistributionValueatRisk(; mu = mu, sigma = sigma, chol = chol, pe = nothing,
-                                       dist = alg.dist)
+        return rebuild_with_slots(alg, (; mu = mu, sigma = sigma, chol = chol))
     end
     fitted = fit_deferred_quantity(alg.pe, pr)
     # `chol` is derived from `sigma`, so it comes from the fan-out only when the fan-out
     # also supplies the `sigma` it factorises. Read before `sigma` is filled.
     chol = isnothing(sigma) ? deferred_derived_quantity(fitted, :chol) : chol
-    return DistributionValueatRisk(; mu = fan_out_slot(fitted, mu, :mu),
-                                   sigma = fan_out_slot(fitted, sigma, :sigma), chol = chol,
-                                   pe = nothing, dist = alg.dist)
+    return rebuild_with_slots(alg,
+                              (; mu = fan_out_slot(fitted, mu, :mu),
+                               sigma = fan_out_slot(fitted, sigma, :sigma), chol = chol,
+                               pe = nothing))
 end
 # Deferrable slots — see `deferred_slots`. `chol` is derived and never defers on its own.
 function deferred_slots(alg::DistributionValueatRisk)
@@ -562,7 +562,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolve the significance level `alpha` of a [`ValueatRisk`](@ref) against prior result `pr`, and resolve the formulation `alg` beside it.
 
-`alpha` takes a **Calibration Rule** in place of the number, so it resolves here. The rebuild goes through the ordinary keyword constructor, and that call re-runs `0 < alpha < 1` on the calibrated number: a rule that returns a value the slot does not admit is refused at fold time, by the constructor a caller's own number meets.
+`alpha` takes a **Calibration Rule** in place of the number, so it resolves here. The rebuild goes through [`rebuild_with_slots`](@ref), and the inner constructor it calls re-runs `0 < alpha < 1` on the calibrated number: a rule that returns a value the slot does not admit is refused at fold time, by the guard a caller's own number meets.
 
 This method is more specific than the derived recursion, so it takes over the `alg` slot that [`deferred_slots`](@ref) declares. It resolves that slot through [`resolve_deferred_child`](@ref), which is the verb the derivation would have used.
 
@@ -579,11 +579,7 @@ function resolve_deferred_quantities(x::ValueatRisk, pr::AbstractPriorResult, sl
     ws = sel(x.w, pr.w)
     alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, slv)
     alg = resolve_deferred_child(x.alg, pr, slv)
-    return if alpha === x.alpha && alg === x.alg
-        x
-    else
-        ValueatRisk(; settings = x.settings, alpha = alpha, w = x.w, alg = alg)
-    end
+    return rebuild_with_slots(x, (; alpha = alpha, alg = alg))
 end
 # Calibration slots — see `calibration_slots`. The significance level is the one quantity of
 # this measure that a rule may compute.
@@ -764,7 +760,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolve the two significance levels of a [`ValueatRiskRange`](@ref) against prior result `pr`, and resolve the formulation `alg` beside them.
 
-Each tail carries its own slot and its own bound, so a tail rule and a head rule resolve independently and neither is mirrored onto the other. The rebuild goes through the ordinary keyword constructor, which re-runs both range checks on the calibrated numbers.
+Each tail carries its own slot and its own bound, so a tail rule and a head rule resolve independently and neither is mirrored onto the other. The rebuild goes through [`rebuild_with_slots`](@ref), whose positional call runs the inner constructor and re-runs both range checks on the calibrated numbers.
 
 This method is more specific than the derived recursion, so it takes over the `alg` slot that [`deferred_slots`](@ref) declares, through [`resolve_deferred_child`](@ref).
 
@@ -781,12 +777,7 @@ function resolve_deferred_quantities(x::ValueatRiskRange, pr::AbstractPriorResul
     alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, slv)
     beta = resolve_calibration_slot(x.beta, :beta, pr, ws, slv)
     alg = resolve_deferred_child(x.alg, pr, slv)
-    return if alpha === x.alpha && beta === x.beta && alg === x.alg
-        x
-    else
-        ValueatRiskRange(; settings = x.settings, alpha = alpha, beta = beta, w = x.w,
-                         alg = alg)
-    end
+    return rebuild_with_slots(x, (; alpha = alpha, beta = beta, alg = alg))
 end
 # Calibration slots — see `calibration_slots`. One slot per tail, each with its own role.
 calibration_slots(x::ValueatRiskRange) = (; alpha = x.alpha, beta = x.beta)
@@ -1007,7 +998,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolve the significance level `alpha` of a [`DrawdownatRisk`](@ref) against prior result `pr`.
 
-The measure reads the drawdown series of the sample, so a rule that counts scenarios counts the same rows the drawdown is taken over. The rebuild goes through the ordinary keyword constructor, which re-runs `0 < alpha < 1` and the `b > s` pairing on the calibrated measure.
+The measure reads the drawdown series of the sample, so a rule that counts scenarios counts the same rows the drawdown is taken over. The rebuild goes through [`rebuild_with_slots`](@ref), whose positional call runs the inner constructor and re-runs `0 < alpha < 1` and the `b > s` pairing on the calibrated measure.
 
 The effective observation weights are computed locally as `sel(x.w, pr.w)` and threaded to the rule.
 
@@ -1022,11 +1013,7 @@ function resolve_deferred_quantities(x::DrawdownatRisk, pr::AbstractPriorResult,
                                      slv = nothing)
     ws = sel(x.w, pr.w)
     alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, slv)
-    return if alpha === x.alpha
-        x
-    else
-        DrawdownatRisk(; settings = x.settings, alpha = alpha, w = x.w, b = x.b, s = x.s)
-    end
+    return rebuild_with_slots(x, (; alpha = alpha))
 end
 # Calibration slots — see `calibration_slots`.
 calibration_slots(x::DrawdownatRisk) = (; alpha = x.alpha)
@@ -1238,7 +1225,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolve the significance level `alpha` of a [`RelativeDrawdownatRisk`](@ref) against prior result `pr`.
 
-The measure is a hierarchical one, so it reaches no `JuMP` model and the [`factory`](@ref) route is its only resolution. The rebuild goes through the ordinary keyword constructor, which re-runs `0 < alpha < 1` on the calibrated number.
+The measure is a hierarchical one, so it reaches no `JuMP` model and the [`factory`](@ref) route is its only resolution. The rebuild goes through [`rebuild_with_slots`](@ref), whose positional call runs the inner constructor and re-runs `0 < alpha < 1` on the calibrated number.
 
 The effective observation weights are computed locally as `sel(x.w, pr.w)` and threaded to the rule.
 
@@ -1253,11 +1240,7 @@ function resolve_deferred_quantities(x::RelativeDrawdownatRisk, pr::AbstractPrio
                                      slv = nothing)
     ws = sel(x.w, pr.w)
     alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, slv)
-    return if alpha === x.alpha
-        x
-    else
-        RelativeDrawdownatRisk(; settings = x.settings, alpha = alpha, w = x.w)
-    end
+    return rebuild_with_slots(x, (; alpha = alpha))
 end
 # Calibration slots — see `calibration_slots`.
 calibration_slots(x::RelativeDrawdownatRisk) = (; alpha = x.alpha)

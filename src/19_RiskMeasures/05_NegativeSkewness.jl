@@ -204,10 +204,10 @@ function resolve_deferred_quantities(r::NegativeSkewness, pr::AbstractPriorResul
     end
     fitted = fit_deferred_quantity(r.sk, pr)
     skmp = deferred_derived_quantity(fitted, :skmp)
-    return NegativeSkewness(; settings = r.settings, mp = isnothing(skmp) ? r.mp : skmp,
-                            sk = deferred_quantity(fitted, :sk),
-                            V = deferred_derived_quantity(fitted, :V), alg = r.alg,
-                            window = r.window)
+    return rebuild_with_slots(r,
+                              (; mp = isnothing(skmp) ? r.mp : skmp,
+                               sk = deferred_quantity(fitted, :sk),
+                               V = deferred_derived_quantity(fitted, :V)))
 end
 # Deferrable slots — see `deferred_slots`. `V` is derived and never defers on its own, and
 # `mp` holds a processor by design.
