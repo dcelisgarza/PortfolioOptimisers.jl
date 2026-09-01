@@ -26,6 +26,7 @@ compat_cov
 compat_cor
 moment_window_and_weights
 windowed_preamble
+weighted_centre
 demean_returns
 ```
 

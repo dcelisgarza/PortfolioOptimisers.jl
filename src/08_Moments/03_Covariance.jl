@@ -334,11 +334,11 @@ The four methods of `Statistics.cov` and `Statistics.cor` that take a [`Covarian
 
 # Algorithm
 
- 1. `ce.w` is `nothing`: take `mu` from `mean`, or compute it with `ce.me` when `mean` is `nothing`. Return `mu` and `ce.ce` unchanged.
- 2. `ce.w` is not `nothing`: send `ce.me` through [`factory`](@ref) with `ce.w`, so that the centre carries the weights of the deviations. Take `mu` from `mean`, or compute it with the rebuilt estimator when `mean` is `nothing`.
- 3. Send `ce.ce` through [`factory_child`](@ref) with `ce.w`. An estimator of the library takes the weights; a `StatsBase.CovarianceEstimator` that is not one of them passes through unchanged, because no verb of this library reads its weights.
+ 1. Resolve the centre `mu` from `ce.me` and `ce.w` with [`weighted_centre`](@ref), which reads `mean` when the caller gave one. `ce.w` reaches `ce.me` through [`factory`](@ref), so the centre carries the weights of the deviations.
+ 2. `ce.w` is `nothing`: return `ce.ce` unchanged.
+ 3. `ce.w` is not `nothing`: send `ce.ce` through [`factory_child`](@ref) with `ce.w`. An estimator of the library takes the weights; a `StatsBase.CovarianceEstimator` that is not one of them passes through unchanged, because no verb of this library reads its weights.
 
-Step 1 is a performance guard and not a second contract. `ce.w` is a field, so its type decides the branch, and the guard keeps a windowed loop from rebuilding the estimator tree of `ce` once per window. A `ce.ce` that holds weights of its own therefore keeps them when `ce.w` is `nothing`, and loses them to `ce.w` when it is not. That is what [`factory`](@ref) does on every other path.
+Step 2 is a performance guard and not a second contract. `ce.w` is a field, so its type decides the branch, and the guard keeps a windowed loop from rebuilding the estimator tree of `ce` once per window. A `ce.ce` that holds weights of its own therefore keeps them when `ce.w` is `nothing`, and loses them to `ce.w` when it is not. That is what [`factory`](@ref) does on every other path.
 
 # Arguments
 
@@ -356,18 +356,14 @@ Step 1 is a performance guard and not a second contract. `ce.w` is a field, so i
 # Related
 
   - [`Covariance`](@ref)
+  - [`weighted_centre`](@ref)
   - [`factory`](@ref)
   - [`factory_child`](@ref)
 """
 function covariance_centre_and_estimator(ce::Covariance, X::MatNum; dims::Int = 1,
                                          mean = nothing, kwargs...)
-    if isnothing(ce.w)
-        mu = isnothing(mean) ? Statistics.mean(ce.me, X; dims = dims, kwargs...) : mean
-        return mu, ce.ce
-    end
-    me = factory(ce.me, ce.w)
-    mu = isnothing(mean) ? Statistics.mean(me, X; dims = dims, kwargs...) : mean
-    return mu, factory_child(ce.ce, ce.w)
+    mu = weighted_centre(X, ce.me, ce.w; dims = dims, mean = mean, kwargs...)
+    return mu, isnothing(ce.w) ? ce.ce : factory_child(ce.ce, ce.w)
 end
 """
     Statistics.cov(

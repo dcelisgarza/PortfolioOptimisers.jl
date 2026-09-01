@@ -327,7 +327,7 @@ This method centres the data with the estimator's mean estimator and repairs the
 
  1. Orient `X` to observations × assets with [`dims_oriented`](@ref), which validates `dims`.
  2. Resolve the observation weights `w` from `kte.w` with [`get_observation_weights`](@ref).
- 3. Resolve the centre `mu`. Take it from `mean` when the caller gave one. Otherwise compute it with `kte.me`, and with `factory(kte.me, kte.w)` when `kte.w` is not `nothing`.
+ 3. Resolve the centre `mu` from `kte.me` and `kte.w` with [`weighted_centre`](@ref), which reads `mean` when the caller gave one.
  4. Replace `X` with the deviation matrix. [`FullMoment`](@ref) takes `X .- mu`, and [`SemiMoment`](@ref) takes `min.(X .- mu, 0)`.
  5. Delegate to [`_cokurtosis`](@ref) with the deviation matrix, `kte.mp` and `w`, and return the matrix it returns.
 
@@ -376,18 +376,13 @@ julia> cokurtosis(Cokurtosis(), X)
 
   - [`Cokurtosis`](@ref)
   - [`_cokurtosis`](@ref)
+  - [`weighted_centre`](@ref)
 """
 function cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:FullMoment}, X::MatNum; dims::Int = 1,
                     mean = nothing, kwargs...)
     X = dims_oriented(dims, X)
     w = get_observation_weights(kte.w, X; dims = 1, kwargs...)
-    mu = if !isnothing(mean)
-        mean
-    elseif isnothing(kte.w)
-        Statistics.mean(kte.me, X; kwargs...)
-    else
-        Statistics.mean(factory(kte.me, kte.w), X; kwargs...)
-    end
+    mu = weighted_centre(X, kte.me, kte.w; dims = 1, mean = mean, kwargs...)
     X = X .- mu
     return _cokurtosis(X, kte.mp, w)
 end
@@ -395,13 +390,7 @@ function cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:SemiMoment}, X::MatNum; dims
                     mean = nothing, kwargs...)
     X = dims_oriented(dims, X)
     w = get_observation_weights(kte.w, X; dims = 1, kwargs...)
-    mu = if !isnothing(mean)
-        mean
-    elseif isnothing(kte.w)
-        Statistics.mean(kte.me, X; kwargs...)
-    else
-        Statistics.mean(factory(kte.me, kte.w), X; kwargs...)
-    end
+    mu = weighted_centre(X, kte.me, kte.w; dims = 1, mean = mean, kwargs...)
     X = min.(X .- mu, zero(eltype(X)))
     return _cokurtosis(X, kte.mp, w)
 end

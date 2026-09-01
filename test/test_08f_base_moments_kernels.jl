@@ -204,6 +204,45 @@ end
     @test PortfolioOptimisers.densify(transpose(x)) isa Matrix{JuMP.VariableRef}
 end
 
+@testset "weighted_centre is the one place ADR 0088 lives" begin
+    rng = StableRNG(20260901)
+    X = randn(rng, 40, 5)
+    me = SimpleExpectedReturns()
+    w = StatsBase.aweights(range(0.5, 1.5; length = size(X, 1)))
+    w2 = StatsBase.aweights(reverse(collect(w)))
+    # No weights: the centre is the one the estimator computes on its own.
+    @test PortfolioOptimisers.weighted_centre(X, me, nothing; dims = 1) ≈
+          Statistics.mean(me, X; dims = 1)
+    # `dims = 2` names the other axis, so the estimator shapes `mu` along the first one.
+    @test size(PortfolioOptimisers.weighted_centre(X, me, nothing; dims = 2)) == (40, 1)
+    # Weights reach the centre through `factory`, so the centre is the WEIGHTED mean.
+    muw = Statistics.mean(SimpleExpectedReturns(; w = w), X; dims = 1)
+    @test PortfolioOptimisers.weighted_centre(X, me, w; dims = 1) ≈ muw
+    @test !isapprox(muw, Statistics.mean(me, X; dims = 1))
+    # The incoming `w` wins over the weights that `me` carries, which is what `factory`
+    # does on every other path.
+    @test PortfolioOptimisers.weighted_centre(X, SimpleExpectedReturns(; w = w2), w;
+                                              dims = 1) ≈ muw
+    # `mean` is the escape hatch. It is returned unchanged, weights set or not.
+    given = fill(0.5, 1, 5)
+    @test PortfolioOptimisers.weighted_centre(X, me, nothing; dims = 1, mean = given) ===
+          given
+    @test PortfolioOptimisers.weighted_centre(X, me, w; dims = 1, mean = given) === given
+    # `covariance_centre_and_estimator` reads the same verb, so `Covariance` centres where
+    # its three siblings do. It also answers the inner estimator, which is the half no
+    # sibling has: `ce.ce` passes through untouched when `ce.w` is `nothing`, and takes the
+    # weights through `factory_child` when it is not.
+    ce0 = Covariance()
+    mu0, cel0 = PortfolioOptimisers.covariance_centre_and_estimator(ce0, X; dims = 1)
+    @test mu0 ≈ Statistics.mean(me, X; dims = 1)
+    @test cel0 === ce0.ce
+    cew = Covariance(; w = w)
+    muw2, celw = PortfolioOptimisers.covariance_centre_and_estimator(cew, X; dims = 1)
+    @test muw2 ≈ muw
+    @test celw.w === w
+    @test !(celw === cew.ce)
+end
+
 @testset "demean_returns subtracts the mean the caller asked for" begin
     rng = StableRNG(20260824)
     X = randn(rng, 40, 5)

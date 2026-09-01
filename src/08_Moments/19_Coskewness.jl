@@ -414,7 +414,7 @@ The two returned matrices are different objects. The first is the coskewness ten
 
  1. Orient `X` to observations × assets with [`dims_oriented`](@ref), which validates `dims`.
  2. Resolve the observation weights `w` from `ske.w` with [`get_observation_weights`](@ref).
- 3. Resolve the centre `mu`. Take it from `mean` when the caller gave one. Otherwise compute it with `ske.me`, and with `factory(ske.me, ske.w)` when `ske.w` is not `nothing`.
+ 3. Resolve the centre `mu` from `ske.me` and `ske.w` with [`weighted_centre`](@ref), which reads `mean` when the caller gave one.
  4. Form the deviation matrix `Y`. [`FullMoment`](@ref) takes `X .- mu`, and [`SemiMoment`](@ref) takes `min.(X .- mu, 0)`.
  5. Delegate to [`_coskewness`](@ref) with `Y`, `X`, `ske.mp` and `w`, and return the pair it returns.
 
@@ -471,19 +471,14 @@ julia> V
 
   - [`Coskewness`](@ref)
   - [`_coskewness`](@ref)
+  - [`weighted_centre`](@ref)
   - [`negative_spectral_coskewness`](@ref)
 """
 function coskewness(ske::Coskewness{<:Any, <:Any, <:FullMoment}, X::MatNum; dims::Int = 1,
                     mean = nothing, kwargs...)
     X = dims_oriented(dims, X)
     w = get_observation_weights(ske.w, X; dims = 1, kwargs...)
-    mu = if !isnothing(mean)
-        mean
-    elseif isnothing(ske.w)
-        Statistics.mean(ske.me, X; kwargs...)
-    else
-        Statistics.mean(factory(ske.me, ske.w), X; kwargs...)
-    end
+    mu = weighted_centre(X, ske.me, ske.w; dims = 1, mean = mean, kwargs...)
     Y = X .- mu
     return _coskewness(Y, X, ske.mp, w)
 end
@@ -491,13 +486,7 @@ function coskewness(ske::Coskewness{<:Any, <:Any, <:SemiMoment}, X::MatNum; dims
                     mean = nothing, kwargs...)
     X = dims_oriented(dims, X)
     w = get_observation_weights(ske.w, X; dims = 1, kwargs...)
-    mu = if !isnothing(mean)
-        mean
-    elseif isnothing(ske.w)
-        Statistics.mean(ske.me, X; kwargs...)
-    else
-        Statistics.mean(factory(ske.me, ske.w), X; kwargs...)
-    end
+    mu = weighted_centre(X, ske.me, ske.w; dims = 1, mean = mean, kwargs...)
     Y = min.(X .- mu, zero(eltype(X)))
     return _coskewness(Y, X, ske.mp, w)
 end

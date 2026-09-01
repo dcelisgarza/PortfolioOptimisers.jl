@@ -113,7 +113,7 @@ Dispersion kernel shared by the [`SimpleVariance`](@ref) methods of `Statistics.
 The matrix method:
 
  1. Check that `dims` is `1` or `2`.
- 2. When `mean` is `nothing`, compute the centring vector `mu` with `me`; otherwise take `mu` from `mean`. When `ve.w` is not `nothing`, send `me` through [`factory`](@ref) first, so that `mu` carries the same weights as the deviations.
+ 2. Resolve the centring vector `mu` from `me` and `ve.w` with [`weighted_centre`](@ref), which reads `mean` when the caller gave one.
  3. Resolve the observation weights from `ve.w` against `X` with [`get_observation_weights`](@ref), giving `w`.
  4. When `w` is `nothing`, call `f(X; dims = dims, corrected = ve.corrected, mean = mu)`.
  5. Otherwise call `f(X, w, dims; corrected = ve.corrected, mean = mu)`.
@@ -124,9 +124,9 @@ The vector method:
  2. When `w` is `nothing`, call `f(X; corrected = ve.corrected, mean = mean)`.
  3. Otherwise call `f(X, w; corrected = ve.corrected, mean = mean)`.
 
-The two methods reach one centre by two routes. The matrix method resolves a centre before it calls `f`, and it takes that centre from `me` after [`factory`](@ref) writes `ve.w` into it. The vector method passes `mean` through, so a `mean` of `nothing` leaves `f` to centre on the **weighted** mean of `X`. One `SimpleVariance` therefore answers a one-column matrix and the matching vector with one number. `ve.w` wins over the weights that `me` carries, which is what [`factory`](@ref) does on every other path. ADR 0088 records the decision, and `mean` takes any other centre.
+The two methods reach one centre by two routes. The matrix method resolves a centre before it calls `f`, and [`weighted_centre`](@ref) takes that centre from `me` after [`factory`](@ref) writes `ve.w` into it. The vector method passes `mean` through, so a `mean` of `nothing` leaves `f` to centre on the **weighted** mean of `X`. One `SimpleVariance` therefore answers a one-column matrix and the matching vector with one number. `ve.w` wins over the weights that `me` carries, which is what [`factory`](@ref) does on every other path. ADR 0088 records the decision, and `mean` takes any other centre.
 
-Step 2 calls [`factory`](@ref) only when `ve.w` is not `nothing`. That test is a performance guard and not a second contract: `ve.w` is a field, so its type decides the branch, and the guard keeps a windowed loop from rebuilding the estimator tree of `me` once per window.
+[`weighted_centre`](@ref) calls [`factory`](@ref) only when `ve.w` is not `nothing`. That test is a performance guard and not a second contract: `ve.w` is a field, so its type decides the branch, and the guard keeps a windowed loop from rebuilding the estimator tree of `me` once per window.
 
 # Arguments
 
@@ -149,19 +149,14 @@ Step 2 calls [`factory`](@ref) only when `ve.w` is not `nothing`. That test is a
 # Related
 
   - [`SimpleVariance`](@ref)
+  - [`weighted_centre`](@ref)
   - [`get_observation_weights`](@ref)
 """
 function simple_variance_kernel(f::F, ve::SimpleVariance,
                                 me::AbstractExpectedReturnsEstimator, X::MatNum;
                                 dims::Int = 1, mean = nothing, kwargs...) where {F}
     assert_dims(dims)
-    mu = if !isnothing(mean)
-        mean
-    elseif isnothing(ve.w)
-        Statistics.mean(me, X; dims = dims, kwargs...)
-    else
-        Statistics.mean(factory(me, ve.w), X; dims = dims, kwargs...)
-    end
+    mu = weighted_centre(X, me, ve.w; dims = dims, mean = mean, kwargs...)
     w = get_observation_weights(ve.w, X; dims = dims, kwargs...)
     return if isnothing(w)
         f(X; dims = dims, corrected = ve.corrected, mean = mu)

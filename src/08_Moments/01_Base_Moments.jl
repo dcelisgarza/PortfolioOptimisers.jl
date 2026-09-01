@@ -922,6 +922,53 @@ function moment_window_and_weights(X::VecNum, w::Option{<:ObsWeights}, window::V
     return X, w
 end
 """
+    weighted_centre(X::MatNum, me::AbstractExpectedReturnsEstimator,
+                    w::Option{<:ObsWeights}; dims::Int = 1, mean = nothing,
+                    kwargs...) -> Union{<:Number, <:ArrNum}
+
+Resolve the centre that a moment estimator's own observation weights weight.
+
+[ADR 0088](https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/main/docs/adr/0088-a-moment-estimators-weights-weight-its-centre.md) decided that a moment estimator's observation weights weight its centre, and not its deviations alone. This verb is the one place that decision lives, so [`SimpleVariance`](@ref), [`Covariance`](@ref), [`Coskewness`](@ref) and [`Cokurtosis`](@ref) reach their centre by one rule.
+
+# Algorithm
+
+ 1. `mean` is not `nothing`: return it unchanged. The keyword is the escape hatch for a centre that `w` does not describe.
+ 2. `w` is `nothing`: return `Statistics.mean(me, X; dims = dims, kwargs...)`.
+ 3. `w` is not `nothing`: send `me` through [`factory`](@ref) with `w`, so the centre carries the weights of the deviations, and return the mean of the rebuilt estimator.
+
+Step 2 is a performance guard and not a second contract. `w` reaches this verb from a field, so its type decides the branch, and the guard keeps a windowed loop from rebuilding the estimator tree of `me` once per window.
+
+# Arguments
+
+  - $(arg_dict[:X])
+  - $(arg_dict[:me])
+  - $(arg_dict[:oow])
+  - $(arg_dict[:dims])
+  - $(arg_dict[:omean])
+  - `kwargs...`: Additional keyword arguments for the expected returns estimator.
+
+# Returns
+
+  - `mu::Union{<:Number, <:ArrNum}`: Centring vector, weighted by `w` when `w` is not `nothing`.
+
+# Related
+
+  - [`AbstractExpectedReturnsEstimator`](@ref)
+  - [`demean_returns`](@ref)
+  - [`covariance_centre_and_estimator`](@ref)
+  - [`factory`](@ref)
+"""
+function weighted_centre(X::MatNum, me::AbstractExpectedReturnsEstimator,
+                         w::Option{<:ObsWeights}; dims::Int = 1, mean = nothing, kwargs...)
+    return if !isnothing(mean)
+        mean
+    elseif isnothing(w)
+        Statistics.mean(me, X; dims = dims, kwargs...)
+    else
+        Statistics.mean(factory(me, w), X; dims = dims, kwargs...)
+    end
+end
+"""
     demean_returns(X::MatNum, me::AbstractExpectedReturnsEstimator; dims::Int = 1, mean = nothing,
                    kwargs...) -> MatNum
 
@@ -929,7 +976,7 @@ Demeans the returns in `X` using the expected returns estimator `me` or if provi
 
 # Algorithm
 
- 1. When `mean` is `nothing`, estimate the expected returns with `Statistics.mean(me, X; dims = dims, kwargs...)`, giving `mu`. Otherwise take `mu` from `mean`.
+ 1. Resolve the centre `mu` with [`weighted_centre`](@ref). When `mean` is `nothing`, the estimator computes it; otherwise `mu` is `mean`. `me` carries whatever weights it holds, and this verb adds none of its own.
  2. Subtract `mu` from `X` by broadcast, and return the result. `dims` names the observation axis, and the estimator shapes `mu` along the other one, so the broadcast subtracts one value per asset from every observation of that asset.
 
 # Arguments
@@ -947,11 +994,11 @@ Demeans the returns in `X` using the expected returns estimator `me` or if provi
 # Related
 
   - [`AbstractExpectedReturnsEstimator`](@ref)
+  - [`weighted_centre`](@ref)
 """
 function demean_returns(X::MatNum, me::AbstractExpectedReturnsEstimator; dims::Int = 1,
                         mean = nothing, kwargs...)
-    mu = isnothing(mean) ? Statistics.mean(me, X; dims = dims, kwargs...) : mean
-    return X .- mu
+    return X .- weighted_centre(X, me, nothing; dims = dims, mean = mean, kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
