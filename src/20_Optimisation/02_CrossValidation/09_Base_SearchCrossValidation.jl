@@ -678,7 +678,7 @@ Converts a dotted string path (e.g., `"opt.pe.ce"`) into a composable lens for g
 # Validation
 
   - String keys longer than `EQUATION_LIMITS[].max_length` are rejected before `Meta.parse`.
-  - `Expr`/`Symbol` keys deeper than `EQUATION_LIMITS[].max_depth` are rejected before the lens-building walk.
+  - Keys deeper than `EQUATION_LIMITS[].max_depth` are rejected before the lens-building walk. A string key is measured after `Meta.parse`, so one depth bound holds for every shape of `key`.
 
 # Returns
 
@@ -692,12 +692,17 @@ Converts a dotted string path (e.g., `"opt.pe.ce"`) into a composable lens for g
   - [`EQUATION_LIMITS`](@ref)
 """
 function parse_lens(key::AbstractString)
-    # Trust boundary: cap the untrusted string length before `Meta.parse` and the
-    # recursive lens-building walk, so a deeply nested key cannot exhaust the stack.
+    # Trust boundary: cap the untrusted string length before `Meta.parse`, so a deeply
+    # nested key cannot exhaust the stack. The length bounds the achievable AST depth at
+    # about a third of the character count, which is looser than `max_depth`, so the
+    # parsed tree meets the depth cap directly, as the `Expr` form does.
     lim = EQUATION_LIMITS[]
     @argcheck(length(key) <= lim.max_length,
               Meta.ParseError("Lens key string is too long ($(length(key)) > $(lim.max_length) characters)."))
-    return expr_to_lens_chain(Meta.parse(key))
+    expr = Meta.parse(key)
+    @argcheck(!_expr_depth_exceeds(expr, lim.max_depth),
+              Meta.ParseError("Lens key expression is too deeply nested (exceeds depth $(lim.max_depth))."))
+    return expr_to_lens_chain(expr)
 end
 function parse_lens(key::Union{Expr, Symbol})
     # Trust-boundary defence for the pre-built-AST form (no string length cap applies):

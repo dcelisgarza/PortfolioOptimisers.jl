@@ -1028,6 +1028,12 @@
             ex = Expr(:ref, ex, 1)
         end
         @test_throws Meta.ParseError pe.parse_lens(ex)
+        # The string form is held to the same depth cap: a key that clears the length cap
+        # can still carry a tree deeper than max_depth, so the cap is read off the parsed
+        # tree rather than inferred from the character count.
+        deep_str = "a" * "[1]"^(pe.EQUATION_LIMITS[].max_depth + 10)
+        @test length(deep_str) <= pe.EQUATION_LIMITS[].max_length
+        @test_throws "too deeply nested" pe.parse_lens(deep_str)
         # A legitimate key still parses under the default caps.
         @test pe.parse_lens("opt.pe.ce") isa Base.Callable
     end

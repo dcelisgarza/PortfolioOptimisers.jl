@@ -1460,7 +1460,7 @@ end
 
 Parse a linear constraint equation from a string into a structured [`ParsingResult`](@ref).
 
-An equation string crosses a trust boundary, so both entry shapes carry a limit from `EQUATION_LIMITS[]` before any recursive walk runs. The string form is capped on length, which bounds the depth its parse can reach, and the pre-built `Expr` form is capped on depth directly, because no length applies to it. `docs/adr/0027-cap-equation-parser-recursion.md` owns both limits.
+An equation string crosses a trust boundary, so both entry shapes carry a limit from `EQUATION_LIMITS[]` before any recursive walk runs. The string form is capped on length before `Meta.parse` runs, and no length applies to the pre-built `Expr` form. Both forms are then capped on the depth of the expression tree, so one number bounds the recursion whichever shape the input takes. `docs/adr/0027-cap-equation-parser-recursion.md` owns both limits.
 
 # Algorithm
 
@@ -1469,7 +1469,7 @@ The method that Julia selects is the algorithm, and one method answers each shap
  1. `eqn` is a vector: apply this function to each element, and return the vector of results.
  2. `eqn` is a string: check its length against `EQUATION_LIMITS[].max_length`, and refuse the pattern `++`.
  3. Find the first operator of `ops1` that occurs in the string, giving `opstr`, and split the string on it into `lhs` and `rhs`.
- 4. Parse both parts with `Meta.parse`, giving `lexpr` and `rexpr`, and check each with [`rethrow_parse_error`](@ref).
+ 4. Parse both parts with `Meta.parse`, giving `lexpr` and `rexpr`, check each with [`rethrow_parse_error`](@ref), and check the depth of each against `EQUATION_LIMITS[].max_depth` with [`_expr_depth_exceeds`](@ref).
  5. `eqn` is an `Expr`: check its depth against `EQUATION_LIMITS[].max_depth` with [`_expr_depth_exceeds`](@ref), and refuse a `++` pattern with [`has_invalid_plus`](@ref).
  6. Check that the head of the expression is a call and is exactly one operator of `ops2`, giving `opstr`, and read `lhs` and `rhs` off the arguments of the call.
  7. Hand `opstr` and the two sides to [`_parse_equation`](@ref), which canonicalises them and builds the [`ParsingResult`](@ref).
@@ -1495,7 +1495,7 @@ The method that Julia selects is the algorithm, and one method answers each shap
 # Validation
 
   - `length(eqn) <= EQUATION_LIMITS[].max_length`, for the string form. A `Meta.ParseError` naming both lengths is thrown otherwise.
-  - The expression tree of `eqn` is no deeper than `EQUATION_LIMITS[].max_depth`, for the `Expr` form. A `Meta.ParseError` naming the limit is thrown otherwise.
+  - The expression tree of `eqn` is no deeper than `EQUATION_LIMITS[].max_depth`, for both forms. The string form is checked after `Meta.parse`, on each side of the operator. A `Meta.ParseError` naming the limit is thrown otherwise.
   - `eqn` holds no `++` pattern.
   - `eqn` holds exactly one comparison operator, from `ops1` for the string form and from `ops2` for the `Expr` form.
   - The head of the `Expr` form is a call.
@@ -1534,9 +1534,10 @@ ParsingResult
 """
 function parse_equation(eqn::AbstractString; ops1::Tuple = ("==", "<=", ">="),
                         datatype::DataType = Float64, kwargs...)::ParsingResult
-    # Trust boundary: cap the untrusted string length before `Meta.parse` and the
-    # recursive expression walks, so a deeply nested string cannot exhaust the stack.
-    # Bounding the length bounds the achievable AST depth of the string form.
+    # Trust boundary: cap the untrusted string length before `Meta.parse`, so a deeply
+    # nested string cannot exhaust the stack. The length bounds the achievable AST depth
+    # at about half the character count, which is looser than `max_depth`, so the parsed
+    # tree meets the depth cap directly, as the `Expr` form does.
     lim = EQUATION_LIMITS[]
     @argcheck(length(eqn) <= lim.max_length,
               Meta.ParseError("Equation string is too long ($(length(eqn)) > $(lim.max_length) characters)."))
@@ -1556,6 +1557,10 @@ function parse_equation(eqn::AbstractString; ops1::Tuple = ("==", "<=", ">="),
     rethrow_parse_error(lexpr, :lhs)
     rexpr = Meta.parse(rhs)
     rethrow_parse_error(rexpr, :rhs)
+    # 3. Hold the parsed tree to the depth cap, before the recursive walks below run.
+    @argcheck(!(_expr_depth_exceeds(lexpr, lim.max_depth) ||
+                _expr_depth_exceeds(rexpr, lim.max_depth)),
+              Meta.ParseError("Equation expression is too deeply nested (exceeds depth $(lim.max_depth))."))
     return _parse_equation(lexpr, opstr, rexpr, datatype)
 end
 """
@@ -1630,10 +1635,7 @@ function _expr_depth_exceeds(x, limit::Integer)::Bool
     if limit < 0
         return true
     end
-    if !(isa(x, Expr))
-        return false
-    end
-    return any(_expr_depth_exceeds(a, limit - 1) for a in x.args)
+    return isa(x, Expr) && any(_expr_depth_exceeds(a, limit - 1) for a in x.args)
 end
 function parse_equation(expr::Expr; ops2::Tuple = (:call, :(==), :(<=), :(>=)),
                         datatype::DataType = Float64, kwargs...)::ParsingResult

@@ -157,3 +157,35 @@ Regression coverage: the "Equation parser recursion caps" testset (scoped overri
 inheritance), the "Asset name suggestions" testset (scoped suggestion silencing), and the new
 "ScopedConfig preferences fail closed" testset, all in
 [test_02_equation_parsing.jl](../../test/test_02_equation_parsing.jl).
+
+## Amendment (2026-09-01): the depth cap governs the string form too
+
+Finding 6 of the 2026-09-01 security review
+(`docs/reports/security-review-20260901-035650.html`) measured what the length cap actually bounds.
+A string of `max_length` characters carries an AST of about `max_length / 2` levels for
+`parse_equation` — one `(` per level — and about `max_length / 3` for `parse_lens` — one `[1]` per
+level. At the shipped defaults that is a tree up to 2048 levels deep, eight times the `max_depth`
+of 256 this ADR states. The two arms of one sink therefore enforced two different depth bounds, and
+the looser one held the untrusted string form, which is the form the trust boundary exists for.
+
+**The string form is now held to `max_depth` as well, on the tree `Meta.parse` returns.** The
+length cap keeps its place, because it must run before `Meta.parse` to bound the parser's own
+recursion, and `_expr_depth_exceeds` cannot measure a tree that does not exist yet. The order is
+therefore: cap the length, parse, cap the depth, walk.
+
+- `parse_equation(eqn::AbstractString)` measures `lexpr` and `rexpr`, one for each side of the
+  comparison operator, after [`rethrow_parse_error`](../../src/12_ConstraintGeneration/02_LinearConstraintGeneration.jl)
+  and before `_parse_equation`.
+- `parse_lens(key::AbstractString)` measures the parsed tree before `expr_to_lens_chain`.
+- Both raise the `Meta.ParseError` message the `Expr` arm already raises, so one number and one
+  message shape govern the sink whichever door the input comes through.
+
+No caller loses a legal value: a real constraint and a real hyperparameter key are a few levels
+deep, far below 256. A caller that genuinely needs a deeper tree raises `max_depth` with
+`set_equation_limits!`, which is the knob this ADR gives for that purpose.
+
+Regression coverage: the "Equation parser recursion caps" testset in
+[test_02_equation_parsing.jl](../../test/test_02_equation_parsing.jl) and the
+"parse_lens recursion caps" testset in
+[test_24_cross_validation.jl](../../test/test_24_cross_validation.jl). Each now feeds a string that
+passes the length cap and fails the depth cap.

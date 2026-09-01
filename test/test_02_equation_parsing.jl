@@ -110,6 +110,17 @@ end
             ex = Expr(:call, :-, ex)
         end
         @test_throws Meta.ParseError parse_equation(Expr(:call, :(<=), ex, 1))
+        # The string form is held to the same depth cap: a string that clears the length
+        # cap can still carry a tree deeper than max_depth, so the cap is read off the
+        # parsed tree rather than inferred from the character count.
+        over = pe.EQUATION_LIMITS[].max_depth + 10
+        deep_str = "-("^over * "w_A" * ")"^over * " <= 1"
+        @test length(deep_str) <= pe.EQUATION_LIMITS[].max_length
+        @test_throws "too deeply nested" parse_equation(deep_str)
+        # A tree under the cap still parses, so the bound is the stated number.
+        under = pe.EQUATION_LIMITS[].max_depth - 2
+        @test parse_equation("-("^under * "w_A" * ")"^under * " <= 1") isa
+              PortfolioOptimisers.ParsingResult
         # The global default is runtime-settable via the ScopedConfig setter, and validated.
         @test_throws ArgumentError pe.set_equation_limits!(max_length = 0)
         @test_throws ArgumentError pe.set_equation_limits!(max_depth = -1)
