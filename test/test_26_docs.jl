@@ -727,15 +727,10 @@ in the sense of `STANDARDS.md`.
     end
 
     # A docstring that interpolates parses to an `Expr(:string, ...)`, and a section heading
-    # is a literal line inside it, so the literal pieces alone carry every heading.
-    function docstring_text(x)
-        for a in x.args[2:end]
-            a isa AbstractString && return String(a)
-            Meta.isexpr(a, :string) &&
-                return join(p isa AbstractString ? p : " " for p in a.args)
-        end
-        return ""
-    end
+    # is a literal line inside it, so the literal pieces alone carry every heading. It is
+    # `CodeHealth`'s beside the predicate above, so this walk and the alias census of
+    # `test_47_alias_and_module_census.jl` read one reader.
+    docstring_text = CH.docstring_text
 
     # Julia strips the indentation of a `"""` block, so a section heading sits at column 0.
     # The count, not the flag, is the primitive: one string block can document several

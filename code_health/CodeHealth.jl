@@ -149,6 +149,30 @@ function isdocstring(x)
            (x.args[1] === DOC_MACRO || x.args[1] === Symbol("@doc"))
 end
 
+"""
+    docstring_text(x) -> String
+
+The literal prose of the docstring `x`, or `""` when it carries none.
+
+**This is the one reader.** `test/test_26_docs.jl` reads a section heading with it and
+`test/test_47_alias_and_module_census.jl` reads a summary sentence and an `@ref` with it, so the
+rule for what counts as prose moves in one edit.
+
+A docstring that interpolates parses to an `Expr(:string, ...)` rather than to a `String`, and a
+section heading is a literal line inside it. So the literal pieces alone carry every heading and
+every `@ref`, and an interpolated piece is replaced by a space rather than dropped.
+"""
+function docstring_text(x)
+    for a in x.args[2:end]
+        if a isa AbstractString
+            return String(a)
+        end
+        Meta.isexpr(a, :string) &&
+            return join(p isa AbstractString ? p : " " for p in a.args)
+    end
+    return ""
+end
+
 # --- the name a definition binds --------------------------------------------
 #
 # **This is the one resolver.** `code_health/coverage.jl` writes the `definition` key of a
@@ -229,7 +253,7 @@ would otherwise be named after the doc macro. Nearly every definition in this li
 so dropping the wrapper is not a corner case.
 """
 function unwrap(e)
-    if e isa Expr && e.head === :macrocall && defname(e.args[1]) == "@doc"
+    if isdocstring(e)
         return unwrap(e.args[end])
     end
     return e

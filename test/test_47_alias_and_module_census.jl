@@ -63,15 +63,9 @@ end
     isdocstring = CH.isdocstring
 
     # A docstring that interpolates parses to an `Expr(:string, ...)`; the literal pieces
-    # carry every heading and every `@ref`.
-    function docstring_text(x)
-        for a in x.args[2:end]
-            a isa AbstractString && return String(a)
-            Meta.isexpr(a, :string) &&
-                return join(p isa AbstractString ? p : " " for p in a.args)
-        end
-        return ""
-    end
+    # carry every heading and every `@ref`. It is `CodeHealth`'s beside the predicate above,
+    # so this census and `test_26_docs.jl` read one reader.
+    docstring_text = CH.docstring_text
 
     # Every name a body CONSTRUCTS, which is what a factory alias's summary sentence must
     # name. `parentmodule` is the filter: `DomainError` is called by `ZeroVarianceFilter` and
