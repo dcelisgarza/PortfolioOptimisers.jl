@@ -135,8 +135,8 @@ whole of the validation.
 
 - A **slot** bound is `Num_SigTailCal`, `Num_SigHeadCal`, `Num_DefTailCal`, `Num_DefHeadCal`,
   `Num_AmbRadCal`, `Num_AmbTwtCal` or `Num_NormCeilCal`, each pairing `Number` with **one** concrete
-  role. A head role in a tail slot, or an ambiguity role in a significance slot, is refused **at
-  construction**.
+  role and with that role's **one** rule family. A head role in a tail slot, or an ambiguity role in
+  a significance slot, is refused **at construction**, and so is a rule of the wrong family.
 - An **`alg`** bound is `Func_SigCal`, `Func_DefCal`, `Func_AmbRadCal`, `Func_AmbTwtCal` or
   `Func_NormCeilCal`, each pairing `Function` with one rule family. No role subtypes a rule family,
   so a role nested inside another role's `alg` is refused by the same route.
@@ -145,10 +145,33 @@ Refusal by the bound is **earlier than any `assert_` method could be**: it fires
 wrote the mistake, not at the fold where the value is read. So no guard method is written for either
 mismatch, and neither refusal has a message that must be kept in step with a bound.
 
+**The slot names the end, so the caller states it once.** A slot bound names one role, and that role
+names the same end of the distribution the slot itself names. A caller who wraps the rule therefore
+writes that end twice, at every calibrated keyword of every measure. The slot bound admits the bare
+rule as well, and `bind_role` puts the role on inside the constructor, before the slot is stored.
+What is stored is still the role, so every reader of a slot — `resolve_calibration_slot`,
+`assert_calibrated_slots`, `sel` and `mirror_role` — sees exactly what it saw before, and the
+wrapped form stays legal and stays the canonical printed form.
+
+Two things are deliberately **not** admitted bare. A **plain `Function`** carries no family, so a
+bound that took one could not tell a deformation closure from a significance one; the role is what
+states the family a function cannot, and a caller with a closure still writes the role. A **role of
+the wrong family or the wrong end** stays refused, because the bound names one role and one rule
+family and no others. So the guarantee this decision rests on is unchanged: the mismatch a caller
+can write is refused at construction, by the bound, with no guard method.
+
+`bind_role` takes two arities, one per shape of slot. A slot that **names an end** passes the role
+type, because a rule alone cannot say tail or head. A slot that **names no end** passes the occupant
+alone, and the rule's own family settles the role. A `TimeDependent` crosses unchanged, because
+`update_time_dependent_fields` rebuilds the host through its keyword constructor, so the fold's own
+value is bound when the fold selects it.
+
 **One bound names two roles, and two `assert_` methods part them.** `LpRegularisation.val` is a
 penalty coefficient in `JuMPOptimiser.lp` and a norm ceiling in `JuMPOptimiser.lpc`, so the field
-cannot name its reading from the type alone. `Num_AmbRadNormCeilCal` admits both roles, and
-`assert_penalty_coefficient_role` and `assert_norm_ceiling_role` settle the reading per field. Both
+cannot name its reading from the type alone. `Num_AmbRadNormCeilCal` admits both roles and both rule families, and
+`assert_penalty_coefficient_role` and `assert_norm_ceiling_role` settle the reading per field. It is
+the one slot whose bare route reads the rule's family to pick between two roles, which is the same
+reading the two `assert_` methods then check. Both
 run in `JuMPOptimiser`'s own constructor, so the refusal still fires where the caller wrote the
 field. ADR 0097 carries that decision, and every other bound names one role.
 

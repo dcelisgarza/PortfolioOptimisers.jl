@@ -1108,6 +1108,7 @@ OrderedWeightsArrayConditionalValueatRisk
     """
     alpha
     function OrderedWeightsArrayConditionalValueatRisk(alpha::Num_SigTailCal)
+        alpha = bind_role(SignificanceTailCalibration, alpha)
         assert_unit_interval(alpha, :alpha)
         return new{typeof(alpha)}(alpha)
     end
@@ -1263,6 +1264,7 @@ OrderedWeightsArrayTailGini
     a_sim
     function OrderedWeightsArrayTailGini(alpha_i::Number, alpha::Num_SigTailCal,
                                          a_sim::Integer)
+        alpha = bind_role(SignificanceTailCalibration, alpha)
         # The joint bound is the whole of the ordering validation, and it can only run
         # where `alpha` is a number. A rule states no value at construction, so `alpha_i`
         # is checked on its own here and the pair is checked again when the rebuild runs at
@@ -1422,6 +1424,8 @@ OrderedWeightsArrayConditionalValueatRiskRange
     beta
     function OrderedWeightsArrayConditionalValueatRiskRange(alpha::Num_SigTailCal,
                                                             beta::Num_SigHeadCal)
+        alpha = bind_role(SignificanceTailCalibration, alpha)
+        beta = bind_role(SignificanceHeadCalibration, beta)
         assert_unit_interval(alpha, :alpha)
         assert_unit_interval(beta, :beta)
         return new{typeof(alpha), typeof(beta)}(alpha, beta)
@@ -1591,6 +1595,8 @@ OrderedWeightsArrayTailGiniRange
     function OrderedWeightsArrayTailGiniRange(alpha_i::Number, alpha::Num_SigTailCal,
                                               a_sim::Integer, beta_i::Number,
                                               beta::Num_SigHeadCal, b_sim::Integer)
+        alpha = bind_role(SignificanceTailCalibration, alpha)
+        beta = bind_role(SignificanceHeadCalibration, beta)
         # Each joint bound runs where its outer level is a number, on the terms the scalar
         # tail-Gini type states. A rule states no value at construction, so its inner bound
         # is checked on its own here and the pair is checked at fold time.

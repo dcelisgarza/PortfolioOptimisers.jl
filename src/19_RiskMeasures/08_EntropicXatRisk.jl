@@ -189,6 +189,7 @@ EntropicValueatRisk
     @pprop w
     function EntropicValueatRisk(settings::RiskMeasureSettings, slv::Option{<:Slv_VecSlv},
                                  alpha::Num_SigTailCal, w::Option{<:ObsWeights})
+        alpha = bind_role(SignificanceTailCalibration, alpha)
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
@@ -291,6 +292,8 @@ Keywords correspond to the struct's fields.
     function EntropicValueatRiskRange(settings::RiskMeasureSettings,
                                       slv::Option{<:Slv_VecSlv}, alpha::Num_SigTailCal,
                                       beta::Num_SigHeadCal, w::Option{<:ObsWeights})
+        alpha = bind_role(SignificanceTailCalibration, alpha)
+        beta = bind_role(SignificanceHeadCalibration, beta)
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
@@ -444,6 +447,7 @@ EntropicDrawdownatRisk
     function EntropicDrawdownatRisk(settings::RiskMeasureSettings,
                                     slv::Option{<:Slv_VecSlv}, alpha::Num_SigTailCal,
                                     w::Option{<:ObsWeights})
+        alpha = bind_role(SignificanceTailCalibration, alpha)
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
@@ -580,6 +584,7 @@ RelativeEntropicDrawdownatRisk
     function RelativeEntropicDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
                                             slv::Option{<:Slv_VecSlv},
                                             alpha::Num_SigTailCal, w::Option{<:ObsWeights})
+        alpha = bind_role(SignificanceTailCalibration, alpha)
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end

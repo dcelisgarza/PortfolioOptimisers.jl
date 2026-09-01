@@ -546,6 +546,7 @@ ValueatRisk
     @fprop @vprop alg
     function ValueatRisk(settings::RiskMeasureSettings, alpha::Num_SigTailCal,
                          w::Option{<:ObsWeights}, alg::ValueatRiskFormulation)
+        alpha = bind_role(SignificanceTailCalibration, alpha)
         assert_unit_interval(alpha, :alpha)
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(w), typeof(alg)}(settings, alpha,
@@ -739,6 +740,8 @@ ValueatRiskRange
     function ValueatRiskRange(settings::RiskMeasureSettings, alpha::Num_SigTailCal,
                               beta::Num_SigHeadCal, w::Option{<:ObsWeights},
                               alg::ValueatRiskFormulation)
+        alpha = bind_role(SignificanceTailCalibration, alpha)
+        beta = bind_role(SignificanceHeadCalibration, beta)
         assert_unit_interval(alpha, :alpha)
         assert_unit_interval(beta, :beta)
         assert_nonempty_nonneg_finite_val(w, :w)
@@ -969,6 +972,7 @@ DrawdownatRisk
     function DrawdownatRisk(settings::RiskMeasureSettings, alpha::Num_SigTailCal,
                             w::Option{<:ObsWeights}, b::Option{<:Number},
                             s::Option{<:Number})
+        alpha = bind_role(SignificanceTailCalibration, alpha)
         assert_unit_interval(alpha, :alpha)
         assert_nonempty_nonneg_finite_val(w, :w)
         bflag = !isnothing(b)
@@ -1188,6 +1192,7 @@ RelativeDrawdownatRisk
     @pprop w
     function RelativeDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
                                     alpha::Num_SigTailCal, w::Option{<:ObsWeights})
+        alpha = bind_role(SignificanceTailCalibration, alpha)
         assert_unit_interval(alpha, :alpha)
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(w)}(settings, alpha, w)

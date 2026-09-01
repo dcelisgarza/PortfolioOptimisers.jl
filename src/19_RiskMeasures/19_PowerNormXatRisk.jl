@@ -178,6 +178,7 @@ PowerNormValueatRisk
     function PowerNormValueatRisk(settings::RiskMeasureSettings, slv::Option{<:Slv_VecSlv},
                                   alpha::Num_SigTailCal, p::Number,
                                   w::Option{<:StatsBase.AbstractWeights})
+        alpha = bind_role(SignificanceTailCalibration, alpha)
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
@@ -322,6 +323,8 @@ PowerNormValueatRiskRange
                                        slv::Option{<:Slv_VecSlv}, alpha::Num_SigTailCal,
                                        beta::Num_SigHeadCal, pa::Number, pb::Number,
                                        w::Option{<:ObsWeights})
+        alpha = bind_role(SignificanceTailCalibration, alpha)
+        beta = bind_role(SignificanceHeadCalibration, beta)
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
@@ -484,6 +487,7 @@ PowerNormDrawdownatRisk
     function PowerNormDrawdownatRisk(settings::RiskMeasureSettings,
                                      slv::Option{<:Slv_VecSlv}, alpha::Num_SigTailCal,
                                      p::Number, w::Option{<:ObsWeights})
+        alpha = bind_role(SignificanceTailCalibration, alpha)
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
@@ -632,6 +636,7 @@ RelativePowerNormDrawdownatRisk
                                              slv::Option{<:Slv_VecSlv},
                                              alpha::Num_SigTailCal, p::Number,
                                              w::Option{<:ObsWeights})
+        alpha = bind_role(SignificanceTailCalibration, alpha)
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end

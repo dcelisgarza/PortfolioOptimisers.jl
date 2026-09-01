@@ -109,6 +109,7 @@ ConditionalValueatRisk
     @pprop w
     function ConditionalValueatRisk(settings::RiskMeasureSettings, alpha::Num_SigTailCal,
                                     w::Option{<:ObsWeights})
+        alpha = bind_role(SignificanceTailCalibration, alpha)
         assert_unit_interval(alpha, :alpha)
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(w)}(settings, alpha, w)
@@ -254,6 +255,9 @@ DistributionallyRobustConditionalValueatRisk
                                                           l::Num_AmbTwtCal,
                                                           r::Num_AmbRadCal,
                                                           w::Option{<:ObsWeights})
+        alpha = bind_role(SignificanceTailCalibration, alpha)
+        l = bind_role(l)
+        r = bind_role(r)
         assert_unit_interval(alpha, :alpha)
         assert_nonempty_gt0_finite_val(l, :l)
         assert_nonempty_gt0_finite_val(r, :r)
@@ -460,6 +464,8 @@ ConditionalValueatRiskRange
     function ConditionalValueatRiskRange(settings::RiskMeasureSettings,
                                          alpha::Num_SigTailCal, beta::Num_SigHeadCal,
                                          w::Option{<:ObsWeights})
+        alpha = bind_role(SignificanceTailCalibration, alpha)
+        beta = bind_role(SignificanceHeadCalibration, beta)
         assert_unit_interval(alpha, :alpha)
         assert_unit_interval(beta, :beta)
         assert_nonempty_nonneg_finite_val(w, :w)
@@ -619,6 +625,12 @@ DistributionallyRobustConditionalValueatRiskRange
                                                                l_b::Num_AmbTwtCal,
                                                                r_b::Num_AmbRadCal,
                                                                w::Option{<:ObsWeights})
+        alpha = bind_role(SignificanceTailCalibration, alpha)
+        l_a = bind_role(l_a)
+        r_a = bind_role(r_a)
+        beta = bind_role(SignificanceHeadCalibration, beta)
+        l_b = bind_role(l_b)
+        r_b = bind_role(r_b)
         assert_unit_interval(alpha, :alpha)
         assert_unit_interval(beta, :beta)
         assert_nonempty_gt0_finite_val(l_a, :l_a)
@@ -895,6 +907,7 @@ ConditionalDrawdownatRisk
     @pprop w
     function ConditionalDrawdownatRisk(settings::RiskMeasureSettings, alpha::Num_SigTailCal,
                                        w::Option{<:ObsWeights})
+        alpha = bind_role(SignificanceTailCalibration, alpha)
         assert_unit_interval(alpha, :alpha)
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(w)}(settings, alpha, w)
@@ -1026,6 +1039,9 @@ DistributionallyRobustConditionalDrawdownatRisk
                                                              l::Num_AmbTwtCal,
                                                              r::Num_AmbRadCal,
                                                              w::Option{<:ObsWeights})
+        alpha = bind_role(SignificanceTailCalibration, alpha)
+        l = bind_role(l)
+        r = bind_role(r)
         assert_unit_interval(alpha, :alpha)
         assert_nonempty_gt0_finite_val(l, :l)
         assert_nonempty_gt0_finite_val(r, :r)
@@ -1274,6 +1290,7 @@ RelativeConditionalDrawdownatRisk
     function RelativeConditionalDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
                                                alpha::Num_SigTailCal,
                                                w::Option{<:ObsWeights})
+        alpha = bind_role(SignificanceTailCalibration, alpha)
         assert_unit_interval(alpha, :alpha)
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(w)}(settings, alpha, w)

@@ -346,6 +346,7 @@ Keywords correspond to the struct's fields.
     """
     alg
     function L2Regularisation(val::Num_AmbRadCal, alg::SecondMomentFormulation)
+        val = bind_role(val)
         assert_nonempty_gt0_finite_val(val, :val)
         assert_ambiguity_radius_formulation(val, alg)
         return new{typeof(val), typeof(alg)}(val, alg)
@@ -601,6 +602,7 @@ Keywords correspond to the struct's fields.
     """
     val
     function LpRegularisation(p::Number, val::Num_AmbRadNormCeilCal)
+        val = bind_role(val)
         @argcheck(isfinite(p), IsNonFiniteError)
         @argcheck(p > one(p), DomainError)
         assert_nonempty_gt0_finite_val(val, :val)

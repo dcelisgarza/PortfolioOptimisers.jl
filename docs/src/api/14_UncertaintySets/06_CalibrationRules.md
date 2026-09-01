@@ -20,6 +20,7 @@ calibration_slots
 assert_calibrated_slots
 assert_declared_calibration_resolver
 mirror_role
+bind_role
 AbstractCalibrationSeries
 AbstractDrawdownSeries
 ReturnsSeries

@@ -252,6 +252,8 @@ RelativisticValueatRisk
     function RelativisticValueatRisk(settings::RiskMeasureSettings,
                                      slv::Option{<:Slv_VecSlv}, alpha::Num_SigTailCal,
                                      kappa::Num_DefTailCal, w::Option{<:ObsWeights})
+        alpha = bind_role(SignificanceTailCalibration, alpha)
+        kappa = bind_role(DeformationTailCalibration, kappa)
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
@@ -428,6 +430,10 @@ RelativisticValueatRiskRange
                                           slv::Option{<:Slv_VecSlv}, alpha::Num_SigTailCal,
                                           kappa_a::Num_DefTailCal, beta::Num_SigHeadCal,
                                           kappa_b::Num_DefHeadCal, w::Option{<:ObsWeights})
+        alpha = bind_role(SignificanceTailCalibration, alpha)
+        kappa_a = bind_role(DeformationTailCalibration, kappa_a)
+        beta = bind_role(SignificanceHeadCalibration, beta)
+        kappa_b = bind_role(DeformationHeadCalibration, kappa_b)
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
@@ -629,6 +635,8 @@ RelativisticDrawdownatRisk
     function RelativisticDrawdownatRisk(settings::RiskMeasureSettings,
                                         slv::Option{<:Slv_VecSlv}, alpha::Num_SigTailCal,
                                         kappa::Num_DefTailCal, w::Option{<:ObsWeights})
+        alpha = bind_role(SignificanceTailCalibration, alpha)
+        kappa = bind_role(DeformationTailCalibration, kappa)
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
@@ -811,6 +819,8 @@ RelativeRelativisticDrawdownatRisk
                                                 alpha::Num_SigTailCal,
                                                 kappa::Num_DefTailCal,
                                                 w::Option{<:ObsWeights})
+        alpha = bind_role(SignificanceTailCalibration, alpha)
+        kappa = bind_role(DeformationTailCalibration, kappa)
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end

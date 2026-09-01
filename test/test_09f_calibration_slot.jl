@@ -226,9 +226,17 @@ end
     @test isa(khead, PO.Num_DefHeadCal)
     @test !isa(ktail, PO.Num_DefHeadCal) && !isa(head, PO.Num_DefHeadCal)
 
-    # A slot takes a role, never a bare rule and never a bare function. The role is what
-    # names the end of the distribution the slot addresses.
-    @test !isa(RULE, PO.Num_SigTailCal) && !isa(probe_rate, PO.Num_SigTailCal)
+    # A slot takes a role, or the rule alone, because the slot itself already names the end
+    # of the distribution it addresses. A bare FUNCTION is refused: a function carries no
+    # family, so a bound that admitted one could not tell a deformation closure from a
+    # significance one, and the role is what states the family a function cannot.
+    @test isa(RULE, PO.Num_SigTailCal) && !isa(probe_rate, PO.Num_SigTailCal)
+
+    # The family split holds on the bare route as it holds on the wrapped one, and it holds
+    # in the bound itself rather than in a guard.
+    @test !isa(KRULE, PO.Num_SigTailCal) && !isa(KRULE, PO.Num_SigHeadCal)
+    @test !isa(RULE, PO.Num_DefTailCal) && !isa(RULE, PO.Num_DefHeadCal)
+    @test isa(KRULE, PO.Num_DefTailCal) && isa(KRULE, PO.Num_DefHeadCal)
 
     # The refusal lands at construction, in the constructor's signature, and not at fold
     # time. This is the claim that lets the mechanism carry no role guard at all. The three
@@ -240,6 +248,71 @@ end
     @test_throws MethodError DeformationProbe(khead)
     @test_throws TypeError CalibratedProbe(; alpha = head)
     @test_throws MethodError CalibratedProbe(head, nothing)
+end
+
+@testset "Calibration slot: a slot puts on the role it already names" begin
+    # The slot names the end of the distribution, so a caller who wraps the rule themselves
+    # states that end twice. The bound admits the rule alone and `bind_role` puts the role
+    # on before the slot is stored, so the two forms construct the same object.
+    wrapped = ConditionalValueatRisk(; alpha = SignificanceTailCalibration(; alg = RULE))
+    bare = ConditionalValueatRisk(; alpha = RULE)
+    @test isa(bare.alpha, SignificanceTailCalibration)
+    @test bare.alpha.alg === RULE
+    @test typeof(bare) === typeof(wrapped)
+
+    # A stated number and a stated role both cross unchanged, so nothing that constructed
+    # before constructs differently now.
+    @test ConditionalValueatRisk(; alpha = 0.05).alpha === 0.05
+    @test ConditionalValueatRisk(; alpha = CTX).alpha === CTX
+
+    # One rule reaches both ends of a Range measure, and each slot puts on its OWN role.
+    both = ConditionalValueatRiskRange(; alpha = RULE, beta = RULE)
+    @test isa(both.alpha, SignificanceTailCalibration)
+    @test isa(both.beta, SignificanceHeadCalibration)
+
+    # A head slot that defaults through `mirror_role` reads the bare rule, which carries no
+    # end, and still lands on the head role.
+    defaulted = ConditionalValueatRiskRange(; alpha = RULE)
+    @test isa(defaulted.beta, SignificanceHeadCalibration)
+    @test defaulted.beta.alg === RULE
+
+    # A measure with two families binds each slot from its own family.
+    rvar = RelativisticValueatRisk(; alpha = RULE, kappa = KRULE)
+    @test isa(rvar.alpha, SignificanceTailCalibration)
+    @test isa(rvar.kappa, DeformationTailCalibration)
+
+    # A slot that names NO end takes the role of the rule's own family instead.
+    drcvar = DistributionallyRobustConditionalValueatRisk(; alpha = RULE,
+                                                          l = TailTermParity(),
+                                                          r = ConcentrationRadius())
+    @test isa(drcvar.l, AmbiguityTailWeightCalibration)
+    @test isa(drcvar.r, AmbiguityRadiusCalibration)
+
+    # The one dual-use slot reads the rule's family to settle which of its two roles to put
+    # on, and the route then refuses the role that has no reading on it.
+    @test isa(LpRegularisation(; val = ConcentrationRadius()).val,
+              AmbiguityRadiusCalibration)
+    @test isa(LpRegularisation(; val = EffectiveAssetFloor()).val, NormCeilingCalibration)
+    @test isa(L2Regularisation(; val = ConcentrationRadius()).val,
+              AmbiguityRadiusCalibration)
+
+    # An optimiser norm slot binds on the same terms, under the time-dependent wrapper.
+    oslv = Solver(; name = :probe, solver = nothing)
+    opt = JuMPOptimiser(; slv = oslv, l1 = ConcentrationRadius(),
+                        l2c = EffectiveAssetFloor())
+    @test isa(opt.l1, AmbiguityRadiusCalibration)
+    @test isa(opt.l2c, NormCeilingCalibration)
+    @test isnothing(JuMPOptimiser(; slv = oslv).l1)
+
+    # The wrong family is refused on the bare route, by the keyword constructor's bound.
+    @test_throws TypeError ConditionalValueatRisk(; alpha = KRULE)
+    @test_throws TypeError RelativisticValueatRisk(; kappa = RULE)
+    @test_throws TypeError LpRegularisation(; val = RULE)
+
+    # The stored role is what every reader of the slot sees, so the value-level refusal and
+    # the resolver both read a bare-route measure exactly as they read a wrapped one.
+    @test_throws ArgumentError PO.assert_calibrated_slots(bare)
+    @test PO.calibration_slots(bare).alpha === bare.alpha
 end
 
 @testset "Calibration slot: the resolver is parallel to `resolve_slot`" begin

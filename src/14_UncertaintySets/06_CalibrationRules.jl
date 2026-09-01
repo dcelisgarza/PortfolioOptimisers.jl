@@ -318,55 +318,76 @@ function DeformationHeadCalibration(; alg::Func_DefCal)
     return DeformationHeadCalibration(alg)
 end
 """
-    const Num_SigTailCal = Union{<:SignificanceTailCalibration, <:Number}
+    const Num_SigTailCal = Union{<:SignificanceTailCalibration,
+                                 <:AbstractSignificanceCalibrationAlgorithm, <:Number}
 
-Field bound for a lower-tail significance slot: the tail probability itself, or the role that computes it.
+Field bound for a lower-tail significance slot: the tail probability itself, the role that computes it, or the rule alone.
 
 The union names one role and no other, so a head role placed in a tail slot fails the constructor's signature and is refused at construction. That is the whole of the role validation, and no guard method is written for it.
+
+The union also names the rule family itself, because the slot already says which end of the distribution it addresses. A caller who states the rule alone therefore states the end once rather than twice, and [`bind_role`](@ref) puts the tail role on before the constructor stores the slot. What is stored is the role, so every reader of the slot sees what it saw before. A plain `Function` is **not** admitted alone: a function carries no family, so the bound could not refuse a deformation rule written as a closure, and the role states the family a function cannot.
 
 # Related
 
   - [`SignificanceTailCalibration`](@ref)
+  - [`AbstractSignificanceCalibrationAlgorithm`](@ref)
   - [`Num_SigHeadCal`](@ref)
+  - [`bind_role`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
-const Num_SigTailCal = Union{<:SignificanceTailCalibration, <:Number}
+const Num_SigTailCal = Union{<:SignificanceTailCalibration,
+                             <:AbstractSignificanceCalibrationAlgorithm, <:Number}
 """
-    const Num_SigHeadCal = Union{<:SignificanceHeadCalibration, <:Number}
+    const Num_SigHeadCal = Union{<:SignificanceHeadCalibration, <:AbstractSignificanceCalibrationAlgorithm, <:Number}
 
-Field bound for an upper-tail significance slot: the tail probability itself, or the role that computes it.
+Field bound for an upper-tail significance slot: the tail probability itself, the role that computes it, or the rule alone.
+
+The rule family stands in the union on the terms [`Num_SigTailCal`](@ref) sets out, and [`bind_role`](@ref) puts the role on before the slot is stored.
 
 # Related
 
   - [`SignificanceHeadCalibration`](@ref)
+  - [`AbstractSignificanceCalibrationAlgorithm`](@ref)
   - [`Num_SigTailCal`](@ref)
+  - [`bind_role`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
-const Num_SigHeadCal = Union{<:SignificanceHeadCalibration, <:Number}
+const Num_SigHeadCal = Union{<:SignificanceHeadCalibration,
+                             <:AbstractSignificanceCalibrationAlgorithm, <:Number}
 """
-    const Num_DefTailCal = Union{<:DeformationTailCalibration, <:Number}
+    const Num_DefTailCal = Union{<:DeformationTailCalibration, <:AbstractDeformationCalibrationAlgorithm, <:Number}
 
-Field bound for a lower-tail deformation slot: the deformation parameter itself, or the role that computes it.
+Field bound for a lower-tail deformation slot: the deformation parameter itself, the role that computes it, or the rule alone.
+
+The rule family stands in the union on the terms [`Num_SigTailCal`](@ref) sets out, and [`bind_role`](@ref) puts the role on before the slot is stored.
 
 # Related
 
   - [`DeformationTailCalibration`](@ref)
+  - [`AbstractDeformationCalibrationAlgorithm`](@ref)
   - [`Num_DefHeadCal`](@ref)
+  - [`bind_role`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
-const Num_DefTailCal = Union{<:DeformationTailCalibration, <:Number}
+const Num_DefTailCal = Union{<:DeformationTailCalibration,
+                             <:AbstractDeformationCalibrationAlgorithm, <:Number}
 """
-    const Num_DefHeadCal = Union{<:DeformationHeadCalibration, <:Number}
+    const Num_DefHeadCal = Union{<:DeformationHeadCalibration, <:AbstractDeformationCalibrationAlgorithm, <:Number}
 
-Field bound for an upper-tail deformation slot: the deformation parameter itself, or the role that computes it.
+Field bound for an upper-tail deformation slot: the deformation parameter itself, the role that computes it, or the rule alone.
+
+The rule family stands in the union on the terms [`Num_SigTailCal`](@ref) sets out, and [`bind_role`](@ref) puts the role on before the slot is stored.
 
 # Related
 
   - [`DeformationHeadCalibration`](@ref)
+  - [`AbstractDeformationCalibrationAlgorithm`](@ref)
   - [`Num_DefTailCal`](@ref)
+  - [`bind_role`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
-const Num_DefHeadCal = Union{<:DeformationHeadCalibration, <:Number}
+const Num_DefHeadCal = Union{<:DeformationHeadCalibration,
+                             <:AbstractDeformationCalibrationAlgorithm, <:Number}
 """
     calibration_slots(x)
 
@@ -508,7 +529,7 @@ Carry the occupant of a lower-tail slot across to its upper-tail counterpart, an
 
 Every Range type defaults its head slot to whatever its tail slot holds, and this verb is what carries the occupant across. A number crosses unchanged, and a tail role crosses as the head role of the same family holding the same `alg`, so a rule stated on one end reaches both ends and no stated number moves. A caller who states the head slot themselves gets their own occupant, and the two ends then resolve independently.
 
-The two role families are the whole domain of the second and third methods, because a head slot's bound admits nothing else. An ambiguity role names no end of the distribution, so it takes no method here, and the ambiguity slots of a Range type keep numbers of their own.
+The two role families are the whole domain of the role methods, because a head slot's bound admits no other role. A bare rule crosses unchanged, because it carries no end and the head slot puts its own role on through [`bind_role`](@ref). An ambiguity role names no end of the distribution, so it takes no method here, and the ambiguity slots of a Range type keep numbers of their own.
 
 # Arguments
 
@@ -524,6 +545,7 @@ The two role families are the whole domain of the second and third methods, beca
   - [`SignificanceHeadCalibration`](@ref)
   - [`DeformationTailCalibration`](@ref)
   - [`DeformationHeadCalibration`](@ref)
+  - [`bind_role`](@ref)
 """
 function mirror_role(x::Number)
     return x
@@ -533,6 +555,66 @@ function mirror_role(r::SignificanceTailCalibration)
 end
 function mirror_role(r::DeformationTailCalibration)
     return DeformationHeadCalibration(; alg = r.alg)
+end
+function mirror_role(alg::AbstractSignificanceCalibrationAlgorithm)
+    return alg
+end
+function mirror_role(alg::AbstractDeformationCalibrationAlgorithm)
+    return alg
+end
+"""
+    bind_role(::Type{R}, x) where {R <: AbstractCalibrationEstimator}
+    bind_role(x)
+
+Put on the **Calibration Role** the slot already names, so that a caller states the rule alone.
+
+A slot's bound names the role it takes, and the role names the same end of the distribution the slot does. A caller who wraps the rule themselves therefore states that end twice. This verb takes the second statement off them: the slot's bound admits a bare rule of the right family, and the constructor calls this verb before it stores the slot, so what is stored is the role and every reader of the slot sees what it saw before.
+
+Two arities serve the two shapes of slot.
+
+  - A slot that **names an end** passes the role type, because a rule alone cannot say tail or head. The four significance and deformation slots take this arity.
+  - A slot that **names no end** passes the occupant alone, and the rule's own family settles the role. The three ambiguity and norm-ceiling slots take this arity, and so does the dual-use slot of [`LpRegularisation`](@ref), which is the one slot that names two roles.
+
+A caller who states the role themselves is served by the pass-through methods, so the wrapped form and the bare form both construct and both store the same thing. A stated number crosses unchanged, and so does a [`TimeDependent`](@ref): a schedule is read per fold by [`update_time_dependent_fields`](@ref), which rebuilds the host through its keyword constructor, so a bare rule inside a schedule is bound when the fold selects it.
+
+# Arguments
+
+  - `R`: The role the slot names, for a slot that names an end of the distribution.
+  - `x`: The slot's occupant: a number, a role, or a rule.
+
+# Returns
+
+  - `y`: The occupant, with the role on it.
+
+# Related
+
+  - [`AbstractCalibrationEstimator`](@ref)
+  - [`AbstractCalibrationAlgorithm`](@ref)
+  - [`Num_SigTailCal`](@ref)
+  - [`Num_AmbRadNormCeilCal`](@ref)
+  - [`mirror_role`](@ref)
+"""
+function bind_role(::Type{R}, x::Number) where {R <: AbstractCalibrationEstimator}
+    return x
+end
+function bind_role(::Type{R},
+                   r::AbstractCalibrationEstimator) where {R <:
+                                                           AbstractCalibrationEstimator}
+    return r
+end
+function bind_role(::Type{R},
+                   alg::AbstractCalibrationAlgorithm) where {R <:
+                                                             AbstractCalibrationEstimator}
+    return R(alg)
+end
+function bind_role(x::Number)
+    return x
+end
+function bind_role(r::AbstractCalibrationEstimator)
+    return r
+end
+function bind_role(::Nothing)
+    return nothing
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -2120,64 +2202,98 @@ function NormCeilingCalibration(; alg::Func_NormCeilCal)
     return NormCeilingCalibration(alg)
 end
 """
-    const Num_AmbRadCal = Union{<:AmbiguityRadiusCalibration, <:Number}
+    const Num_AmbRadCal = Union{<:AmbiguityRadiusCalibration,
+                                <:AbstractAmbiguityRadiusCalibrationAlgorithm, <:Number}
 
-Field bound for an ambiguity-radius slot: the radius itself, or the role that computes it.
+Field bound for an ambiguity-radius slot: the radius itself, the role that computes it, or the rule alone.
 
-The union names one role and no other, so a tail-weight role placed in a radius slot fails the constructor's signature and is refused at construction. That is the whole of the role validation, and no guard method is written for it.
+The union names one role and no other, so a tail-weight role placed in a radius slot fails the constructor's signature and is refused at construction. That is the whole of the role validation, and no guard method is written for it. A bare tail-weight rule is refused by the same union, because the union names one rule family and no other.
+
+The rule family stands in the union on the terms [`Num_SigTailCal`](@ref) sets out, and [`bind_role`](@ref) puts the role on before the slot is stored. The role names no end of the distribution, so the rule's own family is the whole of the choice.
 
 # Related
 
   - [`AmbiguityRadiusCalibration`](@ref)
+  - [`AbstractAmbiguityRadiusCalibrationAlgorithm`](@ref)
   - [`Num_AmbTwtCal`](@ref)
+  - [`bind_role`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
-const Num_AmbRadCal = Union{<:AmbiguityRadiusCalibration, <:Number}
+const Num_AmbRadCal = Union{<:AmbiguityRadiusCalibration,
+                            <:AbstractAmbiguityRadiusCalibrationAlgorithm, <:Number}
 """
-    const Num_AmbTwtCal = Union{<:AmbiguityTailWeightCalibration, <:Number}
+    const Num_AmbTwtCal = Union{<:AmbiguityTailWeightCalibration,
+                                <:AbstractAmbiguityTailWeightCalibrationAlgorithm, <:Number}
 
-Field bound for an ambiguity-tail-weight slot: the tail weight itself, or the role that computes it.
+Field bound for an ambiguity-tail-weight slot: the tail weight itself, the role that computes it, or the rule alone.
+
+The rule family stands in the union on the terms [`Num_SigTailCal`](@ref) sets out, and [`bind_role`](@ref) puts the role on before the slot is stored. The role names no end of the distribution, so the rule's own family is the whole of the choice.
 
 # Related
 
   - [`AmbiguityTailWeightCalibration`](@ref)
+  - [`AbstractAmbiguityTailWeightCalibrationAlgorithm`](@ref)
   - [`Num_AmbRadCal`](@ref)
+  - [`bind_role`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
-const Num_AmbTwtCal = Union{<:AmbiguityTailWeightCalibration, <:Number}
+const Num_AmbTwtCal = Union{<:AmbiguityTailWeightCalibration,
+                            <:AbstractAmbiguityTailWeightCalibrationAlgorithm, <:Number}
 """
-    const Num_NormCeilCal = Union{<:NormCeilingCalibration, <:Number}
+    const Num_NormCeilCal = Union{<:NormCeilingCalibration,
+                                  <:AbstractNormCeilingCalibrationAlgorithm, <:Number}
 
-Field bound for a norm-ceiling slot: the ceiling itself, or the role that computes it.
+Field bound for a norm-ceiling slot: the ceiling itself, the role that computes it, or the rule alone.
 
-The union names one role and no other, so a radius role placed in a ceiling slot fails the constructor's signature and is refused at construction. That is the whole of the role validation, and no guard method is written for it.
+The union names one role and no other, so a radius role placed in a ceiling slot fails the constructor's signature and is refused at construction. That is the whole of the role validation, and no guard method is written for it. A bare radius rule is refused by the same union, because the union names one rule family and no other.
+
+The rule family stands in the union on the terms [`Num_SigTailCal`](@ref) sets out, and [`bind_role`](@ref) puts the role on before the slot is stored.
 
 # Related
 
   - [`NormCeilingCalibration`](@ref)
+  - [`AbstractNormCeilingCalibrationAlgorithm`](@ref)
   - [`Num_AmbRadCal`](@ref)
   - [`Num_AmbRadNormCeilCal`](@ref)
+  - [`bind_role`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
-const Num_NormCeilCal = Union{<:NormCeilingCalibration, <:Number}
+const Num_NormCeilCal = Union{<:NormCeilingCalibration,
+                              <:AbstractNormCeilingCalibrationAlgorithm, <:Number}
 """
     const Num_AmbRadNormCeilCal = Union{<:AmbiguityRadiusCalibration,
-                                        <:NormCeilingCalibration, <:Number}
+                                        <:NormCeilingCalibration,
+                                        <:AbstractAmbiguityRadiusCalibrationAlgorithm,
+                                        <:AbstractNormCeilingCalibrationAlgorithm, <:Number}
 
 Field bound for the one slot the library reads as two quantities, the `val` field of [`LpRegularisation`](@ref).
 
 That estimator is a penalty in the `lp` field of [`JuMPOptimiser`](@ref) and a norm constraint in its `lpc` field, so `val` is an ambiguity radius on one route and a norm ceiling on the other. One field cannot carry two bounds, so this bound admits both roles and each route refuses the role that has no reading on it. It is the only slot in the library whose role is settled after construction rather than by its bound.
+
+Both rule families stand in the union as well, on the terms [`Num_SigTailCal`](@ref) sets out. This slot names no role of its own, so the rule's family is what [`bind_role`](@ref) reads: a radius rule takes the radius role and a ceiling rule takes the ceiling role. The route then refuses the role that has no reading on it, exactly as it refuses a role the caller stated.
 
 # Related
 
   - [`LpRegularisation`](@ref)
   - [`Num_AmbRadCal`](@ref)
   - [`Num_NormCeilCal`](@ref)
+  - [`bind_role`](@ref)
   - [`assert_penalty_coefficient_role`](@ref)
   - [`assert_norm_ceiling_role`](@ref)
 """
 const Num_AmbRadNormCeilCal = Union{<:AmbiguityRadiusCalibration, <:NormCeilingCalibration,
-                                    <:Number}
+                                    <:AbstractAmbiguityRadiusCalibrationAlgorithm,
+                                    <:AbstractNormCeilingCalibrationAlgorithm, <:Number}
+# The role a bare rule takes in a slot that names no end — see `bind_role`.
+function bind_role(alg::AbstractAmbiguityRadiusCalibrationAlgorithm)
+    return AmbiguityRadiusCalibration(alg)
+end
+function bind_role(alg::AbstractAmbiguityTailWeightCalibrationAlgorithm)
+    return AmbiguityTailWeightCalibration(alg)
+end
+function bind_role(alg::AbstractNormCeilingCalibrationAlgorithm)
+    return NormCeilingCalibration(alg)
+end
 """
 $(DocStringExtensions.TYPEDEF)
 

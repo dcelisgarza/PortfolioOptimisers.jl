@@ -640,6 +640,10 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
                            lp::TD_Option{<:LpReg_VecLpReg},
                            linf::TD_Option{<:Num_AmbRadCal}, brt::Bool, x_src::Symbol,
                            z_src::Symbol, strict::Bool)
+        l2c = bind_role(l2c)
+        linfc = bind_role(linfc)
+        l1 = bind_role(l1)
+        linf = bind_role(linf)
         assert_source_selector(x_src, :x_src)
         assert_source_selector(z_src, :z_src)
         if isa(slv, VecSlv)
