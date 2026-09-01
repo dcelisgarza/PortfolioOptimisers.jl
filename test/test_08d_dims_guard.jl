@@ -17,28 +17,19 @@ Two locks hold the seam shut:
   2. CONSTRUCTION. No file in `src/` spells the orientation branch or the guard by hand.
      This rule names no sites either, so a leaf that re-decides the guard fails here rather
      than in a caller's result.
+
+Lock 1 can only drive a leaf that answers its family's verbs, because a leaf that answers
+none of them overflows the stack before it reaches a guard.
+`test_08l_moment_verb_census.jl` is the census that holds that set, and
+`moment_family_setup.jl` holds the one predicate both files read.
 =#
 using Test, PortfolioOptimisers, Statistics, StatsBase, LinearAlgebra, InteractiveUtils
 
 const PO = PortfolioOptimisers
 
-# Every concrete subtype of `T`, at any depth, that `PortfolioOptimisers` itself declares.
-#
-# The suite gives each file its own module but not its own process, so `subtypes` also
-# answers with the probe estimators the files that ran before it declare. The census is
-# about the shipped universe, so a leaf from another module is not one of its members, and
-# the count below is stable whatever else the worker ran first.
-function concrete_leaves(T::Type)
-    out = Type[]
-    for S in subtypes(T)
-        if isabstracttype(S)
-            append!(out, concrete_leaves(S))
-        elseif parentmodule(S) === PO
-            push!(out, S)
-        end
-    end
-    return out
-end
+# The family split and the ownership predicate. `test_08l_moment_verb_census.jl` reads the
+# same two, and a second copy of either is how the two censuses drift apart.
+include(joinpath(@__DIR__, "moment_family_setup.jl"))
 
 @testset "dims_oriented: the guard and the orientation are one call" begin
     X = reshape(collect(1.0:12.0), 4, 3)
@@ -68,23 +59,18 @@ end
 @testset "every moment estimator answers dims = 3 with a DomainError" begin
     X = reshape(collect(1.0:12.0), 4, 3)
 
-    # A variance estimator is also a covariance estimator in the hierarchy, but it answers
-    # `var`/`std` rather than `cov`/`cor`, so each family is driven by its own verbs.
-    ve_types = concrete_leaves(PO.AbstractVarianceEstimator)
-    ce_types = setdiff(concrete_leaves(PO.AbstractCovarianceEstimator), ve_types)
-
-    # `RegimeAdjustedExpWeightedCovariance` and `RegimeAdjustedExpWeightedVariance` answer
-    # neither `cov` nor `cor` at ANY `dims`: neither declares one, so the generic
-    # `cov(::AbstractCovarianceEstimator, X)` falls through to `cor`, which falls back to
-    # `cov`, and the call overflows the stack. That is a missing method rather than a `dims`
-    # hole -- it reproduces at `dims = 1` -- so it is reported separately. Delete this skip
-    # when those two declare their verbs.
-    no_verb = (PO.RegimeAdjustedExpWeightedCovariance, PO.RegimeAdjustedExpWeightedVariance)
-    ce_types = setdiff(ce_types, no_verb)
-
-    families = [(concrete_leaves(PO.AbstractExpectedReturnsEstimator), [Statistics.mean]),
-                (ve_types, [Statistics.var, Statistics.std]),
-                (ce_types, [Statistics.cov, Statistics.cor])]
+    #=
+    Each family is driven by its own verbs, and only a leaf that ANSWERS them can be driven
+    at all. A leaf that owns neither `cov` nor `cor` reaches the surface's fallback, which
+    reaches `StatsBase`'s generic `cor`, which reaches the fallback again: the call overflows
+    the stack at any `dims`, so it reaches no guard to test. That is a missing method rather
+    than a `dims` hole -- it reproduces at `dims = 1` -- and
+    `test_08l_moment_verb_census.jl` is the census that owns it. This file names no leaf: it
+    takes the same predicate, so the day that census admits a leaf, this one drives it.
+    =#
+    leaves = moment_families()
+    families = [(filter(S -> answers_family(f, S), getproperty(leaves, f)),
+                 family_verbs(f)) for f in (:er, :ve, :ce)]
 
     checked = 0
     for (types, verbs) in families

@@ -62,6 +62,7 @@ picking a side — a contradiction between standards files is itself a defect.
 | JuMP model state | ADR 0037, amending ADR 0004 | `test/test_28_seam_lock.jl` |
 | A risk-measure ↔ optimiser pairing | ADR 0018 | `test/test_29_risk_measure_compatibility.jl` |
 | A range risk measure | ADR 0057 | `test/test_44_range_tails_census.jl` |
+| A moment estimator that joins a Choice Surface | [ADR 0099](docs/adr/0099-choice-surface-membership-means-the-verbs-exist.md) — the leaf answers its family's verbs, and `test/moment_family_setup.jl` holds the split and the ownership predicate | `test/test_08l_moment_verb_census.jl`, and `test/test_08d_dims_guard.jl` for the `dims` guard on each pairing it admits |
 | Adding a file, a type or a function under `src/` or `ext/` | [`CLAUDE.md`](CLAUDE.md) § Functionality you add, and [`sweep/manifest.toml`](sweep/manifest.toml) for the row it names | `test/test_45_sweep_census.jl`, and `.github/workflows/Sweep.yml` when the child map has already closed; `test/test_47_alias_and_module_census.jl` for a new file, which `src/PortfolioOptimisers.jl` must `include`. `julia --project=code_health code_health/sweep_check.jl --fetch` reports all of it before the commit |
 | Filing the sweep sub-issue of an addition, by hand | [ADR 0084](docs/adr/0084-the-sweep-job-reopens-a-closed-child-map-and-files-the-addition.md), and the `sweep-file-issues` skill | `julia --project=code_health code_health/sweep_triage.jl --fetch --file <path>` for the plan, then `code_health/sweep_issues.sh apply` |
 | A combination weight on a meta-optimiser | ADR 0053 | `test/test_42_combination_weight_stacking.jl` |
@@ -110,6 +111,7 @@ Every Gate below is a real check that fails on a real breach.
 | `test/test_43_exported_abstract_type_census.jl` | the exported abstract types are exactly the names on the allow-list in that file | run the file |
 | `test/test_40_fallback_shortcut_census.jl` | a fallback shortcut's `Nothing` lands on `fb` | run the file |
 | `test/test_44_range_tails_census.jl` | a range risk measure declares its tails, or is on the fused list | run the file |
+| `test/test_08l_moment_verb_census.jl` | every concrete leaf of the three moment families answers its family's verbs with a method the library declares below the Choice Surface, and the one named exemption still fails | run the file |
 | `test/test_45_sweep_census.jl` | every file under `src/` and `ext/` has a sweep-manifest row naming its child map of #404, and the file's documented-unit count still matches that row | run the file |
 | `test/test_47_alias_and_module_census.jl` | an acronym alias of `src/25_Aliases.jl` IS the binding its docstring names, a factory alias of that file EQUALS the long form its sentence names, and `src/PortfolioOptimisers.jl` `include`s every other file under `src/` exactly once | run the file |
 | `test/test_46_standards_citation_census.jl` | every name and every path a standards file cites resolves against the repository, and no standards file states a count of the repository | run the file |

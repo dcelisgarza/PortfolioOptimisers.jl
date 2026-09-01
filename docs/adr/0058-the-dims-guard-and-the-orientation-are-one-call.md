@@ -115,6 +115,26 @@ this change, and both reproduce at `dims = 1`:
 The census skips those pairings and says why, so the skip disappears when the missing methods
 are declared.
 
+## Amendment (2026-09-01)
+
+The first Note's skip is gone from this census, and the gap it named now has a gate of its own.
+
+[ADR 0099](0099-choice-surface-membership-means-the-verbs-exist.md) rules that a leaf which
+joins a moment Choice Surface answers that surface's verbs.
+`test_08l_moment_verb_census.jl` measures it, and `moment_family_setup.jl` holds the family cut
+and the ownership predicate that both censuses read. The two leaves of the first Note are that
+census's one exemption, named with a reason and with
+[issue #637](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/637), and the census
+asserts that each still fails, so the exemption cannot outlive the repair.
+
+`test_08d_dims_guard.jl` therefore names no leaf any more. It takes its pairings from the
+ownership predicate: a leaf that answers no verb reaches no guard to test, because the call
+overflows the stack first. The census count is unchanged at 41 pairings, because the predicate
+admits exactly the leaves the hand-written skip admitted.
+
+The second Note stands. `cov`/`cor` on the two `AbstractVarianceEstimator` leaves still
+recurse, and giving that family a covariance reading is a separate decision.
+
 ## Related
 
 - [0037](0037-model-state-accessor-interface.md) — the closed-rule polarity the locks copy: a
