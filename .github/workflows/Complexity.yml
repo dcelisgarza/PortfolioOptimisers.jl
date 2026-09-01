@@ -1,7 +1,7 @@
 name: Complexity
 
-# The CodeComplexity half of the code-health gate. It runs `complexity.jl check` and then
-# `expansion.jl check`, both unconditionally, for about 85 seconds.
+# The parser half of the code-health gate. It runs `complexity.jl check`, then `expansion.jl
+# check`, then `size.jl check`, all three unconditionally, for about 90 seconds.
 #
 # There is deliberately NO `paths:` filter here. The gate does more than measure: a tracked `.jl`
 # file that is neither in scope nor a named Unmeasured Path turns it red, and that check reads the
@@ -75,6 +75,12 @@ jobs:
       - name: Expansion Bound
         if: ${{ !cancelled() }}
         run: julia --project=code_health code_health/expansion.jl check
+      # The size ratchet rides in this workflow rather than in one of its own. It is a pure
+      # JuliaSyntax parser like the complexity measurement, it costs about five seconds, and it
+      # reads the same tree through the same scope rule. ADR 0101.
+      - name: Size ratchet
+        if: ${{ !cancelled() }}
+        run: julia --project=code_health code_health/size.jl check
       # A run that trips publishes the Refresh Artifact: the generated baseline as
       # `refresh --accept-rise` would write it. `actions/upload-artifact` authenticates with the
       # Actions runtime token rather than with GITHUB_TOKEN, and this repository is public, so a
@@ -98,6 +104,7 @@ jobs:
         run: |
           julia --project=code_health code_health/complexity.jl refresh
           julia --project=code_health code_health/expansion.jl refresh
+          julia --project=code_health code_health/size.jl refresh
       - name: Publish the fresh numbers
         if: success() && github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
@@ -106,3 +113,4 @@ jobs:
           path: |
             code_health/complexity_baseline.toml
             code_health/expansion_bound.toml
+            code_health/size_baseline.toml

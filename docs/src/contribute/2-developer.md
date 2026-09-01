@@ -136,11 +136,19 @@ asks to fall: `Complexity` and `JET`. Both are a **ratchet**. A file passes when
 risen above the number `code_health/` records for it, so neither check ever asks you to improve a
 number you did not cause. A file far above every threshold is green while its number holds steady.
 
+The `Complexity` check carries a third ratchet beside the two complexity ones, and it reads
+differently. **The size ratchet** counts the **code** lines in a file, where a docstring line, a
+comment line and a blank line are not code. A file's ceiling there is the greater of 500 and the
+number the baseline records for it, so a file under 500 code lines is free to grow and a file over
+500 may fall and may not rise. See
+`docs/adr/0101-the-size-gate-counts-code-lines-and-binds-over-a-threshold.md`.
+
 When one turns red, the run names every offending file, the metric, the baseline number and the new
 one. Take one of three routes, in order.
 
- 1. **Lower the number.** This is the route to take whenever you can. The file's number is the
-    maximum over its definitions, so only the worst definition moves it.
+ 1. **Lower the number.** This is the route to take whenever you can. For a complexity number the
+    file's number is the maximum over its definitions, so only the worst definition moves it. For
+    the size ratchet, move code out of the file or delete it. A docstring costs nothing there.
 
  2. **Dismiss the report**, for `JET` alone. A Dismissal says that a class of report is not a real
     defect. It cites a **Rationale** by name, and the two halves have different owners: citing an

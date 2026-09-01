@@ -8,6 +8,7 @@
 #
 #   [thresholds]        which files the scheduled job files as work. Never the pass rule.
 #   [scheduled_job]     how many of them stand open at once.
+#   [size]              the one number here that IS part of a pass rule. ADR 0101 says why.
 #   [[unmeasured_path]] a path the gate never measures. It has no row and nothing to ratchet.
 #   [[exemption]]       a real number that may stand. It binds issue candidacy alone.
 #   [[dismissal]]       a JET report class that is not a defect. It binds the reviewed count.
@@ -33,6 +34,22 @@ cyclomatic = 10
 cognitive = 15
 argcount = 10
 jet_reviewed = 1
+
+# --- the size ratchet ------------------------------------------------------
+#
+# `code_lines` is the one number in this file that the pass rule reads. ADR 0101 states the reason:
+# a per-file ratchet on a line count is the sum-shaped noise that issue #336 already rejected,
+# because every added helper would turn the gate red. The threshold makes the gate quiet under
+# ordinary work and strict on the files that are already large. A file's ceiling is the greater of
+# this number and the number `code_health/size_baseline.toml` records for it.
+#
+# The cliff in this repository's own distribution of code lines per file sits between 530 and 440,
+# and 500 sits in it. Above it stand fifteen files, which is the same order as the twenty-one the
+# complexity thresholds report. It was chosen once from the cliff. It is not a rule to re-derive,
+# because a re-derived threshold never terminates.
+
+[size]
+code_lines = 500
 
 # --- the scheduled job -----------------------------------------------------
 #
