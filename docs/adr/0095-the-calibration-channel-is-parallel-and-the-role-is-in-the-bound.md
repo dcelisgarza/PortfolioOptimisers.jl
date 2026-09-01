@@ -41,8 +41,10 @@ validate.
 
 ### The channel is parallel, and a role stays out of the `DeferredQuantity` union
 
-Three verbs are new, and each sits beside its counterpart in
-[`src/19_RiskMeasures/01_Base_RiskMeasures.jl`](../../src/19_RiskMeasures/01_Base_RiskMeasures.jl).
+Three verbs are new. Each names its counterpart in
+[`src/19_RiskMeasures/01_Base_RiskMeasures.jl`](../../src/19_RiskMeasures/01_Base_RiskMeasures.jl),
+and the calibration half of each pair lives in
+[`src/14_UncertaintySets/06_CalibrationRules.jl`](../../src/14_UncertaintySets/06_CalibrationRules.jl).
 
 | Calibration | Deferred Quantity | What it does |
 | :--- | :--- | :--- |
@@ -306,11 +308,12 @@ second channel for what the host already varies.
 - **`resolve_deferred_quantities` is no longer only about Deferred Quantities.** The name is now
   narrower than the method, and a reader who takes it literally will miss the calibration resolution
   beside it. ADR 0051 carries the amendment.
-- **The root did not move, and the two uncertainty families were not re-parented.**
-  `AbstractCalibrationAlgorithm` lives in `src/19_RiskMeasures/01_Base_RiskMeasures.jl` beside
-  `resolve_slot`, so ADR 0070's re-parenting of `AbstractUncertaintyKAlgorithm` and
-  `AbstractUncertaintyEpsAlgorithm` has not shipped: both still subtype `AbstractAlgorithm`
-  directly. Re-parenting them needs the root in `src/01_Base.jl` first.
+- **The root did not move under `src/01_Base.jl`, and the two uncertainty families were not
+  re-parented.** `AbstractCalibrationAlgorithm` lives in
+  `src/14_UncertaintySets/06_CalibrationRules.jl`, so ADR 0070's re-parenting of
+  `AbstractUncertaintyKAlgorithm` and `AbstractUncertaintyEpsAlgorithm` has not shipped: both
+  still subtype `AbstractAlgorithm` directly. Re-parenting them needs the root in
+  `src/01_Base.jl` first.
 - **A field bound is enforced on the keyword route only.** `ConcreteStructs.@concrete` emits a
   positional constructor that is strictly broader than the hand-written inner one, so a positional
   call bypasses every bound this decision rests on. That hole reaches every `@concrete` type in the

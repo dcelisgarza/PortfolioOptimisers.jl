@@ -254,3 +254,17 @@ carries the sample's own units, and the preference stays in the caller's `ratio`
 own slot, because its tail-term scale is a CVaR at that level. `alpha` and `l` therefore
 travel together on the shape `alpha` and `kappa` already use, and the three sites that resolve
 an `l` slot bind the level first.
+
+## Amendment (2026-09-01) — the calibration family has its own file
+
+**`AbstractCalibrationAlgorithm` moved.** It lives in
+[`src/14_UncertaintySets/06_CalibrationRules.jl`](../../src/14_UncertaintySets/06_CalibrationRules.jl),
+with the whole Calibration Rule and Role family beside it. The amendment of 2026-08-28 states
+that the root lives in `src/19_RiskMeasures/01_Base_RiskMeasures.jl` beside `resolve_slot`, and
+that statement is now out of date. The move is structural: no type, no bound and no verb
+changed, and the file loads before the risk measures, as it did when it sat inside them.
+
+**The re-parenting still has not shipped.** `AbstractUncertaintyKAlgorithm` and
+`AbstractUncertaintyEpsAlgorithm` still subtype `AbstractAlgorithm` directly. The move puts the
+calibration root in the same directory as the two families, so a later re-parenting no longer
+needs the root in `src/01_Base.jl` first.

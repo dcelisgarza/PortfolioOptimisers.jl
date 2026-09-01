@@ -93,11 +93,12 @@ commit = "8610300"
 "src/14_UncertaintySets/03_NormalUncertaintySets.jl" = { lines = 113, misses = 0 }
 "src/14_UncertaintySets/04_BootstrapUncertaintySets.jl" = { lines = 135, misses = 0 }
 "src/14_UncertaintySets/05_L1UncertaintySets.jl" = { lines = 111, misses = 0 }
+"src/14_UncertaintySets/06_CalibrationRules.jl" = { lines = 314, misses = 0 }
 "src/15_Turnover.jl" = { lines = 36, misses = 0 }
 "src/16_Fees.jl" = { lines = 142, misses = 0 }
 "src/17_NetReturnsDrawdowns.jl" = { lines = 28, misses = 0 }
 "src/18_Tracking.jl" = { lines = 28, misses = 0 }
-"src/19_RiskMeasures/01_Base_RiskMeasures.jl" = { lines = 534, misses = 23 }
+"src/19_RiskMeasures/01_Base_RiskMeasures.jl" = { lines = 220, misses = 23 }
 "src/19_RiskMeasures/02_Variance.jl" = { lines = 117, misses = 11 }
 "src/19_RiskMeasures/03_MomentRiskMeasures.jl" = { lines = 139, misses = 2 }
 "src/19_RiskMeasures/04_Kurtosis.jl" = { lines = 89, misses = 10 }

@@ -1146,7 +1146,7 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        :K_keep_set => "``\\mathcal{K}``: Set of the assets a selector keeps.",#
                        :k_tail_count => "``k``: Number of assets taken from one end of the score ordering.",#
                        :t_corr_threshold => "``t``: Correlation at or above which two assets are redundant.",#
-                       # The ambiguity radius rules of `01_Base_RiskMeasures.jl`, and the
+                       # The ambiguity radius rules of `06_CalibrationRules.jl`, and the
                        # effective sample size the significance rules share with them. Each
                        # rule returns one radius off one record, so the radius, its scale
                        # and the weighted count of the record are each stated by two or
