@@ -178,6 +178,60 @@
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/11_Phylogeny/06_Phylogeny/</loc>
   </url>
   <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/11_Phylogeny/07_PMFG/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/11_Phylogeny/08_GraphTraversal/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/11_Phylogeny/09_CliqueHierarchy/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/11_Phylogeny/10_BubbleTree/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/11_Phylogeny/11_DBHTDendrogram/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/11_Phylogeny/12_DBHTClustering/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/11_Phylogeny/13_LoGo/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/11_Phylogeny/14_Centrality/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/11_Phylogeny/15_CentralityPolarity/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/11_Phylogeny/16_MinimumSpanningTree/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/11_Phylogeny/17_NetworkEstimator/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/11_Phylogeny/18_CentralityEstimator/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/11_Phylogeny/19_NetworkGraph/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/11_Phylogeny/20_Separation/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/11_Phylogeny/21_PhylogenyClustering/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/11_Phylogeny/22_PhylogenyMatrix/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/11_Phylogeny/23_CentralityQueries/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/11_Phylogeny/24_AssetPhylogeny/</loc>
+  </url>
+  <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/12_ConstraintGeneration/01_Base_ConstraintGeneration/</loc>
   </url>
   <url>
