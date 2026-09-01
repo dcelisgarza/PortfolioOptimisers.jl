@@ -203,6 +203,7 @@ routes resolve one measure against one solver.
   - [`RiskMeasure`](@ref)
   - [`set_risk_bounds_and_expression!`](@ref)
   - [`set_risk_frontier_owner!`](@ref)
+  - [`assert_declared_calibration_resolver`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, r::RiskMeasure,
                                opt::JuMPOptimisationEstimator, pr::AbstractPriorResult,
@@ -225,11 +226,16 @@ function set_risk_constraints!(model::JuMP.Model, r::RiskMeasure,
     # `b1` is typed and named, not absorbed by an `args...` tail. The tail let a caller pass
     # a `Fees` in the slot after `fees` and lose it silently — which is exactly what
     # unconstrained `NearOptimalCentering` did (ADR 0008, amendment 2 §4).
+    #
+    # The resolution is also where the calibration declaration and its resolver are paired.
+    # `expected_risk` refuses a surviving Calibration Role at the value-level entry point,
+    # and a `JuMP` builder reads the slot raw, so this route carried no such refusal. A role
+    # that reaches this line names a type that declared the slot and resolved it nowhere.
     first = risk_frontier_length(model)
-    set_risk_constraints!(model, 1,
-                          unit_scale_risk_measure(resolve_deferred_quantities(r, pr,
-                                                                              opt.opt.slv)),
-                          opt, pr, pl, fees, b1; kwargs...)
+    resolved = resolve_deferred_quantities(r, pr, opt.opt.slv)
+    assert_declared_calibration_resolver(resolved)
+    set_risk_constraints!(model, 1, unit_scale_risk_measure(resolved), opt, pr, pl, fees,
+                          b1; kwargs...)
     set_risk_frontier_owner!(model, first, 1)
     return nothing
 end
@@ -239,8 +245,9 @@ function set_risk_constraints!(model::JuMP.Model, rs::VecRM, opt::JuMPOptimisati
                                kwargs...)
     for (i, r) in enumerate(rs)
         first = risk_frontier_length(model)
-        set_risk_constraints!(model, i, resolve_deferred_quantities(r, pr, opt.opt.slv),
-                              opt, pr, pl, fees, b1; kwargs...)
+        resolved = resolve_deferred_quantities(r, pr, opt.opt.slv)
+        assert_declared_calibration_resolver(resolved)
+        set_risk_constraints!(model, i, resolved, opt, pr, pl, fees, b1; kwargs...)
         set_risk_frontier_owner!(model, first, i)
     end
     return nothing

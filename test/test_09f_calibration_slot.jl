@@ -704,3 +704,195 @@ end
     @test res.r.alpha == BUILT_ALPHA[]
     @test res.r.alpha == 0.05
 end
+
+#=
+A declared calibration slot and the resolution that serves it are two separate statements,
+and until now nothing paired them. The Deferred-Quantity channel owns
+`assert_declared_slot_resolver` for exactly this failure: a type that declared the slot and
+wrote no way to resolve it. The calibration channel had no counterpart, so a role reached
+the `JuMP` builders and was multiplied as though it were a number.
+
+`assert_declared_calibration_resolver` is that counterpart. It walks the declaration the way
+`assert_calibrated_slots` does, and it carries its own message: that one names a caller who
+reached a value-level entry point, and this one names the library's own missing resolution.
+=#
+
+# A risk measure that declares its slot and resolves it nowhere. It is the failure the
+# pairing exists to catch, and no shipped type is in this state.
+PortfolioOptimisers.@propagatable struct UnpairedProbe{T1, T2, T3} <: PO.RiskMeasure
+    settings::T1
+    @pprop w::T2
+    alpha::T3
+end
+function UnpairedProbe(; settings::RiskMeasureSettings = RiskMeasureSettings(), w = nothing,
+                       alpha = 0.05)
+    return UnpairedProbe(settings, w, alpha)
+end
+(::UnpairedProbe)(x::PO.VecNum) = sqrt(sum(abs2, x) / length(x))
+PortfolioOptimisers.risk_input_kind(::UnpairedProbe) = PO.NetReturnsInput()
+PortfolioOptimisers.calibration_slots(x::UnpairedProbe) = (; alpha = x.alpha)
+function PortfolioOptimisers.set_risk_constraints!(model::JuMP.Model, ::Any,
+                                                   r::UnpairedProbe,
+                                                   opt::PO.RiskJuMPOptimisationEstimator,
+                                                   pr::PO.AbstractPriorResult, args...;
+                                                   prefix::Symbol = Symbol(""), kwargs...)
+    return PO.state_build!(model, prefix, :unpaired_risk) do
+        unpaired_risk = JuMP.@expression(model, zero(JuMP.AffExpr))
+        PO.set_risk_bounds_and_expression!(model, opt, unpaired_risk, r.settings,
+                                           :unpaired_risk; prefix = prefix)
+        return unpaired_risk
+    end
+end
+
+@testset "Calibration slot: the declaration is paired with its resolver" begin
+    stated = CalibratedProbe(; alpha = 0.05)
+    stated2 = CalibratedProbe(; alpha = 0.1)
+
+    # Nothing to pair: a stated number needs no resolution and passes.
+    @test isnothing(PO.assert_declared_calibration_resolver(stated))
+    @test isnothing(PO.assert_declared_calibration_resolver(0.05))
+    @test isnothing(PO.assert_declared_calibration_resolver(nothing))
+
+    # A role that survived the resolution names a declaration with no resolver.
+    probe = CalibratedProbe(; alpha = SignificanceTailCalibration(; alg = RULE))
+    @test_throws ArgumentError PO.assert_declared_calibration_resolver(probe)
+    msg = try
+        PO.assert_declared_calibration_resolver(probe)
+        ""
+    catch e
+        sprint(showerror, e)
+    end
+
+    # The message names the type, the slot, the role and the resolution to write beside the
+    # declaration.
+    @test occursin("CalibratedProbe.alpha", msg)
+    @test occursin("SignificanceTailCalibration", msg)
+    @test occursin("calibration_slots", msg)
+    @test occursin("resolve_calibration_slot(x.alpha, :alpha, pr, pr.w, slv)", msg)
+
+    # The two halves carry two messages, so one failure never reads as the other. The
+    # value-level half tells a caller to pass the prior result; this half tells the library
+    # to write the resolution.
+    vmsg = try
+        PO.assert_calibrated_slots(probe)
+        ""
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("factory(r, pr)", vmsg)
+    @test !occursin("factory(r, pr)", msg)
+    @test !occursin("calibration_slots", vmsg)
+
+    # The walk recurses into a child, so a container is paired through its children.
+    nested = CalibratedProbe(; alpha = 0.05, child = probe)
+    @test_throws ArgumentError PO.assert_declared_calibration_resolver(nested)
+
+    # A slot that holds a vector of children is walked element by element.
+    @test isnothing(PO.assert_declared_calibration_resolver([stated, stated2]))
+    @test_throws ArgumentError PO.assert_declared_calibration_resolver([stated, probe])
+end
+
+@testset "Calibration slot: every shipped declaration names a type with a resolver" begin
+    # The census reads the method table, so a declaration written tomorrow joins it on the
+    # day it is written. Only the package's own methods are counted: the probes above and
+    # in the sibling test files declare slots too, and they are not the library's.
+    declared = Any[]
+    for m in methods(PO.calibration_slots)
+        m.module === PortfolioOptimisers || continue
+        T = Base.unwrap_unionall(m.sig).parameters[2]
+        T === Any && continue
+        push!(declared, T)
+    end
+    @test !isempty(declared)
+
+    # A declaration is served by one of three verbs. `factory` and `norm_ceiling_factory`
+    # are the two routes ADR 0097 names, and `resolve_deferred_quantities` is the one every
+    # risk measure writes beside its declaration.
+    resolvers = Any[]
+    for f in (PO.resolve_deferred_quantities, PO.factory, PO.norm_ceiling_factory)
+        for m in methods(f)
+            m.module === PortfolioOptimisers || continue
+            sig = Base.unwrap_unionall(m.sig).parameters
+            length(sig) >= 2 || continue
+            R = sig[2]
+            R === Any && continue
+            push!(resolvers, R)
+        end
+    end
+    unpaired = [T for T in declared if !any(R -> T <: R, resolvers)]
+    @test isempty(unpaired)
+end
+
+@testset "Calibration slot: an unreachable slot fails loudly on the JuMP route" begin
+    rng = StableRNG(1029384756)
+    X = randn(rng, 60, 4)
+    pr = prior(EmpiricalPrior(), X)
+    rd = ReturnsResult(; nx = string.(1:4), X = X)
+    slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                 check_sol = (; allow_local = true, allow_almost = true),
+                 settings = "verbose" => false)
+    role = SignificanceTailCalibration(; alg = probe_rate)
+
+    # A `JuMP` builder reads the slot raw, so before the pairing this role reached the
+    # builder and the failure landed several frames down, inside a kernel that expected a
+    # number. It is refused at the resolution instead, and the message names the type and
+    # the slot.
+    mr = MeanRisk(; r = UnpairedProbe(; alpha = role),
+                  opt = JuMPOptimiser(; slv = slv, pe = pr))
+    @test_throws ArgumentError optimise(mr, rd)
+    msg = try
+        optimise(mr, rd)
+        ""
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("UnpairedProbe.alpha", msg)
+    @test occursin("SignificanceTailCalibration", msg)
+
+    # A vector of measures is walked the same way, so a lone measure and an aggregate are
+    # refused alike.
+    mrs = MeanRisk(; r = [Variance(), UnpairedProbe(; alpha = role)],
+                   opt = JuMPOptimiser(; slv = slv, pe = pr))
+    @test_throws ArgumentError optimise(mrs, rd)
+
+    # A stated number needs no resolution, so the same measure optimises when its slot
+    # holds one. The refusal is about the role and not about the declaration.
+    ok = MeanRisk(; r = UnpairedProbe(; alpha = 0.05),
+                  opt = JuMPOptimiser(; slv = slv, pe = pr))
+    @test isa(optimise(ok, rd).retcode, PO.OptimisationSuccess)
+end
+
+@testset "Calibration slot: the three regularisation keys each reach the declaration" begin
+    rng = StableRNG(5647382910)
+    X = randn(rng, 60, 4)
+    pr = prior(EmpiricalPrior(), X)
+
+    # One field, one declaration naming `val`, and three resolution keys that are three
+    # different quantities. ADR 0097 settles why the keys stay apart; the pairing is what
+    # ties each of them back to the declaration that owns the slot.
+    rrole = AmbiguityRadiusCalibration(; alg = RateRadius(; c = 0.2))
+    crole = NormCeilingCalibration(; alg = EffectiveAssetFloor(; fraction = 0.5))
+
+    l2 = factory(L2Regularisation(; val = rrole), pr)
+    @test isa(l2.val, Number)
+    @test isnothing(PO.assert_declared_calibration_resolver(l2))
+
+    lp = factory(LpRegularisation(; p = 3, val = rrole), pr)
+    @test isa(lp.val, Number)
+    @test isnothing(PO.assert_declared_calibration_resolver(lp))
+
+    lpc = PO.norm_ceiling_factory(LpRegularisation(; p = 3, val = crole), pr)
+    @test isa(lpc.val, Number)
+    @test isnothing(PO.assert_declared_calibration_resolver(lpc))
+
+    # A vector of terms goes through the same verb, and each term is paired.
+    lpcs = PO.norm_ceiling_factory([LpRegularisation(; p = 2, val = crole),
+                                    LpRegularisation(; p = 3, val = crole)], pr)
+    @test all(x -> isa(x.val, Number), lpcs)
+    @test isnothing(PO.assert_declared_calibration_resolver(lpcs))
+
+    # A stated number is carried through, and it is paired too.
+    plain = factory(L2Regularisation(; val = 0.1), pr)
+    @test plain.val == 0.1
+    @test isnothing(PO.assert_declared_calibration_resolver(plain))
+end

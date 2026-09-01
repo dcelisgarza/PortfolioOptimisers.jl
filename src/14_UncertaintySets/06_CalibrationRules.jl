@@ -418,6 +418,7 @@ A slot that holds a child measure is declared here too, so a container names its
 
   - [`AbstractCalibrationAlgorithm`](@ref)
   - [`assert_calibrated_slots`](@ref)
+  - [`assert_declared_calibration_resolver`](@ref)
   - [`resolve_calibration_slot`](@ref)
   - [`deferred_slots`](@ref)
 """
@@ -452,6 +453,7 @@ The slots come from [`calibration_slots`](@ref) and the check recurses into what
 
   - [`calibration_slots`](@ref)
   - [`AbstractCalibrationEstimator`](@ref)
+  - [`assert_declared_calibration_resolver`](@ref)
   - [`assert_resolved_slots`](@ref)
   - [`expected_risk`](@ref)
 """
@@ -467,6 +469,70 @@ function assert_calibrated_slots(xs::AbstractArray{<:Union{<:AbstractEstimator,
                                                            <:AbstractAlgorithm}})
     for x in xs
         assert_calibrated_slots(x)
+    end
+    return nothing
+end
+"""
+    assert_declared_calibration_resolver(x, slots::NamedTuple)
+    assert_declared_calibration_resolver(x)
+
+Refuse a type that declares a calibration slot and no way to resolve it.
+
+`slots` is what the resolution produced. A **Calibration Role** that survives it names a type that declared the slot in [`calibration_slots`](@ref) and then wrote no resolution for it, so the role would reach the model builders and be multiplied as though it were a number. This is where the declaration and the resolver are paired.
+
+The two channels check alike. [`assert_declared_slot_resolver`](@ref) is the Deferred-Quantity half, and the two-argument method here carries its shape: the resolver holds the slots it produced and hands them over. The one-argument method reads them off `x` instead, and is what a funnel takes, which holds a resolved value and not the slots that made it.
+
+The walk is the one [`assert_calibrated_slots`](@ref) makes, and the message is the other half of the pair. That one names a caller who reached a value-level entry point, and this one names a slot the library itself left unresolved. So one message never has to serve two failures.
+
+The calibration channel derives no recursion of its own, which is why the pairing is a check and not a derivation: a rule that reads a sibling slot must be resolved after that sibling, and no derivation can know the order. So each type writes its resolution beside its declaration, and this refuses the pair that does not meet.
+
+# Algorithm
+
+ 1. Walk the pairs of `slots`, giving each slot's name `key` and its occupant `slot`.
+ 2. Refuse an occupant that holds an [`AbstractCalibrationEstimator`](@ref).
+ 3. Return `nothing` once the walk is spent.
+
+The one-argument method reads `slots` from [`calibration_slots`](@ref), then recurses into each occupant, so a child measure's own declarations are paired as well. A slot that holds a vector of children is walked element by element.
+
+# Arguments
+
+  - `x`: The slot owner, whose type the message names.
+  - `slots`: The slots the resolution produced, or the declaration itself for the one-argument method.
+
+# Validation
+
+  - Throws an `ArgumentError` when an entry of `slots`, or of any child the walk reaches, still holds an [`AbstractCalibrationEstimator`](@ref). The message names the type, the slot and the resolution to write beside the declaration.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`calibration_slots`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+  - [`assert_calibrated_slots`](@ref)
+  - [`assert_declared_slot_resolver`](@ref)
+"""
+function assert_declared_calibration_resolver(x, slots::NamedTuple)
+    for (key, slot) in pairs(slots)
+        @argcheck(!isa(slot, AbstractCalibrationEstimator),
+                  ArgumentError("`$(nameof(typeof(x))).$key` holds a Calibration Role, a `$(nameof(typeof(slot)))`, after the resolution ran, so `$(nameof(typeof(x)))` declares the slot in `calibration_slots` and resolves it nowhere. The declaration and the resolution travel together, because a rule that reads a sibling slot must be resolved after that sibling. Resolve the slot beside the declaration with `resolve_calibration_slot(x.$key, :$key, pr, pr.w, slv)`, or drop it from `calibration_slots`."))
+    end
+    return nothing
+end
+function assert_declared_calibration_resolver(x)
+    slots = calibration_slots(x)
+    assert_declared_calibration_resolver(x, slots)
+    for slot in slots
+        assert_declared_calibration_resolver(slot)
+    end
+    return nothing
+end
+function assert_declared_calibration_resolver(xs::AbstractArray{<:Union{<:AbstractEstimator,
+                                                                        <:AbstractAlgorithm}})
+    for x in xs
+        assert_declared_calibration_resolver(x)
     end
     return nothing
 end

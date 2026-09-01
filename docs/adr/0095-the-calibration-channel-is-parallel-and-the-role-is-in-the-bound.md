@@ -41,7 +41,7 @@ validate.
 
 ### The channel is parallel, and a role stays out of the `DeferredQuantity` union
 
-Three verbs are new. Each names its counterpart in
+Four verbs are new. Each names its counterpart in
 [`src/19_RiskMeasures/01_Base_RiskMeasures.jl`](../../src/19_RiskMeasures/01_Base_RiskMeasures.jl),
 and the calibration half of each pair lives in
 [`src/14_UncertaintySets/06_CalibrationRules.jl`](../../src/14_UncertaintySets/06_CalibrationRules.jl).
@@ -51,6 +51,7 @@ and the calibration half of each pair lives in
 | `resolve_calibration_slot(slot, key, pr, w, slv = nothing)` | `resolve_slot(slot, key, pr)` | resolve one slot |
 | `calibration_slots(x)` | `deferred_slots(x)` | declare the slots, as a `NamedTuple` |
 | `assert_calibrated_slots(x)` | `assert_resolved_slots(x)` | refuse at a value-level entry point |
+| `assert_declared_calibration_resolver(x, slots)` | `assert_declared_slot_resolver(x, slots)` | refuse a declared slot that no resolver reaches |
 
 `resolve_calibration_slot` runs a rule by **calling** it, `r.alg(key, pr, w, slv)`, and its fallback
 method returns a stated number unchanged. Three facts make it a separate verb rather than a widening
@@ -64,6 +65,14 @@ of `resolve_slot`:
    who reached `expected_risk(r, w, X)` that the slot holds a Calibration Role and that a bare
    returns matrix carries no sample for the rule to read. The Deferred-Quantity message names a fit
    instead, which is the wrong instruction.
+
+**The declaration is paired with its resolver.** `calibration_slots` and the resolution beside it
+are two statements, and a type that writes the first and forgets the second hands a role to the
+model builders. `assert_declared_calibration_resolver` refuses that, and it is the fourth pair
+because the Deferred-Quantity channel already refuses the same failure. It runs where a resolved
+measure meets a consumer that cannot resolve: `set_risk_constraints!` on the `JuMP` route, and the
+three regularisation factories. `assert_calibrated_slots` covers the value-level route already, so
+each route now names the failure in its own words.
 
 **The per-type entry point is shared.** A type's own `resolve_deferred_quantities` method resolves
 both kinds of slot and rebuilds once, because a measure that carries both must not be rebuilt twice

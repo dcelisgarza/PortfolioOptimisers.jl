@@ -381,10 +381,12 @@ The slot is named `val` and its key is `:l2reg_val`, because [`LpRegularisation`
   - [`L2Regularisation`](@ref)
   - [`resolve_calibration_slot`](@ref)
   - [`assert_ambiguity_radius_formulation`](@ref)
+  - [`assert_declared_calibration_resolver`](@ref)
   - [`assemble_jump_model!`](@ref)
 """
 function factory(x::L2Regularisation, pr::AbstractPriorResult, slv = nothing)
     val = resolve_calibration_slot(x.val, :l2reg_val, pr, pr.w, slv)
+    assert_declared_calibration_resolver(x, (; val = val))
     if val === x.val
         return x
     end
@@ -719,11 +721,13 @@ The key still names no norm order, because `p` lives on this estimator and one r
   - [`assert_penalty_coefficient_role`](@ref)
   - [`norm_ceiling_factory`](@ref)
   - [`resolve_calibration_slot`](@ref)
+  - [`assert_declared_calibration_resolver`](@ref)
   - [`assemble_jump_model!`](@ref)
 """
 function factory(x::LpRegularisation, pr::AbstractPriorResult, slv = nothing)
     assert_penalty_coefficient_role(x.val)
     val = resolve_calibration_slot(bind_norm_order(x.val, x.p), :lpreg_val, pr, pr.w, slv)
+    assert_declared_calibration_resolver(x, (; val = val))
     if val === x.val
         return x
     end
@@ -746,7 +750,8 @@ The fallback carries its argument through unchanged, which is the route `nothing
  2. The argument is a vector of terms: resolve each of them, and return the vector of the results.
  3. The argument is one term: refuse a radius role with [`assert_norm_ceiling_role`](@ref).
  4. Bind the term's own `p` into the rule with [`bind_norm_order`](@ref), then resolve the slot under the key `:lpc`, giving `val`.
- 5. `val` is the number the term already holds: return the term itself. Otherwise rebuild the term through the keyword constructor.
+ 5. Pair the declaration with this resolver through [`assert_declared_calibration_resolver`](@ref), which refuses the declared slot when the resolution above did not reach it.
+ 6. `val` is the number the term already holds: return the term itself. Otherwise rebuild the term through the keyword constructor.
 
 # Arguments
 
@@ -765,6 +770,7 @@ The fallback carries its argument through unchanged, which is the route `nothing
   - [`assert_norm_ceiling_role`](@ref)
   - [`bind_norm_order`](@ref)
   - [`resolve_calibration_slot`](@ref)
+  - [`assert_declared_calibration_resolver`](@ref)
   - [`set_weight_norm_p_constraints!`](@ref)
   - [`assemble_jump_model!`](@ref)
 """
@@ -774,6 +780,7 @@ end
 function norm_ceiling_factory(x::LpRegularisation, pr::AbstractPriorResult, slv = nothing)
     assert_norm_ceiling_role(x.val)
     val = resolve_calibration_slot(bind_norm_order(x.val, x.p), :lpc, pr, pr.w, slv)
+    assert_declared_calibration_resolver(x, (; val = val))
     if val === x.val
         return x
     end

@@ -1946,6 +1946,7 @@ Refuse a type that declares a deferrable slot and no way to resolve it.
   - [`resolve_deferred_quantities`](@ref)
   - [`deferred_slots`](@ref)
   - [`DeferredQuantity`](@ref)
+  - [`assert_declared_calibration_resolver`](@ref)
 """
 function assert_declared_slot_resolver(x, slots::NamedTuple)
     for (key, slot) in pairs(slots)

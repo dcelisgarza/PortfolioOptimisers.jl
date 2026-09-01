@@ -18,6 +18,7 @@ Num_DefHeadCal
 resolve_calibration_slot
 calibration_slots
 assert_calibrated_slots
+assert_declared_calibration_resolver
 mirror_role
 AbstractCalibrationSeries
 AbstractDrawdownSeries
