@@ -9,6 +9,10 @@
 # Rendering notes (Documenter's HTML writer):
 #   * `@ref` links cannot live inside a ```` ``` ```` code fence, so the tree is
 #     plain markdown, not a fenced block.
+#   * Each type name is a backticked code span, because that is what makes the
+#     `@ref` a docstring reference (see `_node`). The theme paints a code span
+#     with its own background and padding, which breaks the rows of the tree, so
+#     `.type-tree code` in `docs/src/assets/generated-pages.css` flattens it.
 #   * A bare `<div>`/`<br>` written into markdown text gets HTML-escaped
 #     (`&lt;div&gt;`), so the wrapper `<div class="type-tree">` is emitted via a
 #     `@raw html` block, which passes through verbatim. The markdown tree lives
@@ -37,15 +41,15 @@ function is_linkable(T::Type)
                   Base.Docs.Binding(parentmodule(T), nameof(T)))
 end
 
-function _node(T::Type)#; qualified::Bool = false)
-    name = string(nameof(T))
+function _node(T::Type)
+    # The name is backticked. Documenter reads the text of a link to decide what
+    # the `@ref` points at: backticked text is a docstring reference, and plain
+    # text is a heading reference and nothing else. Every node here must reach a
+    # docstring, so every node name carries the backticks, linked or not.
+    name = string("`", nameof(T), "`")
     if !(is_linkable(T))
         return name
     end
-    # The root repeats the section heading, so a bare `@ref` would resolve to the
-    # heading anchor rather than the docstring; qualifying it (`@ref Mod.Name`)
-    # targets the docstring directly.
-    # target = qualified ? string(" ", parentmodule(T), ".", name) : ""
     return string("[", name, "](@ref)")
 end
 
