@@ -97,7 +97,7 @@ Build one scaled row of the grid formulation of an entropic value-at-risk view.
 
   - [`GridEntropicValueatRiskView`](@ref)
   - [`GridEntropicValueatRiskViewConstraint`](@ref)
-  - [`ep_evar_views!`](@ref)
+  - [`ep_tail_views!`](@ref)
 """
 function ep_evar_grid_row(x::VecNum, ebar::Number, z::Number)
     c = exp.((x .- ebar) ./ z)
@@ -356,7 +356,7 @@ Build one scaled row of the grid formulation of a relativistic value-at-risk vie
 
   - [`GridRelativisticValueatRiskView`](@ref)
   - [`GridRelativisticValueatRiskViewConstraint`](@ref)
-  - [`ep_rlvar_views!`](@ref)
+  - [`ep_tail_views!`](@ref)
 
 # References
 
@@ -1401,8 +1401,7 @@ Resolve one parsed tail view into the assets it names, their coefficients, its o
 
 # Related
 
-  - [`ep_cvar_views!`](@ref)
-  - [`ep_evar_views!`](@ref)
+  - [`ep_tail_views!`](@ref)
   - [`get_linear_constraints`](@ref)
   - [`comparison_sign_ineq_flag`](@ref)
 """
@@ -1454,7 +1453,7 @@ Returns the operator and target of the equivalent view whose coefficient is one,
 # Related
 
   - [`ep_view_terms`](@ref)
-  - [`ep_cvar_views!`](@ref)
+  - [`ep_tail_views!`](@ref)
 """
 function ep_normalise_view_term(coef::Number, op::Symbol, rhs::Number)
     rhs /= coef
@@ -1493,8 +1492,7 @@ A single formulation applies to every view, a vector supplies one per view, and 
 # Related
 
   - [`EntropyPoolingPrior`](@ref)
-  - [`ep_cvar_views!`](@ref)
-  - [`ep_evar_views!`](@ref)
+  - [`ep_tail_views!`](@ref)
 """
 function ep_view_formulations(alg::Option{<:AbstractEntropyPoolingViewFormulation},
                               N::Integer, ::Symbol)
@@ -1532,7 +1530,7 @@ Resolve the number of largest losses the integer conditional value-at-risk formu
 # Related
 
   - [`IntegerConditionalValueatRiskView`](@ref)
-  - [`ep_cvar_views!`](@ref)
+  - [`ep_tail_views!`](@ref)
 
 # References
 
@@ -1588,8 +1586,7 @@ A tail risk measure of a reweighted sample lies between the smallest and the lar
 
 # Related
 
-  - [`ep_cvar_views!`](@ref)
-  - [`ep_evar_views!`](@ref)
+  - [`ep_tail_views!`](@ref)
 """
 function ep_assert_reachable_view(op::Symbol, rhs::Number, x::VecNum, eqn::AbstractString,
                                   name::AbstractString)
@@ -1640,7 +1637,7 @@ The branch each input takes:
 
   - [`LinearConditionalValueatRiskView`](@ref)
   - [`IntegerConditionalValueatRiskView`](@ref)
-  - [`ep_cvar_views!`](@ref)
+  - [`ep_tail_views!`](@ref)
 """
 function ep_cvar_formulation(alg::AbstractConditionalValueatRiskViewFormulation, args...)
     return alg
@@ -1685,7 +1682,7 @@ The branch each input takes:
 
   - [`ConicEntropicValueatRiskView`](@ref)
   - [`GridEntropicValueatRiskView`](@ref)
-  - [`ep_evar_views!`](@ref)
+  - [`ep_tail_views!`](@ref)
 """
 function ep_evar_formulation(alg::AbstractEntropicValueatRiskViewFormulation, args...)
     return alg
@@ -1730,7 +1727,7 @@ The branch each input takes:
 
   - [`ConicRelativisticValueatRiskView`](@ref)
   - [`GridRelativisticValueatRiskView`](@ref)
-  - [`ep_rlvar_views!`](@ref)
+  - [`ep_tail_views!`](@ref)
 """
 function ep_rlvar_formulation(alg::AbstractRelativisticValueatRiskViewFormulation, args...)
     return alg
@@ -1782,7 +1779,7 @@ Lower one conditional value-at-risk view into the tail view constraint its formu
 
   - [`LinearConditionalValueatRiskView`](@ref)
   - [`IntegerConditionalValueatRiskView`](@ref)
-  - [`ep_cvar_views!`](@ref)
+  - [`ep_tail_views!`](@ref)
 """
 function ep_add_cvar_view!(tvs::AbstractVector, ::LinearConditionalValueatRiskView,
                            X::MatNum, idx::VecInt, coef::VecNum, op::Symbol, rhs::Number,
@@ -1865,7 +1862,7 @@ Lower one entropic value-at-risk view into the constraints its formulation needs
   - [`GridEntropicValueatRiskView`](@ref)
   - [`ep_evar_grid`](@ref)
   - [`ep_evar_grid_row`](@ref)
-  - [`ep_evar_views!`](@ref)
+  - [`ep_tail_views!`](@ref)
 """
 function ep_add_evar_view!(epc::AbstractDict, tvs::AbstractVector,
                            ::ConicEntropicValueatRiskView, x::VecNum, alpha::Number,
@@ -1888,27 +1885,74 @@ function ep_add_evar_view!(epc::AbstractDict, tvs::AbstractVector,
     wi = w ./ sum(w)
     z = ep_evar_grid(x, wi, alpha, op, rhs, zstar, pct, K; iters = iters, tol = tol,
                      tilt_iters = tilt_iters, args = args, kwargs = kwargs, zlo = zlo)
-    # A point whose row is not finite is not a grid point. `exp((x - rhs) / z)` overflows at
-    # a dual variable near zero, and a non-finite coefficient reaches the solver as
-    # `NaN * x[j]`. The grid sits there when `pct` approaches one, and wholly there when
-    # `alpha * T` falls below one, because the minimiser is then at the end of its bracket.
-    keep = filter(eachindex(z)) do k
-        c, isc = ep_evar_grid_row(x, rhs, z[k])
-        return all(isfinite, c) && isfinite(isc)
+    function row(zk)
+        c, isc = ep_evar_grid_row(x, rhs, zk)
+        return c, alpha * isc
     end
-    @argcheck(!isempty(keep),
-              ArgumentError("View `$(eqn)` builds no finite grid point. The row of every dual variable the grid spans overflows, which happens when `alpha` ($(alpha)) leaves fewer than one observation in the tail, and when `pct` ($(pct)) approaches one. Raise `alpha`, or narrow `pct`."))
-    z = z[keep]
-    if op == :geq || op == :eq
-        for zk in z
-            c, isc = ep_evar_grid_row(x, rhs, zk)
-            add_ep_constraint!(epc, reshape(-c, 1, :), [-alpha * isc], :ineq)
-        end
-    end
+    # `exp((x - rhs) / z)` overflows at a dual variable near zero. The grid sits there when
+    # `pct` approaches one, and wholly there when `alpha * T` falls below one, because the
+    # minimiser is then at the end of its bracket.
+    z = ep_add_grid_tail_view!(epc, z, op, row,
+                               () -> "View `$(eqn)` builds no finite grid point. The row of every dual variable the grid spans overflows, which happens when `alpha` ($(alpha)) leaves fewer than one observation in the tail, and when `pct` ($(pct)) approaches one. Raise `alpha`, or narrow `pct`.")
     if op == :leq || op == :eq
         push!(tvs, GridEntropicValueatRiskViewConstraint(x, z, alpha, rhs, M))
     end
     return nothing
+end
+"""
+    ep_add_grid_tail_view!(epc::AbstractDict, grid::AbstractVector, op::Symbol, row, msg)
+
+Keep the finite points of a tail view grid, and add the rows of its lower-bound half.
+
+`ep_add_grid_tail_view!` is the scaffold shared by [`GridEntropicValueatRiskView`](@ref) and [`GridRelativisticValueatRiskView`](@ref). Both build a grid of points, drop the points whose row is not finite, and add one linear row per kept point. They differ in what a point is and in how its row is built, and both reach the scaffold through `row`.
+
+A point whose row is not finite is not a grid point, because a non-finite coefficient reaches the solver as `NaN * x[j]`. The caller's `msg` names the setting that put the whole grid there.
+
+# Algorithm
+
+ 1. Build the row of every point with `row`, and keep the points whose coefficients and whose right-hand side are all finite.
+ 2. Raise with `msg` where no point is kept.
+ 3. Where the view carries a lower-bound half, add the row of each kept point to `epc` under `:ineq` with [`add_ep_constraint!`](@ref), negated so the row reads as the `<=` sense that key states.
+ 4. Return the kept points, which the caller carries into the tail view constraint of the upper-bound half.
+
+# Arguments
+
+  - `epc`: Dictionary of entropy pooling constraints, mapping keys to `(lhs, rhs)` pairs.
+  - `grid`: Points of the grid.
+  - `op`: Comparison operator of the view.
+  - `row`: Function taking one point to the coefficients and the right-hand side of its row.
+  - `msg`: Function of no arguments giving the message of the error raised where no point is kept. It is called only where the grid keeps no point.
+
+# Validation
+
+  - At least one point of the grid has a finite row. A grid that keeps no point raises an `ArgumentError` carrying `msg()`.
+
+# Returns
+
+  - `grid::AbstractVector`: Points of the grid whose row is finite.
+
+# Related
+
+  - [`ep_add_evar_view!`](@ref)
+  - [`ep_add_rlvar_view!`](@ref)
+  - [`add_ep_constraint!`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
+"""
+function ep_add_grid_tail_view!(epc::AbstractDict, grid::AbstractVector, op::Symbol, row,
+                                msg)
+    keep = filter(eachindex(grid)) do k
+        c, b = row(grid[k])
+        return all(isfinite, c) && isfinite(b)
+    end
+    @argcheck(!isempty(keep), ArgumentError(msg()))
+    grid = grid[keep]
+    if op == :geq || op == :eq
+        for g in grid
+            c, b = row(g)
+            add_ep_constraint!(epc, reshape(-c, 1, :), [-b], :ineq)
+        end
+    end
+    return grid
 end
 """
     ep_add_rlvar_view!(epc::AbstractDict, tvs::AbstractVector,
@@ -1964,7 +2008,7 @@ Lower one relativistic value-at-risk view into the constraints its formulation n
   - [`ep_rlvar_grid`](@ref)
   - [`ep_rlvar_grid_row`](@ref)
   - [`ep_rlvar_tail`](@ref)
-  - [`ep_rlvar_views!`](@ref)
+  - [`ep_tail_views!`](@ref)
 """
 function ep_add_rlvar_view!(epc::AbstractDict, tvs::AbstractVector,
                             ::ConicRelativisticValueatRiskView, x::VecNum, alpha::Number,
@@ -1990,38 +2034,72 @@ function ep_add_rlvar_view!(epc::AbstractDict, tvs::AbstractVector,
     t, z = ep_rlvar_grid(x, wi, alpha, kappa, op, rhs, zstar, pv, pct, K; iters = iters,
                          tol = tol, tilt_iters = tilt_iters, args = args, kwargs = kwargs,
                          bracket = bracket)
-    # A point whose row is not finite is not a grid point. `ep_rlvar_tail` overflows at a
-    # dual variable near zero, which is where the grid sits when `kappa` approaches one, and
-    # a non-finite coefficient reaches the solver as `NaN * x[j]`.
-    keep = filter(eachindex(z)) do k
-        c, b = ep_rlvar_grid_row(x, rhs, t[k], z[k], alpha, kappa)
-        return all(isfinite, c) && isfinite(b)
+    function row(g)
+        return ep_rlvar_grid_row(x, rhs, g[1], g[2], alpha, kappa)
     end
-    @argcheck(!isempty(keep),
-              ArgumentError("View `$(eqn)` builds no finite grid point at `kappa = $(kappa)`. The tail function overflows at every dual variable the grid spans; state the view at a smaller `kappa`."))
-    t = t[keep]
-    z = z[keep]
-    if op == :geq || op == :eq
-        for (tk, zk) in zip(t, z)
-            c, b = ep_rlvar_grid_row(x, rhs, tk, zk, alpha, kappa)
-            add_ep_constraint!(epc, reshape(-c, 1, :), [-b], :ineq)
-        end
-    end
+    # `ep_rlvar_tail` overflows at a dual variable near zero, which is where the grid sits
+    # when `kappa` approaches one.
+    grid = ep_add_grid_tail_view!(epc, collect(zip(t, z)), op, row,
+                                  () -> "View `$(eqn)` builds no finite grid point at `kappa = $(kappa)`. The tail function overflows at every dual variable the grid spans; state the view at a smaller `kappa`.")
     if op == :leq || op == :eq
-        push!(tvs, GridRelativisticValueatRiskViewConstraint(x, t, z, alpha, kappa, rhs, M))
+        push!(tvs,
+              GridRelativisticValueatRiskViewConstraint(x, first.(grid), last.(grid), alpha,
+                                                        kappa, rhs, M))
     end
     return nothing
 end
 """
-    ep_cvar_views!(cvar_views::Nothing, args...; kwargs...)
+    ep_tail_view_prior_args(tail_views::ConditionalValueatRiskView, w::VecNum)
+    ep_tail_view_prior_args(tail_views::EntropicValueatRiskView, w::VecNum)
+    ep_tail_view_prior_args(tail_views::RelativisticValueatRiskView, w::VecNum)
 
-No-op pass-through for conditional value at risk (CVaR) view constraints when none are specified.
+Give the trailing arguments a `prior(...)` reference of this tail view resolves under.
+
+`ep_tail_view_prior_args` is one of the two kernels [`ep_tail_views!`](@ref) takes a measure from. It names the statistic [`get_pr_value`](@ref) reads, and it carries the level, the prior probabilities, and whatever settings the search for that statistic needs. [`replace_prior_views`](@ref) forwards the tuple unchanged, so a measure is added by adding a method here rather than by copying the lowering.
 
 # Arguments
 
-  - `cvar_views::Nothing`: Indicates that no CVaR view constraints are specified.
-  - `args...`: Additional positional arguments (ignored).
-  - `kwargs...`: Additional keyword arguments (ignored).
+  - `tail_views`: Tail view group whose settings the tuple carries.
+  - `w`: Prior probability weights.
+
+# Returns
+
+  - `args::Tuple`: Trailing arguments of [`replace_prior_views`](@ref), starting with the tag of the statistic.
+
+# Related
+
+  - [`ep_tail_views!`](@ref)
+  - [`replace_prior_views`](@ref)
+  - [`get_pr_value`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
+"""
+function ep_tail_view_prior_args(tail_views::ConditionalValueatRiskView, w::VecNum)
+    return (:cvar, tail_views.alpha, StatsBase.pweights(w))
+end
+function ep_tail_view_prior_args(tail_views::EntropicValueatRiskView, w::VecNum)
+    return (:evar, tail_views.alpha, StatsBase.pweights(w), tail_views.args,
+            tail_views.kwargs, tail_views.zlo)
+end
+function ep_tail_view_prior_args(tail_views::RelativisticValueatRiskView, w::VecNum)
+    return (:rlvar, tail_views.alpha, tail_views.kappa, StatsBase.pweights(w),
+            tail_views.args, tail_views.kwargs, tail_views.bracket)
+end
+"""
+    ep_assert_absolute_view(idx::VecInt, eqn::AbstractString, name::AbstractString)
+
+Reject a tail view that names more than one asset.
+
+[EPTail](@cite) and [EPRLVaR](@cite) give a formulation for a view on the risk measure of one asset alone, so an entropic or relativistic value-at-risk view over several assets has nothing to lower into. A group name expands to its members before this check, so a group of one member names one asset and passes.
+
+# Arguments
+
+  - `idx`: Indices of the assets the view names.
+  - `eqn`: Equation of the view, used in the error message.
+  - `name`: Name of the risk measure, used in the error message.
+
+# Validation
+
+  - The view names exactly one asset. A view over more than one asset raises an `ArgumentError`.
 
 # Returns
 
@@ -2029,45 +2107,94 @@ No-op pass-through for conditional value at risk (CVaR) view constraints when no
 
 # Related
 
-  - [`ep_cvar_views!`](@ref)
+  - [`ep_view_terms`](@ref)
+  - [`ep_add_tail_view!`](@ref)
   - [`EntropyPoolingPrior`](@ref)
+
+# References
+
+  - $(ref_dict[:EPTail])
+  - $(ref_dict[:EPRLVaR])
 """
-function ep_cvar_views!(cvar_views::Nothing, args...; kwargs...)
+function ep_assert_absolute_view(idx::VecInt, eqn::AbstractString, name::AbstractString)
+    @argcheck(isone(length(idx)),
+              ArgumentError("View `$(eqn)` names $(length(idx)) assets. An $(name) view names one asset: there is no formulation for a relative $(name) view."))
     return nothing
 end
 """
-    ep_cvar_views!(cvar_views::LinearConstraintEstimator, epc::AbstractDict,
-                   tvs::AbstractVector, pr::AbstractPriorResult, sets::UniverseSets,
-                   alpha::Number, w::VecNum, alg; strict::Bool = false)
+    ep_normalise_absolute_view(terms::NamedTuple, X::MatNum, eqn::AbstractString,
+                               name::AbstractString)
 
-Parse conditional value-at-risk views and lower them into entropy pooling constraints.
+Normalise a single-asset tail view and read the loss series it is stated on.
 
-`ep_cvar_views!` parses CVaR view equations from a [`LinearConstraintEstimator`](@ref), replaces prior references with their values, resolves the asset names against the universe, picks a formulation for each view, and appends the constraints that formulation needs. Unlike the recursive algorithm of [`MeucciEntropyPoolingPrior`](@ref), nothing is solved here: the views become part of the one entropy pooling problem [`entropy_pooling`](@ref) solves.
-
-It accepts `==`, `>=` and `<=`. A group name expands to its members, each carrying the coefficient the group carried, so a view on a group constrains the *sum* of the members' CVaRs and not their average, and a group of more than one member is a relative view. A view that names several assets is a relative view, and only [`IntegerConditionalValueatRiskView`](@ref) expresses it. A view that names one asset is normalised so its coefficient is one, which flips the operator when the coefficient is negative.
+The three steps below are shared by every tail view that names one asset, which is every entropic and relativistic value-at-risk view, and a conditional value-at-risk view that names one asset.
 
 # Algorithm
 
- 1. Parse the view equations of `cvar_views.val`, giving one [`ParsingResult`](@ref) per view.
- 2. Replace every group name by the assets it spans, giving one term per member.
- 3. Replace every `prior(...)` reference by the prior CVaR at this group's `alpha`, through [`replace_prior_views`](@ref).
- 4. Spread the formulation setting over the views with [`ep_view_formulations`](@ref), giving `algs`.
- 5. For each view in turn, resolve its terms with [`ep_view_terms`](@ref), and drop the view where no name of it is placed in the universe.
- 6. Where the view names one asset, normalise it with [`ep_normalise_view_term`](@ref), and reject a target no reweighting reaches with [`ep_assert_reachable_view`](@ref).
- 7. Compute `pv`, the prior value of the view's left hand side, as the coefficient-weighted sum of the per-asset CVaRs under the prior probabilities `w`.
- 8. Pick the formulation with [`ep_cvar_formulation`](@ref), and append the constraints it needs with [`ep_add_cvar_view!`](@ref).
+ 1. Divide the view by the coefficient it gives the asset with [`ep_normalise_view_term`](@ref), which flips the operator where that coefficient is negative.
+ 2. Read the loss series of the asset, `x`, as the negated returns column.
+ 3. Reject a target no reweighting of the sample reaches with [`ep_assert_reachable_view`](@ref).
 
 # Arguments
 
-  - `cvar_views`: CVaR view constraints.
+  - `terms`: Resolved terms of the view, as [`ep_view_terms`](@ref) returns them.
+  - `X`: Matrix of asset returns.
+  - `eqn`: Equation of the view, used in the error messages.
+  - `name`: Name of the risk measure, used in the error messages.
+
+# Returns
+
+  - `x::VecNum`: Loss series of the asset the view names.
+  - `op::Symbol`: Operator of the normalised view.
+  - `rhs::Number`: Target of the normalised view.
+
+# Related
+
+  - [`ep_view_terms`](@ref)
+  - [`ep_normalise_view_term`](@ref)
+  - [`ep_assert_reachable_view`](@ref)
+  - [`ep_add_tail_view!`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
+"""
+function ep_normalise_absolute_view(terms::NamedTuple, X::MatNum, eqn::AbstractString,
+                                    name::AbstractString)
+    (; idx, coef, op, rhs) = terms
+    op, rhs = ep_normalise_view_term(coef[1], op, rhs)
+    x = -X[:, idx[1]]
+    ep_assert_reachable_view(op, rhs, x, eqn, name)
+    return x, op, rhs
+end
+"""
+    ep_add_tail_view!(epc::AbstractDict, tvs::AbstractVector,
+                      tail_views::ConditionalValueatRiskView, alg, X::MatNum,
+                      terms::NamedTuple, eqn::AbstractString, w::VecNum)
+    ep_add_tail_view!(epc::AbstractDict, tvs::AbstractVector,
+                      tail_views::EntropicValueatRiskView, alg, X::MatNum,
+                      terms::NamedTuple, eqn::AbstractString, w::VecNum)
+    ep_add_tail_view!(epc::AbstractDict, tvs::AbstractVector,
+                      tail_views::RelativisticValueatRiskView, alg, X::MatNum,
+                      terms::NamedTuple, eqn::AbstractString, w::VecNum)
+
+Lower one resolved tail view into the constraints its measure and its formulation need.
+
+`ep_add_tail_view!` is the second of the two kernels [`ep_tail_views!`](@ref) takes a measure from. [`ep_tail_views!`](@ref) parses the group, expands its groups, and resolves its prior references and its terms; this verb carries everything past that point, which is everything the measures do not share. A measure is added by adding a method here and to [`ep_tail_view_prior_args`](@ref).
+
+# Algorithm
+
+ 1. A [`ConditionalValueatRiskView`](@ref) admits a relative view. Where the view names one asset, normalise it with [`ep_normalise_absolute_view`](@ref) and set its coefficient to one. Read `pv`, the prior value of the left hand side, as the coefficient-weighted sum of the per-asset CVaRs under `w`. Pick the formulation with [`ep_cvar_formulation`](@ref), and append with [`ep_add_cvar_view!`](@ref).
+ 2. An [`EntropicValueatRiskView`](@ref) names one asset. Check that with [`ep_assert_absolute_view`](@ref), normalise it with [`ep_normalise_absolute_view`](@ref), and read the prior EVaR and the dual variable that attains it with [`ep_evar`](@ref). Pick the formulation with [`ep_evar_formulation`](@ref), and append with [`ep_add_evar_view!`](@ref).
+ 3. A [`RelativisticValueatRiskView`](@ref) names one asset. Check and normalise it as the entropic view is, and read the prior RLVaR and the primal pair that attains it with [`ep_rlvar`](@ref). Pick the formulation with [`ep_rlvar_formulation`](@ref), and append with [`ep_add_rlvar_view!`](@ref).
+
+# Arguments
+
   - `epc`: Dictionary of entropy pooling constraints, mapping keys to `(lhs, rhs)` pairs.
   - `tvs`: Tail view constraints, appended to.
-  - `pr`: Prior result containing asset return information.
-  - `sets`: Asset set mapping asset names to indices.
-  - `alpha`: Confidence level for CVaR.
+  - `tail_views`: Tail view group the view belongs to. It carries the level, the formulation setting, and the settings of the searches.
+  - `alg`: Formulation of this view, as [`ep_view_formulations`](@ref) spread it.
+  - `X`: Matrix of asset returns.
+  - `terms`: Resolved terms of the view, as [`ep_view_terms`](@ref) returns them.
+  - `eqn`: Equation of the view, used in the error messages.
   - `w`: Prior probability weights.
-  - `alg`: Formulation setting, spread over the views by [`ep_view_formulations`](@ref).
-  - `strict`: If `true`, throws error for missing assets; otherwise, issue warnings.
 
 # Returns
 
@@ -2075,312 +2202,100 @@ It accepts `==`, `>=` and `<=`. A group name expands to its members, each carryi
 
 # Related
 
-  - [`ep_cvar_formulation`](@ref)
+  - [`ep_tail_views!`](@ref)
+  - [`ep_tail_view_prior_args`](@ref)
   - [`ep_add_cvar_view!`](@ref)
-  - [`EntropyPoolingPrior`](@ref)
-"""
-function ep_cvar_views!(cvar_views::ConditionalValueatRiskView, epc::AbstractDict,
-                        tvs::AbstractVector, pr::AbstractPriorResult, sets::UniverseSets,
-                        w::VecNum; strict::Bool = false)
-    return ep_cvar_views!(cvar_views.views, epc, tvs, pr, sets, cvar_views.alpha, w,
-                          cvar_views.alg; strict = strict)
-end
-"""
-    ep_cvar_views!(cvar_views::AbstractVector{<:ConditionalValueatRiskView}, args...; kwargs...)
-
-Lower each group of conditional value-at-risk views under its own settings.
-
-Every [`ConditionalValueatRiskView`](@ref) in the vector is lowered in turn, so the groups accumulate into the same constraint set and one entropy pooling solve answers all of them.
-
-# Arguments
-
-  - `cvar_views`: Groups of CVaR views.
-  - `args...`: Additional positional arguments forwarded to [`ep_cvar_views!`](@ref).
-  - `kwargs...`: Additional keyword arguments forwarded to [`ep_cvar_views!`](@ref).
-
-# Returns
-
-  - `nothing`: The function mutates `epc` and `tvs` in-place.
-
-# Related
-
-  - [`ConditionalValueatRiskView`](@ref)
-  - [`EntropyPoolingPrior`](@ref)
-"""
-function ep_cvar_views!(cvar_views::AbstractVector{<:ConditionalValueatRiskView}, args...;
-                        kwargs...)
-    for cvar_view in cvar_views
-        ep_cvar_views!(cvar_view, args...; kwargs...)
-    end
-    return nothing
-end
-function ep_cvar_views!(cvar_views::LinearConstraintEstimator, epc::AbstractDict,
-                        tvs::AbstractVector, pr::AbstractPriorResult, sets::UniverseSets,
-                        alpha::Number, w::VecNum, alg; strict::Bool = false)
-    X = pr.X
-    views = parse_equation(cvar_views.val; ops1 = ("==", ">=", "<="),
-                           ops2 = (:call, :(==), :(>=), :(<=)), datatype = eltype(X))
-    views = replace_group_by_assets(views, sets, false, true, false)
-    views = replace_prior_views(views, pr, sets, :cvar, alpha, StatsBase.pweights(w);
-                                strict = strict)
-    if !isa(views, AbstractVector)
-        views = [views]
-    end
-    algs = ep_view_formulations(alg, length(views), :alg)
-    rm = ConditionalValueatRisk(; alpha = alpha, w = StatsBase.pweights(w))
-    for (res, algi) in zip(views, algs)
-        terms = ep_view_terms(res, sets, X; strict = strict)
-        if isnothing(terms)
-            continue
-        end
-        (; idx, coef, op, rhs) = terms
-        single = isone(length(idx))
-        if single
-            op, rhs = ep_normalise_view_term(coef[1], op, rhs)
-            coef = [one(eltype(coef))]
-            ep_assert_reachable_view(op, rhs, -X[:, idx[1]], res.eqn, "CVaR")
-        end
-        pv = sum(ci * rm(view(X, :, j)) for (j, ci) in zip(idx, coef))
-        algi = ep_cvar_formulation(algi, single, op, rhs, pv)
-        ep_add_cvar_view!(tvs, algi, X, idx, coef, op, rhs, alpha, w, pv, res.eqn)
-    end
-    return nothing
-end
-"""
-    ep_evar_views!(evar_views::Nothing, args...; kwargs...)
-
-No-op pass-through for entropic value at risk (EVaR) view constraints when none are specified.
-
-# Arguments
-
-  - `evar_views::Nothing`: Indicates that no EVaR view constraints are specified.
-  - `args...`: Additional positional arguments (ignored).
-  - `kwargs...`: Additional keyword arguments (ignored).
-
-# Returns
-
-  - `nothing`.
-
-# Related
-
-  - [`ep_evar_views!`](@ref)
-  - [`EntropyPoolingPrior`](@ref)
-"""
-function ep_evar_views!(evar_views::Nothing, args...; kwargs...)
-    return nothing
-end
-"""
-    ep_evar_views!(evar_views::LinearConstraintEstimator, epc::AbstractDict,
-                   tvs::AbstractVector, pr::AbstractPriorResult, sets::UniverseSets,
-                   alpha::Number, w::VecNum, alg; strict::Bool = false, args::Tuple = (),
-                   kwargs::NamedTuple = (;), zlo::Option{<:Number} = nothing)
-
-Parse entropic value-at-risk views and lower them into entropy pooling constraints.
-
-`ep_evar_views!` parses EVaR view equations from a [`LinearConstraintEstimator`](@ref), replaces prior references with their values, resolves the asset names against the universe, picks a formulation for each view, and appends the constraints that formulation needs. It accepts `==`, `>=` and `<=`. Each view names one asset, because [EPTail](@cite) gives no formulation for a relative EVaR view; a group name expands to its members, each carrying the coefficient the group carried, so only a group of one member names one asset. The view is normalised so its coefficient is one, which flips the operator when the coefficient is negative.
-
-# Algorithm
-
- 1. Parse the view equations of `evar_views.val`, giving one [`ParsingResult`](@ref) per view.
- 2. Replace every group name by the assets it spans, giving one term per member.
- 3. Replace every `prior(...)` reference by the prior EVaR at this group's `alpha`, through [`replace_prior_views`](@ref).
- 4. Spread the formulation setting over the views with [`ep_view_formulations`](@ref), giving `algs`.
- 5. For each view in turn, resolve its terms with [`ep_view_terms`](@ref), and drop the view where no name of it is placed in the universe.
- 6. Raise unless the view names exactly one asset, then normalise it with [`ep_normalise_view_term`](@ref), and reject a target no reweighting reaches with [`ep_assert_reachable_view`](@ref).
- 7. Compute `pv`, the prior EVaR of the asset, and `zstar`, the dual variable that attains it, with [`ep_evar`](@ref) under the prior probabilities `w`.
- 8. Pick the formulation with [`ep_evar_formulation`](@ref), and append the constraints it needs with [`ep_add_evar_view!`](@ref).
-
-# Arguments
-
-  - `evar_views`: EVaR view constraints.
-  - `epc`: Dictionary of entropy pooling constraints, mapping keys to `(lhs, rhs)` pairs.
-  - `tvs`: Tail view constraints, appended to.
-  - `pr`: Prior result containing asset return information.
-  - `sets`: Asset set mapping asset names to indices.
-  - `alpha`: Confidence level for EVaR.
-  - `w`: Prior probability weights.
-  - `alg`: Formulation setting, spread over the views by [`ep_view_formulations`](@ref).
-  - `strict`: If `true`, throws error for missing assets; otherwise, issue warnings.
-  - $(arg_dict[:optargs]) It reaches the prior EVaR a `prior(...)` reference resolves to, the prior EVaR each view is compared against, and the centre of the grid of [`ep_evar_anchor`](@ref).
-  - $(arg_dict[:optkwargs])
-  - `zlo`: Lower end of the bracket, forwarded to [`ep_evar`](@ref). It reaches the same three searches `args` does.
-
-# Returns
-
-  - `nothing`: The function mutates `epc` and `tvs` in-place.
-
-# Related
-
-  - [`ep_evar_formulation`](@ref)
   - [`ep_add_evar_view!`](@ref)
-  - [`EntropyPoolingPrior`](@ref)
-"""
-function ep_evar_views!(evar_views::EntropicValueatRiskView, epc::AbstractDict,
-                        tvs::AbstractVector, pr::AbstractPriorResult, sets::UniverseSets,
-                        w::VecNum; strict::Bool = false)
-    return ep_evar_views!(evar_views.views, epc, tvs, pr, sets, evar_views.alpha, w,
-                          evar_views.alg; strict = strict, args = evar_views.args,
-                          kwargs = evar_views.kwargs, zlo = evar_views.zlo)
-end
-"""
-    ep_evar_views!(evar_views::AbstractVector{<:EntropicValueatRiskView}, args...; kwargs...)
-
-Lower each group of entropic value-at-risk views under its own settings.
-
-Every [`EntropicValueatRiskView`](@ref) in the vector is lowered in turn, so the groups accumulate into the same constraint set and one entropy pooling solve answers all of them.
-
-# Arguments
-
-  - `evar_views`: Groups of EVaR views.
-  - `args...`: Additional positional arguments forwarded to [`ep_evar_views!`](@ref).
-  - `kwargs...`: Additional keyword arguments forwarded to [`ep_evar_views!`](@ref).
-
-# Returns
-
-  - `nothing`: The function mutates `epc` and `tvs` in-place.
-
-# Related
-
-  - [`EntropicValueatRiskView`](@ref)
-  - [`EntropyPoolingPrior`](@ref)
-"""
-function ep_evar_views!(evar_views::AbstractVector{<:EntropicValueatRiskView}, args...;
-                        kwargs...)
-    for evar_view in evar_views
-        ep_evar_views!(evar_view, args...; kwargs...)
-    end
-    return nothing
-end
-function ep_evar_views!(evar_views::LinearConstraintEstimator, epc::AbstractDict,
-                        tvs::AbstractVector, pr::AbstractPriorResult, sets::UniverseSets,
-                        alpha::Number, w::VecNum, alg; strict::Bool = false,
-                        args::Tuple = (), kwargs::NamedTuple = (;),
-                        zlo::Option{<:Number} = nothing)
-    X = pr.X
-    views = parse_equation(evar_views.val; ops1 = ("==", ">=", "<="),
-                           ops2 = (:call, :(==), :(>=), :(<=)), datatype = eltype(X))
-    views = replace_group_by_assets(views, sets, false, true, false)
-    views = replace_prior_views(views, pr, sets, :evar, alpha, StatsBase.pweights(w), args,
-                                kwargs, zlo; strict = strict)
-    if !isa(views, AbstractVector)
-        views = [views]
-    end
-    algs = ep_view_formulations(alg, length(views), :alg)
-    for (res, algi) in zip(views, algs)
-        terms = ep_view_terms(res, sets, X; strict = strict)
-        if isnothing(terms)
-            continue
-        end
-        (; idx, coef, op, rhs) = terms
-        @argcheck(isone(length(idx)),
-                  ArgumentError("View `$(res.eqn)` names $(length(idx)) assets. An EVaR view names one asset: there is no formulation for a relative EVaR view."))
-        op, rhs = ep_normalise_view_term(coef[1], op, rhs)
-        x = -X[:, idx[1]]
-        ep_assert_reachable_view(op, rhs, x, res.eqn, "EVaR")
-        evr = ep_evar(x, w, alpha; args = args, kwargs = kwargs, zlo = zlo)
-        pv, zstar = evr.evar, evr.z
-        algi = ep_evar_formulation(algi, op, rhs, pv)
-        ep_add_evar_view!(epc, tvs, algi, x, alpha, op, rhs, w, zstar, pv, res.eqn;
-                          args = args, kwargs = kwargs, zlo = zlo)
-    end
-    return nothing
-end
-"""
-    ep_rlvar_views!(rlvar_views::Nothing, args...; kwargs...)
-
-No-op pass-through for relativistic value at risk (RLVaR) view constraints when none are specified.
-
-# Arguments
-
-  - `rlvar_views::Nothing`: Indicates that no RLVaR view constraints are specified.
-  - `args...`: Additional positional arguments (ignored).
-  - `kwargs...`: Additional keyword arguments (ignored).
-
-# Returns
-
-  - `nothing`.
-
-# Related
-
-  - [`ep_rlvar_views!`](@ref)
-  - [`EntropyPoolingPrior`](@ref)
-"""
-function ep_rlvar_views!(rlvar_views::Nothing, args...; kwargs...)
-    return nothing
-end
-"""
-    ep_rlvar_views!(rlvar_views::LinearConstraintEstimator, epc::AbstractDict,
-                    tvs::AbstractVector, pr::AbstractPriorResult, sets::UniverseSets,
-                    alpha::Number, kappa::Number, w::VecNum, alg; strict::Bool = false,
-                    args::Tuple = (), kwargs::NamedTuple = (;),
-                    bracket::Option{<:RelativisticValueatRiskViewBracket} = nothing)
-
-Parse relativistic value-at-risk views and lower them into entropy pooling constraints.
-
-`ep_rlvar_views!` parses RLVaR view equations from a [`LinearConstraintEstimator`](@ref), replaces prior references with their values, resolves the asset names against the universe, picks a formulation for each view, and appends the constraints that formulation needs. It accepts `==`, `>=` and `<=`. Each view names one asset, because [EPRLVaR](@cite) gives no formulation for a relative RLVaR view; a group name expands to its members, each carrying the coefficient the group carried, so only a group of one member names one asset. The view is normalised so its coefficient is one, which flips the operator when the coefficient is negative.
-
-# Algorithm
-
- 1. Parse the view equations of `rlvar_views.val`, giving one [`ParsingResult`](@ref) per view.
- 2. Replace every group name by the assets it spans, giving one term per member.
- 3. Replace every `prior(...)` reference by the prior RLVaR at this group's `alpha` and `kappa`, through [`replace_prior_views`](@ref).
- 4. Spread the formulation setting over the views with [`ep_view_formulations`](@ref), giving `algs`.
- 5. For each view in turn, resolve its terms with [`ep_view_terms`](@ref), and drop the view where no name of it is placed in the universe.
- 6. Raise unless the view names exactly one asset, then normalise it with [`ep_normalise_view_term`](@ref), and reject a target no reweighting reaches with [`ep_assert_reachable_view`](@ref).
- 7. Compute the prior RLVaR of the asset and the primal pair that attains it with [`ep_rlvar`](@ref), under the prior probabilities `w`.
- 8. Pick the formulation with [`ep_rlvar_formulation`](@ref), and append the constraints it needs with [`ep_add_rlvar_view!`](@ref).
-
-# Arguments
-
-  - `rlvar_views`: RLVaR view constraints.
-  - `epc`: Dictionary of entropy pooling constraints, mapping keys to `(lhs, rhs)` pairs.
-  - `tvs`: Tail view constraints, appended to.
-  - `pr`: Prior result containing asset return information.
-  - `sets`: Asset set mapping asset names to indices.
-  - `alpha`: Confidence level for RLVaR.
-  - `kappa`: Deformation parameter for RLVaR.
-  - `w`: Prior probability weights.
-  - `alg`: Formulation setting, spread over the views by [`ep_view_formulations`](@ref).
-  - `strict`: If `true`, throws error for missing assets; otherwise, issue warnings.
-  - $(arg_dict[:optargs]) It reaches the prior RLVaR a `prior(...)` reference resolves to, the prior RLVaR each view is compared against, and the centre of the grid of [`ep_rlvar_anchor`](@ref).
-  - $(arg_dict[:optkwargs])
-  - `bracket`: Spans of the searches, forwarded to [`ep_rlvar`](@ref) and [`ep_rlvar_shift`](@ref). They reach the same three searches `args` does.
-
-# Returns
-
-  - `nothing`: The function mutates `epc` and `tvs` in-place.
-
-# Related
-
-  - [`ep_rlvar_formulation`](@ref)
   - [`ep_add_rlvar_view!`](@ref)
   - [`EntropyPoolingPrior`](@ref)
 
 # References
 
+  - $(ref_dict[:EPTail])
   - $(ref_dict[:EPRLVaR])
 """
-function ep_rlvar_views!(rlvar_views::RelativisticValueatRiskView, epc::AbstractDict,
-                         tvs::AbstractVector, pr::AbstractPriorResult, sets::UniverseSets,
-                         w::VecNum; strict::Bool = false)
-    return ep_rlvar_views!(rlvar_views.views, epc, tvs, pr, sets, rlvar_views.alpha,
-                           rlvar_views.kappa, w, rlvar_views.alg; strict = strict,
-                           args = rlvar_views.args, kwargs = rlvar_views.kwargs,
-                           bracket = rlvar_views.bracket)
+function ep_add_tail_view!(epc::AbstractDict, tvs::AbstractVector,
+                           tail_views::ConditionalValueatRiskView, alg, X::MatNum,
+                           terms::NamedTuple, eqn::AbstractString, w::VecNum)
+    (; idx, coef, op, rhs) = terms
+    alpha = tail_views.alpha
+    single = isone(length(idx))
+    if single
+        _, op, rhs = ep_normalise_absolute_view(terms, X, eqn, "CVaR")
+        coef = [one(eltype(coef))]
+    end
+    rm = ConditionalValueatRisk(; alpha = alpha, w = StatsBase.pweights(w))
+    pv = sum(ci * rm(view(X, :, j)) for (j, ci) in zip(idx, coef))
+    alg = ep_cvar_formulation(alg, single, op, rhs, pv)
+    ep_add_cvar_view!(tvs, alg, X, idx, coef, op, rhs, alpha, w, pv, eqn)
+    return nothing
+end
+function ep_add_tail_view!(epc::AbstractDict, tvs::AbstractVector,
+                           tail_views::EntropicValueatRiskView, alg, X::MatNum,
+                           terms::NamedTuple, eqn::AbstractString, w::VecNum)
+    (; alpha, args, kwargs, zlo) = tail_views
+    ep_assert_absolute_view(terms.idx, eqn, "EVaR")
+    x, op, rhs = ep_normalise_absolute_view(terms, X, eqn, "EVaR")
+    evr = ep_evar(x, w, alpha; args = args, kwargs = kwargs, zlo = zlo)
+    pv, zstar = evr.evar, evr.z
+    alg = ep_evar_formulation(alg, op, rhs, pv)
+    ep_add_evar_view!(epc, tvs, alg, x, alpha, op, rhs, w, zstar, pv, eqn; args = args,
+                      kwargs = kwargs, zlo = zlo)
+    return nothing
+end
+function ep_add_tail_view!(epc::AbstractDict, tvs::AbstractVector,
+                           tail_views::RelativisticValueatRiskView, alg, X::MatNum,
+                           terms::NamedTuple, eqn::AbstractString, w::VecNum)
+    (; alpha, kappa, args, kwargs, bracket) = tail_views
+    ep_assert_absolute_view(terms.idx, eqn, "RLVaR")
+    x, op, rhs = ep_normalise_absolute_view(terms, X, eqn, "RLVaR")
+    rlv = ep_rlvar(x, w, alpha, kappa; args = args, kwargs = kwargs, bracket = bracket)
+    alg = ep_rlvar_formulation(alg, op, rhs, rlv.rlvar)
+    ep_add_rlvar_view!(epc, tvs, alg, x, alpha, kappa, op, rhs, w, rlv.z, rlv.rlvar, eqn;
+                       args = args, kwargs = kwargs, bracket = bracket)
+    return nothing
 end
 """
-    ep_rlvar_views!(rlvar_views::AbstractVector{<:RelativisticValueatRiskView}, args...;
-                    kwargs...)
+    ep_tail_views!(tail_views::Nothing, args...; kwargs...)
 
-Lower each group of relativistic value-at-risk views under its own settings.
-
-Every [`RelativisticValueatRiskView`](@ref) in the vector is lowered in turn, so the groups accumulate into the same constraint set and one entropy pooling solve answers all of them.
+No-op pass-through for tail view constraints when none are specified.
 
 # Arguments
 
-  - `rlvar_views`: Groups of RLVaR views.
-  - `args...`: Additional positional arguments forwarded to [`ep_rlvar_views!`](@ref).
-  - `kwargs...`: Additional keyword arguments forwarded to [`ep_rlvar_views!`](@ref).
+  - `tail_views::Nothing`: Indicates that no tail view constraints are specified.
+  - `args...`: Additional positional arguments (ignored).
+  - `kwargs...`: Additional keyword arguments (ignored).
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`ep_tail_views!`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
+"""
+function ep_tail_views!(tail_views::Nothing, args...; kwargs...)
+    return nothing
+end
+"""
+    ep_tail_views!(tail_views::AbstractVector{<:AbstractEntropyPoolingTailViewEstimator},
+                   args...; kwargs...)
+
+Lower each group of tail views under its own settings.
+
+Every [`AbstractEntropyPoolingTailViewEstimator`](@ref) in the vector is lowered in turn, so the groups accumulate into the same constraint set and one entropy pooling solve answers all of them.
+
+# Algorithm
+
+ 1. Lower each group of `tail_views` in turn, forwarding `args...` and `kwargs...` to each call.
+ 2. Return `nothing`. Each call has already written its constraints into `epc` and `tvs`.
+
+# Arguments
+
+  - `tail_views`: Groups of tail views.
+  - `args...`: Additional positional arguments forwarded to [`ep_tail_views!`](@ref).
+  - `kwargs...`: Additional keyword arguments forwarded to [`ep_tail_views!`](@ref).
 
 # Returns
 
@@ -2388,47 +2303,88 @@ Every [`RelativisticValueatRiskView`](@ref) in the vector is lowered in turn, so
 
 # Related
 
-  - [`RelativisticValueatRiskView`](@ref)
+  - [`ep_tail_views!`](@ref)
   - [`EntropyPoolingPrior`](@ref)
 """
-function ep_rlvar_views!(rlvar_views::AbstractVector{<:RelativisticValueatRiskView},
-                         args...; kwargs...)
-    for rlvar_view in rlvar_views
-        ep_rlvar_views!(rlvar_view, args...; kwargs...)
+function ep_tail_views!(tail_views::AbstractVector{<:AbstractEntropyPoolingTailViewEstimator},
+                        args...; kwargs...)
+    for tail_view in tail_views
+        ep_tail_views!(tail_view, args...; kwargs...)
     end
     return nothing
 end
-function ep_rlvar_views!(rlvar_views::LinearConstraintEstimator, epc::AbstractDict,
-                         tvs::AbstractVector, pr::AbstractPriorResult, sets::UniverseSets,
-                         alpha::Number, kappa::Number, w::VecNum, alg; strict::Bool = false,
-                         args::Tuple = (), kwargs::NamedTuple = (;),
-                         bracket::Option{<:RelativisticValueatRiskViewBracket} = nothing)
+"""
+    ep_tail_views!(tail_views::AbstractEntropyPoolingTailViewEstimator, epc::AbstractDict,
+                   tvs::AbstractVector, pr::AbstractPriorResult, sets::UniverseSets,
+                   w::VecNum; strict::Bool = false)
+
+Parse a group of tail views and lower them into entropy pooling constraints.
+
+`ep_tail_views!` is the one lowering of the tail view family. It parses the view equations of a [`LinearConstraintEstimator`](@ref), replaces prior references with their values, resolves the asset names against the universe, picks a formulation for each view, and appends the constraints that formulation needs. Unlike the recursive algorithm of [`MeucciEntropyPoolingPrior`](@ref), nothing is solved here: the views become part of the one entropy pooling problem [`entropy_pooling`](@ref) solves.
+
+It accepts `==`, `>=` and `<=`. A group name expands to its members, each carrying the coefficient the group carried, so a view on a group constrains the *sum* of the members' risk measures and not their average, and a group of more than one member is a relative view.
+
+The two kernels below carry everything that differs between the conditional, the entropic and the relativistic measure, so a fourth measure supplies two methods rather than a fourth copy of this verb:
+
+  - [`ep_tail_view_prior_args`](@ref) names the statistic a `prior(...)` reference resolves to, and the settings its search takes.
+  - [`ep_add_tail_view!`](@ref) checks the shape of the view, reads its prior value, picks its formulation, and appends its constraints.
+
+# Algorithm
+
+ 1. Parse the view equations of `tail_views.views.val`, giving one [`ParsingResult`](@ref) per view.
+ 2. Replace every group name by the assets it spans, giving one term per member.
+ 3. Replace every `prior(...)` reference by the prior value of the measure, through [`replace_prior_views`](@ref) under the tuple [`ep_tail_view_prior_args`](@ref) gives.
+ 4. Spread the formulation setting over the views with [`ep_view_formulations`](@ref), giving `algs`.
+ 5. For each view in turn, resolve its terms with [`ep_view_terms`](@ref), and drop the view where no name of it is placed in the universe.
+ 6. Lower the view with [`ep_add_tail_view!`](@ref).
+
+# Arguments
+
+  - `tail_views`: Tail view constraints.
+  - `epc`: Dictionary of entropy pooling constraints, mapping keys to `(lhs, rhs)` pairs.
+  - `tvs`: Tail view constraints, appended to.
+  - `pr`: Prior result containing asset return information.
+  - `sets`: Asset set mapping asset names to indices.
+  - `w`: Prior probability weights.
+  - `strict`: If `true`, throws error for missing assets; otherwise, issue warnings.
+
+# Returns
+
+  - `nothing`: The function mutates `epc` and `tvs` in-place.
+
+# Related
+
+  - [`ep_tail_view_prior_args`](@ref)
+  - [`ep_add_tail_view!`](@ref)
+  - [`ConditionalValueatRiskView`](@ref)
+  - [`EntropicValueatRiskView`](@ref)
+  - [`RelativisticValueatRiskView`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
+
+# References
+
+  - $(ref_dict[:EPTail])
+  - $(ref_dict[:EPRLVaR])
+"""
+function ep_tail_views!(tail_views::AbstractEntropyPoolingTailViewEstimator,
+                        epc::AbstractDict, tvs::AbstractVector, pr::AbstractPriorResult,
+                        sets::UniverseSets, w::VecNum; strict::Bool = false)
     X = pr.X
-    views = parse_equation(rlvar_views.val; ops1 = ("==", ">=", "<="),
+    views = parse_equation(tail_views.views.val; ops1 = ("==", ">=", "<="),
                            ops2 = (:call, :(==), :(>=), :(<=)), datatype = eltype(X))
     views = replace_group_by_assets(views, sets, false, true, false)
-    views = replace_prior_views(views, pr, sets, :rlvar, alpha, kappa,
-                                StatsBase.pweights(w), args, kwargs, bracket;
+    views = replace_prior_views(views, pr, sets, ep_tail_view_prior_args(tail_views, w)...;
                                 strict = strict)
     if !isa(views, AbstractVector)
         views = [views]
     end
-    algs = ep_view_formulations(alg, length(views), :alg)
+    algs = ep_view_formulations(tail_views.alg, length(views), :alg)
     for (res, algi) in zip(views, algs)
         terms = ep_view_terms(res, sets, X; strict = strict)
         if isnothing(terms)
             continue
         end
-        (; idx, coef, op, rhs) = terms
-        @argcheck(isone(length(idx)),
-                  ArgumentError("View `$(res.eqn)` names $(length(idx)) assets. An RLVaR view names one asset: there is no formulation for a relative RLVaR view."))
-        op, rhs = ep_normalise_view_term(coef[1], op, rhs)
-        x = -X[:, idx[1]]
-        ep_assert_reachable_view(op, rhs, x, res.eqn, "RLVaR")
-        rlv = ep_rlvar(x, w, alpha, kappa; args = args, kwargs = kwargs, bracket = bracket)
-        algi = ep_rlvar_formulation(algi, op, rhs, rlv.rlvar)
-        ep_add_rlvar_view!(epc, tvs, algi, x, alpha, kappa, op, rhs, w, rlv.z, rlv.rlvar,
-                           res.eqn; args = args, kwargs = kwargs, bracket = bracket)
+        ep_add_tail_view!(epc, tvs, tail_views, algi, X, terms, res.eqn, w)
     end
     return nothing
 end
@@ -2880,9 +2836,9 @@ function ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<
     pr = prior(pe.pe, X, F; strict = strict, kwargs...)
     ep_mu_views!(pe.mu_views, epc, pr, pe.sets; strict = strict)
     ep_var_views!(pe.var_views, epc, pr, pe.sets, w0; strict = strict)
-    ep_cvar_views!(pe.cvar_views, epc, tvs, pr, pe.sets, w0; strict = strict)
-    ep_evar_views!(pe.evar_views, epc, tvs, pr, pe.sets, w0; strict = strict)
-    ep_rlvar_views!(pe.rlvar_views, epc, tvs, pr, pe.sets, w0; strict = strict)
+    ep_tail_views!(pe.cvar_views, epc, tvs, pr, pe.sets, w0; strict = strict)
+    ep_tail_views!(pe.evar_views, epc, tvs, pr, pe.sets, w0; strict = strict)
+    ep_tail_views!(pe.rlvar_views, epc, tvs, pr, pe.sets, w0; strict = strict)
     if !isempty(epc) || !isempty(tvs)
         w1 = entropy_pooling(w0, epc, tvs, pe.opt)
         pe = factory(pe, w1)
@@ -2990,9 +2946,9 @@ function ep_prior(alg::H0_EntropyPooling, pe::EntropyPoolingPrior, X::MatNum,
     # mu, VaR, CVaR, EVaR and RLVaR
     ep_mu_views!(pe.mu_views, epc, pr, pe.sets; strict = strict)
     ep_var_views!(pe.var_views, epc, pr, pe.sets, w0; strict = strict)
-    ep_cvar_views!(pe.cvar_views, epc, tvs, pr, pe.sets, w0; strict = strict)
-    ep_evar_views!(pe.evar_views, epc, tvs, pr, pe.sets, w0; strict = strict)
-    ep_rlvar_views!(pe.rlvar_views, epc, tvs, pr, pe.sets, w0; strict = strict)
+    ep_tail_views!(pe.cvar_views, epc, tvs, pr, pe.sets, w0; strict = strict)
+    ep_tail_views!(pe.evar_views, epc, tvs, pr, pe.sets, w0; strict = strict)
+    ep_tail_views!(pe.rlvar_views, epc, tvs, pr, pe.sets, w0; strict = strict)
     # sigma
     if !isnothing(pe.sigma_views)
         ep_sigma_views!(pe.sigma_views, epc, pr, pe.sets; strict = strict)

@@ -190,7 +190,7 @@ An entropy pooling correlation or covariance view whose two sides are groups rat
 *Avoid*: reading it as a statement about one summary of the correlation block; no such aggregate is defined.
 
 **Tail View**
-A view on a quantile risk measure of the posterior — CVaR or EVaR — as opposed to a view on a moment. It is the one view family that is not a linear function of the posterior probabilities.
+A view on a quantile risk measure of the posterior — CVaR, EVaR or RLVaR — as opposed to a view on a moment. It is the one view family that is not a linear function of the posterior probabilities, and the one family `ep_tail_views!` lowers. A VaR view is not one: it constrains the tail mass, which is linear in the posterior probabilities, and `ep_var_views!` lowers it on its own.
 *Avoid*: confusing it with a **View** (§1), which is the index-selection mechanism.
 
 **Risk-Free Shift**

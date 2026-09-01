@@ -30,10 +30,13 @@ ep_evar_formulation
 ep_rlvar_formulation
 ep_add_cvar_view!
 ep_add_evar_view!
+ep_add_grid_tail_view!
 ep_add_rlvar_view!
-ep_cvar_views!
-ep_evar_views!
-ep_rlvar_views!
+ep_tail_view_prior_args
+ep_assert_absolute_view
+ep_normalise_absolute_view
+ep_add_tail_view!
+ep_tail_views!
 add_ep_tail_view!
 ```
 

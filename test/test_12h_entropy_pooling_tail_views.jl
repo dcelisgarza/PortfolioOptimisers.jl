@@ -30,7 +30,7 @@ const ep_k = 0.3
 ep_rlvar_of(j, wi) = PO.ep_rlvar(-rd.X[:, j], wi, ep_a, ep_k).rlvar
 ep_rlvar_at(j, wi, a, k) = PO.ep_rlvar(-rd.X[:, j], wi, a, k).rlvar
 const ep_prlvar = ep_rlvar_of(1, ep_w0)
-# Resolve one view equation the way `ep_cvar_views!` does, without solving anything.
+# Resolve one view equation the way `ep_tail_views!` does, without solving anything.
 function ep_terms(eqn, key, sets = ep_gsets)
     res = PO.parse_equation(eqn; ops1 = ("==", ">=", "<="),
                             ops2 = (:call, :(==), :(>=), :(<=)), datatype = eltype(rd.X))
@@ -288,19 +288,21 @@ end
     # `ep_view_terms` places every name a view holds. Under `strict = false` a name the
     # universe does not hold is reported and dropped, so the view produces no constraint
     # and the loop moves on. Nothing else in this file reaches that branch of
-    # `ep_rlvar_views!`.
+    # `ep_tail_views!`.
     epc = Dict{Symbol, Any}()
     tvs = PO.AbstractEntropyPoolingTailView[]
-    v = LinearConstraintEstimator(; val = "NOTANASSET >= 0.1")
+    v = RelativisticValueatRiskView(;
+                                    views = LinearConstraintEstimator(;
+                                                                      val = "NOTANASSET >= 0.1"),
+                                    alpha = ep_a, kappa = ep_k)
     Logging.with_logger(Logging.NullLogger()) do
-        return PO.ep_rlvar_views!(v, epc, tvs, ep_pr0, ep_gsets, ep_a, ep_k, ep_w0, nothing;
-                                  strict = false)
+        return PO.ep_tail_views!(v, epc, tvs, ep_pr0, ep_gsets, ep_w0; strict = false)
     end
     @test isempty(epc)
     @test isempty(tvs)
     # The same name under `strict = true` raises instead.
-    @test_throws ArgumentError PO.ep_rlvar_views!(v, epc, tvs, ep_pr0, ep_gsets, ep_a, ep_k,
-                                                  ep_w0, nothing; strict = true)
+    @test_throws ArgumentError PO.ep_tail_views!(v, epc, tvs, ep_pr0, ep_gsets, ep_w0;
+                                                 strict = true)
 end
 
 @testset "prior references in tail views" begin
@@ -1351,18 +1353,19 @@ end
     # The counterpart of the RLVaR case above, for the two families whose walkers carry the
     # same guard. Under `strict = false` the name is reported and dropped, the view produces
     # no constraint, and the loop moves on.
-    v = LinearConstraintEstimator(; val = "NOTANASSET >= 0.1")
-    for f in (PO.ep_cvar_views!, PO.ep_evar_views!)
+    lce = LinearConstraintEstimator(; val = "NOTANASSET >= 0.1")
+    for V in (ConditionalValueatRiskView, EntropicValueatRiskView)
+        v = V(; views = lce, alpha = ep_a)
         epc = Dict{Symbol, Any}()
         tvs = PO.AbstractEntropyPoolingTailView[]
         Logging.with_logger(Logging.NullLogger()) do
-            return f(v, epc, tvs, ep_pr0, ep_gsets, ep_a, ep_w0, nothing; strict = false)
+            return PO.ep_tail_views!(v, epc, tvs, ep_pr0, ep_gsets, ep_w0; strict = false)
         end
         @test isempty(epc)
         @test isempty(tvs)
         # The same name under `strict = true` raises instead.
-        @test_throws ArgumentError f(v, epc, tvs, ep_pr0, ep_gsets, ep_a, ep_w0, nothing;
-                                     strict = true)
+        @test_throws ArgumentError PO.ep_tail_views!(v, epc, tvs, ep_pr0, ep_gsets, ep_w0;
+                                                     strict = true)
     end
 end
 
