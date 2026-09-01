@@ -76,6 +76,8 @@ In order to implement a new concrete type that works seamlessly with the library
   - [`SignificanceHeadCalibration`](@ref)
   - [`Func_SigCal`](@ref)
   - [`resolve_calibration_slot`](@ref)
+  - [`ScenarioCount`](@ref): the family's rule that keeps a stated count of tail scenarios.
+  - [`RateSignificance`](@ref): the family's rule that shrinks the level at a square-root rate.
 """
 abstract type AbstractSignificanceCalibrationAlgorithm <: AbstractCalibrationAlgorithm end
 """
@@ -118,6 +120,9 @@ A deformation slot sits on a measure of the return distribution and on a drawdow
   - [`DeformationHeadCalibration`](@ref)
   - [`Func_DefCal`](@ref)
   - [`kappa_log`](@ref)
+  - [`EntropyBudget`](@ref): the family's rule that spends a stated entropy budget.
+  - [`HillTailDecay`](@ref): the family's rule that reads the tail index of the series itself.
+  - [`RadialTailDecay`](@ref): the family's rule that reads the tail index of the radial series.
 """
 abstract type AbstractDeformationCalibrationAlgorithm <: AbstractCalibrationAlgorithm end
 """
@@ -1854,9 +1859,10 @@ In order to implement a new concrete type that works seamlessly with the library
   - [`AbstractCalibrationAlgorithm`](@ref)
   - [`AmbiguityRadiusCalibration`](@ref)
   - [`Func_AmbRadCal`](@ref)
-  - [`ConcentrationRadius`](@ref)
-  - [`RateRadius`](@ref)
-  - [`DimensionalRateRadius`](@ref)
+  - [`ConcentrationRadius`](@ref): the family's rule that shrinks the ball as the sample grows.
+  - [`RateRadius`](@ref): the family's rule that shrinks the radius at a square-root rate.
+  - [`DimensionalRateRadius`](@ref): the family's rule that shrinks it at the dimensional rate a Wasserstein ball earns.
+  - [`DualNormRadius`](@ref): the family's rule that reads the ground metric the slot names.
 """
 abstract type AbstractAmbiguityRadiusCalibrationAlgorithm <: AbstractCalibrationAlgorithm end
 """
@@ -1894,7 +1900,7 @@ In order to implement a new concrete type that works seamlessly with the library
   - [`AmbiguityTailWeightCalibration`](@ref)
   - [`Func_AmbTwtCal`](@ref)
   - [`AbstractAmbiguityRadiusCalibrationAlgorithm`](@ref)
-  - [`TailTermParity`](@ref)
+  - [`TailTermParity`](@ref): the family's rule that prices the tail term at a stated multiple of the mean term.
 """
 abstract type AbstractAmbiguityTailWeightCalibrationAlgorithm <:
               AbstractCalibrationAlgorithm end
@@ -1937,7 +1943,7 @@ A ceiling is read against one norm order, and that order belongs to the constrai
   - [`NormCeilingCalibration`](@ref)
   - [`Func_NormCeilCal`](@ref)
   - [`CalibrationContext`](@ref)
-  - [`EffectiveAssetFloor`](@ref)
+  - [`EffectiveAssetFloor`](@ref): the family's rule that holds a stated fraction of the universe effective.
 """
 abstract type AbstractNormCeilingCalibrationAlgorithm <: AbstractCalibrationAlgorithm end
 """
