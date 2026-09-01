@@ -254,6 +254,27 @@ struct UnresolvedDecay <: PO.GerberIQDecayEstimator end
         end
     end
 
+    @testset "The unit-interval guard over the weights" begin
+        # Every weight of the three templates is a compression weight in `[0, 1]`, and one
+        # guard states that for all thirty-two of them. Both ends belong to the interval, so
+        # a weight that switches a region off and one that keeps its full value both pass.
+        @test BasicGerberIQ(; n = 0.0).n == 0.0
+        @test BasicGerberIQ(; n = 1.0).n == 1.0
+        # Past either end the raise names the field the caller wrote and the value it holds.
+        @test raised_message(() -> BasicGerberIQ(; n = -0.1)) ==
+              "DomainError with 0 <= n <= 1 must hold. Got\nn => -0.1:\n"
+        # The guard reaches every weight of each template. Each derived default is built from
+        # weights of a lower index, so a weight set past the upper end raises on its own row.
+        for i in 1:10
+            @test raised_message(() -> PartialGerberIQ(; Dict(Symbol("n$i") => 2.0)...)) ==
+                  "DomainError with 0 <= n$i <= 1 must hold. Got\nn$i => 2.0:\n"
+        end
+        for i in 1:21
+            @test raised_message(() -> FullGerberIQ(; Dict(Symbol("n$i") => 2.0)...)) ==
+                  "DomainError with 0 <= n$i <= 1 must hold. Got\nn$i => 2.0:\n"
+        end
+    end
+
     @testset "The c against d guard" begin
         # `c` inside the innermost boundary passes.
         @test isnothing(PO.gerber_iq_assert_c_d(0.5, BasicGerberIQ(; d = 0.5)))

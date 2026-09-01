@@ -53,7 +53,7 @@
 "src/01_Base/07_Errors.jl" = { map = 1, units = 8, algorithm = 1, swept = true }
 "src/01_Base/08_TypeAliases.jl" = { map = 1, units = 45, algorithm = 0, swept = true }
 "src/01_Base/09_ObservationWeights.jl" = { map = 1, units = 2, algorithm = 1, swept = true }
-"src/01_Base/10_Assertions.jl" = { map = 1, units = 16, algorithm = 8, swept = true }
+"src/01_Base/10_Assertions.jl" = { map = 1, units = 17, algorithm = 8, swept = true }
 "src/01_Base/11_VecScalar.jl" = { map = 1, units = 3, algorithm = 0, swept = true }
 "src/01_Base/12_NormError.jl" = { map = 1, units = 8, algorithm = 2, swept = true }
 "src/01_Base/13_KappaLog.jl" = { map = 1, units = 1, algorithm = 0, swept = true }

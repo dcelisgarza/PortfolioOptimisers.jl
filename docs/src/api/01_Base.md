@@ -134,6 +134,7 @@ assert_nonempty_gt0_finite_val
 assert_nonempty_finite_val
 assert_matrix_issquare
 assert_unit_interval
+assert_closed_unit_interval
 assert_all_finite
 assert_source_selector
 ```

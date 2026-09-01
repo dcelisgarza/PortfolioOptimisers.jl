@@ -364,6 +364,7 @@ A value of any other type selects the `args...` method, which checks nothing. Th
 
 # Related
 
+  - [`assert_closed_unit_interval`](@ref)
   - [`assert_nonneg`](@ref)
   - [`assert_gt0`](@ref)
   - [`assert_nonempty_gt0_finite_val`](@ref)
@@ -374,6 +375,44 @@ function assert_unit_interval(val::Number, sym::Sym_Str = :val)::Nothing
     return nothing
 end
 function assert_unit_interval(args...)::Nothing
+    return nothing
+end
+"""
+    assert_closed_unit_interval(val::Number, sym::Union{Symbol,<:AbstractString} = :val)
+    assert_closed_unit_interval(args...)
+
+Assert that `val` lies inside the closed unit interval (`0 <= val <= 1`).
+
+This is the closed sibling of [`assert_unit_interval`](@ref), and the two differ only in whether the ends belong to the interval. A weight that a template may switch off entirely, or hand its full value to, reaches both ends, so it needs this rule and not the open one.
+
+A value of any other type selects the `args...` method, which checks nothing, on the terms [`assert_unit_interval`](@ref) already sets.
+
+# Arguments
+
+  - `val`: Value to check.
+  - `sym`: Symbolic name used in the error message.
+
+# Validation
+
+  - `::Number`: `0 <= val <= 1`, which raises a `DomainError` naming `sym` and `val`.
+  - Any other type: no rule, so the call always passes.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`assert_unit_interval`](@ref)
+  - [`assert_nonneg`](@ref)
+  - [`assert_nonempty_nonneg_finite_val`](@ref)
+"""
+function assert_closed_unit_interval(val::Number, sym::Sym_Str = :val)::Nothing
+    @argcheck(zero(val) <= val <= one(val),
+              DomainError("0 <= $sym <= 1 must hold. Got\n$sym => $(val)"))
+    return nothing
+end
+function assert_closed_unit_interval(args...)::Nothing
     return nothing
 end
 """

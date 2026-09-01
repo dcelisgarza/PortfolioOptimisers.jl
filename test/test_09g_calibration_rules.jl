@@ -112,6 +112,25 @@ const PR120 = prior(EmpiricalPrior(), randn(RNG, 120, 4))
     # rule returns.
     @test_throws DomainError HillTailDecay(; kmin = 0)
     @test_throws DomainError RadialTailDecay(; kmin = 0)
+
+    # The same rule holds for the scalar of every other rule, so all eleven refuse a value
+    # that no sample can make sensible. `ScenarioCount.n` is a count of observations and
+    # `RateSignificance.c` is a rate coefficient, so both are positive and finite.
+    # `EntropyBudget.target` may take either sign, because the band it must land in follows
+    # the sample, so only the finiteness is a question the constructor can answer.
+    @test_throws DomainError ScenarioCount(; n = 0)
+    @test_throws DomainError ScenarioCount(; n = -1)
+    @test_throws DomainError ScenarioCount(; n = Inf)
+    @test_throws DomainError RateSignificance(; c = 0)
+    @test_throws DomainError RateSignificance(; c = -1.0)
+    @test_throws DomainError RateSignificance(; c = Inf)
+    @test_throws DomainError EntropyBudget(; target = NaN)
+    @test_throws DomainError EntropyBudget(; target = -Inf)
+    @test EntropyBudget(; target = -0.5).target == -0.5
+
+    # `RateSignificance.c` and `RateRadius.c` carry the same name, the same default and the
+    # same closed form, so they refuse the same value in the same place.
+    @test_throws DomainError RateRadius(; c = -1.0)
 end
 
 @testset "Calibration rules: `ScenarioCount` fixes the count, not the probability" begin

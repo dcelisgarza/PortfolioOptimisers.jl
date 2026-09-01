@@ -376,6 +376,44 @@ end
     @test isnothing(pe.assert_nonempty_nonneg_finite_val(nothing))
     @test isnothing(pe.assert_nonempty_finite_val(nothing))
 end
+@testset "The two unit-interval guards differ only at the ends" begin
+    pe = PortfolioOptimisers
+    # The open guard refuses both ends; the closed one takes them. That is the whole of the
+    # difference, and it is why a compression weight needs the second and a probability the
+    # first.
+    @test isnothing(pe.assert_unit_interval(0.5))
+    @test isnothing(pe.assert_closed_unit_interval(0.5))
+    @test_throws DomainError pe.assert_unit_interval(0.0)
+    @test_throws DomainError pe.assert_unit_interval(1.0)
+    @test isnothing(pe.assert_closed_unit_interval(0.0))
+    @test isnothing(pe.assert_closed_unit_interval(1.0))
+    @test_throws DomainError pe.assert_closed_unit_interval(-eps())
+    @test_throws DomainError pe.assert_closed_unit_interval(1.0 + eps())
+    # Each message states the predicate that failed and names the symbol the caller passed.
+    oerr = try
+        pe.assert_unit_interval(1.0, :alpha)
+        nothing
+    catch e
+        e
+    end
+    cerr = try
+        pe.assert_closed_unit_interval(1.5, :n7)
+        nothing
+    catch e
+        e
+    end
+    @test oerr isa DomainError
+    @test cerr isa DomainError
+    # The guards build `DomainError(text)`, so the text is the `val` field, not the `msg`.
+    @test oerr.val == "0 < alpha < 1 must hold. Got\nalpha => 1.0"
+    @test cerr.val == "0 <= n7 <= 1 must hold. Got\nn7 => 1.5"
+    # Both carry the varargs method that checks nothing, which is how a slot holding a
+    # Calibration Role passes a guard written for a number.
+    role = SignificanceTailCalibration(; alg = ScenarioCount(; n = 5))
+    @test isnothing(pe.assert_unit_interval(nothing))
+    @test isnothing(pe.assert_closed_unit_interval(nothing))
+    @test isnothing(pe.assert_closed_unit_interval(role, :n))
+end
 @testset "norm_factor and norm_error carry the units of the alg" begin
     pe = PortfolioOptimisers
     a, b = [0.5, 0.5], [0.2, 0.9]

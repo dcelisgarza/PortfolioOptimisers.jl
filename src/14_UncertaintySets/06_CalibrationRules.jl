@@ -787,6 +787,10 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields. `n` has no default, because a scenario count that suits every sample does not exist.
 
+## Validation
+
+  - `n > 0` and finite.
+
 # Related
 
   - [`AbstractSignificanceCalibrationAlgorithm`](@ref)
@@ -801,6 +805,7 @@ Keywords correspond to the struct's fields. `n` has no default, because a scenar
     """
     n
     function ScenarioCount(n::Number)
+        assert_nonempty_gt0_finite_val(n, :n)
         return new{typeof(n)}(n)
     end
 end
@@ -871,6 +876,10 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields. `c` defaults to `1`, which is the plain ``1/\\sqrt{T}`` rate.
 
+## Validation
+
+  - `c > 0` and finite.
+
 # Related
 
   - [`AbstractSignificanceCalibrationAlgorithm`](@ref)
@@ -885,6 +894,7 @@ Keywords correspond to the struct's fields. `c` defaults to `1`, which is the pl
     """
     c
     function RateSignificance(c::Number)
+        assert_nonempty_gt0_finite_val(c, :c)
         return new{typeof(c)}(c)
     end
 end
@@ -956,6 +966,10 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields. `target` has no default, because the budget is the whole content of the rule. `alpha` defaults to `nothing`, which is the state a rule stands in a slot in.
 
+## Validation
+
+  - `target` is finite. The band the target must lie in moves with the sample, so the rule checks the band when it runs, not here.
+
 # Related
 
   - [`AbstractDeformationCalibrationAlgorithm`](@ref)
@@ -977,6 +991,7 @@ Keywords correspond to the struct's fields. `target` has no default, because the
     """
     alpha
     function EntropyBudget(target::Number, alpha::Option{<:Number})
+        assert_nonempty_finite_val(target, :target)
         return new{typeof(target), typeof(alpha)}(target, alpha)
     end
 end
