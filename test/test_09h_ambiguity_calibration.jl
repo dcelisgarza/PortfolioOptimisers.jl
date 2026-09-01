@@ -10,12 +10,12 @@ four radius rules and the one tail-weight rule they ship, and the twelve slots.
 
 The two families take the same shape as the two older ones: an abstract family under
 `AbstractCalibrationAlgorithm`, a `Func_` bound for the `alg` field that admits a plain
-`Function`, one role type, and a `Num_` bound that pairs the role with `Number`. A rule is
+`Function`, one rule type, and a `Num_` bound that pairs the rule with `Number`. A rule is
 run by CALLING it, so a callable struct and a plain function are the same thing to the
 resolver.
 
-A radius names no end of the distribution, so each family carries ONE role rather than the
-two that a tail probability carries, and `mirror_role` has nothing to carry across.
+A radius names no end of the distribution, so each family carries ONE rule rather than the
+two that a tail probability carries, and no ambiguity slot defaults from another.
 
 Issue #584 widens the slots. Issue #311 settled the design, and its correction binds: `r` is
 the radius and `l` is the tail weight, not the other way round.
@@ -92,6 +92,16 @@ function probe_tail_weight(key::Symbol, pr::PO.AbstractPriorResult, w, slv,
     return 2 / sqrt(size(pr.X, 1))
 end
 
+# A radius rule that answers a stated number. A rule of the family is what the resolver's
+# range check dispatches on, so a test of that check needs a family and not a closure.
+struct ProbeRadiusValue{T} <: PO.AbstractAmbiguityRadiusCalibrationAlgorithm
+    val::T
+end
+function (alg::ProbeRadiusValue)(::Symbol, ::PO.AbstractPriorResult, ::Any, ::Any,
+                                 ::PO.CalibrationContext)
+    return alg.val
+end
+
 @testset "Ambiguity calibration: the two families join the calibration root" begin
     # Both families sit under the one root, beside the two the mechanism already carried.
     @test PO.AbstractAmbiguityRadiusCalibrationAlgorithm <: PO.AbstractCalibrationAlgorithm
@@ -106,23 +116,20 @@ end
     @test !(PO.AbstractAmbiguityTailWeightCalibrationAlgorithm <:
             PO.AbstractDeformationCalibrationAlgorithm)
 
-    # Both roles are Estimators, not Algorithms. #593 split the taxonomy so that a role
-    # inside another role's `alg` field is refused by the field's bound.
-    @test AmbiguityRadiusCalibration <: PO.AbstractCalibrationEstimator
-    @test AmbiguityTailWeightCalibration <: PO.AbstractCalibrationEstimator
-    @test !(AmbiguityRadiusCalibration <: PO.AbstractCalibrationAlgorithm)
-    @test !(AmbiguityTailWeightCalibration <: PO.AbstractCalibrationAlgorithm)
+    # #641 withdrew the two rules that used to place a rule in these slots, so nothing
+    # stands between the caller and the rule.
+    @test !isdefined(PortfolioOptimisers, :AmbiguityRadiusCalibration)
+    @test !isdefined(PortfolioOptimisers, :AmbiguityTailWeightCalibration)
 
     # Neither abstract type is exported: an export is public API, and the convention is
     # that an abstract type is not one.
     @test :AbstractAmbiguityRadiusCalibrationAlgorithm ∉ names(PortfolioOptimisers)
     @test :AbstractAmbiguityTailWeightCalibrationAlgorithm ∉ names(PortfolioOptimisers)
 
-    # The four concrete names are exported, on the same terms as the roles and rules of the
-    # two older families.
-    for sym in
-        (:AmbiguityRadiusCalibration, :AmbiguityTailWeightCalibration, :ConcentrationRadius,
-         :RateRadius, :DimensionalRateRadius, :DualNormRadius, :TailTermParity)
+    # The five concrete names are exported, on the same terms as the rules of the two
+    # older families.
+    for sym in (:ConcentrationRadius, :RateRadius, :DimensionalRateRadius, :DualNormRadius,
+                :TailTermParity)
         @test sym ∈ names(PortfolioOptimisers)
     end
 
@@ -133,63 +140,42 @@ end
     @test DimensionalRateRadius <: PO.AbstractAmbiguityRadiusCalibrationAlgorithm
     @test DualNormRadius <: PO.AbstractAmbiguityRadiusCalibrationAlgorithm
     @test TailTermParity <: PO.AbstractAmbiguityTailWeightCalibrationAlgorithm
-    @test filter(t -> t !== AmbiguityTailWeightCalibration,
-                 subtypes(PO.AbstractAmbiguityTailWeightCalibrationAlgorithm)) ==
-          [TailTermParity]
+    @test subtypes(PO.AbstractAmbiguityTailWeightCalibrationAlgorithm) == [TailTermParity]
 end
 
-@testset "Ambiguity calibration: the roles, the bounds and the family split" begin
+@testset "Ambiguity calibration: the bounds and the family split" begin
     rrule = RateRadius(; c = 0.2)
-    rrole = AmbiguityRadiusCalibration(; alg = rrule)
-    trole = AmbiguityTailWeightCalibration(; alg = probe_tail_weight)
 
-    # The `alg` bound admits the family's own rules and a plain function, and refuses the
-    # other family's rule. A function carries no family, so no bound can refuse it.
-    @test isa(rrule, PO.Func_AmbRadCal)
-    @test isa(ConcentrationRadius(), PO.Func_AmbRadCal)
-    @test isa(probe_radius, PO.Func_AmbRadCal)
-    @test isa(probe_tail_weight, PO.Func_AmbTwtCal)
-    @test !isa(rrule, PO.Func_AmbTwtCal)
-    @test !isa(ScenarioCount(; n = 25), PO.Func_AmbRadCal)
-    @test !isa(rrule, PO.Func_SigCal)
-    @test !isa(rrule, PO.Func_DefCal)
-
-    # The role is the whole of the type: the rule lives in `alg`.
-    @test rrole.alg === rrule
-    @test trole.alg === probe_tail_weight
-
-    # A rule of the wrong family in an `alg` field is refused at construction, by the
-    # bound. No guard method is written for it.
-    @test_throws TypeError AmbiguityRadiusCalibration(; alg = ScenarioCount(; n = 25))
-    @test_throws TypeError AmbiguityTailWeightCalibration(; alg = rrule)
-    @test_throws TypeError AmbiguityRadiusCalibration(; alg = 0.02)
-
-    # A role is not a rule, so a role inside an `alg` field is refused on the same terms.
-    @test !isa(rrole, PO.Func_AmbRadCal)
-    @test !isa(trole, PO.Func_AmbTwtCal)
-    @test_throws TypeError AmbiguityRadiusCalibration(; alg = rrole)
-    @test_throws TypeError AmbiguityTailWeightCalibration(; alg = trole)
-
-    # The slot bound names one role and no other, so a tail-weight role in a radius slot
-    # fails the constructor's signature.
-    @test isa(rrole, PO.Num_AmbRadCal)
+    # The slot bound admits the family's own rules, a plain function and the number, and
+    # refuses the other family's rule. A function carries no family, so no bound refuses
+    # one and the name of the slot is what states the quantity there.
+    @test isa(rrule, PO.Num_AmbRadCal)
+    @test isa(ConcentrationRadius(), PO.Num_AmbRadCal)
+    @test isa(probe_radius, PO.Num_AmbRadCal)
     @test isa(0.02, PO.Num_AmbRadCal)
-    @test !isa(trole, PO.Num_AmbRadCal)
-    @test isa(trole, PO.Num_AmbTwtCal)
-    @test !isa(rrole, PO.Num_AmbTwtCal)
-    @test !isa(SignificanceTailCalibration(; alg = ScenarioCount(; n = 25)),
-               PO.Num_AmbRadCal)
+    @test isa(probe_tail_weight, PO.Num_AmbTwtCal)
+    @test !isa(rrule, PO.Num_AmbTwtCal)
+    @test !isa(TailTermParity(), PO.Num_AmbRadCal)
+    @test !isa(ScenarioCount(; n = 25), PO.Num_AmbRadCal)
+    @test !isa(rrule, PO.Num_SigCal)
+    @test !isa(rrule, PO.Num_DefCal)
 
-    # A radius names no end of the distribution, so neither role mirrors: `mirror_role`
-    # carries a number across and knows nothing else.
-    @test PO.mirror_role(0.02) == 0.02
-    @test_throws MethodError PO.mirror_role(rrole)
-    @test_throws MethodError PO.mirror_role(trole)
+    # A rule of the wrong family in a slot is refused at construction, by the bound. No
+    # guard method is written for it.
+    @test_throws TypeError DistributionallyRobustConditionalValueatRisk(;
+                                                                        r = TailTermParity())
+    @test_throws TypeError DistributionallyRobustConditionalValueatRisk(; l = rrule)
 
-    # `sel` keeps a role rather than falling back to the prior's value, which is what lets
+    # A radius names no end of the distribution, so no ambiguity slot of a Range measure
+    # defaults from another: each of the four states its own number.
+    dr = DistributionallyRobustConditionalValueatRiskRange(; l_a = 2.0, r_a = 0.05)
+    @test dr.l_b === 1.0
+    @test dr.r_b === 0.02
+
+    # `sel` keeps a rule rather than falling back to the prior's value, which is what lets
     # a rule survive the selection that runs before the resolution.
-    @test PO.sel(rrole, 0.02) === rrole
-    @test PO.sel(trole, 1.0) === trole
+    @test PO.sel(rrule, 0.02) === rrule
+    @test PO.sel(probe_tail_weight, 1.0) === probe_tail_weight
 end
 
 @testset "ConcentrationRadius: the chi-squared form" begin
@@ -340,10 +326,9 @@ end
 
     # The rule joins the radius family and its bounds, and no other.
     @test DimensionalRateRadius <: PO.AbstractAmbiguityRadiusCalibrationAlgorithm
-    @test isa(alg, PO.Func_AmbRadCal)
-    @test !isa(alg, PO.Func_AmbTwtCal)
-    @test isa(AmbiguityRadiusCalibration(; alg = alg), PO.Num_AmbRadCal)
-    @test_throws TypeError AmbiguityTailWeightCalibration(; alg = alg)
+    @test isa(alg, PO.Num_AmbRadCal)
+    @test !isa(alg, PO.Num_AmbTwtCal)
+    @test_throws TypeError DistributionallyRobustConditionalValueatRisk(; l = alg)
 end
 
 @testset "TailTermParity: the tail term at a stated multiple of the mean term" begin
@@ -409,10 +394,9 @@ end
 
     # The rule joins the tail-weight family and its bounds, and no other.
     @test TailTermParity <: PO.AbstractAmbiguityTailWeightCalibrationAlgorithm
-    @test isa(alg, PO.Func_AmbTwtCal)
-    @test !isa(alg, PO.Func_AmbRadCal)
-    @test isa(AmbiguityTailWeightCalibration(; alg = alg), PO.Num_AmbTwtCal)
-    @test_throws TypeError AmbiguityRadiusCalibration(; alg = alg)
+    @test isa(alg, PO.Num_AmbTwtCal)
+    @test !isa(alg, PO.Num_AmbRadCal)
+    @test_throws TypeError DistributionallyRobustConditionalValueatRisk(; r = alg)
 end
 
 @testset "TailTermParity: one stated tail weight is two trade-offs" begin
@@ -435,15 +419,15 @@ end
     # two, and each is the trade-off its own sample earns.
     @test PO.resolve_calibration_slot(1.0, :l, PRDAY, nothing) ==
           PO.resolve_calibration_slot(1.0, :l, PRMON, nothing)
-    role = AmbiguityTailWeightCalibration(; alg = alg)
+    rule = alg
     lctx = CalibrationContext(; alpha = 0.05)
-    @test PO.resolve_calibration_slot(role, :l, PRDAY, nothing, nothing, lctx) !=
-          PO.resolve_calibration_slot(role, :l, PRMON, nothing, nothing, lctx)
+    @test PO.resolve_calibration_slot(rule, :l, PRDAY, nothing, nothing, lctx) !=
+          PO.resolve_calibration_slot(rule, :l, PRMON, nothing, nothing, lctx)
 end
 
 @testset "TailTermParity: `alpha` and `l` travel together" begin
     alg = TailTermParity(; ratio = 1)
-    role = AmbiguityTailWeightCalibration(; alg = alg)
+    rule = alg
 
     # The rule cannot run until the probability reaches it, and the message names the verb
     # that carries it.
@@ -456,24 +440,22 @@ end
     @test isa(err, PO.IsNothingError)
     @test occursin("CalibrationContext.alpha", err.msg)
 
-    # The context carries the number, and the resolver hands it through the ROLE as well as
+    # The context carries the number, and the resolver hands it through the RULE as well as
     # to a bare rule. A stated number and a plain function ignore the field, so no existing
     # behaviour moved.
     c05 = CalibrationContext(; alpha = 0.05)
     @test !hasfield(TailTermParity, :alpha)
     @test TailTermParity(; ratio = 3).ratio == 3
-    @test PO.resolve_calibration_slot(role, :l, PRDAY, nothing, nothing, c05) ≈
+    @test PO.resolve_calibration_slot(rule, :l, PRDAY, nothing, nothing, c05) ≈
           alg(:l, PRDAY, nothing, nothing, c05)
     @test PO.resolve_calibration_slot(1.0, :l, PRDAY, nothing, nothing, c05) === 1.0
-    @test PO.resolve_calibration_slot(AmbiguityTailWeightCalibration(;
-                                                                     alg = probe_tail_weight),
-                                      :l, PRDAY, nothing, nothing, c05) ≈
+    @test PO.resolve_calibration_slot(probe_tail_weight, :l, PRDAY, nothing, nothing, c05) ≈
           2 / sqrt(size(PRDAY.X, 1))
 
     # The scalar measure resolves `alpha` first, so the slot reads the measure's own
     # probability and two measures give two weights.
-    m1 = DistributionallyRobustConditionalValueatRisk(; alpha = 0.05, l = role)
-    m2 = DistributionallyRobustConditionalValueatRisk(; alpha = 0.2, l = role)
+    m1 = DistributionallyRobustConditionalValueatRisk(; alpha = 0.05, l = rule)
+    m2 = DistributionallyRobustConditionalValueatRisk(; alpha = 0.2, l = rule)
     @test PO.resolve_deferred_quantities(m1, PRDAY).l ≈
           TailTermParity(; ratio = 1)(:l, PRDAY, nothing, nothing,
                                       CalibrationContext(; alpha = 0.05))
@@ -486,7 +468,7 @@ end
     # Each end of a Range measure reads its OWN probability, which is the case the six-slot
     # resolution has to get right.
     rg = DistributionallyRobustConditionalValueatRiskRange(; alpha = 0.05, beta = 0.2,
-                                                           l_a = role, l_b = role)
+                                                           l_a = rule, l_b = rule)
     out = PO.resolve_deferred_quantities(rg, PRDAY)
     @test out.l_a ≈ TailTermParity(; ratio = 1)(:l_a, PRDAY, nothing, nothing,
                                                 CalibrationContext(; alpha = 0.05))
@@ -498,8 +480,8 @@ end
 
     # A rule in the `alpha` slot beside a rule in the `l` slot resolves in the right order:
     # the tail weight reads the RESOLVED probability and not the slot's occupant.
-    srole = SignificanceTailCalibration(; alg = RateSignificance(; c = 0.5))
-    both = DistributionallyRobustConditionalValueatRisk(; alpha = srole, l = role)
+    srole = RateSignificance(; c = 0.5)
+    both = DistributionallyRobustConditionalValueatRisk(; alpha = srole, l = rule)
     bout = PO.resolve_deferred_quantities(both, PRDAY)
     @test bout.alpha ≈ 0.5 / sqrt(2520)
     @test bout.l ≈ TailTermParity(; ratio = 1)(:l, PRDAY, nothing, nothing,
@@ -508,7 +490,7 @@ end
     # The drawdown measure carries the same pair, and it hands its own SERIES over beside
     # the probability. #623 corrected this: the number was the asset-column one, and the
     # tail term this measure prices is a CDaR of the drawdown series.
-    dd = DistributionallyRobustConditionalDrawdownatRisk(; alpha = 0.05, l = role)
+    dd = DistributionallyRobustConditionalDrawdownatRisk(; alpha = 0.05, l = rule)
     ddl = PO.resolve_deferred_quantities(dd, PRDAY).l
     @test ddl ≈ TailTermParity(; ratio = 1)(:l, PRDAY, nothing, nothing,
                                             CalibrationContext(; alpha = 0.05,
@@ -552,10 +534,10 @@ end
 end
 
 @testset "Ambiguity calibration: the resolver runs a rule by calling it" begin
-    rrole = AmbiguityRadiusCalibration(; alg = RateRadius(; c = 0.2))
-    trole = AmbiguityTailWeightCalibration(; alg = probe_tail_weight)
+    rrole = RateRadius(; c = 0.2)
+    trole = probe_tail_weight
 
-    # The role is unwrapped and the rule is called, so the role never reaches the rule.
+    # The rule is unwrapped and the rule is called, so the rule never reaches the rule.
     @test PO.resolve_calibration_slot(rrole, :r, PR60, nothing) ≈ 0.2 / sqrt(60)
 
     # A stated number passes through unchanged, and so does `nothing`.
@@ -571,13 +553,12 @@ end
           (; key = :l, weighted = true, solved = true, series = ReturnsSeries())
 
     # A plain function in the `alg` field is a rule on the same terms.
-    @test PO.resolve_calibration_slot(AmbiguityRadiusCalibration(; alg = probe_radius), :r,
-                                      PR60, nothing) ≈ 3 / 60
+    @test PO.resolve_calibration_slot(probe_radius, :r, PR60, nothing) ≈ 3 / 60
 end
 
 @testset "Ambiguity calibration: the six distributionally robust slots" begin
-    rrole = AmbiguityRadiusCalibration(; alg = RateRadius(; c = 0.2))
-    trole = AmbiguityTailWeightCalibration(; alg = probe_tail_weight)
+    rrole = RateRadius(; c = 0.2)
+    trole = probe_tail_weight
     r_num = 0.2 / sqrt(60)
     l_num = 2 / sqrt(60)
 
@@ -603,7 +584,7 @@ end
     # The resolver checks the number the rule returned, so a rule that returns a value the
     # slot does not admit is refused at fold time, by the check a caller's own number
     # meets. The rebuild through the keyword constructor states the same rule again.
-    neg = AmbiguityRadiusCalibration(; alg = (args...) -> -1.0)
+    neg = (args...) -> -1.0
     @test_throws DomainError PO.resolve_deferred_quantities(DistributionallyRobustConditionalValueatRisk(;
                                                                                                          r = neg),
                                                             PR60)
@@ -626,9 +607,7 @@ end
 
     # Each tail keeps its own pair, so two different rules give two different numbers.
     mixed = DistributionallyRobustConditionalValueatRiskRange(; r_a = rrole,
-                                                              r_b = AmbiguityRadiusCalibration(;
-                                                                                               alg = RateRadius(;
-                                                                                                                c = 0.9)))
+                                                              r_b = RateRadius(; c = 0.9))
     mout = PO.resolve_deferred_quantities(mixed, PR60)
     @test mout.r_a ≈ 0.2 / sqrt(60)
     @test mout.r_b ≈ 0.9 / sqrt(60)
@@ -642,20 +621,21 @@ end
     plain_dd = DistributionallyRobustConditionalDrawdownatRisk()
     @test PO.resolve_deferred_quantities(plain_dd, PR60) === plain_dd
 
-    # --- the role split holds at the slot ----------------------------------------------
-    # A radius role in a tail-weight slot, and the reverse, are both refused at
+    # --- the rule split holds at the slot ----------------------------------------------
+    # A radius rule in a tail-weight slot, and the reverse, are both refused at
     # construction. The bound is the whole of the validation.
     @test_throws TypeError DistributionallyRobustConditionalValueatRisk(; l = rrole)
-    @test_throws TypeError DistributionallyRobustConditionalValueatRisk(; r = trole)
+    @test_throws TypeError DistributionallyRobustConditionalValueatRisk(;
+                                                                        r = TailTermParity())
     @test_throws TypeError DistributionallyRobustConditionalValueatRiskRange(; l_a = rrole)
-    @test_throws TypeError DistributionallyRobustConditionalValueatRiskRange(; r_b = trole)
+    @test_throws TypeError DistributionallyRobustConditionalValueatRiskRange(;
+                                                                             r_b = TailTermParity())
     @test_throws TypeError DistributionallyRobustConditionalDrawdownatRisk(; l = rrole)
 
-    # A significance role is refused too: it belongs to neither family.
+    # A significance rule is refused too: it belongs to neither family.
     @test_throws TypeError DistributionallyRobustConditionalValueatRisk(;
-                                                                        r = SignificanceTailCalibration(;
-                                                                                                        alg = ScenarioCount(;
-                                                                                                                            n = 3)))
+                                                                        r = ScenarioCount(;
+                                                                                          n = 3))
 
     # --- the value-level entry point refuses a rule ------------------------------------
     # `expected_risk` given a bare returns matrix has no prior result to resolve against,
@@ -669,7 +649,7 @@ end
     end
     @test isa(err, ArgumentError)
     @test occursin("DistributionallyRobustConditionalValueatRisk.l", err.msg)
-    @test occursin("AmbiguityTailWeightCalibration", err.msg)
+    @test occursin("probe_tail_weight", err.msg)
     @test occursin("factory", err.msg)
 
     # Given the prior result the measure is resolved first, so the same call succeeds.
@@ -680,7 +660,7 @@ end
 end
 
 @testset "Ambiguity calibration: the two regularisation coefficients" begin
-    rrole = AmbiguityRadiusCalibration(; alg = RateRadius(; c = 0.2))
+    rrole = RateRadius(; c = 0.2)
     r_num = 0.2 / sqrt(60)
 
     # --- L2Regularisation ---------------------------------------------------------------
@@ -714,7 +694,7 @@ end
     @test occursin("QuadRiskExpr", PO.squared_norm_radius_msg(QuadRiskExpr()))
 
     # The resolver checks the calibrated number, and the rebuild states the rule again.
-    neg = L2Regularisation(; val = AmbiguityRadiusCalibration(; alg = (args...) -> -1.0))
+    neg = L2Regularisation(; val = (args...) -> -1.0)
     @test_throws DomainError PO.factory(neg, PR60)
 
     # --- LpRegularisation ---------------------------------------------------------------
@@ -728,10 +708,14 @@ end
     # No formulation slot, so no pairing can be wrong and no guard runs.
     @test LpRegularisation(; p = 2.5, val = rrole).val === rrole
 
-    # A tail-weight role is refused in a radius slot, on both estimators.
-    trole = AmbiguityTailWeightCalibration(; alg = probe_tail_weight)
-    @test_throws TypeError L2Regularisation(; val = trole)
-    @test_throws TypeError LpRegularisation(; val = trole)
+    # A tail-weight rule is refused in a radius slot, on both estimators.
+    @test_throws TypeError L2Regularisation(; val = TailTermParity())
+    @test_throws TypeError LpRegularisation(; val = TailTermParity())
+
+    # `L2Regularisation.val` names one quantity, so it admits a plain function. The dual-use
+    # slot of `LpRegularisation` names two, so it is the one slot that refuses one.
+    @test L2Regularisation(; val = probe_radius).val === probe_radius
+    @test_throws TypeError LpRegularisation(; val = probe_radius)
 end
 
 @testset "Ambiguity calibration: the optimiser's l1 and linf reach the model" begin
@@ -739,15 +723,15 @@ end
                  check_sol = (; allow_local = true, allow_almost = true),
                  settings = "verbose" => false)
     rd = ReturnsResult(; nx = string.(1:4), X = X60)
-    rrole = AmbiguityRadiusCalibration(; alg = RateRadius(; c = 0.2))
+    rrole = RateRadius(; c = 0.2)
     r_num = 0.2 / sqrt(60)
 
     # The four coefficients all take a rule, and the bound admits it.
     opt = JuMPOptimiser(; slv = slv, pe = PR60, l1 = rrole, linf = rrole,
                         l2 = L2Regularisation(; val = rrole),
                         lp = LpRegularisation(; val = rrole))
-    @test isa(opt.l1, AmbiguityRadiusCalibration)
-    @test isa(opt.linf, AmbiguityRadiusCalibration)
+    @test opt.l1 === rrole
+    @test opt.linf === rrole
 
     # Neither the weights factory nor the cluster slice holds a prior result, so both carry
     # a rule through untouched. That is right: the rule resolves against the cluster's own
@@ -781,10 +765,9 @@ end
     PO.assemble_jump_model!(modeln, mrn, mrn.opt, attrsn, rd, mrn.r, mrn.obj)
     @test JuMP.coefficient(modeln[:l1], modeln[:t_l1]) ≈ r_num
 
-    # A tail weight is not a radius, so the tail-weight role is refused in all four slots.
-    trole = AmbiguityTailWeightCalibration(; alg = probe_tail_weight)
-    @test_throws TypeError JuMPOptimiser(; slv = slv, l1 = trole)
-    @test_throws TypeError JuMPOptimiser(; slv = slv, linf = trole)
+    # A tail weight is not a radius, so the tail-weight rule is refused in all four slots.
+    @test_throws TypeError JuMPOptimiser(; slv = slv, l1 = TailTermParity())
+    @test_throws TypeError JuMPOptimiser(; slv = slv, linf = TailTermParity())
 end
 
 #=
@@ -802,7 +785,7 @@ that was selected. So the order falls out of the pipeline and nothing had to inv
 @testset "Ambiguity calibration: the time-dependent wrapper selects, then the rule runs" begin
     slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
                  settings = "verbose" => false)
-    rrole = AmbiguityRadiusCalibration(; alg = RateRadius(; c = 0.2))
+    rrole = RateRadius(; c = 0.2)
     rd = ReturnsResult(; nx = string.(1:4), X = X120)
 
     # The widened bound admits a schedule over a rule and a number.
@@ -840,8 +823,8 @@ empirical measure in it.
 
 Issue #614 ships it, and it settles the `:val` collision by widening the two regularisation
 keys to `:l2reg_val` and `:lpreg_val`. The two symbols are the two names `field_dict`
-already uses for the two slots, so a caller's own function placed in an
-`AmbiguityRadiusCalibration` now receives one of those in place of `:val`.
+already uses for the two slots, so a caller's own function placed in one of those slots
+now receives one of those keys in place of `:val`.
 
 The `:lpreg_val` key still names no norm order, because `p` lives on the owner. The order
 travels to the rule in the `CalibrationContext` the penalty site builds, so the caller states
@@ -861,9 +844,8 @@ const DNR_KISH = sum(WTS)^2 / sum(abs2, WTS)
     @test DualNormRadius <: PO.AbstractAmbiguityRadiusCalibrationAlgorithm
     @test !(DualNormRadius <: PO.AbstractAmbiguityTailWeightCalibrationAlgorithm)
     @test :DualNormRadius ∈ names(PortfolioOptimisers)
-    @test isa(DualNormRadius(), PO.Func_AmbRadCal)
-    @test !isa(DualNormRadius(), PO.Func_AmbTwtCal)
-    @test isa(AmbiguityRadiusCalibration(; alg = DualNormRadius()), PO.Num_AmbRadCal)
+    @test !isa(DualNormRadius(), PO.Num_AmbTwtCal)
+    @test isa(DualNormRadius(), PO.Num_AmbRadCal)
 
     # The defaults: a per-coordinate 95% level, and no norm order, which serves every slot
     # but `:lpreg_val`.
@@ -989,19 +971,19 @@ const DNR_KISH = sum(WTS)^2 / sum(abs2, WTS)
 end
 
 @testset "DualNormRadius: the three distributionally robust radius slots" begin
-    role = AmbiguityRadiusCalibration(; alg = DualNormRadius())
+    rule = DualNormRadius()
     # The measures resolve against the empirical prior, so the number is read from the same
     # rule rather than written out twice.
     r_num = DualNormRadius()(:r, PR60, nothing, nothing, CalibrationContext())
     @test r_num > 0
 
-    m = DistributionallyRobustConditionalValueatRisk(; r = role)
+    m = DistributionallyRobustConditionalValueatRisk(; r = rule)
     @test PO.resolve_deferred_quantities(m, PR60).r ≈ r_num
     @test PO.factory(m, PR60).r ≈ r_num
 
     # The drawdown owner hands its own series over, so the error scale comes off the
     # drawdown sample. #623 corrected this: the number was the asset-return one.
-    dd = DistributionallyRobustConditionalDrawdownatRisk(; r = role)
+    dd = DistributionallyRobustConditionalDrawdownatRisk(; r = rule)
     ddr = PO.resolve_deferred_quantities(dd, PR60).r
     @test ddr ≈ DualNormRadius()(:r, PR60, nothing, nothing,
                                  CalibrationContext(; series = AbsoluteDrawdownSeries()))
@@ -1009,7 +991,7 @@ end
 
     # Both ends of the Range twin carry the same ground metric, so one rule on both ends
     # gives one number. The two ends of a radius are not two tails.
-    rg = DistributionallyRobustConditionalValueatRiskRange(; r_a = role, r_b = role)
+    rg = DistributionallyRobustConditionalValueatRiskRange(; r_a = rule, r_b = rule)
     rgo = PO.resolve_deferred_quantities(rg, PR60)
     @test rgo.r_a ≈ r_num
     @test rgo.r_b ≈ r_num
@@ -1019,14 +1001,14 @@ end
 @testset "DualNormRadius: the two regularisation keys are two names, not one" begin
     # `:val` named both slots, and the two carry two different ground metrics, so route 1
     # of #614 widened them to the two names `field_dict` already used.
-    l2role = AmbiguityRadiusCalibration(; alg = DualNormRadius())
-    l2 = L2Regularisation(; val = l2role)
+    l2rule = DualNormRadius()
+    l2 = L2Regularisation(; val = l2rule)
     @test PO.factory(l2, PRDIAG).val ≈ DNR_Z * norm(DNR_SD / sqrt(60), 2)
 
     # The Lp term reads the type-`q` metric of its own norm order. The order belongs to the
     # penalty, so the site states it in the context and the caller states nothing: no rule
     # carries a `p` of its own.
-    lprole = AmbiguityRadiusCalibration(; alg = DualNormRadius())
+    lprole = DualNormRadius()
     lp = LpRegularisation(; p = 3, val = lprole)
     @test PO.factory(lp, PRDIAG).val ≈ DNR_Z * norm(DNR_SD / sqrt(60), 1.5)
     @test PO.factory(lp, PRDIAG).p == 3
@@ -1041,16 +1023,15 @@ end
     # bought. A rule that read `:val` for both could not tell them apart.
     @test PO.factory(l2, PRDIAG).val != PO.factory(lp, PRDIAG).val
 
-    # The order reaches the rule through the role, and leaves everything else where it
+    # The order reaches the rule through the context, and leaves everything else where it
     # was: a number, and a rule that reads no order, both cross whole and nothing is
     # rebuilt on the way in.
     c3 = CalibrationContext(; p = 3)
-    @test l2role.alg.confidence == DualNormRadius().confidence
+    @test l2rule.confidence == DualNormRadius().confidence
     @test PO.resolve_calibration_slot(0.3, :lpreg_val, PRDIAG, nothing, nothing, c3) == 0.3
-    cr_role = AmbiguityRadiusCalibration(; alg = ConcentrationRadius())
-    @test PO.resolve_calibration_slot(cr_role, :r, PRDIAG, nothing, nothing, c3) ==
-          cr_role.alg(:r, PRDIAG, nothing, nothing, c3)
-    @test cr_role.alg === cr_role.alg
+    cr_rule = ConcentrationRadius()
+    @test PO.resolve_calibration_slot(cr_rule, :r, PRDIAG, nothing, nothing, c3) ==
+          cr_rule(:r, PRDIAG, nothing, nothing, c3)
 
     # The three older rules read no key, so the widening moved nothing for them.
     cr = ConcentrationRadius(; scale = 0.5)
@@ -1063,10 +1044,10 @@ end
                  check_sol = (; allow_local = true, allow_almost = true),
                  settings = "verbose" => false)
     rd = ReturnsResult(; nx = string.(1:4), X = X60)
-    role = AmbiguityRadiusCalibration(; alg = DualNormRadius())
+    rule = DualNormRadius()
 
     # One rule, stated on both coefficients of one optimiser.
-    opt = JuMPOptimiser(; slv = slv, pe = PR60, l1 = role, linf = role)
+    opt = JuMPOptimiser(; slv = slv, pe = PR60, l1 = rule, linf = rule)
     mr = MeanRisk(; r = Variance(), opt = opt)
     attrs = PO.processed_jump_optimiser_attributes(mr.opt, rd)
     model = JuMP.Model()
@@ -1240,8 +1221,8 @@ end
     @test PO.calibration_series(DistributionallyRobustConditionalValueatRisk()) ==
           ReturnsSeries()
 
-    lrole = AmbiguityTailWeightCalibration(; alg = TailTermParity())
-    rrole = AmbiguityRadiusCalibration(; alg = ConcentrationRadius())
+    lrole = TailTermParity()
+    rrole = ConcentrationRadius()
 
     dr = PO.resolve_deferred_quantities(DistributionallyRobustConditionalDrawdownatRisk(;
                                                                                         alpha = 0.05,
@@ -1497,7 +1478,7 @@ end
 The two bare radius fields of the optimiser, `l1` and `linf`, hold the number itself rather
 than a term, so no rebuild re-runs a constructor's check on a calibrated radius. The check
 therefore belongs to `resolve_calibration_slot`, which is the one place the rule runs, and
-the role's own method there refuses the values a stated radius is refused. It is paid on
+the rule's own method there refuses the values a stated radius is refused. It is paid on
 the calibrated path alone: a stated number takes the fallback method and meets no check.
 =#
 @testset "Ambiguity calibration: a calibrated radius meets the stated radius's check" begin
@@ -1523,16 +1504,16 @@ the calibrated path alone: a stated number takes the fallback method and meets n
     @test_throws DomainError JuMPOptimiser(; slv = slv, pe = PR60, linf = NaN)
     @test_throws DomainError JuMPOptimiser(; slv = slv, pe = PR60, linf = Inf)
 
-    # The same four numbers, computed by a rule, are refused by the resolver, under the
-    # key of the slot the role stands in.
+    # The same four numbers, computed by a rule of the radius family, are refused by the
+    # resolver, under the key of the slot the rule stands in.
     for bad in (-1.0, 0.0, NaN, Inf)
-        rrole = AmbiguityRadiusCalibration(; alg = (key, pr, w, slv, ctx) -> bad)
+        rrule = ProbeRadiusValue(bad)
         for key in (:l1, :linf, :r, :l2reg_val, :lpreg_val)
-            @test_throws DomainError PO.resolve_calibration_slot(rrole, key, PR60, PR60.w,
+            @test_throws DomainError PO.resolve_calibration_slot(rrule, key, PR60, PR60.w,
                                                                  slv)
         end
         err = try
-            PO.resolve_calibration_slot(rrole, :l1, PR60, PR60.w, slv)
+            PO.resolve_calibration_slot(rrule, :l1, PR60, PR60.w, slv)
         catch e
             e
         end
@@ -1540,11 +1521,22 @@ the calibrated path alone: a stated number takes the fallback method and meets n
 
         # So the whole route refuses it too, at assembly and at the term's own factory.
         @test_throws DomainError assemble_with(JuMPOptimiser(; slv = slv, pe = PR60,
-                                                             l1 = rrole))
+                                                             l1 = rrule))
         @test_throws DomainError assemble_with(JuMPOptimiser(; slv = slv, pe = PR60,
-                                                             linf = rrole))
-        @test_throws DomainError PO.factory(L2Regularisation(; val = rrole), PR60)
-        @test_throws DomainError PO.factory(LpRegularisation(; val = rrole), PR60)
+                                                             linf = rrule))
+        @test_throws DomainError PO.factory(L2Regularisation(; val = rrule), PR60)
+        @test_throws DomainError PO.factory(LpRegularisation(; val = rrule), PR60)
+
+        # A rule written as a plain function names no family, so no method of the resolver
+        # can read the quantity it computes and the resolver returns the number unchecked.
+        # `assemble_jump_model!` is what states the range of the four slots that reach the
+        # model raw, so the route refuses it there instead.
+        fn = (key, pr, w, slv, ctx) -> bad
+        @test PO.resolve_calibration_slot(fn, :l1, PR60, PR60.w, slv) === bad
+        @test_throws DomainError assemble_with(JuMPOptimiser(; slv = slv, pe = PR60,
+                                                             l1 = fn))
+        @test_throws DomainError assemble_with(JuMPOptimiser(; slv = slv, pe = PR60,
+                                                             linf = fn))
     end
 
     # A stated number reaches the fallback method, which checks nothing: the cost is paid
@@ -1554,7 +1546,7 @@ the calibrated path alone: a stated number takes the fallback method and meets n
 
     # A rule that answers a legal radius still reaches the model, so the check refuses
     # nothing a caller could have stated by hand.
-    good = AmbiguityRadiusCalibration(; alg = (key, pr, w, slv, ctx) -> 1e-3)
+    good = (key, pr, w, slv, ctx) -> 1e-3
     model = assemble_with(JuMPOptimiser(; slv = slv, pe = PR60, l1 = good, linf = good))
     @test JuMP.coefficient(model[:l1], model[:t_l1]) ≈ 1e-3
     @test JuMP.coefficient(model[:linf], model[:t_linf]) ≈ 1e-3

@@ -23,16 +23,16 @@ This example shows the slot from the caller's side.
  4. The travelling pair, where `alpha` resolves first and its number reaches the ``\kappa`` rule.
  5. The two tail-decay rules, which read one sample and answer per end and for both ends.
  6. A plain function as a rule, which is the case that has no type.
- 7. The role bounds, which refuse a head rule in a tail slot at construction.
+ 7. The slot bounds, which refuse a rule of the wrong family at construction.
  8. The ambiguity radius and the tail weight of the distributionally robust measure.
 
 The regularisation coefficients `l1`, `linf`, [`L2Regularisation`](@ref) and
-[`LpRegularisation`](@ref) are ambiguity radii too, and they take the same role. They belong to
-the [regularisation example](../4_constraints_costs/07_Regularisation.md), which owns those
-slots. The three norm ceilings `l2c`, `lpc` and `linfc` of [`JuMPOptimiser`](@ref) bound a norm
-rather than price one, so they are a different quantity and take a role of their own,
-[`NormCeilingCalibration`](@ref). That example runs both families, and this one stays on the
-slots that sit on a risk measure.
+[`LpRegularisation`](@ref) are ambiguity radii too, and they take the same rule family. They
+belong to the [regularisation example](../4_constraints_costs/07_Regularisation.md), which owns
+those slots. The three norm ceilings `l2c`, `lpc` and `linfc` of [`JuMPOptimiser`](@ref) bound a
+norm rather than price one, so they are a different quantity and take a family of their own,
+[`AbstractNormCeilingCalibrationAlgorithm`](@ref). That example runs both families, and this one
+stays on the slots that sit on a risk measure.
 =#
 
 using PortfolioOptimisers, PrettyTables, DataFrames, StatsBase, Statistics
@@ -75,26 +75,20 @@ slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
 #=
 ## 2. A stated number and a rule side by side
 
-[`ConditionalValueatRisk`](@ref) takes `alpha = 0.05`, and it takes a
-[`SignificanceTailCalibration`](@ref) holding a rule. The role names the end of the distribution
-the slot addresses, and the rule it carries in `alg` is what computes the number. Nothing else on
-the measure changes.
+[`ConditionalValueatRisk`](@ref) takes `alpha = 0.05`, and it takes a rule that computes the
+number. The slot names the quantity and the end of the distribution, so the rule states the
+method alone. Nothing else on the measure changes.
 =#
 
 cvar_stated = ConditionalValueatRisk(; alpha = 0.05)
 
-cvar_rule = ConditionalValueatRisk(;
-                                   alpha = SignificanceTailCalibration(;
-                                                                       alg = ScenarioCount(;
-                                                                                           n = 25)))
+cvar_rule = ConditionalValueatRisk(; alpha = ScenarioCount(; n = 25))
 
 #=
-The slot already names the end of the distribution, so the role may be left out. The slot puts it
-on, and the two forms build the same measure. The rest of this page writes the role out, because
-the role is what the page is about, but a caller need not.
+What the slot stores is the rule itself, so a reader of the slot sees what the caller wrote.
 =#
 
-ConditionalValueatRisk(; alpha = ScenarioCount(; n = 25)).alpha
+cvar_rule.alpha
 
 #=
 [`ScenarioCount`](@ref) states the tail's population rather than its probability: `alpha = n / T`
@@ -226,14 +220,8 @@ reads a distance, so it returns one number for both ends. They take a ``\kappa``
 same terms [`EntropyBudget`](@ref) does, and section 6 runs both.
 =#
 
-count_rule = ConditionalValueatRisk(;
-                                    alpha = SignificanceTailCalibration(;
-                                                                        alg = ScenarioCount(;
-                                                                                            n = 25)))
-rate_rule = ConditionalValueatRisk(;
-                                   alpha = SignificanceTailCalibration(;
-                                                                       alg = RateSignificance(;
-                                                                                              c = 1.5)))
+count_rule = ConditionalValueatRisk(; alpha = ScenarioCount(; n = 25))
+rate_rule = ConditionalValueatRisk(; alpha = RateSignificance(; c = 1.5))
 
 rule_table = DataFrame(:fold => 1:length(iwf_res.train_idx),
                        :T => length.(iwf_res.train_idx),
@@ -281,17 +269,10 @@ The rule therefore reads its sibling `alpha`. `alpha` resolves first, and the nu
 travels to the ``\kappa`` rule, so the pair resolves in one pass over the measure.
 =#
 
-rlvar_rule = RelativisticValueatRisk(;
-                                     alpha = SignificanceTailCalibration(;
-                                                                         alg = ScenarioCount(;
-                                                                                             n = 25)),
-                                     kappa = DeformationTailCalibration(;
-                                                                        alg = EntropyBudget(;
-                                                                                            target = -6.0)))
+rlvar_rule = RelativisticValueatRisk(; alpha = ScenarioCount(; n = 25),
+                                     kappa = EntropyBudget(; target = -6.0))
 rlvar_stated = RelativisticValueatRisk(; alpha = 0.05,
-                                       kappa = DeformationTailCalibration(;
-                                                                          alg = EntropyBudget(;
-                                                                                              target = -6.0)))
+                                       kappa = EntropyBudget(; target = -6.0))
 
 pair_table = DataFrame(:fold => 1:length(iwf_res.train_idx),
                        :T => length.(iwf_res.train_idx),
@@ -317,10 +298,8 @@ names both.
 
 try
     resolved(RelativisticValueatRisk(; alpha = 0.05,
-                                     kappa = DeformationTailCalibration(;
-                                                                        alg = EntropyBudget(;
-                                                                                            target = -1.5))),
-             first_idx, :kappa)
+                                     kappa = EntropyBudget(; target = -1.5)), first_idx,
+             :kappa)
 catch e
     println(sprint(showerror, e))
 end
@@ -338,16 +317,10 @@ holds both answers. Each end carries a travelling pair of its own: `kappa_a` rea
 `kappa_b` reads `beta`.
 =#
 
-hill_range = RelativisticValueatRiskRange(;
-                                          kappa_a = DeformationTailCalibration(;
-                                                                               alg = HillTailDecay()),
-                                          kappa_b = DeformationHeadCalibration(;
-                                                                               alg = HillTailDecay()))
-radial_range = RelativisticValueatRiskRange(;
-                                            kappa_a = DeformationTailCalibration(;
-                                                                                 alg = RadialTailDecay()),
-                                            kappa_b = DeformationHeadCalibration(;
-                                                                                 alg = RadialTailDecay()))
+hill_range = RelativisticValueatRiskRange(; kappa_a = HillTailDecay(),
+                                          kappa_b = HillTailDecay())
+radial_range = RelativisticValueatRiskRange(; kappa_a = RadialTailDecay(),
+                                            kappa_b = RadialTailDecay())
 
 hill_res = factory(hill_range, pr)
 radial_res = factory(radial_range, pr)
@@ -423,46 +396,39 @@ budget for each.
 tail_budget = Dict(:alpha => 25, :beta => 50)
 budgeted(key, pr, w, slv, ctx) = tail_budget[key] / size(pr.X, 1)
 
-vrr = ValueatRiskRange(; alpha = SignificanceTailCalibration(; alg = budgeted),
-                       beta = SignificanceHeadCalibration(; alg = budgeted))
+vrr = ValueatRiskRange(; alpha = budgeted, beta = budgeted)
 vrr_res = factory(vrr, fold_prior(first_idx))
 println("alpha = $(vrr_res.alpha), beta = $(vrr_res.beta)")
 
 #=
-Every Range measure defaults `beta` to `alpha`, and [`mirror_role`](@ref) is what carries the
-occupant across: a tail role crosses over as the head role holding the same rule.
+Every Range measure defaults `beta` to `alpha`. The rule states the method and the slot states
+the end, so one rule serves both ends and the occupant crosses unchanged.
 =#
 
 owa_range = OrderedWeightsArrayConditionalValueatRiskRange(; alpha = count_rule.alpha)
-println("beta is a $(typeof(owa_range.beta).name.name), same rule = $(owa_range.beta.alg === count_rule.alpha.alg)")
+println("beta is a $(typeof(owa_range.beta).name.name), same rule = $(owa_range.beta === count_rule.alpha)")
 
 #=
-## 8. The role bounds refuse a mismatch
+## 8. The slot bounds refuse a rule of the wrong family
 
-The role is what the slot's type bound admits, and each bound names one role and no other. A head
-rule in a tail slot is therefore refused at construction, before any data is in sight, and no
-guard method is written for it.
+Each slot's type bound names the one rule family that computes the quantity the slot holds. A
+deformation rule in a significance slot is therefore refused at construction, before any data is
+in sight, and no guard method is written for it.
 =#
 
 try
-    ConditionalValueatRisk(;
-                           alpha = SignificanceHeadCalibration(;
-                                                               alg = ScenarioCount(;
-                                                                                   n = 25)))
+    ConditionalValueatRisk(; alpha = EntropyBudget(; target = -6.0))
 catch e
     println(sprint(showerror, e))
 end
 
 #=
-A role inside another role's `alg` field is refused by the same mechanism. A role is configuration
-that carries an algorithm, so the `alg` bound admits rules and functions only.
+A radius and a tail weight are two quantities as well, so each carries a family of its own and
+each slot refuses the other's rule.
 =#
 
 try
-    SignificanceTailCalibration(;
-                                alg = SignificanceTailCalibration(;
-                                                                  alg = ScenarioCount(;
-                                                                                      n = 25)))
+    DistributionallyRobustConditionalValueatRisk(; r = TailTermParity(; ratio = 1))
 catch e
     println(sprint(showerror, e))
 end
@@ -499,16 +465,10 @@ which is the case section 7 covers.
 =#
 
 drcvar = DistributionallyRobustConditionalValueatRisk(; alpha = count_rule.alpha,
-                                                      r = AmbiguityRadiusCalibration(;
-                                                                                     alg = ConcentrationRadius(;
-                                                                                                               confidence = 0.95)),
-                                                      l = AmbiguityTailWeightCalibration(;
-                                                                                         alg = TailTermParity(;
-                                                                                                              ratio = 1)))
-drcvar_rate = DistributionallyRobustConditionalValueatRisk(;
-                                                           r = AmbiguityRadiusCalibration(;
-                                                                                          alg = RateRadius(;
-                                                                                                           c = 0.02)))
+                                                      r = ConcentrationRadius(;
+                                                                              confidence = 0.95),
+                                                      l = TailTermParity(; ratio = 1))
+drcvar_rate = DistributionallyRobustConditionalValueatRisk(; r = RateRadius(; c = 0.02))
 
 amb_table = DataFrame(:fold => 1:length(iwf_res.train_idx),
                       :T => length.(iwf_res.train_idx),
@@ -555,7 +515,7 @@ println("robust out-of-sample variance = $(expected_risk(var_rm, pred_drcvar))")
     end, and [`RadialTailDecay`](@ref) answers once for both.
   - A plain function of `(key, pr, w, slv, ctx)` is a rule, which covers the one-off case in every
     family.
-  - A role names an end of the distribution, and its slot's type bound refuses the other end at
+  - A slot names its quantity, and its type bound refuses a rule of another family at
     construction.
   - The radius rules that read the slot's key, and the three norm ceilings, run in the
     [regularisation example](../4_constraints_costs/07_Regularisation.md), because that example

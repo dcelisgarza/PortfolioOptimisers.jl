@@ -176,8 +176,8 @@ $(DocStringExtensions.FIELDS)
     RelativisticValueatRisk(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
         slv::Option{<:Slv_VecSlv} = nothing,
-        alpha::Num_SigTailCal = 0.05,
-        kappa::Num_DefTailCal = 0.3,
+        alpha::Num_SigCal = 0.05,
+        kappa::Num_DefCal = 0.3,
         w::Option{<:ObsWeights} = nothing
     ) -> RelativisticValueatRisk
 
@@ -250,10 +250,8 @@ RelativisticValueatRisk
     """
     @pprop w
     function RelativisticValueatRisk(settings::RiskMeasureSettings,
-                                     slv::Option{<:Slv_VecSlv}, alpha::Num_SigTailCal,
-                                     kappa::Num_DefTailCal, w::Option{<:ObsWeights})
-        alpha = bind_role(SignificanceTailCalibration, alpha)
-        kappa = bind_role(DeformationTailCalibration, kappa)
+                                     slv::Option{<:Slv_VecSlv}, alpha::Num_SigCal,
+                                     kappa::Num_DefCal, w::Option{<:ObsWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
@@ -269,7 +267,7 @@ RelativisticValueatRisk
 end
 function RelativisticValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                  slv::Option{<:Slv_VecSlv} = nothing,
-                                 alpha::Num_SigTailCal = 0.05, kappa::Num_DefTailCal = 0.3,
+                                 alpha::Num_SigCal = 0.05, kappa::Num_DefCal = 0.3,
                                  w::Option{<:ObsWeights} = nothing)::RelativisticValueatRisk
     return RelativisticValueatRisk(settings, slv, alpha, kappa, w)
 end
@@ -343,10 +341,10 @@ $(DocStringExtensions.FIELDS)
     RelativisticValueatRiskRange(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
         slv::Option{<:Slv_VecSlv} = nothing,
-        alpha::Num_SigTailCal = 0.05,
-        kappa_a::Num_DefTailCal = 0.3,
-        beta::Num_SigHeadCal = mirror_role(alpha),
-        kappa_b::Num_DefHeadCal = mirror_role(kappa_a),
+        alpha::Num_SigCal = 0.05,
+        kappa_a::Num_DefCal = 0.3,
+        beta::Num_SigCal = alpha,
+        kappa_b::Num_DefCal = kappa_a,
         w::Option{<:ObsWeights} = nothing
     ) -> RelativisticValueatRiskRange
 
@@ -427,13 +425,9 @@ RelativisticValueatRiskRange
     """
     @pprop w
     function RelativisticValueatRiskRange(settings::RiskMeasureSettings,
-                                          slv::Option{<:Slv_VecSlv}, alpha::Num_SigTailCal,
-                                          kappa_a::Num_DefTailCal, beta::Num_SigHeadCal,
-                                          kappa_b::Num_DefHeadCal, w::Option{<:ObsWeights})
-        alpha = bind_role(SignificanceTailCalibration, alpha)
-        kappa_a = bind_role(DeformationTailCalibration, kappa_a)
-        beta = bind_role(SignificanceHeadCalibration, beta)
-        kappa_b = bind_role(DeformationHeadCalibration, kappa_b)
+                                          slv::Option{<:Slv_VecSlv}, alpha::Num_SigCal,
+                                          kappa_a::Num_DefCal, beta::Num_SigCal,
+                                          kappa_b::Num_DefCal, w::Option{<:ObsWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
@@ -450,10 +444,9 @@ end
 function RelativisticValueatRiskRange(;
                                       settings::RiskMeasureSettings = RiskMeasureSettings(),
                                       slv::Option{<:Slv_VecSlv} = nothing,
-                                      alpha::Num_SigTailCal = 0.05,
-                                      kappa_a::Num_DefTailCal = 0.3,
-                                      beta::Num_SigHeadCal = mirror_role(alpha),
-                                      kappa_b::Num_DefHeadCal = mirror_role(kappa_a),
+                                      alpha::Num_SigCal = 0.05, kappa_a::Num_DefCal = 0.3,
+                                      beta::Num_SigCal = alpha,
+                                      kappa_b::Num_DefCal = kappa_a,
                                       w::Option{<:ObsWeights} = nothing)::RelativisticValueatRiskRange
     return RelativisticValueatRiskRange(settings, slv, alpha, kappa_a, beta, kappa_b, w)
 end
@@ -462,7 +455,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolve the two significance levels and the two deformation parameters of a [`RelativisticValueatRiskRange`](@ref) against prior result `pr`.
 
-Each end carries a **travelling pair** of its own: `kappa_a` reads `alpha` and `kappa_b` reads `beta`. The gain-side pair defaults to the loss-side pair, through [`mirror_role`](@ref) of `alpha` and of `kappa_a`, so a pair stated on the loss side alone reaches both ends. The resolution runs the pair of the loss side and then the pair of the gain side, and neither side reads the other's number. That is the pairing [`range_tails`](@ref) builds and the functor evaluates.
+Each end carries a **travelling pair** of its own: `kappa_a` reads `alpha` and `kappa_b` reads `beta`. The gain-side pair defaults to the loss-side pair, `beta` to `alpha` and `kappa_b` to `kappa_a`, so a pair stated on the loss side alone reaches both ends. The resolution runs the pair of the loss side and then the pair of the gain side, and neither side reads the other's number. That is the pairing [`range_tails`](@ref) builds and the functor evaluates.
 
 The four slots carry four different bounds, so a rule of the wrong end or the wrong family is refused at construction. The solver is settled once and handed to all four rules.
 
@@ -559,8 +552,8 @@ $(DocStringExtensions.FIELDS)
     RelativisticDrawdownatRisk(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
         slv::Option{<:Slv_VecSlv} = nothing,
-        alpha::Num_SigTailCal = 0.05,
-        kappa::Num_DefTailCal = 0.3,
+        alpha::Num_SigCal = 0.05,
+        kappa::Num_DefCal = 0.3,
         w::Option{<:ObsWeights} = nothing
     ) -> RelativisticDrawdownatRisk
 
@@ -633,10 +626,8 @@ RelativisticDrawdownatRisk
     """
     @pprop w
     function RelativisticDrawdownatRisk(settings::RiskMeasureSettings,
-                                        slv::Option{<:Slv_VecSlv}, alpha::Num_SigTailCal,
-                                        kappa::Num_DefTailCal, w::Option{<:ObsWeights})
-        alpha = bind_role(SignificanceTailCalibration, alpha)
-        kappa = bind_role(DeformationTailCalibration, kappa)
+                                        slv::Option{<:Slv_VecSlv}, alpha::Num_SigCal,
+                                        kappa::Num_DefCal, w::Option{<:ObsWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
@@ -652,8 +643,7 @@ RelativisticDrawdownatRisk
 end
 function RelativisticDrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                     slv::Option{<:Slv_VecSlv} = nothing,
-                                    alpha::Num_SigTailCal = 0.05,
-                                    kappa::Num_DefTailCal = 0.3,
+                                    alpha::Num_SigCal = 0.05, kappa::Num_DefCal = 0.3,
                                     w::Option{<:ObsWeights} = nothing)::RelativisticDrawdownatRisk
     return RelativisticDrawdownatRisk(settings, slv, alpha, kappa, w)
 end
@@ -744,8 +734,8 @@ $(DocStringExtensions.FIELDS)
     RelativeRelativisticDrawdownatRisk(;
         settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
         slv::Option{<:Slv_VecSlv} = nothing,
-        alpha::Num_SigTailCal = 0.05,
-        kappa::Num_DefTailCal = 0.3,
+        alpha::Num_SigCal = 0.05,
+        kappa::Num_DefCal = 0.3,
         w::Option{<:ObsWeights} = nothing
     ) -> RelativeRelativisticDrawdownatRisk
 
@@ -816,11 +806,8 @@ RelativeRelativisticDrawdownatRisk
     @pprop w
     function RelativeRelativisticDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
                                                 slv::Option{<:Slv_VecSlv},
-                                                alpha::Num_SigTailCal,
-                                                kappa::Num_DefTailCal,
+                                                alpha::Num_SigCal, kappa::Num_DefCal,
                                                 w::Option{<:ObsWeights})
-        alpha = bind_role(SignificanceTailCalibration, alpha)
-        kappa = bind_role(DeformationTailCalibration, kappa)
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
@@ -837,8 +824,8 @@ end
 function RelativeRelativisticDrawdownatRisk(;
                                             settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
                                             slv::Option{<:Slv_VecSlv} = nothing,
-                                            alpha::Num_SigTailCal = 0.05,
-                                            kappa::Num_DefTailCal = 0.3,
+                                            alpha::Num_SigCal = 0.05,
+                                            kappa::Num_DefCal = 0.3,
                                             w::Option{<:ObsWeights} = nothing)::RelativeRelativisticDrawdownatRisk
     return RelativeRelativisticDrawdownatRisk(settings, slv, alpha, kappa, w)
 end

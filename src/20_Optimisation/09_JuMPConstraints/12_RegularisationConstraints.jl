@@ -185,6 +185,7 @@ function set_linf_regularisation!(args...)
     return nothing
 end
 function set_l1_regularisation!(model::JuMP.Model, l1_val::Number)
+    assert_nonempty_gt0_finite_val(l1_val, :l1)
     w = get_w(model)
     sc = get_constraint_scale(model)
     JuMP.@variable(model, t_l1)
@@ -219,7 +220,7 @@ abstract type AbstractRegularisationEstimator <: AbstractEstimator end
 
 Build the refusal message of [`assert_ambiguity_radius_formulation`](@ref), naming the formulation that was paired with a rule.
 
-The message is written once and every refusing method reads it, so the two formulations that refuse a radius today, and any that a later type adds, all say the same thing. The formulation is named with `nameof`, not printed, for the reason [`assert_calibrated_slots`](@ref) states: a printed type carries a module prefix wherever the name is not visible from `Main`.
+The message is written once and every refusing method reads it, so the two formulations that refuse a radius today, and any that a later type adds, all say the same thing. The formulation and the rule family are named with `nameof`, not printed, for the reason [`assert_calibrated_slots`](@ref) states: a printed type carries a module prefix wherever the name is not visible from `Main`.
 
 # Arguments
 
@@ -235,14 +236,14 @@ The message is written once and every refusing method reads it, so the two formu
   - [`L2Regularisation`](@ref)
 """
 function squared_norm_radius_msg(alg)
-    return "`L2Regularisation.val` holds an ambiguity radius, an `$(nameof(AmbiguityRadiusCalibration))`, beside a `$(nameof(typeof(alg)))` formulation. That formulation penalises `norm(w, 2)^2`, and an ambiguity radius is the coefficient of `norm(w, 2)`: the Blanchet-Chen-Zhou identity that makes a radius and an L2 coefficient the same number holds for the un-squared penalty alone. A radius beside a squared penalty therefore has no reading. Use `SOCRiskExpr()`, which is the default, or state a plain number."
+    return "`L2Regularisation.val` holds an ambiguity radius, an `$(nameof(AbstractAmbiguityRadiusCalibrationAlgorithm))`, beside a `$(nameof(typeof(alg)))` formulation. That formulation penalises `norm(w, 2)^2`, and an ambiguity radius is the coefficient of `norm(w, 2)`: the Blanchet-Chen-Zhou identity that makes a radius and an L2 coefficient the same number holds for the un-squared penalty alone. A radius beside a squared penalty therefore has no reading. Use `SOCRiskExpr()`, which is the default, or state a plain number."
 end
 """
     assert_ambiguity_radius_formulation(val, alg) -> Nothing
 
 Refuse an ambiguity radius that was placed beside a formulation which penalises the squared norm.
 
-[`L2Regularisation`](@ref) emits `val * norm(w, 2)` under [`SOCRiskExpr`](@ref), and `val * norm(w, 2)^2` under the three others. Only the first is the Wasserstein form, so only the first reads `val` as a radius. A plain number stays legal with every formulation, because a number is whatever coefficient the caller meant it to be; a rule states that the number *is* a radius, and that statement is false beside a squared penalty.
+[`L2Regularisation`](@ref) emits `val * norm(w, 2)` under [`SOCRiskExpr`](@ref), and `val * norm(w, 2)^2` under the three others. Only the first is the Wasserstein form, so only the first reads `val` as a radius. A plain number stays legal with every formulation, because a number is whatever coefficient the caller meant it to be. A rule of the radius family states that the number *is* a radius, and that statement is false beside a squared penalty.
 
 The check is a set of methods rather than a list of types in one body, so a formulation that a later change adds refuses a radius by adding one method here. The permissive fallback is the first method, and each refusing method names one formulation of the family.
 
@@ -254,7 +255,7 @@ The check is a set of methods rather than a list of types in one body, so a form
 
 # Arguments
 
-  - `val`: The coefficient slot's occupant: a number, or an [`AmbiguityRadiusCalibration`](@ref).
+  - `val`: The coefficient slot's occupant: a number, or an [`AbstractAmbiguityRadiusCalibrationAlgorithm`](@ref).
   - `alg`: The formulation the coefficient multiplies.
 
 # Returns
@@ -264,18 +265,18 @@ The check is a set of methods rather than a list of types in one body, so a form
 # Related
 
   - [`L2Regularisation`](@ref)
-  - [`AmbiguityRadiusCalibration`](@ref)
+  - [`Num_AmbRadCal`](@ref)
   - [`squared_norm_radius_msg`](@ref)
   - [`SecondMomentFormulation`](@ref)
 """
 function assert_ambiguity_radius_formulation(::Any, ::Any)
     return nothing
 end
-function assert_ambiguity_radius_formulation(::AmbiguityRadiusCalibration,
+function assert_ambiguity_radius_formulation(::AbstractAmbiguityRadiusCalibrationAlgorithm,
                                              alg::VarianceFormulation)
     return throw(ArgumentError(squared_norm_radius_msg(alg)))
 end
-function assert_ambiguity_radius_formulation(::AmbiguityRadiusCalibration,
+function assert_ambiguity_radius_formulation(::AbstractAmbiguityRadiusCalibrationAlgorithm,
                                              alg::RSOCRiskExpr)
     return throw(ArgumentError(squared_norm_radius_msg(alg)))
 end
@@ -318,12 +319,12 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - If `val` is a number: `val > 0` and finite.
-  - If `val` holds an [`AmbiguityRadiusCalibration`](@ref): `alg` must be [`SOCRiskExpr`](@ref).
+  - If `val` holds an ambiguity-radius rule: `alg` must be [`SOCRiskExpr`](@ref).
 
 # Related
 
   - [`AbstractRegularisationEstimator`](@ref)
-  - [`AmbiguityRadiusCalibration`](@ref)
+  - [`Num_AmbRadCal`](@ref)
   - [`assert_ambiguity_radius_formulation`](@ref)
   - [`L2Reg_VecL2Reg`](@ref)
   - [`VecL2Reg`](@ref)
@@ -346,7 +347,6 @@ Keywords correspond to the struct's fields.
     """
     alg
     function L2Regularisation(val::Num_AmbRadCal, alg::SecondMomentFormulation)
-        val = bind_role(val)
         assert_nonempty_gt0_finite_val(val, :val)
         assert_ambiguity_radius_formulation(val, alg)
         return new{typeof(val), typeof(alg)}(val, alg)
@@ -602,7 +602,6 @@ Keywords correspond to the struct's fields.
     """
     val
     function LpRegularisation(p::Number, val::Num_AmbRadNormCeilCal)
-        val = bind_role(val)
         @argcheck(isfinite(p), IsNonFiniteError)
         @argcheck(p > one(p), DomainError)
         assert_nonempty_gt0_finite_val(val, :val)
@@ -617,9 +616,9 @@ end
 
 Refuse a norm-ceiling rule that was placed in a slot which reads its number as a penalty coefficient.
 
-The `val` field of [`LpRegularisation`](@ref) is the one dual-use slot in the library. [`JuMPOptimiser`](@ref)'s `lp` field adds `val * norm(w, p)` to the objective, where `val` is an ambiguity radius, and its `lpc` field bounds `norm(w, p) <= val * k`, where `val` is a norm ceiling. One field cannot carry two bounds, so [`Num_AmbRadNormCeilCal`](@ref) admits both roles and the slot's *owner* settles which reading is legal.
+The `val` field of [`LpRegularisation`](@ref) is the one dual-use slot in the library. [`JuMPOptimiser`](@ref)'s `lp` field adds `val * norm(w, p)` to the objective, where `val` is an ambiguity radius, and its `lpc` field bounds `norm(w, p) <= val * k`, where `val` is a norm ceiling. One field cannot carry two bounds, so [`Num_AmbRadNormCeilCal`](@ref) admits both rule families and the slot's *owner* settles which reading is legal.
 
-This is the penalty half. A [`NormCeilingCalibration`](@ref) states that the number **is** a ceiling, and a ceiling has no reading as a penalty coefficient: its reciprocal is a floor on the effective number of assets, which says nothing about how strongly the objective should shrink the weights. A plain number stays legal on both routes, because a number is whatever quantity the caller meant it to be.
+This is the penalty half. A rule of the norm-ceiling family states that the number **is** a ceiling, and a ceiling has no reading as a penalty coefficient: its reciprocal is a floor on the effective number of assets, which says nothing about how strongly the objective should shrink the weights. A plain number stays legal on both routes, because a number is whatever quantity the caller meant it to be.
 
 The check is a set of methods rather than a list of types in one body, on the same terms as [`assert_ambiguity_radius_formulation`](@ref). It runs in [`JuMPOptimiser`](@ref)'s constructor, where the caller wrote the field, and again in [`factory`](@ref) for a term that reached the objective by another route.
 
@@ -628,7 +627,7 @@ The check is a set of methods rather than a list of types in one body, on the sa
  1. The occupant is anything but a norm-ceiling role: return `nothing`.
  2. The occupant is an [`LpRegularisation`](@ref): check its `val`.
  3. The occupant is a vector of them: check each.
- 4. The occupant is a [`NormCeilingCalibration`](@ref): refuse.
+ 4. The occupant is an [`AbstractNormCeilingCalibrationAlgorithm`](@ref): refuse.
 
 # Arguments
 
@@ -654,22 +653,22 @@ end
 function assert_penalty_coefficient_role(xs::AbstractVector{<:LpRegularisation})
     return foreach(assert_penalty_coefficient_role, xs)
 end
-function assert_penalty_coefficient_role(::NormCeilingCalibration)
-    return throw(ArgumentError("`LpRegularisation.val` holds a norm ceiling, a `$(nameof(NormCeilingCalibration))`, in a slot that reads it as a penalty coefficient. `JuMPOptimiser.lp` adds `val * norm(w, p)` to the objective, and a ceiling is an upper bound on that norm instead: the two are different quantities. Move the term to `JuMPOptimiser.lpc`, which reads `val` as a ceiling, or state an `$(nameof(AmbiguityRadiusCalibration))` or a plain number."))
+function assert_penalty_coefficient_role(::AbstractNormCeilingCalibrationAlgorithm)
+    return throw(ArgumentError("`LpRegularisation.val` holds a norm ceiling, an `$(nameof(AbstractNormCeilingCalibrationAlgorithm))`, in a slot that reads it as a penalty coefficient. `JuMPOptimiser.lp` adds `val * norm(w, p)` to the objective, and a ceiling is an upper bound on that norm instead: the two are different quantities. Move the term to `JuMPOptimiser.lpc`, which reads `val` as a ceiling, or state an `$(nameof(AbstractAmbiguityRadiusCalibrationAlgorithm))` or a plain number."))
 end
 """
     assert_norm_ceiling_role(x) -> Nothing
 
 Refuse an ambiguity-radius rule that was placed in a slot which reads its number as a norm ceiling.
 
-This is the norm-constraint half of the pair [`assert_penalty_coefficient_role`](@ref) opens, and it carries that method's reading unchanged. An [`AmbiguityRadiusCalibration`](@ref) states that the number **is** a radius, the coefficient of a norm penalty in the objective. `JuMPOptimiser.lpc` bounds the norm instead, so the statement is false there.
+This is the norm-constraint half of the pair [`assert_penalty_coefficient_role`](@ref) opens, and it carries that method's reading unchanged. A rule of the ambiguity-radius family states that the number **is** a radius, the coefficient of a norm penalty in the objective. `JuMPOptimiser.lpc` bounds the norm instead, so the statement is false there.
 
 # Algorithm
 
  1. The occupant is anything but a radius role: return `nothing`.
  2. The occupant is an [`LpRegularisation`](@ref): check its `val`.
  3. The occupant is a vector of them: check each.
- 4. The occupant is an [`AmbiguityRadiusCalibration`](@ref): refuse.
+ 4. The occupant is an [`AbstractAmbiguityRadiusCalibrationAlgorithm`](@ref): refuse.
 
 # Arguments
 
@@ -696,8 +695,8 @@ end
 function assert_norm_ceiling_role(xs::AbstractVector{<:LpRegularisation})
     return foreach(assert_norm_ceiling_role, xs)
 end
-function assert_norm_ceiling_role(::AmbiguityRadiusCalibration)
-    return throw(ArgumentError("`LpRegularisation.val` holds an ambiguity radius, an `$(nameof(AmbiguityRadiusCalibration))`, in a slot that reads it as a norm ceiling. `JuMPOptimiser.lpc` bounds `norm(w, p) <= val * k`, and a radius is the coefficient of that norm in the objective instead: the two are different quantities. Move the term to `JuMPOptimiser.lp`, which reads `val` as a radius, or state a `$(nameof(NormCeilingCalibration))` or a plain number."))
+function assert_norm_ceiling_role(::AbstractAmbiguityRadiusCalibrationAlgorithm)
+    return throw(ArgumentError("`LpRegularisation.val` holds an ambiguity radius, an `$(nameof(AbstractAmbiguityRadiusCalibrationAlgorithm))`, in a slot that reads it as a norm ceiling. `JuMPOptimiser.lpc` bounds `norm(w, p) <= val * k`, and a radius is the coefficient of that norm in the objective instead: the two are different quantities. Move the term to `JuMPOptimiser.lp`, which reads `val` as a radius, or state an `$(nameof(AbstractNormCeilingCalibrationAlgorithm))` or a plain number."))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -706,7 +705,7 @@ Resolve the ambiguity radius in `val` against prior result `pr`, and return an [
 
 It carries the reading of [`factory`](@ref) on [`L2Regularisation`](@ref) unchanged. The estimator has one norm order and no formulation slot, so no pairing of a rule with a formulation can be wrong and [`assert_ambiguity_radius_formulation`](@ref) never runs here: `val` multiplies `norm(w, p)` and never its square. The role guard below is a different check.
 
-The same estimator also serves as a norm *constraint* through the `lpc` field of [`JuMPOptimiser`](@ref), where `val` is an upper bound and not a coefficient. Both routes share one field and one bound, so the route settles the reading: this method refuses a norm-ceiling role through [`assert_penalty_coefficient_role`](@ref), and [`norm_ceiling_factory`](@ref) refuses a radius role on the other side.
+The same estimator also serves as a norm *constraint* through the `lpc` field of [`JuMPOptimiser`](@ref), where `val` is an upper bound and not a coefficient. Both routes share one field and one bound, so the route settles the reading: this method refuses a norm-ceiling rule through [`assert_penalty_coefficient_role`](@ref), and [`norm_ceiling_factory`](@ref) refuses a radius rule on the other side.
 
 The slot is named `val` and its key is `:lpreg_val`, because [`L2Regularisation`](@ref) names its own coefficient `val` too and the two carry two different ground metrics. The two keys are the two names [`field_dict`](@ref) already uses for the two slots.
 
@@ -747,9 +746,9 @@ end
 
 Resolve the norm ceiling in `val` against prior result `pr`, and return an [`LpRegularisation`](@ref) holding the number.
 
-It is the norm-constraint counterpart of [`factory`](@ref) on the same type, and it is a second verb because the two routes read one field as two quantities. A `factory` call on the `lpc` field would refuse the ceiling role that belongs there, and would resolve the rule under `:lpreg_val`, the key of the penalty slot.
+It is the norm-constraint counterpart of [`factory`](@ref) on the same type, and it is a second verb because the two routes read one field as two quantities. A `factory` call on the `lpc` field would refuse the ceiling rule that belongs there, and would resolve the rule under `:lpreg_val`, the key of the penalty slot.
 
-The two verbs differ in the guard and in the key, and in nothing else. Each refuses the role that has no reading on its own route, this one through [`assert_norm_ceiling_role`](@ref). Each states the term's own norm order in the [`CalibrationContext`](@ref) it resolves the slot against, because one rule placed in `lp` or in `lpc` serves every term and each term carries its own `p`.
+The two verbs differ in the guard and in the key, and in nothing else. Each refuses the family that has no reading on its own route, this one through [`assert_norm_ceiling_role`](@ref). Each states the term's own norm order in the [`CalibrationContext`](@ref) it resolves the slot against, because one rule placed in `lp` or in `lpc` serves every term and each term carries its own `p`.
 
 The fallback carries its argument through unchanged, which is the route `nothing` takes. A term whose `val` is already a number is returned by identity instead, because the resolution gives back the number it holds.
 
@@ -757,7 +756,7 @@ The fallback carries its argument through unchanged, which is the route `nothing
 
  1. The argument is neither a term nor a vector of them: return it unchanged.
  2. The argument is a vector of terms: resolve each of them, and return the vector of the results.
- 3. The argument is one term: refuse a radius role with [`assert_norm_ceiling_role`](@ref).
+ 3. The argument is one term: refuse a radius rule with [`assert_norm_ceiling_role`](@ref).
  4. State the term's own `p` in a [`CalibrationContext`](@ref), then resolve the slot under the key `:lpc` against it, giving `val`.
  5. Pair the declaration with this resolver through [`assert_declared_calibration_resolver`](@ref), which refuses the declared slot when the resolution above did not reach it.
  6. `val` is the number the term already holds: return the term itself. Otherwise rebuild the term through the keyword constructor.
@@ -863,6 +862,7 @@ function set_lp_regularisation!(model::JuMP.Model, lps::LpReg_VecLpReg)
     end
 end
 function set_linf_regularisation!(model::JuMP.Model, linf::Number)
+    assert_nonempty_gt0_finite_val(linf, :linf)
     w = get_w(model)
     sc = get_constraint_scale(model)
     JuMP.@variable(model, t_linf)

@@ -7,7 +7,7 @@ plain number.
 The mechanism is parallel to the Deferred Quantity one, not shared with it, and
 `test_09e_deferred_quantity.jl` covers that other half. A Deferred Quantity is fitted and a
 quantity is read off the fit; a rule fits nothing and reads the sample size, the moments and
-the effective observation weights. So the role types stay out of the `DeferredQuantity`
+the effective observation weights. So the rule types stay out of the `DeferredQuantity`
 union, and the resolver, the declaration and the refusal each take their own verb.
 
 A rule is run by CALLING it. A callable struct and a plain function are therefore the same
@@ -51,21 +51,21 @@ end
 struct CalibratedProbe{T1, T2} <: PO.AbstractAlgorithm
     alpha::T1
     child::T2
-    function CalibratedProbe(alpha::PO.Num_SigTailCal, child)
+    function CalibratedProbe(alpha::PO.Num_SigCal, child)
         return new{typeof(alpha), typeof(child)}(alpha, child)
     end
 end
-function CalibratedProbe(; alpha::PO.Num_SigTailCal = 0.05, child = nothing)
+function CalibratedProbe(; alpha::PO.Num_SigCal = 0.05, child = nothing)
     return CalibratedProbe(alpha, child)
 end
 function PortfolioOptimisers.calibration_slots(x::CalibratedProbe)
     return (; alpha = x.alpha, child = x.child)
 end
 
-# Stands in for a head slot. Its bound is the whole of the role validation.
+# Stands in for a head slot. Its bound is the whole of the rule validation.
 struct HeadProbe{T} <: PO.AbstractAlgorithm
     beta::T
-    function HeadProbe(beta::PO.Num_SigHeadCal)
+    function HeadProbe(beta::PO.Num_SigCal)
         return new{typeof(beta)}(beta)
     end
 end
@@ -73,7 +73,7 @@ end
 # Stands in for a deformation slot.
 struct DeformationProbe{T} <: PO.AbstractAlgorithm
     kappa::T
-    function DeformationProbe(kappa::PO.Num_DefTailCal)
+    function DeformationProbe(kappa::PO.Num_DefCal)
         return new{typeof(kappa)}(kappa)
     end
 end
@@ -93,7 +93,7 @@ struct ContextProbe{T1, T2, T3} <: PO.AbstractAlgorithm
     w::T2
     slv::T3
 end
-function ContextProbe(; alpha::PO.Num_SigTailCal = 0.05, w = nothing, slv = nothing)
+function ContextProbe(; alpha::PO.Num_SigCal = 0.05, w = nothing, slv = nothing)
     return ContextProbe(alpha, w, slv)
 end
 PortfolioOptimisers.calibration_slots(x::ContextProbe) = (; alpha = x.alpha)
@@ -102,29 +102,21 @@ PortfolioOptimisers.calibration_slots(x::ContextProbe) = (; alpha = x.alpha)
 struct BareProbe{T1} <: PO.AbstractAlgorithm
     alpha::T1
 end
-BareProbe(; alpha::PO.Num_SigTailCal = 0.05) = BareProbe(alpha)
+BareProbe(; alpha::PO.Num_SigCal = 0.05) = BareProbe(alpha)
 PortfolioOptimisers.calibration_slots(x::BareProbe) = (; alpha = x.alpha)
 
 const RULE = ProbeScenarioCount(25)
 const KRULE = ProbeEntropyBudget(0.3)
-const CTX = SignificanceTailCalibration(; alg = ProbeContext())
+const CTX = ProbeContext()
 
 @testset "Calibration slot: the taxonomy" begin
-    # TWO roots, which is what #593 settled. A rule is an Algorithm, and the role that
-    # places a rule in a slot is configuration that holds an algorithm, so it is an
-    # Estimator. The two families sit under the algorithm root; the roles sit under
-    # NEITHER of them, and that is the whole of the refusal below.
+    # ONE root. A rule is an Algorithm, and the slot that holds it names the quantity, so
+    # nothing stands between the caller and the rule. #641 withdrew the seven rules that
+    # used to, and the Estimator root they stood under with them.
     @test PO.AbstractCalibrationAlgorithm <: PO.AbstractAlgorithm
-    @test PO.AbstractCalibrationEstimator <: PO.AbstractEstimator
-    @test !(PO.AbstractCalibrationEstimator <: PO.AbstractAlgorithm)
     @test !(PO.AbstractCalibrationAlgorithm <: PO.AbstractEstimator)
     @test PO.AbstractSignificanceCalibrationAlgorithm <: PO.AbstractCalibrationAlgorithm
     @test PO.AbstractDeformationCalibrationAlgorithm <: PO.AbstractCalibrationAlgorithm
-    for T in (SignificanceTailCalibration, SignificanceHeadCalibration,
-              DeformationTailCalibration, DeformationHeadCalibration)
-        @test T <: PO.AbstractCalibrationEstimator
-        @test !(T <: PO.AbstractCalibrationAlgorithm)
-    end
 
     # The two families are disjoint, which is what makes a family bound a real check.
     @test !(PO.AbstractSignificanceCalibrationAlgorithm <:
@@ -132,185 +124,113 @@ const CTX = SignificanceTailCalibration(; alg = ProbeContext())
     @test !(PO.AbstractDeformationCalibrationAlgorithm <:
             PO.AbstractSignificanceCalibrationAlgorithm)
 
-    # The role types stay OUT of the Deferred Quantity union. The two mechanisms are
-    # parallel, and a rule reaching `resolve_slot` would be fitted, which it cannot be.
-    @test !isa(SignificanceTailCalibration(; alg = RULE), PO.DeferredQuantity)
-    @test !isa(SignificanceHeadCalibration(; alg = RULE), PO.DeferredQuantity)
-    @test !isa(DeformationTailCalibration(; alg = KRULE), PO.DeferredQuantity)
-    @test !isa(DeformationHeadCalibration(; alg = KRULE), PO.DeferredQuantity)
+    # A rule stays OUT of the Deferred Quantity union. The two mechanisms are parallel, and
+    # a rule reaching `resolve_slot` would be fitted, which it cannot be.
+    @test !isa(RULE, PO.DeferredQuantity)
+    @test !isa(KRULE, PO.DeferredQuantity)
+    @test !isa(probe_rate, PO.DeferredQuantity)
 
-    # The abstract types stay unexported; the role types are caller-facing.
+    # The abstract types stay unexported; the rules themselves are caller-facing.
     exported = names(PortfolioOptimisers)
     @test !(:AbstractCalibrationAlgorithm in exported)
-    @test !(:AbstractCalibrationEstimator in exported)
     @test !(:AbstractSignificanceCalibrationAlgorithm in exported)
     @test !(:AbstractDeformationCalibrationAlgorithm in exported)
-    @test :SignificanceTailCalibration in exported
-    @test :SignificanceHeadCalibration in exported
-    @test :DeformationTailCalibration in exported
-    @test :DeformationHeadCalibration in exported
+    @test :ScenarioCount in exported
+    @test :EntropyBudget in exported
+
+    # The seven rules, their root, and the verb that put them on are all gone.
+    for name in (:AbstractCalibrationEstimator, :SignificanceTailCalibration,
+                 :SignificanceHeadCalibration, :DeformationTailCalibration,
+                 :DeformationHeadCalibration, :AmbiguityRadiusCalibration,
+                 :AmbiguityTailWeightCalibration, :NormCeilingCalibration, :bind_role, :Func_SigCal,
+                 :Func_DefCal, :Func_AmbRadCal, :Func_AmbTwtCal, :Func_NormCeilCal)
+        @test !isdefined(PortfolioOptimisers, name)
+    end
 end
 
-@testset "Calibration slot: the rule lives in `alg`, and the family bounds it" begin
-    # The rule is the whole content of the role type, and it survives the wrapping.
-    @test SignificanceTailCalibration(; alg = RULE).alg === RULE
-    @test SignificanceHeadCalibration(; alg = RULE).alg === RULE
-    @test DeformationTailCalibration(; alg = KRULE).alg === KRULE
-    @test DeformationHeadCalibration(; alg = KRULE).alg === KRULE
-
-    # The positional inner constructor is the one a rebuild calls, so it takes the same rule.
-    @test SignificanceTailCalibration(RULE).alg === RULE
-    @test SignificanceHeadCalibration(RULE).alg === RULE
-    @test DeformationTailCalibration(KRULE).alg === KRULE
-    @test DeformationHeadCalibration(KRULE).alg === KRULE
-
-    # A plain function is a rule too, in every role, because a rule is run by calling it.
-    @test isa(probe_rate, PO.Func_SigCal) && isa(probe_rate, PO.Func_DefCal)
-    @test SignificanceTailCalibration(; alg = probe_rate).alg === probe_rate
-    @test SignificanceHeadCalibration(; alg = probe_rate).alg === probe_rate
-    @test DeformationTailCalibration(; alg = probe_rate).alg === probe_rate
-    @test DeformationHeadCalibration(; alg = probe_rate).alg === probe_rate
-
-    # A typed rule names its family, so the wrong family is refused at construction by the
-    # keyword constructor's bound. No guard method is written for it, and the raise is a
-    # `TypeError` because the keyword carries the annotation.
-    #
-    # The POSITIONAL route is not checked here, and it is not a hole this mechanism opened:
-    # `@concrete` emits an unconstrained `T(f1::__T_f1, ...) where {...}` for every struct
-    # in the library, so a type-invalid positional call falls through every hand-written
-    # bound. Issue #264 carries that, and it reaches every `@concrete` type equally.
-    @test isa(RULE, PO.Func_SigCal) && !isa(RULE, PO.Func_DefCal)
-    @test isa(KRULE, PO.Func_DefCal) && !isa(KRULE, PO.Func_SigCal)
-    @test_throws TypeError SignificanceTailCalibration(; alg = KRULE)
-    @test_throws TypeError SignificanceHeadCalibration(; alg = KRULE)
-    @test_throws TypeError DeformationTailCalibration(; alg = RULE)
-    @test_throws TypeError DeformationHeadCalibration(; alg = RULE)
-
-    # A number is not a rule, so it never reaches an `alg` field.
-    @test_throws TypeError SignificanceTailCalibration(; alg = 0.05)
-    @test_throws TypeError DeformationTailCalibration(; alg = 0.05)
-
-    # A ROLE is not a rule either, so a role inside another role's `alg` field is refused
-    # at construction. Before #593 split the taxonomy a role subtyped its own rule family,
-    # so `Func_SigCal` admitted it and the nesting type-checked. The refusal is the bound's,
-    # and no guard method is written for it.
-    tail = SignificanceTailCalibration(; alg = RULE)
-    head = SignificanceHeadCalibration(; alg = RULE)
-    ktail = DeformationTailCalibration(; alg = KRULE)
-    @test !isa(tail, PO.Func_SigCal) && !isa(head, PO.Func_SigCal)
-    @test !isa(ktail, PO.Func_DefCal)
-    @test_throws TypeError SignificanceTailCalibration(; alg = head)
-    @test_throws TypeError SignificanceTailCalibration(; alg = tail)
-    @test_throws TypeError SignificanceHeadCalibration(; alg = tail)
-    @test_throws TypeError DeformationTailCalibration(; alg = ktail)
-    @test_throws TypeError DeformationHeadCalibration(; alg = ktail)
-end
-
-@testset "Calibration slot: the four field bounds" begin
-    tail = SignificanceTailCalibration(; alg = RULE)
-    head = SignificanceHeadCalibration(; alg = RULE)
-    ktail = DeformationTailCalibration(; alg = KRULE)
-    khead = DeformationHeadCalibration(; alg = KRULE)
-
+@testset "Calibration slot: the field bounds" begin
     # Every bound admits the number, which is what keeps a stated value legal everywhere.
-    @test isa(0.05, PO.Num_SigTailCal) && isa(0.05, PO.Num_SigHeadCal)
-    @test isa(0.05, PO.Num_DefTailCal) && isa(0.05, PO.Num_DefHeadCal)
+    @test isa(0.05, PO.Num_SigCal)
+    @test isa(0.05, PO.Num_DefCal)
 
-    # Each bound admits its own role and no other, so a role in the wrong slot is refused.
-    @test isa(tail, PO.Num_SigTailCal)
-    @test !isa(head, PO.Num_SigTailCal) && !isa(ktail, PO.Num_SigTailCal)
-    @test isa(head, PO.Num_SigHeadCal)
-    @test !isa(tail, PO.Num_SigHeadCal) && !isa(khead, PO.Num_SigTailCal)
-    @test isa(ktail, PO.Num_DefTailCal)
-    @test !isa(khead, PO.Num_DefTailCal) && !isa(tail, PO.Num_DefTailCal)
-    @test isa(khead, PO.Num_DefHeadCal)
-    @test !isa(ktail, PO.Num_DefHeadCal) && !isa(head, PO.Num_DefHeadCal)
+    # Each bound names one rule family and no other, so a rule of the wrong family is
+    # refused. The slot names the end of the distribution, so ONE bound serves the tail
+    # slot and the head slot alike, and the two names the rules needed are gone.
+    @test isa(RULE, PO.Num_SigCal) && !isa(RULE, PO.Num_DefCal)
+    @test isa(KRULE, PO.Num_DefCal) && !isa(KRULE, PO.Num_SigCal)
 
-    # A slot takes a role, or the rule alone, because the slot itself already names the end
-    # of the distribution it addresses. A bare FUNCTION is refused: a function carries no
-    # family, so a bound that admitted one could not tell a deformation closure from a
-    # significance one, and the role is what states the family a function cannot.
-    @test isa(RULE, PO.Num_SigTailCal) && !isa(probe_rate, PO.Num_SigTailCal)
-
-    # The family split holds on the bare route as it holds on the wrapped one, and it holds
-    # in the bound itself rather than in a guard.
-    @test !isa(KRULE, PO.Num_SigTailCal) && !isa(KRULE, PO.Num_SigHeadCal)
-    @test !isa(RULE, PO.Num_DefTailCal) && !isa(RULE, PO.Num_DefHeadCal)
-    @test isa(KRULE, PO.Num_DefTailCal) && isa(KRULE, PO.Num_DefHeadCal)
+    # A plain FUNCTION is admitted by both, because a function carries no family and the
+    # name of the slot is what states the quantity there.
+    @test isa(probe_rate, PO.Num_SigCal) && isa(probe_rate, PO.Num_DefCal)
 
     # The refusal lands at construction, in the constructor's signature, and not at fold
-    # time. This is the claim that lets the mechanism carry no role guard at all. The three
+    # time. This is the claim that lets the mechanism carry no guard at all. The three
     # probes are plain structs, so the positional route is bounded here too.
-    @test HeadProbe(head).beta === head
+    @test HeadProbe(RULE).beta === RULE
     @test HeadProbe(0.05).beta == 0.05
-    @test_throws MethodError HeadProbe(tail)
-    @test DeformationProbe(ktail).kappa === ktail
-    @test_throws MethodError DeformationProbe(khead)
-    @test_throws TypeError CalibratedProbe(; alpha = head)
-    @test_throws MethodError CalibratedProbe(head, nothing)
+    @test_throws MethodError HeadProbe(KRULE)
+    @test DeformationProbe(KRULE).kappa === KRULE
+    @test_throws MethodError DeformationProbe(RULE)
+    @test_throws TypeError CalibratedProbe(; alpha = KRULE)
+    @test_throws MethodError CalibratedProbe(KRULE, nothing)
 end
 
-@testset "Calibration slot: a slot puts on the role it already names" begin
-    # The slot names the end of the distribution, so a caller who wraps the rule themselves
-    # states that end twice. The bound admits the rule alone and `bind_role` puts the role
-    # on before the slot is stored, so the two forms construct the same object.
-    wrapped = ConditionalValueatRisk(; alpha = SignificanceTailCalibration(; alg = RULE))
+@testset "Calibration slot: the slot stores the rule the caller wrote" begin
+    # The slot names the quantity and the end of the distribution, so the caller states the
+    # rule alone and the slot stores it. Nothing wraps it on the way in.
     bare = ConditionalValueatRisk(; alpha = RULE)
-    @test isa(bare.alpha, SignificanceTailCalibration)
-    @test bare.alpha.alg === RULE
-    @test typeof(bare) === typeof(wrapped)
+    @test bare.alpha === RULE
 
-    # A stated number and a stated role both cross unchanged, so nothing that constructed
-    # before constructs differently now.
+    # A stated number crosses unchanged, and so does a plain function.
     @test ConditionalValueatRisk(; alpha = 0.05).alpha === 0.05
+    @test ConditionalValueatRisk(; alpha = probe_rate).alpha === probe_rate
     @test ConditionalValueatRisk(; alpha = CTX).alpha === CTX
 
-    # One rule reaches both ends of a Range measure, and each slot puts on its OWN role.
+    # One rule reaches both ends of a Range measure, and each slot stores it as it stands.
     both = ConditionalValueatRiskRange(; alpha = RULE, beta = RULE)
-    @test isa(both.alpha, SignificanceTailCalibration)
-    @test isa(both.beta, SignificanceHeadCalibration)
+    @test both.alpha === RULE && both.beta === RULE
 
-    # A head slot that defaults through `mirror_role` reads the bare rule, which carries no
-    # end, and still lands on the head role.
+    # A head slot that defaults from its tail slot reads the same rule.
     defaulted = ConditionalValueatRiskRange(; alpha = RULE)
-    @test isa(defaulted.beta, SignificanceHeadCalibration)
-    @test defaulted.beta.alg === RULE
+    @test defaulted.beta === RULE
 
-    # A measure with two families binds each slot from its own family.
+    # A measure with two families takes one rule from each.
     rvar = RelativisticValueatRisk(; alpha = RULE, kappa = KRULE)
-    @test isa(rvar.alpha, SignificanceTailCalibration)
-    @test isa(rvar.kappa, DeformationTailCalibration)
+    @test rvar.alpha === RULE && rvar.kappa === KRULE
 
-    # A slot that names NO end takes the role of the rule's own family instead.
+    # A slot that names no end of the distribution stores its rule the same way.
     drcvar = DistributionallyRobustConditionalValueatRisk(; alpha = RULE,
                                                           l = TailTermParity(),
                                                           r = ConcentrationRadius())
-    @test isa(drcvar.l, AmbiguityTailWeightCalibration)
-    @test isa(drcvar.r, AmbiguityRadiusCalibration)
+    @test isa(drcvar.l, TailTermParity)
+    @test isa(drcvar.r, ConcentrationRadius)
 
-    # The one dual-use slot reads the rule's family to settle which of its two roles to put
-    # on, and the route then refuses the role that has no reading on it.
-    @test isa(LpRegularisation(; val = ConcentrationRadius()).val,
-              AmbiguityRadiusCalibration)
-    @test isa(LpRegularisation(; val = EffectiveAssetFloor()).val, NormCeilingCalibration)
-    @test isa(L2Regularisation(; val = ConcentrationRadius()).val,
-              AmbiguityRadiusCalibration)
+    # The one dual-use slot admits both families, and the route refuses the one that has no
+    # reading on it.
+    @test isa(LpRegularisation(; val = ConcentrationRadius()).val, ConcentrationRadius)
+    @test isa(LpRegularisation(; val = EffectiveAssetFloor()).val, EffectiveAssetFloor)
+    @test isa(L2Regularisation(; val = ConcentrationRadius()).val, ConcentrationRadius)
 
-    # An optimiser norm slot binds on the same terms, under the time-dependent wrapper.
+    # An optimiser norm slot stores its rule on the same terms, under the time-dependent
+    # wrapper.
     oslv = Solver(; name = :probe, solver = nothing)
     opt = JuMPOptimiser(; slv = oslv, l1 = ConcentrationRadius(),
                         l2c = EffectiveAssetFloor())
-    @test isa(opt.l1, AmbiguityRadiusCalibration)
-    @test isa(opt.l2c, NormCeilingCalibration)
+    @test isa(opt.l1, ConcentrationRadius)
+    @test isa(opt.l2c, EffectiveAssetFloor)
     @test isnothing(JuMPOptimiser(; slv = oslv).l1)
 
-    # The wrong family is refused on the bare route, by the keyword constructor's bound.
+    # The wrong family is refused by the keyword constructor's bound.
     @test_throws TypeError ConditionalValueatRisk(; alpha = KRULE)
     @test_throws TypeError RelativisticValueatRisk(; kappa = RULE)
     @test_throws TypeError LpRegularisation(; val = RULE)
 
-    # The stored role is what every reader of the slot sees, so the value-level refusal and
-    # the resolver both read a bare-route measure exactly as they read a wrapped one.
+    # The dual-use slot is the one slot that admits no plain function, because a function
+    # names no family and the two guards of that slot read the family.
+    @test_throws TypeError LpRegularisation(; val = probe_rate)
+    @test isa(ConditionalValueatRisk(; alpha = probe_rate).alpha, Function)
+
+    # The stored rule is what every reader of the slot sees.
     @test_throws ArgumentError PO.assert_calibrated_slots(bare)
     @test PO.calibration_slots(bare).alpha === bare.alpha
 end
@@ -326,48 +246,39 @@ end
     @test PO.resolve_calibration_slot(0.05, :alpha, pr, pweights(fill(1 / 60, 60))) == 0.05
     @test isnothing(PO.resolve_calibration_slot(nothing, :kappa, pr, nothing))
 
-    # A role type is unwrapped and its rule is CALLED. The rule sees the key, the prior and
-    # the weights, in that order, and it never sees the role it was placed in.
-    res = PO.resolve_calibration_slot(SignificanceTailCalibration(; alg = RULE), :alpha, pr,
-                                      nothing)
+    # A rule type is unwrapped and its rule is CALLED. The rule sees the key, the prior and
+    # the weights, in that order, and it never sees the rule it was placed in.
+    res = PO.resolve_calibration_slot(RULE, :alpha, pr, nothing)
     @test res.key === :alpha
     @test res.alpha == 25 / 60
     @test !res.weighted
 
-    # The head role carries the same rule, so it resolves to the same number.
-    res = PO.resolve_calibration_slot(SignificanceHeadCalibration(; alg = RULE), :beta, pr,
-                                      pweights(fill(1 / 60, 60)))
+    # The head rule carries the same rule, so it resolves to the same number.
+    res = PO.resolve_calibration_slot(RULE, :beta, pr, pweights(fill(1 / 60, 60)))
     @test res.key === :beta
     @test res.alpha == 25 / 60
     @test res.weighted
 
     # The deformation family resolves through the same verb.
-    @test PO.resolve_calibration_slot(DeformationTailCalibration(; alg = KRULE), :kappa, pr,
-                                      nothing) == 0.3
-    @test PO.resolve_calibration_slot(DeformationHeadCalibration(; alg = KRULE), :kappa_b,
-                                      pr, nothing) == 0.3
+    @test PO.resolve_calibration_slot(KRULE, :kappa, pr, nothing) == 0.3
+    @test PO.resolve_calibration_slot(KRULE, :kappa_b, pr, nothing) == 0.3
 
     # A plain function in `alg` resolves by the same call, with no adapter in between.
-    @test PO.resolve_calibration_slot(SignificanceTailCalibration(; alg = probe_rate),
-                                      :alpha, pr, nothing) == inv(sqrt(60))
-    @test PO.resolve_calibration_slot(DeformationHeadCalibration(; alg = probe_rate),
-                                      :kappa_b, pr, nothing) == inv(sqrt(60))
+    @test PO.resolve_calibration_slot(probe_rate, :alpha, pr, nothing) == inv(sqrt(60))
+    @test PO.resolve_calibration_slot(probe_rate, :kappa_b, pr, nothing) == inv(sqrt(60))
 
     # The solver reaches the rule, so a rule may call `ERM` or `RRM`. It is the fifth
     # argument and it defaults to `nothing`, so a caller that carries none states nothing.
     slv = Solver(; name = :probe, solver = nothing)
-    res = PO.resolve_calibration_slot(SignificanceTailCalibration(; alg = RULE), :alpha, pr,
-                                      nothing, slv)
+    res = PO.resolve_calibration_slot(RULE, :alpha, pr, nothing, slv)
     @test res.solved
-    @test !PO.resolve_calibration_slot(SignificanceTailCalibration(; alg = RULE), :alpha,
-                                       pr, nothing).solved
+    @test !PO.resolve_calibration_slot(RULE, :alpha, pr, nothing).solved
     @test PO.resolve_calibration_slot(0.05, :alpha, pr, nothing, slv) == 0.05
 
     # The rule refits when the sample moves, which is the entire reason for a rule over a
-    # number: the same role gives a different `alpha` on a shorter fold.
+    # number: the same rule gives a different `alpha` on a shorter fold.
     fold = prior(EmpiricalPrior(), X[1:30, :])
-    @test PO.resolve_calibration_slot(SignificanceTailCalibration(; alg = RULE), :alpha,
-                                      fold, nothing).alpha == 25 / 30
+    @test PO.resolve_calibration_slot(RULE, :alpha, fold, nothing).alpha == 25 / 30
 end
 
 @testset "Calibration slot: the declaration defaults to empty" begin
@@ -381,7 +292,7 @@ end
     @test PO.calibration_slots(MaximumDrawdown()) == (;)
 
     # A type that names its slots gets the values back under the field names.
-    probe = CalibratedProbe(; alpha = SignificanceTailCalibration(; alg = RULE))
+    probe = CalibratedProbe(; alpha = RULE)
     slots = PO.calibration_slots(probe)
     @test keys(slots) === (:alpha, :child)
     @test slots.alpha === probe.alpha
@@ -394,8 +305,8 @@ end
     @test isnothing(PO.assert_calibrated_slots(0.05))
 
     # A rule that reached here has no prior to resolve against, so it is refused, and the
-    # message names the slot, the role standing in it and the way out.
-    probe = CalibratedProbe(; alpha = SignificanceTailCalibration(; alg = RULE))
+    # message names the slot, the rule standing in it and the way out.
+    probe = CalibratedProbe(; alpha = RULE)
     @test_throws ArgumentError PO.assert_calibrated_slots(probe)
     msg = try
         PO.assert_calibrated_slots(probe)
@@ -404,7 +315,7 @@ end
         sprint(showerror, e)
     end
     @test occursin("CalibratedProbe.alpha", msg)
-    @test occursin("SignificanceTailCalibration", msg)
+    @test occursin("ProbeScenarioCount", msg)
     @test occursin("factory(r, pr)", msg)
 
     # The check recurses into a child, so a container is covered by its children's
@@ -427,13 +338,13 @@ end
     #
     # `GenericValueatRiskRange` is the second kind: its functor calls `r.loss(x)` and
     # `r.gain(-x)`. It declared `deferred_slots` alone, so `assert_calibrated_slots` walked
-    # an empty tuple and the role reached the kernel, where `alpha * length(x)` raised a
-    # `MethodError` naming neither the slot nor the role. The declaration below is the fix.
+    # an empty tuple and the rule reached the kernel, where `alpha * length(x)` raised a
+    # `MethodError` naming neither the slot nor the rule. The declaration below is the fix.
     rng = StableRNG(987654321)
     X = randn(rng, 200, 4) / 100
     w = fill(0.25, 4)
-    role = SignificanceTailCalibration(; alg = RULE)
-    cvar = ConditionalValueatRisk(; alpha = role)
+    rule = RULE
+    cvar = ConditionalValueatRisk(; alpha = rule)
 
     # The declaration names both children, so the walk reaches the rule in either of them.
     # The constructor strips each child's risk-expression contribution, so the slots are
@@ -447,7 +358,7 @@ end
     @test_throws ArgumentError PO.assert_calibrated_slots(GenericValueatRiskRange(;
                                                                                   gain = cvar))
 
-    # The message the caller reads names the child's slot, the role standing in it and the
+    # The message the caller reads names the child's slot, the rule standing in it and the
     # way out, on the same terms as a leaf measure's.
     function refusal(r)
         return try
@@ -457,7 +368,7 @@ end
             sprint(showerror, e)
         end
     end
-    owacvar = OrderedWeightsArrayConditionalValueatRisk(; alpha = role)
+    owacvar = OrderedWeightsArrayConditionalValueatRisk(; alpha = rule)
     for (r, slot) in
         ((GenericValueatRiskRange(; loss = cvar), "ConditionalValueatRisk.alpha"),
          (RiskRatio(; r1 = cvar, r2 = Variance()), "ConditionalValueatRisk.alpha"),
@@ -472,40 +383,18 @@ end
                                    w2 = OrderedWeightsArrayConditionalValueatRisk()),
           "OrderedWeightsArrayConditionalValueatRisk.alpha"))
         msg = refusal(r)
-        @test occursin("Calibration Role", msg)
+        @test occursin("Calibration Rule", msg)
         @test occursin(slot, msg)
         @test occursin("factory(r, pr)", msg)
     end
 end
 
-@testset "Calibration slot: `mirror_role` carries the tail across to the head" begin
-    # A number crosses unchanged, which is what keeps `beta = alpha` alive with no widening.
-    @test PO.mirror_role(0.05) === 0.05
-    @test PO.mirror_role(1) === 1
-
-    # A tail role crosses as the head role of the SAME family, holding the SAME rule.
-    mirrored = PO.mirror_role(SignificanceTailCalibration(; alg = RULE))
-    @test isa(mirrored, SignificanceHeadCalibration)
-    @test mirrored.alg === RULE
-
-    kmirrored = PO.mirror_role(DeformationTailCalibration(; alg = KRULE))
-    @test isa(kmirrored, DeformationHeadCalibration)
-    @test kmirrored.alg === KRULE
-
-    # A function-valued rule crosses on the same terms.
-    @test PO.mirror_role(SignificanceTailCalibration(; alg = probe_rate)).alg === probe_rate
-
-    # The mirrored value is admitted by the head bound, which is the point of the carry.
-    @test isa(mirrored, PO.Num_SigHeadCal)
-    @test isa(kmirrored, PO.Num_DefHeadCal)
-end
-
-@testset "Calibration slot: every Range head slot defaults through `mirror_role`" begin
+@testset "Calibration slot: every Range head slot defaults from its tail slot" begin
     # One rule for a head slot, and every Range type states it the same way: the head slot
-    # defaults to `mirror_role` of its tail counterpart. A stated number crosses unchanged,
+    # defaults to its tail counterpart. A stated number crosses unchanged,
     # so the default pair of each type is the pair it carried before the rule became one.
-    sig = SignificanceTailCalibration(; alg = RULE)
-    def = DeformationTailCalibration(; alg = KRULE)
+    sig = RULE
+    def = KRULE
     ranges = (ValueatRiskRange(), ConditionalValueatRiskRange(),
               DistributionallyRobustConditionalValueatRiskRange(),
               EntropicValueatRiskRange(), RelativisticValueatRiskRange(),
@@ -527,7 +416,7 @@ end
     @test OrderedWeightsArrayConditionalValueatRiskRange(; alpha = 0.01).beta === 0.01
     @test OrderedWeightsArrayTailGiniRange(; alpha = 0.01).beta === 0.01
 
-    # A stated tail ROLE crosses as the head role of the same family, in all eight.
+    # A stated tail RULE crosses unchanged to the head slot, in all eight.
     for r in (ValueatRiskRange(; alpha = sig), ConditionalValueatRiskRange(; alpha = sig),
               DistributionallyRobustConditionalValueatRiskRange(; alpha = sig),
               EntropicValueatRiskRange(; alpha = sig),
@@ -535,15 +424,13 @@ end
               PowerNormValueatRiskRange(; alpha = sig),
               OrderedWeightsArrayConditionalValueatRiskRange(; alpha = sig),
               OrderedWeightsArrayTailGiniRange(; alpha = sig))
-        @test isa(r.beta, SignificanceHeadCalibration)
-        @test r.beta.alg === RULE
+        @test r.beta === RULE
     end
 
     # The deformation mirror has a caller in `src/`, and this is it. The gain-side pair of
     # the relativistic Range measure defaults to the loss-side pair, both halves of it.
     rl = RelativisticValueatRiskRange(; alpha = sig, kappa_a = def)
-    @test isa(rl.kappa_b, DeformationHeadCalibration)
-    @test rl.kappa_b.alg === KRULE
+    @test rl.kappa_b === KRULE
     @test RelativisticValueatRiskRange(; kappa_a = 0.5).kappa_b === 0.5
 
     # The two norm orders take the same rule. They stay numbers, so they mirror by plain
@@ -551,8 +438,8 @@ end
     @test PowerNormValueatRiskRange(; pa = 3.0).pb === 3.0
     @test OrderedWeightsArrayTailGiniRange(; alpha_i = 1e-3).beta_i === 1e-3
 
-    # An ambiguity role names no end of the distribution, so `mirror_role` has no method for
-    # one and the two ambiguity slots of the range keep the numbers they declare.
+    # An ambiguity rule names no end of the distribution, so neither ambiguity slot of the
+    # range defaults from the other, and both keep the numbers they declare.
     dr = DistributionallyRobustConditionalValueatRiskRange(; l_a = 2.0, r_a = 0.05)
     @test dr.l_b === 1.0
     @test dr.r_b === 0.02
@@ -568,10 +455,9 @@ end
     # the rule produced. This arm is reachable because the `@propagatable` prior `factory`
     # selects BEFORE it resolves, so a widened slot that also carries `@pprop` arrives here
     # still holding a rule.
-    role = SignificanceTailCalibration(; alg = RULE)
-    @test PO.sel(role, 0.05) === role
-    @test PO.sel(DeformationHeadCalibration(; alg = KRULE), 0.3) isa
-          DeformationHeadCalibration
+    @test PO.sel(RULE, 0.05) === RULE
+    @test PO.sel(KRULE, 0.3) === KRULE
+    @test PO.sel(probe_rate, 0.05) === probe_rate
 
     # A stated number still wins, and an unstated slot still falls back, both unchanged.
     @test PO.sel(0.01, 0.05) == 0.01
@@ -704,11 +590,11 @@ end
     slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
                  check_sol = (; allow_local = true, allow_almost = true),
                  settings = "verbose" => false)
-    role = SignificanceTailCalibration(; alg = probe_solver_rule)
+    rule = probe_solver_rule
 
     # The caller states no solver on the measure, which is the common case: a measure's
     # solver comes from the optimiser.
-    r = SolverProbe(; alpha = role)
+    r = SolverProbe(; alpha = rule)
     @test isnothing(r.slv)
 
     opt = JuMPOptimiser(; slv = slv, pe = pr)
@@ -732,7 +618,7 @@ end
 
     # A vector of measures takes the same route, and the second overload threads the same
     # solver.
-    mrv = MeanRisk(; r = [SolverProbe(; alpha = role)], opt = opt)
+    mrv = MeanRisk(; r = [SolverProbe(; alpha = rule)], opt = opt)
     attrsv = PO.processed_jump_optimiser_attributes(mrv.opt, rd)
     modelv = JuMP.Model()
     PO.set_model_scales!(modelv, mrv.opt.sc, mrv.opt.so)
@@ -746,7 +632,7 @@ end
     # A measure that states its own solver keeps it, which is what `sel` has always done for
     # the weights beside it.
     own = Solver(; name = :own, solver = Clarabel.Optimizer)
-    mro = MeanRisk(; r = SolverProbe(; slv = own, alpha = role), opt = opt)
+    mro = MeanRisk(; r = SolverProbe(; slv = own, alpha = rule), opt = opt)
     attrso = PO.processed_jump_optimiser_attributes(mro.opt, rd)
     modelo = JuMP.Model()
     PO.set_model_scales!(modelo, mro.opt.sc, mro.opt.so)
@@ -766,8 +652,8 @@ end
     slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
                  check_sol = (; allow_local = true, allow_almost = true),
                  settings = "verbose" => false)
-    role = SignificanceTailCalibration(; alg = probe_solver_rule)
-    r = SolverProbe(; alpha = role)
+    rule = probe_solver_rule
+    r = SolverProbe(; alpha = rule)
 
     # The clustering route's call, verbatim: `factory(hrp.r, pr, hrp.opt.slv)`. The
     # selection puts the solver on the struct, and the resolution reads it there.
@@ -798,13 +684,13 @@ end
     slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
                  check_sol = (; allow_local = true, allow_almost = true),
                  settings = "verbose" => false)
-    role = SignificanceTailCalibration(; alg = probe_solver_rule)
+    rule = probe_solver_rule
 
     # `_optimise` builds the model from `mr.r` and records `factory(mr.r, pr, mr.opt.slv)`.
     # The two calls are two routes over one measure, so the number the result carries must
     # be the number the constraint was built from.
     BUILT_ALPHA[] = nothing
-    mr = MeanRisk(; r = SolverProbe(; alpha = role),
+    mr = MeanRisk(; r = SolverProbe(; alpha = rule),
                   opt = JuMPOptimiser(; slv = slv, pe = pr))
     res = optimise(mr, rd)
     @test isa(res.jr.retcode, PO.OptimisationSuccess)
@@ -816,7 +702,7 @@ end
 A declared calibration slot and the resolution that serves it are two separate statements,
 and until now nothing paired them. The Deferred-Quantity channel owns
 `assert_declared_slot_resolver` for exactly this failure: a type that declared the slot and
-wrote no way to resolve it. The calibration channel had no counterpart, so a role reached
+wrote no way to resolve it. The calibration channel had no counterpart, so a rule reached
 the `JuMP` builders and was multiplied as though it were a number.
 
 `assert_declared_calibration_resolver` is that counterpart. It walks the declaration the way
@@ -870,8 +756,8 @@ end
     @test isnothing(PO.assert_declared_calibration_resolver(0.05))
     @test isnothing(PO.assert_declared_calibration_resolver(nothing))
 
-    # A role that survived the resolution names a declaration with no resolver.
-    probe = CalibratedProbe(; alpha = SignificanceTailCalibration(; alg = RULE))
+    # A rule that survived the resolution names a declaration with no resolver.
+    probe = CalibratedProbe(; alpha = RULE)
     @test_throws ArgumentError PO.assert_declared_calibration_resolver(probe)
     msg = try
         PO.assert_declared_calibration_resolver(probe)
@@ -880,10 +766,10 @@ end
         sprint(showerror, e)
     end
 
-    # The message names the type, the slot, the role and the resolution to write beside the
+    # The message names the type, the slot, the rule and the resolution to write beside the
     # declaration.
     @test occursin("CalibratedProbe.alpha", msg)
-    @test occursin("SignificanceTailCalibration", msg)
+    @test occursin("ProbeScenarioCount", msg)
     @test occursin("calibration_slots", msg)
     @test occursin("resolve_calibration_slot(x.alpha, :alpha, pr, pr.w, slv)", msg)
 
@@ -964,13 +850,13 @@ end
     slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
                  check_sol = (; allow_local = true, allow_almost = true),
                  settings = "verbose" => false)
-    role = SignificanceTailCalibration(; alg = probe_rate)
+    rule = probe_rate
 
-    # A `JuMP` builder reads the slot raw, so before the pairing this role reached the
+    # A `JuMP` builder reads the slot raw, so before the pairing this rule reached the
     # builder and the failure landed several frames down, inside a kernel that expected a
     # number. It is refused at the resolution instead, and the message names the type and
     # the slot.
-    mr = MeanRisk(; r = UnpairedProbe(; alpha = role),
+    mr = MeanRisk(; r = UnpairedProbe(; alpha = rule),
                   opt = JuMPOptimiser(; slv = slv, pe = pr))
     @test_throws ArgumentError optimise(mr, rd)
     msg = try
@@ -980,16 +866,16 @@ end
         sprint(showerror, e)
     end
     @test occursin("UnpairedProbe.alpha", msg)
-    @test occursin("SignificanceTailCalibration", msg)
+    @test occursin("probe_rate", msg)
 
     # A vector of measures is walked the same way, so a lone measure and an aggregate are
     # refused alike.
-    mrs = MeanRisk(; r = [Variance(), UnpairedProbe(; alpha = role)],
+    mrs = MeanRisk(; r = [Variance(), UnpairedProbe(; alpha = rule)],
                    opt = JuMPOptimiser(; slv = slv, pe = pr))
     @test_throws ArgumentError optimise(mrs, rd)
 
     # A stated number needs no resolution, so the same measure optimises when its slot
-    # holds one. The refusal is about the role and not about the declaration.
+    # holds one. The refusal is about the rule and not about the declaration.
     ok = MeanRisk(; r = UnpairedProbe(; alpha = 0.05),
                   opt = JuMPOptimiser(; slv = slv, pe = pr))
     @test isa(optimise(ok, rd).retcode, PO.OptimisationSuccess)
@@ -1065,8 +951,8 @@ end
     # One field, one declaration naming `val`, and three resolution keys that are three
     # different quantities. ADR 0097 settles why the keys stay apart; the pairing is what
     # ties each of them back to the declaration that owns the slot.
-    rrole = AmbiguityRadiusCalibration(; alg = RateRadius(; c = 0.2))
-    crole = NormCeilingCalibration(; alg = EffectiveAssetFloor(; fraction = 0.5))
+    rrole = RateRadius(; c = 0.2)
+    crole = EffectiveAssetFloor(; fraction = 0.5)
 
     l2 = factory(L2Regularisation(; val = rrole), pr)
     @test isa(l2.val, Number)

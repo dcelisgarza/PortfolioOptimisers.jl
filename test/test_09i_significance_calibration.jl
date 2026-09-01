@@ -36,17 +36,21 @@ function probe_significance(key::Symbol, pr::PO.AbstractPriorResult, w, slv,
     return 4 / size(pr.X, 1)
 end
 
-# The three roles the file reuses. `n = 3` gives `alpha = 0.05` at `T = 60`, which is the
+# The two rules the file reuses. `n = 3` gives `alpha = 0.05` at `T = 60`, which is the
 # library default, so a fold of that length is the one case where a rule and the default
 # agree — every assertion below that separates them uses a second length.
-sig_tail(n = 3) = SignificanceTailCalibration(; alg = ScenarioCount(; n = n))
-sig_head(n = 3) = SignificanceHeadCalibration(; alg = ScenarioCount(; n = n))
-def_tail(t = -1.2) = DeformationTailCalibration(; alg = EntropyBudget(; target = t))
-def_head(t = -1.2) = DeformationHeadCalibration(; alg = EntropyBudget(; target = t))
+#
+# One rule serves both ends of its family, because the slot is what names the end. The four
+# names below are therefore two rules under two spellings each, and each spelling names the
+# end the reader is looking at.
+sig_tail(n = 3) = ScenarioCount(; n = n)
+const sig_head = sig_tail
+def_tail(t = -1.2) = EntropyBudget(; target = t)
+const def_head = def_tail
 
 #=
-The census. One row per type: the slots it declares, and the role family of each. The four
-role families are disjoint, so the row also states which role each slot refuses.
+The census. One row per type: the slots it declares, and the rule family of each. The four
+rule families are disjoint, so the row also states which rule each slot refuses.
 =#
 const CENSUS = [(; T = ValueatRisk, tail = (:alpha,), head = (), dtail = (), dhead = ()),
                 (; T = ValueatRiskRange, tail = (:alpha,), head = (:beta,), dtail = (),
@@ -158,21 +162,21 @@ kw(slot, val) = NamedTuple{(slot,)}((val,))
     @test keys(PO.calibration_slots(OrderedWeightsArrayTailGiniRange())) == (:alpha, :beta)
 end
 
-@testset "Significance calibration: each slot's bound refuses the other three roles" begin
-    roles = (; tail = sig_tail(), head = sig_head(), dtail = def_tail(), dhead = def_head())
+@testset "Significance calibration: each slot's bound refuses the other family" begin
+    rules = (; tail = sig_tail(), head = sig_head(), dtail = def_tail(), dhead = def_head())
+    # The slot names the end of the distribution, so one bound serves both ends of a
+    # family. What a bound refuses is the OTHER family's rule.
+    other_family = (; tail = :dtail, head = :dhead, dtail = :tail, dhead = :head)
     for row in CENSUS
         for (family, slots) in
             pairs((; tail = row.tail, head = row.head, dtail = row.dtail,
                    dhead = row.dhead))
             for slot in slots
-                # The role the slot admits builds.
-                @test isa(getproperty(row.T(; kw(slot, roles[family])...), slot),
-                          typeof(roles[family]))
-                # The other three are refused at construction, by the bound and by no guard.
-                for other in (:tail, :head, :dtail, :dhead)
-                    other === family && continue
-                    @test_throws TypeError row.T(; kw(slot, roles[other])...)
-                end
+                # The rule the slot admits builds.
+                @test isa(getproperty(row.T(; kw(slot, rules[family])...), slot),
+                          typeof(rules[family]))
+                # The other family is refused at construction, by the bound and by no guard.
+                @test_throws TypeError row.T(; kw(slot, rules[other_family[family]])...)
                 # A plain number still builds, so nothing existing moved.
                 @test getproperty(row.T(; kw(slot, 0.07)...), slot) == 0.07
             end
@@ -185,15 +189,14 @@ end
     # default nor the value the same rule gives at `T = 60`. So a number that matches it can
     # only have come from the rule and from this sample.
     want = 4 / 120
-    roles = (; tail = SignificanceTailCalibration(; alg = ScenarioCount(; n = 4)),
-             head = SignificanceHeadCalibration(; alg = ScenarioCount(; n = 4)),
+    rules = (; tail = ScenarioCount(; n = 4), head = ScenarioCount(; n = 4),
              dtail = def_tail(-1.6), dhead = def_head(-1.6))
     for row in CENSUS
         pairs_ = ((:tail, row.tail), (:head, row.head), (:dtail, row.dtail),
                   (:dhead, row.dhead))
         kws = NamedTuple()
         for (family, slots) in pairs_, slot in slots
-            kws = merge(kws, kw(slot, roles[family]))
+            kws = merge(kws, kw(slot, rules[family]))
         end
         x = row.T(; kws...)
         out = PO.resolve_deferred_quantities(x, PR120)
@@ -216,9 +219,9 @@ end
 
 @testset "Significance calibration: a plain function is a rule, and it sees five arguments" begin
     SIG_SEEN[] = nothing
-    role = SignificanceTailCalibration(; alg = probe_significance)
-    @test isa(probe_significance, PO.Func_SigCal)
-    r = ConditionalValueatRisk(; alpha = role)
+    rule = probe_significance
+    @test isa(probe_significance, PO.Num_SigCal)
+    r = ConditionalValueatRisk(; alpha = rule)
     out = PO.resolve_deferred_quantities(r, PR60)
     @test out.alpha ≈ 4 / 60
     @test SIG_SEEN[] == (; key = :alpha, weighted = false, solved = false)
@@ -227,22 +230,22 @@ end
     # measure that carries one.
     SIG_SEEN[] = nothing
     ws = pweights(range(; start = 1, stop = 2, length = 60))
-    PO.resolve_deferred_quantities(ConditionalValueatRisk(; alpha = role, w = ws), PR60)
+    PO.resolve_deferred_quantities(ConditionalValueatRisk(; alpha = rule, w = ws), PR60)
     @test SIG_SEEN[].weighted
 
     slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
                  settings = "verbose" => false)
     SIG_SEEN[] = nothing
-    PO.resolve_deferred_quantities(EntropicValueatRisk(; alpha = role, slv = slv), PR60)
+    PO.resolve_deferred_quantities(EntropicValueatRisk(; alpha = rule, slv = slv), PR60)
     @test SIG_SEEN[].solved
     # On the `JuMP` route the measure states no solver and the caller threads one, and the
     # owner settles the two with `sel`.
     SIG_SEEN[] = nothing
-    PO.resolve_deferred_quantities(EntropicValueatRisk(; alpha = role), PR60, slv)
+    PO.resolve_deferred_quantities(EntropicValueatRisk(; alpha = rule), PR60, slv)
     @test SIG_SEEN[].solved
     # A measure that carries no solver at all gives the rule the one it was handed.
     SIG_SEEN[] = nothing
-    PO.resolve_deferred_quantities(ConditionalValueatRisk(; alpha = role), PR60, slv)
+    PO.resolve_deferred_quantities(ConditionalValueatRisk(; alpha = rule), PR60, slv)
     @test SIG_SEEN[].solved
 end
 
@@ -251,18 +254,16 @@ end
     # resolver of their own. A per-type resolver is more specific than the derived
     # recursion, so it must carry the child itself or the formulation stops resolving.
     ce = PortfolioOptimisersCovariance()
-    role = SignificanceTailCalibration(; alg = ScenarioCount(; n = 4))
-    v = PO.resolve_deferred_quantities(ValueatRisk(; alpha = role,
+    rule = ScenarioCount(; n = 4)
+    v = PO.resolve_deferred_quantities(ValueatRisk(; alpha = rule,
                                                    alg = DistributionValueatRisk(;
                                                                                  sigma = ce)),
                                        PR120)
     @test v.alpha ≈ 4 / 120
     @test v.alg.sigma ≈ PR120.sigma
 
-    vr = PO.resolve_deferred_quantities(ValueatRiskRange(; alpha = role,
-                                                         beta = SignificanceHeadCalibration(;
-                                                                                            alg = ScenarioCount(;
-                                                                                                                n = 6)),
+    vr = PO.resolve_deferred_quantities(ValueatRiskRange(; alpha = rule,
+                                                         beta = ScenarioCount(; n = 6),
                                                          alg = DistributionValueatRisk(;
                                                                                        sigma = ce)),
                                         PR120)
@@ -335,46 +336,43 @@ end
     st = sig_tail()
     @test PO.resolve_calibration_slot(st, :alpha, PR60, nothing, nothing, ctx) ==
           PO.resolve_calibration_slot(st, :alpha, PR60, nothing, nothing)
-    # The role is not rebuilt on the way in: the resolver unwraps it and hands the context
-    # to the rule, so the occupant a per-type method compares against never moves.
+    # The rule is not rebuilt on the way in: the resolver calls it and hands the context
+    # to it, so the occupant a per-type method compares against never moves.
     dt = def_tail(-1.2)
-    @test !hasfield(typeof(dt.alg), :alpha)
+    @test !hasfield(typeof(dt), :alpha)
     @test PO.resolve_calibration_slot(dt, :kappa, PR60, nothing, nothing, ctx) ≈
-          dt.alg(:kappa, PR60, nothing, nothing, ctx)
+          dt(:kappa, PR60, nothing, nothing, ctx)
     @test PO.resolve_calibration_slot(def_head(-1.2), :kappa_b, PR60, nothing, nothing,
                                       ctx) ≈
           EntropyBudget(; target = -1.2)(:kappa_b, PR60, nothing, nothing, ctx)
 end
 
 @testset "Significance calibration: the ordered-weights builders and their containers" begin
-    role = SignificanceTailCalibration(; alg = ScenarioCount(; n = 4))
+    rule = ScenarioCount(; n = 4)
 
-    # `mirror_role` keeps `beta = alpha` alive on the two Range defaults: a number crosses
-    # unchanged and a tail role crosses as the head role holding the same `alg`.
-    @test PO.mirror_role(0.07) == 0.07
-    cr = OrderedWeightsArrayConditionalValueatRiskRange(; alpha = role)
-    @test isa(cr.beta, SignificanceHeadCalibration)
-    @test cr.beta.alg === role.alg
-    tg = OrderedWeightsArrayTailGiniRange(; alpha = role)
-    @test isa(tg.beta, SignificanceHeadCalibration)
-    @test tg.beta.alg === role.alg
+    # `beta = alpha` is the default on the two Range types: a number crosses unchanged, and
+    # so does a rule, because the slot is what names the end.
+    cr = OrderedWeightsArrayConditionalValueatRiskRange(; alpha = rule)
+    @test cr.beta === rule
+    tg = OrderedWeightsArrayTailGiniRange(; alpha = rule)
+    @test tg.beta === rule
     # `beta_i = alpha_i` is untouched, because neither side widens.
     @test tg.beta_i == tg.alpha_i
     # A stated number still defaults across, so no existing default moved.
     @test OrderedWeightsArrayConditionalValueatRiskRange(; alpha = 0.07).beta == 0.07
     # A caller who states `beta` gets their own occupant.
-    @test OrderedWeightsArrayConditionalValueatRiskRange(; alpha = role, beta = 0.09).beta ==
+    @test OrderedWeightsArrayConditionalValueatRiskRange(; alpha = rule, beta = 0.09).beta ==
           0.09
 
     # A builder carries no observation weights of its own, so the rule reads `pr.w`.
     b = PO.resolve_deferred_quantities(OrderedWeightsArrayConditionalValueatRisk(;
-                                                                                 alpha = role),
+                                                                                 alpha = rule),
                                        PR120)
     @test b.alpha ≈ 4 / 120
 
     # The container declares the builder, so the derived recursion reaches it and neither
     # the builder nor the container needs `@propagatable`.
-    owa = OrderedWeightsArray(; w = OrderedWeightsArrayTailGini(; alpha = role))
+    owa = OrderedWeightsArray(; w = OrderedWeightsArrayTailGini(; alpha = rule))
     @test PO.deferred_slots(owa) == (; w = owa.w)
     @test PO.calibration_slots(owa) == (; w = owa.w)
     o = PO.factory(owa, PR120)
@@ -391,8 +389,8 @@ end
     # The Range container wraps `w2` as `reverse ∘ w2`, so the builder a rule sits in is the
     # composition's inner half. Without a method for the composition the gain-side rule
     # would never resolve while the loss-side one did.
-    rg = OrderedWeightsArrayRange(; w1 = OrderedWeightsArrayTailGini(; alpha = role),
-                                  w2 = OrderedWeightsArrayTailGini(; alpha = role))
+    rg = OrderedWeightsArrayRange(; w1 = OrderedWeightsArrayTailGini(; alpha = rule),
+                                  w2 = OrderedWeightsArrayTailGini(; alpha = rule))
     @test isa(rg.w2, ComposedFunction)
     @test PO.calibration_slots(rg) == (; w1 = rg.w1, w2 = rg.w2)
     @test PO.calibration_slots(rg.w2) == (; inner = rg.w2.inner)
@@ -413,25 +411,25 @@ end
 @testset "Significance calibration: the tail-Gini ordering is refused at fold time" begin
     # The joint bound is the whole of the ordering validation. A rule states no value at
     # construction, so the pair is checked when the rebuild runs.
-    role = sig_tail(3)
-    ok = OrderedWeightsArrayTailGini(; alpha_i = 0.01, alpha = role)
-    @test ok.alpha === role
+    rule = sig_tail(3)
+    ok = OrderedWeightsArrayTailGini(; alpha_i = 0.01, alpha = rule)
+    @test ok.alpha === rule
     @test PO.resolve_deferred_quantities(ok, PR60).alpha ≈ 0.05
 
     # `alpha_i` above the number the rule returns builds, and is refused at fold time by the
     # same constructor a caller's own number meets. At `T = 60` the rule gives `0.05` and
     # the pair holds; at `T = 120` it gives `0.025` and the pair does not.
-    late = OrderedWeightsArrayTailGini(; alpha_i = 0.04, alpha = role)
+    late = OrderedWeightsArrayTailGini(; alpha_i = 0.04, alpha = rule)
     @test PO.resolve_deferred_quantities(late, PR60).alpha ≈ 0.05
     @test_throws DomainError PO.resolve_deferred_quantities(late, PR120)
 
     # An `alpha_i` outside the unit interval is still refused at construction, so the rule
     # branch checks the inner bound on its own rather than skipping it.
-    @test_throws DomainError OrderedWeightsArrayTailGini(; alpha_i = 1.5, alpha = role)
-    @test_throws DomainError OrderedWeightsArrayTailGiniRange(; beta_i = 1.5, alpha = role)
+    @test_throws DomainError OrderedWeightsArrayTailGini(; alpha_i = 1.5, alpha = rule)
+    @test_throws DomainError OrderedWeightsArrayTailGiniRange(; beta_i = 1.5, alpha = rule)
 
     # The Range twin refuses on whichever end breaks the pair.
-    lateb = OrderedWeightsArrayTailGiniRange(; alpha_i = 1e-4, alpha = role, beta_i = 0.04,
+    lateb = OrderedWeightsArrayTailGiniRange(; alpha_i = 1e-4, alpha = rule, beta_i = 0.04,
                                              beta = sig_head(3))
     @test PO.resolve_deferred_quantities(lateb, PR60).beta ≈ 0.05
     @test_throws DomainError PO.resolve_deferred_quantities(lateb, PR120)
@@ -452,7 +450,7 @@ end
     end
     @test isa(err, ArgumentError)
     @test occursin("ConditionalValueatRisk.alpha", err.msg)
-    @test occursin("SignificanceTailCalibration", err.msg)
+    @test occursin("ScenarioCount", err.msg)
     @test occursin("factory", err.msg)
 
     # The refusal recurses into a container's children, so a rule inside a weight builder is
@@ -552,8 +550,8 @@ end
     # The rebuild is derived from the type, so a field the resolution never names survives
     # it. The two Range builders carry four such fields between them, and each was retyped
     # by hand at the rebuild before the channel went through `rebuild_with_slots`.
-    role = sig_tail(3)
-    tg = OrderedWeightsArrayTailGiniRange(; alpha_i = 1e-4, alpha = role, beta_i = 2e-4,
+    rule = sig_tail(3)
+    tg = OrderedWeightsArrayTailGiniRange(; alpha_i = 1e-4, alpha = rule, beta_i = 2e-4,
                                           beta = sig_head(3), a_sim = 77, b_sim = 88)
     out = PO.resolve_deferred_quantities(tg, PR60)
     @test out.alpha ≈ 0.05

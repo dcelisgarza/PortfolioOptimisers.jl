@@ -52,7 +52,7 @@ The 2-norm and the effective number of assets are reciprocally related: for a fu
 
   - [`set_weight_norm_p_constraints!`](@ref)
   - [`set_weight_norm_inf_constraints!`](@ref)
-  - [`NormCeilingCalibration`](@ref)
+  - [`Num_NormCeilCal`](@ref)
   - [`EffectiveAssetFloor`](@ref)
   - [`number_effective_assets`](@ref)
   - [`JuMPOptimiser`](@ref)
@@ -61,6 +61,7 @@ function set_weight_norm_2_constraints!(args...)
     return nothing
 end
 function set_weight_norm_2_constraints!(model::JuMP.Model, val::Number)
+    assert_nonempty_gt0_finite_val(val, :l2c)
     w = get_w(model)
     k = get_k(model)
     sc = get_constraint_scale(model)
@@ -134,7 +135,7 @@ This is [`number_effective_assets`](@ref) taken to an arbitrary order. At ``p = 
   - [`set_weight_norm_inf_constraints!`](@ref)
   - [`norm_ceiling_factory`](@ref)
   - [`assert_norm_ceiling_role`](@ref)
-  - [`NormCeilingCalibration`](@ref)
+  - [`Num_NormCeilCal`](@ref)
   - [`set_lp_regularisation!`](@ref)
   - [`JuMPOptimiser`](@ref)
 """
@@ -217,7 +218,7 @@ Capping the largest weight spreads the portfolio across a minimum number of asse
 
   - [`set_weight_norm_2_constraints!`](@ref)
   - [`set_weight_norm_p_constraints!`](@ref)
-  - [`NormCeilingCalibration`](@ref)
+  - [`Num_NormCeilCal`](@ref)
   - [`EffectiveAssetFloor`](@ref)
   - [`set_linf_regularisation!`](@ref)
   - [`JuMPOptimiser`](@ref)
@@ -226,6 +227,7 @@ function set_weight_norm_inf_constraints!(args...)
     return nothing
 end
 function set_weight_norm_inf_constraints!(model::JuMP.Model, val::Number)
+    assert_nonempty_gt0_finite_val(val, :linfc)
     w = get_w(model)
     k = get_k(model)
     sc = get_constraint_scale(model)

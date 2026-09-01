@@ -229,12 +229,13 @@ moves. The [calibration example](../5_validation_tuning/07_Calibrated_Risk_Measu
 slot on a risk measure. This section reads all seven slots this example owns.
 
 The four penalty coefficients are **ambiguity radii**. A norm penalty is the support function of
-a ball in the dual of the penalised norm, so its coefficient is the radius of that ball and it
-takes an [`AmbiguityRadiusCalibration`](@ref).
+a ball in the dual of the penalised norm, so its coefficient is the radius of that ball and its
+slot takes a rule of the ambiguity-radius family.
 
 The three norm ceilings `l2c`, `lpc` and `linfc` bound a norm rather than price one, so they are
-a different quantity and take a role of their own, [`NormCeilingCalibration`](@ref). A ceiling is
-a diversification statement: its reciprocal is a floor on the effective number of assets.
+a different quantity and their slots take a family of their own, the norm-ceiling rules. A
+ceiling is a diversification statement: its reciprocal is a floor on the effective number of
+assets.
 
 ### 3.1 One rule reads the slot it stands in
 
@@ -268,13 +269,12 @@ because no key can name the conjugate order. The rule holds no order of its own:
 site states it in a `CalibrationContext`, and the `lp5` context above stands in for that site
 because the rule runs outside it here.
 
-The slot takes the role, and the coefficient appears when the model is built. The two runs below
+The slot takes the rule, and the coefficient appears when the model is built. The two runs below
 differ only in what stands in `l1`, and they hold the same weights.
 =#
 
 l1_rule = JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1),
-                        sbgt = 1, bgt = 1,
-                        l1 = AmbiguityRadiusCalibration(; alg = DualNormRadius()))
+                        sbgt = 1, bgt = 1, l1 = DualNormRadius())
 l1_num = JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
                        bgt = 1, l1 = dnr(:l1, pr, nothing, nothing, CalibrationContext()))
 res_rule = optimise(MeanRisk(; opt = l1_rule))
@@ -340,15 +340,15 @@ pretty_table(ceiling_table; formatters = [numfmt])
 One rule serves the three slots, and each site reads it against its own norm order.
 =#
 
-crole = NormCeilingCalibration(; alg = EffectiveAssetFloor(; fraction = 0.5))
+ceil_rule = EffectiveAssetFloor(; fraction = 0.5)
 copts = [JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
                        bgt = 1),# no ceiling
          JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
-                       bgt = 1, l2c = crole),# 2-norm ceiling
+                       bgt = 1, l2c = ceil_rule),# 2-norm ceiling
          JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
-                       bgt = 1, lpc = LpRegularisation(; p = 5, val = crole)),# 5-norm ceiling
+                       bgt = 1, lpc = LpRegularisation(; p = 5, val = ceil_rule)),# 5-norm ceiling
          JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
-                       bgt = 1, linfc = crole)]# Inf-norm ceiling
+                       bgt = 1, linfc = ceil_rule)]# Inf-norm ceiling
 cress = [optimise(MeanRisk(; opt = opt)) for opt in copts]
 
 n_eff_p(w, p) = isinf(p) ? inv(maximum(abs, w)) : sum(abs.(w) .^ p)^inv(1 - p)

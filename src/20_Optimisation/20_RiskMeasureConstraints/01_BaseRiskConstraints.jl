@@ -228,8 +228,8 @@ function set_risk_constraints!(model::JuMP.Model, r::RiskMeasure,
     # unconstrained `NearOptimalCentering` did (ADR 0008, amendment 2 §4).
     #
     # The resolution is also where the calibration declaration and its resolver are paired.
-    # `expected_risk` refuses a surviving Calibration Role at the value-level entry point,
-    # and a `JuMP` builder reads the slot raw, so this route carried no such refusal. A role
+    # `expected_risk` refuses a surviving Calibration Rule at the value-level entry point,
+    # and a `JuMP` builder reads the slot raw, so this route carried no such refusal. A rule
     # that reaches this line names a type that declared the slot and resolved it nowhere.
     first = risk_frontier_length(model)
     resolved = resolve_deferred_quantities(r, pr, opt.opt.slv)

@@ -56,7 +56,7 @@ that:
 
 ```julia
 sel(risk_variable::DeferredQuantity, ::Any) = risk_variable
-sel(risk_variable::AbstractCalibrationEstimator, ::Any) = risk_variable
+sel(risk_variable::Union{<:AbstractCalibrationAlgorithm, <:Function}, ::Any) = risk_variable
 ```
 
 **A slot the caller filled with the method that computes the value is a stated slot.** The caller

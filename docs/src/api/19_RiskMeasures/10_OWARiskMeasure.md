@@ -29,6 +29,8 @@ OrderedWeightsArrayFormulation
 ExactOrderedWeightsArray
 ApproxOrderedWeightsArray
 OrderedWeightsArray
+OWA_RevFunc
+OWA_CalOccupant
 factory(x::OrderedWeightsArray, pr::AbstractPriorResult, args...; kwargs...)
 OrderedWeightsArrayRange
 factory(x::OrderedWeightsArrayRange, pr::AbstractPriorResult, args...; kwargs...)

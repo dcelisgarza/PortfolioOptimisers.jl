@@ -6,14 +6,14 @@ in a constraint. The reciprocal of a ceiling is a floor on the effective number 
 which is a diversification statement rather than a statement about the set of measures the
 model prices.
 
-ADR 0095 rules that the role names the quantity, so the ceiling takes its own family, its
-own role and its own bound rather than borrowing `AmbiguityRadiusCalibration`.
+ADR 0095 rules that the rule names the quantity, so the ceiling takes its own family, its
+own rule and its own bound rather than borrowing the ambiguity-radius family.
 `test_09h_ambiguity_calibration.jl` covers the radius family this one sits beside.
 
 One field carries both readings. `LpRegularisation` is a penalty in `JuMPOptimiser.lp` and
-a norm constraint in `JuMPOptimiser.lpc`, so its `val` cannot be bounded to one role. The
-bound admits both, and the FIELD THAT HOLDS THE TERM refuses the role that has no reading
-there. That is the one place in the library where a role is settled after construction.
+a norm constraint in `JuMPOptimiser.lpc`, so its `val` cannot be bounded to one rule. The
+bound admits both, and the FIELD THAT HOLDS THE TERM refuses the rule that has no reading
+there. That is the one place in the library where a rule is settled after construction.
 =#
 using Clarabel, JuMP, InteractiveUtils
 const PO = PortfolioOptimisers
@@ -25,14 +25,24 @@ const RD60 = ReturnsResult(; nx = string.(1:4), X = X60)
 const SLV = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
                    settings = "verbose" => false)
 
-# A ceiling rule with no type at all. The `alg` bound admits a bare `Function` for exactly
-# this case, and this one reports its arguments so the resolver's order is asserted.
+# A ceiling rule with no type at all. Every ceiling slot admits a bare `Function` for
+# exactly this case, and this one reports its arguments so the resolver's order is asserted.
 const CEIL_SEEN = Ref{Any}(nothing)
 function probe_ceiling(key::Symbol, pr::PO.AbstractPriorResult, w, slv,
                        ctx::PO.CalibrationContext)
     CEIL_SEEN[] = (; key = key, weighted = !isnothing(w), solved = !isnothing(slv),
                    order = ctx.p)
     return 1 / sqrt(size(pr.X, 2))
+end
+
+# A ceiling rule that answers a stated number. A rule of the family is what the resolver's
+# range check dispatches on, so a test of that check needs a family and not a closure.
+struct ProbeCeilingValue{T} <: PO.AbstractNormCeilingCalibrationAlgorithm
+    val::T
+end
+function (alg::ProbeCeilingValue)(::Symbol, ::PO.AbstractPriorResult, ::Any, ::Any,
+                                  ::PO.CalibrationContext)
+    return alg.val
 end
 
 @testset "Norm ceiling calibration: the family joins the calibration root" begin
@@ -48,51 +58,49 @@ end
     @test !(PO.AbstractNormCeilingCalibrationAlgorithm <:
             PO.AbstractSignificanceCalibrationAlgorithm)
 
-    # The role is an Estimator, not an Algorithm, so a role inside another role's `alg`
-    # field is refused by that field's bound.
-    @test NormCeilingCalibration <: PO.AbstractCalibrationEstimator
-    @test !(NormCeilingCalibration <: PO.AbstractCalibrationAlgorithm)
+    # #641 withdrew the rule that used to place a rule in a ceiling slot, so nothing
+    # stands between the caller and the rule.
+    @test !isdefined(PortfolioOptimisers, :NormCeilingCalibration)
     @test EffectiveAssetFloor <: PO.AbstractNormCeilingCalibrationAlgorithm
 
     # The abstract type is not exported: an export is public API, and the convention is
     # that an abstract type is not one.
     @test :AbstractNormCeilingCalibrationAlgorithm ∉ names(PortfolioOptimisers)
 
-    # The two concrete names are exported, on the same terms as the radius family's.
-    @test :NormCeilingCalibration ∈ names(PortfolioOptimisers)
+    # The rule is exported, on the same terms as the radius family's.
     @test :EffectiveAssetFloor ∈ names(PortfolioOptimisers)
 
-    # A ceiling names no end of a distribution, so the family carries one role and
-    # `mirror_role` has nothing to carry across.
-    @test_throws MethodError PO.mirror_role(NormCeilingCalibration(; alg = probe_ceiling))
+    # A ceiling names no end of a distribution, so no ceiling slot defaults from another:
+    # each of the three states its own occupant.
+    slv = Solver(; name = :probe, solver = nothing)
+    @test isnothing(JuMPOptimiser(; slv = slv, l2c = EffectiveAssetFloor()).linfc)
 end
 
-@testset "Norm ceiling calibration: the bounds refuse the wrong role" begin
-    crole = NormCeilingCalibration(; alg = EffectiveAssetFloor())
-    rrole = AmbiguityRadiusCalibration(; alg = RateRadius(; c = 0.2))
+@testset "Norm ceiling calibration: the bounds refuse the wrong family" begin
+    crule = EffectiveAssetFloor()
+    rrule = RateRadius(; c = 0.2)
 
-    # The `alg` bound admits a rule of the family and a plain function, and nothing else.
-    # A role placed inside another role's `alg` is refused by the same route.
-    @test isa(NormCeilingCalibration(; alg = EffectiveAssetFloor()).alg,
-              EffectiveAssetFloor)
-    @test isa(NormCeilingCalibration(; alg = probe_ceiling).alg, Function)
-    @test_throws TypeError NormCeilingCalibration(; alg = RateRadius(; c = 0.2))
-    @test_throws TypeError NormCeilingCalibration(; alg = crole)
-    @test_throws TypeError AmbiguityRadiusCalibration(; alg = EffectiveAssetFloor())
-
-    # The slot bound pairs `Number` with ONE role, so the refusal is at construction and
-    # no guard method is written for it.
+    # The slot bound pairs `Number` with ONE rule family and a plain function, so the
+    # refusal is at construction and no guard method is written for it.
     @test isa(1.0, PO.Num_NormCeilCal)
-    @test isa(crole, PO.Num_NormCeilCal)
-    @test !isa(rrole, PO.Num_NormCeilCal)
-    @test !isa(crole, PO.Num_AmbRadCal)
+    @test isa(crule, PO.Num_NormCeilCal)
+    @test isa(probe_ceiling, PO.Num_NormCeilCal)
+    @test !isa(rrule, PO.Num_NormCeilCal)
+    @test !isa(crule, PO.Num_AmbRadCal)
 
-    # `LpRegularisation.val` is the one dual-use slot, so its bound admits both roles.
-    @test isa(crole, PO.Num_AmbRadNormCeilCal)
-    @test isa(rrole, PO.Num_AmbRadNormCeilCal)
+    # A radius rule in a ceiling slot is refused, and a ceiling rule in a radius slot too.
+    slv = Solver(; name = :probe, solver = nothing)
+    @test_throws TypeError JuMPOptimiser(; slv = slv, l2c = rrule)
+    @test_throws TypeError JuMPOptimiser(; slv = slv, l1 = crule)
+
+    # `LpRegularisation.val` is the one dual-use slot, so its bound admits both families.
+    # It is also the one slot that admits no plain function: a function names no family,
+    # and the two guards of that slot read the family.
+    @test isa(crule, PO.Num_AmbRadNormCeilCal)
+    @test isa(rrule, PO.Num_AmbRadNormCeilCal)
     @test isa(1.0, PO.Num_AmbRadNormCeilCal)
-    @test !isa(AmbiguityTailWeightCalibration(; alg = probe_ceiling),
-               PO.Num_AmbRadNormCeilCal)
+    @test !isa(probe_ceiling, PO.Num_AmbRadNormCeilCal)
+    @test_throws TypeError LpRegularisation(; val = probe_ceiling)
 end
 
 @testset "Norm ceiling calibration: EffectiveAssetFloor reads the universe" begin
@@ -225,7 +233,7 @@ to the infinite arm.
 end
 
 @testset "Norm ceiling calibration: the context carries the constraint's order" begin
-    crole = NormCeilingCalibration(; alg = EffectiveAssetFloor(; fraction = 0.5))
+    crule = EffectiveAssetFloor(; fraction = 0.5)
     ctx3 = CalibrationContext(; p = 3)
 
     # A stated number ignores the context, and so does a caller's own plain function that
@@ -233,14 +241,11 @@ end
     @test PO.resolve_calibration_slot(0.4, :l2c, PR60, nothing, nothing, ctx3) == 0.4
     @test isnothing(PO.resolve_calibration_slot(nothing, :l2c, PR60, nothing, nothing,
                                                 ctx3))
-    fn_role = NormCeilingCalibration(; alg = probe_ceiling)
-    @test fn_role.alg === probe_ceiling
-
-    # The order reaches the rule through the role, and the role itself never moves: the
-    # resolver unwraps it and hands the context on.
-    @test PO.resolve_calibration_slot(crole, :lpc, PR60, nothing, nothing, ctx3) ≈
-          crole.alg(:lpc, PR60, nothing, nothing, ctx3)
-    @test crole.alg.fraction == 0.5
+    # The order reaches the rule through the context, and the rule itself never moves:
+    # the resolver calls it and hands the context on.
+    @test PO.resolve_calibration_slot(crule, :lpc, PR60, nothing, nothing, ctx3) ≈
+          crule(:lpc, PR60, nothing, nothing, ctx3)
+    @test crule.fraction == 0.5
     @test !hasfield(EffectiveAssetFloor, :p)
 
     # No rule carries an order of its own, so the site's order is the only one there is.
@@ -252,7 +257,7 @@ end
     # Resolving against the context is the whole of the channel, and the key and the order
     # both reach the rule.
     CEIL_SEEN[] = nothing
-    @test PO.resolve_calibration_slot(fn_role, :l2c, PR60, PR60.w, SLV,
+    @test PO.resolve_calibration_slot(probe_ceiling, :l2c, PR60, PR60.w, SLV,
                                       CalibrationContext(; p = 2)) ≈ 1 / 2
     @test CEIL_SEEN[].key == :l2c
     @test CEIL_SEEN[].solved
@@ -260,36 +265,38 @@ end
 end
 
 @testset "Norm ceiling calibration: the LpRegularisation route settles the reading" begin
-    crole = NormCeilingCalibration(; alg = EffectiveAssetFloor(; fraction = 0.5))
-    rrole = AmbiguityRadiusCalibration(; alg = RateRadius(; c = 0.2))
+    crule = EffectiveAssetFloor(; fraction = 0.5)
+    rrule = RateRadius(; c = 0.2)
 
-    # One term, one bound, two readings. The constructor admits both roles because it
+    # One term, one bound, two readings. The constructor admits both rules because it
     # cannot know which field the term is about to land in.
-    @test isa(LpRegularisation(; p = 3, val = crole).val, NormCeilingCalibration)
-    @test isa(LpRegularisation(; p = 3, val = rrole).val, AmbiguityRadiusCalibration)
+    @test isa(LpRegularisation(; p = 3, val = crule).val,
+              PO.AbstractNormCeilingCalibrationAlgorithm)
+    @test isa(LpRegularisation(; p = 3, val = rrule).val,
+              PO.AbstractAmbiguityRadiusCalibrationAlgorithm)
 
     # A ceiling has no reading as a penalty coefficient, so the penalty route refuses it.
     # A number stays legal on both routes.
     @test isnothing(PO.assert_penalty_coefficient_role(1e-3))
-    @test isnothing(PO.assert_penalty_coefficient_role(LpRegularisation(; val = rrole)))
-    @test isnothing(PO.assert_penalty_coefficient_role([LpRegularisation(; val = rrole)]))
-    @test_throws ArgumentError PO.assert_penalty_coefficient_role(crole)
+    @test isnothing(PO.assert_penalty_coefficient_role(LpRegularisation(; val = rrule)))
+    @test isnothing(PO.assert_penalty_coefficient_role([LpRegularisation(; val = rrule)]))
+    @test_throws ArgumentError PO.assert_penalty_coefficient_role(crule)
     @test_throws ArgumentError PO.assert_penalty_coefficient_role(LpRegularisation(;
-                                                                                   val = crole))
+                                                                                   val = crule))
     @test_throws ArgumentError PO.assert_penalty_coefficient_role([LpRegularisation(;
-                                                                                    val = crole)])
+                                                                                    val = crule)])
 
     # A radius has no reading as a ceiling, so the constraint route refuses it.
     @test isnothing(PO.assert_norm_ceiling_role(1e-3))
-    @test isnothing(PO.assert_norm_ceiling_role(LpRegularisation(; val = crole)))
-    @test isnothing(PO.assert_norm_ceiling_role([LpRegularisation(; val = crole)]))
-    @test_throws ArgumentError PO.assert_norm_ceiling_role(rrole)
-    @test_throws ArgumentError PO.assert_norm_ceiling_role(LpRegularisation(; val = rrole))
-    @test_throws ArgumentError PO.assert_norm_ceiling_role([LpRegularisation(; val = rrole)])
+    @test isnothing(PO.assert_norm_ceiling_role(LpRegularisation(; val = crule)))
+    @test isnothing(PO.assert_norm_ceiling_role([LpRegularisation(; val = crule)]))
+    @test_throws ArgumentError PO.assert_norm_ceiling_role(rrule)
+    @test_throws ArgumentError PO.assert_norm_ceiling_role(LpRegularisation(; val = rrule))
+    @test_throws ArgumentError PO.assert_norm_ceiling_role([LpRegularisation(; val = rrule)])
 
     # `norm_ceiling_factory` is the constraint route's own verb. It binds the TERM's order,
     # so one rule serves several terms that carry different orders.
-    terms = [LpRegularisation(; p = 2, val = crole), LpRegularisation(; p = 3, val = crole)]
+    terms = [LpRegularisation(; p = 2, val = crule), LpRegularisation(; p = 3, val = crule)]
     out = PO.norm_ceiling_factory(terms, PR60, SLV)
     @test out[1].val ≈ 2^(-1 / 2)
     @test out[2].val ≈ 2^(1 / 3 - 1)
@@ -304,47 +311,48 @@ end
 
     # The penalty route refuses on its own, so a term that reaches the objective by another
     # path is caught there too.
-    @test_throws ArgumentError PO.factory(LpRegularisation(; val = crole), PR60, SLV)
-    @test PO.factory(LpRegularisation(; p = 3, val = rrole), PR60, SLV).val ≈ 0.2 / sqrt(60)
+    @test_throws ArgumentError PO.factory(LpRegularisation(; val = crule), PR60, SLV)
+    @test PO.factory(LpRegularisation(; p = 3, val = rrule), PR60, SLV).val ≈ 0.2 / sqrt(60)
 end
 
-@testset "Norm ceiling calibration: JuMPOptimiser refuses the wrong role per field" begin
-    crole = NormCeilingCalibration(; alg = EffectiveAssetFloor())
-    rrole = AmbiguityRadiusCalibration(; alg = RateRadius(; c = 0.2))
+@testset "Norm ceiling calibration: JuMPOptimiser refuses the wrong rule per field" begin
+    crule = EffectiveAssetFloor()
+    rrule = RateRadius(; c = 0.2)
 
-    # `l2c` and `linfc` are bounded to the ceiling role alone, so a radius is refused by the
+    # `l2c` and `linfc` are bounded to the ceiling rule alone, so a radius is refused by the
     # signature itself, at the point where the caller wrote it.
-    @test_throws TypeError JuMPOptimiser(; slv = SLV, l2c = rrole)
-    @test_throws TypeError JuMPOptimiser(; slv = SLV, linfc = rrole)
-    @test_throws TypeError JuMPOptimiser(; slv = SLV,
-                                         l2c = AmbiguityTailWeightCalibration(;
-                                                                              alg = probe_ceiling))
+    @test_throws TypeError JuMPOptimiser(; slv = SLV, l2c = rrule)
+    @test_throws TypeError JuMPOptimiser(; slv = SLV, linfc = rrule)
 
-    # `lp` and `lpc` share one term type, so the FIELD refuses the role that has no reading
+    # A plain function carries no family, so the bound admits one and the name of the slot
+    # is what states the quantity there.
+    @test JuMPOptimiser(; slv = SLV, l2c = probe_ceiling).l2c === probe_ceiling
+
+    # `lp` and `lpc` share one term type, so the FIELD refuses the rule that has no reading
     # in it. This is the first point at which the reading is known.
     @test_throws ArgumentError JuMPOptimiser(; slv = SLV,
-                                             lp = LpRegularisation(; val = crole))
+                                             lp = LpRegularisation(; val = crule))
     @test_throws ArgumentError JuMPOptimiser(; slv = SLV,
-                                             lpc = LpRegularisation(; val = rrole))
+                                             lpc = LpRegularisation(; val = rrule))
     @test_throws ArgumentError JuMPOptimiser(; slv = SLV,
-                                             lp = [LpRegularisation(; val = crole)])
+                                             lp = [LpRegularisation(; val = crule)])
 
-    # Every correct pairing is accepted, and the roles reach the fields untouched.
-    opt = JuMPOptimiser(; slv = SLV, pe = PR60, l2c = crole, linfc = crole,
-                        lpc = LpRegularisation(; p = 3, val = crole),
-                        lp = LpRegularisation(; p = 3, val = rrole), l1 = rrole)
-    @test isa(opt.l2c, NormCeilingCalibration)
-    @test isa(opt.linfc, NormCeilingCalibration)
-    @test isa(opt.lpc.val, NormCeilingCalibration)
+    # Every correct pairing is accepted, and the rules reach the fields untouched.
+    opt = JuMPOptimiser(; slv = SLV, pe = PR60, l2c = crule, linfc = crule,
+                        lpc = LpRegularisation(; p = 3, val = crule),
+                        lp = LpRegularisation(; p = 3, val = rrule), l1 = rrule)
+    @test opt.l2c === crule
+    @test opt.linfc === crule
+    @test opt.lpc.val === crule
 
     # Neither the weights factory nor the cluster slice holds a prior result, so both carry
     # a rule through untouched: it resolves against the cluster's own prior at assembly.
-    @test PO.factory(opt, fill(0.25, 4)).l2c === crole
-    @test PO.port_opt_view(opt, 1:3, X60).linfc === crole
+    @test PO.factory(opt, fill(0.25, 4)).l2c === crule
+    @test PO.port_opt_view(opt, 1:3, X60).linfc === crule
 end
 
 @testset "Norm ceiling calibration: assembly reaches the stated number" begin
-    crole = NormCeilingCalibration(; alg = EffectiveAssetFloor(; fraction = 0.5))
+    crule = EffectiveAssetFloor(; fraction = 0.5)
     function build(opt)
         mr = MeanRisk(; r = Variance(), opt = opt)
         attrs = PO.processed_jump_optimiser_attributes(mr.opt, RD60)
@@ -359,8 +367,8 @@ end
 
     # The rule reaches the three constraints as the number a caller would have written by
     # hand. Four assets and a half-universe floor make two effective assets.
-    mrule = build(JuMPOptimiser(; slv = SLV, pe = PR60, l2c = crole, linfc = crole,
-                                lpc = LpRegularisation(; p = 3, val = crole)))
+    mrule = build(JuMPOptimiser(; slv = SLV, pe = PR60, l2c = crule, linfc = crule,
+                                lpc = LpRegularisation(; p = 3, val = crule)))
     mnum = build(JuMPOptimiser(; slv = SLV, pe = PR60, l2c = 2^(-1 / 2), linfc = 1 / 2,
                                lpc = LpRegularisation(; p = 3, val = 2^(1 / 3 - 1))))
     @test JuMP.normalized_rhs(mrule[:cl2c]) ≈ JuMP.normalized_rhs(mnum[:cl2c])
@@ -378,7 +386,7 @@ end
 
     # The whole model still solves, so the calibrated ceilings are feasible together.
     res = optimise(MeanRisk(; r = Variance(),
-                            opt = JuMPOptimiser(; slv = SLV, pe = PR60, l2c = crole)))
+                            opt = JuMPOptimiser(; slv = SLV, pe = PR60, l2c = crule)))
     @test isa(res.w, AbstractVector)
     @test sum(res.w) ≈ 1
     @test norm(res.w, 2) <= 2^(-1 / 2) + sqrt(eps())
@@ -395,8 +403,8 @@ selection runs in `update_time_dependent_fields`, before any prior is fitted, an
 calibration resolution runs at assembly, against the prior of the period that was selected.
 =#
 @testset "Norm ceiling calibration: the schedule selects, then the rule runs" begin
-    crole = NormCeilingCalibration(; alg = EffectiveAssetFloor(; fraction = 0.5))
-    td = TimeDependent([crole, 0.6]; default = 0.6)
+    crule = EffectiveAssetFloor(; fraction = 0.5)
+    td = TimeDependent([crule, 0.6]; default = 0.6)
     @test isa(td, PO.TD_Option{<:PO.Num_NormCeilCal})
 
     opt = JuMPOptimiser(; slv = SLV, l2c = td)
@@ -408,7 +416,7 @@ calibration resolution runs at assembly, against the prior of the period that wa
                                 test_idx = [21:40, 41:60])
     ctx2 = TimeDependentContext(; i = 2, n = 2, rd = RD60, train_idx = [1:20, 1:40],
                                 test_idx = [21:40, 41:60])
-    @test PO.time_dependent_value(td, ctx1) === crole
+    @test PO.time_dependent_value(td, ctx1) === crule
     @test PO.time_dependent_value(td, ctx2) == 0.6
 
     # The selected rule then resolves against whichever prior the fold produced, so a
@@ -417,37 +425,37 @@ calibration resolution runs at assembly, against the prior of the period that wa
     @test PO.resolve_calibration_slot(sel, :l2c, PR60, nothing, nothing,
                                       CalibrationContext(; p = 2)) ≈ 2^(-1 / 2)
 
-    # A schedule is not a role, so the constructor's range check skips it and the field
+    # A schedule is not a rule, so the constructor's range check skips it and the field
     # falls back to its own default outside every fold loop.
     @test PO.reset_time_dependent_fields(opt).l2c == 0.6
 end
 
 #=
-Issue #618 sweeps the three units that #616 added to this file: the two role guards and
+Issue #618 sweeps the three units that #616 added to this file: the two rule guards and
 `norm_ceiling_factory`. The ticket asks four questions, and each is answered below with a
 run rather than a read.
 
-ADR 0095 rules that a slot bound pairs `Number` with ONE role, and that the bound is the
-whole of the role validation. `LpRegularisation.val` is the one slot that breaks the rule,
-because one type serves two readings. The first section is the ratchet that keeps the
-exception on that one slot: a second slot of the same shape would be a second exception,
+ADR 0095 rules that a slot bound pairs `Number` with ONE rule family, and that the bound
+is the whole of the family validation. `LpRegularisation.val` is the one slot that breaks
+the rule, because one type serves two readings. The first section is the ratchet that keeps
+the exception on that one slot: a second slot of the same shape would be a second exception,
 and ADR 0095 grants none.
 =#
 @testset "Sweep #618: the two role guards on LpRegularisation" begin
-    crole = NormCeilingCalibration(; alg = EffectiveAssetFloor(; fraction = 0.5))
-    rrole = AmbiguityRadiusCalibration(; alg = RateRadius(; c = 0.2))
+    crule = EffectiveAssetFloor(; fraction = 0.5)
+    rrule = RateRadius(; c = 0.2)
     root = pkgdir(PortfolioOptimisers)
     srcfiles = String[]
     for (d, _, fs) in walkdir(joinpath(root, "src")), f in fs
         endswith(f, ".jl") && push!(srcfiles, joinpath(d, f))
     end
 
-    # -- The one exception. Each alias that pairs `Number` with a calibration role, against
-    # the number of roles it admits. An alias that admits the whole root names no role, so
-    # it bounds no slot and is skipped.
-    roles = filter(T -> parentmodule(T) === PO,
-                   InteractiveUtils.subtypes(PO.AbstractCalibrationEstimator))
-    @test length(roles) == 7
+    # -- The one exception. Each alias that pairs `Number` with a calibration rule family,
+    # against the number of families it admits. An alias that admits the whole root names
+    # no family, so it bounds no slot and is skipped.
+    families = filter(T -> parentmodule(T) === PO,
+                      InteractiveUtils.subtypes(PO.AbstractCalibrationAlgorithm))
+    @test length(families) == 5
     counted = Dict{Symbol, Int}()
     for n in names(PO; all = true)
         isdefined(PO, n) || continue
@@ -455,13 +463,13 @@ and ADR 0095 grants none.
         isa(v, Type) || continue
         isa(Base.unwrap_unionall(v), Union) || continue
         Number <: v || continue
-        PO.AbstractCalibrationEstimator <: v && continue
-        c = count(R -> R <: v, roles)
+        PO.AbstractCalibrationAlgorithm <: v && continue
+        c = count(R -> R <: v, families)
         if c >= 1
             counted[n] = c
         end
     end
-    @test length(counted) == 8
+    @test length(counted) == 6
     @test sort([k for (k, c) in counted if c > 1]) == [:Num_AmbRadNormCeilCal]
     @test counted[:Num_AmbRadNormCeilCal] == 2
     @test all(==(1), [c for (k, c) in counted if k !== :Num_AmbRadNormCeilCal])
@@ -490,61 +498,61 @@ and ADR 0095 grants none.
     # -- The `TimeDependent` case. The constructor calls the two guards with no wrapper
     # check, because a schedule is not a term and meets the permissive fallback. It is the
     # test-substitution that carries each entry back through the same constructor, so a
-    # wrong role inside a schedule is refused where a wrong role in a bare field is.
+    # wrong rule inside a schedule is refused where a wrong rule in a bare field is.
     @test isnothing(PO.assert_penalty_coefficient_role(TimeDependent([LpRegularisation(;
-                                                                                       val = crole)];
+                                                                                       val = crule)];
                                                                      default = LpRegularisation(;
-                                                                                                val = rrole))))
+                                                                                                val = rrule))))
     @test_throws ArgumentError JuMPOptimiser(; slv = SLV,
                                              lp = TimeDependent([LpRegularisation(;
-                                                                                  val = crole),
+                                                                                  val = crule),
                                                                  LpRegularisation(;
-                                                                                  val = rrole)];
+                                                                                  val = rrule)];
                                                                 default = LpRegularisation(;
-                                                                                           val = rrole)))
+                                                                                           val = rrule)))
     @test_throws ArgumentError JuMPOptimiser(; slv = SLV,
                                              lp = TimeDependent([LpRegularisation(;
-                                                                                  val = rrole)];
+                                                                                  val = rrule)];
                                                                 default = LpRegularisation(;
-                                                                                           val = crole)))
+                                                                                           val = crule)))
     @test_throws ArgumentError JuMPOptimiser(; slv = SLV,
                                              lpc = TimeDependent([LpRegularisation(;
-                                                                                   val = rrole),
+                                                                                   val = rrule),
                                                                   LpRegularisation(;
-                                                                                   val = crole)];
+                                                                                   val = crule)];
                                                                  default = LpRegularisation(;
-                                                                                            val = crole)))
+                                                                                            val = crule)))
     @test_throws ArgumentError JuMPOptimiser(; slv = SLV,
                                              lpc = TimeDependent([LpRegularisation(;
-                                                                                   val = crole)];
+                                                                                   val = crule)];
                                                                  default = LpRegularisation(;
-                                                                                            val = rrole)))
+                                                                                            val = rrule)))
 
     # A schedule whose entry is a VECTOR of terms is substituted the same way, so the guard
     # reaches the term through the vector method rather than through a wrapper of its own.
     @test_throws ArgumentError JuMPOptimiser(; slv = SLV,
                                              lp = TimeDependent([[LpRegularisation(;
-                                                                                   val = crole)]];
+                                                                                   val = crule)]];
                                                                 default = [LpRegularisation(;
-                                                                                            val = rrole)]))
+                                                                                            val = rrule)]))
 
-    # The correct pairing crosses, so the guard refuses the role and not the schedule.
+    # The correct pairing crosses, so the guard refuses the rule and not the schedule.
     opt = JuMPOptimiser(; slv = SLV,
-                        lp = TimeDependent([LpRegularisation(; val = rrole),
+                        lp = TimeDependent([LpRegularisation(; val = rrule),
                                             LpRegularisation(; val = 1e-3)];
-                                           default = LpRegularisation(; val = rrole)),
-                        lpc = TimeDependent([LpRegularisation(; val = crole),
+                                           default = LpRegularisation(; val = rrule)),
+                        lpc = TimeDependent([LpRegularisation(; val = crule),
                                              LpRegularisation(; val = 0.6)];
-                                            default = LpRegularisation(; val = crole)))
+                                            default = LpRegularisation(; val = crule)))
     @test isa(opt.lp, TimeDependent)
     @test isa(opt.lpc, TimeDependent)
-    @test PO.reset_time_dependent_fields(opt).lp.val == rrole
+    @test PO.reset_time_dependent_fields(opt).lp.val == rrule
 
     # -- The two verbs differ in the guard and in the key, and in nothing else. Both bind
     # the term's own order, so a rule that reads the order gives a different number at a
     # different `p`. `DualNormRadius` refuses an unbound order, so a penalty route that
     # bound nothing would throw here instead of returning a number.
-    dnr = AmbiguityRadiusCalibration(; alg = DualNormRadius())
+    dnr = DualNormRadius()
     @test_throws ArgumentError PO.resolve_calibration_slot(dnr, :lpreg_val, PR60, PR60.w,
                                                            SLV)
     e = sqrt.(diag(PR60.sigma)) ./ sqrt(60)
@@ -560,7 +568,7 @@ and ADR 0095 grants none.
 
     # The keys are two readings rather than two names for one. A radius rule given an
     # order still has no reading under the ceiling key, which is why a `factory` call on
-    # `lpc` would be wrong even after the role guard.
+    # `lpc` would be wrong even after the rule guard.
     @test_throws ArgumentError PO.resolve_calibration_slot(dnr, :lpc, PR60, PR60.w, SLV,
                                                            CalibrationContext(; p = 3))
 end
@@ -610,9 +618,9 @@ end
 
 #=
 A rule states no number at construction, so the constructor guard on `l2c` and `linfc` reads
-a role, selects the permissive fallback of the validator, and checks nothing. Neither field
+a rule, selects the permissive fallback of the validator, and checks nothing. Neither field
 holds a term, so no rebuild states the range downstream either. The check therefore belongs
-to `resolve_calibration_slot`, which is the one place the rule runs, and the role's own
+to `resolve_calibration_slot`, which is the one place the rule runs, and the rule's own
 method there refuses the values a stated ceiling is refused. It is paid on the calibrated
 path alone: a stated ceiling takes the fallback method and meets no check.
 =#
@@ -635,18 +643,18 @@ path alone: a stated ceiling takes the fallback method and meets no check.
     @test_throws DomainError JuMPOptimiser(; slv = SLV, pe = PR60, linfc = NaN)
     @test_throws DomainError JuMPOptimiser(; slv = SLV, pe = PR60, linfc = Inf)
 
-    # The same four numbers, computed by a rule, are refused by the resolver, under the key
-    # of the slot the role stands in.
+    # The same four numbers, computed by a rule of the ceiling family, are refused by the
+    # resolver, under the key of the slot the rule stands in.
     for bad in (-1.0, 0.0, NaN, Inf)
-        crole = NormCeilingCalibration(; alg = (key, pr, w, slv, ctx) -> bad)
+        crule = ProbeCeilingValue(bad)
         for key in (:l2c, :linfc, :lpc)
-            @test_throws DomainError PO.resolve_calibration_slot(crole, key, PR60, PR60.w,
+            @test_throws DomainError PO.resolve_calibration_slot(crule, key, PR60, PR60.w,
                                                                  SLV,
                                                                  CalibrationContext(;
                                                                                     p = 2))
         end
         err = try
-            PO.resolve_calibration_slot(crole, :l2c, PR60, PR60.w, SLV,
+            PO.resolve_calibration_slot(crule, :l2c, PR60, PR60.w, SLV,
                                         CalibrationContext(; p = 2))
         catch e
             e
@@ -655,12 +663,24 @@ path alone: a stated ceiling takes the fallback method and meets no check.
 
         # So the whole route refuses it too, at assembly and at the term's own factory.
         @test_throws DomainError assemble_with(JuMPOptimiser(; slv = SLV, pe = PR60,
-                                                             l2c = crole))
+                                                             l2c = crule))
         @test_throws DomainError assemble_with(JuMPOptimiser(; slv = SLV, pe = PR60,
-                                                             linfc = crole))
+                                                             linfc = crule))
         @test_throws DomainError PO.norm_ceiling_factory(LpRegularisation(; p = 3,
-                                                                          val = crole),
+                                                                          val = crule),
                                                          PR60)
+
+        # A rule written as a plain function names no family, so no method of the resolver
+        # can read the quantity it computes and the resolver returns the number unchecked.
+        # `assemble_jump_model!` is what states the range of the four slots that reach the
+        # model raw, so the route refuses it there instead.
+        fn = (key, pr, w, slv, ctx) -> bad
+        @test PO.resolve_calibration_slot(fn, :l2c, PR60, PR60.w, SLV,
+                                          CalibrationContext(; p = 2)) === bad
+        @test_throws DomainError assemble_with(JuMPOptimiser(; slv = SLV, pe = PR60,
+                                                             l2c = fn))
+        @test_throws DomainError assemble_with(JuMPOptimiser(; slv = SLV, pe = PR60,
+                                                             linfc = fn))
     end
 
     # A stated ceiling reaches the fallback method, which checks nothing: the cost is paid
@@ -671,7 +691,7 @@ path alone: a stated ceiling takes the fallback method and meets no check.
 
     # A rule that answers a legal ceiling still reaches the model, so the check refuses
     # nothing a caller could have stated by hand.
-    good = NormCeilingCalibration(; alg = (key, pr, w, slv, ctx) -> 1 / 2)
+    good = (key, pr, w, slv, ctx) -> 1 / 2
     model = assemble_with(JuMPOptimiser(; slv = SLV, pe = PR60, l2c = good, linfc = good))
     @test JuMP.normalized_rhs(model[:cl2c]) ≈ 1 / 2
     @test JuMP.normalized_rhs(model[:clinfc]) ≈ 1 / 2

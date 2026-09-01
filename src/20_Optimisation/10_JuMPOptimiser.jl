@@ -419,8 +419,8 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
   - If `cte` is a vector: `!isempty(cte)`.
   - If `card` is provided: `card > 0` and finite.
   - If `tn` or `tr` is a vector: each must be non-empty.
-  - If `l2c`, `linfc`, `l1`, or `linf` is provided as a number: each must be `> 0` and finite. `l1` and `linf` also take an [`AmbiguityRadiusCalibration`](@ref), and `l2c` and `linfc` a [`NormCeilingCalibration`](@ref). A role states no number here, so the check runs on the number its rule returns, in [`resolve_calibration_slot`](@ref).
-  - The role in each [`LpRegularisation`](@ref) is checked against the field that holds it: `lp` is a penalty, so it refuses a [`NormCeilingCalibration`](@ref), and `lpc` is a constraint, so it refuses an [`AmbiguityRadiusCalibration`](@ref). The term itself carries one bound for both readings, so this is the point at which the reading is known.
+  - If `l2c`, `linfc`, `l1`, or `linf` is provided as a number: each must be `> 0` and finite. `l1` and `linf` also take an ambiguity-radius rule, and `l2c` and `linfc` a norm-ceiling rule. A rule states no number here, so the check runs on the number the rule returns, in [`assemble_jump_model!`](@ref).
+  - The rule in each [`LpRegularisation`](@ref) is checked against the field that holds it: `lp` is a penalty, so it refuses a norm-ceiling rule, and `lpc` is a constraint, so it refuses an ambiguity-radius rule. The term itself carries one bound for both readings, so this is the point at which the reading is known.
   - If `l2`, `lp` or `lpc` is a vector: each must be non-empty. An empty vector builds no term, which is what `nothing` already spells.
   - `l2`, `lp` and `lpc` are validated by their own estimator constructors ([`L2Regularisation`](@ref), [`LpRegularisation`](@ref)).
   - If `scard` is provided: compatible `smtx`, `slt`, `sst` sizes required.
@@ -640,10 +640,6 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
                            lp::TD_Option{<:LpReg_VecLpReg},
                            linf::TD_Option{<:Num_AmbRadCal}, brt::Bool, x_src::Symbol,
                            z_src::Symbol, strict::Bool)
-        l2c = bind_role(l2c)
-        linfc = bind_role(linfc)
-        l1 = bind_role(l1)
-        linf = bind_role(linf)
         assert_source_selector(x_src, :x_src)
         assert_source_selector(z_src, :z_src)
         if isa(slv, VecSlv)
@@ -1539,6 +1535,11 @@ function assemble_jump_model!(model::JuMP.Model, optimiser::JuMPOptimisationEsti
     # ceiling is read against one norm order, which belongs to the constraint and not to
     # the rule, so each site states its own order in the context. `lpc` holds estimators
     # and carries one order per term, so it goes through `norm_ceiling_factory`.
+    #
+    # These four slots are the ones that reach the model raw. Every other slot is rebuilt
+    # by its owner's constructor, which states the range of the number. There is no term to
+    # rebuild here, so each of the four builders states the range of the number it is
+    # handed, whatever produced it.
     l2c = resolve_calibration_slot(opt.l2c, :l2c, pr, pr.w, opt.slv,
                                    CalibrationContext(; p = 2))
     linfc = resolve_calibration_slot(opt.linfc, :linfc, pr, pr.w, opt.slv,

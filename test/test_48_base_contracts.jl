@@ -408,11 +408,11 @@ end
     @test oerr.val == "0 < alpha < 1 must hold. Got\nalpha => 1.0"
     @test cerr.val == "0 <= n7 <= 1 must hold. Got\nn7 => 1.5"
     # Both carry the varargs method that checks nothing, which is how a slot holding a
-    # Calibration Role passes a guard written for a number.
-    role = SignificanceTailCalibration(; alg = ScenarioCount(; n = 5))
+    # Calibration Rule passes a guard written for a number.
+    rule = ScenarioCount(; n = 5)
     @test isnothing(pe.assert_unit_interval(nothing))
     @test isnothing(pe.assert_closed_unit_interval(nothing))
-    @test isnothing(pe.assert_closed_unit_interval(role, :n))
+    @test isnothing(pe.assert_closed_unit_interval(rule, :n))
 end
 @testset "norm_factor and norm_error carry the units of the alg" begin
     pe = PortfolioOptimisers

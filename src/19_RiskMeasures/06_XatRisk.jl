@@ -460,7 +460,7 @@ $(DocStringExtensions.FIELDS)
 
     ValueatRisk(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
-        alpha::Num_SigTailCal = 0.05,
+        alpha::Num_SigCal = 0.05,
         w::Option{<:ObsWeights} = nothing,
         alg::ValueatRiskFormulation = MIPValueatRisk()
     ) -> ValueatRisk
@@ -544,9 +544,8 @@ ValueatRisk
     $(field_dict[:alg])
     """
     @fprop @vprop alg
-    function ValueatRisk(settings::RiskMeasureSettings, alpha::Num_SigTailCal,
+    function ValueatRisk(settings::RiskMeasureSettings, alpha::Num_SigCal,
                          w::Option{<:ObsWeights}, alg::ValueatRiskFormulation)
-        alpha = bind_role(SignificanceTailCalibration, alpha)
         assert_unit_interval(alpha, :alpha)
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(w), typeof(alg)}(settings, alpha,
@@ -554,7 +553,7 @@ ValueatRisk
     end
 end
 function ValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                     alpha::Num_SigTailCal = 0.05, w::Option{<:ObsWeights} = nothing,
+                     alpha::Num_SigCal = 0.05, w::Option{<:ObsWeights} = nothing,
                      alg::ValueatRiskFormulation = MIPValueatRisk())::ValueatRisk
     return ValueatRisk(settings, alpha, w, alg)
 end
@@ -574,7 +573,7 @@ The effective observation weights are computed locally as `sel(x.w, pr.w)` and t
   - [`ValueatRisk`](@ref)
   - [`resolve_calibration_slot`](@ref)
   - [`calibration_slots`](@ref)
-  - [`SignificanceTailCalibration`](@ref)
+  - [`Num_SigCal`](@ref)
 """
 function resolve_deferred_quantities(x::ValueatRisk, pr::AbstractPriorResult, slv = nothing)
     ws = sel(x.w, pr.w)
@@ -648,8 +647,8 @@ $(DocStringExtensions.FIELDS)
 
     ValueatRiskRange(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
-        alpha::Num_SigTailCal = 0.05,
-        beta::Num_SigHeadCal = mirror_role(alpha),
+        alpha::Num_SigCal = 0.05,
+        beta::Num_SigCal = alpha,
         w::Option{<:ObsWeights} = nothing,
         alg::ValueatRiskFormulation = MIPValueatRisk()
     ) -> ValueatRiskRange
@@ -737,11 +736,9 @@ ValueatRiskRange
     $(field_dict[:alg])
     """
     @fprop @vprop alg
-    function ValueatRiskRange(settings::RiskMeasureSettings, alpha::Num_SigTailCal,
-                              beta::Num_SigHeadCal, w::Option{<:ObsWeights},
+    function ValueatRiskRange(settings::RiskMeasureSettings, alpha::Num_SigCal,
+                              beta::Num_SigCal, w::Option{<:ObsWeights},
                               alg::ValueatRiskFormulation)
-        alpha = bind_role(SignificanceTailCalibration, alpha)
-        beta = bind_role(SignificanceHeadCalibration, beta)
         assert_unit_interval(alpha, :alpha)
         assert_unit_interval(beta, :beta)
         assert_nonempty_nonneg_finite_val(w, :w)
@@ -753,8 +750,7 @@ ValueatRiskRange
     end
 end
 function ValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                          alpha::Num_SigTailCal = 0.05,
-                          beta::Num_SigHeadCal = mirror_role(alpha),
+                          alpha::Num_SigCal = 0.05, beta::Num_SigCal = alpha,
                           w::Option{<:ObsWeights} = nothing,
                           alg::ValueatRiskFormulation = MIPValueatRisk())::ValueatRiskRange
     return ValueatRiskRange(settings, alpha, beta, w, alg)
@@ -764,7 +760,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolve the two significance levels of a [`ValueatRiskRange`](@ref) against prior result `pr`, and resolve the formulation `alg` beside them.
 
-Each tail carries its own slot and its own bound, so a stated tail rule and a stated head rule resolve independently. `beta` defaults to [`mirror_role`](@ref) of `alpha`, so a rule stated on the loss side alone reaches both ends. The rebuild goes through [`rebuild_with_slots`](@ref), whose positional call runs the inner constructor and re-runs both range checks on the calibrated numbers.
+Each tail carries its own slot and its own bound, so a stated tail rule and a stated head rule resolve independently. `beta` defaults to `alpha`, so a rule stated on the loss side alone reaches both ends: the rule states the method and the slot states the end. The rebuild goes through [`rebuild_with_slots`](@ref), whose positional call runs the inner constructor and re-runs both range checks on the calibrated numbers.
 
 This method is more specific than the derived recursion, so it takes over the `alg` slot that [`deferred_slots`](@ref) declares, through [`resolve_deferred_child`](@ref).
 
@@ -773,7 +769,7 @@ This method is more specific than the derived recursion, so it takes over the `a
   - [`ValueatRiskRange`](@ref)
   - [`resolve_calibration_slot`](@ref)
   - [`calibration_slots`](@ref)
-  - [`SignificanceHeadCalibration`](@ref)
+  - [`Num_SigCal`](@ref)
 """
 function resolve_deferred_quantities(x::ValueatRiskRange, pr::AbstractPriorResult,
                                      slv = nothing)
@@ -894,7 +890,7 @@ $(DocStringExtensions.FIELDS)
 
     DrawdownatRisk(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
-        alpha::Num_SigTailCal = 0.05,
+        alpha::Num_SigCal = 0.05,
         w::Option{<:ObsWeights} = nothing,
         b::Option{<:Number} = nothing,
         s::Option{<:Number} = nothing
@@ -969,10 +965,9 @@ DrawdownatRisk
     $(field_dict[:s_mip])
     """
     s
-    function DrawdownatRisk(settings::RiskMeasureSettings, alpha::Num_SigTailCal,
+    function DrawdownatRisk(settings::RiskMeasureSettings, alpha::Num_SigCal,
                             w::Option{<:ObsWeights}, b::Option{<:Number},
                             s::Option{<:Number})
-        alpha = bind_role(SignificanceTailCalibration, alpha)
         assert_unit_interval(alpha, :alpha)
         assert_nonempty_nonneg_finite_val(w, :w)
         bflag = !isnothing(b)
@@ -993,7 +988,7 @@ DrawdownatRisk
     end
 end
 function DrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                        alpha::Num_SigTailCal = 0.05, w::Option{<:ObsWeights} = nothing,
+                        alpha::Num_SigCal = 0.05, w::Option{<:ObsWeights} = nothing,
                         b::Option{<:Number} = nothing,
                         s::Option{<:Number} = nothing)::DrawdownatRisk
     return DrawdownatRisk(settings, alpha, w, b, s)
@@ -1133,7 +1128,7 @@ $(DocStringExtensions.FIELDS)
 
     RelativeDrawdownatRisk(;
         settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
-        alpha::Num_SigTailCal = 0.05,
+        alpha::Num_SigCal = 0.05,
         w::Option{<:ObsWeights} = nothing
     ) -> RelativeDrawdownatRisk
 
@@ -1191,8 +1186,7 @@ RelativeDrawdownatRisk
     """
     @pprop w
     function RelativeDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
-                                    alpha::Num_SigTailCal, w::Option{<:ObsWeights})
-        alpha = bind_role(SignificanceTailCalibration, alpha)
+                                    alpha::Num_SigCal, w::Option{<:ObsWeights})
         assert_unit_interval(alpha, :alpha)
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(w)}(settings, alpha, w)
@@ -1200,7 +1194,7 @@ RelativeDrawdownatRisk
 end
 function RelativeDrawdownatRisk(;
                                 settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
-                                alpha::Num_SigTailCal = 0.05,
+                                alpha::Num_SigCal = 0.05,
                                 w::Option{<:ObsWeights} = nothing)::RelativeDrawdownatRisk
     return RelativeDrawdownatRisk(settings, alpha, w)
 end

@@ -46,7 +46,7 @@ $(DocStringExtensions.FIELDS)
 
     ConditionalValueatRisk(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
-        alpha::Num_SigTailCal = 0.05,
+        alpha::Num_SigCal = 0.05,
         w::Option{<:ObsWeights} = nothing
     ) -> ConditionalValueatRisk
 
@@ -107,16 +107,15 @@ ConditionalValueatRisk
     $(field_dict[:oow])
     """
     @pprop w
-    function ConditionalValueatRisk(settings::RiskMeasureSettings, alpha::Num_SigTailCal,
+    function ConditionalValueatRisk(settings::RiskMeasureSettings, alpha::Num_SigCal,
                                     w::Option{<:ObsWeights})
-        alpha = bind_role(SignificanceTailCalibration, alpha)
         assert_unit_interval(alpha, :alpha)
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(w)}(settings, alpha, w)
     end
 end
 function ConditionalValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                alpha::Num_SigTailCal = 0.05,
+                                alpha::Num_SigCal = 0.05,
                                 w::Option{<:ObsWeights} = nothing)::ConditionalValueatRisk
     return ConditionalValueatRisk(settings, alpha, w)
 end
@@ -174,7 +173,7 @@ $(DocStringExtensions.FIELDS)
 
     DistributionallyRobustConditionalValueatRisk(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
-        alpha::Num_SigTailCal = 0.05,
+        alpha::Num_SigCal = 0.05,
         l::Num_AmbTwtCal = 1.0,
         r::Num_AmbRadCal = 0.02,
         w::Option{<:ObsWeights} = nothing
@@ -251,13 +250,10 @@ DistributionallyRobustConditionalValueatRisk
     """
     @pprop w
     function DistributionallyRobustConditionalValueatRisk(settings::RiskMeasureSettings,
-                                                          alpha::Num_SigTailCal,
+                                                          alpha::Num_SigCal,
                                                           l::Num_AmbTwtCal,
                                                           r::Num_AmbRadCal,
                                                           w::Option{<:ObsWeights})
-        alpha = bind_role(SignificanceTailCalibration, alpha)
-        l = bind_role(l)
-        r = bind_role(r)
         assert_unit_interval(alpha, :alpha)
         assert_nonempty_gt0_finite_val(l, :l)
         assert_nonempty_gt0_finite_val(r, :r)
@@ -272,7 +268,7 @@ DistributionallyRobustConditionalValueatRisk
 end
 function DistributionallyRobustConditionalValueatRisk(;
                                                       settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                                      alpha::Num_SigTailCal = 0.05,
+                                                      alpha::Num_SigCal = 0.05,
                                                       l::Num_AmbTwtCal = 1.0,
                                                       r::Num_AmbRadCal = 0.02,
                                                       w::Option{<:ObsWeights} = nothing)::DistributionallyRobustConditionalValueatRisk
@@ -298,7 +294,7 @@ A measure whose two slots both hold numbers is returned unchanged, so the common
   - [`DistributionallyRobustConditionalValueatRisk`](@ref)
   - [`resolve_calibration_slot`](@ref)
   - [`calibration_slots`](@ref)
-  - [`AmbiguityRadiusCalibration`](@ref)
+  - [`Num_AmbRadCal`](@ref)
   - [`CalibrationContext`](@ref)
   - [`calibration_series`](@ref)
   - [`TailTermParity`](@ref)
@@ -394,8 +390,8 @@ $(DocStringExtensions.FIELDS)
 
     ConditionalValueatRiskRange(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
-        alpha::Num_SigTailCal = 0.05,
-        beta::Num_SigHeadCal = mirror_role(alpha),
+        alpha::Num_SigCal = 0.05,
+        beta::Num_SigCal = alpha,
         w::Option{<:ObsWeights} = nothing
     ) -> ConditionalValueatRiskRange
 
@@ -461,11 +457,8 @@ ConditionalValueatRiskRange
     $(field_dict[:oow])
     """
     @pprop w
-    function ConditionalValueatRiskRange(settings::RiskMeasureSettings,
-                                         alpha::Num_SigTailCal, beta::Num_SigHeadCal,
-                                         w::Option{<:ObsWeights})
-        alpha = bind_role(SignificanceTailCalibration, alpha)
-        beta = bind_role(SignificanceHeadCalibration, beta)
+    function ConditionalValueatRiskRange(settings::RiskMeasureSettings, alpha::Num_SigCal,
+                                         beta::Num_SigCal, w::Option{<:ObsWeights})
         assert_unit_interval(alpha, :alpha)
         assert_unit_interval(beta, :beta)
         assert_nonempty_nonneg_finite_val(w, :w)
@@ -475,8 +468,7 @@ ConditionalValueatRiskRange
 end
 function ConditionalValueatRiskRange(;
                                      settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                     alpha::Num_SigTailCal = 0.05,
-                                     beta::Num_SigHeadCal = mirror_role(alpha),
+                                     alpha::Num_SigCal = 0.05, beta::Num_SigCal = alpha,
                                      w::Option{<:ObsWeights} = nothing)::ConditionalValueatRiskRange
     return ConditionalValueatRiskRange(settings, alpha, beta, w)
 end
@@ -521,10 +513,10 @@ $(DocStringExtensions.FIELDS)
 
     DistributionallyRobustConditionalValueatRiskRange(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
-        alpha::Num_SigTailCal = 0.05,
+        alpha::Num_SigCal = 0.05,
         l_a::Num_AmbTwtCal = 1.0,
         r_a::Num_AmbRadCal = 0.02,
-        beta::Num_SigHeadCal = mirror_role(alpha),
+        beta::Num_SigCal = alpha,
         l_b::Num_AmbTwtCal = 1.0,
         r_b::Num_AmbRadCal = 0.02,
         w::Option{<:ObsWeights} = nothing
@@ -618,19 +610,13 @@ DistributionallyRobustConditionalValueatRiskRange
     """
     @pprop w
     function DistributionallyRobustConditionalValueatRiskRange(settings::RiskMeasureSettings,
-                                                               alpha::Num_SigTailCal,
+                                                               alpha::Num_SigCal,
                                                                l_a::Num_AmbTwtCal,
                                                                r_a::Num_AmbRadCal,
-                                                               beta::Num_SigHeadCal,
+                                                               beta::Num_SigCal,
                                                                l_b::Num_AmbTwtCal,
                                                                r_b::Num_AmbRadCal,
                                                                w::Option{<:ObsWeights})
-        alpha = bind_role(SignificanceTailCalibration, alpha)
-        l_a = bind_role(l_a)
-        r_a = bind_role(r_a)
-        beta = bind_role(SignificanceHeadCalibration, beta)
-        l_b = bind_role(l_b)
-        r_b = bind_role(r_b)
         assert_unit_interval(alpha, :alpha)
         assert_unit_interval(beta, :beta)
         assert_nonempty_gt0_finite_val(l_a, :l_a)
@@ -645,10 +631,10 @@ DistributionallyRobustConditionalValueatRiskRange
 end
 function DistributionallyRobustConditionalValueatRiskRange(;
                                                            settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                                           alpha::Num_SigTailCal = 0.05,
+                                                           alpha::Num_SigCal = 0.05,
                                                            l_a::Num_AmbTwtCal = 1.0,
                                                            r_a::Num_AmbRadCal = 0.02,
-                                                           beta::Num_SigHeadCal = mirror_role(alpha),
+                                                           beta::Num_SigCal = alpha,
                                                            l_b::Num_AmbTwtCal = 1.0,
                                                            r_b::Num_AmbRadCal = 0.02,
                                                            w::Option{<:ObsWeights} = nothing)::DistributionallyRobustConditionalValueatRiskRange
@@ -664,7 +650,7 @@ Each tail keeps its own pair, so four slots resolve here. It carries the reading
 
 **Each end's tail weight reads that end's own probability.** `alpha` and `beta` resolve first, and each is stated in the context of the tail weight beside it: `l_a` reads `alpha` and `l_b` reads `beta`. A skewed sample therefore resolves the two tail weights to two different numbers, which is the whole point of [`TailTermParity`](@ref) on a Range measure. The two radii read neither probability, so the four remaining slots resolve in one pass.
 
-The two tails take one role and not two. A radius names no end of the distribution, so a rule placed in the loss-side pair and the same rule placed in the gain-side pair resolve independently, and [`mirror_role`](@ref) has nothing to carry across.
+A radius names no end of the distribution, so a rule placed in the loss-side pair and the same rule placed in the gain-side pair resolve independently, and neither ambiguity slot defaults from the other.
 
 Both ends price one series, which is the returns, so the same marker stands in the context of all four slots. The series is a property of the measure and not of an end, where the significance level is a property of the end.
 
@@ -844,7 +830,7 @@ $(DocStringExtensions.FIELDS)
 
     ConditionalDrawdownatRisk(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
-        alpha::Num_SigTailCal = 0.05,
+        alpha::Num_SigCal = 0.05,
         w::Option{<:ObsWeights} = nothing
     ) -> ConditionalDrawdownatRisk
 
@@ -905,16 +891,15 @@ ConditionalDrawdownatRisk
     $(field_dict[:oow])
     """
     @pprop w
-    function ConditionalDrawdownatRisk(settings::RiskMeasureSettings, alpha::Num_SigTailCal,
+    function ConditionalDrawdownatRisk(settings::RiskMeasureSettings, alpha::Num_SigCal,
                                        w::Option{<:ObsWeights})
-        alpha = bind_role(SignificanceTailCalibration, alpha)
         assert_unit_interval(alpha, :alpha)
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(w)}(settings, alpha, w)
     end
 end
 function ConditionalDrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                   alpha::Num_SigTailCal = 0.05,
+                                   alpha::Num_SigCal = 0.05,
                                    w::Option{<:ObsWeights} = nothing)::ConditionalDrawdownatRisk
     return ConditionalDrawdownatRisk(settings, alpha, w)
 end
@@ -958,7 +943,7 @@ $(DocStringExtensions.FIELDS)
 
     DistributionallyRobustConditionalDrawdownatRisk(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
-        alpha::Num_SigTailCal = 0.05,
+        alpha::Num_SigCal = 0.05,
         l::Num_AmbTwtCal = 1.0,
         r::Num_AmbRadCal = 0.02,
         w::Option{<:ObsWeights} = nothing
@@ -1035,13 +1020,10 @@ DistributionallyRobustConditionalDrawdownatRisk
     """
     @pprop w
     function DistributionallyRobustConditionalDrawdownatRisk(settings::RiskMeasureSettings,
-                                                             alpha::Num_SigTailCal,
+                                                             alpha::Num_SigCal,
                                                              l::Num_AmbTwtCal,
                                                              r::Num_AmbRadCal,
                                                              w::Option{<:ObsWeights})
-        alpha = bind_role(SignificanceTailCalibration, alpha)
-        l = bind_role(l)
-        r = bind_role(r)
         assert_unit_interval(alpha, :alpha)
         assert_nonempty_gt0_finite_val(l, :l)
         assert_nonempty_gt0_finite_val(r, :r)
@@ -1054,7 +1036,7 @@ DistributionallyRobustConditionalDrawdownatRisk
 end
 function DistributionallyRobustConditionalDrawdownatRisk(;
                                                          settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                                         alpha::Num_SigTailCal = 0.05,
+                                                         alpha::Num_SigCal = 0.05,
                                                          l::Num_AmbTwtCal = 1.0,
                                                          r::Num_AmbRadCal = 0.02,
                                                          w::Option{<:ObsWeights} = nothing)::DistributionallyRobustConditionalDrawdownatRisk
@@ -1229,7 +1211,7 @@ $(DocStringExtensions.FIELDS)
 
     RelativeConditionalDrawdownatRisk(;
         settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
-        alpha::Num_SigTailCal = 0.05,
+        alpha::Num_SigCal = 0.05,
         w::Option{<:ObsWeights} = nothing
     ) -> RelativeConditionalDrawdownatRisk
 
@@ -1288,9 +1270,7 @@ RelativeConditionalDrawdownatRisk
     """
     @pprop w
     function RelativeConditionalDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
-                                               alpha::Num_SigTailCal,
-                                               w::Option{<:ObsWeights})
-        alpha = bind_role(SignificanceTailCalibration, alpha)
+                                               alpha::Num_SigCal, w::Option{<:ObsWeights})
         assert_unit_interval(alpha, :alpha)
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(w)}(settings, alpha, w)
@@ -1298,7 +1278,7 @@ RelativeConditionalDrawdownatRisk
 end
 function RelativeConditionalDrawdownatRisk(;
                                            settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
-                                           alpha::Num_SigTailCal = 0.05,
+                                           alpha::Num_SigCal = 0.05,
                                            w::Option{<:ObsWeights} = nothing)::RelativeConditionalDrawdownatRisk
     return RelativeConditionalDrawdownatRisk(settings, alpha, w)
 end

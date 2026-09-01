@@ -2,7 +2,7 @@
 status: accepted
 ---
 
-# The calibration channel is parallel to the Deferred Quantity, and the role is in the bound
+# The calibration channel is parallel to the Deferred Quantity, and the rule is in the bound
 
 ## Context
 
@@ -39,7 +39,7 @@ validate.
 
 ## Decision
 
-### The channel is parallel, and a role stays out of the `DeferredQuantity` union
+### The channel is parallel, and a rule stays out of the `DeferredQuantity` union
 
 Five verbs are new. Each names its counterpart in
 [`src/19_RiskMeasures/01_Base_RiskMeasures.jl`](../../src/19_RiskMeasures/01_Base_RiskMeasures.jl),
@@ -63,12 +63,12 @@ of `resolve_slot`:
 2. **`resolve_slot` carries neither the observation weights nor the solver**, and a rule reads both.
    `ScenarioCount` reads Kish's effective sample size off `w`, and a rule may call `ERM` or `RRM`.
 3. **A refusal must name the mechanism the caller wrote.** `assert_calibrated_slots` tells a caller
-   who reached `expected_risk(r, w, X)` that the slot holds a Calibration Role and that a bare
+   who reached `expected_risk(r, w, X)` that the slot holds a Calibration Rule and that a bare
    returns matrix carries no sample for the rule to read. The Deferred-Quantity message names a fit
    instead, which is the wrong instruction.
 
 **The declaration is paired with its resolver.** `calibration_slots` and the resolution beside it
-are two statements, and a type that writes the first and forgets the second hands a role to the
+are two statements, and a type that writes the first and forgets the second hands a rule to the
 model builders. `assert_declared_calibration_resolver` refuses that, and it is the fourth pair
 because the Deferred-Quantity channel already refuses the same failure. It runs where a resolved
 measure meets a consumer that cannot resolve: `set_risk_constraints!` on the `JuMP` route, and the
@@ -113,67 +113,59 @@ the declaration the type already writes, it is one method rather than one per st
 that needs an order of its own overrides it. Where a tag row would have to state the order it cannot
 know, a method is simply shadowed by the more specific one beside the declaration.
 
-### The role names the quantity, and the bound is the whole validation
+### The slot names the quantity, and the bound is the whole validation
 
-A **Calibration Rule** computes a number. A **Calibration Role** places that rule in the slot of one
-quantity and names the quantity. Seven roles ship, over five rule families:
+A **Calibration Rule** computes a number, and the **slot** it stands in names the quantity that
+number is. Five rule families ship, one per quantity:
 
-| Role | Rule family | Slots it stands in |
-| :--- | :--- | :--- |
-| `SignificanceTailCalibration` | `AbstractSignificanceCalibrationAlgorithm` | `alpha` |
-| `SignificanceHeadCalibration` | `AbstractSignificanceCalibrationAlgorithm` | `beta` |
-| `DeformationTailCalibration` | `AbstractDeformationCalibrationAlgorithm` | `kappa`, `kappa_a` |
-| `DeformationHeadCalibration` | `AbstractDeformationCalibrationAlgorithm` | `kappa_b` |
-| `AmbiguityRadiusCalibration` | `AbstractAmbiguityRadiusCalibrationAlgorithm` | `r`, `r_a`, `r_b`, `val`, `l1`, `linf` |
-| `AmbiguityTailWeightCalibration` | `AbstractAmbiguityTailWeightCalibrationAlgorithm` | `l`, `l_a`, `l_b` |
-| `NormCeilingCalibration` | `AbstractNormCeilingCalibrationAlgorithm` | `l2c`, `linfc`, `val` |
+| Rule family | Slots it stands in |
+| :--- | :--- |
+| `AbstractSignificanceCalibrationAlgorithm` | `alpha`, `beta` |
+| `AbstractDeformationCalibrationAlgorithm` | `kappa`, `kappa_a`, `kappa_b` |
+| `AbstractAmbiguityRadiusCalibrationAlgorithm` | `r`, `r_a`, `r_b`, `val`, `l1`, `linf` |
+| `AbstractAmbiguityTailWeightCalibrationAlgorithm` | `l`, `l_a`, `l_b` |
+| `AbstractNormCeilingCalibrationAlgorithm` | `l2c`, `linfc`, `val` |
 
-[#593](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/593) split the root in two: a
-role is an Estimator under `AbstractCalibrationEstimator`, and only a rule is an Algorithm under
-`AbstractCalibrationAlgorithm`. Two bound families follow from that split, and together they are the
-whole of the validation.
-
-- A **slot** bound is `Num_SigTailCal`, `Num_SigHeadCal`, `Num_DefTailCal`, `Num_DefHeadCal`,
-  `Num_AmbRadCal`, `Num_AmbTwtCal` or `Num_NormCeilCal`, each pairing `Number` with **one** concrete
-  role and with that role's **one** rule family. A head role in a tail slot, or an ambiguity role in
-  a significance slot, is refused **at construction**, and so is a rule of the wrong family.
-- An **`alg`** bound is `Func_SigCal`, `Func_DefCal`, `Func_AmbRadCal`, `Func_AmbTwtCal` or
-  `Func_NormCeilCal`, each pairing `Function` with one rule family. No role subtypes a rule family,
-  so a role nested inside another role's `alg` is refused by the same route.
+Every family sits under `AbstractCalibrationAlgorithm`, and one bound family follows. A **slot**
+bound is `Num_SigCal`, `Num_DefCal`, `Num_AmbRadCal`, `Num_AmbTwtCal` or `Num_NormCeilCal`, each
+pairing `Number` with **one** rule family and with a plain `Function`. A deformation rule in a
+significance slot, or an ambiguity rule in either, is refused **at construction**.
 
 Refusal by the bound is **earlier than any `assert_` method could be**: it fires where the caller
-wrote the mistake, not at the fold where the value is read. So no guard method is written for either
-mismatch, and neither refusal has a message that must be kept in step with a bound.
+wrote the mistake, not at the fold where the value is read. So no guard method is written for the
+mismatch, and the refusal has no message that must be kept in step with a bound.
 
-**The slot names the end, so the caller states it once.** A slot bound names one role, and that role
-names the same end of the distribution the slot itself names. A caller who wraps the rule therefore
-writes that end twice, at every calibrated keyword of every measure. The slot bound admits the bare
-rule as well, and `bind_role` puts the role on inside the constructor, before the slot is stored.
-What is stored is still the role, so every reader of a slot — `resolve_calibration_slot`,
-`assert_calibrated_slots`, `sel` and `mirror_role` — sees exactly what it saw before, and the
-wrapped form stays legal and stays the canonical printed form.
+**The slot names the end, so the caller never states it.** `alpha` is the lower tail and `beta` is
+the upper tail, and one rule serves both ends. So one bound serves both slots of a family, and a
+Range measure defaults its head slot to whatever its tail slot holds.
+[#641](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/641) withdrew the seven
+Calibration Roles that used to name the end a second time, and `bind_role` with them. What a slot
+stores is now what the caller wrote.
 
-Two things are deliberately **not** admitted bare. A **plain `Function`** carries no family, so a
-bound that took one could not tell a deformation closure from a significance one; the role is what
-states the family a function cannot, and a caller with a closure still writes the role. A **role of
-the wrong family or the wrong end** stays refused, because the bound names one role and one rule
-family and no others. So the guarantee this decision rests on is unchanged: the mismatch a caller
-can write is refused at construction, by the bound, with no guard method.
+**A plain `Function` is a rule, and the trait says which occupants are.** A closure over a caller's
+own data is the case that has no type, so every slot bound above admits one. A function carries no
+family, so the bound cannot refuse a deformation closure in a significance slot: the name of the
+slot is what states the quantity there, which is the same statement this decision rests on
+everywhere else. `is_calibration_rule` is the marker rather than the `Function` type itself,
+because `calibration_slots` also declares the **children** of a container and one such child — an
+ordered-weights builder wrapped in a reversal — is a `Function` that computes no quantity.
+`OWA_CalOccupant` withdraws it with one method.
 
-`bind_role` takes two arities, one per shape of slot. A slot that **names an end** passes the role
-type, because a rule alone cannot say tail or head. A slot that **names no end** passes the occupant
-alone, and the rule's own family settles the role. A `TimeDependent` crosses unchanged, because
-`update_time_dependent_fields` rebuilds the host through its keyword constructor, so the fold's own
-value is bound when the fold selects it.
-
-**One bound names two roles, and two `assert_` methods part them.** `LpRegularisation.val` is a
+**One bound names two quantities, and two `assert_` methods part them.** `LpRegularisation.val` is a
 penalty coefficient in `JuMPOptimiser.lp` and a norm ceiling in `JuMPOptimiser.lpc`, so the field
-cannot name its reading from the type alone. `Num_AmbRadNormCeilCal` admits both roles and both rule families, and
+cannot name its reading from the type alone. `Num_AmbRadNormCeilCal` admits both rule families, and
 `assert_penalty_coefficient_role` and `assert_norm_ceiling_role` settle the reading per field. It is
-the one slot whose bare route reads the rule's family to pick between two roles, which is the same
-reading the two `assert_` methods then check. Both
-run in `JuMPOptimiser`'s own constructor, so the refusal still fires where the caller wrote the
-field. ADR 0097 carries that decision, and every other bound names one role.
+the one slot that admits **no** plain function, because a function names no family and the two
+guards read the family. Both run in `JuMPOptimiser`'s own constructor, so the refusal still fires
+where the caller wrote the field. ADR 0097 carries that decision, and every other bound names one
+quantity.
+
+**The range of a calibrated number is stated where the number lands.** Every slot whose owner
+rebuilds a term meets that owner's own constructor, and the rebuild states the range. Four slots
+reach a `JuMP` model raw — `l2c` and `linfc` for a ceiling, `l1` and `linf` for a radius — so
+`assemble_jump_model!` states their range itself, on whatever number reaches the model.
+`resolve_calibration_slot` also checks the two families that name those quantities, so a rule of
+either is refused under any key.
 
 ### No ordering guard, and no reordering
 
@@ -331,16 +323,19 @@ assets.
 neither moves with the series, so it never reads `ctx.series`. `ScenarioCount`,
 `RateSignificance`, `RateRadius` and `EffectiveAssetFloor` need no method either.
 
-### Two carriers hold what no derivation can find
+### One carrier holds what no derivation can find
 
-- **`mirror_role(x)`** is the default of the head slot on every Range type. A number crosses
-  unchanged and a tail role crosses as the head role of the same family holding the same `alg`, so
-  a rule stated on one end reaches both and no stated number moves. The two ordered-weights Range
-  types already read `beta = alpha`, and the widening kept that default alive. The six that held a
-  literal of their own now read the same default, which is the same number at the default
-  arguments and the tail slot's occupant otherwise. `RelativisticValueatRiskRange` is what gives
-  the deformation method a caller: its gain-side pair defaults to its loss-side pair, both halves.
-- **`CalibrationContext(; alpha, series, p)`** is the second, and it carries everything the site
+- **The head slot's default is its tail slot.** `beta::Num_SigCal = alpha` on every Range type,
+  and `kappa_b::Num_DefCal = kappa_a` on the relativistic one. The occupant crosses unchanged,
+  because a rule states the method and the slot states the end, so a rule stated on one end
+  reaches both and no stated number moves. The two ordered-weights Range types already read
+  `beta = alpha`, and the widening kept that default alive. The six that held a literal of their
+  own now read the same default, which is the same number at the default arguments and the tail
+  slot's occupant otherwise.
+  [#641](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/641) withdrew `mirror_role`,
+  the verb that carried a tail **role** across as the head role of the same family. With no role
+  to rebuild it was the identity, and an identity verb states less than the default it stood in.
+- **`CalibrationContext(; alpha, series, p)`** carries everything the site
   knows that `key` does not. `resolve_calibration_slot` takes it as a sixth argument and hands it
   to the rule, which is called as `alg(key, pr, w, slv, ctx)`.
   - `alpha` is a **travelling pair**. `EntropyBudget` reads its sibling `alpha`, so the owner
@@ -354,9 +349,8 @@ neither moves with the series, so it never reads `ctx.series`. `ScenarioCount`,
 **No rule holds a field for any of the three.** Each belongs to the site, and a rule cannot know
 which site it reached, so there is no value on the rule for the site to overwrite, no precedence
 between the two to state, and no occupant to rebuild on the way in. A caller who runs a rule
-outside a measure builds the context the site would have built. `mirror_role` is therefore the one
-verb that changes a value, and it does so by design: it carries the `alg` across and nothing
-else.
+outside a measure builds the context the site would have built. No verb of the channel changes a
+value on the way in.
 
 ### A schedule reaches the host, and no further
 
@@ -373,14 +367,14 @@ in `update_time_dependent_fields`, before any prior is fitted. The resolution ru
 against the prior of the period that was selected. So a schedule and a rule compose, and the order
 falls out of the pipeline rather than being invented for it.
 
-So the `Num_` and `Func_` bounds of the seven roles stay free of `TimeDependent`. A generic
+So the five `Num_` bounds stay free of `TimeDependent`. A generic
 resolution is possible in principle: nothing in the mechanism stops a schedule from being resolved
 wherever it stands. It buys no reading that the host's own channel does not already give, so it is
 not built.
 
 ## Rejected alternatives
 
-**Widening `DeferredQuantity` to admit the roles.** One union, one resolver, one declaration verb.
+**Widening `DeferredQuantity` to admit the rules.** One union, one resolver, one declaration verb.
 Rejected because `resolve_slot` would then need a branch on what it holds, two more arguments that
 half its domain ignores, and a refusal message that names a fit for a value that is never fitted.
 The two mechanisms would read as one and behave as two.
@@ -396,14 +390,16 @@ twenty-seven bodies stated the slot list a second and a third time, beside the d
 already held it, and none of them stated an order. A field added to such a type and missed at one of
 the three sites moved the number the measure priced and broke no test.
 
-**One role type per family, with a field naming the end.** `SignificanceCalibration(; end = :tail)`
-halves the type count. Rejected because the end would then be data rather than type, so a tail rule
-in a head slot could only be refused by a guard method at resolution time, which is later and needs
-a message.
+**A role type that places a rule in a slot and names the quantity.** Seven of them shipped in the
+first cut of this decision, one per slot shape, each holding the rule in an `alg` field. Withdrawn
+by [#641](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/641): the slot already names
+the quantity, so the role restated at every call site what the field it was assigned to had already
+said. Nothing read the role's own type at resolution time — there was one resolution method and it
+took the root — so the type carried no information the slot did not.
 
-**A guard method per slot, with every slot bound at `Union{Number, AbstractCalibrationEstimator}`.**
-Rejected on the same grounds. The bound already refuses every mismatch it can see, and a guard would
-duplicate the refusal without widening what is caught.
+**A guard method per slot, with every slot bound at `Union{Number, AbstractCalibrationAlgorithm}`.**
+Rejected. The bound already refuses every mismatch it can see, and a guard would duplicate the
+refusal without widening what is caught.
 
 **An ordering guard on the calibrated pair, or a silent reorder.** Rejected: the joint `@argcheck` is
 the whole validation and it already runs on the rebuilt struct, and a reorder invents an intent.

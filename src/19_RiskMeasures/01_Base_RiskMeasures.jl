@@ -1958,7 +1958,7 @@ end
 """
     resolve_calibration_slots(x, pr::AbstractPriorResult, slv = nothing)
 
-Resolve the slots that [`calibration_slots`](@ref) declared, and return them as a `NamedTuple` for [`resolve_deferred_quantities`](@ref) to rebuild from. The answer is empty when no slot held a **Calibration Role**.
+Resolve the slots that [`calibration_slots`](@ref) declared, and return them as a `NamedTuple` for [`resolve_deferred_quantities`](@ref) to rebuild from. The answer is empty when no slot held a **Calibration Rule**.
 
 This is the derived half of the calibration channel, and it is the parallel of the container recursion in [`resolve_deferred_quantities`](@ref). A type whose slots carry no order between them declares them once and writes no resolution: the declaration is the whole statement, and this method reads it.
 
@@ -1973,7 +1973,7 @@ The empty answer is what keeps a container's key out of the merge. A container n
 # Algorithm
 
  1. Read the slots `x` declares with [`calibration_slots`](@ref), giving `slots`.
- 2. Return an empty `NamedTuple` when no entry of `slots` holds an [`AbstractCalibrationEstimator`](@ref). A stated number resolves to itself, so the walk would move nothing.
+ 2. Return an empty `NamedTuple` when [`is_calibration_rule`](@ref) answers `false` for every entry of `slots`. A stated number resolves to itself, so the walk is skipped. A stated number resolves to itself, so the walk would move nothing.
  3. Read every field of `x` into `props`, by index, which is the shape [`rebuild_with_slots`](@ref) builds. A field read by name would name a field some type reaching this method does not carry.
  4. Settle the effective observation weights `w`, as `sel(props.w, pr.w)` where `x` carries the field and `sel(nothing, pr.w)` where it does not.
  5. Settle the effective solver `sv`, as `sel(props.slv, slv)` where `x` carries the field and `sel(nothing, slv)` where it does not.
@@ -1989,11 +1989,11 @@ The empty answer is what keeps a container's key out of the merge. A container n
   - [`resolve_calibration_slot`](@ref)
   - [`resolve_deferred_quantities`](@ref)
   - [`rebuild_with_slots`](@ref)
-  - [`AbstractCalibrationEstimator`](@ref)
+  - [`AbstractCalibrationAlgorithm`](@ref)
 """
 function resolve_calibration_slots(x, pr::AbstractPriorResult, slv = nothing)
     slots = calibration_slots(x)::NamedTuple
-    if !any(map(slot -> isa(slot, AbstractCalibrationEstimator), values(slots)))
+    if !any(map(is_calibration_rule, values(slots)))
         return (;)
     end
     # The two context fields are read out of the whole field tuple, which is the shape
@@ -2215,7 +2215,7 @@ sel(::Nothing, source_variable::Slv_VecSlv) = solver_selector(nothing, source_va
 sel(risk_variable::UcSE_UcS, source_variable) = ucs_selector(risk_variable, source_variable)
 sel(::Nothing, source_variable::UcSE_UcS) = ucs_selector(nothing, source_variable)
 sel(risk_variable::DeferredQuantity, ::Any) = risk_variable
-sel(risk_variable::AbstractCalibrationEstimator, ::Any) = risk_variable
+sel(risk_variable::Union{<:AbstractCalibrationAlgorithm, <:Function}, ::Any) = risk_variable
 """
     _ctx(args...)
 

@@ -2,15 +2,14 @@
 status: accepted
 ---
 
-# A norm ceiling is not an ambiguity radius, and it takes its own role
+# A norm ceiling is not an ambiguity radius, and it takes its own rule family
 
 ## Context
 
 ADR 0070 widened twelve slots so that a radius could be computed rather than pasted, and ADR
-0095 records the shape that shipped: a **Calibration Role** places a rule in the slot of one
-quantity and **names the quantity**, and the slot's bound pairs `Number` with exactly one
-role. A head role in a tail slot is refused at construction, and no guard method is written
-for the mismatch.
+0095 records the shape that shipped: the **slot** names the quantity, and its bound pairs
+`Number` with exactly one rule family and a plain `Function`. A rule of another family is
+refused at construction, and no guard method is written for the mismatch.
 
 Three slots of [`JuMPOptimiser`](../../src/20_Optimisation/10_JuMPOptimiser.jl) were left as
 bare numbers by both decisions: `l2c`, `lpc` and `linfc`. They read as if they belonged to
@@ -31,31 +30,28 @@ set of measures the model prices, and neither shipped radius rule computes one:
 field and a norm constraint in the `lpc` field, and ADR 0070 widened its `val` to
 `Num_AmbRadCal` for the penalty reading alone. The type is shared, so `lpc` inherited a
 bound it was never meant to have. Nothing resolved it: `set_weight_norm_p_constraints!` read
-`lp.val` raw and handed it to a JuMP expression, so an `AmbiguityRadiusCalibration` in
+`lp.val` raw and handed it to a JuMP expression, so an ambiguity-radius rule in
 `lpc` reached the solver layer and failed there with a message about JuMP. The `factory`
 docstring on that type asserted the opposite — "That field keeps its own bound, so nothing
 there widens and this method never reaches it" — which was never true.
 
 ## Decision
 
-**A Norm Ceiling is its own quantity, and it takes its own family, role and bound.**
+**A Norm Ceiling is its own quantity, and it takes its own rule family and bound.**
 
 The domain noun is a **Norm Ceiling** (`CONTEXT.md` section 3.9), defined against the
 Ambiguity Radius it is not. The mechanism is ADR 0095's, unchanged: a family of rules under
-`AbstractCalibrationAlgorithm`, a `Func_` bound for the `alg` field that also admits a plain
-`Function`, one role under `AbstractCalibrationEstimator`, and a `Num_` bound that pairs the
-role with `Number`.
+`AbstractCalibrationAlgorithm`, and a `Num_` bound that pairs that family with `Number` and a
+plain `Function`.
 
 ```julia
 AbstractNormCeilingCalibrationAlgorithm <: AbstractCalibrationAlgorithm
-const Func_NormCeilCal  = Union{<:Function, <:AbstractNormCeilingCalibrationAlgorithm}
-NormCeilingCalibration  <: AbstractCalibrationEstimator
-const Num_NormCeilCal   = Union{<:NormCeilingCalibration, <:Number}
+const Num_NormCeilCal = Union{<:AbstractNormCeilingCalibrationAlgorithm, <:Function,
+                              <:Number}
 ```
 
-A ceiling names no end of a distribution, so the family carries **one** role and
-`mirror_role` needs no method for it. That is the shape the radius family already has, and
-for the same reason.
+A ceiling names no end of a distribution, so no ceiling slot defaults from another.
+That is the shape the radius family already has, and for the same reason.
 
 ### Three slots widen
 
@@ -89,9 +85,9 @@ Prior. So a cluster, a subset view and a cross-validation fold each get the floo
 universe earns. A stated count would be pinned to the universe it was written for, which is
 the trade ADR 0070 records for every other rule.
 
-**The role's bound is where the radius family is refused.** `Num_NormCeilCal` names one role,
-so an `AmbiguityRadiusCalibration` in `l2c` is a `TypeError` at construction, and a
-`NormCeilingCalibration` in `l1` is the same. No guard method is written for either.
+**The slot's bound is where the radius family is refused.** `Num_NormCeilCal` names one
+family, so a radius rule in `l2c` is a `TypeError` at construction, and a ceiling rule in `l1`
+is the same. No guard method is written for either.
 
 ### The norm order travels through the rule
 
@@ -109,22 +105,26 @@ would have built.
 ### The dual-use slot is settled by the field that holds the term, not by its bound
 
 `LpRegularisation.val` is the one slot in the library that two readings share, so it is the
-one exception to ADR 0095's rule that the bound is the whole of the role validation. One
-field cannot carry two bounds. `Num_AmbRadNormCeilCal` therefore admits both roles, and two
-`assert_` methods settle the reading where it becomes known:
+one exception to ADR 0095's rule that the bound is the whole of the family validation. One
+field cannot carry two bounds. `Num_AmbRadNormCeilCal` therefore admits both rule families,
+and two `assert_` methods settle the reading where it becomes known:
 
-- `assert_penalty_coefficient_role` refuses a ceiling role. It runs in `JuMPOptimiser`'s
+- `assert_penalty_coefficient_role` refuses a ceiling rule. It runs in `JuMPOptimiser`'s
     constructor against `lp`, and again in `factory` for a term that reaches the objective by
     another route.
-- `assert_norm_ceiling_role` refuses a radius role. It runs in `JuMPOptimiser`'s constructor
+- `assert_norm_ceiling_role` refuses a radius rule. It runs in `JuMPOptimiser`'s constructor
     against `lpc`, and again in `norm_ceiling_factory`.
+
+It is also the one slot that admits **no** plain function. A function names no family, and the
+two methods above read the family, so a closure there would reach a route that has no reading
+for it and neither method could say so.
 
 **The constructor is the important half.** It fires where the caller wrote the field, which
 is the point ADR 0095 insists on, and it is as early as any check can be for this slot. The
 factory halves are the backstop for a term assembled by another path.
 
 `norm_ceiling_factory` is a second verb rather than a `factory` method because the two routes
-read one field as two quantities. Each refuses the role that has no reading on its own route,
+read one field as two quantities. Each refuses the family that has no reading on its own route,
 and each resolves the slot under its own key: `:lpreg_val` for the penalty and `:lpc` for the
 constraint. Both bind the term's own norm order first, because a rule placed in either field
 serves every term and each term carries its own `p`.
@@ -140,19 +140,19 @@ and the term's own `p` for each entry of `lpc`. `JuMPOptimiser` still declares n
 ## Rejected alternatives
 
 **Bounding `l2c` and `linfc` at `Num_AmbRadCal`.** About twenty lines, and mechanically
-identical to `l1` and `linf`. Rejected because it reverses ADR 0095's central rule: the role
-would no longer name the quantity, the bound's name would contradict its slot, and both ADRs
-would need an amendment saying so. The saving is a type and a `const`; the cost is the one
-rule that makes every other bound in the mechanism readable.
+identical to `l1` and `linf`. Rejected because it reverses ADR 0095's central rule: the bound
+would no longer name the quantity of its slot, the bound's name would contradict that slot, and
+both ADRs would need an amendment saying so. The saving is a `const`; the cost is the one rule
+that makes every other bound in the mechanism readable.
 
-**One `NormCeilingCalibration` with a `p` field the caller states.** No order in the context,
+**One norm-ceiling rule with a `p` field the caller states.** No order in the context,
 and the rule carries its own. Rejected because `lpc` holds several terms with several orders
 and one rule serves them all, so a caller-stated order would be wrong for every term but
 one. It would also let a caller state `p = 3` in `l2c`, where the answer would be a
 ceiling for the wrong norm and nothing would catch it.
 
 **Leaving `lpc` alone and only fixing its resolution.** Smaller, and it closes the reported
-failure. Rejected because the failure is a symptom: the field would still admit a radius role
+failure. Rejected because the failure is a symptom: the field would still admit a radius rule
 that has no reading there, and the refusal would still arrive from the JuMP layer rather than
 from the library.
 
@@ -170,12 +170,11 @@ Prior instead of pasted.
 - **A diversification floor survives a refit.** A ceiling stated as a fraction of the
     universe re-derives per fold, per cluster and per subset view, which is what a pasted
     `1 / sqrt(m)` never did.
-- **A defect is closed.** An `AmbiguityRadiusCalibration` in `lpc` used to reach a JuMP
-    expression unresolved. It is now refused in `JuMPOptimiser`'s constructor, and a
-    `NormCeilingCalibration` in `lpc` resolves.
+- **A defect is closed.** A radius rule in `lpc` used to reach a JuMP expression unresolved.
+    It is now refused in `JuMPOptimiser`'s constructor, and a ceiling rule in `lpc` resolves.
 - **ADR 0095's rule gains one stated exception.** Every bound but `Num_AmbRadNormCeilCal`
-    still pairs `Number` with one role. That one is dual-use because the type it belongs to
-    is, and the exception is confined to it.
+    still pairs `Number` with one rule family. That one is dual-use because the type it
+    belongs to is, and the exception is confined to it.
 - **The order a rule reads is never on the rule.** A caller who wants a particular order
     states it in a `CalibrationContext` and runs the rule by hand; inside a constraint the
     site's order is the only one there is.

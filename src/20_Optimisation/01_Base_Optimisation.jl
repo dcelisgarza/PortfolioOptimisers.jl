@@ -917,10 +917,6 @@ The set of fields whose constructor signatures use this alias is the single sour
   - [`Option`](@ref)
 """
 const TD_Option{X} = Union{Nothing, <:TimeDependent, X}
-# A schedule crosses unchanged, and the fold's own value is bound — see `bind_role`.
-function bind_role(x::TimeDependent)
-    return x
-end
 """
     const TD{X} = Union{<:TimeDependent, X}
 

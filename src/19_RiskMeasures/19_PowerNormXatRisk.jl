@@ -102,7 +102,7 @@ $(DocStringExtensions.FIELDS)
     PowerNormValueatRisk(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
         slv::Option{<:Slv_VecSlv} = nothing,
-        alpha::Num_SigTailCal = 0.05,
+        alpha::Num_SigCal = 0.05,
         p::Number = 2.0,
         w::Option{<:ObsWeights} = nothing
     ) -> PowerNormValueatRisk
@@ -176,9 +176,8 @@ PowerNormValueatRisk
     """
     @pprop w
     function PowerNormValueatRisk(settings::RiskMeasureSettings, slv::Option{<:Slv_VecSlv},
-                                  alpha::Num_SigTailCal, p::Number,
+                                  alpha::Num_SigCal, p::Number,
                                   w::Option{<:StatsBase.AbstractWeights})
-        alpha = bind_role(SignificanceTailCalibration, alpha)
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
@@ -192,8 +191,8 @@ PowerNormValueatRisk
     end
 end
 function PowerNormValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                              slv::Option{<:Slv_VecSlv} = nothing,
-                              alpha::Num_SigTailCal = 0.05, p::Number = 2.0,
+                              slv::Option{<:Slv_VecSlv} = nothing, alpha::Num_SigCal = 0.05,
+                              p::Number = 2.0,
                               w::Option{<:ObsWeights} = nothing)::PowerNormValueatRisk
     return PowerNormValueatRisk(settings, slv, alpha, p, w)
 end
@@ -236,8 +235,8 @@ $(DocStringExtensions.FIELDS)
     PowerNormValueatRiskRange(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
         slv::Option{<:Slv_VecSlv} = nothing,
-        alpha::Num_SigTailCal = 0.05,
-        beta::Num_SigHeadCal = mirror_role(alpha),
+        alpha::Num_SigCal = 0.05,
+        beta::Num_SigCal = alpha,
         pa::Number = 2.0,
         pb::Number = pa,
         w::Option{<:ObsWeights} = nothing
@@ -320,11 +319,9 @@ PowerNormValueatRiskRange
     """
     @pprop w
     function PowerNormValueatRiskRange(settings::RiskMeasureSettings,
-                                       slv::Option{<:Slv_VecSlv}, alpha::Num_SigTailCal,
-                                       beta::Num_SigHeadCal, pa::Number, pb::Number,
+                                       slv::Option{<:Slv_VecSlv}, alpha::Num_SigCal,
+                                       beta::Num_SigCal, pa::Number, pb::Number,
                                        w::Option{<:ObsWeights})
-        alpha = bind_role(SignificanceTailCalibration, alpha)
-        beta = bind_role(SignificanceHeadCalibration, beta)
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
@@ -339,8 +336,7 @@ PowerNormValueatRiskRange
 end
 function PowerNormValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                    slv::Option{<:Slv_VecSlv} = nothing,
-                                   alpha::Num_SigTailCal = 0.05,
-                                   beta::Num_SigHeadCal = mirror_role(alpha),
+                                   alpha::Num_SigCal = 0.05, beta::Num_SigCal = alpha,
                                    pa::Number = 2.0, pb::Number = pa,
                                    w::Option{<:ObsWeights} = nothing)::PowerNormValueatRiskRange
     return PowerNormValueatRiskRange(settings, slv, alpha, beta, pa, pb, w)
@@ -410,7 +406,7 @@ $(DocStringExtensions.FIELDS)
     PowerNormDrawdownatRisk(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
         slv::Option{<:Slv_VecSlv} = nothing,
-        alpha::Num_SigTailCal = 0.05,
+        alpha::Num_SigCal = 0.05,
         p::Number = 2.0,
         w::Option{<:ObsWeights} = nothing
     ) -> PowerNormDrawdownatRisk
@@ -485,9 +481,8 @@ PowerNormDrawdownatRisk
     """
     @pprop w
     function PowerNormDrawdownatRisk(settings::RiskMeasureSettings,
-                                     slv::Option{<:Slv_VecSlv}, alpha::Num_SigTailCal,
+                                     slv::Option{<:Slv_VecSlv}, alpha::Num_SigCal,
                                      p::Number, w::Option{<:ObsWeights})
-        alpha = bind_role(SignificanceTailCalibration, alpha)
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
@@ -502,7 +497,7 @@ PowerNormDrawdownatRisk
 end
 function PowerNormDrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                  slv::Option{<:Slv_VecSlv} = nothing,
-                                 alpha::Num_SigTailCal = 0.05, p::Number = 2.0,
+                                 alpha::Num_SigCal = 0.05, p::Number = 2.0,
                                  w::Option{<:ObsWeights} = nothing)::PowerNormDrawdownatRisk
     return PowerNormDrawdownatRisk(settings, slv, alpha, p, w)
 end
@@ -561,7 +556,7 @@ $(DocStringExtensions.FIELDS)
     RelativePowerNormDrawdownatRisk(;
         settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
         slv::Option{<:Slv_VecSlv} = nothing,
-        alpha::Num_SigTailCal = 0.05,
+        alpha::Num_SigCal = 0.05,
         p::Number = 2.0,
         w::Option{<:ObsWeights} = nothing
     ) -> RelativePowerNormDrawdownatRisk
@@ -633,10 +628,8 @@ RelativePowerNormDrawdownatRisk
     """
     @pprop w
     function RelativePowerNormDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
-                                             slv::Option{<:Slv_VecSlv},
-                                             alpha::Num_SigTailCal, p::Number,
-                                             w::Option{<:ObsWeights})
-        alpha = bind_role(SignificanceTailCalibration, alpha)
+                                             slv::Option{<:Slv_VecSlv}, alpha::Num_SigCal,
+                                             p::Number, w::Option{<:ObsWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
@@ -652,7 +645,7 @@ end
 function RelativePowerNormDrawdownatRisk(;
                                          settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
                                          slv::Option{<:Slv_VecSlv} = nothing,
-                                         alpha::Num_SigTailCal = 0.05, p::Number = 2.0,
+                                         alpha::Num_SigCal = 0.05, p::Number = 2.0,
                                          w::Option{<:ObsWeights} = nothing)::RelativePowerNormDrawdownatRisk
     return RelativePowerNormDrawdownatRisk(settings, slv, alpha, p, w)
 end

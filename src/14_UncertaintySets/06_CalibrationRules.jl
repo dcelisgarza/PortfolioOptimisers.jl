@@ -9,13 +9,12 @@ A rule is named for the **method** it runs, and carries the name of the quantity
 
 A rule states a default for every keyword it can, so a bare call constructs. Two rules state none, because the quantity the keyword takes is the whole content of the rule and no value suits every sample. [`ScenarioCount`](@ref) and [`EntropyBudget`](@ref) are those two. The keyword of each stands at `nothing`, which is not a value of the quantity, so a bare call is refused with a message that names the quantity, the reason there is no default, and a value to start from.
 
-This root carries the **rules** alone. A **role**, the type that places a rule in the slot of one quantity, is an Estimator under [`AbstractCalibrationEstimator`](@ref) and subtypes nothing here, so a role placed inside another role's `alg` field is refused by the field's bound.
+A rule states the **method** and nothing else. The **slot** states the quantity: `alpha` names the lower tail, `kappa` names the deformation parameter, `r` names an ambiguity radius and `l2c` names a norm ceiling. So the caller writes the rule alone, and each slot's `Num_` bound names the one family that has a reading in that slot. A rule of another family is refused at construction, by the bound.
 
 A **Calibration Rule** is not a [`DeferredQuantity`](@ref), and the two mechanisms stay parallel end to end. A Deferred Quantity is *fitted* and the quantity is read off the fit; a rule fits nothing, and reads the sample size and the moments the prior result already carries. A rule also sees the effective observation weights, which [`resolve_slot`](@ref) does not carry. So a rule resolves through [`resolve_calibration_slot`](@ref), is declared through [`calibration_slots`](@ref), and is refused at a value-level entry point by [`assert_calibrated_slots`](@ref).
 
 # Related
 
-  - [`AbstractCalibrationEstimator`](@ref)
   - [`AbstractSignificanceCalibrationAlgorithm`](@ref)
   - [`AbstractDeformationCalibrationAlgorithm`](@ref)
   - [`AbstractAmbiguityRadiusCalibrationAlgorithm`](@ref)
@@ -28,30 +27,9 @@ abstract type AbstractCalibrationAlgorithm <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Places a **Calibration Rule** in the slot of one quantity, and names the quantity the slot holds.
-
-A role is configuration that carries an algorithm, so a role is an Estimator and the rule it carries is the Algorithm. [`AbstractOrderedWeightsArrayEstimator`](@ref) and [`AbstractOrderedWeightsArrayAlgorithm`](@ref) are the same pair, and the two calibration roots are separate for the same reason.
-
-The separation is the whole of the role validation. Every `alg` field is bounded by a `Func_` union that names one rule family under [`AbstractCalibrationAlgorithm`](@ref), and no role subtypes that root. So a role placed inside another role's `alg` field is refused **at construction, by the bound**, and no guard method is written for it.
-
-The root is flat, and no role carries a per-family supertype, because nothing dispatches on a family of roles. Each slot's `Num_` bound names one concrete role, and the three sites that read a role — [`resolve_calibration_slot`](@ref), [`assert_calibrated_slots`](@ref) and [`sel`](@ref) — read this root itself.
-
-# Related
-
-  - [`AbstractCalibrationAlgorithm`](@ref)
-  - [`SignificanceTailCalibration`](@ref)
-  - [`DeformationTailCalibration`](@ref)
-  - [`AmbiguityRadiusCalibration`](@ref)
-  - [`resolve_calibration_slot`](@ref)
-  - [`assert_calibrated_slots`](@ref)
-"""
-abstract type AbstractCalibrationEstimator <: AbstractEstimator end
-"""
-$(DocStringExtensions.TYPEDEF)
-
 Computes a significance level, the tail probability that an `alpha` or a `beta` slot holds.
 
-All concrete subtypes should subtype `AbstractSignificanceCalibrationAlgorithm`, and should be **callable**, because [`resolve_calibration_slot`](@ref) runs a rule by calling it. A plain `Function` of the same five arguments is therefore a rule as well, and needs no type at all. The family's two role types, [`SignificanceTailCalibration`](@ref) and [`SignificanceHeadCalibration`](@ref), subtype [`AbstractCalibrationEstimator`](@ref) instead: a role names the end of the distribution the slot addresses and holds the rule in its `alg` field, and the same rule serves both ends. Neither role subtypes this family, so neither is admitted by [`Func_SigCal`](@ref).
+All concrete subtypes should subtype `AbstractSignificanceCalibrationAlgorithm`, and should be **callable**, because [`resolve_calibration_slot`](@ref) runs a rule by calling it. A plain `Function` of the same five arguments is therefore a rule as well, and needs no type at all. [`Num_SigCal`](@ref) is the bound of every significance slot, and it names this family. So a deformation rule in a significance slot is refused at construction, and the same rule serves the lower tail and the upper tail, because the slot names the end.
 
 # Interfaces
 
@@ -76,9 +54,7 @@ In order to implement a new concrete type that works seamlessly with the library
 # Related
 
   - [`AbstractCalibrationAlgorithm`](@ref)
-  - [`SignificanceTailCalibration`](@ref)
-  - [`SignificanceHeadCalibration`](@ref)
-  - [`Func_SigCal`](@ref)
+  - [`Num_SigCal`](@ref)
   - [`resolve_calibration_slot`](@ref)
   - [`ScenarioCount`](@ref): the family's rule that keeps a stated count of tail scenarios.
   - [`RateSignificance`](@ref): the family's rule that shrinks the level at a square-root rate.
@@ -89,7 +65,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Computes a deformation parameter, the Kaniadakis ``\\kappa`` that a `kappa` slot holds.
 
-All concrete subtypes should subtype `AbstractDeformationCalibrationAlgorithm`, and should be **callable**, on the same terms as the significance family. The family's two role types, [`DeformationTailCalibration`](@ref) and [`DeformationHeadCalibration`](@ref), subtype [`AbstractCalibrationEstimator`](@ref) instead, and neither is admitted by [`Func_DefCal`](@ref).
+All concrete subtypes should subtype `AbstractDeformationCalibrationAlgorithm`, and should be **callable**, on the same terms as the significance family. [`Num_DefCal`](@ref) is the bound of every deformation slot, and it names this family.
 
 # Interfaces
 
@@ -120,9 +96,7 @@ A deformation slot sits on a measure of the return distribution and on a drawdow
   - [`AbstractCalibrationAlgorithm`](@ref)
   - [`AbstractCalibrationSeries`](@ref)
   - [`CalibrationContext`](@ref)
-  - [`DeformationTailCalibration`](@ref)
-  - [`DeformationHeadCalibration`](@ref)
-  - [`Func_DefCal`](@ref)
+  - [`Num_DefCal`](@ref)
   - [`kappa_log`](@ref)
   - [`EntropyBudget`](@ref): the family's rule that spends a stated entropy budget.
   - [`HillTailDecay`](@ref): the family's rule that reads the tail index of the series itself.
@@ -130,274 +104,74 @@ A deformation slot sits on a measure of the return distribution and on a drawdow
 """
 abstract type AbstractDeformationCalibrationAlgorithm <: AbstractCalibrationAlgorithm end
 """
-    const Func_SigCal = Union{<:Function, <:AbstractSignificanceCalibrationAlgorithm}
+    const Num_SigCal = Union{<:AbstractSignificanceCalibrationAlgorithm, <:Function,
+                             <:Number}
 
-Field bound for the `alg` field of a significance role: a rule of the family, or a plain function of the same five arguments.
+Field bound for a significance slot: the tail probability itself, a rule of the family, or a plain function of the same five arguments.
 
-A rule is run by calling it, so a function and a callable struct are the same thing to [`resolve_calibration_slot`](@ref). The struct earns its keep by carrying parameters and a name that a docstring can describe; the function is the shortest way to state a one-off rule, and a closure over a caller's own data is the case that has no type.
+The slot names the end of the distribution it addresses, so the occupant does not. `alpha` names the lower tail and `beta` names the upper tail, and one rule serves both ends. One bound therefore serves every significance slot, and a Range measure defaults its head slot to whatever its tail slot holds.
 
-A function carries no family, so it is admitted by both role families and the family split cannot refuse it. Only a rule that names its family is checked.
+A rule is run by calling it, so a function and a callable struct are the same thing to [`resolve_calibration_slot`](@ref). The struct earns its keep by carrying parameters and a name that a docstring can describe. The function is the shortest way to state a one-off rule, and a closure over a caller's own data is the case that has no type. A function carries no family, so this bound cannot refuse a deformation rule written as a closure. The name of the slot is what states the quantity there.
 
 # Related
 
   - [`AbstractSignificanceCalibrationAlgorithm`](@ref)
-  - [`Func_DefCal`](@ref)
+  - [`Num_DefCal`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
-const Func_SigCal = Union{<:Function, <:AbstractSignificanceCalibrationAlgorithm}
+const Num_SigCal = Union{<:AbstractSignificanceCalibrationAlgorithm, <:Function, <:Number}
 """
-    const Func_DefCal = Union{<:Function, <:AbstractDeformationCalibrationAlgorithm}
+    const Num_DefCal = Union{<:AbstractDeformationCalibrationAlgorithm, <:Function,
+                             <:Number}
 
-Field bound for the `alg` field of a deformation role: a rule of the family, or a plain function of the same five arguments. It is the counterpart of [`Func_SigCal`](@ref), and carries its reading unchanged.
+Field bound for a deformation slot: the deformation parameter itself, a rule of the family, or a plain function of the same five arguments. It is the counterpart of [`Num_SigCal`](@ref), and carries its reading unchanged.
 
 # Related
 
   - [`AbstractDeformationCalibrationAlgorithm`](@ref)
-  - [`Func_SigCal`](@ref)
+  - [`Num_SigCal`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
-const Func_DefCal = Union{<:Function, <:AbstractDeformationCalibrationAlgorithm}
+const Num_DefCal = Union{<:AbstractDeformationCalibrationAlgorithm, <:Function, <:Number}
 """
-$(DocStringExtensions.TYPEDEF)
+    is_calibration_rule(x) -> Bool
 
-Places a significance rule in a slot that addresses the lower tail of the return distribution.
+Answer whether the occupant `x` of a calibration slot is a **Calibration Rule**.
 
-The role is the whole of the type: the rule itself lives in `alg`, and both ends of the distribution take the same rule. A slot bounded by [`Num_SigTailCal`](@ref) admits this role and refuses [`SignificanceHeadCalibration`](@ref), so a head rule placed in a tail slot is refused at construction rather than at fold time.
+A rule is run by calling it, so the two things a slot may hold and call are an [`AbstractCalibrationAlgorithm`](@ref) and a plain function of the same five arguments. Both answer `true`, and everything else answers `false`: a stated number, `nothing`, and a child measure a container declares.
 
-# Fields
+**A callable is not a rule by being callable.** [`calibration_slots`](@ref) also declares the *children* of a container, and one such child is an ordered-weights builder wrapped in a reversal, which is a `Function` and computes no quantity. So the marker is this trait rather than the `Function` type, and a type that is callable for a reason of its own withdraws itself with one method here. [`OWA_CalOccupant`](@ref) is the one that does.
 
-$(DocStringExtensions.FIELDS)
+The three readers are [`resolve_calibration_slot`](@ref), which calls a rule and returns anything else unchanged, [`assert_calibrated_slots`](@ref), which refuses a rule that reached a value-level entry point, and [`assert_declared_calibration_resolver`](@ref), which refuses a rule the library itself left unresolved.
 
-# Constructors
+# Arguments
 
-    SignificanceTailCalibration(;
-        alg::Func_SigCal
-    ) -> SignificanceTailCalibration
+  - `x`: The slot's occupant.
 
-Keywords correspond to the struct's fields. `alg` has no default, because the rule is the whole content of the type.
+# Returns
+
+  - `y::Bool`: Whether `x` is a rule.
 
 # Related
 
-  - [`AbstractCalibrationEstimator`](@ref)
-  - [`AbstractSignificanceCalibrationAlgorithm`](@ref)
-  - [`SignificanceHeadCalibration`](@ref)
-  - [`Num_SigTailCal`](@ref)
-  - [`Func_SigCal`](@ref)
-  - [`mirror_role`](@ref)
-"""
-@concrete struct SignificanceTailCalibration <: AbstractCalibrationEstimator
-    """
-    $(field_dict[:cal_alg_sig])
-    """
-    alg
-    function SignificanceTailCalibration(alg::Func_SigCal)
-        return new{typeof(alg)}(alg)
-    end
-end
-function SignificanceTailCalibration(; alg::Func_SigCal)
-    return SignificanceTailCalibration(alg)
-end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Places a significance rule in a slot that addresses the upper tail of the return distribution.
-
-It is the counterpart of [`SignificanceTailCalibration`](@ref), and takes the same `alg` members. Every head slot in the library sits on a Range measure, so the head role never appears on a scalar measure.
-
-# Fields
-
-$(DocStringExtensions.FIELDS)
-
-# Constructors
-
-    SignificanceHeadCalibration(;
-        alg::Func_SigCal
-    ) -> SignificanceHeadCalibration
-
-Keywords correspond to the struct's fields. `alg` has no default, because the rule is the whole content of the type.
-
-# Related
-
-  - [`AbstractCalibrationEstimator`](@ref)
-  - [`AbstractSignificanceCalibrationAlgorithm`](@ref)
-  - [`SignificanceTailCalibration`](@ref)
-  - [`Num_SigHeadCal`](@ref)
-  - [`Func_SigCal`](@ref)
-  - [`mirror_role`](@ref)
-"""
-@concrete struct SignificanceHeadCalibration <: AbstractCalibrationEstimator
-    """
-    $(field_dict[:cal_alg_sig])
-    """
-    alg
-    function SignificanceHeadCalibration(alg::Func_SigCal)
-        return new{typeof(alg)}(alg)
-    end
-end
-function SignificanceHeadCalibration(; alg::Func_SigCal)
-    return SignificanceHeadCalibration(alg)
-end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Places a deformation rule in a slot that addresses the lower tail of the return distribution.
-
-It is the deformation family's counterpart of [`SignificanceTailCalibration`](@ref), and carries the same shape.
-
-# Fields
-
-$(DocStringExtensions.FIELDS)
-
-# Constructors
-
-    DeformationTailCalibration(;
-        alg::Func_DefCal
-    ) -> DeformationTailCalibration
-
-Keywords correspond to the struct's fields. `alg` has no default, because the rule is the whole content of the type.
-
-# Related
-
-  - [`AbstractCalibrationEstimator`](@ref)
-  - [`AbstractDeformationCalibrationAlgorithm`](@ref)
-  - [`DeformationHeadCalibration`](@ref)
-  - [`Num_DefTailCal`](@ref)
-  - [`Func_DefCal`](@ref)
-  - [`mirror_role`](@ref)
-"""
-@concrete struct DeformationTailCalibration <: AbstractCalibrationEstimator
-    """
-    $(field_dict[:cal_alg_def])
-    """
-    alg
-    function DeformationTailCalibration(alg::Func_DefCal)
-        return new{typeof(alg)}(alg)
-    end
-end
-function DeformationTailCalibration(; alg::Func_DefCal)
-    return DeformationTailCalibration(alg)
-end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Places a deformation rule in a slot that addresses the upper tail of the return distribution.
-
-It is the counterpart of [`DeformationTailCalibration`](@ref), and takes the same `alg` members.
-
-# Fields
-
-$(DocStringExtensions.FIELDS)
-
-# Constructors
-
-    DeformationHeadCalibration(;
-        alg::Func_DefCal
-    ) -> DeformationHeadCalibration
-
-Keywords correspond to the struct's fields. `alg` has no default, because the rule is the whole content of the type.
-
-# Related
-
-  - [`AbstractCalibrationEstimator`](@ref)
-  - [`AbstractDeformationCalibrationAlgorithm`](@ref)
-  - [`DeformationTailCalibration`](@ref)
-  - [`Num_DefHeadCal`](@ref)
-  - [`Func_DefCal`](@ref)
-  - [`mirror_role`](@ref)
-"""
-@concrete struct DeformationHeadCalibration <: AbstractCalibrationEstimator
-    """
-    $(field_dict[:cal_alg_def])
-    """
-    alg
-    function DeformationHeadCalibration(alg::Func_DefCal)
-        return new{typeof(alg)}(alg)
-    end
-end
-function DeformationHeadCalibration(; alg::Func_DefCal)
-    return DeformationHeadCalibration(alg)
-end
-"""
-    const Num_SigTailCal = Union{<:SignificanceTailCalibration,
-                                 <:AbstractSignificanceCalibrationAlgorithm, <:Number}
-
-Field bound for a lower-tail significance slot: the tail probability itself, the role that computes it, or the rule alone.
-
-The union names one role and no other, so a head role placed in a tail slot fails the constructor's signature and is refused at construction. That is the whole of the role validation, and no guard method is written for it.
-
-The union also names the rule family itself, because the slot already says which end of the distribution it addresses. A caller who states the rule alone therefore states the end once rather than twice, and [`bind_role`](@ref) puts the tail role on before the constructor stores the slot. What is stored is the role, so every reader of the slot sees what it saw before. A plain `Function` is **not** admitted alone: a function carries no family, so the bound could not refuse a deformation rule written as a closure, and the role states the family a function cannot.
-
-# Related
-
-  - [`SignificanceTailCalibration`](@ref)
-  - [`AbstractSignificanceCalibrationAlgorithm`](@ref)
-  - [`Num_SigHeadCal`](@ref)
-  - [`bind_role`](@ref)
+  - [`AbstractCalibrationAlgorithm`](@ref)
+  - [`calibration_slots`](@ref)
   - [`resolve_calibration_slot`](@ref)
+  - [`assert_calibrated_slots`](@ref)
 """
-const Num_SigTailCal = Union{<:SignificanceTailCalibration,
-                             <:AbstractSignificanceCalibrationAlgorithm, <:Number}
-"""
-    const Num_SigHeadCal = Union{<:SignificanceHeadCalibration, <:AbstractSignificanceCalibrationAlgorithm, <:Number}
-
-Field bound for an upper-tail significance slot: the tail probability itself, the role that computes it, or the rule alone.
-
-The rule family stands in the union on the terms [`Num_SigTailCal`](@ref) sets out, and [`bind_role`](@ref) puts the role on before the slot is stored.
-
-# Related
-
-  - [`SignificanceHeadCalibration`](@ref)
-  - [`AbstractSignificanceCalibrationAlgorithm`](@ref)
-  - [`Num_SigTailCal`](@ref)
-  - [`bind_role`](@ref)
-  - [`resolve_calibration_slot`](@ref)
-"""
-const Num_SigHeadCal = Union{<:SignificanceHeadCalibration,
-                             <:AbstractSignificanceCalibrationAlgorithm, <:Number}
-"""
-    const Num_DefTailCal = Union{<:DeformationTailCalibration, <:AbstractDeformationCalibrationAlgorithm, <:Number}
-
-Field bound for a lower-tail deformation slot: the deformation parameter itself, the role that computes it, or the rule alone.
-
-The rule family stands in the union on the terms [`Num_SigTailCal`](@ref) sets out, and [`bind_role`](@ref) puts the role on before the slot is stored.
-
-# Related
-
-  - [`DeformationTailCalibration`](@ref)
-  - [`AbstractDeformationCalibrationAlgorithm`](@ref)
-  - [`Num_DefHeadCal`](@ref)
-  - [`bind_role`](@ref)
-  - [`resolve_calibration_slot`](@ref)
-"""
-const Num_DefTailCal = Union{<:DeformationTailCalibration,
-                             <:AbstractDeformationCalibrationAlgorithm, <:Number}
-"""
-    const Num_DefHeadCal = Union{<:DeformationHeadCalibration, <:AbstractDeformationCalibrationAlgorithm, <:Number}
-
-Field bound for an upper-tail deformation slot: the deformation parameter itself, the role that computes it, or the rule alone.
-
-The rule family stands in the union on the terms [`Num_SigTailCal`](@ref) sets out, and [`bind_role`](@ref) puts the role on before the slot is stored.
-
-# Related
-
-  - [`DeformationHeadCalibration`](@ref)
-  - [`AbstractDeformationCalibrationAlgorithm`](@ref)
-  - [`Num_DefTailCal`](@ref)
-  - [`bind_role`](@ref)
-  - [`resolve_calibration_slot`](@ref)
-"""
-const Num_DefHeadCal = Union{<:DeformationHeadCalibration,
-                             <:AbstractDeformationCalibrationAlgorithm, <:Number}
+is_calibration_rule(::Any) = false
+is_calibration_rule(::AbstractCalibrationAlgorithm) = true
+is_calibration_rule(::Function) = true
 """
     calibration_slots(x)
 
 Declare the slots of `x` that may hold a **Calibration Rule**, as a `NamedTuple` mapping each slot's name to its current value. The default is empty: a type with no calibration slot needs no method.
 
-This is the parallel of [`deferred_slots`](@ref). Three consumers read it: [`assert_calibrated_slots`](@ref) refuses a role that reached a value-level entry point, [`assert_declared_calibration_resolver`](@ref) refuses a role the library itself left unresolved, and [`resolve_calibration_slots`](@ref) resolves the slots.
+This is the parallel of [`deferred_slots`](@ref). Three consumers read it: [`assert_calibrated_slots`](@ref) refuses a rule that reached a value-level entry point, [`assert_declared_calibration_resolver`](@ref) refuses a rule the library itself left unresolved, and [`resolve_calibration_slots`](@ref) resolves the slots.
 
 For most types the declaration is the whole statement, and the resolution is derived from it. A type whose slots carry an **order** between them writes its own [`resolve_deferred_quantities`](@ref) method instead, and a [`CalibrationContext`](@ref) built from a sibling's resolved number is what such an order looks like: the slot reads that number off the context, and no derivation can know which sibling. A slot that names a quantity under a key of its own also writes its own resolution, which is what the three regularisation keys do.
 
-A slot that holds a child measure is declared here too, so a container names its children and each child names its own slots. Such a slot is declared in [`deferred_slots`](@ref) as well, and the deferred recursion is what resolves the child.
+A slot that holds a child measure is declared here too, so a container names its children and each child names its own slots. Such a slot is declared in [`deferred_slots`](@ref) as well, and the deferred recursion is what resolves the child. So a container's declaration is read by the two `assert_` walks alone, and it names a child **only where that child can carry a slot**: an occupant that carries none is not named here, because a plain function standing in a calibration slot is a rule. [`OWA_CalOccupant`](@ref) is the one bound in the library that states which occupants of a weight slot qualify.
 
 # Related
 
@@ -412,24 +186,24 @@ calibration_slots(::Any) = (;)
 """
     assert_calibrated_slots(x)
 
-Refuse a **Calibration Role** that reached a value-level entry point, which has no prior result to resolve its rule against.
+Refuse a **Calibration Rule** that reached a value-level entry point, which has no prior result to resolve it against.
 
-[`expected_risk`](@ref) takes either a prior result or a plain returns matrix. Given the prior it resolves the measure through [`factory`](@ref) first. Given the matrix it cannot: a rule reads the sample size and the moments the prior carries, and it reads the effective observation weights, none of which a bare returns matrix supplies. So it refuses instead, and names the slot, the role standing in it and the way out.
+[`expected_risk`](@ref) takes either a prior result or a plain returns matrix. Given the prior it resolves the measure through [`factory`](@ref) first. Given the matrix it cannot: a rule reads the sample size and the moments the prior carries, and it reads the effective observation weights, none of which a bare returns matrix supplies. So it refuses instead, and names the slot, the rule standing in it and the way out.
 
-This is the shape [`assert_resolved_slots`](@ref) already uses on the Deferred-Quantity side, and the message names both types with `nameof` for the same reason: a printed type carries a module prefix wherever the name is not visible from `Main`, and the message must read the same in every process.
+This is the shape [`assert_resolved_slots`](@ref) already uses on the Deferred-Quantity side, and the message names both types with `nameof` for the same reason: a printed type carries a module prefix wherever the name is not visible from `Main`, and the message must read the same in every process. A rule written as a plain function carries no name of its own, so the message names the slot alone there.
 
 The slots come from [`calibration_slots`](@ref) and the check recurses into whatever they hold, so a container is covered by its children's declarations.
 
 # Algorithm
 
  1. Walk the pairs that [`calibration_slots`](@ref) declares for `x`, giving each slot's name `key` and its occupant `slot`.
- 2. Refuse an occupant that holds an [`AbstractCalibrationEstimator`](@ref).
+ 2. Refuse an occupant that [`is_calibration_rule`](@ref) answers `true` for.
  3. Recurse into the occupant, so a child measure's own slots are checked as well. A slot that holds a vector of children is walked element by element.
  4. Return `nothing` once the walk is spent.
 
 # Validation
 
-  - Throws an `ArgumentError` when a slot of `x`, or of any child the walk reaches, holds an [`AbstractCalibrationEstimator`](@ref). The message names the slot, the role standing in it and the two ways out.
+  - Throws an `ArgumentError` when a slot of `x`, or of any child the walk reaches, holds a **Calibration Rule**. The message names the slot, the rule standing in it and the two ways out.
 
 # Returns
 
@@ -438,15 +212,15 @@ The slots come from [`calibration_slots`](@ref) and the check recurses into what
 # Related
 
   - [`calibration_slots`](@ref)
-  - [`AbstractCalibrationEstimator`](@ref)
+  - [`AbstractCalibrationAlgorithm`](@ref)
   - [`assert_declared_calibration_resolver`](@ref)
   - [`assert_resolved_slots`](@ref)
   - [`expected_risk`](@ref)
 """
 function assert_calibrated_slots(x)
     for (key, slot) in pairs(calibration_slots(x))
-        @argcheck(!isa(slot, AbstractCalibrationEstimator),
-                  ArgumentError("`$(nameof(typeof(x))).$key` holds a Calibration Role, a `$(nameof(typeof(slot)))`, and this entry point has no prior result to resolve its rule against. A rule reads the sample size, the moments and the effective observation weights, which a bare returns matrix does not carry. Pass the prior result itself — `expected_risk(r, w, pr, fees)` — or resolve the measure first with `factory(r, pr)`."))
+        @argcheck(!is_calibration_rule(slot),
+                  ArgumentError("`$(nameof(typeof(x))).$key` holds a Calibration Rule, a `$(nameof(typeof(slot)))`, and this entry point has no prior result to resolve it against. A rule reads the sample size, the moments and the effective observation weights, which a bare returns matrix does not carry. Pass the prior result itself — `expected_risk(r, w, pr, fees)` — or resolve the measure first with `factory(r, pr)`."))
         assert_calibrated_slots(slot)
     end
     return nothing
@@ -464,7 +238,7 @@ end
 
 Refuse a type that declares a calibration slot and no way to resolve it.
 
-`slots` is what the resolution produced. A **Calibration Role** that survives it names a type that declared the slot in [`calibration_slots`](@ref) and then wrote no resolution for it, so the role would reach the model builders and be multiplied as though it were a number. This is where the declaration and the resolver are paired.
+`slots` is what the resolution produced. A **Calibration Rule** that survives it names a type that declared the slot in [`calibration_slots`](@ref) and then wrote no resolution for it, so the rule would reach the model builders and be multiplied as though it were a number. This is where the declaration and the resolver are paired.
 
 The two channels check alike. [`assert_declared_slot_resolver`](@ref) is the Deferred-Quantity half, and the two-argument method here carries its shape: the resolver holds the slots it produced and hands them over. The one-argument method reads them off `x` instead, and is what a funnel takes, which holds a resolved value and not the slots that made it.
 
@@ -475,7 +249,7 @@ The calibration channel derives no recursion of its own, which is why the pairin
 # Algorithm
 
  1. Walk the pairs of `slots`, giving each slot's name `key` and its occupant `slot`.
- 2. Refuse an occupant that holds an [`AbstractCalibrationEstimator`](@ref).
+ 2. Refuse an occupant that [`is_calibration_rule`](@ref) answers `true` for.
  3. Return `nothing` once the walk is spent.
 
 The one-argument method reads `slots` from [`calibration_slots`](@ref), then recurses into each occupant, so a child measure's own declarations are paired as well. A slot that holds a vector of children is walked element by element.
@@ -487,7 +261,7 @@ The one-argument method reads `slots` from [`calibration_slots`](@ref), then rec
 
 # Validation
 
-  - Throws an `ArgumentError` when an entry of `slots`, or of any child the walk reaches, still holds an [`AbstractCalibrationEstimator`](@ref). The message names the type, the slot and the resolution to write beside the declaration.
+  - Throws an `ArgumentError` when an entry of `slots`, or of any child the walk reaches, still holds a **Calibration Rule**. The message names the type, the slot and the resolution to write beside the declaration.
 
 # Returns
 
@@ -502,8 +276,8 @@ The one-argument method reads `slots` from [`calibration_slots`](@ref), then rec
 """
 function assert_declared_calibration_resolver(x, slots::NamedTuple)
     for (key, slot) in pairs(slots)
-        @argcheck(!isa(slot, AbstractCalibrationEstimator),
-                  ArgumentError("`$(nameof(typeof(x))).$key` holds a Calibration Role, a `$(nameof(typeof(slot)))`, after the resolution ran, so `$(nameof(typeof(x)))` declares the slot in `calibration_slots` and resolves it nowhere. The declaration and the resolution travel together, because a rule that reads a sibling slot must be resolved after that sibling. Resolve the slot beside the declaration with `resolve_calibration_slot(x.$key, :$key, pr, pr.w, slv)`, or drop it from `calibration_slots`."))
+        @argcheck(!is_calibration_rule(slot),
+                  ArgumentError("`$(nameof(typeof(x))).$key` holds a Calibration Rule, a `$(nameof(typeof(slot)))`, after the resolution ran, so `$(nameof(typeof(x)))` declares the slot in `calibration_slots` and resolves it nowhere. The declaration and the resolution travel together, because a rule that reads a sibling slot must be resolved after that sibling. Resolve the slot beside the declaration with `resolve_calibration_slot(x.$key, :$key, pr, pr.w, slv)`, or drop it from `calibration_slots`."))
     end
     return nothing
 end
@@ -520,100 +294,6 @@ function assert_declared_calibration_resolver(xs::AbstractArray{<:Union{<:Abstra
     for x in xs
         assert_declared_calibration_resolver(x)
     end
-    return nothing
-end
-"""
-    mirror_role(x)
-
-Carry the occupant of a lower-tail slot across to its upper-tail counterpart, and keep the rule.
-
-Every Range type defaults its head slot to whatever its tail slot holds, and this verb is what carries the occupant across. A number crosses unchanged, and a tail role crosses as the head role of the same family holding the same `alg`, so a rule stated on one end reaches both ends and no stated number moves. A caller who states the head slot themselves gets their own occupant, and the two ends then resolve independently.
-
-The two role families are the whole domain of the role methods, because a head slot's bound admits no other role. A bare rule crosses unchanged, because it carries no end and the head slot puts its own role on through [`bind_role`](@ref). An ambiguity role names no end of the distribution, so it takes no method here, and the ambiguity slots of a Range type keep numbers of their own.
-
-# Arguments
-
-  - `x`: The lower-tail slot's occupant.
-
-# Returns
-
-  - `y`: The upper-tail slot's occupant.
-
-# Related
-
-  - [`SignificanceTailCalibration`](@ref)
-  - [`SignificanceHeadCalibration`](@ref)
-  - [`DeformationTailCalibration`](@ref)
-  - [`DeformationHeadCalibration`](@ref)
-  - [`bind_role`](@ref)
-"""
-function mirror_role(x::Number)
-    return x
-end
-function mirror_role(r::SignificanceTailCalibration)
-    return SignificanceHeadCalibration(; alg = r.alg)
-end
-function mirror_role(r::DeformationTailCalibration)
-    return DeformationHeadCalibration(; alg = r.alg)
-end
-function mirror_role(alg::AbstractSignificanceCalibrationAlgorithm)
-    return alg
-end
-function mirror_role(alg::AbstractDeformationCalibrationAlgorithm)
-    return alg
-end
-"""
-    bind_role(::Type{R}, x) where {R <: AbstractCalibrationEstimator}
-    bind_role(x)
-
-Put on the **Calibration Role** the slot already names, so that a caller states the rule alone.
-
-A slot's bound names the role it takes, and the role names the same end of the distribution the slot does. A caller who wraps the rule themselves therefore states that end twice. This verb takes the second statement off them: the slot's bound admits a bare rule of the right family, and the constructor calls this verb before it stores the slot, so what is stored is the role and every reader of the slot sees what it saw before.
-
-Two arities serve the two shapes of slot.
-
-  - A slot that **names an end** passes the role type, because a rule alone cannot say tail or head. The four significance and deformation slots take this arity.
-  - A slot that **names no end** passes the occupant alone, and the rule's own family settles the role. The three ambiguity and norm-ceiling slots take this arity, and so does the dual-use slot of [`LpRegularisation`](@ref), which is the one slot that names two roles.
-
-A caller who states the role themselves is served by the pass-through methods, so the wrapped form and the bare form both construct and both store the same thing. A stated number crosses unchanged, and so does a [`TimeDependent`](@ref): a schedule is read per fold by [`update_time_dependent_fields`](@ref), which rebuilds the host through its keyword constructor, so a bare rule inside a schedule is bound when the fold selects it.
-
-# Arguments
-
-  - `R`: The role the slot names, for a slot that names an end of the distribution.
-  - `x`: The slot's occupant: a number, a role, or a rule.
-
-# Returns
-
-  - `y`: The occupant, with the role on it.
-
-# Related
-
-  - [`AbstractCalibrationEstimator`](@ref)
-  - [`AbstractCalibrationAlgorithm`](@ref)
-  - [`Num_SigTailCal`](@ref)
-  - [`Num_AmbRadNormCeilCal`](@ref)
-  - [`mirror_role`](@ref)
-"""
-function bind_role(::Type{R}, x::Number) where {R <: AbstractCalibrationEstimator}
-    return x
-end
-function bind_role(::Type{R},
-                   r::AbstractCalibrationEstimator) where {R <:
-                                                           AbstractCalibrationEstimator}
-    return r
-end
-function bind_role(::Type{R},
-                   alg::AbstractCalibrationAlgorithm) where {R <:
-                                                             AbstractCalibrationEstimator}
-    return R(alg)
-end
-function bind_role(x::Number)
-    return x
-end
-function bind_role(r::AbstractCalibrationEstimator)
-    return r
-end
-function bind_role(::Nothing)
     return nothing
 end
 """
@@ -898,15 +578,17 @@ end
 
 Resolve one calibration slot against prior result `pr`, the effective observation weights `w`, the effective solver `slv` and the site's context `ctx`, and return a plain number.
 
-A slot that holds a role type is unwrapped, and the rule in its `alg` field is **called** as `alg(key, pr, w, slv, ctx)`. So a callable rule and a plain function are the same thing here, and a rule never sees the role it was placed in. Anything else, a stated number above all, is returned unchanged.
+A slot that holds a rule is **called** as `alg(key, pr, w, slv, ctx)`. So a callable rule and a plain function are the same thing here. Anything else, a stated number above all, is returned unchanged.
 
 A rule gets no portfolio. A prior result carries no portfolio weight vector, so no rule can measure a portfolio's own loss series. What it can measure is the series of each **column** of the sample, and `ctx.series` tells it which series the slot owner prices. It does get the solver, on both of the routes that resolve a measure, so a rule may call [`ERM`](@ref) or [`RRM`](@ref). On the [`factory`](@ref) route [`@propagatable`](@ref) runs the `@cprop` selection before the resolution, so the solver is on the struct. On the `JuMP` route no selection runs, so [`set_risk_constraints!`](@ref) threads it into [`resolve_deferred_quantities`](@ref) and the owner settles it as `sel(x.slv, slv)`.
 
 **The context is the whole of what the site says, and nothing is rebuilt here.** `key` names the slot rather than the quantity, so a rule that reads the shape of a series, the significance level of a sibling slot, or the norm order of the constraint it stands in reads it off `ctx`. No rule carries a field for any of the three, so no occupant is rebuilt on the way in and nothing a caller stated is overwritten. [`CalibrationContext`](@ref) states which rule reads which field.
 
-**A ceiling and a radius are checked here, and the five other roles are not.** [`NormCeilingCalibration`](@ref) and [`AmbiguityRadiusCalibration`](@ref) each take their own method, which runs [`assert_nonempty_gt0_finite_val`](@ref) on the number the rule returned, under the slot's own `key`. Both quantities reach a JuMP model from a bare field of [`JuMPOptimiser`](@ref) — `l2c` and `linfc` for the ceiling, `l1` and `linf` for the radius — where no term is rebuilt, so nothing downstream would state the range. The five other roles stand only in slots their owner rebuilds, and the rebuild runs the owner's constructor on the calibrated number, so a second check here would restate a rule that file already owns. The cost is paid on the calibrated path alone: a stated number takes the first method and meets no check here at all.
+**A ceiling rule and a radius rule are checked here, and the three other families are not.** [`AbstractNormCeilingCalibrationAlgorithm`](@ref) and [`AbstractAmbiguityRadiusCalibrationAlgorithm`](@ref) each take their own method, which runs [`assert_nonempty_gt0_finite_val`](@ref) on the number the rule returned, under the slot's own `key`. Both quantities reach a JuMP model from a bare field of [`JuMPOptimiser`](@ref) — `l2c` and `linfc` for the ceiling, `l1` and `linf` for the radius — where no term is rebuilt, so nothing downstream would state the range. The three other families stand only in slots their owner rebuilds, and the rebuild runs the owner's constructor on the calibrated number, so a second check here would restate a rule that file already owns. The cost is paid on the calibrated path alone: a stated number takes the first method and meets no check here at all.
 
-This is the parallel of [`resolve_slot`](@ref), and it is a second verb rather than a widening of the first for two reasons. `resolve_slot`'s body is `deferred_quantity(fit_deferred_quantity(dq, pr), key)`, a fit followed by an extraction, and a rule fits nothing. `resolve_slot` also carries neither `w` nor `slv`, which a rule needs. So the role types stay **out** of the [`DeferredQuantity`](@ref) union.
+**A rule written as a plain function is checked by the site, not here.** A function carries no family, so no method here can read the quantity it computes. [`assemble_jump_model!`](@ref) is the one site that reads a calibrated number without rebuilding a term, and it states the range of each of its four norm slots itself.
+
+This is the parallel of [`resolve_slot`](@ref), and it is a second verb rather than a widening of the first for two reasons. `resolve_slot`'s body is `deferred_quantity(fit_deferred_quantity(dq, pr), key)`, a fit followed by an extraction, and a rule fits nothing. `resolve_slot` also carries neither `w` nor `slv`, which a rule needs. So the rule families stay **out** of the [`DeferredQuantity`](@ref) union.
 
 The caller computes `w` itself, as `sel(r.w, pr.w)`, and threads it with the measure's own `slv`. A parent that carries no observation weights of its own passes `pr.w`, and one that carries no solver leaves `slv` at its default.
 
@@ -914,14 +596,13 @@ The caller computes `w` itself, as `sel(r.w, pr.w)`, and threads it with the mea
 
 # Algorithm
 
- 1. Return `slot` unchanged when it is not an [`AbstractCalibrationEstimator`](@ref). A stated number takes that arm.
- 2. Read the rule out of the role's `alg` field.
- 3. Call the rule as `alg(key, pr, w, slv, ctx)`, and return the number it gives. A callable struct and a plain function are the same thing here, so a rule never sees the role it was placed in.
- 4. A [`NormCeilingCalibration`](@ref) or an [`AmbiguityRadiusCalibration`](@ref) takes a more specific method, which checks that number before it returns.
+ 1. Return `slot` unchanged when [`is_calibration_rule`](@ref) answers `false` for it. A stated number takes that arm.
+ 2. Call the rule as `slot(key, pr, w, slv, ctx)`, and return the number it gives. A callable struct and a plain function are the same thing here.
+ 3. A norm-ceiling rule or an ambiguity-radius rule takes a more specific method, which checks that number before it returns.
 
 # Arguments
 
-  - `slot`: The slot's occupant: a number, or a role under [`AbstractCalibrationEstimator`](@ref).
+  - `slot`: The slot's occupant: a number, or a rule.
   - `key`: Name of the slot that is being resolved.
   - `pr`: Prior result the rule reads.
   - `w`: Effective observation weights, or `nothing`.
@@ -930,7 +611,7 @@ The caller computes `w` itself, as `sel(r.w, pr.w)`, and threads it with the mea
 
 # Validation
 
-  - A [`NormCeilingCalibration`](@ref) or an [`AmbiguityRadiusCalibration`](@ref) returns a number that is `> 0` and finite, checked by [`assert_nonempty_gt0_finite_val`](@ref) under `key`. Every other occupant is returned unchecked, and the owner of its slot states the range when it rebuilds.
+  - A norm-ceiling rule or an ambiguity-radius rule returns a number that is `> 0` and finite, checked by [`assert_nonempty_gt0_finite_val`](@ref) under `key`. Every other occupant is returned unchecked, and the owner of its slot states the range when it rebuilds.
 
 # Returns
 
@@ -938,23 +619,18 @@ The caller computes `w` itself, as `sel(r.w, pr.w)`, and threads it with the mea
 
 # Related
 
-  - [`AbstractCalibrationEstimator`](@ref)
   - [`AbstractCalibrationAlgorithm`](@ref)
   - [`CalibrationContext`](@ref)
   - [`calibration_slots`](@ref)
-  - [`Func_SigCal`](@ref)
+  - [`is_calibration_rule`](@ref)
+  - [`Num_SigCal`](@ref)
   - [`resolve_slot`](@ref)
   - [`assert_nonempty_gt0_finite_val`](@ref)
 """
-function resolve_calibration_slot(slot, ::Symbol, ::AbstractPriorResult, ::Any,
-                                  ::Any = nothing,
-                                  ::CalibrationContext = CalibrationContext())
-    return slot
-end
-function resolve_calibration_slot(r::AbstractCalibrationEstimator, key::Symbol,
-                                  pr::AbstractPriorResult, w, slv = nothing,
+function resolve_calibration_slot(slot, key::Symbol, pr::AbstractPriorResult, w,
+                                  slv = nothing,
                                   ctx::CalibrationContext = CalibrationContext())
-    return r.alg(key, pr, w, slv, ctx)
+    return is_calibration_rule(slot) ? slot(key, pr, w, slv, ctx) : slot
 end
 """
     effective_sample_size(pr::AbstractPriorResult, w::Option{<:ObsWeights})
@@ -1038,8 +714,7 @@ Keywords correspond to the struct's fields. `n` has no default a rule could use,
 
   - [`AbstractSignificanceCalibrationAlgorithm`](@ref)
   - [`RateSignificance`](@ref)
-  - [`SignificanceTailCalibration`](@ref)
-  - [`SignificanceHeadCalibration`](@ref)
+  - [`Num_SigCal`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
 @concrete struct ScenarioCount <: AbstractSignificanceCalibrationAlgorithm
@@ -1131,8 +806,7 @@ Keywords correspond to the struct's fields. `c` defaults to `1`, which is the pl
 
   - [`AbstractSignificanceCalibrationAlgorithm`](@ref)
   - [`ScenarioCount`](@ref)
-  - [`SignificanceTailCalibration`](@ref)
-  - [`SignificanceHeadCalibration`](@ref)
+  - [`Num_SigCal`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
 @concrete struct RateSignificance <: AbstractSignificanceCalibrationAlgorithm
@@ -1223,8 +897,7 @@ Keywords correspond to the struct's fields. `target` has no default a rule could
 
   - [`AbstractDeformationCalibrationAlgorithm`](@ref)
   - [`CalibrationContext`](@ref)
-  - [`DeformationTailCalibration`](@ref)
-  - [`DeformationHeadCalibration`](@ref)
+  - [`Num_DefCal`](@ref)
   - [`HillTailDecay`](@ref)
   - [`kappa_log`](@ref)
   - [`RadialTailDecay`](@ref)
@@ -1479,8 +1152,7 @@ Keywords correspond to the struct's fields. `kmin` defaults to `30`, which is th
   - [`AbstractDeformationCalibrationAlgorithm`](@ref)
   - [`AbstractCalibrationSeries`](@ref)
   - [`CalibrationContext`](@ref)
-  - [`DeformationTailCalibration`](@ref)
-  - [`DeformationHeadCalibration`](@ref)
+  - [`Num_DefCal`](@ref)
   - [`EntropyBudget`](@ref)
   - [`hill_tail_index`](@ref)
   - [`kappa_log`](@ref)
@@ -1720,7 +1392,7 @@ The inverse of [`kappa_log`](@ref) is the ``\\kappa``-exponential ``\\exp_{\\kap
 
 **The series the rule reads is radial.** A covariance matrix is a scale and ``\\kappa`` is a shape, so a rule that turns the one into the other needs a second quantity to fix the units, and the sample is the only one a prior result carries. The covariance matrix is what turns the ``T \\times N`` sample into **one** univariate series: [`whitening_factor`](@ref) gives the factor of ``\\hat{\\mathbf{\\Sigma}}``, each row is centred and whitened, and the Euclidean norm of the whitened row is that observation's Mahalanobis distance. Under an elliptical scale mixture that series carries the mixture's tail index, and the whole cross-section stands behind every entry of it. A per-column standardisation drops every off-diagonal term, so [`HillTailDecay`](@ref) cannot buy that reading and this rule cannot buy the per-column one.
 
-**The rule is direction-blind, and that is a statement.** A distance has no sign, so one ``\\kappa`` answers both ends of a Range measure and `key` is ignored. [`HillTailDecay`](@ref) answers per end, and the difference is the whole of what the two rules say: a radial reading asks how far the cross-section moves, and a per-column reading asks how far one end of one column moves. [`mirror_role`](@ref) is therefore trivially correct for this rule, because a head role holding it returns the number a tail role holding it returns.
+**The rule is direction-blind, and that is a statement.** A distance has no sign, so one ``\\kappa`` answers both ends of a Range measure and `key` is ignored. [`HillTailDecay`](@ref) answers per end, and the difference is the whole of what the two rules say: a radial reading asks how far the cross-section moves, and a per-column reading asks how far one end of one column moves. A head slot that defaults to its tail slot therefore holds the same rule and reads the same number, which is what makes one rule correct for both ends here.
 
 The series holds `T` entries where the pool of [`HillTailDecay`](@ref) holds `T N`, so this rule reads **fewer** tail points from the same sample: `alpha = 0.05` at `T = 250` leaves 12 of them. `kmin` is the floor under that count, and it is stated in the same units as its sibling's, so the floor binds harder here. A count below it is refused rather than estimated. The points the series does hold are one per observation rather than `N` per observation, so they carry none of the cross-correlation the pool carries.
 
@@ -1753,8 +1425,7 @@ Keywords correspond to the struct's fields. `kmin` defaults to `30`, which is th
   - [`AbstractDeformationCalibrationAlgorithm`](@ref)
   - [`AbstractCalibrationSeries`](@ref)
   - [`CalibrationContext`](@ref)
-  - [`DeformationTailCalibration`](@ref)
-  - [`DeformationHeadCalibration`](@ref)
+  - [`Num_DefCal`](@ref)
   - [`EntropyBudget`](@ref)
   - [`HillTailDecay`](@ref)
   - [`kappa_log`](@ref)
@@ -1927,7 +1598,7 @@ Computes an ambiguity radius from the data a prior result carries, so that the r
 
 An **Ambiguity Radius** is the radius of the ball of probability measures the model prices, and it is the coefficient of an un-squared norm penalty on the weight vector. It is neither a tail probability nor a deformation parameter, so it takes its own family beside the two of [`AbstractSignificanceCalibrationAlgorithm`](@ref) and [`AbstractDeformationCalibrationAlgorithm`](@ref), under the same root.
 
-All concrete subtypes should subtype `AbstractAmbiguityRadiusCalibrationAlgorithm`, and should be **callable**, on the same terms as the two other families. The family's role type, [`AmbiguityRadiusCalibration`](@ref), subtypes [`AbstractCalibrationEstimator`](@ref) instead, and is not admitted by [`Func_AmbRadCal`](@ref).
+All concrete subtypes should subtype `AbstractAmbiguityRadiusCalibrationAlgorithm`, and should be **callable**, on the same terms as the two other families. [`Num_AmbRadCal`](@ref) is the bound of every radius slot, and it names this family.
 
 # Interfaces
 
@@ -1952,8 +1623,7 @@ In order to implement a new concrete type that works seamlessly with the library
 # Related
 
   - [`AbstractCalibrationAlgorithm`](@ref)
-  - [`AmbiguityRadiusCalibration`](@ref)
-  - [`Func_AmbRadCal`](@ref)
+  - [`Num_AmbRadCal`](@ref)
   - [`ConcentrationRadius`](@ref): the family's rule that shrinks the ball as the sample grows.
   - [`RateRadius`](@ref): the family's rule that shrinks the radius at a square-root rate.
   - [`DimensionalRateRadius`](@ref): the family's rule that shrinks it at the dimensional rate a Wasserstein ball earns.
@@ -1965,9 +1635,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Computes an Esfahani-Kuhn tail weight, the weight that the `l` slot of a distributionally robust measure holds.
 
-The tail weight scales the tail term of the Esfahani-Kuhn loss, and the mean term is not scaled by it. It is a different quantity from the radius, so it takes a different family and a different role: a radius rule placed in a tail-weight slot is refused at construction. The family's role type, [`AmbiguityTailWeightCalibration`](@ref), subtypes [`AbstractCalibrationEstimator`](@ref) rather than this family, and is not admitted by [`Func_AmbTwtCal`](@ref).
+The tail weight scales the tail term of the Esfahani-Kuhn loss, and the mean term is not scaled by it. It is a different quantity from the radius, so it takes a family of its own: a radius rule placed in a tail-weight slot is refused at construction, by [`Num_AmbTwtCal`](@ref).
 
-[`TailTermParity`](@ref) is the rule the family ships. A stated tail weight is dimensionless and is not scale-free in the sample, so one number is a different trade-off at every sampling frequency; the rule reads the sample's own units and leaves the preference in the caller's `ratio`. [`Func_AmbTwtCal`](@ref) admits a plain function beside it, so a caller's own rule needs no type.
+[`TailTermParity`](@ref) is the rule the family ships. A stated tail weight is dimensionless and is not scale-free in the sample, so one number is a different trade-off at every sampling frequency; the rule reads the sample's own units and leaves the preference in the caller's `ratio`. [`Num_AmbTwtCal`](@ref) admits a plain function beside it, so a caller's own rule needs no type.
 
 # Interfaces
 
@@ -1992,8 +1662,7 @@ In order to implement a new concrete type that works seamlessly with the library
 # Related
 
   - [`AbstractCalibrationAlgorithm`](@ref)
-  - [`AmbiguityTailWeightCalibration`](@ref)
-  - [`Func_AmbTwtCal`](@ref)
+  - [`Num_AmbTwtCal`](@ref)
   - [`AbstractAmbiguityRadiusCalibrationAlgorithm`](@ref)
   - [`TailTermParity`](@ref): the family's rule that prices the tail term at a stated multiple of the mean term.
 """
@@ -2006,7 +1675,7 @@ Computes a norm ceiling from the data a prior result carries, so that the ceilin
 
 A **Norm Ceiling** is an upper bound on a norm of the weight vector, the quantity the `l2c`, `lpc` and `linfc` slots of [`JuMPOptimiser`](@ref) hold. It is not an **Ambiguity Radius**. A radius is the coefficient of a norm penalty in the objective, and a ceiling bounds that norm in a constraint. The reciprocal of a ceiling is a floor on the effective number of assets, which is a diversification statement rather than a statement about the set of measures the model prices. So the quantity takes its own family beside the others, under the same root.
 
-All concrete subtypes should subtype `AbstractNormCeilingCalibrationAlgorithm`, and should be **callable**, on the same terms as the other families. The family's role type, [`NormCeilingCalibration`](@ref), subtypes [`AbstractCalibrationEstimator`](@ref) instead, and is not admitted by [`Func_NormCeilCal`](@ref).
+All concrete subtypes should subtype `AbstractNormCeilingCalibrationAlgorithm`, and should be **callable**, on the same terms as the other families. [`Num_NormCeilCal`](@ref) is the bound of every ceiling slot, and it names this family.
 
 # Interfaces
 
@@ -2035,291 +1704,98 @@ A ceiling is read against one norm order, and that order belongs to the constrai
 # Related
 
   - [`AbstractCalibrationAlgorithm`](@ref)
-  - [`NormCeilingCalibration`](@ref)
-  - [`Func_NormCeilCal`](@ref)
+  - [`Num_NormCeilCal`](@ref)
   - [`CalibrationContext`](@ref)
   - [`EffectiveAssetFloor`](@ref): the family's rule that holds a stated fraction of the universe effective.
 """
 abstract type AbstractNormCeilingCalibrationAlgorithm <: AbstractCalibrationAlgorithm end
 """
-    const Func_AmbRadCal = Union{<:Function, <:AbstractAmbiguityRadiusCalibrationAlgorithm}
+    const Num_AmbRadCal = Union{<:AbstractAmbiguityRadiusCalibrationAlgorithm, <:Function,
+                                <:Number}
 
-Field bound for the `alg` field of an ambiguity-radius role: a rule of the family, or a plain function of the same five arguments. It is the counterpart of [`Func_SigCal`](@ref), and carries its reading unchanged.
+Field bound for an ambiguity-radius slot: the radius itself, a rule of the family, or a plain function of the same five arguments.
 
-# Related
-
-  - [`AbstractAmbiguityRadiusCalibrationAlgorithm`](@ref)
-  - [`Func_AmbTwtCal`](@ref)
-  - [`resolve_calibration_slot`](@ref)
-"""
-const Func_AmbRadCal = Union{<:Function, <:AbstractAmbiguityRadiusCalibrationAlgorithm}
-"""
-    const Func_AmbTwtCal = Union{<:Function,
-                                 <:AbstractAmbiguityTailWeightCalibrationAlgorithm}
-
-Field bound for the `alg` field of an ambiguity-tail-weight role: a rule of the family, or a plain function of the same five arguments. [`TailTermParity`](@ref) is the rule the family ships, and the plain function carries a caller's own.
+The union names one rule family and no other, so a tail-weight rule placed in a radius slot fails the constructor's signature and is refused at construction. That is the whole of the family validation, and no guard method is written for it. A function stands in the union on the terms [`Num_SigCal`](@ref) sets out: it carries no family, so the name of the slot is what states the quantity.
 
 # Related
 
-  - [`AbstractAmbiguityTailWeightCalibrationAlgorithm`](@ref)
-  - [`Func_AmbRadCal`](@ref)
-  - [`TailTermParity`](@ref)
-  - [`resolve_calibration_slot`](@ref)
-"""
-const Func_AmbTwtCal = Union{<:Function, <:AbstractAmbiguityTailWeightCalibrationAlgorithm}
-"""
-    const Func_NormCeilCal = Union{<:Function,
-                                   <:AbstractNormCeilingCalibrationAlgorithm}
-
-Field bound for the `alg` field of a norm-ceiling role: a rule of the family, or a plain function of the same five arguments. It is the counterpart of [`Func_AmbRadCal`](@ref), and carries its reading unchanged.
-
-# Related
-
-  - [`AbstractNormCeilingCalibrationAlgorithm`](@ref)
-  - [`Func_AmbRadCal`](@ref)
-  - [`resolve_calibration_slot`](@ref)
-"""
-const Func_NormCeilCal = Union{<:Function, <:AbstractNormCeilingCalibrationAlgorithm}
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Places an ambiguity-radius rule in a slot that holds the radius of the ball the model prices.
-
-The role is the whole of the type: the rule itself lives in `alg`. A radius has no lower and upper end to name, so the family carries one role rather than the two that a tail probability carries, and [`mirror_role`](@ref) needs no method for it.
-
-A slot bounded by [`Num_AmbRadCal`](@ref) admits this role and refuses [`AmbiguityTailWeightCalibration`](@ref), so a tail-weight rule placed in a radius slot is refused at construction rather than at fold time.
-
-# Fields
-
-$(DocStringExtensions.FIELDS)
-
-# Constructors
-
-    AmbiguityRadiusCalibration(;
-        alg::Func_AmbRadCal
-    ) -> AmbiguityRadiusCalibration
-
-Keywords correspond to the struct's fields. `alg` has no default, because the rule is the whole content of the type.
-
-# Related
-
-  - [`AbstractCalibrationEstimator`](@ref)
-  - [`AbstractAmbiguityRadiusCalibrationAlgorithm`](@ref)
-  - [`AmbiguityTailWeightCalibration`](@ref)
-  - [`Num_AmbRadCal`](@ref)
-  - [`Func_AmbRadCal`](@ref)
-  - [`ConcentrationRadius`](@ref)
-  - [`RateRadius`](@ref)
-  - [`DimensionalRateRadius`](@ref)
-"""
-@concrete struct AmbiguityRadiusCalibration <: AbstractCalibrationEstimator
-    """
-    $(field_dict[:cal_alg_amb_rad])
-    """
-    alg
-    function AmbiguityRadiusCalibration(alg::Func_AmbRadCal)
-        return new{typeof(alg)}(alg)
-    end
-end
-function AmbiguityRadiusCalibration(; alg::Func_AmbRadCal)
-    return AmbiguityRadiusCalibration(alg)
-end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Places a tail-weight rule in a slot that holds the weight of the tail term of an Esfahani-Kuhn loss.
-
-It is the counterpart of [`AmbiguityRadiusCalibration`](@ref), and carries the same shape. Its `alg` holds [`TailTermParity`](@ref) or a caller's own function.
-
-The rule reads a **travelling pair**, and a radius rule does not. A tail weight prices a tail at the measure's own significance level, so the slot owner states that level in `ctx.alpha` before the slot is resolved, on the same terms as the two deformation roles.
-
-# Fields
-
-$(DocStringExtensions.FIELDS)
-
-# Constructors
-
-    AmbiguityTailWeightCalibration(;
-        alg::Func_AmbTwtCal
-    ) -> AmbiguityTailWeightCalibration
-
-Keywords correspond to the struct's fields. `alg` has no default, because the rule is the whole content of the type.
-
-# Related
-
-  - [`AbstractCalibrationEstimator`](@ref)
-  - [`AbstractAmbiguityTailWeightCalibrationAlgorithm`](@ref)
-  - [`AmbiguityRadiusCalibration`](@ref)
-  - [`Num_AmbTwtCal`](@ref)
-  - [`Func_AmbTwtCal`](@ref)
-  - [`TailTermParity`](@ref)
-  - [`CalibrationContext`](@ref)
-"""
-@concrete struct AmbiguityTailWeightCalibration <: AbstractCalibrationEstimator
-    """
-    $(field_dict[:cal_alg_amb_twt])
-    """
-    alg
-    function AmbiguityTailWeightCalibration(alg::Func_AmbTwtCal)
-        return new{typeof(alg)}(alg)
-    end
-end
-function AmbiguityTailWeightCalibration(; alg::Func_AmbTwtCal)
-    return AmbiguityTailWeightCalibration(alg)
-end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Places a norm-ceiling rule in a slot that bounds a norm of the weight vector from above.
-
-A ceiling is a different quantity from a radius, so it takes a different role: a radius rule placed in a ceiling slot is refused at construction, and a ceiling rule placed in a radius slot is refused the same way. [`AbstractNormCeilingCalibrationAlgorithm`](@ref) states the difference between the two quantities.
-
-The role is the whole of the type: the rule itself lives in `alg`. A ceiling has no lower and upper end to name, so the family carries one role rather than two, and [`mirror_role`](@ref) needs no method for it.
-
-# Fields
-
-$(DocStringExtensions.FIELDS)
-
-# Constructors
-
-    NormCeilingCalibration(;
-        alg::Func_NormCeilCal
-    ) -> NormCeilingCalibration
-
-Keywords correspond to the struct's fields. `alg` has no default, because the rule is the whole content of the type.
-
-# Related
-
-  - [`AbstractCalibrationEstimator`](@ref)
-  - [`AbstractNormCeilingCalibrationAlgorithm`](@ref)
-  - [`AmbiguityRadiusCalibration`](@ref)
-  - [`Num_NormCeilCal`](@ref)
-  - [`Func_NormCeilCal`](@ref)
-  - [`EffectiveAssetFloor`](@ref)
-"""
-@concrete struct NormCeilingCalibration <: AbstractCalibrationEstimator
-    """
-    $(field_dict[:cal_alg_norm_ceil])
-    """
-    alg
-    function NormCeilingCalibration(alg::Func_NormCeilCal)
-        return new{typeof(alg)}(alg)
-    end
-end
-function NormCeilingCalibration(; alg::Func_NormCeilCal)
-    return NormCeilingCalibration(alg)
-end
-"""
-    const Num_AmbRadCal = Union{<:AmbiguityRadiusCalibration,
-                                <:AbstractAmbiguityRadiusCalibrationAlgorithm, <:Number}
-
-Field bound for an ambiguity-radius slot: the radius itself, the role that computes it, or the rule alone.
-
-The union names one role and no other, so a tail-weight role placed in a radius slot fails the constructor's signature and is refused at construction. That is the whole of the role validation, and no guard method is written for it. A bare tail-weight rule is refused by the same union, because the union names one rule family and no other.
-
-The rule family stands in the union on the terms [`Num_SigTailCal`](@ref) sets out, and [`bind_role`](@ref) puts the role on before the slot is stored. The role names no end of the distribution, so the rule's own family is the whole of the choice.
-
-# Related
-
-  - [`AmbiguityRadiusCalibration`](@ref)
   - [`AbstractAmbiguityRadiusCalibrationAlgorithm`](@ref)
   - [`Num_AmbTwtCal`](@ref)
-  - [`bind_role`](@ref)
+  - [`Num_AmbRadNormCeilCal`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
-const Num_AmbRadCal = Union{<:AmbiguityRadiusCalibration,
-                            <:AbstractAmbiguityRadiusCalibrationAlgorithm, <:Number}
+const Num_AmbRadCal = Union{<:AbstractAmbiguityRadiusCalibrationAlgorithm, <:Function,
+                            <:Number}
 """
-    const Num_AmbTwtCal = Union{<:AmbiguityTailWeightCalibration,
-                                <:AbstractAmbiguityTailWeightCalibrationAlgorithm, <:Number}
+    const Num_AmbTwtCal = Union{<:AbstractAmbiguityTailWeightCalibrationAlgorithm,
+                                <:Function, <:Number}
 
-Field bound for an ambiguity-tail-weight slot: the tail weight itself, the role that computes it, or the rule alone.
-
-The rule family stands in the union on the terms [`Num_SigTailCal`](@ref) sets out, and [`bind_role`](@ref) puts the role on before the slot is stored. The role names no end of the distribution, so the rule's own family is the whole of the choice.
+Field bound for an ambiguity-tail-weight slot: the tail weight itself, a rule of the family, or a plain function of the same five arguments. It is the counterpart of [`Num_AmbRadCal`](@ref), and carries its reading unchanged.
 
 # Related
 
-  - [`AmbiguityTailWeightCalibration`](@ref)
   - [`AbstractAmbiguityTailWeightCalibrationAlgorithm`](@ref)
   - [`Num_AmbRadCal`](@ref)
-  - [`bind_role`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
-const Num_AmbTwtCal = Union{<:AmbiguityTailWeightCalibration,
-                            <:AbstractAmbiguityTailWeightCalibrationAlgorithm, <:Number}
+const Num_AmbTwtCal = Union{<:AbstractAmbiguityTailWeightCalibrationAlgorithm, <:Function,
+                            <:Number}
 """
-    const Num_NormCeilCal = Union{<:NormCeilingCalibration,
-                                  <:AbstractNormCeilingCalibrationAlgorithm, <:Number}
+    const Num_NormCeilCal = Union{<:AbstractNormCeilingCalibrationAlgorithm, <:Function,
+                                  <:Number}
 
-Field bound for a norm-ceiling slot: the ceiling itself, the role that computes it, or the rule alone.
+Field bound for a norm-ceiling slot: the ceiling itself, a rule of the family, or a plain function of the same five arguments.
 
-The union names one role and no other, so a radius role placed in a ceiling slot fails the constructor's signature and is refused at construction. That is the whole of the role validation, and no guard method is written for it. A bare radius rule is refused by the same union, because the union names one rule family and no other.
-
-The rule family stands in the union on the terms [`Num_SigTailCal`](@ref) sets out, and [`bind_role`](@ref) puts the role on before the slot is stored.
+The union names one rule family and no other, so a radius rule placed in a ceiling slot is refused at construction, and a ceiling rule placed in a radius slot is refused the same way. [`AbstractNormCeilingCalibrationAlgorithm`](@ref) states the difference between the two quantities.
 
 # Related
 
-  - [`NormCeilingCalibration`](@ref)
   - [`AbstractNormCeilingCalibrationAlgorithm`](@ref)
   - [`Num_AmbRadCal`](@ref)
   - [`Num_AmbRadNormCeilCal`](@ref)
-  - [`bind_role`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
-const Num_NormCeilCal = Union{<:NormCeilingCalibration,
-                              <:AbstractNormCeilingCalibrationAlgorithm, <:Number}
+const Num_NormCeilCal = Union{<:AbstractNormCeilingCalibrationAlgorithm, <:Function,
+                              <:Number}
 """
-    const Num_AmbRadNormCeilCal = Union{<:AmbiguityRadiusCalibration,
-                                        <:NormCeilingCalibration,
-                                        <:AbstractAmbiguityRadiusCalibrationAlgorithm,
+    const Num_AmbRadNormCeilCal = Union{<:AbstractAmbiguityRadiusCalibrationAlgorithm,
                                         <:AbstractNormCeilingCalibrationAlgorithm, <:Number}
 
 Field bound for the one slot the library reads as two quantities, the `val` field of [`LpRegularisation`](@ref).
 
-That estimator is a penalty in the `lp` field of [`JuMPOptimiser`](@ref) and a norm constraint in its `lpc` field, so `val` is an ambiguity radius on one route and a norm ceiling on the other. One field cannot carry two bounds, so this bound admits both roles and each route refuses the role that has no reading on it. It is the only slot in the library whose role is settled after construction rather than by its bound.
+That estimator is a penalty in the `lp` field of [`JuMPOptimiser`](@ref) and a norm constraint in its `lpc` field, so `val` is an ambiguity radius on one route and a norm ceiling on the other. One field cannot carry two bounds, so this bound admits both rule families and each route refuses the family that has no reading on it. It is the only slot in the library whose quantity is settled after construction rather than by its bound.
 
-Both rule families stand in the union as well, on the terms [`Num_SigTailCal`](@ref) sets out. This slot names no role of its own, so the rule's family is what [`bind_role`](@ref) reads: a radius rule takes the radius role and a ceiling rule takes the ceiling role. The route then refuses the role that has no reading on it, exactly as it refuses a role the caller stated.
+A plain function is **not** admitted here, and this is the one slot that refuses one. Every other slot names one quantity, so a function placed in it needs no family of its own. This slot names two, and the two guards read the family to tell them apart, so a function would reach a route that has no reading for it and no guard could say so.
 
 # Related
 
   - [`LpRegularisation`](@ref)
   - [`Num_AmbRadCal`](@ref)
   - [`Num_NormCeilCal`](@ref)
-  - [`bind_role`](@ref)
   - [`assert_penalty_coefficient_role`](@ref)
   - [`assert_norm_ceiling_role`](@ref)
 """
-const Num_AmbRadNormCeilCal = Union{<:AmbiguityRadiusCalibration, <:NormCeilingCalibration,
-                                    <:AbstractAmbiguityRadiusCalibrationAlgorithm,
+const Num_AmbRadNormCeilCal = Union{<:AbstractAmbiguityRadiusCalibrationAlgorithm,
                                     <:AbstractNormCeilingCalibrationAlgorithm, <:Number}
-# The role a bare rule takes in a slot that names no end — see `bind_role`.
-function bind_role(alg::AbstractAmbiguityRadiusCalibrationAlgorithm)
-    return AmbiguityRadiusCalibration(alg)
-end
-function bind_role(alg::AbstractAmbiguityTailWeightCalibrationAlgorithm)
-    return AmbiguityTailWeightCalibration(alg)
-end
-function bind_role(alg::AbstractNormCeilingCalibrationAlgorithm)
-    return NormCeilingCalibration(alg)
-end
-# The two roles below name a quantity that reaches a JuMP model from a bare field of
+# The two families below name a quantity that reaches a JuMP model from a bare field of
 # `JuMPOptimiser`: the ceiling from `l2c` and `linfc`, the radius from `l1` and `linf`.
-# There is no term to rebuild on that route, and the constructor's guard read a role rather
+# There is no term to rebuild on that route, and the constructor's guard read a rule rather
 # than a number, so it selected the permissive fallback of the validator and stated nothing.
 # The range of the quantity is therefore checked here, on the number the rule returned, and
-# only on the calibrated path. The five other roles stand only in slots their owner
-# rebuilds, and that rebuild states their range.
-function resolve_calibration_slot(r::NormCeilingCalibration, key::Symbol,
+# only on the calibrated path. The three other families stand only in slots their owner
+# rebuilds, and that rebuild states their range. A rule written as a plain function names no
+# family, so it reaches neither method here and `assemble_jump_model!` states its range.
+function resolve_calibration_slot(alg::AbstractNormCeilingCalibrationAlgorithm, key::Symbol,
                                   pr::AbstractPriorResult, w, slv = nothing,
                                   ctx::CalibrationContext = CalibrationContext())
-    val = r.alg(key, pr, w, slv, ctx)
+    val = alg(key, pr, w, slv, ctx)
     assert_nonempty_gt0_finite_val(val, key)
     return val
 end
-function resolve_calibration_slot(r::AmbiguityRadiusCalibration, key::Symbol,
-                                  pr::AbstractPriorResult, w, slv = nothing,
+function resolve_calibration_slot(alg::AbstractAmbiguityRadiusCalibrationAlgorithm,
+                                  key::Symbol, pr::AbstractPriorResult, w, slv = nothing,
                                   ctx::CalibrationContext = CalibrationContext())
-    val = r.alg(key, pr, w, slv, ctx)
+    val = alg(key, pr, w, slv, ctx)
     assert_nonempty_gt0_finite_val(val, key)
     return val
 end
@@ -2364,7 +1840,7 @@ Keywords correspond to the struct's fields. `confidence` defaults to `0.95`, and
   - [`CalibrationContext`](@ref)
   - [`calibration_series_dispersion`](@ref)
   - [`DualNormRadius`](@ref): answers what the sampling error is in the ground metric the slot names, so its number changes with the key while this one's does not.
-  - [`AmbiguityRadiusCalibration`](@ref)
+  - [`Num_AmbRadCal`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
 @concrete struct ConcentrationRadius <: AbstractAmbiguityRadiusCalibrationAlgorithm
@@ -2484,7 +1960,7 @@ Keywords correspond to the struct's fields. `c` defaults to `1`, which is the pl
   - [`ConcentrationRadius`](@ref)
   - [`DimensionalRateRadius`](@ref)
   - [`DualNormRadius`](@ref): answers what the sampling error is in the ground metric the slot names, so its number changes with the key while this one's does not.
-  - [`AmbiguityRadiusCalibration`](@ref)
+  - [`Num_AmbRadCal`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
 @concrete struct RateRadius <: AbstractAmbiguityRadiusCalibrationAlgorithm
@@ -2591,7 +2067,7 @@ Keywords correspond to the struct's fields. `confidence` defaults to `0.95`, and
   - [`AbstractAmbiguityRadiusCalibrationAlgorithm`](@ref)
   - [`ConcentrationRadius`](@ref)
   - [`RateRadius`](@ref)
-  - [`AmbiguityRadiusCalibration`](@ref)
+  - [`Num_AmbRadCal`](@ref)
   - [`CalibrationContext`](@ref)
   - [`calibration_series_dispersion`](@ref)
   - [`resolve_calibration_slot`](@ref)
@@ -2736,7 +2212,7 @@ Keywords correspond to the struct's fields. `confidence` defaults to `0.95`. The
   - [`AbstractAmbiguityRadiusCalibrationAlgorithm`](@ref)
   - [`ConcentrationRadius`](@ref): answers how wide the ball is at a confidence level, in one dimensionless factor that no norm enters.
   - [`RateRadius`](@ref): answers how fast the ball shrinks with the record, and leaves the coefficient to a cross-validation.
-  - [`AmbiguityRadiusCalibration`](@ref)
+  - [`Num_AmbRadCal`](@ref)
   - [`CalibrationContext`](@ref)
   - [`calibration_series_dispersion`](@ref)
   - [`resolve_calibration_slot`](@ref)
@@ -2916,7 +2392,7 @@ Keywords correspond to the struct's fields. `ratio` defaults to `1`, which is pa
 # Related
 
   - [`AbstractAmbiguityTailWeightCalibrationAlgorithm`](@ref)
-  - [`AmbiguityTailWeightCalibration`](@ref)
+  - [`Num_AmbTwtCal`](@ref)
   - [`CalibrationContext`](@ref)
   - [`ConditionalValueatRisk`](@ref)
   - [`DistributionallyRobustConditionalValueatRisk`](@ref)
@@ -3095,7 +2571,7 @@ Keywords correspond to the struct's fields. `fraction` defaults to `0.5`, which 
 # Related
 
   - [`AbstractNormCeilingCalibrationAlgorithm`](@ref)
-  - [`NormCeilingCalibration`](@ref)
+  - [`Num_NormCeilCal`](@ref)
   - [`CalibrationContext`](@ref)
   - [`number_effective_assets`](@ref)
   - [`resolve_calibration_slot`](@ref)
@@ -3158,10 +2634,7 @@ function (alg::EffectiveAssetFloor)(key::Symbol, pr::AbstractPriorResult, ::Any,
     return isinf(p) ? inv(m) : m^(inv(p) - one(p))
 end
 
-export CalibrationContext, SignificanceTailCalibration, SignificanceHeadCalibration,
-       DeformationTailCalibration, DeformationHeadCalibration, ReturnsSeries,
-       AbsoluteDrawdownSeries, RelativeDrawdownSeries, ScenarioCount, RateSignificance,
-       EntropyBudget, HillTailDecay, RadialTailDecay, AmbiguityRadiusCalibration,
-       AmbiguityTailWeightCalibration, ConcentrationRadius, RateRadius,
-       DimensionalRateRadius, DualNormRadius, TailTermParity, NormCeilingCalibration,
-       EffectiveAssetFloor
+export CalibrationContext, ReturnsSeries, AbsoluteDrawdownSeries, RelativeDrawdownSeries,
+       ScenarioCount, RateSignificance, EntropyBudget, HillTailDecay, RadialTailDecay,
+       ConcentrationRadius, RateRadius, DimensionalRateRadius, DualNormRadius,
+       TailTermParity, EffectiveAssetFloor

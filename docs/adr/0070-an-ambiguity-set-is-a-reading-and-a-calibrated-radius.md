@@ -215,11 +215,11 @@ root in [`src/01_Base/02_TypeRoots.jl`](../../src/01_Base/02_TypeRoots.jl) first
 a break that has not happened, and `Num_UcSK` and `Num_UcSEps` are unrelated to the calibration
 bounds today.
 
-**A quantity takes a role, and the alias is named for it.** `AmbiguityRadiusValue` and
-`AmbiguityTailWeightValue` are not the spellings that shipped. The rule lives in the `alg` field of
-a **Calibration Role**, and a slot is bounded by `Num_AmbRadCal` or `Num_AmbTwtCal`, each pairing
-`Number` with one concrete role. The two quantities keep the two separate bounds this ADR insisted
-on, for the reason it gives: `r` is the radius and `l` is a tail weight.
+**A slot names its quantity, and the alias is named for it.** `AmbiguityRadiusValue` and
+`AmbiguityTailWeightValue` are not the spellings that shipped. A slot is bounded by `Num_AmbRadCal`
+or `Num_AmbTwtCal`, each pairing `Number` with one rule family and a plain `Function`. The two
+quantities keep the two separate bounds this ADR insisted on, for the reason it gives: `r` is the
+radius and `l` is a tail weight.
 
 **`kappa` has a rule.** `EntropyBudget` computes the Kaniadakis deformation parameter that spends a
 stated entropy budget. The tail weight still has none, so that half of the observation stands.
@@ -229,9 +229,9 @@ stated entropy budget. The tail weight still has none, so that half of the obser
 **The `lpc` field was widened by accident, and nothing resolved it.** This decision widened
 `LpRegularisation.val` for the penalty reading of the `lp` field. The same type also serves
 as a norm *constraint* through `JuMPOptimiser.lpc`, so that field inherited a bound naming a
-role that has no reading in it, and `set_weight_norm_p_constraints!` read `val` raw. An
-`AmbiguityRadiusCalibration` placed in `lpc` therefore reached a JuMP expression unresolved.
-ADR 0097 closes it: the field refuses a radius role at construction, and a ceiling role in it
+rule family that has no reading in it, and `set_weight_norm_p_constraints!` read `val` raw. An
+ambiguity-radius rule placed in `lpc` therefore reached a JuMP expression unresolved.
+ADR 0097 closes it: the field refuses a radius rule at construction, and a ceiling rule in it
 resolves.
 
 **The three norm ceilings are not radius slots.** `l2c`, `lpc` and `linfc` are spelled beside

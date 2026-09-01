@@ -1,6 +1,6 @@
 #=
-Five **Calibration Rules** stand in the `alg` field of a role type, and each one computes the
-quantity of the slot its role addresses. `test_09f_calibration_slot.jl` covers the mechanism
+Five **Calibration Rules** stand in the `alg` field of a rule type, and each one computes the
+quantity of the slot its rule addresses. `test_09f_calibration_slot.jl` covers the mechanism
 that carries them; this file covers the rules themselves.
 
 `ScenarioCount` and `RateSignificance` compute a significance level, and `EntropyBudget`,
@@ -56,35 +56,33 @@ const PR120 = prior(EmpiricalPrior(), randn(RNG, 120, 4))
     @test !(RadialTailDecay <: PO.AbstractSignificanceCalibrationAlgorithm)
     @test !(ScenarioCount <: PO.AbstractDeformationCalibrationAlgorithm)
 
-    # The family is what the `alg` bound checks, so each rule is admitted by one bound only.
-    @test isa(ScenarioCount(; n = 25), PO.Func_SigCal)
-    @test isa(RateSignificance(), PO.Func_SigCal)
-    @test isa(EntropyBudget(; target = -1.3), PO.Func_DefCal)
-    @test isa(HillTailDecay(), PO.Func_DefCal)
-    @test isa(RadialTailDecay(), PO.Func_DefCal)
-    @test !isa(ScenarioCount(; n = 25), PO.Func_DefCal)
-    @test !isa(EntropyBudget(; target = -1.3), PO.Func_SigCal)
-    @test !isa(HillTailDecay(), PO.Func_SigCal)
-    @test !isa(RadialTailDecay(), PO.Func_SigCal)
+    # The family is what the slot bound checks, so each rule is admitted by one bound only.
+    @test isa(ScenarioCount(; n = 25), PO.Num_SigCal)
+    @test isa(RateSignificance(), PO.Num_SigCal)
+    @test isa(EntropyBudget(; target = -1.3), PO.Num_DefCal)
+    @test isa(HillTailDecay(), PO.Num_DefCal)
+    @test isa(RadialTailDecay(), PO.Num_DefCal)
+    @test !isa(ScenarioCount(; n = 25), PO.Num_DefCal)
+    @test !isa(EntropyBudget(; target = -1.3), PO.Num_SigCal)
+    @test !isa(HillTailDecay(), PO.Num_SigCal)
+    @test !isa(RadialTailDecay(), PO.Num_SigCal)
 
-    # A rule goes inside a role, and both roles of its family take it.
-    @test SignificanceTailCalibration(; alg = ScenarioCount(; n = 25)).alg ==
+    # A slot stores the rule the caller wrote, and both ends of a Range measure take it.
+    @test ConditionalValueatRisk(; alpha = ScenarioCount(; n = 25)).alpha ==
           ScenarioCount(; n = 25)
-    @test isa(SignificanceHeadCalibration(; alg = RateSignificance()).alg, RateSignificance)
-    @test isa(DeformationTailCalibration(; alg = EntropyBudget(; target = -1.3)).alg,
-              EntropyBudget)
-    @test isa(DeformationHeadCalibration(; alg = EntropyBudget(; target = -1.3)).alg,
-              EntropyBudget)
-    @test isa(DeformationTailCalibration(; alg = HillTailDecay()).alg, HillTailDecay)
-    @test isa(DeformationHeadCalibration(; alg = HillTailDecay()).alg, HillTailDecay)
-    @test isa(DeformationTailCalibration(; alg = RadialTailDecay()).alg, RadialTailDecay)
-    @test isa(DeformationHeadCalibration(; alg = RadialTailDecay()).alg, RadialTailDecay)
+    @test ConditionalValueatRiskRange(; alpha = RateSignificance()).beta ==
+          RateSignificance()
+    @test RelativisticValueatRisk(; kappa = EntropyBudget(; target = -1.3)).kappa ==
+          EntropyBudget(; target = -1.3)
+    @test RelativisticValueatRiskRange(; kappa_a = HillTailDecay()).kappa_b ==
+          HillTailDecay()
+    @test RelativisticValueatRisk(; kappa = RadialTailDecay()).kappa == RadialTailDecay()
 
-    # The wrong family is refused at construction, by the role's own bound.
-    @test_throws TypeError SignificanceTailCalibration(; alg = EntropyBudget(; target = -1))
-    @test_throws TypeError DeformationTailCalibration(; alg = ScenarioCount(; n = 25))
-    @test_throws TypeError SignificanceHeadCalibration(; alg = HillTailDecay())
-    @test_throws TypeError SignificanceTailCalibration(; alg = RadialTailDecay())
+    # The wrong family is refused at construction, by the slot's own bound.
+    @test_throws TypeError ConditionalValueatRisk(; alpha = EntropyBudget(; target = -1))
+    @test_throws TypeError RelativisticValueatRisk(; kappa = ScenarioCount(; n = 25))
+    @test_throws TypeError ConditionalValueatRisk(; alpha = HillTailDecay())
+    @test_throws TypeError ConditionalValueatRisk(; alpha = RadialTailDecay())
 
     # The five rules are caller-facing, because a caller states one directly.
     exported = names(PortfolioOptimisers)
@@ -297,17 +295,13 @@ end
     @test rule(:kappa, PR60, nothing, nothing, ctx) ==
           EntropyBudget(; target = -1.3)(:kappa, PR60, nothing, nothing, ctx)
 
-    # The resolver unwraps the role and hands the context to the rule, so the SLOT is what
-    # a per-type method passes and the occupant never moves. Both deformation roles take
-    # it, because a head slot holds a rule too.
-    tail = DeformationTailCalibration(; alg = rule)
-    head = DeformationHeadCalibration(; alg = rule)
-    @test PO.resolve_calibration_slot(tail, :kappa, PR60, nothing, nothing, ctx) ==
+    # The resolver hands the context to the rule, so the SLOT is what a per-type method
+    # passes and the occupant never moves. One rule serves the tail slot and the head slot
+    # alike, because the slot is what names the end.
+    @test PO.resolve_calibration_slot(rule, :kappa, PR60, nothing, nothing, ctx) ==
           rule(:kappa, PR60, nothing, nothing, ctx)
-    @test PO.resolve_calibration_slot(head, :kappa_b, PR60, nothing, nothing, ctx) ==
+    @test PO.resolve_calibration_slot(rule, :kappa_b, PR60, nothing, nothing, ctx) ==
           rule(:kappa_b, PR60, nothing, nothing, ctx)
-    @test tail.alg === rule
-    @test head.alg === rule
 
     # The second rule that reads a sibling reads the same field. A head slot's number is
     # the `beta` of its end, and the context names the reading rather than the spelling.
@@ -315,8 +309,7 @@ end
     @test !hasfield(HillTailDecay, :alpha)
     @test hill.kmin == 3
     hctx = CalibrationContext(; alpha = 0.05)
-    @test PO.resolve_calibration_slot(DeformationHeadCalibration(; alg = hill), :kappa_b,
-                                      PR60, nothing, nothing, hctx) ==
+    @test PO.resolve_calibration_slot(hill, :kappa_b, PR60, nothing, nothing, hctx) ==
           hill(:kappa_b, PR60, nothing, nothing, hctx)
 
     # A stated number passes through untouched. That is what lets the slot owner build one
@@ -326,28 +319,27 @@ end
           nothing
 
     # A rule that reads no sibling ignores the field, whether it is typed or a plain
-    # function, and so does the role it stands in.
+    # function, and so does the rule it stands in.
     probe(::Symbol, ::PO.AbstractPriorResult, ::Any, ::Any, ::PO.CalibrationContext) = 0.3
-    @test PO.resolve_calibration_slot(DeformationTailCalibration(; alg = probe), :kappa,
-                                      PR60, nothing, nothing, ctx) == 0.3
-    @test PO.resolve_calibration_slot(DeformationTailCalibration(; alg = probe), :kappa,
-                                      PR60, nothing, nothing, CalibrationContext()) == 0.3
+    @test PO.resolve_calibration_slot(probe, :kappa, PR60, nothing, nothing, ctx) == 0.3
+    @test PO.resolve_calibration_slot(probe, :kappa, PR60, nothing, nothing,
+                                      CalibrationContext()) == 0.3
 
     # No significance rule reads a sibling, so the whole family answers the same number
     # under a context that names one and under the default.
-    role = SignificanceTailCalibration(; alg = ScenarioCount(; n = 25))
-    @test PO.resolve_calibration_slot(role, :alpha, PR60, nothing, nothing, ctx) ==
-          PO.resolve_calibration_slot(role, :alpha, PR60, nothing, nothing)
+    rule = ScenarioCount(; n = 25)
+    @test PO.resolve_calibration_slot(rule, :alpha, PR60, nothing, nothing, ctx) ==
+          PO.resolve_calibration_slot(rule, :alpha, PR60, nothing, nothing)
 end
 
 @testset "Calibration rules: the resolver runs each rule" begin
     # This is the shape #583's per-type method writes. A significance slot resolves on its
     # own; the deformation slot takes the number the significance slot produced.
-    slot = SignificanceTailCalibration(; alg = ScenarioCount(; n = 3))
+    slot = ScenarioCount(; n = 3)
     alpha = PO.resolve_calibration_slot(slot, :alpha, PR60, nothing)
     @test alpha == 3 / 60
 
-    kslot = DeformationTailCalibration(; alg = EntropyBudget(; target = -1.3))
+    kslot = EntropyBudget(; target = -1.3)
     kappa = PO.resolve_calibration_slot(kslot, :kappa, PR60, nothing, nothing,
                                         CalibrationContext(; alpha = alpha))
     @test 0 < kappa < 1
@@ -361,9 +353,8 @@ end
 
     # A rule reached through a plain `Function` needs no wrapper either, and the rate rule
     # resolves through the same verb.
-    @test PO.resolve_calibration_slot(SignificanceHeadCalibration(;
-                                                                  alg = RateSignificance()),
-                                      :beta, PR60, nothing) == inv(sqrt(60))
+    @test PO.resolve_calibration_slot(RateSignificance(), :beta, PR60, nothing) ==
+          inv(sqrt(60))
 end
 
 #=
@@ -472,14 +463,8 @@ end
     # The travelling pair costs nothing new: `RelativisticValueatRiskRange` already puts
     # `alpha` in the tail slot's context and `beta` in the head slot's, so the rule reads
     # one field and holds none.
-    rg = RelativisticValueatRiskRange(; alpha = 0.01,
-                                      kappa_a = DeformationTailCalibration(;
-                                                                           alg = HillTailDecay(;
-                                                                                               kmin = 20)),
-                                      beta = 0.02,
-                                      kappa_b = DeformationHeadCalibration(;
-                                                                           alg = HillTailDecay(;
-                                                                                               kmin = 20)))
+    rg = RelativisticValueatRiskRange(; alpha = 0.01, kappa_a = HillTailDecay(; kmin = 20),
+                                      beta = 0.02, kappa_b = HillTailDecay(; kmin = 20))
     og = PO.resolve_deferred_quantities(rg, PRSKEW)
     @test og.kappa_a ≈ HillTailDecay(; kmin = 20)(:kappa_a, PRSKEW, nothing, nothing,
                                                   CalibrationContext(; alpha = 0.01))
@@ -736,26 +721,16 @@ end
     @test hill(:kappa_a, PRSKEW, nothing, nothing, CalibrationContext(; alpha = 0.01)) !=
           hill(:kappa_b, PRSKEW, nothing, nothing, CalibrationContext(; alpha = 0.01))
 
-    # `mirror_role` is therefore trivially correct for this rule: the head role it builds
-    # holds the same rule, and the same rule answers the head key with the tail's number.
-    tail = DeformationTailCalibration(; alg = rule)
-    head = PO.mirror_role(tail)
-    @test isa(head, DeformationHeadCalibration)
-    @test head.alg === rule
+    # A head slot that defaults from its tail slot therefore holds the same rule, and that
+    # rule answers the head key with the tail's number.
     mctx = CalibrationContext(; alpha = 0.01)
-    @test PO.resolve_calibration_slot(head, :kappa_b, PRSKEW, nothing, nothing, mctx) ==
-          PO.resolve_calibration_slot(tail, :kappa_a, PRSKEW, nothing, nothing, mctx)
+    @test PO.resolve_calibration_slot(rule, :kappa_b, PRSKEW, nothing, nothing, mctx) ==
+          PO.resolve_calibration_slot(rule, :kappa_a, PRSKEW, nothing, nothing, mctx)
 
     # Through a Range measure the two ends read their OWN probabilities, so the two numbers
     # part when the two probabilities differ. The count `k` moves, not the end.
-    rg = RelativisticValueatRiskRange(; alpha = 0.01,
-                                      kappa_a = DeformationTailCalibration(;
-                                                                           alg = RadialTailDecay(;
-                                                                                                 kmin = 5)),
-                                      beta = 0.02,
-                                      kappa_b = DeformationHeadCalibration(;
-                                                                           alg = RadialTailDecay(;
-                                                                                                 kmin = 5)))
+    rg = RelativisticValueatRiskRange(; alpha = 0.01, kappa_a = RadialTailDecay(; kmin = 5),
+                                      beta = 0.02, kappa_b = RadialTailDecay(; kmin = 5))
     og = PO.resolve_deferred_quantities(rg, PRSKEW)
     @test og.kappa_a == ka
     @test og.kappa_b == RadialTailDecay(; kmin = 5)(:kappa_b, PRSKEW, nothing, nothing,
@@ -765,26 +740,19 @@ end
     @test 0 < og.kappa_b < 1
 
     # The two ends of one probability DO agree, which is the statement the rule makes.
-    eq = RelativisticValueatRiskRange(; alpha = 0.01,
-                                      kappa_a = DeformationTailCalibration(;
-                                                                           alg = RadialTailDecay(;
-                                                                                                 kmin = 5)),
-                                      beta = 0.01,
-                                      kappa_b = DeformationHeadCalibration(;
-                                                                           alg = RadialTailDecay(;
-                                                                                                 kmin = 5)))
+    eq = RelativisticValueatRiskRange(; alpha = 0.01, kappa_a = RadialTailDecay(; kmin = 5),
+                                      beta = 0.01, kappa_b = RadialTailDecay(; kmin = 5))
     oeq = PO.resolve_deferred_quantities(eq, PRSKEW)
     @test oeq.kappa_a == oeq.kappa_b
 
-    # The context reaches the rule through both roles of the family, and through the rule
-    # itself. The role is never rebuilt, so `alg` is the object the caller put there.
+    # The context reaches the rule through the resolver and through a direct call alike.
+    # The rule is never rebuilt, so the slot holds the object the caller put there.
     rad = RadialTailDecay(; kmin = 7)
     c03 = CalibrationContext(; alpha = 0.03)
-    @test PO.resolve_calibration_slot(DeformationTailCalibration(; alg = rad), :kappa,
-                                      PRSKEW, nothing, nothing, c03) ==
+    @test PO.resolve_calibration_slot(rad, :kappa, PRSKEW, nothing, nothing, c03) ==
           rad(:kappa, PRSKEW, nothing, nothing, c03)
-    @test DeformationTailCalibration(; alg = rad).alg === rad
-    @test DeformationHeadCalibration(; alg = rad).alg.kmin == 7
+    @test RelativisticValueatRisk(; kappa = rad).kappa === rad
+    @test RelativisticValueatRiskRange(; kappa_a = rad).kappa_b.kmin == 7
 end
 
 #=
@@ -1025,13 +993,11 @@ end
     rel_ctx = CalibrationContext(; alpha = 0.02, series = RelativeDrawdownSeries())
     ret_ctx = CalibrationContext(; alpha = 0.02)
 
-    # The marker reaches the rule, and through both roles of the family. The role is not
+    # The marker reaches the rule, and through both rules of the family. The rule is not
     # rebuilt, so the occupant of the slot is the object the caller put there.
-    @test PO.resolve_calibration_slot(DeformationTailCalibration(; alg = rule), :kappa,
-                                      PRDD, nothing, nothing, abs_ctx) ==
+    @test PO.resolve_calibration_slot(rule, :kappa, PRDD, nothing, nothing, abs_ctx) ==
           rule(:kappa, PRDD, nothing, nothing, abs_ctx)
-    @test PO.resolve_calibration_slot(DeformationHeadCalibration(; alg = rule), :kappa,
-                                      PRDD, nothing, nothing, rel_ctx) ==
+    @test PO.resolve_calibration_slot(rule, :kappa, PRDD, nothing, nothing, rel_ctx) ==
           rule(:kappa, PRDD, nothing, nothing, rel_ctx)
     @test isa(abs_ctx.series, AbsoluteDrawdownSeries)
     @test isa(rel_ctx.series, RelativeDrawdownSeries)
@@ -1058,7 +1024,7 @@ end
           rule(:kappa, PRDD, nothing, nothing, ret_ctx)
 
     # Everything that reads no series ignores the field: a stated number, a rule of another
-    # reading, a plain function, and the role each of them stands in.
+    # reading, a plain function, and the rule each of them stands in.
     @test PO.resolve_calibration_slot(0.3, :kappa, PRDD, nothing, nothing, abs_ctx) === 0.3
     @test PO.resolve_calibration_slot(nothing, :kappa, PRDD, nothing, nothing, abs_ctx) ===
           nothing
@@ -1069,14 +1035,10 @@ end
     @test budget(:kappa, PRDD, nothing, nothing, bctx) ==
           budget(:kappa, PRDD, nothing, nothing, CalibrationContext(; alpha = 0.05))
     probe = (key, pr, w, slv, ctx) -> 0.4
-    @test PO.resolve_calibration_slot(DeformationTailCalibration(; alg = probe), :kappa,
-                                      PRDD, nothing, nothing, abs_ctx) == 0.4
-    @test PO.resolve_calibration_slot(SignificanceTailCalibration(;
-                                                                  alg = RateSignificance()),
-                                      :alpha, PRDD, nothing, nothing, abs_ctx) ==
-          PO.resolve_calibration_slot(SignificanceTailCalibration(;
-                                                                  alg = RateSignificance()),
-                                      :alpha, PRDD, nothing, nothing)
+    @test PO.resolve_calibration_slot(probe, :kappa, PRDD, nothing, nothing, abs_ctx) == 0.4
+    @test PO.resolve_calibration_slot(RateSignificance(), :alpha, PRDD, nothing, nothing,
+                                      abs_ctx) ==
+          PO.resolve_calibration_slot(RateSignificance(), :alpha, PRDD, nothing, nothing)
 end
 
 @testset "Calibration series: `HillTailDecay` pools the drawdowns" begin
@@ -1251,7 +1213,7 @@ end
 @testset "Calibration series: a measure hands its own series over" begin
     # The four owners resolve one key, `:kappa`, and three of them price three series. The
     # marker is the only thing that separates the three readings.
-    hill = DeformationTailCalibration(; alg = HillTailDecay(; kmin = 20))
+    hill = HillTailDecay(; kmin = 20)
     rlvar = PO.resolve_deferred_quantities(RelativisticValueatRisk(; alpha = 0.05,
                                                                    kappa = hill), PRDD)
     rldar = PO.resolve_deferred_quantities(RelativisticDrawdownatRisk(; alpha = 0.05,
@@ -1273,7 +1235,7 @@ end
     @test rldar.kappa != rrldar.kappa
 
     # The radial rule travels the same way, and its drawdown reading is its own.
-    radial = DeformationTailCalibration(; alg = RadialTailDecay(; kmin = 20))
+    radial = RadialTailDecay(; kmin = 20)
     rdar = PO.resolve_deferred_quantities(RelativisticDrawdownatRisk(; alpha = 0.05,
                                                                      kappa = radial), PRDD)
     @test rdar.kappa == RadialTailDecay(; kmin = 20)(:kappa, PRDD, nothing, nothing,
@@ -1293,8 +1255,7 @@ end
     rg = PO.resolve_deferred_quantities(RelativisticValueatRiskRange(; alpha = 0.05,
                                                                      kappa_a = hill,
                                                                      beta = 0.05,
-                                                                     kappa_b = PO.mirror_role(hill)),
-                                        PRDD)
+                                                                     kappa_b = hill), PRDD)
     @test rg.kappa_a == rlvar.kappa
     @test 0 < rg.kappa_b < 1
 end

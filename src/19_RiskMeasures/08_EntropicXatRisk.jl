@@ -122,7 +122,7 @@ $(DocStringExtensions.FIELDS)
     EntropicValueatRisk(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
         slv::Option{<:Slv_VecSlv} = nothing,
-        alpha::Num_SigTailCal = 0.05,
+        alpha::Num_SigCal = 0.05,
         w::Option{<:ObsWeights} = nothing
     ) -> EntropicValueatRisk
 
@@ -188,8 +188,7 @@ EntropicValueatRisk
     """
     @pprop w
     function EntropicValueatRisk(settings::RiskMeasureSettings, slv::Option{<:Slv_VecSlv},
-                                 alpha::Num_SigTailCal, w::Option{<:ObsWeights})
-        alpha = bind_role(SignificanceTailCalibration, alpha)
+                                 alpha::Num_SigCal, w::Option{<:ObsWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
@@ -200,8 +199,7 @@ EntropicValueatRisk
     end
 end
 function EntropicValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                             slv::Option{<:Slv_VecSlv} = nothing,
-                             alpha::Num_SigTailCal = 0.05,
+                             slv::Option{<:Slv_VecSlv} = nothing, alpha::Num_SigCal = 0.05,
                              w::Option{<:ObsWeights} = nothing)::EntropicValueatRisk
     return EntropicValueatRisk(settings, slv, alpha, w)
 end
@@ -245,8 +243,8 @@ $(DocStringExtensions.FIELDS)
     EntropicValueatRiskRange(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
         slv::Option{<:Slv_VecSlv} = nothing,
-        alpha::Num_SigTailCal = 0.05,
-        beta::Num_SigHeadCal = mirror_role(alpha),
+        alpha::Num_SigCal = 0.05,
+        beta::Num_SigCal = alpha,
         w::Option{<:ObsWeights} = nothing
     ) -> EntropicValueatRiskRange
 
@@ -290,10 +288,8 @@ Keywords correspond to the struct's fields.
     """
     @pprop w
     function EntropicValueatRiskRange(settings::RiskMeasureSettings,
-                                      slv::Option{<:Slv_VecSlv}, alpha::Num_SigTailCal,
-                                      beta::Num_SigHeadCal, w::Option{<:ObsWeights})
-        alpha = bind_role(SignificanceTailCalibration, alpha)
-        beta = bind_role(SignificanceHeadCalibration, beta)
+                                      slv::Option{<:Slv_VecSlv}, alpha::Num_SigCal,
+                                      beta::Num_SigCal, w::Option{<:ObsWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
@@ -309,8 +305,7 @@ Keywords correspond to the struct's fields.
 end
 function EntropicValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                   slv::Option{<:Slv_VecSlv} = nothing,
-                                  alpha::Num_SigTailCal = 0.05,
-                                  beta::Num_SigHeadCal = mirror_role(alpha),
+                                  alpha::Num_SigCal = 0.05, beta::Num_SigCal = alpha,
                                   w::Option{<:ObsWeights} = nothing)::EntropicValueatRiskRange
     return EntropicValueatRiskRange(settings, slv, alpha, beta, w)
 end
@@ -378,7 +373,7 @@ $(DocStringExtensions.FIELDS)
     EntropicDrawdownatRisk(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
         slv::Option{<:Slv_VecSlv} = nothing,
-        alpha::Num_SigTailCal = 0.05,
+        alpha::Num_SigCal = 0.05,
         w::Option{<:ObsWeights} = nothing
     ) -> EntropicDrawdownatRisk
 
@@ -445,9 +440,8 @@ EntropicDrawdownatRisk
     """
     @pprop w
     function EntropicDrawdownatRisk(settings::RiskMeasureSettings,
-                                    slv::Option{<:Slv_VecSlv}, alpha::Num_SigTailCal,
+                                    slv::Option{<:Slv_VecSlv}, alpha::Num_SigCal,
                                     w::Option{<:ObsWeights})
-        alpha = bind_role(SignificanceTailCalibration, alpha)
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
@@ -459,7 +453,7 @@ EntropicDrawdownatRisk
 end
 function EntropicDrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                 slv::Option{<:Slv_VecSlv} = nothing,
-                                alpha::Num_SigTailCal = 0.05,
+                                alpha::Num_SigCal = 0.05,
                                 w::Option{<:ObsWeights} = nothing)::EntropicDrawdownatRisk
     return EntropicDrawdownatRisk(settings, slv, alpha, w)
 end
@@ -518,7 +512,7 @@ $(DocStringExtensions.FIELDS)
     RelativeEntropicDrawdownatRisk(;
         settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
         slv::Option{<:Slv_VecSlv} = nothing,
-        alpha::Num_SigTailCal = 0.05,
+        alpha::Num_SigCal = 0.05,
         w::Option{<:ObsWeights} = nothing
     ) -> RelativeEntropicDrawdownatRisk
 
@@ -582,9 +576,8 @@ RelativeEntropicDrawdownatRisk
     """
     @pprop w
     function RelativeEntropicDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
-                                            slv::Option{<:Slv_VecSlv},
-                                            alpha::Num_SigTailCal, w::Option{<:ObsWeights})
-        alpha = bind_role(SignificanceTailCalibration, alpha)
+                                            slv::Option{<:Slv_VecSlv}, alpha::Num_SigCal,
+                                            w::Option{<:ObsWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
@@ -597,7 +590,7 @@ end
 function RelativeEntropicDrawdownatRisk(;
                                         settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
                                         slv::Option{<:Slv_VecSlv} = nothing,
-                                        alpha::Num_SigTailCal = 0.05,
+                                        alpha::Num_SigCal = 0.05,
                                         w::Option{<:ObsWeights} = nothing)::RelativeEntropicDrawdownatRisk
     return RelativeEntropicDrawdownatRisk(settings, slv, alpha, w)
 end

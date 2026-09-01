@@ -377,7 +377,7 @@ end
 
 Assert that `val` lies strictly inside the open unit interval (`0 < val < 1`).
 
-A value of any other type selects the `args...` method, which checks nothing. That is what lets a caller validate a slot whose bound admits more than a number without a branch of its own, on the terms [`assert_nonempty_gt0_finite_val`](@ref) already sets. A **Calibration Role** ([`AbstractCalibrationEstimator`](@ref)) states no number at construction, so the range is checked when the rebuild runs, against the number its rule returned.
+A value of any other type selects the `args...` method, which checks nothing. That is what lets a caller validate a slot whose bound admits more than a number without a branch of its own, on the terms [`assert_nonempty_gt0_finite_val`](@ref) already sets. A **Calibration Rule** ([`AbstractCalibrationAlgorithm`](@ref)) states no number at construction, so the range is checked when the rebuild runs, against the number the rule returned.
 
 # Arguments
 
