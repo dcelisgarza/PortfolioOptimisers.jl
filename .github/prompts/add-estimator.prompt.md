@@ -58,7 +58,7 @@ Follow [`.github/instructions/julia-return-types.instructions.md`](../instructio
 
 ## Step 5 — Add `arg_dict` / `field_dict` entries if needed
 
-If any field or argument does not yet have an entry in the dictionaries in [`src/01_Base.jl`](../../src/01_Base.jl), add them before finalising the docstring. [`.github/instructions/julia-docstrings.instructions.md`](../instructions/julia-docstrings.instructions.md) § *Documentation Dictionaries* states which text a dictionary owns and when prose is permitted instead.
+If any field or argument does not yet have an entry in the dictionaries in [`src/01_Base/01_DocstringDictionaries.jl`](../../src/01_Base/01_DocstringDictionaries.jl), add them before finalising the docstring. [`.github/instructions/julia-docstrings.instructions.md`](../instructions/julia-docstrings.instructions.md) § *Documentation Dictionaries* states which text a dictionary owns and when prose is permitted instead.
 
 ## Step 6 — Export
 

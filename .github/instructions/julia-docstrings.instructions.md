@@ -88,7 +88,7 @@ Public functions use a **manually written signature** in the docstring header (n
 
 ## Documentation Dictionaries
 
-Five dictionaries in `src/01_Base.jl` provide standardised, consistent descriptions. **Always interpolate from them** instead of writing ad-hoc text.
+Five dictionaries in `src/01_Base/01_DocstringDictionaries.jl` provide standardised, consistent descriptions. **Always interpolate from them** instead of writing ad-hoc text.
 
 - `arg_dict` — argument descriptions. Use as `$(arg_dict[:key])` in `# Arguments` sections.
 - `field_dict` — field descriptions (derived from `arg_dict`). Use as `"$(field_dict[:key])"` in inline field docstrings inside structs.
@@ -96,7 +96,7 @@ Five dictionaries in `src/01_Base.jl` provide standardised, consistent descripti
 - `ret_dict` — return value descriptions. Use as `$(ret_dict[:key])` in `# Returns` sections.
 - `math_dict` — LaTeX mathematical notation. Use as `$(math_dict[:key])` in the `Where:` list of a `# Mathematical definition` or `# JuMP formulation` section.
 
-If a needed key is missing, add it to the appropriate dictionary in `01_Base.jl` before writing the docstring.
+If a needed key is missing, add it to the appropriate dictionary in `01_Base/01_DocstringDictionaries.jl` before writing the docstring.
 
 ### Inline field docstrings
 
@@ -526,7 +526,7 @@ Check 2 reads the `swept` flag because it demands a section, and a presence dema
 
 A docstring that rests on a published source names it. The section is **last**, after `# Related`, and it holds one bullet per work.
 
-- **Never paste the reference prose.** Every bullet is one interpolation of `ref_dict` (`src/01_Base.jl`), which holds a single copy of each reference text:
+- **Never paste the reference prose.** Every bullet is one interpolation of `ref_dict` (`src/01_Base/01_DocstringDictionaries.jl`), which holds a single copy of each reference text:
 
   ```julia
   # References
@@ -673,7 +673,7 @@ Key rules:
 - One comprehensive `Where:` after the last block is acceptable when multiple blocks appear in the same docstring.
 - Every symbol that appears in any block must be defined.
 - Interpolate `$(math_dict[:key])` for standardised variables (``T``, ``\boldsymbol{x}_t``, ``\alpha``, etc.).
-- If a key is missing from `math_dict`, add it to `src/01_Base.jl` first.
+- If a key is missing from `math_dict`, add it to `src/01_Base/01_DocstringDictionaries.jl` first.
 
 ---
 
@@ -681,7 +681,7 @@ Key rules:
 
 The rules above fix the glyphs. The two below fix the content, so that two docstrings that state one quantity state it once and state it alike.
 
-**A shared symbol becomes a `math_dict` key.** A symbol that appears in the docstrings of two or more Units gets a key in [`src/01_Base.jl`](../../src/01_Base.jl), and every site interpolates it. A symbol that exactly one Unit uses may stay inline, on the reasoning of [When a field description may be prose](#when-a-field-description-may-be-prose): one copy cannot drift. When a second Unit needs it, move it into `math_dict` and replace both copies with the interpolation.
+**A shared symbol becomes a `math_dict` key.** A symbol that appears in the docstrings of two or more Units gets a key in [`src/01_Base/01_DocstringDictionaries.jl`](../../src/01_Base/01_DocstringDictionaries.jl), and every site interpolates it. A symbol that exactly one Unit uses may stay inline, on the reasoning of [When a field description may be prose](#when-a-field-description-may-be-prose): one copy cannot drift. When a second Unit needs it, move it into `math_dict` and replace both copies with the interpolation.
 
 A new description is a **new** key. Editing a value already in `math_dict` moves every docstring that interpolates it, which is the reason [ADR 0081](../../docs/adr/0081-the-docstring-standard-states-the-model-it-builds.md) gives for `arg_dict`.
 

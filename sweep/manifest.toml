@@ -44,7 +44,19 @@
 [file]
 "ext/PortfolioOptimisersImputeExt.jl" = { map = 13, units = 0, swept = false }
 "ext/PortfolioOptimisersPlotsExt.jl" = { map = 13, units = 0, swept = false }
-"src/01_Base.jl" = { map = 1, units = 139, algorithm = 40, swept = true }
+"src/01_Base/01_DocstringDictionaries.jl" = { map = 1, units = 8, algorithm = 1, swept = true }
+"src/01_Base/02_TypeRoots.jl" = { map = 1, units = 6, algorithm = 2, swept = true }
+"src/01_Base/03_PrettyShow.jl" = { map = 1, units = 5, algorithm = 4, swept = true }
+"src/01_Base/04_ScopedConfig.jl" = { map = 1, units = 20, algorithm = 12, swept = true }
+"src/01_Base/05_Preferences.jl" = { map = 1, units = 5, algorithm = 3, swept = true }
+"src/01_Base/06_Messages.jl" = { map = 1, units = 12, algorithm = 6, swept = true }
+"src/01_Base/07_Errors.jl" = { map = 1, units = 8, algorithm = 1, swept = true }
+"src/01_Base/08_TypeAliases.jl" = { map = 1, units = 45, algorithm = 0, swept = true }
+"src/01_Base/09_ObservationWeights.jl" = { map = 1, units = 2, algorithm = 1, swept = true }
+"src/01_Base/10_Assertions.jl" = { map = 1, units = 16, algorithm = 8, swept = true }
+"src/01_Base/11_VecScalar.jl" = { map = 1, units = 3, algorithm = 0, swept = true }
+"src/01_Base/12_NormError.jl" = { map = 1, units = 8, algorithm = 2, swept = true }
+"src/01_Base/13_KappaLog.jl" = { map = 1, units = 1, algorithm = 0, swept = true }
 "src/02_Tools.jl" = { map = 1, units = 69, algorithm = 49, swept = true }
 "src/03_Preprocessing.jl" = { map = 2, units = 44, algorithm = 22, swept = true }
 "src/04_PosdefMatrix.jl" = { map = 2, units = 4, algorithm = 2, swept = true }

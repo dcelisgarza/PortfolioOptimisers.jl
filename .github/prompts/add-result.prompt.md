@@ -67,7 +67,7 @@ Follow [`.github/instructions/julia-return-types.instructions.md`](../instructio
 
 ## Step 5 — Add `*_dict` entries if needed
 
-Add any missing entries to the dictionaries in [`src/01_Base.jl`](../../src/01_Base.jl). [`.github/instructions/julia-docstrings.instructions.md`](../instructions/julia-docstrings.instructions.md) § *Documentation Dictionaries* states which text a dictionary owns and when prose is permitted instead.
+Add any missing entries to the dictionaries in [`src/01_Base/01_DocstringDictionaries.jl`](../../src/01_Base/01_DocstringDictionaries.jl). [`.github/instructions/julia-docstrings.instructions.md`](../instructions/julia-docstrings.instructions.md) § *Documentation Dictionaries* states which text a dictionary owns and when prose is permitted instead.
 
 ## Step 6 — Export
 

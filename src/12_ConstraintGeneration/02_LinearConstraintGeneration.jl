@@ -764,7 +764,7 @@ end
 
 Set values in a vector for the asset or the group of assets that `key` names.
 
-`name_to_val!` resolves `key` through [`resolve_axis_name`](@ref) — an asset name resolves to itself, a group name expands to its members — maps the result to indices in the asset universe `nx`, and sets the corresponding entries of `arr` to `val`. If `key` names neither, the function either throws an error or issues a warning, depending on the `strict` flag. Every diagnostic message names the *size* of the universe and never the universe itself or the input value dictionary, because each is routed through a shared message builder in `01_Base.jl`.
+`name_to_val!` resolves `key` through [`resolve_axis_name`](@ref) — an asset name resolves to itself, a group name expands to its members — maps the result to indices in the asset universe `nx`, and sets the corresponding entries of `arr` to `val`. If `key` names neither, the function either throws an error or issues a warning, depending on the `strict` flag. Every diagnostic message names the *size* of the universe and never the universe itself or the input value dictionary, because each is routed through a shared message builder in `01_Base/06_Messages.jl`.
 
 # Algorithm
 

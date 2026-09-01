@@ -247,7 +247,7 @@ nothing raises `@error "File exists but no references were collected"` in
     source_files = vcat(files_under(SRC, ".jl"), files_under(EXT, ".jl"))
     # `ref_dict` itself names every key it defines, so it is not evidence that anything
     # cites the work. Exclude the file that holds the table when looking for users.
-    dict_file = joinpath(SRC, "01_Base.jl")
+    dict_file = joinpath(SRC, "01_Base", "01_DocstringDictionaries.jl")
 
     bib_keys = Set(m.captures[1]
                    for m in eachmatch(r"^@\w+\{([A-Za-z0-9_]+),"m, read(BIB, String)))
@@ -1157,7 +1157,7 @@ in the sense of `STANDARDS.md`.
     ADR 0085 records the decision and
     `.github/instructions/julia-docstrings.instructions.md` is the Authority, in its section
     "Notation is fixed by symbol and by family". A symbol that appears in the docstrings of
-    two or more units gets a `math_dict` key in `src/01_Base.jl`, and every site
+    two or more units gets a `math_dict` key in `src/01_Base/01_DocstringDictionaries.jl`, and every site
     interpolates it. A new description takes a NEW key, because editing a value already in
     the table moves every docstring that interpolates it.
 
@@ -1236,7 +1236,8 @@ in the sense of `STANDARDS.md`.
             return acc
         end
 
-        mvals = math_dict_values(joinpath(ROOT, "src", "01_Base.jl"))
+        mvals = math_dict_values(joinpath(ROOT, "src", "01_Base",
+                                          "01_DocstringDictionaries.jl"))
         @test !isempty(mvals)
 
         # Every bullet of the docstring, stripped of its marker. A `math_dict` value is one

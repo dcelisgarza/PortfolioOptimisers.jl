@@ -65,7 +65,7 @@ happened to list.
 Applying the rule needs no case-by-case judgement for two groups of fields, because they are *bound*
 to another field rather than being independent. Forwarding a bound field past a change to the field
 it describes is the definition of stating something false. `forward_prior` therefore **refuses** such
-a forward, with a [`ConflictingArgumentError`](../../src/01_Base.jl) naming the remedy — the caller
+a forward, with a [`ConflictingArgumentError`](../../src/01_Base/07_Errors.jl) naming the remedy — the caller
 must pass either a rebuilt value or `nothing`.
 
 **`chol` is bound to `sigma`.** This is not a caching nicety. `chol` *takes precedence over* `sigma`

@@ -158,6 +158,18 @@ neighbours show: `MIN_VAL_STEPWISE_REGRESSION_CRITERIA` and `MAX_VAL_STEPWISE_RE
 hold a tuple literal, `STEPWISE_REGRESSION_CRITERIA` holds a splat of the two, none of them holds \
 a function body, and none of them reaches `lcov.info`."""
 
+[rationale.a-definition-a-file-split-moved-unchanged]
+text = """
+A file split moves a definition byte-for-byte into a new file, and ADR 0074's entry test reads \
+the new file as an addition. The definition is not new, its number did not move, and the row that \
+grandfathered it died with the file it named. Two definitions of `src/01_Base.jl` stand above a \
+threshold, and the row of that file recorded both: `@define_pretty_show` drove the file maximum at \
+cyc = 27 and cog = 50, and `apply_preferences!` sat under it at cyc = 26 and cog = 33. The split \
+of that file into one file per concept puts each of them alone in a smaller file, so each now \
+drives its own file's maximum. Neither body changed. Lowering either number is separate work on \
+the definition itself: the macro carries the whole pretty-show rendering, and `apply_preferences!` \
+carries one branch per key of `PREFERENCE_KEYS`."""
+
 # --- exemptions ------------------------------------------------------------
 #
 # Keyed (path, definition, metric), dropped before the file's maximum is taken. An Exemption binds
@@ -269,6 +281,30 @@ path = "src/20_Optimisation/19_SubsetResampling.jl"
 definition = "SubsetResampling"
 metric = "arg"
 rationale = "keyword-constructor-arity"
+
+[[exemption]]
+path = "src/01_Base/03_PrettyShow.jl"
+definition = "@define_pretty_show"
+metric = "cyc"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/01_Base/03_PrettyShow.jl"
+definition = "@define_pretty_show"
+metric = "cog"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/01_Base/05_Preferences.jl"
+definition = "apply_preferences!"
+metric = "cyc"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/01_Base/05_Preferences.jl"
+definition = "apply_preferences!"
+metric = "cog"
+rationale = "a-definition-a-file-split-moved-unchanged"
 
 # --- coverage exemptions ---------------------------------------------------
 #

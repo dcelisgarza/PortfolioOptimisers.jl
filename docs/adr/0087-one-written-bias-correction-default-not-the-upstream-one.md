@@ -13,7 +13,7 @@ status: accepted
 because that weight type declares no bias correction. The raise fires at the reduction, not at the
 constructor.
 
-[`factory`](../../src/01_Base.jl) reaches the same state with no measure in the caller's hand. It
+[`factory`](../../src/02_Tools.jl) reaches the same state with no measure in the caller's hand. It
 replaces the `w` field through the `@wprop` channel and leaves `corrected` alone, so a weighted
 `factory` call on a default `StandardisedValue` raises.
 

@@ -151,7 +151,7 @@ The Blanchet, Chen and Zhou identity holds **only** for `SOCRiskExpr`, which pen
 `norm(w, 2)`. `SquaredSOCRiskExpr`, `QuadRiskExpr` and `RSOCRiskExpr` penalise `norm(w, 2)^2`, where
 a radius is the wrong quantity. `L2Regularisation` stores `alg` beside `val`, so its inner
 constructor refuses the pairing through an `assert_` method in the style of
-[`src/01_Base.jl`](../../src/01_Base.jl)'s family: a permissive fallback plus a refusing method, so
+[`src/01_Base/10_Assertions.jl`](../../src/01_Base/10_Assertions.jl)'s family: a permissive fallback plus a refusing method, so
 **a new formulation adds a method rather than editing a hardcoded check**. A plain `Number` in `val`
 stays legal with every formulation.
 
@@ -211,7 +211,7 @@ mechanism, and three statements above are now out of date. ADR 0095 records the 
 `AbstractCalibrationAlgorithm` lives in
 [`src/19_RiskMeasures/01_Base_RiskMeasures.jl`](../../src/19_RiskMeasures/01_Base_RiskMeasures.jl),
 beside `resolve_slot` and the mechanism that reads it, and re-parenting the two families needs the
-root in [`src/01_Base.jl`](../../src/01_Base.jl) first. So "the abstract hierarchy breaks" describes
+root in [`src/01_Base/02_TypeRoots.jl`](../../src/01_Base/02_TypeRoots.jl) first. So "the abstract hierarchy breaks" describes
 a break that has not happened, and `Num_UcSK` and `Num_UcSEps` are unrelated to the calibration
 bounds today.
 

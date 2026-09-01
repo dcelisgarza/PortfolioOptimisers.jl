@@ -91,7 +91,7 @@ end
 
 @testset "no leaf spells the dims guard or the orientation by hand" begin
     srcdir = normpath(joinpath(@__DIR__, "..", "src"))
-    canonical = "01_Base.jl"        # the file that owns `assert_dims` and `dims_oriented`
+    canonical = "10_Assertions.jl"  # the file that owns `assert_dims` and `dims_oriented`
     offenders = String[]
     for (root, _, files) in walkdir(srcdir), f in files
         # `NOTRACK_*` files are not part of the module.

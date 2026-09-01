@@ -10,7 +10,8 @@ status: accepted
 `estimator_to_val` runs it, and `UniformValues` — the one concrete member the library ships —
 returns the equal-weight range over the universe a `UniverseSets` names.
 
-Two aliases in [`src/01_Base.jl`](../../src/01_Base.jl) carried the family root.
+Two aliases in [`src/01_Base/08_TypeAliases.jl`](../../src/01_Base/08_TypeAliases.jl) carried
+the family root.
 
 - `EstValType` bounds a slot that holds a **value**: `WeightBoundsEstimator`'s `lb` and `ub`,
   `RiskBudgetEstimator`'s `val`, `ThresholdEstimator`'s `val`, `TurnoverEstimator`'s `val`,

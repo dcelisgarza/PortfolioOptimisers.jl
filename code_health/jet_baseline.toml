@@ -16,7 +16,19 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 [run.main.file]
 "ext/PortfolioOptimisersImputeExt.jl" = { raw = 0, reviewed = 0 }
 "ext/PortfolioOptimisersPlotsExt.jl" = { raw = 0, reviewed = 0 }
-"src/01_Base.jl" = { raw = 6, reviewed = 6 }
+"src/01_Base/01_DocstringDictionaries.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/02_TypeRoots.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/03_PrettyShow.jl" = { raw = 2, reviewed = 2 }
+"src/01_Base/04_ScopedConfig.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/05_Preferences.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/06_Messages.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/07_Errors.jl" = { raw = 1, reviewed = 1 }
+"src/01_Base/08_TypeAliases.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/09_ObservationWeights.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/10_Assertions.jl" = { raw = 3, reviewed = 3 }
+"src/01_Base/11_VecScalar.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/12_NormError.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/13_KappaLog.jl" = { raw = 0, reviewed = 0 }
 "src/02_Tools.jl" = { raw = 10, reviewed = 10 }
 "src/03_Preprocessing.jl" = { raw = 19, reviewed = 19 }
 "src/04_PosdefMatrix.jl" = { raw = 14, reviewed = 14 }
@@ -218,7 +230,19 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 [run.plots_ext.file]
 "ext/PortfolioOptimisersImputeExt.jl" = { raw = 0, reviewed = 0 }
 "ext/PortfolioOptimisersPlotsExt.jl" = { raw = 9, reviewed = 9 }
-"src/01_Base.jl" = { raw = 5, reviewed = 5 }
+"src/01_Base/01_DocstringDictionaries.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/02_TypeRoots.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/03_PrettyShow.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/04_ScopedConfig.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/05_Preferences.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/06_Messages.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/07_Errors.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/08_TypeAliases.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/09_ObservationWeights.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/10_Assertions.jl" = { raw = 5, reviewed = 5 }
+"src/01_Base/11_VecScalar.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/12_NormError.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/13_KappaLog.jl" = { raw = 0, reviewed = 0 }
 "src/02_Tools.jl" = { raw = 1, reviewed = 1 }
 "src/03_Preprocessing.jl" = { raw = 0, reviewed = 0 }
 "src/04_PosdefMatrix.jl" = { raw = 0, reviewed = 0 }
@@ -420,7 +444,19 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 [run.impute_ext.file]
 "ext/PortfolioOptimisersImputeExt.jl" = { raw = 0, reviewed = 0 }
 "ext/PortfolioOptimisersPlotsExt.jl" = { raw = 0, reviewed = 0 }
-"src/01_Base.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/01_DocstringDictionaries.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/02_TypeRoots.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/03_PrettyShow.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/04_ScopedConfig.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/05_Preferences.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/06_Messages.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/07_Errors.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/08_TypeAliases.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/09_ObservationWeights.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/10_Assertions.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/11_VecScalar.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/12_NormError.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/13_KappaLog.jl" = { raw = 0, reviewed = 0 }
 "src/02_Tools.jl" = { raw = 0, reviewed = 0 }
 "src/03_Preprocessing.jl" = { raw = 0, reviewed = 0 }
 "src/04_PosdefMatrix.jl" = { raw = 0, reviewed = 0 }

@@ -70,7 +70,8 @@ result type, packing one-or-many. Optimisers own target → field.
 
 Five targets are named after the field they land in. Naming them for the *domain* instead
 was considered and rejected: `pe`, `cle`, `wb`, `lcse`, `ple` are entries in the shared
-`field_dict` in [`01_Base.jl`](../../src/01_Base.jl), reused across every optimiser's
+`field_dict` in
+[`01_Base/01_DocstringDictionaries.jl`](../../src/01_Base/01_DocstringDictionaries.jl), reused across every optimiser's
 docstrings. They are already package-wide vocabulary, so "field name" and "domain name" are
 the same string, and inventing a second set of names would add a synonym without adding
 information.

@@ -1,6 +1,6 @@
 # Base
 
-[`01_Base.jl`](https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/main/src/01_Base.jl) implements the most basal symbols used in `PortfolioOptimisers.jl`.
+[`src/01_Base/`](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/src/01_Base) implements the most basal symbols used in `PortfolioOptimisers.jl`. One file per concept: the docstring dictionaries, the type roots, the pretty-show macro, the `ScopedConfig` holders, the load-time preferences, the message builders, the error hierarchy, the type aliases, the observation weights, the `assert_*` family, `VecScalar`, the `NormError` family and the Kaniadakis logarithm.
 
 ```@docs
 PortfolioOptimisers

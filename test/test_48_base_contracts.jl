@@ -1,5 +1,5 @@
 #=
-The condition 2 and 3 sweep of `src/01_Base.jl` (#439, child map 1 of #404).
+The condition 2 and 3 sweep of `src/01_Base/` (#439, child map 1 of #404).
 
 Every claim below is computed and compared, never read. The file's other units are checked
 where they are used: the equation and resource caps, the preference channel and the

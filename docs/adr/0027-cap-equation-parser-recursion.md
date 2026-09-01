@@ -32,7 +32,7 @@ fail closed with a typed `Meta.ParseError` when either is exceeded.**
 
 - A global config `EQUATION_LIMITS` (a mutable struct holding `max_length = 4096` and
   `max_depth = 256`) with a `set_equation_limits!(; max_length, max_depth)` setter, living in
-  [01_Base.jl](../../src/01_Base.jl) alongside — and mirroring — the existing `STRING_DISTANCE` /
+  [01_Base/04_ScopedConfig.jl](../../src/01_Base/04_ScopedConfig.jl) alongside — and mirroring — the existing `STRING_DISTANCE` /
   `set_string_distance!` and `COMPACT_SHOW` / `set_compact_show!` configuration idiom. Neither the
   const nor the setter is exported; both are used qualified, like `set_string_distance!`.
 - **String form:** `parse_equation(eqn::AbstractString)` rejects any string longer than
@@ -115,7 +115,7 @@ and ADR 0026 described ("global mutable struct + `set_*!` setter") is superseded
 - The config structs (`StringDistanceConfig`, `EquationLimits`) are now **immutable**;
   `EquationLimits` validates positivity in its constructor, so every construction path (setter,
   scoped override, preference seeding) gets the same check.
-- Each global is a `ScopedConfig{T}` ([01_Base.jl](../../src/01_Base.jl)): an `@atomic default`
+- Each global is a `ScopedConfig{T}` ([01_Base/04_ScopedConfig.jl](../../src/01_Base/04_ScopedConfig.jl)): an `@atomic default`
   field swapped whole-struct — *jointly* atomic, so a reader can never observe `max_length` from one
   setting and `max_depth` from another — plus a `Base.ScopedValues.ScopedValue` override. Reads go
   through `CFG[]`: scoped override first, atomic default otherwise.

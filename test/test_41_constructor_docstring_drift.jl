@@ -18,7 +18,8 @@ end
 
     CH = DriftCensusHealth.CodeHealth
 
-    # `field_dict` in `01_Base.jl` centralises the PROSE of a field, but the keyword
+    # `field_dict` in `01_DocstringDictionaries.jl` centralises the PROSE of a field, but
+    # the keyword
     # SIGNATURE of a constructor is copied by hand into each type's `# Constructors`
     # docstring block. The copy and the code drift silently, and on 2026-08-17 twenty
     # blocks had drifted: seven carried a stale default (`SubsetResampling` advertised

@@ -10,9 +10,10 @@ A recurring class of config→allocation weakness runs through the library: an u
 integer (config file, tuning grid, UI) whose own constructor bounds it only from *below*, so an
 absurd value — a stray extra digit, a mis-scaled sweep — is accepted and the process is killed by
 the OOM killer rather than told what went wrong. The seventh security pass introduced
-[`RESOURCE_LIMITS`](../../src/01_Base.jl) (a [`ScopedConfig`](../../src/01_Base.jl) holding a
+[`RESOURCE_LIMITS`](../../src/01_Base/04_ScopedConfig.jl) (a
+[`ScopedConfig`](../../src/01_Base/04_ScopedConfig.jl) holding a
 `ResourceLimits`) with two such caps — `max_samples` (Monte-Carlo draws `n_sim`) and `max_subsets`
-(resampled subsets `n_subsets`) — enforced by [`assert_resource_cap`](../../src/01_Base.jl), which
+(resampled subsets `n_subsets`) — enforced by [`assert_resource_cap`](../../src/01_Base/10_Assertions.jl), which
 fails closed with a typed `DomainError` naming both the rejected field and the knob that raises it.
 This mirrored [ADR 0027](0027-cap-equation-parser-recursion.md) but was never itself recorded.
 
