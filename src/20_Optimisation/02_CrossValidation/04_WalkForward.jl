@@ -101,7 +101,8 @@ Positional and keyword arguments correspond to the struct's fields.
 
 ## Validation
 
-  - `train_size`, `test_size`, and `purged_size` must be non-empty, non-negative, and finite.
+  - `train_size` and `purged_size` must be non-empty, non-negative, and finite.
+  - `test_size` must be non-empty, greater than zero, and finite.
 
 The rule `train_size + purged_size < T`, where `T` is the number of observations, belongs to the
 data rather than to the estimator, so [`Base.split`](@ref) checks it.
@@ -154,7 +155,7 @@ IndexWalkForward
     reduce_test
     function IndexWalkForward(train_size::Integer, test_size::Integer, purged_size::Integer,
                               expand_train::Bool, reduce_test::Bool)
-        assert_nonempty_nonneg_finite_val(test_size, :test_size)
+        assert_nonempty_gt0_finite_val(test_size, :test_size)
         assert_nonempty_nonneg_finite_val(train_size, :train_size)
         assert_nonempty_nonneg_finite_val(purged_size, :purged_size)
         return new{typeof(train_size), typeof(test_size), typeof(purged_size),
@@ -338,7 +339,8 @@ Positional and keyword arguments correspond to the struct's fields.
 
 ## Validation
 
-  - `test_size` and `purged_size` must be non-empty, non-negative, and finite.
+  - `test_size` must be non-empty, greater than zero, and finite.
+  - `purged_size` must be non-empty, non-negative, and finite.
   - If `train_size` is an integer, it must be non-empty, non-negative, and finite.
 
 # Examples
@@ -412,7 +414,7 @@ DateWalkForward
                              period_offset::Option{<:DatesUnionPeriod},
                              purged_size::Integer, adjuster::DateAdjType, previous::Bool,
                              expand_train::Bool, reduce_test::Bool)
-        assert_nonempty_nonneg_finite_val(test_size, :test_size)
+        assert_nonempty_gt0_finite_val(test_size, :test_size)
         if isa(train_size, Integer)
             assert_nonempty_nonneg_finite_val(train_size, :train_size)
         end

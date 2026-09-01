@@ -526,6 +526,19 @@
                   count(k -> 1 + k * b <= a, 0:a) - 1
         end
     end
+    @testset "A zero test_size is refused" begin
+        # A `test_size` of zero advances the walk-forward window by nothing, so each of the
+        # three `while true` split loops runs forever and allocates forever. `n_splits`
+        # divides by `test_size`, so the file already assumes a positive value. The two
+        # constructors take the positive check that both readers need.
+        @test_throws DomainError IndexWalkForward(100, 0)
+        @test_throws DomainError IndexWalkForward(100, 0; purged_size = 5)
+        @test_throws DomainError DateWalkForward(12, 0; period = Month(1))
+        @test_throws DomainError DateWalkForward(Day(23), 0; period = Month(1))
+        # The smallest legal value is still accepted.
+        @test IndexWalkForward(100, 1) isa IndexWalkForward
+        @test DateWalkForward(12, 1; period = Month(1)) isa DateWalkForward
+    end
     @testset "MultipleRandomised" begin
         cv = IndexWalkForward(127, 171)
         res = split(cv, rd)
