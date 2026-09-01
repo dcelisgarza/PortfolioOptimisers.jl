@@ -28,6 +28,7 @@ calibration_series
 calibration_series_vec
 calibration_series_matrix
 calibration_series_dispersion
+effective_sample_size
 ScenarioCount
 RateSignificance
 EntropyBudget

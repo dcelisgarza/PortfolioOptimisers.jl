@@ -715,6 +715,56 @@ function calibration_series_dispersion(series::AbstractDrawdownSeries,
     return vec(Statistics.std(calibration_series_matrix(series, pr.X); dims = 1))
 end
 """
+    effective_sample_size(pr::AbstractPriorResult, w::Option{<:ObsWeights})
+
+Return the number of observations the record of `pr` carries, weighted by `w`.
+
+This is the count a calibration rule divides by, so the four rules that read a record read one definition of it. Without weights it is the row count of `pr.X`. With weights it is Kish's effective sample size, which is the number of equally weighted observations that carries the information the weighted sample carries.
+
+The weights are read through [`get_observation_weights`](@ref), so the whole of the [`ObsWeights`](@ref) union that a rule's own `w` field admits is served here. A [`DynamicAbstractWeights`](@ref) that states no method for a column of the sample raises [`ObservationWeightsError`](@ref), which names the two signatures to write, rather than a bare `MethodError` off `sum`.
+
+# Mathematical definition
+
+```math
+T_{e} = \\begin{cases}
+T & \\textrm{if } w \\textrm{ is } \\texttt{nothing}\\\\
+\\dfrac{\\left(\\sum\\limits_{i=1}^{T} w_{i}\\right)^{2}}{\\sum\\limits_{i=1}^{T} w_{i}^{2}} & \\textrm{otherwise}
+\\end{cases}\\,.
+```
+
+Where:
+
+  - $(math_dict[:T])
+  - $(math_dict[:cal_T_e])
+  - $(math_dict[:cal_w_i])
+
+# Arguments
+
+  - `pr`: Prior result the sample length is read off.
+  - `w`: Effective observation weights, or `nothing`.
+
+# Validation
+
+  - `w` resolves through [`get_observation_weights`](@ref), which raises [`ObservationWeightsError`](@ref) for a [`DynamicAbstractWeights`](@ref) that states no method for a column of `pr.X`.
+
+# Returns
+
+  - `T_e::Number`: The effective sample size.
+
+# Related
+
+  - [`get_observation_weights`](@ref)
+  - [`ObsWeights`](@ref)
+  - [`ScenarioCount`](@ref)
+  - [`ConcentrationRadius`](@ref)
+  - [`DimensionalRateRadius`](@ref)
+  - [`DualNormRadius`](@ref)
+"""
+function effective_sample_size(pr::AbstractPriorResult, w::Option{<:ObsWeights})
+    ws = get_observation_weights(w, view(pr.X, :, 1))
+    return isnothing(ws) ? size(pr.X, 1) : sum(ws)^2 / sum(abs2, ws)
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Computes a significance level from a count of observations, so that the tail keeps the same number of scenarios whatever the sample length becomes.
@@ -765,13 +815,7 @@ Compute the significance level that leaves `alg.n` observations in the tail of t
 # Mathematical definition
 
 ```math
-\\begin{align}
-\\alpha &= \\frac{n}{T_{e}}\\,,\\\\
-T_{e} &= \\begin{cases}
-T & \\textrm{if } w \\textrm{ is } \\texttt{nothing}\\\\
-\\dfrac{\\left(\\sum\\limits_{i=1}^{T} w_{i}\\right)^{2}}{\\sum\\limits_{i=1}^{T} w_{i}^{2}} & \\textrm{otherwise}
-\\end{cases}\\,.
-\\end{align}
+\\alpha = \\frac{n}{T_{e}}\\,.
 ```
 
 Where:
@@ -797,10 +841,11 @@ Where:
 # Related
 
   - [`ScenarioCount`](@ref)
+  - [`effective_sample_size`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
 function (alg::ScenarioCount)(::Symbol, pr::AbstractPriorResult, w, ::Any)
-    T = isnothing(w) ? size(pr.X, 1) : sum(w)^2 / sum(abs2, w)
+    T = effective_sample_size(pr, w)
     return alg.n / T
 end
 """
@@ -2178,10 +2223,6 @@ r &= s \\sqrt{\\dfrac{\\chi^{2}_{N,\\, q}}{T_{e}}}\\,,\\\\
 s &= \\begin{cases}
 \\dfrac{1}{N} \\sum\\limits_{i=1}^{N} \\hat{s}_{i} & \\textrm{if } \\texttt{scale} \\textrm{ is } \\texttt{nothing}\\\\
 \\texttt{scale} & \\textrm{otherwise}
-\\end{cases}\\,,\\\\
-T_{e} &= \\begin{cases}
-T & \\textrm{if } w \\textrm{ is } \\texttt{nothing}\\\\
-\\dfrac{\\left(\\sum\\limits_{i=1}^{T} w_{i}\\right)^{2}}{\\sum\\limits_{i=1}^{T} w_{i}^{2}} & \\textrm{otherwise}
 \\end{cases}\\,.
 \\end{align}
 ```
@@ -2216,11 +2257,12 @@ Where:
   - [`DimensionalRateRadius`](@ref)
   - [`bind_series`](@ref)
   - [`calibration_series_dispersion`](@ref)
+  - [`effective_sample_size`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
 function (alg::ConcentrationRadius)(::Symbol, pr::AbstractPriorResult, w, ::Any)
     N = size(pr.X, 2)
-    T = isnothing(w) ? size(pr.X, 1) : sum(w)^2 / sum(abs2, w)
+    T = effective_sample_size(pr, w)
     scale = if isnothing(alg.scale)
         Statistics.mean(calibration_series_dispersion(alg.series, pr))
     else
@@ -2419,10 +2461,6 @@ r &= s \\left(\\dfrac{\\ln\\left(\\dfrac{1}{1 - q}\\right)}{T_{e}}\\right)^{\\fr
 s &= \\begin{cases}
 \\dfrac{1}{N} \\sum\\limits_{i=1}^{N} \\hat{s}_{i} & \\textrm{if } \\texttt{scale} \\textrm{ is } \\texttt{nothing}\\\\
 \\texttt{scale} & \\textrm{otherwise}
-\\end{cases}\\,,\\\\
-T_{e} &= \\begin{cases}
-T & \\textrm{if } w \\textrm{ is } \\texttt{nothing}\\\\
-\\dfrac{\\left(\\sum\\limits_{i=1}^{T} w_{i}\\right)^{2}}{\\sum\\limits_{i=1}^{T} w_{i}^{2}} & \\textrm{otherwise}
 \\end{cases}\\,.
 \\end{align}
 ```
@@ -2459,11 +2497,12 @@ The exponent is floored at one half, so a universe of one or two assets returns 
   - [`RateRadius`](@ref)
   - [`bind_series`](@ref)
   - [`calibration_series_dispersion`](@ref)
+  - [`effective_sample_size`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
 function (alg::DimensionalRateRadius)(::Symbol, pr::AbstractPriorResult, w, ::Any)
     N = size(pr.X, 2)
-    T = isnothing(w) ? size(pr.X, 1) : sum(w)^2 / sum(abs2, w)
+    T = effective_sample_size(pr, w)
     scale = if isnothing(alg.scale)
         Statistics.mean(calibration_series_dispersion(alg.series, pr))
     else
@@ -2570,10 +2609,6 @@ Compute the ambiguity radius of the slot `key` names, in the ground metric of th
 \\begin{align}
 r &= z_{c} \\lVert \\boldsymbol{e} \\rVert_{g}\\,,\\\\
 e_{i} &= \\dfrac{\\hat{s}_{i}}{\\sqrt{T_{e}}}\\,,\\\\
-T_{e} &= \\begin{cases}
-T & \\textrm{if } w \\textrm{ is } \\texttt{nothing}\\\\
-\\dfrac{\\left(\\sum\\limits_{i=1}^{T} w_{i}\\right)^{2}}{\\sum\\limits_{i=1}^{T} w_{i}^{2}} & \\textrm{otherwise}
-\\end{cases}\\,,\\\\
 q &= \\dfrac{p}{p - 1}\\,.
 \\end{align}
 ```
@@ -2628,10 +2663,11 @@ The two ends of a Range measure carry one ground metric, so a rule stated on bot
   - [`RateRadius`](@ref)
   - [`bind_series`](@ref)
   - [`calibration_series_dispersion`](@ref)
+  - [`effective_sample_size`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
 function (alg::DualNormRadius)(key::Symbol, pr::AbstractPriorResult, w, ::Any)
-    T = isnothing(w) ? size(pr.X, 1) : sum(w)^2 / sum(abs2, w)
+    T = effective_sample_size(pr, w)
     e = calibration_series_dispersion(alg.series, pr) ./ sqrt(T)
     z = Distributions.quantile(Distributions.Normal(), alg.confidence)
     return z * dual_norm_radius_scale(alg, key, e)

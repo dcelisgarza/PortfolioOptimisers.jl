@@ -1341,3 +1341,81 @@ tests pin numbers and refusals rather than types.
     @test 35 < inv(l_day) < 50
     @test inv(l_mon) < 10
 end
+
+#=
+The effective sample size the four record-reading rules divide by. It was written out four
+times, and each copy summed `w` itself rather than resolving it. The `w` a rule receives is
+`sel(x.w, pr.w)`, and both fields are bounded `Option{<:ObsWeights}`, so a
+`DynamicAbstractWeights` reaches the rule. `sum` states no method for one, so the four
+copies raised a bare `MethodError` where `TailTermParity`, which resolves its weights,
+raised the library's own `ObservationWeightsError`. `effective_sample_size` is the one
+definition, and it resolves the weights.
+=#
+
+# A `DynamicAbstractWeights` that states the vector arity, which is the arity a column of
+# the sample takes.
+struct CalibrationEWeights <: PortfolioOptimisers.DynamicAbstractWeights end
+function PortfolioOptimisers.get_observation_weights(::CalibrationEWeights,
+                                                     X::PortfolioOptimisers.VecNum;
+                                                     kwargs...)
+    return pweights(range(; start = 1, stop = 2, length = length(X)))
+end
+
+# A `DynamicAbstractWeights` that states no arity at all, which is the refusal under test.
+struct CalibrationNoWeights <: PortfolioOptimisers.DynamicAbstractWeights end
+
+@testset "effective_sample_size: one definition, and the weights union read once" begin
+    # No weights is the row count of the record, and stated weights are Kish's count.
+    @test PO.effective_sample_size(PR60, nothing) == 60
+    @test PO.effective_sample_size(PR120, nothing) == 120
+    @test PO.effective_sample_size(PR60, WTS) ≈ sum(WTS)^2 / sum(abs2, WTS)
+    @test PO.effective_sample_size(PR60, WTS) < 60
+
+    # -- The four rules read the one definition, so each returns what it returned before.
+    q = Distributions.cquantile(Distributions.Chisq(4), 0.05)
+    kish = sum(WTS)^2 / sum(abs2, WTS)
+    @test ConcentrationRadius(; confidence = 0.95, scale = 0.5)(:r, PR60, WTS, nothing) ≈
+          0.5 * sqrt(q / kish)
+    @test ScenarioCount(; n = 6)(:alpha, PR60, WTS, nothing) ≈ 6 / kish
+    @test DimensionalRateRadius(; confidence = 0.95, scale = 0.5)(:r, PR60, WTS, nothing) ≈
+          0.5 * (log(inv(0.05)) / kish)^inv(4)
+    @test DualNormRadius(; confidence = 0.95)(:r, PR60, WTS, nothing) >
+          DualNormRadius(; confidence = 0.95)(:r, PR60, nothing, nothing)
+
+    # -- A `DynamicAbstractWeights` that states the vector arity now resolves, in every one
+    # of the four rules, to the count its weights carry.
+    dyn = CalibrationEWeights()
+    dyn_kish = sum(WTS)^2 / sum(abs2, WTS)
+    @test PO.effective_sample_size(PR60, dyn) ≈ dyn_kish
+    @test ScenarioCount(; n = 6)(:alpha, PR60, dyn, nothing) ≈ 6 / dyn_kish
+    @test ConcentrationRadius(; confidence = 0.95, scale = 0.5)(:r, PR60, dyn, nothing) ≈
+          0.5 * sqrt(q / dyn_kish)
+    @test DimensionalRateRadius(; confidence = 0.95, scale = 0.5)(:r, PR60, dyn, nothing) ≈
+          0.5 * (log(inv(0.05)) / dyn_kish)^inv(4)
+    @test DualNormRadius(; confidence = 0.95)(:r, PR60, dyn, nothing) ≈
+          DualNormRadius(; confidence = 0.95)(:r, PR60, WTS, nothing)
+
+    # -- The defect. A `DynamicAbstractWeights` that states no arity raises the library's
+    # own named error in all four rules. Before this change, only `TailTermParity` did, and
+    # the four copies raised a bare `MethodError` off `sum`.
+    none = CalibrationNoWeights()
+    @test_throws PO.ObservationWeightsError PO.effective_sample_size(PR60, none)
+    @test_throws PO.ObservationWeightsError ScenarioCount(; n = 6)(:alpha, PR60, none,
+                                                                   nothing)
+    @test_throws PO.ObservationWeightsError ConcentrationRadius(; confidence = 0.95,
+                                                                scale = 0.5)(:r, PR60, none,
+                                                                             nothing)
+    @test_throws PO.ObservationWeightsError DimensionalRateRadius(; confidence = 0.95,
+                                                                  scale = 0.5)(:r, PR60,
+                                                                               none,
+                                                                               nothing)
+    @test_throws PO.ObservationWeightsError DualNormRadius(; confidence = 0.95)(:r, PR60,
+                                                                                none,
+                                                                                nothing)
+    err = try
+        ScenarioCount(; n = 6)(:alpha, PR60, none, nothing)
+    catch e
+        e
+    end
+    @test occursin("CalibrationNoWeights is a DynamicAbstractWeights", err.msg)
+end
