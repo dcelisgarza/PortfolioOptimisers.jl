@@ -63,9 +63,15 @@
         # a structureless symbol that is not a step name fails closed rather than
         # silently becoming a property access on the pipeline struct
         @test_throws ArgumentError PortfolioOptimisers.pipeline_lens(pipe, :impute_typo)
-        # genuinely dotted symbols still fall through to parse_lens (no fail-closed throw)
+        # a dotted symbol rooted at `steps` still falls through to parse_lens
         @test PortfolioOptimisers.pipeline_lens(pipe, Symbol("steps[1].col_thr")) isa
               Accessors.PropertyLens
+        # a dotted symbol rooted anywhere else is refused: the root is allowlisted, so the
+        # step-name table cannot be addressed
+        @test_throws ArgumentError PortfolioOptimisers.pipeline_lens(pipe,
+                                                                     Symbol("names.x"))
+        @test_throws ArgumentError PortfolioOptimisers.pipeline_lens(pipe,
+                                                                     Symbol("names[1].x"))
         # the String arm applies the same rule as its Symbol twin: a structureless key that
         # misses the step-name table is a typo, not a property access on the Pipeline
         @test_throws ArgumentError PortfolioOptimisers.pipeline_lens(pipe, "impute_typo")
@@ -73,6 +79,20 @@
         # into on every fold
         @test_throws ArgumentError PortfolioOptimisers.pipeline_lens(pipe, "steps")
         @test_throws ArgumentError PortfolioOptimisers.pipeline_lens(pipe, "names")
+        # a structured key is not enough: only a path rooted at `steps` is a lens path, so
+        # a path into the step-name table is refused rather than written on every fold
+        @test_throws ArgumentError PortfolioOptimisers.pipeline_lens(pipe, "names[1]")
+        @test_throws ArgumentError PortfolioOptimisers.pipeline_lens(pipe, "names.x")
+        @test_throws ArgumentError PortfolioOptimisers.pipeline_lens(pipe, "stepsy[1]")
+        # and the refusal names the rule
+        rerr = try
+            PortfolioOptimisers.pipeline_lens(pipe, "names[1]")
+            nothing
+        catch e
+            e
+        end
+        @test rerr isa ArgumentError
+        @test occursin("nor a property path rooted at `steps`", rerr.msg)
         # and the message names the typo and suggests the step
         serr = try
             PortfolioOptimisers.pipeline_lens(pipe, "imputer")
