@@ -55,6 +55,18 @@ end
 # --- paths and scope -------------------------------------------------------
 
 const DIR = @__DIR__
+
+"""
+The tree every measurement reads, and the **default** of the `root` keyword each reader below
+carries. It is not the only value the readers accept.
+
+A gate that reached this constant directly admitted one adapter, the live checkout, so its counting
+was checked only by CI running the real script against the real repository. Every function here that
+reads a file, and every `measure` in the four entry scripts, therefore takes `root` and a `files`
+list. The live values are the defaults, so the scripts call them unchanged, and a test drives the
+same code over a fixture tree. `docs/generate_sitemap.jl` and `test/test_50_docs_sitemap.jl` are the
+same pair of adapters at the same kind of seam.
+"""
 const REPO_ROOT = normpath(joinpath(DIR, ".."))
 const RULINGS_PATH = joinpath(DIR, "rulings.toml")
 const ARTIFACT_DIR = joinpath(DIR, "_refresh")
@@ -88,12 +100,15 @@ is_ci() = haskey(ENV, "GITHUB_ACTIONS")
 # census.jl` loads `code_health/coverage.jl` the same way.
 
 """
-    parse_file(file) -> Expr
+    parse_file(file; root = REPO_ROOT) -> Expr
 
-Parse one file with `Meta.parseall`. A relative `file` is read from the repository root. An
-absolute one is read as it stands, which is what a test file under `test/` passes.
+Parse one file with `Meta.parseall`. A relative `file` is read from `root`, which defaults to the
+repository root. An absolute one is read as it stands, which is what a test file under `test/`
+passes.
 """
-parse_file(file) = Meta.parseall(read(joinpath(REPO_ROOT, file), String); filename = file)
+function parse_file(file; root = REPO_ROOT)
+    return Meta.parseall(read(joinpath(root, file), String); filename = file)
+end
 
 """
     Prune
@@ -305,13 +320,13 @@ macro_name(x::QuoteNode) = macro_name(x.value)
 macro_name(x) = ""
 
 """
-    declared_macros(file) -> Vector{String}
+    declared_macros(file; root = REPO_ROOT) -> Vector{String}
 
 The macros a file declares.
 """
-function declared_macros(file)
+function declared_macros(file; root = REPO_ROOT)
     names = String[]
-    walk_ast(parse_file(file)) do e
+    walk_ast(parse_file(file; root)) do e
         if e.head === :macro
             sig = e.args[1]
             n = sig isa Expr ? sig.args[1] : sig
@@ -325,16 +340,16 @@ function declared_macros(file)
 end
 
 """
-    macro_call_sites(file) -> Vector{Tuple{String, Expr}}
+    macro_call_sites(file; root = REPO_ROOT) -> Vector{Tuple{String, Expr}}
 
 Every macro call a file makes outside a struct body, with the name and the call expression. The
 five field-prefix macros — `@fprop`, `@vprop`, `@pprop`, `@cprop` and `@wprop` — declare nothing of
 their own and appear only inside a struct body, so this is what separates them from the seven
 Declaration Macros of ADR 0072.
 """
-function macro_call_sites(file)
+function macro_call_sites(file; root = REPO_ROOT)
     found = Tuple{String, Expr}[]
-    walk_ast(parse_file(file)) do e
+    walk_ast(parse_file(file; root)) do e
         if e.head === :struct
             return PRUNE
         end
@@ -349,24 +364,30 @@ function macro_call_sites(file)
     return found
 end
 
-called_macros(file) = Set(n for (n, _) in macro_call_sites(file))
+function called_macros(file; root = REPO_ROOT)
+    return Set(n for (n, _) in macro_call_sites(file; root))
+end
 
 """
-    declaration_macros(files) -> Vector{String}
+    declaration_macros(files; root = REPO_ROOT, declaring = DECLARING_FILES) -> Vector{String}
 
 A **Declaration Macro** turns a declaration into definitions the parser cannot see. ADR 0072 names
 seven of them and sites all seven in four declaring files. The list is derived rather than written
 down, so a new one is found on the day it is declared and called, which is what ADR 0074's rule for
 the Expansion Bound's key set needs.
+
+`declaring` is the set of files searched for a declaration. It is a parameter for the same reason
+`root` is: a fixture tree holds no `src/01_Base.jl`, so a hard-coded list admits only the live
+checkout. The default is ADR 0072's four files.
 """
-function declaration_macros(files)
+function declaration_macros(files; root = REPO_ROOT, declaring = DECLARING_FILES)
     declared = Set{String}()
-    for f in DECLARING_FILES
-        union!(declared, declared_macros(f))
+    for f in declaring
+        union!(declared, declared_macros(f; root))
     end
     called = Set{String}()
     for f in files
-        union!(called, called_macros(f))
+        union!(called, called_macros(f; root))
     end
     return sort!(collect(intersect(declared, called)))
 end
@@ -388,30 +409,35 @@ end
 # --- git -------------------------------------------------------------------
 
 """
-    tracked_jl_files() -> Vector{String}
+    tracked_jl_files(; root = REPO_ROOT) -> Vector{String}
 
-Every tracked `.jl` file, as a path relative to the repository root. ADR 0072's coverage assertion
+Every tracked `.jl` file of `root`, as a path relative to it. ADR 0072's coverage assertion
 and ADR 0074's set equality both read this list. `git ls-files` is used rather than `walkdir`
 because `measure_directory` ignores `.gitignore` and picks up the untracked `NOTRACK_*` scratch
 files (issue #336).
 """
-function tracked_jl_files()
-    out = read(Cmd(`git ls-files -z -- '*.jl'`; dir = REPO_ROOT), String)
+function tracked_jl_files(; root = REPO_ROOT)
+    out = read(Cmd(`git ls-files -z -- '*.jl'`; dir = root), String)
     return sort!(filter!(!isempty, split(out, '\0')))
 end
 
 """
-    source_files() -> Vector{String}
+    source_files(; root = REPO_ROOT) -> Vector{String}
 
-Every tracked `.jl` file under the measured roots, as a path relative to the repository root. This
-is ADR 0074's expected row set for `sweep/manifest.toml`, and `test/test_45_sweep_census.jl`
-compares it against the rows the manifest holds.
+Every tracked `.jl` file under the measured roots, as a path relative to `root`. This is ADR 0074's
+expected row set for `sweep/manifest.toml`, and `test/test_45_sweep_census.jl` compares it against
+the rows the manifest holds. It is also the default `files` list of all four gates.
 """
-source_files() = String[f for f in tracked_jl_files() if in_scope(f)]
+function source_files(; root = REPO_ROOT)
+    return String[f for f in tracked_jl_files(; root) if in_scope(f)]
+end
 
-function git_short_commit()
+function git_short_commit(; root = REPO_ROOT)
     try
-        return strip(read(Cmd(`git rev-parse --short HEAD`; dir = REPO_ROOT), String))
+        # A root that is not a repository, which a fixture tree is not, answers on stderr. The
+        # answer here is "unknown", so the message would be noise in a test log.
+        cmd = pipeline(Cmd(`git rev-parse --short HEAD`; dir = root); stderr = devnull)
+        return strip(read(cmd, String))
     catch
         return "unknown"
     end
@@ -420,7 +446,7 @@ end
 # --- the sweep manifest ----------------------------------------------------
 
 """
-    documented_units(path) -> Int
+    documented_units(path; root = REPO_ROOT) -> Int
 
 The file's count of documented units: a docstring that attaches to a binding, counted from the
 source text by parsing with `Meta.parseall` and counting the `Core.@doc` macrocalls at any depth.
@@ -433,9 +459,9 @@ so the rule moves in one edit.
 A field docstring is NOT a unit: inside a struct body a docstring parses as a bare string literal
 rather than as a macrocall, so it never reaches this count.
 """
-function documented_units(path::AbstractString)
+function documented_units(path::AbstractString; root = REPO_ROOT)
     n = 0
-    walk_ast(parse_file(path)) do node
+    walk_ast(parse_file(path; root)) do node
         if isdocstring(node)
             (n += 1)
         end

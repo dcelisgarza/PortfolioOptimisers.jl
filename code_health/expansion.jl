@@ -63,14 +63,25 @@ function addition(expr::Expr)
                 for (key, metric) in METRICS)
 end
 
-function measure()
-    files = filter(CodeHealth.in_scope, CodeHealth.tracked_jl_files())
-    decl = Set(CodeHealth.declaration_macros(files))
+"""
+    measure(; root, files, declaring) -> NamedTuple
+
+Measure the Expansion Bound of every Declaration Macro called from `files`, each read from `root`.
+The defaults are the live checkout and every file in scope, so the entry script calls `measure()`
+unchanged; a test passes a fixture tree instead. `CodeHealth.REPO_ROOT` states why the seam is
+written this way.
+
+The expansion itself runs in the loaded `PortfolioOptimisers`, because a macro is a function of the
+module that declares it. So a fixture supplies the call sites and not the macros.
+"""
+function measure(; root = CodeHealth.REPO_ROOT, files = CodeHealth.source_files(; root),
+                 declaring = CodeHealth.DECLARING_FILES)
+    decl = Set(CodeHealth.declaration_macros(files; root, declaring))
     bound = Dict{String, Dict{String, Int}}()
     sites = Dict{String, Int}()
     failed = String[]
     for f in files
-        for (name, expr) in CodeHealth.macro_call_sites(f)
+        for (name, expr) in CodeHealth.macro_call_sites(f; root)
             if !(name in decl)
                 continue
             end
@@ -97,15 +108,15 @@ function measure()
     for name in decl
         get!(() -> Dict(k => 0 for k in BINDING), bound, name)
     end
-    return (; macros = sort!(collect(decl)), bound, sites, provenance = provenance())
+    return (; macros = sort!(collect(decl)), bound, sites, provenance = provenance(; root))
 end
 
-function provenance()
+function provenance(; root = CodeHealth.REPO_ROOT)
     deps = Pkg.dependencies()
     version(name) = string(only(v.version for v in values(deps) if v.name == name))
     return ["julia" => string(VERSION), "code_complexity" => version("CodeComplexity"),
             "julia_syntax" => version("JuliaSyntax"),
-            "commit" => CodeHealth.git_short_commit()]
+            "commit" => CodeHealth.git_short_commit(; root)]
 end
 
 row(m, name) = [k => m.bound[name][k] for k in BINDING]
