@@ -569,6 +569,8 @@ const CATALOGUE = [Section("Core abstractions",
                                    Cap(:GeneralKUncertaintyAlgorithm),
                                    Cap(:ChiSqKUncertaintyAlgorithm),
                                    Note("Predefined scaling parameter")]),
+                            Prose("A third shape holds the worst-case variance of a covariance set as a quadratic penalty on the weights, so the optimisation stays a second-order cone programme and lifts no semidefinite block."),
+                            Cap(:CompactCovarianceUncertaintySet),
                             Prose("It also implements various estimators for the uncertainty sets, the following two can generate box and ellipsoidal sets."),
                             Cap(:NormalUncertaintySet),
                             Group(Cap(:ARCHUncertaintySet;

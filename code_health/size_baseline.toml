@@ -126,6 +126,7 @@ commit = "6aff04f92b"
 "src/14_UncertaintySets/04_BootstrapUncertaintySets.jl" = { code = 213, doc = 572, comment = 0, blank = 199, total = 984 }
 "src/14_UncertaintySets/05_L1UncertaintySets.jl" = { code = 235, doc = 576, comment = 5, blank = 248, total = 1064 }
 "src/14_UncertaintySets/06_CalibrationRules.jl" = { code = 618, doc = 1764, comment = 32, blank = 766, total = 3180 }
+"src/14_UncertaintySets/07_CompactUncertaintySets.jl" = { code = 53, doc = 121, comment = 0, blank = 48, total = 222 }
 "src/15_Turnover.jl" = { code = 81, doc = 458, comment = 0, blank = 184, total = 723 }
 "src/16_Fees.jl" = { code = 240, doc = 839, comment = 0, blank = 321, total = 1400 }
 "src/17_NetReturnsDrawdowns.jl" = { code = 44, doc = 288, comment = 0, blank = 122, total = 454 }

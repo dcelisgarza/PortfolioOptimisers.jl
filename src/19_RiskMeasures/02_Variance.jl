@@ -932,7 +932,11 @@ for a [`BoxUncertaintySet`](@ref) it evaluates `tr(Au * ub) - tr(Al * lb)` at th
 `Au = max.(W, 0)`, `Al = max.(-W, 0)` with `W = w * w'`; for an
 [`EllipsoidalUncertaintySet`](@ref) it evaluates `tr(sigma * W) + k * norm(G * vec(W))`
 with `G` the upper Cholesky factor of the set's shape matrix (the `E = 0` evaluation of
-the model expression, an upper bound on its optimum).
+the model expression, an upper bound on its optimum); for a
+[`CompactCovarianceUncertaintySet`](@ref) it evaluates `w' * sigma * w` plus `kappa` times
+the squared norm of the least-squares residual of `C .* w` against the set's basis. The
+compact evaluation solves the same inner problem the model variable `z_cucs` solves, so it
+is that expression's optimum and not a bound on it.
 
 The [`UncertaintySetVariance`](@ref) functor dispatches here when its `ucs` field is a
 fitted result, keeping scalar risk evaluation consistent with the risk expression the
@@ -953,6 +957,7 @@ optimiser sees.
   - [`UncertaintySetVariance`](@ref)
   - [`BoxUncertaintySet`](@ref)
   - [`EllipsoidalUncertaintySet`](@ref)
+  - [`CompactCovarianceUncertaintySet`](@ref)
 """
 function ucs_variance(ucs::BoxUncertaintySet, ::Any, w::VecNum)
     W = w * transpose(w)
@@ -965,6 +970,16 @@ function ucs_variance(ucs::EllipsoidalUncertaintySet, sigma::MatNum, w::VecNum)
     sigma = something(ucs.val, sigma)
     G = LinearAlgebra.cholesky(ucs.sigma).U
     return LinearAlgebra.tr(sigma * W) + ucs.k * LinearAlgebra.norm(G * vec(W))
+end
+function ucs_variance(ucs::CompactCovarianceUncertaintySet, sigma::MatNum, w::VecNum)
+    # The set names its own centre; `sigma` is the fallback (ADR 0050).
+    sigma = something(ucs.val, sigma)
+    Cw = ucs.C .* w
+    Q = ucs.Q
+    # The left division is the least-squares solve the model's `z_cucs` performs, so it
+    # projects onto the span of `Q` whether or not the columns of `Q` are orthonormal.
+    res = size(Q, 2) > zero(Int) ? Cw - Q * (Q \ Cw) : Cw
+    return LinearAlgebra.dot(w, sigma, w) + ucs.kappa * sum(abs2, res)
 end
 """
     _no_bounds_risk_measure(r, flag)

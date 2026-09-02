@@ -612,19 +612,23 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Build an uncertainty-set variance risk expression for box or ellipsoidal uncertainty.
+Build an uncertainty-set variance risk expression for box, ellipsoidal or compact uncertainty.
 
 The `BoxUncertaintySet` overload introduces symmetric auxiliary matrices `Au` and `Al` and
 encodes the worst-case variance as `tr(Au * ub) - tr(Al * lb)`. The
 `EllipsoidalUncertaintySet` overload introduces a PSD matrix `E`, the compound matrix `W + E`,
-and adds an SOC constraint to bound the ellipsoidal perturbation term.
+and adds an SOC constraint to bound the ellipsoidal perturbation term. Both lift the weights
+into the semidefinite matrix `W`, so each calls [`set_sdp_constraints!`](@ref) itself. The
+`CompactCovarianceUncertaintySet` overload lifts nothing: it bounds the nominal deviation and
+the residual `C .* w - Q * z` with one SOC constraint each, and returns the sum of their
+squares. It is the one overload that leaves the programme a second-order cone programme.
 
 # Arguments
 
   - $(arg_dict[:model])
   - $(arg_dict[:ci])
-  - `ucs`: Uncertainty set instance (`BoxUncertaintySet` or `EllipsoidalUncertaintySet`).
-  - `sigma::MatNum`: Fallback covariance matrix (used by `EllipsoidalUncertaintySet`). The set's own `val` field wins over it (ADR 0050). The box overload names no centre at all, so it ignores both.
+  - `ucs`: Uncertainty set instance (`BoxUncertaintySet`, `EllipsoidalUncertaintySet` or `CompactCovarianceUncertaintySet`).
+  - `sigma::MatNum`: Fallback covariance matrix (used by `EllipsoidalUncertaintySet` and `CompactCovarianceUncertaintySet`). The set's own `val` field wins over it (ADR 0050). The box overload names no centre at all, so it ignores both.
 
 # Returns
 
@@ -634,9 +638,11 @@ and adds an SOC constraint to bound the ellipsoidal perturbation term.
 # Related
 
   - [`set_risk_constraints!`](@ref)
+  - [`set_sdp_constraints!`](@ref)
   - [`UncertaintySetVariance`](@ref)
   - [`BoxUncertaintySet`](@ref)
   - [`EllipsoidalUncertaintySet`](@ref)
+  - [`CompactCovarianceUncertaintySet`](@ref)
 
 # References
 
@@ -646,6 +652,7 @@ and adds an SOC constraint to bound the ellipsoidal perturbation term.
 """
 function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::BoxUncertaintySet, args...;
                                 prefix::Symbol = Symbol(""))
+    set_sdp_constraints!(model; prefix = prefix)
     Au = state_build!(model, prefix, :Au) do
         sc = get_constraint_scale(model)
         W = state_get(model, prefix, :W)
@@ -669,6 +676,7 @@ end
 function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::EllipsoidalUncertaintySet,
                                 sigma::MatNum; prefix::Symbol = Symbol(""))
     sc = get_constraint_scale(model)
+    set_sdp_constraints!(model; prefix = prefix)
     state_build!(model, prefix, :E) do
         W = state_get(model, prefix, :W)
         N = size(W, 1)
@@ -697,6 +705,40 @@ function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::EllipsoidalUncer
                JuMP.@constraint(model,
                                 [sc * t_eucs; sc * x_eucs] in JuMP.SecondOrderCone()))
     return ucs_variance_risk, :eucs_variance_risk_
+end
+function set_ucs_variance_risk!(model::JuMP.Model, i::Any,
+                                ucs::CompactCovarianceUncertaintySet, sigma::MatNum;
+                                prefix::Symbol = Symbol(""))
+    sc = get_constraint_scale(model)
+    w = get_w(model, prefix)
+    # The set is a neighbourhood of the covariance it was calibrated on, so it names the
+    # centre. The risk measure's field and then the prior are the fallbacks (ADR 0050).
+    sigma = something(ucs.val, sigma)
+    G = LinearAlgebra.cholesky(sigma).U
+    dev_cucs = state_set!(model, prefix, :dev_cucs, i, JuMP.@variable(model))
+    state_set!(model, prefix, :cdev_cucs_soc, i,
+               JuMP.@constraint(model,
+                                [sc * dev_cucs; sc * G * w] in JuMP.SecondOrderCone()))
+    C = ucs.C
+    Q = ucs.Q
+    # The basis spans the directions the penalty spares, so a rank of zero leaves the whole
+    # of `C .* w` in the residual and needs no coefficient variable.
+    x_cucs = if size(Q, 2) > zero(Int)
+        z_cucs = state_set!(model, prefix, :z_cucs, i,
+                            JuMP.@variable(model, [1:size(Q, 2)]))
+        JuMP.@expression(model, C .* w - Q * z_cucs)
+    else
+        JuMP.@expression(model, C .* w)
+    end
+    t_cucs = state_set!(model, prefix, :t_cucs, i, JuMP.@variable(model))
+    state_set!(model, prefix, :x_cucs, i, x_cucs)
+    state_set!(model, prefix, :gc_soc, i,
+               JuMP.@constraint(model,
+                                [sc * t_cucs; sc * x_cucs] in JuMP.SecondOrderCone()))
+    ucs_variance_risk = state_set!(model, prefix, :cucs_variance_risk_, i,
+                                   JuMP.@expression(model,
+                                                    dev_cucs^2 + ucs.kappa * t_cucs^2))
+    return ucs_variance_risk, :cucs_variance_risk_
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -730,7 +772,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::UncertaintySetVaria
                                args...; prefix::Symbol = Symbol(""),
                                rd::ReturnsResult = ReturnsResult(), kwargs...)
     mark_state!(model, prefix, :variance_flag)
-    set_sdp_constraints!(model; prefix = prefix)
+    # The lift is the set's business: the box and the ellipsoid bound a matrix and raise
+    # `W` themselves, and the compact set bounds a quadratic form in `w` and raises none.
     ucs = r.ucs
     sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
     ucs_variance_risk, name = set_ucs_variance_risk!(model, i,

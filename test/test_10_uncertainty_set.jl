@@ -1211,4 +1211,178 @@
                   rel(Matrix(mA.sigma), Matrix(mB.sigma))
         end
     end
+    @testset "The compact covariance uncertainty set (#653)" begin
+        # A worst-case variance held as a radius, a diagonal metric square root and a basis
+        # of the directions the penalty spares. The oracle is the closed form
+        # `w' * sigma * w + kappa * w' * C * (I - Q * Q') * C * w`, which the compact term
+        # reproduces without ever building the dense matrix.
+        rngc = StableRNG(987654321)
+        Nc, Kc = 9, 3
+        Bc = randn(rngc, Nc, Kc)
+        Qc = Matrix(qr(Bc).Q)[:, 1:Kc]
+        Cc = 0.5 .+ rand(rngc, Nc)
+        Xc = randn(rngc, 400, Nc) * 0.01
+        rdc = ReturnsResult(; X = Xc, nx = string.("A", 1:Nc))
+        sigmac = cov(Xc)
+        wc = randn(rngc, Nc)
+        ucsc = CompactCovarianceUncertaintySet(; kappa = 2.0, C = Cc, Q = Qc)
+        slvc = Solver(; name = :clarabel_cucs, solver = Clarabel.Optimizer,
+                      check_sol = (; allow_local = true, allow_almost = true),
+                      settings = Dict("verbose" => false, "tol_gap_abs" => 1e-12,
+                                      "tol_gap_rel" => 1e-12, "tol_feas" => 1e-12))
+        optc = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slvc)
+        @testset "Result construction and validation" begin
+            @test ucsc.kappa == 2.0
+            @test ucsc.C == Cc
+            @test isnothing(ucsc.val)
+            @test isa(CompactCovarianceUncertaintySet(2.0, Cc, Qc),
+                      CompactCovarianceUncertaintySet)
+            @test_throws DomainError CompactCovarianceUncertaintySet(; kappa = -1.0, C = Cc,
+                                                                     Q = Qc)
+            @test_throws DomainError CompactCovarianceUncertaintySet(; kappa = Inf, C = Cc,
+                                                                     Q = Qc)
+            @test_throws Exception CompactCovarianceUncertaintySet(; kappa = 1.0,
+                                                                   C = Float64[],
+                                                                   Q = zeros(0, 0))
+            @test_throws DomainError CompactCovarianceUncertaintySet(; kappa = 1.0,
+                                                                     C = [1.0, -1.0],
+                                                                     Q = zeros(2, 0))
+            @test_throws Exception CompactCovarianceUncertaintySet(; kappa = 1.0,
+                                                                   C = [1.0, NaN],
+                                                                   Q = zeros(2, 0))
+            @test_throws Exception CompactCovarianceUncertaintySet(; kappa = 1.0,
+                                                                   C = [1.0, 1.0],
+                                                                   Q = fill(Inf, 2, 1))
+            @test_throws DimensionMismatch CompactCovarianceUncertaintySet(; kappa = 1.0,
+                                                                           C = [1.0, 1.0],
+                                                                           Q = zeros(3, 1))
+            @test_throws DimensionMismatch CompactCovarianceUncertaintySet(; kappa = 1.0,
+                                                                           C = [1.0, 1.0],
+                                                                           Q = zeros(2, 1),
+                                                                           val = ones(3, 3))
+            @test_throws DimensionMismatch CompactCovarianceUncertaintySet(; kappa = 1.0,
+                                                                           C = [1.0, 1.0],
+                                                                           Q = zeros(2, 1),
+                                                                           val = ones(2, 3))
+            # A rank of zero is admitted, and so is a radius of zero.
+            @test size(CompactCovarianceUncertaintySet(; kappa = 0.0, C = Cc,
+                                                       Q = zeros(Nc, 0)).Q, 2) == 0
+        end
+        @testset "The term is the closed form, without the dense matrix" begin
+            want = dot(wc, sigmac, wc) +
+                   ucsc.kappa *
+                   dot(wc, Diagonal(Cc) * (I - Qc * transpose(Qc)) * Diagonal(Cc), wc)
+            @test isapprox(PortfolioOptimisers.ucs_variance(ucsc, sigmac, wc), want;
+                           rtol = 1e-10)
+            # Rank zero leaves the whole of `C .* w` in the residual.
+            ucs0 = CompactCovarianceUncertaintySet(; kappa = 2.0, C = Cc, Q = zeros(Nc, 0))
+            @test isapprox(PortfolioOptimisers.ucs_variance(ucs0, sigmac, wc),
+                           dot(wc, sigmac, wc) + 2.0 * sum(abs2, Cc .* wc); rtol = 1e-12)
+            # The penalty is linear in the radius.
+            ucs3 = CompactCovarianceUncertaintySet(; kappa = 3.0, C = Cc, Q = Qc)
+            ucs1 = CompactCovarianceUncertaintySet(; kappa = 1.0, C = Cc, Q = Qc)
+            z9 = zeros(Nc, Nc)
+            @test isapprox(PortfolioOptimisers.ucs_variance(ucs3, z9, wc),
+                           3 * PortfolioOptimisers.ucs_variance(ucs1, z9, wc))
+            # A portfolio whose metric image lies in the span pays nothing.
+            waligned = Bc[:, 1]
+            ucsa = CompactCovarianceUncertaintySet(; kappa = 2.0, C = Cc,
+                                                   Q = Matrix(qr(Diagonal(Cc) * Bc).Q)[:,
+                                                                                       1:Kc])
+            @test isapprox(PortfolioOptimisers.ucs_variance(ucsa, z9, waligned), 0.0;
+                           atol = 1e-14)
+            # A single asset pays a penalty, so the set is not vacuous.
+            @test PortfolioOptimisers.ucs_variance(ucsc, z9, [1.0; zeros(Nc - 1)]) > 1e-8
+        end
+        @testset "Covariance-only: mu_ucs throws and sigma_ucs passes through" begin
+            @test_throws ArgumentError mu_ucs(ucsc)
+            @test sigma_ucs(ucsc) === ucsc
+        end
+        @testset "A view re-orthonormalises the basis it slices" begin
+            iv = [1, 2, 3, 4, 5]
+            vc = PortfolioOptimisers.port_opt_view(ucsc, iv)
+            @test vc.kappa == ucsc.kappa
+            @test vc.C == Cc[iv]
+            # The slice is not orthonormal, and the view is.
+            @test !isapprox(transpose(Qc[iv, :]) * Qc[iv, :], I(Kc); atol = 1e-8)
+            @test isapprox(transpose(vc.Q) * vc.Q, I(size(vc.Q, 2)); atol = 1e-12)
+            # The span survives the slice, so the view projects onto the same subspace.
+            @test isapprox(vc.Q * transpose(vc.Q) * Qc[iv, :], Qc[iv, :]; atol = 1e-10)
+            # A view equals a fit on the cluster's rows: the projector of the view and the
+            # projector of a fresh orthonormalisation of the same rows agree.
+            Qfit = Matrix(qr(Qc[iv, :]).Q)[:, 1:Kc]
+            @test isapprox(vc.Q * transpose(vc.Q), Qfit * transpose(Qfit); atol = 1e-10)
+            # Slicing the projector instead is wrong: it is not even a projector.
+            Psliced = (I - Qc * transpose(Qc))[iv, iv]
+            @test !isapprox(Psliced * Psliced, Psliced; atol = 1e-8)
+            # The rank falls when the sliced columns become dependent.
+            @test size(PortfolioOptimisers.port_opt_view(ucsc, [1]).Q, 2) == 1
+            @test size(PortfolioOptimisers.orthonormalise_basis(zeros(Nc, 0)), 2) == 0
+            # `val` is a covariance, so it is sliced on both axes.
+            ucsv = CompactCovarianceUncertaintySet(; kappa = 2.0, C = Cc, Q = Qc,
+                                                   val = sigmac)
+            @test PortfolioOptimisers.port_opt_view(ucsv, iv).val == sigmac[iv, iv]
+        end
+        @testset "The JuMP term reproduces the closed form and lifts no matrix" begin
+            resc = optimise(MeanRisk(; r = UncertaintySetVariance(; ucs = ucsc),
+                                     obj = MinimumRisk(), opt = optc), rdc)
+            @test isa(resc.retcode, PortfolioOptimisers.OptimisationSuccess)
+            @test isapprox(sum(resc.w), 1.0)
+            # The model's own expression at the optimum is the scalar worst case.
+            keyc = PortfolioOptimisers.state_key(Symbol(""), :cucs_variance_risk_, 1)
+            @test isapprox(PortfolioOptimisers.JuMP.value(resc.model[keyc]),
+                           PortfolioOptimisers.ucs_variance(ucsc, sigmac, resc.w);
+                           rtol = 1e-6)
+            # No lifted matrix on this route, and one on the ellipsoidal route.
+            @test !haskey(resc.model, :W)
+            rese = optimise(MeanRisk(;
+                                     r = UncertaintySetVariance(;
+                                                                ucs = EllipsoidalUncertaintySet(;
+                                                                                                sigma = I(Nc^2) *
+                                                                                                        1.0,
+                                                                                                k = 0.1,
+                                                                                                class = SigmaEllipsoidalUncertaintySet())),
+                                     obj = MinimumRisk(), opt = optc), rdc)
+            @test haskey(rese.model, :W)
+            # A radius of zero, and a basis that spans everything, both reproduce the
+            # nominal minimum-variance solution.
+            resn = optimise(MeanRisk(; r = Variance(), obj = MinimumRisk(), opt = optc),
+                            rdc)
+            resz = optimise(MeanRisk(;
+                                     r = UncertaintySetVariance(;
+                                                                ucs = CompactCovarianceUncertaintySet(;
+                                                                                                      kappa = 0.0,
+                                                                                                      C = Cc,
+                                                                                                      Q = Qc)),
+                                     obj = MinimumRisk(), opt = optc), rdc)
+            @test isapprox(resz.w, resn.w; rtol = 1e-5, atol = 1e-6)
+            resf = optimise(MeanRisk(;
+                                     r = UncertaintySetVariance(;
+                                                                ucs = CompactCovarianceUncertaintySet(;
+                                                                                                      kappa = 2.0,
+                                                                                                      C = Cc,
+                                                                                                      Q = Matrix(I(Nc) *
+                                                                                                                 1.0))),
+                                     obj = MinimumRisk(), opt = optc), rdc)
+            @test isapprox(resf.w, resn.w; rtol = 1e-5, atol = 1e-6)
+            # A rank-zero set solves, and its penalty is the metric-weighted squared norm.
+            res0 = optimise(MeanRisk(;
+                                     r = UncertaintySetVariance(;
+                                                                ucs = CompactCovarianceUncertaintySet(;
+                                                                                                      kappa = 1.0,
+                                                                                                      C = Cc,
+                                                                                                      Q = zeros(Nc,
+                                                                                                                0))),
+                                     obj = MinimumRisk(), opt = optc), rdc)
+            @test isapprox(sum(res0.w), 1.0)
+            @test !haskey(res0.model, PortfolioOptimisers.state_key(Symbol(""), :z_cucs, 1))
+        end
+        @testset "The carried covariance wins over the fallback (ADR 0050)" begin
+            sigma2 = sigmac * 4
+            ucsw = CompactCovarianceUncertaintySet(; kappa = 2.0, C = Cc, Q = Qc,
+                                                   val = sigma2)
+            @test isapprox(PortfolioOptimisers.ucs_variance(ucsw, sigmac, wc),
+                           PortfolioOptimisers.ucs_variance(ucsc, sigma2, wc))
+        end
+    end
 end

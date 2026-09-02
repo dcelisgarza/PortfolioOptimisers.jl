@@ -125,6 +125,7 @@ commit = "2107fc7a40"
 "src/14_UncertaintySets/04_BootstrapUncertaintySets.jl" = { cyc = 3, cog = 4, arg = 11, cyc_sum = 26, cog_sum = 17, arg_sum = 62, macros = [] }
 "src/14_UncertaintySets/05_L1UncertaintySets.jl" = { cyc = 6, cog = 6, arg = 5, cyc_sum = 54, cog_sum = 50, arg_sum = 49, macros = [] }
 "src/14_UncertaintySets/06_CalibrationRules.jl" = { cyc = 3, cog = 4, arg = 6, cyc_sum = 99, cog_sum = 55, arg_sum = 162, macros = [] }
+"src/14_UncertaintySets/07_CompactUncertaintySets.jl" = { cyc = 3, cog = 2, arg = 4, cyc_sum = 9, cog_sum = 5, arg_sum = 8, macros = [] }
 "src/15_Turnover.jl" = { cyc = 2, cog = 2, arg = 4, cyc_sum = 17, cog_sum = 11, arg_sum = 9, macros = ["@propagatable"] }
 "src/16_Fees.jl" = { cyc = 1, cog = 1, arg = 4, cyc_sum = 41, cog_sum = 7, arg_sum = 106, macros = ["@propagatable"] }
 "src/17_NetReturnsDrawdowns.jl" = { cyc = 2, cog = 2, arg = 4, cyc_sum = 15, cog_sum = 9, arg_sum = 32, macros = [] }
