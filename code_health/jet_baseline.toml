@@ -8,7 +8,7 @@ jet = "0.12.1"
 filter = "AnyFrameModule"
 attribution = "deepest_repository_frame"
 load_set = ["GraphRecipes", "Impute", "StatsPlots"]
-commit = "1f3fd924ed"
+commit = "d8bb0b4c88"
 
 [run.main]
 load_set = ["GraphRecipes", "Impute", "StatsPlots"]
@@ -30,6 +30,8 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/01_Base/12_NormError.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/13_KappaLog.jl" = { raw = 0, reviewed = 0 }
 "src/02_Tools.jl" = { raw = 10, reviewed = 10 }
+"src/03_AssetPanel.jl" = { raw = 0, reviewed = 0 }
+"src/03_AssetPanelBuilder.jl" = { raw = 0, reviewed = 0 }
 "src/03_Preprocessing.jl" = { raw = 19, reviewed = 19 }
 "src/04_PosdefMatrix.jl" = { raw = 14, reviewed = 14 }
 "src/05_Denoise.jl" = { raw = 1, reviewed = 1 }
@@ -121,7 +123,7 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/13_Prior/09_AugmentedBlackLittermanPrior.jl" = { raw = 0, reviewed = 0 }
 "src/13_Prior/10_Base_EntropyPoolingPrior.jl" = { raw = 9, reviewed = 9 }
 "src/13_Prior/11_MeucciEntropyPoolingPrior.jl" = { raw = 1, reviewed = 1 }
-"src/13_Prior/12_EntropyPoolingPrior.jl" = { raw = 20, reviewed = 20 }
+"src/13_Prior/12_EntropyPoolingPrior.jl" = { raw = 19, reviewed = 19 }
 "src/13_Prior/13_OpinionPoolingPrior.jl" = { raw = 1, reviewed = 1 }
 "src/13_Prior/14_HighOrderFactorPriorEstimator.jl" = { raw = 0, reviewed = 0 }
 "src/13_Prior/15_FeaturePrior.jl" = { raw = 0, reviewed = 0 }
@@ -263,6 +265,8 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/01_Base/12_NormError.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/13_KappaLog.jl" = { raw = 0, reviewed = 0 }
 "src/02_Tools.jl" = { raw = 1, reviewed = 1 }
+"src/03_AssetPanel.jl" = { raw = 0, reviewed = 0 }
+"src/03_AssetPanelBuilder.jl" = { raw = 0, reviewed = 0 }
 "src/03_Preprocessing.jl" = { raw = 0, reviewed = 0 }
 "src/04_PosdefMatrix.jl" = { raw = 0, reviewed = 0 }
 "src/05_Denoise.jl" = { raw = 0, reviewed = 0 }
@@ -496,6 +500,8 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/01_Base/12_NormError.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/13_KappaLog.jl" = { raw = 0, reviewed = 0 }
 "src/02_Tools.jl" = { raw = 0, reviewed = 0 }
+"src/03_AssetPanel.jl" = { raw = 0, reviewed = 0 }
+"src/03_AssetPanelBuilder.jl" = { raw = 0, reviewed = 0 }
 "src/03_Preprocessing.jl" = { raw = 0, reviewed = 0 }
 "src/04_PosdefMatrix.jl" = { raw = 0, reviewed = 0 }
 "src/05_Denoise.jl" = { raw = 0, reviewed = 0 }

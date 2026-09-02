@@ -90,7 +90,7 @@ The central data structure carrying all return series through the library: asset
 The container of aligned, time-indexed price-level series: the prices-level mirror of `ReturnsResult`, and the input to price Preprocessing Estimators.
 
 **Feature Matrix** (`Z` / `nz`)
-An assets × features matrix of per-asset quantities that are *not* return series — a sector taxonomy, a fundamentals or ESG panel, factor loadings, a graph neighbourhood. It is exogenous data, letting the clustering and network stack see structure the returns do not encode.
+An assets × features matrix of per-asset quantities that are *not* return series — a sector taxonomy, a fundamentals or ESG panel, factor loadings, a graph neighbourhood. It is exogenous data, letting the clustering and network stack see structure the returns do not encode. Its time-varying shape is observations × assets × features, and that shape is what an Asset Panel writes its values into. It is always finite: a boolean mask rides it as a 0/1 column, and a blank never does.
 *Avoid*: Characteristic (see **Characteristic Vector**, §3.9); and reading "feature" as *factor*, which is a return series.
 
 **Feature Matrix Estimator**
@@ -100,11 +100,11 @@ A producer turning something the library already computes, or a classification t
 An ordered, last-wins list of authored edges resolving into a Feature Matrix. Where the group-key form stacks partitions and derives its axis, a Program writes cells into an axis the caller declared.
 
 **Asset Panel**
-An observations × assets container of point-in-time per-asset data, holding a blank cell where a value was unknown on that date, a level list for a categorical Panel Field, and the universe masks.
-*Avoid*: Feature Matrix (above), which is a finite numeric array carrying neither a blank cell nor a mask.
+The *structure* of a point-in-time table of per-asset data: the field index naming each Panel Field's columns of the Feature Matrix, and the two universe masks. The values ride the Feature Matrix, whose time-varying shape is observations × assets × features, and every blank cell is resolved by `asset_panel` before the Asset Panel exists. See ADR 0102.
+*Avoid*: reading it as a container of values or of blanks. It holds neither; `rd.nz` and `rd.Z` hold the values, and the blank-carrying form is an argument to the builder that never enters a carrier.
 
 **Panel Field**
-One named column of an Asset Panel: a market capitalisation, a book value, a sector classification.
+One named quantity of an Asset Panel: a market capitalisation, a book value, a sector classification, a factor exposure tensor. It claims one column of the Feature Matrix when it is numeric, one per level when it is categorical, and one per third-axis label when it is a tensor. A Panel Field whose blanks are filled claims an observed-mask column beside its values.
 
 **Implied Volatility**
 A forward-looking estimate of an asset's expected price fluctuation, derived from current option prices. Not a historical measurement.

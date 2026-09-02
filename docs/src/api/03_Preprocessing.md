@@ -30,6 +30,62 @@ PortfolioOptimisers.apply_impute_method
     estimator for pipelines, despite the similar name. See
     `docs/adr/0042-impute-is-a-weak-dependency.md`.
 
+## The Asset Panel
+
+A **point-in-time panel** of per-asset fields — returns, market capitalisation, a sector
+classification, a factor exposure tensor — rides the feature matrix that [`ReturnsResult`](@ref)
+already carries. `nz` and `Z` hold the panel's numbers, and the `pnl` slot holds its structure: the
+field index, which maps each **Panel Field** to its kind and to its columns of `nz`, and the two
+point-in-time masks. Splitting it this way is what lets the panel travel through every view and
+every cross-validation fold that already slices `Z` in step with `X`.
+
+A blank cell never reaches a carrier. [`asset_panel`](@ref) resolves every one of them, so `Z` stays
+finite and each Panel Field that can blank contributes an observed-mask column beside the field it
+belongs to.
+
+```@docs
+AssetPanel
+PanelField
+asset_panel
+panel_field
+port_opt_view(::AssetPanel, ::Any)
+PortfolioOptimisers.AbstractPanelFieldKind
+NumericPanelField
+CategoricalPanelField
+TensorPanelField
+PortfolioOptimisers.AbstractPanelFieldInput
+NumericPanelInput
+CategoricalPanelInput
+TensorPanelInput
+PortfolioOptimisers.AbstractPanelFillAlgorithm
+NoPanelFill
+ConstantPanelFill
+ForwardPanelFill
+BackwardPanelFill
+PortfolioOptimisers.panel_layout
+PortfolioOptimisers.panel_claim!
+PortfolioOptimisers.panel_matrix
+PortfolioOptimisers.panel_write_observed!
+PortfolioOptimisers.panel_field_labels
+PortfolioOptimisers.panel_field_observables
+PortfolioOptimisers.panel_observed_labels
+PortfolioOptimisers.panel_column_owner
+PortfolioOptimisers.panel_fill
+PortfolioOptimisers.panel_directional_fill
+PortfolioOptimisers.panel_resolve
+PortfolioOptimisers.panel_input_kind
+PortfolioOptimisers.panel_write!
+PortfolioOptimisers.is_panel_blank
+PortfolioOptimisers.check_asset_panel
+PortfolioOptimisers.assert_panel_labels
+PortfolioOptimisers.assert_panel_columns
+PortfolioOptimisers.assert_panel_field_columns
+PortfolioOptimisers.assert_panel_fill
+PortfolioOptimisers.assert_panel_input
+PortfolioOptimisers.assert_panel_finite
+PortfolioOptimisers.assert_panel_feature_axis
+```
+
 ## Price-level data
 
 ```@docs

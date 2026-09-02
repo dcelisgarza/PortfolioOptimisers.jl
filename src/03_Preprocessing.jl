@@ -666,6 +666,7 @@ $(DocStringExtensions.FIELDS)
         ivpa::Option{<:Num_VecNum} = nothing,
         nz::Option{<:VecStr} = nothing,
         Z::Option{<:MatNum_Arr3Num} = nothing,
+        pnl::Option{<:AssetPanel} = nothing,
     ) -> ReturnsResult
 
 Keywords correspond to the struct's fields.
@@ -682,6 +683,7 @@ Keywords correspond to the struct's fields.
   - If `iv` is not `nothing`, `!isempty(iv)`, `all(x -> x >= 0, iv)`, `all(x -> isfinite(x), iv)`, and `size(iv) == size(X)`.
   - `ivpa` is validated in that same branch, so it is checked only when `iv` is given: `all(x -> x > 0, ivpa)`, `all(x -> isfinite(x), ivpa)`, and, if a vector, `length(ivpa) == size(iv, 2)`. The bound is strict — a zero adjustment is rejected. An `ivpa` passed without an `iv` reaches no check, because it has no implied volatility to adjust.
   - `nz` and `Z` are both `nothing` or both given; see [`check_names_and_feature_matrix`](@ref) for the shape rules, which bind `Z`'s asset axis to `length(nx)` and, for a time-varying `Z`, its observation axis to `size(X, 1)`.
+  - `pnl` needs `nz` and `Z` beside it, and needs the time-varying `Z`, because a point-in-time panel varies in time. Its masks match `Z`'s observation and asset axes, and every column its field index names is a column of `nz`. See [`check_asset_panel`](@ref).
 
 # Examples
 
@@ -698,13 +700,17 @@ ReturnsResult
     iv ┼ nothing
   ivpa ┼ nothing
     nz ┼ nothing
-     Z ┴ nothing
+     Z ┼ nothing
+   pnl ┴ nothing
 ```
 
 # Related
 
   - [`AbstractReturnsResult`](@ref)
   - [`prices_to_returns`](@ref)
+  - [`AssetPanel`](@ref)
+  - [`asset_panel`](@ref)
+  - [`check_asset_panel`](@ref)
   - [`Option`](@ref)
   - [`VecStr`](@ref)
   - [`MatNum`](@ref)
@@ -756,11 +762,16 @@ ReturnsResult
     Optional feature matrix, static (assets × features) or time-varying (observations × assets × features).
     """
     Z
+    """
+    Optional [`AssetPanel`](@ref): the structure of the point-in-time panel whose values `nz` and `Z` carry.
+    """
+    pnl
     function ReturnsResult(nx::Option{<:VecStr}, X::Option{<:MatNum}, nf::Option{<:VecStr},
                            F::Option{<:MatNum}, nb::Option{<:VecStr},
                            B::Option{<:VecNum_MatNum}, ts::Option{<:VecDate},
                            iv::Option{<:MatNum}, ivpa::Option{<:Num_VecNum},
-                           nz::Option{<:VecStr}, Z::Option{<:MatNum_Arr3Num})
+                           nz::Option{<:VecStr}, Z::Option{<:MatNum_Arr3Num},
+                           pnl::Option{<:AssetPanel})
         check_names_and_returns_matrix(nx, X, :nx, :X)
         check_names_and_returns_matrix(nf, F, :nf, :F)
         if isa(B, VecNum) && !isnothing(nb)
@@ -817,11 +828,10 @@ ReturnsResult
         end
         check_names_and_feature_matrix(nz, Z, isnothing(nx) ? nothing : length(nx),
                                        isnothing(X) ? nothing : size(X, 1), "length(nx)")
+        check_asset_panel(pnl, nz, Z)
         return new{typeof(nx), typeof(X), typeof(nf), typeof(F), typeof(nb), typeof(B),
-                   typeof(ts), typeof(iv), typeof(ivpa), typeof(nz), typeof(Z)}(nx, X, nf,
-                                                                                F, nb, B,
-                                                                                ts, iv,
-                                                                                ivpa, nz, Z)
+                   typeof(ts), typeof(iv), typeof(ivpa), typeof(nz), typeof(Z),
+                   typeof(pnl)}(nx, X, nf, F, nb, B, ts, iv, ivpa, nz, Z, pnl)
     end
 end
 function ReturnsResult(; nx::Option{<:VecStr} = nothing, X::Option{<:MatNum} = nothing,
@@ -829,8 +839,9 @@ function ReturnsResult(; nx::Option{<:VecStr} = nothing, X::Option{<:MatNum} = n
                        nb::Option{<:VecStr} = nothing, B::Option{<:VecNum_MatNum} = nothing,
                        ts::Option{<:VecDate} = nothing, iv::Option{<:MatNum} = nothing,
                        ivpa::Option{<:Num_VecNum} = nothing, nz::Option{<:VecStr} = nothing,
-                       Z::Option{<:MatNum_Arr3Num} = nothing)::ReturnsResult
-    return ReturnsResult(nx, X, nf, F, nb, B, ts, iv, ivpa, nz, Z)
+                       Z::Option{<:MatNum_Arr3Num} = nothing,
+                       pnl::Option{<:AssetPanel} = nothing)::ReturnsResult
+    return ReturnsResult(nx, X, nf, F, nb, B, ts, iv, ivpa, nz, Z, pnl)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -851,7 +862,8 @@ This is the [`port_opt_view`](@ref) method for [`ReturnsResult`](@ref) — the V
  4. View the implied volatilities as `view(rd.iv, :, i)`, and the adjustment `ivpa` at `i`.
  5. Read `sq` from [`features_are_assets`](@ref) on `nz` and `nx`. When `sq` is `true`, view `nz` at `i` as well, because the feature axis is the asset axis.
  6. View the feature matrix with [`feature_matrix_view`](@ref) at `i` on the asset axis. `Z` is carried assets-major, so that axis is axis 1 when `Z` is static and axis 2 when `Z` is time-varying. The observation index is a `Colon`, so a time-varying `Z` keeps every observation.
- 7. Rebuild the [`ReturnsResult`](@ref). The factor names `nf`, the factor returns `F` and the timestamps `ts` pass through untouched, because none of the three has an asset axis.
+ 7. View the [`AssetPanel`](@ref) `pnl` at `i` on the asset axis, which slices the columns of both its masks. Its field index passes through unchanged: it addresses the feature axis, which an asset view does not reach.
+ 8. Rebuild the [`ReturnsResult`](@ref). The factor names `nf`, the factor returns `F` and the timestamps `ts` pass through untouched, because none of the three has an asset axis.
 
 Each field that is `nothing` stays `nothing`. No step copies data.
 
@@ -879,7 +891,8 @@ ReturnsResult
     iv ┼ nothing
   ivpa ┼ nothing
     nz ┼ nothing
-     Z ┴ nothing
+     Z ┼ nothing
+   pnl ┴ nothing
 
 julia> PortfolioOptimisers.port_opt_view(rd, 2:2)
 ReturnsResult
@@ -893,7 +906,8 @@ ReturnsResult
     iv ┼ nothing
   ivpa ┼ nothing
     nz ┼ nothing
-     Z ┴ nothing
+     Z ┼ nothing
+   pnl ┴ nothing
 ```
 
 # Related
@@ -929,7 +943,8 @@ Return a view of the `ReturnsResult` object for assets at indices `j`, observati
  5. View the timestamps `ts` at `i`, the implied volatilities as `view(rd.iv, i, j)`, and the adjustment `ivpa` at `j`.
  6. Read `sq` from [`features_are_assets`](@ref) on `nz` and `nx`. When `sq` is `true`, view `nz` at `j` as well.
  7. View the feature matrix with [`feature_matrix_view`](@ref) at the observations `i` and the assets `j`. A static `Z` has no observation axis and ignores `i`, which is the same asymmetry `ivpa` has on the asset axis.
- 8. Rebuild the [`ReturnsResult`](@ref).
+ 8. View the [`AssetPanel`](@ref) `pnl` at the observations `i` and the assets `j`, which slices both axes of both its masks. Its field index passes through unchanged.
+ 9. Rebuild the [`ReturnsResult`](@ref).
 
 Each field that is `nothing` stays `nothing`. No step copies data.
 
@@ -969,7 +984,8 @@ ReturnsResult
     iv ┼ nothing
   ivpa ┼ nothing
     nz ┼ nothing
-     Z ┴ nothing
+     Z ┼ nothing
+   pnl ┴ nothing
 
 julia> PortfolioOptimisers.port_opt_view(rd, 1:2, 2:2)
 ReturnsResult
@@ -983,7 +999,8 @@ ReturnsResult
     iv ┼ nothing
   ivpa ┼ nothing
     nz ┼ nothing
-     Z ┴ nothing
+     Z ┼ nothing
+   pnl ┴ nothing
 ```
 
 * * *
@@ -1033,8 +1050,9 @@ function port_opt_view(rd::ReturnsResult, i)
     sq = features_are_assets(rd.nz, rd.nx)
     nz = sq ? nothing_scalar_array_view(rd.nz, i) : rd.nz
     Z = feature_matrix_view(rd.Z, sq, :, i)
+    pnl = port_opt_view(rd.pnl, i)
     return ReturnsResult(; nx = nx, X = X, nf = rd.nf, F = rd.F, nb = nb, B = B, ts = rd.ts,
-                         iv = iv, ivpa = ivpa, nz = nz, Z = Z)
+                         iv = iv, ivpa = ivpa, nz = nz, Z = Z, pnl = pnl)
 end
 function port_opt_view(rd::ReturnsResult, i, j, k = :)
     nx = nothing_scalar_array_view(rd.nx, j)
@@ -1055,8 +1073,9 @@ function port_opt_view(rd::ReturnsResult, i, j, k = :)
     sq = features_are_assets(rd.nz, rd.nx)
     nz = sq ? nothing_scalar_array_view(rd.nz, j) : rd.nz
     Z = feature_matrix_view(rd.Z, sq, i, j)
+    pnl = port_opt_view(rd.pnl, i, j, k)
     return ReturnsResult(; nx = nx, X = X, nf = nf, F = F, nb = nb, B = B, ts = ts, iv = iv,
-                         ivpa = ivpa, nz = nz, Z = Z)
+                         ivpa = ivpa, nz = nz, Z = Z, pnl = pnl)
 end
 function port_opt_view(rd::ReturnsResult, args...; kwargs...)
     kws = keys(kwargs)
@@ -1289,7 +1308,8 @@ ReturnsResult
     iv ┼ nothing
   ivpa ┼ nothing
     nz ┼ nothing
-     Z ┴ nothing
+     Z ┼ nothing
+   pnl ┴ nothing
 
 julia> rd2 = returns_result_picker(rd, false)  # no change when brt is false
 ReturnsResult
@@ -1303,7 +1323,8 @@ ReturnsResult
     iv ┼ nothing
   ivpa ┼ nothing
     nz ┼ nothing
-     Z ┴ nothing
+     Z ┼ nothing
+   pnl ┴ nothing
 
 julia> rd === rd2
 true
@@ -1320,7 +1341,8 @@ ReturnsResult
     iv ┼ nothing
   ivpa ┼ nothing
     nz ┼ nothing
-     Z ┴ nothing
+     Z ┼ nothing
+   pnl ┴ nothing
 
 julia> rd.X .- rd.B == rd3.X
 true
@@ -1409,7 +1431,8 @@ end
         join_method::Symbol = :outer,
         impute_method = nothing,
         nz::Option{<:VecStr} = nothing,
-        Z::Option{<:MatNum_Arr3Num} = nothing
+        Z::Option{<:MatNum_Arr3Num} = nothing,
+        pnl::Option{<:AssetPanel} = nothing
     ) -> ReturnsResult
 
 Convert `TimeSeries.TimeArray` price data to returns. Handles factor data, missing data,
@@ -1453,7 +1476,7 @@ A benchmark ``B`` is converted by the same rule and **carried alongside** the as
 12. Convert the surviving prices to returns with `TimeSeries.percentchange` under `ret_method` and `padding`. This is the step that applies the formula above. It computes both branches through logarithms — the log return is ``\\ln P_{t,i} - \\ln P_{t-1,i}``, and the simple return is `expm1` of it — so the two agree with the closed forms above to floating point rather than to the last bit. When `padding` is `true` the first observation is kept and its return is `NaN`, so the returns keep the length of the price clock.
 13. Split the surviving column names into the asset names `nx`, the factor names `nf`, the benchmark names `nb`, and the timestamp column, which gives `ts`.
 14. Index the implied volatilities `iv` by `ts`, then check `iv` and `ivpa` against the surviving asset count.
-15. Subselect the feature matrix. Read the surviving assets' positions `acols` in the original asset names, read `sq` from [`features_are_assets`](@ref), recover the surviving rows with [`feature_row_indices`](@ref), and view `Z` with [`feature_matrix_view`](@ref). Materialise the view with `Array`, and view `nz` at `acols` when `sq` is `true`. An asset dropped by steps 9 to 11 takes its features with it, or the two matrices would desynchronise silently. A time-varying `Z` is subselected to the surviving observations as well, matched back into the original price timestamps; a surviving timestamp absent from that clock throws. Under `collapse_args` this gives the aggregated period the features of the row at its representative timestamp, which is last-observation semantics and matches [`LastObservation`](@ref).
+15. Subselect the feature matrix. Read the surviving assets' positions `acols` in the original asset names, read `sq` from [`features_are_assets`](@ref), recover the surviving rows with [`feature_row_indices`](@ref), and view `Z` with [`feature_matrix_view`](@ref). Materialise the view with `Array`, and view `nz` at `acols` when `sq` is `true`. An asset dropped by steps 9 to 11 takes its features with it, or the two matrices would desynchronise silently. A time-varying `Z` is subselected to the surviving observations as well, matched back into the original price timestamps; a surviving timestamp absent from that clock throws. Under `collapse_args` this gives the aggregated period the features of the row at its representative timestamp, which is last-observation semantics and matches [`LastObservation`](@ref). An [`AssetPanel`](@ref) `pnl` describes those same columns, so it is sliced on the same two axes in the same step, with [`port_opt_view`](@ref); its masks come back as views, because nothing here rebuilds them from a table the way `Z` is rebuilt.
 16. Build the asset, factor and benchmark matrices from the surviving columns. A group whose columns all went is `nothing`.
 17. Return the [`ReturnsResult`](@ref).
 
@@ -1476,6 +1499,7 @@ Step 8 counts the missing columns of a row, and step 10 counts the missing rows 
   - `impute_method`: Optional imputation method for missing data. `nothing`, or an `Impute.Imputor` — which requires `using Impute`, since `Impute` is a weak dependency loaded through `PortfolioOptimisersImputeExt`. Unrelated to [`Imputer`](@ref), which is a PortfolioOptimisers estimator and is not accepted here.
   - `nz`: Optional feature names.
   - `Z`: Optional feature matrix, static (assets × features) or time-varying (observations × assets × features), with its axes parallel to `X`'s columns and rows.
+  - `pnl`: Optional [`AssetPanel`](@ref) describing the columns of `Z` as a point-in-time panel. [`asset_panel`](@ref) returns it beside the `nz` and `Z` it belongs to.
 
 # Validation
 
@@ -1518,7 +1542,8 @@ ReturnsResult
     iv ┼ nothing
   ivpa ┼ nothing
     nz ┼ nothing
-     Z ┴ nothing
+     Z ┼ nothing
+   pnl ┴ nothing
 ```
 
 # Related
@@ -1546,7 +1571,8 @@ function prices_to_returns(X::TimeSeries.TimeArray,
                            map_func::Option{<:Function} = nothing,
                            join_method::Symbol = :outer, impute_method = nothing,
                            nz::Option{<:VecStr} = nothing,
-                           Z::Option{<:MatNum_Arr3Num} = nothing)
+                           Z::Option{<:MatNum_Arr3Num} = nothing,
+                           pnl::Option{<:AssetPanel} = nothing)
     @argcheck(!isempty(X), IsEmptyError)
     @argcheck(zero(missing_col_percent) < missing_col_percent <= one(missing_col_percent),
               DomainError)
@@ -1630,8 +1656,10 @@ function prices_to_returns(X::TimeSeries.TimeArray,
                   IsEmptyError("every asset was dropped during the conversion, so the feature matrix (Z) has no asset axis left to bind to"))
         acols = Vector{Int}(indexin(nx, asset_names))
         sq = features_are_assets(nz, asset_names)
-        Z = Array(feature_matrix_view(Z, sq, feature_row_indices(Z, ts, asset_ts), acols))
+        rows = feature_row_indices(Z, ts, asset_ts)
+        Z = Array(feature_matrix_view(Z, sq, rows, acols))
         nz = sq ? nz[acols] : nz
+        pnl = isnothing(pnl) ? nothing : port_opt_view(pnl, rows, acols)
     end
     if isempty(nf)
         nf = nothing
@@ -1652,7 +1680,7 @@ function prices_to_returns(X::TimeSeries.TimeArray,
         X = Matrix(X[!, nx])
     end
     return ReturnsResult(; ts = ts, nx = nx, X = X, nf = nf, F = F, nb = nb, B = B, iv = iv,
-                         ivpa = ivpa, nz = nz, Z = Z)
+                         ivpa = ivpa, nz = nz, Z = Z, pnl = pnl)
 end
 """
     find_complete_indices(X::AbstractMatrix; dims::Int = 1) -> VecInt
