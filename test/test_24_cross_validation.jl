@@ -350,14 +350,14 @@
         (; train_idx, test_idx) = split(cv, rd)
         N = n_splits(cv, rd)
         @test length(train_idx) == length(test_idx) == N
-        @test all(x -> length(x) == 137, train_idx)
+        @test all(x -> length(x) == 137 - 13, train_idx)
         @test all(x -> length(x) == 111, test_idx[1:(end - 1)])
         @test train_idx ==
-              UnitRange{Int64}[1:137, 112:248, 223:359, 334:470, 445:581, 556:692, 667:803,
-                               778:914]
+              UnitRange{Int64}[1:124, 112:235, 223:346, 334:457, 445:568, 556:679, 667:790,
+                               778:901]
         @test test_idx ==
-              UnitRange{Int64}[151:261, 262:372, 373:483, 484:594, 595:705, 706:816,
-                               817:927, 928:1008]
+              UnitRange{Int64}[138:248, 249:359, 360:470, 471:581, 582:692, 693:803,
+                               804:914, 915:1008]
 
         cv = IndexWalkForward(137, 111; reduce_test = true, purged_size = 13,
                               expand_train = true)
@@ -365,14 +365,14 @@
         N = n_splits(cv, rd)
         @test length(train_idx) == length(test_idx) == N
         for (i, t) in enumerate(train_idx)
-            @test length(t) == 137 + (i - 1) * 111
+            @test length(t) == 137 - 13 + (i - 1) * 111
         end
         @test all(x -> length(x) == 111, test_idx[1:(end - 1)])
         @test train_idx ==
-              UnitRange{Int64}[1:137, 1:248, 1:359, 1:470, 1:581, 1:692, 1:803, 1:914]
+              UnitRange{Int64}[1:124, 1:235, 1:346, 1:457, 1:568, 1:679, 1:790, 1:901]
         @test test_idx ==
-              UnitRange{Int64}[151:261, 262:372, 373:483, 484:594, 595:705, 706:816,
-                               817:927, 928:1008]
+              UnitRange{Int64}[138:248, 249:359, 360:470, 471:581, 582:692, 693:803,
+                               804:914, 915:1008]
         function ldm(x)
             val = lastdayofmonth.(x)
             while !isempty(val)
@@ -546,6 +546,37 @@
             @test all(first(t) - last(r) - 1 == purged_size
                       for (r, t) in zip(purged.train_idx, purged.test_idx))
         end
+
+        # The same rule for `IndexWalkForward`. A purge must not move the test schedule: a
+        # walk-forward run reports out-of-sample performance over the test windows, so
+        # funding the gap out of the test side would change what is measured and would cost
+        # test coverage, while leaving the training window untouched.
+        for train_size in (50, 137, 200), test_size in (1, 37, 111),
+            expand_train in (false, true), reduce_test in (false, true),
+            purged_size in (1, 13, 49)
+
+            kwargs = (; expand_train = expand_train, reduce_test = reduce_test)
+            base = split(IndexWalkForward(train_size, test_size; kwargs...), rd)
+            purged = split(IndexWalkForward(train_size, test_size;
+                                            purged_size = purged_size, kwargs...), rd)
+            @test purged.test_idx == base.test_idx
+            @test purged.train_idx ==
+                  [first(x):(last(x) - purged_size) for x in base.train_idx]
+            @test all(first(t) - last(r) - 1 == purged_size
+                      for (r, t) in zip(purged.train_idx, purged.test_idx))
+            # The fold count is a property of the test schedule, so a purge does not move
+            # it either.
+            @test n_splits(IndexWalkForward(train_size, test_size; kwargs...), rd) ==
+                  n_splits(IndexWalkForward(train_size, test_size;
+                                            purged_size = purged_size, kwargs...), rd) ==
+                  length(purged.train_idx)
+        end
+
+        # A purge as wide as the training window would empty it. Both fields reach the
+        # constructor, so the constructor owns the rule.
+        @test_throws DomainError IndexWalkForward(10, 5; purged_size = 10)
+        @test_throws DomainError IndexWalkForward(10, 5; purged_size = 11)
+        @test IndexWalkForward(10, 5; purged_size = 9) isa IndexWalkForward
 
         # `special_div(a, b)` counts the steps of size `b` that fit in the span `1:a`, so it
         # is `div(a - 1, b)` and never a guarded division.

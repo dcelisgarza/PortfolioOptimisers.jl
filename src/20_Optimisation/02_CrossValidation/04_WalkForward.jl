@@ -83,6 +83,8 @@ $(DocStringExtensions.TYPEDEF)
 
 Implements index-based walk-forward cross-validation for time series, supporting purging and flexible train/test windowing.
 
+`purged_size` drops the last `purged_size` rows of each training window. This opens a gap of that many observations before the test window, and removes the training rows whose labels reach into the test period. The test windows do not move, so a purge costs training rows rather than test coverage.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -103,9 +105,10 @@ Positional and keyword arguments correspond to the struct's fields.
 
   - `train_size` and `purged_size` must be non-empty, non-negative, and finite.
   - `test_size` must be non-empty, greater than zero, and finite.
+  - `purged_size < train_size`, because the purge is taken out of the training window.
 
-The rule `train_size + purged_size < T`, where `T` is the number of observations, belongs to the
-data rather than to the estimator, so [`Base.split`](@ref) checks it.
+The rule `train_size < T`, where `T` is the number of observations, belongs to the data rather
+than to the estimator, so [`Base.split`](@ref) checks it.
 
 # Examples
 
@@ -158,6 +161,9 @@ IndexWalkForward
         assert_nonempty_gt0_finite_val(test_size, :test_size)
         assert_nonempty_nonneg_finite_val(train_size, :train_size)
         assert_nonempty_nonneg_finite_val(purged_size, :purged_size)
+        @argcheck(purged_size < train_size,
+                  DomainError(purged_size,
+                              "purged_size ($purged_size) must be less than train_size ($train_size), because the purge is taken out of the training window"))
         return new{typeof(train_size), typeof(test_size), typeof(purged_size),
                    typeof(expand_train), typeof(reduce_test)}(train_size, test_size,
                                                               purged_size, expand_train,
@@ -181,7 +187,7 @@ indices. Each fold advances the test window by `test_size` observations.
 
 # Validation
 
-  - `train_size + purged_size < T`, where `T` is the number of observations in `rd`.
+  - `train_size < T`, where `T` is the number of observations in `rd`.
 
 # Returns
 
@@ -196,11 +202,10 @@ indices. Each fold advances the test window by `test_size` observations.
 function Base.split(iwf::IndexWalkForward, rd::Prices_RR)
     (; train_size, test_size, purged_size, expand_train, reduce_test) = iwf
     T = cv_nobs(rd)
-    @argcheck(train_size + purged_size < T,
-              DomainError(train_size + purged_size,
-                          "train_size + purged_size ($(train_size + purged_size)) must be less than T ($T)"))
+    @argcheck(train_size < T,
+              DomainError(train_size, "train_size ($train_size) must be less than T ($T)"))
     idx = 1:T
-    test_start = train_size + purged_size
+    test_start = train_size
     train_indices = Vector{typeof(idx)}(undef, 0)
     test_indices = Vector{typeof(idx)}(undef, 0)
     while true
@@ -209,7 +214,7 @@ function Base.split(iwf::IndexWalkForward, rd::Prices_RR)
         end
         test_end = test_start + test_size
         train_end = test_start - purged_size
-        train_start = expand_train ? 1 : train_end - train_size + 1
+        train_start = expand_train ? 1 : test_start - train_size + 1
         if test_end > T
             if !reduce_test
                 break
@@ -248,9 +253,9 @@ Return the number of cross-validation splits (folds) that would be produced by `
   - [`CombinatorialCrossValidation`](@ref)
 """
 function n_splits(iwf::IndexWalkForward, rd::Prices_RR)
-    (; train_size, test_size, purged_size, reduce_test) = iwf
+    (; train_size, test_size, reduce_test) = iwf
     T = cv_nobs(rd)
-    N = T - train_size - purged_size
+    N = T - train_size
     val = div(N, test_size)
     if reduce_test && N % test_size != 0
         val += 1
