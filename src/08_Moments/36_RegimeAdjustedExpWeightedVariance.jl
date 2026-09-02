@@ -686,7 +686,10 @@ then advances the smoothed regime state.
 
 # Returns
 
-  - `nothing`.
+  - `cache::RegimeAdjustedVarianceCache`: The cache to read on and to pass to the next observation.
+    The arrays are mutated in place, but `regime_state` and `n_regime_obs` are immutable fields that
+    `Accessors.@reset` replaces, so the caller must rebind the cache to this return value. A caller
+    that discards it freezes the regime state at its initial value.
 
 # Related
 
@@ -715,7 +718,7 @@ function process_observation!(cache::RegimeAdjustedVarianceCache,
     end
 
     if !any(valid)
-        return nothing
+        return cache
     end
 
     copyto!(cache.old_obs_count, cache.obs_count)
@@ -755,12 +758,12 @@ function process_observation!(cache::RegimeAdjustedVarianceCache,
     end
 
     if !any(regime_mask)
-        return nothing
+        return cache
     end
 
     z2_valid = filter(!isnan, view(cache.z2, regime_mask))
     if isempty(z2_valid)
-        return nothing
+        return cache
     end
 
     regime_state = get_regime_state(ce.regime_method, z2_valid, ce.min_val)
@@ -774,7 +777,131 @@ function process_observation!(cache::RegimeAdjustedVarianceCache,
 
     Accessors.@reset cache.n_regime_obs += 1
 
-    return nothing
+    return cache
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Run one forward pass of the online variance update over the observations of `X`, and call `f`
+after each observation.
+
+The pass owns the argument validation, the orientation and the cache, so the two verbs that read
+it, `var` and `variance_series`, state the recursion once. `f` receives the
+observation index and the cache as it stands after that observation, which is what makes a
+point-in-time series a single forward pass rather than one refit per observation.
+
+# Arguments
+
+  - `f`: Function of `(i, cache)` called after observation `i` is processed. A caller that wants
+    only the final cache passes a function that does nothing.
+  - `ce`: Regime-adjusted exponentially weighted variance estimator.
+  - $(arg_dict[:X])
+  - $(arg_dict[:dims])
+  - `estimation_mask`: Optional boolean matrix with the same size as `X`. When provided,
+    only assets where `estimation_mask[i, :]` (or `[:, i]`) is `true` contribute to the
+    regime state update for observation `i`.
+  - `active_mask`: Optional boolean matrix with the same size as `X`. When provided,
+    assets that become inactive have their variance and observation count reset.
+
+# Validation
+
+  - $(val_dict[:dims])
+  - If `estimation_mask` is not `nothing`, `size(X) == size(estimation_mask)`.
+  - If `active_mask` is not `nothing`, `size(X) == size(active_mask)`.
+
+# Returns
+
+  - `cache::RegimeAdjustedVarianceCache`: The cache after the last observation.
+
+# Related
+
+  - [`RegimeAdjustedVarianceCache`](@ref)
+  - [`process_observation!`](@ref)
+  - [`regime_adjusted_variance`](@ref)
+"""
+function regime_adjusted_variance_pass!(f, ce::RegimeAdjustedExpWeightedVariance, X::MatNum,
+                                        dims::Int,
+                                        estimation_mask::Option{<:AbstractMatrix{<:Bool}},
+                                        active_mask::Option{<:AbstractMatrix{<:Bool}})
+    assert_dims(dims)
+    est_flag = !isnothing(estimation_mask)
+    act_flag = !isnothing(active_mask)
+    itr, v = ifelse(isone(dims), (eachrow, (x, y) -> view(x, y, :)),
+                    (eachcol, (x, y) -> view(x, :, y)))
+    if est_flag
+        @argcheck(size(X) == size(estimation_mask),
+                  DimensionMismatch("size(X) ($(size(X))) must match size(estimation_mask) ($(size(estimation_mask)))"))
+    end
+    if act_flag
+        @argcheck(size(X) == size(active_mask),
+                  DimensionMismatch("size(X) ($(size(X))) must match size(active_mask) ($(size(active_mask)))"))
+    end
+    N = size(X, setdiff((1, 2), (dims,))[1])
+
+    cache = RegimeAdjustedVarianceCache(if isnothing(ce.hac_lags)
+                                            nothing
+                                        else
+                                            DataStructures.CircularBuffer{Vector{eltype(X)}}(ce.hac_lags)
+                                        end, zeros(eltype(X), N), zeros(eltype(X), N),
+                                        zeros(eltype(X), N), fill(NaN, N),
+                                        ce.centred ? zeros(eltype(X), N) : fill(NaN, N),
+                                        zeros(Int, N), zeros(Int, N), trues(N), nothing,
+                                        zero(eltype(X)))
+    for (i, Xi) in enumerate(itr(X))
+        emi = est_flag ? v(estimation_mask, i) : nothing
+        ami = act_flag ? v(active_mask, i) : nothing
+        cache = process_observation!(cache, ce, Xi, emi, ami)
+        f(i, cache)
+    end
+
+    return cache
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Read the regime-adjusted variance out of a cache, as it stands.
+
+Applies the exponentially weighted bias correction, blanks every asset that is not ready, and
+scales by the square of the regime multiplier. The cache is read, never written, so the same
+cache answers this call after every observation of a forward pass.
+
+# Arguments
+
+  - `cache::RegimeAdjustedVarianceCache`: Online variance computation cache.
+  - `ce::RegimeAdjustedExpWeightedVariance`: Variance estimator configuration.
+
+# Returns
+
+  - `variance::Vector{<:Number}`: Per-asset regime-adjusted variance vector of length `assets`.
+    An asset with fewer than `ce.min_obs` observations, or one that is not active, is `NaN`.
+
+# Related
+
+  - [`RegimeAdjustedVarianceCache`](@ref)
+  - [`RegimeAdjustedExpWeightedVariance`](@ref)
+"""
+function regime_adjusted_variance(cache::RegimeAdjustedVarianceCache,
+                                  ce::RegimeAdjustedExpWeightedVariance)
+    variance = copy(cache.variance)
+    correction = ones(eltype(variance), length(variance))
+    counted = cache.obs_count .> zero(eltype(cache.obs_count))
+    correction[counted] .= inv.(max.(one(ce.decay) .-
+                                     ce.decay .^ view(cache.obs_count, counted),
+                                     eps(eltype(variance))))
+    variance .*= correction
+    not_ready = .!cache.active .| (cache.obs_count .< ce.min_obs)
+
+    if any(not_ready)
+        variance[not_ready] .= NaN
+    end
+
+    factor = if cache.n_regime_obs < ce.regime_min_obs
+        one(eltype(variance))
+    else
+        regime_multiplier(ce.regime_method, cache.regime_state)
+    end
+
+    return variance * factor^2
 end
 """
     Statistics.var(
@@ -820,65 +947,75 @@ result by the square of the regime multiplier derived from the smoothed regime s
 
   - [`RegimeAdjustedExpWeightedVariance`](@ref)
   - [`RegimeAdjustedVarianceCache`](@ref)
+  - [`variance_series(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::Int = 1, estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)`](@ref)
 """
 function Statistics.var(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::Int = 1,
                         estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                         active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
-    assert_dims(dims)
-    est_flag = !isnothing(estimation_mask)
-    act_flag = !isnothing(active_mask)
-    itr, v = ifelse(isone(dims), (eachrow, (x, y) -> view(x, y, :)),
-                    (eachcol, (x, y) -> view(x, :, y)))
-    if est_flag
-        @argcheck(size(X) == size(estimation_mask),
-                  DimensionMismatch("size(X) ($(size(X))) must match size(estimation_mask) ($(size(estimation_mask)))"))
-    end
-    if act_flag
-        @argcheck(size(X) == size(active_mask),
-                  DimensionMismatch("size(X) ($(size(X))) must match size(active_mask) ($(size(active_mask)))"))
-    end
-    N = size(X, setdiff((1, 2), (dims,))[1])
-
-    cache = RegimeAdjustedVarianceCache(if isnothing(ce.hac_lags)
-                                            nothing
-                                        else
-                                            DataStructures.CircularBuffer{Vector{eltype(X)}}(ce.hac_lags)
-                                        end, zeros(eltype(X), N), zeros(eltype(X), N),
-                                        zeros(eltype(X), N), fill(NaN, N),
-                                        ce.centred ? zeros(eltype(X), N) : fill(NaN, N),
-                                        zeros(Int, N), zeros(Int, N), trues(N), nothing,
-                                        zero(eltype(X)))
-    for (i, Xi) in enumerate(itr(X))
-        emi = est_flag ? v(estimation_mask, i) : nothing
-        ami = act_flag ? v(active_mask, i) : nothing
-        process_observation!(cache, ce, Xi, emi, ami)
-    end
-
-    variance = copy(cache.variance)
-    correction = ones(eltype(variance), length(variance))
-    correction[cache.obs_count .> zero(eltype(cache.obs_count))] .= inv.(max.(one(ce.decay) .-
-                                                                              ce.decay .^
-                                                                              cache.obs_count,
-                                                                              eps(eltype(variance))))
-    variance .*= correction
-    not_ready = .!cache.active .| (cache.obs_count .< ce.min_obs)
-
-    if any(not_ready)
-        variance[not_ready] .= NaN
-    end
-
+    cache = regime_adjusted_variance_pass!((args...) -> nothing, ce, X, dims,
+                                           estimation_mask, active_mask)
     if !ce.centred && any(.!cache.active)
         cache.location[.!cache.active] .= NaN
     end
 
-    factor = if cache.n_regime_obs < ce.regime_min_obs
-        one(eltype(X))
-    else
-        regime_multiplier(ce.regime_method, cache.regime_state)
+    return regime_adjusted_variance(cache, ce)
+end
+"""
+    variance_series(
+        ce::RegimeAdjustedExpWeightedVariance,
+        X::MatNum;
+        dims::Int = 1,
+        estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+        active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+        kwargs...
+    ) -> Matrix{<:Number}
+
+Compute the point-in-time regime-adjusted exponentially weighted variance series.
+
+Row `t` holds what `var` returns for the first `t` observations of `X`, so no row reads an
+observation after its own. The update is a recursion over one observation, so this method
+overrides the expanding-window fallback with a **single forward pass**: it reads the cache after
+each observation instead of refitting.
+
+# Arguments
+
+  - `ce`: Regime-adjusted exponentially weighted variance estimator.
+  - $(arg_dict[:X])
+  - $(arg_dict[:dims])
+  - `estimation_mask`: Optional boolean matrix with the same size as `X`. When provided,
+    only assets where `estimation_mask[i, :]` (or `[:, i]`) is `true` contribute to the
+    regime state update for observation `i`.
+  - `active_mask`: Optional boolean matrix with the same size as `X`. When provided,
+    assets that become inactive have their variance and observation count reset.
+  - $(arg_dict[:ignkwargs])
+
+# Validation
+
+  - $(val_dict[:dims])
+  - If `estimation_mask` is not `nothing`, `size(X) == size(estimation_mask)`.
+  - If `active_mask` is not `nothing`, `size(X) == size(active_mask)`.
+
+# Returns
+
+  - `val::Matrix{<:Number}`: Variance series, shaped as `(T, N)` if `dims == 1` or `(N, T)` if
+    `dims == 2`. An asset with fewer than `ce.min_obs` observations at row `t` is `NaN` there.
+
+# Related
+
+  - [`RegimeAdjustedExpWeightedVariance`](@ref)
+  - [`variance_series(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
+"""
+function variance_series(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::Int = 1,
+                         estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+                         active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
+    assert_dims(dims)
+    val = Matrix{eltype(X)}(undef, size(X, dims), size(X, setdiff((1, 2), (dims,))[1]))
+    regime_adjusted_variance_pass!(ce, X, dims, estimation_mask, active_mask) do i, cache
+        val[i, :] = regime_adjusted_variance(cache, ce)
+        return nothing
     end
 
-    return variance * factor^2
+    return isone(dims) ? val : permutedims(val)
 end
-
 export LogRegimeAdjusted, FirstMomentRegimeAdjusted, RootMeanSquaredAdjusted,
        RegimeAdjustedExpWeightedVariance

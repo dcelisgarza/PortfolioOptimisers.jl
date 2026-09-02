@@ -65,7 +65,7 @@ commit = "8610300"
 "src/08_Moments/33_MedianExpectedReturns.jl" = { lines = 15, misses = 0 }
 "src/08_Moments/34_CustomValueExpectedReturns.jl" = { lines = 23, misses = 0 }
 "src/08_Moments/35_GerberIQCovariance.jl" = { lines = 302, misses = 0 }
-"src/08_Moments/36_RegimeAdjustedExpWeightedVariance.jl" = { lines = 126, misses = 126 }
+"src/08_Moments/36_RegimeAdjustedExpWeightedVariance.jl" = { lines = 126, misses = 0 }
 "src/08_Moments/37_RegimeAdjustedExpWeightedCovariance.jl" = { lines = 17, misses = 13 }
 "src/09_Distance/01_Base_Distance.jl" = { lines = 12, misses = 0 }
 "src/09_Distance/02_Distance.jl" = { lines = 72, misses = 0 }

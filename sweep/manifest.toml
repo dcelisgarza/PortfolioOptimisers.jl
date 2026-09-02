@@ -90,7 +90,7 @@
 "src/08_Moments/23_DimensionReductionRegression.jl" = { map = 3, units = 10, algorithm = 5, swept = true }
 "src/08_Moments/24_ImpliedVolatility.jl" = { map = 3, units = 11, algorithm = 5, swept = true }
 "src/08_Moments/25_CorrelationCovariance.jl" = { map = 3, units = 3, algorithm = 2, swept = true }
-"src/08_Moments/26_AbstractCovarianceVariance.jl" = { map = 3, units = 2, algorithm = 2, swept = true }
+"src/08_Moments/26_AbstractCovarianceVariance.jl" = { map = 3, units = 3, algorithm = 3, swept = true }
 "src/08_Moments/27_StandardDeviationExpectedReturns.jl" = { map = 3, units = 4, algorithm = 0, swept = true }
 "src/08_Moments/28_WindowedExpectedReturns.jl" = { map = 3, units = 0, algorithm = 0, swept = true }
 "src/08_Moments/29_WindowedCovariance.jl" = { map = 3, units = 0, algorithm = 0, swept = true }
@@ -100,7 +100,7 @@
 "src/08_Moments/33_MedianExpectedReturns.jl" = { map = 3, units = 3, algorithm = 1, swept = true }
 "src/08_Moments/34_CustomValueExpectedReturns.jl" = { map = 3, units = 7, algorithm = 1, swept = true }
 "src/08_Moments/35_GerberIQCovariance.jl" = { map = 3, units = 36, algorithm = 13, swept = true }
-"src/08_Moments/36_RegimeAdjustedExpWeightedVariance.jl" = { map = 3, units = 15, swept = false }
+"src/08_Moments/36_RegimeAdjustedExpWeightedVariance.jl" = { map = 3, units = 18, swept = false }
 "src/08_Moments/37_RegimeAdjustedExpWeightedCovariance.jl" = { map = 3, units = 7, swept = false }
 "src/09_Distance/01_Base_Distance.jl" = { map = 2, units = 8, algorithm = 1, swept = true }
 "src/09_Distance/02_Distance.jl" = { map = 2, units = 13, algorithm = 8, swept = true }

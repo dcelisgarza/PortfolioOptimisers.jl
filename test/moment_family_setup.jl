@@ -137,6 +137,10 @@ ADR 0082 records the same two files as the only two at 0.0 % coverage, which is 
 coverage ratchet was built around. ADR 0058 recorded the gap in its Notes when the `dims`
 census met it.
 
+`test/test_08m_variance_series.jl` has since covered the variance file, so the 0.0 % reading
+ADR 0082 records for it is history. That changes nothing here: the file still declares no
+`std`, and the covariance file still declares nothing at all.
+
 Nothing here can supply the missing mathematics, so issue #637 carries it. This tuple empties
 when that issue closes.
 =#

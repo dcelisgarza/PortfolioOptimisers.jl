@@ -56,7 +56,7 @@ commit = "d8bb0b4c88"
 "src/08_Moments/23_DimensionReductionRegression.jl" = { cyc = 3, cog = 3, arg = 6, cyc_sum = 17, cog_sum = 10, arg_sum = 23, macros = ["@propagatable"] }
 "src/08_Moments/24_ImpliedVolatility.jl" = { cyc = 4, cog = 2, arg = 7, cyc_sum = 19, cog_sum = 8, arg_sum = 44, macros = ["@propagatable"] }
 "src/08_Moments/25_CorrelationCovariance.jl" = { cyc = 1, cog = 1, arg = 4, cyc_sum = 4, cog_sum = 1, arg_sum = 9, macros = ["@propagatable"] }
-"src/08_Moments/26_AbstractCovarianceVariance.jl" = { cyc = 2, cog = 2, arg = 4, cyc_sum = 4, cog_sum = 4, arg_sum = 8, macros = [] }
+"src/08_Moments/26_AbstractCovarianceVariance.jl" = { cyc = 3, cog = 3, arg = 4, cyc_sum = 7, cog_sum = 7, arg_sum = 12, macros = [] }
 "src/08_Moments/27_StandardDeviationExpectedReturns.jl" = { cyc = 1, cog = 1, arg = 4, cyc_sum = 6, cog_sum = 2, arg_sum = 10, macros = ["@propagatable"] }
 "src/08_Moments/28_WindowedExpectedReturns.jl" = { cyc = 0, cog = 0, arg = 0, cyc_sum = 0, cog_sum = 0, arg_sum = 0, macros = ["@windowed_estimator"] }
 "src/08_Moments/29_WindowedCovariance.jl" = { cyc = 0, cog = 0, arg = 0, cyc_sum = 0, cog_sum = 0, arg_sum = 0, macros = ["@windowed_estimator"] }
@@ -66,7 +66,7 @@ commit = "d8bb0b4c88"
 "src/08_Moments/33_MedianExpectedReturns.jl" = { cyc = 2, cog = 1, arg = 4, cyc_sum = 5, cog_sum = 2, arg_sum = 9, macros = ["@propagatable"] }
 "src/08_Moments/34_CustomValueExpectedReturns.jl" = { cyc = 2, cog = 1, arg = 4, cyc_sum = 7, cog_sum = 2, arg_sum = 13, macros = [] }
 "src/08_Moments/35_GerberIQCovariance.jl" = { cyc = 73, cog = 73, arg = 25, cyc_sum = 171, cog_sum = 140, arg_sum = 214, macros = ["@propagatable"] }
-"src/08_Moments/36_RegimeAdjustedExpWeightedVariance.jl" = { cyc = 13, cog = 19, arg = 9, cyc_sum = 43, cog_sum = 45, arg_sum = 42, macros = [] }
+"src/08_Moments/36_RegimeAdjustedExpWeightedVariance.jl" = { cyc = 13, cog = 19, arg = 9, cyc_sum = 47, cog_sum = 47, arg_sum = 56, macros = [] }
 "src/08_Moments/37_RegimeAdjustedExpWeightedCovariance.jl" = { cyc = 2, cog = 1, arg = 6, cyc_sum = 8, cog_sum = 4, arg_sum = 9, macros = [] }
 "src/09_Distance/01_Base_Distance.jl" = { cyc = 2, cog = 1, arg = 2, cyc_sum = 3, cog_sum = 2, arg_sum = 2, macros = [] }
 "src/09_Distance/02_Distance.jl" = { cyc = 2, cog = 2, arg = 5, cyc_sum = 33, cog_sum = 18, arg_sum = 112, macros = [] }
