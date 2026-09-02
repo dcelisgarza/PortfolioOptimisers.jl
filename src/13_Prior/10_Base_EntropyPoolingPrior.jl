@@ -2233,6 +2233,10 @@ Where:
   - ``\\bar{v}``: Target value at risk of the view.
   - ``\\mathcal{T}_{i}(\\bar{v})``: Observations of asset ``i`` whose loss reaches the target.
 
+!!! note "The view is met to one observation"
+
+    The constraint fixes the posterior mass of ``\\mathcal{T}_{i}(\\bar{v})``, and the posterior value at risk of that mass is a sample order statistic: [`ValueatRisk`](@ref) reads the first observation whose cumulative weight reaches ``\\alpha``. An entropy pooling solve meets its constraints to its own tolerance, and a mass short of ``\\alpha`` by as little as `1e-8` reads one observation further down the tail. The posterior value at risk then sits under ``\\bar{v}``, by the gap between two neighbouring losses. No tolerance on the solve removes this, because the reading is a step function of the mass. The view is met to the resolution the sample has, which is one observation. Read a posterior value at risk against the two observations that bracket the target, and read the tail mass where an exact statement is needed.
+
 # Algorithm
 
  1. Parse the view equations of `var_views.val`, accepting `==` and `>=` alone.
