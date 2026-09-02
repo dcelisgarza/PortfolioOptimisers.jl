@@ -484,7 +484,8 @@ right question rather than a widened one, and what the two files hold is why:
     carries its docstring. Beyond those methods it declares four module-local `const`s
     holding error-message text, and nothing else.
   - `ext/PortfolioOptimisersImputeExt.jl` defines one method of
-    `PortfolioOptimisers.apply_impute_method`, a seam declared in `src/03_Preprocessing.jl`.
+    `PortfolioOptimisers.apply_impute_method`, a seam declared in
+    `src/03_InputData/03_Preprocessing.jl`.
 
 A method binds in the module that declares the FUNCTION, so none of those 172 methods
 reaches `names(ext; all = true)` and the census asks for a docstring on none of them. That
@@ -735,7 +736,8 @@ in the sense of `STANDARDS.md`.
     # Julia strips the indentation of a `"""` block, so a section heading sits at column 0.
     # The count, not the flag, is the primitive: one string block can document several
     # methods, separated by horizontal rules, and then carries one heading per method that
-    # holds the section. `port_opt_view` in `src/03_Preprocessing.jl` is such a block.
+    # holds the section. `port_opt_view` in `src/03_InputData/03_Preprocessing.jl` is such a
+    # block.
     count_section(text, name) = count(==(string("# ", name)), rstrip.(split(text, '\n')))
     has_section(text, name) = count_section(text, name) > 0
     has_subsection(text, name) = count(==(string("## ", name)),
@@ -925,9 +927,9 @@ in the sense of `STANDARDS.md`.
          lowers it as its file migrates, and the check retires when it reaches zero.
 
     Both numbers count SECTION HEADINGS and not docstrings that carry one. `port_opt_view` in
-    `src/03_Preprocessing.jl` documents four methods under one string block and carries the
-    heading twice, so a docstring count would read 298 and would not fall when the first of
-    those two headings moved.
+    `src/03_InputData/03_Preprocessing.jl` documents four methods under one string block and
+    carries the heading twice, so a docstring count would read 298 and would not fall when the
+    first of those two headings moved.
 
     The manifest gains NO key for either number. A swept row states that a file passed three
     conditions, and this decision changes one of them without re-opening the row, which #478

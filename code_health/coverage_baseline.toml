@@ -23,10 +23,10 @@ commit = "8610300"
 "src/01_Base/12_NormError.jl" = { lines = 54, misses = 0 }
 "src/01_Base/13_KappaLog.jl" = { lines = 2, misses = 0 }
 "src/02_Tools.jl" = { lines = 502, misses = 0 }
-"src/03_AssetPanel.jl" = { lines = 93, misses = 0 }
-"src/03_AssetPanelBuilder.jl" = { lines = 195, misses = 0 }
-"src/03_Preprocessing.jl" = { lines = 403, misses = 0 }
-"src/03_SyntheticAssetPanel.jl" = { lines = 160, misses = 0 }
+"src/03_InputData/01_AssetPanel.jl" = { lines = 93, misses = 0 }
+"src/03_InputData/02_AssetPanelBuilder.jl" = { lines = 195, misses = 0 }
+"src/03_InputData/03_Preprocessing.jl" = { lines = 403, misses = 0 }
+"src/03_InputData/04_SyntheticAssetPanel.jl" = { lines = 160, misses = 0 }
 "src/04_PosdefMatrix.jl" = { lines = 26, misses = 0 }
 "src/05_Denoise.jl" = { lines = 80, misses = 0 }
 "src/06_Detone.jl" = { lines = 30, misses = 0 }

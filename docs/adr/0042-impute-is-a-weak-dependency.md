@@ -70,3 +70,9 @@ The dispatch check the annotation used to perform moves into a fallback method t
 - Future optional third-party integrations are expected to follow the same shape — a named seam in
   the main module with an informative fallback, not a type annotation on a keyword — since an
   annotation forces the dependency to be hard.
+
+## Amendment (2026-09-03): the seam's file moved
+
+`src/03_Preprocessing.jl` is now `src/03_InputData/03_Preprocessing.jl`. ADR 0104 moved the four
+`03_` files of `src/` into a directory of their own, and changed no line of any of them. The link
+in the Context section above is retained as it was written at the time of the decision.

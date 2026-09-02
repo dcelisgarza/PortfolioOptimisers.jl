@@ -490,11 +490,10 @@ end
     candidate_maps(rows, map_names, f) -> Vector{Int}
 
 The child maps a file's own directory already uses. **A `map` is not derivable from a path**, so the
-census prints the candidates and a person chooses by subject. Each of the nine subdirectories of
-`src/` and `ext/` uses exactly one map, and there the answer is an answer. The top level of `src/`
-holds sixteen files across five maps, and the numeric prefix does not rescue the lookup: the blocks
-are not contiguous. `10_` sits between map 2 and map 8, and `25_` returns to map 1. #428 measured
-this.
+census prints the candidates and a person chooses by subject. Every subdirectory of `src/` and
+`ext/` uses exactly one map, and there the answer is an answer. The top level of `src/` holds
+files of five maps, and the numeric prefix does not rescue the lookup: the blocks are not
+contiguous. `10_` sits between map 2 and map 8, and `25_` returns to map 1. #428 measured this.
 
 A file in a brand-new directory has no sibling row, and then every map is a candidate.
 """

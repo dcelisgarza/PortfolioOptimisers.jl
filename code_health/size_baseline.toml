@@ -25,10 +25,10 @@ commit = "5563c05815"
 "src/01_Base/12_NormError.jl" = { code = 106, doc = 313, comment = 0, blank = 129, total = 548 }
 "src/01_Base/13_KappaLog.jl" = { code = 3, doc = 36, comment = 0, blank = 18, total = 57 }
 "src/02_Tools.jl" = { code = 808, doc = 2044, comment = 46, blank = 867, total = 3765 }
-"src/03_AssetPanel.jl" = { code = 175, doc = 411, comment = 0, blank = 190, total = 776 }
-"src/03_AssetPanelBuilder.jl" = { code = 330, doc = 697, comment = 2, blank = 316, total = 1345 }
-"src/03_Preprocessing.jl" = { code = 726, doc = 1331, comment = 11, blank = 536, total = 2604 }
-"src/03_SyntheticAssetPanel.jl" = { code = 310, doc = 326, comment = 0, blank = 149, total = 785 }
+"src/03_InputData/01_AssetPanel.jl" = { code = 175, doc = 411, comment = 0, blank = 190, total = 776 }
+"src/03_InputData/02_AssetPanelBuilder.jl" = { code = 330, doc = 697, comment = 2, blank = 316, total = 1345 }
+"src/03_InputData/03_Preprocessing.jl" = { code = 726, doc = 1331, comment = 11, blank = 536, total = 2604 }
+"src/03_InputData/04_SyntheticAssetPanel.jl" = { code = 310, doc = 326, comment = 0, blank = 149, total = 785 }
 "src/04_PosdefMatrix.jl" = { code = 44, doc = 155, comment = 0, blank = 73, total = 272 }
 "src/05_Denoise.jl" = { code = 132, doc = 535, comment = 34, blank = 196, total = 897 }
 "src/06_Detone.jl" = { code = 46, doc = 188, comment = 0, blank = 81, total = 315 }

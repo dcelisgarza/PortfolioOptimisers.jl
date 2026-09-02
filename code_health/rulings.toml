@@ -198,7 +198,7 @@ carries one branch per key of `PREFERENCE_KEYS`."""
 # definitions sit over seventeen keys, because the key holds no line.
 
 [[exemption]]
-path = "src/03_Preprocessing.jl"
+path = "src/03_InputData/03_Preprocessing.jl"
 definition = "ReturnsResult"
 metric = "arg"
 rationale = "keyword-constructor-arity"
