@@ -499,6 +499,7 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :pa => "`pa`: Processed optimisation attributes.",#
                                  :retcode => "`retcode`: Optimisation return code.",#
                                  :sol => "`sol`: Optimisation solution.",#
+                                 :imsk => "`imsk`: The Investable Mask the optimisation reduced on: `true` at every asset whose prior moments were finite. It is `nothing` when every asset was investable, and that sentinel is what skips both the reduction and the expansion. [`investable_mask`](@ref) derives it once from the full-universe prior result, and the bundle carries it, because the reduced prior can no longer yield it.",#
                                  :fb => "`fb`: Fallback result or estimator.",#
                                  # Optimiser fields.
                                  :opt_jmp => "`opt`: `JuMP` optimiser configuration.",#

@@ -366,6 +366,11 @@ function _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
                    dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
     frc = reset_time_dependent_estimator(frc)
     attrs = processed_jump_optimiser_attributes(frc.opt, rd; dims = dims, kwargs...)
+    # The bundle reduced what it carries. The head carries the rest — an initial weight
+    # vector, a risk measure holding per-asset data, tracking, a custom term — and hands
+    # them to `assemble_jump_model!` itself, so it takes the same view of itself and of
+    # `rd`. Both are unchanged when every asset is investable.
+    frc, rd = investable_view(frc, rd, attrs.pr, attrs.imsk)
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, frc.opt.sc, frc.opt.so)

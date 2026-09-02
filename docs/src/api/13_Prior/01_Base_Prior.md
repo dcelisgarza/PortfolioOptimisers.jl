@@ -29,5 +29,6 @@ PrE_Pr
 port_opt_view(pr::Union{Nothing, AbstractPriorEstimator}, ::Any, args...)
 port_opt_view(pr::LowOrderPrior, rd, args...)
 port_opt_view(pr::HighOrderPrior, rd, args...)
+investable_mask
 feature_matrix_picker
 ```

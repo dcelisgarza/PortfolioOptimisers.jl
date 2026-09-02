@@ -39,7 +39,7 @@ $(DocStringExtensions.FIELDS)
         sgst::Option{<:Bt_VecOptBt}, tn::Option{<:Tn_VecTn}, fees::Option{<:Fees},
         plr::Option{<:Union{<:AbstractPhylogenyConstraintResult,
                             <:AbstractVector{<:AbstractPhylogenyConstraintResult}}},
-        ret::JRE_VecJRE, sca::Scalariser
+        ret::JRE_VecJRE, sca::Scalariser, imsk::Option{<:BitVector} = nothing
     ) -> ProcessedJuMPOptimiserAttributes
 
 Keywords correspond to the struct's fields. The field types are the *result* side of the
@@ -148,6 +148,10 @@ true
     $(field_dict[:sca_res])
     """
     sca
+    """
+    $(field_dict[:imsk])
+    """
+    imsk
     # Field types are the *result* side of each matching `JuMPOptimiser` estimator slot:
     # this bundle holds the constraint/prior results produced by
     # `processed_jump_optimiser_attributes` — never the raw estimators. `ret` is the sole
@@ -170,27 +174,14 @@ true
                                               tn::Option{<:Tn_VecTn}, fees::Option{<:Fees},
                                               plr::Option{<:Union{<:AbstractPhylogenyConstraintResult,
                                                                   <:AbstractVector{<:AbstractPhylogenyConstraintResult}}},
-                                              ret::JRE_VecJRE, sca::Scalariser)
+                                              ret::JRE_VecJRE, sca::Scalariser,
+                                              imsk::Option{<:BitVector})
         return new{typeof(pr), typeof(wb), typeof(lt), typeof(st), typeof(lcsr),
                    typeof(ctr), typeof(gcardr), typeof(sgcardr), typeof(smtx),
                    typeof(sgmtx), typeof(slt), typeof(sst), typeof(sglt), typeof(sgst),
-                   typeof(tn), typeof(fees), typeof(plr), typeof(ret), typeof(sca)}(pr, wb,
-                                                                                    lt, st,
-                                                                                    lcsr,
-                                                                                    ctr,
-                                                                                    gcardr,
-                                                                                    sgcardr,
-                                                                                    smtx,
-                                                                                    sgmtx,
-                                                                                    slt,
-                                                                                    sst,
-                                                                                    sglt,
-                                                                                    sgst,
-                                                                                    tn,
-                                                                                    fees,
-                                                                                    plr,
-                                                                                    ret,
-                                                                                    sca)
+                   typeof(tn), typeof(fees), typeof(plr), typeof(ret), typeof(sca),
+                   typeof(imsk)}(pr, wb, lt, st, lcsr, ctr, gcardr, sgcardr, smtx, sgmtx,
+                                 slt, sst, sglt, sgst, tn, fees, plr, ret, sca, imsk)
     end
 end
 function ProcessedJuMPOptimiserAttributes(; pr::AbstractPriorResult,
@@ -209,11 +200,96 @@ function ProcessedJuMPOptimiserAttributes(; pr::AbstractPriorResult,
                                           tn::Option{<:Tn_VecTn}, fees::Option{<:Fees},
                                           plr::Option{<:Union{<:AbstractPhylogenyConstraintResult,
                                                               <:AbstractVector{<:AbstractPhylogenyConstraintResult}}},
-                                          ret::JRE_VecJRE,
-                                          sca::Scalariser)::ProcessedJuMPOptimiserAttributes
+                                          ret::JRE_VecJRE, sca::Scalariser,
+                                          imsk::Option{<:BitVector} = nothing)::ProcessedJuMPOptimiserAttributes
     return ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcsr, ctr, gcardr, sgcardr,
                                             smtx, sgmtx, slt, sst, sglt, sgst, tn, fees,
-                                            plr, ret, sca)
+                                            plr, ret, sca, imsk)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Reduce an optimisation estimator and its returns data to the assets an Investable Mask keeps.
+
+[`processed_jump_optimiser_attributes`](@ref) reduces what the bundle carries — the prior result and every constraint result. It cannot reduce what the *head* carries: an initial weight vector, a risk measure holding per-asset data, a tracking estimator, a custom constraint. Those travel from the head into [`assemble_jump_model!`](@ref) unmediated by the bundle, so each head takes this view of itself and of `rd` before it assembles a model.
+
+The `nothing` method is the whole all-investable path: it returns both arguments unchanged, so a universe with nothing to exclude allocates nothing and takes the route it took before the mask existed.
+
+The returns matrix the view slices tracking against is `rd.X`, and `pr.X` when the caller stated a fitted prior instead of data. [`port_opt_view`](@ref) reads the prior's own matrix in that case and ignores what it is given, so either is correct and only one of them always exists.
+
+The mask is handed to [`port_opt_view`](@ref) as the index vector `findall(imsk)` rather than as the mask itself. Every other caller of that verb passes an integer index, and a view specialised on one index type is a view whose inference is already exercised.
+
+# Arguments
+
+  - `optimiser::JuMPOptimisationEstimator`: The optimiser head to view.
+  - $(arg_dict[:rd])
+  - $(arg_dict[:pr])
+  - $(arg_dict[:imsk])
+
+# Returns
+
+  - `(optimiser, rd)`: Both restricted to the investable assets, or both unchanged.
+
+# Related
+
+  - [`investable_mask`](@ref)
+  - [`processed_jump_optimiser_attributes`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+function investable_view(optimiser::JuMPOptimisationEstimator, rd::ReturnsResult,
+                         ::AbstractPriorResult, ::Nothing)
+    return optimiser, rd
+end
+function investable_view(optimiser::JuMPOptimisationEstimator, rd::ReturnsResult,
+                         pr::AbstractPriorResult, imsk::BitVector)
+    X = isnothing(rd.X) ? pr.X : rd.X
+    idx = findall(imsk)
+    return port_opt_view(optimiser, idx, X), port_opt_view(rd, idx)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Expand a solved weight vector from the investable subset back onto the full asset universe.
+
+The optimiser solves over the assets the Investable Mask keeps, so its weight vector is shorter than the universe the caller stated. This puts each solved weight back at its own asset and writes a zero everywhere else, which is what a non-investable asset holds: the optimiser could not trade it.
+
+A failed solve carries `NaN` at every solved position. The expansion keeps that distinction — `NaN` where the optimiser tried and failed, zero where it never could — rather than flattening both to zero.
+
+The `nothing` method returns the solution unchanged, so nothing is copied when every asset is investable. The vector method serves the efficient-frontier route, where one solution is recorded per sweep point.
+
+[`JuMPOptimisationResult`](@ref)'s **keyword** constructor is the caller, and every JuMP family builds its result through it. The inner constructor is left alone on purpose: it states the field types of `new`, and reassigning `sol` there widens what inference knows about the result's parameters.
+
+# Arguments
+
+  - $(arg_dict[:imsk])
+  - $(arg_dict[:sol])
+
+# Validation
+
+  - The solved weight vector must hold one weight per investable asset.
+
+# Returns
+
+  - `sol`: The solution, or vector of them, on the full asset universe.
+
+# Related
+
+  - [`investable_mask`](@ref)
+  - [`JuMPOptimisationSolution`](@ref)
+  - [`JuMPOptimisationResult`](@ref)
+"""
+function expand_investable_weights(::Nothing, sol::JuMPOptSol_VecJuMPOptSol)
+    return sol
+end
+function expand_investable_weights(imsk::BitVector, sol::JuMPOptimisationSolution)
+    @argcheck(count(imsk) == length(sol.w),
+              DimensionMismatch("the investable mask keeps $(count(imsk)) of $(length(imsk)) assets, but the solution holds $(length(sol.w)) weights; the mask and the solution must come from the same optimisation"))
+    w = zeros(eltype(sol.w), length(imsk))
+    w[imsk] = sol.w
+    return JuMPOptimisationSolution(; w = w)
+end
+function expand_investable_weights(imsk::BitVector, sol::VecJuMPOptSol)
+    return [expand_investable_weights(imsk, s) for s in sol]
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -274,7 +350,16 @@ function JuMPOptimisationResult(; pa::ProcessedJuMPOptimiserAttributes,
                                 retcode::OptRetCode_VecOptRetCode,
                                 sol::JuMPOptSol_VecJuMPOptSol,
                                 model::Option{<:JuMP.Model})::JuMPOptimisationResult
-    return JuMPOptimisationResult(pa, retcode, sol, model)
+    # The one door every JuMP family's result comes through, and so the one place the weight
+    # expansion belongs: `MeanRisk`, `RiskBudgeting`, `RelaxedRiskBudgeting`,
+    # `FactorRiskContribution` and `NearOptimalCentering` all build their result here. `sol`
+    # arrives holding the reduced vector the solver returned, and the result carries that
+    # vector on the caller's own universe; the reduced problem survives in `model` when the
+    # head was asked to save it. It sits here rather than in the inner constructor because
+    # the inner one states the field types of `new`, and a reassignment there widens what
+    # inference knows about `sol` and `model` both.
+    return JuMPOptimisationResult(pa, retcode, expand_investable_weights(pa.imsk, sol),
+                                  model)
 end
 # Virtual property `:w` extracts portfolio weights from `sol` (a single solution or a vector
 # of them, hence the broadcast); unknown properties forward to `pa` (see [`@forward_properties`](@ref)).
@@ -1147,6 +1232,56 @@ function assert_universe_axis_order(sets::Option{<:UniverseSets}, rd::ReturnsRes
     return nothing
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Derive the Investable Mask of a fitted prior, and reduce the prior, the optimiser and the returns data to the assets it keeps.
+
+A Prior Estimator fits on the coverage universe and hands back a result on the full asset universe, in which an asset it could not estimate carries `NaN` in `mu` and on the diagonal of `sigma`. Nothing downstream of the fit can solve over such an asset, so the reduction happens once, at the optimiser's entry, and every constraint the caller stated over the full universe is sliced by the same index.
+
+Three methods, and the branch is dispatch rather than a condition. The first derives the mask; the `nothing` method is the all-investable path and returns its arguments untouched; the `BitVector` method takes the three views. A universe with nothing to exclude therefore costs one pass over two vectors and no allocation.
+
+The optimiser is viewed at `pr.X`, the *unreduced* returns matrix, because [`port_opt_view`](@ref) slices a tracking estimator against it by the same asset index. The prior is reduced after, so the matrix the view reads is still the full one.
+
+The mask rides as a `BitVector` because the expansion needs the length of the full universe and nothing else carries it once the prior is reduced. The three views take `findall(imsk)` instead, which is the integer index every other caller of [`port_opt_view`](@ref) passes.
+
+# Algorithm
+
+ 1. Derive the Investable Mask from the fitted prior with [`investable_mask`](@ref).
+ 2. Return the mask, the prior, the optimiser and the returns data unchanged when the mask is `nothing`.
+ 3. Otherwise return the mask beside a [`port_opt_view`](@ref) of each of the three at `findall(imsk)`.
+
+# Arguments
+
+  - $(arg_dict[:pr])
+  - `opt::JuMPOptimiser`: JuMP optimiser configuration, holding every constraint estimator the caller stated over the full universe.
+  - $(arg_dict[:rd])
+
+# Returns
+
+  - `(imsk, pr, opt, rd)`: The Investable Mask and the three reduced to it, or `nothing` and the three unchanged.
+
+# Related
+
+  - [`investable_mask`](@ref)
+  - [`investable_view`](@ref)
+  - [`processed_jump_optimiser_attributes`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+function investable_reduction(pr::AbstractPriorResult, opt::JuMPOptimiser,
+                              rd::ReturnsResult)
+    return investable_reduction(investable_mask(pr), pr, opt, rd)
+end
+function investable_reduction(::Nothing, pr::AbstractPriorResult, opt::JuMPOptimiser,
+                              rd::ReturnsResult)
+    return nothing, pr, opt, rd
+end
+function investable_reduction(imsk::BitVector, pr::AbstractPriorResult, opt::JuMPOptimiser,
+                              rd::ReturnsResult)
+    idx = findall(imsk)
+    return imsk, port_opt_view(pr, idx), port_opt_view(opt, idx, pr.X),
+           port_opt_view(rd, idx)
+end
+"""
     processed_jump_optimiser_attributes(
         opt::JuMPOptimiser,
         rd::ReturnsResult;
@@ -1184,6 +1319,12 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
     rd = returns_result_picker(rd, opt.brt)
     assert_universe_axis_order(opt.sets, rd)
     pr = prior(opt.pe, rd; dims = dims)
+    # The prior fits on the coverage universe and returns a result on the full asset
+    # universe, where an asset it could not estimate carries `NaN`. Reduce once, here:
+    # every builder below then states its constraint over the investable assets alone, on
+    # inputs `port_opt_view` has sliced by the same index. The weights are expanded back
+    # in `JuMPOptimisationResult`.
+    imsk, pr, opt, rd = investable_reduction(pr, opt, rd)
     X = pr.X
     datatype = eltype(X)
     wb = weight_bounds_constraints(opt.wb, opt.sets; N = size(X, 2), strict = opt.strict,
@@ -1231,7 +1372,7 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
                                             sgcardr = sgcardr, smtx = smtx, sgmtx = sgmtx,
                                             slt = slt, sst = sst, sglt = sglt, sgst = sgst,
                                             tn = tn, fees = fees, plr = plr, ret = ret,
-                                            sca = opt.sca)
+                                            sca = opt.sca, imsk = imsk)
 end
 """
     no_bounds_optimiser(opt::JuMPOptimiser, args...) -> JuMPOptimiser
@@ -1320,7 +1461,11 @@ function jump_optimiser_from_attributes(opt::JuMPOptimiser,
     rename = (; pr = :pe, lcsr = :lcse, ctr = :cte, gcardr = :gcarde, sgcardr = :sgcarde,
               plr = :ple)
     of = fieldnames(JuMPOptimiser)
-    af = fieldnames(ProcessedJuMPOptimiserAttributes)
+    # `imsk` is the one bundle field that is not a constraint result: it is the Investable
+    # Mask the reduction derived, and `JuMPOptimiser` declares no slot for it. A sub-problem
+    # built from this optimiser reads an already-reduced prior, so it derives no mask of its
+    # own and needs none carried in.
+    af = filter(!=(:imsk), fieldnames(ProcessedJuMPOptimiserAttributes))
     base = NamedTuple{of}(getfield.(opt, of))
     overrides = NamedTuple{map(f -> get(rename, f, f), af)}(getfield.(attrs, af))
     return JuMPOptimiser(; merge(base, overrides)...)

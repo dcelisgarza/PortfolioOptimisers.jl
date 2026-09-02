@@ -1492,6 +1492,58 @@ function port_opt_view(pr::LowOrderPrior, i, args...)::LowOrderPrior
                          fpr = pr.fpr, Z = feature_matrix_view(pr.Z, false, :, i))
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Derive the Investable Mask of a prior result: `true` at every asset whose moments are finite.
+
+A Prior Estimator fits on the coverage universe and returns a result on the **full** asset universe, where an asset it could not estimate carries `NaN` in `mu` and on the diagonal of `sigma`. The mask is *derived here and stored nowhere*: no prior result carries a mask field, so a caller that needs one calls this, and a caller that reduces a result keeps the mask it was given. A reduced result can no longer yield it, because its `mu` is finite everywhere.
+
+The all-investable case returns `nothing` rather than a mask of every `true`. That sentinel is what keeps a universe with nothing to exclude on the path it took before the mask existed: no reduction, no expansion, no allocation.
+
+An off-diagonal `NaN` in `sigma` is not read. A non-investable asset may carry `NaN` across its whole row and column, and the diagonal alone decides, so the mask costs one pass over two vectors.
+
+# Algorithm
+
+ 1. Take the elementwise conjunction of `isfinite.(pr.mu)` and `isfinite.(diag(pr.sigma))`.
+ 2. Throw an `IsEmptyError` when the conjunction holds no `true`. An optimisation over no asset has no answer to give, and a zero-asset problem passed downstream fails further from its cause.
+ 3. Return `nothing` when the conjunction holds no `false`.
+ 4. Return the conjunction otherwise.
+
+# Arguments
+
+  - $(arg_dict[:pr])
+
+# Validation
+
+  - At least one asset must be investable.
+
+# Returns
+
+  - `imsk::Option{BitVector}`: `true` at every investable asset, or `nothing` when every asset is investable.
+
+# Examples
+
+```jldoctest
+julia> pr = prior(EmpiricalPrior(),
+                  ReturnsResult(; nx = [\"a\", \"b\"], X = [0.1 -0.2; -0.1 0.2; 0.05 0.1]));
+
+julia> isnothing(PortfolioOptimisers.investable_mask(pr))
+true
+```
+
+# Related
+
+  - [`LowOrderPrior`](@ref)
+  - [`port_opt_view`](@ref)
+  - [`IsEmptyError`](@ref)
+"""
+function investable_mask(pr::AbstractPriorResult)::Option{BitVector}
+    imsk = isfinite.(pr.mu) .& isfinite.(LinearAlgebra.diag(pr.sigma))
+    @argcheck(any(imsk),
+              IsEmptyError("no asset of the prior result is investable: every asset carries a NaN in `mu` or on the diagonal of `sigma`. Check that the prior estimator received enough observations, and that the universe holds at least one active asset."))
+    return all(imsk) ? nothing : imsk
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Carries the coskewness and cokurtosis a high order prior estimator produced, over the low order prior it wraps.

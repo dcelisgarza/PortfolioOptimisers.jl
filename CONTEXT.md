@@ -246,6 +246,10 @@ The hop from the factor axis to the asset axis: fit the loadings, rebuild the re
 **Original Returns Matrix**
 The returns matrix the caller supplied, as distinct from the one a Prior Result asserts. The two differ only where a factor prior overwrites the returns with its reconstruction.
 
+**Investable Mask**
+The assets an optimisation can trade, derived from a Prior Result and stored nowhere: `true` where `mu` and the diagonal of `sigma` are both finite. A Prior Estimator fits on the coverage universe and returns a result on the *full* asset universe, in which an asset it could not estimate carries `NaN`. The optimiser derives the mask once at its entry, reduces the prior and every constraint the caller stated to it, and expands the solved weights back into a zero vector of the full length. It is `nothing` when every asset is investable, and that sentinel is what skips both halves.
+*Avoid*: confusing it with an **Asset Panel**'s active mask, which is stored and is a point-in-time fact. The active mask says an asset is listed and tradable; the Investable Mask says the estimator produced a finite moment for it. The two differ where an asset is active and not yet warmed up, and where its regression fails.
+
 ### 3.7 Distance
 
 **Distance Matrix**

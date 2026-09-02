@@ -142,7 +142,7 @@
 "src/12_ConstraintGeneration/06_AssetSetsMatrix.jl" = { map = 5, units = 33, algorithm = 12, swept = true }
 "src/12_ConstraintGeneration/07_ThresholdConstraintGeneration.jl" = { map = 5, units = 10, algorithm = 3, swept = true }
 "src/12_ConstraintGeneration/08_ExposureConstraintGeneration.jl" = { map = 5, units = 14, algorithm = 4, swept = true }
-"src/13_Prior/01_Base_Prior.jl" = { map = 6, units = 39, algorithm = 19, swept = true }
+"src/13_Prior/01_Base_Prior.jl" = { map = 6, units = 40, algorithm = 19, swept = true }
 "src/13_Prior/02_EmpiricalPrior.jl" = { map = 6, units = 3, algorithm = 1, swept = true }
 "src/13_Prior/03_FactorPrior.jl" = { map = 6, units = 6, algorithm = 3, swept = true }
 "src/13_Prior/04_HighOrderPrior.jl" = { map = 6, units = 9, algorithm = 8, swept = true }
@@ -228,7 +228,7 @@
 "src/20_Optimisation/09_JuMPConstraints/11_TrackingErrorConstraints.jl" = { map = 11, units = 2, swept = false }
 "src/20_Optimisation/09_JuMPConstraints/12_RegularisationConstraints.jl" = { map = 11, units = 19, swept = false }
 "src/20_Optimisation/09_JuMPConstraints/13_WeightNormConstraints.jl" = { map = 11, units = 3, swept = false }
-"src/20_Optimisation/10_JuMPOptimiser.jl" = { map = 10, units = 18, swept = false }
+"src/20_Optimisation/10_JuMPOptimiser.jl" = { map = 10, units = 21, swept = false }
 "src/20_Optimisation/11_MeanRisk.jl" = { map = 10, units = 14, swept = false }
 "src/20_Optimisation/12_FactorRiskContribution.jl" = { map = 10, units = 7, swept = false }
 "src/20_Optimisation/13_NearOptimalCentering.jl" = { map = 10, units = 25, swept = false }
