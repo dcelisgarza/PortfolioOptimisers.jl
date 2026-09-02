@@ -114,7 +114,8 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :realg => "`alg`: Regression algorithm.",#
                                  :retgt => "`tgt`: Regression model target.",#
                                  :dretgt => "`retgt`: Regression model target.",#
-                                 :drtgt => "`drtgt`: Dimension reduction target.",
+                                 :drtgt => "`drtgt`: Dimension reduction target.",#
+                                 :csrint => "`intercept`: Whether a per-observation intercept is fitted. When `false`, the regression runs through the origin of the cross-section.",
                                  ## Gerber
                                  :gerbalg => "`alg`: Gerber covariance algorithm.",#
                                  :gerbce => "`ce`: Gerber covariance estimator.",#

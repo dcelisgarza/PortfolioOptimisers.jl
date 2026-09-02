@@ -272,7 +272,7 @@ DimensionReductionRegression
 
 # Related
 
-  - [`AbstractRegressionEstimator`](@ref)
+  - [`AbstractTimeSeriesRegressionEstimator`](@ref)
   - [`AbstractVarianceEstimator`](@ref)
   - [`DimensionReductionTarget`](@ref)
   - [`AbstractRegressionTarget`](@ref)
@@ -286,7 +286,8 @@ DimensionReductionRegression
   - $(ref_dict[:cajas2025]) Section 4.3.1, Equations 4.12-4.20.
   - $(ref_dict[:fekedulegn2002])
 """
-@propagatable @concrete struct DimensionReductionRegression <: AbstractRegressionEstimator
+@propagatable @concrete struct DimensionReductionRegression <:
+                               AbstractTimeSeriesRegressionEstimator
     """
     $(field_dict[:ve])
     """

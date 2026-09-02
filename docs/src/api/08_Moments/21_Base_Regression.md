@@ -17,9 +17,13 @@ MaxValStepwiseRegressionCriterion
 MinMaxValStepwiseRegressionCriterion
 Regression
 regression(re::Regression, args...)
-regression(re::AbstractRegressionEstimator, rd::ReturnsResult)
+regression(re::AbstractTimeSeriesRegressionEstimator, rd::ReturnsResult)
 AbstractRegressionEstimator
+AbstractTimeSeriesRegressionEstimator
+AbstractCrossSectionalRegressionEstimator
 AbstractRegressionResult
+AbstractTimeSeriesRegressionResult
+AbstractCrossSectionalRegressionResult
 RegE_Reg
 AbstractRegressionAlgorithm
 AbstractStepwiseRegressionAlgorithm

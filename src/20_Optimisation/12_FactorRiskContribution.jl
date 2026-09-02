@@ -12,7 +12,7 @@ Property access delegates to the embedded [`JuMPOptimisationResult`](@ref); unkn
 # Constructors
 
     FactorRiskContributionResult(;
-        jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM, rr::AbstractRegressionResult,
+        jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM, rr::AbstractTimeSeriesRegressionResult,
         frc_plr::Option{<:AbstractPhylogenyConstraintResult}, fb::Option{<:OptE_Opt}
     ) -> FactorRiskContributionResult
 
@@ -46,7 +46,7 @@ Keywords correspond to the struct's fields.
     """
     fb
     function FactorRiskContributionResult(jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM,
-                                          rr::AbstractRegressionResult,
+                                          rr::AbstractTimeSeriesRegressionResult,
                                           frc_plr::Option{<:AbstractPhylogenyConstraintResult},
                                           fb::Option{<:OptE_Opt})
         return new{typeof(jr), typeof(r), typeof(rr), typeof(frc_plr), typeof(fb)}(jr, r,
@@ -56,7 +56,7 @@ Keywords correspond to the struct's fields.
     end
 end
 function FactorRiskContributionResult(; jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM,
-                                      rr::AbstractRegressionResult,
+                                      rr::AbstractTimeSeriesRegressionResult,
                                       frc_plr::Option{<:AbstractPhylogenyConstraintResult},
                                       fb::Option{<:OptE_Opt})::FactorRiskContributionResult
     return FactorRiskContributionResult(jr, r, rr, frc_plr, fb)

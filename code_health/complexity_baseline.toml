@@ -5,7 +5,7 @@
 julia = "1.12.7"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "d8bb0b4c88"
+commit = "dd069231d0"
 
 [file]
 "ext/PortfolioOptimisersImputeExt.jl" = { cyc = 1, cog = 0, arg = 2, cyc_sum = 1, cog_sum = 0, arg_sum = 2, macros = [] }
@@ -68,6 +68,7 @@ commit = "d8bb0b4c88"
 "src/08_Moments/35_GerberIQCovariance.jl" = { cyc = 73, cog = 73, arg = 25, cyc_sum = 171, cog_sum = 140, arg_sum = 214, macros = ["@propagatable"] }
 "src/08_Moments/36_RegimeAdjustedExpWeightedVariance.jl" = { cyc = 13, cog = 19, arg = 9, cyc_sum = 47, cog_sum = 47, arg_sum = 56, macros = [] }
 "src/08_Moments/37_RegimeAdjustedExpWeightedCovariance.jl" = { cyc = 2, cog = 1, arg = 6, cyc_sum = 8, cog_sum = 4, arg_sum = 9, macros = [] }
+"src/08_Moments/38_CrossSectionalRegression.jl" = { cyc = 6, cog = 10, arg = 5, cyc_sum = 40, cog_sum = 33, arg_sum = 36, macros = [] }
 "src/09_Distance/01_Base_Distance.jl" = { cyc = 2, cog = 1, arg = 2, cyc_sum = 3, cog_sum = 2, arg_sum = 2, macros = [] }
 "src/09_Distance/02_Distance.jl" = { cyc = 2, cog = 2, arg = 5, cyc_sum = 33, cog_sum = 18, arg_sum = 112, macros = [] }
 "src/09_Distance/03_DistanceDistance.jl" = { cyc = 2, cog = 1, arg = 5, cyc_sum = 6, cog_sum = 5, arg_sum = 19, macros = [] }

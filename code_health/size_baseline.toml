@@ -6,12 +6,12 @@
 [provenance]
 julia = "1.12.7"
 julia_syntax = "1.0.2"
-commit = "eda6836b65"
+commit = "dd069231d0"
 
 [file]
 "ext/PortfolioOptimisersImputeExt.jl" = { code = 6, doc = 0, comment = 3, blank = 3, total = 12 }
 "ext/PortfolioOptimisersPlotsExt.jl" = { code = 1963, doc = 0, comment = 129, blank = 41, total = 2133 }
-"src/01_Base/01_DocstringDictionaries.jl" = { code = 1057, doc = 113, comment = 120, blank = 43, total = 1333 }
+"src/01_Base/01_DocstringDictionaries.jl" = { code = 1058, doc = 113, comment = 120, blank = 43, total = 1334 }
 "src/01_Base/02_TypeRoots.jl" = { code = 13, doc = 157, comment = 0, blank = 61, total = 231 }
 "src/01_Base/03_PrettyShow.jl" = { code = 107, doc = 102, comment = 0, blank = 58, total = 267 }
 "src/01_Base/04_ScopedConfig.jl" = { code = 133, doc = 401, comment = 2, blank = 180, total = 716 }
@@ -52,9 +52,9 @@ commit = "eda6836b65"
 "src/08_Moments/18_ExcessExpectedReturns.jl" = { code = 19, doc = 75, comment = 0, blank = 38, total = 132 }
 "src/08_Moments/19_Coskewness.jl" = { code = 75, doc = 297, comment = 0, blank = 125, total = 497 }
 "src/08_Moments/20_Cokurtosis.jl" = { code = 55, doc = 241, comment = 0, blank = 105, total = 401 }
-"src/08_Moments/21_Base_Regression.jl" = { code = 149, doc = 621, comment = 7, blank = 278, total = 1055 }
+"src/08_Moments/21_Base_Regression.jl" = { code = 154, doc = 703, comment = 7, blank = 307, total = 1171 }
 "src/08_Moments/22_StepwiseRegression.jl" = { code = 227, doc = 311, comment = 0, blank = 128, total = 666 }
-"src/08_Moments/23_DimensionReductionRegression.jl" = { code = 97, doc = 287, comment = 0, blank = 124, total = 508 }
+"src/08_Moments/23_DimensionReductionRegression.jl" = { code = 98, doc = 287, comment = 0, blank = 124, total = 509 }
 "src/08_Moments/24_ImpliedVolatility.jl" = { code = 113, doc = 492, comment = 14, blank = 193, total = 812 }
 "src/08_Moments/25_CorrelationCovariance.jl" = { code = 17, doc = 78, comment = 0, blank = 40, total = 135 }
 "src/08_Moments/26_AbstractCovarianceVariance.jl" = { code = 10, doc = 72, comment = 0, blank = 34, total = 116 }
@@ -69,6 +69,7 @@ commit = "eda6836b65"
 "src/08_Moments/35_GerberIQCovariance.jl" = { code = 530, doc = 1431, comment = 0, blank = 545, total = 2506 }
 "src/08_Moments/36_RegimeAdjustedExpWeightedVariance.jl" = { code = 255, doc = 450, comment = 0, blank = 179, total = 884 }
 "src/08_Moments/37_RegimeAdjustedExpWeightedCovariance.jl" = { code = 60, doc = 179, comment = 0, blank = 74, total = 313 }
+"src/08_Moments/38_CrossSectionalRegression.jl" = { code = 198, doc = 504, comment = 0, blank = 210, total = 912 }
 "src/09_Distance/01_Base_Distance.jl" = { code = 24, doc = 222, comment = 0, blank = 89, total = 335 }
 "src/09_Distance/02_Distance.jl" = { code = 158, doc = 350, comment = 0, blank = 157, total = 665 }
 "src/09_Distance/03_DistanceDistance.jl" = { code = 37, doc = 132, comment = 0, blank = 58, total = 227 }
@@ -106,16 +107,16 @@ commit = "eda6836b65"
 "src/12_ConstraintGeneration/05_WeightBoundsConstraintGeneration.jl" = { code = 124, doc = 385, comment = 0, blank = 163, total = 672 }
 "src/12_ConstraintGeneration/06_AssetSetsMatrix.jl" = { code = 294, doc = 766, comment = 10, blank = 364, total = 1434 }
 "src/12_ConstraintGeneration/07_ThresholdConstraintGeneration.jl" = { code = 50, doc = 274, comment = 0, blank = 126, total = 450 }
-"src/12_ConstraintGeneration/08_ExposureConstraintGeneration.jl" = { code = 105, doc = 335, comment = 0, blank = 169, total = 609 }
+"src/12_ConstraintGeneration/08_ExposureConstraintGeneration.jl" = { code = 106, doc = 335, comment = 0, blank = 169, total = 610 }
 "src/13_Prior/01_Base_Prior.jl" = { code = 364, doc = 1050, comment = 48, blank = 414, total = 1876 }
 "src/13_Prior/02_EmpiricalPrior.jl" = { code = 42, doc = 156, comment = 2, blank = 60, total = 260 }
-"src/13_Prior/03_FactorPrior.jl" = { code = 70, doc = 262, comment = 18, blank = 89, total = 439 }
+"src/13_Prior/03_FactorPrior.jl" = { code = 71, doc = 262, comment = 18, blank = 89, total = 440 }
 "src/13_Prior/04_HighOrderPrior.jl" = { code = 214, doc = 419, comment = 5, blank = 187, total = 825 }
 "src/13_Prior/05_BlackLittermanViewsGeneration.jl" = { code = 111, doc = 189, comment = 9, blank = 77, total = 386 }
 "src/13_Prior/06_BlackLittermanPrior.jl" = { code = 113, doc = 432, comment = 29, blank = 159, total = 733 }
 "src/13_Prior/07_BayesianBlackLittermanPrior.jl" = { code = 72, doc = 267, comment = 27, blank = 56, total = 422 }
 "src/13_Prior/08_FactorBlackLittermanPrior.jl" = { code = 82, doc = 250, comment = 37, blank = 54, total = 423 }
-"src/13_Prior/09_AugmentedBlackLittermanPrior.jl" = { code = 124, doc = 304, comment = 66, blank = 69, total = 563 }
+"src/13_Prior/09_AugmentedBlackLittermanPrior.jl" = { code = 125, doc = 304, comment = 66, blank = 69, total = 564 }
 "src/13_Prior/10_Base_EntropyPoolingPrior.jl" = { code = 901, doc = 2141, comment = 60, blank = 817, total = 3919 }
 "src/13_Prior/11_MeucciEntropyPoolingPrior.jl" = { code = 313, doc = 473, comment = 52, blank = 148, total = 986 }
 "src/13_Prior/12_EntropyPoolingPrior.jl" = { code = 910, doc = 1467, comment = 60, blank = 556, total = 2993 }
@@ -238,4 +239,4 @@ commit = "eda6836b65"
 "src/23_Pipeline/05_SearchCrossValidation.jl" = { code = 206, doc = 121, comment = 18, blank = 60, total = 405 }
 "src/24_Plotting.jl" = { code = 57, doc = 961, comment = 102, blank = 275, total = 1395 }
 "src/25_Aliases.jl" = { code = 267, doc = 591, comment = 25, blank = 161, total = 1044 }
-"src/PortfolioOptimisers.jl" = { code = 265, doc = 3, comment = 29, blank = 5, total = 302 }
+"src/PortfolioOptimisers.jl" = { code = 266, doc = 3, comment = 29, blank = 5, total = 303 }

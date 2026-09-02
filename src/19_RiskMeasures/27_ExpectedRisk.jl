@@ -298,7 +298,7 @@ The precedence is fixed, and it is not a source selector:
 
 # Returns
 
-  - `rr::AbstractRegressionResult`: The factor loadings.
+  - `rr::AbstractTimeSeriesRegressionResult`: The factor loadings.
 
 # Related
 
@@ -308,7 +308,7 @@ The precedence is fixed, and it is not a source selector:
 """
 function resolve_factor_regression(re::RegE_Reg, rd::ReturnsResult,
                                    pr::Option{<:AbstractPriorResult} = nothing)
-    if isa(re, AbstractRegressionResult)
+    if isa(re, AbstractTimeSeriesRegressionResult)
         return re
     end
     if !isnothing(pr) && !isnothing(pr.rr)

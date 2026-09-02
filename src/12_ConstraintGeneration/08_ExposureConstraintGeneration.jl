@@ -312,9 +312,9 @@ function port_opt_view(ece::ExposureConstraintEstimator, i,
                                        space = port_opt_view(ece.space, i, args...))
 end
 """
-    factor_space_regression(re::Option{<:RegE_Reg}, rr::Option{<:AbstractRegressionResult},
+    factor_space_regression(re::Option{<:RegE_Reg}, rr::Option{<:AbstractTimeSeriesRegressionResult},
                             rd::Option{<:ReturnsResult})
-        -> Option{<:AbstractRegressionResult}
+        -> Option{<:AbstractTimeSeriesRegressionResult}
 
 Apply [`resolve_factor_regression`](@ref)'s precedence to the three carriers a [`FactorSpace`](@ref) can read its loadings from, and return `nothing` when none of them holds any.
 
@@ -334,7 +334,7 @@ Step 4 is a capability the field adds rather than a fallback: `FactorSpace(; re 
 # Arguments
 
   - `re::Option{<:RegE_Reg}`: The space's stated basis source, or `nothing` to read `rr`.
-  - `rr::Option{<:AbstractRegressionResult}`: The prior's loadings, or `nothing`.
+  - `rr::Option{<:AbstractTimeSeriesRegressionResult}`: The prior's loadings, or `nothing`.
   - `rd::Option{<:ReturnsResult}`: Returns to refit from, or `nothing` on the standalone route.
 
 # Validation
@@ -343,7 +343,7 @@ Step 4 is a capability the field adds rather than a fallback: `FactorSpace(; re 
 
 # Returns
 
-  - `rr::Option{<:AbstractRegressionResult}`: The loadings the highest-ranked carrier holds, or `nothing` when none of the three holds any.
+  - `rr::Option{<:AbstractTimeSeriesRegressionResult}`: The loadings the highest-ranked carrier holds, or `nothing` when none of the three holds any.
 
 # Related
 
@@ -352,9 +352,9 @@ Step 4 is a capability the field adds rather than a fallback: `FactorSpace(; re 
   - [`resolve_factor_regression`](@ref)
 """
 function factor_space_regression(re::Option{<:RegE_Reg},
-                                 rr::Option{<:AbstractRegressionResult},
+                                 rr::Option{<:AbstractTimeSeriesRegressionResult},
                                  rd::Option{<:ReturnsResult})
-    if isa(re, AbstractRegressionResult)
+    if isa(re, AbstractTimeSeriesRegressionResult)
         return re
     end
     if !isnothing(rr)
@@ -401,7 +401,7 @@ The names are looked up on the factor axis, but the *basis* comes from the prior
 
 # Returns
 
-  - `basis::AbstractRegressionResult`: The loadings the rows project through.
+  - `basis::AbstractTimeSeriesRegressionResult`: The loadings the rows project through.
   - `key::AbstractString`: The key the row's names resolve against, `sets.fkey` for a [`FactorSpace`](@ref).
 
 # Related
@@ -412,7 +412,7 @@ The names are looked up on the factor axis, but the *basis* comes from the prior
   - [`factor_universe`](@ref)
 """
 function constraint_space_basis(space::FactorSpace, sets::UniverseSets,
-                                rr::Option{<:AbstractRegressionResult},
+                                rr::Option{<:AbstractTimeSeriesRegressionResult},
                                 rd::Option{<:ReturnsResult} = nothing)
     rr = factor_space_regression(space.re, rr, rd)
     @argcheck(!isnothing(rr),
@@ -508,28 +508,29 @@ The two single-shape methods reach the same row by two routes. The estimator rou
   - [`constraint_row_term`](@ref): the per-term half of the projection, which the estimator route reaches through [`linear_constraints`](@ref).
 """
 function rebase_linear_constraints(lce::LinearConstraintEstimator, sets::UniverseSets,
-                                   basis::AbstractRegressionResult, key::AbstractString;
-                                   datatype::DataType = Float64, strict::Bool = false,
+                                   basis::AbstractTimeSeriesRegressionResult,
+                                   key::AbstractString; datatype::DataType = Float64,
+                                   strict::Bool = false,
                                    bl_flag::Bool = false)::Option{<:LinearConstraint}
     return linear_constraints(lce.val, sets, ifelse(isnothing(lce.key), key, lce.key);
                               datatype = datatype, strict = strict, bl_flag = bl_flag,
                               rr = basis)
 end
 function rebase_linear_constraints(lce::LinearConstraint, ::UniverseSets,
-                                   basis::AbstractRegressionResult, ::AbstractString;
-                                   kwargs...)::LinearConstraint
+                                   basis::AbstractTimeSeriesRegressionResult,
+                                   ::AbstractString; kwargs...)::LinearConstraint
     return project_linear_constraint(lce, basis.M)
 end
 function rebase_linear_constraints(lce::VecLcE_Lc, sets::UniverseSets,
-                                   basis::AbstractRegressionResult, key::AbstractString;
-                                   kwargs...)
+                                   basis::AbstractTimeSeriesRegressionResult,
+                                   key::AbstractString; kwargs...)
     return [rebase_linear_constraints(lc, sets, basis, key; kwargs...) for lc in lce]
 end
 """
     linear_constraints(lcs::ExposureConstraintEstimator, sets::UniverseSets;
                        datatype::DataType = Float64, strict::Bool = false,
                        bl_flag::Bool = false,
-                       rr::Option{<:AbstractRegressionResult} = nothing,
+                       rr::Option{<:AbstractTimeSeriesRegressionResult} = nothing,
                        rd::Option{<:ReturnsResult} = nothing)
 
 Generate the asset-space constraint a re-based one is equivalent to.
@@ -562,7 +563,7 @@ Validates the space's basis once via [`constraint_space_basis`](@ref), then re-b
 function linear_constraints(lcs::ExposureConstraintEstimator, sets::UniverseSets;
                             datatype::DataType = Float64, strict::Bool = false,
                             bl_flag::Bool = false,
-                            rr::Option{<:AbstractRegressionResult} = nothing,
+                            rr::Option{<:AbstractTimeSeriesRegressionResult} = nothing,
                             rd::Option{<:ReturnsResult} = nothing)
     basis, key = constraint_space_basis(lcs.space, sets, rr, rd)
     return rebase_linear_constraints(lcs.lce, sets, basis, key; datatype = datatype,
@@ -571,7 +572,7 @@ end
 """
     linear_constraints(lcs::VecEcE_LcE_Lc, sets::UniverseSets; datatype::DataType = Float64,
                        strict::Bool = false, bl_flag::Bool = false,
-                       rr::Option{<:AbstractRegressionResult} = nothing,
+                       rr::Option{<:AbstractTimeSeriesRegressionResult} = nothing,
                        rd::Option{<:ReturnsResult} = nothing)
 
 Broadcast over a vector that may mix re-based and asset-space constraints, forwarding the loadings and the returns to each. The narrower `VecLcE` method still wins for a vector that holds only [`LinearConstraintEstimator`](@ref)s.
@@ -600,7 +601,7 @@ Each element resolves its own basis, so a vector may mix a space that reads the 
 function linear_constraints(lcs::VecEcE_LcE_Lc, sets::UniverseSets;
                             datatype::DataType = Float64, strict::Bool = false,
                             bl_flag::Bool = false,
-                            rr::Option{<:AbstractRegressionResult} = nothing,
+                            rr::Option{<:AbstractTimeSeriesRegressionResult} = nothing,
                             rd::Option{<:ReturnsResult} = nothing)
     return [linear_constraints(lc, sets; datatype = datatype, strict = strict,
                                bl_flag = bl_flag, rr = rr, rd = rd) for lc in lcs]

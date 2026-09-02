@@ -8,7 +8,7 @@ jet = "0.12.1"
 filter = "AnyFrameModule"
 attribution = "deepest_repository_frame"
 load_set = ["GraphRecipes", "Impute", "StatsPlots"]
-commit = "d8bb0b4c88"
+commit = "dd069231d0"
 
 [run.main]
 load_set = ["GraphRecipes", "Impute", "StatsPlots"]
@@ -74,6 +74,7 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/08_Moments/35_GerberIQCovariance.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/36_RegimeAdjustedExpWeightedVariance.jl" = { raw = 1, reviewed = 1 }
 "src/08_Moments/37_RegimeAdjustedExpWeightedCovariance.jl" = { raw = 0, reviewed = 0 }
+"src/08_Moments/38_CrossSectionalRegression.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/01_Base_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/02_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/03_DistanceDistance.jl" = { raw = 0, reviewed = 0 }
@@ -309,6 +310,7 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/08_Moments/35_GerberIQCovariance.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/36_RegimeAdjustedExpWeightedVariance.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/37_RegimeAdjustedExpWeightedCovariance.jl" = { raw = 0, reviewed = 0 }
+"src/08_Moments/38_CrossSectionalRegression.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/01_Base_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/02_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/03_DistanceDistance.jl" = { raw = 0, reviewed = 0 }
@@ -544,6 +546,7 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/08_Moments/35_GerberIQCovariance.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/36_RegimeAdjustedExpWeightedVariance.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/37_RegimeAdjustedExpWeightedCovariance.jl" = { raw = 0, reviewed = 0 }
+"src/08_Moments/38_CrossSectionalRegression.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/01_Base_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/02_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/03_DistanceDistance.jl" = { raw = 0, reviewed = 0 }

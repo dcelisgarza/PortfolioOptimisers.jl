@@ -149,7 +149,7 @@ StepwiseRegression
   - $(ref_dict[:efroymson1960])
   - $(ref_dict[:hocking1976])
 """
-@propagatable @concrete struct StepwiseRegression <: AbstractRegressionEstimator
+@propagatable @concrete struct StepwiseRegression <: AbstractTimeSeriesRegressionEstimator
     """
     $(field_dict[:crit])
     """

@@ -1,17 +1,33 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all regression estimator types.
+Abstract supertype of every regression estimator, over both the time-series family and the cross-sectional family.
 
-All concrete and/or abstract types implementing regression estimation algorithms should be subtypes of `AbstractRegressionEstimator`.
+The type is an umbrella and declares no interface of its own, because the two families fit different models and answer different verbs. A time-series estimator fits one model per asset over the observations and answers [`regression`](@ref). A cross-sectional estimator fits one model per observation across the assets and answers [`cross_sectional_regression`](@ref). Subtype the child that names the family, never this root, so a consumer of one family never receives a value of the other.
+
+# Related
+
+  - [`AbstractEstimator`](@ref)
+  - [`AbstractTimeSeriesRegressionEstimator`](@ref)
+  - [`AbstractCrossSectionalRegressionEstimator`](@ref)
+  - [`AbstractRegressionAlgorithm`](@ref)
+  - [`AbstractRegressionResult`](@ref)
+"""
+abstract type AbstractRegressionEstimator <: AbstractEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for all time-series regression estimator types.
+
+All concrete and/or abstract types implementing regression estimation algorithms that fit one model per asset over the observations should be subtypes of `AbstractTimeSeriesRegressionEstimator`.
 
 # Interfaces
 
-In order to implement a new regression estimator which will work seamlessly with the library, subtype `AbstractRegressionEstimator` with all necessary parameters as part of the struct, and implement the following methods:
+In order to implement a new time-series regression estimator which will work seamlessly with the library, subtype `AbstractTimeSeriesRegressionEstimator` with all necessary parameters as part of the struct, and implement the following methods:
 
 ## Regression
 
-  - `PortfolioOptimisers.regression(re::AbstractRegressionEstimator, X::MatNum, F::MatNum) -> Regression`: Computes the regression result from asset returns `X` and factor returns `F`.
+  - `PortfolioOptimisers.regression(re::AbstractTimeSeriesRegressionEstimator, X::MatNum, F::MatNum) -> Regression`: Computes the regression result from asset returns `X` and factor returns `F`.
 
 ### Arguments
 
@@ -28,7 +44,7 @@ In order to implement a new regression estimator which will work seamlessly with
 We can create a dummy regression estimator as follows:
 
 ```jldoctest
-julia> struct MyRegressionEstimator <: PortfolioOptimisers.AbstractRegressionEstimator end
+julia> struct MyRegressionEstimator <: PortfolioOptimisers.AbstractTimeSeriesRegressionEstimator end
 
 julia> function PortfolioOptimisers.regression(::MyRegressionEstimator,
                                                X::PortfolioOptimisers.MatNum,
@@ -46,38 +62,138 @@ Regression
 
 # Related
 
-  - [`AbstractEstimator`](@ref)
-  - [`AbstractRegressionAlgorithm`](@ref)
-  - [`AbstractRegressionResult`](@ref)
+  - [`AbstractRegressionEstimator`](@ref)
+  - [`AbstractCrossSectionalRegressionEstimator`](@ref)
+  - [`AbstractTimeSeriesRegressionResult`](@ref)
+  - [`StepwiseRegression`](@ref)
+  - [`DimensionReductionRegression`](@ref)
 """
-abstract type AbstractRegressionEstimator <: AbstractEstimator end
+abstract type AbstractTimeSeriesRegressionEstimator <: AbstractRegressionEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all regression result types.
+Abstract supertype for all cross-sectional regression estimator types.
 
-All concrete and/or abstract types representing the output of regression-based moment estimation should be subtypes of `AbstractRegressionResult`.
+All concrete and/or abstract types implementing regression estimation algorithms that fit one model per observation across the assets should be subtypes of `AbstractCrossSectionalRegressionEstimator`.
+
+# Interfaces
+
+In order to implement a new cross-sectional regression estimator which will work seamlessly with the library, subtype `AbstractCrossSectionalRegressionEstimator` with all necessary parameters as part of the struct, and implement the following methods:
+
+## Cross-sectional regression
+
+  - `PortfolioOptimisers.cross_sectional_regression(cre::AbstractCrossSectionalRegressionEstimator, Z::Arr3Num, X::MatNum, W::MatNum) -> CrossSectionalRegression`: Computes the cross-sectional regression result from the exposure tensor `Z`, the asset returns `X` and the cross-sectional weights `W`.
+
+### Arguments
+
+  - `cre`: Cross-sectional regression estimator.
+  - `Z`: Exposure tensor `observations × assets × factors`.
+  - `X`: Asset returns matrix `observations × assets`.
+  - `W`: Cross-sectional weights matrix `observations × assets`.
+
+### Returns
+
+  - `csr::CrossSectionalRegression`: Cross-sectional regression result carrying the factor returns, the residuals, the counts and the optional intercept.
+
+# Examples
+
+We can create a dummy cross-sectional regression estimator as follows:
+
+```jldoctest
+julia> struct MyCrossSectionalRegressionEstimator <:
+              PortfolioOptimisers.AbstractCrossSectionalRegressionEstimator end
+
+julia> function PortfolioOptimisers.cross_sectional_regression(::MyCrossSectionalRegressionEstimator,
+                                                               Z::PortfolioOptimisers.Arr3Num,
+                                                               X::PortfolioOptimisers.MatNum,
+                                                               W::PortfolioOptimisers.MatNum)
+           f = permutedims(reduce(hcat, Z[t, :, :] \\ X[t, :] for t in axes(X, 1)))
+           eps = X - permutedims(reduce(hcat, Z[t, :, :] * f[t, :] for t in axes(X, 1)))
+           return PortfolioOptimisers.CrossSectionalRegression(; f = f, eps = eps,
+                                                               n = fill(size(X, 2), size(X, 1)))
+       end
+
+julia> cross_sectional_regression(MyCrossSectionalRegressionEstimator(),
+                                  reshape([1.0, 0.0, 0.5, 0.0, 1.0, 0.5], 1, 3, 2), [1.0 2.0 1.5],
+                                  ones(1, 3))
+CrossSectionalRegression
+    f ┼ 1×2 Matrix{Float64}
+  eps ┼ 1×3 Matrix{Float64}
+    n ┼ Vector{Int64}: [3]
+    b ┴ nothing
+```
+
+# Related
+
+  - [`AbstractRegressionEstimator`](@ref)
+  - [`AbstractTimeSeriesRegressionEstimator`](@ref)
+  - [`AbstractCrossSectionalRegressionResult`](@ref)
+  - [`CrossSectionalLinearRegression`](@ref)
+  - [`CrossSectionalTargetRegression`](@ref)
+"""
+abstract type AbstractCrossSectionalRegressionEstimator <: AbstractRegressionEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype of every regression result, over both the time-series family and the cross-sectional family.
+
+The type is an umbrella, and the two families disagree on what an asset index means. A time-series result holds one row per asset, so [`port_opt_view`](@ref) slices its rows. A cross-sectional result holds one row per observation and one column per asset, so the same index slices its columns. Subtype the child that names the family, never this root.
 
 # Related
 
   - [`AbstractResult`](@ref)
-  - [`Regression`](@ref)
+  - [`AbstractTimeSeriesRegressionResult`](@ref)
+  - [`AbstractCrossSectionalRegressionResult`](@ref)
   - [`AbstractRegressionEstimator`](@ref)
 """
 abstract type AbstractRegressionResult <: AbstractResult end
 """
-    const RegE_Reg = Union{<:AbstractRegressionResult, <:AbstractRegressionEstimator}
+$(DocStringExtensions.TYPEDEF)
 
-Alias for a regression result or estimator.
+Abstract supertype for all time-series regression result types.
 
-Matches either an [`AbstractRegressionResult`](@ref) (pre-computed regression result) or an [`AbstractRegressionEstimator`](@ref) (regression specification). Used for dispatch in factor model and regression-based risk routines.
+All concrete and/or abstract types representing the output of a regression fitted per asset over the observations should be subtypes of `AbstractTimeSeriesRegressionResult`. A member carries the loadings matrix `M`, so every consumer that re-bases a constraint or decomposes risk in the factor basis binds this type rather than the umbrella.
 
 # Related
 
   - [`AbstractRegressionResult`](@ref)
+  - [`AbstractCrossSectionalRegressionResult`](@ref)
+  - [`AbstractTimeSeriesRegressionEstimator`](@ref)
+  - [`Regression`](@ref)
+"""
+abstract type AbstractTimeSeriesRegressionResult <: AbstractRegressionResult end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for all cross-sectional regression result types.
+
+All concrete and/or abstract types representing the output of a regression fitted per observation across the assets should be subtypes of `AbstractCrossSectionalRegressionResult`. A member carries no loadings matrix, because the exposures are the regression's input and an Exposure Estimator produces them.
+
+# Related
+
+  - [`AbstractRegressionResult`](@ref)
+  - [`AbstractTimeSeriesRegressionResult`](@ref)
+  - [`AbstractCrossSectionalRegressionEstimator`](@ref)
+  - [`CrossSectionalRegression`](@ref)
+"""
+abstract type AbstractCrossSectionalRegressionResult <: AbstractRegressionResult end
+"""
+    const RegE_Reg = Union{<:AbstractTimeSeriesRegressionResult,
+                           <:AbstractTimeSeriesRegressionEstimator}
+
+Alias for a time-series regression result or estimator.
+
+Matches either an [`AbstractTimeSeriesRegressionResult`](@ref) (pre-computed regression result) or an [`AbstractTimeSeriesRegressionEstimator`](@ref) (regression specification). Used for dispatch in factor model and regression-based risk routines. It names the time-series pair rather than the umbrella, because every consumer of the alias reads the loadings matrix `M`, which only a time-series result carries.
+
+# Related
+
+  - [`AbstractTimeSeriesRegressionResult`](@ref)
+  - [`AbstractTimeSeriesRegressionEstimator`](@ref)
+  - [`AbstractRegressionResult`](@ref)
   - [`AbstractRegressionEstimator`](@ref)
 """
-const RegE_Reg = Union{<:AbstractRegressionResult, <:AbstractRegressionEstimator}
+const RegE_Reg = Union{<:AbstractTimeSeriesRegressionResult,
+                       <:AbstractTimeSeriesRegressionEstimator}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -893,7 +1009,7 @@ Regression
 
 # Related
 
-  - [`AbstractRegressionResult`](@ref)
+  - [`AbstractTimeSeriesRegressionResult`](@ref)
   - [`StepwiseRegression`](@ref)
   - [`DimensionReductionRegression`](@ref)
   - [`port_opt_view`](@ref)
@@ -902,7 +1018,7 @@ Regression
 
   - $(ref_dict[:cajas2025]) Section 4.1, Equations 4.2-4.3.
 """
-@concrete struct Regression <: AbstractRegressionResult
+@concrete struct Regression <: AbstractTimeSeriesRegressionResult
     """
     $(arg_dict[:M])
     """
@@ -1016,7 +1132,7 @@ function regression(re::Regression, args...)
     return re
 end
 """
-    regression(re::AbstractRegressionEstimator, rd::ReturnsResult)
+    regression(re::AbstractTimeSeriesRegressionEstimator, rd::ReturnsResult)
 
 Compute or extract a regression result from an estimator or result and a [`ReturnsResult`](@ref).
 
@@ -1046,7 +1162,7 @@ This method dispatches to `regression(re, rd.X, rd.F)`, allowing both regression
   - [`Regression`](@ref)
   - [`ReturnsResult`](@ref)
 """
-function regression(re::AbstractRegressionEstimator, rd::ReturnsResult)
+function regression(re::AbstractTimeSeriesRegressionEstimator, rd::ReturnsResult)
     @argcheck(!isnothing(rd.X), IsNothingError)
     @argcheck(!isnothing(rd.F), IsNothingError)
     return regression(re, rd.X, rd.F)

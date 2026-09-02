@@ -14,7 +14,7 @@ $(DocStringExtensions.FIELDS)
     FactorPrior(;
         pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
         mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
-        re::AbstractRegressionEstimator = StepwiseRegression(),
+        re::AbstractTimeSeriesRegressionEstimator = StepwiseRegression(),
         ve::AbstractVarianceEstimator = SimpleVariance(),
         rsd::Bool = true
     ) -> FactorPrior
@@ -99,7 +99,7 @@ FactorPrior
   - [`AbstractLowOrderPriorEstimator_F`](@ref)
   - [`AbstractLowOrderPriorEstimator_A_AF`](@ref)
   - [`AbstractMatrixProcessingEstimator`](@ref)
-  - [`AbstractRegressionEstimator`](@ref)
+  - [`AbstractTimeSeriesRegressionEstimator`](@ref)
   - [`AbstractVarianceEstimator`](@ref)
   - [`EmpiricalPrior`](@ref)
   - [`StepwiseRegression`](@ref)
@@ -136,15 +136,15 @@ FactorPrior
     rsd
     function FactorPrior(pe::AbstractLowOrderPriorEstimator_A_AF,
                          mp::AbstractMatrixProcessingEstimator,
-                         re::AbstractRegressionEstimator, ve::AbstractVarianceEstimator,
-                         rsd::Bool)
+                         re::AbstractTimeSeriesRegressionEstimator,
+                         ve::AbstractVarianceEstimator, rsd::Bool)
         return new{typeof(pe), typeof(mp), typeof(re), typeof(ve), typeof(rsd)}(pe, mp, re,
                                                                                 ve, rsd)
     end
 end
 function FactorPrior(; pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
                      mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
-                     re::AbstractRegressionEstimator = StepwiseRegression(),
+                     re::AbstractTimeSeriesRegressionEstimator = StepwiseRegression(),
                      ve::AbstractVarianceEstimator = SimpleVariance(),
                      rsd::Bool = true)::FactorPrior
     return FactorPrior(pe, mp, re, ve, rsd)
@@ -155,8 +155,8 @@ end
     forward(pe, me, ce)
 end
 """
-    factor_reconstruction(re::AbstractRegressionEstimator, X::MatNum,
-                          F::MatNum) -> Tuple{AbstractRegressionResult, MatNum}
+    factor_reconstruction(re::AbstractTimeSeriesRegressionEstimator, X::MatNum,
+                          F::MatNum) -> Tuple{AbstractTimeSeriesRegressionResult, MatNum}
 
 Fit the loadings and rebuild the asset returns from the factor returns.
 
@@ -177,7 +177,7 @@ The second half — projecting the factor moments through the loadings — is [`
 
 # Returns
 
-  - `rr::AbstractRegressionResult`: Regression result carrying the loadings `M` and intercepts `b`.
+  - `rr::AbstractTimeSeriesRegressionResult`: Regression result carrying the loadings `M` and intercepts `b`.
   - `posterior_X::MatNum`: Reconstructed asset returns, `observations × assets`.
 
 # Related
@@ -187,13 +187,14 @@ The second half — projecting the factor moments through the loadings — is [`
   - [`FactorPrior`](@ref)
   - [`LowOrderPrior`](@ref)
 """
-function factor_reconstruction(re::AbstractRegressionEstimator, X::MatNum, F::MatNum)
+function factor_reconstruction(re::AbstractTimeSeriesRegressionEstimator, X::MatNum,
+                               F::MatNum)
     rr = regression(re, X, F)
     return rr, F * transpose(rr.M) .+ transpose(rr.b)
 end
 """
     factor_lift(mp::AbstractMatrixProcessingEstimator, ve::AbstractVarianceEstimator,
-                rsd::Bool, rr::AbstractRegressionResult, f_mu::VecNum, f_sigma::MatNum,
+                rsd::Bool, rr::AbstractTimeSeriesRegressionResult, f_mu::VecNum, f_sigma::MatNum,
                 X::MatNum, posterior_X::MatNum; kwargs...) -> NamedTuple
 
 Project factor moments onto the asset axis through the regression loadings.
@@ -262,8 +263,8 @@ The returned `chol` is the transpose of ``[\\mathbf{B} \\mathbf{L}_f \\quad \\ma
   - [`LowOrderPrior`](@ref)
 """
 function factor_lift(mp::AbstractMatrixProcessingEstimator, ve::AbstractVarianceEstimator,
-                     rsd::Bool, rr::AbstractRegressionResult, f_mu::VecNum, f_sigma::MatNum,
-                     X::MatNum, posterior_X::MatNum; kwargs...)
+                     rsd::Bool, rr::AbstractTimeSeriesRegressionResult, f_mu::VecNum,
+                     f_sigma::MatNum, X::MatNum, posterior_X::MatNum; kwargs...)
     (; b, M) = rr
     posterior_mu = M * f_mu + b
     posterior_sigma = M * f_sigma * transpose(M)
