@@ -735,6 +735,44 @@ function returns_matrix_picker(pr::Pr_RR, rd::Option{<:ReturnsResult}, x_src::Sy
     return isnothing(rd) || x_src == :prior ? pr.X : rd.X
 end
 """
+    carrier_feature_names(::AbstractPriorResult) -> nothing
+    carrier_feature_names(rd::ReturnsResult) -> Option{<:VecStr}
+
+Read the names of a carrier's own feature axis, or `nothing` when that carrier holds none.
+
+The two carriers a [`Pr_RR`](@ref) can be do not agree on names. [`ReturnsResult`](@ref) carries `Z` beside `nz`, and the pair is checked together at construction. [`LowOrderPrior`](@ref) carries `Z` alone: a producer runs inside `prior(pe, X, F; …)` with raw matrices, so names are structurally unavailable to it.
+
+[`feature_matrix_picker`](@ref) needs this because the carrier it reads `Z` off is not always the `rd` argument. `Pr_RR` admits a [`ReturnsResult`](@ref) in the `pr` slot, and `clusterise(cle, rd)` — the shortest public call, and the one every [`Pipeline`](@ref) step makes — puts one there with no `rd` beside it. Reading `nz` off `rd` alone would drop the names of a carrier that holds them, and a [`FeatureDistance`](@ref) column selector written as a name would then fail to resolve on data that names every column.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `pr` is an [`AbstractPriorResult`](@ref): return `nothing`. The family carries no feature axis.
+ 2. `pr` is a [`ReturnsResult`](@ref): return `pr.nz`, which is `nothing` when that carrier holds no feature matrix either.
+
+# Arguments
+
+  - `pr`: The carrier to read, a [`Pr_RR`](@ref).
+
+# Returns
+
+  - `nz::Option{<:VecStr}`: The names of the carrier's feature axis, or `nothing`.
+
+# Related
+
+  - [`feature_matrix_picker`](@ref)
+  - [`Pr_RR`](@ref)
+  - [`ReturnsResult`](@ref)
+  - [`LowOrderPrior`](@ref)
+"""
+function carrier_feature_names(::AbstractPriorResult)
+    return nothing
+end
+function carrier_feature_names(rd::ReturnsResult)
+    return rd.nz
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Pick the feature matrix a [`FeatureDistance`](@ref) inside the clustering, phylogeny or centrality estimator reads, and diagnose its absence.
@@ -748,7 +786,7 @@ A missing feature matrix is **not** an error here: `Z` is only required when a [
  1. Check that `z_src` names one of the two carriers, with [`assert_source_selector`](@ref).
  2. Read `Zp`, the prior carrier's feature matrix, and `Zd`, the returns result's. `Zd` is `nothing` when there is no returns result.
  3. Select `Z`: `Zp` when there is no returns result, or when `z_src` is `:prior`. `Zd` otherwise.
- 4. Select `nz`, the names of `Z`'s feature axis: `rd.nz` when the returns result was selected, and `nothing` otherwise.
+ 4. Select `nz`, the names of `Z`'s feature axis, off **the carrier that supplied `Z`**: `rd.nz` when the returns result was selected, and [`carrier_feature_names`](@ref) of the prior carrier otherwise. The second arm is not always `nothing`, because [`Pr_RR`](@ref) admits a [`ReturnsResult`](@ref) in the `pr` slot.
  5. Make the diagnostic `z_diag`: `:neither` when both `Zp` and `Zd` are `nothing`, and `z_src` itself otherwise. The two cases are distinct, because the second says a matrix exists on the carrier that was not selected.
  6. Return `Z`, `nz` and `z_diag`.
 
@@ -765,7 +803,7 @@ A missing feature matrix is **not** an error here: `Z` is only required when a [
 # Returns
 
   - `Z::Option{<:MatNum_Arr3Num}`: Feature matrix from the selected carrier, or `nothing`.
-  - `nz::Option{<:VecStr}`: Names of `Z`'s feature axis, or `nothing`. A [`FeatureDistance`](@ref) column selector resolves its names against these. Only [`ReturnsResult`](@ref) carries them: [`LowOrderPrior`](@ref) holds `Z` without `nz`, so `nz` is `nothing` whenever the prior carrier is selected, and a name selector cannot resolve under `z_src = :prior`. An integer selector needs no names and serves both carriers.
+  - `nz::Option{<:VecStr}`: Names of `Z`'s feature axis, or `nothing`. A [`FeatureDistance`](@ref) column selector resolves its names against these. They come off the carrier that supplied `Z`, through [`carrier_feature_names`](@ref), and only [`ReturnsResult`](@ref) carries any: [`LowOrderPrior`](@ref) holds `Z` without `nz`, so `nz` is `nothing` when a prior result supplied `Z`, and a name selector cannot resolve there. It **is** non-`nothing` when a [`ReturnsResult`](@ref) supplied `Z` from the `pr` slot, which is what `clusterise(cle, rd)` and every [`Pipeline`](@ref) step do. An integer selector needs no names and serves both carriers.
   - `z_diag::Symbol`: The diagnostic to forward as `z_src`; the selector itself, or `:neither`.
 
 # Related
@@ -779,7 +817,7 @@ function feature_matrix_picker(pr::Pr_RR, rd::Option{<:ReturnsResult}, z_src::Sy
     assert_source_selector(z_src, :z_src)
     Zp = pr.Z
     Zd = isnothing(rd) ? nothing : rd.Z
-    Z, nz = isnothing(rd) || z_src == :prior ? (Zp, nothing) : (Zd, rd.nz)
+    Z, nz = isnothing(rd) || z_src == :prior ? (Zp, carrier_feature_names(pr)) : (Zd, rd.nz)
     return Z, nz, isnothing(Zp) && isnothing(Zd) ? :neither : z_src
 end
 """
