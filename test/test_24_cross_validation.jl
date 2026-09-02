@@ -471,18 +471,21 @@
         (; train_idx, test_idx) = split(cv, rd)
         N = n_splits(cv, rd)
         @test length(train_idx) == length(test_idx) == N
-        @test train_idx == UnitRange{Int64}[1:22, 1:293, 1:567, 1:840]
-        @test test_idx == UnitRange{Int64}[23:276, 294:550, 568:823, 841:1008]
+        @test train_idx == UnitRange{Int64}[1:5, 1:276, 1:550, 1:823]
+        @test test_idx == UnitRange{Int64}[23:293, 294:567, 568:840, 841:1008]
 
+        # The purge comes out of the training window, so it must be smaller than that
+        # window. A `Day(23)` training window holds 16 rows here, and a `purged_size` of 17
+        # would empty it.
         cv = DateWalkForward(Day(23), 13; period = Month(1), adjuster = ldm,
-                             purged_size = 17, period_offset = Week(2))
+                             purged_size = 5, period_offset = Week(2))
         (; train_idx, test_idx) = split(cv, rd)
         N = n_splits(cv, rd)
         @test length(train_idx) == length(test_idx) == N
-        @test all(x -> length(x) in (16, 17), train_idx)
-        @test all(x -> length(x) in (272 - 17, 274 - 16), test_idx)
-        @test train_idx == UnitRange{Int64}[16:32, 288:304, 561:576]
-        @test test_idx == UnitRange{Int64}[33:287, 305:559, 577:834]
+        @test all(x -> length(x) in (16 - 5, 17 - 5), train_idx)
+        @test all(x -> length(x) in (272, 275), test_idx)
+        @test train_idx == UnitRange{Int64}[16:27, 288:299, 561:571]
+        @test test_idx == UnitRange{Int64}[33:304, 305:576, 577:851]
 
         # A negative period_offset puts the first date of the range before the first
         # timestamp, so searchsortedlast returns 0. n_splits must survive that and stay in
@@ -515,6 +518,33 @@
             (; train_idx, test_idx) = split(cv, rd)
             N = n_splits(cv, rd)
             @test length(train_idx) == length(test_idx) == N
+        end
+
+        # `purged_size` drops the last `purged_size` rows of the training window and leaves
+        # the test window alone. The gap it opens is what stops a training row whose label
+        # runs into the test period from teaching the model. Charging the purge to the test
+        # window instead would leave the training window touching the test start, which is
+        # the leak the purge exists to close.
+        for train_size in (Month(6), Month(12), Day(23), 6, 12), test_size in (1, 3, 13),
+            previous in (false, true), expand_train in (false, true),
+            reduce_test in (false, true), period_offset in (nothing, Week(2), Day(-10)),
+            purged_size in (1, 5)
+
+            kwargs = (; period = Month(1), adjuster = ldm, previous = previous,
+                      expand_train = expand_train, reduce_test = reduce_test,
+                      period_offset = period_offset)
+            base = split(DateWalkForward(train_size, test_size; kwargs...), rd)
+            purged = split(DateWalkForward(train_size, test_size; purged_size = purged_size,
+                                           kwargs...), rd)
+            # The test windows do not move.
+            @test purged.test_idx == base.test_idx
+            # Each training window loses its last `purged_size` rows.
+            @test purged.train_idx ==
+                  [first(x):(last(x) - purged_size) for x in base.train_idx]
+            # The gap between the end of the training window and the start of the test
+            # window is exactly `purged_size`.
+            @test all(first(t) - last(r) - 1 == purged_size
+                      for (r, t) in zip(purged.train_idx, purged.test_idx))
         end
 
         # `special_div(a, b)` counts the steps of size `b` that fit in the span `1:a`, so it

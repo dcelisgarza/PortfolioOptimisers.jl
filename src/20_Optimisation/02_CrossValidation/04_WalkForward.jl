@@ -317,6 +317,8 @@ $(DocStringExtensions.TYPEDEF)
 
 Implements date-based walk-forward cross-validation for time series, supporting flexible windowing, purging, and custom date adjustment.
 
+`purged_size` drops the last `purged_size` rows of each training window. This opens a gap of that many observations before the test window, and removes the training rows whose labels reach into the test period. The test window itself is not shortened, so `purged_size` must be smaller than the training window.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -696,10 +698,10 @@ function Base.split(dwf::DateWalkForward{<:Any}, rd::Prices_RR)
             end
             push!(test_indices, idx[i]:T)
         else
-            push!(test_indices, idx[i]:(idx[i + test_size] - purged_size - 1))
+            push!(test_indices, idx[i]:(idx[i + test_size] - 1))
         end
         train_start = expand_train ? 1 : train_idx[i]
-        push!(train_indices, train_start:(idx[i] - 1))
+        push!(train_indices, train_start:(idx[i] - purged_size - 1))
         i += test_size
     end
     return WalkForwardResult(; train_idx = train_indices, test_idx = test_indices)
