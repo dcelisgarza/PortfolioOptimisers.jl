@@ -228,4 +228,52 @@ leaf ordering.
         # and the replay half refuses on the `port_opt_view` tripwire
         @test_throws ArgumentError apply_preprocessing(PO.AssetSelectorResult(nx[1:3]), prd)
     end
+
+    #=
+    A panel presents every slice as a feature, the observed masks and the one-hot levels
+    included, so a redundancy selector that measured all of them would drop assets on a
+    distance the caller never chose. `rd.nz` travels beside `rd.Z` to this site for that
+    reason, and this testset is the proof it arrives: preselection is the one `Z` consumer
+    that reads the carrier directly rather than through `feature_matrix_picker`.
+    =#
+    @testset "sel reaches the pre-prior site through rd.nz" begin
+        # The sector block is the first three columns: `Sector` has three distinct values
+        # and `Industry` six, concatenated in the order of `vals`.
+        rd_sec = ReturnsResult(; nx = nx, X = X, nz = nz[1:3], Z = Z[:, 1:3])
+        # The cut is a real one, so the equality below is not two names for one matrix.
+        @test distance(FeatureDistance(), Z; dims = 1) !=
+              distance(FeatureDistance(), Z[:, 1:3]; dims = 1)
+
+        sel_key = RedundancySelector(;
+                                     alg = ClusterGroups(;
+                                                         cle = ClustersEstimator(;
+                                                                                 de = FeatureDistance(;
+                                                                                                      sel = ["Sector"],
+                                                                                                      sets = sets))),
+                                     score = SCM())
+        sel_idx = RedundancySelector(;
+                                     alg = ClusterGroups(;
+                                                         cle = ClustersEstimator(;
+                                                                                 de = FeatureDistance(;
+                                                                                                      sel = [1,
+                                                                                                             2,
+                                                                                                             3]))),
+                                     score = SCM())
+        # Selecting the sector block out of the full carrier is the same preselection as
+        # carrying the sector block alone.
+        @test fit_preprocessing(sel_key, rd_tax).nx ==
+              fit_preprocessing(sel_feat, rd_sec).nx
+        @test fit_preprocessing(sel_idx, rd_tax).nx ==
+              fit_preprocessing(sel_feat, rd_sec).nx
+        # `ClusterGroups` carries no `z_src` and needs none, but it does need `nz`: a name
+        # that resolves against nothing still diagnoses here.
+        sel_bad = RedundancySelector(;
+                                     alg = ClusterGroups(;
+                                                         cle = ClustersEstimator(;
+                                                                                 de = FeatureDistance(;
+                                                                                                      sel = ["nope"],
+                                                                                                      strict = true))),
+                                     score = SCM())
+        @test_throws ArgumentError fit_preprocessing(sel_bad, rd_tax)
+    end
 end

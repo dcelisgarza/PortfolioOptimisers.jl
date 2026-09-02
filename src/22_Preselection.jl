@@ -1226,6 +1226,8 @@ A [`FeatureDistance`](@ref) in the `cle`'s distance slot measures a feature matr
 
 The selection is decided on the *full* universe and the surviving columns are sliced only afterwards, so `Z` is measured over every asset before any is dropped.
 
+`rd.nz` travels beside `rd.Z`, so a [`FeatureDistance`](@ref) carrying a `sel` names its feature columns here exactly as it does anywhere else. That matters most at this site: a panel presents every slice as a feature, the observed masks and the one-hot levels included, and a redundancy selector that measured all of them would drop assets on a distance the caller never asked for.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -1267,7 +1269,7 @@ Keep one representative of each cluster under [`ClusterGroups`](@ref).
 
 # Algorithm
 
- 1. Cluster the assets with [`clusterise`](@ref) on `rd.X`, passing the feature matrix `rd.Z` and `z_src = :data_only`, giving the clustering result `clr`.
+ 1. Cluster the assets with [`clusterise`](@ref) on `rd.X`, passing the feature matrix `rd.Z`, its names `rd.nz` and `z_src = :data_only`, giving the clustering result `clr`.
  2. Read the cluster assignment of every asset into `idx`.
  3. Collect the asset indices of each of the `clr.k` clusters into `groups`.
  4. Return the mask [`groups_argbest`](@ref) admits for those groups under `scores` and `bib`.
@@ -1293,7 +1295,7 @@ Keep one representative of each cluster under [`ClusterGroups`](@ref).
 """
 function redundancy_keep(alg::ClusterGroups, rd::AbstractReturnsResult,
                          scores::Option{<:VecNum}, bib::Bool)::BitVector
-    clr = clusterise(alg.cle, rd.X; Z = rd.Z, z_src = :data_only)
+    clr = clusterise(alg.cle, rd.X; Z = rd.Z, nz = rd.nz, z_src = :data_only)
     idx = assignments(clr)
     groups = [findall(==(k), idx) for k in 1:(clr.k)]
     return groups_argbest(groups, scores, bib)

@@ -273,4 +273,175 @@ end
             @test D6 != D3
         end
     end
+
+    #=
+    A feature matrix that holds only features can be swallowed whole. One that holds
+    anything else -- an observed mask, a one-hot level -- cannot: a distance measured over
+    every column is one the caller did not ask for, and it is finite, symmetric and
+    plausible, so nothing downstream reports it. `sel` is the cut, and these tests pin what
+    each entry may name and what an entry that resolves against nothing does.
+    =#
+    @testset "sel cuts the feature axis, and names resolve against nz" begin
+        nzd = rd.nz
+        D_all = distance(fde, Zd; dims = 1)
+        D_cut = distance(fde, Zd[:, 1:2]; dims = 1)
+
+        @testset "construction refuses what cannot be read" begin
+            @test isnothing(FeatureDistance().sel)
+            @test isnothing(FeatureDistance().sets)
+            @test FeatureDistance().strict === false
+            # An empty selection is refused rather than read as "every column": `nothing`
+            # already says that, and a selection that silently widens to the whole axis is
+            # the failure `sel` exists to remove.
+            @test_throws PortfolioOptimisers.IsEmptyError FeatureDistance(; sel = String[])
+            @test_throws PortfolioOptimisers.IsEmptyError FeatureDistance(; sel = Int[])
+            @test_throws ArgumentError FeatureDistance(; sel = ["z1", "z1"])
+            @test_throws ArgumentError FeatureDistance(; sel = [1, 1])
+            # `sets` is checked at construction rather than bounded by the field's type,
+            # because `UniverseSets` is defined in a later file than `FeatureDistance`.
+            @test_throws ArgumentError FeatureDistance(; sets = Dict("nx" => ["A"]))
+        end
+
+        @testset "a nothing selector is the behaviour every caller already had" begin
+            @test distance(FeatureDistance(; sel = nothing), Zd; dims = 1, nz = nzd) ==
+                  D_all
+            # The passthrough builds no view at all.
+            @test PortfolioOptimisers.select_features(fde, Zd, nzd, 1) === Zd
+        end
+
+        @testset "names and indices select the same columns" begin
+            @test distance(FeatureDistance(; sel = ["z1", "z2"]), Zd; dims = 1, nz = nzd) ==
+                  D_cut
+            @test distance(FeatureDistance(; sel = [1, 2]), Zd; dims = 1) == D_cut
+            @test distance(FeatureDistance(; sel = ["z1", "z2"]), Zd; dims = 1, nz = nzd) !=
+                  D_all
+            # `cor_and_dist` forwards `nz` through its own kwargs, so both halves agree.
+            S, D = cor_and_dist(FeatureDistance(; sel = ["z1", "z2"]), Zd; dims = 1,
+                                nz = nzd)
+            @test D == D_cut
+            @test S == PortfolioOptimisers.distance_to_similarity(fde.sim; D = D_cut)
+        end
+
+        @testset "the order of sel is the column order" begin
+            k = [4, 1, 6]
+            @test distance(FeatureDistance(; sel = k), Zd; dims = 1) ==
+                  distance(fde, Zd[:, k]; dims = 1)
+            @test distance(FeatureDistance(; sel = nzd[k]), Zd; dims = 1, nz = nzd) ==
+                  distance(fde, Zd[:, k]; dims = 1)
+        end
+
+        @testset "an integer selector needs no names, and a name refuses without them" begin
+            # `LowOrderPrior` carries `Z` without `nz`, so this is the whole of what a
+            # selector can do under `z_src = :prior`.
+            @test distance(FeatureDistance(; sel = [1, 2]), Zd; dims = 1, nz = nothing) ==
+                  D_cut
+            @test_throws PortfolioOptimisers.IsNothingError distance(FeatureDistance(;
+                                                                                     sel = ["z1"]),
+                                                                     Zd; dims = 1,
+                                                                     nz = nothing)
+        end
+
+        @testset "an unresolvable name warns and drops, or throws under strict" begin
+            de_warn = FeatureDistance(; sel = ["z1", "z2", "nope"])
+            @test (@test_logs (:warn,) distance(de_warn, Zd; dims = 1, nz = nzd)) == D_cut
+            @test_throws ArgumentError distance(FeatureDistance(; sel = ["z1", "nope"],
+                                                                strict = true), Zd;
+                                                dims = 1, nz = nzd)
+            # Every entry dropping leaves nothing to measure. That is not a droppable
+            # thing, so it throws whatever `strict` says.
+            @test_throws PortfolioOptimisers.IsEmptyError distance(FeatureDistance(;
+                                                                                   sel = ["no1",
+                                                                                          "no2"]),
+                                                                   Zd; dims = 1, nz = nzd)
+            @test_throws DomainError distance(FeatureDistance(; sel = [1, 99]), Zd;
+                                              dims = 1)
+            @test_throws DomainError distance(FeatureDistance(; sel = [0]), Zd; dims = 1)
+        end
+
+        @testset "a taxonomy key expands to the block it produced" begin
+            tax = UniverseSets(; xkey = "nx",
+                               dict = Dict("nx" => ["A", "B", "C"],
+                                           "nx_sector" => ["Tech", "Tech", "Fin"],
+                                           "nx_country" => ["US", "UK", "UK"]))
+            Zt = asset_sets_features(["nx_sector", "nx_country"], tax)
+            nzt = asset_sets_feature_names(["nx_sector", "nx_country"], tax)
+            # `asset_sets_features` and `asset_sets_feature_names` now read one traversal,
+            # `taxonomy_feature_names`, so the block a key selects is the block it built.
+            @test nzt ==
+                  vcat(PortfolioOptimisers.taxonomy_feature_names(tax, "nx_sector", "test"),
+                       PortfolioOptimisers.taxonomy_feature_names(tax, "nx_country",
+                                                                  "test"))
+            @test distance(FeatureDistance(; sel = ["nx_sector"], sets = tax), Zt; dims = 1,
+                           nz = nzt) == distance(fde, Zt[:, 1:2]; dims = 1)
+            # A key and a plain column name compose, and a key wins the name lookup.
+            @test distance(FeatureDistance(; sel = ["nx_sector", "nx_country=US"],
+                                           sets = tax), Zt; dims = 1, nz = nzt) ==
+                  distance(fde, Zt[:, 1:3]; dims = 1)
+            # A key that resolves but whose columns are not in `nz` is not a typo, so its
+            # message says the matrix was built from another taxonomy instead.
+            other = UniverseSets(; xkey = "nx",
+                                 dict = Dict("nx" => ["A", "B", "C"],
+                                             "nx_size" => ["Big", "Small", "Big"]))
+            @test_throws ArgumentError distance(FeatureDistance(; sel = ["nx_size"],
+                                                                sets = other,
+                                                                strict = true), Zt;
+                                                dims = 1, nz = nzt)
+        end
+
+        @testset "dims names the asset axis, so the feature axis follows it" begin
+            @test distance(FeatureDistance(; sel = [1, 2]), permutedims(Zd); dims = 2) ==
+                  D_cut
+            Z3s = permutedims(cat(Zd, 2 * Zd; dims = 3), (3, 1, 2))
+            @test distance(FeatureDistance(; sel = ["z1", "z2"]), Z3s; dims = 1,
+                           nz = nzd) == distance(fde, Z3s[:, :, 1:2]; dims = 1)
+        end
+
+        @testset "the square case selects reference assets, not assets" begin
+            # When the feature axis is the asset axis, a name is an asset used as a
+            # reference column. Every row survives, so the matrix stays assets x assets.
+            nxs = ["A", "B", "C"]
+            Zsq = [1.0 0.2 0.1; 0.2 1.0 0.7; 0.1 0.7 1.0]
+            @test PortfolioOptimisers.features_are_assets(nxs, nxs)
+            D_sq = distance(FeatureDistance(; sel = ["A", "B"]), Zsq; dims = 1, nz = nxs)
+            @test size(D_sq) == (3, 3)
+            @test D_sq == distance(fde, Zsq[:, 1:2]; dims = 1)
+        end
+
+        @testset "the picker carries nz beside Z, and only the data carrier has it" begin
+            Zp, nzp, zdiag = PortfolioOptimisers.feature_matrix_picker(pr_noz, rd, :data)
+            @test Zp === rd.Z
+            @test nzp === rd.nz
+            @test zdiag === :data
+            # `LowOrderPrior` holds `Z` without `nz`, so the prior carrier gives none.
+            Zq, nzq, _ = PortfolioOptimisers.feature_matrix_picker(pr_z, rd, :prior)
+            @test Zq === pr_z.Z
+            @test isnothing(nzq)
+        end
+
+        @testset "the selector survives the whole routed path" begin
+            de_sel = FeatureDistance(; sel = ["z1", "z2"])
+            rd_cut = ReturnsResult(; nx = rd.nx, X = rd.X, nz = nzd[1:2], Z = Zd[:, 1:2])
+            pm_sel = phylogeny_matrix(NetworkEstimator(; de = de_sel), pr_noz; rd = rd,
+                                      z_src = :data)
+            pm_ref = phylogeny_matrix(NetworkEstimator(; de = fde), pr_noz; rd = rd_cut,
+                                      z_src = :data)
+            pm_all = phylogeny_matrix(NetworkEstimator(; de = fde), pr_noz; rd = rd,
+                                      z_src = :data)
+            @test pm_sel.X == pm_ref.X
+            @test pm_sel.X != pm_all.X
+            # A name still cannot resolve on the derived carrier, which carries no names.
+            @test_throws PortfolioOptimisers.IsNothingError phylogeny_matrix(NetworkEstimator(;
+                                                                                              de = de_sel),
+                                                                             pr_z; rd = rd,
+                                                                             z_src = :prior)
+        end
+
+        @testset "factory carries the new fields" begin
+            de_sel = FeatureDistance(; sel = ["z1", "z2"], strict = true)
+            f = factory(de_sel, pr_noz)
+            @test f.sel == de_sel.sel
+            @test f.sets === de_sel.sets
+            @test f.strict === de_sel.strict
+        end
+    end
 end

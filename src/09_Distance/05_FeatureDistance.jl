@@ -428,6 +428,20 @@ Every metric other than [`AngularDist`](@ref) and `Distances.CorrDist` is scale-
 
 `Distances.Jaccard` is the general non-negative-real (Ruzicka) form, not the binary-set Jaccard, and returns values up to `2` on signed input *without erroring*. It, `Distances.BrayCurtis` and `Distances.ChiSqDist` therefore require a non-negative feature matrix, which [`assert_metric_domain`](@ref) checks in the kernel rather than at construction, because the feature matrix is not known here.
 
+## Choosing the columns
+
+`sel` names the feature columns the metric reads, and `nothing` reads every one of them. Without it this estimator swallows the whole feature axis, which is harmless while a feature matrix holds only features and wrong the moment it holds anything else: a carrier that presents every slice as a feature — an observed mask, a one-hot level — is then measured in full, and the distance is one the caller did not intend and gets no warning about.
+
+An entry of `sel` is read in one of three ways:
+
+  - An **integer** is a position on the feature axis. It needs no names, so it is the only selector that resolves under `z_src = :prior`, where [`LowOrderPrior`](@ref) carries `Z` without `nz`.
+  - A **taxonomy key** of `sets.dict`, when `sets` is given, expands through [`taxonomy_feature_names`](@ref) to every `"<key>=<group>"` column that key contributes. This is the same traversal [`asset_sets_feature_names`](@ref) uses to name the matrix [`asset_sets_features`](@ref) builds, so a key selects exactly the block that key produced.
+  - Anything else is a **column name**, resolved against the carrier's `nz`.
+
+A key expands to names carrying `=`, so a plain column name holding no `=` cannot collide with a key's expansion. `strict` decides what an entry that resolves against no column does: it throws when `strict` is `true`, and warns and drops the entry otherwise. [`select_features`](@ref) states what the selector means when the feature axis is the asset axis, and the one hazard that carries.
+
+The order of `sel` is the column order the metric reads, so a caller decides it.
+
 # Mathematical definition
 
 ```math
@@ -454,7 +468,10 @@ $(DocStringExtensions.FIELDS)
     FeatureDistance(;
         metric::Distances.SemiMetric = AngularDist(),
         alg::AbstractFeatureCollapseAlgorithm = LastObservation(),
-        sim::AbstractSimilarityMatrixAlgorithm = default_similarity(metric)
+        sim::AbstractSimilarityMatrixAlgorithm = default_similarity(metric),
+        sel::Option{<:Union{<:VecStr, <:AbstractVector{<:Integer}}} = nothing,
+        sets = nothing,
+        strict::Bool = false
     ) -> FeatureDistance
 
 Keywords correspond to the struct's fields.
@@ -462,6 +479,7 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - `sim` is defaulted from `metric` via [`default_similarity`](@ref), so the resolved value is visible on the printed object rather than hidden inside the distance kernel.
+  - `sel` and `sets` are checked by [`assert_feature_selector`](@ref): `sets` is a [`UniverseSets`](@ref) or `nothing`, and `sel` is `nothing` or a non-empty vector of distinct entries.
 
 ## Propagated parameters
 
@@ -476,13 +494,19 @@ julia> FeatureDistance()
 FeatureDistance
   metric ┼ AngularDist: AngularDist()
      alg ┼ LastObservation()
-     sim ┴ AngularSimilarity()
+     sim ┼ AngularSimilarity()
+     sel ┼ nothing
+    sets ┼ nothing
+  strict ┴ Bool: false
 
 julia> FeatureDistance(; metric = PortfolioOptimisers.Distances.CosineDist())
 FeatureDistance
   metric ┼ Distances.CosineDist: Distances.CosineDist()
      alg ┼ LastObservation()
-     sim ┴ ComplementSimilarity()
+     sim ┼ ComplementSimilarity()
+     sel ┼ nothing
+    sets ┼ nothing
+  strict ┴ Bool: false
 ```
 
 # Related
@@ -496,6 +520,11 @@ FeatureDistance
   - [`distance`](@ref)
   - [`cor_and_dist`](@ref)
   - [`assert_metric_domain`](@ref): the non-negativity check that the three restricted metrics take in the kernel.
+  - [`assert_feature_selector`](@ref): the construction check on `sel` and `sets`.
+  - [`select_features`](@ref): the cut itself, and what a selector means in the square case.
+  - [`feature_selection_indices`](@ref): how a name, a taxonomy key and an integer each resolve.
+  - [`asset_sets_features`](@ref): the producer whose column names a taxonomy key in `sel` selects.
+  - [`UniverseSets`](@ref): what `sets` holds.
   - [`DBHT`](@ref): carries a `sim` field of its own, deliberately named alike — same type, same job. When both are set DBHT's wins, because [`clusterise`](@ref) overwrites the similarity matrix immediately after [`cor_and_dist`](@ref) returns.
   - [`factory`](@ref)
 """
@@ -512,16 +541,307 @@ FeatureDistance
     $(field_dict[:fdsim])
     """
     sim
+    """
+    $(field_dict[:fdsel])
+    """
+    sel
+    """
+    $(field_dict[:fdsets])
+    """
+    sets
+    """
+    $(field_dict[:fdstrict])
+    """
+    strict
     function FeatureDistance(metric::Distances.SemiMetric,
                              alg::AbstractFeatureCollapseAlgorithm,
-                             sim::AbstractSimilarityMatrixAlgorithm)::FeatureDistance
-        return new{typeof(metric), typeof(alg), typeof(sim)}(metric, alg, sim)
+                             sim::AbstractSimilarityMatrixAlgorithm,
+                             sel::Option{<:Union{<:VecStr, <:AbstractVector{<:Integer}}},
+                             sets, strict::Bool)::FeatureDistance
+        assert_feature_selector(sel, sets)
+        return new{typeof(metric), typeof(alg), typeof(sim), typeof(sel), typeof(sets),
+                   typeof(strict)}(metric, alg, sim, sel, sets, strict)
     end
 end
 function FeatureDistance(; metric::Distances.SemiMetric = AngularDist(),
                          alg::AbstractFeatureCollapseAlgorithm = LastObservation(),
-                         sim::AbstractSimilarityMatrixAlgorithm = default_similarity(metric))::FeatureDistance
-    return FeatureDistance(metric, alg, sim)
+                         sim::AbstractSimilarityMatrixAlgorithm = default_similarity(metric),
+                         sel::Option{<:Union{<:VecStr, <:AbstractVector{<:Integer}}} = nothing,
+                         sets = nothing, strict::Bool = false)::FeatureDistance
+    return FeatureDistance(metric, alg, sim, sel, sets, strict)
+end
+"""
+    assert_feature_selector(sel::Option{<:AbstractVector}, sets)
+
+Validate a [`FeatureDistance`](@ref) column selector at construction: `sets` is a [`UniverseSets`](@ref) or `nothing`, and `sel` is `nothing` or a non-empty vector of distinct entries.
+
+`sets` is checked here rather than bounded by the field's type because [`UniverseSets`](@ref) is defined in a later file than this one, so its name is not yet bound when this struct is declared. The check runs at construction, which is where a type bound would have acted.
+
+An empty `sel` is refused rather than read as "every column": `nothing` already says that, and a selection that silently widens to the whole feature axis is the failure this selector exists to remove. A repeated entry is refused because it doubles that column's contribution to every distance.
+
+# Algorithm
+
+ 1. Check that `sets` is a [`UniverseSets`](@ref) or `nothing`.
+ 2. Return immediately when `sel` is `nothing`, which selects every column.
+ 3. Check that `sel` is non-empty.
+ 4. Check that `sel` repeats no entry.
+
+# Arguments
+
+  - $(field_dict[:fdsel])
+  - $(field_dict[:fdsets])
+
+# Validation
+
+  - `isnothing(sets) || isa(sets, UniverseSets)`.
+  - `!isempty(sel)`.
+  - `allunique(sel)`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`FeatureDistance`](@ref)
+  - [`select_features`](@ref)
+  - [`UniverseSets`](@ref)
+"""
+function assert_feature_selector(sel::Option{<:AbstractVector}, sets)::Nothing
+    @argcheck(isnothing(sets) || isa(sets, UniverseSets),
+              ArgumentError("`sets` must be a `UniverseSets` or `nothing`, because `sel` resolves its taxonomy keys against `sets.dict`. Got\ntypeof(sets) => $(typeof(sets))"))
+    if isnothing(sel)
+        return nothing
+    end
+    @argcheck(!isempty(sel),
+              IsEmptyError("`sel` cannot be empty. Pass `sel = nothing` to read every feature column."))
+    @argcheck(allunique(sel),
+              ArgumentError("`sel` must not repeat an entry, because a repeated column doubles that column's contribution to every distance. Got\nsel => $sel"))
+    return nothing
+end
+"""
+    feature_selector_msg(name, nz, pool, key::Nothing) -> String
+    feature_selector_msg(name, nz, pool, key::AbstractString) -> String
+
+Build the warning/error text for a [`FeatureDistance`](@ref) selector entry that resolves against no column of `nz`. The two methods are the two ways that happens, and they take different remedies.
+
+Both name the size of `nz` rather than its members, the message shape [`unknown_variable_msg`](@ref) fixed for the same reason (ADR 0026): in the square case `nz` holds asset names, and a near-miss probe must not echo them back. The suggestion is gated by [`did_you_mean`](@ref)'s threshold, which is what makes naming a candidate pool safe at all.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `key` is `nothing`: the caller wrote `name` itself, and it is neither a column of `nz` nor a key of `sets.dict`. This is the typo case, so the message appends a [`did_you_mean`](@ref) suggestion drawn from `pool`, with `name` itself dropped from it.
+ 2. `key` is a string: the caller wrote the taxonomy key `key`, which expanded to the column `name`, and `Z` does not carry that column. This is not a typo — the key resolved — so no suggestion is drawn. The message says instead that the feature matrix was not built from this taxonomy.
+
+# Arguments
+
+  - `name`: The column name that resolved against no entry of `nz`.
+  - `nz`: The feature universe. Only its length reaches the message.
+  - `pool`: Suggestion pool: `nz` and, when `sets` is given, the keys of `sets.dict`.
+  - `key`: The taxonomy key that expanded to `name`, or `nothing` when the caller wrote `name` itself.
+
+# Returns
+
+  - `msg::String`: The diagnostic, ready for [`strict_diagnostic`](@ref).
+
+# Related
+
+  - [`FeatureDistance`](@ref)
+  - [`feature_selection_indices`](@ref)
+  - [`strict_diagnostic`](@ref)
+  - [`did_you_mean`](@ref)
+  - [`asset_sets_feature_names`](@ref)
+"""
+function feature_selector_msg(name, nz, pool, ::Nothing)
+    return "`FeatureDistance.sel` names `$(name)`, which is neither a column of the feature universe ($(length(nz)) features under key `nz`) nor a key of `sets.dict`. Under `strict = false` the entry is dropped." *
+           did_you_mean(string(name), filter(!=(string(name)), pool))
+end
+function feature_selector_msg(name, nz, ::Any, key::AbstractString)
+    return "`FeatureDistance.sel` names the taxonomy key `$(key)`, which expands to the column `$(name)`, and that column is not in the feature universe ($(length(nz)) features under key `nz`). Under `strict = false` the column is dropped. The feature matrix was not built from this taxonomy: `asset_sets_features` and `asset_sets_feature_names` build the matrix and its names from one traversal, so a matrix built by the first always carries the names of the second."
+end
+"""
+    feature_selection_push!(k::AbstractVector{<:Integer}, s::AbstractString, nz, sets, pool,
+                            strict::Bool)
+
+Resolve one [`FeatureDistance`](@ref) selector entry to column positions of `nz`, and push them onto `k`.
+
+An entry is read in one of two namespaces, and a key wins. When `sets` is given and `s` is one of its keys, `s` is a **taxonomy key** and expands through [`taxonomy_feature_names`](@ref) to every column that key contributes. Otherwise `s` is a **column name** and stands for itself. A key expands to names that carry `=`, so a plain column name whose text holds no `=` can never collide with the expansion of a key; the order matters only for a caller who named a column exactly as a taxonomy key.
+
+# Algorithm
+
+ 1. Decide whether `s` is a taxonomy key: `sets` is given and `sets.dict` holds `s`.
+ 2. Build the names to resolve. A key expands through [`taxonomy_feature_names`](@ref); a column name gives the one-element tuple `(s,)`.
+ 3. For each name, find its position in `nz`. Push the position onto `k` when it is found. Otherwise hand [`feature_selector_msg`](@ref) to [`strict_diagnostic`](@ref), which throws when `strict` and warns and drops otherwise.
+
+# Arguments
+
+  - `k`: Column positions found so far, pushed onto in place.
+  - `s`: One entry of `sel`, read as a taxonomy key or as a column name.
+  - `nz`: The feature universe the names resolve against.
+  - $(field_dict[:fdsets])
+  - `pool`: Suggestion pool handed to [`feature_selector_msg`](@ref).
+  - $(field_dict[:fdstrict])
+
+# Returns
+
+  - `nothing`. `k` carries the result.
+
+# Related
+
+  - [`FeatureDistance`](@ref)
+  - [`feature_selection_indices`](@ref)
+  - [`taxonomy_feature_names`](@ref)
+  - [`feature_selector_msg`](@ref)
+  - [`strict_diagnostic`](@ref)
+"""
+function feature_selection_push!(k::AbstractVector{<:Integer}, s::AbstractString, nz, sets,
+                                 pool, strict::Bool)::Nothing
+    iskey = !isnothing(sets) && haskey(sets.dict, s)
+    names = if iskey
+        taxonomy_feature_names(sets, s, "a `FeatureDistance` column selector")
+    else
+        (s,)
+    end
+    for name in names
+        j = findfirst(==(name), nz)
+        if isnothing(j)
+            strict_diagnostic(feature_selector_msg(name, nz, pool, iskey ? s : nothing),
+                              strict)
+        else
+            push!(k, j)
+        end
+    end
+    return nothing
+end
+"""
+    feature_selection_indices(sel::AbstractVector{<:Integer}, nz, sets, strict::Bool)
+    feature_selection_indices(sel::VecStr, nz::Option{<:VecStr}, sets, strict::Bool)
+
+Resolve a [`FeatureDistance`](@ref) column selector to positions on the feature axis.
+
+An integer selector **is** the positions, so it passes through untouched and reads neither `nz` nor `sets`. That is what lets it serve a carrier which holds no feature names: [`LowOrderPrior`](@ref) carries `Z` without `nz`, so under `z_src = :prior` an integer selector is the only one that can resolve.
+
+A name selector needs `nz`, and its absence is refused rather than warned about, whatever `strict` says. `strict` governs what is **droppable** — a name that resolves against nothing — and a missing name vector is not a droppable name: nothing can be resolved, so every entry would drop and the selection would be empty.
+
+# Algorithm
+
+An integer selector takes one step:
+
+ 1. Return `sel` itself.
+
+A name selector takes three steps:
+
+ 1. Check that `nz` is not `nothing`.
+ 2. Build the suggestion pool: `nz`, and the keys of `sets.dict` when `sets` is given.
+ 3. Resolve each entry with [`feature_selection_push!`](@ref), in the order `sel` writes them, and return the positions it collected.
+
+The order of `sel` is the order of the columns, so a caller decides the column order of the matrix the metric reads.
+
+# Arguments
+
+  - $(field_dict[:fdsel])
+  - `nz`: The feature universe the names resolve against, or `nothing`.
+  - $(field_dict[:fdsets])
+  - $(field_dict[:fdstrict])
+
+# Validation
+
+  - Under a name selector: `!isnothing(nz)`. Raises an [`IsNothingError`](@ref).
+
+# Returns
+
+  - `k`: Column positions on the feature axis, in the order `sel` writes them.
+
+# Related
+
+  - [`FeatureDistance`](@ref)
+  - [`select_features`](@ref)
+  - [`feature_selection_push!`](@ref)
+  - [`LowOrderPrior`](@ref)
+"""
+function feature_selection_indices(sel::AbstractVector{<:Integer}, ::Any, ::Any, ::Bool)
+    return sel
+end
+function feature_selection_indices(sel::VecStr, nz::Option{<:VecStr}, sets, strict::Bool)
+    @argcheck(!isnothing(nz),
+              IsNothingError("`FeatureDistance.sel` names features, but the carrier holds no feature names. `LowOrderPrior` carries `Z` without `nz`, so a name cannot be resolved under `z_src = :prior`. Two ways forward:\n  1. Select by integer index, which needs no names.\n  2. Carry the feature matrix on the `ReturnsResult`, which requires `nz` beside `Z`, and read it with `z_src = :data`."))
+    pool = isnothing(sets) ? nz : vcat(nz, collect(keys(sets.dict)))
+    k = Int[]
+    for s in sel
+        feature_selection_push!(k, s, nz, sets, pool, strict)
+    end
+    return k
+end
+"""
+    select_features(de::FeatureDistance{<:Any, <:Any, <:Any, Nothing}, Z::ArrNum,
+                    nz::Option{<:VecStr}, dims::Integer)
+    select_features(de::FeatureDistance, Z::ArrNum, nz::Option{<:VecStr}, dims::Integer)
+
+Cut a feature matrix down to the columns a [`FeatureDistance`](@ref) selector names.
+
+A `nothing` selector reads every column, which is the behaviour every caller had before a selector existed, so that method returns `Z` itself and builds no view. The selection is a `view`, so no column is copied.
+
+`dims` names the **asset** axis, and the feature axis is the trailing one beside it: axis `ndims(Z)` at `dims = 1`, and axis `ndims(Z) - 1` at `dims = 2`. That holds for both shapes, the static `assets × features` matrix and the time-varying `observations × assets × features` array.
+
+## The square case
+
+When the feature axis is the asset axis ([`features_are_assets`](@ref)), a selector name is an **asset** name, and the selection keeps every row while cutting the reference columns down — every asset's distance is then measured against the named assets alone. That is a legitimate reading and it is not special-cased.
+
+It carries one hazard. [`port_opt_view`](@ref) slices `nz` by the asset index in the square case, so after a view `nz` holds only that cluster's assets. A `sel` naming an asset outside the cluster therefore resolves in some folds and drops in others, and under `strict = false` it drops with a warning rather than a throw. Set `strict = true` when the selection must be the same in every fold.
+
+# Algorithm
+
+A `nothing` selector takes one step:
+
+ 1. Return `Z`.
+
+Every other selector takes four steps:
+
+ 1. Resolve the selector to column positions `k` with [`feature_selection_indices`](@ref).
+ 2. Read the feature axis from `dims`, and its length `n` from `Z`.
+ 3. Check that `k` is non-empty and that every position lies in `1:n`.
+ 4. Return `selectdim(Z, ax, k)`, a view of `Z` on the feature axis.
+
+# Arguments
+
+  - `de`: Feature distance estimator, read for its `sel`, `sets` and `strict`.
+  - $(arg_dict[:Z])
+  - `nz`: The feature universe the names resolve against, or `nothing`.
+  - $(arg_dict[:dims])
+
+# Validation
+
+  - `!isempty(k)`. Raises an [`IsEmptyError`](@ref): every entry of `sel` resolved against nothing and was dropped.
+  - `all(j -> 1 <= j <= n, k)`. Raises a `DomainError`.
+
+# Returns
+
+  - A view of `Z` holding the selected feature columns, or `Z` itself under a `nothing` selector.
+
+# Related
+
+  - [`FeatureDistance`](@ref)
+  - [`feature_selection_indices`](@ref)
+  - [`features_are_assets`](@ref)
+  - [`port_opt_view`](@ref)
+  - [`distance`](@ref)
+"""
+function select_features(::FeatureDistance{<:Any, <:Any, <:Any, Nothing}, Z::ArrNum,
+                         ::Option{<:VecStr}, ::Integer)
+    return Z
+end
+function select_features(de::FeatureDistance, Z::ArrNum, nz::Option{<:VecStr},
+                         dims::Integer)
+    k = feature_selection_indices(de.sel, nz, de.sets, de.strict)
+    ax = dims == 1 ? ndims(Z) : ndims(Z) - 1
+    n = size(Z, ax)
+    @argcheck(!isempty(k),
+              IsEmptyError("`FeatureDistance.sel` selected no column of the $(n)-column feature axis: every entry resolved against nothing and was dropped. Set `strict = true` to see which entry, or correct `sel`."))
+    @argcheck(all(j -> 1 <= j <= n, k),
+              DomainError(k,
+                          "`FeatureDistance.sel` indexes outside the feature axis, which holds $(n) columns."))
+    return selectdim(Z, ax, k)
 end
 """
     assert_metric_domain(metric::Distances.SemiMetric, Z::ArrNum, sym::Symbol = :Z)
@@ -954,11 +1274,17 @@ julia> distance(FeatureDistance(), Z)
   - [`cor_and_dist`](@ref)
   - [`AbstractFeatureCollapseAlgorithm`](@ref)
 """
-function distance(de::FeatureDistance, Z::MatNum; dims::Int = 1, kwargs...)
+function distance(de::FeatureDistance, Z::MatNum; dims::Int = 1,
+                  nz::Option{<:VecStr} = nothing, kwargs...)
+    assert_dims(dims)
+    Z = select_features(de, Z, nz, dims)
     assert_feature_matrix(de, Z, dims)
     return feature_distance(de.metric, Z, dims)
 end
-function distance(de::FeatureDistance, Z::Arr3Num; dims::Int = 1, kwargs...)
+function distance(de::FeatureDistance, Z::Arr3Num; dims::Int = 1,
+                  nz::Option{<:VecStr} = nothing, kwargs...)
+    assert_dims(dims)
+    Z = select_features(de, Z, nz, dims)
     assert_feature_matrix(de, Z, dims)
     return feature_distance(de, Z, dims)
 end
@@ -1122,14 +1448,14 @@ Every consumer in the clustering and network stack calls `cor_and_dist(de, ce, X
   - [`phylogeny_matrix`](@ref)
 """
 function distance(de::FeatureDistance, ::Any, ::Any; Z::Option{<:ArrNum} = nothing,
-                  z_src::Symbol = :none, kwargs...)
+                  nz::Option{<:VecStr} = nothing, z_src::Symbol = :none, kwargs...)
     assert_feature_matrix_supplied(Z, z_src)
-    return distance(de, Z; dims = 1)
+    return distance(de, Z; dims = 1, nz = nz)
 end
 function cor_and_dist(de::FeatureDistance, ::Any, ::Any; Z::Option{<:ArrNum} = nothing,
-                      z_src::Symbol = :none, kwargs...)
+                      nz::Option{<:VecStr} = nothing, z_src::Symbol = :none, kwargs...)
     assert_feature_matrix_supplied(Z, z_src)
-    return cor_and_dist(de, Z; dims = 1)
+    return cor_and_dist(de, Z; dims = 1, nz = nz)
 end
 
 export AngularDist, MeanCollapse, MedianCollapse, LastObservation, AggregateFeatures,

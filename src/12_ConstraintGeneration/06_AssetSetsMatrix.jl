@@ -1284,8 +1284,49 @@ julia> asset_sets_feature_names([\"nx_sector\", \"nx_country\"], sets)
 function asset_sets_feature_names(vals::AbstractVector{<:AbstractString},
                                   sets::UniverseSets)::Vector{String}
     assert_feature_keys(vals)
-    return [string(v, "=", g) for v in vals
-            for g in unique(taxonomy_column(sets, v, "asset_sets_feature_names"))]
+    return reduce(vcat,
+                  taxonomy_feature_names(sets, v, "asset_sets_feature_names") for v in vals)
+end
+"""
+    taxonomy_feature_names(sets, key::AbstractString, need::AbstractString) -> Vector{String}
+
+Name the feature columns one taxonomy key contributes: `\"<key>=<group>\"`, one per distinct group value, in order of first appearance.
+
+This is the single encoding of the qualified-name convention. [`asset_sets_feature_names`](@ref) concatenates one call per key to name the whole matrix [`asset_sets_features`](@ref) builds, and a [`FeatureDistance`](@ref) column selector calls it to expand a taxonomy key a caller wrote in `sel`. The two agree because they read one function, not two copies of a rule.
+
+A name is qualified by its key rather than left as the bare group value because a **nested** taxonomy reuses its values across levels: an integrated-oil producer is in industry `IntegratedOil` and sub-industry `IntegratedOil`, so bare values would collide and [`ReturnsResult`](@ref)'s uniqueness check would reject them.
+
+# Algorithm
+
+ 1. Read the taxonomy column of `key` through [`taxonomy_column`](@ref), which raises a `KeyError` naming `need` when `sets.dict` holds no such key.
+ 2. Take the distinct group values in order of first appearance.
+ 3. Name each one `\"<key>=<group>\"`, in that order.
+
+# Arguments
+
+  - `sets`: A [`UniverseSets`](@ref) holding the taxonomy.
+  - `key`: The group name key to name the columns of.
+  - `need`: The caller's name, which [`taxonomy_column`](@ref) puts in its `KeyError`.
+
+# Validation
+
+  - `haskey(sets.dict, key)` (enforced by [`taxonomy_column`](@ref)).
+
+# Returns
+
+  - `names::Vector{String}`: One name per distinct group value of `key`, in order of first appearance.
+
+# Related
+
+  - [`asset_sets_feature_names`](@ref)
+  - [`asset_sets_features`](@ref)
+  - [`taxonomy_column`](@ref)
+  - [`FeatureDistance`](@ref)
+  - [`feature_selection_push!`](@ref)
+"""
+function taxonomy_feature_names(sets, key::AbstractString,
+                                need::AbstractString)::Vector{String}
+    return [string(key, "=", g) for g in unique(taxonomy_column(sets, key, need))]
 end
 """
     asset_sets_feature_names(vals::AbstractVector{<:Pair}, sets::UniverseSets) -> Vector{String}

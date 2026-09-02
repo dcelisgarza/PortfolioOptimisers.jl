@@ -11,6 +11,11 @@ AggregateFeatures
 AggregateDistances
 StackObservations
 FeatureDistance
+assert_feature_selector
+feature_selector_msg
+feature_selection_push!
+feature_selection_indices
+select_features
 assert_metric_domain
 assert_feature_matrix
 zero_feature_vectors

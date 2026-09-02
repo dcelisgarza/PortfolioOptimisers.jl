@@ -15,6 +15,7 @@ resolve_feature_value
 PortfolioOptimisers.Num_AFeatVal
 asset_sets_features
 asset_sets_feature_names
+taxonomy_feature_names
 PortfolioOptimisers.feature_program_candidates
 PortfolioOptimisers.is_feature_taxonomy_key
 PortfolioOptimisers.is_feature_factor_key
