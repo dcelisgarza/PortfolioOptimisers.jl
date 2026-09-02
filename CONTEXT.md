@@ -99,6 +99,13 @@ A producer turning something the library already computes, or a classification t
 **Feature Program**
 An ordered, last-wins list of authored edges resolving into a Feature Matrix. Where the group-key form stacks partitions and derives its axis, a Program writes cells into an axis the caller declared.
 
+**Asset Panel**
+An observations × assets container of point-in-time per-asset data, holding a blank cell where a value was unknown on that date, a level list for a categorical Panel Field, and the universe masks.
+*Avoid*: Feature Matrix (above), which is a finite numeric array carrying neither a blank cell nor a mask.
+
+**Panel Field**
+One named column of an Asset Panel: a market capitalisation, a book value, a sector classification.
+
 **Implied Volatility**
 A forward-looking estimate of an asset's expected price fluctuation, derived from current option prices. Not a historical measurement.
 
@@ -123,6 +130,13 @@ Computes a per-asset mean-return vector. Variants:
 - **StandardDeviationExpectedReturns** / **VarianceExpectedReturns**: the asset standard deviations / variances, where a "return" slot should carry dispersion.
 - **CustomValueExpectedReturns**: user-supplied per-asset values.
 - **WindowedExpectedReturns**: the Windowed Estimator for expected returns.
+
+**Return Forecast**
+A per-asset prediction of the next period's return, supplied by the caller or fitted, which enters a Prior's mean vector.
+*Avoid*: `alpha` (§5), which is the Significance Level of a tail; and Expected Returns (above), which is a moment estimated from the sample.
+
+**Return Forecast Estimator**
+A producer of a Return Forecast.
 
 ### 3.2 Covariance & Variance (Moments)
 
@@ -156,6 +170,29 @@ Builds a factor model mapping factor returns to asset returns, underpinning fact
 - **DimensionReductionRegression**: regression on reduced factors — targets `PCA`, `PPCA`.
 - **Regression target** models: `LinearModel`, `GeneralisedLinearModel` (GLM).
 
+**Cross-Sectional Regression**
+A regression of one observation's asset returns on the lagged Factor Exposures across the assets, one fit per observation.
+*Avoid*: Regression Estimator (above), whose families fit one asset at a time over the observations.
+
+**Descriptor**
+A per-asset value computed from one or more Panel Fields at one observation: a momentum, a book-to-price ratio, an exponentially weighted volatility.
+*Avoid*: Score (§1), which is the per-asset number a `ScoreSelector` ranks on.
+
+**Descriptor Estimator**
+A producer of one Descriptor.
+
+**Factor Exposure**
+One asset's loading on one factor at one observation, built from Descriptors or from a one-hot Panel Field. The matrix of them is the loadings matrix a Regression carries, which is where a Factor Exposure Constraint (§4.4) reads it.
+*Avoid*: net and gross exposure (§4.4), which are statements about the weights rather than about a factor model.
+
+**Exposure Estimator**
+A producer of a Factor Exposure matrix.
+*Avoid*: Feature Matrix Estimator (§2), which produces the exogenous data the distance and clustering stack reads.
+
+**Factor Family**
+A set of factors carrying one benchmark-weighted zero-sum constraint, so exactly one member of the set is redundant.
+*Avoid*: the bare word "family", which names a group of Estimator types everywhere else in this glossary.
+
 ### 3.5 Matrix Processing
 
 **Denoising**
@@ -179,6 +216,7 @@ Structural axes: **low-order** is mean plus covariance, **high-order** adds cosk
 
 - **EmpiricalPrior**: moments computed directly from returns.
 - **FactorPrior** / **HighOrderFactorPriorEstimator**: moments reconstructed through a factor model.
+- **CrossSectionalFactorPrior**: moments reconstructed through a factor model whose Factor Exposures are built from an Asset Panel and fitted by a Cross-Sectional Regression.
 - **HighOrderPriorEstimator**: empirical high-order prior.
 - **Black-Litterman family**: blends market-equilibrium priors with investor views — `BlackLittermanPrior`, `BayesianBlackLittermanPrior`, `FactorBlackLittermanPrior`, `AugmentedBlackLittermanPrior`, with `BlackLittermanViews` as the views container.
 - **EntropyPoolingPrior**: re-weights scenario probabilities to satisfy views with minimal relative entropy.
@@ -260,6 +298,9 @@ A neighbourhood of a specific quantity — a mean vector or a covariance matrix 
 **Compact Covariance Uncertainty Set**
 The covariance shape stated as a radius, a diagonal metric square root and a basis of the directions the worst case spares, rather than as a shape matrix on the vectorised covariance. Its worst-case variance is a quadratic penalty on the weights, so the consumer adds one cone and one free coefficient vector rather than the lifted semidefinite block the Ellipsoidal shape needs. `CompactCovarianceUncertaintySet` builds it.
 *Avoid*: Ellipsoidal (above), whose radius is a quantile of a dimension; this one's radius is a size the caller sets.
+
+**Orthogonal Subspace**
+The orthogonal complement of the column space of the weighted loading matrix. An Uncertainty Set confined to it prices no error in a direction the factor model already explains.
 
 **ucs Triple**
 The three ways to ask an Uncertainty Set estimator for its sets: `ucs` for the mean and covariance sets as a pair, `mu_ucs` for the mean half, `sigma_ucs` for the covariance half.
