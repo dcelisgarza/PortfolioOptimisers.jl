@@ -86,6 +86,36 @@ PortfolioOptimisers.assert_panel_finite
 PortfolioOptimisers.assert_panel_feature_axis
 ```
 
+## A synthetic Asset Panel
+
+An acceptance test of a cross-sectional factor model needs a panel whose factor model is already
+known, and no such dataset ships with the package. [`synthetic_asset_panel`](@ref) draws one: a
+point-in-time [`AssetPanel`](@ref) of twenty fundamental and market Panel Fields and one industry
+classification, and beside it the factor returns, the Factor Exposures and the idiosyncratic
+variances it drew them from. Every Panel Field is a noisy function of the same per-asset traits
+that set the exposures, so a model fitted on the panel recovers what the generator drew.
+
+```@docs
+synthetic_asset_panel
+PortfolioOptimisers.SYNTHETIC_PERIODS_PER_YEAR
+PortfolioOptimisers.SYNTHETIC_INDUSTRIES
+PortfolioOptimisers.SYNTHETIC_STYLES
+PortfolioOptimisers.SYNTHETIC_MEDIANS
+PortfolioOptimisers.SYNTHETIC_COVERAGE
+PortfolioOptimisers.SYNTHETIC_DYNAMICS
+PortfolioOptimisers.synthetic_standardise
+PortfolioOptimisers.synthetic_ar1_paths
+PortfolioOptimisers.synthetic_ar1_filter
+PortfolioOptimisers.synthetic_fat_tailed_normal
+PortfolioOptimisers.synthetic_panel_ratios
+PortfolioOptimisers.synthetic_panel_factors
+PortfolioOptimisers.synthetic_panel_returns
+PortfolioOptimisers.synthetic_panel_masks
+PortfolioOptimisers.synthetic_panel_fields
+PortfolioOptimisers.synthetic_panel_blank!
+PortfolioOptimisers.synthetic_panel_inputs
+```
+
 ## Price-level data
 
 ```@docs

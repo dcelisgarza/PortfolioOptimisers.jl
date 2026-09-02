@@ -33,6 +33,7 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/03_AssetPanel.jl" = { raw = 0, reviewed = 0 }
 "src/03_AssetPanelBuilder.jl" = { raw = 0, reviewed = 0 }
 "src/03_Preprocessing.jl" = { raw = 19, reviewed = 19 }
+"src/03_SyntheticAssetPanel.jl" = { raw = 0, reviewed = 0 }
 "src/04_PosdefMatrix.jl" = { raw = 14, reviewed = 14 }
 "src/05_Denoise.jl" = { raw = 1, reviewed = 1 }
 "src/06_Detone.jl" = { raw = 0, reviewed = 0 }
@@ -269,6 +270,7 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/03_AssetPanel.jl" = { raw = 0, reviewed = 0 }
 "src/03_AssetPanelBuilder.jl" = { raw = 0, reviewed = 0 }
 "src/03_Preprocessing.jl" = { raw = 0, reviewed = 0 }
+"src/03_SyntheticAssetPanel.jl" = { raw = 0, reviewed = 0 }
 "src/04_PosdefMatrix.jl" = { raw = 0, reviewed = 0 }
 "src/05_Denoise.jl" = { raw = 0, reviewed = 0 }
 "src/06_Detone.jl" = { raw = 0, reviewed = 0 }
@@ -505,6 +507,7 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/03_AssetPanel.jl" = { raw = 0, reviewed = 0 }
 "src/03_AssetPanelBuilder.jl" = { raw = 0, reviewed = 0 }
 "src/03_Preprocessing.jl" = { raw = 0, reviewed = 0 }
+"src/03_SyntheticAssetPanel.jl" = { raw = 0, reviewed = 0 }
 "src/04_PosdefMatrix.jl" = { raw = 0, reviewed = 0 }
 "src/05_Denoise.jl" = { raw = 0, reviewed = 0 }
 "src/06_Detone.jl" = { raw = 0, reviewed = 0 }

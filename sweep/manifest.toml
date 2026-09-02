@@ -61,6 +61,7 @@
 "src/03_AssetPanel.jl" = { map = 2, units = 14, swept = false }
 "src/03_AssetPanelBuilder.jl" = { map = 2, units = 26, swept = false }
 "src/03_Preprocessing.jl" = { map = 2, units = 44, algorithm = 22, swept = true }
+"src/03_SyntheticAssetPanel.jl" = { map = 2, units = 18, swept = false }
 "src/04_PosdefMatrix.jl" = { map = 2, units = 4, algorithm = 2, swept = true }
 "src/05_Denoise.jl" = { map = 2, units = 10, algorithm = 7, swept = true }
 "src/06_Detone.jl" = { map = 2, units = 4, algorithm = 2, swept = true }
