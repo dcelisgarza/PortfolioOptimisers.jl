@@ -11,7 +11,7 @@ commit = "8787635a8f"
 [file]
 "ext/PortfolioOptimisersImputeExt.jl" = { code = 6, doc = 0, comment = 3, blank = 3, total = 12 }
 "ext/PortfolioOptimisersPlotsExt.jl" = { code = 1963, doc = 0, comment = 129, blank = 41, total = 2133 }
-"src/01_Base/01_DocstringDictionaries.jl" = { code = 1074, doc = 113, comment = 120, blank = 43, total = 1350 }
+"src/01_Base/01_DocstringDictionaries.jl" = { code = 1075, doc = 113, comment = 120, blank = 43, total = 1351 }
 "src/01_Base/02_TypeRoots.jl" = { code = 13, doc = 157, comment = 0, blank = 61, total = 231 }
 "src/01_Base/03_PrettyShow.jl" = { code = 107, doc = 102, comment = 0, blank = 58, total = 267 }
 "src/01_Base/04_ScopedConfig.jl" = { code = 133, doc = 401, comment = 2, blank = 180, total = 716 }
@@ -24,7 +24,7 @@ commit = "8787635a8f"
 "src/01_Base/11_VecScalar.jl" = { code = 16, doc = 46, comment = 0, blank = 20, total = 82 }
 "src/01_Base/12_NormError.jl" = { code = 106, doc = 313, comment = 0, blank = 129, total = 548 }
 "src/01_Base/13_KappaLog.jl" = { code = 3, doc = 36, comment = 0, blank = 18, total = 57 }
-"src/01_Base/14_PartialFit.jl" = { code = 37, doc = 87, comment = 0, blank = 45, total = 169 }
+"src/01_Base/14_PartialFit.jl" = { code = 56, doc = 145, comment = 0, blank = 81, total = 282 }
 "src/02_Tools.jl" = { code = 808, doc = 2044, comment = 46, blank = 867, total = 3765 }
 "src/03_InputData/01_AssetPanel.jl" = { code = 175, doc = 411, comment = 0, blank = 190, total = 776 }
 "src/03_InputData/02_AssetPanelBuilder.jl" = { code = 330, doc = 697, comment = 2, blank = 316, total = 1345 }
@@ -34,9 +34,9 @@ commit = "8787635a8f"
 "src/06_Detone.jl" = { code = 46, doc = 188, comment = 0, blank = 81, total = 315 }
 "src/07_MatrixProcessing.jl" = { code = 74, doc = 352, comment = 0, blank = 118, total = 544 }
 "src/08_Moments/01_Base_Moments.jl" = { code = 440, doc = 939, comment = 9, blank = 375, total = 1763 }
-"src/08_Moments/02_SimpleExpectedReturns.jl" = { code = 20, doc = 103, comment = 0, blank = 45, total = 168 }
-"src/08_Moments/03_Covariance.jl" = { code = 78, doc = 359, comment = 0, blank = 135, total = 572 }
-"src/08_Moments/04_SimpleVariance.jl" = { code = 64, doc = 338, comment = 0, blank = 132, total = 534 }
+"src/08_Moments/02_SimpleExpectedReturns.jl" = { code = 75, doc = 280, comment = 0, blank = 128, total = 483 }
+"src/08_Moments/03_Covariance.jl" = { code = 166, doc = 640, comment = 0, blank = 258, total = 1064 }
+"src/08_Moments/04_SimpleVariance.jl" = { code = 119, doc = 536, comment = 0, blank = 217, total = 872 }
 "src/08_Moments/05_GerberCovariance.jl" = { code = 94, doc = 495, comment = 6, blank = 195, total = 790 }
 "src/08_Moments/06_SmythBrobyCovariance.jl" = { code = 223, doc = 978, comment = 0, blank = 420, total = 1621 }
 "src/08_Moments/07_DistanceCovariance.jl" = { code = 98, doc = 279, comment = 0, blank = 123, total = 500 }
@@ -72,7 +72,7 @@ commit = "8787635a8f"
 "src/08_Moments/37_RegimeAdjustedExpWeightedCovariance.jl" = { code = 60, doc = 179, comment = 0, blank = 74, total = 313 }
 "src/08_Moments/38_CrossSectionalRegression.jl" = { code = 198, doc = 504, comment = 0, blank = 210, total = 912 }
 "src/08_Moments/39_CrossSectionalWeights.jl" = { code = 138, doc = 366, comment = 0, blank = 166, total = 670 }
-"src/08_Moments/40_HigherMomentPartialFit.jl" = { code = 114, doc = 389, comment = 0, blank = 195, total = 698 }
+"src/08_Moments/40_HigherMomentPartialFit.jl" = { code = 120, doc = 422, comment = 0, blank = 216, total = 758 }
 "src/08_Moments/41_CrossSectionalFactorModel.jl" = { code = 157, doc = 281, comment = 7, blank = 104, total = 549 }
 "src/09_Distance/01_Base_Distance.jl" = { code = 24, doc = 222, comment = 0, blank = 89, total = 335 }
 "src/09_Distance/02_Distance.jl" = { code = 158, doc = 350, comment = 0, blank = 157, total = 665 }

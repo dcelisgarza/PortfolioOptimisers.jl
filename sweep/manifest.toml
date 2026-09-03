@@ -57,7 +57,7 @@
 "src/01_Base/11_VecScalar.jl" = { map = 1, units = 3, algorithm = 0, swept = true }
 "src/01_Base/12_NormError.jl" = { map = 1, units = 8, algorithm = 2, swept = true }
 "src/01_Base/13_KappaLog.jl" = { map = 1, units = 1, algorithm = 0, swept = true }
-"src/01_Base/14_PartialFit.jl" = { map = 1, units = 4, swept = false }
+"src/01_Base/14_PartialFit.jl" = { map = 1, units = 6, swept = false }
 "src/02_Tools.jl" = { map = 1, units = 69, algorithm = 49, swept = true }
 "src/03_InputData/01_AssetPanel.jl" = { map = 2, units = 14, swept = false }
 "src/03_InputData/02_AssetPanelBuilder.jl" = { map = 2, units = 26, swept = false }
@@ -67,9 +67,9 @@
 "src/06_Detone.jl" = { map = 2, units = 4, algorithm = 2, swept = true }
 "src/07_MatrixProcessing.jl" = { map = 2, units = 8, algorithm = 3, swept = true }
 "src/08_Moments/01_Base_Moments.jl" = { map = 3, units = 34, algorithm = 17, swept = true }
-"src/08_Moments/02_SimpleExpectedReturns.jl" = { map = 3, units = 2, algorithm = 1, swept = true }
-"src/08_Moments/03_Covariance.jl" = { map = 3, units = 9, algorithm = 7, swept = true }
-"src/08_Moments/04_SimpleVariance.jl" = { map = 3, units = 8, algorithm = 5, swept = true }
+"src/08_Moments/02_SimpleExpectedReturns.jl" = { map = 3, units = 10, algorithm = 6, swept = true }
+"src/08_Moments/03_Covariance.jl" = { map = 3, units = 25, algorithm = 14, swept = true }
+"src/08_Moments/04_SimpleVariance.jl" = { map = 3, units = 16, algorithm = 10, swept = true }
 "src/08_Moments/05_GerberCovariance.jl" = { map = 3, units = 13, algorithm = 9, swept = true }
 "src/08_Moments/06_SmythBrobyCovariance.jl" = { map = 3, units = 35, algorithm = 24, swept = true }
 "src/08_Moments/07_DistanceCovariance.jl" = { map = 3, units = 8, algorithm = 7, swept = true }
@@ -105,7 +105,7 @@
 "src/08_Moments/37_RegimeAdjustedExpWeightedCovariance.jl" = { map = 3, units = 7, swept = false }
 "src/08_Moments/38_CrossSectionalRegression.jl" = { map = 3, units = 18, swept = false }
 "src/08_Moments/39_CrossSectionalWeights.jl" = { map = 3, units = 10, swept = false }
-"src/08_Moments/40_HigherMomentPartialFit.jl" = { map = 3, units = 18, swept = false }
+"src/08_Moments/40_HigherMomentPartialFit.jl" = { map = 3, units = 19, swept = false }
 "src/08_Moments/41_CrossSectionalFactorModel.jl" = { map = 3, units = 9, swept = false }
 "src/09_Distance/01_Base_Distance.jl" = { map = 2, units = 8, algorithm = 1, swept = true }
 "src/09_Distance/02_Distance.jl" = { map = 2, units = 13, algorithm = 8, swept = true }

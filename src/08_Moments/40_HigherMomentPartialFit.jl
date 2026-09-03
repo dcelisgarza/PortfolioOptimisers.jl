@@ -249,6 +249,8 @@ A partial fit keeps the running sample mean and the central co-moments about it,
   - **Observation weights.** A weights vector describes a sample of a fixed length, and a [`DynamicAbstractWeights`](@ref) derives every weight from the length of the sample. Either way a new observation reweights every past one, so no state written before it is still valid.
   - **A mean estimator that is not the plain sample mean.** The state carries the running sample mean, so an estimator whose centre is a shrunk, a median or a custom value would be centred on a quantity the state does not hold.
 
+An estimator that carries no centring field hands over `nothing`, which the `Nothing` method reads as [`SimpleExpectedReturns`](@ref), because that is the centre such an estimator takes.
+
 # Arguments
 
   - `me`: Expected returns estimator of the estimator being fitted.
@@ -276,6 +278,14 @@ function assert_partial_fittable(me::AbstractExpectedReturnsEstimator,
     @argcheck(isa(me, SimpleExpectedReturns) && isnothing(me.w),
               ArgumentError("$name cannot be fitted incrementally with `me = $(typeof(me))`, because a partial-fit state carries the running sample mean and no other centre. Set `me = SimpleExpectedReturns()`, or run the batch verb."))
     return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+`Nothing` method of [`assert_partial_fittable`](@ref). An estimator that carries no centring field, and one whose `nothing` selects [`SimpleExpectedReturns`](@ref), both centre on the plain sample mean, so the pair is checked against that estimator and only the weights can refuse it.
+"""
+function assert_partial_fittable(::Nothing, w::Option{<:ObsWeights}, name::AbstractString)
+    return assert_partial_fittable(SimpleExpectedReturns(), w, name)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

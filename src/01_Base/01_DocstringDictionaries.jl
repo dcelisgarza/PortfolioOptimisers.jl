@@ -806,7 +806,8 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :ps_sortino => "`sortino`: Annualised Sortino ratio, at a zero minimum acceptable return. `NaN` if the downside deviation is zero.",#
                                  :ps_calmar => "`calmar`: Annualised return divided by the absolute maximum drawdown. `NaN` if there is no drawdown.",#
                                  :ps_max_drawdown => "`max_drawdown`: Maximum drawdown, in return space, so it is non-positive.",#
-                                 :ps_cvar => "`cvar`: Conditional Value-at-Risk at `alpha`, in return space, so a tail loss is negative.")
+                                 :ps_cvar => "`cvar`: Conditional Value-at-Risk at `alpha`, in return space, so a tail loss is negative.",#
+                                 :pf_M => "`M`: Running second-moment accumulator of the observations folded into the state, about `mu`.")
 """
     field_dict
 

@@ -16,7 +16,8 @@ $(DocStringExtensions.FIELDS)
     SimpleVariance(;
         me::Option{<:AbstractExpectedReturnsEstimator} = SimpleExpectedReturns(),
         w::Option{<:ObsWeights} = nothing,
-        corrected::Bool = true
+        corrected::Bool = true,
+        cache::Option{<:AbstractPartialFitState} = nothing
     ) -> SimpleVariance
 
 Keywords correspond to the struct's fields.
@@ -74,6 +75,8 @@ SimpleVariance
   - [`std(ve::SimpleVariance, X::VecNum; mean = nothing, kwargs...)`](@ref)
   - [`var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
   - [`var(ve::SimpleVariance, X::VecNum; mean = nothing)`](@ref)
+  - [`SimpleVarianceState`](@ref)
+  - [`partial_fit!`](@ref)
   - [`factory`](@ref)
   - [`port_opt_view`](@ref)
   - [`obs_weights_view`](@ref)
@@ -91,18 +94,47 @@ SimpleVariance
     $(field_dict[:corrected])
     """
     corrected
+    """
+    $(field_dict[:pfcache])
+    """
+    cache
     function SimpleVariance(me::Option{<:AbstractExpectedReturnsEstimator},
-                            w::Option{<:ObsWeights}, corrected::Bool)
+                            w::Option{<:ObsWeights}, corrected::Bool,
+                            cache::Option{<:AbstractPartialFitState})
         assert_nonempty_nonneg_finite_val(w, :w)
-        return new{typeof(me), typeof(w), typeof(corrected)}(me, w, corrected)
+        return new{typeof(me), typeof(w), typeof(corrected), typeof(cache)}(me, w,
+                                                                            corrected,
+                                                                            cache)
     end
 end
 function SimpleVariance(;
                         me::Option{<:AbstractExpectedReturnsEstimator} = SimpleExpectedReturns(),
-                        w::Option{<:ObsWeights} = nothing,
-                        corrected::Bool = true)::SimpleVariance
-    return SimpleVariance(me, w, corrected)
+                        w::Option{<:ObsWeights} = nothing, corrected::Bool = true,
+                        cache::Option{<:AbstractPartialFitState} = nothing)::SimpleVariance
+    return SimpleVariance(me, w, corrected, cache)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Renders every field of a [`SimpleVariance`](@ref) except `cache`.
+
+The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:SimpleVariance, true)` to render it. ADR 0105 records the decision.
+
+# Arguments
+
+  - `::SimpleVariance`: Variance estimator, read for its type alone.
+
+# Returns
+
+  - `fields::Tuple`: The field names to render, which is `(:me, :w, :corrected)`.
+
+# Related
+
+  - [`SimpleVariance`](@ref)
+  - [`show_fields`](@ref)
+  - [`set_show_nothing_fields!`](@ref)
+"""
+show_fields(::SimpleVariance) = (:me, :w, :corrected)
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -530,5 +562,311 @@ julia> var(svw, X)
 """
 function Statistics.var(ve::SimpleVariance, X::VecNum; mean = nothing)
     return simple_variance_kernel(Statistics.var, ve, X; mean = mean)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Carries the running observation count, mean and per-asset second-moment accumulator of an incremental variance fit.
+
+The state of [`SimpleVariance`](@ref) under [`partial_fit!`](@ref). `M` is the accumulator ``\\sum_t (r_{tj} - \\hat{\\mu}_j)^2`` and not the variance, so [`var(ve::SimpleVariance, state::SimpleVarianceState)`](@ref) divides it by the count, or by the count less one when `ve.corrected` holds.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    SimpleVarianceState(;
+        n::Integer = 0,
+        mu::VecNum,
+        M::VecNum = zeros(eltype(mu), length(mu))
+    ) -> SimpleVarianceState
+
+Keywords correspond to the struct's fields. A state seeded for `N` assets is `SimpleVarianceState(; mu = zeros(N))`, which [`partial_fit!`](@ref) builds when the `cache` field of the estimator holds `nothing`.
+
+## Validation
+
+  - `n >= 0`. A `DomainError` is thrown otherwise.
+  - `!isempty(mu)`. An `IsEmptyError` is thrown otherwise.
+  - Every entry of `mu` and of `M` is finite. An `IsNonFiniteError` is thrown otherwise.
+  - `length(M) == length(mu)`. A `DimensionMismatch` is thrown otherwise.
+
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, its fields are subset to the selected assets:
+
+  - `mu`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `M`: Sliced to the selected indices via [`port_opt_view`](@ref).
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.SimpleVarianceState(; mu = [0.0, 0.0])
+PortfolioOptimisers.SimpleVarianceState
+   n ┼ Int64: 0
+  mu ┼ Vector{Float64}: [0.0, 0.0]
+   M ┴ Vector{Float64}: [0.0, 0.0]
+```
+
+# Related
+
+  - [`AbstractPartialFitState`](@ref)
+  - [`SimpleVariance`](@ref)
+  - [`partial_fit!`](@ref)
+  - [`merge_states`](@ref)
+"""
+@concrete struct SimpleVarianceState <: AbstractPartialFitState
+    """
+    $(field_dict[:pf_n])
+    """
+    n
+    """
+    $(field_dict[:pf_mu])
+    """
+    mu
+    """
+    $(field_dict[:pf_M])
+    """
+    M
+end
+function SimpleVarianceState(; n::Integer = 0, mu::VecNum,
+                             M::VecNum = zeros(eltype(mu), length(mu)))::SimpleVarianceState
+    assert_partial_fit_state(n, mu, M)
+    return SimpleVarianceState(n, mu, M)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Folds two [`SimpleVarianceState`](@ref) fitted on disjoint blocks into the state of the concatenated block.
+
+# Algorithm
+
+ 1. Refuse the pair with [`assert_mergeable_states`](@ref).
+ 2. Fold the counts, the means and the accumulators with [`chan_merge`](@ref), whose elementwise method reads a per-asset accumulator.
+
+# Arguments
+
+  - `a`: The state of the first block of observations.
+  - `b`: The state of the second block of observations.
+
+# Validation
+
+  - `a` and `b` pass [`assert_mergeable_states`](@ref).
+
+# Returns
+
+  - `state::SimpleVarianceState`: The state the two blocks give when they are fitted as one block.
+
+# Related
+
+  - [`SimpleVarianceState`](@ref)
+  - [`merge_states`](@ref)
+  - [`chan_merge`](@ref)
+"""
+function merge_states(a::SimpleVarianceState, b::SimpleVarianceState)
+    assert_mergeable_states(a, b)
+    n, mu, M = chan_merge(a.n, a.mu, a.M, b.n, b.mu, b.M)
+    return SimpleVarianceState(n, mu, M)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+[`SimpleVarianceState`](@ref) method of [`partial_fit!`](@ref). Folds one observation into the running count, mean and per-asset accumulator.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+n &\\leftarrow n + 1\\\\
+\\boldsymbol{d} &= \\boldsymbol{x} - \\boldsymbol{\\mu}\\\\
+\\boldsymbol{\\mu} &\\leftarrow \\boldsymbol{\\mu} + \\frac{\\boldsymbol{d}}{n}\\\\
+\\boldsymbol{M} &\\leftarrow \\boldsymbol{M} + \\boldsymbol{d} \\odot (\\boldsymbol{x} - \\boldsymbol{\\mu})\\, .
+\\end{align}
+```
+
+Where:
+
+  - ``n``: observation count.
+  - ``\\boldsymbol{x}``: the observation.
+  - ``\\boldsymbol{\\mu}``: the running mean.
+  - ``\\boldsymbol{d}``: deviation of the observation from the mean **before** the fold.
+  - ``\\boldsymbol{M}``: the running per-asset accumulator.
+
+The last line reads ``\\boldsymbol{\\mu}`` **after** the third line moved it, where ``\\boldsymbol{d}`` read it before. That asymmetry is Welford's, and it is what keeps the accumulator non-negative.
+
+# Algorithm
+
+ 1. Refuse an observation whose length is not the number of assets the state describes.
+ 2. Add one to the count.
+ 3. Take the deviation of the observation from the mean before the fold, giving `d`.
+ 4. Move `mu` in place along `d`, by the reciprocal of the new count.
+ 5. Add `d` times the deviation from the mean **after** the fold to `M`, in place.
+ 6. Rebind the count with `Accessors.@reset`, and return the state.
+"""
+function partial_fit!(state::SimpleVarianceState, x::VecNum)
+    @argcheck(length(x) == length(state.mu),
+              DimensionMismatch("the observation must have one entry per asset, but the state describes $(length(state.mu)) assets and `x` has $(length(x)) entries."))
+    n = state.n + 1
+    d = x .- state.mu
+    state.mu .+= d ./ n
+    state.M .+= d .* (x .- state.mu)
+    return Accessors.@reset state.n = n
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Folds every observation of a block into the partial-fit state of a [`SimpleVariance`](@ref) estimator.
+
+The block arm of the [`partial_fit!`](@ref) interface. Welford's update reads one observation at a time, so the block is folded row by row and the answer is the answer of the same rows handed over one at a time.
+
+# Algorithm
+
+ 1. Orient `X` to `observations × assets`, transposing it when `dims == 2`.
+ 2. Fold each row in turn with the single-observation arm of [`partial_fit!`](@ref), rebinding the estimator each time.
+
+# Arguments
+
+  - `ve`: Variance estimator.
+  - $(arg_dict[:X])
+  - $(arg_dict[:dims])
+
+# Validation
+
+  - $(val_dict[:dims])
+
+# Returns
+
+  - `ve::SimpleVariance`: The estimator carrying the state after the last row.
+
+# Related
+
+  - [`SimpleVariance`](@ref)
+  - [`partial_fit!`](@ref)
+"""
+function partial_fit!(ve::SimpleVariance, X::MatNum; dims::Int = 1)
+    X = dims_oriented(dims, X)
+    for i in axes(X, 1)
+        ve = partial_fit!(ve, view(X, i, :))
+    end
+    return ve
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+[`SimpleVariance`](@ref) method of [`partial_fit!`](@ref). Folds one observation into the state the `cache` field carries, seeding it on the first call.
+
+# Algorithm
+
+ 1. Refuse a configuration no incremental fit reproduces, with [`assert_partial_fittable`](@ref).
+ 2. Seed a [`SimpleVarianceState`](@ref) of zeros over `length(x)` assets when `ve.cache` holds `nothing`, with [`variance_state_seed`](@ref).
+ 3. Fold `x` into the state.
+ 4. Rebind `ve.cache` with `Accessors.@reset`, and return the estimator.
+"""
+function partial_fit!(ve::SimpleVariance, x::VecNum)
+    assert_partial_fittable(ve.me, ve.w, "SimpleVariance")
+    return Accessors.@reset ve.cache = partial_fit!(variance_state_seed(ve.cache, x), x)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Returns the [`SimpleVarianceState`](@ref) an incremental variance fit folds into, seeding one of zeros when the estimator carries none.
+
+The seed is written here rather than inside [`partial_fit!`](@ref), so the fold reads as one line and the branch that reads the `cache` field has one home.
+
+# Arguments
+
+  - `cache`: The state the estimator carries, or `nothing`.
+  - `x`: One observation, `assets × 1`, read for its length and its element type.
+
+# Returns
+
+  - `state::SimpleVarianceState`: The state `cache` holds, or a state of zeros over `length(x)` assets.
+
+# Related
+
+  - [`SimpleVarianceState`](@ref)
+  - [`partial_fit!`](@ref)
+"""
+function variance_state_seed(cache::Option{<:SimpleVarianceState}, x::VecNum)
+    return if isnothing(cache)
+        SimpleVarianceState(0, zeros(eltype(x), length(x)), zeros(eltype(x), length(x)))
+    else
+        cache
+    end
+end
+"""
+    Statistics.var(
+        ve::SimpleVariance,
+        state::SimpleVarianceState
+    ) -> VecNum
+    Statistics.var(
+        ve::SimpleVariance
+    ) -> VecNum
+
+Read the variance of an incremental fit out of a [`SimpleVarianceState`](@ref).
+
+The two-argument method reads a state the caller holds, and the one-argument method reads the state the `cache` field of `ve` carries. Both return the per-asset variance as a vector, `assets × 1`, where the batch method over a matrix returns a row when `dims = 1`.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\hat{\\sigma}^2_j &= \\frac{M_j}{n - c}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:sigma2_hat_j])
+  - ``M_j``: running accumulator of asset ``j``.
+  - ``n``: observation count.
+  - ``c``: one when `ve.corrected` holds, and zero otherwise.
+
+# Algorithm
+
+ 1. Refuse a configuration no incremental fit reproduces, with [`assert_partial_fittable`](@ref).
+ 2. Take the divisor `n - c`, and return a vector of `NaN` when it is below one, in the way `min_obs` reads an asset with too few observations.
+ 3. Otherwise divide the accumulator by the divisor.
+
+# Arguments
+
+  - $(arg_dict[:ve])
+  - `state`: The state to read.
+
+# Validation
+
+  - `ve` carries no observation weights. An `ArgumentError` is thrown otherwise.
+  - `ve.me` is a [`SimpleExpectedReturns`](@ref) carrying no observation weights, or `nothing`. An `ArgumentError` is thrown otherwise.
+  - `ve.cache` is not `nothing`, for the one-argument method. An `ArgumentError` is thrown otherwise.
+
+# Returns
+
+  - `vr::VecNum`: Per-asset variance of the fit, `assets × 1`, or `NaN` where the state holds too few observations.
+
+# Examples
+
+```jldoctest
+julia> ve = foldl(partial_fit!, eachrow([1.0 2.0; 3.0 4.0]); init = SimpleVariance());
+
+julia> var(ve)
+2-element Vector{Float64}:
+ 2.0
+ 2.0
+```
+
+# Related
+
+  - [`SimpleVariance`](@ref)
+  - [`SimpleVarianceState`](@ref)
+  - [`partial_fit!`](@ref)
+  - [`var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+"""
+function Statistics.var(ve::SimpleVariance, state::SimpleVarianceState)
+    assert_partial_fittable(ve.me, ve.w, "SimpleVariance")
+    k = state.n - ve.corrected
+    return k >= one(k) ? state.M ./ k : fill(convert(eltype(state.M), NaN), length(state.M))
+end
+function Statistics.var(ve::SimpleVariance)
+    return Statistics.var(ve, partial_fit_cache(ve))
 end
 export SimpleVariance, var, std

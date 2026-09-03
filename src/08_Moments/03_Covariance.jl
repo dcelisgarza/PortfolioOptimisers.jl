@@ -14,7 +14,8 @@ $(DocStringExtensions.FIELDS)
     GeneralCovariance(;
         ce::StatsBase.CovarianceEstimator = StatsBase.SimpleCovariance(;
             corrected = true),
-        w::Option{<:ObsWeights} = nothing
+        w::Option{<:ObsWeights} = nothing,
+        cache::Option{<:AbstractPartialFitState} = nothing
     ) -> GeneralCovariance
 
 Keywords correspond to the struct's fields.
@@ -64,6 +65,8 @@ GeneralCovariance
   - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator)
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`cov(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`CovarianceState`](@ref)
+  - [`partial_fit!`](@ref)
   - [`factory`](@ref)
   - [`port_opt_view`](@ref)
   - [`obs_weights_view`](@ref)
@@ -77,17 +80,45 @@ GeneralCovariance
     $(field_dict[:oow])
     """
     @wprop w
-    function GeneralCovariance(ce::StatsBase.CovarianceEstimator, w::Option{<:ObsWeights})
+    """
+    $(field_dict[:pfcache])
+    """
+    cache
+    function GeneralCovariance(ce::StatsBase.CovarianceEstimator, w::Option{<:ObsWeights},
+                               cache::Option{<:AbstractPartialFitState})
         assert_nonempty_nonneg_finite_val(w, :w)
-        return new{typeof(ce), typeof(w)}(ce, w)
+        return new{typeof(ce), typeof(w), typeof(cache)}(ce, w, cache)
     end
 end
 function GeneralCovariance(;
                            ce::StatsBase.CovarianceEstimator = StatsBase.SimpleCovariance(;
                                                                                           corrected = true),
-                           w::Option{<:ObsWeights} = nothing)::GeneralCovariance
-    return GeneralCovariance(ce, w)
+                           w::Option{<:ObsWeights} = nothing,
+                           cache::Option{<:AbstractPartialFitState} = nothing)::GeneralCovariance
+    return GeneralCovariance(ce, w, cache)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Renders every field of a [`GeneralCovariance`](@ref) except `cache`.
+
+The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:GeneralCovariance, true)` to render it. ADR 0105 records the decision.
+
+# Arguments
+
+  - `::GeneralCovariance`: Covariance estimator, read for its type alone.
+
+# Returns
+
+  - `fields::Tuple`: The field names to render, which is `(:ce, :w)`.
+
+# Related
+
+  - [`GeneralCovariance`](@ref)
+  - [`show_fields`](@ref)
+  - [`set_show_nothing_fields!`](@ref)
+"""
+show_fields(::GeneralCovariance) = (:ce, :w)
 """
     Statistics.cov(
         ce::GeneralCovariance,
@@ -225,7 +256,8 @@ $(DocStringExtensions.FIELDS)
         me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
         ce::StatsBase.CovarianceEstimator = GeneralCovariance(),
         alg::AbstractMomentAlgorithm = FullMoment(),
-        w::Option{<:ObsWeights} = nothing
+        w::Option{<:ObsWeights} = nothing,
+        cache::Option{<:AbstractPartialFitState} = nothing
     ) -> Covariance
 
 Keywords correspond to the struct's fields.
@@ -291,6 +323,8 @@ Covariance
   - [`Option`](@ref)
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`covariance_centre_and_estimator`](@ref)
+  - [`CovarianceState`](@ref)
+  - [`partial_fit!`](@ref)
   - [`factory`](@ref)
   - [`port_opt_view`](@ref)
   - [`obs_weights_view`](@ref)
@@ -312,19 +346,48 @@ Covariance
     $(field_dict[:oow])
     """
     @wprop w
+    """
+    $(field_dict[:pfcache])
+    """
+    cache
     function Covariance(me::AbstractExpectedReturnsEstimator,
                         ce::StatsBase.CovarianceEstimator, alg::AbstractMomentAlgorithm,
-                        w::Option{<:ObsWeights})
+                        w::Option{<:ObsWeights}, cache::Option{<:AbstractPartialFitState})
         assert_nonempty_nonneg_finite_val(w, :w)
-        return new{typeof(me), typeof(ce), typeof(alg), typeof(w)}(me, ce, alg, w)
+        return new{typeof(me), typeof(ce), typeof(alg), typeof(w), typeof(cache)}(me, ce,
+                                                                                  alg, w,
+                                                                                  cache)
     end
 end
 function Covariance(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                     ce::StatsBase.CovarianceEstimator = GeneralCovariance(),
                     alg::AbstractMomentAlgorithm = FullMoment(),
-                    w::Option{<:ObsWeights} = nothing)::Covariance
-    return Covariance(me, ce, alg, w)
+                    w::Option{<:ObsWeights} = nothing,
+                    cache::Option{<:AbstractPartialFitState} = nothing)::Covariance
+    return Covariance(me, ce, alg, w, cache)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Renders every field of a [`Covariance`](@ref) except `cache`.
+
+The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:Covariance, true)` to render it. ADR 0105 records the decision.
+
+# Arguments
+
+  - `::Covariance`: Covariance estimator, read for its type alone.
+
+# Returns
+
+  - `fields::Tuple`: The field names to render, which is `(:me, :ce, :alg, :w)`.
+
+# Related
+
+  - [`Covariance`](@ref)
+  - [`show_fields`](@ref)
+  - [`set_show_nothing_fields!`](@ref)
+"""
+show_fields(::Covariance) = (:me, :ce, :alg, :w)
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -567,6 +630,435 @@ function Statistics.cor(ce::Covariance{<:Any, <:Any, <:SemiMoment}, X::MatNum;
     mu, cel = covariance_centre_and_estimator(ce, X; dims = dims, mean = mean, kwargs...)
     X = min.(X .- mu, zero(eltype(X)))
     return Statistics.cor(cel, X; dims = dims, mean = zero(eltype(X)), kwargs...)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Carries the running observation count, mean and co-moment accumulator of an incremental covariance fit.
+
+The state of [`GeneralCovariance`](@ref) and of `Covariance{<:Any, <:Any, <:FullMoment}` under [`partial_fit!`](@ref). One struct serves both, because the two estimators run the same recursion over the same three quantities. `M` is the accumulator ``\\sum_t (\\boldsymbol{r}_t - \\hat{\\boldsymbol{\\mu}}) (\\boldsymbol{r}_t - \\hat{\\boldsymbol{\\mu}})^{\\intercal}`` and not the covariance, so [`cov(ce::GeneralCovariance, state::CovarianceState)`](@ref) divides it by the count, or by the count less one when the inner `StatsBase.SimpleCovariance` is corrected.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    CovarianceState(;
+        n::Integer = 0,
+        mu::VecNum,
+        M::MatNum = zeros(eltype(mu), length(mu), length(mu))
+    ) -> CovarianceState
+
+Keywords correspond to the struct's fields. A state seeded for `N` assets is `CovarianceState(; mu = zeros(N))`, which [`partial_fit!`](@ref) builds when the `cache` field of the estimator holds `nothing`.
+
+## Validation
+
+  - `n >= 0`. A `DomainError` is thrown otherwise.
+  - `!isempty(mu)`. An `IsEmptyError` is thrown otherwise.
+  - Every entry of `mu` and of `M` is finite. An `IsNonFiniteError` is thrown otherwise.
+  - `size(M) == (length(mu), length(mu))`. A `DimensionMismatch` is thrown otherwise.
+
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, its fields are subset to the selected assets:
+
+  - `mu`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `M`: Sliced to the selected indices on both axes via [`port_opt_view`](@ref).
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.CovarianceState(; mu = [0.0, 0.0])
+PortfolioOptimisers.CovarianceState
+   n ┼ Int64: 0
+  mu ┼ Vector{Float64}: [0.0, 0.0]
+   M ┴ 2×2 Matrix{Float64}
+```
+
+# Related
+
+  - [`AbstractPartialFitState`](@ref)
+  - [`GeneralCovariance`](@ref)
+  - [`Covariance`](@ref)
+  - [`partial_fit!`](@ref)
+  - [`merge_states`](@ref)
+"""
+@concrete struct CovarianceState <: AbstractPartialFitState
+    """
+    $(field_dict[:pf_n])
+    """
+    n
+    """
+    $(field_dict[:pf_mu])
+    """
+    mu
+    """
+    $(field_dict[:pf_M])
+    """
+    M
+end
+function CovarianceState(; n::Integer = 0, mu::VecNum,
+                         M::MatNum = zeros(eltype(mu), length(mu), length(mu)))::CovarianceState
+    assert_partial_fit_state(n, mu, M)
+    return CovarianceState(n, mu, M)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Folds two [`CovarianceState`](@ref) fitted on disjoint blocks into the state of the concatenated block.
+
+# Algorithm
+
+ 1. Refuse the pair with [`assert_mergeable_states`](@ref).
+ 2. Fold the counts, the means and the accumulators with [`chan_merge`](@ref), whose outer-product method reads a co-moment accumulator.
+
+# Arguments
+
+  - `a`: The state of the first block of observations.
+  - `b`: The state of the second block of observations.
+
+# Validation
+
+  - `a` and `b` pass [`assert_mergeable_states`](@ref).
+
+# Returns
+
+  - `state::CovarianceState`: The state the two blocks give when they are fitted as one block.
+
+# Related
+
+  - [`CovarianceState`](@ref)
+  - [`merge_states`](@ref)
+  - [`chan_merge`](@ref)
+"""
+function merge_states(a::CovarianceState, b::CovarianceState)
+    assert_mergeable_states(a, b)
+    n, mu, M = chan_merge(a.n, a.mu, a.M, b.n, b.mu, b.M)
+    return CovarianceState(n, mu, M)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolves the bias correction of the covariance estimator an incremental fit reproduces, and refuses every other estimator.
+
+A [`CovarianceState`](@ref) accumulates the full-moment sum of outer products about the running mean, which is what `StatsBase.SimpleCovariance` divides by the count or by the count less one. Every other covariance estimator reads the sample in a way the accumulator cannot answer, so it is refused rather than answered wrongly. The verb walks the wrappers, so it reads the flag through a [`GeneralCovariance`](@ref) and through a `Covariance` whose algorithm is [`FullMoment`](@ref).
+
+# Arguments
+
+  - $(arg_dict[:ce])
+
+# Validation
+
+  - `ce` carries no observation weights, at every level it is walked through. An `ArgumentError` is thrown otherwise.
+  - The innermost estimator is a `StatsBase.SimpleCovariance`. An `ArgumentError` is thrown otherwise.
+
+# Returns
+
+  - `corrected::Bool`: Bias correction of the innermost `StatsBase.SimpleCovariance`.
+
+# Related
+
+  - [`CovarianceState`](@ref)
+  - [`GeneralCovariance`](@ref)
+  - [`Covariance`](@ref)
+  - [`partial_fit!`](@ref)
+"""
+partial_fit_corrected(ce::StatsBase.SimpleCovariance) = ce.corrected
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+[`GeneralCovariance`](@ref) method of [`partial_fit_corrected`](@ref). Refuses the observation weights of `ce` with [`assert_partial_fittable`](@ref), then reads the flag off `ce.ce`.
+"""
+function partial_fit_corrected(ce::GeneralCovariance)
+    assert_partial_fittable(nothing, ce.w, "GeneralCovariance")
+    return partial_fit_corrected(ce.ce)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+`Covariance{<:Any, <:Any, <:FullMoment}` method of [`partial_fit_corrected`](@ref). Refuses the observation weights and the centring estimator of `ce` with [`assert_partial_fittable`](@ref), then reads the flag off `ce.ce`.
+"""
+function partial_fit_corrected(ce::Covariance{<:Any, <:Any, <:FullMoment})
+    assert_partial_fittable(ce.me, ce.w, "Covariance")
+    return partial_fit_corrected(ce.ce)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Fallback method of [`partial_fit_corrected`](@ref). Refuses every covariance estimator an incremental fit does not reproduce, naming the type that was handed over.
+"""
+function partial_fit_corrected(ce::StatsBase.CovarianceEstimator)
+    return throw(ArgumentError("an incremental covariance fit folds one observation into a Welford accumulator, which reproduces the full-moment sample covariance of `StatsBase.SimpleCovariance` and no other estimator. `$(typeof(ce))` is not one, so use the batch method."))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Returns the [`CovarianceState`](@ref) an incremental covariance fit folds into, seeding one of zeros when the estimator carries none.
+
+Both covariance estimators of the seam seed the same state from the same observation, so the seed is written once here rather than at each [`partial_fit!`](@ref) method.
+
+# Arguments
+
+  - `cache`: The state the estimator carries, or `nothing`.
+  - `x`: One observation, `assets × 1`, read for its length and its element type.
+
+# Returns
+
+  - `state::CovarianceState`: The state `cache` holds, or a state of zeros over `length(x)` assets.
+
+# Related
+
+  - [`CovarianceState`](@ref)
+  - [`partial_fit!`](@ref)
+"""
+function covariance_state_seed(cache::Option{<:CovarianceState}, x::VecNum)
+    return if isnothing(cache)
+        CovarianceState(0, zeros(eltype(x), length(x)),
+                        zeros(eltype(x), length(x), length(x)))
+    else
+        cache
+    end
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+[`CovarianceState`](@ref) method of [`partial_fit!`](@ref). Folds one observation into the running count, mean and co-moment accumulator.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+n &\\leftarrow n + 1\\\\
+\\boldsymbol{d} &= \\boldsymbol{x} - \\boldsymbol{\\mu}\\\\
+\\boldsymbol{\\mu} &\\leftarrow \\boldsymbol{\\mu} + \\frac{\\boldsymbol{d}}{n}\\\\
+\\boldsymbol{M} &\\leftarrow \\boldsymbol{M} + \\boldsymbol{d} (\\boldsymbol{x} - \\boldsymbol{\\mu})^{\\intercal}\\, .
+\\end{align}
+```
+
+Where:
+
+  - ``n``: observation count.
+  - ``\\boldsymbol{x}``: the observation.
+  - ``\\boldsymbol{\\mu}``: the running mean.
+  - ``\\boldsymbol{d}``: deviation of the observation from the mean **before** the fold.
+  - ``\\boldsymbol{M}``: the running co-moment accumulator.
+
+The last line reads ``\\boldsymbol{\\mu}`` **after** the third line moved it, where ``\\boldsymbol{d}`` read it before. That asymmetry is Welford's, and it is what keeps the accumulator positive semi-definite.
+
+# Algorithm
+
+ 1. Refuse an observation whose length is not the number of assets the state describes.
+ 2. Add one to the count.
+ 3. Take the deviation of the observation from the mean before the fold, giving `d`.
+ 4. Move `mu` in place along `d`, by the reciprocal of the new count.
+ 5. Add the outer product of `d` and the deviation from the mean **after** the fold to `M`, in place.
+ 6. Rebind the count with `Accessors.@reset`, and return the state.
+"""
+function partial_fit!(state::CovarianceState, x::VecNum)
+    @argcheck(length(x) == length(state.mu),
+              DimensionMismatch("the observation must have one entry per asset, but the state describes $(length(state.mu)) assets and `x` has $(length(x)) entries."))
+    n = state.n + 1
+    d = x .- state.mu
+    state.mu .+= d ./ n
+    state.M .+= d .* transpose(x .- state.mu)
+    return Accessors.@reset state.n = n
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Folds every observation of a block into the partial-fit state of a [`GeneralCovariance`](@ref) estimator.
+
+The block arm of the [`partial_fit!`](@ref) interface. Welford's update reads one observation at a time, so the block is folded row by row and the answer is the answer of the same rows handed over one at a time.
+
+# Algorithm
+
+ 1. Orient `X` to `observations × assets`, transposing it when `dims == 2`.
+ 2. Fold each row in turn with the single-observation arm of [`partial_fit!`](@ref), rebinding the estimator each time.
+
+# Arguments
+
+  - `ce`: Covariance estimator.
+  - $(arg_dict[:X])
+  - $(arg_dict[:dims])
+
+# Validation
+
+  - $(val_dict[:dims])
+
+# Returns
+
+  - `ce::GeneralCovariance`: The estimator carrying the state after the last row.
+
+# Related
+
+  - [`GeneralCovariance`](@ref)
+  - [`partial_fit!`](@ref)
+"""
+function partial_fit!(ce::GeneralCovariance, X::MatNum; dims::Int = 1)
+    X = dims_oriented(dims, X)
+    for i in axes(X, 1)
+        ce = partial_fit!(ce, view(X, i, :))
+    end
+    return ce
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+[`GeneralCovariance`](@ref) method of [`partial_fit!`](@ref). Folds one observation into the state the `cache` field carries, seeding it on the first call.
+
+# Algorithm
+
+ 1. Refuse an estimator an incremental fit does not reproduce, with [`partial_fit_corrected`](@ref).
+ 2. Seed a [`CovarianceState`](@ref) of zeros over `length(x)` assets when `ce.cache` holds `nothing`, with [`covariance_state_seed`](@ref).
+ 3. Fold `x` into the state.
+ 4. Rebind `ce.cache` with `Accessors.@reset`, and return the estimator.
+"""
+function partial_fit!(ce::GeneralCovariance, x::VecNum)
+    partial_fit_corrected(ce)
+    return Accessors.@reset ce.cache = partial_fit!(covariance_state_seed(ce.cache, x), x)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Folds every observation of a block into the partial-fit state of a [`Covariance`](@ref) estimator under [`FullMoment`](@ref).
+
+The block arm of the [`partial_fit!`](@ref) interface. Welford's update reads one observation at a time, so the block is folded row by row and the answer is the answer of the same rows handed over one at a time.
+
+# Algorithm
+
+ 1. Orient `X` to `observations × assets`, transposing it when `dims == 2`.
+ 2. Fold each row in turn with the single-observation arm of [`partial_fit!`](@ref), rebinding the estimator each time.
+
+# Arguments
+
+  - `ce`: Covariance estimator with a [`FullMoment`](@ref) moment algorithm.
+  - $(arg_dict[:X])
+  - $(arg_dict[:dims])
+
+# Validation
+
+  - $(val_dict[:dims])
+
+# Returns
+
+  - `ce::Covariance`: The estimator carrying the state after the last row.
+
+# Related
+
+  - [`Covariance`](@ref)
+  - [`partial_fit!`](@ref)
+"""
+function partial_fit!(ce::Covariance{<:Any, <:Any, <:FullMoment}, X::MatNum; dims::Int = 1)
+    X = dims_oriented(dims, X)
+    for i in axes(X, 1)
+        ce = partial_fit!(ce, view(X, i, :))
+    end
+    return ce
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+`Covariance{<:Any, <:Any, <:FullMoment}` method of [`partial_fit!`](@ref). Folds one observation into the state the `cache` field carries, seeding it on the first call.
+
+# Algorithm
+
+ 1. Refuse an estimator an incremental fit does not reproduce, with [`partial_fit_corrected`](@ref).
+ 2. Seed a [`CovarianceState`](@ref) of zeros over `length(x)` assets when `ce.cache` holds `nothing`, with [`covariance_state_seed`](@ref).
+ 3. Fold `x` into the state.
+ 4. Rebind `ce.cache` with `Accessors.@reset`, and return the estimator.
+"""
+function partial_fit!(ce::Covariance{<:Any, <:Any, <:FullMoment}, x::VecNum)
+    partial_fit_corrected(ce)
+    return Accessors.@reset ce.cache = partial_fit!(covariance_state_seed(ce.cache, x), x)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Fallback [`Covariance`](@ref) method of [`partial_fit!`](@ref). Refuses every moment algorithm but [`FullMoment`](@ref), naming the reason.
+
+[`SemiMoment`](@ref) clamps the de-meaned returns at zero **before** the covariance, and the centre it de-means by is a statistic of the whole sample. So a centre that moves moves every past clamp, and a past observation's membership of the downside flips. An incremental fit never reads a past observation again, so it cannot re-clamp one, and the batch method is the one that answers.
+"""
+function partial_fit!(ce::Covariance, ::VecNum_MatNum; kwargs...)
+    return throw(ArgumentError("an incremental covariance fit folds one observation into a Welford accumulator, which reproduces the `FullMoment` sample covariance alone. `$(typeof(ce.alg))` reads the whole sample at every observation, so use the batch method."))
+end
+"""
+    Statistics.cov(
+        ce::Union{<:GeneralCovariance, <:Covariance{<:Any, <:Any, <:FullMoment}},
+        state::CovarianceState
+    ) -> MatNum
+    Statistics.cov(
+        ce::Union{<:GeneralCovariance, <:Covariance{<:Any, <:Any, <:FullMoment}}
+    ) -> MatNum
+
+Read the covariance matrix of an incremental fit out of a [`CovarianceState`](@ref).
+
+The two-argument method reads a state the caller holds, and the one-argument method reads the state the `cache` field of `ce` carries. The bias correction comes from the innermost `StatsBase.SimpleCovariance`, which [`partial_fit_corrected`](@ref) resolves.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\hat{\\mathbf{\\Sigma}} &= \\frac{M}{n - c}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:Sigma_hat])
+  - ``M``: Running co-moment accumulator.
+  - ``n``: Observation count.
+  - ``c``: One when the innermost `StatsBase.SimpleCovariance` is corrected, and zero otherwise.
+
+# Algorithm
+
+ 1. Resolve the bias correction with [`partial_fit_corrected`](@ref), which refuses every estimator an incremental fit does not reproduce.
+ 2. Take the divisor `n - c`, and return a matrix of `NaN` when it is below one, in the way `min_obs` reads an asset with too few observations.
+ 3. Otherwise divide the accumulator by the divisor.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - `state`: The state to read.
+
+# Validation
+
+  - `ce` passes [`partial_fit_corrected`](@ref). An `ArgumentError` is thrown otherwise.
+  - `ce.cache` is not `nothing`, for the one-argument method. An `ArgumentError` is thrown otherwise.
+
+# Returns
+
+  - $(ret_dict[:sigma]) `NaN` where the state holds too few observations.
+
+# Examples
+
+```jldoctest
+julia> ce = foldl(partial_fit!, eachrow([0.01 0.02; 0.03 0.04; 0.02 0.03]); init = Covariance());
+
+julia> cov(ce)
+2×2 Matrix{Float64}:
+ 0.0001  0.0001
+ 0.0001  0.0001
+```
+
+# Related
+
+  - [`GeneralCovariance`](@ref)
+  - [`Covariance`](@ref)
+  - [`CovarianceState`](@ref)
+  - [`partial_fit!`](@ref)
+  - [`partial_fit_corrected`](@ref)
+  - [`cov(ce::Covariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+"""
+function Statistics.cov(ce::Union{<:GeneralCovariance,
+                                  <:Covariance{<:Any, <:Any, <:FullMoment}},
+                        state::CovarianceState)
+    k = state.n - partial_fit_corrected(ce)
+    return k >= one(k) ? state.M ./ k : fill(convert(eltype(state.M), NaN), size(state.M))
+end
+function Statistics.cov(ce::Union{<:GeneralCovariance,
+                                  <:Covariance{<:Any, <:Any, <:FullMoment}})
+    return Statistics.cov(ce, partial_fit_cache(ce))
 end
 
 export GeneralCovariance, Covariance, cov, cor

@@ -200,5 +200,83 @@ function merge_states(a::AbstractPartialFitState, b::AbstractPartialFitState)
     name = Base.typename(typeof(a)).name
     return throw(ArgumentError("$name is an AbstractPartialFitState with no `merge_states` method. Implement `merge_states(a::$name, b::$name)`, which calls `assert_mergeable_states` first, refuses any further mismatch of its own, and folds the two states with `chan_merge`. See the `AbstractPartialFitState` docstring for the interface."))
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Refuses a partial-fit state whose count, mean or accumulator cannot describe a sample.
+
+Every second-order state carries the same three quantities, so one check serves the whole family: a non-negative count, a non-empty finite mean, and an accumulator whose every axis has the length of the mean. The accumulator is per-asset in a variance state and a co-moment matrix in a covariance state, and the axis rule reads both.
+
+# Algorithm
+
+ 1. Refuse a negative `n`.
+ 2. Refuse an empty or non-finite `mu`.
+ 3. Return when `M` is `nothing`, which is the mean-only state.
+ 4. Refuse a non-finite `M`, and refuse an `M` whose any axis does not have the length of `mu`.
+
+# Arguments
+
+  - $(arg_dict[:pf_n])
+  - $(arg_dict[:pf_mu])
+  - `M`: The second-moment accumulator, or `nothing` for a state that carries a mean alone.
+
+# Validation
+
+  - `n >= 0`. A `DomainError` is thrown otherwise.
+  - `!isempty(mu)`. An `IsEmptyError` is thrown otherwise.
+  - Every entry of `mu` is finite. An `IsNonFiniteError` is thrown otherwise.
+  - Every entry of `M` is finite. An `IsNonFiniteError` is thrown otherwise.
+  - Every axis of `M` has the length of `mu`. A `DimensionMismatch` is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`AbstractPartialFitState`](@ref)
+  - [`merge_states`](@ref)
+"""
+function assert_partial_fit_state(n::Integer, mu::VecNum, M::Option{<:ArrNum} = nothing)
+    assert_nonneg(n, :n)
+    assert_nonempty(mu, :mu)
+    assert_all_finite(mu, :mu)
+    if !isnothing(M)
+        assert_all_finite(M, :M)
+        @argcheck(all(==(length(mu)), size(M)),
+                  DimensionMismatch("every axis of `M` must have the length of `mu`, but `mu` has length $(length(mu)) and `M` has size $(size(M))."))
+    end
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Returns the partial-fit state an estimator carries, and refuses an estimator that carries none.
+
+A read-out verb called on the estimator alone reads the state out of the `cache` field, and that field holds `nothing` until the first fold. The refusal names the verb that fills it, so a caller who reached the one-argument form too early is told what to call rather than meeting a `MethodError`.
+
+# Arguments
+
+  - `est`: The estimator whose `cache` field carries the state.
+
+# Validation
+
+  - `est.cache` is not `nothing`. An `ArgumentError` is thrown otherwise.
+
+# Returns
+
+  - `state::AbstractPartialFitState`: The state the estimator carries.
+
+# Related
+
+  - [`AbstractPartialFitState`](@ref)
+  - [`partial_fit!`](@ref)
+"""
+function partial_fit_cache(est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEstimator})
+    cache = est.cache
+    @argcheck(!isnothing(cache),
+              ArgumentError("`$(typeof(est))` carries no partial-fit state, so there is nothing to read. Call `partial_fit!` on it first, or pass a state as the second argument."))
+    return cache
+end
 
 export partial_fit!

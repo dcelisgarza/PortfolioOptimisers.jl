@@ -224,6 +224,8 @@ PortfolioOptimisers.AbstractPartialFitState
 PortfolioOptimisers.merge_states
 PortfolioOptimisers.assert_mergeable_states
 PortfolioOptimisers.chan_merge
+PortfolioOptimisers.assert_partial_fit_state
+PortfolioOptimisers.partial_fit_cache
 ```
 
 ## Iteration and indexing

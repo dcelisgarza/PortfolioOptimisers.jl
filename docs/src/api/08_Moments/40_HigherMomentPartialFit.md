@@ -15,5 +15,6 @@ PortfolioOptimisers.CokurtosisPartialFitState
 PortfolioOptimisers.comoment_block
 PortfolioOptimisers.shift_comoment3
 PortfolioOptimisers.shift_comoment4
-PortfolioOptimisers.assert_partial_fittable
+PortfolioOptimisers.assert_partial_fittable(me::PortfolioOptimisers.AbstractExpectedReturnsEstimator, w::PortfolioOptimisers.Option{<:PortfolioOptimisers.ObsWeights}, name::AbstractString)
+PortfolioOptimisers.assert_partial_fittable(::Nothing, w::PortfolioOptimisers.Option{<:PortfolioOptimisers.ObsWeights}, name::AbstractString)
 ```
