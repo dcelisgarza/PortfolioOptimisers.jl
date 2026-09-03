@@ -72,6 +72,7 @@ commit = "dd069231d0"
 "src/08_Moments/38_CrossSectionalRegression.jl" = { cyc = 6, cog = 10, arg = 5, cyc_sum = 40, cog_sum = 33, arg_sum = 36, macros = [] }
 "src/08_Moments/39_CrossSectionalWeights.jl" = { cyc = 5, cog = 5, arg = 4, cyc_sum = 24, cog_sum = 18, arg_sum = 5, macros = [] }
 "src/08_Moments/40_HigherMomentPartialFit.jl" = { cyc = 2, cog = 1, arg = 5, cyc_sum = 17, cog_sum = 5, arg_sum = 35, macros = [] }
+"src/08_Moments/41_CrossSectionalFactorModel.jl" = { cyc = 7, cog = 13, arg = 12, cyc_sum = 27, cog_sum = 17, arg_sum = 21, macros = ["@forward_properties"] }
 "src/09_Distance/01_Base_Distance.jl" = { cyc = 2, cog = 1, arg = 2, cyc_sum = 3, cog_sum = 2, arg_sum = 2, macros = [] }
 "src/09_Distance/02_Distance.jl" = { cyc = 2, cog = 2, arg = 5, cyc_sum = 33, cog_sum = 18, arg_sum = 112, macros = [] }
 "src/09_Distance/03_DistanceDistance.jl" = { cyc = 2, cog = 1, arg = 5, cyc_sum = 6, cog_sum = 5, arg_sum = 19, macros = [] }

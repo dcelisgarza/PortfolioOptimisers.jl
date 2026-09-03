@@ -300,20 +300,20 @@ const REFERENCE_W1_B = [0.3333333333333333 0.16666666666666666 0.5 0.0
             ((EPS_A, MASK_A, MCAP_A, 1.0, 0.5, 20.0, (0.025, 0.975)),
              (EPS_B, MASK_B, MCAP_B, 0.5, 1.0, 2.0, (0.1, 0.9)),
              (EPS_B, MASK_B, MCAP_B, 0.0, 0.25, 20.0, (0.05, 0.95)))
-            rw = BlendedInverseVarianceWeights(; p = p, lambda = lambda, ratio = ratio,
-                                               wins = wins)
-            W0 = PortfolioOptimisers.cs_weights_initial(rw, iszero(p) ? nothing : mcap,
+            alg = BlendedInverseVarianceWeights(; p = p, lambda = lambda, ratio = ratio,
+                                                wins = wins)
+            W0 = PortfolioOptimisers.cs_weights_initial(alg, iszero(p) ? nothing : mcap,
                                                         mask)
-            W1 = PortfolioOptimisers.cs_weights_refine(rw, W0, eps, SimpleVariance(), mask)
+            W1 = PortfolioOptimisers.cs_weights_refine(alg, W0, eps, SimpleVariance(), mask)
             V = reference_variance_series(eps)
             @test W1 ≈ reference_blended_weights(V, W0, mask, lambda, ratio, wins)
         end
     end
 
     @testset "The warm-up rows fall back to the cap weights" begin
-        rw = BlendedInverseVarianceWeights(; p = 1.0, lambda = 1.0, ratio = 20.0)
-        W0 = PortfolioOptimisers.cs_weights_initial(rw, MCAP_A, MASK_A)
-        W1 = PortfolioOptimisers.cs_weights_refine(rw, W0, EPS_A, SimpleVariance(), MASK_A)
+        alg = BlendedInverseVarianceWeights(; p = 1.0, lambda = 1.0, ratio = 20.0)
+        W0 = PortfolioOptimisers.cs_weights_initial(alg, MCAP_A, MASK_A)
+        W1 = PortfolioOptimisers.cs_weights_refine(alg, W0, EPS_A, SimpleVariance(), MASK_A)
         # Rows 1 and 2 carry no variance estimate, so they take the normalised cap weights
         # even at a blend of one, which asks for the inverse variance component alone.
         cap = MCAP_A ./ sum(MCAP_A; dims = 2)
@@ -323,19 +323,20 @@ const REFERENCE_W1_B = [0.3333333333333333 0.16666666666666666 0.5 0.0
     end
 
     @testset "A later residual moves no earlier weight" begin
-        rw = BlendedInverseVarianceWeights(; p = 1.0, lambda = 0.5)
-        W0 = PortfolioOptimisers.cs_weights_initial(rw, MCAP_A, MASK_A)
-        W1 = PortfolioOptimisers.cs_weights_refine(rw, W0, EPS_A, SimpleVariance(), MASK_A)
+        alg = BlendedInverseVarianceWeights(; p = 1.0, lambda = 0.5)
+        W0 = PortfolioOptimisers.cs_weights_initial(alg, MCAP_A, MASK_A)
+        W1 = PortfolioOptimisers.cs_weights_refine(alg, W0, EPS_A, SimpleVariance(), MASK_A)
         # The weight of the last observation reads every earlier residual and none of its
         # own, so changing the last residual moves no weight at all.
         late = copy(EPS_A)
         late[4, :] = [5.0, -5.0, 5.0]
-        @test PortfolioOptimisers.cs_weights_refine(rw, W0, late, SimpleVariance(),
+        @test PortfolioOptimisers.cs_weights_refine(alg, W0, late, SimpleVariance(),
                                                     MASK_A) == W1
         # Changing an earlier residual moves every weight that reads it, and no other.
         early = copy(EPS_A)
         early[2, :] = [5.0, -5.0, 5.0]
-        W1b = PortfolioOptimisers.cs_weights_refine(rw, W0, early, SimpleVariance(), MASK_A)
+        W1b = PortfolioOptimisers.cs_weights_refine(alg, W0, early, SimpleVariance(),
+                                                    MASK_A)
         @test W1b[1:2, :] == W1[1:2, :]
         @test W1b[3, :] != W1[3, :]
         @test W1b[4, :] != W1[4, :]
@@ -349,8 +350,8 @@ const REFERENCE_W1_B = [0.3333333333333333 0.16666666666666666 0.5 0.0
         Wiv = PortfolioOptimisers.cs_weights_refine(pure, W0, EPS_B, SimpleVariance(),
                                                     MASK_B)
         for lambda in (0.0, 0.25, 0.5, 0.75, 1.0)
-            rw = BlendedInverseVarianceWeights(; p = 0.5, lambda = lambda)
-            W1 = PortfolioOptimisers.cs_weights_refine(rw, W0, EPS_B, SimpleVariance(),
+            alg = BlendedInverseVarianceWeights(; p = 0.5, lambda = lambda)
+            W1 = PortfolioOptimisers.cs_weights_refine(alg, W0, EPS_B, SimpleVariance(),
                                                        MASK_B)
             # Every eligible observation sums to one, so the two components enter in the
             # proportion the caller wrote.
@@ -364,10 +365,10 @@ const REFERENCE_W1_B = [0.3333333333333333 0.16666666666666666 0.5 0.0
                 false false false
                 true true true
                 true true true]
-        rw = BlendedInverseVarianceWeights(; p = 0.5, lambda = 0.5)
-        W0 = PortfolioOptimisers.cs_weights_initial(rw, MCAP_A, mask)
+        alg = BlendedInverseVarianceWeights(; p = 0.5, lambda = 0.5)
+        W0 = PortfolioOptimisers.cs_weights_initial(alg, MCAP_A, mask)
         @test all(iszero, W0[2, :])
-        W1 = PortfolioOptimisers.cs_weights_refine(rw, W0, EPS_A, SimpleVariance(), mask)
+        W1 = PortfolioOptimisers.cs_weights_refine(alg, W0, EPS_A, SimpleVariance(), mask)
         @test all(iszero, W1[2, :])
         @test all(isfinite, W1)
         @test isapprox(sum(W1[4, :]), 1.0)
@@ -380,9 +381,9 @@ const REFERENCE_W1_B = [0.3333333333333333 0.16666666666666666 0.5 0.0
                0.02 0.05 -0.01
                -0.03 0.05 0.01
                0.04 0.05 0.02]
-        rw = BlendedInverseVarianceWeights(; p = 0.0, lambda = 1.0, ratio = 20.0)
-        W0 = PortfolioOptimisers.cs_weights_initial(rw, nothing, trues(4, 3))
-        W1 = PortfolioOptimisers.cs_weights_refine(rw, W0, eps, SimpleVariance(),
+        alg = BlendedInverseVarianceWeights(; p = 0.0, lambda = 1.0, ratio = 20.0)
+        W0 = PortfolioOptimisers.cs_weights_initial(alg, nothing, trues(4, 3))
+        W1 = PortfolioOptimisers.cs_weights_refine(alg, W0, eps, SimpleVariance(),
                                                    trues(4, 3))
         @test all(isfinite, W1)
         @test all(x -> isapprox(x, 1.0), sum(W1; dims = 2))
@@ -393,19 +394,20 @@ const REFERENCE_W1_B = [0.3333333333333333 0.16666666666666666 0.5 0.0
     end
 
     @testset "The refine step refuses a malformed design" begin
-        rw = BlendedInverseVarianceWeights(; lambda = 0.5)
-        @test_throws DimensionMismatch PortfolioOptimisers.cs_weights_refine(rw, ones(4, 3),
+        alg = BlendedInverseVarianceWeights(; lambda = 0.5)
+        @test_throws DimensionMismatch PortfolioOptimisers.cs_weights_refine(alg,
+                                                                             ones(4, 3),
                                                                              EPS_B,
                                                                              SimpleVariance(),
                                                                              MASK_A)
-        @test_throws PortfolioOptimisers.IsNonFiniteError PortfolioOptimisers.cs_weights_refine(rw,
+        @test_throws PortfolioOptimisers.IsNonFiniteError PortfolioOptimisers.cs_weights_refine(alg,
                                                                                                 fill(NaN,
                                                                                                      4,
                                                                                                      3),
                                                                                                 EPS_A,
                                                                                                 SimpleVariance(),
                                                                                                 MASK_A)
-        @test_throws DomainError PortfolioOptimisers.cs_weights_refine(rw, -ones(4, 3),
+        @test_throws DomainError PortfolioOptimisers.cs_weights_refine(alg, -ones(4, 3),
                                                                        EPS_A,
                                                                        SimpleVariance(),
                                                                        MASK_A)

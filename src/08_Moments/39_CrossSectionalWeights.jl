@@ -13,11 +13,11 @@ In order to implement a new concrete type that works seamlessly with the library
 
 ## `cs_weights_initial`
 
-  - [`cs_weights_initial(rw::AbstractCrossSectionalWeightsAlgorithm, mcap::Option{<:MatNum}, mask::AbstractMatrix{Bool})`](@ref): Returns the weights of the first pass.
+  - [`cs_weights_initial(alg::AbstractCrossSectionalWeightsAlgorithm, mcap::Option{<:MatNum}, mask::AbstractMatrix{Bool})`](@ref): Returns the weights of the first pass.
 
 ### Arguments
 
-  - `rw`: The concrete subtype instance.
+  - `alg`: The concrete subtype instance.
   - `mcap`: Market capitalisation matrix `observations × assets`, or `nothing`.
   - `mask`: Eligibility mask `observations × assets`.
 
@@ -27,11 +27,11 @@ In order to implement a new concrete type that works seamlessly with the library
 
 ## `cs_weights_refine`
 
-  - [`cs_weights_refine(rw::AbstractCrossSectionalWeightsAlgorithm, W0::MatNum, eps::MatNum, ve::AbstractCovarianceEstimator, mask::AbstractMatrix{Bool}; kwargs...)`](@ref): Returns the weights of the second pass. A member whose [`needs_second_pass`](@ref) is `false` needs no method, because the caller never calls it.
+  - [`cs_weights_refine(alg::AbstractCrossSectionalWeightsAlgorithm, W0::MatNum, eps::MatNum, ve::AbstractCovarianceEstimator, mask::AbstractMatrix{Bool}; kwargs...)`](@ref): Returns the weights of the second pass. A member whose [`needs_second_pass`](@ref) is `false` needs no method, because the caller never calls it.
 
 ### Arguments
 
-  - `rw`: The concrete subtype instance.
+  - `alg`: The concrete subtype instance.
   - `W0`: First-pass weights `observations × assets`.
   - `eps`: First-pass residual matrix `observations × assets`.
   - `ve`: Variance estimator.
@@ -43,11 +43,11 @@ In order to implement a new concrete type that works seamlessly with the library
 
 ## `needs_second_pass`
 
-  - [`needs_second_pass(rw::AbstractCrossSectionalWeightsAlgorithm)`](@ref): Returns `true` when the caller must fit twice. The root answers `false`, so a one-pass member needs no method.
+  - [`needs_second_pass(alg::AbstractCrossSectionalWeightsAlgorithm)`](@ref): Returns `true` when the caller must fit twice. The root answers `false`, so a one-pass member needs no method.
 
 ### Arguments
 
-  - `rw`: The concrete subtype instance.
+  - `alg`: The concrete subtype instance.
 
 ### Returns
 
@@ -71,7 +71,7 @@ false
 """
 abstract type AbstractCrossSectionalWeightsAlgorithm <: AbstractAlgorithm end
 """
-    needs_second_pass(rw::AbstractCrossSectionalWeightsAlgorithm) -> Bool
+    needs_second_pass(alg::AbstractCrossSectionalWeightsAlgorithm) -> Bool
 
 Return whether a weight policy asks the caller to fit the cross-sectional regression twice.
 
@@ -79,7 +79,7 @@ The trait keeps the fit loop in the caller, which reads top to bottom, so the we
 
 # Arguments
 
-  - `rw`: Cross-sectional weight policy.
+  - `alg`: Cross-sectional weight policy.
 
 # Returns
 
@@ -353,9 +353,9 @@ function cross_sectional_cap_weights(p::Real, mcap::Option{<:MatNum},
     return W0
 end
 """
-    cs_weights_initial(rw::MarketCapWeights, mcap::Option{<:MatNum},
+    cs_weights_initial(alg::MarketCapWeights, mcap::Option{<:MatNum},
                        mask::AbstractMatrix{Bool}) -> Matrix{<:Number}
-    cs_weights_initial(rw::BlendedInverseVarianceWeights, mcap::Option{<:MatNum},
+    cs_weights_initial(alg::BlendedInverseVarianceWeights, mcap::Option{<:MatNum},
                        mask::AbstractMatrix{Bool}) -> Matrix{<:Number}
 
 Return the first-pass cross-sectional regression weights of a weight policy.
@@ -364,7 +364,7 @@ Both members read the capitalisation the same way, so both call [`cross_sectiona
 
 # Arguments
 
-  - `rw`: Cross-sectional weight policy.
+  - `alg`: Cross-sectional weight policy.
   - `mcap::Option{<:MatNum}`: Market capitalisation matrix `observations × assets`, or `nothing` when the policy's `p` is zero.
   - `mask::AbstractMatrix{Bool}`: Eligibility mask `observations × assets`.
 
@@ -393,13 +393,13 @@ julia> PortfolioOptimisers.cs_weights_initial(MarketCapWeights(; p = 1.0), [2.0 
   - [`cross_sectional_cap_weights`](@ref)
   - [`cs_weights_refine`](@ref)
 """
-function cs_weights_initial(rw::MarketCapWeights, mcap::Option{<:MatNum},
+function cs_weights_initial(alg::MarketCapWeights, mcap::Option{<:MatNum},
                             mask::AbstractMatrix{Bool})::MatNum
-    return cross_sectional_cap_weights(rw.p, mcap, mask)
+    return cross_sectional_cap_weights(alg.p, mcap, mask)
 end
-function cs_weights_initial(rw::BlendedInverseVarianceWeights, mcap::Option{<:MatNum},
+function cs_weights_initial(alg::BlendedInverseVarianceWeights, mcap::Option{<:MatNum},
                             mask::AbstractMatrix{Bool})::MatNum
-    return cross_sectional_cap_weights(rw.p, mcap, mask)
+    return cross_sectional_cap_weights(alg.p, mcap, mask)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -583,13 +583,13 @@ function cross_sectional_median_cap!(IV::Matrix{<:Number}, ratio::Real)::BitVect
     return ready
 end
 """
-    cs_weights_refine(rw::BlendedInverseVarianceWeights, W0::MatNum, eps::MatNum,
+    cs_weights_refine(alg::BlendedInverseVarianceWeights, W0::MatNum, eps::MatNum,
                       ve::AbstractCovarianceEstimator, mask::AbstractMatrix{Bool};
                       kwargs...) -> Matrix{<:Number}
 
 Return the second-pass cross-sectional regression weights of a weight policy.
 
-The verb takes the first-pass weights and residuals as arguments rather than reading them off the policy, because a weight policy is configuration and holds no fitted data. A caller runs it only when [`needs_second_pass`](@ref) answers `true`. An observation whose eligible first-pass weights sum to zero returns `NaN` rather than a weight, because both components are normalised. An eligible pair carries a positive weight whenever `rw.p` is zero or its market capitalisation is positive, so a caller reaches that state only by handing in a weight matrix that [`cs_weights_initial`](@ref) did not build.
+The verb takes the first-pass weights and residuals as arguments rather than reading them off the policy, because a weight policy is configuration and holds no fitted data. A caller runs it only when [`needs_second_pass`](@ref) answers `true`. An observation whose eligible first-pass weights sum to zero returns `NaN` rather than a weight, because both components are normalised. An eligible pair carries a positive weight whenever `alg.p` is zero or its market capitalisation is positive, so a caller reaches that state only by handing in a weight matrix that [`cs_weights_initial`](@ref) did not build.
 
 # Algorithm
 
@@ -599,11 +599,11 @@ The verb takes the first-pass weights and residuals as arguments rather than rea
  4. Normalise the first-pass weights over the same universe.
  5. Write zero over every entry that is still `NaN`, so a missing entry does not contribute.
  6. Write the normalised first-pass weights into every observation that carries no estimate.
- 7. Blend the two components by `rw.lambda`, and write zero outside `mask`.
+ 7. Blend the two components by `alg.lambda`, and write zero outside `mask`.
 
 # Arguments
 
-  - `rw`: Cross-sectional weight policy.
+  - `alg`: Cross-sectional weight policy.
   - `W0::MatNum`: First-pass weights `observations × assets`.
   - `eps::MatNum`: First-pass residual matrix `observations × assets`.
   - `ve`: Variance estimator.
@@ -625,11 +625,11 @@ The verb takes the first-pass weights and residuals as arguments rather than rea
 ```jldoctest
 julia> eps = [1.0 2.0; 3.0 6.0; 2.0 4.0];
 
-julia> rw = BlendedInverseVarianceWeights(; p = 0.0, lambda = 1.0);
+julia> alg = BlendedInverseVarianceWeights(; p = 0.0, lambda = 1.0);
 
-julia> W0 = PortfolioOptimisers.cs_weights_initial(rw, nothing, trues(3, 2));
+julia> W0 = PortfolioOptimisers.cs_weights_initial(alg, nothing, trues(3, 2));
 
-julia> PortfolioOptimisers.cs_weights_refine(rw, W0, eps, SimpleVariance(), trues(3, 2))
+julia> PortfolioOptimisers.cs_weights_refine(alg, W0, eps, SimpleVariance(), trues(3, 2))
 3×2 Matrix{Float64}:
  0.5    0.5
  0.5    0.5
@@ -646,7 +646,7 @@ julia> PortfolioOptimisers.cs_weights_refine(rw, W0, eps, SimpleVariance(), true
   - [`cross_sectional_winsorise!`](@ref)
   - [`cross_sectional_median_cap!`](@ref)
 """
-function cs_weights_refine(rw::BlendedInverseVarianceWeights, W0::MatNum, eps::MatNum,
+function cs_weights_refine(alg::BlendedInverseVarianceWeights, W0::MatNum, eps::MatNum,
                            ve::AbstractCovarianceEstimator, mask::AbstractMatrix{Bool};
                            kwargs...)::MatNum
     @argcheck(size(W0) == size(eps),
@@ -654,15 +654,15 @@ function cs_weights_refine(rw::BlendedInverseVarianceWeights, W0::MatNum, eps::M
     @argcheck(all(isfinite, W0), IsNonFiniteError("all entries of W0 must be finite"))
     @argcheck(all(x -> x >= zero(x), W0), DomainError(W0, "all entries of W0 must be >= 0"))
     IV = cross_sectional_lagged_inverse_variance(ve, eps, mask; kwargs...)
-    cross_sectional_winsorise!(IV, W0, rw.wins)
-    ready = cross_sectional_median_cap!(IV, rw.ratio)
-    Tf = promote_type(eltype(IV), float(real(eltype(W0))), float(typeof(rw.lambda)))
+    cross_sectional_winsorise!(IV, W0, alg.wins)
+    ready = cross_sectional_median_cap!(IV, alg.ratio)
+    Tf = promote_type(eltype(IV), float(real(eltype(W0))), float(typeof(alg.lambda)))
     Wm = Tf.(W0)
     Wm ./= sum(Wm; dims = 2)
     U = Tf.(IV)
     U[isnan.(U)] .= zero(Tf)
     U[.!ready, :] = Wm[.!ready, :]
-    W1 = rw.lambda .* U .+ (one(Tf) - rw.lambda) .* Wm
+    W1 = alg.lambda .* U .+ (one(Tf) - alg.lambda) .* Wm
     W1[.!mask] .= zero(Tf)
     return W1
 end

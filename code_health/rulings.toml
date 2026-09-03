@@ -299,6 +299,15 @@ definition = "SubsetResampling"
 metric = "arg"
 rationale = "keyword-constructor-arity"
 
+# Issue #706's, added after the seventeen above. `CrossSectionalFactorModel` carries twelve
+# fields, so its constructor takes twelve arguments under the same house style.
+
+[[exemption]]
+path = "src/08_Moments/41_CrossSectionalFactorModel.jl"
+definition = "CrossSectionalFactorModel"
+metric = "arg"
+rationale = "keyword-constructor-arity"
+
 [[exemption]]
 path = "src/01_Base/03_PrettyShow.jl"
 definition = "@define_pretty_show"
