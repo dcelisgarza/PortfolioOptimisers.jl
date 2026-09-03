@@ -322,11 +322,15 @@ Which of the two opposite quantities a Centrality algorithm's edge weights must 
 ### 3.9 Uncertainty Sets
 
 **Uncertainty Set**
-A neighbourhood of a specific quantity — a mean vector or a covariance matrix — within which a robust optimiser protects against the worst case. Shapes: **Box** (per-parameter bounds), **Ellipsoidal** (a joint confidence region), the covariance-only **Compact** (below), and the mean-only **ℓ1** and **Signed ℓ1** cross-polytopes. Constructors: `DeltaUncertaintySet`, `NormalUncertaintySet`, `ARCHUncertaintySet`, `CharacteristicUncertaintySet`.
+A neighbourhood of a specific quantity — a mean vector or a covariance matrix — within which a robust optimiser protects against the worst case. Shapes: **Box** (per-parameter bounds), **Ellipsoidal** (a joint confidence region), the covariance-only **Compact** (below), **Norm Ball** (below, a geometry map of any rank under a norm order, on either axis), and the mean-only **ℓ1** and **Signed ℓ1** cross-polytopes. Constructors: `DeltaUncertaintySet`, `NormalUncertaintySet`, `ARCHUncertaintySet`, `CharacteristicUncertaintySet`.
 
 **Compact Covariance Uncertainty Set**
 The covariance shape stated as a radius, a diagonal metric square root and a basis of the directions the worst case spares, rather than as a shape matrix on the vectorised covariance. Its worst-case variance is a quadratic penalty on the weights, so the consumer adds one cone and one free coefficient vector rather than the lifted semidefinite block the Ellipsoidal shape needs. `CompactCovarianceUncertaintySet` builds it.
 *Avoid*: Ellipsoidal (above), whose radius is a quantile of a dimension; this one's radius is a size the caller sets.
+
+**Norm-Ball Uncertainty Set**
+A shape stated as a radius, a geometry map and a norm order: the set is the image of the normalised ball of that order under the map, centred on the quantity it bounds, and its worst case is the radius times the dual norm of the map's transpose applied to the exposure. The map may have fewer columns than the quantity has entries, so the shape may be flat, which is what a set confined to an Orthogonal Subspace needs. It serves both axes. The Ellipsoidal, Box and ℓ1 shapes are its order-2, order-∞ and order-1 cases with a square or diagonal map. `NormBallUncertaintySet` builds it.
+*Avoid*: Ellipsoidal (above) for a flat set, because an Ellipsoidal shape matrix must be full rank.
 
 **Orthogonal Subspace**
 The orthogonal complement of the column space of the weighted loading matrix. An Uncertainty Set confined to it prices no error in a direction the factor model already explains.
