@@ -154,6 +154,15 @@
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/08_Moments/41_CrossSectionalFactorModel/</loc>
   </url>
   <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/08_Moments/42_FactorExposures/01_Base_Descriptor/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/08_Moments/42_FactorExposures/02_PanelFieldDescriptors/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/08_Moments/42_FactorExposures/03_LagDescriptors/</loc>
+  </url>
+  <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/09_Distance/01_Base_Distance/</loc>
   </url>
   <url>
