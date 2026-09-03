@@ -69,6 +69,7 @@ commit = "8610300"
 "src/08_Moments/36_RegimeAdjustedExpWeightedVariance.jl" = { lines = 126, misses = 0 }
 "src/08_Moments/37_RegimeAdjustedExpWeightedCovariance.jl" = { lines = 17, misses = 13 }
 "src/08_Moments/38_CrossSectionalRegression.jl" = { lines = 123, misses = 0 }
+"src/08_Moments/39_CrossSectionalWeights.jl" = { lines = 86, misses = 0 }
 "src/09_Distance/01_Base_Distance.jl" = { lines = 12, misses = 0 }
 "src/09_Distance/02_Distance.jl" = { lines = 72, misses = 0 }
 "src/09_Distance/03_DistanceDistance.jl" = { lines = 14, misses = 0 }

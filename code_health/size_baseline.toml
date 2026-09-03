@@ -71,6 +71,7 @@ commit = "5563c05815"
 "src/08_Moments/36_RegimeAdjustedExpWeightedVariance.jl" = { code = 279, doc = 535, comment = 0, blank = 207, total = 1021 }
 "src/08_Moments/37_RegimeAdjustedExpWeightedCovariance.jl" = { code = 60, doc = 179, comment = 0, blank = 74, total = 313 }
 "src/08_Moments/38_CrossSectionalRegression.jl" = { code = 198, doc = 504, comment = 0, blank = 210, total = 912 }
+"src/08_Moments/39_CrossSectionalWeights.jl" = { code = 138, doc = 366, comment = 0, blank = 166, total = 670 }
 "src/09_Distance/01_Base_Distance.jl" = { code = 24, doc = 222, comment = 0, blank = 89, total = 335 }
 "src/09_Distance/02_Distance.jl" = { code = 158, doc = 350, comment = 0, blank = 157, total = 665 }
 "src/09_Distance/03_DistanceDistance.jl" = { code = 37, doc = 132, comment = 0, blank = 58, total = 227 }
