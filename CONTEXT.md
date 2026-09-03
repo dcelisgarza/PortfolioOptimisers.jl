@@ -229,7 +229,12 @@ An entropy pooling correlation or covariance view whose two sides are groups rat
 
 **Tail View**
 A view on a quantile risk measure of the posterior — CVaR, EVaR or RLVaR — as opposed to a view on a moment. It is the one view family that is not a linear function of the posterior probabilities, and the one family `ep_tail_views!` lowers. A VaR view is not one: it constrains the tail mass, which is linear in the posterior probabilities, and `ep_var_views!` lowers it on its own.
-*Avoid*: confusing it with a **View** (§1), which is the index-selection mechanism.
+A tail view names one or more assets, each with a coefficient. Every one of the three measures is concave in the posterior probabilities, so a view whose coefficients share one sign is a **positive combination** whose lower bound is a convex set, and the dual formulations write it exactly, one block per asset. A view whose coefficients carry both signs is a **relative view**, whose feasible set is not convex; it takes the integer formulation or a **Surrogate Row**. See ADR 0069.
+*Avoid*: confusing it with a **View** (§1), which is the index-selection mechanism. *Avoid*: calling a group view relative; a group of two or more members is a positive combination, and needs no integer variable.
+
+**Surrogate Row**
+The linear upper bound a sequential tail view formulation writes for each measure on the wrong side of the inequality, read from the primal representation at multipliers fixed at the last posterior: the value at risk for CVaR, the primal pair for RLVaR, and the tangent of the fixed-dual-variable primal for EVaR. It is sufficient for the view and tight where it was read, and `entropy_pooling` re-reads it and solves again until it is tight at the answer. See ADR 0069.
+*Avoid*: reading its slack as a violated view. The view holds on every posterior of the sequence, and the slack says only that the divergence can still fall.
 
 **Search Bracket**
 The span a scalar search of a **Tail View** runs over. It is stated in the units the search works in, and the name says which: `zlo_frac` is a fraction of an upper end that is proven, and `log_zlo` and `log_zhi` are additive offsets on the logarithm of the loss range. A knob whose default follows from the data is a field on the view estimator defaulting to `nothing`, and a group of knobs whose defaults are plain numbers is its own algorithm type. See ADR 0069.

@@ -6,12 +6,12 @@
 [provenance]
 julia = "1.12.7"
 julia_syntax = "1.0.2"
-commit = "5563c05815"
+commit = "8787635a8f"
 
 [file]
 "ext/PortfolioOptimisersImputeExt.jl" = { code = 6, doc = 0, comment = 3, blank = 3, total = 12 }
 "ext/PortfolioOptimisersPlotsExt.jl" = { code = 1963, doc = 0, comment = 129, blank = 41, total = 2133 }
-"src/01_Base/01_DocstringDictionaries.jl" = { code = 1059, doc = 113, comment = 120, blank = 43, total = 1335 }
+"src/01_Base/01_DocstringDictionaries.jl" = { code = 1068, doc = 113, comment = 120, blank = 43, total = 1344 }
 "src/01_Base/02_TypeRoots.jl" = { code = 13, doc = 157, comment = 0, blank = 61, total = 231 }
 "src/01_Base/03_PrettyShow.jl" = { code = 107, doc = 102, comment = 0, blank = 58, total = 267 }
 "src/01_Base/04_ScopedConfig.jl" = { code = 133, doc = 401, comment = 2, blank = 180, total = 716 }
@@ -28,7 +28,6 @@ commit = "5563c05815"
 "src/03_InputData/01_AssetPanel.jl" = { code = 175, doc = 411, comment = 0, blank = 190, total = 776 }
 "src/03_InputData/02_AssetPanelBuilder.jl" = { code = 330, doc = 697, comment = 2, blank = 316, total = 1345 }
 "src/03_InputData/03_Preprocessing.jl" = { code = 726, doc = 1331, comment = 11, blank = 536, total = 2604 }
-"src/03_InputData/04_SyntheticAssetPanel.jl" = { code = 310, doc = 326, comment = 0, blank = 149, total = 785 }
 "src/04_PosdefMatrix.jl" = { code = 44, doc = 155, comment = 0, blank = 73, total = 272 }
 "src/05_Denoise.jl" = { code = 132, doc = 535, comment = 34, blank = 196, total = 897 }
 "src/06_Detone.jl" = { code = 46, doc = 188, comment = 0, blank = 81, total = 315 }
@@ -119,9 +118,9 @@ commit = "5563c05815"
 "src/13_Prior/07_BayesianBlackLittermanPrior.jl" = { code = 72, doc = 267, comment = 27, blank = 56, total = 422 }
 "src/13_Prior/08_FactorBlackLittermanPrior.jl" = { code = 82, doc = 250, comment = 37, blank = 54, total = 423 }
 "src/13_Prior/09_AugmentedBlackLittermanPrior.jl" = { code = 125, doc = 304, comment = 66, blank = 69, total = 564 }
-"src/13_Prior/10_Base_EntropyPoolingPrior.jl" = { code = 901, doc = 2141, comment = 60, blank = 817, total = 3919 }
+"src/13_Prior/10_Base_EntropyPoolingPrior.jl" = { code = 974, doc = 2396, comment = 60, blank = 920, total = 4350 }
 "src/13_Prior/11_MeucciEntropyPoolingPrior.jl" = { code = 313, doc = 473, comment = 52, blank = 148, total = 986 }
-"src/13_Prior/12_EntropyPoolingPrior.jl" = { code = 910, doc = 1467, comment = 60, blank = 556, total = 2993 }
+"src/13_Prior/12_EntropyPoolingPrior.jl" = { code = 1152, doc = 1850, comment = 67, blank = 675, total = 3744 }
 "src/13_Prior/13_OpinionPoolingPrior.jl" = { code = 93, doc = 317, comment = 16, blank = 118, total = 544 }
 "src/13_Prior/14_HighOrderFactorPriorEstimator.jl" = { code = 172, doc = 269, comment = 20, blank = 82, total = 543 }
 "src/13_Prior/15_FeaturePrior.jl" = { code = 140, doc = 476, comment = 27, blank = 211, total = 854 }

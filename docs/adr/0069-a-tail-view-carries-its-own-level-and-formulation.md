@@ -169,3 +169,51 @@ A search bracket takes one of two shapes, and the default decides which:
 A fourth tail-view family takes shape 1 for a knob whose default needs the data, and shape 2 for a
 group of knobs whose defaults do not. `CONTEXT.md` holds the **Search Bracket** term and the
 warning that its two readings are not interchangeable.
+
+## Amendment (2026-09-03)
+
+### A view over several assets is convex when its coefficients share one sign
+
+This ADR said a group of more than one member is a relative view, which sends CVaR to the
+integer formulation and which EVaR refuses. That reading was too coarse, and issue #350 asked
+whether it could be lifted. Each of the three measures is a maximum of a linear function over a
+set that is jointly convex in the dual weights and the posterior probabilities, so each is
+**concave** in the probabilities. Two consequences replace the rule above.
+
+- A view whose coefficients share one sign, `gA >= c`, is a positive combination of concave
+  functions bounded from below: a convex set. The dual formulations write it exactly, one dual
+  block per asset and one row over the coefficient-weighted sum. `ep_cvar_formulation` reads a
+  `mixed` flag in place of `single`, and `ep_evar_formulation` and `ep_rlvar_formulation` take the
+  same flag. No group view needs an integer variable, and no measure refuses one.
+- A view whose coefficients carry both signs, `A - B >= c`, is a difference of concave functions,
+  and its feasible set is not convex. No convex program describes it exactly. It takes
+  `IntegerConditionalValueatRiskView` by default for CVaR, as [EPTail](@cite) writes it, and the
+  sequential formulation below for EVaR and RLVaR, which have no integer formulation.
+
+### The sequential formulation is the third formulation of every measure
+
+`SequentialConditionalValueatRiskView`, `SequentialEntropicValueatRiskView` and
+`SequentialRelativisticValueatRiskView` write every view the dual formulation cannot, with no
+integer variable. The view is oriented as a lower bound. Each asset with a positive coefficient
+keeps its exact dual block. Each asset with a negative coefficient takes a **Surrogate Row**, a
+linear upper bound on its measure read from the primal representation at fixed multipliers: the
+value at risk for CVaR, the primal pair for RLVaR, and the tangent of the fixed-dual-variable
+primal for EVaR, whose fixed form is concave rather than linear. The row is sufficient for the
+view, and tight at the posterior it was read at.
+
+`entropy_pooling` re-reads the row at each posterior and solves again, up to `iters` times or
+until the row is tight to `tol`. The last posterior stays feasible for the re-read row, so the
+divergence never rises between solves, and at the fixed point the view holds exactly. The answer
+is a local minimiser of the divergence, which is why the sequential formulation is the default
+only where no exact one exists. An equality is written as the bound the prior violates, and the
+entropy minimiser makes it tight, as the dual formulations already do.
+
+A linear bound read at one point has a floor, and for the relativistic measure the floor sits
+close to the prior, so a target well below it leaves the first solve with no feasible point.
+`ep_sequential_start` walks the multipliers toward the target with a chain of exponential tilts
+before the first solve, as the grid anchors do, so the first row can meet the view.
+
+The carriers under `AbstractSequentialTailViewConstraint` hold the two sides and the row.
+`ep_tail_dual_block!` writes one asset's dual block for the dual carrier and the sequential one of
+a measure alike, so each block is written once. `ep_jump_entropy_pooling` is the one solve, and
+`entropy_pooling` is the loop around it, so the three `ep_prior` stages refine within each stage.

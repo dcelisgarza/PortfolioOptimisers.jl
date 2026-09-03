@@ -9,6 +9,14 @@ ConicEntropicValueatRiskViewConstraint
 GridEntropicValueatRiskViewConstraint
 ConicRelativisticValueatRiskViewConstraint
 GridRelativisticValueatRiskViewConstraint
+AbstractSequentialTailViewConstraint
+SequentialConditionalValueatRiskViewConstraint
+SequentialEntropicValueatRiskViewConstraint
+SequentialRelativisticValueatRiskViewConstraint
+ep_tail_dual_block!
+ep_var_multiplier
+ep_tail_surrogate_row
+ep_refine_tail_view(tv::AbstractSequentialTailViewConstraint, w::VecNum)
 ep_evar
 ep_evar_grid_row
 ep_rlvar_tail
@@ -28,13 +36,13 @@ ep_assert_reachable_view
 ep_cvar_formulation
 ep_evar_formulation
 ep_rlvar_formulation
+ep_sequential_sides
 ep_add_cvar_view!
 ep_add_evar_view!
 ep_add_grid_tail_view!
 ep_add_rlvar_view!
 ep_tail_view_prior_args
-ep_assert_absolute_view
-ep_normalise_absolute_view
+ep_normalise_tail_view
 ep_add_tail_view!
 ep_tail_views!
 add_ep_tail_view!

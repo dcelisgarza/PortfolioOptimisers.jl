@@ -356,6 +356,15 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :rlvar_bigM => "`M`: Big-M constant of the grid relativistic value-at-risk formulation.",#
                                  :ep_rlvar_zgrid => "`z`: Grid of relativistic value-at-risk dual variables.",#
                                  :ep_rlvar_tgrid => "`t`: Shift variable that minimises the objective at each point of `z`, one entry per grid point. It is read under the probabilities the grid is centred on, which are the prior's only where the centre is the prior's.",#
+                                 :ep_losses => "`x`: Per asset the view names, its loss series (`-returns`).",#
+                                 :ep_seq_iters => "`iters`: Largest number of re-solves after the first solve. Each re-solve reads the multipliers of the primal representation at the last posterior, which tightens the surrogate row. Zero keeps the first posterior, on which the view holds but the row is slack.",#
+                                 :ep_seq_tol => "`tol`: Relative gap between the surrogate row and the risk measures it bounds at which the re-solves stop. It is read against the larger of the view's target and the largest loss the view names.",#
+                                 :ep_seq_xd => "`xd`: Per asset on the dual side of the view, its loss series (`-returns`). Once the view is oriented as a lower bound these are the assets with a positive coefficient, and each takes the exact dual block of its measure.",#
+                                 :ep_seq_cd => "`cd`: Per asset on the dual side of the view, the coefficient the view gives its risk measure. Positive.",#
+                                 :ep_seq_xp => "`xp`: Per asset on the primal side of the view, its loss series (`-returns`). Once the view is oriented as a lower bound these are the assets with a negative coefficient, and each takes a linear upper bound read from its primal representation.",#
+                                 :ep_seq_cp => "`cp`: Per asset on the primal side of the view, the coefficient the view gives its risk measure. Negative.",#
+                                 :ep_seq_row => "`c`: Coefficients of the surrogate row, one per observation. They are the coefficient-weighted sum of the linear upper bounds of the primal side, read at the last posterior.",#
+                                 :ep_seq_b => "`b`: Constant of the surrogate row.",#
                                  # Black-Litterman views.
                                  :P => "`P`: Views loading matrix `views × assets`.",#
                                  :Q => "`Q`: Views values vector `views × 1`.",#

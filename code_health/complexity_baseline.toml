@@ -27,7 +27,6 @@ commit = "dd069231d0"
 "src/03_InputData/01_AssetPanel.jl" = { cyc = 7, cog = 12, arg = 4, cyc_sum = 35, cog_sum = 28, arg_sum = 17, macros = [] }
 "src/03_InputData/02_AssetPanelBuilder.jl" = { cyc = 6, cog = 10, arg = 7, cyc_sum = 75, cog_sum = 58, arg_sum = 52, macros = [] }
 "src/03_InputData/03_Preprocessing.jl" = { cyc = 20, cog = 31, arg = 16, cyc_sum = 161, cog_sum = 164, arg_sum = 139, macros = [] }
-"src/03_InputData/04_SyntheticAssetPanel.jl" = { cyc = 3, cog = 3, arg = 9, cyc_sum = 22, cog_sum = 12, arg_sum = 44, macros = [] }
 "src/04_PosdefMatrix.jl" = { cyc = 5, cog = 4, arg = 2, cyc_sum = 10, cog_sum = 5, arg_sum = 4, macros = [] }
 "src/05_Denoise.jl" = { cyc = 4, cog = 6, arg = 7, cyc_sum = 18, cog_sum = 11, arg_sum = 30, macros = [] }
 "src/06_Detone.jl" = { cyc = 3, cog = 2, arg = 2, cyc_sum = 8, cog_sum = 3, arg_sum = 8, macros = [] }

@@ -99,6 +99,12 @@ that expresses it exactly — [`LinearConditionalValueatRiskView`](@ref),
 lower bound or an equality at or above the prior value, and
 [`IntegerConditionalValueatRiskView`](@ref), [`GridEntropicValueatRiskView`](@ref) or
 [`GridRelativisticValueatRiskView`](@ref) otherwise, which need a mixed-integer conic solver.
+A view over several assets whose coefficients share one sign, such as a group, is a positive
+combination of the measures and takes the same dual formulations. A relative view, whose
+coefficients carry both signs, takes the integer formulation for CVaR, and
+[`SequentialEntropicValueatRiskView`](@ref) or [`SequentialRelativisticValueatRiskView`](@ref)
+for the other two measures, which re-solve a convex program a few times and need no integer
+variable. [`SequentialConditionalValueatRiskView`](@ref) offers CVaR the same route.
 For an [`EntropicValueatRiskView`](@ref) or a [`RelativisticValueatRiskView`](@ref) the `alg`
 field is also where the grid of dual variables and the big-M constant live, so one group can
 take its own [`GridEntropicValueatRiskView`](@ref) or
@@ -191,6 +197,9 @@ A target below the prior is the other half, and it needs the other formulation.
 takes [`GridRelativisticValueatRiskView`](@ref) instead. The grid picks one of its points with
 a binary vector, so it needs a solver for mixed-integer conic programs. Pajarito supplies one,
 driving HiGHS on the outer approximation and Clarabel on the cones.
+[`SequentialRelativisticValueatRiskView`](@ref) is the other route to a `<=` view: it bounds the
+RLVaR from above by a row that is linear in the posterior probabilities, and re-solves with the
+row re-read at each posterior until it is tight, so it needs no integer variable.
 =#
 
 mip_slv = Solver(; name = :pajarito1,
