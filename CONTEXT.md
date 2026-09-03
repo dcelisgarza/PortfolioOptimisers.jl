@@ -205,6 +205,14 @@ A producer of a Factor Exposure matrix.
 A set of factors carrying one benchmark-weighted zero-sum constraint, so exactly one member of the set is redundant.
 *Avoid*: the bare word "family", which names a group of Estimator types everywhere else in this glossary.
 
+**Neutralisation**
+The replacement of one Factor Exposure by its residual after a benchmark-weighted regression across the assets on the exposures of other factors, re-standardised, so the factor carries none of the targets' tilt.
+*Avoid*: orthogonalisation, which is the same operation under another name; Detoning (§3.5), which removes principal components from a correlation matrix.
+
+**Factor Family Basis**
+The time-varying change of basis that imposes each Factor Family's zero-sum constraint by dropping one member and rewriting the others, stored as the per-observation ratios of the retained members to the dropped one.
+*Avoid*: the reduced loadings, which are what the basis produces rather than the basis itself.
+
 ### 3.5 Matrix Processing
 
 **Denoising**
