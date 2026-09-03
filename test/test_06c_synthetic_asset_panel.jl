@@ -5,14 +5,18 @@ The generator draws a panel from a factor model it also returns, so every test h
 question: does the panel the caller receives still hold the model the generator drew? The
 shapes, the two masks, the reconciliation `X = f B' + eps` and the reproducibility of one
 seed are the four the acceptance tests of the prior stand on.
+
+The generator is a toy fixture for this one acceptance test, not library functionality, so it
+lives in `test06c_setup.jl` beside this file rather than under `src/`.
 =#
+include(joinpath(@__DIR__, "test06c_setup.jl"))
 using Statistics, Dates
 
 @testset "Synthetic panel shapes and carrier" begin
     res = synthetic_asset_panel(; n_assets = 8, n_observations = 60, n_industries = 3,
                                 rng = StableRNG(987))
     rd, tr = res.rd, res.truth
-    T, N, K = 60, 8, 1 + 3 + length(PortfolioOptimisers.SYNTHETIC_STYLES)
+    T, N, K = 60, 8, 1 + 3 + length(SYNTHETIC_STYLES)
 
     @test size(rd.X) == (T, N)
     @test length(rd.nx) == N
@@ -44,7 +48,7 @@ using Statistics, Dates
     @test length(tr.fgrp) == K
     @test tr.nf[1] == "market"
     @test tr.fgrp == vcat("market", fill("industry", 3), fill("style", 10))
-    @test tr.nf[5:end] == [s[1] for s in PortfolioOptimisers.SYNTHETIC_STYLES]
+    @test tr.nf[5:end] == [s[1] for s in SYNTHETIC_STYLES]
     @test all(x -> x > 0, tr.ivar)
 end
 
@@ -188,24 +192,23 @@ end
 
 @testset "Synthetic panel helpers" begin
     # A constant cross-section standardises to zero rather than to a division by zero.
-    @test PortfolioOptimisers.synthetic_standardise(fill(3.0, 5)) == zeros(5)
-    @test isapprox(PortfolioOptimisers.synthetic_standardise([1.0, 2.0, 3.0]),
-                   [-sqrt(1.5), 0.0, sqrt(1.5)]; rtol = 1e-10)
+    @test synthetic_standardise(fill(3.0, 5)) == zeros(5)
+    @test isapprox(synthetic_standardise([1.0, 2.0, 3.0]), [-sqrt(1.5), 0.0, sqrt(1.5)];
+                   rtol = 1e-10)
 
     # The autoregressive filter keeps the stationary variance at one.
     rng = StableRNG(3)
-    filt = PortfolioOptimisers.synthetic_ar1_filter(randn(rng, 20000, 2), 0.9)
+    filt = synthetic_ar1_filter(randn(rng, 20000, 2), 0.9)
     @test isapprox(Statistics.var(filt[:, 1]), 1.0; rtol = 0.1)
     @test isapprox(Statistics.cor(filt[2:end, 1], filt[1:(end - 1), 1]), 0.9; rtol = 0.1)
 
     # The paths hit their stated annualised volatility and mean.
-    paths = PortfolioOptimisers.synthetic_ar1_paths(StableRNG(4), 20000, [0.2], [0.1],
-                                                    [0.0])
+    paths = synthetic_ar1_paths(StableRNG(4), 20000, [0.2], [0.1], [0.0])
     @test isapprox(Statistics.std(paths[:, 1]) * sqrt(252), 0.2; rtol = 0.1)
     @test isapprox(Statistics.mean(paths[:, 1]) * 252, 0.1; atol = 0.05)
 
     # The fat-tailed draw is unit variance and heavier tailed than a normal.
-    z = PortfolioOptimisers.synthetic_fat_tailed_normal(StableRNG(5), 6.0, 40000)
+    z = synthetic_fat_tailed_normal(StableRNG(5), 6.0, 40000)
     @test isapprox(Statistics.var(z), 1.0; rtol = 0.15)
     @test StatsBase.kurtosis(z) > 1
 end
