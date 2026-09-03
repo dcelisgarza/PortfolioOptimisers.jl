@@ -67,7 +67,7 @@ commit = "dd069231d0"
 "src/08_Moments/33_MedianExpectedReturns.jl" = { cyc = 2, cog = 1, arg = 4, cyc_sum = 5, cog_sum = 2, arg_sum = 9, macros = ["@propagatable"] }
 "src/08_Moments/34_CustomValueExpectedReturns.jl" = { cyc = 2, cog = 1, arg = 4, cyc_sum = 7, cog_sum = 2, arg_sum = 13, macros = [] }
 "src/08_Moments/35_GerberIQCovariance.jl" = { cyc = 73, cog = 73, arg = 25, cyc_sum = 171, cog_sum = 140, arg_sum = 214, macros = ["@propagatable"] }
-"src/08_Moments/36_RegimeAdjustedExpWeightedVariance.jl" = { cyc = 13, cog = 19, arg = 9, cyc_sum = 47, cog_sum = 47, arg_sum = 56, macros = [] }
+"src/08_Moments/36_RegimeAdjustedExpWeightedVariance.jl" = { cyc = 13, cog = 19, arg = 10, cyc_sum = 55, cog_sum = 56, arg_sum = 76, macros = [] }
 "src/08_Moments/37_RegimeAdjustedExpWeightedCovariance.jl" = { cyc = 2, cog = 1, arg = 6, cyc_sum = 8, cog_sum = 4, arg_sum = 9, macros = [] }
 "src/08_Moments/38_CrossSectionalRegression.jl" = { cyc = 6, cog = 10, arg = 5, cyc_sum = 40, cog_sum = 33, arg_sum = 36, macros = [] }
 "src/08_Moments/39_CrossSectionalWeights.jl" = { cyc = 5, cog = 5, arg = 4, cyc_sum = 24, cog_sum = 18, arg_sum = 5, macros = [] }

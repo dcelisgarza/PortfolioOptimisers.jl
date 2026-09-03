@@ -375,7 +375,8 @@ $(DocStringExtensions.FIELDS)
         regime_min_obs::Integer   = round(Int, max(1, inv(log2(inv(decay))) / 2)),
         regime_lohi_mult::Option{<:Tuple{<:Number, <:Number}} = (0.7, 1.6),
         min_val::Number           = sqrt(eps()),
-        centred::Bool             = false
+        centred::Bool             = false,
+        cache::Option{<:AbstractPartialFitState} = nothing
     ) -> RegimeAdjustedExpWeightedVariance
 
 Keywords correspond to the struct's fields.
@@ -407,6 +408,7 @@ julia> ce.min_obs
   - [`FirstMomentRegimeAdjusted`](@ref)
   - [`RootMeanSquaredAdjusted`](@ref)
   - [`AbstractCovarianceEstimator`](@ref)
+  - [`partial_fit!`](@ref)
 """
 @concrete struct RegimeAdjustedExpWeightedVariance <: AbstractCovarianceEstimator
     """
@@ -445,6 +447,10 @@ julia> ce.min_obs
     $(field_dict[:centred])
     """
     centred
+    """
+    Running state of an incremental fit, or `nothing` before the first call to [`partial_fit!`](@ref). It is the one Result this estimator holds, and its type bound is the enforcement of the rule that ADR 0106 excepts. [`Statistics.var(ce::RegimeAdjustedExpWeightedVariance)`](@ref) reads it, and a fit over a matrix ignores it.
+    """
+    cache
     function RegimeAdjustedExpWeightedVariance(decay::Number, min_obs::Integer,
                                                hac_lags::Option{<:Integer},
                                                regime_method::RegimeAdjustedMethod,
@@ -452,7 +458,8 @@ julia> ce.min_obs
                                                regime_min_obs::Integer,
                                                regime_lohi_mult::Option{<:Tuple{<:Number,
                                                                                 <:Number}},
-                                               min_val::Number, centred::Bool)
+                                               min_val::Number, centred::Bool,
+                                               cache::Option{<:AbstractPartialFitState})
         assert_nonempty_gt0_finite_val(decay, :decay)
         assert_nonempty_gt0_finite_val(min_obs, :min_obs)
         assert_nonempty_gt0_finite_val(regime_min_obs, :regime_min_obs)
@@ -465,10 +472,12 @@ julia> ce.min_obs
         end
         return new{typeof(decay), typeof(min_obs), typeof(hac_lags), typeof(regime_method),
                    typeof(regime_decay), typeof(regime_min_obs), typeof(regime_lohi_mult),
-                   typeof(min_val), typeof(centred)}(decay, min_obs, hac_lags,
-                                                     regime_method, regime_decay,
-                                                     regime_min_obs, regime_lohi_mult,
-                                                     min_val, centred)
+                   typeof(min_val), typeof(centred), typeof(cache)}(decay, min_obs,
+                                                                    hac_lags, regime_method,
+                                                                    regime_decay,
+                                                                    regime_min_obs,
+                                                                    regime_lohi_mult,
+                                                                    min_val, centred, cache)
     end
 end
 function RegimeAdjustedExpWeightedVariance(; decay::Number = exp2(-inv(40.0)),
@@ -487,10 +496,11 @@ function RegimeAdjustedExpWeightedVariance(; decay::Number = exp2(-inv(40.0)),
                                                                             <:Number}} = (0.7,
                                                                                           1.6),
                                            min_val::Number = sqrt(eps()),
-                                           centred::Bool = false)::RegimeAdjustedExpWeightedVariance
+                                           centred::Bool = false,
+                                           cache::Option{<:AbstractPartialFitState} = nothing)::RegimeAdjustedExpWeightedVariance
     return RegimeAdjustedExpWeightedVariance(decay, min_obs, hac_lags, regime_method,
                                              regime_decay, regime_min_obs, regime_lohi_mult,
-                                             min_val, centred)
+                                             min_val, centred, cache)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -802,12 +812,16 @@ point-in-time series a single forward pass rather than one refit per observation
     regime state update for observation `i`.
   - `active_mask`: Optional boolean matrix with the same size as `X`. When provided,
     assets that become inactive have their variance and observation count reset.
+  - `state`: Optional cache to continue from. The default `nothing` builds the cold cache, which
+    is what a fit over a whole sample needs. [`partial_fit!`](@ref) passes the estimator's own
+    state instead, so the pass continues where the last call stopped.
 
 # Validation
 
   - $(val_dict[:dims])
   - If `estimation_mask` is not `nothing`, `size(X) == size(estimation_mask)`.
   - If `active_mask` is not `nothing`, `size(X) == size(active_mask)`.
+  - If `state` is not `nothing`, it holds as many assets as `X`.
 
 # Returns
 
@@ -818,11 +832,13 @@ point-in-time series a single forward pass rather than one refit per observation
   - [`RegimeAdjustedVarianceCache`](@ref)
   - [`process_observation!`](@ref)
   - [`regime_adjusted_variance`](@ref)
+  - [`partial_fit!`](@ref)
 """
 function regime_adjusted_variance_pass!(f, ce::RegimeAdjustedExpWeightedVariance, X::MatNum,
                                         dims::Int,
                                         estimation_mask::Option{<:AbstractMatrix{<:Bool}},
-                                        active_mask::Option{<:AbstractMatrix{<:Bool}})
+                                        active_mask::Option{<:AbstractMatrix{<:Bool}},
+                                        state::Option{<:RegimeAdjustedVarianceCache} = nothing)
     assert_dims(dims)
     est_flag = !isnothing(estimation_mask)
     act_flag = !isnothing(active_mask)
@@ -838,15 +854,21 @@ function regime_adjusted_variance_pass!(f, ce::RegimeAdjustedExpWeightedVariance
     end
     N = size(X, setdiff((1, 2), (dims,))[1])
 
-    cache = RegimeAdjustedVarianceCache(if isnothing(ce.hac_lags)
-                                            nothing
-                                        else
-                                            DataStructures.CircularBuffer{Vector{eltype(X)}}(ce.hac_lags)
-                                        end, zeros(eltype(X), N), zeros(eltype(X), N),
-                                        zeros(eltype(X), N), fill(NaN, N),
-                                        ce.centred ? zeros(eltype(X), N) : fill(NaN, N),
-                                        zeros(Int, N), zeros(Int, N), trues(N), nothing,
-                                        zero(eltype(X)))
+    cache = if isnothing(state)
+        RegimeAdjustedVarianceCache(if isnothing(ce.hac_lags)
+                                        nothing
+                                    else
+                                        DataStructures.CircularBuffer{Vector{eltype(X)}}(ce.hac_lags)
+                                    end, zeros(eltype(X), N), zeros(eltype(X), N),
+                                    zeros(eltype(X), N), fill(NaN, N),
+                                    ce.centred ? zeros(eltype(X), N) : fill(NaN, N),
+                                    zeros(Int, N), zeros(Int, N), trues(N), nothing,
+                                    zero(eltype(X)))
+    else
+        @argcheck(length(state.variance) == N,
+                  DimensionMismatch("the state holds $(length(state.variance)) assets, and `X` holds $N"))
+        state
+    end
     for (i, Xi) in enumerate(itr(X))
         emi = est_flag ? v(estimation_mask, i) : nothing
         ami = act_flag ? v(active_mask, i) : nothing
@@ -1016,6 +1038,290 @@ function variance_series(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims:
     end
 
     return isone(dims) ? val : permutedims(val)
+end
+"""
+    partial_fit!(
+        ce::RegimeAdjustedExpWeightedVariance,
+        X::MatNum;
+        dims::Int = 1,
+        estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+        active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+        kwargs...
+    ) -> RegimeAdjustedExpWeightedVariance
+
+Fold every observation of `X` into the estimator's own online variance state.
+
+The state is the cache the forward pass already builds, kept on the estimator instead of dropped, so a second call continues the recursion where the first stopped. A call on an estimator whose `cache` field holds `nothing` builds the cold cache, so one call over a whole sample gives the state that `var(ce, X)` reads and throws away.
+
+The arrays of the state are mutated in place and its scalar fields are rebound with `Accessors.@reset`, so the caller must rebind the estimator to the return value. Two estimators returned by successive calls share one state object, which is what the `!` in the name says.
+
+# Arguments
+
+  - `ce`: Regime-adjusted exponentially weighted variance estimator.
+  - $(arg_dict[:X])
+  - $(arg_dict[:dims])
+  - `estimation_mask`: Optional boolean matrix with the same size as `X`. When provided,
+    only assets where `estimation_mask[i, :]` (or `[:, i]`) is `true` contribute to the
+    regime state update for observation `i`.
+  - `active_mask`: Optional boolean matrix with the same size as `X`. When provided,
+    assets that become inactive have their variance and observation count reset.
+  - $(arg_dict[:ignkwargs])
+
+# Validation
+
+  - $(val_dict[:dims])
+  - If `estimation_mask` is not `nothing`, `size(X) == size(estimation_mask)`.
+  - If `active_mask` is not `nothing`, `size(X) == size(active_mask)`.
+  - If `ce.cache` is not `nothing`, it holds as many assets as `X`.
+
+# Returns
+
+  - `ce::RegimeAdjustedExpWeightedVariance`: The estimator, with `cache` holding the state after
+    the last observation of `X`.
+
+# Examples
+
+```jldoctest
+julia> X = [0.01 -0.02; -0.015 0.03; 0.02 -0.01; -0.005 0.012; 0.008 -0.02; -0.02 0.03];
+
+julia> ce = RegimeAdjustedExpWeightedVariance(; decay = 0.9, min_obs = 2, regime_min_obs = 2);
+
+julia> isequal(var(partial_fit!(ce, X)), var(ce, X))
+true
+
+julia> halves = partial_fit!(partial_fit!(ce, X[1:3, :]), X[4:6, :]);
+
+julia> isequal(var(halves), var(ce, X))
+true
+```
+
+# Related
+
+  - [`RegimeAdjustedExpWeightedVariance`](@ref)
+  - [`RegimeAdjustedVarianceCache`](@ref)
+  - [`regime_adjusted_variance_pass!`](@ref)
+  - [`Statistics.var(ce::RegimeAdjustedExpWeightedVariance)`](@ref)
+"""
+function partial_fit!(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::Int = 1,
+                      estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+                      active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
+    cache = regime_adjusted_variance_pass!((args...) -> nothing, ce, X, dims,
+                                           estimation_mask, active_mask, ce.cache)
+    Accessors.@reset ce.cache = cache
+    return ce
+end
+"""
+    partial_fit!(
+        ce::RegimeAdjustedExpWeightedVariance,
+        x::VecNum;
+        estimation_mask::Option{<:AbstractVector{<:Bool}} = nothing,
+        active_mask::Option{<:AbstractVector{<:Bool}} = nothing,
+        kwargs...
+    ) -> RegimeAdjustedExpWeightedVariance
+
+Fold one observation into the estimator's own online variance state.
+
+The entries of `x` are the assets of a single observation, which is the row the matrix method folds one at a time. This is the shape a caller has when the observations arrive one by one.
+
+# Arguments
+
+  - `ce`: Regime-adjusted exponentially weighted variance estimator.
+  - `x::VecNum`: One observation, with one entry per asset.
+  - `estimation_mask`: Optional boolean vector with the same length as `x`, restricting which
+    assets contribute to the regime state update.
+  - `active_mask`: Optional boolean vector with the same length as `x`. An asset that becomes
+    inactive has its variance and observation count reset.
+  - $(arg_dict[:ignkwargs])
+
+# Validation
+
+  - If `estimation_mask` is not `nothing`, `length(x) == length(estimation_mask)`.
+  - If `active_mask` is not `nothing`, `length(x) == length(active_mask)`.
+  - If `ce.cache` is not `nothing`, it holds as many assets as `x`.
+
+# Returns
+
+  - `ce::RegimeAdjustedExpWeightedVariance`: The estimator, with `cache` holding the state after
+    the observation.
+
+# Examples
+
+```jldoctest
+julia> X = [0.01 -0.02; -0.015 0.03; 0.02 -0.01; -0.005 0.012; 0.008 -0.02; -0.02 0.03];
+
+julia> ce = RegimeAdjustedExpWeightedVariance(; decay = 0.9, min_obs = 2, regime_min_obs = 2);
+
+julia> one_at_a_time = foldl((c, i) -> partial_fit!(c, view(X, i, :)), axes(X, 1); init = ce);
+
+julia> isequal(var(one_at_a_time), var(ce, X))
+true
+```
+
+# Related
+
+  - [`partial_fit!(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::Int = 1, estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)`](@ref)
+  - [`RegimeAdjustedExpWeightedVariance`](@ref)
+  - [`Statistics.var(ce::RegimeAdjustedExpWeightedVariance)`](@ref)
+"""
+function partial_fit!(ce::RegimeAdjustedExpWeightedVariance, x::VecNum;
+                      estimation_mask::Option{<:AbstractVector{<:Bool}} = nothing,
+                      active_mask::Option{<:AbstractVector{<:Bool}} = nothing, kwargs...)
+    return partial_fit!(ce, permutedims(x); dims = 1,
+                        estimation_mask = if isnothing(estimation_mask)
+                            nothing
+                        else
+                            permutedims(estimation_mask)
+                        end, active_mask = if isnothing(active_mask)
+                            nothing
+                        else
+                            permutedims(active_mask)
+                        end)
+end
+"""
+    Statistics.var(
+        ce::RegimeAdjustedExpWeightedVariance,
+        state::RegimeAdjustedVarianceCache;
+        kwargs...
+    ) -> Vector{<:Number}
+
+Read the regime-adjusted variance out of a state held by hand.
+
+This is [`regime_adjusted_variance`](@ref) under the family's public verb, so a state a caller keeps outside an estimator answers the same call as one the estimator holds. The state is read and never written.
+
+# Arguments
+
+  - `ce`: Regime-adjusted exponentially weighted variance estimator.
+  - `state`: Running state of an incremental fit.
+  - $(arg_dict[:ignkwargs])
+
+# Returns
+
+  - `var::Vector{<:Number}`: Per-asset regime-adjusted exponentially weighted variance vector of
+    length `assets`. An asset with fewer than `ce.min_obs` observations is `NaN`.
+
+# Examples
+
+```jldoctest
+julia> X = [0.01 -0.02; -0.015 0.03; 0.02 -0.01; -0.005 0.012];
+
+julia> ce = partial_fit!(RegimeAdjustedExpWeightedVariance(; decay = 0.9, min_obs = 2,
+                                                           regime_min_obs = 2), X);
+
+julia> isequal(var(ce, ce.cache), var(ce))
+true
+```
+
+# Related
+
+  - [`RegimeAdjustedVarianceCache`](@ref)
+  - [`regime_adjusted_variance`](@ref)
+  - [`Statistics.var(ce::RegimeAdjustedExpWeightedVariance)`](@ref)
+"""
+function Statistics.var(ce::RegimeAdjustedExpWeightedVariance,
+                        state::RegimeAdjustedVarianceCache; kwargs...)
+    return regime_adjusted_variance(state, ce)
+end
+"""
+    Statistics.var(ce::RegimeAdjustedExpWeightedVariance; kwargs...) -> Vector{<:Number}
+
+Read the regime-adjusted variance out of the estimator's own state.
+
+The one-argument form is what an incremental fit answers: [`partial_fit!`](@ref) leaves the state in the `cache` field, and this verb turns it into the ordinary answer. An estimator that has been given no observation carries no state, so the call is refused rather than answered with a zero.
+
+# Arguments
+
+  - `ce`: Regime-adjusted exponentially weighted variance estimator carrying a state.
+  - $(arg_dict[:ignkwargs])
+
+# Validation
+
+  - `ce.cache` is not `nothing`. An `ArgumentError` is thrown otherwise.
+
+# Returns
+
+  - `var::Vector{<:Number}`: Per-asset regime-adjusted exponentially weighted variance vector of
+    length `assets`. An asset with fewer than `ce.min_obs` observations is `NaN`.
+
+# Examples
+
+```jldoctest
+julia> X = [0.01 -0.02; -0.015 0.03; 0.02 -0.01; -0.005 0.012];
+
+julia> ce = partial_fit!(RegimeAdjustedExpWeightedVariance(; decay = 0.9, min_obs = 2,
+                                                           regime_min_obs = 2), X);
+
+julia> length(var(ce))
+2
+
+julia> var(RegimeAdjustedExpWeightedVariance())
+ERROR: ArgumentError: `ce` holds no partial-fit state, so there is nothing to read. Call `partial_fit!(ce, X)` first, or `var(ce, X)` for a fit over a whole sample.
+[...]
+```
+
+# Related
+
+  - [`partial_fit!(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::Int = 1, estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)`](@ref)
+  - [`Statistics.var(ce::RegimeAdjustedExpWeightedVariance, state::RegimeAdjustedVarianceCache; kwargs...)`](@ref)
+  - [`RegimeAdjustedVarianceCache`](@ref)
+"""
+function Statistics.var(ce::RegimeAdjustedExpWeightedVariance; kwargs...)
+    state = ce.cache
+    @argcheck(!isnothing(state),
+              ArgumentError("`ce` holds no partial-fit state, so there is nothing to read. Call `partial_fit!(ce, X)` first, or `var(ce, X)` for a fit over a whole sample."))
+    return var(ce, state)
+end
+"""
+    merge_states(
+        a::RegimeAdjustedVarianceCache,
+        b::RegimeAdjustedVarianceCache
+    ) -> Union{}
+
+Refuses a pair of regime-adjusted states, because this family does not merge.
+
+A merge needs the state of a block to be a sufficient statistic for what that block contributes, and this one is not. The regime state reads each observation's standardised squared innovation, which divides by the running variance and is gated by the running observation count, so a block fitted from a cold start weighs its own first observations differently from the same block fitted after another. The exponentially weighted accumulator itself does fold, as ``\\lambda^{n_B} v_A + v_B``, but the regime state that scales it does not, and an uncentred fit also carries its running location while a HAC fit carries its buffer of recent returns.
+
+Fold the second block into the first with [`partial_fit!`](@ref) instead. A sequential fit is exact, and it is the route this family gives.
+
+# Arguments
+
+  - `a`: The state of the first block of observations.
+  - `b`: The state of the second block of observations.
+
+# Validation
+
+  - `a` and `b` pass [`assert_mergeable_states`](@ref), so a mismatched pair is named as such.
+  - The pair is then refused with an `ArgumentError`, whatever it holds.
+
+# Returns
+
+  - Nothing is returned. The method always throws.
+
+# Examples
+
+```jldoctest
+julia> X = [0.01 -0.02; -0.015 0.03; 0.02 -0.01; -0.005 0.012];
+
+julia> ce = partial_fit!(RegimeAdjustedExpWeightedVariance(; decay = 0.9, min_obs = 2,
+                                                           regime_min_obs = 2), X);
+
+julia> try
+           PortfolioOptimisers.merge_states(ce.cache, ce.cache)
+       catch err
+           err isa ArgumentError
+       end
+true
+```
+
+# Related
+
+  - [`RegimeAdjustedVarianceCache`](@ref)
+  - [`merge_states`](@ref)
+  - [`assert_mergeable_states`](@ref)
+  - [`partial_fit!(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::Int = 1, estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)`](@ref)
+"""
+function merge_states(a::RegimeAdjustedVarianceCache, b::RegimeAdjustedVarianceCache)
+    assert_mergeable_states(a, b)
+    return throw(ArgumentError("a `RegimeAdjustedVarianceCache` pair does not merge, because a block fitted from a cold start is not what the same block contributes after another one. The regime state reads each observation's standardised squared innovation, which divides by the running variance and is gated by the running observation count. Fold the second block into the first with `partial_fit!` instead."))
 end
 export LogRegimeAdjusted, FirstMomentRegimeAdjusted, RootMeanSquaredAdjusted,
        RegimeAdjustedExpWeightedVariance

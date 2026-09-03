@@ -50,11 +50,20 @@ protocol and the pretty `show` come free and neither `Union` needs an edit.
 to `nothing`.** The bound is the enforcement the rule already asks for. A wider bound would admit
 the Result the rule refuses, so the bound is the rule, not a comment about it.
 
-**Every state answers `merge_states`.** Two states fitted on disjoint blocks of observations merge
-into the state of the concatenated block, which is what makes an incremental fit parallel and
-associative. `assert_mergeable_states` refuses a pair of different types and a pair over different
-numbers of assets, and a family whose merge needs more adds a method of its own that calls it
-first. `chan_merge` carries the mathematics of the merge, once, for every family.
+**Every state answers `merge_states`, with the fold or with a refusal.** Two states fitted on
+disjoint blocks of observations merge into the state of the concatenated block whenever the
+statistic is a sum of blocks, which is what makes an incremental fit parallel and associative.
+`assert_mergeable_states` refuses a pair of different types and a pair over different numbers of
+assets, and a family whose merge needs more adds a method of its own that calls it first.
+`chan_merge` carries the mathematics of the merge, once, for every family.
+
+**A family whose state is not a sufficient statistic for its block refuses the pair instead, and
+names the reason.** `RegimeAdjustedVarianceCache` is that case, and issue #701 measured it. Its
+exponentially weighted accumulator does fold, as `decay^n_B * v_A + v_B`, but the regime state that
+scales the answer reads each observation's standardised squared innovation, gated by the running
+observation count. A block fitted from a cold start therefore skips its own first `min_obs`
+observations of the regime state, and no function of the two block states can put back what neither
+of them recorded. The family's route is a sequential `partial_fit!`, which is exact.
 
 **The verb is `merge_states`, not `Base.merge`.** `Base.merge` on a `Dict` and on a `NamedTuple`
 means that the right operand wins a key conflict. This merge is a sum, so the borrowed name would
@@ -72,7 +81,8 @@ the shape, so it moves under the root that names what it is.
 - `CONTEXT.md` gains the two terms the seam introduces: Partial Fit State, and the merge of two
   states.
 - A new state struct owes exactly one method, `merge_states`, and the interface section of the
-  `AbstractPartialFitState` docstring states it.
+  `AbstractPartialFitState` docstring states it. The method is the fold when the statistic is a sum
+  of blocks, and a refusal naming the reason when it is not.
 - The exception is closed. A field of any other Result type on an Estimator is still refused, and
   the type bound is what refuses it. Widening the bound is what a reviewer looks for.
 - `RegimeAdjustedVarianceCache` changes supertype. It is unexported and no doctest renders its

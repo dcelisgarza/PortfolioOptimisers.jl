@@ -23,4 +23,15 @@ variance_series(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::Int = 1,
                     estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                     active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                     kwargs...)
+partial_fit!(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::Int = 1,
+                    estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+                    active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+                    kwargs...)
+partial_fit!(ce::RegimeAdjustedExpWeightedVariance, x::VecNum;
+                    estimation_mask::Option{<:AbstractVector{<:Bool}} = nothing,
+                    active_mask::Option{<:AbstractVector{<:Bool}} = nothing,
+                    kwargs...)
+var(ce::RegimeAdjustedExpWeightedVariance, state::RegimeAdjustedVarianceCache; kwargs...)
+var(ce::RegimeAdjustedExpWeightedVariance; kwargs...)
+PortfolioOptimisers.merge_states(a::RegimeAdjustedVarianceCache, b::RegimeAdjustedVarianceCache)
 ```

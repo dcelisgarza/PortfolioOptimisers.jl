@@ -216,9 +216,10 @@ ref_dict
 
 ## Partial fit
 
-An incremental fit folds one observation into an estimate without reading the sample again. Its running quantities live in a [`AbstractPartialFitState`](@ref), and [`merge_states`](@ref) combines the states of two disjoint blocks of observations into the state of the concatenated block.
+An incremental fit folds one observation into an estimate without reading the sample again. [`partial_fit!`](@ref) is the verb that folds it, its running quantities live in a [`AbstractPartialFitState`](@ref), and [`merge_states`](@ref) combines the states of two disjoint blocks of observations into the state of the concatenated block.
 
 ```@docs
+partial_fit!
 PortfolioOptimisers.AbstractPartialFitState
 PortfolioOptimisers.merge_states
 PortfolioOptimisers.assert_mergeable_states

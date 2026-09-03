@@ -1,4 +1,37 @@
 """
+    partial_fit!(est, X)
+
+Folds observations into an estimator's partial-fit state, and returns the estimator.
+
+An incremental fit reads each observation once and keeps what it needs in an [`AbstractPartialFitState`](@ref), so a later call continues where the last one stopped instead of reading the sample again. The state lives in the estimator's `cache` field, which holds `nothing` until the first call. ADR 0106 records why that field is the one Result an estimator holds.
+
+The verb mutates the array fields of the state and rebinds its scalar fields with `Accessors.@reset`, so it returns a **new** estimator and the caller must rebind it. The returned estimator shares the state object with the one it was built from, which is what the `!` in the name says: two estimators returned by successive calls read the same running quantities.
+
+A batch verb ignores the state. `var(ce, X)` fits `X` alone, so an estimator carrying a state still answers any input it is given.
+
+# Interfaces
+
+A family that answers this verb implements two methods:
+
+  - `partial_fit!(est, X::MatNum; dims::Int = 1, kwargs...) -> est`: Folds every observation of `X`, in order.
+  - `partial_fit!(est, x::VecNum; kwargs...) -> est`: Folds one observation, whose entries are the assets.
+
+# Arguments
+
+  - `est`: Estimator whose state is folded forward.
+  - `X`: Observations to fold. A matrix holds one observation per row when `dims == 1`, and one per column when `dims == 2`. A vector is a single observation across the assets.
+
+# Returns
+
+  - `est`: The estimator, with its `cache` field rebound to the state after the last observation.
+
+# Related
+
+  - [`AbstractPartialFitState`](@ref)
+  - [`merge_states`](@ref)
+"""
+function partial_fit! end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Refuses two partial-fit states that cannot be merged, naming the reason.
@@ -167,3 +200,5 @@ function merge_states(a::AbstractPartialFitState, b::AbstractPartialFitState)
     name = Base.typename(typeof(a)).name
     return throw(ArgumentError("$name is an AbstractPartialFitState with no `merge_states` method. Implement `merge_states(a::$name, b::$name)`, which calls `assert_mergeable_states` first, refuses any further mismatch of its own, and folds the two states with `chan_merge`. See the `AbstractPartialFitState` docstring for the interface."))
 end
+
+export partial_fit!

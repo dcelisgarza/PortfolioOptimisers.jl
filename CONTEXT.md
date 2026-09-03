@@ -25,7 +25,7 @@ The running quantities an incremental fit keeps between calls — the observatio
 *Avoid*: Cache (a cache may be dropped without changing an answer, and a state may not).
 
 **State Merge**
-The combination of two Partial Fit States fitted on disjoint blocks of observations into the state of the concatenated block, under the verb `merge_states`. It is a sum rather than a right-operand-wins overwrite, which is why the verb is not `Base.merge`, and it is what makes an incremental fit parallel and associative: a sample split into any set of disjoint blocks gives the state of the whole sample, whatever order the blocks are folded in.
+The combination of two Partial Fit States fitted on disjoint blocks of observations into the state of the concatenated block, under the verb `merge_states`. It is a sum rather than a right-operand-wins overwrite, which is why the verb is not `Base.merge`, and it is what makes an incremental fit parallel and associative: a sample split into any set of disjoint blocks gives the state of the whole sample, whatever order the blocks are folded in. A family whose state is not a sufficient statistic for its own block refuses the merge and names the reason, and its route is a sequential fit instead.
 
 **Choice Surface**
 The set of things a caller picks when specifying a problem: every concrete type the package declares that is a leaf Estimator, a leaf Algorithm, a leaf `AbstractCovarianceEstimator`, or an export under its own name. Results and errors are what comes back, never what is chosen, so they are not on it. `AbstractCovarianceEstimator` is named on its own because it descends from `StatsBase.CovarianceEstimator` rather than from Estimator, and the export rule catches whatever family takes a root nothing here names.

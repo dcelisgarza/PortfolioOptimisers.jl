@@ -73,7 +73,7 @@ In order to implement a new partial-fit state which will work seamlessly with th
 
  1. Call [`assert_mergeable_states`](@ref) on the pair, which refuses two states of different types and two states over different numbers of assets.
  2. Refuse any further mismatch the family needs. An exponentially weighted pair must also agree on its decay, because the two states then weight the same observation differently.
- 3. Fold the observation count, the mean and the second-moment accumulator with [`chan_merge`](@ref), and rebuild the state from the result.
+ 3. Fold the observation count, the mean and the second-moment accumulator with [`chan_merge`](@ref), and rebuild the state from the result. A family whose state is not a sufficient statistic for its own block refuses the pair here instead, with a message naming the reason, because no fold can put back what the state never recorded.
 
 # Related
 
