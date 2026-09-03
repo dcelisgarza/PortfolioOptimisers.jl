@@ -37,6 +37,7 @@ ep_cvar_formulation
 ep_evar_formulation
 ep_rlvar_formulation
 ep_sequential_sides
+ep_sequential_start(tv::AbstractSequentialTailViewConstraint, w::VecNum)
 ep_add_cvar_view!
 ep_add_evar_view!
 ep_add_grid_tail_view!
