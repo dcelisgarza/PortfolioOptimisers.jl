@@ -1919,12 +1919,12 @@ The method that Julia selects is the algorithm, and the re-basis selects it.
 function constraint_row_length(::Nothing, nx::VecStr)::Int
     return length(nx)
 end
-function constraint_row_length(rr::AbstractTimeSeriesRegressionResult, ::VecStr)::Int
+function constraint_row_length(rr::AbstractLoadingsRegressionResult, ::VecStr)::Int
     return size(rr.M, 1)
 end
 """
     constraint_row_term(::Nothing, Ai, c)
-    constraint_row_term(rr::AbstractTimeSeriesRegressionResult, Ai, c)
+    constraint_row_term(rr::AbstractLoadingsRegressionResult, Ai, c)
 
 Contribution of one matched variable to a constraint row.
 
@@ -1975,14 +1975,14 @@ The method that Julia selects is the algorithm, and the re-basis selects it.
 function constraint_row_term(::Nothing, Ai, c)
     return Ai * c
 end
-function constraint_row_term(rr::AbstractTimeSeriesRegressionResult, Ai, c)
+function constraint_row_term(rr::AbstractLoadingsRegressionResult, Ai, c)
     return vec(sum(view(rr.M, :, Ai); dims = 2)) * c
 end
 """
     get_linear_constraints(lcs::PR_VecPR, sets::UniverseSets,
                            key::Option{<:AbstractString} = nothing;
                            datatype::DataType = Float64, strict::Bool = false,
-                           rr::Option{<:AbstractTimeSeriesRegressionResult} = nothing)
+                           rr::Option{<:AbstractLoadingsRegressionResult} = nothing)
 
 Convert parsed linear constraint equations into a `LinearConstraint` object.
 
@@ -2037,7 +2037,7 @@ A row takes one of two shapes. Without `rr` it runs over the universe the names 
 function get_linear_constraints(lcs::PR_VecPR, sets::UniverseSets,
                                 key::Option{<:AbstractString} = nothing;
                                 datatype::DataType = Float64, strict::Bool = false,
-                                rr::Option{<:AbstractTimeSeriesRegressionResult} = nothing)
+                                rr::Option{<:AbstractLoadingsRegressionResult} = nothing)
     if isa(lcs, AbstractVector)
         @argcheck(!isempty(lcs), IsEmptyError)
     end
@@ -2383,7 +2383,7 @@ function linear_constraints(eqn::EqnType, sets::UniverseSets,
                             ops2::Tuple = (:call, :(==), :(<=), :(>=)),
                             datatype::DataType = Float64, strict::Bool = false,
                             bl_flag::Bool = false,
-                            rr::Option{<:AbstractTimeSeriesRegressionResult} = nothing)::Option{<:LinearConstraint}
+                            rr::Option{<:AbstractLoadingsRegressionResult} = nothing)::Option{<:LinearConstraint}
     lcs = parse_equation(eqn; ops1 = ops1, ops2 = ops2, datatype = datatype)
     lcs = replace_group_by_assets(lcs, sets, bl_flag)
     return get_linear_constraints(lcs, sets, key; datatype = datatype, strict = strict,
@@ -2393,12 +2393,12 @@ end
     linear_constraints(lcs::LinearConstraintEstimator, sets::UniverseSets;
                        datatype::DataType = Float64, strict::Bool = false,
                        bl_flag::Bool = false,
-                       rr::Option{<:AbstractTimeSeriesRegressionResult} = nothing,
+                       rr::Option{<:AbstractLoadingsRegressionResult} = nothing,
                        rd::Option{<:ReturnsResult} = nothing)
     linear_constraints(lcs::VecLcE, sets::UniverseSets;
                        datatype::DataType = Float64, strict::Bool = false,
                        bl_flag::Bool = false,
-                       rr::Option{<:AbstractTimeSeriesRegressionResult} = nothing,
+                       rr::Option{<:AbstractLoadingsRegressionResult} = nothing,
                        rd::Option{<:ReturnsResult} = nothing)
 
 Parse the equations a [`LinearConstraintEstimator`](@ref) carries, against the universe key that estimator names.
@@ -2438,14 +2438,14 @@ The method reads `val` and `key` off the estimator and hands both to the equatio
 function linear_constraints(lcs::LinearConstraintEstimator, sets::UniverseSets;
                             datatype::DataType = Float64, strict::Bool = false,
                             bl_flag::Bool = false,
-                            rr::Option{<:AbstractTimeSeriesRegressionResult} = nothing,
+                            rr::Option{<:AbstractLoadingsRegressionResult} = nothing,
                             rd::Option{<:ReturnsResult} = nothing)::Option{<:LinearConstraint}
     return linear_constraints(lcs.val, sets, lcs.key; datatype = datatype, strict = strict,
                               bl_flag = bl_flag)
 end
 function linear_constraints(lcs::VecLcE, sets::UniverseSets; datatype::DataType = Float64,
                             strict::Bool = false, bl_flag::Bool = false,
-                            rr::Option{<:AbstractTimeSeriesRegressionResult} = nothing,
+                            rr::Option{<:AbstractLoadingsRegressionResult} = nothing,
                             rd::Option{<:ReturnsResult} = nothing)
     return [linear_constraints(lc, sets; datatype = datatype, strict = strict,
                                bl_flag = bl_flag, rr = rr, rd = rd) for lc in lcs]

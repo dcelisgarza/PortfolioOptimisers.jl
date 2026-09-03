@@ -64,7 +64,7 @@ Regression
 
   - [`AbstractRegressionEstimator`](@ref)
   - [`AbstractCrossSectionalRegressionEstimator`](@ref)
-  - [`AbstractTimeSeriesRegressionResult`](@ref)
+  - [`AbstractLoadingsRegressionResult`](@ref)
   - [`StepwiseRegression`](@ref)
   - [`DimensionReductionRegression`](@ref)
 """
@@ -135,14 +135,14 @@ abstract type AbstractCrossSectionalRegressionEstimator <: AbstractRegressionEst
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype of every regression result, over both the time-series family and the cross-sectional family.
+Abstract supertype of every regression result, over both the loadings family and the cross-sectional family.
 
-The type is an umbrella, and the two families disagree on what an asset index means. A time-series result holds one row per asset, so [`port_opt_view`](@ref) slices its rows. A cross-sectional result holds one row per observation and one column per asset, so the same index slices its columns. Subtype the child that names the family, never this root.
+The type is an umbrella, and the two children disagree on what an asset index means. A loadings result holds one row of `M` per asset, so [`port_opt_view`](@ref) slices its rows. A cross-sectional result holds one row per observation and one column per asset, so the same index slices its columns. Subtype the child that states what the result carries, never this root.
 
 # Related
 
   - [`AbstractResult`](@ref)
-  - [`AbstractTimeSeriesRegressionResult`](@ref)
+  - [`AbstractLoadingsRegressionResult`](@ref)
   - [`AbstractCrossSectionalRegressionResult`](@ref)
   - [`AbstractRegressionEstimator`](@ref)
 """
@@ -150,9 +150,9 @@ abstract type AbstractRegressionResult <: AbstractResult end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all time-series regression result types.
+Abstract supertype for all regression result types that carry a loadings matrix.
 
-All concrete and/or abstract types representing the output of a regression fitted per asset over the observations should be subtypes of `AbstractTimeSeriesRegressionResult`. A member carries the loadings matrix `M`, so every consumer that re-bases a constraint or decomposes risk in the factor basis binds this type rather than the umbrella.
+All concrete and/or abstract types representing the output of a regression that carries a loadings matrix `M`, one row per asset and one column per factor, should be subtypes of `AbstractLoadingsRegressionResult`. The root states what a member carries, not how it was fitted, because every consumer that re-bases a constraint or decomposes risk in the factor basis reads `M` and binds this type rather than the umbrella. The fitting geometry is not the criterion: a result fitted per asset over the observations and a result fitted per observation across the assets both belong here when they carry `M`.
 
 # Related
 
@@ -161,7 +161,7 @@ All concrete and/or abstract types representing the output of a regression fitte
   - [`AbstractTimeSeriesRegressionEstimator`](@ref)
   - [`Regression`](@ref)
 """
-abstract type AbstractTimeSeriesRegressionResult <: AbstractRegressionResult end
+abstract type AbstractLoadingsRegressionResult <: AbstractRegressionResult end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -172,27 +172,29 @@ All concrete and/or abstract types representing the output of a regression fitte
 # Related
 
   - [`AbstractRegressionResult`](@ref)
-  - [`AbstractTimeSeriesRegressionResult`](@ref)
+  - [`AbstractLoadingsRegressionResult`](@ref)
   - [`AbstractCrossSectionalRegressionEstimator`](@ref)
   - [`CrossSectionalRegression`](@ref)
 """
 abstract type AbstractCrossSectionalRegressionResult <: AbstractRegressionResult end
 """
-    const RegE_Reg = Union{<:AbstractTimeSeriesRegressionResult,
+    const RegE_Reg = Union{<:AbstractLoadingsRegressionResult,
                            <:AbstractTimeSeriesRegressionEstimator}
 
-Alias for a time-series regression result or estimator.
+Alias for a loadings regression result or a time-series regression estimator.
 
-Matches either an [`AbstractTimeSeriesRegressionResult`](@ref) (pre-computed regression result) or an [`AbstractTimeSeriesRegressionEstimator`](@ref) (regression specification). Used for dispatch in factor model and regression-based risk routines. It names the time-series pair rather than the umbrella, because every consumer of the alias reads the loadings matrix `M`, which only a time-series result carries.
+Matches either an [`AbstractLoadingsRegressionResult`](@ref) (a pre-computed result that carries the loadings matrix `M`) or an [`AbstractTimeSeriesRegressionEstimator`](@ref) (a specification whose verb produces one). Used for dispatch in factor model and regression-based risk routines. Every consumer of the alias reads `M`, so the alias names the two ways a consumer obtains it rather than the umbrella.
+
+The two arms state different criteria, and the asymmetry is deliberate. A result carries a payload, so the result arm names what it carries and admits any loadings result whatever its fitting geometry. An estimator carries no payload, so the estimator arm names the family whose verb, [`regression`](@ref), returns a loadings result. A cross-sectional estimator answers [`cross_sectional_regression`](@ref), whose result carries no loadings, so it stays outside the alias.
 
 # Related
 
-  - [`AbstractTimeSeriesRegressionResult`](@ref)
+  - [`AbstractLoadingsRegressionResult`](@ref)
   - [`AbstractTimeSeriesRegressionEstimator`](@ref)
   - [`AbstractRegressionResult`](@ref)
   - [`AbstractRegressionEstimator`](@ref)
 """
-const RegE_Reg = Union{<:AbstractTimeSeriesRegressionResult,
+const RegE_Reg = Union{<:AbstractLoadingsRegressionResult,
                        <:AbstractTimeSeriesRegressionEstimator}
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1009,7 +1011,7 @@ Regression
 
 # Related
 
-  - [`AbstractTimeSeriesRegressionResult`](@ref)
+  - [`AbstractLoadingsRegressionResult`](@ref)
   - [`StepwiseRegression`](@ref)
   - [`DimensionReductionRegression`](@ref)
   - [`port_opt_view`](@ref)
@@ -1018,7 +1020,7 @@ Regression
 
   - $(ref_dict[:cajas2025]) Section 4.1, Equations 4.2-4.3.
 """
-@concrete struct Regression <: AbstractTimeSeriesRegressionResult
+@concrete struct Regression <: AbstractLoadingsRegressionResult
     """
     $(arg_dict[:M])
     """

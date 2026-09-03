@@ -266,7 +266,7 @@ The predicate is `false` for everything else, including a space whose `re` is an
   - [`ExposureConstraintEstimator`](@ref)
 """
 function stated_constraint_space_basis(space::FactorSpace)::Bool
-    return isa(space.re, AbstractTimeSeriesRegressionResult)
+    return isa(space.re, AbstractLoadingsRegressionResult)
 end
 function stated_constraint_space_basis(::Any)::Bool
     return false
@@ -291,7 +291,7 @@ Factored out because the three JuMP-side [`assert_external_optimiser`](@ref) met
 """
 function assert_external_lcse(opt)::Nothing
     @argcheck(!stated_constraint_space_basis(opt.opt.lcse),
-              ArgumentError("a constraint space in opt.opt.lcse cannot hold a precomputed AbstractTimeSeriesRegressionResult in re; use an estimator instead. The outer problem replaces the asset universe with cluster names, so stated loadings cannot be sliced to follow it, and a row re-based through them would name assets that no longer exist"))
+              ArgumentError("a constraint space in opt.opt.lcse cannot hold a precomputed AbstractLoadingsRegressionResult in re; use an estimator instead. The outer problem replaces the asset universe with cluster names, so stated loadings cannot be sliced to follow it, and a row re-based through them would name assets that no longer exist"))
     return nothing
 end
 function assert_external_optimiser(opt::JuMPOptimisationEstimator)::Nothing
@@ -320,8 +320,8 @@ function assert_external_optimiser(opt::RiskBudgetingOptimiser)::Nothing
     @argcheck(!isa(opt.opt.pe, AbstractPriorResult),
               ArgumentError("opt.opt.pe cannot be a precomputed AbstractPriorResult; use an estimator instead"))
     if isa(opt.rba, FactorRiskBudgeting)
-        @argcheck(!isa(opt.rba.re, AbstractTimeSeriesRegressionResult),
-                  ArgumentError("opt.rba.re cannot be a precomputed AbstractTimeSeriesRegressionResult; use an estimator instead"))
+        @argcheck(!isa(opt.rba.re, AbstractLoadingsRegressionResult),
+                  ArgumentError("opt.rba.re cannot be a precomputed AbstractLoadingsRegressionResult; use an estimator instead"))
     end
     assert_external_lcse(opt)
     assert_internal_optimiser(opt)
@@ -331,8 +331,8 @@ function assert_external_optimiser(opt::FactorRiskContribution)::Nothing
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
     @argcheck(!isa(opt.opt.pe, AbstractPriorResult),
               ArgumentError("opt.opt.pe cannot be a precomputed AbstractPriorResult; use an estimator instead"))
-    @argcheck(!isa(opt.re, AbstractTimeSeriesRegressionResult),
-              ArgumentError("opt.re cannot be a precomputed AbstractTimeSeriesRegressionResult; use an estimator instead"))
+    @argcheck(!isa(opt.re, AbstractLoadingsRegressionResult),
+              ArgumentError("opt.re cannot be a precomputed AbstractLoadingsRegressionResult; use an estimator instead"))
     assert_external_lcse(opt)
     assert_internal_optimiser(opt)
     return nothing

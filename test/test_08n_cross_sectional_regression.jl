@@ -377,13 +377,13 @@ end
     end
 
     @testset "The type tree" begin
-        # Both roots are umbrellas, and the two existing concrete types sit on the
-        # time-series side.
+        # Both roots are umbrellas. An estimator child names the geometry it fits, and
+        # a result child names what a member carries.
         @test StepwiseRegression <:
               PortfolioOptimisers.AbstractTimeSeriesRegressionEstimator
         @test DimensionReductionRegression <:
               PortfolioOptimisers.AbstractTimeSeriesRegressionEstimator
-        @test Regression <: PortfolioOptimisers.AbstractTimeSeriesRegressionResult
+        @test Regression <: PortfolioOptimisers.AbstractLoadingsRegressionResult
         @test CrossSectionalLinearRegression <:
               PortfolioOptimisers.AbstractCrossSectionalRegressionEstimator
         @test CrossSectionalTargetRegression <:
@@ -394,8 +394,19 @@ end
               PortfolioOptimisers.AbstractRegressionEstimator
         @test PortfolioOptimisers.AbstractCrossSectionalRegressionResult <:
               PortfolioOptimisers.AbstractRegressionResult
-        # `RegE_Reg` names the time-series pair, so no cross-sectional type reaches a
-        # consumer that reads the loadings matrix.
+        @test PortfolioOptimisers.AbstractLoadingsRegressionResult <:
+              PortfolioOptimisers.AbstractRegressionResult
+        # The loadings criterion partitions the two result children, so neither is a
+        # subtype of the other.
+        @test !(PortfolioOptimisers.AbstractCrossSectionalRegressionResult <:
+                PortfolioOptimisers.AbstractLoadingsRegressionResult)
+        @test !(PortfolioOptimisers.AbstractLoadingsRegressionResult <:
+                PortfolioOptimisers.AbstractCrossSectionalRegressionResult)
+        # The loadings root replaced `AbstractTimeSeriesRegressionResult`, so a site that
+        # kept the old name fails to resolve rather than binding a stale root.
+        @test !isdefined(PortfolioOptimisers, :AbstractTimeSeriesRegressionResult)
+        # `RegE_Reg` pairs the loadings result root with the time-series estimator root,
+        # so no cross-sectional type reaches a consumer that reads the loadings matrix.
         @test StepwiseRegression <: PortfolioOptimisers.RegE_Reg
         @test Regression <: PortfolioOptimisers.RegE_Reg
         @test !(CrossSectionalLinearRegression <: PortfolioOptimisers.RegE_Reg)
@@ -408,8 +419,8 @@ end
         end
         # None of the new abstract types is exported.
         for T in (:AbstractTimeSeriesRegressionEstimator,
-                  :AbstractCrossSectionalRegressionEstimator,
-                  :AbstractTimeSeriesRegressionResult, :AbstractCrossSectionalRegressionResult,
+                  :AbstractCrossSectionalRegressionEstimator, :AbstractLoadingsRegressionResult,
+                  :AbstractCrossSectionalRegressionResult,
                   :AbstractCrossSectionalSolveAlgorithm)
             @test !Base.isexported(PortfolioOptimisers, T)
         end

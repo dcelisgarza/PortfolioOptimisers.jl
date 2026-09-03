@@ -156,7 +156,7 @@ end
 end
 """
     factor_reconstruction(re::AbstractTimeSeriesRegressionEstimator, X::MatNum,
-                          F::MatNum) -> Tuple{AbstractTimeSeriesRegressionResult, MatNum}
+                          F::MatNum) -> Tuple{AbstractLoadingsRegressionResult, MatNum}
 
 Fit the loadings and rebuild the asset returns from the factor returns.
 
@@ -177,7 +177,7 @@ The second half — projecting the factor moments through the loadings — is [`
 
 # Returns
 
-  - `rr::AbstractTimeSeriesRegressionResult`: Regression result carrying the loadings `M` and intercepts `b`.
+  - `rr::AbstractLoadingsRegressionResult`: Regression result carrying the loadings `M` and intercepts `b`.
   - `posterior_X::MatNum`: Reconstructed asset returns, `observations × assets`.
 
 # Related
@@ -194,7 +194,7 @@ function factor_reconstruction(re::AbstractTimeSeriesRegressionEstimator, X::Mat
 end
 """
     factor_lift(mp::AbstractMatrixProcessingEstimator, ve::AbstractVarianceEstimator,
-                rsd::Bool, rr::AbstractTimeSeriesRegressionResult, f_mu::VecNum, f_sigma::MatNum,
+                rsd::Bool, rr::AbstractLoadingsRegressionResult, f_mu::VecNum, f_sigma::MatNum,
                 X::MatNum, posterior_X::MatNum; kwargs...) -> NamedTuple
 
 Project factor moments onto the asset axis through the regression loadings.
@@ -263,7 +263,7 @@ The returned `chol` is the transpose of ``[\\mathbf{B} \\mathbf{L}_f \\quad \\ma
   - [`LowOrderPrior`](@ref)
 """
 function factor_lift(mp::AbstractMatrixProcessingEstimator, ve::AbstractVarianceEstimator,
-                     rsd::Bool, rr::AbstractTimeSeriesRegressionResult, f_mu::VecNum,
+                     rsd::Bool, rr::AbstractLoadingsRegressionResult, f_mu::VecNum,
                      f_sigma::MatNum, X::MatNum, posterior_X::MatNum; kwargs...)
     (; b, M) = rr
     posterior_mu = M * f_mu + b

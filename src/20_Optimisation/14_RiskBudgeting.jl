@@ -37,12 +37,12 @@ $(DocStringExtensions.FIELDS)
     """
     rr
     function ProcessedFactorRiskBudgetingAttributes(rkb::RiskBudget, b1::MatNum,
-                                                    rr::AbstractTimeSeriesRegressionResult)
+                                                    rr::AbstractLoadingsRegressionResult)
         return new{typeof(rkb), typeof(b1), typeof(rr)}(rkb, b1, rr)
     end
 end
 function ProcessedFactorRiskBudgetingAttributes(; rkb::RiskBudget, b1::MatNum,
-                                                rr::AbstractTimeSeriesRegressionResult)::ProcessedFactorRiskBudgetingAttributes
+                                                rr::AbstractLoadingsRegressionResult)::ProcessedFactorRiskBudgetingAttributes
     return ProcessedFactorRiskBudgetingAttributes(rkb, b1, rr)
 end
 """

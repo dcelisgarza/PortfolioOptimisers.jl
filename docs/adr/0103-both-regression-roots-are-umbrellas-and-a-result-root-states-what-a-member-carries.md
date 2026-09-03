@@ -2,7 +2,7 @@
 status: accepted
 ---
 
-# Both regression roots are umbrellas, and the time-series pair keeps `RegE_Reg`
+# Both regression roots are umbrellas, and a result root states what a member carries
 
 ## Context
 
@@ -22,7 +22,7 @@ under map [#643](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/64
 rule is that every decision must reproduce the reference implementation, and may only **add**
 capability or **simplify** the design.
 
-Three facts about the library decided the shape.
+Four facts about the library decided the shape.
 
  1. **Thirty-three sites bind the two roots outside their own file**, and every one of the result
     bounds reads `rr.M`. A plain subtype of the old root would have matched them at once, and every
@@ -32,7 +32,14 @@ Three facts about the library decided the shape.
     the same index slices its **columns**.
  3. **`regression(re::Regression, args...)` is a greedy passthrough.** It returns its first
     argument for any trailing arguments, so a four-argument `regression` method placed beside it
-    would return a time-series result silently instead of raising.
+    would return a loadings result silently instead of raising.
+ 4. **The fitting geometry and the payload part company.** A root can state how a member was
+    fitted, or what a member carries, and the first version of this decision stated both at once:
+    a result was "fitted per asset over the observations" **and** "carries the loadings matrix
+    `M`". [Issue #649](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/649) found a
+    member that meets one criterion and not the other. `CrossSectionalFactorModel` is fitted per
+    observation across the assets **and** carries `M`, so under the paired criteria it belonged to
+    neither child.
 
 ## Decision
 
@@ -44,27 +51,52 @@ abstract type AbstractTimeSeriesRegressionEstimator     <: AbstractRegressionEst
 abstract type AbstractCrossSectionalRegressionEstimator <: AbstractRegressionEstimator end
 
 abstract type AbstractRegressionResult <: AbstractResult end                          # umbrella
-abstract type AbstractTimeSeriesRegressionResult     <: AbstractRegressionResult end
+abstract type AbstractLoadingsRegressionResult       <: AbstractRegressionResult end
 abstract type AbstractCrossSectionalRegressionResult <: AbstractRegressionResult end
 ```
 
 `StepwiseRegression` and `DimensionReductionRegression` become time-series estimators, and
-`Regression` becomes a time-series result. The umbrella declares **no** interface of its own: the
+`Regression` becomes a loadings result. The umbrella declares **no** interface of its own: the
 `# Interfaces` section moved down to each child, because the two families answer different verbs.
 
 None of the four is exported, per `CLAUDE.md`.
 
-### `RegE_Reg` names the time-series pair
+### An estimator root states its geometry, and a result root states its payload
+
+Fact 4 forces the two sides apart, and each side takes the criterion its consumers bind.
+
+An estimator carries no payload, so it is named by the verb it answers and the geometry that verb
+fits. `AbstractTimeSeriesRegressionEstimator` fits one model per asset over the observations and
+answers `regression`. `AbstractCrossSectionalRegressionEstimator` fits one model per observation
+across the assets and answers `cross_sectional_regression`.
+
+A result carries a payload, and every consumer of a result binds the payload, so a result root is
+named by what a member carries. `AbstractLoadingsRegressionResult` carries the loadings matrix `M`,
+one row per asset and one column per factor, whatever geometry fitted it.
+`AbstractCrossSectionalRegressionResult` carries no loadings matrix, because the exposures are the
+regression's input and an Exposure Estimator produces them.
+
+The cross-sectional result root keeps its name. Its rule already reads on the payload, and
+`CrossSectionalRegression` still meets it.
+
+### `RegE_Reg` pairs the loadings result with the time-series estimator
 
 ```julia
-const RegE_Reg = Union{<:AbstractTimeSeriesRegressionResult,
+const RegE_Reg = Union{<:AbstractLoadingsRegressionResult,
                        <:AbstractTimeSeriesRegressionEstimator}
 ```
 
-Every consumer of the alias reads the loadings matrix, which only a time-series result carries. The
-33 bounds retighten to the time-series children in the same change, across
-`12_ConstraintGeneration/`, `13_Prior/`, `19_RiskMeasures/27_ExpectedRisk.jl` and
-`20_Optimisation/`.
+Every consumer of the alias reads the loadings matrix. The alias therefore names the two ways a
+consumer obtains one: a result that already carries `M`, and an estimator whose verb returns such a
+result. The two arms state different criteria, which is fact 4 made concrete, and the alias's
+docstring states the asymmetry rather than hiding it.
+
+The estimator arm stays on the time-series root. Renaming it would name an estimator by a payload it
+does not hold, and a cross-sectional estimator returns a result that carries no loadings, so the arm
+would then have to exclude its own sibling by hand.
+
+The 33 bounds retighten to the two children in the same change, across `12_ConstraintGeneration/`,
+`13_Prior/`, `19_RiskMeasures/27_ExpectedRisk.jl` and `20_Optimisation/`.
 
 ### The result is a sibling, and `Regression` is untouched
 
@@ -126,3 +158,6 @@ design, and `MinimumNormSolve` parts from the other two only where the two toler
   `StepwiseRegression` is unaffected, because the umbrella still matches it. A caller who **stored**
   a value under the old root and hands it to a library consumer now meets a `MethodError` at the
   call rather than a silent wrong answer.
+- A loadings result fitted by any geometry reaches every loadings consumer with no further
+  widening. That is what `CrossSectionalFactorModel` needs, and it is why the result roots split on
+  the payload rather than on the geometry.
