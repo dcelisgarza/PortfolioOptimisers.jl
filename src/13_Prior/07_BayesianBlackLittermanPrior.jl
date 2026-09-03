@@ -42,6 +42,14 @@ Because both blocks are posterior, the returned carrier is **internally consiste
 
     The returned `mu` and `sigma` are the Black-Litterman posterior, but `w` is the **wrapped prior's** observation weighting, forwarded unchanged. Black-Litterman produces no observation-level posterior, so there is no Black-Litterman-consistent alternative to forward — and dropping `w` would substitute the unweighted empirical distribution, which is further from the caller's intent than the weights they computed. A caller reading `pr.w`, `pr.ens`, `pr.kld` or `pr.ow` is therefore reading a property of the prior, not of the posterior.
 
+## What this estimator refuses
+
+The update inverts the wrapped prior's factor covariance twice, so it needs a factor axis of full rank. A factor model that states a re-based Factor Family through [`has_family_rebasis`](@ref) carries `fpr` on the **raw** axis, which a re-basis makes a linear image of a smaller one, so that covariance is singular by construction. Such a carrier is refused with an `ArgumentError` naming the wrapped estimator.
+
+The refusal is not decoration over a failure that would otherwise be visible. The inversion **raises nothing** on such a matrix: it returns entries of order `1e18`, and the update carries on to a posterior whose scale looks like the prior's, so a caller reading the result sees no sign that it is meaningless. That is why the refusal reads what the result *states* rather than testing its rank, and why it is a refusal rather than a warning.
+
+[`HighOrderFactorPriorEstimator`](@ref) accepts the same carrier, because it only projects through `rr.M` and never inverts the factor covariance.
+
 ## The views are written on the factor axis
 
 `views` resolves against `sets.dict[sets.fkey]` — the axis [`UniverseSets`](@ref) declares for factors — because the Bayesian update lands on the factor distribution and reaches the assets through the loadings. The asset axis is still required (every `UniverseSets` carries one) and is what [`port_opt_view`](@ref) slices; the factor entries come back untouched, which is why this field is `@vprop` rather than exempted by hand.
@@ -317,7 +325,7 @@ Both are measured. Over a ``250 \\times 5`` sample on three factors with two fac
 
  1. Orient `X` and `F` with [`dims_oriented`](@ref), to `observations × assets` and `observations × factors`.
  2. When `pe.views` resolves names, check the declared factor axis against the width of `F` with [`factor_universe`](@ref). A precomputed [`BlackLittermanViews`](@ref) resolves no name, so step 4 checks its width instead.
- 3. Fit the wrapped prior `pe.pe` on `(X, F)`, giving `prior_result`, check it carries a regression with [`assert_prior_regression`](@ref), and read `posterior_X`, `prior_sigma`, `fpr` and `rr` off it.
+ 3. Fit the wrapped prior `pe.pe` on `(X, F)`, giving `prior_result`, check it carries a regression with [`assert_prior_regression`](@ref), read `posterior_X`, `prior_sigma`, `fpr` and `rr` off it, and refuse a `rr` that states a re-based Factor Family through [`has_family_rebasis`](@ref).
  4. Assemble the views and their uncertainty with [`bl_preroll`](@ref), over the **factor** prior covariance and `size(F, 1)` observations, giving `P`, `Q` and `omega`. The axis is `:fkey`, because these views land on the factors.
  5. Build the posterior factor precision ``\\mathbf{H}`` as `sigma_hat`.
  6. Solve `sigma_hat` against the sum of the two precision-weighted means, giving `mu_hat`, the posterior factor mean ``\\bar{\\boldsymbol{\\Pi}}_f``.
@@ -342,6 +350,7 @@ Both are measured. Over a ``250 \\times 5`` sample on three factors with two fac
   - `dims in (1, 2)`.
   - If `pe.views` is a [`LinearConstraintEstimator`](@ref), `haskey(pe.sets.dict, pe.sets.fkey)` and `length(pe.sets.dict[pe.sets.fkey]) == size(F, 2)`, both via [`factor_universe`](@ref).
   - The prior produced by `pe.pe` must carry a regression result, via [`assert_prior_regression`](@ref).
+  - The regression result the prior carries must state no re-based Factor Family, via [`has_family_rebasis`](@ref). A re-basis makes `fpr.sigma` singular, and steps 5, 6 and 10 all invert it.
 
 # Returns
 
@@ -375,6 +384,18 @@ function prior(pe::BayesianBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int 
     assert_prior_regression(prior_result, :pe)
     posterior_X, prior_sigma, fpr, rr = prior_result.X, prior_result.sigma,
                                         prior_result.fpr, prior_result.rr
+    # The views land on the factors, so the update below inverts `f_sigma` twice. A factor
+    # model fitted in a re-based Factor Family states a raw factor axis that is a linear
+    # image of a smaller one, so a covariance on that axis is singular by construction.
+    #
+    # The inversion RAISES NOTHING on such a matrix. Measured on the fixture of
+    # `test/test_12i_cross_sectional_factor_carrier.jl`: the solve returns entries of order
+    # `1e18` and the update carries on to a posterior whose scale looks like the prior's, so
+    # a caller reading the result sees no sign that it is meaningless. That is what the
+    # refusal is for, and it is why the refusal reads the result's own statement rather than
+    # testing a rank -- a tolerance this matrix passes cannot separate the two cases.
+    @argcheck(!has_family_rebasis(rr),
+              ArgumentError("`pe` returned a prior whose factor model was fitted in a re-based Factor Family, so `pr.fpr.sigma` sits on the raw factor axis of `pr.rr.M` and that axis is a linear image of a smaller one. $(nameof(BayesianBlackLittermanPrior)) applies its views to the factor distribution and inverts that covariance, which is singular by construction, so the update has no answer.\nApply the views on the asset axis with `$(nameof(BlackLittermanPrior))`, which reads no factor covariance, or wrap a prior whose factor model re-bases no family.\nGot\npe => $(nameof(typeof(pe.pe)))\nrr => $(nameof(typeof(rr)))"))
     f_mu, f_sigma = fpr.mu, fpr.sigma
     (; P, Q, omega) = bl_preroll(pe.views, pe.sets, pe.views_conf, f_sigma, pe.tau,
                                  size(F, 1), eltype(posterior_X), strict, :fkey)

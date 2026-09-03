@@ -451,6 +451,44 @@ end
     swap(L, M)
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+State whether the model was fitted in a re-based factor family.
+
+`L` and `fcb` are present together and absent together, and the pair is present exactly when a Factor Family was re-based before the fit. The answer is therefore the presence of `L`, read with `getfield` rather than through property access: the `swap(L, M)` rule of [`CrossSectionalFactorModel`](@ref) makes `csfm.L` return `csfm.M` when `L` is unset, so a property read would answer `true` for every model.
+
+# Arguments
+
+  - `csfm`: A cross-sectional factor model result.
+
+# Returns
+
+  - `val::Bool`: `true` when `L` is set, so the raw factor axis of `M` is a linear image of the re-based one and a factor covariance stated on it is singular; `false` when the fit ran in the raw basis.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.has_family_rebasis(CrossSectionalFactorModel(; M = [1.0 2.0; 3.0 4.0],
+                                                                        b = [0.1, 0.2]))
+false
+
+julia> PortfolioOptimisers.has_family_rebasis(CrossSectionalFactorModel(; M = [1.0 2.0; 3.0 4.0],
+                                                                        L = reshape([1.0, 2.0], 2,
+                                                                                    1),
+                                                                        b = [0.1, 0.2],
+                                                                        fcb = [1.0, -1.0]))
+true
+```
+
+# Related
+
+  - [`CrossSectionalFactorModel`](@ref)
+  - [`AbstractLoadingsRegressionResult`](@ref)
+"""
+function has_family_rebasis(csfm::CrossSectionalFactorModel)::Bool
+    return !isnothing(getfield(csfm, :L))
+end
+"""
     port_opt_view(csfm::CrossSectionalFactorModel, i, args...)
 
 Return a view of a [`CrossSectionalFactorModel`](@ref) result, selecting only the assets indexed by `i`.

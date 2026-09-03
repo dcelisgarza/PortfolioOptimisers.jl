@@ -30,6 +30,7 @@ AbstractStepwiseRegressionAlgorithm
 AbstractStepwiseRegressionCriterion
 AbstractRegressionTarget
 port_opt_view(re::Regression, i, args...)
+has_family_rebasis(rr::AbstractLoadingsRegressionResult)
 default_regression_criterion_variant
 regression_criterion_func
 regression_polarity

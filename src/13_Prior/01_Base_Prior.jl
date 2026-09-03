@@ -1234,7 +1234,7 @@ $(DocStringExtensions.FIELDS)
         ens::Option{<:Number} = nothing,
         kld::Option{<:Num_VecNum} = nothing,
         ow::Option{<:VecNum} = nothing,
-        rr::Option{<:Regression} = nothing,
+        rr::Option{<:AbstractLoadingsRegressionResult} = nothing,
         fpr::Option{<:LowOrderPrior} = nothing,
         Z::Option{<:MatNum_Arr3Num} = nothing
     ) -> LowOrderPrior
@@ -1246,6 +1246,10 @@ Keywords correspond to the struct's fields.
 A prior fit through a factor model carries two distributions: one over the assets, in the carrier's own fields, and one over the factors. The factor one is a **nested `LowOrderPrior`** in `fpr` rather than a set of `f_`-prefixed flat fields, so it gains every field the carrier has — `w`, `ens`, `kld` and `ow` as well as `mu` and `sigma` — and gains any field added in future without a second edit. Its `X` is the factor returns matrix, over the same observations as the asset `X`; `fpr.Z` is therefore factors × features, which is why an asset-axis `Z` never comes from it.
 
 `fpr` travels with `rr`: the two are the factor block, and the constructor requires them together or not at all. `rr` is what projects the block onto the assets (`mu ≈ rr.M * fpr.mu + rr.b`), so a factor distribution with no loadings could not be read against this asset axis.
+
+`rr` is bound to [`AbstractLoadingsRegressionResult`](@ref), the root that states a member carries the loadings matrix `M`, so a [`Regression`](@ref) and a [`CrossSectionalFactorModel`](@ref) both sit in the slot. The bound is the loadings criterion and not a fitting geometry: every invariant the constructor checks here reads `rr.M` alone, `fpr` sits on the axis `M`'s columns name, and every consumer of the slot reads `M`, or reads `L` and gets `M` back when `L` is unset.
+
+One property of the block does not follow from the slot, and a consumer that needs it must ask. A member fitted in a re-based Factor Family states so through [`has_family_rebasis`](@ref), and its `fpr.sigma` is then singular by construction, because the raw factor axis is a linear image of the re-based one. Projecting through `M` is unaffected — that is what [`HighOrderFactorPriorEstimator`](@ref) does — but inverting or factorising `fpr.sigma` has no answer. The inversion does not say so: it raises nothing and returns a result whose scale looks ordinary, so [`BayesianBlackLittermanPrior`](@ref) refuses such a carrier rather than reporting one.
 
 The flat names are **virtual reads** of the nested block, so code written against the old shape is unaffected: `pr.f_mu`, `pr.f_sigma` and `pr.f_w` return `fpr.mu`, `fpr.sigma` and `fpr.w`, or `nothing` when there is no factor block, and `pr.f_ens`, `pr.f_kld` and `pr.f_ow` come with them. They are properties, not fields — [`forward_prior`](@ref) and [`prior_field_values`](@ref) see only `fpr`.
 
@@ -1395,7 +1399,8 @@ LowOrderPrior
     function LowOrderPrior(X::MatNum, o_X::Option{<:MatNum}, mu::VecNum, sigma::MatNum,
                            chol::Option{<:MatNum}, w::Option{<:ObsWeights},
                            ens::Option{<:Number}, kld::Option{<:Num_VecNum},
-                           ow::Option{<:VecNum}, rr::Option{<:Regression},
+                           ow::Option{<:VecNum},
+                           rr::Option{<:AbstractLoadingsRegressionResult},
                            fpr::Option{<:LowOrderPrior}, Z::Option{<:MatNum_Arr3Num})
         @argcheck(!isempty(X), IsEmptyError("X cannot be empty"))
         @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
@@ -1461,7 +1466,7 @@ function LowOrderPrior(; X::MatNum, o_X::Option{<:MatNum} = nothing, mu::VecNum,
                        sigma::MatNum, chol::Option{<:MatNum} = nothing,
                        w::Option{<:ObsWeights} = nothing, ens::Option{<:Number} = nothing,
                        kld::Option{<:Num_VecNum} = nothing, ow::Option{<:VecNum} = nothing,
-                       rr::Option{<:Regression} = nothing,
+                       rr::Option{<:AbstractLoadingsRegressionResult} = nothing,
                        fpr::Option{<:LowOrderPrior} = nothing,
                        Z::Option{<:MatNum_Arr3Num} = nothing)::LowOrderPrior
     return LowOrderPrior(X, o_X, mu, sigma, chol, w, ens, kld, ow, rr, fpr, Z)

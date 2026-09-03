@@ -163,6 +163,39 @@ All concrete and/or abstract types representing the output of a regression that 
 """
 abstract type AbstractLoadingsRegressionResult <: AbstractRegressionResult end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+State whether a loadings result was fitted in a re-based factor family.
+
+A Factor Family whose one-hot exposures are collinear with a global factor is re-based before the fit: one factor of the family is dropped, and the family is rewritten in an equivalent basis of full column rank. A result that carries such a re-basis keeps the raw loadings in `M` and the re-based ones in `L`, so its **raw** factor axis is a linear image of a smaller one, and a factor covariance stated on that axis is singular by construction. A consumer that inverts or factorises such a covariance reads this trait and refuses the result, rather than letting the factorisation fail on a matrix it was handed.
+
+The root answers `false`, and a member that cannot state a re-basis needs no method. That fallback is an answer rather than a missing declaration: a [`Regression`](@ref) fits one model per asset over the observations and re-bases nothing, so `false` is true of it. Only [`CrossSectionalFactorModel`](@ref) overrides it.
+
+# Arguments
+
+  - `rr`: Loadings regression result.
+
+# Returns
+
+  - `val::Bool`: `true` when the result carries a family re-basis, so its raw factor axis is rank deficient; `false` otherwise.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.has_family_rebasis(Regression(; M = [1 2; 3 4], b = [1, 2]))
+false
+```
+
+# Related
+
+  - [`AbstractLoadingsRegressionResult`](@ref)
+  - [`Regression`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+"""
+function has_family_rebasis(::AbstractLoadingsRegressionResult)::Bool
+    return false
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all cross-sectional regression result types.

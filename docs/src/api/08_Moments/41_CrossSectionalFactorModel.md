@@ -17,4 +17,5 @@ assert_exposure_history
 assert_cs_regression_assets
 port_opt_view(csfm::CrossSectionalFactorModel, i, args...)
 regression(csfm::CrossSectionalFactorModel, args...)
+has_family_rebasis(csfm::CrossSectionalFactorModel)
 ```

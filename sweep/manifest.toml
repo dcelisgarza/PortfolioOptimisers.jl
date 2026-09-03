@@ -86,7 +86,7 @@
 "src/08_Moments/18_ExcessExpectedReturns.jl" = { map = 3, units = 2, algorithm = 0, swept = true }
 "src/08_Moments/19_Coskewness.jl" = { map = 3, units = 5, algorithm = 3, swept = true }
 "src/08_Moments/20_Cokurtosis.jl" = { map = 3, units = 4, algorithm = 2, swept = true }
-"src/08_Moments/21_Base_Regression.jl" = { map = 3, units = 33, algorithm = 7, swept = true }
+"src/08_Moments/21_Base_Regression.jl" = { map = 3, units = 34, algorithm = 7, swept = true }
 "src/08_Moments/22_StepwiseRegression.jl" = { map = 3, units = 12, algorithm = 8, swept = true }
 "src/08_Moments/23_DimensionReductionRegression.jl" = { map = 3, units = 10, algorithm = 5, swept = true }
 "src/08_Moments/24_ImpliedVolatility.jl" = { map = 3, units = 11, algorithm = 5, swept = true }
@@ -106,7 +106,7 @@
 "src/08_Moments/38_CrossSectionalRegression.jl" = { map = 3, units = 18, swept = false }
 "src/08_Moments/39_CrossSectionalWeights.jl" = { map = 3, units = 10, swept = false }
 "src/08_Moments/40_HigherMomentPartialFit.jl" = { map = 3, units = 19, swept = false }
-"src/08_Moments/41_CrossSectionalFactorModel.jl" = { map = 3, units = 9, swept = false }
+"src/08_Moments/41_CrossSectionalFactorModel.jl" = { map = 3, units = 10, swept = false }
 "src/09_Distance/01_Base_Distance.jl" = { map = 2, units = 8, algorithm = 1, swept = true }
 "src/09_Distance/02_Distance.jl" = { map = 2, units = 13, algorithm = 8, swept = true }
 "src/09_Distance/03_DistanceDistance.jl" = { map = 2, units = 4, algorithm = 3, swept = true }
