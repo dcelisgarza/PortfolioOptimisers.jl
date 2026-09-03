@@ -15,8 +15,10 @@ for sym in [private_symbols; public_symbols]
          end)
 end
 
-# Keep rendered docs and @example output fully expanded (no large-struct collapsing).
+# Keep rendered docs and @example output fully expanded (no large-struct collapsing), and
+# render every field, including one that holds `nothing`, so the docs show the complete type.
 PortfolioOptimisers.set_compact_show!(false)
+PortfolioOptimisers.set_show_nothing_fields!(true)
 
 # `@example` output is captured into a plain `IOBuffer`, whose `displaysize` falls back to
 # `Base.displaysize()` — i.e. `ENV["LINES"]`/`ENV["COLUMNS"]`, defaulting to 24×80. PrettyTables
@@ -29,7 +31,8 @@ ENV["COLUMNS"] = 100_000
 DocMeta.setdocmeta!(PortfolioOptimisers, :DocTestSetup,
                     :(using PortfolioOptimisers, StatsBase, Statistics, LinearAlgebra,
                             Dates, Distributions, StableRNGs, TimeSeries;
-                    PortfolioOptimisers.set_compact_show!(false)); recursive = true)
+                    PortfolioOptimisers.set_compact_show!(false);
+                    PortfolioOptimisers.set_show_nothing_fields!(true)); recursive = true)
 
 # utility function from https://github.com/JuliaOpt/Convex.jl/blob/master/docs/make.jl
 function pre_process_content_md(content)

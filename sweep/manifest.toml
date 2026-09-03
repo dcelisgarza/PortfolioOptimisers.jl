@@ -46,9 +46,9 @@
 "ext/PortfolioOptimisersPlotsExt.jl" = { map = 13, units = 0, swept = false }
 "src/01_Base/01_DocstringDictionaries.jl" = { map = 1, units = 8, algorithm = 1, swept = true }
 "src/01_Base/02_TypeRoots.jl" = { map = 1, units = 6, algorithm = 2, swept = true }
-"src/01_Base/03_PrettyShow.jl" = { map = 1, units = 5, algorithm = 4, swept = true }
-"src/01_Base/04_ScopedConfig.jl" = { map = 1, units = 20, algorithm = 12, swept = true }
-"src/01_Base/05_Preferences.jl" = { map = 1, units = 5, algorithm = 3, swept = true }
+"src/01_Base/03_PrettyShow.jl" = { map = 1, units = 7, algorithm = 5, swept = true }
+"src/01_Base/04_ScopedConfig.jl" = { map = 1, units = 24, algorithm = 14, swept = true }
+"src/01_Base/05_Preferences.jl" = { map = 1, units = 6, algorithm = 4, swept = true }
 "src/01_Base/06_Messages.jl" = { map = 1, units = 12, algorithm = 6, swept = true }
 "src/01_Base/07_Errors.jl" = { map = 1, units = 8, algorithm = 1, swept = true }
 "src/01_Base/08_TypeAliases.jl" = { map = 1, units = 45, algorithm = 0, swept = true }

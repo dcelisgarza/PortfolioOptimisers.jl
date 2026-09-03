@@ -26,6 +26,7 @@ Base.getindex(cfg::ScopedConfig)
 set_default!
 with_config
 apply_preferences!
+apply_show_preferences!
 PortfolioOptimisers.__init__
 PREFERENCE_KEYS
 PREFERENCE_DISTANCES
@@ -39,15 +40,21 @@ with_resource_limits
 
 ## Pretty printing
 
-`PortfolioOptimisers.jl`'s types tend to contain quite a lot of information, these functions enable pretty printing so they are easier to interpret.
+`PortfolioOptimisers.jl`'s types tend to contain quite a lot of information, these functions enable pretty printing so they are easier to interpret. A field that holds `nothing` is hidden by default and shown in this documentation; [`set_show_nothing_fields!`](@ref) is the switch, and [`show_fields`](@ref) is the hook a type overloads to hide a field of its own choice.
 
 ```@docs
 @define_pretty_show
+show_fields
+pretty_show_fields
 has_pretty_show_method
 set_compact_show!
 with_compact_show
 COMPACT_SHOW
 compact_show_budget
+ShowNothingFields
+SHOW_NOTHING_FIELDS
+set_show_nothing_fields!
+with_show_nothing_fields
 pretty_show_vector_summary
 pretty_show_vector_element
 pretty_show_vector_body

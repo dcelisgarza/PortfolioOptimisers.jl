@@ -30,8 +30,10 @@ The Preferences.jl keys read at package load to seed the global config defaults 
   - `"suggestion_min_score"`: real number for the [`STRING_DISTANCE`](@ref) threshold.
   - `"suggestion_distance"`: a [`PREFERENCE_DISTANCES`](@ref) name for the [`STRING_DISTANCE`](@ref) metric.
   - `"compact_show"`: boolean or integer for [`COMPACT_SHOW`](@ref).
+  - `"show_nothing_fields"`: boolean for the global switch of [`SHOW_NOTHING_FIELDS`](@ref).
+  - `"show_nothing_fields_by_type"`: a table of booleans, one per type name, for the per-name entries of [`SHOW_NOTHING_FIELDS`](@ref).
 
-Preferences.jl offers no way to enumerate the keys a project has set, so a misspelled *key* cannot be detected and is silently ignored (the shipped default applies) — misspelled or invalid *values* under these keys fail closed at load.
+Preferences.jl offers no way to enumerate the keys a project has set, so a misspelled *key* cannot be detected and is silently ignored (the shipped default applies) — misspelled or invalid *values* under these keys fail closed at load. A name inside the `"show_nothing_fields_by_type"` table that matches no type is a value the package cannot refuse either: a type outside the package can render through [`@define_pretty_show`](@ref), so an unknown name is accepted and does nothing.
 
 A valid value is applied, but a value that *widens* a guard is announced with a warning (see [`relaxed_preferences_msg`](@ref)): a preference file is data, it travels with a cloned project, and it applies before any user code runs.
 
@@ -43,7 +45,8 @@ A valid value is applied, but a value that *widens* a guard is announced with a 
 const PREFERENCE_KEYS = ("equation_max_length", "equation_max_depth", "max_n_sim",
                          "max_n_subsets", "max_frontier", "max_bins", "max_hop_count",
                          "max_search_grid", "max_ep_grid", "suggestion_min_score",
-                         "suggestion_distance", "compact_show")
+                         "suggestion_distance", "compact_show", "show_nothing_fields",
+                         "show_nothing_fields_by_type")
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -84,7 +87,59 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Apply load-time preference values to the global config defaults ([`EQUATION_LIMITS`](@ref), [`RESOURCE_LIMITS`](@ref), [`STRING_DISTANCE`](@ref), [`COMPACT_SHOW`](@ref)). Called by the package `__init__` with the [`PREFERENCE_KEYS`](@ref) values read via `Preferences.load_preference`; `nothing` values (unset preferences) are skipped and keep the shipped default.
+Apply the two load-time preferences of [`SHOW_NOTHING_FIELDS`](@ref): the global switch and the per-name table. Called by [`apply_preferences!`](@ref), which owns the contract of the preference channel; `nothing` values (unset preferences) are skipped and keep the shipped default.
+
+Fails closed on an *invalid* value, as [`apply_preferences!`](@ref) does: a typed `ArgumentError` names the key and the value. A name inside the table that matches no type is not refused; see [`PREFERENCE_KEYS`](@ref).
+
+# Algorithm
+
+ 1. Read `"show_nothing_fields"`. When it is set, check that it is a `Bool`, and apply it through the one-argument form of [`set_show_nothing_fields!`](@ref).
+ 2. Read `"show_nothing_fields_by_type"`. When it is set, check that it is a table, then check that every value is a `Bool`, and apply each entry through the per-name form of [`set_show_nothing_fields!`](@ref), with the key converted to a `Symbol`.
+
+# Arguments
+
+  - `prefs`: The dictionary that [`apply_preferences!`](@ref) receives. Only the two keys above are read.
+
+# Validation
+
+  - `"show_nothing_fields"` is a `Bool`.
+  - `"show_nothing_fields_by_type"` is a dictionary, and every value in it is a `Bool`.
+  - A breach of either rule raises an `ArgumentError` that names the key and the value.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`apply_preferences!`](@ref)
+  - [`PREFERENCE_KEYS`](@ref)
+  - [`set_show_nothing_fields!`](@ref)
+  - [`SHOW_NOTHING_FIELDS`](@ref)
+"""
+function apply_show_preferences!(prefs::AbstractDict{<:AbstractString, <:Any})
+    sn = get(prefs, "show_nothing_fields", nothing)
+    if !isnothing(sn)
+        @argcheck(sn isa Bool,
+                  ArgumentError("preference `show_nothing_fields = $(repr(sn))` must be a boolean."))
+        set_show_nothing_fields!(sn)
+    end
+    sb = get(prefs, "show_nothing_fields_by_type", nothing)
+    if !isnothing(sb)
+        @argcheck(sb isa AbstractDict,
+                  ArgumentError("preference `show_nothing_fields_by_type = $(repr(sb))` must be a table of booleans, one per type name."))
+        for (name, val) in sb
+            @argcheck(val isa Bool,
+                      ArgumentError("preference `show_nothing_fields_by_type.$(name) = $(repr(val))` must be a boolean."))
+            set_show_nothing_fields!(Symbol(name), val)
+        end
+    end
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Apply load-time preference values to the global config defaults ([`EQUATION_LIMITS`](@ref), [`RESOURCE_LIMITS`](@ref), [`STRING_DISTANCE`](@ref), [`COMPACT_SHOW`](@ref), [`SHOW_NOTHING_FIELDS`](@ref)). Called by the package `__init__` with the [`PREFERENCE_KEYS`](@ref) values read via `Preferences.load_preference`; `nothing` values (unset preferences) are skipped and keep the shipped default.
 
 Fails closed on an *invalid* value: it throws a typed `ArgumentError` naming the key and value, so the package refuses to load rather than silently running with a value the project got wrong. Values are applied through the `set_*!` setters, so they receive the same validation as runtime calls.
 
@@ -106,6 +161,10 @@ max_ep_grid = 500
 suggestion_min_score = 0.8
 suggestion_distance = "damerau_levenshtein"
 compact_show = 4
+show_nothing_fields = true
+
+[PortfolioOptimisers.show_nothing_fields_by_type]
+SimpleVariance = false
 ```
 
 # Algorithm
@@ -116,7 +175,8 @@ compact_show = 4
  4. Read `"suggestion_min_score"`. When it is set, check that it is a real number, record a triple when it is below the current threshold, and apply it through [`set_string_distance!`](@ref). A lower threshold widens the guard, which is the opposite direction from a cap.
  5. Read `"suggestion_distance"`. When it is set, check that it is a string, and look it up in [`PREFERENCE_DISTANCES`](@ref). An unknown name raises, and the message carries a [`did_you_mean`](@ref) suggestion. Apply the resolved distance through [`set_string_distance!`](@ref).
  6. Read `"compact_show"`. When it is set, check that it is a boolean or an integer, and apply it through [`set_compact_show!`](@ref). This key guards nothing, so it records no triple.
- 7. When `relaxations` is not empty, emit the text of [`relaxed_preferences_msg`](@ref) as a warning.
+ 7. Hand `prefs` to [`apply_show_preferences!`](@ref), which reads `"show_nothing_fields"` and `"show_nothing_fields_by_type"`. Neither key guards anything, so neither records a triple.
+ 8. When `relaxations` is not empty, emit the text of [`relaxed_preferences_msg`](@ref) as a warning.
 
 # Arguments
 
@@ -128,6 +188,7 @@ compact_show = 4
   - `"suggestion_min_score"` is a real number that is not a `Bool`.
   - `"suggestion_distance"` is a string, and it names an entry of [`PREFERENCE_DISTANCES`](@ref).
   - `"compact_show"` is a `Bool` or an `Integer`.
+  - `"show_nothing_fields"` is a `Bool`, and `"show_nothing_fields_by_type"` is a table of `Bool` values, both checked by [`apply_show_preferences!`](@ref).
   - A breach of any rule above raises an `ArgumentError` that names the key and the value, so the package refuses to load.
 
 # Returns
@@ -142,6 +203,7 @@ compact_show = 4
   - [`set_resource_limits!`](@ref)
   - [`set_string_distance!`](@ref)
   - [`set_compact_show!`](@ref)
+  - [`apply_show_preferences!`](@ref)
   - [`relaxed_preferences_msg`](@ref)
 """
 function apply_preferences!(prefs::AbstractDict{<:AbstractString, <:Any})
@@ -223,6 +285,7 @@ function apply_preferences!(prefs::AbstractDict{<:AbstractString, <:Any})
                   ArgumentError("preference `compact_show = $(repr(cs))` must be a boolean or an integer."))
         set_compact_show!(cs)
     end
+    apply_show_preferences!(prefs)
     if !isempty(relaxations)
         @warn relaxed_preferences_msg(relaxations)
     end

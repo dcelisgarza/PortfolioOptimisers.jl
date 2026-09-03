@@ -7,11 +7,12 @@ Reads go through `cfg[]`, which returns the innermost active scoped override whe
 
 Configs held this way store *immutable* structs (or bits values); changing any knob builds a new value and swaps it in, never mutates in place.
 
-Used by [`COMPACT_SHOW`](@ref), [`STRING_DISTANCE`](@ref), and [`EQUATION_LIMITS`](@ref); their global defaults are set via the `set_*!` setters, scoped overrides via the `with_*` helpers, and load-time per-project defaults via Preferences.jl (see [`apply_preferences!`](@ref)).
+Used by [`COMPACT_SHOW`](@ref), [`SHOW_NOTHING_FIELDS`](@ref), [`STRING_DISTANCE`](@ref), and [`EQUATION_LIMITS`](@ref); their global defaults are set via the `set_*!` setters, scoped overrides via the `with_*` helpers, and load-time per-project defaults via Preferences.jl (see [`apply_preferences!`](@ref)).
 
 # Related
 
   - [`set_compact_show!`](@ref) / [`with_compact_show`](@ref)
+  - [`set_show_nothing_fields!`](@ref) / [`with_show_nothing_fields`](@ref)
   - [`set_string_distance!`](@ref) / [`with_string_distance`](@ref)
   - [`set_equation_limits!`](@ref) / [`with_equation_limits`](@ref)
   - [`apply_preferences!`](@ref)
@@ -226,6 +227,159 @@ function compact_show_budget(io::IO)
         return Int(v)
     end
     return max(8, displaysize(io)[1] - 4)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Configuration for whether [`@define_pretty_show`](@ref) renders a field that holds `nothing`.
+
+Held in the [`SHOW_NOTHING_FIELDS`](@ref) [`ScopedConfig`](@ref), and read by [`pretty_show_fields`](@ref). Set the global default via [`set_show_nothing_fields!`](@ref), override per scope via [`with_show_nothing_fields`](@ref). The value is treated as immutable: a change builds a new value with a copied `by_type` and swaps it in, so a reader never observes a half-written table.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    ShowNothingFields(default::Bool, by_type::Dict{Symbol, Bool}) -> ShowNothingFields
+    ShowNothingFields(cfg::ShowNothingFields, name::Symbol,
+                      x::Union{Nothing, Bool}) -> ShowNothingFields
+
+The second form copies `cfg` with one per-name entry changed: `x` sets the entry for `name`, and `nothing` removes it.
+
+# Related
+
+  - [`SHOW_NOTHING_FIELDS`](@ref)
+  - [`set_show_nothing_fields!`](@ref)
+  - [`with_show_nothing_fields`](@ref)
+  - [`pretty_show_fields`](@ref)
+  - [`show_fields`](@ref)
+  - [`ScopedConfig`](@ref)
+"""
+struct ShowNothingFields
+    """
+    Whether a field that holds `nothing` prints for a type that no per-name entry names. The shipped default is `false`, so a `nothing` field is hidden.
+    """
+    default::Bool
+    """
+    Per-name overrides, keyed on the bare name of a type. A `true` entry prints every declared field of that type, and a `false` entry hides its `nothing` fields, whatever `default` holds and whatever the type's own [`show_fields`](@ref) method returns.
+    """
+    by_type::Dict{Symbol, Bool}
+end
+function ShowNothingFields(cfg::ShowNothingFields, name::Symbol, x::Union{Nothing, Bool})
+    by_type = copy(cfg.by_type)
+    if isnothing(x)
+        delete!(by_type, name)
+    else
+        by_type[name] = x
+    end
+    return ShowNothingFields(cfg.default, by_type)
+end
+"""
+    SHOW_NOTHING_FIELDS = ScopedConfig(ShowNothingFields(false, Dict{Symbol, Bool}()))
+
+Global control for whether [`@define_pretty_show`](@ref) renders a field that holds `nothing`.
+
+The shipped default hides such a field, because a reader at the REPL wants the fields that carry a value. The documentation build turns them on with `set_show_nothing_fields!(true)`, beside its `set_compact_show!(false)` call, so a rendered docstring shows the complete type. Read as `SHOW_NOTHING_FIELDS[]` by [`pretty_show_fields`](@ref); the default may be seeded per project at load time via the `"show_nothing_fields"` and `"show_nothing_fields_by_type"` preferences (see [`apply_preferences!`](@ref)).
+
+# Related
+
+  - [`ShowNothingFields`](@ref)
+  - [`set_show_nothing_fields!`](@ref)
+  - [`with_show_nothing_fields`](@ref)
+  - [`pretty_show_fields`](@ref)
+  - [`show_fields`](@ref)
+  - [`COMPACT_SHOW`](@ref)
+"""
+const SHOW_NOTHING_FIELDS = ScopedConfig(ShowNothingFields(false, Dict{Symbol, Bool}()))
+"""
+    set_show_nothing_fields!(x::Bool)
+    set_show_nothing_fields!(name::Symbol, x::Union{Nothing, Bool})
+
+Configure whether [`@define_pretty_show`](@ref) renders a field that holds `nothing`.
+
+  - `set_show_nothing_fields!(false)`: hide a `nothing` field, for every type that no per-name entry names. This is the shipped default.
+  - `set_show_nothing_fields!(true)`: render a `nothing` field, for every type that no per-name entry names.
+  - `set_show_nothing_fields!(:SimpleVariance, false)`: hide the `nothing` fields of every type named `SimpleVariance`, whatever the global switch says.
+  - `set_show_nothing_fields!(:SimpleVariance, true)`: render every declared field of every type named `SimpleVariance`, including one that its own [`show_fields`](@ref) method hides.
+  - `set_show_nothing_fields!(:SimpleVariance, nothing)`: remove the per-name entry, so the type follows the global switch and its own [`show_fields`](@ref) method again.
+
+The per-name form takes a name and not a type, because the load-time preference channel is TOML, which carries no types. The name is the bare name of the type, so two types of one name in two modules share one entry. A name that matches no type is accepted and does nothing, because a type outside the package can render through [`@define_pretty_show`](@ref) too.
+
+Sets the global default (atomically; see [`ScopedConfig`](@ref)). For a temporary, task-scoped override use [`with_show_nothing_fields`](@ref).
+
+# Algorithm
+
+ 1. Read the current global default of [`SHOW_NOTHING_FIELDS`](@ref) atomically. A scoped override is not read, so the call configures the global default alone.
+ 2. Build the new [`ShowNothingFields`](@ref): the one-argument form keeps the per-name table and replaces the global switch, and the two-argument form keeps the global switch and copies the table with one entry set or removed.
+ 3. Store it as the global default through [`set_default!`](@ref).
+
+# Arguments
+
+  - `x::Bool`: `false` hides a `nothing` field, `true` renders it.
+  - `name::Symbol`: The bare name of a type.
+  - `x::Union{Nothing, Bool}`: In the per-name form, the entry to set, or `nothing` to remove the entry.
+
+# Returns
+
+  - `cfg::ShowNothingFields`: The new global default.
+
+# Related
+
+  - [`@define_pretty_show`](@ref)
+  - [`SHOW_NOTHING_FIELDS`](@ref)
+  - [`ShowNothingFields`](@ref)
+  - [`with_show_nothing_fields`](@ref)
+  - [`pretty_show_fields`](@ref)
+  - [`set_compact_show!`](@ref)
+"""
+function set_show_nothing_fields!(x::Bool)
+    cfg = @atomic SHOW_NOTHING_FIELDS.default
+    return set_default!(SHOW_NOTHING_FIELDS, ShowNothingFields(x, cfg.by_type))
+end
+function set_show_nothing_fields!(name::Symbol, x::Union{Nothing, Bool})
+    cfg = @atomic SHOW_NOTHING_FIELDS.default
+    return set_default!(SHOW_NOTHING_FIELDS, ShowNothingFields(cfg, name, x))
+end
+"""
+    with_show_nothing_fields(f, x::Bool)
+    with_show_nothing_fields(f, name::Symbol, x::Union{Nothing, Bool})
+
+Run `f()` with the [`SHOW_NOTHING_FIELDS`](@ref) setting overridden for the dynamic extent of the call, restoring the previous setting on exit. Task-scoped and thread-safe (see [`ScopedConfig`](@ref)); the global default is untouched. The part of the setting the call does not name inherits from the currently active value, so nested overrides compose.
+
+# Algorithm
+
+ 1. Read the currently active value of [`SHOW_NOTHING_FIELDS`](@ref), so that a nested override inherits from the enclosing one instead of from the global default.
+ 2. Build the override as [`set_show_nothing_fields!`](@ref) does: the one-argument form replaces the global switch and keeps the per-name table, and the two-argument form keeps the global switch and copies the table with one entry set or removed.
+ 3. Run `f()` with [`SHOW_NOTHING_FIELDS`](@ref) bound to that value through [`with_config`](@ref).
+
+# Arguments
+
+  - `f`: Zero-argument function to run under the override.
+  - `x::Bool`: `false` hides a `nothing` field, `true` renders it.
+  - `name::Symbol`: The bare name of a type.
+  - `x::Union{Nothing, Bool}`: In the per-name form, the entry to set, or `nothing` to remove the entry.
+
+# Returns
+
+  - The value that `f()` returns.
+
+# Related
+
+  - [`SHOW_NOTHING_FIELDS`](@ref)
+  - [`ShowNothingFields`](@ref)
+  - [`set_show_nothing_fields!`](@ref)
+  - [`pretty_show_fields`](@ref)
+  - [`with_config`](@ref)
+  - [`with_compact_show`](@ref)
+"""
+function with_show_nothing_fields(f, x::Bool)
+    cfg = SHOW_NOTHING_FIELDS[]
+    return with_config(f, SHOW_NOTHING_FIELDS, ShowNothingFields(x, cfg.by_type))
+end
+function with_show_nothing_fields(f, name::Symbol, x::Union{Nothing, Bool})
+    cfg = SHOW_NOTHING_FIELDS[]
+    return with_config(f, SHOW_NOTHING_FIELDS, ShowNothingFields(cfg, name, x))
 end
 """
 $(DocStringExtensions.TYPEDEF)

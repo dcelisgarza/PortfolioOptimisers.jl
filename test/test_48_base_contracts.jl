@@ -10,11 +10,11 @@ path, the message builders, the iteration protocol and the norm seam.
 using PortfolioOptimisers, Test, Clustering, JuMP, StableRNGs, StatsBase
 using PortfolioOptimisers: @define_pretty_show, compact_show_budget,
                            pretty_show_vector_summary, pretty_show_vector_element,
-                           pretty_show_vector_body
-import PortfolioOptimisers: has_pretty_show_method
+                           pretty_show_vector_body, pretty_show_fields
+import PortfolioOptimisers: has_pretty_show_method, show_fields
 
 # `@define_pretty_show` escapes its whole body, so a caller outside the module must bring the
-# five names the body uses into scope, and must `import` the one it adds a method to. These
+# six names the body uses into scope, and must `import` the one it adds a method to. These
 # probes exercise the branches no shipped type reaches: an empty field list, a vector field of
 # renderable elements, and a `DataType` field.
 struct PSFieldless end
@@ -30,6 +30,26 @@ end
 @define_pretty_show(PSFieldless)
 @define_pretty_show(PSLeaf)
 @define_pretty_show(PSProbe)
+
+# The `nothing`-field switch. `PSAllNothing` has fields and every one holds `nothing`, so the
+# shipped default renders it as fieldless. `PSParent` holds it as its last field, so the
+# parent's connector reads the child's RESOLVED field list, not its declared one. `PSHook`
+# overloads `show_fields` and always hides `drop`, whatever `drop` holds.
+struct PSAllNothing
+    a::Nothing
+    b::Nothing
+end
+struct PSParent
+    child::PSAllNothing
+end
+struct PSHook
+    keep::Int
+    drop::Int
+end
+@define_pretty_show(PSAllNothing)
+@define_pretty_show(PSParent)
+@define_pretty_show(PSHook)
+show_fields(::PSHook) = (:keep,)
 
 # A `DynamicAbstractWeights` with no `get_observation_weights` method of its own. The whole
 # point of the type is that the unimplemented shape raises rather than computing unweighted.
@@ -50,15 +70,23 @@ const PROBE = string(PSProbe)
     # `:compact` and `:multiline` each print the type name alone.
     @test render(io -> show(IOContext(io, :compact => true), PSLeaf(1))) == "$(LEAF)\n"
     @test render(io -> show(IOContext(io, :multiline => true), PSLeaf(1))) == "$(LEAF)\n"
-    # The full rendering, one line per field, each field through its own branch.
+    # The full rendering, one line per field, each field through its own branch. The `n`
+    # field holds `nothing`, so the shipped default hides it and the `┴` marker lands on the
+    # last RENDERED field, `dt`. The documentation setting renders `n` as well.
     @test render(io -> show(io, probe)) ==
           join(["$(PROBE)", "  leaf ┼ $(LEAF)", "       │   a ┴ Int64: 1",
                 "    rs ┼ 2-element Vector{$(LEAF)}", "       │ $(LEAF) ⋯",
-                "       │ $(LEAF) ⋯", "    dt ┼ DataType: Float64", "     n ┴ nothing", ""],
-               '\n')
+                "       │ $(LEAF) ⋯", "    dt ┴ DataType: Float64", ""], '\n')
+    full = pe.with_show_nothing_fields(true) do
+        return render(io -> show(io, probe))
+    end
+    @test full == join(["$(PROBE)", "  leaf ┼ $(LEAF)", "       │   a ┴ Int64: 1",
+                        "    rs ┼ 2-element Vector{$(LEAF)}", "       │ $(LEAF) ⋯",
+                        "       │ $(LEAF) ⋯", "    dt ┼ DataType: Float64", "     n ┴ nothing", ""],
+                       '\n')
     # A `DataType` field prints its type and the wrapper name of the value, so a parametrised
     # type reports the wrapper it instantiates.
-    @test occursin("dt ┼ DataType: Array",
+    @test occursin("dt ┴ DataType: Array",
                    render(io -> show(io,
                                      PSProbe(PSLeaf(1), [PSLeaf(2)], Vector{Float64},
                                              nothing))))
@@ -66,8 +94,7 @@ const PROBE = string(PSProbe)
     # budget of one line the nested leaf collapses to `Name ⋯` and the vector loses its tail.
     @test render(io -> show(IOContext(io, :po_compact => 1), probe)) ==
           join(["$(PROBE)", "  leaf ┼ $(LEAF) ⋯", "    rs ┼ 2-element Vector{$(LEAF)}",
-                "       │ $(LEAF) ⋯", "       │ ⋮", "    dt ┼ DataType: Float64",
-                "     n ┴ nothing", ""], '\n')
+                "       │ $(LEAF) ⋯", "       │ ⋮", "    dt ┴ DataType: Float64", ""], '\n')
     # A budget the rendering fits under changes nothing.
     @test render(io -> show(IOContext(io, :po_compact => 3), probe)) ==
           render(io -> show(io, probe))
@@ -75,6 +102,98 @@ const PROBE = string(PSProbe)
     # `@forward_properties` that stays out of `show`, not the swapped value of a real field.
     @test length(fieldnames(PSProbe)) == 4
     @test all(f -> hasfield(PSProbe, f), fieldnames(PSProbe))
+end
+@testset "The nothing-field switch and the show_fields hook" begin
+    pe = PortfolioOptimisers
+    probe = PSProbe(PSLeaf(1), [PSLeaf(2)], Float64, nothing)
+    ALL = string(PSAllNothing)
+    PARENT = string(PSParent)
+    HOOK = string(PSHook)
+    shown(x) = render(io -> show(io, x))
+    has_n(x) = occursin("n ┴ nothing", shown(x))
+    # The shipped default hides a `nothing` field, and the global setter renders it.
+    @test pe.SHOW_NOTHING_FIELDS[].default === false
+    @test isempty(pe.SHOW_NOTHING_FIELDS[].by_type)
+    @test !has_n(probe)
+    @test pe.set_show_nothing_fields!(true).default === true
+    @test has_n(probe)
+    pe.set_show_nothing_fields!(false)
+    @test !has_n(probe)
+    # A per-name entry beats the global switch, in both directions, and `nothing` removes it.
+    pe.set_show_nothing_fields!(:PSProbe, true)
+    @test has_n(probe)
+    pe.set_show_nothing_fields!(true)
+    pe.set_show_nothing_fields!(:PSProbe, false)
+    @test !has_n(probe)
+    @test pe.set_show_nothing_fields!(:PSProbe, nothing).by_type == Dict{Symbol, Bool}()
+    @test has_n(probe)
+    pe.set_show_nothing_fields!(false)
+    @test !has_n(probe)
+    # `with_show_nothing_fields` is scoped: the override holds inside, a task spawned inside
+    # inherits it, the global default is untouched, and the previous value returns on exit,
+    # including through an error.
+    pe.with_show_nothing_fields(true) do
+        @test has_n(probe)
+        @test fetch(Threads.@spawn has_n(probe))
+        @test (@atomic pe.SHOW_NOTHING_FIELDS.default).default === false
+    end
+    @test !has_n(probe)
+    pe.with_show_nothing_fields(:PSProbe, true) do
+        @test has_n(probe)
+        # A nested override inherits the enclosing per-name entry, so the global `false`
+        # inside does not hide `n`.
+        pe.with_show_nothing_fields(false) do
+            @test has_n(probe)
+        end
+        pe.with_show_nothing_fields(:PSProbe, nothing) do
+            @test !has_n(probe)
+        end
+    end
+    @test_throws ErrorException pe.with_show_nothing_fields(true) do
+        @test has_n(probe)
+        error("restore")
+    end
+    @test !has_n(probe)
+    # A type whose every field is `nothing` still renders its name, with no empty body. As
+    # the last field of a parent it prints on one line, so the parent's connector is `┴`.
+    @test shown(PSAllNothing(nothing, nothing)) == "$(ALL)()\n"
+    @test shown(PSParent(PSAllNothing(nothing, nothing))) ==
+          join(["$(PARENT)", "  child ┴ $(ALL)()", ""], '\n')
+    pe.with_show_nothing_fields(true) do
+        @test shown(PSAllNothing(nothing, nothing)) ==
+              join(["$(ALL)", "  a ┼ nothing", "  b ┴ nothing", ""], '\n')
+        @test shown(PSParent(PSAllNothing(nothing, nothing))) ==
+              join(["$(PARENT)", "  child ┼ $(ALL)", "        │   a ┼ nothing",
+                    "        │   b ┴ nothing", ""], '\n')
+    end
+    # A `show_fields` overload hides `drop` whatever it holds and whatever the global switch
+    # says. A per-name `true` entry overrides the overload and renders every declared field,
+    # and a per-name `false` entry keeps the overload's list.
+    hook = PSHook(1, 2)
+    @test pretty_show_fields(hook) == [:keep]
+    @test shown(hook) == join(["$(HOOK)", "  keep ┴ Int64: 1", ""], '\n')
+    pe.with_show_nothing_fields(true) do
+        @test pretty_show_fields(hook) == (:keep,)
+        @test shown(hook) == join(["$(HOOK)", "  keep ┴ Int64: 1", ""], '\n')
+    end
+    pe.with_show_nothing_fields(:PSHook, true) do
+        @test pretty_show_fields(hook) == (:keep, :drop)
+        @test shown(hook) ==
+              join(["$(HOOK)", "  keep ┼ Int64: 1", "  drop ┴ Int64: 2", ""], '\n')
+    end
+    pe.with_show_nothing_fields(:PSHook, false) do
+        @test pretty_show_fields(hook) == [:keep]
+    end
+    # The resolver returns the declared tuple when the switch is on, and a filtered vector
+    # when it is off, whether or not a field was dropped.
+    @test pretty_show_fields(PSLeaf(1)) == [:a]
+    @test pretty_show_fields(probe) == [:leaf, :rs, :dt]
+    pe.with_show_nothing_fields(true) do
+        @test pretty_show_fields(PSLeaf(1)) == (:a,)
+        @test pretty_show_fields(probe) == (:leaf, :rs, :dt, :n)
+    end
+    @test pe.SHOW_NOTHING_FIELDS[].default === false
+    @test isempty(pe.SHOW_NOTHING_FIELDS[].by_type)
 end
 @testset "The vector rendering helpers" begin
     # The summary names the element type when every element shares a wrapper, and falls back

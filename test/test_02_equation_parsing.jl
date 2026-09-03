@@ -179,12 +179,17 @@ end
     pe.apply_preferences!(Dict{String, Any}("equation_max_length" => 512,
                                             "suggestion_distance" => "damerau_levenshtein",
                                             "suggestion_min_score" => 0.8,
-                                            "compact_show" => 4))
+                                            "compact_show" => 4,
+                                            "show_nothing_fields" => true,
+                                            "show_nothing_fields_by_type" =>
+                                                Dict{String, Any}("SimpleVariance" => false)))
     @test pe.EQUATION_LIMITS[].max_length == 512
     @test pe.EQUATION_LIMITS[].max_depth == 256          # unset key keeps its default
     @test pe.STRING_DISTANCE[].dist isa pe.StringDistances.DamerauLevenshtein
     @test pe.STRING_DISTANCE[].min_score == 0.8
     @test pe.COMPACT_SHOW[] == 4
+    @test pe.SHOW_NOTHING_FIELDS[].default === true
+    @test pe.SHOW_NOTHING_FIELDS[].by_type == Dict(:SimpleVariance => false)
     # Unset preferences (nothing) are skipped entirely.
     pe.apply_preferences!(Dict{String, Any}())
     @test pe.EQUATION_LIMITS[].max_length == 512
@@ -198,6 +203,20 @@ end
     @test_throws ArgumentError pe.apply_preferences!(Dict{String, Any}("suggestion_min_score" =>
                                                                            true))
     @test_throws ArgumentError pe.apply_preferences!(Dict{String, Any}("compact_show" => "yes"))
+    # The two show-nothing keys fail closed on a wrong value: a non-boolean switch, a table
+    # that is not a table, and a table entry that is not a boolean. A name that matches no
+    # type is accepted, because a type outside the package can render through the macro.
+    @test_throws ArgumentError pe.apply_preferences!(Dict{String, Any}("show_nothing_fields" =>
+                                                                           1))
+    @test_throws ArgumentError pe.apply_preferences!(Dict{String, Any}("show_nothing_fields_by_type" =>
+                                                                           true))
+    @test_throws ArgumentError pe.apply_preferences!(Dict{String, Any}("show_nothing_fields_by_type" =>
+                                                                           Dict{String,
+                                                                                Any}("SimpleVariance" => "no")))
+    @test isnothing(pe.apply_preferences!(Dict{String, Any}("show_nothing_fields_by_type" =>
+                                                                Dict{String, Any}("NoSuchType" =>
+                                                                                      true))))
+    @test pe.SHOW_NOTHING_FIELDS[].by_type[:NoSuchType] === true
     # Unknown distance name fails closed against the enumerated allowlist, with a suggestion.
     err = try
         pe.apply_preferences!(Dict{String, Any}("suggestion_distance" => "levenstein"))
@@ -214,6 +233,11 @@ end
     pe.set_equation_limits!(max_length = 4096, max_depth = 256)
     pe.set_string_distance!(dist = pe.StringDistances.Levenshtein(), min_score = 0.7)
     pe.set_compact_show!(true)
+    pe.set_show_nothing_fields!(false)
+    pe.set_show_nothing_fields!(:SimpleVariance, nothing)
+    pe.set_show_nothing_fields!(:NoSuchType, nothing)
+    @test pe.SHOW_NOTHING_FIELDS[].default === false
+    @test isempty(pe.SHOW_NOTHING_FIELDS[].by_type)
 end
 @testset "Suggestion threshold rejects a non-positive min_score" begin
     using PortfolioOptimisers, Test

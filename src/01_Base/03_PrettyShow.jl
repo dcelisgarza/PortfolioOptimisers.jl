@@ -3,7 +3,7 @@
 
 Defines a `Base.show` method for `T` that prints the type name and one aligned line per field.
 
-A field that is itself pretty-printable is rendered under its parent and indented, and an oversized one is collapsed to `Name ⋯`. The height at which a nested field collapses is the budget that [`compact_show_budget`](@ref) reads; see [`set_compact_show!`](@ref).
+A field that is itself pretty-printable is rendered under its parent and indented, and an oversized one is collapsed to `Name ⋯`. The height at which a nested field collapses is the budget that [`compact_show_budget`](@ref) reads; see [`set_compact_show!`](@ref). The fields that print are the ones [`pretty_show_fields`](@ref) resolves, so a field that holds `nothing` is hidden under the shipped default of [`SHOW_NOTHING_FIELDS`](@ref), and a type hides a field of its own choice through [`show_fields`](@ref).
 
 # Algorithm
 
@@ -13,7 +13,7 @@ The macro emits two definitions. Steps 3 to 9 are the body of the `Base.show` me
 
  2. Define `Base.show(io::IO, obj::T)`.
 
- 3. Read `fields`, the field names of `obj`. When `fields` is empty, print `T()` and return.
+ 3. Read `fields`, the field names that [`pretty_show_fields`](@ref) resolves for `obj`. When `fields` is empty, print `T()` and return. A type with no field reaches this step, and so does a type whose every field is hidden.
 
  4. When the `IO` context sets `:compact` or `:multiline`, print the type name alone and return.
 
@@ -21,7 +21,7 @@ The macro emits two definitions. Steps 3 to 9 are the body of the `Base.show` me
 
  6. For each field in declaration order, read `val` with `getproperty`, so that a property a rule of [`@forward_properties`](@ref) swaps prints the swapped value.
 
- 7. Choose the connector `sym1`, giving `┴` for the last printed line and `┼` otherwise.
+ 7. Choose the connector `sym1`, giving `┴` for the last printed line and `┼` otherwise. The last printed line is the last field of `fields`, so a hidden field never carries the marker. A nested value whose own resolved field list is empty prints on one line, so it takes `┴` too.
 
  8. Print the field name, right-aligned to `padding`.
 
@@ -52,6 +52,9 @@ The macro emits two definitions. Steps 3 to 9 are the body of the `Base.show` me
   - [`AbstractCovarianceEstimator`](@ref)
   - [`has_pretty_show_method`](@ref)
   - [`compact_show_budget`](@ref)
+  - [`pretty_show_fields`](@ref)
+  - [`show_fields`](@ref)
+  - [`SHOW_NOTHING_FIELDS`](@ref)
   - [`pretty_show_vector_summary`](@ref)
   - [`pretty_show_vector_body`](@ref)
   - [`Base.show`](https://docs.julialang.org/en/v1/base/io/#Base.show)
@@ -62,7 +65,7 @@ macro define_pretty_show(T, flag::Bool = true)
                 has_pretty_show_method(::$T)::Bool = true
             end
             function Base.show(io::IO, obj::$T)
-                fields = fieldnames(typeof(obj))
+                fields = pretty_show_fields(obj)
                 tobj = typeof(obj)
                 if isempty(fields)
                     return print(io, string(tobj, "()"), '\n')
@@ -77,7 +80,7 @@ macro define_pretty_show(T, flag::Bool = true)
                     val = getproperty(obj, field)
                     flag = has_pretty_show_method(val)
                     sym1 = ifelse(i == length(fields) &&
-                                      (!flag || (flag && isempty(fieldnames(typeof(val))))),
+                                      (!flag || (flag && isempty(pretty_show_fields(val)))),
                                   '┴', '┼')
                     print(io, lpad(string(field), padding), " ")
                     if isnothing(val)
@@ -240,6 +243,67 @@ function pretty_show_vector_body(io::IO, lines::AbstractVector{<:AbstractString}
     nhead = cld(budget, 2)
     ntail = budget - nhead
     return vcat(lines[1:nhead], "⋮", lines[(n - ntail + 1):n])
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Name the fields of `obj` that [`@define_pretty_show`](@ref) considers for rendering, in declaration order.
+
+The default method returns every declared field. A type that always hides one of its fields, whatever the field holds, overloads this method for itself and returns the others. That overload is the per-type arm of the field selection, and [`SHOW_NOTHING_FIELDS`](@ref) is the configured arm: [`pretty_show_fields`](@ref) resolves the two, and a per-name entry of the configuration overrides this method in either direction.
+
+# Arguments
+
+  - `obj`: The value under rendering.
+
+# Returns
+
+  - `fields`: The field names to consider, as a tuple or a vector of `Symbol`.
+
+# Related
+
+  - [`@define_pretty_show`](@ref)
+  - [`pretty_show_fields`](@ref)
+  - [`SHOW_NOTHING_FIELDS`](@ref)
+"""
+show_fields(@nospecialize(obj)) = fieldnames(typeof(obj))
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve the fields that [`@define_pretty_show`](@ref) renders for `obj`.
+
+Three sources take part, and the precedence is fixed: a per-name entry of [`SHOW_NOTHING_FIELDS`](@ref) beats the [`show_fields`](@ref) method of the type, which beats the global default of [`SHOW_NOTHING_FIELDS`](@ref). The name is the bare name of the type, so two types of one name in two modules share one entry.
+
+# Algorithm
+
+ 1. Read `cfg`, the active value of [`SHOW_NOTHING_FIELDS`](@ref), and `entry`, its per-name entry for the name of the type of `obj`, giving `nothing` when no entry is set.
+ 2. Take `fields`: every declared field when `entry` is `true`, so that a per-name request to show everything overrides a [`show_fields`](@ref) overload, and the result of [`show_fields`](@ref) otherwise.
+ 3. Take `show`, which is `entry` when an entry is set and the global default of `cfg` otherwise.
+ 4. Return `fields` when `show` is `true`. Otherwise return the members of `fields` whose value, read with `getproperty`, is not `nothing`.
+
+# Arguments
+
+  - `obj`: The value under rendering.
+
+# Returns
+
+  - `fields`: The field names to render, in declaration order. Every declared field, the result of [`show_fields`](@ref), or the members of that result whose value is not `nothing`.
+
+# Related
+
+  - [`@define_pretty_show`](@ref)
+  - [`show_fields`](@ref)
+  - [`SHOW_NOTHING_FIELDS`](@ref)
+  - [`set_show_nothing_fields!`](@ref)
+  - [`with_show_nothing_fields`](@ref)
+"""
+function pretty_show_fields(obj)
+    cfg = SHOW_NOTHING_FIELDS[]
+    entry = get(cfg.by_type, nameof(typeof(obj)), nothing)
+    fields = entry === true ? fieldnames(typeof(obj)) : show_fields(obj)
+    if something(entry, cfg.default)
+        return fields
+    end
+    return [f for f in fields if !isnothing(getproperty(obj, f))]
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
