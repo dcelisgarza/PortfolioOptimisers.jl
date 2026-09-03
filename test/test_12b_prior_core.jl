@@ -819,7 +819,16 @@ end
     var_views = LinearConstraintEstimator(; val = "AAPL == 0.03264496113282452")
     pr = prior(EntropyPoolingPrior(; sets = sets, opt = opt,
                                    var_views = ValueatRiskView(; views = var_views)), rd)
-    @test ValueatRisk(; w = pr.w)(rd.X[:, 1]) == ValueatRisk(;)(rd.X[:, 1])
+    var_tgt = 0.03264496113282452
+    # The view is a constraint on the posterior tail mass, so that mass is what the solve meets.
+    @test isapprox(sum(pr.w[i] for i in axes(rd.X, 1) if rd.X[i, 1] <= -var_tgt), 0.05,
+                   rtol = 1e-6)
+    # The reported value at risk is a sample order statistic, and the mass lands within `1e-8`
+    # of `0.05` on either side, which reads one of the two observations that bracket the target.
+    # See issues #573, #695 and #697.
+    @test var_view_floor(rd.X[:, 1], var_tgt) <=
+          ValueatRisk(; w = pr.w)(rd.X[:, 1]) <=
+          var_view_ceiling(rd.X[:, 1], var_tgt)
     @test isapprox(pr.w,
                    prior(EntropyPoolingPrior(; sets = sets, opt = jopt,
                                              var_views = ValueatRiskView(;
@@ -846,7 +855,16 @@ end
     var_views = LinearConstraintEstimator(; val = "AAPL == 0.12865204867438676")
     pr = prior(EntropyPoolingPrior(; sets = sets, opt = opt,
                                    var_views = ValueatRiskView(; views = var_views)), rd)
-    @test ValueatRisk(; w = pr.w)(rd.X[:, 1]) == WorstRealisation()(rd.X[:, 1])
+    var_tgt = 0.12865204867438676
+    # The view is a constraint on the posterior tail mass, so that mass is what the solve meets.
+    @test isapprox(sum(pr.w[i] for i in axes(rd.X, 1) if rd.X[i, 1] <= -var_tgt), 0.05,
+                   rtol = 1e-6)
+    # The target sits one observation from the worst realisation, so the reading is either it or
+    # the second worst observation, depending on the sign of a residual near `1e-10`. See issues
+    # #573, #695 and #697.
+    @test var_view_floor(rd.X[:, 1], var_tgt) <=
+          ValueatRisk(; w = pr.w)(rd.X[:, 1]) <=
+          var_view_ceiling(rd.X[:, 1], var_tgt)
     @test isapprox(pr.w,
                    prior(EntropyPoolingPrior(; sets = sets, opt = jopt,
                                              var_views = ValueatRiskView(;
@@ -857,7 +875,16 @@ end
     pr = prior(EntropyPoolingPrior(; sets = sets, opt = opt,
                                    var_views = ValueatRiskView(; alpha = 0.07,
                                                                views = var_views)), rd)
-    @test isapprox(ValueatRisk(; alpha = 0.07, w = pr.w)(rd.X[:, 1]), 0.028, rtol = 7e-3)
+    # The view is a constraint on the posterior tail mass, so that mass is what the solve meets.
+    @test isapprox(sum(pr.w[i] for i in axes(rd.X, 1) if rd.X[i, 1] <= -0.028), 0.07,
+                   rtol = 1e-6)
+    # The reported value at risk is a sample order statistic, and the mass lands within `1e-10`
+    # of `0.07` on either side, which reads one of the two observations that bracket the target.
+    # A residual on the wrong side once put the reading outside the old `rtol = 7e-3` band. See
+    # issues #573, #695 and #697.
+    @test var_view_floor(rd.X[:, 1], 0.028) <=
+          ValueatRisk(; alpha = 0.07, w = pr.w)(rd.X[:, 1]) <=
+          var_view_ceiling(rd.X[:, 1], 0.028)
     @test ValueatRisk(; alpha = 0.07, w = pr.w)(rd.X[:, end]) >= 0.027
     @test isapprox(pr.w,
                    prior(EntropyPoolingPrior(; sets = sets, opt = jopt,

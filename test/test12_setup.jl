@@ -65,6 +65,16 @@ function var_view_floor(x::AbstractVector, target::Real)
     k = count(<=(-target), x)
     return -losses[min(k + 1, length(losses))]
 end
+# The companion of `var_view_floor`. It returns the smallest loss the target includes, which is
+# the reading a solve gives when the posterior tail mass meets `alpha` from above rather than
+# falling short of it. Together the two functions state both observations a value at risk view
+# can read, and a reading between them meets the view to the resolution the sample has. See
+# issues #573, #695 and #697.
+function var_view_ceiling(x::AbstractVector, target::Real)
+    losses = sort(x)
+    k = count(<=(-target), x)
+    return -losses[max(k, 1)]
+end
 T = size(rd.X, 1)
 iT = inv(T)
 w = StatsBase.pweights(range(iT, iT; length = T))
