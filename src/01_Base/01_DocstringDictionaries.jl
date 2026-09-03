@@ -747,6 +747,9 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :ep_w => "`w`: Prior observation probability weights. If `nothing`, uniform weights are used.",#
                                  # Opinion pooling.
                                  :opalg => "`alg`: Opinion pooling algorithm.",#
+                                 # Cross-sectional transforms.
+                                 :min_group_size => "`min_group_size`: Smallest estimation set a group may carry and still be estimated from. A group below it, and every asset that carries no group, takes the whole observation's statistics instead.",#
+                                 :atol_cs => "`atol`: Absolute tolerance below which a cross-sectional scale counts as zero. An observation at or below it carries no dispersion, so its finite cells score zero rather than dividing by that scale.",#
                                  # Non-optimisation risk measures.
                                  :rt_mean => "`rt`: Mean return estimator.",#
                                  # Regime adjusted estimators.

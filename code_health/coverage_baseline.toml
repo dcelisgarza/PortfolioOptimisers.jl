@@ -27,6 +27,7 @@ commit = "8610300"
 "src/03_InputData/01_AssetPanel.jl" = { lines = 93, misses = 0 }
 "src/03_InputData/02_AssetPanelBuilder.jl" = { lines = 195, misses = 0 }
 "src/03_InputData/03_Preprocessing.jl" = { lines = 403, misses = 0 }
+"src/03_InputData/04_CrossSectionalTransforms.jl" = { lines = 308, misses = 0 }
 "src/04_PosdefMatrix.jl" = { lines = 26, misses = 0 }
 "src/05_Denoise.jl" = { lines = 80, misses = 0 }
 "src/06_Detone.jl" = { lines = 30, misses = 0 }
