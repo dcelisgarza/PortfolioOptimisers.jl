@@ -188,6 +188,10 @@ A per-asset value computed from one or more Panel Fields at one observation: a m
 **Descriptor Estimator**
 A producer of one Descriptor.
 
+**Cross-Sectional Transform**
+A rescaling of a Descriptor within one observation, across the assets: a winsorisation, a standardisation against a benchmark-weighted centre, a Gaussian or percentile rank, a tanh shrink. It reads the benchmark weights and an optional group label at the call, keeps no fitted state, and returns a value of the same shape.
+*Avoid*: Preprocessing Estimator (§2), which transforms a series along time and fits a Result.
+
 **Factor Exposure**
 One asset's loading on one factor at one observation, built from Descriptors or from a one-hot Panel Field. The matrix of them is the loadings matrix a Regression carries, which is where a Factor Exposure Constraint (§4.4) reads it.
 *Avoid*: net and gross exposure (§4.4), which are statements about the weights rather than about a factor model.
