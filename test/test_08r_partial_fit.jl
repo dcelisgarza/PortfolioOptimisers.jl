@@ -6,6 +6,11 @@ batch method, associativity of `merge_states`, the `NaN` a state with too few ob
 reads, and the guarantee that `partial_fit!` leaves the caller's estimator untouched. The
 refusals follow, one per configuration that the batch answer and the Welford accumulator
 disagree on.
+
+The last four testsets are the seam-wide rulings of #712, built by #714 and recorded in ADR
+0107: each propagation channel does one thing with the state, the value form `partial_fit`
+leaves a kept estimator alone, every state copies without aliasing, and a read-out refuses a
+state its estimator no longer matches.
 =#
 @testset "Partial fit: Welford states for the second-order sample estimators" begin
     using Test, PortfolioOptimisers, Statistics, StableRNGs, StatsBase, LinearAlgebra
@@ -200,7 +205,7 @@ disagree on.
         @test_throws DimensionMismatch pe.CovarianceState(; mu = zeros(3), M = zeros(2, 2))
     end
 
-    @testset "A cache is hidden, and a view carries it unchanged" begin
+    @testset "A cache is hidden, and each channel does one thing with it" begin
         cv = fold(Covariance(), X)
         ve = fold(SimpleVariance(), X)
         me = fold(SimpleExpectedReturns(), X)
@@ -220,11 +225,85 @@ disagree on.
         @test occursin("cache", sprint(show, cv))
         pe.set_show_nothing_fields!(:Covariance, nothing)
 
-        # The `cache` field carries no propagation tag, so every channel passes it through
-        # unchanged. That is the shipped reading of the whole seam, and issue #712 holds the
-        # ruling on whether a channel must instead drop or slice it.
-        @test pe.port_opt_view(cv, [1, 3]).cache === cv.cache
-        @test pe.obs_weights_view(ve, 1:10).cache === ve.cache
+        # `cache` carries `@fprop @vprop`, so each channel does one thing with it, and
+        # ADR 0107 states which. `factory` carries the state, `port_opt_view` slices it to
+        # the selected assets, and `obs_weights_view` drops it.
         @test pe.factory(me).cache === me.cache
+        @test isnothing(pe.obs_weights_view(ve, 1:10).cache)
+        @test isnothing(pe.obs_weights_view(cv, 1:10).cache)
+        @test isnothing(pe.obs_weights_view(me, 1:10).cache)
+        @test isnothing(pe.obs_weights_view(gc, 1:10).cache)
+
+        # The slice is exact: the viewed estimator reads what the same estimator reads when
+        # it is fitted on the selected columns alone.
+        i = [1, 3]
+        @test isapprox(cov(pe.port_opt_view(cv, i)), cov(Covariance(), X[:, i]);
+                       rtol = 1e-13)
+        @test isapprox(var(pe.port_opt_view(ve, i)), vec(var(SimpleVariance(), X[:, i]));
+                       rtol = 1e-13)
+        @test isapprox(mean(pe.port_opt_view(me, i)),
+                       vec(mean(SimpleExpectedReturns(), X[:, i])); rtol = 1e-13)
+        @test isapprox(cov(pe.port_opt_view(gc, i)), cov(GeneralCovariance(), X[:, i]);
+                       rtol = 1e-13)
+
+        # The slice copies by index rather than viewing, so a fold on the viewed estimator
+        # writes into arrays of its own and the estimator it was viewed from is untouched.
+        vcv = pe.port_opt_view(cv, i)
+        @test vcv.cache.mu !== view(cv.cache.mu, i)
+        before = copy(cv.cache.M)
+        partial_fit!(vcv, X[1, i])
+        @test cv.cache.M == before
+    end
+
+    @testset "The value form folds a copy" begin
+        # `partial_fit` copies the state and folds the copy, so a kept estimator reads what
+        # it read before the call. ADR 0107.
+        for (est, readout) in
+            ((Covariance(), cov), (SimpleVariance(), var), (SimpleExpectedReturns(), mean),
+             (GeneralCovariance(), cov))
+            warm = fold(est, view(X, 1:30, :))
+            kept = readout(warm)
+            fitted = partial_fit(warm, view(X, 31:50, :))
+            @test readout(warm) == kept
+            @test warm.cache !== fitted.cache
+            # The value form and the batch verb answer the same sample.
+            @test isapprox(readout(fitted), readout(fold(est, X)); rtol = 1e-13)
+        end
+        # A cold estimator has no state to copy, and the fold seeds one of its own.
+        cold = partial_fit(SimpleVariance(), X)
+        @test isapprox(var(cold), var(fold(SimpleVariance(), X)); rtol = 1e-13)
+    end
+
+    @testset "Every state copies without aliasing" begin
+        for est in (fold(Covariance(), X), fold(SimpleVariance(), X),
+                    fold(SimpleExpectedReturns(), X), fold(GeneralCovariance(), X))
+            state = est.cache
+            twin = copy(state)
+            @test typeof(twin) === typeof(state)
+            @test twin !== state
+            @test twin.n == state.n
+            for name in fieldnames(typeof(state))
+                a = getfield(state, name)
+                b = getfield(twin, name)
+                if isa(a, AbstractArray)
+                    @test a == b
+                    @test a !== b
+                end
+            end
+        end
+    end
+
+    @testset "A read-out refuses a state its estimator no longer matches" begin
+        # `factory` carries the state and replaces `w`, so the estimator says weighted and
+        # holds a state fitted unweighted. Every read-out refuses. ADR 0107.
+        w = StatsBase.Weights(fill(inv(50), 50))
+        for (est, readout) in
+            ((Covariance(), cov), (SimpleVariance(), var), (SimpleExpectedReturns(), mean),
+             (GeneralCovariance(), cov))
+            warm = fold(est, X)
+            weighted = pe.factory(warm, w)
+            @test !isnothing(weighted.cache)
+            @test_throws ArgumentError readout(weighted)
+        end
     end
 end

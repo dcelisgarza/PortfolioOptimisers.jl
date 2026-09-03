@@ -634,12 +634,28 @@ end
     @test length(s) == 1
     @test s[1] === s
     @test collect(s) == [s]
-    # The root is not exported. The seam's whole public surface is `partial_fit!`, which the
-    # estimator tickets add, so nothing here reaches a caller by its bare name.
+    # The root is not exported. The seam's whole public surface is the two verbs, so nothing
+    # here reaches a caller by its bare name.
+    @test :partial_fit! in names(PortfolioOptimisers)
+    @test :partial_fit in names(PortfolioOptimisers)
     @test !(:AbstractPartialFitState in names(PortfolioOptimisers))
     @test !(:merge_states in names(PortfolioOptimisers))
     @test !(:chan_merge in names(PortfolioOptimisers))
     @test !(:assert_mergeable_states in names(PortfolioOptimisers))
+end
+@testset "A view drops a state on the observation axis, whatever the family" begin
+    pe = PortfolioOptimisers
+    # One root method is the drop, so a family that adds a state owes no method of its own.
+    # `@fprop` routes the field through the verb, and the method returns `nothing`.
+    # ADR 0107.
+    for state in
+        (PFSOther(3), PFSBare(1, [1.0], [0.0]), PFSFull(0.97, 2, [1.0], fill(0.5, 1, 1)))
+        @test isnothing(pe.obs_weights_view(state, 1:5))
+        @test isnothing(pe.obs_weights_view(state, [2, 4]))
+        @test isnothing(pe.obs_weights_view(state, Colon()))
+    end
+    # The universal fallback still carries every value that is not a state.
+    @test pe.obs_weights_view(3, 1:5) == 3
 end
 @testset "assert_mergeable_states names the mismatch it refuses" begin
     pe = PortfolioOptimisers

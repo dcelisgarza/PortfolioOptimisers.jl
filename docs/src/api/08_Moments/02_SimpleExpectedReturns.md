@@ -20,4 +20,6 @@ partial_fit!(me::SimpleExpectedReturns, x::VecNum)
 expected_returns_state_seed
 mean(me::SimpleExpectedReturns, state::SimpleExpectedReturnsState)
 merge_states(a::SimpleExpectedReturnsState, b::SimpleExpectedReturnsState)
+Base.copy(x::SimpleExpectedReturnsState)
+port_opt_view(x::SimpleExpectedReturnsState, i, args...)
 ```

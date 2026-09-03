@@ -27,18 +27,20 @@ Keywords correspond to the struct's fields.
 When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+  - `cache`: Carried unchanged via [`factory`](@ref).
 
 ## View parameters
 
 When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
 
-  - `cache`: Recursively viewed via [`port_opt_view`](@ref).
+  - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
 
 ## Observation weight parameters
 
 When [`obs_weights_view`](@ref) is called on this type, the following fields are automatically indexed to the selected observations:
 
   - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).
+  - `cache`: Dropped via [`obs_weights_view`](@ref), because no slice of a state exists on the observation axis.
 
 # Examples
 
@@ -71,7 +73,7 @@ SimpleExpectedReturns
     """
     $(field_dict[:pfcache])
     """
-    cache
+    @fprop @vprop cache
     function SimpleExpectedReturns(w::Option{<:ObsWeights},
                                    cache::Option{<:AbstractPartialFitState})::SimpleExpectedReturns
         assert_nonempty_nonneg_finite_val(w, :w)
@@ -298,6 +300,56 @@ function merge_states(a::SimpleExpectedReturnsState, b::SimpleExpectedReturnsSta
     assert_mergeable_states(a, b)
     n, mu, _ = chan_merge(a.n, a.mu, false, b.n, b.mu, false)
     return SimpleExpectedReturnsState(n, mu)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Copies a [`SimpleExpectedReturnsState`](@ref), so the copy shares no array with the original.
+
+The `copy` method of the [`AbstractPartialFitState`](@ref) interface, which [`partial_fit`](@ref) calls before it folds. The count is a scalar and passes through, and the running mean is copied.
+
+# Arguments
+
+  - `x`: The state to copy.
+
+# Returns
+
+  - `state::SimpleExpectedReturnsState`: A fresh state, equal to `x`, whose `mu` is a fresh vector.
+
+# Related
+
+  - [`SimpleExpectedReturnsState`](@ref)
+  - [`partial_fit`](@ref)
+  - [`AbstractPartialFitState`](@ref)
+"""
+function Base.copy(x::SimpleExpectedReturnsState)
+    return SimpleExpectedReturnsState(x.n, copy(x.mu))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Slices a [`SimpleExpectedReturnsState`](@ref) to the selected assets.
+
+The Welford mean of one asset reads that asset's observations alone, so the slice of the state is the state of the sliced universe, entry for entry, and the count is shared by every asset and passes through. The slice copies by index and does not `view`: a later [`partial_fit!`](@ref) on the viewed estimator would otherwise write through into the arrays of the estimator the view was taken from.
+
+# Arguments
+
+  - `x`: The state to slice.
+  - `i`: Index or indices of the assets to keep.
+  - `args...`: Additional positional arguments (ignored).
+
+# Returns
+
+  - `state::SimpleExpectedReturnsState`: The state of the same sample over the selected assets.
+
+# Related
+
+  - [`SimpleExpectedReturnsState`](@ref)
+  - [`port_opt_view`](@ref)
+  - [`partial_fit!`](@ref)
+"""
+function port_opt_view(x::SimpleExpectedReturnsState, i, args...)
+    return SimpleExpectedReturnsState(x.n, x.mu[i])
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

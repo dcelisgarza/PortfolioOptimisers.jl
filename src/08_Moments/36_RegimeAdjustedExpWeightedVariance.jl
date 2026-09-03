@@ -1323,5 +1323,48 @@ function merge_states(a::RegimeAdjustedVarianceCache, b::RegimeAdjustedVarianceC
     assert_mergeable_states(a, b)
     return throw(ArgumentError("a `RegimeAdjustedVarianceCache` pair does not merge, because a block fitted from a cold start is not what the same block contributes after another one. The regime state reads each observation's standardised squared innovation, which divides by the running variance and is gated by the running observation count. Fold the second block into the first with `partial_fit!` instead."))
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Copies a [`RegimeAdjustedVarianceCache`](@ref), so the copy shares no array with the original.
+
+The `copy` method of the [`AbstractPartialFitState`](@ref) interface, which [`partial_fit`](@ref) calls before it folds. Every array field is copied, and the two scalar fields pass through. The circular buffer of recent centred returns is rebuilt at the same capacity, and each observation it holds is copied into it, so a fold on the copy pushes into a buffer of its own.
+
+This family answers `copy` and refuses `merge_states`. The two methods are independent: the merge asks whether two blocks fold into one, and the copy asks only that a fold on one estimator leaves another alone.
+
+# Algorithm
+
+ 1. Rebuild the circular buffer at the capacity of `x.ret_buffer`, and push a copy of each observation it holds. Take `nothing` when `x.ret_buffer` is `nothing`, which is the estimator that runs no HAC correction.
+ 2. Name the constructor, and pass a copy of each array field and the two scalar fields unchanged.
+
+# Arguments
+
+  - `x`: The cache to copy.
+
+# Returns
+
+  - `state::RegimeAdjustedVarianceCache`: A fresh cache, equal to `x`, whose arrays are fresh.
+
+# Related
+
+  - [`RegimeAdjustedVarianceCache`](@ref)
+  - [`partial_fit`](@ref)
+  - [`AbstractPartialFitState`](@ref)
+"""
+function Base.copy(x::RegimeAdjustedVarianceCache)
+    ret_buffer = if isnothing(x.ret_buffer)
+        nothing
+    else
+        buffer = DataStructures.CircularBuffer{eltype(x.ret_buffer)}(DataStructures.capacity(x.ret_buffer))
+        for X_old in x.ret_buffer
+            push!(buffer, copy(X_old))
+        end
+        buffer
+    end
+    return RegimeAdjustedVarianceCache(ret_buffer, copy(x.variance), copy(x.X2),
+                                       copy(x.X_old_i), copy(x.z2), copy(x.location),
+                                       copy(x.obs_count), copy(x.old_obs_count),
+                                       copy(x.active), x.regime_state, x.n_regime_obs)
+end
 export LogRegimeAdjusted, FirstMomentRegimeAdjusted, RootMeanSquaredAdjusted,
        RegimeAdjustedExpWeightedVariance

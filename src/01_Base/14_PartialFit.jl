@@ -5,7 +5,13 @@ Folds observations into an estimator's partial-fit state, and returns the estima
 
 An incremental fit reads each observation once and keeps what it needs in an [`AbstractPartialFitState`](@ref), so a later call continues where the last one stopped instead of reading the sample again. The state lives in the estimator's `cache` field, which holds `nothing` until the first call. ADR 0106 records why that field is the one Result an estimator holds.
 
-The verb mutates the array fields of the state and rebinds its scalar fields with `Accessors.@reset`, so it returns a **new** estimator and the caller must rebind it. The returned estimator shares the state object with the one it was built from, which is what the `!` in the name says: two estimators returned by successive calls read the same running quantities.
+This is the method each family writes, and it is the family's cheapest exact fold. It writes into the array fields of the state where it can, and it rebinds the scalar fields with `Accessors.@reset`. So it returns a **new** estimator, and the caller must rebind it.
+
+The verb promises **nothing** about an estimator the caller kept from before the call, and that is what the `!` in the name says. Three pitfalls follow from it. [`partial_fit`](@ref) is the verb that has none of them, because it folds a copy of the state.
+
+  - A kept estimator holds a state whose arrays moved and whose count did not, so it reads neither the old sample nor the new one.
+  - Two folds that start from one warm estimator write into the same arrays, so they contaminate each other.
+  - A family whose fold builds a fresh state leaves the kept estimator valid by accident, and no caller may rely on that.
 
 A batch verb ignores the state. `var(ce, X)` fits `X` alone, so an estimator carrying a state still answers any input it is given.
 
@@ -28,9 +34,105 @@ A family that answers this verb implements two methods:
 # Related
 
   - [`AbstractPartialFitState`](@ref)
+  - [`partial_fit`](@ref)
   - [`merge_states`](@ref)
 """
 function partial_fit! end
+"""
+    partial_fit(est, args...; kwargs...)
+
+Folds observations into a copy of an estimator's partial-fit state, and returns the estimator that carries the copy.
+
+This is the value form of [`partial_fit!`](@ref), and it is the pair [`matrix_processing`](@ref) makes with [`matrix_processing!`](@ref). The estimator handed over is untouched, and so is the state it carries, so two folds that start from one warm estimator cannot contaminate each other.
+
+One generic method serves the whole seam, so a family writes no method for it. A family whose fold builds a fresh state in either verb overrides it, to skip a copy that nothing reads.
+
+# Interfaces
+
+A family that overrides this verb implements the two methods the family already answers under [`partial_fit!`](@ref):
+
+  - `partial_fit(est, X::MatNum; dims::Int = 1, kwargs...) -> est`: Folds every observation of `X`, in order.
+  - `partial_fit(est, x::VecNum; kwargs...) -> est`: Folds one observation, whose entries are the assets.
+
+# Arguments
+
+  - `est`: Estimator whose state is folded forward.
+  - `X`: Observations to fold. A matrix holds one observation per row when `dims == 1`, and one per column when `dims == 2`. A vector is a single observation across the assets.
+
+# Returns
+
+  - `est`: A new estimator, whose `cache` field carries the state after the last observation.
+
+# Related
+
+  - [`AbstractPartialFitState`](@ref)
+  - [`partial_fit!`](@ref)
+  - [`merge_states`](@ref)
+"""
+function partial_fit end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Generic method of [`partial_fit`](@ref). Copies the state the estimator carries, and folds the observations into the copy.
+
+Every family of the seam reaches this method, because the copy and the fold are the same two steps whatever the state holds. The copy is one state per call, which is the order of the update itself for every second-order family.
+
+# Algorithm
+
+ 1. Return `partial_fit!(est, args...)` unchanged when `est.cache` holds `nothing`. There is no state to protect, and the fold seeds one of its own.
+ 2. Otherwise rebind `est.cache` to `copy(est.cache)` with `Accessors.@reset`.
+ 3. Fold the observations into the copy with [`partial_fit!`](@ref), and return the estimator it gives.
+
+# Arguments
+
+  - `est`: Estimator whose state is folded forward.
+  - `args...`: The observations, forwarded to [`partial_fit!`](@ref).
+  - `kwargs...`: Additional keyword arguments, forwarded to [`partial_fit!`](@ref).
+
+# Returns
+
+  - `est`: A new estimator, whose `cache` field carries the state after the last observation.
+
+# Related
+
+  - [`partial_fit`](@ref)
+  - [`partial_fit!`](@ref)
+  - [`AbstractPartialFitState`](@ref)
+"""
+function partial_fit(est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEstimator},
+                     args...; kwargs...)
+    cache = est.cache
+    if !isnothing(cache)
+        est = Accessors.@reset est.cache = copy(cache)
+    end
+    return partial_fit!(est, args...; kwargs...)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Drops a partial-fit state when its estimator is viewed on the observation axis.
+
+[`obs_weights_view`](@ref) selects observations, and a state describes the observations it was fitted on. No slice of a state exists on that axis: removing an observation from a running accumulator has no numerically stable inverse, which is the reason the seam refuses a windowed estimator in the first place. So the channel drops the state rather than carrying one that answers over observations the view excluded, and the viewed estimator's read-out refuses instead of answering wrongly.
+
+The asset axis is the other case, and it slices. [`port_opt_view`](@ref) restricts the estimator to a subset of assets, and a family whose state has an exact sub-state over that subset returns it by index copy.
+
+# Arguments
+
+  - `::AbstractPartialFitState`: The state the estimator carries, read for its type alone.
+  - `::Any`: Index of the observations to keep, which no slice of a state reads.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`AbstractPartialFitState`](@ref)
+  - [`obs_weights_view`](@ref)
+  - [`port_opt_view`](@ref)
+  - [`partial_fit!`](@ref)
+"""
+obs_weights_view(::AbstractPartialFitState, ::Any) = nothing
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -279,4 +381,4 @@ function partial_fit_cache(est::Union{<:AbstractEstimator, <:StatsBase.Covarianc
     return cache
 end
 
-export partial_fit!
+export partial_fit!, partial_fit

@@ -330,6 +330,60 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Copies a [`CoskewnessPartialFitState`](@ref), so the copy shares no array with the original.
+
+The `copy` method of the [`AbstractPartialFitState`](@ref) interface. The count is a scalar and passes through, and the running mean and the two accumulators are copied. This family overrides [`partial_fit`](@ref), so the seam's own value form never calls this method on it, and a caller who copies a state by hand still gets one.
+
+# Arguments
+
+  - `x`: The state to copy.
+
+# Returns
+
+  - `state::CoskewnessPartialFitState`: A fresh state, equal to `x`, whose `mu`, `M2` and `M3` are fresh arrays.
+
+# Related
+
+  - [`CoskewnessPartialFitState`](@ref)
+  - [`partial_fit`](@ref)
+  - [`AbstractPartialFitState`](@ref)
+"""
+function Base.copy(x::CoskewnessPartialFitState)
+    return CoskewnessPartialFitState(x.n, copy(x.mu), copy(x.M2), copy(x.M3))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Slices a [`CoskewnessPartialFitState`](@ref) to the selected assets.
+
+A third co-moment reads three assets' observations and no fourth, so the sub-tensor over a subset of assets is the state of that subset, entry for entry, and the count passes through. `M3` is `assets × assets²`, and its column for the pair ``(p, q)`` is ``(p - 1) N + q``, so the slice keeps the rows `i` and the columns of every pair drawn from `i`. [`fourth_moment_index_generator`](@ref) builds that column set, in the order the sliced universe numbers its own pairs.
+
+The slice copies by index and does not `view`, so a later [`partial_fit!`](@ref) on the viewed estimator writes into arrays of its own. The copy is small: a cluster's sub-tensor is cubic in the cluster size, where the full one is cubic in the universe size.
+
+# Arguments
+
+  - `x`: The state to slice.
+  - `i`: Index or indices of the assets to keep.
+  - `args...`: Additional positional arguments (ignored).
+
+# Returns
+
+  - `state::CoskewnessPartialFitState`: The state of the same sample over the selected assets.
+
+# Related
+
+  - [`CoskewnessPartialFitState`](@ref)
+  - [`port_opt_view`](@ref)
+  - [`fourth_moment_index_generator`](@ref)
+  - [`partial_fit!`](@ref)
+"""
+function port_opt_view(x::CoskewnessPartialFitState, i, args...)
+    idx = fourth_moment_index_generator(length(x.mu), i)
+    return CoskewnessPartialFitState(x.n, x.mu[i], x.M2[i, i], x.M3[i, idx])
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Folds two [`CokurtosisPartialFitState`](@ref) fitted on disjoint blocks into the state of the concatenated block.
 
 The companion of the [`CoskewnessPartialFitState`](@ref) merge, carried one order further. The fourth accumulator is shifted before the third, because [`shift_comoment4`](@ref) reads the third accumulator of the block about its own mean.
@@ -374,11 +428,65 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Copies a [`CokurtosisPartialFitState`](@ref), so the copy shares no array with the original.
+
+The `copy` method of the [`AbstractPartialFitState`](@ref) interface. The count is a scalar and passes through, and the running mean and the three accumulators are copied. `M4` is `assets² × assets²`, so this method is the expensive one of the seam, and it is why the family overrides [`partial_fit`](@ref) rather than paying the copy on every fold.
+
+# Arguments
+
+  - `x`: The state to copy.
+
+# Returns
+
+  - `state::CokurtosisPartialFitState`: A fresh state, equal to `x`, whose `mu`, `M2`, `M3` and `M4` are fresh arrays.
+
+# Related
+
+  - [`CokurtosisPartialFitState`](@ref)
+  - [`partial_fit`](@ref)
+  - [`AbstractPartialFitState`](@ref)
+"""
+function Base.copy(x::CokurtosisPartialFitState)
+    return CokurtosisPartialFitState(x.n, copy(x.mu), copy(x.M2), copy(x.M3), copy(x.M4))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Slices a [`CokurtosisPartialFitState`](@ref) to the selected assets.
+
+A fourth co-moment reads four assets' observations and no fifth, so the sub-tensor over a subset of assets is the state of that subset, entry for entry, and the count passes through. `M4` is `assets² × assets²`, and both of its axes are numbered by the pair ``(p, q)`` at ``(p - 1) N + q``, so the slice keeps the columns of every pair drawn from `i` on both axes. `M3` keeps the rows `i` and the same column set.
+
+The slice copies by index and does not `view`, so a later [`partial_fit!`](@ref) on the viewed estimator writes into arrays of its own. The copy is small next to the state it comes from: a cluster's sub-tensor is quartic in the cluster size, so ten clusters of ten assets copy 80 KB each out of the 800 MB a hundred-asset state holds.
+
+# Arguments
+
+  - `x`: The state to slice.
+  - `i`: Index or indices of the assets to keep.
+  - `args...`: Additional positional arguments (ignored).
+
+# Returns
+
+  - `state::CokurtosisPartialFitState`: The state of the same sample over the selected assets.
+
+# Related
+
+  - [`CokurtosisPartialFitState`](@ref)
+  - [`port_opt_view`](@ref)
+  - [`fourth_moment_index_generator`](@ref)
+  - [`partial_fit!`](@ref)
+"""
+function port_opt_view(x::CokurtosisPartialFitState, i, args...)
+    idx = fourth_moment_index_generator(length(x.mu), i)
+    return CokurtosisPartialFitState(x.n, x.mu[i], x.M2[i, i], x.M3[i, idx], x.M4[idx, idx])
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Folds a block of observations into the partial-fit state of a [`Coskewness`](@ref) estimator under [`FullMoment`](@ref).
 
 The estimator that carries no state adopts the block's state. The estimator that carries one merges the two, so the state after any sequence of blocks is the state of the concatenated sample. One row per call is the Welford update, and it is exact: the block of one observation carries zero accumulators, and the whole correction is the shift of the running state to the new mean.
 
-The method builds a new state rather than writing into the arrays of the old one, because the merge of two blocks is written once and shared with [`merge_states`](@ref). The returned estimator therefore holds a state that does **not** alias the one it was built from, and an estimator a caller kept from an earlier call still reads the sample it was shown. That is narrower than the general [`partial_fit!`](@ref) contract, and it is the reading issue #712 asks the maintainer to settle for the whole seam.
+The method builds a new state rather than writing into the arrays of the old one, because the merge of two blocks is written once and shared with [`merge_states`](@ref). No caller may rely on that: the verb promises nothing about an estimator kept from before the call, and [`partial_fit`](@ref) is the verb that does. This family is the one that overrides [`partial_fit`](@ref), because a copy of the state it never writes into buys nothing.
 
 # Algorithm
 
@@ -475,6 +583,36 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+[`Coskewness`](@ref) method of [`partial_fit`](@ref). Forwards to [`partial_fit!`](@ref), because the fold already writes into no array of the state it was given.
+
+This is the one family that overrides the generic method. The generic method copies the state before it folds, and a copy is what gives the verb its value semantics. This family's fold reaches [`merge_states`](@ref), which reads the two states and builds a third, so the estimator handed over is already left as it was and the copy buys nothing.
+
+# Algorithm
+
+ 1. Forward `X` and every keyword to [`partial_fit!`](@ref), and return the estimator it gives.
+
+# Arguments
+
+  - `ske`: Coskewness estimator with a [`FullMoment`](@ref) moment algorithm.
+  - `args...`: The observations, forwarded to [`partial_fit!`](@ref).
+  - `kwargs...`: Additional keyword arguments, forwarded to [`partial_fit!`](@ref).
+
+# Returns
+
+  - `ske::Coskewness`: A new estimator carrying the folded state.
+
+# Related
+
+  - [`Coskewness`](@ref)
+  - [`partial_fit`](@ref)
+  - [`partial_fit!`](@ref)
+"""
+function partial_fit(ske::Coskewness{<:Any, <:Any, <:FullMoment}, args...; kwargs...)
+    return partial_fit!(ske, args...; kwargs...)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Refuses an incremental fit of a [`Coskewness`](@ref) estimator under [`SemiMoment`](@ref).
 
 [`SemiMoment`](@ref) clips every positive deviation to zero before the moment, and the centre it clips against is a statistic of the whole sample. A new observation moves that centre, so every past clip moves with it and a past observation's membership of the clipped set flips. No state written before that observation is still valid, which is the second clause of the membership rule of issue #308.
@@ -503,7 +641,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Folds a block of observations into the partial-fit state of a [`Cokurtosis`](@ref) estimator under [`FullMoment`](@ref).
 
-The companion of the [`Coskewness`](@ref) method, carried one order further. The state it writes is `assets² × assets²` in its largest field, so the memory the seam trades for the recomputation it removes is stated on [`CokurtosisPartialFitState`](@ref). It builds a new state rather than writing into the arrays of the old one, for the reason the [`Coskewness`](@ref) method states, and issue #712 asks the maintainer to settle that reading for the whole seam.
+The companion of the [`Coskewness`](@ref) method, carried one order further. The state it writes is `assets² × assets²` in its largest field, so the memory the seam trades for the recomputation it removes is stated on [`CokurtosisPartialFitState`](@ref). It builds a new state rather than writing into the arrays of the old one, for the reason the [`Coskewness`](@ref) method states, and it overrides [`partial_fit`](@ref) for that reason too.
 
 # Algorithm
 
@@ -598,6 +736,36 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+[`Cokurtosis`](@ref) method of [`partial_fit`](@ref). Forwards to [`partial_fit!`](@ref), because the fold already writes into no array of the state it was given.
+
+The companion of the [`Coskewness`](@ref) method, and the one that pays for the override. The generic method would copy `M4` before every fold, which is `assets² × assets²`: 800 MB at a hundred assets, per call, for a copy no caller reads.
+
+# Algorithm
+
+ 1. Forward `X` and every keyword to [`partial_fit!`](@ref), and return the estimator it gives.
+
+# Arguments
+
+  - `kte`: Cokurtosis estimator with a [`FullMoment`](@ref) moment algorithm.
+  - `args...`: The observations, forwarded to [`partial_fit!`](@ref).
+  - `kwargs...`: Additional keyword arguments, forwarded to [`partial_fit!`](@ref).
+
+# Returns
+
+  - `kte::Cokurtosis`: A new estimator carrying the folded state.
+
+# Related
+
+  - [`Cokurtosis`](@ref)
+  - [`partial_fit`](@ref)
+  - [`partial_fit!`](@ref)
+"""
+function partial_fit(kte::Cokurtosis{<:Any, <:Any, <:FullMoment}, args...; kwargs...)
+    return partial_fit!(kte, args...; kwargs...)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Refuses an incremental fit of a [`Cokurtosis`](@ref) estimator under [`SemiMoment`](@ref).
 
 The same refusal as the [`Coskewness`](@ref) one, for the same reason: [`SemiMoment`](@ref) clips against a centre that a new observation moves, so a past observation's membership of the clipped set flips.
@@ -632,13 +800,18 @@ Only the shape of that sample survives a partial fit, so the matrix processing e
 
 # Algorithm
 
- 1. Divide the third accumulator by the observation count, giving the coskewness tensor.
- 2. Reduce it with [`negative_spectral_coskewness`](@ref), under `ske.mp` and the shape of the fitted sample.
+ 1. Refuse a configuration the state no longer matches, with [`assert_partial_fittable`](@ref). [`factory`](@ref) carries the state and replaces `w`, so an estimator that says weighted may hold a state fitted unweighted. The state stays on the estimator, so a caller who restores `w = nothing` reads it again.
+ 2. Divide the third accumulator by the observation count, giving the coskewness tensor.
+ 3. Reduce it with [`negative_spectral_coskewness`](@ref), under `ske.mp` and the shape of the fitted sample.
 
 # Arguments
 
   - `ske`: Coskewness estimator with a [`FullMoment`](@ref) moment algorithm.
   - `state`: Partial-fit state written by [`partial_fit!`](@ref).
+
+# Validation
+
+  - `ske.w` is `nothing` and `ske.me` is an unweighted [`SimpleExpectedReturns`](@ref). An `ArgumentError` is thrown otherwise.
 
 # Returns
 
@@ -654,6 +827,7 @@ Only the shape of that sample survives a partial fit, so the matrix processing e
 """
 function coskewness(ske::Coskewness{<:Any, <:Any, <:FullMoment},
                     state::CoskewnessPartialFitState)
+    assert_partial_fittable(ske.me, ske.w, "Coskewness")
     cskew = state.M3 ./ state.n
     shape = SparseArrays.spzeros(eltype(cskew), state.n, length(state.mu))
     return cskew, negative_spectral_coskewness(cskew, shape, ske.mp)
@@ -704,13 +878,18 @@ Only the shape of that sample survives a partial fit, so the matrix processing e
 
 # Algorithm
 
- 1. Divide the fourth accumulator by the observation count, giving the cokurtosis matrix.
- 2. Process it in place with [`matrix_processing!`](@ref), under `kte.mp` and the shape of the fitted sample.
+ 1. Refuse a configuration the state no longer matches, with [`assert_partial_fittable`](@ref). [`factory`](@ref) carries the state and replaces `w`, so an estimator that says weighted may hold a state fitted unweighted. The state stays on the estimator, so a caller who restores `w = nothing` reads it again.
+ 2. Divide the fourth accumulator by the observation count, giving the cokurtosis matrix.
+ 3. Process it in place with [`matrix_processing!`](@ref), under `kte.mp` and the shape of the fitted sample.
 
 # Arguments
 
   - `kte`: Cokurtosis estimator with a [`FullMoment`](@ref) moment algorithm.
   - `state`: Partial-fit state written by [`partial_fit!`](@ref).
+
+# Validation
+
+  - `kte.w` is `nothing` and `kte.me` is an unweighted [`SimpleExpectedReturns`](@ref). An `ArgumentError` is thrown otherwise.
 
 # Returns
 
@@ -725,6 +904,7 @@ Only the shape of that sample survives a partial fit, so the matrix processing e
 """
 function cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:FullMoment},
                     state::CokurtosisPartialFitState)
+    assert_partial_fittable(kte.me, kte.w, "Cokurtosis")
     ckurt = state.M4 ./ state.n
     shape = SparseArrays.spzeros(eltype(ckurt), state.n, length(state.mu))
     matrix_processing!(kte.mp, ckurt, shape)

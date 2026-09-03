@@ -54,7 +54,7 @@ A partial-fit state carries the quantities an estimator needs to fold one more o
 
 # Interfaces
 
-In order to implement a new partial-fit state which will work seamlessly with the library, subtype `AbstractPartialFitState` and implement the following method:
+In order to implement a new partial-fit state which will work seamlessly with the library, subtype `AbstractPartialFitState` and implement the following two methods:
 
 ## Merging two states
 
@@ -74,6 +74,24 @@ In order to implement a new partial-fit state which will work seamlessly with th
  1. Call [`assert_mergeable_states`](@ref) on the pair, which refuses two states of different types and two states over different numbers of assets.
  2. Refuse any further mismatch the family needs. An exponentially weighted pair must also agree on its decay, because the two states then weight the same observation differently.
  3. Fold the observation count, the mean and the second-moment accumulator with [`chan_merge`](@ref), and rebuild the state from the result. A family whose state is not a sufficient statistic for its own block refuses the pair here instead, with a message naming the reason, because no fold can put back what the state never recorded.
+
+## Copying a state
+
+  - `Base.copy(x::MyState) -> MyState`: Returns a fresh state whose arrays alias none of the arrays of `x`.
+
+[`partial_fit`](@ref) calls this method, and the value semantics of that verb rest on it: the estimator handed over keeps the state it held, whatever [`partial_fit!`](@ref) then writes into the copy. A state that shares one array with its copy breaks the promise for that quantity alone, which is the hardest kind of defect to see.
+
+### Arguments
+
+  - `x`: The state to copy.
+
+### Returns
+
+  - `state::MyState`: A fresh state, equal to `x`, whose arrays are fresh.
+
+### Algorithm
+
+ 1. Name the state's own constructor, and pass `copy` of each array field and each scalar field unchanged. The constructor is named here rather than recovered by reflection, the way the prior carriers name theirs, so a family the library has never seen gets a `MethodError` naming this method rather than a state built by machinery.
 
 # Related
 

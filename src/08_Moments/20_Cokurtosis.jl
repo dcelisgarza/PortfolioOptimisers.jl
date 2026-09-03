@@ -142,12 +142,14 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 
   - `me`: Recursively updated via [`factory`](@ref).
   - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+  - `cache`: Carried unchanged via [`factory`](@ref).
 
 ## View parameters
 
 When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
 
   - `me`: Recursively viewed via [`port_opt_view`](@ref).
+  - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
 
 ## Observation weight parameters
 
@@ -155,6 +157,7 @@ When [`obs_weights_view`](@ref) is called on this type, the following fields are
 
   - `me`: Recursively indexed via [`obs_weights_view`](@ref).
   - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).
+  - `cache`: Dropped via [`obs_weights_view`](@ref), because no slice of a state exists on the observation axis.
 
 # Examples
 
@@ -211,7 +214,7 @@ Cokurtosis
     """
     $(field_dict[:pfcache])
     """
-    cache
+    @fprop @vprop cache
     function Cokurtosis(me::AbstractExpectedReturnsEstimator,
                         mp::AbstractMatrixProcessingEstimator, alg::AbstractMomentAlgorithm,
                         w::Option{<:ObsWeights}, cache::Option{<:AbstractPartialFitState})

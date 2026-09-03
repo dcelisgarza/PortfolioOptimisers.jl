@@ -34,4 +34,5 @@ partial_fit!(ce::RegimeAdjustedExpWeightedVariance, x::VecNum;
 var(ce::RegimeAdjustedExpWeightedVariance, state::RegimeAdjustedVarianceCache; kwargs...)
 var(ce::RegimeAdjustedExpWeightedVariance; kwargs...)
 PortfolioOptimisers.merge_states(a::RegimeAdjustedVarianceCache, b::RegimeAdjustedVarianceCache)
+Base.copy(x::PortfolioOptimisers.RegimeAdjustedVarianceCache)
 ```

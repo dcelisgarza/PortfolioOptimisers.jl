@@ -30,12 +30,14 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 
   - `ce`: Recursively updated via [`factory`](@ref).
   - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+  - `cache`: Carried unchanged via [`factory`](@ref).
 
 ## View parameters
 
 When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
 
   - `ce`: Recursively viewed via [`port_opt_view`](@ref).
+  - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
 
 ## Observation weight parameters
 
@@ -43,6 +45,7 @@ When [`obs_weights_view`](@ref) is called on this type, the following fields are
 
   - `ce`: Recursively indexed via [`obs_weights_view`](@ref).
   - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).
+  - `cache`: Dropped via [`obs_weights_view`](@ref), because no slice of a state exists on the observation axis.
 
 # Examples
 
@@ -83,7 +86,7 @@ GeneralCovariance
     """
     $(field_dict[:pfcache])
     """
-    cache
+    @fprop @vprop cache
     function GeneralCovariance(ce::StatsBase.CovarianceEstimator, w::Option{<:ObsWeights},
                                cache::Option{<:AbstractPartialFitState})
         assert_nonempty_nonneg_finite_val(w, :w)
@@ -273,6 +276,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
   - `me`: Recursively updated via [`factory`](@ref).
   - `ce`: Recursively updated via [`factory`](@ref).
   - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+  - `cache`: Carried unchanged via [`factory`](@ref).
 
 ## View parameters
 
@@ -280,6 +284,7 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
 
   - `me`: Recursively viewed via [`port_opt_view`](@ref).
   - `ce`: Recursively viewed via [`port_opt_view`](@ref).
+  - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
 
 ## Observation weight parameters
 
@@ -288,6 +293,7 @@ When [`obs_weights_view`](@ref) is called on this type, the following fields are
   - `me`: Recursively indexed via [`obs_weights_view`](@ref).
   - `ce`: Recursively indexed via [`obs_weights_view`](@ref).
   - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).
+  - `cache`: Dropped via [`obs_weights_view`](@ref), because no slice of a state exists on the observation axis.
 
 # Examples
 
@@ -349,7 +355,7 @@ Covariance
     """
     $(field_dict[:pfcache])
     """
-    cache
+    @fprop @vprop cache
     function Covariance(me::AbstractExpectedReturnsEstimator,
                         ce::StatsBase.CovarianceEstimator, alg::AbstractMomentAlgorithm,
                         w::Option{<:ObsWeights}, cache::Option{<:AbstractPartialFitState})
@@ -736,6 +742,56 @@ function merge_states(a::CovarianceState, b::CovarianceState)
     assert_mergeable_states(a, b)
     n, mu, M = chan_merge(a.n, a.mu, a.M, b.n, b.mu, b.M)
     return CovarianceState(n, mu, M)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Copies a [`CovarianceState`](@ref), so the copy shares no array with the original.
+
+The `copy` method of the [`AbstractPartialFitState`](@ref) interface, which [`partial_fit`](@ref) calls before it folds. The count is a scalar and passes through, and the running mean and the co-moment accumulator are copied.
+
+# Arguments
+
+  - `x`: The state to copy.
+
+# Returns
+
+  - `state::CovarianceState`: A fresh state, equal to `x`, whose `mu` and `M` are fresh arrays.
+
+# Related
+
+  - [`CovarianceState`](@ref)
+  - [`partial_fit`](@ref)
+  - [`AbstractPartialFitState`](@ref)
+"""
+function Base.copy(x::CovarianceState)
+    return CovarianceState(x.n, copy(x.mu), copy(x.M))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Slices a [`CovarianceState`](@ref) to the selected assets.
+
+The Welford accumulator of one pair of assets reads those two assets' observations alone, and reads no third asset. So the slice of the state is the state of the sliced universe, entry for entry, and the count is shared by every asset and passes through. The slice copies by index and does not `view`: a later [`partial_fit!`](@ref) on the viewed estimator would otherwise write through into the arrays of the estimator the view was taken from.
+
+# Arguments
+
+  - `x`: The state to slice.
+  - `i`: Index or indices of the assets to keep.
+  - `args...`: Additional positional arguments (ignored).
+
+# Returns
+
+  - `state::CovarianceState`: The state of the same sample over the selected assets.
+
+# Related
+
+  - [`CovarianceState`](@ref)
+  - [`port_opt_view`](@ref)
+  - [`partial_fit!`](@ref)
+"""
+function port_opt_view(x::CovarianceState, i, args...)
+    return CovarianceState(x.n, x.mu[i], x.M[i, i])
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

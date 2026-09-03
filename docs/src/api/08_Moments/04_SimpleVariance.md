@@ -26,4 +26,6 @@ partial_fit!(ve::SimpleVariance, x::VecNum)
 variance_state_seed
 var(ve::SimpleVariance, state::SimpleVarianceState)
 merge_states(a::SimpleVarianceState, b::SimpleVarianceState)
+Base.copy(x::SimpleVarianceState)
+port_opt_view(x::SimpleVarianceState, i, args...)
 ```

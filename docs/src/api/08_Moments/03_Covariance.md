@@ -37,6 +37,8 @@ partial_fit!(ce::Covariance{<:Any, <:Any, <:FullMoment}, x::VecNum)
 partial_fit!(ce::Covariance, ::VecNum_MatNum; kwargs...)
 cov(ce::Union{<:GeneralCovariance, <:Covariance{<:Any, <:Any, <:FullMoment}}, state::CovarianceState)
 merge_states(a::CovarianceState, b::CovarianceState)
+Base.copy(x::CovarianceState)
+port_opt_view(x::CovarianceState, i, args...)
 covariance_state_seed
 partial_fit_corrected(ce::StatsBase.SimpleCovariance)
 partial_fit_corrected(ce::GeneralCovariance)

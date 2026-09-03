@@ -33,12 +33,14 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 
   - `me`: Recursively updated via [`factory`](@ref).
   - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+  - `cache`: Carried unchanged via [`factory`](@ref).
 
 ## View parameters
 
 When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
 
   - `me`: Recursively viewed via [`port_opt_view`](@ref).
+  - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
 
 ## Observation weight parameters
 
@@ -46,6 +48,7 @@ When [`obs_weights_view`](@ref) is called on this type, the following fields are
 
   - `me`: Recursively indexed via [`obs_weights_view`](@ref).
   - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).
+  - `cache`: Dropped via [`obs_weights_view`](@ref), because no slice of a state exists on the observation axis.
 
 # Examples
 
@@ -97,7 +100,7 @@ SimpleVariance
     """
     $(field_dict[:pfcache])
     """
-    cache
+    @fprop @vprop cache
     function SimpleVariance(me::Option{<:AbstractExpectedReturnsEstimator},
                             w::Option{<:ObsWeights}, corrected::Bool,
                             cache::Option{<:AbstractPartialFitState})
@@ -667,6 +670,56 @@ function merge_states(a::SimpleVarianceState, b::SimpleVarianceState)
     assert_mergeable_states(a, b)
     n, mu, M = chan_merge(a.n, a.mu, a.M, b.n, b.mu, b.M)
     return SimpleVarianceState(n, mu, M)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Copies a [`SimpleVarianceState`](@ref), so the copy shares no array with the original.
+
+The `copy` method of the [`AbstractPartialFitState`](@ref) interface, which [`partial_fit`](@ref) calls before it folds. The count is a scalar and passes through, and the running mean and the per-asset accumulator are copied.
+
+# Arguments
+
+  - `x`: The state to copy.
+
+# Returns
+
+  - `state::SimpleVarianceState`: A fresh state, equal to `x`, whose `mu` and `M` are fresh vectors.
+
+# Related
+
+  - [`SimpleVarianceState`](@ref)
+  - [`partial_fit`](@ref)
+  - [`AbstractPartialFitState`](@ref)
+"""
+function Base.copy(x::SimpleVarianceState)
+    return SimpleVarianceState(x.n, copy(x.mu), copy(x.M))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Slices a [`SimpleVarianceState`](@ref) to the selected assets.
+
+The Welford accumulator of one asset reads that asset's observations alone, and reads no other asset. So the slice of the state is the state of the sliced universe, entry for entry, and the count is shared by every asset and passes through. The slice copies by index and does not `view`: a later [`partial_fit!`](@ref) on the viewed estimator would otherwise write through into the arrays of the estimator the view was taken from.
+
+# Arguments
+
+  - `x`: The state to slice.
+  - `i`: Index or indices of the assets to keep.
+  - `args...`: Additional positional arguments (ignored).
+
+# Returns
+
+  - `state::SimpleVarianceState`: The state of the same sample over the selected assets.
+
+# Related
+
+  - [`SimpleVarianceState`](@ref)
+  - [`port_opt_view`](@ref)
+  - [`partial_fit!`](@ref)
+"""
+function port_opt_view(x::SimpleVarianceState, i, args...)
+    return SimpleVarianceState(x.n, x.mu[i], x.M[i])
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

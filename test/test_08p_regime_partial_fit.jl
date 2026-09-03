@@ -160,9 +160,62 @@ function of the two block states can put back what neither of them recorded.
     @test_throws DimensionMismatch PO.merge_states(a, partial_fit!(ce, X[:, 1:3]).cache)
 end
 
-@testset "the seam adds one name to the public surface" begin
+@testset "the seam adds two names to the public surface" begin
     @test Base.isexported(PO, :partial_fit!)
+    @test Base.isexported(PO, :partial_fit)
     for name in (:AbstractPartialFitState, :RegimeAdjustedVarianceCache, :merge_states)
         @test !Base.isexported(PO, name)
     end
+end
+
+@testset "the cache copies without aliasing" begin
+    # This family refuses `merge_states` and answers `copy`. The two are independent: the
+    # merge asks whether two blocks fold into one, and the copy asks only that a fold on one
+    # estimator leaves another alone. ADR 0107.
+    X = randn(StableRNG(987654321), 37, 3)
+    for lags in (nothing, 3)
+        ce = partial_fit!(RegimeAdjustedExpWeightedVariance(; hac_lags = lags), X)
+        state = ce.cache
+        twin = copy(state)
+        @test typeof(twin) === typeof(state)
+        @test twin !== state
+        @test twin.regime_state == state.regime_state
+        @test twin.n_regime_obs == state.n_regime_obs
+        # `z2` and `location` hold `NaN` for an asset that is not ready, so the comparison
+        # is `isequal` rather than `==`.
+        for name in fieldnames(typeof(state))
+            a = getfield(state, name)
+            b = getfield(twin, name)
+            if isa(a, AbstractArray)
+                @test isequal(a, b)
+                @test a !== b
+            end
+        end
+        # The copy reads out the same variance the original does.
+        @test isequal(var(ce), var(ce, twin))
+    end
+
+    # The circular buffer is rebuilt at the same capacity, and each observation it holds is
+    # copied into it, so a fold on the copy pushes into a buffer of its own.
+    ce = partial_fit!(RegimeAdjustedExpWeightedVariance(; hac_lags = 3), X)
+    b0 = ce.cache.ret_buffer
+    b1 = copy(ce.cache).ret_buffer
+    @test b1 !== b0
+    @test length(b1) == length(b0)
+    @test PO.DataStructures.capacity(b1) == PO.DataStructures.capacity(b0)
+    @test all(isequal(x, y) for (x, y) in zip(b0, b1))
+    @test !any(x === y for (x, y) in zip(b0, b1))
+    # The estimator that runs no HAC correction carries no buffer, and the copy carries none.
+    @test isnothing(copy(partial_fit!(RegimeAdjustedExpWeightedVariance(), X).cache).ret_buffer)
+
+    # The value form folds a copy, so the estimator handed over reads what it read before.
+    warm = partial_fit!(RegimeAdjustedExpWeightedVariance(), view(X, 1:20, :))
+    kept = var(warm)
+    fitted = partial_fit(warm, X[21:end, :])
+    @test isequal(var(warm), kept)
+    @test warm.cache !== fitted.cache
+    @test isequal(var(fitted), var(partial_fit!(RegimeAdjustedExpWeightedVariance(), X)))
+
+    # No slice of a state exists on the observation axis, so the root drops it.
+    @test isnothing(PO.obs_weights_view(warm.cache, 1:10))
 end

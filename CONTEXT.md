@@ -22,6 +22,7 @@ A plain data struct holding the computed output of a function applied to an Esti
 
 **Partial Fit State**
 The running quantities an incremental fit keeps between calls — the observation count, the mean and the second-moment accumulator — so one more observation folds into an estimate without the sample being read again. It is a Result that no consumer reads: a read-out verb turns a state into the ordinary Result first. This is the one kind of Result an Estimator holds, in a field bound to `Union{Nothing, <:AbstractPartialFitState}`, and ADR 0106 records the exception.
+Two verbs fold observations into it, and ADR 0107 records what each promises. `partial_fit!` is the method each family writes, and it is that family's cheapest exact fold; it writes into the arrays of the state where it can, and it promises nothing about an Estimator the caller kept from before the call. `partial_fit` is one generic method with value semantics: it copies the state and folds the copy, so the Estimator handed over reads what it read before. Every state answers `merge_states` and `copy`.
 *Avoid*: Cache (a cache may be dropped without changing an answer, and a state may not).
 
 **State Merge**

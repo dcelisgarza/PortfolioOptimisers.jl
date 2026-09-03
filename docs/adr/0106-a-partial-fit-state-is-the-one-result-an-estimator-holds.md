@@ -65,6 +65,12 @@ observation count. A block fitted from a cold start therefore skips its own firs
 observations of the regime state, and no function of the two block states can put back what neither
 of them recorded. The family's route is a sequential `partial_fit!`, which is exact.
 
+**Every state also answers `Base.copy`.** A fresh state whose arrays alias none of the arrays of
+the original is what gives the seam's value-form verb its promise.
+[ADR 0107](0107-the-update-seam-has-two-verbs-and-a-view-slices-by-asset-and-drops-by-observation.md)
+records that verb and its contract, and states this method's rule: the family names its own
+constructor, the way the prior carriers name theirs.
+
 **The verb is `merge_states`, not `Base.merge`.** `Base.merge` on a `Dict` and on a `NamedTuple`
 means that the right operand wins a key conflict. This merge is a sum, so the borrowed name would
 state the wrong contract. The repository's own idiom settles it too: `merge_linear_constraints`
@@ -80,9 +86,10 @@ the shape, so it moves under the root that names what it is.
   exception at the same time.
 - `CONTEXT.md` gains the two terms the seam introduces: Partial Fit State, and the merge of two
   states.
-- A new state struct owes exactly one method, `merge_states`, and the interface section of the
-  `AbstractPartialFitState` docstring states it. The method is the fold when the statistic is a sum
-  of blocks, and a refusal naming the reason when it is not.
+- A new state struct owes exactly two methods, `merge_states` and `Base.copy`, and the interface
+  section of the `AbstractPartialFitState` docstring states both. The merge is the fold when the
+  statistic is a sum of blocks, and a refusal naming the reason when it is not. ADR 0107 owns the
+  `copy` rule and the verbs that call it.
 - The exception is closed. A field of any other Result type on an Estimator is still refused, and
   the type bound is what refuses it. Widening the bound is what a reviewer looks for.
 - `RegimeAdjustedVarianceCache` changes supertype. It is unexported and no doctest renders its
