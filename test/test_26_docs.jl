@@ -1332,8 +1332,8 @@ in the sense of `STANDARDS.md`.
                     # One quantity under two glyphs, ``s_{c1}`` and ``s_c``. A merge
                     # candidate: the entropy pooling optimiser states its own scale.
                     "constraint scale" => [:ep_sc1, :sc_scale],
-                    # Six counts of six different things.
-                    "number" => [:N, :T, :k_tail_count, :n_network, :sigma_st_i_paths,
+                    # Seven counts of seven different things.
+                    "number" => [:K, :N, :T, :k_tail_count, :n_network, :sigma_st_i_paths,
                                  :sigma_st_paths],
                     # As `constraint scale`, and the same merge candidate.
                     "objective scale" => [:ep_so, :so_scale],

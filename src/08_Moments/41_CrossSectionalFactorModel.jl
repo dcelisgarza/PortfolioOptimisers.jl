@@ -250,7 +250,8 @@ The result is the cross-sectional member of [`AbstractLoadingsRegressionResult`]
 
 ```math
 \\begin{align}
-\\boldsymbol{x}_{t} &= \\boldsymbol{b} + \\mathbf{M}_{t} \\boldsymbol{f}_{t} + \\boldsymbol{\\varepsilon}_{t}\\,, \\\\
+\\boldsymbol{x}_{t} &= b_{t} \\boldsymbol{1} + \\mathbf{M}_{t} \\boldsymbol{f}_{t} + \\boldsymbol{\\varepsilon}_{t}\\,, \\\\
+\\boldsymbol{\\mu} &= \\mathbf{M} \\boldsymbol{\\mu}_{f} + \\boldsymbol{b}\\,, \\\\
 \\mathbf{M} &= \\mathbf{M}_{T}\\,.
 \\end{align}
 ```
@@ -258,13 +259,17 @@ The result is the cross-sectional member of [`AbstractLoadingsRegressionResult`]
 Where:
 
   - $(math_dict[:x_t_obs])
-  - ``\\boldsymbol{b}``: Factor-orthogonal expected return ``N \\times 1``, `b`. It is the part of the expected return the factors do not span.
+  - ``b_{t}``: Intercept of observation ``t``, the ``t``-th entry of the intercept vector [`CrossSectionalRegression`](@ref) carries. The term is absent when the fit carries no intercept.
+  - ``\\boldsymbol{1}``: Vector of ones ``N \\times 1``.
   - ``\\mathbf{M}_{t}``: Exposure slice of observation ``t``, ``N \\times K``, the ``t``-th slice of `Ms`.
-  - ``\\mathbf{M}``: Loadings matrix ``N \\times K`` of the factor model, `M`. It is the last slice of the exposure history.
   - ``\\boldsymbol{f}_{t}``: Factor returns of observation ``t``, on the axis of ``\\mathbf{M}_{t}``.
-  - ``\\boldsymbol{\\varepsilon}_{t}``: Idiosyncratic returns of observation ``t``, the part of ``\\boldsymbol{x}_{t}`` the factors do not explain.
+  - ``\\boldsymbol{\\varepsilon}_{t}``: Idiosyncratic returns of observation ``t``, the part of ``\\boldsymbol{x}_{t}`` the exposures and the intercept do not explain.
+  - $(math_dict[:mu_er])
+  - ``\\boldsymbol{\\mu}_{f}``: Expected factor returns ``K \\times 1``. A factor prior carries it, and this result does not.
+  - ``\\boldsymbol{b}``: Factor-orthogonal expected return ``N \\times 1``, `b`. It is the part of ``\\boldsymbol{\\mu}`` the factors do not span, so it is a term of the expected return and never a term of one observation.
+  - ``\\mathbf{M}``: Loadings matrix ``N \\times K`` of the factor model, `M`. It is the last slice of the exposure history.
   - $(math_dict[:N])
-  - ``K``: Number of factors.
+  - $(math_dict[:K])
   - $(math_dict[:T])
 
 # Fields
@@ -360,7 +365,7 @@ CrossSectionalFactorModel
     """
     csr
     """
-    Exposure history `observations × assets × factors`. Its last slice is the loadings matrix `M`.
+    Exposure history `observations × assets × factors`. Its last slice is the loadings matrix `M`. The constructor checks the two axes it shares with `M` and never the entries, so a caller that builds both keeps them in step itself.
     """
     Ms
     """

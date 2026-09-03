@@ -986,6 +986,7 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        :x_t_obs => "``\\boldsymbol{x}_t``: Asset returns for observation ``t``, the ``t``-th row of the returns matrix.",#
                        :w_t_obs => "``w_{t}``: Observation weight of observation ``t``.",#
                        :N => "``N``: Number of assets.",#
+                       :K => "``K``: Number of factors.",#
                        # Sample moments of the returns matrix.
                        :r_tj => "``r_{tj}``: Return of asset ``j`` at time ``t``.",#
                        :mu_hat_j => "``\\hat{\\mu}_j``: Estimated mean of asset ``j``.",#

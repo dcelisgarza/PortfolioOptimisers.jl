@@ -1010,7 +1010,7 @@ Where:
   - ``\\boldsymbol{f}_{t}``: Factor returns for observation ``t``, the ``t``-th row of the factor matrix.
   - ``\\boldsymbol{\\varepsilon}_{t}``: Residual returns for observation ``t``, the part of ``\\boldsymbol{x}_{t}`` the factors do not explain.
   - $(math_dict[:N])
-  - ``K``: Number of factors.
+  - $(math_dict[:K])
 
 # Fields
 

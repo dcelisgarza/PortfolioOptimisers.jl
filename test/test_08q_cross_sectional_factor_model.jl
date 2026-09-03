@@ -198,6 +198,32 @@ absent together.
         @test v.rw == rw[:, [2, 3]]
     end
 
+    @testset "The realised identity carries the intercept of the fit, not b" begin
+        # `# Mathematical definition` states two equations, and the first one is measurable.
+        # A fit of real numbers reproduces `x_t = b_t 1 + M_t f_t + eps_t`, where `b_t` is
+        # the intercept of observation `t`. The per-asset `b` of the model is a term of the
+        # expected return, so it never closes this identity. The docstring stated `b` in
+        # that place until issue #715 measured the residue.
+        rng = StableRNG(987654321)
+        To, No, Ko = 6, 5, 2
+        Z = randn(rng, To, No, Ko)
+        Xr = randn(rng, To, No) ./ 20
+        Wr = fill(1.0, To, No)
+        fit = cross_sectional_regression(CrossSectionalLinearRegression(; intercept = true),
+                                         Z, Xr, Wr)
+        csfm = CrossSectionalFactorModel(; M = Z[end, :, :], b = randn(rng, No) ./ 100,
+                                         csr = fit, Ms = Z)
+        # The loadings are the last slice of the exposure history.
+        @test csfm.M == csfm.Ms[end, :, :]
+        for t in 1:To
+            r = Xr[t, :] - csfm.Ms[t, :, :] * fit.f[t, :] - fit.eps[t, :]
+            # The residue of the identity is one number repeated across the assets.
+            @test all(x -> isapprox(x, fit.b[t]; atol = 1e-12), r)
+            # It is the intercept of the fit, and not the factor-orthogonal expected return.
+            @test !isapprox(r, csfm.b)
+        end
+    end
+
     @testset "The model is a loadings result the verbs already reach" begin
         csfm = full_model()
         @test isa(csfm, PortfolioOptimisers.AbstractLoadingsRegressionResult)

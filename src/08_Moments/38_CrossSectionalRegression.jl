@@ -126,7 +126,7 @@ Where:
   - ``w_{t,i} \\geq 0``: Cross-sectional weight of asset ``i`` at observation ``t``. A weight of zero excludes the pair from the fit.
   - ``b_{t}``: Intercept of observation ``t``, the ``t``-th entry of `b`. The term is absent when `b` is unset.
   - $(math_dict[:N])
-  - ``K``: Number of factors.
+  - $(math_dict[:K])
 
 Each observation is one independent problem, so a factor return is a cross-sectional quantity and never a time-series one.
 
