@@ -77,6 +77,7 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/08_Moments/37_RegimeAdjustedExpWeightedCovariance.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/38_CrossSectionalRegression.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/39_CrossSectionalWeights.jl" = { raw = 0, reviewed = 0 }
+"src/08_Moments/40_HigherMomentPartialFit.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/01_Base_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/02_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/03_DistanceDistance.jl" = { raw = 0, reviewed = 0 }
@@ -315,6 +316,7 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/08_Moments/37_RegimeAdjustedExpWeightedCovariance.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/38_CrossSectionalRegression.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/39_CrossSectionalWeights.jl" = { raw = 0, reviewed = 0 }
+"src/08_Moments/40_HigherMomentPartialFit.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/01_Base_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/02_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/03_DistanceDistance.jl" = { raw = 0, reviewed = 0 }
@@ -553,6 +555,7 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/08_Moments/37_RegimeAdjustedExpWeightedCovariance.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/38_CrossSectionalRegression.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/39_CrossSectionalWeights.jl" = { raw = 0, reviewed = 0 }
+"src/08_Moments/40_HigherMomentPartialFit.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/01_Base_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/02_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/03_DistanceDistance.jl" = { raw = 0, reviewed = 0 }

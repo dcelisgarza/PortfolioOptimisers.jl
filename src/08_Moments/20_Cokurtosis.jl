@@ -126,7 +126,8 @@ $(DocStringExtensions.FIELDS)
         me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
         mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
         alg::AbstractMomentAlgorithm = FullMoment(),
-        w::Option{<:ObsWeights} = nothing
+        w::Option{<:ObsWeights} = nothing,
+        cache::Option{<:AbstractPartialFitState} = nothing
     ) -> Cokurtosis
 
 Keywords correspond to the struct's fields.
@@ -160,18 +161,19 @@ When [`obs_weights_view`](@ref) is called on this type, the following fields are
 ```jldoctest
 julia> Cokurtosis()
 Cokurtosis
-   me ┼ SimpleExpectedReturns
-      │   w ┴ nothing
-   mp ┼ MatrixProcessing
-      │     pdm ┼ Posdef
-      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │      dn ┼ nothing
-      │      dt ┼ nothing
-      │     alg ┼ nothing
-      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-  alg ┼ FullMoment()
-    w ┴ nothing
+     me ┼ SimpleExpectedReturns
+        │   w ┴ nothing
+     mp ┼ MatrixProcessing
+        │     pdm ┼ Posdef
+        │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+        │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+        │      dn ┼ nothing
+        │      dt ┼ nothing
+        │     alg ┼ nothing
+        │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+    alg ┼ FullMoment()
+      w ┼ nothing
+  cache ┴ nothing
 ```
 
 # Related
@@ -206,18 +208,25 @@ Cokurtosis
     $(field_dict[:oow])
     """
     @wprop w
+    """
+    $(field_dict[:pfcache])
+    """
+    cache
     function Cokurtosis(me::AbstractExpectedReturnsEstimator,
                         mp::AbstractMatrixProcessingEstimator, alg::AbstractMomentAlgorithm,
-                        w::Option{<:ObsWeights})
+                        w::Option{<:ObsWeights}, cache::Option{<:AbstractPartialFitState})
         assert_nonempty_nonneg_finite_val(w, :w)
-        return new{typeof(me), typeof(mp), typeof(alg), typeof(w)}(me, mp, alg, w)
+        return new{typeof(me), typeof(mp), typeof(alg), typeof(w), typeof(cache)}(me, mp,
+                                                                                  alg, w,
+                                                                                  cache)
     end
 end
 function Cokurtosis(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                     mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                     alg::AbstractMomentAlgorithm = FullMoment(),
-                    w::Option{<:ObsWeights} = nothing)::Cokurtosis
-    return Cokurtosis(me, mp, alg, w)
+                    w::Option{<:ObsWeights} = nothing,
+                    cache::Option{<:AbstractPartialFitState} = nothing)::Cokurtosis
+    return Cokurtosis(me, mp, alg, w, cache)
 end
 """
     _cokurtosis(X::MatNum, mp::AbstractMatrixProcessingEstimator, w::Option{<:ObsWeights}) -> MatNum
