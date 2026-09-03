@@ -1,6 +1,6 @@
 # Base
 
-[`src/01_Base/`](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/src/01_Base) implements the most basal symbols used in `PortfolioOptimisers.jl`. One file per concept: the docstring dictionaries, the type roots, the pretty-show macro, the `ScopedConfig` holders, the load-time preferences, the message builders, the error hierarchy, the type aliases, the observation weights, the `assert_*` family, `VecScalar`, the `NormError` family and the Kaniadakis logarithm.
+[`src/01_Base/`](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/src/01_Base) implements the most basal symbols used in `PortfolioOptimisers.jl`. One file per concept: the docstring dictionaries, the type roots, the pretty-show macro, the `ScopedConfig` holders, the load-time preferences, the message builders, the error hierarchy, the type aliases, the observation weights, the `assert_*` family, `VecScalar`, the `NormError` family, the Kaniadakis logarithm and the partial-fit state seam.
 
 ```@docs
 PortfolioOptimisers
@@ -212,6 +212,17 @@ field_dict
 math_dict
 err_name_dict
 ref_dict
+```
+
+## Partial fit
+
+An incremental fit folds one observation into an estimate without reading the sample again. Its running quantities live in a [`AbstractPartialFitState`](@ref), and [`merge_states`](@ref) combines the states of two disjoint blocks of observations into the state of the concatenated block.
+
+```@docs
+PortfolioOptimisers.AbstractPartialFitState
+PortfolioOptimisers.merge_states
+PortfolioOptimisers.assert_mergeable_states
+PortfolioOptimisers.chan_merge
 ```
 
 ## Iteration and indexing

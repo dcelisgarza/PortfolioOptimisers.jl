@@ -1194,6 +1194,7 @@ The `const` definition below is the single source of truth. A key must appear on
 const ref_dict = unique_key_dict(:ref_dict,
                                  :brinson_attribution => "[brinson_attribution](@cite) G. P. Brinson and N. Fachler. *Measuring non-US. equity portfolio performance*. The Journal of Portfolio Management 11, 73–76 (1985).",#
                                  :bergstra2012 => "[bergstra2012](@cite) J. Bergstra and Y. Bengio. *Random search for hyper-parameter optimization*. Journal of Machine Learning Research 13, 281–305 (2012).",#
+                                 :chan1983 => "[chan1983](@cite) T. F. Chan, G. H. Golub and R. J. LeVeque. *Algorithms for computing the sample variance: Analysis and recommendations*. The American Statistician 37, 242–247 (1983).",#
                                  :DBHTs => "[DBHTs](@cite) W.-M. Song, T. Di Matteo and T. Aste. *Hierarchical information clustering by means of topologically embedded graphs*. PloS one 7, e31929 (2012).",#
                                  :drcvar => "[drcvar](@cite) P. Mohajerin Esfahani and D. Kuhn. *Data-driven distributionally robust optimization using the Wasserstein metric: performance guarantees and tractable reformulations*. Mathematical Programming 171, 115–166 (2018).",#
                                  :freedman1981 => "[freedman1981](@cite) D. Freedman and P. Diaconis. *On the histogram as a density estimator: L2 theory*. Zeitschrift für Wahrscheinlichkeitstheorie und verwandte Gebiete 57, 453–476 (1981).",#

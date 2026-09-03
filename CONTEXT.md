@@ -20,6 +20,13 @@ An Algorithm that carries no field, and whose only job is to name the branch a c
 **Result**
 A plain data struct holding the computed output of a function applied to an Estimator: *the answer for the input it was computed on*. Never callable.
 
+**Partial Fit State**
+The running quantities an incremental fit keeps between calls — the observation count, the mean and the second-moment accumulator — so one more observation folds into an estimate without the sample being read again. It is a Result that no consumer reads: a read-out verb turns a state into the ordinary Result first. This is the one kind of Result an Estimator holds, in a field bound to `Union{Nothing, <:AbstractPartialFitState}`, and ADR 0106 records the exception.
+*Avoid*: Cache (a cache may be dropped without changing an answer, and a state may not).
+
+**State Merge**
+The combination of two Partial Fit States fitted on disjoint blocks of observations into the state of the concatenated block, under the verb `merge_states`. It is a sum rather than a right-operand-wins overwrite, which is why the verb is not `Base.merge`, and it is what makes an incremental fit parallel and associative: a sample split into any set of disjoint blocks gives the state of the whole sample, whatever order the blocks are folded in.
+
 **Choice Surface**
 The set of things a caller picks when specifying a problem: every concrete type the package declares that is a leaf Estimator, a leaf Algorithm, a leaf `AbstractCovarianceEstimator`, or an export under its own name. Results and errors are what comes back, never what is chosen, so they are not on it. `AbstractCovarianceEstimator` is named on its own because it descends from `StatsBase.CovarianceEstimator` rather than from Estimator, and the export rule catches whatever family takes a root nothing here names.
 

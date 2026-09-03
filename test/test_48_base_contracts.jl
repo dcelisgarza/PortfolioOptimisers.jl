@@ -5,7 +5,8 @@ Every claim below is computed and compared, never read. The file's other units a
 where they are used: the equation and resource caps, the preference channel and the
 suggestion threshold in `test_02_equation_parsing.jl`, and `failed_solve_msg` in
 `test_01_structs.jl`. What is left is the compact-show contract, the `ScopedConfig` restore
-path, the message builders, the iteration protocol and the norm seam.
+path, the message builders, the iteration protocol, the norm seam and the partial-fit
+state seam.
 =#
 using PortfolioOptimisers, Test, Clustering, JuMP, StableRNGs, StatsBase
 using PortfolioOptimisers: @define_pretty_show, compact_show_budget,
@@ -54,6 +55,43 @@ show_fields(::PSHook) = (:keep,)
 # A `DynamicAbstractWeights` with no `get_observation_weights` method of its own. The whole
 # point of the type is that the unimplemented shape raises rather than computing unweighted.
 struct NoWeightsProbe <: PortfolioOptimisers.DynamicAbstractWeights end
+
+# Three partial-fit state probes. `PFSBare` implements nothing, so it reaches the generic
+# `merge_states` that names the method its family owes. `PFSOther` is a second struct, so a pair
+# drawn from both is a type mismatch. `PFSFull` implements the interface the way a shipped state
+# will: it calls `assert_mergeable_states` first, refuses the mismatch its own family adds, and
+# folds the triple with `chan_merge`.
+struct PFSBare <: PortfolioOptimisers.AbstractPartialFitState
+    n::Int
+    mu::Vector{Float64}
+    M::Vector{Float64}
+end
+struct PFSOther <: PortfolioOptimisers.AbstractPartialFitState
+    n::Int
+end
+struct PFSFull <: PortfolioOptimisers.AbstractPartialFitState
+    decay::Float64
+    n::Int
+    mu::Vector{Float64}
+    M::Matrix{Float64}
+end
+function PortfolioOptimisers.merge_states(a::PFSFull, b::PFSFull)
+    PortfolioOptimisers.assert_mergeable_states(a, b)
+    if a.decay != b.decay
+        throw(ArgumentError("two states of different decay cannot be merged, but `a` has $(a.decay) and `b` has $(b.decay)."))
+    end
+    n, mu, M = PortfolioOptimisers.chan_merge(a.n, a.mu, a.M, b.n, b.mu, b.M)
+    return PFSFull(a.decay, n, mu, M)
+end
+
+# The batch state of `X`, so a merged state is compared against the state the whole block gives.
+# `M` is the accumulator, not the covariance, so nothing is divided by a count.
+function batch_state(X)
+    n = size(X, 1)
+    mu = vec(sum(X; dims = 1)) / n
+    D = X .- transpose(mu)
+    return n, mu, transpose(D) * D
+end
 
 render(f) = (io = IOBuffer(); f(io); String(take!(io)))
 
@@ -584,4 +622,144 @@ end
     # already the weights.
     @test isnothing(pe.get_observation_weights(nothing, ones(3, 10)))
     @test pe.get_observation_weights([1.0, 2.0]) == [1.0, 2.0]
+end
+
+@testset "A partial-fit state is a Result under its own root" begin
+    pe = PortfolioOptimisers
+    # The root buys the length-1 iteration protocol and the pretty show, so it sits under
+    # `AbstractResult` and neither `Union` of the protocol moves.
+    @test pe.AbstractPartialFitState <: pe.AbstractResult
+    @test supertype(pe.RegimeAdjustedVarianceCache) === pe.AbstractPartialFitState
+    s = PFSOther(3)
+    @test length(s) == 1
+    @test s[1] === s
+    @test collect(s) == [s]
+    # The root is not exported. The seam's whole public surface is `partial_fit!`, which the
+    # estimator tickets add, so nothing here reaches a caller by its bare name.
+    @test !(:AbstractPartialFitState in names(PortfolioOptimisers))
+    @test !(:merge_states in names(PortfolioOptimisers))
+    @test !(:chan_merge in names(PortfolioOptimisers))
+    @test !(:assert_mergeable_states in names(PortfolioOptimisers))
+end
+@testset "assert_mergeable_states names the mismatch it refuses" begin
+    pe = PortfolioOptimisers
+    a = PFSBare(2, [1.0, 2.0], [0.5, 0.5])
+    # A pair of one struct over one asset count passes, and returns nothing.
+    @test isnothing(pe.assert_mergeable_states(a, PFSBare(3, [2.0, 3.0], [1.0, 1.0])))
+    # Two different structs. The message names both types, so the reader sees which pair was
+    # handed over rather than only that a pair was refused.
+    terr = try
+        pe.assert_mergeable_states(a, PFSOther(1))
+        nothing
+    catch e
+        e
+    end
+    @test terr isa ArgumentError
+    @test occursin("different types cannot be merged", terr.msg)
+    @test occursin("PFSBare", terr.msg)
+    @test occursin("PFSOther", terr.msg)
+    # One struct, two asset counts. The message names the field that disagrees and both shapes.
+    derr = try
+        pe.assert_mergeable_states(a, PFSBare(3, [1.0, 2.0, 3.0], [1.0, 1.0, 1.0]))
+        nothing
+    catch e
+        e
+    end
+    @test derr isa DimensionMismatch
+    @test occursin("different numbers of assets", derr.msg)
+    @test occursin("`mu`", derr.msg)
+    @test occursin("(2,)", derr.msg)
+    @test occursin("(3,)", derr.msg)
+end
+@testset "chan_merge reproduces the batch state, and is associative" begin
+    pe = PortfolioOptimisers
+    rng = StableRNG(987654321)
+    X = randn(rng, 30, 4)
+    # The three shapes the merge takes. `M` is a matrix for a co-moment, a vector for a per-asset
+    # moment, and a scalar for one series, and the outer product degenerates to a square each time.
+    nA, muA, MA = batch_state(view(X, 1:12, :))
+    nB, muB, MB = batch_state(view(X, 13:30, :))
+    n, mu, M = pe.chan_merge(nA, muA, MA, nB, muB, MB)
+    nX, muX, MX = batch_state(X)
+    @test n == nX
+    @test isapprox(mu, muX; rtol = 1e-12)
+    @test isapprox(M, MX; rtol = 1e-12)
+    # A per-asset accumulator is the diagonal of the co-moment one, so the vector method and the
+    # matrix method answer the same numbers over the same blocks.
+    nv, muv, Mv = pe.chan_merge(nA, muA, [MA[i, i] for i in axes(MA, 1)], nB, muB,
+                                [MB[i, i] for i in axes(MB, 1)])
+    @test nv == nX
+    @test isapprox(muv, muX; rtol = 1e-12)
+    @test isapprox(Mv, [MX[i, i] for i in axes(MX, 1)]; rtol = 1e-12)
+    # One series. Every operand is a scalar and the merge stays scalar.
+    x = view(X, :, 1)
+    ns, mus, Ms = pe.chan_merge(12, StatsBase.mean(view(x, 1:12)),
+                                sum(abs2, view(x, 1:12) .- StatsBase.mean(view(x, 1:12))),
+                                18, StatsBase.mean(view(x, 13:30)),
+                                sum(abs2, view(x, 13:30) .- StatsBase.mean(view(x, 13:30))))
+    @test ns == 30
+    @test isapprox(mus, StatsBase.mean(x); rtol = 1e-12)
+    @test isapprox(Ms, sum(abs2, x .- StatsBase.mean(x)); rtol = 1e-12)
+    # Associativity is the property that makes a parallel fit legal: three disjoint blocks give
+    # one state whatever order they are folded in.
+    s1 = batch_state(view(X, 1:7, :))
+    s2 = batch_state(view(X, 8:19, :))
+    s3 = batch_state(view(X, 20:30, :))
+    l = pe.chan_merge(pe.chan_merge(s1..., s2...)..., s3...)
+    r = pe.chan_merge(s1..., pe.chan_merge(s2..., s3...)...)
+    @test l[1] == r[1]
+    @test isapprox(l[2], r[2]; rtol = 1e-12)
+    @test isapprox(l[3], r[3]; rtol = 1e-12)
+    # The merge divides by the total count, so two empty blocks are refused rather than answered
+    # with NaN. This is a domain check on a count, not a tolerance.
+    @test_throws DomainError pe.chan_merge(0, [0.0], [0.0], 0, [0.0], [0.0])
+    @test_throws DomainError pe.chan_merge(0, [0.0], zeros(1, 1), 0, [0.0], zeros(1, 1))
+end
+@testset "merge_states names the method a family still owes" begin
+    pe = PortfolioOptimisers
+    # The generic method is reached only by a pair no family answers. It refuses the pair that
+    # cannot merge at all first, so a type mismatch reads as a type mismatch.
+    terr = try
+        pe.merge_states(PFSBare(1, [1.0], [0.0]), PFSOther(1))
+        nothing
+    catch e
+        e
+    end
+    @test terr isa ArgumentError
+    @test occursin("different types cannot be merged", terr.msg)
+    # A mergeable pair whose family wrote no method names the method to write.
+    merr = try
+        pe.merge_states(PFSBare(1, [1.0], [0.0]), PFSBare(2, [2.0], [1.0]))
+        nothing
+    catch e
+        e
+    end
+    @test merr isa ArgumentError
+    @test occursin("PFSBare is an AbstractPartialFitState with no `merge_states` method",
+                   merr.msg)
+    @test occursin("merge_states(a::PFSBare, b::PFSBare)", merr.msg)
+    # A family that implements the interface reaches its own method, and the generic one never
+    # runs. The route is the one a shipped state takes: guard, family guard, fold.
+    rng = StableRNG(24680)
+    X = randn(rng, 20, 3)
+    nA, muA, MA = batch_state(view(X, 1:8, :))
+    nB, muB, MB = batch_state(view(X, 9:20, :))
+    a = PFSFull(0.94, nA, muA, MA)
+    b = PFSFull(0.94, nB, muB, MB)
+    s = pe.merge_states(a, b)
+    nX, muX, MX = batch_state(X)
+    @test s isa PFSFull
+    @test s.n == nX
+    @test isapprox(s.mu, muX; rtol = 1e-12)
+    @test isapprox(s.M, MX; rtol = 1e-12)
+    # The decay refusal the family adds runs after the generic guard, so a decay mismatch over
+    # one asset count is the message the family wrote.
+    derr = try
+        pe.merge_states(a, PFSFull(0.97, nB, muB, MB))
+        nothing
+    catch e
+        e
+    end
+    @test derr isa ArgumentError
+    @test occursin("different decay cannot be merged", derr.msg)
 end

@@ -11,7 +11,7 @@ commit = "8787635a8f"
 [file]
 "ext/PortfolioOptimisersImputeExt.jl" = { code = 6, doc = 0, comment = 3, blank = 3, total = 12 }
 "ext/PortfolioOptimisersPlotsExt.jl" = { code = 1963, doc = 0, comment = 129, blank = 41, total = 2133 }
-"src/01_Base/01_DocstringDictionaries.jl" = { code = 1068, doc = 113, comment = 120, blank = 43, total = 1344 }
+"src/01_Base/01_DocstringDictionaries.jl" = { code = 1069, doc = 113, comment = 120, blank = 43, total = 1345 }
 "src/01_Base/02_TypeRoots.jl" = { code = 13, doc = 157, comment = 0, blank = 61, total = 231 }
 "src/01_Base/03_PrettyShow.jl" = { code = 107, doc = 102, comment = 0, blank = 58, total = 267 }
 "src/01_Base/04_ScopedConfig.jl" = { code = 133, doc = 401, comment = 2, blank = 180, total = 716 }
@@ -24,6 +24,7 @@ commit = "8787635a8f"
 "src/01_Base/11_VecScalar.jl" = { code = 16, doc = 46, comment = 0, blank = 20, total = 82 }
 "src/01_Base/12_NormError.jl" = { code = 106, doc = 313, comment = 0, blank = 129, total = 548 }
 "src/01_Base/13_KappaLog.jl" = { code = 3, doc = 36, comment = 0, blank = 18, total = 57 }
+"src/01_Base/14_PartialFit.jl" = { code = 37, doc = 87, comment = 0, blank = 45, total = 169 }
 "src/02_Tools.jl" = { code = 808, doc = 2044, comment = 46, blank = 867, total = 3765 }
 "src/03_InputData/01_AssetPanel.jl" = { code = 175, doc = 411, comment = 0, blank = 190, total = 776 }
 "src/03_InputData/02_AssetPanelBuilder.jl" = { code = 330, doc = 697, comment = 2, blank = 316, total = 1345 }

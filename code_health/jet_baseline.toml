@@ -29,6 +29,7 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/01_Base/11_VecScalar.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/12_NormError.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/13_KappaLog.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/14_PartialFit.jl" = { raw = 0, reviewed = 0 }
 "src/02_Tools.jl" = { raw = 10, reviewed = 10 }
 "src/03_InputData/01_AssetPanel.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/02_AssetPanelBuilder.jl" = { raw = 0, reviewed = 0 }
@@ -266,6 +267,7 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/01_Base/11_VecScalar.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/12_NormError.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/13_KappaLog.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/14_PartialFit.jl" = { raw = 0, reviewed = 0 }
 "src/02_Tools.jl" = { raw = 1, reviewed = 1 }
 "src/03_InputData/01_AssetPanel.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/02_AssetPanelBuilder.jl" = { raw = 0, reviewed = 0 }
@@ -503,6 +505,7 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/01_Base/11_VecScalar.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/12_NormError.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/13_KappaLog.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/14_PartialFit.jl" = { raw = 0, reviewed = 0 }
 "src/02_Tools.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/01_AssetPanel.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/02_AssetPanelBuilder.jl" = { raw = 0, reviewed = 0 }

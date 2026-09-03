@@ -507,7 +507,7 @@ $(DocStringExtensions.FIELDS)
 
   - [`RegimeAdjustedExpWeightedVariance`](@ref)
 """
-@concrete struct RegimeAdjustedVarianceCache <: AbstractResult
+@concrete struct RegimeAdjustedVarianceCache <: AbstractPartialFitState
     """
     $(field_dict[:ret_buffer])
     """

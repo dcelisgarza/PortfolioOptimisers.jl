@@ -23,6 +23,7 @@ commit = "dd069231d0"
 "src/01_Base/11_VecScalar.jl" = { cyc = 1, cog = 1, arg = 2, cyc_sum = 2, cog_sum = 1, arg_sum = 4, macros = [] }
 "src/01_Base/12_NormError.jl" = { cyc = 2, cog = 2, arg = 4, cyc_sum = 28, cog_sum = 6, arg_sum = 52, macros = [] }
 "src/01_Base/13_KappaLog.jl" = { cyc = 1, cog = 0, arg = 2, cyc_sum = 1, cog_sum = 0, arg_sum = 2, macros = [] }
+"src/01_Base/14_PartialFit.jl" = { cyc = 4, cog = 4, arg = 6, cyc_sum = 7, cog_sum = 4, arg_sum = 16, macros = [] }
 "src/02_Tools.jl" = { cyc = 45, cog = 96, arg = 6, cyc_sum = 238, cog_sum = 233, arg_sum = 262, macros = ["@propagatable"] }
 "src/03_InputData/01_AssetPanel.jl" = { cyc = 7, cog = 12, arg = 4, cyc_sum = 35, cog_sum = 28, arg_sum = 17, macros = [] }
 "src/03_InputData/02_AssetPanelBuilder.jl" = { cyc = 6, cog = 10, arg = 7, cyc_sum = 75, cog_sum = 58, arg_sum = 52, macros = [] }

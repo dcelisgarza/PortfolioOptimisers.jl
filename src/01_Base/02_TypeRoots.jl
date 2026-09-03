@@ -46,6 +46,46 @@ abstract type AbstractResult end
 """
 $(DocStringExtensions.TYPEDEF)
 
+Abstract supertype for the running state of an incremental fit.
+
+All partial-fit state objects should subtype `AbstractPartialFitState`.
+
+A partial-fit state carries the quantities an estimator needs to fold one more observation into an estimate without reading the sample again. It subtypes [`AbstractResult`](@ref), so it inherits the length-1 iteration protocol and the pretty `show`, but it is not consumable: the rest of the library reads an ordinary Result, so a read-out verb turns a state into one first. It is the one kind of Result an estimator holds, and ADR 0106 records that exception.
+
+# Interfaces
+
+In order to implement a new partial-fit state which will work seamlessly with the library, subtype `AbstractPartialFitState` and implement the following method:
+
+## Merging two states
+
+  - `merge_states(a::MyState, b::MyState) -> MyState`: Combines the states of two disjoint blocks of observations into the state of the concatenated block.
+
+### Arguments
+
+  - `a`: The state of the first block.
+  - `b`: The state of the second block.
+
+### Returns
+
+  - `state::MyState`: The state the two blocks give when they are fitted as one block.
+
+### Algorithm
+
+ 1. Call [`assert_mergeable_states`](@ref) on the pair, which refuses two states of different types and two states over different numbers of assets.
+ 2. Refuse any further mismatch the family needs. An exponentially weighted pair must also agree on its decay, because the two states then weight the same observation differently.
+ 3. Fold the observation count, the mean and the second-moment accumulator with [`chan_merge`](@ref), and rebuild the state from the result.
+
+# Related
+
+  - [`AbstractResult`](@ref)
+  - [`merge_states`](@ref)
+  - [`assert_mergeable_states`](@ref)
+  - [`chan_merge`](@ref)
+"""
+abstract type AbstractPartialFitState <: AbstractResult end
+"""
+$(DocStringExtensions.TYPEDEF)
+
 Abstract supertype for dynamically computed observation weight estimators.
 
 `DynamicAbstractWeights` subtypes are used when observation weights must be computed from data (rather than supplied directly as a numeric vector). They are passed to estimators that accept an `ObsWeights` argument and evaluated at fit time.

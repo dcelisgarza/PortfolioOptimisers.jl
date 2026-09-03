@@ -84,7 +84,11 @@ before you merge so you lower the number that is current.
 ## Design rules
 
 - **Estimators never hold Results internally.** Enforce it with the field's *type bound*, not a
-  runtime check; precomputed structure belongs on the Result type.
+  runtime check; precomputed structure belongs on the Result type. The rule has one exception, and
+  [ADR 0106](docs/adr/0106-a-partial-fit-state-is-the-one-result-an-estimator-holds.md) states it:
+  a partial-fit state is a Result that no consumer reads, so an estimator may hold one in a field
+  bound to `Union{Nothing, <:AbstractPartialFitState}`. That bound is the enforcement, and it still
+  refuses every other Result.
 - **Prefer a per-type method over a new dependency** for reflection-style work. Derive the field
   list, write the constructor name once per type, and use the ordinary keyword constructor.
 - Docstring field text is centralised in `field_dict` / `arg_dict` in

@@ -45,7 +45,7 @@
 "ext/PortfolioOptimisersImputeExt.jl" = { map = 13, units = 0, swept = false }
 "ext/PortfolioOptimisersPlotsExt.jl" = { map = 13, units = 0, swept = false }
 "src/01_Base/01_DocstringDictionaries.jl" = { map = 1, units = 8, algorithm = 1, swept = true }
-"src/01_Base/02_TypeRoots.jl" = { map = 1, units = 6, algorithm = 2, swept = true }
+"src/01_Base/02_TypeRoots.jl" = { map = 1, units = 7, algorithm = 2, swept = true }
 "src/01_Base/03_PrettyShow.jl" = { map = 1, units = 7, algorithm = 5, swept = true }
 "src/01_Base/04_ScopedConfig.jl" = { map = 1, units = 24, algorithm = 14, swept = true }
 "src/01_Base/05_Preferences.jl" = { map = 1, units = 6, algorithm = 4, swept = true }
@@ -57,6 +57,7 @@
 "src/01_Base/11_VecScalar.jl" = { map = 1, units = 3, algorithm = 0, swept = true }
 "src/01_Base/12_NormError.jl" = { map = 1, units = 8, algorithm = 2, swept = true }
 "src/01_Base/13_KappaLog.jl" = { map = 1, units = 1, algorithm = 0, swept = true }
+"src/01_Base/14_PartialFit.jl" = { map = 1, units = 3, swept = false }
 "src/02_Tools.jl" = { map = 1, units = 69, algorithm = 49, swept = true }
 "src/03_InputData/01_AssetPanel.jl" = { map = 2, units = 14, swept = false }
 "src/03_InputData/02_AssetPanelBuilder.jl" = { map = 2, units = 26, swept = false }
