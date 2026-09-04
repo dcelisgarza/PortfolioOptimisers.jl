@@ -646,6 +646,14 @@ The algorithm that spreads a Fees object's one-off terms, turnover and the two f
 **Finite Allocation**
 See §4.7: the discretisation of weights into whole shares within a cash budget.
 
+**Factor Attribution**
+The decomposition of a portfolio's volatility and return into a systematic part, an idiosyncratic part and an Unattributed Remainder, read off the factor-model block of a Prior Result and reported on three axes: by factor, by Factor Family and by asset. The **predicted** attribution reads the block's loadings, factor moments and idiosyncratic covariance. The **realised** attribution reads the factor-return, idiosyncratic-return and exposure histories against a realised net return series, and may roll over windows.
+*Avoid*: factor risk contribution (the Euler decomposition of any risk measure through a pseudo-inverse, which leaks idiosyncratic risk into the factors), risk attribution, performance attribution (Brinson).
+
+**Unattributed Remainder**
+The part of a Factor Attribution that the factor model does not explain: what is left of the total after the systematic and idiosyncratic parts. On the realised side it holds fees, cash, weight drift inside a period, the exposure lag and the cross-sectional intercept share. On the predicted side it holds the gap a wrapping Prior opens between the Prior Result's `mu` and `sigma` and the block's own, so it is at rounding level on a plain fit. Its share of the variance is the reader's check that the attribution means something; the library states its causes and never guards it.
+*Avoid*: residual (taken by the idiosyncratic part), error term, alpha.
+
 ## 7. Errors & Status
 
 **PortfolioOptimisersError**
