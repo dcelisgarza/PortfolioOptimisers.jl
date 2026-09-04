@@ -163,6 +163,24 @@
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/08_Moments/42_FactorExposures/03_LagDescriptors/</loc>
   </url>
   <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/08_Moments/42_FactorExposures/07_RollingDescriptors/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/08_Moments/42_FactorExposures/08_Base_Exposure/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/08_Moments/42_FactorExposures/09_CompositeExposure/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/08_Moments/42_FactorExposures/10_DerivedExposure/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/08_Moments/42_FactorExposures/11_OneHotExposure/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/08_Moments/42_FactorExposures/12_ConstantExposure/</loc>
+  </url>
+  <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/09_Distance/01_Base_Distance/</loc>
   </url>
   <url>
