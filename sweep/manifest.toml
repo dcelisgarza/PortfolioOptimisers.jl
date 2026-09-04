@@ -182,7 +182,7 @@
 "src/14_UncertaintySets/08_NormBallUncertaintySets.jl" = { map = 7, units = 6, swept = false }
 "src/15_Turnover.jl" = { map = 8, units = 15, algorithm = 8, swept = true }
 "src/16_Fees.jl" = { map = 8, units = 24, algorithm = 19, swept = true }
-"src/17_NetReturnsDrawdowns.jl" = { map = 8, units = 29, algorithm = 8, swept = true }
+"src/17_NetReturnsDrawdowns.jl" = { map = 8, units = 29, algorithm = 8, swept = false }
 "src/18_Tracking.jl" = { map = 8, units = 14, algorithm = 4, swept = true }
 "src/19_RiskMeasures/01_Base_RiskMeasures.jl" = { map = 9, units = 89, swept = false }
 "src/19_RiskMeasures/02_Variance.jl" = { map = 9, units = 24, swept = false }
