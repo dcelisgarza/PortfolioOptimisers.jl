@@ -218,9 +218,14 @@ end
     end
 
     @testset "The M readers answer as they do for a Regression" begin
+        # #723 split the factor axis in two, so the one read that deliberately *differs*
+        # is the axis key: the cross-sectional model resolves its names against `cfkey`
+        # and the regression against `tfkey`. Every other `M` read still answers alike,
+        # which is what the rest of this testset holds.
         sets = UniverseSets(;
                             dict = Dict("nx" => ["A", "B", "C", "D"],
                                         "nf" => ["mkt", "size", "value"],
+                                        "ncf" => ["mkt", "size", "value"],
                                         "cyclical" => ["size", "value"]))
 
         # 1. `FactorSpace`'s axis check, at
@@ -229,14 +234,26 @@ end
         rr_r, key_r = PO.constraint_space_basis(FactorSpace(), sets, reg_reb)
         @test rr_c === csfm_reb
         @test rr_r === reg_reb
-        @test key_c == key_r == "nf"
+        # The key follows the block that carries `M`, so a mandate written for one family
+        # can never resolve against the other's names.
+        @test key_c == sets.cfkey == "ncf"
+        @test key_r == sets.tfkey == "nf"
         # The check reads `rr.M`, the raw axis, so it is the named factors it counts and not
         # the two the re-basis left.
         short_sets = UniverseSets(;
                                   dict = Dict("nx" => ["A", "B", "C", "D"],
-                                              "nf" => ["r1", "r2"]))
+                                              "nf" => ["r1", "r2"], "ncf" => ["r1", "r2"]))
         @test_throws DimensionMismatch PO.constraint_space_basis(FactorSpace(), short_sets,
                                                                  csfm_reb)
+        @test_throws DimensionMismatch PO.constraint_space_basis(FactorSpace(), short_sets,
+                                                                 reg_reb)
+        # A sets that declares only the time-series axis is complete for a regression and
+        # incomplete for the cross-sectional model, and the `KeyError` names `ncf`.
+        ts_only = UniverseSets(;
+                               dict = Dict("nx" => ["A", "B", "C", "D"],
+                                           "nf" => ["mkt", "size", "value"]))
+        @test PO.constraint_space_basis(FactorSpace(), ts_only, reg_reb)[2] == "nf"
+        @test_throws KeyError PO.constraint_space_basis(FactorSpace(), ts_only, csfm_reb)
 
         # 2. `constraint_row_term`, at
         #    `12_ConstraintGeneration/02_LinearConstraintGeneration.jl`.

@@ -192,7 +192,7 @@ sets = UniverseSets(;
                                      "Energy", "Industrials", "Healthcare",
                                      "Consumer_Staples"]))
 # The post-#224 shape for a factor-flavoured consumer: both axes declared, factors under
-# `fkey`. No consumer in this group still reads factors off `xkey`.
+# `tfkey`. No consumer in this group still reads factors off `xkey`.
 xfsets = UniverseSets(; dict = Dict("nx" => rd.nx, "nf" => rd.nf))
 pr = prior(HighOrderPriorEstimator(), rd)
 rr = regression(DimensionReductionRegression(), rd)

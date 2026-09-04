@@ -327,12 +327,14 @@ julia> function PortfolioOptimisers.estimator_to_val(alg::MyIncreasingValue, set
 
 julia> sets = UniverseSets(; dict = Dict(\"nx\" => [\"sha\", \"bis\", \"man\"]))
 UniverseSets
-   xkey ┼ String: "nx"
-  uxkey ┼ String: "ux"
-   fkey ┼ String: "nf"
-  ufkey ┼ String: "uf"
-   zkey ┼ String: "nz"
-   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["sha", "bis", "man"])
+    xkey ┼ String: "nx"
+   uxkey ┼ String: "ux"
+   tfkey ┼ String: "nf"
+  utfkey ┼ String: "uf"
+   cfkey ┼ String: "ncf"
+  ucfkey ┼ String: "ucf"
+    zkey ┼ String: "nz"
+    dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["sha", "bis", "man"])
 
 julia> estimator_to_val(MyIncreasingValue(), sets)
 1.0:1.0:3.0

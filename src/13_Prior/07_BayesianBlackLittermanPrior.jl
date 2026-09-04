@@ -52,9 +52,9 @@ The refusal is not decoration over a failure that would otherwise be visible. Th
 
 ## The views are written on the factor axis
 
-`views` resolves against `sets.dict[sets.fkey]` — the axis [`UniverseSets`](@ref) declares for factors — because the Bayesian update lands on the factor distribution and reaches the assets through the loadings. The asset axis is still required (every `UniverseSets` carries one) and is what [`port_opt_view`](@ref) slices; the factor entries come back untouched, which is why this field is `@vprop` rather than exempted by hand.
+`views` resolves against `sets.dict[sets.tfkey]` — the axis [`UniverseSets`](@ref) declares for factors — because the Bayesian update lands on the factor distribution and reaches the assets through the loadings. The asset axis is still required (every `UniverseSets` carries one) and is what [`port_opt_view`](@ref) slices; the factor entries come back untouched, which is why this field is `@vprop` rather than exempted by hand.
 
-`sets.dict[sets.fkey]` must name the columns of `F` **in order**; [`factor_universe`](@ref) checks it, and reports the factor axis rather than the asset one when it is missing or the wrong length.
+`sets.dict[sets.tfkey]` must name the columns of `F` **in order**; [`factor_universe`](@ref) checks it, and reports the factor axis rather than the asset one when it is missing or the wrong length.
 
 ## Validation
 
@@ -166,12 +166,14 @@ BayesianBlackLittermanPrior
              │   val ┼ Vector{String}: ["F1 == 0.03", "F2 == 0.04"]
              │   key ┴ nothing
         sets ┼ UniverseSets
-             │    xkey ┼ String: "nx"
-             │   uxkey ┼ String: "ux"
-             │    fkey ┼ String: "nf"
-             │   ufkey ┼ String: "uf"
-             │    zkey ┼ String: "nz"
-             │    dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"], "nf" => ["F1", "F2"])
+             │     xkey ┼ String: "nx"
+             │    uxkey ┼ String: "ux"
+             │    tfkey ┼ String: "nf"
+             │   utfkey ┼ String: "uf"
+             │    cfkey ┼ String: "ncf"
+             │   ucfkey ┼ String: "ucf"
+             │     zkey ┼ String: "nz"
+             │     dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"], "nf" => ["F1", "F2"])
   views_conf ┼ nothing
           rf ┼ Float64: 0.0
          tau ┴ nothing
@@ -326,7 +328,7 @@ Both are measured. Over a ``250 \\times 5`` sample on three factors with two fac
  1. Orient `X` and `F` with [`dims_oriented`](@ref), to `observations × assets` and `observations × factors`.
  2. When `pe.views` resolves names, check the declared factor axis against the width of `F` with [`factor_universe`](@ref). A precomputed [`BlackLittermanViews`](@ref) resolves no name, so step 4 checks its width instead.
  3. Fit the wrapped prior `pe.pe` on `(X, F)`, giving `prior_result`, check it carries a regression with [`assert_prior_regression`](@ref), read `posterior_X`, `prior_sigma`, `fpr` and `rr` off it, and refuse a `rr` that states a re-based Factor Family through [`has_family_rebasis`](@ref).
- 4. Assemble the views and their uncertainty with [`bl_preroll`](@ref), over the **factor** prior covariance and `size(F, 1)` observations, giving `P`, `Q` and `omega`. The axis is `:fkey`, because these views land on the factors.
+ 4. Assemble the views and their uncertainty with [`bl_preroll`](@ref), over the **factor** prior covariance and `size(F, 1)` observations, giving `P`, `Q` and `omega`. The axis is `:tfkey`, because these views land on the factors.
  5. Build the posterior factor precision ``\\mathbf{H}`` as `sigma_hat`.
  6. Solve `sigma_hat` against the sum of the two precision-weighted means, giving `mu_hat`, the posterior factor mean ``\\bar{\\boldsymbol{\\Pi}}_f``.
  7. Build the posterior asset covariance from ``\\mathbf{H}``, the loadings and `prior_sigma`, giving `posterior_sigma`.
@@ -348,7 +350,7 @@ Both are measured. Over a ``250 \\times 5`` sample on three factors with two fac
 # Validation
 
   - `dims in (1, 2)`.
-  - If `pe.views` is a [`LinearConstraintEstimator`](@ref), `haskey(pe.sets.dict, pe.sets.fkey)` and `length(pe.sets.dict[pe.sets.fkey]) == size(F, 2)`, both via [`factor_universe`](@ref).
+  - If `pe.views` is a [`LinearConstraintEstimator`](@ref), `haskey(pe.sets.dict, pe.sets.tfkey)` and `length(pe.sets.dict[pe.sets.tfkey]) == size(F, 2)`, both via [`factor_universe`](@ref).
   - The prior produced by `pe.pe` must carry a regression result, via [`assert_prior_regression`](@ref).
   - The regression result the prior carries must state no re-based Factor Family, via [`has_family_rebasis`](@ref). A re-basis makes `fpr.sigma` singular, and steps 5, 6 and 10 all invert it.
 
@@ -361,7 +363,7 @@ Both are measured. Over a ``250 \\times 5`` sample on three factors with two fac
   - [`BayesianBlackLittermanPrior`](@ref)
   - [`LowOrderPrior`](@ref)
   - [`prior`](@ref)
-  - [`bl_preroll`](@ref): Assembles `P`, `Q` and `omega` at `pe.sets.fkey`, and resolves `pe.tau` to `1/T` when the estimator carries none.
+  - [`bl_preroll`](@ref): Assembles `P`, `Q` and `omega` at `pe.sets.tfkey`, and resolves `pe.tau` to `1/T` when the estimator carries none.
   - [`calc_omega`](@ref)
   - [`apply_rf`](@ref)
   - [`forward_prior`](@ref)
@@ -376,7 +378,7 @@ function prior(pe::BayesianBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int 
     # `P`, so demanding one for it would reject the legitimate precomputed-views configuration,
     # which `assert_bl` deliberately permits to supply no `sets` at all.
     if isa(pe.views, LinearConstraintEstimator)
-        factor_universe(pe.sets, size(F, 2),
+        factor_universe(pe.sets, pe.sets.tfkey, size(F, 2),
                         "BayesianBlackLittermanPrior, whose views are written in factor names",
                         "F")
     end
@@ -398,7 +400,7 @@ function prior(pe::BayesianBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int 
               ArgumentError("`pe` returned a prior whose factor model was fitted in a re-based Factor Family, so `pr.fpr.sigma` sits on the raw factor axis of `pr.rr.M` and that axis is a linear image of a smaller one. $(nameof(BayesianBlackLittermanPrior)) applies its views to the factor distribution and inverts that covariance, which is singular by construction, so the update has no answer.\nApply the views on the asset axis with `$(nameof(BlackLittermanPrior))`, which reads no factor covariance, or wrap a prior whose factor model re-bases no family.\nGot\npe => $(nameof(typeof(pe.pe)))\nrr => $(nameof(typeof(rr)))"))
     f_mu, f_sigma = fpr.mu, fpr.sigma
     (; P, Q, omega) = bl_preroll(pe.views, pe.sets, pe.views_conf, f_sigma, pe.tau,
-                                 size(F, 1), eltype(posterior_X), strict, :fkey)
+                                 size(F, 1), eltype(posterior_X), strict, :tfkey)
     (; b, M) = rr
     sigma_hat = f_sigma \ LinearAlgebra.I + transpose(P) * (omega \ P)
     mu_hat = sigma_hat \ (f_sigma \ f_mu + transpose(P) * (omega \ Q))

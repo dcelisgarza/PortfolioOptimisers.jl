@@ -439,10 +439,18 @@ The user-facing extension point for a preference the library does not name: a Cu
 ### 4.4 Constraints
 
 **Universe Sets**
-A user-defined mapping of names to named groups (sectors, countries), groups, or unique-member groups, declaring every axis it carries: assets, factors and features. The foundational input to nearly all Constraint Generation.
+A user-defined mapping of names to named groups (sectors, countries), groups, or unique-member groups, declaring every axis it carries: assets, the two factor axes, and features. The foundational input to nearly all Constraint Generation.
 
 **Universe Prefix Grammar**
-The five key prefixes a Universe Sets carries, and the rule each one declares. `xkey` names the asset universe and is the one mandatory axis; an `xkey`-prefixed key is a partition of it and has the length of the asset universe. `uxkey` prefixes a unique-entry variant, which names the `xkey`-prefixed partition it draws from. `fkey` and `ufkey` mean the same on the factor axis, which is optional and is demanded at the point of need. `zkey` names the declared feature axis and carries no unique-entry sibling and no length rule, because nothing is partitioned over that axis. No prefix may be a prefix of another, which is what makes a key resolve to exactly one axis. A key matching none of them is a plain group: expanded by name and axis-blind.
+The seven key prefixes a Universe Sets carries, and the rule each one declares. `xkey` names the asset universe and is the one mandatory axis; an `xkey`-prefixed key is a partition of it and has the length of the asset universe. `uxkey` prefixes a unique-entry variant, which names the `xkey`-prefixed partition it draws from. `tfkey` and `utfkey` mean the same on the Time-Series Factor Axis, and `cfkey` and `ucfkey` mean the same again on the Cross-Sectional Factor Axis; both axes are optional and are demanded at the point of need. `zkey` names the declared feature axis and carries no unique-entry sibling and no length rule, because nothing is partitioned over that axis. No prefix may be a prefix of another, which is what makes a key resolve to exactly one axis. A key matching none of them is a plain group: expanded by name and axis-blind.
+
+**Time-Series Factor Axis**
+The factor universe a time-series regression is written on, declared under `tfkey`. Its names are the columns of a returns result's `F`, so a caller copies `rd.nf` into the dict and the axis agrees with the loadings by construction.
+*Avoid*: "the factor axis" alone, which no longer names one list.
+
+**Cross-Sectional Factor Axis**
+The factor universe a cross-sectional regression is written on, declared under `cfkey`. Its names are the Factor Exposures the fit was built from, which exist only inside the fitted block, so no returns result carries them. A consumer never picks between the two axes by hand: `factor_axis_key` reads the key off the loadings result it already holds.
+*Avoid*: "the factor axis" alone, which no longer names one list.
 
 **Constraint Space**
 The basis a constraint's names resolve in. Assets are the absence of a re-basis; `FactorSpace` is the only member, declared by the `ExposureConstraintEstimator` wrapper.

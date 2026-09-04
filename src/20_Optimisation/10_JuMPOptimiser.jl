@@ -1219,7 +1219,7 @@ function assert_universe_axis_order(sets::Option{<:UniverseSets}, rd::ReturnsRes
         return nothing
     end
     for (axis, key, names, sym) in
-        (("asset", sets.xkey, rd.nx, "nx"), ("factor", sets.fkey, rd.nf, "nf"))
+        (("asset", sets.xkey, rd.nx, "nx"), ("factor", sets.tfkey, rd.nf, "nf"))
         if isnothing(names) || !haskey(sets.dict, key)
             continue
         end

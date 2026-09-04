@@ -515,16 +515,25 @@ end
     fs = UniverseSets(; xkey = "nx", zkey = "nz",
                       dict = Dict{String, Any}("nx" => ["A", "B", "C"],
                                                "nf" => ["F1", "F2"],
+                                               "ncf" => ["Size", "Value"],
                                                "nz" => ["Tech", "Finance"],
                                                "nx_sector" => ["Tech", "Tech", "Finance"],
-                                               "nf_style" => ["Value", "Growth"]))
-    for prog in (["nf_style" => ["nx_sector" => "Tech" => 1.0]],   # row selector
-                 ["A" => ["nf_style" => "Value" => 1.0]],          # target, two-level
-                 ["A" => ["nf_style" => 1.0]])                     # target, bare
-        @test_logs((:warn, r"names the factor axis"), match_mode = :any,
+                                               "nf_style" => ["Value", "Growth"],
+                                               "ncf_family" => ["Style", "Style"]))
+    # #723 split the factor axis in two, and both are refused here for the same reason:
+    # each is factor-length, and a graded feature program has no factor-length position.
+    for prog in (["nf_style" => ["nx_sector" => "Tech" => 1.0]],    # row selector
+                 ["A" => ["nf_style" => "Value" => 1.0]],           # target, two-level
+                 ["A" => ["nf_style" => 1.0]],                      # target, bare
+                 ["ncf_family" => ["nx_sector" => "Tech" => 1.0]],  # row selector
+                 ["A" => ["ncf_family" => "Style" => 1.0]],         # target, two-level
+                 ["A" => ["ncf_family" => 1.0]])                    # target, bare
+        @test_logs((:warn, r"names a factor axis"), match_mode = :any,
                    asset_sets_features(prog, fs))
         res = @test_throws ArgumentError asset_sets_features(prog, fs; strict = true)
-        @test occursin("names the factor axis", res.value.msg)
+        @test occursin("names a factor axis", res.value.msg)
+        # The message names all four prefixes, so a caller sees which axes are excluded.
+        @test occursin("`nf`/`uf`/`ncf`/`ucf`", res.value.msg)
         # No suggestion: the name resolved perfectly well, on the wrong axis.
         @test !occursin("did you mean", res.value.msg)
     end

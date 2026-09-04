@@ -90,7 +90,7 @@ The third line is the whole of the re-basis, and it says two things. A constrain
 
 A factor exposure is ``\\mathbf{M}^\\intercal\\boldsymbol{w}`` and nothing more. It is defined without the intercept a [`Regression`](@ref) also carries, which appears in no line above. ``\\boldsymbol{b}`` above is the right-hand side of the constraints and is a different quantity from that intercept.
 
-The names resolve against the declared factor axis, `sets.dict[sets.fkey]`, and the loadings are `rr.M` rather than `rr.L` — `M`'s columns are the named original factors, and a constraint must be *written* in names a user can put in an equation, whereas `L`'s columns are principal components under [`DimensionReductionRegression`](@ref). Risk decomposition reads `L` and is correct to; the two are the two sides of one projection, not a drift between conventions.
+The names resolve against the factor axis the loadings themselves name — [`factor_axis_key`](@ref) reads `sets.tfkey` off a [`Regression`](@ref) and `sets.cfkey` off a [`CrossSectionalFactorModel`](@ref), so a mandate written for one family can never resolve against the other's names. The loadings are `rr.M` rather than `rr.L` — `M`'s columns are the named original factors, and a constraint must be *written* in names a user can put in an equation, whereas `L`'s columns are principal components under [`DimensionReductionRegression`](@ref). Risk decomposition reads `L` and is correct to; the two are the two sides of one projection, not a drift between conventions.
 
 # Fields
 
@@ -382,12 +382,12 @@ Every check a space needs before a single row is assembled lives here, so the as
  1. Resolve `rr`, the loadings, with [`factor_space_regression`](@ref) over the three carriers `space.re`, `rr` and `rd`.
  2. Raise when `rr` is `nothing`. No carrier holds a basis, and no row can be assembled.
  3. Check the declared factor axis with [`factor_universe`](@ref), against `size(rr.M, 2)`. The call raises and returns no value the assembly reads.
- 4. Return `rr` and `sets.fkey`, the key the row's names resolve against.
+ 4. Return `rr` and the factor axis key [`factor_axis_key`](@ref) reads off `rr`, which is the key the row's names resolve against.
 
 # Arguments
 
   - `space`: The [`FactorSpace`](@ref) whose basis is resolved.
-  - `sets`: The declared universe, which must carry the factor axis under `sets.fkey`.
+  - `sets`: The declared universe, which must carry the factor axis `rr` names, under `sets.tfkey` or `sets.cfkey`.
   - `rr`: The prior's loadings, or `nothing`.
   - `rd`: Returns the space may refit from, or `nothing` on the standalone route.
 
@@ -396,13 +396,13 @@ Every check a space needs before a single row is assembled lives here, so the as
 The names are looked up on the factor axis, but the *basis* comes from the prior, so the two can disagree in ways a single object cannot check. That is why all three of these are checked here and not at construction.
 
   - **A missing basis throws, ignoring `strict`.** `strict` governs unknown *names*: a per-row, recoverable condition where the offending row is dropped and the rest of the problem is still the problem the caller described. A missing regression is not that — it makes every row unbuildable, and dropping them silently yields a feasible, plausible-looking portfolio carrying none of the requested exposure. "Missing" means no carrier holds any: the space can supply its own through [`FactorSpace`](@ref)'s `re`, which is what makes a factor mandate legal on a prior with no factor block. Raises an [`IsNothingError`](@ref).
-  - **A missing factor axis throws**, naming `fkey`. The axis is optional on [`UniverseSets`](@ref); it is not optional for a constraint written against it. [`factor_universe`](@ref) raises a `KeyError`.
-  - **`size(rr.M, 2) == length(sets.dict[fkey])` always.** [`factor_universe`](@ref) raises a `DimensionMismatch` otherwise. The name-level cross-check against `rd.nf` needs the returns and lives at the optimiser.
+  - **A missing factor axis throws**, naming the key [`factor_axis_key`](@ref) chose. The axis is optional on [`UniverseSets`](@ref); it is not optional for a constraint written against it. [`factor_universe`](@ref) raises a `KeyError`.
+  - **`size(rr.M, 2) == length(sets.dict[key])` always.** [`factor_universe`](@ref) raises a `DimensionMismatch` otherwise. The name-level cross-check against `rd.nf` needs the returns and lives at the optimiser.
 
 # Returns
 
   - `basis::AbstractLoadingsRegressionResult`: The loadings the rows project through.
-  - `key::AbstractString`: The key the row's names resolve against, `sets.fkey` for a [`FactorSpace`](@ref).
+  - `key::AbstractString`: The key the row's names resolve against, [`factor_axis_key`](@ref) of `rr` for a [`FactorSpace`](@ref).
 
 # Related
 
@@ -417,8 +417,9 @@ function constraint_space_basis(space::FactorSpace, sets::UniverseSets,
     rr = factor_space_regression(space.re, rr, rd)
     @argcheck(!isnothing(rr),
               IsNothingError("a factor exposure constraint is written in factor names and re-based through the regression loadings, so it needs a source for them, and none of the three carriers holds any: the space states none (`space.re === nothing`) and the prior carries none (`rr === nothing`). Unlike an unknown name, this is not recoverable per row and is not governed by `strict`: every row of the constraint would be dropped, leaving a feasible portfolio with none of the requested exposure.\nState the basis on the space instead, `FactorSpace(; re = Regression(; M = ...))` to pin it or `FactorSpace(; re = StepwiseRegression())` to refit it from the returns. $prior_regression_remedy"))
-    factor_universe(sets, size(rr.M, 2), "a $(FactorSpace) constraint", "rr.M")
-    return rr, sets.fkey
+    key = factor_axis_key(sets, rr)
+    factor_universe(sets, key, size(rr.M, 2), "a $(FactorSpace) constraint", "rr.M")
+    return rr, key
 end
 """
     project_linear_constraint(lc::LinearConstraint, M::MatNum) -> LinearConstraint
@@ -474,7 +475,7 @@ end
 
 Re-base one wrapped shape. Dispatches on what [`ExposureConstraintEstimator`](@ref) is decorating:
 
-  - A [`LinearConstraintEstimator`](@ref) parses and assembles against `key`, projecting each term as it goes. A `key === nothing` on the wrapped estimator resolves to the space's key — `sets.fkey` for [`FactorSpace`](@ref) — rather than to `sets.xkey`.
+  - A [`LinearConstraintEstimator`](@ref) parses and assembles against `key`, projecting each term as it goes. A `key === nothing` on the wrapped estimator resolves to the space's key — the factor axis of `rr` for [`FactorSpace`](@ref) — rather than to `sets.xkey`.
   - A precomputed [`LinearConstraint`](@ref) is projected wholesale by [`project_linear_constraint`](@ref).
   - A vector is mapped elementwise, matching what [`linear_constraints`](@ref) returns for a vector of estimators.
 
@@ -542,7 +543,7 @@ Validates the space's basis once via [`constraint_space_basis`](@ref), then re-b
 # Arguments
 
   - `lcs`: The [`ExposureConstraintEstimator`](@ref) whose rows are re-based.
-  - `sets`: The declared universe, carrying the factor axis under `sets.fkey`.
+  - `sets`: The declared universe, carrying the factor axis `rr` names, under `sets.tfkey` or `sets.cfkey`.
   - `datatype`: Data type of the assembled row.
   - `strict`: If `true`, a name the universe does not resolve throws; if `false`, it warns and the term is dropped.
   - `bl_flag`: If `true`, enables Black-Litterman-style group expansion.

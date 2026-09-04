@@ -150,8 +150,8 @@ include(joinpath(@__DIR__, "test16_setup.jl"))
     @test isa(res.retcode, OptimisationSuccess)
     rkc = factor_risk_contribution(r, res.w, pr.X; re = res.prb.rr)
     rkc[1:5] /= sum(rkc[1:5])
-    ## The budget is now resolved against the *factor* axis, so the key is `sets.fkey`.
-    rkb = risk_budget_constraints(rb.rba.rkb, xfsets, xfsets.fkey)
+    ## The budget is now resolved against the *factor* axis, so the key is `sets.tfkey`.
+    rkb = risk_budget_constraints(rb.rba.rkb, xfsets, xfsets.tfkey)
     @test isapprox(rkc[1:5], rkb.val, rtol = 5e-4)
     ## Bit-identity: the migration changed only the *lookup*. `xfsets.dict["nf"]` is the
     ## vector `fsets.dict["nx"]` was, so the same named budget resolves to the same vector
@@ -171,7 +171,7 @@ end
     @test_throws IsNothingError FactorRiskBudgeting(; re = rr, rkb = rkbe)
 
     ## The pre-migration shape — factor names under the asset key, no factor axis declared —
-    ## is now a missing-axis error, reported against `sets.fkey` rather than a `KeyError`
+    ## is now a missing-axis error, reported against `sets.tfkey` rather than a `KeyError`
     ## about an asset universe the user never wrote in.
     @test_throws KeyError optimise(RiskBudgeting(;
                                                  rba = FactorRiskBudgeting(; re = rr,
@@ -209,8 +209,8 @@ end
     @test size(rbav.re.M) == (length(i), size(rr.M, 2))
     ## The budget the viewed object generates is the unviewed one: an asset slice cannot
     ## move a factor budget.
-    @test risk_budget_constraints(rbav.rkb, rbav.sets, rbav.sets.fkey).val ==
-          risk_budget_constraints(rba.rkb, rba.sets, rba.sets.fkey).val
+    @test risk_budget_constraints(rbav.rkb, rbav.sets, rbav.sets.tfkey).val ==
+          risk_budget_constraints(rba.rkb, rba.sets, rba.sets.tfkey).val
 end
 
 @testset "Factor Risk Budgeting regression estimator/result data contract" begin

@@ -17,7 +17,7 @@ sets = UniverseSets(;
                                      1, 2]))
 fsets = UniverseSets(; dict = Dict("nx" => rd.nf))
 # The post-#224 shape for a factor-flavoured consumer: both axes declared, factors under
-# `fkey`. `fsets` keeps the pre-migration shape for the consumers still reading `xkey`.
+# `tfkey`. `fsets` keeps the pre-migration shape for the consumers still reading `xkey`.
 xfsets = UniverseSets(; dict = Dict("nx" => rd.nx, "nf" => rd.nf))
 # The dual-axis shape `AugmentedBlackLittermanPrior` needs: `sets`' asset groups, which its
 # `a_views` resolve against, *plus* the declared factor axis its `f_views` land on.

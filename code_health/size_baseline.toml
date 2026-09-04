@@ -11,7 +11,7 @@ commit = "8787635a8f"
 [file]
 "ext/PortfolioOptimisersImputeExt.jl" = { code = 6, doc = 0, comment = 3, blank = 3, total = 12 }
 "ext/PortfolioOptimisersPlotsExt.jl" = { code = 1963, doc = 0, comment = 129, blank = 41, total = 2133 }
-"src/01_Base/01_DocstringDictionaries.jl" = { code = 1078, doc = 113, comment = 121, blank = 43, total = 1355 }
+"src/01_Base/01_DocstringDictionaries.jl" = { code = 1080, doc = 113, comment = 121, blank = 43, total = 1357 }
 "src/01_Base/02_TypeRoots.jl" = { code = 13, doc = 157, comment = 0, blank = 61, total = 231 }
 "src/01_Base/03_PrettyShow.jl" = { code = 107, doc = 102, comment = 0, blank = 58, total = 267 }
 "src/01_Base/04_ScopedConfig.jl" = { code = 133, doc = 401, comment = 2, blank = 180, total = 716 }
@@ -109,7 +109,7 @@ commit = "8787635a8f"
 "src/11_Phylogeny/23_CentralityQueries.jl" = { code = 46, doc = 147, comment = 1, blank = 67, total = 261 }
 "src/11_Phylogeny/24_AssetPhylogeny.jl" = { code = 13, doc = 64, comment = 0, blank = 33, total = 110 }
 "src/12_ConstraintGeneration/01_Base_ConstraintGeneration.jl" = { code = 39, doc = 169, comment = 0, blank = 94, total = 302 }
-"src/12_ConstraintGeneration/02_LinearConstraintGeneration.jl" = { code = 665, doc = 1211, comment = 47, blank = 533, total = 2456 }
+"src/12_ConstraintGeneration/02_LinearConstraintGeneration.jl" = { code = 697, doc = 1291, comment = 47, blank = 565, total = 2600 }
 "src/12_ConstraintGeneration/03_RiskBudgetConstraintGeneration.jl" = { code = 50, doc = 263, comment = 10, blank = 119, total = 442 }
 "src/12_ConstraintGeneration/04_PhylogenyConstraintGeneration.jl" = { code = 190, doc = 585, comment = 5, blank = 210, total = 990 }
 "src/12_ConstraintGeneration/05_WeightBoundsConstraintGeneration.jl" = { code = 124, doc = 385, comment = 0, blank = 163, total = 672 }

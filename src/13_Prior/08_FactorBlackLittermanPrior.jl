@@ -42,9 +42,9 @@ Its siblings differ: [`BayesianBlackLittermanPrior`](@ref) also satisfies the id
 
 ## The views are written on the factor axis
 
-`views` resolves against `sets.dict[sets.fkey]` — the axis [`UniverseSets`](@ref) declares for factors — because that is the distribution they update. The asset axis is still required (every `UniverseSets` carries one) and is what [`port_opt_view`](@ref) slices; the factor entries come back untouched, which is why this field is `@vprop` rather than exempted by hand.
+`views` resolves against `sets.dict[sets.tfkey]` — the axis [`UniverseSets`](@ref) declares for factors — because that is the distribution they update. The asset axis is still required (every `UniverseSets` carries one) and is what [`port_opt_view`](@ref) slices; the factor entries come back untouched, which is why this field is `@vprop` rather than exempted by hand.
 
-`sets.dict[sets.fkey]` must name the columns of `F` **in order**; [`factor_universe`](@ref) checks it, and reports the factor axis rather than the asset one when it is missing or the wrong length.
+`sets.dict[sets.tfkey]` must name the columns of `F` **in order**; [`factor_universe`](@ref) checks it, and reports the factor axis rather than the asset one when it is missing or the wrong length.
 
 ## Validation
 
@@ -134,12 +134,14 @@ FactorBlackLittermanPrior
              │   val ┼ Vector{String}: ["F1 == 0.03", "F2 == 0.04"]
              │   key ┴ nothing
         sets ┼ UniverseSets
-             │    xkey ┼ String: "nx"
-             │   uxkey ┼ String: "ux"
-             │    fkey ┼ String: "nf"
-             │   ufkey ┼ String: "uf"
-             │    zkey ┼ String: "nz"
-             │    dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"], "nf" => ["F1", "F2"])
+             │     xkey ┼ String: "nx"
+             │    uxkey ┼ String: "ux"
+             │    tfkey ┼ String: "nf"
+             │   utfkey ┼ String: "uf"
+             │    cfkey ┼ String: "ncf"
+             │   ucfkey ┼ String: "ucf"
+             │     zkey ┼ String: "nz"
+             │     dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"], "nf" => ["F1", "F2"])
   views_conf ┼ nothing
            w ┼ nothing
           rf ┼ Float64: 0.0
@@ -313,7 +315,7 @@ The shift is linear in ``r_f`` and depends on the views through ``\\mathbf{G}``.
  2. When `pe.views` resolves names, check the declared factor axis against the width of `F` with [`factor_universe`](@ref). A precomputed [`BlackLittermanViews`](@ref) resolves no name, so step 4 checks its width instead.
  3. Fit the wrapped prior `pe.pe` on `F` alone, giving `f_prior`, and read `prior_mu` and `prior_sigma` off it. The wrapped estimator is bounded over the asset axis, but the matrix it is handed here is the factor one.
  4. Regress `X` on `F` with [`factor_reconstruction`](@ref) under `pe.re`, giving the regression result `rr` and the reconstructed returns `posterior_X`.
- 5. Assemble the views and their uncertainty with [`bl_preroll`](@ref), over `prior_sigma` and `size(X, 1)` observations, giving `P`, `Q`, `tau` and `omega`. The axis is `:fkey`.
+ 5. Assemble the views and their uncertainty with [`bl_preroll`](@ref), over `prior_sigma` and `size(X, 1)` observations, giving `P`, `Q`, `tau` and `omega`. The axis is `:tfkey`.
  6. Put the prior mean on the total-return scale the views are written on, giving `prior_total_mu`. When `pe.l` is set this is the equilibrium mean of [`equilibrium_mu`](@ref), a risk premium, plus `pe.rf` by [`apply_rf`](@ref); otherwise it is `prior_mu`, which is on that scale already.
  7. Run the master equations with [`vanilla_posteriors`](@ref), giving the posterior factor pair.
  8. Process the posterior factor covariance in place with [`matrix_processing!`](@ref), under `pe.f_mp` and `F`.
@@ -333,7 +335,7 @@ The shift is linear in ``r_f`` and depends on the views through ``\\mathbf{G}``.
 # Validation
 
   - `dims in (1, 2)`.
-  - If `pe.views` is a [`LinearConstraintEstimator`](@ref), `haskey(pe.sets.dict, pe.sets.fkey)` and `length(pe.sets.dict[pe.sets.fkey]) == size(F, 2)`, both via [`factor_universe`](@ref).
+  - If `pe.views` is a [`LinearConstraintEstimator`](@ref), `haskey(pe.sets.dict, pe.sets.tfkey)` and `length(pe.sets.dict[pe.sets.tfkey]) == size(F, 2)`, both via [`factor_universe`](@ref).
 
 `pe.w` has no named check. When `pe.l` is set, a `pe.w` whose length is not `size(X, 2)` raises a bare `DimensionMismatch` from the multiplication inside [`equilibrium_mu`](@ref). When `pe.l` is `nothing`, `pe.w` is never read.
 
@@ -360,7 +362,7 @@ function prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 
     # `P`, so demanding one for it would reject the legitimate precomputed-views configuration,
     # which `assert_bl` deliberately permits to supply no `sets` at all.
     if isa(pe.views, LinearConstraintEstimator)
-        factor_universe(pe.sets, size(F, 2),
+        factor_universe(pe.sets, pe.sets.tfkey, size(F, 2),
                         "FactorBlackLittermanPrior, whose views are written in factor names",
                         "F")
     end
@@ -371,7 +373,7 @@ function prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 
     rr, posterior_X = factor_reconstruction(pe.re, X, F)
     M = rr.M
     (; P, Q, tau, omega) = bl_preroll(pe.views, pe.sets, pe.views_conf, prior_sigma, pe.tau,
-                                      size(X, 1), eltype(posterior_X), strict, :fkey)
+                                      size(X, 1), eltype(posterior_X), strict, :tfkey)
     # `pe.l` replaces the factor prior's own mean with an equilibrium one implied by the asset
     # weights `pe.w`. The expression and its equal-weight fallback belong to
     # [`equilibrium_mu`](@ref).

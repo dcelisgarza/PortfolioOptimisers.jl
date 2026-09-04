@@ -372,7 +372,7 @@ end
 
 @testset "Bayesian Black Litterman reads the declared factor axis" begin
     # The golden test above is the bit-identity proof: entry 2 of `pes` runs on `xfsets`,
-    # whose factors live under `fkey`, and still matches `BlackLitterman.csv.gz` to the same
+    # whose factors live under `tfkey`, and still matches `BlackLitterman.csv.gz` to the same
     # tolerance it matched under the pre-migration shape. Only the *lookup* changed.
     f_views = LinearConstraintEstimator(; val = ["MTUM == 0.0001"])
     # The pre-migration shape — factor names under `xkey`, no factor axis at all. The naive
@@ -510,7 +510,7 @@ end
 
 @testset "Factor Black Litterman reads the declared factor axis" begin
     # The golden tests above are the bit-identity proof: they run on `xfsets`, whose factors
-    # live under `fkey`, and still match `FactorBlackLitterman[12].csv.gz` to the same
+    # live under `tfkey`, and still match `FactorBlackLitterman[12].csv.gz` to the same
     # tolerance they matched under the pre-migration shape. Only the *lookup* changed.
     f_views = LinearConstraintEstimator(; val = ["MTUM == 0.0001"])
     # The pre-migration shape — factor names under `xkey`, no factor axis at all — is the
@@ -1819,7 +1819,7 @@ no name, and the two guards that stand between a view and the wrong axis. Sweep 
     # else. A third axis is refused before anything is resolved.
     ready = BlackLittermanViews(; P = ones(1, 3), Q = [0.01])
     Sb = cov(Xb)
-    for ax in (:xkey, :fkey)
+    for ax in (:xkey, :tfkey)
         @test isa(PortfolioOptimisers.bl_preroll(ready, nothing, nothing, Sb, nothing, 60,
                                                  Float64, false, ax), NamedTuple)
     end
@@ -2705,7 +2705,7 @@ view matrix, and the one site that adds the rate. Sweep ticket #536.
                   BL536_Xr, F)
     f_mu, f_sigma = pr_in.fpr.mu, pr_in.fpr.sigma
     Sigma, Mm, bb = pr_in.sigma, pr_in.rr.M, pr_in.rr.b
-    pk = PO.bl_preroll(fv, afs, nothing, f_sigma, nothing, T, Float64, false, :fkey)
+    pk = PO.bl_preroll(fv, afs, nothing, f_sigma, nothing, T, Float64, false, :tfkey)
     P, Q, tau, Om = pk.P, pk.Q, pk.tau, pk.omega
     # `P` is over the factor axis, so it is `K` wide and not `N`, and `tau` is `1/T`.
     @test size(P) == (2, K)
@@ -2762,7 +2762,7 @@ lifted through the loadings. Sweep ticket #536.
 
     fp = prior(EmpiricalPrior(), F)
     rr, pX = PO.factor_reconstruction(StepwiseRegression(), BL536_Xr, F)
-    pk = PO.bl_preroll(fv, afs, nothing, fp.sigma, nothing, T, Float64, false, :fkey)
+    pk = PO.bl_preroll(fv, afs, nothing, fp.sigma, nothing, T, Float64, false, :tfkey)
     # The factor moments are literally `vanilla_posteriors` run over the factor axis.
     fmu, fsig = PO.vanilla_posteriors(pk.tau, fp.mu, fp.sigma, pk.omega, pk.P, pk.Q)
     err = BL536_Xr .- pX
@@ -2839,7 +2839,7 @@ Sweep ticket #536.
     @test isapprox((transpose(Xc) * Fc) ./ (T - 1), rr.M * Sf; atol = 1e-16)
 
     ak = PO.bl_preroll(av, afs, nothing, Sa, nothing, T, Float64, false)
-    fk = PO.bl_preroll(fv, afs, nothing, Sf, nothing, T, Float64, false, :fkey)
+    fk = PO.bl_preroll(fv, afs, nothing, Sf, nothing, T, Float64, false, :tfkey)
     augP = [ak.P zeros(size(ak.P, 1), K); zeros(size(fk.P, 1), N) fk.P]
     augQ = vcat(ak.Q, fk.Q)
     augOm = [ak.omega zeros(2, 2); zeros(2, 2) fk.omega]

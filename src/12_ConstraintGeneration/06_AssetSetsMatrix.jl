@@ -634,7 +634,9 @@ end
 """
     is_feature_factor_key(k, sets::UniverseSets) -> Bool
 
-Whether a name in a graded feature program declares the **factor axis**, by carrying the `sets.fkey` or `sets.ufkey` prefix.
+Whether a name in a graded feature program declares a **factor axis**, by carrying the `sets.tfkey`, `sets.utfkey`, `sets.cfkey` or `sets.ucfkey` prefix.
+
+[`UniverseSets`](@ref) declares two factor axes and this test answers `true` for either, because the reason a factor name is refused here is the same on both: the name is factor-length, and a graded feature program has no factor-length position.
 
 Such a name is factor-length, so it can index neither the rows (assets) nor the declared nodes. It is refused **by name** rather than falling through to the plain-group branch, where it would fail later on a length mismatch that names neither the axis nor the cause. [`feature_rows`](@ref) puts the test between the asset branch and the group branch, and [`feature_factor_key_msg`](@ref) writes the diagnostic.
 
@@ -645,7 +647,7 @@ Such a name is factor-length, so it can index neither the rows (assets) nor the 
 
 # Returns
 
-  - `::Bool`: `true` when `k` is an `AbstractString` carrying the `sets.fkey` or the `sets.ufkey` prefix. Such a name matches no production of the grammar, so a `true` drops the term through [`feature_factor_key_msg`](@ref). It writes no cell of `Z`.
+  - `::Bool`: `true` when `k` is an `AbstractString` carrying the `sets.tfkey`, `sets.utfkey`, `sets.cfkey` or `sets.ucfkey` prefix. Such a name matches no production of the grammar, so a `true` drops the term through [`feature_factor_key_msg`](@ref). It writes no cell of `Z`.
 
 # Related
 
@@ -656,7 +658,10 @@ Such a name is factor-length, so it can index neither the rows (assets) nor the 
   - [`UniverseSets`](@ref)
 """
 function is_feature_factor_key(k, sets::UniverseSets)::Bool
-    return isa(k, AbstractString) && (startswith(k, sets.fkey) || startswith(k, sets.ufkey))
+    return isa(k, AbstractString) && (startswith(k, sets.tfkey) ||
+                                      startswith(k, sets.utfkey) ||
+                                      startswith(k, sets.cfkey) ||
+                                      startswith(k, sets.ucfkey))
 end
 """
     feature_grammar_msg(term) -> String
@@ -692,9 +697,9 @@ end
 """
     feature_factor_key_msg(k, sets::UniverseSets) -> String
 
-Build the warning/error text for a name `k` that a graded feature program wrote in a row-selector or column-target position, but that declares the **factor axis** (see [`is_feature_factor_key`](@ref)).
+Build the warning/error text for a name `k` that a graded feature program wrote in a row-selector or column-target position, but that declares a **factor axis** (see [`is_feature_factor_key`](@ref)).
 
-The message names the two prefixes and the reason, and names sizes rather than universes — the same info-leak-safe discipline as [`unknown_variable_msg`](@ref). It carries **no** [`did_you_mean`](@ref) suggestion: the name resolved perfectly well, on the wrong axis, so there is no typo to propose.
+The message names the four prefixes and the reason, and names sizes rather than universes — the same info-leak-safe discipline as [`unknown_variable_msg`](@ref). It carries **no** [`did_you_mean`](@ref) suggestion: the name resolved perfectly well, on the wrong axis, so there is no typo to propose.
 
 # Arguments
 
@@ -703,7 +708,7 @@ The message names the two prefixes and the reason, and names sizes rather than u
 
 # Returns
 
-  - `msg::String`: The diagnostic text. It names the two factor prefixes and the reason, and names sizes rather than universes.
+  - `msg::String`: The diagnostic text. It names the four factor prefixes and the reason, and names sizes rather than universes.
 
 # Related
 
@@ -713,7 +718,7 @@ The message names the two prefixes and the reason, and names sizes rather than u
   - [`unknown_variable_msg`](@ref)
 """
 function feature_factor_key_msg(k, sets::UniverseSets)
-    return "`$(k)` names the factor axis (prefix `$(sets.fkey)`/`$(sets.ufkey)`), which is neither a row selector nor a column target: a graded feature program indexes assets by row and declared feature nodes by column, and a factor-length list is neither; term dropped"
+    return "`$(k)` names a factor axis (prefix `$(sets.tfkey)`/`$(sets.utfkey)`/`$(sets.cfkey)`/`$(sets.ucfkey)`), which is neither a row selector nor a column target: a graded feature program indexes assets by row and declared feature nodes by column, and a factor-length list is neither; term dropped"
 end
 """
     feature_missing_group_value_msg(key, group, col) -> String

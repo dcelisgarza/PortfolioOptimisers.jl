@@ -127,12 +127,14 @@ MeucciEntropyPoolingPrior
     cov_views ┼ nothing
     rho_views ┼ nothing
          sets ┼ UniverseSets
-              │    xkey ┼ String: "nx"
-              │   uxkey ┼ String: "ux"
-              │    fkey ┼ String: "nf"
-              │   ufkey ┼ String: "uf"
-              │    zkey ┼ String: "nz"
-              │    dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
+              │     xkey ┼ String: "nx"
+              │    uxkey ┼ String: "ux"
+              │    tfkey ┼ String: "nf"
+              │   utfkey ┼ String: "uf"
+              │    cfkey ┼ String: "ncf"
+              │   ucfkey ┼ String: "ucf"
+              │     zkey ┼ String: "nz"
+              │     dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
        ds_opt ┼ nothing
        dm_opt ┼ nothing
           opt ┼ OptimEntropyPooling

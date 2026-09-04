@@ -118,12 +118,14 @@ BlackLittermanPrior
              │   val ┼ Vector{String}: ["A == 0.03", "B + C == 0.04"]
              │   key ┴ nothing
         sets ┼ UniverseSets
-             │    xkey ┼ String: "nx"
-             │   uxkey ┼ String: "ux"
-             │    fkey ┼ String: "nf"
-             │   ufkey ┼ String: "uf"
-             │    zkey ┼ String: "nz"
-             │    dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
+             │     xkey ┼ String: "nx"
+             │    uxkey ┼ String: "ux"
+             │    tfkey ┼ String: "nf"
+             │   utfkey ┼ String: "uf"
+             │    cfkey ┼ String: "ncf"
+             │   ucfkey ┼ String: "ucf"
+             │     zkey ┼ String: "nz"
+             │     dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
   views_conf ┼ nothing
           rf ┼ Float64: 0.0
          tau ┴ nothing
@@ -238,9 +240,11 @@ Pre-compute shared Black-Litterman inputs from views, prior covariance, and blen
 
 Extracts the view matrix `P`, view returns vector `Q`, and excluded indices from `views` and `sets` via [`black_litterman_views`](@ref), resolves `tau`, filters excluded rows from `views_conf` via [`remove_excl_views`](@ref), and computes the scaled uncertainty matrix `omega = tau * Ω` via [`calc_omega`](@ref).
 
-`axis` names the declared axis of the distribution the views land on, and every caller knows it from its own type rather than from the views: [`BlackLittermanPrior`](@ref) takes the default `:xkey` (the asset axis), while a member whose views update the **factor** distribution passes `:fkey`. It is the last argument because it is the only one an asset-space caller never supplies.
+`axis` names the declared axis of the distribution the views land on, and every caller knows it from its own type rather than from the views: [`BlackLittermanPrior`](@ref) takes the default `:xkey` (the asset axis), while a member whose views update the **factor** distribution passes `:tfkey` or `:cfkey`. It is the last argument because it is the only one an asset-space caller never supplies.
 
-The selector is a *field of* [`UniverseSets`](@ref) rather than a key resolved from one, so a caller states its axis and nothing else. Resolving the key is this function's work, and it happens only when there is a `sets` to read it from — reading `sets.fkey` to describe a universe that does not exist is the same error as reading the universe itself. Views supplied as a [`BlackLittermanViews`](@ref) result are the one shape that arrives with no `sets` at all: they resolve no names and ignore both the sets and the axis.
+[`UniverseSets`](@ref) declares two factor axes, so the accepted set is three symbols wide. Every member in the library today updates a factor distribution whose columns are the columns of `F`, so every one of them passes `:tfkey`; `:cfkey` is accepted because the axis exists and a view can land on it, not because a member reaches it yet.
+
+The selector is a *field of* [`UniverseSets`](@ref) rather than a key resolved from one, so a caller states its axis and nothing else. Resolving the key is this function's work, and it happens only when there is a `sets` to read it from — reading `sets.tfkey` to describe a universe that does not exist is the same error as reading the universe itself. Views supplied as a [`BlackLittermanViews`](@ref) result are the one shape that arrives with no `sets` at all: they resolve no names and ignore both the sets and the axis.
 
 This is also where `P` meets the distribution it updates, so it is where their widths are reconciled. A `P` assembled from names is the right width by construction; a **precomputed** [`BlackLittermanViews`](@ref) resolves no names and is checked nowhere else.
 
@@ -260,7 +264,7 @@ The returned `omega` already carries ``\\tau``, so a caller passes it to [`vanil
 
 # Validation
 
-  - `axis in (:xkey, :fkey)`.
+  - `axis in (:xkey, :tfkey, :cfkey)`.
   - At least one view resolves, so [`black_litterman_views`](@ref) does not answer `nothing`.
   - `size(P, 2) == size(prior_sigma, 1)`.
 
@@ -295,9 +299,9 @@ The returned `omega` already carries ``\\tau``, so a caller passes it to [`vanil
 """
 function bl_preroll(views, sets, views_conf, prior_sigma, pe_tau, T, datatype, strict,
                     axis::Symbol = :xkey)
-    @argcheck(axis in (:xkey, :fkey),
+    @argcheck(axis in (:xkey, :tfkey, :cfkey),
               DomainError(axis,
-                          "axis must name a declared axis a view can land on, :xkey or :fkey"))
+                          "axis must name a declared axis a view can land on, :xkey, :tfkey or :cfkey"))
     # The caller states the axis; resolving it to a key is this function's work. That is what
     # lets a caller which admits `sets === nothing` — precomputed views resolve no names —
     # say which distribution its views update without guarding the sets it may not have.

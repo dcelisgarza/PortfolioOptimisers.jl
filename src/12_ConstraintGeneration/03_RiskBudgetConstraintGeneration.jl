@@ -338,7 +338,7 @@ The normalisation divides by a computed sum, so the result lands within round-of
   - `rb`: A dictionary, pair, or vector of pairs mapping asset or group names to risk budget values.
   - `sets`: A [`UniverseSets`](@ref) object specifying the universe and groupings.
   - `dval`: Default value to use for names not found in `rb`. If `nothing`, a default value of `1/length(sets.dict[key])` is used.
-  - $(arg_dict[:ekey]) [`FactorRiskBudgeting`](@ref) passes `sets.fkey`, because its budget is written in factor names.
+  - $(arg_dict[:ekey]) [`FactorRiskBudgeting`](@ref) passes the factor axis key of its own `re`, because its budget is written in factor names.
   - `strict`: If `true`, throws an error if a key in `rb` is not found in `sets`; if `false`, issues a warning.
 
 # Validation
@@ -366,7 +366,7 @@ A budget written in factor names resolves against the declared factor axis, whic
 ```jldoctest
 julia> sets = UniverseSets(; dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"], \"nf\" => [\"F1\", \"F2\"]));
 
-julia> risk_budget_constraints(Dict(\"F1\" => 0.25), sets, nothing, sets.fkey)
+julia> risk_budget_constraints(Dict(\"F1\" => 0.25), sets, nothing, sets.tfkey)
 RiskBudget
   val ┴ Vector{Float64}: [0.3333333333333333, 0.6666666666666666]
 ```
@@ -408,7 +408,7 @@ There is **no vector method**. A vector of estimators raises `MethodError`, and 
 
   - `rb`: A [`RiskBudgetEstimator`](@ref) carrying the mapping and the default value.
   - `sets`: A [`UniverseSets`](@ref) object specifying the universe and groupings.
-  - $(arg_dict[:ekey]) [`FactorRiskBudgeting`](@ref) passes `sets.fkey`, because its budget is written in factor names.
+  - $(arg_dict[:ekey]) [`FactorRiskBudgeting`](@ref) passes the factor axis key of its own `re`, because its budget is written in factor names.
   - `strict`: If `true`, throws an error if a name in `rb.val` is not found in `sets`; if `false`, issues a warning.
   - `kwargs...`: Additional keyword arguments forwarded to the mapping method.
 
@@ -421,7 +421,7 @@ There is **no vector method**. A vector of estimators raises `MethodError`, and 
 ```jldoctest
 julia> sets = UniverseSets(; dict = Dict(\"nx\" => [\"A\", \"B\", \"C\", \"D\"], \"nf\" => [\"F1\", \"F2\"]));
 
-julia> risk_budget_constraints(RiskBudgetEstimator(; val = Dict(\"F1\" => 0.4)), sets, sets.fkey)
+julia> risk_budget_constraints(RiskBudgetEstimator(; val = Dict(\"F1\" => 0.4)), sets, sets.tfkey)
 RiskBudget
   val ┴ Vector{Float64}: [0.4444444444444445, 0.5555555555555556]
 ```

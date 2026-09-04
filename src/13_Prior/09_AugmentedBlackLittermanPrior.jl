@@ -134,9 +134,9 @@ This estimator **merges two** priors rather than forwarding one along its own ax
 
 ## One sets, two axes
 
-This is the only estimator whose views land on **both** distributions, and the two axes it needs are the two [`UniverseSets`](@ref) declares: `a_views` resolves against `sets.dict[sets.xkey]`, `f_views` against `sets.dict[sets.fkey]`. Before the axis was declared this took two separate sets objects, and the factor-flavoured one had to be exempted from [`port_opt_view`](@ref) **by hand** — a missing annotation was all that stood between a view and a factor universe sliced by asset indices. With one dual-axis object the exemption is a property of the data: the field is `@vprop`, the slice moves the asset entries and the factor entries come back untouched.
+This is the only estimator whose views land on **both** distributions, and the two axes it needs are the two [`UniverseSets`](@ref) declares: `a_views` resolves against `sets.dict[sets.xkey]`, `f_views` against `sets.dict[sets.tfkey]`. Before the axis was declared this took two separate sets objects, and the factor-flavoured one had to be exempted from [`port_opt_view`](@ref) **by hand** — a missing annotation was all that stood between a view and a factor universe sliced by asset indices. With one dual-axis object the exemption is a property of the data: the field is `@vprop`, the slice moves the asset entries and the factor entries come back untouched.
 
-Each axis is required only by the views that resolve names against it. A [`BlackLittermanViews`](@ref) result carries its own `P` and needs no universe at all, so asset-views-only and factor-views-only mandates are both expressible with a single `sets` — and a pair of precomputed view sets needs none. Measured over four mandates on one fixture: named views on both axes, named asset views against precomputed factor views, precomputed asset views against named factor views, and a precomputed pair. All four run, and the precomputed pair with no `sets` reproduces the same pair supplied with `sets` to `0.0`. [`port_opt_view`](@ref) over the selection `[1, 3, 5]` of five assets leaves `sets.dict[sets.fkey]` at its full three factors while `sets.dict[sets.xkey]` and `w` both fall to three entries.
+Each axis is required only by the views that resolve names against it. A [`BlackLittermanViews`](@ref) result carries its own `P` and needs no universe at all, so asset-views-only and factor-views-only mandates are both expressible with a single `sets` — and a pair of precomputed view sets needs none. Measured over four mandates on one fixture: named views on both axes, named asset views against precomputed factor views, precomputed asset views against named factor views, and a precomputed pair. All four run, and the precomputed pair with no `sets` reproduces the same pair supplied with `sets` to `0.0`. [`port_opt_view`](@ref) over the selection `[1, 3, 5]` of five assets leaves `sets.dict[sets.tfkey]` at its full three factors while `sets.dict[sets.xkey]` and `w` both fall to three entries.
 
 ## Validation
 
@@ -242,12 +242,14 @@ AugmentedBlackLittermanPrior
                │   val ┼ Vector{String}: ["F1 == 0.01", "F2 == 0.02"]
                │   key ┴ nothing
           sets ┼ UniverseSets
-               │    xkey ┼ String: "nx"
-               │   uxkey ┼ String: "ux"
-               │    fkey ┼ String: "nf"
-               │   ufkey ┼ String: "uf"
-               │    zkey ┼ String: "nz"
-               │    dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"], "nf" => ["F1", "F2"])
+               │     xkey ┼ String: "nx"
+               │    uxkey ┼ String: "ux"
+               │    tfkey ┼ String: "nf"
+               │   utfkey ┼ String: "uf"
+               │    cfkey ┼ String: "ncf"
+               │   ucfkey ┼ String: "ucf"
+               │     zkey ┼ String: "nz"
+               │     dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"], "nf" => ["F1", "F2"])
   a_views_conf ┼ nothing
   f_views_conf ┼ nothing
              w ┼ nothing
@@ -406,7 +408,7 @@ When `pe.tau` is `nothing` the blending parameter is `1/T`, where `T` is the num
 
   - `dims in (1, 2)`.
   - If `pe.a_views` is a [`LinearConstraintEstimator`](@ref), `length(pe.sets.dict[pe.sets.xkey]) == size(X, 2)`.
-  - If `pe.f_views` is a [`LinearConstraintEstimator`](@ref), `haskey(pe.sets.dict, pe.sets.fkey)` and `length(pe.sets.dict[pe.sets.fkey]) == size(F, 2)`, both via [`factor_universe`](@ref).
+  - If `pe.f_views` is a [`LinearConstraintEstimator`](@ref), `haskey(pe.sets.dict, pe.sets.tfkey)` and `length(pe.sets.dict[pe.sets.tfkey]) == size(F, 2)`, both via [`factor_universe`](@ref).
 
 `pe.w` has no named check. When `pe.l` is set, a `pe.w` whose length is not `size(X, 2)` raises a bare `DimensionMismatch` from the multiplication inside [`equilibrium_mu`](@ref). When `pe.l` is `nothing`, `pe.w` is never read.
 
@@ -421,7 +423,7 @@ When `pe.tau` is `nothing` the blending parameter is `1/T`, where `T` is the num
  3. When `pe.f_views` resolves names, check the declared factor axis against the width of `F` with [`factor_universe`](@ref). Each axis is checked only by the views that resolve names against it, so a pair of precomputed [`BlackLittermanViews`](@ref) needs no `sets` at all.
  4. Fit `pe.a_pe` on `X`, giving `a_prior`, and `pe.f_pe` on `F`, giving `f_prior`.
  5. Regress `X` on `F` with [`factor_reconstruction`](@ref) under `pe.re`, giving `rr` and the reconstructed returns `posterior_X`.
- 6. Assemble the asset views with [`bl_preroll`](@ref) at the default `:xkey`, over the asset prior covariance, and the factor views at `:fkey`, over the factor prior covariance.
+ 6. Assemble the asset views with [`bl_preroll`](@ref) at the default `:xkey`, over the asset prior covariance, and the factor views at `:tfkey`, over the factor prior covariance.
  7. Build ``\\boldsymbol{\\Sigma}_{aug}``, whose off-diagonal blocks are the model-implied cross-covariance ``\\mathbf{M}\\boldsymbol{\\Sigma}_f`` and its transpose.
  8. Stack ``\\mathbf{P}_{aug}`` block-diagonally, ``\\boldsymbol{q}_{aug}`` and ``\\boldsymbol{\\Omega}_{aug}`` to match, the asset rows above the factor rows.
  9. Put the stacked prior mean on the total-return scale the views are written on, giving `aug_prior_mu`. When `pe.l` is `nothing` this is the stacked wrapped means, which are on that scale already. When `pe.l` is set it is the equilibrium mean of [`equilibrium_mu`](@ref), a bare risk premium, plus `pe.rf` by [`apply_rf`](@ref) and plus `rr.b` on the asset half.
@@ -455,7 +457,7 @@ function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int
     if isa(pe.f_views, LinearConstraintEstimator)
         # The factor views land on the *factor* distribution, so they resolve against the
         # declared factor axis — not against `xkey`, which names the assets `a_views` uses.
-        factor_universe(pe.sets, size(F, 2),
+        factor_universe(pe.sets, pe.sets.tfkey, size(F, 2),
                         "AugmentedBlackLittermanPrior, whose `f_views` are written in factor names",
                         "F")
     end
@@ -471,12 +473,12 @@ function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int
     (; b, M) = rr
     dt = eltype(posterior_X)
     T = size(X, 1)
-    # One sets, two axes: the asset views take the default `:xkey`, the factor views `:fkey`.
+    # One sets, two axes: the asset views take the default `:xkey`, the factor views `:tfkey`.
     (; P, Q, tau, omega) = bl_preroll(pe.a_views, pe.sets, pe.a_views_conf, a_prior_sigma,
                                       pe.tau, T, dt, strict)
     a_omega = omega
     f_result = bl_preroll(pe.f_views, pe.sets, pe.f_views_conf, f_prior_sigma, pe.tau, T,
-                          dt, strict, :fkey)
+                          dt, strict, :tfkey)
     f_P, f_Q, f_omega = f_result.P, f_result.Q, f_result.omega
     aug_prior_sigma = hcat(vcat(a_prior_sigma, f_prior_sigma * transpose(M)),
                            vcat(M * f_prior_sigma, f_prior_sigma))

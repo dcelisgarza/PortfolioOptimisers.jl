@@ -326,7 +326,7 @@ Factor-level Risk Budgeting algorithm.
 
 `FactorRiskBudgeting` specifies the risk budget at the factor level, using a factor model regression to decompose risk across factors and an idiosyncratic component.
 
-A named budget is written in **factor** names and resolved against the declared factor axis, `sets.dict[sets.fkey]`, which must name the columns of `rr.L` in order — see [`risk_budget_universe_key`](@ref).
+A named budget is written in **factor** names and resolved against the factor axis `re` names — [`factor_axis_key`](@ref) reads `sets.tfkey` off the time-series family and `sets.cfkey` off the cross-sectional one. That axis must name the columns of `rr.L` in order — see [`risk_budget_universe_key`](@ref).
 
 # Fields
 
@@ -388,7 +388,7 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
                                  sets::Option{<:UniverseSets}, flag::Bool)
         if isa(rkb, RiskBudgetEstimator)
             @argcheck(!isnothing(sets),
-                      IsNothingError("sets cannot be nothing when rkb is a RiskBudgetEstimator: the budget is written in factor names and is resolved against the declared factor axis, `sets.dict[sets.fkey]`"))
+                      IsNothingError("sets cannot be nothing when rkb is a RiskBudgetEstimator: the budget is written in factor names and is resolved against the factor axis `re` names, `sets.dict[sets.tfkey]` or `sets.dict[sets.cfkey]`"))
         end
         return new{typeof(re), typeof(rkb), typeof(sets), typeof(flag)}(re, rkb, sets, flag)
     end
@@ -626,7 +626,7 @@ end
 
 Return the key of the universe a named risk budget resolves against, or `nothing` for the asset frame.
 
-The budget vector is indexed by the variables the budget is *over*, so the universe naming it is a property of the algorithm rather than of the sets: [`AssetRiskBudgeting`](@ref) budgets the asset weights and takes the default axis, while [`FactorRiskBudgeting`](@ref) budgets the factor weights `w1` and takes the declared factor axis, `sets.fkey`.
+The budget vector is indexed by the variables the budget is *over*, so the universe naming it is a property of the algorithm rather than of the sets: [`AssetRiskBudgeting`](@ref) budgets the asset weights and takes the default axis, while [`FactorRiskBudgeting`](@ref) budgets the factor weights `w1` and takes the factor axis its own `re` names, which [`factor_axis_key`](@ref) reads.
 
 The axis is only read when `rba.rkb` is a [`RiskBudgetEstimator`](@ref) — a [`RiskBudget`](@ref) result carries its own vector and resolves no names, so an unread axis is left unvalidated, as it is in every other consumer of the declared axis. When it *is* read, [`factor_universe`](@ref) checks it against `N`, the number of factor weights, which is `size(rr.L, 2)`: under a [`DimensionReductionRegression`](@ref) that is the reduced basis the risk is decomposed in and not the columns of `F`, so a budget named after the original factors is rejected here rather than by a bare `DimensionMismatch` further down.
 
@@ -653,8 +653,9 @@ function risk_budget_universe_key(rba::FactorRiskBudgeting, N::Integer)
     if !isa(rba.rkb, RiskBudgetEstimator)
         return nothing
     end
-    factor_universe(rba.sets, N, "a $(FactorRiskBudgeting) risk budget", "rr.L")
-    return rba.sets.fkey
+    key = factor_axis_key(rba.sets, rba.re)
+    factor_universe(rba.sets, key, N, "a $(FactorRiskBudgeting) risk budget", "rr.L")
+    return key
 end
 """
     _set_risk_budgeting_constraints!(model, rb, ...)

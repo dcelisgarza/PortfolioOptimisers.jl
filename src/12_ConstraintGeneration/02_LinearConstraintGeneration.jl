@@ -432,7 +432,7 @@ A missing partition key is reported by the *group* that asked for it, so the who
 # Arguments
 
   - `dict`: The [`UniverseSets`](@ref) dictionary being validated.
-  - `prefix`: The axis prefix the missing key must carry, `xkey` or `fkey`.
+  - `prefix`: The axis prefix the missing key must carry, `xkey`, `tfkey` or `cfkey`.
 
 # Returns
 
@@ -461,7 +461,7 @@ The counterpart of [`prefixed_sets_keys`](@ref) for the one key with no prefix o
 # Arguments
 
   - `dict`: The [`UniverseSets`](@ref) dictionary being validated.
-  - `claimed`: The other declared axis prefixes, `uxkey`, `fkey`, `ufkey` and `zkey`.
+  - `claimed`: The other declared axis prefixes, `uxkey`, `tfkey`, `utfkey`, `cfkey`, `ucfkey` and `zkey`.
 
 # Returns
 
@@ -478,23 +478,106 @@ function unclaimed_sets_keys(dict::AbstractDict, claimed)
                   for k in keys(dict) if !any(p -> startswith(string(k), p), claimed)]
 end
 """
+    assert_factor_partition(dict::AbstractDict, k::AbstractString, fkey::AbstractString,
+                            axis::AbstractString) -> Nothing
+
+Assert that the factor partition `k` names a declared factor axis `fkey`, and that the two agree on how many factors there are.
+
+[`UniverseSets`](@ref) carries **two** factor axes, and both obey this one rule, so the rule is written once and called twice. `axis` names the axis in both messages — a caller who declared the time-series axis and wrote a cross-sectional partition is told which of the two is missing, which the key value alone does not say.
+
+# Arguments
+
+  - `dict`: The [`UniverseSets`](@ref) dictionary being validated.
+  - `k`: The `fkey`-prefixed key under validation.
+  - `fkey`: The factor axis key the prefix belongs to, `tfkey` or `cfkey`.
+  - `axis`: Names the axis in both diagnostic messages, for example `"time-series factor"`.
+
+# Validation
+
+  - `haskey(dict, fkey)`. A `KeyError` naming `axis` is thrown otherwise.
+  - `length(dict[k]) == length(dict[fkey])`. A `DimensionMismatch` naming `axis` is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`UniverseSets`](@ref)
+  - [`assert_factor_unique_group`](@ref)
+"""
+function assert_factor_partition(dict::AbstractDict, k::AbstractString,
+                                 fkey::AbstractString, axis::AbstractString)::Nothing
+    @argcheck(haskey(dict, fkey),
+              KeyError("$fkey (the $axis universe), required by the $axis partition $k. A `$fkey`-prefixed key declares a partition of the $axis axis, so the axis itself must be declared: add `$fkey => <factor names>` to `dict`, or rename `$k` if it was never meant to be a $axis partition."))
+    @argcheck(length(dict[k]) == length(dict[fkey]),
+              DimensionMismatch("the $axis partition `$k` and the $axis universe `$fkey` disagree on how many factors there are. Got\nlength(dict[$k]) => $(length(dict[k]))\nlength(dict[$fkey]) => $(length(dict[fkey]))"))
+    return nothing
+end
+"""
+    assert_factor_unique_group(dict::AbstractDict, k::AbstractString, fkey::AbstractString,
+                               ufkey::AbstractString, axis::AbstractString) -> Nothing
+
+Assert that the unique-entry factor group `k` names a declared factor axis `fkey`, that the partition it draws its entries from exists, and that the partition has the length of the axis.
+
+The sibling of [`assert_factor_partition`](@ref), and written for the same reason: [`UniverseSets`](@ref) carries two factor axes and both obey this one rule, so the rule is written once and called twice.
+
+# Arguments
+
+  - `dict`: The [`UniverseSets`](@ref) dictionary being validated.
+  - `k`: The `ufkey`-prefixed key under validation.
+  - `fkey`: The factor axis key the group summarises, `tfkey` or `cfkey`.
+  - `ufkey`: The unique-entry prefix `k` carries, `utfkey` or `ucfkey`.
+  - `axis`: Names the axis in every diagnostic message, for example `"cross-sectional factor"`.
+
+# Validation
+
+  - `haskey(dict, fkey)`. A `KeyError` naming `axis` is thrown otherwise.
+  - `haskey(dict, fkey * chopprefix(k, ufkey))`. A `KeyError` carrying a spelling suggestion is thrown otherwise.
+  - `length(dict[fkey * chopprefix(k, ufkey)]) == length(dict[fkey])`. A `DimensionMismatch` is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`UniverseSets`](@ref)
+  - [`assert_factor_partition`](@ref)
+  - [`prefixed_sets_keys`](@ref)
+"""
+function assert_factor_unique_group(dict::AbstractDict, k::AbstractString,
+                                    fkey::AbstractString, ufkey::AbstractString,
+                                    axis::AbstractString)::Nothing
+    @argcheck(haskey(dict, fkey),
+              KeyError("$fkey (the $axis universe), required by the unique-entry $axis group $k. A `$ufkey`-prefixed key summarises a partition of the $axis axis, so the axis itself must be declared: add `$fkey => <factor names>` to `dict`, or rename `$k` if it was never meant to be a $axis group."))
+    tmp_key = fkey * chopprefix(k, ufkey)
+    @argcheck(haskey(dict, tmp_key),
+              KeyError("$tmp_key (the $axis partition), required by the unique-entry $axis group $k. Every `$ufkey`-prefixed group names the `$fkey`-prefixed partition it draws its entries from: correct the spelling$(suggest_declared_key(tmp_key, prefixed_sets_keys(dict, fkey))), or add `$tmp_key => <one group per factor>` to `dict`."))
+    @argcheck(length(dict[tmp_key]) == length(dict[fkey]),
+              DimensionMismatch("the $axis partition `$tmp_key`, required by the unique-entry $axis group `$k`, and the $axis universe `$fkey` disagree on how many factors there are. Got\nlength(dict[$tmp_key]) => $(length(dict[tmp_key]))\nlength(dict[$fkey]) => $(length(dict[fkey]))"))
+    return nothing
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Declares the universes a portfolio problem is written against, and any groupings or partitions of them.
 
 Constraint generation and the estimator routines read it to expand group references, to map a group name to its member list, and to validate membership.
 
-It **declares every axis it carries**: `xkey`/`uxkey` for assets, `fkey`/`ufkey` for factors, and `zkey` for features. Assets are the *primary* axis — `haskey(dict, xkey)` is required, and it is the axis a view slices. The factor and feature axes are **optional**: requiring either would invalidate every sets object built for a problem with no factor model or no feature program, so a consumer that needs one and does not find it throws at the point of need rather than at construction.
+It **declares every axis it carries**: `xkey`/`uxkey` for assets, `tfkey`/`utfkey` for time-series factors, `cfkey`/`ucfkey` for cross-sectional factors, and `zkey` for features. Assets are the *primary* axis — `haskey(dict, xkey)` is required, and it is the axis a view slices. The factor and feature axes are **optional**: requiring any of them would invalidate every sets object built for a problem with no factor model or no feature program, so a consumer that needs one and does not find it throws at the point of need rather than at construction.
+
+There are **two factor axes** because the two factor families name different things. A time-series regression fits one loading vector per asset over the observations, so its factors are the columns of `rd.F` and a caller copies `rd.nf` into the dict under `tfkey`. A cross-sectional regression fits one loading vector per observation across the assets, so its factors are the exposures the fit was built from, and they exist only inside the fitted block. One axis carrying both would make a single key mean two different lists on one problem. A consumer never chooses between them by hand: [`factor_axis_key`](@ref) reads the key off the loadings result it already holds.
 
 If a key in `dict` starts with the same value as `xkey`, it means that the corresponding group must have the same length as the asset universe, `dict[xkey]`. This is useful for defining partitions of the asset universe, for example when using [`asset_sets_matrix`](@ref) with [`NestedClustered`](@ref).
 
 If a key in `dict` starts with the same value as `uxkey`, it identifies a unique-entry group variant. The corresponding `xkey`-prefixed group must exist in `dict` with the same length as the asset universe, and is used to match each asset to a unique entry from the `uxkey`-prefixed group. This enables constraint generation using unique entries even in [`NestedClustered`](@ref) optimisations.
 
-The `fkey`/`ufkey` prefixes mean the same thing on the factor axis, but they buy something different. On the asset side the conventions serve *views*; factors are never sliced by an asset index, so on the factor side they buy length validation at construction and one shared mental model.
+The `tfkey`/`utfkey` prefixes mean the same thing on the time-series factor axis, and `cfkey`/`ucfkey` mean the same thing again on the cross-sectional one. They buy something different from the asset pair. On the asset side the conventions serve *views*; factors are never sliced by an asset index, so on either factor side they buy length validation at construction and one shared mental model. The two factor axes are validated alike, and neither is validated against the other: a problem may declare one, both, or neither.
 
-`zkey` has **no prefix convention at all**, and that asymmetry is the point. `xkey` and `fkey` each have a unique-entry sibling because each names an axis that *partitions are written over*; nothing is written over the feature axis. A graded feature program's taxonomy keys are `xkey`-prefixed and asset-length, and its column nodes are named directly out of the flat list `dict[zkey]`. So `zkey` carries exactly one rule — `allunique(dict[zkey])`, so [`ReturnsResult`](@ref)'s own uniqueness check cannot be reached with a duplicate — and no length rule whatever.
+`zkey` has **no prefix convention at all**, and that asymmetry is the point. `xkey`, `tfkey` and `cfkey` each have a unique-entry sibling because each names an axis that *partitions are written over*; nothing is written over the feature axis. A graded feature program's taxonomy keys are `xkey`-prefixed and asset-length, and its column nodes are named directly out of the flat list `dict[zkey]`. So `zkey` carries exactly one rule — `allunique(dict[zkey])`, so [`ReturnsResult`](@ref)'s own uniqueness check cannot be reached with a duplicate — and no length rule whatever.
 
-A key matching none of the four prefixes is a plain group: expanded by name and **axis-blind**, which is why a factor group needs no machinery of its own.
+A key matching none of the six prefixes is a plain group: expanded by name and **axis-blind**, which is why a factor group needs no machinery of its own.
 
 # Fields
 
@@ -505,8 +588,10 @@ $(DocStringExtensions.FIELDS)
     UniverseSets(;
         xkey::AbstractString = "nx",
         uxkey::AbstractString = "ux",
-        fkey::AbstractString = "nf",
-        ufkey::AbstractString = "uf",
+        tfkey::AbstractString = "nf",
+        utfkey::AbstractString = "uf",
+        cfkey::AbstractString = "ncf",
+        ucfkey::AbstractString = "ucf",
         zkey::AbstractString = "nz",
         dict::AbstractDict{<:AbstractString, <:Any}
     ) -> UniverseSets
@@ -517,12 +602,14 @@ Keywords correspond to the struct's fields.
 
   - `!isempty(dict)`.
   - `haskey(dict, xkey)`.
-  - No two of `xkey`, `uxkey`, `fkey`, `ufkey`, `zkey` may be a prefix of one another (20 ordered checks, which also rules out any two being equal).
+  - No two of `xkey`, `uxkey`, `tfkey`, `utfkey`, `cfkey`, `ucfkey`, `zkey` may be a prefix of one another (42 ordered checks, which also rules out any two being equal).
   - If `haskey(dict, zkey)`, `allunique(dict[zkey])`.
   - If a key in `dict` starts with the same value as `xkey`, `length(dict[k]) == length(dict[xkey])`.
   - If a key in `dict` starts with the same value as `uxkey`, there must be a corresponding key in `dict` where the `uxkey` prefix is replaced by the `xkey` prefix, and its length must equal `length(dict[xkey])`.
-  - If a key in `dict` starts with the same value as `fkey`, `haskey(dict, fkey)` and `length(dict[k]) == length(dict[fkey])`.
-  - If a key in `dict` starts with the same value as `ufkey`, there must be a corresponding key in `dict` where the `ufkey` prefix is replaced by the `fkey` prefix, and its length must equal `length(dict[fkey])`.
+  - If a key in `dict` starts with the same value as `tfkey`, `haskey(dict, tfkey)` and `length(dict[k]) == length(dict[tfkey])`.
+  - If a key in `dict` starts with the same value as `utfkey`, there must be a corresponding key in `dict` where the `utfkey` prefix is replaced by the `tfkey` prefix, and its length must equal `length(dict[tfkey])`.
+  - If a key in `dict` starts with the same value as `cfkey`, `haskey(dict, cfkey)` and `length(dict[k]) == length(dict[cfkey])`.
+  - If a key in `dict` starts with the same value as `ucfkey`, there must be a corresponding key in `dict` where the `ucfkey` prefix is replaced by the `cfkey` prefix, and its length must equal `length(dict[cfkey])`.
 
 ## View parameters
 
@@ -530,20 +617,22 @@ Keywords correspond to the struct's fields.
 
   - The method reads the asset index alone. It drops every further positional argument, because no axis but the asset axis is sliced.
   - Every `xkey`-prefixed entry of `dict` is sliced to the selected assets, and every `uxkey`-prefixed entry is rebuilt from the sliced partition it names.
-  - The `fkey`-, `ufkey`- and `zkey`-prefixed entries, and every plain group, are carried through unchanged. [`port_opt_view`](@ref) states why each axis is exempt.
-  - The five key prefixes are carried through unchanged, so the viewed value declares the same axes as the original.
+  - The `tfkey`-, `utfkey`-, `cfkey`-, `ucfkey`- and `zkey`-prefixed entries, and every plain group, are carried through unchanged. [`port_opt_view`](@ref) states why each axis is exempt.
+  - The seven key prefixes are carried through unchanged, so the viewed value declares the same axes as the original.
 
 # Examples
 
 ```jldoctest
 julia> UniverseSets(; xkey = \"nx\", dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"], \"group1\" => [\"A\", \"B\"]))
 UniverseSets
-   xkey ┼ String: "nx"
-  uxkey ┼ String: "ux"
-   fkey ┼ String: "nf"
-  ufkey ┼ String: "uf"
-   zkey ┼ String: "nz"
-   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"], "group1" => ["A", "B"])
+    xkey ┼ String: "nx"
+   uxkey ┼ String: "ux"
+   tfkey ┼ String: "nf"
+  utfkey ┼ String: "uf"
+   cfkey ┼ String: "ncf"
+  ucfkey ┼ String: "ucf"
+    zkey ┼ String: "nz"
+    dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"], "group1" => ["A", "B"])
 ```
 
 # Related
@@ -551,6 +640,7 @@ UniverseSets
   - [`replace_group_by_assets`](@ref)
   - [`estimator_to_val`](@ref)
   - [`linear_constraints`](@ref)
+  - [`factor_axis_key`](@ref)
   - [`factor_universe`](@ref)
   - [`feature_universe`](@ref)
   - [`prefixed_sets_keys`](@ref)
@@ -567,13 +657,21 @@ UniverseSets
     """
     uxkey
     """
-    $(field_dict[:us_fkey])
+    $(field_dict[:us_tfkey])
     """
-    fkey
+    tfkey
     """
-    $(field_dict[:us_ufkey])
+    $(field_dict[:us_utfkey])
     """
-    ufkey
+    utfkey
+    """
+    $(field_dict[:us_cfkey])
+    """
+    cfkey
+    """
+    $(field_dict[:us_ucfkey])
+    """
+    ucfkey
     """
     $(field_dict[:us_zkey])
     """
@@ -582,14 +680,16 @@ UniverseSets
     $(field_dict[:dict])
     """
     dict
-    function UniverseSets(xkey::AbstractString, uxkey::AbstractString, fkey::AbstractString,
-                          ufkey::AbstractString, zkey::AbstractString,
+    function UniverseSets(xkey::AbstractString, uxkey::AbstractString,
+                          tfkey::AbstractString, utfkey::AbstractString,
+                          cfkey::AbstractString, ucfkey::AbstractString,
+                          zkey::AbstractString,
                           dict::AbstractDict{<:AbstractString, <:Any})::UniverseSets
         @argcheck(!isempty(dict), IsEmptyError)
         @argcheck(haskey(dict, xkey),
-                  KeyError("$xkey (the asset universe), required by UniverseSets. The asset axis is the one mandatory axis: correct the spelling$(suggest_declared_key(xkey, unclaimed_sets_keys(dict, (uxkey, fkey, ufkey, zkey)))), pass `xkey = <the key you wrote>`, or add `$xkey => <asset names>` to `dict`."))
-        knames = ("xkey", "uxkey", "fkey", "ufkey", "zkey")
-        kvals = (xkey, uxkey, fkey, ufkey, zkey)
+                  KeyError("$xkey (the asset universe), required by UniverseSets. The asset axis is the one mandatory axis: correct the spelling$(suggest_declared_key(xkey, unclaimed_sets_keys(dict, (uxkey, tfkey, utfkey, cfkey, ucfkey, zkey)))), pass `xkey = <the key you wrote>`, or add `$xkey => <asset names>` to `dict`."))
+        knames = ("xkey", "uxkey", "tfkey", "utfkey", "cfkey", "ucfkey", "zkey")
+        kvals = (xkey, uxkey, tfkey, utfkey, cfkey, ucfkey, zkey)
         for i in eachindex(kvals), j in eachindex(kvals)
             i == j && continue
             @argcheck(!startswith(kvals[i], kvals[j]),
@@ -599,7 +699,7 @@ UniverseSets
             @argcheck(allunique(dict[zkey]),
                       ArgumentError("the declared feature axis `$zkey` must not repeat a node, because a duplicate would silently merge two columns and would be rejected by `ReturnsResult`'s own `nz` uniqueness check anyway"))
         end
-        for k in setdiff(keys(dict), (xkey, fkey, zkey))
+        for k in setdiff(keys(dict), (xkey, tfkey, cfkey, zkey))
             if startswith(k, xkey)
                 @argcheck(length(dict[k]) == length(dict[xkey]),
                           DimensionMismatch("the asset partition `$k` and the asset universe `$xkey` disagree on how many assets there are. Got\nlength(dict[$k]) => $(length(dict[k]))\nlength(dict[$xkey]) => $(length(dict[xkey]))"))
@@ -609,37 +709,36 @@ UniverseSets
                           KeyError("$tmp_key (the asset partition), required by the unique-entry asset group $k. Every `$uxkey`-prefixed group names the `$xkey`-prefixed partition it draws its entries from: correct the spelling$(suggest_declared_key(tmp_key, prefixed_sets_keys(dict, xkey))), or add `$tmp_key => <one group per asset>` to `dict`."))
                 @argcheck(length(dict[tmp_key]) == length(dict[xkey]),
                           DimensionMismatch("the asset partition `$tmp_key`, required by the unique-entry asset group `$k`, and the asset universe `$xkey` disagree on how many assets there are. Got\nlength(dict[$tmp_key]) => $(length(dict[tmp_key]))\nlength(dict[$xkey]) => $(length(dict[xkey]))"))
-            elseif startswith(k, fkey)
-                @argcheck(haskey(dict, fkey),
-                          KeyError("$fkey (the factor universe), required by the factor partition $k. A `$fkey`-prefixed key declares a partition of the factor axis, so the axis itself must be declared: add `$fkey => <factor names>` to `dict`, or rename `$k` if it was never meant to be a factor partition."))
-                @argcheck(length(dict[k]) == length(dict[fkey]),
-                          DimensionMismatch("the factor partition `$k` and the factor universe `$fkey` disagree on how many factors there are. Got\nlength(dict[$k]) => $(length(dict[k]))\nlength(dict[$fkey]) => $(length(dict[fkey]))"))
-            elseif startswith(k, ufkey)
-                @argcheck(haskey(dict, fkey),
-                          KeyError("$fkey (the factor universe), required by the unique-entry factor group $k. A `$ufkey`-prefixed key summarises a partition of the factor axis, so the axis itself must be declared: add `$fkey => <factor names>` to `dict`, or rename `$k` if it was never meant to be a factor group."))
-                tmp_key = fkey * chopprefix(k, ufkey)
-                @argcheck(haskey(dict, tmp_key),
-                          KeyError("$tmp_key (the factor partition), required by the unique-entry factor group $k. Every `$ufkey`-prefixed group names the `$fkey`-prefixed partition it draws its entries from: correct the spelling$(suggest_declared_key(tmp_key, prefixed_sets_keys(dict, fkey))), or add `$tmp_key => <one group per factor>` to `dict`."))
-                @argcheck(length(dict[tmp_key]) == length(dict[fkey]),
-                          DimensionMismatch("the factor partition `$tmp_key`, required by the unique-entry factor group `$k`, and the factor universe `$fkey` disagree on how many factors there are. Got\nlength(dict[$tmp_key]) => $(length(dict[tmp_key]))\nlength(dict[$fkey]) => $(length(dict[fkey]))"))
+            elseif startswith(k, tfkey)
+                assert_factor_partition(dict, k, tfkey, "time-series factor")
+            elseif startswith(k, utfkey)
+                assert_factor_unique_group(dict, k, tfkey, utfkey, "time-series factor")
+            elseif startswith(k, cfkey)
+                assert_factor_partition(dict, k, cfkey, "cross-sectional factor")
+            elseif startswith(k, ucfkey)
+                assert_factor_unique_group(dict, k, cfkey, ucfkey, "cross-sectional factor")
             end
         end
-        return new{typeof(xkey), typeof(uxkey), typeof(fkey), typeof(ufkey), typeof(zkey),
-                   typeof(dict)}(xkey, uxkey, fkey, ufkey, zkey, dict)
+        return new{typeof(xkey), typeof(uxkey), typeof(tfkey), typeof(utfkey),
+                   typeof(cfkey), typeof(ucfkey), typeof(zkey), typeof(dict)}(xkey, uxkey,
+                                                                              tfkey, utfkey,
+                                                                              cfkey, ucfkey,
+                                                                              zkey, dict)
     end
 end
 function UniverseSets(; xkey::AbstractString = "nx", uxkey::AbstractString = "ux",
-                      fkey::AbstractString = "nf", ufkey::AbstractString = "uf",
+                      tfkey::AbstractString = "nf", utfkey::AbstractString = "uf",
+                      cfkey::AbstractString = "ncf", ucfkey::AbstractString = "ucf",
                       zkey::AbstractString = "nz",
                       dict::AbstractDict{<:AbstractString, <:Any})::UniverseSets
-    return UniverseSets(xkey, uxkey, fkey, ufkey, zkey, dict)
+    return UniverseSets(xkey, uxkey, tfkey, utfkey, cfkey, ucfkey, zkey, dict)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return a view of a [`UniverseSets`](@ref) restricted to the assets at index `i`.
 
-The asset axis is the only axis this view slices, and the other two are exempt for two different reasons. The factor axis is exempt because an asset index has no meaning on it. Declaring that axis is what makes the exemption a property of the *data*: before the declaration, a factor-flavoured sets sitting in a `@vprop` field was sliced by asset indices and failed with a length mismatch, and the only defence was omitting the annotation by hand, field by field. There is deliberately **no factor-index arity** either. `port_opt_view(rd, i, j, k)` can slice `rd.nf`, but no internal caller passes a non-colon `k`, so a user who slices factors updates their sets themselves.
+The asset axis is the only axis this view slices, and the other three are exempt for two different reasons. **Both** factor axes are exempt because an asset index has no meaning on either, and they are treated alike: a `cfkey`-prefixed entry comes back bit-identical exactly as a `tfkey`-prefixed one does. Declaring an axis is what makes the exemption a property of the *data*: before the declaration, a factor-flavoured sets sitting in a `@vprop` field was sliced by asset indices and failed with a length mismatch, and the only defence was omitting the annotation by hand, field by field. There is deliberately **no factor-index arity** either. `port_opt_view(rd, i, j, k)` can slice `rd.nf`, but no internal caller passes a non-colon `k`, so a user who slices factors updates their sets themselves.
 
 The feature axis is exempt although some of its nodes *are* assets. It is left alone because the axis is **declared** rather than derived: the caller wrote the node list down, so it is the program's coordinate system and not a summary of the current universe. That is what makes `size(Z, 2)` **fold-invariant** for a graded [`asset_sets_features`](@ref) program — exactly the opposite of the group-name-key path, where the viewed producer rebuilds the axis from the viewed taxonomy and a group left with no members disappears. The consequence is accepted rather than filtered: an asset node whose asset the view dropped survives as an **all-zero column**.
 
@@ -648,8 +747,8 @@ The feature axis is exempt although some of its nodes *are* assets. It is left a
  1. Read `xkey` and `uxkey` from `sets`, and open an empty dictionary `dict` of the type `sets.dict` has.
  2. For an entry of `sets.dict` whose key starts with `xkey`, take `view(v, i)`, the group restricted to the selected assets.
  3. For an entry whose key starts with `uxkey`, take the unique entries of the `xkey`-prefixed partition it names, restricted to `i`. The unique-entry group is therefore derived from the sliced partition and never from the original one.
- 4. Carry every other entry through unchanged, into the same `dict`. The `fkey`-, `ufkey`- and `zkey`-prefixed entries, and every plain group, come back bit-identical.
- 5. Return the [`UniverseSets`](@ref) built from `dict` and the five unchanged key prefixes, which revalidates the prefix grammar over the viewed universe.
+ 4. Carry every other entry through unchanged, into the same `dict`. The `tfkey`-, `utfkey`-, `cfkey`-, `ucfkey`- and `zkey`-prefixed entries, and every plain group, come back bit-identical.
+ 5. Return the [`UniverseSets`](@ref) built from `dict` and the seven unchanged key prefixes, which revalidates the prefix grammar over the viewed universe.
 
 # Arguments
 
@@ -659,7 +758,7 @@ The feature axis is exempt although some of its nodes *are* assets. It is left a
 
 # Returns
 
-  - `sets::UniverseSets`: A new [`UniverseSets`](@ref) over the selected assets, declaring the same five axes as the original.
+  - `sets::UniverseSets`: A new [`UniverseSets`](@ref) over the selected assets, declaring the same seven key prefixes as the original.
 
 # Related
 
@@ -679,30 +778,34 @@ function port_opt_view(sets::UniverseSets, i, args...)::UniverseSets
         end
         push!(dict, k => v)
     end
-    return UniverseSets(; xkey = xkey, uxkey = uxkey, fkey = sets.fkey, ufkey = sets.ufkey,
+    return UniverseSets(; xkey = xkey, uxkey = uxkey, tfkey = sets.tfkey,
+                        utfkey = sets.utfkey, cfkey = sets.cfkey, ucfkey = sets.ucfkey,
                         zkey = sets.zkey, dict = dict)
 end
 """
-    factor_universe(sets::UniverseSets, K::Integer, need::AbstractString,
-                    source::AbstractString) -> VecStr
+    factor_universe(sets::UniverseSets, key::AbstractString, K::Integer,
+                    need::AbstractString, source::AbstractString) -> VecStr
 
-Read the **declared** factor universe, `sets.dict[sets.fkey]`, checking that it exists and that it agrees with `source` — the `observations × factors` matrix whose `K` columns it must name — on how many factors there are.
+Read the **declared** factor universe `sets.dict[key]`, checking that it exists and that it agrees with `source` — the `observations × factors` matrix whose `K` columns it must name — on how many factors there are.
 
-The factor axis is optional on [`UniverseSets`](@ref) but is not optional for a consumer written against it, so the failure has to be diagnosed at the point of need. Both messages name `sets.fkey` and the matrix, because the two are what a caller has to reconcile: a user arriving from the pre-declaration shape put the factor names under `xkey` and would otherwise be told about an *asset* universe they never wrote in.
+A factor axis is optional on [`UniverseSets`](@ref) but is not optional for a consumer written against it, so the failure has to be diagnosed at the point of need. Both messages name `key` and the matrix, because the two are what a caller has to reconcile: a user arriving from the pre-declaration shape put the factor names under `xkey` and would otherwise be told about an *asset* universe they never wrote in.
 
-One helper therefore serves every consumer of the axis, and none of them re-encodes the checks.
+`key` is stated rather than read off `sets`, because [`UniverseSets`](@ref) declares **two** factor axes and this helper cannot tell which one a caller means. A caller that holds a loadings result reads the key from it with [`factor_axis_key`](@ref); a caller written against the returns data's own `F` states `sets.tfkey`, the axis those columns live on.
+
+One helper therefore serves every consumer of either axis, and none of them re-encodes the checks.
 
 # Arguments
 
   - `sets`: The [`UniverseSets`](@ref) whose factor axis is read.
+  - `key`: The factor axis key to read, `sets.tfkey` or `sets.cfkey`.
   - `K`: The number of columns of `source`, which the declared axis must name.
   - `need`: Names the consumer in both diagnostic messages, for example `"a FactorSpace constraint"`.
   - `source`: Names the matrix in both diagnostic messages, for example `"rr.M"` or `"F"`.
 
 # Validation
 
-  - `haskey(sets.dict, sets.fkey)`. A `KeyError` naming `need` is thrown otherwise.
-  - `length(sets.dict[sets.fkey]) == K`. A `DimensionMismatch` naming `source` is thrown otherwise.
+  - `haskey(sets.dict, key)`. A `KeyError` naming `need` is thrown otherwise.
+  - `length(sets.dict[key]) == K`. A `DimensionMismatch` naming `source` is thrown otherwise.
 
 # Returns
 
@@ -711,19 +814,60 @@ One helper therefore serves every consumer of the axis, and none of them re-enco
 # Related
 
   - [`UniverseSets`](@ref)
+  - [`factor_axis_key`](@ref)
   - [`constraint_space_basis`](@ref)
   - [`FactorBlackLittermanPrior`](@ref)
   - [`feature_universe`](@ref): the same helper for the feature axis, which carries no arity to reconcile.
 """
-function factor_universe(sets::UniverseSets, K::Integer, need::AbstractString,
-                         source::AbstractString)
-    fkey = sets.fkey
-    @argcheck(haskey(sets.dict, fkey),
-              KeyError("$fkey (the factor universe), required by $need. The factor axis is optional on UniverseSets; it is not optional here: add `sets.fkey => <factor names>` to `sets.dict`, in the column order of `$source`."))
-    nf = sets.dict[fkey]
+function factor_universe(sets::UniverseSets, key::AbstractString, K::Integer,
+                         need::AbstractString, source::AbstractString)
+    @argcheck(haskey(sets.dict, key),
+              KeyError("$key (the factor universe), required by $need. A factor axis is optional on UniverseSets; it is not optional here: add `$key => <factor names>` to `sets.dict`, in the column order of `$source`."))
+    nf = sets.dict[key]
     @argcheck(length(nf) == K,
-              DimensionMismatch("`$source` and the declared factor axis disagree on how many factors there are. Got\nsize($source, 2) => $K\nlength(sets.dict[$fkey]) => $(length(nf))"))
+              DimensionMismatch("`$source` and the declared factor axis disagree on how many factors there are. Got\nsize($source, 2) => $K\nlength(sets.dict[$key]) => $(length(nf))"))
     return nf
+end
+"""
+    factor_axis_key(sets::UniverseSets, rr::Regression) -> AbstractString
+    factor_axis_key(sets::UniverseSets, rr::CrossSectionalFactorModel) -> AbstractString
+    factor_axis_key(sets::UniverseSets,
+                    re::AbstractTimeSeriesRegressionEstimator) -> AbstractString
+
+Return the [`UniverseSets`](@ref) key naming the factor axis that `rr`'s loadings are written on.
+
+[`UniverseSets`](@ref) declares two factor axes, so a consumer that resolves factor names has to say which one it means. It never says so by hand. The key follows the block that carries `M`: a [`Regression`](@ref) is fitted per asset over the observations, so its columns are the columns of `rd.F` and it answers `sets.tfkey`; a [`CrossSectionalFactorModel`](@ref) is fitted per observation across the assets, so its columns are the exposures the fit was built from and it answers `sets.cfkey`. A caller therefore cannot name the wrong axis, and no consumer gains a field to state it in.
+
+The third method serves a consumer that holds an unfitted specification rather than a result. Only the time-series family names a specification here, because [`RegE_Reg`](@ref) admits an [`AbstractTimeSeriesRegressionEstimator`](@ref) and no other estimator, and every result that family fits is a [`Regression`](@ref). The three methods therefore cover [`RegE_Reg`](@ref) exactly.
+
+There is deliberately **no fallback on [`AbstractLoadingsRegressionResult`](@ref)**. A future member of the root would silently inherit whichever axis the fallback named, and half the time that is the wrong list of names with the right length — a constraint written against it would still solve and would constrain the wrong factors. A missing method is a `MethodError` that names the type.
+
+# Arguments
+
+  - `sets`: The [`UniverseSets`](@ref) whose factor axis key is read.
+  - `rr` / `re`: The loadings result, or the specification whose verb produces one.
+
+# Returns
+
+  - `key::AbstractString`: `sets.tfkey` for the time-series family, `sets.cfkey` for the cross-sectional one.
+
+# Related
+
+  - [`UniverseSets`](@ref)
+  - [`factor_universe`](@ref)
+  - [`Regression`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+  - [`constraint_space_basis`](@ref)
+  - [`risk_budget_universe_key`](@ref)
+"""
+function factor_axis_key(sets::UniverseSets, ::Regression)
+    return sets.tfkey
+end
+function factor_axis_key(sets::UniverseSets, ::CrossSectionalFactorModel)
+    return sets.cfkey
+end
+function factor_axis_key(sets::UniverseSets, ::AbstractTimeSeriesRegressionEstimator)
+    return sets.tfkey
 end
 """
     feature_universe(sets::UniverseSets, need::AbstractString) -> VecStr
@@ -1861,20 +2005,20 @@ end
 """
     universe_axis(sets::UniverseSets, key::AbstractString) -> String
 
-Name of the axis the universe stored under `key` belongs to, read off the key itself: `"factor"` for anything carrying the `fkey` prefix, `"asset"` otherwise. It exists only so [`unknown_variable_msg`](@ref) and [`empty_row_msg`](@ref) can name the axis the user wrote in.
+Name of the axis the universe stored under `key` belongs to, read off the key itself: `"factor"` for anything carrying the `tfkey` prefix, `"asset"` otherwise. It exists only so [`unknown_variable_msg`](@ref) and [`empty_row_msg`](@ref) can name the axis the user wrote in.
 
-The **key** is the evidence, for both callers, and the reason is that both resolve names against `sets.dict[key]` and nothing else: whatever axis that universe belongs to is the axis a failed lookup failed on. [`get_black_litterman_views`](@ref) takes the key from the estimator that owns the views, and [`get_linear_constraints`](@ref) from the constraint space — [`FactorSpace`](@ref) resolving at `sets.fkey`. Reading it off the *re-basis* instead would be a second encoding of the same fact, and a worse one: a wrapped estimator carrying its own `key` overrides the space's, so a re-based row can legitimately resolve against a universe the loadings are not written in, and the message must name the universe that was searched.
+The **key** is the evidence, for both callers, and the reason is that both resolve names against `sets.dict[key]` and nothing else: whatever axis that universe belongs to is the axis a failed lookup failed on. [`get_black_litterman_views`](@ref) takes the key from the estimator that owns the views, and [`get_linear_constraints`](@ref) from the constraint space — [`FactorSpace`](@ref) resolving at `sets.tfkey`. Reading it off the *re-basis* instead would be a second encoding of the same fact, and a worse one: a wrapped estimator carrying its own `key` overrides the space's, so a re-based row can legitimately resolve against a universe the loadings are not written in, and the message must name the universe that was searched.
 
 The **prefix** rather than equality is what makes a factor group key (`"nf_sector"`) resolve as the factor axis too, and the disjoint-prefix rule [`UniverseSets`](@ref) enforces at construction is what makes that unambiguous.
 
 # Algorithm
 
- 1. Return `"factor"` when `key` starts with `sets.fkey`.
+ 1. Return `"factor"` when `key` starts with `sets.tfkey`.
  2. Return `"asset"` in every other case.
 
 # Arguments
 
-  - `sets`: The [`UniverseSets`](@ref) whose `fkey` names the factor axis.
+  - `sets`: The [`UniverseSets`](@ref) whose `tfkey` names the factor axis.
   - `key`: The key the names were resolved against.
 
 # Returns
@@ -1888,7 +2032,7 @@ The **prefix** rather than equality is what makes a factor group key (`"nf_secto
   - [`UniverseSets`](@ref)
 """
 function universe_axis(sets::UniverseSets, key::AbstractString)::String
-    return ifelse(startswith(key, sets.fkey), "factor", "asset")
+    return ifelse(startswith(key, sets.tfkey), "factor", "asset")
 end
 """
     constraint_row_length(rr, nx::VecStr) -> Int
@@ -2007,7 +2151,7 @@ A row takes one of two shapes. Without `rr` it runs over the universe the names 
 
   - `lcs`: A single [`ParsingResult`](@ref) or a vector of such objects, representing parsed constraint equations.
   - `sets`: A [`UniverseSets`](@ref) object specifying the universes and groupings.
-  - `key`: Key naming the universe the variables resolve against. Defaults to `sets.xkey`; a re-based constraint passes `sets.fkey`.
+  - `key`: Key naming the universe the variables resolve against. Defaults to `sets.xkey`; a re-based constraint passes `sets.tfkey`.
   - `datatype`: Numeric type for coefficients and right-hand side.
   - `strict`: If `true`, throws an error if a variable or group is not found in `sets`; if `false`, issues a warning.
   - `rr`: Loadings to re-base through, or `nothing` for an ordinary asset-space constraint. See [`ExposureConstraintEstimator`](@ref) — callers do not pass this directly.

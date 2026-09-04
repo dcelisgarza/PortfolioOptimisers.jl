@@ -179,7 +179,7 @@
         @test all(x -> x.ineq.A == linear_constraints(bare, sets).ineq.A, vb)
     end
     @testset "The wrapped key overrides the factor axis" begin
-        # `key === nothing` resolves to `sets.fkey` rather than `sets.xkey`; a key written on
+        # `key === nothing` resolves to `sets.tfkey` rather than `sets.xkey`; a key written on
         # the wrapped estimator still wins, so an alternative factor partition can be named.
         setsk = UniverseSets(;
                              dict = Dict("nx" => ["A", "B", "C"],
@@ -289,7 +289,7 @@
         @test vec(lcr.ineq.A) ≈ M[:, 1]
         # The axis check counts `M`'s columns, not `L`'s: `L` has two here and the constraint
         # still builds against a three-factor axis.
-        @test size(rrl.L, 2) != length(sets.dict[sets.fkey])
+        @test size(rrl.L, 2) != length(sets.dict[sets.tfkey])
     end
     # A tiny factor market for the optimiser tests: the assets are combinations of two
     # factors plus noise, so a fitted `M` is close to `Mo` without being it. Every assertion
