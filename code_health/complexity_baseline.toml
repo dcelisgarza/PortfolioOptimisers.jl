@@ -143,6 +143,7 @@ commit = "dd069231d0"
 "src/14_UncertaintySets/05_L1UncertaintySets.jl" = { cyc = 6, cog = 6, arg = 5, cyc_sum = 54, cog_sum = 50, arg_sum = 49, macros = [] }
 "src/14_UncertaintySets/06_CalibrationRules.jl" = { cyc = 3, cog = 4, arg = 6, cyc_sum = 87, cog_sum = 50, arg_sum = 154, macros = [] }
 "src/14_UncertaintySets/07_CompactUncertaintySets.jl" = { cyc = 3, cog = 2, arg = 4, cyc_sum = 9, cog_sum = 5, arg_sum = 8, macros = [] }
+"src/14_UncertaintySets/08_NormBallUncertaintySets.jl" = { cyc = 4, cog = 3, arg = 5, cyc_sum = 14, cog_sum = 7, arg_sum = 6, macros = [] }
 "src/15_Turnover.jl" = { cyc = 2, cog = 2, arg = 4, cyc_sum = 17, cog_sum = 11, arg_sum = 9, macros = ["@propagatable"] }
 "src/16_Fees.jl" = { cyc = 1, cog = 1, arg = 4, cyc_sum = 41, cog_sum = 7, arg_sum = 106, macros = ["@propagatable"] }
 "src/17_NetReturnsDrawdowns.jl" = { cyc = 2, cog = 2, arg = 4, cyc_sum = 15, cog_sum = 9, arg_sum = 32, macros = [] }
@@ -206,7 +207,7 @@ commit = "dd069231d0"
 "src/20_Optimisation/09_JuMPConstraints/10_FeesConstraints.jl" = { cyc = 3, cog = 2, arg = 7, cyc_sum = 14, cog_sum = 5, arg_sum = 21, macros = [] }
 "src/20_Optimisation/09_JuMPConstraints/11_TrackingErrorConstraints.jl" = { cyc = 2, cog = 2, arg = 10, cyc_sum = 12, cog_sum = 4, arg_sum = 57, macros = [] }
 "src/20_Optimisation/09_JuMPConstraints/12_RegularisationConstraints.jl" = { cyc = 2, cog = 1, arg = 5, cyc_sum = 42, cog_sum = 10, arg_sum = 78, macros = [] }
-"src/20_Optimisation/09_JuMPConstraints/13_WeightNormConstraints.jl" = { cyc = 2, cog = 1, arg = 2, cyc_sum = 7, cog_sum = 1, arg_sum = 9, macros = [] }
+"src/20_Optimisation/09_JuMPConstraints/13_WeightNormConstraints.jl" = { cyc = 4, cog = 4, arg = 5, cyc_sum = 11, cog_sum = 5, arg_sum = 14, macros = [] }
 "src/20_Optimisation/10_JuMPOptimiser.jl" = { cyc = 102, cog = 98, arg = 44, cyc_sum = 142, cog_sum = 128, arg_sum = 116, macros = ["@forward_properties"] }
 "src/20_Optimisation/11_MeanRisk.jl" = { cyc = 5, cog = 5, arg = 7, cyc_sum = 41, cog_sum = 23, arg_sum = 85, macros = ["@pipe_delegates", "@pipe_route_sigma_ucs", "@propagatable"] }
 "src/20_Optimisation/12_FactorRiskContribution.jl" = { cyc = 4, cog = 3, arg = 9, cyc_sum = 18, cog_sum = 11, arg_sum = 33, macros = ["@forward_properties", "@pipe_delegates", "@pipe_route_sigma_ucs", "@propagatable"] }

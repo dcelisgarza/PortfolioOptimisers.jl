@@ -193,7 +193,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - If `ucs` is an `EllipsoidalUncertaintySet`: must be parameterised by `MuEllipsoidalUncertaintySet`.
+  - If `ucs` is an `EllipsoidalUncertaintySet` or a `NormBallUncertaintySet`: must be parameterised by `MuUncertaintySetClass`.
   - If `mu` is a number: `isfinite(mu)`.
   - If `mu` is a vector: `!isempty(mu)` and `all(isfinite, mu)`.
 
@@ -230,9 +230,13 @@ Keywords correspond to the struct's fields.
                               mu::Option{<:ArithRetMu})
         if isa(ucs, EllipsoidalUncertaintySet)
             @argcheck(isa(ucs,
-                          EllipsoidalUncertaintySet{<:Any, <:Any,
-                                                    <:MuEllipsoidalUncertaintySet}),
-                      ArgumentError("ucs must be parameterised by MuEllipsoidalUncertaintySet, got $(typeof(ucs))"))
+                          EllipsoidalUncertaintySet{<:Any, <:Any, <:MuUncertaintySetClass}),
+                      ArgumentError("ucs must be parameterised by MuUncertaintySetClass, got $(typeof(ucs))"))
+        elseif isa(ucs, NormBallUncertaintySet)
+            @argcheck(isa(ucs,
+                          NormBallUncertaintySet{<:Any, <:Any, <:Any,
+                                                 <:MuUncertaintySetClass}),
+                      ArgumentError("ucs must be parameterised by MuUncertaintySetClass, got $(typeof(ucs))"))
         end
         if isa(mu, VecNum)
             @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
@@ -1731,6 +1735,82 @@ function set_ucs_return_constraints!(model::JuMP.Model, i, ucs::SignedL1Uncertai
     add_fees_to_ret!(model, ret, settings.fee)
     add_market_impact_cost!(model, ret, settings.mic)
     return ret, mu, false
+end
+"""
+    set_ucs_return_constraints!(model, i, ucs::NormBallUncertaintySet, mu, settings)
+
+Build one term's norm-ball-robust return expression.
+
+Introduces one cone on ``\\mathbf{L}^{\\intercal}\\boldsymbol{w}``, the cone the dual norm
+order names, so the ellipsoid's Cholesky factor is replaced by the set's own map and nothing
+is factorised. A map with no column raises no cone and leaves the nominal return, and the term
+is then not reported as `robust`. The method is defined on the mean tag alone, and the
+[`ArithmeticReturn`](@ref) constructor refuses a set that carries the covariance tag.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\hat{r}(\\boldsymbol{w}) &= \\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - \\kappa \\lVert \\mathbf{L}^{\\intercal}\\boldsymbol{w} \\rVert_{q}\\,, \\quad \\frac{1}{p} + \\frac{1}{q} = 1\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\hat{r}(\\boldsymbol{w})``: Worst-case expected return.
+  - $(math_dict[:mu_er])
+  - $(math_dict[:w_port])
+  - ``\\kappa``: Norm-ball radius.
+  - ``\\mathbf{L}``: Geometry map of the set, ``N \\times r``.
+  - ``p``, ``q``: Norm order of the set and its dual.
+
+# JuMP formulation
+
+## Variables
+
+  - `w`: portfolio weights, read from the model.
+
+## Expressions
+
+  - `x_nbucs_w_i`: ``\\mathbf{L}^{\\intercal}\\boldsymbol{w}``, registered only when ``\\mathbf{L}`` has a column.
+  - `ret_i`: ``\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - \\kappa t``, with ``t`` the epigraph [`norm_ball_dual_norm_epigraph!`](@ref) registers, or ``\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w}`` when ``\\mathbf{L}`` has no column.
+
+Where:
+
+  - $(math_dict[:mu_er])
+  - $(math_dict[:w_port])
+  - ``\\kappa``, ``\\mathbf{L}``: Radius and geometry map of the set.
+  - ``t``: Epigraph of ``\\lVert \\mathbf{L}^{\\intercal}\\boldsymbol{w} \\rVert_{q}``.
+
+# Related
+
+  - [`set_ucs_return_constraints!`](@ref)
+  - [`norm_ball_dual_norm_epigraph!`](@ref)
+  - [`NormBallUncertaintySet`](@ref)
+  - [`EllipsoidalUncertaintySet`](@ref)
+"""
+function set_ucs_return_constraints!(model::JuMP.Model, i,
+                                     ucs::NormBallUncertaintySet{<:Any, <:Any, <:Any,
+                                                                 <:MuUncertaintySetClass},
+                                     mu::Num_VecNum, settings::JuMPReturnsSettings)
+    w = get_w(model)
+    mu = something(ucs.val, mu)
+    L = ucs.L
+    # A map with no column spans nothing, so the worst case is the nominal return and no
+    # cone is needed.
+    robust = size(L, 2) > zero(Int)
+    ret = if robust
+        x_nbucs_w = state_set!(model, Symbol(""), :x_nbucs_w_, i,
+                               JuMP.@expression(model, transpose(L) * w))
+        t_nbucs = norm_ball_dual_norm_epigraph!(model, Symbol(""), i, x_nbucs_w, ucs.p)
+        JuMP.@expression(model, dot_scalar(mu, w) - ucs.kappa * t_nbucs)
+    else
+        JuMP.@expression(model, dot_scalar(mu, w))
+    end
+    ret = state_set!(model, Symbol(""), :ret_, i, ret)
+    add_fees_to_ret!(model, ret, settings.fee)
+    add_market_impact_cost!(model, ret, settings.mic)
+    return ret, mu, robust
 end
 function set_return_constraints!(model::JuMP.Model, i,
                                  pret::ArithmeticReturn{<:Any, <:UcSE_UcS, <:Any},

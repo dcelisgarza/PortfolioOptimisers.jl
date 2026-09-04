@@ -820,9 +820,9 @@ function ucs(ue::NormalUncertaintySet{<:Any,
     X_sigma = transpose(reshape(X_sigma, N^2, :))
     sigma_sigma = sigma_asymptotic_cov(ue.pdm, sigma_mu, sigma, T)
     return ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, X_mu, sigma_mu,
-                           MuEllipsoidalUncertaintySet(), pr.mu),
+                           MuUncertaintySetClass(), pr.mu),
            ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, X_sigma, sigma_sigma,
-                           SigmaEllipsoidalUncertaintySet(), pr.sigma)
+                           SigmaUncertaintySetClass(), pr.sigma)
 end
 """
     ucs(ue::NormalUncertaintySet{<:Any, <:EllipsoidalUncertaintySetAlgorithm{<:Any, <:Any},
@@ -898,9 +898,9 @@ function ucs(ue::NormalUncertaintySet{<:Any,
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
     sigma_sigma = sigma_asymptotic_cov(ue.pdm, sigma_mu, sigma, T)
     return ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, nothing, sigma_mu,
-                           MuEllipsoidalUncertaintySet(), pr.mu),
+                           MuUncertaintySetClass(), pr.mu),
            ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, nothing, sigma_sigma,
-                           SigmaEllipsoidalUncertaintySet(), pr.sigma)
+                           SigmaUncertaintySetClass(), pr.sigma)
 end
 """
     mu_ucs(ue::NormalUncertaintySet{<:Any,
@@ -970,7 +970,7 @@ function mu_ucs(ue::NormalUncertaintySet{<:Any,
     # the law it is drawn from, and what a draw from `N(mu, sigma)` would cost.
     X_mu = transpose(rand(rng, Distributions.MvNormal(mu, sigma_mu), ue.n_sim) .- mu)
     return ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, X_mu, sigma_mu,
-                           MuEllipsoidalUncertaintySet(), pr.mu)
+                           MuUncertaintySetClass(), pr.mu)
 end
 """
     mu_ucs(ue::NormalUncertaintySet{<:Any, <:EllipsoidalUncertaintySetAlgorithm{<:Any, <:Any},
@@ -1035,7 +1035,7 @@ function mu_ucs(ue::NormalUncertaintySet{<:Any,
     T = choose_scaling_parameter(ue, pr)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
     return ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, nothing, sigma_mu,
-                           MuEllipsoidalUncertaintySet(), pr.mu)
+                           MuUncertaintySetClass(), pr.mu)
 end
 """
     sigma_ucs(ue::NormalUncertaintySet{<:Any,
@@ -1117,7 +1117,7 @@ function sigma_ucs(ue::NormalUncertaintySet{<:Any,
     X_sigma = transpose(reshape(X_sigma, N^2, :))
     sigma_sigma = sigma_asymptotic_cov(ue.pdm, sigma_mu, sigma, T)
     return ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, X_sigma, sigma_sigma,
-                           SigmaEllipsoidalUncertaintySet(), pr.sigma)
+                           SigmaUncertaintySetClass(), pr.sigma)
 end
 """
     sigma_ucs(ue::NormalUncertaintySet{<:Any,
@@ -1188,7 +1188,7 @@ function sigma_ucs(ue::NormalUncertaintySet{<:Any,
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
     sigma_sigma = sigma_asymptotic_cov(ue.pdm, sigma_mu, sigma, T)
     return ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, nothing, sigma_sigma,
-                           SigmaEllipsoidalUncertaintySet(), pr.sigma)
+                           SigmaUncertaintySetClass(), pr.sigma)
 end
 
 export NormalUncertaintySet

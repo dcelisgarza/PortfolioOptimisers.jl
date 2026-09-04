@@ -440,21 +440,21 @@
         Xs = randn(StableRNG(1), 50, 2)
         # Number method returns k == the number verbatim; cov passed through untouched.
         s = PortfolioOptimisers.ellipsoidal_set(false, 5, q, nothing, cov,
-                                                MuEllipsoidalUncertaintySet())
+                                                MuUncertaintySetClass())
         @test s.k == 5
         @test s.sigma == cov
-        @test s.class isa MuEllipsoidalUncertaintySet
+        @test s.class isa MuUncertaintySetClass
         # diagonal = true restricts cov to its diagonal before fitting k.
         sd = PortfolioOptimisers.ellipsoidal_set(true, 5, q, nothing, cov,
-                                                 SigmaEllipsoidalUncertaintySet())
+                                                 SigmaUncertaintySetClass())
         @test sd.sigma == LinearAlgebra.Diagonal(cov)
-        @test sd.class isa SigmaEllipsoidalUncertaintySet
+        @test sd.class isa SigmaUncertaintySetClass
         # General / ChiSq / Normal k-methods match k_ucs on the (possibly diagonalised) cov.
         for (method, samp) in ((GeneralKUncertaintyAlgorithm(), nothing),
                                (ChiSqKUncertaintyAlgorithm(), nothing), (NormalKUncertaintyAlgorithm(), Xs))
             for diag in (false, true)
                 e = PortfolioOptimisers.ellipsoidal_set(diag, method, q, samp, cov,
-                                                        MuEllipsoidalUncertaintySet())
+                                                        MuUncertaintySetClass())
                 cov_ref = diag ? LinearAlgebra.Diagonal(cov) : cov
                 @test e.sigma == cov_ref
                 @test e.k == PortfolioOptimisers.k_ucs(method, q, samp, cov_ref)
@@ -515,12 +515,12 @@
                                                              ub = [0.3, 0.4],
                                                              val = [1.0, 2.0, 3.0])
             @test isnothing(EllipsoidalUncertaintySet(; sigma = [1.0 0.0; 0.0 1.0], k = 2.0,
-                                                      class = MuEllipsoidalUncertaintySet()).val)
+                                                      class = MuUncertaintySetClass()).val)
             @test_throws DimensionMismatch EllipsoidalUncertaintySet(;
                                                                      sigma = [1.0 0.0;
                                                                               0.0 1.0],
                                                                      k = 2.0,
-                                                                     class = MuEllipsoidalUncertaintySet(),
+                                                                     class = MuUncertaintySetClass(),
                                                                      val = [1.0, 2.0, 3.0])
             @test isnothing(L1UncertaintySet(; eps = 0.1).mu)
             @test L1UncertaintySet(; eps = 0.1, mu = [1.0, 2.0]).mu == [1.0, 2.0]
@@ -534,7 +534,7 @@
             # The pre-fix positional arities still construct, and carry nothing.
             @test isnothing(BoxUncertaintySet([0.1, 0.2], [0.3, 0.4]).val)
             @test isnothing(EllipsoidalUncertaintySet([1.0 0.0; 0.0 1.0], 2.0,
-                                                      MuEllipsoidalUncertaintySet()).val)
+                                                      MuUncertaintySetClass()).val)
             @test isnothing(L1UncertaintySet(0.1, nothing).mu)
             @test isnothing(SignedL1UncertaintySet(0.1, 0.2, nothing).mu)
         end
@@ -577,18 +577,18 @@
                                              ucs = EllipsoidalUncertaintySet(;
                                                                              sigma = shape,
                                                                              k = 1.5,
-                                                                             class = SigmaEllipsoidalUncertaintySet(),
+                                                                             class = SigmaUncertaintySetClass(),
                                                                              val = A),
                                              sigma = B)
             bare_a = UncertaintySetVariance(;
                                             ucs = EllipsoidalUncertaintySet(; sigma = shape,
                                                                             k = 1.5,
-                                                                            class = SigmaEllipsoidalUncertaintySet()),
+                                                                            class = SigmaUncertaintySetClass()),
                                             sigma = A)
             bare_b = UncertaintySetVariance(;
                                             ucs = EllipsoidalUncertaintySet(; sigma = shape,
                                                                             k = 1.5,
-                                                                            class = SigmaEllipsoidalUncertaintySet()),
+                                                                            class = SigmaUncertaintySetClass()),
                                             sigma = B)
             @test carried(w) == bare_a(w)
             @test carried(w) != bare_b(w)
@@ -621,7 +621,7 @@
             ev = PortfolioOptimisers.port_opt_view(EllipsoidalUncertaintySet(;
                                                                              sigma = pr_ref.sigma,
                                                                              k = 1.5,
-                                                                             class = MuEllipsoidalUncertaintySet(),
+                                                                             class = MuUncertaintySetClass(),
                                                                              val = pr_ref.mu),
                                                    i)
             @test ev.val == pr_ref.mu[i]
@@ -631,7 +631,7 @@
             em = PortfolioOptimisers.port_opt_view(EllipsoidalUncertaintySet(;
                                                                              sigma = LinearAlgebra.Diagonal(ones(N^2)),
                                                                              k = 1.5,
-                                                                             class = SigmaEllipsoidalUncertaintySet(),
+                                                                             class = SigmaUncertaintySetClass(),
                                                                              val = pr_ref.sigma),
                                                    i)
             @test em.val == pr_ref.sigma[i, i]
@@ -734,9 +734,9 @@
             cv = Statistics.cov(Xd)
             km = NormalKUncertaintyAlgorithm()
             e_full = PortfolioOptimisers.ellipsoidal_set(false, km, 0.05, Xd, cv,
-                                                         MuEllipsoidalUncertaintySet())
+                                                         MuUncertaintySetClass())
             e_diag = PortfolioOptimisers.ellipsoidal_set(true, km, 0.05, Xd, cv,
-                                                         MuEllipsoidalUncertaintySet())
+                                                         MuUncertaintySetClass())
             d2_diag = [LinearAlgebra.dot(Xd[t, :], LinearAlgebra.Diagonal(cv) \ Xd[t, :])
                        for t in axes(Xd, 1)]
             @test e_diag.k ≈ sqrt(quantile(d2_diag, 0.95))
@@ -756,9 +756,9 @@
                 Xs = randn(StableRNG(s), 252, 5) * 0.01
                 cvs = Statistics.cov(Xs)
                 kf = PortfolioOptimisers.ellipsoidal_set(false, km, 0.05, Xs, cvs,
-                                                         MuEllipsoidalUncertaintySet()).k
+                                                         MuUncertaintySetClass()).k
                 kd = PortfolioOptimisers.ellipsoidal_set(true, km, 0.05, Xs, cvs,
-                                                         MuEllipsoidalUncertaintySet()).k
+                                                         MuUncertaintySetClass()).k
                 return kd > kf
             end
             @test n_diag_larger == 34
@@ -1341,7 +1341,7 @@
                                                                                                 sigma = I(Nc^2) *
                                                                                                         1.0,
                                                                                                 k = 0.1,
-                                                                                                class = SigmaEllipsoidalUncertaintySet())),
+                                                                                                class = SigmaUncertaintySetClass())),
                                      obj = MinimumRisk(), opt = optc), rdc)
             @test haskey(rese.model, :W)
             # A radius of zero, and a basis that spans everything, both reproduce the
@@ -1383,6 +1383,273 @@
                                                    val = sigma2)
             @test isapprox(PortfolioOptimisers.ucs_variance(ucsw, sigmac, wc),
                            PortfolioOptimisers.ucs_variance(ucsc, sigma2, wc))
+        end
+    end
+    @testset "The norm-ball uncertainty set (#729)" begin
+        # A set held as a radius, a geometry map and a norm order. The oracle is Hölder's
+        # inequality: the worst case is the radius times the dual norm of `L' e`, so no
+        # consumer factorises anything, and the map may be flat or have no column.
+        rngn = StableRNG(20260904)
+        Nn, rn = 6, 3
+        Ln = randn(rngn, Nn, rn) * 1e-3
+        Xn = randn(rngn, 300, Nn) * 0.01 .+ 5e-4
+        rdn = ReturnsResult(; X = Xn, nx = string.("A", 1:Nn))
+        mun = vec(mean(Xn; dims = 1))
+        sigman = cov(Xn)
+        wn = randn(rngn, Nn)
+        slvn = Solver(; name = :clarabel_nbucs, solver = Clarabel.Optimizer,
+                      check_sol = (; allow_local = true, allow_almost = true),
+                      settings = Dict("verbose" => false, "tol_gap_abs" => 1e-12,
+                                      "tol_gap_rel" => 1e-12, "tol_feas" => 1e-12))
+        optn = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slvn)
+        mu_tag = MuUncertaintySetClass()
+        sg_tag = SigmaUncertaintySetClass()
+        ret_key = PortfolioOptimisers.state_key(Symbol(""), :ret_, 1)
+        skey(name) = PortfolioOptimisers.state_key(Symbol(""), name, 1)
+        dualq = PortfolioOptimisers.dual_norm_order
+        # A maximum-utility objective pulls on the return term, so the epigraph is tight at
+        # the optimum and the model's own expression is the worst case.
+        function solve_ret(ucs)
+            return optimise(MeanRisk(; r = Variance(), obj = MaximumUtility(; l = 2),
+                                     opt = JuMPOptimiser(; pe = EmpiricalPrior(),
+                                                         slv = slvn,
+                                                         ret = ArithmeticReturn(;
+                                                                                ucs = ucs))),
+                            rdn)
+        end
+        function solve_var(ucs)
+            return optimise(MeanRisk(; r = UncertaintySetVariance(; ucs = ucs),
+                                     obj = MinimumRisk(), opt = optn), rdn)
+        end
+        @testset "Result construction and validation" begin
+            ucs = NormBallUncertaintySet(; kappa = 2.0, L = Ln, class = mu_tag)
+            @test ucs.kappa == 2.0
+            @test ucs.L === Ln
+            @test ucs.p == 2
+            @test ucs.class === mu_tag
+            @test isnothing(ucs.val)
+            @test isa(NormBallUncertaintySet(2.0, Ln, 3, mu_tag, nothing),
+                      NormBallUncertaintySet)
+            # The three admitted edges: a radius of zero, a map with no column, and the
+            # two norm orders whose dual is polyhedral.
+            @test NormBallUncertaintySet(; kappa = 0.0, L = Ln, class = mu_tag).kappa == 0
+            @test size(NormBallUncertaintySet(; kappa = 1.0, L = zeros(Nn, 0),
+                                              class = mu_tag).L, 2) == 0
+            @test isinf(NormBallUncertaintySet(; kappa = 1.0, L = Ln, p = Inf,
+                                               class = mu_tag).p)
+            @test NormBallUncertaintySet(; kappa = 1.0, L = Ln, p = 1, class = mu_tag).p ==
+                  1
+            @test_throws DomainError NormBallUncertaintySet(; kappa = -1.0, L = Ln,
+                                                            class = mu_tag)
+            @test_throws DomainError NormBallUncertaintySet(; kappa = Inf, L = Ln,
+                                                            class = mu_tag)
+            @test_throws DomainError NormBallUncertaintySet(; kappa = 1.0, L = Ln, p = 0.5,
+                                                            class = mu_tag)
+            @test_throws DomainError NormBallUncertaintySet(; kappa = 1.0, L = Ln, p = NaN,
+                                                            class = mu_tag)
+            @test_throws Exception NormBallUncertaintySet(; kappa = 1.0,
+                                                          L = [1.0 NaN; 0.0 1.0],
+                                                          class = mu_tag)
+            @test_throws Exception NormBallUncertaintySet(; kappa = 1.0, L = zeros(0, 2),
+                                                          class = mu_tag)
+            @test_throws DimensionMismatch NormBallUncertaintySet(; kappa = 1.0, L = Ln,
+                                                                  class = mu_tag,
+                                                                  val = ones(Nn + 1))
+            # The covariance tag needs a perfect square of rows and a square centre.
+            @test_throws DimensionMismatch NormBallUncertaintySet(; kappa = 1.0,
+                                                                  L = zeros(Nn^2 + 1, 1),
+                                                                  class = sg_tag)
+            @test_throws DimensionMismatch NormBallUncertaintySet(; kappa = 1.0,
+                                                                  L = zeros(Nn^2, 1),
+                                                                  class = sg_tag,
+                                                                  val = ones(Nn^2))
+            @test NormBallUncertaintySet(; kappa = 1.0, L = zeros(Nn^2, 1), class = sg_tag,
+                                         val = sigman).val === sigman
+            @test NormBallUncertaintySet(; kappa = 1.0, L = Ln, class = mu_tag,
+                                         val = mun).val === mun
+            # The axis tags lost the word ellipsoidal, because a norm ball of order one is
+            # no ellipsoid and the tag names the axis alone.
+            @test !isdefined(PortfolioOptimisers, :MuEllipsoidalUncertaintySet)
+            @test !isdefined(PortfolioOptimisers, :SigmaEllipsoidalUncertaintySet)
+            @test !isdefined(PortfolioOptimisers,
+                             :AbstractEllipsoidalUncertaintySetResultClass)
+            @test MuUncertaintySetClass <: PortfolioOptimisers.AbstractUncertaintySetClass
+            @test SigmaUncertaintySetClass <:
+                  PortfolioOptimisers.AbstractUncertaintySetClass
+            # The dual order.
+            @test isinf(dualq(1))
+            @test dualq(2) == 2
+            @test dualq(Inf) == 1
+            @test dualq(3) == 1.5
+            @test dualq(1.5) == 3
+        end
+        @testset "The mean penalty is the radius times the dual norm at the optimum" begin
+            for p in (1, 2, 3, Inf)
+                ucs = NormBallUncertaintySet(; kappa = 1.0, L = Ln, p = p, class = mu_tag)
+                res = solve_ret(ucs)
+                @test isa(res.retcode, PortfolioOptimisers.OptimisationSuccess)
+                @test isapprox(sum(res.w), 1.0)
+                want = dot(mun, res.w) - ucs.kappa * norm(transpose(Ln) * res.w, dualq(p))
+                @test isapprox(PortfolioOptimisers.JuMP.value(res.model[ret_key]), want;
+                               rtol = 1e-6)
+                @test haskey(res.model, skey(:t_nbucs_))
+                @test haskey(res.model, skey(:nbucs_cone_))
+                # Only the power-cone route carries the per-entry auxiliaries.
+                @test haskey(res.model, skey(:r_nbucs_)) == (p == 3)
+                @test haskey(res.model, skey(:nbucs_cone_sum_)) == (p == 3)
+            end
+            # The penalty is linear in the radius and vanishes at zero, where the weights
+            # are the nominal ones.
+            resn = solve_ret(nothing)
+            res0 = solve_ret(NormBallUncertaintySet(; kappa = 0.0, L = Ln, class = mu_tag))
+            @test isapprox(res0.w, resn.w; rtol = 1e-5, atol = 1e-6)
+        end
+        @testset "The ellipsoid and its converted norm ball reach the same weights" begin
+            Sm = sigman / size(Xn, 1)
+            ell = EllipsoidalUncertaintySet(; sigma = Sm, k = 2.0, class = mu_tag)
+            nbe = NormBallUncertaintySet(ell)
+            @test nbe.kappa == ell.k
+            @test nbe.p == 2
+            @test nbe.class === ell.class
+            @test isnothing(nbe.val)
+            @test isapprox(nbe.L * transpose(nbe.L), Sm)
+            @test NormBallUncertaintySet(EllipsoidalUncertaintySet(; sigma = Sm, k = 2.0,
+                                                                   class = mu_tag,
+                                                                   val = mun)).val === mun
+            rese = solve_ret(ell)
+            resb = solve_ret(nbe)
+            @test isapprox(resb.w, rese.w; rtol = 1e-5, atol = 1e-6)
+            @test isapprox(PortfolioOptimisers.JuMP.value(resb.model[ret_key]),
+                           PortfolioOptimisers.JuMP.value(rese.model[ret_key]); rtol = 1e-6)
+            # A diagonal shape converts to a diagonal map and factorises nothing dense.
+            elld = EllipsoidalUncertaintySet(; sigma = Diagonal(diag(Sm)), k = 2.0,
+                                             class = mu_tag)
+            nbd = NormBallUncertaintySet(elld)
+            @test isa(nbd.L, Diagonal)
+            @test isapprox(solve_ret(nbd).w, solve_ret(elld).w; rtol = 1e-5, atol = 1e-6)
+            # The covariance axis, through the lifted form with `L'` for the Cholesky
+            # factor.
+            ells = sigma_ucs(NormalUncertaintySet(; pe = EmpiricalPrior(),
+                                                  rng = StableRNG(7),
+                                                  alg = EllipsoidalUncertaintySetAlgorithm()),
+                             rdn)
+            @test isa(ells.class, SigmaUncertaintySetClass)
+            nbs = NormBallUncertaintySet(ells)
+            @test size(nbs.L) == (Nn^2, Nn^2)
+            @test isa(nbs.class, SigmaUncertaintySetClass)
+            @test nbs.val === ells.val
+            ress = solve_var(ells)
+            resv = solve_var(nbs)
+            @test isa(resv.retcode, PortfolioOptimisers.OptimisationSuccess)
+            @test isapprox(resv.w, ress.w; rtol = 1e-5, atol = 1e-6)
+            # The route registers `W` as the ellipsoid's does.
+            @test haskey(resv.model, :W)
+            @test haskey(resv.model, :E)
+            keyv = skey(:nbucs_variance_risk_)
+            keye = skey(:eucs_variance_risk_)
+            @test isapprox(PortfolioOptimisers.JuMP.value(resv.model[keyv]),
+                           PortfolioOptimisers.JuMP.value(ress.model[keye]); rtol = 1e-6)
+            # The scalar twin is the `E = 0` evaluation, an upper bound on the model's
+            # optimum, and it agrees with the ellipsoid's twin.
+            twin = PortfolioOptimisers.ucs_variance(nbs, sigman, resv.w)
+            @test twin >= PortfolioOptimisers.JuMP.value(resv.model[keyv]) - 1e-10
+            @test isapprox(twin, PortfolioOptimisers.ucs_variance(ells, sigman, resv.w);
+                           rtol = 1e-10)
+        end
+        @testset "A diagonal norm ball of order infinity is the box, and of order one the l1 set" begin
+            d = (0.5 .+ rand(rngn, Nn)) * 1e-3
+            box = BoxUncertaintySet(; lb = mun - d, ub = mun + d)
+            nbb = NormBallUncertaintySet(; kappa = 1.0, L = Diagonal(d), p = Inf,
+                                         class = mu_tag)
+            resbox = solve_ret(box)
+            resnbb = solve_ret(nbb)
+            @test isapprox(resnbb.w, resbox.w; rtol = 1e-5, atol = 1e-6)
+            @test isapprox(PortfolioOptimisers.JuMP.value(resnbb.model[ret_key]),
+                           PortfolioOptimisers.JuMP.value(resbox.model[ret_key]);
+                           rtol = 1e-6)
+            sdv = (0.5 .+ rand(rngn, Nn)) * 1e-3
+            l1 = L1UncertaintySet(; eps = 0.5, sd = sdv)
+            nb1 = NormBallUncertaintySet(; kappa = 0.5, L = Diagonal(sdv), p = 1,
+                                         class = mu_tag)
+            resl1 = solve_ret(l1)
+            resnb1 = solve_ret(nb1)
+            @test isapprox(resnb1.w, resl1.w; rtol = 1e-5, atol = 1e-6)
+            @test isapprox(PortfolioOptimisers.JuMP.value(resnb1.model[ret_key]),
+                           PortfolioOptimisers.JuMP.value(resl1.model[ret_key]);
+                           rtol = 1e-6)
+        end
+        @testset "A view is the projection of the set, not a refit" begin
+            iv = [2, 4, 5]
+            wfull = zeros(Nn)
+            wfull[iv] = wn[iv]
+            ucs = NormBallUncertaintySet(; kappa = 2.0, L = Ln, p = 3, class = mu_tag,
+                                         val = mun)
+            v = PortfolioOptimisers.port_opt_view(ucs, iv)
+            @test v.kappa == ucs.kappa
+            @test v.p == ucs.p
+            @test v.class === ucs.class
+            @test v.L == Ln[iv, :]
+            @test v.val == mun[iv]
+            # The penalty of the projected set on the cluster's weights equals the penalty
+            # of the whole set on the same weights padded with zeros.
+            @test isapprox(norm(transpose(v.L) * wn[iv], dualq(3)),
+                           norm(transpose(Ln) * wfull, dualq(3)))
+            # The covariance axis maps the row index through the fourth-moment index and
+            # slices the centre on both axes.
+            Ls = randn(rngn, Nn^2, 2)
+            us = NormBallUncertaintySet(; kappa = 2.0, L = Ls, p = 1.5, class = sg_tag,
+                                        val = sigman)
+            vs = PortfolioOptimisers.port_opt_view(us, iv)
+            @test vs.val == sigman[iv, iv]
+            @test size(vs.L, 1) == length(iv)^2
+            @test vs.L == Ls[PortfolioOptimisers.fourth_moment_index_generator(Nn, iv), :]
+            @test isapprox(PortfolioOptimisers.ucs_variance(vs, sigman[iv, iv], wn[iv]),
+                           PortfolioOptimisers.ucs_variance(us, sigman, wfull))
+            # A map with no column survives a view with no column.
+            u0 = NormBallUncertaintySet(; kappa = 2.0, L = zeros(Nn, 0), class = mu_tag)
+            @test size(PortfolioOptimisers.port_opt_view(u0, iv).L) == (length(iv), 0)
+            # The passthrough routes and the refusal.
+            @test mu_ucs(ucs) === ucs
+            @test sigma_ucs(us) === us
+            @test_throws ArgumentError ArithmeticReturn(; ucs = us)
+        end
+        @testset "A rank-zero set solves and raises no cone" begin
+            resn = solve_ret(nothing)
+            res0 = solve_ret(NormBallUncertaintySet(; kappa = 1.0, L = zeros(Nn, 0),
+                                                    class = mu_tag))
+            @test isa(res0.retcode, PortfolioOptimisers.OptimisationSuccess)
+            @test isapprox(res0.w, resn.w; rtol = 1e-5, atol = 1e-6)
+            @test !haskey(res0.model, skey(:t_nbucs_))
+            @test !haskey(res0.model, skey(:x_nbucs_w_))
+            resv = optimise(MeanRisk(; r = Variance(), obj = MinimumRisk(), opt = optn),
+                            rdn)
+            res0s = solve_var(NormBallUncertaintySet(; kappa = 1.0, L = zeros(Nn^2, 0),
+                                                     class = sg_tag))
+            @test isa(res0s.retcode, PortfolioOptimisers.OptimisationSuccess)
+            # The lifted programme reaches the plain variance's optimum through a PSD cone,
+            # so the two agree to the semidefinite solve's accuracy and not to the 1e-5 two
+            # second-order cone programmes reach.
+            @test isapprox(res0s.w, resv.w; rtol = 1e-4, atol = 1e-5)
+            @test haskey(res0s.model, :W)
+            @test !haskey(res0s.model, skey(:t_nbucs_))
+            # The scalar twin pays nothing on a map with no column.
+            u0s = NormBallUncertaintySet(; kappa = 1.0, L = zeros(Nn^2, 0), class = sg_tag)
+            @test isapprox(PortfolioOptimisers.ucs_variance(u0s, sigman, wn),
+                           dot(wn, sigman, wn))
+        end
+        @testset "The carried centre wins over the fallback (ADR 0050)" begin
+            nbv = NormBallUncertaintySet(; kappa = 1.0, L = Ln, class = mu_tag,
+                                         val = 3 * mun)
+            resv = solve_ret(nbv)
+            want = dot(3 * mun, resv.w) - norm(transpose(Ln) * resv.w, 2)
+            @test isapprox(PortfolioOptimisers.JuMP.value(resv.model[ret_key]), want;
+                           rtol = 1e-6)
+            Ls = randn(rngn, Nn^2, 2)
+            us = NormBallUncertaintySet(; kappa = 2.0, L = Ls, class = sg_tag)
+            usw = NormBallUncertaintySet(; kappa = 2.0, L = Ls, class = sg_tag,
+                                         val = 4 * sigman)
+            @test isapprox(PortfolioOptimisers.ucs_variance(usw, sigman, wn),
+                           PortfolioOptimisers.ucs_variance(us, 4 * sigman, wn))
         end
     end
 end

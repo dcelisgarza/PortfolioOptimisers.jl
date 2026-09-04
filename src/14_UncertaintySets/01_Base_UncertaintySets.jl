@@ -931,9 +931,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Names the axis an [`EllipsoidalUncertaintySet`](@ref) lives on, which fixes the dimension of its shape matrix.
+Names the axis an uncertainty set lives on, which fixes the row count of its shape matrix or of its geometry map.
 
-The family has exactly two inhabitants, and both ship. A consumer dispatches on the tag, because a mean ellipsoid and a covariance ellipsoid are the same struct with shape matrices of different size.
+The family has exactly two inhabitants, and both ship. A consumer dispatches on the tag, because a mean set and a covariance set are the same struct with a shape matrix, or a geometry map, of a different size: [`EllipsoidalUncertaintySet`](@ref) and [`NormBallUncertaintySet`](@ref) both carry one. The tag names the axis alone and not the geometry, so a norm ball of order one, which is no ellipsoid, carries the same tag as an ellipsoid on the same axis.
 
 # Interfaces
 
@@ -941,36 +941,38 @@ A subtype is a tag that carries no field and declares no method of its own.
 
 # Related
 
-  - [`MuEllipsoidalUncertaintySet`](@ref)
-  - [`SigmaEllipsoidalUncertaintySet`](@ref)
+  - [`MuUncertaintySetClass`](@ref)
+  - [`SigmaUncertaintySetClass`](@ref)
+  - [`EllipsoidalUncertaintySet`](@ref)
+  - [`NormBallUncertaintySet`](@ref)
 """
-abstract type AbstractEllipsoidalUncertaintySetResultClass <: AbstractUncertaintySetResult end
+abstract type AbstractUncertaintySetClass <: AbstractUncertaintySetResult end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Tags an [`EllipsoidalUncertaintySet`](@ref) as living on the mean axis, where the shape matrix is ``N \\times N``.
+Tags an [`EllipsoidalUncertaintySet`](@ref) or a [`NormBallUncertaintySet`](@ref) as living on the mean axis, where the shape matrix is ``N \\times N`` and the geometry map has ``N`` rows.
 
 The tag is what the consumers dispatch on. `port_opt_view` slices such a set with the plain asset index, and the robust-return builder refuses a set that carries the covariance tag instead.
 
 # Related
 
-  - [`AbstractEllipsoidalUncertaintySetResultClass`](@ref)
-  - [`SigmaEllipsoidalUncertaintySet`](@ref)
+  - [`AbstractUncertaintySetClass`](@ref)
+  - [`SigmaUncertaintySetClass`](@ref)
 """
-struct MuEllipsoidalUncertaintySet <: AbstractEllipsoidalUncertaintySetResultClass end
+struct MuUncertaintySetClass <: AbstractUncertaintySetClass end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Tags an [`EllipsoidalUncertaintySet`](@ref) as living on the covariance axis, where the shape matrix is ``N^{2} \\times N^{2}``.
+Tags an [`EllipsoidalUncertaintySet`](@ref) or a [`NormBallUncertaintySet`](@ref) as living on the covariance axis, where the shape matrix is ``N^{2} \\times N^{2}`` and the geometry map has ``N^{2}`` rows.
 
-The tag is what the consumers dispatch on. `port_opt_view` maps the asset index through the fourth-moment index generator before it slices the shape matrix, because the ellipsoid bounds a vectorised covariance.
+The tag is what the consumers dispatch on. `port_opt_view` maps the asset index through the fourth-moment index generator before it slices the shape matrix or the geometry map, because the set bounds a vectorised covariance.
 
 # Related
 
-  - [`AbstractEllipsoidalUncertaintySetResultClass`](@ref)
-  - [`MuEllipsoidalUncertaintySet`](@ref)
+  - [`AbstractUncertaintySetClass`](@ref)
+  - [`MuUncertaintySetClass`](@ref)
 """
-struct SigmaEllipsoidalUncertaintySet <: AbstractEllipsoidalUncertaintySetResultClass end
+struct SigmaUncertaintySetClass <: AbstractUncertaintySetClass end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -978,7 +980,7 @@ Holds the shape matrix, the radius, and the axis tag of an ellipsoidal uncertain
 
 An ellipsoid is a Mahalanobis ball, so it reads as a confidence region that carries the correlation between the entries it bounds. Its worst case is Equation 11.25 on the mean axis and Equation 11.26 on the covariance axis of the source, and both are second-order cones.
 
-**`class` names the axis, and the axis fixes both the size of `sigma` and the index a view applies.** A [`MuEllipsoidalUncertaintySet`](@ref) carries an ``N \\times N`` shape matrix and takes the plain asset index. A [`SigmaEllipsoidalUncertaintySet`](@ref) carries an ``N^{2} \\times N^{2}`` one, because it bounds a vectorised covariance, so [`port_opt_view`](@ref) recovers ``N`` from the shape matrix and maps the asset index through [`fourth_moment_index_generator`](@ref) before it slices. The two consumers dispatch on the tag too, and the robust-return builder refuses a set that carries the covariance tag.
+**`class` names the axis, and the axis fixes both the size of `sigma` and the index a view applies.** A [`MuUncertaintySetClass`](@ref) carries an ``N \\times N`` shape matrix and takes the plain asset index. A [`SigmaUncertaintySetClass`](@ref) carries an ``N^{2} \\times N^{2}`` one, because it bounds a vectorised covariance, so [`port_opt_view`](@ref) recovers ``N`` from the shape matrix and maps the asset index through [`fourth_moment_index_generator`](@ref) before it slices. The two consumers dispatch on the tag too, and the robust-return builder refuses a set that carries the covariance tag.
 
 **A view carries `k` through unchanged, so it is not the set the same estimator would fit on the subset alone.** The restricted shape matrix does equal the one fitted on the subset, entry for entry, whenever the shape is diagonal. The radius does not, because two of the three algorithms calibrate it on the dimension or on the sample: on a four-asset universe restricted to two assets, [`ChiSqKUncertaintyAlgorithm`](@ref) gives ``3.0802`` on the view against ``2.4477`` on the subset fit, and [`NormalKUncertaintyAlgorithm`](@ref) gives ``3.0398`` against ``2.4242``. Only [`GeneralKUncertaintyAlgorithm`](@ref) agrees, because its radius reads neither the data nor the shape. A view is therefore the conservative choice, and a caller who wants the subset's own radius fits the subset.
 
@@ -1012,7 +1014,7 @@ $(DocStringExtensions.FIELDS)
     EllipsoidalUncertaintySet(;
         sigma::MatNum,
         k::Number,
-        class::AbstractEllipsoidalUncertaintySetResultClass,
+        class::AbstractUncertaintySetClass,
         val::Option{<:ArrNum} = nothing
     ) -> EllipsoidalUncertaintySet
 
@@ -1028,17 +1030,17 @@ Keywords correspond to the struct's fields.
 # Examples
 
 ```jldoctest
-julia> EllipsoidalUncertaintySet([1.0 0.2; 0.2 1.0], 2.5, SigmaEllipsoidalUncertaintySet())
+julia> EllipsoidalUncertaintySet([1.0 0.2; 0.2 1.0], 2.5, SigmaUncertaintySetClass())
 EllipsoidalUncertaintySet
   sigma ┼ 2×2 Matrix{Float64}
       k ┼ Float64: 2.5
-  class ┼ SigmaEllipsoidalUncertaintySet()
+  class ┼ SigmaUncertaintySetClass()
     val ┴ nothing
 ```
 
 # Related
 
-  - [`AbstractEllipsoidalUncertaintySetResultClass`](@ref)
+  - [`AbstractUncertaintySetClass`](@ref)
   - [`AbstractUncertaintySetResult`](@ref)
   - [`BoxUncertaintySet`](@ref)
   - [`k_ucs`](@ref)
@@ -1066,7 +1068,7 @@ EllipsoidalUncertaintySet
     """
     val
     function EllipsoidalUncertaintySet(sigma::MatNum, k::Number,
-                                       class::AbstractEllipsoidalUncertaintySetResultClass,
+                                       class::AbstractUncertaintySetClass,
                                        val::Option{<:ArrNum})
         @argcheck(!isempty(sigma), IsEmptyError("sigma cannot be empty"))
         assert_matrix_issquare(sigma, :sigma)
@@ -1080,11 +1082,11 @@ EllipsoidalUncertaintySet
     end
 end
 function EllipsoidalUncertaintySet(sigma::MatNum, k::Number,
-                                   class::AbstractEllipsoidalUncertaintySetResultClass)::EllipsoidalUncertaintySet
+                                   class::AbstractUncertaintySetClass)::EllipsoidalUncertaintySet
     return EllipsoidalUncertaintySet(sigma, k, class, nothing)
 end
 function EllipsoidalUncertaintySet(; sigma::MatNum, k::Number,
-                                   class::AbstractEllipsoidalUncertaintySetResultClass,
+                                   class::AbstractUncertaintySetClass,
                                    val::Option{<:ArrNum} = nothing)::EllipsoidalUncertaintySet
     return EllipsoidalUncertaintySet(sigma, k, class, val)
 end
@@ -1115,13 +1117,13 @@ The set bounds a vectorised covariance, so its shape matrix lives on the ``N^{2}
 # Related
 
   - [`EllipsoidalUncertaintySet`](@ref)
-  - [`SigmaEllipsoidalUncertaintySet`](@ref)
+  - [`SigmaUncertaintySetClass`](@ref)
   - [`fourth_moment_index_generator`](@ref)
   - [`port_opt_view`](@ref)
 """
 function port_opt_view(risk_ucs::EllipsoidalUncertaintySet{<:MatNum, <:Any,
-                                                           <:SigmaEllipsoidalUncertaintySet},
-                       i, args...)::EllipsoidalUncertaintySet
+                                                           <:SigmaUncertaintySetClass}, i,
+                       args...)::EllipsoidalUncertaintySet
     # `val` is the N x N covariance the set is a neighbourhood of, so it takes the asset
     # index, whereas the N^2 x N^2 shape matrix takes the fourth-moment index.
     val = nothing_scalar_array_view(risk_ucs.val, i)
@@ -1155,12 +1157,12 @@ The set bounds a characteristic vector, so its shape matrix and its centre both 
 # Related
 
   - [`EllipsoidalUncertaintySet`](@ref)
-  - [`MuEllipsoidalUncertaintySet`](@ref)
+  - [`MuUncertaintySetClass`](@ref)
   - [`port_opt_view`](@ref)
 """
 function port_opt_view(risk_ucs::EllipsoidalUncertaintySet{<:MatNum, <:Any,
-                                                           <:MuEllipsoidalUncertaintySet},
-                       i, args...)::EllipsoidalUncertaintySet
+                                                           <:MuUncertaintySetClass}, i,
+                       args...)::EllipsoidalUncertaintySet
     return EllipsoidalUncertaintySet(; sigma = view(risk_ucs.sigma, i, i), k = risk_ucs.k,
                                      class = risk_ucs.class,
                                      val = nothing_scalar_array_view(risk_ucs.val, i))
@@ -1256,7 +1258,7 @@ function vec_quantile_bounds(mus::MatNum, q::Number, kwargs)
 end
 """
     ellipsoidal_set(diagonal::Bool, method, q::Number, samples, cov::MatNum,
-                    class::AbstractEllipsoidalUncertaintySetResultClass,
+                    class::AbstractUncertaintySetClass,
                     val::Option{<:ArrNum} = nothing)
 
 Assemble an [`EllipsoidalUncertaintySet`](@ref) from an already-computed asymptotic covariance `cov`.
@@ -1293,7 +1295,7 @@ Shared by every ellipsoidal [`ucs`](@ref), [`mu_ucs`](@ref) and [`sigma_ucs`](@r
   - [`ucs`](@ref)
 """
 function ellipsoidal_set(diagonal::Bool, method, q::Number, samples, cov::MatNum,
-                         class::AbstractEllipsoidalUncertaintySetResultClass,
+                         class::AbstractUncertaintySetClass,
                          val::Option{<:ArrNum} = nothing)
     if diagonal
         cov = LinearAlgebra.Diagonal(cov)
@@ -1305,5 +1307,5 @@ end
 export ucs, mu_ucs, sigma_ucs, BoxUncertaintySetAlgorithm, BoxUncertaintySet,
        NormalKUncertaintyAlgorithm, GeneralKUncertaintyAlgorithm,
        ChiSqKUncertaintyAlgorithm, EllipsoidalUncertaintySetAlgorithm,
-       EllipsoidalUncertaintySet, SigmaEllipsoidalUncertaintySet,
-       MuEllipsoidalUncertaintySet, AbstractUncertaintyEpsAlgorithm
+       EllipsoidalUncertaintySet, SigmaUncertaintySetClass, MuUncertaintySetClass,
+       AbstractUncertaintyEpsAlgorithm

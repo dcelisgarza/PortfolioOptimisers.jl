@@ -936,7 +936,10 @@ the model expression, an upper bound on its optimum); for a
 [`CompactCovarianceUncertaintySet`](@ref) it evaluates `w' * sigma * w` plus `kappa` times
 the squared norm of the least-squares residual of `C .* w` against the set's basis. The
 compact evaluation solves the same inner problem the model variable `z_cucs` solves, so it
-is that expression's optimum and not a bound on it.
+is that expression's optimum and not a bound on it. For a covariance
+[`NormBallUncertaintySet`](@ref) it evaluates `tr(sigma * W) + kappa * norm(L' * vec(W), q)`
+with `q` the dual norm order of the set (again the `E = 0` evaluation, an upper bound on the
+model expression's optimum), and a map with no column pays nothing.
 
 The [`UncertaintySetVariance`](@ref) functor dispatches here when its `ucs` field is a
 fitted result, keeping scalar risk evaluation consistent with the risk expression the
@@ -980,6 +983,17 @@ function ucs_variance(ucs::CompactCovarianceUncertaintySet, sigma::MatNum, w::Ve
     # projects onto the span of `Q` whether or not the columns of `Q` are orthonormal.
     res = size(Q, 2) > zero(Int) ? Cw - Q * (Q \ Cw) : Cw
     return LinearAlgebra.dot(w, sigma, w) + ucs.kappa * sum(abs2, res)
+end
+function ucs_variance(ucs::NormBallUncertaintySet{<:Any, <:Any, <:Any,
+                                                  <:SigmaUncertaintySetClass},
+                      sigma::MatNum, w::VecNum)
+    W = w * transpose(w)
+    # The set names its own centre; `sigma` is the fallback (ADR 0050).
+    sigma = something(ucs.val, sigma)
+    # `norm` of an empty vector is zero under every order, so a map with no column pays
+    # nothing without a branch.
+    penalty = LinearAlgebra.norm(transpose(ucs.L) * vec(W), dual_norm_order(ucs.p))
+    return LinearAlgebra.tr(sigma * W) + ucs.kappa * penalty
 end
 """
     _no_bounds_risk_measure(r, flag)

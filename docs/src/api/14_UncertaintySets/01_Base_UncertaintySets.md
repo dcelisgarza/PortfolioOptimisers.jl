@@ -3,8 +3,8 @@
 ```@docs
 BoxUncertaintySet
 BoxUncertaintySetAlgorithm
-MuEllipsoidalUncertaintySet
-SigmaEllipsoidalUncertaintySet
+MuUncertaintySetClass
+SigmaUncertaintySetClass
 NormalKUncertaintyAlgorithm
 GeneralKUncertaintyAlgorithm
 ChiSqKUncertaintyAlgorithm
@@ -26,14 +26,14 @@ AbstractUncertaintyEpsAlgorithm
 UcSE_UcS
 Num_UcSK
 Num_UcSEps
-AbstractEllipsoidalUncertaintySetResultClass
+AbstractUncertaintySetClass
 ucs_selector
 k_ucs
 port_opt_view(risk_ucs::Option{<:AbstractUncertaintySetEstimator}, ::Any, args...)
 port_opt_view(risk_ucs::BoxUncertaintySet{<:VecNum, <:VecNum}, i, args...)
 port_opt_view(risk_ucs::BoxUncertaintySet{<:MatNum, <:MatNum}, i, args...)
-port_opt_view(risk_ucs::EllipsoidalUncertaintySet{<:MatNum, <:Any, <:SigmaEllipsoidalUncertaintySet}, i, args...)
-port_opt_view(risk_ucs::EllipsoidalUncertaintySet{<:MatNum, <:Any, <:MuEllipsoidalUncertaintySet}, i, args...)
+port_opt_view(risk_ucs::EllipsoidalUncertaintySet{<:MatNum, <:Any, <:SigmaUncertaintySetClass}, i, args...)
+port_opt_view(risk_ucs::EllipsoidalUncertaintySet{<:MatNum, <:Any, <:MuUncertaintySetClass}, i, args...)
 vec_quantile_bounds
 ellipsoidal_set
 box_quantile_bounds

@@ -177,6 +177,7 @@
 "src/14_UncertaintySets/05_L1UncertaintySets.jl" = { map = 7, units = 14, algorithm = 7, swept = true }
 "src/14_UncertaintySets/06_CalibrationRules.jl" = { map = 7, units = 56, swept = false }
 "src/14_UncertaintySets/07_CompactUncertaintySets.jl" = { map = 7, units = 4, swept = false }
+"src/14_UncertaintySets/08_NormBallUncertaintySets.jl" = { map = 7, units = 6, swept = false }
 "src/15_Turnover.jl" = { map = 8, units = 15, algorithm = 8, swept = true }
 "src/16_Fees.jl" = { map = 8, units = 20, algorithm = 17, swept = true }
 "src/17_NetReturnsDrawdowns.jl" = { map = 8, units = 8, algorithm = 8, swept = true }
@@ -229,7 +230,7 @@
 "src/20_Optimisation/07_HierarchicalEqualRiskContribution.jl" = { map = 10, units = 11, swept = false }
 "src/20_Optimisation/08_Base_JuMPOptimisation.jl" = { map = 10, units = 89, swept = false }
 "src/20_Optimisation/09_JuMPConstraints/01_MIPIndicators.jl" = { map = 11, units = 32, swept = false }
-"src/20_Optimisation/09_JuMPConstraints/02_Returns_and_ObjectiveFunctions.jl" = { map = 11, units = 37, swept = false }
+"src/20_Optimisation/09_JuMPConstraints/02_Returns_and_ObjectiveFunctions.jl" = { map = 11, units = 38, swept = false }
 "src/20_Optimisation/09_JuMPConstraints/03_BudgetConstraints.jl" = { map = 11, units = 15, swept = false }
 "src/20_Optimisation/09_JuMPConstraints/04_WeightConstraints.jl" = { map = 11, units = 5, swept = false }
 "src/20_Optimisation/09_JuMPConstraints/05_SDPConstraints.jl" = { map = 11, units = 4, swept = false }
@@ -240,7 +241,7 @@
 "src/20_Optimisation/09_JuMPConstraints/10_FeesConstraints.jl" = { map = 11, units = 6, swept = false }
 "src/20_Optimisation/09_JuMPConstraints/11_TrackingErrorConstraints.jl" = { map = 11, units = 2, swept = false }
 "src/20_Optimisation/09_JuMPConstraints/12_RegularisationConstraints.jl" = { map = 11, units = 19, swept = false }
-"src/20_Optimisation/09_JuMPConstraints/13_WeightNormConstraints.jl" = { map = 11, units = 3, swept = false }
+"src/20_Optimisation/09_JuMPConstraints/13_WeightNormConstraints.jl" = { map = 11, units = 4, swept = false }
 "src/20_Optimisation/10_JuMPOptimiser.jl" = { map = 10, units = 21, swept = false }
 "src/20_Optimisation/11_MeanRisk.jl" = { map = 10, units = 14, swept = false }
 "src/20_Optimisation/12_FactorRiskContribution.jl" = { map = 10, units = 7, swept = false }

@@ -36,6 +36,7 @@ set_ucs_return_constraints!(model::JuMP.Model, i, ucs::BoxUncertaintySet, mu::Nu
 set_ucs_return_constraints!(model::JuMP.Model, i, ucs::EllipsoidalUncertaintySet, mu::Num_VecNum, settings::JuMPReturnsSettings)
 set_ucs_return_constraints!(model::JuMP.Model, i, ucs::L1UncertaintySet, mu::Num_VecNum, settings::JuMPReturnsSettings)
 set_ucs_return_constraints!(model::JuMP.Model, i, ucs::SignedL1UncertaintySet, mu::Num_VecNum, settings::JuMPReturnsSettings)
+set_ucs_return_constraints!(model::JuMP.Model, i, ucs::NormBallUncertaintySet{<:Any, <:Any, <:Any, <:MuUncertaintySetClass}, mu::Num_VecNum, settings::JuMPReturnsSettings)
 add_to_objective_penalty!
 add_penalty_to_objective!
 set_portfolio_objective_function!

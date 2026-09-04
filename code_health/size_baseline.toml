@@ -11,7 +11,7 @@ commit = "8787635a8f"
 [file]
 "ext/PortfolioOptimisersImputeExt.jl" = { code = 6, doc = 0, comment = 3, blank = 3, total = 12 }
 "ext/PortfolioOptimisersPlotsExt.jl" = { code = 1963, doc = 0, comment = 129, blank = 41, total = 2133 }
-"src/01_Base/01_DocstringDictionaries.jl" = { code = 1080, doc = 113, comment = 121, blank = 43, total = 1357 }
+"src/01_Base/01_DocstringDictionaries.jl" = { code = 1082, doc = 113, comment = 121, blank = 43, total = 1359 }
 "src/01_Base/02_TypeRoots.jl" = { code = 13, doc = 157, comment = 0, blank = 61, total = 231 }
 "src/01_Base/03_PrettyShow.jl" = { code = 107, doc = 102, comment = 0, blank = 58, total = 267 }
 "src/01_Base/04_ScopedConfig.jl" = { code = 133, doc = 401, comment = 2, blank = 180, total = 716 }
@@ -144,6 +144,7 @@ commit = "8787635a8f"
 "src/14_UncertaintySets/05_L1UncertaintySets.jl" = { code = 235, doc = 576, comment = 5, blank = 248, total = 1064 }
 "src/14_UncertaintySets/06_CalibrationRules.jl" = { code = 482, doc = 1467, comment = 31, blank = 660, total = 2640 }
 "src/14_UncertaintySets/07_CompactUncertaintySets.jl" = { code = 53, doc = 121, comment = 0, blank = 48, total = 222 }
+"src/14_UncertaintySets/08_NormBallUncertaintySets.jl" = { code = 72, doc = 171, comment = 2, blank = 72, total = 317 }
 "src/15_Turnover.jl" = { code = 81, doc = 458, comment = 0, blank = 184, total = 723 }
 "src/16_Fees.jl" = { code = 240, doc = 839, comment = 0, blank = 321, total = 1400 }
 "src/17_NetReturnsDrawdowns.jl" = { code = 44, doc = 288, comment = 0, blank = 122, total = 454 }
@@ -196,7 +197,7 @@ commit = "8787635a8f"
 "src/20_Optimisation/07_HierarchicalEqualRiskContribution.jl" = { code = 406, doc = 327, comment = 5, blank = 88, total = 826 }
 "src/20_Optimisation/08_Base_JuMPOptimisation.jl" = { code = 538, doc = 960, comment = 46, blank = 433, total = 1977 }
 "src/20_Optimisation/09_JuMPConstraints/01_MIPIndicators.jl" = { code = 331, doc = 534, comment = 20, blank = 211, total = 1096 }
-"src/20_Optimisation/09_JuMPConstraints/02_Returns_and_ObjectiveFunctions.jl" = { code = 594, doc = 968, comment = 25, blank = 372, total = 1959 }
+"src/20_Optimisation/09_JuMPConstraints/02_Returns_and_ObjectiveFunctions.jl" = { code = 619, doc = 1006, comment = 27, blank = 387, total = 2039 }
 "src/20_Optimisation/09_JuMPConstraints/03_BudgetConstraints.jl" = { code = 430, doc = 434, comment = 0, blank = 152, total = 1016 }
 "src/20_Optimisation/09_JuMPConstraints/04_WeightConstraints.jl" = { code = 93, doc = 102, comment = 2, blank = 51, total = 248 }
 "src/20_Optimisation/09_JuMPConstraints/05_SDPConstraints.jl" = { code = 73, doc = 66, comment = 0, blank = 36, total = 175 }
@@ -207,7 +208,7 @@ commit = "8787635a8f"
 "src/20_Optimisation/09_JuMPConstraints/10_FeesConstraints.jl" = { code = 74, doc = 147, comment = 0, blank = 65, total = 286 }
 "src/20_Optimisation/09_JuMPConstraints/11_TrackingErrorConstraints.jl" = { code = 176, doc = 63, comment = 3, blank = 22, total = 264 }
 "src/20_Optimisation/09_JuMPConstraints/12_RegularisationConstraints.jl" = { code = 219, doc = 442, comment = 11, blank = 205, total = 877 }
-"src/20_Optimisation/09_JuMPConstraints/13_WeightNormConstraints.jl" = { code = 61, doc = 124, comment = 0, blank = 55, total = 240 }
+"src/20_Optimisation/09_JuMPConstraints/13_WeightNormConstraints.jl" = { code = 92, doc = 160, comment = 0, blank = 70, total = 322 }
 "src/20_Optimisation/10_JuMPOptimiser.jl" = { code = 751, doc = 736, comment = 54, blank = 202, total = 1743 }
 "src/20_Optimisation/11_MeanRisk.jl" = { code = 248, doc = 419, comment = 4, blank = 117, total = 788 }
 "src/20_Optimisation/12_FactorRiskContribution.jl" = { code = 152, doc = 207, comment = 6, blank = 63, total = 428 }

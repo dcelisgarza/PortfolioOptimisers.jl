@@ -612,13 +612,18 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Build an uncertainty-set variance risk expression for box, ellipsoidal or compact uncertainty.
+Build an uncertainty-set variance risk expression for box, ellipsoidal, compact or norm-ball uncertainty.
 
 The `BoxUncertaintySet` overload introduces symmetric auxiliary matrices `Au` and `Al` and
 encodes the worst-case variance as `tr(Au * ub) - tr(Al * lb)`. The
 `EllipsoidalUncertaintySet` overload introduces a PSD matrix `E`, the compound matrix `W + E`,
-and adds an SOC constraint to bound the ellipsoidal perturbation term. Both lift the weights
-into the semidefinite matrix `W`, so each calls [`set_sdp_constraints!`](@ref) itself. The
+and adds an SOC constraint to bound the ellipsoidal perturbation term. The
+`NormBallUncertaintySet` overload, defined on the covariance tag alone, is the ellipsoid's
+lifted form with the set's own map ``\\mathbf{L}^{\\intercal}`` in place of the Cholesky
+factor and the cone of the dual norm order in place of the second-order cone, raised by
+[`norm_ball_dual_norm_epigraph!`](@ref); it factorises nothing, and a map with no column
+raises no cone and leaves `tr(sigma * (W + E))`. These three lift the weights into the
+semidefinite matrix `W`, so each calls [`set_sdp_constraints!`](@ref) itself. The
 `CompactCovarianceUncertaintySet` overload lifts nothing: it bounds the nominal deviation and
 the residual `C .* w - Q * z` with one SOC constraint each, and returns the sum of their
 squares. It is the one overload that leaves the programme a second-order cone programme.
@@ -627,8 +632,8 @@ squares. It is the one overload that leaves the programme a second-order cone pr
 
   - $(arg_dict[:model])
   - $(arg_dict[:ci])
-  - `ucs`: Uncertainty set instance (`BoxUncertaintySet`, `EllipsoidalUncertaintySet` or `CompactCovarianceUncertaintySet`).
-  - `sigma::MatNum`: Fallback covariance matrix (used by `EllipsoidalUncertaintySet` and `CompactCovarianceUncertaintySet`). The set's own `val` field wins over it (ADR 0050). The box overload names no centre at all, so it ignores both.
+  - `ucs`: Uncertainty set instance (`BoxUncertaintySet`, `EllipsoidalUncertaintySet`, `CompactCovarianceUncertaintySet` or a covariance `NormBallUncertaintySet`).
+  - `sigma::MatNum`: Fallback covariance matrix (used by every overload but the box). The set's own `val` field wins over it (ADR 0050). The box overload names no centre at all, so it ignores both.
 
 # Returns
 
@@ -643,6 +648,8 @@ squares. It is the one overload that leaves the programme a second-order cone pr
   - [`BoxUncertaintySet`](@ref)
   - [`EllipsoidalUncertaintySet`](@ref)
   - [`CompactCovarianceUncertaintySet`](@ref)
+  - [`NormBallUncertaintySet`](@ref)
+  - [`norm_ball_dual_norm_epigraph!`](@ref)
 
 # References
 
@@ -739,6 +746,39 @@ function set_ucs_variance_risk!(model::JuMP.Model, i::Any,
                                    JuMP.@expression(model,
                                                     dev_cucs^2 + ucs.kappa * t_cucs^2))
     return ucs_variance_risk, :cucs_variance_risk_
+end
+function set_ucs_variance_risk!(model::JuMP.Model, i::Any,
+                                ucs::NormBallUncertaintySet{<:Any, <:Any, <:Any,
+                                                            <:SigmaUncertaintySetClass},
+                                sigma::MatNum; prefix::Symbol = Symbol(""))
+    sc = get_constraint_scale(model)
+    set_sdp_constraints!(model; prefix = prefix)
+    state_build!(model, prefix, :E) do
+        W = state_get(model, prefix, :W)
+        N = size(W, 1)
+        E = JuMP.@variable(model, [1:N, 1:N], Symmetric)
+        state_set!(model, prefix, :WpE, JuMP.@expression(model, W + E))
+        state_set!(model, prefix, :ceucs_variance,
+                   JuMP.@constraint(model, sc * E in JuMP.PSDCone()))
+        return E
+    end
+    WpE = state_get(model, prefix, :WpE)
+    # The set is a neighbourhood of the covariance it was calibrated on, so it names the
+    # centre. The risk measure's field and then the prior are the fallbacks (ADR 0050).
+    sigma = something(ucs.val, sigma)
+    L = ucs.L
+    # A map with no column spans nothing, so the worst case is the nominal variance and no
+    # cone is needed.
+    ucs_variance_risk = if size(L, 2) > zero(Int)
+        x_nbucs = state_set!(model, prefix, :x_nbucs_, i,
+                             JuMP.@expression(model, transpose(L) * vec(WpE)))
+        t_nbucs = norm_ball_dual_norm_epigraph!(model, prefix, i, x_nbucs, ucs.p)
+        JuMP.@expression(model, LinearAlgebra.tr(sigma * WpE) + ucs.kappa * t_nbucs)
+    else
+        JuMP.@expression(model, LinearAlgebra.tr(sigma * WpE))
+    end
+    state_set!(model, prefix, :nbucs_variance_risk_, i, ucs_variance_risk)
+    return ucs_variance_risk, :nbucs_variance_risk_
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
