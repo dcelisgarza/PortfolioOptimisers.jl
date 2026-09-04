@@ -34,6 +34,12 @@ Keywords correspond to the struct's fields.
 
   - `l`, `s`, `fl`, `fs`, `dl`, `ds`, `dfl`, `dfs` are validated with [`assert_nonempty_nonneg_finite_val`](@ref).
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `tn`: Recursively updated via [`factory`](@ref).
+
 ## View parameters
 
 When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
@@ -77,13 +83,14 @@ FeesEstimator
   - [`TnE_Tn`](@ref)
   - [`EstValType`](@ref)
   - [`fees_constraints`](@ref)
+  - [`factory`](@ref)
   - [`port_opt_view`](@ref)
 """
 @propagatable @concrete struct FeesEstimator <: AbstractEstimator
     """
     $(field_dict[:tn_fees])
     """
-    @vprop tn
+    @fprop @vprop tn
     """
     $(field_dict[:l_fees])
     """
