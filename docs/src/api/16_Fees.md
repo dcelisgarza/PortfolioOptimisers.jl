@@ -3,6 +3,7 @@
 In active, and small quantity investing, fees can be a non-negligible factor that affects portfolio returns. `PortfolioOptimisers.jl` has the capability of including a variety of fees.
 
 ```@docs
+AbstractFeeAmortisation
 FeesEstimator
 Fees
 AmortisedFees
@@ -13,6 +14,8 @@ calc_fixed_fees
 calc_asset_fees
 calc_asset_fixed_fees
 needs_previous_weights(fe::FeesE_Fees)
+amortisation_divisor
+amortise_fees
 ```
 
 ## References
