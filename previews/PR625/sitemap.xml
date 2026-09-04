@@ -163,6 +163,12 @@
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/08_Moments/42_FactorExposures/03_LagDescriptors/</loc>
   </url>
   <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/08_Moments/42_FactorExposures/04_EWMeanDescriptors/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/08_Moments/42_FactorExposures/05_EWVolatilityDescriptors/</loc>
+  </url>
+  <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/08_Moments/42_FactorExposures/07_RollingDescriptors/</loc>
   </url>
   <url>
@@ -359,6 +365,9 @@
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/14_UncertaintySets/07_CompactUncertaintySets/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/14_UncertaintySets/08_NormBallUncertaintySets/</loc>
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/15_Turnover/</loc>
