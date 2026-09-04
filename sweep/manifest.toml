@@ -50,7 +50,7 @@
 "src/01_Base/04_ScopedConfig.jl" = { map = 1, units = 24, algorithm = 14, swept = true }
 "src/01_Base/05_Preferences.jl" = { map = 1, units = 6, algorithm = 4, swept = true }
 "src/01_Base/06_Messages.jl" = { map = 1, units = 12, algorithm = 6, swept = true }
-"src/01_Base/07_Errors.jl" = { map = 1, units = 8, algorithm = 1, swept = true }
+"src/01_Base/07_Errors.jl" = { map = 1, units = 9, algorithm = 1, swept = true }
 "src/01_Base/08_TypeAliases.jl" = { map = 1, units = 45, algorithm = 0, swept = true }
 "src/01_Base/09_ObservationWeights.jl" = { map = 1, units = 2, algorithm = 1, swept = true }
 "src/01_Base/10_Assertions.jl" = { map = 1, units = 18, algorithm = 8, swept = true }
@@ -182,7 +182,7 @@
 "src/14_UncertaintySets/08_NormBallUncertaintySets.jl" = { map = 7, units = 6, swept = false }
 "src/15_Turnover.jl" = { map = 8, units = 15, algorithm = 8, swept = true }
 "src/16_Fees.jl" = { map = 8, units = 24, algorithm = 19, swept = true }
-"src/17_NetReturnsDrawdowns.jl" = { map = 8, units = 8, algorithm = 8, swept = true }
+"src/17_NetReturnsDrawdowns.jl" = { map = 8, units = 18, algorithm = 8, swept = true }
 "src/18_Tracking.jl" = { map = 8, units = 14, algorithm = 4, swept = true }
 "src/19_RiskMeasures/01_Base_RiskMeasures.jl" = { map = 9, units = 89, swept = false }
 "src/19_RiskMeasures/02_Variance.jl" = { map = 9, units = 24, swept = false }

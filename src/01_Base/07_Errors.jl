@@ -13,6 +13,7 @@ All error types specific to `PortfolioOptimisers.jl` should be subtypes of `Port
   - [`ConflictingArgumentError`](@ref)
   - [`PropertyPathError`](@ref)
   - [`ObservationWeightsError`](@ref)
+  - [`NonPositiveWealthError`](@ref)
 """
 abstract type PortfolioOptimisersError <: Exception end
 """
@@ -243,6 +244,46 @@ Stacktrace:
     msg
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Exception type thrown when a drifted portfolio's wealth reaches zero or turns negative over the observations it is scored on.
+
+A drifted series divides by the wealth of the previous observation, so a wealth of zero or below is outside the domain of the series rather than a large loss inside it. The check runs before any return is formed, so a ruined window gives no partial series. A negative wealth is **finite**, and every leg of the record flips its sign, so nothing downstream reads the failure from a `NaN`. That is why the drift raises rather than returning a value.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    NonPositiveWealthError(msg) -> NonPositiveWealthError
+
+Arguments correspond to the fields above.
+
+# Examples
+
+```jldoctest
+julia> throw(NonPositiveWealthError(\"the drifted wealth must satisfy `all(>(0), wealth)`, but the wealth is -0.3975 at row 2 of the window\"))
+ERROR: NonPositiveWealthError: the drifted wealth must satisfy `all(>(0), wealth)`, but the wealth is -0.3975 at row 2 of the window
+Stacktrace:
+ [1] top-level scope
+   @ none:1
+```
+
+# Related
+
+  - [`PortfolioOptimisersError`](@ref)
+  - [`SelfFinancingDrift`](@ref)
+  - [`assert_positive_wealth`](@ref)
+  - [`non_positive_wealth_index`](@ref)
+"""
+@concrete struct NonPositiveWealthError <: PortfolioOptimisersError
+    """
+    $(field_dict[:msg])
+    """
+    msg
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Print human-readable representation of `PortfolioOptimisersError` subtypes to `io`, stripping parametric type suffixes.
@@ -274,4 +315,4 @@ function Base.showerror(io::IO, err::PortfolioOptimisersError)
 end
 
 export IsEmptyError, IsNothingError, IsNonFiniteError, ConflictingArgumentError,
-       PropertyPathError, ObservationWeightsError
+       PropertyPathError, ObservationWeightsError, NonPositiveWealthError

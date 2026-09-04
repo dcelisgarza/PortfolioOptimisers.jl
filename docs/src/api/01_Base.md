@@ -126,6 +126,7 @@ IsNonFiniteError
 PropertyPathError
 ConflictingArgumentError
 ObservationWeightsError
+NonPositiveWealthError
 ```
 
 ## Assertions

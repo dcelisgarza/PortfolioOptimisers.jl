@@ -140,6 +140,530 @@ function calc_net_asset_returns(w::VecNum, X::MatNum, fees::Fees)
     return X ⊙ transpose(w) .- transpose(calc_asset_fees(w, fees))
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Supertype for the algorithms that let a portfolio's weights drift with its own returns over the observations it is scored on.
+
+A cross-validation scheme carries this family in its `wd` field. `nothing` scores every observation against the same weight vector, which is the library's original behaviour and stays its default. [`SelfFinancingDrift`](@ref) is the family's one leaf.
+
+# Related
+
+  - [`SelfFinancingDrift`](@ref)
+  - [`weight_path`](@ref)
+  - [`held_weights`](@ref)
+  - [`calc_net_returns(w::VecVecNum, X::MatNum, fees, wd::AbstractWeightDrift, obs)`](@ref)
+  - [`AbstractAlgorithm`](@ref)
+"""
+abstract type AbstractWeightDrift <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Grows each position at its own asset return and holds no trade in between, so the weights drift and the series is the wealth ratio of the drifted holdings.
+
+The portfolio is self-financing over the window: no capital enters it and none leaves it, and the implicit cash position ``1 - \\sum_j w_j`` earns zero. The recursion therefore holds for a long-short book and for a partly invested one.
+
+# Examples
+
+```jldoctest
+julia> SelfFinancingDrift()
+SelfFinancingDrift()
+```
+
+# Related
+
+  - [`AbstractWeightDrift`](@ref)
+  - [`weight_path`](@ref)
+  - [`held_weights`](@ref)
+  - [`calc_net_returns(w::VecVecNum, X::MatNum, fees, wd::AbstractWeightDrift, obs)`](@ref)
+"""
+struct SelfFinancingDrift <: AbstractWeightDrift end
+"""
+    drift_position_values(wd::AbstractWeightDrift, w::VecNum, X::MatNum)
+
+Compute the value of each position at each observation of a drifted window.
+
+Each position starts at its weight and compounds at its own asset return, so row `t` holds what one unit of initial capital has become in each asset by the end of observation `t`. The matrix is the quantity every other drift verb reads, and it is a cumulative product, not a per step renormalisation.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+P_{t j} &= w_{j} \\prod\\limits_{s=1}^{t} \\left(1 + X_{s j}\\right)
+\\end{align}
+```
+
+Where:
+
+  - ``P_{t j}``: Value of the position in asset ``j`` at the end of observation ``t``, per unit of initial capital.
+  - ``X_{s j}``: Return of asset ``j`` at observation ``s``.
+  - $(math_dict[:w_port])
+  - $(math_dict[:T])
+  - $(math_dict[:N])
+
+# Algorithm
+
+ 1. Compound the asset returns with [`relative_cumulative_returns`](@ref), giving the `T × N` matrix of growth factors of each asset up to each observation.
+ 2. Scale column `j` of that matrix by `w[j]`, giving the position values.
+
+# Arguments
+
+  - `wd`: Weight drift algorithm.
+  - `w`: Portfolio weights.
+  - `X`: Asset return matrix (observations × assets).
+
+# Returns
+
+  - `P::MatNum`: `T × N` matrix of position values.
+
+# Related
+
+  - [`AbstractWeightDrift`](@ref)
+  - [`SelfFinancingDrift`](@ref)
+  - [`drift_wealth`](@ref): Contracts this matrix into the wealth of each observation.
+  - [`relative_cumulative_returns`](@ref): The helper that step 1 reaches.
+  - [`weight_path`](@ref)
+"""
+function drift_position_values(::AbstractWeightDrift, w::VecNum, X::MatNum)
+    return relative_cumulative_returns(X) ⊙ transpose(w)
+end
+"""
+    drift_wealth(P::MatNum, w::VecNum)
+
+Compute the wealth of each observation of a drifted window from its position values.
+
+The cash position is what the weights leave uninvested, `1 - sum(w)`, and it earns zero, so it enters every observation's wealth unchanged. A fully invested book holds none of it, and a levered or short book holds a negative one.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+V_{t} &= \\sum\\limits_{j=1}^{N} P_{t j} + \\left(1 - \\sum\\limits_{j=1}^{N} w_{j}\\right)
+\\end{align}
+```
+
+Where:
+
+  - ``V_{t}``: Wealth at the end of observation ``t``, per unit of initial capital.
+  - ``P_{t j}``: Value of the position in asset ``j`` at the end of observation ``t``.
+  - $(math_dict[:w_port])
+  - $(math_dict[:N])
+
+# Algorithm
+
+ 1. Sum `P` along its asset axis, giving the invested wealth of each observation.
+ 2. Add the cash position `1 - sum(w)` to every entry.
+
+# Arguments
+
+  - `P`: `T × N` matrix of position values, from [`drift_position_values`](@ref).
+  - `w`: Portfolio weights.
+
+# Returns
+
+  - `V::VecNum`: `T × 1` vector of wealth, one entry per observation.
+
+# Related
+
+  - [`drift_position_values`](@ref): The matrix this verb contracts.
+  - [`drift_returns`](@ref): Reads this vector as a series of returns.
+  - [`assert_positive_wealth`](@ref): The domain check this vector must pass.
+  - [`weight_path`](@ref)
+"""
+function drift_wealth(P::MatNum, w::VecNum)
+    return vec(sum(P; dims = 2)) .+ (one(eltype(P)) - sum(w))
+end
+"""
+    drift_returns(V::VecNum)
+
+Read a wealth vector as the return series of the drifted window.
+
+The return of an observation is the ratio of its wealth to the wealth before it, and the wealth before the first observation is the initial capital of one. The series is therefore the wealth ratio of the drifted holdings, and it is **not** the dot product of the held weights with the asset returns: the two differ by up to 809 ulp, and the wealth ratio is what the reference arithmetic computes.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+R_{t} &= \\frac{V_{t}}{V_{t-1}} - 1\\,, \\qquad V_{0} = 1
+\\end{align}
+```
+
+Where:
+
+  - ``R_{t}``: Return of observation ``t``.
+  - ``V_{t}``: Wealth at the end of observation ``t``, per unit of initial capital.
+  - $(math_dict[:T])
+
+# Algorithm
+
+ 1. Prepend the initial capital of one to `V`, and drop its last entry, giving the wealth before each observation.
+ 2. Divide `V` by that vector elementwise, and subtract one.
+
+# Arguments
+
+  - `V`: `T × 1` vector of wealth, from [`drift_wealth`](@ref).
+
+# Returns
+
+  - `R::VecNum`: `T × 1` vector of drifted returns.
+
+# Related
+
+  - [`drift_wealth`](@ref): The vector this verb reads.
+  - [`calc_net_returns(w::VecVecNum, X::MatNum, fees, wd::AbstractWeightDrift, obs)`](@ref): Charges the fee against this series.
+  - [`cumulative_returns`](@ref)
+"""
+function drift_returns(V::VecNum)
+    return V ./ vcat(one(eltype(V)), @view(V[1:(end - 1)])) .- one(eltype(V))
+end
+"""
+    non_positive_wealth_index(V::VecNum)
+
+Find the first observation whose wealth is not positive.
+
+A `NaN` wealth fails `> 0` and is found, so an exactly zero wealth and the non-finite values it makes downstream are both caught here.
+
+# Algorithm
+
+ 1. Return the index of the first entry of `V` that does not satisfy `x > 0`, and `nothing` when every entry does.
+
+# Arguments
+
+  - `V`: `T × 1` vector of wealth, from [`drift_wealth`](@ref).
+
+# Returns
+
+  - `i::Option{<:Integer}`: Index of the first non-positive wealth, or `nothing`.
+
+# Related
+
+  - [`drift_wealth`](@ref)
+  - [`assert_positive_wealth`](@ref): The check that raises on this index.
+  - [`NonPositiveWealthError`](@ref)
+  - [`Option`](@ref)
+"""
+function non_positive_wealth_index(V::VecNum)
+    return findfirst(x -> !(x > zero(x)), V)
+end
+"""
+    assert_positive_wealth(V::VecNum, obs = nothing, member = nothing)
+
+Check that every observation of a drifted window has a positive wealth.
+
+The check runs before any return is formed, so a ruined window gives no partial series. `obs` names the failing observation in the message: a vector of labels names it by its label, a vector of integers names it by its panel row, and `nothing` names it by its row inside the window.
+
+# Algorithm
+
+ 1. Find the first non-positive wealth with [`non_positive_wealth_index`](@ref). Return `nothing` when there is none.
+ 2. Build the phrase that names the failing observation, reading `obs`.
+ 3. Raise a [`NonPositiveWealthError`](@ref) that states the condition, the failing wealth, that phrase, and the member when one is named.
+
+# Arguments
+
+  - `V`: `T × 1` vector of wealth, from [`drift_wealth`](@ref).
+  - `obs`: Observation labels of the window, panel rows of the window, or `nothing`.
+  - `member`: Index of the population member the wealth belongs to, or `nothing` for a single weight vector.
+
+# Validation
+
+  - `V`: `all(>(0), V)`, else a [`NonPositiveWealthError`](@ref) is raised.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`non_positive_wealth_index`](@ref): The finder step 1 reaches.
+  - [`NonPositiveWealthError`](@ref)
+  - [`drift_wealth`](@ref)
+  - [`weight_path`](@ref)
+"""
+function assert_positive_wealth(V::VecNum, obs = nothing, member = nothing)::Nothing
+    i = non_positive_wealth_index(V)
+    if isnothing(i)
+        return nothing
+    end
+    where_at = if isnothing(obs)
+        "row $(i) of the window"
+    elseif isa(obs[i], Integer)
+        "panel row $(obs[i])"
+    else
+        "observation $(obs[i])"
+    end
+    whose = isnothing(member) ? "the wealth" : "the wealth of member $(member)"
+    return throw(NonPositiveWealthError("the drifted wealth must satisfy `all(>(0), wealth)`, but $(whose) is $(V[i]) at $(where_at)"))
+end
+"""
+    weight_path(wd::AbstractWeightDrift, w::VecNum, X::MatNum, obs = nothing)
+
+Compute the weights held at each observation of a drifted window.
+
+Row `t` holds the weights the book carries **through** observation `t`, so the first row is the target weights and every later row is the previous observation's position values deflated by its wealth. The rows and the deflated cash position sum to one at every observation.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+U_{1 j} &= w_{j}\\\\
+U_{t j} &= \\frac{P_{t-1,\\, j}}{V_{t-1}}\\,, \\qquad t > 1
+\\end{align}
+```
+
+The equivalent closed form is the self-financing recursion, which a reader may recognise from the literature:
+
+```math
+\\begin{align}
+\\boldsymbol{u}_{t+1} &= \\frac{\\boldsymbol{u}_{t} \\odot \\left(1 + \\boldsymbol{x}_{t}\\right)}{1 + \\boldsymbol{u}_{t} \\cdot \\boldsymbol{x}_{t}}
+\\end{align}
+```
+
+The two forms agree in exact arithmetic and differ in floating point: the cumulative product is what the code computes, and the recursion was measured up to 824 ulp away from it.
+
+Where:
+
+  - ``U_{t j}``: Weight held in asset ``j`` through observation ``t``.
+  - ``P_{t j}``: Value of the position in asset ``j`` at the end of observation ``t``.
+  - ``V_{t}``: Wealth at the end of observation ``t``.
+  - ``\\boldsymbol{u}_{t}``: `N × 1` vector of weights held through observation ``t``.
+  - $(math_dict[:x_t_obs])
+  - $(math_dict[:w_port])
+  - $(math_dict[:T])
+  - $(math_dict[:N])
+  - ``\\odot``: Elementwise (Hadamard) multiplication.
+
+# Algorithm
+
+ 1. Compute the position values with [`drift_position_values`](@ref) and the wealth with [`drift_wealth`](@ref).
+ 2. Check the wealth with [`assert_positive_wealth`](@ref).
+ 3. Write the target weights into the first row.
+ 4. Write each earlier observation's position values, deflated by that observation's wealth, into the row after it.
+
+# Arguments
+
+  - `wd`: Weight drift algorithm.
+  - `w`: Portfolio weights.
+  - `X`: Asset return matrix (observations × assets).
+  - `obs`: Observation labels of the window, panel rows of the window, or `nothing`. Read only by the message of step 2.
+
+# Validation
+
+  - The wealth of every observation is positive, else a [`NonPositiveWealthError`](@ref) is raised.
+
+# Returns
+
+  - `U::MatNum`: `T × N` matrix of held weights, one row per observation.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.weight_path(SelfFinancingDrift(), [0.5, 0.5], [0.1 -0.1; 0.2 0.0])
+2×2 Matrix{Float64}:
+ 0.5   0.5
+ 0.55  0.45
+```
+
+# Related
+
+  - [`AbstractWeightDrift`](@ref)
+  - [`SelfFinancingDrift`](@ref)
+  - [`held_weights`](@ref): The weights held after the last observation.
+  - [`drift_position_values`](@ref)
+  - [`drift_wealth`](@ref)
+  - [`assert_positive_wealth`](@ref)
+"""
+function weight_path(wd::AbstractWeightDrift, w::VecNum, X::MatNum, obs = nothing)
+    P = drift_position_values(wd, w, X)
+    V = drift_wealth(P, w)
+    assert_positive_wealth(V, obs)
+    U = similar(P, float(eltype(P)))
+    U[1, :] .= w
+    if size(P, 1) > 1
+        U[2:end, :] .= @view(P[1:(end - 1), :]) ./ @view(V[1:(end - 1)])
+    end
+    return U
+end
+"""
+    held_weights(wd::AbstractWeightDrift, w::VecNum, X::MatNum, obs = nothing)
+
+Compute the weights held after the last observation of a drifted window.
+
+These are the weights a fund carries into the next rebalance, so they are the base a trade is measured against. They are one step beyond the last row of [`weight_path`](@ref), which holds the weights carried **through** the last observation.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+h_{j} &= \\frac{P_{T j}}{V_{T}}
+\\end{align}
+```
+
+Where:
+
+  - ``h_{j}``: Weight held in asset ``j`` after the last observation.
+  - ``P_{t j}``: Value of the position in asset ``j`` at the end of observation ``t``.
+  - ``V_{t}``: Wealth at the end of observation ``t``.
+  - $(math_dict[:T])
+  - $(math_dict[:N])
+
+# Algorithm
+
+ 1. Compute the position values with [`drift_position_values`](@ref) and the wealth with [`drift_wealth`](@ref).
+ 2. Check the wealth with [`assert_positive_wealth`](@ref).
+ 3. Divide the last row of the position values by the last wealth.
+
+# Arguments
+
+  - `wd`: Weight drift algorithm.
+  - `w`: Portfolio weights.
+  - `X`: Asset return matrix (observations × assets).
+  - `obs`: Observation labels of the window, panel rows of the window, or `nothing`. Read only by the message of step 2.
+
+# Validation
+
+  - The wealth of every observation is positive, else a [`NonPositiveWealthError`](@ref) is raised.
+
+# Returns
+
+  - `h::VecNum`: `N × 1` vector of held weights.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.held_weights(SelfFinancingDrift(), [0.5, 0.5], [0.1 -0.1; 0.2 0.0])
+2-element Vector{Float64}:
+ 0.5945945945945945
+ 0.4054054054054054
+```
+
+# Related
+
+  - [`AbstractWeightDrift`](@ref)
+  - [`SelfFinancingDrift`](@ref)
+  - [`weight_path`](@ref): The weights held through each observation.
+  - [`drift_position_values`](@ref)
+  - [`drift_wealth`](@ref)
+  - [`assert_positive_wealth`](@ref)
+"""
+function held_weights(wd::AbstractWeightDrift, w::VecNum, X::MatNum, obs = nothing)
+    P = drift_position_values(wd, w, X)
+    V = drift_wealth(P, w)
+    assert_positive_wealth(V, obs)
+    return @view(P[end, :]) ./ V[end]
+end
+"""
+    calc_net_returns(w::VecVecNum, X::MatNum, fees, wd::AbstractWeightDrift, obs = nothing)
+    calc_net_returns(w::VecNum, X::MatNum, fees, wd::AbstractWeightDrift, obs = nothing)
+    calc_net_returns(w::VecNum, X::MatNum, fees, wd::Nothing, args...)
+    calc_net_returns(w::VecVecNum, X::MatNum, fees, wd::Nothing, args...)
+
+Compute the net portfolio returns of a window, reading the weight drift `wd`.
+
+A `nothing` `wd` scores every observation against the same weight vector and reproduces [`calc_net_returns(w::VecNum, X::MatNum, args...)`](@ref) exactly. An [`AbstractWeightDrift`](@ref) lets each position grow at its own return, and the series becomes the wealth ratio of the drifted holdings. The fee is charged as it is on the undrifted series: [`calc_fees`](@ref) contracts the target weights into one scalar, and that scalar is subtracted from every observation.
+
+A vector of weight vectors is a population, and a ruined member does not stop the run. The member's series is filled with `NaN`, one warning names every member that fell, and the run raises only when no member survives. A single weight vector is a population of one, so it raises.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+R_{t} &= \\frac{V_{t}}{V_{t-1}} - 1 - F_{\\text{t}}(\\boldsymbol{w})\\,, \\qquad V_{0} = 1\\\\
+V_{t} &= \\sum\\limits_{j=1}^{N} w_{j} \\prod\\limits_{s=1}^{t} \\left(1 + X_{s j}\\right) + \\left(1 - \\sum\\limits_{j=1}^{N} w_{j}\\right)
+\\end{align}
+```
+
+Where:
+
+  - ``R_{t}``: Net return of observation ``t``.
+  - ``V_{t}``: Wealth at the end of observation ``t``, per unit of initial capital.
+  - ``X_{s j}``: Return of asset ``j`` at observation ``s``.
+  - ``F_{\\text{t}}(\\boldsymbol{w})``: Total fees computed using [`calc_fees`](@ref).
+  - $(math_dict[:w_port])
+  - $(math_dict[:T])
+  - $(math_dict[:N])
+
+# Algorithm
+
+ 1. On a `nothing` `wd`, delegate to [`calc_net_returns(w::VecNum, X::MatNum, args...)`](@ref), which charges the fee and reads no drift.
+ 2. On an [`AbstractWeightDrift`](@ref), compute the position values with [`drift_position_values`](@ref) and the wealth with [`drift_wealth`](@ref).
+ 3. Check the wealth with [`assert_positive_wealth`](@ref).
+ 4. Read the wealth as a return series with [`drift_returns`](@ref), and subtract the one fee scalar from every observation.
+ 5. On a population, run steps 2 to 4 for each member. Fill a ruined member's series with `NaN`, warn once naming every member that fell, and raise when every member fell.
+
+# Arguments
+
+  - `w`: Portfolio weights, or a vector of portfolio weight vectors.
+  - `X`: Asset return matrix (observations × assets).
+  - `fees`: [`Fees`](@ref) structure, or `nothing`.
+  - `wd`: Weight drift algorithm, or `nothing`.
+  - `obs`: Observation labels of the window, panel rows of the window, or `nothing`. Read only by the message of step 3.
+  - `args...`: Additional arguments (ignored).
+
+# Validation
+
+  - The wealth of every observation is positive, else a [`NonPositiveWealthError`](@ref) is raised. On a population, the raise happens only when no member survives.
+
+# Returns
+
+  - `val::VecNum`: Portfolio net returns, for a `w::VecNum`.
+  - `val::Vector{<:VecNum}`: One net return series per weight vector, for a `w::VecVecNum`.
+
+# Examples
+
+```jldoctest
+julia> calc_net_returns([0.5, 0.5], [0.1 -0.1; 0.2 0.0], nothing, SelfFinancingDrift())
+2-element Vector{Float64}:
+ 0.0
+ 0.1100000000000001
+```
+
+# Related
+
+  - [`AbstractWeightDrift`](@ref)
+  - [`SelfFinancingDrift`](@ref)
+  - [`calc_net_returns(w::VecNum, X::MatNum, args...)`](@ref): The undrifted series a `nothing` `wd` reaches.
+  - [`drift_returns`](@ref)
+  - [`assert_positive_wealth`](@ref)
+  - [`NonPositiveWealthError`](@ref)
+  - [`VecVecNum`](@ref)
+  - [`Fees`](@ref)
+"""
+function calc_net_returns(w::VecVecNum, X::MatNum, fees, wd::AbstractWeightDrift,
+                          obs = nothing)
+    Tr = float(promote_type(eltype(X), eltype(first(w))))
+    ret = Vector{Vector{Tr}}(undef, length(w))
+    ruined = Int[]
+    for (i, wi) in pairs(w)
+        P = drift_position_values(wd, wi, X)
+        V = drift_wealth(P, wi)
+        if isnothing(non_positive_wealth_index(V))
+            ret[i] = drift_returns(V) .- calc_fees(wi, fees)
+        else
+            push!(ruined, i)
+            ret[i] = fill(convert(Tr, NaN), size(X, 1))
+        end
+    end
+    if length(ruined) == length(w)
+        assert_positive_wealth(drift_wealth(drift_position_values(wd, first(w), X),
+                                            first(w)), obs, 1)
+    elseif !isempty(ruined)
+        @warn "the drifted wealth of $(length(ruined)) of $(length(w)) population member(s) is not positive, so their series are `NaN` and their members are dropped: $(ruined)"
+    end
+    return ret
+end
+function calc_net_returns(w::VecNum, X::MatNum, fees, wd::AbstractWeightDrift,
+                          obs = nothing)
+    P = drift_position_values(wd, w, X)
+    V = drift_wealth(P, w)
+    assert_positive_wealth(V, obs)
+    return drift_returns(V) .- calc_fees(w, fees)
+end
+function calc_net_returns(w::VecNum, X::MatNum, fees, ::Nothing, args...)
+    return calc_net_returns(w, X, fees)
+end
+function calc_net_returns(w::VecVecNum, X::MatNum, fees, ::Nothing, args...)
+    return calc_net_returns(w, X, fees)
+end
+"""
     relative_cumulative_returns(X; dims = 1)
 
 Compute the relative cumulative returns from a return matrix.
@@ -451,4 +975,5 @@ function drawdowns(X::ArrNum, compound::Bool = false; cX::Bool = false, dims::In
     end
 end
 
-export calc_net_returns, calc_net_asset_returns, cumulative_returns, drawdowns
+export calc_net_returns, calc_net_asset_returns, cumulative_returns, drawdowns,
+       SelfFinancingDrift
