@@ -87,7 +87,7 @@ decision that moved many times, so read the amendments as well as the body.
 | 0064 | [The entropy pooling prior dispatches on its algorithm](0064-the-entropy-pooling-prior-dispatches-on-its-algorithm.md) | | `prior` has one method on the bare estimator, which forwards the algorithm as a value. |
 | 0065 | [The weighted moment seam densifies its observations](0065-the-weighted-moment-seam-densifies-its-observations.md) | | The weighted methods materialise the observation matrix before the call. |
 | 0066 | [A sub-portfolio enumeration is an adapter](0066-the-sub-portfolio-enumeration-is-an-adapter.md) | | `SubPortfolioUniverse` is the adapter, and the module is written once. |
-| 0067 | [The cross-validation fold loop is one seam](0067-the-cross-validation-fold-loop-is-one-seam.md) | 1 · 2026-08-19 | One `fold_loop`, beside `parallel_folds` and `run_folds`. |
+| 0067 | [The cross-validation fold loop is one seam](0067-the-cross-validation-fold-loop-is-one-seam.md) | 3 · 2026-09-04 | One `fold_loop`, beside `parallel_folds` and `run_folds`. |
 | 0068 | [A Black-Litterman caller states its axis, not its key](0068-a-black-litterman-caller-states-its-axis-not-its-key.md) | | The last argument of `bl_preroll` names the axis. The callee resolves the key. |
 | 0069 | [A tail view carries its own level and formulation](0069-a-tail-view-carries-its-own-level-and-formulation.md) | | The group holds `alpha` and `alg`. `nothing` picks the cheapest exact formulation. |
 | 0070 | [An ambiguity set is a reading, and what is missing is a calibrated radius](0070-an-ambiguity-set-is-a-reading-and-a-calibrated-radius.md) | 3 · 2026-08-29 | No set family. A radius slot admits the rule that computes it, resolved by Factory. |

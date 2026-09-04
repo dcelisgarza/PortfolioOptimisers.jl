@@ -214,3 +214,76 @@ A `Pipeline` over a `KFold` or a `KFoldResult` whose steps need the previous wei
 runs its folds in parallel with `w_prev == nothing`, and emits no `cv_sequential_info` message. A
 turnover budget, a turnover fee or a tracking term in such a pipeline reads its own reference
 weights instead of the previous fold's. Every other scheme is unchanged.
+
+## Amendment (2026-09-04, second)
+
+Issue #762. The rule is a conjunction, and no site computed it. A run is sequential only when
+the fold enumeration is a timeline **and** the estimator needs the previous fold's weights. The
+first amendment put the timeline half in `fold_loop`'s `time_ordered::Bool` keyword and the
+previous-weights half in `run_folds`'s `::Val{PW}` type parameter. `fold_loop` sent one case to
+`run_folds`, which re-decided and sent its own `else` arm back to `parallel_folds`. So
+`parallel_folds` was reached by two routes for one reason, and `run_folds` did not always run the
+folds the way its name says.
+
+`fold_loop` now computes the conjunction, and `run_folds` is the sequential loop:
+
+```julia
+# fold_loop
+return if folds_are_time_ordered(cv) && prev_w_flag
+    run_folds(fold, n, ElT)
+else
+    parallel_folds(i -> fold(i, nothing), n, ex, ElT)
+end
+```
+
+### The keyword becomes the scheme, not a `Bool`
+
+`time_ordered::Bool` is gone, and `fold_loop` takes `cv = nothing` in its place. This is what
+makes the conjunction fold. A keyword *value* survives only by constant propagation, which one
+call hop loses — the same mechanism the first amendment measured for `ElT`. A keyword *type* does
+not. `folds_are_time_ordered(cv)` and `needs_previous_weights(est)` are both per-type methods over
+concretely-typed arguments, so inference decides the conjunction from types alone and eliminates
+the arm that cannot run. `folds_are_time_ordered(::Any)` already answers `nothing`, so the two
+path-level sites that hold no scheme omit the keyword.
+
+`run_folds` also loses `opt` and `ex`. `opt` existed for the `Val` default, and `ex` for the
+`else` arm; with no branch, both are dead. `cv_sequential_info` loses its `prev_w_flag` argument
+for the same reason: the only caller is the sequential loop, so the value was always `true`. The
+message now states both facts rather than quoting a constant back.
+
+### What the measurement says
+
+The claim of the first amendment — "runtime dispatch inside the loop machinery is now **zero** on
+all four schemes" — was too strong as written, and this shape improves on what was actually there.
+Runtime-dispatch reports attributed to `fold_loop`, `run_folds` or `parallel_folds`, from
+`JET.report_opt` over `cross_val_predict`, on an `EqualWeighted` with and without a
+`PreviousWeightsFunction` schedule:
+
+| scheme | plain, before | plain, after | previous weights, before | previous weights, after |
+| :--- | ---: | ---: | ---: | ---: |
+| `KFold` | 4 | 2 | 3 | 2 |
+| `CombinatorialCrossValidation` | 5 | 3 | 3 | 3 |
+| `IndexWalkForward` | 4 | 2 | 3 | 1 |
+| `MultipleRandomised` | 26 | 17 | 18 | 2 |
+
+Every case falls or holds. The reports that remain sit on the `@floop` line of `parallel_folds`,
+which is FLoops spawning its tasks, and one on the sequential loop's abstractly-typed
+`predictions[i - 1]`.
+
+That last one is the defect this amendment removes. Before, it was reported on the `KFold` and
+combinatorial paths too, where the sequential loop can never run: `time_ordered` was a run-time
+`Bool`, so the `run_folds` arm was inferred even for a scheme that never reaches it. It is now
+reported only on `IndexWalkForward` and `MultipleRandomised` with a previous-weights estimator —
+the two cases that do run the sequential loop.
+
+### What did not change
+
+`folds_are_time_ordered` keeps its two methods and its conservative `true` default, so a
+user-supplied scheme still threads history unless it declares that it does not. `parallel_folds`
+keeps its signature and its four direct callers. `Fold`, `fold_view` and `assert_unshuffled_folds`
+are untouched. ADR 0030 is untouched.
+
+`test_37_time_dependent_constraints.jl` gains a testset that names the conjunction and covers all
+three reachable combinations at the optimiser level: both halves (sequential, and fold 2 reads
+fold 1), the previous-weights half alone over a `KFold` (parallel, silent, no history), and the
+timeline half alone (parallel, silent).

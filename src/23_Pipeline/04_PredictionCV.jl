@@ -239,8 +239,8 @@ function cross_val_predict(pipe::Pipeline, data::Prices_RR,
     (; train_idx, test_idx) = cv_res
     assert_unshuffled_folds(cv, train_idx)
     predictions = fold_loop(pipe, length(train_idx), ex, Vector{PredictionResult};
-                            rd = data, train_idx = train_idx, test_idx = test_idx,
-                            time_ordered = folds_are_time_ordered(cv)) do fold
+                            rd = data, train_idx = train_idx, test_idx = test_idx, cv = cv
+                            ) do fold
         res = StatsAPI.fit(fold.est, pipeline_data_view(fold.rd, fold.train))
         return [StatsAPI.predict(res, fold.rd, group) for group in fold.test]
     end
@@ -357,8 +357,7 @@ function cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::CVER = KFold();
     # @argcheck(isa(test_idx[1], VecInt),
     #           ArgumentError("pipeline cross-validation requires non-combinatorial (VecInt) test indices, but got $(typeof(test_idx[1])); combinatorial schemes recombine non-contiguous test groups, which a fitted workflow cannot replay"))
     predictions = fold_loop(pipe, length(train_idx), ex; rd = data, train_idx = train_idx,
-                            test_idx = test_idx, time_ordered = folds_are_time_ordered(cv)
-                            ) do fold
+                            test_idx = test_idx, cv = cv) do fold
         res = StatsAPI.fit(fold.est, pipeline_data_view(fold.rd, fold.train))
         return StatsAPI.predict(res, fold.rd, fold.test)
     end

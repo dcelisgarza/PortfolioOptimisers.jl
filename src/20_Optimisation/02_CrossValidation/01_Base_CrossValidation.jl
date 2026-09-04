@@ -1051,20 +1051,18 @@ function sort_predictions!(res::CrossValidationResult, predictions::VecPredRes)
     return sort_predictions!(res.test_idx, predictions)
 end
 """
-    cv_sequential_info(prev_w_flag::Bool)
+    cv_sequential_info()
 
-Build the informational message emitted when a cross-validation run falls back to sequential
-execution because the optimiser needs the previous fold's weights.
-Shared by the [`run_folds`](@ref) walk fallback used in walk-forward and multiple-randomised
-cross-validation.
+Build the informational message emitted when a cross-validation run runs its folds
+sequentially. [`run_folds`](@ref) is the only site that emits it, and it is the sequential
+loop, so the message states the two facts that sent the run there rather than quoting a
+value back.
 
-Time dependence alone does not force the fallback and takes no argument here. A
-[`TimeDependent`](@ref) schedule is known for every fold before the loop starts, so
-[`fold_loop`](@ref) resolves it in parallel.
-
-# Arguments
-
-  - `prev_w_flag::Bool`: The value of [`needs_previous_weights`](@ref) for the optimiser, which the message quotes back to the user.
+The two facts are the conjunction [`fold_loop`](@ref) computes. The fold enumeration of the
+scheme is a timeline ([`folds_are_time_ordered`](@ref)), and the estimator needs the
+previous fold's weights ([`needs_previous_weights`](@ref)). Either one alone leaves the
+folds independent. Time dependence is neither of them: a [`TimeDependent`](@ref) schedule is
+known for every fold before the loop starts, so [`fold_loop`](@ref) resolves it in parallel.
 
 # Returns
 
@@ -1074,10 +1072,11 @@ Time dependence alone does not force the fallback and takes no argument here. A
 
   - [`run_folds`](@ref)
   - [`fold_loop`](@ref)
+  - [`folds_are_time_ordered`](@ref)
   - [`needs_previous_weights`](@ref)
 """
-function cv_sequential_info(prev_w_flag::Bool)
-    return "Running cross-validation sequentially because the optimiser must use the previous optimisation's weights (needs_previous_weights(opt) == $prev_w_flag). This is because somewhere within the optimisation estimator is contained at least one of the following:\n\t- Turnover and/or TurnoverEstimator,\n\t- WeightsTracking,\n\t- TurnoverRiskMeasure,\n\t- custom constraints which use asset weights,\n\t- custom objective penalties which use asset weights,\n\t- a time-dependent constraint whose entries need previous weights (e.g. a PreviousWeightsFunction).\nTo enable parallel processing please either mark the weights as fixed or remove the offending component(s). Time-dependent constraints alone do not force sequential processing."
+function cv_sequential_info()
+    return "Running cross-validation sequentially because the folds of the cross-validation scheme are a timeline (folds_are_time_ordered(cv) == true) and the optimiser must use the previous optimisation's weights (needs_previous_weights(opt) == true). The second fact is because somewhere within the optimisation estimator is contained at least one of the following:\n\t- Turnover and/or TurnoverEstimator,\n\t- WeightsTracking,\n\t- TurnoverRiskMeasure,\n\t- custom constraints which use asset weights,\n\t- custom objective penalties which use asset weights,\n\t- a time-dependent constraint whose entries need previous weights (e.g. a PreviousWeightsFunction).\nTo enable parallel processing please either mark the weights as fixed or remove the offending component(s). Time-dependent constraints alone do not force sequential processing."
 end
 """
     parallel_folds(fit_fold, n::Integer, ex::FLoops.Transducers.Executor,
@@ -1086,6 +1085,10 @@ end
 Run `n` cross-validation folds in parallel, filling `predictions[i] = fit_fold(i)` for `i in 1:n`
 over executor `ex`. `ElT` is the per-fold result element type (a single [`PredictionResult`](@ref)
 for time-ordered schemes, a `Vector{PredictionResult}` for the multi-path combinatorial scheme).
+
+This is the sibling of [`run_folds`](@ref), and the two divide the work by name. A fold here
+takes no previous fold, so `fit_fold` takes the fold index alone. [`fold_loop`](@ref)
+decides which of the two runs, and neither one re-decides.
 
 `ElT` is a *positional* `::Type{ElT}` argument, not a keyword, so a method always
 specialises on it and `Vector{ElT}(undef, n)` stays a compile-time construction. As a
@@ -1107,42 +1110,37 @@ function parallel_folds(fit_fold, n::Integer, ex::FLoops.Transducers.Executor,
     return predictions
 end
 """
-    run_folds(fit_fold, opt, n::Integer, ex::FLoops.Transducers.Executor,
-              ::Type{ElT} = PredictionResult,
-              ::Val{PW} = Val(needs_previous_weights(opt)))
+    run_folds(fit_fold, n::Integer, ::Type{ElT} = PredictionResult)
 
-Run `n` cross-validation folds, either in parallel or — when `opt` needs the previous fold's
-weights (`needs_previous_weights`) — sequentially, emitting [`cv_sequential_info`](@ref).
-`fit_fold(i, prev)` returns the prediction for fold `i`, where `prev` is `nothing` in parallel
-mode or the previous fold's prediction in sequential mode; the caller uses `prev` to thread
-previous weights into fold `i`. Time-dependent constraints alone do not force sequential
-processing — their per-fold values are known upfront.
+Run `n` cross-validation folds in order, filling
+`predictions[i] = fit_fold(i, predictions[i - 1])` for `i in 1:n`, and emit
+[`cv_sequential_info`](@ref). Fold 1 takes `nothing`, because it has no fold behind it. The
+caller uses the previous fold to thread its weights into fold `i`. `ElT` is the per-fold
+result element type.
+
+This is the sequential loop, and it does that one job. [`fold_loop`](@ref) is the only site
+that calls it, and it calls it only when the folds are a timeline *and* the estimator needs
+the previous fold's weights. The loop therefore neither re-decides nor takes an executor:
+its sibling [`parallel_folds`](@ref) owns the other case.
 
 `ElT` is a *positional* `::Type{ElT}` argument for the reason given in
-[`parallel_folds`](@ref). The previous-weights flag is a `Val` for the same reason applied
-to a branch: as a run-time `Bool` the sequential branch is *inferred* even when it can
-never run, and it reads an abstractly-typed `predictions[i - 1]`, which is a runtime
-dispatch. As a type parameter the branch is eliminated.
+[`parallel_folds`](@ref).
 
 # Related
 
   - [`parallel_folds`](@ref)
   - [`fold_loop`](@ref)
   - [`cv_sequential_info`](@ref)
+  - [`folds_are_time_ordered`](@ref)
   - [`fit_and_predict`](@ref)
 """
-function run_folds(fit_fold, opt, n::Integer, ex::FLoops.Transducers.Executor,
-                   ::Type{ElT} = PredictionResult,
-                   ::Val{PW} = Val(needs_previous_weights(opt))) where {ElT, PW}
-    if PW
-        @info(cv_sequential_info(PW))
-        predictions = Vector{ElT}(undef, n)
-        for i in 1:n
-            predictions[i] = fit_fold(i, i > 1 ? predictions[i - 1] : nothing)
-        end
-        return predictions
+function run_folds(fit_fold, n::Integer, ::Type{ElT} = PredictionResult) where {ElT}
+    @info(cv_sequential_info())
+    predictions = Vector{ElT}(undef, n)
+    for i in 1:n
+        predictions[i] = fit_fold(i, i > 1 ? predictions[i - 1] : nothing)
     end
-    return parallel_folds(i -> fit_fold(i, nothing), n, ex, ElT)
+    return predictions
 end
 """
     assert_unshuffled_folds(cv, train_idx)
@@ -1227,16 +1225,21 @@ end
 
 Return `true` if the fold enumeration of a cross-validation scheme is a timeline.
 
-This is the predicate that every call site reads for the `time_ordered` keyword of
-[`fold_loop`](@ref), so a scheme states for itself whether its folds carry history. A
-walk-forward, a multiple-randomised path, and any scheme with no more specific method
-enumerate their folds in time order. Fold `i` has fold `i - 1` behind it, so the loop runs
-the folds in order and threads the previous fold's weights.
+This is one half of the conjunction [`fold_loop`](@ref) computes, so a scheme states for
+itself whether its folds carry history. A walk-forward, a multiple-randomised path, and any
+scheme with no more specific method enumerate their folds in time order. Fold `i` has fold
+`i - 1` behind it, so the loop may run the folds in order and thread the previous fold's
+weights. [`needs_previous_weights`](@ref) is the other half, and it decides whether the loop
+does so.
 
 A [`NonSeqCVER`](@ref) scheme answers `false`. A k-fold and a combinatorial enumeration are
 not timelines: each fold is independent of the others, so no fold has a previous fold, and
 the loop runs them in parallel. A `KFold` training window holds rows that follow its test
 window, so a quantity measured against another fold's weights is not a backtest reading.
+
+The method is per type and takes the scheme itself, so inference reads the answer from the
+type of `cv` and never needs the value. `folds_are_time_ordered(::Any)` answers `nothing`
+too, which is what [`fold_loop`](@ref) receives from a call site that holds no scheme.
 
 # Related
 
@@ -1250,7 +1253,7 @@ folds_are_time_ordered(::NonSeqCVER) = false
 """
     fold_loop(fit_fold, est, n::Integer, ex::FLoops.Transducers.Executor,
               ::Type{ElT} = PredictionResult; rd, train_idx, test_idx,
-              path_id = nothing, time_ordered::Bool = true, fold_view = nothing)
+              path_id = nothing, cv = nothing, fold_view = nothing)
 
 Run the `n` folds of a cross-validation scheme over `est`, and resolve each fold's estimator
 before the callback sees it.
@@ -1273,14 +1276,23 @@ The callback takes the one [`Fold`](@ref) record, so a call site names what it r
 
 [`assert_time_dependent_fold_count`](@ref) runs once, before the loop.
 
-`time_ordered` states whether the fold enumeration of the scheme is a timeline. `true`
-routes through [`run_folds`](@ref), so an optimiser that needs the previous weights runs
-sequentially. `false` routes through [`parallel_folds`](@ref), because a scheme whose
-folds are not a timeline has no previous fold to thread. A call site that holds the scheme
-takes the value from [`folds_are_time_ordered`](@ref), so the scheme states the answer once
-instead of each call site restating it. A path-level site enumerates an inner walk-forward
-and holds no scheme, so it takes the default. `ElT` is the per-fold result
-element type: a single
+This is also the one site that decides how the folds run. A run is sequential only when two
+facts hold at once: the fold enumeration of `cv` is a timeline
+([`folds_are_time_ordered`](@ref)), *and* `est` needs the previous fold's weights
+([`needs_previous_weights`](@ref)). The conjunction routes through [`run_folds`](@ref).
+Every other case routes through [`parallel_folds`](@ref), because a fold with no fold behind
+it, or a fold whose estimator reads no previous weights, is independent of the other folds.
+Neither loop re-decides.
+
+`cv` is the scheme, and the loop reads its two per-type predicates rather than a
+value a call site computes. Both are decided by the *types* of `cv` and `est`, so inference
+folds the conjunction and eliminates the arm that cannot run. A `Bool` keyword cannot do
+this: its value survives only by constant propagation, which one call hop loses, and the
+sequential arm is then inferred even where it can never run — see the amendments of ADR
+0067. The two path-level sites enumerate an inner walk-forward and hold no scheme, so they
+omit `cv`; `folds_are_time_ordered(nothing)` answers `true`.
+
+`ElT` is the per-fold result element type: a single
 [`PredictionResult`](@ref) for a time-ordered scheme, a `Vector{PredictionResult}` for the
 multi-path combinatorial scheme. It is positional for the reason given in
 [`parallel_folds`](@ref).
@@ -1297,8 +1309,7 @@ multi-path combinatorial scheme. It is positional for the reason given in
 """
 function fold_loop(fit_fold, est, n::Integer, ex::FLoops.Transducers.Executor,
                    ::Type{ElT} = PredictionResult; rd, train_idx, test_idx,
-                   path_id = nothing, time_ordered::Bool = true,
-                   fold_view = nothing) where {ElT}
+                   path_id = nothing, cv = nothing, fold_view = nothing) where {ElT}
     td_flag = is_time_dependent(est)
     if td_flag
         assert_time_dependent_fold_count(est, n)
@@ -1320,13 +1331,13 @@ function fold_loop(fit_fold, est, n::Integer, ex::FLoops.Transducers.Executor,
         end
         return fit_fold(Fold(i, n, esti, rdi, train_idx[i], test_idx[i]))
     end
-    # The previous-weights flag crosses into `run_folds` as a `Val`, not a `Bool`. As a
-    # value it is a run-time argument, so the sequential branch is inferred even for an
-    # optimiser that never takes it, and that branch reads an abstractly-typed
-    # `predictions[i - 1]`, which is a runtime dispatch. As a type parameter the branch is
-    # eliminated instead. See the ADR 0067 amendment.
-    return if time_ordered
-        run_folds(fold, est, n, ex, ElT, Val(prev_w_flag))
+    # Both halves are per-type methods over the concretely-typed `cv` and `est`, so
+    # inference decides the conjunction from types alone and eliminates the arm that
+    # cannot run. A `Bool` keyword would leave the `run_folds` arm inferred, and its
+    # abstractly-typed `predictions[i - 1]` is a runtime dispatch. See the ADR 0067
+    # amendments.
+    return if folds_are_time_ordered(cv) && prev_w_flag
+        run_folds(fold, n, ElT)
     else
         parallel_folds(i -> fold(i, nothing), n, ex, ElT)
     end
@@ -1338,8 +1349,7 @@ function fit_and_predict(opt::OptE_Opt_TD, rd::ReturnsResult, cv::NonSeqCVER; co
     (; train_idx, test_idx) = cv_res
     assert_unshuffled_folds(cv, train_idx)
     predictions = fold_loop(opt, length(train_idx), ex; rd = rd, train_idx = train_idx,
-                            test_idx = test_idx, time_ordered = folds_are_time_ordered(cv)
-                            ) do fold
+                            test_idx = test_idx, cv = cv) do fold
         return fit_and_predict(fold.est, fold.rd; train_idx = fold.train,
                                test_idx = fold.test, cols = cols)
     end

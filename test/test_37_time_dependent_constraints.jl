@@ -430,6 +430,46 @@ end
         @test isnothing(hpreds.pred[1].res.fees) || hpreds.pred[1].res.fees.l == 0.0
         @test hpreds.pred[2].res.fees.l == 0.01
     end
+    @testset "the fold loop is sequential only on the conjunction" begin
+        # Issue #762. A run is sequential only when two facts hold at once: the fold
+        # enumeration is a timeline, and the estimator needs the previous fold's weights.
+        # `fold_loop` computes that conjunction once, and `run_folds` is the sequential
+        # loop with no branch of its own. Each fold writes its own slot, so the parallel
+        # cases race nothing.
+        kf = KFold(; n = 3)
+        cvw = IndexWalkForward(100, 50)
+        nk = length(split(kf, rd).train_idx)
+        nw = length(split(cvw, rd).train_idx)
+        capture(store) = TimeDependent(PreviousWeightsFunction(ctx -> begin
+                                                                   store[ctx.i] = if isnothing(ctx.w_prev)
+                                                                       nothing
+                                                                   else
+                                                                       copy(ctx.w_prev)
+                                                                   end
+                                                                   WeightBounds()
+                                                               end))
+        # Both halves: the run is sequential, it says so, and fold 2 reads fold 1.
+        wseen = Vector{Any}(nothing, nw)
+        ewp = EqualWeighted(; wb = capture(wseen))
+        @test PortfolioOptimisers.folds_are_time_ordered(cvw)
+        @test PortfolioOptimisers.needs_previous_weights(ewp)
+        pw = @test_logs (:info,) match_mode = :any cross_val_predict(ewp, rd, cvw)
+        @test isnothing(wseen[1])
+        @test isapprox(wseen[2], pw.pred[1].res.w)
+        # The previous-weights half alone: a `KFold` fold has no fold behind it, so the
+        # run is parallel, silent, and carries no history.
+        kseen = Vector{Any}(nothing, nk)
+        ewk = EqualWeighted(; wb = capture(kseen))
+        @test !PortfolioOptimisers.folds_are_time_ordered(kf)
+        pk = @test_logs cross_val_predict(ewk, rd, kf)
+        @test length(pk.pred) == nk
+        @test all(isnothing, kseen)
+        # The timeline half alone: an estimator that reads no previous weights leaves the
+        # folds independent, so the walk-forward is parallel and silent too.
+        @test !PortfolioOptimisers.needs_previous_weights(EqualWeighted())
+        pe = @test_logs cross_val_predict(EqualWeighted(), rd, cvw)
+        @test length(pe.pred) == nw
+    end
     @testset "Naive optimisers" begin
         sched = TimeDependent([WeightBounds(; lb = 0.0, ub = 0.9),
                                WeightBounds(; lb = 0.0, ub = 0.8)])

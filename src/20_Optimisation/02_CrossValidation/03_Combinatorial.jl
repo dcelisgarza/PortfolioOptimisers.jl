@@ -594,8 +594,7 @@ function fit_and_predict(opt::OptE_TD, rd::ReturnsResult, cv::CombCVER; cols = :
     # no ordering is imposed on time-dependent entries; the user keys them off the
     # fold's indices (ctx.train_idx[ctx.i] / ctx.test_idx[ctx.i]).
     predictions = fold_loop(opt, length(train_idx), ex, Vector{PredictionResult}; rd = rd,
-                            train_idx = train_idx, test_idx = test_idx,
-                            time_ordered = folds_are_time_ordered(cv)) do fold
+                            train_idx = train_idx, test_idx = test_idx, cv = cv) do fold
         return fit_and_predict(fold.est, fold.rd; train_idx = fold.train,
                                test_idx = fold.test, cols = cols)
     end
