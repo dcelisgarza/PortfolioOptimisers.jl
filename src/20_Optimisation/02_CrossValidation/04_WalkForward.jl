@@ -97,9 +97,20 @@ $(DocStringExtensions.FIELDS)
         purged_size::Integer = 0,
         expand_train::Bool = false,
         reduce_test::Bool = false,
+        wd::Option{<:AbstractWeightDrift} = nothing,
+        pws::Option{<:AbstractPreviousWeightsSource} = nothing,
+        store_weight_path::Bool = false,
     ) -> IndexWalkForward
 
 Positional and keyword arguments correspond to the struct's fields.
+
+## Weight drift and previous weights
+
+The two switches are independent, and each one is `nothing` by default, which is the library's original behaviour.
+
+`wd` is the Weight Drift of the scheme. `nothing` reads a fold's return series as `X * w` net of fees, at the target weights of that fold. A [`SelfFinancingDrift`](@ref) reads the series as the wealth ratio of the drifted holdings instead. `store_weight_path` makes the fold store the weight path it computed, which a reader otherwise rebuilds on demand.
+
+`pws` is the Previous-Weights Source. `nothing` threads the target weights of the previous fold into the next one. A [`DriftedWeights`](@ref) threads the weights held after the last observation of the previous fold instead, so a turnover, a tracking or a fee estimator measures the trades a fund places rather than the change in the decision. A fold enumeration of this scheme is a timeline, so the source has a previous fold to read.
 
 ## Validation
 
@@ -115,11 +126,14 @@ than to the estimator, so [`Base.split`](@ref) checks it.
 ```jldoctest
 julia> IndexWalkForward(100, 20; purged_size = 5, expand_train = true, reduce_test = false)
 IndexWalkForward
-    train_size ┼ Int64: 100
-     test_size ┼ Int64: 20
-   purged_size ┼ Int64: 5
-  expand_train ┼ Bool: true
-   reduce_test ┴ Bool: false
+         train_size ┼ Int64: 100
+          test_size ┼ Int64: 20
+        purged_size ┼ Int64: 5
+       expand_train ┼ Bool: true
+        reduce_test ┼ Bool: false
+                 wd ┼ nothing
+                pws ┼ nothing
+  store_weight_path ┴ Bool: false
 ```
 
 # Related
@@ -156,8 +170,23 @@ IndexWalkForward
     $(field_dict[:reduce_test])
     """
     reduce_test
+    """
+    $(field_dict[:wd])
+    """
+    wd
+    """
+    $(field_dict[:pws])
+    """
+    pws
+    """
+    $(field_dict[:store_weight_path])
+    """
+    store_weight_path
     function IndexWalkForward(train_size::Integer, test_size::Integer, purged_size::Integer,
-                              expand_train::Bool, reduce_test::Bool)
+                              expand_train::Bool, reduce_test::Bool,
+                              wd::Option{<:AbstractWeightDrift},
+                              pws::Option{<:AbstractPreviousWeightsSource},
+                              store_weight_path::Bool)
         assert_nonempty_gt0_finite_val(test_size, :test_size)
         assert_nonempty_nonneg_finite_val(train_size, :train_size)
         assert_nonempty_nonneg_finite_val(purged_size, :purged_size)
@@ -165,14 +194,19 @@ IndexWalkForward
                   DomainError(purged_size,
                               "purged_size ($purged_size) must be less than train_size ($train_size), because the purge is taken out of the training window"))
         return new{typeof(train_size), typeof(test_size), typeof(purged_size),
-                   typeof(expand_train), typeof(reduce_test)}(train_size, test_size,
-                                                              purged_size, expand_train,
-                                                              reduce_test)
+                   typeof(expand_train), typeof(reduce_test), typeof(wd), typeof(pws),
+                   typeof(store_weight_path)}(train_size, test_size, purged_size,
+                                              expand_train, reduce_test, wd, pws,
+                                              store_weight_path)
     end
 end
 function IndexWalkForward(train_size::Integer, test_size::Integer; purged_size::Integer = 0,
-                          expand_train::Bool = false, reduce_test::Bool = false)
-    return IndexWalkForward(train_size, test_size, purged_size, expand_train, reduce_test)
+                          expand_train::Bool = false, reduce_test::Bool = false,
+                          wd::Option{<:AbstractWeightDrift} = nothing,
+                          pws::Option{<:AbstractPreviousWeightsSource} = nothing,
+                          store_weight_path::Bool = false)
+    return IndexWalkForward(train_size, test_size, purged_size, expand_train, reduce_test,
+                            wd, pws, store_weight_path)
 end
 """
     Base.split(iwf::IndexWalkForward, rd::Prices_RR) -> WalkForwardResult
@@ -340,9 +374,20 @@ $(DocStringExtensions.FIELDS)
         previous::Bool = false,
         expand_train::Bool = false,
         reduce_test::Bool = false,
+        wd::Option{<:AbstractWeightDrift} = nothing,
+        pws::Option{<:AbstractPreviousWeightsSource} = nothing,
+        store_weight_path::Bool = false,
     ) -> DateWalkForward
 
 Positional and keyword arguments correspond to the struct's fields.
+
+## Weight drift and previous weights
+
+The two switches are independent, and each one is `nothing` by default, which is the library's original behaviour.
+
+`wd` is the Weight Drift of the scheme. `nothing` reads a fold's return series as `X * w` net of fees, at the target weights of that fold. A [`SelfFinancingDrift`](@ref) reads the series as the wealth ratio of the drifted holdings instead. `store_weight_path` makes the fold store the weight path it computed, which a reader otherwise rebuilds on demand.
+
+`pws` is the Previous-Weights Source. `nothing` threads the target weights of the previous fold into the next one. A [`DriftedWeights`](@ref) threads the weights held after the last observation of the previous fold instead, so a turnover, a tracking or a fee estimator measures the trades a fund places rather than the change in the decision. A fold enumeration of this scheme is a timeline, so the source has a previous fold to read.
 
 ## Validation
 
@@ -355,15 +400,18 @@ Positional and keyword arguments correspond to the struct's fields.
 ```jldoctest
 julia> DateWalkForward(252, 21; period = Dates.Day(1), purged_size = 5, expand_train = true)
 DateWalkForward
-     train_size ┼ Int64: 252
-      test_size ┼ Int64: 21
-         period ┼ Dates.Day: Dates.Day(1)
-  period_offset ┼ nothing
-    purged_size ┼ Int64: 5
-       adjuster ┼ typeof(identity): identity
-       previous ┼ Bool: false
-   expand_train ┼ Bool: true
-    reduce_test ┴ Bool: false
+         train_size ┼ Int64: 252
+          test_size ┼ Int64: 21
+             period ┼ Dates.Day: Dates.Day(1)
+      period_offset ┼ nothing
+        purged_size ┼ Int64: 5
+           adjuster ┼ typeof(identity): identity
+           previous ┼ Bool: false
+       expand_train ┼ Bool: true
+        reduce_test ┼ Bool: false
+                 wd ┼ nothing
+                pws ┼ nothing
+  store_weight_path ┴ Bool: false
 ```
 
 # Related
@@ -416,11 +464,26 @@ DateWalkForward
     $(field_dict[:reduce_test])
     """
     reduce_test
+    """
+    $(field_dict[:wd])
+    """
+    wd
+    """
+    $(field_dict[:pws])
+    """
+    pws
+    """
+    $(field_dict[:store_weight_path])
+    """
+    store_weight_path
     function DateWalkForward(train_size::IntPeriodDateRange, test_size::Integer,
                              period::DatesUnionPeriod,
                              period_offset::Option{<:DatesUnionPeriod},
                              purged_size::Integer, adjuster::DateAdjType, previous::Bool,
-                             expand_train::Bool, reduce_test::Bool)
+                             expand_train::Bool, reduce_test::Bool,
+                             wd::Option{<:AbstractWeightDrift},
+                             pws::Option{<:AbstractPreviousWeightsSource},
+                             store_weight_path::Bool)
         assert_nonempty_gt0_finite_val(test_size, :test_size)
         if isa(train_size, Integer)
             assert_nonempty_nonneg_finite_val(train_size, :train_size)
@@ -428,15 +491,12 @@ DateWalkForward
         assert_nonempty_nonneg_finite_val(purged_size, :purged_size)
         return new{typeof(train_size), typeof(test_size), typeof(period),
                    typeof(period_offset), typeof(purged_size), typeof(adjuster),
-                   typeof(previous), typeof(expand_train), typeof(reduce_test)}(train_size,
-                                                                                test_size,
-                                                                                period,
-                                                                                period_offset,
-                                                                                purged_size,
-                                                                                adjuster,
-                                                                                previous,
-                                                                                expand_train,
-                                                                                reduce_test)
+                   typeof(previous), typeof(expand_train), typeof(reduce_test), typeof(wd),
+                   typeof(pws), typeof(store_weight_path)}(train_size, test_size, period,
+                                                           period_offset, purged_size,
+                                                           adjuster, previous, expand_train,
+                                                           reduce_test, wd, pws,
+                                                           store_weight_path)
     end
 end
 function DateWalkForward(train_size::IntPeriodDateRange, test_size::Integer;
@@ -444,9 +504,13 @@ function DateWalkForward(train_size::IntPeriodDateRange, test_size::Integer;
                          period_offset::Option{<:DatesUnionPeriod} = nothing,
                          purged_size::Integer = 0, adjuster::DateAdjType = identity,
                          previous::Bool = false, expand_train::Bool = false,
-                         reduce_test::Bool = false)
+                         reduce_test::Bool = false,
+                         wd::Option{<:AbstractWeightDrift} = nothing,
+                         pws::Option{<:AbstractPreviousWeightsSource} = nothing,
+                         store_weight_path::Bool = false)
     return DateWalkForward(train_size, test_size, period, period_offset, purged_size,
-                           adjuster, previous, expand_train, reduce_test)
+                           adjuster, previous, expand_train, reduce_test, wd, pws,
+                           store_weight_path)
 end
 """
     walk_forward_date_range(ts::AbstractVector, period::DatesUnionPeriod,
@@ -764,10 +828,13 @@ function fit_and_predict(opt::OptE_TD, rd::ReturnsResult, cv::WFCVER; cols = :,
     cv_res = split(cv, rd)
     (; train_idx, test_idx) = cv_res
     assert_unshuffled_folds(cv, train_idx)
+    (; wd, pws, store_weight_path) = fold_evaluation(cv)
+    hwd = held_weights_drift(wd, pws)
     predictions = fold_loop(opt, length(train_idx), ex; rd = rd, train_idx = train_idx,
-                            test_idx = test_idx, cv = cv) do fold
+                            test_idx = test_idx, cv = cv, pws = pws) do fold
         return fit_and_predict(fold.est, fold.rd; train_idx = fold.train,
-                               test_idx = fold.test, cols = cols)
+                               test_idx = fold.test, cols = cols, wd = wd, hwd = hwd,
+                               store_weight_path = store_weight_path)
     end
     return MultiPeriodPredictionResult(; pred = predictions, id = id)
 end
@@ -777,10 +844,53 @@ function fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::Returns
     cv_res = split(cv, rd)
     test_idx = cv_res.test_idx
     assert_unshuffled_folds(cv, cv_res.train_idx)
+    (; wd, pws, store_weight_path) = fold_evaluation(cv)
+    hwd = held_weights_drift(wd, pws)
     predictions = parallel_folds(length(test_idx), ex) do i
-        return StatsAPI.predict(res, rd, test_idx[i])
+        return StatsAPI.predict(res, rd, test_idx[i], :; wd = wd, hwd = hwd,
+                                store_weight_path = store_weight_path)
     end
     return MultiPeriodPredictionResult(; pred = predictions, id = id)
 end
 
+"""
+    fold_evaluation(cv::IndexWalkForward)
+
+Read the evaluation switches of a [`IndexWalkForward`](@ref).
+
+The folds of this scheme are a timeline, so it carries both switches and states both of them here.
+
+# Returns
+
+  - `(; wd, pws, store_weight_path)`: The Weight Drift, the Previous-Weights Source, and the flag that stores a fold's weight path.
+
+# Related
+
+  - [`fold_evaluation`](@ref)
+  - [`IndexWalkForward`](@ref)
+  - [`held_weights_drift`](@ref)
+"""
+function fold_evaluation(cv::IndexWalkForward)
+    return (; wd = cv.wd, pws = cv.pws, store_weight_path = cv.store_weight_path)
+end
+"""
+    fold_evaluation(cv::DateWalkForward)
+
+Read the evaluation switches of a [`DateWalkForward`](@ref).
+
+The folds of this scheme are a timeline, so it carries both switches and states both of them here.
+
+# Returns
+
+  - `(; wd, pws, store_weight_path)`: The Weight Drift, the Previous-Weights Source, and the flag that stores a fold's weight path.
+
+# Related
+
+  - [`fold_evaluation`](@ref)
+  - [`DateWalkForward`](@ref)
+  - [`held_weights_drift`](@ref)
+"""
+function fold_evaluation(cv::DateWalkForward)
+    return (; wd = cv.wd, pws = cv.pws, store_weight_path = cv.store_weight_path)
+end
 export WalkForwardResult, IndexWalkForward, DateWalkForward, n_splits

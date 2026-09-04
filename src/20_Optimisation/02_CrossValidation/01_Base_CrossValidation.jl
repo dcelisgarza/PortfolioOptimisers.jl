@@ -448,6 +448,121 @@ All concrete prediction result types from cross-validation should subtype `Abstr
 """
 abstract type AbstractPredictionResult <: AbstractResult end
 """
+    ruined_retcodes(retcode::VecOptRetCode, ruined::VecInt)
+
+Set the return code of every ruined member of a population to an [`OptimisationFailure`](@ref).
+
+The failure payload names the member and the reason, so a reader of `res.retcode` finds why the member left the run. A member that is not named keeps the code its own optimisation gave it.
+
+# Algorithm
+
+ 1. Walk the codes with their positions, and replace the code of a named member with a failure that states the reason.
+
+# Arguments
+
+  - `retcode`: Return codes of the population, one per member.
+  - `ruined`: Indices of the members whose drifted wealth is not positive.
+
+# Returns
+
+  - `VecOptRetCode`: The codes, with the ruined members failed.
+
+# Related
+
+  - [`mark_ruined_members`](@ref)
+  - [`OptimisationFailure`](@ref)
+  - [`held_weights_result`](@ref)
+"""
+function ruined_retcodes(retcode::VecOptRetCode, ruined::VecInt)
+    return OptimisationReturnCode[if i in ruined
+                                      OptimisationFailure(;
+                                                          res = "the drifted wealth of member $(i) is not positive, so the fold dropped it and its series and held weights are `NaN`")
+                                  else
+                                      rc
+                                  end
+                                  for (i, rc) in pairs(retcode)]
+end
+"""
+    mark_ruined_members(res::NonFiniteAllocationOptimisationResult, ruined::Nothing)
+    mark_ruined_members(res::NonFiniteAllocationOptimisationResult, ruined::VecInt)
+
+Rebuild a fold's optimisation result so that its ruined members carry a failure code.
+
+The drop needs no machinery of its own. The library already folds a vector of return codes with `any(x -> isa(x, OptimisationFailure), …)`, and the cross-validation path already filters a path on `isa(y.res.retcode, OptimisationSuccess)`, so a failed member takes the path it is on out of the run.
+
+# Algorithm
+
+ 1. With no ruined member, and with an empty set of them, give `res` unchanged. Nothing is rebuilt on the ordinary path.
+ 2. Otherwise rebuild `res` through [`set_retcode`](@ref), with the codes [`ruined_retcodes`](@ref) makes.
+
+# Arguments
+
+  - `res`: Optimisation result of the fold.
+  - `ruined`: Indices of the members whose drifted wealth is not positive, or `nothing`.
+
+# Returns
+
+  - `NonFiniteAllocationOptimisationResult`: The result, rebuilt only when a member was ruined.
+
+# Related
+
+  - [`ruined_retcodes`](@ref)
+  - [`set_retcode`](@ref)
+  - [`held_weights_result`](@ref)
+"""
+function mark_ruined_members(res::NonFiniteAllocationOptimisationResult, ::Nothing)
+    return res
+end
+function mark_ruined_members(res::NonFiniteAllocationOptimisationResult, ruined::VecInt)
+    return if isempty(ruined)
+        res
+    else
+        set_retcode(res, ruined_retcodes(res.retcode, ruined))
+    end
+end
+"""
+    warn_ruined_members(wd::AbstractWeightDrift, args...)
+    warn_ruined_members(wd::Nothing, ruined::Nothing, n::Integer)
+    warn_ruined_members(wd::Nothing, ruined::VecInt, n::Integer)
+
+Warn once when a drift dropped members of a population, and the return series did not.
+
+A fold whose series is drifted is warned about by [`calc_net_returns(w::VecVecNum, X::MatNum, fees, wd::AbstractWeightDrift, obs)`](@ref), which runs the same drift over the same window. A fold that drifts only its held weights has no such site, so the warning is raised here instead. Either way the fold warns once.
+
+# Algorithm
+
+ 1. With a drifted series, say nothing. The series already warned.
+ 2. With no ruined member, say nothing.
+ 3. Otherwise warn, and name the count and the members.
+
+# Arguments
+
+  - `wd`: Weight drift of the scheme, or `nothing`.
+  - `ruined`: Indices of the ruined members, or `nothing`.
+  - `n`: Number of members of the population.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`held_weights_result`](@ref)
+  - [`mark_ruined_members`](@ref)
+"""
+function warn_ruined_members(::AbstractWeightDrift, args...)::Nothing
+    return nothing
+end
+function warn_ruined_members(::Nothing, ::Nothing, ::Integer)::Nothing
+    return nothing
+end
+function warn_ruined_members(::Nothing, ruined::VecInt, n::Integer)::Nothing
+    if !isempty(ruined)
+        @warn "the drifted wealth of $(length(ruined)) of $(n) population member(s) is not positive, so their held weights are `NaN` and their members are dropped: $(ruined)"
+    end
+    return nothing
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Stores the result of a single cross-validation fold prediction. Pairs an optimisation
@@ -470,10 +585,15 @@ $(DocStringExtensions.FIELDS)
 
     PredictionResult(;
         res::NonFiniteAllocationOptimisationResult,
-        rd::PredictionReturnsResult
+        rd::PredictionReturnsResult,
+        hw::Option{<:HeldWeightsResult} = nothing
     ) -> PredictionResult
 
-Keywords correspond to the struct's fields. Both are required, because a fold prediction is meaningless without either half.
+Keywords correspond to the struct's fields. `res` and `rd` are required, because a fold prediction is meaningless without either half. `hw` defaults to `nothing`, which is the fold that held its target weights on every observation.
+
+## The held-weights record
+
+`hw` is present only when a Weight Drift ran over the fold, so a reader dispatches on its absence rather than testing for it. It carries the asset returns of the fold, the weights held after the last observation and the form that made them, and [`weight_path`](@ref) rebuilds the weight path from it.
 
 # Related
 
@@ -483,6 +603,8 @@ Keywords correspond to the struct's fields. Both are required, because a fold pr
   - [`fit_predict`](@ref)
   - [`PredictionReturnsResult`](@ref)
   - [`rebuild_returns_result`](@ref)
+  - [`HeldWeightsResult`](@ref)
+  - [`weight_path`](@ref)
 """
 @concrete struct PredictionResult <: AbstractPredictionResult
     """
@@ -493,14 +615,59 @@ Keywords correspond to the struct's fields. Both are required, because a fold pr
     $(field_dict[:rd])
     """
     rd
+    """
+    $(field_dict[:hw])
+    """
+    hw
     function PredictionResult(res::NonFiniteAllocationOptimisationResult,
-                              rd::PredictionReturnsResult)
-        return new{typeof(res), typeof(rd)}(res, rd)
+                              rd::PredictionReturnsResult, hw::Option{<:HeldWeightsResult})
+        return new{typeof(res), typeof(rd), typeof(hw)}(res, rd, hw)
     end
 end
 function PredictionResult(; res::NonFiniteAllocationOptimisationResult,
-                          rd::PredictionReturnsResult)::PredictionResult
-    return PredictionResult(res, rd)
+                          rd::PredictionReturnsResult,
+                          hw::Option{<:HeldWeightsResult} = nothing)::PredictionResult
+    return PredictionResult(res, rd, hw)
+end
+"""
+    previous_weights(pws::Any, prev::Nothing)
+    previous_weights(pws::Nothing, prev::PredictionResult)
+    previous_weights(pws::AbstractPreviousWeightsSource, prev::PredictionResult)
+
+Read the weights a fold threads into the fold that follows it.
+
+This is the one seam of the Previous-Weights Source. The first fold of a run has no fold behind it, so it threads nothing whatever the source is. A later fold threads the target weights of the previous fold by default, and the weights that fold **held** after its last observation when the source asks for them.
+
+# Algorithm
+
+ 1. With no previous fold, give `nothing`.
+ 2. With no source, give the target weights of the previous fold, `prev.res.w`.
+ 3. With a source, give the held weights of the previous fold, `prev.hw.w`.
+
+# Arguments
+
+  - `pws`: Previous-weights source of the scheme, or `nothing`.
+  - `prev`: Prediction result of the previous fold, or `nothing`.
+
+# Returns
+
+  - `Option{<:VecNum_VecVecNum}`: The weights the next fold reads through [`factory`](@ref).
+
+# Related
+
+  - [`AbstractPreviousWeightsSource`](@ref)
+  - [`DriftedWeights`](@ref)
+  - [`fold_loop`](@ref)
+  - [`HeldWeightsResult`](@ref)
+"""
+function previous_weights(::Any, ::Nothing)
+    return nothing
+end
+function previous_weights(::Nothing, prev::PredictionResult)
+    return prev.res.w
+end
+function previous_weights(::AbstractPreviousWeightsSource, prev::PredictionResult)
+    return prev.hw.w
 end
 """
     VecPredRes = AbstractVector{<:PredictionResult}
@@ -1032,10 +1199,16 @@ no such rebuild, so it charges the whole one-off cost unless the fee already car
   - [`amortise_fees`](@ref)
   - [`extract_fees`](@ref)
 """
-function StatsAPI.predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)
-    X = calc_net_returns(res, rd.X)
+function StatsAPI.predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult;
+                          wd::Option{<:AbstractWeightDrift} = nothing,
+                          hwd::Option{<:AbstractWeightDrift} = wd,
+                          store_weight_path::Bool = false)
+    X = calc_net_returns(res, rd.X, nothing, wd, rd.ts)
+    (hw, ruined) = held_weights_result(hwd, res.w, rd.X, store_weight_path, rd.ts)
+    warn_ruined_members(wd, ruined, length(res.w))
+    res = mark_ruined_members(res, ruined)
     rd = reconstruct_rd(res, rd, X)
-    return PredictionResult(; res = res, rd = rd)
+    return PredictionResult(; res = res, rd = rd, hw = hw)
 end
 """
     fit_predict(opt::OptE_Opt, rd::ReturnsResult)
@@ -1063,16 +1236,23 @@ function fit_predict(opt::OptE_Opt, rd::ReturnsResult)
     return StatsAPI.predict(res, rd)
 end
 function StatsAPI.predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
-                          test_idx::VecInt, cols = :)
+                          test_idx::VecInt, cols = :;
+                          wd::Option{<:AbstractWeightDrift} = nothing,
+                          hwd::Option{<:AbstractWeightDrift} = wd,
+                          store_weight_path::Bool = false)
     rdi = port_opt_view(rd, test_idx, cols)
     fees = amortise_fees(extract_fees(res, nothing), size(rdi.X, 1))
-    X = calc_net_returns(res, rdi.X, fees)
+    obs = drift_observations(rdi.ts, test_idx)
+    X = calc_net_returns(res, rdi.X, fees, wd, obs)
+    (hw, ruined) = held_weights_result(hwd, res.w, rdi.X, store_weight_path, obs)
+    warn_ruined_members(wd, ruined, length(res.w))
+    res = mark_ruined_members(res, ruined)
     rdi = reconstruct_rd(res, rdi, X)
-    return PredictionResult(; res = res, rd = rdi)
+    return PredictionResult(; res = res, rd = rdi, hw = hw)
 end
 function StatsAPI.predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
-                          test_idxs::VecVecInt, cols = :)
-    return [StatsAPI.predict(res, rd, test_idx, cols) for test_idx in test_idxs]
+                          test_idxs::VecVecInt, cols = :; kwargs...)
+    return [StatsAPI.predict(res, rd, test_idx, cols; kwargs...) for test_idx in test_idxs]
 end
 """
     fit_and_predict(opt, rd::ReturnsResult, cv::NonSeqCVER; cols, ex, id) -> MultiPeriodPredictionResult
@@ -1111,18 +1291,26 @@ The two-argument methods operate on a single pre-defined train/test split or on 
   - [`CombinatorialCrossValidation`](@ref)
 """
 function fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult;
-                         test_idx::VecInt_VecVecInt, cols = :, kwargs...)
-    return StatsAPI.predict(res, rd, test_idx, cols)
+                         test_idx::VecInt_VecVecInt, cols = :,
+                         wd::Option{<:AbstractWeightDrift} = nothing,
+                         hwd::Option{<:AbstractWeightDrift} = wd,
+                         store_weight_path::Bool = false, kwargs...)
+    return StatsAPI.predict(res, rd, test_idx, cols; wd = wd, hwd = hwd,
+                            store_weight_path = store_weight_path)
 end
 function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::ReturnsResult;
-                         train_idx::VecInt, test_idx::VecInt_VecVecInt, cols = :)
+                         train_idx::VecInt, test_idx::VecInt_VecVecInt, cols = :,
+                         wd::Option{<:AbstractWeightDrift} = nothing,
+                         hwd::Option{<:AbstractWeightDrift} = wd,
+                         store_weight_path::Bool = false)
     rd_train = port_opt_view(rd, train_idx, cols)
     if !isa(cols, Colon)
         opt = port_opt_view(opt, cols, rd.X)
     end
     #! Add ability to do callbacks
     res = optimise(opt, rd_train)
-    return StatsAPI.predict(res, rd, test_idx, cols)
+    return StatsAPI.predict(res, rd, test_idx, cols; wd = wd, hwd = hwd,
+                            store_weight_path = store_weight_path)
 end
 """
     sort_predictions!(res::VecVecInt, predictions::VecPredRes) -> VecPredRes
@@ -1367,6 +1555,31 @@ too, which is what [`fold_loop`](@ref) receives from a call site that holds no s
 """
 folds_are_time_ordered(::Any) = true
 folds_are_time_ordered(::NonSeqCVER) = false
+
+"""
+    fold_evaluation(cv)
+
+Read the evaluation switches of a cross-validation scheme, in one named triple.
+
+Every scheme entry point reads the same three settings before it runs its folds, and each scheme states them for itself through a method of its own. A scheme that carries none of them, and a call site that holds a split result rather than the scheme that made it, reach the fallback and get today's behaviour: no drift, no drifted previous weights, and no stored weight path.
+
+The method is per type and takes the scheme itself, so inference reads the answer from the type of `cv`, exactly as [`folds_are_time_ordered`](@ref) does.
+
+# Returns
+
+  - `(; wd, pws, store_weight_path)`: The Weight Drift, the Previous-Weights Source, and the flag that stores a fold's weight path.
+
+# Related
+
+  - [`folds_are_time_ordered`](@ref)
+  - [`held_weights_drift`](@ref)
+  - [`AbstractWeightDrift`](@ref)
+  - [`AbstractPreviousWeightsSource`](@ref)
+  - [`fold_loop`](@ref)
+"""
+function fold_evaluation(::Any)
+    return (; wd = nothing, pws = nothing, store_weight_path = false)
+end
 """
     fold_loop(fit_fold, est, n::Integer, ex::FLoops.Transducers.Executor,
               ::Type{ElT} = PredictionResult; rd, train_idx, test_idx,
@@ -1426,14 +1639,15 @@ multi-path combinatorial scheme. It is positional for the reason given in
 """
 function fold_loop(fit_fold, est, n::Integer, ex::FLoops.Transducers.Executor,
                    ::Type{ElT} = PredictionResult; rd, train_idx, test_idx,
-                   path_id = nothing, cv = nothing, fold_view = nothing) where {ElT}
+                   path_id = nothing, cv = nothing, fold_view = nothing,
+                   pws = nothing) where {ElT}
     td_flag = is_time_dependent(est)
     if td_flag
         assert_time_dependent_fold_count(est, n)
     end
     prev_w_flag = needs_previous_weights(est)
     function fold(i, prev)
-        w_prev = isnothing(prev) ? nothing : prev.res.w
+        w_prev = previous_weights(pws, prev)
         (esti, rdi) = isnothing(fold_view) ? (est, rd) : fold_view(i)
         # Resolve time-dependent entries first, so a freshly swapped-in per-fold entry also
         # receives the previous weights from the factory pass below.
@@ -1465,10 +1679,13 @@ function fit_and_predict(opt::OptE_Opt_TD, rd::ReturnsResult, cv::NonSeqCVER; co
     cv_res = split(cv, rd)
     (; train_idx, test_idx) = cv_res
     assert_unshuffled_folds(cv, train_idx)
+    (; wd, pws, store_weight_path) = fold_evaluation(cv)
+    hwd = held_weights_drift(wd, pws)
     predictions = fold_loop(opt, length(train_idx), ex; rd = rd, train_idx = train_idx,
-                            test_idx = test_idx, cv = cv) do fold
+                            test_idx = test_idx, cv = cv, pws = pws) do fold
         return fit_and_predict(fold.est, fold.rd; train_idx = fold.train,
-                               test_idx = fold.test, cols = cols)
+                               test_idx = fold.test, cols = cols, wd = wd, hwd = hwd,
+                               store_weight_path = store_weight_path)
     end
     return MultiPeriodPredictionResult(; pred = predictions, id = id)
 end

@@ -46,6 +46,31 @@ function MeanRiskResult(; jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM,
     return MeanRiskResult(jr, r, fb)
 end
 """
+    set_retcode(res::MeanRiskResult, retcode::OptRetCode_VecOptRetCode)
+
+Rebuild a [`MeanRiskResult`](@ref) with a different return code.
+
+`retcode` is not a field of this result and resolves through the [`JuMPOptimisationResult`](@ref) it embeds, so the rebuild rebuilds `jr` and carries every other member over unchanged.
+
+# Arguments
+
+  - `res`: Result to rebuild.
+  - `retcode`: Return code, or one per member of the population.
+
+# Returns
+
+  - [`MeanRiskResult`](@ref): The result, with the new return code.
+
+# Related
+
+  - [`set_retcode`](@ref)
+  - [`mark_ruined_members`](@ref)
+  - [`MeanRiskResult`](@ref)
+"""
+function set_retcode(res::MeanRiskResult, retcode::OptRetCode_VecOptRetCode)
+    return MeanRiskResult(set_retcode(res.jr, retcode), res.r, res.fb)
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the static defaults of the [`MeanRisk`](@ref) fields that may hold a [`TimeDependent`](@ref).

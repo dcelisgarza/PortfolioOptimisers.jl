@@ -338,6 +338,31 @@ function RelaxedRiskBudgetingResult(; jr::JuMPOptimisationResult,
                                     fb::Option{<:OptE_Opt})::RelaxedRiskBudgetingResult
     return RelaxedRiskBudgetingResult(jr, prb, fb)
 end
+"""
+    set_retcode(res::RelaxedRiskBudgetingResult, retcode::OptRetCode_VecOptRetCode)
+
+Rebuild a [`RelaxedRiskBudgetingResult`](@ref) with a different return code.
+
+`retcode` is not a field of this result and resolves through the [`JuMPOptimisationResult`](@ref) it embeds, so the rebuild rebuilds `jr` and carries every other member over unchanged.
+
+# Arguments
+
+  - `res`: Result to rebuild.
+  - `retcode`: Return code, or one per member of the population.
+
+# Returns
+
+  - [`RelaxedRiskBudgetingResult`](@ref): The result, with the new return code.
+
+# Related
+
+  - [`set_retcode`](@ref)
+  - [`mark_ruined_members`](@ref)
+  - [`RelaxedRiskBudgetingResult`](@ref)
+"""
+function set_retcode(res::RelaxedRiskBudgetingResult, retcode::OptRetCode_VecOptRetCode)
+    return RelaxedRiskBudgetingResult(set_retcode(res.jr, retcode), res.prb, res.fb)
+end
 # Unique field `prb` resolves directly; unknown properties forward into `prb` first, then
 # into the embedded [`JuMPOptimisationResult`](@ref) `jr` (the virtual `:w` and `pa` fall-through).
 @forward_properties RelaxedRiskBudgetingResult begin

@@ -138,6 +138,33 @@ function NearOptimalCenteringResult(; jr::JuMPOptimisationResult, r::BaseRM_VecB
                                       noc_retcode, fb)
 end
 """
+    set_retcode(res::NearOptimalCenteringResult, retcode::OptRetCode_VecOptRetCode)
+
+Rebuild a [`NearOptimalCenteringResult`](@ref) with a different return code.
+
+The population's return code is the one the embedded [`JuMPOptimisationResult`](@ref) carries, because `retcode` is not a field of this result and resolves through `jr`. So the rebuild rebuilds `jr`, and the three return codes this result names of its own are carried over unchanged.
+
+# Arguments
+
+  - `res`: Result to rebuild.
+  - `retcode`: Return code, or one per member of the population.
+
+# Returns
+
+  - [`NearOptimalCenteringResult`](@ref): The result, with the new return code.
+
+# Related
+
+  - [`set_retcode`](@ref)
+  - [`mark_ruined_members`](@ref)
+  - [`NearOptimalCenteringResult`](@ref)
+"""
+function set_retcode(res::NearOptimalCenteringResult, retcode::OptRetCode_VecOptRetCode)
+    return NearOptimalCenteringResult(set_retcode(res.jr, retcode), res.r,
+                                      res.w_min_retcode, res.w_opt_retcode,
+                                      res.w_max_retcode, res.noc_retcode, res.fb)
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the static defaults of the [`NearOptimalCentering`](@ref) fields that may hold a [`TimeDependent`](@ref).

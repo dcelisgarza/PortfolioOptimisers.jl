@@ -132,6 +132,31 @@ function RiskBudgetingResult(; jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM,
                              fb::Option{<:OptE_Opt})::RiskBudgetingResult
     return RiskBudgetingResult(jr, r, prb, fb)
 end
+"""
+    set_retcode(res::RiskBudgetingResult, retcode::OptRetCode_VecOptRetCode)
+
+Rebuild a [`RiskBudgetingResult`](@ref) with a different return code.
+
+`retcode` is not a field of this result and resolves through the [`JuMPOptimisationResult`](@ref) it embeds, so the rebuild rebuilds `jr` and carries every other member over unchanged.
+
+# Arguments
+
+  - `res`: Result to rebuild.
+  - `retcode`: Return code, or one per member of the population.
+
+# Returns
+
+  - [`RiskBudgetingResult`](@ref): The result, with the new return code.
+
+# Related
+
+  - [`set_retcode`](@ref)
+  - [`mark_ruined_members`](@ref)
+  - [`RiskBudgetingResult`](@ref)
+"""
+function set_retcode(res::RiskBudgetingResult, retcode::OptRetCode_VecOptRetCode)
+    return RiskBudgetingResult(set_retcode(res.jr, retcode), res.r, res.prb, res.fb)
+end
 # Unique field `prb` resolves directly; unknown properties forward into `prb` first, then
 # into the embedded [`JuMPOptimisationResult`](@ref) `jr` (the virtual `:w` and `pa` fall-through).
 @forward_properties RiskBudgetingResult begin

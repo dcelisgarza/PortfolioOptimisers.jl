@@ -1168,6 +1168,8 @@ const CATALOGUE = [Section("Core abstractions",
                                          [Cap(:IndexWalkForward, :DateWalkForward)]),
                                    Cap(:MultipleRandomised, :MultipleRandomisedResult;
                                        label = "Multiple randomised [`MultipleRandomised`](@ref) returns a [`MultipleRandomisedResult`](@ref)")]),
+                            Prose("A scheme reads a fold under an evaluation convention. [`SelfFinancingDrift`](@ref) reads a fold's series on the weights the fund holds rather than the weights the optimiser chose, and the fold then carries a [`HeldWeightsResult`](@ref). A walk-forward may also thread those held weights into the fold that follows it."),
+                            Cap(:DriftedWeights), Cap(:HeldWeightsResult),
                             Group(Cap(:search_cross_validation),
                                   [Cap(:GridSearchCrossValidation),
                                    Cap(:RandomisedSearchCrossValidation),

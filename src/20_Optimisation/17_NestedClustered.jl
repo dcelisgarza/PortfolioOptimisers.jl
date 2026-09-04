@@ -110,6 +110,32 @@ function NestedClusteredResult(; pr::Option{<:AbstractPriorResult},
     return NestedClusteredResult(pr, clr, wb, fees, resi, reso, cv, retcode, w, fb)
 end
 """
+    set_retcode(res::NestedClusteredResult, retcode::OptRetCode_VecOptRetCode)
+
+Rebuild a [`NestedClusteredResult`](@ref) with a different return code.
+
+The result carries one return code per member of the population, so a member is dropped by failing its own entry. Every other member of the record is carried over unchanged.
+
+# Arguments
+
+  - `res`: Result to rebuild.
+  - `retcode`: Return code, or one per member of the population.
+
+# Returns
+
+  - [`NestedClusteredResult`](@ref): The result, with the new return code.
+
+# Related
+
+  - [`set_retcode`](@ref)
+  - [`mark_ruined_members`](@ref)
+  - [`NestedClusteredResult`](@ref)
+"""
+function set_retcode(res::NestedClusteredResult, retcode::OptRetCode_VecOptRetCode)
+    return NestedClusteredResult(res.pr, res.clr, res.wb, res.fees, res.resi, res.reso,
+                                 res.cv, retcode, res.w, res.fb)
+end
+"""
     assert_internal_optimiser(opt)
 
 Assert that the inner (cluster-level) optimiser is valid for use in NCO.

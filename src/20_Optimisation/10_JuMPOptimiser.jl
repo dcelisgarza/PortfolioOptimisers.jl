@@ -361,6 +361,31 @@ function JuMPOptimisationResult(; pa::ProcessedJuMPOptimiserAttributes,
     return JuMPOptimisationResult(pa, retcode, expand_investable_weights(pa.imsk, sol),
                                   model)
 end
+"""
+    set_retcode(res::JuMPOptimisationResult, retcode::OptRetCode_VecOptRetCode)
+
+Rebuild a [`JuMPOptimisationResult`](@ref) with a different return code.
+
+The rebuild reaches the inner constructor rather than the keyword one, because the keyword constructor expands the solver's reduced weight vector onto the caller's universe. `sol` is already expanded here, so a second pass through that door would expand it twice.
+
+# Arguments
+
+  - `res`: Result to rebuild.
+  - `retcode`: Return code, or one per member of the population.
+
+# Returns
+
+  - [`JuMPOptimisationResult`](@ref): The result, with the new return code.
+
+# Related
+
+  - [`set_retcode`](@ref)
+  - [`mark_ruined_members`](@ref)
+  - [`JuMPOptimisationResult`](@ref)
+"""
+function set_retcode(res::JuMPOptimisationResult, retcode::OptRetCode_VecOptRetCode)
+    return JuMPOptimisationResult(res.pa, retcode, res.sol, res.model)
+end
 # Virtual property `:w` extracts portfolio weights from `sol` (a single solution or a vector
 # of them, hence the broadcast); unknown properties forward to `pa` (see [`@forward_properties`](@ref)).
 @forward_properties JuMPOptimisationResult begin

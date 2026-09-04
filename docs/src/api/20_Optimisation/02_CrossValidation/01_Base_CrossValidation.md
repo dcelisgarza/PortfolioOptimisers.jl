@@ -44,6 +44,11 @@ parallel_folds
 run_folds
 Fold
 folds_are_time_ordered
+fold_evaluation
+previous_weights
+ruined_retcodes
+mark_ruined_members
+warn_ruined_members
 fold_loop
 assert_unshuffled_folds
 cv_nobs

@@ -61,6 +61,32 @@ function FactorRiskContributionResult(; jr::JuMPOptimisationResult, r::BaseRM_Ve
                                       fb::Option{<:OptE_Opt})::FactorRiskContributionResult
     return FactorRiskContributionResult(jr, r, rr, frc_plr, fb)
 end
+"""
+    set_retcode(res::FactorRiskContributionResult, retcode::OptRetCode_VecOptRetCode)
+
+Rebuild a [`FactorRiskContributionResult`](@ref) with a different return code.
+
+`retcode` is not a field of this result and resolves through the [`JuMPOptimisationResult`](@ref) it embeds, so the rebuild rebuilds `jr` and carries every other member over unchanged.
+
+# Arguments
+
+  - `res`: Result to rebuild.
+  - `retcode`: Return code, or one per member of the population.
+
+# Returns
+
+  - [`FactorRiskContributionResult`](@ref): The result, with the new return code.
+
+# Related
+
+  - [`set_retcode`](@ref)
+  - [`mark_ruined_members`](@ref)
+  - [`FactorRiskContributionResult`](@ref)
+"""
+function set_retcode(res::FactorRiskContributionResult, retcode::OptRetCode_VecOptRetCode)
+    return FactorRiskContributionResult(set_retcode(res.jr, retcode), res.r, res.rr,
+                                        res.frc_plr, res.fb)
+end
 # Unique fields resolve directly; unknown properties forward into `rr` first, then into the
 # embedded [`JuMPOptimisationResult`](@ref) `jr` (the virtual `:w` and `pa` fall-through).
 @forward_properties FactorRiskContributionResult begin
