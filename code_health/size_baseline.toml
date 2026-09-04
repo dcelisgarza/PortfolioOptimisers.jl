@@ -79,6 +79,11 @@ commit = "8787635a8f"
 "src/08_Moments/42_FactorExposures/02_PanelFieldDescriptors.jl" = { code = 237, doc = 788, comment = 0, blank = 346, total = 1371 }
 "src/08_Moments/42_FactorExposures/03_LagDescriptors.jl" = { code = 109, doc = 324, comment = 0, blank = 132, total = 565 }
 "src/08_Moments/42_FactorExposures/07_RollingDescriptors.jl" = { code = 119, doc = 288, comment = 0, blank = 125, total = 532 }
+"src/08_Moments/42_FactorExposures/08_Base_Exposure.jl" = { code = 55, doc = 148, comment = 0, blank = 82, total = 285 }
+"src/08_Moments/42_FactorExposures/09_CompositeExposure.jl" = { code = 107, doc = 214, comment = 0, blank = 79, total = 400 }
+"src/08_Moments/42_FactorExposures/10_DerivedExposure.jl" = { code = 48, doc = 97, comment = 0, blank = 31, total = 176 }
+"src/08_Moments/42_FactorExposures/11_OneHotExposure.jl" = { code = 71, doc = 145, comment = 0, blank = 71, total = 287 }
+"src/08_Moments/42_FactorExposures/12_ConstantExposure.jl" = { code = 19, doc = 62, comment = 0, blank = 33, total = 114 }
 "src/09_Distance/01_Base_Distance.jl" = { code = 24, doc = 222, comment = 0, blank = 89, total = 335 }
 "src/09_Distance/02_Distance.jl" = { code = 158, doc = 350, comment = 0, blank = 157, total = 665 }
 "src/09_Distance/03_DistanceDistance.jl" = { code = 37, doc = 132, comment = 0, blank = 58, total = 227 }

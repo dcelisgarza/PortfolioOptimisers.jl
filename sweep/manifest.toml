@@ -112,6 +112,11 @@
 "src/08_Moments/42_FactorExposures/02_PanelFieldDescriptors.jl" = { map = 3, units = 32, swept = false }
 "src/08_Moments/42_FactorExposures/03_LagDescriptors.jl" = { map = 3, units = 10, swept = false }
 "src/08_Moments/42_FactorExposures/07_RollingDescriptors.jl" = { map = 3, units = 10, swept = false }
+"src/08_Moments/42_FactorExposures/08_Base_Exposure.jl" = { map = 3, units = 8, swept = false }
+"src/08_Moments/42_FactorExposures/09_CompositeExposure.jl" = { map = 3, units = 7, swept = false }
+"src/08_Moments/42_FactorExposures/10_DerivedExposure.jl" = { map = 3, units = 2, swept = false }
+"src/08_Moments/42_FactorExposures/11_OneHotExposure.jl" = { map = 3, units = 6, swept = false }
+"src/08_Moments/42_FactorExposures/12_ConstantExposure.jl" = { map = 3, units = 2, swept = false }
 "src/09_Distance/01_Base_Distance.jl" = { map = 2, units = 8, algorithm = 1, swept = true }
 "src/09_Distance/02_Distance.jl" = { map = 2, units = 13, algorithm = 8, swept = true }
 "src/09_Distance/03_DistanceDistance.jl" = { map = 2, units = 4, algorithm = 3, swept = true }
