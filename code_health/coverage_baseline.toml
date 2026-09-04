@@ -76,6 +76,7 @@ commit = "8610300"
 "src/08_Moments/42_FactorExposures/01_Base_Descriptor.jl" = { lines = 35, misses = 0 }
 "src/08_Moments/42_FactorExposures/02_PanelFieldDescriptors.jl" = { lines = 121, misses = 0 }
 "src/08_Moments/42_FactorExposures/03_LagDescriptors.jl" = { lines = 66, misses = 0 }
+"src/08_Moments/42_FactorExposures/07_RollingDescriptors.jl" = { lines = 74, misses = 0 }
 "src/09_Distance/01_Base_Distance.jl" = { lines = 12, misses = 0 }
 "src/09_Distance/02_Distance.jl" = { lines = 72, misses = 0 }
 "src/09_Distance/03_DistanceDistance.jl" = { lines = 14, misses = 0 }

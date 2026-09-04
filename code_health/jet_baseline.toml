@@ -83,6 +83,7 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/08_Moments/42_FactorExposures/01_Base_Descriptor.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/42_FactorExposures/02_PanelFieldDescriptors.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/42_FactorExposures/03_LagDescriptors.jl" = { raw = 0, reviewed = 0 }
+"src/08_Moments/42_FactorExposures/07_RollingDescriptors.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/01_Base_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/02_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/03_DistanceDistance.jl" = { raw = 0, reviewed = 0 }
@@ -327,6 +328,7 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/08_Moments/42_FactorExposures/01_Base_Descriptor.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/42_FactorExposures/02_PanelFieldDescriptors.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/42_FactorExposures/03_LagDescriptors.jl" = { raw = 0, reviewed = 0 }
+"src/08_Moments/42_FactorExposures/07_RollingDescriptors.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/01_Base_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/02_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/03_DistanceDistance.jl" = { raw = 0, reviewed = 0 }
@@ -571,6 +573,7 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/08_Moments/42_FactorExposures/01_Base_Descriptor.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/42_FactorExposures/02_PanelFieldDescriptors.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/42_FactorExposures/03_LagDescriptors.jl" = { raw = 0, reviewed = 0 }
+"src/08_Moments/42_FactorExposures/07_RollingDescriptors.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/01_Base_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/02_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/03_DistanceDistance.jl" = { raw = 0, reviewed = 0 }
