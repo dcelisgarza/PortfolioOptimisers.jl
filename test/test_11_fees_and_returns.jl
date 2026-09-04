@@ -315,6 +315,93 @@
         @test !PortfolioOptimisers.needs_previous_weights(Fees(; tn = tn_fx))
         @test !PortfolioOptimisers.needs_previous_weights(Fees(; l = 0.01, fl = 1.0))
     end
+    # Issue #754/#760: fee amortisation spreads the one-off terms, `tn`, `fl` and `fs`,
+    # over a holding period, and `l`/`s` are never touched.
+    @testset "Fee amortisation" begin
+        wf = [0.6, -0.4, 0.0, 0.25]
+        pf = [100.0, 50.0, 20.0, 10.0]
+        tnf = Turnover(; w = [0.1, 0.2, 0.3, 0.4], val = 0.02)
+        fee0 = Fees(; tn = tnf, l = 0.001, s = 0.002, fl = 0.5, fs = 1.0)
+
+        # `fa` defaults to `nothing` on both fee types.
+        @test isnothing(Fees().fa)
+        @test isnothing(FeesEstimator().fa)
+
+        # `AmortisedFees` validates a stated `horizon`, positive and finite.
+        @test isnothing(AmortisedFees().horizon)
+        @test AmortisedFees(; horizon = 21).horizon == 21
+        @test_throws DomainError AmortisedFees(; horizon = 0)
+        @test_throws DomainError AmortisedFees(; horizon = -1)
+        @test_throws DomainError AmortisedFees(; horizon = Inf)
+        @test_throws DomainError AmortisedFees(; horizon = NaN)
+
+        # `amortise_fees` returns its argument unchanged in three cases: a `nothing` fee, a
+        # `nothing` `fa`, and an `fa.horizon` that is already stated.
+        @test isnothing(PortfolioOptimisers.amortise_fees(nothing, 3))
+        @test PortfolioOptimisers.amortise_fees(fee0, 3) === fee0
+        feeH = Fees(; tn = tnf, l = 0.001, s = 0.002, fl = 0.5, fs = 1.0,
+                    fa = AmortisedFees(; horizon = 5))
+        @test PortfolioOptimisers.amortise_fees(feeH, 3) === feeH
+
+        # A bare `AmortisedFees()` settles its horizon to the fold's length.
+        feeA = Fees(; tn = tnf, l = 0.001, s = 0.002, fl = 0.5, fs = 1.0,
+                    fa = AmortisedFees())
+        famort = PortfolioOptimisers.amortise_fees(feeA, 3)
+        @test famort.fa.horizon == 3
+
+        # `fa === nothing` reproduces every current number: the census fixture, one trade
+        # charged in full on every one of the fold's three rows.
+        @test isapprox(calc_fees(wf, fee0) * 3, 6.09795)
+
+        # A site that holds no fold and no `horizon` charges the whole cost, as today: a
+        # bare, unresolved `AmortisedFees()` divides by `1`, exactly like `fa === nothing`.
+        @test PortfolioOptimisers.amortisation_divisor(nothing) == 1
+        @test PortfolioOptimisers.amortisation_divisor(AmortisedFees()) == 1
+        @test PortfolioOptimisers.amortisation_divisor(AmortisedFees(; horizon = 7)) == 7
+        @test isapprox(calc_fees(wf, feeA), calc_fees(wf, fee0))
+        @test isapprox(calc_asset_fees(wf, feeA), calc_asset_fees(wf, fee0))
+        @test isapprox(calc_fees(wf, pf, feeA), calc_fees(wf, pf, fee0))
+        @test isapprox(calc_asset_fees(wf, pf, feeA), calc_asset_fees(wf, pf, fee0))
+
+        # `AmortisedFees()` over a 3-row fold charges the one-off part exactly one time:
+        # `l` and `s` still charge on every row, `tn`, `fl` and `fs` charge once in total.
+        l_term = calc_fees(wf, fee0.l, .>=)
+        s_term = -calc_fees(wf, fee0.s, .<)
+        fixedlong = PortfolioOptimisers.calc_fixed_fees(wf, fee0.fl, fee0.kwargs, .>=)
+        fixedshort = PortfolioOptimisers.calc_fixed_fees(wf, fee0.fs, fee0.kwargs, .<)
+        turn = calc_fees(wf, tnf)
+        oneoff = fixedlong + fixedshort + turn
+        @test isapprox(calc_fees(wf, famort) * 3, 2.0359499999999997)
+        @test isapprox(calc_fees(wf, famort), l_term + s_term + oneoff / 3)
+
+        # A stated `horizon` overrides the fold everywhere the fee is read.
+        @test isapprox(calc_fees(wf, feeH), l_term + s_term + oneoff / 5)
+
+        # `l` and `s` are unmoved under every state of `fa`.
+        @test famort.l == fee0.l && famort.s == fee0.s
+        @test feeH.l == fee0.l && feeH.s == fee0.s
+
+        # The per-asset identity holds under every state of `fa`, to rounding.
+        @test isapprox(sum(calc_asset_fees(wf, famort)), calc_fees(wf, famort))
+        @test isapprox(sum(calc_asset_fees(wf, feeH)), calc_fees(wf, feeH))
+        @test isapprox(sum(calc_asset_fees(wf, pf, famort)), calc_fees(wf, pf, famort))
+        @test isapprox(sum(calc_asset_fees(wf, pf, feeH)), calc_fees(wf, pf, feeH))
+
+        # The price-carrying family divides the same three terms.
+        l_termp = calc_fees(wf, pf, fee0.l, .>=)
+        s_termp = -calc_fees(wf, pf, fee0.s, .<)
+        fixedlongp = PortfolioOptimisers.calc_fixed_fees(wf, fee0.fl, fee0.kwargs, .>=)
+        fixedshortp = PortfolioOptimisers.calc_fixed_fees(wf, fee0.fs, fee0.kwargs, .<)
+        turnp = calc_fees(wf, pf, tnf)
+        oneoffp = fixedlongp + fixedshortp + turnp
+        @test isapprox(calc_fees(wf, pf, famort), l_termp + s_termp + oneoffp / 3)
+        @test isapprox(calc_fees(wf, pf, feeH), l_termp + s_termp + oneoffp / 5)
+
+        # `fees_constraints` carries the estimator's `fa` to the result, unchanged.
+        fsets2 = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"]))
+        festA = FeesEstimator(; l = Dict("A" => 0.001), fa = AmortisedFees(; horizon = 10))
+        @test fees_constraints(festA, fsets2).fa === festA.fa
+    end
 end
 
 # The net-returns pair of `src/17_NetReturnsDrawdowns.jl`, swept under issue #547.

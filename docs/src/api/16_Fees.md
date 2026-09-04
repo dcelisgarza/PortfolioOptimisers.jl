@@ -5,6 +5,7 @@ In active, and small quantity investing, fees can be a non-negligible factor tha
 ```@docs
 FeesEstimator
 Fees
+AmortisedFees
 FeesE_Fees
 fees_constraints
 calc_fees

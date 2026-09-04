@@ -898,6 +898,12 @@ Apply an optimisation result `res` to returns data `rd` to produce a
 When `test_idx` is provided, only the rows (observations) indexed by `test_idx` (and
 optionally columns `cols`) of `rd` are used for the prediction.
 
+The `test_idx` method settles the fee's amortisation horizon against the fold's own length before
+charging it: `amortise_fees(extract_fees(res, nothing), size(rdi.X, 1))`. A stated `horizon` on the
+fee's `fa` overrides this and reaches unchanged. The whole-sample method, `predict(res, rd)`, gets
+no such rebuild, so it charges the whole one-off cost unless the fee already carries a stated
+`horizon`.
+
 # Arguments
 
   - `res::NonFiniteAllocationOptimisationResult`: Fitted optimisation result.
@@ -915,6 +921,8 @@ optionally columns `cols`) of `rd` are used for the prediction.
   - [`fit_and_predict`](@ref)
   - [`PredictionResult`](@ref)
   - [`MultiPeriodPredictionResult`](@ref)
+  - [`amortise_fees`](@ref)
+  - [`extract_fees`](@ref)
 """
 function StatsAPI.predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)
     X = calc_net_returns(res, rd.X)
@@ -949,7 +957,8 @@ end
 function StatsAPI.predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
                           test_idx::VecInt, cols = :)
     rdi = port_opt_view(rd, test_idx, cols)
-    X = calc_net_returns(res, rdi.X)
+    fees = amortise_fees(extract_fees(res, nothing), size(rdi.X, 1))
+    X = calc_net_returns(res, rdi.X, fees)
     rdi = reconstruct_rd(res, rdi, X)
     return PredictionResult(; res = res, rd = rdi)
 end

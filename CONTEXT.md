@@ -635,6 +635,10 @@ Peak-to-trough declines computed from Net Returns, and the input series to drawd
 **Fees**
 The composite of holding and trading costs: **long** (management), **short** (borrowing), **turnover** (commission) and **fixed** (a constant charge on any non-zero weight).
 
+**Fee Amortisation**
+The algorithm that spreads a Fees object's one-off terms, turnover and the two fixed charges, over a holding period. `nothing` charges them in full on every observation. A bare form divides by the fold's own length; a stated horizon overrides the fold everywhere the fee is read.
+*Avoid*: fee smoothing, fee spreading, fee timing.
+
 **Finite Allocation**
 See §4.7: the discretisation of weights into whole shares within a cash budget.
 

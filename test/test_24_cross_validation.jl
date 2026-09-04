@@ -866,6 +866,59 @@
                          0.06630600610829536, 0.07240998627924726, 0.07916366997300678]],
                        rtol = 5e-5)
         @test isa(eff_front_combinatorial_pred.pred[1].res, AbstractVector)
+
+        # Issue #754/#760: `predict` settles a bare `AmortisedFees()` against the fold's own
+        # length. `fa` never reaches the objective (it is read only by `calc_fees` and
+        # `calc_asset_fees`, both value-level, post-solve verbs), so the three runs below
+        # solve to the same weights per fold; the only difference is the value-level fee
+        # charged in `pred.rd.X`. The turnover term is the one-off term a conic solver can
+        # carry without a MIP builder, so it is the one used here; `fl`/`fs` would need one.
+        fsets = UniverseSets(; dict = Dict("nx" => rd.nx))
+        fwb = WeightBounds(; lb = 0, ub = 1)
+        fest_plain = FeesEstimator(; tn = TurnoverEstimator(; w = w0, val = 0.0005))
+        fest_amort = FeesEstimator(; tn = TurnoverEstimator(; w = w0, val = 0.0005),
+                                   fa = AmortisedFees())
+        mr_plain = MeanRisk(;
+                            opt = JuMPOptimiser(; sets = fsets, wb = fwb, bgt = 1,
+                                                fees = fest_plain, slv = slv))
+        mr_amort = MeanRisk(;
+                            opt = JuMPOptimiser(; sets = fsets, wb = fwb, bgt = 1,
+                                                fees = fest_amort, slv = slv))
+        cv = IndexWalkForward(127, 171)
+        pred_plain = cross_val_predict(mr_plain, rd, cv)
+        pred_amort = cross_val_predict(mr_amort, rd, cv)
+        for (pp, pa) in zip(pred_plain.pred, pred_amort.pred)
+            @test pp.res.w == pa.res.w
+            T = size(pp.rd.X, 1)
+            fee_plain = calc_fees(pp.res.w,
+                                  PortfolioOptimisers.extract_fees(pp.res, nothing))
+            fee_amort = calc_fees(pa.res.w,
+                                  PortfolioOptimisers.amortise_fees(PortfolioOptimisers.extract_fees(pa.res,
+                                                                                                     nothing),
+                                                                    T))
+            diff_expected = fee_amort - fee_plain
+            @test all(x -> isapprox(x, diff_expected; atol = 1e-8), pp.rd.X .- pa.rd.X)
+        end
+
+        # A stated `horizon` overrides every fold's own length.
+        fest_horizon = FeesEstimator(; tn = TurnoverEstimator(; w = w0, val = 0.0005),
+                                     fa = AmortisedFees(; horizon = 21))
+        mr_horizon = MeanRisk(;
+                              opt = JuMPOptimiser(; sets = fsets, wb = fwb, bgt = 1,
+                                                  fees = fest_horizon, slv = slv))
+        pred_horizon = cross_val_predict(mr_horizon, rd, cv)
+        for (pp, ph) in zip(pred_plain.pred, pred_horizon.pred)
+            @test pp.res.w == ph.res.w
+            fee_plain = calc_fees(pp.res.w,
+                                  PortfolioOptimisers.extract_fees(pp.res, nothing))
+            hfee = PortfolioOptimisers.extract_fees(ph.res, nothing)
+            fee_h = calc_fees(ph.res.w,
+                              PortfolioOptimisers.amortise_fees(hfee, size(pp.rd.X, 1)))
+            fee_h_direct = calc_fees(ph.res.w, hfee)
+            @test isapprox(fee_h, fee_h_direct)
+            diff_expected = fee_h - fee_plain
+            @test all(x -> isapprox(x, diff_expected; atol = 1e-8), pp.rd.X .- ph.rd.X)
+        end
     end
     @testset "Grid search and Randomised search cv" begin
         opt = JuMPOptimiser(; slv = slv)
