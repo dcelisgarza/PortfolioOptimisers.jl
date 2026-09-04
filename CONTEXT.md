@@ -340,10 +340,14 @@ A shape stated as a radius, a geometry map and a norm order: the set is the imag
 *Avoid*: Ellipsoidal (above) for a flat set, because an Ellipsoidal shape matrix must be full rank.
 
 **Orthogonal Subspace**
-The orthogonal complement of the column space of the weighted loading matrix. An Uncertainty Set confined to it prices no error in a direction the factor model already explains.
+The orthogonal complement of the column space of the loading matrix, taken under an Orthogonality Metric (below). An Uncertainty Set confined to it prices no error in a direction the factor model already explains.
+
+**Orthogonality Metric**
+The cross-sectional weighting under which the loading matrix's span and its Orthogonal Subspace (above) are taken: the benchmark weights, the regression weights, the inverse idiosyncratic variances, or the identity, each read off the Prior Result's factor block at its latest observation. A caller states it as a marker, and the default is the inverse idiosyncratic variance.
+*Avoid*: the weights of a Cross-Sectional Regression (§3.4), which the prior's fit computes per observation; a metric only selects a quantity the fit already stored.
 
 **ucs Triple**
-The three ways to ask an Uncertainty Set estimator for its sets: `ucs` for the mean and covariance sets as a pair, `mu_ucs` for the mean half, `sigma_ucs` for the covariance half.
+The three ways to ask an Uncertainty Set estimator for its sets: `ucs` for the mean and covariance sets as a pair, `mu_ucs` for the mean half, `sigma_ucs` for the covariance half. Most estimators fit from returns data; an estimator that reads the optimisation's own Prior Result, as one confined to an Orthogonal Subspace must, answers the same three verbs from that result instead, and the optimiser hands it the prior where it builds the constraint.
 
 **Characteristic Vector**
 The per-asset quantity an ℓ1 uncertainty set is built around, usually the expected return, entering the objective as `mu'w`.
