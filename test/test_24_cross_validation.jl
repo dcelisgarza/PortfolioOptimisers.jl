@@ -920,6 +920,31 @@
             @test all(x -> isapprox(x, diff_expected; atol = 1e-8), pp.rd.X .- ph.rd.X)
         end
     end
+    # Ticket #765: `tr.fees` is charged only inside the fit, over the training matrix. No
+    # site stamps a fold length onto it, so a bare `AmortisedFees()` on a `WeightsTracking`
+    # benchmark reproduces `fa === nothing` exactly, over folds of unequal length.
+    @testset "a fold length never reaches tr.fees" begin
+        wbt = fill(inv(size(rd.X, 2)), size(rd.X, 2))
+        tnb = Turnover(; w = wbt, val = 0.02)
+        fee_n = Fees(; tn = tnb, l = 0.001, fl = 0.5)
+        fee_b = Fees(; tn = tnb, l = 0.001, fl = 0.5, fa = AmortisedFees())
+        cv765 = DateWalkForward(12, 3; period = Month(1))
+
+        # The test folds are of unequal length, so a fold-length divisor would move the
+        # numbers if one ever reached `tr.fees`.
+        (; test_idx) = split(cv765, rd)
+        @test length(unique(length.(test_idx))) > 1
+
+        function tracked_pred(fees)
+            r = TrackingRiskMeasure(; tr = WeightsTracking(; fees = fees, w = wbt))
+            return cross_val_predict(MeanRisk(; r = r, opt = JuMPOptimiser(; slv = slv)),
+                                     rd, cv765)
+        end
+        pred_n = tracked_pred(fee_n)
+        pred_b = tracked_pred(fee_b)
+        @test [p.res.w for p in pred_n.pred] == [p.res.w for p in pred_b.pred]
+        @test [p.rd.X for p in pred_n.pred] == [p.rd.X for p in pred_b.pred]
+    end
     @testset "Grid search and Randomised search cv" begin
         opt = JuMPOptimiser(; slv = slv)
         # The grids below tune an L2 regularisation coefficient. `l2` holds an

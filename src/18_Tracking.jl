@@ -195,6 +195,8 @@ Where:
   - ``\\boldsymbol{w}_{b}``: `N × 1` benchmark weight vector, the `w` field.
   - ``\\boldsymbol{F}(\\boldsymbol{w}_{b})``: Per-period fee charged on the benchmark, from the `fees` field. It is zero when `fees` is `nothing`. See [`calc_net_returns`](@ref).
 
+The `fees` field reads no fold. [`amortise_fees`](@ref) is the one verb that stamps a fold length onto a fee, and [`predict`](@ref) calls it on the portfolio's own fee, never on this one. A bare [`AmortisedFees`](@ref) here therefore charges `tn`, `fl` and `fs` in full on every observation, exactly as a `nothing` `fa` does. State a `horizon` on the [`AmortisedFees`](@ref) to divide them, because a stated horizon overrides the fold at every site.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)

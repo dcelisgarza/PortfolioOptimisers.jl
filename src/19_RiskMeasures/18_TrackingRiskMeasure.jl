@@ -39,6 +39,8 @@ Both bind at `err`. On a 250x5 sample against an equal-weight benchmark, `err = 
 
     The default `err = 0.0` admits only portfolios whose tracked risk is exactly the benchmark's. For a positive-definite measure in independent mode that pins ``\\boldsymbol{w}`` to ``\\boldsymbol{w}_b``. State an `err` unless that is what you want.
 
+The bound reads `tr.w` and never `tr.fees`, so it holds no [`Fees`](@ref) object to amortise and fee amortisation cannot reach it.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -249,6 +251,8 @@ Computes the Tracking Error of a portfolio weight vector `w`.
   - `X::MatNum`: Asset returns matrix (``T \\times N``).
   - `fees`: Optional fee structure.
 
+The benchmark's fee and the portfolio's fee are charged at the same site, over the same `X`, and neither is divided by a fold. `fees` reaches [`calc_net_returns`](@ref) and `r.tr.fees` reaches [`tracking_benchmark`](@ref). A bare [`AmortisedFees`](@ref) on either one charges in full, so both halves of the norm read one clock. State a `horizon` on both to divide both.
+
 ## Precomputed portfolio returns
 
     (r::TrackingRiskMeasure{<:Any, <:ReturnsTracking})(x::VecNum)
@@ -409,6 +413,8 @@ Where:
   - $(math_dict[:w_port])
   - ``\\boldsymbol{w}_b``: Benchmark portfolio weights vector ``N \\times 1``.
   - ``\\rho``: Chosen base risk measure.
+
+Neither this measure nor its constraint twin reads `tr.fees`: the computation reads `tr.w` alone. There is no [`Fees`](@ref) object on this path, so fee amortisation cannot reach it, and the distance is re-evaluated fresh every fold.
 
 # Fields
 

@@ -402,6 +402,46 @@
         festA = FeesEstimator(; l = Dict("A" => 0.001), fa = AmortisedFees(; horizon = 10))
         @test fees_constraints(festA, fsets2).fa === festA.fa
     end
+    # Ticket #765: a `WeightsTracking` benchmark fee reads no fold. `amortise_fees` is the
+    # one verb that stamps a fold length onto a fee, and `predict` calls it on the
+    # portfolio's own fee, never on `tr.fees`.
+    @testset "a WeightsTracking fee reads no fold" begin
+        Xt = [0.01 0.02 -0.01 0.03; 0.03 0.04 0.02 -0.02; -0.01 0.005 0.01 0.04]
+        wbt = [0.3, 0.2, 0.4, 0.1]
+        tnb = Turnover(; w = [0.25, 0.25, 0.25, 0.25], val = 0.02)
+        fee_n = Fees(; tn = tnb, l = 0.001, fl = 0.5)
+        fee_b = Fees(; tn = tnb, l = 0.001, fl = 0.5, fa = AmortisedFees())
+        fee_h = Fees(; tn = tnb, l = 0.001, fl = 0.5, fa = AmortisedFees(; horizon = 21))
+        tr_n = WeightsTracking(; fees = fee_n, w = wbt)
+        tr_b = WeightsTracking(; fees = fee_b, w = wbt)
+        tr_h = WeightsTracking(; fees = fee_h, w = wbt)
+
+        # A bare `AmortisedFees()` charges the one-off terms in full, exactly as a
+        # `nothing` `fa` does, because no fold length reaches this fee.
+        @test PortfolioOptimisers.tracking_benchmark(tr_b, Xt) ==
+              PortfolioOptimisers.tracking_benchmark(tr_n, Xt)
+
+        # A stated `horizon` is the only way to divide them, and it divides `fl` and `tn`
+        # while it leaves `l` alone.
+        bn = PortfolioOptimisers.tracking_benchmark(tr_n, Xt)
+        bh = PortfolioOptimisers.tracking_benchmark(tr_h, Xt)
+        oneoff = PortfolioOptimisers.calc_fixed_fees(wbt, fee_n.fl, fee_n.kwargs, .>=) +
+                 calc_fees(wbt, tnb)
+        @test isapprox(bh .- bn, fill(oneoff * (1 - inv(21)), size(Xt, 1)))
+
+        # Both halves of the tracking norm read one clock: the benchmark's fee and the
+        # portfolio's fee are charged at the same site, over the same `X`, and a bare
+        # `AmortisedFees()` divides neither.
+        wpt = [0.25, 0.25, 0.3, 0.2]
+        @test TrackingRiskMeasure(; tr = tr_b)(wpt, Xt, fee_b) ==
+              TrackingRiskMeasure(; tr = tr_n)(wpt, Xt, fee_n)
+
+        # `factory` advances the benchmark's reference weights and stamps no horizon.
+        trf = factory(tr_b, wpt)
+        @test trf.w == wpt
+        @test trf.fees.tn.w == wbt
+        @test isa(trf.fees.fa, AmortisedFees) && isnothing(trf.fees.fa.horizon)
+    end
 end
 
 # The net-returns pair of `src/17_NetReturnsDrawdowns.jl`, swept under issue #547.
