@@ -43,6 +43,7 @@ cv_sequential_info
 parallel_folds
 run_folds
 Fold
+folds_are_time_ordered
 fold_loop
 assert_unshuffled_folds
 cv_nobs

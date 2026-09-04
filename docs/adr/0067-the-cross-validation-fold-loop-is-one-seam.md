@@ -179,3 +179,38 @@ type nor the flag, so both folded one hop from their use.
 `parallel_folds` and `run_folds` keep their roles and their default element type. The four
 predict-only and path-level sites still call `parallel_folds` directly. The `time_ordered` and
 `fold_view` parameters are unchanged. ADR 0030 is untouched.
+
+## Amendment (2026-09-04)
+
+Issue #759. The original decision wrote `time_ordered` as a literal at each call site, and said
+"Two sites pass `false`". That count was a fact about the call sites, not a rule, and the
+`Pipeline` seam broke it. The `Pipeline` method for `cv::CVER` serves `KFold` and both
+walk-forwards through one body, so it could not restate the literal, and it took the `true`
+default for all three. A `Pipeline` over a `KFold` therefore carried the previous fold's weights,
+where the optimiser-level `KFold` path did not.
+
+The scheme now states the answer, and the call sites read it:
+
+```julia
+folds_are_time_ordered(::Any) = true
+folds_are_time_ordered(::NonSeqCVER) = false
+```
+
+Five sites hold a scheme, and each passes `time_ordered = folds_are_time_ordered(cv)`: the
+optimiser-level non-sequential, combinatorial and walk-forward methods, and the `Pipeline`
+combinatorial and `CVER` methods. Two path-level sites enumerate an inner walk-forward and hold
+no scheme, so they keep the `true` default.
+
+The default is `true`, so a user-supplied scheme threads history unless it declares that it does
+not. Threading history into a scheme that has none is a wrong reading; dropping it from a
+timeline is a wrong optimisation. The conservative default is the one that keeps the timeline.
+
+`fold_loop` keeps the `time_ordered` keyword and its `true` default. The change is which value
+each call site sends, not what the loop does with it.
+
+### Behaviour this moves
+
+A `Pipeline` over a `KFold` or a `KFoldResult` whose steps need the previous weights now
+runs its folds in parallel with `w_prev == nothing`, and emits no `cv_sequential_info` message. A
+turnover budget, a turnover fee or a tracking term in such a pipeline reads its own reference
+weights instead of the previous fold's. Every other scheme is unchanged.

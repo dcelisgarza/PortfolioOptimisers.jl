@@ -18,6 +18,16 @@ end
 function PortfolioOptimisers.needs_previous_weights(::TDPipePrevW)
     return true
 end
+# `TDPipeKFoldSwitch` turns the previous weights into an observable difference in the fold's
+# weights: a fold that receives none optimises equal weights, a fold that receives some
+# optimises inverse volatility. Every fold of a non-sequential scheme takes the first branch.
+struct TDPipeKFoldSwitch <: PortfolioOptimisers.TimeDependentOptimiserCallable end
+function (::TDPipeKFoldSwitch)(ctx::TimeDependentContext)
+    return isnothing(ctx.w_prev) ? EqualWeighted() : InverseVolatility()
+end
+function PortfolioOptimisers.needs_previous_weights(::TDPipeKFoldSwitch)
+    return true
+end
 @testset "Pipeline prediction and CV" begin
     using Test, PortfolioOptimisers, TimeSeries, Dates, StableRNGs, Statistics, FLoops
 
@@ -321,6 +331,46 @@ end
             p = @test_logs (:info,) match_mode = :any cross_val_predict(pipe, pr, cvw)
             @test isnothing(cap.seen[1])
             @test cap.seen[2] ≈ p.pred[1].res.w
+        end
+
+        @testset "a non-sequential scheme carries no history" begin
+            # Issue #759. A `KFold` fold is independent of the other folds, so a pipeline
+            # that needs the previous weights still runs the folds in parallel with none.
+            # This is the behaviour the optimiser-level `KFold` path already had. The scheme
+            # states the answer once, through `folds_are_time_ordered`, and every call site
+            # that holds a scheme reads it.
+            kf = KFold(; n = 3)
+            @test !PortfolioOptimisers.folds_are_time_ordered(kf)
+            @test !PortfolioOptimisers.folds_are_time_ordered(CombinatorialCrossValidation())
+            @test PortfolioOptimisers.folds_are_time_ordered(cvw)
+            @test PortfolioOptimisers.folds_are_time_ordered(MultipleRandomised(cvw))
+            # A result answers with its estimator.
+            @test !PortfolioOptimisers.folds_are_time_ordered(split(kf, pr))
+            @test PortfolioOptimisers.folds_are_time_ordered(sp)
+
+            nk = length(split(kf, pr).train_idx)
+            cap = TDPipePrevW(Vector{Any}(nothing, nk))
+            pipe = Pipeline(; steps = (prep..., TimeDependent(cap)))
+            @test PortfolioOptimisers.needs_previous_weights(pipe)
+            # One guard covers both legs of the thread. `w_prev` is `nothing`, so neither
+            # the fold's context nor the `factory` pass over the optimisation steps sees a
+            # previous fold's weights. The run is silent: `cv_sequential_info` is emitted by
+            # `run_folds`, which a non-sequential scheme no longer reaches.
+            p = @test_logs cross_val_predict(pipe, pr, kf)
+            @test length(p.pred) == nk
+            @test all(isnothing, cap.seen)
+
+            # The switch makes the branch observable in the weights.
+            sw = Pipeline(; steps = (prep..., TimeDependent(TDPipeKFoldSwitch())))
+            ewt = fill(1 / 5, 5)
+            pk = cross_val_predict(sw, pr, kf)
+            @test length(pk.pred) == nk
+            @test all(pred -> isapprox(pred.res.w, ewt), pk.pred)
+            # A walk-forward is a timeline, so it keeps threading: fold 1 receives no
+            # previous weights and fold 2 does.
+            pw = @test_logs (:info,) match_mode = :any cross_val_predict(sw, pr, cvw)
+            @test isapprox(pw.pred[1].res.w, ewt)
+            @test !isapprox(pw.pred[2].res.w, ewt)
         end
 
         @testset "fold-less fit is default-or-throw" begin

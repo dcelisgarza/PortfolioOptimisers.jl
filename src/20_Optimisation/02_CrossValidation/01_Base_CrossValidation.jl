@@ -1223,6 +1223,31 @@ struct Fold{T1, T2, T3, T4, T5, T6}
     test::T6
 end
 """
+    folds_are_time_ordered(cv)
+
+Return `true` if the fold enumeration of a cross-validation scheme is a timeline.
+
+This is the predicate that every call site reads for the `time_ordered` keyword of
+[`fold_loop`](@ref), so a scheme states for itself whether its folds carry history. A
+walk-forward, a multiple-randomised path, and any scheme with no more specific method
+enumerate their folds in time order. Fold `i` has fold `i - 1` behind it, so the loop runs
+the folds in order and threads the previous fold's weights.
+
+A [`NonSeqCVER`](@ref) scheme answers `false`. A k-fold and a combinatorial enumeration are
+not timelines: each fold is independent of the others, so no fold has a previous fold, and
+the loop runs them in parallel. A `KFold` training window holds rows that follow its test
+window, so a quantity measured against another fold's weights is not a backtest reading.
+
+# Related
+
+  - [`fold_loop`](@ref)
+  - [`NonSeqCVER`](@ref)
+  - [`needs_previous_weights`](@ref)
+  - [`cross_val_predict`](@ref)
+"""
+folds_are_time_ordered(::Any) = true
+folds_are_time_ordered(::NonSeqCVER) = false
+"""
     fold_loop(fit_fold, est, n::Integer, ex::FLoops.Transducers.Executor,
               ::Type{ElT} = PredictionResult; rd, train_idx, test_idx,
               path_id = nothing, time_ordered::Bool = true, fold_view = nothing)
@@ -1251,7 +1276,10 @@ The callback takes the one [`Fold`](@ref) record, so a call site names what it r
 `time_ordered` states whether the fold enumeration of the scheme is a timeline. `true`
 routes through [`run_folds`](@ref), so an optimiser that needs the previous weights runs
 sequentially. `false` routes through [`parallel_folds`](@ref), because a scheme whose
-folds are not a timeline has no previous fold to thread. `ElT` is the per-fold result
+folds are not a timeline has no previous fold to thread. A call site that holds the scheme
+takes the value from [`folds_are_time_ordered`](@ref), so the scheme states the answer once
+instead of each call site restating it. A path-level site enumerates an inner walk-forward
+and holds no scheme, so it takes the default. `ElT` is the per-fold result
 element type: a single
 [`PredictionResult`](@ref) for a time-ordered scheme, a `Vector{PredictionResult}` for the
 multi-path combinatorial scheme. It is positional for the reason given in
@@ -1263,6 +1291,7 @@ multi-path combinatorial scheme. It is positional for the reason given in
   - [`run_folds`](@ref)
   - [`parallel_folds`](@ref)
   - [`assert_unshuffled_folds`](@ref)
+  - [`folds_are_time_ordered`](@ref)
   - [`fit_and_predict`](@ref)
   - [`cross_val_predict`](@ref)
 """
@@ -1309,7 +1338,8 @@ function fit_and_predict(opt::OptE_Opt_TD, rd::ReturnsResult, cv::NonSeqCVER; co
     (; train_idx, test_idx) = cv_res
     assert_unshuffled_folds(cv, train_idx)
     predictions = fold_loop(opt, length(train_idx), ex; rd = rd, train_idx = train_idx,
-                            test_idx = test_idx, time_ordered = false) do fold
+                            test_idx = test_idx, time_ordered = folds_are_time_ordered(cv)
+                            ) do fold
         return fit_and_predict(fold.est, fold.rd; train_idx = fold.train,
                                test_idx = fold.test, cols = cols)
     end

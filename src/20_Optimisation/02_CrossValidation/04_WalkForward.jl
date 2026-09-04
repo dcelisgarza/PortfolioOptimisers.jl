@@ -765,7 +765,8 @@ function fit_and_predict(opt::OptE_TD, rd::ReturnsResult, cv::WFCVER; cols = :,
     (; train_idx, test_idx) = cv_res
     assert_unshuffled_folds(cv, train_idx)
     predictions = fold_loop(opt, length(train_idx), ex; rd = rd, train_idx = train_idx,
-                            test_idx = test_idx) do fold
+                            test_idx = test_idx, time_ordered = folds_are_time_ordered(cv)
+                            ) do fold
         return fit_and_predict(fold.est, fold.rd; train_idx = fold.train,
                                test_idx = fold.test, cols = cols)
     end

@@ -214,7 +214,7 @@
 "src/19_RiskMeasures/27_ExpectedRisk.jl" = { map = 9, units = 18, swept = false }
 "src/19_RiskMeasures/28_RiskMeasureTools.jl" = { map = 9, units = 7, swept = false }
 "src/20_Optimisation/01_Base_Optimisation.jl" = { map = 10, units = 112, swept = false }
-"src/20_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl" = { map = 12, units = 46, swept = false }
+"src/20_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl" = { map = 12, units = 47, swept = false }
 "src/20_Optimisation/02_CrossValidation/02_KFold.jl" = { map = 12, units = 3, swept = false }
 "src/20_Optimisation/02_CrossValidation/03_Combinatorial.jl" = { map = 12, units = 11, swept = false }
 "src/20_Optimisation/02_CrossValidation/04_WalkForward.jl" = { map = 12, units = 18, swept = false }
