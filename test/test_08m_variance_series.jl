@@ -13,7 +13,8 @@ exactly: the fast route reads the cache after observation `t`, and the slow rout
 same cache from observations `1` to `t`.
 
 The file also holds this estimator's first tests. Two defects it found are fixed in the same
-change, and the last two testsets are their regressions.
+change, and the last two testsets are their regressions. The final testset is issue #743's
+regression: `regime_lohi_mult` clamps the multiplier now, so this file also covers that field.
 =#
 using Test, PortfolioOptimisers, Statistics, StableRNGs, LinearAlgebra
 
@@ -272,4 +273,56 @@ holds.
     @test all(isnan, view(got, 40:45, 2))
     @test isapprox(got[50, 2], plain_series(view(Xm, 46:50, 2:2), decay, min_obs)[end, 1];
                    rtol = 1e-12)
+end
+#=
+Issue #743. `regime_lohi_mult` validated its own ordering and was stored, but nothing read it: the
+documented clamp on the regime multiplier never ran, and the shipped default `(0.7, 1.6)` bounded
+nothing. `regime_adjusted_variance` now clamps the multiplier to that range before it is squared,
+and the default moved to `nothing`, so a caller who names no bound keeps the answer this library
+always gave.
+=#
+@testset "regime_lohi_mult clamps the multiplier, and nothing leaves it alone" begin
+    rng = StableRNG(4326)
+    X = randn(rng, 120, 3) .* 0.02
+    X[90:end, :] .*= 5.0
+    lo, hi = 0.9, 1.1
+
+    for rm in (PO.FirstMomentRegimeAdjusted(), PO.LogRegimeAdjusted(),
+               PO.RootMeanSquaredAdjusted())
+        # The multiplier alone, backed out of an inert estimator that carries no regime factor.
+        inert = RegimeAdjustedExpWeightedVariance(; decay = 0.94, min_obs = 5,
+                                                  regime_min_obs = 10_000,
+                                                  regime_method = rm)
+        base = var(inert, X)
+
+        unclamped = RegimeAdjustedExpWeightedVariance(; decay = 0.94, min_obs = 5,
+                                                      regime_min_obs = 3,
+                                                      regime_method = rm)
+        factor = sqrt.(var(unclamped, X) ./ base)
+
+        clamped = RegimeAdjustedExpWeightedVariance(; decay = 0.94, min_obs = 5,
+                                                    regime_min_obs = 3, regime_method = rm,
+                                                    regime_lohi_mult = (lo, hi))
+        expected = base .* clamp.(factor, lo, hi) .^ 2
+        @test isapprox(var(clamped, X), expected; rtol = 1e-12)
+
+        # An explicit `nothing` reproduces the answer the field always gave before this fix.
+        off = RegimeAdjustedExpWeightedVariance(; decay = 0.94, min_obs = 5,
+                                                regime_min_obs = 3, regime_method = rm,
+                                                regime_lohi_mult = nothing)
+        @test isequal(var(unclamped, X), var(off, X))
+    end
+
+    # The clamp survives the point-in-time series path too, not only the batch read-out.
+    ce = RegimeAdjustedExpWeightedVariance(; decay = 0.94, min_obs = 5, regime_min_obs = 3,
+                                           regime_lohi_mult = (lo, hi))
+    @test isequal(PO.variance_series(ce, X)[end, :], var(ce, X))
+    @test isequal(slow_series(ce, X), PO.variance_series(ce, X))
+
+    @test_throws DomainError RegimeAdjustedExpWeightedVariance(;
+                                                               regime_lohi_mult = (1.1,
+                                                                                   0.9))
+    @test_throws DomainError RegimeAdjustedExpWeightedVariance(;
+                                                               regime_lohi_mult = (0.0,
+                                                                                   1.6))
 end

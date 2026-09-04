@@ -351,6 +351,9 @@ Final variance:
 \\end{align}
 ```
 
+When `regime_lohi_mult` is not `nothing`, `mult(s_T)` is clamped to the `(lo, hi)` range that field
+gives before the square is taken.
+
 Where:
 
   - ``v_t``: Exponentially weighted variance at time ``t``.
@@ -378,7 +381,7 @@ $(DocStringExtensions.FIELDS)
         regime_method::Option{<:RegimeAdjustedMethod} = FirstMomentRegimeAdjusted(),
         regime_decay::Number      = exp2(-2 / inv(log2(inv(decay)))),
         regime_min_obs::Integer   = round(Int, max(1, inv(log2(inv(decay))) / 2)),
-        regime_lohi_mult::Option{<:Tuple{<:Number, <:Number}} = (0.7, 1.6),
+        regime_lohi_mult::Option{<:Tuple{<:Number, <:Number}} = nothing,
         min_val::Number           = sqrt(eps()),
         centred::Bool             = false,
         cache::Option{<:AbstractPartialFitState} = nothing
@@ -498,8 +501,7 @@ function RegimeAdjustedExpWeightedVariance(; decay::Number = exp2(-inv(40.0)),
                                                                                inv(log2(inv(decay))) /
                                                                                2)),
                                            regime_lohi_mult::Option{<:Tuple{<:Number,
-                                                                            <:Number}} = (0.7,
-                                                                                          1.6),
+                                                                            <:Number}} = nothing,
                                            min_val::Number = sqrt(eps()),
                                            centred::Bool = false,
                                            cache::Option{<:AbstractPartialFitState} = nothing)::RegimeAdjustedExpWeightedVariance
@@ -900,6 +902,9 @@ Where `ce.regime_method` is `nothing`, [`process_observation!`](@ref) advances n
 `cache.n_regime_obs` stays at zero, which is below every admissible `regime_min_obs`. The
 multiplier is then one and the variance is the plain recursion.
 
+Where `ce.regime_lohi_mult` is not `nothing`, the multiplier is clamped to that `(lo, hi)` range
+before it is squared. Where it is `nothing`, no clamp runs.
+
 # Arguments
 
   - `cache::RegimeAdjustedVarianceCache`: Online variance computation cache.
@@ -934,6 +939,9 @@ function regime_adjusted_variance(cache::RegimeAdjustedVarianceCache,
         one(eltype(variance))
     else
         regime_multiplier(ce.regime_method, cache.regime_state)
+    end
+    if !isnothing(ce.regime_lohi_mult)
+        factor = clamp(factor, ce.regime_lohi_mult[1], ce.regime_lohi_mult[2])
     end
 
     return variance * factor^2
