@@ -217,3 +217,59 @@ the pass rebinds it.
         @test !isequal(PO.variance_series(live, X), PO.variance_series(inert, X))
     end
 end
+#=
+`regime_method = nothing` is the off switch, added by issue #718 for `EWVolatility`. Before it, the
+only way to read the plain exponentially weighted recursion was a `regime_min_obs` the sample
+cannot reach, which is a property of the data and not of the estimator. The switch advances no
+regime state, so `n_regime_obs` stays at zero and the multiplier stays at one whatever the sample
+holds.
+=#
+@testset "no regime method is the plain exponentially weighted recursion" begin
+    rng = StableRNG(718)
+    X = randn(rng, 90, 4) .* 0.02
+    X[70:end, :] .*= 6.0
+    decay, min_obs = exp2(-inv(5.0)), 5
+
+    # The recursion written out by hand: uncentred, bias corrected, no regime factor.
+    function plain_series(X, decay, min_obs)
+        T, N = size(X)
+        V = fill(NaN, T, N)
+        for i in 1:N
+            s, n = 0.0, 0
+            for t in 1:T
+                if isfinite(X[t, i])
+                    s = decay * s + (1 - decay) * X[t, i]^2
+                    n += 1
+                end
+                if n >= min_obs
+                    V[t, i] = s / (1 - decay^n)
+                end
+            end
+        end
+        return V
+    end
+
+    off = RegimeAdjustedExpWeightedVariance(; decay = decay, min_obs = min_obs,
+                                            centred = true, regime_method = nothing)
+    expected = plain_series(X, decay, min_obs)
+    @test isapprox(PO.variance_series(off, X), expected; rtol = 1e-12, nans = true)
+    @test isapprox(vec(var(off, X)), expected[end, :]; rtol = 1e-12, nans = true)
+
+    # The default still applies the multiplier, so the switch changes an answer.
+    on = RegimeAdjustedExpWeightedVariance(; decay = decay, min_obs = min_obs,
+                                           centred = true)
+    @test !isapprox(PO.variance_series(on, X), expected; rtol = 1e-12, nans = true)
+
+    # The slow route agrees with the fast one, as it does for every other setting.
+    @test isapprox(slow_series(off, X), PO.variance_series(off, X); rtol = 1e-12,
+                   nans = true)
+
+    # An asset that turns inactive restarts, and the switch does not change that.
+    amsk = trues(size(X))
+    amsk[40:45, 2] .= false
+    Xm = ifelse.(amsk, X, NaN)
+    got = PO.variance_series(off, Xm; active_mask = amsk)
+    @test all(isnan, view(got, 40:45, 2))
+    @test isapprox(got[50, 2], plain_series(view(Xm, 46:50, 2:2), decay, min_obs)[end, 1];
+                   rtol = 1e-12)
+end

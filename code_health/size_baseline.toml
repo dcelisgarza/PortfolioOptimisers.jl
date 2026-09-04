@@ -75,10 +75,12 @@ commit = "8787635a8f"
 "src/08_Moments/39_CrossSectionalWeights.jl" = { code = 138, doc = 366, comment = 0, blank = 166, total = 670 }
 "src/08_Moments/40_HigherMomentPartialFit.jl" = { code = 120, doc = 422, comment = 0, blank = 216, total = 758 }
 "src/08_Moments/41_CrossSectionalFactorModel.jl" = { code = 157, doc = 286, comment = 7, blank = 104, total = 554 }
-"src/08_Moments/42_FactorExposures/01_Base_Descriptor.jl" = { code = 50, doc = 132, comment = 0, blank = 66, total = 248 }
+"src/08_Moments/42_FactorExposures/01_Base_Descriptor.jl" = { code = 63, doc = 169, comment = 0, blank = 86, total = 318 }
 "src/08_Moments/42_FactorExposures/02_PanelFieldDescriptors.jl" = { code = 237, doc = 788, comment = 0, blank = 346, total = 1371 }
 "src/08_Moments/42_FactorExposures/03_LagDescriptors.jl" = { code = 109, doc = 324, comment = 0, blank = 132, total = 565 }
-"src/08_Moments/42_FactorExposures/07_RollingDescriptors.jl" = { code = 119, doc = 288, comment = 0, blank = 125, total = 532 }
+"src/08_Moments/42_FactorExposures/04_EWMeanDescriptors.jl" = { code = 196, doc = 441, comment = 0, blank = 168, total = 805 }
+"src/08_Moments/42_FactorExposures/05_EWVolatilityDescriptors.jl" = { code = 42, doc = 148, comment = 0, blank = 67, total = 257 }
+"src/08_Moments/42_FactorExposures/07_RollingDescriptors.jl" = { code = 112, doc = 274, comment = 0, blank = 115, total = 501 }
 "src/08_Moments/42_FactorExposures/08_Base_Exposure.jl" = { code = 55, doc = 148, comment = 0, blank = 82, total = 285 }
 "src/08_Moments/42_FactorExposures/09_CompositeExposure.jl" = { code = 107, doc = 214, comment = 0, blank = 79, total = 400 }
 "src/08_Moments/42_FactorExposures/10_DerivedExposure.jl" = { code = 48, doc = 97, comment = 0, blank = 31, total = 176 }

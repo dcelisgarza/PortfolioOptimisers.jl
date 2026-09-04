@@ -30,37 +30,6 @@ function assert_rolling_sign(sign::Real)::Nothing
     return nothing
 end
 """
-    assert_log_returns(X::AbstractMatrix{<:Real}) -> nothing
-
-Check that every return that is not missing is greater than `-1`.
-
-A rolling log-return Descriptor takes the logarithm of one plus each return. A return of `-1` is a total loss, and the logarithm is undefined below it, so the check refuses the whole matrix rather than write an infinity into one cell of the Descriptor. A missing return is a `NaN`, and it passes the check.
-
-# Arguments
-
-  - `X`: The returns, `observations × assets`.
-
-# Validation
-
-  - Every entry of `X` that is not `NaN` is greater than `-1`. Raises a `DomainError`.
-
-# Returns
-
-  - `nothing`.
-
-# Related
-
-  - [`RollingLogReturn`](@ref)
-  - [`descriptor`](@ref)
-"""
-function assert_log_returns(X::AbstractMatrix{<:Real})::Nothing
-    k = findfirst(x -> !isnan(x) && x <= -one(x), X)
-    @argcheck(isnothing(k),
-              DomainError(isnothing(k) ? NaN : X[k],
-                          "a rolling log-return Descriptor takes the logarithm of one plus each return, so every return that is not missing must be greater than -1, and it is $(isnothing(k) ? NaN : X[k]) at observation $(isnothing(k) ? 0 : k[1]) for asset $(isnothing(k) ? 0 : k[2]). A return at or below -1 is a data error, so clean the input rather than pass it through."))
-    return nothing
-end
-"""
     descriptor_returns(rd::ReturnsResult) -> Tuple{Matrix{<:Real}, AssetPanel}
 
 Read the returns and the Asset Panel a rolling Descriptor works on.

@@ -108,10 +108,12 @@
 "src/08_Moments/39_CrossSectionalWeights.jl" = { map = 3, units = 10, swept = false }
 "src/08_Moments/40_HigherMomentPartialFit.jl" = { map = 3, units = 25, swept = false }
 "src/08_Moments/41_CrossSectionalFactorModel.jl" = { map = 3, units = 10, algorithm = 1, swept = true }
-"src/08_Moments/42_FactorExposures/01_Base_Descriptor.jl" = { map = 3, units = 5, swept = false }
+"src/08_Moments/42_FactorExposures/01_Base_Descriptor.jl" = { map = 3, units = 7, swept = false }
 "src/08_Moments/42_FactorExposures/02_PanelFieldDescriptors.jl" = { map = 3, units = 32, swept = false }
 "src/08_Moments/42_FactorExposures/03_LagDescriptors.jl" = { map = 3, units = 10, swept = false }
-"src/08_Moments/42_FactorExposures/07_RollingDescriptors.jl" = { map = 3, units = 10, swept = false }
+"src/08_Moments/42_FactorExposures/04_EWMeanDescriptors.jl" = { map = 3, units = 13, swept = false }
+"src/08_Moments/42_FactorExposures/05_EWVolatilityDescriptors.jl" = { map = 3, units = 5, swept = false }
+"src/08_Moments/42_FactorExposures/07_RollingDescriptors.jl" = { map = 3, units = 9, swept = false }
 "src/08_Moments/42_FactorExposures/08_Base_Exposure.jl" = { map = 3, units = 8, swept = false }
 "src/08_Moments/42_FactorExposures/09_CompositeExposure.jl" = { map = 3, units = 7, swept = false }
 "src/08_Moments/42_FactorExposures/10_DerivedExposure.jl" = { map = 3, units = 2, swept = false }

@@ -312,6 +312,11 @@ a standardised squared innovation `z²`. After accumulating enough observations,
 smooths a regime state using `regime_decay`, then scales the final variance by
 `regime_multiplier(regime_method, regime_state)²`.
 
+A `regime_method` of `nothing` turns the adjustment off: no regime state advances, so the
+multiplier stays at one and the estimator is the plain exponentially weighted recursion. That
+is what a consumer needs when it reads a volatility rather than a regime-scaled risk figure,
+and [`EWVolatility`](@ref) is the one in the library.
+
 # Mathematical definition
 
 EWM variance update (decay ``\\lambda``):
@@ -370,7 +375,7 @@ $(DocStringExtensions.FIELDS)
         decay::Number             = exp2(-inv(40.0)),
         min_obs::Integer          = round(Int, max(1, inv(log2(inv(decay))))),
         hac_lags::Option{<:Integer} = nothing,
-        regime_method::RegimeAdjustedMethod = FirstMomentRegimeAdjusted(),
+        regime_method::Option{<:RegimeAdjustedMethod} = FirstMomentRegimeAdjusted(),
         regime_decay::Number      = exp2(-2 / inv(log2(inv(decay)))),
         regime_min_obs::Integer   = round(Int, max(1, inv(log2(inv(decay))) / 2)),
         regime_lohi_mult::Option{<:Tuple{<:Number, <:Number}} = (0.7, 1.6),
@@ -453,7 +458,7 @@ julia> ce.min_obs
     cache
     function RegimeAdjustedExpWeightedVariance(decay::Number, min_obs::Integer,
                                                hac_lags::Option{<:Integer},
-                                               regime_method::RegimeAdjustedMethod,
+                                               regime_method::Option{<:RegimeAdjustedMethod},
                                                regime_decay::Number,
                                                regime_min_obs::Integer,
                                                regime_lohi_mult::Option{<:Tuple{<:Number,
@@ -485,7 +490,7 @@ function RegimeAdjustedExpWeightedVariance(; decay::Number = exp2(-inv(40.0)),
                                                                     max(1,
                                                                         inv(log2(inv(decay))))),
                                            hac_lags::Option{<:Integer} = nothing,
-                                           regime_method::RegimeAdjustedMethod = FirstMomentRegimeAdjusted(),
+                                           regime_method::Option{<:RegimeAdjustedMethod} = FirstMomentRegimeAdjusted(),
                                            regime_decay::Number = exp2(-2 /
                                                                        inv(log2(inv(decay)))),
                                            regime_min_obs::Integer = round(Int,
@@ -682,7 +687,8 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Processes a single observation row (or column) to update the online variance cache.
 
 Updates the running location, variance, and standardised squared innovations in `cache`,
-then advances the smoothed regime state.
+then advances the smoothed regime state. A `regime_method` of `nothing` advances no regime
+state, so the variance stays the plain exponentially weighted recursion.
 
 # Arguments
 
@@ -742,7 +748,10 @@ function process_observation!(cache::RegimeAdjustedVarianceCache,
         X - loc
     end
 
-    regime_mask = valid .& (cache.old_obs_count .>= ce.min_obs)
+    # A `regime_method` of `nothing` empties the mask, so no `z²` is formed and no regime state
+    # advances. It is a conjunction rather than a branch, which keeps one code path.
+    regime_mask = valid .& (cache.old_obs_count .>= ce.min_obs) .&
+                  !isnothing(ce.regime_method)
     fill!(cache.z2, NaN)
     var_idx = regime_mask .& (cache.variance .>= ce.min_val)
     if any(var_idx)
@@ -886,6 +895,10 @@ Read the regime-adjusted variance out of a cache, as it stands.
 Applies the exponentially weighted bias correction, blanks every asset that is not ready, and
 scales by the square of the regime multiplier. The cache is read, never written, so the same
 cache answers this call after every observation of a forward pass.
+
+Where `ce.regime_method` is `nothing`, [`process_observation!`](@ref) advances no regime state, so
+`cache.n_regime_obs` stays at zero, which is below every admissible `regime_min_obs`. The
+multiplier is then one and the variance is the plain recursion.
 
 # Arguments
 

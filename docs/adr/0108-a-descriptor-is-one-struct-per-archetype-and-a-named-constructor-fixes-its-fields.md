@@ -28,8 +28,8 @@ under that rule with the maintainer in the loop, and asked the first build to wr
 
 Two facts about the library shaped the choice.
 
- 1. **The library already spells a variant as a slot, not as a type.** `SimpleVariance` takes a
-    moment Algorithm, `FullMoment` or `SemiMoment`, and there is no `SimpleSemiVariance` struct. A
+ 1. **The library already spells a variant as a slot, not as a type.** `Covariance` takes a
+    moment Algorithm, `FullMoment` or `SemiMoment`, and there is no `SemiCovariance` struct. A
     downside volatility in the reference is a class; here it is the same slot on the same struct.
  2. **A struct is configuration, and a Descriptor Estimator holds no data.** Every parameter of a
     reference class is a field name or a numeric default. Nothing in a named class is a
@@ -51,11 +51,34 @@ and the numeric parameters of the computation. The first three ship in this deci
 | `ChangeToScale` | `field`, `scale`, `lag` | `ChangeToScale` and `EarningsChangeToPrice` |
 | `ChangeInIntensity` | `field`, `scale`, `lag` | `ChangeInIntensity` and `CapexToAssetsChangeInIntensity` |
 
-The exponentially weighted and rolling archetypes follow in
-[#718](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/718),
-[#719](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/719) and
-[#720](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/720), and their downside
-variants are the `FullMoment` / `SemiMoment` slot of fact 1.
+[#718](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/718) added the four
+exponentially weighted archetypes under the same rule, and its downside variant is the
+`FullMoment` / `SemiMoment` slot of fact 1:
+
+| Archetype | Fields | Reference classes it covers |
+| --- | --- | --- |
+| `EWMean` | `decay`, `min_obs`, `skip`, `exponentiate` | `EWMomentum` |
+| `EWVolumeRatio` | `num`, `den`, `decay`, `min_obs` | `EWShareTurnover` and `EWAmihudIlliquidity` |
+| `DaysToCover` | `num`, `den`, `decay`, `min_obs` | `DaysToCover` |
+| `EWVolatility` | `ce`, `alg`, `mar` | `EWVolatility` and `EWDownsideVolatility` |
+
+[#720](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/720) added the two rolling
+archetypes, where the sign is a field rather than two structs:
+
+| Archetype | Fields | Reference classes it covers |
+| --- | --- | --- |
+| `RollingLogReturn` | `window`, `skip`, `sign`, `exponentiate` | `RollingMomentum` and `Reversal` |
+| `RollingMax` | `window` | `MaxReturn` |
+
+The exponentially weighted beta family follows in
+[#719](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/719).
+
+An exponentially weighted archetype states a `decay` and a `min_obs`, as
+`RegimeAdjustedExpWeightedVariance` spells them, and every named constructor takes a `half_life`
+instead and converts it. Two archetypes carry no named constructor of their own, because their
+reference class is the archetype: a named constructor there would be a second keyword method of
+one function, which Julia cannot dispatch. Each takes `half_life` as a keyword that fixes the
+defaults of the fields it converts to.
 
 A numerator or a denominator is one Panel Field name, or a vector of `name => coefficient` pairs
 read as their sum. That is how a gross profit, `sales - cost of revenue`, or a total capital,

@@ -17,5 +17,4 @@ MaxReturn
 descriptor_returns
 rolling_window_max
 assert_rolling_sign
-assert_log_returns
 ```

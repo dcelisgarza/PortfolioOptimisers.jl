@@ -34,6 +34,12 @@ In order to implement a new concrete type that works seamlessly with the library
   - [`GrowthRate`](@ref)
   - [`ChangeToScale`](@ref)
   - [`ChangeInIntensity`](@ref)
+  - [`EWMean`](@ref)
+  - [`EWVolumeRatio`](@ref)
+  - [`DaysToCover`](@ref)
+  - [`EWVolatility`](@ref)
+  - [`RollingLogReturn`](@ref)
+  - [`RollingMax`](@ref)
   - [`AssetPanel`](@ref)
 """
 abstract type AbstractDescriptorEstimator <: AbstractEstimator end
@@ -152,6 +158,70 @@ function panel_field_values(rd::ReturnsResult,
         V .+= panel_field_values(rd, terms[k][1]) .* terms[k][2]
     end
     return V
+end
+"""
+    descriptor_asset_panel(rd::ReturnsResult) -> AssetPanel
+
+Read the Asset Panel a Descriptor needs out of a carrier.
+
+[`panel_field_values`](@ref) reaches the panel through the name of a Panel Field, and every Descriptor that reads one meets its refusal. A Descriptor over the returns reads no Panel Field, so it takes this route to the same refusal and to the active mask [`descriptor_active_fill!`](@ref) needs.
+
+# Arguments
+
+  - $(arg_dict[:rd])
+
+# Validation
+
+  - `rd.pnl` is an [`AssetPanel`](@ref). Raises an [`IsNothingError`](@ref).
+
+# Returns
+
+  - `pnl::AssetPanel`: The Asset Panel the carrier holds.
+
+# Related
+
+  - [`descriptor`](@ref)
+  - [`descriptor_active_fill!`](@ref)
+  - [`panel_field_values`](@ref)
+  - [`AssetPanel`](@ref)
+"""
+function descriptor_asset_panel(rd::ReturnsResult)::AssetPanel
+    pnl = rd.pnl
+    @argcheck(!isnothing(pnl),
+              IsNothingError("a Descriptor is `NaN` wherever the active mask of an Asset Panel is `false`, and rd.pnl is nothing. Build the carrier with the `pnl`, `nz` and `Z` that asset_panel returns."))
+    return pnl
+end
+"""
+    assert_log_returns(X::AbstractMatrix{<:Real}) -> nothing
+
+Check that every return that is not missing is greater than `-1`.
+
+A Descriptor that compounds returns takes the logarithm of one plus each return. A return of `-1` is a total loss, and the logarithm is undefined below it, so the check refuses the whole matrix rather than write an infinity into one cell of the Descriptor. A missing return is a `NaN`, and it passes the check. Every Descriptor that reads `log1p(rd.X)` runs it, exponentially weighted and rolling alike.
+
+# Arguments
+
+  - `X`: The returns, `observations × assets`.
+
+# Validation
+
+  - Every entry of `X` that is not `NaN` is greater than `-1`. Raises a `DomainError`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`descriptor`](@ref)
+  - [`EWMean`](@ref)
+  - [`RollingLogReturn`](@ref)
+"""
+function assert_log_returns(X::AbstractMatrix{<:Real})::Nothing
+    k = findfirst(x -> !isnan(x) && x <= -one(x), X)
+    @argcheck(isnothing(k),
+              DomainError(isnothing(k) ? NaN : X[k],
+                          "a Descriptor over log returns takes the logarithm of one plus each return, so every return that is not missing must be greater than -1, and it is $(isnothing(k) ? NaN : X[k]) at observation $(isnothing(k) ? 0 : k[1]) for asset $(isnothing(k) ? 0 : k[2]). A return at or below -1 is a data error, so clean the input rather than pass it through."))
+    return nothing
 end
 """
     descriptor_active_fill!(D::AbstractMatrix{<:Real}, pnl::AssetPanel) -> nothing

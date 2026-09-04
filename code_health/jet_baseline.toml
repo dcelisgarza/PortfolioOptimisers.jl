@@ -83,6 +83,8 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/08_Moments/42_FactorExposures/01_Base_Descriptor.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/42_FactorExposures/02_PanelFieldDescriptors.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/42_FactorExposures/03_LagDescriptors.jl" = { raw = 0, reviewed = 0 }
+"src/08_Moments/42_FactorExposures/04_EWMeanDescriptors.jl" = { raw = 0, reviewed = 0 }
+"src/08_Moments/42_FactorExposures/05_EWVolatilityDescriptors.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/42_FactorExposures/07_RollingDescriptors.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/42_FactorExposures/08_Base_Exposure.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/42_FactorExposures/09_CompositeExposure.jl" = { raw = 0, reviewed = 0 }
@@ -334,6 +336,8 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/08_Moments/42_FactorExposures/01_Base_Descriptor.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/42_FactorExposures/02_PanelFieldDescriptors.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/42_FactorExposures/03_LagDescriptors.jl" = { raw = 0, reviewed = 0 }
+"src/08_Moments/42_FactorExposures/04_EWMeanDescriptors.jl" = { raw = 0, reviewed = 0 }
+"src/08_Moments/42_FactorExposures/05_EWVolatilityDescriptors.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/42_FactorExposures/07_RollingDescriptors.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/42_FactorExposures/08_Base_Exposure.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/42_FactorExposures/09_CompositeExposure.jl" = { raw = 0, reviewed = 0 }
@@ -585,6 +589,8 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/08_Moments/42_FactorExposures/01_Base_Descriptor.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/42_FactorExposures/02_PanelFieldDescriptors.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/42_FactorExposures/03_LagDescriptors.jl" = { raw = 0, reviewed = 0 }
+"src/08_Moments/42_FactorExposures/04_EWMeanDescriptors.jl" = { raw = 0, reviewed = 0 }
+"src/08_Moments/42_FactorExposures/05_EWVolatilityDescriptors.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/42_FactorExposures/07_RollingDescriptors.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/42_FactorExposures/08_Base_Exposure.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/42_FactorExposures/09_CompositeExposure.jl" = { raw = 0, reviewed = 0 }

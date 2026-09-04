@@ -74,10 +74,12 @@ commit = "dd069231d0"
 "src/08_Moments/39_CrossSectionalWeights.jl" = { cyc = 5, cog = 5, arg = 4, cyc_sum = 24, cog_sum = 18, arg_sum = 5, macros = [] }
 "src/08_Moments/40_HigherMomentPartialFit.jl" = { cyc = 2, cog = 1, arg = 5, cyc_sum = 17, cog_sum = 5, arg_sum = 35, macros = [] }
 "src/08_Moments/41_CrossSectionalFactorModel.jl" = { cyc = 7, cog = 13, arg = 12, cyc_sum = 27, cog_sum = 17, arg_sum = 21, macros = ["@forward_properties"] }
-"src/08_Moments/42_FactorExposures/01_Base_Descriptor.jl" = { cyc = 4, cog = 6, arg = 0, cyc_sum = 12, cog_sum = 13, arg_sum = 0, macros = [] }
+"src/08_Moments/42_FactorExposures/01_Base_Descriptor.jl" = { cyc = 6, cog = 9, arg = 0, cyc_sum = 19, cog_sum = 22, arg_sum = 0, macros = [] }
 "src/08_Moments/42_FactorExposures/02_PanelFieldDescriptors.jl" = { cyc = 6, cog = 11, arg = 4, cyc_sum = 54, cog_sum = 26, arg_sum = 6, macros = [] }
 "src/08_Moments/42_FactorExposures/03_LagDescriptors.jl" = { cyc = 2, cog = 1, arg = 3, cyc_sum = 18, cog_sum = 6, arg_sum = 8, macros = [] }
-"src/08_Moments/42_FactorExposures/07_RollingDescriptors.jl" = { cyc = 6, cog = 11, arg = 4, cyc_sum = 30, cog_sum = 30, arg_sum = 6, macros = [] }
+"src/08_Moments/42_FactorExposures/04_EWMeanDescriptors.jl" = { cyc = 5, cog = 9, arg = 4, cyc_sum = 32, cog_sum = 19, arg_sum = 12, macros = [] }
+"src/08_Moments/42_FactorExposures/05_EWVolatilityDescriptors.jl" = { cyc = 1, cog = 1, arg = 3, cyc_sum = 7, cog_sum = 1, arg_sum = 3, macros = [] }
+"src/08_Moments/42_FactorExposures/07_RollingDescriptors.jl" = { cyc = 6, cog = 11, arg = 4, cyc_sum = 24, cog_sum = 22, arg_sum = 6, macros = [] }
 "src/08_Moments/42_FactorExposures/08_Base_Exposure.jl" = { cyc = 4, cog = 4, arg = 0, cyc_sum = 15, cog_sum = 7, arg_sum = 0, macros = [] }
 "src/08_Moments/42_FactorExposures/09_CompositeExposure.jl" = { cyc = 4, cog = 5, arg = 8, cyc_sum = 18, cog_sum = 13, arg_sum = 8, macros = [] }
 "src/08_Moments/42_FactorExposures/10_DerivedExposure.jl" = { cyc = 2, cog = 1, arg = 7, cyc_sum = 5, cog_sum = 2, arg_sum = 9, macros = [] }
