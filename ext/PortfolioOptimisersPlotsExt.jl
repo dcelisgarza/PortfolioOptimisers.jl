@@ -2116,14 +2116,12 @@ function PortfolioOptimisers.plot_rolling_measure(r::PortfolioOptimisers.BaseRM_
     end
     T = length(ret)
     window = rolling == 0 ? ceil(Int, sqrt(T)) : rolling
-    # Off the functor: a vector is not callable, and a call method on `AbstractVector` would be
-    # piracy on `Base`. `expected_risk_from_returns` serves a measure and a vector alike, and on
-    # a single supported measure it returns `r(x)`, so the number is unchanged.
-    rolling_vals = [PortfolioOptimisers.expected_risk_from_returns(r,
-                                                                   view(ret,
-                                                                        (t - window + 1):t);
-                                                                   sca = sca)
-                    for t in window:T]
+    # Off the functor, and through the library's own verb rather than a second copy of the
+    # rolling loop. `rolling_window_measure` scores each window with
+    # `expected_risk_from_returns`, which serves a measure and a vector alike and on a single
+    # supported measure returns `r(x)`, so the number is unchanged. It also refuses a `rolling`
+    # longer than the sample, which this method's own `rolling >= 0` check never caught.
+    rolling_vals = PortfolioOptimisers.rolling_window_measure(r, ret, window; sca = sca)
     ts_rolling = ts[window:end]
     rname = measure_label(r)
     return plot(ts_rolling, rolling_vals; title = "Rolling $rname (window=$window)",

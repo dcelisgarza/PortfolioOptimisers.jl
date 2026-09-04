@@ -800,24 +800,26 @@ Line plot of a risk or return measure evaluated over a rolling window of portfol
   - `X`: Asset returns matrix (observations × assets).
   - `fees::Option{<:Fees} = nothing`: Optional transaction fees.
   - `ts::AbstractVector = 1:size(X, 1)`: Time axis labels.
-  - `rolling::Integer = 0`: Rolling window size. `0` auto-detects as `⌈√T⌉`. Must be `>= 0`.
+  - `rolling::Integer = 0`: Rolling window size. `0` auto-detects as `⌈√T⌉`. Must be `>= 0`, and no longer than the return series.
   - `sca::Scalariser = SumScalariser()`: Scalariser combining the measures in `r`. Inert when `r` is a single measure.
 
 ## Multiplicity
 
 Each window plots **one** number, the scalarised aggregate. A vector does not become several lines.
 
-A single measure is evaluated through [`expected_risk_from_returns`](@ref) rather than as a functor: a vector is not callable, and defining a call method on `AbstractVector` would be piracy. Both arities take the same route, so the singular figure is unchanged.
+The windows come from [`rolling_window_measure`](@ref) on the return series, rather than from a second copy of the rolling loop inside the extension. That verb scores each window through [`expected_risk_from_returns`](@ref) rather than as a functor: a vector is not callable, and defining a call method on `AbstractVector` would be piracy. Both arities take the same route, so the singular figure is unchanged.
 
 # Validation
 
   - `rolling >= 0`.
+  - `rolling` no longer than the return series, else the `DomainError` [`rolling_window_measure`](@ref) raises on its own `window`. A longer `rolling` used to give an empty vector of risks and an empty plot.
 
 Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
 # Related
 
   - [`expected_risk`](@ref)
+  - [`rolling_window_measure`](@ref)
 """
 function plot_rolling_measure end
 

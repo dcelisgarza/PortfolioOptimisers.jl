@@ -945,6 +945,53 @@
         @test [p.res.w for p in pred_n.pred] == [p.res.w for p in pred_b.pred]
         @test [p.rd.X for p in pred_n.pred] == [p.rd.X for p in pred_b.pred]
     end
+    @testset "The rolling window measure reads a prediction's own series (#770)" begin
+        # The realised-history reading takes a fold result and reads nothing but the series
+        # `predict` already stored, so it needs neither weights nor fees. The four
+        # delegating methods mirror `expected_risk`'s own family, and `InverseVolatility`
+        # keeps the fixture off the solver.
+        r770 = ConditionalValueatRisk()
+        mp770 = cross_val_predict(InverseVolatility(), rd, KFold(; n = 4))
+        pp770 = cross_val_predict(InverseVolatility(), rd,
+                                  CombinatorialCrossValidation(; n_folds = 6,
+                                                               n_test_folds = 2))
+        @test isa(mp770, MultiPeriodPredictionResult)
+        @test isa(pp770, PopulationPredictionResult)
+
+        # One fold: the delegation is exact, because the method only picks `pred.rd.X`.
+        p770 = first(mp770.pred)
+        @test PortfolioOptimisers.rolling_window_measure(r770, p770, 20) ==
+              PortfolioOptimisers.rolling_window_measure(r770, p770.rd.X, 20)
+
+        # One path: the series concatenates the folds, so a window can straddle a
+        # rebalance. Each rebalance adds `window - 1` straddling windows, and that count is
+        # exactly what the path reads above the sum of its folds read alone.
+        W = 60
+        @test mp770.mrd.X == reduce(vcat, [p.rd.X for p in mp770.pred])
+        @test PortfolioOptimisers.rolling_window_measure(r770, mp770, W) ==
+              PortfolioOptimisers.rolling_window_measure(r770, mp770.mrd.X, W)
+        n_path = length(PortfolioOptimisers.rolling_window_measure(r770, mp770, W))
+        n_folds_sum = sum(length(PortfolioOptimisers.rolling_window_measure(r770, p, W))
+                          for p in mp770.pred)
+        @test n_path - n_folds_sum == (length(mp770.pred) - 1) * (W - 1)
+
+        # A population of paths: the vector method maps, and the population method routes
+        # through it, which is the route `expected_risk` takes on the same two types.
+        pop770 = PortfolioOptimisers.rolling_window_measure(r770, pp770, W)
+        @test length(pop770) == length(pp770.pred)
+        @test pop770 == PortfolioOptimisers.rolling_window_measure(r770, pp770.pred, W)
+        @test pop770[1] ==
+              PortfolioOptimisers.rolling_window_measure(r770, first(pp770.pred), W)
+
+        # The window check reaches through every delegating method.
+        @test_throws DomainError PortfolioOptimisers.rolling_window_measure(r770, p770,
+                                                                            length(p770.rd.X) +
+                                                                            1)
+        @test_throws DomainError PortfolioOptimisers.rolling_window_measure(r770, mp770,
+                                                                            length(mp770.mrd.X) +
+                                                                            1)
+        @test_throws DomainError PortfolioOptimisers.rolling_window_measure(r770, pp770, 0)
+    end
     @testset "Grid search and Randomised search cv" begin
         opt = JuMPOptimiser(; slv = slv)
         # The grids below tune an L2 regularisation coefficient. `l2` holds an

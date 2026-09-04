@@ -532,6 +532,33 @@ function expected_risk(r::BaseRM_VecBaseRM, pred::PredictionResult; kwargs...)
     return expected_risk_from_returns(r, pred.rd.X; kwargs...)
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Roll a risk measure over the return series a single fold formed.
+
+The realised-history reading of [`rolling_window_measure`](@ref) on a fold: `pred.rd.X` is the series [`predict`](@ref) stored, so no weights are read and none are needed. Under a weight drift that series is the drifted one, and a window of it is a sub-series of the fold's own drift.
+
+# Arguments
+
+  - `r::BaseRM_VecBaseRM`: Risk measure to evaluate, or a vector of them.
+  - `pred::PredictionResult`: Single-fold prediction result.
+  - `window::Integer`: Size of the rolling window (number of periods).
+
+# Returns
+
+  - `risks::VecNum`: Expected risk values for each rolling window.
+
+# Related
+
+  - [`rolling_window_measure`](@ref)
+  - [`expected_risk`](@ref)
+  - [`PredictionResult`](@ref)
+"""
+function rolling_window_measure(r::BaseRM_VecBaseRM, pred::PredictionResult,
+                                window::Integer; kwargs...)
+    return rolling_window_measure(r, pred.rd.X, window; kwargs...)
+end
+"""
     mapreduce_RetMtx(rd, sym = :X)
 
 Concatenate return matrices from a vector of `PredictionReturnsResult` objects.
@@ -656,6 +683,33 @@ function expected_risk(r::BaseRM_VecBaseRM, mpred::MultiPeriodPredictionResult; 
     return expected_risk_from_returns(r, X; kwargs...)
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Roll a risk measure over the return series a whole path formed.
+
+`mpred.mrd.X` concatenates the folds of the path into one series, so a window can straddle a rebalance and read observations from two folds. That is the realised history: the fund held one set of weights before the rebalance and another after it, and the window sees both.
+
+# Arguments
+
+  - `r::BaseRM_VecBaseRM`: Risk measure to evaluate, or a vector of them.
+  - `mpred::MultiPeriodPredictionResult`: Multi-period prediction result.
+  - `window::Integer`: Size of the rolling window (number of periods).
+
+# Returns
+
+  - `risks::VecNum`: Expected risk values for each rolling window.
+
+# Related
+
+  - [`rolling_window_measure`](@ref)
+  - [`expected_risk`](@ref)
+  - [`MultiPeriodPredictionResult`](@ref)
+"""
+function rolling_window_measure(r::BaseRM_VecBaseRM, mpred::MultiPeriodPredictionResult,
+                                window::Integer; kwargs...)
+    return rolling_window_measure(r, mpred.mrd.X, window; kwargs...)
+end
+"""
     PredRes_MultiPredRes = Union{<:PredictionResult, <:MultiPeriodPredictionResult}
 
 Alias for a single-fold or multi-period prediction result.
@@ -726,6 +780,60 @@ function expected_risk(r::BaseRM_VecBaseRM, preds::VecMPredRes; kwargs...)
 end
 function expected_risk(r::BaseRM_VecBaseRM, ppred::PopulationPredictionResult; kwargs...)
     return expected_risk(r, ppred.pred; kwargs...)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Roll a risk measure over each path of a vector of multi-period prediction results.
+
+Maps the multi-period method over `preds`, so each path is rolled on its own series. The paths of a combinatorial scheme cover the same calendar, so their windows are comparable across the vector.
+
+# Arguments
+
+  - `r::BaseRM_VecBaseRM`: Risk measure to evaluate, or a vector of them.
+  - `preds::VecMPredRes`: Vector of multi-period prediction results.
+  - `window::Integer`: Size of the rolling window (number of periods).
+
+# Returns
+
+  - `risks::Vector{<:VecNum}`: Rolling risk values, one vector per path.
+
+# Related
+
+  - [`rolling_window_measure`](@ref)
+  - [`expected_risk`](@ref)
+  - [`VecMPredRes`](@ref)
+"""
+function rolling_window_measure(r::BaseRM_VecBaseRM, preds::VecMPredRes, window::Integer;
+                                kwargs...)
+    return [rolling_window_measure(r, pred, window; kwargs...) for pred in preds]
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Roll a risk measure over every path of a population prediction result.
+
+Delegates to the vector method on `ppred.pred`, which is the route [`expected_risk`](@ref) takes on the same type.
+
+# Arguments
+
+  - `r::BaseRM_VecBaseRM`: Risk measure to evaluate, or a vector of them.
+  - `ppred::PopulationPredictionResult`: Population prediction result.
+  - `window::Integer`: Size of the rolling window (number of periods).
+
+# Returns
+
+  - `risks::Vector{<:VecNum}`: Rolling risk values, one vector per path.
+
+# Related
+
+  - [`rolling_window_measure`](@ref)
+  - [`expected_risk`](@ref)
+  - [`PopulationPredictionResult`](@ref)
+"""
+function rolling_window_measure(r::BaseRM_VecBaseRM, ppred::PopulationPredictionResult,
+                                window::Integer; kwargs...)
+    return rolling_window_measure(r, ppred.pred, window; kwargs...)
 end
 """
     sort_by_measure(ppred::PopulationPredictionResult, r::BaseRM_VecBaseRM; kwargs...)

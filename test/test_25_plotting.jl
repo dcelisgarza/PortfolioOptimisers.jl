@@ -181,6 +181,12 @@
         # use return-based risk measure (CVaR), not covariance-based (Variance)
         @test is_plot(plot_rolling_measure(r_cvr, w, X))
         @test is_plot(plot_rolling_measure(r_cvr, w, X; rolling = 20))
+        # The method rolls the series through `rolling_window_measure` rather than through a
+        # second copy of the loop, so a `rolling` longer than the sample now raises. It used
+        # to give an empty vector of risks and an empty plot, which the neighbouring
+        # docstring already called a caller error (#770).
+        @test is_plot(plot_rolling_measure(r_cvr, w, X; rolling = size(X, 1)))
+        @test_throws DomainError plot_rolling_measure(r_cvr, w, X; rolling = size(X, 1) + 1)
     end
 
     @testset "plot_cv_scores" begin

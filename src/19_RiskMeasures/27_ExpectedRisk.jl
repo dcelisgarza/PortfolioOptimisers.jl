@@ -647,6 +647,8 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Compute the expected risk of a risk measure over rolling windows of the returns data.
 
+This is the **constant-weight** reading: the one vector `w` is re-scored on every window, so each number is a property of that weight vector rather than of a history. The **realised-history** reading is the `(r, ret::VecNum, window)` method below, which rolls an already-formed net return series instead. The two answer different questions, so they are two methods rather than two settings of one.
+
 # Arguments
 
   - `r::BaseRM_VecBaseRM`: Risk measure to evaluate, or a vector of them.
@@ -683,6 +685,75 @@ function rolling_window_measure(r::BaseRM_VecBaseRM, w::VecNum, X::MatNum,
                           "window must be in 1:$(T), the number of observations in X; got window => $window"))
     return [expected_risk(r, w, view(X, (t - window + 1):t, :), fees; sca = sca, kwargs...)
             for t in window:T]
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Compute the expected risk of a risk measure over rolling windows of an already-formed net return series.
+
+This is the **realised-history** reading: a window is a sub-series of whatever formed `ret`, so under a weight drift the drift does **not** restart at a window's first row — the weights that a row reads are the ones held on the way to that row. It takes no `fees` argument, because the series is net already. The **constant-weight** reading is the `(r, w::VecNum, X, fees, window)` method above.
+
+# Arguments
+
+  - `r::BaseRM_VecBaseRM`: Risk measure to evaluate, or a vector of them.
+  - `ret::VecNum`: Net portfolio return series.
+  - `window::Integer`: Size of the rolling window (number of periods).
+
+# Keyword Arguments
+
+  - `sca::Scalariser = SumScalariser()`: Scalariser combining a vector `r`. Inert on a single measure.
+
+# Validation
+
+  - `1 <= window <= length(ret)`, else a `DomainError` naming `window`.
+  - Each window is scored through [`expected_risk_from_returns`](@ref), so a measure whose [`supports_precomputed_returns`](@ref) is `false` raises that entry's own named `ArgumentError`.
+
+The window is checked here for the reason the constant-weight method states, and the refusal of a weights-consuming measure is the existing one rather than a new error type.
+
+# Returns
+
+  - `risks::VecNum`: Expected risk values for each rolling window.
+
+# Related
+
+  - [`expected_risk_from_returns`](@ref)
+  - [`supports_precomputed_returns`](@ref)
+  - [`plot_rolling_measure`](@ref)
+"""
+function rolling_window_measure(r::BaseRM_VecBaseRM, ret::VecNum, window::Integer;
+                                sca::Scalariser = SumScalariser(), kwargs...)
+    T = length(ret)
+    @argcheck(1 <= window <= T,
+              DomainError(window,
+                          "window must be in 1:$(T), the number of observations in ret; got window => $window"))
+    return [expected_risk_from_returns(r, view(ret, (t - window + 1):t); sca = sca,
+                                       kwargs...) for t in window:T]
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Roll the realised-history measure over each series of a population of net return series.
+
+The twin of the singular series method, and it mirrors [`expected_risk_from_returns`](@ref) on a [`VecVecNum`](@ref): a fold whose optimisation result carries a population of weight vectors forms one series per member, and each member is rolled on its own.
+
+# Arguments
+
+  - `r::BaseRM_VecBaseRM`: Risk measure to evaluate, or a vector of them.
+  - `ret::VecVecNum`: Net portfolio return series, one per population member.
+  - `window::Integer`: Size of the rolling window (number of periods).
+
+# Returns
+
+  - `risks::Vector{<:VecNum}`: Rolling risk values, one vector per population member.
+
+# Related
+
+  - [`expected_risk_from_returns`](@ref)
+  - [`VecVecNum`](@ref)
+"""
+function rolling_window_measure(r::BaseRM_VecBaseRM, ret::VecVecNum, window::Integer;
+                                kwargs...)
+    return [rolling_window_measure(r, reti, window; kwargs...) for reti in ret]
 end
 
 export RiskRatio, number_effective_assets, risk_contribution, factor_risk_contribution,

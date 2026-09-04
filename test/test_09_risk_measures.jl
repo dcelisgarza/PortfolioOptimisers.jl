@@ -636,4 +636,60 @@
                            RelativeConditionalDrawdownatRisk(; alpha = a, w = wl)(xl))
         end
     end
+    @testset "The realised-history rolling window measure reads a series (#770)" begin
+        # One verb, two readings. The constant-weight reading re-scores one weight vector on
+        # every window, so each number is a property of that vector. The realised-history
+        # reading rolls a series that is already formed, so each number is a property of the
+        # history that formed it. Over a constant-weight series the two price the same
+        # quantity, which is what pins the new method to the old one.
+        T = size(rd.X, 1)
+        rw = ConditionalValueatRisk()
+        ret = calc_net_returns(w, rd.X)
+
+        # The definition, written out: each window is the measure on that window's rows.
+        @test PortfolioOptimisers.rolling_window_measure(rw, ret, 20) ==
+              [rw(view(ret, (t - 19):t)) for t in 20:T]
+        # The two readings agree on a series no drift moved. They reduce the same rows in a
+        # different order, so this is an `isapprox` rather than an equality.
+        @test isapprox(PortfolioOptimisers.rolling_window_measure(rw, ret, 20),
+                       PortfolioOptimisers.rolling_window_measure(rw, w, rd.X, nothing, 20))
+        @test length(PortfolioOptimisers.rolling_window_measure(rw, ret, T)) == 1
+        @test length(PortfolioOptimisers.rolling_window_measure(rw, ret, 20)) == T - 19
+
+        # The window is refused at the same boundary as the constant-weight method, and the
+        # message names the length of the series rather than the row count of a matrix.
+        for bad in (0, -1, T + 1)
+            @test_throws DomainError PortfolioOptimisers.rolling_window_measure(rw, ret,
+                                                                                bad)
+        end
+        err = try
+            PortfolioOptimisers.rolling_window_measure(rw, ret, T + 1)
+        catch e
+            e
+        end
+        @test occursin("observations in ret", sprint(showerror, err))
+
+        # A vector of measures scalarises inside each window, so `sca` reaches the series
+        # method exactly as it reaches the constant-weight one.
+        rws = [ConditionalValueatRisk(), ValueatRisk()]
+        @test isapprox(PortfolioOptimisers.rolling_window_measure(rws, ret, 20),
+                       PortfolioOptimisers.rolling_window_measure(rws, w, rd.X, nothing,
+                                                                  20))
+        @test PortfolioOptimisers.rolling_window_measure(rws, ret, 20;
+                                                         sca = MaxScalariser()) !=
+              PortfolioOptimisers.rolling_window_measure(rws, ret, 20)
+
+        # A measure that consumes weights is refused by name through the guard that
+        # `expected_risk_from_returns` already carries. No new error type is added.
+        @test !PortfolioOptimisers.supports_precomputed_returns(Variance())
+        @test_throws ArgumentError PortfolioOptimisers.rolling_window_measure(Variance(),
+                                                                              ret, 20)
+
+        # A population of series is rolled one member at a time, which mirrors
+        # `expected_risk_from_returns` on a vector of vectors.
+        pop = PortfolioOptimisers.rolling_window_measure(rw, [ret, 2 * ret], 20)
+        @test length(pop) == 2
+        @test pop[1] == PortfolioOptimisers.rolling_window_measure(rw, ret, 20)
+        @test pop[2] == PortfolioOptimisers.rolling_window_measure(rw, 2 * ret, 20)
+    end
 end
