@@ -140,11 +140,18 @@ Computes a per-asset mean-return vector. Variants:
 - **WindowedExpectedReturns**: the Windowed Estimator for expected returns.
 
 **Return Forecast**
-A per-asset prediction of the next period's return, supplied by the caller or fitted, which enters a Prior's mean vector.
+A per-asset prediction of the next period's idiosyncratic return, supplied by the caller or fitted from Descriptor Scores, which a Prior splits against its latest Factor Exposures into a spanned part that blends into the factor mean and an orthogonal part that enters its mean vector under a confidence.
 *Avoid*: `alpha` (§5), which is the Significance Level of a tail; and Expected Returns (above), which is a moment estimated from the sample.
 
 **Return Forecast Estimator**
-A producer of a Return Forecast.
+A producer of a Return Forecast, from Descriptor Scores and the factor-model block of the Prior it serves, or from a stated vector.
+
+**Descriptor Scores**
+The cross-sectional scores of a set of Descriptors: each winsorised and standardised per observation, regressed out against named Factor Exposures under the estimation mask, and standardised again. The recipe every fitted Return Forecast Estimator starts from.
+*Avoid*: Factor Exposure (§3.4), which is scored under the benchmark weights and names a factor of the model.
+
+**Forecast Unit**
+The unit a Return Forecast Estimator's descriptors forecast in: the idiosyncratic return, or the idiosyncratic Sharpe ratio, which the estimator converts back with the idiosyncratic volatility so a Return Forecast is always in return units.
 
 ### 3.2 Covariance & Variance (Moments)
 
