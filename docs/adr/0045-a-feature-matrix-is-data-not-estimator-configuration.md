@@ -943,3 +943,58 @@ The verbs derive from the panel and live beside it in `03_InputData`. `feature_m
 `feature_labels` are exported. `CONTEXT.md` §2 gains **Feature Selector**, and §3.7 re-cuts
 **Feature Distance**. The build is
 [#811](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/811).
+
+## Amendment (2026-09-05): a taxonomy is a categorical Panel Field, and the graded program is deleted
+
+Map [#802](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/802)'s fourth decision,
+[#806](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/806), decides how a taxonomy
+reaches the distance now that the carrier holds an Asset Panel (the seventh amendment), a producer
+returns one (the eighth) and the selector reads the panel's fields (the ninth). Every option was
+judged from zero, on architecture, maintainability, ergonomics and performance.
+
+**A `UniverseSets` key is one Panel Field, through one bridge.** `panel_input(sets, key)` returns
+the raw input `asset_panel` already reads: a `CategoricalPanelInput` for a string-valued key and a
+`NumericPanelInput` for a number-valued key, by dispatch on the key's element type. A key of mixed
+element type is refused. `panel_input(sets, keys)` maps the same rule over a vector. In both forms
+an entry `key => InputType` forces the type, and there is no `kind` keyword; the scalar form takes
+`name`, `levels` and `alg`, which the vector form does not. The field is named by the key with the
+`xkey` prefix and its underscore stripped, `"nx_sector"` to `"sector"`, because every field of a
+panel is asset-parallel by construction and the prefix says nothing there. A nested taxonomy is
+several keys, so several fields. The bridge lives after `UniverseSets` in the load order. A second
+`asset_panel` entry over keys alone was rejected because it cannot put a taxonomy beside a
+fundamentals table; constructor methods on the two input types were rejected because they write
+the element-type rule twice.
+
+**A static input joins a time-varying panel by a lazy lift, at build.** `asset_panel` builds a
+time-varying panel when any input is time-varying **or** when `amsk` and `emsk` are given, and it
+lifts each static input to that observation count through one unexported, Base-only array type
+that stores the static array once and indexes a leading observation axis. A lifted field carries no
+observed mask, because every cell was observed. An all-static input set with no masks builds a
+static panel, as ADR 0102 states. Lifting at read, where every reader of a field accepts both
+shapes, was rejected because it spreads one rule over every read site; an eager lift was rejected
+because it copies what the lazy one indexes; a `T` keyword was rejected because the masks already
+say that the panel has observations.
+
+**The graded edge-authoring program is deleted.** Every matrix the fourth amendment's grammar
+writes is one static `assets × nodes` matrix, and a static `TensorPanelInput` holds any such
+matrix with the node list as its labels: a scaled block, a cross edge, an asset node, a mixed axis
+and an all-zero row are all cells of a matrix the caller authors as data. So the grammar was a
+second way to state a field the panel takes as an input, and it declared its axis on a type no
+other panel input reads. `AssetSetsFeatures`, `asset_sets_features`, `Scale`,
+`AbstractFeatureValue`, `UniverseSets.zkey` and `feature_universe` have no reader and go with it.
+`UniverseSets` returns to two declared axis families, assets and factors, and the fourth
+amendment's constructor change is reversed. A numeric taxonomy key, which the grammar wrote as an
+asset's own number, enters as a numeric Panel Field through the bridge. Keeping the grammar as a
+builder of one tensor input was rejected because it keeps a parser, a resolution order and three
+documented hazards beside an input that admits the same matrix with none of them.
+
+**A taxonomy reaches map #643's cross-sectional prior through the ordinary categorical field.**
+The one-hot exposure reads a categorical field's codes and levels, and a lifted field has both. A
+consumer that reads the masks dispatches on the mask type, so a static panel is refused there by
+dispatch, and the refusal names the masks as the lift.
+
+The fourth amendment above is released history and stands as written. `CONTEXT.md` §2 loses
+**Feature Program**, §4.4's **Universe Sets** loses the feature axis, and **Asset Panel** states
+the bridge and the lift. The lift is built by
+[#809](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/809), and the bridge and the
+deletions by [#810](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/810).

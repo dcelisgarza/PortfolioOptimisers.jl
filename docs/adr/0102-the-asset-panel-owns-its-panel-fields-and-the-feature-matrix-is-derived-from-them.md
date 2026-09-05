@@ -131,14 +131,59 @@ at about 54 sites. `CONTEXT.md` rules out the profit-and-loss reading.
 per-field fill policy, and returns the `AssetPanel` with every blank resolved. So a numeric
 field's values stay finite, and no consumer sees a `NaN` or a `Missing`.
 
-An input whose `vals` has one dimension fewer builds a static panel. There, `ForwardPanelFill` and
-`BackwardPanelFill` are refused, because there is no observation axis to fill along;
-`ConstantPanelFill` and `NoPanelFill` are admitted; and the mask keywords must be `nothing`.
+An input whose `vals` has one dimension fewer is a static input. On a static input
+`ForwardPanelFill` and `BackwardPanelFill` are refused, because there is no observation axis to
+fill along, and `ConstantPanelFill` and `NoPanelFill` are admitted. An input set that is static
+throughout, with no masks, builds a static panel. A static input that meets a time-varying input
+or the masks is lifted; the section below states the rule.
 
 Two routes were rejected, as before. A `NaN` reaches `FeatureDistance` and `ClusterGroups` as a
 `NaN` distance. A `Missing` element type widens a library-wide numeric bound and stops the array
 being concrete. This mirrors what the library already does for a missing **return**: a
 preprocessing step resolves it before the returns carrier exists.
+
+### A static input joins a time-varying panel by a lazy lift
+
+[Issue #806](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/806) decided the rule.
+`asset_panel` builds a time-varying panel when any input is time-varying **or** when `amsk` and
+`emsk` are given, and lifts each static input to that observation count. The lift is lazy: one
+unexported, Base-only array type stores the static array once and indexes a leading observation
+axis, so `f.vals[t, i]` reads the static value for every `t`, `size` answers the lifted shape, and
+a `view` of it is a `SubArray` that `port_opt_view` slices like any other. A lifted field carries
+no observed mask, because every cell was observed. The masks are the lift signal because the
+section above already couples them to the shape: masks are `nothing` if and only if the panel is
+static, so masks with static inputs alone are a request for observations, not a contradiction.
+
+Lifting at read was rejected: a panel that mixes shapes makes every reader of a field carry a
+static branch, at about 54 sites. An eager lift was rejected: it copies `T × N` per static field
+what the lazy one indexes. A `T` keyword was rejected: it says what the masks already say.
+
+A taxonomy therefore reaches map #643's cross-sectional prior through the ordinary categorical
+field, once it is lifted beside the panel's fundamentals or by the masks. A consumer that reads
+the masks dispatches on the mask type, so a static panel is refused there by dispatch, and the
+refusal names the masks as the lift.
+
+### A Universe Sets key enters as one field, through one bridge
+
+A `UniverseSets` key is one vector over the asset axis, which is the static raw form of one
+field. `panel_input(sets, key)` returns a `CategoricalPanelInput` for a string-valued key and a
+`NumericPanelInput` for a number-valued key, by dispatch on the element type; a key of mixed
+element type is refused. `panel_input(sets, keys)` maps the rule over a vector. In both forms an
+entry `key => InputType` forces the type, and there is no `kind` keyword. The scalar form takes
+`name`, `levels` and `alg`; the vector form takes none, so a key that needs one of them goes
+through the scalar form. The field is named by the key with the `xkey` prefix and its underscore
+stripped, `"nx_sector"` to `"sector"`, and a key with no prefix keeps its name. `levels` defaults
+to `nothing`, so the builder sorts them, as it does for every categorical input. A nested taxonomy
+is several keys, so several fields. `UniverseSets` is defined after the panel builder in the load
+order, so the bridge lives with the taxonomy verbs, not with the builder.
+
+A second `asset_panel` entry over keys alone was rejected because it cannot put a taxonomy beside
+a fundamentals table in one panel. Constructor methods on the two input types were rejected
+because they write the element-type rule twice.
+
+The graded edge-authoring program of ADR 0045's fourth amendment is deleted, and its tenth
+amendment records why. Every matrix that program wrote is one static `assets × nodes` matrix, and
+a static `TensorPanelInput` with the node list as labels admits any such matrix as data.
 
 ### The builder is a function, not a preprocessing estimator
 
@@ -220,4 +265,11 @@ categorical field is.
 - **The `field_dict` entry `:nz_feat` loses both users and is deleted.**
 - **`feature_matrix`, `feature_labels` and `select_fields` are the one new surface.** Issue #805
   fixed their signatures, and the selector build of map #802 writes them.
+- **`panel_input` is one new exported verb, and the lazy lift is one new unexported array type.**
+  The type owes its `size`, `getindex` and `show`, and its rows in the JET, coverage and size
+  baselines. Issue #806 named it `RepeatedLeading`, and the build may rename it.
+- **The graded program's files go.** `AssetSetsFeatures`, `asset_sets_features`, `Scale`,
+  `AbstractFeatureValue`, `UniverseSets.zkey` and `feature_universe` have no reader. `UniverseSets`
+  loses one name field and its constructor loses one positional, and every doctest that prints a
+  `UniverseSets` loses its `zkey` row.
 - **Panel persistence is not built.** It is in scope for map #643 and does not gate its close.

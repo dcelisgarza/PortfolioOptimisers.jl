@@ -109,12 +109,9 @@ The statement on a Feature Distance of which Panel Fields the Feature Matrix sta
 A producer turning something the library already computes into a static Asset Panel with one Panel Field, at the point of use: `RegressionPanel` builds a loadings tensor from the prior's regression, `PhylogenyPanel` a proximity tensor from the returns. It is configuration on a Feature Distance, so it refits on the universe of the subproblem that runs it, and it holds no data.
 *Avoid*: reading it as a source of a Feature Matrix; it makes a panel, and the matrix is stacked from the panel like any other. And a classification the caller supplies, which enters `asset_panel` as a categorical Panel Field, not through a producer.
 
-**Feature Program**
-An ordered, last-wins list of authored edges resolving into a Feature Matrix. Where the group-key form stacks partitions and derives its axis, a Program writes cells into an axis the caller declared.
-
 **Asset Panel**
-The one carrier of per-asset data that is not a return series: named Panel Fields over a shared asset axis. Its static shape is assets × features with no masks: a taxonomy, a loadings matrix, an adjacency. Its point-in-time shape adds an observation axis, an active mask and an estimation mask. Every blank cell is resolved by `asset_panel` before the Asset Panel exists. See ADR 0102.
-*Avoid*: reading `pnl` as profit-and-loss; the field holds the panel. And reading the panel as one matrix: it is a set of fields, and the Feature Matrix is stacked from them.
+The one carrier of per-asset data that is not a return series: named Panel Fields over a shared asset axis. Its static shape is assets × features with no masks: a taxonomy, a loadings matrix, an adjacency. Its point-in-time shape adds an observation axis, an active mask and an estimation mask. Every blank cell is resolved by `asset_panel` before the Asset Panel exists. A Universe Sets key enters as one Panel Field through `panel_input`: a categorical field for a string key, a numeric field for a numeric key, named by the key without its asset-axis prefix. A static input that meets a time-varying input, or the two masks, is lifted to the observation axis as a field that is constant in time. See ADR 0102.
+*Avoid*: reading `pnl` as profit-and-loss; the field holds the panel. And reading the panel as one matrix: it is a set of fields, and the Feature Matrix is stacked from them. And a graded or weighted membership matrix as anything but a tensor Panel Field the caller authors as data.
 
 **Panel Field**
 One named quantity of an Asset Panel, which owns its values and its observed mask: a market capitalisation (numeric), a sector classification (categorical, integer codes over declared levels), a factor exposure tensor (tensor, with third-axis labels and optional groups). A Panel Field whose blanks were filled carries an observed mask saying which cells the fill touched. One whose policy refuses blanks carries none.
@@ -455,10 +452,10 @@ The user-facing extension point for a preference the library does not name: a Cu
 ### 4.4 Constraints
 
 **Universe Sets**
-A user-defined mapping of names to named groups (sectors, countries), groups, or unique-member groups, declaring every axis it carries: assets, the two factor axes, and features. The foundational input to nearly all Constraint Generation.
+A user-defined mapping of names to named groups (sectors, countries), groups, or unique-member groups, declaring every axis it carries: assets and the two factor axes. The foundational input to nearly all Constraint Generation.
 
 **Universe Prefix Grammar**
-The seven key prefixes a Universe Sets carries, and the rule each one declares. `xkey` names the asset universe and is the one mandatory axis; an `xkey`-prefixed key is a partition of it and has the length of the asset universe. `uxkey` prefixes a unique-entry variant, which names the `xkey`-prefixed partition it draws from. `tfkey` and `utfkey` mean the same on the Time-Series Factor Axis, and `cfkey` and `ucfkey` mean the same again on the Cross-Sectional Factor Axis; both axes are optional and are demanded at the point of need. `zkey` names the declared feature axis and carries no unique-entry sibling and no length rule, because nothing is partitioned over that axis. No prefix may be a prefix of another, which is what makes a key resolve to exactly one axis. A key matching none of them is a plain group: expanded by name and axis-blind.
+The six key prefixes a Universe Sets carries, and the rule each one declares. `xkey` names the asset universe and is the one mandatory axis; an `xkey`-prefixed key is a partition of it and has the length of the asset universe. `uxkey` prefixes a unique-entry variant, which names the `xkey`-prefixed partition it draws from. `tfkey` and `utfkey` mean the same on the Time-Series Factor Axis, and `cfkey` and `ucfkey` mean the same again on the Cross-Sectional Factor Axis; both axes are optional and are demanded at the point of need. No prefix may be a prefix of another, which is what makes a key resolve to exactly one axis. A key matching none of them is a plain group: expanded by name and axis-blind.
 
 **Time-Series Factor Axis**
 The factor universe a time-series regression is written on, declared under `tfkey`. Its names are the columns of a returns result's `F`, so a caller copies `rd.nf` into the dict and the axis agrees with the loadings by construction.
