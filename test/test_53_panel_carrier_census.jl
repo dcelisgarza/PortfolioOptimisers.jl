@@ -1,7 +1,7 @@
 #=
 The Asset Panel reaches every consumer that needs it.
 
-`#646` decided that the panel rides `rd.Z`, `rd.nz` and `rd.pnl`, stops at `ReturnsResult` and
+`#646` decided that the panel rides `panel_feature_matrix(rd.pnl)[2]`, `panel_feature_matrix(rd.pnl)[1]` and `rd.pnl`, stops at `ReturnsResult` and
 never travels onto `LowOrderPrior`. That decision rests on one claim: every consumer that needs
 the panel is passed the `rd` that carries it. `#666` audited the claim across the 83 call sites
 of the eleven verbs that can carry an `rd`, and found one place where it fails.
@@ -26,9 +26,8 @@ re-derive them:
     `ExposureConstraintEstimator`. Nothing that reads returns data can reach those slots, so
     their `linear_constraints` calls need no `rd` — the type bound is the guard, as the design
     rules ask.
-  - `PredictionReturnsResult` deliberately carries no `Z`, `nz` or `pnl`: `reconstruct_rd`
-    collapses the asset axis onto one synthetic asset, and a panel over the old assets would be
-    wrong.
+  - `PredictionReturnsResult` deliberately carries no `pnl`: `reconstruct_rd` collapses the
+    asset axis onto one synthetic asset, and a panel over the old assets would be wrong.
 =#
 @testset "Asset Panel carrier census: the names travel with the matrix" begin
     PO = PortfolioOptimisers
@@ -41,7 +40,7 @@ re-derive them:
     Z = abs.(randn(rng, na, nk))
     nz = ["z$i" for i in 1:nk]
     nx = ["A$i" for i in 1:na]
-    rd = ReturnsResult(; nx = nx, X = X, nz = nz, Z = Z)
+    rd = ReturnsResult(; nx = nx, X = X, pnl = feature_matrix_panel(nz, Z))
     w = fill(inv(na), na)
 
     # ---------------------------------------- 1. the invariant this census exists to pin
@@ -54,7 +53,7 @@ re-derive them:
         =#
         for z_src in (:prior, :data)
             Zs, nzs, z_diag = PO.feature_matrix_picker(rd, nothing, z_src)
-            @test Zs === rd.Z
+            @test Zs == panel_feature_matrix(rd.pnl)[2]
             @test nzs == nz
             @test z_diag === z_src
         end
@@ -63,7 +62,7 @@ re-derive them:
         # either way, because both carriers here are the same one.
         for z_src in (:prior, :data)
             Zs, nzs, _ = PO.feature_matrix_picker(rd, rd, z_src)
-            @test Zs === rd.Z
+            @test Zs == panel_feature_matrix(rd.pnl)[2]
             @test nzs == nz
         end
 
@@ -73,23 +72,25 @@ re-derive them:
         @test PO.returns_matrix_picker(rd, rd, :data) === rd.X
     end
 
-    @testset "A prior result supplies `Z` and carries no names" begin
+    @testset "A prior result supplies `Z` and names it positionally" begin
         #=
-        The documented limit, and the reason the refusal message names `LowOrderPrior`. A
-        producer runs inside `prior(pe, X, F; …)` with raw matrices, so names are
-        structurally unavailable to it. The message is only reachable from here, and after
-        `#666` it is true wherever it fires.
+        The documented limit. A producer runs inside `prior(pe, X, F; …)` with raw matrices,
+        so the names a *caller* knows are structurally unavailable to it. The panel it builds
+        therefore names its columns positionally, which is what a nameless `Z` offered a
+        selector before: an integer resolves, and a caller's own name does not.
         =#
-        pr = LowOrderPrior(; X = X, mu = vec(mean(X; dims = 1)), sigma = cov(X), Z = Z)
-        @test isnothing(PO.carrier_feature_names(pr))
+        pnz = ["_z$i" for i in 1:nk]
+        pr = LowOrderPrior(; X = X, mu = vec(mean(X; dims = 1)), sigma = cov(X),
+                           pnl = feature_matrix_panel(pnz, Z))
+        @test PO.carrier_asset_panel(pr) === pr.pnl
         Zs, nzs, z_diag = PO.feature_matrix_picker(pr, nothing, :prior)
-        @test Zs === Z
-        @test isnothing(nzs)
+        @test Zs == Z
+        @test nzs == pnz
         @test z_diag === :prior
 
         # With both carriers populated the selector picks between them, and the names follow
         # the pick rather than the argument position.
-        @test isnothing(PO.feature_matrix_picker(pr, rd, :prior)[2])
+        @test PO.feature_matrix_picker(pr, rd, :prior)[2] == pnz
         @test PO.feature_matrix_picker(pr, rd, :data)[2] == nz
 
         # A prior result that carries no `Z` at all still diagnoses `:neither`.
@@ -187,7 +188,8 @@ re-derive them:
                                               rd)
         # And the pre-`#666` state is the refusal this census closes: hand the inner method
         # the `nothing` the picker used to produce, and the name cannot resolve.
-        @test_throws PortfolioOptimisers.IsNothingError clusterise(cle, rd.X; Z = rd.Z,
+        @test_throws PortfolioOptimisers.IsNothingError clusterise(cle, rd.X;
+                                                                   Z = panel_feature_matrix(rd.pnl)[2],
                                                                    nz = nothing,
                                                                    z_src = :data)
     end

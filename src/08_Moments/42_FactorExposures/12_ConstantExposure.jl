@@ -85,10 +85,10 @@ Compute the constant Factor Exposure of a carrier.
 # Examples
 
 ```jldoctest
-julia> res = asset_panel([NumericPanelInput(; name = \"a\", vals = [1.0 2.0; 3.0 4.0])];
+julia> pnl = asset_panel([NumericPanelInput(; name = \"a\", vals = [1.0 2.0; 3.0 4.0])];
                          amsk = [true true; true false], emsk = [true true; true false]);
 
-julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = zeros(2, 2), res...);
+julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = zeros(2, 2), pnl = pnl);
 
 julia> factor_exposure(ConstantExposure(), rd)
 2×2 Matrix{Float64}:
@@ -105,7 +105,7 @@ julia> factor_exposure(ConstantExposure(), rd)
 function factor_exposure(::ConstantExposure, rd::ReturnsResult)::Matrix{<:Real}
     pnl = rd.pnl
     @argcheck(!isnothing(pnl),
-              IsNothingError("a constant Factor Exposure takes its shape from the active mask of an Asset Panel, and rd.pnl is nothing. Build the carrier with the `pnl`, `nz` and `Z` that asset_panel returns."))
+              IsNothingError("a constant Factor Exposure takes its shape from the active mask of an Asset Panel, and rd.pnl is nothing. Build the carrier with the `pnl` that asset_panel returns."))
     L = ones(float(eltype(rd.X)), size(pnl.amsk))
     exposure_active_fill!(L, pnl)
     return L

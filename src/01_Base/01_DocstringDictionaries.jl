@@ -232,7 +232,7 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :Xv => "`X`: Data vector `observations × 1`.",#
                                  :X_Xv => "`X`: Data matrix or vector.",#
                                  :Z => "`Z`: Feature matrix `assets × features` if `dims = 1`, `features × assets` when `dims = 2`. May also be a 3-D array of time-varying features, in which case the observation axis always leads: `observations × assets × features` if `dims = 1`, `observations × features × assets` when `dims = 2`.",#
-                                 :Z_prior => "`Z`: Derived feature matrix, canonically assets-major: `assets × features` when static, `observations × assets × features` when time-varying. Nameless — feature names live on the `ReturnsResult` or come from a `UniverseSets`. Populated only by a producer that declares the matrix to be features; a user's `rd.Z` never reaches a prior result.",#
+                                 :pnl_prior => "`pnl`: Derived `AssetPanel`, static (`assets`) or time-varying (`observations × assets`). Populated only by a producer that declares a matrix to be features; a user's `rd.pnl` never reaches a prior result.",#
                                  :ze => "`ze`: Feature matrix estimator: the producer that computes `Z` from the wrapped prior result.",#
                                  :plfe => "`pl`: Structure source, always an estimator so that it refits per fold: a network estimator (a graph, whose `sep` measures the separations `alg` grades) or a clustering estimator (a partition, for which `alg` is inert). A precomputed result is not accepted -- an Estimator does not hold a Result.",#
                                  :plfalg => "`alg`: Phylogeny feature algorithm: the rule turning the source's separations into feature values. Inert for a partition source, which has no separation to grade.",#
@@ -619,7 +619,6 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :pws_wd => "`wd`: Weight drift the held weights are computed under when the return series carries no drift of its own.",#
                                  # Data carrier fields.
                                  :ivpa_iv => "`ivpa`: Implied volatility risk premium adjustment, if a vector (assets × 1).",#
-                                 :nz_feat => "`nz`: Names or identifiers of feature columns (features × 1).",#
                                  # Prediction result fields.
                                  :pred_nx => "`nx`: Asset name vector.",#
                                  :pred_nf => "`nf`: Factor name vector.",#

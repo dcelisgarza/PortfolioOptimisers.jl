@@ -28,16 +28,16 @@ using Statistics, Dates
 
     # Twenty numeric Panel Fields, each with its observed-mask column, then the one-hot
     # industry block.
-    @test size(rd.Z) == (T, N, 43)
-    @test length(rd.nz) == 43
-    @test rd.nz[1] == "adj_close"
-    @test rd.nz[2] == "adj_close::observed"
-    @test rd.nz[(end - 2):end] ==
+    @test size(panel_feature_matrix(rd.pnl)[2]) == (T, N, 43)
+    @test length(panel_feature_matrix(rd.pnl)[1]) == 43
+    @test panel_feature_matrix(rd.pnl)[1][1] == "adj_close"
+    @test panel_feature_matrix(rd.pnl)[1][2] == "adj_close::observed"
+    @test panel_feature_matrix(rd.pnl)[1][(end - 2):end] ==
           ["industry=Real Estate", "industry=Software", "industry=Banks"]
-    @test all(isfinite, rd.Z)
+    @test all(isfinite, panel_feature_matrix(rd.pnl)[2])
     @test length(rd.pnl.pf) == 21
-    @test PortfolioOptimisers.panel_field(rd.pnl, "market_cap").kind == NumericPanelField()
-    @test PortfolioOptimisers.panel_field(rd.pnl, "industry").kind.levels ==
+    @test isa(PortfolioOptimisers.panel_field(rd.pnl, "market_cap"), NumericPanelField)
+    @test PortfolioOptimisers.panel_field(rd.pnl, "industry").levels ==
           ["Real Estate", "Software", "Banks"]
 
     @test size(tr.B) == (N, K)
@@ -67,7 +67,9 @@ end
     # A cell that is not active carries a `NaN` return and no observed value.
     @test all(isnan, res.rd.X[.!amsk])
     @test all(isfinite, res.rd.X[amsk])
-    obs = res.rd.Z[:, :, findfirst(==("market_cap::observed"), res.rd.nz)]
+    obs = panel_feature_matrix(res.rd.pnl)[2][:, :,
+                                              findfirst(==("market_cap::observed"),
+                                                        panel_feature_matrix(res.rd.pnl)[1])]
     @test all(iszero, obs[.!amsk])
     @test all(isone, obs[amsk])
 
@@ -129,8 +131,8 @@ end
 
     # `X` carries a `NaN` where an asset is not active, so equality is `isequal`.
     @test isequal(a.rd.X, b.rd.X)
-    @test a.rd.Z == b.rd.Z
-    @test a.rd.nz == b.rd.nz
+    @test panel_feature_matrix(a.rd.pnl)[2] == panel_feature_matrix(b.rd.pnl)[2]
+    @test panel_feature_matrix(a.rd.pnl)[1] == panel_feature_matrix(b.rd.pnl)[1]
     @test a.rd.ts == b.rd.ts
     @test a.rd.pnl.amsk == b.rd.pnl.amsk
     @test a.rd.pnl.emsk == b.rd.pnl.emsk
@@ -147,7 +149,9 @@ end
     rd = res.rd
     amsk = rd.pnl.amsk
     obs_share = name -> begin
-        col = rd.Z[:, :, findfirst(==(name * "::observed"), rd.nz)]
+        col = panel_feature_matrix(rd.pnl)[2][:, :,
+                                              findfirst(==(name * "::observed"),
+                                                        panel_feature_matrix(rd.pnl)[1])]
         return sum(col[amsk]) / sum(amsk)
     end
 
@@ -163,7 +167,9 @@ end
     # one, so the observed columns of the unnamed fields are the active mask itself.
     none = synthetic_asset_panel(; n_assets = 6, n_observations = 40, n_industries = 2,
                                  missing_ratio = 0.0, rng = StableRNG(56))
-    ncol = none.rd.Z[:, :, findfirst(==("sales_ttm::observed"), none.rd.nz)]
+    ncol = panel_feature_matrix(none.rd.pnl)[2][:, :,
+                                                findfirst(==("sales_ttm::observed"),
+                                                          panel_feature_matrix(none.rd.pnl)[1])]
     @test ncol == none.rd.pnl.amsk
 end
 
@@ -172,7 +178,9 @@ end
                                 missing_ratio = 0.0, rng = StableRNG(99))
     rd = res.rd
     amsk = rd.pnl.amsk
-    field = name -> rd.Z[:, :, findfirst(==(name), rd.nz)]
+    field = name -> panel_feature_matrix(rd.pnl)[2][:, :,
+                                                    findfirst(==(name),
+                                                              panel_feature_matrix(rd.pnl)[1])]
 
     # The market capitalisation is the price times the share count, on every active cell.
     mcap = field("market_cap")[amsk]

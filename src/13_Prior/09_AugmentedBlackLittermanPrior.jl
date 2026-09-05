@@ -553,7 +553,7 @@ function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int
     return LowOrderPrior(; X = posterior_X, o_X = X, mu = posterior_mu,
                          sigma = posterior_sigma, w = a_prior.w, ens = a_prior.ens,
                          kld = a_prior.kld, ow = a_prior.ow, rr = rr, fpr = fpr,
-                         Z = a_prior.Z)
+                         pnl = a_prior.pnl)
 end
 
 function factor_residual_config(::AugmentedBlackLittermanPrior)

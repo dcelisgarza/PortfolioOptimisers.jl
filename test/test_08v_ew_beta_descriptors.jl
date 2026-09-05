@@ -51,7 +51,7 @@ function ewb_hand_panel(X::AbstractMatrix{<:Real}, W::AbstractMatrix{<:Real};
                                     levels = sort(unique(vec(industry)))))
     end
     res = asset_panel(identity.(inputs); amsk = amsk, emsk = emsk)
-    return ReturnsResult(; nx = ["A" * string(i) for i in 1:size(X, 2)], X = X, res...)
+    return ReturnsResult(; nx = ["A" * string(i) for i in 1:size(X, 2)], X = X, pnl = res)
 end
 
 # Two matrices agree when they hold `NaN` in the same cells and are close everywhere else.
@@ -676,8 +676,7 @@ end
         end
     end
     rd = ReturnsResult(; nx = rd0.nx, X = Xg, nf = rd0.nf, F = rd0.F, nb = rd0.nb,
-                       B = rd0.B, ts = rd0.ts, iv = rd0.iv, nz = rd0.nz, Z = rd0.Z,
-                       pnl = rd0.pnl)
+                       B = rd0.B, ts = rd0.ts, iv = rd0.iv, pnl = rd0.pnl)
     ref = 0.01 .* randn(StableRNGs.StableRNG(7191), T)
     ref[7] = NaN
     ref[8] = NaN

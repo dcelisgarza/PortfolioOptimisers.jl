@@ -376,7 +376,7 @@ mean-reverting factors of `SYNTHETIC_STYLES`, and its exposures are the standard
 characteristics.
 
 The panel rides the carrier the same way a real one does: the returns are `rd.X`, the
-field values are `rd.Z`, their names are `rd.nz`, and the field index and the two masks
+field values are `panel_feature_matrix(rd.pnl)[2]`, their names are `panel_feature_matrix(rd.pnl)[1]`, and the field index and the two masks
 are `rd.pnl`. The default size (`n_assets = 500`, `n_observations = 2520`) allocates
 about half a gigabyte, so a test passes smaller dimensions.
 
@@ -424,7 +424,7 @@ function synthetic_asset_panel(; n_assets::Integer = 500, n_observations::Intege
     days = start_date:Dates.Day(1):(start_date + Dates.Day(2 * T + 7))
     rd = ReturnsResult(; nx = ["A" * lpad(i, 5, '0') for i in 1:N],
                        X = ifelse.(amsk, ret.X, NaN),
-                       ts = filter(d -> Dates.dayofweek(d) <= 5, days)[1:T], pnl...)
+                       ts = filter(d -> Dates.dayofweek(d) <= 5, days)[1:T], pnl = pnl)
     onehot = Float64[ind_idx[i] == k for i in 1:N, k in 1:n_industries]
     truth = (;
              nf = vcat("market", ["industry=" * l for l in levels],

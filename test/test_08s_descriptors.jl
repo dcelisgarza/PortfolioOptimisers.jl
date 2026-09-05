@@ -20,7 +20,7 @@ THREE CONVENTIONS SHAPE THE PROBES.
 
 The synthetic panel of `test06c_setup.jl` carries every Panel Field the named descriptors
 read, so the last testset runs all of them on it and checks each against the field arithmetic
-written out by hand from `rd.nz` and `rd.Z`.
+written out by hand from `panel_feature_matrix(rd.pnl)[1]` and `panel_feature_matrix(rd.pnl)[2]`.
 =#
 include(joinpath(@__DIR__, "test06c_setup.jl"))
 
@@ -33,15 +33,15 @@ function descriptor_hand_panel(fields::AbstractVector{<:Pair{String, <:AbstractM
               for (n, v) in fields]
     res = asset_panel(inputs; amsk = amsk, emsk = emsk)
     T, N = size(amsk)
-    return ReturnsResult(; nx = ["A" * string(i) for i in 1:N], X = zeros(T, N), res...)
+    return ReturnsResult(; nx = ["A" * string(i) for i in 1:N], X = zeros(T, N), pnl = res)
 end
 
 # Read one raw field and its observed mask back off the carrier by column name, so the
 # expected value of a probe never goes through the function under test.
 function descriptor_raw_field(rd::ReturnsResult, name::AbstractString)
-    Z = rd.Z
-    col = findfirst(==(name), rd.nz)
-    ocol = findfirst(==(name * "::observed"), rd.nz)
+    Z = panel_feature_matrix(rd.pnl)[2]
+    col = findfirst(==(name), panel_feature_matrix(rd.pnl)[1])
+    ocol = findfirst(==(name * "::observed"), panel_feature_matrix(rd.pnl)[1])
     V = Matrix{Float64}(Z[:, :, col])
     if !isnothing(ocol)
         V[iszero.(Z[:, :, ocol])] .= NaN
@@ -187,7 +187,7 @@ end
                        CategoricalPanelInput(; name = "sector", vals = ["a" "b"; "a" "b"],
                                              levels = ["a", "b"])]; amsk = trues(2, 2),
                       emsk = trues(2, 2))
-    rdc = ReturnsResult(; nx = ["A1", "A2"], X = zeros(2, 2), res...)
+    rdc = ReturnsResult(; nx = ["A1", "A2"], X = zeros(2, 2), pnl = res)
     @test_throws ArgumentError PortfolioOptimisers.panel_field_values(rdc, "sector")
     @test_throws ArgumentError descriptor(Passthrough(; field = "sector"), rdc)
     # A field that cannot blank carries no observed-mask column, and reads back whole.

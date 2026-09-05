@@ -294,7 +294,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Prepares the ReturnsResult for outer optimisation, applying the inner cluster weights `wi` to the returns matrix `rd.B`, and adjusting the independent variable matrices `rd.iv` and `rd.ivpa`, and the feature matrix `rd.Z`, accordingly.
+Prepares the ReturnsResult for outer optimisation, applying the inner cluster weights `wi` to the returns matrix `rd.B`, and adjusting the independent variable matrices `rd.iv` and `rd.ivpa`, and the Feature Matrix derived from `rd.pnl`, accordingly.
 
 !!! warning
 
@@ -346,9 +346,10 @@ function prepare_outer_rd(rd::ReturnsResult, wi::MatNum)
     # Features are intensive too. When the feature axis *is* the asset axis the collapse is
     # two-sided, so the synthetic universe keeps a square feature matrix whose names are the
     # synthetic asset names — which is what keeps `features_are_assets` true one level up.
-    sq = features_are_assets(rd.nz, rd.nx)
-    Z = collapse_feature_matrix(rd.Z, sq, wi)
-    nz = sq ? ["_$(i)" for i in 1:size(wi, 2)] : rd.nz
+    nzd, Zd = carrier_feature_matrix(rd)
+    sq = features_are_assets(nzd, rd.nx)
+    Z = collapse_feature_matrix(Zd, sq, wi)
+    nz = sq ? ["_$(i)" for i in 1:size(wi, 2)] : nzd
     X = Matrix{eltype(rd.X)}(undef, size(rd.X, 1), size(wi, 2))
     return nb, B, iv, ivpa, nz, Z, X
 end
@@ -405,7 +406,7 @@ Only a **time-varying** feature matrix needs this — a static one has no observ
 
 # Arguments
 
-  - `rd`: Original [`ReturnsResult`](@ref), whose `ts` is the clock `rd.Z`'s observation axis is parallel to.
+  - `rd`: Original [`ReturnsResult`](@ref), whose `ts` is the clock a time-varying `rd.pnl`'s observation axis is parallel to.
   - `pred`: Per-fold [`PredictionResult`](@ref) objects from one sub-portfolio.
 
 # Returns
@@ -421,7 +422,7 @@ Only a **time-varying** feature matrix needs this — a static one has no observ
 function fold_row_indices(rd::ReturnsResult, pred::VecPredRes)
     @argcheck(!isnothing(rd.ts),
               IsNothingError("a time-varying feature matrix (Z) has its observation axis parallel to the returns result's timestamps, so collapsing it onto a meta-optimiser's synthetic assets fold by fold needs `ts` to say which observation of Z each fold's observations are. Got ts => nothing. Supply timestamps, or pass a static assets × features Z, which has no observation axis to align."))
-    return [feature_row_indices(rd.Z, p.rd.ts, rd.ts) for p in pred]
+    return [feature_row_indices(rd.pnl, p.rd.ts, rd.ts) for p in pred]
 end
 """
     fold_weight_matrix(predictions, u::FullUniverse, f, na)
@@ -533,25 +534,29 @@ Scoping the row recovery to the shape that needs it is what keeps the clock requ
   - [`fold_row_indices`](@ref)
 """
 function fold_feature_anchors(rd::ReturnsResult, pred::VecPredRes)
-    return isa(rd.Z, Arr3Num) ? fold_row_indices(rd, pred) : [length(p.rd.X) for p in pred]
+    return if !isnothing(rd.pnl) && !panel_is_static(rd.pnl)
+        fold_row_indices(rd, pred)
+    else
+        [length(p.rd.X) for p in pred]
+    end
 end
 """
     rebuild_feature_matrix(rd, predictions, u, pred1)
 
 Recompute the outer problem's feature matrix at the cross-validation assembly seam.
 
-Per fold, this makes the *same* [`collapse_feature_matrix`](@ref) call [`prepare_outer_rd`](@ref) makes on the non-cross-validated path — same `sq`, same weight-matrix arity, same original `rd.Z` — and stacks the results down the observation axis. That shared call is the whole point: `cv` is execution control, so toggling it must not change what the outer optimiser measures.
+Per fold, this makes the *same* [`collapse_feature_matrix`](@ref) call [`prepare_outer_rd`](@ref) makes on the non-cross-validated path — same `sq`, same weight-matrix arity, same original panel — and stacks the results down the observation axis. That shared call is the whole point: `cv` is execution control, so toggling it must not change what the outer optimiser measures.
 
 # Arguments
 
-  - `rd`: Original [`ReturnsResult`](@ref), whose `nz`/`Z` are read unsliced.
+  - `rd`: Original [`ReturnsResult`](@ref), whose panel is derived unsliced.
   - `predictions`: Vector of [`MultiPeriodPredictionResult`](@ref) objects, one per sub-portfolio.
   - `u`: Sub-portfolio enumeration, a [`SubPortfolioUniverse`](@ref).
   - `pred1`: The first sub-portfolio's folds, from [`assert_fold_alignment`](@ref) — every sub-portfolio agrees with them, so they define the fold boundaries.
 
 # Returns
 
-  - `(nz, Z)`: The synthetic asset names when the feature axis *is* the asset axis, `rd.nz` otherwise; and the stacked `observations × synthetic assets × features` matrix. Both `nothing` when `rd` carries no feature matrix.
+  - `(nz, Z)`: The synthetic asset names when the feature axis *is* the asset axis, the panel's own derived names otherwise; and the stacked `observations × synthetic assets × features` matrix. Both `nothing` when `rd` carries no panel.
 
 # Related
 
@@ -563,15 +568,16 @@ Per fold, this makes the *same* [`collapse_feature_matrix`](@ref) call [`prepare
 """
 function rebuild_feature_matrix(rd::ReturnsResult, predictions::VecMPredRes,
                                 u::SubPortfolioUniverse, pred1::VecPredRes)
-    if isnothing(rd.Z)
+    nzd, Zd = carrier_feature_matrix(rd)
+    if isnothing(Zd)
         return nothing, nothing
     end
     N = length(predictions)
     na = size(rd.X, 2)
     # Identical to `prepare_outer_rd`: square indexes both trailing axes precisely because
     # they are the same axis, so there is no square branch here either.
-    sq = features_are_assets(rd.nz, rd.nx)
-    Zs = [fold_feature_matrix(rd.Z, sq, fold_weight_matrix(predictions, u, f, na), anchor)
+    sq = features_are_assets(nzd, rd.nx)
+    Zs = [fold_feature_matrix(Zd, sq, fold_weight_matrix(predictions, u, f, na), anchor)
           for (f, anchor) in enumerate(fold_feature_anchors(rd, pred1))]
     Z = Array{eltype(Zs[1])}(undef, sum(x -> size(x, 1), Zs), size(Zs[1], 2),
                              size(Zs[1], 3))
@@ -581,7 +587,7 @@ function rebuild_feature_matrix(rd::ReturnsResult, predictions::VecMPredRes,
         Z[(r + 1):(r + n), :, :] = Zf
         r += n
     end
-    return sq ? ["_$(i)" for i in 1:N] : rd.nz, Z
+    return sq ? ["_$(i)" for i in 1:N] : nzd, Z
 end
 """
     rebuild_returns_result(rd, predictions, u)
@@ -596,7 +602,7 @@ Combines individual fold predictions from `predictions` into a new `ReturnsResul
 
 ## The feature matrix
 
-The folds carry none. Instead, the collapse onto the synthetic universe is **recomputed here** from the original, unsliced `rd.Z`, using the same [`collapse_feature_matrix`](@ref) call [`prepare_outer_rd`](@ref) makes on the non-cross-validated path — with `sq` from [`features_are_assets`](@ref) flowing through unchanged, and the per-fold `assets × sub-portfolios` weight matrix assembled from `pred[f].res.w` (see [`rebuild_feature_matrix`](@ref)). The fold results stack down the observation axis, giving the `observations × assets × features` shape the time-varying carrier takes, and the outer optimiser's default [`LastObservation`](@ref) reduces them to the most recent fold's collapse.
+The folds carry none. Instead, the collapse onto the synthetic universe is **recomputed here** from the Feature Matrix derived from the original, unsliced `rd.pnl`, using the same [`collapse_feature_matrix`](@ref) call [`prepare_outer_rd`](@ref) makes on the non-cross-validated path — with `sq` from [`features_are_assets`](@ref) flowing through unchanged, and the per-fold `assets × sub-portfolios` weight matrix assembled from `pred[f].res.w` (see [`rebuild_feature_matrix`](@ref)). The fold results stack down the observation axis, giving the `observations × assets × features` shape the time-varying carrier takes, and the outer optimiser's default [`LastObservation`](@ref) reduces them to the most recent fold's collapse.
 
 The inner solves are untouched: each still sees its own cluster-sliced feature matrix. What the recompute buys is that `cv`, which is execution control, no longer changes what the outer problem measures — and it closes the one intersection where the matrix used to be dropped altogether, a square feature matrix under [`NestedClustered`](@ref), whose folds see cluster-sliced returns and so could never agree on a feature axis to stack.
 
@@ -665,7 +671,8 @@ function rebuild_returns_result(rd::ReturnsResult, predictions::VecMPredRes,
     end
     iv = iv_flag ? reshape(iv, :, N) : nothing
     return ReturnsResult(; nx = ["_$i" for i in 1:N], X = X, nf = rd1.nf, F = rd1.F,
-                         nb = nb, B = B, ts = rd1.ts, iv = iv, ivpa = ivpa, nz = nz, Z = Z)
+                         nb = nb, B = B, ts = rd1.ts, iv = iv, ivpa = ivpa,
+                         pnl = collapsed_asset_panel(nz, Z))
 end
 """
     sub_portfolio_predictions(::Type{T}, opti, u, rd, cv, ex) where {T}
@@ -766,7 +773,8 @@ function predict_outer_returns(::Option{<:OptimisationCrossValidation}, ::Any,
                                    sub_portfolio_view(u, fees, i))
     end
     return ReturnsResult(; nx = ["_$i" for i in 1:size(wi, 2)], X = X, nf = rd.nf, F = rd.F,
-                         nb = nb, B = B, ts = rd.ts, iv = iv, ivpa = ivpa, nz = nz, Z = Z)
+                         nb = nb, B = B, ts = rd.ts, iv = iv, ivpa = ivpa,
+                         pnl = collapsed_asset_panel(nz, Z))
 end
 function predict_outer_returns(cv::OptimisationCrossValidation{<:NonCombOptCV}, opt,
                                u::SubPortfolioUniverse, rd::ReturnsResult,

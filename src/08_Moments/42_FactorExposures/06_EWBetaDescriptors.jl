@@ -667,8 +667,8 @@ function ew_beta_output(group::AbstractString, de::EWBeta, rd::ReturnsResult,
                         Ba::AbstractMatrix{<:Real}, Vm::AbstractVector{<:Real},
                         Xa::AbstractMatrix{<:Real},
                         rma::AbstractVector{<:Real})::Matrix{<:Real}
-    W = Matrix{float(eltype(rd.Z))}(panel_field_values(rd, de.mcap))
-    L = cross_sectional_groups(descriptor_asset_panel(rd), rd.Z, group)
+    W = Matrix{Float64}(panel_field_values(rd, de.mcap))
+    L = cross_sectional_groups(descriptor_asset_panel(rd), group)
     Vr = ew_beta_residual_variance(Xa, rma, Ba, de.decay, de.min_obs)
     en = 2 * decay_half_life(de.decay)
     agg_obs = de.agg_obs
@@ -724,11 +724,11 @@ An asset whose return is missing at an observation holds the beta it last carrie
 # Examples
 
 ```jldoctest
-julia> res = asset_panel([NumericPanelInput(; name = \"market_cap\",
+julia> pnl = asset_panel([NumericPanelInput(; name = \"market_cap\",
                                             vals = [1.0 2.0; 3.0 4.0; 5.0 6.0])];
                          amsk = trues(3, 2), emsk = trues(3, 2));
 
-julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = [0.1 0.2; -0.1 0.0; 0.05 0.05], res...);
+julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = [0.1 0.2; -0.1 0.0; 0.05 0.05], pnl = pnl);
 
 julia> descriptor(EWMarketBeta(; half_life = 1), rd)
 3×2 Matrix{Float64}:
@@ -1049,11 +1049,11 @@ Compute an exponentially weighted macro sensitivity Descriptor from a carrier an
 # Examples
 
 ```jldoctest
-julia> res = asset_panel([NumericPanelInput(; name = \"market_cap\",
+julia> pnl = asset_panel([NumericPanelInput(; name = \"market_cap\",
                                             vals = [1.0 2.0; 3.0 4.0; 5.0 6.0])];
                          amsk = trues(3, 2), emsk = trues(3, 2));
 
-julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = [0.1 0.2; -0.1 0.0; 0.05 0.05], res...);
+julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = [0.1 0.2; -0.1 0.0; 0.05 0.05], pnl = pnl);
 
 julia> descriptor(EWMacroSensitivity(; half_life = 1), rd; ref = [0.02, -0.01, 0.03])
 3×2 Matrix{Float64}:
@@ -1285,11 +1285,11 @@ An asset whose return is missing at an observation advances no co-moment of its 
 # Examples
 
 ```jldoctest
-julia> res = asset_panel([NumericPanelInput(; name = \"market_cap\",
+julia> pnl = asset_panel([NumericPanelInput(; name = \"market_cap\",
                                             vals = [1.0 2.0; 3.0 4.0; 5.0 6.0])];
                          amsk = trues(3, 2), emsk = trues(3, 2));
 
-julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = [0.1 0.2; -0.1 0.0; 0.05 0.05], res...);
+julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = [0.1 0.2; -0.1 0.0; 0.05 0.05], pnl = pnl);
 
 julia> descriptor(EWDownsideBeta(; half_life = 1), rd)
 3×2 Matrix{Float64}:

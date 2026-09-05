@@ -6,12 +6,12 @@
 [provenance]
 julia = "1.12.7"
 julia_syntax = "1.0.2"
-commit = "91f61eb656"
+commit = "77a2ae3eea"
 
 [file]
 "ext/PortfolioOptimisersImputeExt.jl" = { code = 6, doc = 0, comment = 4, blank = 3, total = 13 }
 "ext/PortfolioOptimisersPlotsExt.jl" = { code = 1985, doc = 0, comment = 131, blank = 41, total = 2157 }
-"src/01_Base/01_DocstringDictionaries.jl" = { code = 1096, doc = 113, comment = 122, blank = 43, total = 1374 }
+"src/01_Base/01_DocstringDictionaries.jl" = { code = 1095, doc = 113, comment = 122, blank = 43, total = 1373 }
 "src/01_Base/02_TypeRoots.jl" = { code = 14, doc = 190, comment = 0, blank = 85, total = 289 }
 "src/01_Base/03_PrettyShow.jl" = { code = 117, doc = 138, comment = 0, blank = 76, total = 331 }
 "src/01_Base/04_ScopedConfig.jl" = { code = 163, doc = 491, comment = 2, blank = 214, total = 870 }
@@ -26,10 +26,10 @@ commit = "91f61eb656"
 "src/01_Base/13_KappaLog.jl" = { code = 3, doc = 36, comment = 0, blank = 18, total = 57 }
 "src/01_Base/14_PartialFit.jl" = { code = 66, doc = 204, comment = 0, blank = 114, total = 384 }
 "src/02_Tools.jl" = { code = 808, doc = 2044, comment = 46, blank = 867, total = 3765 }
-"src/03_InputData/01_AssetPanel.jl" = { code = 175, doc = 411, comment = 0, blank = 190, total = 776 }
-"src/03_InputData/02_AssetPanelBuilder.jl" = { code = 330, doc = 697, comment = 2, blank = 316, total = 1345 }
-"src/03_InputData/03_Preprocessing.jl" = { code = 726, doc = 1331, comment = 11, blank = 536, total = 2604 }
-"src/03_InputData/04_CrossSectionalTransforms.jl" = { code = 463, doc = 709, comment = 0, blank = 334, total = 1506 }
+"src/03_InputData/01_AssetPanel.jl" = { code = 348, doc = 650, comment = 0, blank = 312, total = 1310 }
+"src/03_InputData/02_AssetPanelBuilder.jl" = { code = 265, doc = 567, comment = 0, blank = 251, total = 1083 }
+"src/03_InputData/03_Preprocessing.jl" = { code = 689, doc = 1320, comment = 11, blank = 551, total = 2571 }
+"src/03_InputData/04_CrossSectionalTransforms.jl" = { code = 464, doc = 708, comment = 0, blank = 334, total = 1506 }
 "src/04_PosdefMatrix.jl" = { code = 44, doc = 155, comment = 0, blank = 73, total = 272 }
 "src/05_Denoise.jl" = { code = 132, doc = 535, comment = 34, blank = 196, total = 897 }
 "src/06_Detone.jl" = { code = 46, doc = 188, comment = 0, blank = 81, total = 315 }
@@ -54,7 +54,7 @@ commit = "91f61eb656"
 "src/08_Moments/18_ExcessExpectedReturns.jl" = { code = 19, doc = 75, comment = 0, blank = 38, total = 132 }
 "src/08_Moments/19_Coskewness.jl" = { code = 79, doc = 305, comment = 0, blank = 125, total = 509 }
 "src/08_Moments/20_Cokurtosis.jl" = { code = 59, doc = 249, comment = 0, blank = 105, total = 413 }
-"src/08_Moments/21_Base_Regression.jl" = { code = 167, doc = 749, comment = 7, blank = 329, total = 1252 }
+"src/08_Moments/21_Base_Regression.jl" = { code = 168, doc = 758, comment = 7, blank = 333, total = 1266 }
 "src/08_Moments/22_StepwiseRegression.jl" = { code = 227, doc = 311, comment = 0, blank = 128, total = 666 }
 "src/08_Moments/23_DimensionReductionRegression.jl" = { code = 98, doc = 287, comment = 0, blank = 124, total = 509 }
 "src/08_Moments/24_ImpliedVolatility.jl" = { code = 113, doc = 492, comment = 14, blank = 193, total = 812 }
@@ -74,22 +74,22 @@ commit = "91f61eb656"
 "src/08_Moments/38_CrossSectionalRegression.jl" = { code = 198, doc = 504, comment = 0, blank = 210, total = 912 }
 "src/08_Moments/39_CrossSectionalWeights.jl" = { code = 138, doc = 366, comment = 0, blank = 166, total = 670 }
 "src/08_Moments/40_HigherMomentPartialFit.jl" = { code = 145, doc = 526, comment = 0, blank = 275, total = 946 }
-"src/08_Moments/41_CrossSectionalFactorModel.jl" = { code = 175, doc = 342, comment = 7, blank = 130, total = 654 }
+"src/08_Moments/41_CrossSectionalFactorModel.jl" = { code = 190, doc = 349, comment = 7, blank = 131, total = 677 }
 "src/08_Moments/42_FactorExposures/01_Base_Descriptor.jl" = { code = 143, doc = 278, comment = 0, blank = 129, total = 550 }
 "src/08_Moments/42_FactorExposures/02_PanelFieldDescriptors.jl" = { code = 237, doc = 830, comment = 0, blank = 346, total = 1413 }
 "src/08_Moments/42_FactorExposures/03_LagDescriptors.jl" = { code = 109, doc = 324, comment = 0, blank = 132, total = 565 }
 "src/08_Moments/42_FactorExposures/04_EWMeanDescriptors.jl" = { code = 200, doc = 461, comment = 0, blank = 179, total = 840 }
 "src/08_Moments/42_FactorExposures/05_EWVolatilityDescriptors.jl" = { code = 109, doc = 320, comment = 0, blank = 125, total = 554 }
 "src/08_Moments/42_FactorExposures/06_EWBetaDescriptors.jl" = { code = 383, doc = 681, comment = 0, blank = 253, total = 1317 }
-"src/08_Moments/42_FactorExposures/07_RollingDescriptors.jl" = { code = 112, doc = 274, comment = 0, blank = 115, total = 501 }
+"src/08_Moments/42_FactorExposures/07_RollingDescriptors.jl" = { code = 112, doc = 275, comment = 0, blank = 115, total = 502 }
 "src/08_Moments/42_FactorExposures/08_Base_Exposure.jl" = { code = 55, doc = 148, comment = 0, blank = 82, total = 285 }
 "src/08_Moments/42_FactorExposures/09_CompositeExposure.jl" = { code = 107, doc = 214, comment = 0, blank = 79, total = 400 }
 "src/08_Moments/42_FactorExposures/10_DerivedExposure.jl" = { code = 48, doc = 97, comment = 0, blank = 31, total = 176 }
-"src/08_Moments/42_FactorExposures/11_OneHotExposure.jl" = { code = 71, doc = 145, comment = 0, blank = 71, total = 287 }
+"src/08_Moments/42_FactorExposures/11_OneHotExposure.jl" = { code = 75, doc = 145, comment = 0, blank = 71, total = 291 }
 "src/08_Moments/42_FactorExposures/12_ConstantExposure.jl" = { code = 19, doc = 62, comment = 0, blank = 33, total = 114 }
 "src/08_Moments/42_FactorExposures/13_ExposureNeutralisation.jl" = { code = 80, doc = 90, comment = 0, blank = 47, total = 217 }
-"src/08_Moments/43_FactorFamilyBasis.jl" = { code = 203, doc = 292, comment = 0, blank = 140, total = 635 }
-"src/08_Moments/44_FactorFamilyBasisTransforms.jl" = { code = 188, doc = 220, comment = 0, blank = 139, total = 547 }
+"src/08_Moments/43_FactorFamilyBasis.jl" = { code = 202, doc = 292, comment = 0, blank = 140, total = 634 }
+"src/08_Moments/44_FactorFamilyBasisTransforms.jl" = { code = 189, doc = 220, comment = 0, blank = 139, total = 548 }
 "src/09_Distance/01_Base_Distance.jl" = { code = 24, doc = 222, comment = 0, blank = 89, total = 335 }
 "src/09_Distance/02_Distance.jl" = { code = 158, doc = 350, comment = 0, blank = 157, total = 665 }
 "src/09_Distance/03_DistanceDistance.jl" = { code = 37, doc = 132, comment = 0, blank = 58, total = 227 }
@@ -128,7 +128,7 @@ commit = "91f61eb656"
 "src/12_ConstraintGeneration/06_AssetSetsMatrix.jl" = { code = 297, doc = 767, comment = 10, blank = 365, total = 1439 }
 "src/12_ConstraintGeneration/07_ThresholdConstraintGeneration.jl" = { code = 50, doc = 274, comment = 0, blank = 126, total = 450 }
 "src/12_ConstraintGeneration/08_ExposureConstraintGeneration.jl" = { code = 107, doc = 335, comment = 0, blank = 169, total = 611 }
-"src/12_ConstraintGeneration/09_CrossSectionalFactorAxis.jl" = { code = 52, doc = 79, comment = 0, blank = 41, total = 172 }
+"src/12_ConstraintGeneration/09_CrossSectionalFactorAxis.jl" = { code = 55, doc = 79, comment = 0, blank = 41, total = 175 }
 "src/13_Prior/01_Base_Prior.jl" = { code = 377, doc = 1101, comment = 48, blank = 445, total = 1971 }
 "src/13_Prior/02_EmpiricalPrior.jl" = { code = 42, doc = 156, comment = 2, blank = 60, total = 260 }
 "src/13_Prior/03_FactorPrior.jl" = { code = 75, doc = 264, comment = 22, blank = 89, total = 450 }
@@ -143,7 +143,7 @@ commit = "91f61eb656"
 "src/13_Prior/12_EntropyPoolingPrior.jl" = { code = 1152, doc = 1852, comment = 67, blank = 675, total = 3746 }
 "src/13_Prior/13_OpinionPoolingPrior.jl" = { code = 93, doc = 317, comment = 16, blank = 118, total = 544 }
 "src/13_Prior/14_HighOrderFactorPriorEstimator.jl" = { code = 172, doc = 271, comment = 20, blank = 82, total = 545 }
-"src/13_Prior/15_FeaturePrior.jl" = { code = 140, doc = 476, comment = 27, blank = 211, total = 854 }
+"src/13_Prior/15_FeaturePrior.jl" = { code = 141, doc = 476, comment = 31, blank = 211, total = 859 }
 "src/14_UncertaintySets/01_Base_UncertaintySets.jl" = { code = 247, doc = 845, comment = 5, blank = 407, total = 1504 }
 "src/14_UncertaintySets/02_DeltaUncertaintySets.jl" = { code = 42, doc = 249, comment = 0, blank = 93, total = 384 }
 "src/14_UncertaintySets/03_NormalUncertaintySets.jl" = { code = 205, doc = 731, comment = 4, blank = 254, total = 1194 }
@@ -222,7 +222,7 @@ commit = "91f61eb656"
 "src/20_Optimisation/13_NearOptimalCentering.jl" = { code = 606, doc = 594, comment = 15, blank = 198, total = 1413 }
 "src/20_Optimisation/14_RiskBudgeting.jl" = { code = 299, doc = 432, comment = 12, blank = 170, total = 913 }
 "src/20_Optimisation/15_RelaxedRiskBudgeting.jl" = { code = 218, doc = 282, comment = 7, blank = 116, total = 623 }
-"src/20_Optimisation/16_Base_MetaOptimisation.jl" = { code = 252, doc = 349, comment = 17, blank = 167, total = 785 }
+"src/20_Optimisation/16_Base_MetaOptimisation.jl" = { code = 260, doc = 349, comment = 17, blank = 167, total = 793 }
 "src/20_Optimisation/17_NestedClustered.jl" = { code = 380, doc = 326, comment = 5, blank = 118, total = 829 }
 "src/20_Optimisation/18_Stacking.jl" = { code = 252, doc = 269, comment = 2, blank = 86, total = 609 }
 "src/20_Optimisation/19_SubsetResampling.jl" = { code = 256, doc = 288, comment = 0, blank = 85, total = 629 }
@@ -253,7 +253,7 @@ commit = "91f61eb656"
 "src/20_Optimisation/23_GreedyFiniteAllocation.jl" = { code = 114, doc = 180, comment = 8, blank = 73, total = 375 }
 "src/20_Optimisation/24_RiskMeasureCompatibility.jl" = { code = 42, doc = 61, comment = 4, blank = 20, total = 127 }
 "src/21_ExpectedReturns.jl" = { code = 272, doc = 827, comment = 24, blank = 289, total = 1412 }
-"src/22_Preselection.jl" = { code = 313, doc = 762, comment = 0, blank = 365, total = 1440 }
+"src/22_Preselection.jl" = { code = 314, doc = 762, comment = 0, blank = 365, total = 1441 }
 "src/23_Pipeline/01_Base_Pipeline.jl" = { code = 154, doc = 348, comment = 0, blank = 152, total = 654 }
 "src/23_Pipeline/02_StepExecution.jl" = { code = 208, doc = 197, comment = 2, blank = 103, total = 510 }
 "src/23_Pipeline/03_Pipeline.jl" = { code = 422, doc = 399, comment = 6, blank = 215, total = 1042 }

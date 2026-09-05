@@ -60,7 +60,7 @@ end
 """
     one_hot_field(rd::ReturnsResult, name::AbstractString) -> PanelField
 
-Look the categorical Panel Field a [`OneHotExposure`](@ref) expands up in the field index of a carrier.
+Look the categorical Panel Field a [`OneHotExposure`](@ref) expands up on a carrier's Asset Panel.
 
 The lookup and its two refusals are written once, because the verb and the factor names both need the field.
 
@@ -85,13 +85,15 @@ The lookup and its two refusals are written once, because the verb and the facto
   - [`panel_field`](@ref)
   - [`CategoricalPanelField`](@ref)
 """
-function one_hot_field(rd::ReturnsResult, name::AbstractString)::PanelField
+function one_hot_field(rd::ReturnsResult, name::AbstractString)::CategoricalPanelField
     pnl = rd.pnl
     @argcheck(!isnothing(pnl),
-              IsNothingError("a one-hot Factor Exposure reads its Panel Field through the field index of an Asset Panel, and rd.pnl is nothing. Build the carrier with the `pnl`, `nz` and `Z` that asset_panel returns."))
+              IsNothingError("a one-hot Factor Exposure reads its Panel Field off an Asset Panel, and rd.pnl is nothing. Build the carrier with the `pnl` that asset_panel returns."))
     f = panel_field(pnl, name)
-    @argcheck(isa(f.kind, CategoricalPanelField),
-              ArgumentError("a one-hot Factor Exposure expands one level per factor, so the Panel Field \"$name\" must be a CategoricalPanelField, got a $(nameof(typeof(f.kind)))"))
+    @argcheck(isa(f, CategoricalPanelField),
+              ArgumentError("a one-hot Factor Exposure expands one level per factor, so the Panel Field \"$name\" must be a CategoricalPanelField, got a $(nameof(typeof(f)))"))
+    @argcheck(ndims(f.codes) == 2,
+              DimensionMismatch("a one-hot Factor Exposure is read per observation and asset, so the Panel Field \"$name\" must be time-varying; this Asset Panel is static"))
     return f
 end
 """
@@ -117,11 +119,11 @@ The names are the column labels the Panel Field contributes to the feature axis,
 # Examples
 
 ```jldoctest
-julia> res = asset_panel([CategoricalPanelInput(; name = \"sector\",
+julia> pnl = asset_panel([CategoricalPanelInput(; name = \"sector\",
                                                 vals = [\"tech\" \"banks\"; \"tech\" \"tech\"])];
                          amsk = trues(2, 2), emsk = trues(2, 2));
 
-julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = zeros(2, 2), res...);
+julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = zeros(2, 2), pnl = pnl);
 
 julia> PortfolioOptimisers.one_hot_exposure_names(OneHotExposure(; field = \"sector\",
                                                                  family = \"sector\"), rd)
@@ -138,7 +140,7 @@ julia> PortfolioOptimisers.one_hot_exposure_names(OneHotExposure(; field = \"sec
 """
 function one_hot_exposure_names(xe::OneHotExposure, rd::ReturnsResult)::Vector{String}
     f = one_hot_field(rd, xe.field)
-    return panel_field_labels(f.kind, f.name)
+    return panel_field_labels(f)
 end
 """
     one_hot_level_fill!(B::AbstractArray{<:Real, 3}) -> nothing
@@ -204,15 +206,14 @@ A blank never reaches a carrier: the builder resolves it to a fill value and rec
   - [`one_hot_level_fill!`](@ref)
   - [`factor_exposure`](@ref)
 """
-function one_hot_observed_fill!(::AbstractArray{<:Real, 3}, ::Arr3Num, ::Nothing)::Nothing
+function one_hot_observed_fill!(::AbstractArray{<:Real, 3}, ::Nothing)::Nothing
     return nothing
 end
-function one_hot_observed_fill!(B::AbstractArray{<:Real, 3}, Z::Arr3Num,
-                                ocols::VecInt)::Nothing
-    O = view(Z, :, :, ocols[1])
+function one_hot_observed_fill!(B::AbstractArray{<:Real, 3},
+                                omsk::AbstractMatrix{Bool})::Nothing
     Tf = eltype(B)
     for t in axes(B, 1), i in axes(B, 2)
-        if iszero(O[t, i])
+        if !omsk[t, i]
             for l in axes(B, 3)
                 B[t, i, l] = Tf(NaN)
             end
@@ -227,7 +228,7 @@ Compute the Factor Exposure of a categorical Panel Field, one factor per level.
 
 # Algorithm
 
- 1. Look the Panel Field up, and copy its one-hot block out of `rd.Z`.
+ 1. Look the Panel Field up, and expand its codes into a one-hot block.
  2. Write `NaN` across the levels of every cell the Panel Field does not observe.
  3. Write `NaN` across the levels of every cell that sets no level.
  4. Write `NaN` across the levels of every cell the active mask does not activate.
@@ -248,11 +249,11 @@ Compute the Factor Exposure of a categorical Panel Field, one factor per level.
 # Examples
 
 ```jldoctest
-julia> res = asset_panel([CategoricalPanelInput(; name = \"sector\",
+julia> pnl = asset_panel([CategoricalPanelInput(; name = \"sector\",
                                                 vals = [\"tech\" \"banks\"; \"tech\" \"tech\"])];
                          amsk = [true true; true false], emsk = [true true; true false]);
 
-julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = zeros(2, 2), res...);
+julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = zeros(2, 2), pnl = pnl);
 
 julia> factor_exposure(OneHotExposure(; field = \"sector\", family = \"sector\"), rd)
 2×2×2 Array{Float64, 3}:
@@ -275,10 +276,13 @@ julia> factor_exposure(OneHotExposure(; field = \"sector\", family = \"sector\")
 """
 function factor_exposure(xe::OneHotExposure, rd::ReturnsResult)::Array{<:Real, 3}
     f = one_hot_field(rd, xe.field)
-    Z = rd.Z
-    Tf = float(eltype(Z))
-    B = Array{Tf, 3}(view(Z, :, :, f.cols))
-    one_hot_observed_fill!(B, Z, f.ocols)
+    codes = f.codes
+    Tf = Float64
+    B = zeros(Tf, size(codes, 1), size(codes, 2), length(f.levels))
+    for i in CartesianIndices(codes)
+        B[i, codes[i]] = one(Tf)
+    end
+    one_hot_observed_fill!(B, f.omsk)
     one_hot_level_fill!(B)
     exposure_active_fill!(B, rd.pnl)
     return B

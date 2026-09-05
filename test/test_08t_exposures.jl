@@ -56,7 +56,7 @@ function exposure_hand_panel(fields::AbstractVector{<:Pair{String, <:AbstractMat
     end
     res = asset_panel(identity.(inputs); amsk = amsk, emsk = emsk)
     T, N = size(amsk)
-    return ReturnsResult(; nx = ["A" * string(i) for i in 1:N], X = zeros(T, N), res...)
+    return ReturnsResult(; nx = ["A" * string(i) for i in 1:N], X = zeros(T, N), pnl = res)
 end
 
 @testset "Exposure constructors and their refusals" begin
@@ -242,7 +242,7 @@ end
         ct = CrossSectionalStandardiser(; min_group_size = 2)
         xe = CompositeExposure(; descriptors = [Passthrough(; field = "a")],
                                outlier = nothing, scoring = ct, group = "sector")
-        G = cross_sectional_groups(rdg.pnl, rdg.Z, "sector")
+        G = cross_sectional_groups(rdg.pnl, "sector")
         expected = cross_sectional_transform(ct,
                                              PortfolioOptimisers.panel_field_values(rdg,
                                                                                     "a");
@@ -296,13 +296,16 @@ end
     @testset "An inactive cell is NaN across every level" begin
         @test all(isnan, factor_exposure(xe, rd)[2, 2, :])
     end
-    @testset "An asset that sets no level is NaN across every level" begin
+    @testset "An asset cannot set no level" begin
+        # A categorical Panel Field stores one code per cell, so the level-less cell the
+        # one-hot layout could express is now unrepresentable: the code is refused rather
+        # than read back as a row of zeros.
         rdb = exposure_hand_panel(["a" => [1.0 2.0; 3.0 4.0]];
                                   sectors = ["tech" "banks"; "tech" "tech"])
-        Z = Array{Float64, 3}(rdb.Z)
-        Z[1, 1, :] .= 0.0
-        rdz = ReturnsResult(; nx = rdb.nx, X = rdb.X, nz = rdb.nz, Z = Z, pnl = rdb.pnl)
-        @test all(isnan, factor_exposure(xe, rdz)[1, 1, :])
+        f = PortfolioOptimisers.panel_field(rdb.pnl, "sector")
+        @test all(c -> 1 <= c <= length(f.levels), f.codes)
+        @test_throws DomainError CategoricalPanelField(; name = "sector", levels = f.levels,
+                                                       codes = zeros(Int, size(f.codes)))
     end
     @testset "A level the fill wrote is NaN, not a classification the asset carried" begin
         # The field can blank, so it earns an observed-mask column. The forward fill
@@ -367,7 +370,7 @@ end
     end
     @testset "The one-hot block is the classification, and the constant is the ones" begin
         Lo = factor_exposure(OneHotExposure(; field = "industry", family = "industry"), rd)
-        G = cross_sectional_groups(rd.pnl, rd.Z, "industry")
+        G = cross_sectional_groups(rd.pnl, "industry")
         amsk = rd.pnl.amsk
         @test size(Lo) == (size(amsk)..., 4)
         for k in CartesianIndices(amsk)

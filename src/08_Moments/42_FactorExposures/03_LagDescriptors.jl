@@ -296,13 +296,13 @@ Every method then writes `NaN` into the inactive cells.
 # Examples
 
 ```jldoctest
-julia> res = asset_panel([NumericPanelInput(; name = \"sales_ttm\",
+julia> pnl = asset_panel([NumericPanelInput(; name = \"sales_ttm\",
                                             vals = [100.0 50.0; 110.0 40.0; 121.0 0.0]),
                           NumericPanelInput(; name = \"market_cap\",
                                             vals = [1000.0 500.0; 1000.0 500.0; 1000.0 0.0])];
                          amsk = trues(3, 2), emsk = trues(3, 2));
 
-julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = zeros(3, 2), res...);
+julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = zeros(3, 2), pnl = pnl);
 
 julia> descriptor(GrowthRate(; field = \"sales_ttm\", lag = 1), rd)
 3×2 Matrix{Float64}:

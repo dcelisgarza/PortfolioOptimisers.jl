@@ -82,13 +82,15 @@ struct UnviewableReturnsResult <: PO.AbstractReturnsResult end
     # the values and not only in the shape.
     Z3 = reshape(Float64.(1:(T * N * K)), T, N, K) ./ 1000
 
-    rd_sq = ReturnsResult(; nx = nx, X = X, nf = nf, F = F, ts = ts, nz = nx, Z = Zsq)
+    rd_sq = ReturnsResult(; nx = nx, X = X, nf = nf, F = F, ts = ts,
+                          pnl = feature_matrix_panel(nx, Zsq))
     # The same numbers, but the names no longer claim the features are the assets. This is
     # the *only* difference between `rd_sq` and `rd_rect`, which is what makes the pair a
     # controlled experiment on the feature-axis slice.
     rd_rect = ReturnsResult(; nx = nx, X = X, nf = nf, F = F, ts = ts,
-                            nz = ["z$i" for i in 1:N], Z = Zsq)
-    rd_3d = ReturnsResult(; nx = nx, X = X, nf = nf, F = F, ts = ts, nz = nf, Z = Z3)
+                            pnl = feature_matrix_panel(["z$i" for i in 1:N], Zsq))
+    rd_3d = ReturnsResult(; nx = nx, X = X, nf = nf, F = F, ts = ts,
+                          pnl = feature_matrix_panel(nf, Z3))
 
     @testset "NestedClustered slices both axes of a square feature matrix" begin
         # The inner optimiser runs per cluster on a column subset. When the features are
@@ -113,8 +115,8 @@ struct UnviewableReturnsResult <: PO.AbstractReturnsResult end
         # The outer problem is the full universe, so both runs cluster identically: the
         # divergence below is caused by the feature-axis slice and by nothing else.
         @test assignments(res_re.clr) == idx
-        @test ro_sq.seen[1] === Zsq
-        @test ro_re.seen[1] === Zsq
+        @test ro_sq.seen[1] == Zsq
+        @test ro_re.seen[1] == Zsq
 
         # Correct: both axes move with the cluster.
         @test [size(z) for z in ri_sq.seen] == [(length(cl), length(cl)) for cl in cls]
@@ -189,7 +191,7 @@ struct UnviewableReturnsResult <: PO.AbstractReturnsResult end
                       opto = plain_hrp(), ex = seq)
         res = optimise(st, rd_sq)
         @test length(ri.seen) == 1
-        @test ri.seen[1] === Zsq
+        @test ri.seen[1] == Zsq
         @test isapprox(sum(res.w), 1)
 
         #=
@@ -235,14 +237,15 @@ struct UnviewableReturnsResult <: PO.AbstractReturnsResult end
 
             rs = RecordingDistance(FeatureDistance())
             cross_val_predict(HierarchicalRiskParity(; opt = hopt(rs)), rd_sq, cv; ex = seq)
-            @test all(z === Zsq for z in rs.seen)
+            @test all(z == Zsq for z in rs.seen)
         end
 
         # `train_test_split` is a pair of `port_opt_view`s, so the same rule holds there.
         tr, te = train_test_split(rd_3d; train_size = 150)
-        @test tr.Z == Z3[1:size(tr.X, 1), :, :]
-        @test te.Z == Z3[(T - size(te.X, 1) + 1):T, :, :]
-        @test size(tr.Z, 1) + size(te.Z, 1) == T
+        @test panel_feature_matrix(tr.pnl)[2] == Z3[1:size(tr.X, 1), :, :]
+        @test panel_feature_matrix(te.pnl)[2] == Z3[(T - size(te.X, 1) + 1):T, :, :]
+        @test size(panel_feature_matrix(tr.pnl)[2], 1) +
+              size(panel_feature_matrix(te.pnl)[2], 1) == T
     end
 
     @testset "MultipleRandomised splits observations and assets together" begin
@@ -276,7 +279,8 @@ struct UnviewableReturnsResult <: PO.AbstractReturnsResult end
 
         # Price-level cross-validation: each fold converts its own window, losing the row
         # the percentage change consumes -- and `Z` must lose exactly that row too.
-        prc = PricesResult(; X = TimeArray(tsp, Pv, nx), nz = nf, Z = Z3p)
+        prc = PricesResult(; X = TimeArray(tsp, Pv, nx),
+                           pnl = feature_matrix_panel(nf, Z3p))
         ri = RecordingDistance(FeatureDistance())
         pipe = Pipeline(;
                         steps = (PricesToReturns(),
@@ -293,7 +297,8 @@ struct UnviewableReturnsResult <: PO.AbstractReturnsResult end
         # price level, and a square carrier must lose that asset on both axes.
         Pm = copy(Pv)
         Pm[:, 3] .= NaN
-        prm = PricesResult(; X = TimeArray(tsp, Pm, nx), nz = nx, Z = Zsqp)
+        prm = PricesResult(; X = TimeArray(tsp, Pm, nx),
+                           pnl = feature_matrix_panel(nx, Zsqp))
         keep = [1, 2, 4, 5, 6, 7, 8]
         rf = RecordingDistance(FeatureDistance())
         pipe_f = Pipeline(;
@@ -301,7 +306,7 @@ struct UnviewableReturnsResult <: PO.AbstractReturnsResult end
                                    HierarchicalRiskParity(; opt = hopt(rf))))
         res_f = fit(pipe_f, prm)
         @test res_f.ctx.returns.nx == nx[keep]
-        @test res_f.ctx.returns.Z == Zsqp[keep, keep]
+        @test panel_feature_matrix(res_f.ctx.returns.pnl)[2] == Zsqp[keep, keep]
         @test rf.seen[1] == Zsqp[keep, keep]
 
         # A clustering step in the pipeline reaches the same bridge, so it is routed too.
@@ -315,7 +320,8 @@ struct UnviewableReturnsResult <: PO.AbstractReturnsResult end
 
         # Search cross-validation at price level draws assets *and* windows rows, through
         # `pipeline_asset_view`/`pipeline_data_view` rather than the returns-level arities.
-        prs = PricesResult(; X = TimeArray(tsp, Pv, nx), nz = nx, Z = Zsqp)
+        prs = PricesResult(; X = TimeArray(tsp, Pv, nx),
+                           pnl = feature_matrix_panel(nx, Zsqp))
         rg = RecordingDistance(FeatureDistance())
         mrs = MultipleRandomised(IndexWalkForward(60, 20); subset_size = 3, n_subsets = 2,
                                  seed = 42)
@@ -339,8 +345,8 @@ struct UnviewableReturnsResult <: PO.AbstractReturnsResult end
         # The carriers hold genuinely different matrices, so a test cannot pass by picking
         # the wrong one: the data carrier is the square block matrix, the prior carrier the
         # rectangular factor loadings.
-        @test size(rd_sq.Z) == (N, N)
-        @test size(pr_z.Z) == (N, K)
+        @test size(panel_feature_matrix(rd_sq.pnl)[2]) == (N, N)
+        @test size(panel_feature_matrix(pr_z.pnl)[2]) == (N, K)
 
         function run_nco(z_src)
             ri, ro = RecordingDistance(FeatureDistance()),
@@ -363,28 +369,33 @@ struct UnviewableReturnsResult <: PO.AbstractReturnsResult end
         res_p, ri_p, ro_p, cls_p = run_nco(:prior)
 
         # The selector picks between two populated carriers at the outer level.
-        @test ro_d.seen[1] === rd_sq.Z
-        @test ro_p.seen[1] == pr_z.Z
+        @test ro_d.seen[1] == panel_feature_matrix(rd_sq.pnl)[2]
+        @test ro_p.seen[1] == panel_feature_matrix(pr_z.pnl)[2]
         @test assignments(res_d.clr) != assignments(res_p.clr)
 
         # `:data` slices the carried matrix -- both axes, because it is square.
         @test [size(z) for z in ri_d.seen] == [(length(cl), length(cl)) for cl in cls_d]
-        @test all(ri_d.seen[i] == rd_sq.Z[cls_d[i], cls_d[i]] for i in eachindex(cls_d))
+        @test all(ri_d.seen[i] == panel_feature_matrix(rd_sq.pnl)[2][cls_d[i], cls_d[i]]
+                  for i in eachindex(cls_d))
 
         # `:prior` does not slice anything: the cluster's prior is refit on the cluster's
         # own returns, so the matrix that reaches the kernel is a fresh estimate whose
         # feature axis is still the full factor set.
         @test [size(z) for z in ri_p.seen] == [(length(cl), K) for cl in cls_p]
-        @test all(ri_p.seen[i] == prior(fpe, port_opt_view(rd_sq, cls_p[i])).Z
+        @test all(ri_p.seen[i] ==
+                  panel_feature_matrix(prior(fpe, port_opt_view(rd_sq, cls_p[i])).pnl)[2]
                   for i in eachindex(cls_p))
 
         # A `LowOrderPrior` view slices its own carrier on the asset axis and never on the
         # feature axis -- a square derived `Z` included, since the producer that built it
         # refits rather than being cut down.
         i = [1, 3, 5]
-        @test port_opt_view(pr_z, i).Z == pr_z.Z[i, :]
-        pr_sq = LowOrderPrior(; X = pr_z.X, mu = pr_z.mu, sigma = pr_z.sigma, Z = Zsq)
-        @test port_opt_view(pr_sq, i).Z == Zsq[i, :]
+        @test panel_feature_matrix(port_opt_view(pr_z, i).pnl)[2] ==
+              panel_feature_matrix(pr_z.pnl)[2][i, :]
+        pr_sq = LowOrderPrior(; X = pr_z.X, mu = pr_z.mu, sigma = pr_z.sigma,
+                              pnl = feature_matrix_panel(["_z$(k)" for k in axes(Zsq, 2)],
+                                                         Zsq))
+        @test panel_feature_matrix(port_opt_view(pr_sq, i).pnl)[2] == Zsq[i, :]
     end
 
     @testset "A square feature producer refits inside a real fold" begin
@@ -432,11 +443,11 @@ struct UnviewableReturnsResult <: PO.AbstractReturnsResult end
         idx = assignments(res.clr)
         cls = [findall(==(i), idx) for i in 1:(res.clr.k)]
 
-        @test ro.seen[1] == prior(fpe_conf, rd_plain).Z
+        @test ro.seen[1] == panel_feature_matrix(prior(fpe_conf, rd_plain).pnl)[2]
         @test [size(z) for z in ri.seen] == [(length(cl), length(cl)) for cl in cls]
         # The reference is the producer viewed the same way the fold views it -- a refit.
-        @test all(ri.seen[i] ==
-                  prior(port_opt_view(fpe_conf, cls[i]), port_opt_view(rd_plain, cls[i])).Z
+        @test all(ri.seen[i] == panel_feature_matrix(prior(port_opt_view(fpe_conf, cls[i]),
+                                                           port_opt_view(rd_plain, cls[i])).pnl)[2]
                   for i in eachindex(cls))
         @test isapprox(sum(res.w), 1)
 
@@ -490,8 +501,10 @@ struct UnviewableReturnsResult <: PO.AbstractReturnsResult end
         sp = split(cv, rd_plain)
         @test length(ri.seen) == length(sp.train_idx)
         @test all(size(z) == (cv.subset_size, cv.subset_size) for z in ri.seen)
-        @test all(ri.seen[i] == prior(port_opt_view(fpe_conf, sp.asset_idx[i]),
-                    port_opt_view(rd_plain, sp.train_idx[i], sp.asset_idx[i])).Z
+        @test all(ri.seen[i] ==
+                  panel_feature_matrix(prior(port_opt_view(fpe_conf, sp.asset_idx[i]),
+                                             port_opt_view(rd_plain, sp.train_idx[i],
+                                                           sp.asset_idx[i])).pnl)[2]
                   for i in eachindex(sp.train_idx))
     end
 

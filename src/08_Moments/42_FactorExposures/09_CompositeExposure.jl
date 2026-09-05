@@ -351,13 +351,13 @@ Compute the Factor Exposure of a fixed weighted combination of Descriptors.
 # Examples
 
 ```jldoctest
-julia> res = asset_panel([NumericPanelInput(; name = \"a\", vals = [1.0 2.0; 3.0 4.0]),
+julia> pnl = asset_panel([NumericPanelInput(; name = \"a\", vals = [1.0 2.0; 3.0 4.0]),
                           NumericPanelInput(; name = \"b\", vals = [5.0 6.0; 7.0 8.0]),
                           NumericPanelInput(; name = \"benchmark_weights\",
                                             vals = [1.0 1.0; 1.0 1.0])]; amsk = trues(2, 2),
                          emsk = trues(2, 2));
 
-julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = zeros(2, 2), res...);
+julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = zeros(2, 2), pnl = pnl);
 
 julia> xe = CompositeExposure(;
                               descriptors = [Passthrough(; field = \"a\"),

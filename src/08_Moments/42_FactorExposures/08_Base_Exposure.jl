@@ -199,7 +199,7 @@ function exposure_group_labels(::ReturnsResult, ::Nothing)::Nothing
     return nothing
 end
 function exposure_group_labels(rd::ReturnsResult, group::AbstractString)::Matrix{Int}
-    return cross_sectional_groups(rd.pnl, rd.Z, group)
+    return cross_sectional_groups(rd.pnl, group)
 end
 """
     exposure_transform(ct::Nothing, X::MatNum, w::Option{<:MatNum},

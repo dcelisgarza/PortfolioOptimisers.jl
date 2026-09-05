@@ -66,7 +66,7 @@ function descriptor_returns(rd::ReturnsResult)
     @argcheck(!isnothing(X),
               IsNothingError("a rolling Descriptor reads returns, and rd.X is nothing. Build the carrier with the returns matrix the Asset Panel was drawn on."))
     @argcheck(!isnothing(pnl),
-              IsNothingError("a rolling Descriptor reads the active mask of an Asset Panel, and rd.pnl is nothing. Build the carrier with the `pnl`, `nz` and `Z` that asset_panel returns."))
+              IsNothingError("a rolling Descriptor reads the active mask of an Asset Panel, and rd.pnl is nothing. Build the carrier with the `pnl` that asset_panel returns."))
     return Matrix{float(eltype(X))}(X), pnl
 end
 """
@@ -304,11 +304,12 @@ Both members read the returns of `rd.X` and the active mask of the Asset Panel, 
 # Examples
 
 ```jldoctest
-julia> res = asset_panel([NumericPanelInput(; name = \"market_cap\",
+julia> pnl = asset_panel([NumericPanelInput(; name = \"market_cap\",
                                             vals = [1.0 1.0; 1.0 1.0; 1.0 1.0; 1.0 1.0])];
                          amsk = trues(4, 2), emsk = trues(4, 2));
 
-julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = [0.1 -0.05; 0.2 0.1; -0.1 0.05; 0.05 NaN], res...);
+julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = [0.1 -0.05; 0.2 0.1; -0.1 0.05; 0.05 NaN],
+                          pnl = pnl);
 
 julia> descriptor(RollingLogReturn(; window = 2), rd)
 4×2 Matrix{Float64}:

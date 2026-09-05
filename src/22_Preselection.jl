@@ -1222,11 +1222,11 @@ A cluster whose best score is tied keeps nobody (see [`groups_argbest`](@ref)).
 
 ## Clustering on a feature matrix
 
-A [`FeatureDistance`](@ref) in the `cle`'s distance slot measures a feature matrix rather than the returns, and `ClusterGroups` supplies it from `rd.Z` — the data carrier the selector is fitted on. There is no `z_src` field here, and that absence is the whole statement: preselection is a *pre-prior* site, so only the data carrier can supply a feature matrix. A selector is fitted by [`fit_preprocessing`](@ref) from the returns data alone and never sees a prior result; in a [`Pipeline`](@ref) it writes `:returns`, which invalidates any `:prior` already computed. An optimiser's `z_src` therefore does not reach here, and setting it changes nothing about this call. Supply `Z` on the [`ReturnsResult`](@ref) — for instance from [`asset_sets_features`](@ref) — or the clustering throws (see [`assert_feature_matrix_supplied`](@ref)).
+A [`FeatureDistance`](@ref) in the `cle`'s distance slot measures a feature matrix rather than the returns, and `ClusterGroups` derives it from `rd.pnl` — the data carrier the selector is fitted on. There is no `z_src` field here, and that absence is the whole statement: preselection is a *pre-prior* site, so only the data carrier can supply a feature matrix. A selector is fitted by [`fit_preprocessing`](@ref) from the returns data alone and never sees a prior result; in a [`Pipeline`](@ref) it writes `:returns`, which invalidates any `:prior` already computed. An optimiser's `z_src` therefore does not reach here, and setting it changes nothing about this call. Supply an [`AssetPanel`](@ref) on the [`ReturnsResult`](@ref) — for instance from [`asset_panel`](@ref) — or the clustering throws (see [`assert_feature_matrix_supplied`](@ref)).
 
 The selection is decided on the *full* universe and the surviving columns are sliced only afterwards, so `Z` is measured over every asset before any is dropped.
 
-`rd.nz` travels beside `rd.Z`, so a [`FeatureDistance`](@ref) carrying a `sel` names its feature columns here exactly as it does anywhere else. That matters most at this site: a panel presents every slice as a feature, the observed masks and the one-hot levels included, and a redundancy selector that measured all of them would drop assets on a distance the caller never asked for.
+The names come off the same panel as the values, so a [`FeatureDistance`](@ref) carrying a `sel` names its feature columns here exactly as it does anywhere else. That matters most at this site: a panel presents every slice as a feature, the observed masks and the one-hot levels included, and a redundancy selector that measured all of them would drop assets on a distance the caller never asked for.
 
 # Fields
 
@@ -1269,7 +1269,7 @@ Keep one representative of each cluster under [`ClusterGroups`](@ref).
 
 # Algorithm
 
- 1. Cluster the assets with [`clusterise`](@ref) on `rd.X`, passing the feature matrix `rd.Z`, its names `rd.nz` and `z_src = :data_only`, giving the clustering result `clr`.
+ 1. Derive the feature matrix and its names from `rd.pnl` with [`panel_feature_matrix`](@ref). Cluster the assets with [`clusterise`](@ref) on `rd.X`, passing both and `z_src = :data_only`, giving the clustering result `clr`.
  2. Read the cluster assignment of every asset into `idx`.
  3. Collect the asset indices of each of the `clr.k` clusters into `groups`.
  4. Return the mask [`groups_argbest`](@ref) admits for those groups under `scores` and `bib`.
@@ -1295,7 +1295,8 @@ Keep one representative of each cluster under [`ClusterGroups`](@ref).
 """
 function redundancy_keep(alg::ClusterGroups, rd::AbstractReturnsResult,
                          scores::Option{<:VecNum}, bib::Bool)::BitVector
-    clr = clusterise(alg.cle, rd.X; Z = rd.Z, nz = rd.nz, z_src = :data_only)
+    nz, Z = isnothing(rd.pnl) ? (nothing, nothing) : panel_feature_matrix(rd.pnl)
+    clr = clusterise(alg.cle, rd.X; Z = Z, nz = nz, z_src = :data_only)
     idx = assignments(clr)
     groups = [findall(==(k), idx) for k in 1:(clr.k)]
     return groups_argbest(groups, scores, bib)

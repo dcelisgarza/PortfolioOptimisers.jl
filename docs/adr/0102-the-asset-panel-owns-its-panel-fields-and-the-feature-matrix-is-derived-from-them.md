@@ -113,6 +113,14 @@ rebuilds the same matrix.
 `nz` therefore has no home. The field names are the vector of `f.name`, and column labels are the
 output of `feature_labels` when a consumer needs them.
 
+`feature_matrix` is `FeaturePrior`'s until the producer build frees the name, so the carrier build
+ships the pair it needs under interim names: `panel_feature_matrix(pnl)`, which stacks every field
+and returns the labels beside the matrix, and `feature_matrix_panel(nz, Z)`, its exact inverse —
+one numeric field per column, under that column's own name. The inverse is how a routine that
+produces a bare matrix, a producer or a meta-optimiser collapse onto a synthetic universe, puts
+that matrix on a carrier. The selector build replaces `panel_feature_matrix` with the three verbs
+above and keeps the inverse.
+
 ### The carriers hold one field, `pnl`
 
 `ReturnsResult` holds `nx, X, nf, F, nb, B, ts, iv, ivpa, pnl`, and `PricesResult` holds
@@ -120,6 +128,13 @@ output of `feature_labels` when a consumer needs them.
 and the asset count; a static one must match the asset count. `LowOrderPrior` loses `Z`, and
 `HighOrderPrior` forwards nothing of it. The `Pr_RR` bridge stays, because `x_src` stays and the
 bridge serves it.
+
+The carrier build gave `LowOrderPrior` a `pnl` field in place of `Z`, as a **shim**: a producer
+still runs and still has to put its matrix somewhere until the producer build deletes
+`FeaturePrior`. A produced matrix is nameless, so the shim names its columns positionally
+(`_z1`, `_z2`, …) through `feature_matrix_panel`. That is what a nameless `Z` offered a selector
+before — an integer resolves and a caller's own name does not — and the producer build deletes
+the field with the producers.
 
 `pnl` follows the library's abbreviated-type-word pattern (`alg`, `opt`, `sim`, `sel`). The strict
 initialism `ap` was considered; `pnl` reads as *panel* and is what map #643's readers already say
@@ -130,6 +145,10 @@ at about 54 sites. `CONTEXT.md` rules out the profit-and-loss reading.
 `asset_panel(inputs; amsk, emsk)` takes the raw, blank-carrying form of each Panel Field with a
 per-field fill policy, and returns the `AssetPanel` with every blank resolved. So a numeric
 field's values stay finite, and no consumer sees a `NaN` or a `Missing`.
+
+The finiteness rule sits on the **field constructor**, not on the builder, so a hand-built field
+carries the same guarantee the carrier's `check_feature_matrix` used to give a matrix. That is
+where the rule has to be once the panel is the storage: nothing else sees every field.
 
 An input whose `vals` has one dimension fewer is a static input. On a static input
 `ForwardPanelFill` and `BackwardPanelFill` are refused, because there is no observation axis to
@@ -245,8 +264,11 @@ hand-supplied adjacency only.
 ### What the fold ticket owns
 
 Both `port_opt_view` arities return views of the fields and the masks. The square case, an
-adjacency whose labels are the asset names, becomes a tensor field whose label axis a view slices
-when the labels equal `nx`. The meta-optimiser collapse, preselection and the assembly seam are
+adjacency whose columns are the asset names, is carried by the carrier build as one numeric field
+per asset, and `port_opt_view(pnl, i, j, sq)` selects the field vector by the same asset index
+when `sq` says the fields *are* the assets. The carrier reads `sq` from `features_are_assets` over
+the panel's derived names, exactly as it read it over `nz` before. A tensor field whose label axis
+a view slices is the other candidate, and the fold ticket of map #802 chooses between them. The meta-optimiser collapse, preselection and the assembly seam are
 decided by the fold ticket of map #802. Per-field storage makes one question visible that the
 dense layout hid: a convex combination of one-hot columns is a membership fraction, but a convex
 combination of integer codes means nothing, so the fold ticket must say what a collapsed

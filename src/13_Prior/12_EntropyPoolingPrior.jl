@@ -3643,11 +3643,11 @@ function ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<
     # wrapped prior's feature matrix is forwarded unchanged (see [`LowOrderPrior`](@ref)).
     # The factor block is the refit prior's, forwarded whole, on the same reasoning as the
     # note at the same seam in `MeucciEntropyPoolingPrior`'s `ep_prior`.
-    (; X, o_X, mu, sigma, chol, rr, fpr, Z) = pr
+    (; X, o_X, mu, sigma, chol, rr, fpr, pnl) = pr
     ens = exp(StatsBase.entropy(w1))
     kld = StatsBase.kldivergence(w1, w0)
     return LowOrderPrior(; X = X, o_X = o_X, mu = mu, sigma = sigma, chol = chol, w = w1,
-                         ens = ens, kld = kld, rr = rr, fpr = fpr, Z = Z)
+                         ens = ens, kld = kld, rr = rr, fpr = fpr, pnl = pnl)
 end
 """
     ep_prior(alg::H0_EntropyPooling, pe::EntropyPoolingPrior, X::MatNum,
@@ -3733,11 +3733,11 @@ function ep_prior(alg::H0_EntropyPooling, pe::EntropyPoolingPrior, X::MatNum,
     # wrapped prior's feature matrix is forwarded unchanged (see [`LowOrderPrior`](@ref)).
     # The factor block is the refit prior's, forwarded whole, on the same reasoning as the
     # note at the same seam in `MeucciEntropyPoolingPrior`'s `ep_prior`.
-    (; X, o_X, mu, sigma, chol, rr, fpr, Z) = pr
+    (; X, o_X, mu, sigma, chol, rr, fpr, pnl) = pr
     ens = exp(StatsBase.entropy(w1))
     kld = StatsBase.kldivergence(w1, w0)
     return LowOrderPrior(; X = X, o_X = o_X, mu = mu, sigma = sigma, chol = chol, w = w1,
-                         ens = ens, kld = kld, rr = rr, fpr = fpr, Z = Z)
+                         ens = ens, kld = kld, rr = rr, fpr = fpr, pnl = pnl)
 end
 function factor_residual_config(pe::EntropyPoolingPrior)
     return factor_residual_config(pe.pe)

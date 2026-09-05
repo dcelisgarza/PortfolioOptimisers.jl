@@ -564,20 +564,21 @@ end
 end
 
 @testset "cross_sectional_groups reads an Asset Panel's categorical field" begin
-    pf = [PanelField(; name = "sector", kind = CategoricalPanelField(; levels = ["a", "b"]),
-                     cols = [1, 2]),
-          PanelField(; name = "size", kind = NumericPanelField(), cols = [3])]
-    pnl = AssetPanel(; pf = pf, amsk = trues(2, 3), emsk = trues(2, 3))
-    Z = zeros(2, 3, 3)
-    Z[1, 1, 1] = 1.0
-    Z[1, 2, 2] = 1.0
-    Z[2, 1, 2] = 1.0
-    Z[2, 3, 1] = 1.0
-    @test cross_sectional_groups(pnl, Z, "sector") ==
-          [1 2 PortfolioOptimisers.CS_MISSING_GROUP;
-           2 PortfolioOptimisers.CS_MISSING_GROUP 1]
-    @test_throws ArgumentError cross_sectional_groups(pnl, Z, "size")
-    @test_throws KeyError cross_sectional_groups(pnl, Z, "country")
+    # A categorical Panel Field stores its codes, so a group label is read rather than
+    # recovered from a one-hot block, and every cell carries one.
+    pnl = AssetPanel(;
+                     pf = [CategoricalPanelField(; name = "sector", levels = ["a", "b"],
+                                                 codes = [1 2 1; 2 1 1]),
+                           NumericPanelField(; name = "size", vals = ones(2, 3))],
+                     amsk = trues(2, 3), emsk = trues(2, 3))
+    @test cross_sectional_groups(pnl, "sector") == [1 2 1; 2 1 1]
+    @test_throws ArgumentError cross_sectional_groups(pnl, "size")
+    @test_throws KeyError cross_sectional_groups(pnl, "country")
+    # The verb reads one label per observation and asset, so a static panel has none.
+    stat = AssetPanel(;
+                      pf = [CategoricalPanelField(; name = "sector", levels = ["a", "b"],
+                                                  codes = [1, 2, 1])])
+    @test_throws DimensionMismatch cross_sectional_groups(stat, "sector")
 end
 
 @testset "The internal helpers answer on their own" begin

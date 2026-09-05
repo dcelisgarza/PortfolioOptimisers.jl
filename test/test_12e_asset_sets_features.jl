@@ -179,7 +179,7 @@ end
     # which is what finally makes that field live -- it shipped unused with the carrier.
     pe = FeaturePrior(; ze = ze, sets = TAX)
     pr = prior(pe, rd)
-    @test pr.Z == asset_sets_features(KEYS, TAX)
+    @test panel_feature_matrix(pr.pnl)[2] == asset_sets_features(KEYS, TAX)
 
     # Purely additive: every moment is the wrapped estimator's, untouched.
     pr0 = prior(EmpiricalPrior(), rd)
@@ -195,9 +195,10 @@ end
                                   "nx_pairB" => string.(repeat(1:(NA ÷ 2); outer = 2))))
     prsq = prior(FeaturePrior(; ze = AssetSetsFeatures(; vals = ["nx_pairA", "nx_pairB"]),
                               sets = sq), rd)
-    @test size(prsq.Z, 2) == NA
+    @test size(panel_feature_matrix(prsq.pnl)[2], 2) == NA
     i = [1, 3, 5]
-    @test size(PortfolioOptimisers.port_opt_view(prsq, i).Z) == (length(i), NA)
+    @test size(panel_feature_matrix(PortfolioOptimisers.port_opt_view(prsq, i).pnl)[2]) ==
+          (length(i), NA)
 
     # The taxonomy is the whole input, so an absent `sets` is a missing argument rather than
     # a defaulted one: a returns-derived substitute would be the exact endogeneity this
@@ -227,7 +228,7 @@ end
     # So the viewed producer recomputes the taxonomy of the *subproblem*, rather than
     # carrying the full universe's columns into it. The feature axis is rebuilt, not
     # sliced: a group with no members left in the view disappears.
-    Zv = prior(pev, rd.X[:, i]).Z
+    Zv = panel_feature_matrix(prior(pev, rd.X[:, i]).pnl)[2]
     @test size(Zv, 1) == length(i)
     @test size(Zv, 2) == sum(length(unique(TAX.dict[k][i])) for k in KEYS)
     @test all(==(Float64(length(KEYS))), sum(Zv; dims = 2))
@@ -253,15 +254,15 @@ end
     # `asset_sets_features` is public in its own right -- a producer alone runs inside
     # `prior(pe::FeaturePrior, …)` and could only ever feed the derived carrier.
     rdz = ReturnsResult(; nx = rd.nx, X = rd.X, nf = rd.nf, F = rd.F, ts = rd.ts,
-                        nz = asset_sets_feature_names(KEYS, TAX), Z = Z)
+                        pnl = feature_matrix_panel(asset_sets_feature_names(KEYS, TAX), Z))
     # Carrier two: derived, via the producer.
     pe = FeaturePrior(; ze = AssetSetsFeatures(; vals = KEYS), sets = TAX)
     pr = prior(pe, rd)
-    @test pr.Z == Z
+    @test panel_feature_matrix(pr.pnl)[2] == Z
 
     # The two carriers agree on the matrix, hence on the distance -- they differ only in
     # what a fold does to them, not in what they say about the universe.
-    @test distance(fde, pr.Z) == distance(fde, Z)
+    @test distance(fde, panel_feature_matrix(pr.pnl)[2]) == distance(fde, Z)
 
     cle_f = ClustersEstimator(; de = fde)
     cle_c = ClustersEstimator(; de = cde)
@@ -598,7 +599,7 @@ end
     # sets)`, so there is nowhere to pass a keyword through.
     pe = FeaturePrior(; ze = ze, sets = GSETS)
     pr = prior(pe, randn(StableRNG(987654321), 64, 3))
-    @test pr.Z == GEXP
+    @test panel_feature_matrix(pr.pnl)[2] == GEXP
     @test pr.mu == prior(EmpiricalPrior(), randn(StableRNG(987654321), 64, 3)).mu
 
     bad = FeaturePrior(;
@@ -629,12 +630,12 @@ end
     fde = FeatureDistance()
     # Carrier one: the user's own data, under the default `z_src = :data`.
     rdz = ReturnsResult(; nx = rd.nx, X = rd.X, nf = rd.nf, F = rd.F, ts = rd.ts,
-                        nz = asset_sets_feature_names(prog, G), Z = Z)
-    @test rdz.nz == nzz
+                        pnl = feature_matrix_panel(asset_sets_feature_names(prog, G), Z))
+    @test panel_feature_matrix(rdz.pnl)[1] == nzz
     # Carrier two: derived, via the producer.
     pe = FeaturePrior(; ze = AssetSetsFeatures(; vals = prog), sets = G)
     pr = prior(pe, rd)
-    @test pr.Z == Z
+    @test panel_feature_matrix(pr.pnl)[2] == Z
 
     cle_f = ClustersEstimator(; de = fde)
     clr_d = clusterise(cle_f, rdz)
@@ -645,9 +646,13 @@ end
     # The grading changes the answer, which is the whole point of authoring it: doubling the
     # sector weight is a different distance from the one-hot stack.
     clr_1 = clusterise(cle_f,
-                       ReturnsResult(; nx = rd.nx, X = rd.X, ts = rd.ts, nz = nzz,
-                                     Z = asset_sets_features(["nx_sector" => 1.0,
-                                                              "nx_industry" => 1.0], G)))
+                       ReturnsResult(; nx = rd.nx, X = rd.X, ts = rd.ts,
+                                     pnl = feature_matrix_panel(nzz,
+                                                                asset_sets_features(["nx_sector" =>
+                                                                                         1.0,
+                                                                                     "nx_industry" =>
+                                                                                         1.0],
+                                                                                    G))))
     @test clr_d.D != clr_1.D
     # And it still differs from the returns correlation, so exogenous structure survives.
     clr_c = clusterise(ClustersEstimator(; de = Distance(; alg = CanonicalDistance())), rd)

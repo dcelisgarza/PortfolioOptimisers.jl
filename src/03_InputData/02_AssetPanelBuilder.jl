@@ -5,7 +5,7 @@ Supertype of the policies that resolve a blank cell of a raw Panel Field.
 
 All concrete types stating what a Panel Field's blank cell becomes should subtype `AbstractPanelFillAlgorithm`.
 
-A blank never reaches a carrier. [`asset_panel`](@ref) resolves every one of them, so the feature matrix `Z` stays finite and `check_feature_matrix` keeps its `assert_all_finite` guarantee. The policy says what the resolved value is; the observed-mask column the Panel Field also contributes says which cells the resolution touched.
+A blank never reaches a carrier. [`asset_panel`](@ref) resolves every one of them, so every Panel Field comes out finite. The policy says what the resolved value is; the observed mask the Panel Field also carries says which cells the resolution touched.
 
 # Interfaces
 
@@ -82,7 +82,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - If `val` is a `Number`, `isfinite(val)`. A non-finite fill would put an infinity into `Z`, which `check_feature_matrix` refuses.
+  - If `val` is a `Number`, `isfinite(val)`. A non-finite fill would put an infinity into a Panel Field, which [`assert_panel_finite`](@ref) refuses.
 
 # Examples
 
@@ -350,7 +350,7 @@ The method that Julia selects is the algorithm, and the four differ in where the
 function panel_fill(::NoPanelFill, v::AbstractVector, name::AbstractString)
     i = findfirst(is_panel_blank, v)
     @argcheck(isnothing(i),
-              ArgumentError("the Panel Field \"$name\" carries a blank cell at observation $i, and its fill policy is NoPanelFill, which refuses one. A blank never reaches a carrier, so give the field a fill policy — ForwardPanelFill is the one that is safe across a cross-validation fold — or remove the blank from the raw input."))
+              ArgumentError("the Panel Field \"$name\" carries a blank cell at position $i, and its fill policy is NoPanelFill, which refuses one. A blank never reaches a carrier, so give the field a fill policy — ForwardPanelFill is the one that is safe across a cross-validation fold — or remove the blank from the raw input."))
     return collect(v)
 end
 function panel_fill(alg::ConstantPanelFill, v::AbstractVector, ::AbstractString)
@@ -516,24 +516,24 @@ NumericPanelInput
 """
 @concrete struct NumericPanelInput <: AbstractPanelFieldInput
     """
-    The Panel Field's name, which names its column of `nz`.
+    The Panel Field's name, which names its column of a derived Feature Matrix.
     """
     name
     """
-    Raw values (observations × assets), blanks included. A blank is a `missing` or a `NaN`.
+    Raw values, blanks included: `assets` when static, `observations × assets` when time-varying. A blank is a `missing` or a `NaN`.
     """
     vals
     """
     The policy that resolves the blanks.
     """
     alg
-    function NumericPanelInput(name::AbstractString, vals::AbstractMatrix,
+    function NumericPanelInput(name::AbstractString, vals::AbstractArray,
                                alg::AbstractPanelFillAlgorithm)
-        assert_panel_input(name, vals)
+        assert_panel_input(name, vals, 1, 2)
         return new{typeof(name), typeof(vals), typeof(alg)}(name, vals, alg)
     end
 end
-function NumericPanelInput(; name::AbstractString, vals::AbstractMatrix,
+function NumericPanelInput(; name::AbstractString, vals::AbstractArray,
                            alg::AbstractPanelFillAlgorithm = NoPanelFill())::NumericPanelInput
     return NumericPanelInput(name, vals, alg)
 end
@@ -586,11 +586,11 @@ CategoricalPanelInput
 """
 @concrete struct CategoricalPanelInput <: AbstractPanelFieldInput
     """
-    The Panel Field's name, which prefixes each of its one-hot columns of `nz`.
+    The Panel Field's name, which prefixes each of its columns of a derived Feature Matrix.
     """
     name
     """
-    Raw labels (observations × assets), blanks included. A blank is a `missing`.
+    Raw labels, blanks included: `assets` when static, `observations × assets` when time-varying. A blank is a `missing`.
     """
     vals
     """
@@ -601,10 +601,10 @@ CategoricalPanelInput
     The policy that resolves the blanks. A `val` it carries must itself be a level.
     """
     alg
-    function CategoricalPanelInput(name::AbstractString, vals::AbstractMatrix,
+    function CategoricalPanelInput(name::AbstractString, vals::AbstractArray,
                                    levels::Option{<:VecStr},
                                    alg::AbstractPanelFillAlgorithm)
-        assert_panel_input(name, vals)
+        assert_panel_input(name, vals, 1, 2)
         if !isnothing(levels)
             assert_panel_labels(levels, :levels)
         end
@@ -612,7 +612,7 @@ CategoricalPanelInput
                                                                             levels, alg)
     end
 end
-function CategoricalPanelInput(; name::AbstractString, vals::AbstractMatrix,
+function CategoricalPanelInput(; name::AbstractString, vals::AbstractArray,
                                levels::Option{<:VecStr} = nothing,
                                alg::AbstractPanelFillAlgorithm = NoPanelFill())::CategoricalPanelInput
     return CategoricalPanelInput(name, vals, levels, alg)
@@ -671,11 +671,11 @@ TensorPanelInput
 """
 @concrete struct TensorPanelInput <: AbstractPanelFieldInput
     """
-    The Panel Field's name, which prefixes each of its third-axis columns of `nz`.
+    The Panel Field's name, which prefixes each of its columns of a derived Feature Matrix.
     """
     name
     """
-    Raw values (observations × assets × third axis), blanks included. A blank is a `missing` or a `NaN`.
+    Raw values, blanks included: `assets × labels` when static, `observations × assets × labels` when time-varying. A blank is a `missing` or a `NaN`.
     """
     vals
     """
@@ -694,19 +694,18 @@ TensorPanelInput
     The policy that resolves the blanks.
     """
     alg
-    function TensorPanelInput(name::AbstractString, vals::AbstractArray{<:Any, 3},
+    function TensorPanelInput(name::AbstractString, vals::AbstractArray,
                               axis::AbstractString, labels::VecStr,
                               groups::Option{<:VecStr}, alg::AbstractPanelFillAlgorithm)
-        assert_panel_input(name, vals)
-        @argcheck(size(vals, 3) == length(labels),
-                  DimensionMismatch("the tensor Panel Field \"$name\" needs one third-axis label per third-axis entry of vals, got size(vals, 3) = $(size(vals, 3)) and length(labels) = $(length(labels))"))
+        assert_panel_input(name, vals, 2, 3)
+        @argcheck(size(vals, ndims(vals)) == length(labels),
+                  DimensionMismatch("the tensor Panel Field \"$name\" needs one label per trailing-axis entry of vals, got $(size(vals, ndims(vals))) trailing entries and length(labels) = $(length(labels))"))
         return new{typeof(name), typeof(vals), typeof(axis), typeof(labels), typeof(groups),
                    typeof(alg)}(name, vals, axis, labels, groups, alg)
     end
 end
-function TensorPanelInput(; name::AbstractString, vals::AbstractArray{<:Any, 3},
-                          axis::AbstractString, labels::VecStr,
-                          groups::Option{<:VecStr} = nothing,
+function TensorPanelInput(; name::AbstractString, vals::AbstractArray, axis::AbstractString,
+                          labels::VecStr, groups::Option{<:VecStr} = nothing,
                           alg::AbstractPanelFillAlgorithm = NoPanelFill())::TensorPanelInput
     return TensorPanelInput(name, vals, axis, labels, groups, alg)
 end
@@ -739,29 +738,28 @@ Check the name and the raw values shared by every [`AbstractPanelFieldInput`](@r
   - [`AbstractPanelFieldInput`](@ref)
   - [`NumericPanelInput`](@ref)
 """
-function assert_panel_input(name::AbstractString, vals::AbstractArray)::Nothing
+function assert_panel_input(name::AbstractString, vals::AbstractArray, s::Integer,
+                            t::Integer)::Nothing
     @argcheck(!isempty(name),
-              IsEmptyError("the name of a Panel Field input cannot be empty: it is the key its Panel Field is looked up by, and it names its columns of the feature axis"))
+              IsEmptyError("the name of a Panel Field input cannot be empty: it is the key its Panel Field is looked up by, and it names its columns of a derived Feature Matrix"))
     @argcheck(!isempty(vals),
               IsEmptyError("the raw values (vals) of the Panel Field \"$name\" cannot be empty"))
+    @argcheck(ndims(vals) == s || ndims(vals) == t,
+              DimensionMismatch("the raw values (vals) of the Panel Field \"$name\" are $s-dimensional when static and $t-dimensional when time-varying, got a $(ndims(vals))-dimensional array of size $(size(vals))"))
     return nothing
 end
 """
-    panel_resolve(inp::NumericPanelInput) -> Tuple{Matrix{Float64}, BitMatrix}
-    panel_resolve(inp::CategoricalPanelInput) -> Tuple{Matrix{String}, BitMatrix}
-    panel_resolve(inp::TensorPanelInput) -> Tuple{Array{Float64, 3}, BitArray{3}}
+    panel_input_is_static(inp::NumericPanelInput) -> Bool
+    panel_input_is_static(inp::CategoricalPanelInput) -> Bool
+    panel_input_is_static(inp::TensorPanelInput) -> Bool
 
-Resolve one raw Panel Field's blanks, and record which of its cells were observed.
+Return whether a raw Panel Field carries no observation axis.
 
-The fill runs **per asset, along the observation axis**, which is the only axis a point-in-time panel blanks along: an asset lists late or delists, so its history has a head or a tail of blanks and the cross-section at one observation is not the thing being carried across.
+The rank of the raw values is what declares the shape: a numeric or a categorical input is `assets` when static and `observations × assets` when time-varying, and a tensor input is `assets × labels` when static and `observations × assets × labels` when time-varying.
 
 # Algorithm
 
-The method that Julia selects is the algorithm, and the three differ only in the axes they walk.
-
- 1. [`NumericPanelInput`](@ref): walk the assets, resolve each asset's column with [`panel_fill`](@ref), and record the observed cells.
- 2. [`CategoricalPanelInput`](@ref): the same walk, over labels rather than numbers.
- 3. [`TensorPanelInput`](@ref): walk the assets and the third-axis entries, and resolve each `(asset, entry)` column.
+The method that Julia selects is the algorithm, and the three differ only in the rank the static shape takes.
 
 # Arguments
 
@@ -769,477 +767,283 @@ The method that Julia selects is the algorithm, and the three differ only in the
 
 # Returns
 
-  - `vals::AbstractArray`: The resolved values, in the raw input's own shape.
-  - `obs::AbstractArray{Bool}`: Whether each raw cell was observed.
+  - `static::Bool`: `true` when the raw values carry no observation axis.
 
 # Related
 
   - [`AbstractPanelFieldInput`](@ref)
+  - [`asset_panel`](@ref)
+  - [`panel_is_static`](@ref)
+"""
+function panel_input_is_static(inp::NumericPanelInput)::Bool
+    return isone(ndims(inp.vals))
+end
+function panel_input_is_static(inp::CategoricalPanelInput)::Bool
+    return isone(ndims(inp.vals))
+end
+function panel_input_is_static(inp::TensorPanelInput)::Bool
+    return ndims(inp.vals) == 2
+end
+"""
+    assert_panel_input_fill(inp::AbstractPanelFieldInput) -> nothing
+
+Check that a static raw Panel Field does not carry a directional fill policy.
+
+[`ForwardPanelFill`](@ref) and [`BackwardPanelFill`](@ref) carry the last observed value along the observation axis, and a static Panel Field has none. Carrying along the asset axis instead would give asset `k` the value of asset `k - 1`, which is not a fill but a fabrication, so the two are refused rather than reinterpreted. [`NoPanelFill`](@ref) and [`ConstantPanelFill`](@ref) are cell-wise and are admitted.
+
+# Algorithm
+
+ 1. Return when the raw Panel Field is time-varying.
+ 2. Throw when its fill policy is directional.
+
+# Arguments
+
+  - `inp`: The raw Panel Field.
+
+# Validation
+
+  - The fill policy of a static raw Panel Field is not directional. Raises an `ArgumentError`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`AbstractPanelFieldInput`](@ref)
+  - [`panel_input_is_static`](@ref)
+  - [`ForwardPanelFill`](@ref)
+  - [`BackwardPanelFill`](@ref)
+  - [`asset_panel`](@ref)
+"""
+function assert_panel_input_fill(inp::AbstractPanelFieldInput)::Nothing
+    @argcheck(!(panel_input_is_static(inp) &&
+                isa(inp.alg, Union{<:ForwardPanelFill, <:BackwardPanelFill})),
+              ArgumentError("the Panel Field \"$(inp.name)\" is static, so it has no observation axis to carry a value along, and its fill policy $(nameof(typeof(inp.alg))) is directional. Use NoPanelFill or ConstantPanelFill, or give the raw values an observation axis."))
+    return nothing
+end
+"""
+    panel_fill_array(vals::AbstractArray, alg::AbstractPanelFillAlgorithm, name::AbstractString, tv::Bool)
+
+Resolve the blanks of one raw Panel Field, and return the filled array.
+
+The fill runs **per asset, along the observation axis**, which is the only axis a point-in-time panel blanks along: an asset lists late or delists, so its history has a head or a tail of blanks, and the cross-section at one observation is not the thing being carried across.
+
+A static raw Panel Field has no observation axis. Its two admitted policies are cell-wise, so the whole array is resolved as one flat run and reshaped back.
+
+# Algorithm
+
+ 1. When the raw Panel Field is static, resolve `vec(vals)` with [`panel_fill`](@ref) and reshape the result.
+ 2. Otherwise walk the trailing axes, and resolve each column of the observation axis with [`panel_fill`](@ref).
+
+# Arguments
+
+  - `vals`: The raw values, blanks included.
+  - `alg`: The fill policy.
+  - `name`: The Panel Field's name, displayed in the error messages.
+  - `tv`: Whether the raw values carry an observation axis.
+
+# Returns
+
+  - `filled::AbstractArray`: The same size as `vals`, and free of blanks.
+
+# Related
+
   - [`panel_fill`](@ref)
+  - [`panel_resolve`](@ref)
+  - [`asset_panel`](@ref)
+"""
+function panel_fill_array(vals::AbstractArray, alg::AbstractPanelFillAlgorithm,
+                          name::AbstractString, tv::Bool)
+    if !tv
+        return reshape(panel_fill(alg, vec(vals), name), size(vals))
+    end
+    cols = CartesianIndices(size(vals)[2:end])
+    first = panel_fill(alg, view(vals, :, cols[1]), name)
+    out = Array{eltype(first)}(undef, size(vals))
+    out[:, cols[1]] = first
+    for k in 2:length(cols)
+        out[:, cols[k]] = panel_fill(alg, view(vals, :, cols[k]), name)
+    end
+    return out
+end
+"""
+    panel_resolve(inp::NumericPanelInput) -> Tuple{Array{Float64}, BitArray}
+    panel_resolve(inp::CategoricalPanelInput) -> Tuple{Array{String}, BitArray}
+    panel_resolve(inp::TensorPanelInput) -> Tuple{Array{Float64}, BitArray}
+
+Resolve one raw Panel Field's blanks, and record which of its cells were observed.
+
+# Algorithm
+
+The method that Julia selects is the algorithm, and the three differ only in the element type they resolve into.
+
+ 1. Fill the blanks with [`panel_fill_array`](@ref).
+ 2. Walk the raw cells, recording which were observed and copying the filled value into the output.
+ 3. Check that a numeric or a tensor Panel Field carries no non-finite value, with [`assert_panel_finite`](@ref).
+
+# Arguments
+
+  - `inp`: The raw Panel Field.
+
+# Returns
+
+  - `vals::AbstractArray`: The resolved values, the same size as the raw ones.
+  - `obs::BitArray`: The observed mask, the same size as the raw values.
+
+# Related
+
+  - [`AbstractPanelFieldInput`](@ref)
+  - [`panel_fill_array`](@ref)
+  - [`panel_input_field`](@ref)
   - [`asset_panel`](@ref)
 """
 function panel_resolve(inp::NumericPanelInput)
-    T, N = size(inp.vals)
-    out = Matrix{Float64}(undef, T, N)
-    obs = BitMatrix(undef, T, N)
-    for a in axes(inp.vals, 2)
-        col = view(inp.vals, :, a)
-        f = panel_fill(inp.alg, col, inp.name)
-        for t in axes(inp.vals, 1)
-            obs[t, a] = !is_panel_blank(col[t])
-            out[t, a] = f[t]
-        end
+    f = panel_fill_array(inp.vals, inp.alg, inp.name, !panel_input_is_static(inp))
+    out = Array{Float64}(undef, size(inp.vals))
+    obs = BitArray(undef, size(inp.vals))
+    for i in CartesianIndices(inp.vals)
+        obs[i] = !is_panel_blank(inp.vals[i])
+        out[i] = f[i]
     end
     assert_panel_finite(out, inp.name)
     return out, obs
 end
 function panel_resolve(inp::CategoricalPanelInput)
-    T, N = size(inp.vals)
-    out = Matrix{String}(undef, T, N)
-    obs = BitMatrix(undef, T, N)
-    for a in axes(inp.vals, 2)
-        col = view(inp.vals, :, a)
-        f = panel_fill(inp.alg, col, inp.name)
-        for t in axes(inp.vals, 1)
-            obs[t, a] = !is_panel_blank(col[t])
-            out[t, a] = string(f[t])
-        end
+    f = panel_fill_array(inp.vals, inp.alg, inp.name, !panel_input_is_static(inp))
+    out = Array{String}(undef, size(inp.vals))
+    obs = BitArray(undef, size(inp.vals))
+    for i in CartesianIndices(inp.vals)
+        obs[i] = !is_panel_blank(inp.vals[i])
+        out[i] = string(f[i])
     end
     return out, obs
 end
 function panel_resolve(inp::TensorPanelInput)
-    T, N, L = size(inp.vals)
-    out = Array{Float64, 3}(undef, T, N, L)
-    obs = BitArray{3}(undef, T, N, L)
-    for l in axes(inp.vals, 3), a in axes(inp.vals, 2)
-        col = view(inp.vals, :, a, l)
-        f = panel_fill(inp.alg, col, inp.name)
-        for t in axes(inp.vals, 1)
-            obs[t, a, l] = !is_panel_blank(col[t])
-            out[t, a, l] = f[t]
-        end
+    f = panel_fill_array(inp.vals, inp.alg, inp.name, !panel_input_is_static(inp))
+    out = Array{Float64}(undef, size(inp.vals))
+    obs = BitArray(undef, size(inp.vals))
+    for i in CartesianIndices(inp.vals)
+        obs[i] = !is_panel_blank(inp.vals[i])
+        out[i] = f[i]
     end
     assert_panel_finite(out, inp.name)
     return out, obs
 end
 """
-    assert_panel_finite(vals::AbstractArray{<:Real}, name::AbstractString) -> nothing
+    panel_input_field(inp::NumericPanelInput, vals, obs) -> NumericPanelField
+    panel_input_field(inp::CategoricalPanelInput, vals, obs) -> CategoricalPanelField
+    panel_input_field(inp::TensorPanelInput, vals, obs) -> TensorPanelField
 
-Check that a resolved Panel Field carries no non-finite value.
-
-The fill policies each write a finite value by construction, so this catches a non-finite cell that the *raw input* carried and that no policy touched: an infinity is not a blank, so [`is_panel_blank`](@ref) leaves it where it stands. It would then reach `check_feature_matrix`, which names `Z` and not the Panel Field that spoiled it.
-
-# Algorithm
-
- 1. Find the first non-finite entry of `vals`.
- 2. Throw when there is one, naming the Panel Field and the position.
-
-# Arguments
-
-  - `vals`: The resolved values of one Panel Field.
-  - `name`: The Panel Field's name, displayed in the error message.
-
-# Validation
-
-  - `all(isfinite, vals)`. Raises an [`IsNonFiniteError`](@ref).
-
-# Returns
-
-  - `nothing`.
-
-# Related
-
-  - [`panel_resolve`](@ref)
-  - [`is_panel_blank`](@ref)
-  - [`asset_panel`](@ref)
-"""
-function assert_panel_finite(vals::AbstractArray{<:Real}, name::AbstractString)::Nothing
-    i = findfirst(!isfinite, vals)
-    @argcheck(isnothing(i),
-              IsNonFiniteError("the Panel Field \"$name\" carries a non-finite value at $(isnothing(i) ? "" : string(Tuple(i))). An infinity is not a blank, so no fill policy resolves it; correct the raw input. The feature matrix Z is checked for finiteness by check_feature_matrix, which names Z rather than the Panel Field."))
-    return nothing
-end
-"""
-    panel_input_kind(inp::NumericPanelInput, vals::AbstractArray) -> NumericPanelField
-    panel_input_kind(inp::CategoricalPanelInput, vals::AbstractArray) -> CategoricalPanelField
-    panel_input_kind(inp::TensorPanelInput, vals::AbstractArray) -> TensorPanelField
-
-Return the kind a raw Panel Field builds, deriving what the input left to be derived.
+Return the Panel Field a resolved raw Panel Field builds, deriving what the input left to be derived.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. [`NumericPanelInput`](@ref): a [`NumericPanelField`](@ref), which carries no metadata.
- 2. [`CategoricalPanelInput`](@ref): a [`CategoricalPanelField`](@ref) over `inp.levels`, or, when that is `nothing`, over the distinct resolved labels in sorted order. The resolved labels are read rather than the raw ones, so a level that only a fill policy introduces still gets its column.
+ 1. [`NumericPanelInput`](@ref): a [`NumericPanelField`](@ref) over the resolved values.
+ 2. [`CategoricalPanelInput`](@ref): a [`CategoricalPanelField`](@ref) over `inp.levels`, or, when that is `nothing`, over the distinct resolved labels in sorted order. The resolved labels are read rather than the raw ones, so a level that only a fill policy introduces still gets a code. Each label is then encoded to its level's position.
  3. [`TensorPanelInput`](@ref): a [`TensorPanelField`](@ref) over the input's own axis, labels and groups.
+
+The observed mask rides only when the fill policy is not [`NoPanelFill`](@ref): a Panel Field that refuses a blank observed every cell, so a mask of it carries no information.
 
 # Arguments
 
   - `inp`: The raw Panel Field.
   - `vals`: The resolved values, as [`panel_resolve`](@ref) returned them.
+  - `obs`: The observed mask, as [`panel_resolve`](@ref) returned it.
+
+# Validation
+
+  - Every resolved label of a categorical Panel Field is one of its levels. Raises an `ArgumentError`.
 
 # Returns
 
-  - `kind::AbstractPanelFieldKind`: The Panel Field's kind.
+  - `f::AbstractPanelField`: The Panel Field.
 
 # Related
 
   - [`AbstractPanelFieldInput`](@ref)
-  - [`AbstractPanelFieldKind`](@ref)
+  - [`AbstractPanelField`](@ref)
   - [`panel_resolve`](@ref)
   - [`asset_panel`](@ref)
 """
-function panel_input_kind(::NumericPanelInput, ::AbstractArray)::NumericPanelField
-    return NumericPanelField()
+function panel_input_field(inp::NumericPanelInput, vals::AbstractArray{Float64},
+                           obs::BitArray)
+    return NumericPanelField(; name = inp.name, vals = vals,
+                             omsk = isa(inp.alg, NoPanelFill) ? nothing : obs)
 end
-function panel_input_kind(inp::CategoricalPanelInput,
-                          vals::AbstractArray)::CategoricalPanelField
-    levels = isnothing(inp.levels) ? sort!(unique(vals)) : inp.levels
-    return CategoricalPanelField(; levels = levels)
-end
-function panel_input_kind(inp::TensorPanelInput, ::AbstractArray)::TensorPanelField
-    return TensorPanelField(; axis = inp.axis, labels = inp.labels, groups = inp.groups)
-end
-"""
-    panel_write!(Z::AbstractArray, kind::NumericPanelField, vals, cols::VecInt) -> nothing
-    panel_write!(Z::AbstractArray, kind::CategoricalPanelField, vals, cols::VecInt) -> nothing
-    panel_write!(Z::AbstractArray, kind::TensorPanelField, vals, cols::VecInt) -> nothing
-
-Write one resolved Panel Field's values into the value columns of the feature matrix.
-
-# Algorithm
-
-The method that Julia selects is the algorithm.
-
- 1. [`NumericPanelField`](@ref): copy the resolved matrix into the one column.
- 2. [`CategoricalPanelField`](@ref): write a `1` in the column of each cell's level. `Z` enters the call as zeros, so the other columns of that cell stay `0`, which is what one-hot means. A label that is not a level throws.
- 3. [`TensorPanelField`](@ref): copy each third-axis slice into its own column.
-
-# Arguments
-
-  - `Z`: The feature matrix under construction, `observations × assets × features`.
-  - `kind`: The Panel Field's kind.
-  - `vals`: The resolved values.
-  - `cols`: The columns of `Z` the kind claims, in its own column order.
-
-# Validation
-
-  - On the categorical method, every resolved label is one of `kind.levels`. Raises an `ArgumentError` carrying a [`did_you_mean`](@ref) suggestion.
-
-# Returns
-
-  - `nothing`.
-
-# Related
-
-  - [`AbstractPanelFieldKind`](@ref)
-  - [`panel_resolve`](@ref)
-  - [`asset_panel`](@ref)
-"""
-function panel_write!(Z::AbstractArray, ::NumericPanelField, vals, cols::VecInt)::Nothing
-    Z[:, :, cols[1]] = vals
-    return nothing
-end
-function panel_write!(Z::AbstractArray, kind::CategoricalPanelField, vals,
-                      cols::VecInt)::Nothing
-    pos = Dict(string(l) => k for (k, l) in pairs(kind.levels))
+function panel_input_field(inp::CategoricalPanelInput, vals::AbstractArray{String},
+                           obs::BitArray)
+    levels = isnothing(inp.levels) ? sort!(unique(vals)) : String.(inp.levels)
+    pos = Dict(l => k for (k, l) in pairs(levels))
+    codes = Array{Int}(undef, size(vals))
     for i in CartesianIndices(vals)
-        k = get(pos, vals[i], nothing)
-        @argcheck(!isnothing(k),
-                  ArgumentError("the categorical Panel Field carries the label `$(vals[i])` at $(Tuple(i)), which is not one of its levels$(did_you_mean(vals[i], string.(kind.levels))). Its levels are $(join(string.(kind.levels), ", "))"))
-        Z[i[1], i[2], cols[k]] = one(eltype(Z))
+        k = get(pos, vals[i], 0)
+        @argcheck(k > 0,
+                  ArgumentError("the categorical Panel Field \"$(inp.name)\" carries the label `$(vals[i])` at $(Tuple(i)), which is not one of its levels$(did_you_mean(vals[i], levels)). Its levels are $(join(levels, ", "))"))
+        codes[i] = k
     end
-    return nothing
+    return CategoricalPanelField(; name = inp.name, levels = levels, codes = codes,
+                                 omsk = isa(inp.alg, NoPanelFill) ? nothing : obs)
 end
-function panel_write!(Z::AbstractArray, kind::TensorPanelField, vals, cols::VecInt)::Nothing
-    for l in eachindex(kind.labels)
-        Z[:, :, cols[l]] = view(vals, :, :, l)
-    end
-    return nothing
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return the names of the observed-mask columns one Panel Field contributes to `nz`.
-
-A Panel Field with a single observable takes `"<name>::observed"`. One with several takes its value column's own name with `"::observed"` appended, so a tensor Panel Field keeps one mask column per third-axis label.
-
-The separator is `"::"` rather than the `"="` the value columns use, so a mask column cannot be mistaken for a level of the same Panel Field. It is a convention and nothing more: [`asset_panel`](@ref) checks that the whole feature axis is unique, and every consumer reaches a column through the field index rather than by reading its name.
-
-# Algorithm
-
- 1. Read the observable count from [`panel_field_observables`](@ref).
- 2. When it is one, return the single name `"<name>::observed"`.
- 3. Otherwise append `"::observed"` to each name [`panel_field_labels`](@ref) gives.
-
-# Arguments
-
-  - `kind`: The Panel Field's kind.
-  - `name`: The Panel Field's own name.
-
-# Returns
-
-  - `labels::Vector{String}`: One name per observed-mask column.
-
-# Related
-
-  - [`panel_field_labels`](@ref)
-  - [`panel_field_observables`](@ref)
-  - [`asset_panel`](@ref)
-"""
-function panel_observed_labels(kind::AbstractPanelFieldKind,
-                               name::AbstractString)::Vector{String}
-    return if isone(panel_field_observables(kind))
-        ["$name::observed"]
-    else
-        ["$l::observed" for l in panel_field_labels(kind, name)]
-    end
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Lay the feature axis out, resolve every raw Panel Field, and build the field index.
-
-The first half of [`asset_panel`](@ref), split off because a build does two separable things: it decides *where* each Panel Field's columns go, and it then *writes* them. The layout half is what a reader checks a column convention against.
-
-# Algorithm
-
- 1. Walk the inputs in order. Check that each shares the observation count `T` and the asset count `N` of the first.
- 2. Resolve the input with [`panel_resolve`](@ref), and read its kind with [`panel_input_kind`](@ref).
- 3. Claim the next `length(panel_field_labels(kind, name))` columns as the Panel Field's value columns, and append their names to the feature axis.
- 4. When the fill policy is not [`NoPanelFill`](@ref), claim the next columns as its observed-mask columns, and append their names from [`panel_observed_labels`](@ref). A Panel Field that cannot blank claims none.
- 5. Record the kind, the resolved values, the observed mask and the [`PanelField`](@ref).
-
-# Arguments
-
-  - `inputs`: The raw Panel Fields, in the order their columns take on the feature axis.
-  - `T`: The observation count every input must share.
-  - `N`: The asset count every input must share.
-
-# Validation
-
-  - Every input has the observation count `T` and the asset count `N`. Raises a `DimensionMismatch` naming the Panel Field and both shapes.
-
-# Returns
-
-  - `nz::Vector{String}`: The feature axis.
-  - `kinds::Vector{AbstractPanelFieldKind}`: One kind per Panel Field, in the same order.
-  - `vals::Vector{Any}`: One resolved value array per Panel Field.
-  - `obss::Vector{Any}`: One observed-mask array per Panel Field.
-  - `pf::Vector{PanelField}`: The field index.
-
-# Related
-
-  - [`asset_panel`](@ref)
-  - [`panel_matrix`](@ref)
-  - [`panel_resolve`](@ref)
-  - [`panel_input_kind`](@ref)
-"""
-function panel_layout(inputs::AbstractVector{<:AbstractPanelFieldInput}, T::Integer,
-                      N::Integer)
-    nz = String[]
-    kinds = AbstractPanelFieldKind[]
-    vals = Any[]
-    obss = Any[]
-    pf = PanelField[]
-    for inp in inputs
-        @argcheck(size(inp.vals, 1) == T && size(inp.vals, 2) == N,
-                  DimensionMismatch("every Panel Field of one Asset Panel shares its observation axis and its asset axis, and the Panel Field \"$(inp.name)\" does not: got $(size(inp.vals, 1)) × $(size(inp.vals, 2)) against the $T × $N of \"$(inputs[1].name)\""))
-        v, o = panel_resolve(inp)
-        kind = panel_input_kind(inp, v)
-        cols = panel_claim!(nz, panel_field_labels(kind, inp.name))
-        ocols = if isa(inp.alg, NoPanelFill)
-            nothing
-        else
-            panel_claim!(nz, panel_observed_labels(kind, inp.name))
-        end
-        push!(kinds, kind)
-        push!(vals, v)
-        push!(obss, o)
-        push!(pf, PanelField(; name = inp.name, kind = kind, cols = cols, ocols = ocols))
-    end
-    return nz, kinds, vals, obss, pf
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Append a Panel Field's column names to the feature axis, and return the columns they took.
-
-The one place a column index is minted, so the feature axis and the field index cannot disagree about where a Panel Field's columns are.
-
-# Algorithm
-
- 1. Read the feature axis's current length, which is the last column already claimed.
- 2. Append `labels` to it.
- 3. Return the range of columns the append occupied, as a vector.
-
-# Arguments
-
-  - `nz`: The feature axis under construction. It is appended to.
-  - `labels`: The column names to claim.
-
-# Returns
-
-  - `cols::Vector{Int}`: The columns `labels` took, in order.
-
-# Related
-
-  - [`panel_layout`](@ref)
-  - [`asset_panel`](@ref)
-"""
-function panel_claim!(nz::AbstractVector{String}, labels::AbstractVector{String})
-    cols = collect((length(nz) + 1):(length(nz) + length(labels)))
-    append!(nz, labels)
-    return cols
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Allocate the feature matrix and write every Panel Field's values and observed masks into it.
-
-The second half of [`asset_panel`](@ref). It allocates zeros, which is what makes a one-hot column correct: [`panel_write!`](@ref) writes only the `1`s, and the rest of that cell's level columns are already `0`.
-
-# Algorithm
-
- 1. Allocate `Z` as `zeros(Float64, T, N, nc)`.
- 2. For each Panel Field, write its values into its value columns with [`panel_write!`](@ref).
- 3. Write its observed mask, one column per observable. A three-dimensional mask contributes one column per third-axis entry; a two-dimensional one contributes its single column.
-
-# Arguments
-
-  - `kinds`: One kind per Panel Field, as [`panel_layout`](@ref) returned them.
-  - `vals`: One resolved value array per Panel Field.
-  - `obss`: One observed-mask array per Panel Field.
-  - `pf`: The field index.
-  - `nc`: The length of the feature axis.
-  - `T`: The observation count.
-  - `N`: The asset count.
-
-# Returns
-
-  - `Z::Array{Float64, 3}`: The feature matrix, `observations × assets × features`.
-
-# Related
-
-  - [`asset_panel`](@ref)
-  - [`panel_layout`](@ref)
-  - [`panel_write!`](@ref)
-"""
-function panel_matrix(kinds, vals, obss, pf::AbstractVector{<:PanelField}, nc::Integer,
-                      T::Integer, N::Integer)
-    Z = zeros(Float64, T, N, nc)
-    for (k, f) in pairs(pf)
-        panel_write!(Z, kinds[k], vals[k], f.cols)
-        panel_write_observed!(Z, obss[k], f.ocols)
-    end
-    return Z
-end
-"""
-    panel_write_observed!(Z::AbstractArray, obs, ocols::Nothing) -> nothing
-    panel_write_observed!(Z::AbstractArray, obs, ocols::VecInt) -> nothing
-
-Write one Panel Field's observed mask into its observed-mask columns of the feature matrix.
-
-# Algorithm
-
-The method that Julia selects is the algorithm.
-
- 1. `ocols` is `nothing`: the Panel Field cannot blank, so it has no mask column and nothing is written.
- 2. `ocols` is a column vector: write the mask as `0`/`1`. A three-dimensional mask writes one third-axis entry per column; a two-dimensional one writes its single column.
-
-# Arguments
-
-  - `Z`: The feature matrix under construction.
-  - `obs`: The observed mask, as [`panel_resolve`](@ref) returned it.
-  - `ocols`: The observed-mask columns, or `nothing`.
-
-# Returns
-
-  - `nothing`.
-
-# Related
-
-  - [`panel_matrix`](@ref)
-  - [`panel_resolve`](@ref)
-"""
-function panel_write_observed!(::AbstractArray, ::Any, ::Nothing)::Nothing
-    return nothing
-end
-function panel_write_observed!(Z::AbstractArray, obs::AbstractMatrix,
-                               ocols::VecInt)::Nothing
-    Z[:, :, ocols[1]] = obs
-    return nothing
-end
-function panel_write_observed!(Z::AbstractArray, obs::AbstractArray{<:Any, 3},
-                               ocols::VecInt)::Nothing
-    for (l, c) in pairs(ocols)
-        Z[:, :, c] = view(obs, :, :, l)
-    end
-    return nothing
+function panel_input_field(inp::TensorPanelInput, vals::AbstractArray{Float64},
+                           obs::BitArray)
+    return TensorPanelField(; name = inp.name, axis = inp.axis, labels = inp.labels,
+                            groups = inp.groups, vals = vals,
+                            omsk = isa(inp.alg, NoPanelFill) ? nothing : obs)
 end
 """
     asset_panel(
         inputs::AbstractVector{<:AbstractPanelFieldInput};
         amsk::Option{<:AbstractMatrix{Bool}} = nothing,
         emsk::Option{<:AbstractMatrix{Bool}} = nothing
-    ) -> @NamedTuple{nz::Vector{String}, Z::Array{Float64, 3}, pnl::AssetPanel}
+    ) -> AssetPanel
 
-Build the three things a point-in-time panel enters a carrier as: its feature names, its feature matrix, and its [`AssetPanel`](@ref).
+Build the [`AssetPanel`](@ref) a carrier holds, from the raw, blank-carrying form of each Panel Field.
 
-This is the **build seam**. It takes the raw, blank-carrying form of each Panel Field with its fill policy, and it returns the resolved triple. The blanks stop here: `Z` comes out finite, so `check_feature_matrix` keeps its `assert_all_finite` guarantee and no existing consumer of a feature matrix loses one.
+This is the **build seam**. It takes each Panel Field's raw values with its fill policy, and it returns the panel alone: the panel owns the values, so there is nothing else for a carrier to be handed. The blanks stop here, and every Panel Field comes out finite.
 
-The result splats straight into the keywords the carriers already have, `ReturnsResult(; nx = nx, X = X, asset_panel(inputs)...)`, and the same three keywords reach [`prices_to_returns`](@ref).
+The result goes straight into the keyword the carriers have, `ReturnsResult(; nx = nx, X = X, pnl = asset_panel(inputs))`, and the same keyword reaches [`prices_to_returns`](@ref).
+
+The **static entry** is the rank of the raw values. An input whose values carry no observation axis builds a static panel: a fundamentals table or a sector classification with no history is that shape. There [`ForwardPanelFill`](@ref) and [`BackwardPanelFill`](@ref) are refused, because there is no observation axis to carry a value along, and the mask keywords must be `nothing`, because a static panel carries no universe mask.
 
 # Algorithm
 
  1. Check that `inputs` is not empty and that the Panel Field names are unique.
- 2. Resolve every input with [`panel_resolve`](@ref), which fills its blanks per asset along the observation axis and records the observed cells. Check that every input has the same observation count and asset count.
- 3. Read each Panel Field's kind with [`panel_input_kind`](@ref), and lay out the feature axis: the value columns from [`panel_field_labels`](@ref), then, for a Panel Field whose fill policy is not [`NoPanelFill`](@ref), the observed-mask columns from [`panel_observed_labels`](@ref).
- 4. Check that the feature axis is unique, so a Panel Field's own name cannot silently collide with another's level.
- 5. Allocate `Z` as zeros, write every Panel Field's values with [`panel_write!`](@ref), and write each observed mask as a `0`/`1` column beside the field it belongs to.
- 6. Default a missing mask to all-true, and build the [`AssetPanel`](@ref), whose constructor holds the subset invariant.
+ 2. Check each input's fill policy against its shape, with [`assert_panel_input_fill`](@ref).
+ 3. Resolve every input with [`panel_resolve`](@ref), which fills its blanks and records the observed cells, and build its Panel Field with [`panel_input_field`](@ref).
+ 4. Read the shape the Panel Fields agreed on. When it is static, check that no mask was given and return the panel.
+ 5. Otherwise fill in all-`true` masks for the ones that were not given, and return the panel. The [`AssetPanel`](@ref) constructor checks that every Panel Field shares one shape.
 
 # Arguments
 
-  - `inputs`: The raw Panel Fields, in the order their columns take on the feature axis.
-  - `amsk`: The active mask (observations × assets), or `nothing` for all-true.
-  - `emsk`: The estimation mask (observations × assets), or `nothing` for all-true.
+  - `inputs`: The raw Panel Fields, in the order their columns are derived in.
+  - `amsk`: The active mask (observations × assets), or `nothing` for all-`true`.
+  - `emsk`: The estimation mask (observations × assets), or `nothing` for all-`true`.
 
 # Validation
 
   - `!isempty(inputs)`. Raises an [`IsEmptyError`](@ref).
-  - The Panel Field names are non-empty and unique (see [`assert_panel_labels`](@ref)).
-  - Every input has the same observation count and asset count. Raises a `DimensionMismatch`.
-  - The feature axis it builds is unique. Raises an `ArgumentError` naming the two Panel Fields that collide.
-  - The masks, and the subset invariant, are checked by [`AssetPanel`](@ref).
+  - The Panel Field names are non-empty and unique. See [`assert_panel_labels`](@ref).
+  - A static input carries no directional fill policy. See [`assert_panel_input_fill`](@ref).
+  - `amsk` and `emsk` are `nothing` when the Panel Fields are static. Raises a `DimensionMismatch`.
 
 # Returns
 
-  - `nz::Vector{String}`: The feature axis, one name per column of `Z`.
-  - `Z::Array{Float64, 3}`: The feature matrix, `observations × assets × features`.
-  - `pnl::AssetPanel`: The field index and the two masks.
+  - `pnl::AssetPanel`: The Asset Panel.
 
 # Examples
 
 ```jldoctest
-julia> res = asset_panel([NumericPanelInput(; name = \"mcap\", vals = [1.0 missing; 3.0 4.0],
-                                            alg = ForwardPanelFill(; val = 0.0))]);
+julia> pnl = asset_panel([NumericPanelInput(; name = \"mcap\", vals = [1.0, 2.0, 3.0]),
+                          CategoricalPanelInput(; name = \"sector\", vals = [\"Fin\", \"Tech\", \"Fin\"])]);
 
-julia> res.nz
-2-element Vector{String}:
+julia> panel_feature_matrix(pnl)[1]
+3-element Vector{String}:
  "mcap"
- "mcap::observed"
-
-julia> res.Z[:, :, 1]
-2×2 Matrix{Float64}:
- 1.0  0.0
- 3.0  4.0
-
-julia> res.Z[:, :, 2]
-2×2 Matrix{Float64}:
- 1.0  0.0
- 1.0  1.0
+ "sector=Fin"
+ "sector=Tech"
 ```
 
 # Related
@@ -1247,6 +1051,8 @@ julia> res.Z[:, :, 2]
   - [`AssetPanel`](@ref)
   - [`AbstractPanelFieldInput`](@ref)
   - [`AbstractPanelFillAlgorithm`](@ref)
+  - [`panel_input_field`](@ref)
+  - [`panel_feature_matrix`](@ref)
   - [`ReturnsResult`](@ref)
   - [`prices_to_returns`](@ref)
   - [`Option`](@ref)
@@ -1255,91 +1061,23 @@ function asset_panel(inputs::AbstractVector{<:AbstractPanelFieldInput};
                      amsk::Option{<:AbstractMatrix{Bool}} = nothing,
                      emsk::Option{<:AbstractMatrix{Bool}} = nothing)
     @argcheck(!isempty(inputs),
-              IsEmptyError("an Asset Panel needs at least one Panel Field input: an empty build describes no column of the feature axis"))
+              IsEmptyError("an Asset Panel needs at least one Panel Field input: an empty build carries no feature data"))
     assert_panel_labels([inp.name for inp in inputs], "the Panel Field names")
-    T, N = size(inputs[1].vals, 1), size(inputs[1].vals, 2)
-    nz, kinds, vals, obss, pf = panel_layout(inputs, T, N)
-    assert_panel_feature_axis(nz, pf)
-    Z = panel_matrix(kinds, vals, obss, pf, length(nz), T, N)
-    return (; nz = nz, Z = Z,
-            pnl = AssetPanel(; pf = pf, amsk = isnothing(amsk) ? trues(T, N) : amsk,
-                             emsk = isnothing(emsk) ? trues(T, N) : emsk))
-end
-"""
-    assert_panel_feature_axis(nz::VecStr, pf::AbstractVector{<:PanelField}) -> nothing
-
-Check that the feature axis an Asset Panel build produced holds no repeated name.
-
-A repeated name is the one way the naming conventions can bite. `"<field>=<level>"` and `"<field>::observed"` are unique within one Panel Field by construction, so a collision is always between two Panel Fields — a field literally named `"sector=Tech"` beside a `"sector"` field with a `"Tech"` level, say. The index makes the collision harmless to a consumer, which reads columns as integers; it is refused anyway, because `ReturnsResult` requires a unique `nz` and would otherwise refuse it later with a message naming no Panel Field.
-
-# Algorithm
-
- 1. Find the first repeated name of `nz`.
- 2. Throw when there is one, naming it and the Panel Fields that claim its two columns.
-
-# Arguments
-
-  - `nz`: The feature axis the build produced.
-  - `pf`: The field index the build produced.
-
-# Validation
-
-  - `allunique(nz)`. Raises an `ArgumentError`.
-
-# Returns
-
-  - `nothing`.
-
-# Related
-
-  - [`asset_panel`](@ref)
-  - [`PanelField`](@ref)
-  - [`ReturnsResult`](@ref)
-"""
-function assert_panel_feature_axis(nz::VecStr, pf::AbstractVector{<:PanelField})::Nothing
-    j = findfirst(k -> nz[k] in view(nz, 1:(k - 1)), eachindex(nz))
-    if !isnothing(j)
-        # `j` is the *second* occurrence, so the first one exists. `something` says so to
-        # the type system, which otherwise carries a `Nothing` into `panel_column_owner`.
-        i = something(findfirst(==(nz[j]), nz), j)
-        owners = [panel_column_owner(pf, c) for c in (i, j)]
-        throw(ArgumentError("the Asset Panel build produced the feature name \"$(nz[j])\" twice, at columns $i and $j, claimed by the Panel Fields \"$(owners[1])\" and \"$(owners[2])\". A carrier needs a unique feature axis, so rename one of the two Panel Fields."))
+    pf = AbstractPanelField[]
+    for inp in inputs
+        assert_panel_input_fill(inp)
+        v, o = panel_resolve(inp)
+        push!(pf, panel_input_field(inp, v, o))
     end
-    return nothing
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return the name of the Panel Field that claims one column of the feature axis.
-
-The inverse of the field index, and the only reader of it that walks: the index is keyed by Panel Field, and this answers the other question, which an error message asks once and nothing else asks at all.
-
-# Algorithm
-
- 1. Walk the field index, and return the first Panel Field whose value columns or observed-mask columns hold `c`.
- 2. Return `"?"` when no Panel Field claims it, which the [`AssetPanel`](@ref) constructor makes unreachable through a built panel.
-
-# Arguments
-
-  - `pf`: The field index.
-  - `c`: The column of the feature axis.
-
-# Returns
-
-  - `name::String`: The claiming Panel Field's name, or `"?"`.
-
-# Related
-
-  - [`assert_panel_feature_axis`](@ref)
-  - [`PanelField`](@ref)
-"""
-function panel_column_owner(pf::AbstractVector{<:PanelField}, c::Integer)::String
-    for f in pf
-        if c in f.cols || (!isnothing(f.ocols) && c in f.ocols)
-            return String(f.name)
-        end
+    ax = panel_field_axes(pf[1])
+    if isone(length(ax))
+        @argcheck(isnothing(amsk) && isnothing(emsk),
+                  DimensionMismatch("the Panel Fields of this build carry no observation axis, so the Asset Panel is static and carries no universe mask; drop amsk and emsk, or give the raw values an observation axis"))
+        return AssetPanel(; pf = pf)
     end
-    return "?"
+    T, N = ax
+    return AssetPanel(; pf = pf, amsk = isnothing(amsk) ? trues(T, N) : amsk,
+                      emsk = isnothing(emsk) ? trues(T, N) : emsk)
 end
 export asset_panel, NumericPanelInput, CategoricalPanelInput, TensorPanelInput, NoPanelFill,
        ConstantPanelFill, ForwardPanelFill, BackwardPanelFill

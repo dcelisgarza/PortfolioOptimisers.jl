@@ -411,7 +411,7 @@ This is the single-partition case of the round-trip argument that closed the end
 
 The source is a [`NetworkEstimator`](@ref) and never a precomputed [`PhylogenyResult`](@ref), because an Estimator does not hold a Result (see `CONTEXT.md` §1). This producer is therefore **endogenous**: the graph is filtered from the returns correlation, so it measures topology the correlation implies rather than structure outside it, and it refits on every fold and every subproblem.
 
-A `FeatureDistance` nested inside the source's own `de` does not recurse: the producer runs inside `prior(pe, X, F; …)`, before `pr.Z` exists, so it fails loudly with an `IsNothingError` naming the missing feature matrix.
+A `FeatureDistance` nested inside the source's own `de` does not recurse: the producer runs inside `prior(pe, X, F; …)`, before `pr.pnl` exists, so it fails loudly with an `IsNothingError` naming the missing feature matrix.
 
 # Validation
 
@@ -841,9 +841,14 @@ function prior(pe::FeaturePrior, X::MatNum, F::Option{<:MatNum} = nothing; dims:
     end
     pr = prior(pe.pe, X, F; kwargs...)
     Z = feature_matrix(pe.ze, pr, X, F, pe.sets; kwargs...)
-    # This estimator only attaches a feature matrix, so `Z` is the single deviation from the
-    # wrapped result and everything else forwards untouched (see [`forward_prior`](@ref)).
-    return forward_prior(pr; Z = Z)
+    # This estimator only attaches a feature matrix, so the panel it builds is the single
+    # deviation from the wrapped result and everything else forwards untouched (see
+    # [`forward_prior`](@ref)). A produced matrix is nameless — a producer runs inside
+    # `prior(pe, X, F; …)` with raw matrices — so the panel names its columns positionally,
+    # which is exactly what a nameless `Z` offered a selector before: an integer resolves,
+    # and a name does not.
+    pnl = feature_matrix_panel(["_z$(k)" for k in 1:size(Z, ndims(Z))], Z)
+    return forward_prior(pr; pnl = pnl)
 end
 
 function factor_residual_config(pe::FeaturePrior)

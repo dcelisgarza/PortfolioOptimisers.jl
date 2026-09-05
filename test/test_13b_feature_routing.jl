@@ -30,7 +30,7 @@ end
     # derived from it cannot coincide with a correlation distance by accident.
     Zd = abs.(randn(rng, na, 6))
     rd = ReturnsResult(; nx = rd0.nx, X = rd0.X, nf = rd0.nf, F = rd0.F, ts = rd0.ts,
-                       nz = ["z$i" for i in 1:6], Z = Zd)
+                       pnl = feature_matrix_panel(["z$i" for i in 1:6], Zd))
     # The derived carrier: factor loadings, `assets × factors`, computed by the prior.
     fpe = FeaturePrior(; pe = FactorPrior(), ze = RegressionFeatures())
     pr_z = prior(fpe, rd)
@@ -58,7 +58,7 @@ end
         # `z_src = :prior` selects the derived carrier instead, and the two carriers give
         # different answers, so the selector is doing real work.
         clr_p = clusterise(cle_f, pr_z; z_src = :prior)
-        @test clr_p.D == distance(fde, pr_z.Z)
+        @test clr_p.D == distance(fde, panel_feature_matrix(pr_z.pnl)[2])
         @test clr_p.D != clr_d.D
 
         # With both carriers populated, `z_src` picks between them rather than falling back.
@@ -175,7 +175,7 @@ end
         @test clusterise(cle, rd; dims = 1).D == distance(fde, Zd; dims = 1)
         Zsq = abs.(randn(rng, na, na))
         rd_sq = ReturnsResult(; nx = rd0.nx, X = rd0.X, ts = rd0.ts,
-                              nz = ["z$i" for i in 1:na], Z = Zsq)
+                              pnl = feature_matrix_panel(["z$i" for i in 1:na], Zsq))
         # A square `Z` is the only shape where a transposed read would not throw, so it is
         # the only one that can prove `dims` is not consulted.
         @test clusterise(cle, rd_sq; dims = 2).D == distance(fde, Zsq; dims = 1)
@@ -201,7 +201,7 @@ end
             end
             # The clusters — hence the weights — actually come from `Z`.
             @test wd.clr.D == distance(fde, Zd)
-            @test wp.clr.D == distance(fde, pr_z.Z)
+            @test wp.clr.D == distance(fde, panel_feature_matrix(pr_z.pnl)[2])
             @test wd.w != wc.w
             @test wp.w != wd.w
         end
@@ -282,7 +282,7 @@ end
     each entry may name and what an entry that resolves against nothing does.
     =#
     @testset "sel cuts the feature axis, and names resolve against nz" begin
-        nzd = rd.nz
+        nzd = panel_feature_matrix(rd.pnl)[1]
         D_all = distance(fde, Zd; dims = 1)
         D_cut = distance(fde, Zd[:, 1:2]; dims = 1)
 
@@ -407,20 +407,23 @@ end
             @test D_sq == distance(fde, Zsq[:, 1:2]; dims = 1)
         end
 
-        @testset "the picker carries nz beside Z, and only the data carrier has it" begin
+        @testset "the picker carries nz beside Z, and each carrier names its own" begin
             Zp, nzp, zdiag = PortfolioOptimisers.feature_matrix_picker(pr_noz, rd, :data)
-            @test Zp === rd.Z
-            @test nzp === rd.nz
+            @test Zp == panel_feature_matrix(rd.pnl)[2]
+            @test nzp == panel_feature_matrix(rd.pnl)[1]
             @test zdiag === :data
-            # `LowOrderPrior` holds `Z` without `nz`, so the prior carrier gives none.
+            # A produced panel names its columns positionally, so a caller's own name still
+            # cannot resolve against the prior carrier.
             Zq, nzq, _ = PortfolioOptimisers.feature_matrix_picker(pr_z, rd, :prior)
-            @test Zq === pr_z.Z
-            @test isnothing(nzq)
+            @test Zq == panel_feature_matrix(pr_z.pnl)[2]
+            @test nzq == ["_z$(k)" for k in eachindex(nzq)]
+            @test isdisjoint(nzq, nzp)
         end
 
         @testset "the selector survives the whole routed path" begin
             de_sel = FeatureDistance(; sel = ["z1", "z2"])
-            rd_cut = ReturnsResult(; nx = rd.nx, X = rd.X, nz = nzd[1:2], Z = Zd[:, 1:2])
+            rd_cut = ReturnsResult(; nx = rd.nx, X = rd.X,
+                                   pnl = feature_matrix_panel(nzd[1:2], Zd[:, 1:2]))
             pm_sel = phylogeny_matrix(NetworkEstimator(; de = de_sel), pr_noz; rd = rd,
                                       z_src = :data)
             pm_ref = phylogeny_matrix(NetworkEstimator(; de = fde), pr_noz; rd = rd_cut,
@@ -429,11 +432,16 @@ end
                                       z_src = :data)
             @test pm_sel.X == pm_ref.X
             @test pm_sel.X != pm_all.X
-            # A name still cannot resolve on the derived carrier, which carries no names.
-            @test_throws PortfolioOptimisers.IsNothingError phylogeny_matrix(NetworkEstimator(;
-                                                                                              de = de_sel),
-                                                                             pr_z; rd = rd,
-                                                                             z_src = :prior)
+            # A caller's own name still cannot resolve on the derived carrier, whose
+            # columns are named positionally: `strict` names the entry that failed, and
+            # the default drops every entry and reports an empty selection.
+            de_strict = FeatureDistance(; sel = ["z1", "z2"], strict = true)
+            @test_throws ArgumentError phylogeny_matrix(NetworkEstimator(; de = de_strict),
+                                                        pr_z; rd = rd, z_src = :prior)
+            @test_throws PortfolioOptimisers.IsEmptyError phylogeny_matrix(NetworkEstimator(;
+                                                                                            de = de_sel),
+                                                                           pr_z; rd = rd,
+                                                                           z_src = :prior)
         end
 
         @testset "factory carries the new fields" begin

@@ -1428,7 +1428,7 @@ function cross_sectional_cell_stats(A::AbstractMatrix, w::Option{<:MatNum}, t::I
 end
 """
     cross_sectional_groups(B::AbstractArray{<:Real, 3}) -> Matrix{Int}
-    cross_sectional_groups(pnl::AssetPanel, Z::Arr3Num, name::AbstractString) -> Matrix{Int}
+    cross_sectional_groups(pnl::AssetPanel, name::AbstractString) -> Matrix{Int}
 
 Derive the group labels of a cross-sectional transform from a one-hot block of a Panel Field.
 
@@ -1442,8 +1442,7 @@ A categorical Panel Field claims one column of the feature axis per level, and a
 # Arguments
 
   - `B::AbstractArray{<:Real, 3}`: One-hot block `observations × assets × levels`.
-  - `pnl::AssetPanel`: Asset Panel holding the field index.
-  - `Z::Arr3Num`: Time-varying feature matrix `observations × assets × features` the field index addresses.
+  - `pnl::AssetPanel`: Asset Panel holding the categorical Panel Field.
   - `name::AbstractString`: Name of the categorical Panel Field to read.
 
 # Validation
@@ -1493,12 +1492,13 @@ function cross_sectional_groups(B::AbstractArray{<:Real, 3})::Matrix{Int}
     end
     return G
 end
-function cross_sectional_groups(pnl::AssetPanel, Z::Arr3Num,
-                                name::AbstractString)::Matrix{Int}
+function cross_sectional_groups(pnl::AssetPanel, name::AbstractString)::Matrix{Int}
     f = panel_field(pnl, name)
-    @argcheck(isa(f.kind, CategoricalPanelField),
-              ArgumentError("group labels come from a one-hot block, so the Panel Field \"$name\" must be a CategoricalPanelField, got a $(nameof(typeof(f.kind)))"))
-    return cross_sectional_groups(view(Z, :, :, f.cols))
+    @argcheck(isa(f, CategoricalPanelField),
+              ArgumentError("a group label is the code of a categorical Panel Field, so \"$name\" must be a CategoricalPanelField, got a $(nameof(typeof(f)))"))
+    @argcheck(ndims(f.codes) == 2,
+              DimensionMismatch("a group label is read per observation and asset, so the Panel Field \"$name\" must be time-varying; this Asset Panel is static"))
+    return Matrix{Int}(f.codes)
 end
 
 export CrossSectionalWinsoriser, CrossSectionalTanhShrinker, CrossSectionalStandardiser,

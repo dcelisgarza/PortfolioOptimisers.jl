@@ -48,7 +48,7 @@ abstract type AbstractDescriptorEstimator <: AbstractEstimator end
 
 Compute the Descriptor of a carrier.
 
-This is the verb every Descriptor Estimator answers. It reads the Panel Fields the estimator names from the carrier's feature matrix `rd.Z`, through the field index of `rd.pnl`, and never from the column names of `rd.nz`. Returns are not a Panel Field, so a member that reads them reads `rd.X`. Every member follows two conventions: the value at an observation uses information up to and including that observation, and every cell where the active mask of the Asset Panel is `false` is `NaN`.
+This is the verb every Descriptor Estimator answers. It reads the Panel Fields the estimator names off `rd.pnl`, which owns their values. Returns are not a Panel Field, so a member that reads them reads `rd.X`. Every member follows two conventions: the value at an observation uses information up to and including that observation, and every cell where the active mask of the Asset Panel is `false` is `NaN`.
 
 # Arguments
 
@@ -79,7 +79,7 @@ This is the one route from a Panel Field's name to its values, and every Descrip
 
 # Algorithm
 
- 1. Look the Panel Field up by name through [`panel_field`](@ref), and copy its value column of `rd.Z` into a floating point matrix.
+ 1. Look the Panel Field up by name through [`panel_field`](@ref), and copy its values into a floating point matrix.
  2. When the Panel Field carries an observed-mask column, write `NaN` into every cell whose mask entry is zero.
  3. For a vector of `name => coefficient` pairs, read each named field the same way, and return the sum of the fields, each multiplied by its coefficient. A `NaN` in any term is a `NaN` in the sum.
 
@@ -102,12 +102,12 @@ This is the one route from a Panel Field's name to its values, and every Descrip
 # Examples
 
 ```jldoctest
-julia> res = asset_panel([NumericPanelInput(; name = \"mcap\", vals = [1.0 2.0; NaN 4.0],
+julia> pnl = asset_panel([NumericPanelInput(; name = \"mcap\", vals = [1.0 2.0; NaN 4.0],
                                             alg = ForwardPanelFill(; val = 0.0)),
                           NumericPanelInput(; name = \"debt\", vals = [0.5 1.0; 1.5 2.0])];
                          amsk = trues(2, 2), emsk = trues(2, 2));
 
-julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = zeros(2, 2), res...);
+julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = zeros(2, 2), pnl = pnl);
 
 julia> PortfolioOptimisers.panel_field_values(rd, \"mcap\")
 2×2 Matrix{Float64}:
@@ -131,18 +131,18 @@ julia> PortfolioOptimisers.panel_field_values(rd, [\"mcap\" => 1, \"debt\" => 1]
 function panel_field_values(rd::ReturnsResult, name::AbstractString)::Matrix{<:Real}
     pnl = rd.pnl
     @argcheck(!isnothing(pnl),
-              IsNothingError("a Descriptor reads its Panel Fields through the field index of an Asset Panel, and rd.pnl is nothing. Build the carrier with the `pnl`, `nz` and `Z` that asset_panel returns."))
+              IsNothingError("a Descriptor reads its Panel Fields off an Asset Panel, and rd.pnl is nothing. Build the carrier with the `pnl` that asset_panel returns."))
     f = panel_field(pnl, name)
-    @argcheck(isa(f.kind, NumericPanelField),
-              ArgumentError("a Descriptor reads one number per observation and asset, so the Panel Field \"$name\" must be a NumericPanelField, got a $(nameof(typeof(f.kind))), which occupies $(length(f.cols)) column(s) of the feature axis"))
-    Z = rd.Z
-    Tf = float(eltype(Z))
-    V = Matrix{Tf}(view(Z, :, :, f.cols[1]))
-    ocols = f.ocols
-    if !isnothing(ocols)
-        O = view(Z, :, :, ocols[1])
-        for k in eachindex(V, O)
-            if iszero(O[k])
+    @argcheck(isa(f, NumericPanelField),
+              ArgumentError("a Descriptor reads one number per observation and asset, so the Panel Field \"$name\" must be a NumericPanelField, got a $(nameof(typeof(f)))"))
+    @argcheck(ndims(f.vals) == 2,
+              DimensionMismatch("a Descriptor reads one number per observation and asset, so the Panel Field \"$name\" must be time-varying; this Asset Panel is static"))
+    Tf = float(eltype(f.vals))
+    V = Matrix{Tf}(f.vals)
+    omsk = f.omsk
+    if !isnothing(omsk)
+        for k in CartesianIndices(V)
+            if !omsk[k]
                 V[k] = Tf(NaN)
             end
         end
@@ -188,7 +188,7 @@ Read the Asset Panel a Descriptor needs out of a carrier.
 function descriptor_asset_panel(rd::ReturnsResult)::AssetPanel
     pnl = rd.pnl
     @argcheck(!isnothing(pnl),
-              IsNothingError("a Descriptor is `NaN` wherever the active mask of an Asset Panel is `false`, and rd.pnl is nothing. Build the carrier with the `pnl`, `nz` and `Z` that asset_panel returns."))
+              IsNothingError("a Descriptor is `NaN` wherever the active mask of an Asset Panel is `false`, and rd.pnl is nothing. Build the carrier with the `pnl` that asset_panel returns."))
     return pnl
 end
 """
@@ -246,7 +246,7 @@ Every Descriptor Estimator ends with this call, so the convention that an inacti
 # Examples
 
 ```jldoctest
-julia> pnl = AssetPanel(; pf = [PanelField(; name = \"a\", kind = NumericPanelField(), cols = [1])],
+julia> pnl = AssetPanel(; pf = [NumericPanelField(; name = \"a\", vals = [1.0 2.0; 3.0 4.0])],
                         amsk = [true false; true true], emsk = [true false; true true]);
 
 julia> D = [1.0 2.0; 3.0 4.0];
@@ -347,10 +347,10 @@ A weight is not required to be positive: a negative capitalisation is a data err
 # Examples
 
 ```jldoctest
-julia> res = asset_panel([NumericPanelInput(; name = \"market_cap\", vals = [1.0 3.0; 2.0 2.0])];
+julia> pnl = asset_panel([NumericPanelInput(; name = \"market_cap\", vals = [1.0 3.0; 2.0 2.0])];
                          amsk = trues(2, 2), emsk = trues(2, 2));
 
-julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = [0.1 0.2; -0.1 0.3], res...);
+julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = [0.1 0.2; -0.1 0.3], pnl = pnl);
 
 julia> PortfolioOptimisers.market_return_series(rd, \"market_cap\")
 2-element Vector{Float64}:

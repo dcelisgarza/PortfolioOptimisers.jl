@@ -136,11 +136,11 @@ Compute the Factor Exposure derived from the Factor Exposure of another factor.
 # Examples
 
 ```jldoctest
-julia> res = asset_panel([NumericPanelInput(; name = \"benchmark_weights\",
+julia> pnl = asset_panel([NumericPanelInput(; name = \"benchmark_weights\",
                                             vals = [1.0 1.0; 1.0 1.0])]; amsk = trues(2, 2),
                          emsk = trues(2, 2));
 
-julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = zeros(2, 2), res...);
+julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = zeros(2, 2), pnl = pnl);
 
 julia> xe = DerivedExposure(; source = \"size\", f = x -> x .^ 2, scoring = nothing);
 

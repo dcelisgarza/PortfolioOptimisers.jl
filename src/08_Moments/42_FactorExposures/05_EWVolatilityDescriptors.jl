@@ -192,11 +192,11 @@ The warm-up and the bias correction belong to the variance estimator, so a cell 
 # Examples
 
 ```jldoctest
-julia> res = asset_panel([NumericPanelInput(; name = \"market_cap\",
+julia> pnl = asset_panel([NumericPanelInput(; name = \"market_cap\",
                                             vals = [1.0 2.0; 3.0 4.0; 5.0 6.0])];
                          amsk = trues(3, 2), emsk = trues(3, 2));
 
-julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = [0.1 0.2; -0.1 0.0; 0.05 0.05], res...);
+julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = [0.1 0.2; -0.1 0.0; 0.05 0.05], pnl = pnl);
 
 julia> descriptor(EWVolatility(; half_life = 1), rd)
 3×2 Matrix{Float64}:
@@ -458,11 +458,11 @@ The warm-up and the bias correction belong to the variance estimator, so a cell 
 # Examples
 
 ```jldoctest
-julia> res = asset_panel([NumericPanelInput(; name = \"market_cap\",
+julia> pnl = asset_panel([NumericPanelInput(; name = \"market_cap\",
                                             vals = [1.0 2.0; 3.0 4.0; 5.0 6.0])];
                          amsk = trues(3, 2), emsk = trues(3, 2));
 
-julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = [0.1 0.2; -0.1 0.0; 0.05 0.05], res...);
+julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = [0.1 0.2; -0.1 0.0; 0.05 0.05], pnl = pnl);
 
 julia> descriptor(EWResidualVolatility(; half_life = 1, beta_half_life = 1), rd)
 3×2 Matrix{Float64}:

@@ -32,7 +32,7 @@ function ew_hand_panel(fields::AbstractVector{<:Pair{String, <:AbstractMatrix}},
     inputs = [NumericPanelInput(; name = n, vals = v, alg = ForwardPanelFill(; val = 0.0))
               for (n, v) in fields]
     res = asset_panel(inputs; amsk = amsk, emsk = emsk)
-    return ReturnsResult(; nx = ["A" * string(i) for i in 1:size(X, 2)], X = X, res...)
+    return ReturnsResult(; nx = ["A" * string(i) for i in 1:size(X, 2)], X = X, pnl = res)
 end
 
 # Two matrices agree when they hold `NaN` in the same cells and are close everywhere else.
@@ -94,9 +94,9 @@ end
 
 # Read one raw field and its observed mask back off the carrier by column name.
 function ew_raw_field(rd::ReturnsResult, name::AbstractString)
-    Z = rd.Z
-    col = findfirst(==(name), rd.nz)
-    ocol = findfirst(==(name * "::observed"), rd.nz)
+    Z = panel_feature_matrix(rd.pnl)[2]
+    col = findfirst(==(name), panel_feature_matrix(rd.pnl)[1])
+    ocol = findfirst(==(name * "::observed"), panel_feature_matrix(rd.pnl)[1])
     V = Matrix{Float64}(Z[:, :, col])
     if !isnothing(ocol)
         V[iszero.(Z[:, :, ocol])] .= NaN
@@ -400,7 +400,7 @@ end
             @test any(isfinite, D)
         end
     end
-    @testset "Every one equals its census formula, written from rd.nz and rd.Z" begin
+    @testset "Every one equals its census formula, written from panel_feature_matrix(rd.pnl)[1] and panel_feature_matrix(rd.pnl)[2]" begin
         lam, mo = exp2(-inv(5.0)), 5
         X = rd.X
         vol = ew_raw_field(rd, "adj_volume")

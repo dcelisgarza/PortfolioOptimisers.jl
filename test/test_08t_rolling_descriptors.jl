@@ -36,7 +36,7 @@ function rolling_hand_panel(X::AbstractMatrix{<:Real};
     T, N = size(X)
     res = asset_panel([NumericPanelInput(; name = "market_cap", vals = ones(T, N))];
                       amsk = amsk, emsk = emsk)
-    return ReturnsResult(; nx = ["A" * string(i) for i in 1:N], X = X, res...)
+    return ReturnsResult(; nx = ["A" * string(i) for i in 1:N], X = X, pnl = res)
 end
 
 # The window sum of log returns, written out by hand: a missing return contributes zero, and

@@ -56,7 +56,7 @@ LowOrderPrior
      ow ┼ nothing
      rr ┼ nothing
     fpr ┼ nothing
-      Z ┴ nothing
+    pnl ┴ nothing
 ```
 
 # Related
@@ -766,11 +766,11 @@ The method that Julia selects is the algorithm.
   - [`ReturnsResult`](@ref)
   - [`LowOrderPrior`](@ref)
 """
-function carrier_feature_names(::AbstractPriorResult)
-    return nothing
+function carrier_asset_panel(pr::AbstractPriorResult)
+    return pr.pnl
 end
-function carrier_feature_names(rd::ReturnsResult)
-    return rd.nz
+function carrier_asset_panel(rd::ReturnsResult)
+    return rd.pnl
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -786,7 +786,7 @@ A missing feature matrix is **not** an error here: `Z` is only required when a [
  1. Check that `z_src` names one of the two carriers, with [`assert_source_selector`](@ref).
  2. Read `Zp`, the prior carrier's feature matrix, and `Zd`, the returns result's. `Zd` is `nothing` when there is no returns result.
  3. Select `Z`: `Zp` when there is no returns result, or when `z_src` is `:prior`. `Zd` otherwise.
- 4. Select `nz`, the names of `Z`'s feature axis, off **the carrier that supplied `Z`**: `rd.nz` when the returns result was selected, and [`carrier_feature_names`](@ref) of the prior carrier otherwise. The second arm is not always `nothing`, because [`Pr_RR`](@ref) admits a [`ReturnsResult`](@ref) in the `pr` slot.
+ 4. Derive `nz` and `Z` together from the panel that was picked, with [`panel_feature_matrix`](@ref). They come off one object, so they cannot disagree about which carrier supplied them.
  5. Make the diagnostic `z_diag`: `:neither` when both `Zp` and `Zd` are `nothing`, and `z_src` itself otherwise. The two cases are distinct, because the second says a matrix exists on the carrier that was not selected.
  6. Return `Z`, `nz` and `z_diag`.
 
@@ -815,10 +815,10 @@ A missing feature matrix is **not** an error here: `Z` is only required when a [
 """
 function feature_matrix_picker(pr::Pr_RR, rd::Option{<:ReturnsResult}, z_src::Symbol)
     assert_source_selector(z_src, :z_src)
-    Zp = pr.Z
-    Zd = isnothing(rd) ? nothing : rd.Z
-    Z, nz = isnothing(rd) || z_src == :prior ? (Zp, carrier_feature_names(pr)) : (Zd, rd.nz)
-    return Z, nz, isnothing(Zp) && isnothing(Zd) ? :neither : z_src
+    pp = carrier_asset_panel(pr)
+    pd = isnothing(rd) ? nothing : rd.pnl
+    nz, Z = panel_feature_matrix(isnothing(rd) || z_src == :prior ? pp : pd)
+    return Z, nz, isnothing(pp) && isnothing(pd) ? :neither : z_src
 end
 """
     clusterise(cle::AbstractClustersEstimator, pr::AbstractPriorResult; kwargs...)
@@ -1243,7 +1243,7 @@ Keywords correspond to the struct's fields.
 
 ## The factor block
 
-A prior fit through a factor model carries two distributions: one over the assets, in the carrier's own fields, and one over the factors. The factor one is a **nested `LowOrderPrior`** in `fpr` rather than a set of `f_`-prefixed flat fields, so it gains every field the carrier has — `w`, `ens`, `kld` and `ow` as well as `mu` and `sigma` — and gains any field added in future without a second edit. Its `X` is the factor returns matrix, over the same observations as the asset `X`; `fpr.Z` is therefore factors × features, which is why an asset-axis `Z` never comes from it.
+A prior fit through a factor model carries two distributions: one over the assets, in the carrier's own fields, and one over the factors. The factor one is a **nested `LowOrderPrior`** in `fpr` rather than a set of `f_`-prefixed flat fields, so it gains every field the carrier has — `w`, `ens`, `kld` and `ow` as well as `mu` and `sigma` — and gains any field added in future without a second edit. Its `X` is the factor returns matrix, over the same observations as the asset `X`; `fpr.pnl` is therefore a panel over the factors, which is why an asset-axis panel never comes from it.
 
 `fpr` travels with `rr`: the two are the factor block, and the constructor requires them together or not at all. `rr` is what projects the block onto the assets (`mu ≈ rr.M * fpr.mu + rr.b`), so a factor distribution with no loadings could not be read against this asset axis.
 
@@ -1257,7 +1257,7 @@ The flat names are **virtual reads** of the nested block, so code written agains
 
 **`pr.fpr.mu` is the public read**; the flat `f_`-prefixed names are a **compatibility surface**, kept so that code written against the pre-nesting shape keeps working, and useful where a value-or-`nothing` read without branching is wanted.
 
-The reason is not taste. The flat surface is **partial and frozen**: there are six flat names over twelve fields, so `fpr.X` — the factor returns matrix — and `fpr.Z`, `fpr.chol` and `fpr.rr` have no flat spelling at all and never will. A surface that cannot express the whole block cannot be the way to read it. The set is fixed at the six here and the seven on [`HighOrderPrior`](@ref); a field added to a carrier in future is reachable as `pr.fpr.<name>` and gains no `f_` counterpart, so nothing has to be added in two places to stay complete.
+The reason is not taste. The flat surface is **partial and frozen**: there are six flat names over twelve fields, so `fpr.X` — the factor returns matrix — and `fpr.pnl`, `fpr.chol` and `fpr.rr` have no flat spelling at all and never will. A surface that cannot express the whole block cannot be the way to read it. The set is fixed at the six here and the seven on [`HighOrderPrior`](@ref); a field added to a carrier in future is reachable as `pr.fpr.<name>` and gains no `f_` counterpart, so nothing has to be added in two places to stay complete.
 
 The two reads also differ where the block is absent, which is the one case worth checking before choosing: `pr.f_mu` returns `nothing`, while `pr.fpr.mu` throws, because `fpr` is `nothing`. Guard with [`assert_prior_regression`](@ref) — `rr` and `fpr` are supplied together or not at all, so checking `rr` establishes the whole block — and then read through `fpr`.
 
@@ -1301,7 +1301,7 @@ The two matrices are not interchangeable. The reconstruction spans only the fact
   - If the factor block is present, `size(rr.M, 2) == length(fpr.mu) == size(fpr.sigma, 1)`, `size(rr.M, 1) == length(mu)`, and `size(fpr.X, 1) == size(X, 1)` — the two blocks describe the same observations. Everything internal to the factor block, including its own `w` against its own `X`, is validated by its own constructor.
   - If `o_X` is not `nothing`, `o_X !== X`, `size(o_X) == size(X)`, and `rr` is not `nothing`. `o_X !== X` is an **identity** test and not an equality test, so `o_X = copy(X)` is admitted where `o_X = X` raises. The two calls read identically at a call site, and only the first carries a matrix a later change to `X` cannot follow. What the guard rejects is the carrier that has no original distinct from the one it asserts, not a matrix whose values happen to agree.
   - If `chol` is not `nothing`, `!isempty(chol)` and `length(mu) == size(chol, 2)`.
-  - If `Z` is not `nothing`, it is non-empty, all-finite, and assets-major against `X`: `size(Z, 1) == size(X, 2)` when static, `size(Z, 1) == size(X, 1)` and `size(Z, 2) == size(X, 2)` when time-varying (see [`check_feature_matrix`](@ref)).
+  - If `pnl` is not `nothing`, its asset axis is `size(X, 2)`, and its observation axis is `size(X, 1)` when it is time-varying (see [`check_asset_panel`](@ref)).
 
 ## View parameters
 
@@ -1331,7 +1331,7 @@ LowOrderPrior
      ow ┼ nothing
      rr ┼ nothing
     fpr ┼ nothing
-      Z ┴ nothing
+    pnl ┴ nothing
 ```
 
 # Related
@@ -1393,15 +1393,15 @@ LowOrderPrior
     """
     fpr
     """
-    $(field_dict[:Z_prior])
+    $(field_dict[:pnl_prior])
     """
-    Z
+    pnl
     function LowOrderPrior(X::MatNum, o_X::Option{<:MatNum}, mu::VecNum, sigma::MatNum,
                            chol::Option{<:MatNum}, w::Option{<:ObsWeights},
                            ens::Option{<:Number}, kld::Option{<:Num_VecNum},
                            ow::Option{<:VecNum},
                            rr::Option{<:AbstractLoadingsRegressionResult},
-                           fpr::Option{<:LowOrderPrior}, Z::Option{<:MatNum_Arr3Num})
+                           fpr::Option{<:LowOrderPrior}, pnl::Option{<:AssetPanel})
         @argcheck(!isempty(X), IsEmptyError("X cannot be empty"))
         @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
         @argcheck(!isempty(sigma), IsEmptyError("sigma cannot be empty"))
@@ -1456,10 +1456,10 @@ LowOrderPrior
             @argcheck(length(mu) == size(chol, 2),
                       DimensionMismatch("length(mu) ($(length(mu))) must match size(chol, 2) ($(size(chol, 2)))"))
         end
-        check_feature_matrix(Z, size(X, 2), size(X, 1), "size(X, 2)")
+        check_asset_panel(pnl, size(X, 2), size(X, 1), "size(X, 2)")
         return new{typeof(X), typeof(o_X), typeof(mu), typeof(sigma), typeof(chol),
                    typeof(w), typeof(ens), typeof(kld), typeof(ow), typeof(rr), typeof(fpr),
-                   typeof(Z)}(X, o_X, mu, sigma, chol, w, ens, kld, ow, rr, fpr, Z)
+                   typeof(pnl)}(X, o_X, mu, sigma, chol, w, ens, kld, ow, rr, fpr, pnl)
     end
 end
 function LowOrderPrior(; X::MatNum, o_X::Option{<:MatNum} = nothing, mu::VecNum,
@@ -1468,8 +1468,8 @@ function LowOrderPrior(; X::MatNum, o_X::Option{<:MatNum} = nothing, mu::VecNum,
                        kld::Option{<:Num_VecNum} = nothing, ow::Option{<:VecNum} = nothing,
                        rr::Option{<:AbstractLoadingsRegressionResult} = nothing,
                        fpr::Option{<:LowOrderPrior} = nothing,
-                       Z::Option{<:MatNum_Arr3Num} = nothing)::LowOrderPrior
-    return LowOrderPrior(X, o_X, mu, sigma, chol, w, ens, kld, ow, rr, fpr, Z)
+                       pnl::Option{<:AssetPanel} = nothing)::LowOrderPrior
+    return LowOrderPrior(X, o_X, mu, sigma, chol, w, ens, kld, ow, rr, fpr, pnl)
 end
 # The flat `f_`-prefixed names are virtual reads of the nested factor block, so code written
 # against the pre-nesting shape is unaffected, and `f_ens`/`f_kld`/`f_ow` come for free.
@@ -1532,7 +1532,7 @@ function port_opt_view(pr::LowOrderPrior, i, args...)::LowOrderPrior
     return LowOrderPrior(; X = view(pr.X, :, i), o_X = o_X, mu = view(pr.mu, i),
                          sigma = view(pr.sigma, i, i), chol = chol, w = pr.w, ens = pr.ens,
                          kld = pr.kld, ow = pr.ow, rr = port_opt_view(pr.rr, i),
-                         fpr = pr.fpr, Z = feature_matrix_view(pr.Z, false, :, i))
+                         fpr = pr.fpr, pnl = panel_carrier_view(pr.pnl, :, i, false))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1672,7 +1672,7 @@ HighOrderPrior
        │      ow ┼ nothing
        │      rr ┼ nothing
        │     fpr ┼ nothing
-       │       Z ┴ nothing
+       │     pnl ┴ nothing
     kt ┼ 4×4 Matrix{Float64}
     D2 ┼ 4×3 SparseArrays.SparseMatrixCSC{Int64, Int64}
     L2 ┼ 3×4 SparseArrays.SparseMatrixCSC{Int64, Int64}

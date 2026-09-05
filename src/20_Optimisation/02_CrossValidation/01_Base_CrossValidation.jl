@@ -302,7 +302,7 @@ Keywords correspond to the struct's fields.
 
 ## No feature matrix
 
-This carrier used to transport a per-fold collapsed feature matrix, so that [`rebuild_returns_result`](@ref) could stack the folds into the outer problem's. It no longer does: the outer collapse is recomputed at the assembly seam from the original, unsliced `rd.Z` and the fold's weights, which is the *same* call the non-cross-validated path makes (see [`rebuild_returns_result`](@ref)). Nothing is lost — the fold's weights are on [`PredictionResult`](@ref)'s `res`, and `ts` here is the fold's slice of the original clock, which is everything the seam needs to reconstruct any fold's view.
+This carrier used to transport a per-fold collapsed feature matrix, so that [`rebuild_returns_result`](@ref) could stack the folds into the outer problem's. It no longer does: the outer collapse is recomputed at the assembly seam from the original, unsliced `rd.pnl` and the fold's weights, which is the *same* call the non-cross-validated path makes (see [`rebuild_returns_result`](@ref)). Nothing is lost — the fold's weights are on [`PredictionResult`](@ref)'s `res`, and `ts` here is the fold's slice of the original clock, which is everything the seam needs to reconstruct any fold's view.
 
 ## Validation
 
@@ -905,7 +905,7 @@ Concatenates the test-period returns from all folds into an aggregated
 
 Per-observation quantities (`X`, `F`, `B`, `ts`, `iv`) stack across folds. `ivpa` is per-asset, not per-observation, and each fold's [`reconstruct_rd`](@ref) has already collapsed it to one value per synthetic asset using *that fold's* weights, so it cannot stack — it is **reduced to the last fold's value**. This matches [`predict_realised_vols`](@ref), which reads the last row of the stacked `iv`: the premium divisor is paired with the implied volatility it divides.
 
-A feature matrix is **not** among them. It is not carried through the folds at all — [`rebuild_returns_result`](@ref) recomputes the outer collapse from the original `rd.Z`, reaching each fold through `pred[f].res.w` and `pred[f].rd.ts`, so `pred` is what this result has to retain for it.
+A feature matrix is **not** among them. It is not carried through the folds at all — [`rebuild_returns_result`](@ref) recomputes the outer collapse from the original `rd.pnl`, reaching each fold through `pred[f].res.w` and `pred[f].rd.ts`, so `pred` is what this result has to retain for it.
 
 # Fields
 
@@ -1298,7 +1298,7 @@ The benchmark collapse follows the fold's weight-drift setting whenever `rd.B` i
 
 ## No feature matrix
 
-The fold does not collapse `rd.Z`. Only one weight vector is in scope here, which is not enough to collapse a *square* feature matrix — the second contraction needs every synthetic asset's weights at once — so a fold-side collapse could only serve one of the two shapes, and the two paths into the outer problem would disagree on what a square carrier means. [`rebuild_returns_result`](@ref) instead recomputes the collapse for the whole synthetic universe at once, from the original `rd.Z` and the fold weights it reaches through `pred[f].res.w`.
+The fold does not collapse the carrier's panel. Only one weight vector is in scope here, which is not enough to collapse a *square* feature matrix — the second contraction needs every synthetic asset's weights at once — so a fold-side collapse could only serve one of the two shapes, and the two paths into the outer problem would disagree on what a square carrier means. [`rebuild_returns_result`](@ref) instead recomputes the collapse for the whole synthetic universe at once, from the original `rd.pnl` and the fold weights it reaches through `pred[f].res.w`.
 
 # Arguments
 

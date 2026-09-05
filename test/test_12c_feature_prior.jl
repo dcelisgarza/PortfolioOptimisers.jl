@@ -47,9 +47,9 @@ end
         base = prior(pe, rd)
         wrapped = prior(FeaturePrior(; pe = pe, ze = Zlit), rd)
         @test same_moments(base, wrapped)
-        @test wrapped.Z == Zlit
+        @test panel_feature_matrix(wrapped.pnl)[2] == Zlit
         # The wrapped estimator itself never grows a feature matrix.
-        @test isnothing(base.Z)
+        @test isnothing(panel_feature_matrix(base.pnl)[2])
     end
 end
 
@@ -58,16 +58,17 @@ end
     pr = prior(FeaturePrior(; pe = FactorPrior(), ze = RegressionFeatures()), rd)
     @test same_moments(fp, pr)
     # `rr.L` falls back to `rr.M` when unset, so the producer needs no branch.
-    @test pr.Z == fp.rr.L
-    @test size(pr.Z, 1) == size(rd.X, 2)
+    @test panel_feature_matrix(pr.pnl)[2] == fp.rr.L
+    @test size(panel_feature_matrix(pr.pnl)[2], 1) == size(rd.X, 2)
 
     # `L` proper, not the reconstructed `M`: a dimension-reduction regression sets both, and
     # they are different matrices.
     fpd = prior(FactorPrior(; re = DimensionReductionRegression()), rd)
     prd = prior(FeaturePrior(; pe = FactorPrior(; re = DimensionReductionRegression()),
                              ze = RegressionFeatures()), rd)
-    @test prd.Z == fpd.rr.L
-    @test size(prd.Z, 2) != size(fpd.rr.M, 2) || prd.Z != fpd.rr.M
+    @test panel_feature_matrix(prd.pnl)[2] == fpd.rr.L
+    @test size(panel_feature_matrix(prd.pnl)[2], 2) != size(fpd.rr.M, 2) ||
+          panel_feature_matrix(prd.pnl)[2] != fpd.rr.M
 
     # A prior that carries no regression cannot produce loadings, and says so.
     @test_throws PortfolioOptimisers.IsNothingError prior(FeaturePrior(;
@@ -86,8 +87,8 @@ end
                                      pe = FeaturePrior(; pe = FactorPrior(),
                                                        ze = RegressionFeatures()),
                                      sets = sets, views = blv), rd)
-    @test blout.Z == fp.rr.L
-    @test blout.Z == blin.Z
+    @test panel_feature_matrix(blout.pnl)[2] == fp.rr.L
+    @test panel_feature_matrix(blout.pnl)[2] == panel_feature_matrix(blin.pnl)[2]
 end
 
 @testset "Nesting order does not matter" begin
@@ -104,14 +105,14 @@ end
                                                                             me = EquilibriumExpectedReturns()),
                                                         ze = Zlit), sets = sets,
                                       views = views), rd)
-    @test outer.Z == inner.Z == Zlit
+    @test panel_feature_matrix(outer.pnl)[2] == panel_feature_matrix(inner.pnl)[2] == Zlit
     @test same_moments(outer, inner)
 
     # The outermost declaration wins rather than merging.
     Zother = rand(rng, na, 2)
     nested = prior(FeaturePrior(; pe = FeaturePrior(; pe = EmpiricalPrior(), ze = Zlit),
                                 ze = Zother), rd)
-    @test nested.Z == Zother
+    @test panel_feature_matrix(nested.pnl)[2] == Zother
 end
 
 @testset "Every wrapping prior forwards Z" begin
@@ -123,38 +124,50 @@ end
     f_views = LinearConstraintEstimator(; val = ["$(rd.nf[1]) == 0.01"])
 
     # Asset-space wrappers forward.
-    @test prior(BlackLittermanPrior(; pe = fpe, sets = sets, views = views), rd).Z == Zlit
-    @test prior(BayesianBlackLittermanPrior(;
-                                            pe = FeaturePrior(; pe = FactorPrior(),
-                                                              ze = Zlit), sets = xfsets,
-                                            views = f_views), rd).Z == Zlit
-    @test prior(AugmentedBlackLittermanPrior(; a_pe = fpe, sets = xfsets, a_views = views,
-                                             f_views = f_views), rd).Z == Zlit
-    @test prior(EntropyPoolingPrior(; pe = fpe, sets = sets,
-                                    mu_views = LinearConstraintEstimator(;
-                                                                         val = ["$(rd.nx[1]) == 0.01"])),
-                rd).Z == Zlit
-    @test prior(EntropyPoolingPrior(; pe = fpe, sets = sets, alg = H1_EntropyPooling(),
-                                    mu_views = LinearConstraintEstimator(;
-                                                                         val = ["$(rd.nx[1]) == 0.01"])),
-                rd).Z == Zlit
-    @test prior(OpinionPoolingPrior(;
-                                    pes = [EntropyPoolingPrior(; pe = fpe, sets = sets,
-                                                               mu_views = LinearConstraintEstimator(;
-                                                                                                    val = ["$(rd.nx[1]) == 0.01"]))],
-                                    pe2 = fpe), rd).Z == Zlit
+    @test panel_feature_matrix(prior(BlackLittermanPrior(; pe = fpe, sets = sets,
+                                                         views = views), rd).pnl)[2] == Zlit
+    @test panel_feature_matrix(prior(BayesianBlackLittermanPrior(;
+                                                                 pe = FeaturePrior(;
+                                                                                   pe = FactorPrior(),
+                                                                                   ze = Zlit),
+                                                                 sets = xfsets,
+                                                                 views = f_views), rd).pnl)[2] ==
+          Zlit
+    @test panel_feature_matrix(prior(AugmentedBlackLittermanPrior(; a_pe = fpe,
+                                                                  sets = xfsets,
+                                                                  a_views = views,
+                                                                  f_views = f_views), rd).pnl)[2] ==
+          Zlit
+    @test panel_feature_matrix(prior(EntropyPoolingPrior(; pe = fpe, sets = sets,
+                                                         mu_views = LinearConstraintEstimator(;
+                                                                                              val = ["$(rd.nx[1]) == 0.01"])),
+                                     rd).pnl)[2] == Zlit
+    @test panel_feature_matrix(prior(EntropyPoolingPrior(; pe = fpe, sets = sets,
+                                                         alg = H1_EntropyPooling(),
+                                                         mu_views = LinearConstraintEstimator(;
+                                                                                              val = ["$(rd.nx[1]) == 0.01"])),
+                                     rd).pnl)[2] == Zlit
+    @test panel_feature_matrix(prior(OpinionPoolingPrior(;
+                                                         pes = [EntropyPoolingPrior(;
+                                                                                    pe = fpe,
+                                                                                    sets = sets,
+                                                                                    mu_views = LinearConstraintEstimator(;
+                                                                                                                         val = ["$(rd.nx[1]) == 0.01"]))],
+                                                         pe2 = fpe), rd).pnl)[2] == Zlit
 
     # Factor-space wrappers drop it: their wrapped prior is fit on the factors, so its
     # feature matrix would not describe the asset axis.
     f_na = size(rd.F, 2)
     f_fpe = FeaturePrior(; pe = EmpiricalPrior(), ze = rand(rng, f_na, 3))
-    @test isnothing(prior(FactorPrior(; pe = f_fpe), rd).Z)
-    @test isnothing(prior(FactorBlackLittermanPrior(; pe = f_fpe, sets = xfsets,
-                                                    views = f_views), rd).Z)
+    @test isnothing(panel_feature_matrix(prior(FactorPrior(; pe = f_fpe), rd).pnl)[2])
+    @test isnothing(panel_feature_matrix(prior(FactorBlackLittermanPrior(; pe = f_fpe,
+                                                                         sets = xfsets,
+                                                                         views = f_views),
+                                               rd).pnl)[2])
 
     # `HighOrderPrior` needs no edits at all — it forwards any property of its child.
     hop = prior(HighOrderPriorEstimator(; pe = fpe), rd)
-    @test hop.Z == Zlit
+    @test panel_feature_matrix(hop.pnl)[2] == Zlit
 end
 
 @testset "port_opt_view slices the feature matrix" begin
@@ -173,14 +186,19 @@ end
                           (rand(rng, nobs, na, 4), (idx, Z) -> Z[:, idx, :]),
                           (rand(rng, nobs, na, na), (idx, Z) -> Z[:, idx, :]))
         pr = PortfolioOptimisers.LowOrderPrior(; X = base.X, mu = base.mu,
-                                               sigma = base.sigma, Z = Z)
+                                               sigma = base.sigma,
+                                               pnl = feature_matrix_panel(["_z$(k)"
+                                                                           for k in
+                                                                               1:size(Z,
+                                                                                      ndims(Z))],
+                                                                          Z))
         v = PortfolioOptimisers.port_opt_view(pr, i)
-        @test v.Z == expected(i, Z)
+        @test panel_feature_matrix(v.pnl)[2] == expected(i, Z)
         # Observations are taken whole: folds slice them before the prior is fit.
-        @test size(v.Z, 1) == (ndims(Z) == 3 ? nobs : length(i))
+        @test size(panel_feature_matrix(v.pnl)[2], 1) == (ndims(Z) == 3 ? nobs : length(i))
         # Repeated views compose.
         v2 = PortfolioOptimisers.port_opt_view(v, [1, 3])
-        @test v2.Z == expected([1, 3], expected(i, Z))
+        @test panel_feature_matrix(v2.pnl)[2] == expected([1, 3], expected(i, Z))
     end
 
     # The estimator-side view: a producer is configuration and passes through, a literal
@@ -198,7 +216,7 @@ end
     pr = prior(PortfolioOptimisers.port_opt_view(FeaturePrior(; pe = EmpiricalPrior(),
                                                               ze = Zlit), i),
                view(rd.X, :, i))
-    @test pr.Z == Zlit[i, :]
+    @test panel_feature_matrix(pr.pnl)[2] == Zlit[i, :]
 
     # `HighOrderPrior`'s view recurses into its child.
     hv = PortfolioOptimisers.port_opt_view(prior(HighOrderPriorEstimator(;
@@ -206,7 +224,7 @@ end
                                                                                            pe = EmpiricalPrior(),
                                                                                            ze = Zlit)),
                                                  rd), i)
-    @test hv.Z == Zlit[i, :]
+    @test panel_feature_matrix(hv.pnl)[2] == Zlit[i, :]
 end
 
 @testset "The prior carrier validates its feature matrix" begin
@@ -216,32 +234,36 @@ end
     base = prior(EmpiricalPrior(), rd)
     lop(; kwargs...) = PortfolioOptimisers.LowOrderPrior(; X = base.X, mu = base.mu,
                                                          sigma = base.sigma, kwargs...)
+    # A produced feature matrix is nameless, so the panel it enters the carrier as names its
+    # columns positionally.
+    lopz(Z) = lop(; pnl = feature_matrix_panel(["_z$(k)" for k in 1:size(Z, ndims(Z))], Z))
 
     # The carrier has no squareness flag, and the break is loud rather than silently
     # absorbed: there is no `kwargs...` on the keyword constructor to swallow it.
-    @test_throws MethodError lop(; Z = rand(rng, na, na), z_sq = true)
+    @test_throws MethodError lop(; pnl = feature_matrix_panel(["_z1"], rand(rng, na, 1)),
+                                 z_sq = true)
     # A square derived `Z` is an ordinary matrix here -- nothing to declare, nothing to check.
-    @test size(lop(; Z = rand(rng, na, na)).Z) == (na, na)
-    @test size(lop(; Z = rand(rng, nobs, na, na)).Z) == (nobs, na, na)
+    @test size(panel_feature_matrix(lopz(rand(rng, na, na)).pnl)[2]) == (na, na)
+    @test size(panel_feature_matrix(lopz(rand(rng, nobs, na, na)).pnl)[2]) == (nobs, na, na)
 
     # Assets-major, bound to `X`.
-    @test_throws DimensionMismatch lop(; Z = rand(rng, 4, na))
-    @test_throws DimensionMismatch lop(; Z = rand(rng, na + 1, 4))
-    @test_throws DimensionMismatch lop(; Z = rand(rng, nobs - 1, na, 4))
-    @test_throws DimensionMismatch lop(; Z = rand(rng, nobs, na + 1, 4))
+    @test_throws DimensionMismatch lopz(rand(rng, 4, na))
+    @test_throws DimensionMismatch lopz(rand(rng, na + 1, 4))
+    @test_throws DimensionMismatch lopz(rand(rng, nobs - 1, na, 4))
+    @test_throws DimensionMismatch lopz(rand(rng, nobs, na + 1, 4))
 
     # Never imputed: a non-finite entry is rejected rather than mapped to a plausible,
     # wrong distance.
     Zbad = rand(rng, na, 4)
     Zbad[2, 3] = NaN
-    @test_throws PortfolioOptimisers.IsNonFiniteError lop(; Z = Zbad)
+    @test_throws PortfolioOptimisers.IsNonFiniteError lopz(Zbad)
     Zinf = rand(rng, na, 4)
     Zinf[1, 1] = Inf
-    @test_throws PortfolioOptimisers.IsNonFiniteError lop(; Z = Zinf)
-    @test_throws PortfolioOptimisers.IsEmptyError lop(; Z = Matrix{Float64}(undef, na, 0))
+    @test_throws PortfolioOptimisers.IsNonFiniteError lopz(Zinf)
+    @test_throws PortfolioOptimisers.IsEmptyError lopz(Matrix{Float64}(undef, na, 0))
 
-    # No `Z` is the default, and it is not an error.
-    @test isnothing(lop().Z)
+    # No panel is the default, and it is not an error.
+    @test isnothing(panel_feature_matrix(lop().pnl)[2])
 
     # A literal `ze` is checked for emptiness at construction.
     @test_throws PortfolioOptimisers.IsEmptyError FeaturePrior(; pe = EmpiricalPrior(),
@@ -257,8 +279,8 @@ end
     pr = prior(FeaturePrior(; pe = FactorPrior(), ze = RegressionFeatures()), rd)
     de = FeatureDistance()
 
-    D = distance(de, pr.Z)
-    S, D2 = cor_and_dist(de, pr.Z)
+    D = distance(de, panel_feature_matrix(pr.pnl)[2])
+    S, D2 = cor_and_dist(de, panel_feature_matrix(pr.pnl)[2])
     @test D == D2
     @test size(D) == (size(rd.X, 2), size(rd.X, 2))
     @test issymmetric(D)
@@ -276,7 +298,9 @@ end
 
     # A cluster subset of the prior yields the distance over exactly that subset.
     i = [1, 4, 7, 11]
-    @test distance(de, PortfolioOptimisers.port_opt_view(pr, i).Z) == D[i, i]
+    @test distance(de,
+                   panel_feature_matrix(PortfolioOptimisers.port_opt_view(pr, i).pnl)[2]) ==
+          D[i, i]
 end
 
 @testset "A time-varying literal cannot follow an observation fold, and says so" begin
@@ -288,7 +312,7 @@ end
     # It is only a *changed* observation count that fails. Construction, an asset view and a
     # fit on the full sample all succeed, which is why cross-validation is where it surfaces.
     pe = FeaturePrior(; pe = EmpiricalPrior(), ze = Zlit)
-    @test size(prior(pe, rd).Z) == (nobs, na, 2)
+    @test size(panel_feature_matrix(prior(pe, rd).pnl)[2]) == (nobs, na, 2)
     @test size(PortfolioOptimisers.port_opt_view(pe, [1, 2, 3]).ze) == (nobs, 3, 2)
 
     # The estimator-side view leaves the observation axis alone — that is what creates the
@@ -312,13 +336,15 @@ end
     # tracks the fold. The derived carrier supports the shape; nothing shipped emits it.
     pe_prod = FeaturePrior(; pe = EmpiricalPrior(),
                            ze = TrailingDispersionFeatures([5, 21]))
-    @test size(prior(pe_prod, rd).Z) == (nobs, na, 2)
-    @test size(prior(pe_prod, rd.X[1:(nobs - 10), :]).Z) == (nobs - 10, na, 2)
+    @test size(panel_feature_matrix(prior(pe_prod, rd).pnl)[2]) == (nobs, na, 2)
+    @test size(panel_feature_matrix(prior(pe_prod, rd.X[1:(nobs - 10), :]).pnl)[2]) ==
+          (nobs - 10, na, 2)
 
     # And the same matrix on the data carrier is sliced with the returns rather than refused.
-    rdz = ReturnsResult(; nx = rd.nx, X = rd.X, ts = rd.ts, nz = ["a", "b"], Z = Zlit)
+    rdz = ReturnsResult(; nx = rd.nx, X = rd.X, ts = rd.ts,
+                        pnl = feature_matrix_panel(["a", "b"], Zlit))
     v = PortfolioOptimisers.port_opt_view(rdz, 1:(nobs - 10), [1, 2, 3])
-    @test size(v.Z) == (nobs - 10, 3, 2)
+    @test size(panel_feature_matrix(v.pnl)[2]) == (nobs - 10, 3, 2)
 end
 
 @testset "Both standalone priors forward the residual config of the estimator they wrap" begin
