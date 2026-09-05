@@ -231,7 +231,7 @@ end
     # so the model no longer reproduces the anchors and the two gaps are measurable. The tilt is
     # built here rather than fitted: `EntropyPoolingPrior` hands its nested estimator a bare returns
     # matrix, which a Cross-Sectional Factor Prior refuses because it reads an Asset Panel, so the
-    # two cannot yet be composed (issue #785). The carrier this testset builds is exactly what such
+    # two cannot yet be composed (issue #840). The carrier this testset builds is exactly what such
     # a composition would produce, and it is what the anchoring rule is stated over.
     tilt = LowOrderPrior(; X = pr.X, mu = pr.mu .+ 0.002, sigma = 1.3 * pr.sigma,
                          rr = pr.rr, fpr = pr.fpr)
