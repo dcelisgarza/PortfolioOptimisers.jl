@@ -34,6 +34,41 @@ function half_life_decay(half_life::Real)::Real
     return exp2(-inv(half_life))
 end
 """
+    decay_half_life(decay::Real) -> Real
+
+Convert an exponential decay factor back into the half-life it came from.
+
+This is the exact inverse of [`half_life_decay`](@ref). A Descriptor spells the decay factor rather than the half-life, and the shrinkage of [`EWBeta`](@ref) needs the effective sample size of the recursion, which is twice its half-life. The half-life is recovered rather than carried, so one number states the memory of the recursion and no second field can contradict it.
+
+# Arguments
+
+  - `decay`: The decay factor. It must lie strictly between zero and one.
+
+# Returns
+
+  - `half_life::Real`: The half-life, `-1 / log2(decay)`.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.decay_half_life(0.5)
+1.0
+
+julia> PortfolioOptimisers.decay_half_life(PortfolioOptimisers.half_life_decay(60.0))
+60.00000000000008
+```
+
+# Related
+
+  - [`half_life_decay`](@ref)
+  - [`EWBeta`](@ref)
+  - [`ew_beta_shrink`](@ref)
+"""
+function decay_half_life(decay::Real)::Real
+    assert_ew_decay(decay)
+    return -inv(log2(decay))
+end
+"""
     half_life_min_obs(half_life::Real) -> Int
 
 Convert a half-life in observations into the warm-up an exponentially weighted Descriptor waits out.

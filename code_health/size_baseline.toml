@@ -11,7 +11,7 @@ commit = "aff5eb2929"
 [file]
 "ext/PortfolioOptimisersImputeExt.jl" = { code = 6, doc = 0, comment = 4, blank = 3, total = 13 }
 "ext/PortfolioOptimisersPlotsExt.jl" = { code = 1963, doc = 0, comment = 129, blank = 41, total = 2133 }
-"src/01_Base/01_DocstringDictionaries.jl" = { code = 1093, doc = 113, comment = 121, blank = 43, total = 1370 }
+"src/01_Base/01_DocstringDictionaries.jl" = { code = 1095, doc = 113, comment = 122, blank = 43, total = 1373 }
 "src/01_Base/02_TypeRoots.jl" = { code = 14, doc = 190, comment = 0, blank = 85, total = 289 }
 "src/01_Base/03_PrettyShow.jl" = { code = 117, doc = 138, comment = 0, blank = 76, total = 331 }
 "src/01_Base/04_ScopedConfig.jl" = { code = 163, doc = 491, comment = 2, blank = 214, total = 870 }
@@ -75,11 +75,12 @@ commit = "aff5eb2929"
 "src/08_Moments/39_CrossSectionalWeights.jl" = { code = 138, doc = 366, comment = 0, blank = 166, total = 670 }
 "src/08_Moments/40_HigherMomentPartialFit.jl" = { code = 145, doc = 526, comment = 0, blank = 275, total = 946 }
 "src/08_Moments/41_CrossSectionalFactorModel.jl" = { code = 160, doc = 310, comment = 7, blank = 115, total = 592 }
-"src/08_Moments/42_FactorExposures/01_Base_Descriptor.jl" = { code = 63, doc = 169, comment = 0, blank = 86, total = 318 }
+"src/08_Moments/42_FactorExposures/01_Base_Descriptor.jl" = { code = 143, doc = 278, comment = 0, blank = 129, total = 550 }
 "src/08_Moments/42_FactorExposures/02_PanelFieldDescriptors.jl" = { code = 237, doc = 830, comment = 0, blank = 346, total = 1413 }
 "src/08_Moments/42_FactorExposures/03_LagDescriptors.jl" = { code = 109, doc = 324, comment = 0, blank = 132, total = 565 }
-"src/08_Moments/42_FactorExposures/04_EWMeanDescriptors.jl" = { code = 196, doc = 441, comment = 0, blank = 168, total = 805 }
-"src/08_Moments/42_FactorExposures/05_EWVolatilityDescriptors.jl" = { code = 42, doc = 148, comment = 0, blank = 67, total = 257 }
+"src/08_Moments/42_FactorExposures/04_EWMeanDescriptors.jl" = { code = 200, doc = 461, comment = 0, blank = 179, total = 840 }
+"src/08_Moments/42_FactorExposures/05_EWVolatilityDescriptors.jl" = { code = 109, doc = 320, comment = 0, blank = 125, total = 554 }
+"src/08_Moments/42_FactorExposures/06_EWBetaDescriptors.jl" = { code = 383, doc = 681, comment = 0, blank = 253, total = 1317 }
 "src/08_Moments/42_FactorExposures/07_RollingDescriptors.jl" = { code = 112, doc = 274, comment = 0, blank = 115, total = 501 }
 "src/08_Moments/42_FactorExposures/08_Base_Exposure.jl" = { code = 55, doc = 148, comment = 0, blank = 82, total = 285 }
 "src/08_Moments/42_FactorExposures/09_CompositeExposure.jl" = { code = 107, doc = 214, comment = 0, blank = 79, total = 400 }
@@ -256,4 +257,4 @@ commit = "aff5eb2929"
 "src/23_Pipeline/05_SearchCrossValidation.jl" = { code = 212, doc = 121, comment = 18, blank = 60, total = 411 }
 "src/24_Plotting.jl" = { code = 57, doc = 961, comment = 102, blank = 275, total = 1395 }
 "src/25_Aliases.jl" = { code = 267, doc = 591, comment = 25, blank = 161, total = 1044 }
-"src/PortfolioOptimisers.jl" = { code = 283, doc = 3, comment = 29, blank = 5, total = 320 }
+"src/PortfolioOptimisers.jl" = { code = 284, doc = 3, comment = 29, blank = 5, total = 321 }

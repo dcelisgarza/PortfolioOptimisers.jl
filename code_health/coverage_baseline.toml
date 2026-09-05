@@ -73,11 +73,12 @@ commit = "8610300"
 "src/08_Moments/39_CrossSectionalWeights.jl" = { lines = 86, misses = 0 }
 "src/08_Moments/40_HigherMomentPartialFit.jl" = { lines = 77, misses = 0 }
 "src/08_Moments/41_CrossSectionalFactorModel.jl" = { lines = 71, misses = 0 }
-"src/08_Moments/42_FactorExposures/01_Base_Descriptor.jl" = { lines = 43, misses = 0 }
+"src/08_Moments/42_FactorExposures/01_Base_Descriptor.jl" = { lines = 107, misses = 0 }
 "src/08_Moments/42_FactorExposures/02_PanelFieldDescriptors.jl" = { lines = 121, misses = 0 }
 "src/08_Moments/42_FactorExposures/03_LagDescriptors.jl" = { lines = 66, misses = 0 }
-"src/08_Moments/42_FactorExposures/04_EWMeanDescriptors.jl" = { lines = 103, misses = 0 }
-"src/08_Moments/42_FactorExposures/05_EWVolatilityDescriptors.jl" = { lines = 19, misses = 0 }
+"src/08_Moments/42_FactorExposures/04_EWMeanDescriptors.jl" = { lines = 106, misses = 0 }
+"src/08_Moments/42_FactorExposures/05_EWVolatilityDescriptors.jl" = { lines = 50, misses = 0 }
+"src/08_Moments/42_FactorExposures/06_EWBetaDescriptors.jl" = { lines = 253, misses = 0 }
 "src/08_Moments/42_FactorExposures/07_RollingDescriptors.jl" = { lines = 70, misses = 0 }
 "src/08_Moments/42_FactorExposures/08_Base_Exposure.jl" = { lines = 33, misses = 0 }
 "src/08_Moments/42_FactorExposures/09_CompositeExposure.jl" = { lines = 57, misses = 0 }

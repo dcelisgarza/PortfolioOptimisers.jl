@@ -17,6 +17,7 @@ EWShareTurnover
 EWAmihudIlliquidity
 half_life_decay
 half_life_min_obs
+decay_half_life
 assert_ew_decay
 assert_ew_ratio_side
 ew_ratio_values

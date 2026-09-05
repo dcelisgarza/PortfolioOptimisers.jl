@@ -8,7 +8,7 @@ jet = "0.12.1"
 filter = "AnyFrameModule"
 attribution = "deepest_repository_frame"
 load_set = ["GraphRecipes", "Impute", "StatsPlots"]
-commit = "dd069231d0"
+commit = "c478842590"
 
 [run.main]
 load_set = ["GraphRecipes", "Impute", "StatsPlots"]
@@ -74,7 +74,7 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/08_Moments/33_MedianExpectedReturns.jl" = { raw = 1, reviewed = 1 }
 "src/08_Moments/34_CustomValueExpectedReturns.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/35_GerberIQCovariance.jl" = { raw = 0, reviewed = 0 }
-"src/08_Moments/36_RegimeAdjustedExpWeightedVariance.jl" = { raw = 1, reviewed = 1 }
+"src/08_Moments/36_RegimeAdjustedExpWeightedVariance.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/37_RegimeAdjustedExpWeightedCovariance.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/38_CrossSectionalRegression.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/39_CrossSectionalWeights.jl" = { raw = 0, reviewed = 0 }
@@ -85,6 +85,7 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/08_Moments/42_FactorExposures/03_LagDescriptors.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/42_FactorExposures/04_EWMeanDescriptors.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/42_FactorExposures/05_EWVolatilityDescriptors.jl" = { raw = 0, reviewed = 0 }
+"src/08_Moments/42_FactorExposures/06_EWBetaDescriptors.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/42_FactorExposures/07_RollingDescriptors.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/42_FactorExposures/08_Base_Exposure.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/42_FactorExposures/09_CompositeExposure.jl" = { raw = 0, reviewed = 0 }
@@ -338,6 +339,7 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/08_Moments/42_FactorExposures/03_LagDescriptors.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/42_FactorExposures/04_EWMeanDescriptors.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/42_FactorExposures/05_EWVolatilityDescriptors.jl" = { raw = 0, reviewed = 0 }
+"src/08_Moments/42_FactorExposures/06_EWBetaDescriptors.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/42_FactorExposures/07_RollingDescriptors.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/42_FactorExposures/08_Base_Exposure.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/42_FactorExposures/09_CompositeExposure.jl" = { raw = 0, reviewed = 0 }
@@ -591,6 +593,7 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/08_Moments/42_FactorExposures/03_LagDescriptors.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/42_FactorExposures/04_EWMeanDescriptors.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/42_FactorExposures/05_EWVolatilityDescriptors.jl" = { raw = 0, reviewed = 0 }
+"src/08_Moments/42_FactorExposures/06_EWBetaDescriptors.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/42_FactorExposures/07_RollingDescriptors.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/42_FactorExposures/08_Base_Exposure.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/42_FactorExposures/09_CompositeExposure.jl" = { raw = 0, reviewed = 0 }
