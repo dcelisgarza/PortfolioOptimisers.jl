@@ -94,14 +94,24 @@ special case in a different place.
 
 ### The Feature Matrix is derived, and nothing stores it
 
-One verb stacks the fields a selector names into the matrix a distance measures. A numeric field
-gives one column, a categorical field one `0`/`1` column per level, a tensor field one column per
-label, and an observed mask one `0`/`1` column. The verb's name and its selector argument are
-decided by the selector ticket of map #802; the natural name is `feature_matrix`, free once the
-producer ticket deletes the `FeaturePrior` verb of that name.
+`feature_matrix(pnl, sel = nothing; strict = false)` stacks the Panel Fields a selector names into
+the matrix a distance measures: `assets × features` for a static panel, and
+`observations × assets × features` for a time-varying one. A numeric field gives one column, a
+categorical field one `0`/`1` column per level, a tensor field one column per label, and an
+observed mask one `0`/`1` column. `feature_labels(pnl, sel = nothing; strict = false)` gives one
+label per column, and both verbs read one resolution, `select_fields(pnl, sel, strict)`, which is
+unexported.
+
+The selector grammar and the label form were decided by
+[issue #805](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/805) under map #802,
+and are recorded against ADR 0045. An entry is a field name, a field paired with the levels or
+labels it keeps, a field paired with one level or label, or a field paired with `:observed`. A
+bare name expands to the value columns alone, and `nothing` stacks every field's values in panel
+order. A label is the entry that selects exactly its column, so a label vector is a selector that
+rebuilds the same matrix.
 
 `nz` therefore has no home. The field names are the vector of `f.name`, and column labels are the
-stacking verb's output when a consumer needs them.
+output of `feature_labels` when a consumer needs them.
 
 ### The carriers hold one field, `pnl`
 
@@ -208,5 +218,6 @@ categorical field is.
   and loses its `Z` argument; the one-hot exposure builds its tensor from `codes` and `levels`.
   The readers of `rd.pnl`'s masks change nothing.
 - **The `field_dict` entry `:nz_feat` loses both users and is deleted.**
-- **The stacking verb is the one new surface**, and the selector ticket owns its signature.
+- **`feature_matrix`, `feature_labels` and `select_fields` are the one new surface.** Issue #805
+  fixed their signatures, and the selector build of map #802 writes them.
 - **Panel persistence is not built.** It is in scope for map #643 and does not gate its close.

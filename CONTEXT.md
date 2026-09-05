@@ -98,8 +98,12 @@ The central data structure carrying all return series through the library: asset
 The container of aligned, time-indexed price-level series: the prices-level mirror of `ReturnsResult`, and the input to price Preprocessing Estimators.
 
 **Feature Matrix**
-The assets × features matrix a Feature Distance measures, or its time-varying form, observations × assets × features. It is built at the point of use from the Panel Fields a selector names: a numeric field gives one column, a categorical field one 0/1 column per level, a tensor field one column per third-axis label, and an observed mask one 0/1 column. It is always finite.
+The assets × features matrix a Feature Distance measures, or its time-varying form, observations × assets × features. It is built at the point of use from the Panel Fields a Feature Selector names: a numeric field gives one column, a categorical field one 0/1 column per level, a tensor field one column per third-axis label, and an observed mask one 0/1 column. Each column carries a label, which is the Feature Selector entry that selects exactly that column. It is always finite.
 *Avoid*: reading it as a stored quantity. No carrier holds a Feature Matrix; an Asset Panel holds Panel Fields, and the matrix is derived from them. Also Characteristic (see **Characteristic Vector**, §3.9); and reading "feature" as *factor*, which is a return series.
+
+**Feature Selector**
+The statement on a Feature Distance of which Panel Fields the Feature Matrix stacks. An entry names one field, or one field with the levels or labels it keeps, or one field's observed mask. A bare field name means the field's values alone; an absent selector means every field's values. An entry that names nothing the panel holds is dropped with a warning, or refused under `strict`.
+*Avoid*: reading an entry as a column position; every column has a name. And a taxonomy key, which is the name of a categorical Panel Field, not a second namespace.
 
 **Asset Panel Estimator**
 A producer turning something the library already computes into a static Asset Panel with one Panel Field, at the point of use: `RegressionPanel` builds a loadings tensor from the prior's regression, `PhylogenyPanel` a proximity tensor from the returns. It is configuration on a Feature Distance, so it refits on the universe of the subproblem that runs it, and it holds no data.
@@ -292,7 +296,7 @@ A symmetric, zero-diagonal matrix in which larger values mean less relatedness. 
 Converts correlation or returns into a distance: `SimpleDistance`, `SimpleAbsoluteDistance`, `LogDistance`, `CorrelationDistance`, `VariationInfoDistance`, `CanonicalDistance`. `Distance` is the configurable container and `DistanceDistance` computes a distance-of-distances.
 
 **Feature Distance**
-The one Distance Estimator measuring something other than returns: it applies a metric to the rows of a Feature Matrix, so the resulting hierarchy expresses exogenous structure.
+The one Distance Estimator measuring something other than returns: it applies a metric to the rows of a Feature Matrix, stacked from the Panel Fields its Feature Selector names, so the resulting hierarchy expresses exogenous structure.
 
 **Similarity Matrix Algorithm**
 The transform turning a Distance Matrix into a similarity matrix: `MaximumDistanceSimilarity`, `ExponentialSimilarity`, `GeneralExponentialSimilarity`, `ComplementSimilarity`, `AngularSimilarity`.

@@ -871,3 +871,75 @@ the type it holds: `AbstractAssetPanelEstimator`, `ape`, `asset_panel`, `Regress
 `PhylogenyPanel`. `CONTEXT.md` §2 replaces **Feature Matrix Estimator** with **Asset Panel
 Estimator**, and §3.8 re-cuts **Phylogeny Features**. The build is
 [#810](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/810).
+
+## Amendment (2026-09-05): the selector reads one namespace, and one verb stacks the Feature Matrix
+
+Map [#802](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/802)'s third decision,
+[#805](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/805), decides what
+`FeatureDistance.sel` names, now that the carrier holds an Asset Panel (the seventh amendment) and
+a producer returns one (the eighth). Every option was judged from zero, on architecture,
+maintainability, ergonomics and performance.
+
+**One namespace: the Panel Fields of the panel the distance measures.** An entry of `sel` takes one
+of four forms, read by dispatch on its type.
+
+- A field name, `"mcap"`. It expands to the field's value columns: one for a numeric field, one
+  per level for a categorical field, one per label for a tensor field.
+- A field paired with the levels or labels it keeps, `"industry" => ["Tech", "Energy"]` or
+  `"loadings" => ["MKT", "SMB"]`.
+- A field paired with one level or label, `"industry" => "Tech"`. This is the one-element case of
+  the vector form, and it is the form a column label takes.
+- A field paired with `:observed`, `"mcap" => :observed`. It gives the field's observed mask as one
+  `0`/`1` column.
+
+Mixed entries in one vector are admitted, and the order of the vector is the column order the
+metric reads. `nothing` stacks the values of every field in panel order, and no mask. A bare name
+never includes the mask. The mask is a fact about the fill, and the values are a fact about the
+asset, so a fill policy the caller adds does not move the distance.
+
+**No integer entry.** The integer existed for a carrier with no names (decision 6). Every Panel
+Field has a name, every level and every label has a string, and a produced panel is labelled off
+the carrier or positionally (the eighth amendment), so no column the stack can make is nameless.
+
+**`sets` leaves the estimator, and the precedence rule goes with it.** A taxonomy enters the panel
+as a categorical Panel Field named after its key, which the taxonomy ticket of map #802 owns. The
+caller who selected a taxonomy block by key writes the field name, `sel = ["sector"]`. There are no
+longer two namespaces to order.
+
+**`strict` keeps the library rule.** An absent field name, level or label is droppable: it warns
+and drops under `strict = false`, and throws under `strict = true`, through `strict_diagnostic`. A
+view never removes a Panel Field or a declared level, and it does slice a tensor field's label axis
+in the square case, so a label is the one absence a fold causes, and `strict = true` is how a
+caller demands the same selection in every fold. The `did_you_mean` pool is the namespace the entry
+resolves in: the field names for a field entry, and the field's levels or labels for a paired
+entry. `:observed` on a field with no observed mask gives a column of ones, because `nothing` in
+`omsk` means every cell was observed. Construction refuses any other entry form, an empty vector,
+an empty label vector and a duplicated entry. Two entries that expand to the same column are
+refused at resolution, and a selector that drops every entry raises an `IsEmptyError`.
+
+**Decision 4's square case has no special case in the selector.** A subset of an adjacency field's
+labels keeps every row and cuts the columns to the named assets, so every asset is measured against
+the named assets alone. The comparison of the labels against `nx` lives in the view alone, which
+the fold ticket of map #802 owns.
+
+**Three verbs, one resolution.** `select_fields(pnl, sel, strict)` resolves the selector once, and
+is unexported. `feature_matrix(pnl, sel = nothing; strict = false)` stacks the resolved entries into
+`assets × features` for a static panel and `observations × assets × features` for a time-varying
+one, and returns the matrix alone. The kernel calls it with `de.sel` and `de.strict`.
+`feature_labels(pnl, sel = nothing; strict = false)` returns one label per column, and a label is
+the selector entry that selects exactly that column: `"mcap"`, `"industry" => "Tech"`,
+`"loadings" => "MKT"`, `"mcap" => :observed`. A label vector is therefore a valid selector that
+rebuilds the same matrix, which is what a result that records what it measured needs. The kernel
+never allocates labels it does not read.
+
+Four alternatives were rejected. One verb returning `(Z, labels)` allocates labels on every
+distance call that nothing reads. A matrix-only surface leaves a one-hot column with no name a
+caller can read back. A typed entry, `FieldSelection(name; keep, observed)`, is a second concept
+with no library precedent, where the asset-sets program already spells `"key" => "group"`. A
+string convention, `"industry=Tech"` and `"mcap::observed"`, is the pair of conventions ADR 0102
+removed from the panel.
+
+The verbs derive from the panel and live beside it in `03_InputData`. `feature_matrix` and
+`feature_labels` are exported. `CONTEXT.md` §2 gains **Feature Selector**, and §3.7 re-cuts
+**Feature Distance**. The build is
+[#811](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/811).
