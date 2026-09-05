@@ -24,6 +24,7 @@ AbstractCrossSectionalRegressionEstimator
 AbstractRegressionResult
 AbstractLoadingsRegressionResult
 AbstractCrossSectionalRegressionResult
+AbstractFactorFamilyBasis
 RegE_Reg
 AbstractRegressionAlgorithm
 AbstractStepwiseRegressionAlgorithm

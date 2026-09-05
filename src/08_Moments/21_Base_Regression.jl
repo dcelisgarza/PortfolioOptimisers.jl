@@ -199,6 +199,20 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
+Abstract supertype for all Factor Family Basis result types.
+
+All concrete and/or abstract types representing the change of basis that a re-based Factor Family is written in should be subtypes of `AbstractFactorFamilyBasis`. The root exists so that [`CrossSectionalFactorModel`](@ref) can bind its `fcb` slot to a type rather than to `Any`, and it is declared here rather than beside its member because the block that carries the slot is loaded before the member that fills it.
+
+# Related
+
+  - [`FactorFamilyBasis`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+  - [`has_family_rebasis`](@ref)
+"""
+abstract type AbstractFactorFamilyBasis <: AbstractResult end
+"""
+$(DocStringExtensions.TYPEDEF)
+
 Abstract supertype for all cross-sectional regression result types.
 
 All concrete and/or abstract types representing the output of a regression fitted per observation across the assets should be subtypes of `AbstractCrossSectionalRegressionResult`. A member carries no loadings matrix, because the exposures are the regression's input and an Exposure Estimator produces them.

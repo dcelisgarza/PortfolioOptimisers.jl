@@ -73,7 +73,7 @@ commit = "4405198354"
 "src/08_Moments/38_CrossSectionalRegression.jl" = { cyc = 6, cog = 10, arg = 5, cyc_sum = 40, cog_sum = 33, arg_sum = 36, macros = [] }
 "src/08_Moments/39_CrossSectionalWeights.jl" = { cyc = 5, cog = 5, arg = 4, cyc_sum = 24, cog_sum = 18, arg_sum = 5, macros = [] }
 "src/08_Moments/40_HigherMomentPartialFit.jl" = { cyc = 2, cog = 1, arg = 5, cyc_sum = 26, cog_sum = 8, arg_sum = 56, macros = [] }
-"src/08_Moments/41_CrossSectionalFactorModel.jl" = { cyc = 7, cog = 13, arg = 12, cyc_sum = 33, cog_sum = 18, arg_sum = 30, macros = ["@forward_properties"] }
+"src/08_Moments/41_CrossSectionalFactorModel.jl" = { cyc = 7, cog = 13, arg = 13, cyc_sum = 34, cog_sum = 19, arg_sum = 31, macros = ["@forward_properties"] }
 "src/08_Moments/42_FactorExposures/01_Base_Descriptor.jl" = { cyc = 7, cog = 12, arg = 6, cyc_sum = 37, cog_sum = 45, arg_sum = 8, macros = [] }
 "src/08_Moments/42_FactorExposures/02_PanelFieldDescriptors.jl" = { cyc = 6, cog = 11, arg = 4, cyc_sum = 54, cog_sum = 26, arg_sum = 6, macros = [] }
 "src/08_Moments/42_FactorExposures/03_LagDescriptors.jl" = { cyc = 2, cog = 1, arg = 3, cyc_sum = 18, cog_sum = 6, arg_sum = 8, macros = [] }
@@ -86,6 +86,9 @@ commit = "4405198354"
 "src/08_Moments/42_FactorExposures/10_DerivedExposure.jl" = { cyc = 2, cog = 1, arg = 7, cyc_sum = 5, cog_sum = 2, arg_sum = 9, macros = [] }
 "src/08_Moments/42_FactorExposures/11_OneHotExposure.jl" = { cyc = 7, cog = 12, arg = 2, cyc_sum = 17, cog_sum = 19, arg_sum = 2, macros = [] }
 "src/08_Moments/42_FactorExposures/12_ConstantExposure.jl" = { cyc = 1, cog = 1, arg = 1, cyc_sum = 3, cog_sum = 1, arg_sum = 1, macros = [] }
+"src/08_Moments/42_FactorExposures/13_ExposureNeutralisation.jl" = { cyc = 8, cog = 11, arg = 4, cyc_sum = 19, cog_sum = 21, arg_sum = 4, macros = [] }
+"src/08_Moments/43_FactorFamilyBasis.jl" = { cyc = 6, cog = 12, arg = 5, cyc_sum = 32, cog_sum = 29, arg_sum = 10, macros = [] }
+"src/08_Moments/44_FactorFamilyBasisTransforms.jl" = { cyc = 5, cog = 7, arg = 3, cyc_sum = 39, cog_sum = 33, arg_sum = 29, macros = [] }
 "src/09_Distance/01_Base_Distance.jl" = { cyc = 2, cog = 1, arg = 2, cyc_sum = 3, cog_sum = 2, arg_sum = 2, macros = [] }
 "src/09_Distance/02_Distance.jl" = { cyc = 2, cog = 2, arg = 5, cyc_sum = 33, cog_sum = 18, arg_sum = 112, macros = [] }
 "src/09_Distance/03_DistanceDistance.jl" = { cyc = 2, cog = 1, arg = 5, cyc_sum = 6, cog_sum = 5, arg_sum = 19, macros = [] }
@@ -124,6 +127,7 @@ commit = "4405198354"
 "src/12_ConstraintGeneration/06_AssetSetsMatrix.jl" = { cyc = 9, cog = 16, arg = 5, cyc_sum = 75, cog_sum = 61, arg_sum = 43, macros = [] }
 "src/12_ConstraintGeneration/07_ThresholdConstraintGeneration.jl" = { cyc = 2, cog = 1, arg = 3, cyc_sum = 8, cog_sum = 4, arg_sum = 3, macros = ["@propagatable"] }
 "src/12_ConstraintGeneration/08_ExposureConstraintGeneration.jl" = { cyc = 4, cog = 5, arg = 7, cyc_sum = 20, cog_sum = 15, arg_sum = 26, macros = [] }
+"src/12_ConstraintGeneration/09_CrossSectionalFactorAxis.jl" = { cyc = 5, cog = 6, arg = 3, cyc_sum = 12, cog_sum = 8, arg_sum = 8, macros = [] }
 "src/13_Prior/01_Base_Prior.jl" = { cyc = 10, cog = 8, arg = 12, cyc_sum = 96, cog_sum = 85, arg_sum = 113, macros = ["@forward_properties"] }
 "src/13_Prior/02_EmpiricalPrior.jl" = { cyc = 2, cog = 1, arg = 5, cyc_sum = 6, cog_sum = 2, arg_sum = 14, macros = ["@propagatable"] }
 "src/13_Prior/03_FactorPrior.jl" = { cyc = 3, cog = 2, arg = 9, cyc_sum = 11, cog_sum = 5, arg_sum = 25, macros = ["@forward_properties", "@propagatable"] }

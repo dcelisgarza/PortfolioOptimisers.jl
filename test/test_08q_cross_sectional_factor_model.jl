@@ -23,8 +23,8 @@ THREE FACTS SHAPE THE PROBES.
    benchmark weights and stay a model. `A slim model keeps its loadings and drops its
    histories` is that last case.
 
-`fcb` carries the family re-basis. Issue #651 settles what it is, so this file uses a matrix as
-a stand-in and probes only the rule this result states: `L` and `fcb` are present together or
+`fcb` carries the family re-basis, and issue #724 built the [`FactorFamilyBasis`](@ref) it holds.
+This file probes only the rule this result states: `L` and `fcb` are present together or
 absent together.
 =#
 
@@ -50,7 +50,10 @@ absent together.
     fam = ["style", "sector"]
     # A family re-basis drops one factor of a constrained family, so `L` is narrower than `M`.
     L = reshape([1.0, 3.0, 5.0], 3, 1)
-    fcb = reshape([1.0, -1.0], 2, 1)
+    # The family holds both raw factors and drops the second, so the reduced axis is one
+    # factor wide and every ratio is one.
+    fcb = FactorFamilyBasis(; fnm = ["f"], fi = [[1, 2]], di = [2], ratios = ones(4, 1),
+                            K = 2)
 
     full_model(; kwargs...) = CrossSectionalFactorModel(; M = M, b = b, csr = csr, Ms = Ms,
                                                         vs = vs, esigma = esigma_diag,

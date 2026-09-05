@@ -6,7 +6,7 @@
 [provenance]
 julia = "1.12.7"
 julia_syntax = "1.0.2"
-commit = "4405198354"
+commit = "91f61eb656"
 
 [file]
 "ext/PortfolioOptimisersImputeExt.jl" = { code = 6, doc = 0, comment = 4, blank = 3, total = 13 }
@@ -87,6 +87,9 @@ commit = "4405198354"
 "src/08_Moments/42_FactorExposures/10_DerivedExposure.jl" = { code = 48, doc = 97, comment = 0, blank = 31, total = 176 }
 "src/08_Moments/42_FactorExposures/11_OneHotExposure.jl" = { code = 71, doc = 145, comment = 0, blank = 71, total = 287 }
 "src/08_Moments/42_FactorExposures/12_ConstantExposure.jl" = { code = 19, doc = 62, comment = 0, blank = 33, total = 114 }
+"src/08_Moments/42_FactorExposures/13_ExposureNeutralisation.jl" = { code = 80, doc = 90, comment = 0, blank = 47, total = 217 }
+"src/08_Moments/43_FactorFamilyBasis.jl" = { code = 203, doc = 292, comment = 0, blank = 140, total = 635 }
+"src/08_Moments/44_FactorFamilyBasisTransforms.jl" = { code = 188, doc = 220, comment = 0, blank = 139, total = 547 }
 "src/09_Distance/01_Base_Distance.jl" = { code = 24, doc = 222, comment = 0, blank = 89, total = 335 }
 "src/09_Distance/02_Distance.jl" = { code = 158, doc = 350, comment = 0, blank = 157, total = 665 }
 "src/09_Distance/03_DistanceDistance.jl" = { code = 37, doc = 132, comment = 0, blank = 58, total = 227 }
@@ -125,6 +128,7 @@ commit = "4405198354"
 "src/12_ConstraintGeneration/06_AssetSetsMatrix.jl" = { code = 297, doc = 767, comment = 10, blank = 365, total = 1439 }
 "src/12_ConstraintGeneration/07_ThresholdConstraintGeneration.jl" = { code = 50, doc = 274, comment = 0, blank = 126, total = 450 }
 "src/12_ConstraintGeneration/08_ExposureConstraintGeneration.jl" = { code = 107, doc = 335, comment = 0, blank = 169, total = 611 }
+"src/12_ConstraintGeneration/09_CrossSectionalFactorAxis.jl" = { code = 52, doc = 79, comment = 0, blank = 41, total = 172 }
 "src/13_Prior/01_Base_Prior.jl" = { code = 377, doc = 1101, comment = 48, blank = 445, total = 1971 }
 "src/13_Prior/02_EmpiricalPrior.jl" = { code = 42, doc = 156, comment = 2, blank = 60, total = 260 }
 "src/13_Prior/03_FactorPrior.jl" = { code = 75, doc = 264, comment = 22, blank = 89, total = 450 }
@@ -257,4 +261,4 @@ commit = "4405198354"
 "src/23_Pipeline/05_SearchCrossValidation.jl" = { code = 212, doc = 121, comment = 18, blank = 60, total = 411 }
 "src/24_Plotting.jl" = { code = 57, doc = 974, comment = 102, blank = 280, total = 1413 }
 "src/25_Aliases.jl" = { code = 267, doc = 591, comment = 25, blank = 161, total = 1044 }
-"src/PortfolioOptimisers.jl" = { code = 284, doc = 3, comment = 29, blank = 5, total = 321 }
+"src/PortfolioOptimisers.jl" = { code = 288, doc = 3, comment = 29, blank = 5, total = 325 }

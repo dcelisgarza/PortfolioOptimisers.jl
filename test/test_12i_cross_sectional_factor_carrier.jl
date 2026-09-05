@@ -10,8 +10,8 @@ loadings into a field only `Regression` has would raise here instead.
 TWO CARRIERS, BECAUSE THE FACTOR AXIS DIFFERS. A model fitted in a re-based Factor Family
 carries `L` and `fcb`, and issue #649 put `fpr` on the RAW factor axis, which the re-basis
 makes a linear image of a smaller one. Its `fpr.sigma` is singular by construction. The
-fixture builds that case honestly — `L = M * fcb`, and the raw factor returns are the reduced
-ones lifted through `fcb` — so the singularity is the fixture's arithmetic rather than a
+fixture builds that case honestly — `L` is `M` reduced through `fcb`, and the raw factor returns
+are the reduced ones expanded through it — so the singularity is the fixture's arithmetic rather than a
 written number. The flat carrier re-bases nothing and its factor covariance is full rank.
 
 WHAT REFUSES AND WHAT DOES NOT. `BayesianBlackLittermanPrior` inverts `fpr.sigma`, so it
@@ -19,8 +19,8 @@ refuses a re-based model. `HighOrderFactorPriorEstimator` only projects through 
 accepts one. Both are probed, because ADR 0046 asks the estimator's docstring to state which
 it is, and a test is what keeps the two statements together.
 
-`fcb` carries the family re-basis and issue #651 settles what it is. This file uses the one
-rule the result states today: `L` and `fcb` are present together or absent together.
+`fcb` carries the family re-basis, which issue #651 settled and issue #724 built. This file uses
+the one rule the result states: `L` and `fcb` are present together or absent together.
 
 `FixedPrior` holds a THUNK, not a Result. An estimator never holds a Result in a field, and a
 stub in a test file is not an exception worth making.
@@ -48,11 +48,15 @@ end
     b = [0.01, 0.02, 0.03, 0.04]
     # The third raw factor is the one the constrained family drops, and the re-basis rewrites
     # the pair it constrained against it. `L` is what `M` becomes in that basis.
-    fcb = [1.0 0.0
-           0.0 1.0
-           -1.0 -1.0]
-    L = M * fcb
+    # `Rt` is the dense change of basis this family expresses: the first two factors are
+    # retained and the third is reconstructed from them, so every ratio is one.
+    Rt = [1.0 0.0
+          0.0 1.0
+          -1.0 -1.0]
     T = 8
+    fcb = FactorFamilyBasis(; fnm = ["f"], fi = [[1, 2, 3]], di = [3], ratios = ones(T, 2),
+                            K = 3)
+    L = PO.reduce_loadings(fcb, M)
     # Reduced factor returns, written out. The raw ones are these lifted through `fcb`, which
     # is what makes the raw factor covariance rank 2 over 3 columns.
     Fred = [0.010 -0.020
@@ -63,7 +67,10 @@ end
             0.005 -0.012
             -0.022 0.008
             0.014 0.020]
-    F_deg = Fred * transpose(fcb)
+    F_deg = PO.expand_factor_returns(fcb, Fred)
+    # The compact basis is the dense one, so the fixture states both and checks they agree.
+    @test L == M * Rt
+    @test F_deg == Fred * transpose(Rt)
     # A third raw factor that is not a combination of the other two, for the flat carrier.
     F_ok = hcat(Fred, [0.007, -0.011, 0.019, 0.004, -0.026, 0.013, 0.009, -0.017])
 

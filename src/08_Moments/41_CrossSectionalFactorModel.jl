@@ -288,8 +288,9 @@ $(DocStringExtensions.FIELDS)
         esigma::Option{<:VecNum_MatNum} = nothing,
         rw::Option{<:MatNum} = nothing,
         bw::Option{<:MatNum} = nothing,
+        nf::Option{<:VecStr} = nothing,
         fam::Option{<:VecStr} = nothing,
-        fcb = nothing,
+        fcb::Option{<:AbstractFactorFamilyBasis} = nothing,
         lag::Option{<:Integer} = nothing
     ) -> CrossSectionalFactorModel
 
@@ -300,6 +301,7 @@ Keywords correspond to the struct's fields.
   - `!isempty(M)`, `!isempty(b)`, and `length(b) == size(M, 1)`.
   - `L` and `fcb` are present together, or absent together.
   - If provided, `!isempty(L)`, and `size(L, 1) == size(M, 1)`.
+  - If provided, `!isempty(nf)`, `length(nf) == size(M, 2)`, and `nf` repeats no name.
   - If provided, `!isempty(fam)`, and `length(fam) == size(M, 2)`.
   - If provided, `!isempty(Ms)`, `size(Ms, 2) == size(M, 1)`, and `size(Ms, 3) == size(M, 2)`.
   - If provided, `size(csr.eps, 2) == size(M, 1)`.
@@ -317,7 +319,7 @@ Keywords correspond to the struct's fields.
   - `Ms` is sliced on its **second** axis, which is the asset axis of a slice.
   - `vs`, `rw` and `bw` are sliced on their **second** axis, which is the asset axis of a per-asset history.
   - `esigma` is sliced by [`idiosyncratic_covariance_view`](@ref), on one axis or on both.
-  - `fam`, `fcb` and `lag` pass through unchanged. Each is indexed by factor, or by nothing at all, and neither follows an asset selection.
+  - `nf`, `fam`, `fcb` and `lag` pass through unchanged. Each is indexed by factor, or by nothing at all, and neither follows an asset selection.
 
 # Examples
 
@@ -334,6 +336,7 @@ CrossSectionalFactorModel
   esigma ┼ Vector{Float64}: [0.4, 0.5, 0.6]
       rw ┼ nothing
       bw ┼ nothing
+      nf ┼ nothing
      fam ┼ Vector{String}: ["style", "style"]
      fcb ┼ nothing
      lag ┴ Int64: 1
@@ -385,6 +388,10 @@ CrossSectionalFactorModel
     """
     bw
     """
+    Name of each raw factor, one entry per column of `M`. The prior derives the axis from its Exposure Estimators and stores the answer here, so a consumer that names a factor reads one list.
+    """
+    nf
+    """
     Family label of each raw factor, one entry per column of `M`.
     """
     fam
@@ -401,7 +408,9 @@ CrossSectionalFactorModel
                                        Ms::Option{<:Arr3Num}, vs::Option{<:MatNum},
                                        esigma::Option{<:VecNum_MatNum},
                                        rw::Option{<:MatNum}, bw::Option{<:MatNum},
-                                       fam::Option{<:VecStr}, fcb, lag::Option{<:Integer})
+                                       nf::Option{<:VecStr}, fam::Option{<:VecStr},
+                                       fcb::Option{<:AbstractFactorFamilyBasis},
+                                       lag::Option{<:Integer})
         @argcheck(!isempty(M), IsEmptyError("M cannot be empty"))
         @argcheck(!isempty(b), IsEmptyError("b cannot be empty"))
         N = size(M, 1)
@@ -414,6 +423,12 @@ CrossSectionalFactorModel
             @argcheck(!isempty(L), IsEmptyError("L cannot be empty"))
             @argcheck(size(L, 1) == N,
                       DimensionMismatch("L ($(size(L, 1)) rows) must match M ($N rows)"))
+        end
+        if !isnothing(nf)
+            @argcheck(!isempty(nf), IsEmptyError("nf cannot be empty"))
+            @argcheck(length(nf) == K,
+                      DimensionMismatch("nf ($(length(nf))) must match M ($K columns)"))
+            @argcheck(allunique(nf), ArgumentError("nf must not repeat a factor name"))
         end
         if !isnothing(fam)
             @argcheck(!isempty(fam), IsEmptyError("fam cannot be empty"))
@@ -433,8 +448,9 @@ CrossSectionalFactorModel
         assert_cs_history_obs(trw, tvs, :rw, :vs)
         assert_cs_history_obs(tbw, tvs, :bw, :vs)
         return new{typeof(M), typeof(L), typeof(b), typeof(csr), typeof(Ms), typeof(vs),
-                   typeof(esigma), typeof(rw), typeof(bw), typeof(fam), typeof(fcb),
-                   typeof(lag)}(M, L, b, csr, Ms, vs, esigma, rw, bw, fam, fcb, lag)
+                   typeof(esigma), typeof(rw), typeof(bw), typeof(nf), typeof(fam),
+                   typeof(fcb), typeof(lag)}(M, L, b, csr, Ms, vs, esigma, rw, bw, nf, fam,
+                                             fcb, lag)
     end
 end
 function CrossSectionalFactorModel(; M::MatNum, L::Option{<:MatNum} = nothing, b::VecNum,
@@ -444,9 +460,12 @@ function CrossSectionalFactorModel(; M::MatNum, L::Option{<:MatNum} = nothing, b
                                    esigma::Option{<:VecNum_MatNum} = nothing,
                                    rw::Option{<:MatNum} = nothing,
                                    bw::Option{<:MatNum} = nothing,
-                                   fam::Option{<:VecStr} = nothing, fcb = nothing,
+                                   nf::Option{<:VecStr} = nothing,
+                                   fam::Option{<:VecStr} = nothing,
+                                   fcb::Option{<:AbstractFactorFamilyBasis} = nothing,
                                    lag::Option{<:Integer} = nothing)::CrossSectionalFactorModel
-    return CrossSectionalFactorModel(M, L, b, csr, Ms, vs, esigma, rw, bw, fam, fcb, lag)
+    return CrossSectionalFactorModel(M, L, b, csr, Ms, vs, esigma, rw, bw, nf, fam, fcb,
+                                     lag)
 end
 """
     idiosyncratic_variances(rr::AbstractLoadingsRegressionResult)
@@ -514,7 +533,8 @@ end
 # when `L` is a stored matrix the default field access already returns it, so only the
 # `Nothing` specialisation needs a rule (see [`@forward_properties`](@ref)'s `swap`).
 @forward_properties CrossSectionalFactorModel{<:Any, Nothing, <:Any, <:Any, <:Any, <:Any,
-                                              <:Any, <:Any, <:Any, <:Any, <:Any, <:Any} begin
+                                              <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                                              <:Any} begin
     swap(L, M)
 end
 """
@@ -539,11 +559,13 @@ julia> PortfolioOptimisers.has_family_rebasis(CrossSectionalFactorModel(; M = [1
                                                                         b = [0.1, 0.2]))
 false
 
+julia> fcb = FactorFamilyBasis(; fnm = [\"f\"], fi = [[1, 2]], di = [2],
+                               ratios = reshape([1.0], 1, 1), K = 2);
+
 julia> PortfolioOptimisers.has_family_rebasis(CrossSectionalFactorModel(; M = [1.0 2.0; 3.0 4.0],
                                                                         L = reshape([1.0, 2.0], 2,
                                                                                     1),
-                                                                        b = [0.1, 0.2],
-                                                                        fcb = [1.0, -1.0]))
+                                                                        b = [0.1, 0.2], fcb = fcb))
 true
 ```
 
@@ -567,7 +589,7 @@ Return a view of a [`CrossSectionalFactorModel`](@ref) result, selecting only th
  3. View the nested fit with its own [`port_opt_view`](@ref) method, which cuts its residuals on the asset axis.
  4. Take a view of `Ms` on its second axis, and of `vs`, `rw` and `bw` on their second axis, giving the histories of the selected assets.
  5. View `esigma` with [`idiosyncratic_covariance_view`](@ref), which reads its shape.
- 6. Build a new [`CrossSectionalFactorModel`](@ref) from the views, passing `fam`, `fcb` and `lag` through, which re-runs every guard of the constructor.
+ 6. Build a new [`CrossSectionalFactorModel`](@ref) from the views, passing `nf`, `fam`, `fcb` and `lag` through, which re-runs every guard of the constructor.
 
 # Arguments
 
@@ -624,7 +646,8 @@ function port_opt_view(csfm::CrossSectionalFactorModel, i,
                                      esigma = idiosyncratic_covariance_view(csfm.esigma, i),
                                      rw = isnothing(rw) ? nothing : view(rw, :, i),
                                      bw = isnothing(bw) ? nothing : view(bw, :, i),
-                                     fam = csfm.fam, fcb = csfm.fcb, lag = csfm.lag)
+                                     nf = csfm.nf, fam = csfm.fam, fcb = csfm.fcb,
+                                     lag = csfm.lag)
 end
 """
     regression(csfm::CrossSectionalFactorModel, args...)

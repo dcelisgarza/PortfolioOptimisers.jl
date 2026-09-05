@@ -8,7 +8,7 @@ jet = "0.12.1"
 filter = "AnyFrameModule"
 attribution = "deepest_repository_frame"
 load_set = ["GraphRecipes", "Impute", "StatsPlots"]
-commit = "c478842590"
+commit = "91f61eb656"
 
 [run.main]
 load_set = ["GraphRecipes", "Impute", "StatsPlots"]
@@ -92,6 +92,9 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/08_Moments/42_FactorExposures/10_DerivedExposure.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/42_FactorExposures/11_OneHotExposure.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/42_FactorExposures/12_ConstantExposure.jl" = { raw = 0, reviewed = 0 }
+"src/08_Moments/42_FactorExposures/13_ExposureNeutralisation.jl" = { raw = 0, reviewed = 0 }
+"src/08_Moments/43_FactorFamilyBasis.jl" = { raw = 0, reviewed = 0 }
+"src/08_Moments/44_FactorFamilyBasisTransforms.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/01_Base_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/02_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/03_DistanceDistance.jl" = { raw = 0, reviewed = 0 }
@@ -130,6 +133,7 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/12_ConstraintGeneration/06_AssetSetsMatrix.jl" = { raw = 0, reviewed = 0 }
 "src/12_ConstraintGeneration/07_ThresholdConstraintGeneration.jl" = { raw = 0, reviewed = 0 }
 "src/12_ConstraintGeneration/08_ExposureConstraintGeneration.jl" = { raw = 2, reviewed = 2 }
+"src/12_ConstraintGeneration/09_CrossSectionalFactorAxis.jl" = { raw = 0, reviewed = 0 }
 "src/13_Prior/01_Base_Prior.jl" = { raw = 1, reviewed = 1 }
 "src/13_Prior/02_EmpiricalPrior.jl" = { raw = 0, reviewed = 0 }
 "src/13_Prior/03_FactorPrior.jl" = { raw = 0, reviewed = 0 }
@@ -346,6 +350,9 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/08_Moments/42_FactorExposures/10_DerivedExposure.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/42_FactorExposures/11_OneHotExposure.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/42_FactorExposures/12_ConstantExposure.jl" = { raw = 0, reviewed = 0 }
+"src/08_Moments/42_FactorExposures/13_ExposureNeutralisation.jl" = { raw = 0, reviewed = 0 }
+"src/08_Moments/43_FactorFamilyBasis.jl" = { raw = 0, reviewed = 0 }
+"src/08_Moments/44_FactorFamilyBasisTransforms.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/01_Base_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/02_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/03_DistanceDistance.jl" = { raw = 0, reviewed = 0 }
@@ -384,6 +391,7 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/12_ConstraintGeneration/06_AssetSetsMatrix.jl" = { raw = 0, reviewed = 0 }
 "src/12_ConstraintGeneration/07_ThresholdConstraintGeneration.jl" = { raw = 0, reviewed = 0 }
 "src/12_ConstraintGeneration/08_ExposureConstraintGeneration.jl" = { raw = 0, reviewed = 0 }
+"src/12_ConstraintGeneration/09_CrossSectionalFactorAxis.jl" = { raw = 0, reviewed = 0 }
 "src/13_Prior/01_Base_Prior.jl" = { raw = 0, reviewed = 0 }
 "src/13_Prior/02_EmpiricalPrior.jl" = { raw = 0, reviewed = 0 }
 "src/13_Prior/03_FactorPrior.jl" = { raw = 0, reviewed = 0 }
@@ -600,6 +608,9 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/08_Moments/42_FactorExposures/10_DerivedExposure.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/42_FactorExposures/11_OneHotExposure.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/42_FactorExposures/12_ConstantExposure.jl" = { raw = 0, reviewed = 0 }
+"src/08_Moments/42_FactorExposures/13_ExposureNeutralisation.jl" = { raw = 0, reviewed = 0 }
+"src/08_Moments/43_FactorFamilyBasis.jl" = { raw = 0, reviewed = 0 }
+"src/08_Moments/44_FactorFamilyBasisTransforms.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/01_Base_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/02_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/03_DistanceDistance.jl" = { raw = 0, reviewed = 0 }
@@ -638,6 +649,7 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/12_ConstraintGeneration/06_AssetSetsMatrix.jl" = { raw = 0, reviewed = 0 }
 "src/12_ConstraintGeneration/07_ThresholdConstraintGeneration.jl" = { raw = 0, reviewed = 0 }
 "src/12_ConstraintGeneration/08_ExposureConstraintGeneration.jl" = { raw = 0, reviewed = 0 }
+"src/12_ConstraintGeneration/09_CrossSectionalFactorAxis.jl" = { raw = 0, reviewed = 0 }
 "src/13_Prior/01_Base_Prior.jl" = { raw = 0, reviewed = 0 }
 "src/13_Prior/02_EmpiricalPrior.jl" = { raw = 0, reviewed = 0 }
 "src/13_Prior/03_FactorPrior.jl" = { raw = 0, reviewed = 0 }

@@ -87,7 +87,7 @@
 "src/08_Moments/18_ExcessExpectedReturns.jl" = { map = 3, units = 2, algorithm = 0, swept = true }
 "src/08_Moments/19_Coskewness.jl" = { map = 3, units = 5, algorithm = 3, swept = true }
 "src/08_Moments/20_Cokurtosis.jl" = { map = 3, units = 4, algorithm = 2, swept = true }
-"src/08_Moments/21_Base_Regression.jl" = { map = 3, units = 35, algorithm = 7, swept = true }
+"src/08_Moments/21_Base_Regression.jl" = { map = 3, units = 36, algorithm = 7, swept = true }
 "src/08_Moments/22_StepwiseRegression.jl" = { map = 3, units = 12, algorithm = 8, swept = true }
 "src/08_Moments/23_DimensionReductionRegression.jl" = { map = 3, units = 10, algorithm = 5, swept = true }
 "src/08_Moments/24_ImpliedVolatility.jl" = { map = 3, units = 11, algorithm = 5, swept = true }
@@ -120,6 +120,9 @@
 "src/08_Moments/42_FactorExposures/10_DerivedExposure.jl" = { map = 3, units = 2, swept = false }
 "src/08_Moments/42_FactorExposures/11_OneHotExposure.jl" = { map = 3, units = 6, swept = false }
 "src/08_Moments/42_FactorExposures/12_ConstantExposure.jl" = { map = 3, units = 2, swept = false }
+"src/08_Moments/42_FactorExposures/13_ExposureNeutralisation.jl" = { map = 3, units = 5, swept = false }
+"src/08_Moments/43_FactorFamilyBasis.jl" = { map = 3, units = 13, swept = false }
+"src/08_Moments/44_FactorFamilyBasisTransforms.jl" = { map = 3, units = 12, swept = false }
 "src/09_Distance/01_Base_Distance.jl" = { map = 2, units = 8, algorithm = 1, swept = true }
 "src/09_Distance/02_Distance.jl" = { map = 2, units = 13, algorithm = 8, swept = true }
 "src/09_Distance/03_DistanceDistance.jl" = { map = 2, units = 4, algorithm = 3, swept = true }
@@ -158,6 +161,7 @@
 "src/12_ConstraintGeneration/06_AssetSetsMatrix.jl" = { map = 5, units = 33, algorithm = 12, swept = true }
 "src/12_ConstraintGeneration/07_ThresholdConstraintGeneration.jl" = { map = 5, units = 10, algorithm = 3, swept = true }
 "src/12_ConstraintGeneration/08_ExposureConstraintGeneration.jl" = { map = 5, units = 14, algorithm = 4, swept = true }
+"src/12_ConstraintGeneration/09_CrossSectionalFactorAxis.jl" = { map = 5, units = 4, swept = false }
 "src/13_Prior/01_Base_Prior.jl" = { map = 6, units = 41, algorithm = 19, swept = true }
 "src/13_Prior/02_EmpiricalPrior.jl" = { map = 6, units = 3, algorithm = 1, swept = true }
 "src/13_Prior/03_FactorPrior.jl" = { map = 6, units = 6, algorithm = 3, swept = true }
