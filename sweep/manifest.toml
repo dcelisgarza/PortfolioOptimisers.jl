@@ -45,7 +45,7 @@
 "ext/PortfolioOptimisersImputeExt.jl" = { map = 13, units = 0, swept = false }
 "ext/PortfolioOptimisersPlotsExt.jl" = { map = 13, units = 0, swept = false }
 "src/01_Base/01_DocstringDictionaries.jl" = { map = 1, units = 8, algorithm = 1, swept = true }
-"src/01_Base/02_TypeRoots.jl" = { map = 1, units = 7, algorithm = 2, swept = true }
+"src/01_Base/02_TypeRoots.jl" = { map = 1, units = 8, algorithm = 2, swept = true }
 "src/01_Base/03_PrettyShow.jl" = { map = 1, units = 7, algorithm = 5, swept = true }
 "src/01_Base/04_ScopedConfig.jl" = { map = 1, units = 24, algorithm = 14, swept = true }
 "src/01_Base/05_Preferences.jl" = { map = 1, units = 6, algorithm = 4, swept = true }
@@ -123,10 +123,12 @@
 "src/08_Moments/42_FactorExposures/13_ExposureNeutralisation.jl" = { map = 3, units = 5, swept = false }
 "src/08_Moments/43_FactorFamilyBasis.jl" = { map = 3, units = 13, swept = false }
 "src/08_Moments/44_FactorFamilyBasisTransforms.jl" = { map = 3, units = 12, swept = false }
-"src/08_Moments/45_ReturnForecasts/01_Base_ReturnForecast.jl" = { map = 3, units = 6, swept = false }
+"src/08_Moments/45_ReturnForecasts/01_Base_ReturnForecast.jl" = { map = 3, units = 10, swept = false }
 "src/08_Moments/45_ReturnForecasts/02_DescriptorScores.jl" = { map = 3, units = 5, swept = false }
 "src/08_Moments/45_ReturnForecasts/03_CustomValueReturnForecast.jl" = { map = 3, units = 4, swept = false }
 "src/08_Moments/45_ReturnForecasts/04_FixedWeightedReturnForecast.jl" = { map = 3, units = 7, swept = false }
+"src/08_Moments/45_ReturnForecasts/05_ExpWeightedReturnForecast.jl" = { map = 3, units = 9, swept = false }
+"src/08_Moments/45_ReturnForecasts/06_TargetReturnForecast.jl" = { map = 3, units = 14, swept = false }
 "src/08_Moments/46_CrossSectionalRegressionDiagnostics.jl" = { map = 3, units = 31, swept = false }
 "src/09_Distance/01_Base_Distance.jl" = { map = 2, units = 8, algorithm = 1, swept = true }
 "src/09_Distance/02_Distance.jl" = { map = 2, units = 13, algorithm = 8, swept = true }
@@ -227,7 +229,7 @@
 "src/19_RiskMeasures/27_ExpectedRisk.jl" = { map = 9, units = 22, swept = false }
 "src/19_RiskMeasures/28_RiskMeasureTools.jl" = { map = 9, units = 7, swept = false }
 "src/20_Optimisation/01_Base_Optimisation.jl" = { map = 10, units = 113, swept = false }
-"src/20_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl" = { map = 12, units = 60, swept = false }
+"src/20_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl" = { map = 12, units = 59, swept = false }
 "src/20_Optimisation/02_CrossValidation/02_KFold.jl" = { map = 12, units = 4, swept = false }
 "src/20_Optimisation/02_CrossValidation/03_Combinatorial.jl" = { map = 12, units = 12, swept = false }
 "src/20_Optimisation/02_CrossValidation/04_WalkForward.jl" = { map = 12, units = 20, swept = false }

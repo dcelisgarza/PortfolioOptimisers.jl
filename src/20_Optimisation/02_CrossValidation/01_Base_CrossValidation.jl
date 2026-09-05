@@ -1,18 +1,6 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all cross-validation estimators.
-
-# Related
-
-  - [`CrossValidationResult`](@ref)
-  - [`OptimisationCrossValidationEstimator`](@ref)
-  - [`NonOptimisationCrossValidationEstimator`](@ref)
-"""
-abstract type CrossValidationEstimator <: AbstractEstimator end
-"""
-$(DocStringExtensions.TYPEDEF)
-
 Abstract supertype for all cross-validation result types.
 
 # Related

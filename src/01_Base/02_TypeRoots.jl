@@ -104,6 +104,20 @@ abstract type AbstractPartialFitState <: AbstractResult end
 """
 $(DocStringExtensions.TYPEDEF)
 
+Abstract supertype for all cross-validation estimators.
+
+It is declared here rather than beside the rest of its family because an estimator of an earlier layer binds a slot to it: a fold split is read by the Return Forecast family, which loads long before the optimisation layer the other cross-validation types live in.
+
+# Related
+
+  - [`CrossValidationResult`](@ref)
+  - [`OptimisationCrossValidationEstimator`](@ref)
+  - [`NonOptimisationCrossValidationEstimator`](@ref)
+"""
+abstract type CrossValidationEstimator <: AbstractEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
 Abstract supertype for dynamically computed observation weight estimators.
 
 `DynamicAbstractWeights` subtypes are used when observation weights must be computed from data (rather than supplied directly as a numeric vector). They are passed to estimators that accept an `ObsWeights` argument and evaluated at fit time.

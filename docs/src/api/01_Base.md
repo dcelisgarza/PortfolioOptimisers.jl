@@ -14,6 +14,7 @@ PortfolioOptimisers
 AbstractEstimator
 AbstractAlgorithm
 AbstractResult
+CrossValidationEstimator
 ```
 
 ## Configuration

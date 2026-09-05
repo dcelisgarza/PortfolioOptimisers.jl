@@ -216,6 +216,12 @@ metric = "arg"
 rationale = "keyword-constructor-arity"
 
 [[exemption]]
+path = "src/08_Moments/45_ReturnForecasts/06_TargetReturnForecast.jl"
+definition = "TargetReturnForecast"
+metric = "arg"
+rationale = "keyword-constructor-arity"
+
+[[exemption]]
 path = "src/13_Prior/01_Base_Prior.jl"
 definition = "LowOrderPrior"
 metric = "arg"

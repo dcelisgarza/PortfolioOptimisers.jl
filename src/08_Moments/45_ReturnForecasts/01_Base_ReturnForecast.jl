@@ -165,4 +165,195 @@ function return_forecast_weights(rd::ReturnsResult)::Matrix{Float64}
     return Float64.(emsk)
 end
 
+"""
+    forecast_unit_target(unit::IdiosyncraticReturnUnit, y::MatNum,
+                         vs::Option{<:MatNum}) -> MatNum
+    forecast_unit_target(unit::IdiosyncraticSharpeUnit, y::MatNum, vs::MatNum) -> MatNum
+
+Convert a forward idiosyncratic return into the Forecast Unit a fitted member scores in.
+
+This is the inverse of [`forecast_return_units`](@ref). A fitted member regresses its Descriptor scores on a target, and the target must stand in the unit the scores are read in, so the two conversions are one pair of methods on the tag.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. [`IdiosyncraticReturnUnit`](@ref): the target is already the idiosyncratic return, so it is returned unchanged and `vs` is not read.
+ 2. [`IdiosyncraticSharpeUnit`](@ref): every cell is divided by the square root of the idiosyncratic variance of the same observation and asset. A cell whose variance is zero leaves an infinite target, which is not finite, so the pair drops out of the fit.
+
+# Arguments
+
+  - `unit`: The Forecast Unit the member scores in.
+  - `y`: Forward idiosyncratic returns, `observations × assets`.
+  - `vs`: Idiosyncratic variance history, `observations × assets`.
+
+# Returns
+
+  - `y::MatNum`: The target in the Forecast Unit.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.forecast_unit_target(IdiosyncraticSharpeUnit(), [0.2 1.0], [0.04 0.25])
+1×2 Matrix{Float64}:
+ 1.0  2.0
+```
+
+# Related
+
+  - [`AbstractForecastUnit`](@ref)
+  - [`forecast_return_units`](@ref)
+  - [`forward_mean_returns`](@ref)
+"""
+function forecast_unit_target(::IdiosyncraticReturnUnit, y::MatNum,
+                              ::Option{<:MatNum})::MatNum
+    return y
+end
+function forecast_unit_target(::IdiosyncraticSharpeUnit, y::MatNum, vs::MatNum)::MatNum
+    return y ./ sqrt.(vs)
+end
+"""
+    forecast_idiosyncratic_returns(csfm::CrossSectionalFactorModel) -> MatNum
+
+Return the idiosyncratic return history a fitted Return Forecast builds its target from.
+
+The history lives on the cross-sectional fit the block nests, which is optional, so this is the one place that states the refusal.
+
+# Arguments
+
+  - `csfm`: The fitted factor-model block.
+
+# Validation
+
+  - `csfm.csr` is given. Raises an [`IsNothingError`](@ref).
+
+# Returns
+
+  - `eps::MatNum`: Idiosyncratic returns, `observations × assets`.
+
+# Related
+
+  - [`CrossSectionalFactorModel`](@ref)
+  - [`CrossSectionalRegression`](@ref)
+  - [`forward_mean_returns`](@ref)
+"""
+function forecast_idiosyncratic_returns(csfm::CrossSectionalFactorModel)::MatNum
+    csr = csfm.csr
+    @argcheck(!isnothing(csr),
+              IsNothingError("a fitted Return Forecast regresses its Descriptor scores on the forward idiosyncratic return, and the factor model block carries no cross-sectional fit in csr"))
+    return csr.eps
+end
+"""
+    forecast_idiosyncratic_variances(csfm::CrossSectionalFactorModel) -> MatNum
+
+Return the idiosyncratic variance history a fitted Return Forecast weighs its fit by.
+
+A fitted member reads the variances whatever its Forecast Unit: in the return unit they are the regression weights, and in the Sharpe unit they scale the target and the forecast. A finite variance that is not strictly positive is refused rather than carried, because it is a weight of infinity in the first reading and a division by zero in the second.
+
+# Arguments
+
+  - `csfm`: The fitted factor-model block.
+
+# Validation
+
+  - `csfm.vs` is given. Raises an [`IsNothingError`](@ref).
+  - Every finite entry of `csfm.vs` is strictly positive. Raises a `DomainError`.
+
+# Returns
+
+  - `vs::MatNum`: Idiosyncratic variances, `observations × assets`.
+
+# Related
+
+  - [`CrossSectionalFactorModel`](@ref)
+  - [`forecast_unit_target`](@ref)
+  - [`forecast_return_units`](@ref)
+"""
+function forecast_idiosyncratic_variances(csfm::CrossSectionalFactorModel)::MatNum
+    vs = csfm.vs
+    @argcheck(!isnothing(vs),
+              IsNothingError("a fitted Return Forecast weighs its fit by the idiosyncratic variance, and the factor model block carries no variance history in vs"))
+    for idx in CartesianIndices(vs)
+        v = vs[idx]
+        @argcheck(!isfinite(v) || v > zero(v),
+                  DomainError(v,
+                              "every finite idiosyncratic variance weighs a fit, so it must be strictly positive, got vs[$(idx[1]), $(idx[2])] = $v"))
+    end
+    return vs
+end
+"""
+    forward_mean_returns(X::MatNum, horizon::Integer, lag::Integer) -> Matrix{<:Real}
+
+Return the forward mean of a return history, one target per observation and asset.
+
+The target of observation `t` is the mean of the returns over the observations `t + lag` to `t + lag + horizon - 1`. It is the one target both fitted members of the Return Forecast family regress on, and it is why a member states a `horizon` and a `lag` rather than a single offset.
+
+The mean skips a cell that is not finite, so a window with one missing return still gives a target. A window with no finite return, and the last `lag + horizon - 1` observations, give `NaN`.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+y_{t,i} &= \\frac{1}{\\lvert \\mathcal{W}_{t,i} \\rvert} \\sum_{s \\in \\mathcal{W}_{t,i}} x_{s,i}\\,, &
+\\mathcal{W}_{t,i} &= \\left\\{s \\in [t + \\ell,\\, t + \\ell + h - 1] : x_{s,i} \\text{ is finite}\\right\\}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``x_{s,i}``: return of asset ``i`` at observation ``s``.
+  - ``\\ell``: the lag.
+  - ``h``: the horizon.
+  - ``\\mathcal{W}_{t,i}``: the finite returns of the forward window of asset ``i`` at observation ``t``.
+
+# Arguments
+
+  - `X`: Return history, `observations × assets`.
+  - $(arg_dict[:rf_horizon])
+  - $(arg_dict[:rf_lag])
+
+# Returns
+
+  - `Y::Matrix{<:Real}`: Forward mean returns, `observations × assets`.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.forward_mean_returns([1.0; 2.0; NaN; 4.0; 5.0;;], 2, 1)
+5×1 Matrix{Float64}:
+   2.0
+   4.0
+   4.5
+ NaN
+ NaN
+```
+
+# Related
+
+  - [`forecast_idiosyncratic_returns`](@ref)
+  - [`forecast_unit_target`](@ref)
+  - [`return_forecast`](@ref)
+"""
+function forward_mean_returns(X::MatNum, horizon::Integer, lag::Integer)::Matrix{<:Real}
+    Tf = float(real(eltype(X)))
+    T = size(X, 1)
+    Y = fill(Tf(NaN), T, size(X, 2))
+    gap = lag + horizon - 1
+    for i in axes(X, 2), t in 1:(T - gap)
+        s = zero(Tf)
+        n = 0
+        for k in (t + lag):(t + gap)
+            x = X[k, i]
+            if isfinite(x)
+                s += x
+                n += 1
+            end
+        end
+        if n > 0
+            Y[t, i] = s / n
+        end
+    end
+    return Y
+end
+
 export return_forecast, IdiosyncraticReturnUnit, IdiosyncraticSharpeUnit

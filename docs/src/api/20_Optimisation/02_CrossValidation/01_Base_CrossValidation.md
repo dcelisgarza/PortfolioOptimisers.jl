@@ -1,7 +1,6 @@
 # Base Cross Validation
 
 ```@docs
-CrossValidationEstimator
 CrossValidationResult
 Base.split(res::CrossValidationResult, args...)
 CrossValidationAlgorithm

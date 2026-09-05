@@ -161,7 +161,7 @@ $(DocStringExtensions.TYPEDFIELDS)
 """
 @concrete struct FixedWeightedReturnForecast <: AbstractReturnForecastEstimator
     """
-    The recipe that turns the Descriptors into cross-sectional scores.
+    $(field_dict[:rf_scores])
     """
     scores
     """
@@ -177,7 +177,7 @@ $(DocStringExtensions.TYPEDFIELDS)
     """
     min_coverage
     """
-    The Forecast Unit the composite score is read in, before the member converts it to return units.
+    $(field_dict[:rf_unit])
     """
     unit
     function FixedWeightedReturnForecast(scores::DescriptorScores, scale::Real,
