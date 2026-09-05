@@ -1641,8 +1641,209 @@ Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 function plot_exposure_condition_number end
 
 ## ────────────────────────────────────────────────────────────────────────────
+## Factor attribution
+## ────────────────────────────────────────────────────────────────────────────
+"""
+    plot_attribution_vol_contrib(
+        fa::FactorAttributionResult;
+        by_family::Bool = false,
+        rd::ReturnsResult = ReturnsResult(),
+        nf::Option{<:AbstractVector} = nothing,
+        N::Option{<:Number} = nothing,
+        kwargs...
+    ) -> Plot
+
+Plot the volatility contribution of each factor, or of each factor family, as a bar chart.
+
+The plot reads one [`FactorAttributionResult`](@ref) and computes nothing: the rows it draws are `fa.fbd.vol_contrib`, or `fa.fmbd.vol_contrib` under `by_family`, and it selects and orders the rows it shows. A family axis is present only when the factor model block names families, so `by_family = true` on a Result whose `fmbd` is `nothing` raises.
+
+# Arguments
+
+  - `fa`: Factor attribution result.
+  - `by_family`: Whether to draw the family axis rather than the factor axis.
+  - `rd`: Returns result providing the factor names through `rd.nf`.
+  - `nf`: Factor names; overrides `rd.nf` when provided. Inert under `by_family`, whose labels the Result carries.
+  - `N`: Maximum number of rows to display, chosen by the magnitude of the value drawn. The rows shown keep the order of the axis, and the rest are not drawn.
+
+# Validation
+
+  - If `by_family` is `true`, `fa.fmbd` is not `nothing`, else an `ArgumentError` is raised.
+  - If `N` is not `nothing`, `N > 0`.
+
+Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
+
+# Related
+
+  - [`factor_attribution`](@ref)
+  - [`FactorAttributionResult`](@ref)
+  - [`plot_attribution_mu_contrib`](@ref)
+  - [`plot_attribution_exposure`](@ref)
+  - [`plot_attribution_mu_vs_vol`](@ref)
+"""
+function plot_attribution_vol_contrib end
+"""
+    plot_attribution_mu_contrib(
+        fa::FactorAttributionResult;
+        by_family::Bool = false,
+        rd::ReturnsResult = ReturnsResult(),
+        nf::Option{<:AbstractVector} = nothing,
+        N::Option{<:Number} = nothing,
+        z::Number = 1.96,
+        kwargs...
+    ) -> Plot
+
+Plot the mean return contribution of each factor, or of each factor family, as a bar chart with error bars.
+
+The plot reads one [`FactorAttributionResult`](@ref) and computes nothing beyond the half-width `z * se` it draws. The bars are `fa.fbd.mu_contrib`, or `fa.fmbd.mu_contrib` under `by_family`, and the error bars are the standard errors the Result carries. A Result fitted without `se = true` carries none, and the plot then draws the bars alone.
+
+# Arguments
+
+  - `fa`: Factor attribution result.
+  - `by_family`: Whether to draw the family axis rather than the factor axis.
+  - `rd`: Returns result providing the factor names through `rd.nf`.
+  - `nf`: Factor names; overrides `rd.nf` when provided. Inert under `by_family`, whose labels the Result carries.
+  - `N`: Maximum number of rows to display, chosen by the magnitude of the value drawn. The rows shown keep the order of the axis, and the rest are not drawn.
+  - `z`: Half-width of the error bar, in standard errors.
+
+# Validation
+
+  - If `by_family` is `true`, `fa.fmbd` is not `nothing`, else an `ArgumentError` is raised.
+  - If `N` is not `nothing`, `N > 0`.
+  - `z >= 0`.
+
+Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
+
+# Related
+
+  - [`factor_attribution`](@ref)
+  - [`FactorAttributionResult`](@ref)
+  - [`plot_attribution_vol_contrib`](@ref)
+  - [`plot_attribution_exposure`](@ref)
+  - [`plot_attribution_mu_vs_vol`](@ref)
+"""
+function plot_attribution_mu_contrib end
+"""
+    plot_attribution_exposure(
+        fa::FactorAttributionResult;
+        by_family::Bool = false,
+        rd::ReturnsResult = ReturnsResult(),
+        nf::Option{<:AbstractVector} = nothing,
+        N::Option{<:Number} = nothing,
+        kwargs...
+    ) -> Plot
+
+Plot the portfolio's exposure to each factor, or to each factor family, as a bar chart with its spread.
+
+The plot reads one [`FactorAttributionResult`](@ref) and computes nothing: the bars are `fa.fbd.exposure`, or `fa.fmbd.exposure` under `by_family`, and the error bars are the spread of the per-observation exposure the Result carries. A predicted attribution reads one exposure and no history, so it carries no spread and the plot draws the bars alone.
+
+# Arguments
+
+  - `fa`: Factor attribution result.
+  - `by_family`: Whether to draw the family axis rather than the factor axis.
+  - `rd`: Returns result providing the factor names through `rd.nf`.
+  - `nf`: Factor names; overrides `rd.nf` when provided. Inert under `by_family`, whose labels the Result carries.
+  - `N`: Maximum number of rows to display, chosen by the magnitude of the value drawn. The rows shown keep the order of the axis, and the rest are not drawn.
+
+# Validation
+
+  - If `by_family` is `true`, `fa.fmbd` is not `nothing`, else an `ArgumentError` is raised.
+  - If `N` is not `nothing`, `N > 0`.
+
+Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
+
+# Related
+
+  - [`factor_attribution`](@ref)
+  - [`FactorAttributionResult`](@ref)
+  - [`plot_attribution_vol_contrib`](@ref)
+  - [`plot_attribution_mu_contrib`](@ref)
+  - [`plot_attribution_mu_vs_vol`](@ref)
+"""
+function plot_attribution_exposure end
+"""
+    plot_attribution_mu_vs_vol(
+        fa::FactorAttributionResult;
+        by_family::Bool = false,
+        rd::ReturnsResult = ReturnsResult(),
+        nf::Option{<:AbstractVector} = nothing,
+        N::Option{<:Number} = nothing,
+        kwargs...
+    ) -> Plot
+
+Plot the mean return contribution of each factor against its volatility contribution, as a labelled scatter.
+
+The plot reads one [`FactorAttributionResult`](@ref) and computes nothing: each point is one row of the factor axis, or of the family axis under `by_family`, placed at its volatility contribution and its mean return contribution. It is where a reader sees which factor paid for the risk it carried.
+
+# Arguments
+
+  - `fa`: Factor attribution result.
+  - `by_family`: Whether to draw the family axis rather than the factor axis.
+  - `rd`: Returns result providing the factor names through `rd.nf`.
+  - `nf`: Factor names; overrides `rd.nf` when provided. Inert under `by_family`, whose labels the Result carries.
+  - `N`: Maximum number of rows to display, chosen by the magnitude of the volatility contribution. The rest are not drawn.
+
+# Validation
+
+  - If `by_family` is `true`, `fa.fmbd` is not `nothing`, else an `ArgumentError` is raised.
+  - If `N` is not `nothing`, `N > 0`.
+
+Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
+
+# Related
+
+  - [`factor_attribution`](@ref)
+  - [`FactorAttributionResult`](@ref)
+  - [`plot_attribution_vol_contrib`](@ref)
+  - [`plot_attribution_mu_contrib`](@ref)
+  - [`plot_attribution_exposure`](@ref)
+"""
+function plot_attribution_mu_vs_vol end
+
+## ────────────────────────────────────────────────────────────────────────────
 ## Internal helpers (no Plots.jl dependency)
 ## ────────────────────────────────────────────────────────────────────────────
+"""
+    attribution_plot_axis(fa::FactorAttributionResult, by_family::Bool, rd::ReturnsResult,
+                          nf::Option{<:AbstractVector})
+
+Return the axis of a [`FactorAttributionResult`](@ref) a plot draws, and the labels of its rows.
+
+The four attribution plots share one choice: the factor axis or the family axis, and where the labels of that axis come from. The family axis carries its own labels, because they are derived from the block; the factor axis carries none, because the factor names are carried input, so they come from `nf`, from `rd.nf`, or from the row's position.
+
+# Arguments
+
+  - `fa`: Factor attribution result.
+  - `by_family`: Whether to draw the family axis rather than the factor axis.
+  - `rd`: Returns result providing the factor names through `rd.nf`.
+  - `nf`: Factor names; overrides `rd.nf` when provided.
+
+# Validation
+
+  - If `by_family` is `true`, `fa.fmbd` is not `nothing`, else an `ArgumentError` is raised.
+
+# Returns
+
+  - `bd::AttributionBreakdown`: The axis the plot draws.
+  - `labels::AbstractVector`: The label of each row of that axis.
+
+# Related
+
+  - [`plot_attribution_vol_contrib`](@ref)
+  - [`plot_attribution_mu_contrib`](@ref)
+  - [`plot_attribution_exposure`](@ref)
+  - [`plot_attribution_mu_vs_vol`](@ref)
+"""
+function attribution_plot_axis(fa::FactorAttributionResult, by_family::Bool,
+                               rd::ReturnsResult, nf::Option{<:AbstractVector})
+    if by_family
+        @argcheck(!isnothing(fa.fmbd),
+                  ArgumentError("this attribution has no family axis: the factor model block it decomposes names no factor family, so `fa.fmbd` is nothing. Fit the prior with families, or plot the factor axis"))
+        return fa.fmbd, fa.fmbd.labels
+    end
+    K = length(fa.fbd.vol_contrib)
+    labels = !isnothing(nf) ? nf : !isnothing(rd.nf) ? rd.nf : 1:K
+    return fa.fbd, labels
+end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -1698,4 +1899,5 @@ export plot_portfolio_cumulative_returns, plot_asset_cumulative_returns, plot_co
        plot_performance_summary, plot_rolling_drawdowns, plot_cs_regression_r2,
        plot_cs_regression_adjusted_r2, plot_cs_regression_aic, plot_cs_regression_bic,
        plot_cs_regression_t_stats, plot_cs_regression_t_stat_exceedance_rate,
-       plot_exposure_vif, plot_exposure_condition_number
+       plot_attribution_vol_contrib, plot_attribution_mu_contrib, plot_attribution_exposure,
+       plot_attribution_mu_vs_vol, plot_exposure_vif, plot_exposure_condition_number

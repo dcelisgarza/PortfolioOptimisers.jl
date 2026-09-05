@@ -414,4 +414,60 @@
         @test_throws PortfolioOptimisers.IsNothingError plot_exposure_vif(no_rr)
         @test_throws PortfolioOptimisers.IsNothingError plot_cs_regression_r2(no_rr)
     end
+    @testset "The four factor attribution plots" begin
+        # A hand-built factor model block, so the plots are exercised without a panel fit. The two
+        # factors sit in two families, and the block keeps every history the realised attribution
+        # and its standard errors read.
+        rng_fa = StableRNG(782_101)
+        Ms_fa = Array{Float64, 3}(undef, 4, 3, 2)
+        for t in 1:4
+            Ms_fa[t, :, :] = [1.0 0.5+0.1*t; 1.0 -0.5; 1.0 1.5]
+        end
+        f_fa = randn(rng_fa, 4, 2) ./ 50
+        eps_fa = randn(rng_fa, 4, 3) ./ 200
+        csr_fa = CrossSectionalRegression(; f = f_fa, eps = eps_fa, n = [3, 3, 3, 3])
+        rw_fa = fill(1 / 3, 4, 3)
+        vs_fa = fill(1.0e-4, 4, 3)
+        rr_fa = CrossSectionalFactorModel(; M = Ms_fa[4, :, :], b = [0.001, 0.0005, 0.0012],
+                                          csr = csr_fa, Ms = Ms_fa, vs = vs_fa,
+                                          esigma = [1.2e-4, 1.8e-4, 1.6e-4], rw = rw_fa,
+                                          bw = rw_fa, nf = ["market", "value"],
+                                          fam = ["market", "style"], lag = 0)
+        fpr_fa = LowOrderPrior(; X = f_fa, mu = vec(mean(f_fa; dims = 1)),
+                               sigma = cov(f_fa))
+        X_fa = f_fa * transpose(rr_fa.M) .+ eps_fa
+        mu_fa = rr_fa.M * fpr_fa.mu .+ rr_fa.b
+        sigma_fa = rr_fa.M * fpr_fa.sigma * transpose(rr_fa.M) + Diagonal(rr_fa.esigma)
+        pr_fa = LowOrderPrior(; X = X_fa, mu = mu_fa, sigma = sigma_fa, rr = rr_fa,
+                              fpr = fpr_fa)
+        w_fa = [0.5, 0.3, 0.2]
+        fa_r = factor_attribution(w_fa, pr_fa, X_fa; se = true)
+        fa_p = factor_attribution(w_fa, pr_fa)
+        rd_fa = ReturnsResult(; nx = ["a", "b", "c"], X = X_fa, nf = ["market", "value"],
+                              F = f_fa)
+        for plt in (plot_attribution_vol_contrib, plot_attribution_mu_contrib,
+                    plot_attribution_exposure, plot_attribution_mu_vs_vol)
+            # Both axes, both sides, with and without a row limit.
+            @test is_plot(plt(fa_r))
+            @test is_plot(plt(fa_p))
+            @test is_plot(plt(fa_r; by_family = true))
+            @test is_plot(plt(fa_p; by_family = true))
+            @test is_plot(plt(fa_r; N = 1))
+            @test is_plot(plt(fa_r; rd = rd_fa))
+            @test is_plot(plt(fa_r; nf = ["one", "two"]))
+            @test_throws DomainError plt(fa_r; N = 0)
+        end
+        @test_throws DomainError plot_attribution_mu_contrib(fa_r; z = -1)
+        # A block that names no family has no family axis to draw.
+        no_fam = CrossSectionalFactorModel(; M = rr_fa.M, b = rr_fa.b, csr = csr_fa,
+                                           Ms = Ms_fa, esigma = rr_fa.esigma, lag = 0)
+        pr_nf = LowOrderPrior(; X = X_fa, mu = mu_fa, sigma = sigma_fa, rr = no_fam,
+                              fpr = fpr_fa)
+        fa_nf = factor_attribution(w_fa, pr_nf)
+        @test isnothing(fa_nf.fmbd)
+        for plt in (plot_attribution_vol_contrib, plot_attribution_mu_contrib,
+                    plot_attribution_exposure, plot_attribution_mu_vs_vol)
+            @test_throws ArgumentError plt(fa_nf; by_family = true)
+        end
+    end
 end
