@@ -807,3 +807,67 @@ distance estimator itself; the producer ticket of map #802 records that seam. `P
 field index still said *categorical*. With per-field storage, a categorical field holds integer
 codes, and a convex combination of codes means nothing. The fold ticket must say what a collapsed
 categorical field is. Nothing here decides it.
+
+## Amendment (2026-09-05): a producer is configuration on the distance, and returns a static Asset Panel
+
+Map [#802](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/802)'s second decision,
+[#804](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/804), decides where a
+*derived* feature source lives, now that the prior carrier of decision 6 is gone. The maintainer
+set the ground rule for the ticket: judge every option from zero, on architecture,
+maintainability, ergonomics and performance, and give what exists no weight.
+
+**The producer moves onto the distance estimator.** `FeatureDistance` gains one slot, `ape`,
+bound to `Option{<:AbstractAssetPanelEstimator}`. `nothing` reads the panel on the data carrier.
+A producer builds a panel at the point of use, from the prior result and the returns of the
+subproblem that runs it. Both values are configuration, so the founding argument of this ADR
+holds unchanged: the estimator holds no data, a view passes it through, and a fold refits it.
+The slot admits no literal. A caller with a hand-made matrix builds a static panel with
+`asset_panel` and puts it on the carrier, where it has field names and where the view rule of
+ADR 0102 already acts on it. A literal matrix and a literal panel on the estimator were both
+rejected: each puts data on an estimator, and each would need a view method and a square-case
+rule beside the panel's own.
+
+**A producer returns a static `AssetPanel` with one tensor field.** `RegressionPanel` returns
+the field `"loadings"` on the axis `"factor"`, holding `pr.rr.L`. `PhylogenyPanel` returns the
+field `"proximity"` on the axis `"asset"`, holding the proximity matrix of its `pl` and `alg`
+over the subproblem's returns. One tensor field was chosen over one numeric field per factor: a
+loadings matrix is one quantity with a labelled axis, the panel has a type for it, and it is the
+shape map #643's exposure history already takes.
+
+**The labels come off the data carrier by dispatch, and are positional otherwise.** A proximity
+field is labelled by `rd.nx`. A loadings field is labelled by `rd.nf` when the result is a
+`Regression` whose loadings are the raw `M`. Every other case is labelled `"1"` to `"K"`: a
+reduced or re-based `L`, a `CrossSectionalFactorModel` whose factors are exposures that no data
+names, and a call that hands a prior with no data carrier. Labels on the producer as
+configuration were rejected, because they restate what the carrier holds; positional labels
+everywhere were rejected, because they leave the factor axis unnamed where a name exists.
+
+**The carriers reach the kernel as two keywords.** Every consumer calls
+`cor_and_dist(de, ce, X; dims, kwargs...)`, and the keyword tail is open. The forwarders that
+take a prior result pass `pr` and `rd` through it. The kernel's three-argument entry is
+`cor_and_dist(de::FeatureDistance, ::Any, X; pr = nothing, rd = nothing, kwargs...)`, and one
+verb, `asset_panel(ape, pr, rd, X)`, resolves the source by dispatch on the slot, the prior and
+the carrier. `nothing` with a data carrier in either slot answers `rd.pnl`; `nothing` with a
+prior alone raises an `IsNothingError`; `RegressionPanel` with no prior raises one that names the
+site. Preselection passes `rd` alone. A forwarder that picked the panel and passed it with the
+prior was rejected: it splits the resolution across two places and puts the carrier's names out
+of the producer's reach.
+
+**What goes, and why.** `FeaturePrior` existed to attach a literal to a prior; the literal is
+refused and the producer has a home, so it goes. `z_src` picked between two carriers of one
+matrix; there is one carrier, so it goes from the three optimiser structs, and
+`feature_matrix_picker` and `carrier_feature_names` go with it. `feature_estimator_view` viewed
+a literal; nothing on the estimator needs a view. `Pr_RR` stays, because `x_src` stays. The third
+amendment's rule for preselection stands: `ClusterGroups` reads the data carrier and carries no
+source selector.
+
+**The regression producer reads both regression results unchanged.** `Regression` and
+`CrossSectionalFactorModel` are both an `AbstractLoadingsRegressionResult`, and both swap an unset
+`L` to `M`, so `pr.rr.L` resolves for the time-series prior and for map #643's cross-sectional
+prior with one method. This closes the `Z` bridge question map #643 handed to map #802.
+
+The name set follows the library's rule that a type is named for what it makes and a field for
+the type it holds: `AbstractAssetPanelEstimator`, `ape`, `asset_panel`, `RegressionPanel`,
+`PhylogenyPanel`. `CONTEXT.md` §2 replaces **Feature Matrix Estimator** with **Asset Panel
+Estimator**, and §3.8 re-cuts **Phylogeny Features**. The build is
+[#810](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/810).

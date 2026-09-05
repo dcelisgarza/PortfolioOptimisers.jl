@@ -101,8 +101,9 @@ The container of aligned, time-indexed price-level series: the prices-level mirr
 The assets × features matrix a Feature Distance measures, or its time-varying form, observations × assets × features. It is built at the point of use from the Panel Fields a selector names: a numeric field gives one column, a categorical field one 0/1 column per level, a tensor field one column per third-axis label, and an observed mask one 0/1 column. It is always finite.
 *Avoid*: reading it as a stored quantity. No carrier holds a Feature Matrix; an Asset Panel holds Panel Fields, and the matrix is derived from them. Also Characteristic (see **Characteristic Vector**, §3.9); and reading "feature" as *factor*, which is a return series.
 
-**Feature Matrix Estimator**
-A producer turning something the library already computes, or a classification the caller supplies, into a Feature Matrix: `RegressionFeatures`, `AssetSetsFeatures`, `PhylogenyFeatures`.
+**Asset Panel Estimator**
+A producer turning something the library already computes into a static Asset Panel with one Panel Field, at the point of use: `RegressionPanel` builds a loadings tensor from the prior's regression, `PhylogenyPanel` a proximity tensor from the returns. It is configuration on a Feature Distance, so it refits on the universe of the subproblem that runs it, and it holds no data.
+*Avoid*: reading it as a source of a Feature Matrix; it makes a panel, and the matrix is stacked from the panel like any other. And a classification the caller supplies, which enters `asset_panel` as a categorical Panel Field, not through a producer.
 
 **Feature Program**
 An ordered, last-wins list of authored edges resolving into a Feature Matrix. Where the group-key form stacks partitions and derives its axis, a Program writes cells into an axis the caller declared.
@@ -206,7 +207,7 @@ One asset's loading on one factor at one observation, built from Descriptors or 
 
 **Exposure Estimator**
 A producer of a Factor Exposure matrix.
-*Avoid*: Feature Matrix Estimator (§2), which produces the exogenous data the distance and clustering stack reads.
+*Avoid*: Asset Panel Estimator (§2), which produces the panel the distance and clustering stack reads.
 
 **Factor Family**
 A set of factors carrying one benchmark-weighted zero-sum constraint, so exactly one member of the set is redundant.
@@ -311,7 +312,7 @@ The characterisation of asset relationships derived from a Distance Matrix. The 
 `PhylogenyResult` carries the resulting matrix or vector.
 
 **Phylogeny Features**
-The reverse direction: a phylogeny reused as a Feature Matrix rather than consumed as one, since an assets × assets neighbourhood matrix is an assets × features matrix.
+The reverse direction: a phylogeny reused as a Panel Field rather than consumed as one, since an assets × assets proximity matrix is a tensor field whose labels are the assets. `PhylogenyPanel` is the Asset Panel Estimator that builds it.
 
 **Separation**
 How far apart two assets sit in a Network, and how far is too far. Two members: `HopCount`, the number of edges on the shortest path, and `PathLength`, the summed distance along it.

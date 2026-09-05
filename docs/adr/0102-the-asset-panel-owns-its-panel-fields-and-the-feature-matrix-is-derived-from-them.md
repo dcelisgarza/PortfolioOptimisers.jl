@@ -163,6 +163,30 @@ panel in which some observation has no active asset. An asset view can produce e
 a view must not throw. The rule would also be a refusal rather than a capability, so dropping it
 removes no mode.
 
+### A producer returns a static panel with one field
+
+An `AbstractAssetPanelEstimator` builds a panel at the point of use, on the distance estimator
+that holds it ([issue #804](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/804),
+recorded against ADR 0045). What it returns is decided here, because it is a panel.
+
+A producer returns a **static** `AssetPanel` holding **one tensor field**. A loadings matrix is
+`assets × factors`, and a proximity matrix is `assets × assets`; both are two-dimensional, so
+the static shape is the one that fits, and both are one quantity with a labelled third axis, so
+the tensor field is the type that fits. `RegressionPanel` returns `"loadings"` on the axis
+`"factor"`; `PhylogenyPanel` returns `"proximity"` on the axis `"asset"`. One numeric field per
+factor was rejected: it cuts one quantity into parts and loses the fact that they belong
+together, where a tensor field can carry a Factor Family as `groups`.
+
+The labels come off the data carrier by dispatch and are positional otherwise: `rd.nx` for a
+proximity field; `rd.nf` for a loadings field whose result is a `Regression` with the raw `M`
+as its loadings; `"1"` to `"K"` for a reduced or re-based `L`, for a `CrossSectionalFactorModel`,
+and for a call that hands no data carrier. Neither regression result names its factors as data,
+so the carrier is the one place a name exists.
+
+A produced panel never meets a view: the producer is configuration, and it refits on the
+subproblem's own prior and returns. So the square-case rule of the section below acts on a
+hand-supplied adjacency only.
+
 ### What the fold ticket owns
 
 Both `port_opt_view` arities return views of the fields and the masks. The square case, an
