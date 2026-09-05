@@ -654,6 +654,14 @@ The decomposition of a portfolio's volatility and return into a systematic part,
 The part of a Factor Attribution that the factor model does not explain: what is left of the total after the systematic and idiosyncratic parts. On the realised side it holds fees, cash, weight drift inside a period, the exposure lag and the cross-sectional intercept share. On the predicted side it holds the gap a wrapping Prior opens between the Prior Result's `mu` and `sigma` and the block's own, so it is at rounding level on a plain fit. Its share of the variance is the reader's check that the attribution means something; the library states its causes and never guards it.
 *Avoid*: residual (taken by the idiosyncratic part), error term, alpha.
 
+**Factor Model Diagnostic**
+A statistic that measures how well a fitted cross-sectional factor model describes the data it was fitted to, read off the factor-model block of a Prior Result and never added to it. Each diagnostic is one verb that answers with a series or a table, and the same verb answers over the bare histories the block holds, so a caller with arrays and no block reads the same number. The diagnostics fall into three groups: those of the cross-sectional regression fit (the significance of each factor return, the collinearity and the conditioning of the exposures, the goodness of fit), those of the exposure history (the correlation between factors, the information coefficient, the stability, the dispersion and the coverage of each exposure), and those of the standardised idiosyncratic returns (the calibration, the tails, the shape, and the dependence of the residual on its forecast volatility). A plot of a diagnostic draws the verb's answer and computes nothing of its own.
+*Avoid*: factor model statistic, regression diagnostic (the group name, not the term), model check, plot-only diagnostic.
+
+**Factor Model Summary**
+The per-factor table that gathers, for every raw factor of a fitted cross-sectional factor model, the annualised return, the annualised volatility, the Sharpe ratio and the first-order autocorrelation of its factor return, and the means over the history of its Factor Model Diagnostics for significance, collinearity, stability and coverage. It is one Result, built from the Factor Model Diagnostics and never from its own computation, and a factor that the Factor Family Basis drops from the regression is reported as absent, not omitted.
+*Avoid*: factor summary table, diagnostics table, factor report, model summary.
+
 ## 7. Errors & Status
 
 **PortfolioOptimisersError**
