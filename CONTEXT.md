@@ -538,6 +538,18 @@ The one loop every cross-validation entry point runs. Per fold it resolves the e
 **Fold**
 The record the Fold Loop hands its callback: the fold's index and count, its already-resolved estimator, its already-viewed data, and its own training and test index vectors.
 
+**Weight Drift**
+The movement of a fold's held weights away from its target weights, because each position grows at its own return under the self-financing recursion. Unset, a fold reports `X * w` on every observation, which is the reading the optimiser maximises.
+*Avoid*: using it for the distance a `TrackingError` or a `TurnoverRiskMeasure` bounds. That is a divergence between two portfolios; this is the movement of one portfolio's own weights.
+
+**Previous-Weights Source**
+Which weights of the previous fold the Fold Loop threads to the next: its target weights, or its drifted weights after its last observation. It changes what `Turnover`, `TurnoverEstimator`, `WeightsTracking`, `TurnoverRiskMeasure` and the turnover fee measure, and it changes nothing else. It is a field of the two walk-forwards alone, because a scheme whose folds carry no history has no previous fold to read.
+*Avoid*: Turnover, which measures the trade a source implies and does not choose the source.
+
+**Held Weights**
+The record a fold keeps of what the portfolio actually held: the asset returns it was scored over, the weights after its last observation, and the Weight Drift form that produced them. The weight path itself is rebuilt from that record on demand, and stored only when the scheme's `store_weight_path` asks for it.
+*Avoid*: using it for the target weights. Those are the decision, and they live on the optimisation result.
+
 ### 4.7 Finite Allocation (post-processing)
 
 Discretises continuous weights into whole shares for a fixed cash budget, since real markets have no fractional shares.
