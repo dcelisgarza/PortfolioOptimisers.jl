@@ -319,9 +319,10 @@ The shift is linear in ``r_f`` and depends on the views through ``\\mathbf{G}``.
  6. Put the prior mean on the total-return scale the views are written on, giving `prior_total_mu`. When `pe.l` is set this is the equilibrium mean of [`equilibrium_mu`](@ref), a risk premium, plus `pe.rf` by [`apply_rf`](@ref); otherwise it is `prior_mu`, which is on that scale already.
  7. Run the master equations with [`vanilla_posteriors`](@ref), giving the posterior factor pair.
  8. Process the posterior factor covariance in place with [`matrix_processing!`](@ref), under `pe.f_mp` and `F`.
- 9. Lift the posterior factor pair onto the assets with [`factor_lift`](@ref), giving `mu`, `sigma` and `chol`. This is the lift [`FactorPrior`](@ref) applies; only the factor moments handed to it differ. It adds the residual block when `pe.rsd` is `true`, and processes `sigma` under `pe.mp`.
-10. Forward the factor block with [`forward_prior`](@ref), replacing `mu` and `sigma` by the posterior factor pair and dropping `chol`.
-11. Build the carrier directly, taking `w` and its diagnostics from `f_prior` and carrying no `Z`.
+ 9. Lift the posterior factor pair onto the assets with [`factor_lift`](@ref), giving `mu`, `sigma`, `chol` and `esigma`. This is the lift [`FactorPrior`](@ref) applies; only the factor moments handed to it differ. It adds the residual block when `pe.rsd` is `true`, and processes `sigma` under `pe.mp`.
+10. Write `esigma` onto the `esigma` field of `rr`. Under `pe.rsd = true` the field holds the residual variances the lift measured, and under `pe.rsd = false` it holds `nothing`, because the lift added no residual block.
+11. Forward the factor block with [`forward_prior`](@ref), replacing `mu` and `sigma` by the posterior factor pair and dropping `chol`.
+12. Build the carrier directly, taking `w` and its diagnostics from `f_prior` and carrying no `Z`.
 
 # Arguments
 
@@ -395,8 +396,13 @@ function prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 
     matrix_processing!(pe.f_mp, f_posterior_sigma, F)
     # Reconstruct the posteriors using the black litterman adjusted factor statistics. The lift
     # is the same one `FactorPrior` applies; only the factor moments handed to it differ.
-    (; mu, sigma, chol) = factor_lift(pe.mp, pe.ve, pe.rsd, rr, f_posterior_mu,
-                                      f_posterior_sigma, X, posterior_X; kwargs...)
+    (; mu, sigma, chol, esigma) = factor_lift(pe.mp, pe.ve, pe.rsd, rr, f_posterior_mu,
+                                              f_posterior_sigma, X, posterior_X; kwargs...)
+    # The lift already measured the residual variances, so the block carries them instead of
+    # making every consumer recompute them from the reconstruction error. Under `rsd = false`
+    # the lift added no residual block and `esigma` is `nothing`, which is what the field then
+    # holds.
+    rr = set_idiosyncratic_covariance(rr, esigma)
     # Nothing is added to `mu`. `f_posterior_mu` is a total return over the factors, so the
     # lift gives a total return over the assets, and `rr.b` is applied inside the lift once.
     #

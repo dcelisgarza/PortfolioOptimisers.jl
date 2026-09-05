@@ -816,9 +816,12 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::UncertaintySetVaria
     # `W` themselves, and the compact set bounds a quadratic form in `w` and raises none.
     ucs = r.ucs
     sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
+    # The prior travels beside the returns, because an `AbstractPriorUncertaintySetEstimator`
+    # is fitted from the optimisation's own prior result rather than from returns data. An
+    # estimator that carries its own `pe` drops it (see [`sigma_ucs`](@ref)).
     ucs_variance_risk, name = set_ucs_variance_risk!(model, i,
-                                                     sigma_ucs(ucs, rd; kwargs...), sigma;
-                                                     prefix = prefix)
+                                                     sigma_ucs(ucs, rd, pr; kwargs...),
+                                                     sigma; prefix = prefix)
     set_risk_bounds_and_expression!(model, opt, ucs_variance_risk, r.settings, name, i;
                                     prefix = prefix)
     return ucs_variance_risk

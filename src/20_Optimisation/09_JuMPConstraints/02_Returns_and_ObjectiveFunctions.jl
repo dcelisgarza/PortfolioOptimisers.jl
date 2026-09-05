@@ -1819,8 +1819,11 @@ function set_return_constraints!(model::JuMP.Model, i,
     # The set is a neighbourhood of the quantity it was calibrated on, so it names the
     # centre. The term's own field and then the prior are the fallbacks (ADR 0050).
     fb = ifelse(isnothing(pret.mu), pr.mu, pret.mu)
-    ret, mu, robust = set_ucs_return_constraints!(model, i, mu_ucs(pret.ucs, rd; kwargs...),
-                                                  fb, settings)
+    # The prior travels beside the returns, because an `AbstractPriorUncertaintySetEstimator`
+    # is fitted from the optimisation's own prior result rather than from returns data. An
+    # estimator that carries its own `pe` drops it (see [`mu_ucs`](@ref)).
+    uc = mu_ucs(pret.ucs, rd, pr; kwargs...)
+    ret, mu, robust = set_ucs_return_constraints!(model, i, uc, fb, settings)
     set_return_bounds!(model, i, ret, settings.lb)
     set_return_expression!(model, i, ret, settings.scale, settings.rte)
     return mu, robust

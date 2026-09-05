@@ -233,10 +233,10 @@ The returned `chol` is the transpose of ``[\\mathbf{B} \\mathbf{L}_f \\quad \\ma
  3. Project the factor covariance through the loadings, giving `posterior_sigma`, the systematic block.
  4. Process `posterior_sigma` in place with [`matrix_processing!`](@ref), under `mp` and `posterior_X`.
  5. Carry the lower Cholesky factor of `f_sigma` through the loadings, giving `posterior_csigma`. This reads the `f_sigma` the caller passed, which step 4 does not touch.
- 6. When `rsd` is `true`, take the reconstruction error `err = X - posterior_X`, and size the residual block as `err_sigma`, the diagonal matrix of the column variances of `err` under `ve`.
+ 6. When `rsd` is `true`, take the reconstruction error `err = X - posterior_X`, and read `esigma`, the column variances of `err` under `ve`. Size the residual block as `err_sigma`, the diagonal matrix of those variances. When `rsd` is `false`, `esigma` is `nothing`.
  7. Still under `rsd`, add `err_sigma` to `posterior_sigma` and re-condition the sum with [`posdef!`](@ref), under `mp.pdm`. This is the body's only explicit [`posdef!`](@ref) call. `mp.pdm` also reaches `posterior_sigma` inside step 4, whenever `:pdm` is a member of `mp.order`.
  8. Still under `rsd`, widen `posterior_csigma` with `sqrt.(err_sigma)`, so the block that step 7 added to the covariance enters the factor as well.
- 9. Reshape `posterior_csigma` to `length(posterior_mu)` columns, transpose it into `chol`, and return the three quantities.
+ 9. Reshape `posterior_csigma` to `length(posterior_mu)` columns, transpose it into `chol`, and return the four quantities.
 
 # Arguments
 
@@ -252,12 +252,13 @@ The returned `chol` is the transpose of ``[\\mathbf{B} \\mathbf{L}_f \\quad \\ma
 
 # Returns
 
-  - `(; mu, sigma, chol)::NamedTuple`: Asset expected returns, asset covariance, and the Cholesky-like factor whose trailing block is the residual standard deviations when `rsd` is `true`.
+  - `(; mu, sigma, chol, esigma)::NamedTuple`: Asset expected returns, asset covariance, the Cholesky-like factor whose trailing block is the residual standard deviations when `rsd` is `true`, and the residual variances themselves. `esigma` is `nothing` when `rsd` is `false`, because no residual block was added. A caller writes it onto the `esigma` field of the loadings result it returns, so that a consumer that needs the idiosyncratic variances reads them off the block instead of recomputing them from the reconstruction error.
 
 # Related
 
   - [`factor_reconstruction`](@ref)
   - [`factor_residual_config`](@ref)
+  - [`Regression`](@ref)
   - [`FactorPrior`](@ref)
   - [`FactorBlackLittermanPrior`](@ref)
   - [`LowOrderPrior`](@ref)
@@ -270,15 +271,18 @@ function factor_lift(mp::AbstractMatrixProcessingEstimator, ve::AbstractVariance
     posterior_sigma = M * f_sigma * transpose(M)
     matrix_processing!(mp, posterior_sigma, posterior_X; kwargs...)
     posterior_csigma = M * LinearAlgebra.cholesky(f_sigma).L
+    esigma = nothing
     if rsd
         err = X - posterior_X
-        err_sigma = LinearAlgebra.diagm(vec(Statistics.var(ve, err; dims = 1)))
+        esigma = vec(Statistics.var(ve, err; dims = 1))
+        err_sigma = LinearAlgebra.diagm(esigma)
         posterior_sigma .+= err_sigma
         posdef!(mp.pdm, posterior_sigma)
         posterior_csigma = hcat(posterior_csigma, sqrt.(err_sigma))
     end
     return (; mu = posterior_mu, sigma = posterior_sigma,
-            chol = transpose(reshape(posterior_csigma, length(posterior_mu), :)))
+            chol = transpose(reshape(posterior_csigma, length(posterior_mu), :)),
+            esigma = esigma)
 end
 """
     factor_residual_config(pe::AbstractPriorEstimator) -> Option{<:NamedTuple}
@@ -380,8 +384,9 @@ The factor moments ``\\hat{\\boldsymbol{f}}`` and ``\\mathbf{\\Sigma}_f`` come f
  1. Orient `X` and `F` with [`dims_oriented`](@ref), to `observations × assets` and `observations × factors`.
  2. Fit the wrapped prior `pe.pe` on `F`, giving `f_prior`, the factor-axis prior result. `strict` reaches it, because `pe.pe` admits [`BlackLittermanPrior`](@ref) and [`EntropyPoolingPrior`](@ref), which resolve view names against a universe.
  3. Fit the loadings and rebuild the asset returns with [`factor_reconstruction`](@ref), giving `rr` and `posterior_X`.
- 4. Project `f_prior.mu` and `f_prior.sigma` through `rr` with [`factor_lift`](@ref), giving `mu`, `sigma` and `chol`.
- 5. Assemble a [`LowOrderPrior`](@ref) over `posterior_X`, with the oriented `X` under `o_X`, the three lifted moments, the factor prior's `w`, `ens`, `kld` and `ow`, the regression result under `rr`, and `f_prior` itself under `fpr`. No `Z` is carried; the composition note of [`FactorPrior`](@ref) says why.
+ 4. Project `f_prior.mu` and `f_prior.sigma` through `rr` with [`factor_lift`](@ref), giving `mu`, `sigma`, `chol` and `esigma`.
+ 5. Write `esigma` onto the `esigma` field of `rr`. Under `pe.rsd = true` the field holds the residual variances the lift measured, and under `pe.rsd = false` it holds `nothing`, because the lift added no residual block.
+ 6. Assemble a [`LowOrderPrior`](@ref) over `posterior_X`, with the oriented `X` under `o_X`, the three lifted moments, the factor prior's `w`, `ens`, `kld` and `ow`, the regression result under `rr`, and `f_prior` itself under `fpr`. No `Z` is carried; the composition note of [`FactorPrior`](@ref) says why.
 
 # Arguments
 
@@ -416,8 +421,13 @@ function prior(pe::FactorPrior, X::MatNum, F::MatNum; dims::Int = 1, strict::Boo
     # `EntropyPoolingPrior`, both of which resolve view names against a universe and honour it.
     f_prior = prior(pe.pe, F; strict = strict)
     rr, posterior_X = factor_reconstruction(pe.re, X, F)
-    (; mu, sigma, chol) = factor_lift(pe.mp, pe.ve, pe.rsd, rr, f_prior.mu, f_prior.sigma,
-                                      X, posterior_X; kwargs...)
+    (; mu, sigma, chol, esigma) = factor_lift(pe.mp, pe.ve, pe.rsd, rr, f_prior.mu,
+                                              f_prior.sigma, X, posterior_X; kwargs...)
+    # The lift already measured the residual variances, so the block carries them instead of
+    # making every consumer recompute them from the reconstruction error. Under `rsd = false`
+    # the lift added no residual block and `esigma` is `nothing`, which is what the field then
+    # holds.
+    rr = set_idiosyncratic_covariance(rr, esigma)
     # No `Z` is forwarded: `f_prior` is fit on the factors, so its feature matrix would be
     # factors × features and would not describe the asset axis. To attach features here, wrap
     # this estimator — `FeaturePrior(; pe = FactorPrior(…), ze = RegressionFeatures())` reads

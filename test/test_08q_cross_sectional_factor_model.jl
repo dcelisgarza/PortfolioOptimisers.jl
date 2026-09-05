@@ -232,4 +232,49 @@ absent together.
         @test regression(csfm) === csfm
         @test regression(csfm, csfm.M, csfm.M) === csfm
     end
+
+    # Issue #776. One reader answers the idiosyncratic variances off either loadings block,
+    # whatever shape that block stores them in, and it refuses rather than inventing a
+    # weighting when the block carries none.
+    @testset "idiosyncratic_variances reads either shape off either block" begin
+        PO = PortfolioOptimisers
+        # A vector of variances comes back unchanged, off both blocks.
+        @test PO.idiosyncratic_variances(full_model()) == esigma_diag
+        @test PO.idiosyncratic_variances(PO.Regression(; M = M, esigma = esigma_diag)) ==
+              esigma_diag
+        # A full covariance comes back as its diagonal, off both blocks.
+        @test PO.idiosyncratic_variances(full_model(; esigma = esigma_full)) ==
+              LinearAlgebra.diag(esigma_full)
+        @test PO.idiosyncratic_variances(PO.Regression(; M = M, esigma = esigma_full)) ==
+              LinearAlgebra.diag(esigma_full)
+        # The diagonal of the full fixture is the diagonal fixture, so the two shapes agree.
+        @test LinearAlgebra.diag(esigma_full) == esigma_diag
+    end
+
+    @testset "idiosyncratic_variances refuses a block that carries none, and names its filler" begin
+        PO = PortfolioOptimisers
+        # A `Regression` is filled by the prior that lifts the factor moments, so the message
+        # names the switch that makes that prior add a residual block.
+        reg_err = try
+            PO.idiosyncratic_variances(PO.Regression(; M = M))
+            nothing
+        catch e
+            e
+        end
+        @test isa(reg_err, PO.IsNothingError)
+        @test occursin("rsd", reg_err.msg)
+        @test occursin("Regression", reg_err.msg)
+        # A cross-sectional model is filled by its own fit, so the message names the field.
+        cs_err = try
+            PO.idiosyncratic_variances(CrossSectionalFactorModel(; M = M, b = b))
+            nothing
+        catch e
+            e
+        end
+        @test isa(cs_err, PO.IsNothingError)
+        @test occursin("esigma", cs_err.msg)
+        @test occursin("CrossSectionalFactorModel", cs_err.msg)
+        # The two messages are not one message: each names its own block.
+        @test !occursin("rsd", cs_err.msg)
+    end
 end

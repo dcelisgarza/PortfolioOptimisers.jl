@@ -114,6 +114,7 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :M => "`M`: Main coefficient (loadings) matrix `assets × factors`.",#
                                  :L => "`L`: Reduced dimensionality coefficient (loadings) matrix `assets × reduced_dimensions`.",#
                                  :b => "`b`: Regression intercept vector.",#
+                                 :esigma => "`esigma`: Idiosyncratic covariance. A vector holds the variances alone, and a matrix holds the full covariance.",#
                                  :crit => "`crit`: Factor selection criterion. A [`PValue`](@ref), or a `Val` of one symbol of [`STEPWISE_REGRESSION_CRITERIA`](@ref).",#
                                  :r2variant => "`variant`: Name of the pseudo-``R^2`` variant a maximisation criterion reads, or `nothing` to take the default of the criterion.",#
                                  :realg => "`alg`: Regression algorithm.",#

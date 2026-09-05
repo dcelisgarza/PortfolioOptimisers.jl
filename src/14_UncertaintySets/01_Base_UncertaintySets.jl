@@ -44,6 +44,54 @@ abstract type AbstractUncertaintySetEstimator <: AbstractEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
+Fits an uncertainty set from the prior result the optimisation is solving on, rather than from returns data.
+
+Every other [`AbstractUncertaintySetEstimator`](@ref) carries its own prior estimator `pe` and fits it on the returns it is handed, so the set it builds knows nothing of the prior the optimiser is using. A subtype of this root reads the fitted prior result instead: its factor model, its `mu` and its `sigma` are the inputs of the fit, and it carries no `pe` of its own. Both JuMP builders hold the prior beside the returns, so both pass it, and the three-argument form of the triple routes each estimator to the argument it reads.
+
+The root is unexported. It is a family root that a caller names only when it writes a subtype, and every consumer reaches it through the triple.
+
+# Interfaces
+
+In order to implement a new concrete type that works seamlessly with the library, subtype `AbstractPriorUncertaintySetEstimator` and implement the following methods:
+
+## `mu_ucs`
+
+  - `mu_ucs(ue::AbstractPriorUncertaintySetEstimator, pr::AbstractPriorResult; kwargs...) -> AbstractUncertaintySetResult`: Fits the uncertainty set of the mean.
+
+## `sigma_ucs`
+
+  - `sigma_ucs(ue::AbstractPriorUncertaintySetEstimator, pr::AbstractPriorResult; kwargs...) -> AbstractUncertaintySetResult`: Fits the uncertainty set of the covariance.
+
+## `ucs`
+
+  - `ucs(ue::AbstractPriorUncertaintySetEstimator, pr::AbstractPriorResult; kwargs...) -> Tuple`: Fits both sets in one pass, so that a shared geometry is computed once.
+
+### Arguments
+
+  - `ue`: The concrete subtype instance.
+  - `pr`: The prior result the optimisation is solving on.
+  - `kwargs...`: Additional keyword arguments.
+
+### Returns
+
+  - `ucs::AbstractUncertaintySetResult`: The fitted set, or a tuple of the mean set and the covariance set for `ucs`.
+
+A subtype inherits the three-argument methods of the triple, which drop the returns data and call the two-argument methods above. It needs no method of the returns-data interface [`AbstractUncertaintySetEstimator`](@ref) declares, because no consumer reaches that interface through this root.
+
+There is no default fit. The root carries a method of each of the three verbs, and each raises and names the type it was called on, so a subtype that declares none says which method its author owes rather than failing on the root.
+
+# Related
+
+  - [`AbstractUncertaintySetEstimator`](@ref)
+  - [`AbstractUncertaintySetResult`](@ref)
+  - [`ucs`](@ref)
+  - [`mu_ucs`](@ref)
+  - [`sigma_ucs`](@ref)
+"""
+abstract type AbstractPriorUncertaintySetEstimator <: AbstractUncertaintySetEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
 Selects which shape of uncertainty set an estimator builds, such as a box or an ellipsoid.
 
 All concrete subtypes should subtype `AbstractUncertaintySetAlgorithm`. A subtype carries the parameters of its own shape and nothing else. The estimator does the fitting.
@@ -473,6 +521,151 @@ function sigma_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; kwarg
                   IsNothingError("this is a factor prior; it needs factor returns. ReturnsResult.F is nothing — populate F (e.g. via prices_to_returns on factor prices)."))
     end
     return sigma_ucs(uc, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs...)
+end
+"""
+    ucs(ue::AbstractPriorUncertaintySetEstimator, ::AbstractPriorResult; kwargs...)
+    mu_ucs(ue::AbstractPriorUncertaintySetEstimator, ::AbstractPriorResult; kwargs...)
+    sigma_ucs(ue::AbstractPriorUncertaintySetEstimator, ::AbstractPriorResult; kwargs...)
+
+Refuses a prior-reading uncertainty set estimator that declares no fit of its own, and names it.
+
+[`AbstractPriorUncertaintySetEstimator`](@ref) states three verbs over a Prior Result, and a member owes a method of each. These three are the root's own methods, and they raise. They exist because the three-argument form of the triple forwards here, so a member that declares none of the three would otherwise fail with a `MethodError` naming the root rather than the type the author wrote.
+
+There is no default fit. An estimator of this family reads a fitted prior result, and no two members read the same part of it, so a fallback would have to invent a set rather than build one. That is the polarity [`factor_residual_config`](@ref) uses for a per-type declaration whose absence is a defect rather than an answer.
+
+# Arguments
+
+  - `ue`: Uncertainty set estimator, which the raise names.
+  - `pr`: Prior result (ignored).
+  - `kwargs...`: Additional keyword arguments (ignored).
+
+# Validation
+
+  - Throws an `ArgumentError` naming the type of `ue`.
+
+# Related
+
+  - [`AbstractPriorUncertaintySetEstimator`](@ref)
+  - [`ucs`](@ref)
+  - [`mu_ucs`](@ref)
+  - [`sigma_ucs`](@ref)
+"""
+function ucs(ue::AbstractPriorUncertaintySetEstimator, ::AbstractPriorResult; kwargs...)
+    return throw(ArgumentError("`ucs` is not defined for `$(nameof(typeof(ue)))`. Every concrete `AbstractPriorUncertaintySetEstimator` must fit both sets from the prior result it is handed by adding a method of `ucs`, `mu_ucs` and `sigma_ucs` over an `AbstractPriorResult`."))
+end
+function mu_ucs(ue::AbstractPriorUncertaintySetEstimator, ::AbstractPriorResult; kwargs...)
+    return throw(ArgumentError("`mu_ucs` is not defined for `$(nameof(typeof(ue)))`. Every concrete `AbstractPriorUncertaintySetEstimator` must fit the mean set from the prior result it is handed by adding a method of `mu_ucs` over an `AbstractPriorResult`."))
+end
+function sigma_ucs(ue::AbstractPriorUncertaintySetEstimator, ::AbstractPriorResult;
+                   kwargs...)
+    return throw(ArgumentError("`sigma_ucs` is not defined for `$(nameof(typeof(ue)))`. Every concrete `AbstractPriorUncertaintySetEstimator` must fit the covariance set from the prior result it is handed by adding a method of `sigma_ucs` over an `AbstractPriorResult`."))
+end
+"""
+    ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult, ::AbstractPriorResult; kwargs...)
+    ucs(uc::AbstractPriorUncertaintySetEstimator, ::ReturnsResult, pr::AbstractPriorResult; kwargs...)
+
+Fits both uncertainty sets from an estimator that is handed the returns data **and** the prior result the optimisation is solving on.
+
+This is the form both JuMP builders call, and it exists so that one call site serves every estimator. Each estimator reads the one argument its own fit is defined on, and the third method of the form is the passthrough that already takes `args...`, so a slot holding a built pair answers here too.
+
+| `uc`                                              | Reads   | Forwards to       |
+|:------------------------------------------------- |:------- |:----------------- |
+| an [`AbstractUncertaintySetEstimator`](@ref)      | `rd`    | `ucs(uc, rd)`     |
+| an [`AbstractPriorUncertaintySetEstimator`](@ref) | `pr`    | `ucs(uc, pr)`     |
+| a built pair, or `nothing`                        | neither | itself, unchanged |
+
+The prior is dropped rather than checked on the first row. An estimator that carries its own `pe` fits it on the returns it is handed, so the optimisation's own prior is not an input of that fit, and passing it changes no number.
+
+# Arguments
+
+  - `uc`: Uncertainty set estimator, built pair, or `nothing`.
+  - `rd`: [`ReturnsResult`](@ref). Read by a returns-data estimator, and dropped by a prior-reading one.
+  - `pr`: [`AbstractPriorResult`](@ref). Read by a prior-reading estimator, and dropped by a returns-data one.
+  - `kwargs...`: Additional keyword arguments passed to the estimator.
+
+# Returns
+
+  - `uc::Tuple{<:AbstractUncertaintySetResult, <:AbstractUncertaintySetResult}`: Expected returns and covariance uncertainty sets.
+
+# Related
+
+  - [`mu_ucs`](@ref)
+  - [`sigma_ucs`](@ref)
+  - [`AbstractPriorUncertaintySetEstimator`](@ref)
+"""
+function ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult, ::AbstractPriorResult;
+             kwargs...)
+    return ucs(uc, rd; kwargs...)
+end
+function ucs(uc::AbstractPriorUncertaintySetEstimator, ::ReturnsResult,
+             pr::AbstractPriorResult; kwargs...)
+    return ucs(uc, pr; kwargs...)
+end
+"""
+    mu_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult, ::AbstractPriorResult; kwargs...)
+    mu_ucs(uc::AbstractPriorUncertaintySetEstimator, ::ReturnsResult, pr::AbstractPriorResult; kwargs...)
+
+Fits the mean uncertainty set from an estimator that is handed the returns data **and** the prior result the optimisation is solving on.
+
+This is the form the robust-return builder calls. The routing table of [`ucs`](@ref) states which argument each estimator reads, and the third method of the form is the passthrough that already takes `args...`, so a slot holding a built set answers here too.
+
+# Arguments
+
+  - `uc`: Uncertainty set estimator, built set, or `nothing`.
+  - `rd`: [`ReturnsResult`](@ref). Read by a returns-data estimator, and dropped by a prior-reading one.
+  - `pr`: [`AbstractPriorResult`](@ref). Read by a prior-reading estimator, and dropped by a returns-data one.
+  - `kwargs...`: Additional keyword arguments passed to the estimator.
+
+# Returns
+
+  - `uc::AbstractUncertaintySetResult`: Expected returns uncertainty set.
+
+# Related
+
+  - [`ucs`](@ref)
+  - [`sigma_ucs`](@ref)
+  - [`AbstractPriorUncertaintySetEstimator`](@ref)
+"""
+function mu_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult,
+                ::AbstractPriorResult; kwargs...)
+    return mu_ucs(uc, rd; kwargs...)
+end
+function mu_ucs(uc::AbstractPriorUncertaintySetEstimator, ::ReturnsResult,
+                pr::AbstractPriorResult; kwargs...)
+    return mu_ucs(uc, pr; kwargs...)
+end
+"""
+    sigma_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult, ::AbstractPriorResult; kwargs...)
+    sigma_ucs(uc::AbstractPriorUncertaintySetEstimator, ::ReturnsResult, pr::AbstractPriorResult; kwargs...)
+
+Fits the covariance uncertainty set from an estimator that is handed the returns data **and** the prior result the optimisation is solving on.
+
+This is the form the uncertainty set variance builder calls. The routing table of [`ucs`](@ref) states which argument each estimator reads, and the third method of the form is the passthrough that already takes `args...`, so a slot holding a built set answers here too.
+
+# Arguments
+
+  - `uc`: Uncertainty set estimator, built set, or `nothing`.
+  - `rd`: [`ReturnsResult`](@ref). Read by a returns-data estimator, and dropped by a prior-reading one.
+  - `pr`: [`AbstractPriorResult`](@ref). Read by a prior-reading estimator, and dropped by a returns-data one.
+  - `kwargs...`: Additional keyword arguments passed to the estimator.
+
+# Returns
+
+  - `uc::AbstractUncertaintySetResult`: Covariance uncertainty set.
+
+# Related
+
+  - [`ucs`](@ref)
+  - [`mu_ucs`](@ref)
+  - [`AbstractPriorUncertaintySetEstimator`](@ref)
+"""
+function sigma_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult,
+                   ::AbstractPriorResult; kwargs...)
+    return sigma_ucs(uc, rd; kwargs...)
+end
+function sigma_ucs(uc::AbstractPriorUncertaintySetEstimator, ::ReturnsResult,
+                   pr::AbstractPriorResult; kwargs...)
+    return sigma_ucs(uc, pr; kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDEF)

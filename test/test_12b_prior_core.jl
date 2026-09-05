@@ -197,6 +197,60 @@ processing, and the residual block enters `sigma` and `chol` once each. Sweep ti
     cfg = PO.factor_residual_config(fp)
     @test (cfg.ve, cfg.pdm, cfg.rsd) === (fp.ve, fp.mp.pdm, fp.rsd)
     @test isnothing(PO.factor_residual_config(EmpiricalPrior()))
+
+    # Issue #776. The lift returns the residual variances it measured, and they are the
+    # diagonal it folded into `sigma`, not a second measurement of it.
+    @test l1.esigma == diag(err_sigma)
+    @test isapprox(l1.sigma - systematic, diagm(l1.esigma))
+    # Under `rsd = false` no residual block was added, so there is nothing to report.
+    @test isnothing(l0.esigma)
+end
+
+# Issue #776. A prior that lifts the factor moments writes the residual variances onto the
+# loadings block, so a consumer reads them off `pr.rr` instead of recomputing them from the
+# reconstruction error.
+@testset "A time-series factor prior writes esigma onto its loadings block" begin
+    PO = PortfolioOptimisers
+    pe1 = FactorPrior(; rsd = true)
+    pr1 = prior(pe1, rd)
+    rr1, posterior_X1 = PO.factor_reconstruction(pe1.re, rd.X, rd.F)
+    lift1 = PO.factor_lift(pe1.mp, pe1.ve, true, rr1, prior(pe1.pe, rd.F).mu,
+                           prior(pe1.pe, rd.F).sigma, rd.X, posterior_X1)
+    # The field holds the variances the lift measured, which are the diagonal it folded in.
+    @test pr1.rr.esigma == lift1.esigma
+    @test isapprox(pr1.rr.esigma, vec(var(pe1.ve, rd.X - posterior_X1; dims = 1)))
+    # The reader answers off the block without a shape test at the call site.
+    @test PO.idiosyncratic_variances(pr1.rr) == pr1.rr.esigma
+    # Nothing else on the block moved, and `L` is still unset under a stepwise fit.
+    @test pr1.rr.M == rr1.M
+    @test pr1.rr.b == rr1.b
+    @test isnothing(getfield(pr1.rr, :L))
+
+    # Under `rsd = false` the lift adds no residual block, so the field is unset and the
+    # reader refuses with a message that names the switch.
+    pr0 = prior(FactorPrior(; rsd = false), rd)
+    @test isnothing(pr0.rr.esigma)
+    @test_throws PO.IsNothingError PO.idiosyncratic_variances(pr0.rr)
+
+    # A dimension-reduction fit sets `L`, and the write leaves it set.
+    pr2 = prior(FactorPrior(; re = DimensionReductionRegression(;), rsd = true), rd)
+    @test !isnothing(getfield(pr2.rr, :L))
+    @test !isnothing(pr2.rr.esigma)
+
+    # `FactorBlackLittermanPrior` applies the same lift, so it writes the field too.
+    fbl(rsd) = FactorBlackLittermanPrior(; pe = EmpiricalPrior(;), rsd = rsd, sets = xfsets,
+                                         tau = 1 / size(rd.X, 1),
+                                         views = LinearConstraintEstimator(;
+                                                                           val = ["MTUM == 0.0001",
+                                                                                  "QUAL - USMV == -0.0003"]))
+    prb = prior(fbl(true), rd)
+    @test !isnothing(prb.rr.esigma)
+    @test length(prb.rr.esigma) == size(rd.X, 2)
+    @test isnothing(prior(fbl(false), rd).rr.esigma)
+
+    # A view of the prior slices the field with the assets, on the one axis it has.
+    i = [1, 3, 5]
+    @test PO.port_opt_view(pr1, i).rr.esigma == pr1.rr.esigma[i]
 end
 
 @testset "High Order Prior" begin

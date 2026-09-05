@@ -1158,6 +1158,11 @@ Resolve the uncertainty set of an [`UncertaintySetVariance`](@ref) risk measure 
 fitted [`AbstractUncertaintySetResult`](@ref) using the returns data. Other risk measures
 are returned unchanged; vectors of risk measures are resolved element-wise.
 
+A risk measure whose slot holds an [`AbstractPriorUncertaintySetEstimator`](@ref) is
+returned unchanged too. Such an estimator is fitted from the optimisation's own prior
+result, and this pre-fit runs before any prior exists, so the estimator travels to the
+builder and each corner solve fits it there against the prior that solve was handed.
+
 Used by [`near_optimal_centering_setup`](@ref) so that the barrier risk targets, the
 sub-problem solves, and the NOC model all share the same fitted uncertainty set (fitted
 results pass through [`sigma_ucs`](@ref) unchanged). With a fitted set the
@@ -1173,6 +1178,15 @@ expression.
 """
 function ucs_risk_measure(r::UncertaintySetVariance, rd::ReturnsResult)
     return Accessors.@set r.ucs = sigma_ucs(r.ucs, rd)
+end
+function ucs_risk_measure(r::UncertaintySetVariance{<:Any,
+                                                    <:AbstractPriorUncertaintySetEstimator,
+                                                    <:Any}, ::ReturnsResult)
+    # The pre-fit runs before any prior exists, and this estimator is fitted from the
+    # optimisation's own prior result, so there is nothing to fit here. The estimator passes
+    # through unchanged, and each corner solve fits it inside its own builder, from the prior
+    # that solve was handed.
+    return r
 end
 function ucs_risk_measure(r::Any, ::ReturnsResult)
     return r

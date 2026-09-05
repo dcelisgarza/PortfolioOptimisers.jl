@@ -424,4 +424,56 @@ const StatsAPI = PortfolioOptimisers.StatsAPI
         @test isa(PO.DimensionReductionRegression(), PO.RegE_Reg)
         @test !isa(PO.LinearModel(), PO.RegE_Reg)
     end
+
+    # Issue #776. `esigma` is the fourth field, and it carries the same name, the same two
+    # shapes and the same guards as the field `CrossSectionalFactorModel` declares, so one
+    # reader answers off either block.
+    @testset "esigma takes the two shapes and is checked against the asset count" begin
+        M = [1.0 2.0; 3.0 4.0; 5.0 6.0]
+        @test PO.Regression(; M = M, esigma = [0.1, 0.2, 0.3]).esigma == [0.1, 0.2, 0.3]
+        esm = Matrix(0.1 * I(3))
+        @test PO.Regression(; M = M, esigma = esm).esigma == esm
+        # A regression estimator fits loadings alone, so the default is unset.
+        @test isnothing(PO.Regression(; M = M).esigma)
+        # The guards are `assert_idiosyncratic_covariance`'s, run against `size(M, 1)`.
+        @test_throws PO.IsEmptyError PO.Regression(; M = M, esigma = Float64[])
+        @test_throws DimensionMismatch PO.Regression(; M = M, esigma = [0.1, 0.2])
+        @test_throws DimensionMismatch PO.Regression(; M = M, esigma = Matrix(0.1 * I(2)))
+        # A matrix must be square before its size is read.
+        @test_throws DimensionMismatch PO.Regression(; M = M, esigma = zeros(3, 2))
+    end
+
+    @testset "port_opt_view cuts esigma on every axis it has" begin
+        M = [1.0 2.0; 3.0 4.0; 5.0 6.0]
+        i = [1, 3]
+        # A vector of variances is one axis, so it is indexed once.
+        rev = PO.Regression(; M = M, b = [0.1, 0.2, 0.3], esigma = [1.0, 2.0, 3.0])
+        @test PO.port_opt_view(rev, i).esigma == [1.0, 3.0]
+        # A full covariance is two axes, so the selected block stays square.
+        esm = [1.0 0.4 0.5; 0.4 2.0 0.6; 0.5 0.6 3.0]
+        rem = PO.Regression(; M = M, esigma = esm)
+        @test PO.port_opt_view(rem, i).esigma == esm[i, i]
+        # An unset field stays unset through the view.
+        @test isnothing(PO.port_opt_view(PO.Regression(; M = M), i).esigma)
+    end
+
+    @testset "set_idiosyncratic_covariance rewrites one field and keeps an unset L unset" begin
+        M = [1.0 2.0; 3.0 4.0; 5.0 6.0]
+        re = PO.Regression(; M = M, b = [0.1, 0.2, 0.3])
+        @test isnothing(getfield(re, :L))
+        re2 = PO.set_idiosyncratic_covariance(re, [1.0, 2.0, 3.0])
+        @test re2.esigma == [1.0, 2.0, 3.0]
+        # The `swap(L, M)` rule makes `re.L` answer `M`, so a property-based rewrite would
+        # materialise `L` as a copy of `M`. This one reads `getfield`, so the field stays
+        # unset and `M` and `b` come through untouched.
+        @test isnothing(getfield(re2, :L))
+        @test re2.M == M
+        @test re2.b == [0.1, 0.2, 0.3]
+        # A set `L` survives, and `nothing` clears the field.
+        reL = PO.Regression(; M = M, L = 2 * M)
+        @test PO.set_idiosyncratic_covariance(reL, [1.0, 2.0, 3.0]).L == 2 * M
+        @test isnothing(PO.set_idiosyncratic_covariance(re2, nothing).esigma)
+        # The guards of the constructor run again.
+        @test_throws DimensionMismatch PO.set_idiosyncratic_covariance(re, [1.0, 2.0])
+    end
 end

@@ -1,3 +1,24 @@
+#=
+Issue #776. A stub of the prior arm of the ucs triple, for the Pipeline step that serves it.
+It carries no `pe`, so a call that reached the returns-data base would raise instead of
+quietly answering, and the sets it builds are read off `pr.mu` and `pr.sigma`, so a probe can
+tell which prior the step saw.
+=#
+struct Ticket776PipelinePriorUCS <: PortfolioOptimisers.AbstractPriorUncertaintySetEstimator end
+function PortfolioOptimisers.mu_ucs(::Ticket776PipelinePriorUCS,
+                                    pr::PortfolioOptimisers.AbstractPriorResult; kwargs...)
+    return BoxUncertaintySet(; lb = pr.mu .- 1, ub = pr.mu .+ 1, val = pr.mu)
+end
+function PortfolioOptimisers.sigma_ucs(::Ticket776PipelinePriorUCS,
+                                       pr::PortfolioOptimisers.AbstractPriorResult;
+                                       kwargs...)
+    return BoxUncertaintySet(; lb = pr.sigma .- 1, ub = pr.sigma .+ 1, val = pr.sigma)
+end
+function PortfolioOptimisers.ucs(ue::Ticket776PipelinePriorUCS,
+                                 pr::PortfolioOptimisers.AbstractPriorResult; kwargs...)
+    return PortfolioOptimisers.mu_ucs(ue, pr), PortfolioOptimisers.sigma_ucs(ue, pr)
+end
+
 @testset "Pipeline fit" begin
     using Test, PortfolioOptimisers, TimeSeries, Dates, StableRNGs, Statistics, Clarabel
 
@@ -196,6 +217,58 @@
         # it having declared no target at all.
         @test_throws ArgumentError PortfolioOptimisers.run_uncertainty_step(DeltaUncertaintySet(),
                                                                             :nonsense, ctx)
+
+        # Issue #776. An estimator that reads the prior result serves the same three targets,
+        # and the slot is the difference: it requires `:prior`, never `:returns`.
+        @testset "an uncertainty step that reads the prior" begin
+            ue776 = Ticket776PipelinePriorUCS()
+            pr776 = prior(EmpiricalPrior(), rd)
+            ctx776 = PortfolioOptimisers.PipelineContext(; returns = rd, prior = pr776)
+            for (target, half) in ((:mu, :mu), (:sigma, :sigma))
+                res776, ctx2 = PortfolioOptimisers.run_uncertainty_step(ue776, target,
+                                                                        ctx776)
+                # The set was fitted from the pipeline's own prior.
+                ref = target == :mu ? pr776.mu : pr776.sigma
+                @test res776.val == ref
+                @test getproperty(ctx2.uncertainty, half).val == ref
+                # A narrowed step leaves the other half alone.
+                other = target == :mu ? :sigma : :mu
+                @test isnothing(getproperty(ctx2.uncertainty, other))
+            end
+            # `:both` derives both halves from one read.
+            pair776, ctx_both = PortfolioOptimisers.run_uncertainty_step(ue776, :both,
+                                                                         ctx776)
+            @test pair776 isa PortfolioOptimisers.PipelineUncertaintySets
+            @test pair776.mu.val == pr776.mu
+            @test pair776.sigma.val == pr776.sigma
+            @test ctx_both.uncertainty === pair776
+            # The two narrowed steps compose into the same pair.
+            _, ctx_mu = PortfolioOptimisers.run_uncertainty_step(ue776, :mu, ctx776)
+            _, ctx_two = PortfolioOptimisers.run_uncertainty_step(ue776, :sigma, ctx_mu)
+            @test ctx_two.uncertainty.mu.val == pair776.mu.val
+            @test ctx_two.uncertainty.sigma.val == pair776.sigma.val
+            # The `:prior` slot is required, and the returns alone do not satisfy it.
+            ctx_no_prior = PortfolioOptimisers.PipelineContext(; returns = rd)
+            for target in (:mu, :sigma, :both)
+                @test_throws PortfolioOptimisers.IsNothingError PortfolioOptimisers.run_uncertainty_step(ue776,
+                                                                                                         target,
+                                                                                                         ctx_no_prior)
+            end
+            # The returns are not read at all, so a context that carries the prior alone runs.
+            ctx_prior_only = PortfolioOptimisers.PipelineContext(; prior = pr776)
+            @test PortfolioOptimisers.run_uncertainty_step(ue776, :mu, ctx_prior_only)[1].val ==
+                  pr776.mu
+            # The target check is the returns-data method's, unchanged.
+            @test_throws ArgumentError PortfolioOptimisers.run_uncertainty_step(ue776,
+                                                                                :nonsense,
+                                                                                ctx776)
+            # A prior step ahead of it fills the slot, so the whole pipeline runs.
+            ps776 = PipelineStep(; est = ue776, reads = (:prior,), writes = :uncertainty,
+                                 target = :both)
+            res_pipe = fit(Pipeline(; steps = (EmpiricalPrior(), ps776)), rd)
+            @test res_pipe.ctx.uncertainty.mu.val == res_pipe.ctx.prior.mu
+            @test res_pipe.ctx.uncertainty.sigma.val == res_pipe.ctx.prior.sigma
+        end
 
         # unroutable targets fail loudly
         @test_throws ArgumentError fit(Pipeline(; steps = (ps_sigma, EqualWeighted())), rd)

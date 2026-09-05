@@ -1,3 +1,29 @@
+#=
+Issue #776 adds the prior arm of the ucs triple: a root whose members are fitted from the
+prior result the optimisation is solving on, rather than from returns data.
+
+The stub below is what the probes fit. It carries NO `pe` field, which is the point: the
+returns-data base reads `uc.pe` before it forwards, so a probe that reached the base by
+mistake raises a `FieldError` instead of quietly answering. The sets it builds are read off
+`pr.mu` and `pr.sigma`, so a probe can tell which prior a fit saw.
+=#
+struct Ticket776PriorUCS <: PortfolioOptimisers.AbstractPriorUncertaintySetEstimator end
+# A second stub that declares nothing, so the root's own refusals are reachable.
+struct Ticket776BarePriorUCS <: PortfolioOptimisers.AbstractPriorUncertaintySetEstimator end
+function PortfolioOptimisers.mu_ucs(::Ticket776PriorUCS,
+                                    pr::PortfolioOptimisers.AbstractPriorResult; kwargs...)
+    return BoxUncertaintySet(; lb = pr.mu .- 1, ub = pr.mu .+ 1, val = pr.mu)
+end
+function PortfolioOptimisers.sigma_ucs(::Ticket776PriorUCS,
+                                       pr::PortfolioOptimisers.AbstractPriorResult;
+                                       kwargs...)
+    return BoxUncertaintySet(; lb = pr.sigma .- 1, ub = pr.sigma .+ 1, val = pr.sigma)
+end
+function PortfolioOptimisers.ucs(ue::Ticket776PriorUCS,
+                                 pr::PortfolioOptimisers.AbstractPriorResult; kwargs...)
+    return PortfolioOptimisers.mu_ucs(ue, pr), PortfolioOptimisers.sigma_ucs(ue, pr)
+end
+
 @testset "Uncertainty set" begin
     using PortfolioOptimisers, Test, DataFrames, CSV, TimeSeries, StableRNGs, Random,
           Clarabel, Statistics, LinearAlgebra, Distributions
@@ -1650,6 +1676,111 @@
                                          val = 4 * sigman)
             @test isapprox(PortfolioOptimisers.ucs_variance(usw, sigman, wn),
                            PortfolioOptimisers.ucs_variance(us, 4 * sigman, wn))
+        end
+    end
+
+    # Issue #776. Both JuMP builders hold the prior beside the returns, so both pass it, and
+    # the three-argument form of the triple routes each estimator to the argument it reads.
+    @testset "The three-argument triple routes each estimator to what it reads" begin
+        rng776 = StableRNG(776776)
+        X776 = randn(rng776, 200, 4)
+        rd776 = ReturnsResult(; X = X776, nx = string.("A", 1:4))
+        pr776 = prior(EmpiricalPrior(), X776)
+        # A second prior, so a probe can tell which one a fit saw.
+        pr776b = prior(EmpiricalPrior(), X776 .+ 1)
+
+        @testset "A returns-data estimator drops the prior" begin
+            ue = DeltaUncertaintySet(;)
+            # The prior is not an input of this fit, so passing it changes no number, and
+            # passing a different prior changes no number either.
+            @test isapprox(mu_ucs(ue, rd776, pr776).lb, mu_ucs(ue, rd776).lb)
+            @test isapprox(mu_ucs(ue, rd776, pr776).ub, mu_ucs(ue, rd776).ub)
+            @test isapprox(sigma_ucs(ue, rd776, pr776).lb, sigma_ucs(ue, rd776).lb)
+            @test isapprox(mu_ucs(ue, rd776, pr776b).lb, mu_ucs(ue, rd776, pr776).lb)
+            m3, s3 = ucs(ue, rd776, pr776)
+            m2, s2 = ucs(ue, rd776)
+            @test isapprox(m3.lb, m2.lb)
+            @test isapprox(s3.ub, s2.ub)
+        end
+
+        @testset "A prior-reading estimator drops the returns" begin
+            ue = Ticket776PriorUCS()
+            # The fit reads `pr`, so the built set is the two-argument set exactly.
+            @test isapprox(mu_ucs(ue, rd776, pr776).val, pr776.mu)
+            @test isapprox(mu_ucs(ue, rd776, pr776).val, mu_ucs(ue, pr776).val)
+            @test isapprox(sigma_ucs(ue, rd776, pr776).val, pr776.sigma)
+            m3, s3 = ucs(ue, rd776, pr776)
+            @test isapprox(m3.val, pr776.mu)
+            @test isapprox(s3.val, pr776.sigma)
+            # A different prior gives a different set, which is what "reads the prior" means.
+            @test !isapprox(mu_ucs(ue, rd776, pr776b).val, mu_ucs(ue, rd776, pr776).val)
+            # The returns are never read: an empty container reaches no guard of the
+            # returns-data base, because the base is not the method that runs.
+            @test isapprox(mu_ucs(ue, ReturnsResult(), pr776).val, pr776.mu)
+        end
+
+        @testset "A built set passes through the three-argument form" begin
+            built = mu_ucs(DeltaUncertaintySet(;), rd776)
+            @test mu_ucs(built, rd776, pr776) === built
+            @test sigma_ucs(built, rd776, pr776) === built
+            pair = ucs(DeltaUncertaintySet(;), rd776)
+            @test ucs(pair, rd776, pr776) === pair
+            # An empty slot answers too, so a consumer needs no `isnothing` test of its own.
+            @test isnothing(mu_ucs(nothing, rd776, pr776))
+            @test isnothing(sigma_ucs(nothing, rd776, pr776))
+            @test isnothing(ucs(nothing, rd776, pr776))
+        end
+
+        @testset "ucs_risk_measure passes a prior-reading estimator through" begin
+            ue = Ticket776PriorUCS()
+            r = UncertaintySetVariance(; ucs = ue)
+            # The pre-fit runs before any prior exists, so the estimator travels unchanged and
+            # each corner solve fits it in its own builder.
+            @test PortfolioOptimisers.ucs_risk_measure(r, rd776) === r
+            @test isa(PortfolioOptimisers.ucs_risk_measure(r, rd776).ucs, Ticket776PriorUCS)
+            # A returns-data estimator is still fitted there, which is the rule this method
+            # narrows rather than replaces.
+            rd = UncertaintySetVariance(; ucs = DeltaUncertaintySet(;))
+            @test isa(PortfolioOptimisers.ucs_risk_measure(rd, rd776).ucs,
+                      PortfolioOptimisers.AbstractUncertaintySetResult)
+            # A vector of risk measures is still resolved element-wise.
+            rs = PortfolioOptimisers.ucs_risk_measure([r, rd], rd776)
+            @test isa(rs[1].ucs, Ticket776PriorUCS)
+            @test isa(rs[2].ucs, PortfolioOptimisers.AbstractUncertaintySetResult)
+        end
+
+        @testset "The root is an uncertainty set estimator, and it is unexported" begin
+            @test isa(Ticket776PriorUCS(),
+                      PortfolioOptimisers.AbstractPriorUncertaintySetEstimator)
+            @test isa(Ticket776PriorUCS(),
+                      PortfolioOptimisers.AbstractUncertaintySetEstimator)
+            @test !isdefined(Main, :AbstractPriorUncertaintySetEstimator)
+            # `port_opt_view` needs nothing new: the estimator passthrough already covers it,
+            # and a cluster's own sub-optimiser fits the estimator from the cluster's prior.
+            ue = Ticket776PriorUCS()
+            @test PortfolioOptimisers.port_opt_view(ue, [1, 2]) === ue
+        end
+
+        @testset "A member that declares no fit raises and names itself" begin
+            bare = Ticket776BarePriorUCS()
+            # The root carries a method of each verb, so the message names the author's type
+            # and the verb they owe, rather than failing on the root.
+            for (verb, name) in
+                ((ucs, "ucs"), (mu_ucs, "mu_ucs"), (sigma_ucs, "sigma_ucs"))
+                err = try
+                    verb(bare, pr776)
+                    nothing
+                catch e
+                    e
+                end
+                @test isa(err, ArgumentError)
+                @test occursin("Ticket776BarePriorUCS", err.msg)
+                @test occursin(name, err.msg)
+            end
+            # The three-argument form forwards there, so it raises the same way.
+            @test_throws ArgumentError mu_ucs(bare, rd776, pr776)
+            @test_throws ArgumentError sigma_ucs(bare, rd776, pr776)
+            @test_throws ArgumentError ucs(bare, rd776, pr776)
         end
     end
 end

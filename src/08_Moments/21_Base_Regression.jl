@@ -55,9 +55,10 @@ julia> function PortfolioOptimisers.regression(::MyRegressionEstimator,
 julia> regression(MyRegressionEstimator(), [1.0 2.0; 3.0 4.0; 5.0 6.0],
                   [1.0 0.0; 0.0 1.0; 0.5 0.5])
 Regression
-  M ┼ 2×2 Matrix{Float64}
-  L ┼ 2×2 Matrix{Float64}
-  b ┴ nothing
+       M ┼ 2×2 Matrix{Float64}
+       L ┼ 2×2 Matrix{Float64}
+       b ┼ nothing
+  esigma ┴ nothing
 ```
 
 # Related
@@ -990,9 +991,11 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Holds the loadings matrix, the intercept vector and the reduced-basis loadings of a fitted factor model.
+Holds the loadings matrix, the intercept vector, the reduced-basis loadings and the idiosyncratic covariance of a fitted factor model.
 
 `M` and `b` are the loadings matrix and the intercept vector of the factor model, one row per asset. `L` carries the same loadings written in the reduced basis a dimension reduction produced; it is unset when the estimator regresses on the original factors. **An unset `L` reads back as `M`.** A [`@forward_properties`](@ref) `swap(L, M)` rule makes `re.L` return `re.M` whenever `L` was not given, so a consumer that decomposes risk in the factor basis needs no `Nothing` branch, and `isnothing(re.L)` is never true. Read `getfield(re, :L)` when the unset case must be told apart, as [`port_opt_view`](@ref) does. [`StepwiseRegression`](@ref) leaves `L` unset and [`DimensionReductionRegression`](@ref) sets it, so `size(L, 2)` is the width of the basis risk is decomposed in: the original factors under the first, the retained principal components under the second.
+
+`esigma` holds the idiosyncratic covariance the fit left over, and it carries the same name and the same shapes as the field [`CrossSectionalFactorModel`](@ref) declares, so one reader answers off either block. A regression estimator fits loadings alone and writes nothing here; the field is filled by the prior that lifts the factor moments, and only when that prior adds a residual block. [`FactorPrior`](@ref) and [`FactorBlackLittermanPrior`](@ref) write the residual variances of [`factor_lift`](@ref) under `rsd = true`, and leave the field unset under `rsd = false`.
 
 # Mathematical definition
 
@@ -1021,7 +1024,8 @@ $(DocStringExtensions.FIELDS)
     Regression(;
         M::MatNum,
         L::Option{<:MatNum} = nothing,
-        b::Option{<:VecNum} = nothing
+        b::Option{<:VecNum} = nothing,
+        esigma::Option{<:VecNum_MatNum} = nothing
     ) -> Regression
 
 Keywords correspond to the struct's fields.
@@ -1031,15 +1035,17 @@ Keywords correspond to the struct's fields.
   - `!isempty(M)`.
   - If provided, `!isempty(b)`, and `length(b) == size(M, 1)`.
   - If provided, `!isempty(L)`, and `size(L, 1) == size(M, 1)`.
+  - If provided, `!isempty(esigma)`, and `esigma` carries `size(M, 1)` entries when it is a vector, or is square with `size(M, 1)` rows when it is a matrix.
 
 # Examples
 
 ```jldoctest
-julia> Regression(; M = [1 2 3; 4 5 6], L = [1 2 3 4; 5 6 7 8], b = [1, 2])
+julia> Regression(; M = [1 2 3; 4 5 6], L = [1 2 3 4; 5 6 7 8], b = [1, 2], esigma = [0.1, 0.2])
 Regression
-  M ┼ 2×3 Matrix{Int64}
-  L ┼ 2×4 Matrix{Int64}
-  b ┴ Vector{Int64}: [1, 2]
+       M ┼ 2×3 Matrix{Int64}
+       L ┼ 2×4 Matrix{Int64}
+       b ┼ Vector{Int64}: [1, 2]
+  esigma ┴ Vector{Float64}: [0.1, 0.2]
 ```
 
 # Related
@@ -1066,7 +1072,12 @@ Regression
     $(arg_dict[:b])
     """
     b
-    function Regression(M::MatNum, L::Option{<:MatNum}, b::Option{<:VecNum})
+    """
+    $(arg_dict[:esigma])
+    """
+    esigma
+    function Regression(M::MatNum, L::Option{<:MatNum}, b::Option{<:VecNum},
+                        esigma::Option{<:VecNum_MatNum})
         @argcheck(!isempty(M), IsEmptyError)
         if isa(b, VecNum)
             @argcheck(!isempty(b), IsEmptyError)
@@ -1076,17 +1087,19 @@ Regression
             @argcheck(!isempty(L), IsEmptyError)
             @argcheck(size(L, 1) == size(M, 1), DimensionMismatch)
         end
-        return new{typeof(M), typeof(L), typeof(b)}(M, L, b)
+        assert_idiosyncratic_covariance(esigma, size(M, 1))
+        return new{typeof(M), typeof(L), typeof(b), typeof(esigma)}(M, L, b, esigma)
     end
 end
 function Regression(; M::MatNum, L::Option{<:MatNum} = nothing,
-                    b::Option{<:VecNum} = nothing)::Regression
-    return Regression(M, L, b)
+                    b::Option{<:VecNum} = nothing,
+                    esigma::Option{<:VecNum_MatNum} = nothing)::Regression
+    return Regression(M, L, b, esigma)
 end
 # When `L` is unset (`Nothing` type parameter), `:L` falls back to the loadings matrix `M`;
 # when `L` is a stored matrix the default field access already returns it, so only the
 # `Nothing` specialisation needs a rule (see [`@forward_properties`](@ref)'s `swap`).
-@forward_properties Regression{<:Any, Nothing, <:Any} begin
+@forward_properties Regression{<:Any, Nothing, <:Any, <:Any} begin
     swap(L, M)
 end
 """
@@ -1094,7 +1107,7 @@ end
 
 Return a view of a [`Regression`](@ref) result object, selecting only the rows indexed by `i`.
 
-This function constructs a new `Regression` result, where the coefficient matrix `M`, optional auxiliary matrix `L`, and intercept vector `b` are restricted to the rows specified by the index vector `i`. This is useful for extracting or operating on a subset of regression results, such as for a subset of assets.
+This function constructs a new `Regression` result, where the coefficient matrix `M`, optional auxiliary matrix `L`, intercept vector `b` and idiosyncratic covariance `esigma` are restricted to the rows specified by the index vector `i`. This is useful for extracting or operating on a subset of regression results, such as for a subset of assets.
 
 # Algorithm
 
@@ -1102,7 +1115,8 @@ This function constructs a new `Regression` result, where the coefficient matrix
  2. Take a row view of `M` over `i`, giving the loadings of the selected assets.
  3. Take a row view of `L` over `i` when step 1 found a matrix, and `nothing` otherwise.
  4. Take an element view of `b` over `i` when step 1 found a vector, and `nothing` otherwise.
- 5. Build a new [`Regression`](@ref) from the three, which re-runs every guard of the constructor.
+ 5. View `esigma` with [`idiosyncratic_covariance_view`](@ref), which reads its shape: a vector of variances is indexed once, and a full covariance is indexed on both axes.
+ 6. Build a new [`Regression`](@ref) from the four, which re-runs every guard of the constructor.
 
 # Arguments
 
@@ -1118,15 +1132,17 @@ This function constructs a new `Regression` result, where the coefficient matrix
 ```jldoctest
 julia> re = Regression(; M = [1 2; 3 4; 5 6], L = [10 20; 30 40; 50 60], b = [7, 8, 9])
 Regression
-  M ┼ 3×2 Matrix{Int64}
-  L ┼ 3×2 Matrix{Int64}
-  b ┴ Vector{Int64}: [7, 8, 9]
+       M ┼ 3×2 Matrix{Int64}
+       L ┼ 3×2 Matrix{Int64}
+       b ┼ Vector{Int64}: [7, 8, 9]
+  esigma ┴ nothing
 
 julia> PortfolioOptimisers.port_opt_view(re, [1, 3])
 Regression
-  M ┼ 2×2 SubArray{Int64, 2, Matrix{Int64}, Tuple{Vector{Int64}, Base.Slice{Base.OneTo{Int64}}}, false}
-  L ┼ 2×2 SubArray{Int64, 2, Matrix{Int64}, Tuple{Vector{Int64}, Base.Slice{Base.OneTo{Int64}}}, false}
-  b ┴ SubArray{Int64, 1, Vector{Int64}, Tuple{Vector{Int64}}, false}: [7, 9]
+       M ┼ 2×2 SubArray{Int64, 2, Matrix{Int64}, Tuple{Vector{Int64}, Base.Slice{Base.OneTo{Int64}}}, false}
+       L ┼ 2×2 SubArray{Int64, 2, Matrix{Int64}, Tuple{Vector{Int64}, Base.Slice{Base.OneTo{Int64}}}, false}
+       b ┼ SubArray{Int64, 1, Vector{Int64}, Tuple{Vector{Int64}}, false}: [7, 9]
+  esigma ┴ nothing
 ```
 
 # Related
@@ -1141,7 +1157,37 @@ function port_opt_view(re::Regression, i, args...)::Regression
     L = getfield(re, :L)
     b = getfield(re, :b)
     return Regression(; M = view(re.M, i, :), L = isnothing(L) ? nothing : view(L, i, :),
-                      b = isnothing(b) ? nothing : view(b, i))
+                      b = isnothing(b) ? nothing : view(b, i),
+                      esigma = idiosyncratic_covariance_view(re.esigma, i))
+end
+"""
+    set_idiosyncratic_covariance(re::Regression, esigma::Option{<:VecNum_MatNum})
+
+Return a [`Regression`](@ref) that carries `esigma`, with every other field unchanged.
+
+A regression estimator fits loadings alone, so the block a fit returns carries no idiosyncratic covariance. The prior that lifts the factor moments measures the residual variances on the way, and it writes them here rather than making every consumer recompute them. [`FactorPrior`](@ref) and [`FactorBlackLittermanPrior`](@ref) are the two callers, and each passes what [`factor_lift`](@ref) returned: the variances under `rsd = true`, and `nothing` under `rsd = false`.
+
+`Accessors.@set` cannot do this. It reads the fields through property access, and the `swap(L, M)` rule of [`Regression`](@ref) makes `re.L` return `re.M` when `L` is unset, so the rebuilt result would carry a copy of `M` under `L` and `isnothing(getfield(re, :L))` would stop being true. This method reads `L` and `b` with `getfield` for that reason, as [`port_opt_view`](@ref) does.
+
+# Arguments
+
+  - `re`: The regression result to rewrite.
+  - `esigma`: The idiosyncratic covariance to write, or `nothing` to leave the field unset.
+
+# Returns
+
+  - `re::Regression`: A new result carrying `esigma`, which re-runs every guard of the constructor.
+
+# Related
+
+  - [`Regression`](@ref)
+  - [`factor_lift`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+function set_idiosyncratic_covariance(re::Regression,
+                                      esigma::Option{<:VecNum_MatNum})::Regression
+    return Regression(; M = re.M, L = getfield(re, :L), b = getfield(re, :b),
+                      esigma = esigma)
 end
 """
     regression(re::Regression, args...)

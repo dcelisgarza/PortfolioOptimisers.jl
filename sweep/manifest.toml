@@ -87,7 +87,7 @@
 "src/08_Moments/18_ExcessExpectedReturns.jl" = { map = 3, units = 2, algorithm = 0, swept = true }
 "src/08_Moments/19_Coskewness.jl" = { map = 3, units = 5, algorithm = 3, swept = true }
 "src/08_Moments/20_Cokurtosis.jl" = { map = 3, units = 4, algorithm = 2, swept = true }
-"src/08_Moments/21_Base_Regression.jl" = { map = 3, units = 34, algorithm = 7, swept = true }
+"src/08_Moments/21_Base_Regression.jl" = { map = 3, units = 35, algorithm = 7, swept = true }
 "src/08_Moments/22_StepwiseRegression.jl" = { map = 3, units = 12, algorithm = 8, swept = true }
 "src/08_Moments/23_DimensionReductionRegression.jl" = { map = 3, units = 10, algorithm = 5, swept = true }
 "src/08_Moments/24_ImpliedVolatility.jl" = { map = 3, units = 11, algorithm = 5, swept = true }
@@ -107,7 +107,7 @@
 "src/08_Moments/38_CrossSectionalRegression.jl" = { map = 3, units = 18, swept = false }
 "src/08_Moments/39_CrossSectionalWeights.jl" = { map = 3, units = 10, swept = false }
 "src/08_Moments/40_HigherMomentPartialFit.jl" = { map = 3, units = 25, swept = false }
-"src/08_Moments/41_CrossSectionalFactorModel.jl" = { map = 3, units = 10, algorithm = 1, swept = true }
+"src/08_Moments/41_CrossSectionalFactorModel.jl" = { map = 3, units = 11, algorithm = 1, swept = true }
 "src/08_Moments/42_FactorExposures/01_Base_Descriptor.jl" = { map = 3, units = 10, swept = false }
 "src/08_Moments/42_FactorExposures/02_PanelFieldDescriptors.jl" = { map = 3, units = 32, swept = false }
 "src/08_Moments/42_FactorExposures/03_LagDescriptors.jl" = { map = 3, units = 10, swept = false }
@@ -173,7 +173,7 @@
 "src/13_Prior/13_OpinionPoolingPrior.jl" = { map = 6, units = 7, algorithm = 3, swept = true }
 "src/13_Prior/14_HighOrderFactorPriorEstimator.jl" = { map = 6, units = 4, algorithm = 3, swept = true }
 "src/13_Prior/15_FeaturePrior.jl" = { map = 6, units = 13, algorithm = 6, swept = true }
-"src/14_UncertaintySets/01_Base_UncertaintySets.jl" = { map = 7, units = 34, algorithm = 11, swept = true }
+"src/14_UncertaintySets/01_Base_UncertaintySets.jl" = { map = 7, units = 39, algorithm = 11, swept = true }
 "src/14_UncertaintySets/02_DeltaUncertaintySets.jl" = { map = 7, units = 6, algorithm = 5, swept = true }
 "src/14_UncertaintySets/03_NormalUncertaintySets.jl" = { map = 7, units = 17, algorithm = 16, swept = true }
 "src/14_UncertaintySets/04_BootstrapUncertaintySets.jl" = { map = 7, units = 16, algorithm = 10, swept = true }
@@ -284,7 +284,7 @@
 "src/21_ExpectedReturns.jl" = { map = 8, units = 21, algorithm = 5, swept = true }
 "src/22_Preselection.jl" = { map = 8, units = 30, algorithm = 11, swept = true }
 "src/23_Pipeline/01_Base_Pipeline.jl" = { map = 12, units = 19, swept = false }
-"src/23_Pipeline/02_StepExecution.jl" = { map = 12, units = 13, swept = false }
+"src/23_Pipeline/02_StepExecution.jl" = { map = 12, units = 14, swept = false }
 "src/23_Pipeline/03_Pipeline.jl" = { map = 12, units = 27, swept = false }
 "src/23_Pipeline/04_PredictionCV.jl" = { map = 12, units = 14, swept = false }
 "src/23_Pipeline/05_SearchCrossValidation.jl" = { map = 12, units = 9, swept = false }

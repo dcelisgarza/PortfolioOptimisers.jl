@@ -373,7 +373,7 @@ CrossSectionalFactorModel
     """
     vs
     """
-    Idiosyncratic covariance. A vector holds the variances alone, and a matrix holds the full covariance an idiosyncratic correlation threshold produces.
+    $(field_dict[:esigma])
     """
     esigma
     """
@@ -447,6 +447,68 @@ function CrossSectionalFactorModel(; M::MatNum, L::Option{<:MatNum} = nothing, b
                                    fam::Option{<:VecStr} = nothing, fcb = nothing,
                                    lag::Option{<:Integer} = nothing)::CrossSectionalFactorModel
     return CrossSectionalFactorModel(M, L, b, csr, Ms, vs, esigma, rw, bw, fam, fcb, lag)
+end
+"""
+    idiosyncratic_variances(rr::AbstractLoadingsRegressionResult)
+    idiosyncratic_variances(esigma::VecNum, rr::AbstractLoadingsRegressionResult)
+    idiosyncratic_variances(esigma::MatNum, rr::AbstractLoadingsRegressionResult)
+    idiosyncratic_variances(esigma::Nothing, rr::Regression)
+    idiosyncratic_variances(esigma::Nothing, rr::CrossSectionalFactorModel)
+
+Read the idiosyncratic variance vector off a loadings block, whatever shape the block stores it in.
+
+Both members of [`AbstractLoadingsRegressionResult`](@ref) carry `esigma` under one name, and both admit the two shapes: a vector of variances, or a full covariance. A consumer that needs the variances alone — an [`AbstractUncertaintySetEstimator`](@ref) that weights the cross-section by the inverse idiosyncratic variance is the first one — asks for them here rather than testing the shape at its own site.
+
+The shape is the dispatch, as it is in [`assert_idiosyncratic_covariance`](@ref) and [`idiosyncratic_covariance_view`](@ref). The one-argument entry reads the field and forwards it beside the block, so the two refusals name the block they came from: a [`Regression`](@ref) is filled by the prior that lifts the factor moments, so its message names `rsd`, and a [`CrossSectionalFactorModel`](@ref) is filled by its own fit, so its message names the field.
+
+There is no fallback. A block that carries no idiosyncratic covariance cannot answer, and an answer of ones or of zeros is a different weighting rather than a missing one.
+
+# Arguments
+
+  - `esigma`: Idiosyncratic covariance, a vector of variances, a square matrix, or `nothing`.
+  - `rr`: The loadings block the field was read from, which the raise reports.
+
+# Validation
+
+  - `!isnothing(esigma)`, raising an `IsNothingError`.
+
+# Returns
+
+  - `esigma::VecNum`: The idiosyncratic variances, one per asset. A vector comes back unchanged, and a matrix comes back as its diagonal.
+
+# Examples
+
+```jldoctest
+julia> re = Regression(; M = [1.0 2.0; 3.0 4.0], esigma = [0.1, 0.2]);
+
+julia> PortfolioOptimisers.idiosyncratic_variances(re)
+2-element Vector{Float64}:
+ 0.1
+ 0.2
+```
+
+# Related
+
+  - [`AbstractLoadingsRegressionResult`](@ref)
+  - [`Regression`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+  - [`assert_idiosyncratic_covariance`](@ref)
+  - [`idiosyncratic_covariance_view`](@ref)
+"""
+function idiosyncratic_variances(rr::AbstractLoadingsRegressionResult)
+    return idiosyncratic_variances(rr.esigma, rr)
+end
+function idiosyncratic_variances(esigma::VecNum, ::AbstractLoadingsRegressionResult)
+    return esigma
+end
+function idiosyncratic_variances(esigma::MatNum, ::AbstractLoadingsRegressionResult)
+    return LinearAlgebra.diag(esigma)
+end
+function idiosyncratic_variances(::Nothing, rr::Regression)
+    return throw(IsNothingError("`esigma` is unset on this loadings block, so it carries no idiosyncratic variances to read. A time-series factor prior writes them only when it adds a residual block, and this block was built by a fit that added none.\nFit the prior with `rsd = true`, so that the lift measures the residual variances and writes them onto the block.\nGot\nrr => $(nameof(typeof(rr)))\nesigma => nothing"))
+end
+function idiosyncratic_variances(::Nothing, rr::CrossSectionalFactorModel)
+    return throw(IsNothingError("`esigma` is unset on this loadings block, so it carries no idiosyncratic variances to read. A cross-sectional factor model fills the field from its own fit, and this block was built without it.\nBuild the block with `esigma` set, so that the idiosyncratic variances travel with the loadings.\nGot\nrr => $(nameof(typeof(rr)))\nesigma => nothing"))
 end
 # When `L` is unset (`Nothing` type parameter), `:L` falls back to the loadings matrix `M`;
 # when `L` is a stored matrix the default field access already returns it, so only the
