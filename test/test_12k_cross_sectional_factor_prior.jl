@@ -16,6 +16,23 @@ The recovery testset is statistical, not exact: the synthetic panel's Panel Fiel
 functions of the true loadings, so a fitted exposure correlates with the truth rather than equalling
 it. The one exception is the industry block, which a one-hot exposure recovers exactly.
 
+THE TWO STORED CASES ARE THE REFERENCE IMPLEMENTATION'S OWN OUTPUT.
+`assets/CrossSectionalFactorPriorFactorReturns.csv.gz` and
+`assets/CrossSectionalFactorPriorFamilyFactorReturns.csv.gz` hold the factor returns the reference
+implementation's own prior produced, driven on the panel the stored-case testset rebuilds, with the
+same four factors, the same lag, the same two capitalisation powers and the same factor prior. The
+whole fit was diffed the same way before the cases were stored, over 40 assets and 120 observations:
+the loadings and the benchmark weights agree BIT FOR BIT, the regression weights to 5.7e-14, the
+factor returns to 1.3e-16, the idiosyncratic returns to 5.9e-16 and the factor mean to 1.1e-18, in
+both the plain and the constrained-family case. The two libraries solve the same weighted least
+squares by different routes -- this one factorises the weighted design, the reference implementation
+solves the normal equations -- so machine precision is the agreement to expect.
+
+The panel of that testset is fully active and carries no blank cell, and its two style exposures are
+standardised in the test rather than by a Descriptor. Both choices are deliberate: they take every
+departure below out of the picture, so the stored cases measure the fit alone. Issue #721 already
+diffed the Factor Exposures themselves.
+
 TWO DEPARTURES FROM THE REFERENCE IMPLEMENTATION, both recorded in the resolution comment of #725.
 
   - The benchmark mask and the eligibility mask both drop a pair whose market capitalisation is not
@@ -435,6 +452,62 @@ end
         @test_throws ArgumentError prior(CrossSectionalFactorPrior(;
                                                                    factors = csfp_factors(),
                                                                    minra = 10_000), rd)
+    end
+end
+
+@testset "The fit matches the reference implementation's own output" begin
+    PO = PortfolioOptimisers
+    # A fully active panel with no blank cell. Every departure the two libraries have over an
+    # inactive or an unobserved cell is then out of the picture, and the two stored cases
+    # measure the fit alone: the regression, its weights, and the family re-basis.
+    res = csfp_panel(; n_assets = 40, n_observations = 120, n_industries = 3,
+                     seed = 725_900, late_listing_proba = 0.0, delisting_proba = 0.0,
+                     missing_ratio = 0.0)
+    rd0 = res.rd
+    @test all(rd0.pnl.amsk)
+    # The two style fields are standardised here rather than by a Descriptor, so a
+    # passthrough exposure is bit-identical on both sides and the diff isolates the fit.
+    function csfp_zscore(A)
+        B = similar(A)
+        for t in axes(A, 1)
+            r = view(A, t, :)
+            B[t, :] = (r .- Statistics.mean(r)) ./ Statistics.std(r; corrected = false)
+        end
+        return B
+    end
+    mcap = PO.panel_field_values(rd0, "market_cap")
+    pf = Any[f for f in rd0.pnl.pf]
+    push!(pf, NumericPanelField(; name = "style1", vals = csfp_zscore(log.(mcap))))
+    push!(pf,
+          NumericPanelField(; name = "style2",
+                            vals = csfp_zscore(PO.panel_field_values(rd0, "book_equity") ./
+                                               mcap)))
+    rd = ReturnsResult(; nx = rd0.nx, X = rd0.X, ts = rd0.ts,
+                       pnl = AssetPanel(; pf = identity.(pf), amsk = rd0.pnl.amsk,
+                                        emsk = rd0.pnl.emsk))
+    csfp_pass(field) = CompositeExposure(; descriptors = [Passthrough(; field = field)],
+                                         outlier = nothing, scoring = nothing,
+                                         family = "style")
+    factors = ["market" => ConstantExposure(),
+               "industry" => OneHotExposure(; field = "industry", family = "industry"),
+               "style1" => csfp_pass("style1"), "style2" => csfp_pass("style2")]
+    for (nm, fams) in (("", nothing), ("Family", ["industry" => nothing]))
+        pr = prior(CrossSectionalFactorPrior(; factors = factors, families = fams), rd)
+        E = Matrix(CSV.read(joinpath(@__DIR__,
+                                     "assets/CrossSectionalFactorPrior$(nm)FactorReturns.csv.gz"),
+                            DataFrame))
+        @test size(pr.fpr.X) == size(E)
+        @test all(isfinite, E)
+        # The two libraries solve the same weighted least squares by different routes: this
+        # one factorises the weighted design, and the reference implementation solves the
+        # normal equations. The absolute agreement is therefore machine precision, and a
+        # near-zero factor return makes the relative figure larger than that.
+        @test maximum(abs, pr.fpr.X - E) < 1e-14
+        # The stored factor returns pin the residuals too, because the reconciliation is
+        # exact: `Ms[t - 1] f_t + eps_t == X_t`.
+        d, n = csfp_reconciliation(pr, rd, 1)
+        @test n > 4000
+        @test d < 1e-14
     end
 end
 
