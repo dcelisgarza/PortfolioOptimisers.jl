@@ -10,6 +10,7 @@ GeneralKUncertaintyAlgorithm
 ChiSqKUncertaintyAlgorithm
 EllipsoidalUncertaintySet
 EllipsoidalUncertaintySetAlgorithm
+NormBallUncertaintySetAlgorithm
 ucs(uc::Option{<:Tuple{<:Option{<:AbstractUncertaintySetResult},
                        <:Option{<:AbstractUncertaintySetResult}}}, args...;
              kwargs...)

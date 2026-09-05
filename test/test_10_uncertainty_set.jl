@@ -1679,6 +1679,211 @@ end
         end
     end
 
+    @testset "The norm-ball estimator members (#730)" begin
+        # Both estimators emit a norm ball on both axes. The Normal one factorises the
+        # asymptotic covariance it already builds, so its set is the converted ellipsoid.
+        # The bootstrap one stores the deviations themselves, so its set carries the
+        # sample second moment exactly and its radius reads the sample's own rank.
+        rng730 = StableRNG(20260905)
+        N730 = 4
+        X730 = randn(rng730, 300, N730) * 0.01 .+ 5e-4
+        rd730 = ReturnsResult(; X = X730, nx = string.("A", 1:N730))
+        slv730 = Solver(; name = :clarabel_730, solver = Clarabel.Optimizer,
+                        check_sol = (; allow_local = true, allow_almost = true),
+                        settings = Dict("verbose" => false, "tol_gap_abs" => 1e-12,
+                                        "tol_gap_rel" => 1e-12, "tol_feas" => 1e-12))
+        opt730 = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv730)
+        function ret730(ucs)
+            return optimise(MeanRisk(; r = Variance(), obj = MaximumUtility(; l = 2),
+                                     opt = JuMPOptimiser(; pe = EmpiricalPrior(),
+                                                         slv = slv730,
+                                                         ret = ArithmeticReturn(;
+                                                                                ucs = ucs))),
+                            rd730)
+        end
+        function var730(ucs)
+            return optimise(MeanRisk(; r = UncertaintySetVariance(; ucs = ucs),
+                                     obj = MinimumRisk(), opt = opt730), rd730)
+        end
+        @testset "The algorithm member and its validation" begin
+            alg = NormBallUncertaintySetAlgorithm()
+            @test isa(alg, PortfolioOptimisers.AbstractUncertaintySetAlgorithm)
+            @test isa(alg.method, ChiSqKUncertaintyAlgorithm)
+            @test alg.diagonal
+            @test alg.p == 2
+            alg2 = NormBallUncertaintySetAlgorithm(; method = NormalKUncertaintyAlgorithm(),
+                                                   diagonal = false, p = Inf)
+            @test isa(alg2.method, NormalKUncertaintyAlgorithm)
+            @test !alg2.diagonal
+            @test isinf(alg2.p)
+            @test isa(NormBallUncertaintySetAlgorithm(; p = 1), Any)
+            @test isa(NormBallUncertaintySetAlgorithm(; method = 3.0).method, Number)
+            @test_throws DomainError NormBallUncertaintySetAlgorithm(; p = 0.5)
+            @test_throws DomainError NormBallUncertaintySetAlgorithm(; p = NaN)
+        end
+        @testset "The radius reads the map, and matches k_ucs on a square factor" begin
+            # `k_norm_ball` solves in the factor, so on a full-rank square map it is the
+            # Mahalanobis distance `k_ucs` measures against `L * L'`.
+            S730 = cov(X730)
+            L730 = cholesky(S730).L
+            E730 = randn(StableRNG(5), 500, N730) * 1e-2
+            km = NormalKUncertaintyAlgorithm()
+            @test isapprox(PortfolioOptimisers.k_norm_ball(km, 0.05, E730, L730, N730),
+                           PortfolioOptimisers.k_ucs(km, 0.05, E730, S730))
+            # The chi-squared radius reads the degrees of freedom it is handed, and not
+            # the row count of the map.
+            @test PortfolioOptimisers.k_norm_ball(ChiSqKUncertaintyAlgorithm(), 0.05,
+                                                  nothing, L730, 2) ==
+                  sqrt(cquantile(Chisq(2), 0.05))
+            # The two algorithms that read no geometry absorb every trailing argument.
+            @test PortfolioOptimisers.k_norm_ball(GeneralKUncertaintyAlgorithm(), 0.05) ==
+                  sqrt(0.95 / 0.05)
+            @test PortfolioOptimisers.k_norm_ball(2.5, 0.05) == 2.5
+            # The two factor builders.
+            @test isa(PortfolioOptimisers.norm_ball_factor(true, S730), Diagonal)
+            @test isapprox(Matrix(PortfolioOptimisers.norm_ball_factor(true, S730)),
+                           Diagonal(sqrt.(diag(S730))))
+            Lf = PortfolioOptimisers.norm_ball_factor(false, S730)
+            @test isapprox(Lf * transpose(Lf), S730)
+            Ld = PortfolioOptimisers.norm_ball_deviation_factor(false, E730)
+            @test isapprox(Ld * transpose(Ld), cov(E730))
+            @test size(Ld) == (N730, 500)
+            @test isa(PortfolioOptimisers.norm_ball_deviation_factor(true, E730), Diagonal)
+            @test isapprox(diag(PortfolioOptimisers.norm_ball_deviation_factor(true, E730)),
+                           sqrt.(vec(var(E730; dims = 1))))
+        end
+        @testset "The Normal estimator emits the ellipsoid it would have built, factorised" begin
+            for diagonal in (true, false),
+                method in (ChiSqKUncertaintyAlgorithm(), NormalKUncertaintyAlgorithm(),
+                           GeneralKUncertaintyAlgorithm())
+
+                un = NormalUncertaintySet(;
+                                          alg = NormBallUncertaintySetAlgorithm(;
+                                                                                method = method,
+                                                                                diagonal = diagonal),
+                                          n_sim = 200, seed = 42)
+                ue = NormalUncertaintySet(;
+                                          alg = EllipsoidalUncertaintySetAlgorithm(;
+                                                                                   method = method,
+                                                                                   diagonal = diagonal),
+                                          n_sim = 200, seed = 42)
+                mb, sb = ucs(un, X730)
+                me, se = ucs(ue, X730)
+                @test isa(mb, NormBallUncertaintySet)
+                @test isa(sb, NormBallUncertaintySet)
+                @test isa(mb.class, MuUncertaintySetClass)
+                @test isa(sb.class, SigmaUncertaintySetClass)
+                # The empirical radius solves in the factor rather than inverting the
+                # shape, so the two routes agree to the accuracy of the two solves and
+                # not bit for bit.
+                @test isapprox(mb.kappa, me.k; rtol = 1e-8)
+                @test isapprox(sb.kappa, se.k; rtol = 1e-8)
+                @test isapprox(mb.L * transpose(mb.L), Matrix(me.sigma))
+                @test isapprox(sb.L * transpose(sb.L), Matrix(se.sigma))
+                @test mb.val == me.val
+                @test sb.val == se.val
+                # The single-axis verbs return the same sets the pair does, because both
+                # walk the same stream from the same seed.
+                @test isapprox(mu_ucs(un, X730).kappa, mu_ucs(ue, X730).k; rtol = 1e-8)
+                @test isapprox(sigma_ucs(un, X730).kappa, sigma_ucs(ue, X730).k;
+                               rtol = 1e-8)
+            end
+        end
+        @testset "The Normal norm ball reaches the ellipsoid's weights on both axes" begin
+            un = NormalUncertaintySet(; alg = NormBallUncertaintySetAlgorithm(), seed = 1,
+                                      n_sim = 50)
+            ue = NormalUncertaintySet(; alg = EllipsoidalUncertaintySetAlgorithm(),
+                                      seed = 1, n_sim = 50)
+            @test isapprox(ret730(mu_ucs(un, rd730)).w, ret730(mu_ucs(ue, rd730)).w;
+                           rtol = 1e-5, atol = 1e-6)
+            rb = var730(sigma_ucs(un, rd730))
+            re = var730(sigma_ucs(ue, rd730))
+            @test isa(rb.retcode, PortfolioOptimisers.OptimisationSuccess)
+            @test isapprox(rb.w, re.w; rtol = 1e-5, atol = 1e-6)
+        end
+        @testset "The bootstrap mean axis is full rank, so it is the ellipsoid" begin
+            ub = ARCHUncertaintySet(;
+                                    alg = NormBallUncertaintySetAlgorithm(;
+                                                                          diagonal = false),
+                                    n_sim = 30, seed = 7)
+            ueb = ARCHUncertaintySet(;
+                                     alg = EllipsoidalUncertaintySetAlgorithm(;
+                                                                              diagonal = false),
+                                     n_sim = 30, seed = 7)
+            mb = mu_ucs(ub, X730)
+            me = mu_ucs(ueb, X730)
+            @test size(mb.L) == (N730, 30)
+            @test rank(mb.L) == N730
+            @test isapprox(mb.L * transpose(mb.L), Matrix(me.sigma); rtol = 1e-12)
+            @test mb.kappa == me.k
+            @test isapprox(ret730(mb).w, ret730(me).w; rtol = 1e-5, atol = 1e-6)
+        end
+        @testset "The bootstrap covariance axis is exact, low rank, and repairs nothing" begin
+            # A vectorised symmetric matrix spans N(N+1)/2 coordinates, so the sample
+            # covariance of the deviations is rank deficient at every sample size. The
+            # ellipsoid's shape is therefore the repaired one and its radius reads N^2
+            # degrees of freedom; the map carries the sample second moment exactly and its
+            # radius reads the rank the sample has.
+            for n_sim in (30, 12)
+                ub = ARCHUncertaintySet(;
+                                        alg = NormBallUncertaintySetAlgorithm(;
+                                                                              diagonal = false),
+                                        n_sim = n_sim, seed = 7)
+                ueb = ARCHUncertaintySet(;
+                                         alg = EllipsoidalUncertaintySetAlgorithm(;
+                                                                                  diagonal = false),
+                                         n_sim = n_sim, seed = 7)
+                pr730 = prior(ub.pe, X730)
+                sigmas = PortfolioOptimisers.sigma_bootstrap_generator(ub, pr730.X)
+                Xd = Matrix{Float64}(undef, N730^2, n_sim)
+                for i in axes(Xd, 2)
+                    Xd[:, i] = vec(sigmas[:, :, i] - pr730.sigma)
+                end
+                Xd = transpose(Xd)
+                sb = sigma_ucs(ub, X730)
+                se = sigma_ucs(ueb, X730)
+                @test size(sb.L) == (N730^2, n_sim)
+                @test maximum(abs, sb.L * transpose(sb.L) - cov(Xd)) <
+                      1e-12 * maximum(abs, cov(Xd))
+                @test rank(sb.L) == min(n_sim - 1, div(N730 * (N730 + 1), 2))
+                @test sb.kappa == sqrt(cquantile(Chisq(rank(sb.L)), ub.q))
+                @test se.k == sqrt(cquantile(Chisq(N730^2), ueb.q))
+                # The ellipsoid's shape is not the sample's own second moment, because the
+                # sample is rank deficient and the default matrix processing repairs it.
+                @test !isposdef(cov(Xd))
+                @test isposdef(Matrix(se.sigma))
+                @test maximum(abs, Matrix(se.sigma) - cov(Xd)) > 0
+            end
+        end
+        @testset "The bootstrap pair and the two single-axis verbs agree under a seed" begin
+            ub = ARCHUncertaintySet(; alg = NormBallUncertaintySetAlgorithm(), n_sim = 20,
+                                    seed = 11)
+            mp, sp = ucs(ub, X730)
+            @test mp.kappa == mu_ucs(ub, X730).kappa
+            @test sp.kappa == sigma_ucs(ub, X730).kappa
+            @test Matrix(mp.L) == Matrix(mu_ucs(ub, X730).L)
+            @test Matrix(sp.L) == Matrix(sigma_ucs(ub, X730).L)
+            @test mp.val == prior(ub.pe, X730).mu
+        end
+        @testset "The norm order reaches the set, and a bootstrap set solves" begin
+            ub = ARCHUncertaintySet(;
+                                    alg = NormBallUncertaintySetAlgorithm(; p = 1,
+                                                                          diagonal = false),
+                                    n_sim = 20, seed = 3)
+            mb = mu_ucs(ub, X730)
+            @test mb.p == 1
+            resb = ret730(mb)
+            @test isa(resb.retcode, PortfolioOptimisers.OptimisationSuccess)
+            # The worst case is the radius times the dual norm of the map's transpose.
+            want = dot(mb.val, resb.w) -
+                   mb.kappa * norm(transpose(Matrix(mb.L)) * resb.w,
+                                   PortfolioOptimisers.dual_norm_order(mb.p))
+            key730 = PortfolioOptimisers.state_key(Symbol(""), :ret_, 1)
+            @test isapprox(PortfolioOptimisers.JuMP.value(resb.model[key730]), want;
+                           rtol = 1e-6)
+        end
+    end
+
     # Issue #776. Both JuMP builders hold the prior beside the returns, so both pass it, and
     # the three-argument form of the triple routes each estimator to the argument it reads.
     @testset "The three-argument triple routes each estimator to what it reads" begin

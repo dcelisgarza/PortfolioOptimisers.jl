@@ -528,6 +528,86 @@ function normal_box_preamble(ue::NormalUncertaintySet, X::MatNum,
     return pr, T, mu_asymptotic_cov(ue.pdm, pr.sigma, T), ue.q * 0.5
 end
 """
+    normal_mu_error_sample(ue::NormalUncertaintySet, rng::Random.AbstractRNG, mu::VecNum,
+                           sigma_mu::MatNum)
+
+Draw `ue.n_sim` estimation errors of the mean from the sampling law that normal returns imply.
+
+**The sample is the estimation error, not the level.** The draws come from ``\\mathcal{N}(\\hat{\\boldsymbol{\\mu}}, \\hat{\\mathbf{\\Sigma}}/T)`` and `mu` is subtracted from each, so the sample and the shape it is measured against are on one scale. A draw from ``\\mathcal{N}(\\hat{\\boldsymbol{\\mu}}, \\hat{\\mathbf{\\Sigma}})`` in its place multiplies every deviation, and therefore the radius, by ``\\sqrt{T}``. The generator is passed in rather than resolved here, so a caller that needs both axes draws them off one stream.
+
+# Algorithm
+
+ 1. Draw `ue.n_sim` vectors from `Distributions.MvNormal(mu, sigma_mu)`, giving one column per simulation.
+ 2. Subtract `mu` from every column, and transpose, giving one estimation error per row.
+
+# Arguments
+
+  - `ue`: Normal uncertainty set estimator.
+  - `rng`: Random number generator, resolved by the caller with [`resolve_rng`](@ref).
+  - `mu`: Point estimate of the expected returns vector, the centre the draws are taken around.
+  - `sigma_mu`: Mean asymptotic covariance from [`mu_asymptotic_cov`](@ref).
+
+# Returns
+
+  - `X_mu::MatNum`: Sampled estimation errors, `ue.n_sim` by `N`.
+
+# Related
+
+  - [`NormalUncertaintySet`](@ref)
+  - [`normal_sigma_error_sample`](@ref)
+  - [`mu_asymptotic_cov`](@ref)
+  - [`k_ucs`](@ref)
+  - [`k_norm_ball`](@ref)
+"""
+function normal_mu_error_sample(ue::NormalUncertaintySet, rng::Random.AbstractRNG,
+                                mu::VecNum, sigma_mu::MatNum)
+    return transpose(rand(rng, Distributions.MvNormal(mu, sigma_mu), ue.n_sim) .- mu)
+end
+"""
+    normal_sigma_error_sample(ue::NormalUncertaintySet, rng::Random.AbstractRNG,
+                              sigma::MatNum, sigma_mu::MatNum, T::Number, N::Integer)
+
+Draw `ue.n_sim` estimation errors of the vectorised covariance from the Wishart law that normal returns imply.
+
+**The sample is the estimation error, not the level.** Each draw has `sigma` subtracted from it, and the variance of an entry of a ``\\mathrm{Wishart}(T, \\hat{\\mathbf{\\Sigma}}/T)`` draw is the matching diagonal entry of the covariance asymptotic covariance, so the sample and the shape it is measured against are on one scale. `N` is passed in rather than read from `sigma`, so every caller reads the asset count from one source, `size(pr.X, 2)`.
+
+# Algorithm
+
+ 1. Draw `ue.n_sim` matrices from `Distributions.Wishart(T, sigma_mu)`, giving `sigmas`.
+ 2. Subtract `sigma` from each draw into an `N` by `N` by `ue.n_sim` array.
+ 3. Reshape to `N^2` columns and transpose, giving one vectorised estimation error per row.
+
+# Arguments
+
+  - `ue`: Normal uncertainty set estimator.
+  - `rng`: Random number generator, resolved by the caller with [`resolve_rng`](@ref).
+  - `sigma`: Point estimate of the covariance matrix, the centre the draws are taken around.
+  - `sigma_mu`: Mean asymptotic covariance from [`mu_asymptotic_cov`](@ref), the Wishart scale.
+  - `T`: Scaling parameter from [`choose_scaling_parameter`](@ref), the Wishart degrees of freedom.
+  - `N`: Asset count, read by the caller from `size(pr.X, 2)`.
+
+# Returns
+
+  - `X_sigma::MatNum`: Sampled estimation errors, `ue.n_sim` by `N^2`.
+
+# Related
+
+  - [`NormalUncertaintySet`](@ref)
+  - [`normal_mu_error_sample`](@ref)
+  - [`sigma_asymptotic_cov`](@ref)
+  - [`k_ucs`](@ref)
+  - [`k_norm_ball`](@ref)
+"""
+function normal_sigma_error_sample(ue::NormalUncertaintySet, rng::Random.AbstractRNG,
+                                   sigma::MatNum, sigma_mu::MatNum, T::Number, N::Integer)
+    sigmas = rand(rng, Distributions.Wishart(T, sigma_mu), ue.n_sim)
+    X_sigma = Array{eltype(sigma)}(undef, N, N, ue.n_sim)
+    for i in axes(sigmas, 1)
+        X_sigma[:, :, i] = sigmas[i] - sigma
+    end
+    return transpose(reshape(X_sigma, N^2, :))
+end
+"""
     ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any, <:Any},
         X::MatNum,
         F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
@@ -769,8 +849,8 @@ Where:
  2. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref).
  3. Build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
  4. Resolve the random number generator from `ue.rng` and `ue.seed` with [`resolve_rng`](@ref).
- 5. Draw `ue.n_sim` vectors from `Distributions.MvNormal(mu, sigma_mu)` and subtract `mu`, giving `X_mu`, one mean estimation error per row.
- 6. Draw `ue.n_sim` matrices from `Distributions.Wishart(T, sigma_mu)`, subtract `sigma` from each, and reshape to `N^2` columns, giving `X_sigma`, one vectorised covariance estimation error per row.
+ 5. Draw the mean sample with [`normal_mu_error_sample`](@ref), giving `X_mu`, one mean estimation error per row.
+ 6. Draw the covariance sample with [`normal_sigma_error_sample`](@ref), giving `X_sigma`, one vectorised covariance estimation error per row.
  7. Build the covariance shape `sigma_sigma` with [`sigma_asymptotic_cov`](@ref).
  8. Fit the mean ellipsoid with [`ellipsoidal_set`](@ref) on `X_mu` and `sigma_mu`, with `pr.mu` as the centre.
  9. Fit the covariance ellipsoid the same way on `X_sigma` and `sigma_sigma`, with `pr.sigma` as the centre.
@@ -809,15 +889,8 @@ function ucs(ue::NormalUncertaintySet{<:Any,
     T = choose_scaling_parameter(ue, pr)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
     rng = resolve_rng(ue.rng, ue.seed)
-    # The sample must be the estimation ERROR, not the level. The docstring above states
-    # the law it is drawn from, and what a draw from `N(mu, sigma)` would cost.
-    X_mu = transpose(rand(rng, Distributions.MvNormal(mu, sigma_mu), ue.n_sim) .- mu)
-    sigmas = rand(rng, Distributions.Wishart(T, sigma_mu), ue.n_sim)
-    X_sigma = Array{eltype(sigma)}(undef, N, N, ue.n_sim)
-    for i in axes(sigmas, 1)
-        X_sigma[:, :, i] = sigmas[i] - sigma
-    end
-    X_sigma = transpose(reshape(X_sigma, N^2, :))
+    X_mu = normal_mu_error_sample(ue, rng, mu, sigma_mu)
+    X_sigma = normal_sigma_error_sample(ue, rng, sigma, sigma_mu, T, N)
     sigma_sigma = sigma_asymptotic_cov(ue.pdm, sigma_mu, sigma, T)
     return ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, X_mu, sigma_mu,
                            MuUncertaintySetClass(), pr.mu),
@@ -933,7 +1006,7 @@ Where:
  1. Fit the prior with `prior(ue.pe, X, F; dims = dims, kwargs...)`, giving `pr`, and read `mu` and `sigma` from it.
  2. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref).
  3. Build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
- 4. Resolve the random number generator with [`resolve_rng`](@ref), draw `ue.n_sim` vectors from `Distributions.MvNormal(mu, sigma_mu)`, and subtract `mu`, giving `X_mu`, one estimation error per row.
+ 4. Resolve the random number generator with [`resolve_rng`](@ref), and draw the sample with [`normal_mu_error_sample`](@ref), giving `X_mu`, one estimation error per row.
  5. Fit and return the ellipsoid with [`ellipsoidal_set`](@ref) on `X_mu` and `sigma_mu`, with `pr.mu` as the centre.
 
 # Arguments
@@ -966,9 +1039,7 @@ function mu_ucs(ue::NormalUncertaintySet{<:Any,
     T = choose_scaling_parameter(ue, pr)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
     rng = resolve_rng(ue.rng, ue.seed)
-    # The sample must be the estimation ERROR, not the level. The docstring above states
-    # the law it is drawn from, and what a draw from `N(mu, sigma)` would cost.
-    X_mu = transpose(rand(rng, Distributions.MvNormal(mu, sigma_mu), ue.n_sim) .- mu)
+    X_mu = normal_mu_error_sample(ue, rng, mu, sigma_mu)
     return ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, X_mu, sigma_mu,
                            MuUncertaintySetClass(), pr.mu)
 end
@@ -1073,10 +1144,9 @@ Where:
  1. Fit the prior with `prior(ue.pe, X, F; dims = dims, kwargs...)`, giving `pr`, and read `sigma = pr.sigma` and `N = size(pr.X, 2)`.
  2. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref).
  3. Build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
- 4. Resolve the random number generator with [`resolve_rng`](@ref), and draw `ue.n_sim` matrices `sigmas` from `Distributions.Wishart(T, sigma_mu)`.
- 5. Subtract `sigma` from each draw and reshape to `N^2` columns, giving `X_sigma`, one vectorised estimation error per row.
- 6. Build the covariance shape `sigma_sigma` with [`sigma_asymptotic_cov`](@ref).
- 7. Fit and return the ellipsoid with [`ellipsoidal_set`](@ref) on `X_sigma` and `sigma_sigma`, with `pr.sigma` as the centre.
+ 4. Resolve the random number generator with [`resolve_rng`](@ref), and draw the sample with [`normal_sigma_error_sample`](@ref), giving `X_sigma`, one vectorised estimation error per row.
+ 5. Build the covariance shape `sigma_sigma` with [`sigma_asymptotic_cov`](@ref).
+ 6. Fit and return the ellipsoid with [`ellipsoidal_set`](@ref) on `X_sigma` and `sigma_sigma`, with `pr.sigma` as the centre.
 
 # Arguments
 
@@ -1109,12 +1179,7 @@ function sigma_ucs(ue::NormalUncertaintySet{<:Any,
     T = choose_scaling_parameter(ue, pr)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
     rng = resolve_rng(ue.rng, ue.seed)
-    sigmas = rand(rng, Distributions.Wishart(T, sigma_mu), ue.n_sim)
-    X_sigma = Array{eltype(sigma)}(undef, N, N, ue.n_sim)
-    for i in axes(sigmas, 1)
-        X_sigma[:, :, i] = sigmas[i] - sigma
-    end
-    X_sigma = transpose(reshape(X_sigma, N^2, :))
+    X_sigma = normal_sigma_error_sample(ue, rng, sigma, sigma_mu, T, N)
     sigma_sigma = sigma_asymptotic_cov(ue.pdm, sigma_mu, sigma, T)
     return ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, X_sigma, sigma_sigma,
                            SigmaUncertaintySetClass(), pr.sigma)
@@ -1189,6 +1254,352 @@ function sigma_ucs(ue::NormalUncertaintySet{<:Any,
     sigma_sigma = sigma_asymptotic_cov(ue.pdm, sigma_mu, sigma, T)
     return ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, nothing, sigma_sigma,
                            SigmaUncertaintySetClass(), pr.sigma)
+end
+
+"""
+    ucs(ue::NormalUncertaintySet{<:Any,
+                                 <:NormBallUncertaintySetAlgorithm{<:NormalKUncertaintyAlgorithm, <:Any, <:Any},
+                                 <:Any, <:Any, <:Any}, X::MatNum,
+        F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+
+Constructs norm-ball uncertainty sets for expected returns and covariance statistics under the assumption of normally distributed returns, using a normal scaling algorithm.
+
+The two sets are the two ellipsoids of the sibling route with their shape matrices factorised, so they name the same region and reach the same weights. The gain is on the consumer's side: a [`NormBallUncertaintySet`](@ref) carries the factor, so neither builder factorises anything at solve time. This route draws the sample the empirical radius reads, off one generator, so its Wishart draws follow its normal draws.
+
+# Algorithm
+
+ 1. Fit the prior with `prior(ue.pe, X, F; dims = dims, kwargs...)`, giving `pr`, and read `mu`, `sigma` and `N = size(pr.X, 2)`.
+ 2. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref), and build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
+ 3. Resolve one generator with [`resolve_rng`](@ref), and draw the two samples with [`normal_mu_error_sample`](@ref) and [`normal_sigma_error_sample`](@ref), mean first.
+ 4. Build the covariance shape `sigma_sigma` with [`sigma_asymptotic_cov`](@ref).
+ 5. Assemble the two sets with [`norm_ball_set`](@ref), on the mean shape and on the covariance shape, and return them as a tuple, mean first.
+
+# Arguments
+
+  - `ue`: Normal uncertainty set estimator.
+  - `X`: Data matrix.
+  - `F`: Optional factor matrix. Used by the prior estimator.
+  - $(arg_dict[:dims])
+  - `kwargs...`: Additional keyword arguments passed to the prior estimator.
+
+# Returns
+
+  - `mu_ucs::NormBallUncertaintySet`: Expected returns uncertainty set.
+  - `sigma_ucs::NormBallUncertaintySet`: Covariance uncertainty set.
+
+# Related
+
+  - [`NormalUncertaintySet`](@ref)
+  - [`NormBallUncertaintySetAlgorithm`](@ref)
+  - [`NormBallUncertaintySet`](@ref)
+  - [`norm_ball_set`](@ref)
+  - [`k_norm_ball`](@ref)
+  - [`mu_ucs`](@ref)
+  - [`sigma_ucs`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Equations 11.16, 11.17 and 11.24.
+  - $(ref_dict[:bentalnemirovski1998]) Section 3, Equation 14.
+"""
+function ucs(ue::NormalUncertaintySet{<:Any,
+                                      <:NormBallUncertaintySetAlgorithm{<:NormalKUncertaintyAlgorithm,
+                                                                        <:Any, <:Any},
+                                      <:Any, <:Any, <:Any}, X::MatNum,
+             F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
+    (; mu, sigma) = pr
+    N = size(pr.X, 2)
+    T = choose_scaling_parameter(ue, pr)
+    sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
+    rng = resolve_rng(ue.rng, ue.seed)
+    X_mu = normal_mu_error_sample(ue, rng, mu, sigma_mu)
+    X_sigma = normal_sigma_error_sample(ue, rng, sigma, sigma_mu, T, N)
+    sigma_sigma = sigma_asymptotic_cov(ue.pdm, sigma_mu, sigma, T)
+    return norm_ball_set(ue.alg, ue.q, X_mu, sigma_mu, MuUncertaintySetClass(), pr.mu),
+           norm_ball_set(ue.alg, ue.q, X_sigma, sigma_sigma, SigmaUncertaintySetClass(),
+                         pr.sigma)
+end
+"""
+    ucs(ue::NormalUncertaintySet{<:Any, <:NormBallUncertaintySetAlgorithm{<:Any, <:Any, <:Any},
+                                 <:Any, <:Any, <:Any}, X::MatNum,
+        F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+
+Constructs norm-ball uncertainty sets for expected returns and covariance statistics under the assumption of normally distributed returns, using a generic radius algorithm.
+
+**This route runs no simulation, so it serves every radius algorithm that reads no sample.** That is [`ChiSqKUncertaintyAlgorithm`](@ref), [`GeneralKUncertaintyAlgorithm`](@ref), and a plain number. Its sibling on [`NormalKUncertaintyAlgorithm`](@ref) draws the sample that the empirical radius needs. The two routes build the same maps, so they differ only in the radius.
+
+# Algorithm
+
+ 1. Fit the prior with `prior(ue.pe, X, F; dims = dims, kwargs...)`, giving `pr`, and read `sigma = pr.sigma`.
+ 2. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref), and build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
+ 3. Build the covariance shape `sigma_sigma` with [`sigma_asymptotic_cov`](@ref).
+ 4. Assemble the two sets with [`norm_ball_set`](@ref), passing `nothing` in place of a sample, and return them as a tuple, mean first.
+
+# Arguments
+
+  - `ue`: Normal uncertainty set estimator.
+  - `X`: Data matrix.
+  - `F`: Optional factor matrix. Used by the prior estimator.
+  - $(arg_dict[:dims])
+  - `kwargs...`: Additional keyword arguments passed to the prior estimator.
+
+# Returns
+
+  - `mu_ucs::NormBallUncertaintySet`: Expected returns uncertainty set.
+  - `sigma_ucs::NormBallUncertaintySet`: Covariance uncertainty set.
+
+# Related
+
+  - [`NormalUncertaintySet`](@ref)
+  - [`NormBallUncertaintySetAlgorithm`](@ref)
+  - [`NormBallUncertaintySet`](@ref)
+  - [`norm_ball_set`](@ref)
+  - [`k_norm_ball`](@ref)
+  - [`mu_ucs`](@ref)
+  - [`sigma_ucs`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Equations 11.16, 11.17 and 11.24.
+  - $(ref_dict[:goldfarbiyengar2003]) Section 5.
+"""
+function ucs(ue::NormalUncertaintySet{<:Any,
+                                      <:NormBallUncertaintySetAlgorithm{<:Any, <:Any,
+                                                                        <:Any}, <:Any,
+                                      <:Any, <:Any}, X::MatNum,
+             F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
+    sigma = pr.sigma
+    T = choose_scaling_parameter(ue, pr)
+    sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
+    sigma_sigma = sigma_asymptotic_cov(ue.pdm, sigma_mu, sigma, T)
+    return norm_ball_set(ue.alg, ue.q, nothing, sigma_mu, MuUncertaintySetClass(), pr.mu),
+           norm_ball_set(ue.alg, ue.q, nothing, sigma_sigma, SigmaUncertaintySetClass(),
+                         pr.sigma)
+end
+"""
+    mu_ucs(ue::NormalUncertaintySet{<:Any,
+                                    <:NormBallUncertaintySetAlgorithm{<:NormalKUncertaintyAlgorithm, <:Any, <:Any},
+                                    <:Any, <:Any, <:Any}, X::MatNum,
+           F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+
+Constructs a norm-ball uncertainty set for expected returns under the assumption of normally distributed returns, using a normal scaling algorithm.
+
+The map is the factor of ``\\hat{\\mathbf{\\Sigma}} / T``, so the set is the mean ellipsoid of the sibling route with its shape factorised. This method draws its normal sample off a generator that nothing has advanced, which is the same stream position [`ucs`](@ref) draws its own mean sample from, so the two radii agree under one seed.
+
+# Algorithm
+
+ 1. Fit the prior with `prior(ue.pe, X, F; dims = dims, kwargs...)`, giving `pr`, and read `mu` and `sigma`.
+ 2. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref), and build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
+ 3. Resolve the generator with [`resolve_rng`](@ref), and draw the sample with [`normal_mu_error_sample`](@ref).
+ 4. Assemble and return the set with [`norm_ball_set`](@ref), with `pr.mu` as the centre.
+
+# Arguments
+
+  - `ue`: Normal uncertainty set estimator.
+  - `X`: Data matrix.
+  - `F`: Optional factor matrix. Used by the prior estimator.
+  - $(arg_dict[:dims])
+  - `kwargs...`: Additional keyword arguments passed to the prior estimator.
+
+# Returns
+
+  - `mu_ucs::NormBallUncertaintySet`: Expected returns uncertainty set.
+
+# Related
+
+  - [`NormalUncertaintySet`](@ref)
+  - [`NormBallUncertaintySetAlgorithm`](@ref)
+  - [`NormBallUncertaintySet`](@ref)
+  - [`norm_ball_set`](@ref)
+  - [`normal_mu_error_sample`](@ref)
+  - [`sigma_ucs`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Equation 11.24.
+  - $(ref_dict[:bentalnemirovski1998]) Section 3, Equation 14.
+"""
+function mu_ucs(ue::NormalUncertaintySet{<:Any,
+                                         <:NormBallUncertaintySetAlgorithm{<:NormalKUncertaintyAlgorithm,
+                                                                           <:Any, <:Any},
+                                         <:Any, <:Any, <:Any}, X::MatNum,
+                F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
+    (; mu, sigma) = pr
+    T = choose_scaling_parameter(ue, pr)
+    sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
+    rng = resolve_rng(ue.rng, ue.seed)
+    X_mu = normal_mu_error_sample(ue, rng, mu, sigma_mu)
+    return norm_ball_set(ue.alg, ue.q, X_mu, sigma_mu, MuUncertaintySetClass(), pr.mu)
+end
+"""
+    mu_ucs(ue::NormalUncertaintySet{<:Any, <:NormBallUncertaintySetAlgorithm{<:Any, <:Any, <:Any},
+                                    <:Any, <:Any, <:Any}, X::MatNum,
+           F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+
+Constructs a norm-ball uncertainty set for expected returns under the assumption of normally distributed returns, using a generic radius algorithm.
+
+**This route runs no simulation, so it serves every radius algorithm that reads no sample.** That is [`ChiSqKUncertaintyAlgorithm`](@ref), [`GeneralKUncertaintyAlgorithm`](@ref), and a plain number. Its sibling on [`NormalKUncertaintyAlgorithm`](@ref) draws the sample that the empirical radius needs, and builds the same map.
+
+# Algorithm
+
+ 1. Fit the prior with `prior(ue.pe, X, F; dims = dims, kwargs...)`, giving `pr`, and read `sigma = pr.sigma`.
+ 2. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref), and build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
+ 3. Assemble and return the set with [`norm_ball_set`](@ref), passing `nothing` in place of a sample and `pr.mu` as the centre.
+
+# Arguments
+
+  - `ue`: Normal uncertainty set estimator.
+  - `X`: Data matrix.
+  - `F`: Optional factor matrix. Used by the prior estimator.
+  - $(arg_dict[:dims])
+  - `kwargs...`: Additional keyword arguments passed to the prior estimator.
+
+# Returns
+
+  - `mu_ucs::NormBallUncertaintySet`: Expected returns uncertainty set.
+
+# Related
+
+  - [`NormalUncertaintySet`](@ref)
+  - [`NormBallUncertaintySetAlgorithm`](@ref)
+  - [`NormBallUncertaintySet`](@ref)
+  - [`norm_ball_set`](@ref)
+  - [`k_norm_ball`](@ref)
+  - [`sigma_ucs`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Equation 11.24.
+  - $(ref_dict[:goldfarbiyengar2003]) Section 5.
+"""
+function mu_ucs(ue::NormalUncertaintySet{<:Any,
+                                         <:NormBallUncertaintySetAlgorithm{<:Any, <:Any,
+                                                                           <:Any}, <:Any,
+                                         <:Any, <:Any}, X::MatNum,
+                F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
+    sigma = pr.sigma
+    T = choose_scaling_parameter(ue, pr)
+    sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
+    return norm_ball_set(ue.alg, ue.q, nothing, sigma_mu, MuUncertaintySetClass(), pr.mu)
+end
+"""
+    sigma_ucs(ue::NormalUncertaintySet{<:Any,
+                                       <:NormBallUncertaintySetAlgorithm{<:NormalKUncertaintyAlgorithm, <:Any, <:Any},
+                                       <:Any, <:Any, <:Any}, X::MatNum,
+              F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+
+Constructs a norm-ball uncertainty set for covariance under the assumption of normally distributed returns, using a normal scaling algorithm.
+
+The map is the factor of the vectorised covariance's asymptotic covariance, so the set is the covariance ellipsoid of the sibling route with its shape factorised. **The radius is not the one [`ucs`](@ref) fits, under the same seed**, because this method draws its Wishart matrices off a generator that nothing has advanced while [`ucs`](@ref) draws its mean sample first. Both radii are valid fits of the same quantity.
+
+# Algorithm
+
+ 1. Fit the prior with `prior(ue.pe, X, F; dims = dims, kwargs...)`, giving `pr`, and read `sigma = pr.sigma` and `N = size(pr.X, 2)`.
+ 2. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref), and build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
+ 3. Resolve the generator with [`resolve_rng`](@ref), and draw the sample with [`normal_sigma_error_sample`](@ref).
+ 4. Build the covariance shape `sigma_sigma` with [`sigma_asymptotic_cov`](@ref).
+ 5. Assemble and return the set with [`norm_ball_set`](@ref), with `pr.sigma` as the centre.
+
+# Arguments
+
+  - `ue`: Normal uncertainty set estimator.
+  - `X`: Data matrix.
+  - `F`: Optional factor matrix. Used by the prior estimator.
+  - $(arg_dict[:dims])
+  - `kwargs...`: Additional keyword arguments passed to the prior estimator.
+
+# Returns
+
+  - `sigma_ucs::NormBallUncertaintySet`: Covariance uncertainty set.
+
+# Related
+
+  - [`NormalUncertaintySet`](@ref)
+  - [`NormBallUncertaintySetAlgorithm`](@ref)
+  - [`NormBallUncertaintySet`](@ref)
+  - [`norm_ball_set`](@ref)
+  - [`normal_sigma_error_sample`](@ref)
+  - [`mu_ucs`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Equations 11.17 and 11.24.
+  - $(ref_dict[:bentalnemirovski1998]) Section 3, Equation 14.
+"""
+function sigma_ucs(ue::NormalUncertaintySet{<:Any,
+                                            <:NormBallUncertaintySetAlgorithm{<:NormalKUncertaintyAlgorithm,
+                                                                              <:Any, <:Any},
+                                            <:Any, <:Any, <:Any}, X::MatNum,
+                   F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
+    sigma = pr.sigma
+    N = size(pr.X, 2)
+    T = choose_scaling_parameter(ue, pr)
+    sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
+    rng = resolve_rng(ue.rng, ue.seed)
+    X_sigma = normal_sigma_error_sample(ue, rng, sigma, sigma_mu, T, N)
+    sigma_sigma = sigma_asymptotic_cov(ue.pdm, sigma_mu, sigma, T)
+    return norm_ball_set(ue.alg, ue.q, X_sigma, sigma_sigma, SigmaUncertaintySetClass(),
+                         pr.sigma)
+end
+"""
+    sigma_ucs(ue::NormalUncertaintySet{<:Any, <:NormBallUncertaintySetAlgorithm{<:Any, <:Any, <:Any},
+                                       <:Any, <:Any, <:Any}, X::MatNum,
+              F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+
+Constructs a norm-ball uncertainty set for covariance under the assumption of normally distributed returns, using a generic radius algorithm.
+
+**This route runs no simulation, so it serves every radius algorithm that reads no sample.** That is [`ChiSqKUncertaintyAlgorithm`](@ref), [`GeneralKUncertaintyAlgorithm`](@ref), and a plain number. Its sibling on [`NormalKUncertaintyAlgorithm`](@ref) draws the sample that the empirical radius needs, and builds the same map.
+
+# Algorithm
+
+ 1. Fit the prior with `prior(ue.pe, X, F; dims = dims, kwargs...)`, giving `pr`, and read `sigma = pr.sigma`.
+ 2. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref), and build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
+ 3. Build the covariance shape `sigma_sigma` with [`sigma_asymptotic_cov`](@ref).
+ 4. Assemble and return the set with [`norm_ball_set`](@ref), passing `nothing` in place of a sample and `pr.sigma` as the centre.
+
+# Arguments
+
+  - `ue`: Normal uncertainty set estimator.
+  - `X`: Data matrix.
+  - `F`: Optional factor matrix. Used by the prior estimator.
+  - $(arg_dict[:dims])
+  - `kwargs...`: Additional keyword arguments passed to the prior estimator.
+
+# Returns
+
+  - `sigma_ucs::NormBallUncertaintySet`: Covariance uncertainty set.
+
+# Related
+
+  - [`NormalUncertaintySet`](@ref)
+  - [`NormBallUncertaintySetAlgorithm`](@ref)
+  - [`NormBallUncertaintySet`](@ref)
+  - [`norm_ball_set`](@ref)
+  - [`k_norm_ball`](@ref)
+  - [`mu_ucs`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Equations 11.17 and 11.24.
+  - $(ref_dict[:goldfarbiyengar2003]) Section 5.
+"""
+function sigma_ucs(ue::NormalUncertaintySet{<:Any,
+                                            <:NormBallUncertaintySetAlgorithm{<:Any, <:Any,
+                                                                              <:Any}, <:Any,
+                                            <:Any, <:Any}, X::MatNum,
+                   F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
+    sigma = pr.sigma
+    T = choose_scaling_parameter(ue, pr)
+    sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
+    sigma_sigma = sigma_asymptotic_cov(ue.pdm, sigma_mu, sigma, T)
+    return norm_ball_set(ue.alg, ue.q, nothing, sigma_sigma, SigmaUncertaintySetClass(),
+                         pr.sigma)
 end
 
 export NormalUncertaintySet

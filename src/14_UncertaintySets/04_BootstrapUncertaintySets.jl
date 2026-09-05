@@ -981,4 +981,196 @@ function sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any,
                            SigmaUncertaintySetClass(), pr.sigma)
 end
 
+"""
+    ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:NormBallUncertaintySetAlgorithm, <:Any,
+                               <:Any, <:Any, <:Any, <:Any}, X::MatNum,
+        F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+
+Constructs norm-ball uncertainty sets for expected returns and covariance statistics using bootstrap resampling for time series data.
+
+**The bootstrap deviations are the geometry map, so this route builds no shape matrix.** The ellipsoidal sibling fits `ue.ce` on the deviations, which on the covariance axis is an ``N^{2} \\times N^{2}`` matrix of rank at most ``\\min(M - 1, N(N+1)/2)``, so it is rank deficient at every sample size and the default matrix processing repairs it. The map [`norm_ball_deviation_factor`](@ref) builds carries the same second moment exactly, at the rank the sample has, and `ue.ce` takes no part in it. `ue.ce` still fits the covariance of every resample, so it enters this axis once rather than twice. On the mean axis the map is of full rank once `ue.n_sim` exceeds ``N``, so the two shapes agree and the two sets reach the same weights.
+
+# Mathematical definition
+
+```math
+\\mathbf{L} = \\dfrac{\\left(\\mathbf{X} - \\boldsymbol{1}\\bar{\\mathbf{x}}^{\\intercal}\\right)^{\\intercal}}{\\sqrt{M - 1}}\\,, \\qquad \\mathbf{L}\\mathbf{L}^{\\intercal} = \\operatorname{Cov}(\\mathbf{X})\\,, \\qquad U = \\left\\{ \\hat{\\mathbf{z}} + \\mathbf{L}\\mathbf{u} \\, \\vert \\, \\lVert \\mathbf{u} \\rVert_{p} \\leq \\kappa \\right\\}\\,.
+```
+
+Where:
+
+  - ``\\mathbf{L}``: Geometry map.
+  - ``\\mathbf{X}``: Bootstrap deviations, one row per resample.
+  - ``\\bar{\\mathbf{x}}``: Column means of ``\\mathbf{X}``.
+  - ``M``: Number of resamples, `ue.n_sim`.
+  - ``\\hat{\\mathbf{z}}``: Point estimate the deviations are taken from.
+  - ``\\kappa``, ``p``: Radius and norm order of the ball.
+
+# Algorithm
+
+ 1. Fit the prior with `prior(ue.pe, X, F; dims = dims, kwargs...)`, giving `pr`, and read `X = pr.X` and `N = size(X, 2)`.
+ 2. Refit both statistics on every resample with [`bootstrap_generator`](@ref), giving `mus` and `sigmas` from one index stream.
+ 3. Subtract `pr.mu` from every resampled mean and `pr.sigma` from every resampled covariance, giving `X_mu` and `X_sigma`, one deviation per column.
+ 4. Assemble the two sets with [`norm_ball_deviation_set`](@ref) on the transposed deviations, and return them as a tuple, mean first.
+
+# Arguments
+
+  - `ue`: ARCH uncertainty set estimator.
+  - `X`: Data matrix.
+  - `F`: Optional factor matrix. Used by the prior estimator.
+  - $(arg_dict[:dims])
+  - `kwargs...`: Additional keyword arguments passed to the prior estimator, `ue.me` and `ue.ce`.
+
+# Returns
+
+  - `mu_ucs::NormBallUncertaintySet`: Expected returns uncertainty set.
+  - `sigma_ucs::NormBallUncertaintySet`: Covariance uncertainty set.
+
+# Related
+
+  - [`ARCHUncertaintySet`](@ref)
+  - [`NormBallUncertaintySetAlgorithm`](@ref)
+  - [`NormBallUncertaintySet`](@ref)
+  - [`norm_ball_deviation_set`](@ref)
+  - [`bootstrap_generator`](@ref)
+  - [`mu_ucs`](@ref)
+  - [`sigma_ucs`](@ref)
+
+# References
+
+  - $(ref_dict[:bentalnemirovski1998]) Section 3, Equation 14.
+  - $(ref_dict[:goldfarbiyengar2003]) Section 5.
+"""
+function ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:NormBallUncertaintySetAlgorithm,
+                                    <:Any, <:Any, <:Any, <:Any, <:Any}, X::MatNum,
+             F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
+    X = pr.X
+    N = size(X, 2)
+    mus, sigmas = bootstrap_generator(ue, X; kwargs...)
+    X_mu = Matrix{eltype(X)}(undef, N, ue.n_sim)
+    X_sigma = Matrix{eltype(X)}(undef, N^2, ue.n_sim)
+    for i in axes(X_mu, 2)
+        X_mu[:, i] = vec(mus[:, i] - pr.mu)
+        X_sigma[:, i] = vec(sigmas[:, :, i] - pr.sigma)
+    end
+    return norm_ball_deviation_set(ue.alg, ue.q, transpose(X_mu), MuUncertaintySetClass(),
+                                   pr.mu),
+           norm_ball_deviation_set(ue.alg, ue.q, transpose(X_sigma),
+                                   SigmaUncertaintySetClass(), pr.sigma)
+end
+"""
+    mu_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:NormBallUncertaintySetAlgorithm, <:Any,
+                                  <:Any, <:Any, <:Any, <:Any}, X::MatNum,
+           F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+
+Constructs a norm-ball uncertainty set for expected returns using bootstrap resampling for time series data.
+
+**The bootstrap deviations are the geometry map, so this route builds no shape matrix**, and `ue.ce` takes no part on this axis at all: the ellipsoidal sibling fits it on the mean deviations, and the map carries the same second moment without it. With `ue.seed` set the method sees the same resamples as the mean half of [`ucs`](@ref); with `ue.seed` unset it does not.
+
+# Algorithm
+
+ 1. Fit the prior with `prior(ue.pe, X, F; dims = dims, kwargs...)`, giving `pr`, and read `X = pr.X` and `N = size(X, 2)`.
+ 2. Refit the mean on every resample with [`mu_bootstrap_generator`](@ref), giving `mus`.
+ 3. Subtract `pr.mu` from every resampled mean, giving `X_mu`, one deviation per column.
+ 4. Assemble and return the set with [`norm_ball_deviation_set`](@ref) on the transposed deviations, with `pr.mu` as the centre.
+
+# Arguments
+
+  - `ue`: ARCH uncertainty set estimator.
+  - `X`: Data matrix.
+  - `F`: Optional factor matrix. Used by the prior estimator.
+  - $(arg_dict[:dims])
+  - `kwargs...`: Additional keyword arguments passed to the prior estimator and `ue.me`.
+
+# Returns
+
+  - `mu_ucs::NormBallUncertaintySet`: Expected returns uncertainty set.
+
+# Related
+
+  - [`ARCHUncertaintySet`](@ref)
+  - [`NormBallUncertaintySetAlgorithm`](@ref)
+  - [`NormBallUncertaintySet`](@ref)
+  - [`norm_ball_deviation_set`](@ref)
+  - [`mu_bootstrap_generator`](@ref)
+  - [`sigma_ucs`](@ref)
+
+# References
+
+  - $(ref_dict[:bentalnemirovski1998]) Section 3, Equation 14.
+  - $(ref_dict[:goldfarbiyengar2003]) Section 5.
+"""
+function mu_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any,
+                                       <:NormBallUncertaintySetAlgorithm, <:Any, <:Any,
+                                       <:Any, <:Any, <:Any}, X::MatNum,
+                F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
+    X = pr.X
+    N = size(X, 2)
+    mus = mu_bootstrap_generator(ue, X; kwargs...)
+    X_mu = Matrix{eltype(X)}(undef, N, ue.n_sim)
+    for i in axes(X_mu, 2)
+        X_mu[:, i] = vec(mus[:, i] - pr.mu)
+    end
+    return norm_ball_deviation_set(ue.alg, ue.q, transpose(X_mu), MuUncertaintySetClass(),
+                                   pr.mu)
+end
+"""
+    sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:NormBallUncertaintySetAlgorithm,
+                                     <:Any, <:Any, <:Any, <:Any, <:Any}, X::MatNum,
+              F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+
+Constructs a norm-ball uncertainty set for covariance using bootstrap resampling for time series data.
+
+**This is the one route of the library that bounds a covariance without a matrix of side ``N^{2}``.** The ellipsoidal sibling fits `ue.ce` on the ``M \\times N^{2}`` deviations, and its shape is rank deficient at **every** sample size, because a vectorised symmetric matrix spans only ``N(N+1)/2`` coordinates; the default matrix processing then repairs it into a matrix the sample never named, and the chi-squared radius reads ``N^{2}`` degrees of freedom where the errors have ``N(N+1)/2``. The map [`norm_ball_deviation_factor`](@ref) builds is the deviations themselves, scaled, so it carries the sample second moment exactly at rank ``\\min(M - 1, N(N+1)/2)``, and [`k_norm_ball`](@ref) reads that rank rather than the side of a shape.
+
+# Algorithm
+
+ 1. Fit the prior with `prior(ue.pe, X, F; dims = dims, kwargs...)`, giving `pr`, and read `X = pr.X` and `N = size(X, 2)`.
+ 2. Refit the covariance on every resample with [`sigma_bootstrap_generator`](@ref), giving `sigmas`.
+ 3. Subtract `pr.sigma` from every resampled covariance and vectorise, giving `X_sigma`, one deviation per column.
+ 4. Assemble and return the set with [`norm_ball_deviation_set`](@ref) on the transposed deviations, with `pr.sigma` as the centre.
+
+# Arguments
+
+  - `ue`: ARCH uncertainty set estimator.
+  - `X`: Data matrix.
+  - `F`: Optional factor matrix. Used by the prior estimator.
+  - $(arg_dict[:dims])
+  - `kwargs...`: Additional keyword arguments passed to the prior estimator and `ue.ce`.
+
+# Returns
+
+  - `sigma_ucs::NormBallUncertaintySet`: Covariance uncertainty set.
+
+# Related
+
+  - [`ARCHUncertaintySet`](@ref)
+  - [`NormBallUncertaintySetAlgorithm`](@ref)
+  - [`NormBallUncertaintySet`](@ref)
+  - [`norm_ball_deviation_set`](@ref)
+  - [`sigma_bootstrap_generator`](@ref)
+  - [`mu_ucs`](@ref)
+
+# References
+
+  - $(ref_dict[:bentalnemirovski1998]) Section 3, Equation 14.
+  - $(ref_dict[:goldfarbiyengar2003]) Section 5.
+"""
+function sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any,
+                                          <:NormBallUncertaintySetAlgorithm, <:Any, <:Any,
+                                          <:Any, <:Any, <:Any}, X::MatNum,
+                   F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
+    X = pr.X
+    N = size(X, 2)
+    sigmas = sigma_bootstrap_generator(ue, X; kwargs...)
+    X_sigma = Matrix{eltype(X)}(undef, N^2, ue.n_sim)
+    for i in axes(X_sigma, 2)
+        X_sigma[:, i] = vec(sigmas[:, :, i] - pr.sigma)
+    end
+    return norm_ball_deviation_set(ue.alg, ue.q, transpose(X_sigma),
+                                   SigmaUncertaintySetClass(), pr.sigma)
+end
+
 export StationaryBootstrap, CircularBootstrap, MovingBootstrap, ARCHUncertaintySet

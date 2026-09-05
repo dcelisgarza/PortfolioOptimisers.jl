@@ -1124,6 +1124,79 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
+Selects a norm-ball uncertainty set, and carries the radius algorithm, the diagonal switch and the norm order it needs.
+
+Its siblings [`BoxUncertaintySetAlgorithm`](@ref) and [`EllipsoidalUncertaintySetAlgorithm`](@ref) select the two older shapes. The set it selects is a [`NormBallUncertaintySet`](@ref), which holds a geometry map rather than a shape matrix, so an estimator that emits it factorises the shape once at fit time, or skips the shape entirely and stores its own deviations. `diagonal = true` discards the correlation between the estimation errors of different entries, exactly as it does on the ellipsoid.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    NormBallUncertaintySetAlgorithm(;
+        method::Num_UcSK = ChiSqKUncertaintyAlgorithm(),
+        diagonal::Bool = true,
+        p::Number = 2
+    ) -> NormBallUncertaintySetAlgorithm
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `!isnan(p)` and `p >= 1`. `Inf` is admitted.
+
+# Examples
+
+```jldoctest
+julia> NormBallUncertaintySetAlgorithm()
+NormBallUncertaintySetAlgorithm
+    method ┼ ChiSqKUncertaintyAlgorithm()
+  diagonal ┼ Bool: true
+         p ┴ Int64: 2
+```
+
+# Related
+
+  - [`AbstractUncertaintySetAlgorithm`](@ref)
+  - [`AbstractUncertaintyKAlgorithm`](@ref)
+  - [`NormBallUncertaintySet`](@ref)
+  - [`EllipsoidalUncertaintySetAlgorithm`](@ref)
+  - [`BoxUncertaintySetAlgorithm`](@ref)
+  - [`norm_ball_set`](@ref)
+  - [`norm_ball_deviation_set`](@ref)
+
+# References
+
+  - $(ref_dict[:bentalnemirovski1998]) Section 3, Equation 14.
+  - $(ref_dict[:goldfarbiyengar2003]) Section 5.
+"""
+@concrete struct NormBallUncertaintySetAlgorithm <: AbstractUncertaintySetAlgorithm
+    """
+    Radius algorithm of the ball, or the radius itself as a `Number`. It is read against the geometry map rather than against a shape matrix, so [`k_norm_ball`](@ref) serves it and not [`k_ucs`](@ref).
+    """
+    method
+    """
+    $(field_dict[:diagonal])
+    """
+    diagonal
+    """
+    Norm order ``p \\geq 1`` of the ball, `Inf` admitted. It reaches the set unchanged, and the consumer raises the cone of the dual order.
+    """
+    p
+    function NormBallUncertaintySetAlgorithm(method::Num_UcSK, diagonal::Bool, p::Number)
+        @argcheck(!isnan(p) && p >= one(p), DomainError(p, "p must be >= 1"))
+        return new{typeof(method), typeof(diagonal), typeof(p)}(method, diagonal, p)
+    end
+end
+function NormBallUncertaintySetAlgorithm(; method::Num_UcSK = ChiSqKUncertaintyAlgorithm(),
+                                         diagonal::Bool = true,
+                                         p::Number = 2)::NormBallUncertaintySetAlgorithm
+    return NormBallUncertaintySetAlgorithm(method, diagonal, p)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
 Names the axis an uncertainty set lives on, which fixes the row count of its shape matrix or of its geometry map.
 
 The family has exactly two inhabitants, and both ship. A consumer dispatches on the tag, because a mean set and a covariance set are the same struct with a shape matrix, or a geometry map, of a different size: [`EllipsoidalUncertaintySet`](@ref) and [`NormBallUncertaintySet`](@ref) both carry one. The tag names the axis alone and not the geometry, so a norm ball of order one, which is no ellipsoid, carries the same tag as an ellipsoid on the same axis.
@@ -1500,5 +1573,5 @@ end
 export ucs, mu_ucs, sigma_ucs, BoxUncertaintySetAlgorithm, BoxUncertaintySet,
        NormalKUncertaintyAlgorithm, GeneralKUncertaintyAlgorithm,
        ChiSqKUncertaintyAlgorithm, EllipsoidalUncertaintySetAlgorithm,
-       EllipsoidalUncertaintySet, SigmaUncertaintySetClass, MuUncertaintySetClass,
-       AbstractUncertaintyEpsAlgorithm
+       NormBallUncertaintySetAlgorithm, EllipsoidalUncertaintySet, SigmaUncertaintySetClass,
+       MuUncertaintySetClass, AbstractUncertaintyEpsAlgorithm

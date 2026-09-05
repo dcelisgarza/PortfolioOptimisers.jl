@@ -177,14 +177,14 @@
 "src/13_Prior/13_OpinionPoolingPrior.jl" = { map = 6, units = 7, algorithm = 3, swept = true }
 "src/13_Prior/14_HighOrderFactorPriorEstimator.jl" = { map = 6, units = 4, algorithm = 3, swept = true }
 "src/13_Prior/15_FeaturePrior.jl" = { map = 6, units = 13, algorithm = 6, swept = true }
-"src/14_UncertaintySets/01_Base_UncertaintySets.jl" = { map = 7, units = 39, algorithm = 11, swept = true }
+"src/14_UncertaintySets/01_Base_UncertaintySets.jl" = { map = 7, units = 40, algorithm = 11, swept = true }
 "src/14_UncertaintySets/02_DeltaUncertaintySets.jl" = { map = 7, units = 6, algorithm = 5, swept = true }
-"src/14_UncertaintySets/03_NormalUncertaintySets.jl" = { map = 7, units = 17, algorithm = 16, swept = true }
-"src/14_UncertaintySets/04_BootstrapUncertaintySets.jl" = { map = 7, units = 16, algorithm = 10, swept = true }
+"src/14_UncertaintySets/03_NormalUncertaintySets.jl" = { map = 7, units = 25, algorithm = 24, swept = true }
+"src/14_UncertaintySets/04_BootstrapUncertaintySets.jl" = { map = 7, units = 19, algorithm = 13, swept = true }
 "src/14_UncertaintySets/05_L1UncertaintySets.jl" = { map = 7, units = 14, algorithm = 7, swept = true }
 "src/14_UncertaintySets/06_CalibrationRules.jl" = { map = 7, units = 56, swept = false }
 "src/14_UncertaintySets/07_CompactUncertaintySets.jl" = { map = 7, units = 4, swept = false }
-"src/14_UncertaintySets/08_NormBallUncertaintySets.jl" = { map = 7, units = 6, swept = false }
+"src/14_UncertaintySets/08_NormBallUncertaintySets.jl" = { map = 7, units = 11, swept = false }
 "src/15_Turnover.jl" = { map = 8, units = 15, algorithm = 8, swept = true }
 "src/16_Fees.jl" = { map = 8, units = 24, algorithm = 19, swept = true }
 "src/17_NetReturnsDrawdowns.jl" = { map = 8, units = 31, algorithm = 8, swept = false }
