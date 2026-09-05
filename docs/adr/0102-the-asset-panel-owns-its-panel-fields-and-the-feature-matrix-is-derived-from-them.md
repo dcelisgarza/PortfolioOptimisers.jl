@@ -125,7 +125,10 @@ above and keeps the inverse.
 
 `ReturnsResult` holds `nx, X, nf, F, nb, B, ts, iv, ivpa, pnl`, and `PricesResult` holds
 `X, F, B, iv, ivpa, pnl`. `nz` and `Z` leave both. A time-varying panel must match `size(X, 1)`
-and the asset count; a static one must match the asset count. `LowOrderPrior` loses `Z`, and
+and the asset count; a static one must match the asset count. `check_asset_panel` keeps its name
+and states that rule: its old body checked the panel against `nz` and `Z` and is gone with them,
+and the axis rule is a check three carriers make, so it stays one named check rather than three
+copies. `LowOrderPrior` loses `Z`, and
 `HighOrderPrior` forwards nothing of it. The `Pr_RR` bridge stays, because `x_src` stays and the
 bridge serves it.
 
