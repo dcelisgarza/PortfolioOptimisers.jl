@@ -123,6 +123,10 @@
 "src/08_Moments/42_FactorExposures/13_ExposureNeutralisation.jl" = { map = 3, units = 5, swept = false }
 "src/08_Moments/43_FactorFamilyBasis.jl" = { map = 3, units = 13, swept = false }
 "src/08_Moments/44_FactorFamilyBasisTransforms.jl" = { map = 3, units = 12, swept = false }
+"src/08_Moments/45_ReturnForecasts/01_Base_ReturnForecast.jl" = { map = 3, units = 8, swept = false }
+"src/08_Moments/45_ReturnForecasts/02_DescriptorScores.jl" = { map = 3, units = 5, swept = false }
+"src/08_Moments/45_ReturnForecasts/03_CustomValueReturnForecast.jl" = { map = 3, units = 3, swept = false }
+"src/08_Moments/45_ReturnForecasts/04_FixedWeightedReturnForecast.jl" = { map = 3, units = 6, swept = false }
 "src/09_Distance/01_Base_Distance.jl" = { map = 2, units = 8, algorithm = 1, swept = true }
 "src/09_Distance/02_Distance.jl" = { map = 2, units = 13, algorithm = 8, swept = true }
 "src/09_Distance/03_DistanceDistance.jl" = { map = 2, units = 4, algorithm = 3, swept = true }

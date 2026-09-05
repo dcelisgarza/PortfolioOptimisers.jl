@@ -170,17 +170,22 @@ function neutralisation_names(targets::VecStr)::VecStr
     return targets
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
+    neutralisation_weights(y::MatNum, X::AbstractArray{<:Real, 3}, bw::MatNum)
+    neutralisation_weights(Ms::AbstractArray{<:Real, 3}, X::AbstractArray{<:Real, 3},
+                           bw::MatNum, k::Integer)
 
 Return the regression weights of one Neutralisation.
 
-An asset whose key exposure or whose target exposure is not finite carries no weight in that regression, because a cross-sectional fit refuses a non-finite entry at a positive weight. A non-finite benchmark weight and a negative one are read as zero on the same rule.
+An asset whose response or whose target exposure is not finite carries no weight in that regression, because a cross-sectional fit refuses a non-finite entry at a positive weight. A non-finite base weight and a negative one are read as zero on the same rule.
+
+The response is one Factor Exposure when a Factor Exposure is neutralised, and one Descriptor score when a Descriptor score is: the four-argument method names the exposure by its raw factor index and forwards it to the three-argument one, so the two neutralisations share one rule.
 
 # Arguments
 
+  - `y::MatNum`: The response being neutralised, `observations × assets`.
   - `Ms::AbstractArray{<:Real, 3}`: Exposure history, `observations × assets × factors`.
   - `X::AbstractArray{<:Real, 3}`: Target exposures, `observations × assets × targets`.
-  - `bw::MatNum`: Benchmark weight history, `observations × assets`.
+  - `bw::MatNum`: Base weight history, `observations × assets`. It is the benchmark weights of a Factor Exposure Neutralisation and the estimation mask of a Descriptor score one.
   - `k::Integer`: Raw index of the factor being neutralised.
 
 # Returns
@@ -190,16 +195,16 @@ An asset whose key exposure or whose target exposure is not finite carries no we
 # Related
 
   - [`neutralise_exposures!`](@ref)
+  - [`neutralise_scores!`](@ref)
   - [`cross_sectional_design_mask`](@ref)
 """
-function neutralisation_weights(Ms::AbstractArray{<:Real, 3}, X::AbstractArray{<:Real, 3},
-                                bw::MatNum, k::Integer)
-    Tf = promote_type(float(real(eltype(Ms))), float(real(eltype(bw))))
+function neutralisation_weights(y::MatNum, X::AbstractArray{<:Real, 3}, bw::MatNum)
+    Tf = promote_type(float(real(eltype(y))), float(real(eltype(bw))))
     T, N = size(bw)
     W = zeros(Tf, T, N)
     for i in 1:N, t in 1:T
         b = bw[t, i]
-        if !isfinite(b) || b <= zero(b) || !isfinite(Ms[t, i, k])
+        if !isfinite(b) || b <= zero(b) || !isfinite(y[t, i])
             continue
         end
         ok = true
@@ -214,4 +219,8 @@ function neutralisation_weights(Ms::AbstractArray{<:Real, 3}, X::AbstractArray{<
         end
     end
     return W
+end
+function neutralisation_weights(Ms::AbstractArray{<:Real, 3}, X::AbstractArray{<:Real, 3},
+                                bw::MatNum, k::Integer)
+    return neutralisation_weights(view(Ms, :, :, k), X, bw)
 end

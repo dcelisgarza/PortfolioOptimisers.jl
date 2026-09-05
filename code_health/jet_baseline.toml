@@ -8,7 +8,7 @@ jet = "0.12.1"
 filter = "AnyFrameModule"
 attribution = "deepest_repository_frame"
 load_set = ["GraphRecipes", "Impute", "StatsPlots"]
-commit = "91f61eb656"
+commit = "36ff46bdd9"
 
 [run.main]
 load_set = ["GraphRecipes", "Impute", "StatsPlots"]
@@ -33,7 +33,7 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/02_Tools.jl" = { raw = 10, reviewed = 10 }
 "src/03_InputData/01_AssetPanel.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/02_AssetPanelBuilder.jl" = { raw = 0, reviewed = 0 }
-"src/03_InputData/03_Preprocessing.jl" = { raw = 19, reviewed = 19 }
+"src/03_InputData/03_Preprocessing.jl" = { raw = 18, reviewed = 18 }
 "src/03_InputData/04_CrossSectionalTransforms.jl" = { raw = 0, reviewed = 0 }
 "src/04_PosdefMatrix.jl" = { raw = 14, reviewed = 14 }
 "src/05_Denoise.jl" = { raw = 1, reviewed = 1 }
@@ -95,6 +95,10 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/08_Moments/42_FactorExposures/13_ExposureNeutralisation.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/43_FactorFamilyBasis.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/44_FactorFamilyBasisTransforms.jl" = { raw = 0, reviewed = 0 }
+"src/08_Moments/45_ReturnForecasts/01_Base_ReturnForecast.jl" = { raw = 0, reviewed = 0 }
+"src/08_Moments/45_ReturnForecasts/02_DescriptorScores.jl" = { raw = 0, reviewed = 0 }
+"src/08_Moments/45_ReturnForecasts/03_CustomValueReturnForecast.jl" = { raw = 0, reviewed = 0 }
+"src/08_Moments/45_ReturnForecasts/04_FixedWeightedReturnForecast.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/01_Base_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/02_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/03_DistanceDistance.jl" = { raw = 0, reviewed = 0 }
@@ -353,6 +357,10 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/08_Moments/42_FactorExposures/13_ExposureNeutralisation.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/43_FactorFamilyBasis.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/44_FactorFamilyBasisTransforms.jl" = { raw = 0, reviewed = 0 }
+"src/08_Moments/45_ReturnForecasts/01_Base_ReturnForecast.jl" = { raw = 0, reviewed = 0 }
+"src/08_Moments/45_ReturnForecasts/02_DescriptorScores.jl" = { raw = 0, reviewed = 0 }
+"src/08_Moments/45_ReturnForecasts/03_CustomValueReturnForecast.jl" = { raw = 0, reviewed = 0 }
+"src/08_Moments/45_ReturnForecasts/04_FixedWeightedReturnForecast.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/01_Base_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/02_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/03_DistanceDistance.jl" = { raw = 0, reviewed = 0 }
@@ -611,6 +619,10 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/08_Moments/42_FactorExposures/13_ExposureNeutralisation.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/43_FactorFamilyBasis.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/44_FactorFamilyBasisTransforms.jl" = { raw = 0, reviewed = 0 }
+"src/08_Moments/45_ReturnForecasts/01_Base_ReturnForecast.jl" = { raw = 0, reviewed = 0 }
+"src/08_Moments/45_ReturnForecasts/02_DescriptorScores.jl" = { raw = 0, reviewed = 0 }
+"src/08_Moments/45_ReturnForecasts/03_CustomValueReturnForecast.jl" = { raw = 0, reviewed = 0 }
+"src/08_Moments/45_ReturnForecasts/04_FixedWeightedReturnForecast.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/01_Base_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/02_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/03_DistanceDistance.jl" = { raw = 0, reviewed = 0 }
