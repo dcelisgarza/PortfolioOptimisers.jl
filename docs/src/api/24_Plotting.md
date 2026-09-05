@@ -47,6 +47,11 @@ plot_attribution_vol_contrib
 plot_attribution_mu_contrib
 plot_attribution_exposure
 plot_attribution_mu_vs_vol
+plot_exposure_correlation
+plot_cumulative_exposure_ic
+plot_exposure_distribution
+plot_exposure_dispersion
+plot_exposure_stability
 relevant_assets
 attribution_plot_axis
 ```

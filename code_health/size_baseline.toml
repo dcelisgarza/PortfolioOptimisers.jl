@@ -10,7 +10,7 @@ commit = "36ff46bdd9"
 
 [file]
 "ext/PortfolioOptimisersImputeExt.jl" = { code = 6, doc = 0, comment = 4, blank = 3, total = 13 }
-"ext/PortfolioOptimisersPlotsExt.jl" = { code = 2188, doc = 0, comment = 148, blank = 43, total = 2379 }
+"ext/PortfolioOptimisersPlotsExt.jl" = { code = 2312, doc = 0, comment = 158, blank = 44, total = 2514 }
 "src/01_Base/01_DocstringDictionaries.jl" = { code = 1102, doc = 113, comment = 122, blank = 43, total = 1380 }
 "src/01_Base/02_TypeRoots.jl" = { code = 15, doc = 199, comment = 0, blank = 89, total = 303 }
 "src/01_Base/03_PrettyShow.jl" = { code = 117, doc = 138, comment = 0, blank = 76, total = 331 }
@@ -97,6 +97,7 @@ commit = "36ff46bdd9"
 "src/08_Moments/45_ReturnForecasts/05_ExpWeightedReturnForecast.jl" = { code = 171, doc = 267, comment = 0, blank = 91, total = 529 }
 "src/08_Moments/45_ReturnForecasts/06_TargetReturnForecast.jl" = { code = 256, doc = 371, comment = 0, blank = 138, total = 765 }
 "src/08_Moments/46_CrossSectionalRegressionDiagnostics.jl" = { code = 431, doc = 611, comment = 0, blank = 284, total = 1326 }
+"src/08_Moments/47_CrossSectionalExposureDiagnostics.jl" = { code = 407, doc = 502, comment = 0, blank = 247, total = 1156 }
 "src/09_Distance/01_Base_Distance.jl" = { code = 24, doc = 222, comment = 0, blank = 89, total = 335 }
 "src/09_Distance/02_Distance.jl" = { code = 158, doc = 350, comment = 0, blank = 157, total = 665 }
 "src/09_Distance/03_DistanceDistance.jl" = { code = 37, doc = 132, comment = 0, blank = 58, total = 227 }
@@ -161,7 +162,7 @@ commit = "36ff46bdd9"
 "src/14_UncertaintySets/06_CalibrationRules.jl" = { code = 482, doc = 1467, comment = 31, blank = 660, total = 2640 }
 "src/14_UncertaintySets/07_CompactUncertaintySets.jl" = { code = 53, doc = 121, comment = 0, blank = 48, total = 222 }
 "src/14_UncertaintySets/08_NormBallUncertaintySets.jl" = { code = 70, doc = 171, comment = 5, blank = 72, total = 318 }
-"src/14_UncertaintySets/09_OrthogonalUncertaintySets.jl" = { code = 145, doc = 414, comment = 3, blank = 180, total = 742 }
+"src/14_UncertaintySets/09_OrthogonalUncertaintySets.jl" = { code = 165, doc = 447, comment = 3, blank = 198, total = 813 }
 "src/15_Turnover.jl" = { code = 81, doc = 458, comment = 0, blank = 184, total = 723 }
 "src/16_Fees.jl" = { code = 294, doc = 974, comment = 0, blank = 373, total = 1641 }
 "src/17_NetReturnsDrawdowns.jl" = { code = 281, doc = 961, comment = 0, blank = 415, total = 1657 }
@@ -271,6 +272,6 @@ commit = "36ff46bdd9"
 "src/23_Pipeline/03_Pipeline.jl" = { code = 422, doc = 399, comment = 6, blank = 215, total = 1042 }
 "src/23_Pipeline/04_PredictionCV.jl" = { code = 172, doc = 132, comment = 15, blank = 63, total = 382 }
 "src/23_Pipeline/05_SearchCrossValidation.jl" = { code = 212, doc = 121, comment = 18, blank = 60, total = 411 }
-"src/24_Plotting.jl" = { code = 84, doc = 1295, comment = 108, blank = 416, total = 1903 }
+"src/24_Plotting.jl" = { code = 91, doc = 1462, comment = 108, blank = 472, total = 2133 }
 "src/25_Aliases.jl" = { code = 267, doc = 591, comment = 25, blank = 161, total = 1044 }
 "src/PortfolioOptimisers.jl" = { code = 298, doc = 3, comment = 29, blank = 5, total = 335 }

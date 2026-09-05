@@ -11,6 +11,8 @@ IdentityScaling
 IdiosyncraticVarianceScaling
 orthogonality_weights
 latest_orthogonality_weights
+cs_diagnostic_weights
+cs_diagnostic_weight_history
 orthogonal_scaling
 OrthogonalUncertaintySet
 orthogonal_factor_span

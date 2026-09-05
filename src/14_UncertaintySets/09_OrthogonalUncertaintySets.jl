@@ -737,6 +737,77 @@ function sigma_ucs(ue::OrthogonalUncertaintySet, pr::AbstractPriorResult; kwargs
     return orthogonal_sigma_set(ue, pr, w_sqrt, Q)
 end
 
+"""
+    cs_diagnostic_weights(weighting::IdentityMetric, csfm::CrossSectionalFactorModel)
+    cs_diagnostic_weights(weighting::BenchmarkWeightMetric, csfm::CrossSectionalFactorModel)
+    cs_diagnostic_weights(weighting::RegressionWeightMetric, csfm::CrossSectionalFactorModel)
+    cs_diagnostic_weights(weighting::InverseIdiosyncraticVarianceMetric, csfm::CrossSectionalFactorModel)
+
+Return the cross-sectional weight history an [`AbstractOrthogonalityMetric`](@ref) names, over the whole observation axis of a factor model block.
+
+[`orthogonality_weights`](@ref) reads the same family off the same block and answers with the weights of the **latest** observation, which is what an uncertainty set needs. A diagnostic scores every observation, so it needs the whole history, and this verb is that reading of the family.
+
+# Arguments
+
+  - `weighting`: The metric that names the history.
+  - `csfm`: A cross-sectional factor model block.
+
+# Validation
+
+  - The field the metric names is not `nothing`, else an `IsNothingError` naming it is raised.
+
+# Returns
+
+  - `u::Option{<:MatNum}`: `observations × assets`, and `nothing` under [`IdentityMetric`](@ref), which the diagnostics read as equal weights.
+
+# Related
+
+  - [`AbstractOrthogonalityMetric`](@ref)
+  - [`orthogonality_weights`](@ref)
+  - [`exposure_weights`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+"""
+function cs_diagnostic_weights(::IdentityMetric, ::CrossSectionalFactorModel)
+    return nothing
+end
+function cs_diagnostic_weights(::BenchmarkWeightMetric, csfm::CrossSectionalFactorModel)
+    return cs_diagnostic_weight_history(csfm.bw, "bw", "the benchmark weight history")
+end
+function cs_diagnostic_weights(::RegressionWeightMetric, csfm::CrossSectionalFactorModel)
+    return cs_diagnostic_weight_history(csfm.rw, "rw", "the regression weight history")
+end
+function cs_diagnostic_weights(::InverseIdiosyncraticVarianceMetric,
+                               csfm::CrossSectionalFactorModel)
+    vs = cs_diagnostic_weight_history(csfm.vs, "vs", "the idiosyncratic variance history")
+    return one(float(real(eltype(vs)))) ./ vs
+end
+"""
+    cs_diagnostic_weight_history(A::Nothing, name::AbstractString, what::AbstractString)
+    cs_diagnostic_weight_history(A::MatNum, name::AbstractString, what::AbstractString)
+
+Return a weight history of a factor model block, or refuse an absent one by name.
+
+# Arguments
+
+  - `A`: The field of the block the metric names, or `nothing`.
+  - `name`: Name of that field, which the refusal states.
+  - `what`: What the field holds, which the refusal states.
+
+# Returns
+
+  - `A::MatNum`: The history.
+
+# Related
+
+  - [`cs_diagnostic_weights`](@ref)
+"""
+function cs_diagnostic_weight_history(::Nothing, name::AbstractString, what::AbstractString)
+    return throw(IsNothingError("$name cannot be nothing: an exposure diagnostic reads $what of the block"))
+end
+function cs_diagnostic_weight_history(A::MatNum, ::AbstractString, ::AbstractString)
+    return A
+end
+
 export BenchmarkWeightMetric, RegressionWeightMetric, InverseIdiosyncraticVarianceMetric,
        IdentityMetric, IdentityScaling, IdiosyncraticVarianceScaling,
        OrthogonalUncertaintySet

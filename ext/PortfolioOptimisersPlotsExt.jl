@@ -2376,4 +2376,139 @@ function PortfolioOptimisers.plot_exposure_condition_number(pr::PortfolioOptimis
                                                               kwargs...)
 end
 
+## ────────────────────────────────────────────────────────────────────────────
+## Cross-sectional exposure diagnostics
+## ────────────────────────────────────────────────────────────────────────────
+# The exposure group answers on the RAW factor axis, because it reads the exposure
+# history as the panel wrote it and never the design of the fit, so these figures label
+# their series off `csfm.nf` and not off `cs_diagnostic_factor_names`. The one exception
+# is the cumulative information coefficient under `reduced`, which does map the exposures
+# through the family re-basis and is then labelled on the reduced axis.
+function exposure_diagnostic_labels(csfm, nf::Option{<:AbstractVector}, K::Integer)
+    nf_use = isnothing(nf) ? csfm.nf : nf
+    return isnothing(nf_use) ? string.(1:K) : string.(nf_use)
+end
+function PortfolioOptimisers.plot_exposure_correlation(csfm::PortfolioOptimisers.CrossSectionalFactorModel;
+                                                       nf::Option{<:AbstractVector} = nothing,
+                                                       weighting = PortfolioOptimisers.BenchmarkWeightMetric(),
+                                                       kwargs...)
+    C = PortfolioOptimisers.exposure_correlation(csfm; weighting = weighting)
+    labels = exposure_diagnostic_labels(csfm, nf, size(C, 1))
+    K = size(C, 1)
+    return heatmap(C; xticks = (1:K, labels), yticks = (1:K, labels), xrotation = 90,
+                   clim = (-1.0, 1.0), color = cgrad(:Spectral), yflip = true,
+                   title = "Time-Average Exposure Correlation", colorbar_title = "ρ",
+                   kwargs...)
+end
+function PortfolioOptimisers.plot_exposure_correlation(pr::PortfolioOptimisers.AbstractPriorResult;
+                                                       nf::Option{<:AbstractVector} = nothing,
+                                                       weighting = PortfolioOptimisers.BenchmarkWeightMetric(),
+                                                       kwargs...)
+    return PortfolioOptimisers.plot_exposure_correlation(cs_diagnostic_block(pr); nf = nf,
+                                                         weighting = weighting, kwargs...)
+end
+function PortfolioOptimisers.plot_cumulative_exposure_ic(csfm::PortfolioOptimisers.CrossSectionalFactorModel;
+                                                         nf::Option{<:AbstractVector} = nothing,
+                                                         rank::Bool = true,
+                                                         reduced::Bool = false, kwargs...)
+    ic = PortfolioOptimisers.exposure_ic(csfm; horizon = 1, rank = rank, reduced = reduced)
+    cum = cumulative_exposure_ic(ic)
+    labels = if reduced
+        cs_diagnostic_labels(csfm, nf, size(ic, 2))
+    else
+        exposure_diagnostic_labels(csfm, nf, size(ic, 2))
+    end
+    method = rank ? "Spearman" : "Pearson"
+    return cs_diagnostic_series(cum, labels, "Cumulative Exposure IC ($method)",
+                                "Cumulative IC"; kwargs...)
+end
+function PortfolioOptimisers.plot_cumulative_exposure_ic(pr::PortfolioOptimisers.AbstractPriorResult;
+                                                         nf::Option{<:AbstractVector} = nothing,
+                                                         rank::Bool = true,
+                                                         reduced::Bool = false, kwargs...)
+    return PortfolioOptimisers.plot_cumulative_exposure_ic(cs_diagnostic_block(pr); nf = nf,
+                                                           rank = rank, reduced = reduced,
+                                                           kwargs...)
+end
+# An observation whose information coefficient is not defined contributes nothing to the
+# running sum, so one missing cross-section breaks no series.
+function cumulative_exposure_ic(ic::MatNum)
+    P, K = size(ic)
+    cum = similar(ic)
+    for k in 1:K
+        s = zero(eltype(ic))
+        for t in 1:P
+            v = ic[t, k]
+            if isfinite(v)
+                s += v
+            end
+            cum[t, k] = s
+        end
+    end
+    return cum
+end
+function PortfolioOptimisers.plot_exposure_distribution(csfm::PortfolioOptimisers.CrossSectionalFactorModel;
+                                                        factor::Integer = 1,
+                                                        observation::Option{<:Integer} = nothing,
+                                                        nf::Option{<:AbstractVector} = nothing,
+                                                        kwargs...)
+    Ms = PortfolioOptimisers.cs_diagnostic_exposures(csfm)
+    labels = exposure_diagnostic_labels(csfm, nf, size(Ms, 3))
+    slice = if isnothing(observation)
+        vec(view(Ms, :, :, factor))
+    else
+        vec(view(Ms, observation, :, factor))
+    end
+    values = filter(isfinite, slice)
+    span = isnothing(observation) ? "all observations" : "observation $observation"
+    return histogram(values; title = "Exposure Distribution: $(labels[factor]) ($span)",
+                     xlabel = "Exposure", ylabel = "Count", legend = false, kwargs...)
+end
+function PortfolioOptimisers.plot_exposure_distribution(pr::PortfolioOptimisers.AbstractPriorResult;
+                                                        factor::Integer = 1,
+                                                        observation::Option{<:Integer} = nothing,
+                                                        nf::Option{<:AbstractVector} = nothing,
+                                                        kwargs...)
+    return PortfolioOptimisers.plot_exposure_distribution(cs_diagnostic_block(pr);
+                                                          factor = factor,
+                                                          observation = observation,
+                                                          nf = nf, kwargs...)
+end
+function PortfolioOptimisers.plot_exposure_dispersion(csfm::PortfolioOptimisers.CrossSectionalFactorModel;
+                                                      nf::Option{<:AbstractVector} = nothing,
+                                                      weighting = PortfolioOptimisers.BenchmarkWeightMetric(),
+                                                      kwargs...)
+    D = PortfolioOptimisers.exposure_dispersion(csfm; weighting = weighting)
+    labels = exposure_diagnostic_labels(csfm, nf, size(D, 2))
+    plt = cs_diagnostic_series(D, labels, "Exposure Cross-Sectional Std", "Std"; kwargs...)
+    return plt
+end
+function PortfolioOptimisers.plot_exposure_dispersion(pr::PortfolioOptimisers.AbstractPriorResult;
+                                                      nf::Option{<:AbstractVector} = nothing,
+                                                      weighting = PortfolioOptimisers.BenchmarkWeightMetric(),
+                                                      kwargs...)
+    return PortfolioOptimisers.plot_exposure_dispersion(cs_diagnostic_block(pr); nf = nf,
+                                                        weighting = weighting, kwargs...)
+end
+function PortfolioOptimisers.plot_exposure_stability(csfm::PortfolioOptimisers.CrossSectionalFactorModel;
+                                                     nf::Option{<:AbstractVector} = nothing,
+                                                     step::Integer = 21,
+                                                     weighting = PortfolioOptimisers.BenchmarkWeightMetric(),
+                                                     kwargs...)
+    S = PortfolioOptimisers.exposure_stability(csfm; step = step, weighting = weighting)
+    labels = exposure_diagnostic_labels(csfm, nf, size(S, 2))
+    plt = cs_diagnostic_series(S, labels, "Exposure Stability (step=$step)", "ρ"; kwargs...)
+    hline!(plt, [1.0]; label = "", linewidth = 2, color = :red, linestyle = :dash)
+    return plt
+end
+function PortfolioOptimisers.plot_exposure_stability(pr::PortfolioOptimisers.AbstractPriorResult;
+                                                     nf::Option{<:AbstractVector} = nothing,
+                                                     step::Integer = 21,
+                                                     weighting = PortfolioOptimisers.BenchmarkWeightMetric(),
+                                                     kwargs...)
+    return PortfolioOptimisers.plot_exposure_stability(cs_diagnostic_block(pr); nf = nf,
+                                                       step = step, weighting = weighting,
+                                                       kwargs...)
+end
+
 end

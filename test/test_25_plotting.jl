@@ -470,4 +470,68 @@
             @test_throws ArgumentError plt(fa_nf; by_family = true)
         end
     end
+    @testset "Cross-sectional exposure diagnostics (#799)" begin
+        # Each figure draws one level-2 verb. The block carries a benchmark weight history,
+        # because the default weighting of the exposure group reads it.
+        rng_ex = MersenneTwister(799)
+        Te, Ne, Ke = 12, 8, 3
+        Ms_ex = randn(rng_ex, Te, Ne, Ke)
+        csr_ex = CrossSectionalRegression(; f = 0.02 * randn(rng_ex, Te, Ke),
+                                          eps = 0.01 * randn(rng_ex, Te, Ne),
+                                          n = fill(Ne, Te))
+        csfm_ex = CrossSectionalFactorModel(; M = Ms_ex[Te, :, :], b = zeros(Ne),
+                                            csr = csr_ex, Ms = Ms_ex,
+                                            rw = abs.(randn(rng_ex, Te, Ne)) .+ 0.1,
+                                            bw = fill(1 / Ne, Te, Ne),
+                                            vs = abs.(randn(rng_ex, Te, Ne)) .+ 0.5,
+                                            nf = ["value", "size", "momentum"], lag = 1)
+        fpr_ex = LowOrderPrior(; X = randn(rng_ex, Te, Ke), mu = zeros(Ke),
+                               sigma = Matrix(1.0 * I, Ke, Ke))
+        pr_ex = LowOrderPrior(; X = randn(rng_ex, Te, Ne), mu = zeros(Ne),
+                              sigma = Matrix(1.0 * I, Ne, Ne), rr = csfm_ex, fpr = fpr_ex)
+
+        for plt in (plot_exposure_correlation, plot_exposure_dispersion)
+            @test is_plot(plt(csfm_ex))
+            @test is_plot(plt(pr_ex))
+            @test is_plot(plt(csfm_ex; nf = ["a", "b", "c"]))
+            @test is_plot(plt(csfm_ex; weighting = IdentityMetric()))
+        end
+        @test is_plot(plot_exposure_stability(csfm_ex; step = 3))
+        @test is_plot(plot_exposure_stability(pr_ex; step = 3))
+        @test is_plot(plot_exposure_stability(csfm_ex; step = 3, nf = ["a", "b", "c"],
+                                              weighting = RegressionWeightMetric()))
+        @test is_plot(plot_cumulative_exposure_ic(csfm_ex))
+        @test is_plot(plot_cumulative_exposure_ic(pr_ex))
+        @test is_plot(plot_cumulative_exposure_ic(csfm_ex; rank = false,
+                                                  nf = ["a", "b", "c"]))
+        @test is_plot(plot_exposure_distribution(csfm_ex))
+        @test is_plot(plot_exposure_distribution(pr_ex; factor = 2))
+        @test is_plot(plot_exposure_distribution(csfm_ex; factor = 3, observation = 4,
+                                                 nf = ["a", "b", "c"]))
+        # A block that names no factor is labelled by position.
+        bare_ex = CrossSectionalFactorModel(; M = Ms_ex[Te, :, :], b = zeros(Ne),
+                                            csr = csr_ex, Ms = Ms_ex, lag = 1)
+        @test is_plot(plot_exposure_correlation(bare_ex; weighting = IdentityMetric()))
+        @test is_plot(plot_exposure_distribution(bare_ex))
+        # A re-based block labels the cumulative information coefficient on the reduced
+        # axis when it is asked for the reduced answer.
+        fcb_ex = FactorFamilyBasis(; fnm = ["industry"], fi = [[1, 2]], di = [2],
+                                   ratios = reshape(collect(range(0.4, 0.9; length = Te)),
+                                                    Te, 1), K = Ke)
+        reb_ex = CrossSectionalFactorModel(; M = Ms_ex[Te, :, :],
+                                           L = PortfolioOptimisers.reduce_loadings(fcb_ex,
+                                                                                   Ms_ex[Te,
+                                                                                         :,
+                                                                                         :]),
+                                           b = zeros(Ne), csr = csr_ex, Ms = Ms_ex,
+                                           rw = abs.(randn(rng_ex, Te, Ne)) .+ 0.1,
+                                           fcb = fcb_ex, nf = ["value", "size", "momentum"],
+                                           lag = 1)
+        @test is_plot(plot_cumulative_exposure_ic(reb_ex; reduced = true))
+        # A prior result that carries no factor block names the remedy.
+        no_rr_ex = LowOrderPrior(; X = randn(rng_ex, Te, Ne), mu = zeros(Ne),
+                                 sigma = Matrix(1.0 * I, Ne, Ne))
+        @test_throws PortfolioOptimisers.IsNothingError plot_exposure_correlation(no_rr_ex)
+        @test_throws PortfolioOptimisers.IsNothingError plot_exposure_distribution(no_rr_ex)
+    end
 end

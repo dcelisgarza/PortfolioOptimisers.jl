@@ -130,6 +130,7 @@
 "src/08_Moments/45_ReturnForecasts/05_ExpWeightedReturnForecast.jl" = { map = 3, units = 9, swept = false }
 "src/08_Moments/45_ReturnForecasts/06_TargetReturnForecast.jl" = { map = 3, units = 14, swept = false }
 "src/08_Moments/46_CrossSectionalRegressionDiagnostics.jl" = { map = 3, units = 31, swept = false }
+"src/08_Moments/47_CrossSectionalExposureDiagnostics.jl" = { map = 3, units = 22, swept = false }
 "src/09_Distance/01_Base_Distance.jl" = { map = 2, units = 8, algorithm = 1, swept = true }
 "src/09_Distance/02_Distance.jl" = { map = 2, units = 13, algorithm = 8, swept = true }
 "src/09_Distance/03_DistanceDistance.jl" = { map = 2, units = 4, algorithm = 3, swept = true }
@@ -194,7 +195,7 @@
 "src/14_UncertaintySets/06_CalibrationRules.jl" = { map = 7, units = 56, swept = false }
 "src/14_UncertaintySets/07_CompactUncertaintySets.jl" = { map = 7, units = 4, swept = false }
 "src/14_UncertaintySets/08_NormBallUncertaintySets.jl" = { map = 7, units = 11, swept = false }
-"src/14_UncertaintySets/09_OrthogonalUncertaintySets.jl" = { map = 7, units = 19, swept = false }
+"src/14_UncertaintySets/09_OrthogonalUncertaintySets.jl" = { map = 7, units = 21, swept = false }
 "src/15_Turnover.jl" = { map = 8, units = 15, algorithm = 8, swept = true }
 "src/16_Fees.jl" = { map = 8, units = 24, algorithm = 19, swept = true }
 "src/17_NetReturnsDrawdowns.jl" = { map = 8, units = 31, algorithm = 8, swept = false }
@@ -304,6 +305,6 @@
 "src/23_Pipeline/03_Pipeline.jl" = { map = 12, units = 27, swept = false }
 "src/23_Pipeline/04_PredictionCV.jl" = { map = 12, units = 14, swept = false }
 "src/23_Pipeline/05_SearchCrossValidation.jl" = { map = 12, units = 9, swept = false }
-"src/24_Plotting.jl" = { map = 13, units = 48, swept = false }
+"src/24_Plotting.jl" = { map = 13, units = 53, swept = false }
 "src/25_Aliases.jl" = { map = 1, units = 132, algorithm = 0, swept = true }
 "src/PortfolioOptimisers.jl" = { map = 1, units = 1, algorithm = 0, swept = true }

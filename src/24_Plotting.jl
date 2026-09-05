@@ -1639,6 +1639,234 @@ Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
   - [`CrossSectionalFactorModel`](@ref)
 """
 function plot_exposure_condition_number end
+"""
+    plot_exposure_correlation(
+        csfm::CrossSectionalFactorModel;
+        nf::Option{<:AbstractVector} = nothing,
+        weighting = BenchmarkWeightMetric(),
+        kwargs...
+    ) -> Plot
+    plot_exposure_correlation(
+        pr::AbstractPriorResult;
+        nf::Option{<:AbstractVector} = nothing,
+        weighting = BenchmarkWeightMetric(),
+        kwargs...
+    ) -> Plot
+
+Plot the time-averaged correlation between every pair of factor exposures as a heatmap.
+
+The figure draws what [`exposure_correlation`](@ref) returns and computes nothing of its own. The colour scale is fixed to the range of a correlation, so two figures of two models are read against the same scale.
+
+# Arguments
+
+  - `csfm`: A cross-sectional factor model block.
+  - `pr`: A prior result whose `rr` is such a block.
+  - `nf`: Factor names of the answer's axis. `nothing` reads them off the block, and falls back to the position of the factor.
+  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history the block is read with.
+  - `kwargs...`: Additional keyword arguments passed to the plotting backend.
+
+# Validation
+
+  - `pr.rr` is not `nothing`.
+
+# Returns
+
+  - `plt::Plot`: The figure.
+
+Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
+
+# Related
+
+  - [`exposure_correlation`](@ref)
+  - [`plot_exposure_vif`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+"""
+function plot_exposure_correlation end
+"""
+    plot_cumulative_exposure_ic(
+        csfm::CrossSectionalFactorModel;
+        nf::Option{<:AbstractVector} = nothing,
+        rank::Bool = true,
+        reduced::Bool = false,
+        kwargs...
+    ) -> Plot
+    plot_cumulative_exposure_ic(
+        pr::AbstractPriorResult;
+        nf::Option{<:AbstractVector} = nothing,
+        rank::Bool = true,
+        reduced::Bool = false,
+        kwargs...
+    ) -> Plot
+
+Plot the running sum of the information coefficient of every factor exposure, one series per factor.
+
+The figure draws the running sum of what [`exposure_ic`](@ref) returns at a horizon of one observation, and computes nothing else of its own. A series that rises through the sample is an exposure that forecast the return, a flat series is one that carried no forecast, and a falling series is one whose forecast had the opposite sign.
+
+A risk factor with an information coefficient near zero is not a bad risk factor. A risk factor is built to explain the covariance and not to predict the mean, so read [`plot_exposure_stability`](@ref) and the variance the factor contributes before you judge one.
+
+# Arguments
+
+  - `csfm`: A cross-sectional factor model block.
+  - `pr`: A prior result whose `rr` is such a block.
+  - `nf`: Factor names of the answer's axis. `nothing` reads them off the block, and falls back to the position of the factor.
+  - `rank`: Take the rank correlation when `true`, and the weighted correlation otherwise.
+  - `reduced`: Map the exposures through the family re-basis of the block before the correlation.
+  - `kwargs...`: Additional keyword arguments passed to the plotting backend.
+
+# Validation
+
+  - `pr.rr` is not `nothing`.
+
+# Returns
+
+  - `plt::Plot`: The figure.
+
+Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
+
+# Related
+
+  - [`exposure_ic`](@ref)
+  - [`exposure_ic_summary`](@ref)
+  - [`plot_exposure_stability`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+"""
+function plot_cumulative_exposure_ic end
+"""
+    plot_exposure_distribution(
+        csfm::CrossSectionalFactorModel;
+        factor::Integer = 1,
+        observation::Option{<:Integer} = nothing,
+        nf::Option{<:AbstractVector} = nothing,
+        kwargs...
+    ) -> Plot
+    plot_exposure_distribution(
+        pr::AbstractPriorResult;
+        factor::Integer = 1,
+        observation::Option{<:Integer} = nothing,
+        nf::Option{<:AbstractVector} = nothing,
+        kwargs...
+    ) -> Plot
+
+Plot the cross-sectional distribution of one factor exposure as a histogram.
+
+The figure draws one slice of the exposure history of the block and computes nothing of its own. `observation` selects one observation, and `nothing` pools every observation into one figure. The entries that are not finite are dropped, so the count of the figure is the coverage of the factor.
+
+# Arguments
+
+  - `csfm`: A cross-sectional factor model block.
+  - `pr`: A prior result whose `rr` is such a block.
+  - `factor`: Position of the factor on the raw factor axis of the block.
+  - `observation`: Position of the observation, or `nothing` to pool every observation.
+  - `nf`: Factor names of the raw axis. `nothing` reads them off the block, and falls back to the position of the factor.
+  - `kwargs...`: Additional keyword arguments passed to the plotting backend.
+
+# Validation
+
+  - `pr.rr` is not `nothing`.
+
+# Returns
+
+  - `plt::Plot`: The figure.
+
+Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
+
+# Related
+
+  - [`exposure_dispersion`](@ref)
+  - [`exposure_coverage`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+"""
+function plot_exposure_distribution end
+"""
+    plot_exposure_dispersion(
+        csfm::CrossSectionalFactorModel;
+        nf::Option{<:AbstractVector} = nothing,
+        weighting = BenchmarkWeightMetric(),
+        kwargs...
+    ) -> Plot
+    plot_exposure_dispersion(
+        pr::AbstractPriorResult;
+        nf::Option{<:AbstractVector} = nothing,
+        weighting = BenchmarkWeightMetric(),
+        kwargs...
+    ) -> Plot
+
+Plot the weighted cross-sectional standard deviation of every factor exposure, one series per factor.
+
+The figure draws what [`exposure_dispersion`](@ref) returns and computes nothing of its own. Read the series and not its level: the level follows the standardisation the exposures were built under, and the series shows the observation at which the panel changed.
+
+# Arguments
+
+  - `csfm`: A cross-sectional factor model block.
+  - `pr`: A prior result whose `rr` is such a block.
+  - `nf`: Factor names of the answer's axis. `nothing` reads them off the block, and falls back to the position of the factor.
+  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history the block is read with.
+  - `kwargs...`: Additional keyword arguments passed to the plotting backend.
+
+# Validation
+
+  - `pr.rr` is not `nothing`.
+
+# Returns
+
+  - `plt::Plot`: The figure.
+
+Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
+
+# Related
+
+  - [`exposure_dispersion`](@ref)
+  - [`plot_exposure_distribution`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+"""
+function plot_exposure_dispersion end
+"""
+    plot_exposure_stability(
+        csfm::CrossSectionalFactorModel;
+        nf::Option{<:AbstractVector} = nothing,
+        step::Integer = 21,
+        weighting = BenchmarkWeightMetric(),
+        kwargs...
+    ) -> Plot
+    plot_exposure_stability(
+        pr::AbstractPriorResult;
+        nf::Option{<:AbstractVector} = nothing,
+        step::Integer = 21,
+        weighting = BenchmarkWeightMetric(),
+        kwargs...
+    ) -> Plot
+
+Plot the stability of every factor exposure, one series per factor.
+
+The figure draws what [`exposure_stability`](@ref) returns and computes nothing of its own. A reference line marks the value an exposure that keeps its ordering of the assets reaches.
+
+# Arguments
+
+  - `csfm`: A cross-sectional factor model block.
+  - `pr`: A prior result whose `rr` is such a block.
+  - `nf`: Factor names of the answer's axis. `nothing` reads them off the block, and falls back to the position of the factor.
+  - `step`: Number of observations between the two cross-sections.
+  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history the block is read with.
+  - `kwargs...`: Additional keyword arguments passed to the plotting backend.
+
+# Validation
+
+  - `pr.rr` is not `nothing`.
+
+# Returns
+
+  - `plt::Plot`: The figure.
+
+Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
+
+# Related
+
+  - [`exposure_stability`](@ref)
+  - [`plot_exposure_dispersion`](@ref)
+  - [`plot_cumulative_exposure_ic`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+"""
+function plot_exposure_stability end
 
 ## ────────────────────────────────────────────────────────────────────────────
 ## Factor attribution
@@ -1900,4 +2128,6 @@ export plot_portfolio_cumulative_returns, plot_asset_cumulative_returns, plot_co
        plot_cs_regression_adjusted_r2, plot_cs_regression_aic, plot_cs_regression_bic,
        plot_cs_regression_t_stats, plot_cs_regression_t_stat_exceedance_rate,
        plot_attribution_vol_contrib, plot_attribution_mu_contrib, plot_attribution_exposure,
-       plot_attribution_mu_vs_vol, plot_exposure_vif, plot_exposure_condition_number
+       plot_attribution_mu_vs_vol, plot_exposure_vif, plot_exposure_condition_number,
+       plot_exposure_correlation, plot_cumulative_exposure_ic, plot_exposure_distribution,
+       plot_exposure_dispersion, plot_exposure_stability
