@@ -146,7 +146,7 @@ A per-asset prediction of the next period's idiosyncratic return, supplied by th
 *Avoid*: `alpha` (§5), which is the Significance Level of a tail; and Expected Returns (above), which is a moment estimated from the sample.
 
 **Return Forecast Estimator**
-A producer of a Return Forecast, from Descriptor Scores and the factor-model block of the Prior it serves, or from a stated vector.
+A producer of a Return Forecast, from Descriptor Scores and the factor-model block of the Prior it serves, or from a stated vector. It scores its Descriptors over the whole history of the carrier and reads the block on the block's own rows, which are the carrier's last rows, so its Result is on the block's axis.
 
 **Descriptor Scores**
 The cross-sectional scores of a set of Descriptors: each winsorised and standardised per observation, regressed out against named Factor Exposures under the estimation mask, and standardised again. The recipe every fitted Return Forecast Estimator starts from.
