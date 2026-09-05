@@ -127,6 +127,7 @@
 "src/08_Moments/45_ReturnForecasts/02_DescriptorScores.jl" = { map = 3, units = 5, swept = false }
 "src/08_Moments/45_ReturnForecasts/03_CustomValueReturnForecast.jl" = { map = 3, units = 3, swept = false }
 "src/08_Moments/45_ReturnForecasts/04_FixedWeightedReturnForecast.jl" = { map = 3, units = 6, swept = false }
+"src/08_Moments/46_CrossSectionalRegressionDiagnostics.jl" = { map = 3, units = 31, swept = false }
 "src/09_Distance/01_Base_Distance.jl" = { map = 2, units = 8, algorithm = 1, swept = true }
 "src/09_Distance/02_Distance.jl" = { map = 2, units = 13, algorithm = 8, swept = true }
 "src/09_Distance/03_DistanceDistance.jl" = { map = 2, units = 4, algorithm = 3, swept = true }
@@ -299,6 +300,6 @@
 "src/23_Pipeline/03_Pipeline.jl" = { map = 12, units = 27, swept = false }
 "src/23_Pipeline/04_PredictionCV.jl" = { map = 12, units = 14, swept = false }
 "src/23_Pipeline/05_SearchCrossValidation.jl" = { map = 12, units = 9, swept = false }
-"src/24_Plotting.jl" = { map = 13, units = 35, swept = false }
+"src/24_Plotting.jl" = { map = 13, units = 43, swept = false }
 "src/25_Aliases.jl" = { map = 1, units = 132, algorithm = 0, swept = true }
 "src/PortfolioOptimisers.jl" = { map = 1, units = 1, algorithm = 0, swept = true }

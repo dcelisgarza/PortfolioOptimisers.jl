@@ -10,7 +10,7 @@ commit = "36ff46bdd9"
 
 [file]
 "ext/PortfolioOptimisersImputeExt.jl" = { code = 6, doc = 0, comment = 4, blank = 3, total = 13 }
-"ext/PortfolioOptimisersPlotsExt.jl" = { code = 1985, doc = 0, comment = 131, blank = 41, total = 2157 }
+"ext/PortfolioOptimisersPlotsExt.jl" = { code = 2109, doc = 0, comment = 142, blank = 42, total = 2293 }
 "src/01_Base/01_DocstringDictionaries.jl" = { code = 1097, doc = 113, comment = 122, blank = 43, total = 1375 }
 "src/01_Base/02_TypeRoots.jl" = { code = 14, doc = 190, comment = 0, blank = 85, total = 289 }
 "src/01_Base/03_PrettyShow.jl" = { code = 117, doc = 138, comment = 0, blank = 76, total = 331 }
@@ -94,6 +94,7 @@ commit = "36ff46bdd9"
 "src/08_Moments/45_ReturnForecasts/02_DescriptorScores.jl" = { code = 96, doc = 141, comment = 0, blank = 58, total = 295 }
 "src/08_Moments/45_ReturnForecasts/03_CustomValueReturnForecast.jl" = { code = 30, doc = 66, comment = 0, blank = 31, total = 127 }
 "src/08_Moments/45_ReturnForecasts/04_FixedWeightedReturnForecast.jl" = { code = 88, doc = 165, comment = 0, blank = 64, total = 317 }
+"src/08_Moments/46_CrossSectionalRegressionDiagnostics.jl" = { code = 431, doc = 611, comment = 0, blank = 284, total = 1326 }
 "src/09_Distance/01_Base_Distance.jl" = { code = 24, doc = 222, comment = 0, blank = 89, total = 335 }
 "src/09_Distance/02_Distance.jl" = { code = 158, doc = 350, comment = 0, blank = 157, total = 665 }
 "src/09_Distance/03_DistanceDistance.jl" = { code = 37, doc = 132, comment = 0, blank = 58, total = 227 }
@@ -266,6 +267,6 @@ commit = "36ff46bdd9"
 "src/23_Pipeline/03_Pipeline.jl" = { code = 422, doc = 399, comment = 6, blank = 215, total = 1042 }
 "src/23_Pipeline/04_PredictionCV.jl" = { code = 172, doc = 132, comment = 15, blank = 63, total = 382 }
 "src/23_Pipeline/05_SearchCrossValidation.jl" = { code = 212, doc = 121, comment = 18, blank = 60, total = 411 }
-"src/24_Plotting.jl" = { code = 57, doc = 974, comment = 102, blank = 280, total = 1413 }
+"src/24_Plotting.jl" = { code = 68, doc = 1159, comment = 105, blank = 369, total = 1701 }
 "src/25_Aliases.jl" = { code = 267, doc = 591, comment = 25, blank = 161, total = 1044 }
 "src/PortfolioOptimisers.jl" = { code = 294, doc = 3, comment = 29, blank = 5, total = 331 }

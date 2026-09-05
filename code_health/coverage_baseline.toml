@@ -85,6 +85,7 @@ commit = "8610300"
 "src/08_Moments/42_FactorExposures/10_DerivedExposure.jl" = { lines = 20, misses = 0 }
 "src/08_Moments/42_FactorExposures/11_OneHotExposure.jl" = { lines = 52, misses = 0 }
 "src/08_Moments/42_FactorExposures/12_ConstantExposure.jl" = { lines = 10, misses = 0 }
+"src/08_Moments/46_CrossSectionalRegressionDiagnostics.jl" = { lines = 339, misses = 0 }
 "src/09_Distance/01_Base_Distance.jl" = { lines = 12, misses = 0 }
 "src/09_Distance/02_Distance.jl" = { lines = 72, misses = 0 }
 "src/09_Distance/03_DistanceDistance.jl" = { lines = 14, misses = 0 }

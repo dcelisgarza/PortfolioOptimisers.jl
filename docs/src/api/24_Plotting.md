@@ -35,5 +35,13 @@ plot_cv_dashboard
 plot_efficient_frontier
 plot_performance_summary
 plot_rolling_drawdowns
+plot_cs_regression_r2
+plot_cs_regression_adjusted_r2
+plot_cs_regression_aic
+plot_cs_regression_bic
+plot_cs_regression_t_stats
+plot_cs_regression_t_stat_exceedance_rate
+plot_exposure_vif
+plot_exposure_condition_number
 relevant_assets
 ```

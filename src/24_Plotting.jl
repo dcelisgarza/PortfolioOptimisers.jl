@@ -1356,6 +1356,291 @@ Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 function plot_rolling_drawdowns end
 
 ## ────────────────────────────────────────────────────────────────────────────
+## Cross-sectional regression diagnostics
+## ────────────────────────────────────────────────────────────────────────────
+"""
+    plot_cs_regression_r2(csfm::CrossSectionalFactorModel; kwargs...) -> Plot
+    plot_cs_regression_r2(pr::AbstractPriorResult; kwargs...) -> Plot
+
+Plot the weighted cross-sectional coefficient of determination of every observation.
+
+The figure draws what [`cs_regression_r2`](@ref) returns and computes nothing of its own. A prior result is forwarded through its `rr` field, which is the block the fit produced.
+
+# Arguments
+
+  - `csfm`: A cross-sectional factor model block.
+  - `pr`: A prior result whose `rr` is such a block.
+  - `kwargs...`: Additional keyword arguments passed to the plotting backend.
+
+# Validation
+
+  - `pr.rr` is not `nothing`.
+
+# Returns
+
+  - `plt::Plot`: The figure.
+
+Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
+
+# Related
+
+  - [`cs_regression_r2`](@ref)
+  - [`plot_cs_regression_adjusted_r2`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+"""
+function plot_cs_regression_r2 end
+"""
+    plot_cs_regression_adjusted_r2(csfm::CrossSectionalFactorModel; kwargs...) -> Plot
+    plot_cs_regression_adjusted_r2(pr::AbstractPriorResult; kwargs...) -> Plot
+
+Plot the adjusted cross-sectional coefficient of determination of every observation.
+
+The figure draws what [`cs_regression_adjusted_r2`](@ref) returns and computes nothing of its own. A prior result is forwarded through its `rr` field, which is the block the fit produced.
+
+# Arguments
+
+  - `csfm`: A cross-sectional factor model block.
+  - `pr`: A prior result whose `rr` is such a block.
+  - `kwargs...`: Additional keyword arguments passed to the plotting backend.
+
+# Validation
+
+  - `pr.rr` is not `nothing`.
+
+# Returns
+
+  - `plt::Plot`: The figure.
+
+Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
+
+# Related
+
+  - [`cs_regression_adjusted_r2`](@ref)
+  - [`plot_cs_regression_r2`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+"""
+function plot_cs_regression_adjusted_r2 end
+"""
+    plot_cs_regression_aic(csfm::CrossSectionalFactorModel; kwargs...) -> Plot
+    plot_cs_regression_aic(pr::AbstractPriorResult; kwargs...) -> Plot
+
+Plot the Akaike information criterion of every cross-sectional fit.
+
+The figure draws what [`cs_regression_aic`](@ref) returns and computes nothing of its own. A prior result is forwarded through its `rr` field, which is the block the fit produced.
+
+# Arguments
+
+  - `csfm`: A cross-sectional factor model block.
+  - `pr`: A prior result whose `rr` is such a block.
+  - `kwargs...`: Additional keyword arguments passed to the plotting backend.
+
+# Validation
+
+  - `pr.rr` is not `nothing`.
+
+# Returns
+
+  - `plt::Plot`: The figure.
+
+Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
+
+# Related
+
+  - [`cs_regression_aic`](@ref)
+  - [`plot_cs_regression_bic`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+"""
+function plot_cs_regression_aic end
+"""
+    plot_cs_regression_bic(csfm::CrossSectionalFactorModel; kwargs...) -> Plot
+    plot_cs_regression_bic(pr::AbstractPriorResult; kwargs...) -> Plot
+
+Plot the Bayesian information criterion of every cross-sectional fit.
+
+The figure draws what [`cs_regression_bic`](@ref) returns and computes nothing of its own. A prior result is forwarded through its `rr` field, which is the block the fit produced.
+
+# Arguments
+
+  - `csfm`: A cross-sectional factor model block.
+  - `pr`: A prior result whose `rr` is such a block.
+  - `kwargs...`: Additional keyword arguments passed to the plotting backend.
+
+# Validation
+
+  - `pr.rr` is not `nothing`.
+
+# Returns
+
+  - `plt::Plot`: The figure.
+
+Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
+
+# Related
+
+  - [`cs_regression_bic`](@ref)
+  - [`plot_cs_regression_aic`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+"""
+function plot_cs_regression_bic end
+"""
+    plot_cs_regression_t_stats(
+        csfm::CrossSectionalFactorModel;
+        nf::Option{<:AbstractVector} = nothing,
+        kwargs...
+    ) -> Plot
+    plot_cs_regression_t_stats(
+        pr::AbstractPriorResult;
+        nf::Option{<:AbstractVector} = nothing,
+        kwargs...
+    ) -> Plot
+
+Plot the t-statistic of every factor return, one series per factor.
+
+The figure draws what [`cs_regression_t_stats`](@ref) returns and computes nothing of its own. The series are labelled by the factor names of the answer's axis, which [`cs_diagnostic_factor_names`](@ref) resolves, so a block that carries a family re-basis is labelled on the reduced axis.
+
+# Arguments
+
+  - `csfm`: A cross-sectional factor model block.
+  - `pr`: A prior result whose `rr` is such a block.
+  - `nf`: Factor names of the answer's axis. `nothing` reads them off the block, and falls back to the position of the factor.
+  - `kwargs...`: Additional keyword arguments passed to the plotting backend.
+
+# Validation
+
+  - `pr.rr` is not `nothing`.
+
+# Returns
+
+  - `plt::Plot`: The figure.
+
+Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
+
+# Related
+
+  - [`cs_regression_t_stats`](@ref)
+  - [`plot_cs_regression_t_stat_exceedance_rate`](@ref)
+  - [`cs_diagnostic_factor_names`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+"""
+function plot_cs_regression_t_stats end
+"""
+    plot_cs_regression_t_stat_exceedance_rate(
+        csfm::CrossSectionalFactorModel;
+        nf::Option{<:AbstractVector} = nothing,
+        threshold::Number = 2,
+        kwargs...
+    ) -> Plot
+    plot_cs_regression_t_stat_exceedance_rate(
+        pr::AbstractPriorResult;
+        nf::Option{<:AbstractVector} = nothing,
+        threshold::Number = 2,
+        kwargs...
+    ) -> Plot
+
+Plot the fraction of observations at which each factor's t-statistic exceeds a threshold.
+
+The figure draws what [`cs_regression_t_stat_exceedance_rate`](@ref) returns and computes nothing of its own. A reference line marks the rate a factor of no explanatory power would reach.
+
+# Arguments
+
+  - `csfm`: A cross-sectional factor model block.
+  - `pr`: A prior result whose `rr` is such a block.
+  - `nf`: Factor names of the answer's axis. `nothing` reads them off the block, and falls back to the position of the factor.
+  - `threshold`: Absolute t-statistic above which an observation counts as significant.
+  - `kwargs...`: Additional keyword arguments passed to the plotting backend.
+
+# Validation
+
+  - `pr.rr` is not `nothing`.
+
+# Returns
+
+  - `plt::Plot`: The figure.
+
+Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
+
+# Related
+
+  - [`cs_regression_t_stat_exceedance_rate`](@ref)
+  - [`plot_cs_regression_t_stats`](@ref)
+  - [`cs_diagnostic_factor_names`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+"""
+function plot_cs_regression_t_stat_exceedance_rate end
+"""
+    plot_exposure_vif(
+        csfm::CrossSectionalFactorModel;
+        nf::Option{<:AbstractVector} = nothing,
+        kwargs...
+    ) -> Plot
+    plot_exposure_vif(
+        pr::AbstractPriorResult;
+        nf::Option{<:AbstractVector} = nothing,
+        kwargs...
+    ) -> Plot
+
+Plot the variance inflation factor of every factor, one series per factor.
+
+The figure draws what [`exposure_vif`](@ref) returns and computes nothing of its own. A reference line marks the value an orthogonal design reaches.
+
+# Arguments
+
+  - `csfm`: A cross-sectional factor model block.
+  - `pr`: A prior result whose `rr` is such a block.
+  - `nf`: Factor names of the answer's axis. `nothing` reads them off the block, and falls back to the position of the factor.
+  - `kwargs...`: Additional keyword arguments passed to the plotting backend.
+
+# Validation
+
+  - `pr.rr` is not `nothing`.
+
+# Returns
+
+  - `plt::Plot`: The figure.
+
+Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
+
+# Related
+
+  - [`exposure_vif`](@ref)
+  - [`plot_exposure_condition_number`](@ref)
+  - [`cs_diagnostic_factor_names`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+"""
+function plot_exposure_vif end
+"""
+    plot_exposure_condition_number(csfm::CrossSectionalFactorModel; kwargs...) -> Plot
+    plot_exposure_condition_number(pr::AbstractPriorResult; kwargs...) -> Plot
+
+Plot the condition number of the cross-sectional design of every observation.
+
+The figure draws what [`exposure_condition_number`](@ref) returns and computes nothing of its own. The vertical axis is logarithmic, because the condition number of a nearly collinear design is many orders of magnitude above that of a well conditioned one.
+
+# Arguments
+
+  - `csfm`: A cross-sectional factor model block.
+  - `pr`: A prior result whose `rr` is such a block.
+  - `kwargs...`: Additional keyword arguments passed to the plotting backend.
+
+# Validation
+
+  - `pr.rr` is not `nothing`.
+
+# Returns
+
+  - `plt::Plot`: The figure.
+
+Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
+
+# Related
+
+  - [`exposure_condition_number`](@ref)
+  - [`plot_exposure_vif`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+"""
+function plot_exposure_condition_number end
+
+## ────────────────────────────────────────────────────────────────────────────
 ## Internal helpers (no Plots.jl dependency)
 ## ────────────────────────────────────────────────────────────────────────────
 """
@@ -1410,4 +1695,7 @@ export plot_portfolio_cumulative_returns, plot_asset_cumulative_returns, plot_co
        plot_rolling_measure, plot_weight_stability, plot_cv_scores, plot_turnover,
        plot_prior, plot_factor_mu, plot_benchmark, plot_coskewness, plot_cokurtosis,
        plot_portfolio_dashboard, plot_cv_dashboard, plot_efficient_frontier,
-       plot_performance_summary, plot_rolling_drawdowns
+       plot_performance_summary, plot_rolling_drawdowns, plot_cs_regression_r2,
+       plot_cs_regression_adjusted_r2, plot_cs_regression_aic, plot_cs_regression_bic,
+       plot_cs_regression_t_stats, plot_cs_regression_t_stat_exceedance_rate,
+       plot_exposure_vif, plot_exposure_condition_number
