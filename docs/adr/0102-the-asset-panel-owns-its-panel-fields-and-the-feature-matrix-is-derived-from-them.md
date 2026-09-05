@@ -119,7 +119,9 @@ and returns the labels beside the matrix, and `feature_matrix_panel(nz, Z)`, its
 one numeric field per column, under that column's own name. The inverse is how a routine that
 produces a bare matrix, a producer or a meta-optimiser collapse onto a synthetic universe, puts
 that matrix on a carrier. The selector build replaces `panel_feature_matrix` with the three verbs
-above and keeps the inverse.
+above. The producer build deletes the inverse with the shim, because the collapse of
+[issue #807](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/807) returns a panel and
+a producer builds its tensor field directly, so the inverse loses its last reader.
 
 ### The carriers hold one field, `pnl`
 
@@ -264,18 +266,33 @@ A produced panel never meets a view: the producer is configuration, and it refit
 subproblem's own prior and returns. So the square-case rule of the section below acts on a
 hand-supplied adjacency only.
 
-### What the fold ticket owns
+### A panel under an asset view, a fold and a meta-optimiser collapse
 
-Both `port_opt_view` arities return views of the fields and the masks. The square case, an
-adjacency whose columns are the asset names, is carried by the carrier build as one numeric field
-per asset, and `port_opt_view(pnl, i, j, sq)` selects the field vector by the same asset index
-when `sq` says the fields *are* the assets. The carrier reads `sq` from `features_are_assets` over
-the panel's derived names, exactly as it read it over `nz` before. A tensor field whose label axis
-a view slices is the other candidate, and the fold ticket of map #802 chooses between them. The meta-optimiser collapse, preselection and the assembly seam are
-decided by the fold ticket of map #802. Per-field storage makes one question visible that the
-dense layout hid: a convex combination of one-hot columns is a membership fraction, but a convex
-combination of integer codes means nothing, so the fold ticket must say what a collapsed
-categorical field is.
+[Issue #807](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/807) decided the rule,
+and ADR 0045's eleventh amendment records it against the distance. What is a fact about the panel
+is stated here.
+
+Both `port_opt_view` arities return views of every field's values and observed mask and of the two
+masks, and a static panel ignores the observation index. **The square case is derived at the view,
+by name**: the carrier's view hands its asset names to the panel view, and a tensor field whose
+labels equal them is sliced on its label axis by the same asset index, with its labels and groups.
+Nothing records the fact. A marker on the field was rejected because a declaration and the labels
+are two things that must agree, which is fact 1 again; one numeric field per asset was rejected
+because it cuts one quantity into parts, which is the reason a producer returns a tensor field.
+
+**The collapse acts one field at a time, and returns a panel.** A numeric field collapses to a
+numeric field, and a tensor field to a tensor field, one label at a time, two-sided and renamed
+after the synthetic assets when its labels are the asset names. A categorical field collapses to a
+**tensor field of membership fractions**, with the same name, the axis `"level"` and the levels as
+labels, because a convex combination of a one-hot column is the share of the synthetic asset's
+weight in that level, and a convex combination of integer codes means nothing. A consumer that
+dispatches on a categorical field finds none on a synthetic universe and refuses. **A mask
+collapses as the support of its convex combination**, `(Wᵀ · m) .> 0`, so the types and the
+selector namespace survive the collapse, and the subset invariant survives with no second check.
+
+The assembly seam recovers a fold's rows through `feature_row_indices` and stacks the fold panels
+along the observation axis field by field, with all-true universe masks, so a collapsed panel on
+the cross-validated path is time-varying and the static-shape coupling above holds.
 
 ## Consequences
 
@@ -297,4 +314,8 @@ categorical field is.
   `AbstractFeatureValue`, `UniverseSets.zkey` and `feature_universe` have no reader. `UniverseSets`
   loses one name field and its constructor loses one positional, and every doctest that prints a
   `UniverseSets` loses its `zkey` row.
+- **`feature_matrix_panel` is deleted** with its export, its API entry and its catalogue entry,
+  once the producer build removes the shim that reads it. `features_are_assets` compares one tensor
+  field's labels against the asset names, and the matrix collapse gives way to a collapse over the
+  panel's fields.
 - **Panel persistence is not built.** It is in scope for map #643 and does not gate its close.

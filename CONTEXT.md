@@ -114,7 +114,7 @@ The one carrier of per-asset data that is not a return series: named Panel Field
 *Avoid*: reading `pnl` as profit-and-loss; the field holds the panel. And reading the panel as one matrix: it is a set of fields, and the Feature Matrix is stacked from them. And a graded or weighted membership matrix as anything but a tensor Panel Field the caller authors as data.
 
 **Panel Field**
-One named quantity of an Asset Panel, which owns its values and its observed mask: a market capitalisation (numeric), a sector classification (categorical, integer codes over declared levels), a factor exposure tensor (tensor, with third-axis labels and optional groups). A Panel Field whose blanks were filled carries an observed mask saying which cells the fill touched. One whose policy refuses blanks carries none.
+One named quantity of an Asset Panel, which owns its values and its observed mask: a market capitalisation (numeric), a sector classification (categorical, integer codes over declared levels), a factor exposure tensor (tensor, with third-axis labels and optional groups). A Panel Field whose blanks were filled carries an observed mask saying which cells the fill touched. One whose policy refuses blanks carries none. Under an asset view a Panel Field follows the universe, and a tensor field whose labels are the asset names is sliced on its label axis too. Under a meta-optimiser collapse a Panel Field becomes its convex combination on the Sub-Portfolios: a categorical field becomes a tensor field of membership fractions over its levels, and a mask holds where any weighted member holds.
 
 **Implied Volatility**
 A forward-looking estimate of an asset's expected price fluctuation, derived from current option prices. Not a historical measurement.

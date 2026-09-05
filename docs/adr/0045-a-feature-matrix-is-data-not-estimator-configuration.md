@@ -998,3 +998,84 @@ The fourth amendment above is released history and stands as written. `CONTEXT.m
 the bridge and the lift. The lift is built by
 [#809](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/809), and the bridge and the
 deletions by [#810](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/810).
+
+## Amendment (2026-09-05): a panel under an asset view, a fold and a meta-optimiser collapse
+
+Map [#802](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/802)'s fifth decision,
+[#807](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/807), decides what the Asset
+Panel does at the four places a feature matrix was sliced or aggregated: an asset view, a
+cross-validation fold, a meta-optimiser collapse and preselection. Every option was judged from
+zero, on architecture, maintainability, ergonomics and performance. The reference implementation
+slices its panel by observation as a view and by asset as a copy, never slices a third axis by
+asset, and has no collapse onto a synthetic universe, so every decision here adds capability.
+
+**The view reaches every field, and nothing is copied.** Both `port_opt_view` arities on the panel
+view each field's values and observed mask and the two universe masks. A static panel has no
+observation axis and ignores the observation index. This is what the carrier build shipped, and it
+stands.
+
+**The square case is derived at the view, by name.** The carrier's view hands its asset names to
+the panel view, `port_opt_view(pnl, i, j, nx)`, and a tensor field whose labels equal `nx` is
+sliced on its label axis by the same asset index, together with its labels and its groups. Decision
+4's rule therefore acts per field, and the comparison is by name, as decision 4 states. Nothing
+records the fact: the first amendment's deletion of `z_sq` is kept, and no carrier gains a flag.
+A marker on the field, checked against `nx` by the carrier, was rejected because a declaration and
+the labels are two things that must agree, which is the shape ADR 0102 rejected, and because a
+caller who omits the marker gets a wrong distance in silence. One numeric field per asset was
+rejected because it cuts one quantity into `N` parts, makes a selector name assets as fields, and
+makes the collapse rename `N` fields. `features_are_assets` becomes the comparison of one tensor
+field's labels against `nx`.
+
+**The collapse acts on the panel one field at a time, and returns a panel.** The second amendment's
+kernel is kept: a feature is intensive, so a synthetic asset's value is the convex combination of
+its members' values under `synthetic_asset_weights`.
+
+- A numeric field collapses to a numeric field of the same name.
+- A tensor field collapses to a tensor field of the same name and labels, one label at a time.
+  When its labels are the asset names the collapse is two-sided, its labels are renamed after the
+  synthetic assets, and its groups are dropped, so the square case holds one level up.
+- A categorical field collapses to a **tensor field of membership fractions**: the same name, the
+  axis `"level"`, the levels as labels, and `Wᵀ · onehot(codes)` as values. A one-hot column of the
+  Feature Matrix is a `0`/`1` feature, and its convex combination is the share of the synthetic
+  asset's weight in that level. So the value columns of the collapsed panel's Feature Matrix equal
+  the second amendment's collapse of the original panel's Feature Matrix, and a selector written
+  for the inner problem, `"sector"` or `"sector" => ["Tech"]`, resolves on the outer panel with no
+  change. The majority level as a categorical field was rejected because it loses the fractions and
+  needs a tie rule. A refusal was rejected because a taxonomy is the first use of a feature
+  distance, and it could not reach an outer problem.
+
+**A mask collapses as the support of its convex combination**, `(Wᵀ · m) .> 0`: a synthetic asset
+is observed, active or in estimation at an observation when any member with weight is. One kernel
+serves values and masks, the types and the selector namespace are preserved, and the subset
+invariant between the estimation mask and the active mask survives with no second check. All-true
+masks were rejected because they lose the fill history and the universe history. The full share,
+`.== 1`, was rejected because one late-listed member makes a cluster inactive until it lists. A
+coverage fraction stored as a numeric field was rejected because the observed mask is `Bool` by
+type, and a field named for a mask collides with the ninth amendment's label grammar.
+
+**Preselection is as the eighth amendment decided.** `ClusterGroups` passes the data carrier alone
+to the kernel, and a `RegressionPanel` on the distance with no prior raises an `IsNothingError`
+that names the site. The third amendment stands: preselection reads the data carrier and carries
+no source selector.
+
+**The assembly seam keeps its shape.** `rebuild_returns_result` makes the same panel collapse
+`prepare_outer_rd` makes, once per fold, from the original unsliced panel and the fold's
+`assets × sub-portfolios` weight matrix; it recovers the fold's rows from `ts` through
+`feature_row_indices`, which is unchanged; and it stacks the fold panels along the observation axis
+field by field. A static source is repeated to the fold's row count, and the stacked panel takes
+all-true universe masks, so the cross-validated path is time-varying by construction, as the second
+amendment states, and the fifth amendment's criterion holds: `cv` is execution control, and both
+seams make one call.
+
+Of the first five amendments, this one keeps the first (no squareness flag on any carrier), the
+second (a convex collapse, two-sided when square, with the feature axis renamed after the synthetic
+assets, and a time-varying fold path), the third (preselection reads the data carrier and has no
+`z_src`) and the fifth (the collapse at the assembly seam, from the unsliced carrier, by the fold's
+timestamps). The fourth was deleted by the tenth.
+
+`feature_matrix_panel` loses its last reader, because the collapse returns a panel and a producer
+builds its tensor field directly, and it is deleted with its export, its API entry and its
+catalogue entry. A caller with a bare matrix builds one `TensorPanelField`, or one
+`NumericPanelField` per column. `CONTEXT.md` §2's **Panel Field** states the view and the
+collapse. The build is
+[#810](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/810).
