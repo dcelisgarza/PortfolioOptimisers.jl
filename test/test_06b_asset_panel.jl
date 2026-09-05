@@ -435,3 +435,64 @@ end
     @test PortfolioOptimisers.panel_field(prices_to_returns(P; pnl = sp).pnl, "mcap").vals ==
           [1.0, 2.0, 3.0]
 end
+@testset "PricesResult carries the panel through both views" begin
+    ts = [Dates.Date(2020, 1, i) for i in 1:3]
+    P = TimeSeries.TimeArray(ts, [100.0 100.0 100.0; 110.0 90.0 100.0; 121.0 81.0 100.0],
+                             [:A, :B, :C])
+    # vals is column-major, so vals == [1 4 7; 2 5 8; 3 6 9] and every entry names its own
+    # position. The two masks differ from each other, so a slice that dropped one of them
+    # cannot pass by matching the other.
+    amsk = [true true false; true false true; false true true]
+    emsk = [true false false; true false false; false true true]
+    pnl = asset_panel([NumericPanelInput(; name = "mcap", vals = reshape(1.0:9.0, 3, 3))];
+                      amsk = amsk, emsk = emsk)
+    pr = PricesResult(; X = P, pnl = pnl)
+    @test pr.pnl === pnl
+
+    # The panel describes the carrier's universe, so both its axes are the price series'.
+    @test_throws DimensionMismatch PricesResult(; X = P,
+                                                pnl = asset_panel([NumericPanelInput(;
+                                                                                     name = "mcap",
+                                                                                     vals = ones(3,
+                                                                                                 2))];
+                                                                  amsk = trues(3, 2),
+                                                                  emsk = trues(3, 2)))
+    @test_throws DimensionMismatch PricesResult(; X = P,
+                                                pnl = asset_panel([NumericPanelInput(;
+                                                                                     name = "mcap",
+                                                                                     vals = ones(2,
+                                                                                                 3))];
+                                                                  amsk = trues(2, 3),
+                                                                  emsk = trues(2, 3)))
+    # A carrier with no panel checks nothing.
+    @test isnothing(PricesResult(; X = P).pnl)
+
+    # The timestamp arity keeps every asset and slices both masks to the rows it keeps.
+    vt = PortfolioOptimisers.port_opt_view(pr, ts[2:3])
+    @test vt.pnl.amsk == amsk[2:3, :]
+    @test vt.pnl.emsk == emsk[2:3, :]
+    @test PortfolioOptimisers.panel_field(vt.pnl, "mcap").vals == [2.0 5.0 8.0; 3.0 6.0 9.0]
+
+    # The observations-then-assets arity slices both mask columns as well.
+    va = PortfolioOptimisers.port_opt_view(pr, ts[2:3], [1, 3])
+    @test va.pnl.amsk == amsk[2:3, [1, 3]]
+    @test va.pnl.emsk == emsk[2:3, [1, 3]]
+    @test PortfolioOptimisers.panel_field(va.pnl, "mcap").vals == [2.0 8.0; 3.0 9.0]
+    @test panel_feature_matrix(va.pnl)[1] == panel_feature_matrix(pr.pnl)[1]
+
+    # The conversion costs the first observation, so the panel comes back one row shorter.
+    rd = prices_to_returns(PricesToReturns(), pr)
+    @test size(rd.X, 1) == size(values(P), 1) - 1
+    @test rd.pnl.amsk == amsk[2:3, :]
+    @test rd.pnl.emsk == emsk[2:3, :]
+    @test PortfolioOptimisers.panel_field(rd.pnl, "mcap").vals == [2.0 5.0 8.0; 3.0 6.0 9.0]
+
+    # A static panel binds the asset axis alone, so a timestamp window leaves it whole.
+    sp = feature_matrix_panel(["f1", "f2"], [1.0 2.0; 3.0 4.0; 5.0 6.0])
+    prs = PricesResult(; X = P, pnl = sp)
+    @test panel_feature_matrix(PortfolioOptimisers.port_opt_view(prs, ts[2:3]).pnl)[2] ==
+          [1.0 2.0; 3.0 4.0; 5.0 6.0]
+    @test panel_feature_matrix(PortfolioOptimisers.port_opt_view(prs, ts[2:3], [1, 3]).pnl)[2] ==
+          [1.0 2.0; 5.0 6.0]
+    @test isnothing(prices_to_returns(PricesToReturns(), prs).pnl.amsk)
+end
