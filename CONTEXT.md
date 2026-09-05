@@ -348,6 +348,10 @@ The orthogonal complement of the column space of the loading matrix, taken under
 The cross-sectional weighting under which the loading matrix's span and its Orthogonal Subspace (above) are taken: the benchmark weights, the regression weights, the inverse idiosyncratic variances, or the identity, each read off the Prior Result's factor block at its latest observation. A caller states it as a marker, and the default is the inverse idiosyncratic variance.
 *Avoid*: the weights of a Cross-Sectional Regression (§3.4), which the prior's fit computes per observation; a metric only selects a quantity the fit already stored.
 
+**Orthogonal Scaling**
+The shape a mean Uncertainty Set takes inside the Orthogonal Subspace (above): the identity, which gives every orthogonal direction the same uncertainty, or the idiosyncratic covariance projected onto the subspace, which gives a noisy direction more than a quiet one. A caller states it as a marker, and the default is the identity. It changes the shape of the set and not the subspace the set lives in, so the radius reads the same rank either way.
+*Avoid*: Orthogonality Metric (above), which fixes which subspace the set lives in; a scaling fixes only its shape inside that subspace.
+
 **ucs Triple**
 The three ways to ask an Uncertainty Set estimator for its sets: `ucs` for the mean and covariance sets as a pair, `mu_ucs` for the mean half, `sigma_ucs` for the covariance half. Most estimators fit from returns data; an estimator that reads the optimisation's own Prior Result, as one confined to an Orthogonal Subspace must, answers the same three verbs from that result instead, and the optimiser hands it the prior where it builds the constraint.
 

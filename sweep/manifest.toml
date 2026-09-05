@@ -191,6 +191,7 @@
 "src/14_UncertaintySets/06_CalibrationRules.jl" = { map = 7, units = 56, swept = false }
 "src/14_UncertaintySets/07_CompactUncertaintySets.jl" = { map = 7, units = 4, swept = false }
 "src/14_UncertaintySets/08_NormBallUncertaintySets.jl" = { map = 7, units = 11, swept = false }
+"src/14_UncertaintySets/09_OrthogonalUncertaintySets.jl" = { map = 7, units = 19, swept = false }
 "src/15_Turnover.jl" = { map = 8, units = 15, algorithm = 8, swept = true }
 "src/16_Fees.jl" = { map = 8, units = 24, algorithm = 19, swept = true }
 "src/17_NetReturnsDrawdowns.jl" = { map = 8, units = 31, algorithm = 8, swept = false }
