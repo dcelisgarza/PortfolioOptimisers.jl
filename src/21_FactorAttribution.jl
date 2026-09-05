@@ -869,11 +869,11 @@ Decompose a portfolio's volatility and mean return over the factors of a factor 
 
 The verb reads the weights and the factor model block, and returns one [`FactorAttributionResult`](@ref). The **predicted** methods take no return series and decompose the moments the optimiser saw. The **realised** methods take one, and decompose the history the portfolio actually produced. Each realised method has a **rolling** twin that takes a positional `window` and returns one Result per window.
 
-**The predicted totals anchor on the prior result, not on the model.** `pr.mu` and `pr.sigma` are what the optimiser saw and what [`expected_return`](@ref) and [`expected_risk`](@ref) report, so they are the totals. A wrapping prior replaces them while it forwards the block unchanged, so the model no longer reproduces them, and the two gaps `dot(w, pr.mu - M * fpr.mu - b)` and `dot(w, (pr.sigma - M * F * M' - D) * w) / sigma_P` land in the unattributed remainder. The remainder is therefore present on the predicted side too, and it is at rounding level on a plain fit.
+**The predicted totals anchor on the prior result, not on the model.** `pr.mu` and `pr.sigma` are what the optimiser saw and what [`expected_return`](@ref) and [`expected_risk`](@ref) report, so they are the totals. A wrapping prior replaces them while it forwards the block unchanged, so the model no longer reproduces them, and the two gaps `dot(w, pr.mu - M * fpr.mu - b)` and `dot(w, (pr.sigma - M * F * M' - D) * w) / sigma_P` land in the unattributed remainder. The remainder is therefore present on the predicted side too, and it is at rounding level on a plain fit. ADR 0113 records the rule and the four alternatives it refused.
 
 **Every source of unexplained return lands in the remainder, and no guard reports it.** On the realised side the identity per observation is `portfolio return = systematic + idiosyncratic + unattributed`, and the remainder holds the per-observation intercept share `b_t * sum(w)`, the fees, the cash, the weight drift inside a period and the exposure lag. A large `pct_var` on the remainder means the model does not explain the portfolio, and the reader draws that conclusion.
 
-**The factor shares disagree with [`factor_risk_contribution`](@ref), and the disagreement is the leakage term.** A risk contribution re-bases the whole portfolio risk into the factor basis and charges the residual leakage to the factors, while this decomposition holds the idiosyncratic part apart as its own component. The two therefore report different factor rows on the same portfolio, and neither is wrong.
+**The factor shares disagree with [`factor_risk_contribution`](@ref), and the disagreement is one term.** That verb computes `(M' w)_k * (pinv(M) * grad)_k` with `grad` a finite difference of any risk measure, so for the variance and `sigma = M F M' + D` it reads `grad = (M F M' w + D w) / sigma_P` and its factor share is `(M' w)_k * (F M' w + pinv(M) D w)_k / sigma_P`. This decomposition's factor share is the first term alone, `(M' w)_k * (F M' w)_k / sigma_P`, and it holds the second, the **leakage** `(M' w)_k * (pinv(M) D w)_k / sigma_P`, in the idiosyncratic component instead. The two therefore agree exactly when `pinv(M) D w` is zero, and neither is wrong: one is an Euler decomposition through a pseudo-inverse, generic in the risk measure, and this one is the analytic model split, specific to the variance.
 
 # Algorithm
 
@@ -970,7 +970,9 @@ function factor_attribution(w::VecNum, pr::AbstractPriorResult; assets::Bool = f
                                bexp .* Fb ./ total_var, mu_f .* sc.s1,
                                bexp .* mu_f .* sc.s1, nothing)
     fmbd = attribution_family_axis(attribution_families(rr), fbd, nothing, nothing)
-    abd, afc = predicted_attribution_assets(assets, w, M, F, mu_f, D, bp, Fb, sigma_p, sc)
+    abd, afc = predicted_attribution_assets(assets, w,
+                                            (; M = M, F = F, mu_f = mu_f, D = D, bp = bp),
+                                            Fb, sigma_p, sc)
     return FactorAttributionResult(sys, idio, unattr, total, fbd, fmbd, abd, afc, false,
                                    ppy)
 end
@@ -979,7 +981,7 @@ function factor_attribution(res::OptimisationResult, pr::Option{<:Pr_RR} = nothi
     return factor_attribution(res.w, extract_pr(res, pr); kwargs...)
 end
 """
-    predicted_attribution_assets(assets::Bool, w, M, F, mu_f, D, bp, Fb, sigma_p, sc)
+    predicted_attribution_assets(assets::Bool, w, mdl::NamedTuple, Fb, sigma_p, sc)
 
 Return the asset axis and the asset-by-factor matrices of a predicted attribution.
 
@@ -989,11 +991,7 @@ The asset axis decomposes the **model**, not the anchors: every row reads `M F M
 
   - `assets`: Whether to compute the two answers at all.
   - `w`: Portfolio weights.
-  - `M`: Raw loadings, `assets × factors`.
-  - `F`: Factor covariance.
-  - `mu_f`: Expected factor returns.
-  - `D`: Idiosyncratic covariance.
-  - `bp`: Factor-orthogonal expected return.
+  - `mdl`: The factor model: the raw loadings `M`, the factor covariance `F`, the expected factor returns `mu_f`, the idiosyncratic covariance `D` and the factor-orthogonal expected return `bp`.
   - `Fb`: The product of the factor covariance and the portfolio exposure.
   - `sigma_p`: Portfolio volatility.
   - `sc`: The two annualisation factors.
@@ -1009,12 +1007,12 @@ The asset axis decomposes the **model**, not the anchors: every row reads `M F M
   - [`AssetAttributionBreakdown`](@ref)
   - [`AssetFactorContribution`](@ref)
 """
-function predicted_attribution_assets(assets::Bool, w::VecNum, M::MatNum, F::MatNum,
-                                      mu_f::VecNum, D, bp::VecNum, Fb::VecNum,
+function predicted_attribution_assets(assets::Bool, w::VecNum, mdl::NamedTuple, Fb::VecNum,
                                       sigma_p::Number, sc::NamedTuple)
     if !assets
         return nothing, nothing
     end
+    M, F, mu_f, D, bp = mdl.M, mdl.F, mdl.mu_f, mdl.D, mdl.bp
     sys_cov = M * F * transpose(M)
     full_cov = sys_cov + D
     cov_p = full_cov * w

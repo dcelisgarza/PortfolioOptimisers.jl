@@ -889,8 +889,10 @@ function attribution_scatter(V::MatNum, keep, nr::Integer)
     return S
 end
 """
-    attribution_family_errors(fam::Nothing, g, Vf, scale::Number, T::Integer)
-    attribution_family_errors(fam::VecStr, g::MatNum, Vf, scale::Number, T::Integer)
+    attribution_family_errors(fam::Nothing, g::MatNum, Vf::AbstractVector{<:MatNum},
+                              scale::Number, T::Integer)
+    attribution_family_errors(fam::VecStr, g::MatNum, Vf::AbstractVector{<:MatNum},
+                              scale::Number, T::Integer)
 
 Return the standard error of each family's mean return contribution.
 
@@ -913,19 +915,28 @@ A family's contribution sums the contributions of its factors, so its error read
   - [`attribution_standard_errors`](@ref)
   - [`attribution_family_index`](@ref)
 """
-function attribution_family_errors(::Nothing, ::Any, ::Any, ::Number, ::Integer)::Nothing
+function attribution_family_errors(::Nothing, ::MatNum, ::AbstractVector{<:MatNum},
+                                   ::Number, ::Integer)::Nothing
     return nothing
 end
-function attribution_family_errors(fam::VecStr, g::MatNum, Vf, scale::Number, T::Integer)
+function attribution_family_errors(fam::VecStr, g::MatNum, Vf::AbstractVector{<:MatNum},
+                                   scale::Number, T::Integer)
     fi = attribution_family_index(fam)
-    nan = convert(typeof(scale), NaN)
-    return [if l == ATTRIBUTION_CURRENCY_FAMILY
-                nan
-            else
-                scale * sqrt(max(zero(scale),
-                                 sum(LinearAlgebra.dot(view(g, t, i), view(Vf[t], i, i), view(g, t, i)) for t in 1:T)))
-            end
-            for (l, i) in zip(fi.labels, fi.idx)]
+    Tf = typeof(float(scale))
+    out = Vector{Tf}(undef, length(fi.labels))
+    for j in eachindex(fi.labels)
+        if fi.labels[j] == ATTRIBUTION_CURRENCY_FAMILY
+            out[j] = Tf(NaN)
+            continue
+        end
+        i = fi.idx[j]
+        v = zero(Tf)
+        for t in 1:T
+            v += Tf(LinearAlgebra.dot(view(g, t, i), view(Vf[t], i, i), view(g, t, i)))
+        end
+        out[j] = Tf(scale) * sqrt(max(zero(Tf), v))
+    end
+    return out
 end
 """
     realised_attribution_assets(assets::Bool, W::VecNum_MatNum, al::NamedTuple,

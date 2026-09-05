@@ -323,6 +323,25 @@ end
     end
 end
 
+@testset "A collinear cross-section takes the pseudo-inverse" begin
+    # The market intercept is the sum of the one-hot industry block, so the Gram matrix of every
+    # observation is rank-deficient and the sandwich falls back to the pseudo-inverse. The answer is
+    # the minimum-norm one, so it is finite; a plain solve would return an arbitrarily large number.
+    PO = PortfolioOptimisers
+    pr, rd = fa_prior()
+    w = fa_weights(pr)
+    al = PO.attribution_align(pr.rr, size(rd.X, 1))
+    G = transpose(view(al.B, 1, :, :)) * Diagonal(view(al.rw, 1, :)) * view(al.B, 1, :, :)
+    @test PO.cross_sectional_rank(G) < size(G, 2)
+    fa = factor_attribution(w, pr, rd.X; se = true)
+    @test isfinite(fa.sys.mu_se)
+    @test fa.sys.mu_se == fa.idio.mu_se
+    @test all(isfinite, fa.fbd.mu_se)
+    @test all(isfinite, fa.fmbd.mu_se)
+    # The error of a mean return contribution is small beside the contribution itself.
+    @test fa.sys.mu_se < 1
+end
+
 @testset "The remainder holds the intercept, the fee and the drift" begin
     PO = PortfolioOptimisers
     pr, rd = fa_prior()

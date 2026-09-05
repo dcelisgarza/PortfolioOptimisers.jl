@@ -43,5 +43,10 @@ plot_cs_regression_t_stats
 plot_cs_regression_t_stat_exceedance_rate
 plot_exposure_vif
 plot_exposure_condition_number
+plot_attribution_vol_contrib
+plot_attribution_mu_contrib
+plot_attribution_exposure
+plot_attribution_mu_vs_vol
 relevant_assets
+attribution_plot_axis
 ```
