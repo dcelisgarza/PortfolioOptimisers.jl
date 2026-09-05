@@ -1,5 +1,4 @@
 The source files can be found in [examples/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../../examples/4_constraints_costs/05_Turnover_and_Tracking.jl"
 ```
@@ -12,9 +11,9 @@ stray from a benchmark. Both come in two flavours in `PortfolioOptimisers.jl` �
 on a [`JuMPOptimiser`](@ref), or as a **risk measure** you minimise directly — and the choice
 between them is the difference between "respect this limit" and "make this the goal".
 
-- **Turnover** ([`Turnover`](@ref) via `tn`, or [`TurnoverRiskMeasure`](@ref)) penalises trading
+  - **Turnover** ([`Turnover`](@ref) via `tn`, or [`TurnoverRiskMeasure`](@ref)) penalises trading
     away from a reference weight vector.
-- **Tracking** ([`TrackingError`](@ref) via `tr`, or [`TrackingRiskMeasure`](@ref)) penalises
+  - **Tracking** ([`TrackingError`](@ref) via `tr`, or [`TrackingRiskMeasure`](@ref)) penalises
     deviation from a benchmark, specified either as weights ([`WeightsTracking`](@ref)) or as a
     benchmark return series ([`ReturnsTracking`](@ref) — e.g. an index).
 

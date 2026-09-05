@@ -15,9 +15,17 @@ $(DocStringExtensions.FIELDS)
         n::Integer = 5,
         purged_size::Integer = 0,
         embargo_size::Integer = 0,
+        wd::Option{<:AbstractWeightDrift} = nothing,
+        store_weight_path::Bool = false,
     ) -> KFold
 
 Keyword arguments correspond to the struct's fields.
+
+## Weight drift
+
+`wd` is the Weight Drift of the scheme, and `nothing` is the library's original behaviour: a fold's return series is `X * w` net of fees, read at the target weights of that fold. A [`SelfFinancingDrift`](@ref) reads the series as the wealth ratio of the drifted holdings instead, and the fold carries a [`HeldWeightsResult`](@ref). `store_weight_path` makes the fold store the weight path it computed, which a reader otherwise rebuilds on demand.
+
+A k-fold enumeration is not a timeline, so this scheme carries no Previous-Weights Source. Each of its folds is independent of the others, and no fold has a fold behind it to inherit weights from.
 
 ## Validation
 
@@ -30,9 +38,11 @@ Keyword arguments correspond to the struct's fields.
 ```jldoctest
 julia> KFold(; n = 5, purged_size = 7, embargo_size = 11)
 KFold
-             n ┼ Int64: 5
-   purged_size ┼ Int64: 7
-  embargo_size ┴ Int64: 11
+                  n ┼ Int64: 5
+        purged_size ┼ Int64: 7
+       embargo_size ┼ Int64: 11
+                 wd ┼ nothing
+  store_weight_path ┴ Bool: false
 ```
 
 # Related
@@ -61,16 +71,28 @@ KFold
     $(field_dict[:embargo_size])
     """
     embargo_size
-    function KFold(n::Integer, purged_size::Integer, embargo_size::Integer)
+    """
+    $(field_dict[:wd])
+    """
+    wd
+    """
+    $(field_dict[:store_weight_path])
+    """
+    store_weight_path
+    function KFold(n::Integer, purged_size::Integer, embargo_size::Integer,
+                   wd::Option{<:AbstractWeightDrift}, store_weight_path::Bool)
         assert_nonempty_gt0_finite_val(n, :n)
         assert_nonempty_finite_val(purged_size, :purged_size)
         assert_nonempty_finite_val(embargo_size, :embargo_size)
-        return new{typeof(n), typeof(purged_size), typeof(embargo_size)}(n, purged_size,
-                                                                         embargo_size)
+        return new{typeof(n), typeof(purged_size), typeof(embargo_size), typeof(wd),
+                   typeof(store_weight_path)}(n, purged_size, embargo_size, wd,
+                                              store_weight_path)
     end
 end
-function KFold(; n::Integer = 5, purged_size::Integer = 0, embargo_size::Integer = 0)::KFold
-    return KFold(n, purged_size, embargo_size)
+function KFold(; n::Integer = 5, purged_size::Integer = 0, embargo_size::Integer = 0,
+               wd::Option{<:AbstractWeightDrift} = nothing,
+               store_weight_path::Bool = false)::KFold
+    return KFold(n, purged_size, embargo_size, wd, store_weight_path)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -191,4 +213,24 @@ function n_splits(kf::KFold, rd::Prices_RR)
     return min(kf.n, cv_nobs(rd))
 end
 
+"""
+    fold_evaluation(cv::KFold)
+
+Read the evaluation switches of a [`KFold`](@ref).
+
+The folds of this scheme are not a timeline, so it carries no Previous-Weights Source and the triple names `nothing` for it. There is no previous fold whose weights a fold of this scheme could inherit.
+
+# Returns
+
+  - `(; wd, pws, store_weight_path)`: The Weight Drift, the Previous-Weights Source, and the flag that stores a fold's weight path.
+
+# Related
+
+  - [`fold_evaluation`](@ref)
+  - [`KFold`](@ref)
+  - [`held_weights_drift`](@ref)
+"""
+function fold_evaluation(cv::KFold)
+    return (; wd = cv.wd, pws = nothing, store_weight_path = cv.store_weight_path)
+end
 export KFold, KFoldResult

@@ -177,6 +177,13 @@ Both overloads stamp the owning measure onto the `:risk_frontier` entries that m
 registered ([`set_risk_frontier_owner!`](@ref)). This is the only depth at which the measure
 and its entries are both in hand.
 
+Both overloads resolve the measure through [`resolve_deferred_quantities`](@ref), and both
+thread the estimator's own solver into that call. This route calls no [`factory`](@ref), so
+no selection has run and a measure that states no solver of its own still holds `nothing`. A
+**Calibration Rule** that reads the solver would see that `nothing`, while the same rule on
+the `factory` route sees the optimiser's. Threading `opt.opt.slv` is what makes the two
+routes resolve one measure against one solver.
+
 # Arguments
 
   - $(arg_dict[:model])
@@ -196,6 +203,7 @@ and its entries are both in hand.
   - [`RiskMeasure`](@ref)
   - [`set_risk_bounds_and_expression!`](@ref)
   - [`set_risk_frontier_owner!`](@ref)
+  - [`assert_declared_calibration_resolver`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, r::RiskMeasure,
                                opt::JuMPOptimisationEstimator, pr::AbstractPriorResult,
@@ -205,6 +213,12 @@ function set_risk_constraints!(model::JuMP.Model, r::RiskMeasure,
     # so this is where a Deferred Quantity becomes a value. It resolves the deferred state
     # alone; each builder's own prior fallback is untouched.
     #
+    # The estimator's own solver is threaded with the prior. No selection runs on this
+    # route, so a measure that states no solver of its own holds `nothing` here, and a
+    # Calibration Rule that reads the solver would see that `nothing` rather than the one
+    # the optimisation settled on. The `factory` route settles it by selection before it
+    # resolves, and this is how the two routes are made to agree (issue #591).
+    #
     # `scale` is a combination weight, so it is dropped here: a lone measure is not an
     # aggregate and the weight has nothing to weigh. The vector method below keeps it,
     # because there the measures really do combine.
@@ -212,10 +226,16 @@ function set_risk_constraints!(model::JuMP.Model, r::RiskMeasure,
     # `b1` is typed and named, not absorbed by an `args...` tail. The tail let a caller pass
     # a `Fees` in the slot after `fees` and lose it silently — which is exactly what
     # unconstrained `NearOptimalCentering` did (ADR 0008, amendment 2 §4).
+    #
+    # The resolution is also where the calibration declaration and its resolver are paired.
+    # `expected_risk` refuses a surviving Calibration Rule at the value-level entry point,
+    # and a `JuMP` builder reads the slot raw, so this route carried no such refusal. A rule
+    # that reaches this line names a type that declared the slot and resolved it nowhere.
     first = risk_frontier_length(model)
-    set_risk_constraints!(model, 1,
-                          unit_scale_risk_measure(resolve_deferred_quantities(r, pr)), opt,
-                          pr, pl, fees, b1; kwargs...)
+    resolved = resolve_deferred_quantities(r, pr, opt.opt.slv)
+    assert_declared_calibration_resolver(resolved)
+    set_risk_constraints!(model, 1, unit_scale_risk_measure(resolved), opt, pr, pl, fees,
+                          b1; kwargs...)
     set_risk_frontier_owner!(model, first, 1)
     return nothing
 end
@@ -225,8 +245,9 @@ function set_risk_constraints!(model::JuMP.Model, rs::VecRM, opt::JuMPOptimisati
                                kwargs...)
     for (i, r) in enumerate(rs)
         first = risk_frontier_length(model)
-        set_risk_constraints!(model, i, resolve_deferred_quantities(r, pr), opt, pr, pl,
-                              fees, b1; kwargs...)
+        resolved = resolve_deferred_quantities(r, pr, opt.opt.slv)
+        assert_declared_calibration_resolver(resolved)
+        set_risk_constraints!(model, i, resolved, opt, pr, pl, fees, b1; kwargs...)
         set_risk_frontier_owner!(model, first, i)
     end
     return nothing

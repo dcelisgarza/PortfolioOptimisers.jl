@@ -247,7 +247,8 @@ A deferred slot therefore **wins over `pe`**, which is the map's precedence rule
   - [`fan_out_slot`](@ref)
   - [`fit_deferred_quantity`](@ref)
 """
-function resolve_deferred_quantities(r::Kurtosis, pr::AbstractPriorResult)::Kurtosis
+function resolve_deferred_quantities(r::Kurtosis, pr::AbstractPriorResult,
+                                     ::Any = nothing)::Kurtosis
     if isnothing(r.pe) && !isa(r.mu, DeferredQuantity) && !isa(r.kt, DeferredQuantity)
         return r
     end
@@ -260,13 +261,12 @@ function resolve_deferred_quantities(r::Kurtosis, pr::AbstractPriorResult)::Kurt
         mu = nothing_scalar_array_selector(centre, deferred_derived_quantity(fitted, :mu))
     end
     if isnothing(r.pe)
-        return Kurtosis(; settings = r.settings, w = r.w, mu = mu, kt = kt, N = r.N,
-                        alg1 = r.alg1, alg2 = r.alg2, pe = nothing)
+        return rebuild_with_slots(r, (; mu = mu, kt = kt))
     end
     fitted = fit_deferred_quantity(r.pe, pr)
-    return Kurtosis(; settings = r.settings, w = r.w, mu = fan_out_slot(fitted, mu, :mu),
-                    kt = fan_out_slot(fitted, kt, :kt), N = r.N, alg1 = r.alg1,
-                    alg2 = r.alg2, pe = nothing)
+    return rebuild_with_slots(r,
+                              (; mu = fan_out_slot(fitted, mu, :mu),
+                               kt = fan_out_slot(fitted, kt, :kt), pe = nothing))
 end
 # Deferrable slots — see `deferred_slots`.
 deferred_slots(r::Kurtosis) = (; mu = r.mu, kt = r.kt, pe = r.pe)

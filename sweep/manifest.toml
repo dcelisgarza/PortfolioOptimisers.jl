@@ -44,104 +44,169 @@
 [file]
 "ext/PortfolioOptimisersImputeExt.jl" = { map = 13, units = 0, swept = false }
 "ext/PortfolioOptimisersPlotsExt.jl" = { map = 13, units = 0, swept = false }
-"src/01_Base.jl" = { map = 1, units = 136, swept = false }
+"src/01_Base/01_DocstringDictionaries.jl" = { map = 1, units = 8, algorithm = 1, swept = true }
+"src/01_Base/02_TypeRoots.jl" = { map = 1, units = 7, algorithm = 2, swept = true }
+"src/01_Base/03_PrettyShow.jl" = { map = 1, units = 7, algorithm = 5, swept = true }
+"src/01_Base/04_ScopedConfig.jl" = { map = 1, units = 24, algorithm = 14, swept = true }
+"src/01_Base/05_Preferences.jl" = { map = 1, units = 6, algorithm = 4, swept = true }
+"src/01_Base/06_Messages.jl" = { map = 1, units = 12, algorithm = 6, swept = true }
+"src/01_Base/07_Errors.jl" = { map = 1, units = 9, algorithm = 1, swept = true }
+"src/01_Base/08_TypeAliases.jl" = { map = 1, units = 45, algorithm = 0, swept = true }
+"src/01_Base/09_ObservationWeights.jl" = { map = 1, units = 2, algorithm = 1, swept = true }
+"src/01_Base/10_Assertions.jl" = { map = 1, units = 18, algorithm = 8, swept = true }
+"src/01_Base/11_VecScalar.jl" = { map = 1, units = 3, algorithm = 0, swept = true }
+"src/01_Base/12_NormError.jl" = { map = 1, units = 8, algorithm = 2, swept = true }
+"src/01_Base/13_KappaLog.jl" = { map = 1, units = 1, algorithm = 0, swept = true }
+"src/01_Base/14_PartialFit.jl" = { map = 1, units = 9, swept = false }
 "src/02_Tools.jl" = { map = 1, units = 69, algorithm = 49, swept = true }
-"src/03_Preprocessing.jl" = { map = 2, units = 44, algorithm = 22, swept = true }
+"src/03_InputData/01_AssetPanel.jl" = { map = 2, units = 28, swept = false }
+"src/03_InputData/02_AssetPanelBuilder.jl" = { map = 2, units = 20, swept = false }
+"src/03_InputData/03_Preprocessing.jl" = { map = 2, units = 46, algorithm = 22, swept = false }
+"src/03_InputData/04_CrossSectionalTransforms.jl" = { map = 2, units = 29, swept = false }
 "src/04_PosdefMatrix.jl" = { map = 2, units = 4, algorithm = 2, swept = true }
 "src/05_Denoise.jl" = { map = 2, units = 10, algorithm = 7, swept = true }
 "src/06_Detone.jl" = { map = 2, units = 4, algorithm = 2, swept = true }
 "src/07_MatrixProcessing.jl" = { map = 2, units = 8, algorithm = 3, swept = true }
-"src/08_Moments/01_Base_Moments.jl" = { map = 3, units = 33, swept = false }
-"src/08_Moments/02_SimpleExpectedReturns.jl" = { map = 3, units = 2, swept = false }
-"src/08_Moments/03_Covariance.jl" = { map = 3, units = 8, swept = false }
-"src/08_Moments/04_SimpleVariance.jl" = { map = 3, units = 8, swept = false }
-"src/08_Moments/05_GerberCovariance.jl" = { map = 3, units = 13, swept = false }
-"src/08_Moments/06_SmythBrobyCovariance.jl" = { map = 3, units = 33, swept = false }
-"src/08_Moments/07_DistanceCovariance.jl" = { map = 3, units = 8, swept = false }
-"src/08_Moments/08_LowerTailDependenceCovariance.jl" = { map = 3, units = 3, swept = false }
-"src/08_Moments/09_RankCovariance.jl" = { map = 3, units = 5, swept = false }
-"src/08_Moments/10_Histogram.jl" = { map = 3, units = 16, swept = false }
-"src/08_Moments/11_MutualInfoCovariance.jl" = { map = 3, units = 2, swept = false }
-"src/08_Moments/12_DenoiseCovariance.jl" = { map = 3, units = 1, swept = false }
-"src/08_Moments/13_DetoneCovariance.jl" = { map = 3, units = 1, swept = false }
-"src/08_Moments/14_ProcessedCovariance.jl" = { map = 3, units = 1, swept = false }
-"src/08_Moments/15_PortfolioOptimisersCovariance.jl" = { map = 3, units = 4, swept = false }
-"src/08_Moments/16_ShrunkExpectedReturns.jl" = { map = 3, units = 14, swept = false }
-"src/08_Moments/17_EquilibriumExpectedReturns.jl" = { map = 3, units = 3, swept = false }
-"src/08_Moments/18_ExcessExpectedReturns.jl" = { map = 3, units = 2, swept = false }
-"src/08_Moments/19_Coskewness.jl" = { map = 3, units = 5, swept = false }
-"src/08_Moments/20_Cokurtosis.jl" = { map = 3, units = 4, swept = false }
-"src/08_Moments/21_Base_Regression.jl" = { map = 3, units = 28, swept = false }
-"src/08_Moments/22_StepwiseRegression.jl" = { map = 3, units = 14, swept = false }
-"src/08_Moments/23_DimensionReductionRegression.jl" = { map = 3, units = 10, swept = false }
-"src/08_Moments/24_ImpliedVolatility.jl" = { map = 3, units = 11, swept = false }
-"src/08_Moments/25_CorrelationCovariance.jl" = { map = 3, units = 3, swept = false }
-"src/08_Moments/26_AbstractCovarianceVariance.jl" = { map = 3, units = 2, swept = false }
-"src/08_Moments/27_StandardDeviationExpectedReturns.jl" = { map = 3, units = 4, swept = false }
-"src/08_Moments/28_WindowedExpectedReturns.jl" = { map = 3, units = 0, swept = false }
-"src/08_Moments/29_WindowedCovariance.jl" = { map = 3, units = 0, swept = false }
-"src/08_Moments/30_WindowedVariance.jl" = { map = 3, units = 0, swept = false }
-"src/08_Moments/31_WindowedCoskewness.jl" = { map = 3, units = 0, swept = false }
-"src/08_Moments/32_WindowedCokurtosis.jl" = { map = 3, units = 0, swept = false }
-"src/08_Moments/33_MedianExpectedReturns.jl" = { map = 3, units = 3, swept = false }
-"src/08_Moments/34_CustomValueExpectedReturns.jl" = { map = 3, units = 7, swept = false }
-"src/08_Moments/35_GerberIQCovariance.jl" = { map = 3, units = 34, swept = false }
-"src/08_Moments/36_RegimeAdjustedExpWeightedVariance.jl" = { map = 3, units = 15, swept = false }
+"src/08_Moments/01_Base_Moments.jl" = { map = 3, units = 34, algorithm = 17, swept = true }
+"src/08_Moments/02_SimpleExpectedReturns.jl" = { map = 3, units = 12, algorithm = 6, swept = true }
+"src/08_Moments/03_Covariance.jl" = { map = 3, units = 27, algorithm = 14, swept = true }
+"src/08_Moments/04_SimpleVariance.jl" = { map = 3, units = 18, algorithm = 10, swept = true }
+"src/08_Moments/05_GerberCovariance.jl" = { map = 3, units = 13, algorithm = 9, swept = true }
+"src/08_Moments/06_SmythBrobyCovariance.jl" = { map = 3, units = 35, algorithm = 24, swept = true }
+"src/08_Moments/07_DistanceCovariance.jl" = { map = 3, units = 8, algorithm = 7, swept = true }
+"src/08_Moments/08_LowerTailDependenceCovariance.jl" = { map = 3, units = 3, algorithm = 2, swept = true }
+"src/08_Moments/09_RankCovariance.jl" = { map = 3, units = 5, algorithm = 2, swept = true }
+"src/08_Moments/10_Histogram.jl" = { map = 3, units = 16, algorithm = 7, swept = true }
+"src/08_Moments/11_MutualInfoCovariance.jl" = { map = 3, units = 2, algorithm = 1, swept = true }
+"src/08_Moments/12_DenoiseCovariance.jl" = { map = 3, units = 1, algorithm = 1, swept = true }
+"src/08_Moments/13_DetoneCovariance.jl" = { map = 3, units = 1, algorithm = 1, swept = true }
+"src/08_Moments/14_ProcessedCovariance.jl" = { map = 3, units = 1, algorithm = 1, swept = true }
+"src/08_Moments/15_PortfolioOptimisersCovariance.jl" = { map = 3, units = 4, algorithm = 3, swept = true }
+"src/08_Moments/16_ShrunkExpectedReturns.jl" = { map = 3, units = 14, algorithm = 7, swept = true }
+"src/08_Moments/17_EquilibriumExpectedReturns.jl" = { map = 3, units = 3, algorithm = 2, swept = true }
+"src/08_Moments/18_ExcessExpectedReturns.jl" = { map = 3, units = 2, algorithm = 0, swept = true }
+"src/08_Moments/19_Coskewness.jl" = { map = 3, units = 5, algorithm = 3, swept = true }
+"src/08_Moments/20_Cokurtosis.jl" = { map = 3, units = 4, algorithm = 2, swept = true }
+"src/08_Moments/21_Base_Regression.jl" = { map = 3, units = 36, algorithm = 7, swept = true }
+"src/08_Moments/22_StepwiseRegression.jl" = { map = 3, units = 12, algorithm = 8, swept = true }
+"src/08_Moments/23_DimensionReductionRegression.jl" = { map = 3, units = 10, algorithm = 5, swept = true }
+"src/08_Moments/24_ImpliedVolatility.jl" = { map = 3, units = 11, algorithm = 5, swept = true }
+"src/08_Moments/25_CorrelationCovariance.jl" = { map = 3, units = 3, algorithm = 2, swept = true }
+"src/08_Moments/26_AbstractCovarianceVariance.jl" = { map = 3, units = 3, algorithm = 3, swept = true }
+"src/08_Moments/27_StandardDeviationExpectedReturns.jl" = { map = 3, units = 4, algorithm = 0, swept = true }
+"src/08_Moments/28_WindowedExpectedReturns.jl" = { map = 3, units = 0, algorithm = 0, swept = true }
+"src/08_Moments/29_WindowedCovariance.jl" = { map = 3, units = 0, algorithm = 0, swept = true }
+"src/08_Moments/30_WindowedVariance.jl" = { map = 3, units = 0, algorithm = 0, swept = true }
+"src/08_Moments/31_WindowedCoskewness.jl" = { map = 3, units = 0, algorithm = 0, swept = true }
+"src/08_Moments/32_WindowedCokurtosis.jl" = { map = 3, units = 0, algorithm = 0, swept = true }
+"src/08_Moments/33_MedianExpectedReturns.jl" = { map = 3, units = 3, algorithm = 1, swept = true }
+"src/08_Moments/34_CustomValueExpectedReturns.jl" = { map = 3, units = 7, algorithm = 1, swept = true }
+"src/08_Moments/35_GerberIQCovariance.jl" = { map = 3, units = 36, algorithm = 13, swept = true }
+"src/08_Moments/36_RegimeAdjustedExpWeightedVariance.jl" = { map = 3, units = 24, swept = false }
 "src/08_Moments/37_RegimeAdjustedExpWeightedCovariance.jl" = { map = 3, units = 7, swept = false }
+"src/08_Moments/38_CrossSectionalRegression.jl" = { map = 3, units = 18, swept = false }
+"src/08_Moments/39_CrossSectionalWeights.jl" = { map = 3, units = 10, swept = false }
+"src/08_Moments/40_HigherMomentPartialFit.jl" = { map = 3, units = 25, swept = false }
+"src/08_Moments/41_CrossSectionalFactorModel.jl" = { map = 3, units = 11, algorithm = 1, swept = true }
+"src/08_Moments/42_FactorExposures/01_Base_Descriptor.jl" = { map = 3, units = 10, swept = false }
+"src/08_Moments/42_FactorExposures/02_PanelFieldDescriptors.jl" = { map = 3, units = 32, swept = false }
+"src/08_Moments/42_FactorExposures/03_LagDescriptors.jl" = { map = 3, units = 10, swept = false }
+"src/08_Moments/42_FactorExposures/04_EWMeanDescriptors.jl" = { map = 3, units = 14, swept = false }
+"src/08_Moments/42_FactorExposures/05_EWVolatilityDescriptors.jl" = { map = 3, units = 9, swept = false }
+"src/08_Moments/42_FactorExposures/06_EWBetaDescriptors.jl" = { map = 3, units = 21, swept = false }
+"src/08_Moments/42_FactorExposures/07_RollingDescriptors.jl" = { map = 3, units = 9, swept = false }
+"src/08_Moments/42_FactorExposures/08_Base_Exposure.jl" = { map = 3, units = 8, swept = false }
+"src/08_Moments/42_FactorExposures/09_CompositeExposure.jl" = { map = 3, units = 7, swept = false }
+"src/08_Moments/42_FactorExposures/10_DerivedExposure.jl" = { map = 3, units = 2, swept = false }
+"src/08_Moments/42_FactorExposures/11_OneHotExposure.jl" = { map = 3, units = 6, swept = false }
+"src/08_Moments/42_FactorExposures/12_ConstantExposure.jl" = { map = 3, units = 2, swept = false }
+"src/08_Moments/42_FactorExposures/13_ExposureNeutralisation.jl" = { map = 3, units = 5, swept = false }
+"src/08_Moments/43_FactorFamilyBasis.jl" = { map = 3, units = 13, swept = false }
+"src/08_Moments/44_FactorFamilyBasisTransforms.jl" = { map = 3, units = 12, swept = false }
+"src/08_Moments/45_ReturnForecasts/01_Base_ReturnForecast.jl" = { map = 3, units = 8, swept = false }
+"src/08_Moments/45_ReturnForecasts/02_DescriptorScores.jl" = { map = 3, units = 5, swept = false }
+"src/08_Moments/45_ReturnForecasts/03_CustomValueReturnForecast.jl" = { map = 3, units = 3, swept = false }
+"src/08_Moments/45_ReturnForecasts/04_FixedWeightedReturnForecast.jl" = { map = 3, units = 6, swept = false }
+"src/08_Moments/46_CrossSectionalRegressionDiagnostics.jl" = { map = 3, units = 31, swept = false }
 "src/09_Distance/01_Base_Distance.jl" = { map = 2, units = 8, algorithm = 1, swept = true }
 "src/09_Distance/02_Distance.jl" = { map = 2, units = 13, algorithm = 8, swept = true }
-"src/09_Distance/03_DistanceDistance.jl" = { map = 2, units = 4, swept = false }
-"src/09_Distance/04_Similarity.jl" = { map = 2, units = 10, swept = false }
-"src/09_Distance/05_FeatureDistance.jl" = { map = 2, units = 23, swept = false }
+"src/09_Distance/03_DistanceDistance.jl" = { map = 2, units = 4, algorithm = 3, swept = true }
+"src/09_Distance/04_Similarity.jl" = { map = 2, units = 10, algorithm = 8, swept = true }
+"src/09_Distance/05_FeatureDistance.jl" = { map = 2, units = 28, algorithm = 20, swept = true }
 "src/10_JuMPModelOptimisation.jl" = { map = 10, units = 12, swept = false }
-"src/11_Phylogeny/01_Base_Phylogeny.jl" = { map = 4, units = 24, swept = false }
-"src/11_Phylogeny/02_Clusters.jl" = { map = 4, units = 18, swept = false }
-"src/11_Phylogeny/03_Hierarchical.jl" = { map = 4, units = 12, swept = false }
-"src/11_Phylogeny/04_DBHT.jl" = { map = 4, units = 37, swept = false }
-"src/11_Phylogeny/05_NonHierarchicalClustering.jl" = { map = 4, units = 5, swept = false }
-"src/11_Phylogeny/06_Phylogeny.jl" = { map = 4, units = 63, swept = false }
-"src/12_ConstraintGeneration/01_Base_ConstraintGeneration.jl" = { map = 5, units = 6, swept = false }
-"src/12_ConstraintGeneration/02_LinearConstraintGeneration.jl" = { map = 5, units = 48, swept = false }
-"src/12_ConstraintGeneration/03_RiskBudgetConstraintGeneration.jl" = { map = 5, units = 7, swept = false }
-"src/12_ConstraintGeneration/04_PhylogenyConstraintGeneration.jl" = { map = 5, units = 22, swept = false }
-"src/12_ConstraintGeneration/05_WeightBoundsConstraintGeneration.jl" = { map = 5, units = 11, swept = false }
-"src/12_ConstraintGeneration/06_AssetSetsMatrix.jl" = { map = 5, units = 32, swept = false }
-"src/12_ConstraintGeneration/07_ThresholdConstraintGeneration.jl" = { map = 5, units = 10, swept = false }
-"src/12_ConstraintGeneration/08_ExposureConstraintGeneration.jl" = { map = 5, units = 14, swept = false }
-"src/13_Prior/01_Base_Prior.jl" = { map = 6, units = 39, swept = false }
-"src/13_Prior/02_EmpiricalPrior.jl" = { map = 6, units = 3, swept = false }
-"src/13_Prior/03_FactorPrior.jl" = { map = 6, units = 6, swept = false }
-"src/13_Prior/04_HighOrderPrior.jl" = { map = 6, units = 9, swept = false }
-"src/13_Prior/05_BlackLittermanViewsGeneration.jl" = { map = 6, units = 5, swept = false }
-"src/13_Prior/06_BlackLittermanPrior.jl" = { map = 6, units = 11, swept = false }
-"src/13_Prior/07_BayesianBlackLittermanPrior.jl" = { map = 6, units = 2, swept = false }
-"src/13_Prior/08_FactorBlackLittermanPrior.jl" = { map = 6, units = 2, swept = false }
-"src/13_Prior/09_AugmentedBlackLittermanPrior.jl" = { map = 6, units = 2, swept = false }
-"src/13_Prior/10_Base_EntropyPoolingPrior.jl" = { map = 6, units = 62, swept = false }
-"src/13_Prior/11_MeucciEntropyPoolingPrior.jl" = { map = 6, units = 7, swept = false }
-"src/13_Prior/12_EntropyPoolingPrior.jl" = { map = 6, units = 28, swept = false }
-"src/13_Prior/13_OpinionPoolingPrior.jl" = { map = 6, units = 7, swept = false }
-"src/13_Prior/14_HighOrderFactorPriorEstimator.jl" = { map = 6, units = 4, swept = false }
-"src/13_Prior/15_FeaturePrior.jl" = { map = 6, units = 13, swept = false }
-"src/14_UncertaintySets/01_Base_UncertaintySets.jl" = { map = 7, units = 34, swept = false }
-"src/14_UncertaintySets/02_DeltaUncertaintySets.jl" = { map = 7, units = 6, swept = false }
-"src/14_UncertaintySets/03_NormalUncertaintySets.jl" = { map = 7, units = 20, swept = false }
-"src/14_UncertaintySets/04_BootstrapUncertaintySets.jl" = { map = 7, units = 16, swept = false }
-"src/14_UncertaintySets/05_L1UncertaintySets.jl" = { map = 7, units = 14, swept = false }
-"src/15_Turnover.jl" = { map = 8, units = 15, swept = false }
-"src/16_Fees.jl" = { map = 8, units = 20, swept = false }
-"src/17_NetReturnsDrawdowns.jl" = { map = 8, units = 8, swept = false }
-"src/18_Tracking.jl" = { map = 8, units = 13, swept = false }
-"src/19_RiskMeasures/01_Base_RiskMeasures.jl" = { map = 9, units = 88, swept = false }
+"src/11_Phylogeny/01_Base_Phylogeny.jl" = { map = 4, units = 24, algorithm = 5, swept = true }
+"src/11_Phylogeny/02_Clusters.jl" = { map = 4, units = 18, algorithm = 4, swept = true }
+"src/11_Phylogeny/03_Hierarchical.jl" = { map = 4, units = 12, algorithm = 6, swept = true }
+"src/11_Phylogeny/04_DBHT.jl" = { map = 4, units = 4, algorithm = 0, swept = true }
+"src/11_Phylogeny/05_NonHierarchicalClustering.jl" = { map = 4, units = 5, algorithm = 4, swept = true }
+"src/11_Phylogeny/06_Phylogeny.jl" = { map = 4, units = 3, algorithm = 0, swept = true }
+"src/11_Phylogeny/07_PMFG.jl" = { map = 4, units = 2, algorithm = 2, swept = true }
+"src/11_Phylogeny/08_GraphTraversal.jl" = { map = 4, units = 2, algorithm = 2, swept = true }
+"src/11_Phylogeny/09_CliqueHierarchy.jl" = { map = 4, units = 7, algorithm = 7, swept = true }
+"src/11_Phylogeny/10_BubbleTree.jl" = { map = 4, units = 4, algorithm = 4, swept = true }
+"src/11_Phylogeny/11_DBHTDendrogram.jl" = { map = 4, units = 5, algorithm = 5, swept = true }
+"src/11_Phylogeny/12_DBHTClustering.jl" = { map = 4, units = 2, algorithm = 2, swept = true }
+"src/11_Phylogeny/13_LoGo.jl" = { map = 4, units = 11, algorithm = 7, swept = true }
+"src/11_Phylogeny/14_Centrality.jl" = { map = 4, units = 15, algorithm = 5, swept = true }
+"src/11_Phylogeny/15_CentralityPolarity.jl" = { map = 4, units = 4, algorithm = 0, swept = true }
+"src/11_Phylogeny/16_MinimumSpanningTree.jl" = { map = 4, units = 6, algorithm = 1, swept = true }
+"src/11_Phylogeny/17_NetworkEstimator.jl" = { map = 4, units = 6, algorithm = 0, swept = true }
+"src/11_Phylogeny/18_CentralityEstimator.jl" = { map = 4, units = 2, algorithm = 0, swept = true }
+"src/11_Phylogeny/19_NetworkGraph.jl" = { map = 4, units = 5, algorithm = 5, swept = true }
+"src/11_Phylogeny/20_Separation.jl" = { map = 4, units = 7, algorithm = 7, swept = true }
+"src/11_Phylogeny/21_PhylogenyClustering.jl" = { map = 4, units = 4, algorithm = 3, swept = true }
+"src/11_Phylogeny/22_PhylogenyMatrix.jl" = { map = 4, units = 3, algorithm = 3, swept = true }
+"src/11_Phylogeny/23_CentralityQueries.jl" = { map = 4, units = 5, algorithm = 3, swept = true }
+"src/11_Phylogeny/24_AssetPhylogeny.jl" = { map = 4, units = 3, algorithm = 2, swept = true }
+"src/12_ConstraintGeneration/01_Base_ConstraintGeneration.jl" = { map = 5, units = 6, algorithm = 2, swept = true }
+"src/12_ConstraintGeneration/02_LinearConstraintGeneration.jl" = { map = 5, units = 51, algorithm = 29, swept = true }
+"src/12_ConstraintGeneration/03_RiskBudgetConstraintGeneration.jl" = { map = 5, units = 7, algorithm = 4, swept = true }
+"src/12_ConstraintGeneration/04_PhylogenyConstraintGeneration.jl" = { map = 5, units = 22, algorithm = 2, swept = true }
+"src/12_ConstraintGeneration/05_WeightBoundsConstraintGeneration.jl" = { map = 5, units = 11, algorithm = 7, swept = true }
+"src/12_ConstraintGeneration/06_AssetSetsMatrix.jl" = { map = 5, units = 33, algorithm = 12, swept = true }
+"src/12_ConstraintGeneration/07_ThresholdConstraintGeneration.jl" = { map = 5, units = 10, algorithm = 3, swept = true }
+"src/12_ConstraintGeneration/08_ExposureConstraintGeneration.jl" = { map = 5, units = 14, algorithm = 4, swept = true }
+"src/12_ConstraintGeneration/09_CrossSectionalFactorAxis.jl" = { map = 5, units = 4, swept = false }
+"src/13_Prior/01_Base_Prior.jl" = { map = 6, units = 41, algorithm = 19, swept = true }
+"src/13_Prior/02_EmpiricalPrior.jl" = { map = 6, units = 3, algorithm = 1, swept = true }
+"src/13_Prior/03_FactorPrior.jl" = { map = 6, units = 6, algorithm = 3, swept = true }
+"src/13_Prior/04_HighOrderPrior.jl" = { map = 6, units = 9, algorithm = 8, swept = true }
+"src/13_Prior/05_BlackLittermanViewsGeneration.jl" = { map = 6, units = 5, algorithm = 2, swept = true }
+"src/13_Prior/06_BlackLittermanPrior.jl" = { map = 6, units = 10, algorithm = 7, swept = true }
+"src/13_Prior/07_BayesianBlackLittermanPrior.jl" = { map = 6, units = 2, algorithm = 1, swept = true }
+"src/13_Prior/08_FactorBlackLittermanPrior.jl" = { map = 6, units = 2, algorithm = 1, swept = true }
+"src/13_Prior/09_AugmentedBlackLittermanPrior.jl" = { map = 6, units = 2, algorithm = 1, swept = true }
+"src/13_Prior/10_Base_EntropyPoolingPrior.jl" = { map = 6, units = 75, algorithm = 19, swept = true }
+"src/13_Prior/11_MeucciEntropyPoolingPrior.jl" = { map = 6, units = 9, algorithm = 6, swept = true }
+"src/13_Prior/12_EntropyPoolingPrior.jl" = { map = 6, units = 53, algorithm = 25, swept = true }
+"src/13_Prior/13_OpinionPoolingPrior.jl" = { map = 6, units = 7, algorithm = 3, swept = true }
+"src/13_Prior/14_HighOrderFactorPriorEstimator.jl" = { map = 6, units = 4, algorithm = 3, swept = true }
+"src/13_Prior/15_FeaturePrior.jl" = { map = 6, units = 13, algorithm = 6, swept = true }
+"src/13_Prior/16_Base_CrossSectionalFactorPrior.jl" = { map = 6, units = 26, swept = false }
+"src/13_Prior/17_CrossSectionalFactorPrior.jl" = { map = 6, units = 4, swept = false }
+"src/14_UncertaintySets/01_Base_UncertaintySets.jl" = { map = 7, units = 40, algorithm = 11, swept = true }
+"src/14_UncertaintySets/02_DeltaUncertaintySets.jl" = { map = 7, units = 6, algorithm = 5, swept = true }
+"src/14_UncertaintySets/03_NormalUncertaintySets.jl" = { map = 7, units = 25, algorithm = 24, swept = true }
+"src/14_UncertaintySets/04_BootstrapUncertaintySets.jl" = { map = 7, units = 19, algorithm = 13, swept = true }
+"src/14_UncertaintySets/05_L1UncertaintySets.jl" = { map = 7, units = 14, algorithm = 7, swept = true }
+"src/14_UncertaintySets/06_CalibrationRules.jl" = { map = 7, units = 56, swept = false }
+"src/14_UncertaintySets/07_CompactUncertaintySets.jl" = { map = 7, units = 4, swept = false }
+"src/14_UncertaintySets/08_NormBallUncertaintySets.jl" = { map = 7, units = 11, swept = false }
+"src/14_UncertaintySets/09_OrthogonalUncertaintySets.jl" = { map = 7, units = 19, swept = false }
+"src/15_Turnover.jl" = { map = 8, units = 15, algorithm = 8, swept = true }
+"src/16_Fees.jl" = { map = 8, units = 24, algorithm = 19, swept = true }
+"src/17_NetReturnsDrawdowns.jl" = { map = 8, units = 31, algorithm = 8, swept = false }
+"src/18_Tracking.jl" = { map = 8, units = 14, algorithm = 4, swept = true }
+"src/19_RiskMeasures/01_Base_RiskMeasures.jl" = { map = 9, units = 89, swept = false }
 "src/19_RiskMeasures/02_Variance.jl" = { map = 9, units = 24, swept = false }
 "src/19_RiskMeasures/03_MomentRiskMeasures.jl" = { map = 9, units = 32, swept = false }
 "src/19_RiskMeasures/04_Kurtosis.jl" = { map = 9, units = 9, swept = false }
 "src/19_RiskMeasures/05_NegativeSkewness.jl" = { map = 9, units = 5, swept = false }
-"src/19_RiskMeasures/06_XatRisk.jl" = { map = 9, units = 17, swept = false }
-"src/19_RiskMeasures/07_ConditionalXatRisk.jl" = { map = 9, units = 11, swept = false }
+"src/19_RiskMeasures/06_XatRisk.jl" = { map = 9, units = 19, swept = false }
+"src/19_RiskMeasures/07_ConditionalXatRisk.jl" = { map = 9, units = 14, swept = false }
 "src/19_RiskMeasures/08_EntropicXatRisk.jl" = { map = 9, units = 5, swept = false }
-"src/19_RiskMeasures/09_RelativisticXatRisk.jl" = { map = 9, units = 5, swept = false }
-"src/19_RiskMeasures/10_OWARiskMeasures.jl" = { map = 9, units = 43, swept = false }
+"src/19_RiskMeasures/09_RelativisticXatRisk.jl" = { map = 9, units = 9, swept = false }
+"src/19_RiskMeasures/10_OWARiskMeasures.jl" = { map = 9, units = 48, swept = false }
 "src/19_RiskMeasures/11_AverageDrawdown.jl" = { map = 9, units = 3, swept = false }
 "src/19_RiskMeasures/12_UlcerIndex.jl" = { map = 9, units = 2, swept = false }
 "src/19_RiskMeasures/13_MaximumDrawdown.jl" = { map = 9, units = 2, swept = false }
@@ -150,7 +215,7 @@
 "src/19_RiskMeasures/16_NoRisk.jl" = { map = 9, units = 6, swept = false }
 "src/19_RiskMeasures/16_Range.jl" = { map = 9, units = 1, swept = false }
 "src/19_RiskMeasures/17_TurnoverRiskMeasure.jl" = { map = 9, units = 4, swept = false }
-"src/19_RiskMeasures/18_TrackingRiskMeasure.jl" = { map = 9, units = 16, swept = false }
+"src/19_RiskMeasures/18_TrackingRiskMeasure.jl" = { map = 9, units = 17, swept = false }
 "src/19_RiskMeasures/19_PowerNormXatRisk.jl" = { map = 9, units = 5, swept = false }
 "src/19_RiskMeasures/20_VarianceSkewKurtosis.jl" = { map = 9, units = 16, swept = false }
 "src/19_RiskMeasures/21_GenericValueatRiskRange.jl" = { map = 9, units = 2, swept = false }
@@ -159,14 +224,14 @@
 "src/19_RiskMeasures/24_MedianAbsoluteDeviationRisk.jl" = { map = 9, units = 12, swept = false }
 "src/19_RiskMeasures/25_NonOptimisationRiskMeasures.jl" = { map = 9, units = 10, swept = false }
 "src/19_RiskMeasures/26_AdjustRiskContributions.jl" = { map = 9, units = 6, swept = false }
-"src/19_RiskMeasures/27_ExpectedRisk.jl" = { map = 9, units = 18, swept = false }
+"src/19_RiskMeasures/27_ExpectedRisk.jl" = { map = 9, units = 22, swept = false }
 "src/19_RiskMeasures/28_RiskMeasureTools.jl" = { map = 9, units = 7, swept = false }
-"src/20_Optimisation/01_Base_Optimisation.jl" = { map = 10, units = 112, swept = false }
-"src/20_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl" = { map = 12, units = 46, swept = false }
-"src/20_Optimisation/02_CrossValidation/02_KFold.jl" = { map = 12, units = 3, swept = false }
-"src/20_Optimisation/02_CrossValidation/03_Combinatorial.jl" = { map = 12, units = 11, swept = false }
-"src/20_Optimisation/02_CrossValidation/04_WalkForward.jl" = { map = 12, units = 18, swept = false }
-"src/20_Optimisation/02_CrossValidation/05_MultipleRandomised.jl" = { map = 12, units = 19, swept = false }
+"src/20_Optimisation/01_Base_Optimisation.jl" = { map = 10, units = 113, swept = false }
+"src/20_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl" = { map = 12, units = 60, swept = false }
+"src/20_Optimisation/02_CrossValidation/02_KFold.jl" = { map = 12, units = 4, swept = false }
+"src/20_Optimisation/02_CrossValidation/03_Combinatorial.jl" = { map = 12, units = 12, swept = false }
+"src/20_Optimisation/02_CrossValidation/04_WalkForward.jl" = { map = 12, units = 20, swept = false }
+"src/20_Optimisation/02_CrossValidation/05_MultipleRandomised.jl" = { map = 12, units = 20, swept = false }
 "src/20_Optimisation/02_CrossValidation/06_Validation.jl" = { map = 12, units = 1, swept = false }
 "src/20_Optimisation/02_CrossValidation/07_Scoring.jl" = { map = 12, units = 6, swept = false }
 "src/20_Optimisation/02_CrossValidation/08_OptimisationCrossValidation.jl" = { map = 12, units = 2, swept = false }
@@ -180,7 +245,7 @@
 "src/20_Optimisation/07_HierarchicalEqualRiskContribution.jl" = { map = 10, units = 11, swept = false }
 "src/20_Optimisation/08_Base_JuMPOptimisation.jl" = { map = 10, units = 89, swept = false }
 "src/20_Optimisation/09_JuMPConstraints/01_MIPIndicators.jl" = { map = 11, units = 32, swept = false }
-"src/20_Optimisation/09_JuMPConstraints/02_Returns_and_ObjectiveFunctions.jl" = { map = 11, units = 37, swept = false }
+"src/20_Optimisation/09_JuMPConstraints/02_Returns_and_ObjectiveFunctions.jl" = { map = 11, units = 38, swept = false }
 "src/20_Optimisation/09_JuMPConstraints/03_BudgetConstraints.jl" = { map = 11, units = 15, swept = false }
 "src/20_Optimisation/09_JuMPConstraints/04_WeightConstraints.jl" = { map = 11, units = 5, swept = false }
 "src/20_Optimisation/09_JuMPConstraints/05_SDPConstraints.jl" = { map = 11, units = 4, swept = false }
@@ -190,18 +255,18 @@
 "src/20_Optimisation/09_JuMPConstraints/09_TurnoverConstraints.jl" = { map = 11, units = 2, swept = false }
 "src/20_Optimisation/09_JuMPConstraints/10_FeesConstraints.jl" = { map = 11, units = 6, swept = false }
 "src/20_Optimisation/09_JuMPConstraints/11_TrackingErrorConstraints.jl" = { map = 11, units = 2, swept = false }
-"src/20_Optimisation/09_JuMPConstraints/12_RegularisationConstraints.jl" = { map = 11, units = 12, swept = false }
-"src/20_Optimisation/09_JuMPConstraints/13_WeightNormConstraints.jl" = { map = 11, units = 3, swept = false }
-"src/20_Optimisation/10_JuMPOptimiser.jl" = { map = 10, units = 18, swept = false }
-"src/20_Optimisation/11_MeanRisk.jl" = { map = 10, units = 14, swept = false }
-"src/20_Optimisation/12_FactorRiskContribution.jl" = { map = 10, units = 7, swept = false }
-"src/20_Optimisation/13_NearOptimalCentering.jl" = { map = 10, units = 25, swept = false }
-"src/20_Optimisation/14_RiskBudgeting.jl" = { map = 10, units = 20, swept = false }
-"src/20_Optimisation/15_RelaxedRiskBudgeting.jl" = { map = 10, units = 13, swept = false }
+"src/20_Optimisation/09_JuMPConstraints/12_RegularisationConstraints.jl" = { map = 11, units = 19, swept = false }
+"src/20_Optimisation/09_JuMPConstraints/13_WeightNormConstraints.jl" = { map = 11, units = 4, swept = false }
+"src/20_Optimisation/10_JuMPOptimiser.jl" = { map = 10, units = 22, swept = false }
+"src/20_Optimisation/11_MeanRisk.jl" = { map = 10, units = 15, swept = false }
+"src/20_Optimisation/12_FactorRiskContribution.jl" = { map = 10, units = 8, swept = false }
+"src/20_Optimisation/13_NearOptimalCentering.jl" = { map = 10, units = 26, swept = false }
+"src/20_Optimisation/14_RiskBudgeting.jl" = { map = 10, units = 21, swept = false }
+"src/20_Optimisation/15_RelaxedRiskBudgeting.jl" = { map = 10, units = 14, swept = false }
 "src/20_Optimisation/16_Base_MetaOptimisation.jl" = { map = 10, units = 19, swept = false }
-"src/20_Optimisation/17_NestedClustered.jl" = { map = 10, units = 17, swept = false }
-"src/20_Optimisation/18_Stacking.jl" = { map = 10, units = 12, swept = false }
-"src/20_Optimisation/19_SubsetResampling.jl" = { map = 10, units = 13, swept = false }
+"src/20_Optimisation/17_NestedClustered.jl" = { map = 10, units = 18, swept = false }
+"src/20_Optimisation/18_Stacking.jl" = { map = 10, units = 13, swept = false }
+"src/20_Optimisation/19_SubsetResampling.jl" = { map = 10, units = 14, swept = false }
 "src/20_Optimisation/20_RiskMeasureConstraints/01_BaseRiskConstraints.jl" = { map = 11, units = 18, swept = false }
 "src/20_Optimisation/20_RiskMeasureConstraints/02_VarianceConstraints.jl" = { map = 11, units = 16, swept = false }
 "src/20_Optimisation/20_RiskMeasureConstraints/03_MomentRiskMeasureConstraints.jl" = { map = 11, units = 7, swept = false }
@@ -228,13 +293,13 @@
 "src/20_Optimisation/22_DiscreteFiniteAllocation.jl" = { map = 10, units = 5, swept = false }
 "src/20_Optimisation/23_GreedyFiniteAllocation.jl" = { map = 10, units = 5, swept = false }
 "src/20_Optimisation/24_RiskMeasureCompatibility.jl" = { map = 10, units = 3, swept = false }
-"src/21_ExpectedReturns.jl" = { map = 8, units = 19, swept = false }
-"src/22_Preselection.jl" = { map = 8, units = 24, swept = false }
+"src/21_ExpectedReturns.jl" = { map = 8, units = 21, algorithm = 5, swept = true }
+"src/22_Preselection.jl" = { map = 8, units = 30, algorithm = 11, swept = true }
 "src/23_Pipeline/01_Base_Pipeline.jl" = { map = 12, units = 19, swept = false }
-"src/23_Pipeline/02_StepExecution.jl" = { map = 12, units = 13, swept = false }
+"src/23_Pipeline/02_StepExecution.jl" = { map = 12, units = 14, swept = false }
 "src/23_Pipeline/03_Pipeline.jl" = { map = 12, units = 27, swept = false }
 "src/23_Pipeline/04_PredictionCV.jl" = { map = 12, units = 14, swept = false }
 "src/23_Pipeline/05_SearchCrossValidation.jl" = { map = 12, units = 9, swept = false }
-"src/24_Plotting.jl" = { map = 13, units = 35, swept = false }
-"src/25_Aliases.jl" = { map = 1, units = 132, swept = false }
-"src/PortfolioOptimisers.jl" = { map = 1, units = 1, swept = false }
+"src/24_Plotting.jl" = { map = 13, units = 43, swept = false }
+"src/25_Aliases.jl" = { map = 1, units = 132, algorithm = 0, swept = true }
+"src/PortfolioOptimisers.jl" = { map = 1, units = 1, algorithm = 0, swept = true }

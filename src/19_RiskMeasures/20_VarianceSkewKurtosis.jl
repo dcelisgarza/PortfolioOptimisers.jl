@@ -246,7 +246,8 @@ A deferred slot therefore **wins over `pe`**, which is the map's precedence rule
   - [`fan_out_slot`](@ref)
   - [`fit_deferred_quantity`](@ref)
 """
-function resolve_deferred_quantities(r::Skewness, pr::AbstractPriorResult)::Skewness
+function resolve_deferred_quantities(r::Skewness, pr::AbstractPriorResult,
+                                     ::Any = nothing)::Skewness
     if isnothing(r.pe) && !isa(r.mu, DeferredQuantity) && !isa(r.sk, DeferredQuantity)
         return r
     end
@@ -259,12 +260,12 @@ function resolve_deferred_quantities(r::Skewness, pr::AbstractPriorResult)::Skew
         mu = nothing_scalar_array_selector(centre, deferred_derived_quantity(fitted, :mu))
     end
     if isnothing(r.pe)
-        return Skewness(; settings = r.settings, ve = r.ve, sk = sk, w = r.w, mu = mu,
-                        pe = nothing)
+        return rebuild_with_slots(r, (; sk = sk, mu = mu))
     end
     fitted = fit_deferred_quantity(r.pe, pr)
-    return Skewness(; settings = r.settings, ve = r.ve, sk = fan_out_slot(fitted, sk, :sk),
-                    w = r.w, mu = fan_out_slot(fitted, mu, :mu), pe = nothing)
+    return rebuild_with_slots(r,
+                              (; sk = fan_out_slot(fitted, sk, :sk),
+                               mu = fan_out_slot(fitted, mu, :mu), pe = nothing))
 end
 # Deferrable slots — see `deferred_slots`. `ve` holds a variance estimator by design, not a
 # Deferred Quantity, so it is not declared here.
@@ -659,29 +660,27 @@ The composed measure adds a variance, a skewness and a kurtosis term, so a calle
   - [`fan_out_slot`](@ref)
   - [`fit_deferred_quantity`](@ref)
 """
-function resolve_deferred_quantities(r::VarianceSkewKurtosis, pr::AbstractPriorResult)
-    vr = resolve_deferred_quantities(r.vr, pr)
-    sk = resolve_deferred_quantities(r.sk, pr)
-    kt = resolve_deferred_quantities(r.kt, pr)
+function resolve_deferred_quantities(r::VarianceSkewKurtosis, pr::AbstractPriorResult,
+                                     slv = nothing)
+    vr = resolve_deferred_quantities(r.vr, pr, slv)
+    sk = resolve_deferred_quantities(r.sk, pr, slv)
+    kt = resolve_deferred_quantities(r.kt, pr, slv)
     if isnothing(r.pe)
-        return VarianceSkewKurtosis(; settings = r.settings, vr = vr, sk = sk, kt = kt,
-                                    pe = nothing)
+        return rebuild_with_slots(r, (; vr = vr, sk = sk, kt = kt))
     end
     fitted = fit_deferred_quantity(r.pe, pr)
     # `chol` is derived from `sigma`, so it comes from the fan-out only when the fan-out
     # also supplies the `sigma` it factorises.
-    sigma_flag = isnothing(vr.sigma)
-    vr = Variance(; settings = vr.settings, sigma = fan_out_slot(fitted, vr.sigma, :sigma),
-                  chol = sigma_flag ? deferred_derived_quantity(fitted, :chol) : vr.chol,
-                  rc = vr.rc, alg = vr.alg)
-    sk = Skewness(; settings = sk.settings, ve = sk.ve,
-                  sk = fan_out_slot(fitted, sk.sk, :sk), w = sk.w,
-                  mu = fan_out_slot(fitted, sk.mu, :mu), pe = nothing)
-    kt = Kurtosis(; settings = kt.settings, w = kt.w, mu = fan_out_slot(fitted, kt.mu, :mu),
-                  kt = fan_out_slot(fitted, kt.kt, :kt), N = kt.N, alg1 = kt.alg1,
-                  alg2 = kt.alg2, pe = nothing)
-    return VarianceSkewKurtosis(; settings = r.settings, vr = vr, sk = sk, kt = kt,
-                                pe = nothing)
+    chol = isnothing(vr.sigma) ? deferred_derived_quantity(fitted, :chol) : vr.chol
+    vr = rebuild_with_slots(vr,
+                            (; sigma = fan_out_slot(fitted, vr.sigma, :sigma), chol = chol))
+    sk = rebuild_with_slots(sk,
+                            (; sk = fan_out_slot(fitted, sk.sk, :sk),
+                             mu = fan_out_slot(fitted, sk.mu, :mu), pe = nothing))
+    kt = rebuild_with_slots(kt,
+                            (; mu = fan_out_slot(fitted, kt.mu, :mu),
+                             kt = fan_out_slot(fitted, kt.kt, :kt), pe = nothing))
+    return rebuild_with_slots(r, (; vr = vr, sk = sk, kt = kt, pe = nothing))
 end
 # Deferrable slots — see `deferred_slots`. The three children carry their own, so the check
 # recurses into them.

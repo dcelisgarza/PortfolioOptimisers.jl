@@ -25,7 +25,7 @@ implying "tracking" where none exists.
 **Promote the norm family to a first-class `Base` vocabulary primitive named `NormError`, and
 rename the `Lx*` types from `*Tracking` to `*Norm`.**
 
-- `abstract type NormError <: AbstractEstimator` moves to [01_Base.jl](../../src/01_Base.jl),
+- `abstract type NormError <: AbstractEstimator` moves to [01_Base/12_NormError.jl](../../src/01_Base/12_NormError.jl),
   alongside the other cross-cutting reducers (the Vector-to-Scalar Reducers already live here).
   Concrete members: `L1Norm`, `L2Norm`, `SquaredL2Norm`, `LpNorm(p, ddof)`, `LInfNorm`.
 - The evaluation seam is `norm_error(f::NormError, a, b, T)` (and the one-argument

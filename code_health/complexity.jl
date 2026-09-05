@@ -48,18 +48,18 @@ const ROW_NUMBERS = ("cyc", "cog", "arg", "cyc_sum", "cog_sum", "arg_sum")
 # --- parseability ----------------------------------------------------------
 
 """
-    parse_failures(files) -> Vector{String}
+    parse_failures(files; root = CodeHealth.REPO_ROOT) -> Vector{String}
 
 CodeComplexity parses with `ignore_errors = true`, so a file with a syntax error is measured as if
 it were correct and reports a low number (issue #336). The gate therefore checks parseability
 itself, with errors on.
 """
-function parse_failures(files)
+function parse_failures(files; root = CodeHealth.REPO_ROOT)
     bad = String[]
     for f in files
         try
-            JuliaSyntax.parseall(Expr, read(joinpath(CodeHealth.REPO_ROOT, f), String);
-                                 filename = f, ignore_errors = false)
+            JuliaSyntax.parseall(Expr, read(joinpath(root, f), String); filename = f,
+                                 ignore_errors = false)
         catch e
             push!(bad, "$f: $(sprint(showerror, e))")
         end
@@ -76,36 +76,43 @@ struct FileNumbers
     macros::Vector{String}
 end
 
-function measure()
-    files = filter(CodeHealth.in_scope, CodeHealth.tracked_jl_files())
-    bad = parse_failures(files)
+"""
+    measure(; root, files, declaring) -> NamedTuple
+
+Measure the three metrics over `files`, each read from `root`. The defaults are the live checkout
+and every file in scope, so the entry script calls `measure()` unchanged; a test passes a fixture
+tree instead. `CodeHealth.REPO_ROOT` states why the seam is written this way.
+"""
+function measure(; root = CodeHealth.REPO_ROOT, files = CodeHealth.source_files(; root),
+                 declaring = CodeHealth.DECLARING_FILES)
+    bad = parse_failures(files; root)
     if !(isempty(bad))
         error("A file in scope does not parse:\n" * join(bad, "\n"))
     end
-    decl = CodeHealth.declaration_macros(files)
+    decl = CodeHealth.declaration_macros(files; root, declaring)
     numbers = Dict{String, FileNumbers}()
     for f in files
         mx, sm = Dict{String, Int}(), Dict{String, Int}()
         defs = Dict{String, Vector{CodeHealth.Definition}}()
         for (key, metric) in METRICS
-            fns = measure_file(metric, joinpath(CodeHealth.REPO_ROOT, f)).functions
+            fns = measure_file(metric, joinpath(root, f)).functions
             mx[key] = isempty(fns) ? 0 : maximum(fn -> fn.value, fns)
             sm[key] = sum(fn -> fn.value, fns; init = 0)
             defs[key] = [CodeHealth.Definition(String(fn.name), fn.value, fn.line)
                          for fn in fns]
         end
-        marker = sort!(collect(intersect(CodeHealth.called_macros(f), decl)))
+        marker = sort!(collect(intersect(CodeHealth.called_macros(f; root), decl)))
         numbers[f] = FileNumbers(mx, sm, defs, marker)
     end
-    return (; files, numbers, provenance = provenance())
+    return (; files, numbers, provenance = provenance(; root))
 end
 
-function provenance()
+function provenance(; root = CodeHealth.REPO_ROOT)
     deps = Pkg.dependencies()
     version(name) = string(only(v.version for v in values(deps) if v.name == name))
     return ["julia" => string(VERSION), "code_complexity" => version("CodeComplexity"),
             "julia_syntax" => version("JuliaSyntax"),
-            "commit" => CodeHealth.git_short_commit()]
+            "commit" => CodeHealth.git_short_commit(; root)]
 end
 
 function row(n::FileNumbers)

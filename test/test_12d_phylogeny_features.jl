@@ -116,15 +116,18 @@ end
     # stored matrix left that could describe a different one.
     for alg in (Proximity(; decay = NoDecay()), Proximity()), pl in (NTE, CLE)
         pr = prior(FeaturePrior(; ze = PhylogenyFeatures(; pl = pl, alg = alg)), rd)
-        @test size(pr.Z) == (NA, NA)              # the only producer whose axes coincide
-        @test pr.Z == phylogeny_features(alg, pl, rd.X)
+        @test size(panel_feature_matrix(pr.pnl)[2]) == (NA, NA)              # the only producer whose axes coincide
+        @test panel_feature_matrix(pr.pnl)[2] == phylogeny_features(alg, pl, rd.X)
     end
 
     # Squareness is a property of the matrix, not a claim on the carrier: the other producers
     # are rectangular and the carrier says nothing about either case.
-    @test size(prior(FeaturePrior(; pe = FactorPrior(), ze = RegressionFeatures()), rd).Z,
+    @test size(panel_feature_matrix(prior(FeaturePrior(; pe = FactorPrior(),
+                                                       ze = RegressionFeatures()), rd).pnl)[2],
                2) != NA
-    @test size(prior(FeaturePrior(; ze = rand(StableRNG(987654321), NA, 3)), rd).Z) ==
+    @test size(panel_feature_matrix(prior(FeaturePrior(;
+                                                       ze = rand(StableRNG(987654321), NA,
+                                                                 3)), rd).pnl)[2]) ==
           (NA, 3)
 end
 
@@ -137,8 +140,8 @@ end
     for pl in (NTE, CLE)
         pr = prior(FeaturePrior(; ze = PhylogenyFeatures(; pl = pl)), rd)
         prv = PortfolioOptimisers.port_opt_view(pr, i)
-        @test size(prv.Z) == (length(i), NA)
-        @test prv.Z == pr.Z[i, :]
+        @test size(panel_feature_matrix(prv.pnl)[2]) == (length(i), NA)
+        @test panel_feature_matrix(prv.pnl)[2] == panel_feature_matrix(pr.pnl)[2][i, :]
     end
 
     # The semantics survive the flag, reached by the better route. A subproblem is measured
@@ -149,15 +152,16 @@ end
     pen = FeaturePrior(; ze = PhylogenyFeatures(; pl = NTE))
     prs = prior(pen, rd)
     rdv = ReturnsResult(; nx = rd.nx[i], X = rd.X[:, i])
-    Zr = prior(PortfolioOptimisers.port_opt_view(pen, i), rdv).Z
+    Zr = panel_feature_matrix(prior(PortfolioOptimisers.port_opt_view(pen, i), rdv).pnl)[2]
     @test size(Zr) == (length(i), length(i))
-    @test distance(de, Zr) != distance(de, prs.Z)[i, i]
+    @test distance(de, Zr) != distance(de, panel_feature_matrix(prs.pnl)[2])[i, i]
 
     # A rectangular producer is the contrast: its feature axis is not the asset axis, so a
     # view keeps every row's feature vector intact and the distance does commute.
     prf = prior(FeaturePrior(; pe = FactorPrior(), ze = RegressionFeatures()), rd)
-    @test distance(de, PortfolioOptimisers.port_opt_view(prf, i).Z) ==
-          distance(de, prf.Z)[i, i]
+    @test distance(de,
+                   panel_feature_matrix(PortfolioOptimisers.port_opt_view(prf, i).pnl)[2]) ==
+          distance(de, panel_feature_matrix(prf.pnl)[2])[i, i]
 end
 
 @testset "Every producer is configuration, so a view passes it through" begin
@@ -177,7 +181,7 @@ end
     # feature matrix a subproblem sees describes the subproblem's assets.
     rdv = ReturnsResult(; nx = rd.nx[i], X = rd.X[:, i])
     pen = FeaturePrior(; ze = PhylogenyFeatures(; pl = NTE))
-    Zv = prior(PortfolioOptimisers.port_opt_view(pen, i), rdv).Z
+    Zv = panel_feature_matrix(prior(PortfolioOptimisers.port_opt_view(pen, i), rdv).pnl)[2]
     @test size(Zv) == (length(i), length(i))
     @test Zv == phylogeny_features(Proximity(), NTE, rd.X[:, i])
 end
@@ -217,7 +221,8 @@ end
     # — they agree at k = 2 and k = 3 and only diverge from k = 4 on. Recorded rather than
     # asserted away: it is what an endogenous source buys, and what it does not.
     pr = prior(FeaturePrior(; ze = PhylogenyFeatures(; pl = NTE)), rd)
-    hf = Clustering.hclust(distance(FeatureDistance(), pr.Z); linkage = :ward)
+    hf = Clustering.hclust(distance(FeatureDistance(), panel_feature_matrix(pr.pnl)[2]);
+                           linkage = :ward)
     @test hf.merges != hc.merges
     @test Clustering.cutree(hf; k = 3) == Clustering.cutree(hc; k = 3)
     @test Clustering.cutree(hf; k = 4) != Clustering.cutree(hc; k = 4)
@@ -227,14 +232,15 @@ end
     # is endogenous too, and coarser: it recodes a clustering of the same returns, so it
     # agrees with the correlation hierarchy at the cut that defined it.
     prc = prior(FeaturePrior(; ze = PhylogenyFeatures(; pl = CLE)), rd)
-    hxc = Clustering.hclust(distance(FeatureDistance(), prc.Z); linkage = :ward)
-    @test size(prc.Z) == (NA, NA)
-    @test length(unique(prc.Z)) == 2
+    hxc = Clustering.hclust(distance(FeatureDistance(), panel_feature_matrix(prc.pnl)[2]);
+                            linkage = :ward)
+    @test size(panel_feature_matrix(prc.pnl)[2]) == (NA, NA)
+    @test length(unique(panel_feature_matrix(prc.pnl)[2])) == 2
 end
 
 @testset "The recursion hazard fails loudly rather than looping" begin
     # A `FeatureDistance` inside the source's own `de` runs inside `prior(pe, X, F; …)`,
-    # before `pr.Z` exists, so there is no feature matrix to find and none to recurse into.
+    # before `panel_feature_matrix(pr.pnl)[2]` exists, so there is no feature matrix to find and none to recurse into.
     ze = PhylogenyFeatures(; pl = NetworkEstimator(; de = FeatureDistance()))
     @test_throws PortfolioOptimisers.IsNothingError prior(FeaturePrior(; ze = ze), rd)
     res = @test_throws PortfolioOptimisers.IsNothingError phylogeny_features(Proximity(;
@@ -331,6 +337,22 @@ end
     @test all(≈(exp(-0.8)), es[2:end] ./ es[1:(end - 1)])
     @test !all(≈(rs[2] / rs[1]), rs[2:end] ./ rs[1:(end - 1)])
     @test rs[end] > es[end]                       # heavier tail
+
+    # `power` is a fall-off dial on the shipped spelling `(1 + d)^-p`: raising it lowers the
+    # score at every `d > 0` and moves `f(0) = 1` not at all. The rejected spelling
+    # `(1 + d^p)^-1` is what `ReciprocalDecay`'s docstring contrasts it with, and the
+    # contrast is that the rejected one pivots at `d = 1` and reverses direction across it.
+    for d in (0.25, 0.5, 1.0, 2.0, 4.0)
+        @test separation_decay(ReciprocalDecay(; power = 3.0), d, 9) <
+              separation_decay(ReciprocalDecay(; power = 1.0), d, 9)
+    end
+    @test separation_decay(ReciprocalDecay(; power = 3.0), 0, 9) ==
+          separation_decay(ReciprocalDecay(; power = 1.0), 0, 9) ==
+          1
+    alt_recip(d, p) = inv(1 + d^p)
+    @test alt_recip(1.0, 3.0) == alt_recip(1.0, 1.0) == 0.5
+    @test alt_recip(0.5, 3.0) > alt_recip(0.5, 1.0)
+    @test alt_recip(2.0, 3.0) < alt_recip(2.0, 1.0)
 
     # Field validation, on the members that carry a parameter.
     @test_throws DomainError ExponentialDecay(; rate = 0)
@@ -714,7 +736,7 @@ end
         @test all(>(0), diag(Z))                  # the diagonal is the top of the scale
         @test maximum(Z) == first(diag(Z))
         pr = prior(FeaturePrior(; ze = PhylogenyFeatures(; pl = pl, alg = alg)), rd)
-        @test pr.Z == Z
+        @test panel_feature_matrix(pr.pnl)[2] == Z
     end
 
     # `dmax = nothing` reaches the whole connected component, so a flat decay over a graph

@@ -541,9 +541,15 @@ This fallback lets a correlation-style covariance estimator define only its [`St
 
 Where:
 
-  - ``\\hat{\\mathbf{\\Sigma}}``: Estimated covariance matrix.
-  - ``\\hat{\\rho}_{ij}``: Correlation between assets ``i`` and ``j``, from `cor(ce, X)`.
-  - ``\\hat{\\sigma}_i``: Standard deviation of asset ``i``, from `std(ce.ve, X)`.
+  - $(math_dict[:Sigma_hat])
+  - ``\\hat{\\rho}_{ij}``: Correlation between assets ``i`` and ``j``.
+  - ``\\hat{\\sigma}_i``: Standard deviation of asset ``i``.
+
+# Algorithm
+
+ 1. Estimate the correlation matrix with `Statistics.cor(ce, X)`.
+ 2. Estimate the marginal standard deviations with `Statistics.std(ce.ve, X)`.
+ 3. Rescale the correlation matrix into a covariance matrix with `StatsBase.cor2cov!`. The call is in place, so it consumes the matrix that step 1 returned.
 
 # Arguments
 
@@ -573,6 +579,11 @@ end
 Materialise a lazy or sparse observation matrix as a dense `Matrix`.
 
 `StatsBase`'s weighted moment API is typed on `DenseMatrix`. A `Transpose`, an `Adjoint`, a `SubArray` or a sparse matrix does not match it. Without a `mean` the call raises a `MethodError`, which is recoverable. With a `mean` it is not: `cov(::SimpleCovariance, X, w; mean = mu)` forwards four positional arguments as `covm(X, mu, w, dims)`, and when the `DenseMatrix` method does not match, that call resolves to `Statistics.covm(x, xmean, y, ymean, vardim)` — the **cross-covariance of `X` against the weight vector**. It returns an `N × 1` matrix in place of an `N × N` one and raises nothing. [`robust_cov`](@ref) and [`robust_cor`](@ref) densify before every weighted call so that neither outcome is reachable.
+
+# Algorithm
+
+ 1. When `X` is a `DenseMatrix` of numbers or of `JuMP` scalars, return it unchanged.
+ 2. Otherwise return `Matrix(X)`, a dense copy.
 
 # Arguments
 
@@ -606,6 +617,12 @@ end
 
 Compute the covariance matrix robustly using the specified covariance estimator `ce`, data matrix `X`, and optional weights vector `w`.
 
+# Algorithm
+
+ 1. When the caller passed extra keyword arguments, and `hasmethod` reports that `Statistics.cov` takes `dims`, `mean` and those keys for this estimator and these arguments, call `Statistics.cov` with all of them and return the result.
+ 2. When step 1 raises a `MethodError`, drop the extra keyword arguments and continue. A method whose signature ends in a `kwargs...` slurp satisfies `hasmethod` and can still reject a key further down its call chain. Any other error propagates to the caller.
+ 3. Call `Statistics.cov(ce, X, args...; dims = dims, mean = mean)`, and return the result.
+
 # Arguments
 
   - $(arg_dict[:ce])
@@ -618,12 +635,6 @@ Compute the covariance matrix robustly using the specified covariance estimator 
 # Returns
 
   - $(ret_dict[:sigma])
-
-# Details
-
-  - This function computes the optionally weighted covariance matrix using the provided estimator and keyword arguments.
-  - Keyword arguments are only forwarded if the estimator's `cov` method accepts them (checked via `hasmethod`); otherwise the call is made with `dims` and `mean` alone. If the forwarded call throws a `MethodError` (e.g. a `kwargs...` slurp that rejects them further down its call chain), it is retried without them. Genuine errors thrown by the estimator propagate to the caller.
-  - If the call throws a `MethodError`, it is retried once with a densified `Matrix(X)`.
 
 # Related
 
@@ -660,6 +671,12 @@ end
 
 Computes the optionally weighted covariance with [`compat_cov`](@ref) on dense observations. The unweighted method retries once with a densified `Matrix` after a `MethodError`. The weighted method calls [`densify`](@ref) before the estimator.
 
+# Algorithm
+
+ 1. Without `w`, call [`compat_cov`](@ref) on `X` as the caller gave it. When that call raises a `MethodError`, call [`compat_cov`](@ref) once more on `Matrix(X)`. Any other error propagates to the caller.
+ 2. With `w`, densify `X` with [`densify`](@ref), then call [`compat_cov`](@ref) once. There is no retry, because the densification already removes the only failure the retry answers.
+ 3. Return the matrix that [`compat_cov`](@ref) returned.
+
 # Arguments
 
   - $(arg_dict[:ce])
@@ -669,15 +686,13 @@ Computes the optionally weighted covariance with [`compat_cov`](@ref) on dense o
   - $(arg_dict[:omean])
   - `kwargs...`: Additional keyword arguments passed to `compat_cov`.
 
+# Validation
+
+  - $(val_dict[:dims])
+
 # Returns
 
   - $(ret_dict[:sigma])
-
-# Details
-
-  - This function computes the optionally weighted covariance matrix using the provided estimator and keyword arguments.
-  - The unweighted method calls the estimator on `X` as given. If the call throws a `MethodError`, it is retried once with a densified `Matrix(X)`.
-  - The weighted method calls [`densify`](@ref) first. `StatsBase`'s weighted API is typed on `DenseMatrix`, and a lazy `X` can resolve to a cross-covariance there without raising.
 
 # Related
 
@@ -715,6 +730,15 @@ end
 
 Compute the correlation matrix robustly using the specified covariance estimator `ce`, data matrix `X`, and optional weights vector `w`.
 
+# Algorithm
+
+ 1. When `hasmethod` reports that `Statistics.cor` takes `dims` and `mean` for this estimator and these arguments, take steps 2 and 3. Otherwise take step 4.
+ 2. When the caller passed extra keyword arguments, and `hasmethod` reports that `Statistics.cor` takes those keys too, call `Statistics.cor` with all of them and return the result. When that call raises a `MethodError`, drop the extra keyword arguments and continue. A method whose signature ends in a `kwargs...` slurp satisfies `hasmethod` and can still reject a key further down its call chain.
+ 3. Call `Statistics.cor(ce, X, args...; dims = dims, mean = mean)`, and return the result. When that call raises a `MethodError`, continue to step 4. Any other error propagates to the caller.
+ 4. The estimator answers no `cor` call, so compute the covariance matrix `sigma` with [`robust_cov`](@ref) instead.
+ 5. When `sigma` is mutable, convert it to a correlation matrix in place with `StatsBase.cov2cor!` and the square roots of its own diagonal. Otherwise convert a dense copy with `StatsBase.cov2cor`.
+ 6. Return `sigma`.
+
 # Arguments
 
   - $(arg_dict[:ce])
@@ -727,13 +751,6 @@ Compute the correlation matrix robustly using the specified covariance estimator
 # Returns
 
   - $(ret_dict[:rho])
-
-# Details
-
-  - This function computes the optionally weighted correlation matrix using the provided estimator and keyword arguments.
-  - Keyword arguments are only forwarded if the estimator's `cor` method accepts them (checked via `hasmethod`); otherwise the call is made with `dims` and `mean` alone. If the forwarded call throws a `MethodError` (e.g. a `kwargs...` slurp that rejects them further down its call chain), it is retried without them. Genuine errors thrown by the estimator propagate to the caller.
-  - If the estimator defines no suitable `cor` method, the result is computed with [`robust_cov`](@ref) and converted to a correlation matrix.
-  - If the call throws a `MethodError`, it is retried once with a densified `Matrix(X)`.
 
 # Related
 
@@ -786,6 +803,12 @@ end
 
 Computes the optionally weighted correlation with [`compat_cor`](@ref) on dense observations. The unweighted method retries once with a densified `Matrix` after a `MethodError`. The weighted method calls [`densify`](@ref) before the estimator.
 
+# Algorithm
+
+ 1. Without `w`, call [`compat_cor`](@ref) on `X` as the caller gave it. When that call raises a `MethodError`, call [`compat_cor`](@ref) once more on `Matrix(X)`. Any other error propagates to the caller.
+ 2. With `w`, densify `X` with [`densify`](@ref), then call [`compat_cor`](@ref) once. There is no retry, because the densification already removes the only failure the retry answers.
+ 3. Return the matrix that [`compat_cor`](@ref) returned.
+
 # Arguments
 
   - $(arg_dict[:ce])
@@ -795,15 +818,13 @@ Computes the optionally weighted correlation with [`compat_cor`](@ref) on dense 
   - $(arg_dict[:omean])
   - `kwargs...`: Additional keyword arguments passed to `compat_cor`.
 
+# Validation
+
+  - $(val_dict[:dims])
+
 # Returns
 
   - $(ret_dict[:rho])
-
-# Details
-
-  - This function computes the optionally weighted correlation matrix using the provided estimator and keyword arguments.
-  - The unweighted method calls the estimator on `X` as given. If the call throws a `MethodError`, it is retried once with a densified `Matrix(X)`.
-  - The weighted method calls [`densify`](@ref) first. `StatsBase`'s weighted API is typed on `DenseMatrix`, and a lazy `X` can resolve to a cross-correlation there without raising.
 
 # Related
 
@@ -847,7 +868,14 @@ end
 
 Apply the observation window and resolve weights for moment estimation.
 
-Slices `X` to the last `window` observations (if provided) and resolves the observation weights, returning the windowed data and finalised weights.
+Takes the view of `X` over the observations that `window` indexes, and resolves the observation weights over that same view. The caller resolves `window` first with [`get_window`](@ref), so an `Int` window has already become a range by the time it reaches this function.
+
+# Algorithm
+
+ 1. Without a `window`, `X` passes through unchanged, and step 3 resolves the weights over the whole of it.
+ 2. With a `window`, take the view of `X` over those observations. For a matrix that is `view(X, window, :)` when `dims == 1`, and `view(X, :, window)` when `dims == 2`. For a vector it is `view(X, window)`. Index `w` to the same observations with [`nothing_scalar_array_getindex`](@ref).
+ 3. Resolve the observation weights with [`get_observation_weights`](@ref), over `w` and the `X` of the step above.
+ 4. Return that `X` and the resolved `w`.
 
 # Arguments
 
@@ -864,19 +892,11 @@ Slices `X` to the last `window` observations (if provided) and resolves the obse
   - `X::VecNum_MatNum`: Appropriately windowed data matrix.
   - `w::Option{<:StatsBase.AbstractWeights}`: Resolved and appropriately windowed weights.
 
-# Details
-
-  - If `window` is provided:
-      + Gets the appropriate view of `X` given its type and the value of `dims`.
-      + Calls [`nothing_scalar_array_getindex`](@ref) on `w` to resolve the windowed weights.
-  - If no `window` is provided:
-      + Calls [`get_observation_weights`](@ref) on `w` to resolve the weights.
-  - Returns the appropriate `X` and `w`.
-
 # Related
 
   - [`get_window`](@ref)
   - [`get_observation_weights`](@ref)
+  - [`nothing_scalar_array_getindex`](@ref)
 """
 function moment_window_and_weights(X::MatNum, w::Option{<:ObsWeights}, args...;
                                    dims::Int = 1, kwargs...)
@@ -902,10 +922,62 @@ function moment_window_and_weights(X::VecNum, w::Option{<:ObsWeights}, window::V
     return X, w
 end
 """
+    weighted_centre(X::MatNum, me::AbstractExpectedReturnsEstimator,
+                    w::Option{<:ObsWeights}; dims::Int = 1, mean = nothing,
+                    kwargs...) -> Union{<:Number, <:ArrNum}
+
+Resolve the centre that a moment estimator's own observation weights weight.
+
+[ADR 0088](https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/main/docs/adr/0088-a-moment-estimators-weights-weight-its-centre.md) decided that a moment estimator's observation weights weight its centre, and not its deviations alone. This verb is the one place that decision lives, so [`SimpleVariance`](@ref), [`Covariance`](@ref), [`Coskewness`](@ref) and [`Cokurtosis`](@ref) reach their centre by one rule.
+
+# Algorithm
+
+ 1. `mean` is not `nothing`: return it unchanged. The keyword is the escape hatch for a centre that `w` does not describe.
+ 2. `w` is `nothing`: return `Statistics.mean(me, X; dims = dims, kwargs...)`.
+ 3. `w` is not `nothing`: send `me` through [`factory`](@ref) with `w`, so the centre carries the weights of the deviations, and return the mean of the rebuilt estimator.
+
+Step 2 is a performance guard and not a second contract. `w` reaches this verb from a field, so its type decides the branch, and the guard keeps a windowed loop from rebuilding the estimator tree of `me` once per window.
+
+# Arguments
+
+  - $(arg_dict[:X])
+  - $(arg_dict[:me])
+  - $(arg_dict[:oow])
+  - $(arg_dict[:dims])
+  - $(arg_dict[:omean])
+  - `kwargs...`: Additional keyword arguments for the expected returns estimator.
+
+# Returns
+
+  - `mu::Union{<:Number, <:ArrNum}`: Centring vector, weighted by `w` when `w` is not `nothing`.
+
+# Related
+
+  - [`AbstractExpectedReturnsEstimator`](@ref)
+  - [`demean_returns`](@ref)
+  - [`covariance_centre_and_estimator`](@ref)
+  - [`factory`](@ref)
+"""
+function weighted_centre(X::MatNum, me::AbstractExpectedReturnsEstimator,
+                         w::Option{<:ObsWeights}; dims::Int = 1, mean = nothing, kwargs...)
+    return if !isnothing(mean)
+        mean
+    elseif isnothing(w)
+        Statistics.mean(me, X; dims = dims, kwargs...)
+    else
+        Statistics.mean(factory(me, w), X; dims = dims, kwargs...)
+    end
+end
+"""
     demean_returns(X::MatNum, me::AbstractExpectedReturnsEstimator; dims::Int = 1, mean = nothing,
                    kwargs...) -> MatNum
 
 Demeans the returns in `X` using the expected returns estimator `me` or if provided, a `mean` array.
+
+# Algorithm
+
+ 1. Resolve the centre `mu` with [`weighted_centre`](@ref). When `mean` is `nothing`, the estimator computes it; otherwise `mu` is `mean`. `me` carries whatever weights it holds, and this verb adds none of its own.
+ 2. Subtract `mu` from `X` by broadcast, and return the result. `dims` names the observation axis, and the estimator shapes `mu` along the other one, so the broadcast subtracts one value per asset from every observation of that asset.
 
 # Arguments
 
@@ -922,23 +994,29 @@ Demeans the returns in `X` using the expected returns estimator `me` or if provi
 # Related
 
   - [`AbstractExpectedReturnsEstimator`](@ref)
+  - [`weighted_centre`](@ref)
 """
 function demean_returns(X::MatNum, me::AbstractExpectedReturnsEstimator; dims::Int = 1,
                         mean = nothing, kwargs...)
-    mu = isnothing(mean) ? Statistics.mean(me, X; dims = dims, kwargs...) : mean
-    return X .- mu
+    return X .- weighted_centre(X, me, nothing; dims = dims, mean = mean, kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Shared preamble for windowed moment estimators (matrix input).
 
-Resolves the window specification, subsets `X` (and `iv`) to the selected observations,
-rebinds observation weights to the window, and builds a weight-updated copy of `est` via
-[`factory`](@ref). Whenever a window is given — an `Int` (which resolves to a range) or an
-explicit index vector — `iv` is subset to the same rows, or columns when `dims = 2`, so it
-stays aligned with the windowed returns. Only `window = nothing`, which resolves to a
-`Colon`, leaves `iv` unchanged.
+Whenever a window is given — an `Int`, which resolves to a range, or an explicit index
+vector — `iv` is subset to the same rows, or columns when `dims = 2`, so it stays aligned
+with the windowed returns. Only `window = nothing`, which resolves to a `Colon`, leaves `iv`
+unchanged.
+
+# Algorithm
+
+ 1. Resolve `window` with [`get_window`](@ref), giving `win`. `nothing` resolves to a `Colon`, an `Int` to the range of the last `window` observations, and an index vector passes through.
+ 2. Apply `win` to `X` and rebind the observation weights to it with [`moment_window_and_weights`](@ref), giving the windowed `X` and `w_new`.
+ 3. Build `inner`, a copy of `est` that carries `w_new`, with [`factory`](@ref).
+ 4. When `iv` is given and `win` is an index vector, subset `iv` to the same rows, or to the same columns when `dims == 2`. A `Colon` leaves `iv` unchanged, so the full-data case never copies it.
+ 5. Return `inner`, the windowed `X`, and `iv`.
 
 # Arguments
 
@@ -953,6 +1031,10 @@ stays aligned with the windowed returns. Only `window = nothing`, which resolves
     [`assert_dims`](@ref), so every generated windowed method rejects an out-of-range `dims`
     instead of silently resolving a one-observation window.
   - `kwargs...`: Passed through to [`moment_window_and_weights`](@ref).
+
+# Validation
+
+  - $(val_dict[:dims])
 
 # Returns
 
@@ -988,9 +1070,15 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Shared preamble for windowed moment estimators (vector input).
 
-Resolves the window specification, subsets `X` to the selected observations, rebinds
-observation weights to the window, and builds a weight-updated copy of `est` via
-[`factory`](@ref).
+This method takes no `dims`, because a vector carries one axis, and no `iv`, because no
+vector generic of the family declares one.
+
+# Algorithm
+
+ 1. Resolve `window` with [`get_window`](@ref), giving `win`. `nothing` resolves to a `Colon`, an `Int` to the range of the last `window` observations, and an index vector passes through.
+ 2. Apply `win` to `X` and rebind the observation weights to it with [`moment_window_and_weights`](@ref), giving the windowed `X` and `w_new`.
+ 3. Build `inner`, a copy of `est` that carries `w_new`, with [`factory`](@ref).
+ 4. Return `inner` and the windowed `X`.
 
 # Arguments
 
@@ -1053,6 +1141,14 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Throw a uniform, expansion-time [`ArgumentError`](https://docs.julialang.org/en/v1/base/base/#Core.ArgumentError) for a malformed [`@windowed_estimator`](@ref) declaration.
 
+# Arguments
+
+  - `msg::AbstractString`: Body of the message. The function prefixes it with `@windowed_estimator: `, so every message of the macro reads alike.
+
+# Validation
+
+  - The function always raises, so it never returns to its caller.
+
 # Related
 
   - [`@windowed_estimator`](@ref)
@@ -1065,6 +1161,20 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Validate that `key` names an entry of `dict`, appending a [`did_you_mean`](@ref) suggestion
 to the error when it does not. `what` names the table in the message.
+
+# Arguments
+
+  - `key::Symbol`: The key the declaration wrote.
+  - `dict::AbstractDict`: The table the key must name an entry of.
+  - `what::AbstractString`: Name of that table, written into the message.
+
+# Validation
+
+  - `haskey(dict, key)`. A key that names no entry raises through [`windowed_estimator_error`](@ref), with a [`windowed_estimator_suggest`](@ref) suffix appended.
+
+# Returns
+
+  - `key::Symbol`: The key, unchanged, so a caller can check and bind in one expression.
 
 # Related
 
@@ -1089,6 +1199,15 @@ declaration-key suggestion shares: Damerau-Levenshtein at `min_score = 0.5`, bec
 candidates here are compile-time constants — block keys and `field_dict`/`ret_dict` names —
 with nothing to leak.
 
+# Arguments
+
+  - `key`: The mistyped key.
+  - `candidates`: The keys the declaration accepts.
+
+# Returns
+
+  - `msg::String`: The suggestion suffix, ready to append to a message, and empty when no candidate scores high enough.
+
 # Related
 
   - [`@windowed_estimator`](@ref)
@@ -1107,6 +1226,26 @@ inner estimator's field name, its declared type, and its keyword-constructor def
 The field name doubles as the [`field_dict`](@ref) key for the generated field docstring and
 as the argument name of every generated forwarding method, so it must follow the library's
 naming convention (`me`, `ce`, `ve`, `ske`, `kte`).
+
+# Algorithm
+
+ 1. Read the field name and its declared type from the left of the `=`, giving `name` and `type`.
+ 2. Check `name` against [`field_dict`](@ref) with [`windowed_estimator_check_key`](@ref).
+ 3. Return `name`, `type`, and the right of the `=`, which is the keyword-constructor default.
+
+# Arguments
+
+  - `ex`: The one `field::Type = default` line of the declaration body.
+
+# Validation
+
+  - `ex` reads `field::Type = default`. Any other shape raises.
+  - The field name is a `Symbol`. Any other name raises.
+  - The field name names an entry of [`field_dict`](@ref).
+
+# Returns
+
+  - `(name, type, default)`: The field name, its declared type, and its keyword-constructor default.
 
 # Related
 
@@ -1133,6 +1272,32 @@ Parse one `forward` entry of a [`@windowed_estimator`](@ref) body — `generic(:
 
 Naming `mean` in the mini-signature is what keeps it out of the forwarded `kwargs...`, where
 it would otherwise leak into [`windowed_preamble`](@ref).
+
+# Algorithm
+
+ 1. Split `ex` at the `=>`, giving the mini-signature `sig` and the return keys `rets`.
+ 2. Read the forwarded generic from the head of `sig`, giving `gen`.
+ 3. Walk the arguments of `sig`. A `mean` keyword sets `has_mean`. The one positional argument type sets `input`.
+ 4. Check `input` against [`WINDOWED_ESTIMATOR_INPUTS`](@ref).
+ 5. Check every entry of `rets` against [`ret_dict`](@ref) with [`windowed_estimator_check_key`](@ref), collecting them into `keys_`.
+ 6. Return `gen`, `input`, `has_mean` and `keys_`.
+
+# Arguments
+
+  - `ex`: One entry of the `forward` vector of the declaration body.
+
+# Validation
+
+  - `ex` reads `generic(::Input[; mean]) => :ret_key`, or `=> (:k1, :k2)` for a tuple return. Any other shape raises.
+  - The left of the `=>` is a call.
+  - `mean` is the only keyword the mini-signature may name.
+  - The mini-signature declares exactly one positional argument type.
+  - That type names an entry of [`WINDOWED_ESTIMATOR_INPUTS`](@ref).
+  - Every return key is a quoted symbol, and names an entry of [`ret_dict`](@ref).
+
+# Returns
+
+  - `(gen, input, has_mean, keys_)`: The forwarded generic, its input type, whether the mini-signature names `mean`, and the [`ret_dict`](@ref) keys of its return values.
 
 # Related
 
@@ -1187,6 +1352,17 @@ forwarding method from the type's and its siblings' `# Related` sections.
 Keyword arguments are deliberately omitted: Documenter resolves an `@ref` by positional
 method signature, and the two positional types already identify the method uniquely.
 
+# Arguments
+
+  - `gen`: The forwarded generic.
+  - `field::Symbol`: Name of the inner estimator's field, which is also the argument name of the generated method.
+  - `name::Symbol`: Name of the windowed estimator type.
+  - `input::Symbol`: Input type of the generated method, `:MatNum` or `:VecNum`.
+
+# Returns
+
+  - `ref::String`: A Documenter cross-reference to the generated method. It links the code span `gen(field::Name, X::Input)` to that method.
+
 # Related
 
   - [`@windowed_estimator`](@ref)
@@ -1202,6 +1378,32 @@ Build the docstring for one generated forwarding method as an interpolation AST.
 Returning `Expr(:string, ...)` rather than a `String` is load-bearing: it keeps
 [`arg_dict`](@ref) and [`ret_dict`](@ref) lookups as live parts of the `DocStr`, exactly as
 a hand-written `\$(arg_dict[:dims])` would be.
+
+# Algorithm
+
+ 1. Build the signature line `sig` from `gen`, `field`, `name` and `input`. The matrix signature carries `dims`, `iv` and `kwargs...`; the vector signature carries neither. `mean` joins either one when `has_mean` is set.
+ 2. Open `parts` with `sig`, the summary sentences, the two steps of the generated method's own algorithm, and the arguments heading with its two prose bullets. The summary names the generic and not the type's noun, because `std` on a `WindowedVariance` computes a standard deviation and not a variance.
+ 3. For the matrix input, push the `arg_dict[:dims]` lookup as a live expression.
+ 4. When `has_mean` is set, push the `mean` bullet.
+ 5. For the matrix input, push the `arg_dict[:oiv]` lookup and the `kwargs...` bullet.
+ 6. Push the returns heading, then one live `ret_dict` lookup per entry of `ret_keys`.
+ 7. Push the related heading, the type, every entry of `siblings`, and [`windowed_preamble`](@ref).
+ 8. Return `parts` wrapped in `Expr(:string, ...)`, so every lookup stays live.
+
+# Arguments
+
+  - `gen`: The forwarded generic.
+  - `field::Symbol`: Name of the inner estimator's field, which is also the argument name of the generated method.
+  - `name::Symbol`: Name of the windowed estimator type.
+  - `input::Symbol`: Input type of the generated method, `:MatNum` or `:VecNum`.
+  - `has_mean::Bool`: Whether the method declares a `mean` keyword.
+  - `ret_keys::Vector{Symbol}`: The [`ret_dict`](@ref) keys documenting the return values.
+  - `noun::AbstractString`: Capitalised noun phrase naming the moment, which drives the generated prose.
+  - `siblings::Vector{String}`: Cross-references to the type's other generated methods, from [`windowed_method_ref`](@ref).
+
+# Returns
+
+  - `doc::Expr`: An `Expr(:string, ...)` holding the docstring, with every dictionary lookup left unevaluated.
 
 # Related
 
@@ -1224,7 +1426,7 @@ function windowed_method_doc(gen, field::Symbol, name::Symbol, input::Symbol,
     # The summary names the *generic*, not the type's noun: `std` on a WindowedVariance
     # computes a standard deviation, not a variance.
     parts = Any["\n", sig,
-                "\n\nCompute `$(gen)` over a rolling or indexed observation window ($(is_mat ? "matrix" : "vector") input).\n\nThis method selects a window of observations from `X` (and applies observation weights if specified), then delegates to the underlying $(lc) estimator.\n\n# Arguments\n\n  - `$(field)`: Windowed $(lc) estimator.\n  - `X`: Data $(is_mat ? "matrix of asset returns (observations × assets)" : "vector of returns").\n"]
+                "\n\nCompute `$(gen)` over a rolling or indexed observation window ($(is_mat ? "matrix" : "vector") input).\n\nThis method selects a window of observations from `X` (and applies observation weights if specified), then delegates to the underlying $(lc) estimator.\n\n# Algorithm\n\n 1. Resolve the window and the observation weights with [`windowed_preamble`](@ref), giving `inner`, a copy of `$(field).$(field)` that carries the windowed weights, together with the windowed `X`$(is_mat ? " and the windowed `iv`" : "").\n 2. Call `$(gen)` on `inner` and the windowed `X`, and return its result. The inner estimator alone decides the value, so the window and the weights are the whole of this method's contribution.\n\n# Arguments\n\n  - `$(field)`: Windowed $(lc) estimator.\n  - `X`: Data $(is_mat ? "matrix of asset returns (observations × assets)" : "vector of returns").\n"]
     if is_mat
         push!(parts, "  - ", :(arg_dict[:dims]), "\n")
     end
@@ -1252,6 +1454,26 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Build one generated forwarding method: resolve the window via [`windowed_preamble`](@ref),
 then delegate to the inner estimator's own method.
+
+# Algorithm
+
+ 1. Build the three field accesses the body reads: `field.field`, the inner estimator; `field.w`, the observation weights; and `field.window`, the window specification.
+ 2. Build the keyword list of the signature. The matrix method takes `dims`, then `mean` when `has_mean` is set, then `iv` and `kwargs...`. The vector method takes `mean` alone, and only when `has_mean` is set.
+ 3. Build the matching keyword list of the delegated call. It carries the same names, each forwarded by value, and the `iv` it forwards is the windowed one.
+ 4. Build the body: one call to [`windowed_preamble`](@ref) that binds `inner` and the windowed `X`, and `iv` too for the matrix method, then a `return` of `gen` applied to `inner` and that `X`.
+ 5. Return the whole `Expr(:function, ...)`.
+
+# Arguments
+
+  - `gen`: The forwarded generic.
+  - `field::Symbol`: Name of the inner estimator's field, which is also the argument name of the generated method.
+  - `name::Symbol`: Name of the windowed estimator type.
+  - `input::Symbol`: Input type of the generated method, `:MatNum` or `:VecNum`.
+  - `has_mean::Bool`: Whether the method declares a `mean` keyword.
+
+# Returns
+
+  - `def::Expr`: The `Expr(:function, ...)` of the forwarding method.
 
 # Related
 
@@ -1296,6 +1518,31 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Build the type docstring of a generated windowed estimator as an interpolation AST, keeping
 `DocStringExtensions` abbreviations and dictionary lookups live (see
 [`windowed_method_doc`](@ref)).
+
+# Algorithm
+
+ 1. Read the inner estimator's own name out of `default`, giving `inner_ref`. A call such as `SimpleVariance()` contributes its head; a bare name contributes itself.
+ 2. Open `parts` with the live `DocStringExtensions.TYPEDEF` abbreviation, the two summary sentences, the `# Fields` heading, and the live `DocStringExtensions.FIELDS` abbreviation.
+ 3. Push the `# Constructors` section, the keyword signature built from `name`, `field`, `ftype` and `default`, and the `## Validation` subsection carrying the live `val_dict[:oow]` lookup and the window rule.
+ 4. Push the three propagation subsections, `## Propagated parameters`, `## View parameters` and `## Observation weight parameters`, each naming `field` and `w` as the tags on the generated struct declare them.
+ 5. Push the `# Examples` section, fencing `doctest` as a `jldoctest` block.
+ 6. Push the `# Related` heading, the supertype, `inner_ref`, every entry of `methods`, and the four seam functions the type answers.
+ 7. Return `parts` wrapped in `Expr(:string, ...)`, so every lookup stays live.
+
+# Arguments
+
+  - `name::Symbol`: Name of the windowed estimator type.
+  - `super`: Its supertype.
+  - `field::Symbol`: Name of the inner estimator's field.
+  - `ftype`: Declared type of that field.
+  - `default`: Its keyword-constructor default.
+  - `noun::AbstractString`: Capitalised noun phrase naming the moment, which drives the generated prose.
+  - `doctest::AbstractString`: Body of the `jldoctest` block of the `# Examples` section, without its fences.
+  - `methods::Vector{String}`: Cross-references to the type's generated methods, from [`windowed_method_ref`](@ref).
+
+# Returns
+
+  - `doc::Expr`: An `Expr(:string, ...)` holding the docstring, with every abbreviation and lookup left unevaluated.
 
 # Related
 
@@ -1358,6 +1605,33 @@ in sync; see ADR 0039.
 
 Unknown keys, malformed `forward` entries, and unknown `field_dict`/`ret_dict` keys are
 rejected at macro-expansion time with a [`did_you_mean`](@ref) suggestion.
+
+# Algorithm
+
+ 1. Read `name` and `super` from the header.
+ 2. Walk the body once. The one `field::Type = default` line goes to [`windowed_parse_field`](@ref), which returns `field`, `ftype` and `default`. The `noun`, `forward` and `doctest` lines bind their values. Any other key raises.
+ 3. Parse every entry of `forward` with [`windowed_parse_forward`](@ref), giving `specs`.
+ 4. Render one cross-reference per entry of `specs` with [`windowed_method_ref`](@ref), giving `refs`.
+ 5. For each entry of `specs`, build one documented forwarding method: [`windowed_method_doc`](@ref) writes its docstring, and [`windowed_method_def`](@ref) writes its body. Each method's `# Related` section lists the `refs` of its siblings and not its own.
+ 6. Build `structexpr`, the `@concrete` struct. It declares the inner estimator tagged `@fprop @vprop`, `w` tagged `@wprop`, and `window`, each with its live [`field_dict`](@ref) lookup, and the inner constructor that validates `w` and `window`.
+ 7. Build `kwctor`, the keyword constructor, whose defaults are `default`, `nothing` and `nothing`.
+ 8. Write the type's docstring with [`windowed_type_doc`](@ref), and attach it to `structexpr` wrapped in `@propagatable @concrete`.
+ 9. Return the escaped block: the documented struct, `kwctor`, the forwarding methods, and the `export` of `name`.
+
+# Validation
+
+  - The header reads `Name <: Super`, and `Name` is a `Symbol`.
+  - The declaration body is a `begin ... end` block, and every line of it is an assignment.
+  - At most one `field::Type = default` line appears.
+  - Every other key names an entry of [`WINDOWED_ESTIMATOR_KEYS`](@ref). An unknown key raises with a [`windowed_estimator_suggest`](@ref) suffix.
+  - All four of `field::Type = default`, `noun`, `forward` and `doctest` are present.
+  - `noun` and `doctest` are string literals.
+  - `forward` is a vector, and it declares at least one generic.
+  - Every failure above raises an `ArgumentError` through [`windowed_estimator_error`](@ref), at macro-expansion time.
+
+# Returns
+
+  - `ex::Expr`: The escaped block that declares the whole family member.
 
 # Examples
 

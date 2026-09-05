@@ -446,10 +446,12 @@ end
 end
 @testset "Weight norm constraints double as a diversification floor" begin
     # l2c/lpc/linfc are upper bounds on the respective norm. Via the reciprocal recipe they
-    # act as diversification floors: l2c = 1/sqrt(m) and lpc val = m^(-1/p) require at least
-    # m (p-norm) effective assets; linfc = 1/m caps the largest weight at a 1/m share.
+    # act as diversification floors: l2c = 1/sqrt(m) and lpc val = m^(1/p - 1) require at
+    # least m order-p effective assets; linfc = 1/m caps the largest weight at a 1/m share.
+    # The order-p count is `number_effective_assets` taken to an arbitrary order, so an
+    # equal-weight portfolio over m assets reports exactly m at every order.
     opt(; kwargs...) = JuMPOptimiser(; pe = pr, slv = slv, kwargs...)
-    ena_p(w, p) = inv(sum(abs.(w) .^ p))
+    ena_p(w, p) = sum(abs.(w) .^ p)^inv(1 - p)
     w_none = optimise(MeanRisk(; obj = MaximumReturn(), opt = opt())).w
     @test number_effective_assets(w_none) < 1.5    # concentrated without a constraint
     for v in (4, 8)
@@ -459,7 +461,8 @@ end
     for v in (4, 8)
         w = optimise(MeanRisk(; obj = MaximumReturn(),
                               opt = opt(;
-                                        lpc = LpRegularisation(; p = 3, val = v^(-1 / 3))))).w
+                                        lpc = LpRegularisation(; p = 3,
+                                                               val = v^(1 / 3 - 1))))).w
         @test ena_p(w, 3) >= v - 1e-3
     end
     for v in (4, 8)

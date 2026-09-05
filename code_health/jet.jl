@@ -84,7 +84,7 @@ end
 # --- attribution and fingerprint -------------------------------------------
 
 """
-    attribute(report) -> Union{String, Nothing}
+    attribute_frame(report; root = REPO_ROOT) -> (file, line)
 
 The deepest frame of the report's virtual stack trace that names a file under `src/` or `ext/`.
 
@@ -94,12 +94,12 @@ them ending in `Base_compiler.jl`, which throws away a defect in package code wh
 ends inside a dependency. Keying on the **shallowest** frame piles hundreds of reports onto the few
 entry points, so the per-file key stops localising anything. ADR 0073.
 """
-function attribute_frame(report)
+function attribute_frame(report; root = CodeHealth.REPO_ROOT)
     hit, line = nothing, 0
     for frame in report.vst
         path = String(frame.file)
-        rel = if startswith(path, CodeHealth.REPO_ROOT)
-            lstrip(path[(length(CodeHealth.REPO_ROOT) + 1):end], '/')
+        rel = if startswith(path, root)
+            lstrip(path[(length(root) + 1):end], '/')
         else
             path
         end
@@ -108,7 +108,7 @@ function attribute_frame(report)
     return hit, line
 end
 
-attribute(report) = attribute_frame(report)[1]
+attribute(report; root = CodeHealth.REPO_ROOT) = attribute_frame(report; root)[1]
 
 report_kind(report) = String(nameof(typeof(report)))
 
@@ -166,12 +166,22 @@ function target_module(name::Symbol)
     return m
 end
 
-function measure()
+"""
+    measure(; root, files, rulings) -> NamedTuple
+
+Run each analysis of `RUNS` and record its reports against `files`, whose paths are read relative to
+`root`. The defaults are the live checkout, every file in scope and the committed Rulings, so the
+entry script calls `measure()` unchanged. `CodeHealth.REPO_ROOT` states why the seam is written this
+way.
+
+`report_package` analyses the loaded package and cannot be pointed at a tree, so `root` reaches the
+attribution and the file set alone.
+"""
+function measure(; root = CodeHealth.REPO_ROOT, files = CodeHealth.source_files(; root),
+                 rulings = CodeHealth.read_rulings())
     assert_environment()
     assert_load_set(LOAD_SET)
-    rulings = CodeHealth.read_rulings()
     dismissed = dismissal_set(rulings)
-    files = filter(CodeHealth.in_scope, CodeHealth.tracked_jl_files())
     runs = Pair{String, Any}[]
     reviewed = Dict(f => CodeHealth.Reviewed[] for f in files)
     unattributed = String[]
@@ -180,7 +190,7 @@ function measure()
         result = JET.report_package(target; target_modules = (JET.AnyFrameModule(target),))
         counts = Dict(f => Dict("raw" => 0, "reviewed" => 0) for f in files)
         for report in JET.get_reports(result)
-            file, line = attribute_frame(report)
+            file, line = attribute_frame(report; root)
             kind, message = report_kind(report), report_message(report)
             if file === nothing
                 push!(unattributed, "$run: $kind: $message")
@@ -200,15 +210,15 @@ function measure()
               "nowhere to be recorded and the gate would lose them silently:\n" *
               join(first(unattributed, 10), "\n"))
     end
-    return (; files, runs, reviewed, provenance = provenance())
+    return (; files, runs, reviewed, provenance = provenance(; root))
 end
 
-function provenance()
+function provenance(; root = CodeHealth.REPO_ROOT)
     deps = Pkg.dependencies()
     version(name) = string(only(v.version for v in values(deps) if v.name == name))
     return ["julia" => string(VERSION), "jet" => version("JET"), "filter" => FILTER,
             "attribution" => ATTRIBUTION, "load_set" => LOAD_SET,
-            "commit" => CodeHealth.git_short_commit()]
+            "commit" => CodeHealth.git_short_commit(; root)]
 end
 
 row(counts, f) = ["raw" => counts[f]["raw"], "reviewed" => counts[f]["reviewed"]]

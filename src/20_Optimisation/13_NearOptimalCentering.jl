@@ -138,6 +138,33 @@ function NearOptimalCenteringResult(; jr::JuMPOptimisationResult, r::BaseRM_VecB
                                       noc_retcode, fb)
 end
 """
+    set_retcode(res::NearOptimalCenteringResult, retcode::OptRetCode_VecOptRetCode)
+
+Rebuild a [`NearOptimalCenteringResult`](@ref) with a different return code.
+
+The population's return code is the one the embedded [`JuMPOptimisationResult`](@ref) carries, because `retcode` is not a field of this result and resolves through `jr`. So the rebuild rebuilds `jr`, and the three return codes this result names of its own are carried over unchanged.
+
+# Arguments
+
+  - `res`: Result to rebuild.
+  - `retcode`: Return code, or one per member of the population.
+
+# Returns
+
+  - [`NearOptimalCenteringResult`](@ref): The result, with the new return code.
+
+# Related
+
+  - [`set_retcode`](@ref)
+  - [`mark_ruined_members`](@ref)
+  - [`NearOptimalCenteringResult`](@ref)
+"""
+function set_retcode(res::NearOptimalCenteringResult, retcode::OptRetCode_VecOptRetCode)
+    return NearOptimalCenteringResult(set_retcode(res.jr, retcode), res.r,
+                                      res.w_min_retcode, res.w_opt_retcode,
+                                      res.w_max_retcode, res.noc_retcode, res.fb)
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the static defaults of the [`NearOptimalCentering`](@ref) fields that may hold a [`TimeDependent`](@ref).
@@ -647,6 +674,10 @@ function near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResu
     unconstrained = isa(noc.alg, UnconstrainedNearOptimalCentering)
     r = ucs_risk_measure(noc.r, rd)
     attrs = processed_jump_optimiser_attributes(noc.opt, rd; dims = dims, kwargs...)
+    # The corner solves below run the head's own `opt`, `r` and anchor weights against
+    # `rd`, so the head is reduced before any of them, and before the optimiser is
+    # repackaged from the bundle. `_optimise` takes the same view of its own locals.
+    noc, rd = investable_view(noc, rd, attrs.pr, attrs.imsk)
     opt = jump_optimiser_from_attributes(noc.opt, attrs)
     # The per-term corner solves need the same unbounded pair the max-return corner uses, so
     # the pair is built whenever a return term declares a frontier bound, even when both
@@ -1321,6 +1352,9 @@ function _optimise(noc::NearOptimalCentering, rd::ReturnsResult = ReturnsResult(
     noc = reset_time_dependent_estimator(noc)
     setup = near_optimal_centering_setup(noc, rd; dims = dims, kwargs...)
     (; w_opt, r, opt, attrs, w_min_retcode, w_opt_retcode, w_max_retcode) = setup
+    # The setup reduced its own locals. These are this method's, and they reach
+    # `assemble_near_optimal_centering_model!` directly.
+    noc, rd = investable_view(noc, rd, attrs.pr, attrs.imsk)
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, opt.sc, opt.so)

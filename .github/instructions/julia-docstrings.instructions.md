@@ -4,6 +4,30 @@ applyTo: 'src/**/*.jl, ext/**/*.jl, docs/**/*.md'
 
 # Docstring and Documentation Guidelines for PortfolioOptimisers.jl
 
+## How to read this file
+
+This file is the Authority for docstrings, in the sense of [`STANDARDS.md`](../../STANDARDS.md). It carries the rules, and it names where to read a real docstring. It holds no worked docstring of its own: a copy inside a standards file drifts away from the code, and a pointer cannot.
+
+Three kinds of block appear below.
+
+- **A rule** is prose or a bullet list. It is normative.
+- **A template** is a fenced block marked `**Template.**`. Its section names, its order and its shape are normative. The identifiers inside it are invented, and they are not.
+- **An example** is a fenced block marked `**Example.**`. It illustrates the rule beside it, and it is not normative.
+
+A fenced block inside a bullet belongs to that bullet.
+
+To read a complete docstring, open a Unit that [Reference docstrings](#reference-docstrings) names.
+
+## Vocabulary
+
+Five words are used precisely in this file.
+
+- **Unit** — one documented name: a module, a type, a function, a macro or a constant. [`sweep/manifest.toml`](../../sweep/manifest.toml) records the unit count of every file under `src/` and `ext/`, and `test/test_45_sweep_census.jl` fails when a file's count leaves its row.
+- **Family** — a leaf abstract supertype, together with the concrete types that subtype it. Leaf-most means that no abstract type subtypes it, so a generic root such as `RiskMeasure` or `AbstractResult` is not a Family: its members span many files and share no notation. Most families sit inside one file, so a rule about a Family is local to one sweep ticket. [Notation is fixed by symbol and by family](#notation-is-fixed-by-symbol-and-by-family) is such a rule.
+- **Reference docstring** — a docstring that the [Reference docstrings](#reference-docstrings) table names. Its file is marked `swept = true` in the sweep manifest, so a Gate holds it. Read one in place of a worked example.
+- **Capability Catalogue** — the user-facing inventory of everything the package offers, built by [`docs/capability_catalogue.jl`](../../docs/capability_catalogue.jl) under ADR 0040. It extracts the first sentence of a type's summary paragraph verbatim.
+- **Coverage Exemption** — a named ruling in [`code_health/rulings.toml`](../../code_health/rulings.toml) that excuses a stated number of uncovered lines in one file. [ADR 0082](../../docs/adr/0082-the-coverage-terminal-condition-is-a-per-file-ratchet-and-a-named-exemption.md) owns it.
+
 ## General Guidelines
 
 - Look at how other docstrings are implemented and follow similar patterns.
@@ -64,19 +88,21 @@ Public functions use a **manually written signature** in the docstring header (n
 
 ## Documentation Dictionaries
 
-Four dictionaries in `src/01_Base.jl` provide standardised, consistent descriptions. **Always interpolate from them** instead of writing ad-hoc text.
+Five dictionaries in `src/01_Base/01_DocstringDictionaries.jl` provide standardised, consistent descriptions. **Always interpolate from them** instead of writing ad-hoc text.
 
 - `arg_dict` — argument descriptions. Use as `$(arg_dict[:key])` in `# Arguments` sections.
 - `field_dict` — field descriptions (derived from `arg_dict`). Use as `"$(field_dict[:key])"` in inline field docstrings inside structs.
 - `val_dict` — validation rule descriptions. Use as `$(val_dict[:key])` in `## Validation` sections.
 - `ret_dict` — return value descriptions. Use as `$(ret_dict[:key])` in `# Returns` sections.
-- `math_dict` — LaTeX mathematical notation. Use as `$(math_dict[:key])` in `# Details` sections.
+- `math_dict` — LaTeX mathematical notation. Use as `$(math_dict[:key])` in the `Where:` list of a `# Mathematical definition` or `# JuMP formulation` section.
 
-If a needed key is missing, add it to the appropriate dictionary in `01_Base.jl` before writing the docstring.
+If a needed key is missing, add it to the appropriate dictionary in `src/01_Base/01_DocstringDictionaries.jl` before writing the docstring.
 
 ### Inline field docstrings
 
 Fields in `@concrete` structs are documented inline using `field_dict`:
+
+**Example.**
 
 ```julia
 @concrete struct Covariance <: AbstractCovarianceEstimator
@@ -100,6 +126,8 @@ The dictionary exists to stop two copies of one sentence drifting apart. One cop
 
 `field_dict` is derived from `arg_dict` by stripping everything up to and including the first `:`, so a new field description is added to `arg_dict`. Editing a value already in `arg_dict` moves every docstring that interpolates the key, so **add a new key rather than rewriting one that is in use**.
 
+**Example.**
+
 ```julia
 @concrete struct MyType <: AbstractMyType
     # `me` is described by many types, so it interpolates.
@@ -113,9 +141,50 @@ end
 
 ---
 
+## What each section holds
+
+A docstring has one home for each kind of fact. Put a sentence where its **subject** belongs. A true sentence in the wrong section is still a defect, because the reader who needs it looks somewhere else.
+
+| Section | Holds | Does not hold |
+| --- | --- | --- |
+| summary paragraph | what the unit is, in the first sentence; a trap that applies to the unit as a whole, in a later sentence | a formula, a step, or a fact about one field |
+| `# Mathematical definition` | the closed form that defines the unit, and a consequence of that form | an identifier from the body, an order of operations, or a choice the implementation made |
+| `# Algorithm` | the numbered steps the body runs, each naming the quantity it produces | a closed form restated as a step |
+| `# JuMP formulation` | the model the code builds: the variables, expressions and rows it registers, the objective it sets, and the relaxation when the encoding is not exact | an entry the body does not register |
+| `# Interfaces` | on an abstract type, the methods a concrete subtype must implement, one subsection per method | a method the family does not dispatch on |
+| `# Fields` | one description per field, written where the field is declared | a fact about the type as a whole |
+| `# Constructors` | the signature, `## Validation`, and the propagation subsections | a rule the constructor does not enforce |
+| `# Arguments` | the contract of each argument | the shape of the result |
+| `# Validation` | every precondition and every raise | a precondition the code does not check |
+| `# Returns` | the shape and the meaning of each returned value | how the value was computed |
+| `# Examples` | a `jldoctest` block | prose that a section above owns |
+| `# Related` | one bullet per related unit, annotated when the relation is not obvious | a copy of the related unit's own text |
+| `# References` | one `ref_dict` interpolation per published work | reference prose written out |
+
+### `# Details` is abolished
+
+**There is no `# Details` section.** It held facts that the sections above already own, and it held them because nothing said where they belonged. Write no new one, and move an existing one by the **subject** of each fact it carries.
+
+| The fact is about… | It goes to |
+| --- | --- |
+| one field | that field's description |
+| a raise or a precondition | `# Validation` |
+| the unit as a whole | the summary paragraph, in the second sentence or later |
+| another unit | `# Related`, as an annotated entry |
+
+A mis-filed step goes to `# Algorithm`, an argument contract to `# Arguments`, the shape of a result to `# Returns`, and a model entry to `# JuMP formulation`.
+
+The Capability Catalogue extracts the **first sentence only** of the summary paragraph, so a later sentence of that paragraph is a safe home for a trap that applies to the whole unit.
+
+`test/test_26_docs.jl` gates the abolition twice. A file marked `swept = true` in [`sweep/manifest.toml`](../../sweep/manifest.toml) carries **zero** `# Details` sections, and the library-wide count of the section **may not rise**. The second check retires when that count reaches zero. [ADR 0085](../../docs/adr/0085-the-docstring-standard-is-rules-and-pointers.md) records the decision.
+
+---
+
 ## Section Structure for Types (abstract and concrete)
 
 ### Abstract types
+
+**Template.**
 
 ````julia
 """
@@ -159,6 +228,8 @@ abstract type MyAbstractType <: AbstractEstimator end
 ````
 
 ### Concrete struct types
+
+**Template.**
 
 ````julia
 """
@@ -244,7 +315,7 @@ A field may carry any combination (`@fprop @vprop field`, in either order) — t
 
 > `MyType` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
 
-and follow that with a bullet list of high-level details, written in the shape of the `# Details` section of a function docstring. Cover these points, in this order, and only where the method has something to say:
+and follow that with a bullet list of high-level details. Cover these points, in this order, and only where the method has something to say:
 
 - Which arguments beyond `i` the method reads, and what it does with them.
 - Which fields recurse through [`port_opt_view`](@ref), and with which arguments.
@@ -262,6 +333,8 @@ Describe the method, do not transcribe it. A field carried through with nothing 
 > **The same field appears in two subsections, saying two different things.** A `@wprop` field is *replaced* under `## Propagated parameters` and *indexed* under `## Observation weight parameters`. That is not a duplication to collapse: it is the one place a reader learns that `factory` and `obs_weights_view` treat the field differently. A `@fprop` sibling appears in both too, and recurses in both.
 
 List fields in the same order they appear in the struct body, and add [`factory`](@ref), [`port_opt_view`](@ref) and/or [`obs_weights_view`](@ref) to `# Related` to match the subsections present.
+
+**Template.**
 
 ````julia
 """
@@ -351,6 +424,8 @@ end
 
 Public functions use a manually written signature as the docstring header.
 
+**Template.**
+
 ````julia
 """
     function_name(
@@ -377,10 +452,6 @@ Longer explanation if needed.
 
   - $(ret_dict[:key])
 
-# Details
-
-  - Additional implementation notes.
-
 # Examples
 
 ```jldoctest
@@ -402,6 +473,47 @@ Internal/private functions may use `$(DocStringExtensions.TYPEDSIGNATURES)` as t
 
 ---
 
+## Section Structure for Aliases
+
+An **alias** is a second name for something another docstring already documents. Its docstring routes the reader to that documentation. It restates none of it, because a second copy drifts away from the first — the argument that put the field descriptions into `field_dict`.
+
+Three kinds of alias exist, and the sections differ by kind.
+
+| Kind | Declaration | Lives in | Header line | Sections it carries |
+| --- | --- | --- | --- | --- |
+| **Acronym alias** | `const HRP = HierarchicalRiskParity` | `src/25_Aliases.jl` only | the alias name alone | none |
+| **Factory alias** | `MAD(; kwargs...)::LowOrderMoment` | `src/25_Aliases.jl` only | the signature, ending `-> T` | `# Validation`, and only when its own body raises |
+| **Dispatch alias** | `const RhoDistanceAlgorithm = Union{...}` | any file under `src/` | the declaration, `const NAME = <type expression>` | `# Related`, and `# References` when the grouping itself is published |
+
+A **dispatch alias** is a `const` bound to a type expression rather than to a bare name. A `Union`, a container such as `AbstractVector{<:LinearConstraint}`, and a parametrised form such as `const RMCVaR{T} = Union{...}` are all one kind, because a caller meets all three the same way: as the type a method signature dispatches on.
+
+### The summary paragraph
+
+- An **acronym alias** carries exactly one sentence, `Alias for [`Canonical`](@ref).` and nothing more. The alias and its target are the same object, so a second sentence describes the target and belongs on the target.
+- A **factory alias** carries one sentence naming what it builds. That sentence `@ref`s every type the factory composes. A later sentence is permitted, and only for a choice the composition fixes that a reader would otherwise get wrong. Read `ZeroVarianceFilter` in [`src/25_Aliases.jl`](../../src/25_Aliases.jl), which states why it scores with `SCM()` and not with `Variance`.
+- A **dispatch alias** carries what the alias groups and why the group exists. The *why* is the load-bearing half: a reader who sees only the member list learns nothing the declaration did not already show.
+
+### Why an alias carries so little
+
+- **No `# Fields`, no `# Constructors`, no `# Arguments`, no `# Returns`, no `# Examples`, on any kind.** The canonical unit owns each of them, and the summary sentence puts it one click away. A copy on the alias is a second text to maintain and the one a reader reaches first when it goes stale.
+- **No `# Related` on an acronym alias or on a factory alias.** Its summary sentence already `@ref`s every canonical name, and `## What each section holds` states that `# Related` does not hold a copy of the related unit's own text. One link, once.
+- **`# Related` on a dispatch alias**, one bullet per grouped member. A group of members is a list, and a summary sentence must not be one. A function that dispatches on the alias may take a bullet of its own.
+- **`# Algorithm`, `# Mathematical definition` and `# JuMP formulation` reach no alias.** An alias runs no steps and registers no model entry. A factory alias composes types and takes no branch worth numbering.
+
+The Capability Catalogue lists an alias in `NOT_A_FEATURE` with the reason `:alias`, under [`.github/instructions/julia-source-code.instructions.md`](julia-source-code.instructions.md), so it never reads an alias summary sentence.
+
+### The Gate
+
+`test/test_26_docs.jl` gates the rule with three checks, in the shape [ADR 0086](../../docs/adr/0086-an-alias-docstring-links-its-canonical-unit-and-restates-nothing.md) records.
+
+ 1. **Library-wide, absolute.** No alias carries a section outside its kind's row of the table above. A new breach is the only way this check can red.
+ 2. **A swept file, presence.** A dispatch alias in a file marked `swept = true` in [`sweep/manifest.toml`](../../sweep/manifest.toml) carries `# Related`.
+ 3. **Library-wide, a ratchet.** The count of dispatch aliases carrying no `# Related` may not rise. The check retires when that count reaches zero.
+
+Check 2 reads the `swept` flag because it demands a section, and a presence demand may not red a file that no child map of issue #404 has swept. Check 1 forbids a section instead, so it needs no flag.
+
+---
+
 ## The `# Validation` Section
 
 - Include a `## Validation` sub-section in struct docstrings and a `# Validation` section in function docstrings whenever the function or constructor enforces preconditions.
@@ -414,7 +526,7 @@ Internal/private functions may use `$(DocStringExtensions.TYPEDSIGNATURES)` as t
 
 A docstring that rests on a published source names it. The section is **last**, after `# Related`, and it holds one bullet per work.
 
-- **Never paste the reference prose.** Every bullet is one interpolation of `ref_dict` (`src/01_Base.jl`), which holds a single copy of each reference text:
+- **Never paste the reference prose.** Every bullet is one interpolation of `ref_dict` (`src/01_Base/01_DocstringDictionaries.jl`), which holds a single copy of each reference text:
 
   ```julia
   # References
@@ -456,6 +568,8 @@ The four rules above are checked by the `"References"` testset in `test/test_26_
 
 Each source file `src/SomeFeature.jl` has a corresponding `docs/src/api/SomeFeature.md`. Every public symbol defined in the source file must be listed under an appropriate heading using the Documenter.jl `@docs` block:
 
+**Template.**
+
 ````markdown
 ## My section heading
 
@@ -474,6 +588,21 @@ When adding a new symbol, also add it to the corresponding API markdown file.
 
 When a type or function has a mathematical formulation, include a `# Mathematical definition` section immediately before `# Fields` (for structs) or before `# Arguments` (for functions).
 
+### What the section may not state
+
+The section states the mathematics and nothing else. It **names no identifier from the body, states no order of operations, and states no property that the implementation chose rather than the mathematics.** A consequence of the definition stays, because a consequence is mathematics.
+
+`# Algorithm` carries the reverse rule — *do not restate a closed form as a step*. The two rules bound one border from opposite sides, so a fact that fails this rule usually already stands as a step, and the fix is to delete it here rather than to move it.
+
+**Example.** Read against `ShrunkDenoise` in [`src/05_Denoise.jl`](../../src/05_Denoise.jl):
+
+- CUT — *the eigenvalues sorted ascending*. The sort is the body's choice, and it is already an `# Algorithm` step.
+- CUT — *the diagonal is pinned to one afterwards to shed the eigendecomposition round-off*. That is an `# Algorithm` step too.
+- CUT — `vals`, `vecs`, `corr0`. Each names a local of the body.
+- KEEP — *the two `alpha` weights sum to one on the diagonal, so the reconstruction preserves it in exact arithmetic*. That is a consequence of the definition, and it holds whatever the body does.
+
+An implementation fact is not a token, so no parser finds one. This rule is **unenforced**: it holds by review, in the sense of [`STANDARDS.md`](../../STANDARDS.md). That is a known state and not a hidden one.
+
 ### LaTeX conventions
 
 | Notation | Use for |
@@ -488,6 +617,8 @@ When a type or function has a mathematical formulation, include a `# Mathematica
 ### `\begin{align}` environment
 
 All math blocks use `\begin{align}...\end{align}` with `&` alignment markers and `\\` line breaks. Each separate equation goes on its own line. Use `\quad` for in-equation spacing only; split distinct equations onto separate lines (never `\qquad` between two equations in the same block).
+
+**Example.**
 
 ````julia
 # Good — each equation on its own line
@@ -512,6 +643,8 @@ All math blocks use `\begin{align}...\end{align}` with `&` alignment markers and
 ### `Where:` section
 
 Immediately after each math block (or after the **last** math block when multiple consecutive blocks belong to the same docstring), add a `Where:` bullet list defining every symbol. Use `$(math_dict[:key])` for common variables.
+
+**Template.**
 
 ````julia
 """
@@ -540,7 +673,31 @@ Key rules:
 - One comprehensive `Where:` after the last block is acceptable when multiple blocks appear in the same docstring.
 - Every symbol that appears in any block must be defined.
 - Interpolate `$(math_dict[:key])` for standardised variables (``T``, ``\boldsymbol{x}_t``, ``\alpha``, etc.).
-- If a key is missing from `math_dict`, add it to `src/01_Base.jl` first.
+- If a key is missing from `math_dict`, add it to `src/01_Base/01_DocstringDictionaries.jl` first.
+
+---
+
+### Notation is fixed by symbol and by family
+
+The rules above fix the glyphs. The two below fix the content, so that two docstrings that state one quantity state it once and state it alike.
+
+**A shared symbol becomes a `math_dict` key.** A symbol that appears in the docstrings of two or more Units gets a key in [`src/01_Base/01_DocstringDictionaries.jl`](../../src/01_Base/01_DocstringDictionaries.jl), and every site interpolates it. A symbol that exactly one Unit uses may stay inline, on the reasoning of [When a field description may be prose](#when-a-field-description-may-be-prose): one copy cannot drift. When a second Unit needs it, move it into `math_dict` and replace both copies with the interpolation.
+
+A new description is a **new** key. Editing a value already in `math_dict` moves every docstring that interpolates it, which is the reason [ADR 0081](../../docs/adr/0081-the-docstring-standard-states-the-model-it-builds.md) gives for `arg_dict`.
+
+**A key owns a definition, not a glyph.** One glyph carries different quantities in different families: ``\boldsymbol{w}`` is the portfolio weights vector in a risk measure and the observation weights in a moment estimator. A key is therefore claimed by the whole definition — the symbol together with the sentence that defines it — and a second quantity on the same glyph takes its own key under its own symbol. It never takes a second meaning on the first.
+
+**One quantity takes one key.** The converse of the rule above. Two keys that define one quantity are drift inside the table that exists to stop drift, and the docstrings that read them state one thing in two spellings. `:w_t_moment`, `:w_t_obsweight` and `:cal_w_i` each defined the observation weight, under ``w_t``, ``w_{t}`` and ``w_{i}``, and as "observation ``t``" against "period ``i``". They are one key, `:w_t_obs`. A new key states a quantity the table does not already carry; a new *description* of a quantity it does carry is a change to the key that owns it, under the rule above.
+
+**Gate.** Two checks in `test/test_26_docs.jl`, one for each direction. The first reds when a `Where:` bullet copies a `math_dict` value instead of interpolating it. It matches the whole bullet against the whole value, so it fires on a copy and never on a glyph that two families share. A file marked `swept = true` in [`sweep/manifest.toml`](../../sweep/manifest.toml) carries no such copy, and the library-wide count may not rise. The copies that remain migrate file by file, inside each file's own sweep ticket of issue #404.
+
+The second reads the table itself, and reds when two keys open with one definition head — the noun phrase before the first punctuation mark and the first function word. A head that several keys share is recorded in that testset with the reason the keys are not one, so a new key may not restate a definition the table already carries. A head is a coarse instrument: two keys worded differently do not match, and the per-file sweep ticket reads that pair by hand.
+
+**Siblings of one Family state a shared quantity in the same form.** Not the same symbol alone — the same shape of equation. A condition that one sibling writes in a parenthesis, the second in set notation and the third in its `Where:` list is one fact written three ways, and the three do not read as one Family. Take the shape from the sibling that states it most completely, and write the others to match it.
+
+The Family is the leaf-most abstract supertype, never a generic root. `RiskMeasure` and `AbstractResult` span many files and their members share no notation, so neither is a Family in this sense.
+
+An equation's form is not a token, so no parser finds a breach. This rule is **unenforced**: it holds by review, in the sense of [`STANDARDS.md`](../../STANDARDS.md). That is a known state and not a hidden one.
 
 ---
 
@@ -555,9 +712,9 @@ Rules:
 - Write **numbered steps, one step per operation**. Each step names the quantity that the operation produces.
 - Name each quantity by the name that the body gives it, so a reader can follow the steps in the code.
 - Do not restate a closed form as a step. The formula belongs in `# Mathematical definition`, and the step that applies it names it.
-- A **selector tag** — a type whose only job is to name the branch that a caller takes — carries **neither** section. Its summary sentence states which branch it selects. Most subtypes of `AbstractAlgorithm` are selector tags, so the rule must never force numbered steps onto a marker type.
+- A **selector tag** — a type whose only job is to name the branch that a caller takes — is never *forced* to carry either section. Its summary sentence states which branch it selects, and a tag that names nothing further stops there. Most subtypes of `AbstractAlgorithm` are selector tags, so the rule must never force numbered steps onto a marker type. A tag whose branch *is* a closed form does state it: the form under `# Mathematical definition`, and the steps of that branch under `# Algorithm`. `SpectralDenoise` is the reference for that shape, and the row below points at it.
 
-The following is the algorithm of `denoise!(dn::Denoise, X::MatNum, q::Number)` in `src/05_Denoise.jl`:
+**Example.** The following is the algorithm of `denoise!(dn::Denoise, X::MatNum, q::Number)` in `src/05_Denoise.jl`:
 
 ````julia
 """
@@ -578,21 +735,41 @@ The following is the algorithm of `denoise!(dn::Denoise, X::MatNum, q::Number)` 
 
 ## The `# JuMP formulation` Section
 
-Any code that **adds rows to a `JuMP.Model`** carries this section. It states the model that the code builds, which the mathematics alone does not: the rows carry names, a caller reads them back by those names, and the encoding is not always exact.
+Any code that **builds part of a `JuMP.Model`** carries this section. It states the model that the code builds, which the mathematics alone does not: a model entry carries a name, a caller reads the entry back by that name, and the encoding is not always exact.
+
+The trigger is mechanical. The body calls `JuMP.@variable`, `JuMP.@variables`, `JuMP.@expression`, `JuMP.@expressions`, `JuMP.@constraint`, `JuMP.@constraints` or `JuMP.@objective`. **A row is not the only public entry.** `model[:sc]`, `model[:w]`, `model[:ret]` and `model[:risk]` are registered as a variable or as an expression, and each is read back by name across the library. `set_model_scales!` registers `sc` and `so` for every builder that scales a row or an objective.
 
 `# JuMP formulation` sits after `# Mathematical definition` and after `# Algorithm`, and before `# Fields` (for structs) or before `# Arguments` (for functions).
 
-It has three subsections, in this order. The first two are always present. The third is present only when the encoding is not exact.
+It has five subsections, in this order. Each of the first four is present whenever the body calls the macro that owns it. The fifth is present only when the encoding is not exact.
+
+| Subsection | Present when the body calls | Holds |
+| --- | --- | --- |
+| `## Variables` | `JuMP.@variable`, `JuMP.@variables` | the model variables the code creates, and the ones it reads |
+| `## Expressions` | `JuMP.@expression`, `JuMP.@expressions` | the expressions the code registers |
+| `## Constraints` | `JuMP.@constraint`, `JuMP.@constraints` | the rows the code registers |
+| `## Objective` | `JuMP.@objective` | the sense and the expression the code sets |
+| `## Relaxation` | — | the bound, when the encoding is not exact |
+
+`## Variables` is also permitted when the body only **reads** a variable. A formulation that reads `w` and never names it is unreadable.
+
+The **last** of the first four subsections that is present closes with a `Where:` list. It defines every symbol the section uses, under the rules of the `Where:` section above. Interpolate `$(math_dict[:key])` for a standardised symbol. One list serves the whole section.
 
 ### `## Variables`
 
-One bullet per model variable that the code reads or creates. Name each variable by its model key, and say whether the code reads it or creates it.
+One bullet per model variable that the code creates, and one per model variable that it reads. Name each variable by its model key, and say whether the code reads it or creates it. A variable that the macro creates under no key is named by the symbol the body binds it to.
+
+### `## Expressions`
+
+One bullet per expression that the code registers, in the order in which the body registers them. Each bullet carries **the expression's model key** and the mathematics of the expression. An expression that the macro does not name carries the key it is stored under. An expression that the function only returns is named by the returned value.
 
 ### `## Constraints`
 
 **One bullet per row that the code registers**, in the order in which the body registers them. Each bullet carries **the row's JuMP name** and the mathematics of the row. The name is the one written in the `JuMP.@constraint` call, because that is the key with which a caller reads the row back out of the model.
 
-Close the subsection with a `Where:` list that defines every symbol, under the rules of the `Where:` section above. Interpolate `$(math_dict[:key])` for a standardised symbol.
+### `## Objective`
+
+One bullet: the sense that the code sets, `Min` or `Max`, and the expression that it minimises or maximises, named by its model key. Two methods of one function can differ in nothing but the objective, and then this bullet is the only text that tells them apart.
 
 ### `## Relaxation`
 
@@ -604,7 +781,9 @@ Open the subsection with `$(val_dict[:relax])`, so that the opening cannot drift
  2. The **quantity** that is bounded, named by its model key.
  3. The **condition** under which the bound is tight.
 
-The following is the formulation of `set_gross_budget_constraints!` in `src/20_Optimisation/09_JuMPConstraints/03_BudgetConstraints.jl`:
+**A bound does not have to sit in a row.** `BrownianDistanceVariance` relaxes inside an expression, and the `Max` and log-sum-exp scalarisers put an upper bound in `model[:risk]` that is tight only while a minimising objective pulls on it.
+
+**Example.** The following is the formulation of `set_gross_budget_constraints!` in `src/20_Optimisation/09_JuMPConstraints/03_BudgetConstraints.jl`:
 
 ````julia
 """
@@ -617,8 +796,8 @@ The following is the formulation of `set_gross_budget_constraints!` in `src/20_O
 
 ## Constraints
 
-  - `gbgt_lb`: ``s_c \\left(\\sum lw + \\sum sw - k b_l\\right) \\geq 0``
-  - `gbgt_ub`: ``s_c \\left(\\sum lw + \\sum sw - k b_u\\right) \\leq 0``
+  - `gbgt_lb`: ``s_c \left(\sum lw + \sum sw - k b_l\right) \geq 0``
+  - `gbgt_ub`: ``s_c \left(\sum lw + \sum sw - k b_u\right) \leq 0``
 
 Where:
 
@@ -628,385 +807,37 @@ Where:
 """
 ````
 
----
-
-## Complete Example
-
-The following is a fully worked example covering abstract types, concrete types, and functions. Use it as a reference when writing docstrings.
+**Example that registers no row.** The following is the formulation of `set_model_scales!` in `src/20_Optimisation/08_Base_JuMPOptimisation.jl`. It registers two expressions and nothing else, so it carries one subsection:
 
 ````julia
 """
-$(DocStringExtensions.TYPEDEF)
+# JuMP formulation
 
-Abstract supertype for all custom processes in `PortfolioOptimisers.jl`.
+## Expressions
 
-All concrete and/or abstract types that implement a custom process should subtype `MyAbstractCustomProcess`.
+  - `sc`: ``s_c``, multiplied into both sides of every scaled row.
+  - `so`: ``s_o``, multiplied into the objective.
 
-# Interfaces
+Where:
 
-In order to implement a new custom process that can seamlessly work with the library, subtype `MyAbstractCustomProcess`, ensuring that the structure contains all necessary parameters for the custom process, and implement the following methods:
-
-## Custom process interface
-
-### Functions
-
-- `do_process(pr::MyAbstractCustomProcess, b::Real, c::Integer)`: Performs the custom process.
-
-#### Arguments
-
-- `pr`: Custom process.
-- `b`: First argument for the custom process.
-- `c`: Second argument for the custom process.
-
-#### Returns
-
-- `nothing`.
-
-### Examples
-
-We can create a dummy custom process as follows:
-
-```jldoctest
-julia> struct MyNewCustomProcess{T1, T2} <: PortfolioOptimisers.MyAbstractCustomProcess
-           alg::T1
-           new_param::T2
-           function MyNewCustomProcess(alg::MyAbstractCustomProcessAlgorithm, new_param::Symbol)
-               return new{typeof(alg), typeof(new_param)}(alg, new_param)
-           end
-       end
-
-julia> function MyNewCustomProcess(; alg::MyAbstractCustomProcessAlgorithm = MyCustomProcessAlgorithm1(), new_param::Symbol = :Foo)
-           return MyNewCustomProcess(alg, new_param)
-        end
-
-julia> function PortfolioOptimisers.do_process(a::MyNewCustomProcess, b::Real, c::Integer)
-          println("new custom process: $b $c $(a.sym)")
-          do_algorithm(a.alg, c)
-          return nothing
-       end
-
-julia> do_process(MyNewCustomProcess(), -0.5, 9)
-new custom process: -0.5 9 Foo
-algorithm 1: 9
-```
-
-# Related
-
-- [`MyAbstractCustomProcessAlgorithm`](@ref)
-- [`do_process`](@ref)
-- [`do_algorithm`](@ref)
+  - $(math_dict[:sc_scale])
+  - $(math_dict[:so_scale])
 """
-abstract type MyAbstractCustomProcess end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Abstract supertype for all custom process algorithms in `PortfolioOptimisers.jl`.
-
-All concrete and/or abstract types that implement a custom process algorithms should subtype `MyAbstractCustomProcessAlgorithm`.
-
-# Interfaces
-
-In order to implement a new custom process algorithms that can seamlessly work with the library, subtype `MyAbstractCustomProcessAlgorithm`, ensuring that the structure contains all necessary parameters for the custom process algorithm, and implement the following methods:
-
-## Custom process algorithm interface
-
-### Functions
-
-- `do_algorithm(pra::MyAbstractCustomProcessAlgorithm, c::Integer) -> Integer`: Performs the custom process algorithm and returns the result.
-
-#### Arguments
-
-- `pra`: Custom process algorithm.
-- `c`: Argument for the custom process algorithm.
-
-#### Returns
-
-- `res::Integer`: The result of the algorithm.
-
-### Examples
-
-We can create a dummy custom process algorithm as follows:
-
-```jldoctest
-julia> struct MyNewCustomProcessAlgorithm{T} <: PortfolioOptimisers.MyAbstractCustomProcessAlgorithm
-           new_param::T
-           function MyNewCustomProcessAlgorithm(new_param::Symbol)
-               return new{typeof(new_param)}(new_param)
-           end
-       end
-
-julia> function MyNewCustomProcessAlgorithm(; new_param::Symbol = :Bar)
-           return MyNewCustomProcessAlgorithm(new_param)
-        end
-
-julia> function PortfolioOptimisers.do_algorithm(alg::MyNewCustomProcessAlgorithm, c::Integer)
-          println("new algorithm: $c $(alg.new_param)")
-          return c + 1
-       end
-
-julia> do_algorithm(MyNewCustomProcessAlgorithm(), 3)
-new algorithm: 3 Bar
-4
-```
-
-# Related
-
-- [`MyAbstractCustomProcess`](@ref)
-- [`do_process`](@ref)
-- [`do_algorithm`](@ref)
-"""
-abstract type MyAbstractCustomProcessAlgorithm end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Implements my custom process algorithm 1.
-
-# Related
-
-- [`MyAbstractCustomProcess`](@ref)
-- [`MyAbstractCustomProcessAlgorithm`](@ref)
-- [`do_process`](@ref)
-- [`do_algorithm`](@ref)
-"""
-struct MyCustomProcessAlgorithm1 <: MyAbstractCustomProcessAlgorithm end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Performs the custom process algorithm 1.
-
-# Arguments
-
-- `alg::MyCustomProcessAlgorithm1`: The algorithm to perform.
-- `c::Integer`: The input integer.
-
-# Returns
-
-- `res::Integer`: The result of the algorithm.
-
-# Details
-
-- Multiplies `c` by 2.
-- Prints the result with a custom message.
-- Returns the result.
-
-```jldoctest
-julia> do_algorithm(MyCustomProcessAlgorithm1(), 3)
-algorithm 1: 6
-6
-```
-
-# Related
-
-- [`MyAbstractCustomProcess`](@ref)
-- [`MyAbstractCustomProcessAlgorithm`](@ref)
-- [`do_process`](@ref)
-"""
-function do_algorithm(::MyCustomProcessAlgorithm1, c::Integer)
-    c = c * 2
-    println("algorithm 1: $c")
-    return c
-end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Defines my custom process 1.
-
-# Fields
-
-- `alg::MyAbstractCustomProcessAlgorithm`: The algorithm to use.
-
-# Constructors
-
-    MyConcreteCustomProcess1(;
-        alg::MyAbstractCustomProcessAlgorithm = MyCustomProcessAlgorithm1()
-    ) -> MyConcreteCustomProcess1
-
-Keywords correspond to the struct's fields.
-
-# Examples
-
-```jldoctest
-julia> MyConcreteCustomProcess1()
-MyConcreteCustomProcess1
-  alg ┴ MyCustomProcessAlgorithm1()
-```
-
-# Related
-
-- [`MyAbstractCustomProcess`](@ref)
-- [`MyAbstractCustomProcessAlgorithm`](@ref)
-- [`do_process`](@ref)
-- [`do_algorithm`](@ref)
-"""
-struct MyConcreteCustomProcess1{T} <: MyAbstractCustomProcess
-    alg::T
-    function MyConcreteCustomProcess1(alg::MyAbstractCustomProcessAlgorithm)
-        return new{typeof(alg)}(alg)
-    end
-end
-function MyConcreteCustomProcess1(;
-                                  alg::MyAbstractCustomProcessAlgorithm = MyCustomProcessAlgorithm1())
-    return MyConcreteCustomProcess1(alg)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Performs the custom process 1.
-
-# Arguments
-
-- `a::MyConcreteCustomProcess1`: The custom process to perform.
-- `b::Real`: The first argument.
-- `c::Integer`: The second argument.
-
-# Validation
-
-- `b >= 0`: `b` must be non-negative.
-
-# Returns
-
-- `nothing`.
-
-# Details
-
-- Checks `b >= 0` before performing the process.
-- Prints a message using the arguments `b` and `c`.
-- Calls `do_algorithm` with the algorithm from `a.alg` and `c`.
-
-# Examples
-
-```jldoctest
-julia> do_process(MyConcreteCustomProcess1(), 1.0, 2)
-Custom process 1: 1.0 + 2
-algorithm 1: 4
-```
-
-# Related
-
-- [`MyAbstractCustomProcess`](@ref)
-- [`MyAbstractCustomProcessAlgorithm`](@ref)
-- [`MyConcreteCustomProcess1`](@ref)
-- [`do_algorithm`](@ref)
-"""
-function do_process(a::MyConcreteCustomProcess1, b::Real, c::Integer)
-    @argcheck(b >= 0, "b must be non-negative")
-    println("Custom process 1: $b + $c")
-    do_algorithm(a.alg, c)
-    return nothing
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Validates that `val > 2`.
-
-# Arguments
-
-- `val::Real`: The value to validate.
-
-# Returns
-
-- `nothing`.
-
-# Related
-
-- [`MyConcreteCustomProcess2`](@ref)
-"""
-function assert_val_value(val::Real)
-    @argcheck(val >= 2 * one(eltype(val)), "val must be non-negative")
-    return nothing
-end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Defines my custom process 2.
-
-# Fields
-
-- `alg::MyAbstractCustomProcessAlgorithm`: The algorithm to use.
-- `val::Real`: The value to use.
-
-# Constructors
-
-    MyConcreteCustomProcess2(;
-        alg::MyAbstractCustomProcessAlgorithm = MyCustomProcessAlgorithm1(),
-        val::Real = 2.0
-    ) -> MyConcreteCustomProcess2
-
-Keywords correspond to the struct's fields.
-
-## Validation
-
-- `val` is validated via [`assert_val_value`](@ref).
-
-# Examples
-
-```jldoctest
-julia> MyConcreteCustomProcess2()
-MyConcreteCustomProcess2
-  alg ┼ MyCustomProcessAlgorithm1()
-  val ┴ 2.0
-```
-
-# Related
-
-- [`MyAbstractCustomProcess`](@ref)
-- [`MyAbstractCustomProcessAlgorithm`](@ref)
-- [`assert_val_value`](@ref)
-- [`do_process`](@ref)
-- [`do_algorithm`](@ref)
-"""
-struct MyConcreteCustomProcess2{T1, T2} <: MyAbstractCustomProcess
-    alg::T1
-    val::T2
-    function MyConcreteCustomProcess2(alg::MyAbstractCustomProcessAlgorithm, val::Real)
-        return new{typeof(alg), typeof(val)}(alg, val)
-    end
-end
-function MyConcreteCustomProcess2(;
-                                  alg::MyAbstractCustomProcessAlgorithm = MyCustomProcessAlgorithm1(),
-                                  val::Real = 2.0)
-    assert_val_value(val)
-    return MyConcreteCustomProcess2(alg, val)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Performs the custom process 2.
-
-# Arguments
-
-- `a::MyConcreteCustomProcess2`: The custom process to perform.
-- `b::Real`: The first argument.
-- `c::Integer`: The second argument.
-
-# Returns
-
-- `nothing`.
-
-# Details
-
-- Prints a message using the arguments `a.val`, `b` and `c`.
-- Calls `do_algorithm` with the algorithm from `a.alg` and `c`.
-
-# Examples
-
-```jldoctest
-julia> do_process(MyConcreteCustomProcess2(), 1.0, 2)
-Custom process 2: 2.0 - 1.0 + 2
-algorithm 1: 4
-```
-
-# Related
-
-- [`MyAbstractCustomProcess`](@ref)
-- [`MyAbstractCustomProcessAlgorithm`](@ref)
-- [`MyConcreteCustomProcess1`](@ref)
-- [`do_algorithm`](@ref)
-"""
-function do_process(a::MyConcreteCustomProcess2, b::Real, c::Integer)
-    println("Custom process 2: $(a.val) - $b + $c")
-    do_algorithm(a.alg, c)
-    return nothing
-end
-
 ````
+
+---
+
+## Reference docstrings
+
+Read a real docstring, not a copy of one. Each row names a Unit whose file is marked `swept = true` in [`sweep/manifest.toml`](../../sweep/manifest.toml), so a Gate holds the target and the pointer cannot drift.
+
+| Kind | Unit | File |
+| --- | --- | --- |
+| Abstract type | `AbstractDenoiseAlgorithm` | [`src/05_Denoise.jl`](../../src/05_Denoise.jl) |
+| Selector tag | `SpectralDenoise` | [`src/05_Denoise.jl`](../../src/05_Denoise.jl) |
+| Struct with fields | `ShrunkDenoise` | [`src/05_Denoise.jl`](../../src/05_Denoise.jl) |
+| Public function | `denoise!` | [`src/05_Denoise.jl`](../../src/05_Denoise.jl) |
+| Private function | `_denoise!` | [`src/05_Denoise.jl`](../../src/05_Denoise.jl) |
+| Dispatch alias | `RhoDistanceAlgorithm` | [`src/09_Distance/02_Distance.jl`](../../src/09_Distance/02_Distance.jl) |
+
+The table above carries no row for `# JuMP formulation`. Every file that calls a `JuMP` macro is unswept, so no Gate holds a pointer into one. The row is added when the first such file is swept.

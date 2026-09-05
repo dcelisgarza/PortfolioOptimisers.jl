@@ -113,6 +113,32 @@ function StackingResult(; pr::Option{<:AbstractPriorResult}, wb::Option{<:Weight
     return StackingResult(pr, wb, fees, resi, reso, cv, retcode, w, fb)
 end
 """
+    set_retcode(res::StackingResult, retcode::OptRetCode_VecOptRetCode)
+
+Rebuild a [`StackingResult`](@ref) with a different return code.
+
+The result carries one return code per member of the population, so a member is dropped by failing its own entry. Every other member of the record is carried over unchanged.
+
+# Arguments
+
+  - `res`: Result to rebuild.
+  - `retcode`: Return code, or one per member of the population.
+
+# Returns
+
+  - [`StackingResult`](@ref): The result, with the new return code.
+
+# Related
+
+  - [`set_retcode`](@ref)
+  - [`mark_ruined_members`](@ref)
+  - [`StackingResult`](@ref)
+"""
+function set_retcode(res::StackingResult, retcode::OptRetCode_VecOptRetCode)
+    return StackingResult(res.pr, res.wb, res.fees, res.resi, res.reso, res.cv, retcode,
+                          res.w, res.fb)
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the static defaults of the [`Stacking`](@ref) fields that may hold a [`TimeDependent`](@ref).

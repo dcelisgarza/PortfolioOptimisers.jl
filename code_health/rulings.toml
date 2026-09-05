@@ -8,6 +8,7 @@
 #
 #   [thresholds]        which files the scheduled job files as work. Never the pass rule.
 #   [scheduled_job]     how many of them stand open at once.
+#   [size]              the one number here that IS part of a pass rule. ADR 0101 says why.
 #   [[unmeasured_path]] a path the gate never measures. It has no row and nothing to ratchet.
 #   [[exemption]]       a real number that may stand. It binds issue candidacy alone.
 #   [[dismissal]]       a JET report class that is not a defect. It binds the reviewed count.
@@ -33,6 +34,22 @@ cyclomatic = 10
 cognitive = 15
 argcount = 10
 jet_reviewed = 1
+
+# --- the size ratchet ------------------------------------------------------
+#
+# `code_lines` is the one number in this file that the pass rule reads. ADR 0101 states the reason:
+# a per-file ratchet on a line count is the sum-shaped noise that issue #336 already rejected,
+# because every added helper would turn the gate red. The threshold makes the gate quiet under
+# ordinary work and strict on the files that are already large. A file's ceiling is the greater of
+# this number and the number `code_health/size_baseline.toml` records for it.
+#
+# The cliff in this repository's own distribution of code lines per file sits between 530 and 440,
+# and 500 sits in it. Above it stand fifteen files, which is the same order as the twenty-one the
+# complexity thresholds report. It was chosen once from the cliff. It is not a rule to re-derive,
+# because a re-derived threshold never terminates.
+
+[size]
+code_lines = 500
 
 # --- the scheduled job -----------------------------------------------------
 #
@@ -99,6 +116,77 @@ counting positional slots alone leaves 86 of the 196 files above the old thresho
 dropping every struct constructor leaves 87, against 101. Keyword arguments and estimator \
 constructors own the extreme tail, not the bulk."""
 
+[rationale.a-cut-into-one-cluster-is-always-valid]
+text = """
+`validate_k_value` walks the `k - 1` tallest nodes of the dendrogram, so at `k = 1` it walks none \
+and answers `true` whatever the tree looks like. The `Integer` method of \
+`optimal_number_clusters` reaches its two searches only when the stated `k` is invalid, which \
+needs `k >= 2`, and its downward search runs from `k - 1` down to `1`. That search therefore \
+always finds a valid count, and its distance `dl` is never zero at the decision below it. The arm \
+that reads `du != 0 && dl == 0` cannot be entered. It is the symmetric partner of the arm beside \
+it and is kept rather than deleted, because deleting it would rest this function on an invariant \
+of another function that no signature states. Measured by the sweep of issue #468: over 160 \
+dendrograms with distinct heights no count was rejected at all, and on the tied trees that do \
+reject one, every other arm of the decision is reached."""
+
+[rationale.a-signature-line-counter-the-test-job-cannot-reach]
+text = """
+Julia allocates the counter on the `function` line of some inner constructors to code that runs \
+when the method is **defined**, not when it is called. Definition happens during precompilation, \
+in a process whose coverage the test job discards, so the line reads zero however many times the \
+constructor runs. Measured by the sweep of issue #513 over seven test files: the constructor's \
+own body carries 196 on both of its lines while the signature line carries 0. It is an artifact \
+of counter allocation and not an unreached branch, so no test can pay it. The neighbouring \
+constructors show the two shapes it is not: `PartialLinearConstraint`, whose signature is one \
+line, carries 215 there, and `UniverseSets`, whose signature is three, carries 67. A row here is \
+therefore keyed to the one definition that shows it, never to multi-line signatures as a class."""
+
+[rationale.a-return-after-an-unconditional-throw]
+text = """
+A fallback method that exists only to reject a term has one unconditional `throw` for a body, and \
+keeps the `return nothing` its sibling methods end with so that all three read alike. No call can \
+reach that `return`: the `throw` above it takes no branch and returns to no caller, so the line is \
+unreachable by construction rather than merely untested. Julia allocates a counter to it anyway. \
+Measured by the sweep of issue #515 over nine test files: `feature_target!`'s fallback carries 3 on \
+its `function` line and 3 on its `throw`, and 0 on the `return` below them, while the `Pair` method \
+beside it carries 51 and every other line of the file is covered. The four malformed shapes \
+`test_12e_asset_sets_features.jl` drives through the grammar are what raise that 3, so the method \
+itself is reached and only its last line is not. Deleting the line would buy the number by making \
+one of three methods shaped unlike its siblings."""
+
+[rationale.a-closure-inside-a-top-level-const]
+text = """
+A top-level `const` whose value is built by a higher-order call carries an anonymous function, and \
+that closure runs once, when the module is defined. Definition happens in the precompile process, \
+whose coverage the test job discards, so the test process allocates the line no counter at all. \
+`CoverageTools` then reads the line as code and writes a synthetic `0` over it while it converts \
+the `.cov` files into `lcov.info`, and the gate reads that `0` as a miss. No test can move it. \
+Measured by the review of PR #625, piece P11, on the two `Union{map(c -> Val{c}, …)...}` \
+constants of `src/08_Moments/21_Base_Regression.jl`. A targeted run of \
+`test_08j_base_regression.jl` under `--code-coverage` hits all 68 executable lines of the file and \
+leaves no zero, and lines 649 and 667 carry a bare `-`. `CoverageTools.process_file` over the same \
+source answers `0` on exactly those two lines and `nothing` on the three neighbouring constants, \
+which is the synthetic zero the CI artifact then carries as `DA:649,0` and `DA:667,0`. The union \
+each line builds is nevertheless correct, which is the proof that the closure ran: \
+`MinValStepwiseRegressionCriterion` is `Union{Val{:aic}, Val{:aicc}, Val{:bic}}`, \
+`MaxValStepwiseRegressionCriterion` is `Union{Val{:r2}, Val{:adjr2}}`, and the file dispatches on \
+both. The closure and not the `const` is the shape that draws the zero, which those three \
+neighbours show: `MIN_VAL_STEPWISE_REGRESSION_CRITERIA` and `MAX_VAL_STEPWISE_REGRESSION_CRITERIA` \
+hold a tuple literal, `STEPWISE_REGRESSION_CRITERIA` holds a splat of the two, none of them holds \
+a function body, and none of them reaches `lcov.info`."""
+
+[rationale.a-definition-a-file-split-moved-unchanged]
+text = """
+A file split moves a definition byte-for-byte into a new file, and ADR 0074's entry test reads \
+the new file as an addition. The definition is not new, its number did not move, and the row that \
+grandfathered it died with the file it named. Two definitions of `src/01_Base.jl` stand above a \
+threshold, and the row of that file recorded both: `@define_pretty_show` drove the file maximum at \
+cyc = 27 and cog = 50, and `apply_preferences!` sat under it at cyc = 26 and cog = 33. The split \
+of that file into one file per concept puts each of them alone in a smaller file, so each now \
+drives its own file's maximum. Neither body changed. Lowering either number is separate work on \
+the definition itself: the macro carries the whole pretty-show rendering, and `apply_preferences!` \
+carries one branch per key of `PREFERENCE_KEYS`."""
+
 # --- exemptions ------------------------------------------------------------
 #
 # Keyed (path, definition, metric), dropped before the file's maximum is taken. An Exemption binds
@@ -110,7 +198,7 @@ constructors own the extreme tail, not the bulk."""
 # definitions sit over seventeen keys, because the key holds no line.
 
 [[exemption]]
-path = "src/03_Preprocessing.jl"
+path = "src/03_InputData/03_Preprocessing.jl"
 definition = "ReturnsResult"
 metric = "arg"
 rationale = "keyword-constructor-arity"
@@ -211,6 +299,49 @@ definition = "SubsetResampling"
 metric = "arg"
 rationale = "keyword-constructor-arity"
 
+# Issue #706's, added after the seventeen above. `CrossSectionalFactorModel` carries twelve
+# fields, so its constructor takes twelve arguments under the same house style.
+
+[[exemption]]
+path = "src/08_Moments/41_CrossSectionalFactorModel.jl"
+definition = "CrossSectionalFactorModel"
+metric = "arg"
+rationale = "keyword-constructor-arity"
+
+# Issue #725's. `CrossSectionalFactorPrior` carries fifteen fields, so its constructor takes
+# fifteen arguments under the same house style. Twelve of them are the reference
+# implementation's own public parameters, one per configuration choice the prior offers.
+
+[[exemption]]
+path = "src/13_Prior/17_CrossSectionalFactorPrior.jl"
+definition = "CrossSectionalFactorPrior"
+metric = "arg"
+rationale = "keyword-constructor-arity"
+
+[[exemption]]
+path = "src/01_Base/03_PrettyShow.jl"
+definition = "@define_pretty_show"
+metric = "cyc"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/01_Base/03_PrettyShow.jl"
+definition = "@define_pretty_show"
+metric = "cog"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/01_Base/05_Preferences.jl"
+definition = "apply_preferences!"
+metric = "cyc"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/01_Base/05_Preferences.jl"
+definition = "apply_preferences!"
+metric = "cog"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
 # --- coverage exemptions ---------------------------------------------------
 #
 # ADR 0082. One row per definition that holds an uncovered line no test can reach, keyed
@@ -236,11 +367,46 @@ rationale = "keyword-constructor-arity"
 # whether the file is **terminal**, which is #404's condition for closing a child map on coverage.
 # The ratchet still sees every miss.
 #
-# The list is empty. #408 built the machinery; the thirteen child maps of #404 write the rows as
-# they sweep. A row is written when a line cannot be reached, never when reaching it is merely
-# awkward.
+# #408 built the machinery; the thirteen child maps of #404 write the rows as they sweep. A row is
+# written when a line cannot be reached, never when reaching it is merely awkward.
 #
 # A line reached only by its own `jldoctest` is not exempt. Coverage is the test suite's number:
 # the `doctest` job of `Docs.yml` carries no instrumentation, and a doctest asserts a rendering
 # rather than a result. "The doctest reaches it" is therefore not a rationale, and the sweep writes
 # the test. ADR 0082, issue #411.
+
+[[coverage_exemption]]
+path = "src/11_Phylogeny/03_Hierarchical.jl"
+definition = "optimal_number_clusters"
+misses = 1
+rationale = "a-cut-into-one-cluster-is-always-valid"
+
+[[coverage_exemption]]
+path = "src/12_ConstraintGeneration/02_LinearConstraintGeneration.jl"
+definition = "LinearConstraint"
+misses = 1
+rationale = "a-signature-line-counter-the-test-job-cannot-reach"
+
+# The definition is `feature_target!`'s fallback method. The key names every `feature_target!`
+# method in the file, and the count of 1 is their sum. This row was keyed `Nothing` until issue
+# #521 was fixed, because `defname` named a definition that declares a return type after the return
+# type. Only the key changed.
+[[coverage_exemption]]
+path = "src/12_ConstraintGeneration/06_AssetSetsMatrix.jl"
+definition = "feature_target!"
+misses = 1
+rationale = "a-return-after-an-unconditional-throw"
+
+# Two constants of one shape, one row each. The `const` line of each holds the `map` closure that
+# builds the union, and the count of 1 is the synthetic zero that the line draws.
+[[coverage_exemption]]
+path = "src/08_Moments/21_Base_Regression.jl"
+definition = "MinValStepwiseRegressionCriterion"
+misses = 1
+rationale = "a-closure-inside-a-top-level-const"
+
+[[coverage_exemption]]
+path = "src/08_Moments/21_Base_Regression.jl"
+definition = "MaxValStepwiseRegressionCriterion"
+misses = 1
+rationale = "a-closure-inside-a-top-level-const"

@@ -10,10 +10,10 @@
     If you haven't, please read the [Developer documentation](2-developer.md) first. This page
     assumes you can already build, test and format the package.
 
-Two tools measure this repository continuously. **JET** looks for inference and correctness
-problems, and **CodeComplexity** measures cyclomatic complexity, cognitive complexity and argument
-count. Their numbers are recorded per file in `code_health/`, and a CI gate turns red when a number
-rises.
+Three tools measure this repository continuously. **JET** looks for inference and correctness
+problems, **CodeComplexity** measures cyclomatic complexity, cognitive complexity and argument
+count, and **JuliaSyntax** counts the code lines in a file. Their numbers are recorded per file in
+`code_health/`, and a CI gate turns red when a number rises.
 
 This page is the procedure for making a number **fall**. It is what you follow when you pick up an
 issue labelled `code-health` and sit down to spend a session on it.
@@ -33,6 +33,18 @@ The gate is a **ratchet**. It compares each file's measured number against the n
 repository recorded, and it fails only on a rise. It is green the day it lands, and it stays green
 however high a number already stands. See
 `docs/adr/0076-the-code-health-pass-rule-is-a-ratchet.md`.
+
+!!! note "The size ratchet reads its threshold, and the other three do not"
+
+    `size.jl` counts the **code** lines in a file, where a docstring line, a comment line and a
+    blank line are not code. A file's ceiling is the greater of the threshold in
+    `code_health/rulings.toml` and the number the baseline records for it. So a file under 500 code
+    lines is free to grow, and a file over 500 may fall and may not rise. A file that crosses 500
+    trips on the crossing.
+
+    A plain ratchet was rejected here. A line count moves on every added helper, so a plain ratchet
+    would redden on ordinary work, and that is the noise issue #336 already measured. See
+    `docs/adr/0101-the-size-gate-counts-code-lines-and-binds-over-a-threshold.md`.
 
 Because the ratchet enforces no improvement, a **scheduled job** files the work. Every Monday it
 looks for files above a threshold, ranks them, and tops the `code-health` label up to **five open
@@ -84,19 +96,22 @@ Run the check that the issue's metric belongs to, from the repository root.
 ```bash
 julia --project=code_health code_health/complexity.jl check
 julia --project=code_health code_health/expansion.jl check
+julia --project=code_health code_health/size.jl check
 julia --project=code_health code_health/jet.jl check
 COVERAGE_LCOV=path/to/lcov.info julia --project=code_health code_health/coverage.jl check
 ```
 
-The complexity check takes about 15 seconds and the Expansion Bound about 30 seconds, so you can run
-either as often as you like. **The JET check takes about 6 minutes 30 seconds and peaks at 2.6 GiB.**
+The complexity check takes about 15 seconds, the Expansion Bound about 30 seconds and the size
+ratchet about 5 seconds, so you can run any of the three as often as you like. **The JET check takes about 6 minutes 30 seconds and peaks at 2.6 GiB.**
 
 The coverage check takes about 10 seconds, and it needs an `lcov.info` that it cannot make itself.
-In CI the `coverage` job of `.github/workflows/ReusableTest.yml` downloads the one the test job
-wrote. Locally, run the suite with coverage on and process it, or download the `lcov` artifact from
-any green run of `Test.yml` and point `COVERAGE_LCOV` at it. ADR 0082.
+In CI the `coverage` job of `.github/workflows/ReusableTest.yml` downloads the one the test job of
+the same run wrote, so the gate runs wherever the suite runs. The step that runs the ratchet carries
+`continue-on-error: true`, so a ratchet that trips annotates the run and leaves the test check
+green. Locally, run the suite with coverage on and process it, or download the `lcov`
+artifact from any green run of `Test.yml` and point `COVERAGE_LCOV` at it. ADR 0082.
 
-`coverage.jl` takes one more verb than the other three. `terminal` answers #404's closing question
+`coverage.jl` takes one more verb than the others. `terminal` answers #404's closing question
 for a child map's own files, and names the definitions that still hold an uncovered line.
 
 ```bash

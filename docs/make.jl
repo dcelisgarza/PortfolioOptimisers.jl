@@ -15,8 +15,10 @@ for sym in [private_symbols; public_symbols]
          end)
 end
 
-# Keep rendered docs and @example output fully expanded (no large-struct collapsing).
+# Keep rendered docs and @example output fully expanded (no large-struct collapsing), and
+# render every field, including one that holds `nothing`, so the docs show the complete type.
 PortfolioOptimisers.set_compact_show!(false)
+PortfolioOptimisers.set_show_nothing_fields!(true)
 
 # `@example` output is captured into a plain `IOBuffer`, whose `displaysize` falls back to
 # `Base.displaysize()` — i.e. `ENV["LINES"]`/`ENV["COLUMNS"]`, defaulting to 24×80. PrettyTables
@@ -29,7 +31,8 @@ ENV["COLUMNS"] = 100_000
 DocMeta.setdocmeta!(PortfolioOptimisers, :DocTestSetup,
                     :(using PortfolioOptimisers, StatsBase, Statistics, LinearAlgebra,
                             Dates, Distributions, StableRNGs, TimeSeries;
-                    PortfolioOptimisers.set_compact_show!(false)); recursive = true)
+                    PortfolioOptimisers.set_compact_show!(false);
+                    PortfolioOptimisers.set_show_nothing_fields!(true)); recursive = true)
 
 # utility function from https://github.com/JuliaOpt/Convex.jl/blob/master/docs/make.jl
 function pre_process_content_md(content)
@@ -184,6 +187,10 @@ contribute = [joinpath("contribute", file)
               if splitext(file)[2] == ".md"]
 idx1 = findfirst("api", api_pages[1][1])[1]
 
+# The base URL of the deployed site. `Documenter.HTML` writes it into every page's
+# `<link rel="canonical">`, and `generate_sitemap` roots every sitemap entry at it.
+const CANONICAL_URL = "https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable"
+
 makedocs(; modules = [PortfolioOptimisers], doctest = false,
          authors = "Daniel Celis Garza <daniel.celis.garza@gmail.com>",
          repo = "https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/{commit}{path}#{line}",
@@ -196,7 +203,11 @@ makedocs(; modules = [PortfolioOptimisers], doctest = false,
                                   # local build therefore needs a server, not `file://`:
                                   # `using LiveServer; serve(; dir = "docs/build")`.
                                   prettyurls = true,
-                                  canonical = "https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable",
+                                  # The base URL of the deployed site.
+                                  # `generate_sitemap` roots every sitemap
+                                  # entry at the same constant, so the sitemap
+                                  # and the canonical tags cannot disagree.
+                                  canonical = CANONICAL_URL,
                                   # `repo` above is a String, so Documenter cannot
                                   # derive the navbar link. Name the remote explicitly.
                                   repolink = "https://github.com/dcelisgarza/PortfolioOptimisers.jl",
@@ -219,27 +230,34 @@ makedocs(; modules = [PortfolioOptimisers], doctest = false,
                   "User Guide" => user_guide;
                   "Examples" => examples;
                   "API" => [joinpath.(api_pages[1][1][idx1:end], api_pages[1][3]);
-                            "Moments" => joinpath.(api_pages[2][1][idx1:end], api_pages[2][3])
-                            "Distance" => joinpath.(api_pages[3][1][idx1:end], api_pages[3][3])
-                            "Phylogeny" => joinpath.(api_pages[4][1][idx1:end], api_pages[4][3])
+                            "Moments" => [joinpath.(api_pages[2][1][idx1:end], api_pages[2][3])
+                                          joinpath.(api_pages[3][1][idx1:end], api_pages[3][3])
+                                          joinpath.(api_pages[4][1][idx1:end], api_pages[4][3])]
+                            "Distance" => joinpath.(api_pages[5][1][idx1:end], api_pages[5][3])
+                            "Phylogeny" => joinpath.(api_pages[6][1][idx1:end], api_pages[6][3])
                             "Constraint Generation" =>
-                                joinpath.(api_pages[5][1][idx1:end], api_pages[5][3])
-                            "Prior" => joinpath.(api_pages[6][1][idx1:end], api_pages[6][3]);
-                            "Uncertainty Sets" =>
                                 joinpath.(api_pages[7][1][idx1:end], api_pages[7][3])
+                            "Prior" => joinpath.(api_pages[8][1][idx1:end], api_pages[8][3]);
+                            "Uncertainty Sets" =>
+                                joinpath.(api_pages[9][1][idx1:end], api_pages[9][3])
                             "Risk Measures" =>
-                                joinpath.(api_pages[8][1][idx1:end], api_pages[8][3])
+                                joinpath.(api_pages[10][1][idx1:end], api_pages[10][3])
                             "Optimisation" =>
-                                [joinpath.(api_pages[9][1][idx1:end], api_pages[9][3])
-                                 joinpath.(api_pages[10][1][idx1:end], api_pages[10][3])
-                                 joinpath.(api_pages[11][1][idx1:end], api_pages[11][3])
-                                 joinpath.(api_pages[12][1][idx1:end], api_pages[12][3])]
+                                [joinpath.(api_pages[11][1][idx1:end], api_pages[11][3])
+                                 joinpath.(api_pages[12][1][idx1:end], api_pages[12][3])
+                                 joinpath.(api_pages[13][1][idx1:end], api_pages[13][3])
+                                 joinpath.(api_pages[14][1][idx1:end], api_pages[14][3])]
                             "Pipeline" =>
-                                joinpath.(api_pages[13][1][idx1:end], api_pages[13][3])];
+                                joinpath.(api_pages[15][1][idx1:end], api_pages[15][3])];
                   "Contribute" => contribute;
                   "References" => REFERENCES_PAGE],
          plugins = [CitationBibliography(joinpath(@__DIR__, "src", "References.bib");
                                          style = :numeric), CodeBlocks(), LandingPage()])
+
+# The sitemap is written from the pages `makedocs` actually built, so it must run after
+# `makedocs`, and before `deploydocs` copies `docs/build` into the deployed tree.
+include(joinpath(@__DIR__, "generate_sitemap.jl"))
+generate_sitemap(joinpath(@__DIR__, "build"), CANONICAL_URL)
 
 deploydocs(; repo = "github.com/dcelisgarza/PortfolioOptimisers.jl", target = "build",
            devbranch = "main", branch = "gh-pages", push_preview = true)

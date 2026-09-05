@@ -44,7 +44,7 @@ PortfolioOptimisers.jl is a modular, extensible Julia package for advanced portf
         Pkg.test()
         ```
 
-  - Add new tests as `test-*.jl` in `test/`.
+  - Add new tests as `test_*.jl` in `test/`.
   - Tests must pass before creating a pull request.
 
 ### Build and Development Commands
@@ -93,7 +93,7 @@ PortfolioOptimisers.jl is a modular, extensible Julia package for advanced portf
   - Keep commits atomic and rebase on `main` before PR.
 - **Releases:**
 
-  - Use a `release-x.y.z` branch, update `Project.toml` and `CHANGELOG.md`, and follow the release checklist in `2-developer.md`.
+  - Use a `release-x.y.z` branch, update `Project.toml`, and follow the release checklist in `2-developer.md`.
 
 ## Integration & Dependencies
 
@@ -157,8 +157,9 @@ Before completing any task or creating a pull request, **ALWAYS**:
  3. **Run doctests**: Doctests are separate from `] test` — run them via the `docs` project environment (see `.github/prompts/pre-commit-and-test.prompt.md` for the exact commands).
  4. **Verify changes**: Ensure all file changes align with the task requirements.
  5. **Update documentation**: If adding new features, update relevant docstrings and docs.
- 6. **Update the Capability Catalogue**: Any new estimator, algorithm, or exported function must be placed in `docs/capability_catalogue.jl` (or listed in `NOT_A_FEATURE`, for a function, or `NOT_A_CHOICE`, for a type the library constructs for itself, with a reason). Do not write a description — it comes from the first sentence of the docstring. `test/test_26_docs.jl` fails if you skip this. See ADR 0040.
- 7. **Check code quality**: Ensure code follows established patterns and conventions.
+ 6. **Update the Capability Catalogue**: Any new type on the Choice Surface, and any new exported function, must be placed in `docs/capability_catalogue.jl` (or listed in `NOT_A_FEATURE`, for a function, or `NOT_A_CHOICE`, for a type the library constructs for itself, with a reason). The surface is every concrete type the package declares that is a leaf `AbstractEstimator`, a leaf `AbstractAlgorithm`, a leaf `AbstractCovarianceEstimator`, or an export under its own name, less the Results and the errors. Do not write a description — it comes from the first sentence of the docstring. `test/test_26_docs.jl` fails if you skip this. See ADR 0040.
+ 7. **Conform an addition to the sweep**: A file added or changed under `src/` or `ext/` owes the four steps of `CLAUDE.md` § *Functionality you add*. Run `julia --project=code_health code_health/sweep_check.jl --fetch`, which reports every one of them and prints the manifest line to paste. See ADR 0084.
+ 8. **Check code quality**: Ensure code follows established patterns and conventions.
 
 * * *
 

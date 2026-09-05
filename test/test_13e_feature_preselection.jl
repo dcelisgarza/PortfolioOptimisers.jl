@@ -38,7 +38,7 @@ leaf ordering.
     nz = asset_sets_feature_names(vals, sets)
     Z = asset_sets_features(vals, sets)
 
-    rd_tax = ReturnsResult(; nx = nx, X = X, nz = nz, Z = Z)
+    rd_tax = ReturnsResult(; nx = nx, X = X, pnl = feature_matrix_panel(nz, Z))
     rd_bare = ReturnsResult(; nx = nx, X = X)
 
     sel_feat = RedundancySelector(;
@@ -83,7 +83,7 @@ leaf ordering.
         Zsq = phylogeny_features(Proximity(), NetworkEstimator(), X)
         @test size(Zsq) == (N, N)
 
-        rd_sq = ReturnsResult(; nx = nx, X = X, nz = nx, Z = Zsq)
+        rd_sq = ReturnsResult(; nx = nx, X = X, pnl = feature_matrix_panel(nx, Zsq))
         kept_sq = fit_preprocessing(sel_feat, rd_sq).nx
 
         @test kept_sq != fit_preprocessing(sel_ret, rd_sq).nx
@@ -102,11 +102,11 @@ leaf ordering.
         @test rdv.nx == res.nx
         @test size(rdv.X) == (T, k)
         # rectangular: the asset axis is sliced, the feature axis is not
-        @test size(rdv.Z) == (k, size(Z, 2))
-        @test rdv.nz == nz
+        @test size(panel_feature_matrix(rdv.pnl)[2]) == (k, size(Z, 2))
+        @test panel_feature_matrix(rdv.pnl)[1] == nz
         # and the rows are the fitted assets' own rows, in fitted order
         idx = [findfirst(==(a), nx) for a in res.nx]
-        @test rdv.Z == Z[idx, :]
+        @test panel_feature_matrix(rdv.pnl)[2] == Z[idx, :]
 
         # the selection is decided on the *full* universe and sliced only afterwards, so
         # the fitted answer does not depend on the slice
@@ -114,14 +114,14 @@ leaf ordering.
 
         # square: both axes slice, and `nz` slices with them
         Zsq = phylogeny_features(Proximity(), NetworkEstimator(), X)
-        rd_sq = ReturnsResult(; nx = nx, X = X, nz = nx, Z = Zsq)
+        rd_sq = ReturnsResult(; nx = nx, X = X, pnl = feature_matrix_panel(nx, Zsq))
         res_sq = fit_preprocessing(sel_feat, rd_sq)
         rdv_sq = apply_preprocessing(res_sq, rd_sq)
         ksq = length(res_sq.nx)
         idx_sq = [findfirst(==(a), nx) for a in res_sq.nx]
-        @test size(rdv_sq.Z) == (ksq, ksq)
-        @test rdv_sq.nz == res_sq.nx
-        @test rdv_sq.Z == Zsq[idx_sq, idx_sq]
+        @test size(panel_feature_matrix(rdv_sq.pnl)[2]) == (ksq, ksq)
+        @test panel_feature_matrix(rdv_sq.pnl)[1] == res_sq.nx
+        @test panel_feature_matrix(rdv_sq.pnl)[2] == Zsq[idx_sq, idx_sq]
     end
 
     @testset ":data_only names the pre-prior situation" begin
@@ -190,7 +190,8 @@ leaf ordering.
         @test kept == fit_preprocessing(sel_feat, rd_tax).nx
         @test length(res.ctx.opt.w) == length(kept)
         # the surviving window still carries a sliced feature matrix
-        @test size(res.ctx.returns.Z) == (length(kept), size(Z, 2))
+        @test size(panel_feature_matrix(res.ctx.returns.pnl)[2]) ==
+              (length(kept), size(Z, 2))
         @test predict(res, rd_tax) isa Any
 
         # a `z_src` set on a downstream optimiser does not reach the selector: the
@@ -227,5 +228,54 @@ leaf ordering.
         @test_throws MethodError fit_preprocessing(CompleteAssetSelector(), prd)
         # and the replay half refuses on the `port_opt_view` tripwire
         @test_throws ArgumentError apply_preprocessing(PO.AssetSelectorResult(nx[1:3]), prd)
+    end
+
+    #=
+    A panel presents every slice as a feature, the observed masks and the one-hot levels
+    included, so a redundancy selector that measured all of them would drop assets on a
+    distance the caller never chose. `panel_feature_matrix(rd.pnl)[1]` travels beside `panel_feature_matrix(rd.pnl)[2]` to this site for that
+    reason, and this testset is the proof it arrives: preselection is the one `Z` consumer
+    that reads the carrier directly rather than through `feature_matrix_picker`.
+    =#
+    @testset "sel reaches the pre-prior site through panel_feature_matrix(rd.pnl)[1]" begin
+        # The sector block is the first three columns: `Sector` has three distinct values
+        # and `Industry` six, concatenated in the order of `vals`.
+        rd_sec = ReturnsResult(; nx = nx, X = X,
+                               pnl = feature_matrix_panel(nz[1:3], Z[:, 1:3]))
+        # The cut is a real one, so the equality below is not two names for one matrix.
+        @test distance(FeatureDistance(), Z; dims = 1) !=
+              distance(FeatureDistance(), Z[:, 1:3]; dims = 1)
+
+        sel_key = RedundancySelector(;
+                                     alg = ClusterGroups(;
+                                                         cle = ClustersEstimator(;
+                                                                                 de = FeatureDistance(;
+                                                                                                      sel = ["Sector"],
+                                                                                                      sets = sets))),
+                                     score = SCM())
+        sel_idx = RedundancySelector(;
+                                     alg = ClusterGroups(;
+                                                         cle = ClustersEstimator(;
+                                                                                 de = FeatureDistance(;
+                                                                                                      sel = [1,
+                                                                                                             2,
+                                                                                                             3]))),
+                                     score = SCM())
+        # Selecting the sector block out of the full carrier is the same preselection as
+        # carrying the sector block alone.
+        @test fit_preprocessing(sel_key, rd_tax).nx ==
+              fit_preprocessing(sel_feat, rd_sec).nx
+        @test fit_preprocessing(sel_idx, rd_tax).nx ==
+              fit_preprocessing(sel_feat, rd_sec).nx
+        # `ClusterGroups` carries no `z_src` and needs none, but it does need `nz`: a name
+        # that resolves against nothing still diagnoses here.
+        sel_bad = RedundancySelector(;
+                                     alg = ClusterGroups(;
+                                                         cle = ClustersEstimator(;
+                                                                                 de = FeatureDistance(;
+                                                                                                      sel = ["nope"],
+                                                                                                      strict = true))),
+                                     score = SCM())
+        @test_throws ArgumentError fit_preprocessing(sel_bad, rd_tax)
     end
 end

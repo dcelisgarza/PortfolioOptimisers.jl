@@ -338,6 +338,31 @@ function RelaxedRiskBudgetingResult(; jr::JuMPOptimisationResult,
                                     fb::Option{<:OptE_Opt})::RelaxedRiskBudgetingResult
     return RelaxedRiskBudgetingResult(jr, prb, fb)
 end
+"""
+    set_retcode(res::RelaxedRiskBudgetingResult, retcode::OptRetCode_VecOptRetCode)
+
+Rebuild a [`RelaxedRiskBudgetingResult`](@ref) with a different return code.
+
+`retcode` is not a field of this result and resolves through the [`JuMPOptimisationResult`](@ref) it embeds, so the rebuild rebuilds `jr` and carries every other member over unchanged.
+
+# Arguments
+
+  - `res`: Result to rebuild.
+  - `retcode`: Return code, or one per member of the population.
+
+# Returns
+
+  - [`RelaxedRiskBudgetingResult`](@ref): The result, with the new return code.
+
+# Related
+
+  - [`set_retcode`](@ref)
+  - [`mark_ruined_members`](@ref)
+  - [`RelaxedRiskBudgetingResult`](@ref)
+"""
+function set_retcode(res::RelaxedRiskBudgetingResult, retcode::OptRetCode_VecOptRetCode)
+    return RelaxedRiskBudgetingResult(set_retcode(res.jr, retcode), res.prb, res.fb)
+end
 # Unique field `prb` resolves directly; unknown properties forward into `prb` first, then
 # into the embedded [`JuMPOptimisationResult`](@ref) `jr` (the virtual `:w` and `pa` fall-through).
 @forward_properties RelaxedRiskBudgetingResult begin
@@ -547,6 +572,11 @@ function _optimise(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult(
                    dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
     rrb = reset_time_dependent_estimator(rrb)
     attrs = processed_jump_optimiser_attributes(rrb.opt, rd; dims = dims, kwargs...)
+    # The bundle reduced what it carries. The head carries the rest — an initial weight
+    # vector, a risk measure holding per-asset data, tracking, a custom term — and hands
+    # them to `assemble_jump_model!` itself, so it takes the same view of itself and of
+    # `rd`. Both are unchanged when every asset is investable.
+    rrb, rd = investable_view(rrb, rd, attrs.pr, attrs.imsk)
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, rrb.opt.sc, rrb.opt.so)

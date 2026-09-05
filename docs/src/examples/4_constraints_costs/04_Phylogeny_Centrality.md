@@ -1,5 +1,4 @@
 The source files can be found in [examples/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../../examples/4_constraints_costs/04_Phylogeny_Centrality.jl"
 ```
@@ -15,10 +14,10 @@ the hubs of the correlation network". The groups are discovered from the data, n
 `PortfolioOptimisers.jl` builds the network with a [`NetworkEstimator`](@ref) (or a clustering
 estimator) and then exposes two families:
 
-- **Phylogeny constraints** ([`SemiDefinitePhylogenyEstimator`](@ref),
+  - **Phylogeny constraints** ([`SemiDefinitePhylogenyEstimator`](@ref),
     [`IntegerPhylogenyEstimator`](@ref)) via the `ple` keyword — limit joint exposure to
     network-linked assets.
-- **Centrality constraints** ([`CentralityConstraint`](@ref) built from a
+  - **Centrality constraints** ([`CentralityConstraint`](@ref) built from a
     [`CentralityEstimator`](@ref)) via the `cte` keyword — bound the portfolio's average
     network centrality.
 
@@ -79,9 +78,9 @@ each constraint sees as one bet.
 
 Two separations ship, and they measure the same structure in different units:
 
-- [`HopCount`](@ref) counts **edges**, ignoring their lengths, with a budget of `n` of them.
+  - [`HopCount`](@ref) counts **edges**, ignoring their lengths, with a budget of `n` of them.
     `HopCount(; n = 1)` is the default and means "directly linked only".
-- [`PathLength`](@ref) adds up the **distances** along the shortest path, with a budget `dmax`
+  - [`PathLength`](@ref) adds up the **distances** along the shortest path, with a budget `dmax`
     in those same units.
 
 The two are interchangeable — every consumer takes either — but their numbers are *not*

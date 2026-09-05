@@ -110,6 +110,17 @@ end
             ex = Expr(:call, :-, ex)
         end
         @test_throws Meta.ParseError parse_equation(Expr(:call, :(<=), ex, 1))
+        # The string form is held to the same depth cap: a string that clears the length
+        # cap can still carry a tree deeper than max_depth, so the cap is read off the
+        # parsed tree rather than inferred from the character count.
+        over = pe.EQUATION_LIMITS[].max_depth + 10
+        deep_str = "-("^over * "w_A" * ")"^over * " <= 1"
+        @test length(deep_str) <= pe.EQUATION_LIMITS[].max_length
+        @test_throws "too deeply nested" parse_equation(deep_str)
+        # A tree under the cap still parses, so the bound is the stated number.
+        under = pe.EQUATION_LIMITS[].max_depth - 2
+        @test parse_equation("-("^under * "w_A" * ")"^under * " <= 1") isa
+              PortfolioOptimisers.ParsingResult
         # The global default is runtime-settable via the ScopedConfig setter, and validated.
         @test_throws ArgumentError pe.set_equation_limits!(max_length = 0)
         @test_throws ArgumentError pe.set_equation_limits!(max_depth = -1)
@@ -168,12 +179,17 @@ end
     pe.apply_preferences!(Dict{String, Any}("equation_max_length" => 512,
                                             "suggestion_distance" => "damerau_levenshtein",
                                             "suggestion_min_score" => 0.8,
-                                            "compact_show" => 4))
+                                            "compact_show" => 4,
+                                            "show_nothing_fields" => true,
+                                            "show_nothing_fields_by_type" =>
+                                                Dict{String, Any}("SimpleVariance" => false)))
     @test pe.EQUATION_LIMITS[].max_length == 512
     @test pe.EQUATION_LIMITS[].max_depth == 256          # unset key keeps its default
     @test pe.STRING_DISTANCE[].dist isa pe.StringDistances.DamerauLevenshtein
     @test pe.STRING_DISTANCE[].min_score == 0.8
     @test pe.COMPACT_SHOW[] == 4
+    @test pe.SHOW_NOTHING_FIELDS[].default === true
+    @test pe.SHOW_NOTHING_FIELDS[].by_type == Dict(:SimpleVariance => false)
     # Unset preferences (nothing) are skipped entirely.
     pe.apply_preferences!(Dict{String, Any}())
     @test pe.EQUATION_LIMITS[].max_length == 512
@@ -187,6 +203,20 @@ end
     @test_throws ArgumentError pe.apply_preferences!(Dict{String, Any}("suggestion_min_score" =>
                                                                            true))
     @test_throws ArgumentError pe.apply_preferences!(Dict{String, Any}("compact_show" => "yes"))
+    # The two show-nothing keys fail closed on a wrong value: a non-boolean switch, a table
+    # that is not a table, and a table entry that is not a boolean. A name that matches no
+    # type is accepted, because a type outside the package can render through the macro.
+    @test_throws ArgumentError pe.apply_preferences!(Dict{String, Any}("show_nothing_fields" =>
+                                                                           1))
+    @test_throws ArgumentError pe.apply_preferences!(Dict{String, Any}("show_nothing_fields_by_type" =>
+                                                                           true))
+    @test_throws ArgumentError pe.apply_preferences!(Dict{String, Any}("show_nothing_fields_by_type" =>
+                                                                           Dict{String,
+                                                                                Any}("SimpleVariance" => "no")))
+    @test isnothing(pe.apply_preferences!(Dict{String, Any}("show_nothing_fields_by_type" =>
+                                                                Dict{String, Any}("NoSuchType" =>
+                                                                                      true))))
+    @test pe.SHOW_NOTHING_FIELDS[].by_type[:NoSuchType] === true
     # Unknown distance name fails closed against the enumerated allowlist, with a suggestion.
     err = try
         pe.apply_preferences!(Dict{String, Any}("suggestion_distance" => "levenstein"))
@@ -203,6 +233,11 @@ end
     pe.set_equation_limits!(max_length = 4096, max_depth = 256)
     pe.set_string_distance!(dist = pe.StringDistances.Levenshtein(), min_score = 0.7)
     pe.set_compact_show!(true)
+    pe.set_show_nothing_fields!(false)
+    pe.set_show_nothing_fields!(:SimpleVariance, nothing)
+    pe.set_show_nothing_fields!(:NoSuchType, nothing)
+    @test pe.SHOW_NOTHING_FIELDS[].default === false
+    @test isempty(pe.SHOW_NOTHING_FIELDS[].by_type)
 end
 @testset "Suggestion threshold rejects a non-positive min_score" begin
     using PortfolioOptimisers, Test
@@ -231,15 +266,16 @@ end
 @testset "Resource caps fail closed" begin
     using PortfolioOptimisers, Test
     pe = PortfolioOptimisers
-    # One cap per sink (ADR 0041); the keyword constructor is the safe path since the six
-    # fields are same-typed and four share the value 100_000.
+    # One cap per sink (ADR 0041); the keyword constructor is the safe path since the
+    # seven fields are same-typed and four share the value 100_000.
     @test pe.RESOURCE_LIMITS[] ==
-          pe.ResourceLimits(1_000_000, 100_000, 100_000, 10_000, 100_000, 100_000)
+          pe.ResourceLimits(1_000_000, 100_000, 100_000, 10_000, 100_000, 100_000, 10_000)
     @test pe.ResourceLimits() ==
-          pe.ResourceLimits(1_000_000, 100_000, 100_000, 10_000, 100_000, 100_000)
+          pe.ResourceLimits(1_000_000, 100_000, 100_000, 10_000, 100_000, 100_000, 10_000)
     @test pe.ResourceLimits(; max_bins = 500).max_bins == 500
     @test pe.ResourceLimits(; max_hop_count = 7).max_hop_count == 7
     @test pe.ResourceLimits(; max_search_grid = 9).max_search_grid == 9
+    @test pe.ResourceLimits(; max_ep_grid = 21).max_ep_grid == 21
     # Every field must be positive, like EquationLimits.
     @test_throws ArgumentError pe.ResourceLimits(; max_n_sim = 0)
     @test_throws ArgumentError pe.ResourceLimits(; max_n_subsets = -1)
@@ -247,12 +283,14 @@ end
     @test_throws ArgumentError pe.ResourceLimits(; max_bins = -1)
     @test_throws ArgumentError pe.ResourceLimits(; max_hop_count = 0)
     @test_throws ArgumentError pe.ResourceLimits(; max_search_grid = -1)
+    @test_throws ArgumentError pe.ResourceLimits(; max_ep_grid = 0)
     @test_throws ArgumentError pe.set_resource_limits!(max_n_sim = 0)
     @test_throws ArgumentError pe.set_resource_limits!(max_n_subsets = -1)
     @test_throws ArgumentError pe.set_resource_limits!(max_frontier = 0)
     @test_throws ArgumentError pe.set_resource_limits!(max_bins = -1)
     @test_throws ArgumentError pe.set_resource_limits!(max_hop_count = 0)
     @test_throws ArgumentError pe.set_resource_limits!(max_search_grid = -1)
+    @test_throws ArgumentError pe.set_resource_limits!(max_ep_grid = -1)
     # n_sim sizes an N^2 * n_sim array in both uncertainty-set estimators; the ceiling
     # converts an OOM kill into a typed DomainError naming the knob that raises it.
     @test_throws DomainError NormalUncertaintySet(; n_sim = 10_000_000_000)
@@ -349,6 +387,20 @@ end
                                                    ["a" => collect(1:10),
                                                     "b" => collect(1:10)]])
     end
+    # K sizes a binary block of the mixed-integer program an upper-bound or equality
+    # tail view builds, so the grid formulations take a cap of their own. The parity
+    # check alone admitted a grid of ten million binaries from one view.
+    @test_throws DomainError GridEntropicValueatRiskView(; K = 10_000_001)
+    @test_throws DomainError GridRelativisticValueatRiskView(; K = 10_000_001)
+    kerr = try
+        GridRelativisticValueatRiskView(; K = 10_000_001)
+        nothing
+    catch e
+        e
+    end
+    @test kerr isa DomainError
+    @test occursin("max_ep_grid", kerr.msg)
+    @test GridEntropicValueatRiskView(; K = 21).K == 21
     # A raised ceiling is honoured, and scoped overrides restore on exit.
     pe.with_resource_limits(; max_n_sim = 20_000_000_000) do
         @test NormalUncertaintySet(; n_sim = 10_000_000_000).n_sim == 10_000_000_000
@@ -366,6 +418,9 @@ end
         @test length(pe.lens_val_grid(["a" => collect(1:100), "b" => collect(1:100)])[2]) ==
               10_000
     end
+    pe.with_resource_limits(; max_ep_grid = 20_000_000) do
+        @test GridRelativisticValueatRiskView(; K = 10_000_001).K == 10_000_001
+    end
     @test pe.RESOURCE_LIMITS[].max_n_sim == 1_000_000
     # Preferences fail closed at load, like the equation caps.
     pe.apply_preferences!(Dict{String, Any}("max_n_subsets" => 1_234, "max_bins" => 321))
@@ -373,9 +428,12 @@ end
     @test pe.RESOURCE_LIMITS[].max_bins == 321
     @test pe.RESOURCE_LIMITS[].max_n_sim == 1_000_000  # unset key keeps its default
     @test pe.RESOURCE_LIMITS[].max_frontier == 100_000  # unset key keeps its default
-    pe.apply_preferences!(Dict{String, Any}("max_hop_count" => 12, "max_search_grid" => 34))
+    pe.apply_preferences!(Dict{String, Any}("max_hop_count" => 12, "max_search_grid" => 34,
+                                            "max_ep_grid" => 56))
     @test pe.RESOURCE_LIMITS[].max_hop_count == 12
     @test pe.RESOURCE_LIMITS[].max_search_grid == 34
+    @test pe.RESOURCE_LIMITS[].max_ep_grid == 56
+    @test_throws ArgumentError pe.apply_preferences!(Dict{String, Any}("max_ep_grid" => 0))
     @test_throws ArgumentError pe.apply_preferences!(Dict{String, Any}("max_hop_count" => 0))
     @test_throws ArgumentError pe.apply_preferences!(Dict{String, Any}("max_search_grid" =>
                                                                            2.5))
@@ -386,7 +444,8 @@ end
     @test_throws ArgumentError pe.apply_preferences!(Dict{String, Any}("max_bins" => 1.5))
     pe.set_resource_limits!(max_n_sim = 1_000_000, max_n_subsets = 100_000,
                             max_frontier = 100_000, max_bins = 10_000,
-                            max_hop_count = 100_000, max_search_grid = 100_000)  # restore
+                            max_hop_count = 100_000, max_search_grid = 100_000,
+                            max_ep_grid = 10_000)  # restore
 end
 @testset "A preference that widens a guard is announced" begin
     using PortfolioOptimisers, Test
@@ -420,7 +479,114 @@ end
     @test pe.RESOURCE_LIMITS[].max_bins == 100  # the value is applied either way
     pe.set_resource_limits!(max_n_sim = 1_000_000, max_n_subsets = 100_000,
                             max_frontier = 100_000, max_bins = 10_000,
-                            max_hop_count = 100_000, max_search_grid = 100_000)  # restore
+                            max_hop_count = 100_000, max_search_grid = 100_000,
+                            max_ep_grid = 10_000)  # restore
     pe.set_equation_limits!(max_length = 4096, max_depth = 256)
     pe.set_string_distance!(dist = pe.StringDistances.Levenshtein(), min_score = 0.7)
+end
+@testset "Canonicalisation invariants (issue #513)" begin
+    using PortfolioOptimisers, Test, Logging
+    with_logger(SimpleLogger(stderr, Logging.Error)) do
+        # Repeated names accumulate into one coefficient rather than two entries.
+        res = parse_equation("2*A + 3*A <= 1")
+        @test res.vars == ["A"]
+        @test res.coef == [5.0]
+
+        # `collect_terms!` handles `:-` by negating the last argument, and a unary minus
+        # holds no argument but the last, so its one operand is the negated one.
+        res = parse_equation("-A <= 1")
+        @test res.coef == [-1.0]
+        res = parse_equation("A - B - C <= 1")
+        idx = sortperm(res.vars)
+        @test res.vars[idx] == ["A", "B", "C"]
+        @test res.coef[idx] == [1.0, -1.0, -1.0]
+        res = parse_equation("-(A - B) <= 1")
+        idx = sortperm(res.vars)
+        @test res.vars[idx] == ["A", "B"]
+        @test res.coef[idx] == [-1.0, 1.0]
+
+        # A product or a quotient of two non-numeric sides is opaque: it becomes one
+        # variable named by its own text, which resolves against the universe like any
+        # other name and is dropped when it matches none.
+        @test parse_equation("A/B <= 1").vars == ["A / B"]
+        @test parse_equation("A*B <= 1").vars == ["A * B"]
+        # A node whose head is not `:call` is rebuilt from its folded arguments, so a
+        # tuple survives the fold and becomes one opaque name.
+        @test parse_equation("(A, B) <= 1").vars == ["(A, B)"]
+        sets = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"]))
+        @test isnothing(@test_logs (:warn,) (:warn,) linear_constraints("A/B <= 1", sets))
+        @test_throws ArgumentError linear_constraints("A/B <= 1", sets; strict = true)
+
+        # `datatype` names the numeric domain of the coefficients as well as of the
+        # right-hand side. The walk starts from `one(datatype)`, so `coef` carries it.
+        res = parse_equation("2*A + 1 <= 3"; datatype = Float32)
+        @test res.coef isa Vector{Float32}
+        @test res.rhs isa Float32
+        @test res.coef == Float32[2.0]
+        @test res.rhs == Float32(2)
+
+        # One constraint prints one way whether or not a group expanded: both renderings
+        # go through `format_term`, which elides a unit coefficient.
+        gsets = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"], "g" => ["A", "B"]))
+        res = replace_group_by_assets(parse_equation("g + 2*C <= 1"), gsets)
+        @test res.eqn == "2.0*C + A + B <= 1.0"
+
+        # A `>=` row is the same constraint as the negated `<=` row, in both halves.
+        ge = linear_constraints("A >= 0.1", sets)
+        le = linear_constraints("-A <= -0.1", sets)
+        @test collect(ge.ineq.A) == collect(le.ineq.A)
+        @test ge.ineq.B == le.ineq.B
+        @test collect(ge.ineq.A) == [-1.0 0.0 0.0]
+        @test ge.ineq.B == [-0.1]
+
+        # A group carries the coefficient onto every member, and the Black-Litterman
+        # expansion divides it by the member count instead: a sum against a mean.
+        s3 = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"], "g3" => ["A", "B", "C"]))
+        eq6 = parse_equation("6*g3 <= 1")
+        @test replace_group_by_assets(eq6, s3, false).coef == [6.0, 6.0, 6.0]
+        @test replace_group_by_assets(eq6, s3, true).coef == [2.0, 2.0, 2.0]
+    end
+end
+@testset "One comparison-operator table (issue #520)" begin
+    using PortfolioOptimisers, Test
+    # The (sign, is_inequality) table had five encodings and one caller each, so one
+    # change to it forced five edits. Both spellings of an operator — the function a
+    # constraint estimator carries and the string a `ParsingResult` carries — now go
+    # through `comparison_sign_ineq_flag`, and the two spellings must give the same row.
+    csif = PortfolioOptimisers.comparison_sign_ineq_flag
+    @test csif(==) == csif("==") == (1, false)
+    @test csif(<=) == csif("<=") == (1, true)
+    @test csif(>=) == csif(">=") == (-1, true)
+    @test all(r -> isa(r[1], Int) && isa(r[2], Bool),
+              (csif("=="), csif("<="), csif(">="), csif(==), csif(<=), csif(>=)))
+    # An operator outside the three used to fall through to the equality branch in
+    # silence. `ParsingResult` is exported and takes `op` positionally, so a hand-built
+    # result can carry any string and reach the table.
+    @test_throws ArgumentError csif("!=")
+    @test_throws ArgumentError csif("<")
+    sets = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"]))
+    @test_throws ArgumentError PortfolioOptimisers.get_linear_constraints([ParsingResult(["A"],
+                                                                                         [1.0],
+                                                                                         "!=",
+                                                                                         1.0,
+                                                                                         "A != 1.0")],
+                                                                          sets)
+    # Each of the three operators still lands in the half, and with the sign, the table
+    # names: `==` in the equality half, `<=` and `>=` in the inequality half written in
+    # the `<=` sense.
+    lc = PortfolioOptimisers.get_linear_constraints([ParsingResult(["A"], [1.0], "==", 1.0,
+                                                                   "A == 1.0")], sets)
+    @test isnothing(lc.ineq)
+    @test collect(lc.eq.A) == [1.0 0.0 0.0]
+    @test lc.eq.B == [1.0]
+    lc = PortfolioOptimisers.get_linear_constraints([ParsingResult(["A"], [1.0], "<=", 1.0,
+                                                                   "A <= 1.0")], sets)
+    @test isnothing(lc.eq)
+    @test collect(lc.ineq.A) == [1.0 0.0 0.0]
+    @test lc.ineq.B == [1.0]
+    lc = PortfolioOptimisers.get_linear_constraints([ParsingResult(["A"], [1.0], ">=", 1.0,
+                                                                   "A >= 1.0")], sets)
+    @test isnothing(lc.eq)
+    @test collect(lc.ineq.A) == [-1.0 0.0 0.0]
+    @test lc.ineq.B == [-1.0]
 end

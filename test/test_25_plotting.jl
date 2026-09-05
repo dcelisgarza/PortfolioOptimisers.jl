@@ -181,6 +181,12 @@
         # use return-based risk measure (CVaR), not covariance-based (Variance)
         @test is_plot(plot_rolling_measure(r_cvr, w, X))
         @test is_plot(plot_rolling_measure(r_cvr, w, X; rolling = 20))
+        # The method rolls the series through `rolling_window_measure` rather than through a
+        # second copy of the loop, so a `rolling` longer than the sample now raises. It used
+        # to give an empty vector of risks and an empty plot, which the neighbouring
+        # docstring already called a caller error (#770).
+        @test is_plot(plot_rolling_measure(r_cvr, w, X; rolling = size(X, 1)))
+        @test_throws DomainError plot_rolling_measure(r_cvr, w, X; rolling = size(X, 1) + 1)
     end
 
     @testset "plot_cv_scores" begin
@@ -349,5 +355,63 @@
         @test is_plot(plot_asset_cumulative_returns(pred))
         @test_throws ArgumentError plot_risk_contribution(r_cvr, pred)
         @test_throws ArgumentError plot_factor_risk_contribution(r_cvr, pred)
+    end
+    @testset "A drifted fold plots its risk contributions (#769)" begin
+        # The blanket refusal above is lifted for a fold that carries a Held Weights
+        # record: that record keeps the fold's asset returns, which is exactly what the
+        # refusal said a `PredictionResult` had lost.
+        mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
+        raw = cross_val_predict(mr, rd, KFold(; n = 2, wd = SelfFinancingDrift())).pred
+        pred = isa(raw[1], PredictionResult) ? raw[1] : raw[1].pred[1]
+
+        @test !isnothing(pred.hw)
+        @test is_plot(plot_risk_contribution(r_cvr, pred))
+        @test is_plot(plot_factor_risk_contribution(r_cvr, pred))
+        @test is_plot(plot_risk_contribution(r_cvr, pred; percentage = false))
+    end
+    @testset "Cross-sectional regression diagnostics (#798)" begin
+        # Each figure draws one level-2 verb. The block is built by hand rather than fitted,
+        # because the diagnostics read only the histories the block carries.
+        rng_cs = MersenneTwister(798)
+        Tc, Nc, Kc = 10, 8, 3
+        Ms_cs = randn(rng_cs, Tc, Nc, Kc)
+        csr_cs = CrossSectionalRegression(; f = 0.02 * randn(rng_cs, Tc, Kc),
+                                          eps = 0.01 * randn(rng_cs, Tc, Nc),
+                                          n = fill(Nc, Tc))
+        csfm_cs = CrossSectionalFactorModel(; M = Ms_cs[Tc, :, :], b = zeros(Nc),
+                                            csr = csr_cs, Ms = Ms_cs,
+                                            rw = abs.(randn(rng_cs, Tc, Nc)) .+ 0.1,
+                                            nf = ["value", "size", "momentum"], lag = 1)
+        # `rr` and `fpr` are the factor block and travel together, so the factor prior is
+        # built alongside the loadings even though these figures never read it.
+        fpr_cs = LowOrderPrior(; X = randn(rng_cs, Tc, Kc), mu = zeros(Kc),
+                               sigma = Matrix(1.0 * I, Kc, Kc))
+        pr_cs = LowOrderPrior(; X = randn(rng_cs, Tc, Nc), mu = zeros(Nc),
+                              sigma = Matrix(1.0 * I, Nc, Nc), rr = csfm_cs, fpr = fpr_cs)
+
+        for plt in
+            (plot_cs_regression_r2, plot_cs_regression_adjusted_r2, plot_cs_regression_aic,
+             plot_cs_regression_bic, plot_exposure_condition_number)
+            @test is_plot(plt(csfm_cs))
+            @test is_plot(plt(pr_cs))
+        end
+        for plt in (plot_cs_regression_t_stats, plot_exposure_vif)
+            @test is_plot(plt(csfm_cs))
+            @test is_plot(plt(pr_cs))
+            @test is_plot(plt(csfm_cs; nf = ["a", "b", "c"]))
+        end
+        @test is_plot(plot_cs_regression_t_stat_exceedance_rate(csfm_cs))
+        @test is_plot(plot_cs_regression_t_stat_exceedance_rate(pr_cs))
+        @test is_plot(plot_cs_regression_t_stat_exceedance_rate(csfm_cs; threshold = 1,
+                                                                nf = ["a", "b", "c"]))
+        # A block that names no factor is labelled by position.
+        bare = CrossSectionalFactorModel(; M = Ms_cs[Tc, :, :], b = zeros(Nc), csr = csr_cs,
+                                         Ms = Ms_cs, lag = 1)
+        @test is_plot(plot_exposure_vif(bare))
+        # A prior result that carries no factor block names the remedy.
+        no_rr = LowOrderPrior(; X = randn(rng_cs, Tc, Nc), mu = zeros(Nc),
+                              sigma = Matrix(1.0 * I, Nc, Nc))
+        @test_throws PortfolioOptimisers.IsNothingError plot_exposure_vif(no_rr)
+        @test_throws PortfolioOptimisers.IsNothingError plot_cs_regression_r2(no_rr)
     end
 end

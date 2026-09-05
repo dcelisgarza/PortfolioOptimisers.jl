@@ -49,7 +49,8 @@ EmpiricalPrior
           │      │    ce ┼ GeneralCovariance
           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
           │      │       │    w ┴ nothing
-          │      │   alg ┴ FullMoment()
+          │      │   alg ┼ FullMoment()
+          │      │     w ┴ nothing
           │   mp ┼ MatrixProcessing
           │      │     pdm ┼ Posdef
           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
@@ -134,6 +135,8 @@ Where:
 
 Every choice inside `pe.me` and `pe.ce` reaches the result. A shrunk mean and a denoised covariance move both away from the display above rather than refining it.
 
+This method takes the **arithmetic** moments of `X` directly. It applies no log transform, so it is not the ``h = 1`` case of the horizon method: that one still passes through ``\\log(1 + x_t)`` and back, and the round trip is an identity only in the limit of small returns.
+
 # Arguments
 
   - `pe`: Empirical prior estimator.
@@ -198,6 +201,19 @@ Where:
   - ``\\hat{\\sigma}_{ij}``: Arithmetic covariance between assets ``i`` and ``j``.
 
 `X` in the returned [`LowOrderPrior`](@ref) is the arithmetic returns matrix the caller supplied. Only the moments are computed in log space.
+
+# Algorithm
+
+The order of steps 5 to 7 is **not free**. Step 6 reads the `mu` that step 5 left, which is ``\\hat{\\mu}_i + 1`` and not ``\\hat{\\mu}_i``, because step 7 has not yet subtracted the one. The second closed form asks for exactly that factor, so the body meets it by ordering rather than by recomputing. Moving step 7 in front of step 6 replaces each ``\\hat{\\mu}_i + 1`` by ``\\hat{\\mu}_i``, and on a daily return series that collapses the covariance to a small fraction of its value.
+
+ 1. Orient `X` to `observations × assets` with [`dims_oriented`](@ref).
+ 2. Take the log-returns `X_log`, as `log1p.(X)`.
+ 3. Compute the log-return mean `mu` on `X_log`, under `pe.me`, and the log-return covariance `sigma` on `X_log`, under `pe.ce`.
+ 4. Scale both by `pe.horizon`, giving ``\\tilde{\\boldsymbol{\\mu}}`` and ``\\tilde{\\mathbf{\\Sigma}}``.
+ 5. Overwrite `mu` with the exponential of the first closed form. This is the arithmetic mean **plus one**, because the subtraction is still to come.
+ 6. Overwrite `sigma` with the second closed form, whose ``\\hat{\\mu}_i + 1`` factors are the `mu` of step 5.
+ 7. Subtract one from `mu`, giving ``\\hat{\\boldsymbol{\\mu}}``.
+ 8. Return a [`LowOrderPrior`](@ref) carrying the arithmetic `X` of step 1, `mu` and `sigma`.
 
 # Arguments
 

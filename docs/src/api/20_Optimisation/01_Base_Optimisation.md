@@ -20,6 +20,7 @@ NonFiniteAllocationOptimisationResult
 OptimisationReturnCode
 VecOptRetCode
 OptRetCode_VecOptRetCode
+set_retcode
 OptimisationModelResult
 OptimisationSuccess
 OptimisationFailure

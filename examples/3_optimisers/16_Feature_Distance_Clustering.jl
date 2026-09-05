@@ -181,7 +181,7 @@ Feeding both hierarchies to [`HierarchicalRiskParity`](@ref) shows the allocatio
 [`ReturnsResult`](@ref) — that pairing is §7's subject.
 =#
 
-rdz = ReturnsResult(; nx = rd.nx, X = rd.X, ts = rd.ts, nz = nz, Z = Z)
+rdz = ReturnsResult(; nx = rd.nx, X = rd.X, ts = rd.ts, pnl = feature_matrix_panel(nz, Z))
 
 hrp_cor = optimise(HierarchicalRiskParity(;
                                           opt = HierarchicalOptimiser(; pe = pr,
@@ -233,7 +233,8 @@ pe_taxonomy = FeaturePrior(; pe = EmpiricalPrior(),
                            ze = AssetSetsFeatures(; vals = taxonomy), sets = sets)
 pr_taxonomy = prior(pe_taxonomy, rd)
 
-println("The producer and the public function agree exactly: ", pr_taxonomy.Z == Z)
+println("The producer and the public function agree exactly: ",
+        panel_feature_matrix(pr_taxonomy.pnl)[2] == Z)
 
 #=
 #### Grading the levels
@@ -281,7 +282,8 @@ rdf = prices_to_returns(X, F)
 pr_loadings = prior(FeaturePrior(; pe = FactorPrior(), ze = RegressionFeatures()), rdf)
 
 pretty_table(DataFrame(["Asset" => rd.nx;
-                        [rdf.nf[k] => pr_loadings.Z[:, k] for k in eachindex(rdf.nf)]...]);
+                        [rdf.nf[k] => panel_feature_matrix(pr_loadings.pnl)[2][:, k]
+                         for k in eachindex(rdf.nf)]...]);
              formatters = [(v, i, j) -> j == 1 ? v : round(v; digits = 4)],
              title = "Factor loadings as a feature matrix")
 
@@ -308,7 +310,8 @@ pe_graph = FeaturePrior(; pe = EmpiricalPrior(),
 pr_graph = prior(pe_graph, rd)
 
 pretty_table(DataFrame(["Asset" => rd.nx;
-                        [rd.nx[k] => pr_graph.Z[:, k] for k in 1:6]...]);
+                        [rd.nx[k] => panel_feature_matrix(pr_graph.pnl)[2][:, k]
+                         for k in 1:6]...]);
              formatters = [(v, i, j) -> j == 1 ? v : round(v; digits = 4)],
              title = "The first six columns of the graph feature matrix")
 
@@ -325,8 +328,10 @@ producers = DataFrame("Producer" =>
                            "PhylogenyFeatures"],
                       "Feature axis" => ["whatever you supply", "taxonomy groups",
                                          "factors / reduced dimensions", "the assets"],
-                      "Shape here" => [string(size(Z)), string(size(pr_taxonomy.Z)),
-                                       string(size(pr_loadings.Z)), string(size(pr_graph.Z))],
+                      "Shape here" => [string(size(Z)),
+                                       string(size(panel_feature_matrix(pr_taxonomy.pnl)[2])),
+                                       string(size(panel_feature_matrix(pr_loadings.pnl)[2])),
+                                       string(size(panel_feature_matrix(pr_graph.pnl)[2]))],
                       "Exogenous" => ["depends on the source", "yes", "no", "no"],
                       "Signed" => ["depends on the source", "no", "yes", "no"])
 pretty_table(producers; title = "The four routes a feature matrix takes")
@@ -357,7 +362,7 @@ decays = ["LinearDecay()" => LinearDecay(), "ExponentialDecay()" => ExponentialD
 function graph_features(sep, decay)
     ze = PhylogenyFeatures(; pl = NetworkEstimator(; sep = sep),
                            alg = Proximity(; decay = decay))
-    return prior(FeaturePrior(; pe = EmpiricalPrior(), ze = ze), rd).Z
+    return panel_feature_matrix(prior(FeaturePrior(; pe = EmpiricalPrior(), ze = ze), rd).pnl)[2]
 end
 
 sweep = DataFrame()
@@ -448,7 +453,7 @@ They part company as soon as the matrix is signed:
 
 signed_metric = try
     distance(FeatureDistance(; metric = PortfolioOptimisers.Distances.Jaccard()),
-             pr_loadings.Z; dims = 1)
+             panel_feature_matrix(pr_loadings.pnl)[2]; dims = 1)
     "no error"
 catch err
     sprint(showerror, err)
@@ -583,7 +588,7 @@ picks which:
   - `z_src = :prior` reads the prior result's `Z` — the matrix a **producer derived**.
 
 Provenance is strict: a producer only ever populates the prior carrier, and `prior(pe, rd)`
-always drops `rd.Z`. The two carriers therefore never hold two copies of one matrix, and `z_src`
+always drops `panel_feature_matrix(rd.pnl)[2]`. The two carriers therefore never hold two copies of one matrix, and `z_src`
 never picks between two spellings of the same thing.
 
 ### 7.1 Outside a fold the two routes agree
@@ -633,7 +638,8 @@ same as reading a subproblem out of the universe's distance matrix.
 
 Z_square = phylogeny_features(Proximity(; decay = LinearDecay()),
                               NetworkEstimator(; sep = HopCount(; n = 2)), pr.X)
-rd_square = ReturnsResult(; nx = rd.nx, X = rd.X, ts = rd.ts, nz = rd.nx, Z = Z_square)
+rd_square = ReturnsResult(; nx = rd.nx, X = rd.X, ts = rd.ts,
+                          pnl = feature_matrix_panel(rd.nx, Z_square))
 subset = [1, 2, 3, 5, 8, 10, 13, 17]
 
 view_square = PortfolioOptimisers.port_opt_view(rd_square, subset)
@@ -642,14 +648,18 @@ view_rect = PortfolioOptimisers.port_opt_view(rdz, subset)
 commute = DataFrame("Feature axis" =>
                         ["The assets (square)", "Taxonomy groups (rectangular)"],
                     "Shape of the view" =>
-                        [string(size(view_square.Z)), string(size(view_rect.Z))],
+                        [string(size(panel_feature_matrix(view_square.pnl)[2])),
+                         string(size(panel_feature_matrix(view_rect.pnl)[2]))],
                     "Largest disagreement" => [maximum(abs,
                                                        distance(FeatureDistance(), Z_square; dims = 1)[subset,
                                                                                                        subset] -
-                                                       distance(FeatureDistance(), view_square.Z; dims = 1)),
+                                                       distance(FeatureDistance(),
+                                                                panel_feature_matrix(view_square.pnl)[2];
+                                                                dims = 1)),
                                                maximum(abs,
                                                        distance(FeatureDistance(), Z; dims = 1)[subset, subset] -
-                                                       distance(FeatureDistance(), view_rect.Z; dims = 1))])
+                                                       distance(FeatureDistance(),
+                                                                panel_feature_matrix(view_rect.pnl)[2]; dims = 1))])
 pretty_table(commute;
              formatters = [(v, i, j) -> isa(v, AbstractFloat) ? round(v; digits = 4) : v],
              title = "Measuring the subproblem against measuring the universe")
@@ -719,14 +729,15 @@ view_estimator = PortfolioOptimisers.port_opt_view(FeaturePrior(; pe = Empirical
                                                                 ze = Ztv_wide), [1, 2, 3])
 view_carried = PortfolioOptimisers.port_opt_view(ReturnsResult(; nx = rd.nx, X = rd.X,
                                                                ts = rd.ts,
-                                                               nz = ["volatility",
-                                                                     "momentum"], Z = Ztv),
+                                                               pnl = feature_matrix_panel(["volatility",
+                                                                                           "momentum"],
+                                                                                          Ztv)),
                                                  1:100, [1, 2, 3])
 
 pretty_table(DataFrame("Carrier" => ["Estimator-held literal `ze`", "ReturnsResult `Z`"],
                        "Before the view" => [string(size(Ztv_wide)), string(size(Ztv))],
-                       "After the view" =>
-                           [string(size(view_estimator.ze)), string(size(view_carried.Z))],
+                       "After the view" => [string(size(view_estimator.ze)),
+                                            string(size(panel_feature_matrix(view_carried.pnl)[2]))],
                        "Observation axis" => ["untouched", "sliced"]);
              title = "Only one of the two carriers can follow an observation fold")
 
@@ -864,7 +875,8 @@ Z_bt = asset_sets_features(taxonomy,
                                                         [sector[a] for a in rdb.nx],
                                                     "nx_industry" =>
                                                         [industry[a] for a in rdb.nx])))
-rdbz = ReturnsResult(; nx = rdb.nx, X = rdb.X, ts = rdb.ts, nz = nz, Z = Z_bt)
+rdbz = ReturnsResult(; nx = rdb.nx, X = rdb.X, ts = rdb.ts,
+                     pnl = feature_matrix_panel(nz, Z_bt))
 walk = IndexWalkForward(252, 63)
 
 bt_cor = cross_val_predict(HierarchicalRiskParity(;

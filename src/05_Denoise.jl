@@ -132,38 +132,47 @@ abstract type AbstractDenoiseAlgorithm <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Denoises by setting the smallest `num_factors` eigenvalues to zero. This removes the principal components that random matrix theory attributes to noise, then rescales the reconstruction back to unit diagonal.
+Denoises by setting the noise eigenvalues to zero. This removes the principal components that random matrix theory attributes to noise, then rescales the reconstruction back to unit diagonal.
 
 # Mathematical definition
 
-Let ``\\mathbf{V}`` be the eigenvector matrix and ``\\boldsymbol{\\lambda}`` the eigenvalues sorted ascending. The noise eigenvalues (``\\lambda_i \\leq \\lambda_+``) are set to zero, the matrix is rebuilt from the signal components alone, and the result is rescaled to unit diagonal:
+The noise eigenvalues are set to zero, the matrix is rebuilt from the resulting spectrum, and the result is rescaled to unit diagonal:
 
 ```math
 \\begin{align}
-\\mathbf{C}_{\\mathrm{signal}} &= \\mathbf{V}_{\\mathrm{signal}} \\, \\mathrm{Diag}(\\boldsymbol{\\lambda}_{\\mathrm{signal}}) \\, \\mathbf{V}_{\\mathrm{signal}}^\\intercal\\,, \\\\
+\\tilde{\\lambda}_i &= \\begin{cases} 0 & \\lambda_i \\leq \\lambda_+ \\\\ \\lambda_i & \\lambda_i > \\lambda_+ \\end{cases}\\,, \\\\
+\\mathbf{C}_{\\mathrm{signal}} &= \\mathbf{V} \\, \\mathrm{Diag}(\\tilde{\\boldsymbol{\\lambda}}) \\, \\mathbf{V}^\\intercal\\,, \\\\
 \\tilde{X}_{ij} &= \\frac{(C_{\\mathrm{signal}})_{ij}}{\\sqrt{(C_{\\mathrm{signal}})_{ii} \\, (C_{\\mathrm{signal}})_{jj}}}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\tilde{\\mathbf{X}}``: Denoised matrix.
-  - ``\\mathbf{C}_{\\mathrm{signal}}``: Signal-only reconstruction.
-  - ``\\mathbf{V}_{\\mathrm{signal}}``: Eigenvector matrix of the signal components.
-  - ``\\boldsymbol{\\lambda}_{\\mathrm{signal}}``: Signal eigenvalues (``\\lambda_i > \\lambda_+``).
-  - ``\\lambda_+``: Marčenko-Pastur upper bound for noise eigenvalues.
+  - $(math_dict[:lambda_tilde_i])
+  - $(math_dict[:lambda_i_eig])
+  - $(math_dict[:lambda_plus_mp])
+  - $(math_dict[:V_eigvec])
+  - $(math_dict[:C_signal])
+  - $(math_dict[:X_denoised])
+
+Zeroing the noise eigenvalues takes the diagonal of ``\\mathbf{C}_{\\mathrm{signal}}`` below one, so the rescaling is not cosmetic: it changes every entry.
+
+When every eigenvalue is at or below ``\\lambda_+``, ``\\mathbf{C}_{\\mathrm{signal}}`` is the zero matrix and the rescaling is undefined. The denoised matrix is the identity in that case:
+
+```math
+\\tilde{\\mathbf{X}} = \\mathbf{I} \\quad \\textrm{if} \\quad \\lambda_i \\leq \\lambda_+ \\quad \\forall \\, i\\,.
+```
+
+No signal survives, so every asset keeps its own variance and no pair keeps a correlation. [`FixedDenoise`](@ref) returns the identity on the same input, so the two tags agree on this case.
 
 # Algorithm
 
 The branch of [`_denoise!`](@ref) that this tag selects runs these steps.
 
- 1. Set the `num_factors` smallest entries of `vals` to zero. `vals` is sorted ascending, so those are the noise eigenvalues.
- 2. Rebuild the matrix as `vecs * Diagonal(vals) * transpose(vecs)`, which is the signal-only reconstruction ``\\mathbf{C}_{\\mathrm{signal}}``.
- 3. Rescale the reconstruction to unit diagonal with `StatsBase.cov2cor`, and write the result into `X`. The rescaling also sheds the round-off of the eigendecomposition, so this branch never pins the diagonal by hand.
-
-# Details
-
-  - The rescaling is not cosmetic. Discarding the noise eigenvalues shrinks the diagonal of ``\\mathbf{C}_{\\mathrm{signal}}`` below one, so the rescaling changes every entry. On a 40x10 one-factor sample with nine noise eigenvalues, ``(C_{\\mathrm{signal}})_{11} = 0.7180`` and ``(C_{\\mathrm{signal}})_{12} = 0.7817``, against ``\\tilde{X}_{11} = \\tilde{X}_{12} = 1``.
+ 1. When `num_factors` equals `length(vals)`, write the identity into `X` and return it. Every eigenvalue is noise, so steps 2 to 4 would divide zero by zero.
+ 2. Set the `num_factors` smallest entries of `vals` to zero. `vals` is sorted ascending, so those are the noise eigenvalues.
+ 3. Rebuild the matrix as `vecs * Diagonal(vals) * transpose(vecs)`, which is the signal-only reconstruction ``\\mathbf{C}_{\\mathrm{signal}}``.
+ 4. Rescale the reconstruction to unit diagonal with `StatsBase.cov2cor`, and write the result into `X`. The rescaling also sheds the round-off of the eigendecomposition, so this branch never pins the diagonal by hand.
 
 # Constructors
 
@@ -192,11 +201,11 @@ struct SpectralDenoise <: AbstractDenoiseAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Denoises by replacing the smallest `num_factors` eigenvalues with their average. This flattens the principal components that random matrix theory attributes to noise, rather than discarding them, then rescales the reconstruction back to unit diagonal.
+Denoises by replacing the noise eigenvalues with their own mean. This flattens the principal components that random matrix theory attributes to noise, rather than discarding them, then rescales the reconstruction back to unit diagonal.
 
 # Mathematical definition
 
-Noise eigenvalues ``\\{\\lambda_i : \\lambda_i \\leq \\lambda_+\\}`` are replaced by their mean ``\\bar{\\lambda}_\\text{noise}``, the matrix is rebuilt from the flattened spectrum, and the result is rescaled to unit diagonal:
+The noise eigenvalues are replaced by their own mean, the matrix is rebuilt from the flattened spectrum, and the result is rescaled to unit diagonal:
 
 ```math
 \\begin{align}
@@ -208,13 +217,15 @@ Noise eigenvalues ``\\{\\lambda_i : \\lambda_i \\leq \\lambda_+\\}`` are replace
 
 Where:
 
-  - ``\\tilde{\\lambda}_i``: Denoised ``i``-th eigenvalue.
-  - ``\\lambda_i``: Original ``i``-th eigenvalue.
+  - $(math_dict[:lambda_tilde_i])
+  - $(math_dict[:lambda_i_eig])
+  - $(math_dict[:lambda_plus_mp])
   - ``\\bar{\\lambda}_\\text{noise}``: Mean of the noise eigenvalues.
-  - ``\\mathbf{V}``: Eigenvector matrix of the input.
+  - $(math_dict[:V_eigvec])
   - ``\\mathbf{C}``: Reconstruction from the flattened spectrum.
-  - ``\\tilde{\\mathbf{X}}``: Denoised matrix.
-  - ``\\lambda_+``: Marčenko-Pastur upper bound for noise eigenvalues.
+  - $(math_dict[:X_denoised])
+
+Flattening the noise eigenvalues preserves the trace but not the diagonal, so the rescaling is not cosmetic: it changes every entry.
 
 # Algorithm
 
@@ -223,10 +234,6 @@ The branch of [`_denoise!`](@ref) that this tag selects runs these steps.
  1. Replace the `num_factors` smallest entries of `vals` by their own mean. `vals` is sorted ascending, so those are the noise eigenvalues.
  2. Rebuild the matrix as `vecs * Diagonal(vals) * transpose(vecs)`, which is the reconstruction ``\\mathbf{C}`` from the flattened spectrum.
  3. Rescale the reconstruction to unit diagonal with `StatsBase.cov2cor`, and write the result into `X`. The rescaling also sheds the round-off of the eigendecomposition, so this branch never pins the diagonal by hand.
-
-# Details
-
-  - Flattening the noise eigenvalues preserves the trace but not the diagonal, so the rescaling changes every entry. On a 40x10 one-factor sample with nine noise eigenvalues, ``C_{11} = 0.9715`` and ``C_{12} = 0.7524``, against ``\\tilde{X}_{11} = 1`` and ``\\tilde{X}_{12} = 0.7280``.
 
 # Constructors
 
@@ -255,7 +262,7 @@ struct FixedDenoise <: AbstractDenoiseAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Denoises by shrinking the off-diagonal part of the noise block towards zero, keeping its diagonal whole. `alpha` is the weight kept on that off-diagonal part, so `alpha = 0` is total shrinkage and `alpha = 1` returns the input unchanged.
+Denoises by shrinking the off-diagonal part of the noise block towards zero, keeping its diagonal whole. The polarity of `alpha` is the reverse of the reading its name suggests: `alpha` is the weight *kept* on that off-diagonal part, so `alpha = 0` is total shrinkage and `alpha = 1` returns the input unchanged. The default `alpha = 0.0` is therefore total shrinkage.
 
 # Mathematical definition
 
@@ -271,15 +278,18 @@ The spectrum is split at the Marčenko-Pastur upper bound. The signal block is r
 
 Where:
 
-  - ``\\tilde{\\mathbf{X}}``: Denoised matrix.
-  - ``\\mathbf{C}_{\\mathrm{signal}}``: Reconstruction from the signal eigenpairs (``\\lambda_i > \\lambda_+``).
-  - ``\\mathbf{C}_{\\mathrm{noise}}``: Reconstruction from the noise eigenpairs (``\\lambda_i \\leq \\lambda_+``).
-  - ``\\mathbf{V}_{\\mathrm{signal}}``, ``\\mathbf{V}_{\\mathrm{noise}}``: The matching eigenvector blocks.
-  - ``\\boldsymbol{\\lambda}_{\\mathrm{signal}}``, ``\\boldsymbol{\\lambda}_{\\mathrm{noise}}``: The matching eigenvalues.
+  - $(math_dict[:lambda_i_eig])
+  - $(math_dict[:lambda_plus_mp])
+  - $(math_dict[:V_signal])
+  - ``\\mathbf{V}_{\\mathrm{noise}}``: Eigenvector block of the noise eigenpairs.
+  - $(math_dict[:lambda_vec_signal])
+  - ``\\boldsymbol{\\lambda}_{\\mathrm{noise}}``: Noise eigenvalues.
+  - $(math_dict[:C_signal])
+  - ``\\mathbf{C}_{\\mathrm{noise}}``: Reconstruction from the noise eigenpairs alone.
   - ``\\alpha \\in [0, 1]``: Weight kept on the off-diagonal part of the noise block. ``\\alpha = 0`` keeps only its diagonal, which is total shrinkage. ``\\alpha = 1`` keeps the block whole, so ``\\tilde{\\mathbf{X}} = \\mathbf{X}``.
-  - ``\\lambda_+``: Marčenko-Pastur upper bound for noise eigenvalues.
+  - $(math_dict[:X_denoised])
 
-The two ``\\alpha`` weights sum to one on the diagonal, so the reconstruction preserves it in exact arithmetic. The diagonal is pinned to one afterwards to shed the eigendecomposition round-off.
+The two ``\\alpha`` weights sum to one on the diagonal, so the reconstruction preserves it in exact arithmetic.
 
 # Algorithm
 
@@ -289,11 +299,7 @@ The branch of [`_denoise!`](@ref) that this tag selects runs these steps.
  2. Build `corr0` from the signal block, which is ``\\mathbf{C}_{\\mathrm{signal}}``.
  3. Build `corr1` from the noise block, which is ``\\mathbf{C}_{\\mathrm{noise}}``.
  4. Write `corr0 + alpha * corr1 + (1 - alpha) * Diagonal(corr1)` into `X`.
- 5. Set the diagonal of `X` to one. This branch reconstructs directly rather than through `StatsBase.cov2cor`, so it is the only branch that must pin its own diagonal.
-
-# Details
-
-  - The polarity of `alpha` is the reverse of the reading its name suggests, and the default `alpha = 0.0` is therefore total shrinkage. On a 24x8 standard normal sample where every eigenvalue is noise, the off-diagonal mass of the input is `9.4205`; `alpha = 0.0` gives `0.0`, `alpha = 0.5` gives `4.7102`, and `alpha = 1.0` gives `9.4205`, which reproduces the input to `1.4e-15`.
+ 5. Set the diagonal of `X` to one. The reconstruction preserves the diagonal in exact arithmetic, so this step sheds the round-off of the eigendecomposition. This branch reconstructs directly rather than through `StatsBase.cov2cor`, so it is the only branch that must pin its own diagonal.
 
 # Fields
 
@@ -333,7 +339,7 @@ ShrunkDenoise
 """
 @concrete struct ShrunkDenoise <: AbstractDenoiseAlgorithm
     """
-    Shrinkage parameter controlling the degree of shrinkage applied to the smallest eigenvalues.
+    Weight kept on the off-diagonal part of the noise block, ``\\alpha \\in [0, 1]``. It is the weight *kept*, not the weight removed: `0` keeps only the diagonal of that block, which is total shrinkage, and `1` keeps the block whole, which returns the input unchanged.
     """
     alpha
     function ShrunkDenoise(alpha::Number)
@@ -482,7 +488,7 @@ These methods are called internally by [`denoise!`](@ref) and [`denoise`](@ref) 
 
 The method that Julia selects is the algorithm. `vals` is sorted ascending, so the first `num_factors` entries are the noise eigenvalues and the rest are the signal eigenvalues.
 
- 1. `alg` is a [`SpectralDenoise`](@ref): zero the noise eigenvalues, rebuild from the signal components alone, and rescale to unit diagonal with `StatsBase.cov2cor`.
+ 1. `alg` is a [`SpectralDenoise`](@ref): zero the noise eigenvalues, rebuild from the signal components alone, and rescale to unit diagonal with `StatsBase.cov2cor`. When every eigenvalue is noise, the reconstruction is the zero matrix and the rescaling is undefined, so this branch writes the identity instead.
  2. `alg` is a [`FixedDenoise`](@ref): replace the noise eigenvalues by their own mean, rebuild from the flattened spectrum, and rescale to unit diagonal with `StatsBase.cov2cor`.
  3. `alg` is a [`ShrunkDenoise`](@ref): rebuild the two blocks separately, combine them under `alg.alpha`, and pin the diagonal to one. This branch does not route through `StatsBase.cov2cor`, so it is the only branch that pins its own diagonal.
 
@@ -500,19 +506,13 @@ Every branch writes into `X` and returns it.
 
   - `X::MatNum`: The input matrix `X` is modified in-place.
 
-# Details
-
-  - Applies the algorithm `alg` to `vals` using `num_factors`.
-  - Reconstructs the denoised correlation matrix `X` in-place from the modified eigenvalues `vals` and eigenvectors `vecs`.
-  - Returns the denoised correlation matrix `X`.
-
 # Related
 
   - [`denoise!`](@ref)
   - [`Denoise`](@ref)
-  - [`SpectralDenoise`](@ref)
-  - [`FixedDenoise`](@ref)
-  - [`ShrunkDenoise`](@ref)
+  - [`SpectralDenoise`](@ref): the closed form of the branch of step 1.
+  - [`FixedDenoise`](@ref): the closed form of the branch of step 2.
+  - [`ShrunkDenoise`](@ref): the closed form of the branch of step 3.
   - [`MatNum`](@ref)
   - [`VecNum`](@ref)
 
@@ -524,6 +524,20 @@ Every branch writes into `X` and returns it.
 """
 function _denoise!(::SpectralDenoise, X::MatNum, vals::VecNum, vecs::MatNum,
                    num_factors::Integer)
+    #=
+    When every eigenvalue is noise, zeroing them all makes the reconstruction the zero
+    matrix, and `cov2cor` then divides zero by zero and returns `NaN` everywhere. The
+    identity is the answer that matches the claim: no signal survives, so every asset
+    keeps its own variance and no pair keeps a correlation. `FixedDenoise` already
+    returns the identity here, because it replaces the noise eigenvalues by their own
+    non-zero mean, and `cov2cor` rescales that positive multiple of the identity back
+    to unit diagonal.
+    =#
+    if num_factors == length(vals)
+        X .= zero(eltype(X))
+        X[LinearAlgebra.diagind(X)] .= one(eltype(X))
+        return X
+    end
     vals[1:num_factors] .= zero(eltype(X))
     X .= StatsBase.cov2cor(vecs * LinearAlgebra.Diagonal(vals) * transpose(vecs))
     return X
@@ -582,6 +596,8 @@ Estimate the upper edge of the Marčenko–Pastur (MP) distribution for a set of
 
 This function fits the MP distribution to the observed spectrum by minimizing the sum of squared errors between the empirical and theoretical densities, and returns the estimated maximum eigenvalue for noise.
 
+Three traps follow from the shape of that fit. The fitted variance is bounded above by one, so a spectrum whose noise variance exceeds one fits at the boundary and the returned edge is the unit-variance edge; a correlation matrix has unit variance by construction, which is the case this bound is written for. A spectrum whose eigenvalues are all equal carries no fit, because its range is a single point; such a matrix is a multiple of the identity, so it holds no signal to separate. A search that does not converge substitutes a unit variance and warns, so a caller can tell a fitted edge from a fallback edge; only `args` and `kwargs` can make the search fail, and the defaults converge.
+
 # Mathematical definition
 
 For an effective sample ratio ``q = T/N`` and a noise variance ``\\sigma^2``, the Marčenko-Pastur density and its support are
@@ -608,8 +624,8 @@ Where:
   - ``\\hat{f}``: Average shifted histogram estimate of the density of the observed eigenvalues.
   - ``\\lambda_{\\pm}``: Upper and lower edges of the support of ``f``.
   - ``\\hat{\\lambda}_{+}``: Fitted upper edge, which is the value returned.
-  - ``\\sigma^2``: Variance attributed to noise. A correlation matrix has ``\\sigma^2 = 1``.
-  - ``q = T/N``: Effective sample ratio.
+  - $(math_dict[:sigma2_noise])
+  - $(math_dict[:q_mp])
   - ``n``: Number of grid points, which is the argument `n`.
   - $(math_dict[:T])
   - $(math_dict[:N])
@@ -617,14 +633,14 @@ Where:
 # Algorithm
 
  1. Compute the two edge factors of a unit variance, `op_sqrt_iq_sq` for ``\\lambda_+`` and `om_sqrt_iq_sq` for ``\\lambda_-``.
- 2. Estimate the density of `vals` with `AverageShiftedHistograms.ash`, under `kernel` and `m`, over the range of `vals` itself. The estimate is built once, so it does not depend on the trial variance.
+ 2. Estimate the density of `vals` with `AverageShiftedHistograms.ash`, under `kernel` and `m`, over the range of `vals` itself. When that range is a single point, span `[v, v + 1]` instead, because the estimator needs a range it can bin. The estimate is built once, so its support is fixed and it does not depend on the trial variance. An estimate whose support followed the trial variance would renormalise over a shrinking window, which gives the objective a spurious local minimum well below the true variance.
  3. Define the objective on a trial variance `x`. Steps 4 to 7 are its body.
  4. Scale the two edge factors by `x`, giving `e_min` and `e_max`, and place `n` equally spaced points over `[e_min, e_max]`, giving `rg`.
  5. Evaluate the theoretical density on `rg`, giving column 1 of `pdf`. The product under the square root is clamped at zero, so a round-off outside the support gives zero rather than a domain error.
  6. Read the estimate of step 2 on `rg`, the same abscissa as column 1, giving column 2 of `pdf`. Replace a non-finite entry by zero.
  7. Return the sum of the squared differences of the two columns.
  8. Minimise the objective over `x` in `[0, 1]` with `Optim.optimize`, under `args` and `kwargs`.
- 9. Take `x` as the minimiser when the search converged. When it did not, warn and substitute `x = 1`, the variance of a correlation matrix.
+ 9. Take `x` as the minimiser when the search converged. When it did not, warn and substitute `x = 1`, the variance of a correlation matrix, so the returned edge is the unit-variance edge exactly.
 10. Return `x * op_sqrt_iq_sq`, the fitted upper edge.
 
 # Arguments
@@ -640,16 +656,6 @@ Where:
 # Returns
 
   - `e_max::Number`: Estimated upper edge of the noise eigenvalue spectrum.
-
-# Details
-
-  - Minimises the sum of squared errors (SSE) between the theoretical Marčenko–Pastur (MP) eigenvalue density and the empirical eigenvalue density estimated from observed eigenvalues.
-  - Uses the minimiser and effective sample ratio to compute the maximum feasible noise eigenvalue.
-  - Returns the maximum feasible noise eigenvalue.
-  - **The fitted variance is bounded above by one.** `Optim.optimize` searches `[0, 1]`, so a spectrum whose noise variance exceeds one fits at the boundary and the returned edge is the unit-variance edge. A correlation matrix has unit variance by construction, which is the case this bound is written for.
-  - **The two densities share one abscissa, and the empirical estimate has a fixed support.** Both columns of `pdf` are read on `rg`, and the average shifted histogram spans the range of `vals` for every trial variance. An estimate whose support followed `x` would renormalise over a shrinking window, which gives the objective a spurious local minimum well below the true variance.
-  - **A spectrum whose eigenvalues are all equal carries no fit.** The range of `vals` is a single point, so the estimate spans `[v, v + 1]` instead and the search returns a value that carries no information. A matrix with such a spectrum is a multiple of the identity, so it holds no signal to separate.
-  - **A search that does not converge substitutes a unit variance.** The returned edge is then ``(1 + \\sqrt{1/q})^2`` exactly. The substitution emits a warning, so the caller can tell a fitted edge from a fallback edge. Only `args` and `kwargs` can make the search fail; the defaults converge.
 
 # Related
 
@@ -715,19 +721,21 @@ For matrices without unit diagonal, the function converts them into correlation 
 
 # Mathematical definition
 
-The Marčenko-Pastur upper bound for noise eigenvalues (for effective sample ratio ``q = T/N``):
+The spectrum of ``\\mathbf{X}`` is split at the Marčenko-Pastur upper bound:
 
 ```math
 \\begin{align}
-\\lambda_{+} &= \\sigma^2 \\left(1 + \\frac{1}{\\sqrt{q}}\\right)^2\\,.
+\\lambda_{+} &= \\sigma^2 \\left(1 + \\sqrt{\\frac{1}{q}}\\right)^2\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\lambda_+``: Marčenko-Pastur upper bound for noise eigenvalues.
-  - ``\\sigma^2``: Variance explained by noise (fitted from the Marčenko-Pastur distribution).
-  - ``q = T/N``: Effective sample ratio (observations to assets).
+  - $(math_dict[:lambda_plus_mp])
+  - $(math_dict[:sigma2_noise])
+  - $(math_dict[:q_mp])
+
+The split is the whole of the mathematics that this function contributes. What happens to each side of it is the closed form of `dn.alg`.
 
 # Algorithm
 
@@ -748,23 +756,13 @@ Where:
   - $(arg_dict[:sigrhoX])
   - `q`: The effective sample ratio `observations / assets`, used for spectral thresholding.
 
+# Validation
+
+  - `X` is square, checked with [`assert_matrix_issquare`](@ref). The `::Nothing` method returns before the check, so a `dn` of `nothing` accepts any `X`.
+
 # Returns
 
   - `X::MatNum`: The input matrix `X` is modified in-place.
-
-# Details
-
-  - If `dn` is `::Nothing`, the function returns `X` without modification.
-  - If `X` is not a correlation matrix, it is converted to one before applying the algorithm.
-  - Performs an eigenvector decomposition of `X`.
-  - Uses the Marčenko-Pastur distribution to compute the maximum feasible noise eigenvalue.
-
-Eigenvalues ``\\lambda \\leq \\lambda_+`` are classified as noise and processed by `dn.alg`.
-
-  - Applies the denoising algorithm to `X` in `dn.alg` via [`_denoise!`](@ref) to the eigenvalues which are below this value.
-  - Applies the positive definite projection in `dn.pdm` to `X` via [`posdef!`](@ref).
-  - If `X` was not originally a correlation matrix, it is converted back.
-  - Returns `X`.
 
 # Examples
 

@@ -500,6 +500,38 @@ Alias for either a single optimisation return code or a vector of return codes.
   - [`VecOptRetCode`](@ref)
 """
 const OptRetCode_VecOptRetCode = Union{<:OptimisationReturnCode, <:VecOptRetCode}
+
+"""
+    set_retcode(res::NonFiniteAllocationOptimisationResult, retcode::OptRetCode_VecOptRetCode)
+
+Rebuild an optimisation result with a different return code, and every other member unchanged.
+
+A cross-validation fold that drifts a population's weights drops the members whose wealth is not positive, and it drops them by failing their entry of the result's return code. A result is an immutable record, so the drop rebuilds it. The rebuild is a per-type method that writes the constructor name once, rather than a reflection pass over the field list.
+
+Only a result that can carry a population of weight vectors needs a method here, because only such a result can hold one return code per member. A result that reaches the fallback raises, and the message names the type that is missing its method.
+
+# Arguments
+
+  - `res`: Optimisation result to rebuild.
+  - `retcode`: Return code, or one per member of the population.
+
+# Validation
+
+  - The type of `res` declares a method of its own, else an `ArgumentError` is raised.
+
+# Returns
+
+  - `NonFiniteAllocationOptimisationResult`: The result, with the new return code.
+
+# Related
+
+  - [`mark_ruined_members`](@ref)
+  - [`OptRetCode_VecOptRetCode`](@ref)
+  - [`OptimisationFailure`](@ref)
+"""
+function set_retcode(res::NonFiniteAllocationOptimisationResult, ::OptRetCode_VecOptRetCode)
+    return throw(ArgumentError("`set_retcode` has no method for `$(Base.typename(typeof(res)).wrapper)`, so a ruined population member of it cannot be dropped. A result that carries one return code per member needs a method of `set_retcode` that rebuilds it."))
+end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -2797,29 +2829,35 @@ function extract_fees(res::OptimisationResult, fees::Option{<:Fees} = nothing)
     return fees
 end
 """
-    calc_net_returns(res::OptimisationResult, X::MatNum, fees = nothing)
-    calc_net_returns(res::OptimisationResult, pr::Pr_RR, fees = nothing)
+    calc_net_returns(res::OptimisationResult, X::MatNum, fees = nothing, wd = nothing, obs = nothing)
+    calc_net_returns(res::OptimisationResult, pr::Pr_RR, fees = nothing, wd = nothing, obs = nothing)
 
 Compute net returns for a [`OptimisationResult`](@ref).
 
-`fees` takes precedence over `res.fees` if both are provided. Delegates to [`calc_net_returns(w, X, fees)`](@ref).
+`fees` takes precedence over `res.fees` if both are provided. Delegates to [`calc_net_returns(w, X, fees, wd, obs)`](@ref).
 
 When `pr::Pr_RR` is passed, extracts `X` from `pr.X` and delegates.
+
+`wd` is the Weight Drift the window is read under. `nothing` reads the window at the constant weights `res.w`, which is the library's original behaviour. A [`SelfFinancingDrift`](@ref) reads it as the wealth ratio of the drifted holdings, and `obs` then names the observations of the message a non-positive wealth raises.
 
 # Related
 
   - [`calc_net_returns`](@ref)
   - [`OptimisationResult`](@ref)
   - [`Pr_RR`](@ref)
+  - [`AbstractWeightDrift`](@ref)
+  - [`SelfFinancingDrift`](@ref)
 """
 function calc_net_returns(res::OptimisationResult, X::MatNum,
-                          fees::Option{<:Fees} = nothing)
+                          fees::Option{<:Fees} = nothing,
+                          wd::Option{<:AbstractWeightDrift} = nothing, obs = nothing)
     fees = extract_fees(res, fees)
-    return calc_net_returns(res.w, X, fees)
+    return calc_net_returns(res.w, X, fees, wd, obs)
 end
 function calc_net_returns(res::OptimisationResult, pr::Pr_RR,
-                          fees::Option{<:Fees} = nothing)
-    return calc_net_returns(res, pr.X, fees)
+                          fees::Option{<:Fees} = nothing,
+                          wd::Option{<:AbstractWeightDrift} = nothing, obs = nothing)
+    return calc_net_returns(res, pr.X, fees, wd, obs)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

@@ -323,7 +323,7 @@ This method applies a sequence of matrix processing steps to the input covarianc
 # Algorithm
 
  1. Take the next symbol of `mp.order`. The default order is `(:pdm, :dn, :dt, :alg)`.
- 2. Wrap the symbol in a `Val` and apply [`matrix_processing_step!`](@ref) to `sigma`. Each step reads the estimator that the symbol names, and a step whose estimator is `nothing` is a no-op, so a `nothing` field skips its step rather than removing it from the order.
+ 2. Wrap the symbol in a `Val` and apply [`matrix_processing_step!`](@ref) to `sigma`. Each step reads the estimator that the symbol names: `:pdm` reads `mp.pdm`, `:dn` reads `mp.dn` and the effective sample ratio `T / N` taken from the shape of `X`, `:dt` reads `mp.dt`, and `:alg` reads `mp.alg`. A step whose estimator is `nothing` is a no-op, so a `nothing` field skips its step rather than removing it from the order.
  3. Repeat from step 1 until `mp.order` is exhausted, then return `sigma`.
 
 `mp.order` is validated at construction, so no step of this loop can name a field that `MatrixProcessing` does not carry. A repeated symbol applies its step twice, which is the order's own business and not an error.
@@ -341,12 +341,6 @@ This method applies a sequence of matrix processing steps to the input covarianc
 # Returns
 
   - `sigma::MatNum`: The input matrix `sigma` is modified in-place.
-
-# Details
-
-  - If `mp` is `nothing`, the function returns `sigma` without modification.
-  - Iterates over `mp.order` and applies each named step via [`matrix_processing_step!`](@ref): `:pdm` (using `mp.pdm`), `:dn` (using `mp.dn` and the ratio `T / N` from `X`), `:dt` (using `mp.dt`), and `:alg` (using `mp.alg`).
-  - An unrecognised step symbol errors at construction.
 
 # Examples
 

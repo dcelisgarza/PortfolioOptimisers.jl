@@ -1,5 +1,4 @@
 The source files can be found in [user_guide/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/user_guide/).
-
 ```@meta
 EditURL = "../../../user_guide/04_Constraints_and_Costs.jl"
 ```
@@ -170,9 +169,9 @@ When a mandate needs something no built-in keyword covers — a continuous per-a
 like a factor score, or a relationship between weights that isn't a plain linear bound — two
 [`JuMPOptimiser`](@ref) extension points let you write straight against the JuMP model:
 
-- `cobj` takes a [`CustomJuMPObjective`](@ref) — implement [`add_custom_objective_term!`](@ref)
+  - `cobj` takes a [`CustomJuMPObjective`](@ref) — implement [`add_custom_objective_term!`](@ref)
     to price a preference, contributing the term with [`add_to_objective_penalty!`](@ref).
-- `ccnt` takes a [`CustomJuMPConstraint`](@ref) — implement [`add_custom_constraint!`](@ref) to
+  - `ccnt` takes a [`CustomJuMPConstraint`](@ref) — implement [`add_custom_constraint!`](@ref) to
     add a constraint to the model.
 
 Each keyword takes a single estimator or a vector of them, and each hook dispatches on the

@@ -350,14 +350,14 @@
         (; train_idx, test_idx) = split(cv, rd)
         N = n_splits(cv, rd)
         @test length(train_idx) == length(test_idx) == N
-        @test all(x -> length(x) == 137, train_idx)
+        @test all(x -> length(x) == 137 - 13, train_idx)
         @test all(x -> length(x) == 111, test_idx[1:(end - 1)])
         @test train_idx ==
-              UnitRange{Int64}[1:137, 112:248, 223:359, 334:470, 445:581, 556:692, 667:803,
-                               778:914]
+              UnitRange{Int64}[1:124, 112:235, 223:346, 334:457, 445:568, 556:679, 667:790,
+                               778:901]
         @test test_idx ==
-              UnitRange{Int64}[151:261, 262:372, 373:483, 484:594, 595:705, 706:816,
-                               817:927, 928:1008]
+              UnitRange{Int64}[138:248, 249:359, 360:470, 471:581, 582:692, 693:803,
+                               804:914, 915:1008]
 
         cv = IndexWalkForward(137, 111; reduce_test = true, purged_size = 13,
                               expand_train = true)
@@ -365,14 +365,14 @@
         N = n_splits(cv, rd)
         @test length(train_idx) == length(test_idx) == N
         for (i, t) in enumerate(train_idx)
-            @test length(t) == 137 + (i - 1) * 111
+            @test length(t) == 137 - 13 + (i - 1) * 111
         end
         @test all(x -> length(x) == 111, test_idx[1:(end - 1)])
         @test train_idx ==
-              UnitRange{Int64}[1:137, 1:248, 1:359, 1:470, 1:581, 1:692, 1:803, 1:914]
+              UnitRange{Int64}[1:124, 1:235, 1:346, 1:457, 1:568, 1:679, 1:790, 1:901]
         @test test_idx ==
-              UnitRange{Int64}[151:261, 262:372, 373:483, 484:594, 595:705, 706:816,
-                               817:927, 928:1008]
+              UnitRange{Int64}[138:248, 249:359, 360:470, 471:581, 582:692, 693:803,
+                               804:914, 915:1008]
         function ldm(x)
             val = lastdayofmonth.(x)
             while !isempty(val)
@@ -471,18 +471,21 @@
         (; train_idx, test_idx) = split(cv, rd)
         N = n_splits(cv, rd)
         @test length(train_idx) == length(test_idx) == N
-        @test train_idx == UnitRange{Int64}[1:22, 1:293, 1:567, 1:840]
-        @test test_idx == UnitRange{Int64}[23:276, 294:550, 568:823, 841:1008]
+        @test train_idx == UnitRange{Int64}[1:5, 1:276, 1:550, 1:823]
+        @test test_idx == UnitRange{Int64}[23:293, 294:567, 568:840, 841:1008]
 
+        # The purge comes out of the training window, so it must be smaller than that
+        # window. A `Day(23)` training window holds 16 rows here, and a `purged_size` of 17
+        # would empty it.
         cv = DateWalkForward(Day(23), 13; period = Month(1), adjuster = ldm,
-                             purged_size = 17, period_offset = Week(2))
+                             purged_size = 5, period_offset = Week(2))
         (; train_idx, test_idx) = split(cv, rd)
         N = n_splits(cv, rd)
         @test length(train_idx) == length(test_idx) == N
-        @test all(x -> length(x) in (16, 17), train_idx)
-        @test all(x -> length(x) in (272 - 17, 274 - 16), test_idx)
-        @test train_idx == UnitRange{Int64}[16:32, 288:304, 561:576]
-        @test test_idx == UnitRange{Int64}[33:287, 305:559, 577:834]
+        @test all(x -> length(x) in (16 - 5, 17 - 5), train_idx)
+        @test all(x -> length(x) in (272, 275), test_idx)
+        @test train_idx == UnitRange{Int64}[16:27, 288:299, 561:571]
+        @test test_idx == UnitRange{Int64}[33:304, 305:576, 577:851]
 
         # A negative period_offset puts the first date of the range before the first
         # timestamp, so searchsortedlast returns 0. n_splits must survive that and stay in
@@ -517,6 +520,64 @@
             @test length(train_idx) == length(test_idx) == N
         end
 
+        # `purged_size` drops the last `purged_size` rows of the training window and leaves
+        # the test window alone. The gap it opens is what stops a training row whose label
+        # runs into the test period from teaching the model. Charging the purge to the test
+        # window instead would leave the training window touching the test start, which is
+        # the leak the purge exists to close.
+        for train_size in (Month(6), Month(12), Day(23), 6, 12), test_size in (1, 3, 13),
+            previous in (false, true), expand_train in (false, true),
+            reduce_test in (false, true), period_offset in (nothing, Week(2), Day(-10)),
+            purged_size in (1, 5)
+
+            kwargs = (; period = Month(1), adjuster = ldm, previous = previous,
+                      expand_train = expand_train, reduce_test = reduce_test,
+                      period_offset = period_offset)
+            base = split(DateWalkForward(train_size, test_size; kwargs...), rd)
+            purged = split(DateWalkForward(train_size, test_size; purged_size = purged_size,
+                                           kwargs...), rd)
+            # The test windows do not move.
+            @test purged.test_idx == base.test_idx
+            # Each training window loses its last `purged_size` rows.
+            @test purged.train_idx ==
+                  [first(x):(last(x) - purged_size) for x in base.train_idx]
+            # The gap between the end of the training window and the start of the test
+            # window is exactly `purged_size`.
+            @test all(first(t) - last(r) - 1 == purged_size
+                      for (r, t) in zip(purged.train_idx, purged.test_idx))
+        end
+
+        # The same rule for `IndexWalkForward`. A purge must not move the test schedule: a
+        # walk-forward run reports out-of-sample performance over the test windows, so
+        # funding the gap out of the test side would change what is measured and would cost
+        # test coverage, while leaving the training window untouched.
+        for train_size in (50, 137, 200), test_size in (1, 37, 111),
+            expand_train in (false, true), reduce_test in (false, true),
+            purged_size in (1, 13, 49)
+
+            kwargs = (; expand_train = expand_train, reduce_test = reduce_test)
+            base = split(IndexWalkForward(train_size, test_size; kwargs...), rd)
+            purged = split(IndexWalkForward(train_size, test_size;
+                                            purged_size = purged_size, kwargs...), rd)
+            @test purged.test_idx == base.test_idx
+            @test purged.train_idx ==
+                  [first(x):(last(x) - purged_size) for x in base.train_idx]
+            @test all(first(t) - last(r) - 1 == purged_size
+                      for (r, t) in zip(purged.train_idx, purged.test_idx))
+            # The fold count is a property of the test schedule, so a purge does not move
+            # it either.
+            @test n_splits(IndexWalkForward(train_size, test_size; kwargs...), rd) ==
+                  n_splits(IndexWalkForward(train_size, test_size;
+                                            purged_size = purged_size, kwargs...), rd) ==
+                  length(purged.train_idx)
+        end
+
+        # A purge as wide as the training window would empty it. Both fields reach the
+        # constructor, so the constructor owns the rule.
+        @test_throws DomainError IndexWalkForward(10, 5; purged_size = 10)
+        @test_throws DomainError IndexWalkForward(10, 5; purged_size = 11)
+        @test IndexWalkForward(10, 5; purged_size = 9) isa IndexWalkForward
+
         # `special_div(a, b)` counts the steps of size `b` that fit in the span `1:a`, so it
         # is `div(a - 1, b)` and never a guarded division.
         for a in 1:40, b in 1:7
@@ -525,6 +586,19 @@
                   length(1:b:a) - 1 ==
                   count(k -> 1 + k * b <= a, 0:a) - 1
         end
+    end
+    @testset "A zero test_size is refused" begin
+        # A `test_size` of zero advances the walk-forward window by nothing, so each of the
+        # three `while true` split loops runs forever and allocates forever. `n_splits`
+        # divides by `test_size`, so the file already assumes a positive value. The two
+        # constructors take the positive check that both readers need.
+        @test_throws DomainError IndexWalkForward(100, 0)
+        @test_throws DomainError IndexWalkForward(100, 0; purged_size = 5)
+        @test_throws DomainError DateWalkForward(12, 0; period = Month(1))
+        @test_throws DomainError DateWalkForward(Day(23), 0; period = Month(1))
+        # The smallest legal value is still accepted.
+        @test IndexWalkForward(100, 1) isa IndexWalkForward
+        @test DateWalkForward(12, 1; period = Month(1)) isa DateWalkForward
     end
     @testset "MultipleRandomised" begin
         cv = IndexWalkForward(127, 171)
@@ -792,17 +866,148 @@
                          0.06630600610829536, 0.07240998627924726, 0.07916366997300678]],
                        rtol = 5e-5)
         @test isa(eff_front_combinatorial_pred.pred[1].res, AbstractVector)
+
+        # Issue #754/#760: `predict` settles a bare `AmortisedFees()` against the fold's own
+        # length. `fa` never reaches the objective (it is read only by `calc_fees` and
+        # `calc_asset_fees`, both value-level, post-solve verbs), so the three runs below
+        # solve to the same weights per fold; the only difference is the value-level fee
+        # charged in `pred.rd.X`. The turnover term is the one-off term a conic solver can
+        # carry without a MIP builder, so it is the one used here; `fl`/`fs` would need one.
+        fsets = UniverseSets(; dict = Dict("nx" => rd.nx))
+        fwb = WeightBounds(; lb = 0, ub = 1)
+        fest_plain = FeesEstimator(; tn = TurnoverEstimator(; w = w0, val = 0.0005))
+        fest_amort = FeesEstimator(; tn = TurnoverEstimator(; w = w0, val = 0.0005),
+                                   fa = AmortisedFees())
+        mr_plain = MeanRisk(;
+                            opt = JuMPOptimiser(; sets = fsets, wb = fwb, bgt = 1,
+                                                fees = fest_plain, slv = slv))
+        mr_amort = MeanRisk(;
+                            opt = JuMPOptimiser(; sets = fsets, wb = fwb, bgt = 1,
+                                                fees = fest_amort, slv = slv))
+        cv = IndexWalkForward(127, 171)
+        pred_plain = cross_val_predict(mr_plain, rd, cv)
+        pred_amort = cross_val_predict(mr_amort, rd, cv)
+        for (pp, pa) in zip(pred_plain.pred, pred_amort.pred)
+            @test pp.res.w == pa.res.w
+            T = size(pp.rd.X, 1)
+            fee_plain = calc_fees(pp.res.w,
+                                  PortfolioOptimisers.extract_fees(pp.res, nothing))
+            fee_amort = calc_fees(pa.res.w,
+                                  PortfolioOptimisers.amortise_fees(PortfolioOptimisers.extract_fees(pa.res,
+                                                                                                     nothing),
+                                                                    T))
+            diff_expected = fee_amort - fee_plain
+            @test all(x -> isapprox(x, diff_expected; atol = 1e-8), pp.rd.X .- pa.rd.X)
+        end
+
+        # A stated `horizon` overrides every fold's own length.
+        fest_horizon = FeesEstimator(; tn = TurnoverEstimator(; w = w0, val = 0.0005),
+                                     fa = AmortisedFees(; horizon = 21))
+        mr_horizon = MeanRisk(;
+                              opt = JuMPOptimiser(; sets = fsets, wb = fwb, bgt = 1,
+                                                  fees = fest_horizon, slv = slv))
+        pred_horizon = cross_val_predict(mr_horizon, rd, cv)
+        for (pp, ph) in zip(pred_plain.pred, pred_horizon.pred)
+            @test pp.res.w == ph.res.w
+            fee_plain = calc_fees(pp.res.w,
+                                  PortfolioOptimisers.extract_fees(pp.res, nothing))
+            hfee = PortfolioOptimisers.extract_fees(ph.res, nothing)
+            fee_h = calc_fees(ph.res.w,
+                              PortfolioOptimisers.amortise_fees(hfee, size(pp.rd.X, 1)))
+            fee_h_direct = calc_fees(ph.res.w, hfee)
+            @test isapprox(fee_h, fee_h_direct)
+            diff_expected = fee_h - fee_plain
+            @test all(x -> isapprox(x, diff_expected; atol = 1e-8), pp.rd.X .- ph.rd.X)
+        end
+    end
+    # Ticket #765: `tr.fees` is charged only inside the fit, over the training matrix. No
+    # site stamps a fold length onto it, so a bare `AmortisedFees()` on a `WeightsTracking`
+    # benchmark reproduces `fa === nothing` exactly, over folds of unequal length.
+    @testset "a fold length never reaches tr.fees" begin
+        wbt = fill(inv(size(rd.X, 2)), size(rd.X, 2))
+        tnb = Turnover(; w = wbt, val = 0.02)
+        fee_n = Fees(; tn = tnb, l = 0.001, fl = 0.5)
+        fee_b = Fees(; tn = tnb, l = 0.001, fl = 0.5, fa = AmortisedFees())
+        cv765 = DateWalkForward(12, 3; period = Month(1))
+
+        # The test folds are of unequal length, so a fold-length divisor would move the
+        # numbers if one ever reached `tr.fees`.
+        (; test_idx) = split(cv765, rd)
+        @test length(unique(length.(test_idx))) > 1
+
+        function tracked_pred(fees)
+            r = TrackingRiskMeasure(; tr = WeightsTracking(; fees = fees, w = wbt))
+            return cross_val_predict(MeanRisk(; r = r, opt = JuMPOptimiser(; slv = slv)),
+                                     rd, cv765)
+        end
+        pred_n = tracked_pred(fee_n)
+        pred_b = tracked_pred(fee_b)
+        @test [p.res.w for p in pred_n.pred] == [p.res.w for p in pred_b.pred]
+        @test [p.rd.X for p in pred_n.pred] == [p.rd.X for p in pred_b.pred]
+    end
+    @testset "The rolling window measure reads a prediction's own series (#770)" begin
+        # The realised-history reading takes a fold result and reads nothing but the series
+        # `predict` already stored, so it needs neither weights nor fees. The four
+        # delegating methods mirror `expected_risk`'s own family, and `InverseVolatility`
+        # keeps the fixture off the solver.
+        r770 = ConditionalValueatRisk()
+        mp770 = cross_val_predict(InverseVolatility(), rd, KFold(; n = 4))
+        pp770 = cross_val_predict(InverseVolatility(), rd,
+                                  CombinatorialCrossValidation(; n_folds = 6,
+                                                               n_test_folds = 2))
+        @test isa(mp770, MultiPeriodPredictionResult)
+        @test isa(pp770, PopulationPredictionResult)
+
+        # One fold: the delegation is exact, because the method only picks `pred.rd.X`.
+        p770 = first(mp770.pred)
+        @test PortfolioOptimisers.rolling_window_measure(r770, p770, 20) ==
+              PortfolioOptimisers.rolling_window_measure(r770, p770.rd.X, 20)
+
+        # One path: the series concatenates the folds, so a window can straddle a
+        # rebalance. Each rebalance adds `window - 1` straddling windows, and that count is
+        # exactly what the path reads above the sum of its folds read alone.
+        W = 60
+        @test mp770.mrd.X == reduce(vcat, [p.rd.X for p in mp770.pred])
+        @test PortfolioOptimisers.rolling_window_measure(r770, mp770, W) ==
+              PortfolioOptimisers.rolling_window_measure(r770, mp770.mrd.X, W)
+        n_path = length(PortfolioOptimisers.rolling_window_measure(r770, mp770, W))
+        n_folds_sum = sum(length(PortfolioOptimisers.rolling_window_measure(r770, p, W))
+                          for p in mp770.pred)
+        @test n_path - n_folds_sum == (length(mp770.pred) - 1) * (W - 1)
+
+        # A population of paths: the vector method maps, and the population method routes
+        # through it, which is the route `expected_risk` takes on the same two types.
+        pop770 = PortfolioOptimisers.rolling_window_measure(r770, pp770, W)
+        @test length(pop770) == length(pp770.pred)
+        @test pop770 == PortfolioOptimisers.rolling_window_measure(r770, pp770.pred, W)
+        @test pop770[1] ==
+              PortfolioOptimisers.rolling_window_measure(r770, first(pp770.pred), W)
+
+        # The window check reaches through every delegating method.
+        @test_throws DomainError PortfolioOptimisers.rolling_window_measure(r770, p770,
+                                                                            length(p770.rd.X) +
+                                                                            1)
+        @test_throws DomainError PortfolioOptimisers.rolling_window_measure(r770, mp770,
+                                                                            length(mp770.mrd.X) +
+                                                                            1)
+        @test_throws DomainError PortfolioOptimisers.rolling_window_measure(r770, pp770, 0)
     end
     @testset "Grid search and Randomised search cv" begin
         opt = JuMPOptimiser(; slv = slv)
-        mr = Stacking(; opti = [MeanRisk(; opt = opt), RiskBudgeting(; opt = opt)],
+        # The grids below tune an L2 regularisation coefficient. `l2` holds an
+        # `L2Regularisation` and not the number, so the coefficient lives in that
+        # estimator's `val` field and the first inner optimiser must carry one for the
+        # lens to reach it. A number written into `l2` itself is outside the field's type
+        # bound, and `factory` has no method for it (issue #584).
+        optl2 = JuMPOptimiser(; slv = slv, l2 = L2Regularisation())
+        mr = Stacking(; opti = [MeanRisk(; opt = optl2), RiskBudgeting(; opt = opt)],
                       opto = MeanRisk(; opt = opt))
         r = MeanReturnRiskRatio(; rk = LowOrderMoment(; alg = SecondMoment()))
         p = concrete_typed_array([["opti[2].opt.l1" =>
                                        range(; start = 0.0005, stop = 0.0008, length = 3),
-                                   "opti[1].opt.l2" =>
+                                   "opti[1].opt.l2.val" =>
                                        range(; start = 0.0004, stop = 0.0007, length = 3)],
-                                  ["opti[1].opt.l2" =>
+                                  ["opti[1].opt.l2.val" =>
                                        range(; start = 0.0004, stop = 0.0007, length = 3)],
                                   [PropertyLens(:l1) ∘ PropertyLens(:opt) ∘ IndexLens(2) ∘
                                    PropertyLens(:opti) =>
@@ -820,10 +1025,10 @@
         p = concrete_typed_array([Dict("opti[2].opt.l1" =>
                                            range(; start = 0.0005, stop = 0.0008,
                                                  length = 3),
-                                       "opti[1].opt.l2" =>
+                                       "opti[1].opt.l2.val" =>
                                            range(; start = 0.0004, stop = 0.0007,
                                                  length = 3)),
-                                  Dict("opti[1].opt.l2" =>
+                                  Dict("opti[1].opt.l2.val" =>
                                            range(; start = 0.0004, stop = 0.0007,
                                                  length = 3)),
                                   Dict(PropertyLens(:l1) ∘ PropertyLens(:opt) ∘
@@ -872,7 +1077,7 @@
         end
 
         p = [["opti[2].opt.l1" => range(; start = 0.0005, stop = 0.0008, length = 3),
-              "opti[1].opt.l2" => Uniform(0, 0.0015)],
+              "opti[1].opt.l2.val" => Uniform(0, 0.0015)],
              ["opti[2]" => [MeanRisk(; opt = opt, obj = MaximumUtility()),
                             MeanRisk(; opt = opt, obj = MaximumRatio())]]]
         rs_cv1 = RandomisedSearchCrossValidation(p; rng = StableRNG(42), r = r, n_iter = 2)
@@ -880,7 +1085,7 @@
 
         p = [OrderedDict("opti[2].opt.l1" =>
                              range(; start = 0.0005, stop = 0.0008, length = 3),
-                         "opti[1].opt.l2" => Uniform(0, 0.0015)),
+                         "opti[1].opt.l2.val" => Uniform(0, 0.0015)),
              OrderedDict("opti[2]" => [MeanRisk(; opt = opt, obj = MaximumUtility()),
                                        MeanRisk(; opt = opt, obj = MaximumRatio())])]
         rs_cv2 = RandomisedSearchCrossValidation(p; rng = StableRNG(42), r = r, n_iter = 2)
@@ -1009,6 +1214,12 @@
             ex = Expr(:ref, ex, 1)
         end
         @test_throws Meta.ParseError pe.parse_lens(ex)
+        # The string form is held to the same depth cap: a key that clears the length cap
+        # can still carry a tree deeper than max_depth, so the cap is read off the parsed
+        # tree rather than inferred from the character count.
+        deep_str = "a" * "[1]"^(pe.EQUATION_LIMITS[].max_depth + 10)
+        @test length(deep_str) <= pe.EQUATION_LIMITS[].max_length
+        @test_throws "too deeply nested" pe.parse_lens(deep_str)
         # A legitimate key still parses under the default caps.
         @test pe.parse_lens("opt.pe.ce") isa Base.Callable
     end
@@ -1105,6 +1316,377 @@
                 @test all(k -> last(te) + k > T || !(last(te) + k in tr), 1:(p + e))
             end
             @test sum(length, res.test_idx) == T
+        end
+    end
+    @testset "Weight drift and previous weights" begin
+        PO = PortfolioOptimisers
+        ivol = InverseVolatility()
+        sfd = SelfFinancingDrift()
+        dw = DriftedWeights()
+        @testset "The switches are fields of the schemes that can read them" begin
+            @test hasproperty(KFold(), :wd)
+            @test hasproperty(KFold(), :store_weight_path)
+            @test !hasproperty(KFold(), :pws)
+            @test hasproperty(CombinatorialCrossValidation(), :wd)
+            @test hasproperty(CombinatorialCrossValidation(), :store_weight_path)
+            @test !hasproperty(CombinatorialCrossValidation(), :pws)
+            for cv in (IndexWalkForward(200, 50), DateWalkForward(200, 1))
+                @test hasproperty(cv, :wd)
+                @test hasproperty(cv, :pws)
+                @test hasproperty(cv, :store_weight_path)
+                @test isnothing(cv.wd)
+                @test isnothing(cv.pws)
+                @test cv.store_weight_path == false
+            end
+            @test isnothing(KFold().wd)
+            @test KFold().store_weight_path == false
+            @test isnothing(CombinatorialCrossValidation().wd)
+            @test CombinatorialCrossValidation().store_weight_path == false
+            @test !hasproperty(MultipleRandomised(IndexWalkForward(200, 50);
+                                                  subset_size = 5, n_subsets = 2), :wd)
+        end
+        @testset "fold_evaluation reads each scheme, and the wrappers inherit" begin
+            @test PO.fold_evaluation(KFold(; n = 3, wd = sfd, store_weight_path = true)) ==
+                  (; wd = sfd, pws = nothing, store_weight_path = true)
+            @test PO.fold_evaluation(CombinatorialCrossValidation(; wd = sfd)) ==
+                  (; wd = sfd, pws = nothing, store_weight_path = false)
+            iwf = IndexWalkForward(200, 50; wd = sfd, pws = dw, store_weight_path = true)
+            dwf = DateWalkForward(200, 1; wd = sfd, pws = dw)
+            @test PO.fold_evaluation(iwf) ==
+                  (; wd = sfd, pws = dw, store_weight_path = true)
+            @test PO.fold_evaluation(dwf) ==
+                  (; wd = sfd, pws = dw, store_weight_path = false)
+            mrand = MultipleRandomised(iwf; subset_size = 5, n_subsets = 2)
+            @test PO.fold_evaluation(mrand) == PO.fold_evaluation(iwf)
+            pgrid = ["opt.l1" => [0.0005, 0.0008]]
+            gscv = GridSearchCrossValidation(pgrid; cv = iwf, r = Variance())
+            rscv = RandomisedSearchCrossValidation(pgrid; cv = iwf, r = Variance())
+            @test PO.fold_evaluation(gscv.cv) == PO.fold_evaluation(iwf)
+            @test PO.fold_evaluation(rscv.cv) == PO.fold_evaluation(iwf)
+            @test PO.fold_evaluation(nothing) ==
+                  (; wd = nothing, pws = nothing, store_weight_path = false)
+        end
+        @testset "held_weights_drift resolves the one drift that runs" begin
+            @test isnothing(PO.held_weights_drift(nothing, nothing))
+            @test PO.held_weights_drift(sfd, nothing) === sfd
+            @test PO.held_weights_drift(sfd, dw) === sfd
+            @test PO.held_weights_drift(nothing, dw) === dw.wd
+        end
+        @testset "HeldWeightsResult checks the shapes of its members" begin
+            X24 = [0.01 0.02; -0.01 0.03]
+            w24 = [0.5, 0.5]
+            U24 = [0.5 0.5; 0.4 0.6]
+            @test isa(HeldWeightsResult(; X = X24, U = nothing, w = w24, wd = sfd),
+                      HeldWeightsResult)
+            @test isa(HeldWeightsResult(; X = X24, U = U24, w = w24, wd = sfd),
+                      HeldWeightsResult)
+            @test isa(HeldWeightsResult(; X = X24, U = [U24, U24], w = [w24, w24],
+                                        wd = sfd), HeldWeightsResult)
+            @test_throws DimensionMismatch HeldWeightsResult(; X = X24, U = nothing,
+                                                             w = [0.5], wd = sfd)
+            @test_throws DimensionMismatch HeldWeightsResult(; X = X24, U = U24[1:1, :],
+                                                             w = w24, wd = sfd)
+            @test_throws DimensionMismatch HeldWeightsResult(; X = X24, U = [U24],
+                                                             w = [w24, w24], wd = sfd)
+            @test_throws IsEmptyError HeldWeightsResult(; X = Matrix{Float64}(undef, 0, 0),
+                                                        U = nothing, w = Float64[],
+                                                        wd = sfd)
+        end
+        @testset "weight_path reads a record, or gives the constant path" begin
+            X24 = [0.01 0.02; -0.01 0.03]
+            w24 = [0.5, 0.5]
+            @test PO.weight_path(nothing, w24, X24) == [0.5 0.5; 0.5 0.5]
+            @test PO.weight_path(nothing, [w24, w24], X24) ==
+                  [[0.5 0.5; 0.5 0.5], [0.5 0.5; 0.5 0.5]]
+            (hw24, ruined24) = PO.held_weights_result(sfd, w24, X24, false)
+            (hws24, _) = PO.held_weights_result(sfd, w24, X24, true)
+            @test isnothing(ruined24)
+            @test isnothing(hw24.U)
+            @test PO.weight_path(hws24, w24) === hws24.U
+            @test PO.weight_path(hw24, w24) == hws24.U
+            @test PO.weight_path(hw24, w24) == PO.weight_path(sfd, w24, X24)
+            @test hw24.w == PO.held_weights(sfd, w24, X24)
+            @test PO.held_weights_result(nothing, w24, X24, true) == (nothing, nothing)
+            (hwp24, _) = PO.held_weights_result(sfd, [w24, w24], X24, true)
+            @test PO.weight_path(hwp24, [w24, w24]) === hwp24.U
+            (hwp24l, _) = PO.held_weights_result(sfd, [w24, w24], X24, false)
+            @test PO.weight_path(hwp24l, [w24, w24]) == hwp24.U
+        end
+        @testset "A ruined member is dropped, and a ruined population raises" begin
+            Xr = reshape([-0.6], 1, 1)
+            good = [0.5]
+            bad = [2.0]
+            (hwr, ruinedr) = PO.held_weights_result(sfd, [good, bad], Xr, true)
+            @test ruinedr == [2]
+            @test all(isfinite, hwr.w[1])
+            @test all(isnan, hwr.w[2])
+            @test all(isnan, hwr.U[2])
+            @test all(isfinite, hwr.U[1])
+            @test_throws NonPositiveWealthError PO.held_weights_result(sfd, [bad, bad], Xr,
+                                                                       false)
+            @test_throws NonPositiveWealthError PO.held_weights_result(sfd, bad, Xr, false)
+            @test_logs (:warn,) PO.warn_ruined_members(nothing, [2], 2)
+            @test isnothing(PO.warn_ruined_members(sfd, [2], 2))
+            @test isnothing(PO.warn_ruined_members(nothing, nothing, 2))
+            @test isnothing(PO.warn_ruined_members(nothing, Int[], 2))
+        end
+        @testset "ruined_retcodes fails only the members that are named" begin
+            rcs = PO.OptimisationReturnCode[OptimisationSuccess(), OptimisationSuccess()]
+            outr = PO.ruined_retcodes(rcs, [2])
+            @test isa(outr[1], OptimisationSuccess)
+            @test isa(outr[2], OptimisationFailure)
+            @test occursin("member 2", outr[2].res)
+        end
+    end
+    @testset "Weight drift through the fold loop" begin
+        PO = PortfolioOptimisers
+        ivol = InverseVolatility()
+        sfd = SelfFinancingDrift()
+        dw = DriftedWeights()
+        @testset "Both switches off leave the fold with no record" begin
+            for cv in (KFold(; n = 3), IndexWalkForward(500, 250))
+                pred = cross_val_predict(ivol, rd, cv)
+                (; test_idx) = split(cv, rd)
+                @test all(p -> isnothing(p.hw), pred.pred)
+                for (i, p) in pairs(pred.pred)
+                    rdi = PO.port_opt_view(rd, test_idx[i], :)
+                    fees = PO.amortise_fees(PO.extract_fees(p.res, nothing), size(rdi.X, 1))
+                    @test p.rd.X == PO.calc_net_returns(p.res.w, rdi.X, fees)
+                end
+            end
+            ccv = CombinatorialCrossValidation(; n_folds = 4, n_test_folds = 2)
+            pcomb = cross_val_predict(ivol, rd, ccv)
+            @test all(path -> all(p -> isnothing(p.hw), path.pred), pcomb.pred)
+        end
+        @testset "The drifted series is the wealth ratio of the drifted holdings" begin
+            cvd = IndexWalkForward(500, 250; wd = sfd)
+            pred = cross_val_predict(ivol, rd, cvd)
+            base = cross_val_predict(ivol, rd, IndexWalkForward(500, 250))
+            for (p, b) in zip(pred.pred, base.pred)
+                @test !isnothing(p.hw)
+                @test p.hw.wd === sfd
+                @test isnothing(p.hw.U)
+                @test p.res.w == b.res.w
+                fees = PO.amortise_fees(PO.extract_fees(p.res, nothing), size(p.hw.X, 1))
+                @test p.rd.X == PO.calc_net_returns(p.res.w, p.hw.X, fees, sfd)
+                @test p.hw.w == PO.held_weights(sfd, p.res.w, p.hw.X)
+                @test p.rd.X != b.rd.X
+            end
+        end
+        @testset "The store and the rebuild agree bit for bit" begin
+            cvs = IndexWalkForward(500, 250; wd = sfd, store_weight_path = true)
+            cvl = IndexWalkForward(500, 250; wd = sfd)
+            preds = cross_val_predict(ivol, rd, cvs)
+            predl = cross_val_predict(ivol, rd, cvl)
+            for (ps, pl) in zip(preds.pred, predl.pred)
+                @test !isnothing(ps.hw.U)
+                @test isnothing(pl.hw.U)
+                @test size(ps.hw.U) == size(ps.hw.X)
+                @test PO.weight_path(pl.hw, pl.res.w) == ps.hw.U
+                @test ps.rd.X == pl.rd.X
+            end
+        end
+        @testset "previous_weights is the one seam of the source" begin
+            pred = cross_val_predict(ivol, rd, IndexWalkForward(500, 250; wd = sfd))
+            p = pred.pred[1]
+            @test isnothing(PO.previous_weights(nothing, nothing))
+            @test isnothing(PO.previous_weights(dw, nothing))
+            @test PO.previous_weights(nothing, p) === p.res.w
+            @test PO.previous_weights(dw, p) === p.hw.w
+            @test PO.previous_weights(dw, p) != PO.previous_weights(nothing, p)
+        end
+        @testset "The source threads the held weights into the next fold" begin
+            w0 = fill(inv(size(rd.X, 2)), size(rd.X, 2))
+            optn = JuMPOptimiser(; slv = slv, tn = Turnover(; w = w0, val = 0.02))
+            mrt = MeanRisk(; opt = optn)
+            a = cross_val_predict(mrt, rd, IndexWalkForward(500, 250; wd = sfd))
+            b = cross_val_predict(mrt, rd, IndexWalkForward(500, 250; wd = sfd, pws = dw))
+            @test a.pred[1].res.w == b.pred[1].res.w
+            @test a.pred[2].res.w != b.pred[2].res.w
+        end
+        @testset "The drift reaches the pipeline entry point" begin
+            pipe = Pipeline(; steps = (EmpiricalPrior(), ivol))
+            a = cross_val_predict(pipe, rd, IndexWalkForward(500, 250))
+            b = cross_val_predict(pipe, rd, IndexWalkForward(500, 250; wd = sfd))
+            @test all(p -> isnothing(p.hw), a.pred)
+            @test all(p -> !isnothing(p.hw), b.pred)
+            @test a.pred[1].rd.X != b.pred[1].rd.X
+        end
+        @testset "set_retcode rebuilds a result, and refuses a type with no method" begin
+            resj = optimise(MeanRisk(; opt = JuMPOptimiser(; slv = slv)), rd)
+            rcf = OptimisationFailure(; res = "test")
+            outj = PO.set_retcode(resj, rcf)
+            @test Base.typename(typeof(outj)) === Base.typename(typeof(resj))
+            @test outj.retcode === rcf
+            @test outj.w == resj.w
+            @test PO.mark_ruined_members(resj, nothing) === resj
+            @test PO.mark_ruined_members(resj, Int[]) === resj
+            resi = optimise(ivol, rd)
+            @test_throws ArgumentError PO.set_retcode(resi, rcf)
+        end
+    end
+    @testset "The per-observation consumers read the weight path (#769)" begin
+        PO = PortfolioOptimisers
+        ivol = InverseVolatility()
+        sfd = SelfFinancingDrift()
+        rw = ConditionalValueatRisk()
+        # `rd` carries no benchmark, so the collapse is exercised on one that does. A
+        # benchmark equal to the asset returns makes the collapsed series the portfolio's
+        # own gross series, which is what pins the row-by-row reading to the drift.
+        rdb = ReturnsResult(; nx = rd.nx, X = rd.X, nf = rd.nf, F = rd.F, nb = rd.nx,
+                            B = rd.X, ts = rd.ts)
+
+        @testset "collapse_benchmark reads the pair by dispatch" begin
+            X = rd.X[1:20, 1:4]
+            w = [0.4, 0.3, 0.2, 0.1]
+            pop = [w, [0.25, 0.25, 0.25, 0.25]]
+            B = X
+            hw, ruined = PO.held_weights_result(sfd, w, X, false)
+            hwp, ruinedp = PO.held_weights_result(sfd, pop, X, false)
+            @test isnothing(ruined)
+            @test isempty(ruinedp)
+
+            @test isnothing(PO.collapse_benchmark(nothing, w, nothing))
+            @test isnothing(PO.collapse_benchmark(nothing, pop, hwp))
+            bv = X * w
+            @test PO.collapse_benchmark(bv, w, hw) === bv
+            @test PO.collapse_benchmark(bv, pop, hwp) == fill(bv, 2)
+
+            # With no record the matrix collapses against the target weights, as before.
+            @test PO.collapse_benchmark(B, w, nothing) == B * w
+            @test PO.collapse_benchmark(B, pop, nothing) == [B * wi for wi in pop]
+
+            # With a record it collapses row by row against the fold's own weight path.
+            U = PO.weight_path(hw, w)
+            @test PO.collapse_benchmark(B, w, hw) == vec(sum(B .* U; dims = 2))
+            Up = PO.weight_path(hwp, pop)
+            @test PO.collapse_benchmark(B, pop, hwp) ==
+                  [vec(sum(B .* Ui; dims = 2)) for Ui in Up]
+
+            # The benchmark then follows exactly the convention the portfolio follows: a
+            # benchmark equal to the asset returns collapses to the gross drifted series.
+            @test PO.collapse_benchmark(B, w, hw) ≈ PO.calc_net_returns(w, X, nothing, sfd)
+        end
+
+        @testset "A fold's benchmark follows its weight-drift setting" begin
+            cvo = IndexWalkForward(500, 250)
+            cvd = IndexWalkForward(500, 250; wd = sfd)
+            po = cross_val_predict(ivol, rdb, cvo)
+            pd = cross_val_predict(ivol, rdb, cvd)
+            for (a, b) in zip(po.pred, pd.pred)
+                @test isnothing(a.hw)
+                @test !isnothing(b.hw)
+                @test a.rd.B == b.hw.X * a.res.w
+                @test b.rd.B == vec(sum(b.hw.X .* PO.weight_path(b.hw, b.res.w); dims = 2))
+                @test a.rd.B != b.rd.B
+            end
+            # A fold that ran no drift keeps every number it had.
+            po2 = cross_val_predict(ivol, rdb, IndexWalkForward(500, 250))
+            @test all(x -> x[1].rd.B == x[2].rd.B, zip(po.pred, po2.pred))
+        end
+
+        @testset "The fold-taking consumers resolve the fold" begin
+            pd = cross_val_predict(ivol, rd, IndexWalkForward(500, 250; wd = sfd))
+            po = cross_val_predict(ivol, rd, IndexWalkForward(500, 250))
+            p = pd.pred[1]
+            q = po.pred[1]
+
+            # The split's rows sum to the series the fold stored, so the delegating method
+            # settles the fee exactly as `predict` settled it.
+            split = calc_net_asset_returns(p)
+            @test size(split) == size(p.hw.X)
+            @test vec(sum(split; dims = 2)) ≈ p.rd.X
+            @test split == calc_net_asset_returns(PO.weight_path(p.hw, p.res.w), p.hw.X,
+                                                  PO.amortise_fees(PO.extract_fees(p.res, nothing),
+                                                                   size(p.hw.X, 1)))
+
+            # The risk contributions read the target weights and the fold's asset returns.
+            fees = PO.amortise_fees(PO.extract_fees(p.res, nothing), size(p.hw.X, 1))
+            @test risk_contribution(rw, p) == risk_contribution(rw, p.res.w, p.hw.X, fees)
+            @test length(risk_contribution(rw, p)) == length(p.res.w)
+            @test factor_risk_contribution(rw, p) ==
+                  factor_risk_contribution(rw, p.res.w, p.hw.X, fees;
+                                           rd = ReturnsResult(; nx = p.rd.nx, X = p.hw.X,
+                                                              nf = p.rd.nf, F = p.rd.F))
+
+            # A fold that carries no record kept no asset returns, so all three refuse by
+            # name rather than through a bare `MethodError`.
+            @test isnothing(q.hw)
+            @test_throws ArgumentError calc_net_asset_returns(q)
+            @test_throws ArgumentError risk_contribution(rw, q)
+            @test_throws ArgumentError factor_risk_contribution(rw, q)
+            msg = try
+                risk_contribution(rw, q)
+            catch e
+                sprint(showerror, e)
+            end
+            @test occursin("neither `wd` nor `pws`", msg)
+        end
+    end
+    @testset "Every result that carries a population rebuilds its return code" begin
+        PO = PortfolioOptimisers
+        sfd = SelfFinancingDrift()
+        rcf = OptimisationFailure(; res = "test")
+        opt24 = JuMPOptimiser(; slv = slv)
+        resj = optimise(MeanRisk(; opt = opt24), rd)
+        resr = optimise(RiskBudgeting(; opt = opt24), rd)
+        resn = optimise(NearOptimalCentering(; opt = opt24), rd)
+        resf = optimise(FactorRiskContribution(; opt = opt24), rd)
+        @testset "the wrappers rebuild the result they embed" begin
+            for res24 in (resj, resr, resn, resf)
+                out24 = PO.set_retcode(res24, rcf)
+                @test Base.typename(typeof(out24)) === Base.typename(typeof(res24))
+                @test out24.retcode === rcf
+                @test out24.w == res24.w
+            end
+            rrb = RelaxedRiskBudgetingResult(resr.jr, resr.prb, nothing)
+            @test PO.set_retcode(rrb, rcf).retcode === rcf
+        end
+        @testset "the meta results rebuild themselves" begin
+            st = StackingResult(nothing, nothing, nothing, [resj], resj, nothing,
+                                OptimisationSuccess(), resj.w, nothing)
+            @test PO.set_retcode(st, rcf).retcode === rcf
+            @test PO.set_retcode(st, rcf).w == resj.w
+            nc = NestedClusteredResult(nothing, nothing, nothing, nothing, [resj], resj,
+                                       nothing, OptimisationSuccess(), resj.w, nothing)
+            @test PO.set_retcode(nc, rcf).retcode === rcf
+            sr = SubsetResamplingResult(nothing, nothing, nothing, [resj],
+                                        reshape(collect(1.0:length(resj.w)), length(resj.w),
+                                                1), OptimisationSuccess(), resj.w, nothing)
+            @test PO.set_retcode(sr, rcf).retcode === rcf
+        end
+        @testset "mark_ruined_members fails the members that were dropped" begin
+            pop = PO.set_retcode(resj,
+                                 PO.OptimisationReturnCode[OptimisationSuccess(),
+                                                           OptimisationSuccess()])
+            marked = PO.mark_ruined_members(pop, [2])
+            @test isa(marked.retcode[1], OptimisationSuccess)
+            @test isa(marked.retcode[2], OptimisationFailure)
+            @test occursin("member 2", marked.retcode[2].res)
+        end
+        @testset "the wealth message names an observation the way the fold can" begin
+            V24 = [1.0, -0.5]
+            @test_throws NonPositiveWealthError PO.assert_positive_wealth(V24)
+            @test isnothing(PO.assert_positive_wealth([1.0, 2.0]))
+            err_row = try
+                PO.assert_positive_wealth(V24, [17, 18])
+            catch e
+                e
+            end
+            @test occursin("panel row 18", err_row.msg)
+            err_lbl = try
+                PO.assert_positive_wealth(V24, [Date(2020, 1, 1), Date(2020, 1, 2)], 3)
+            catch e
+                e
+            end
+            @test occursin("observation 2020-01-02", err_lbl.msg)
+            @test occursin("member 3", err_lbl.msg)
+            err_win = try
+                PO.assert_positive_wealth(V24)
+            catch e
+                e
+            end
+            @test occursin("row 2 of the window", err_win.msg)
         end
     end
 end

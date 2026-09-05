@@ -173,15 +173,6 @@ For covariance matrices, first standardise ``\\mathbf{C} = \\mathrm{diag}(\\math
 
   - `X::MatNum`: The input matrix `X` modified in-place.
 
-# Details
-
-  - If `pdm` is `::Nothing`, or `X` is already positive definite, the function returns `X` without modification.
-  - If `X` is not a correlation matrix, it is converted to one before applying the algorithm.
-  - Calls `NearestCorrelationMatrix.nearest_cor!(X, pdm.alg; pdm.kwargs...)` to perform the projection.
-  - If the projected matrix is still not positive definite, a warning is emitted. The matrix is returned either way.
-  - If `X` is not a correlation matrix, it is converted back.
-  - Returns `X`.
-
 # Examples
 
 ```jldoctest

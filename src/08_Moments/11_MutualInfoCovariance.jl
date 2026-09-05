@@ -5,12 +5,14 @@ Measures codependence with mutual information, which captures a non-linear relat
 
 The mutual information matrix is optionally normalised by the smaller of the two marginal entropies, then rescaled by the marginal standard deviations of `ve` to give a covariance matrix.
 
+Mutual information is non-negative, so every entry of the matrix is non-negative and no pair is ever reported as opposed. A negative linear relationship reads as a strong one, not as a negative one. When `normalise` is `false` the correlation matrix is unbounded above and its diagonal carries the marginal entropy in nats rather than one, so it is a codependence matrix rather than a correlation matrix in the usual sense.
+
 # Mathematical definition
 
 ```math
 \\begin{align}
 \\hat{\\boldsymbol{\\rho}}_{ij} &= \\mathrm{MI}(X_i,\\, X_j)\\,, \\\\
-\\hat{\\mathbf{\\Sigma}}_{ij} &= \\hat{\\boldsymbol{\\rho}}_{ij}\\,\\hat{\\sigma}_i\\,\\hat{\\sigma}_j\\,.
+\\hat{\\mathbf{\\Sigma}}_{ij} &= \\begin{cases} \\hat{\\sigma}_i^2 & i = j \\\\ \\hat{\\boldsymbol{\\rho}}_{ij}\\,\\hat{\\sigma}_i\\,\\hat{\\sigma}_j & i \\neq j \\end{cases}\\,.
 \\end{align}
 ```
 
@@ -20,6 +22,8 @@ Where:
   - ``\\hat{\\mathbf{\\Sigma}}_{ij}``: Covariance between assets ``i`` and ``j``.
   - ``\\mathrm{MI}(X_i, X_j)``: Mutual information between assets ``i`` and ``j``, computed by [`mutual_info`](@ref). When `normalise` is `true` it is divided by ``\\min(H(X_i), H(X_j))``, which bounds it to ``[0,\\, 1]``.
   - ``\\hat{\\sigma}_i``: Marginal standard deviation of asset ``i`` from the variance estimator `ve`.
+
+The diagonal of ``\\hat{\\mathbf{\\Sigma}}`` is the variance whatever ``\\hat{\\boldsymbol{\\rho}}`` carries there, so the two values of `normalise` give the same diagonal and differ only off it.
 
 # Fields
 
@@ -112,26 +116,35 @@ Compute the mutual information (MI) correlation matrix using a [`MutualInfoCovar
 
 This method computes the pairwise mutual information correlation matrix for the input data matrix `X`, using the binning strategy and normalisation specified in `ce`. The MI correlation captures both linear and nonlinear dependencies between asset returns, making it robust to complex relationships that may not be detected by traditional correlation measures.
 
+The result is bounded by ``[0, 1]`` with a unit diagonal only when `ce.normalise` is `true`. When it is `false` the entries are mutual information in nats and the diagonal is the marginal entropy, as [`mutual_info`](@ref) states.
+
+# Algorithm
+
+ 1. Orient `X` to `observations × assets` with [`dims_oriented`](@ref), which validates `dims` and transposes when `dims` is `2`.
+ 2. Return [`mutual_info`](@ref) of the oriented matrix, under the binning algorithm `ce.bins` and the flag `ce.normalise`.
+
 # Arguments
 
-  - `ce`: Mutual information-based covariance estimator.
-  - `X`: Data matrix of asset returns (observations × assets).
+  - $(arg_dict[:ce])
+  - $(arg_dict[:X])
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments (currently unused).
 
 # Validation
 
-  - `dims` is either `1` or `2`.
+  - $(val_dict[:dims])
 
 # Returns
 
-  - `rho::Matrix{<:Number}`: Symmetric matrix of mutual information-based correlation coefficients.
+  - $(ret_dict[:rho])
 
 # Related
 
   - [`MutualInfoCovariance`](@ref)
   - [`mutual_info`](@ref)
-  - [`cov(ce::MutualInfoCovariance, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
+  - [`Int_Bin`](@ref)
+  - [`dims_oriented`](@ref)
+  - [`cov(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
 function Statistics.cor(ce::MutualInfoCovariance, X::MatNum; dims::Int = 1, kwargs...)
     X = dims_oriented(dims, X)

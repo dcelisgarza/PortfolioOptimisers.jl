@@ -1,5 +1,4 @@
 The source files can be found in [examples/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../../examples/5_validation_tuning/04_Time_Dependent_Constraints.jl"
 ```
@@ -16,8 +15,8 @@ Every constraint we have used so far is *static*: it is fixed when the optimiser
 
 Two rules govern the behaviour:
 
-- **Enumeration-order indexing, no hidden ranking**: entry `i` maps to fold `i` of `split(cv, rd)` — the machinery never re-orders folds behind your back. Walk-forward and (unshuffled) KFold enumerate chronologically, so there "fold time" is calendar time; for schemes whose enumeration is not a timeline it is *your* job to key entries off the fold's indices, which the context provides.
-- **Inert outside fold loops**: a plain `optimise` call has no folds, so the schedule simply does not participate — the affected fields run at their static defaults.
+  - **Enumeration-order indexing, no hidden ranking**: entry `i` maps to fold `i` of `split(cv, rd)` — the machinery never re-orders folds behind your back. Walk-forward and (unshuffled) KFold enumerate chronologically, so there "fold time" is calendar time; for schemes whose enumeration is not a timeline it is *your* job to key entries off the fold's indices, which the context provides.
+  - **Inert outside fold loops**: a plain `optimise` call has no folds, so the schedule simply does not participate — the affected fields run at their static defaults.
 
 In this example we run the same portfolio problem under each cross-validation scheme — [`IndexWalkForward`](@ref), [`KFold`](@ref), [`CombinatorialCrossValidation`](@ref) and [`MultipleRandomised`](@ref) — and compare how the three methods behave in each.
 
@@ -293,8 +292,8 @@ pretty_table(DataFrame(:path => 1:length(pred_cc_sched.pred),
 
 [`MultipleRandomised`](@ref) crosses random *asset subsets* with a walk-forward over time, producing one path per subset. Two things happen to a schedule here:
 
-- `ctx.i` is the fold's position in the path's enumeration; predictions are re-sorted by test window *afterwards, for reporting only* — output order never influences which entry a fold received.
-- Each path sees a different asset universe: the optimiser is *viewed* down to the subset before the schedule is resolved, so schedule entries are sub-selected along with everything else, and callables see the viewed universe through `ctx.rd` (its `nx` are the subset's names).
+  - `ctx.i` is the fold's position in the path's enumeration; predictions are re-sorted by test window *afterwards, for reporting only* — output order never influences which entry a fold received.
+  - Each path sees a different asset universe: the optimiser is *viewed* down to the subset before the schedule is resolved, so schedule entries are sub-selected along with everything else, and callables see the viewed universe through `ctx.rd` (its `nx` are the subset's names).
 
 A universe-aware callable is the natural fit — here the cap adapts to however many assets the path drew, allowing at most twice the equal weight:
 
@@ -444,7 +443,7 @@ There is no separate "vector of schedules": to vary only *some* entries of a con
 ## 8. Summary
 
 | Method | Spelling | Sized/validated | Parallel? | Best for |
-| --- | --- | --- | --- | --- |
+|---|---|---|---|---|
 | Static | the field itself | at construction | yes | constraints that do not change |
 | Schedule | `field = TimeDependent([v₁, …, vₙ])` | each entry test-substituted at construction; length vs fold count at `split` time | yes | known calendars: de-leveraging plans, phased mandates, regime dates fixed in advance |
 | Callable | `field = TimeDependent(f)` — a function, or a [`TimeDependentConstraintCallable`](@ref) struct that can declare previous-weights needs as a trait | output validated by the host constructor at each fold | yes, unless previous weights are declared ([`PreviousWeightsFunction`](@ref) wrapper or the struct's trait) | values computed from the fold: volatility regimes, universe size, previous weights |

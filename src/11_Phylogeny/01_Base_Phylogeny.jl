@@ -55,7 +55,21 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the phylogeny estimator or result `pl` unchanged.
 
-Identity pass-through used when a phylogeny estimator or pre-computed result is provided in a context that calls [`factory`](@ref).
+Identity pass-through used when a phylogeny estimator or pre-computed result is provided in a context that calls [`factory`](@ref). A phylogeny estimator carries no prior-dependent field to rebuild, so every field is passed through and none is replaced.
+
+# Algorithm
+
+ 1. Return `pl` itself. No field of it is rebuilt, and `args` and `kwargs` are discarded.
+
+# Arguments
+
+  - `pl`: Phylogeny estimator or phylogeny result.
+  - `args...`: Optional arguments (ignored).
+  - `kwargs...`: Optional keyword arguments (ignored).
+
+# Returns
+
+  - `pl::PlE_Pl`: The original phylogeny estimator or result.
 
 # Related
 
@@ -71,7 +85,21 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the phylogeny algorithm `alg` unchanged.
 
-Identity pass-through used when a phylogeny algorithm is provided in a context that calls [`factory`](@ref).
+Identity pass-through used when a phylogeny algorithm is provided in a context that calls [`factory`](@ref). A phylogeny algorithm carries no prior-dependent field to rebuild, so every field is passed through and none is replaced.
+
+# Algorithm
+
+ 1. Return `alg` itself. No field of it is rebuilt, and `args` and `kwargs` are discarded.
+
+# Arguments
+
+  - `alg`: Phylogeny algorithm.
+  - `args...`: Optional arguments (ignored).
+  - `kwargs...`: Optional keyword arguments (ignored).
+
+# Returns
+
+  - `alg::AbstractPhylogenyAlgorithm`: The original phylogeny algorithm.
 
 # Related
 
@@ -452,6 +480,12 @@ Both clauses carry a sentinel of their own.
   - `isfinite` is `true` for every `Integer`, so on its own it admits [`HopCount`](@ref)'s `typemax(Int)` — which [`ReciprocalDecay`](@ref) then overflows.
   - `typemax` of a `Float64` *is* `Inf`, so the comparison covers [`PathLength`](@ref)'s sentinel as well; `isfinite` stays to reject a `NaN`, which no shipped path produces and which would compare `false` against every budget anyway.
 
+# Algorithm
+
+ 1. Test `isfinite(d)`, rejecting a `NaN` and rejecting [`PathLength`](@ref)'s `Inf`.
+ 2. Compare `d` against `typemax(typeof(d))`, rejecting [`HopCount`](@ref)'s `typemax(Int)`, which step 1 admits.
+ 3. Return `reachable`, the conjunction of the two tests. `&&` short-circuits, so step 2 runs only on a finite `d`.
+
 # Arguments
 
   - `sep`: Separation algorithm. Inert for the shipped members, and the dispatch channel for an extension whose routine reports a different sentinel.
@@ -486,6 +520,12 @@ The one place the budget is applied to an entry of a separation matrix: reachabl
 # It does not remove the caller's obligation to short-circuit
 
 A consumer that scores the separation must still keep the *evaluation* of the score inside a short-circuiting branch — `is_related(...) ? separation_decay(...) : zero(...)`, never `ifelse` — because an `ifelse` evaluates both arms and [`ReciprocalDecay`](@ref) overflows `1 + d` at `typemax(Int)`, which a fractional `power` turns into a `DomainError`. The predicate owns the rule; the call site owns the laziness.
+
+# Algorithm
+
+ 1. Call [`is_reachable`](@ref) on `sep` and `d`, giving the reachability test. This runs first, so a sentinel is rejected whatever `dmax` is.
+ 2. Compare `d` against `dmax`, giving the budget test.
+ 3. Return `related`, the conjunction of the two tests. `&&` short-circuits, so step 2 runs only on a reachable `d`.
 
 # Arguments
 
@@ -566,7 +606,7 @@ f(d) &= d_{\\mathrm{max}} + 1 - d\\,,
 
 Where:
 
-  - ``d``: Separation between two assets.
+  - $(math_dict[:d_sep])
   - ``d_{\\mathrm{max}}``: Separation budget in scope.
 
 The default, and the only member that reads the budget. It is the fall-off the graded neighbourhood hardcoded before the family existed, so it reproduces those values exactly: a direct neighbour scores ``d_{\\mathrm{max}}``, the asset itself ``d_{\\mathrm{max}} + 1``.
@@ -608,7 +648,7 @@ f(d) &= e^{-\\lambda d}\\,,
 
 Where:
 
-  - ``d``: Separation between two assets.
+  - $(math_dict[:d_sep])
   - ``\\lambda``: Rate of the fall-off, `rate`.
 
 Pins `f(0) = 1` and lets `rate` set the self-versus-neighbour contrast independently of the budget, which is what a caller wanting relatedness to drop *sharply* needs — the budget only says how far to look.
@@ -683,12 +723,12 @@ f(d) &= \\left(1 + d\\right)^{-p}\\,,
 
 Where:
 
-  - ``d``: Separation between two assets.
+  - $(math_dict[:d_sep])
   - ``p``: Exponent of the fall-off, `power`.
 
 The middle ground between [`LinearDecay`](@ref) and [`ExponentialDecay`](@ref): heavier-tailed than the exponential, so distant assets keep a small but non-negligible score.
 
-The `1 +` is what makes classical inverse-distance weighting finite at ``d = 0``; it also pins `f(0) = 1`, matching [`ExponentialDecay`](@ref)'s scale for free. The alternative spelling ``(1 + d^p)^{-1}`` is *not* used: it pins ``f(1) = 1/2`` for every `p` and is non-monotone in `p` at fixed `d`, so raising the exponent would score near neighbours *lower* and far ones higher.
+The `1 +` is what makes classical inverse-distance weighting finite at ``d = 0``; it also pins `f(0) = 1`, matching [`ExponentialDecay`](@ref)'s scale for free. The alternative spelling ``(1 + d^p)^{-1}`` is *not* used: it pins ``f(1) = 1/2`` for every `p`, and its response to `p` at fixed `d` **flips sign about that pivot** — raising the exponent scores a pair nearer than ``d = 1`` *higher* and a pair further away lower. At ``p = 1`` and ``p = 3`` it scores ``d = 0.5`` as ``0.6667`` and ``0.8889``, and ``d = 2`` as ``0.3333`` and ``0.1111``. So `p` is no fall-off dial there, because it cannot sharpen the decay inside the pivot at all. Under the spelling above, raising `p` lowers the score at every ``d > 0``.
 
 # Fields
 
@@ -757,7 +797,7 @@ f(d) &= 1\\,,
 
 Where:
 
-  - ``d``: Separation between two assets.
+  - $(math_dict[:d_sep])
 
 # No decay is not no truncation
 
@@ -796,6 +836,19 @@ struct NoDecay <: AbstractSeparationDecayAlgorithm end
 Score a separation under a decay algorithm.
 
 The whole extension contract of [`AbstractSeparationDecayAlgorithm`](@ref): a new member is a struct and one method of this function.
+
+# The method the call selects
+
+This function is a **selector** and runs no step of its own. It dispatches on `dk`, and the selected method evaluates one closed form. Each form is stated under `# Mathematical definition` on the member that owns it, and none is restated here.
+
+| `dk`                       | The fall-off it selects            | Reads `dmax` |
+|:-------------------------- |:---------------------------------- |:------------ |
+| [`LinearDecay`](@ref)      | Linear to the edge of the budget   | yes          |
+| [`ExponentialDecay`](@ref) | Exponential in `rate`              | no           |
+| [`ReciprocalDecay`](@ref)  | A power of `1 + d`, set by `power` | no           |
+| [`NoDecay`](@ref)          | Flat                               | no           |
+
+[`LinearDecay`](@ref) is the only member that reads the budget, which is why the other three methods leave their third argument unnamed.
 
 # Arguments
 
@@ -862,6 +915,18 @@ The fallback **probes**: it evaluates [`separation_decay`](@ref) over `ds` and c
 Probing is cheap where it is used because `ds` is small and the loop it guards is not: [`Proximity`](@ref) passes `0:dmax`, which under [`HopCount`](@ref) is *exhaustive* — every separation the `assets × assets` loop can ever ask about, in `dmax + 1` evaluations. Under a separation whose budget is not an integer the same range is a unit-spaced *sample*, which is all a continuum admits and all the clauses below need.
 
 Non-negativity gets **one extra evaluation at `d = dmax`**, whether or not `dmax` appears in `ds`, mirroring the out-of-loop evaluation of `f(0)`. That endpoint is what closes the clause over a *continuum*: monotonicity is already promised, so `f(dmax) >= 0` implies `f(d) >= 0` for every `d` in `[0, dmax]`, and a `ds` that can only ever be a sample — as it must be once separations are weighted path lengths — costs this clause nothing. Monotonicity itself gains nothing from the endpoint and remains genuinely sampled.
+
+# Algorithm
+
+These are the steps of the probing fallback. The method on the four shipped members runs none of them.
+
+ 1. Score the separation `zero(dmax)` with [`separation_decay`](@ref), giving `f0`, the top of the scale.
+ 2. Check that `f0` is finite and strictly positive.
+ 3. Sort `ds` when it is not sorted already, so that step 5 reads the separations in increasing order.
+ 4. Set `fp`, the score of the previous separation, to `f0`.
+ 5. For each `d` of `ds`, score it with [`separation_decay`](@ref), giving `f`. Check that `f` is finite and does not exceed `f0`. Check that `f` does not exceed `fp`. Check that `f` is non-negative. Set `fp` to `f`.
+ 6. Score `dmax` itself, giving `fmax`, and check that `fmax` is non-negative. This is the endpoint the paragraph above states, and step 5 need not have reached it.
+ 7. Return `nothing`.
 
 # Arguments
 

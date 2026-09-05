@@ -1,5 +1,4 @@
 The source files can be found in [examples/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../../examples/4_constraints_costs/08_Nested_Clustered_Constraints.jl"
 ```
@@ -9,9 +8,9 @@ EditURL = "../../../../examples/4_constraints_costs/08_Nested_Clustered_Constrai
 This example shows how to apply constraints at three distinct layers of
 [`NestedClustered`](@ref):
 
-- the inner optimisation within each cluster,
-- the outer optimisation across synthetic cluster portfolios,
-- and a final overall optimisation pass on the full universe.
+  - the inner optimisation within each cluster,
+  - the outer optimisation across synthetic cluster portfolios,
+  - and a final overall optimisation pass on the full universe.
 
 It also shows how fees can be attached to the nested stage and to the final overall stage.
 
@@ -36,9 +35,9 @@ nothing #hide
 
 We use one year of S&P 500 data and compute clusters once. Then we compare three nested setups:
 
-- inner-only weight bounds,
-- inner + outer bounds plus fees in the nested stage,
-- direct overall asset bounds on [`NestedClustered`](@ref).
+  - inner-only weight bounds,
+  - inner + outer bounds plus fees in the nested stage,
+  - direct overall asset bounds on [`NestedClustered`](@ref).
 
 ````@example 08_Nested_Clustered_Constraints
 using CSV, TimeSeries, DataFrames, Clarabel
@@ -64,8 +63,8 @@ clr = clusterise(ClustersEstimator(; alg = DBHT()), pr.X)
 
 The nested workflow solves:
 
-- an inner [`MeanRisk`](@ref) within each cluster, then
-- an outer [`MeanRisk`](@ref) on synthetic cluster returns.
+  - an inner [`MeanRisk`](@ref) within each cluster, then
+  - an outer [`MeanRisk`](@ref) on synthetic cluster returns.
 
 The key wiring rule remains the same: the **outer optimiser must not** consume the
 asset-level prior directly; it works on synthetic cluster returns.
@@ -111,9 +110,9 @@ pretty_table(DataFrame(; :assets => rd.nx, :InnerOnlyWB => res_inner.w,
 
 The following audit confirms where the constraints are active.
 
-- Inner bound (`0.35`) applies to each cluster-level solve.
-- Outer bound (`0.62`) applies to cluster allocation weights.
-- Overall bound (`0.20`) can be applied directly in [`NestedClustered`](@ref), applied here using per-asset vector bounds.
+  - Inner bound (`0.35`) applies to each cluster-level solve.
+  - Outer bound (`0.62`) applies to cluster allocation weights.
+  - Overall bound (`0.20`) can be applied directly in [`NestedClustered`](@ref), applied here using per-asset vector bounds.
 
 ````@example 08_Nested_Clustered_Constraints
 inner_local_max(res) = maximum(maximum(ri.w) for ri in res.resi)
@@ -136,9 +135,9 @@ pretty_table(audit; formatters = [resfmt])
 
 These runs isolate layer placement:
 
-- inner bounds shape per-cluster compositions,
-- outer bounds shape allocation across clusters,
-- direct `NestedClustered(wb = ...)` bounds constrain the final aggregated asset weights.
+  - inner bounds shape per-cluster compositions,
+  - outer bounds shape allocation across clusters,
+  - direct `NestedClustered(wb = ...)` bounds constrain the final aggregated asset weights.
 
 ````@example 08_Nested_Clustered_Constraints
 using StatsPlots, GraphRecipes
@@ -152,9 +151,9 @@ plot_stacked_bar_composition([res_inner, res_inner_outer, res_nested_overall], r
 Layered controls can be applied around [`NestedClustered`](@ref) without giving up the
 cluster-based decomposition.
 
-- Inner `wb` controls weights inside each cluster.
-- Outer `wb` controls allocation across synthetic cluster portfolios.
-- Direct `NestedClustered(wb = ...)` constrains the final aggregated asset weights, whether
+  - Inner `wb` controls weights inside each cluster.
+  - Outer `wb` controls allocation across synthetic cluster portfolios.
+  - Direct `NestedClustered(wb = ...)` constrains the final aggregated asset weights, whether
     given as a scalar, a per-asset vector, or an estimator.
 
 ---

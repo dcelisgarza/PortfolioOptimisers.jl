@@ -61,11 +61,19 @@ include(joinpath(@__DIR__, "test16_setup.jl"))
     v1 = minimum(rkc)
     v2 = maximum(rkc)
     @test isapprox(v2 / v1, 1; rtol = 5e-4)
+    # Host-sensitive, like `test_16b` index 18. This branch-and-bound solve is unbudgeted
+    # and unbounded, so its weights are large and a small relative move in the relaxation
+    # lands outside `5e-4`. On a Linux developer machine it needs `5.1e-4`: the first entry
+    # comes back `-11.960911070533959` against the `-11.967020478519200` recorded here,
+    # with every entry finite and no NaN, so it is a weight drift and not a failed solve.
+    # A `git archive` export of the untouched tip reproduces the same failure, so no change
+    # caused it. `1e-3` sits inside the spread of the hosts and holds on both sides.
+    # Issue #518.
     @test isapprox(res.w,
                    [-11.9670204785192, -20.27855656466867, -9.031638570761155,
                     -12.404198792206339, 23.38560846510856, -11.411103386313773,
                     15.532421847999915, 11.074304614043934, 5.235656319779921,
-                    10.963933763939947], rtol = 5e-4)
+                    10.963933763939947], rtol = 1e-3)
 
     rb = RiskBudgeting(; r = r, opt = opt,
                        rba = AssetRiskBudgeting(;

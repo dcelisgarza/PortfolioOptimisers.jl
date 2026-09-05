@@ -507,6 +507,56 @@ end
                    PortfolioOptimisers.norm_error(L2Norm(; ddof = sq.ddof), rd.X * res.w,
                                                   wr, size(rd.X, 1))^2)
 
+    #=
+    Issue #547 asked for the `SquaredL2Norm` conversion to be confirmed against a solved
+    model, because the `TrackingError` docstring states it as a trap: `err` is read in the
+    units of `alg`, so the same number is two different bounds. The conversion is the
+    square root and it carries no dependence on `T`, so a `SquaredL2Norm` bound of `9e-6`
+    and an `L2Norm` bound of `3e-3` are the SAME bound. `tracking_error_soc_factor` writes
+    one cone bound for both, and the two models must therefore return the same weights.
+    Read the deviation from the weights, not from a model key: `TrackingError` registers
+    `:t_te_`, `:te_`, `:cte_soc_` and `:cte_`, and never `:sq_tracking_risk_`, which
+    belongs to `TrackingRiskMeasure`.
+    =#
+    optsq = JuMPOptimiser(; pe = pr, slv = slv,
+                          tr = TrackingError(; tr = ReturnsTracking(; w = wr), err = 9e-6,
+                                             alg = SquaredL2Norm()))
+    optl2 = JuMPOptimiser(; pe = pr, slv = slv,
+                          tr = TrackingError(; tr = ReturnsTracking(; w = wr), err = 3e-3,
+                                             alg = L2Norm()))
+    ressq = optimise(MeanRisk(; obj = MinimumRisk(), opt = optsq))
+    resl2 = optimise(MeanRisk(; obj = MinimumRisk(), opt = optl2))
+    @test PortfolioOptimisers.tracking_error_soc_factor(SquaredL2Norm(), 9e-6,
+                                                        size(rd.X, 1)) ==
+          PortfolioOptimisers.tracking_error_soc_factor(L2Norm(), 3e-3, size(rd.X, 1))
+    @test isapprox(ressq.w, resl2.w, atol = 1e-8)
+    dsq = PortfolioOptimisers.norm_error(SquaredL2Norm(), rd.X * ressq.w, wr, size(rd.X, 1))
+    dl2 = PortfolioOptimisers.norm_error(L2Norm(), rd.X * resl2.w, wr, size(rd.X, 1))
+    @test isapprox(dsq, dl2^2)
+    # both bounds bind, so the equality is not the trivial one of a slack constraint
+    @test dsq <= 9e-6 * (1 + 1e-6)
+    @test dl2 <= 3e-3 * (1 + 1e-6)
+    @test dsq / 9e-6 > 0.999
+    @test dl2 / 3e-3 > 0.999
+    # the model registers the tracking rows under `te`, not under `tracking_risk`
+    ks = keys(JuMP.object_dictionary(ressq.model))
+    @test :t_te_1 in ks
+    @test :te_1 in ks
+    @test :cte_soc_1 in ks
+    @test :cte_1 in ks
+    @test !(:sq_tracking_risk_1 in ks)
+    @test !(:tracking_risk_1 in ks)
+    # `ddof` moves the cone bound, so it moves the realised deviation
+    optd0 = JuMPOptimiser(; pe = pr, slv = slv,
+                          tr = TrackingError(; tr = ReturnsTracking(; w = wr), err = 3e-3,
+                                             alg = L2Norm(; ddof = 0)))
+    resd0 = optimise(MeanRisk(; obj = MinimumRisk(), opt = optd0))
+    @test LinearAlgebra.norm(rd.X * resd0.w - wr) > LinearAlgebra.norm(rd.X * resl2.w - wr)
+    @test isapprox(LinearAlgebra.norm(rd.X * resd0.w - wr),
+                   PortfolioOptimisers.tracking_error_soc_factor(L2Norm(; ddof = 0), 3e-3,
+                                                                 size(rd.X, 1)),
+                   rtol = 1e-6)
+
     opt = JuMPOptimiser(; pe = pr, slv = slv,
                         tr = TrackingError(; tr = ReturnsTracking(; w = wr), err = 4.5e-3,
                                            alg = LpNorm()))
@@ -726,4 +776,159 @@ end
     @test_throws ArgumentError PortfolioOptimisers.estimator_to_val("Mixed" => 0.3,
                                                                     partial_sets;
                                                                     strict = true)
+end
+
+@testset "Row assembly and carriers (issue #513)" begin
+    sets = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"]))
+
+    # `merge_partial_linear_constraints` stacks the halves it is given, in input order,
+    # skips the absent ones, and refuses rows of differing width.
+    p1 = PartialLinearConstraint(; A = [1.0 0.0 0.0; 0.0 1.0 0.0], B = [1.0, 2.0])
+    p2 = PartialLinearConstraint(; A = [1.0 1.0 1.0], B = [3.0])
+    m = PortfolioOptimisers.merge_partial_linear_constraints([p1, nothing, p2])
+    @test size(m.A, 1) == length(m.B) == 3
+    @test m.B == [1.0, 2.0, 3.0]
+    @test isnothing(PortfolioOptimisers.merge_partial_linear_constraints([nothing, nothing]))
+    @test_throws DimensionMismatch PortfolioOptimisers.merge_partial_linear_constraints([p1,
+                                                                                         PartialLinearConstraint(;
+                                                                                                                 A = [1.0 1.0],
+                                                                                                                 B = [0.0])])
+
+    # A one-element vector comes back as the element itself, not as a copy of it, and a
+    # bare constraint reaches the same method through the `LinearConstraint` arity.
+    lc = LinearConstraint(; ineq = p1)
+    @test PortfolioOptimisers.merge_linear_constraints([lc]) === lc
+    @test PortfolioOptimisers.merge_linear_constraints(lc) === lc
+    @test_throws PortfolioOptimisers.IsEmptyError PortfolioOptimisers.merge_linear_constraints(LinearConstraint[])
+
+    # The four computed properties answer `nothing` for the half that is absent.
+    @test lc.A_ineq === p1.A
+    @test lc.B_ineq === p1.B
+    @test isnothing(lc.A_eq)
+    @test isnothing(lc.B_eq)
+    lce = LinearConstraint(; eq = p2)
+    @test isnothing(lce.A_ineq)
+    @test isnothing(lce.B_ineq)
+    @test lce.A_eq === p2.A
+    @test lce.B_eq === p2.B
+
+    # Two or more elements take the merging branch, and the halves concatenate in input
+    # order.
+    both = PortfolioOptimisers.merge_linear_constraints([lc, lce])
+    @test size(both.A_ineq, 1) == 2
+    @test size(both.A_eq, 1) == 1
+    @test both.B_ineq == [1.0, 2.0]
+    @test both.B_eq == [3.0]
+
+    # A precomputed constraint is carried through a sub-selection unchanged: the row is
+    # written over the whole universe it was assembled against, so slicing `A` would
+    # change what the row asserts. A row wider than the weight vector then fails loudly
+    # at model build time; `NestedClustered` refuses a bare precomputed constraint for
+    # exactly this reason.
+    @test PortfolioOptimisers.port_opt_view(lc, [1, 2]) === lc
+
+    # An already-assembled constraint, `nothing`, and a vector of constraints pass
+    # through `linear_constraints` untouched.
+    @test linear_constraints(lc, sets) === lc
+    @test isnothing(linear_constraints(nothing, sets))
+    v = [lc, lce]
+    @test linear_constraints(v, nothing) === v
+
+    # A row whose every term matched no name is dropped, so a constraint that keeps no
+    # row at all answers `nothing` rather than an empty matrix.
+    @test isnothing(@test_logs (:warn,) (:warn,) linear_constraints("Z <= 1", sets))
+    @test_throws ArgumentError linear_constraints("Z <= 1", sets; strict = true)
+
+    # A missing asset universe suggests only keys no other declared axis speaks for, so a
+    # dict carrying a feature axis alone is not answered with the feature key.
+    @test_throws KeyError UniverseSets(; dict = Dict("nxx" => ["A"], "nz" => ["z"]))
+    @test PortfolioOptimisers.unclaimed_sets_keys(Dict("nxx" => ["A"], "nz" => ["z"]),
+                                                  ("ux", "nf", "uf", "nz")) == ["nxx"]
+
+    # `universe_axis` reads the axis off the key, so a factor universe is named as one.
+    fsets = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"], "nf" => ["F1", "F2"]))
+    @test PortfolioOptimisers.universe_axis(fsets, "nx") == "asset"
+    @test PortfolioOptimisers.universe_axis(fsets, "nf") == "factor"
+    @test PortfolioOptimisers.universe_axis(fsets, "nf_style") == "factor"
+
+    # `factor_universe` and `feature_universe` each raise at the point of need, naming the
+    # axis they read and the matrix they reconcile it against.
+    @test_throws KeyError PortfolioOptimisers.factor_universe(sets, 2, "a test", "rr.M")
+    @test_throws DimensionMismatch PortfolioOptimisers.factor_universe(fsets, 3, "a test",
+                                                                       "rr.M")
+    @test PortfolioOptimisers.factor_universe(fsets, 2, "a test", "rr.M") == ["F1", "F2"]
+    @test_throws KeyError PortfolioOptimisers.feature_universe(sets, "a test")
+    zsets = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"], "nz" => ["z1", "z2"]))
+    @test PortfolioOptimisers.feature_universe(zsets, "a test") == ["z1", "z2"]
+
+    # `estimator_to_val` answers each shape it is given against the same universe.
+    @test PortfolioOptimisers.estimator_to_val(nothing, sets) === nothing
+    @test PortfolioOptimisers.estimator_to_val(0.7, sets) == 0.7
+    @test PortfolioOptimisers.estimator_to_val([1.0, 2.0, 3.0], sets) == [1.0, 2.0, 3.0]
+    @test_throws DimensionMismatch PortfolioOptimisers.estimator_to_val([1.0, 2.0], sets)
+    # The matrix method validates `size(val, dims)`, and `dims` is 2 by default, so the
+    # universe names the *columns* of the matrix.
+    mat = [1.0 2.0 3.0; 4.0 5.0 6.0]
+    @test PortfolioOptimisers.estimator_to_val(mat, sets) === mat
+    tmat = transpose(mat)
+    @test PortfolioOptimisers.estimator_to_val(tmat, sets; dims = 1) === tmat
+    @test_throws DimensionMismatch PortfolioOptimisers.estimator_to_val(tmat, sets)
+    # `UniformValues` answers a range rather than a vector, and its entries sum to one.
+    for N in (3, 7, 10)
+        uv = PortfolioOptimisers.estimator_to_val(UniformValues(),
+                                                  UniverseSets(;
+                                                               dict = Dict("nx" =>
+                                                                               string.(1:N))))
+        @test uv isa AbstractRange
+        @test length(uv) == N
+        @test sum(uv) == 1.0
+    end
+    # Two entries naming overlapping groups let the last write win.
+    osets = UniverseSets(;
+                         dict = Dict("nx" => ["A", "B", "C"], "g1" => ["A", "B"],
+                                     "g2" => ["B", "C"]))
+    @test PortfolioOptimisers.estimator_to_val(["g1" => 1.0, "g2" => 2.0], osets) ==
+          [1.0, 2.0, 2.0]
+    @test PortfolioOptimisers.estimator_to_val(["g2" => 2.0, "g1" => 1.0], osets) ==
+          [1.0, 1.0, 2.0]
+end
+@testset "An estimator value algorithm is a value, not an equation (issue #633)" begin
+    #=
+    `AbstractEstimatorValueAlgorithm` splits by the shape of the value the algorithm
+    returns. `UniformValues` returns a `Num_VecNum`, so it sits under
+    `VectorAbstractEstimatorValueAlgorithm`, and a slot that resolves a value admits that
+    branch by writing it into its own bound.
+
+    An equation slot admits no branch at all. `LinearConstraintEstimator` used to accept
+    one, because `EqnType` carried the family root, and the method that answered the
+    resulting estimator returned the numeric value `estimator_to_val` computes. That value
+    is not a `LinearConstraint`: it carries neither a comparison operator nor a side, so no
+    constraint row can be assembled from it. The return annotation refused it, and the
+    estimator raised on every call it could receive. The bound now refuses the estimator
+    itself, at the slot the caller wrote.
+    =#
+    sets = UniverseSets(; xkey = "nx", dict = Dict("nx" => ["A", "B", "C", "D"]))
+    @test UniformValues <: PortfolioOptimisers.VectorAbstractEstimatorValueAlgorithm
+    @test UniformValues <: PortfolioOptimisers.AbstractEstimatorValueAlgorithm
+    @test UniformValues <:
+          PortfolioOptimisers.EstValType{<:PortfolioOptimisers.VectorAbstractEstimatorValueAlgorithm}
+    @test !(UniformValues <: PortfolioOptimisers.EqnType)
+    # The keyword route names the slot that refused the value; the positional route has no
+    # method for it.
+    @test_throws TypeError LinearConstraintEstimator(; val = UniformValues())
+    @test_throws MethodError LinearConstraintEstimator(UniformValues())
+    # Equation text is unaffected, and so is a precomputed constraint.
+    lce = LinearConstraintEstimator(; val = ["A + B == 1", "A >= 0.1"])
+    @test linear_constraints(lce, sets) isa LinearConstraint
+    # Every slot that resolves a value keeps the algorithm, and resolves it to the uniform
+    # vector over the universe.
+    wb = weight_bounds_constraints(WeightBoundsEstimator(; ub = UniformValues()), sets)
+    @test isapprox(collect(wb.ub), fill(0.25, 4))
+    rkb = risk_budget_constraints(RiskBudgetEstimator(; val = UniformValues()), sets)
+    @test isapprox(collect(rkb.val), fill(0.25, 4))
+    @test ThresholdEstimator(; val = UniformValues()).val === UniformValues()
+    @test TurnoverEstimator(; w = fill(0.25, 4), val = UniformValues()).val ===
+          UniformValues()
+    @test FeesEstimator(; l = UniformValues()).l === UniformValues()
+    @test PortfolioOptimisers.PortfolioTarget(; w = UniformValues()).w === UniformValues()
 end

@@ -15,7 +15,7 @@ $(DocStringExtensions.FIELDS)
 
     TurnoverEstimator(;
         w::VecNum,
-        val::EstValType,
+        val::EstValType{<:VectorAbstractEstimatorValueAlgorithm},
         dval::Option{<:Number} = nothing,
         fixed::Bool = false
     ) -> TurnoverEstimator
@@ -24,9 +24,15 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `w` is validated with [`assert_nonempty_finite_val`](@ref).
-  - `val` is validated with [`assert_nonempty_nonneg_finite_val`](@ref).
-  - `dval`, if not `nothing`, `dval >= 0`.
+  - `w`, through [`assert_nonempty_finite_val`](@ref): `!isempty(w)` and `any(isfinite, w)`.
+
+  - `val`, through [`assert_nonempty_nonneg_finite_val`](@ref):
+
+      + `AbstractDict`: `!isempty(val)`, `any(isfinite, values(val))` and `all(x -> x >= 0, values(val))`.
+      + Vector of pairs: `!isempty(val)`, `any(isfinite, getindex.(val, 2))` and `all(x -> x[2] >= 0, val)`.
+      + `Pair`: `isfinite(val[2])` and `val[2] >= 0`.
+
+  - `dval`: if not `nothing`, `dval >= 0`.
 
 ## View parameters
 
@@ -73,8 +79,9 @@ TurnoverEstimator
     $(field_dict[:fixed])
     """
     fixed
-    function TurnoverEstimator(w::VecNum, val::EstValType, dval::Option{<:Number},
-                               fixed::Bool)::TurnoverEstimator
+    function TurnoverEstimator(w::VecNum,
+                               val::EstValType{<:VectorAbstractEstimatorValueAlgorithm},
+                               dval::Option{<:Number}, fixed::Bool)::TurnoverEstimator
         assert_nonempty_finite_val(w, :w)
         assert_nonempty_nonneg_finite_val(val, :val)
         if !isnothing(dval)
@@ -83,29 +90,36 @@ TurnoverEstimator
         return new{typeof(w), typeof(val), typeof(dval), typeof(fixed)}(w, val, dval, fixed)
     end
 end
-function TurnoverEstimator(; w::VecNum, val::EstValType, dval::Option{<:Number} = nothing,
+function TurnoverEstimator(; w::VecNum,
+                           val::EstValType{<:VectorAbstractEstimatorValueAlgorithm},
+                           dval::Option{<:Number} = nothing,
                            fixed::Bool = false)::TurnoverEstimator
     return TurnoverEstimator(w, val, dval, fixed)
 end
 """
     factory(tn::TurnoverEstimator, w::VecNum)
 
-Create a new `TurnoverEstimator` with updated portfolio weights.
+Replace the reference weights of a [`TurnoverEstimator`](@ref), unless `fixed` holds them.
 
-Constructs a new [`TurnoverEstimator`](@ref) object using the provided portfolio weights `w` and the turnover values and default value from an existing `TurnoverEstimator` `tn`.
+The `fixed` field decides which weight vector survives. A `fixed` estimator pins the reference weights it was built with, so the incoming `w` is discarded and the argument `tn` is returned itself.
+
+# Algorithm
+
+ 1. Read `tn.fixed`. When it is `true`, return `tn` unchanged: the reference weights `tn.w` survive and the argument `w` is discarded.
+ 2. When it is `false`, build a new [`TurnoverEstimator`](@ref) whose `w` is the argument `w`, and whose `val`, `dval` and `fixed` are those of `tn`. The argument `w` survives.
 
 # Arguments
 
-  - `tn`: Existing `TurnoverEstimator` object. Supplies turnover values and default value.
-  - `w`: New portfolio weights vector.
+  - `tn`: Existing `TurnoverEstimator` object. Supplies the turnover values, the default value and the `fixed` flag.
+  - `w`: Candidate reference weights vector.
 
 # Validation
 
-  - `w` is validated to be non-empty, finite, and numeric.
+  - Step 2 builds a `TurnoverEstimator`, so `w` meets that constructor's rules. Step 1 builds nothing and checks nothing.
 
 # Returns
 
-  - `tn::TurnoverEstimator`: New estimator object with the same values and default but updated weights.
+  - `tn::TurnoverEstimator`: `tn` itself when `tn.fixed` is `true`, otherwise a new estimator carrying `w` as its reference weights.
 
 # Examples
 
@@ -163,6 +177,11 @@ Generate turnover portfolio constraints from a `TurnoverEstimator` and asset set
 
 `turnover_constraints` constructs a [`Turnover`](@ref) object representing turnover constraints for the assets in `sets`, using the specifications in `tn`. Supports scalar, vector, dictionary, pair, or custom turnover types for flexible assignment and validation.
 
+# Algorithm
+
+ 1. Resolve `tn.val` against the universe of `sets` with [`estimator_to_val`](@ref), giving one turnover bound per asset. The bounds follow the order of the universe, not the order of the keys of `tn.val`. Every asset the keys miss takes `tn.dval`, or `zero(datatype)` when `tn.dval` is `nothing`. A key that names neither an asset nor a group raises when `strict` is `true`, and warns otherwise.
+ 2. Build a [`Turnover`](@ref) from `tn.w`, the bound vector of step 1 and `tn.fixed`.
+
 # Arguments
 
   - `tn`: [`TurnoverEstimator`](@ref) specifying current weights, asset-specific turnover values, and default value.
@@ -173,10 +192,6 @@ Generate turnover portfolio constraints from a `TurnoverEstimator` and asset set
 # Returns
 
   - `tn::Turnover`: Object containing portfolio weights and turnover values aligned with `sets`.
-
-# Details
-
-  - Turnover values are extracted and mapped to assets using [`estimator_to_val`](@ref).
 
 # Examples
 
@@ -197,6 +212,7 @@ Turnover
   - [`TurnoverEstimator`](@ref)
   - [`Turnover`](@ref)
   - [`UniverseSets`](@ref)
+  - [`estimator_to_val`](@ref): resolves the names of `tn.val` against the universe of `sets`.
 """
 function turnover_constraints(tn::TurnoverEstimator, sets::UniverseSets;
                               datatype::DataType = Float64, strict::Bool = false)::Turnover
@@ -232,8 +248,6 @@ Where:
   - ``\\boldsymbol{\\delta}``: `N × 1` vector of maximum turnover, the `val` field. A scalar `val` broadcasts to every asset.
   - ``\\lvert \\cdot \\rvert``: Element-wise absolute value.
 
-[`set_turnover_constraints!`](@ref) writes the second line as the two linear constraints the source gives, one per side of the absolute value.
-
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -250,12 +264,16 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `!isempty(w)`.
+The rules are listed in the order of the raises, so the first rule a value breaks is the one it is told about.
 
-  - `val`:
+  - `w`, through [`assert_nonempty_finite_val`](@ref): `!isempty(w)` and `any(isfinite, w)`.
 
-      + `AbstractVector`: `!isempty(val)`, `length(w) == length(val)`, `any(isfinite, val)`, `all(x -> x >= 0, val)`.
+  - `val`, through [`assert_nonempty_nonneg_finite_val`](@ref):
+
+      + `AbstractVector`: `!isempty(val)`, `any(isfinite, val)` and `all(x -> x >= 0, val)`.
       + `Number`: `isfinite(val)` and `val >= 0`.
+
+  - `length(w) == length(val)` when `val` is an `AbstractVector`, raising a `DimensionMismatch`. This rule is checked last.
 
 ## View parameters
 
@@ -282,9 +300,9 @@ Turnover
 
 # Related
 
-  - [`set_turnover_constraints!`](@ref)
+  - [`set_turnover_constraints!`](@ref): writes the bound as the two linear rows the source gives, one per side of the absolute value.
   - [`_set_turnover_constraints!`](@ref)
-  - [`set_turnover_fees!`](@ref)
+  - [`set_turnover_fees!`](@ref): reads `val` as a per-asset fee rate rather than as a bound.
   - [`TurnoverEstimator`](@ref)
   - [`AbstractResult`](@ref)
   - [`VecNum`](@ref)
@@ -326,18 +344,27 @@ end
 """
     factory(tn::Turnover, w::VecNum)
 
-Create a new `Turnover` constraint with updated portfolio weights.
+Replace the reference weights of a [`Turnover`](@ref), unless `fixed` holds them.
 
-`factory` constructs a new [`Turnover`](@ref) object using the provided portfolio weights `w` and the turnover values from an existing `Turnover` constraint `tn`.
+The `fixed` field decides which weight vector survives. A `fixed` constraint pins the reference weights it was built with, so the incoming `w` is discarded and the argument `tn` is returned itself.
+
+# Algorithm
+
+ 1. Read `tn.fixed`. When it is `true`, return `tn` unchanged: the reference weights `tn.w` survive and the argument `w` is discarded.
+ 2. When it is `false`, build a new [`Turnover`](@ref) whose `w` is the argument `w`, and whose `val` and `fixed` are those of `tn`. The argument `w` survives.
 
 # Arguments
 
-  - `tn`: Existing `Turnover` constraint object.
-  - `w`: New portfolio weights vector.
+  - `tn`: Existing `Turnover` constraint object. Supplies the turnover values and the `fixed` flag.
+  - `w`: Candidate reference weights vector.
+
+# Validation
+
+  - Step 2 builds a `Turnover`, so `w` meets that constructor's rules. Step 1 builds nothing and checks nothing.
 
 # Returns
 
-  - `tn::Turnover`: New constraint object with updated weights and original turnover values.
+  - `tn::Turnover`: `tn` itself when `tn.fixed` is `true`, otherwise a new constraint carrying `w` as its reference weights.
 
 # Examples
 
@@ -383,6 +410,10 @@ Propagate or pass through turnover portfolio constraints.
 
 `turnover_constraints` returns the input [`Turnover`](@ref) object unchanged or `nothing`. This method is used to propagate already constructed turnover constraints, enabling composability and uniform interface handling in constraint generation workflows.
 
+# Algorithm
+
+ 1. Return `tn`. A [`Turnover`](@ref) already carries one bound per asset, so no universe is resolved. The method reads none of its other arguments and none of its keywords.
+
 # Arguments
 
   - `tn`: An existing [`Turnover`](@ref) object.
@@ -418,61 +449,62 @@ end
 """
     const TnE_Tn = Union{<:Turnover, <:TurnoverEstimator}
 
-Alias for a turnover constraint or estimator.
-
-Represents either a constructed turnover constraint or a turnover constraint estimator. Used for flexible dispatch in turnover constraint generation and processing.
+Union of the two turnover types, one turnover constraint on either side of name resolution. Both carry `w`, `val` and `fixed`, so [`factory`](@ref), [`port_opt_view`](@ref) and [`needs_previous_weights`](@ref) act on either without a branch; they differ only in whether `val` is already one bound per asset.
 
 # Related
 
   - [`Turnover`](@ref)
   - [`TurnoverEstimator`](@ref)
+  - [`turnover_constraints`](@ref): the verb that turns the estimator side into the result side.
+  - [`FeesEstimator`](@ref): holds one of these in its `tn` field.
 """
 const TnE_Tn = Union{<:Turnover, <:TurnoverEstimator}
 """
     const VecTnE_Tn = AbstractVector{<:TnE_Tn}
 
-Alias for a vector of turnover constraints or estimators.
-
-Represents a collection of turnover constraints or estimators, enabling batch processing and broadcasting of turnover constraint generation.
+Vector of [`TnE_Tn`](@ref), the type the broadcast methods of this file dispatch on. Several turnover constraints can hold at once, so the singular alias needs a plural counterpart; the element type may mix both sides of name resolution, which is why the methods that build a new vector keep it concrete.
 
 # Related
 
   - [`TnE_Tn`](@ref)
   - [`Turnover`](@ref)
   - [`TurnoverEstimator`](@ref)
+  - [`turnover_constraints`](@ref)
+  - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
+  - [`needs_previous_weights`](@ref)
 """
 const VecTnE_Tn = AbstractVector{<:TnE_Tn}
 """
     const VecTn = AbstractVector{<:Turnover}
 
-Alias for a vector of turnover constraints.
-
-Represents a collection of constructed turnover constraints for multiple portfolios or assets.
+Vector of [`Turnover`](@ref) alone, the resolved side of [`VecTnE_Tn`](@ref). It is what the vector method of [`turnover_constraints`](@ref) returns, so a method that dispatches on it is downstream of name resolution and reads `val` as one bound per asset.
 
 # Related
 
   - [`Turnover`](@ref)
+  - [`VecTnE_Tn`](@ref)
+  - [`Tn_VecTn`](@ref)
+  - [`turnover_constraints`](@ref)
 """
 const VecTn = AbstractVector{<:Turnover}
 """
     const Tn_VecTn = Union{<:Turnover, <:VecTn}
 
-Alias for a single turnover constraint or a vector of turnover constraints.
-
-Enables flexible dispatch for functions that accept either a single turnover constraint or multiple constraints.
+One resolved turnover constraint or a vector of them. This is the shape a `JuMPOptimiser` holds after name resolution and the shape [`set_turnover_constraints!`](@ref) reads, so no method that dispatches on it ever meets a [`TurnoverEstimator`](@ref).
 
 # Related
 
   - [`Turnover`](@ref)
   - [`VecTn`](@ref)
+  - [`TnE_Tn_VecTnE_Tn`](@ref): the unresolved counterpart, which the optimiser accepts from the caller.
+  - [`set_turnover_constraints!`](@ref)
 """
 const Tn_VecTn = Union{<:Turnover, <:VecTn}
 """
     const TnE_Tn_VecTnE_Tn = Union{<:TnE_Tn, <:VecTnE_Tn}
 
-Alias for a single turnover constraint/estimator or a vector of them.
-
-Supports flexible dispatch for turnover constraint generation and processing, accepting either a single constraint/estimator or a collection.
+Widest turnover alias: one constraint or estimator, or a vector of them. It is the type a `JuMPOptimiser` accepts for its `tn` keyword, because a caller may pass either side of name resolution and either count; [`turnover_constraints`](@ref) narrows every case of it to [`Tn_VecTn`](@ref).
 
 # Related
 
@@ -480,6 +512,8 @@ Supports flexible dispatch for turnover constraint generation and processing, ac
   - [`VecTnE_Tn`](@ref)
   - [`Turnover`](@ref)
   - [`TurnoverEstimator`](@ref)
+  - [`Tn_VecTn`](@ref): what this narrows to once the names are resolved.
+  - [`turnover_constraints`](@ref)
 """
 const TnE_Tn_VecTnE_Tn = Union{<:TnE_Tn, <:VecTnE_Tn}
 """
@@ -489,6 +523,11 @@ const TnE_Tn_VecTnE_Tn = Union{<:TnE_Tn, <:VecTnE_Tn}
 Broadcasts [`turnover_constraints`](@ref) over the vector.
 
 Provides a uniform interface for processing multiple constraint estimators simultaneously.
+
+# Algorithm
+
+ 1. For each entry `tni` of `tn`, in the order of `tn`, call [`turnover_constraints`](@ref) on `tni` with `sets`, `datatype` and `strict`. An entry that is already a [`Turnover`](@ref) passes through.
+ 2. Collect the results into a vector that preserves the order of `tn`.
 
 # Arguments
 
@@ -542,6 +581,11 @@ Applies [`factory`](@ref) to each element in `tn`, constructing a new collection
 
 This is the generic vector [`factory`](@ref) plus [`concrete_typed_array_if_abstract`](@ref): a mixed vector of [`Turnover`](@ref) and [`TurnoverEstimator`](@ref) keeps a concrete element type.
 
+# Algorithm
+
+ 1. For each entry `tni` of `tn`, in the order of `tn`, call [`factory`](@ref) on `tni` with `w`. A `fixed` entry returns itself and keeps its own reference weights, so a vector may hold both outcomes.
+ 2. Pass the collected vector through [`concrete_typed_array_if_abstract`](@ref). Step 1 can widen the element type to an abstract one, because the two turnover types have no common concrete type; this step narrows it back to a `Union` the compiler can dispatch on.
+
 # Arguments
 
   - `tn`: Vector of turnover constraints or estimators.
@@ -583,7 +627,7 @@ function factory(tn::VecTnE_Tn, w::VecNum)
     return concrete_typed_array_if_abstract([factory(tni, w) for tni in tn])
 end
 """
-    port_opt_view(tn::VecTnE_Tn, i)
+    port_opt_view(tn::VecTnE_Tn, i, args...)
 
 Create views of multiple turnover constraints or estimators for a subset of assets.
 
@@ -591,20 +635,20 @@ Create views of multiple turnover constraints or estimators for a subset of asse
 
 This is the generic vector [`port_opt_view`](@ref) plus [`concrete_typed_array_if_abstract`](@ref): a mixed vector of [`Turnover`](@ref) and [`TurnoverEstimator`](@ref) keeps a concrete element type.
 
+# Algorithm
+
+ 1. For each entry `tni` of `tn`, in the order of `tn`, call [`port_opt_view`](@ref) on `tni` with `i` and `args...`. The `@vprop` tags of each type decide what is sliced: `w` and a vector `val` become views over `i`, and a scalar or dictionary `val` passes through unchanged.
+ 2. Pass the collected vector through [`concrete_typed_array_if_abstract`](@ref), for the reason [`factory(tn::VecTnE_Tn, w::VecNum)`](@ref) gives.
+
 # Arguments
 
   - `tn`: Vector of turnover constraints or estimators.
   - `i`: Index or indices specifying the subset of assets.
+  - `args...`: Further arguments, forwarded unchanged to each element's [`port_opt_view`](@ref).
 
 # Returns
 
   - `res::VecTnE_Tn`: Vector of turnover constraint or estimator objects, each restricted to the specified subset.
-
-# Details
-
-  - Applies `port_opt_view` to each element in `tn`.
-  - Supports both `Turnover` and `TurnoverEstimator` types.
-  - Enables composable and uniform processing of asset subsets for batch turnover constraints.
 
 # Examples
 
@@ -646,9 +690,16 @@ end
 
 Check if a turnover constraint or estimator requires previous portfolio weights.
 
+A `fixed` entry pins its own reference weights, so it needs none: the scalar method answers `!tn.fixed`. The vector method answers `any` and not `all`, so one entry that is not `fixed` makes the whole vector need them.
+
+# Algorithm
+
+ 1. On a single [`TnE_Tn`](@ref), return `!tn.fixed`.
+ 2. On a [`VecTnE_Tn`](@ref), apply step 1 to every entry and reduce with `any`.
+
 # Arguments
 
-  - `tn`: Turnover constraint or estimator.
+  - `tn`: One turnover constraint or estimator, or a vector of them.
 
 # Returns
 
@@ -658,6 +709,9 @@ Check if a turnover constraint or estimator requires previous portfolio weights.
 
   - [`TurnoverEstimator`](@ref)
   - [`Turnover`](@ref)
+  - [`TnE_Tn`](@ref)
+  - [`VecTnE_Tn`](@ref)
+  - [`factory(tn::Turnover, w::VecNum)`](@ref): the verb that reads the same `fixed` flag.
 """
 function needs_previous_weights(tn::TnE_Tn)::Bool
     return !tn.fixed

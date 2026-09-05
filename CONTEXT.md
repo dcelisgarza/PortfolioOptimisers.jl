@@ -14,11 +14,22 @@ A configuration object encoding a statistical or mathematical method together wi
 **Algorithm**
 A type held inside an Estimator that selects or modifies its computational behaviour. Consumed through an Estimator, never used on its own.
 
+**Selector tag**
+An Algorithm that carries no field, and whose only job is to name the branch a caller takes. Dispatch on the type is the whole of its behaviour: `SpectralDenoise` selects the spectral branch of `denoise!`. Most subtypes of `AbstractAlgorithm` are selector tags.
+
 **Result**
 A plain data struct holding the computed output of a function applied to an Estimator: *the answer for the input it was computed on*. Never callable.
 
+**Partial Fit State**
+The running quantities an incremental fit keeps between calls — the observation count, the mean and the second-moment accumulator — so one more observation folds into an estimate without the sample being read again. It is a Result that no consumer reads: a read-out verb turns a state into the ordinary Result first. This is the one kind of Result an Estimator holds, in a field bound to `Union{Nothing, <:AbstractPartialFitState}`, and ADR 0106 records the exception.
+Two verbs fold observations into it, and ADR 0107 records what each promises. `partial_fit!` is the method each family writes, and it is that family's cheapest exact fold; it writes into the arrays of the state where it can, and it promises nothing about an Estimator the caller kept from before the call. `partial_fit` is one generic method with value semantics: it copies the state and folds the copy, so the Estimator handed over reads what it read before. Every state answers `merge_states` and `copy`.
+*Avoid*: Cache (a cache may be dropped without changing an answer, and a state may not).
+
+**State Merge**
+The combination of two Partial Fit States fitted on disjoint blocks of observations into the state of the concatenated block, under the verb `merge_states`. It is a sum rather than a right-operand-wins overwrite, which is why the verb is not `Base.merge`, and it is what makes an incremental fit parallel and associative: a sample split into any set of disjoint blocks gives the state of the whole sample, whatever order the blocks are folded in. A family whose state is not a sufficient statistic for its own block refuses the merge and names the reason, and its route is a sequential fit instead.
+
 **Choice Surface**
-The set of things a caller picks when specifying a problem: the concrete leaf Estimators and Algorithms. Results are what comes back, never what is chosen.
+The set of things a caller picks when specifying a problem: every concrete type the package declares that is a leaf Estimator, a leaf Algorithm, a leaf `AbstractCovarianceEstimator`, or an export under its own name. Results and errors are what comes back, never what is chosen, so they are not on it. `AbstractCovarianceEstimator` is named on its own because it descends from `StatsBase.CovarianceEstimator` rather than from Estimator, and the export rule catches whatever family takes a root nothing here names.
 
 **Factory**
 The mechanism that propagates runtime-computed values down a composed struct tree, returning a new, fully-configured struct of the same type.
@@ -81,20 +92,29 @@ The pervasive Algorithm distinction in moment estimation: `FullMoment` includes 
 ## 2. Data
 
 **ReturnsResult**
-The central data structure carrying all return series through the library: asset, factor and benchmark returns, their names, timestamps, implied volatility, and the Feature Matrix. Produced by `prices_to_returns`.
+The central data structure carrying all return series through the library: asset, factor and benchmark returns, their names, timestamps, implied volatility, and the Asset Panel. Produced by `prices_to_returns`.
 
 **PricesResult**
 The container of aligned, time-indexed price-level series: the prices-level mirror of `ReturnsResult`, and the input to price Preprocessing Estimators.
 
-**Feature Matrix** (`Z` / `nz`)
-An assets × features matrix of per-asset quantities that are *not* return series — a sector taxonomy, a fundamentals or ESG panel, factor loadings, a graph neighbourhood. It is exogenous data, letting the clustering and network stack see structure the returns do not encode.
-*Avoid*: Characteristic (see **Characteristic Vector**, §3.9); and reading "feature" as *factor*, which is a return series.
+**Feature Matrix**
+The assets × features matrix a Feature Distance measures, or its time-varying form, observations × assets × features. It is built at the point of use from the Panel Fields a Feature Selector names: a numeric field gives one column, a categorical field one 0/1 column per level, a tensor field one column per label, and an observed mask one 0/1 column. Each column carries a label, which is the Feature Selector entry that selects exactly that column. It is always finite.
+*Avoid*: reading it as a stored quantity. No carrier holds a Feature Matrix; an Asset Panel holds Panel Fields, and the matrix is derived from them. Also Characteristic (see **Characteristic Vector**, §3.9); and reading "feature" as *factor*, which is a return series.
 
-**Feature Matrix Estimator**
-A producer turning something the library already computes, or a classification the caller supplies, into a Feature Matrix: `RegressionFeatures`, `AssetSetsFeatures`, `PhylogenyFeatures`.
+**Feature Selector**
+The statement on a Feature Distance of which Panel Fields the Feature Matrix stacks. An entry names one field, or one field with the levels or labels it keeps, or one field's observed mask. A bare field name means the field's values alone; an absent selector means every field's values. An entry that names nothing the panel holds is dropped with a warning, or refused under `strict`.
+*Avoid*: reading an entry as a column position; every column has a name. And a taxonomy key, which is the name of a categorical Panel Field, not a second namespace.
 
-**Feature Program**
-An ordered, last-wins list of authored edges resolving into a Feature Matrix. Where the group-key form stacks partitions and derives its axis, a Program writes cells into an axis the caller declared.
+**Asset Panel Estimator**
+A producer turning something the library already computes into a static Asset Panel with one Panel Field, at the point of use: `RegressionPanel` builds a loadings tensor from the prior's regression, `PhylogenyPanel` a proximity tensor from the returns. It is configuration on a Feature Distance, so it refits on the universe of the subproblem that runs it, and it holds no data.
+*Avoid*: reading it as a source of a Feature Matrix; it makes a panel, and the matrix is stacked from the panel like any other. And a classification the caller supplies, which enters `asset_panel` as a categorical Panel Field, not through a producer.
+
+**Asset Panel**
+The one carrier of per-asset data that is not a return series: named Panel Fields over a shared asset axis. Its static shape indexes each field by asset alone and carries no masks: a taxonomy, a loadings matrix, an adjacency. Its point-in-time shape adds an observation axis, an active mask and an estimation mask. Every blank cell is resolved by `asset_panel` before the Asset Panel exists. A Universe Sets key enters as one Panel Field through `panel_input`: a categorical field for a string key, a numeric field for a numeric key, named by the key without its asset-axis prefix. A static input that meets a time-varying input, or the two masks, is lifted to the observation axis as a field that is constant in time. See ADR 0102.
+*Avoid*: reading `pnl` as profit-and-loss; the field holds the panel. And reading the panel as one matrix: it is a set of fields, and the Feature Matrix is stacked from them. And a graded or weighted membership matrix as anything but a tensor Panel Field the caller authors as data.
+
+**Panel Field**
+One named quantity of an Asset Panel, which owns its values and its observed mask: a market capitalisation (numeric), a sector classification (categorical, integer codes over declared levels), a factor exposure tensor (tensor, with third-axis labels and optional groups). A Panel Field whose blanks were filled carries an observed mask saying which cells the fill touched. One whose policy refuses blanks carries none.
 
 **Implied Volatility**
 A forward-looking estimate of an asset's expected price fluctuation, derived from current option prices. Not a historical measurement.
@@ -113,13 +133,27 @@ A moment estimator restricting an inner moment estimator to a sub-window of the 
 Computes a per-asset mean-return vector. Variants:
 
 - **SimpleExpectedReturns**: sample mean, with optional observation weights.
-- **ShrunkExpectedReturns**: shrinks the sample mean toward a target. Targets: `GrandMean`, `VolatilityWeighted`. Algorithms: `JamesStein`, `BayesStein`, `BodnarOkhrinParolya`.
+- **ShrunkExpectedReturns**: shrinks the sample mean toward a target. Targets: `GrandMean`, `VolatilityWeighted`, `MeanSquaredError`. Algorithms: `JamesStein`, `BayesStein`, `BodnarOkhrinParolya`. The target and the algorithm are independent choices, so the estimator has nine combinations.
 - **EquilibriumExpectedReturns**: implied (equilibrium) returns via reverse optimisation, Π = λ·Σ·w_eq. The Black-Litterman equilibrium anchor.
 - **ExcessExpectedReturns**: returns net of a reference/risk-free rate.
 - **MedianExpectedReturns**: (weighted) per-asset median.
 - **StandardDeviationExpectedReturns** / **VarianceExpectedReturns**: the asset standard deviations / variances, where a "return" slot should carry dispersion.
 - **CustomValueExpectedReturns**: user-supplied per-asset values.
 - **WindowedExpectedReturns**: the Windowed Estimator for expected returns.
+
+**Return Forecast**
+A per-asset prediction of the next period's idiosyncratic return, supplied by the caller or fitted from Descriptor Scores, which a Prior splits against its latest Factor Exposures into a spanned part that blends into the factor mean and an orthogonal part that enters its mean vector under a confidence.
+*Avoid*: `alpha` (§5), which is the Significance Level of a tail; and Expected Returns (above), which is a moment estimated from the sample.
+
+**Return Forecast Estimator**
+A producer of a Return Forecast, from Descriptor Scores and the factor-model block of the Prior it serves, or from a stated vector.
+
+**Descriptor Scores**
+The cross-sectional scores of a set of Descriptors: each winsorised and standardised per observation, regressed out against named Factor Exposures under the estimation mask, and standardised again. The recipe every fitted Return Forecast Estimator starts from.
+*Avoid*: Factor Exposure (§3.4), which is scored under the benchmark weights and names a factor of the model.
+
+**Forecast Unit**
+The unit a Return Forecast Estimator's descriptors forecast in: the idiosyncratic return, or the idiosyncratic Sharpe ratio, which the estimator converts back with the idiosyncratic volatility so a Return Forecast is always in return units.
 
 ### 3.2 Covariance & Variance (Moments)
 
@@ -153,6 +187,41 @@ Builds a factor model mapping factor returns to asset returns, underpinning fact
 - **DimensionReductionRegression**: regression on reduced factors — targets `PCA`, `PPCA`.
 - **Regression target** models: `LinearModel`, `GeneralisedLinearModel` (GLM).
 
+**Cross-Sectional Regression**
+A regression of one observation's asset returns on the lagged Factor Exposures across the assets, one fit per observation.
+*Avoid*: Regression Estimator (above), whose families fit one asset at a time over the observations.
+
+**Descriptor**
+A per-asset value computed from one or more Panel Fields at one observation: a momentum, a book-to-price ratio, an exponentially weighted volatility.
+*Avoid*: Score (§1), which is the per-asset number a `ScoreSelector` ranks on.
+
+**Descriptor Estimator**
+A producer of one Descriptor.
+
+**Cross-Sectional Transform**
+A rescaling of a Descriptor within one observation, across the assets: a winsorisation, a standardisation against a benchmark-weighted centre, a Gaussian or percentile rank, a tanh shrink. It reads the benchmark weights and an optional group label at the call, keeps no fitted state, and returns a value of the same shape.
+*Avoid*: Preprocessing Estimator (§2), which transforms a series along time and fits a Result.
+
+**Factor Exposure**
+One asset's loading on one factor at one observation, built from Descriptors or from a one-hot Panel Field. The matrix of them is the loadings matrix a Regression carries, which is where a Factor Exposure Constraint (§4.4) reads it.
+*Avoid*: net and gross exposure (§4.4), which are statements about the weights rather than about a factor model.
+
+**Exposure Estimator**
+A producer of a Factor Exposure matrix.
+*Avoid*: Asset Panel Estimator (§2), which produces the panel the distance and clustering stack reads.
+
+**Factor Family**
+A set of factors carrying one benchmark-weighted zero-sum constraint, so exactly one member of the set is redundant.
+*Avoid*: the bare word "family", which names a group of Estimator types everywhere else in this glossary.
+
+**Neutralisation**
+The replacement of one Factor Exposure by its residual after a benchmark-weighted regression across the assets on the exposures of other factors, re-standardised, so the factor carries none of the targets' tilt.
+*Avoid*: orthogonalisation, which is the same operation under another name; Detoning (§3.5), which removes principal components from a correlation matrix.
+
+**Factor Family Basis**
+The time-varying change of basis that imposes each Factor Family's zero-sum constraint by dropping one member and rewriting the others, stored as the per-observation ratios of the retained members to the dropped one.
+*Avoid*: the reduced loadings, which are what the basis produces rather than the basis itself.
+
 ### 3.5 Matrix Processing
 
 **Denoising**
@@ -176,6 +245,7 @@ Structural axes: **low-order** is mean plus covariance, **high-order** adds cosk
 
 - **EmpiricalPrior**: moments computed directly from returns.
 - **FactorPrior** / **HighOrderFactorPriorEstimator**: moments reconstructed through a factor model.
+- **CrossSectionalFactorPrior**: moments reconstructed through a factor model whose Factor Exposures are built from an Asset Panel and fitted by a Cross-Sectional Regression.
 - **HighOrderPriorEstimator**: empirical high-order prior.
 - **Black-Litterman family**: blends market-equilibrium priors with investor views — `BlackLittermanPrior`, `BayesianBlackLittermanPrior`, `FactorBlackLittermanPrior`, `AugmentedBlackLittermanPrior`, with `BlackLittermanViews` as the views container.
 - **EntropyPoolingPrior**: re-weights scenario probabilities to satisfy views with minimal relative entropy.
@@ -187,11 +257,21 @@ An entropy pooling correlation or covariance view whose two sides are groups rat
 *Avoid*: reading it as a statement about one summary of the correlation block; no such aggregate is defined.
 
 **Tail View**
-A view on a quantile risk measure of the posterior — CVaR or EVaR — as opposed to a view on a moment. It is the one view family that is not a linear function of the posterior probabilities.
-*Avoid*: confusing it with a **View** (§1), which is the index-selection mechanism.
+A view on a quantile risk measure of the posterior — CVaR, EVaR or RLVaR — as opposed to a view on a moment. It is the one view family that is not a linear function of the posterior probabilities, and the one family `ep_tail_views!` lowers. A VaR view is not one: it constrains the tail mass, which is linear in the posterior probabilities, and `ep_var_views!` lowers it on its own.
+A tail view names one or more assets, each with a coefficient. Every one of the three measures is concave in the posterior probabilities, so a view whose coefficients share one sign is a **positive combination** whose lower bound is a convex set, and the dual formulations write it exactly, one block per asset. A view whose coefficients carry both signs is a **relative view**, whose feasible set is not convex; it takes the integer formulation or a **Surrogate Row**. See ADR 0069.
+*Avoid*: confusing it with a **View** (§1), which is the index-selection mechanism. *Avoid*: calling a group view relative; a group of two or more members is a positive combination, and needs no integer variable.
+
+**Surrogate Row**
+The linear upper bound a sequential tail view formulation writes for each measure on the wrong side of the inequality, read from the primal representation at multipliers fixed at the last posterior: the value at risk for CVaR, the primal pair for RLVaR, and the tangent of the fixed-dual-variable primal for EVaR. It is sufficient for the view and tight where it was read, and `entropy_pooling` re-reads it and solves again until it is tight at the answer. See ADR 0069.
+*Avoid*: reading its slack as a violated view. The view holds on every posterior of the sequence, and the slack says only that the divergence can still fall.
+
+**Search Bracket**
+The span a scalar search of a **Tail View** runs over. It is stated in the units the search works in, and the name says which: `zlo_frac` is a fraction of an upper end that is proven, and `log_zlo` and `log_zhi` are additive offsets on the logarithm of the loss range. A knob whose default follows from the data is a field on the view estimator defaulting to `nothing`, and a group of knobs whose defaults are plain numbers is its own algorithm type. See ADR 0069.
+*Avoid*: reading one family's number under another's rule. A fraction written where an offset is read passes every guard and searches the wrong span.
 
 **Risk-Free Shift**
-The round trip a Black-Litterman prior makes around its own update: the rate comes off before the update, because the update is written in excess returns, and goes back on after it.
+The one place a Black-Litterman prior reads its `rf` field. The update blends the prior mean against the view returns, so it runs on the total-return scale those are written on. A prior mean taken from a wrapped estimator is on that scale already and is left alone; an equilibrium mean from `EquilibriumExpectedReturns` is a bare risk premium, and the rate converts it *before* the update. A member with no equilibrium branch has nothing to convert, and adds the rate to the posterior asset mean instead.
+*Avoid*: calling it a round trip. Nothing subtracts the rate, and the update is affine rather than a translation, so a conversion and its inverse around the update would not cancel.
 
 **Factor Lift**
 The hop from the factor axis to the asset axis: fit the loadings, rebuild the returns through them, project the factor moments, and optionally add a residual block.
@@ -199,6 +279,10 @@ The hop from the factor axis to the asset axis: fit the loadings, rebuild the re
 
 **Original Returns Matrix**
 The returns matrix the caller supplied, as distinct from the one a Prior Result asserts. The two differ only where a factor prior overwrites the returns with its reconstruction.
+
+**Investable Mask**
+The assets an optimisation can trade, derived from a Prior Result and stored nowhere: `true` where `mu` and the diagonal of `sigma` are both finite. A Prior Estimator fits on the coverage universe and returns a result on the *full* asset universe, in which an asset it could not estimate carries `NaN`. The optimiser derives the mask once at its entry, reduces the prior and every constraint the caller stated to it, and expands the solved weights back into a zero vector of the full length. It is `nothing` when every asset is investable, and that sentinel is what skips both halves.
+*Avoid*: confusing it with an **Asset Panel**'s active mask, which is stored and is a point-in-time fact. The active mask says an asset is listed and tradable; the Investable Mask says the estimator produced a finite moment for it. The two differ where an asset is active and not yet warmed up, and where its regression fails.
 
 ### 3.7 Distance
 
@@ -209,7 +293,7 @@ A symmetric, zero-diagonal matrix in which larger values mean less relatedness. 
 Converts correlation or returns into a distance: `SimpleDistance`, `SimpleAbsoluteDistance`, `LogDistance`, `CorrelationDistance`, `VariationInfoDistance`, `CanonicalDistance`. `Distance` is the configurable container and `DistanceDistance` computes a distance-of-distances.
 
 **Feature Distance**
-The one Distance Estimator measuring something other than returns: it applies a metric to the rows of a Feature Matrix, so the resulting hierarchy expresses exogenous structure.
+The one Distance Estimator measuring something other than returns: it applies a metric to the rows of a Feature Matrix, stacked from the Panel Fields its Feature Selector names, so the resulting hierarchy expresses exogenous structure.
 
 **Similarity Matrix Algorithm**
 The transform turning a Distance Matrix into a similarity matrix: `MaximumDistanceSimilarity`, `ExponentialSimilarity`, `GeneralExponentialSimilarity`, `ComplementSimilarity`, `AngularSimilarity`.
@@ -229,7 +313,7 @@ The characterisation of asset relationships derived from a Distance Matrix. The 
 `PhylogenyResult` carries the resulting matrix or vector.
 
 **Phylogeny Features**
-The reverse direction: a phylogeny reused as a Feature Matrix rather than consumed as one, since an assets × assets neighbourhood matrix is an assets × features matrix.
+The reverse direction: a phylogeny reused as a Panel Field rather than consumed as one, since an assets × assets proximity matrix is a tensor field whose labels are the assets. `PhylogenyPanel` is the Asset Panel Estimator that builds it.
 
 **Separation**
 How far apart two assets sit in a Network, and how far is too far. Two members: `HopCount`, the number of edges on the shortest path, and `PathLength`, the summed distance along it.
@@ -247,10 +331,29 @@ Which of the two opposite quantities a Centrality algorithm's edge weights must 
 ### 3.9 Uncertainty Sets
 
 **Uncertainty Set**
-A neighbourhood of a specific quantity — a mean vector or a covariance matrix — within which a robust optimiser protects against the worst case. Shapes: **Box** (per-parameter bounds), **Ellipsoidal** (a joint confidence region), and the mean-only **ℓ1** and **Signed ℓ1** cross-polytopes. Constructors: `DeltaUncertaintySet`, `NormalUncertaintySet`, `ARCHUncertaintySet`, `CharacteristicUncertaintySet`.
+A neighbourhood of a specific quantity — a mean vector or a covariance matrix — within which a robust optimiser protects against the worst case. Shapes: **Box** (per-parameter bounds), **Ellipsoidal** (a joint confidence region), the covariance-only **Compact** (below), **Norm Ball** (below, a geometry map of any rank under a norm order, on either axis), and the mean-only **ℓ1** and **Signed ℓ1** cross-polytopes. Constructors: `DeltaUncertaintySet`, `NormalUncertaintySet`, `ARCHUncertaintySet`, `CharacteristicUncertaintySet`.
+
+**Compact Covariance Uncertainty Set**
+The covariance shape stated as a radius, a diagonal metric square root and a basis of the directions the worst case spares, rather than as a shape matrix on the vectorised covariance. Its worst-case variance is a quadratic penalty on the weights, so the consumer adds one cone and one free coefficient vector rather than the lifted semidefinite block the Ellipsoidal shape needs. `CompactCovarianceUncertaintySet` builds it.
+*Avoid*: Ellipsoidal (above), whose radius is a quantile of a dimension; this one's radius is a size the caller sets.
+
+**Norm-Ball Uncertainty Set**
+A shape stated as a radius, a geometry map and a norm order: the set is the image of the normalised ball of that order under the map, centred on the quantity it bounds, and its worst case is the radius times the dual norm of the map's transpose applied to the exposure. The map may have fewer columns than the quantity has entries, so the shape may be flat, which is what a set confined to an Orthogonal Subspace needs. It serves both axes. The Ellipsoidal, Box and ℓ1 shapes are its order-2, order-∞ and order-1 cases with a square or diagonal map. `NormBallUncertaintySet` builds it, and `NormBallUncertaintySetAlgorithm` selects it on the Normal and bootstrap estimators. The Normal estimator factors the asymptotic covariance it already builds, so its set is the Ellipsoidal one restated; the bootstrap estimator stores its own deviations as the map, so its set carries the sample second moment exactly and needs neither a square matrix of side N² nor a positive definite repair.
+*Avoid*: Ellipsoidal (above) for a flat set, because an Ellipsoidal shape matrix must be full rank.
+
+**Orthogonal Subspace**
+The orthogonal complement of the column space of the loading matrix, taken under an Orthogonality Metric (below). An Uncertainty Set confined to it prices no error in a direction the factor model already explains.
+
+**Orthogonality Metric**
+The cross-sectional weighting under which the loading matrix's span and its Orthogonal Subspace (above) are taken: the benchmark weights, the regression weights, the inverse idiosyncratic variances, or the identity, each read off the Prior Result's factor block at its latest observation. A caller states it as a marker, and the default is the inverse idiosyncratic variance.
+*Avoid*: the weights of a Cross-Sectional Regression (§3.4), which the prior's fit computes per observation; a metric only selects a quantity the fit already stored.
+
+**Orthogonal Scaling**
+The shape a mean Uncertainty Set takes inside the Orthogonal Subspace (above): the identity, which gives every orthogonal direction the same uncertainty, or the idiosyncratic covariance projected onto the subspace, which gives a noisy direction more than a quiet one. A caller states it as a marker, and the default is the identity. It changes the shape of the set and not the subspace the set lives in, so the radius reads the same rank either way.
+*Avoid*: Orthogonality Metric (above), which fixes which subspace the set lives in; a scaling fixes only its shape inside that subspace.
 
 **ucs Triple**
-The three ways to ask an Uncertainty Set estimator for its sets: `ucs` for the mean and covariance sets as a pair, `mu_ucs` for the mean half, `sigma_ucs` for the covariance half.
+The three ways to ask an Uncertainty Set estimator for its sets: `ucs` for the mean and covariance sets as a pair, `mu_ucs` for the mean half, `sigma_ucs` for the covariance half. Most estimators fit from returns data; an estimator that reads the optimisation's own Prior Result, as one confined to an Orthogonal Subspace must, answers the same three verbs from that result instead, and the optimiser hands it the prior where it builds the constraint.
 
 **Characteristic Vector**
 The per-asset quantity an ℓ1 uncertainty set is built around, usually the expected return, entering the objective as `mu'w`.
@@ -259,16 +362,39 @@ The per-asset quantity an ℓ1 uncertainty set is built around, usually the expe
 **Radius Calibration**
 The conversion from "how many assets should I hold?" to the radius that produces it. It is a calibration, not a constraint, so a further constraint may move the realised count.
 
+**Activation Ladder**
+The non-decreasing sequence of radii at which each successive asset of a ranking joins the ℓ1 solution, one rung per asset. A Radius Calibration reads it as a bracket: a radius strictly between the `q`-th rung and the next activates exactly `q` assets. The long-only ladder ranks the characteristic on its own; the paired ladder adds the ladder of the reversed, negated ranking, so one rung activates a long/short pair.
+
 **Ambiguity Set**
 A neighbourhood of a whole distribution, rather than of one of its moments: Wasserstein (the data moves), Gelbrich (the moments are wrong), or divergence (the probabilities are wrong). It is a **reading of machinery that already exists**, not an object — no estimator constructs one.
 *Avoid*: Uncertainty Set (above), which is an object a caller builds and passes.
 
 **Ambiguity Radius**
-The size of an Ambiguity Set, in the units of the return data. For a Wasserstein or a Gelbrich ball it enters the model as the coefficient of a dual-norm penalty on the weights, so the same number is spelled `val` on a Regularisation Estimator and `r` on a distributionally robust risk measure.
+The size of an Ambiguity Set, in the units of the scenarios the model prices. For a Wasserstein or a Gelbrich ball it enters the model as the coefficient of a dual-norm penalty on the weights, so the same number is spelled `val` on a Regularisation Estimator and `r` on a distributionally robust risk measure. Those scenarios are the returns on every owner but one: the distributionally robust drawdown measure measures its transport cost against the per-asset drawdowns, so its radius carries drawdown units and its Calibration Series says so.
+*Avoid*: Norm Ceiling (below), which bounds the same norm instead of multiplying it.
+
+**Norm Ceiling**
+The upper bound on a norm of the weight vector, in a constraint rather than in the objective: `l2c`, `lpc` and `linfc` on `JuMPOptimiser`. Its reciprocal is a floor on the Effective Number of Assets, so it is a diversification statement and carries no units. A ceiling and an Ambiguity Radius are read against the same norm and are different quantities, so each takes its own family of Calibration Rules and neither family is admitted in the other's slot. `LpRegularisation` serves both readings, so its `val` is the one slot whose reading is settled by the field that holds the term rather than by the field's own bound.
+*Avoid*: Ambiguity Radius (above), which is the coefficient of the norm rather than a bound on it.
 
 **Calibration Rule**
-A value in a slot that computes its own number from the Prior instead of stating one, resolved by Factory so the containing type's constructor validates the result. A stated number holds the quantity still across a refit; a rule holds whatever the rule is defined in terms of still, and lets the quantity move.
+A value in a slot that computes its own number from the Prior instead of stating one, resolved by Factory on the clustering route and by the risk-constraint route inside a JuMP build, so the containing type's constructor validates the result. Both routes hand the rule the same effective solver. A stated number holds the quantity still across a refit; a rule holds whatever the rule is defined in terms of still, and lets the quantity move. A rule is named for the method it runs, and carries the name of the quantity as a suffix only where the bare method word is already claimed by another rule or by a mathematical object. A rule states a default for every keyword it can, so a bare call constructs; the two rules whose keyword is the whole content of the rule state none, and each refuses a bare call with a message that names the quantity. ADR 0095 owns both lists.
 *Avoid*: Radius Calibration (above), which is one specific conversion rather than the mechanism.
+
+**Calibration Slot**
+The field that holds a Calibration Rule, and the thing that names the quantity: the Significance Level of one end of the distribution, the Deformation Parameter (§5) of one end, the Ambiguity Radius, the Esfahani-Kuhn tail weight, or the Norm Ceiling. The slot's type bound names the one rule family that computes its quantity, so a rule of another family is refused at construction. The bound also admits a plain function of the rule's five arguments, which is the case that has no type: a function names no family, so the slot's own name is what states the quantity there. `LpRegularisation.val` is the one slot that names two quantities, and it is the one slot that admits no plain function. A caller therefore writes the rule alone, and the slot stores what the caller wrote. ADR 0095 owns the mechanism.
+*Avoid*: Calibration Rule (above), which is what a slot holds rather than the field that holds it.
+
+**Travelling Pair**
+Two slots whose Calibration Rules must resolve in a stated order, because one rule reads the number the other resolved to. Two pair shapes ship. A Deformation Parameter (§5) stands beside the Significance Level of its own end of the distribution, and three rules read that sibling: an entropy budget and two tail-index readings. An Esfahani-Kuhn tail weight stands beside that same Significance Level, and one rule reads it. The rule reads the sibling `alpha` off the Calibration Context (below), so the owning type resolves `alpha` first and states the number in the context of the slot that reads it. No derivation can find that order, which is why a type that owns a Travelling Pair writes the resolution beside its declaration. A type that owns none writes no resolution: its declaration is the whole statement, and the resolution is derived from it.
+
+**Calibration Series**
+The series of the sample that a Calibration Rule reads: the returns, the absolute drawdowns, or the relative drawdowns. A marker is an Estimator a caller states. It is a property of the slot owner rather than of the rule, because one slot key serves a measure of the return distribution and a drawdown measure alike. The owner states it as a trait and puts it in the Calibration Context (below). No rule holds a marker of its own. A rule forms no portfolio, so a drawdown series is formed per column of the sample and holds one entry per observation, which leaves every count the rule forms unchanged. A rule needs the marker when its answer carries the units of the quantity or reads the shape of it: the two tail-index readings, the three Ambiguity Radius rules and the Esfahani-Kuhn tail weight. A Significance Level is a probability and a Norm Ceiling bounds the weight vector, so neither family reads one.
+*Avoid*: Travelling Pair (above), which is a pair of slots rather than a property of the owner.
+
+**Calibration Context**
+The record of what a calibration site knows that the slot's key does not: the Significance Level of a sibling slot, the Calibration Series (above) the slot owner prices, and the norm order of the constraint or of the penalty the quantity stands in. It is the sixth argument of the resolver and the fifth of every Calibration Rule, so a rule reads the fields it needs and one that reads none names the type and ignores it. No rule holds a field for any of the three: each belongs to the site, and a rule cannot know which site it reached, so there is nothing on the rule to overwrite. A caller who runs a rule outside a measure builds the context the site would have built.
+*Avoid*: Travelling Pair (above), which is the ordering between two slots rather than the record the order produces.
 
 ## 4. Optimisation
 
@@ -330,7 +456,18 @@ The user-facing extension point for a preference the library does not name: a Cu
 ### 4.4 Constraints
 
 **Universe Sets**
-A user-defined mapping of names to named groups (sectors, countries), groups, or unique-member groups, declaring every axis it carries: assets, factors and features. The foundational input to nearly all Constraint Generation.
+A user-defined mapping of names to named groups (sectors, countries), groups, or unique-member groups, declaring every axis it carries: assets and the two factor axes. The foundational input to nearly all Constraint Generation.
+
+**Universe Prefix Grammar**
+The six key prefixes a Universe Sets carries, and the rule each one declares. `xkey` names the asset universe and is the one mandatory axis; an `xkey`-prefixed key is a partition of it and has the length of the asset universe. `uxkey` prefixes a unique-entry variant, which names the `xkey`-prefixed partition it draws from. `tfkey` and `utfkey` mean the same on the Time-Series Factor Axis, and `cfkey` and `ucfkey` mean the same again on the Cross-Sectional Factor Axis; both axes are optional and are demanded at the point of need. No prefix may be a prefix of another, which is what makes a key resolve to exactly one axis. A key matching none of them is a plain group: expanded by name and axis-blind.
+
+**Time-Series Factor Axis**
+The factor universe a time-series regression is written on, declared under `tfkey`. Its names are the columns of a returns result's `F`, so a caller copies `rd.nf` into the dict and the axis agrees with the loadings by construction.
+*Avoid*: "the factor axis" alone, which no longer names one list.
+
+**Cross-Sectional Factor Axis**
+The factor universe a cross-sectional regression is written on, declared under `cfkey`. Its names are the Factor Exposures the fit was built from, which exist only inside the fitted block, so no returns result carries them. A consumer never picks between the two axes by hand: `factor_axis_key` reads the key off the loadings result it already holds.
+*Avoid*: "the factor axis" alone, which no longer names one list.
 
 **Constraint Space**
 The basis a constraint's names resolve in. Assets are the absence of a re-basis; `FactorSpace` is the only member, declared by the `ExposureConstraintEstimator` wrapper.
@@ -406,6 +543,18 @@ The one loop every cross-validation entry point runs. Per fold it resolves the e
 **Fold**
 The record the Fold Loop hands its callback: the fold's index and count, its already-resolved estimator, its already-viewed data, and its own training and test index vectors.
 
+**Weight Drift**
+The movement of a fold's held weights away from its target weights, because each position grows at its own return under the self-financing recursion. Unset, a fold reports `X * w` on every observation, which is the reading the optimiser maximises.
+*Avoid*: using it for the distance a `TrackingError` or a `TurnoverRiskMeasure` bounds. That is a divergence between two portfolios; this is the movement of one portfolio's own weights.
+
+**Previous-Weights Source**
+Which weights of the previous fold the Fold Loop threads to the next: its target weights, or its drifted weights after its last observation. It changes what `Turnover`, `TurnoverEstimator`, `WeightsTracking`, `TurnoverRiskMeasure` and the turnover fee measure, and it changes nothing else. It is a field of the two walk-forwards alone, because a scheme whose folds carry no history has no previous fold to read.
+*Avoid*: Turnover, which measures the trade a source implies and does not choose the source.
+
+**Held Weights**
+The record a fold keeps of what the portfolio actually held: the asset returns it was scored over, the weights after its last observation, and the Weight Drift form that produced them. The weight path itself is rebuilt from that record on demand, and stored only when the scheme's `store_weight_path` asks for it.
+*Avoid*: using it for the target weights. Those are the decision, and they live on the optimisation result.
+
 ### 4.7 Finite Allocation (post-processing)
 
 Discretises continuous weights into whole shares for a fixed cash budget, since real markets have no fractional shares.
@@ -436,6 +585,14 @@ The two point measures a Range variant is the sum of: the **loss** tail on the n
 
 **Negated Upper Tail**
 The sign convention that lets a Range be a sum. The gain tail is the base measure applied to the *negated* returns, so it is reported on the same sign convention as the loss tail and the two add rather than subtract.
+
+**Significance Level**
+The probability mass in one end of the return distribution that a tail measure prices: `alpha` in the loss end, `beta` in the gain end, both in `(0, 1)`. At sample length `T` a tail at `alpha` holds `ceil(alpha * T)` of the sample's scenarios. The two ends are the **tail**, which is the lower one, and the **head**, which is the upper one. A Calibration Slot (§3.9) names its own end, so one rule serves both.
+*Avoid*: Deformation Parameter (below), which shares the range `(0, 1)` and nothing else.
+
+**Deformation Parameter**
+The Kaniadakis `kappa` of a relativistic measure, in `(0, 1)`, which sets the shape of the deformed logarithm the measure prices its dual variable through. It is not a probability, and it names no end of the distribution on its own: a `kappa` slot addresses the end its sibling Significance Level addresses, which is why the Range form carries `kappa_a` beside `alpha` and `kappa_b` beside `beta`.
+*Avoid*: Significance Level (above).
 
 **Risk Series**
 The per-observation series a conic tail measure reduces. Two exist: the net portfolio returns, and the negated drawdown path. Both are signed as returns, so a loss is a negative entry.
@@ -500,8 +657,28 @@ Peak-to-trough declines computed from Net Returns, and the input series to drawd
 **Fees**
 The composite of holding and trading costs: **long** (management), **short** (borrowing), **turnover** (commission) and **fixed** (a constant charge on any non-zero weight).
 
+**Fee Amortisation**
+The algorithm that spreads a Fees object's one-off terms, turnover and the two fixed charges, over a holding period. `nothing` charges them in full on every observation. A bare form divides by the fold's own length; a stated horizon overrides the fold everywhere the fee is read.
+*Avoid*: fee smoothing, fee spreading, fee timing.
+
 **Finite Allocation**
 See §4.7: the discretisation of weights into whole shares within a cash budget.
+
+**Factor Attribution**
+The decomposition of a portfolio's volatility and return into a systematic part, an idiosyncratic part and an Unattributed Remainder, read off the factor-model block of a Prior Result and reported on three axes: by factor, by Factor Family and by asset. The **predicted** attribution reads the block's loadings, factor moments and idiosyncratic covariance. The **realised** attribution reads the factor-return, idiosyncratic-return and exposure histories against a realised net return series, and may roll over windows.
+*Avoid*: factor risk contribution (the Euler decomposition of any risk measure through a pseudo-inverse, which leaks idiosyncratic risk into the factors), risk attribution, performance attribution (Brinson).
+
+**Unattributed Remainder**
+The part of a Factor Attribution that the factor model does not explain: what is left of the total after the systematic and idiosyncratic parts. On the realised side it holds fees, cash, weight drift inside a period, the exposure lag and the cross-sectional intercept share. On the predicted side it holds the gap a wrapping Prior opens between the Prior Result's `mu` and `sigma` and the block's own, so it is at rounding level on a plain fit. Its share of the variance is the reader's check that the attribution means something; the library states its causes and never guards it.
+*Avoid*: residual (taken by the idiosyncratic part), error term, alpha.
+
+**Factor Model Diagnostic**
+A statistic that measures how well a fitted cross-sectional factor model describes the data it was fitted to, read off the factor-model block of a Prior Result and never added to it. Each diagnostic is one verb that answers with a series or a table, and the same verb answers over the bare histories the block holds, so a caller with arrays and no block reads the same number. The diagnostics fall into three groups: those of the cross-sectional regression fit (the significance of each factor return, the collinearity and the conditioning of the exposures, the goodness of fit), those of the exposure history (the correlation between factors, the information coefficient, the stability, the dispersion and the coverage of each exposure), and those of the standardised idiosyncratic returns (the calibration, the tails, the shape, and the dependence of the residual on its forecast volatility). A plot of a diagnostic draws the verb's answer and computes nothing of its own.
+*Avoid*: factor model statistic, regression diagnostic (the group name, not the term), model check, plot-only diagnostic.
+
+**Factor Model Summary**
+The per-factor table that gathers, for every raw factor of a fitted cross-sectional factor model, the annualised return, the annualised volatility, the Sharpe ratio and the first-order autocorrelation of its factor return, and the means over the history of its Factor Model Diagnostics for significance, collinearity, stability and coverage. It is one Result, built from the Factor Model Diagnostics and never from its own computation, and a factor that the Factor Family Basis drops from the regression is reported as absent, not omitted.
+*Avoid*: factor summary table, diagnostics table, factor report, model summary.
 
 ## 7. Errors & Status
 

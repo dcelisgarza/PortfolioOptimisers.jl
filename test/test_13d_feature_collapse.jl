@@ -193,14 +193,16 @@ end
     end
 
     rd_r = ReturnsResult(; nx = nx, X = X, nf = nf, F = F, ts = ts,
-                         nz = ["z$i" for i in 1:K], Z = Zr)
-    rd_sq = ReturnsResult(; nx = nx, X = X, nf = nf, F = F, ts = ts, nz = nx, Z = Zsq)
-    rd_3d = ReturnsResult(; nx = nx, X = X, nf = nf, F = F, ts = ts, nz = nf, Z = Z3)
+                         pnl = feature_matrix_panel(["z$i" for i in 1:K], Zr))
+    rd_sq = ReturnsResult(; nx = nx, X = X, nf = nf, F = F, ts = ts,
+                          pnl = feature_matrix_panel(nx, Zsq))
+    rd_3d = ReturnsResult(; nx = nx, X = X, nf = nf, F = F, ts = ts,
+                          pnl = feature_matrix_panel(nf, Z3))
 
     @testset "prepare_outer_rd collapses, and its arity break is loud" begin
         wi = Wlev
         nb, B, iv, ivpa, nz, Z, Xb = PO.prepare_outer_rd(rd_r, wi)
-        @test nz == rd_r.nz
+        @test nz == panel_feature_matrix(rd_r.pnl)[1]
         @test Z ≈ collapse(Zr, false, wi)
         @test size(Xb) == (T, k)
 
@@ -222,7 +224,7 @@ end
         would have let a stale overload keep building a feature-less result in silence.
         =#
         stale_nb, stale_B, stale_iv, stale_ivpa, stale_X = PO.prepare_outer_rd(rd_r, wi)
-        @test stale_X === nz
+        @test stale_X == nz
         @test !isa(stale_X, AbstractMatrix)
         @test_throws MethodError stale_X[1] = 1.0
     end
@@ -373,8 +375,8 @@ end
         for t in 1:T
             Z3sq[t, :, :] = Zsq .* (1 + t / T)
         end
-        rd_3dsq = ReturnsResult(; nx = nx, X = X, nf = nf, F = F, ts = ts, nz = nx,
-                                Z = Z3sq)
+        rd_3dsq = ReturnsResult(; nx = nx, X = X, nf = nf, F = F, ts = ts,
+                                pnl = feature_matrix_panel(nx, Z3sq))
         r3 = RecordingDistance(FeatureDistance())
         nco3 = NestedClustered(; cle = ClustersEstimator(; de = FeatureDistance()),
                                opti = plain_hrp(),
@@ -422,16 +424,16 @@ end
                 Ws = [PO.fold_weight_matrix(predictions, u, f, N)
                       for f in eachindex(test_idx)]
                 rdo = PO.rebuild_returns_result(rd, predictions, u)
-                @test size(rdo.Z, 1) == size(rdo.X, 1) == T
-                @test size(rdo.Z, 2) == length(rdo.nx)
-                @test PO.features_are_assets(rdo.nz, rdo.nx) == sq
+                @test size(panel_feature_matrix(rdo.pnl)[2], 1) == size(rdo.X, 1) == T
+                @test size(panel_feature_matrix(rdo.pnl)[2], 2) == length(rdo.nx)
+                @test PO.features_are_assets(panel_feature_matrix(rdo.pnl)[1], rdo.nx) == sq
                 r = 0
                 for (f, rows) in enumerate(test_idx)
                     _, _, _, _, nz_e, Z_e, _ = PO.prepare_outer_rd(PO.port_opt_view(rd,
                                                                                     rows,
                                                                                     :),
                                                                    Ws[f])
-                    blk = rdo.Z[(r + 1):(r + length(rows)), :, :]
+                    blk = panel_feature_matrix(rdo.pnl)[2][(r + 1):(r + length(rows)), :, :]
                     # A static source has no observation axis of its own, so the non-`cv`
                     # result is the fold's constant; a time-varying one already carries one.
                     expected = if ndims(Z_e) == 3
@@ -440,7 +442,7 @@ end
                         permutedims(repeat(Z_e, 1, 1, length(rows)), (3, 1, 2))
                     end
                     @test blk ≈ expected
-                    @test rdo.nz == nz_e
+                    @test panel_feature_matrix(rdo.pnl)[1] == nz_e
                     r += length(rows)
                 end
             end
@@ -468,10 +470,10 @@ end
         rdo = PO.rebuild_returns_result(rd_3d, predictions, PO.FullUniverse())
         # The folds cover fewer rows than the clock has, which is the point: a cumulative
         # count would have started at row 1 and run out before the last fold.
-        @test size(rdo.Z, 1) == sum(length, test_idx) < T
+        @test size(panel_feature_matrix(rdo.pnl)[2], 1) == sum(length, test_idx) < T
         r = 0
         for (f, rows) in enumerate(test_idx)
-            @test rdo.Z[(r + 1):(r + length(rows)), :, :] ≈
+            @test panel_feature_matrix(rdo.pnl)[2][(r + 1):(r + length(rows)), :, :] ≈
                   PO.collapse_feature_matrix(Z3[rows, :, :], false, Ws[f])
             r += length(rows)
         end
@@ -488,7 +490,8 @@ end
         cv = KFold(; n = 3)
         herc() = HierarchicalEqualRiskContribution(;
                                                    opt = HierarchicalOptimiser(; slv = slv))
-        rd_3d_nots = ReturnsResult(; nx = nx, X = X, nf = nf, F = F, nz = nf, Z = Z3)
+        rd_3d_nots = ReturnsResult(; nx = nx, X = X, nf = nf, F = F,
+                                   pnl = feature_matrix_panel(nf, Z3))
         preds = [PO.cross_val_predict(o, rd_3d_nots, cv; ex = seq)
                  for o in (plain_hrp(), herc())]
         e = try
@@ -502,10 +505,11 @@ end
         # The requirement is scoped to the shape that needs it: a static feature matrix has
         # no observation axis to align, so it runs on fold sizes alone and never asks.
         rd_r_nots = ReturnsResult(; nx = nx, X = X, nf = nf, F = F,
-                                  nz = ["z$i" for i in 1:K], Z = Zr)
+                                  pnl = feature_matrix_panel(["z$i" for i in 1:K], Zr))
         preds_r = [PO.cross_val_predict(o, rd_r_nots, cv; ex = seq)
                    for o in (plain_hrp(), herc())]
-        @test size(PO.rebuild_returns_result(rd_r_nots, preds_r, PO.FullUniverse()).Z) ==
+        @test size(panel_feature_matrix(PO.rebuild_returns_result(rd_r_nots, preds_r,
+                                                                  PO.FullUniverse()).pnl)[2]) ==
               (T, 2, K)
 
         # Recovering by time is only sound on a uniquely-keyed axis, so `ReturnsResult`
@@ -552,7 +556,9 @@ end
         @test :Z ∉ fieldnames(PredictionReturnsResult)
         @test :nz ∉ fieldnames(PredictionReturnsResult)
         @test_throws MethodError PredictionReturnsResult(; nx = ["_1"], X = Xf,
-                                                         nz = ["a", "b"], Z = Zf)
+                                                         pnl = feature_matrix_panel(["a",
+                                                                                     "b"],
+                                                                                    Zf))
         # Nothing is lost: the seam reaches every fold's weights and rows through `pred`.
         pred = PO.cross_val_predict(plain_hrp(), rd_3d, KFold(; n = 3); ex = seq)
         @test length(pred.pred) == 3

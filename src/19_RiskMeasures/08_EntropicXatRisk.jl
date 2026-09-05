@@ -57,7 +57,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Represents the Entropic Value-at-Risk (EVaR) risk measure.
 
-`EntropicValueatRisk` is a coherent risk measure based on the Chernoff bound. It is an upper bound for both CVaR and VaR and is computed by solving a conic optimisation problem via an external solver.
+`EntropicValueatRisk` is a coherent risk measure based on the Chernoff bound. It is an upper bound for both CVaR and VaR and is computed by solving a conic optimisation problem via an external solver. It is also the divergence Ambiguity Set of the library, read as a risk measure: the worst expected loss over a Kullback-Leibler ball about the sample distribution, at radius ``-\\ln(\\alpha)``.
 
 # Mathematical definition
 
@@ -74,7 +74,7 @@ Where:
   - ``\\mathrm{EVaR}_{\\alpha}(\\boldsymbol{x})``: Entropic Value-at-Risk (tightest exponential upper bound on VaR and CVaR).
   - $(math_dict[:xret])
   - $(math_dict[:alpha_rm])
-  - ``L_t = -x_t``: Loss at period ``t``.
+  - $(math_dict[:amb_L_t])
   - ``M_L(u) = \\mathbb{E}[e^{uL}]``: Moment-generating function of the loss.
   - ``z``: Exponential tilt parameter.
 
@@ -94,6 +94,25 @@ Where:
 
 For observation-weighted samples with weight vector ``\\boldsymbol{w}``, the normalisation ``\\alpha T`` becomes ``\\alpha \\sum_{t=1}^{T} w_t`` and the budget constraint becomes ``\\boldsymbol{w}^\\intercal \\boldsymbol{u} \\leq z``.
 
+The dual of that programme is the worst expected loss over a Kullback-Leibler ball about the sample distribution:
+
+```math
+\\begin{align}
+\\mathrm{EVaR}_{\\alpha}(\\boldsymbol{x}) &= \\underset{Q \\in \\mathcal{Q}_{\\mathrm{KL}}(\\alpha)}{\\sup} \\mathbb{E}_{Q}[L]\\,, \\\\
+\\mathcal{Q}_{\\mathrm{KL}}(\\alpha) &= \\left\\{ Q : D_{\\mathrm{KL}}(Q \\,\\|\\, P) \\leq -\\ln(\\alpha) \\right\\}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathcal{Q}_{\\mathrm{KL}}(\\alpha)``: Kullback-Leibler ambiguity ball of radius ``-\\ln(\\alpha)``.
+  - ``D_{\\mathrm{KL}}(Q \\,\\|\\, P) = \\sum_{t=1}^{T} q_t \\ln\\!\\left(\\frac{q_t}{p_t}\\right)``: Kullback-Leibler divergence.
+  - $(math_dict[:amb_Q])
+  - $(math_dict[:amb_P])
+  - $(math_dict[:amb_EQ_L])
+
+So the significance level is the Ambiguity Radius, through ``-\\ln(\\alpha)``, and a smaller ``\\alpha`` widens the ball. The ball is a reading of this measure and not an object, so no estimator constructs one.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -103,7 +122,7 @@ $(DocStringExtensions.FIELDS)
     EntropicValueatRisk(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
         slv::Option{<:Slv_VecSlv} = nothing,
-        alpha::Number = 0.05,
+        alpha::Num_SigCal = 0.05,
         w::Option{<:ObsWeights} = nothing
     ) -> EntropicValueatRisk
 
@@ -111,7 +130,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `0 < alpha < 1`.
+  - If `alpha` is a number: `0 < alpha < 1`.
   - If `slv` is a `VecSlv`: `!isempty(slv)`.
   - If `w` is not `nothing`: `!isempty(w)`.
 
@@ -169,7 +188,7 @@ EntropicValueatRisk
     """
     @pprop w
     function EntropicValueatRisk(settings::RiskMeasureSettings, slv::Option{<:Slv_VecSlv},
-                                 alpha::Number, w::Option{<:ObsWeights})
+                                 alpha::Num_SigCal, w::Option{<:ObsWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
@@ -180,10 +199,12 @@ EntropicValueatRisk
     end
 end
 function EntropicValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                             slv::Option{<:Slv_VecSlv} = nothing, alpha::Number = 0.05,
+                             slv::Option{<:Slv_VecSlv} = nothing, alpha::Num_SigCal = 0.05,
                              w::Option{<:ObsWeights} = nothing)::EntropicValueatRisk
     return EntropicValueatRisk(settings, slv, alpha, w)
 end
+# Calibration slots — see `calibration_slots`.
+calibration_slots(x::EntropicValueatRisk) = (; alpha = x.alpha)
 function (r::EntropicValueatRisk)(x::VecNum)
     return ERM(x, r.slv, r.alpha, r.w)
 end
@@ -211,6 +232,8 @@ Where:
 
 $(math_dict[:negated_upper_tail])
 
+Each term is the worst expected loss over its own Kullback-Leibler ball about the sample distribution, at radius ``-\\ln(\\alpha)`` on the lower tail and ``-\\ln(\\beta)`` on the upper tail. [`EntropicValueatRisk`](@ref) states the ball.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -220,8 +243,8 @@ $(DocStringExtensions.FIELDS)
     EntropicValueatRiskRange(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
         slv::Option{<:Slv_VecSlv} = nothing,
-        alpha::Number = 0.05,
-        beta::Number = 0.05,
+        alpha::Num_SigCal = 0.05,
+        beta::Num_SigCal = alpha,
         w::Option{<:ObsWeights} = nothing
     ) -> EntropicValueatRiskRange
 
@@ -229,7 +252,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `0 < alpha < 1`, `0 < beta < 1`.
+  - If `alpha` is a number: `0 < alpha < 1`. If `beta` is a number: `0 < beta < 1`.
   - If `slv` is a `VecSlv`: `!isempty(slv)`.
   - If `w` is not `nothing`: `!isempty(w)`.
 
@@ -265,8 +288,8 @@ Keywords correspond to the struct's fields.
     """
     @pprop w
     function EntropicValueatRiskRange(settings::RiskMeasureSettings,
-                                      slv::Option{<:Slv_VecSlv}, alpha::Number,
-                                      beta::Number, w::Option{<:ObsWeights})
+                                      slv::Option{<:Slv_VecSlv}, alpha::Num_SigCal,
+                                      beta::Num_SigCal, w::Option{<:ObsWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
@@ -281,11 +304,13 @@ Keywords correspond to the struct's fields.
     end
 end
 function EntropicValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                  slv::Option{<:Slv_VecSlv} = nothing, alpha::Number = 0.05,
-                                  beta::Number = 0.05,
+                                  slv::Option{<:Slv_VecSlv} = nothing,
+                                  alpha::Num_SigCal = 0.05, beta::Num_SigCal = alpha,
                                   w::Option{<:ObsWeights} = nothing)::EntropicValueatRiskRange
     return EntropicValueatRiskRange(settings, slv, alpha, beta, w)
 end
+# Calibration slots — see `calibration_slots`. One slot per tail, each with its own role.
+calibration_slots(x::EntropicValueatRiskRange) = (; alpha = x.alpha, beta = x.beta)
 # Tail decomposition — see `range_tails`. The functor below is the value-level twin: it is
 # the same two tails, evaluated instead of built.
 function range_tails(r::EntropicValueatRiskRange)
@@ -337,6 +362,8 @@ Where:
   - $(math_dict[:alpha_rm])
   - ``\\boldsymbol{d}(\\boldsymbol{x})``: Absolute drawdown series vector ``T \\times 1``.
 
+So the EDaR is the worst expected drawdown over a Kullback-Leibler ball about the sample distribution of ``\\boldsymbol{d}(\\boldsymbol{x})``, at radius ``-\\ln(\\alpha)``. [`EntropicValueatRisk`](@ref) states the ball.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -346,7 +373,7 @@ $(DocStringExtensions.FIELDS)
     EntropicDrawdownatRisk(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
         slv::Option{<:Slv_VecSlv} = nothing,
-        alpha::Number = 0.05,
+        alpha::Num_SigCal = 0.05,
         w::Option{<:ObsWeights} = nothing
     ) -> EntropicDrawdownatRisk
 
@@ -354,7 +381,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `0 < alpha < 1`.
+  - If `alpha` is a number: `0 < alpha < 1`.
   - If `slv` is a `VecSlv`: `!isempty(slv)`.
   - If `w` is not `nothing`: `!isempty(w)`.
 
@@ -413,7 +440,7 @@ EntropicDrawdownatRisk
     """
     @pprop w
     function EntropicDrawdownatRisk(settings::RiskMeasureSettings,
-                                    slv::Option{<:Slv_VecSlv}, alpha::Number,
+                                    slv::Option{<:Slv_VecSlv}, alpha::Num_SigCal,
                                     w::Option{<:ObsWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
@@ -425,10 +452,13 @@ EntropicDrawdownatRisk
     end
 end
 function EntropicDrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                slv::Option{<:Slv_VecSlv} = nothing, alpha::Number = 0.05,
+                                slv::Option{<:Slv_VecSlv} = nothing,
+                                alpha::Num_SigCal = 0.05,
                                 w::Option{<:ObsWeights} = nothing)::EntropicDrawdownatRisk
     return EntropicDrawdownatRisk(settings, slv, alpha, w)
 end
+# Calibration slots — see `calibration_slots`.
+calibration_slots(x::EntropicDrawdownatRisk) = (; alpha = x.alpha)
 function (r::EntropicDrawdownatRisk)(x::VecNum)
     dd = absolute_drawdown_vec(x)
     return ERM(dd, r.slv, r.alpha, r.w)
@@ -471,6 +501,8 @@ Where:
   - $(math_dict[:alpha_rm])
   - ``\\boldsymbol{rd}(\\boldsymbol{x})``: Relative drawdown series vector ``T \\times 1``.
 
+So the Relative EDaR is the worst expected relative drawdown over a Kullback-Leibler ball about the sample distribution of ``\\boldsymbol{rd}(\\boldsymbol{x})``, at radius ``-\\ln(\\alpha)``. [`EntropicValueatRisk`](@ref) states the ball.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -480,7 +512,7 @@ $(DocStringExtensions.FIELDS)
     RelativeEntropicDrawdownatRisk(;
         settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
         slv::Option{<:Slv_VecSlv} = nothing,
-        alpha::Number = 0.05,
+        alpha::Num_SigCal = 0.05,
         w::Option{<:ObsWeights} = nothing
     ) -> RelativeEntropicDrawdownatRisk
 
@@ -488,7 +520,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `0 < alpha < 1`.
+  - If `alpha` is a number: `0 < alpha < 1`.
   - If `slv` is a `VecSlv`: `!isempty(slv)`.
   - If `w` is not `nothing`: `!isempty(w)`.
 
@@ -544,7 +576,7 @@ RelativeEntropicDrawdownatRisk
     """
     @pprop w
     function RelativeEntropicDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
-                                            slv::Option{<:Slv_VecSlv}, alpha::Number,
+                                            slv::Option{<:Slv_VecSlv}, alpha::Num_SigCal,
                                             w::Option{<:ObsWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
@@ -558,10 +590,12 @@ end
 function RelativeEntropicDrawdownatRisk(;
                                         settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
                                         slv::Option{<:Slv_VecSlv} = nothing,
-                                        alpha::Number = 0.05,
+                                        alpha::Num_SigCal = 0.05,
                                         w::Option{<:ObsWeights} = nothing)::RelativeEntropicDrawdownatRisk
     return RelativeEntropicDrawdownatRisk(settings, slv, alpha, w)
 end
+# Calibration slots — see `calibration_slots`.
+calibration_slots(x::RelativeEntropicDrawdownatRisk) = (; alpha = x.alpha)
 function (r::RelativeEntropicDrawdownatRisk)(x::VecNum)
     dd = relative_drawdown_vec(x)
     return ERM(dd, r.slv, r.alpha, r.w)

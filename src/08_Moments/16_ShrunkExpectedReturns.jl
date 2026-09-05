@@ -58,7 +58,30 @@ $(DocStringExtensions.TYPEDEF)
 
 Fills the shrinkage target with the grand mean of the sample expected returns.
 
-Every element of the target holds the same value, so a shrinkage estimator pulls each asset toward the average of the whole universe.
+Every element of the target holds the same value, so a shrinkage estimator pulls each asset toward the average of the whole universe. The three targets are each a multiple of the vector of ones, and only the multiplier separates them.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+b_j &= \\bar{\\mu} = \\frac{1}{N} \\sum_{i=1}^{N} \\hat{\\mu}_i\\,, \\quad j = 1, \\ldots, N\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:b_j_shrink_tgt])
+  - $(math_dict[:mu_hat_shrink])
+  - $(math_dict[:N])
+
+The sample covariance matrix does not enter the form, so this target is the only one of the three that a singular covariance matrix leaves untouched.
+
+# Algorithm
+
+The branch of [`target_mean`](@ref) that this tag selects runs these steps.
+
+ 1. Take the unweighted mean of `mu`, giving `val`.
+ 2. Return the constant range that repeats `val` `length(mu)` times.
 
 # Constructors
 
@@ -89,7 +112,32 @@ $(DocStringExtensions.TYPEDEF)
 
 Fills the shrinkage target with the inverse-covariance-weighted mean of the sample expected returns.
 
-The inverse covariance matrix supplies the weights. Under a diagonal covariance matrix each weight is the reciprocal of the asset's variance, so a riskier asset counts for less.
+The inverse covariance matrix supplies the weights. Under a diagonal covariance matrix each weight is the reciprocal of the asset's variance, so a riskier asset counts for less. The name says volatility, and the form reads the whole inverse covariance matrix, so an off-diagonal entry moves the target too.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+b_j &= \\bar{\\mu}_{\\mathrm{vol}} = \\frac{\\boldsymbol{1}^\\intercal \\hat{\\mathbf{\\Sigma}}^{-1} \\hat{\\boldsymbol{\\mu}}}{\\boldsymbol{1}^\\intercal \\hat{\\mathbf{\\Sigma}}^{-1} \\boldsymbol{1}}\\,, \\quad j = 1, \\ldots, N\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:b_j_shrink_tgt])
+  - $(math_dict[:mu_hat_shrink])
+  - $(math_dict[:Sigma_hat])
+  - ``\\boldsymbol{1}``: ``N \\times 1`` vector of ones.
+  - $(math_dict[:N])
+
+# Algorithm
+
+The branch of [`target_mean`](@ref) that this tag selects runs these steps.
+
+ 1. When `isigma` is `nothing`, solve `sigma \\ LinearAlgebra.I`, giving `isigma`. A caller that already holds the inverse passes it, so the solve runs once per estimate at most.
+ 2. When `mu` has one row, flatten it with `vec`, so that the product `isigma * mu` is defined.
+ 3. Divide the sum of `isigma * mu` by the sum of `isigma`, giving `val`. Summing a matrix-vector product is the numerator ``\\boldsymbol{1}^\\intercal \\hat{\\mathbf{\\Sigma}}^{-1} \\hat{\\boldsymbol{\\mu}}``, and summing the matrix is the denominator ``\\boldsymbol{1}^\\intercal \\hat{\\mathbf{\\Sigma}}^{-1} \\boldsymbol{1}``.
+ 4. Return the constant range that repeats `val` `length(mu)` times.
 
 # Constructors
 
@@ -120,7 +168,30 @@ $(DocStringExtensions.TYPEDEF)
 
 Fills the shrinkage target with the trace of the covariance matrix divided by the number of observations.
 
-Every element of the target holds the same value. The target reads a scale off the covariance matrix alone, so the sample expected returns do not enter it.
+Every element of the target holds the same value. The target reads a scale off the covariance matrix alone, so the sample expected returns do not enter it. It is the only one of the three targets that a shift of every asset's mean leaves where it was.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+b_j &= \\frac{\\mathrm{tr}(\\hat{\\mathbf{\\Sigma}})}{T}\\,, \\quad j = 1, \\ldots, N\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:b_j_shrink_tgt])
+  - ``\\mathrm{tr}(\\cdot)``: Matrix trace operator.
+  - $(math_dict[:Sigma_hat])
+  - $(math_dict[:T])
+  - $(math_dict[:N])
+
+# Algorithm
+
+The branch of [`target_mean`](@ref) that this tag selects runs these steps.
+
+ 1. Divide the trace of `sigma` by `T`, giving `val`. `T` is a required keyword of this branch alone.
+ 2. Return the constant range that repeats `val` `length(mu)` times.
 
 # Constructors
 
@@ -255,7 +326,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Combines the sample expected returns and the target under two coefficients from random matrix theory.
 
-The two coefficients are set separately and neither is a convex weight, so the result is not a blend between the sample mean and the target. It suits a universe whose asset count is close to its observation count.
+The two coefficients are set separately and neither is a convex weight, so the result is not a blend between the sample mean and the target. It suits a universe whose asset count is a large fraction of its observation count, and it needs more observations than assets.
 
 # Fields
 
@@ -353,7 +424,8 @@ ShrunkExpectedReturns
       │      │    ce ┼ GeneralCovariance
       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
       │      │       │    w ┴ nothing
-      │      │   alg ┴ FullMoment()
+      │      │   alg ┼ FullMoment()
+      │      │     w ┴ nothing
       │   mp ┼ MatrixProcessing
       │      │     pdm ┼ Posdef
       │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
@@ -438,51 +510,15 @@ Compute the shrinkage target vector for expected returns estimation.
 
 Every element of the returned vector holds the same value, so the function returns a `StepRangeLen` rather than a dense vector.
 
-# Mathematical definition
+# Algorithm
 
-**`GrandMean`**: each target element is the grand mean of sample expected returns:
+The method that Julia selects is the algorithm, and the closed form of each branch lives on the tag that selects it. Every branch ends the same way: it computes one scalar `val` and returns `range(val, val; length = length(mu))`, a constant range rather than a dense vector.
 
-```math
-\\begin{align}
-b_j &= \\bar{\\mu} = \\frac{1}{N} \\sum_{i=1}^{N} \\hat{\\mu}_i, \\quad j = 1, \\ldots, N\\,.
-\\end{align}
-```
+ 1. `tgt` is a [`GrandMean`](@ref): take the unweighted mean of `mu`. It reads neither `sigma` nor `isigma` nor `T`.
+ 2. `tgt` is a [`VolatilityWeighted`](@ref): solve for `isigma` when the caller passed none, flatten `mu` when it has one row, then divide the sum of `isigma * mu` by the sum of `isigma`.
+ 3. `tgt` is a [`MeanSquaredError`](@ref): divide the trace of `sigma` by the keyword `T`. It reads neither `mu` nor `isigma`, so only the length of `mu` reaches the result.
 
-Where:
-
-  - ``b_j``: ``j``-th element of the shrinkage target vector.
-  - ``\\hat{\\boldsymbol{\\mu}}``: ``N \\times 1`` vector of sample expected returns.
-  - $(math_dict[:N])
-
-**`VolatilityWeighted`**: each target element is the inverse-covariance-weighted mean:
-
-```math
-\\begin{align}
-b_j &= \\bar{\\mu}_{\\text{vol}} = \\frac{\\boldsymbol{1}^\\intercal \\hat{\\mathbf{\\Sigma}}^{-1} \\hat{\\boldsymbol{\\mu}}}{\\boldsymbol{1}^\\intercal \\hat{\\mathbf{\\Sigma}}^{-1} \\boldsymbol{1}}, \\quad j = 1, \\ldots, N\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``b_j``: ``j``-th element of the shrinkage target vector.
-  - ``\\hat{\\mathbf{\\Sigma}}``: ``N \\times N`` sample covariance matrix.
-  - ``\\hat{\\boldsymbol{\\mu}}``: ``N \\times 1`` sample expected returns vector.
-  - ``\\boldsymbol{1}``: ``N \\times 1`` vector of ones.
-
-**`MeanSquaredError`**: each target element is the scaled matrix trace:
-
-```math
-\\begin{align}
-b_j &= \\frac{\\mathrm{tr}(\\hat{\\mathbf{\\Sigma}})}{T}, \\quad j = 1, \\ldots, N\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``b_j``: ``j``-th element of the shrinkage target vector.
-  - ``\\mathrm{tr}(\\cdot)``: Matrix trace operator.
-  - ``\\hat{\\mathbf{\\Sigma}}``: ``N \\times N`` sample covariance matrix.
-  - $(math_dict[:T])
+Each branch takes the arguments the other two do not need through `args...` and `kwargs...`, so one call site serves all three.
 
 # Arguments
 
@@ -494,7 +530,7 @@ Where:
 
   - `mu`: 1D array of expected returns.
 
-  - `sigma`: Covariance matrix of asset returns.
+  - $(arg_dict[:sigma])
 
   - `isigma`: Inverse covariance matrix, taken **positionally** by the [`VolatilityWeighted`](@ref) method. If `nothing`, the method computes `sigma \\ LinearAlgebra.I` itself. The other two methods swallow it in `args...`.
 
@@ -508,11 +544,20 @@ Where:
 
 # Related
 
-  - [`GrandMean`](@ref)
-  - [`VolatilityWeighted`](@ref)
-  - [`MeanSquaredError`](@ref)
+  - [`GrandMean`](@ref): the closed form of the branch of step 1.
+  - [`VolatilityWeighted`](@ref): the closed form of the branch of step 2.
+  - [`MeanSquaredError`](@ref): the closed form of the branch of step 3.
   - [`AbstractShrunkExpectedReturnsTarget`](@ref)
   - [`ShrunkExpectedReturns`](@ref)
+  - [`ArrNum`](@ref)
+  - [`MatNum`](@ref)
+  - [`Option`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Equation 3.43.
+  - $(ref_dict[:meucci2005])
+  - $(ref_dict[:fengpalomar2016])
 """
 function target_mean(::GrandMean, mu::ArrNum, sigma::MatNum, args...; kwargs...)
     val = Statistics.mean(mu)
@@ -539,39 +584,44 @@ end
 
 Compute shrunk expected returns using the specified estimator.
 
-This method applies a shrinkage algorithm to the sample expected returns, pulling them toward a specified target to reduce estimation error, especially in high-dimensional settings.
+This method applies a shrinkage algorithm to the sample expected returns, pulling them toward a target to reduce estimation error, especially in high-dimensional settings. **No method of this family clamps its coefficients.** [`JamesStein`](@ref) and [`BayesStein`](@ref) write `(1 - alpha) * mu + alpha * b`, and nothing holds `alpha` inside ``[0, 1]``, so the result can sit outside the segment that joins the sample mean and the target. [`BodnarOkhrinParolya`](@ref) sets its two coefficients separately and they do not sum to one.
 
 # Mathematical definition
 
-James-Stein shrinkage of sample expected returns toward target ``\\boldsymbol{b}``:
+James-Stein shrinkage of the sample expected returns toward the target:
 
 ```math
 \\begin{align}
-\\hat{\\boldsymbol{\\mu}}_{JS} &= (1 - \\alpha)\\, \\hat{\\boldsymbol{\\mu}} + \\alpha\\, \\boldsymbol{b}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\hat{\\boldsymbol{\\mu}}_{JS}``: James-Stein shrunk expected returns.
-  - ``\\hat{\\boldsymbol{\\mu}}``: ``N \\times 1`` sample expected returns.
-  - ``\\boldsymbol{b}``: ``N \\times 1`` shrinkage target vector.
-  - ``\\alpha``: Shrinkage intensity.
-
-The shrinkage intensity is:
-
-```math
-\\begin{align}
+\\hat{\\boldsymbol{\\mu}}_{JS} &= (1 - \\alpha)\\, \\hat{\\boldsymbol{\\mu}} + \\alpha\\, \\boldsymbol{b}\\,, \\\\
 \\alpha &= \\frac{N \\bar{\\lambda} - 2 \\lambda_{\\max}}{T \\, \\lVert \\hat{\\boldsymbol{\\mu}} - \\boldsymbol{b} \\rVert_2^2}\\,.
 \\end{align}
 ```
 
 Where:
 
+  - ``\\hat{\\boldsymbol{\\mu}}_{JS}``: James-Stein shrunk expected returns.
+  - $(math_dict[:mu_hat_shrink])
+  - $(math_dict[:b_shrink_tgt])
+  - $(math_dict[:alpha_shrink_mu])
   - ``\\bar{\\lambda}``: Mean eigenvalue of the covariance matrix.
   - ``\\lambda_{\\max}``: Maximum eigenvalue of the covariance matrix.
   - $(math_dict[:T])
   - $(math_dict[:N])
+
+Two consequences of the form bound where it is usable.
+
+  - ``N \\bar{\\lambda}`` is the trace of the covariance matrix, so ``N \\bar{\\lambda} \\leq 2 \\lambda_{\\max}`` whenever ``N \\leq 2``. The intensity is then negative and the blend extrapolates away from the target rather than toward it.
+  - The denominator is zero when the target equals the sample mean. [`GrandMean`](@ref) and [`VolatilityWeighted`](@ref) both reduce to the sample mean at ``N = 1``, so a one-asset sample raises a `DomainError` under either of them. [`MeanSquaredError`](@ref) does not read the sample mean, so it stays finite there.
+
+# Algorithm
+
+ 1. Compute the sample expected returns with `me.me`, giving `mu`.
+ 2. Compute the covariance matrix with `me.ce`, giving `sigma`.
+ 3. Read `T` and `N` off `size(X)`, and swap them when `dims` is `2`.
+ 4. Compute the shrinkage target with [`target_mean`](@ref), giving `b`, and transpose it into a row when `dims` is `1`.
+ 5. Eigendecompose `sigma`, giving `evals`.
+ 6. Subtract `b` from `mu`, giving `mb`, and form the intensity `alpha` from `evals`, `mb`, `N` and `T`.
+ 7. Return the blend `(1 - alpha) * mu + alpha * b`.
 
 # Arguments
 
@@ -581,39 +631,34 @@ Where:
       + `me::ShrunkExpectedReturns{<:Any, <:Any, <:BayesStein}`: Use the Bayes-Stein algorithm.
       + `me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinParolya}`: Use the Bodnar-Okhrin-Parolya algorithm.
 
-  - `X`: Data matrix (observations × assets).
+  - $(arg_dict[:X])
 
   - $(arg_dict[:dims])
 
   - `kwargs...`: Additional keyword arguments passed to the mean and covariance estimators.
 
+# Validation
+
+  - `!iszero(dot(mu - b, mu - b))`. The [`JamesStein`](@ref) intensity divides by this denominator, and it is exactly zero when the target equals the sample mean. [`GrandMean`](@ref) and [`VolatilityWeighted`](@ref) both do so at ``N = 1``. The other two overloads state their own rules. ADR 0092 records the decision to raise here.
+
 # Returns
 
-  - `mu::ArrNum`: Shrunk expected returns, shaped as `(1, N)` if `dims == 1` or `(N, 1)` if `dims == 2`.
-
-# Details
-
-  - Computes the sample mean with `me.me` and the covariance with `me.ce`.
-
-  - Computes the shrinkage target `b` with [`target_mean`](@ref).
-
-  - Computes the coefficients with:
-
-      + `JamesStein`: The eigenvalues of the covariance matrix and the squared distance between the sample mean and the target.
-      + `BayesStein`: The inverse-covariance-weighted squared distance between the sample mean and the target.
-      + `BodnarOkhrinParolya`: Three inverse-covariance-weighted quadratic forms in the sample mean and the target.
-
-  - Combines the sample mean and the target.
-
-  - **No method clamps its coefficients.** `JamesStein` and `BayesStein` write `(1 - alpha) * mu + alpha * b`, but nothing holds `alpha` inside `[0, 1]`, so the result can sit outside the segment that joins the two. `BodnarOkhrinParolya` sets `alpha` and `beta` separately and they do not sum to one.
+  - $(ret_dict[:mu])
 
 # Related
 
-  - [`JamesStein`](@ref)
+  - [`JamesStein`](@ref): the tag that selects this method.
   - [`BayesStein`](@ref)
   - [`BodnarOkhrinParolya`](@ref)
   - [`ShrunkExpectedReturns`](@ref)
   - [`target_mean`](@ref)
+  - [`ArrNum`](@ref)
+  - [`MatNum`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 3.4.1.1.
+  - $(ref_dict[:meucci2005])
 """
 function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein}, X::MatNum;
                          dims::Int = 1, kwargs...)
@@ -630,8 +675,11 @@ function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein}, 
     end
     evals = LinearAlgebra.eigvals(sigma)
     mb = mu - b
-    alpha = (N * Statistics.mean(evals) - 2 * maximum(evals)) / LinearAlgebra.dot(mb, mb) /
-            T
+    mb2 = LinearAlgebra.dot(mb, mb)
+    @argcheck(!iszero(mb2),
+              DomainError(mb2,
+                          "the James-Stein intensity divides by `dot(mu - b, mu - b)`, which is exactly zero because the $(nameof(typeof(me.alg.tgt))) target equals the sample mean. GrandMean and VolatilityWeighted both reduce to the sample mean at N == 1, got N = $N"))
+    alpha = (N * Statistics.mean(evals) - 2 * maximum(evals)) / mb2 / T
     return (one(alpha) - alpha) * mu + alpha * b
 end
 """
@@ -641,7 +689,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 # Mathematical definition
 
-Bayes-Stein shrinkage intensity:
+Bayes-Stein shrinkage of the sample expected returns toward the target:
 
 ```math
 \\begin{align}
@@ -652,23 +700,40 @@ Bayes-Stein shrinkage intensity:
 
 Where:
 
-  - ``\\alpha``: Bayes-Stein shrinkage intensity.
+  - $(math_dict[:alpha_shrink_mu])
   - ``\\hat{\\boldsymbol{\\mu}}_{BS}``: Bayes-Stein shrunk expected returns.
-  - ``\\hat{\\boldsymbol{\\mu}}``: ``N \\times 1`` sample expected returns.
-  - ``\\boldsymbol{b}``: ``N \\times 1`` shrinkage target vector.
-  - ``\\hat{\\mathbf{\\Sigma}}``: ``N \\times N`` sample covariance matrix.
+  - $(math_dict[:mu_hat_shrink])
+  - $(math_dict[:b_shrink_tgt])
+  - $(math_dict[:Sigma_hat])
   - $(math_dict[:T])
   - $(math_dict[:N])
 
-# Details
+Two consequences of the form separate this intensity from the James-Stein one.
 
+  - The quadratic form is non-negative whenever ``\\hat{\\mathbf{\\Sigma}}`` is positive semidefinite, so ``\\alpha`` then lies in ``(0, 1]``. This is the only one of the three algorithms whose coefficient is a convex weight without a clamp, and it returns the target exactly when the quadratic form is zero. A covariance estimator that returns an indefinite matrix breaks the bound.
   - The quadratic form uses the inverse of the covariance matrix that `me.ce` returns. Equation 3.44 of [cajas2025](@cite) states the same intensity over the bias-corrected matrix ``\\bar{\\mathbf{\\Sigma}} = \\frac{T-1}{T-N-1} \\hat{\\mathbf{\\Sigma}}``, and its own reference implementation uses ``\\hat{\\mathbf{\\Sigma}}``, as this method does. The correction raises ``\\alpha``.
+
+# Algorithm
+
+ 1. Compute the sample expected returns with `me.me`, giving `mu`.
+ 2. Compute the covariance matrix with `me.ce`, giving `sigma`.
+ 3. Read `T` and `N` off `size(X)`, and swap them when `dims` is `2`.
+ 4. Solve `sigma \\ LinearAlgebra.I`, giving `isigma`, and pass it to [`target_mean`](@ref) so that the [`VolatilityWeighted`](@ref) branch does not solve a second time.
+ 5. Compute the shrinkage target, giving `b`, and transpose it into a row when `dims` is `1`.
+ 6. Flatten `mu - b` with `vec`, giving `mb`, and form the intensity `alpha` from `mb`, `isigma`, `N` and `T`.
+ 7. Return the blend `(1 - alpha) * mu + alpha * b`.
 
 # Related
 
-  - [`BayesStein`](@ref)
+  - [`BayesStein`](@ref): the tag that selects this method.
+  - [`mean(me::ShrunkExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref): the arguments, the return value and the trap the three overloads share.
   - [`ShrunkExpectedReturns`](@ref)
   - [`target_mean`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 3.4.1.2, Equation 3.44.
+  - $(ref_dict[:jorion1986])
 """
 function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BayesStein}, X::MatNum;
                          dims::Int = 1, kwargs...)
@@ -691,11 +756,11 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-[`BodnarOkhrinParolya`](@ref) overload of [`mean(me::ShrunkExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref). Shrinks sample returns toward the target using the Bodnar-Okhrin-Parolya formula, designed for robust high-dimensional estimation.
+[`BodnarOkhrinParolya`](@ref) overload of [`mean(me::ShrunkExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref). Shrinks sample returns toward the target using the Bodnar-Okhrin-Parolya formula, designed for robust high-dimensional estimation. It needs ``T > N``: the term ``N/(T-N)`` is undefined at ``T = N`` and changes sign below it, so a square or wide returns matrix raises a `DomainError`.
 
 # Mathematical definition
 
-Define scalars:
+Three inverse-covariance-weighted quadratic forms carry the sample mean and the target:
 
 ```math
 \\begin{align}
@@ -705,46 +770,62 @@ w &= \\hat{\\boldsymbol{\\mu}}^\\intercal \\hat{\\mathbf{\\Sigma}}^{-1} \\boldsy
 \\end{align}
 ```
 
-Where:
-
-  - ``u``, ``v``, ``w``: Inverse-covariance-weighted quadratic forms.
-  - ``\\hat{\\boldsymbol{\\mu}}``: ``N \\times 1`` sample expected returns.
-  - ``\\boldsymbol{b}``: ``N \\times 1`` shrinkage target vector.
-  - ``\\hat{\\mathbf{\\Sigma}}``: ``N \\times N`` sample covariance matrix.
+The two coefficients and the combination follow from them:
 
 ```math
 \\begin{align}
 \\alpha &= \\frac{(u - N/(T-N))v - w^2}{uv - w^2}\\,, \\\\
-\\beta &= \\frac{(1-\\alpha) w}{u}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\alpha``, ``\\beta``: Shrinkage coefficients.
-  - $(math_dict[:T])
-  - $(math_dict[:N])
-
-```math
-\\begin{align}
+\\beta &= \\frac{(1-\\alpha) w}{u}\\,, \\\\
 \\hat{\\boldsymbol{\\mu}}_{BOP} &= \\alpha \\hat{\\boldsymbol{\\mu}} + \\beta \\boldsymbol{b}\\,.
 \\end{align}
 ```
 
 Where:
 
+  - ``u``, ``v``, ``w``: Inverse-covariance-weighted quadratic forms.
+  - ``\\alpha``, ``\\beta``: Shrinkage coefficients.
   - ``\\hat{\\boldsymbol{\\mu}}_{BOP}``: Bodnar-Okhrin-Parolya shrunk expected returns.
+  - $(math_dict[:mu_hat_shrink])
+  - $(math_dict[:b_shrink_tgt])
+  - $(math_dict[:Sigma_hat])
+  - $(math_dict[:T])
+  - $(math_dict[:N])
 
-# Details
+Three consequences of the form separate this algorithm from the other two.
 
-  - ``\\alpha`` and ``\\beta`` are set separately and do not sum to one, so the result is not a point on the segment that joins ``\\hat{\\boldsymbol{\\mu}}`` and ``\\boldsymbol{b}``.
-  - ``T > N`` is needed. The term ``N/(T-N)`` is undefined at ``T = N`` and changes sign above it.
+  - ``\\alpha`` and ``\\beta`` are set separately and do not sum to one, so the result is not a point on the segment that joins ``\\hat{\\boldsymbol{\\mu}}`` and ``\\boldsymbol{b}``. Cancelling the ``w^2`` term rewrites the coefficient as ``\\alpha = 1 - \\frac{N}{T-N} \\frac{v}{uv - w^2}``, so ``\\alpha < 1`` always, and ``\\alpha < 0`` exactly when ``\\frac{N}{T-N} v > uv - w^2``. The combination then extrapolates away from the sample mean.
+  - ``uv - w^2`` is a Cauchy-Schwarz gap in the inner product ``\\langle \\boldsymbol{x}, \\boldsymbol{y} \\rangle = \\boldsymbol{x}^\\intercal \\hat{\\mathbf{\\Sigma}}^{-1} \\boldsymbol{y}``, so it vanishes exactly when the target is a multiple of the sample mean. At ``N = 1`` every vector is such a multiple, so a one-asset sample raises a `DomainError` under all three targets.
+  - Every target of this file is a multiple of the vector of ones, so writing ``\\boldsymbol{b} = c \\boldsymbol{1}`` makes ``v`` and ``w`` scale with ``c^2`` and ``c``. The factor cancels in ``\\alpha``, which is therefore the same for the three targets on one sample, and survives in ``\\beta \\boldsymbol{b}``, which is not.
+
+# Algorithm
+
+ 1. Compute the sample expected returns with `me.me`, giving `mu`.
+ 2. Compute the covariance matrix with `me.ce`, giving `sigma`.
+ 3. Read `T` and `N` off `size(X)`, and swap them when `dims` is `2`.
+ 4. Solve `sigma \\ LinearAlgebra.I`, giving `isigma`, and pass it to [`target_mean`](@ref) so that the [`VolatilityWeighted`](@ref) branch does not solve a second time.
+ 5. Compute the shrinkage target, giving `b`, and transpose it into a row when `dims` is `1`.
+ 6. Flatten `mu` and `b` into the vectors `vm` and `vb`, which the quadratic forms need whichever way `dims` orients the data.
+ 7. Form the three quadratic forms `u`, `v` and `w` from `vm`, `vb` and `isigma`.
+ 8. Form `alpha` from `u`, `v`, `w`, `N` and `T`, then `beta` from `alpha`, `w` and `u`.
+ 9. Return the combination `alpha * mu + beta * b`.
+
+# Validation
+
+  - `T > N`, the estimator's own published condition. The term ``N/(T-N)`` is undefined at ``T = N`` and negative below it.
+  - `!iszero(u * v - w^2)`. Both coefficients divide by this Cauchy-Schwarz gap, and it is exactly zero when the target is a multiple of the sample mean. Every vector is such a multiple at ``N = 1``.
+  - ADR 0092 records the decision to raise on both.
 
 # Related
 
-  - [`BodnarOkhrinParolya`](@ref)
+  - [`BodnarOkhrinParolya`](@ref): the tag that selects this method.
+  - [`mean(me::ShrunkExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref): the arguments, the return value and the trap the three overloads share.
   - [`ShrunkExpectedReturns`](@ref)
   - [`target_mean`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 3.4.1.3.
+  - $(ref_dict[:bodnar2019])
 """
 function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinParolya},
                          X::MatNum; dims::Int = 1, kwargs...)
@@ -755,6 +836,9 @@ function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinP
     if !flag
         N, T = T, N
     end
+    @argcheck(T > N,
+              DomainError((T, N),
+                          "the Bodnar-Okhrin-Parolya coefficients contain `N / (T - N)`, so they need more observations than assets. The term is undefined at T == N and negative below it, got T = $T, N = $N"))
     isigma = sigma \ LinearAlgebra.I
     b = target_mean(me.alg.tgt, mu, sigma, isigma; T = T)
     if flag
@@ -768,8 +852,12 @@ function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinP
     u = LinearAlgebra.dot(vm, isigma, vm)
     v = LinearAlgebra.dot(vb, isigma, vb)
     w = LinearAlgebra.dot(vm, isigma, vb)
+    gap = u * v - w^2
+    @argcheck(!iszero(gap),
+              DomainError(gap,
+                          "the Bodnar-Okhrin-Parolya coefficients divide by the Cauchy-Schwarz gap `u * v - w^2`, which is exactly zero because the $(nameof(typeof(me.alg.tgt))) target is a multiple of the sample mean. Every vector is such a multiple at N == 1, got N = $N"))
     alpha = (u - N / (T - N)) * v - w^2
-    alpha /= u * v - w^2
+    alpha /= gap
     beta = (one(alpha) - alpha) * w / u
     return alpha * mu + beta * b
 end

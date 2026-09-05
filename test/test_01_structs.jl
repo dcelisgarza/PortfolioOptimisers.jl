@@ -2221,19 +2221,34 @@
                                             "nf" => ["MTUM", "VLUE", "QUAL"],
                                             "nf_style" => ["Mom", "Val", "Qual"],
                                             "uf_style" => ["Mom", "Val", "Qual"],
+                                            "ncf" => ["Size", "Value"],
+                                            "ncf_family" => ["Style", "Style"],
+                                            "ucf_family" => ["Style"],
                                             "defensive" => ["VLUE", "QUAL"],
                                             "nz" => ["Tech", "Fin", "AAPL"])
         sets = UniverseSets(; dict = both)
         @test sets.xkey == "nx"
         @test sets.uxkey == "ux"
-        @test sets.fkey == "nf"
-        @test sets.ufkey == "uf"
+        @test sets.tfkey == "nf"
+        @test sets.utfkey == "uf"
+        @test sets.cfkey == "ncf"
+        @test sets.ucfkey == "ucf"
         @test sets.zkey == "nz"
 
-        # The factor and feature axes are optional: the asset axis alone must still
-        # construct.
-        @test UniverseSets(; dict = Dict("nx" => ["A", "B"])).fkey == "nf"
+        # Both factor axes and the feature axis are optional: the asset axis alone must
+        # still construct.
+        @test UniverseSets(; dict = Dict("nx" => ["A", "B"])).tfkey == "nf"
+        @test UniverseSets(; dict = Dict("nx" => ["A", "B"])).cfkey == "ncf"
+        @test UniverseSets(; dict = Dict("nx" => ["A", "B"])).ucfkey == "ucf"
         @test UniverseSets(; dict = Dict("nx" => ["A", "B"])).zkey == "nz"
+
+        # The two factor axes are never validated against each other: declaring one alone
+        # is a complete, valid object. A problem with only a cross-sectional model is the
+        # case that would break if the rule read both axes at once.
+        @test UniverseSets(;
+                           dict = Dict("nx" => ["A", "B"], "ncf" => ["Size"],
+                                       "ncf_family" => ["Style"],
+                                       "ucf_family" => ["Style"])) isa UniverseSets
 
         # `zkey` carries *no* length rule and no unique-entry sibling -- nothing is written
         # over the feature axis, so its list is free to be any length -- but it does carry
@@ -2253,7 +2268,7 @@
                                                     dict = Dict("nx" => ["A", "B"],
                                                                 "nf" => ["F1", "F2"],
                                                                 "nf_style" => ["Mom"]))
-        # A `ufkey` group needs its matching `fkey` partition to exist.
+        # A `utfkey` group needs its matching `tfkey` partition to exist.
         @test_throws KeyError UniverseSets(;
                                            dict = Dict("nx" => ["A", "B"],
                                                        "nf" => ["F1", "F2"],
@@ -2266,17 +2281,57 @@
                                            dict = Dict("nx" => ["A", "B"],
                                                        "uf_style" => ["Mom", "Val"]))
 
-        # All five keys must be pairwise prefix-disjoint, in both orders -- 20 ordered checks
-        # since `zkey` joined the loop. In turn: two keys equal, xkey == fkey, fkey prefixes
-        # ufkey, xkey prefixes fkey, uxkey prefixes ufkey, zkey == xkey, zkey prefixes xkey,
-        # xkey prefixes zkey.
-        for (xkey, uxkey, fkey, ufkey, zkey) in
-            (("nx", "nx", "nf", "uf", "nz"), ("nx", "ux", "nx", "uf", "nz"),
-             ("nx", "ux", "nf", "nf_", "nz"), ("n", "ux", "nf", "uf", "nz"),
-             ("nx", "u", "nf", "uf", "nz"), ("nx", "ux", "nf", "uf", "nx"),
-             ("nx", "ux", "nf", "uf", "n"), ("nx", "ux", "nf", "uf", "nx_z"))
+        # The cross-sectional axis obeys the same two rules, and each failure names *that*
+        # axis rather than the time-series one. The rule is written once and called twice,
+        # so these four cases are what proves the second call site is wired.
+        @test_throws DimensionMismatch UniverseSets(;
+                                                    dict = Dict("nx" => ["A", "B"],
+                                                                "ncf" => ["F1", "F2"],
+                                                                "ncf_family" => ["Style"]))
+        @test_throws KeyError UniverseSets(;
+                                           dict = Dict("nx" => ["A", "B"],
+                                                       "ncf" => ["F1", "F2"],
+                                                       "ucf_family" => ["Style"]))
+        @test_throws KeyError UniverseSets(;
+                                           dict = Dict("nx" => ["A", "B"],
+                                                       "ncf_family" => ["Style", "Style"]))
+        @test_throws KeyError UniverseSets(;
+                                           dict = Dict("nx" => ["A", "B"],
+                                                       "ucf_family" => ["Style", "Val"]))
+        # The message names the cross-sectional axis, so a caller who declared the
+        # time-series one is not sent to the wrong key.
+        @test occursin("cross-sectional factor",
+                       sprint(showerror,
+                              try
+                                  UniverseSets(;
+                                               dict = Dict("nx" => ["A", "B"],
+                                                           "ncf_family" => ["S", "S"]))
+                              catch e
+                                  e
+                              end))
+
+        # All seven keys must be pairwise prefix-disjoint, in both orders -- 42 ordered
+        # checks since the two cross-sectional keys joined the loop. In turn: two keys
+        # equal, xkey == tfkey, tfkey prefixes utfkey, xkey prefixes tfkey, uxkey prefixes
+        # utfkey, zkey == xkey, zkey prefixes xkey, xkey prefixes zkey, cfkey == tfkey,
+        # cfkey prefixes ucfkey, tfkey prefixes cfkey, ucfkey prefixes zkey.
+        for (xkey, uxkey, tfkey, utfkey, cfkey, ucfkey, zkey) in
+            (("nx", "nx", "nf", "uf", "ncf", "ucf", "nz"),
+             ("nx", "ux", "nx", "uf", "ncf", "ucf", "nz"),
+             ("nx", "ux", "nf", "nf_", "ncf", "ucf", "nz"),
+             ("n", "ux", "nf", "uf", "ncf", "ucf", "nz"),
+             ("nx", "u", "nf", "uf", "ncf", "ucf", "nz"),
+             ("nx", "ux", "nf", "uf", "ncf", "ucf", "nx"),
+             ("nx", "ux", "nf", "uf", "ncf", "ucf", "n"),
+             ("nx", "ux", "nf", "uf", "ncf", "ucf", "nx_z"),
+             ("nx", "ux", "nf", "uf", "nf", "ucf", "nz"),
+             ("nx", "ux", "nf", "uf", "ncf", "ncf_", "nz"),
+             ("nx", "ux", "nc", "uf", "ncf", "ucf", "nz"),
+             ("nx", "ux", "nf", "uf", "ncf", "ucf", "ucf_z"))
             @test_throws ArgumentError UniverseSets(; xkey = xkey, uxkey = uxkey,
-                                                    fkey = fkey, ufkey = ufkey, zkey = zkey,
+                                                    tfkey = tfkey, utfkey = utfkey,
+                                                    cfkey = cfkey, ucfkey = ucfkey,
+                                                    zkey = zkey,
                                                     dict = Dict("nx" => ["A", "B"],
                                                                 "n" => ["A", "B"]))
         end
@@ -2289,34 +2344,88 @@
         @test v.dict["nf"] === sets.dict["nf"]
         @test v.dict["nf_style"] === sets.dict["nf_style"]
         @test v.dict["uf_style"] === sets.dict["uf_style"]
+        # The cross-sectional axis is carried through exactly as the time-series one is:
+        # an asset index has no meaning on either.
+        @test v.dict["ncf"] === sets.dict["ncf"]
+        @test v.dict["ncf_family"] === sets.dict["ncf_family"]
+        @test v.dict["ucf_family"] === sets.dict["ucf_family"]
         @test v.dict["defensive"] === sets.dict["defensive"]
         # The feature axis is bit-identical too, but for a *different* reason: some of its
         # nodes are assets, and it still passes through because the axis is declared rather
         # than derived. Hence `AAPL` survives even in a view that keeps it, and would
         # survive as an all-zero column in one that did not.
         @test v.dict["nz"] === sets.dict["nz"]
-        @test (v.xkey, v.uxkey, v.fkey, v.ufkey, v.zkey) ==
-              (sets.xkey, sets.uxkey, sets.fkey, sets.ufkey, sets.zkey)
+        @test (v.xkey, v.uxkey, v.tfkey, v.utfkey, v.cfkey, v.ucfkey, v.zkey) ==
+              (sets.xkey, sets.uxkey, sets.tfkey, sets.utfkey, sets.cfkey, sets.ucfkey,
+               sets.zkey)
 
         # A view collapsing the asset universe to one sector recomputes only `ux_sector`.
         v = PortfolioOptimisers.port_opt_view(sets, [1, 2])
         @test v.dict["ux_sector"] == ["Tech"]
         @test v.dict["uf_style"] == ["Mom", "Val", "Qual"]
+        @test v.dict["ucf_family"] == ["Style"]
 
         # Non-default axis keys are honoured, not just the defaults.
-        alt = UniverseSets(; xkey = "assets", uxkey = "uassets", fkey = "factors",
-                           ufkey = "ufactors", zkey = "features",
+        alt = UniverseSets(; xkey = "assets", uxkey = "uassets", tfkey = "factors",
+                           utfkey = "ufactors", cfkey = "styles", ucfkey = "ustyles",
+                           zkey = "features",
                            dict = Dict("assets" => ["A", "B"],
                                        "assets_sector" => ["Tech", "Fin"],
                                        "factors" => ["F1"], "factors_style" => ["Mom"],
-                                       "ufactors_style" => ["Mom"],
+                                       "ufactors_style" => ["Mom"], "styles" => ["Size"],
+                                       "styles_family" => ["Style"],
+                                       "ustyles_family" => ["Style"],
                                        "features" => ["Tech", "Fin"]))
         v = PortfolioOptimisers.port_opt_view(alt, [2])
         @test v.dict["assets"] == ["B"]
         @test v.dict["assets_sector"] == ["Fin"]
         @test v.dict["factors_style"] === alt.dict["factors_style"]
+        @test v.dict["styles_family"] === alt.dict["styles_family"]
+        @test v.dict["ustyles_family"] === alt.dict["ustyles_family"]
         @test v.dict["features"] === alt.dict["features"]
+        @test v.cfkey == "styles"
+        @test v.ucfkey == "ustyles"
         @test v.zkey == "features"
+    end
+    @testset "factor_axis_key" begin
+        sets = UniverseSets(;
+                            dict = Dict("nx" => ["A", "B", "C"], "nf" => ["F1", "F2"],
+                                        "ncf" => ["Size", "Value"]))
+        M = [1.0 0.0; 0.0 1.0; 1.0 1.0]
+        b = [0.0, 0.0, 0.0]
+        reg = Regression(; M = M, b = b)
+        csfm = PortfolioOptimisers.CrossSectionalFactorModel(; M = M, b = b)
+
+        # The key follows the block that carries `M`, so no caller can name the wrong axis.
+        @test PortfolioOptimisers.factor_axis_key(sets, reg) == sets.tfkey
+        @test PortfolioOptimisers.factor_axis_key(sets, csfm) == sets.cfkey
+        # A specification answers the axis its own family fits on. `RegE_Reg` admits only
+        # the time-series estimator family, so the three methods cover the alias exactly.
+        @test PortfolioOptimisers.factor_axis_key(sets, StepwiseRegression()) == sets.tfkey
+        @test PortfolioOptimisers.factor_axis_key(sets, DimensionReductionRegression()) ==
+              sets.tfkey
+
+        # Non-default keys are read off `sets`, never hard-coded.
+        alt = UniverseSets(; tfkey = "factors", utfkey = "ufactors", cfkey = "styles",
+                           ucfkey = "ustyles",
+                           dict = Dict("nx" => ["A", "B", "C"], "factors" => ["F1", "F2"],
+                                       "styles" => ["Size", "Value"]))
+        @test PortfolioOptimisers.factor_axis_key(alt, reg) == "factors"
+        @test PortfolioOptimisers.factor_axis_key(alt, csfm) == "styles"
+
+        # There is deliberately no fallback on the loadings root: an unrecognised member
+        # raises rather than silently inheriting an axis.
+        @test_throws MethodError PortfolioOptimisers.factor_axis_key(sets, nothing)
+
+        # `factor_universe` reads the key it is handed, and reports the axis that is
+        # missing rather than the other one.
+        @test PortfolioOptimisers.factor_universe(sets, sets.cfkey, 2, "a test", "M") ==
+              ["Size", "Value"]
+        @test_throws DimensionMismatch PortfolioOptimisers.factor_universe(sets, sets.cfkey,
+                                                                           3, "a test", "M")
+        bare = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"], "nf" => ["F1", "F2"]))
+        @test_throws KeyError PortfolioOptimisers.factor_universe(bare, bare.cfkey, 2,
+                                                                  "a test", "M")
     end
     @testset "PartialLinearConstraint" begin
         # The form is `A * x <= B`, so a half with more bounds than rows -- or more rows
@@ -2377,11 +2486,139 @@
                                                                      "B" => 0.8)), sets)
         @test isapprox(rkb.val, [0.15, 0.6, 0.25])
         #=
-        The keyword constructor repeats the inner constructor's guards because a scalar
-        matches the generic constructor `@concrete` emits ahead of the inner `VecNum`
-        method. Without the repeat, a negative scalar would construct.
+        Both constructors run the same guards, and the POSITIONAL route is the one that
+        needed the fix. `@concrete` emits a generic `RiskBudget(val::__T_val) where
+        __T_val`, and a scalar matches it whenever the inner constructor is narrower than
+        a scalar. The inner one was typed `VecNum`, so `RiskBudget(-1.0)` returned an
+        object holding `-1.0` while `RiskBudget(; val = -1.0)` raised. `Num_VecNum` is
+        more specific than the unbounded generic for a scalar too, so the hole closes and
+        the keyword form needs no copy of the checks. `Threshold` has always been typed
+        this way, which is why it never had the hole. Issue #518.
         =#
+        @test_throws DomainError RiskBudget(-1.0)
         @test_throws DomainError RiskBudget(; val = -1.0)
+        @test_throws DomainError RiskBudget([0.5, -1.0])
         @test_throws DomainError RiskBudget(; val = [0.5, -1.0])
+        @test_throws PortfolioOptimisers.IsEmptyError RiskBudget(Float64[])
+        @test_throws PortfolioOptimisers.IsEmptyError RiskBudget(; val = Float64[])
+        # A scalar and a zero entry both stay admissible.
+        @test RiskBudget(0.7).val == 0.7
+        @test RiskBudget(; val = 0.7).val == 0.7
+        @test RiskBudget([0.0, 1.0]).val == [0.0, 1.0]
+        # `Threshold` is the sibling of the same shape, and every route raises there too.
+        @test_throws DomainError Threshold(-1.0)
+        @test_throws DomainError Threshold(; val = -1.0)
+    end
+end
+
+# `src/18_Tracking.jl`, swept under issue #547. `factory(tr::WeightsTracking, w)` and
+# `needs_previous_weights(tr::VecTr)` were the file's six coverage misses; the rest of the
+# testset is the condition-2 measurement the ticket asked for.
+@testset "Tracking" begin
+    using PortfolioOptimisers, Test
+
+    PO = PortfolioOptimisers
+    wb = [0.3, 0.2, 0.4, 0.1]
+    Xt = [0.01 0.02 -0.01 0.03; 0.03 0.04 0.02 -0.02; -0.01 0.005 0.01 0.04]
+
+    @testset "the constructors validate w and err" begin
+        # `assert_nonempty_finite_val` demands one finite entry, not every entry.
+        @test_throws PortfolioOptimisers.IsEmptyError WeightsTracking(; w = Float64[])
+        @test_throws PortfolioOptimisers.IsEmptyError ReturnsTracking(; w = Float64[])
+        @test_throws DomainError WeightsTracking(; w = [NaN, NaN])
+        @test_throws DomainError ReturnsTracking(; w = [Inf, NaN])
+        @test WeightsTracking(; w = [0.5, NaN]).w[1] == 0.5
+
+        tr = WeightsTracking(; w = wb)
+        @test_throws DomainError TrackingError(; tr = tr, err = -0.01)
+        @test_throws DomainError TrackingError(; tr = tr, err = Inf)
+        @test_throws DomainError TrackingError(; tr = tr, err = NaN)
+        @test TrackingError(; tr = tr, err = 0.0).err == 0.0
+    end
+
+    @testset "the benchmark is the net return series" begin
+        # `tracking_benchmark(tr::WeightsTracking, X)` is `calc_net_returns`, hand-checked.
+        trn = WeightsTracking(; w = wb)
+        @test PO.tracking_benchmark(trn, Xt) == Xt * wb
+        @test PO.tracking_benchmark(trn, Xt) ≈ [0.006, 0.023, 0.006]
+
+        # a fee is the one scalar, subtracted from every period
+        trf = WeightsTracking(; fees = Fees(; l = 0.001), w = wb)
+        @test PO.tracking_benchmark(trf, Xt) ≈ Xt * wb .- 0.001
+        @test PO.tracking_benchmark(trf, Xt) ≈ [0.005, 0.022, 0.005]
+
+        # `fees = nothing` reaches the `args...` method, not the `Fees` one
+        @test PO.tracking_benchmark(trn, Xt) == calc_net_returns(wb, Xt, nothing)
+    end
+
+    @testset "a ReturnsTracking benchmark reads no return matrix" begin
+        rt = ReturnsTracking(; w = [0.01, 0.02, 0.03])
+        @test PO.tracking_benchmark(rt) === rt.w
+        # a matrix of the wrong number of rows still succeeds: the length mismatch is the
+        # model's to raise, not this function's
+        @test PO.tracking_benchmark(rt, zeros(7, 2)) === rt.w
+        @test PO.tracking_benchmark(rt, zeros(7, 2), :nonsense, 42) === rt.w
+    end
+
+    @testset "factory obeys fixed the way Turnover's does" begin
+        tn = Turnover(; w = [0.1, 0.2, 0.3, 0.4], val = 0.01)
+        neww = [0.25, 0.25, 0.25, 0.25]
+
+        # `fixed = true` returns the object itself and never reads `w`
+        trF = WeightsTracking(; fees = Fees(; tn = tn), w = wb, fixed = true)
+        @test PO.factory(trF, neww) === trF
+        @test PO.factory(trF, neww).w == wb
+
+        # `fixed = false` takes the new weights, and hands the OLD ones to the turnover
+        trV = WeightsTracking(; fees = Fees(; tn = tn), w = wb, fixed = false)
+        fV = PO.factory(trV, neww)
+        @test fV.w == neww
+        @test fV.fees.tn.w == wb
+        @test fV.fixed == false
+
+        # which is the rule `Turnover`'s own factory follows
+        @test PO.factory(Turnover(; w = [0.1, 0.2, 0.3, 0.4], val = 0.01), wb).w == wb
+        @test PO.factory(Turnover(; w = [0.1, 0.2, 0.3, 0.4], val = 0.01, fixed = true),
+                         wb).w == [0.1, 0.2, 0.3, 0.4]
+    end
+
+    @testset "needs_previous_weights on a vector is any, not all" begin
+        teFixed = TrackingError(; tr = WeightsTracking(; w = wb, fixed = true), err = 0.01)
+        teFree = TrackingError(; tr = WeightsTracking(; w = wb, fixed = false), err = 0.01)
+        teRet = TrackingError(; tr = ReturnsTracking(; w = [0.01, 0.02]), err = 0.01)
+
+        @test !PO.needs_previous_weights(teFixed)
+        @test PO.needs_previous_weights(teFree)
+        @test !PO.needs_previous_weights(teRet)
+
+        # `all` would answer `false` here, so the mixed vector is the discriminating case
+        @test PO.needs_previous_weights([teFixed, teFree])
+        @test PO.needs_previous_weights([teFree, teFixed])
+        @test !PO.needs_previous_weights([teFixed, teRet])
+        @test PO.needs_previous_weights([teFree, teFree])
+    end
+
+    @testset "the SquaredL2Norm bound is the square of the L2Norm bound" begin
+        # Both norms share one cone, and `tracking_error_soc_factor` is where they meet.
+        # `err = 9e-6` under `SquaredL2Norm` is `err = 3e-3` under `L2Norm`: the two write
+        # the identical bound, with no dependence on `T`.
+        @test PO.tracking_error_soc_factor(SquaredL2Norm(), 9e-6, 252) ==
+              PO.tracking_error_soc_factor(L2Norm(), 3e-3, 252)
+        @test PO.tracking_error_soc_factor(SquaredL2Norm(), 5e-6, 252) ≈
+              PO.tracking_error_soc_factor(L2Norm(), sqrt(5e-6), 252)
+
+        # `ddof` moves the bound, through `norm_factor`
+        @test PO.norm_factor(L2Norm(; ddof = 0), 252) == sqrt(252)
+        @test PO.norm_factor(L2Norm(; ddof = 1), 252) == sqrt(251)
+        @test PO.norm_factor(SquaredL2Norm(; ddof = 1), 252) == 251
+        @test PO.tracking_error_soc_factor(L2Norm(; ddof = 0), 3e-3, 252) !=
+              PO.tracking_error_soc_factor(L2Norm(; ddof = 1), 3e-3, 252)
+
+        # and `norm_error` divides by exactly that factor
+        a = [0.01, -0.02, 0.03]
+        b = [0.005, -0.015, 0.02]
+        @test PO.norm_error(L2Norm(), a, b, nothing) == LinearAlgebra.norm(a - b)
+        @test PO.norm_error(SquaredL2Norm(), a, b, 3) ≈
+              PO.norm_error(L2Norm(; ddof = 1), a, b, 3)^2
     end
 end

@@ -21,10 +21,39 @@ domain vocabulary is normative — read `CONTEXT.md` before touching anything yo
   want, and `grep_code` when you already hold an exact token. `/graphify` builds a queryable graph
   for larger architectural questions.
 
+## Parallel sessions
+
+Sessions run in parallel, so the checkout is not yours alone. Two rules keep them apart.
+
+**Work in your own worktree.** Create it with the `EnterWorktree` tool before your first edit.
+Commit there, then rebase onto `dev`, so the merge is a fast-forward that carries only your work.
+Merge into the local `dev`, and push `dev` to `origin`, never the worktree branch. After the merge,
+leave the worktree with `ExitWorktree`, then delete the branch. Never commit a change you did not
+make: check `git status` before you stage, and stage the files you edited by name rather than with
+`git add -A`.
+
+**Do not edit a file at the same time as another session.** Two sessions can change the same file
+during one ticket, one after the other. Only a simultaneous edit loses work. The session that
+finishes last commits the common file. That session rebases onto the commit of the session that
+finished first, then adds its own change to the current text.
+
+Three files are shared by every sweep ticket, so this rule bites hardest there:
+
+- `sweep/manifest.toml` — one row per source file.
+- `src/01_Base/01_DocstringDictionaries.jl` — `arg_dict`, `math_dict` and their siblings.
+- `test/test_26_docs.jl` — the library-wide ratchets, `DETAILS_TOTAL`, `NO_RELATED_TOTAL` and
+  `MATH_COPY_TOTAL`.
+
+A ratchet is one number for the whole library. Two sessions that each lower it write two different
+numbers, and a merge keeps one of them. Lower a ratchet in the commit that pays it, and rebase
+before you merge so you lower the number that is current.
+
 ## Running Julia
 
 - **Go through the kaimon MCP tools**, not `julia` on Bash. `ex(e="…")` evaluates in a REPL the
-  user shares live.
+  user shares live. Start a REPL for your own worktree with `start_session(project_path=…)`, and
+  pass its session key to every `ex` call. A REPL that another session opened is not yours to
+  restart.
 - **Single-threaded**: `julia -t 1`, `BLAS.set_num_threads(1)`. Never kick off the full test suite
   or a docs build — those are the maintainer's to run.
 - Run **targeted** `test_*.jl` files for the area you changed. `test/runtests.jl` supplies a shared
@@ -55,10 +84,15 @@ domain vocabulary is normative — read `CONTEXT.md` before touching anything yo
 ## Design rules
 
 - **Estimators never hold Results internally.** Enforce it with the field's *type bound*, not a
-  runtime check; precomputed structure belongs on the Result type.
+  runtime check; precomputed structure belongs on the Result type. The rule has one exception, and
+  [ADR 0106](docs/adr/0106-a-partial-fit-state-is-the-one-result-an-estimator-holds.md) states it:
+  a partial-fit state is a Result that no consumer reads, so an estimator may hold one in a field
+  bound to `Union{Nothing, <:AbstractPartialFitState}`. That bound is the enforcement, and it still
+  refuses every other Result.
 - **Prefer a per-type method over a new dependency** for reflection-style work. Derive the field
   list, write the constructor name once per type, and use the ordinary keyword constructor.
-- Docstring field text is centralised in `field_dict` / `arg_dict` in `src/01_Base.jl`, and an entry
+- Docstring field text is centralised in `field_dict` / `arg_dict` in
+  `src/01_Base/01_DocstringDictionaries.jl`, and an entry
   that loses its last user is deleted. When a description must interpolate a key and when prose is
   permitted is stated by
   [`.github/instructions/julia-docstrings.instructions.md`](.github/instructions/julia-docstrings.instructions.md),
@@ -98,6 +132,11 @@ Wire your addition into the audit in the same change:
 4. Open one sub-issue of that child map for the addition, so it is swept as systematically as the
    code it joins.
 
+`julia --project=code_health code_health/sweep_check.jl --fetch` reports all four steps for the
+files your branch touches, and prints the line to paste for step 1. It measures and writes nothing.
+The `sweep-conform` skill runs it before the commit, and the `sweep-file-issues` skill does steps 3
+and 4.
+
 Defer a feature whose design is not settled. Leave its row at `swept = false`, record it in the
 child map's *Not yet specified* section, and take steps 3 and 4 when the design settles.
 
@@ -105,3 +144,10 @@ child map's *Not yet specified* section, and take steps 3 and 4 when the design 
 
 - Never link to or post in repositories outside `dcelisgarza`'s — name external sources in prose.
 - Branch before committing if you are on the default branch, and only commit when asked.
+- **Close an issue yourself after you commit the work that resolves it.** This holds for every kind
+  of issue: a defect, a feature, a sweep sub-issue, a map. Name the issue in the commit message, for
+  example `Fix #493: …`. A closing keyword does not close the issue: GitHub acts on the keyword only
+  when the commit reaches the default branch `main`, and `main` is current to the last release. Run
+  `gh issue close <number> --comment "…"` after you commit, and name the commit in the comment. If
+  the commit resolves only a part of the issue, leave the issue open. Close it after the commit that
+  finishes the work.

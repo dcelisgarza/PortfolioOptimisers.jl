@@ -84,7 +84,7 @@ const DAO = DiscreteAllocation
 """
     GAO
 
-    Alias for [`GreedyAllocation`](@ref).
+Alias for [`GreedyAllocation`](@ref).
 """
 const GAO = GreedyAllocation
 """
@@ -943,11 +943,9 @@ Spelled with `SCM()` rather than [`Variance`](@ref): `Variance` is a [`WeightsIn
 risk measure whose functor consumes portfolio weights, so it cannot score a single asset's
 return series.
 
-# Related
+# Validation
 
-  - [`ScoreSelector`](@ref)
-  - [`ThresholdRule`](@ref)
-  - [`SCM`](@ref)
+  - `tol >= 0`.
 """
 function ZeroVarianceFilter(; tol::Number = 1e-12)::ScoreSelector
     @argcheck(tol >= zero(tol),

@@ -54,7 +54,7 @@ end
     @test fpr isa LowOrderPrior
     @test fpr.mu == [0.05, 0.06]
     # Every other field is the very same object, not a copy or a recomputation.
-    for sym in (:X, :o_X, :sigma, :chol, :w, :ens, :kld, :ow, :rr, :fpr, :Z)
+    for sym in (:X, :o_X, :sigma, :chol, :w, :ens, :kld, :ow, :rr, :fpr, :pnl)
         @test getfield(fpr, sym) === getfield(pr, sym)
     end
     # In particular, the three fields whose silent loss motivated ADR 0046.
@@ -236,8 +236,17 @@ end
                                                                                        0,
                                                                                        0))
     # The feature matrix keeps its assets-major check.
-    @test_throws DimensionMismatch PO.forward_prior(bare; Z = [1.0 2.0; 3.0 4.0; 5.0 6.0])
-    @test PO.forward_prior(bare; Z = [1.0 2.0; 3.0 4.0]).Z == [1.0 2.0; 3.0 4.0]
+    @test_throws DimensionMismatch PO.forward_prior(bare;
+                                                    pnl = feature_matrix_panel(["_z1",
+                                                                                "_z2"],
+                                                                               [1.0 2.0;
+                                                                                3.0 4.0;
+                                                                                5.0 6.0]))
+    @test panel_feature_matrix(PO.forward_prior(bare;
+                                                pnl = feature_matrix_panel(["_z1", "_z2"],
+                                                                           [1.0 2.0;
+                                                                            3.0 4.0])).pnl)[2] ==
+          [1.0 2.0; 3.0 4.0]
 end
 
 @testset "forward_prior: HighOrderPrior forwards through the same rule" begin
@@ -309,4 +318,45 @@ end
     # only `forward_prior` enforces the three bindings.
     @test_throws DimensionMismatch PO.reconstruct_prior(pr, (; mu = [0.7, 0.8, 0.9]))
     @test PO.reconstruct_prior(pr, (; w = StatsBase.pweights([0.5, 0.5]))).ens === pr.ens
+end
+
+@testset "forward_prior: an inconsistent forward throws as the constructor would" begin
+    #=
+    `reconstruct_prior` routes through the carrier's ordinary keyword constructor, so the
+    docstring claims that a patch leaving the carrier inconsistent "throws exactly as a
+    hand-written constructor call would". Exactly means the same exception type and the
+    same message: a caller that reads the message of a hand-written call must be able to
+    read the message of a forward. The claim is checked by building each inconsistency
+    twice and comparing the two exceptions.
+    =#
+    function raised(f)
+        return try
+            f()
+            nothing
+        catch e
+            e
+        end
+    end
+    hand(pr, patch) = LowOrderPrior(; merge(PO.prior_field_values(pr), patch)...)
+
+    pr = weighted_prior()
+    for patch in ((; mu = [0.02, 0.03, 0.04]), (; ow = Float64[]),
+                  (; sigma = [0.0004 0.0002; 0.0002 0.0003; 0.0 0.0]), (; X = zeros(0, 0)))
+        by_forward = raised(() -> PO.forward_prior(pr; patch...))
+        by_hand = raised(() -> hand(pr, patch))
+        @test !isnothing(by_forward)
+        @test typeof(by_forward) === typeof(by_hand)
+        @test sprint(showerror, by_forward) == sprint(showerror, by_hand)
+    end
+
+    # The same holds on the other carrier, whose constructor validates different shapes.
+    hop = HighOrderPrior(; pr = pr, kt = Matrix(1.0I, 4, 4), L2 = PO.elimination_matrix(2),
+                         S2 = PO.summation_matrix(2))
+    for patch in ((; kt = Matrix(1.0I, 3, 3)), (; S2 = nothing))
+        by_forward = raised(() -> PO.forward_prior(hop; patch...))
+        by_hand = raised(() -> HighOrderPrior(; merge(PO.prior_field_values(hop), patch)...))
+        @test !isnothing(by_forward)
+        @test typeof(by_forward) === typeof(by_hand)
+        @test sprint(showerror, by_forward) == sprint(showerror, by_hand)
+    end
 end

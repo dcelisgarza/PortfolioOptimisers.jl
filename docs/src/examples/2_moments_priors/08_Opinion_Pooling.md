@@ -1,5 +1,4 @@
 The source files can be found in [examples/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../../examples/2_moments_priors/08_Opinion_Pooling.jl"
 ```
@@ -67,9 +66,9 @@ sets = UniverseSets(;
 Each opinion is an [`EntropyPoolingPrior`](@ref) with its own views — think of them as three
 analysts who looked at the same market and came to different conclusions:
 
-- **Opinion A** (bullish Apple): `AAPL == 0.0008`.
-- **Opinion B** (sector call): tech beats energy, and Microsoft does well.
-- **Opinion C** (defensive): pin down a couple of low-vol names.
+  - **Opinion A** (bullish Apple): `AAPL == 0.0008`.
+  - **Opinion B** (sector call): tech beats energy, and Microsoft does well.
+  - **Opinion C** (defensive): pin down a couple of low-vol names.
 
 ````@example 08_Opinion_Pooling
 opinion_a = EntropyPoolingPrior(; sets = sets,
@@ -124,10 +123,10 @@ plot_mu(pr_op, rd.nx)
 
 The pooling `alg` controls *how* the opinion distributions are combined.
 
-- [`LinearOpinionPooling`](@ref) (default) takes a **weighted arithmetic average** of the
+  - [`LinearOpinionPooling`](@ref) (default) takes a **weighted arithmetic average** of the
     opinion probabilities. It is the "mixture of experts" rule — the consensus is a blend, so a
     single confident opinion can pull the mean a long way.
-- [`LogarithmicOpinionPooling`](@ref) takes a **weighted geometric mean** (the
+  - [`LogarithmicOpinionPooling`](@ref) takes a **weighted geometric mean** (the
     Kullback–Leibler-optimal consensus). It is more consensus-seeking: an asset only moves far
     if the opinions *agree*, so disagreement is damped.
 

@@ -55,7 +55,7 @@ const f_views = LinearConstraintEstimator(; val = ["$(rd.nf[1]) == 0.004"])
 
     # The pre-fix carrier: `BlackLittermanPrior` forwarded `X`/`mu`/`sigma`/`Z` and
     # nothing else, so the weights never reached the selection machinery at all.
-    old = LowOrderPrior(; X = pr.X, mu = pr.mu, sigma = pr.sigma, Z = pr.Z)
+    old = LowOrderPrior(; X = pr.X, mu = pr.mu, sigma = pr.sigma, pnl = pr.pnl)
     @test isnothing(old.w)
     @test isnothing(factory(rm, old).w)
     @test isapprox(expected_risk(factory(rm, old), wt, pr.X), r_flat)
@@ -79,7 +79,7 @@ end
 
     # The pre-fix carrier: with `ens` dropped, the fallback sized the set off a
     # sample count ~2x too large.
-    old = LowOrderPrior(; X = pr.X, mu = pr.mu, sigma = pr.sigma, Z = pr.Z)
+    old = LowOrderPrior(; X = pr.X, mu = pr.mu, sigma = pr.sigma, pnl = pr.pnl)
     @test isnothing(old.ens)
     @test PO.choose_scaling_parameter(ue, old) == T
 end
@@ -160,12 +160,12 @@ end
     # `FactorPrior` — the plain lift. `Z` is its only drop, and dropping it from the
     # asset slot is a *relocation* rather than a destruction: the factor prior is
     # forwarded whole, so its factors × features matrix is still reachable at
-    # `pr.fpr.Z`, which is where a factor-axis feature matrix belongs.
+    # `panel_feature_matrix(pr.fpr.pnl)[2]`, which is where a factor-axis feature matrix belongs.
     Zfac = rand(StableRNG(24680), size(rd.F, 2), 3)
     f_withZ_pe = FeaturePrior(; pe = ep_factor, ze = Zfac)
     fp_lift = prior(FactorPrior(; pe = f_withZ_pe), rd)
-    @test isnothing(fp_lift.Z)
-    @test fp_lift.fpr.Z == Zfac
+    @test isnothing(panel_feature_matrix(fp_lift.pnl)[2])
+    @test panel_feature_matrix(fp_lift.fpr.pnl)[2] == Zfac
     @test fp_lift.w == f_pooled.w
     @test fp_lift.ens == f_pooled.ens
     @test !isnothing(fp_lift.chol)           # rebuilt on the asset axis, not forwarded
@@ -192,8 +192,8 @@ end
     @test isnothing(fbl.fpr.chol)            # superseded by the posterior covariance
     fbl_withZ = prior(FactorBlackLittermanPrior(; pe = f_withZ_pe, sets = xfsets,
                                                 views = f_views), rd)
-    @test isnothing(fbl_withZ.Z)             # same relocation as the plain lift
-    @test fbl_withZ.fpr.Z == Zfac
+    @test isnothing(panel_feature_matrix(fbl_withZ.pnl)[2])             # same relocation as the plain lift
+    @test panel_feature_matrix(fbl_withZ.fpr.pnl)[2] == Zfac
 
     # `AugmentedBlackLittermanPrior` — symmetric, and the two weightings stay
     # distinguishable: the asset slot is `a_prior`'s, the factor block is `f_prior`.
@@ -212,7 +212,7 @@ end
     rng = StableRNG(987654321)
     Zlit = rand(rng, size(rd.X, 2), 4)
     fp = prior(FeaturePrior(; pe = ep_asset, ze = Zlit), rd)
-    @test fp.Z == Zlit
+    @test panel_feature_matrix(fp.pnl)[2] == Zlit
     @test fp.w == a_pooled.w
     @test fp.ens == a_pooled.ens
     @test fp.kld == a_pooled.kld

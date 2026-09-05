@@ -195,6 +195,8 @@ Where:
   - ``\\boldsymbol{w}_{b}``: `N × 1` benchmark weight vector, the `w` field.
   - ``\\boldsymbol{F}(\\boldsymbol{w}_{b})``: Per-period fee charged on the benchmark, from the `fees` field. It is zero when `fees` is `nothing`. See [`calc_net_returns`](@ref).
 
+The `fees` field reads no fold. [`amortise_fees`](@ref) is the one verb that stamps a fold length onto a fee, and [`predict`](@ref) calls it on the portfolio's own fee, never on this one. A bare [`AmortisedFees`](@ref) here therefore charges `tn`, `fl` and `fs` in full on every observation, exactly as a `nothing` `fa` does. State a `horizon` on the [`AmortisedFees`](@ref) to divide them, because a stated horizon overrides the fold at every site.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -211,7 +213,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `!isempty(w)`.
+  - `w`, through [`assert_nonempty_finite_val`](@ref): `!isempty(w)` and `any(isfinite, w)`. One finite entry is enough, so `[0.5, NaN]` is admitted and `[NaN, NaN]` is not.
 
 ## View parameters
 
@@ -275,7 +277,14 @@ end
 
 Construct a new `WeightsTracking` object with updated portfolio weights.
 
-This function creates a new [`WeightsTracking`](@ref) instance by copying the fees from the input `tr` object and replacing the portfolio weights with `w`. The fees field is updated using the `factory` function on the existing fees and weights.
+The `fixed` flag decides whether the benchmark moves, and it obeys it the way [`factory(tn::Turnover, w::VecNum)`](@ref) obeys its own. A `fixed` benchmark is a fixed allocation, so the object is returned unchanged and `===` holds. A benchmark that is not `fixed` takes `w` as its new reference, and its `fees` advance one step: the nested [`Turnover`](@ref) takes the **old** `tr.w` as its reference, because that is the allocation the portfolio is turning over from.
+
+# Algorithm
+
+ 1. Read `tr.fixed`.
+ 2. When `tr.fixed` is `true`, return `tr` itself. The argument `w` is not read.
+ 3. When `tr.fixed` is `false`, advance the fees with `factory(tr.fees, tr.w)`, which hands the **old** weights to the nested turnover as its reference.
+ 4. Build a new [`WeightsTracking`](@ref) from the advanced fees, the new `w`, and the unchanged `tr.fixed`.
 
 # Arguments
 
@@ -284,12 +293,7 @@ This function creates a new [`WeightsTracking`](@ref) instance by copying the fe
 
 # Returns
 
-  - `tr::WeightsTracking`: New tracking algorithm object with updated weights.
-
-# Details
-
-  - Copies and updates the `fees` field using `factory(tr.fees, tr.w)`.
-  - Replaces the `w` field with the provided weights.
+  - `tr::WeightsTracking`: New tracking algorithm object with updated weights, or `tr` itself when `tr.fixed` is `true`.
 
 # Examples
 
@@ -302,6 +306,7 @@ WeightsTracking
         │        s ┼ nothing
         │       fl ┼ nothing
         │       fs ┼ nothing
+        │       fa ┼ nothing
         │   kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
       w ┼ Vector{Float64}: [0.5, 0.5]
   fixed ┴ Bool: false
@@ -314,6 +319,7 @@ WeightsTracking
         │        s ┼ nothing
         │       fl ┼ nothing
         │       fs ┼ nothing
+        │       fa ┼ nothing
         │   kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
       w ┼ Vector{Float64}: [0.6, 0.4]
   fixed ┴ Bool: false
@@ -326,6 +332,7 @@ WeightsTracking
         │        s ┼ nothing
         │       fl ┼ nothing
         │       fs ┼ nothing
+        │       fa ┼ nothing
         │   kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
       w ┼ Vector{Float64}: [0.5, 0.5]
   fixed ┴ Bool: true
@@ -338,6 +345,7 @@ WeightsTracking
         │        s ┼ nothing
         │       fl ┼ nothing
         │       fs ┼ nothing
+        │       fa ┼ nothing
         │   kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
       w ┼ Vector{Float64}: [0.5, 0.5]
   fixed ┴ Bool: true
@@ -348,6 +356,8 @@ WeightsTracking
   - [`WeightsTracking`](@ref)
   - [`VecNum`](@ref)
   - [`factory`](@ref)
+  - [`factory(tn::Turnover, w::VecNum)`](@ref): The verb that reads the same `fixed` flag, one level down.
+  - [`needs_previous_weights`](@ref): Reads the same flag to decide whether the optimiser must supply a previous weight vector.
 """
 function factory(tr::WeightsTracking, w::VecNum)
     return if tr.fixed
@@ -363,19 +373,22 @@ Compute the benchmark portfolio returns for a weights-based tracking algorithm.
 
 `tracking_benchmark` computes the net portfolio returns for the benchmark weights stored in a [`WeightsTracking`](@ref) object, optionally adjusting for transaction fees if specified. The asset return matrix `X` is multiplied by the benchmark weights, and fees are deducted if present.
 
+This method restates no definition of its own. It is [`calc_net_returns(tr.w, X, tr.fees)`](@ref), so the fee is the one scalar that function subtracts from every period. On the three-period matrix `[0.01 0.02 -0.01 0.03; 0.03 0.04 0.02 -0.02; -0.01 0.005 0.01 0.04]` and ``\\boldsymbol{w}_{b} = [0.3,\\, 0.2,\\, 0.4,\\, 0.1]``, the benchmark measured `[0.006, 0.023, 0.006]` with no fee, and `[0.005, 0.022, 0.005]` under `Fees(; l = 0.001)`, whose fee is `0.001`.
+
+# Algorithm
+
+ 1. Forward `tr.w`, `X` and `tr.fees` to [`calc_net_returns`](@ref).
+ 2. A `nothing` `tr.fees` reaches the `args...` method of [`calc_net_returns`](@ref), which returns `X * tr.w`. It does not reach the `Fees` method and charge a zero fee.
+ 3. A [`Fees`](@ref) `tr.fees` reaches the `Fees` method, which subtracts the one scalar `calc_fees(tr.w, tr.fees)` from every entry of `X * tr.w`.
+
 # Arguments
 
   - `tr`: [`WeightsTracking`](@ref) tracking algorithm containing benchmark weights and optional fees.
-  - `X`: Asset return matrix (assets × periods).
+  - `X`: Asset return matrix (observations × assets).
 
 # Returns
 
-  - `b::VecNum`: Net benchmark portfolio returns.
-
-# Details
-
-  - If `tr.fees` is not `nothing`, net returns are computed using `calc_net_returns`.
-  - Otherwise, returns are computed as `X * tr.w`.
+  - `b::VecNum`: Net benchmark portfolio returns, one entry per row of `X`.
 
 # Examples
 
@@ -394,8 +407,9 @@ julia> PortfolioOptimisers.tracking_benchmark(tr, X)
 
   - [`WeightsTracking`](@ref)
   - [`MatNum`](@ref)
-  - [`calc_net_returns`](@ref)
-  - [`tracking_benchmark`](@ref)
+  - [`calc_net_returns`](@ref): The single definition this method forwards to.
+  - [`Fees`](@ref)
+  - [`tracking_benchmark(tr::ReturnsTracking, args...)`](@ref): The sibling, which reads no return matrix at all.
 """
 function tracking_benchmark(tr::WeightsTracking, X::MatNum)
     return calc_net_returns(tr.w, X, tr.fees)
@@ -423,7 +437,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `!isempty(w)`.
+  - `w`, through [`assert_nonempty_finite_val`](@ref): `!isempty(w)` and `any(isfinite, w)`. One finite entry is enough, so `[0.01, NaN]` is admitted and `[NaN, NaN]` is not.
 
 # Examples
 
@@ -464,6 +478,12 @@ Return the benchmark portfolio returns for a returns-based tracking algorithm.
 
 `tracking_benchmark` extracts the benchmark portfolio returns stored in a [`ReturnsTracking`](@ref) object. This is used for tracking error measurement and constraint generation where the comparison is made directly between portfolio returns and benchmark returns.
 
+**No return matrix is read, and no fee is applied.** Every trailing argument is ignored, so a matrix whose number of rows does not match `length(tr.w)` still returns `tr.w` unchanged: a three-entry `w` against a seven-row matrix succeeds here. That is deliberate. A length mismatch is a property of the model the series is put into, so it is raised there rather than by this function.
+
+# Algorithm
+
+ 1. Return `tr.w`. No argument after `tr` is read.
+
 # Arguments
 
   - `tr`: [`ReturnsTracking`](@ref) tracking algorithm containing benchmark returns.
@@ -471,7 +491,7 @@ Return the benchmark portfolio returns for a returns-based tracking algorithm.
 
 # Returns
 
-  - `b::VecNum`: Benchmark portfolio returns.
+  - `b::VecNum`: Benchmark portfolio returns. It is `tr.w` itself, not a copy, so `tracking_benchmark(tr) === tr.w`.
 
 # Examples
 
@@ -489,6 +509,7 @@ julia> PortfolioOptimisers.tracking_benchmark(tr)
 
   - [`ReturnsTracking`](@ref)
   - [`WeightsTracking`](@ref)
+  - [`tracking_benchmark(tr::WeightsTracking, X::MatNum)`](@ref): The sibling, which does read the return matrix and does charge a fee.
   - [`TrackingError`](@ref)
 """
 function tracking_benchmark(tr::ReturnsTracking, args...)
@@ -521,6 +542,19 @@ Where:
 
     `err` is stated in the units of `alg`, and [`SquaredL2Norm`](@ref) squares. The same number therefore means two different bounds: `TrackingError(; alg = SquaredL2Norm(), err = 5e-6)` admits an [`L2Norm`](@ref) error up to `sqrt(5e-6)`, about `0.00224`, where `TrackingError(; alg = L2Norm(), err = 5e-6)` admits `5e-6`. Convert with the square, not by reusing the tolerance. The model, [`norm_error`](@ref) and `set_risk_constraints!` all read `err` the same way.
 
+The conversion is the square root, it carries no dependence on `T`, and the two norms then write the **same** cone bound. [`tracking_error_soc_factor`](@ref) is where they meet: on `T = 252` it returned `0.04752893855326458` for both `(SquaredL2Norm(), 9e-6)` and `(L2Norm(), 3e-3)`. Two minimum-variance models over 252 observations of 20 assets, tracking an index series under those two settings, returned **identical** weight vectors, and their realised deviations satisfied the square exactly: `9.0e-6` against `3.0e-3` squared, both measured `8.999996766182225e-6`. The `ddof` field of `alg` moves that bound. At `ddof = 0` the same problem realised `0.04762352278968468` and at `ddof = 1` it realised `0.047528930014379016`, each matching its cone bound to eight digits.
+
+The keys the model registers are picked by `alg`, and each carries the constraint index appended. Every branch registers `:t_te_` for the cone variable, `:te_` for the deviation expression ``\\mathbf{X}\\boldsymbol{w} - \\boldsymbol{b}k``, and `:cte_` for the row that holds the cone variable below the scaled tolerance. The cone, its row, and the rows a branch adds beyond those three, are:
+
+| `alg`                                     | Cone                        | Cone row        | Rows the branch adds |
+|:----------------------------------------- |:--------------------------- |:--------------- |:-------------------- |
+| [`L1Norm`](@ref)                          | `JuMP.MOI.NormOneCone`      | `:cte_noc_`     | none                 |
+| [`L2Norm`](@ref), [`SquaredL2Norm`](@ref) | `JuMP.SecondOrderCone`      | `:cte_soc_`     | none                 |
+| [`LpNorm`](@ref)                          | `JuMP.MOI.PowerCone`        | `:cte_pnorm_`   | `:r_te_`, `:cste_`   |
+| [`LInfNorm`](@ref)                        | `JuMP.MOI.NormInfinityCone` | `:cte_infnorm_` | none                 |
+
+`:cte_soc_` is therefore the key of the default `alg = L2Norm()` and of [`SquaredL2Norm`](@ref) alone. The model registers no `:tracking_risk_` and no `:sq_tracking_risk_`: those two keys belong to [`TrackingRiskMeasure`](@ref), which measures a risk difference rather than a return-series deviation.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -537,7 +571,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `isfinite(err)` and `err >= 0`.
+  - `err`, through [`assert_nonempty_nonneg_finite_val`](@ref): `isfinite(err)` and `err >= 0`, each raising a `DomainError` naming `err`. `err = 0.0` is admitted, and it pins the portfolio to the benchmark.
 
 ## Propagated parameters
 
@@ -579,6 +613,8 @@ TrackingError
   - [`L1Norm`](@ref)
   - [`norm_error`](@ref)
   - [`norm_factor`](@ref)
+  - [`tracking_error_soc_factor`](@ref): Turns `err` into the cone bound, and is where the two `L2` norms meet.
+  - [`TrackingRiskMeasure`](@ref): The risk-difference measure that owns `:tracking_risk_` and `:sq_tracking_risk_`.
   - [`tracking_benchmark`](@ref)
   - [`factory`](@ref)
   - [`port_opt_view`](@ref)
@@ -609,6 +645,41 @@ function TrackingError(; tr::AbstractTrackingAlgorithm, err::Number = 0.0,
                        alg::NormError = L2Norm())
     return TrackingError(tr, err, alg)
 end
+"""
+    needs_previous_weights(tr::AbstractTrackingAlgorithm) -> Bool
+    needs_previous_weights(tr::WeightsTracking) -> Bool
+    needs_previous_weights(tr::TrackingError) -> Bool
+    needs_previous_weights(tr::VecTr) -> Bool
+
+Check whether a tracking algorithm or tracking result needs the previous portfolio weights.
+
+Only a [`WeightsTracking`](@ref) that is not `fixed` needs them, because only it moves its reference allocation when [`factory`](@ref) runs. A [`ReturnsTracking`](@ref) carries a return series and reaches the fallback, which answers `false`. The vector method answers `any` and not `all`, so one entry that needs the previous weights makes the whole vector need them: a vector holding one `fixed` and one free [`WeightsTracking`](@ref) answers `true` where `all` would answer `false`.
+
+# Algorithm
+
+ 1. On any [`AbstractTrackingAlgorithm`](@ref) that no method below claims, return `false`.
+ 2. On a [`WeightsTracking`](@ref), return `!tr.fixed`.
+ 3. On a [`TrackingError`](@ref), forward to the `tr.tr` field and return its answer.
+ 4. On a [`VecTr`](@ref), apply steps 1 to 3 to every entry and reduce with `any`.
+
+# Arguments
+
+  - `tr`: One tracking algorithm, one tracking result, or a vector of tracking results.
+
+# Returns
+
+  - `Bool`: `true` if previous weights are needed, `false` otherwise.
+
+# Related
+
+  - [`AbstractTrackingAlgorithm`](@ref)
+  - [`WeightsTracking`](@ref)
+  - [`ReturnsTracking`](@ref)
+  - [`TrackingError`](@ref)
+  - [`VecTr`](@ref)
+  - [`factory(tr::WeightsTracking, w::VecNum)`](@ref): The verb that reads the same `fixed` flag.
+  - [`Turnover`](@ref): Carries the same `fixed` flag and the same `any` rule one family across.
+"""
 function needs_previous_weights(tr::TrackingError)
     return needs_previous_weights(tr.tr)
 end

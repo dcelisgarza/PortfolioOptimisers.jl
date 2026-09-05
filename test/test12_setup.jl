@@ -17,7 +17,7 @@ sets = UniverseSets(;
                                      1, 2]))
 fsets = UniverseSets(; dict = Dict("nx" => rd.nf))
 # The post-#224 shape for a factor-flavoured consumer: both axes declared, factors under
-# `fkey`. `fsets` keeps the pre-migration shape for the consumers still reading `xkey`.
+# `tfkey`. `fsets` keeps the pre-migration shape for the consumers still reading `xkey`.
 xfsets = UniverseSets(; dict = Dict("nx" => rd.nx, "nf" => rd.nf))
 # The dual-axis shape `AugmentedBlackLittermanPrior` needs: `sets`' asset groups, which its
 # `a_views` resolve against, *plus* the declared factor axis its `f_views` land on.
@@ -53,6 +53,28 @@ slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
                               "reduced_tol_gap_rel" => 1e-4, "reduced_tol_ktratio" => 1e-3,
                               "reduced_tol_feas" => 1e-4, "reduced_tol_infeas_abs" => 1e-4,
                               "reduced_tol_infeas_rel" => 1e-4))]
+# A value at risk view binds the posterior mass of the tail at its target to `alpha`, and an
+# entropy pooling solve meets that constraint to about `1e-8`. The posterior value at risk is a
+# sample order statistic: `ValueatRisk` reads the first observation whose cumulative weight
+# reaches `alpha`, so a mass short of `alpha` by that much reads the next observation down the
+# tail. `var_view_floor` returns that observation, which is the largest loss the target excludes.
+# A posterior at or above it meets the view to the resolution the sample has, and an assertion
+# written against it does not turn on the sign of a solver residual. See issues #573 and #695.
+function var_view_floor(x::AbstractVector, target::Real)
+    losses = sort(x)
+    k = count(<=(-target), x)
+    return -losses[min(k + 1, length(losses))]
+end
+# The companion of `var_view_floor`. It returns the smallest loss the target includes, which is
+# the reading a solve gives when the posterior tail mass meets `alpha` from above rather than
+# falling short of it. Together the two functions state both observations a value at risk view
+# can read, and a reading between them meets the view to the resolution the sample has. See
+# issues #573, #695 and #697.
+function var_view_ceiling(x::AbstractVector, target::Real)
+    losses = sort(x)
+    k = count(<=(-target), x)
+    return -losses[max(k, 1)]
+end
 T = size(rd.X, 1)
 iT = inv(T)
 w = StatsBase.pweights(range(iT, iT; length = T))

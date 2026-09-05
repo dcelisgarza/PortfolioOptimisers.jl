@@ -1,0 +1,32 @@
+# Cross-Sectional Factor Prior internals
+
+The verbs a [`CrossSectionalFactorPrior`](@ref) composes: the carrier it hands its Exposure Estimators, the exposure history and its dependency order, the two masks the fit runs on, the idiosyncratic block, the scenario reconstruction, and the lift onto the assets.
+
+```@docs
+PortfolioOptimisers.cross_sectional_prior_pairs
+PortfolioOptimisers.cross_sectional_benchmark_carrier
+PortfolioOptimisers.cross_sectional_exposure_order
+PortfolioOptimisers.cross_sectional_exposure_widths
+PortfolioOptimisers.cross_sectional_exposure_write!
+PortfolioOptimisers.cross_sectional_exposure_history
+PortfolioOptimisers.cross_sectional_exposures_finite
+PortfolioOptimisers.cross_sectional_warmup
+PortfolioOptimisers.cross_sectional_eligible
+PortfolioOptimisers.assert_cross_sectional_coverage
+PortfolioOptimisers.cross_sectional_idiosyncratic_covariance
+PortfolioOptimisers.cross_sectional_finite_mean
+PortfolioOptimisers.cross_sectional_standardised_residuals
+PortfolioOptimisers.cross_sectional_scenarios
+PortfolioOptimisers.cross_sectional_investable
+PortfolioOptimisers.cross_sectional_panel_masks
+PortfolioOptimisers.cross_sectional_cap_finite!
+PortfolioOptimisers.cross_sectional_needs_market_cap
+PortfolioOptimisers.cross_sectional_rows
+PortfolioOptimisers.cross_sectional_reduced_loadings
+PortfolioOptimisers.cross_sectional_neutralise!
+PortfolioOptimisers.cross_sectional_family_basis
+PortfolioOptimisers.cross_sectional_basis_now
+PortfolioOptimisers.cross_sectional_expand
+PortfolioOptimisers.cross_sectional_residual_block
+PortfolioOptimisers.cross_sectional_lift
+```

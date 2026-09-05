@@ -1,5 +1,4 @@
 The source files can be found in [examples/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../../examples/2_moments_priors/05_Black_Litterman.jl"
 ```
@@ -110,9 +109,9 @@ sets = UniverseSets(;
 
 Views are plain strings, and Black–Litterman understands three shapes:
 
-- **Absolute** — `"AAPL == 0.0008"`: Apple returns 8 bps a day.
-- **Relative** — `"MSFT - AMD == 0.0005"`: Microsoft beats AMD by 5 bps.
-- **Group** — `"tech == 0.0006"`: the tech group averages 6 bps.
+  - **Absolute** — `"AAPL == 0.0008"`: Apple returns 8 bps a day.
+  - **Relative** — `"MSFT - AMD == 0.0005"`: Microsoft beats AMD by 5 bps.
+  - **Group** — `"tech == 0.0006"`: the tech group averages 6 bps.
 
 We build one posterior per view type and compare the resulting expected returns against the
 equilibrium prior. A key property to notice: BL views are *soft*. The posterior does not

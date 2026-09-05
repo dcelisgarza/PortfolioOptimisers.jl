@@ -1,0 +1,781 @@
+#=
+The condition 2 and 3 sweep of `src/01_Base/` (#439, child map 1 of #404).
+
+Every claim below is computed and compared, never read. The file's other units are checked
+where they are used: the equation and resource caps, the preference channel and the
+suggestion threshold in `test_02_equation_parsing.jl`, and `failed_solve_msg` in
+`test_01_structs.jl`. What is left is the compact-show contract, the `ScopedConfig` restore
+path, the message builders, the iteration protocol, the norm seam and the partial-fit
+state seam.
+=#
+using PortfolioOptimisers, Test, Clustering, JuMP, StableRNGs, StatsBase
+using PortfolioOptimisers: @define_pretty_show, compact_show_budget,
+                           pretty_show_vector_summary, pretty_show_vector_element,
+                           pretty_show_vector_body, pretty_show_fields
+import PortfolioOptimisers: has_pretty_show_method, show_fields
+
+# `@define_pretty_show` escapes its whole body, so a caller outside the module must bring the
+# six names the body uses into scope, and must `import` the one it adds a method to. These
+# probes exercise the branches no shipped type reaches: an empty field list, a vector field of
+# renderable elements, and a `DataType` field.
+struct PSFieldless end
+struct PSLeaf
+    a::Int
+end
+struct PSProbe
+    leaf::PSLeaf
+    rs::Vector{PSLeaf}
+    dt::DataType
+    n::Nothing
+end
+@define_pretty_show(PSFieldless)
+@define_pretty_show(PSLeaf)
+@define_pretty_show(PSProbe)
+
+# The `nothing`-field switch. `PSAllNothing` has fields and every one holds `nothing`, so the
+# shipped default renders it as fieldless. `PSParent` holds it as its last field, so the
+# parent's connector reads the child's RESOLVED field list, not its declared one. `PSHook`
+# overloads `show_fields` and always hides `drop`, whatever `drop` holds.
+struct PSAllNothing
+    a::Nothing
+    b::Nothing
+end
+struct PSParent
+    child::PSAllNothing
+end
+struct PSHook
+    keep::Int
+    drop::Int
+end
+@define_pretty_show(PSAllNothing)
+@define_pretty_show(PSParent)
+@define_pretty_show(PSHook)
+show_fields(::PSHook) = (:keep,)
+
+# A `DynamicAbstractWeights` with no `get_observation_weights` method of its own. The whole
+# point of the type is that the unimplemented shape raises rather than computing unweighted.
+struct NoWeightsProbe <: PortfolioOptimisers.DynamicAbstractWeights end
+
+# Three partial-fit state probes. `PFSBare` implements nothing, so it reaches the generic
+# `merge_states` that names the method its family owes. `PFSOther` is a second struct, so a pair
+# drawn from both is a type mismatch. `PFSFull` implements the interface the way a shipped state
+# will: it calls `assert_mergeable_states` first, refuses the mismatch its own family adds, and
+# folds the triple with `chan_merge`.
+struct PFSBare <: PortfolioOptimisers.AbstractPartialFitState
+    n::Int
+    mu::Vector{Float64}
+    M::Vector{Float64}
+end
+struct PFSOther <: PortfolioOptimisers.AbstractPartialFitState
+    n::Int
+end
+struct PFSFull <: PortfolioOptimisers.AbstractPartialFitState
+    decay::Float64
+    n::Int
+    mu::Vector{Float64}
+    M::Matrix{Float64}
+end
+function PortfolioOptimisers.merge_states(a::PFSFull, b::PFSFull)
+    PortfolioOptimisers.assert_mergeable_states(a, b)
+    if a.decay != b.decay
+        throw(ArgumentError("two states of different decay cannot be merged, but `a` has $(a.decay) and `b` has $(b.decay)."))
+    end
+    n, mu, M = PortfolioOptimisers.chan_merge(a.n, a.mu, a.M, b.n, b.mu, b.M)
+    return PFSFull(a.decay, n, mu, M)
+end
+
+# The batch state of `X`, so a merged state is compared against the state the whole block gives.
+# `M` is the accumulator, not the covariance, so nothing is divided by a count.
+function batch_state(X)
+    n = size(X, 1)
+    mu = vec(sum(X; dims = 1)) / n
+    D = X .- transpose(mu)
+    return n, mu, transpose(D) * D
+end
+
+render(f) = (io = IOBuffer(); f(io); String(take!(io)))
+
+# A type declared in a test sandbox renders module-qualified, so the expected text is built
+# from the names themselves. The layout, the connectors and the padding are still exact.
+const LEAF = string(PSLeaf)
+const PROBE = string(PSProbe)
+
+@testset "@define_pretty_show renders every branch" begin
+    pe = PortfolioOptimisers
+    probe = PSProbe(PSLeaf(1), [PSLeaf(2), PSLeaf(3)], Float64, nothing)
+    # An empty field list prints `T()` and returns, so no connector is drawn.
+    @test render(io -> show(io, PSFieldless())) == "$(string(PSFieldless))()\n"
+    # `:compact` and `:multiline` each print the type name alone.
+    @test render(io -> show(IOContext(io, :compact => true), PSLeaf(1))) == "$(LEAF)\n"
+    @test render(io -> show(IOContext(io, :multiline => true), PSLeaf(1))) == "$(LEAF)\n"
+    # The full rendering, one line per field, each field through its own branch. The `n`
+    # field holds `nothing`, so the shipped default hides it and the `┴` marker lands on the
+    # last RENDERED field, `dt`. The documentation setting renders `n` as well.
+    @test render(io -> show(io, probe)) ==
+          join(["$(PROBE)", "  leaf ┼ $(LEAF)", "       │   a ┴ Int64: 1",
+                "    rs ┼ 2-element Vector{$(LEAF)}", "       │ $(LEAF) ⋯",
+                "       │ $(LEAF) ⋯", "    dt ┴ DataType: Float64", ""], '\n')
+    full = pe.with_show_nothing_fields(true) do
+        return render(io -> show(io, probe))
+    end
+    @test full == join(["$(PROBE)", "  leaf ┼ $(LEAF)", "       │   a ┴ Int64: 1",
+                        "    rs ┼ 2-element Vector{$(LEAF)}", "       │ $(LEAF) ⋯",
+                        "       │ $(LEAF) ⋯", "    dt ┼ DataType: Float64", "     n ┴ nothing", ""],
+                       '\n')
+    # A `DataType` field prints its type and the wrapper name of the value, so a parametrised
+    # type reports the wrapper it instantiates.
+    @test occursin("dt ┴ DataType: Array",
+                   render(io -> show(io,
+                                     PSProbe(PSLeaf(1), [PSLeaf(2)], Vector{Float64},
+                                             nothing))))
+    # `:po_compact` reaches the nested buffer, so the budget applies at every depth. At a
+    # budget of one line the nested leaf collapses to `Name ⋯` and the vector loses its tail.
+    @test render(io -> show(IOContext(io, :po_compact => 1), probe)) ==
+          join(["$(PROBE)", "  leaf ┼ $(LEAF) ⋯", "    rs ┼ 2-element Vector{$(LEAF)}",
+                "       │ $(LEAF) ⋯", "       │ ⋮", "    dt ┴ DataType: Float64", ""], '\n')
+    # A budget the rendering fits under changes nothing.
+    @test render(io -> show(IOContext(io, :po_compact => 3), probe)) ==
+          render(io -> show(io, probe))
+    # The macro reads the value with `getproperty`, so it is the flattened surface of
+    # `@forward_properties` that stays out of `show`, not the swapped value of a real field.
+    @test length(fieldnames(PSProbe)) == 4
+    @test all(f -> hasfield(PSProbe, f), fieldnames(PSProbe))
+end
+@testset "The nothing-field switch and the show_fields hook" begin
+    pe = PortfolioOptimisers
+    probe = PSProbe(PSLeaf(1), [PSLeaf(2)], Float64, nothing)
+    ALL = string(PSAllNothing)
+    PARENT = string(PSParent)
+    HOOK = string(PSHook)
+    shown(x) = render(io -> show(io, x))
+    has_n(x) = occursin("n ┴ nothing", shown(x))
+    # The shipped default hides a `nothing` field, and the global setter renders it.
+    @test pe.SHOW_NOTHING_FIELDS[].default === false
+    @test isempty(pe.SHOW_NOTHING_FIELDS[].by_type)
+    @test !has_n(probe)
+    @test pe.set_show_nothing_fields!(true).default === true
+    @test has_n(probe)
+    pe.set_show_nothing_fields!(false)
+    @test !has_n(probe)
+    # A per-name entry beats the global switch, in both directions, and `nothing` removes it.
+    pe.set_show_nothing_fields!(:PSProbe, true)
+    @test has_n(probe)
+    pe.set_show_nothing_fields!(true)
+    pe.set_show_nothing_fields!(:PSProbe, false)
+    @test !has_n(probe)
+    @test pe.set_show_nothing_fields!(:PSProbe, nothing).by_type == Dict{Symbol, Bool}()
+    @test has_n(probe)
+    pe.set_show_nothing_fields!(false)
+    @test !has_n(probe)
+    # `with_show_nothing_fields` is scoped: the override holds inside, a task spawned inside
+    # inherits it, the global default is untouched, and the previous value returns on exit,
+    # including through an error.
+    pe.with_show_nothing_fields(true) do
+        @test has_n(probe)
+        @test fetch(Threads.@spawn has_n(probe))
+        @test (@atomic pe.SHOW_NOTHING_FIELDS.default).default === false
+    end
+    @test !has_n(probe)
+    pe.with_show_nothing_fields(:PSProbe, true) do
+        @test has_n(probe)
+        # A nested override inherits the enclosing per-name entry, so the global `false`
+        # inside does not hide `n`.
+        pe.with_show_nothing_fields(false) do
+            @test has_n(probe)
+        end
+        pe.with_show_nothing_fields(:PSProbe, nothing) do
+            @test !has_n(probe)
+        end
+    end
+    @test_throws ErrorException pe.with_show_nothing_fields(true) do
+        @test has_n(probe)
+        error("restore")
+    end
+    @test !has_n(probe)
+    # A type whose every field is `nothing` still renders its name, with no empty body. As
+    # the last field of a parent it prints on one line, so the parent's connector is `┴`.
+    @test shown(PSAllNothing(nothing, nothing)) == "$(ALL)()\n"
+    @test shown(PSParent(PSAllNothing(nothing, nothing))) ==
+          join(["$(PARENT)", "  child ┴ $(ALL)()", ""], '\n')
+    pe.with_show_nothing_fields(true) do
+        @test shown(PSAllNothing(nothing, nothing)) ==
+              join(["$(ALL)", "  a ┼ nothing", "  b ┴ nothing", ""], '\n')
+        @test shown(PSParent(PSAllNothing(nothing, nothing))) ==
+              join(["$(PARENT)", "  child ┼ $(ALL)", "        │   a ┼ nothing",
+                    "        │   b ┴ nothing", ""], '\n')
+    end
+    # A `show_fields` overload hides `drop` whatever it holds and whatever the global switch
+    # says. A per-name `true` entry overrides the overload and renders every declared field,
+    # and a per-name `false` entry keeps the overload's list.
+    hook = PSHook(1, 2)
+    @test pretty_show_fields(hook) == [:keep]
+    @test shown(hook) == join(["$(HOOK)", "  keep ┴ Int64: 1", ""], '\n')
+    pe.with_show_nothing_fields(true) do
+        @test pretty_show_fields(hook) == (:keep,)
+        @test shown(hook) == join(["$(HOOK)", "  keep ┴ Int64: 1", ""], '\n')
+    end
+    pe.with_show_nothing_fields(:PSHook, true) do
+        @test pretty_show_fields(hook) == (:keep, :drop)
+        @test shown(hook) ==
+              join(["$(HOOK)", "  keep ┼ Int64: 1", "  drop ┴ Int64: 2", ""], '\n')
+    end
+    pe.with_show_nothing_fields(:PSHook, false) do
+        @test pretty_show_fields(hook) == [:keep]
+    end
+    # The resolver returns the declared tuple when the switch is on, and a filtered vector
+    # when it is off, whether or not a field was dropped.
+    @test pretty_show_fields(PSLeaf(1)) == [:a]
+    @test pretty_show_fields(probe) == [:leaf, :rs, :dt]
+    pe.with_show_nothing_fields(true) do
+        @test pretty_show_fields(PSLeaf(1)) == (:a,)
+        @test pretty_show_fields(probe) == (:leaf, :rs, :dt, :n)
+    end
+    @test pe.SHOW_NOTHING_FIELDS[].default === false
+    @test isempty(pe.SHOW_NOTHING_FIELDS[].by_type)
+end
+@testset "The vector rendering helpers" begin
+    # The summary names the element type when every element shares a wrapper, and falls back
+    # to the vector's own element type otherwise.
+    @test pretty_show_vector_summary([PSLeaf(1), PSLeaf(2)]) == "2-element Vector{$(LEAF)}"
+    @test pretty_show_vector_summary(Union{PSLeaf, PSFieldless}[PSLeaf(1), PSFieldless()]) ==
+          "2-element Vector{Union{$(string(PSFieldless)), $(LEAF)}}"
+    @test pretty_show_vector_summary([PSLeaf(1), PSFieldless()]) == "2-element Vector{Any}"
+    # An element with fields is elided; a fieldless one has nothing to elide.
+    @test pretty_show_vector_element(PSLeaf(1)) == "$(LEAF) ⋯"
+    @test pretty_show_vector_element(PSFieldless()) == string(PSFieldless)
+    # No budget, or a budget the vector fits under, returns the lines unchanged.
+    lines = ["a", "b", "c", "d", "e"]
+    @test pretty_show_vector_body(IOBuffer(), lines) === lines
+    @test pretty_show_vector_body(IOContext(IOBuffer(), :po_compact => 5), lines) === lines
+    # Over budget, the head keeps `cld(budget, 2)` lines and the tail keeps the rest, so an
+    # odd budget spends its extra line on the head.
+    @test pretty_show_vector_body(IOContext(IOBuffer(), :po_compact => 4), lines) ==
+          ["a", "b", "⋮", "d", "e"]
+    @test pretty_show_vector_body(IOContext(IOBuffer(), :po_compact => 3), lines) ==
+          ["a", "b", "⋮", "e"]
+    @test pretty_show_vector_body(IOContext(IOBuffer(), :po_compact => 2), lines) ==
+          ["a", "⋮", "e"]
+    @test pretty_show_vector_body(IOContext(IOBuffer(), :po_compact => 1), lines) ==
+          ["a", "⋮"]
+end
+@testset "has_pretty_show_method covers the three foreign types" begin
+    # A parent finds that a field renders through the macro by this predicate. The three
+    # foreign types print their own way, and everything else answers `false`.
+    @test has_pretty_show_method(JuMP.Model())
+    @test has_pretty_show_method(hclust([0.0 1.0; 1.0 0.0]))
+    @test has_pretty_show_method(kmeans(randn(StableRNG(123456789), 3, 20), 2))
+    @test has_pretty_show_method(PSLeaf(1))
+    @test !has_pretty_show_method(1)
+    @test !has_pretty_show_method("a")
+end
+@testset "compact_show_budget resolves its five branches" begin
+    pe = PortfolioOptimisers
+    # Without `:po_compact`, collapsing applies only to height-limited output, so a plain
+    # buffer, a `string` or a file write expands fully.
+    @test isnothing(compact_show_budget(IOBuffer()))
+    # Height-limited output reads the global setting. The automatic budget is four lines
+    # under the terminal height, with a floor of eight.
+    @test compact_show_budget(IOContext(IOBuffer(), :limit => true)) == 20
+    @test displaysize(IOContext(IOBuffer(), :limit => true)) == (24, 80)
+    @test compact_show_budget(IOContext(IOBuffer(), :limit => true,
+                                        :displaysize => (30, 80))) == 26
+    @test compact_show_budget(IOContext(IOBuffer(), :limit => true,
+                                        :displaysize => (10, 80))) == 8
+    # A per-call `:po_compact` overrides both, and skips the `:limit` test entirely.
+    @test isnothing(compact_show_budget(IOContext(IOBuffer(), :po_compact => false)))
+    @test compact_show_budget(IOContext(IOBuffer(), :po_compact => 7)) == 7
+    @test compact_show_budget(IOContext(IOBuffer(), :po_compact => true)) == 20
+    # The global setting takes the same three values, and the integer form is a fixed budget.
+    pe.with_compact_show(false) do
+        return @test isnothing(compact_show_budget(IOContext(IOBuffer(), :limit => true)))
+    end
+    pe.with_compact_show(5) do
+        return @test compact_show_budget(IOContext(IOBuffer(), :limit => true)) == 5
+    end
+    @test pe.COMPACT_SHOW[] === true
+end
+@testset "ScopedConfig restores the previous value on a throw" begin
+    pe = PortfolioOptimisers
+    # The outer constructor takes the element type from the value; the inner one converts.
+    cfg = pe.ScopedConfig(3)
+    @test cfg isa pe.ScopedConfig{Int}
+    @test cfg[] === 3
+    @test pe.ScopedConfig{Float64}(3)[] === 3.0
+    @test_throws InexactError pe.ScopedConfig{Int}(1.5)
+    # `set_default!` converts before it stores and returns the stored value.
+    @test pe.set_default!(cfg, 5) === 5
+    @test cfg[] === 5
+    @test pe.set_default!(pe.ScopedConfig{Float64}(0.0), 2) === 2.0
+    # A scoped override is restored when the block returns and when it raises.
+    @test pe.with_config(cfg, 7) do
+        return cfg[]
+    end == 7
+    @test cfg[] === 5
+    @test_throws ErrorException pe.with_config(cfg, 7) do
+        @test cfg[] === 7
+        return error("boom")
+    end
+    @test cfg[] === 5
+    # The same on each of the four shipped verbs, which is the property a caller relies on
+    # when it wraps an untrusted batch: a raise inside the block must not leak the override.
+    @test_throws ErrorException pe.with_string_distance(; min_score = 1.5) do
+        @test pe.STRING_DISTANCE[].min_score == 1.5
+        return error("boom")
+    end
+    @test pe.STRING_DISTANCE[].min_score == 0.7
+    @test_throws ErrorException pe.with_equation_limits(; max_length = 8) do
+        @test pe.EQUATION_LIMITS[].max_length == 8
+        return error("boom")
+    end
+    @test pe.EQUATION_LIMITS[].max_length == 4096
+    @test_throws ErrorException pe.with_resource_limits(; max_bins = 3) do
+        @test pe.RESOURCE_LIMITS[].max_bins == 3
+        return error("boom")
+    end
+    @test pe.RESOURCE_LIMITS[].max_bins == 10_000
+    @test_throws ErrorException pe.with_compact_show(4) do
+        @test pe.COMPACT_SHOW[] === 4
+        return error("boom")
+    end
+    @test pe.COMPACT_SHOW[] === true
+end
+@testset "A `with_*` inherits from the active value, a `set_*!` from the global" begin
+    pe = PortfolioOptimisers
+    # This is the fact each pair owes its reader. A nested `with_*` defaults an omitted
+    # keyword from the enclosing override, so overrides compose; a `set_*!` defaults it from
+    # the global default, so it cannot be used to amend an override.
+    try
+        pe.with_string_distance(; min_score = 0.9) do
+            pe.with_string_distance(; dist = pe.StringDistances.DamerauLevenshtein()) do
+                @test pe.STRING_DISTANCE[].min_score == 0.9
+                return @test pe.STRING_DISTANCE[].dist isa
+                             pe.StringDistances.DamerauLevenshtein
+            end
+            pe.set_string_distance!(; dist = pe.StringDistances.DamerauLevenshtein())
+            # The global default now carries the shipped 0.7, not the active 0.9.
+            return @test (@atomic pe.STRING_DISTANCE.default).min_score == 0.7
+        end
+    finally
+        pe.set_string_distance!(; dist = pe.StringDistances.Levenshtein(), min_score = 0.7)
+    end
+    @test pe.STRING_DISTANCE[].min_score == 0.7
+    @test pe.STRING_DISTANCE[].dist isa pe.StringDistances.Levenshtein
+end
+@testset "The suggestion admits by score and breaks a tie by position" begin
+    pe = PortfolioOptimisers
+    SD = pe.StringDistances
+    # The normalised similarity is what the threshold gates. Both candidates score the same
+    # against `APL`, so the collection's own order decides which one the message names.
+    @test SD.compare("APL", "AAPL", SD.Levenshtein()) == 0.75
+    @test SD.compare("APL", "APPL", SD.Levenshtein()) == 0.75
+    @test SD.compare("APL", "MSFT", SD.Levenshtein()) == 0.0
+    @test pe.did_you_mean("APL", ["MSFT", "APPL", "AAPL"]) == " (did you mean `APPL`?)"
+    @test pe.did_you_mean("APL", ["AAPL", "APPL", "MSFT"]) == " (did you mean `AAPL`?)"
+    # `suggest_declared_key` exists because the strict global default is dead code over short
+    # keys. The docstring's own example: a transposition scores 0.5 under Levenshtein, below
+    # the 0.7 threshold, and 0.75 under Damerau-Levenshtein, above the looser 0.5.
+    @test SD.compare("nuon", "noun", SD.Levenshtein()) == 0.5
+    @test SD.compare("nuon", "noun", SD.DamerauLevenshtein()) == 0.75
+    @test pe.did_you_mean("nuon", ["noun", "axis"]) == ""
+    @test pe.suggest_declared_key(:nuon, (:noun, :axis)) == " (did you mean `noun`?)"
+    # The looser configuration is scoped, so it leaves the global default alone.
+    @test pe.STRING_DISTANCE[].min_score == 0.7
+    @test pe.STRING_DISTANCE[].dist isa SD.Levenshtein
+    # Nothing close enough still draws no suggestion, at either threshold.
+    @test pe.suggest_declared_key("zzzz", (:noun, :axis)) == ""
+    @test pe.did_you_mean("APL", String[]) == ""
+end
+@testset "The message builders name a size, never a universe" begin
+    pe = PortfolioOptimisers
+    nx = ["AAPL", "MSFT", "GOOG"]
+    # `axis` names the universe the variable was written against, and it inflects the noun.
+    m = pe.unknown_variable_msg("APL", nx, "nx"; axis = "factor")
+    @test occursin("not in factor universe (3 factors under key `nx`)", m)
+    @test occursin("did you mean `AAPL`?", m)
+    # A wider candidate pool can name a mistyped group, and the reported size stays the
+    # universe's, not the pool's.
+    mg = pe.unknown_variable_msg("techh", nx, "nx"; candidates = vcat(nx, "tech"))
+    @test occursin("(3 assets under key `nx`)", mg)
+    @test occursin("did you mean `tech`?", mg)
+    # A re-based row that resolved but projected to zero is a different failure from a row
+    # whose names missed, so it gets its own text and names no typo.
+    mp = pe.empty_projected_row_msg("f1 >= 0", ["f1", "f2"], "nf", 5)
+    @test occursin("resolved against the factor universe (2 factors under key `nf`)", mp)
+    @test occursin("projected to an all-zero row over 5 assets", mp)
+    @test !occursin("did you mean", mp)
+    @test occursin("view `",
+                   pe.empty_projected_row_msg("f1 == 0", ["f1"], "nf", 2; noun = "view"))
+    # A group that resolved but whose members did not: the member names are caller input and
+    # do reach the text; the universe does not.
+    mm = pe.missing_group_assets_msg("tech", ["APL"], nx, "nx")
+    @test occursin("group `tech`: 1 member(s) not in asset universe", mm)
+    @test occursin("(3 assets under key `nx`)", mm)
+    @test occursin("[\"APL\"]", mm)
+    @test occursin("did you mean `AAPL`?", mm)
+    @test !occursin("GOOG", mm)
+    # The gross budget message names the bound size and the failed predicate, never a bound
+    # value. Scalar or absent bounds have no size, so the scope is named without a count.
+    ms = pe.gross_budget_bounds_msg(nothing, nothing)
+    @test occursin("Got weight bounds with no negative element in lb or ub.", ms)
+    mv = pe.gross_budget_bounds_msg(zeros(3), ones(3))
+    @test occursin("Got weight bounds over 3 assets with no negative element in lb or ub.",
+                   mv)
+    @test !occursin("0.0", mv)
+    @test !occursin("1.0", mv)
+    # The greater of the two lengths binds, so a scalar paired with a vector still reports.
+    @test occursin("over 4 assets", pe.gross_budget_bounds_msg(0.0, ones(4)))
+    @test occursin("over 4 assets", pe.gross_budget_bounds_msg(zeros(4), 1.0))
+    # A misaligned universe has two shapes, and the message tells them apart. A length
+    # mismatch names both counts; an order mismatch names the first position that differs.
+    ml = pe.misaligned_axis_msg(["A", "B"], ["A", "B", "C"], "asset", "nx", :nx)
+    @test occursin("2 assets are declared, but the data has 3", ml)
+    @test occursin("Set `sets.dict[\"nx\"]` to `rd.nx`", ml)
+    mo = pe.misaligned_axis_msg(["A", "B"], ["A", "C"], "asset", "nx", :nx)
+    @test occursin("both have 2 assets but the order differs, first at position 2: `B` vs `C`",
+                   mo)
+    mf = pe.misaligned_axis_msg(["f1"], ["f1", "f2"], "factor", "nf", :nf)
+    @test occursin("the factor universe declared under key `nf`", mf)
+    @test occursin("1 factors are declared, but the data has 2", mf)
+end
+@testset "strict_diagnostic branches on strict" begin
+    pe = PortfolioOptimisers
+    # One function owns the policy: the same text throws under `strict` and warns otherwise,
+    # and in both cases the offending term is dropped.
+    @test_throws ArgumentError pe.strict_diagnostic("term dropped", true)
+    err = try
+        pe.strict_diagnostic("term dropped", true)
+        nothing
+    catch e
+        e
+    end
+    @test err isa ArgumentError
+    @test err.msg == "term dropped"
+    @test_logs (:warn, "term dropped") pe.strict_diagnostic("term dropped", false)
+    @test isnothing(@test_logs (:warn, "term dropped") pe.strict_diagnostic("term dropped",
+                                                                            false))
+end
+@testset "first_error_line truncates the content, not the line" begin
+    pe = PortfolioOptimisers
+    # The cap counts the characters of the error, and the ellipsis is added on top, so a
+    # truncated line is one character longer than the cap.
+    long = pe.first_error_line(ErrorException("x"^500), 200)
+    @test length(long) == 201
+    @test long == "x"^200 * "…"
+    # A line of exactly the cap is left alone; one character more is cut.
+    @test pe.first_error_line(ErrorException("abcde"), 5) == "abcde"
+    @test pe.first_error_line(ErrorException("abcde"), 4) == "abcd…"
+    # Only the first line survives, so a multi-line payload cannot reach a log.
+    @test pe.first_error_line(ErrorException("boom\nsecond line"), 200) == "boom"
+    # A value that is not an exception is shown with `repr`.
+    @test pe.first_error_line(:boom, 200) == ":boom"
+    @test pe.first_error_line(42, 200) == "42"
+    # A trial that recorded no stage is reported under the single stage `:trial`.
+    @test pe.failed_solve_msg(Dict("s" => ErrorException("bang"))) ==
+          "Model could not be solved satisfactorily (1 solver trial(s)).\n  s: trial → bang"
+    # The keyword reaches `first_error_line`.
+    @test occursin("s: optimize! → xxxx…",
+                   pe.failed_solve_msg(Dict("s" =>
+                                                Dict(:optimize! => ErrorException("x"^20)));
+                                       max_line_length = 4))
+end
+@testset "An estimator, an algorithm and a result are one-element iterables" begin
+    pe = PortfolioOptimisers
+    # The protocol lets a caller write one estimator where the API takes a collection, so a
+    # scalar and a one-element vector are the same input.
+    for obj in (L1Norm(), pe.NoDefault(), pe.VecScalar(; v = [1.0, 2.0], s = 3.0))
+        @test length(obj) == 1
+        @test only(collect(obj)) === obj
+        @test first(obj) === obj
+        @test obj[1] === obj
+        @test iterate(obj) === (obj, 2)
+        @test isnothing(iterate(obj, 2))
+        @test_throws BoundsError obj[2]
+        @test_throws BoundsError obj[0]
+    end
+end
+@testset "assert_gt0 over each of its five shapes" begin
+    pe = PortfolioOptimisers
+    # The guard is one verb over five containers, and each states the predicate it failed.
+    @test isnothing(pe.assert_gt0(Dict(:a => 1.0, :b => 2.0)))
+    @test_throws DomainError pe.assert_gt0(Dict(:a => 1.0, :b => 0.0))
+    @test isnothing(pe.assert_gt0([:a => 1.0, :b => 2.0]))
+    @test_throws DomainError pe.assert_gt0([:a => 1.0, :b => -1.0])
+    @test isnothing(pe.assert_gt0(:a => 1.0))
+    @test_throws DomainError pe.assert_gt0(:a => 0.0)
+    @test isnothing(pe.assert_gt0([1.0, 2.0]))
+    @test_throws DomainError pe.assert_gt0([1.0, 0.0])
+    @test isnothing(pe.assert_gt0(1.0))
+    @test_throws DomainError pe.assert_gt0(0.0)
+    # The message names the symbol the caller passed, so the report points at the keyword.
+    derr = try
+        pe.assert_gt0(Dict(:a => 0.0), :n_sim)
+        nothing
+    catch e
+        e
+    end
+    @test derr isa DomainError
+    # The guard builds `DomainError(text)`, so the text is the `val` field, not the `msg`.
+    @test derr.msg == ""
+    @test occursin("all(x -> 0 < x, values(n_sim)) must hold", derr.val)
+    perr = try
+        pe.assert_gt0(:a => 0.0, :alpha)
+        nothing
+    catch e
+        e
+    end
+    @test perr isa DomainError
+    @test occursin("0 < alpha[2] must hold", perr.val)
+    # The composed guards take a value of any of the five shapes, and their varargs method
+    # accepts everything else without a check, which is how an absent value passes through.
+    @test isnothing(pe.assert_nonempty_gt0_finite_val([1.0, 2.0]))
+    @test_throws DomainError pe.assert_nonempty_gt0_finite_val([1.0, 0.0])
+    @test isnothing(pe.assert_nonempty_gt0_finite_val(nothing))
+    @test isnothing(pe.assert_nonempty_nonneg_finite_val(nothing))
+    @test isnothing(pe.assert_nonempty_finite_val(nothing))
+end
+@testset "The two unit-interval guards differ only at the ends" begin
+    pe = PortfolioOptimisers
+    # The open guard refuses both ends; the closed one takes them. That is the whole of the
+    # difference, and it is why a compression weight needs the second and a probability the
+    # first.
+    @test isnothing(pe.assert_unit_interval(0.5))
+    @test isnothing(pe.assert_closed_unit_interval(0.5))
+    @test_throws DomainError pe.assert_unit_interval(0.0)
+    @test_throws DomainError pe.assert_unit_interval(1.0)
+    @test isnothing(pe.assert_closed_unit_interval(0.0))
+    @test isnothing(pe.assert_closed_unit_interval(1.0))
+    @test_throws DomainError pe.assert_closed_unit_interval(-eps())
+    @test_throws DomainError pe.assert_closed_unit_interval(1.0 + eps())
+    # Each message states the predicate that failed and names the symbol the caller passed.
+    oerr = try
+        pe.assert_unit_interval(1.0, :alpha)
+        nothing
+    catch e
+        e
+    end
+    cerr = try
+        pe.assert_closed_unit_interval(1.5, :n7)
+        nothing
+    catch e
+        e
+    end
+    @test oerr isa DomainError
+    @test cerr isa DomainError
+    # The guards build `DomainError(text)`, so the text is the `val` field, not the `msg`.
+    @test oerr.val == "0 < alpha < 1 must hold. Got\nalpha => 1.0"
+    @test cerr.val == "0 <= n7 <= 1 must hold. Got\nn7 => 1.5"
+    # Both carry the varargs method that checks nothing, which is how a slot holding a
+    # Calibration Rule passes a guard written for a number.
+    rule = ScenarioCount(; n = 5)
+    @test isnothing(pe.assert_unit_interval(nothing))
+    @test isnothing(pe.assert_closed_unit_interval(nothing))
+    @test isnothing(pe.assert_closed_unit_interval(rule, :n))
+end
+@testset "norm_factor and norm_error carry the units of the alg" begin
+    pe = PortfolioOptimisers
+    a, b = [0.5, 0.5], [0.2, 0.9]
+    # With no observation count there is nothing to normalise by, whatever the alg.
+    @test pe.norm_factor(nothing, nothing) == 1
+    @test pe.norm_factor(L2Norm(), nothing) == 1
+    @test pe.norm_factor(SquaredL2Norm(), nothing) == 1
+    @test pe.norm_factor(L1Norm(), nothing) == 1
+    @test pe.norm_factor(LpNorm(), nothing) == 1
+    @test pe.norm_factor(LInfNorm(), nothing) == 1
+    # `a - b` has norm 0.5 exactly, which separates the squaring alg from the plain one.
+    @test pe.norm_error(L2Norm(), a, b) == 0.5
+    @test pe.norm_error(SquaredL2Norm(), a, b) == 0.25
+    # The single-argument arity is the same measure over `a` alone.
+    @test pe.norm_error(SquaredL2Norm(), a - b) == 0.25
+    @test pe.norm_error(L2Norm(), a - b) == 0.5
+    @test pe.norm_error(nothing, a - b) == 0.5
+    # The observation count divides, and each alg divides by its own factor. `L2Norm` takes
+    # the square root and `SquaredL2Norm` does not, so the second is the square of the first.
+    @test pe.norm_factor(L2Norm(; ddof = 1), 5) == 2.0
+    @test pe.norm_factor(SquaredL2Norm(; ddof = 1), 5) == 4
+    @test pe.norm_error(L2Norm(), a, b, 5) == 0.25
+    @test pe.norm_error(SquaredL2Norm(), a, b, 5) == 0.0625
+    @test pe.norm_error(SquaredL2Norm(), a - b, 5) == 0.0625
+    @test pe.norm_error(SquaredL2Norm(), a, b, 5) == pe.norm_error(L2Norm(), a, b, 5)^2
+end
+@testset "An unimplemented observation-weight shape names the shape" begin
+    pe = PortfolioOptimisers
+    # The refusal names the arity that is missing, so the reader knows which method to write.
+    # With no data argument at all there is no shape to name, and the text says so.
+    err = try
+        pe.get_observation_weights(NoWeightsProbe())
+        nothing
+    catch e
+        e
+    end
+    @test err isa pe.ObservationWeightsError
+    @test occursin("no `get_observation_weights` method for the given input", err.msg)
+    @test occursin("NoWeightsProbe is a DynamicAbstractWeights", err.msg)
+    merr = try
+        pe.get_observation_weights(NoWeightsProbe(), ones(3, 10))
+        nothing
+    catch e
+        e
+    end
+    @test merr isa pe.ObservationWeightsError
+    @test occursin("for a 2-dimensional input of size (3, 10)", merr.msg)
+    # The two shapes that need no method: nothing computes unweighted, and a plain vector is
+    # already the weights.
+    @test isnothing(pe.get_observation_weights(nothing, ones(3, 10)))
+    @test pe.get_observation_weights([1.0, 2.0]) == [1.0, 2.0]
+end
+
+@testset "A partial-fit state is a Result under its own root" begin
+    pe = PortfolioOptimisers
+    # The root buys the length-1 iteration protocol and the pretty show, so it sits under
+    # `AbstractResult` and neither `Union` of the protocol moves.
+    @test pe.AbstractPartialFitState <: pe.AbstractResult
+    @test supertype(pe.RegimeAdjustedVarianceCache) === pe.AbstractPartialFitState
+    s = PFSOther(3)
+    @test length(s) == 1
+    @test s[1] === s
+    @test collect(s) == [s]
+    # The root is not exported. The seam's whole public surface is the two verbs, so nothing
+    # here reaches a caller by its bare name.
+    @test :partial_fit! in names(PortfolioOptimisers)
+    @test :partial_fit in names(PortfolioOptimisers)
+    @test !(:AbstractPartialFitState in names(PortfolioOptimisers))
+    @test !(:merge_states in names(PortfolioOptimisers))
+    @test !(:chan_merge in names(PortfolioOptimisers))
+    @test !(:assert_mergeable_states in names(PortfolioOptimisers))
+end
+@testset "A view drops a state on the observation axis, whatever the family" begin
+    pe = PortfolioOptimisers
+    # One root method is the drop, so a family that adds a state owes no method of its own.
+    # `@fprop` routes the field through the verb, and the method returns `nothing`.
+    # ADR 0107.
+    for state in
+        (PFSOther(3), PFSBare(1, [1.0], [0.0]), PFSFull(0.97, 2, [1.0], fill(0.5, 1, 1)))
+        @test isnothing(pe.obs_weights_view(state, 1:5))
+        @test isnothing(pe.obs_weights_view(state, [2, 4]))
+        @test isnothing(pe.obs_weights_view(state, Colon()))
+    end
+    # The universal fallback still carries every value that is not a state.
+    @test pe.obs_weights_view(3, 1:5) == 3
+end
+@testset "assert_mergeable_states names the mismatch it refuses" begin
+    pe = PortfolioOptimisers
+    a = PFSBare(2, [1.0, 2.0], [0.5, 0.5])
+    # A pair of one struct over one asset count passes, and returns nothing.
+    @test isnothing(pe.assert_mergeable_states(a, PFSBare(3, [2.0, 3.0], [1.0, 1.0])))
+    # Two different structs. The message names both types, so the reader sees which pair was
+    # handed over rather than only that a pair was refused.
+    terr = try
+        pe.assert_mergeable_states(a, PFSOther(1))
+        nothing
+    catch e
+        e
+    end
+    @test terr isa ArgumentError
+    @test occursin("different types cannot be merged", terr.msg)
+    @test occursin("PFSBare", terr.msg)
+    @test occursin("PFSOther", terr.msg)
+    # One struct, two asset counts. The message names the field that disagrees and both shapes.
+    derr = try
+        pe.assert_mergeable_states(a, PFSBare(3, [1.0, 2.0, 3.0], [1.0, 1.0, 1.0]))
+        nothing
+    catch e
+        e
+    end
+    @test derr isa DimensionMismatch
+    @test occursin("different numbers of assets", derr.msg)
+    @test occursin("`mu`", derr.msg)
+    @test occursin("(2,)", derr.msg)
+    @test occursin("(3,)", derr.msg)
+end
+@testset "chan_merge reproduces the batch state, and is associative" begin
+    pe = PortfolioOptimisers
+    rng = StableRNG(987654321)
+    X = randn(rng, 30, 4)
+    # The three shapes the merge takes. `M` is a matrix for a co-moment, a vector for a per-asset
+    # moment, and a scalar for one series, and the outer product degenerates to a square each time.
+    nA, muA, MA = batch_state(view(X, 1:12, :))
+    nB, muB, MB = batch_state(view(X, 13:30, :))
+    n, mu, M = pe.chan_merge(nA, muA, MA, nB, muB, MB)
+    nX, muX, MX = batch_state(X)
+    @test n == nX
+    @test isapprox(mu, muX; rtol = 1e-12)
+    @test isapprox(M, MX; rtol = 1e-12)
+    # A per-asset accumulator is the diagonal of the co-moment one, so the vector method and the
+    # matrix method answer the same numbers over the same blocks.
+    nv, muv, Mv = pe.chan_merge(nA, muA, [MA[i, i] for i in axes(MA, 1)], nB, muB,
+                                [MB[i, i] for i in axes(MB, 1)])
+    @test nv == nX
+    @test isapprox(muv, muX; rtol = 1e-12)
+    @test isapprox(Mv, [MX[i, i] for i in axes(MX, 1)]; rtol = 1e-12)
+    # One series. Every operand is a scalar and the merge stays scalar.
+    x = view(X, :, 1)
+    ns, mus, Ms = pe.chan_merge(12, StatsBase.mean(view(x, 1:12)),
+                                sum(abs2, view(x, 1:12) .- StatsBase.mean(view(x, 1:12))),
+                                18, StatsBase.mean(view(x, 13:30)),
+                                sum(abs2, view(x, 13:30) .- StatsBase.mean(view(x, 13:30))))
+    @test ns == 30
+    @test isapprox(mus, StatsBase.mean(x); rtol = 1e-12)
+    @test isapprox(Ms, sum(abs2, x .- StatsBase.mean(x)); rtol = 1e-12)
+    # Associativity is the property that makes a parallel fit legal: three disjoint blocks give
+    # one state whatever order they are folded in.
+    s1 = batch_state(view(X, 1:7, :))
+    s2 = batch_state(view(X, 8:19, :))
+    s3 = batch_state(view(X, 20:30, :))
+    l = pe.chan_merge(pe.chan_merge(s1..., s2...)..., s3...)
+    r = pe.chan_merge(s1..., pe.chan_merge(s2..., s3...)...)
+    @test l[1] == r[1]
+    @test isapprox(l[2], r[2]; rtol = 1e-12)
+    @test isapprox(l[3], r[3]; rtol = 1e-12)
+    # The merge divides by the total count, so two empty blocks are refused rather than answered
+    # with NaN. This is a domain check on a count, not a tolerance.
+    @test_throws DomainError pe.chan_merge(0, [0.0], [0.0], 0, [0.0], [0.0])
+    @test_throws DomainError pe.chan_merge(0, [0.0], zeros(1, 1), 0, [0.0], zeros(1, 1))
+end
+@testset "merge_states names the method a family still owes" begin
+    pe = PortfolioOptimisers
+    # The generic method is reached only by a pair no family answers. It refuses the pair that
+    # cannot merge at all first, so a type mismatch reads as a type mismatch.
+    terr = try
+        pe.merge_states(PFSBare(1, [1.0], [0.0]), PFSOther(1))
+        nothing
+    catch e
+        e
+    end
+    @test terr isa ArgumentError
+    @test occursin("different types cannot be merged", terr.msg)
+    # A mergeable pair whose family wrote no method names the method to write.
+    merr = try
+        pe.merge_states(PFSBare(1, [1.0], [0.0]), PFSBare(2, [2.0], [1.0]))
+        nothing
+    catch e
+        e
+    end
+    @test merr isa ArgumentError
+    @test occursin("PFSBare is an AbstractPartialFitState with no `merge_states` method",
+                   merr.msg)
+    @test occursin("merge_states(a::PFSBare, b::PFSBare)", merr.msg)
+    # A family that implements the interface reaches its own method, and the generic one never
+    # runs. The route is the one a shipped state takes: guard, family guard, fold.
+    rng = StableRNG(24680)
+    X = randn(rng, 20, 3)
+    nA, muA, MA = batch_state(view(X, 1:8, :))
+    nB, muB, MB = batch_state(view(X, 9:20, :))
+    a = PFSFull(0.94, nA, muA, MA)
+    b = PFSFull(0.94, nB, muB, MB)
+    s = pe.merge_states(a, b)
+    nX, muX, MX = batch_state(X)
+    @test s isa PFSFull
+    @test s.n == nX
+    @test isapprox(s.mu, muX; rtol = 1e-12)
+    @test isapprox(s.M, MX; rtol = 1e-12)
+    # The decay refusal the family adds runs after the generic guard, so a decay mismatch over
+    # one asset count is the message the family wrote.
+    derr = try
+        pe.merge_states(a, PFSFull(0.97, nB, muB, MB))
+        nothing
+    catch e
+        e
+    end
+    @test derr isa ArgumentError
+    @test occursin("different decay cannot be merged", derr.msg)
+end

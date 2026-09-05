@@ -1,0 +1,56 @@
+# Calibration Rules
+
+```@docs
+AbstractCalibrationAlgorithm
+AbstractSignificanceCalibrationAlgorithm
+AbstractDeformationCalibrationAlgorithm
+Num_SigCal
+Num_DefCal
+resolve_calibration_slot
+calibration_slots
+is_calibration_rule
+assert_calibrated_slots
+assert_declared_calibration_resolver
+AbstractCalibrationSeries
+AbstractDrawdownSeries
+ReturnsSeries
+AbsoluteDrawdownSeries
+RelativeDrawdownSeries
+calibration_series
+calibration_series_vec
+calibration_series_matrix
+calibration_series_dispersion
+CalibrationContext
+effective_sample_size
+ScenarioCount
+RateSignificance
+EntropyBudget
+hill_tail_index
+series_end_sign
+HillTailDecay
+whitening_factor
+radial_tail_index
+radial_series_inputs
+RadialTailDecay
+AbstractAmbiguityRadiusCalibrationAlgorithm
+AbstractAmbiguityTailWeightCalibrationAlgorithm
+Num_AmbRadCal
+Num_AmbTwtCal
+ConcentrationRadius
+RateRadius
+DimensionalRateRadius
+DualNormRadius
+dual_norm_radius_scale
+TailTermParity
+AbstractNormCeilingCalibrationAlgorithm
+Num_NormCeilCal
+Num_AmbRadNormCeilCal
+EffectiveAssetFloor
+```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

@@ -3,7 +3,7 @@
 ```@docs
 LowOrderPrior
 HighOrderPrior
-prior(pr::AbstractPriorEstimator, rd::ReturnsResult; kwargs...)
+prior(pe::AbstractPriorEstimator, rd::ReturnsResult; kwargs...)
 prior(pr::AbstractPriorResult, args...; kwargs...)
 assert_prior_regression
 prior_regression_remedy
@@ -29,5 +29,7 @@ PrE_Pr
 port_opt_view(pr::Union{Nothing, AbstractPriorEstimator}, ::Any, args...)
 port_opt_view(pr::LowOrderPrior, rd, args...)
 port_opt_view(pr::HighOrderPrior, rd, args...)
+investable_mask
 feature_matrix_picker
+PortfolioOptimisers.carrier_feature_names
 ```

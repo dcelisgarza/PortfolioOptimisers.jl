@@ -1,5 +1,4 @@
 The source files can be found in [examples/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../../examples/3_optimisers/07_Drawdown_Risk_Measures.jl"
 ```
@@ -189,14 +188,14 @@ plot!(dd_cdar; label = "Min CDaR")
 
 Drawdown measures target the *path* of cumulative wealth:
 
-- [`MaximumDrawdown`](@ref) guards against the worst single episode but can produce
+  - [`MaximumDrawdown`](@ref) guards against the worst single episode but can produce
     concentrated portfolios.
-- [`AverageDrawdown`](@ref) and [`UlcerIndex`](@ref) penalise the entire recovery curve.
-- [`ConditionalDrawdownatRisk`](@ref) is the natural drawdown analogue of CVaR and
+  - [`AverageDrawdown`](@ref) and [`UlcerIndex`](@ref) penalise the entire recovery curve.
+  - [`ConditionalDrawdownatRisk`](@ref) is the natural drawdown analogue of CVaR and
     responds to `alpha` the same way.
-  - Heatmaps of `drawdowns()` are often clearer than overlaid line plots when comparing many
+    - Heatmaps of `drawdowns()` are often clearer than overlaid line plots when comparing many
         drawdown-optimised portfolios.
-- After optimisation, `drawdowns()` and `cumulative_returns()` give the full diagnostic
+  - After optimisation, `drawdowns()` and `cumulative_returns()` give the full diagnostic
     picture for any weight vector without re-running the optimiser.
 
 ---

@@ -102,7 +102,7 @@ $(DocStringExtensions.FIELDS)
     PowerNormValueatRisk(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
         slv::Option{<:Slv_VecSlv} = nothing,
-        alpha::Number = 0.05,
+        alpha::Num_SigCal = 0.05,
         p::Number = 2.0,
         w::Option{<:ObsWeights} = nothing
     ) -> PowerNormValueatRisk
@@ -111,7 +111,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `0 < alpha < 1`.
+  - If `alpha` is a number: `0 < alpha < 1`.
   - `p >= 1`.
   - If `slv` is a `VecSlv`: `!isempty(slv)`.
   - If `w` is not `nothing`: `!isempty(w)`.
@@ -176,7 +176,7 @@ PowerNormValueatRisk
     """
     @pprop w
     function PowerNormValueatRisk(settings::RiskMeasureSettings, slv::Option{<:Slv_VecSlv},
-                                  alpha::Number, p::Number,
+                                  alpha::Num_SigCal, p::Number,
                                   w::Option{<:StatsBase.AbstractWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
@@ -191,11 +191,14 @@ PowerNormValueatRisk
     end
 end
 function PowerNormValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                              slv::Option{<:Slv_VecSlv} = nothing, alpha::Number = 0.05,
+                              slv::Option{<:Slv_VecSlv} = nothing, alpha::Num_SigCal = 0.05,
                               p::Number = 2.0,
                               w::Option{<:ObsWeights} = nothing)::PowerNormValueatRisk
     return PowerNormValueatRisk(settings, slv, alpha, p, w)
 end
+# Calibration slots — see `calibration_slots`. `p` is the order of the norm, not a quantity
+# of the sample, so it is not one of them.
+calibration_slots(x::PowerNormValueatRisk) = (; alpha = x.alpha)
 function (r::PowerNormValueatRisk)(x::VecNum)
     return PRM(x, r.slv, r.alpha, r.p, r.w)
 end
@@ -232,10 +235,10 @@ $(DocStringExtensions.FIELDS)
     PowerNormValueatRiskRange(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
         slv::Option{<:Slv_VecSlv} = nothing,
-        alpha::Number = 0.05,
-        beta::Number = 0.05,
+        alpha::Num_SigCal = 0.05,
+        beta::Num_SigCal = alpha,
         pa::Number = 2.0,
-        pb::Number = 2.0,
+        pb::Number = pa,
         w::Option{<:ObsWeights} = nothing
     ) -> PowerNormValueatRiskRange
 
@@ -243,7 +246,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `0 < alpha < 1`, `0 < beta < 1`.
+  - If `alpha` is a number: `0 < alpha < 1`. If `beta` is a number: `0 < beta < 1`.
   - `pa > 1`, `pb > 1`.
   - If `slv` is a `VecSlv`: `!isempty(slv)`.
   - If `w` is not `nothing`: `!isempty(w)`.
@@ -316,8 +319,8 @@ PowerNormValueatRiskRange
     """
     @pprop w
     function PowerNormValueatRiskRange(settings::RiskMeasureSettings,
-                                       slv::Option{<:Slv_VecSlv}, alpha::Number,
-                                       beta::Number, pa::Number, pb::Number,
+                                       slv::Option{<:Slv_VecSlv}, alpha::Num_SigCal,
+                                       beta::Num_SigCal, pa::Number, pb::Number,
                                        w::Option{<:ObsWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
@@ -333,11 +336,13 @@ PowerNormValueatRiskRange
 end
 function PowerNormValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                    slv::Option{<:Slv_VecSlv} = nothing,
-                                   alpha::Number = 0.05, beta::Number = 0.05,
-                                   pa::Number = 2.0, pb::Number = 2.0,
+                                   alpha::Num_SigCal = 0.05, beta::Num_SigCal = alpha,
+                                   pa::Number = 2.0, pb::Number = pa,
                                    w::Option{<:ObsWeights} = nothing)::PowerNormValueatRiskRange
     return PowerNormValueatRiskRange(settings, slv, alpha, beta, pa, pb, w)
 end
+# Calibration slots — see `calibration_slots`. One slot per tail, each with its own role.
+calibration_slots(x::PowerNormValueatRiskRange) = (; alpha = x.alpha, beta = x.beta)
 # Tail decomposition — see `range_tails`. Each tail carries its own norm order: `pa` shapes
 # the loss side, `pb` the gain side. The functor below is the value-level twin, and it is
 # what pins that pairing.
@@ -401,7 +406,7 @@ $(DocStringExtensions.FIELDS)
     PowerNormDrawdownatRisk(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
         slv::Option{<:Slv_VecSlv} = nothing,
-        alpha::Number = 0.05,
+        alpha::Num_SigCal = 0.05,
         p::Number = 2.0,
         w::Option{<:ObsWeights} = nothing
     ) -> PowerNormDrawdownatRisk
@@ -410,7 +415,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `0 < alpha < 1`.
+  - If `alpha` is a number: `0 < alpha < 1`.
   - `p >= 1`.
   - If `slv` is a `VecSlv`: `!isempty(slv)`.
   - If `w` is not `nothing`: `!isempty(w)`.
@@ -476,8 +481,8 @@ PowerNormDrawdownatRisk
     """
     @pprop w
     function PowerNormDrawdownatRisk(settings::RiskMeasureSettings,
-                                     slv::Option{<:Slv_VecSlv}, alpha::Number, p::Number,
-                                     w::Option{<:ObsWeights})
+                                     slv::Option{<:Slv_VecSlv}, alpha::Num_SigCal,
+                                     p::Number, w::Option{<:ObsWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
@@ -491,11 +496,13 @@ PowerNormDrawdownatRisk
     end
 end
 function PowerNormDrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                 slv::Option{<:Slv_VecSlv} = nothing, alpha::Number = 0.05,
-                                 p::Number = 2.0,
+                                 slv::Option{<:Slv_VecSlv} = nothing,
+                                 alpha::Num_SigCal = 0.05, p::Number = 2.0,
                                  w::Option{<:ObsWeights} = nothing)::PowerNormDrawdownatRisk
     return PowerNormDrawdownatRisk(settings, slv, alpha, p, w)
 end
+# Calibration slots — see `calibration_slots`.
+calibration_slots(x::PowerNormDrawdownatRisk) = (; alpha = x.alpha)
 function (r::PowerNormDrawdownatRisk)(x::VecNum)
     dd = absolute_drawdown_vec(x)
     return PRM(dd, r.slv, r.alpha, r.p, r.w)
@@ -549,7 +556,7 @@ $(DocStringExtensions.FIELDS)
     RelativePowerNormDrawdownatRisk(;
         settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
         slv::Option{<:Slv_VecSlv} = nothing,
-        alpha::Number = 0.05,
+        alpha::Num_SigCal = 0.05,
         p::Number = 2.0,
         w::Option{<:ObsWeights} = nothing
     ) -> RelativePowerNormDrawdownatRisk
@@ -558,7 +565,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `0 < alpha < 1`.
+  - If `alpha` is a number: `0 < alpha < 1`.
   - `p >= 1`.
   - If `slv` is a `VecSlv`: `!isempty(slv)`.
   - If `w` is not `nothing`: `!isempty(w)`.
@@ -621,7 +628,7 @@ RelativePowerNormDrawdownatRisk
     """
     @pprop w
     function RelativePowerNormDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
-                                             slv::Option{<:Slv_VecSlv}, alpha::Number,
+                                             slv::Option{<:Slv_VecSlv}, alpha::Num_SigCal,
                                              p::Number, w::Option{<:ObsWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
@@ -638,10 +645,12 @@ end
 function RelativePowerNormDrawdownatRisk(;
                                          settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
                                          slv::Option{<:Slv_VecSlv} = nothing,
-                                         alpha::Number = 0.05, p::Number = 2.0,
+                                         alpha::Num_SigCal = 0.05, p::Number = 2.0,
                                          w::Option{<:ObsWeights} = nothing)::RelativePowerNormDrawdownatRisk
     return RelativePowerNormDrawdownatRisk(settings, slv, alpha, p, w)
 end
+# Calibration slots — see `calibration_slots`.
+calibration_slots(x::RelativePowerNormDrawdownatRisk) = (; alpha = x.alpha)
 function (r::RelativePowerNormDrawdownatRisk)(x::VecNum)
     dd = relative_drawdown_vec(x)
     return PRM(dd, r.slv, r.alpha, r.p, r.w)

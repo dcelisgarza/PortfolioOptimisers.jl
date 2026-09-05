@@ -98,16 +98,20 @@ pretty_table(DataFrame(; :estimator => [k for (k, _) in prs],
 #=
 ## 3. Visualising the eigenspectrum
 
-[`plot_eigenspectrum`](@ref) shows the Marchenko–Pastur ``\\lambda_+`` threshold: bars above it
+[`plot_eigenspectrum`](@ref) shows the Marchenko–Pastur ``\lambda_+`` threshold: bars above it
 carry signal, bars below are noise. Denoising acts on the sub-threshold bulk.
 =#
 
-# Eigenspectrum: vanilla sample covariance.
 using StatsPlots, GraphRecipes
-# Eigenspectrum: fixed-denoised covariance.
+# Eigenspectrum: vanilla sample covariance.
 plot_eigenspectrum(prs[1].second, rd)
-# Eigenspectrum: LoGo(MaxDist) sparsified covariance.
+# Eigenspectrum: fixed-denoised covariance.
 plot_eigenspectrum(prs[2].second, rd)
+# Eigenspectrum: shrunk-denoised covariance.
+plot_eigenspectrum(prs[3].second, rd)
+# Eigenspectrum: spectral-denoised covariance.
+plot_eigenspectrum(prs[4].second, rd)
+# Eigenspectrum: LoGo(MaxDist) sparsified covariance.
 plot_eigenspectrum(prs[5].second, rd)
 
 #=

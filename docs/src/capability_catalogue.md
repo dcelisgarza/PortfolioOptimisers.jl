@@ -100,9 +100,9 @@ Configures and applies denoising algorithms to covariance or correlation matrice
 </summary>
 ```
 
-- Denoises by setting the smallest `num_factors` eigenvalues to zero. [`SpectralDenoise`](@ref)
-- Denoises by replacing the smallest `num_factors` eigenvalues with their average. [`FixedDenoise`](@ref)
-- Denoises by shrinking the smallest `num_factors` eigenvalues towards the diagonal. [`ShrunkDenoise`](@ref)
+- Denoises by setting the noise eigenvalues to zero. [`SpectralDenoise`](@ref)
+- Denoises by replacing the noise eigenvalues with their own mean. [`FixedDenoise`](@ref)
+- Denoises by shrinking the off-diagonal part of the noise block towards zero, keeping its diagonal whole. [`ShrunkDenoise`](@ref)
 
 ```@raw html
 </details>
@@ -117,8 +117,8 @@ Factor prior models and implied volatility use [`regression`](@ref) in their est
 
 ### Regression targets
 
-- Regression target type for standard linear models. [`LinearModel`](@ref)
-- Regression target type for generalised linear models (GLMs). [`GeneralisedLinearModel`](@ref)
+- Fits each response by ordinary least squares through `GLM.LinearModel`. [`LinearModel`](@ref)
+- Fits each response by a generalised linear model through `GLM.GeneralizedLinearModel`. [`GeneralisedLinearModel`](@ref)
 
 ### Regression types
 
@@ -127,7 +127,7 @@ Factor prior models and implied volatility use [`regression`](@ref) in their est
 <summary>
 ```
 
-Estimator for stepwise regression-based moment estimation. [`StepwiseRegression`](@ref)
+Estimates a loadings matrix by selecting a factor subset per asset, one factor at a time. [`StepwiseRegression`](@ref)
 
 ```@raw html
 </summary>
@@ -144,8 +144,8 @@ Algorithms
 </summary>
 ```
 
-- Stepwise regression algorithm: forward selection. [`ForwardSelection`](@ref)
-- Stepwise regression algorithm: backward elimination. [`BackwardElimination`](@ref)
+- Grows the factor set from empty, adding the factor that most improves the criterion. [`ForwardSelection`](@ref)
+- Shrinks the factor set from full, removing the factor whose removal most improves the criterion. [`BackwardElimination`](@ref)
 
 ```@raw html
 </details>
@@ -162,12 +162,12 @@ Selection criteria
 </summary>
 ```
 
-- Stepwise regression criterion based on p-value thresholding. [`PValue`](@ref)
-- Akaike Information Criterion (AIC) for stepwise regression. [`AIC`](@ref)
-- Corrected Akaike Information Criterion (AICC) for stepwise regression. [`AICC`](@ref)
-- Bayesian Information Criterion (BIC) for stepwise regression. [`BIC`](@ref)
-- Coefficient of determination (R²) for stepwise regression. [`RSquared`](@ref)
-- Adjusted coefficient of determination (Adjusted R²) for stepwise regression. [`AdjustedRSquared`](@ref)
+- Selects factors by the statistical significance of their coefficients. [`PValue`](@ref)
+- `:aic`
+- `:aicc`
+- `:bic`
+- `:r2`
+- `:adjr2`
 
 ```@raw html
 </details>
@@ -182,14 +182,14 @@ Selection criteria
 <summary>
 ```
 
-Estimator for dimension reduction regression-based moment estimation. [`DimensionReductionRegression`](@ref)
+Estimates a loadings matrix by regressing each asset on the leading components of the factors. [`DimensionReductionRegression`](@ref)
 
 ```@raw html
 </summary>
 ```
 
-- Principal Component Analysis (PCA) dimension reduction target. [`PCA`](@ref)
-- Probabilistic Principal Component Analysis (PPCA) dimension reduction target. [`PPCA`](@ref)
+- Replaces the factors with the principal components of their standardised covariance. [`PCA`](@ref)
+- Replaces the factors with the latent components of a Gaussian latent-variable model. [`PPCA`](@ref)
 
 ```@raw html
 </details>
@@ -201,16 +201,16 @@ Estimator for dimension reduction regression-based moment estimation. [`Dimensio
 
 Overloads `Statistics.mean`.
 
-- A simple expected returns estimator for `PortfolioOptimisers.jl`, representing the sample mean with optional observation weights. [`SimpleExpectedReturns`](@ref)
-- Container type for equilibrium expected returns estimators. [`EquilibriumExpectedReturns`](@ref)
-- Container type for excess expected returns estimators. [`ExcessExpectedReturns`](@ref)
+- Computes the expected returns as the sample mean of the asset returns. [`SimpleExpectedReturns`](@ref)
+- Computes the expected excess returns that a set of equilibrium weights implies, by reverse optimisation. [`EquilibriumExpectedReturns`](@ref)
+- Subtracts a risk-free rate from the expected returns that a nested estimator computes. [`ExcessExpectedReturns`](@ref)
 
 ```@raw html
 <details class="cap-group" style="margin-left: 2em">
 <summary>
 ```
 
-Container type for shrinkage-based expected returns estimators. [`ShrunkExpectedReturns`](@ref)
+Shrinks the sample expected returns toward a target chosen by the shrinkage algorithm. [`ShrunkExpectedReturns`](@ref)
 
 ```@raw html
 </summary>
@@ -260,22 +260,22 @@ Targets: all algorithms can have any of the following targets
 
 - Expected returns estimator that returns the asset standard deviations. [`StandardDeviationExpectedReturns`](@ref)
 - Expected returns estimator that returns the asset variances. [`VarianceExpectedReturns`](@ref)
-- Expected returns estimator that returns the optionally weighted asset medians. [`MedianExpectedReturns`](@ref)
-- Expected returns estimator that returns custom values for each asset. [`CustomValueExpectedReturns`](@ref)
+- Computes the expected returns as the per-asset median of the asset returns. [`MedianExpectedReturns`](@ref)
+- Returns a caller-supplied value for each asset instead of estimating one from the data. [`CustomValueExpectedReturns`](@ref)
 - Expected returns estimator that restricts computation to a rolling or indexed observation window. [`WindowedExpectedReturns`](@ref)
 
 ### Variance and standard deviation
 
 Overloads `Statistics.var` and `Statistics.std`.
 
-- A flexible variance estimator for `PortfolioOptimisers.jl` supporting optional expected returns estimators, observation weights, and bias correction. [`SimpleVariance`](@ref)
+- Computes the marginal variance and standard deviation, optionally weighted and optionally bias-corrected. [`SimpleVariance`](@ref)
 - Variance estimator that restricts computation to a rolling or indexed observation window. [`WindowedVariance`](@ref)
 
 ### Covariance and correlation
 
 Overloads `Statistics.cov` and `Statistics.cor`.
 
-- A simple wrapper around a [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator), optional [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/), and an optional index. [`GeneralCovariance`](@ref)
+- Adapts any `StatsBase.CovarianceEstimator` to the library's calling convention, carrying its observation weights alongside it. [`GeneralCovariance`](@ref)
 
 ```@raw html
 <details class="cap-group" style="margin-left: 2em">
@@ -288,8 +288,8 @@ Estimates the covariance matrix of asset returns from a centring estimator, a co
 </summary>
 ```
 
-- `FullMoment` is used to indicate that all deviations are included in the moment estimation process. [`FullMoment`](@ref)
-- `SemiMoment` is used for semi-moment estimators, where only observations below a target are considered. [`SemiMoment`](@ref)
+- Keeps every deviation from the target, so the moment is two-sided. [`FullMoment`](@ref)
+- Clips every deviation above the target to zero, so the moment reads the downside alone. [`SemiMoment`](@ref)
 
 ```@raw html
 </details>
@@ -306,9 +306,9 @@ Configures and applies Gerber covariance estimators. [`GerberCovariance`](@ref)
 </summary>
 ```
 
-- Implements the original Gerber covariance algorithm. [`Gerber0`](@ref)
-- Implements the first variant of the Gerber covariance algorithm. [`Gerber1`](@ref)
-- Implements the second variant of the Gerber covariance algorithm. [`Gerber2`](@ref)
+- Normalises the net co-movement vote by the observations on which both assets crossed their threshold. [`Gerber0`](@ref)
+- Normalises the net co-movement vote by every observation on which at least one asset crossed its threshold. [`Gerber1`](@ref)
+- Normalises the raw net co-movement vote by the geometric mean of its own diagonal. [`Gerber2`](@ref)
 
 ```@raw html
 </details>
@@ -325,15 +325,15 @@ Configures and applies Smyth-Broby covariance estimators. [`SmythBrobyCovariance
 </summary>
 ```
 
-- Implements the original Smyth-Broby covariance algorithm. [`SmythBroby0`](@ref)
-- Implements the first variant of the Smyth-Broby covariance algorithm. [`SmythBroby1`](@ref)
-- Implements the second variant of the Smyth-Broby covariance algorithm. [`SmythBroby2`](@ref)
-- Implements the original Smyth-Broby covariance algorithm scaled by vote counts. [`SmythBrobyGerber0`](@ref)
-- Implements the first variant of the Smyth-Broby covariance algorithm scaled by vote counts. [`SmythBrobyGerber1`](@ref)
-- Implements the second variant of the Smyth-Broby covariance algorithm scaled by vote counts. [`SmythBrobyGerber2`](@ref)
-- Implements the original Smyth-Broby covariance algorithm using vote counts only. [`SmythBrobyCount0`](@ref)
-- Implements the first variant of the Smyth-Broby covariance algorithm using vote counts only. [`SmythBrobyCount1`](@ref)
-- Implements the second variant of the Smyth-Broby covariance algorithm using vote counts only. [`SmythBrobyCount2`](@ref)
+- Divides the difference of the concordant and discordant Smyth-Broby contribution sums by their sum. [`SmythBroby0`](@ref)
+- Divides the difference of the concordant and discordant Smyth-Broby contribution sums by their sum plus the neutral sum. [`SmythBroby1`](@ref)
+- Normalises the net Smyth-Broby contribution of a pair by the geometric mean of its own diagonal. [`SmythBroby2`](@ref)
+- Weights each Smyth-Broby contribution sum by its own observation count, then divides the difference by the sum. [`SmythBrobyGerber0`](@ref)
+- Weights each Smyth-Broby contribution sum by its own count, then divides the difference by the sum plus the neutral term. [`SmythBrobyGerber1`](@ref)
+- Weights each Smyth-Broby contribution sum by its own count, then normalises the net score by the geometric mean of its own diagonal. [`SmythBrobyGerber2`](@ref)
+- Counts concordant and discordant observations, discards the contribution sums, and divides their difference by their sum. [`SmythBrobyCount0`](@ref)
+- Counts concordant, discordant and neutral observations, discards the contribution sums, and divides the net count by the total. [`SmythBrobyCount1`](@ref)
+- Counts concordant and discordant observations, discards the contribution sums, and normalises the net count by the geometric mean of its own diagonal. [`SmythBrobyCount2`](@ref)
 
 ```@raw html
 </details>
@@ -360,8 +360,8 @@ Gerber Information Quality [`GerberIQCovariance`](@ref) with custom variance, de
 </details>
 ```
 
-- Configures and applies distance-based covariance estimators. [`DistanceCovariance`](@ref)
-- Lower tail dependence covariance estimator. [`LowerTailDependenceCovariance`](@ref)
+- Measures linear and non-linear codependence from doubly-centred pairwise distance matrices. [`DistanceCovariance`](@ref)
+- Measures co-movement in the lower tail: the share of an asset's worst returns that fall on the same dates as another's. [`LowerTailDependenceCovariance`](@ref)
 
 ```@raw html
 <details class="cap-group" style="margin-left: 2em">
@@ -374,8 +374,8 @@ Rank covariances
 </summary>
 ```
 
-- Robust covariance estimator based on Kendall's tau rank correlation. [`KendallCovariance`](@ref)
-- Robust covariance estimator based on Spearman's rho rank correlation. [`SpearmanCovariance`](@ref)
+- Measures monotonic association with Kendall's tau, counting concordant against discordant pairs. [`KendallCovariance`](@ref)
+- Measures monotonic association with Spearman's rho, the Pearson correlation of the rank-transformed returns. [`SpearmanCovariance`](@ref)
 
 ```@raw html
 </details>
@@ -386,7 +386,7 @@ Rank covariances
 <summary>
 ```
 
-Covariance estimator based on mutual information. [`MutualInfoCovariance`](@ref)
+Measures codependence with mutual information, which captures a non-linear relationship a correlation misses. [`MutualInfoCovariance`](@ref)
 
 ```@raw html
 </summary>
@@ -433,15 +433,15 @@ Covariance estimator based on implied volatility scaling. [`ImpliedVolatility`](
 </summary>
 ```
 
-- Implied volatility algorithm that scales implied volatility by a user-supplied premium factor. [`ImpliedVolatilityPremium`](@ref)
+- Implied volatility algorithm that divides the latest implied volatility by a volatility risk premium adjustment. [`ImpliedVolatilityPremium`](@ref)
 - Implied volatility algorithm that predicts realised volatility via regression on implied volatility. [`ImpliedVolatilityRegression`](@ref)
 
 ```@raw html
 </details>
 ```
 
-- Composite covariance estimator with post-processing. [`PortfolioOptimisersCovariance`](@ref)
-- A covariance estimator that returns the correlation matrix as both the covariance and correlation. [`CorrelationCovariance`](@ref)
+- Runs any covariance estimator, then applies a matrix post-processing step to its result. [`PortfolioOptimisersCovariance`](@ref)
+- Answers both `cov` and `cor` with the wrapped estimator's correlation matrix. [`CorrelationCovariance`](@ref)
 - Covariance estimator that restricts computation to a rolling or indexed observation window. [`WindowedCovariance`](@ref)
 
 ```@raw html
@@ -545,14 +545,14 @@ Implements [`coskewness`](@ref).
 <summary>
 ```
 
-Container type for coskewness estimators. [`Coskewness`](@ref)
+Estimates the coskewness tensor of a returns matrix, together with its negative spectral skewness matrix. [`Coskewness`](@ref)
 
 ```@raw html
 </summary>
 ```
 
-- `FullMoment` is used to indicate that all deviations are included in the moment estimation process. [`FullMoment`](@ref)
-- `SemiMoment` is used for semi-moment estimators, where only observations below a target are considered. [`SemiMoment`](@ref)
+- Keeps every deviation from the target, so the moment is two-sided. [`FullMoment`](@ref)
+- Clips every deviation above the target to zero, so the moment reads the downside alone. [`SemiMoment`](@ref)
 
 ```@raw html
 </details>
@@ -569,14 +569,14 @@ Implements [`cokurtosis`](@ref).
 <summary>
 ```
 
-Container type for cokurtosis estimators. [`Cokurtosis`](@ref)
+Estimates the square cokurtosis matrix of a returns matrix. [`Cokurtosis`](@ref)
 
 ```@raw html
 </summary>
 ```
 
-- `FullMoment` is used to indicate that all deviations are included in the moment estimation process. [`FullMoment`](@ref)
-- `SemiMoment` is used for semi-moment estimators, where only observations below a target are considered. [`SemiMoment`](@ref)
+- Keeps every deviation from the target, so the moment is two-sided. [`FullMoment`](@ref)
+- Clips every deviation above the target to zero, so the moment reads the downside alone. [`SemiMoment`](@ref)
 
 ```@raw html
 </details>
@@ -594,22 +594,22 @@ Every windowed estimator wraps a base moment estimator and recomputes it over a 
 
 Implements [`distance`](@ref) and [`cor_and_dist`](@ref).
 
-- Distance estimator. [`Distance`](@ref)
-- Distance-of-distances estimator for portfolio optimization. [`DistanceDistance`](@ref)
+- Pairs a distance algorithm with an optional integer power, and applies it to a correlation matrix or to the data. [`Distance`](@ref)
+- Measures how differently two assets relate to the whole universe, by applying a metric to a distance matrix. [`DistanceDistance`](@ref)
 
 The distance estimators are used together with various distance matrix algorithms.
 
-- Simple distance algorithm for portfolio optimization. [`SimpleDistance`](@ref)
-- Simple absolute distance algorithm for portfolio optimization. [`SimpleAbsoluteDistance`](@ref)
-- Logarithmic distance algorithm for portfolio optimization. [`LogDistance`](@ref)
-- Correlation distance algorithm for portfolio optimization. [`CorrelationDistance`](@ref)
+- Turns a signed correlation into a distance by $\sqrt{(1 - \rho) / 2}$. [`SimpleDistance`](@ref)
+- Turns the magnitude of a correlation into a distance by $\sqrt{1 - \lvert\rho\rvert}$. [`SimpleAbsoluteDistance`](@ref)
+- Turns the magnitude of a correlation into an unbounded distance by $-\log\lvert\rho\rvert$. [`LogDistance`](@ref)
+- Turns a non-negative codependence into a distance by $\sqrt{1 - \rho}$, without halving. [`CorrelationDistance`](@ref)
 
 ```@raw html
 <details class="cap-group" style="margin-left: 2em">
 <summary>
 ```
 
-Variation of Information (VI) distance algorithm for portfolio optimization. [`VariationInfoDistance`](@ref)
+Measures the information one asset loses about another, from the entropies of a joint histogram. [`VariationInfoDistance`](@ref)
 
 ```@raw html
 </summary>
@@ -641,7 +641,7 @@ Abstract supertype for all histogram binning algorithms based on a bin width sel
 </details>
 ```
 
-- Canonical distance algorithm for portfolio optimization. [`CanonicalDistance`](@ref)
+- Selects the distance algorithm that matches the covariance estimator it is given. [`CanonicalDistance`](@ref)
 
 ### Feature distances
 
@@ -652,7 +652,7 @@ A feature matrix describes assets by their exposures, memberships, loadings or a
 <summary>
 ```
 
-Feature-based distance estimator for portfolio optimization. [`FeatureDistance`](@ref)
+Turns a feature matrix into a distance matrix, by applying a metric to the rows of that matrix. [`FeatureDistance`](@ref)
 
 ```@raw html
 </summary>
@@ -671,27 +671,27 @@ Collapsing a window of time-varying features
 </summary>
 ```
 
-- Feature collapse algorithm keeping the most recent observation. [`LastObservation`](@ref)
+- Discards the window and measures the last observation's feature matrix alone. [`LastObservation`](@ref)
 
 ```@raw html
 <details class="cap-group" style="margin-left: 2em">
 <summary>
 ```
 
-Feature collapse algorithm aggregating the features, then measuring. [`AggregateFeatures`](@ref) and [`AggregateDistances`](@ref)
+Collapses the window to one `assets × features` matrix, then applies the metric once. [`AggregateFeatures`](@ref) and [`AggregateDistances`](@ref)
 
 ```@raw html
 </summary>
 ```
 
-- Collapse algorithm aggregating by the mean. [`MeanCollapse`](@ref)
-- Collapse algorithm aggregating by the median. [`MedianCollapse`](@ref)
+- Aggregates along the observation axis with the possibly weighted arithmetic mean. [`MeanCollapse`](@ref)
+- Aggregates along the observation axis with the possibly weighted median, which resists an outlying observation. [`MedianCollapse`](@ref)
 
 ```@raw html
 </details>
 ```
 
-- Feature collapse algorithm stacking the observations into one feature vector. [`StackObservations`](@ref)
+- Concatenates the window into one long feature vector per asset, so nothing is averaged away. [`StackObservations`](@ref)
 
 ```@raw html
 </details>
@@ -707,11 +707,11 @@ Every similarity matrix algorithm is a pure transformation of a distance matrix,
 
 The PMFG cannot take a negative weight, so it admits only the narrower [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref) and refuses [`AngularSimilarity`](@ref) at construction. Two of the admitted members carry a domain precondition on the distance matrix, checked by [`assert_similarity_domain`](@ref): [`ComplementSimilarity`](@ref) needs `D <= 1`, and [`MaximumDistanceSimilarity`](@ref) needs a finite `D`.
 
-- Similarity matrix algorithm using the linear complement of the distance. [`ComplementSimilarity`](@ref)
-- Similarity matrix algorithm inverting a normalised angular distance. [`AngularSimilarity`](@ref)
-- Similarity matrix algorithm using the maximum distance transformation. [`MaximumDistanceSimilarity`](@ref)
-- Similarity matrix algorithm using the exponential transformation. [`ExponentialSimilarity`](@ref)
-- Similarity matrix algorithm using a generalised exponential transformation. [`GeneralExponentialSimilarity`](@ref)
+- Takes the linear complement $1 - D$, the exact counterpart of a metric that is itself one minus a similarity. [`ComplementSimilarity`](@ref)
+- Recovers a correlation from a normalised angular distance by $\cos(\pi D)$. [`AngularSimilarity`](@ref)
+- Subtracts the squared distance from a ceiling placed above the largest squared distance. [`MaximumDistanceSimilarity`](@ref)
+- Maps a distance of any magnitude into $(0,\,1]$ by $e^{-D}$. [`ExponentialSimilarity`](@ref)
+- Applies $e^{-c D^{p}}$, adding a scale and an exponent to the exponential transformation. [`GeneralExponentialSimilarity`](@ref)
 
 ## Phylogeny
 
@@ -726,16 +726,16 @@ Phylogeny constraints and clustering optimisations make use of clustering algori
 <summary>
 ```
 
-Estimator type for selecting the optimal number of clusters. [`OptimalNumberClusters`](@ref) and [`VectorToScalarMeasure`](@ref)
+Decides how many clusters to cut a dendrogram or a partition into. [`OptimalNumberClusters`](@ref) and [`VectorToScalarMeasure`](@ref)
 
 ```@raw html
 </summary>
 ```
 
-- Algorithm type for estimating the optimal number of clusters using the second-order difference method. [`SecondOrderDifference`](@ref)
-- Algorithm type for estimating the optimal number of clusters using the standardised silhouette score. [`SilhouetteScore`](@ref)
+- Picks the number of clusters at which the within-cluster dispersion curve bends most sharply. [`SecondOrderDifference`](@ref)
+- Picks the number of clusters whose assets sit best inside their own cluster. [`SilhouetteScore`](@ref)
 - Predefined number of clusters.
-- Select the optimal number of clusters for a hierarchical clustering tree. [`optimal_number_clusters`](@ref)
+- Cut a dendrogram at the number of clusters `onc` selects. [`optimal_number_clusters`](@ref)
 
 ```@raw html
 </details>
@@ -745,7 +745,7 @@ Estimator type for selecting the optimal number of clusters. [`OptimalNumberClus
 
 #### Hierarchical
 
-- Algorithm type for hierarchical clustering. [`HClustAlgorithm`](@ref)
+- Builds a dendrogram by merging the two nearest clusters until one remains. [`HClustAlgorithm`](@ref)
 
 ```@raw html
 <details class="cap-group" style="margin-left: 2em">
@@ -769,8 +769,8 @@ Root selection
 </summary>
 ```
 
-- A DBHT root selection method that enforces a unique root in the hierarchy. [`UniqueRoot`](@ref)
-- A DBHT root selection method that creates a root from the adjacency tree of all root candidates. [`EqualRoot`](@ref)
+- Takes one clique of the planar hierarchy as its single root. [`UniqueRoot`](@ref)
+- Builds one root from the adjacency tree of every root candidate. [`EqualRoot`](@ref)
 
 ```@raw html
 </details>
@@ -784,7 +784,7 @@ Root selection
 
 Non-hierarchical clustering algorithms are incompatible with hierarchical clustering optimisations, but they can be used for phylogeny constraints and [`NestedClustered`](@ref) optimisations.
 
-- K-means clustering algorithm configuration for non-hierarchical clustering. [`KMeansAlgorithm`](@ref)
+- Partitions assets into `k` groups by Lloyd's algorithm, with no dendrogram. [`KMeansAlgorithm`](@ref)
 
 ### Networks
 
@@ -803,7 +803,7 @@ Network adjacency [`NetworkEstimator`](@ref) with custom tree algorithms, covari
 </summary>
 ```
 
-- Algorithm type for Kruskal's minimum spanning tree (MST). [`KruskalTree`](@ref), [`BoruvkaTree`](@ref), and [`PrimTree`](@ref)
+- Grows the minimum spanning tree by taking the lightest edge that joins two components. [`KruskalTree`](@ref), [`BoruvkaTree`](@ref), and [`PrimTree`](@ref)
 
 ```@raw html
 <details class="cap-group" style="margin-left: 2em">
@@ -843,8 +843,8 @@ Which pairs count as related: the `sep` separation
 </details>
 ```
 
-- Estimator type for clustering. [`ClustersEstimator`](@ref) and [`Clusters`](@ref)
-- Estimator type for network-based clustering. [`NetworkClustersEstimator`](@ref)
+- Turns a return matrix into a clustering of the asset universe. [`ClustersEstimator`](@ref) and [`Clusters`](@ref)
+- Clusters assets by the pseudo-distances that a network's structure induces. [`NetworkClustersEstimator`](@ref)
 - Group assets by clustering them, and keep the best-scoring member of each cluster. [`ClusterGroups`](@ref)
 
 #### Centrality and phylogeny measures
@@ -904,7 +904,7 @@ The override runs one way: it removes the weights and never supplies them, so th
 
 Hierarchical clustering produces a tree of [`ClusterNode`](@ref)s, walked by [`to_tree`](@ref), [`pre_order`](@ref), and [`is_leaf`](@ref).
 
-- Preorder traversal strategy that visits nodes by their ID. [`PreorderTreeByID`](@ref)
+- Collects each leaf's `id`, which for a leaf is its asset index. [`PreorderTreeByID`](@ref)
 
 ## Optimisation constraints
 
@@ -937,7 +937,7 @@ Wraps whatever `lcse` already accepts and declares the [`AbstractConstraintSpace
 - No-op fallback for risk budget constraint generation. [`risk_budget_constraints`](@ref), [`RiskBudgetEstimator`](@ref), and [`RiskBudget`](@ref)
 - Generate phylogeny-based portfolio constraints from an estimator or result. [`phylogeny_constraints`](@ref), [`centrality_constraints`](@ref), [`SemiDefinitePhylogenyEstimator`](@ref), [`SemiDefinitePhylogeny`](@ref), [`IntegerPhylogenyEstimator`](@ref), [`IntegerPhylogeny`](@ref), and [`CentralityConstraint`](@ref)
 - Generate portfolio weight bounds constraints from a `WeightBoundsEstimator` and asset set. [`weight_bounds_constraints`](@ref), [`WeightBoundsEstimator`](@ref), and [`WeightBounds`](@ref)
-- Container for the universe axes and group information used in constraint generation. [`UniverseSets`](@ref)
+- Declares the universes a portfolio problem is written against, and any groupings or partitions of them. [`UniverseSets`](@ref)
 
 ```@raw html
 <details class="cap-group" style="margin-left: 2em">
@@ -950,8 +950,8 @@ Budget constraints [`BudgetEstimator`](@ref) and [`BudgetRange`](@ref)
 </summary>
 ```
 
-- Budget constraint that accounts for linear transaction costs. [`BudgetCosts`](@ref)
-- Budget constraint that accounts for non-linear (power-law) market impact costs. [`BudgetMarketImpact`](@ref)
+- Charges the portfolio budget for transaction costs that grow linearly with the traded volume. [`BudgetCosts`](@ref)
+- Charges the portfolio budget and the return for market impact costs that follow an empirical power law. [`BudgetMarketImpact`](@ref)
 
 ```@raw html
 </details>
@@ -970,7 +970,7 @@ Constraint values [`AbstractEstimatorValueAlgorithm`](@ref)
 
 Where a constraint takes one value per asset or group, these algorithms say how to derive it from data rather than stating it outright.
 
-- Custom weight bounds constraint for uniformly distributing asset weights, `1/N` for lower bounds and `1` for upper bounds, where `N` is the number of assets. [`UniformValues`](@ref)
+- Fills every entry of a value vector with `1/N`, where `N` is the number of assets in the universe. [`UniformValues`](@ref)
 - Return value for assets or groups, based on a mapping and asset sets. [`estimator_to_val`](@ref)
 - Algorithm for reducing a vector of real values to its minimum. [`MinValue`](@ref)
 - Algorithm for reducing a vector of real values to its maximum. [`MaxValue`](@ref)
@@ -982,7 +982,7 @@ Where a constraint takes one value per asset or group, these algorithms say how 
 - Algorithm for reducing a vector of real values to its optionally weighted standard deviation. [`StdValue`](@ref)
 - Algorithm for reducing a vector of real values to its optionally weighted variance. [`VarValue`](@ref)
 - Algorithm for reducing a vector of real values to its optionally weighted mean divided by its optionally weighted standard deviation. [`StandardisedValue`](@ref)
-- Marker for "no default here", used in the two places a fold-less value may be missing. [`NoDefault`](@ref)
+- States that no fold-less value exists. [`NoDefault`](@ref)
 
 ```@raw html
 </details>
@@ -993,7 +993,7 @@ Where a constraint takes one value per asset or group, these algorithms say how 
 <summary>
 ```
 
-Time-dependent constraint: an optimiser input whose value changes across the folds of a cross-validation scheme. [`TimeDependent`](@ref)
+Varies one optimiser input across the folds of a cross-validation scheme. [`TimeDependent`](@ref)
 
 ```@raw html
 </summary>
@@ -1004,8 +1004,8 @@ A time-dependent input takes a different value in each fold of a cross-validatio
 - Abstract supertype for the callable structs used as time-dependent values. [`TimeDependentCallable`](@ref)
 - Abstract supertype for callable structs whose per-fold value is a *constraint value*. [`TimeDependentConstraintCallable`](@ref)
 - Abstract supertype for callable structs whose per-fold value is an *optimiser*. [`TimeDependentOptimiserCallable`](@ref)
-- Per-fold context handed to time-dependent constraints when they are resolved. [`TimeDependentContext`](@ref)
-- Wrapper marking a callable time-dependent constraint entry as requiring the previous optimisation's weights. [`PreviousWeightsFunction`](@ref)
+- Describes one fold to the time-dependent constraints that resolve against it. [`TimeDependentContext`](@ref)
+- Declares that a callable time-dependent entry requires the previous optimisation's weights. [`PreviousWeightsFunction`](@ref)
 
 ```@raw html
 </details>
@@ -1023,7 +1023,7 @@ Many optimisations and constraints use prior statistics computed via [`prior`](@
 <summary>
 ```
 
-Container type for low order prior results. [`LowOrderPrior`](@ref)
+Carries the returns, mean and covariance a low order prior estimator produced. [`LowOrderPrior`](@ref)
 
 ```@raw html
 </summary>
@@ -1058,13 +1058,13 @@ Black-Litterman
 <summary>
 ```
 
-Entropy pooling prior estimator for asset returns with tail views. [`EntropyPoolingPrior`](@ref)
+Reweights the observations of a prior so that its moments and its tails meet a set of views. [`EntropyPoolingPrior`](@ref)
 
 ```@raw html
 </summary>
 ```
 
-Entropy pooling reweights the observations so that the posterior satisfies the stated views while staying as close as possible to the prior. Alongside the moment views it takes views on the conditional and entropic value at risk, each written as constraints of the one entropy pooling problem.
+Entropy pooling reweights the observations so that the posterior satisfies the stated views while staying as close as possible to the prior. Alongside the moment views it takes views on the conditional, entropic and relativistic value at risk, each written as constraints of the one entropy pooling problem.
 
 - Container for Black-Litterman investor views in canonical matrix form. [`BlackLittermanViews`](@ref)
 
@@ -1079,9 +1079,9 @@ View constraint algorithms
 </summary>
 ```
 
-- One-shot entropy pooling. [`H0_EntropyPooling`](@ref)
-- Uses the initial probabilities to optimise the posterior probabilities at every step. [`H1_EntropyPooling`](@ref)
-- Uses the previous step's probabilities to optimise the next step's probabilities. [`H2_EntropyPooling`](@ref)
+- Enforces every view in a single entropy pooling optimisation. [`H0_EntropyPooling`](@ref)
+- Enforces the views in stages, and starts every stage from the prior probabilities. [`H1_EntropyPooling`](@ref)
+- Enforces the views in stages, and starts every stage from the previous stage's probabilities. [`H2_EntropyPooling`](@ref)
 
 ```@raw html
 </details>
@@ -1102,6 +1102,8 @@ Tail view formulations
 - Integer formulation of a conditional value-at-risk view [EPTail](@cite). [`IntegerConditionalValueatRiskView`](@ref)
 - Exponential cone formulation of an entropic value-at-risk view [EPTail](@cite). [`ConicEntropicValueatRiskView`](@ref)
 - Grid formulation of an entropic value-at-risk view [EPTail](@cite). [`GridEntropicValueatRiskView`](@ref)
+- Power cone formulation of a relativistic value-at-risk view [EPRLVaR](@cite). [`ConicRelativisticValueatRiskView`](@ref)
+- Grid formulation of a relativistic value-at-risk view. [`GridRelativisticValueatRiskView`](@ref)
 
 ```@raw html
 </details>
@@ -1118,11 +1120,13 @@ View groups
 </summary>
 ```
 
-A significance level belongs to a view, not to the estimator holding it. These pair a group of view equations with the level, and for a tail view the formulation, they are read under, so one estimator can state views at several levels.
+A significance level belongs to a view, not to the estimator holding it. These pair a group of view equations with the level, and for a tail view the formulation, they are read under, so one estimator can state views at several levels. A relativistic view group carries its deformation parameter on the same reasoning.
 
-- A group of value-at-risk views, with the significance level they are read under. [`ValueatRiskView`](@ref)
-- A group of conditional value-at-risk views, with the significance level and formulation they are read under. [`ConditionalValueatRiskView`](@ref)
-- A group of entropic value-at-risk views, with the significance level and formulation they are read under. [`EntropicValueatRiskView`](@ref)
+- A group of **value at risk** views, with the significance level they are read under. [`ValueatRiskView`](@ref)
+- A group of **conditional value at risk** views, with the significance level and formulation they are read under. [`ConditionalValueatRiskView`](@ref)
+- A group of **entropic value at risk** views, with the significance level and formulation they are read under. [`EntropicValueatRiskView`](@ref)
+- A group of **relativistic value at risk** views, with the significance level, the deformation parameter and the formulation they are read under. [`RelativisticValueatRiskView`](@ref)
+- Spans of the two searches that read a relativistic value at risk. [`RelativisticValueatRiskViewBracket`](@ref)
 
 ```@raw html
 </details>
@@ -1139,8 +1143,8 @@ Divergence formulations
 </summary>
 ```
 
-- Exponential entropy pooling optimisation algorithm. [`ExpEntropyPooling`](@ref)
-- Logarithmic entropy pooling optimisation algorithm. [`LogEntropyPooling`](@ref)
+- Evaluates the entropy pooling objective through the exponential of the dual variables. [`ExpEntropyPooling`](@ref)
+- Evaluates the entropy pooling objective in log space. [`LogEntropyPooling`](@ref)
 
 ```@raw html
 </details>
@@ -1157,8 +1161,8 @@ Optimisers
 </summary>
 ```
 
-- [`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl)-based entropy pooling optimiser. [`OptimEntropyPooling`](@ref)
-- [`JuMP.jl`](https://github.com/jump-dev/JuMP.jl)-based entropy pooling optimiser. [`JuMPEntropyPooling`](@ref)
+- Solves the dual of the entropy pooling problem with Optim.jl. [`OptimEntropyPooling`](@ref)
+- Solves the primal of the entropy pooling problem with JuMP.jl. [`JuMPEntropyPooling`](@ref)
 
 ```@raw html
 </details>
@@ -1173,7 +1177,7 @@ Optimisers
 <summary>
 ```
 
-Entropy pooling prior estimator for asset returns. [`MeucciEntropyPoolingPrior`](@ref)
+Reweights the observations of a prior so that its moments meet a set of views, and root-finds a CVaR view. [`MeucciEntropyPoolingPrior`](@ref)
 
 ```@raw html
 </summary>
@@ -1192,10 +1196,10 @@ View constraint algorithms
 </summary>
 ```
 
-- One-shot entropy pooling. [`H0_EntropyPooling`](@ref)
-- Uses the initial probabilities to optimise the posterior probabilities at every step. [`H1_EntropyPooling`](@ref)
-- Uses the previous step's probabilities to optimise the next step's probabilities. [`H2_EntropyPooling`](@ref)
-- Conditional Value-at-Risk (CVaR) entropy pooling optimiser. [`ConditionalValueatRiskEntropyPooling`](@ref)
+- Enforces every view in a single entropy pooling optimisation. [`H0_EntropyPooling`](@ref)
+- Enforces the views in stages, and starts every stage from the prior probabilities. [`H1_EntropyPooling`](@ref)
+- Enforces the views in stages, and starts every stage from the previous stage's probabilities. [`H2_EntropyPooling`](@ref)
+- Root-finds the value at risk level that meets a single conditional value-at-risk view. [`ConditionalValueatRiskEntropyPooling`](@ref)
 
 ```@raw html
 </details>
@@ -1216,8 +1220,8 @@ Opinion pooling prior estimator for asset returns. [`OpinionPoolingPrior`](@ref)
 </summary>
 ```
 
-- Linear opinion pooling algorithm for consensus prior estimation. [`LinearOpinionPooling`](@ref)
-- Logarithmic opinion pooling algorithm for consensus prior estimation. [`LogarithmicOpinionPooling`](@ref)
+- Pools the opinions as a weighted arithmetic mean of their scenario weights. [`LinearOpinionPooling`](@ref)
+- Pools the opinions as a weighted geometric mean of their scenario weights, renormalised. [`LogarithmicOpinionPooling`](@ref)
 
 ```@raw html
 </details>
@@ -1384,14 +1388,14 @@ The same type's second contract, dispatched on `vals`' element type, and it stri
 <summary>
 ```
 
-Container type for high order prior results. [`HighOrderPrior`](@ref)
+Carries the coskewness and cokurtosis a high order prior estimator produced, over the low order prior it wraps. [`HighOrderPrior`](@ref)
 
 ```@raw html
 </summary>
 ```
 
 - High order prior estimator for asset returns. [`HighOrderPriorEstimator`](@ref)
-- Represents the High Order Factor Prior Estimator. [`HighOrderFactorPriorEstimator`](@ref)
+- Projects factor coskewness and cokurtosis onto the asset axis through the regression loadings. [`HighOrderFactorPriorEstimator`](@ref)
 
 ```@raw html
 </details>
@@ -1403,7 +1407,7 @@ In order to make optimisations more robust to noise and measurement error, it is
 
 `PortfolioOptimisers.jl` implements two types of uncertainty sets.
 
-- Represents a box uncertainty set for risk or prior statistics in portfolio optimisation. [`BoxUncertaintySet`](@ref) and [`BoxUncertaintySetAlgorithm`](@ref)
+- Holds the element-wise lower and upper bounds of a box uncertainty set on a mean vector or on a covariance matrix. [`BoxUncertaintySet`](@ref) and [`BoxUncertaintySetAlgorithm`](@ref)
 
 ```@raw html
 <details class="cap-group" style="margin-left: 2em">
@@ -1416,9 +1420,9 @@ In order to make optimisations more robust to noise and measurement error, it is
 </summary>
 ```
 
-- Algorithm for computing the scaling parameter `k` for ellipsoidal uncertainty sets under the assumption of normally distributed returns in portfolio optimisation. [`NormalKUncertaintyAlgorithm`](@ref)
-- Computes the ellipsoidal uncertainty set scaling parameter `k` as `sqrt((1 - q) / q)`. [`GeneralKUncertaintyAlgorithm`](@ref)
-- Algorithm for computing the scaling parameter `k` for ellipsoidal uncertainty sets using the chi-squared distribution in portfolio optimisation. [`ChiSqKUncertaintyAlgorithm`](@ref)
+- Fits the ellipsoid radius `k` empirically, as the `1 - q` quantile of the Mahalanobis distances of the sampled estimation errors. [`NormalKUncertaintyAlgorithm`](@ref)
+- Computes the ellipsoid radius `k` as `sqrt((1 - q) / q)`, the closed form that holds for any distribution of the estimation errors. [`GeneralKUncertaintyAlgorithm`](@ref)
+- Computes the ellipsoid radius `k` as the square root of the `1 - q` chi-squared quantile, the closed form that holds when the estimation errors are normal. [`ChiSqKUncertaintyAlgorithm`](@ref)
 - Predefined scaling parameter
 
 ```@raw html
@@ -1427,7 +1431,7 @@ In order to make optimisations more robust to noise and measurement error, it is
 
 It also implements various estimators for the uncertainty sets, the following two can generate box and ellipsoidal sets.
 
-- Estimator for box or ellipsoidal uncertainty sets under the assumption of normally distributed returns in portfolio optimisation. [`NormalUncertaintySet`](@ref)
+- Fits a box or an ellipsoidal uncertainty set from the sampling laws that normal returns imply: the mean is normal and the covariance is Wishart. [`NormalUncertaintySet`](@ref)
 
 ```@raw html
 <details class="cap-group" style="margin-left: 2em">
@@ -1450,7 +1454,7 @@ Bootstrapping via Autoregressive Conditional Heteroscedasticity [`ARCHUncertaint
 
 The following estimator can only generate box sets.
 
-- Estimator for box uncertainty sets using delta bounds on mean and covariance statistics in portfolio optimisation. [`DeltaUncertaintySet`](@ref)
+- Fits a box uncertainty set by widening the prior statistics by a fixed fraction of their own absolute value. [`DeltaUncertaintySet`](@ref)
 
 Quintile portfolios are expressed as an uncertainty set on the characteristic vector rather than as an optimiser of their own (ADR 0032).
 
@@ -1459,7 +1463,7 @@ Quintile portfolios are expressed as an uncertainty set on the characteristic ve
 <summary>
 ```
 
-Estimator for $\ell_1$ uncertainty sets on the characteristic vector. [`CharacteristicUncertaintySet`](@ref)
+Fits an $\ell_1$ uncertainty set on the characteristic vector, mean-only and with a calibrated radius. [`CharacteristicUncertaintySet`](@ref)
 
 ```@raw html
 </summary>
@@ -1467,7 +1471,7 @@ Estimator for $\ell_1$ uncertainty sets on the characteristic vector. [`Characte
 
 - $\ell_1$ (cross-polytope) uncertainty set on the characteristic vector. [`L1UncertaintySet`](@ref) and [`L1UncertaintySetAlgorithm`](@ref)
 - Signed $\ell_1$ uncertainty set on the characteristic vector, with a separate error budget per sign. [`SignedL1UncertaintySet`](@ref) and [`SignedL1UncertaintySetAlgorithm`](@ref)
-- Radius algorithm that calibrates the $\ell_1$ uncertainty radius to a target number of active assets. [`ActiveAssetsUncertaintyAlgorithm`](@ref)
+- Calibrates the $\ell_1$ uncertainty radius to a target number of active assets. [`ActiveAssetsUncertaintyAlgorithm`](@ref)
 
 ```@raw html
 </details>
@@ -1484,8 +1488,8 @@ Ellipsoidal set classes
 </summary>
 ```
 
-- Represents the class identifier for mean ellipsoidal uncertainty sets in portfolio optimisation. [`MuEllipsoidalUncertaintySet`](@ref)
-- Represents the class identifier for covariance ellipsoidal uncertainty sets in portfolio optimisation. [`SigmaEllipsoidalUncertaintySet`](@ref)
+- Tags an [`EllipsoidalUncertaintySet`](@ref) as living on the mean axis, where the shape matrix is $N \times N$. [`MuEllipsoidalUncertaintySet`](@ref)
+- Tags an [`EllipsoidalUncertaintySet`](@ref) as living on the covariance axis, where the shape matrix is $N^{2} \times N^{2}$. [`SigmaEllipsoidalUncertaintySet`](@ref)
 
 ```@raw html
 </details>
@@ -1499,7 +1503,7 @@ The turnover is defined as the element-wise absolute difference between the vect
 
 Fees are a non-negligible aspect of active investing. As such `PortfolioOptimiser.jl` has the ability to account for them in all optimisations but the naive ones. They can also be used to adjust expected returns calculations via [`calc_fees`](@ref) and [`calc_asset_fees`](@ref).
 
-- Generate portfolio transaction fee constraints from a `FeesEstimator` and asset set. [`fees_constraints`](@ref)
+- Resolve the name-keyed fee fields of a [`FeesEstimator`](@ref) against a universe, giving a [`Fees`](@ref) of plain per-asset vectors. [`fees_constraints`](@ref)
 - Compute the fixed portfolio fees for assets that have been allocated. [`calc_fixed_fees`](@ref) and [`calc_asset_fixed_fees`](@ref)
 
 ```@raw html
@@ -1507,7 +1511,7 @@ Fees are a non-negligible aspect of active investing. As such `PortfolioOptimise
 <summary>
 ```
 
-Estimator for portfolio transaction fees constraints. [`FeesEstimator`](@ref) and [`Fees`](@ref)
+Names the per-asset fee rates, for [`fees_constraints`](@ref) to align to a universe. [`FeesEstimator`](@ref) and [`Fees`](@ref)
 
 ```@raw html
 </summary>
@@ -1542,8 +1546,8 @@ Compute the benchmark portfolio returns for a weights-based tracking algorithm. 
 </summary>
 ```
 
-- Returns-based tracking algorithm. [`ReturnsTracking`](@ref)
-- Asset weights-based tracking algorithm. [`WeightsTracking`](@ref)
+- Carries the benchmark return series itself, for a benchmark whose weights are unknown. [`ReturnsTracking`](@ref)
+- Builds the benchmark return series by holding a fixed weight vector, net of its own fees. [`WeightsTracking`](@ref)
 
 ```@raw html
 </details>
@@ -1574,14 +1578,54 @@ Norm tracking algorithms
 
 It is also possible to track the error in with risk measures [`RiskTrackingError`](@ref) using [`WeightsTracking`](@ref), which allows for two approaches.
 
-- Dependent variable-based tracking formulation. [`DependentVariableTracking`](@ref)
-- Independent variable-based tracking formulation. [`IndependentVariableTracking`](@ref)
+- Applies the risk measure to each portfolio, then takes the absolute difference of the two risks. [`DependentVariableTracking`](@ref)
+- Applies the risk measure to the difference between the portfolio weights and the benchmark weights. [`IndependentVariableTracking`](@ref)
 
 ## Risk measures
 
 `PortfolioOptimisers.jl` provides a wide range of risk measures. These are broadly categorised into two types based on the type of optimisations that support them.
 
 Every prior-derived slot on a risk measure -- `mu`, `sigma`, `kt`, `sk` -- takes the value itself or the estimator that computes it, a [`DeferredQuantity`](@ref). The estimator is resolved against the optimisation's own prior, so it refits per cross-validation fold and per meta-optimiser subset where a pasted matrix cannot. A measure with two or more deferrable slots names one prior estimator in `pe` instead, and one fit fills every slot the measure leaves unstated. See ADR 0051.
+
+### Calibration
+
+A tail probability and a deformation parameter also take a **rule** in place of the number. The rule goes inside the role that names the end of the distribution the slot addresses, and the role is resolved against the optimisation's own prior, so the quantity refits per cross-validation fold and per meta-optimiser subset where a stated number holds still. The role carries the rule in its `alg` field, and that field takes a callable estimator or a plain function of `(key, pr, w, slv)`. Five rules ship: two compute a significance level, and three compute a deformation parameter. Forty slots across twenty-seven risk measures and weight builders take one: every `alpha` and `beta`, and every `kappa`, `kappa_a` and `kappa_b`. The two inner integration bounds of the tail-Gini family, `alpha_i` and `beta_i`, are starting points rather than quantities to estimate, so they keep their numbers and the joint `0 < alpha_i < alpha < 1` bound is checked against the calibrated `alpha` at fold time.
+
+- Places a significance rule in a slot that addresses the lower tail of the return distribution. [`SignificanceTailCalibration`](@ref)
+- Places a significance rule in a slot that addresses the upper tail of the return distribution. [`SignificanceHeadCalibration`](@ref)
+- Places a deformation rule in a slot that addresses the lower tail of the return distribution. [`DeformationTailCalibration`](@ref)
+- Places a deformation rule in a slot that addresses the upper tail of the return distribution. [`DeformationHeadCalibration`](@ref)
+
+A significance rule reads the sample length, and reads the effective observation weights where the count it states is a count of observations. A deformation rule reads the probability of its own end, which travels to it through `bind_alpha`. One spends a stated entropy budget on the sample length. The other two read the shape of the sample's own tail and return the reciprocal of its index: one standardises each column and answers per end, so a skewed sample gives two numbers, and one whitens each observation with the covariance matrix and answers one number for both ends.
+
+A rule that reads the shape of a series is told which series to read. A drawdown measure prices the drawdown series of the portfolio rather than its returns, and the slot key names neither, so the measure hands the rule its own series through `bind_series` in the same place it hands over the significance level. The two rules then run the same reading over the drawdown series of each column, in place of the columns themselves: the pooled rule pools those series, and the radial rule whitens their rows with the covariance matrix of that same sample, because a prior result states no drawdown moment. The series belongs to the measure, so a marker stated on a rule serves a caller who runs it by hand and is overwritten wherever a measure resolves it.
+
+- Computes a significance level from a count of observations, so that the tail keeps the same number of scenarios whatever the sample length becomes. [`ScenarioCount`](@ref)
+- Computes a significance level that shrinks with the square root of the sample length. [`RateSignificance`](@ref)
+- Computes the Kaniadakis deformation parameter that makes a relativistic measure spend a stated entropy budget. [`EntropyBudget`](@ref)
+- Computes the Kaniadakis deformation parameter whose tail decays at the rate the sample's own tail decays at. [`HillTailDecay`](@ref)
+- Computes the Kaniadakis deformation parameter whose tail decays at the rate the sample's radial series decays at. [`RadialTailDecay`](@ref)
+
+An ambiguity radius takes a rule on the same terms. It names no end of the distribution, so it carries one role rather than two, and it reaches the four regularisation coefficients of [`JuMPOptimiser`](@ref) as well as the two distributionally robust risk measures. Four rules ship, and all four compute a radius. Two shrink the ball at the square-root rate of the sample length, and the third shrinks it at the rate the number of assets sets, which is far slower over a wide universe.
+
+- Places an ambiguity-radius rule in a slot that holds the radius of the ball the model prices. [`AmbiguityRadiusCalibration`](@ref)
+- Places a tail-weight rule in a slot that holds the weight of the tail term of an Esfahani-Kuhn loss. [`AmbiguityTailWeightCalibration`](@ref)
+- Computes an ambiguity radius from the concentration of measure, so that the ball shrinks as the sample grows. [`ConcentrationRadius`](@ref)
+- Computes an ambiguity radius that shrinks with the square root of the sample length. [`RateRadius`](@ref)
+- Computes an ambiguity radius that shrinks at the dimensional rate a Wasserstein ball earns, not at the square-root rate. [`DimensionalRateRadius`](@ref)
+
+Those three return one number for every slot, and the eight radius slots do not measure distance in one norm. The fourth rule reads the slot's key, picks the ground metric that slot names, and returns the sampling error of the empirical measure in it, so the `l1` and `linf` coefficients of one optimiser get two coefficients rather than one.
+
+- Computes an ambiguity radius in the ground metric that the slot it stands in names, so that two slots of two different norms get two different numbers. [`DualNormRadius`](@ref)
+
+The tail weight of an Esfahani-Kuhn loss carries a role and a family of its own. One rule ships there, and it prices the tail term of the loss at a stated multiple of its mean term: a stated tail weight is dimensionless and is not scale-free in the sample, so one number is a different trade-off at every sampling frequency. That rule reads the probability of its own slot, which travels to it through `bind_alpha`.
+
+- Computes the Esfahani-Kuhn tail weight that prices the tail term of the loss at a stated multiple of its mean term. [`TailTermParity`](@ref)
+
+A norm ceiling is a different quantity from a radius, so it carries a role and a family of its own and neither role is admitted in the other's slot. A radius is the coefficient of a norm penalty in the objective; a ceiling bounds that norm in a constraint, and its reciprocal is a floor on the effective number of assets. It reaches the three norm-constraint slots of [`JuMPOptimiser`](@ref), `l2c`, `lpc` and `linfc`. One rule ships, and it holds a stated fraction of the universe effective, so the floor moves with the universe the prior carries. The order the ceiling is read against belongs to the constraint rather than to the rule, so each constraint site hands its own order over before the slot resolves.
+
+- Places a norm-ceiling rule in a slot that bounds a norm of the weight vector from above. [`NormCeilingCalibration`](@ref)
+- Computes a norm ceiling that holds a stated fraction of the universe effective, so that the floor refits whenever the universe changes. [`EffectiveAssetFloor`](@ref)
 
 ### Risk measures for traditional optimisation
 
@@ -1622,8 +1666,8 @@ Formulations
 </summary>
 ```
 
-- Direct quadratic risk expression optimisation formulation for variance-like risk measures. [`QuadRiskExpr`](@ref)
-- Squared second-order cone risk expression optimisation formulation for applicable risk measures. [`SquaredSOCRiskExpr`](@ref)
+- Encodes the second moment as an explicit quadratic form, without an auxiliary variable or a cone. [`QuadRiskExpr`](@ref)
+- Encodes the second moment as the square of a second-order cone variable. [`SquaredSOCRiskExpr`](@ref)
 
 ```@raw html
 </details>
@@ -1676,8 +1720,8 @@ Second squared moments
 </summary>
 ```
 
-- `FullMoment` is used to indicate that all deviations are included in the moment estimation process. [`FullMoment`](@ref)
-- `SemiMoment` is used for semi-moment estimators, where only observations below a target are considered. [`SemiMoment`](@ref)
+- Keeps every deviation from the target, so the moment is two-sided. [`FullMoment`](@ref)
+- Clips every deviation above the target to zero, so the moment reads the downside alone. [`SemiMoment`](@ref)
 
 ```@raw html
 <details class="cap-group" style="margin-left: 2em">
@@ -1690,9 +1734,9 @@ Traditional optimisation formulations
 </summary>
 ```
 
-- Direct quadratic risk expression optimisation formulation for variance-like risk measures. [`QuadRiskExpr`](@ref)
-- Squared second-order cone risk expression optimisation formulation for applicable risk measures. [`SquaredSOCRiskExpr`](@ref)
-- Rotated second-order cone risk expression optimisation formulation for applicable risk measures. [`RSOCRiskExpr`](@ref)
+- Encodes the second moment as an explicit quadratic form, without an auxiliary variable or a cone. [`QuadRiskExpr`](@ref)
+- Encodes the second moment as the square of a second-order cone variable. [`SquaredSOCRiskExpr`](@ref)
+- Encodes the second moment as a variable that a rotated second-order cone bounds. [`RSOCRiskExpr`](@ref)
 
 ```@raw html
 </details>
@@ -1707,14 +1751,14 @@ Traditional optimisation formulations
 <summary>
 ```
 
-Second-order cone risk expression optimisation formulation for applicable risk measures. [`SOCRiskExpr`](@ref)
+Encodes the square root of the second moment as a second-order cone variable. [`SOCRiskExpr`](@ref)
 
 ```@raw html
 </summary>
 ```
 
-- `FullMoment` is used to indicate that all deviations are included in the moment estimation process. [`FullMoment`](@ref)
-- `SemiMoment` is used for semi-moment estimators, where only observations below a target are considered. [`SemiMoment`](@ref)
+- Keeps every deviation from the target, so the moment is two-sided. [`FullMoment`](@ref)
+- Clips every deviation above the target to zero, so the moment reads the downside alone. [`SemiMoment`](@ref)
 
 ```@raw html
 </details>
@@ -1752,8 +1796,8 @@ FullMoment and semi-kurtosis are supported in traditional optimisers via the `kt
 </summary>
 ```
 
-- `FullMoment` is used to indicate that all deviations are included in the moment estimation process. [`FullMoment`](@ref)
-- `SemiMoment` is used for semi-moment estimators, where only observations below a target are considered. [`SemiMoment`](@ref)
+- Keeps every deviation from the target, so the moment is two-sided. [`FullMoment`](@ref)
+- Clips every deviation above the target to zero, so the moment reads the downside alone. [`SemiMoment`](@ref)
 
 ```@raw html
 </details>
@@ -1770,9 +1814,9 @@ Traditional optimisation formulations
 </summary>
 ```
 
-- Direct quadratic risk expression optimisation formulation for variance-like risk measures. [`QuadRiskExpr`](@ref)
-- Squared second-order cone risk expression optimisation formulation for applicable risk measures. [`SquaredSOCRiskExpr`](@ref)
-- Rotated second-order cone risk expression optimisation formulation for applicable risk measures. [`RSOCRiskExpr`](@ref)
+- Encodes the second moment as an explicit quadratic form, without an auxiliary variable or a cone. [`QuadRiskExpr`](@ref)
+- Encodes the second moment as the square of a second-order cone variable. [`SquaredSOCRiskExpr`](@ref)
+- Encodes the second moment as a variable that a rotated second-order cone bounds. [`RSOCRiskExpr`](@ref)
 
 ```@raw html
 </details>
@@ -1783,14 +1827,14 @@ Traditional optimisation formulations
 <summary>
 ```
 
-Second-order cone risk expression optimisation formulation for applicable risk measures. [`SOCRiskExpr`](@ref)
+Encodes the square root of the second moment as a second-order cone variable. [`SOCRiskExpr`](@ref)
 
 ```@raw html
 </summary>
 ```
 
-- `FullMoment` is used to indicate that all deviations are included in the moment estimation process. [`FullMoment`](@ref)
-- `SemiMoment` is used for semi-moment estimators, where only observations below a target are considered. [`SemiMoment`](@ref)
+- Keeps every deviation from the target, so the moment is two-sided. [`FullMoment`](@ref)
+- Clips every deviation above the target to zero, so the moment reads the downside alone. [`SemiMoment`](@ref)
 
 ```@raw html
 </details>
@@ -1833,8 +1877,8 @@ FullMoment and semi-skewness are supported in traditional optimisers via the `sk
 </summary>
 ```
 
-- `FullMoment` is used to indicate that all deviations are included in the moment estimation process. [`FullMoment`](@ref)
-- `SemiMoment` is used for semi-moment estimators, where only observations below a target are considered. [`SemiMoment`](@ref)
+- Keeps every deviation from the target, so the moment is two-sided. [`FullMoment`](@ref)
+- Clips every deviation above the target to zero, so the moment reads the downside alone. [`SemiMoment`](@ref)
 
 ```@raw html
 </details>
@@ -1851,14 +1895,14 @@ Traditional optimisation formulations
 </summary>
 ```
 
-- Direct quadratic risk expression optimisation formulation for variance-like risk measures. [`QuadRiskExpr`](@ref)
-- Squared second-order cone risk expression optimisation formulation for applicable risk measures. [`SquaredSOCRiskExpr`](@ref)
+- Encodes the second moment as an explicit quadratic form, without an auxiliary variable or a cone. [`QuadRiskExpr`](@ref)
+- Encodes the second moment as the square of a second-order cone variable. [`SquaredSOCRiskExpr`](@ref)
 
 ```@raw html
 </details>
 ```
 
-- Second-order cone risk expression optimisation formulation for applicable risk measures. [`SOCRiskExpr`](@ref)
+- Encodes the square root of the second moment as a second-order cone variable. [`SOCRiskExpr`](@ref)
 
 ```@raw html
 </details>
@@ -1988,8 +2032,8 @@ Traditional optimisation formulations
 </summary>
 ```
 
-- OWA formulation that computes exact OWA weights by solving a linear programme. [`ExactOrderedWeightsArray`](@ref)
-- OWA formulation that approximates OWA weights using a set of p-norm parameters. [`ApproxOrderedWeightsArray`](@ref)
+- OWA formulation that computes the exact OWA risk by solving a linear programme. [`ExactOrderedWeightsArray`](@ref)
+- OWA formulation that approximates the OWA risk using a set of p-norm parameters. [`ApproxOrderedWeightsArray`](@ref)
 - Estimator type for OWA weights using JuMP-based optimization. [`OWAJuMP`](@ref)
 
 ```@raw html
@@ -2168,8 +2212,8 @@ Risk formulation
 </summary>
 ```
 
-- Direct quadratic risk expression optimisation formulation for variance-like risk measures. [`QuadRiskExpr`](@ref)
-- Rotated second-order cone risk expression optimisation formulation for applicable risk measures. [`RSOCRiskExpr`](@ref)
+- Encodes the second moment as an explicit quadratic form, without an auxiliary variable or a cone. [`QuadRiskExpr`](@ref)
+- Encodes the second moment as a variable that a rotated second-order cone bounds. [`RSOCRiskExpr`](@ref)
 
 ```@raw html
 </details>
@@ -2219,8 +2263,8 @@ Risk Tracking Risk Measure
 </summary>
 ```
 
-- Dependent variable-based tracking formulation. [`DependentVariableTracking`](@ref)
-- Independent variable-based tracking formulation. [`IndependentVariableTracking`](@ref)
+- Applies the risk measure to each portfolio, then takes the absolute difference of the two risks. [`DependentVariableTracking`](@ref)
+- Applies the risk measure to the difference between the portfolio weights and the benchmark weights. [`IndependentVariableTracking`](@ref)
 
 ```@raw html
 </details>
@@ -2228,7 +2272,7 @@ Risk Tracking Risk Measure
 
 - Represents the Power Norm Value-at-Risk (PNVaR) risk measure. [`PowerNormValueatRisk`](@ref)
 - Represents the Power Norm Value-at-Risk Range (PNVaRRange) risk measure. [`PowerNormValueatRiskRange`](@ref)
-- Represents the Power Norm Drawdown-at-Risk (PNDDaR) risk measure. [`PowerNormDrawdownatRisk`](@ref)
+- Represents the Power Norm Drawdown-at-Risk (PNDaR) risk measure. [`PowerNormDrawdownatRisk`](@ref)
 - Represents a generic Value-at-Risk range risk measure that combines any pair of XatRisk-type measures applied to the loss and gain sides of the return distribution. [`GenericValueatRiskRange`](@ref)
 - Represents the Risk Tracking risk measure. [`RiskTrackingRiskMeasure`](@ref)
 - Risk measure that contributes no risk. [`NoRisk`](@ref)
@@ -2246,9 +2290,9 @@ Risk measure settings
 
 Every risk measure carries a settings object saying how it enters the problem: as the objective, as a constraint with an upper bound, and with what scale.
 
-- Settings type for configuring risk measure estimators. [`RiskMeasureSettings`](@ref)
-- Settings type for configuring hierarchical risk measure estimators. [`HierarchicalRiskMeasureSettings`](@ref)
-- Settings type for configuring risk measures that expose a lower bound (maximisation direction). [`MaxRiskMeasureSettings`](@ref)
+- Weights a risk measure inside an aggregate, and bounds its risk expression from above. [`RiskMeasureSettings`](@ref)
+- Weights a hierarchical risk measure inside an aggregate, and carries no bound. [`HierarchicalRiskMeasureSettings`](@ref)
+- Weights a risk measure inside an aggregate, and bounds its risk expression from **below**. [`MaxRiskMeasureSettings`](@ref)
 
 ```@raw html
 </details>
@@ -2283,8 +2327,8 @@ Represents the unstandardised fourth moment (kurtosis or semi-kurtosis) risk mea
 </summary>
 ```
 
-- `FullMoment` is used to indicate that all deviations are included in the moment estimation process. [`FullMoment`](@ref)
-- `SemiMoment` is used for semi-moment estimators, where only observations below a target are considered. [`SemiMoment`](@ref)
+- Keeps every deviation from the target, so the moment is two-sided. [`FullMoment`](@ref)
+- Clips every deviation above the target to zero, so the moment reads the downside alone. [`SemiMoment`](@ref)
 
 ```@raw html
 </details>
@@ -2301,8 +2345,8 @@ Represents a standardised high-order moment risk measure algorithm. [`Standardis
 </summary>
 ```
 
-- `FullMoment` is used to indicate that all deviations are included in the moment estimation process. [`FullMoment`](@ref)
-- `SemiMoment` is used for semi-moment estimators, where only observations below a target are considered. [`SemiMoment`](@ref)
+- Keeps every deviation from the target, so the moment is two-sided. [`FullMoment`](@ref)
+- Clips every deviation above the target to zero, so the moment reads the downside alone. [`SemiMoment`](@ref)
 
 ```@raw html
 </details>
@@ -2319,7 +2363,7 @@ Represents a standardised high-order moment risk measure algorithm. [`Standardis
 - Represents the Relative Average Drawdown risk measure for hierarchical optimisation. [`RelativeAverageDrawdown`](@ref)
 - Represents the Relative Ulcer Index risk measure for hierarchical optimisation. [`RelativeUlcerIndex`](@ref)
 - Represents the Relative Maximum Drawdown risk measure for hierarchical optimisation. [`RelativeMaximumDrawdown`](@ref)
-- Represents the Relative Power Norm Drawdown-at-Risk (Relative PNDDaR) risk measure for hierarchical optimisation. [`RelativePowerNormDrawdownatRisk`](@ref)
+- Represents the Relative Power Norm Drawdown-at-Risk (Relative PNDaR) risk measure for hierarchical optimisation. [`RelativePowerNormDrawdownatRisk`](@ref)
 - Represents a risk ratio risk measure for hierarchical portfolio optimisation. [`RiskRatio`](@ref)
 - Represents the Equal Risk Measure for hierarchical portfolio optimisation. [`EqualRisk`](@ref)
 - Represents the Median Absolute Deviation (MAD) risk measure for hierarchical portfolio optimisation. [`MedianAbsoluteDeviation`](@ref)
@@ -2399,13 +2443,13 @@ Optimisations are implemented via [`optimise`](@ref). Optimisations consume an e
 
 These return a [`NaiveOptimisationResult`](@ref).
 
-- Inverse Volatility portfolio optimiser. [`InverseVolatility`](@ref)
-- Equal-weighted portfolio optimiser. [`EqualWeighted`](@ref)
-- Random-weighted portfolio optimiser. [`RandomWeighted`](@ref)
+- Allocates each asset a weight inversely proportional to its volatility, or to its variance when `sq = true`. [`InverseVolatility`](@ref)
+- Allocates the same weight to every asset in the universe. [`EqualWeighted`](@ref)
+- Draws portfolio weights at random from a Dirichlet distribution with concentration parameter `alpha`. [`RandomWeighted`](@ref)
 
 #### Naive optimisation features
 
-- Estimator for portfolio weight bounds constraints. [`WeightBoundsEstimator`](@ref), [`UniformValues`](@ref), and [`WeightBounds`](@ref)
+- Resolves weight bounds written in asset or group names against a universe. [`WeightBoundsEstimator`](@ref), [`UniformValues`](@ref), and [`WeightBounds`](@ref)
 
 ```@raw html
 <details class="cap-group" style="margin-left: 2em">
@@ -2432,9 +2476,9 @@ Uses a JuMP optimisation model to enforce weight bounds. [`JuMPWeightFinaliser`]
 ```
 
 - Minimises the L1 norm of relative weight deviations when enforcing weight bounds. [`RelativeErrorWeightFinaliser`](@ref)
-- Minimises the L2 norm (squared) of relative weight deviations when enforcing weight bounds. [`SquaredRelativeErrorWeightFinaliser`](@ref)
+- Minimises the L2 norm of relative weight deviations when enforcing weight bounds. [`SquaredRelativeErrorWeightFinaliser`](@ref)
 - Minimises the L1 norm of absolute weight deviations when enforcing weight bounds. [`AbsoluteErrorWeightFinaliser`](@ref)
-- Minimises the L2 norm (squared) of absolute weight deviations when enforcing weight bounds. [`SquaredAbsoluteErrorWeightFinaliser`](@ref)
+- Minimises the L2 norm of absolute weight deviations when enforcing weight bounds. [`SquaredAbsoluteErrorWeightFinaliser`](@ref)
 
 ```@raw html
 </details>
@@ -2452,7 +2496,7 @@ These optimisations are implemented as `JuMP` problems and make use of [`JuMPOpt
 
 These optimisations support a variety of objective functions.
 
-- Container for configuring a JuMP solver and its settings. [`Solver`](@ref)
+- Configures one solver backend, its attributes, and the statuses its solutions must reach. [`Solver`](@ref)
 - Main JuMP-based portfolio optimiser configuration. [`JuMPOptimiser`](@ref)
 
 ```@raw html
@@ -2492,7 +2536,7 @@ Mean-Risk portfolio optimiser. [`MeanRisk`](@ref) and [`NearOptimalCentering`](@
 <summary>
 ```
 
-Defines the number of points on the efficient frontier (Pareto Front). [`Frontier`](@ref)
+Sweeps the efficient frontier by solving the model once at each of `N` evenly spaced bound values. [`Frontier`](@ref)
 
 ```@raw html
 </summary>
@@ -2631,9 +2675,9 @@ Relaxed Risk Budgeting [`RelaxedRiskBudgeting`](@ref) returns a [`RelaxedRiskBud
 </summary>
 ```
 
-- Basic Relaxed Risk Budgeting formulation. [`BasicRelaxedRiskBudgeting`](@ref)
-- Regularised Relaxed Risk Budgeting formulation. [`RegularisedRelaxedRiskBudgeting`](@ref)
-- Regularised and penalised Relaxed Risk Budgeting formulation. [`RegularisedPenalisedRelaxedRiskBudgeting`](@ref)
+- Bounds the risk variable by the portfolio standard deviation alone, which is the relaxation with no extra term. [`BasicRelaxedRiskBudgeting`](@ref)
+- Adds a second cone on an auxiliary scalar, which lifts the floor on the risk variable and improves numerical stability. [`RegularisedRelaxedRiskBudgeting`](@ref)
+- Bounds the auxiliary scalar by the individual standard deviations rather than the portfolio one, weighted by `p`. [`RegularisedPenalisedRelaxedRiskBudgeting`](@ref)
 
 ```@raw html
 </details>
@@ -2647,7 +2691,7 @@ Relaxed Risk Budgeting [`RelaxedRiskBudgeting`](@ref) returns a [`RelaxedRiskBud
 
 - Abstract supertype for custom JuMP objective implementations. [`CustomJuMPObjective`](@ref)
 - Abstract supertype for custom JuMP constraint implementations. [`CustomJuMPConstraint`](@ref)
-- Estimator for portfolio weight bounds constraints. [`WeightBoundsEstimator`](@ref), [`UniformValues`](@ref), and [`WeightBounds`](@ref)
+- Resolves weight bounds written in asset or group names against a universe. [`WeightBoundsEstimator`](@ref), [`UniformValues`](@ref), and [`WeightBounds`](@ref)
 
 ```@raw html
 <details class="cap-group" style="margin-left: 2em">
@@ -2690,7 +2734,7 @@ Type
 ```
 
 - Exact
-- Specifies the portfolio budget constraint as a closed interval $[\mathrm{lb}, \mathrm{ub}]$ on the sum of weights. [`BudgetRange`](@ref)
+- Bounds the sum of the portfolio weights inside a closed interval, rather than pinning it to one value. [`BudgetRange`](@ref)
 
 ```@raw html
 </details>
@@ -2705,7 +2749,7 @@ Type
 <summary>
 ```
 
-Estimator for buy-in threshold portfolio constraints. [`ThresholdEstimator`](@ref) and [`Threshold`](@ref)
+Resolves a minimum-holding threshold written in asset or group names against a universe. [`ThresholdEstimator`](@ref) and [`Threshold`](@ref)
 
 ```@raw html
 </summary>
@@ -2741,7 +2785,7 @@ Type
 ```
 
 - Asset
-- Estimator for constructing asset set membership matrices from asset groupings. [`AssetSetsMatrixEstimator`](@ref)
+- Names the group name key a binary asset-group membership matrix is built from. [`AssetSetsMatrixEstimator`](@ref)
 
 ```@raw html
 </details>
@@ -2751,8 +2795,8 @@ Type
 </details>
 ```
 
-- Container for one or more linear constraint equations to be parsed and converted into constraint matrices. [`LinearConstraintEstimator`](@ref) and [`LinearConstraint`](@ref)
-- Estimator type for centrality-based analysis. [`CentralityEstimator`](@ref)
+- Holds the linear constraint equations to parse, and the universe key their names resolve against. [`LinearConstraintEstimator`](@ref) and [`LinearConstraint`](@ref)
+- Bundles a network source with the centrality algorithm that scores its assets. [`CentralityEstimator`](@ref)
 
 ```@raw html
 <details class="cap-group" style="margin-left: 2em">
@@ -2766,18 +2810,18 @@ Cardinality
 ```
 
 - Asset
-- Container for one or more linear constraint equations to be parsed and converted into constraint matrices. [`LinearConstraintEstimator`](@ref) and [`LinearConstraint`](@ref)
+- Holds the linear constraint equations to parse, and the universe key their names resolve against. [`LinearConstraintEstimator`](@ref) and [`LinearConstraint`](@ref)
 - Set(s)
-- Container for one or more linear constraint equations to be parsed and converted into constraint matrices. [`LinearConstraintEstimator`](@ref) and [`LinearConstraint`](@ref)
+- Holds the linear constraint equations to parse, and the universe key their names resolve against. [`LinearConstraintEstimator`](@ref) and [`LinearConstraint`](@ref)
 
 ```@raw html
 </details>
 ```
 
-- Estimator for turnover portfolio constraints. [`TurnoverEstimator`](@ref) and [`Turnover`](@ref)
-- Estimator for portfolio transaction fees constraints. [`FeesEstimator`](@ref) and [`Fees`](@ref)
-- Tracking error result type. [`TrackingError`](@ref)
-- Estimator for generating integer phylogeny-based constraints. [`IntegerPhylogenyEstimator`](@ref) and [`SemiDefinitePhylogenyEstimator`](@ref)
+- Names the per-asset turnover bounds, for [`turnover_constraints`](@ref) to align to a universe. [`TurnoverEstimator`](@ref) and [`Turnover`](@ref)
+- Names the per-asset fee rates, for [`fees_constraints`](@ref) to align to a universe. [`FeesEstimator`](@ref) and [`Fees`](@ref)
+- Bounds how far the portfolio return series may drift from a benchmark return series. [`TrackingError`](@ref)
+- Caps how many related assets may be held at once, refitting the structure from returns. [`IntegerPhylogenyEstimator`](@ref) and [`SemiDefinitePhylogenyEstimator`](@ref)
 
 ```@raw html
 <details class="cap-group" style="margin-left: 2em">
@@ -2791,7 +2835,7 @@ Portfolio returns
 ```
 
 - One return term, or a vector of them weighted-summed into the model's return expression
-- Per-term settings bundle carried by every [`JuMPReturnsEstimator`](@ref). [`JuMPReturnsSettings`](@ref)
+- Carries one return term's own weight in the return sum, its own lower bound, and the two charges netted out of it. [`JuMPReturnsSettings`](@ref)
 
 ```@raw html
 <details class="cap-group" style="margin-left: 2em">
@@ -2804,7 +2848,7 @@ Arithmetic [`ArithmeticReturn`](@ref)
 </summary>
 ```
 
-- Represents a box uncertainty set for risk or prior statistics in portfolio optimisation. [`BoxUncertaintySet`](@ref), [`BoxUncertaintySetAlgorithm`](@ref), [`EllipsoidalUncertaintySet`](@ref), and [`EllipsoidalUncertaintySetAlgorithm`](@ref)
+- Holds the element-wise lower and upper bounds of a box uncertainty set on a mean vector or on a covariance matrix. [`BoxUncertaintySet`](@ref), [`BoxUncertaintySetAlgorithm`](@ref), [`EllipsoidalUncertaintySet`](@ref), and [`EllipsoidalUncertaintySetAlgorithm`](@ref)
 - Custom expected returns vector
 - Deferred expected returns estimator, resolved against the optimisation's own prior
 
@@ -2830,9 +2874,9 @@ Risk vector scalarisation
 </summary>
 ```
 
-- Scalariser that combines multiple risk measures using a weighted sum. [`SumScalariser`](@ref)
-- Scalariser that selects the risk expression whose scaled value is the largest. [`MaxScalariser`](@ref)
-- Scalariser that aggregates multiple risk measures using the log-sum-exp function. [`LogSumExpScalariser`](@ref)
+- Adds the scaled risk measures together. [`SumScalariser`](@ref)
+- Reports the largest of the scaled risk measures, so the aggregate is the worst of them. [`MaxScalariser`](@ref)
+- Smooths the maximum of the scaled risk measures, so every measure keeps a share of the aggregate. [`LogSumExpScalariser`](@ref)
 
 ```@raw html
 </details>
@@ -2902,8 +2946,8 @@ Each result carries the measures and scalarisers its optimisation ran under, sto
 
 ##### Hierarchical clustering optimisation features
 
-- Estimator for portfolio weight bounds constraints. [`WeightBoundsEstimator`](@ref), [`UniformValues`](@ref), and [`WeightBounds`](@ref)
-- Estimator for portfolio transaction fees constraints. [`FeesEstimator`](@ref) and [`Fees`](@ref)
+- Resolves weight bounds written in asset or group names against a universe. [`WeightBoundsEstimator`](@ref), [`UniformValues`](@ref), and [`WeightBounds`](@ref)
+- Names the per-asset fee rates, for [`fees_constraints`](@ref) to align to a universe. [`FeesEstimator`](@ref) and [`Fees`](@ref)
 
 ```@raw html
 <details class="cap-group" style="margin-left: 2em">
@@ -2917,10 +2961,10 @@ Risk vector scalarisation
 ```
 
 - The clustering optimisers accept every scalariser; a `JuMP` optimiser accepts only the non-hierarchical three
-- Scalariser that combines multiple risk measures using a weighted sum. [`SumScalariser`](@ref)
-- Scalariser that selects the risk expression whose scaled value is the largest. [`MaxScalariser`](@ref)
-- Scalariser that aggregates multiple risk measures using the log-sum-exp function. [`LogSumExpScalariser`](@ref)
-- Scalariser that selects the risk expression whose scaled value is the smallest. [`MinScalariser`](@ref)
+- Adds the scaled risk measures together. [`SumScalariser`](@ref)
+- Reports the largest of the scaled risk measures, so the aggregate is the worst of them. [`MaxScalariser`](@ref)
+- Smooths the maximum of the scaled risk measures, so every measure keeps a share of the aggregate. [`LogSumExpScalariser`](@ref)
+- Reports the smallest of the scaled risk measures, so the aggregate is the mildest of them. [`MinScalariser`](@ref)
 
 ```@raw html
 </details>
@@ -2951,9 +2995,9 @@ Uses a JuMP optimisation model to enforce weight bounds. [`JuMPWeightFinaliser`]
 ```
 
 - Minimises the L1 norm of relative weight deviations when enforcing weight bounds. [`RelativeErrorWeightFinaliser`](@ref)
-- Minimises the L2 norm (squared) of relative weight deviations when enforcing weight bounds. [`SquaredRelativeErrorWeightFinaliser`](@ref)
+- Minimises the L2 norm of relative weight deviations when enforcing weight bounds. [`SquaredRelativeErrorWeightFinaliser`](@ref)
 - Minimises the L1 norm of absolute weight deviations when enforcing weight bounds. [`AbsoluteErrorWeightFinaliser`](@ref)
-- Minimises the L2 norm (squared) of absolute weight deviations when enforcing weight bounds. [`SquaredAbsoluteErrorWeightFinaliser`](@ref)
+- Minimises the L2 norm of absolute weight deviations when enforcing weight bounds. [`SquaredAbsoluteErrorWeightFinaliser`](@ref)
 
 ```@raw html
 </details>
@@ -2974,14 +3018,14 @@ Schur complementary hierarchical risk parity provides a bridge between mean vari
 <summary>
 ```
 
-Parameters for the Schur Complement step of SCHRP. [`SchurComplementParams`](@ref)
+Collects the risk measure, the interpolation parameter $\gamma$, and the two algorithms that one Schur complement bundle runs with. [`SchurComplementParams`](@ref)
 
 ```@raw html
 </summary>
 ```
 
-- Monotonic Schur Complement algorithm variant for SCHRP. [`MonotonicSchurComplement`](@ref)
-- Non-monotonic Schur Complement algorithm variant for SCHRP. [`NonMonotonicSchurComplement`](@ref)
+- Searches $[0, \gamma]$ for the value that gives the lowest portfolio variance. [`MonotonicSchurComplement`](@ref)
+- Runs the allocation at the $\gamma$ the caller gave, with no search. [`NonMonotonicSchurComplement`](@ref)
 
 ```@raw html
 </details>
@@ -2989,8 +3033,8 @@ Parameters for the Schur Complement step of SCHRP. [`SchurComplementParams`](@re
 
 ##### Schur complementary optimisation features
 
-- Estimator for portfolio weight bounds constraints. [`WeightBoundsEstimator`](@ref), [`UniformValues`](@ref), and [`WeightBounds`](@ref)
-- Estimator for portfolio transaction fees constraints. [`FeesEstimator`](@ref) and [`Fees`](@ref)
+- Resolves weight bounds written in asset or group names against a universe. [`WeightBoundsEstimator`](@ref), [`UniformValues`](@ref), and [`WeightBounds`](@ref)
+- Names the per-asset fee rates, for [`fees_constraints`](@ref) to align to a universe. [`FeesEstimator`](@ref) and [`Fees`](@ref)
 
 ```@raw html
 <details class="cap-group" style="margin-left: 2em">
@@ -3017,9 +3061,9 @@ Uses a JuMP optimisation model to enforce weight bounds. [`JuMPWeightFinaliser`]
 ```
 
 - Minimises the L1 norm of relative weight deviations when enforcing weight bounds. [`RelativeErrorWeightFinaliser`](@ref)
-- Minimises the L2 norm (squared) of relative weight deviations when enforcing weight bounds. [`SquaredRelativeErrorWeightFinaliser`](@ref)
+- Minimises the L2 norm of relative weight deviations when enforcing weight bounds. [`SquaredRelativeErrorWeightFinaliser`](@ref)
 - Minimises the L1 norm of absolute weight deviations when enforcing weight bounds. [`AbsoluteErrorWeightFinaliser`](@ref)
-- Minimises the L2 norm (squared) of absolute weight deviations when enforcing weight bounds. [`SquaredAbsoluteErrorWeightFinaliser`](@ref)
+- Minimises the L2 norm of absolute weight deviations when enforcing weight bounds. [`SquaredAbsoluteErrorWeightFinaliser`](@ref)
 
 ```@raw html
 </details>
@@ -3045,8 +3089,8 @@ This matrix of predicted returns is then used by the outer optimisation estimato
 #### Nested clusters optimisation features
 
 - Any features supported by the inner and outer estimators.
-- Estimator for portfolio weight bounds constraints. [`WeightBoundsEstimator`](@ref), [`UniformValues`](@ref), and [`WeightBounds`](@ref)
-- Estimator for portfolio transaction fees constraints. [`FeesEstimator`](@ref) and [`Fees`](@ref)
+- Resolves weight bounds written in asset or group names against a universe. [`WeightBoundsEstimator`](@ref), [`UniformValues`](@ref), and [`WeightBounds`](@ref)
+- Names the per-asset fee rates, for [`fees_constraints`](@ref) to align to a universe. [`FeesEstimator`](@ref) and [`Fees`](@ref)
 
 ```@raw html
 <details class="cap-group" style="margin-left: 2em">
@@ -3073,9 +3117,9 @@ Uses a JuMP optimisation model to enforce weight bounds. [`JuMPWeightFinaliser`]
 ```
 
 - Minimises the L1 norm of relative weight deviations when enforcing weight bounds. [`RelativeErrorWeightFinaliser`](@ref)
-- Minimises the L2 norm (squared) of relative weight deviations when enforcing weight bounds. [`SquaredRelativeErrorWeightFinaliser`](@ref)
+- Minimises the L2 norm of relative weight deviations when enforcing weight bounds. [`SquaredRelativeErrorWeightFinaliser`](@ref)
 - Minimises the L1 norm of absolute weight deviations when enforcing weight bounds. [`AbsoluteErrorWeightFinaliser`](@ref)
-- Minimises the L2 norm (squared) of absolute weight deviations when enforcing weight bounds. [`SquaredAbsoluteErrorWeightFinaliser`](@ref)
+- Minimises the L2 norm of absolute weight deviations when enforcing weight bounds. [`SquaredAbsoluteErrorWeightFinaliser`](@ref)
 
 ```@raw html
 </details>
@@ -3096,8 +3140,8 @@ This works similarly to the Nested Clustered estimator, only instead of breaking
 #### Ensemble optimisation features
 
 - Any features supported by the inner and outer estimators.
-- Estimator for portfolio transaction fees constraints. [`FeesEstimator`](@ref) and [`Fees`](@ref)
-- Estimator for portfolio weight bounds constraints. [`WeightBoundsEstimator`](@ref), [`UniformValues`](@ref), and [`WeightBounds`](@ref)
+- Names the per-asset fee rates, for [`fees_constraints`](@ref) to align to a universe. [`FeesEstimator`](@ref) and [`Fees`](@ref)
+- Resolves weight bounds written in asset or group names against a universe. [`WeightBoundsEstimator`](@ref), [`UniformValues`](@ref), and [`WeightBounds`](@ref)
 
 ```@raw html
 <details class="cap-group" style="margin-left: 2em">
@@ -3124,9 +3168,9 @@ Uses a JuMP optimisation model to enforce weight bounds. [`JuMPWeightFinaliser`]
 ```
 
 - Minimises the L1 norm of relative weight deviations when enforcing weight bounds. [`RelativeErrorWeightFinaliser`](@ref)
-- Minimises the L2 norm (squared) of relative weight deviations when enforcing weight bounds. [`SquaredRelativeErrorWeightFinaliser`](@ref)
+- Minimises the L2 norm of relative weight deviations when enforcing weight bounds. [`SquaredRelativeErrorWeightFinaliser`](@ref)
 - Minimises the L1 norm of absolute weight deviations when enforcing weight bounds. [`AbsoluteErrorWeightFinaliser`](@ref)
-- Minimises the L2 norm (squared) of absolute weight deviations when enforcing weight bounds. [`SquaredAbsoluteErrorWeightFinaliser`](@ref)
+- Minimises the L2 norm of absolute weight deviations when enforcing weight bounds. [`SquaredAbsoluteErrorWeightFinaliser`](@ref)
 
 ```@raw html
 </details>
@@ -3147,8 +3191,8 @@ This optimiser takes ideas from [`MultipleRandomised`](@ref) cross validation to
 #### Subset resampling optimisation features
 
 - Any features supported by the inner estimator.
-- Estimator for portfolio transaction fees constraints. [`FeesEstimator`](@ref) and [`Fees`](@ref)
-- Estimator for portfolio weight bounds constraints. [`WeightBoundsEstimator`](@ref), [`UniformValues`](@ref), and [`WeightBounds`](@ref)
+- Names the per-asset fee rates, for [`fees_constraints`](@ref) to align to a universe. [`FeesEstimator`](@ref) and [`Fees`](@ref)
+- Resolves weight bounds written in asset or group names against a universe. [`WeightBoundsEstimator`](@ref), [`UniformValues`](@ref), and [`WeightBounds`](@ref)
 
 ```@raw html
 <details class="cap-group" style="margin-left: 2em">
@@ -3175,9 +3219,9 @@ Uses a JuMP optimisation model to enforce weight bounds. [`JuMPWeightFinaliser`]
 ```
 
 - Minimises the L1 norm of relative weight deviations when enforcing weight bounds. [`RelativeErrorWeightFinaliser`](@ref)
-- Minimises the L2 norm (squared) of relative weight deviations when enforcing weight bounds. [`SquaredRelativeErrorWeightFinaliser`](@ref)
+- Minimises the L2 norm of relative weight deviations when enforcing weight bounds. [`SquaredRelativeErrorWeightFinaliser`](@ref)
 - Minimises the L1 norm of absolute weight deviations when enforcing weight bounds. [`AbsoluteErrorWeightFinaliser`](@ref)
-- Minimises the L2 norm (squared) of absolute weight deviations when enforcing weight bounds. [`SquaredAbsoluteErrorWeightFinaliser`](@ref)
+- Minimises the L2 norm of absolute weight deviations when enforcing weight bounds. [`SquaredAbsoluteErrorWeightFinaliser`](@ref)
 
 ```@raw html
 </details>
@@ -3227,9 +3271,9 @@ Uses a JuMP optimisation model to enforce weight bounds. [`JuMPWeightFinaliser`]
 ```
 
 - Minimises the L1 norm of relative weight deviations when enforcing weight bounds. [`RelativeErrorWeightFinaliser`](@ref)
-- Minimises the L2 norm (squared) of relative weight deviations when enforcing weight bounds. [`SquaredRelativeErrorWeightFinaliser`](@ref)
+- Minimises the L2 norm of relative weight deviations when enforcing weight bounds. [`SquaredRelativeErrorWeightFinaliser`](@ref)
 - Minimises the L1 norm of absolute weight deviations when enforcing weight bounds. [`AbsoluteErrorWeightFinaliser`](@ref)
-- Minimises the L2 norm (squared) of absolute weight deviations when enforcing weight bounds. [`SquaredAbsoluteErrorWeightFinaliser`](@ref)
+- Minimises the L2 norm of absolute weight deviations when enforcing weight bounds. [`SquaredAbsoluteErrorWeightFinaliser`](@ref)
 
 ```@raw html
 </details>

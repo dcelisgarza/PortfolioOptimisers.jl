@@ -197,17 +197,17 @@ The measure carries one deferrable slot, so there is no fan-out to make and it t
   - [`fit_deferred_quantity`](@ref)
   - [`HighOrderPrior`](@ref)
 """
-function resolve_deferred_quantities(r::NegativeSkewness,
-                                     pr::AbstractPriorResult)::NegativeSkewness
+function resolve_deferred_quantities(r::NegativeSkewness, pr::AbstractPriorResult,
+                                     ::Any = nothing)::NegativeSkewness
     if !isa(r.sk, DeferredQuantity)
         return r
     end
     fitted = fit_deferred_quantity(r.sk, pr)
     skmp = deferred_derived_quantity(fitted, :skmp)
-    return NegativeSkewness(; settings = r.settings, mp = isnothing(skmp) ? r.mp : skmp,
-                            sk = deferred_quantity(fitted, :sk),
-                            V = deferred_derived_quantity(fitted, :V), alg = r.alg,
-                            window = r.window)
+    return rebuild_with_slots(r,
+                              (; mp = isnothing(skmp) ? r.mp : skmp,
+                               sk = deferred_quantity(fitted, :sk),
+                               V = deferred_derived_quantity(fitted, :V)))
 end
 # Deferrable slots — see `deferred_slots`. `V` is derived and never defers on its own, and
 # `mp` holds a processor by design.

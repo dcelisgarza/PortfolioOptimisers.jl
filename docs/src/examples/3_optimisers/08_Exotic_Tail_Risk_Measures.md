@@ -1,5 +1,4 @@
 The source files can be found in [examples/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../../examples/3_optimisers/08_Exotic_Tail_Risk_Measures.jl"
 ```
@@ -12,19 +11,19 @@ distributions with the same tail *average* but very different tail *shapes* look
 it. The library ships a family of coherent tail measures that weight the extreme tail more
 aggressively than CVaR:
 
-- [`EntropicValueatRisk`](@ref) (EVaR) — the tightest coherent upper bound on Value-at-Risk,
+  - [`EntropicValueatRisk`](@ref) (EVaR) — the tightest coherent upper bound on Value-at-Risk,
     built from the exponential moment-generating function. It is more conservative than CVaR
     and is solved over the **exponential cone**.
-- [`RelativisticValueatRisk`](@ref) (RLVaR) — a coherent generalisation of EVaR via the
-    Tsallis (``\kappa``-deformed) entropy, parametrised by ``\kappa \in (0, 1)``. It
+  - [`RelativisticValueatRisk`](@ref) (RLVaR) — a coherent generalisation of EVaR via the
+    Kaniadakis (``\kappa``-deformed) entropy, parametrised by ``\kappa \in (0, 1)``. It
     *interpolates* between EVaR (as ``\kappa \to 0``) and the worst realisation (as
     ``\kappa \to 1``), giving a continuous dial on how hard the extreme tail is penalised.
     Solved over the **power cone**.
-- [`PowerNormValueatRisk`](@ref) (PNVaR) — generalises EVaR by replacing the
+  - [`PowerNormValueatRisk`](@ref) (PNVaR) — generalises EVaR by replacing the
     moment-generating function with a power-norm, parametrised by a power ``p \ge 1``. Also
     solved over the **power cone**, and likewise approaches the worst realisation as ``p``
     grows.
-- [`GenericValueatRiskRange`](@ref) — composes *any* two of these measures into a two-sided
+  - [`GenericValueatRiskRange`](@ref) — composes *any* two of these measures into a two-sided
     range: one measure on the loss side, another on the gain side.
 
 These measures sit in a conservativeness ladder, ``\mathrm{CVaR} \le \mathrm{EVaR} \le
@@ -210,11 +209,11 @@ plot_stacked_bar_composition(results, rd; xticks = ([1, 2, 3, 4], names_r))
 Beyond CVaR, the library offers a ladder of coherent tail measures that weight the extreme
 tail progressively harder:
 
-- [`EntropicValueatRisk`](@ref) is the tight coherent upper bound on VaR (exponential cone).
-- [`RelativisticValueatRisk`](@ref) generalises EVaR and dials continuously from EVaR
+  - [`EntropicValueatRisk`](@ref) is the tight coherent upper bound on VaR (exponential cone).
+  - [`RelativisticValueatRisk`](@ref) generalises EVaR and dials continuously from EVaR
     (``\kappa \to 0``) to the worst realisation (``\kappa \to 1``) via the power cone.
-- [`PowerNormValueatRisk`](@ref) offers the same kind of dial through ``p \ge 1``.
-- [`GenericValueatRiskRange`](@ref) composes any two of them into an asymmetric two-sided
+  - [`PowerNormValueatRisk`](@ref) offers the same kind of dial through ``p \ge 1``.
+  - [`GenericValueatRiskRange`](@ref) composes any two of them into an asymmetric two-sided
     measure.
 
 All are convex and solved by Clarabel's exponential/power cones — no special solver needed.

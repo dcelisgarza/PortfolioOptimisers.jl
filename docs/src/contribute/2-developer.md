@@ -136,11 +136,19 @@ asks to fall: `Complexity` and `JET`. Both are a **ratchet**. A file passes when
 risen above the number `code_health/` records for it, so neither check ever asks you to improve a
 number you did not cause. A file far above every threshold is green while its number holds steady.
 
+The `Complexity` check carries a third ratchet beside the two complexity ones, and it reads
+differently. **The size ratchet** counts the **code** lines in a file, where a docstring line, a
+comment line and a blank line are not code. A file's ceiling there is the greater of 500 and the
+number the baseline records for it, so a file under 500 code lines is free to grow and a file over
+500 may fall and may not rise. See
+`docs/adr/0101-the-size-gate-counts-code-lines-and-binds-over-a-threshold.md`.
+
 When one turns red, the run names every offending file, the metric, the baseline number and the new
 one. Take one of three routes, in order.
 
- 1. **Lower the number.** This is the route to take whenever you can. The file's number is the
-    maximum over its definitions, so only the worst definition moves it.
+ 1. **Lower the number.** This is the route to take whenever you can. For a complexity number the
+    file's number is the maximum over its definitions, so only the worst definition moves it. For
+    the size ratchet, move code out of the file or delete it. A docstring costs nothing there.
 
  2. **Dismiss the report**, for `JET` alone. A Dismissal says that a class of report is not a real
     defect. It cites a **Rationale** by name, and the two halves have different owners: citing an
@@ -195,7 +203,7 @@ The maintenance loop that drives these numbers down, rather than merely holding 
 
 The [capability catalogue](@ref capability-catalogue) is the user-facing inventory of everything the package can do, grouped by the job each thing does. It is generated: `docs/capability_catalogue.jl` curates only the **grouping**, and every description is the first sentence of the corresponding docstring, so a description cannot drift from the type it describes.
 
-**Adding a new estimator, algorithm, or exported function means adding it here too.** This is enforced, not merely requested — `test/test_26_docs.jl` fails if any concrete leaf subtype of `AbstractEstimator` or `AbstractAlgorithm` is missing, and the docs build refuses to render an incomplete page.
+**Adding a new type or exported function means adding it here too.** This is enforced, not merely requested — `test/test_26_docs.jl` fails if any name on the Choice Surface is missing, and the docs build refuses to render an incomplete page. A concrete type the package declares is on the surface when it is a leaf subtype of `AbstractEstimator`, of `AbstractAlgorithm` or of `AbstractCovarianceEstimator`, or when it is an export under its own name; a Result and an error are subtracted, because a caller receives them and never chooses them. `choice_surface_names` in `docs/generate_capability_catalogue.jl` is the one statement of that rule, and both the test and the docs build call it.
 
 - Add a `Cap(:YourType)` to the group it belongs to, chosen by what it *does* rather than which file it lives in.
 - Do **not** write a description. It comes from the docstring. Pass `label` only where the docstring genuinely reads worse as a bullet — for instance when every sibling in a group would repeat the same prefix.
@@ -226,12 +234,6 @@ To create a new release, you can follow these simple steps:
 - Create a branch `release-x.y.z`
 
 - Update `version` in `Project.toml`
-- Update the `CHANGELOG.md`:
-
-  - Rename the section "Unreleased" to "[x.y.z] - yyyy-mm-dd" (i.e., version under brackets, dash, and date in ISO format)
-  - Add a new section on top of it named "Unreleased"
-  - Add a new link in the bottom for version "x.y.z"
-  - Change the "[unreleased]" link to use the latest version - end of line, `vx.y.z ... HEAD`.
 - Create a commit "Release vx.y.z", push, create a PR, wait for it to pass, merge the PR.
 - Go back to main screen and click on the latest commit (link: [https://github.com/dcelisgarza/PortfolioOptimisers.jl/commit/main](https://github.com/dcelisgarza/PortfolioOptimisers.jl/commit/main))
 - At the bottom, write `@JuliaRegistrator register`

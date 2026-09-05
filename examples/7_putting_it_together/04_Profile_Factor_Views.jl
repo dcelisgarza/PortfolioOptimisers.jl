@@ -59,7 +59,7 @@ asset_sets = UniverseSets(;
                                       "energy" => ["CVX", "XOM", "RRC"],
                                       "healthcare" => ["JNJ", "LLY", "MRK", "PFE", "UNH"]))
 ## `FactorBlackLittermanPrior` reads the *declared* factor axis, so the sets it takes names
-## both: assets under `xkey`, factors under `fkey`, in the column order of `rd.F`.
+## both: assets under `xkey`, factors under `tfkey`, in the column order of `rd.F`.
 factor_sets = UniverseSets(; dict = Dict("nx" => rd.nx, "nf" => rd.nf))
 tau = 1 / size(rd.X, 1)
 

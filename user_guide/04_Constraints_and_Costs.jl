@@ -77,8 +77,9 @@ Real mandates are often written in **factor** names rather than tickers — "at 
 the loadings matrix a factor model already computes.
 
 Wrap a [`LinearConstraintEstimator`](@ref) in an [`ExposureConstraintEstimator`](@ref) and declare
-the space with [`FactorSpace`](@ref); the names resolve against the factor axis a
-[`UniverseSets`](@ref) declares under `fkey` (default `"nf"`), and the rows are projected through
+the space with [`FactorSpace`](@ref); the names resolve against the factor axis the loadings name,
+which for a time-series regression is the one a [`UniverseSets`](@ref) declares under `tfkey`
+(default `"nf"`), and the rows are projected through
 the loadings while the constraint is generated. What the optimiser receives is an ordinary
 asset-space constraint, so this composes with everything else on this page.
 

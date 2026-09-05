@@ -11,7 +11,9 @@ MIPValueatRisk
 DistributionValueatRisk
 factory(alg::DistributionValueatRisk, pr::AbstractPriorResult, args...; kwargs...)
 ValueatRisk
+resolve_deferred_quantities(x::ValueatRisk, pr::AbstractPriorResult)
 ValueatRiskRange
+resolve_deferred_quantities(x::ValueatRiskRange, pr::AbstractPriorResult)
 DrawdownatRisk
 RelativeDrawdownatRisk
 CholRM

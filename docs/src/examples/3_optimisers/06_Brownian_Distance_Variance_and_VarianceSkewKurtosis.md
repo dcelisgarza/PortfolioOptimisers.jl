@@ -1,5 +1,4 @@
 The source files can be found in [examples/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../../examples/3_optimisers/06_Brownian_Distance_Variance_and_VarianceSkewKurtosis.jl"
 ```
@@ -9,12 +8,12 @@ EditURL = "../../../../examples/3_optimisers/06_Brownian_Distance_Variance_and_V
 Some risk measures capture dependence structure or higher-order moment interactions that
 variance and CVaR miss. Two such specialist measures are:
 
-- [`BrownianDistanceVariance`](@ref) — measures non-linear dependence between portfolio
+  - [`BrownianDistanceVariance`](@ref) — measures non-linear dependence between portfolio
     returns and a reference via the Brownian (distance) covariance framework. It is zero if
     and only if the returns are *statistically independent* of the reference; variance can be
     zero while Brownian Distance Variance is not. It builds a T×T pairwise distance matrix
     so it scales quadratically in observations, not in assets.
-- [`VarianceSkewKurtosis`](@ref) — a composite that combines variance (penalises
+  - [`VarianceSkewKurtosis`](@ref) — a composite that combines variance (penalises
     dispersion), negative skewness (penalises asymmetry), and kurtosis (penalises heavy
     tails) into a single objective. It uses large PSD cones so it's best to use a solver that
     supports first-order algorithms such as SCS.
@@ -151,9 +150,9 @@ opt_ho = JuMPOptimiser(; pe = pr_ho, slv = scs_slv)
 
 [`VarianceSkewKurtosis`](@ref) combines three sub-measures:
 
-- [`Variance`](@ref) — penalises dispersion.
-- [`Skewness`](@ref) (negative skewness convention) — penalises left-skewed returns.
-- [`Kurtosis`](@ref) — penalises fat tails.
+  - [`Variance`](@ref) — penalises dispersion.
+  - [`Skewness`](@ref) (negative skewness convention) — penalises left-skewed returns.
+  - [`Kurtosis`](@ref) — penalises fat tails.
 
 The default scales are 1:1:1. Scaling one component higher makes the objective more
 sensitive to that moment.
@@ -202,10 +201,10 @@ plot_stacked_bar_composition([res_var_scs, res_vsk, res_vsk_heavy], rd)
 
 ## Summary
 
-- [`BrownianDistanceVariance`](@ref) uses a 50-observation slice with Clarabel.
+  - [`BrownianDistanceVariance`](@ref) uses a 50-observation slice with Clarabel.
     It captures non-linear dependence via a quadratic T×T distance matrix; keep T small
     (the O(T²) model size is the limiting factor, not the number of assets).
-- [`VarianceSkewKurtosis`](@ref) must use **SCS** (polynomial PSD cones). Pair it with
+  - [`VarianceSkewKurtosis`](@ref) must use **SCS** (polynomial PSD cones). Pair it with
     [`HighOrderPriorEstimator`](@ref) and a short observation window to keep the
     higher-moment tensor computation feasible.
 

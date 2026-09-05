@@ -1505,8 +1505,13 @@ end
         end
         return out
     end
+    # A type declares its slots through one of the two parallel verbs. `deferred_slots`
+    # names the slots that may hold a Deferred Quantity, and `calibration_slots` names the
+    # slots that may hold a Calibration Rule. Both are resolved by the same verb, and the
+    # pairing the rule asserts is resolver-with-declaration, not resolver-with-one-verb: the
+    # six distributionally robust slots #584 widened resolve a rule and declare it there.
     resolvers = firstargs(PO.resolve_deferred_quantities)
-    declarations = firstargs(PO.deferred_slots)
+    declarations = union(firstargs(PO.deferred_slots), firstargs(PO.calibration_slots))
     @test isempty(setdiff(resolvers, declarations))
 
     # `ArithmeticReturn` was the one violation, and it is reachable now: `ExpectedReturn.rt`
@@ -1519,6 +1524,20 @@ end
               NonOptimisationRiskRatio, ExpectedReturn, ExpectedReturnRiskRatio)
         @test T in declarations
         @test !(T in resolvers)
+    end
+
+    # Every resolver takes the effective solver as a third positional argument (#591). The
+    # `JuMP` risk-constraint route passes three, so a method written with two would not be
+    # called at all: dispatch would fall through to the universal fallback, and the type's
+    # own resolution would be skipped in silence. `nargs` counts the function itself, so a
+    # method with three positional arguments has `nargs == 4`.
+    arities = Dict{Any, Set{Int}}()
+    for m in methods(PO.resolve_deferred_quantities)
+        T = Base.unwrap_unionall(m.sig).parameters[2]
+        push!(get!(arities, T, Set{Int}()), m.nargs)
+    end
+    for (T, ns) in arities
+        @test 4 in ns
     end
 end
 
@@ -1564,7 +1583,9 @@ end
     # legitimately in `Skewness.ve`. So the declaration is per type, and this is the gate that
     # catches the container that forgot one: it reads the field's own type bound off the
     # positional constructor and asks whether that bound admits any type that declares slots.
-    # Six containers were missing before the recursion was derived.
+    # Six containers were missing before the recursion was derived, and the two ordered-
+    # weights containers joined when #583 widened the significance slots of the four weight
+    # builders they hold.
     tr = WeightsTracking(; w = fill(0.2, 5))
     function instantiate(T)
         for f in (() -> T(), () -> T(; tr = tr), () -> T(; w = fill(0.2, 5)))
@@ -1583,7 +1604,7 @@ end
         x = instantiate(base(T))
         isnothing(x) || push!(declaring, x)
     end
-    @test length(declaring) == 22
+    @test length(declaring) == 24
 
     # The inner constructor states one bound per field, in field order.
     function field_bounds(T)
@@ -1619,4 +1640,37 @@ end
     end
     @test isempty(undeclared)
     @test isempty(unbounded)
+end
+
+@testset "Deferred Quantity: every resolver rebuilds through `rebuild_with_slots`" begin
+    # One rebuild for the whole channel. A method that names its own constructor restates
+    # the field list, so a field added to the type later reaches the struct and not the
+    # rebuild: the resolved measure then carries that field's default in silence, and no
+    # compiler and no test catches it. `rebuild_with_slots` derives the field list from the
+    # type, so no site can drop a field.
+    root = normpath(joinpath(@__DIR__, ".."))
+    call = r"^\s+(?:return |\w+ = )?[A-Z]\w*\(;"
+    # A `CalibrationContext` is not a rebuild of the measure. It carries what the site
+    # knows into the rule, it names no field of the type the resolver rebuilds, and so it
+    # cannot drop one. ADR 0095 owns it.
+    exempt = r"CalibrationContext\(;"
+    offenders = String[]
+    for (dir, _, files) in walkdir(joinpath(root, "src"))
+        for file in files
+            endswith(file, ".jl") || continue
+            path = joinpath(dir, file)
+            inside = false
+            for (n, line) in pairs(readlines(path))
+                if startswith(line, "function resolve_deferred_quantities(")
+                    inside = true
+                elseif inside && line == "end"
+                    inside = false
+                elseif inside && occursin(call, line) && !occursin(exempt, line)
+                    push!(offenders,
+                          relpath(path, root) * ":" * string(n) * ": " * strip(line))
+                end
+            end
+        end
+    end
+    @test isempty(offenders)
 end

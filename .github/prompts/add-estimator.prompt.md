@@ -7,11 +7,12 @@ Follow these steps to add a new estimator to PortfolioOptimisers.jl. Read the re
 
 ## Before you begin
 
-Read the following to understand patterns and conventions:
+This prompt carries the **order of the work**, and no rule of its own. Every rule it needs lives in a standards file, and each step links to the section that owns it. Read these first:
 
-- `.github/instructions/julia-source-code.instructions.md`
-- `.github/instructions/julia-docstrings.instructions.md`
-- `.github/instructions/julia-return-types.instructions.md`
+- [`STANDARDS.md`](../../STANDARDS.md) — which file owns which rule, and which check holds it.
+- [`.github/instructions/julia-source-code.instructions.md`](../instructions/julia-source-code.instructions.md) — type roles, constructors, validation, dispatch, exports.
+- [`.github/instructions/julia-docstrings.instructions.md`](../instructions/julia-docstrings.instructions.md) — the Authority for every docstring section named below.
+- [`.github/instructions/julia-return-types.instructions.md`](../instructions/julia-return-types.instructions.md) — when to annotate a return type.
 - A similar existing estimator file in `src/` as a reference.
 
 ## Step 1 — Identify the correct abstract supertype
@@ -24,82 +25,32 @@ Decide which abstract type hierarchy this estimator belongs to:
 - `AbstractDenoiseEstimator`, `AbstractDetoneEstimator`, `AbstractPosdefEstimator` (matrix processing)
 - Other domain-specific abstract type
 
-If no suitable abstract type exists, define a new one (see `add-algorithm.prompt.md` for algorithm types and follow the same pattern for estimator abstract types).
+If no suitable abstract type exists, define a new one. Its docstring follows [`.github/instructions/julia-docstrings.instructions.md`](../instructions/julia-docstrings.instructions.md) § *Abstract types*, which owns the section list and its order.
+
+An abstract type is **not exported** unless the maintainer says so. [`CLAUDE.md`](../../CLAUDE.md) § *Design rules* owns that rule, and `test/test_43_exported_abstract_type_census.jl` holds it.
 
 ## Step 2 — Define the struct
 
 In the appropriate source file (or a new numbered file if this is a distinct component):
 
-1. Write the docstring using `$(DocStringExtensions.TYPEDEF)` as the header.
-2. Use `@concrete struct MyEstimator <: AbstractSupertype`.
-3. Document all fields inline using `"$(field_dict[:key])"`.
-4. Write the **inner constructor**: positional args, `@argcheck` / `assert_*` validation, `return new{typeof(f1), ...}(f1, ...)`.
-5. Write the **outer constructor**: keyword args with default values, delegates to inner constructor.
-
-````julia
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Description of what this estimator does.
-
-# Fields
-
-$(DocStringExtensions.FIELDS)
-
-# Constructors
-
-    MyEstimator(;
-        field1::Type1 = default1,
-        field2::Type2 = default2
-    ) -> MyEstimator
-
-Keywords correspond to the struct's fields.
-
-## Validation
-
-  - $(val_dict[:key])
-
-# Examples
-
-```jldoctest
-julia> MyEstimator()
-MyEstimator
-  field1 ┴ default1
-```
-
-## Related
-
-  - [`AbstractSupertype`](@ref)
-  - [`my_function`](@ref)
-"""
-@concrete struct MyEstimator <: AbstractSupertype
-    "$(field_dict[:key1])"
-    field1
-    "$(field_dict[:key2])"
-    field2
-    function MyEstimator(field1::Type1, field2::Type2)
-        assert_nonempty_nonneg_finite_val(field1, :field1)
-        return new{typeof(field1), typeof(field2)}(field1, field2)
-    end
-end
-function MyEstimator(; field1::Type1 = default1, field2::Type2 = default2)
-    return MyEstimator(field1, field2)
-end
-````
+ 1. Write `@concrete struct MyEstimator <: AbstractSupertype`, an inner constructor that validates its positional arguments and returns `new`, and an outer keyword constructor that carries the defaults. [`.github/instructions/julia-source-code.instructions.md`](../instructions/julia-source-code.instructions.md) § *Constructor Pattern* owns the shape, and § *Input Validation* owns the checks.
+ 2. Write the docstring as [`.github/instructions/julia-docstrings.instructions.md`](../instructions/julia-docstrings.instructions.md) § *Concrete struct types* states. A type that carries propagated, view or observation-weight parameters follows § *`@propagatable` concrete struct types* instead.
+ 3. Write one inline description per field, as § *Inline field docstrings* of the same file states.
+ 4. Read a real docstring rather than a copy of one. The § *Reference docstrings* table names one Unit per kind, and a Gate holds every Unit it names.
 
 ## Step 3 — Implement the interface methods
 
 Implement all methods required by the abstract supertype's `# Interfaces` section. Common ones include:
 
 - `factory(est::MyEstimator, w::ObsWeights)::MyEstimator` — returns a copy with observation weights propagated.
-- `*_view(est::MyEstimator, i)::MyEstimator` — returns a sliced view.
-- The domain-specific computation function (e.g., `Statistics.cov`, `prior`, `denoise!`).
+- `port_opt_view(est::MyEstimator, i)::MyEstimator` — returns a sliced view.
+- The domain-specific computation function (for example `Statistics.cov`, `prior`, `denoise!`).
 
-Write a docstring for every method.
+Write a docstring for every method, as [`.github/instructions/julia-docstrings.instructions.md`](../instructions/julia-docstrings.instructions.md) § *Section Structure for Functions* states.
 
 ## Step 4 — Add return type annotations
 
-Following `.github/instructions/julia-return-types.instructions.md`:
+Follow [`.github/instructions/julia-return-types.instructions.md`](../instructions/julia-return-types.instructions.md):
 
 - Annotate `factory` with `::MyEstimator`.
 - Annotate validation helpers with `::Nothing`.
@@ -107,7 +58,7 @@ Following `.github/instructions/julia-return-types.instructions.md`:
 
 ## Step 5 — Add `arg_dict` / `field_dict` entries if needed
 
-If any field or argument does not yet have an entry in the dictionaries in `src/01_Base.jl`, add them before finalising the docstring.
+If any field or argument does not yet have an entry in the dictionaries in [`src/01_Base/01_DocstringDictionaries.jl`](../../src/01_Base/01_DocstringDictionaries.jl), add them before finalising the docstring. [`.github/instructions/julia-docstrings.instructions.md`](../instructions/julia-docstrings.instructions.md) § *Documentation Dictionaries* states which text a dictionary owns and when prose is permitted instead.
 
 ## Step 6 — Export
 
@@ -123,19 +74,25 @@ MyEstimator
 ```
 ````
 
+[`.github/instructions/julia-docstrings.instructions.md`](../instructions/julia-docstrings.instructions.md) § *`docs/src/api/` Markdown Files* owns the layout of that page, including when the page carries a bibliography block.
+
 ## Step 8 — Write tests
 
-Create or extend a `test/test-*.jl` file following `.github/instructions/julia-test-writing.instructions.md`:
+Create or extend a `test/test_*.jl` file following [`.github/instructions/julia-test-writing.instructions.md`](../instructions/julia-test-writing.instructions.md):
 
 1. Test constructor validation (all `@argcheck` conditions).
 2. Test normal usage with valid inputs.
 3. Test `factory` propagates weights correctly.
-4. Test `moment_view` returns the correct type and slice.
+4. Test `port_opt_view` returns the correct type and slice.
 5. Test each dispatch variant of the computation function.
 6. Test composability with other estimators.
 
-## Step 9 — Final checks
+## Step 9 — Wire the file into the sweep
 
-Run the full pre-commit, test, and doctest suite following `.github/prompts/pre-commit-and-test.prompt.md`.
+If the addition creates a new file under `src/`, give it a row in [`sweep/manifest.toml`](../../sweep/manifest.toml) and open its sweep ticket in the same change. [`CLAUDE.md`](../../CLAUDE.md) § *Functionality you add* owns the four steps, and `test/test_45_sweep_census.jl` holds them.
+
+## Step 10 — Final checks
+
+Run the full pre-commit, test, and doctest suite following [`.github/prompts/pre-commit-and-test.prompt.md`](pre-commit-and-test.prompt.md).
 
 All three steps must pass before committing.

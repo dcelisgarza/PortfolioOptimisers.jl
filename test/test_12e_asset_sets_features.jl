@@ -179,7 +179,7 @@ end
     # which is what finally makes that field live -- it shipped unused with the carrier.
     pe = FeaturePrior(; ze = ze, sets = TAX)
     pr = prior(pe, rd)
-    @test pr.Z == asset_sets_features(KEYS, TAX)
+    @test panel_feature_matrix(pr.pnl)[2] == asset_sets_features(KEYS, TAX)
 
     # Purely additive: every moment is the wrapped estimator's, untouched.
     pr0 = prior(EmpiricalPrior(), rd)
@@ -195,9 +195,10 @@ end
                                   "nx_pairB" => string.(repeat(1:(NA ÷ 2); outer = 2))))
     prsq = prior(FeaturePrior(; ze = AssetSetsFeatures(; vals = ["nx_pairA", "nx_pairB"]),
                               sets = sq), rd)
-    @test size(prsq.Z, 2) == NA
+    @test size(panel_feature_matrix(prsq.pnl)[2], 2) == NA
     i = [1, 3, 5]
-    @test size(PortfolioOptimisers.port_opt_view(prsq, i).Z) == (length(i), NA)
+    @test size(panel_feature_matrix(PortfolioOptimisers.port_opt_view(prsq, i).pnl)[2]) ==
+          (length(i), NA)
 
     # The taxonomy is the whole input, so an absent `sets` is a missing argument rather than
     # a defaulted one: a returns-derived substitute would be the exact endogeneity this
@@ -227,7 +228,7 @@ end
     # So the viewed producer recomputes the taxonomy of the *subproblem*, rather than
     # carrying the full universe's columns into it. The feature axis is rebuilt, not
     # sliced: a group with no members left in the view disappears.
-    Zv = prior(pev, rd.X[:, i]).Z
+    Zv = panel_feature_matrix(prior(pev, rd.X[:, i]).pnl)[2]
     @test size(Zv, 1) == length(i)
     @test size(Zv, 2) == sum(length(unique(TAX.dict[k][i])) for k in KEYS)
     @test all(==(Float64(length(KEYS))), sum(Zv; dims = 2))
@@ -253,15 +254,15 @@ end
     # `asset_sets_features` is public in its own right -- a producer alone runs inside
     # `prior(pe::FeaturePrior, …)` and could only ever feed the derived carrier.
     rdz = ReturnsResult(; nx = rd.nx, X = rd.X, nf = rd.nf, F = rd.F, ts = rd.ts,
-                        nz = asset_sets_feature_names(KEYS, TAX), Z = Z)
+                        pnl = feature_matrix_panel(asset_sets_feature_names(KEYS, TAX), Z))
     # Carrier two: derived, via the producer.
     pe = FeaturePrior(; ze = AssetSetsFeatures(; vals = KEYS), sets = TAX)
     pr = prior(pe, rd)
-    @test pr.Z == Z
+    @test panel_feature_matrix(pr.pnl)[2] == Z
 
     # The two carriers agree on the matrix, hence on the distance -- they differ only in
     # what a fold does to them, not in what they say about the universe.
-    @test distance(fde, pr.Z) == distance(fde, Z)
+    @test distance(fde, panel_feature_matrix(pr.pnl)[2]) == distance(fde, Z)
 
     cle_f = ClustersEstimator(; de = fde)
     cle_c = ClustersEstimator(; de = cde)
@@ -515,16 +516,25 @@ end
     fs = UniverseSets(; xkey = "nx", zkey = "nz",
                       dict = Dict{String, Any}("nx" => ["A", "B", "C"],
                                                "nf" => ["F1", "F2"],
+                                               "ncf" => ["Size", "Value"],
                                                "nz" => ["Tech", "Finance"],
                                                "nx_sector" => ["Tech", "Tech", "Finance"],
-                                               "nf_style" => ["Value", "Growth"]))
-    for prog in (["nf_style" => ["nx_sector" => "Tech" => 1.0]],   # row selector
-                 ["A" => ["nf_style" => "Value" => 1.0]],          # target, two-level
-                 ["A" => ["nf_style" => 1.0]])                     # target, bare
-        @test_logs((:warn, r"names the factor axis"), match_mode = :any,
+                                               "nf_style" => ["Value", "Growth"],
+                                               "ncf_family" => ["Style", "Style"]))
+    # #723 split the factor axis in two, and both are refused here for the same reason:
+    # each is factor-length, and a graded feature program has no factor-length position.
+    for prog in (["nf_style" => ["nx_sector" => "Tech" => 1.0]],    # row selector
+                 ["A" => ["nf_style" => "Value" => 1.0]],           # target, two-level
+                 ["A" => ["nf_style" => 1.0]],                      # target, bare
+                 ["ncf_family" => ["nx_sector" => "Tech" => 1.0]],  # row selector
+                 ["A" => ["ncf_family" => "Style" => 1.0]],         # target, two-level
+                 ["A" => ["ncf_family" => 1.0]])                    # target, bare
+        @test_logs((:warn, r"names a factor axis"), match_mode = :any,
                    asset_sets_features(prog, fs))
         res = @test_throws ArgumentError asset_sets_features(prog, fs; strict = true)
-        @test occursin("names the factor axis", res.value.msg)
+        @test occursin("names a factor axis", res.value.msg)
+        # The message names all four prefixes, so a caller sees which axes are excluded.
+        @test occursin("`nf`/`uf`/`ncf`/`ucf`", res.value.msg)
         # No suggestion: the name resolved perfectly well, on the wrong axis.
         @test !occursin("did you mean", res.value.msg)
     end
@@ -589,7 +599,7 @@ end
     # sets)`, so there is nowhere to pass a keyword through.
     pe = FeaturePrior(; ze = ze, sets = GSETS)
     pr = prior(pe, randn(StableRNG(987654321), 64, 3))
-    @test pr.Z == GEXP
+    @test panel_feature_matrix(pr.pnl)[2] == GEXP
     @test pr.mu == prior(EmpiricalPrior(), randn(StableRNG(987654321), 64, 3)).mu
 
     bad = FeaturePrior(;
@@ -620,12 +630,12 @@ end
     fde = FeatureDistance()
     # Carrier one: the user's own data, under the default `z_src = :data`.
     rdz = ReturnsResult(; nx = rd.nx, X = rd.X, nf = rd.nf, F = rd.F, ts = rd.ts,
-                        nz = asset_sets_feature_names(prog, G), Z = Z)
-    @test rdz.nz == nzz
+                        pnl = feature_matrix_panel(asset_sets_feature_names(prog, G), Z))
+    @test panel_feature_matrix(rdz.pnl)[1] == nzz
     # Carrier two: derived, via the producer.
     pe = FeaturePrior(; ze = AssetSetsFeatures(; vals = prog), sets = G)
     pr = prior(pe, rd)
-    @test pr.Z == Z
+    @test panel_feature_matrix(pr.pnl)[2] == Z
 
     cle_f = ClustersEstimator(; de = fde)
     clr_d = clusterise(cle_f, rdz)
@@ -636,9 +646,13 @@ end
     # The grading changes the answer, which is the whole point of authoring it: doubling the
     # sector weight is a different distance from the one-hot stack.
     clr_1 = clusterise(cle_f,
-                       ReturnsResult(; nx = rd.nx, X = rd.X, ts = rd.ts, nz = nzz,
-                                     Z = asset_sets_features(["nx_sector" => 1.0,
-                                                              "nx_industry" => 1.0], G)))
+                       ReturnsResult(; nx = rd.nx, X = rd.X, ts = rd.ts,
+                                     pnl = feature_matrix_panel(nzz,
+                                                                asset_sets_features(["nx_sector" =>
+                                                                                         1.0,
+                                                                                     "nx_industry" =>
+                                                                                         1.0],
+                                                                                    G))))
     @test clr_d.D != clr_1.D
     # And it still differs from the returns correlation, so exogenous structure survives.
     clr_c = clusterise(ClustersEstimator(; de = Distance(; alg = CanonicalDistance())), rd)
@@ -656,4 +670,138 @@ end
         # Same matrix through both carriers, so the same weights.
         @test isapprox(wd.w, wp.w)
     end
+end
+
+@testset "A numeric key restricted by one of its own numbers" begin
+    esg = findfirst(==("esg"), GSETS.dict["nz"])
+
+    # `feature_diagonal!`'s numeric branch reached *with* a group value. The group is a
+    # number here rather than a categorical label, because a numeric key's column is what
+    # the selector is matched against -- and the node stays the key's own, `nx_esg` with
+    # `nx_` stripped, since that is the only node a numeric key has.
+    Z = asset_sets_features(["nx_esg" => 0.80 => 5.0], GSETS)
+    @test Z[:, esg] == [0.0, 5.0, 0.0]
+    @test count(!iszero, Z) == 1
+
+    # The natural value is still that row's own number, so a marker resolves per cell even
+    # once the rows are restricted to one.
+    @test asset_sets_features(["nx_esg" => 0.80 => Scale(2.0)], GSETS)[:, esg] ==
+          [0.0, 1.6, 0.0]
+
+    # A number no asset carries selects no row, and that is a *name* failure rather than a
+    # syntax error: soft by default, and it names the count of distinct values under the
+    # key, never the values themselves.
+    miss = ["nx_esg" => 0.99 => 5.0]
+    @test_logs((:warn, r"matches no asset"), match_mode = :any,
+               asset_sets_features(miss, GSETS))
+    @test all(iszero, asset_sets_features(miss, GSETS))
+    res = @test_throws ArgumentError asset_sets_features(miss, GSETS; strict = true)
+    @test occursin("group value `0.99` of taxonomy key `nx_esg`", res.value.msg)
+    @test occursin("3 distinct values under that key", res.value.msg)
+end
+
+@testset "A stale group member, and a target that resolves in no namespace" begin
+    # A group key that lists a name the universe no longer carries. `feature_rows` maps the
+    # resolved members to row indices and reports the missing ones once, through the shared
+    # `missing_group_assets_msg`, so a stale group reads the same here as it does through
+    # `name_to_val!`.
+    holey = UniverseSets(; xkey = "nx", zkey = "nz",
+                         dict = Dict{String, Any}("nx" => ["A", "B", "C"],
+                                                  "nz" => ["Tech", "Finance"],
+                                                  "nx_sector" =>
+                                                      ["Tech", "Tech", "Finance"],
+                                                  "ABZ" => ["A", "B", "Zz"]))
+    prog = ["ABZ" => ["nx_sector" => "Tech" => 1.0]]
+    Z = @test_logs (:warn, r"not in asset universe") match_mode = :any asset_sets_features(prog,
+                                                                                           holey)
+    # The surviving members still write: a stale member costs its own row, not the term.
+    @test Z[:, 1] == [1.0, 1.0, 0.0]
+    res = @test_throws ArgumentError asset_sets_features(prog, holey; strict = true)
+    @test occursin("group `ABZ`", res.value.msg)
+    @test occursin("[\"Zz\"]", res.value.msg)
+
+    # The mirror of the unresolved row selector, in *target* position. It reports against
+    # the asset axis, because a target's left half names an asset or a group and the
+    # declared axis is only reached once that name has resolved.
+    unknown = ["A" => ["Zzz" => 1.0]]
+    @test_logs((:warn, r"not in asset universe"), match_mode = :any,
+               asset_sets_features(unknown, GSETS))
+    @test all(iszero, asset_sets_features(unknown, GSETS))
+    res = @test_throws ArgumentError asset_sets_features(unknown, GSETS; strict = true)
+    @test occursin("variable `Zzz` not in asset universe", res.value.msg)
+end
+
+@testset "Every shape the target grammar refuses, in every branch" begin
+    # Four different branches of `feature_target!`, one per shape: no `Pair` at all, a
+    # taxonomy key whose group carries a non-value, a taxonomy key whose right half is
+    # neither a group nor a value, and an asset target whose right half is not a value.
+    # Each is a syntax error, so each throws whatever `strict` says -- the asymmetry the
+    # docstring states, and the reason the message prints the grammar rather than naming a
+    # namespace.
+    for prog in (["A" => [1.0]], ["A" => ["nx_sector" => "Tech" => "oops"]],
+                 ["A" => ["nx_sector" => ["Tech"]]], ["A" => ["B" => ["C"]]])
+        for strict in (false, true)
+            res = @test_throws ArgumentError asset_sets_features(prog, GSETS;
+                                                                 strict = strict)
+            @test occursin("is not a well-formed graded feature program term",
+                           res.value.msg)
+            @test occursin("rowsel := asset | group | taxkey", res.value.msg)
+        end
+    end
+end
+
+@testset "A taxonomy key on the left takes three different branches" begin
+    col(n) = findfirst(==(n), GSETS.dict["nz"])
+
+    # The right side is `g => tail` and `g` is *itself* a taxonomy key, so `g` starts a
+    # target and the left side is a bare row selector over the whole universe. This is the
+    # grammar's one genuine ambiguity, and the prefix rule settles it.
+    Z2 = asset_sets_features(["nx_sector" => "nx_country" => "UK" => 0.4], GSETS)
+    @test Z2[:, col("UK")] == [0.4, 0.4, 0.4]
+    @test count(!iszero, Z2) == 3
+    # Contrast, one branch down: a `g` that is no taxonomy key restricts the rows instead,
+    # so only the `Tech` rows write and `C` stays zero.
+    @test asset_sets_features(["nx_sector" => "Tech" => ["nx_country" => "UK" => 0.4]],
+                              GSETS)[:, col("UK")] == [0.4, 0.4, 0.0]
+
+    # The right side is no `Pair` at all, so it is a target list over every row.
+    @test asset_sets_features(["nx_sector" => ["nx_country" => "US" => 0.75]], GSETS)[:,
+                                                                                      col("US")] ==
+          [0.75, 0.75, 0.75]
+
+    # And the restricting `g` that matches no row: a name failure, soft by default, named
+    # against the key whose column was searched.
+    miss = ["nx_sector" => "Zzz" => ["nx_country" => "UK" => 1.0]]
+    @test_logs((:warn, r"matches no asset"), match_mode = :any,
+               asset_sets_features(miss, GSETS))
+    @test all(iszero, asset_sets_features(miss, GSETS))
+    res = @test_throws ArgumentError asset_sets_features(miss, GSETS; strict = true)
+    @test occursin("group value `Zzz` of taxonomy key `nx_sector`", res.value.msg)
+end
+@testset "port_opt_view over a vector of estimators, the method that breaks the tie" begin
+    # An `AssetSetsMatrixEstimator` holds a key *name*, so an asset view leaves it alone. A
+    # vector of them alone matches both `port_opt_view(::VecMatNum_ASetMatE, ...)` and the
+    # generic vector method in `02_Tools.jl`, and neither is more specific: `MatNum` is
+    # outside the generic's element union and `Nothing` is outside this one's. The method
+    # that takes that intersection is what makes this call resolve rather than raise.
+    e1 = AssetSetsMatrixEstimator(; val = "nx_sector")
+    e2 = AssetSetsMatrixEstimator(; val = "nx_industry")
+    i = [1, 3, 5]
+    v = PortfolioOptimisers.port_opt_view([e1, e2], i)
+    @test v == [e1, e2]
+    @test v[1] === e1
+    @test v[2] === e2
+    # The array is concretely typed, which is the whole reason the intersection method
+    # repeats the body rather than falling back: a membership matrix and its estimator must
+    # produce the same element type.
+    @test isconcretetype(eltype(v))
+    @test v isa Vector{AssetSetsMatrixEstimator{String}}
+    # The matrix side of the same union slices its columns, and its vector method gives one
+    # such view per entry.
+    smtx = asset_sets_matrix("nx_sector", TAX)
+    mv = PortfolioOptimisers.port_opt_view([smtx, smtx], i)
+    @test length(mv) == 2
+    @test isconcretetype(eltype(mv))
+    @test all(m -> m == smtx[:, i], mv)
+    @test size(mv[1]) == (size(smtx, 1), length(i))
 end

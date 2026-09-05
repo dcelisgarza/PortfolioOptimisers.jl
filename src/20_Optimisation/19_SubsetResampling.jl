@@ -105,6 +105,32 @@ function SubsetResamplingResult(; pr::Option{<:AbstractPriorResult},
     return SubsetResamplingResult(pr, wb, fees, ress, idx, retcode, w, fb)
 end
 """
+    set_retcode(res::SubsetResamplingResult, retcode::OptRetCode_VecOptRetCode)
+
+Rebuild a [`SubsetResamplingResult`](@ref) with a different return code.
+
+The result carries one return code per member of the population, so a member is dropped by failing its own entry. Every other member of the record is carried over unchanged.
+
+# Arguments
+
+  - `res`: Result to rebuild.
+  - `retcode`: Return code, or one per member of the population.
+
+# Returns
+
+  - [`SubsetResamplingResult`](@ref): The result, with the new return code.
+
+# Related
+
+  - [`set_retcode`](@ref)
+  - [`mark_ruined_members`](@ref)
+  - [`SubsetResamplingResult`](@ref)
+"""
+function set_retcode(res::SubsetResamplingResult, retcode::OptRetCode_VecOptRetCode)
+    return SubsetResamplingResult(res.pr, res.wb, res.fees, res.ress, res.idx, retcode,
+                                  res.w, res.fb)
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Rebuild a [`SubsetResamplingResult`](@ref) with an updated fallback optimiser `fb`.

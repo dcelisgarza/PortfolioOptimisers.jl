@@ -42,6 +42,8 @@ For a leaf measure, the generic entry consults [`risk_input_kind`](@ref) and dis
   - [`WeightsReturnsFeesInput`](@ref): calls `r(w, X, fees)`.
   - [`WeightsInput`](@ref): calls `r(w)` (ignores `X` and `fees`).
 
+These are the constant-weight methods: the one vector `w` weighs every observation. The `w::MatNum` methods below read a **weight path** instead, one row of weights per observation, which is what a fold scored under a Weight Drift held. The weight argument's type is the picker, so a vector reads one target and a matrix reads a path.
+
 Composite and container forms keep explicit methods:
 
   - [`RiskRatio`](@ref): computes `expected_risk(r.r1, ...) / expected_risk(r.r2, ...)`.
@@ -60,6 +62,8 @@ Given a prior result the measure is put through [`factory`](@ref) first, so the 
 
 Given a bare returns matrix neither can happen. That call has no `pr.w` to thread and no factor returns to reach, so an unresolved slot is refused by name rather than several frames down ([`assert_resolved_slots`](@ref)), and an unstated slot keeps whatever the measure holds.
 
+A **Calibration Rule** is refused on the same terms, by [`assert_calibrated_slots`](@ref). A rule reads the sample size, the moments and the effective observation weights that a prior result carries, so a bare matrix cannot run one either. The two refusals are separate verbs because the two mechanisms are, and both are taken here.
+
 # Related
 
   - [`risk_input_kind`](@ref)
@@ -69,9 +73,11 @@ Given a bare returns matrix neither can happen. That call has no `pr.w` to threa
   - [`calc_net_returns`](@ref)
   - [`resolve_risk_inputs`](@ref)
   - [`assert_resolved_slots`](@ref)
+  - [`assert_calibrated_slots`](@ref)
 """
 function expected_risk(r::AbstractBaseRiskMeasure, w::VecNum, args...; kwargs...)
     assert_resolved_slots(r)
+    assert_calibrated_slots(r)
     return expected_risk(risk_input_kind(r), r, w, args...; kwargs...)
 end
 """
@@ -80,7 +86,7 @@ end
 
 Scalarise several risk measures into **one** number.
 
-Each element is evaluated through the singular public entry above and weighted by its own `settings.scale`, then the vector is combined by `sca`. So the vector crosses **no** seam as a unit: [`risk_input_kind`](@ref) and [`assert_resolved_slots`](@ref) are taken by each element itself, and an unresolved slot in element three is refused by name rather than several frames down.
+Each element is evaluated through the singular public entry above and weighted by its own `settings.scale`, then the vector is combined by `sca`. So the vector crosses **no** seam as a unit: [`risk_input_kind`](@ref), [`assert_resolved_slots`](@ref) and [`assert_calibrated_slots`](@ref) are taken by each element itself, and an unresolved slot in element three is refused by name rather than several frames down.
 
 ## Three rules the vector inherits
 
@@ -294,7 +300,7 @@ The precedence is fixed, and it is not a source selector:
 
 # Returns
 
-  - `rr::AbstractRegressionResult`: The factor loadings.
+  - `rr::AbstractLoadingsRegressionResult`: The factor loadings.
 
 # Related
 
@@ -304,7 +310,7 @@ The precedence is fixed, and it is not a source selector:
 """
 function resolve_factor_regression(re::RegE_Reg, rd::ReturnsResult,
                                    pr::Option{<:AbstractPriorResult} = nothing)
-    if isa(re, AbstractRegressionResult)
+    if isa(re, AbstractLoadingsRegressionResult)
         return re
     end
     if !isnothing(pr) && !isnothing(pr.rr)
@@ -323,6 +329,107 @@ end
 # element evaluation. Without it the generic vector twin above would resolve the prior inside the
 # scalarise loop.
 function expected_risk(rs::VecBaseRM, w::VecNum, pr::Pr_RR, args...; kwargs...)
+    rs, X = resolve_risk_inputs(rs, pr)
+    return expected_risk(rs, w, X, args...; kwargs...)
+end
+"""
+    expected_risk(r::AbstractBaseRiskMeasure, w::MatNum, args...; kwargs...)
+    expected_risk(rs::VecBaseRM, w::MatNum, args...; sca = SumScalariser(), kwargs...)
+    expected_risk(kind::RiskInputKind, r, w::MatNum, args...; kwargs...)
+    expected_risk(r::RiskRatio, w::MatNum, X::MatNum, fees = nothing; kwargs...)
+    expected_risk(r::NonOptimisationRiskRatio, w::MatNum, X::MatNum, fees = nothing; kwargs...)
+    expected_risk(r::MeanReturnRiskRatio, w::MatNum, X::MatNum, fees = nothing; kwargs...)
+    expected_risk(r::AbstractBaseRiskMeasure, w::MatNum, pr::Pr_RR, args...; kwargs...)
+    expected_risk(rs::VecBaseRM, w::MatNum, pr::Pr_RR, args...; kwargs...)
+
+Compute the expected value of a risk measure for a portfolio scored over a **weight path**.
+
+**The weight argument's type is the picker.** A [`VecNum`](@ref) is one target weight vector, and it weighs every observation. A [`MatNum`](@ref) `w` is a `T × N` weight path: row `t` holds the weights the portfolio carried **through** observation `t`, which is what a fold scored under a Weight Drift held. [`weight_path`](@ref) is the verb that makes one. This family mirrors the [`VecNum`](@ref) family above method for method, so the entry consults [`risk_input_kind`](@ref) and the composites keep their own explicit methods, exactly as they do there.
+
+## The three input kinds answer a path separately
+
+  - [`NetReturnsInput`](@ref) **computes**. Its method is `r(calc_net_returns(w, X, fees))`, and [`calc_net_returns(w::MatNum, X::MatNum, args...)`](@ref) reads the path, so the measure's own kernel is untouched.
+  - [`WeightsReturnsFeesInput`](@ref) and [`WeightsInput`](@ref) **refuse a path by name**. Their kernels read a weight vector as a cross-section, and a path gives one number per observation, which is a different quantity. The refusal names the measure and its kind, as [`risk_input_kind`](@ref)'s own fallback does, rather than leaving a bare `MethodError` several frames down.
+
+A measure that refuses a path is not a measure the library cannot score under a drift. It is a measure whose question is about the weights and not about the series, so the answer it wants is the one taken over the target weights.
+
+# Arguments
+
+  - `r`: Risk measure, or a vector of risk measures.
+  - `w`: Weight path (observations × assets).
+  - $(arg_dict[:X])
+  - `fees`: [`Fees`](@ref) structure.
+  - `pr`: Prior result or [`ReturnsResult`](@ref) carrying the returns matrix.
+  - `args...`: Additional arguments forwarded to the kind's method.
+
+# Validation
+
+  - Throws an `ArgumentError` when `r` declares [`WeightsReturnsFeesInput`](@ref) or [`WeightsInput`](@ref), naming the measure and its kind.
+
+# Returns
+
+  - `rk::Number`: The expected risk of the path.
+
+# Related
+
+  - [`MatNum`](@ref)
+  - [`weight_path`](@ref): Makes the path this family reads.
+  - [`SelfFinancingDrift`](@ref)
+  - [`risk_input_kind`](@ref)
+  - [`RiskInputKind`](@ref)
+  - [`calc_net_returns`](@ref)
+  - [`expected_risk`](@ref)
+"""
+function expected_risk(r::AbstractBaseRiskMeasure, w::MatNum, args...; kwargs...)
+    assert_resolved_slots(r)
+    assert_calibrated_slots(r)
+    return expected_risk(risk_input_kind(r), r, w, args...; kwargs...)
+end
+function expected_risk(rs::VecBaseRM, w::MatNum, args...; sca::Scalariser = SumScalariser(),
+                       kwargs...)
+    return scalarise(sca, rs) do r
+        return expected_risk(r, w, args...; kwargs...) * r.settings.scale
+    end
+end
+function expected_risk(::NetReturnsInput, r::AbstractBaseRiskMeasure, w::MatNum, X::MatNum,
+                       fees::Option{<:Fees} = nothing; kwargs...)
+    return r(calc_net_returns(w, X, fees))
+end
+# The two weight-reading kinds refuse a path rather than falling through to a `MethodError`.
+# Their kernels contract a weight vector across the assets, so a path is not a wider input to
+# them but a different quantity. The message follows `risk_input_kind`'s own fallback.
+function expected_risk(::WeightsReturnsFeesInput, r::AbstractBaseRiskMeasure, w::MatNum,
+                       args...; kwargs...)
+    return throw(ArgumentError("`$(typeof(r))` declares `WeightsReturnsFeesInput`, so its kernel reads `w` as one cross-section of weights and is called as `r(w, X, fees)`. A `w::MatNum` is a weight path, one row of weights per observation, which is a different quantity and not a wider input to that kernel.\nScore this measure against the target weight vector, `w::VecNum`, which is the first row of the path.\nGot\nsize(w) => $(size(w))"))
+end
+function expected_risk(::WeightsInput, r::AbstractBaseRiskMeasure, w::MatNum, args...;
+                       kwargs...)
+    return throw(ArgumentError("`$(typeof(r))` declares `WeightsInput`, so its kernel reads `w` as one cross-section of weights and is called as `r(w)`. A `w::MatNum` is a weight path, one row of weights per observation, which is a different quantity and not a wider input to that kernel.\nScore this measure against the target weight vector, `w::VecNum`, which is the first row of the path.\nGot\nsize(w) => $(size(w))"))
+end
+# The three ratio composites split by type for the same reason their `VecNum` twins do:
+# `NonOptimisationRiskRatio` names `sca1` and `sca2`, and `RiskRatio` carries neither.
+function expected_risk(r::RiskRatio, w::MatNum, X::MatNum, fees::Option{<:Fees} = nothing;
+                       kwargs...)
+    return expected_risk(r.r1, w, X, fees; kwargs...) /
+           expected_risk(r.r2, w, X, fees; kwargs...)
+end
+function expected_risk(r::NonOptimisationRiskRatio, w::MatNum, X::MatNum,
+                       fees::Option{<:Fees} = nothing; kwargs...)
+    return expected_risk(r.r1, w, X, fees; kwargs..., sca = r.sca1) /
+           expected_risk(r.r2, w, X, fees; kwargs..., sca = r.sca2)
+end
+function expected_risk(r::MeanReturnRiskRatio, w::MatNum, X::MatNum,
+                       fees::Option{<:Fees} = nothing; kwargs...)
+    return (expected_risk(r.rt, w, X, fees; kwargs...) - r.rf) /
+           expected_risk(r.rk, w, X, fees; kwargs..., sca = r.sca)
+end
+function expected_risk(r::AbstractBaseRiskMeasure, w::MatNum, pr::Pr_RR, args...; kwargs...)
+    r, X = resolve_risk_inputs(r, pr)
+    return expected_risk(r, w, X, args...; kwargs...)
+end
+# The vector's own prior route, as above: it resolves the whole vector **once**, so a Deferred
+# Quantity is fitted once per measure rather than once per element evaluation.
+function expected_risk(rs::VecBaseRM, w::MatNum, pr::Pr_RR, args...; kwargs...)
     rs, X = resolve_risk_inputs(rs, pr)
     return expected_risk(rs, w, X, args...; kwargs...)
 end
@@ -521,6 +628,7 @@ The partial derivative is approximated using a two-sided finite difference with 
 
   - A prior result resolves the measure **once**, before the loop ([`resolve_risk_inputs`](@ref)), so a **Deferred Quantity** is fitted once rather than once per finite difference.
   - A vector of measures differentiates the **aggregate**, which is the figure [`expected_risk`](@ref) reports. The homogeneity correction is applied per element inside the loop ([`adjusted_risk`](@ref)), so `Σᵢ wᵢ·rcᵢ` recovers the aggregate exactly even when the elements have different homogeneity degrees.
+  - Under a Weight Drift the figures are exact to **first order in the drift** only. The function differentiates one weight vector, and a drifted fold's return series is not linear in that vector, so the contributions sum to the fold's realised risk approximately rather than exactly. The **target** weights are what the figures are reported against, because they are the decision the finite difference perturbs — a weight path holds no single vector for the difference to move.
 
 !!! warning
 
@@ -612,6 +720,7 @@ Where:
   - A consequence: under a factor prior the parts sum to the risk on the caller's returns, and **not** to `expected_risk(r, w, pr)`. A measure whose kernel reads a moment rather than the series — [`Variance`](@ref), [`StandardDeviation`](@ref), [`DistributionValueatRisk`](@ref) — is unaffected either way, because it never reduces the returns matrix.
   - The loadings come from [`resolve_factor_regression`](@ref), which prefers the prior's own `rr` over a refit, so the loadings and the returns are the pair the prior was fitted on. A stated regression **estimator** therefore loses to a prior that carries a factor block.
   - A prior result resolves the measure **once**, before the loop ([`resolve_factor_risk_inputs`](@ref)), so a **Deferred Quantity** is fitted once rather than once per finite difference.
+  - Under a Weight Drift the figures are exact to **first order in the drift** only. The function differentiates one weight vector, and a drifted fold's return series is not linear in that vector, so the contributions sum to the fold's realised risk approximately rather than exactly. The **target** weights are what the figures are reported against, because they are the decision the finite difference perturbs — a weight path holds no single vector for the difference to move.
 
 # Related
 
@@ -642,6 +751,10 @@ end
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Compute the expected risk of a risk measure over rolling windows of the returns data.
+
+This is the **constant-weight** reading: the one vector `w` is re-scored on every window, so each number is a property of that weight vector rather than of a history. The **realised-history** reading is the `(r, ret::VecNum, window)` method below, which rolls an already-formed net return series instead. The two answer different questions, so they are two methods rather than two settings of one.
+
+The `(r, w::MatNum, X, fees, window)` method below is the constant-weight reading of a **weight path**: it re-scores the window against the weights held at the window's ending row rather than against one vector for the whole sample. The weight argument's type is the picker, so a vector reads one target and a matrix reads a path.
 
 # Arguments
 
@@ -679,6 +792,126 @@ function rolling_window_measure(r::BaseRM_VecBaseRM, w::VecNum, X::MatNum,
                           "window must be in 1:$(T), the number of observations in X; got window => $window"))
     return [expected_risk(r, w, view(X, (t - window + 1):t, :), fees; sca = sca, kwargs...)
             for t in window:T]
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Compute the expected risk of a risk measure over rolling windows, against a weight path.
+
+The **ending-weights** reading. `w` is a `T × N` weight path, and the window closing at row `t` is scored against row `t` of the path — the weights the portfolio held by the time that window closed. That is the same reading of *ending weights* the rest of the library takes, so a window's number is a property of the weights a fund carried into the window's last observation.
+
+It is one snapshot per window and not an exact decomposition of the window's realised return: the weights moved inside the window, and this method scores the window as though they had not. A caller who wants the window's own history is served by the `(r, ret::VecNum, window)` method, which rolls the drifted series itself.
+
+At constant weights every row of the path is the same vector, so this method reproduces the `(r, w::VecNum, X, fees, window)` method above.
+
+# Arguments
+
+  - `r::BaseRM_VecBaseRM`: Risk measure to evaluate, or a vector of them.
+  - `w::MatNum`: Weight path (observations × assets), as [`weight_path`](@ref) makes one.
+  - `X::MatNum`: Asset returns matrix.
+  - `fees::Option{<:Fees}`: Optional fee structure.
+  - `window::Integer`: Size of the rolling window (number of periods).
+
+# Keyword Arguments
+
+  - `sca::Scalariser = SumScalariser()`: Scalariser combining a vector `r`. Inert on a single measure.
+
+# Validation
+
+  - `1 <= window <= size(X, 1)`, else a `DomainError` naming `window`.
+  - `size(w, 1) == size(X, 1)`, else a `DimensionMismatch` naming both. A path shorter than the sample indexes out of bounds inside whichever measure `r` names, which is the caller error the window check already refuses at the boundary.
+
+# Returns
+
+  - `risks::VecNum`: Expected risk values for each rolling window.
+
+# Related
+
+  - [`weight_path`](@ref)
+  - [`SelfFinancingDrift`](@ref)
+  - [`expected_risk`](@ref)
+  - [`MatNum`](@ref)
+"""
+function rolling_window_measure(r::BaseRM_VecBaseRM, w::MatNum, X::MatNum,
+                                fees::Option{<:Fees}, window::Integer;
+                                sca::Scalariser = SumScalariser(), kwargs...)
+    T = size(X, 1)
+    @argcheck(1 <= window <= T,
+              DomainError(window,
+                          "window must be in 1:$(T), the number of observations in X; got window => $window"))
+    @argcheck(size(w, 1) == T,
+              DimensionMismatch("`size(w, 1) == size(X, 1)` must hold.\nsize(w, 1) => $(size(w, 1))\nsize(X, 1) => $(T)"))
+    return [expected_risk(r, view(w, t, :), view(X, (t - window + 1):t, :), fees; sca = sca,
+                          kwargs...) for t in window:T]
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Compute the expected risk of a risk measure over rolling windows of an already-formed net return series.
+
+This is the **realised-history** reading: a window is a sub-series of whatever formed `ret`, so under a weight drift the drift does **not** restart at a window's first row — the weights that a row reads are the ones held on the way to that row. It takes no `fees` argument, because the series is net already. The **constant-weight** reading is the `(r, w::VecNum, X, fees, window)` method above.
+
+# Arguments
+
+  - `r::BaseRM_VecBaseRM`: Risk measure to evaluate, or a vector of them.
+  - `ret::VecNum`: Net portfolio return series.
+  - `window::Integer`: Size of the rolling window (number of periods).
+
+# Keyword Arguments
+
+  - `sca::Scalariser = SumScalariser()`: Scalariser combining a vector `r`. Inert on a single measure.
+
+# Validation
+
+  - `1 <= window <= length(ret)`, else a `DomainError` naming `window`.
+  - Each window is scored through [`expected_risk_from_returns`](@ref), so a measure whose [`supports_precomputed_returns`](@ref) is `false` raises that entry's own named `ArgumentError`.
+
+The window is checked here for the reason the constant-weight method states, and the refusal of a weights-consuming measure is the existing one rather than a new error type.
+
+# Returns
+
+  - `risks::VecNum`: Expected risk values for each rolling window.
+
+# Related
+
+  - [`expected_risk_from_returns`](@ref)
+  - [`supports_precomputed_returns`](@ref)
+  - [`plot_rolling_measure`](@ref)
+"""
+function rolling_window_measure(r::BaseRM_VecBaseRM, ret::VecNum, window::Integer;
+                                sca::Scalariser = SumScalariser(), kwargs...)
+    T = length(ret)
+    @argcheck(1 <= window <= T,
+              DomainError(window,
+                          "window must be in 1:$(T), the number of observations in ret; got window => $window"))
+    return [expected_risk_from_returns(r, view(ret, (t - window + 1):t); sca = sca,
+                                       kwargs...) for t in window:T]
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Roll the realised-history measure over each series of a population of net return series.
+
+The twin of the singular series method, and it mirrors [`expected_risk_from_returns`](@ref) on a [`VecVecNum`](@ref): a fold whose optimisation result carries a population of weight vectors forms one series per member, and each member is rolled on its own.
+
+# Arguments
+
+  - `r::BaseRM_VecBaseRM`: Risk measure to evaluate, or a vector of them.
+  - `ret::VecVecNum`: Net portfolio return series, one per population member.
+  - `window::Integer`: Size of the rolling window (number of periods).
+
+# Returns
+
+  - `risks::Vector{<:VecNum}`: Rolling risk values, one vector per population member.
+
+# Related
+
+  - [`expected_risk_from_returns`](@ref)
+  - [`VecVecNum`](@ref)
+"""
+function rolling_window_measure(r::BaseRM_VecBaseRM, ret::VecVecNum, window::Integer;
+                                kwargs...)
+    return [rolling_window_measure(r, reti, window; kwargs...) for reti in ret]
 end
 
 export RiskRatio, number_effective_assets, risk_contribution, factor_risk_contribution,

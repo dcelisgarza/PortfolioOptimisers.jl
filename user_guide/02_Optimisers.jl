@@ -168,8 +168,8 @@ sets_z = UniverseSets(; xkey = "nx",
                                   "nx_revenue" => [revenue[a] for a in rd.nx]))
 vals_z = ["nx_sector", "nx_revenue"]
 rd_z = ReturnsResult(; nx = rd.nx, X = rd.X, ts = rd.ts,
-                     nz = asset_sets_feature_names(vals_z, sets_z),
-                     Z = asset_sets_features(vals_z, sets_z))
+                     pnl = feature_matrix_panel(asset_sets_feature_names(vals_z, sets_z),
+                                                asset_sets_features(vals_z, sets_z)))
 
 res_hrp_z = optimise(HierarchicalRiskParity(;
                                             opt = HierarchicalOptimiser(; pe = pr,

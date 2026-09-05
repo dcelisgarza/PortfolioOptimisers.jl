@@ -1,5 +1,4 @@
 The source files can be found in [examples/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../../examples/2_moments_priors/10_Windowed_Estimators.jl"
 ```
@@ -17,9 +16,9 @@ than the full sample.
 [`WindowedExpectedReturns`](@ref), [`WindowedCovariance`](@ref), [`WindowedVariance`](@ref),
 [`WindowedCoskewness`](@ref), [`WindowedCokurtosis`](@ref) — each carrying two controls:
 
-- `window` — either an integer (use the **last `window` observations**, a trailing recency
+  - `window` — either an integer (use the **last `window` observations**, a trailing recency
     window) or a vector of indices (use a **specific, hand-picked sub-period**).
-- `w` — optional observation weights ([`eweights`](https://juliastats.org/StatsBase.jl/stable/weights/)
+  - `w` — optional observation weights ([`eweights`](https://juliastats.org/StatsBase.jl/stable/weights/)
     and friends), to taper the influence of older observations *without* a hard cutoff.
 
 Each call still returns **one** moment — a single mean vector or covariance matrix for the

@@ -13,6 +13,8 @@ If moving away from the already established Gerber covariance algorithms, you mu
 
   - [`GerberCovariance`](@ref)
   - [`GerberCovarianceAlgorithm`](@ref)
+  - [`BaseSmythBrobyCovariance`](@ref): subtype that weights each crossing instead of counting it.
+  - [`BaseGerberIQCovariance`](@ref): subtype that scales the threshold per pair and decays each observation in time.
 
 # References
 
@@ -25,18 +27,20 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all Gerber covariance algorithm types.
 
-All concrete and/or abstract types implementing specific Gerber covariance algorithms should be subtypes of `GerberCovarianceAlgorithm`.
-
-These types are used to specify the algorithm when constructing a [`GerberCovariance`](@ref) estimator.
+All concrete and/or abstract types implementing specific Gerber covariance algorithms should be subtypes of `GerberCovarianceAlgorithm`. These types are used to specify the algorithm when constructing a [`GerberCovariance`](@ref) estimator. A subtype selects the denominator that [`comovement_ratio`](@ref) puts under the net co-movement vote, so a new subtype is a new method of that function.
 
 # Interfaces
 
-If moving away from the already established Gerber covariance algorithms, you must follow [`AbstractCovarianceEstimator`](@ref) to implement the entire chain. Else you can follow the instructions and examples in [`GerberCovarianceAlgorithm`](@ref).
+If moving away from the already established Gerber covariance algorithms, you must follow [`AbstractCovarianceEstimator`](@ref) to implement the entire chain.
 
 # Related
 
   - [`BaseGerberCovariance`](@ref)
   - [`GerberCovariance`](@ref)
+  - [`Gerber0`](@ref)
+  - [`Gerber1`](@ref)
+  - [`Gerber2`](@ref)
+  - [`comovement_ratio`](@ref)
 
 # References
 
@@ -46,9 +50,31 @@ abstract type GerberCovarianceAlgorithm <: AbstractMomentAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Normalises the net co-movement vote by the observations on which both assets crossed their threshold.
+Normalises the net co-movement vote by the observations on which both assets crossed their threshold. This is the original Gerber statistic.
 
-The pairwise statistic is ``(n_{c} - n_{d}) / (n_{c} + n_{d})``, where an observation votes only when both assets cross a threshold, concordantly for ``n_{c}`` and discordantly for ``n_{d}``. This is the original Gerber statistic.
+# Mathematical definition
+
+```math
+\\begin{align}
+\\rho_{i,\\,j} &= \\frac{n_{c} - n_{d}}{n_{c} + n_{d}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:rho_ij])
+  - $(math_dict[:nc_gerber])
+  - $(math_dict[:nd_gerber])
+
+An observation votes only when both assets cross, so an observation on which exactly one asset crossed leaves the statistic unchanged. The denominator vanishes when no observation moved both assets, and the statistic is zero there.
+
+# Algorithm
+
+The branch of [`comovement_ratio`](@ref) that this tag selects runs these steps.
+
+ 1. Add the concordant and discordant counts into the denominator `den`.
+ 2. Return `zero(T)` when `den` is zero. An asset that never crosses its own threshold gives that case for every pair it belongs to.
+ 3. Otherwise return `(p - n) / den`.
 
 # Constructors
 
@@ -67,6 +93,7 @@ Gerber0()
   - [`GerberCovariance`](@ref)
   - [`Gerber1`](@ref)
   - [`Gerber2`](@ref)
+  - [`comovement_ratio`](@ref)
 
 # References
 
@@ -78,7 +105,30 @@ $(DocStringExtensions.TYPEDEF)
 
 Normalises the net co-movement vote by every observation on which at least one asset crossed its threshold.
 
-The pairwise statistic is ``(n_{c} - n_{d}) / (n_{c} + n_{d} + n_{n})``. The extra term ``n_{n}`` counts the observations on which exactly one of the two assets crossed, so the denominator is larger than [`Gerber0`](@ref)'s and the statistic is bounded more tightly.
+# Mathematical definition
+
+```math
+\\begin{align}
+\\rho_{i,\\,j} &= \\frac{n_{c} - n_{d}}{n_{c} + n_{d} + n_{n}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:rho_ij])
+  - $(math_dict[:nc_gerber])
+  - $(math_dict[:nd_gerber])
+  - $(math_dict[:nn_gerber])
+
+The denominator carries ``n_{n}`` on top of [`Gerber0`](@ref)'s, so it is never smaller and the statistic is never larger in magnitude. The two agree when every crossing is shared.
+
+# Algorithm
+
+The branch of [`comovement_ratio`](@ref) that this tag selects runs these steps.
+
+ 1. Add the concordant, discordant and neutral counts into the denominator `den`.
+ 2. Return `zero(T)` when `den` is zero. An asset that never crosses its own threshold gives that case for every pair it belongs to.
+ 3. Otherwise return `(p - n) / den`.
 
 # Constructors
 
@@ -97,6 +147,7 @@ Gerber1()
   - [`GerberCovariance`](@ref)
   - [`Gerber0`](@ref)
   - [`Gerber2`](@ref)
+  - [`comovement_ratio`](@ref)
 
 # References
 
@@ -108,7 +159,30 @@ $(DocStringExtensions.TYPEDEF)
 
 Normalises the raw net co-movement vote by the geometric mean of its own diagonal.
 
-The pairwise statistic is ``h_{ij} / \\sqrt{h_{ii} h_{jj}}`` with ``h_{ij} = n_{c} - n_{d}``. The diagonal is therefore unit by construction, rather than by a per-pair denominator as in [`Gerber0`](@ref) and [`Gerber1`](@ref).
+# Mathematical definition
+
+```math
+\\begin{align}
+h_{i,\\,j} &= n_{c} - n_{d}\\,, \\\\
+\\rho_{i,\\,j} &= \\frac{h_{i,\\,j}}{\\sqrt{h_{i,\\,i} \\, h_{j,\\,j}}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:rho_ij])
+  - ``h_{i,\\,j}``: Net co-movement vote of the pair, before any normalisation.
+  - $(math_dict[:nc_gerber])
+  - $(math_dict[:nd_gerber])
+
+The normalisation is a property of the whole matrix and not of one pair, so the diagonal is unit by construction rather than by a per-pair denominator as in [`Gerber0`](@ref) and [`Gerber1`](@ref). An asset crosses concordantly with itself at every crossing, so ``h_{i,\\,i}`` counts the crossings of asset ``i``.
+
+# Algorithm
+
+The branch of [`comovement_ratio`](@ref) and of [`standardise_comovement!`](@ref) that this tag selects runs these steps.
+
+ 1. Return the raw difference `p - n` for every pair. This branch applies no denominator of its own.
+ 2. Divide the assembled matrix by the outer product of the square roots of its own diagonal. The roots are clamped from below by `sqrt(eps(eltype(rho)))`, so an asset that never crosses gives a zero row rather than a division by zero.
 
 # Constructors
 
@@ -127,6 +201,8 @@ Gerber2()
   - [`GerberCovariance`](@ref)
   - [`Gerber0`](@ref)
   - [`Gerber1`](@ref)
+  - [`comovement_ratio`](@ref)
+  - [`standardise_comovement!`](@ref)
 
 # References
 
@@ -138,7 +214,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Configures and applies Gerber covariance estimators.
 
-`GerberCovariance` encapsulates all components required for Gerber-based covariance or correlation estimation, including the variance estimator, positive definite matrix estimator, t parameter, and the specific Gerber algorithm variant.
+`GerberCovariance` encapsulates all components required for Gerber-based covariance or correlation estimation, including the variance estimator, positive definite matrix estimator, t parameter, and the specific Gerber algorithm variant. A Gerber matrix is a matrix of pairwise votes and is not positive definite in general, so `pdm` projects the result onto the nearest positive definite matrix; `pdm = nothing` returns the raw statistic instead.
 
 # Fields
 
@@ -253,6 +329,35 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Build the up and down indicator matrices shared by every Gerber correlation variant.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+U_{t,\\,i} &= \\mathbf{1}[x_{t,\\,i} \\geq t \\, \\sigma_i \\land x_{t,\\,i} > 0]\\,, \\\\
+D_{t,\\,i} &= \\mathbf{1}[x_{t,\\,i} \\leq -t \\, \\sigma_i \\land x_{t,\\,i} < 0]\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:U_gerber])
+  - $(math_dict[:D_gerber])
+  - $(math_dict[:x_ti_ret])
+  - $(math_dict[:t_threshold])
+  - $(math_dict[:sigma_i_asset])
+  - $(math_dict[:T])
+  - $(math_dict[:N])
+
+The two bands never overlap, so no observation is marked in both matrices and their sum is the crossing indicator. The sign test is what keeps them apart at a zero band edge. `ce.t = 0` produces one, and so does a zero entry of `sd`, which the `Statistics.cor` method rules out by raising `sd` to at least `eps`. Without the sign test the two closed comparisons both hold on an exactly zero return, and the sum is two rather than one. ADR 0090 records the decision.
+
+For a positive band edge the sign test is redundant, because ``x_{t,\\,i} \\geq t \\, \\sigma_i > 0`` already implies ``x_{t,\\,i} > 0``. A zero band edge therefore makes the pair of matrices the sign of the return, and the Gerber statistic the sign concordance.
+
+# Algorithm
+
+ 1. Scale the standard deviation vector by the threshold, giving the per-asset band edge `ts = sd * ce.t`.
+ 2. Mark `U[t, i]` when `X[t, i] >= ts[i]` and `X[t, i]` is positive.
+ 3. Mark `D[t, i]` when `X[t, i] <= -ts[i]` and `X[t, i]` is negative.
+
 # Arguments
 
   - $(arg_dict[:gerbce])
@@ -261,7 +366,7 @@ Build the up and down indicator matrices shared by every Gerber correlation vari
 
 # Returns
 
-  - `(U, D)::Tuple{Matrix{Bool}, Matrix{Bool}}`: `U[t, i]` marks `X[t, i] >= ce.t * sd[i]`, and `D[t, i]` marks `X[t, i] <= -ce.t * sd[i]`.
+  - `(U, D)::Tuple{Matrix{Bool}, Matrix{Bool}}`: The up and the down indicator matrices.
 
 # Related
 
@@ -273,8 +378,12 @@ function gerber_updown(ce::GerberCovariance, X::MatNum, sd::ArrNum)
     U = Matrix{Bool}(undef, T, N)
     D = Matrix{Bool}(undef, T, N)
     ts = sd * ce.t
-    U .= X .>= ts
-    D .= X .<= -ts
+    # The sign test is redundant for a positive band edge, because `X >= ts > 0` already
+    # implies `X > 0`. It binds only when the edge is zero, where the two closed
+    # comparisons would otherwise both hold on an exactly zero return. ADR 0090.
+    zx = zero(eltype(X))
+    U .= (X .>= ts) .& (X .> zx)
+    D .= (X .<= -ts) .& (X .< zx)
     return U, D
 end
 """
@@ -282,7 +391,21 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Split the concordant and discordant co-movement counts out of their difference and their sum.
 
-`nconc[i, j]` counts the observations on which assets `i` and `j` both crossed a threshold in the same direction. `ndisc[i, j]` counts the observations on which they crossed in opposite directions. A matrix product delivers the difference and the sum directly, so the two counts are recovered from those instead of by two more matrix products. The split is exact, and the reduction in [`comovement_ratio`](@ref) sees the same numerator and denominator as the matrix formula.
+A matrix product delivers the difference and the sum directly, so the two counts are recovered from those instead of by two more matrix products. The split is exact, and the reduction in [`comovement_ratio`](@ref) sees the same numerator and denominator as the matrix formula.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+n_{c} &= \\frac{(n_{c} + n_{d}) + (n_{c} - n_{d})}{2}\\,, \\\\
+n_{d} &= \\frac{(n_{c} + n_{d}) - (n_{c} - n_{d})}{2}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:nc_gerber])
+  - $(math_dict[:nd_gerber])
 
 # Arguments
 
@@ -312,16 +435,6 @@ Implements the original Gerber correlation algorithm.
 
 # Mathematical definition
 
-Let ``\\mathbf{U}, \\mathbf{D} \\in \\{0,1\\}^{T \\times N}`` be indicator matrices with:
-
-```math
-\\begin{align}
-U_{ti} &= \\mathbf{1}[x_{ti} \\geq t \\, \\sigma_i], \\quad D_{ti} = \\mathbf{1}[x_{ti} \\leq -t \\, \\sigma_i]\\,.
-\\end{align}
-```
-
-Define ``\\mathbf{H} = \\mathbf{U} - \\mathbf{D}`` and ``\\mathbf{V} = \\mathbf{U} + \\mathbf{D}``. The Gerber0 correlation is:
-
 ```math
 \\begin{align}
 \\hat{\\boldsymbol{\\rho}} &= \\left(\\mathbf{H}^\\intercal \\mathbf{H}\\right) \\oslash \\left(\\mathbf{V}^\\intercal \\mathbf{V}\\right)\\,.
@@ -330,12 +443,27 @@ Define ``\\mathbf{H} = \\mathbf{U} - \\mathbf{D}`` and ``\\mathbf{V} = \\mathbf{
 
 Where:
 
-  - ``x_{ti}``: Return of asset ``i`` at time ``t``.
-  - ``t``: Threshold parameter.
-  - ``\\sigma_i``: Standard deviation of asset ``i``.
-  - ``T``: Number of observations.
-  - ``N``: Number of assets.
-  - ``\\oslash``: Element-wise division.
+  - $(math_dict[:U_gerber])
+  - $(math_dict[:D_gerber])
+  - $(math_dict[:H_gerber])
+  - $(math_dict[:Vcross_gerber])
+  - $(math_dict[:x_ti_ret])
+  - $(math_dict[:t_threshold])
+  - $(math_dict[:sigma_i_asset])
+  - $(math_dict[:T])
+  - $(math_dict[:N])
+  - $(math_dict[:oslash])
+
+The entry of ``\\mathbf{H}^\\intercal \\mathbf{H}`` is ``n_{c} - n_{d}`` and the entry of ``\\mathbf{V}^\\intercal \\mathbf{V}`` is ``n_{c} + n_{d}``, so this is the pairwise statistic of [`Gerber0`](@ref) written over the whole matrix.
+
+# Algorithm
+
+ 1. Build the indicator matrices `U` and `D` with [`gerber_updown`](@ref).
+ 2. Form the signed crossing matrix `UmD = U - D` and the crossing matrix `UpD = U + D`.
+ 3. Recover the concordant count `nconc` and the discordant count `ndisc` from `transpose(UmD) * UmD` and `transpose(UpD) * UpD` with [`concordance_counts`](@ref).
+ 4. Reduce every pair with [`comovement_ratio`](@ref), giving `rho`.
+ 5. Write one onto a zero diagonal entry of `rho` with [`comovement_unit_diagonal!`](@ref). An asset that crosses no threshold reduces to a zero diagonal entry, and that entry is one by definition.
+ 6. Repair `rho` with `posdef!`, which is a no-op when `ce.pdm` is `nothing`.
 
 # Arguments
 
@@ -347,16 +475,6 @@ Where:
 
   - $(ret_dict[:rho])
 
-# Details
-
-The algorithm proceeds as follows:
-
-  - Build the indicator matrices `U` and `D` with [`gerber_updown`](@ref).
-  - Compute `UmD = U - D` and `UpD = U + D`.
-  - Recover the concordant and discordant counts from `UmD' * UmD` and `UpD' * UpD` with [`concordance_counts`](@ref).
-  - Reduce each pair to `(nconc - ndisc) / (nconc + ndisc)` with [`comovement_ratio`](@ref), which returns zero when the denominator vanishes.
-  - The result is projected to the nearest positive definite matrix using `posdef!`.
-
 # Related
 
   - [`GerberCovariance`](@ref)
@@ -364,6 +482,7 @@ The algorithm proceeds as follows:
   - [`gerber_updown`](@ref)
   - [`concordance_counts`](@ref)
   - [`comovement_ratio`](@ref)
+  - [`comovement_unit_diagonal!`](@ref)
   - [`posdef!`](@ref)
 
 # References
@@ -377,12 +496,13 @@ function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Any, <:Gerber0}, X::
     UpD = U + D
     nconc, ndisc = concordance_counts(transpose(UmD) * UmD, transpose(UpD) * UpD)
     rho = comovement_ratio.(Ref(ce.alg), nconc, ndisc, 0, eltype(X))
+    comovement_unit_diagonal!(rho)
     posdef!(ce.pdm, rho)
     return rho
 end
 """
     gerber(
-        ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber1},
+        ce::GerberCovariance{<:Any, <:Any, <:Any, <:Any, <:Gerber1},
         X::MatNum,
         sd::ArrNum
     ) -> MatNum
@@ -390,16 +510,6 @@ end
 Implements the first variant of the Gerber correlation algorithm.
 
 # Mathematical definition
-
-Let ``\\mathbf{U}, \\mathbf{D}, \\mathbf{N} \\in \\{0,1\\}^{T \\times N}`` be indicator matrices with:
-
-```math
-\\begin{align}
-U_{ti} &= \\mathbf{1}[x_{ti} \\geq t \\, \\sigma_i], \\quad D_{ti} = \\mathbf{1}[x_{ti} \\leq -t \\, \\sigma_i], \\quad N_{ti} = \\mathbf{1}[{-t\\sigma_i < x_{ti} < t\\sigma_i}]\\,.
-\\end{align}
-```
-
-Define ``\\mathbf{H} = \\mathbf{U} - \\mathbf{D}``. The Gerber1 correlation is:
 
 ```math
 \\begin{align}
@@ -409,13 +519,31 @@ Define ``\\mathbf{H} = \\mathbf{U} - \\mathbf{D}``. The Gerber1 correlation is:
 
 Where:
 
-  - ``x_{ti}``: Return of asset ``i`` at time ``t``.
-  - ``t``: Threshold parameter.
-  - ``\\sigma_i``: Standard deviation of asset ``i``.
-  - ``T``: Number of observations.
-  - ``N``: Number of assets.
-  - ``\\oslash``: Element-wise division.
+  - $(math_dict[:U_gerber])
+  - $(math_dict[:D_gerber])
+  - $(math_dict[:Nneut_gerber])
+  - $(math_dict[:H_gerber])
+  - $(math_dict[:x_ti_ret])
+  - $(math_dict[:t_threshold])
+  - $(math_dict[:sigma_i_asset])
+  - $(math_dict[:T])
+  - $(math_dict[:N])
+  - $(math_dict[:oslash])
   - ``\\boldsymbol{1}``: Vector of ones.
+
+The entry of ``\\mathbf{N}^\\intercal \\mathbf{N}`` counts the observations on which neither asset crossed, so the denominator counts the observations on which at least one of them did. That is ``n_{c} + n_{d} + n_{n}``, the pairwise denominator of [`Gerber1`](@ref).
+
+# Algorithm
+
+ 1. Build the indicator matrices `U` and `D` with [`gerber_updown`](@ref).
+ 2. Form the neutral matrix `Nt`, which marks the observations on which the asset crossed in neither direction.
+ 3. Form `NtN = transpose(Nt) * Nt`, the count of observations on which both assets of a pair are neutral, and `nneutral`, the count of neutral observations of each asset on its own.
+ 4. Form the signed crossing matrix `UmD = U - D`.
+ 5. Recover the concordant count `nconc` and the discordant count `ndisc` from `transpose(UmD) * UmD` and the both-crossed count `T .- nneutral .- transpose(nneutral) .+ NtN` with [`concordance_counts`](@ref).
+ 6. Form `nneut = nneutral .+ transpose(nneutral) .- 2 .* NtN`, the count of observations on which exactly one asset of the pair crossed.
+ 7. Reduce every pair with [`comovement_ratio`](@ref), giving `rho`.
+ 8. Write one onto a zero diagonal entry of `rho` with [`comovement_unit_diagonal!`](@ref). An asset that crosses no threshold reduces to a zero diagonal entry, and that entry is one by definition.
+ 9. Repair `rho` with `posdef!`, which is a no-op when `ce.pdm` is `nothing`.
 
 # Arguments
 
@@ -427,18 +555,6 @@ Where:
 
   - $(ret_dict[:rho])
 
-# Details
-
-The algorithm proceeds as follows:
-
-  - Build the indicator matrices `U` and `D` with [`gerber_updown`](@ref).
-  - Compute the neutral matrix `Nt`, whose entries mark `X in (-ce.t * sd, ce.t * sd)` (i.e., neither up nor down).
-  - Compute `UmD = U - D`.
-  - Split the denominator `T .- (Nt' * Nt)` into the observations on which both assets crossed a threshold and the observations on which exactly one of them crossed.
-  - Recover the concordant and discordant counts from `UmD' * UmD` and the both-crossed count with [`concordance_counts`](@ref).
-  - Reduce each pair to `(nconc - ndisc) / (nconc + ndisc + nneut)` with [`comovement_ratio`](@ref), which returns zero when the denominator vanishes.
-  - The result is projected to the nearest positive definite matrix using `posdef!`.
-
 # Related
 
   - [`GerberCovariance`](@ref)
@@ -446,6 +562,7 @@ The algorithm proceeds as follows:
   - [`gerber_updown`](@ref)
   - [`concordance_counts`](@ref)
   - [`comovement_ratio`](@ref)
+  - [`comovement_unit_diagonal!`](@ref)
   - [`posdef!`](@ref)
 
 # References
@@ -468,12 +585,13 @@ function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Any, <:Gerber1}, X::
                                       T .- nneutral .- transpose(nneutral) .+ NtN)
     nneut = nneutral .+ transpose(nneutral) .- 2 .* NtN
     rho = comovement_ratio.(Ref(ce.alg), nconc, ndisc, nneut, eltype(X))
+    comovement_unit_diagonal!(rho)
     posdef!(ce.pdm, rho)
     return rho
 end
 """
     gerber(
-        ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber2},
+        ce::GerberCovariance{<:Any, <:Any, <:Any, <:Any, <:Gerber2},
         X::MatNum,
         sd::ArrNum
     ) -> MatNum
@@ -482,29 +600,36 @@ Implements the second variant of the Gerber correlation algorithm.
 
 # Mathematical definition
 
-Let ``\\mathbf{U}, \\mathbf{D} \\in \\{0,1\\}^{T \\times N}`` be indicator matrices with:
-
 ```math
 \\begin{align}
-U_{ti} &= \\mathbf{1}[x_{ti} \\geq t \\, \\sigma_i], \\quad D_{ti} = \\mathbf{1}[x_{ti} \\leq -t \\, \\sigma_i]\\,.
-\\end{align}
-```
-
-Define ``\\mathbf{H} = (\\mathbf{U} - \\mathbf{D})^\\intercal (\\mathbf{U} - \\mathbf{D})`` and ``\\boldsymbol{h} = \\sqrt{\\mathrm{diag}(\\mathbf{H})}``. The Gerber2 correlation is:
-
-```math
-\\begin{align}
-\\hat{\\boldsymbol{\\rho}} &= \\mathbf{H} \\oslash (\\boldsymbol{h} \\boldsymbol{h}^\\intercal)\\,.
+\\mathbf{G} &= \\mathbf{H}^\\intercal \\mathbf{H}\\,, \\\\
+\\boldsymbol{g} &= \\sqrt{\\mathrm{diag}(\\mathbf{G})}\\,, \\\\
+\\hat{\\boldsymbol{\\rho}} &= \\mathbf{G} \\oslash (\\boldsymbol{g} \\boldsymbol{g}^\\intercal)\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``x_{ti}``: Return of asset ``i`` at time ``t``.
-  - ``t``: Threshold parameter.
-  - ``\\sigma_i``: Standard deviation of asset ``i``.
-  - ``\\mathrm{diag}(\\cdot)``: Diagonal of a matrix.
-  - ``\\oslash``: Element-wise division.
+  - $(math_dict[:U_gerber])
+  - $(math_dict[:D_gerber])
+  - $(math_dict[:H_gerber])
+  - ``\\mathbf{G}``: Raw net co-movement matrix, whose entry is ``n_{c} - n_{d}``.
+  - ``\\boldsymbol{g}``: Square roots of the diagonal of ``\\mathbf{G}``.
+  - $(math_dict[:x_ti_ret])
+  - $(math_dict[:t_threshold])
+  - $(math_dict[:sigma_i_asset])
+  - $(math_dict[:oslash])
+
+The diagonal of ``\\mathbf{G}`` counts the crossings of each asset, so the normalisation is a property of the whole matrix and the diagonal of ``\\hat{\\boldsymbol{\\rho}}`` is unit by construction.
+
+# Algorithm
+
+ 1. Build the indicator matrices `U` and `D` with [`gerber_updown`](@ref).
+ 2. Form the signed crossing matrix `UmD = U - D`.
+ 3. Form the raw net co-movement matrix `rho = transpose(UmD) * UmD`.
+ 4. Normalise `rho` in place with [`standardise_comovement!`](@ref).
+ 5. Write one onto a zero diagonal entry of `rho` with [`comovement_unit_diagonal!`](@ref). An asset that crosses no threshold gets a zero diagonal entry of ``\\mathbf{G}``, which the clamp of step 4 leaves at zero, and that entry is one by definition.
+ 6. Repair `rho` with `posdef!`, which is a no-op when `ce.pdm` is `nothing`.
 
 # Arguments
 
@@ -516,22 +641,13 @@ Where:
 
   - $(ret_dict[:rho])
 
-# Details
-
-The algorithm proceeds as follows:
-
-  - Build the indicator matrices `U` and `D` with [`gerber_updown`](@ref).
-  - Compute the signed indicator matrix `UmD = U - D`.
-  - Compute the raw Gerber2 matrix `rho = UmD' * UmD`.
-  - Normalise `rho` by the geometric mean of its diagonal with [`standardise_comovement!`](@ref), which clamps the diagonal roots away from zero.
-  - The result is projected to the nearest positive definite matrix using `posdef!`.
-
 # Related
 
   - [`GerberCovariance`](@ref)
   - [`Gerber2`](@ref)
   - [`gerber_updown`](@ref)
   - [`standardise_comovement!`](@ref)
+  - [`comovement_unit_diagonal!`](@ref)
   - [`posdef!`](@ref)
 
 # References
@@ -544,6 +660,7 @@ function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Any, <:Gerber2}, X::
     UmD = U - D
     rho = Matrix{eltype(X)}(transpose(UmD) * UmD)
     standardise_comovement!(ce.alg, rho)
+    comovement_unit_diagonal!(rho)
     posdef!(ce.pdm, rho)
     return rho
 end
@@ -556,6 +673,13 @@ end
     ) -> MatNum
 
 Compute the Gerber correlation matrix using the algorithm specified in `ce.alg`.
+
+# Algorithm
+
+ 1. Orient `X` to `observations × assets` with [`dims_oriented`](@ref).
+ 2. Compute the standard deviation vector `sd` with `ce.ve`, and raise each entry to at least `eps(eltype(sd))`. A constant column leaves a standard deviation and a centring residual of the same round-off order, so the unraised threshold marks every one of its observations as a crossing; the raised threshold marks none of them.
+ 3. Centre the returns with `ce.me` through [`demean_returns`](@ref).
+ 4. Return the Gerber correlation matrix from [`gerber`](@ref), through the branch that `ce.alg` selects.
 
 # Arguments
 
@@ -570,13 +694,7 @@ Compute the Gerber correlation matrix using the algorithm specified in `ce.alg`.
 
 # Returns
 
-  - $(arg_dict[:rho])
-
-# Details
-
-  - Computes the standard deviation vector for each asset using the estimator's variance estimator.
-  - Demeans the returns with `ce.me` and [`demean_returns`](@ref).
-  - Computes the Gerber correlation matrix using the Gerber algorithm in `ce.alg`.
+  - $(ret_dict[:rho])
 
 # Related
 
@@ -608,6 +726,30 @@ end
 
 Compute the Gerber covariance matrix using the algorithm specified in `ce.alg`.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+\\hat{\\mathbf{\\Sigma}} &= \\mathrm{Diag}(\\boldsymbol{\\sigma}) \\, \\hat{\\boldsymbol{\\rho}} \\, \\mathrm{Diag}(\\boldsymbol{\\sigma})\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\hat{\\mathbf{\\Sigma}}``: Gerber covariance matrix.
+  - ``\\hat{\\boldsymbol{\\rho}}``: Gerber correlation matrix of the same estimator.
+  - ``\\boldsymbol{\\sigma}``: Standard deviation vector of the assets.
+
+The Gerber statistic sets the correlations alone, so the variances come from `ce.ve` and the diagonal of ``\\hat{\\mathbf{\\Sigma}}`` is ``\\boldsymbol{\\sigma}^2``.
+
+# Algorithm
+
+ 1. Orient `X` to `observations × assets` with [`dims_oriented`](@ref).
+ 2. Compute the standard deviation vector `sd` with `ce.ve`, and raise each entry to at least `eps(eltype(sd))`. A constant column leaves a standard deviation and a centring residual of the same round-off order, so the unraised threshold marks every one of its observations as a crossing; the raised threshold marks none of them.
+ 3. Centre the returns with `ce.me` through [`demean_returns`](@ref).
+ 4. Compute the Gerber correlation matrix `sigma` with [`gerber`](@ref), through the branch that `ce.alg` selects.
+ 5. Rescale `sigma` in place to a covariance matrix with `StatsBase.cor2cov!` and `sd`.
+
 # Arguments
 
   - $(arg_dict[:gerbce])
@@ -621,14 +763,7 @@ Compute the Gerber covariance matrix using the algorithm specified in `ce.alg`.
 
 # Returns
 
-  - $(arg_dict[:rho])
-
-# Details
-
-  - Computes the standard deviation vector for each asset using the estimator's variance estimator.
-  - Demeans the returns with `ce.me` and [`demean_returns`](@ref).
-  - Computes the Gerber correlation matrix using the Gerber algorithm in `ce.alg`.
-  - Rescales the Gerber correlation matrix to a covariance matrix by multiplying with the standard deviation vector outer product.
+  - $(ret_dict[:sigma])
 
 # Related
 

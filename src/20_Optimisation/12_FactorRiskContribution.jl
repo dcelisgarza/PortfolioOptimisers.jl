@@ -12,7 +12,7 @@ Property access delegates to the embedded [`JuMPOptimisationResult`](@ref); unkn
 # Constructors
 
     FactorRiskContributionResult(;
-        jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM, rr::AbstractRegressionResult,
+        jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM, rr::AbstractLoadingsRegressionResult,
         frc_plr::Option{<:AbstractPhylogenyConstraintResult}, fb::Option{<:OptE_Opt}
     ) -> FactorRiskContributionResult
 
@@ -46,7 +46,7 @@ Keywords correspond to the struct's fields.
     """
     fb
     function FactorRiskContributionResult(jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM,
-                                          rr::AbstractRegressionResult,
+                                          rr::AbstractLoadingsRegressionResult,
                                           frc_plr::Option{<:AbstractPhylogenyConstraintResult},
                                           fb::Option{<:OptE_Opt})
         return new{typeof(jr), typeof(r), typeof(rr), typeof(frc_plr), typeof(fb)}(jr, r,
@@ -56,10 +56,36 @@ Keywords correspond to the struct's fields.
     end
 end
 function FactorRiskContributionResult(; jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM,
-                                      rr::AbstractRegressionResult,
+                                      rr::AbstractLoadingsRegressionResult,
                                       frc_plr::Option{<:AbstractPhylogenyConstraintResult},
                                       fb::Option{<:OptE_Opt})::FactorRiskContributionResult
     return FactorRiskContributionResult(jr, r, rr, frc_plr, fb)
+end
+"""
+    set_retcode(res::FactorRiskContributionResult, retcode::OptRetCode_VecOptRetCode)
+
+Rebuild a [`FactorRiskContributionResult`](@ref) with a different return code.
+
+`retcode` is not a field of this result and resolves through the [`JuMPOptimisationResult`](@ref) it embeds, so the rebuild rebuilds `jr` and carries every other member over unchanged.
+
+# Arguments
+
+  - `res`: Result to rebuild.
+  - `retcode`: Return code, or one per member of the population.
+
+# Returns
+
+  - [`FactorRiskContributionResult`](@ref): The result, with the new return code.
+
+# Related
+
+  - [`set_retcode`](@ref)
+  - [`mark_ruined_members`](@ref)
+  - [`FactorRiskContributionResult`](@ref)
+"""
+function set_retcode(res::FactorRiskContributionResult, retcode::OptRetCode_VecOptRetCode)
+    return FactorRiskContributionResult(set_retcode(res.jr, retcode), res.r, res.rr,
+                                        res.frc_plr, res.fb)
 end
 # Unique fields resolve directly; unknown properties forward into `rr` first, then into the
 # embedded [`JuMPOptimisationResult`](@ref) `jr` (the virtual `:w` and `pa` fall-through).
@@ -153,7 +179,7 @@ $(DocStringExtensions.FIELDS)
         re::TD{<:RegE_Reg} = StepwiseRegression(),
         r::TD{<:RM_VecRM} = Variance(),
         obj::TD{<:ObjectiveFunction} = MinimumRisk(),
-        frc_ple::TD_Option{<:PlCE_PhC_VecPlCE_PlC} = nothing,
+        frc_ple::TD_Option{<:PlCE_PlC_VecPlCE_PlC} = nothing,
         sets::TD_Option{<:UniverseSets} = nothing,
         wi::TD_Option{<:VecNum} = nothing,
         flag::Bool = false,
@@ -245,7 +271,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
     @fprop fb
     function FactorRiskContribution(opt::JuMPOptimiser, re::TD{<:RegE_Reg},
                                     r::TD{<:RM_VecRM}, obj::TD{<:ObjectiveFunction},
-                                    frc_ple::TD_Option{<:PlCE_PhC_VecPlCE_PlC},
+                                    frc_ple::TD_Option{<:PlCE_PlC_VecPlCE_PlC},
                                     sets::TD_Option{<:UniverseSets},
                                     wi::TD_Option{<:VecNum}, flag::Bool,
                                     fb::TDO_Option{<:OptE_Opt})
@@ -271,7 +297,7 @@ function FactorRiskContribution(; opt::JuMPOptimiser,
                                 re::TD{<:RegE_Reg} = StepwiseRegression(),
                                 r::TD{<:RM_VecRM} = Variance(),
                                 obj::TD{<:ObjectiveFunction} = MinimumRisk(),
-                                frc_ple::TD_Option{<:PlCE_PhC_VecPlCE_PlC} = nothing,
+                                frc_ple::TD_Option{<:PlCE_PlC_VecPlCE_PlC} = nothing,
                                 sets::TD_Option{<:UniverseSets} = nothing,
                                 wi::TD_Option{<:VecNum} = nothing, flag::Bool = false,
                                 fb::TDO_Option{<:OptE_Opt} = nothing)::FactorRiskContribution
@@ -366,6 +392,11 @@ function _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
                    dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
     frc = reset_time_dependent_estimator(frc)
     attrs = processed_jump_optimiser_attributes(frc.opt, rd; dims = dims, kwargs...)
+    # The bundle reduced what it carries. The head carries the rest — an initial weight
+    # vector, a risk measure holding per-asset data, tracking, a custom term — and hands
+    # them to `assemble_jump_model!` itself, so it takes the same view of itself and of
+    # `rd`. Both are unchanged when every asset is investable.
+    frc, rd = investable_view(frc, rd, attrs.pr, attrs.imsk)
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, frc.opt.sc, frc.opt.so)

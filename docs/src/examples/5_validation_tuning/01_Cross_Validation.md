@@ -1,5 +1,4 @@
 The source files can be found in [examples/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../../examples/5_validation_tuning/01_Cross_Validation.jl"
 ```
@@ -78,7 +77,6 @@ mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
 ````
 
 ## 2. Cross validation
-
 ### 2.1 KFold
 
 The simplest form of cross validation is KFold. This method splits the data into K folds, and then iteratively trains on K-1 folds and tests on the remaining fold. This process is repeated K times, with each fold being used as the test set once.

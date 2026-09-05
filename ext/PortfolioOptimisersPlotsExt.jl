@@ -368,9 +368,21 @@ function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.BaseR
                                                       percentage = percentage, N = N,
                                                       sca = sca, kwargs...)
 end
+function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.BaseRM_VecBaseRM,
+                                                    pred::PredictionResult{<:Any, <:Any,
+                                                                           <:HeldWeightsResult},
+                                                    fees::Option{<:Fees} = nothing;
+                                                    kwargs...)
+    hw = pred.hw
+    fees = PortfolioOptimisers.amortise_fees(extract_fees(pred.res, fees), size(hw.X, 1))
+    nx = isnothing(pred.rd.nx) ? (1:size(hw.X, 2)) : pred.rd.nx
+    return PortfolioOptimisers.plot_risk_contribution(r, pred.res.w, hw.X, fees; nx = nx,
+                                                      kwargs...)
+end
 function PortfolioOptimisers.plot_risk_contribution(::PortfolioOptimisers.BaseRM_VecBaseRM,
-                                                    ::PredictionResult; kwargs...)
-    return throw(ArgumentError("`plot_risk_contribution(r, pred::PredictionResult)` is not supported: `PredictionReturnsResult` stores portfolio returns, not raw asset returns. Call `plot_risk_contribution(r, pred.res.w, rd::ReturnsResult, ...)` with the original returns data."))
+                                                    ::PredictionResult{<:Any, <:Any,
+                                                                       Nothing}; kwargs...)
+    return throw(ArgumentError("`plot_risk_contribution(r, pred::PredictionResult)` needs the fold's asset returns, and this fold kept none: `pred.rd.X` is the portfolio return series, and `pred.hw` is absent because the fold's scheme set neither `wd` nor `pws`. Set one of them so the fold records its asset returns, or call `plot_risk_contribution(r, pred.res.w, rd::ReturnsResult, ...)` with the original returns data."))
 end
 ## plot_factor_risk_contribution
 function PortfolioOptimisers.plot_factor_risk_contribution(r::PortfolioOptimisers.BaseRM_VecBaseRM,
@@ -386,9 +398,23 @@ function PortfolioOptimisers.plot_factor_risk_contribution(r::PortfolioOptimiser
                                                              rd = rd, delta = delta, N = N,
                                                              sca = sca, kwargs...)
 end
+function PortfolioOptimisers.plot_factor_risk_contribution(r::PortfolioOptimisers.BaseRM_VecBaseRM,
+                                                           pred::PredictionResult{<:Any,
+                                                                                  <:Any,
+                                                                                  <:HeldWeightsResult},
+                                                           fees::Option{<:Fees} = nothing;
+                                                           kwargs...)
+    hw = pred.hw
+    fees = PortfolioOptimisers.amortise_fees(extract_fees(pred.res, fees), size(hw.X, 1))
+    rd = ReturnsResult(; nx = pred.rd.nx, X = hw.X, nf = pred.rd.nf, F = pred.rd.F)
+    return PortfolioOptimisers.plot_factor_risk_contribution(r, pred.res.w, hw.X, fees;
+                                                             rd = rd, kwargs...)
+end
 function PortfolioOptimisers.plot_factor_risk_contribution(::PortfolioOptimisers.BaseRM_VecBaseRM,
-                                                           ::PredictionResult; kwargs...)
-    return throw(ArgumentError("`plot_factor_risk_contribution(r, pred::PredictionResult)` is not supported: `PredictionReturnsResult` stores portfolio returns, not raw asset returns. Call `plot_factor_risk_contribution(r, pred.res.w, rd::ReturnsResult, ...)` with the original returns data."))
+                                                           ::PredictionResult{<:Any, <:Any,
+                                                                              Nothing};
+                                                           kwargs...)
+    return throw(ArgumentError("`plot_factor_risk_contribution(r, pred::PredictionResult)` needs the fold's asset returns, and this fold kept none: `pred.rd.X` is the portfolio return series, and `pred.hw` is absent because the fold's scheme set neither `wd` nor `pws`. Set one of them so the fold records its asset returns, or call `plot_factor_risk_contribution(r, pred.res.w, rd::ReturnsResult, ...)` with the original returns data."))
 end
 ## plot_network
 function PortfolioOptimisers.plot_network(pl::NwE_ClE_Cl, X::MatNum,
@@ -2116,18 +2142,152 @@ function PortfolioOptimisers.plot_rolling_measure(r::PortfolioOptimisers.BaseRM_
     end
     T = length(ret)
     window = rolling == 0 ? ceil(Int, sqrt(T)) : rolling
-    # Off the functor: a vector is not callable, and a call method on `AbstractVector` would be
-    # piracy on `Base`. `expected_risk_from_returns` serves a measure and a vector alike, and on
-    # a single supported measure it returns `r(x)`, so the number is unchanged.
-    rolling_vals = [PortfolioOptimisers.expected_risk_from_returns(r,
-                                                                   view(ret,
-                                                                        (t - window + 1):t);
-                                                                   sca = sca)
-                    for t in window:T]
+    # Off the functor, and through the library's own verb rather than a second copy of the
+    # rolling loop. `rolling_window_measure` scores each window with
+    # `expected_risk_from_returns`, which serves a measure and a vector alike and on a single
+    # supported measure returns `r(x)`, so the number is unchanged. It also refuses a `rolling`
+    # longer than the sample, which this method's own `rolling >= 0` check never caught.
+    rolling_vals = PortfolioOptimisers.rolling_window_measure(r, ret, window; sca = sca)
     ts_rolling = ts[window:end]
     rname = measure_label(r)
     return plot(ts_rolling, rolling_vals; title = "Rolling $rname (window=$window)",
                 ylabel = rname, xlabel = "Date", legend = false, linewidth = 2, kwargs...)
+end
+
+## ────────────────────────────────────────────────────────────────────────────
+## Cross-sectional regression diagnostics
+## ────────────────────────────────────────────────────────────────────────────
+# Each figure draws one level-2 verb and computes nothing of its own, which is the rule
+# `plot_risk_contribution` follows. The prior-result entry points guard through
+# `assert_prior_regression` first: `rr` may be absent, and the guard's message names the
+# remedy, where reading `pr.rr` straight away would raise on `nothing` with no diagnosis.
+# A block that is a time-series `Regression` rather than a `CrossSectionalFactorModel`
+# reaches the level-2 verb and raises a `MethodError` naming that type, which is the
+# honest report: these diagnostics read a point-in-time exposure history that a
+# time-series block does not carry.
+const NO_CS_DIAGNOSTIC_LEAD = "a cross-sectional regression diagnostic reads the factor block `rr`. $NO_FACTOR_BLOCK_HINT Pass the block directly as the first argument if you hold it."
+function cs_diagnostic_block(pr::PortfolioOptimisers.AbstractPriorResult)
+    PortfolioOptimisers.assert_prior_regression(pr, :pr; lead = NO_CS_DIAGNOSTIC_LEAD)
+    return pr.rr
+end
+function cs_diagnostic_labels(csfm, nf::Option{<:AbstractVector}, K::Integer)
+    nf_use = isnothing(nf) ? PortfolioOptimisers.cs_diagnostic_factor_names(csfm) : nf
+    return isnothing(nf_use) ? string.(1:K) : string.(nf_use)
+end
+function cs_diagnostic_series(vals::MatNum, labels::AbstractVector, title::AbstractString,
+                              ylabel::AbstractString; kwargs...)
+    plt = plot(vals[:, 1]; title = title, xlabel = "Observation", ylabel = ylabel,
+               label = labels[1], legend = true, linewidth = 2, kwargs...)
+    for k in 2:size(vals, 2)
+        plot!(plt, vals[:, k]; label = labels[k], linewidth = 2, kwargs...)
+    end
+    return plt
+end
+function PortfolioOptimisers.plot_cs_regression_r2(csfm::PortfolioOptimisers.CrossSectionalFactorModel;
+                                                   kwargs...)
+    return plot(PortfolioOptimisers.cs_regression_r2(csfm);
+                title = "Cross-Sectional Regression R²", xlabel = "Observation",
+                ylabel = "R²", legend = false, linewidth = 2, kwargs...)
+end
+function PortfolioOptimisers.plot_cs_regression_r2(pr::PortfolioOptimisers.AbstractPriorResult;
+                                                   kwargs...)
+    return PortfolioOptimisers.plot_cs_regression_r2(cs_diagnostic_block(pr); kwargs...)
+end
+function PortfolioOptimisers.plot_cs_regression_adjusted_r2(csfm::PortfolioOptimisers.CrossSectionalFactorModel;
+                                                            kwargs...)
+    return plot(PortfolioOptimisers.cs_regression_adjusted_r2(csfm);
+                title = "Cross-Sectional Regression Adjusted R²", xlabel = "Observation",
+                ylabel = "Adjusted R²", legend = false, linewidth = 2, kwargs...)
+end
+function PortfolioOptimisers.plot_cs_regression_adjusted_r2(pr::PortfolioOptimisers.AbstractPriorResult;
+                                                            kwargs...)
+    return PortfolioOptimisers.plot_cs_regression_adjusted_r2(cs_diagnostic_block(pr);
+                                                              kwargs...)
+end
+function PortfolioOptimisers.plot_cs_regression_aic(csfm::PortfolioOptimisers.CrossSectionalFactorModel;
+                                                    kwargs...)
+    return plot(PortfolioOptimisers.cs_regression_aic(csfm);
+                title = "Cross-Sectional Regression AIC", xlabel = "Observation",
+                ylabel = "AIC", legend = false, linewidth = 2, kwargs...)
+end
+function PortfolioOptimisers.plot_cs_regression_aic(pr::PortfolioOptimisers.AbstractPriorResult;
+                                                    kwargs...)
+    return PortfolioOptimisers.plot_cs_regression_aic(cs_diagnostic_block(pr); kwargs...)
+end
+function PortfolioOptimisers.plot_cs_regression_bic(csfm::PortfolioOptimisers.CrossSectionalFactorModel;
+                                                    kwargs...)
+    return plot(PortfolioOptimisers.cs_regression_bic(csfm);
+                title = "Cross-Sectional Regression BIC", xlabel = "Observation",
+                ylabel = "BIC", legend = false, linewidth = 2, kwargs...)
+end
+function PortfolioOptimisers.plot_cs_regression_bic(pr::PortfolioOptimisers.AbstractPriorResult;
+                                                    kwargs...)
+    return PortfolioOptimisers.plot_cs_regression_bic(cs_diagnostic_block(pr); kwargs...)
+end
+function PortfolioOptimisers.plot_cs_regression_t_stats(csfm::PortfolioOptimisers.CrossSectionalFactorModel;
+                                                        nf::Option{<:AbstractVector} = nothing,
+                                                        kwargs...)
+    t = PortfolioOptimisers.cs_regression_t_stats(csfm)
+    labels = cs_diagnostic_labels(csfm, nf, size(t, 2))
+    return cs_diagnostic_series(t, labels, "Cross-Sectional Regression t-Statistics", "t";
+                                kwargs...)
+end
+function PortfolioOptimisers.plot_cs_regression_t_stats(pr::PortfolioOptimisers.AbstractPriorResult;
+                                                        nf::Option{<:AbstractVector} = nothing,
+                                                        kwargs...)
+    return PortfolioOptimisers.plot_cs_regression_t_stats(cs_diagnostic_block(pr); nf = nf,
+                                                          kwargs...)
+end
+function PortfolioOptimisers.plot_cs_regression_t_stat_exceedance_rate(csfm::PortfolioOptimisers.CrossSectionalFactorModel;
+                                                                       nf::Option{<:AbstractVector} = nothing,
+                                                                       threshold::Number = 2,
+                                                                       kwargs...)
+    rate = PortfolioOptimisers.cs_regression_t_stat_exceedance_rate(csfm;
+                                                                    threshold = threshold)
+    labels = cs_diagnostic_labels(csfm, nf, length(rate))
+    K = length(rate)
+    plt = bar(rate; xticks = (1:K, labels),
+              title = "t-Statistic Exceedance Rate (|t| > $threshold)", xlabel = "Factor",
+              ylabel = "Fraction of observations", xrotation = 90, legend = false,
+              kwargs...)
+    hline!(plt, [0.05]; label = "", linewidth = 2, color = :red, linestyle = :dash)
+    return plt
+end
+function PortfolioOptimisers.plot_cs_regression_t_stat_exceedance_rate(pr::PortfolioOptimisers.AbstractPriorResult;
+                                                                       nf::Option{<:AbstractVector} = nothing,
+                                                                       threshold::Number = 2,
+                                                                       kwargs...)
+    return PortfolioOptimisers.plot_cs_regression_t_stat_exceedance_rate(cs_diagnostic_block(pr);
+                                                                         nf = nf,
+                                                                         threshold = threshold,
+                                                                         kwargs...)
+end
+function PortfolioOptimisers.plot_exposure_vif(csfm::PortfolioOptimisers.CrossSectionalFactorModel;
+                                               nf::Option{<:AbstractVector} = nothing,
+                                               kwargs...)
+    vif = PortfolioOptimisers.exposure_vif(csfm)
+    labels = cs_diagnostic_labels(csfm, nf, size(vif, 2))
+    plt = cs_diagnostic_series(vif, labels, "Exposure Variance Inflation Factors", "VIF";
+                               kwargs...)
+    hline!(plt, [1.0]; label = "", linewidth = 2, color = :red, linestyle = :dash)
+    return plt
+end
+function PortfolioOptimisers.plot_exposure_vif(pr::PortfolioOptimisers.AbstractPriorResult;
+                                               nf::Option{<:AbstractVector} = nothing,
+                                               kwargs...)
+    return PortfolioOptimisers.plot_exposure_vif(cs_diagnostic_block(pr); nf = nf,
+                                                 kwargs...)
+end
+function PortfolioOptimisers.plot_exposure_condition_number(csfm::PortfolioOptimisers.CrossSectionalFactorModel;
+                                                            kwargs...)
+    return plot(PortfolioOptimisers.exposure_condition_number(csfm);
+                title = "Exposure Condition Number", xlabel = "Observation", ylabel = "κ",
+                yscale = :log10, legend = false, linewidth = 2, kwargs...)
+end
+function PortfolioOptimisers.plot_exposure_condition_number(pr::PortfolioOptimisers.AbstractPriorResult;
+                                                            kwargs...)
+    return PortfolioOptimisers.plot_exposure_condition_number(cs_diagnostic_block(pr);
+                                                              kwargs...)
 end
 
 end

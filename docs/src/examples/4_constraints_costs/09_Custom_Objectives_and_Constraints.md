@@ -1,5 +1,4 @@
 The source files can be found in [examples/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../../examples/4_constraints_costs/09_Custom_Objectives_and_Constraints.jl"
 ```
@@ -11,9 +10,9 @@ is a *pre-built* way to shape the problem. When a mandate needs something none o
 `PortfolioOptimisers.jl` gives you two extension points that write **straight against the JuMP
 model**:
 
-- [`CustomJuMPObjective`](@ref) (the `cobj` keyword) — implement
+  - [`CustomJuMPObjective`](@ref) (the `cobj` keyword) — implement
     [`add_custom_objective_term!`](@ref) to *price* a preference, softly.
-- [`CustomJuMPConstraint`](@ref) (the `ccnt` keyword) — implement
+  - [`CustomJuMPConstraint`](@ref) (the `ccnt` keyword) — implement
     [`add_custom_constraint!`](@ref) to *mandate* one, hard.
 
 Each keyword takes a single estimator *or a vector of them*, and each hook **dispatches on the
@@ -88,14 +87,14 @@ the model *mid-assembly* and contributes a term to the **objective penalty**. It
 add_custom_objective_term!(model, obj, cobj, optimiser, attrs)
 ```
 
-- `model` — the [`JuMP`](https://jump.dev/) model under construction.
-- `obj` — the [`ObjectiveFunction`](@ref) being built (`MinimumRisk`, `MaximumUtility`, …).
+  - `model` — the [`JuMP`](https://jump.dev/) model under construction.
+  - `obj` — the [`ObjectiveFunction`](@ref) being built (`MinimumRisk`, `MaximumUtility`, …).
     Dispatch on this if your term should *differ* by objective; you do **not** need it to get
     the sign right.
-- `cobj` — your estimator; the argument you dispatch your method on.
-- `optimiser` — the outer optimiser estimator (e.g. the [`MeanRisk`](@ref) itself). Its `opt`
+  - `cobj` — your estimator; the argument you dispatch your method on.
+  - `optimiser` — the outer optimiser estimator (e.g. the [`MeanRisk`](@ref) itself). Its `opt`
     field is the [`JuMPOptimiser`](@ref).
-- `attrs` — the [`ProcessedJuMPOptimiserAttributes`](@ref) bundle: `attrs.pr` (prior),
+  - `attrs` — the [`ProcessedJuMPOptimiserAttributes`](@ref) bundle: `attrs.pr` (prior),
     `attrs.ret` (returns estimator), `attrs.wb` (bounds) and the rest of the processed problem
     data, if your term is data-driven rather than carrying its own numbers.
 
@@ -190,7 +189,7 @@ one method of [`add_custom_constraint!`](@ref), whose signature is
 add_custom_constraint!(model, ccnt, optimiser, attrs)
 ```
 
-- `model`, `optimiser`, `attrs` — exactly as on the objective side (`ccnt` is what you
+  - `model`, `optimiser`, `attrs` — exactly as on the objective side (`ccnt` is what you
     dispatch on). The two hooks take the same arguments; the objective one adds `obj` ahead of
     the dispatch argument, and that is the only difference between them.
 

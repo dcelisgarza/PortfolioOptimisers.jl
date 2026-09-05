@@ -1,5 +1,4 @@
 The source files can be found in [examples/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../../examples/3_optimisers/01_MeanRisk_Objectives.jl"
 ```
@@ -11,11 +10,11 @@ trade-off between expected return and risk, and an **objective function** decide
 that trade-off you get. The same estimator, prior and risk measure can produce four very different
 portfolios depending on the objective:
 
-- [`MinimumRisk`](@ref) — ignore return, take the least-risk portfolio.
-- [`MaximumReturn`](@ref) — ignore risk, take the highest-return portfolio (a corner solution).
-- [`MaximumRatio`](@ref) — maximise the risk-adjusted ratio (return over risk, net of the
+  - [`MinimumRisk`](@ref) — ignore return, take the least-risk portfolio.
+  - [`MaximumReturn`](@ref) — ignore risk, take the highest-return portfolio (a corner solution).
+  - [`MaximumRatio`](@ref) — maximise the risk-adjusted ratio (return over risk, net of the
     risk-free rate) — the tangency portfolio.
-- [`MaximumUtility`](@ref) — maximise `return − l · risk`, where the risk-aversion `l` dials
+  - [`MaximumUtility`](@ref) — maximise `return − l · risk`, where the risk-aversion `l` dials
     continuously between the return-seeking and risk-averse ends.
 
 This page runs all four against a common benchmark, confirms each does what it claims, and shows how

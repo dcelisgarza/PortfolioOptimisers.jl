@@ -184,6 +184,35 @@ end
         @test all(isone, LinearAlgebra.diag(c5))
         @test all(isone, LinearAlgebra.diag(c1))
     end
+    @testset "Ticket 476: SpectralDenoise on an all-noise spectrum" begin
+        #=
+        Every eigenvalue of this sample sits below the fitted edge. `SpectralDenoise`
+        zeroes them all, so its reconstruction is the zero matrix and `cov2cor` divides
+        zero by zero. It used to return `NaN` everywhere, and `posdef!` then raised an
+        `ArgumentError` from LAPACK that named neither the cause nor the file. The
+        identity is the answer that matches the claim of the algorithm: no signal
+        survives, so no pair keeps a correlation.
+        =#
+        rng = StableRNG(987654321)
+        C = cor(randn(rng, 24, 8))
+        q = 24 / 8
+        vals = LinearAlgebra.eigen(C).values
+        max_val = PortfolioOptimisers.find_max_eval(copy(vals), q,
+                                                    AverageShiftedHistograms.Kernels.gaussian,
+                                                    10, 1000, (), (;))
+        @test searchsortedlast(vals, max_val) == 8
+        Id = Matrix(1.0 * LinearAlgebra.I, 8, 8)
+        Xs = denoise(Denoise(; alg = SpectralDenoise()), C, q)
+        @test all(isfinite, Xs)
+        @test isapprox(Xs, Id)
+        # `FixedDenoise` already answered the identity here, so the two tags agree.
+        @test isapprox(denoise(Denoise(; alg = FixedDenoise()), C, q), Id)
+        # The covariance route keeps each asset's own variance and drops every covariance.
+        sd = collect(range(0.5, 2.0; length = 8))
+        S = StatsBase.cor2cov(copy(C), sd)
+        @test isapprox(denoise(Denoise(; alg = SpectralDenoise()), S, q),
+                       Matrix(LinearAlgebra.Diagonal(sd .^ 2)))
+    end
     @testset "Ticket 447: detone! removes the top n modes" begin
         # `detone!` decrements `n` and slices `(end - n):end`, so `dt.n` is the count of
         # modes removed and `dt.n = 1` removes the market mode alone.
@@ -333,4 +362,118 @@ end
         @test matrix_processing(mp, sigma, Xr) == [1.0 -0.25; -0.25 1.0]
         @test sigma == sigmac
     end
+end
+
+#=
+The three structure matrices and the block vectorisation of `src/13_Prior/04_HighOrderPrior.jl`.
+Sweep ticket #534: no test in the suite named `duplication_matrix`, `elimination_matrix` or
+`summation_matrix` on the identity each is defined by — they were reached only through the high
+order prior, so every property they are supposed to have was untested. These check the identities
+themselves, at `n = 3` and `n = 4`, for both `diag` settings.
+=#
+@testset "Duplication, elimination and summation matrices" begin
+    PO = PortfolioOptimisers
+    # The lower triangle read column by column, with and without the diagonal.
+    vech(A) = [A[i, j] for j in axes(A, 2) for i in j:size(A, 1)]
+    vech_strict(A) = [A[i, j] for j in axes(A, 2) for i in (j + 1):size(A, 1)]
+
+    for n in (3, 4)
+        m = div(n * (n + 1), 2)
+        ms = div(n * (n - 1), 2)
+        A = reshape(collect(1.0:(n ^ 2)), n, n)
+        A = A + transpose(A)
+
+        D = PO.duplication_matrix(n)
+        L = PO.elimination_matrix(n)
+        S = PO.summation_matrix(n)
+        Ds = PO.duplication_matrix(n, false)
+        Ls = PO.elimination_matrix(n, false)
+        Ss = PO.summation_matrix(n, false)
+
+        # `D * vech(A) == vec(A)`, the identity the duplication matrix is named for. Without
+        # the diagonal it restores the hollow matrix instead.
+        @test size(D) == (n^2, m)
+        @test D * vech(A) == vec(A)
+        @test size(Ds) == (n^2, ms)
+        @test Ds * vech_strict(A) == vec(A - Diagonal(A))
+
+        # `L * vec(A) == vech(A)`. Dropping the diagonal drops exactly the `n` rows that read
+        # it, so the row count falls from `n(n+1)/2` to `n(n-1)/2` and the column count stays.
+        @test size(L) == (m, n^2)
+        @test L * vec(A) == vech(A)
+        @test size(Ls) == (ms, n^2)
+        @test Ls * vec(A) == vech_strict(A)
+        @test size(L, 1) - size(Ls, 1) == n
+        @test size(L, 2) == size(Ls, 2) == n^2
+
+        # `S == transpose(D) * D * L`, which weights each row by the number of places its
+        # entry occupies in `vec(A)`: one on the diagonal and two off it. The sum identity
+        # follows. Without the diagonal every row is off it, so every weight is two and the
+        # sum reaches the off-diagonal entries alone.
+        @test size(S) == (m, n^2)
+        @test S == transpose(D) * D * L
+        @test sum(S * vec(A)) == sum(vec(A))
+        @test size(Ss) == (ms, n^2)
+        @test Ss == transpose(Ds) * Ds * Ls
+        @test sum(Ss * vec(A)) == sum(vec(A)) - sum(diag(A))
+        @test all(x -> x == 2, filter(!iszero, Array(Ss)))
+
+        # The one-walk builder returns the same three matrices as three separate calls.
+        D2, L2, S2 = PO.dup_elim_sum_matrices(n)
+        @test D2 == D
+        @test L2 == L
+        @test S2 == S
+    end
+
+    # `n` must be positive. The docstring claimed the precondition and nothing checked it:
+    # `n = 0` returned three empty matrices and `n = -1` surfaced an opaque `ArgumentError`
+    # from `SparseArrays`. Sweep ticket #534.
+    @test_throws DomainError PO.dup_elim_sum_matrices(0)
+    @test_throws DomainError PO.dup_elim_sum_matrices(-1)
+    @test size(PO.dup_elim_sum_matrices(1)[1]) == (1, 1)
+
+    # `dup_elim_sum_view` is two methods. The matrix one reads the dimension from its second
+    # argument and never from the matrix, which is what lets `port_opt_view` pass the full
+    # cokurtosis and the subproblem's asset count. The varargs one builds nothing, and it
+    # also takes any call whose argument count the matrix method does not.
+    M = reshape(collect(1.0:24.0), 6, 4)
+    @test PO.dup_elim_sum_view(M, 3) == PO.dup_elim_sum_matrices(3)
+    @test size(PO.dup_elim_sum_view(M, 3)[1]) == (9, 6)
+    @test PO.dup_elim_sum_view(nothing, 3) == (nothing, nothing, nothing)
+    @test PO.dup_elim_sum_view(M, 3, :ignored) == (nothing, nothing, nothing)
+    @test PO.dup_elim_sum_view() == (nothing, nothing, nothing)
+end
+
+#=
+`block_vec_pq` on a non-square partition. The `jldoctest` gives a `4 × 4` case with `p == q` and
+`m == n`, and a square partition cannot separate a block-column-major stacking from a
+block-row-major one. Sweep ticket #534.
+=#
+@testset "Block vectorisation" begin
+    PO = PortfolioOptimisers
+    p, q, m, n = 2, 3, 3, 4
+    A = reshape(collect(1:(m * p * n * q)), m * p, n * q)
+    B = PO.block_vec_pq(A, p, q)
+    @test size(A) == (6, 12)
+    @test size(B) == (m * n, p * q)
+
+    # Row `(j - 1) * m + i` holds the vectorisation of block `(i, j)`, so the block column
+    # index runs slowest.
+    H = Matrix{Int}(undef, m * n, p * q)
+    for j in 0:(n - 1), i in 0:(m - 1)
+        H[j * m + i + 1, :] = vec(A[(i * p + 1):((i + 1) * p), (j * q + 1):((j + 1) * q)])
+    end
+    @test B == H
+
+    # The other stacking order is a different matrix, which is the property the square
+    # example in the docstring cannot show.
+    H2 = Matrix{Int}(undef, m * n, p * q)
+    for i in 0:(m - 1), j in 0:(n - 1)
+        H2[i * n + j + 1, :] = vec(A[(i * p + 1):((i + 1) * p), (j * q + 1):((j + 1) * q)])
+    end
+    @test B != H2
+
+    # Both divisibility guards.
+    @test_throws DomainError PO.block_vec_pq(A, 4, q)
+    @test_throws DomainError PO.block_vec_pq(A, p, 5)
 end

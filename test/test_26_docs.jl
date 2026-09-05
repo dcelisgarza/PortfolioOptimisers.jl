@@ -1,3 +1,18 @@
+#=
+`code_health/CodeHealth.jl` is a module rather than a script, and it loads only `TOML`, which
+`test/Project.toml` already carries. It holds the one parser every census in this repository reads
+the source text with: `walk_ast`, `isdocstring` and `documented_units`.
+`test_45_sweep_census.jl` states what those measure, and
+`test_49_coverage_attribution_census.jl` loads `code_health/coverage.jl` the same way.
+
+The load sits OUTSIDE the `@testset` on purpose. `include` defines methods, and a method defined
+inside one top-level statement is not visible to a call in that same statement. The module wrapper
+keeps that module's own names out of the worker module.
+=#
+module DocsCensusHealth
+include(joinpath(@__DIR__, "..", "code_health", "CodeHealth.jl"))
+end
+
 @testset "Docs completeness" begin
     using PortfolioOptimisers, Test
     all_names = Base.undocumented_names(PortfolioOptimisers; private = true)
@@ -66,56 +81,36 @@ function -- cannot host.
         return nothing
     end
 
-    # A leaf is a non-abstract type with no subtypes. Note `!isabstracttype` rather
-    # than `isconcretetype`: nearly every struct here is `@concrete`, so the bare
-    # name is a `UnionAll` and `isconcretetype` is false for every one of them.
-    #
-    # The runner gives each test file its own module, but not its own process. An
-    # estimator that another file declares therefore stays in the worker, and
-    # `subtypes` finds it here. The catalogue is about the shipped universe, so a
-    # leaf from another module is not one of its members: keep only what
-    # `PortfolioOptimisers` itself declares. Which files share a worker changes
-    # from run to run, so without this filter the test is a scheduling flake.
-    function leaf_types(T, acc = Set{Type}())
-        subs = subtypes(T)
-        if isempty(subs)
-            if !isabstracttype(T) && parentmodule(T) === PortfolioOptimisers
-                push!(acc, T)
-            else
-                false
-            end
-        else
-            foreach(S -> leaf_types(S, acc), subs)
-        end
-        return acc
-    end
-
     @testset "Capability catalogue" begin
         PO = PortfolioOptimisers
         catalogued = catalogued_names(CATALOGUE)
 
-        @testset "every estimator and algorithm is catalogued" begin
-            # Estimators and Algorithms are the user's choice surface (CONTEXT.md);
-            # Results are outputs nobody constructs, so they are not required here.
-            required = Set(nameof.(collect(union(leaf_types(PO.AbstractEstimator),
-                                                 leaf_types(PO.AbstractAlgorithm)))))
+        @testset "every choice is catalogued" begin
+            # `choice_surface_names` comes from the generator this file includes, so
+            # the coverage rule is stated once and the docs build cannot disagree
+            # with the test. It is the Choice Surface of CONTEXT.md § 1: every
+            # concrete type the package declares that is a leaf estimator, a leaf
+            # algorithm, a leaf covariance estimator, or an export under its own
+            # name, less the Results and the errors, which a caller receives
+            # rather than chooses.
+            required = choice_surface_names()
             # A type the library constructs for itself is not a choice, so it is
             # exempt by name and with a reason -- see `NOT_A_CHOICE`.
             uncatalogued = sort(collect(setdiff(required, catalogued, keys(NOT_A_CHOICE))))
             if !isempty(uncatalogued)
-                @warn """$(length(uncatalogued)) estimator(s)/algorithm(s) are missing from the
-                         Capability Catalogue. Add each to `docs/capability_catalogue.jl` under
-                         the group it belongs to, or list it in `NOT_A_CHOICE` with a reason
+                @warn """$(length(uncatalogued)) choice(s) are missing from the Capability
+                         Catalogue. Add each to `docs/capability_catalogue.jl` under the group
+                         it belongs to, or list it in `NOT_A_CHOICE` with a reason
                          (`:internal`):\n  $(join(uncatalogued, "\n  "))"""
             end
             @test isempty(uncatalogued)
 
             # The other direction, as for `NOT_A_FEATURE`: an exemption for a type
-            # that is no longer a leaf estimator or algorithm is stale, and would
-            # silently exempt whatever later takes that name.
+            # that is no longer on the choice surface is stale, and would silently
+            # exempt whatever later takes that name.
             stale = sort([n for n in keys(NOT_A_CHOICE) if !(n in required)])
             if !isempty(stale)
-                @warn "Stale `NOT_A_CHOICE` entries (no longer a leaf estimator/algorithm): $(join(stale, ", "))"
+                @warn "Stale `NOT_A_CHOICE` entries (no longer on the choice surface): $(join(stale, ", "))"
             end
             @test isempty(stale)
 
@@ -252,7 +247,7 @@ nothing raises `@error "File exists but no references were collected"` in
     source_files = vcat(files_under(SRC, ".jl"), files_under(EXT, ".jl"))
     # `ref_dict` itself names every key it defines, so it is not evidence that anything
     # cites the work. Exclude the file that holds the table when looking for users.
-    dict_file = joinpath(SRC, "01_Base.jl")
+    dict_file = joinpath(SRC, "01_Base", "01_DocstringDictionaries.jl")
 
     bib_keys = Set(m.captures[1]
                    for m in eachmatch(r"^@\w+\{([A-Za-z0-9_]+),"m, read(BIB, String)))
@@ -489,7 +484,8 @@ right question rather than a widened one, and what the two files hold is why:
     carries its docstring. Beyond those methods it declares four module-local `const`s
     holding error-message text, and nothing else.
   - `ext/PortfolioOptimisersImputeExt.jl` defines one method of
-    `PortfolioOptimisers.apply_impute_method`, a seam declared in `src/03_Preprocessing.jl`.
+    `PortfolioOptimisers.apply_impute_method`, a seam declared in
+    `src/03_InputData/03_Preprocessing.jl`.
 
 A method binds in the module that declares the FUNCTION, so none of those 172 methods
 reaches `names(ext; all = true)` and the census asks for a docstring on none of them. That
@@ -629,12 +625,12 @@ No file is swept today, so this testset asserts the exemption and nothing else, 
 
 The sections are not gated the same way, and the reason is the trigger, not the section.
 
-  `# JuMP formulation` HAS A MECHANICAL TRIGGER IN THE CODE. A body that calls
-  `JuMP.@constraint` or `JuMP.@constraints` registers a row, and the parser sees the call.
-  The trigger needs no judgement and no exemption list, so this section gets the strongest
-  check available: a PER-UNIT PRESENCE RULE. Measured over the tree, 82 functions register a
-  row and every one of the 82 is documented in its own file, so the rule demands the section
-  of 82 docstrings and of nothing else.
+  `# JuMP formulation` HAS A MECHANICAL TRIGGER IN THE CODE. A body that calls a JuMP
+  model-building macro builds part of the model, and the parser sees the call. The trigger
+  needs no judgement and no exemption list, so this section gets the strongest check
+  available: a PER-UNIT PRESENCE RULE, on the section AND on each subsection the body's
+  macros demand. #443 widened the trigger from `@constraint` alone; the block above the
+  trigger table records what it measured.
 
   `# Algorithm` HAS NO SUCH TRIGGER. The standard says a procedure carries it, a closed form
   stays in `# Mathematical definition`, and a SELECTOR TAG carries neither. `AbstractAlgorithm`
@@ -651,7 +647,7 @@ selector tag that a parser can apply, and it would carry an exemption row per ma
 It was set aside for that cost. It stays available: the ratchet is a floor, and a later
 ticket can raise it to a presence rule without moving the manifest key.
 
-------------------------------------------------- what a row-registering docstring is
+------------------------------------------------ what a model-building docstring is
 
 A docstring does not always sit on the method that registers the row. Two shapes exist in
 the tree and the attribution must read both.
@@ -676,14 +672,11 @@ case exists in the tree today. It is the accepted blind spot, in the manner of t
 
 --------------------------------------------------------------- what is NOT gated here
 
-The standard's trigger sentence is "any code that ADDS ROWS to a `JuMP.Model`", and this
-check gates exactly that. 40 further documented functions touch the model without
-registering a row: they create a variable, register an expression, or set the objective.
-`set_model_scales!` is one of them, and it is the function whose `sc` and `so` were swapped
-for nine callers -- the defect #404's charter names when it says the JuMP layer is
-undocumented as a model. Whether the trigger should widen to cover them is a change to the
-STANDARD, which is #405's charter and not this gate's, so it is raised as its own ticket
-rather than settled here by a gate that demands more than its Authority states.
+The CONTENT of a subsection. Nothing compares the model keys a docstring names with the keys
+the body registers, and nothing reads a `## Relaxation` at all -- an inexact encoding is a
+fact about the mathematics, not a token. ADR 0081 records the key census as the largest build
+of this area and leaves it in the map's *Not yet specified*. `## Relaxation` holds by review,
+in the sense of `STANDARDS.md`.
 =#
 @testset "Swept file section completeness" begin
     using Test, TOML
@@ -693,67 +686,106 @@ rather than settled here by a gate that demands more than its Authority states.
     swept = sort([f for (f, r) in rows if r["swept"]])
 
     # The same instrument `test_45_sweep_census.jl` counts units with: one parse per file,
-    # no package loaded, and a count that cannot move under a reformat.
-    doc_macro = GlobalRef(Core, Symbol("@doc"))
-    isdocstring(x) = Meta.isexpr(x, :macrocall) &&
-                     !isempty(x.args) &&
-                     (x.args[1] === doc_macro || x.args[1] === Symbol("@doc"))
+    # no package loaded, and a count that cannot move under a reformat. It is
+    # `CodeHealth`'s, so the three walks below and that census read one predicate.
+    CH = DocsCensusHealth.CodeHealth
+    isdocstring = CH.isdocstring
 
     # A definition, not a local assignment. `Au = ...` inside a body whose right-hand side
     # holds a `JuMP.@constraint` is a local, and reading it as a definition attributes the
-    # row to a name no docstring can ever carry.
+    # row to a name no docstring can ever carry. A short form that declares a return type,
+    # `f(x)::Bool = true`, is a definition and not an assignment, and `CH.is_signature` is
+    # the one place that tells the two apart. Issue #521.
     function isdefinition(x)
         Meta.isexpr(x, :function) && return true
-        # A `macro` is a definition and it binds a name, so its body reaches `registers_row`
-        # like any other. `test_45_sweep_census.jl` counts a documented macro as a unit, and
-        # these two checks read the same units it does.
+        # A `macro` is a definition and it binds a name, so its body reaches
+        # `demanded_subsections` like any other. `test_45_sweep_census.jl` counts a
+        # documented macro as a unit, and these two checks read the same units it does.
         Meta.isexpr(x, :macro) && return true
         Meta.isexpr(x, :(=)) || return false
-        lhs = x.args[1]
-        while Meta.isexpr(lhs, :where)
-            lhs = lhs.args[1]
-        end
-        return Meta.isexpr(lhs, :call)
+        return CH.is_signature(x.args[1])
     end
 
-    # The name a definition binds. A definition reaches here through four declaration forms:
-    # bare, `@concrete struct`, a short form, and a macro-prefixed one. A `macro` declaration
-    # binds its name through its `:call` node, exactly as a `function` does, and it is named
-    # here without its `@`.
+    #=
+    The name a definition binds, as a Symbol, or `nothing` when the expression binds none.
+
+    `CH.definition_name` is the one resolver, and `code_health/coverage.jl` writes the
+    `definition` key of a Coverage Exemption with the same answer. It reads the five
+    declaration forms a definition arrives in -- bare, `@concrete struct`, a short form, a
+    macro-prefixed one and a qualified one -- and it names a `macro` without its `@`.
+
+    A qualified method, `Statistics.mean(...)`, is one of the five, and it is not rare: four
+    files under `src/` carried a `# Details` section that no count below could see, and four
+    more carried one the count read short.
+
+    A functor method, `(alg::HopCountQuantile)(x)`, is named after its TYPE and not after its
+    receiver variable. The copy that stood here named it `alg`, so every functor in a file
+    that shares a receiver name collapsed onto one key. Issue #521.
+    =#
     function bound_name(x)
-        x isa Symbol && return x
-        x isa Expr || return nothing
-        if Meta.isexpr(x, :macrocall)
-            for a in x.args[2:end]
-                n = bound_name(a)
-                isnothing(n) || return n
-            end
-            return nothing
-        end
-        x.head === :struct && return bound_name(x.args[2])
-        x.head in
-        (:function, :macro, :(=), :call, :where, :(::), :const, :abstract, :curly, :(<:)) &&
-            return bound_name(x.args[1])
-        return nothing
+        n = CH.definition_name(x)
+        return isempty(n) ? nothing : Symbol(n)
     end
 
     # A docstring that interpolates parses to an `Expr(:string, ...)`, and a section heading
-    # is a literal line inside it, so the literal pieces alone carry every heading.
-    function docstring_text(x)
-        for a in x.args[2:end]
-            a isa AbstractString && return String(a)
-            Meta.isexpr(a, :string) &&
-                return join(p isa AbstractString ? p : " " for p in a.args)
-        end
-        return ""
-    end
+    # is a literal line inside it, so the literal pieces alone carry every heading. It is
+    # `CodeHealth`'s beside the predicate above, so this walk and the alias census of
+    # `test_47_alias_and_module_census.jl` read one reader.
+    docstring_text = CH.docstring_text
 
     # Julia strips the indentation of a `"""` block, so a section heading sits at column 0.
-    has_section(text, name) = any(==(string("# ", name)), rstrip.(split(text, '\n')))
+    # The count, not the flag, is the primitive: one string block can document several
+    # methods, separated by horizontal rules, and then carries one heading per method that
+    # holds the section. `port_opt_view` in `src/03_InputData/03_Preprocessing.jl` is such a
+    # block.
+    count_section(text, name) = count(==(string("# ", name)), rstrip.(split(text, '\n')))
+    has_section(text, name) = count_section(text, name) > 0
+    has_subsection(text, name) = count(==(string("## ", name)),
+                                       rstrip.(split(text, '\n'))) > 0
 
-    constraint_macros = (Symbol("@constraint"), Symbol("@constraints"))
-    function registers_row(node)
-        node isa Expr || return false
+    #=
+    THE TRIGGER IS THE MACRO FAMILY, AND EACH FAMILY OWNS ONE SUBSECTION.
+
+    #437 built this check on `JuMP.@constraint` alone, because the standard's trigger
+    sentence read "any code that ADDS ROWS to a `JuMP.Model`". #443 widened both, and the
+    reason is the standard's OWN justification for the section: an entry carries a name, and
+    a caller reads the entry back by that name. THAT IS NOT A PROPERTY OF A ROW.
+    `model[:sc]`, `model[:w]`, `model[:ret]` and `model[:risk]` are each a variable or an
+    expression, `src/` reads a model key back by name in 51 places over 16 distinct keys, and
+    `08_Base_JuMPOptimisation.jl` wraps nine of those keys in an accessor that raises a named
+    `ArgumentError` when its builder has not run. A row name is public, and so is every one
+    of those.
+
+    Measured over `src/` and `ext/` at the tip that widened it: 137 documented units call one
+    of the macros below, 96 register a row, and 41 touch the model without one. 31 of the 41
+    register only an expression, 3 only a variable, 4 both, 2 only the objective and 1 an
+    expression and the objective. `set_model_scales!` is one of the 41, and its swapped
+    `sc`/`so` is the defect #404's charter names when it says the JuMP layer is undocumented
+    as a model. Two of the four `## Relaxation` cases ADR 0081 cites -- the
+    `BrownianDistanceVariance` bound and the scalarisers -- sat on the exempt side of the
+    trigger that same decision wrote.
+
+    `@objective` is IN. A formulation is variables, constraints and an objective, and the
+    third was missing. `owa_l_moment_crm_sumsq_obj` in `src/19_RiskMeasures/` is two methods
+    that differ in `Min so * t` against `Min so * t^2` AND IN NOTHING ELSE, so the objective
+    line is the only text that can tell them apart.
+
+    The widening costs no judgement and no exemption list, which is the property that made
+    the narrow rule worth building: the parser sees a macro call, and each family maps to the
+    subsection that documents what that macro registers. It is measured to red nothing today
+    -- no file marked `swept = true` calls a JuMP macro.
+    =#
+    subsection_of = Dict(Symbol("@variable") => "Variables",
+                         Symbol("@variables") => "Variables",
+                         Symbol("@expression") => "Expressions",
+                         Symbol("@expressions") => "Expressions",
+                         Symbol("@constraint") => "Constraints",
+                         Symbol("@constraints") => "Constraints",
+                         Symbol("@objective") => "Objective")
+
+    # Every subsection the macros under `node` demand of the docstring that speaks for it.
+    function demanded_subsections(node, acc = Set{String}())
+        node isa Expr || return acc
         if Meta.isexpr(node, :macrocall) && !isempty(node.args)
             m = node.args[1]
             s = if m isa GlobalRef
@@ -765,22 +797,28 @@ rather than settled here by a gate that demands more than its Authority states.
             else
                 nothing
             end
-            s in constraint_macros && return true
+            if !isnothing(s) && haskey(subsection_of, s)
+                push!(acc, subsection_of[s])
+            end
         end
-        return any(registers_row, node.args)
+        for a in node.args
+            demanded_subsections(a, acc)
+        end
+        return acc
     end
 
     #=
     Returns the file's documented units in source order -- the name each one documents and
-    its text -- and the indices of those that own a row-registering definition. A docstring
-    takes charge of its own name when it is read, and holds it until the next docstring of
-    that name, which is the attribution the two shapes above need.
+    its text -- and, for each unit that owns a model-building definition, the subsections
+    that definition demands. A docstring takes charge of its own name when it is read, and
+    holds it until the next docstring of that name, which is the attribution the two shapes
+    above need. A unit whose definitions call no such macro carries no entry.
     =#
     function scan(path)
-        names, texts, registering = Symbol[], String[], Int[]
+        names, texts = Symbol[], String[]
+        demanded = Dict{Int, Set{String}}()
         in_force = Dict{Symbol, Int}()
-        function walk(node)
-            node isa Expr || return nothing
+        CH.walk_ast(CH.parse_file(path)) do node
             if isdocstring(node)
                 d = length(node.args) >= 4 ? node.args[4] : nothing
                 nm = isnothing(d) ? nothing : bound_name(d)
@@ -791,32 +829,43 @@ rather than settled here by a gate that demands more than its Authority states.
                 end
             elseif isdefinition(node)
                 nm = bound_name(node)
-                if !isnothing(nm) && haskey(in_force, nm) && registers_row(node)
-                    push!(registering, in_force[nm])
+                if !isnothing(nm) && haskey(in_force, nm)
+                    subs = demanded_subsections(node)
+                    isempty(subs) ||
+                        union!(get!(demanded, in_force[nm], Set{String}()), subs)
                 end
             end
-            foreach(walk, node.args)
             return nothing
         end
-        walk(Meta.parseall(read(path, String)))
-        return names, texts, unique!(sort!(registering))
+        return names, texts, demanded
     end
 
-    @testset "a swept file's row-registering docstring carries # JuMP formulation" begin
+    @testset "a swept file's model-building docstring carries # JuMP formulation" begin
         offenders = String[]
         for f in swept
-            names, texts, registering = scan(joinpath(ROOT, f))
-            for u in registering
-                has_section(texts[u], "JuMP formulation") ||
-                    push!(offenders, string(f, "  ", names[u]))
+            names, texts, demanded = scan(joinpath(ROOT, f))
+            for u in sort(collect(keys(demanded)))
+                text = texts[u]
+                if !has_section(text, "JuMP formulation")
+                    push!(offenders, string(f, "  ", names[u], "  # JuMP formulation"))
+                    continue
+                end
+                # The section is there, so each family the body calls owes its subsection.
+                for sub in sort(collect(demanded[u]))
+                    has_subsection(text, sub) ||
+                        push!(offenders, string(f, "  ", names[u], "  ## ", sub))
+                end
             end
         end
         if !isempty(offenders)
             @warn """$(length(offenders)) docstring(s) in a file marked `swept = true` in
-                     `sweep/manifest.toml` document a function that registers a row through
-                     `JuMP.@constraint` or `JuMP.@constraints` and carry no
-                     `# JuMP formulation` section. The section names one bullet per row, by
-                     the row's JuMP name:\n  $(join(offenders, "\n  "))"""
+                     `sweep/manifest.toml` document a function that builds part of a
+                     `JuMP.Model` and carry neither the `# JuMP formulation` section nor a
+                     subsection the body's macros demand. `@variable` owes `## Variables`,
+                     `@expression` owes `## Expressions`, `@constraint` owes
+                     `## Constraints` and `@objective` owes `## Objective`, each naming its
+                     entry by the model key a caller reads it back
+                     by:\n  $(join(offenders, "\n  "))"""
         end
         @test isempty(offenders)
     end
@@ -853,6 +902,496 @@ rather than settled here by a gate that demands more than its Authority states.
                 println("    \"", f, "\" = { map = ", row["map"], ", units = ",
                         row["units"], ", algorithm = ", now, ", swept = ", row["swept"],
                         " }")
+            end
+        end
+    end
+
+    #=
+    `# Details` is abolished (issue #480, under the standards-hardening map #478).
+
+    ADR 0085 records the decision. The section held facts that five other sections already
+    own, and it held them because nothing said where they belonged: the Authority mentioned
+    it four times, every mention sat inside a template, and the only text that described it
+    was the placeholder `Additional implementation notes.` 299 sections over 84 files carried
+    it on the day the rule was written.
+
+    The two checks below INVERT the `# Algorithm` floor above. That floor may not FALL,
+    because a swept file's steps must stay written. These counts may not RISE, because the
+    section they count must reach zero.
+
+      1. A file whose manifest row reads `swept = true` carries ZERO `# Details` sections.
+         #485 migrated the 29 sections the seven swept files carried when the rule was
+         written, so the debt list that held them is spent and gone, and the check now reads
+         exactly as the Authority states it.
+      2. The library-wide count may not rise above `DETAILS_TOTAL`. Each #404 sweep ticket
+         lowers it as its file migrates, and the check retires when it reaches zero.
+
+    Both numbers count SECTION HEADINGS and not docstrings that carry one. `port_opt_view` in
+    `src/03_InputData/03_Preprocessing.jl` documents four methods under one string block and
+    carries the heading twice, so a docstring count would read 298 and would not fall when the
+    first of those two headings moved.
+
+    The manifest gains NO key for either number. A swept row states that a file passed three
+    conditions, and this decision changes one of them without re-opening the row, which #478
+    settles explicitly. So the debt is written here, in the census idiom of
+    `test_43_exported_abstract_type_census.jl`, where deleting the last entry is a visible
+    edit and not a silent one.
+    =#
+    @testset "# Details is abolished" begin
+        DETAILS_TOTAL = 57
+
+        @testset "a swept file carries no # Details section" begin
+            offenders = Tuple{String, Int}[]
+            for f in swept
+                _, texts, _ = scan(joinpath(ROOT, f))
+                measured = sum(t -> count_section(t, "Details"), texts; init = 0)
+                measured > 0 && push!(offenders, (f, measured))
+            end
+            if !isempty(offenders)
+                @warn """$(length(offenders)) file(s) marked `swept = true` in
+                         `sweep/manifest.toml` carry a `# Details` section. The section is
+                         abolished: move each fact by its subject, under
+                         `## What each section holds` in
+                         `.github/instructions/julia-docstrings.instructions.md`. The columns
+                         are the file and what it
+                         carries:\n  $(join(string.(offenders), "\n  "))"""
+            end
+            @test isempty(offenders)
+        end
+
+        @testset "the library-wide # Details count does not rise" begin
+            # `sweep/manifest.toml` carries one row per file under `src/` and `ext/`, and
+            # `test_45_sweep_census.jl` reds when a file has no row. So its keys are the
+            # scope of this count, already gated, and no second file walk is needed.
+            per = Tuple{String, Int}[]
+            for f in sort(collect(keys(rows)))
+                _, texts, _ = scan(joinpath(ROOT, f))
+                n = sum(t -> count_section(t, "Details"), texts; init = 0)
+                n > 0 && push!(per, (f, n))
+            end
+            measured = sum(last, per; init = 0)
+
+            if measured > DETAILS_TOTAL
+                @warn """The library carries $measured `# Details` sections over
+                         $(length(per)) file(s), above the $DETAILS_TOTAL this check records.
+                         The section is abolished, so the count may only fall. Move the new
+                         fact by its subject rather than raising the number."""
+            end
+            @test measured <= DETAILS_TOTAL
+
+            if measured < DETAILS_TOTAL
+                println("The count of `# Details` sections has fallen to ", measured,
+                        " over ", length(per), " file(s). Lower the number in the same ",
+                        "commit that removed them, and retire this testset at zero:")
+                println("        DETAILS_TOTAL = ", measured)
+            end
+        end
+    end
+    #=
+    ---------------------------------------------------------------- alias docstrings
+
+    An alias is a second name for something another docstring already documents. The
+    Authority gave a section structure for a type and one for a function, and none for an
+    alias (issue #436, under the standards-hardening map #478). Read literally, a factory
+    alias needed `# Arguments`, `# Returns` and `# Related`, and an acronym alias needed
+    `# Related`. Nothing in the tree did either, so the standard and the code disagreed at
+    381 units.
+
+    ADR 0086 settles it: an alias LINKS its canonical unit and RESTATES nothing. Three
+    kinds, and three section sets.
+
+      - An ACRONYM alias, `const HRP = HierarchicalRiskParity`, carries NO section. It and
+        its target are the same object.
+      - A FACTORY alias, `MAD(; kwargs...)::LowOrderMoment`, carries `# Validation` alone,
+        and only when its own body raises.
+      - A DISPATCH alias, a `const` bound to a type EXPRESSION, carries `# Related` and
+        `# References`. A union, a container such as `AbstractVector{<:LinearConstraint}`
+        and a parametrised form such as `const RMCVaR{T} = Union{...}` are ONE kind,
+        because a caller meets all three as the type a signature dispatches on. Reading
+        only the unions would have missed 66 of the 249.
+
+    The kind is read from the parse, not from a name. An acronym and a factory are scoped to
+    `src/25_Aliases.jl`, which is where both live and is itself part of the rule. Without
+    that scope `const PROP_TAG_MACRO_NAMES = ...` in `src/02_Tools.jl` reads as an acronym
+    alias, and it is a computed constant.
+
+    Three checks, and the split between them is the one ADR 0081 drew and ADR 0085 reused. A
+    check that DEMANDS a section reads the `swept` flag, because it may not red a file that
+    no child map of #404 has swept. A check that FORBIDS one does not, because a file passes
+    it by changing nothing.
+    =#
+    @testset "an alias docstring carries only the sections its kind allows" begin
+        ALLOWED = Dict(:acronym => String[], :factory => ["# Validation"],
+                       :dispatch => ["# Related", "# References"])
+        # The count of dispatch aliases carrying no `# Related`. Each file's own #404 prose
+        # ticket pays its share. Lower the number in the commit that pays it, and retire the
+        # ratchet at zero.
+        NO_RELATED_TOTAL = 20
+
+        # A `const` bound to a bare name is an acronym; to a type expression, a dispatch
+        # alias. `Expr(:curly, ...)` is a type expression and `Expr(:call, ...)` is a value,
+        # which is what keeps `const allowed_functions = Dict{Symbol, Function}(...)` out.
+        function alias_kind(d, path)
+            in_aliases = endswith(path, "25_Aliases.jl")
+            if Meta.isexpr(d, :function) ||
+               (Meta.isexpr(d, :(=)) && Meta.isexpr(d.args[1], :call))
+                return in_aliases ? :factory : nothing
+            end
+            e = Meta.isexpr(d, :const) ? d.args[1] : d
+            Meta.isexpr(e, :(=)) || return nothing
+            lhs, rhs = e.args[1], e.args[2]
+            lhs isa Symbol ||
+                (Meta.isexpr(lhs, :curly) && lhs.args[1] isa Symbol) ||
+                return nothing
+            (rhs isa Symbol || Meta.isexpr(rhs, :.)) &&
+                return in_aliases ? :acronym : nothing
+            Meta.isexpr(rhs, :curly) && return :dispatch
+            return nothing
+        end
+
+        # Every alias of a file: its name, its kind, and the sections its docstring carries.
+        function scan_aliases(path)
+            found = Tuple{Symbol, Symbol, Vector{String}}[]
+            CH.walk_ast(CH.parse_file(path)) do node
+                if isdocstring(node) && length(node.args) >= 4
+                    d = node.args[4]
+                    k = alias_kind(d, path)
+                    if !isnothing(k)
+                        nm = bound_name(d)
+                        secs = [String(rstrip(l))
+                                for l in split(docstring_text(node), '\n')
+                                if startswith(l, "# ")]
+                        isnothing(nm) || push!(found, (nm, k, secs))
+                    end
+                end
+                return nothing
+            end
+            return found
+        end
+
+        # `sweep/manifest.toml` holds one row per file under `src/` and `ext/`, and
+        # `test_45_sweep_census.jl` reds when a file has no row. So its keys are the scope,
+        # already gated, and one walk serves all three checks.
+        measured = Dict(f => scan_aliases(joinpath(ROOT, f))
+                        for f in sort(collect(keys(rows))))
+
+        @testset "no alias carries a section outside its kind" begin
+            offenders = String[]
+            for f in sort(collect(keys(measured))), (nm, k, secs) in measured[f]
+                extra = setdiff(secs, ALLOWED[k])
+                isempty(extra) || push!(offenders,
+                                        string(f, "  ", nm, "  (", k, ")  ", join(extra, ", ")))
+            end
+            if !isempty(offenders)
+                @warn """$(length(offenders)) alias docstring(s) carry a section their kind
+                         does not allow. An alias links its canonical unit and restates
+                         nothing: see `## Section Structure for Aliases` in
+                         `.github/instructions/julia-docstrings.instructions.md`, and
+                         ADR 0086. An acronym alias carries no section, a factory alias
+                         carries `# Validation` alone and only when its body raises, and a
+                         dispatch alias carries `# Related` and
+                         `# References`:\n  $(join(offenders, "\n  "))"""
+            end
+            @test isempty(offenders)
+        end
+
+        @testset "a dispatch alias in a swept file carries # Related" begin
+            offenders = String[]
+            for f in swept, (nm, k, secs) in measured[f]
+                k === :dispatch &&
+                    "# Related" ∉ secs &&
+                    push!(offenders, string(f, "  ", nm))
+            end
+            if !isempty(offenders)
+                @warn """$(length(offenders)) dispatch alias(es) in a file marked
+                         `swept = true` in `sweep/manifest.toml` carry no `# Related`
+                         section. The section lists what the alias groups, one bullet per
+                         member, and the summary paragraph states why the group
+                         exists:\n  $(join(offenders, "\n  "))"""
+            end
+            @test isempty(offenders)
+        end
+
+        @testset "the count of dispatch aliases with no # Related does not rise" begin
+            per = Tuple{String, Int}[]
+            for f in sort(collect(keys(measured)))
+                n = count(t -> t[2] === :dispatch && "# Related" ∉ t[3], measured[f])
+                n > 0 && push!(per, (f, n))
+            end
+            total = sum(last, per; init = 0)
+
+            if total > NO_RELATED_TOTAL
+                @warn """$total dispatch alias(es) over $(length(per)) file(s) carry no
+                         `# Related` section, above the $NO_RELATED_TOTAL this check records.
+                         A new dispatch alias carries the section, so the count may only
+                         fall:\n  $(join(string.(per), "\n  "))"""
+            end
+            @test total <= NO_RELATED_TOTAL
+
+            if total < NO_RELATED_TOTAL
+                println("The count of dispatch aliases carrying no `# Related` has fallen ",
+                        "to ", total, " over ", length(per),
+                        " file(s). Lower the number in ",
+                        "the same commit that paid it, and retire this testset at zero:")
+                println("        NO_RELATED_TOTAL = ", total)
+            end
+        end
+    end
+
+    #=
+    `math_dict` is read from source with the same instrument the rest of this file uses, so
+    the checks below load no package either. The table is built by a bare `Dict` call, so
+    each of its entries parses to `Expr(:call, :(=>), QuoteNode(key), value)`.
+    =#
+    function math_dict_pairs(path)
+        acc = Tuple{Symbol, String}[]
+        CH.walk_ast(CH.parse_file(path)) do node
+            if Meta.isexpr(node, :(=)) &&
+               node.args[1] === :math_dict &&
+               node.args[2] isa Expr
+                for p in node.args[2].args
+                    if Meta.isexpr(p, :call) &&
+                       length(p.args) == 3 &&
+                       p.args[1] === :(=>) &&
+                       p.args[2] isa QuoteNode &&
+                       p.args[3] isa AbstractString
+                        push!(acc, (p.args[2].value, strip(p.args[3])))
+                    end
+                end
+                # The table is read, so nothing below it can add to `acc`.
+                return CH.PRUNE
+            end
+            return nothing
+        end
+        return acc
+    end
+
+    math_pairs = math_dict_pairs(joinpath(ROOT, "src", "01_Base",
+                                          "01_DocstringDictionaries.jl"))
+
+    #=
+    The notation contract (issue #481, under the standards-hardening map #478).
+
+    ADR 0085 records the decision and
+    `.github/instructions/julia-docstrings.instructions.md` is the Authority, in its section
+    "Notation is fixed by symbol and by family". A symbol that appears in the docstrings of
+    two or more units gets a `math_dict` key in `src/01_Base/01_DocstringDictionaries.jl`, and every site
+    interpolates it. A new description takes a NEW key, because editing a value already in
+    the table moves every docstring that interpolates it.
+
+    #478 opened on the drift that follows when a symbol stays inline. Three subtypes of
+    `AbstractDenoiseAlgorithm` state one noise condition three ways -- in a parenthesis, in
+    set notation, and in the `Where:` list -- and the symbol every sibling of that family
+    needs is written by hand at each of its sites and has no key at all.
+
+    ------------------------------------------------------------ what this check matches
+
+    A WHOLE BULLET AGAINST A WHOLE VALUE, never a symbol against a symbol.
+
+    A glyph is not owned by a key. `\boldsymbol{w}` is `math_dict[:w_port]`, the portfolio
+    weights vector, inside a risk measure; it is the observation weights in
+    `src/02_Tools.jl` and the OWA weight vector in
+    `src/19_RiskMeasures/10_OWARiskMeasures.jl`. Matching on the symbol alone reported 149
+    sites, and the great majority of them define a different quantity that the key would
+    state wrongly -- `src/02_Tools.jl` among them, the one such site inside a swept file.
+    Matching the whole bullet against the whole value reports only a COPY of the dictionary
+    text. That copy is the drift the rule exists to stop, and the match cannot fire on a
+    glyph that two families share.
+
+    An interpolation leaves no text behind, which is what makes the match cheap.
+    `docstring_text` above joins the literal pieces of an interpolating docstring, so
+    `math_dict[:T]` contributes nothing to the text it returns. A bullet that still reads as
+    the value is therefore a hand-written copy of it.
+
+    The cost of the trade is stated plainly: a copy that drifts by one word stops matching
+    and stops being reported. That is the trade the exact-name resolution of
+    `test_46_standards_citation_census.jl` already makes, and a drifted copy is what the
+    per-file sweep ticket reads by hand.
+
+    The FAMILY half of the rule -- siblings of one leaf abstract supertype state a shared
+    quantity in the same form -- is not gated here or anywhere. An equation's form is not a
+    token. It holds by review, in the sense of `STANDARDS.md`.
+
+    ---------------------------------------------------------------------- the two checks
+
+      1. A file whose manifest row reads `swept = true` carries ZERO copies. No swept file
+         carries one today, so this check needs no debt list of its own.
+      2. The library-wide count may not rise above `MATH_COPY_TOTAL`. Each #404 sweep ticket
+         lowers it as its file migrates, and the check retires when it reaches zero.
+
+    Both mirror the `# Details` pair above, for the same reason: ADR 0085 settles that the
+    migration is per file, inside each file's own sweep ticket, and never in one
+    library-wide pass.
+    =#
+    @testset "a math_dict value is interpolated, never copied" begin
+        MATH_COPY_TOTAL = 7
+
+        mvals = Dict{String, Symbol}(v => k for (k, v) in math_pairs)
+        @test !isempty(mvals)
+
+        # Every bullet of the docstring, stripped of its marker. A `math_dict` value is one
+        # line, so a bullet that wraps onto a second line cannot be a copy of one.
+        function copied_keys(text, mvals)
+            acc = Symbol[]
+            for line in split(text, '\n')
+                m = match(r"^\s*[-*]\s+(.*?)\s*$", line)
+                isnothing(m) && continue
+                k = get(mvals, m.captures[1], nothing)
+                isnothing(k) || push!(acc, k)
+            end
+            return acc
+        end
+
+        @testset "a swept file copies no math_dict value" begin
+            offenders = String[]
+            for f in swept
+                names, texts, _ = scan(joinpath(ROOT, f))
+                for (nm, t) in zip(names, texts), k in copied_keys(t, mvals)
+                    push!(offenders, string(f, "  ", nm, "  math_dict[:", k, "]"))
+                end
+            end
+            if !isempty(offenders)
+                @warn """$(length(offenders)) `Where:` bullet(s) in a file marked
+                         `swept = true` in `sweep/manifest.toml` write out a `math_dict`
+                         value instead of interpolating it. Replace the bullet with
+                         `\$(math_dict[:key])`, under `Notation is fixed by symbol and by
+                         family` in
+                         `.github/instructions/julia-docstrings.instructions.md`. The
+                         columns are the file, the documented name, and the key it
+                         copies:\n  $(join(offenders, "\n  "))"""
+            end
+            @test isempty(offenders)
+        end
+
+        @testset "the library-wide count of copied values does not rise" begin
+            # The manifest keys are the scope, exactly as they are for `# Details` above:
+            # `test_45_sweep_census.jl` reds when a file under `src/` or `ext/` has no row,
+            # so no second file walk is needed.
+            per = Tuple{String, Int}[]
+            for f in sort(collect(keys(rows)))
+                _, texts, _ = scan(joinpath(ROOT, f))
+                n = sum(t -> length(copied_keys(t, mvals)), texts; init = 0)
+                n > 0 && push!(per, (f, n))
+            end
+            measured = sum(last, per; init = 0)
+
+            if measured > MATH_COPY_TOTAL
+                @warn """$measured `Where:` bullet(s) over $(length(per)) file(s) copy a
+                         `math_dict` value, above the $MATH_COPY_TOTAL this check records. A
+                         shared symbol is interpolated, so the count may only
+                         fall:\n  $(join(string.(per), "\n  "))"""
+            end
+            @test measured <= MATH_COPY_TOTAL
+
+            if measured < MATH_COPY_TOTAL
+                println("The count of copied `math_dict` values has fallen to ", measured,
+                        " over ", length(per), " file(s). Lower the number in the same ",
+                        "commit that paid it, and retire this testset at zero:")
+                println("        MATH_COPY_TOTAL = ", measured)
+            end
+        end
+    end
+
+    #=
+    The other half of the notation contract. The check above reads `src/` for a docstring
+    that writes out a table value; this one reads the TABLE for two keys that write out one
+    quantity.
+
+    Finding 9 of the maintainability review of PR 625 is what it pays. `:w_t_moment`,
+    `:w_t_obsweight` and `:cal_w_i` each defined the observation weight, in three spellings
+    of the glyph and in two wordings of the quantity, "observation ``t``" and "period
+    ``i``". The docstring of `math_dict` licenses a second key only when the glyph carries a
+    DIFFERENT quantity, so the three were drift inside the table that exists to stop drift.
+    They are one key, `:w_t_obs`.
+
+    ---------------------------------------------------------- what this check matches
+
+    THE HEAD OF THE DEFINITION, never the glyph.
+
+    A glyph collides for a licensed reason, and 21 of the 148 keys did: matching on the
+    glyph reports the licence and not the drift, exactly as the copy check above found when
+    it matched on a symbol. The head is the noun phrase the definition opens with -- the
+    text after the glyph, cut at the first punctuation mark and at the first function word.
+    Two keys that share a head name one thing. Either the debt list below says why they are
+    two, or a merge pays them off.
+
+    The cost of the trade is the one the copy check also makes: two heads that are worded
+    differently -- "observation weight" against "weight of an observation" -- do not match,
+    and a per-file sweep ticket reads that pair by hand.
+
+    -------------------------------------------------------------------- the debt list
+
+    Every group that stands today is recorded with the reason it is two keys and not one. A
+    head that is not recorded, and a recorded head that gains a key, red this check: a new
+    key may not restate a definition the table already carries. A merge that pays a row off
+    prints the row to correct or to delete.
+    =#
+    @testset "two math_dict keys do not state one quantity" begin
+        recorded = [# The observation SETS of a pair, against the SCORES read off them.
+                    "concordant" => [:CDN_sb, :pqu_sb],
+                    # One quantity under two glyphs, ``s_{c1}`` and ``s_c``. A merge
+                    # candidate: the entropy pooling optimiser states its own scale.
+                    "constraint scale" => [:ep_sc1, :sc_scale],
+                    # Seven counts of seven different things.
+                    "number" => [:K, :N, :T, :k_tail_count, :n_network, :sigma_st_i_paths,
+                                 :sigma_st_paths],
+                    # As `constraint scale`, and the same merge candidate.
+                    "objective scale" => [:ep_so, :so_scale],
+                    # The weights an optimisation produced, against the weights themselves.
+                    "portfolio weights vector ``n \\times 1``" => [:w_0_finaliser, :w_port],
+                    # One quantity under two glyphs, ``r_{tj}`` and ``x_{t,\,i}``. A merge
+                    # candidate, and the wider of the two.
+                    "return" => [:r_tj, :x_ti_ret],
+                    # The equality subscript and the inequality subscript.
+                    "subscript" => [:eq, :ineq]]
+
+        # A function word ends the head, so the noun phrase is what precedes it.
+        head_stop = r"\b(a|an|at|between|for|from|in|is|it|its|of|on|over|that|the|to|under|which|whose|with)\b"
+        function definition_head(v)
+            m = match(r"^``.*?``:\s*(.*)$", v)
+            isnothing(m) && return nothing
+            d = lowercase(strip(first(split(m.captures[1], r"[.,;:]"))))
+            f = match(head_stop, d)
+            isnothing(f) || (d = strip(d[1:prevind(d, f.offset)]))
+            return isempty(d) ? nothing : String(d)
+        end
+
+        groups = Dict{String, Vector{Symbol}}()
+        for (k, v) in math_pairs
+            h = definition_head(v)
+            isnothing(h) || push!(get!(groups, h, Symbol[]), k)
+        end
+        measured = Dict(h => sort(ks) for (h, ks) in groups if length(ks) > 1)
+        debt = Dict(recorded)
+
+        offenders = String[]
+        for h in sort(collect(keys(measured)))
+            added = setdiff(measured[h], get(debt, h, Symbol[]))
+            isempty(added) || push!(offenders, string(h, "  ", join(added, ", ")))
+        end
+        if !isempty(offenders)
+            @warn """$(length(offenders)) definition head(s) of `math_dict` are stated by a
+                     key this testset does not record, so a key restates a quantity the
+                     table already carries. Interpolate the key that owns the quantity, or
+                     record the head with the reason the two are different quantities, under
+                     `Notation is fixed by symbol and by family` in
+                     `.github/instructions/julia-docstrings.instructions.md`. The columns are
+                     the head and the unrecorded key(s):\n  $(join(offenders, "\n  "))"""
+        end
+        @test isempty(offenders)
+
+        stale = [h for (h, ks) in recorded if get(measured, h, Symbol[]) != ks]
+        if !isempty(stale)
+            println("The debt list of `math_dict` definition heads carries ", length(stale),
+                    " stale row(s). Correct them in the same commit that paid them, and ",
+                    "retire this list when no row is left:")
+            for h in sort(stale)
+                ks = get(measured, h, Symbol[])
+                println("        \"", h, "\" => ", if isempty(ks)
+                            "DELETE THIS ROW"
+                        else
+                            string("[:", join(ks, ", :"), "]")
+                        end)
             end
         end
     end

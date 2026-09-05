@@ -92,12 +92,20 @@ S_{i,\\,j} &= \\left\\lceil\\max(\\mathbf{D})^2\\right\\rceil - D_{i,\\,j}^2\\,,
 Where:
 
   - ``S_{i,\\,j}``: Similarity between assets ``i`` and ``j``.
-  - ``\\mathbf{D}``: Distance matrix.
+  - $(math_dict[:D_mat_dist])
   - ``D_{i,\\,j}``: Distance between assets ``i`` and ``j``.
 
 !!! warning
 
     The transformation is defined only for a **finite** distance matrix. An infinite entry makes `ceil(Inf^2) - Inf^2`, which is `NaN`, and every other entry `Inf`. This is not a corner case: [`LogDistance`](@ref) maps an exactly zero correlation to an infinite distance, and this member is the default of both [`DBHT`](@ref) and [`LoGo`](@ref). [`assert_similarity_domain`](@ref) refuses it on the PMFG path.
+
+# Algorithm
+
+The branch of [`distance_to_similarity`](@ref) that this tag selects runs these steps.
+
+ 1. Take the largest entry of `D`, square that one scalar, and round it up with `ceil`, giving the ceiling. The ceiling is the square of the maximum rounded up, not the maximum of the squares; the two agree because a distance is never negative.
+ 2. Square every entry of `D`.
+ 3. Subtract the squared entries of step 2 from the single scalar of step 1, giving the similarity matrix. The element type of `D` is carried through, so a `Float32` distance matrix gives a `Float32` similarity matrix.
 
 # Related
 
@@ -112,7 +120,7 @@ Where:
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 13.1.
+  - $(ref_dict[:cajas2025]) Section 13.1.4.2, footnote 7.
 """
 struct MaximumDistanceSimilarity <: AbstractNonNegativeSimilarityMatrixAlgorithm end
 """
@@ -133,8 +141,15 @@ S_{i,\\,j} &= e^{-D_{i,\\,j}}\\,,
 Where:
 
   - ``S_{i,\\,j}``: Similarity between assets ``i`` and ``j``.
-  - ``\\mathbf{D}``: Distance matrix.
+  - $(math_dict[:D_mat_dist])
   - ``D_{i,\\,j}``: Distance between assets ``i`` and ``j``.
+
+# Algorithm
+
+The branch of [`distance_to_similarity`](@ref) that this tag selects runs these steps.
+
+ 1. Negate every entry of `D`.
+ 2. Exponentiate the negated entries, giving the similarity matrix. The element type of `D` is carried through, so a `Float32` distance matrix gives a `Float32` similarity matrix.
 
 # Related
 
@@ -165,10 +180,19 @@ S_{i,\\,j} &= e^{-c \\cdot D_{i,\\,j}^p}\\,,
 Where:
 
   - ``S_{i,\\,j}``: Similarity between assets ``i`` and ``j``.
-  - ``\\mathbf{D}``: Distance matrix.
+  - $(math_dict[:D_mat_dist])
   - ``D_{i,\\,j}``: Distance between assets ``i`` and ``j``.
   - ``c``: Scale factor.
   - ``p``: Exponent.
+
+# Algorithm
+
+The branch of [`distance_to_similarity`](@ref) that this tag selects runs these steps.
+
+ 1. Read `power` and `coef` off the tag.
+ 2. Raise every entry of `D` to `power`.
+ 3. Multiply the result of step 2 by `-coef`. `coef` is a scalar, so it scales the whole matrix at once.
+ 4. Exponentiate entrywise, giving the similarity matrix. The element type of `D` is carried through whenever neither field is wider than it, which is the case for the `Integer` defaults: a `Float32` distance matrix gives a `Float32` similarity matrix.
 
 # Fields
 
@@ -245,7 +269,7 @@ S_{i,\\,j} &= 1 - D_{i,\\,j}\\,,
 Where:
 
   - ``S_{i,\\,j}``: Similarity between assets ``i`` and ``j``.
-  - ``\\mathbf{D}``: Distance matrix.
+  - $(math_dict[:D_mat_dist])
   - ``D_{i,\\,j}``: Distance between assets ``i`` and ``j``.
 
 This recovers the named similarity counterpart of every distance that is itself one minus a similarity. `Distances.CosineDist` returns the cosine similarity, `Distances.Jaccard` the Ruzicka similarity, `Distances.BrayCurtis` the Sørensen–Dice similarity, and `Distances.CorrDist` the Pearson correlation.
@@ -263,6 +287,13 @@ This recovers the named similarity counterpart of every distance that is itself 
     This member is the honest inverse of a **specific** set of metrics, listed above. Paired with any other distance it returns a number that is in domain, non-negative, and wrong — and nothing catches it, on any path.
 
     [`SimpleDistance`](@ref) is ``\\sqrt{(1 - \\rho) / 2}``, so a correlation of `0.003` gives `D = 0.706` and this member reports a similarity of `0.29`. No check placed anywhere can detect that, because `0.706` is a perfectly legal bounded distance. [`default_similarity`](@ref) pairs a metric with its inverse on the [`FeatureDistance`](@ref) path; [`NetworkEstimator`](@ref)'s `alg`, [`DBHT`](@ref)'s `sim` and [`LoGo`](@ref)'s `sim` take a member with no reference to the distance estimator that produced ``\\mathbf{D}``, so on those the pairing is the caller's to get right.
+
+# Algorithm
+
+The branch of [`distance_to_similarity`](@ref) that this tag selects runs these steps.
+
+ 1. Build the unit in the element type of `D` with `one(eltype(D))`. Writing the unit in that element type is what carries it through, so a `Float32` distance matrix gives a `Float32` similarity matrix.
+ 2. Subtract every entry of `D` from that unit, giving the similarity matrix.
 
 # Related
 
@@ -295,7 +326,7 @@ S_{i,\\,j} &= \\cos\\left(\\pi D_{i,\\,j}\\right)\\,,
 Where:
 
   - ``S_{i,\\,j}``: Similarity between assets ``i`` and ``j``.
-  - ``\\mathbf{D}``: Distance matrix.
+  - $(math_dict[:D_mat_dist])
   - ``D_{i,\\,j}``: Distance between assets ``i`` and ``j``.
 
 For an angular distance ``D_{i,\\,j} = \\arccos(\\rho_{i,\\,j}) / \\pi`` this recovers ``\\rho_{i,\\,j}`` exactly, without reference to the data the distance was computed from. Against [`AngularDist`](@ref) on an 8-asset feature matrix the recovered cosine matched the one computed from the features to `3.608224830031759e-16`. It maps ``[0,\\,1] \\to [1,\\,-1]``, so the similarity is bounded and the diagonal is unity whenever the distance matrix has a zero diagonal.
@@ -308,7 +339,16 @@ It is **not** a member of [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref)
 
 !!! warning "The pairing is not checked"
 
-    Paired with a distance that is not an angular one, this member returns a number that is not a correlation. [`SimpleDistance`](@ref) is ``\\sqrt{(1 - \\rho) / 2}`` and shares this member's ``[0,\\,1]`` range exactly, so it type-checks: a correlation of `0.003` gives `D = 0.706` and ``\\cos(\\pi D)`` reports `-0.618`, which is not a weak negative correlation but nonsense.
+    Paired with a distance that is not an angular one, this member returns a number that is not a correlation. [`SimpleDistance`](@ref) is ``\\sqrt{(1 - \\rho) / 2}`` and shares this member's ``[0,\\,1]`` range exactly, so it type-checks: a correlation of `0.003` gives `D = 0.706` and ``\\cos(\\pi D)`` reports `-0.603`, which is not a weak negative correlation but nonsense.
+
+# Algorithm
+
+The branch of [`distance_to_similarity`](@ref) that this tag selects runs these steps.
+
+ 1. Multiply every entry of `D` by `pi`. `pi` is an `Irrational`, which takes the element type of the number it multiplies rather than widening it, so a `Float32` distance matrix stays `Float32`.
+ 2. Take the cosine of each scaled entry, giving the similarity matrix.
+
+The sign follows from step 2 alone. ``\\cos(\\pi D)`` is positive below ``D = 0.5``, crosses zero at ``D = 0.5`` and is negative above it, which is why this member is not admitted to [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref).
 
 # Related
 
@@ -332,7 +372,12 @@ struct AngularSimilarity <: AbstractSimilarityMatrixAlgorithm end
 
 Compute a similarity matrix from a distance matrix using the specified similarity algorithm.
 
-This function dispatches on the type of `se` to apply the appropriate similarity transformation to the distance matrix `D`.
+# Algorithm
+
+ 1. Select the method by the type of `se`. Every member of [`AbstractSimilarityMatrixAlgorithm`](@ref) owns one method, and the member's own docstring carries the closed form and the steps of its branch.
+ 2. Apply that transformation to `D` entrywise, giving a new matrix of the same size. `D` is never written to, and no method reads a keyword.
+
+The function is a **pure transformation with no domain of its own**. It never calls [`assert_similarity_domain`](@ref), so a member whose non-negativity needs a precondition on `D` is checked by the caller, at the five PMFG entry points, and not here.
 
 # Arguments
 
@@ -427,6 +472,12 @@ The scope follows the failure, which is path-dependent rather than member-wide. 
 
 Nothing that works today. Every pairing this refuses already throws, at [`PMFG_T2s`](@ref)'s own check and one transformation later, with a message that names `W` rather than the configuration that produced it. The gain is the message: it names **both halves**, which is why `de` is passed in — the distance estimator that produced the offending value, and the similarity that refused it.
 
+# Algorithm
+
+ 1. Select the method by the type of `sim`. The two members of the table above own a method each; every other member reaches the method of [`AbstractSimilarityMatrixAlgorithm`](@ref), which is a no-op and returns immediately.
+ 2. Test that member's precondition over the whole of `D`.
+ 3. Raise a `DomainError` when the test fails. The message carries `maximum(D)`, the name of the similarity that refused it, that similarity's closed form, and the concrete type of `de`. Return `nothing` when it holds.
+
 # Arguments
 
   - `sim`: Similarity matrix algorithm.
@@ -471,10 +522,22 @@ function assert_similarity_domain(sim::MaximumDistanceSimilarity,
 end
 """
     default_similarity(metric::Distances.SemiMetric)
+    default_similarity(metric::AngularDist)
 
 Select the similarity matrix algorithm that is the natural counterpart of a distance metric.
 
 Used to default the similarity field of a distance algorithm from its metric, so that the resolved value is visible on the printed object rather than hidden inside the distance kernel. The fallback is [`ComplementSimilarity`](@ref), which is the named counterpart of every metric expressible as one minus a similarity; metrics whose inversion is not linear add their own method.
+
+# Algorithm
+
+ 1. Select the method by the type of `metric`. Dispatch does the selection, so a metric whose inversion is not linear adds a method of its own and reaches it without a branch here.
+
+ 2. Return the similarity that method names. There are two methods today:
+
+      + `metric::Distances.SemiMetric` is the fallback, and returns [`ComplementSimilarity`](@ref). Every metric that is itself one minus a similarity lands here, and the complement recovers that similarity by name.
+      + `metric::AngularDist` returns [`AngularSimilarity`](@ref), which is the exact algebraic inverse of the angular distance. That method is declared in `src/09_Distance/05_FeatureDistance.jl`, beside [`AngularDist`](@ref) itself, and this docstring speaks for it.
+
+The pairing this function makes is correct because it selects the inverse of the metric it is given. A similarity chosen by hand carries no such guarantee; [`ComplementSimilarity`](@ref) and [`AngularSimilarity`](@ref) both state what a wrong pairing returns.
 
 # Arguments
 
@@ -489,6 +552,9 @@ Used to default the similarity field of a distance algorithm from its metric, so
 ```jldoctest
 julia> PortfolioOptimisers.default_similarity(PortfolioOptimisers.Distances.CosineDist())
 ComplementSimilarity()
+
+julia> PortfolioOptimisers.default_similarity(PortfolioOptimisers.AngularDist())
+AngularSimilarity()
 ```
 
 # Related
@@ -496,6 +562,8 @@ ComplementSimilarity()
   - [`AbstractSimilarityMatrixAlgorithm`](@ref)
   - [`ComplementSimilarity`](@ref)
   - [`AngularSimilarity`](@ref)
+  - [`AngularDist`](@ref)
+  - [`FeatureDistance`](@ref)
   - [`distance_to_similarity`](@ref)
 """
 function default_similarity(::Distances.SemiMetric)::ComplementSimilarity

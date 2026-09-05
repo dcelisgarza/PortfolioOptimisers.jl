@@ -1,5 +1,4 @@
 The source files can be found in [user_guide/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/user_guide/).
-
 ```@meta
 EditURL = "../../../user_guide/02_Optimisers.jl"
 ```
@@ -99,9 +98,9 @@ The drawdown notion is also useful purely as a *post-optimisation diagnostic* �
 
 The other JuMP families follow the same `opt = JuMPOptimiser(...)` pattern:
 
-- [`RiskBudgeting`](@ref) / [`RelaxedRiskBudgeting`](@ref) — target a risk contribution per
+  - [`RiskBudgeting`](@ref) / [`RelaxedRiskBudgeting`](@ref) — target a risk contribution per
     asset or factor ([Risk Budgeting](../examples/3_optimisers/09_Risk_Budgeting.md)).
-- [`NearOptimalCentering`](@ref) — a robust point near the efficient frontier
+  - [`NearOptimalCentering`](@ref) — a robust point near the efficient frontier
     ([Near Optimal Centering](../examples/3_optimisers/15_Near_Optimal_Centering.md)).
 
 Here is the minimal risk-budgeting call (equal risk contribution by default):
@@ -192,12 +191,12 @@ derived one.
 Two consequences only appear once cross-validation is switched on, and neither can be inferred
 from the API:
 
-- **`:data` slices, `:prior` refits.** Inside a fold or a meta-optimiser's subproblem, a
+  - **`:data` slices, `:prior` refits.** Inside a fold or a meta-optimiser's subproblem, a
     carried matrix is *subselected* while a derived one is *recomputed on the subproblem's own
     returns*. For a fixed classification the two coincide; for a returns-derived producer they
     are two different questions, so the selector chooses between two semantics rather than two
     copies.
-- **A time-varying literal matrix cannot survive an observation fold.** A three-dimensional
+  - **A time-varying literal matrix cannot survive an observation fold.** A three-dimensional
     `observations × assets × features` matrix handed straight to [`FeaturePrior`](@ref) has no
     way to be resliced down its observation axis, so the fit throws a `DimensionMismatch` as
     soon as the observation count changes. Features that must vary with time *and* survive folds

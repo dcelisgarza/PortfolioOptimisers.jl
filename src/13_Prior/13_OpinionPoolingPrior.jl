@@ -59,7 +59,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Pools the opinions as a weighted arithmetic mean of their scenario weights.
 
-Each scenario's consensus weight is the opinion-weighted average of what the experts assign to it, so the pooled distribution keeps every scenario any one expert believes in.
+Each scenario's consensus weight is the opinion-weighted average of what the experts assign to it, so the pooled distribution keeps every scenario any one expert believes in. It suits opinions that are independent and additive.
 
 # Mathematical definition
 
@@ -69,16 +69,19 @@ p_t^{*} &= \\sum_{k=1}^{K} \\alpha_k\\, p_{tk}\\,.
 \\end{align}
 ```
 
-# Details
+Where:
 
-  - Suitable where the opinions are independent and additive.
-  - A scenario reaches zero in the consensus only when **every** opinion assigns it zero probability, because a sum of non-negative terms vanishes only when all of them do. This is the property that separates it from [`LogarithmicOpinionPooling`](@ref), where one zero is enough.
-  - The pooled distribution is a mixture, so it is at least as dispersed as the most dispersed opinion.
+  - ``p_t^{*}``: Pooled weight of scenario ``t``.
+  - ``\\alpha_k``: Opinion probability of expert ``k``.
+  - ``p_{tk}``: Scenario weight for scenario ``t`` from expert ``k``.
+  - ``K``: Number of opinions.
+
+A sum of non-negative terms vanishes only when every term does, so ``p_t^{*} = 0`` requires that **every** opinion assigns scenario ``t`` zero probability. The pooled distribution is a mixture of the opinions, so it is at least as dispersed as the most dispersed one.
 
 # Related
 
   - [`OpinionPoolingAlgorithm`](@ref)
-  - [`LogarithmicOpinionPooling`](@ref)
+  - [`LogarithmicOpinionPooling`](@ref): the sibling rule, under which one zero opinion is enough to zero a scenario.
   - [`OpinionPoolingPrior`](@ref)
   - [`compute_pooling`](@ref)
 
@@ -92,7 +95,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Pools the opinions as a weighted geometric mean of their scenario weights, renormalised.
 
-The result is the distribution that minimises the opinion-weighted Kullback-Leibler divergence to the individual opinions, which makes it the information-theoretic consensus.
+The result is the distribution that minimises the opinion-weighted Kullback-Leibler divergence to the individual opinions, which makes it the information-theoretic consensus. It is robust to extremes, because it down-weights a scenario that any one opinion doubts.
 
 # Mathematical definition
 
@@ -102,18 +105,22 @@ p_t^{*} &= \\frac{\\exp\\!\\left(\\sum_{k=1}^{K} \\alpha_k \\log p_{tk}\\right)}
 \\end{align}
 ```
 
-# Details
+Where:
 
-  - Robust to extremes, because it down-weights a scenario that any one opinion doubts.
-  - A scenario reaches zero in the consensus as soon as **one** opinion assigns it zero probability, since a single ``\\log 0`` sends the exponent to ``-\\infty``. [`LinearOpinionPooling`](@ref) needs all of them to agree.
-  - The normalisation runs through `LogExpFunctions.logsumexp`, so the exponent is shifted before it is exponentiated and a very negative sum does not underflow to a vector of zeros.
+  - ``p_t^{*}``: Pooled weight of scenario ``t``.
+  - ``\\alpha_k``: Opinion probability of expert ``k``.
+  - ``p_{tk}``: Scenario weight for scenario ``t`` from expert ``k``.
+  - ``K``: Number of opinions.
+  - $(math_dict[:T])
+
+A single ``\\log 0`` sends the exponent to ``-\\infty``, so ``p_t^{*} = 0`` as soon as **one** opinion assigns scenario ``t`` zero probability. The product ``\\alpha_k \\log p_{tk}`` is undefined when both factors vanish, which is the one case the form above does not cover.
 
 # Related
 
   - [`OpinionPoolingAlgorithm`](@ref)
-  - [`LinearOpinionPooling`](@ref)
+  - [`LinearOpinionPooling`](@ref): the sibling rule, under which every opinion must agree before a scenario reaches zero.
   - [`OpinionPoolingPrior`](@ref)
-  - [`compute_pooling`](@ref)
+  - [`compute_pooling`](@ref): its `# Validation` section states what the code does at the undefined product.
 
 # References
 
@@ -127,6 +134,8 @@ $(DocStringExtensions.TYPEDEF)
 Opinion pooling prior estimator for asset returns.
 
 `OpinionPoolingPrior` is a low order prior estimator that computes the mean and covariance of asset returns by combining multiple prior estimations into a consensus prior using opinion pooling algorithms. It supports both linear and logarithmic pooling, flexible weighting of opinions, and optional pre- and post-processing estimators.
+
+The opinions contribute **observation weights** alone. Every moment of the result comes from refitting `pe2` under the pooled weights, which is why `pes` is typed to the entropy-pooling estimators — they are the ones whose result carries a `w`. A `w` of `nothing` weights every opinion equally at `1/length(pes)`, and a `p` of `nothing` uses the opinion probabilities as given rather than adjusting them through [`robust_probabilities`](@ref).
 
 # Fields
 
@@ -150,7 +159,8 @@ Keywords correspond to the struct's fields. All arguments are validated for type
 
   - `pes` must be a non-empty vector of prior estimators.
   - If `w` is not `nothing`, `!isempty(w)`, `length(w) == length(pes)`, `all(x -> 0 <= x <= 1, w)`, and `sum(w) <= 1`.
-  - If `p` is not `nothing`, `p > 0`.
+  - The last is an inequality on purpose. When `sum(w) < 1`, [`prior`](@ref) gives the remaining weight to a uniform prior over the observations, which becomes an opinion in its own right: it takes a column of `pw`, and it is pooled and penalised alongside the others.
+  - If `p` is not `nothing`, `p > 0`. The bound is strict, so `p = 0` raises; `p = nothing` is how one asks for no penalty.
 
 ## Propagated parameters
 
@@ -167,14 +177,6 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
   - `pes`: Recursively viewed via [`port_opt_view`](@ref).
   - `pe1`: Recursively viewed via [`port_opt_view`](@ref).
   - `pe2`: Recursively viewed via [`port_opt_view`](@ref).
-
-# Details
-
-  - If `w` is `nothing`, all opinions are equally weighted at `1/length(pes)`.
-  - If `w` is not `nothing` and `sum(w) < 1`, the remaining weight is assigned to a uniform prior over the observations. That remainder is an opinion in its own right: it takes a column of `pw` and it is penalised alongside the others.
-  - If `p` is `nothing`, the opinion probabilities are used as given. Otherwise they are adjusted by their Kullback-Leibler divergence from the consensus, through [`robust_probabilities`](@ref).
-  - `p` is bounded below by zero strictly. `p = nothing` is how one asks for no penalty; there is no `p = 0`.
-  - The opinions contribute **observation weights** alone. Every moment of the result comes from refitting `pe2` under the pooled weights, which is why `pes` is typed to the entropy-pooling estimators — they are the ones whose result carries a `w`.
 
 # Examples
 
@@ -203,7 +205,8 @@ OpinionPoolingPrior
       │           │      │    ce ┼ GeneralCovariance
       │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
       │           │      │       │    w ┴ nothing
-      │           │      │   alg ┴ FullMoment()
+      │           │      │   alg ┼ FullMoment()
+      │           │      │     w ┴ nothing
       │           │   mp ┼ MatrixProcessing
       │           │      │     pdm ┼ Posdef
       │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
@@ -280,7 +283,8 @@ OpinionPoolingPrior
             @argcheck(!isempty(w), IsEmptyError("w cannot be empty"))
             @argcheck(length(w) == length(pes),
                       DimensionMismatch("length(w) ($(length(w))) must match length(pes) ($(length(pes)))"))
-            @argcheck(all(x -> zero(x) <= x <= one(x), w), DomainError)
+            @argcheck(all(x -> zero(x) <= x <= one(x), w),
+                      DomainError(w, "every entry of w must be in [0, 1]"))
             @argcheck(sum(w) <= one(eltype(w)),
                       DomainError("sum(w) ($(sum(w))) must be <= 1"))
         end
@@ -324,6 +328,17 @@ Where:
 
 The consensus ``\\boldsymbol{c}`` is always the **linear** pool, whatever [`OpinionPoolingAlgorithm`](@ref) the caller selected. The divergence is also directed: it reads ``D_k = \\mathrm{KL}(\\boldsymbol{p}_k \\,\\|\\, \\boldsymbol{c})``, from each opinion to the consensus. The `kld` field of the result runs the other way, from the consensus to each opinion, so the two are different numbers and neither is the other's mirror.
 
+``\\exp(-\\rho D_k)`` decreases in ``D_k``, so a larger ``\\rho`` concentrates the mass on the opinions nearest the consensus. As ``\\rho`` grows without bound the pool tends to the single opinion of smallest divergence.
+
+# Algorithm
+
+The steps below are those of the three-argument method. The `args...` method takes no step and returns `ow`.
+
+ 1. Pool the opinions linearly, giving the consensus `c`.
+ 2. Read the Kullback-Leibler divergence of each column of `pw` against `c`, giving `kldivs`.
+ 3. Scale each entry of `ow` by `exp(-p * kldivs)`, into a **new** vector.
+ 4. Divide that vector by its sum, giving the penalised opinion probabilities.
+
 # Arguments
 
   - `ow`: Vector of opinion probabilities (length = number of opinions).
@@ -332,18 +347,11 @@ The consensus ``\\boldsymbol{c}`` is always the **linear** pool, whatever [`Opin
 
 # Returns
 
-  - `ow::VecNum`: A **new** vector of opinion probabilities for pooling, summing to 1. The argument is never modified, because it may be the estimator's own `w` field.
-
-# Details
-
-  - If `p` is `nothing`, i.e. the method with `args...`, returns the original opinion probabilities.
-  - If `p` is not `nothing`, computes the consensus distribution, computes the Kullback-Leibler divergence for each opinion, and applies an exponential penalty to each probability. The adjusted probabilities are normalised to sum to 1.
-  - A larger `p` concentrates the mass on the opinions nearest the consensus. As `p` grows without bound the pool tends to the single closest opinion.
-  - Used internally by [`OpinionPoolingPrior`](@ref) to ensure robust aggregation of opinions.
+  - `ow::VecNum`: The opinion probabilities for pooling, summing to 1. The three-argument method returns a **new** vector, and the `args...` method returns the argument itself. The argument is never modified either way, because it may be the estimator's own `w` field, or the immutable `range` that the uniform-weight branch of [`prior`](@ref) builds.
 
 # Related
 
-  - [`OpinionPoolingPrior`](@ref)
+  - [`OpinionPoolingPrior`](@ref): the estimator that calls this to make its aggregation of opinions robust.
   - [`compute_pooling`](@ref)
 """
 function robust_probabilities(ow::VecNum, args...)
@@ -397,25 +405,35 @@ Where:
   - ``p_{tk}``: Scenario weight for scenario ``t`` from expert ``k``.
   - $(math_dict[:T])
 
+# Algorithm
+
+Under [`LinearOpinionPooling`](@ref):
+
+ 1. Multiply `pw` by `ow`, giving the consensus weights `w`.
+
+Under [`LogarithmicOpinionPooling`](@ref):
+
+ 1. Multiply the elementwise logarithm of `pw` by `ow`, giving the exponent vector `u`.
+ 2. Read `LogExpFunctions.logsumexp(u)` into `lse`. This shifts `u` by its own maximum before exponentiating it, so a very negative exponent does not underflow to a vector of zeros.
+ 3. Exponentiate `u .- lse`, giving the consensus weights `w`.
+
 # Arguments
 
   - `alg`: Opinion pooling algorithm (`LinearOpinionPooling` or `LogarithmicOpinionPooling`).
   - `ow`: Vector of opinion probabilities (length = number of opinions).
   - `pw`: Matrix of prior weights for each opinion (observations × opinions).
 
+# Validation
+
+  - The result carries no `Inf` and no `NaN`, checked by `StatsBase.pweights`. Under [`LogarithmicOpinionPooling`](@ref) an opinion probability of exactly `0` against a scenario weight of exactly `0` makes the product `0 * log(0)`, which is `NaN`, and the call raises `ArgumentError`. A zero scenario weight alone is safe: it gives `-Inf`, which exponentiates to a consensus weight of `0`.
+
 # Returns
 
   - `w::StatsBase.ProbabilityWeights`: Consensus posterior probability weights.
 
-# Details
-
-  - For `LinearOpinionPooling`, computes the weighted arithmetic mean of the individual prior weights: `w = pw * ow`.
-  - For `LogarithmicOpinionPooling`, computes the weighted geometric mean of the individual prior weights: `w = exp.(log.(pw) * ow - LogExpFunctions.logsumexp(log.(pw) * ow))`.
-  - Used internally by [`OpinionPoolingPrior`](@ref) to form the consensus prior distribution.
-
 # Related
 
-  - [`OpinionPoolingPrior`](@ref)
+  - [`OpinionPoolingPrior`](@ref): the estimator that calls this to form its consensus prior distribution.
   - [`LinearOpinionPooling`](@ref)
   - [`LogarithmicOpinionPooling`](@ref)
 """
@@ -435,6 +453,20 @@ Compute opinion pooling prior moments for asset returns.
 
 `prior` estimates the mean and covariance of asset returns by combining multiple prior estimations into a consensus prior using opinion pooling algorithms. Supports both linear and logarithmic pooling, robust opinion probability adjustment, and optional pre- and post-processing estimators.
 
+No field of `pe` is modified, so calling `prior` twice on one estimator gives the same answer twice. Every moment of the result is `pe.pe2`'s; the opinions contribute observation weights alone.
+
+# Algorithm
+
+ 1. Orient `X` and `F` by `dims`.
+ 2. When `pe.pe1` is not `nothing`, replace `X` with the returns of that estimator's prior.
+ 3. Read the opinion probabilities `ow`, from `pe.w` when it is set and from a uniform `range` over `length(pe.pes)` when it is `nothing`.
+ 4. Take the remainder `rw` of `ow` against one. When `rw` exceeds `eps`, append it to `ow` and give `pw` a last column of `1/T`, the uniform prior over the observations.
+ 5. Fit every estimator of `pe.pes` over the executor `pe.ex`, writing each result's weights into a column of `pw`.
+ 6. Penalise `ow` through [`robust_probabilities`](@ref), which is the identity when `pe.p` is `nothing`.
+ 7. Pool the columns of `pw` under `pe.alg` through [`compute_pooling`](@ref), giving the consensus weights `w`.
+ 8. Refit `pe.pe2` under `w` through [`factory`](@ref), giving the moments of the result.
+ 9. Read `ens` as `exp` of the entropy of `w`, and `kld` as the divergence from `w` to each column of `pw`.
+
 # Arguments
 
   - `pe`: Opinion pooling prior estimator.
@@ -451,18 +483,9 @@ Compute opinion pooling prior moments for asset returns.
 # Returns
 
   - `pr::LowOrderPrior`: Result object containing asset returns, posterior mean vector, posterior covariance matrix, consensus weights, entropy, Kullback-Leibler divergence, opinion probabilities, and optional factor moments.
-
-# Details
-
-  - Optional pre-processing estimator `pe.pe1` is applied to asset returns before pooling, else the original returns are used.
-  - Each prior estimator in `pe.pes` is applied to the asset returns, producing individual prior weights.
-  - Opinion probabilities `ow` are initialised from `pe.w` or set uniformly if it is `nothing`; if their sum is less than 1, the remainder is assigned to a uniform prior, which takes the last column of `pw` and is pooled and penalised like any other opinion.
-  - Robust opinion probabilities are computed using [`robust_probabilities`](@ref) if a penalty parameter `pe.p` is not `nothing`. Neither `pe.w` nor any other field of `pe` is modified: calling `prior` twice on one estimator gives the same answer twice.
-  - Consensus posterior weights are computed using [`compute_pooling`](@ref) according to the specified pooling algorithm `pe.alg`.
-  - Post-processing estimator `pe.pe2` is applied using the consensus weights, via [`factory`](@ref). Every moment of the result is `pe.pe2`'s; the opinions contribute observation weights alone.
-  - The result includes the effective number of scenarios, Kullback-Leibler divergence to each opinion, robust opinion probabilities, and optional factor moments.
-  - `pr.ens` is `exp` of the entropy of the consensus weights, so it runs from 1 (all mass on one observation) to `T` (uniform).
-  - `pr.kld[i]` is ``\\mathrm{KL}(\\boldsymbol{w} \\,\\|\\, \\boldsymbol{p}_i)``, from the **consensus to** opinion `i`. [`robust_probabilities`](@ref) reads the divergence in the other direction, so the two vectors are different numbers.
+  - `pr.ens`: `exp` of the entropy of the consensus weights, so it runs from 1 (all mass on one observation) to `T` (uniform).
+  - `pr.kld[i]`: ``\\mathrm{KL}(\\boldsymbol{w} \\,\\|\\, \\boldsymbol{p}_i)``, from the **consensus to** opinion `i`. [`robust_probabilities`](@ref) reads the divergence in the other direction, so the two vectors are different numbers.
+  - `pr.ow`: The penalised opinion probabilities, one entry per column of `pw`. It is one entry longer than `pe.w` when the uniform-prior remainder took a column.
 
 # Related
 
@@ -504,11 +527,11 @@ function prior(pe::OpinionPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing
     # pooled prior's feature matrix is forwarded unchanged (see [`LowOrderPrior`](@ref)).
     # The factor block is the refit prior's, forwarded whole rather than stamped with the
     # pooled weights — see the note at the same seam in `12_EntropyPoolingPrior.jl`.
-    (; X, o_X, mu, sigma, chol, rr, fpr, Z) = prior(pe2, X, F; strict = strict, kwargs...)
+    (; X, o_X, mu, sigma, chol, rr, fpr, pnl) = prior(pe2, X, F; strict = strict, kwargs...)
     ens = exp(StatsBase.entropy(w))
     kld = [StatsBase.kldivergence(w, view(pw, :, i)) for i in axes(pw, 2)]
     return LowOrderPrior(; X = X, o_X = o_X, mu = mu, sigma = sigma, chol = chol, w = w,
-                         ens = ens, kld = kld, ow = ow, rr = rr, fpr = fpr, Z = Z)
+                         ens = ens, kld = kld, ow = ow, rr = rr, fpr = fpr, pnl = pnl)
 end
 
 function factor_residual_config(pe::OpinionPoolingPrior)

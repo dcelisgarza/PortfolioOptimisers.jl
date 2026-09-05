@@ -39,7 +39,7 @@ $(DocStringExtensions.FIELDS)
         sgst::Option{<:Bt_VecOptBt}, tn::Option{<:Tn_VecTn}, fees::Option{<:Fees},
         plr::Option{<:Union{<:AbstractPhylogenyConstraintResult,
                             <:AbstractVector{<:AbstractPhylogenyConstraintResult}}},
-        ret::JRE_VecJRE, sca::Scalariser
+        ret::JRE_VecJRE, sca::Scalariser, imsk::Option{<:BitVector} = nothing
     ) -> ProcessedJuMPOptimiserAttributes
 
 Keywords correspond to the struct's fields. The field types are the *result* side of the
@@ -148,6 +148,10 @@ true
     $(field_dict[:sca_res])
     """
     sca
+    """
+    $(field_dict[:imsk])
+    """
+    imsk
     # Field types are the *result* side of each matching `JuMPOptimiser` estimator slot:
     # this bundle holds the constraint/prior results produced by
     # `processed_jump_optimiser_attributes` — never the raw estimators. `ret` is the sole
@@ -170,27 +174,14 @@ true
                                               tn::Option{<:Tn_VecTn}, fees::Option{<:Fees},
                                               plr::Option{<:Union{<:AbstractPhylogenyConstraintResult,
                                                                   <:AbstractVector{<:AbstractPhylogenyConstraintResult}}},
-                                              ret::JRE_VecJRE, sca::Scalariser)
+                                              ret::JRE_VecJRE, sca::Scalariser,
+                                              imsk::Option{<:BitVector})
         return new{typeof(pr), typeof(wb), typeof(lt), typeof(st), typeof(lcsr),
                    typeof(ctr), typeof(gcardr), typeof(sgcardr), typeof(smtx),
                    typeof(sgmtx), typeof(slt), typeof(sst), typeof(sglt), typeof(sgst),
-                   typeof(tn), typeof(fees), typeof(plr), typeof(ret), typeof(sca)}(pr, wb,
-                                                                                    lt, st,
-                                                                                    lcsr,
-                                                                                    ctr,
-                                                                                    gcardr,
-                                                                                    sgcardr,
-                                                                                    smtx,
-                                                                                    sgmtx,
-                                                                                    slt,
-                                                                                    sst,
-                                                                                    sglt,
-                                                                                    sgst,
-                                                                                    tn,
-                                                                                    fees,
-                                                                                    plr,
-                                                                                    ret,
-                                                                                    sca)
+                   typeof(tn), typeof(fees), typeof(plr), typeof(ret), typeof(sca),
+                   typeof(imsk)}(pr, wb, lt, st, lcsr, ctr, gcardr, sgcardr, smtx, sgmtx,
+                                 slt, sst, sglt, sgst, tn, fees, plr, ret, sca, imsk)
     end
 end
 function ProcessedJuMPOptimiserAttributes(; pr::AbstractPriorResult,
@@ -209,11 +200,96 @@ function ProcessedJuMPOptimiserAttributes(; pr::AbstractPriorResult,
                                           tn::Option{<:Tn_VecTn}, fees::Option{<:Fees},
                                           plr::Option{<:Union{<:AbstractPhylogenyConstraintResult,
                                                               <:AbstractVector{<:AbstractPhylogenyConstraintResult}}},
-                                          ret::JRE_VecJRE,
-                                          sca::Scalariser)::ProcessedJuMPOptimiserAttributes
+                                          ret::JRE_VecJRE, sca::Scalariser,
+                                          imsk::Option{<:BitVector} = nothing)::ProcessedJuMPOptimiserAttributes
     return ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcsr, ctr, gcardr, sgcardr,
                                             smtx, sgmtx, slt, sst, sglt, sgst, tn, fees,
-                                            plr, ret, sca)
+                                            plr, ret, sca, imsk)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Reduce an optimisation estimator and its returns data to the assets an Investable Mask keeps.
+
+[`processed_jump_optimiser_attributes`](@ref) reduces what the bundle carries — the prior result and every constraint result. It cannot reduce what the *head* carries: an initial weight vector, a risk measure holding per-asset data, a tracking estimator, a custom constraint. Those travel from the head into [`assemble_jump_model!`](@ref) unmediated by the bundle, so each head takes this view of itself and of `rd` before it assembles a model.
+
+The `nothing` method is the whole all-investable path: it returns both arguments unchanged, so a universe with nothing to exclude allocates nothing and takes the route it took before the mask existed.
+
+The returns matrix the view slices tracking against is `rd.X`, and `pr.X` when the caller stated a fitted prior instead of data. [`port_opt_view`](@ref) reads the prior's own matrix in that case and ignores what it is given, so either is correct and only one of them always exists.
+
+The mask is handed to [`port_opt_view`](@ref) as the index vector `findall(imsk)` rather than as the mask itself. Every other caller of that verb passes an integer index, and a view specialised on one index type is a view whose inference is already exercised.
+
+# Arguments
+
+  - `optimiser::JuMPOptimisationEstimator`: The optimiser head to view.
+  - $(arg_dict[:rd])
+  - $(arg_dict[:pr])
+  - $(arg_dict[:imsk])
+
+# Returns
+
+  - `(optimiser, rd)`: Both restricted to the investable assets, or both unchanged.
+
+# Related
+
+  - [`investable_mask`](@ref)
+  - [`processed_jump_optimiser_attributes`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+function investable_view(optimiser::JuMPOptimisationEstimator, rd::ReturnsResult,
+                         ::AbstractPriorResult, ::Nothing)
+    return optimiser, rd
+end
+function investable_view(optimiser::JuMPOptimisationEstimator, rd::ReturnsResult,
+                         pr::AbstractPriorResult, imsk::BitVector)
+    X = isnothing(rd.X) ? pr.X : rd.X
+    idx = findall(imsk)
+    return port_opt_view(optimiser, idx, X), port_opt_view(rd, idx)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Expand a solved weight vector from the investable subset back onto the full asset universe.
+
+The optimiser solves over the assets the Investable Mask keeps, so its weight vector is shorter than the universe the caller stated. This puts each solved weight back at its own asset and writes a zero everywhere else, which is what a non-investable asset holds: the optimiser could not trade it.
+
+A failed solve carries `NaN` at every solved position. The expansion keeps that distinction — `NaN` where the optimiser tried and failed, zero where it never could — rather than flattening both to zero.
+
+The `nothing` method returns the solution unchanged, so nothing is copied when every asset is investable. The vector method serves the efficient-frontier route, where one solution is recorded per sweep point.
+
+[`JuMPOptimisationResult`](@ref)'s **keyword** constructor is the caller, and every JuMP family builds its result through it. The inner constructor is left alone on purpose: it states the field types of `new`, and reassigning `sol` there widens what inference knows about the result's parameters.
+
+# Arguments
+
+  - $(arg_dict[:imsk])
+  - $(arg_dict[:sol])
+
+# Validation
+
+  - The solved weight vector must hold one weight per investable asset.
+
+# Returns
+
+  - `sol`: The solution, or vector of them, on the full asset universe.
+
+# Related
+
+  - [`investable_mask`](@ref)
+  - [`JuMPOptimisationSolution`](@ref)
+  - [`JuMPOptimisationResult`](@ref)
+"""
+function expand_investable_weights(::Nothing, sol::JuMPOptSol_VecJuMPOptSol)
+    return sol
+end
+function expand_investable_weights(imsk::BitVector, sol::JuMPOptimisationSolution)
+    @argcheck(count(imsk) == length(sol.w),
+              DimensionMismatch("the investable mask keeps $(count(imsk)) of $(length(imsk)) assets, but the solution holds $(length(sol.w)) weights; the mask and the solution must come from the same optimisation"))
+    w = zeros(eltype(sol.w), length(imsk))
+    w[imsk] = sol.w
+    return JuMPOptimisationSolution(; w = w)
+end
+function expand_investable_weights(imsk::BitVector, sol::VecJuMPOptSol)
+    return [expand_investable_weights(imsk, s) for s in sol]
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -274,7 +350,41 @@ function JuMPOptimisationResult(; pa::ProcessedJuMPOptimiserAttributes,
                                 retcode::OptRetCode_VecOptRetCode,
                                 sol::JuMPOptSol_VecJuMPOptSol,
                                 model::Option{<:JuMP.Model})::JuMPOptimisationResult
-    return JuMPOptimisationResult(pa, retcode, sol, model)
+    # The one door every JuMP family's result comes through, and so the one place the weight
+    # expansion belongs: `MeanRisk`, `RiskBudgeting`, `RelaxedRiskBudgeting`,
+    # `FactorRiskContribution` and `NearOptimalCentering` all build their result here. `sol`
+    # arrives holding the reduced vector the solver returned, and the result carries that
+    # vector on the caller's own universe; the reduced problem survives in `model` when the
+    # head was asked to save it. It sits here rather than in the inner constructor because
+    # the inner one states the field types of `new`, and a reassignment there widens what
+    # inference knows about `sol` and `model` both.
+    return JuMPOptimisationResult(pa, retcode, expand_investable_weights(pa.imsk, sol),
+                                  model)
+end
+"""
+    set_retcode(res::JuMPOptimisationResult, retcode::OptRetCode_VecOptRetCode)
+
+Rebuild a [`JuMPOptimisationResult`](@ref) with a different return code.
+
+The rebuild reaches the inner constructor rather than the keyword one, because the keyword constructor expands the solver's reduced weight vector onto the caller's universe. `sol` is already expanded here, so a second pass through that door would expand it twice.
+
+# Arguments
+
+  - `res`: Result to rebuild.
+  - `retcode`: Return code, or one per member of the population.
+
+# Returns
+
+  - [`JuMPOptimisationResult`](@ref): The result, with the new return code.
+
+# Related
+
+  - [`set_retcode`](@ref)
+  - [`mark_ruined_members`](@ref)
+  - [`JuMPOptimisationResult`](@ref)
+"""
+function set_retcode(res::JuMPOptimisationResult, retcode::OptRetCode_VecOptRetCode)
+    return JuMPOptimisationResult(res.pa, retcode, res.sol, res.model)
 end
 # Virtual property `:w` extracts portfolio weights from `sol` (a single solution or a vector
 # of them, hence the broadcast); unknown properties forward to `pa` (see [`@forward_properties`](@ref)).
@@ -381,7 +491,7 @@ $(DocStringExtensions.FIELDS)
         fees::TD_Option{<:FeesE_Fees} = nothing,
         sets::TD_Option{<:UniverseSets} = nothing,
         tr::TD_Option{<:Tr_VecTr} = nothing,
-        ple::TD_Option{<:PlCE_PhC_VecPlCE_PlC} = nothing,
+        ple::TD_Option{<:PlCE_PlC_VecPlCE_PlC} = nothing,
         ret::TD{<:JRE_VecJRE} = ArithmeticReturn(),
         sca::TD{<:NonHierarchicalScalariser} = SumScalariser(),
         ccnt::TD_Option{<:JuMPConstr_VecJuMPConstr} = nothing,
@@ -391,13 +501,13 @@ $(DocStringExtensions.FIELDS)
         ss::TD_Option{<:Number} = nothing,
         card::TD_Option{<:Integer} = nothing,
         scard::TD_Option{<:Int_VecInt} = nothing,
-        l2c::TD_Option{<:Number} = nothing,
+        l2c::TD_Option{<:Num_NormCeilCal} = nothing,
         lpc::TD_Option{<:LpReg_VecLpReg} = nothing,
-        linfc::TD_Option{<:Number} = nothing,
-        l1::TD_Option{<:Number} = nothing,
+        linfc::TD_Option{<:Num_NormCeilCal} = nothing,
+        l1::TD_Option{<:Num_AmbRadCal} = nothing,
         l2::TD_Option{<:L2Reg_VecL2Reg} = nothing,
-        linf::TD_Option{<:Number} = nothing,
         lp::TD_Option{<:LpReg_VecLpReg} = nothing,
+        linf::TD_Option{<:Num_AmbRadCal} = nothing,
         brt::Bool = false,
         x_src::Symbol = :prior,
         z_src::Symbol = :data,
@@ -419,8 +529,9 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
   - If `cte` is a vector: `!isempty(cte)`.
   - If `card` is provided: `card > 0` and finite.
   - If `tn` or `tr` is a vector: each must be non-empty.
-  - If `l2c`, `linfc`, `l1`, or `linf` is provided: each must be `> 0` and finite.
-  - If `lp` is a vector: `!isempty(lp)`.
+  - If `l2c`, `linfc`, `l1`, or `linf` is provided as a number: each must be `> 0` and finite. `l1` and `linf` also take an ambiguity-radius rule, and `l2c` and `linfc` a norm-ceiling rule. A rule states no number here, so the check runs on the number the rule returns, in [`assemble_jump_model!`](@ref).
+  - The rule in each [`LpRegularisation`](@ref) is checked against the field that holds it: `lp` is a penalty, so it refuses a norm-ceiling rule, and `lpc` is a constraint, so it refuses an ambiguity-radius rule. The term itself carries one bound for both readings, so this is the point at which the reading is known.
+  - If `l2`, `lp` or `lpc` is a vector: each must be non-empty. An empty vector builds no term, which is what `nothing` already spells.
   - `l2`, `lp` and `lpc` are validated by their own estimator constructors ([`L2Regularisation`](@ref), [`LpRegularisation`](@ref)).
   - If `scard` is provided: compatible `smtx`, `slt`, `sst` sizes required.
   - If `sgcarde` is provided: compatible `sgmtx`, `sglt`, `sgst` sizes required.
@@ -588,13 +699,13 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
     """
     l2
     """
-    $(field_dict[:linf])
-    """
-    linf
-    """
     $(field_dict[:lp])
     """
     lp
+    """
+    $(field_dict[:linf])
+    """
+    linf
     """
     $(field_dict[:brt])
     """
@@ -626,16 +737,19 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
                            sgst::TD_Option{<:BtE_Bt_VecOptBtE_Bt},
                            tn::TD_Option{<:TnE_Tn_VecTnE_Tn}, fees::TD_Option{<:FeesE_Fees},
                            sets::TD_Option{<:UniverseSets}, tr::TD_Option{<:Tr_VecTr},
-                           ple::TD_Option{<:PlCE_PhC_VecPlCE_PlC}, ret::TD{<:JRE_VecJRE},
+                           ple::TD_Option{<:PlCE_PlC_VecPlCE_PlC}, ret::TD{<:JRE_VecJRE},
                            sca::TD{<:NonHierarchicalScalariser},
                            ccnt::TD_Option{<:JuMPConstr_VecJuMPConstr},
                            cobj::TD_Option{<:JuMPObj_VecJuMPObj}, sc::Number, so::Number,
                            ss::TD_Option{<:Number}, card::TD_Option{<:Integer},
-                           scard::TD_Option{<:Int_VecInt}, l2c::TD_Option{<:Number},
-                           lpc::TD_Option{<:LpReg_VecLpReg}, linfc::TD_Option{<:Number},
-                           l1::TD_Option{<:Number}, l2::TD_Option{<:L2Reg_VecL2Reg},
-                           linf::TD_Option{<:Number}, lp::TD_Option{<:LpReg_VecLpReg},
-                           brt::Bool, x_src::Symbol, z_src::Symbol, strict::Bool)
+                           scard::TD_Option{<:Int_VecInt},
+                           l2c::TD_Option{<:Num_NormCeilCal},
+                           lpc::TD_Option{<:LpReg_VecLpReg},
+                           linfc::TD_Option{<:Num_NormCeilCal},
+                           l1::TD_Option{<:Num_AmbRadCal}, l2::TD_Option{<:L2Reg_VecL2Reg},
+                           lp::TD_Option{<:LpReg_VecLpReg},
+                           linf::TD_Option{<:Num_AmbRadCal}, brt::Bool, x_src::Symbol,
+                           z_src::Symbol, strict::Bool)
         assert_source_selector(x_src, :x_src)
         assert_source_selector(z_src, :z_src)
         if isa(slv, VecSlv)
@@ -675,11 +789,24 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
         if !isnothing(l1) && !isa(l1, TimeDependent)
             assert_nonempty_gt0_finite_val(l1, :l1)
         end
-        if !isnothing(linf) && !isa(linf, TimeDependent)
-            assert_nonempty_gt0_finite_val(linf, :linf)
+        if isa(l2, AbstractVector)
+            @argcheck(!isempty(l2), IsEmptyError("l2 cannot be empty"))
         end
         if isa(lp, AbstractVector)
             @argcheck(!isempty(lp), IsEmptyError("lp cannot be empty"))
+        end
+        if isa(lpc, AbstractVector)
+            @argcheck(!isempty(lpc), IsEmptyError("lpc cannot be empty"))
+        end
+        # `LpRegularisation.val` is read as a coefficient in `lp` and as a ceiling in
+        # `lpc`, and one field cannot carry two bounds. This is the first point at which
+        # the reading is known, so it is where the wrong role is refused. A `TimeDependent`
+        # needs no guard: it is not a term, so it meets the permissive fallback, and the
+        # constructor test-substitutes each of its entries through this same check.
+        assert_penalty_coefficient_role(lp)
+        assert_norm_ceiling_role(lpc)
+        if !isnothing(linf) && !isa(linf, TimeDependent)
+            assert_nonempty_gt0_finite_val(linf, :linf)
         end
         scard_td = any(x -> isa(x, TimeDependent), (scard, smtx, slt, sst))
         if !scard_td && isa(scard, Integer)
@@ -827,7 +954,7 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
                                             lcse, cte, gcarde, sgcarde, smtx, sgmtx, slt,
                                             sst, sglt, sgst, tn, fees, sets, tr, ple, ret,
                                             sca, ccnt, cobj, sc, so, ss, card, scard, l2c,
-                                            lpc, linfc, l1, l2, linf, lp, brt, x_src, z_src,
+                                            lpc, linfc, l1, l2, lp, linf, brt, x_src, z_src,
                                             strict), jump_optimiser_td_defaults())
         return new{typeof(pe), typeof(slv), typeof(wb), typeof(bgt), typeof(sbgt),
                    typeof(gbgt), typeof(xbgt), typeof(lt), typeof(st), typeof(lcse),
@@ -836,51 +963,51 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
                    typeof(tn), typeof(fees), typeof(sets), typeof(tr), typeof(ple),
                    typeof(ret), typeof(sca), typeof(ccnt), typeof(cobj), typeof(sc),
                    typeof(so), typeof(ss), typeof(card), typeof(scard), typeof(l2c),
-                   typeof(lpc), typeof(linfc), typeof(l1), typeof(l2), typeof(linf),
-                   typeof(lp), typeof(brt), typeof(x_src), typeof(z_src), typeof(strict)}(pe,
-                                                                                          slv,
-                                                                                          wb,
-                                                                                          bgt,
-                                                                                          sbgt,
-                                                                                          gbgt,
-                                                                                          xbgt,
-                                                                                          lt,
-                                                                                          st,
-                                                                                          lcse,
-                                                                                          cte,
-                                                                                          gcarde,
-                                                                                          sgcarde,
-                                                                                          smtx,
-                                                                                          sgmtx,
-                                                                                          slt,
-                                                                                          sst,
-                                                                                          sglt,
-                                                                                          sgst,
-                                                                                          tn,
-                                                                                          fees,
-                                                                                          sets,
-                                                                                          tr,
-                                                                                          ple,
-                                                                                          ret,
-                                                                                          sca,
-                                                                                          ccnt,
-                                                                                          cobj,
-                                                                                          sc,
-                                                                                          so,
-                                                                                          ss,
-                                                                                          card,
-                                                                                          scard,
-                                                                                          l2c,
-                                                                                          lpc,
-                                                                                          linfc,
-                                                                                          l1,
-                                                                                          l2,
-                                                                                          linf,
-                                                                                          lp,
-                                                                                          brt,
-                                                                                          x_src,
-                                                                                          z_src,
-                                                                                          strict)
+                   typeof(lpc), typeof(linfc), typeof(l1), typeof(l2), typeof(lp),
+                   typeof(linf), typeof(brt), typeof(x_src), typeof(z_src), typeof(strict)}(pe,
+                                                                                            slv,
+                                                                                            wb,
+                                                                                            bgt,
+                                                                                            sbgt,
+                                                                                            gbgt,
+                                                                                            xbgt,
+                                                                                            lt,
+                                                                                            st,
+                                                                                            lcse,
+                                                                                            cte,
+                                                                                            gcarde,
+                                                                                            sgcarde,
+                                                                                            smtx,
+                                                                                            sgmtx,
+                                                                                            slt,
+                                                                                            sst,
+                                                                                            sglt,
+                                                                                            sgst,
+                                                                                            tn,
+                                                                                            fees,
+                                                                                            sets,
+                                                                                            tr,
+                                                                                            ple,
+                                                                                            ret,
+                                                                                            sca,
+                                                                                            ccnt,
+                                                                                            cobj,
+                                                                                            sc,
+                                                                                            so,
+                                                                                            ss,
+                                                                                            card,
+                                                                                            scard,
+                                                                                            l2c,
+                                                                                            lpc,
+                                                                                            linfc,
+                                                                                            l1,
+                                                                                            l2,
+                                                                                            lp,
+                                                                                            linf,
+                                                                                            brt,
+                                                                                            x_src,
+                                                                                            z_src,
+                                                                                            strict)
     end
 end
 function JuMPOptimiser(; pe::TD{<:PrE_Pr} = EmpiricalPrior(), slv::Slv_VecSlv,
@@ -903,7 +1030,7 @@ function JuMPOptimiser(; pe::TD{<:PrE_Pr} = EmpiricalPrior(), slv::Slv_VecSlv,
                        fees::TD_Option{<:FeesE_Fees} = nothing,
                        sets::TD_Option{<:UniverseSets} = nothing,
                        tr::TD_Option{<:Tr_VecTr} = nothing,
-                       ple::TD_Option{<:PlCE_PhC_VecPlCE_PlC} = nothing,
+                       ple::TD_Option{<:PlCE_PlC_VecPlCE_PlC} = nothing,
                        ret::TD{<:JRE_VecJRE} = ArithmeticReturn(),
                        sca::TD{<:NonHierarchicalScalariser} = SumScalariser(),
                        ccnt::TD_Option{<:JuMPConstr_VecJuMPConstr} = nothing,
@@ -911,19 +1038,20 @@ function JuMPOptimiser(; pe::TD{<:PrE_Pr} = EmpiricalPrior(), slv::Slv_VecSlv,
                        so::Number = 1, ss::TD_Option{<:Number} = nothing,
                        card::TD_Option{<:Integer} = nothing,
                        scard::TD_Option{<:Int_VecInt} = nothing,
-                       l2c::TD_Option{<:Number} = nothing,
+                       l2c::TD_Option{<:Num_NormCeilCal} = nothing,
                        lpc::TD_Option{<:LpReg_VecLpReg} = nothing,
-                       linfc::TD_Option{<:Number} = nothing,
-                       l1::TD_Option{<:Number} = nothing,
+                       linfc::TD_Option{<:Num_NormCeilCal} = nothing,
+                       l1::TD_Option{<:Num_AmbRadCal} = nothing,
                        l2::TD_Option{<:L2Reg_VecL2Reg} = nothing,
-                       linf::TD_Option{<:Number} = nothing,
-                       lp::TD_Option{<:LpReg_VecLpReg} = nothing, brt::Bool = false,
+
+                       lp::TD_Option{<:LpReg_VecLpReg} = nothing,
+                       linf::TD_Option{<:Num_AmbRadCal} = nothing, brt::Bool = false,
                        x_src::Symbol = :prior, z_src::Symbol = :data,
                        strict::Bool = false)::JuMPOptimiser
     return JuMPOptimiser(pe, slv, wb, bgt, sbgt, gbgt, xbgt, lt, st, lcse, cte, gcarde,
                          sgcarde, smtx, sgmtx, slt, sst, sglt, sgst, tn, fees, sets, tr,
                          ple, ret, sca, ccnt, cobj, sc, so, ss, card, scard, l2c, lpc,
-                         linfc, l1, l2, linf, lp, brt, x_src, z_src, strict)
+                         linfc, l1, l2, lp, linf, brt, x_src, z_src, strict)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1010,7 +1138,7 @@ function factory(opt::JuMPOptimiser, w::AbstractVector)::JuMPOptimiser
                          ret = opt.ret, sca = opt.sca, ccnt = ccnt, cobj = cobj,
                          sc = opt.sc, so = opt.so, ss = opt.ss, card = opt.card,
                          scard = opt.scard, l2c = opt.l2c, lpc = opt.lpc, linfc = opt.linfc,
-                         l1 = opt.l1, l2 = opt.l2, linf = opt.linf, lp = opt.lp,
+                         l1 = opt.l1, l2 = opt.l2, lp = opt.lp, linf = opt.linf,
                          brt = opt.brt, x_src = opt.x_src, z_src = opt.z_src,
                          strict = opt.strict)
 end
@@ -1090,7 +1218,7 @@ function port_opt_view(opt::JuMPOptimiser, i, X::MatNum, args...)::JuMPOptimiser
                          ple = opt.ple, ret = ret, sca = opt.sca, ccnt = ccnt, cobj = cobj,
                          sc = opt.sc, so = opt.so, ss = opt.ss, card = opt.card,
                          scard = opt.scard, l2c = opt.l2c, lpc = opt.lpc, linfc = opt.linfc,
-                         l1 = opt.l1, l2 = opt.l2, linf = opt.linf, lp = opt.lp,
+                         l1 = opt.l1, l2 = opt.l2, lp = opt.lp, linf = opt.linf,
                          brt = opt.brt, x_src = opt.x_src, z_src = opt.z_src,
                          strict = opt.strict)
 end
@@ -1116,7 +1244,7 @@ function assert_universe_axis_order(sets::Option{<:UniverseSets}, rd::ReturnsRes
         return nothing
     end
     for (axis, key, names, sym) in
-        (("asset", sets.xkey, rd.nx, "nx"), ("factor", sets.fkey, rd.nf, "nf"))
+        (("asset", sets.xkey, rd.nx, "nx"), ("factor", sets.tfkey, rd.nf, "nf"))
         if isnothing(names) || !haskey(sets.dict, key)
             continue
         end
@@ -1127,6 +1255,56 @@ function assert_universe_axis_order(sets::Option{<:UniverseSets}, rd::ReturnsRes
                   ArgumentError(misaligned_axis_msg(declared, names, axis, key, sym)))
     end
     return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Derive the Investable Mask of a fitted prior, and reduce the prior, the optimiser and the returns data to the assets it keeps.
+
+A Prior Estimator fits on the coverage universe and hands back a result on the full asset universe, in which an asset it could not estimate carries `NaN` in `mu` and on the diagonal of `sigma`. Nothing downstream of the fit can solve over such an asset, so the reduction happens once, at the optimiser's entry, and every constraint the caller stated over the full universe is sliced by the same index.
+
+Three methods, and the branch is dispatch rather than a condition. The first derives the mask; the `nothing` method is the all-investable path and returns its arguments untouched; the `BitVector` method takes the three views. A universe with nothing to exclude therefore costs one pass over two vectors and no allocation.
+
+The optimiser is viewed at `pr.X`, the *unreduced* returns matrix, because [`port_opt_view`](@ref) slices a tracking estimator against it by the same asset index. The prior is reduced after, so the matrix the view reads is still the full one.
+
+The mask rides as a `BitVector` because the expansion needs the length of the full universe and nothing else carries it once the prior is reduced. The three views take `findall(imsk)` instead, which is the integer index every other caller of [`port_opt_view`](@ref) passes.
+
+# Algorithm
+
+ 1. Derive the Investable Mask from the fitted prior with [`investable_mask`](@ref).
+ 2. Return the mask, the prior, the optimiser and the returns data unchanged when the mask is `nothing`.
+ 3. Otherwise return the mask beside a [`port_opt_view`](@ref) of each of the three at `findall(imsk)`.
+
+# Arguments
+
+  - $(arg_dict[:pr])
+  - `opt::JuMPOptimiser`: JuMP optimiser configuration, holding every constraint estimator the caller stated over the full universe.
+  - $(arg_dict[:rd])
+
+# Returns
+
+  - `(imsk, pr, opt, rd)`: The Investable Mask and the three reduced to it, or `nothing` and the three unchanged.
+
+# Related
+
+  - [`investable_mask`](@ref)
+  - [`investable_view`](@ref)
+  - [`processed_jump_optimiser_attributes`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+function investable_reduction(pr::AbstractPriorResult, opt::JuMPOptimiser,
+                              rd::ReturnsResult)
+    return investable_reduction(investable_mask(pr), pr, opt, rd)
+end
+function investable_reduction(::Nothing, pr::AbstractPriorResult, opt::JuMPOptimiser,
+                              rd::ReturnsResult)
+    return nothing, pr, opt, rd
+end
+function investable_reduction(imsk::BitVector, pr::AbstractPriorResult, opt::JuMPOptimiser,
+                              rd::ReturnsResult)
+    idx = findall(imsk)
+    return imsk, port_opt_view(pr, idx), port_opt_view(opt, idx, pr.X),
+           port_opt_view(rd, idx)
 end
 """
     processed_jump_optimiser_attributes(
@@ -1166,6 +1344,12 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
     rd = returns_result_picker(rd, opt.brt)
     assert_universe_axis_order(opt.sets, rd)
     pr = prior(opt.pe, rd; dims = dims)
+    # The prior fits on the coverage universe and returns a result on the full asset
+    # universe, where an asset it could not estimate carries `NaN`. Reduce once, here:
+    # every builder below then states its constraint over the investable assets alone, on
+    # inputs `port_opt_view` has sliced by the same index. The weights are expanded back
+    # in `JuMPOptimisationResult`.
+    imsk, pr, opt, rd = investable_reduction(pr, opt, rd)
     X = pr.X
     datatype = eltype(X)
     wb = weight_bounds_constraints(opt.wb, opt.sets; N = size(X, 2), strict = opt.strict,
@@ -1175,7 +1359,8 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
     lcsr = linear_constraints(opt.lcse, opt.sets; datatype = datatype, strict = opt.strict,
                               rr = pr.rr, rd = rd)
     ctr = centrality_constraints(opt.cte, pr; iv = rd.iv, ivpa = rd.ivpa, rd = rd,
-                                 x_src = opt.x_src, z_src = opt.z_src, kwargs...)
+                                 x_src = opt.x_src, z_src = opt.z_src, strict = opt.strict,
+                                 kwargs...)
     gcardr = linear_constraints(opt.gcarde, opt.sets; datatype = Int, strict = opt.strict)
     sgcardr = linear_constraints(opt.sgcarde, opt.sets; datatype = Int, strict = opt.strict)
     if opt.smtx === opt.sgmtx
@@ -1212,7 +1397,7 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
                                             sgcardr = sgcardr, smtx = smtx, sgmtx = sgmtx,
                                             slt = slt, sst = sst, sglt = sglt, sgst = sgst,
                                             tn = tn, fees = fees, plr = plr, ret = ret,
-                                            sca = opt.sca)
+                                            sca = opt.sca, imsk = imsk)
 end
 """
     no_bounds_optimiser(opt::JuMPOptimiser, args...) -> JuMPOptimiser
@@ -1301,7 +1486,11 @@ function jump_optimiser_from_attributes(opt::JuMPOptimiser,
     rename = (; pr = :pe, lcsr = :lcse, ctr = :cte, gcardr = :gcarde, sgcardr = :sgcarde,
               plr = :ple)
     of = fieldnames(JuMPOptimiser)
-    af = fieldnames(ProcessedJuMPOptimiserAttributes)
+    # `imsk` is the one bundle field that is not a constraint result: it is the Investable
+    # Mask the reduction derived, and `JuMPOptimiser` declares no slot for it. A sub-problem
+    # built from this optimiser reads an already-reduced prior, so it derives no mask of its
+    # own and needs none carried in.
+    af = filter(!=(:imsk), fieldnames(ProcessedJuMPOptimiserAttributes))
     base = NamedTuple{of}(getfield.(opt, of))
     overrides = NamedTuple{map(f -> get(rename, f, f), af)}(getfield.(attrs, af))
     return JuMPOptimiser(; merge(base, overrides)...)
@@ -1462,8 +1651,14 @@ and can be capped.
   - $(arg_dict[:model])
   - `optimiser::JuMPOptimisationEstimator`: Dispatch object for risk, tracking, and custom
     constraint builders.
-  - `opt::JuMPOptimiser`: Supplies scalar settings (`l2c`, `linfc`, `l1`, `l2`, `linf`, `lp`,
-    `card`, `scard`, `tr`, `ccnt`, `sca`, `ss`).
+  - `opt::JuMPOptimiser`: Supplies scalar settings (`l2c`, `lpc`, `linfc`, `l1`, `l2`,
+    `lp`, `linf`, `card`, `scard`, `tr`, `ccnt`, `sca`, `ss`). The four regularisation
+    coefficients and the three norm ceilings are the one place a **Calibration Rule**
+    reaches the model builders, so they are resolved against `attrs.pr` here rather than
+    by [`processed_jump_optimiser_attributes`](@ref): the bundle carries no slot for them
+    and this is where both the prior result and the optimiser are in hand. A ceiling is
+    read against one norm order, so each of the three sites states its own order in the
+    [`CalibrationContext`](@ref) it resolves the slot against.
   - `attrs::ProcessedJuMPOptimiserAttributes`: Pre-computed constraint and prior bundle
     produced by [`processed_jump_optimiser_attributes`](@ref).
   - $(arg_dict[:rd])
@@ -1506,13 +1701,31 @@ function assemble_jump_model!(model::JuMP.Model, optimiser::JuMPOptimisationEsti
                           opt.ss)
     set_turnover_constraints!(model, tn)
     set_tracking_error_constraints!(model, pr, opt.tr, optimiser, plr, fees, b1; rd = rd)
-    set_weight_norm_2_constraints!(model, opt.l2c)
-    set_weight_norm_p_constraints!(model, opt.lpc)
-    set_weight_norm_inf_constraints!(model, opt.linfc)
-    set_l1_regularisation!(model, opt.l1)
-    set_l2_regularisation!(model, opt.l2)
-    set_linf_regularisation!(model, opt.linf)
-    set_lp_regularisation!(model, opt.lp)
+    # The three norm ceilings each take a Calibration Rule, and each resolves here. A
+    # ceiling is read against one norm order, which belongs to the constraint and not to
+    # the rule, so each site states its own order in the context. `lpc` holds estimators
+    # and carries one order per term, so it goes through `norm_ceiling_factory`.
+    #
+    # These four slots are the ones that reach the model raw. Every other slot is rebuilt
+    # by its owner's constructor, which states the range of the number. There is no term to
+    # rebuild here, so each of the four builders states the range of the number it is
+    # handed, whatever produced it.
+    l2c = resolve_calibration_slot(opt.l2c, :l2c, pr, pr.w, opt.slv,
+                                   CalibrationContext(; p = 2))
+    linfc = resolve_calibration_slot(opt.linfc, :linfc, pr, pr.w, opt.slv,
+                                     CalibrationContext(; p = Inf))
+    set_weight_norm_2_constraints!(model, l2c)
+    set_weight_norm_p_constraints!(model, norm_ceiling_factory(opt.lpc, pr, opt.slv))
+    set_weight_norm_inf_constraints!(model, linfc)
+    # The four regularisation coefficients are the ambiguity radii of the four ground
+    # metrics, so each takes a Calibration Rule and each resolves here, against the
+    # optimisation's own prior result and effective solver. `l2` and `lp` hold estimators,
+    # so their own `factory` methods resolve them; `l1` and `linf` hold the number itself.
+    set_l1_regularisation!(model, resolve_calibration_slot(opt.l1, :l1, pr, pr.w, opt.slv))
+    set_l2_regularisation!(model, factory(opt.l2, pr, opt.slv))
+    set_lp_regularisation!(model, factory(opt.lp, pr, opt.slv))
+    set_linf_regularisation!(model,
+                             resolve_calibration_slot(opt.linf, :linf, pr, pr.w, opt.slv))
     set_non_fixed_fees!(model, fees)
     set_risk_and_scalarise!(model, r, optimiser, opt, pr, plr, fees, b1; rd = rd)
     set_return_constraints!(model, ret, obj, pr; rd = rd)

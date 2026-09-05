@@ -768,3 +768,233 @@ algorithm names it cites are retired. `GradedNeighbourhood` is now `Proximity`, 
 member, and `BinaryNeighbourhood` is `Proximity(; decay = NoDecay())`. The neighbourhood's *reach*
 moved further still: it is `NetworkEstimator.sep`, on the source rather than on the producer, because
 the phylogeny constraint path receives nothing but the estimator.
+
+## Amendment (2026-09-05): the carrier holds an Asset Panel, and the Feature Matrix is derived from it
+
+Map [#802](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/802) reworks the
+feature-distance stack from zero, and its first decision,
+[#803](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/803), changes what a data
+carrier holds. This amendment records the change against the decisions above. The rest of the
+stack (the producers, `z_src`, the selector, the collapse) is amended by the map's later tickets.
+
+**The carrier no longer holds a matrix.** `nz` and `Z` leave `ReturnsResult` and `PricesResult`.
+Each holds one field, `pnl`, an `AssetPanel`: a vector of Panel Fields, each of which owns its
+values and its observed mask, plus the two universe masks in the time-varying shape. ADR 0102 owns
+the panel's shape.
+
+**Decision 1 stands, and its symbol moves.** The word is still *feature*, and the matrix a
+distance measures is still the Feature Matrix. But the matrix is now **derived**: one verb stacks
+the Panel Fields a selector names into `assets × features` or `observations × assets × features`,
+one-hot for a categorical field and `0`/`1` for an observed mask. `Z` names that derived matrix
+inside the distance kernels, and nothing stores it. So the sentence "the matrix rides on the
+result beside the returns" now reads "the panel rides on the result beside the returns, and the
+matrix is stacked from it at the point of use".
+
+**Decision 2 stands, and moves onto the panel.** Both shapes are admitted, and `ndims` of a
+field's values is the switch. A static panel has no masks; a time-varying one has both.
+
+**Decision 4 changes form.** Squareness is no longer `nz == nx` over a whole axis. An adjacency is
+one tensor Panel Field whose labels are the asset names, and an asset view slices its label axis
+when the labels equal `nx`. The fold ticket of map #802 states the view.
+
+**Decision 6's prior carrier is deleted.** `LowOrderPrior.Z` goes, and with it the second carrier
+of the feature matrix. The prior carrier's role, a producer that runs on the prior, moves onto the
+distance estimator itself; the producer ticket of map #802 records that seam. `Pr_RR` stays for
+`x_src`.
+
+**The fifth amendment's collapse gains a visible question.** `collapse_feature_matrix` wrote
+`W' * Z`, so a one-hot level became a membership fraction and a mask a coverage fraction, and the
+field index still said *categorical*. With per-field storage, a categorical field holds integer
+codes, and a convex combination of codes means nothing. The fold ticket must say what a collapsed
+categorical field is. Nothing here decides it.
+
+## Amendment (2026-09-05): a producer is configuration on the distance, and returns a static Asset Panel
+
+Map [#802](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/802)'s second decision,
+[#804](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/804), decides where a
+*derived* feature source lives, now that the prior carrier of decision 6 is gone. The maintainer
+set the ground rule for the ticket: judge every option from zero, on architecture,
+maintainability, ergonomics and performance, and give what exists no weight.
+
+**The producer moves onto the distance estimator.** `FeatureDistance` gains one slot, `ape`,
+bound to `Option{<:AbstractAssetPanelEstimator}`. `nothing` reads the panel on the data carrier.
+A producer builds a panel at the point of use, from the prior result and the returns of the
+subproblem that runs it. Both values are configuration, so the founding argument of this ADR
+holds unchanged: the estimator holds no data, a view passes it through, and a fold refits it.
+The slot admits no literal. A caller with a hand-made matrix builds a static panel with
+`asset_panel` and puts it on the carrier, where it has field names and where the view rule of
+ADR 0102 already acts on it. A literal matrix and a literal panel on the estimator were both
+rejected: each puts data on an estimator, and each would need a view method and a square-case
+rule beside the panel's own.
+
+**A producer returns a static `AssetPanel` with one tensor field.** `RegressionPanel` returns
+the field `"loadings"` on the axis `"factor"`, holding `pr.rr.L`. `PhylogenyPanel` returns the
+field `"proximity"` on the axis `"asset"`, holding the proximity matrix of its `pl` and `alg`
+over the subproblem's returns. One tensor field was chosen over one numeric field per factor: a
+loadings matrix is one quantity with a labelled axis, the panel has a type for it, and it is the
+shape map #643's exposure history already takes.
+
+**The labels come off the data carrier by dispatch, and are positional otherwise.** A proximity
+field is labelled by `rd.nx`. A loadings field is labelled by `rd.nf` when the result is a
+`Regression` whose loadings are the raw `M`. Every other case is labelled `"1"` to `"K"`: a
+reduced or re-based `L`, a `CrossSectionalFactorModel` whose factors are exposures that no data
+names, and a call that hands a prior with no data carrier. Labels on the producer as
+configuration were rejected, because they restate what the carrier holds; positional labels
+everywhere were rejected, because they leave the factor axis unnamed where a name exists.
+
+**The carriers reach the kernel as two keywords.** Every consumer calls
+`cor_and_dist(de, ce, X; dims, kwargs...)`, and the keyword tail is open. The forwarders that
+take a prior result pass `pr` and `rd` through it. The kernel's three-argument entry is
+`cor_and_dist(de::FeatureDistance, ::Any, X; pr = nothing, rd = nothing, kwargs...)`, and one
+verb, `asset_panel(ape, pr, rd, X)`, resolves the source by dispatch on the slot, the prior and
+the carrier. `nothing` with a data carrier in either slot answers `rd.pnl`; `nothing` with a
+prior alone raises an `IsNothingError`; `RegressionPanel` with no prior raises one that names the
+site. Preselection passes `rd` alone. A forwarder that picked the panel and passed it with the
+prior was rejected: it splits the resolution across two places and puts the carrier's names out
+of the producer's reach.
+
+**What goes, and why.** `FeaturePrior` existed to attach a literal to a prior; the literal is
+refused and the producer has a home, so it goes. `z_src` picked between two carriers of one
+matrix; there is one carrier, so it goes from the three optimiser structs, and
+`feature_matrix_picker` and `carrier_feature_names` go with it. `feature_estimator_view` viewed
+a literal; nothing on the estimator needs a view. `Pr_RR` stays, because `x_src` stays. The third
+amendment's rule for preselection stands: `ClusterGroups` reads the data carrier and carries no
+source selector.
+
+**The regression producer reads both regression results unchanged.** `Regression` and
+`CrossSectionalFactorModel` are both an `AbstractLoadingsRegressionResult`, and both swap an unset
+`L` to `M`, so `pr.rr.L` resolves for the time-series prior and for map #643's cross-sectional
+prior with one method. This closes the `Z` bridge question map #643 handed to map #802.
+
+The name set follows the library's rule that a type is named for what it makes and a field for
+the type it holds: `AbstractAssetPanelEstimator`, `ape`, `asset_panel`, `RegressionPanel`,
+`PhylogenyPanel`. `CONTEXT.md` §2 replaces **Feature Matrix Estimator** with **Asset Panel
+Estimator**, and §3.8 re-cuts **Phylogeny Features**. The build is
+[#810](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/810).
+
+## Amendment (2026-09-05): the selector reads one namespace, and one verb stacks the Feature Matrix
+
+Map [#802](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/802)'s third decision,
+[#805](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/805), decides what
+`FeatureDistance.sel` names, now that the carrier holds an Asset Panel (the seventh amendment) and
+a producer returns one (the eighth). Every option was judged from zero, on architecture,
+maintainability, ergonomics and performance.
+
+**One namespace: the Panel Fields of the panel the distance measures.** An entry of `sel` takes one
+of four forms, read by dispatch on its type.
+
+- A field name, `"mcap"`. It expands to the field's value columns: one for a numeric field, one
+  per level for a categorical field, one per label for a tensor field.
+- A field paired with the levels or labels it keeps, `"industry" => ["Tech", "Energy"]` or
+  `"loadings" => ["MKT", "SMB"]`.
+- A field paired with one level or label, `"industry" => "Tech"`. This is the one-element case of
+  the vector form, and it is the form a column label takes.
+- A field paired with `:observed`, `"mcap" => :observed`. It gives the field's observed mask as one
+  `0`/`1` column.
+
+Mixed entries in one vector are admitted, and the order of the vector is the column order the
+metric reads. `nothing` stacks the values of every field in panel order, and no mask. A bare name
+never includes the mask. The mask is a fact about the fill, and the values are a fact about the
+asset, so a fill policy the caller adds does not move the distance.
+
+**No integer entry.** The integer existed for a carrier with no names (decision 6). Every Panel
+Field has a name, every level and every label has a string, and a produced panel is labelled off
+the carrier or positionally (the eighth amendment), so no column the stack can make is nameless.
+
+**`sets` leaves the estimator, and the precedence rule goes with it.** A taxonomy enters the panel
+as a categorical Panel Field named after its key, which the taxonomy ticket of map #802 owns. The
+caller who selected a taxonomy block by key writes the field name, `sel = ["sector"]`. There are no
+longer two namespaces to order.
+
+**`strict` keeps the library rule.** An absent field name, level or label is droppable: it warns
+and drops under `strict = false`, and throws under `strict = true`, through `strict_diagnostic`. A
+view never removes a Panel Field or a declared level, and it does slice a tensor field's label axis
+in the square case, so a label is the one absence a fold causes, and `strict = true` is how a
+caller demands the same selection in every fold. The `did_you_mean` pool is the namespace the entry
+resolves in: the field names for a field entry, and the field's levels or labels for a paired
+entry. `:observed` on a field with no observed mask gives a column of ones, because `nothing` in
+`omsk` means every cell was observed. Construction refuses any other entry form, an empty vector,
+an empty label vector and a duplicated entry. Two entries that expand to the same column are
+refused at resolution, and a selector that drops every entry raises an `IsEmptyError`.
+
+**Decision 4's square case has no special case in the selector.** A subset of an adjacency field's
+labels keeps every row and cuts the columns to the named assets, so every asset is measured against
+the named assets alone. The comparison of the labels against `nx` lives in the view alone, which
+the fold ticket of map #802 owns.
+
+**Three verbs, one resolution.** `select_fields(pnl, sel, strict)` resolves the selector once, and
+is unexported. `feature_matrix(pnl, sel = nothing; strict = false)` stacks the resolved entries into
+`assets × features` for a static panel and `observations × assets × features` for a time-varying
+one, and returns the matrix alone. The kernel calls it with `de.sel` and `de.strict`.
+`feature_labels(pnl, sel = nothing; strict = false)` returns one label per column, and a label is
+the selector entry that selects exactly that column: `"mcap"`, `"industry" => "Tech"`,
+`"loadings" => "MKT"`, `"mcap" => :observed`. A label vector is therefore a valid selector that
+rebuilds the same matrix, which is what a result that records what it measured needs. The kernel
+never allocates labels it does not read.
+
+Four alternatives were rejected. One verb returning `(Z, labels)` allocates labels on every
+distance call that nothing reads. A matrix-only surface leaves a one-hot column with no name a
+caller can read back. A typed entry, `FieldSelection(name; keep, observed)`, is a second concept
+with no library precedent, where the asset-sets program already spells `"key" => "group"`. A
+string convention, `"industry=Tech"` and `"mcap::observed"`, is the pair of conventions ADR 0102
+removed from the panel.
+
+The verbs derive from the panel and live beside it in `03_InputData`. `feature_matrix` and
+`feature_labels` are exported. `CONTEXT.md` §2 gains **Feature Selector**, and §3.7 re-cuts
+**Feature Distance**. The build is
+[#811](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/811).
+
+## Amendment (2026-09-05): a taxonomy is a categorical Panel Field, and the graded program is deleted
+
+Map [#802](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/802)'s fourth decision,
+[#806](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/806), decides how a taxonomy
+reaches the distance now that the carrier holds an Asset Panel (the seventh amendment), a producer
+returns one (the eighth) and the selector reads the panel's fields (the ninth). Every option was
+judged from zero, on architecture, maintainability, ergonomics and performance.
+
+**A `UniverseSets` key is one Panel Field, through one bridge.** `panel_input(sets, key)` returns
+the raw input `asset_panel` already reads: a `CategoricalPanelInput` for a string-valued key and a
+`NumericPanelInput` for a number-valued key, by dispatch on the key's element type. A key of mixed
+element type is refused. `panel_input(sets, keys)` maps the same rule over a vector. In both forms
+an entry `key => InputType` forces the type, and there is no `kind` keyword; the scalar form takes
+`name`, `levels` and `alg`, which the vector form does not. The field is named by the key with the
+`xkey` prefix and its underscore stripped, `"nx_sector"` to `"sector"`, because every field of a
+panel is asset-parallel by construction and the prefix says nothing there. A nested taxonomy is
+several keys, so several fields. The bridge lives after `UniverseSets` in the load order. A second
+`asset_panel` entry over keys alone was rejected because it cannot put a taxonomy beside a
+fundamentals table; constructor methods on the two input types were rejected because they write
+the element-type rule twice.
+
+**A static input joins a time-varying panel by a lazy lift, at build.** `asset_panel` builds a
+time-varying panel when any input is time-varying **or** when `amsk` and `emsk` are given, and it
+lifts each static input to that observation count through one unexported, Base-only array type
+that stores the static array once and indexes a leading observation axis. A lifted field carries no
+observed mask, because every cell was observed. An all-static input set with no masks builds a
+static panel, as ADR 0102 states. Lifting at read, where every reader of a field accepts both
+shapes, was rejected because it spreads one rule over every read site; an eager lift was rejected
+because it copies what the lazy one indexes; a `T` keyword was rejected because the masks already
+say that the panel has observations.
+
+**The graded edge-authoring program is deleted.** Every matrix the fourth amendment's grammar
+writes is one static `assets × nodes` matrix, and a static `TensorPanelInput` holds any such
+matrix with the node list as its labels: a scaled block, a cross edge, an asset node, a mixed axis
+and an all-zero row are all cells of a matrix the caller authors as data. So the grammar was a
+second way to state a field the panel takes as an input, and it declared its axis on a type no
+other panel input reads. `AssetSetsFeatures`, `asset_sets_features`, `Scale`,
+`AbstractFeatureValue`, `UniverseSets.zkey` and `feature_universe` have no reader and go with it.
+`UniverseSets` returns to two declared axis families, assets and factors, and the fourth
+amendment's constructor change is reversed. A numeric taxonomy key, which the grammar wrote as an
+asset's own number, enters as a numeric Panel Field through the bridge. Keeping the grammar as a
+builder of one tensor input was rejected because it keeps a parser, a resolution order and three
+documented hazards beside an input that admits the same matrix with none of them.
+
+**A taxonomy reaches map #643's cross-sectional prior through the ordinary categorical field.**
+The one-hot exposure reads a categorical field's codes and levels, and a lifted field has both. A
+consumer that reads the masks dispatches on the mask type, so a static panel is refused there by
+dispatch, and the refusal names the masks as the lift.
+
+The fourth amendment above is released history and stands as written. `CONTEXT.md` §2 loses
+**Feature Program**, §4.4's **Universe Sets** loses the feature axis, and **Asset Panel** states
+the bridge and the lift. The lift is built by
+[#809](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/809), and the bridge and the
+deletions by [#810](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/810).

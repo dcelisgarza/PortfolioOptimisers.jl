@@ -1072,7 +1072,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     OrderedWeightsArrayConditionalValueatRisk(;
-        alpha::Number = 0.05
+        alpha::Num_SigCal = 0.05
     ) -> OrderedWeightsArrayConditionalValueatRisk
 
 Keywords correspond to the struct's fields.
@@ -1107,14 +1107,16 @@ OrderedWeightsArrayConditionalValueatRisk
     $(field_dict[:alpha])
     """
     alpha
-    function OrderedWeightsArrayConditionalValueatRisk(alpha::Number)
+    function OrderedWeightsArrayConditionalValueatRisk(alpha::Num_SigCal)
         assert_unit_interval(alpha, :alpha)
         return new{typeof(alpha)}(alpha)
     end
 end
-function OrderedWeightsArrayConditionalValueatRisk(; alpha::Number = 0.05)
+function OrderedWeightsArrayConditionalValueatRisk(; alpha::Num_SigCal = 0.05)
     return OrderedWeightsArrayConditionalValueatRisk(alpha)
 end
+# Calibration slots — see `calibration_slots`.
+calibration_slots(x::OrderedWeightsArrayConditionalValueatRisk) = (; alpha = x.alpha)
 function (r::OrderedWeightsArrayConditionalValueatRisk)(T::Integer)
     return owa_cvar(T, r.alpha)
 end
@@ -1212,7 +1214,7 @@ $(DocStringExtensions.FIELDS)
 
     OrderedWeightsArrayTailGini(;
         alpha_i::Number = 1e-4,
-        alpha::Number = 0.05,
+        alpha::Num_SigCal = 0.05,
         a_sim::Integer = 100
     ) -> OrderedWeightsArrayTailGini
 
@@ -1259,17 +1261,28 @@ OrderedWeightsArrayTailGini
     $(field_dict[:a_sim])
     """
     a_sim
-    function OrderedWeightsArrayTailGini(alpha_i::Number, alpha::Number, a_sim::Integer)
-        @argcheck(0 < alpha_i < alpha < 1,
-                  DomainError("0 < alpha_i < alpha < 1 must hold. Got\nalpha_i => $alpha_i\nalpha => $alpha"))
+    function OrderedWeightsArrayTailGini(alpha_i::Number, alpha::Num_SigCal, a_sim::Integer)
+        # The joint bound is the whole of the ordering validation, and it can only run
+        # where `alpha` is a number. A rule states no value at construction, so `alpha_i`
+        # is checked on its own here and the pair is checked again when the rebuild runs at
+        # fold time, against the number the rule returned.
+        if isa(alpha, Number)
+            @argcheck(0 < alpha_i < alpha < 1,
+                      DomainError("0 < alpha_i < alpha < 1 must hold. Got\nalpha_i => $alpha_i\nalpha => $alpha"))
+        else
+            assert_unit_interval(alpha_i, :alpha_i)
+        end
         @argcheck(0 < a_sim, DomainError("a_sim must be positive. Got\n a_sim => $a_sim"))
         return new{typeof(alpha_i), typeof(alpha), typeof(a_sim)}(alpha_i, alpha, a_sim)
     end
 end
-function OrderedWeightsArrayTailGini(; alpha_i::Number = 1e-4, alpha::Number = 0.05,
+function OrderedWeightsArrayTailGini(; alpha_i::Number = 1e-4, alpha::Num_SigCal = 0.05,
                                      a_sim::Integer = 100)
     return OrderedWeightsArrayTailGini(alpha_i, alpha, a_sim)
 end
+# Calibration slots — see `calibration_slots`. `alpha_i` is a starting point of the inner
+# integration, not a quantity to estimate, so it is not one of them.
+calibration_slots(x::OrderedWeightsArrayTailGini) = (; alpha = x.alpha)
 function (r::OrderedWeightsArrayTailGini)(T::Integer)
     return owa_tg(T; alpha_i = r.alpha_i, alpha = r.alpha, a_sim = r.a_sim)
 end
@@ -1364,8 +1377,8 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     OrderedWeightsArrayConditionalValueatRiskRange(;
-        alpha::Number = 0.05,
-        beta::Number = alpha
+        alpha::Num_SigCal = 0.05,
+        beta::Num_SigCal = alpha
     ) -> OrderedWeightsArrayConditionalValueatRiskRange
 
 Keywords correspond to the struct's fields.
@@ -1406,15 +1419,20 @@ OrderedWeightsArrayConditionalValueatRiskRange
     $(field_dict[:beta])
     """
     beta
-    function OrderedWeightsArrayConditionalValueatRiskRange(alpha::Number, beta::Number)
+    function OrderedWeightsArrayConditionalValueatRiskRange(alpha::Num_SigCal,
+                                                            beta::Num_SigCal)
         assert_unit_interval(alpha, :alpha)
         assert_unit_interval(beta, :beta)
         return new{typeof(alpha), typeof(beta)}(alpha, beta)
     end
 end
-function OrderedWeightsArrayConditionalValueatRiskRange(; alpha::Number = 0.05,
-                                                        beta::Number = alpha)
+function OrderedWeightsArrayConditionalValueatRiskRange(; alpha::Num_SigCal = 0.05,
+                                                        beta::Num_SigCal = alpha)
     return OrderedWeightsArrayConditionalValueatRiskRange(alpha, beta)
+end
+# Calibration slots — see `calibration_slots`. One slot per tail, each with its own role.
+function calibration_slots(x::OrderedWeightsArrayConditionalValueatRiskRange)
+    return (; alpha = x.alpha, beta = x.beta)
 end
 function (r::OrderedWeightsArrayConditionalValueatRiskRange)(T::Integer)
     return owa_cvarrg(T; alpha = r.alpha, beta = r.beta)
@@ -1502,10 +1520,10 @@ $(DocStringExtensions.FIELDS)
 
     OrderedWeightsArrayTailGiniRange(;
         alpha_i::Number = 1e-4,
-        alpha::Number = 0.05,
+        alpha::Num_SigCal = 0.05,
         a_sim::Integer = 100,
         beta_i::Number = alpha_i,
-        beta::Number = alpha,
+        beta::Num_SigCal = alpha,
         b_sim::Integer = a_sim
     ) -> OrderedWeightsArrayTailGiniRange
 
@@ -1569,24 +1587,39 @@ OrderedWeightsArrayTailGiniRange
     $(field_dict[:b_sim])
     """
     b_sim
-    function OrderedWeightsArrayTailGiniRange(alpha_i::Number, alpha::Number,
-                                              a_sim::Integer, beta_i::Number, beta::Number,
-                                              b_sim::Integer)
-        @argcheck(0 < alpha_i < alpha < 1,
-                  DomainError("0 < alpha_i < alpha < 1 must hold. Got\nalpha_i => $alpha_i\nalpha => $alpha"))
+    function OrderedWeightsArrayTailGiniRange(alpha_i::Number, alpha::Num_SigCal,
+                                              a_sim::Integer, beta_i::Number,
+                                              beta::Num_SigCal, b_sim::Integer)
+        # Each joint bound runs where its outer level is a number, on the terms the scalar
+        # tail-Gini type states. A rule states no value at construction, so its inner bound
+        # is checked on its own here and the pair is checked at fold time.
+        if isa(alpha, Number)
+            @argcheck(0 < alpha_i < alpha < 1,
+                      DomainError("0 < alpha_i < alpha < 1 must hold. Got\nalpha_i => $alpha_i\nalpha => $alpha"))
+        else
+            assert_unit_interval(alpha_i, :alpha_i)
+        end
         @argcheck(0 < a_sim, DomainError("a_sim must be positive. Got\n a_sim => $a_sim"))
-        @argcheck(0 < beta_i < beta < 1,
-                  DomainError("0 < beta_i < beta < 1 must hold. Got\nbeta_i => $beta_i\nbeta => $beta"))
+        if isa(beta, Number)
+            @argcheck(0 < beta_i < beta < 1,
+                      DomainError("0 < beta_i < beta < 1 must hold. Got\nbeta_i => $beta_i\nbeta => $beta"))
+        else
+            assert_unit_interval(beta_i, :beta_i)
+        end
         @argcheck(0 < b_sim, DomainError("b_sim must be positive. Got\n b_sim => $b_sim"))
         return new{typeof(alpha_i), typeof(alpha), typeof(a_sim), typeof(beta_i),
                    typeof(beta), typeof(b_sim)}(alpha_i, alpha, a_sim, beta_i, beta, b_sim)
     end
 end
-function OrderedWeightsArrayTailGiniRange(; alpha_i::Number = 1e-4, alpha::Number = 0.05,
-                                          a_sim::Integer = 100, beta_i::Number = alpha_i,
-                                          beta::Number = alpha, b_sim::Integer = a_sim)
+function OrderedWeightsArrayTailGiniRange(; alpha_i::Number = 1e-4,
+                                          alpha::Num_SigCal = 0.05, a_sim::Integer = 100,
+                                          beta_i::Number = alpha_i,
+                                          beta::Num_SigCal = alpha, b_sim::Integer = a_sim)
     return OrderedWeightsArrayTailGiniRange(alpha_i, alpha, a_sim, beta_i, beta, b_sim)
 end
+# Calibration slots — see `calibration_slots`. The two inner starting points are not
+# quantities to estimate, so neither is one of them.
+calibration_slots(x::OrderedWeightsArrayTailGiniRange) = (; alpha = x.alpha, beta = x.beta)
 function (r::OrderedWeightsArrayTailGiniRange)(T::Integer)
     return owa_tgrg(T; alpha_i = r.alpha_i, alpha = r.alpha, a_sim = r.a_sim,
                     beta_i = r.beta_i, beta = r.beta, b_sim = r.b_sim)
@@ -2013,6 +2046,69 @@ function OrderedWeightsArray(; settings::RiskMeasureSettings = RiskMeasureSettin
                              alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray())
     return OrderedWeightsArray(settings, w, alg)
 end
+# Deferrable slots — see `deferred_slots`. The weight builder carries them, so both the
+# check and the derived recursion in `resolve_deferred_quantities` reach a builder's own
+# `alpha` through `w`. A weight vector and a plain function defer nothing, so the recursion
+# is the identity for them.
+deferred_slots(r::OrderedWeightsArray) = (; w = r.w)
+"""
+    const OWA_RevFunc = ComposedFunction{typeof(reverse),
+                                         <:AbstractOrderedWeightsArrayFunction}
+
+The reversal of an ordered-weights builder, which is what [`OrderedWeightsArrayRange`](@ref) stores in `w2` under the approximate formulation.
+
+It is a `Function` and it computes no quantity, so it is the one occupant of a weight slot that a reader of the calibration channel must part from a **Calibration Rule**. The name is written once here, because the type is long and three sites read it.
+
+# Related
+
+  - [`OrderedWeightsArrayRange`](@ref)
+  - [`OWA_CalOccupant`](@ref)
+  - [`AbstractOrderedWeightsArrayFunction`](@ref)
+"""
+const OWA_RevFunc = ComposedFunction{typeof(reverse), <:AbstractOrderedWeightsArrayFunction}
+"""
+    const OWA_CalOccupant = Union{<:AbstractOrderedWeightsArrayFunction, <:OWA_RevFunc}
+
+The occupants of an [`OrderedWeightsArray`](@ref) weight slot that carry a calibration slot of their own: a weight builder, and the reversal of one that the Range container builds.
+
+The slot also takes a weight vector and a caller's own plain function, and neither carries a slot. Neither is therefore named in [`calibration_slots`](@ref), and the distinction matters because a plain function standing in a calibration slot **is** a Calibration Rule everywhere else in the library. The rule is what [`resolve_calibration_slot`](@ref) calls and what [`assert_calibrated_slots`](@ref) refuses, so a weight builder written as a plain function must not reach either.
+
+# Related
+
+  - [`OrderedWeightsArray`](@ref)
+  - [`OrderedWeightsArrayRange`](@ref)
+  - [`OWA_RevFunc`](@ref)
+  - [`calibration_slots`](@ref)
+"""
+const OWA_CalOccupant = Union{<:AbstractOrderedWeightsArrayFunction, <:OWA_RevFunc}
+# A reversed builder is a `Function` and computes no quantity, so it withdraws itself from
+# the rule marker — see `is_calibration_rule`.
+is_calibration_rule(::OWA_CalOccupant) = false
+# Calibration slots — see `calibration_slots`. The container states no quantity of its own;
+# it names the child, and the child names its own slots. Only a builder carries a slot, so
+# only a builder is named: a weight vector and a caller's own plain function carry none, and
+# a plain function standing in a calibration slot IS a rule everywhere else in the library.
+# The occupant's type is a type parameter, so the branch folds.
+calibration_slots(r::OrderedWeightsArray) = isa(r.w, OWA_CalOccupant) ? (; w = r.w) : (;)
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve the weight builder in `w` against prior result `pr`, and return an [`OrderedWeightsArray`](@ref) whose builder holds numbers.
+
+The measure carries no propagation tag, so it generates no prior [`factory`](@ref) method of its own and this is the channel the value-level entry points take. The `JuMP` route reaches the same recursion through [`set_risk_constraints!`](@ref), which calls [`resolve_deferred_quantities`](@ref) directly.
+
+A builder holding numbers, a weight vector and a plain function are all carried through unchanged, so the common case allocates nothing.
+
+# Related
+
+  - [`OrderedWeightsArray`](@ref)
+  - [`resolve_deferred_quantities`](@ref)
+  - [`deferred_slots`](@ref)
+  - [`expected_risk`](@ref)
+"""
+function factory(x::OrderedWeightsArray, pr::AbstractPriorResult, args...; kwargs...)
+    return resolve_deferred_quantities(x, pr)
+end
 function (r::OrderedWeightsArray)(x::VecNum)
     w = isa(r.w, VecNum) ? r.w : r.w(length(x))
     return LinearAlgebra.dot(w, sort(x))
@@ -2167,6 +2263,57 @@ function OrderedWeightsArrayRange(; settings::RiskMeasureSettings = RiskMeasureS
                                   rev::Bool = false)
     return OrderedWeightsArrayRange(settings, w1, w2, alg, rev)
 end
+# Deferrable slots — see `deferred_slots`. Both builders carry them. `rev` is stored as a
+# done flag, so the positional rebuild of `rebuild_with_slots` passes `true` and reverses
+# nothing a second time.
+deferred_slots(r::OrderedWeightsArrayRange) = (; w1 = r.w1, w2 = r.w2)
+# Calibration slots — see `calibration_slots`. The container names its two children, on the
+# terms the single-builder container above states.
+function calibration_slots(r::OrderedWeightsArrayRange)
+    return merge(isa(r.w1, OWA_CalOccupant) ? (; w1 = r.w1) : (;),
+                 isa(r.w2, OWA_CalOccupant) ? (; w2 = r.w2) : (;))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve the two weight builders of an [`OrderedWeightsArrayRange`](@ref) against prior result `pr`.
+
+It carries the reading of [`factory`](@ref) on [`OrderedWeightsArray`](@ref) unchanged, over two builders instead of one.
+
+# Related
+
+  - [`OrderedWeightsArrayRange`](@ref)
+  - [`OrderedWeightsArray`](@ref)
+  - [`resolve_deferred_quantities`](@ref)
+  - [`deferred_slots`](@ref)
+"""
+function factory(x::OrderedWeightsArrayRange, pr::AbstractPriorResult, args...; kwargs...)
+    return resolve_deferred_quantities(x, pr)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve the weight builder inside the reversal that [`OrderedWeightsArrayRange`](@ref) wraps its `w2` in.
+
+The Range constructor stores `w2` as `reverse ∘ w2` whenever the caller has not already reversed it, so the object the `w2` slot holds is a composition and the builder a rule sits in is its inner half. Without this method the recursion would stop at the composition and a rule in the gain-side builder would never resolve, while the same rule in `w1` did.
+
+The composition is rebuilt around the resolved half, so the reversal survives. The bound names `reverse` and an [`AbstractOrderedWeightsArrayFunction`](@ref), so no other composition reaches it.
+
+# Related
+
+  - [`OrderedWeightsArrayRange`](@ref)
+  - [`resolve_deferred_quantities`](@ref)
+  - [`calibration_slots`](@ref)
+"""
+function resolve_deferred_quantities(x::ComposedFunction{typeof(reverse),
+                                                         <:AbstractOrderedWeightsArrayFunction},
+                                     pr::AbstractPriorResult, slv = nothing)
+    inner = resolve_deferred_quantities(x.inner, pr, slv)
+    return inner === x.inner ? x : reverse ∘ inner
+end
+# Calibration slots — see `calibration_slots`. The reversal states no quantity of its own,
+# so it names the builder it wraps and that builder names its own slots.
+calibration_slots(x::OWA_RevFunc) = (; inner = x.inner)
 # Tail decomposition — see `range_tails`. Declared for the approximate formulation only: the
 # exact one collapses both tails into a single constraint on `w1 - w2`, so it fuses rather
 # than duplicating. `w2` is already reversed by the constructor (`rev` is a done flag), so

@@ -23,8 +23,8 @@ In order to implement a new coskewness estimator which will work seamlessly with
 
 ### Returns
 
-  - `cskew::MatNum`: Coskewness tensor `assets × assets^2`.
-  - `V::MatNum`: Processed coskewness matrix `assets × assets`.
+  - $(ret_dict[:cskew])
+  - $(ret_dict[:cskewV])
 
 ## Factory
 
@@ -118,9 +118,9 @@ abstract type CoskewnessEstimator <: AbstractEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Container type for coskewness estimators.
+Estimates the coskewness tensor of a returns matrix, together with its negative spectral skewness matrix.
 
-`Coskewness` encapsulates the mean estimator, matrix processing estimator, and moment algorithm for coskewness estimation.
+`Coskewness` composes a mean estimator, a matrix processing estimator and a moment algorithm. [`coskewness`](@ref) returns both matrices as a pair: the `assets × assets²` tensor first, and the `assets × assets` matrix that [`negative_spectral_coskewness`](@ref) reduces it to second. The second is not a processed copy of the first.
 
 # Fields
 
@@ -132,7 +132,8 @@ $(DocStringExtensions.FIELDS)
         me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
         mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
         alg::AbstractMomentAlgorithm = FullMoment(),
-        w::Option{<:ObsWeights} = nothing
+        w::Option{<:ObsWeights} = nothing,
+        cache::Option{<:AbstractPartialFitState} = nothing
     ) -> Coskewness
 
 Keywords correspond to the struct's fields.
@@ -147,12 +148,14 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 
   - `me`: Recursively updated via [`factory`](@ref).
   - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+  - `cache`: Carried unchanged via [`factory`](@ref).
 
 ## View parameters
 
 When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
 
   - `me`: Recursively viewed via [`port_opt_view`](@ref).
+  - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
 
 ## Observation weight parameters
 
@@ -160,24 +163,26 @@ When [`obs_weights_view`](@ref) is called on this type, the following fields are
 
   - `me`: Recursively indexed via [`obs_weights_view`](@ref).
   - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).
+  - `cache`: Dropped via [`obs_weights_view`](@ref), because no slice of a state exists on the observation axis.
 
 # Examples
 
 ```jldoctest
 julia> Coskewness()
 Coskewness
-   me ┼ SimpleExpectedReturns
-      │   w ┴ nothing
-   mp ┼ MatrixProcessing
-      │     pdm ┼ Posdef
-      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │      dn ┼ nothing
-      │      dt ┼ nothing
-      │     alg ┼ nothing
-      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-  alg ┼ FullMoment()
-    w ┴ nothing
+     me ┼ SimpleExpectedReturns
+        │   w ┴ nothing
+     mp ┼ MatrixProcessing
+        │     pdm ┼ Posdef
+        │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+        │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+        │      dn ┼ nothing
+        │      dt ┼ nothing
+        │     alg ┼ nothing
+        │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+    alg ┼ FullMoment()
+      w ┼ nothing
+  cache ┴ nothing
 ```
 
 # Related
@@ -214,22 +219,29 @@ Coskewness
     $(field_dict[:oow])
     """
     @wprop w
+    """
+    $(field_dict[:pfcache])
+    """
+    @fprop @vprop cache
     function Coskewness(me::AbstractExpectedReturnsEstimator,
                         mp::AbstractMatrixProcessingEstimator, alg::AbstractMomentAlgorithm,
-                        w::Option{<:ObsWeights})
+                        w::Option{<:ObsWeights}, cache::Option{<:AbstractPartialFitState})
         assert_nonempty_nonneg_finite_val(w, :w)
-        return new{typeof(me), typeof(mp), typeof(alg), typeof(w)}(me, mp, alg, w)
+        return new{typeof(me), typeof(mp), typeof(alg), typeof(w), typeof(cache)}(me, mp,
+                                                                                  alg, w,
+                                                                                  cache)
     end
 end
 function Coskewness(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                     mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                     alg::AbstractMomentAlgorithm = FullMoment(),
-                    w::Option{<:ObsWeights} = nothing)::Coskewness
-    return Coskewness(me, mp, alg, w)
+                    w::Option{<:ObsWeights} = nothing,
+                    cache::Option{<:AbstractPartialFitState} = nothing)::Coskewness
+    return Coskewness(me, mp, alg, w, cache)
 end
 """
     negative_spectral_coskewness(cskew::MatNum, X::MatNum,
-                 mp::AbstractMatrixProcessingEstimator)
+                 mp::Option{<:AbstractMatrixProcessingEstimator})
 
 Internal helper that builds the negative spectral skewness matrix.
 
@@ -255,15 +267,28 @@ Where:
   - ``\\mathbf{V}``: Negative spectral skewness matrix. It is positive semidefinite, because it is a sum of negated negative semidefinite matrices.
   - $(math_dict[:N])
 
+The entry ``\\mathbf{S}_{i,\\,aj}`` is the third comoment of the deviations of the assets ``a``, ``i`` and ``j``. That comoment does not depend on the order of its three assets, which is why the block is symmetric.
+
+# Algorithm
+
+ 1. Read `N` from the row count of `cskew`, and allocate the ``N \\times N`` accumulator `V` of zeros.
+ 2. For each block index `i`, take `coskew_jk`, the view of the columns `(i - 1) * N + 1` to `i * N` of `cskew`.
+ 3. Eigendecompose `coskew_jk`, giving the eigenvalues `vals` and the eigenvectors `vecs`.
+ 4. When `vals` is real, clamp every entry to zero from above, so a non-negative eigenvalue becomes zero and a negative one is kept. Subtract the reconstruction `vecs * Diagonal(vals) * transpose(vecs)` from `V`.
+ 5. When `vals` is complex, clamp the real part and the imaginary part the same way, and subtract the real part of the reconstruction. `LinearAlgebra.eigen` returns a complex spectrum only when round-off leaves the block asymmetric, so this branch is a fallback and not the definition above.
+ 6. Run [`matrix_processing!`](@ref) once, on the accumulated `V`. No block is processed on its own.
+
 # Arguments
 
-  - `cskew`: Coskewness tensor (flattened or block matrix).
-  - `X`: Data matrix (observations × assets).
-  - `mp`: Matrix processing estimator.
+  - `cskew`: Coskewness tensor, `assets × assets²`, laid out as `N` blocks of `N` columns.
+  - `X`: Data matrix (observations × assets). [`matrix_processing!`](@ref) reads it, and the spectral step does not.
+  - $(arg_dict[:omp])
+      + `::AbstractMatrixProcessingEstimator`: The estimator processes the accumulated `V` in-place.
+      + `::Nothing`: No-op. `V` is the raw sum of the negated negative parts.
 
 # Returns
 
-  - `V::Matrix{<:Number}`: Processed coskewness matrix.
+  - $(ret_dict[:cskewV]) It is the ``\\mathbf{V}`` above, so a portfolio's negative quadratic skewness is the quadratic form ``\\boldsymbol{w}^{\\intercal} \\mathbf{V} \\boldsymbol{w}``.
 
 # Related
 
@@ -271,9 +296,14 @@ Where:
   - [`_coskewness`](@ref)
   - [`matrix_processing!`](@ref)
   - [`coskewness`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 7.2.5.1, Equations 7.104 and 7.105.
+  - $(ref_dict[:nskew])
 """
 function negative_spectral_coskewness(cskew::MatNum, X::MatNum,
-                                      mp::AbstractMatrixProcessingEstimator)
+                                      mp::Option{<:AbstractMatrixProcessingEstimator})
     N = size(cskew, 1)
     V = zeros(eltype(cskew), N, N)
     for i in 1:N
@@ -281,7 +311,7 @@ function negative_spectral_coskewness(cskew::MatNum, X::MatNum,
         k = i * N
         coskew_jk = view(cskew, :, j:k)
         vals, vecs = LinearAlgebra.eigen(coskew_jk)
-        if isa(eltype(vals), Number)
+        if eltype(vals) <: Real
             vals .= clamp.(vals, typemin(eltype(cskew)), zero(eltype(cskew)))
             V .-= vecs * LinearAlgebra.Diagonal(vals) * transpose(vecs)
         else
@@ -294,15 +324,15 @@ function negative_spectral_coskewness(cskew::MatNum, X::MatNum,
     return V
 end
 """
-    _coskewness(Y::MatNum, X::MatNum, mp::AbstractMatrixProcessingEstimator, w::Option{<:StatsBase.AbstractWeights}) -> MatNum
+    _coskewness(Y::MatNum, X::MatNum, mp::AbstractMatrixProcessingEstimator, w::Option{<:StatsBase.AbstractWeights}) -> (MatNum, MatNum)
 
-Internal helper for coskewness computation.
+Internal helper that builds the coskewness tensor from a deviation matrix.
 
-`_coskewness` computes the coskewness tensor and applies matrix processing. Used internally by coskewness estimators.
+`_coskewness` returns the tensor together with its negative spectral skewness matrix. The matrix processing estimator runs on the second one alone, inside [`negative_spectral_coskewness`](@ref), and never on the tensor.
 
 # Mathematical definition
 
-Let ``\\mathbf{Y}`` be the ``T \\times N`` matrix of demeaned returns. Define ``\\boldsymbol{z}_t = \\boldsymbol{y}_t \\otimes \\boldsymbol{y}_t`` (Kronecker-style element-wise product). The ``N \\times N^2`` coskewness tensor is:
+The ``N \\times N^{2}`` coskewness tensor is the third comoment matrix of the deviations:
 
 Unweighted:
 
@@ -323,33 +353,49 @@ Weighted:
 
 Where:
 
-  - ``\\hat{\\mathbf{S}}``: ``N \\times N^2`` coskewness tensor.
+  - ``\\hat{\\mathbf{S}}``: ``N \\times N^{2}`` coskewness tensor. Its entry ``\\hat{\\mathbf{S}}_{a,\\,(i-1)N+j}`` is the third comoment of the deviations of the assets ``a``, ``i`` and ``j``, so each of its ``N`` blocks of ``N`` columns is symmetric.
+  - $(math_dict[:Y_dev])
+  - $(math_dict[:y_t_dev])
+  - $(math_dict[:Z_pairprod])
+  - $(math_dict[:w_obs_vec])
+  - $(math_dict[:w_t_obs])
   - $(math_dict[:T])
-  - ``\\mathbf{Y}``: ``T \\times N`` matrix of demeaned returns.
-  - ``\\mathbf{Z}``: Row-wise outer product expansion matrix.
-  - ``\\boldsymbol{y}_t``: Demeaned return vector at time ``t``.
-  - ``\\boldsymbol{w}``: Observation weights vector ``T \\times 1``.
-  - ``w_t``: Observation weight at time ``t``.
+  - $(math_dict[:N])
+  - ``\\boldsymbol{1}``: ``N \\times 1`` vector of ones.
   - ``\\otimes``: Kronecker product.
-  - ``\\odot``: Element-wise (row-wise broadcast) multiplication.
+  - ``\\odot``: Element-wise product. Where the operands differ in shape, it broadcasts along the row axis.
+
+# Algorithm
+
+ 1. Build `o`, the ``1 \\times N`` row of ones.
+ 2. Build `z`, the pairwise expansion `kron(o, Y) ⊙ kron(Y, o)`. Its column `(i - 1) * N + j` is the element-wise product of the columns `i` and `j` of `Y`.
+ 3. Without weights, form `cskew` as `transpose(Y) * z / size(Y, 1)`.
+ 4. With weights, form `cskew` as `transpose(w .* Y) * z / sum(w)`. The weights multiply the left factor alone, so each summand carries one weight and not three.
+ 5. Reduce `cskew` to `V` with [`negative_spectral_coskewness`](@ref), which runs `mp` on the reduced matrix.
+ 6. Return the pair `(cskew, V)`.
 
 # Arguments
 
-  - `Y`: Centered data vector (e.g., `X .- mean`).
-  - `X`: Data matrix (observations × assets).
+  - `Y`: Deviation matrix (observations × assets), already centred by the caller.
+  - `X`: Data matrix (observations × assets). It reaches [`matrix_processing!`](@ref) through [`negative_spectral_coskewness`](@ref).
   - `mp`: Matrix processing estimator.
-  - `w`: Optional observation weights.
+  - `w`: Optional observation weights. The unweighted method takes `nothing` through its `args...`.
 
 # Returns
 
-  - `cskew::Matrix{<:Number}`: Coskewness tensor.
-  - `V::Matrix{<:Number}`: Processed coskewness matrix.
+  - $(ret_dict[:cskew])
+  - $(ret_dict[:cskewV])
 
 # Related
 
   - [`Coskewness`](@ref)
   - [`negative_spectral_coskewness`](@ref)
   - [`coskewness`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 3.1.4, Equation 3.6.
+  - $(ref_dict[:pkurt])
 """
 function _coskewness(Y::MatNum, X::MatNum, mp::AbstractMatrixProcessingEstimator, args...)
     o = transpose(range(one(eltype(Y)), one(eltype(Y)); length = size(Y, 2)))
@@ -370,7 +416,19 @@ end
     coskewness(ske::Option{<:Coskewness}, X::MatNum; dims::Int = 1,
                mean = nothing, kwargs...)
 
-Compute the full coskewness tensor and processed matrix for a dataset. Observation weights in `ske.w` are applied if set. For `FullMoment`, it uses all centered data; for `SemiMoment`, it uses only negative deviations. If the estimator is `nothing`, returns `(nothing, nothing)`.
+Compute the coskewness tensor of a dataset, together with its negative spectral skewness matrix. Observation weights in `ske.w` are applied if set. [`FullMoment`](@ref) takes the centred returns, and [`SemiMoment`](@ref) clips every positive deviation to zero. If the estimator is `nothing`, returns `(nothing, nothing)`.
+
+`ske.w` weights the whole estimate, so it reaches the centre as well as the deviations. When `mean` is `nothing` and `ske.w` is not, the method sends `ske.me` through [`factory`](@ref) with `ske.w`, so `ske.w` wins over the weights that `ske.me` carries. Pass `mean` for a centre that `ske.w` does not describe. ADR 0088 records the decision.
+
+The two returned matrices are different objects. The first is the coskewness tensor itself, and the second is the negative spectral skewness matrix that [`negative_spectral_coskewness`](@ref) reduces it to.
+
+# Algorithm
+
+ 1. Orient `X` to observations × assets with [`dims_oriented`](@ref), which validates `dims`.
+ 2. Resolve the observation weights `w` from `ske.w` with [`get_observation_weights`](@ref).
+ 3. Resolve the centre `mu` from `ske.me` and `ske.w` with [`weighted_centre`](@ref), which reads `mean` when the caller gave one.
+ 4. Form the deviation matrix `Y`. [`FullMoment`](@ref) takes `X .- mu`, and [`SemiMoment`](@ref) takes `min.(X .- mu, 0)`.
+ 5. Delegate to [`_coskewness`](@ref) with `Y`, `X`, `ske.mp` and `w`, and return the pair it returns.
 
 # Arguments
 
@@ -394,8 +452,8 @@ Compute the full coskewness tensor and processed matrix for a dataset. Observati
 
 # Returns
 
-  - `cskew::Matrix{<:Number}`: Coskewness tensor (observations × assets^2).
-  - `V::Matrix{<:Number}`: Processed coskewness matrix (assets × assets).
+  - $(ret_dict[:cskew])
+  - $(ret_dict[:cskewV])
 
 # Examples
 
@@ -425,13 +483,14 @@ julia> V
 
   - [`Coskewness`](@ref)
   - [`_coskewness`](@ref)
+  - [`weighted_centre`](@ref)
   - [`negative_spectral_coskewness`](@ref)
 """
 function coskewness(ske::Coskewness{<:Any, <:Any, <:FullMoment}, X::MatNum; dims::Int = 1,
                     mean = nothing, kwargs...)
     X = dims_oriented(dims, X)
     w = get_observation_weights(ske.w, X; dims = 1, kwargs...)
-    mu = isnothing(mean) ? Statistics.mean(ske.me, X; kwargs...) : mean
+    mu = weighted_centre(X, ske.me, ske.w; dims = 1, mean = mean, kwargs...)
     Y = X .- mu
     return _coskewness(Y, X, ske.mp, w)
 end
@@ -439,7 +498,7 @@ function coskewness(ske::Coskewness{<:Any, <:Any, <:SemiMoment}, X::MatNum; dims
                     mean = nothing, kwargs...)
     X = dims_oriented(dims, X)
     w = get_observation_weights(ske.w, X; dims = 1, kwargs...)
-    mu = isnothing(mean) ? Statistics.mean(ske.me, X; kwargs...) : mean
+    mu = weighted_centre(X, ske.me, ske.w; dims = 1, mean = mean, kwargs...)
     Y = min.(X .- mu, zero(eltype(X)))
     return _coskewness(Y, X, ske.mp, w)
 end

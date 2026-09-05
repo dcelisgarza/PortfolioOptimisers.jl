@@ -46,6 +46,31 @@ function MeanRiskResult(; jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM,
     return MeanRiskResult(jr, r, fb)
 end
 """
+    set_retcode(res::MeanRiskResult, retcode::OptRetCode_VecOptRetCode)
+
+Rebuild a [`MeanRiskResult`](@ref) with a different return code.
+
+`retcode` is not a field of this result and resolves through the [`JuMPOptimisationResult`](@ref) it embeds, so the rebuild rebuilds `jr` and carries every other member over unchanged.
+
+# Arguments
+
+  - `res`: Result to rebuild.
+  - `retcode`: Return code, or one per member of the population.
+
+# Returns
+
+  - [`MeanRiskResult`](@ref): The result, with the new return code.
+
+# Related
+
+  - [`set_retcode`](@ref)
+  - [`mark_ruined_members`](@ref)
+  - [`MeanRiskResult`](@ref)
+"""
+function set_retcode(res::MeanRiskResult, retcode::OptRetCode_VecOptRetCode)
+    return MeanRiskResult(set_retcode(res.jr, retcode), res.r, res.fb)
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the static defaults of the [`MeanRisk`](@ref) fields that may hold a [`TimeDependent`](@ref).
@@ -125,7 +150,8 @@ MeanRisk
       │           │           │      │    ce ┼ GeneralCovariance
       │           │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
       │           │           │      │       │    w ┴ nothing
-      │           │           │      │   alg ┴ FullMoment()
+      │           │           │      │   alg ┼ FullMoment()
+      │           │           │      │     w ┴ nothing
       │           │           │   mp ┼ MatrixProcessing
       │           │           │      │     pdm ┼ Posdef
       │           │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
@@ -189,8 +215,8 @@ MeanRisk
       │     linfc ┼ nothing
       │        l1 ┼ nothing
       │        l2 ┼ nothing
-      │      linf ┼ nothing
       │        lp ┼ nothing
+      │      linf ┼ nothing
       │       brt ┼ Bool: false
       │     x_src ┼ Symbol: :prior
       │     z_src ┼ Symbol: :data
@@ -733,6 +759,11 @@ function _optimise(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int 
                    str_names::Bool = false, save::Bool = true, kwargs...)
     mr = reset_time_dependent_estimator(mr)
     attrs = processed_jump_optimiser_attributes(mr.opt, rd; dims = dims, kwargs...)
+    # The bundle reduced what it carries. The head carries the rest — an initial weight
+    # vector, a risk measure holding per-asset data, tracking, a custom term — and hands
+    # them to `assemble_jump_model!` itself, so it takes the same view of itself and of
+    # `rd`. Both are unchanged when every asset is investable.
+    mr, rd = investable_view(mr, rd, attrs.pr, attrs.imsk)
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, mr.opt.sc, mr.opt.so)

@@ -5,6 +5,44 @@ Abstract supertype for all histogram binning algorithms.
 
 `AbstractBins` is the abstract type for all binning algorithm types used in histogram-based calculations within `PortfolioOptimisers.jl`, such as mutual information and variation of information analysis. Concrete subtypes implement specific binning strategies (e.g., Knuth, Freedman-Diaconis, Scott, Hacine-Gharbi-Ravier) and provide a consistent interface for bin selection.
 
+A bin count is chosen per **pair** of variables, not per variable, because the measures that read it estimate a joint histogram.
+
+# Interfaces
+
+In order to implement a new binning algorithm which will work seamlessly with the library, subtype `AbstractBins` with all necessary parameters as part of the struct, and implement the following method:
+
+  - `calc_num_bins(bins::AbstractBins, xj::VecNum, xi::VecNum, j::Integer, i::Integer, T::Integer) -> Integer`: The number of histogram bins for the pair `(xj, xi)`.
+
+## Arguments
+
+  - $(arg_dict[:bins])
+  - $(arg_dict[:xj])
+  - $(arg_dict[:xi])
+  - $(arg_dict[:jidx])
+  - $(arg_dict[:iidx])
+  - $(arg_dict[:Tobs])
+
+## Returns
+
+  - $(ret_dict[:nbins])
+
+# Examples
+
+We can create a dummy binning algorithm as follows:
+
+```jldoctest
+julia> struct MyBins <: PortfolioOptimisers.AbstractBins end
+
+julia> function PortfolioOptimisers.calc_num_bins(bins::MyBins, xj::PortfolioOptimisers.VecNum,
+                                                  xi::PortfolioOptimisers.VecNum, j::Integer,
+                                                  i::Integer, T::Integer)
+           return 4
+       end
+
+julia> PortfolioOptimisers.calc_num_bins(MyBins(), [1.0, 2.0, 3.0], [3.0, 2.0, 1.0], 1, 2, 3)
+4
+```
+
 # Related
 
   - [`BinWidthBins`](@ref)
@@ -12,6 +50,7 @@ Abstract supertype for all histogram binning algorithms.
   - [`FreedmanDiaconis`](@ref)
   - [`Scott`](@ref)
   - [`HacineGharbiRavier`](@ref)
+  - [`calc_num_bins`](@ref)
 """
 abstract type AbstractBins <: AbstractAlgorithm end
 """
@@ -24,6 +63,9 @@ Matches either an [`AbstractBins`](@ref) algorithm (auto-selecting bin counts) o
 # Related
 
   - [`AbstractBins`](@ref)
+  - [`calc_num_bins`](@ref)
+  - [`mutual_info`](@ref)
+  - [`variation_info`](@ref)
   - [`mutual_variation_info`](@ref)
 """
 const Int_Bin = Union{<:AbstractBins, <:Integer}
@@ -34,12 +76,46 @@ Abstract supertype for all histogram binning algorithms based on a bin width sel
 
 `BinWidthBins` is the abstract type for all binning algorithm types that select the number of bins by first computing an optimal bin width from the data, such as Knuth, Freedman-Diaconis, and Scott. Concrete subtypes implement specific binning strategies and provide a consistent interface for bin selection in histogram-based calculations within `PortfolioOptimisers.jl`.
 
+A subtype states a bin **width** for a single variable. The shared [`calc_num_bins`](@ref) method turns that width into a bin count for the pair, so a subtype implements no `calc_num_bins` method of its own.
+
+# Interfaces
+
+In order to implement a new bin width rule which will work seamlessly with the library, subtype `BinWidthBins` with all necessary parameters as part of the struct, and implement the following method:
+
+  - `bin_width(bins::BinWidthBins, x::VecNum) -> Number`: The optimal histogram bin width for `x`.
+
+## Arguments
+
+  - $(arg_dict[:bins])
+  - `x`: Data vector.
+
+## Returns
+
+  - $(ret_dict[:dx])
+
+# Examples
+
+We can create a dummy bin width rule as follows:
+
+```jldoctest
+julia> struct MyWidth <: PortfolioOptimisers.BinWidthBins end
+
+julia> function PortfolioOptimisers.bin_width(bins::MyWidth, x::PortfolioOptimisers.VecNum)
+           return (maximum(x) - minimum(x)) / 4
+       end
+
+julia> PortfolioOptimisers.calc_num_bins(MyWidth(), [1.0, 2.0, 3.0], [3.0, 2.0, 1.0], 1, 2, 3)
+4
+```
+
 # Related
 
   - [`Knuth`](@ref)
   - [`FreedmanDiaconis`](@ref)
   - [`Scott`](@ref)
   - [`AbstractBins`](@ref)
+  - [`bin_width`](@ref)
+  - [`calc_num_bins`](@ref)
 """
 abstract type BinWidthBins <: AbstractBins end
 """
@@ -75,6 +151,7 @@ Knuth
   - [`FreedmanDiaconis`](@ref)
   - [`Scott`](@ref)
   - [`HacineGharbiRavier`](@ref)
+  - [`bin_width`](@ref)
 
 # References
 
@@ -120,6 +197,7 @@ FreedmanDiaconis()
   - [`Knuth`](@ref)
   - [`Scott`](@ref)
   - [`HacineGharbiRavier`](@ref)
+  - [`bin_width`](@ref)
 
 # References
 
@@ -150,6 +228,7 @@ Scott()
   - [`Knuth`](@ref)
   - [`FreedmanDiaconis`](@ref)
   - [`HacineGharbiRavier`](@ref)
+  - [`bin_width`](@ref)
 
 # References
 
@@ -165,7 +244,7 @@ Histogram binning algorithm using the Hacine-Gharbi–Ravier rule.
 
 # Mathematical definition
 
-Two closed forms, selected by the pair's Pearson correlation ``\\rho``. For ``\\rho \\neq 1`` the bi-histogram formula applies:
+Two closed forms, selected by the pair's Pearson correlation ``\\rho``. For ``\\rho^2 \\neq 1`` the bi-histogram formula applies:
 
 ```math
 \\begin{align}
@@ -173,7 +252,7 @@ M &= \\left[\\frac{1}{\\sqrt{2}} \\sqrt{1 + \\sqrt{1 + \\frac{24 T}{1 - \\rho^2}
 \\end{align}
 ```
 
-For ``\\rho = 1`` the pair carries no joint information beyond one marginal, so the univariate formula applies:
+The form is singular at ``\\rho^2 = 1``, at both ends of the correlation range. There the pair is deterministic and carries no joint information beyond one marginal, so the univariate formula applies, which is the limit of the bi-histogram one:
 
 ```math
 \\begin{align}
@@ -241,12 +320,17 @@ Where:
 
 # Returns
 
-  - `dx::Number`: The optimal bin width.
+  - $(ret_dict[:dx])
 
 # Related
 
   - [`Scott`](@ref)
+  - [`BinWidthBins`](@ref)
   - [`calc_num_bins`](@ref)
+
+# References
+
+  - $(ref_dict[:scott1979])
 """
 function bin_width(::Scott, x::VecNum)
     return Statistics.std(x; corrected = false) * cbrt(24 * sqrt(pi) / length(x))
@@ -276,12 +360,17 @@ Where:
 
 # Returns
 
-  - `dx::Number`: The optimal bin width.
+  - $(ret_dict[:dx])
 
 # Related
 
   - [`FreedmanDiaconis`](@ref)
+  - [`BinWidthBins`](@ref)
   - [`calc_num_bins`](@ref)
+
+# References
+
+  - $(ref_dict[:freedman1981])
 """
 function bin_width(::FreedmanDiaconis, x::VecNum)
     q25, q75 = Statistics.quantile(x, [0.25, 0.75])
@@ -292,7 +381,9 @@ end
 
 Compute the optimal histogram bin width for `x` using Knuth's rule [knuth2019](@cite).
 
-Maximises the marginal posterior probability of a piecewise-constant density model with ``M`` equal-width bins over the data range,
+# Mathematical definition
+
+The bin width is the range of `x` divided by the bin count ``M`` that maximises the marginal posterior probability of a piecewise-constant density model with ``M`` equal-width bins over that range:
 
 ```math
 \\begin{align}
@@ -306,22 +397,36 @@ Where:
   - ``n``: Number of observations.
   - ``n_k``: Number of observations in bin ``k``.
 
+The maximiser is an integer, so no closed form gives it. The method searches for it.
+
+# Algorithm
+
+ 1. Read the range of `x` into `rx`, the difference of its two extrema.
+ 2. Build the objective `f`, which takes a one-element vector `Ms`, floors its entry into the bin count `M`, and returns `Inf` when `M` is not positive.
+ 3. Inside `f`, bin the data into the counts `nk` over `M` equal-width bins of the range, and return the negated posterior of the mathematical definition. The optimiser minimises, so the sign is flipped.
+ 4. Take the starting point `M0` from the bin count that the Freedman-Diaconis rule implies for `x`, plus one.
+ 5. Minimise `f` from `M0` with `Optim.optimize`, passing `bins.args` and `bins.kwargs`. The default `args` is a Nelder-Mead simplex.
+ 6. Floor the minimiser into a bin count, and return the range divided by it.
+
 # Arguments
 
+  - $(arg_dict[:bins])
   - `x`: Data vector.
 
 # Returns
 
-  - `dx::Number`: The optimal bin width.
-
-# Details
-
-  - The optimisation is performed with Nelder-Mead over a continuous relaxation of ``M`` (evaluated at ``\\lfloor M \\rfloor``), started at the bin count implied by the Freedman-Diaconis rule.
+  - $(ret_dict[:dx])
 
 # Related
 
   - [`Knuth`](@ref)
+  - [`BinWidthBins`](@ref)
+  - [`FreedmanDiaconis`](@ref)
   - [`calc_num_bins`](@ref)
+
+# References
+
+  - $(ref_dict[:knuth2019])
 """
 function bin_width(bins::Knuth, x::VecNum)
     n = length(x)
@@ -357,27 +462,42 @@ end
 
 Compute the number of histogram bins for a pair of variables using a specified binning algorithm.
 
-This function determines the number of bins to use for histogram-based calculations (such as mutual information or variation of information) between two variables, based on the selected binning strategy. It dispatches on the binning algorithm type and uses the appropriate method for each:
+This function determines the number of bins to use for histogram-based calculations (such as mutual information or variation of information) between two variables, based on the selected binning strategy. It dispatches on the binning algorithm type, and the three methods read different arguments: only the [`HacineGharbiRavier`](@ref) method reads `T`, and the `Integer` method reads none of them.
 
-  - For `BinWidthBins`, it calls [`bin_width`](@ref) on `bins` and divides each variable's range by the returned width, rounding to the nearest integer. For off-diagonal pairs it takes the larger of the two variables' bin counts. This method ignores `T`.
-  - For `HacineGharbiRavier`, it applies that rule's two closed forms, which read `T` and the pair's Pearson correlation.
-  - For an integer, it returns that number of bins directly and reads no other argument.
+# Algorithm
+
+The [`BinWidthBins`](@ref) method turns a bin width into a bin count.
+
+ 1. Read the range of `xj` into `xju - xjl`, and divide it by [`bin_width`](@ref) of `xj`, giving `k1`.
+ 2. When `j` and `i` differ, repeat step 1 for `xi`, giving `k2`, and select the larger of `k1` and `k2`. The joint histogram is square, so one count serves both axes, and the larger of the two keeps the finer resolution. When `j` and `i` are equal, the pair is a variable against itself, so select `k1` and read `xi` no further.
+ 3. Round the selected value to the nearest integer, and return it.
+
+The [`HacineGharbiRavier`](@ref) method reads the pair instead of a width.
+
+ 1. Take the Pearson correlation of the pair into `corr`.
+ 2. Select the closed form of [`HacineGharbiRavier`](@ref) that `corr` falls under.
+ 3. Round the selected value to the nearest integer, and return it.
+
+The `Integer` method returns `bins` unchanged.
 
 # Arguments
 
-  - `bins`: Binning algorithm/number.
-  - `xj`: Data vector for variable `j`.
-  - `xi`: Data vector for variable `i`.
-  - `j`: Index of variable `j`.
-  - `i`: Index of variable `i`.
-  - `T`: Number of observations. Read by [`HacineGharbiRavier`](@ref) alone.
+  - $(arg_dict[:bins])
+  - $(arg_dict[:xj])
+  - $(arg_dict[:xi])
+  - $(arg_dict[:jidx])
+  - $(arg_dict[:iidx])
+  - $(arg_dict[:Tobs])
+  - `args...`: Ignored arguments, so that the three methods share one call site.
 
 # Returns
 
-  - `nbins::Int`: The computed number of bins for the variable pair.
+  - $(ret_dict[:nbins])
 
 # Related
 
+  - [`AbstractBins`](@ref)
+  - [`BinWidthBins`](@ref)
   - [`Knuth`](@ref)
   - [`FreedmanDiaconis`](@ref)
   - [`Scott`](@ref)
@@ -399,7 +519,15 @@ end
 function calc_num_bins(::HacineGharbiRavier, xj::VecNum, xi::VecNum, j::Integer, i::Integer,
                        T::Integer)
     corr = Statistics.cor(xj, xi)
-    return round(Int, if isone(corr)
+    #=
+    The bi-histogram formula divides by `1 - corr^2`, so it is singular at BOTH ends of the
+    correlation range. `isone(abs(corr))` catches them together: a perfectly anti-correlated
+    pair is as deterministic as a perfectly correlated one, and the univariate formula is the
+    limit of the bi-histogram one in either case. Testing `isone(corr)` alone sent `corr = -1`
+    into the singular branch, where `24T/0` is `Inf` and `round(Int, Inf)` raises an
+    `InexactError`.
+    =#
+    return round(Int, if isone(abs(corr))
                      z = cbrt(8 + 324 * T + 12 * sqrt(36 * T + 729 * T^2))
                      z / 6 + 2 / (3 * z) + 1 / 3
                  else
@@ -416,37 +544,45 @@ Compute histogram-based marginal and joint distributions for two variables.
 
 This function computes the normalised histograms (probability mass functions) for two variables `xj` and `xi` using the specified number of bins, as well as their joint histogram. It returns the marginal entropies and the joint histogram, which are used in mutual information and variation of information calculations.
 
+A bin is closed on the left, so the lower edge is the minimum itself and needs no widening. The upper edge is exclusive, so it is `nextfloat` of the maximum, one unit in the last place above it at every magnitude. The largest observation therefore falls strictly inside the last bin whatever the magnitude of the data, and a constant column gives an entropy of zero rather than `NaN`.
+
+# Algorithm
+
+ 1. Add one to `bins`, giving `bp1`, the number of bin edges.
+ 2. Build the edge range of `xj` from `minimum(xj)` to `nextfloat(maximum(xj))`, with `bp1` points. Repeat for `xi`.
+ 3. Bin `xj` over its own edges, giving the counts `hx`, and divide `hx` by its own sum to make it a probability mass function.
+ 4. Repeat step 3 for `xi`, giving `hy`.
+ 5. Take the Shannon entropy of `hx` into `ex`, and of `hy` into `ey`.
+ 6. Bin the pair over both edge ranges, giving the joint counts `hxy`. It is left unnormalised, because [`intrinsic_mutual_info`](@ref) normalises it itself.
+
 # Arguments
 
-  - `xj`: Data vector for variable `j`.
-  - `xi`: Data vector for variable `i`.
+  - $(arg_dict[:xj])
+  - $(arg_dict[:xi])
   - `bins`: Number of bins to use for the histograms.
 
 # Returns
 
-  - `ex::Number`: Entropy of `xj`.
-  - `ey::Number`: Entropy of `xi`.
+  - `ex::Number`: Shannon entropy of the marginal probability mass function of `xj`, in nats.
+  - `ey::Number`: Shannon entropy of the marginal probability mass function of `xi`, in nats.
   - `hxy::Matrix{<:Number}`: Joint histogram (counts, not normalised to probability).
-
-# Details
-
-  - The histograms are computed using `StatsAPI.fit(StatsBase.Histogram, ...)` over the range of each variable, with bin edges expanded slightly using `eps` to ensure all data is included.
-  - The marginal histograms are normalised to sum to 1 before entropy calculation.
-  - The joint histogram is not normalised, as it is used directly in mutual information calculations.
 
 # Related
 
   - [`variation_info`](@ref)
   - [`mutual_info`](@ref)
+  - [`mutual_variation_info`](@ref)
+  - [`intrinsic_mutual_info`](@ref)
+  - [`calc_num_bins`](@ref)
 """
 function calc_hist_data(xj::VecNum, xi::VecNum, bins::Integer)
     bp1 = bins + one(bins)
 
-    xjl = minimum(xj) - eps(eltype(xj))
-    xjh = maximum(xj) + eps(eltype(xj))
+    xjl = minimum(xj)
+    xjh = nextfloat(maximum(xj))
 
-    xil = minimum(xi) - eps(eltype(xi))
-    xih = maximum(xi) + eps(eltype(xi))
+    xil = minimum(xi)
+    xih = nextfloat(maximum(xi))
 
     hx = StatsAPI.fit(StatsBase.Histogram, xj, range(xjl, xjh; length = bp1)).weights
     hx /= sum(hx)
@@ -469,6 +605,8 @@ Compute the intrinsic mutual information from a joint histogram.
 
 This function computes the mutual information between two variables given their joint histogram matrix `X`. It is used as a core step in information-theoretic measures such as mutual information and variation of information.
 
+**Intrinsic** names the estimate itself: the quantity the joint histogram carries, before [`mutual_info`](@ref) divides it by a marginal entropy and before either matrix-valued measure clamps it. It is therefore in nats, it is not bounded above by one, and it is the value that [`mutual_info`](@ref) returns when `normalise` is `false`. It is **not** the intrinsic conditional information of secret-key agreement, which is a different quantity under the same word.
+
 # Mathematical definition
 
 Given the joint histogram ``\\mathbf{X}`` (unnormalised counts), with marginals ``p_i = \\sum_j X_{ij} / n`` and ``p_j = \\sum_i X_{ij} / n``:
@@ -486,25 +624,36 @@ Where:
   - ``n = \\sum_{i,j} X_{ij}``: Total count.
   - ``p_i = \\sum_j X_{ij} / n``, ``p_j = \\sum_i X_{ij} / n``: Marginal probabilities.
 
+A bin the pair never visits contributes nothing, because ``p \\log p`` tends to zero as ``p`` does. The sum therefore runs over the non-empty bins alone. When either axis has a single bin the two variables are indistinguishable under the binning, and the estimate is zero.
+
+# Algorithm
+
+ 1. Sum `X` over its columns into `p_i`, and over its rows into `p_j`. Both are unnormalised marginal counts.
+ 2. When either marginal has length one, return zero.
+ 3. Find the indices of the non-zero entries of `X` into `mask`, and read those entries into the vector `nz`.
+ 4. Sum `nz` into `nz_sum`, the total count, and divide `nz` by it, giving the joint probabilities `nz_nm`.
+ 5. Take the outer product of the two marginal counts at the masked indices into `outer`, and turn it into the logarithm of the product of the marginal probabilities, `log_outer`, by subtracting the logarithm of each marginal total.
+ 6. Form the per-bin contributions `mi` from `nz_nm` and the two logarithms, and set to zero every contribution whose magnitude is below the machine epsilon.
+ 7. Return the sum of `mi`.
+
 # Arguments
 
   - `X`: Joint histogram matrix.
 
 # Returns
 
-  - `mi::Number`: The intrinsic mutual information between the two variables.
-
-# Details
-
-  - The function computes marginal distributions by summing over rows and columns.
-  - Only nonzero entries in the joint histogram are considered.
-  - The mutual information is computed as the sum over all nonzero joint probabilities of `p(x, y) * log(p(x, y) / (p(x) * p(y)))`, with careful handling of log and normalisation.
+  - `mi::Number`: The intrinsic mutual information between the two variables, in nats.
 
 # Related
 
   - [`calc_hist_data`](@ref)
   - [`variation_info`](@ref)
   - [`mutual_info`](@ref)
+  - [`mutual_variation_info`](@ref)
+
+# References
+
+  - $(ref_dict[:shannon1948])
 """
 function intrinsic_mutual_info(X::MatNum)
     p_i = vec(sum(X; dims = 2))
@@ -535,7 +684,7 @@ end
 
 Compute the variation of information (VI) matrix for a set of variables.
 
-This function computes the pairwise variation of information between all columns of the data matrix `X`, using histogram-based entropy and mutual information estimates. VI quantifies the amount of information lost and gained when moving from one variable to another, and is a true metric on the space of discrete distributions.
+This function computes the pairwise variation of information between all columns of the data matrix `X`, using histogram-based entropy and mutual information estimates. VI quantifies the amount of information lost and gained when moving from one variable to another, and is a true metric on the space of discrete distributions: it is non-negative, it is zero exactly when the two variables agree, it is symmetric, and it satisfies the triangle inequality. [`mutual_info`](@ref) is the complementary measure and is **not** a metric — it grows with agreement rather than with disagreement, and its diagonal is the entropy rather than zero.
 
 # Mathematical definition
 
@@ -566,34 +715,41 @@ Where:
   - ``\\widetilde{\\mathrm{VI}}(X, Y)``: Normalised variation of information.
   - ``H(X,Y) = H(X) + H(Y) - I(X;Y)``: Joint entropy.
 
-Equation 6.25 of the source normalises by ``\\max(H(X), H(Y))`` instead. This function divides by the joint entropy, which keeps the result a metric on ``[0, 1]``.
+The divisor is the joint entropy, which keeps the normalised form a metric on ``[0, 1]``. Equation 6.25 of the source divides by ``\\max(H(X), H(Y))`` instead, which is bounded by the same interval but is not a metric.
+
+# Algorithm
+
+ 1. Read the shape of `X` into `T`, the number of observations, and `N`, the number of variables.
+ 2. Allocate the `N × N` result `var_mtx`.
+ 3. For each variable `j`, write an exact zero at `var_mtx[j, j]`. ``\\mathrm{VI}(X, X)`` is zero by definition, and the histogram estimate of ``I(X; X)`` does not reproduce the estimate of ``H(X)`` bit for bit, so estimating the self pair leaves roughly `1e-16` on the diagonal. That is enough to stop the result being a distance matrix, and skipping the self pair also saves `N` histogram computations.
+ 4. For each pair `(j, i)` below the diagonal, take the bin count from [`calc_num_bins`](@ref), giving `nbins`.
+ 5. Take the two marginal entropies `ex` and `ey` and the joint histogram `hxy` from [`calc_hist_data`](@ref).
+ 6. Take the mutual information of `hxy` from [`intrinsic_mutual_info`](@ref), giving `mut_ixy`, and apply the definition above, giving `var_ixy`.
+ 7. When `normalise` is true, divide `var_ixy` by the joint entropy `vxy`.
+ 8. Clamp `var_ixy` below at zero, and write it into both `var_mtx[j, i]` and `var_mtx[i, j]`.
 
 # Arguments
 
-  - `X`: Data matrix (observations × variables).
-  - `bins`: Binning algorithm or fixed number of bins.
-  - `normalise`: Whether to normalise the VI by the joint entropy.
+  - $(arg_dict[:X])
+  - $(arg_dict[:bins])
+  - $(arg_dict[:normalise])
 
 # Returns
 
-  - `var_mtx::Matrix{<:Number}`: Symmetric matrix of pairwise variation of information values.
-
-# Details
-
-  - For each pair of variables, the function computes marginal entropies and the joint histogram using `calc_hist_data`.
-  - The mutual information is computed using `intrinsic_mutual_info`.
-  - VI is calculated as `ex + ey - 2 * intrinsic_mutual_info(hxy)`. If `normalise` is `true`, it is divided by the joint entropy `ex + ey - intrinsic_mutual_info(hxy)`.
-  - The result is clamped to `[0, typemax(eltype(X))]` and is symmetric.
-  - The diagonal is **pinned to exactly zero** rather than estimated. `VI(X, X)` is zero by definition, but the histogram estimate of `I(X; X)` does not reproduce the estimate of `H(X)` bit for bit, so computing it leaves roughly `1e-16` there — enough to stop the result being a valid distance matrix.
+  - `var_mtx::Matrix{<:Number}`: Symmetric matrix of pairwise variation of information values, with an exactly zero diagonal. In nats when `normalise` is `false`, and dimensionless on `[0, 1]` when it is `true`.
 
 # Related
 
   - [`mutual_info`](@ref)
+  - [`mutual_variation_info`](@ref)
   - [`calc_hist_data`](@ref)
+  - [`calc_num_bins`](@ref)
   - [`intrinsic_mutual_info`](@ref)
+  - [`Int_Bin`](@ref)
 
 # References
 
+  - $(ref_dict[:shannon1948])
   - $(ref_dict[:cajas2025]) Section 6.2.2, equation 6.24.
 """
 function variation_info(X::MatNum, bins::Int_Bin = HacineGharbiRavier(),
@@ -629,26 +785,76 @@ function variation_info(X::MatNum, bins::Int_Bin = HacineGharbiRavier(),
     end
     return var_mtx
 end
-# COV_EXCL_START
 """
     mutual_variation_info(X::MatNum, bins::Int_Bin = Knuth(), normalise::Bool = true)
 
 Compute the pairwise mutual information and variation of information matrices from a data matrix.
 
+Both matrices come from one pass over the pairs, so the two share a bin count and a joint histogram per pair. The result is what [`mutual_info`](@ref) and [`variation_info`](@ref) return, and the two normalisers differ: mutual information is divided by the smaller marginal entropy, variation of information by the joint entropy. The default `bins` is [`Knuth`](@ref) here and [`HacineGharbiRavier`](@ref) in the other two, so the three agree only when `bins` is given.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+I(X_i; X_j) &= H(X_i) + H(X_j) - H(X_i, X_j)\\,, \\\\
+\\mathrm{VI}(X_i, X_j) &= H(X_i) + H(X_j) - 2\\,I(X_i; X_j)\\,.
+\\end{align}
+```
+
+When `normalise = true`, each is divided by its own normaliser:
+
+```math
+\\begin{align}
+\\tilde{I}(X_i; X_j) &= \\frac{I(X_i; X_j)}{\\min\\bigl(H(X_i),\\, H(X_j)\\bigr)}\\,, \\\\
+\\widetilde{\\mathrm{VI}}(X_i, X_j) &= \\frac{\\mathrm{VI}(X_i, X_j)}{H(X_i) + H(X_j) - I(X_i; X_j)}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``I(X_i; X_j)``: Mutual information between assets ``i`` and ``j``.
+  - ``\\mathrm{VI}(X_i, X_j)``: Variation of information between assets ``i`` and ``j``.
+  - ``H(X_i)``, ``H(X_j)``: Marginal Shannon entropies.
+  - ``H(X_i, X_j) = H(X_i) + H(X_j) - I(X_i; X_j)``: Joint entropy.
+  - ``\\tilde{I}(X_i; X_j)``: Normalised mutual information.
+  - ``\\widetilde{\\mathrm{VI}}(X_i, X_j)``: Normalised variation of information.
+
+# Algorithm
+
+ 1. Read the shape of `X` into `T`, the number of observations, and `N`, the number of variables.
+ 2. Allocate the two `N × N` results `mut_mtx` and `var_mtx`.
+ 3. For each pair `(j, i)` on or below the diagonal, take the bin count from [`calc_num_bins`](@ref), giving `nbins`.
+ 4. Take the two marginal entropies `ex` and `ey` and the joint histogram `hxy` from [`calc_hist_data`](@ref).
+ 5. Take the mutual information of `hxy` from [`intrinsic_mutual_info`](@ref), giving `mut_ixy`, and form `var_ixy` from it and the two entropies.
+ 6. When `normalise` is true, divide `var_ixy` by the joint entropy `vxy` and `mut_ixy` by the smaller of `ex` and `ey`.
+ 7. Clamp both below at zero, and write each into both of its symmetric positions.
+ 8. After the inner loop, write an exact zero at `var_mtx[j, j]`, for the reason [`variation_info`](@ref) gives. `mut_mtx[j, j]` keeps its estimate, because ``I(X; X) = H(X)`` is a real value there rather than a zero.
+
 # Arguments
 
-  - `X`: Data matrix of shape `(T, N)` (observations × assets).
-  - `bins`: Binning algorithm or integer number of bins for histogram computation.
-  - `normalise`: If `true`, normalises the mutual information and variation of information.
+  - $(arg_dict[:X])
+  - $(arg_dict[:bins])
+  - $(arg_dict[:normalise])
 
 # Returns
 
-  - `(mut_mtx, var_mtx)`: Tuple of symmetric matrices for mutual information and variation of information.
+  - `mut_mtx::Matrix{<:Number}`: Symmetric matrix of pairwise mutual information values, whose diagonal is the marginal entropy when `normalise` is `false` and one when it is `true`.
+  - `var_mtx::Matrix{<:Number}`: Symmetric matrix of pairwise variation of information values, with an exactly zero diagonal.
 
 # Related
 
   - [`Int_Bin`](@ref)
   - [`AbstractBins`](@ref)
+  - [`mutual_info`](@ref)
+  - [`variation_info`](@ref)
+  - [`calc_hist_data`](@ref)
+  - [`calc_num_bins`](@ref)
+  - [`intrinsic_mutual_info`](@ref)
+
+# References
+
+  - $(ref_dict[:shannon1948])
+  - $(ref_dict[:cajas2025]) Sections 6.1.6 and 6.2.2, equations 6.18, 6.19 and 6.24.
 """
 function mutual_variation_info(X::MatNum, bins::Int_Bin = Knuth(), normalise::Bool = true)
     T, N = size(X)
@@ -690,7 +896,6 @@ function mutual_variation_info(X::MatNum, bins::Int_Bin = Knuth(), normalise::Bo
 
     return mut_mtx, var_mtx
 end
-# COV_EXCL_STOP
 """
     mutual_info(X::MatNum, bins::Int_Bin = HacineGharbiRavier(),
                 normalise::Bool = true)
@@ -698,6 +903,8 @@ end
 Compute the mutual information (MI) matrix for a set of variables.
 
 This function computes the pairwise mutual information between all columns of the data matrix `X`, using histogram-based entropy and mutual information estimates. MI quantifies the amount of shared information between pairs of variables, and is widely used in information-theoretic analysis of dependencies.
+
+Mutual information is a measure of agreement and is **not** a metric: it grows with dependence rather than with distance, and its diagonal carries the marginal entropy rather than zero. [`variation_info`](@ref) is the metric of the pair. The diagonal is estimated here, not pinned, so it is the marginal entropy in nats when `normalise` is `false` and one when it is `true`.
 
 # Mathematical definition
 
@@ -728,28 +935,37 @@ Where:
 
   - ``\\tilde{I}(X_i; X_j)``: Normalised mutual information.
 
+The smaller marginal entropy is the largest value the mutual information of the pair can take, so the normalised form is bounded by ``[0, 1]`` and reaches one exactly when one variable determines the other.
+
+# Algorithm
+
+ 1. Read the shape of `X` into `T`, the number of observations, and `N`, the number of variables.
+ 2. Allocate the `N × N` result `mut_mtx`.
+ 3. For each pair `(j, i)` on or below the diagonal, take the bin count from [`calc_num_bins`](@ref), giving `nbins`.
+ 4. Take the two marginal entropies `ex` and `ey` and the joint histogram `hxy` from [`calc_hist_data`](@ref).
+ 5. Take the mutual information of `hxy` from [`intrinsic_mutual_info`](@ref), giving `mut_ixy`.
+ 6. When `normalise` is true, divide `mut_ixy` by the smaller of `ex` and `ey`.
+ 7. Clamp `mut_ixy` below at zero, and write it into both `mut_mtx[j, i]` and `mut_mtx[i, j]`.
+
 # Arguments
 
-  - `X`: Data matrix (observations × variables).
-  - `bins`: Binning algorithm or fixed number of bins.
-  - `normalise`: Whether to normalise the MI by the minimum marginal entropy.
+  - $(arg_dict[:X])
+  - $(arg_dict[:bins])
+  - $(arg_dict[:normalise])
 
 # Returns
 
-  - `mut_mtx::Matrix{<:Number}`: Symmetric matrix of pairwise mutual information values.
-
-# Details
-
-  - For each pair of variables, the function computes marginal entropies and the joint histogram using [`calc_hist_data`](@ref).
-  - The mutual information is computed using [`intrinsic_mutual_info`](@ref).
-  - If `normalise` is `true`, the MI is divided by the minimum of the two marginal entropies.
-  - The result is clamped to `[0, typemax(eltype(X))]` and is symmetric.
+  - `mut_mtx::Matrix{<:Number}`: Symmetric matrix of pairwise mutual information values. In nats when `normalise` is `false`, and dimensionless on `[0, 1]` when it is `true`.
 
 # Related
 
   - [`variation_info`](@ref)
+  - [`mutual_variation_info`](@ref)
   - [`calc_hist_data`](@ref)
+  - [`calc_num_bins`](@ref)
   - [`intrinsic_mutual_info`](@ref)
+  - [`Int_Bin`](@ref)
+  - [`MutualInfoCovariance`](@ref)
 
 # References
 

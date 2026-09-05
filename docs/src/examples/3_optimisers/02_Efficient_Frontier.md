@@ -1,5 +1,4 @@
 The source files can be found in [examples/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../../examples/3_optimisers/02_Efficient_Frontier.jl"
 ```
@@ -66,8 +65,8 @@ rd = prices_to_returns(X)
 
 There are two mutually exclusive ways to trace a frontier:
 
-- **Minimise risk** subject to a *lower bound on return* — sweep the return floor upward.
-- **Maximise return** subject to an *upper bound on risk* — sweep the risk ceiling upward.
+  - **Minimise risk** subject to a *lower bound on return* — sweep the return floor upward.
+  - **Maximise return** subject to an *upper bound on risk* — sweep the risk ceiling upward.
 
 Each bound can be supplied **explicitly** (a `range` of numbers you pick) or as a
 [`Frontier`](@ref) object, which inspects the problem, finds the feasible extremes, and lays out

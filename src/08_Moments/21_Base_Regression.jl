@@ -1,17 +1,33 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all regression estimator types.
+Abstract supertype of every regression estimator, over both the time-series family and the cross-sectional family.
 
-All concrete and/or abstract types implementing regression estimation algorithms should be subtypes of `AbstractRegressionEstimator`.
+The type is an umbrella and declares no interface of its own, because the two families fit different models and answer different verbs. A time-series estimator fits one model per asset over the observations and answers [`regression`](@ref). A cross-sectional estimator fits one model per observation across the assets and answers [`cross_sectional_regression`](@ref). Subtype the child that names the family, never this root, so a consumer of one family never receives a value of the other.
+
+# Related
+
+  - [`AbstractEstimator`](@ref)
+  - [`AbstractTimeSeriesRegressionEstimator`](@ref)
+  - [`AbstractCrossSectionalRegressionEstimator`](@ref)
+  - [`AbstractRegressionAlgorithm`](@ref)
+  - [`AbstractRegressionResult`](@ref)
+"""
+abstract type AbstractRegressionEstimator <: AbstractEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for all time-series regression estimator types.
+
+All concrete and/or abstract types implementing regression estimation algorithms that fit one model per asset over the observations should be subtypes of `AbstractTimeSeriesRegressionEstimator`.
 
 # Interfaces
 
-In order to implement a new regression estimator which will work seamlessly with the library, subtype `AbstractRegressionEstimator` with all necessary parameters as part of the struct, and implement the following methods:
+In order to implement a new time-series regression estimator which will work seamlessly with the library, subtype `AbstractTimeSeriesRegressionEstimator` with all necessary parameters as part of the struct, and implement the following methods:
 
 ## Regression
 
-  - `PortfolioOptimisers.regression(re::AbstractRegressionEstimator, X::MatNum, F::MatNum) -> Regression`: Computes the regression result from asset returns `X` and factor returns `F`.
+  - `PortfolioOptimisers.regression(re::AbstractTimeSeriesRegressionEstimator, X::MatNum, F::MatNum) -> Regression`: Computes the regression result from asset returns `X` and factor returns `F`.
 
 ### Arguments
 
@@ -28,7 +44,7 @@ In order to implement a new regression estimator which will work seamlessly with
 We can create a dummy regression estimator as follows:
 
 ```jldoctest
-julia> struct MyRegressionEstimator <: PortfolioOptimisers.AbstractRegressionEstimator end
+julia> struct MyRegressionEstimator <: PortfolioOptimisers.AbstractTimeSeriesRegressionEstimator end
 
 julia> function PortfolioOptimisers.regression(::MyRegressionEstimator,
                                                X::PortfolioOptimisers.MatNum,
@@ -39,45 +55,195 @@ julia> function PortfolioOptimisers.regression(::MyRegressionEstimator,
 julia> regression(MyRegressionEstimator(), [1.0 2.0; 3.0 4.0; 5.0 6.0],
                   [1.0 0.0; 0.0 1.0; 0.5 0.5])
 Regression
-  M ┼ 2×2 Matrix{Float64}
-  L ┼ 2×2 Matrix{Float64}
-  b ┴ nothing
+       M ┼ 2×2 Matrix{Float64}
+       L ┼ 2×2 Matrix{Float64}
+       b ┼ nothing
+  esigma ┴ nothing
 ```
 
 # Related
 
-  - [`AbstractEstimator`](@ref)
-  - [`AbstractRegressionAlgorithm`](@ref)
-  - [`AbstractRegressionResult`](@ref)
+  - [`AbstractRegressionEstimator`](@ref)
+  - [`AbstractCrossSectionalRegressionEstimator`](@ref)
+  - [`AbstractLoadingsRegressionResult`](@ref)
+  - [`StepwiseRegression`](@ref)
+  - [`DimensionReductionRegression`](@ref)
 """
-abstract type AbstractRegressionEstimator <: AbstractEstimator end
+abstract type AbstractTimeSeriesRegressionEstimator <: AbstractRegressionEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all regression result types.
+Abstract supertype for all cross-sectional regression estimator types.
 
-All concrete and/or abstract types representing the output of regression-based moment estimation should be subtypes of `AbstractRegressionResult`.
+All concrete and/or abstract types implementing regression estimation algorithms that fit one model per observation across the assets should be subtypes of `AbstractCrossSectionalRegressionEstimator`.
+
+# Interfaces
+
+In order to implement a new cross-sectional regression estimator which will work seamlessly with the library, subtype `AbstractCrossSectionalRegressionEstimator` with all necessary parameters as part of the struct, and implement the following methods:
+
+## Cross-sectional regression
+
+  - `PortfolioOptimisers.cross_sectional_regression(cre::AbstractCrossSectionalRegressionEstimator, Z::Arr3Num, X::MatNum, W::MatNum) -> CrossSectionalRegression`: Computes the cross-sectional regression result from the exposure tensor `Z`, the asset returns `X` and the cross-sectional weights `W`.
+
+### Arguments
+
+  - `cre`: Cross-sectional regression estimator.
+  - `Z`: Exposure tensor `observations × assets × factors`.
+  - `X`: Asset returns matrix `observations × assets`.
+  - `W`: Cross-sectional weights matrix `observations × assets`.
+
+### Returns
+
+  - `csr::CrossSectionalRegression`: Cross-sectional regression result carrying the factor returns, the residuals, the counts and the optional intercept.
+
+# Examples
+
+We can create a dummy cross-sectional regression estimator as follows:
+
+```jldoctest
+julia> struct MyCrossSectionalRegressionEstimator <:
+              PortfolioOptimisers.AbstractCrossSectionalRegressionEstimator end
+
+julia> function PortfolioOptimisers.cross_sectional_regression(::MyCrossSectionalRegressionEstimator,
+                                                               Z::PortfolioOptimisers.Arr3Num,
+                                                               X::PortfolioOptimisers.MatNum,
+                                                               W::PortfolioOptimisers.MatNum)
+           f = permutedims(reduce(hcat, Z[t, :, :] \\ X[t, :] for t in axes(X, 1)))
+           eps = X - permutedims(reduce(hcat, Z[t, :, :] * f[t, :] for t in axes(X, 1)))
+           return PortfolioOptimisers.CrossSectionalRegression(; f = f, eps = eps,
+                                                               n = fill(size(X, 2), size(X, 1)))
+       end
+
+julia> cross_sectional_regression(MyCrossSectionalRegressionEstimator(),
+                                  reshape([1.0, 0.0, 0.5, 0.0, 1.0, 0.5], 1, 3, 2), [1.0 2.0 1.5],
+                                  ones(1, 3))
+CrossSectionalRegression
+    f ┼ 1×2 Matrix{Float64}
+  eps ┼ 1×3 Matrix{Float64}
+    n ┼ Vector{Int64}: [3]
+    b ┴ nothing
+```
+
+# Related
+
+  - [`AbstractRegressionEstimator`](@ref)
+  - [`AbstractTimeSeriesRegressionEstimator`](@ref)
+  - [`AbstractCrossSectionalRegressionResult`](@ref)
+  - [`CrossSectionalLinearRegression`](@ref)
+  - [`CrossSectionalTargetRegression`](@ref)
+"""
+abstract type AbstractCrossSectionalRegressionEstimator <: AbstractRegressionEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype of every regression result, over both the loadings family and the cross-sectional family.
+
+The type is an umbrella, and the two children disagree on what an asset index means. A loadings result holds one row of `M` per asset, so [`port_opt_view`](@ref) slices its rows. A cross-sectional result holds one row per observation and one column per asset, so the same index slices its columns. Subtype the child that states what the result carries, never this root.
 
 # Related
 
   - [`AbstractResult`](@ref)
-  - [`Regression`](@ref)
+  - [`AbstractLoadingsRegressionResult`](@ref)
+  - [`AbstractCrossSectionalRegressionResult`](@ref)
   - [`AbstractRegressionEstimator`](@ref)
 """
 abstract type AbstractRegressionResult <: AbstractResult end
 """
-    const RegE_Reg = Union{<:AbstractRegressionResult, <:AbstractRegressionEstimator}
+$(DocStringExtensions.TYPEDEF)
 
-Alias for a regression result or estimator.
+Abstract supertype for all regression result types that carry a loadings matrix.
 
-Matches either an [`AbstractRegressionResult`](@ref) (pre-computed regression result) or an [`AbstractRegressionEstimator`](@ref) (regression specification). Used for dispatch in factor model and regression-based risk routines.
+All concrete and/or abstract types representing the output of a regression that carries a loadings matrix `M`, one row per asset and one column per factor, should be subtypes of `AbstractLoadingsRegressionResult`. The root states what a member carries, not how it was fitted, because every consumer that re-bases a constraint or decomposes risk in the factor basis reads `M` and binds this type rather than the umbrella. The fitting geometry is not the criterion: a result fitted per asset over the observations and a result fitted per observation across the assets both belong here when they carry `M`.
 
 # Related
 
   - [`AbstractRegressionResult`](@ref)
+  - [`AbstractCrossSectionalRegressionResult`](@ref)
+  - [`AbstractTimeSeriesRegressionEstimator`](@ref)
+  - [`Regression`](@ref)
+"""
+abstract type AbstractLoadingsRegressionResult <: AbstractRegressionResult end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+State whether a loadings result was fitted in a re-based factor family.
+
+A Factor Family whose one-hot exposures are collinear with a global factor is re-based before the fit: one factor of the family is dropped, and the family is rewritten in an equivalent basis of full column rank. A result that carries such a re-basis keeps the raw loadings in `M` and the re-based ones in `L`, so its **raw** factor axis is a linear image of a smaller one, and a factor covariance stated on that axis is singular by construction. A consumer that inverts or factorises such a covariance reads this trait and refuses the result, rather than letting the factorisation fail on a matrix it was handed.
+
+The root answers `false`, and a member that cannot state a re-basis needs no method. That fallback is an answer rather than a missing declaration: a [`Regression`](@ref) fits one model per asset over the observations and re-bases nothing, so `false` is true of it. Only [`CrossSectionalFactorModel`](@ref) overrides it.
+
+# Arguments
+
+  - `rr`: Loadings regression result.
+
+# Returns
+
+  - `val::Bool`: `true` when the result carries a family re-basis, so its raw factor axis is rank deficient; `false` otherwise.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.has_family_rebasis(Regression(; M = [1 2; 3 4], b = [1, 2]))
+false
+```
+
+# Related
+
+  - [`AbstractLoadingsRegressionResult`](@ref)
+  - [`Regression`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+"""
+function has_family_rebasis(::AbstractLoadingsRegressionResult)::Bool
+    return false
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for all Factor Family Basis result types.
+
+All concrete and/or abstract types representing the change of basis that a re-based Factor Family is written in should be subtypes of `AbstractFactorFamilyBasis`. The root exists so that [`CrossSectionalFactorModel`](@ref) can bind its `fcb` slot to a type rather than to `Any`, and it is declared here rather than beside its member because the block that carries the slot is loaded before the member that fills it.
+
+# Related
+
+  - [`FactorFamilyBasis`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+  - [`has_family_rebasis`](@ref)
+"""
+abstract type AbstractFactorFamilyBasis <: AbstractResult end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for all cross-sectional regression result types.
+
+All concrete and/or abstract types representing the output of a regression fitted per observation across the assets should be subtypes of `AbstractCrossSectionalRegressionResult`. A member carries no loadings matrix, because the exposures are the regression's input and an Exposure Estimator produces them.
+
+# Related
+
+  - [`AbstractRegressionResult`](@ref)
+  - [`AbstractLoadingsRegressionResult`](@ref)
+  - [`AbstractCrossSectionalRegressionEstimator`](@ref)
+  - [`CrossSectionalRegression`](@ref)
+"""
+abstract type AbstractCrossSectionalRegressionResult <: AbstractRegressionResult end
+"""
+    const RegE_Reg = Union{<:AbstractLoadingsRegressionResult,
+                           <:AbstractTimeSeriesRegressionEstimator}
+
+Alias for a loadings regression result or a time-series regression estimator.
+
+Matches either an [`AbstractLoadingsRegressionResult`](@ref) (a pre-computed result that carries the loadings matrix `M`) or an [`AbstractTimeSeriesRegressionEstimator`](@ref) (a specification whose verb produces one). Used for dispatch in factor model and regression-based risk routines. Every consumer of the alias reads `M`, so the alias names the two ways a consumer obtains it rather than the umbrella.
+
+The two arms state different criteria, and the asymmetry is deliberate. A result carries a payload, so the result arm names what it carries and admits any loadings result whatever its fitting geometry. An estimator carries no payload, so the estimator arm names the family whose verb, [`regression`](@ref), returns a loadings result. A cross-sectional estimator answers [`cross_sectional_regression`](@ref), whose result carries no loadings, so it stays outside the alias.
+
+# Related
+
+  - [`AbstractLoadingsRegressionResult`](@ref)
+  - [`AbstractTimeSeriesRegressionEstimator`](@ref)
+  - [`AbstractRegressionResult`](@ref)
   - [`AbstractRegressionEstimator`](@ref)
 """
-const RegE_Reg = Union{<:AbstractRegressionResult, <:AbstractRegressionEstimator}
+const RegE_Reg = Union{<:AbstractLoadingsRegressionResult,
+                       <:AbstractTimeSeriesRegressionEstimator}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -197,6 +363,11 @@ end
 
 Return a new [`LinearModel`](@ref) regression target with observation weights `w` added to the keyword arguments.
 
+# Algorithm
+
+ 1. Merge `w` into `re.kwargs` under the key `weights`, replacing any entry already stored there, giving the keyword arguments of the new target.
+ 2. Build a new [`LinearModel`](@ref) from them.
+
 # Arguments
 
   - `re`: Linear model regression target.
@@ -220,6 +391,11 @@ end
 Fit a standard linear regression model using a [`LinearModel`](@ref) regression target.
 
 This method dispatches to `StatsAPI.fit` with the `GLM.LinearModel` type, passing the design matrix `X`, response vector `y`, and any keyword arguments stored in `tgt.kwargs`. It enables flexible configuration of the underlying linear model fitting routine within the regression estimation framework.
+
+# Algorithm
+
+ 1. Read `tgt.kwargs`. When it carries a `weights` entry holding a [`DynamicAbstractWeights`](@ref), resolve that entry against `X` with [`get_observation_weights`](@ref) and write the resolved weights back under the same key, giving `kwargs`. Otherwise take `tgt.kwargs` unchanged.
+ 2. Call `StatsAPI.fit(GLM.LinearModel, X, y; kwargs...)`, giving the fitted model.
 
 # Arguments
 
@@ -251,7 +427,32 @@ end
 
 Tuple of the pseudo-``R^2`` variants `StatsAPI.r2` accepts for a fitted [`GeneralisedLinearModel`](@ref).
 
-The members are `:McFadden`, `:CoxSnell`, `:Nagelkerke` and `:devianceratio`. The `variant` field of [`GeneralisedLinearModel`](@ref) is checked against this tuple at construction.
+The members are `:McFadden`, `:CoxSnell`, `:Nagelkerke` and `:devianceratio`. The `variant` field of [`GeneralisedLinearModel`](@ref) is checked against this tuple at construction. A generalised linear model has no classical ``R^2``, so each member scores the fitted model against the intercept-only model of the same family instead.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+R^2_{\\mathrm{McF}} &= 1 - \\frac{\\ln\\hat{L}}{\\ln\\hat{L}_{0}}\\,,\\\\
+R^2_{\\mathrm{CS}} &= 1 - \\left(\\frac{\\hat{L}_{0}}{\\hat{L}}\\right)^{2/T}\\,,\\\\
+R^2_{\\mathrm{N}} &= \\frac{R^2_{\\mathrm{CS}}}{1 - \\hat{L}_{0}^{\\,2/T}}\\,,\\\\
+R^2_{\\mathrm{dev}} &= 1 - \\frac{D}{D_{0}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``R^2_{\\mathrm{McF}}``: `:McFadden`.
+  - ``R^2_{\\mathrm{CS}}``: `:CoxSnell`.
+  - ``R^2_{\\mathrm{N}}``: `:Nagelkerke`.
+  - ``R^2_{\\mathrm{dev}}``: `:devianceratio`.
+  - ``\\hat{L}``: Maximum likelihood of the fitted model.
+  - ``\\hat{L}_{0}``: Maximum likelihood of the intercept-only model of the same family.
+  - ``D``: Deviance of the fitted model.
+  - ``D_{0}``: Deviance of the intercept-only model of the same family.
+  - $(math_dict[:T])
+
+Three consequences follow for the Normal family, which is the default of [`GeneralisedLinearModel`](@ref). Its deviance is the residual sum of squares, so ``R^2_{\\mathrm{dev}}`` is the classical ``R^2`` of the same fit. Its maximum likelihood carries the fitted dispersion, so ``\\left(\\hat{L}_{0}/\\hat{L}\\right)^{2/T} = D/D_{0}`` and ``R^2_{\\mathrm{CS}}`` equals ``R^2_{\\mathrm{dev}}`` exactly. Its likelihood is a density rather than a probability, so ``\\hat{L}_{0}`` sits on either side of one and the two forms built on the log-likelihood, ``R^2_{\\mathrm{McF}}`` and ``R^2_{\\mathrm{N}}``, leave ``[0, 1]`` in either direction: rescaling the response alone moves both from above one to below zero, while ``R^2_{\\mathrm{dev}}`` does not move at all. Only ``R^2_{\\mathrm{dev}}`` is continuous with the [`LinearModel`](@ref) path, which is why [`default_regression_criterion_variant`](@ref) returns `:devianceratio`.
 
 # Related
 
@@ -259,6 +460,13 @@ The members are `:McFadden`, `:CoxSnell`, `:Nagelkerke` and `:devianceratio`. Th
   - [`GeneralisedLinearModel`](@ref)
   - [`default_regression_criterion_variant`](@ref)
   - [`regression_criterion_func`](@ref)
+
+# References
+
+  - $(ref_dict[:mcfadden1974])
+  - $(ref_dict[:coxsnell1989])
+  - $(ref_dict[:nagelkerke1991])
+  - $(ref_dict[:nelder1972])
 """
 const PSEUDO_R2_VARIANTS = (:McFadden, :CoxSnell, :Nagelkerke, :devianceratio)
 """
@@ -266,13 +474,43 @@ const PSEUDO_R2_VARIANTS = (:McFadden, :CoxSnell, :Nagelkerke, :devianceratio)
 
 Tuple of the pseudo-``R^2`` variants `StatsAPI.adjr2` accepts for a fitted [`GeneralisedLinearModel`](@ref).
 
-The members are `:McFadden` and `:devianceratio`, a strict subset of [`PSEUDO_R2_VARIANTS`](@ref). [`GeneralisedLinearModel`](@ref) cannot check against this tuple, because it does not know which criterion will read its `variant`. [`StepwiseRegression`](@ref) checks it instead: it is the first type that holds the criterion and the target together.
+The members are `:McFadden` and `:devianceratio`, a strict subset of [`PSEUDO_R2_VARIANTS`](@ref). [`GeneralisedLinearModel`](@ref) cannot check against this tuple, because it does not know which criterion will read its `variant`. [`StepwiseRegression`](@ref) checks it instead: it is the first type that holds the criterion and the target together. `StatsAPI.adjr2` raises an `ArgumentError` on either variant this tuple omits.
+
+# Mathematical definition
+
+Each member discounts its unadjusted form of [`PSEUDO_R2_VARIANTS`](@ref) by the parameters the model consumes.
+
+```math
+\\begin{align}
+\\bar{R}^2_{\\mathrm{McF}} &= 1 - \\frac{\\ln\\hat{L} - k}{\\ln\\hat{L}_{0}}\\,,\\\\
+\\bar{R}^2_{\\mathrm{dev}} &= 1 - \\frac{D\\,(T - 1)}{D_{0}\\,(T - k)}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\bar{R}^2_{\\mathrm{McF}}``: `:McFadden`.
+  - ``\\bar{R}^2_{\\mathrm{dev}}``: `:devianceratio`.
+  - ``\\hat{L}``: Maximum likelihood of the fitted model.
+  - ``\\hat{L}_{0}``: Maximum likelihood of the intercept-only model of the same family.
+  - ``D``: Deviance of the fitted model.
+  - ``D_{0}``: Deviance of the intercept-only model of the same family.
+  - ``k``: Number of estimated parameters, which is `StatsAPI.dof` of the fitted model: the regression coefficients, the intercept, and the dispersion.
+  - $(math_dict[:T])
+
+The ``k`` here is the one `:aic`, `:aicc` and `:bic` read, not the predictor count `:adjr2` reads on a fitted [`LinearModel`](@ref). See [`STEPWISE_REGRESSION_CRITERIA`](@ref), which states both.
 
 # Related
 
   - [`PSEUDO_R2_VARIANTS`](@ref)
   - [`GeneralisedLinearModel`](@ref)
+  - [`STEPWISE_REGRESSION_CRITERIA`](@ref)
   - [`StepwiseRegression`](@ref)
+
+# References
+
+  - $(ref_dict[:mcfadden1974])
+  - $(ref_dict[:nelder1972])
 """
 const ADJUSTED_PSEUDO_R2_VARIANTS = (:McFadden, :devianceratio)
 """
@@ -280,7 +518,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Fits each response by a generalised linear model through `GLM.GeneralizedLinearModel`.
 
-The `args` field carries the response distribution and, optionally, the link function; `kwargs` carries the remaining `GLM` options. The default `args = (Normal(),)` with the canonical identity link reproduces ordinary least squares. `variant` names the pseudo-``R^2`` a maximisation criterion reads.
+The `args` field carries the response distribution and, optionally, the link function; `kwargs` carries the remaining `GLM` options. The default `args = (Normal(),)` with the canonical identity link reproduces ordinary least squares. `GLM` defines ``R^2`` for a fitted [`LinearModel`](@ref) only, so `variant` names the pseudo-``R^2`` a maximisation criterion reads instead, and it supplies it to the `:r2` and `:adjr2` members of [`STEPWISE_REGRESSION_CRITERIA`](@ref). A `nothing` `variant` takes the default of the criterion, which [`default_regression_criterion_variant`](@ref) states. The field is dead under a minimisation criterion, which reads no variant at all.
 
 # Fields
 
@@ -298,7 +536,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - If provided, `variant in PSEUDO_R2_VARIANTS`.
+  - If provided, `variant in PSEUDO_R2_VARIANTS`, the wider of the two variant tuples. `StatsAPI.adjr2` accepts [`ADJUSTED_PSEUDO_R2_VARIANTS`](@ref) alone, and [`StepwiseRegression`](@ref) rejects the difference when its criterion is `:adjr2`.
 
 # Examples
 
@@ -310,19 +548,15 @@ GeneralisedLinearModel
   variant ┴ nothing
 ```
 
-# Details
-
-  - `GLM` defines ``R^2`` for a fitted [`LinearModel`](@ref) only, so a generalised linear model needs a named pseudo-``R^2`` variant instead. `variant` supplies it to the `:r2` and `:adjr2` criteria of [`STEPWISE_REGRESSION_CRITERIA`](@ref).
-  - A `nothing` `variant` takes the default of the criterion. See [`default_regression_criterion_variant`](@ref).
-  - The constructor checks `variant` against [`PSEUDO_R2_VARIANTS`](@ref), the wider of the two sets. `StatsAPI.adjr2` accepts [`ADJUSTED_PSEUDO_R2_VARIANTS`](@ref) alone, and [`StepwiseRegression`](@ref) rejects the difference when its criterion is `:adjr2`.
-  - The field is dead under a minimisation criterion, which reads no variant.
-
 # Related
 
   - [`AbstractRegressionTarget`](@ref)
   - [`LinearModel`](@ref)
   - [`PSEUDO_R2_VARIANTS`](@ref)
+  - [`ADJUSTED_PSEUDO_R2_VARIANTS`](@ref)
+  - [`STEPWISE_REGRESSION_CRITERIA`](@ref)
   - [`StepwiseRegression`](@ref)
+  - [`default_regression_criterion_variant`](@ref)
   - [`regression_criterion_func`](@ref)
   - [`StatsAPI.fit(::GeneralisedLinearModel, ::MatNum, ::VecNum)`](@ref)
 
@@ -362,6 +596,11 @@ end
 
 Return a new [`GeneralisedLinearModel`](@ref) regression target with observation weights `w` added to the keyword arguments.
 
+# Algorithm
+
+ 1. Merge `w` into `re.kwargs` under the key `weights`, replacing any entry already stored there, giving the keyword arguments of the new target.
+ 2. Build a new [`GeneralisedLinearModel`](@ref) from them, carrying `re.args` and `re.variant` across unchanged.
+
 # Arguments
 
   - `re`: Generalised linear model regression target.
@@ -386,6 +625,11 @@ end
 Fit a generalised linear regression model using a [`GeneralisedLinearModel`](@ref) regression target.
 
 This method dispatches to `StatsAPI.fit` with the `GLM.GeneralizedLinearModel` type, passing the design matrix `X`, response vector `y`, any positional arguments in `tgt.args`, and any keyword arguments in `tgt.kwargs`.
+
+# Algorithm
+
+ 1. Read `tgt.kwargs`. When it carries a `weights` entry holding a [`DynamicAbstractWeights`](@ref), resolve that entry against `X` with [`get_observation_weights`](@ref) and write the resolved weights back under the same key, giving `kwargs`. Otherwise take `tgt.kwargs` unchanged.
+ 2. Call `StatsAPI.fit(GLM.GeneralizedLinearModel, X, y, tgt.args...; kwargs...)`, giving the fitted model.
 
 # Arguments
 
@@ -445,9 +689,9 @@ const MAX_VAL_STEPWISE_REGRESSION_CRITERIA = (:r2, :adjr2)
 
 Tuple of the symbols that name a stepwise regression criterion scoring a fitted model with one number.
 
-[`StepwiseRegression`](@ref) accepts any symbol of this tuple in its `crit` field and stores it as a `Val`, which is what [`regression_criterion_func`](@ref), [`regression_threshold`](@ref) and the `get_*_reg_incl*!` helpers dispatch on. A symbol outside the tuple is rejected at construction. [`PValue`](@ref) is not a member: it reads the coefficient p-values of the fitted model instead of one score, so it stays a type and takes its own stepwise methods.
+[`StepwiseRegression`](@ref) accepts any symbol of this tuple in its `crit` field and stores it as a `Val`, which is what [`regression_criterion_func`](@ref), [`regression_threshold`](@ref) and the `get_*_reg_incl*!` helpers dispatch on. A symbol outside the tuple is rejected at construction. [`PValue`](@ref) is not a member: it reads the coefficient p-values of the fitted model instead of one score, so it stays a type and takes its own stepwise methods. `:aic`, `:aicc` and `:bic` score a fitted [`LinearModel`](@ref) and a fitted [`GeneralisedLinearModel`](@ref) alike, while `:r2` and `:adjr2` are defined for a fitted [`LinearModel`](@ref) only and read a named pseudo-``R^2`` variant under the other target.
 
-# Criteria
+# Mathematical definition
 
 ## `:aic` — Akaike Information Criterion
 
@@ -532,17 +776,14 @@ Where:
   - ``k``: Number of predictors, excluding the intercept. `:aic`, `:aicc` and `:bic` write ``k`` for a different count: the predictors, plus the intercept, plus the residual variance.
   - $(math_dict[:T])
 
-# Details
-
-  - `:aic`, `:aicc` and `:bic` accept a fitted [`LinearModel`](@ref) and a fitted [`GeneralisedLinearModel`](@ref) alike.
-  - `:r2` and `:adjr2` are defined for a fitted [`LinearModel`](@ref) only. Under a [`GeneralisedLinearModel`](@ref) target they read a named pseudo-``R^2`` variant instead. See [`regression_criterion_func`](@ref) and [`default_regression_criterion_variant`](@ref).
-
 # Related
 
   - [`MinValStepwiseRegressionCriterion`](@ref)
   - [`MaxValStepwiseRegressionCriterion`](@ref)
   - [`StepwiseRegression`](@ref)
+  - [`PSEUDO_R2_VARIANTS`](@ref)
   - [`regression_criterion_func`](@ref)
+  - [`default_regression_criterion_variant`](@ref)
   - [`regression_threshold`](@ref)
   - [`PValue`](@ref)
 
@@ -612,6 +853,8 @@ const MinMaxValStepwiseRegressionCriterion = Union{MinValStepwiseRegressionCrite
 
 Return the pseudo-``R^2`` variant a maximisation criterion reads when the target names none.
 
+`:devianceratio` is the only member of [`PSEUDO_R2_VARIANTS`](@ref) that both `StatsAPI.r2` and `StatsAPI.adjr2` accept and that also reproduces the classical ``R^2`` of a fitted [`LinearModel`](@ref) on a Normal family. The default therefore keeps the score continuous with the [`LinearModel`](@ref) path under either criterion.
+
 # Arguments
 
   - `crit`: Maximisation criterion, as the `Val` the `crit` field of [`StepwiseRegression`](@ref) holds.
@@ -620,17 +863,13 @@ Return the pseudo-``R^2`` variant a maximisation criterion reads when the target
 
   - `variant::Symbol`: `:devianceratio`.
 
-# Details
-
-  - `:devianceratio` is the only variant both `StatsAPI.r2` and `StatsAPI.adjr2` accept that also matches the classical definition of ``R^2`` for a linear model. The default therefore keeps the score continuous with the [`LinearModel`](@ref) path, and it is valid under either criterion.
-  - A [`GeneralisedLinearModel`](@ref) whose `variant` is not `nothing` overrides this.
-
 # Related
 
   - [`MaxValStepwiseRegressionCriterion`](@ref)
-  - [`GeneralisedLinearModel`](@ref)
-  - [`regression_criterion_func`](@ref)
+  - [`GeneralisedLinearModel`](@ref) — a target whose `variant` is not `nothing` overrides this default.
+  - [`regression_criterion_func`](@ref) — the only caller, and it reads the default only when the target names no variant.
   - [`PSEUDO_R2_VARIANTS`](@ref)
+  - [`ADJUSTED_PSEUDO_R2_VARIANTS`](@ref)
 """
 function default_regression_criterion_variant(::MaxValStepwiseRegressionCriterion)
     return :devianceratio
@@ -641,20 +880,7 @@ end
 
 Return the function that scores a fitted model under a stepwise regression criterion.
 
-The method dispatches on the `Val` naming the criterion and on the regression target, because the two maximisation criteria read a different quantity under each target.
-
-# Arguments
-
-  - `crit`: Criterion, as the `Val` the `crit` field of [`StepwiseRegression`](@ref) holds.
-  - `tgt`: Regression target the candidate models are fitted with.
-
-# Returns
-
-  - `f::Function`: The function that computes the criterion value for a fitted model.
-
-# Details
-
-The map is:
+The method dispatches on the `Val` naming the criterion and on the regression target, because the two maximisation criteria read a different quantity under each target. The map is:
 
 | Criterion | [`LinearModel`](@ref) | [`GeneralisedLinearModel`](@ref)          |
 |:--------- |:--------------------- |:----------------------------------------- |
@@ -664,9 +890,23 @@ The map is:
 | `:r2`     | `StatsAPI.r2`         | `model -> StatsAPI.r2(model, variant)`    |
 | `:adjr2`  | `StatsAPI.adjr2`      | `model -> StatsAPI.adjr2(model, variant)` |
 
-  - `StatsAPI.aic`, `StatsAPI.aicc` and `StatsAPI.bic` accept a fitted model of either target, so the minimisation criteria take one method each.
-  - `StatsAPI.r2` and `StatsAPI.adjr2` accept a fitted [`LinearModel`](@ref) without a variant. A fitted [`GeneralisedLinearModel`](@ref) needs a named pseudo-``R^2`` variant, which comes from `tgt.variant` when it is set and from [`default_regression_criterion_variant`](@ref) when it is `nothing`.
-  - [`PValue`](@ref) has no method here. It reads the coefficient p-values of the fitted model, not one score, so its stepwise methods are separate.
+`StatsAPI.aic`, `StatsAPI.aicc` and `StatsAPI.bic` accept a fitted model of either target, so the three minimisation criteria take one method each. `StatsAPI.r2` and `StatsAPI.adjr2` accept a fitted [`LinearModel`](@ref) without a variant, and a fitted [`GeneralisedLinearModel`](@ref) needs a named pseudo-``R^2`` variant, so the two maximisation criteria take two methods each. [`PValue`](@ref) has no method here: it reads the coefficient p-values of the fitted model rather than one score, so its stepwise methods are separate.
+
+# Algorithm
+
+The five methods that return a `StatsAPI` function run no steps. The two that close over a variant run these:
+
+ 1. Read `tgt.variant`. When it is `nothing`, take [`default_regression_criterion_variant`](@ref) of `crit` instead, giving `variant`.
+ 2. Build a closure over `variant` that calls `StatsAPI.r2(model, variant)`, or `StatsAPI.adjr2(model, variant)` under `:adjr2`.
+
+# Arguments
+
+  - `crit`: Criterion, as the `Val` the `crit` field of [`StepwiseRegression`](@ref) holds.
+  - `tgt`: Regression target the candidate models are fitted with.
+
+# Returns
+
+  - `f::Function`: The function that computes the criterion value for a fitted model.
 
 # Related
 
@@ -702,11 +942,45 @@ function regression_criterion_func(crit::Val{:adjr2}, tgt::GeneralisedLinearMode
     return model -> StatsAPI.adjr2(model, variant)
 end
 """
+    regression_polarity(crit::MinMaxValStepwiseRegressionCriterion)
+
+Return the three functions that state which direction of a stepwise criterion is better.
+
+A stepwise search asks the same three questions of every criterion: which entry of a score vector is the best one, whether a candidate score improves on the score in hand, and what the worst score of a type is. Each answer is one function under a minimised criterion and its opposite under a maximised one. This is the only method pair in the library that states the pairing, so [`regression_threshold`](@ref), [`get_forward_reg_incl_excl!`](@ref), [`get_backward_reg_incl!`](@ref) and the two `_regression` methods that seed a score vector all read it rather than restate it.
+
+# Arguments
+
+  - `crit`: Criterion, as the `Val` the `crit` field of [`StepwiseRegression`](@ref) holds.
+
+# Returns
+
+  - `polarity::NamedTuple`: Three functions.
+
+      + `best`: `findmin` under a minimised criterion, `findmax` under a maximised one. Returns the best entry of a score vector and its index.
+      + `improves`: `<` under a minimised criterion, `>` under a maximised one. Answers whether the first score is better than the second.
+      + `worst`: `typemax` under a minimised criterion, `typemin` under a maximised one. Returns the worst score of the type it is given.
+
+# Related
+
+  - [`MinValStepwiseRegressionCriterion`](@ref)
+  - [`MaxValStepwiseRegressionCriterion`](@ref)
+  - [`STEPWISE_REGRESSION_CRITERIA`](@ref)
+  - [`regression_threshold`](@ref)
+  - [`get_forward_reg_incl_excl!`](@ref)
+  - [`get_backward_reg_incl!`](@ref)
+"""
+function regression_polarity(::MinValStepwiseRegressionCriterion)
+    return (; best = findmin, improves = <, worst = typemax)
+end
+function regression_polarity(::MaxValStepwiseRegressionCriterion)
+    return (; best = findmax, improves = >, worst = typemin)
+end
+"""
     regression_threshold(crit::MinMaxValStepwiseRegressionCriterion)
 
 Return the starting threshold for a forward stepwise regression search.
 
-The value is the worst score the criterion can take, so the first candidate model always improves on it. Dispatches on the polarity of the criterion.
+The value is the worst score the criterion can take, so the first candidate model always improves on it. [`regression_polarity`](@ref) states which of `typemax` and `typemin` that is, and `typemax(Float64)` is `Inf`. Only [`ForwardSelection`](@ref) reads it: [`BackwardElimination`](@ref) starts from the score of the full model instead, because its first move must beat a model that already exists.
 
 # Arguments
 
@@ -716,28 +990,44 @@ The value is the worst score the criterion can take, so the first candidate mode
 
   - `t::Number`: `Inf` for a minimisation criterion, `-Inf` for a maximisation criterion.
 
-# Details
-
-Only [`ForwardSelection`](@ref) reads this. [`BackwardElimination`](@ref) starts from the score of the full model instead, because its first move must beat a model that already exists.
-
 # Related
 
+  - [`regression_polarity`](@ref) — the pairing this method reads.
   - [`MinValStepwiseRegressionCriterion`](@ref)
   - [`MaxValStepwiseRegressionCriterion`](@ref)
   - [`STEPWISE_REGRESSION_CRITERIA`](@ref)
+  - [`ForwardSelection`](@ref) — the only caller.
+  - [`BackwardElimination`](@ref) — starts from the score of the full model, never from this value.
 """
-function regression_threshold(::MinValStepwiseRegressionCriterion)
-    return Inf
-end
-function regression_threshold(::MaxValStepwiseRegressionCriterion)
-    return -Inf
+function regression_threshold(crit::MinMaxValStepwiseRegressionCriterion)
+    return regression_polarity(crit).worst(Float64)
 end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Holds the loadings matrix, the intercept vector and the reduced-basis loadings of a fitted factor model.
+Holds the loadings matrix, the intercept vector, the reduced-basis loadings and the idiosyncratic covariance of a fitted factor model.
 
-`M` and `b` are the loadings matrix ``B`` and the intercept vector ``\\alpha`` of the factor model, one row per asset. `L` carries the same loadings written in the reduced basis a dimension reduction produced; it is unset when the estimator regresses on the original factors.
+`M` and `b` are the loadings matrix and the intercept vector of the factor model, one row per asset. `L` carries the same loadings written in the reduced basis a dimension reduction produced; it is unset when the estimator regresses on the original factors. **An unset `L` reads back as `M`.** A [`@forward_properties`](@ref) `swap(L, M)` rule makes `re.L` return `re.M` whenever `L` was not given, so a consumer that decomposes risk in the factor basis needs no `Nothing` branch, and `isnothing(re.L)` is never true. Read `getfield(re, :L)` when the unset case must be told apart, as [`port_opt_view`](@ref) does. [`StepwiseRegression`](@ref) leaves `L` unset and [`DimensionReductionRegression`](@ref) sets it, so `size(L, 2)` is the width of the basis risk is decomposed in: the original factors under the first, the retained principal components under the second.
+
+`esigma` holds the idiosyncratic covariance the fit left over, and it carries the same name and the same shapes as the field [`CrossSectionalFactorModel`](@ref) declares, so one reader answers off either block. A regression estimator fits loadings alone and writes nothing here; the field is filled by the prior that lifts the factor moments, and only when that prior adds a residual block. [`FactorPrior`](@ref) and [`FactorBlackLittermanPrior`](@ref) write the residual variances of [`factor_lift`](@ref) under `rsd = true`, and leave the field unset under `rsd = false`.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\boldsymbol{x}_{t} &= \\boldsymbol{b} + \\mathbf{M} \\boldsymbol{f}_{t} + \\boldsymbol{\\varepsilon}_{t}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:x_t_obs])
+  - ``\\boldsymbol{b}``: Intercept vector ``N \\times 1``, `b`. The term is absent when `b` is unset.
+  - ``\\mathbf{M}``: Loadings matrix ``N \\times K`` of the factor model, `M`.
+  - ``\\boldsymbol{f}_{t}``: Factor returns for observation ``t``, the ``t``-th row of the factor matrix.
+  - ``\\boldsymbol{\\varepsilon}_{t}``: Residual returns for observation ``t``, the part of ``\\boldsymbol{x}_{t}`` the factors do not explain.
+  - $(math_dict[:N])
+  - $(math_dict[:K])
 
 # Fields
 
@@ -748,7 +1038,8 @@ $(DocStringExtensions.FIELDS)
     Regression(;
         M::MatNum,
         L::Option{<:MatNum} = nothing,
-        b::Option{<:VecNum} = nothing
+        b::Option{<:VecNum} = nothing,
+        esigma::Option{<:VecNum_MatNum} = nothing
     ) -> Regression
 
 Keywords correspond to the struct's fields.
@@ -757,26 +1048,23 @@ Keywords correspond to the struct's fields.
 
   - `!isempty(M)`.
   - If provided, `!isempty(b)`, and `length(b) == size(M, 1)`.
-  - If provided, `size(L, 1) == size(M, 1)`. The constructor does **not** reject an empty `L`, so an `L` with the right number of rows and no columns is accepted.
-
-# Details
-
-  - **An unset `L` reads back as `M`.** A `@forward_properties` `swap(L, M)` rule makes `re.L` return `re.M` whenever `L` was not given, and a consumer that decomposes risk in the factor basis needs no `Nothing` branch. [`StepwiseRegression`](@ref) leaves `L` unset; [`DimensionReductionRegression`](@ref) sets it. Use `getfield(re, :L)` when the unset case must be told apart, as [`port_opt_view`](@ref) does.
-  - `size(L, 2)` is therefore the width of the basis risk is decomposed in: the original factors under a stepwise regression, and the retained principal components under a dimension reduction regression.
+  - If provided, `!isempty(L)`, and `size(L, 1) == size(M, 1)`.
+  - If provided, `!isempty(esigma)`, and `esigma` carries `size(M, 1)` entries when it is a vector, or is square with `size(M, 1)` rows when it is a matrix.
 
 # Examples
 
 ```jldoctest
-julia> Regression(; M = [1 2 3; 4 5 6], L = [1 2 3 4; 5 6 7 8], b = [1, 2])
+julia> Regression(; M = [1 2 3; 4 5 6], L = [1 2 3 4; 5 6 7 8], b = [1, 2], esigma = [0.1, 0.2])
 Regression
-  M ┼ 2×3 Matrix{Int64}
-  L ┼ 2×4 Matrix{Int64}
-  b ┴ Vector{Int64}: [1, 2]
+       M ┼ 2×3 Matrix{Int64}
+       L ┼ 2×4 Matrix{Int64}
+       b ┼ Vector{Int64}: [1, 2]
+  esigma ┴ Vector{Float64}: [0.1, 0.2]
 ```
 
 # Related
 
-  - [`AbstractRegressionResult`](@ref)
+  - [`AbstractLoadingsRegressionResult`](@ref)
   - [`StepwiseRegression`](@ref)
   - [`DimensionReductionRegression`](@ref)
   - [`port_opt_view`](@ref)
@@ -785,7 +1073,7 @@ Regression
 
   - $(ref_dict[:cajas2025]) Section 4.1, Equations 4.2-4.3.
 """
-@concrete struct Regression <: AbstractRegressionResult
+@concrete struct Regression <: AbstractLoadingsRegressionResult
     """
     $(arg_dict[:M])
     """
@@ -798,7 +1086,12 @@ Regression
     $(arg_dict[:b])
     """
     b
-    function Regression(M::MatNum, L::Option{<:MatNum}, b::Option{<:VecNum})
+    """
+    $(arg_dict[:esigma])
+    """
+    esigma
+    function Regression(M::MatNum, L::Option{<:MatNum}, b::Option{<:VecNum},
+                        esigma::Option{<:VecNum_MatNum})
         @argcheck(!isempty(M), IsEmptyError)
         if isa(b, VecNum)
             @argcheck(!isempty(b), IsEmptyError)
@@ -808,17 +1101,19 @@ Regression
             @argcheck(!isempty(L), IsEmptyError)
             @argcheck(size(L, 1) == size(M, 1), DimensionMismatch)
         end
-        return new{typeof(M), typeof(L), typeof(b)}(M, L, b)
+        assert_idiosyncratic_covariance(esigma, size(M, 1))
+        return new{typeof(M), typeof(L), typeof(b), typeof(esigma)}(M, L, b, esigma)
     end
 end
 function Regression(; M::MatNum, L::Option{<:MatNum} = nothing,
-                    b::Option{<:VecNum} = nothing)::Regression
-    return Regression(M, L, b)
+                    b::Option{<:VecNum} = nothing,
+                    esigma::Option{<:VecNum_MatNum} = nothing)::Regression
+    return Regression(M, L, b, esigma)
 end
 # When `L` is unset (`Nothing` type parameter), `:L` falls back to the loadings matrix `M`;
 # when `L` is a stored matrix the default field access already returns it, so only the
 # `Nothing` specialisation needs a rule (see [`@forward_properties`](@ref)'s `swap`).
-@forward_properties Regression{<:Any, Nothing, <:Any} begin
+@forward_properties Regression{<:Any, Nothing, <:Any, <:Any} begin
     swap(L, M)
 end
 """
@@ -826,7 +1121,16 @@ end
 
 Return a view of a [`Regression`](@ref) result object, selecting only the rows indexed by `i`.
 
-This function constructs a new `Regression` result, where the coefficient matrix `M`, optional auxiliary matrix `L`, and intercept vector `b` are restricted to the rows specified by the index vector `i`. This is useful for extracting or operating on a subset of regression results, such as for a subset of assets.
+This function constructs a new `Regression` result, where the coefficient matrix `M`, optional auxiliary matrix `L`, intercept vector `b` and idiosyncratic covariance `esigma` are restricted to the rows specified by the index vector `i`. This is useful for extracting or operating on a subset of regression results, such as for a subset of assets.
+
+# Algorithm
+
+ 1. Read `L` and `b` with `getfield`, never through property access. The `swap(L, M)` rule of [`Regression`](@ref) makes `re.L` return `re.M` when `L` is unset, so a property read would materialise `L` as a copy of `M` and lose the unset-ness.
+ 2. Take a row view of `M` over `i`, giving the loadings of the selected assets.
+ 3. Take a row view of `L` over `i` when step 1 found a matrix, and `nothing` otherwise.
+ 4. Take an element view of `b` over `i` when step 1 found a vector, and `nothing` otherwise.
+ 5. View `esigma` with [`idiosyncratic_covariance_view`](@ref), which reads its shape: a vector of variances is indexed once, and a full covariance is indexed on both axes.
+ 6. Build a new [`Regression`](@ref) from the four, which re-runs every guard of the constructor.
 
 # Arguments
 
@@ -842,15 +1146,17 @@ This function constructs a new `Regression` result, where the coefficient matrix
 ```jldoctest
 julia> re = Regression(; M = [1 2; 3 4; 5 6], L = [10 20; 30 40; 50 60], b = [7, 8, 9])
 Regression
-  M ┼ 3×2 Matrix{Int64}
-  L ┼ 3×2 Matrix{Int64}
-  b ┴ Vector{Int64}: [7, 8, 9]
+       M ┼ 3×2 Matrix{Int64}
+       L ┼ 3×2 Matrix{Int64}
+       b ┼ Vector{Int64}: [7, 8, 9]
+  esigma ┴ nothing
 
 julia> PortfolioOptimisers.port_opt_view(re, [1, 3])
 Regression
-  M ┼ 2×2 SubArray{Int64, 2, Matrix{Int64}, Tuple{Vector{Int64}, Base.Slice{Base.OneTo{Int64}}}, false}
-  L ┼ 2×2 SubArray{Int64, 2, Matrix{Int64}, Tuple{Vector{Int64}, Base.Slice{Base.OneTo{Int64}}}, false}
-  b ┴ SubArray{Int64, 1, Vector{Int64}, Tuple{Vector{Int64}}, false}: [7, 9]
+       M ┼ 2×2 SubArray{Int64, 2, Matrix{Int64}, Tuple{Vector{Int64}, Base.Slice{Base.OneTo{Int64}}}, false}
+       L ┼ 2×2 SubArray{Int64, 2, Matrix{Int64}, Tuple{Vector{Int64}, Base.Slice{Base.OneTo{Int64}}}, false}
+       b ┼ SubArray{Int64, 1, Vector{Int64}, Tuple{Vector{Int64}}, false}: [7, 9]
+  esigma ┴ nothing
 ```
 
 # Related
@@ -865,7 +1171,37 @@ function port_opt_view(re::Regression, i, args...)::Regression
     L = getfield(re, :L)
     b = getfield(re, :b)
     return Regression(; M = view(re.M, i, :), L = isnothing(L) ? nothing : view(L, i, :),
-                      b = isnothing(b) ? nothing : view(b, i))
+                      b = isnothing(b) ? nothing : view(b, i),
+                      esigma = idiosyncratic_covariance_view(re.esigma, i))
+end
+"""
+    set_idiosyncratic_covariance(re::Regression, esigma::Option{<:VecNum_MatNum})
+
+Return a [`Regression`](@ref) that carries `esigma`, with every other field unchanged.
+
+A regression estimator fits loadings alone, so the block a fit returns carries no idiosyncratic covariance. The prior that lifts the factor moments measures the residual variances on the way, and it writes them here rather than making every consumer recompute them. [`FactorPrior`](@ref) and [`FactorBlackLittermanPrior`](@ref) are the two callers, and each passes what [`factor_lift`](@ref) returned: the variances under `rsd = true`, and `nothing` under `rsd = false`.
+
+`Accessors.@set` cannot do this. It reads the fields through property access, and the `swap(L, M)` rule of [`Regression`](@ref) makes `re.L` return `re.M` when `L` is unset, so the rebuilt result would carry a copy of `M` under `L` and `isnothing(getfield(re, :L))` would stop being true. This method reads `L` and `b` with `getfield` for that reason, as [`port_opt_view`](@ref) does.
+
+# Arguments
+
+  - `re`: The regression result to rewrite.
+  - `esigma`: The idiosyncratic covariance to write, or `nothing` to leave the field unset.
+
+# Returns
+
+  - `re::Regression`: A new result carrying `esigma`, which re-runs every guard of the constructor.
+
+# Related
+
+  - [`Regression`](@ref)
+  - [`factor_lift`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+function set_idiosyncratic_covariance(re::Regression,
+                                      esigma::Option{<:VecNum_MatNum})::Regression
+    return Regression(; M = re.M, L = getfield(re, :L), b = getfield(re, :b),
+                      esigma = esigma)
 end
 """
     regression(re::Regression, args...)
@@ -891,16 +1227,26 @@ function regression(re::Regression, args...)
     return re
 end
 """
-    regression(re::AbstractRegressionEstimator, rd::ReturnsResult)
+    regression(re::AbstractTimeSeriesRegressionEstimator, rd::ReturnsResult)
 
 Compute or extract a regression result from an estimator or result and a [`ReturnsResult`](@ref).
 
 This method dispatches to `regression(re, rd.X, rd.F)`, allowing both regression estimators and regression result objects to be used interchangeably in generic workflows. If `re` is an estimator, it computes the regression result using the data in `rd`. If `re` is already a result, it is returned unchanged.
 
+# Algorithm
+
+ 1. Check that `rd` carries both matrices, per `# Validation` below.
+ 2. Call `regression(re, rd.X, rd.F)`, giving the regression result.
+
 # Arguments
 
   - `re`: A regression estimator or result object.
   - `rd`: A returns result object containing data matrices `X` and `F`.
+
+# Validation
+
+  - `!isnothing(rd.X)`. A regression needs the asset returns it explains.
+  - `!isnothing(rd.F)`. A regression needs the factor returns it explains them with.
 
 # Returns
 
@@ -911,7 +1257,7 @@ This method dispatches to `regression(re, rd.X, rd.F)`, allowing both regression
   - [`Regression`](@ref)
   - [`ReturnsResult`](@ref)
 """
-function regression(re::AbstractRegressionEstimator, rd::ReturnsResult)
+function regression(re::AbstractTimeSeriesRegressionEstimator, rd::ReturnsResult)
     @argcheck(!isnothing(rd.X), IsNothingError)
     @argcheck(!isnothing(rd.F), IsNothingError)
     return regression(re, rd.X, rd.F)

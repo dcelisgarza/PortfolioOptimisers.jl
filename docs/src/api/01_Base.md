@@ -1,6 +1,6 @@
 # Base
 
-[`01_Base.jl`](https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/main/src/01_Base.jl) implements the most basal symbols used in `PortfolioOptimisers.jl`.
+[`src/01_Base/`](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/src/01_Base) implements the most basal symbols used in `PortfolioOptimisers.jl`. One file per concept: the docstring dictionaries, the type roots, the pretty-show macro, the `ScopedConfig` holders, the load-time preferences, the message builders, the error hierarchy, the type aliases, the observation weights, the `assert_*` family, `VecScalar`, the `NormError` family, the Kaniadakis logarithm and the partial-fit state seam.
 
 ```@docs
 PortfolioOptimisers
@@ -26,27 +26,35 @@ Base.getindex(cfg::ScopedConfig)
 set_default!
 with_config
 apply_preferences!
+apply_show_preferences!
 PortfolioOptimisers.__init__
 PREFERENCE_KEYS
 PREFERENCE_DISTANCES
 RESOURCE_LIMITS
 ResourceLimits
 assert_resource_cap
+assert_ep_grid_size
 set_resource_limits!
 with_resource_limits
 ```
 
 ## Pretty printing
 
-`PortfolioOptimisers.jl`'s types tend to contain quite a lot of information, these functions enable pretty printing so they are easier to interpret.
+`PortfolioOptimisers.jl`'s types tend to contain quite a lot of information, these functions enable pretty printing so they are easier to interpret. A field that holds `nothing` is hidden by default and shown in this documentation; [`set_show_nothing_fields!`](@ref) is the switch, and [`show_fields`](@ref) is the hook a type overloads to hide a field of its own choice.
 
 ```@docs
 @define_pretty_show
+show_fields
+pretty_show_fields
 has_pretty_show_method
 set_compact_show!
 with_compact_show
 COMPACT_SHOW
 compact_show_budget
+ShowNothingFields
+SHOW_NOTHING_FIELDS
+set_show_nothing_fields!
+with_show_nothing_fields
 pretty_show_vector_summary
 pretty_show_vector_element
 pretty_show_vector_body
@@ -61,6 +69,7 @@ DynamicAbstractWeights
 AbstractCustomValue
 VecScalar
 AbstractEstimatorValueAlgorithm
+VectorAbstractEstimatorValueAlgorithm
 get_observation_weights
 NormError
 L2Norm
@@ -70,6 +79,7 @@ LpNorm
 LInfNorm
 norm_error
 norm_factor
+kappa_log
 resolve_rng
 ```
 
@@ -90,6 +100,7 @@ strict_diagnostic
 missing_group_assets_msg
 empty_row_msg
 empty_projected_row_msg
+zero_centrality_msg
 gross_budget_bounds_msg
 failed_solve_msg
 relaxed_preferences_msg
@@ -115,6 +126,7 @@ IsNonFiniteError
 PropertyPathError
 ConflictingArgumentError
 ObservationWeightsError
+NonPositiveWealthError
 ```
 
 ## Assertions
@@ -131,6 +143,7 @@ assert_nonempty_gt0_finite_val
 assert_nonempty_finite_val
 assert_matrix_issquare
 assert_unit_interval
+assert_closed_unit_interval
 assert_all_finite
 assert_source_selector
 ```
@@ -200,6 +213,23 @@ field_dict
 math_dict
 err_name_dict
 ref_dict
+```
+
+## Partial fit
+
+An incremental fit folds one observation into an estimate without reading the sample again. [`partial_fit!`](@ref) is the verb each family writes, [`partial_fit`](@ref) is the value form that folds a copy of the state, its running quantities live in a [`AbstractPartialFitState`](@ref), and [`merge_states`](@ref) combines the states of two disjoint blocks of observations into the state of the concatenated block.
+
+```@docs
+partial_fit!
+partial_fit
+partial_fit(est::Union{<:PortfolioOptimisers.AbstractEstimator, <:StatsBase.CovarianceEstimator}, args...; kwargs...)
+PortfolioOptimisers.AbstractPartialFitState
+PortfolioOptimisers.merge_states
+PortfolioOptimisers.assert_mergeable_states
+PortfolioOptimisers.chan_merge
+PortfolioOptimisers.assert_partial_fit_state
+PortfolioOptimisers.partial_fit_cache
+PortfolioOptimisers.obs_weights_view(::PortfolioOptimisers.AbstractPartialFitState, ::Any)
 ```
 
 ## Iteration and indexing

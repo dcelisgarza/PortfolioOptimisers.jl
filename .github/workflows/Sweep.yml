@@ -71,24 +71,16 @@ jobs:
       # `CodeHealth.yml` runs for sixteen minutes. `sweep_triage.jl` includes `CodeHealth.jl`, which
       # loads only `TOML`, and `TOML` is stdlib.
       #
+      # Every `gh` call this job makes lives in `code_health/sweep_issues.sh`, which a person runs
+      # by hand with the same two subcommands. One copy, so a hand run and this job cannot drift.
+      #
       # The two dumps are tab-separated, one issue per line, so the Julia side needs no JSON parser.
       # The maps dump carries every `wayfinder:map` issue in the tracker; the script picks the
       # thirteen children out of it by title and reads the umbrella by number.
       - name: Dump the wayfinder maps and the sweep issues
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          mkdir -p code_health/_sweep
-          gh issue list --label wayfinder:map --state all --limit 200 \
-             --json number,state,title \
-             --template '{{range .}}{{.number}}{{"\t"}}{{.state}}{{"\t"}}{{.title}}{{"\n"}}{{end}}' \
-             > code_health/_sweep/maps.tsv
-          gh issue list --label sweep --state all --limit 500 \
-             --json number,state,title \
-             --template '{{range .}}{{.number}}{{"\t"}}{{.state}}{{"\t"}}{{.title}}{{"\n"}}{{end}}' \
-             > code_health/_sweep/existing.tsv
-          echo "The tracker holds $(wc -l < code_health/_sweep/maps.tsv) map(s)."
-          echo "It holds $(wc -l < code_health/_sweep/existing.tsv) sweep issue(s)."
+        run: bash code_health/sweep_issues.sh dump
       # The script throws when the manifest and the tracker disagree, and it then writes no plan.
       # That is deliberate: a wrong parent or a wrong title is work a person must undo by hand.
       - name: Plan the sub-issues
@@ -106,37 +98,10 @@ jobs:
         if: ${{ github.event_name == 'schedule' || !inputs.dry_run }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          while read -r n; do
-            [ -n "$n" ] || continue
-            gh issue reopen "$n" </dev/null
-            echo "Reopened #$n."
-          done < code_health/_sweep/reopen.tsv
-          count=0
-          while IFS=$'\t' read -r stem path parent; do
-            [ -n "$stem" ] || continue
-            url=$(gh issue create --label sweep \
-                    --title "$(cat "code_health/_sweep/$stem.title")" \
-                    --body-file "code_health/_sweep/$stem.body" </dev/null)
-            echo "Opened $url for $path."
-            # The sub-issues endpoint takes the child's DATABASE id, which is not the number in the
-            # URL. `gh issue create` prints the URL alone, so the id is read back by number.
-            child=$(gh api "repos/$GITHUB_REPOSITORY/issues/${url##*/}" --jq .id </dev/null)
-            gh api "repos/$GITHUB_REPOSITORY/issues/$parent/sub_issues" \
-               -F sub_issue_id="$child" --silent </dev/null
-            echo "Attached it to child map #$parent."
-            count=$((count + 1))
-          done < code_health/_sweep/plan.tsv
-          echo "Opened $count sub-issue(s)."
+        run: bash code_health/sweep_issues.sh apply
       - name: Report the dry run
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
-        run: |
-          echo "Dry run. Nothing was opened and nothing was reopened."
-          echo "--- the sub-issues that would be opened ---"
-          cat code_health/_sweep/plan.tsv || true
-          echo "--- the issues that would be reopened ---"
-          cat code_health/_sweep/reopen.tsv || true
+        run: bash code_health/sweep_issues.sh apply --dry-run
       # The plan is kept so a dry run can be read in full. It carries no secret: every line of it
       # came from a committed file or from the public tracker.
       - name: Publish the plan
