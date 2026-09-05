@@ -293,7 +293,7 @@ A symmetric, zero-diagonal matrix in which larger values mean less relatedness. 
 Converts correlation or returns into a distance: `SimpleDistance`, `SimpleAbsoluteDistance`, `LogDistance`, `CorrelationDistance`, `VariationInfoDistance`, `CanonicalDistance`. `Distance` is the configurable container and `DistanceDistance` computes a distance-of-distances.
 
 **Feature Distance**
-The one Distance Estimator measuring something other than returns: it applies a metric to the rows of a Feature Matrix, stacked from the Panel Fields its Feature Selector names, so the resulting hierarchy expresses exogenous structure.
+The one Distance Estimator measuring something other than returns: it applies a metric to the rows of a Feature Matrix, stacked from the Panel Fields its Feature Selector names, so the resulting hierarchy expresses exogenous structure. A clustering or phylogeny result records nothing about that matrix: `feature_labels(de, pr, rd, X)` derives what it measured from the estimator and the carriers, and the kernel derives the matrix the same way.
 
 **Similarity Matrix Algorithm**
 The transform turning a Distance Matrix into a similarity matrix: `MaximumDistanceSimilarity`, `ExponentialSimilarity`, `GeneralExponentialSimilarity`, `ComplementSimilarity`, `AngularSimilarity`.

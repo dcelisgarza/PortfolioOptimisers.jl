@@ -1079,3 +1079,57 @@ catalogue entry. A caller with a bare matrix builds one `TensorPanelField`, or o
 `NumericPanelField` per column. `CONTEXT.md` §2's **Panel Field** states the view and the
 collapse. The build is
 [#810](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/810).
+
+## Amendment (2026-09-05): a `Clusters` result records nothing about the panel, and the derivation verbs gain a method on the distance
+
+Map [#802](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/802)'s sixth decision,
+[#816](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/816), closes the question the first text left
+open: whether a `Clusters` result should record which matrix produced it. Every option was judged
+from zero, on architecture, maintainability, ergonomics and performance. The reference
+implementation's clustering estimator records the asset names it was fit on, for its dendrogram
+plot, and its distance estimators record the codependence and the distance. Neither records a
+feature name, because neither reads a panel, so both decisions here add capability.
+
+**A `Clusters` result records nothing about the panel the distance measured.** It holds the answer,
+`res` and `k`, and the two matrices it was cut from, `S` and `D`, with `P` on the network path.
+What produced `D` is the estimator, that is `FeatureDistance`'s metric, producer slot, selector and
+`strict`, together with the carriers the caller handed the kernel. That is the division the
+glossary states: a Result is the answer for the input it was computed on, and an Estimator says
+how. It is the division the type already keeps for a covariance `Distance`, whose `Clusters`
+records neither the covariance estimator nor the distance estimator, and it is the division the
+eleventh amendment kept for the square case, which nothing records. `PhylogenyResult` holds `X`
+alone and is also the literal a caller builds by hand, so it records nothing either, and the
+question's third item, whether the phylogeny result records the same, is void.
+
+The resolved labels, stored lazily behind an opt-in flag, were rejected. The lazy-flag rule covers
+a quantity that exists only inside a step and needs the step run again to rebuild. The labels need
+no step run again, because the estimator and the carrier derive them with no distance computed, so
+a lazy store saves nothing. The field would also put a per-estimator seam into three clustering
+kernels and two network kernels, and every result built through a covariance distance would answer
+`nothing`. Recording the resolved panel was rejected because it duplicates the carrier on every
+result built from one. Recording the field names alone was rejected because a name vector loses a
+level subset and does not rebuild the matrix. Nothing in `src/` or `ext/` reads a feature name off
+a clustering result: the optimisers and the plots read `res`, `k` and `S`, and the dendrogram takes
+the asset names from the caller.
+
+**The two derivation verbs gain a method on the distance, and the kernel calls it.**
+
+```julia
+feature_matrix(de::FeatureDistance, pr, rd, X) = feature_matrix(asset_panel(de.ape, pr, rd, X), de.sel; strict = de.strict)
+feature_labels(de::FeatureDistance, pr, rd, X) = feature_labels(asset_panel(de.ape, pr, rd, X), de.sel; strict = de.strict)
+```
+
+The kernel's three-argument entry, `cor_and_dist(de, ::Any, X; pr, rd)`, calls
+`feature_matrix(de, pr, rd, X)`. A caller who asks what a clustering measured calls
+`feature_labels(de, res.pr, rd, rd.X)` with the arguments the optimiser received. So the
+resolution has one site, the caller's rebuild is the kernel's measurement by construction, and the
+ninth amendment's two rules hold: the label vector is a selector that rebuilds the matrix, and the
+kernel allocates no label it does not read. The shape follows `asset_panel(ape, pr, rd, X)` of the
+eighth amendment, a method by dispatch on the first argument beside the builder. A method that
+composed the two calls at every caller was rejected because the resolution would then be spelt
+twice, and a change to the kernel's line could leave a caller's rebuild different from the
+measurement.
+
+The build is [#810](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/810), which owns the kernel's
+line. The methods stand on the selector verbs of
+[#811](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/811).

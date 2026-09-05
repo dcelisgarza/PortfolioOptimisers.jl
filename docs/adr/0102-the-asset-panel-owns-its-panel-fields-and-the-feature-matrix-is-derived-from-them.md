@@ -113,6 +113,15 @@ rebuilds the same matrix.
 `nz` therefore has no home. The field names are the vector of `f.name`, and column labels are the
 output of `feature_labels` when a consumer needs them.
 
+Both verbs also take the distance in place of the panel and the selector:
+`feature_matrix(de, pr, rd, X)` and `feature_labels(de, pr, rd, X)` resolve the panel through
+`asset_panel(de.ape, pr, rd, X)` and read `de.sel` and `de.strict`. The kernel calls the first, and
+a caller who asks what a clustering measured calls the second with the arguments the optimiser
+received, so the resolution has one site. No clustering or phylogeny result records the labels or
+the panel: [issue #816](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/816) decided that against
+ADR 0045, because the estimator and the carrier derive them with no distance computed, so there is
+nothing a lazy store would save.
+
 `feature_matrix` is `FeaturePrior`'s until the producer build frees the name, so the carrier build
 ships the pair it needs under interim names: `panel_feature_matrix(pnl)`, which stacks every field
 and returns the labels beside the matrix, and `feature_matrix_panel(nz, Z)`, its exact inverse —
