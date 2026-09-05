@@ -1052,6 +1052,8 @@ Compute Brinson performance attribution aggregated per asset class [brinson_attr
 
 `X` holds **prices**, not returns. The period return of an asset is the ratio of its last value in the range to its first value, less one, which is a return only when the entries are prices.
 
+The function is defined over **one** evaluation period, between the two dates, and it reads no weight path. `w` and `wb` are held fixed over that period, so a fund whose holdings drifted inside it is attributed at the weights it opened with. A drift-aware multi-period attribution needs a scheme for linking the single-period effects into a cumulative one, and this library has chosen none, so no such method exists. Attribute each period on its own, and link the results outside the library.
+
 Both class returns divide by the class weight, and neither division is guarded. A class holding zero portfolio weight makes its ``r_{i}`` a `NaN`, and a class holding zero benchmark weight makes its ``r_{i}^{b}`` a `NaN`. The two spread differently, because ``\\mathrm{AA}_{i}`` reads only ``r_{i}^{b}``. A zero portfolio weight leaves ``\\mathrm{AA}_{i}`` finite and makes the other three rows of that class a `NaN`; a zero benchmark weight makes all four a `NaN`. The `Total` column is a row sum, so a row is a `NaN` exactly when one of its class entries is. Drop the empty class from `asset_classes` to remove it.
 
 # Mathematical definition

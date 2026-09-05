@@ -368,9 +368,21 @@ function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.BaseR
                                                       percentage = percentage, N = N,
                                                       sca = sca, kwargs...)
 end
+function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.BaseRM_VecBaseRM,
+                                                    pred::PredictionResult{<:Any, <:Any,
+                                                                           <:HeldWeightsResult},
+                                                    fees::Option{<:Fees} = nothing;
+                                                    kwargs...)
+    hw = pred.hw
+    fees = PortfolioOptimisers.amortise_fees(extract_fees(pred.res, fees), size(hw.X, 1))
+    nx = isnothing(pred.rd.nx) ? (1:size(hw.X, 2)) : pred.rd.nx
+    return PortfolioOptimisers.plot_risk_contribution(r, pred.res.w, hw.X, fees; nx = nx,
+                                                      kwargs...)
+end
 function PortfolioOptimisers.plot_risk_contribution(::PortfolioOptimisers.BaseRM_VecBaseRM,
-                                                    ::PredictionResult; kwargs...)
-    return throw(ArgumentError("`plot_risk_contribution(r, pred::PredictionResult)` is not supported: `PredictionReturnsResult` stores portfolio returns, not raw asset returns. Call `plot_risk_contribution(r, pred.res.w, rd::ReturnsResult, ...)` with the original returns data."))
+                                                    ::PredictionResult{<:Any, <:Any,
+                                                                       Nothing}; kwargs...)
+    return throw(ArgumentError("`plot_risk_contribution(r, pred::PredictionResult)` needs the fold's asset returns, and this fold kept none: `pred.rd.X` is the portfolio return series, and `pred.hw` is absent because the fold's scheme set neither `wd` nor `pws`. Set one of them so the fold records its asset returns, or call `plot_risk_contribution(r, pred.res.w, rd::ReturnsResult, ...)` with the original returns data."))
 end
 ## plot_factor_risk_contribution
 function PortfolioOptimisers.plot_factor_risk_contribution(r::PortfolioOptimisers.BaseRM_VecBaseRM,
@@ -386,9 +398,23 @@ function PortfolioOptimisers.plot_factor_risk_contribution(r::PortfolioOptimiser
                                                              rd = rd, delta = delta, N = N,
                                                              sca = sca, kwargs...)
 end
+function PortfolioOptimisers.plot_factor_risk_contribution(r::PortfolioOptimisers.BaseRM_VecBaseRM,
+                                                           pred::PredictionResult{<:Any,
+                                                                                  <:Any,
+                                                                                  <:HeldWeightsResult},
+                                                           fees::Option{<:Fees} = nothing;
+                                                           kwargs...)
+    hw = pred.hw
+    fees = PortfolioOptimisers.amortise_fees(extract_fees(pred.res, fees), size(hw.X, 1))
+    rd = ReturnsResult(; nx = pred.rd.nx, X = hw.X, nf = pred.rd.nf, F = pred.rd.F)
+    return PortfolioOptimisers.plot_factor_risk_contribution(r, pred.res.w, hw.X, fees;
+                                                             rd = rd, kwargs...)
+end
 function PortfolioOptimisers.plot_factor_risk_contribution(::PortfolioOptimisers.BaseRM_VecBaseRM,
-                                                           ::PredictionResult; kwargs...)
-    return throw(ArgumentError("`plot_factor_risk_contribution(r, pred::PredictionResult)` is not supported: `PredictionReturnsResult` stores portfolio returns, not raw asset returns. Call `plot_factor_risk_contribution(r, pred.res.w, rd::ReturnsResult, ...)` with the original returns data."))
+                                                           ::PredictionResult{<:Any, <:Any,
+                                                                              Nothing};
+                                                           kwargs...)
+    return throw(ArgumentError("`plot_factor_risk_contribution(r, pred::PredictionResult)` needs the fold's asset returns, and this fold kept none: `pred.rd.X` is the portfolio return series, and `pred.hw` is absent because the fold's scheme set neither `wd` nor `pws`. Set one of them so the fold records its asset returns, or call `plot_factor_risk_contribution(r, pred.res.w, rd::ReturnsResult, ...)` with the original returns data."))
 end
 ## plot_network
 function PortfolioOptimisers.plot_network(pl::NwE_ClE_Cl, X::MatNum,

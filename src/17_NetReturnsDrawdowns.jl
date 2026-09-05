@@ -81,6 +81,8 @@ The rows sum to the portfolio series. `vec(sum(calc_net_asset_returns(w, X, fees
 
 Each per asset fee is charged in **every** period, as it is for [`calc_net_returns`](@ref). The `N × 1` fee vector is subtracted from every row of ``\\mathbf{X} \\odot \\boldsymbol{w}^{\\intercal}``, so a `T`-row matrix charges it `T` times.
 
+These are the constant-weight methods: the one vector `w` weighs every observation. The `w::MatNum` methods below read a weight path instead, one row of weights per observation, which is what a fold scored under a Weight Drift held.
+
 # Mathematical definition
 
 ```math
@@ -138,6 +140,81 @@ function calc_net_asset_returns(w::VecNum, X::MatNum, args...)
 end
 function calc_net_asset_returns(w::VecNum, X::MatNum, fees::Fees)
     return X ⊙ transpose(w) .- transpose(calc_asset_fees(w, fees))
+end
+"""
+    calc_net_asset_returns(w::MatNum, X::MatNum, args...)
+    calc_net_asset_returns(w::MatNum, X::MatNum, fees::Fees)
+
+Compute the per asset net portfolio returns of a weight path.
+
+`w` is a `T × N` weight path: row `t` holds the weights the portfolio carried **through** observation `t`. [`weight_path`](@ref) is the verb that makes one, under a Weight Drift or at constant weights, so this method reads a drifted window the way the [`VecNum`](@ref) methods above read a constant one.
+
+The rows sum to the portfolio series of that same path. The wealth ratio of an observation is the weights held through it contracted with that observation's asset returns, so `vec(sum(calc_net_asset_returns(U, X, fees); dims = 2))` reproduces the series [`calc_net_returns`](@ref) forms from the same fold under the same drift. The two sides add in a different order, so the identity holds to rounding and not to `==`.
+
+The fee is charged from the **first** row of the path. That row is the target weights, because nothing has drifted when the window opens, and it is the vector the portfolio series charges its own fee from. The same `N × 1` vector is therefore subtracted from every row here as there.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathbf{R}(\\mathbf{X},\\, \\mathbf{U}) &= \\mathbf{X} \\odot \\mathbf{U} \\ominus \\boldsymbol{F}_{\\text{t}}(\\mathbf{U}_{1,\\cdot})^{\\intercal}
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathbf{R}(\\mathbf{X},\\, \\mathbf{U})``: `T × N` matrix of per asset portfolio net returns.
+  - ``\\mathbf{X}``: `T × N` matrix of asset returns (observations × assets).
+  - ``\\mathbf{U}``: `T × N` weight path, whose row ``t`` holds the weights carried through observation ``t``.
+  - ``\\mathbf{U}_{1,\\cdot}``: First row of the path, which is the target weights.
+  - ``\\boldsymbol{F}_{\\text{t}}(\\boldsymbol{w})``: `N × 1` per asset vector of total portfolio fees computed using [`calc_fees`](@ref).
+  - ``\\odot``: Elementwise (Hadamard) multiplication.
+  - ``\\ominus``: Elementwise (Hadamard) subtraction.
+
+# Algorithm
+
+ 1. Scale each observation of `X` by the weights held through it, giving `X ⊙ w`, the `T × N` matrix of gross per asset contributions.
+ 2. On the `args...` method, return that matrix unchanged. The method reads none of its trailing arguments, so a `nothing` `fees` reaches it and charges nothing rather than charging a zero fee.
+ 3. On the `fees::Fees` method, compute the `N × 1` vector `calc_asset_fees(view(w, 1, :), fees)` from the path's first row, and subtract its transpose from every row of the matrix.
+
+# Validation
+
+  - `size(w) == size(X)`, else the broadcast raises a `DimensionMismatch`. A fold's path has the size of the fold's asset returns by construction, and [`assert_held_weights_shape`](@ref) checks a stored one.
+
+# Arguments
+
+  - `w`: Weight path (observations × assets).
+  - `X`: Asset return matrix (observations × assets).
+  - `fees`: [`Fees`](@ref) structure.
+  - `args...`: Additional arguments (ignored).
+
+# Returns
+
+  - `ret::MatNum`: Per asset portfolio net returns.
+
+# Examples
+
+```jldoctest
+julia> calc_net_asset_returns([0.5 0.5; 0.6 0.4], [0.01 0.02; 0.03 0.04])
+2×2 Matrix{Float64}:
+ 0.005  0.01
+ 0.018  0.016
+```
+
+# Related
+
+  - [`MatNum`](@ref)
+  - [`weight_path`](@ref): Makes the path this method reads.
+  - [`SelfFinancingDrift`](@ref)
+  - [`calc_net_returns`](@ref): The portfolio series this matrix sums to along `dims = 2`.
+  - [`calc_asset_fees`](@ref): Computes the per asset vector that step 3 subtracts.
+  - [`Fees`](@ref)
+"""
+function calc_net_asset_returns(w::MatNum, X::MatNum, args...)
+    return X ⊙ w
+end
+function calc_net_asset_returns(w::MatNum, X::MatNum, fees::Fees)
+    return X ⊙ w .- transpose(calc_asset_fees(view(w, 1, :), fees))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1314,7 +1391,8 @@ The stored path is read by dispatch on `U`, so [`weight_path`](@ref) tests nothi
 # Algorithm
 
  1. On a stored `U`, return it.
- 2. On `nothing`, run the drift over `X` and give its path, member by member under a population.
+ 2. On `nothing` under a single weight vector, run the drift over `X` and give its path.
+ 3. On `nothing` under a population, run the drift member by member, and fill a member whose wealth is not positive with `NaN`. That is what the store holds for such a member, so the rebuild stays bit-identical to it. [`held_weights_result`](@ref) already raised on a population every member of which is ruined, so no record reaching this verb holds one.
 
 # Arguments
 
@@ -1340,7 +1418,18 @@ function rebuild_weight_path(::Nothing, wd::AbstractWeightDrift, w::VecNum, X::M
     return weight_path(wd, w, X)
 end
 function rebuild_weight_path(::Nothing, wd::AbstractWeightDrift, w::VecVecNum, X::MatNum)
-    return [weight_path(wd, wi, X) for wi in w]
+    Tw = float(promote_type(eltype(X), eltype(first(w))))
+    Us = Vector{Matrix{Tw}}(undef, length(w))
+    for (i, wi) in pairs(w)
+        P = drift_position_values(wd, wi, X)
+        V = drift_wealth(P, wi)
+        Us[i] = if isnothing(non_positive_wealth_index(V))
+            drifted_weight_path(P, V, wi)
+        else
+            fill(convert(Tw, NaN), size(X))
+        end
+    end
+    return Us
 end
 """
     held_weights_drift(wd::Nothing, pws::Nothing)

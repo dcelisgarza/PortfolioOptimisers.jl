@@ -356,4 +356,17 @@
         @test_throws ArgumentError plot_risk_contribution(r_cvr, pred)
         @test_throws ArgumentError plot_factor_risk_contribution(r_cvr, pred)
     end
+    @testset "A drifted fold plots its risk contributions (#769)" begin
+        # The blanket refusal above is lifted for a fold that carries a Held Weights
+        # record: that record keeps the fold's asset returns, which is exactly what the
+        # refusal said a `PredictionResult` had lost.
+        mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
+        raw = cross_val_predict(mr, rd, KFold(; n = 2, wd = SelfFinancingDrift())).pred
+        pred = isa(raw[1], PredictionResult) ? raw[1] : raw[1].pred[1]
+
+        @test !isnothing(pred.hw)
+        @test is_plot(plot_risk_contribution(r_cvr, pred))
+        @test is_plot(plot_factor_risk_contribution(r_cvr, pred))
+        @test is_plot(plot_risk_contribution(r_cvr, pred; percentage = false))
+    end
 end

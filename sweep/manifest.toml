@@ -183,7 +183,7 @@
 "src/14_UncertaintySets/08_NormBallUncertaintySets.jl" = { map = 7, units = 6, swept = false }
 "src/15_Turnover.jl" = { map = 8, units = 15, algorithm = 8, swept = true }
 "src/16_Fees.jl" = { map = 8, units = 24, algorithm = 19, swept = true }
-"src/17_NetReturnsDrawdowns.jl" = { map = 8, units = 29, algorithm = 8, swept = false }
+"src/17_NetReturnsDrawdowns.jl" = { map = 8, units = 30, algorithm = 8, swept = false }
 "src/18_Tracking.jl" = { map = 8, units = 14, algorithm = 4, swept = true }
 "src/19_RiskMeasures/01_Base_RiskMeasures.jl" = { map = 9, units = 89, swept = false }
 "src/19_RiskMeasures/02_Variance.jl" = { map = 9, units = 24, swept = false }
@@ -212,10 +212,10 @@
 "src/19_RiskMeasures/24_MedianAbsoluteDeviationRisk.jl" = { map = 9, units = 12, swept = false }
 "src/19_RiskMeasures/25_NonOptimisationRiskMeasures.jl" = { map = 9, units = 10, swept = false }
 "src/19_RiskMeasures/26_AdjustRiskContributions.jl" = { map = 9, units = 6, swept = false }
-"src/19_RiskMeasures/27_ExpectedRisk.jl" = { map = 9, units = 20, swept = false }
+"src/19_RiskMeasures/27_ExpectedRisk.jl" = { map = 9, units = 21, swept = false }
 "src/19_RiskMeasures/28_RiskMeasureTools.jl" = { map = 9, units = 7, swept = false }
 "src/20_Optimisation/01_Base_Optimisation.jl" = { map = 10, units = 113, swept = false }
-"src/20_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl" = { map = 12, units = 56, swept = false }
+"src/20_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl" = { map = 12, units = 60, swept = false }
 "src/20_Optimisation/02_CrossValidation/02_KFold.jl" = { map = 12, units = 4, swept = false }
 "src/20_Optimisation/02_CrossValidation/03_Combinatorial.jl" = { map = 12, units = 12, swept = false }
 "src/20_Optimisation/02_CrossValidation/04_WalkForward.jl" = { map = 12, units = 20, swept = false }

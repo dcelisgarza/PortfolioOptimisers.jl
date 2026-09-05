@@ -692,4 +692,54 @@
         @test pop[1] == PortfolioOptimisers.rolling_window_measure(rw, ret, 20)
         @test pop[2] == PortfolioOptimisers.rolling_window_measure(rw, 2 * ret, 20)
     end
+    @testset "The ending-weights rolling window measure reads a path (#769)" begin
+        # The third reading of the one verb. The weight argument's type is the picker: a
+        # vector is one target vector, and a matrix is a weight path whose row `t` holds the
+        # weights carried through observation `t`. A window closing at row `t` is scored
+        # against row `t` of the path — the weights held by the time the window closed.
+        PO = PortfolioOptimisers
+        T = size(rd.X, 1)
+        rw = ConditionalValueatRisk()
+        wdr = SelfFinancingDrift()
+        U = PO.weight_path(wdr, w, rd.X)
+        Uc = PO.weight_path(nothing, w, rd.X)
+
+        # The definition, written out.
+        @test PO.rolling_window_measure(rw, U, rd.X, nothing, 20) ==
+              [rw(view(rd.X, (t - 19):t, :) * view(U, t, :)) for t in 20:T]
+
+        # Every row of a constant path is the same vector, so the reading reproduces the
+        # constant-weight method exactly rather than approximately.
+        @test PO.rolling_window_measure(rw, Uc, rd.X, nothing, 20) ==
+              PO.rolling_window_measure(rw, w, rd.X, nothing, 20)
+        @test length(PO.rolling_window_measure(rw, U, rd.X, nothing, T)) == 1
+        @test length(PO.rolling_window_measure(rw, U, rd.X, nothing, 20)) == T - 19
+
+        # A drifted path moves the numbers, which is the whole point of the reading.
+        @test PO.rolling_window_measure(rw, U, rd.X, nothing, 20) !=
+              PO.rolling_window_measure(rw, w, rd.X, nothing, 20)
+
+        # The window is refused at the same boundary as the two methods beside it.
+        for bad in (0, -1, T + 1)
+            @test_throws DomainError PO.rolling_window_measure(rw, U, rd.X, nothing, bad)
+        end
+
+        # A path shorter than the sample is refused by name, rather than surfacing as a
+        # `BoundsError` from inside whichever measure `r` names.
+        @test_throws DimensionMismatch PO.rolling_window_measure(rw, view(U, 1:(T - 1), :),
+                                                                 rd.X, nothing, 20)
+        err = try
+            PO.rolling_window_measure(rw, view(U, 1:(T - 1), :), rd.X, nothing, 20)
+        catch e
+            e
+        end
+        @test occursin("size(w, 1) == size(X, 1)", sprint(showerror, err))
+
+        # A vector of measures scalarises inside each window here too.
+        rws = [ConditionalValueatRisk(), ValueatRisk()]
+        @test PO.rolling_window_measure(rws, Uc, rd.X, nothing, 20) ==
+              PO.rolling_window_measure(rws, w, rd.X, nothing, 20)
+        @test PO.rolling_window_measure(rws, U, rd.X, nothing, 20; sca = MaxScalariser()) !=
+              PO.rolling_window_measure(rws, U, rd.X, nothing, 20)
+    end
 end

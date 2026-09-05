@@ -496,6 +496,42 @@ end
         @test r[1] ≈ Xn * ws[1]
         @test r[2] ≈ Xn * ws[2]
     end
+    @testset "the weight path split sums to the drifted series (#769)" begin
+        # Decision #755: the weight argument's type is the picker. A vector is one target
+        # vector and a matrix is a weight path, so the split reads `X ⊙ U` and its rows
+        # still sum to the portfolio series of the same path.
+        wdn = SelfFinancingDrift()
+        U = PO.weight_path(wdn, wn, Xn)
+        @test U[1, :] == wn
+
+        a = calc_net_returns(wn, Xn, fn, wdn)
+        b = vec(sum(calc_net_asset_returns(U, Xn, fn); dims = 2))
+        @test a ≈ b
+        @test maximum(abs, a - b) < 1e-15
+        @test calc_net_returns(wn, Xn, nothing, wdn) ≈
+              vec(sum(calc_net_asset_returns(U, Xn); dims = 2))
+
+        # The fee is charged from the path's first row, which is the target weights, so
+        # the same `N × 1` vector is subtracted from every row here as there.
+        fa = PO.calc_asset_fees(wn, fn)
+        @test calc_net_asset_returns(U, Xn, fn) ≈
+              calc_net_asset_returns(U, Xn) .- transpose(fa)
+
+        # The constant path is the reader-facing shape of a window that ran no drift, so
+        # the `MatNum` methods reproduce the `VecNum` ones on it, exactly.
+        Uc = PO.weight_path(nothing, wn, Xn)
+        @test calc_net_asset_returns(Uc, Xn, fn) == calc_net_asset_returns(wn, Xn, fn)
+        @test calc_net_asset_returns(Uc, Xn) == calc_net_asset_returns(wn, Xn)
+        @test calc_net_asset_returns(Uc, Xn, nothing) == Xn .* transpose(wn)
+
+        # A `nothing` fee reaches the `args...` method here too, and charges nothing.
+        m = which(calc_net_asset_returns, (typeof(U), typeof(Xn), Nothing))
+        @test m.file ==
+              Symbol(joinpath(dirname(@__DIR__), "src", "17_NetReturnsDrawdowns.jl"))
+
+        # A path that is not the shape of the window is a caller error the broadcast names.
+        @test_throws DimensionMismatch calc_net_asset_returns(view(U, 1:2, :), Xn, fn)
+    end
 end
 @testset "Weight drift" begin
     using PortfolioOptimisers, Test, Dates
@@ -777,5 +813,24 @@ end
         out = @test_logs min_level = Logging.Warn calc_net_returns(pop, X, nothing, wd)
         @test out[1] == calc_net_returns(pop[1], X, nothing, wd)
         @test out[2] == calc_net_returns(pop[2], X, nothing, wd)
+    end
+    @testset "a rebuilt population path matches the stored one, ruined members and all (#769)" begin
+        # `rebuild_weight_path`'s own docstring promises a rebuild that is bit-identical to
+        # the store. It was not, for a population carrying a ruined member: the store fills
+        # such a member with `NaN`, and the rebuild ran the drift again and raised on it.
+        X = [0.01 0.02; -0.6 0.03; 0.02 -0.01]
+        pop = [[0.5, 0.5], [2.0, 0.0], [0.3, 0.7]]
+        stored, ruined = PO.held_weights_result(wd, pop, X, true)
+        lazy, _ = PO.held_weights_result(wd, pop, X, false)
+        @test ruined == [2]
+        @test isnothing(lazy.U)
+
+        Us = PO.weight_path(stored, pop)
+        Ul = PO.weight_path(lazy, pop)
+        @test length(Ul) == 3
+        @test all(isequal(a, b) for (a, b) in zip(Us, Ul))
+        @test all(isnan, Ul[2])
+        @test Ul[1] == PO.weight_path(wd, pop[1], X)
+        @test Ul[3] == PO.weight_path(wd, pop[3], X)
     end
 end

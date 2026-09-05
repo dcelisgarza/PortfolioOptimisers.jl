@@ -525,6 +525,7 @@ The partial derivative is approximated using a two-sided finite difference with 
 
   - A prior result resolves the measure **once**, before the loop ([`resolve_risk_inputs`](@ref)), so a **Deferred Quantity** is fitted once rather than once per finite difference.
   - A vector of measures differentiates the **aggregate**, which is the figure [`expected_risk`](@ref) reports. The homogeneity correction is applied per element inside the loop ([`adjusted_risk`](@ref)), so `Σᵢ wᵢ·rcᵢ` recovers the aggregate exactly even when the elements have different homogeneity degrees.
+  - Under a Weight Drift the figures are exact to **first order in the drift** only. The function differentiates one weight vector, and a drifted fold's return series is not linear in that vector, so the contributions sum to the fold's realised risk approximately rather than exactly. The **target** weights are what the figures are reported against, because they are the decision the finite difference perturbs — a weight path holds no single vector for the difference to move.
 
 !!! warning
 
@@ -616,6 +617,7 @@ Where:
   - A consequence: under a factor prior the parts sum to the risk on the caller's returns, and **not** to `expected_risk(r, w, pr)`. A measure whose kernel reads a moment rather than the series — [`Variance`](@ref), [`StandardDeviation`](@ref), [`DistributionValueatRisk`](@ref) — is unaffected either way, because it never reduces the returns matrix.
   - The loadings come from [`resolve_factor_regression`](@ref), which prefers the prior's own `rr` over a refit, so the loadings and the returns are the pair the prior was fitted on. A stated regression **estimator** therefore loses to a prior that carries a factor block.
   - A prior result resolves the measure **once**, before the loop ([`resolve_factor_risk_inputs`](@ref)), so a **Deferred Quantity** is fitted once rather than once per finite difference.
+  - Under a Weight Drift the figures are exact to **first order in the drift** only. The function differentiates one weight vector, and a drifted fold's return series is not linear in that vector, so the contributions sum to the fold's realised risk approximately rather than exactly. The **target** weights are what the figures are reported against, because they are the decision the finite difference perturbs — a weight path holds no single vector for the difference to move.
 
 # Related
 
@@ -648,6 +650,8 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Compute the expected risk of a risk measure over rolling windows of the returns data.
 
 This is the **constant-weight** reading: the one vector `w` is re-scored on every window, so each number is a property of that weight vector rather than of a history. The **realised-history** reading is the `(r, ret::VecNum, window)` method below, which rolls an already-formed net return series instead. The two answer different questions, so they are two methods rather than two settings of one.
+
+The `(r, w::MatNum, X, fees, window)` method below is the constant-weight reading of a **weight path**: it re-scores the window against the weights held at the window's ending row rather than against one vector for the whole sample. The weight argument's type is the picker, so a vector reads one target and a matrix reads a path.
 
 # Arguments
 
@@ -685,6 +689,57 @@ function rolling_window_measure(r::BaseRM_VecBaseRM, w::VecNum, X::MatNum,
                           "window must be in 1:$(T), the number of observations in X; got window => $window"))
     return [expected_risk(r, w, view(X, (t - window + 1):t, :), fees; sca = sca, kwargs...)
             for t in window:T]
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Compute the expected risk of a risk measure over rolling windows, against a weight path.
+
+The **ending-weights** reading. `w` is a `T × N` weight path, and the window closing at row `t` is scored against row `t` of the path — the weights the portfolio held by the time that window closed. That is the same reading of *ending weights* the rest of the library takes, so a window's number is a property of the weights a fund carried into the window's last observation.
+
+It is one snapshot per window and not an exact decomposition of the window's realised return: the weights moved inside the window, and this method scores the window as though they had not. A caller who wants the window's own history is served by the `(r, ret::VecNum, window)` method, which rolls the drifted series itself.
+
+At constant weights every row of the path is the same vector, so this method reproduces the `(r, w::VecNum, X, fees, window)` method above.
+
+# Arguments
+
+  - `r::BaseRM_VecBaseRM`: Risk measure to evaluate, or a vector of them.
+  - `w::MatNum`: Weight path (observations × assets), as [`weight_path`](@ref) makes one.
+  - `X::MatNum`: Asset returns matrix.
+  - `fees::Option{<:Fees}`: Optional fee structure.
+  - `window::Integer`: Size of the rolling window (number of periods).
+
+# Keyword Arguments
+
+  - `sca::Scalariser = SumScalariser()`: Scalariser combining a vector `r`. Inert on a single measure.
+
+# Validation
+
+  - `1 <= window <= size(X, 1)`, else a `DomainError` naming `window`.
+  - `size(w, 1) == size(X, 1)`, else a `DimensionMismatch` naming both. A path shorter than the sample indexes out of bounds inside whichever measure `r` names, which is the caller error the window check already refuses at the boundary.
+
+# Returns
+
+  - `risks::VecNum`: Expected risk values for each rolling window.
+
+# Related
+
+  - [`weight_path`](@ref)
+  - [`SelfFinancingDrift`](@ref)
+  - [`expected_risk`](@ref)
+  - [`MatNum`](@ref)
+"""
+function rolling_window_measure(r::BaseRM_VecBaseRM, w::MatNum, X::MatNum,
+                                fees::Option{<:Fees}, window::Integer;
+                                sca::Scalariser = SumScalariser(), kwargs...)
+    T = size(X, 1)
+    @argcheck(1 <= window <= T,
+              DomainError(window,
+                          "window must be in 1:$(T), the number of observations in X; got window => $window"))
+    @argcheck(size(w, 1) == T,
+              DimensionMismatch("`size(w, 1) == size(X, 1)` must hold.\nsize(w, 1) => $(size(w, 1))\nsize(X, 1) => $(T)"))
+    return [expected_risk(r, view(w, t, :), view(X, (t - window + 1):t, :), fees; sca = sca,
+                          kwargs...) for t in window:T]
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

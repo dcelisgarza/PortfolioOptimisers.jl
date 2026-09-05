@@ -1525,6 +1525,104 @@
             @test_throws ArgumentError PO.set_retcode(resi, rcf)
         end
     end
+    @testset "The per-observation consumers read the weight path (#769)" begin
+        PO = PortfolioOptimisers
+        ivol = InverseVolatility()
+        sfd = SelfFinancingDrift()
+        rw = ConditionalValueatRisk()
+        # `rd` carries no benchmark, so the collapse is exercised on one that does. A
+        # benchmark equal to the asset returns makes the collapsed series the portfolio's
+        # own gross series, which is what pins the row-by-row reading to the drift.
+        rdb = ReturnsResult(; nx = rd.nx, X = rd.X, nf = rd.nf, F = rd.F, nb = rd.nx,
+                            B = rd.X, ts = rd.ts)
+
+        @testset "collapse_benchmark reads the pair by dispatch" begin
+            X = rd.X[1:20, 1:4]
+            w = [0.4, 0.3, 0.2, 0.1]
+            pop = [w, [0.25, 0.25, 0.25, 0.25]]
+            B = X
+            hw, ruined = PO.held_weights_result(sfd, w, X, false)
+            hwp, ruinedp = PO.held_weights_result(sfd, pop, X, false)
+            @test isnothing(ruined)
+            @test isempty(ruinedp)
+
+            @test isnothing(PO.collapse_benchmark(nothing, w, nothing))
+            @test isnothing(PO.collapse_benchmark(nothing, pop, hwp))
+            bv = X * w
+            @test PO.collapse_benchmark(bv, w, hw) === bv
+            @test PO.collapse_benchmark(bv, pop, hwp) == fill(bv, 2)
+
+            # With no record the matrix collapses against the target weights, as before.
+            @test PO.collapse_benchmark(B, w, nothing) == B * w
+            @test PO.collapse_benchmark(B, pop, nothing) == [B * wi for wi in pop]
+
+            # With a record it collapses row by row against the fold's own weight path.
+            U = PO.weight_path(hw, w)
+            @test PO.collapse_benchmark(B, w, hw) == vec(sum(B .* U; dims = 2))
+            Up = PO.weight_path(hwp, pop)
+            @test PO.collapse_benchmark(B, pop, hwp) ==
+                  [vec(sum(B .* Ui; dims = 2)) for Ui in Up]
+
+            # The benchmark then follows exactly the convention the portfolio follows: a
+            # benchmark equal to the asset returns collapses to the gross drifted series.
+            @test PO.collapse_benchmark(B, w, hw) ≈ PO.calc_net_returns(w, X, nothing, sfd)
+        end
+
+        @testset "A fold's benchmark follows its weight-drift setting" begin
+            cvo = IndexWalkForward(500, 250)
+            cvd = IndexWalkForward(500, 250; wd = sfd)
+            po = cross_val_predict(ivol, rdb, cvo)
+            pd = cross_val_predict(ivol, rdb, cvd)
+            for (a, b) in zip(po.pred, pd.pred)
+                @test isnothing(a.hw)
+                @test !isnothing(b.hw)
+                @test a.rd.B == b.hw.X * a.res.w
+                @test b.rd.B == vec(sum(b.hw.X .* PO.weight_path(b.hw, b.res.w); dims = 2))
+                @test a.rd.B != b.rd.B
+            end
+            # A fold that ran no drift keeps every number it had.
+            po2 = cross_val_predict(ivol, rdb, IndexWalkForward(500, 250))
+            @test all(x -> x[1].rd.B == x[2].rd.B, zip(po.pred, po2.pred))
+        end
+
+        @testset "The fold-taking consumers resolve the fold" begin
+            pd = cross_val_predict(ivol, rd, IndexWalkForward(500, 250; wd = sfd))
+            po = cross_val_predict(ivol, rd, IndexWalkForward(500, 250))
+            p = pd.pred[1]
+            q = po.pred[1]
+
+            # The split's rows sum to the series the fold stored, so the delegating method
+            # settles the fee exactly as `predict` settled it.
+            split = calc_net_asset_returns(p)
+            @test size(split) == size(p.hw.X)
+            @test vec(sum(split; dims = 2)) ≈ p.rd.X
+            @test split == calc_net_asset_returns(PO.weight_path(p.hw, p.res.w), p.hw.X,
+                                                  PO.amortise_fees(PO.extract_fees(p.res, nothing),
+                                                                   size(p.hw.X, 1)))
+
+            # The risk contributions read the target weights and the fold's asset returns.
+            fees = PO.amortise_fees(PO.extract_fees(p.res, nothing), size(p.hw.X, 1))
+            @test risk_contribution(rw, p) == risk_contribution(rw, p.res.w, p.hw.X, fees)
+            @test length(risk_contribution(rw, p)) == length(p.res.w)
+            @test factor_risk_contribution(rw, p) ==
+                  factor_risk_contribution(rw, p.res.w, p.hw.X, fees;
+                                           rd = ReturnsResult(; nx = p.rd.nx, X = p.hw.X,
+                                                              nf = p.rd.nf, F = p.rd.F))
+
+            # A fold that carries no record kept no asset returns, so all three refuse by
+            # name rather than through a bare `MethodError`.
+            @test isnothing(q.hw)
+            @test_throws ArgumentError calc_net_asset_returns(q)
+            @test_throws ArgumentError risk_contribution(rw, q)
+            @test_throws ArgumentError factor_risk_contribution(rw, q)
+            msg = try
+                risk_contribution(rw, q)
+            catch e
+                sprint(showerror, e)
+            end
+            @test occursin("neither `wd` nor `pws`", msg)
+        end
+    end
     @testset "Every result that carries a population rebuilds its return code" begin
         PO = PortfolioOptimisers
         sfd = SelfFinancingDrift()

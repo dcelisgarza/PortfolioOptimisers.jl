@@ -210,8 +210,15 @@ function plot_stacked_area_composition end
     plot_risk_contribution(r, w, rd::ReturnsResult, fees = nothing; delta, marginal, percentage, N, sca, kwargs...) -> Plot
     plot_risk_contribution(r, res::OptimisationResult, rd; delta, marginal, percentage, N, sca, kwargs...) -> Plot
     plot_risk_contribution(r, res::OptimisationResult, pr; nx, delta, marginal, percentage, N, sca, kwargs...) -> Plot
+    plot_risk_contribution(r, pred::PredictionResult, fees = nothing; delta, marginal, percentage, N, sca, kwargs...) -> Plot
 
 Plot per-asset risk contribution as a bar chart.
+
+## A fold
+
+The fold-taking method reads the fold's target weights and the asset returns its Held Weights record kept, and it settles the fee against the fold's own length exactly as [`predict`](@ref) settled it. Under a Weight Drift the bars are exact to **first order in the drift** only, for the reason [`risk_contribution`](@ref) states.
+
+A fold whose scheme set neither `wd` nor `pws` carries no record, so it kept no asset returns and the method raises. Pass the returns the fold was fitted on instead.
 
 # Arguments
 
@@ -241,6 +248,8 @@ Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
   - [`risk_contribution`](@ref)
   - [`plot_composition`](@ref)
+  - [`PredictionResult`](@ref)
+  - [`HeldWeightsResult`](@ref)
 """
 function plot_risk_contribution end
 
@@ -262,8 +271,13 @@ function plot_risk_contribution end
         kwargs...
     ) -> Plot
     plot_factor_risk_contribution(r, res::OptimisationResult, rd; re, delta, N, sca, kwargs...) -> Plot
+    plot_factor_risk_contribution(r, pred::PredictionResult, fees = nothing; re, delta, N, sca, kwargs...) -> Plot
 
 Plot per-factor risk contribution as a bar chart, including the constant (idiosyncratic) term.
+
+## A fold
+
+The fold-taking method is the twin of [`plot_risk_contribution`](@ref)'s, and it builds the `rd` the loadings are fitted from out of the fold: the asset returns of its Held Weights record beside the factor block the fold carried. The same first-order caveat holds, and a fold that carries no record raises for the same reason.
 
 # Arguments
 
@@ -289,6 +303,8 @@ Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
   - [`factor_risk_contribution`](@ref)
   - [`plot_composition`](@ref)
+  - [`PredictionResult`](@ref)
+  - [`HeldWeightsResult`](@ref)
 """
 function plot_factor_risk_contribution end
 

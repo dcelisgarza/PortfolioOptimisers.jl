@@ -726,6 +726,148 @@ function rolling_window_measure(r::BaseRM_VecBaseRM, pred::PredictionResult,
     return rolling_window_measure(r, pred.rd.X, window; kwargs...)
 end
 """
+    calc_net_asset_returns(pred::PredictionResult{<:Any, <:Any, <:HeldWeightsResult}, fees = nothing)
+    calc_net_asset_returns(pred::PredictionResult{<:Any, <:Any, Nothing}, args...)
+
+Split a fold's net return series over the assets that produced it.
+
+The fold-taking method of [`calc_net_asset_returns`](@ref), and the mirror of [`calc_net_returns(res::OptimisationResult, X, fees)`](@ref): it resolves the fold's asset returns, its weight path and its fee, so a caller holding a fold reaches the split in one call. The fee is settled against the fold's own length exactly as [`predict`](@ref) settled it, so the rows of the result sum to the series the fold stored, to rounding.
+
+A fold that carries no Held Weights record raises. `pred.rd.X` is the **portfolio** series, not the asset returns, so a fold whose scheme ran neither switch keeps no matrix to split.
+
+# Arguments
+
+  - `pred`: Single-fold prediction result.
+  - `fees`: Fees that take precedence over the result's own.
+  - `args...`: Additional arguments (ignored by the refusing method).
+
+# Validation
+
+  - The fold carries a [`HeldWeightsResult`](@ref), else an `ArgumentError` naming the two switches.
+
+# Returns
+
+  - `ret::MatNum`: Per asset net returns of the fold, one row per observation.
+
+# Related
+
+  - [`calc_net_asset_returns`](@ref)
+  - [`HeldWeightsResult`](@ref)
+  - [`weight_path`](@ref)
+  - [`amortise_fees`](@ref)
+  - [`PredictionResult`](@ref)
+"""
+function calc_net_asset_returns(pred::PredictionResult{<:Any, <:Any, <:HeldWeightsResult},
+                                fees::Option{<:Fees} = nothing)
+    hw = pred.hw
+    return calc_net_asset_returns(weight_path(hw, pred.res.w), hw.X,
+                                  amortise_fees(extract_fees(pred.res, fees),
+                                                size(hw.X, 1)))
+end
+function calc_net_asset_returns(::PredictionResult{<:Any, <:Any, Nothing}, args...)
+    return throw(ArgumentError("`calc_net_asset_returns(pred::PredictionResult)` needs the fold's asset returns, and this fold kept none: `pred.rd.X` is the portfolio return series, and `pred.hw` is absent because the fold's scheme set neither `wd` nor `pws`.\nSet one of them so the fold records its asset returns, or call `calc_net_asset_returns(w, X, fees)` with the returns you fitted on."))
+end
+"""
+    risk_contribution(r::BaseRM_VecBaseRM, pred::PredictionResult{<:Any, <:Any, <:HeldWeightsResult}, fees = nothing; kwargs...)
+    risk_contribution(r::BaseRM_VecBaseRM, pred::PredictionResult{<:Any, <:Any, Nothing}, args...; kwargs...)
+
+Decompose a fold's risk over its assets.
+
+The fold-taking method of [`risk_contribution`](@ref). It resolves the fold's **target** weights, its asset returns and its fee, and hands them to the free function unchanged, so the figures are the free function's own.
+
+Under a Weight Drift the figures are exact to **first order in the drift** only, for the reason the free function states: the drifted series is not linear in the target weights, so the contributions sum to the fold's realised risk approximately rather than exactly. The target weights are still what a contribution is reported against, because they are the decision the finite difference perturbs.
+
+A fold that carries no Held Weights record raises, because `pred.rd.X` is the portfolio series and no asset matrix survives on the fold.
+
+# Arguments
+
+  - `r::BaseRM_VecBaseRM`: Risk measure to differentiate, or a vector of them.
+  - `pred`: Single-fold prediction result.
+  - `fees`: Fees that take precedence over the result's own.
+  - `args...`: Additional arguments (ignored by the refusing method).
+
+# Validation
+
+  - The fold carries a [`HeldWeightsResult`](@ref), else an `ArgumentError` naming the two switches.
+
+# Returns
+
+  - `Vector`: Risk contributions (or marginal risks) for each asset.
+
+# Related
+
+  - [`risk_contribution`](@ref)
+  - [`factor_risk_contribution`](@ref)
+  - [`HeldWeightsResult`](@ref)
+  - [`PredictionResult`](@ref)
+"""
+function risk_contribution(r::BaseRM_VecBaseRM,
+                           pred::PredictionResult{<:Any, <:Any, <:HeldWeightsResult},
+                           fees::Option{<:Fees} = nothing; kwargs...)
+    hw = pred.hw
+    return risk_contribution(r, pred.res.w, hw.X,
+                             amortise_fees(extract_fees(pred.res, fees), size(hw.X, 1));
+                             kwargs...)
+end
+function risk_contribution(::BaseRM_VecBaseRM, ::PredictionResult{<:Any, <:Any, Nothing},
+                           args...; kwargs...)
+    return throw(ArgumentError("`risk_contribution(r, pred::PredictionResult)` needs the fold's asset returns, and this fold kept none: `pred.rd.X` is the portfolio return series, and `pred.hw` is absent because the fold's scheme set neither `wd` nor `pws`.\nSet one of them so the fold records its asset returns, or call `risk_contribution(r, pred.res.w, rd.X, fees)` with the returns you fitted on."))
+end
+"""
+    factor_risk_contribution(r::BaseRM_VecBaseRM, pred::PredictionResult{<:Any, <:Any, <:HeldWeightsResult}, fees = nothing; rd, kwargs...)
+    factor_risk_contribution(r::BaseRM_VecBaseRM, pred::PredictionResult{<:Any, <:Any, Nothing}, args...; kwargs...)
+
+Decompose a fold's risk over its factors.
+
+The fold-taking method of [`factor_risk_contribution`](@ref), and the twin of the [`risk_contribution`](@ref) method above. It resolves the fold's target weights, its asset returns and its fee the same way, and it builds the `rd` the loadings are fitted from out of the fold itself: the fold's asset returns beside the factor block [`reconstruct_rd`](@ref) carried through. A caller who wants other loadings passes its own `rd`, or a precomputed [`Regression`](@ref) as `re`.
+
+The first-order caveat of the [`risk_contribution`](@ref) method above holds here unchanged, and a fold that carries no Held Weights record raises for the same reason.
+
+# Arguments
+
+  - `r::BaseRM_VecBaseRM`: Risk measure to decompose, or a vector of them.
+  - `pred`: Single-fold prediction result.
+  - `fees`: Fees that take precedence over the result's own.
+  - `args...`: Additional arguments (ignored by the refusing method).
+
+# Keyword Arguments
+
+  - `rd::ReturnsResult`: Returns result the loadings are fitted from. Defaults to the fold's own asset returns and factor block.
+
+# Validation
+
+  - The fold carries a [`HeldWeightsResult`](@ref), else an `ArgumentError` naming the two switches.
+
+# Returns
+
+  - `Vector`: Risk contributions for each factor, with the last element being the idiosyncratic (off-factor) contribution.
+
+# Related
+
+  - [`factor_risk_contribution`](@ref)
+  - [`risk_contribution`](@ref)
+  - [`HeldWeightsResult`](@ref)
+  - [`PredictionResult`](@ref)
+"""
+function factor_risk_contribution(r::BaseRM_VecBaseRM,
+                                  pred::PredictionResult{<:Any, <:Any, <:HeldWeightsResult},
+                                  fees::Option{<:Fees} = nothing;
+                                  rd::ReturnsResult = ReturnsResult(; nx = pred.rd.nx,
+                                                                    X = pred.hw.X,
+                                                                    nf = pred.rd.nf,
+                                                                    F = pred.rd.F),
+                                  kwargs...)
+    hw = pred.hw
+    return factor_risk_contribution(r, pred.res.w, hw.X,
+                                    amortise_fees(extract_fees(pred.res, fees),
+                                                  size(hw.X, 1)); rd = rd, kwargs...)
+end
+function factor_risk_contribution(::BaseRM_VecBaseRM,
+                                  ::PredictionResult{<:Any, <:Any, Nothing}, args...;
+                                  kwargs...)
+    return throw(ArgumentError("`factor_risk_contribution(r, pred::PredictionResult)` needs the fold's asset returns, and this fold kept none: `pred.rd.X` is the portfolio return series, and `pred.hw` is absent because the fold's scheme set neither `wd` nor `pws`.\nSet one of them so the fold records its asset returns, or call `factor_risk_contribution(r, pred.res.w, rd.X, fees; rd = rd)` with the returns you fitted on."))
+end
+"""
     mapreduce_RetMtx(rd, sym = :X)
 
 Concatenate return matrices from a vector of `PredictionReturnsResult` objects.
@@ -1086,11 +1228,73 @@ function quantile_by_measure(ppred::PopulationPredictionResult, r::BaseRM_VecBas
     # return sorted_predictions[idx]
 end
 """
-    reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult, X)
+    collapse_benchmark(B::Nothing, w::VecNum_VecVecNum, hw)
+    collapse_benchmark(B::VecNum, w::VecNum, hw)
+    collapse_benchmark(B::VecNum, w::VecVecNum, hw)
+    collapse_benchmark(B::MatNum, w::VecNum, hw::Nothing)
+    collapse_benchmark(B::MatNum, w::VecVecNum, hw::Nothing)
+    collapse_benchmark(B::MatNum, w::VecNum, hw::HeldWeightsResult)
+    collapse_benchmark(B::MatNum, w::VecVecNum, hw::HeldWeightsResult)
+
+Collapse a fold's benchmark asset returns into a benchmark return series.
+
+A benchmark that is already a series passes through. A benchmark matrix is contracted with the fold's own weights, and the method is chosen by the pair `(B, w)`, so nothing is tested at run time.
+
+The fold's Held Weights record picks the reading. Without one the matrix collapses against the target weights, which is the library's original behaviour and what a fold that ran no drift keeps. With one it collapses row by row against the weight path, so the benchmark follows the same convention the portfolio series follows and a caller comparing the two — a tracking error, for instance — compares two series scored the same way.
+
+# Algorithm
+
+ 1. On `nothing`, give `nothing`.
+ 2. On a benchmark series, give it back, repeated once per member under a population.
+ 3. On a matrix with no record, give `B * w`, once per member under a population.
+ 4. On a matrix with a record, give `vec(sum(B ⊙ U; dims = 2))` for the fold's weight path `U`, once per member under a population.
+
+# Arguments
+
+  - `B`: Benchmark returns of the fold: `nothing`, a series, or an observations × assets matrix.
+  - `w`: Target weights of the fold, or a population of them.
+  - `hw`: Held Weights record of the fold, or `nothing`.
+
+# Returns
+
+  - The benchmark return series, or a vector of them under a population, or `nothing`.
+
+# Related
+
+  - [`reconstruct_rd`](@ref)
+  - [`HeldWeightsResult`](@ref)
+  - [`weight_path`](@ref)
+  - [`PredictionReturnsResult`](@ref)
+"""
+function collapse_benchmark(::Nothing, ::VecNum_VecVecNum, ::Any)
+    return nothing
+end
+function collapse_benchmark(B::VecNum, ::VecNum, ::Any)
+    return B
+end
+function collapse_benchmark(B::VecNum, w::VecVecNum, ::Any)
+    return fill(B, length(w))
+end
+function collapse_benchmark(B::MatNum, w::VecNum, ::Nothing)
+    return B * w
+end
+function collapse_benchmark(B::MatNum, w::VecVecNum, ::Nothing)
+    return [B * wi for wi in w]
+end
+function collapse_benchmark(B::MatNum, w::VecNum, hw::HeldWeightsResult)
+    return vec(sum(B ⊙ weight_path(hw, w); dims = 2))
+end
+function collapse_benchmark(B::MatNum, w::VecVecNum, hw::HeldWeightsResult)
+    return [vec(sum(B ⊙ U; dims = 2)) for U in weight_path(hw, w)]
+end
+"""
+    reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult, X, hw = nothing)
 
 Reconstruct a `PredictionReturnsResult` from an optimisation result and returns data.
 
 Computes the benchmark returns, the implied volatilities and the implied volatility risk premium adjustment from the optimisation result weights and the original returns data.
+
+The benchmark collapse follows the fold's weight-drift setting whenever `rd.B` is a matrix. A fold that carries a [`HeldWeightsResult`](@ref) collapses the matrix row by row against its weight path, the same convention its portfolio series is scored under; a fold that carries none collapses it against the target weights, as before. [`collapse_benchmark`](@ref) is the verb, and it reads the pair by dispatch.
 
 ## No feature matrix
 
@@ -1101,6 +1305,7 @@ The fold does not collapse `rd.Z`. Only one weight vector is in scope here, whic
   - `res::NonFiniteAllocationOptimisationResult`: Fitted optimisation result.
   - `rd::ReturnsResult`: Original returns data.
   - `X`: Portfolio returns (vector or vector of vectors).
+  - `hw`: Held Weights record of the fold, or `nothing`.
 
 # Returns
 
@@ -1111,10 +1316,12 @@ The fold does not collapse `rd.Z`. Only one weight vector is in scope here, whic
   - [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref)
   - [`PredictionReturnsResult`](@ref)
   - [`rebuild_returns_result`](@ref)
+  - [`collapse_benchmark`](@ref)
+  - [`HeldWeightsResult`](@ref)
 """
 function reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
-                        X::VecNum)
-    B = !isa(rd.B, MatNum) ? rd.B : rd.B * res.w
+                        X::VecNum, hw::Option{<:HeldWeightsResult} = nothing)
+    B = collapse_benchmark(rd.B, res.w, hw)
     iv = rd.iv
     ivpa = rd.ivpa
     iv_flag = !isnothing(iv)
@@ -1133,15 +1340,9 @@ function reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsR
                                    B = B, ts = rd.ts, iv = iv, ivpa = ivpa)
 end
 function reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
-                        X::VecVecNum)
+                        X::VecVecNum, hw::Option{<:HeldWeightsResult} = nothing)
     nb = rd.nb
-    B = if isnothing(rd.B)
-        nothing
-    elseif isa(rd.B, VecNum)
-        fill(rd.B, length(res.w))
-    else
-        [rd.B * w for w in res.w]
-    end
+    B = collapse_benchmark(rd.B, res.w, hw)
     iv = rd.iv
     ivpa = rd.ivpa
     iv_flag = !isnothing(iv)
@@ -1207,7 +1408,7 @@ function StatsAPI.predict(res::NonFiniteAllocationOptimisationResult, rd::Return
     (hw, ruined) = held_weights_result(hwd, res.w, rd.X, store_weight_path, rd.ts)
     warn_ruined_members(wd, ruined, length(res.w))
     res = mark_ruined_members(res, ruined)
-    rd = reconstruct_rd(res, rd, X)
+    rd = reconstruct_rd(res, rd, X, hw)
     return PredictionResult(; res = res, rd = rd, hw = hw)
 end
 """
@@ -1247,7 +1448,7 @@ function StatsAPI.predict(res::NonFiniteAllocationOptimisationResult, rd::Return
     (hw, ruined) = held_weights_result(hwd, res.w, rdi.X, store_weight_path, obs)
     warn_ruined_members(wd, ruined, length(res.w))
     res = mark_ruined_members(res, ruined)
-    rdi = reconstruct_rd(res, rdi, X)
+    rdi = reconstruct_rd(res, rdi, X, hw)
     return PredictionResult(; res = res, rd = rdi, hw = hw)
 end
 function StatsAPI.predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
