@@ -768,3 +768,42 @@ algorithm names it cites are retired. `GradedNeighbourhood` is now `Proximity`, 
 member, and `BinaryNeighbourhood` is `Proximity(; decay = NoDecay())`. The neighbourhood's *reach*
 moved further still: it is `NetworkEstimator.sep`, on the source rather than on the producer, because
 the phylogeny constraint path receives nothing but the estimator.
+
+## Amendment (2026-09-05): the carrier holds an Asset Panel, and the Feature Matrix is derived from it
+
+Map [#802](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/802) reworks the
+feature-distance stack from zero, and its first decision,
+[#803](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/803), changes what a data
+carrier holds. This amendment records the change against the decisions above. The rest of the
+stack (the producers, `z_src`, the selector, the collapse) is amended by the map's later tickets.
+
+**The carrier no longer holds a matrix.** `nz` and `Z` leave `ReturnsResult` and `PricesResult`.
+Each holds one field, `pnl`, an `AssetPanel`: a vector of Panel Fields, each of which owns its
+values and its observed mask, plus the two universe masks in the time-varying shape. ADR 0102 owns
+the panel's shape.
+
+**Decision 1 stands, and its symbol moves.** The word is still *feature*, and the matrix a
+distance measures is still the Feature Matrix. But the matrix is now **derived**: one verb stacks
+the Panel Fields a selector names into `assets × features` or `observations × assets × features`,
+one-hot for a categorical field and `0`/`1` for an observed mask. `Z` names that derived matrix
+inside the distance kernels, and nothing stores it. So the sentence "the matrix rides on the
+result beside the returns" now reads "the panel rides on the result beside the returns, and the
+matrix is stacked from it at the point of use".
+
+**Decision 2 stands, and moves onto the panel.** Both shapes are admitted, and `ndims` of a
+field's values is the switch. A static panel has no masks; a time-varying one has both.
+
+**Decision 4 changes form.** Squareness is no longer `nz == nx` over a whole axis. An adjacency is
+one tensor Panel Field whose labels are the asset names, and an asset view slices its label axis
+when the labels equal `nx`. The fold ticket of map #802 states the view.
+
+**Decision 6's prior carrier is deleted.** `LowOrderPrior.Z` goes, and with it the second carrier
+of the feature matrix. The prior carrier's role, a producer that runs on the prior, moves onto the
+distance estimator itself; the producer ticket of map #802 records that seam. `Pr_RR` stays for
+`x_src`.
+
+**The fifth amendment's collapse gains a visible question.** `collapse_feature_matrix` wrote
+`W' * Z`, so a one-hot level became a membership fraction and a mask a coverage fraction, and the
+field index still said *categorical*. With per-field storage, a categorical field holds integer
+codes, and a convex combination of codes means nothing. The fold ticket must say what a collapsed
+categorical field is. Nothing here decides it.
