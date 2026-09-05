@@ -138,6 +138,8 @@ commit = "8610300"
 "src/13_Prior/13_OpinionPoolingPrior.jl" = { lines = 52, misses = 0 }
 "src/13_Prior/14_HighOrderFactorPriorEstimator.jl" = { lines = 116, misses = 0 }
 "src/13_Prior/15_FeaturePrior.jl" = { lines = 62, misses = 0 }
+"src/13_Prior/16_Base_CrossSectionalFactorPrior.jl" = { lines = 227, misses = 0 }
+"src/13_Prior/17_CrossSectionalFactorPrior.jl" = { lines = 71, misses = 0 }
 "src/14_UncertaintySets/01_Base_UncertaintySets.jl" = { lines = 128, misses = 0 }
 "src/14_UncertaintySets/02_DeltaUncertaintySets.jl" = { lines = 20, misses = 0 }
 "src/14_UncertaintySets/03_NormalUncertaintySets.jl" = { lines = 161, misses = 0 }

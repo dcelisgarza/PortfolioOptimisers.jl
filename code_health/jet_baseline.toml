@@ -153,6 +153,8 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/13_Prior/13_OpinionPoolingPrior.jl" = { raw = 1, reviewed = 1 }
 "src/13_Prior/14_HighOrderFactorPriorEstimator.jl" = { raw = 0, reviewed = 0 }
 "src/13_Prior/15_FeaturePrior.jl" = { raw = 0, reviewed = 0 }
+"src/13_Prior/16_Base_CrossSectionalFactorPrior.jl" = { raw = 0, reviewed = 0 }
+"src/13_Prior/17_CrossSectionalFactorPrior.jl" = { raw = 0, reviewed = 0 }
 "src/14_UncertaintySets/01_Base_UncertaintySets.jl" = { raw = 0, reviewed = 0 }
 "src/14_UncertaintySets/02_DeltaUncertaintySets.jl" = { raw = 0, reviewed = 0 }
 "src/14_UncertaintySets/03_NormalUncertaintySets.jl" = { raw = 0, reviewed = 0 }
@@ -415,6 +417,8 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/13_Prior/13_OpinionPoolingPrior.jl" = { raw = 0, reviewed = 0 }
 "src/13_Prior/14_HighOrderFactorPriorEstimator.jl" = { raw = 0, reviewed = 0 }
 "src/13_Prior/15_FeaturePrior.jl" = { raw = 0, reviewed = 0 }
+"src/13_Prior/16_Base_CrossSectionalFactorPrior.jl" = { raw = 0, reviewed = 0 }
+"src/13_Prior/17_CrossSectionalFactorPrior.jl" = { raw = 0, reviewed = 0 }
 "src/14_UncertaintySets/01_Base_UncertaintySets.jl" = { raw = 0, reviewed = 0 }
 "src/14_UncertaintySets/02_DeltaUncertaintySets.jl" = { raw = 0, reviewed = 0 }
 "src/14_UncertaintySets/03_NormalUncertaintySets.jl" = { raw = 0, reviewed = 0 }
@@ -677,6 +681,8 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/13_Prior/13_OpinionPoolingPrior.jl" = { raw = 0, reviewed = 0 }
 "src/13_Prior/14_HighOrderFactorPriorEstimator.jl" = { raw = 0, reviewed = 0 }
 "src/13_Prior/15_FeaturePrior.jl" = { raw = 0, reviewed = 0 }
+"src/13_Prior/16_Base_CrossSectionalFactorPrior.jl" = { raw = 0, reviewed = 0 }
+"src/13_Prior/17_CrossSectionalFactorPrior.jl" = { raw = 0, reviewed = 0 }
 "src/14_UncertaintySets/01_Base_UncertaintySets.jl" = { raw = 0, reviewed = 0 }
 "src/14_UncertaintySets/02_DeltaUncertaintySets.jl" = { raw = 0, reviewed = 0 }
 "src/14_UncertaintySets/03_NormalUncertaintySets.jl" = { raw = 0, reviewed = 0 }
