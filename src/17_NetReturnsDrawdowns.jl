@@ -72,6 +72,79 @@ function calc_net_returns(w::VecVecNum, X::MatNum, args...)
     return [calc_net_returns(wi, X, args...) for wi in w]
 end
 """
+    calc_net_returns(w::MatNum, X::MatNum, args...)
+
+Compute the net portfolio returns of a weight path.
+
+`w` is a `T × N` weight path: row `t` holds the weights the portfolio carried **through** observation `t`. [`weight_path`](@ref) is the verb that makes one, under a Weight Drift or at constant weights, so this method reads a drifted window the way the [`VecNum`](@ref) methods above read a constant one.
+
+**The weight argument's type is the picker.** A [`VecNum`](@ref) is one target weight vector, and it weighs every observation. A [`MatNum`](@ref) is a path, and it weighs each observation by the row that belongs to it. A scorer that forwards its weights to this verb therefore reads a path with no change of its own: [`performance_summary`](@ref) is bound [`ArrNum`](@ref) and admits both today.
+
+This method states no arithmetic of its own. It sums the per asset split of the same path along the asset axis, so the two cannot drift apart, and the fee it charges is the one [`calc_net_asset_returns`](@ref) charges. At constant weights every row of the path is the same vector, so the answer is the one the [`VecNum`](@ref) methods give. The two sides add in a different order, so that identity holds to rounding and not to `==`.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\boldsymbol{R}(\\mathbf{X},\\, \\mathbf{U}) &= \\left(\\mathbf{X} \\odot \\mathbf{U} \\ominus \\boldsymbol{F}_{\\text{t}}(\\mathbf{U}_{1,\\cdot})^{\\intercal}\\right) \\boldsymbol{1}
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{R}(\\mathbf{X},\\, \\mathbf{U})``: `T × 1` vector of portfolio net returns.
+  - ``\\mathbf{X}``: `T × N` matrix of asset returns (observations × assets).
+  - ``\\mathbf{U}``: `T × N` weight path, whose row ``t`` holds the weights carried through observation ``t``.
+  - ``\\mathbf{U}_{1,\\cdot}``: First row of the path, which is the target weights.
+  - ``\\boldsymbol{F}_{\\text{t}}(\\boldsymbol{w})``: `N × 1` per asset vector of total portfolio fees computed using [`calc_fees`](@ref).
+  - ``\\boldsymbol{1}``: `N × 1` vector of ones, which sums along the asset axis.
+  - ``\\odot``: Elementwise (Hadamard) multiplication.
+  - ``\\ominus``: Elementwise (Hadamard) subtraction.
+
+# Algorithm
+
+ 1. Split the path over the assets with [`calc_net_asset_returns`](@ref), which scales each observation by the weights held through it and charges the fee from the path's first row.
+ 2. Sum that `T × N` matrix along its asset axis, giving the `T × 1` portfolio net return series.
+
+# Validation
+
+  - `size(w) == size(X)`, else the broadcast inside [`calc_net_asset_returns`](@ref) raises a `DimensionMismatch`. A fold's path has the size of the fold's asset returns by construction, and [`assert_held_weights_shape`](@ref) checks a stored one.
+
+# Arguments
+
+  - `w`: Weight path (observations × assets).
+  - `X`: Asset return matrix (observations × assets).
+  - `fees`: [`Fees`](@ref) structure.
+  - `args...`: Additional arguments (ignored).
+
+# Returns
+
+  - `val::VecNum`: Portfolio net returns.
+
+# Examples
+
+```jldoctest
+julia> calc_net_returns([0.5 0.5; 0.6 0.4], [0.01 0.02; 0.03 0.04])
+2-element Vector{Float64}:
+ 0.015
+ 0.034
+```
+
+# Related
+
+  - [`MatNum`](@ref)
+  - [`ArrNum`](@ref)
+  - [`weight_path`](@ref): Makes the path this method reads.
+  - [`SelfFinancingDrift`](@ref)
+  - [`calc_net_asset_returns`](@ref): The per asset split this method sums.
+  - [`performance_summary`](@ref): Scores the series this method forms.
+  - [`expected_risk`](@ref): Scores a path through this method on a [`NetReturnsInput`](@ref) measure.
+  - [`Fees`](@ref)
+"""
+function calc_net_returns(w::MatNum, X::MatNum, args...)
+    return vec(sum(calc_net_asset_returns(w, X, args...); dims = 2))
+end
+"""
     calc_net_asset_returns(w::VecNum, X::MatNum, args...)
     calc_net_asset_returns(w::VecNum, X::MatNum, fees::Fees)
 

@@ -532,6 +532,45 @@ end
         # A path that is not the shape of the window is a caller error the broadcast names.
         @test_throws DimensionMismatch calc_net_asset_returns(view(U, 1:2, :), Xn, fn)
     end
+    @testset "the weight path is the picker for the portfolio series (#773)" begin
+        # Decision #772: the weight argument's type is the picker at the base verb too, so
+        # a scorer that forwards its weights here reads a path with no change of its own.
+        # The method states no arithmetic of its own — it sums the split of the same path
+        # along the asset axis — so the two cannot drift apart.
+        wdn = SelfFinancingDrift()
+        U = PO.weight_path(wdn, wn, Xn)
+
+        @test calc_net_returns(U, Xn, fn) ==
+              vec(sum(calc_net_asset_returns(U, Xn, fn); dims = 2))
+        @test calc_net_returns(U, Xn) == vec(sum(calc_net_asset_returns(U, Xn); dims = 2))
+
+        # It is the series the drift route forms from the same window under the same drift.
+        # The two sides add in a different order, so this needs an absolute tolerance.
+        a = calc_net_returns(wn, Xn, fn, wdn)
+        b = calc_net_returns(U, Xn, fn)
+        @test a ≈ b
+        @test maximum(abs, a - b) < 1e-15
+
+        # A constant path is the reader-facing shape of a window that ran no drift, so the
+        # `MatNum` method reproduces the `VecNum` one on it, again to rounding.
+        Uc = PO.weight_path(nothing, wn, Xn)
+        c = calc_net_returns(Uc, Xn, fn)
+        d = calc_net_returns(wn, Xn, fn)
+        @test c ≈ d
+        @test maximum(abs, c - d) < 1e-16
+        @test calc_net_returns(Uc, Xn) ≈ calc_net_returns(wn, Xn)
+
+        # A `nothing` fee reaches the `args...` method and charges nothing.
+        m = which(calc_net_returns, (typeof(U), typeof(Xn), Nothing))
+        @test m.file ==
+              Symbol(joinpath(dirname(@__DIR__), "src", "17_NetReturnsDrawdowns.jl"))
+        @test calc_net_returns(Uc, Xn, nothing) ≈ Xn * wn
+
+        # A row count that is not the window's is a caller error the broadcast names, on
+        # either side of the pair.
+        @test_throws DimensionMismatch calc_net_returns(view(U, 1:2, :), Xn, fn)
+        @test_throws DimensionMismatch calc_net_returns(U, view(Xn, 1:2, :), fn)
+    end
 end
 @testset "Weight drift" begin
     using PortfolioOptimisers, Test, Dates

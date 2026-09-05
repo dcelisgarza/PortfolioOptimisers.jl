@@ -42,6 +42,8 @@ For a leaf measure, the generic entry consults [`risk_input_kind`](@ref) and dis
   - [`WeightsReturnsFeesInput`](@ref): calls `r(w, X, fees)`.
   - [`WeightsInput`](@ref): calls `r(w)` (ignores `X` and `fees`).
 
+These are the constant-weight methods: the one vector `w` weighs every observation. The `w::MatNum` methods below read a **weight path** instead, one row of weights per observation, which is what a fold scored under a Weight Drift held. The weight argument's type is the picker, so a vector reads one target and a matrix reads a path.
+
 Composite and container forms keep explicit methods:
 
   - [`RiskRatio`](@ref): computes `expected_risk(r.r1, ...) / expected_risk(r.r2, ...)`.
@@ -327,6 +329,107 @@ end
 # element evaluation. Without it the generic vector twin above would resolve the prior inside the
 # scalarise loop.
 function expected_risk(rs::VecBaseRM, w::VecNum, pr::Pr_RR, args...; kwargs...)
+    rs, X = resolve_risk_inputs(rs, pr)
+    return expected_risk(rs, w, X, args...; kwargs...)
+end
+"""
+    expected_risk(r::AbstractBaseRiskMeasure, w::MatNum, args...; kwargs...)
+    expected_risk(rs::VecBaseRM, w::MatNum, args...; sca = SumScalariser(), kwargs...)
+    expected_risk(kind::RiskInputKind, r, w::MatNum, args...; kwargs...)
+    expected_risk(r::RiskRatio, w::MatNum, X::MatNum, fees = nothing; kwargs...)
+    expected_risk(r::NonOptimisationRiskRatio, w::MatNum, X::MatNum, fees = nothing; kwargs...)
+    expected_risk(r::MeanReturnRiskRatio, w::MatNum, X::MatNum, fees = nothing; kwargs...)
+    expected_risk(r::AbstractBaseRiskMeasure, w::MatNum, pr::Pr_RR, args...; kwargs...)
+    expected_risk(rs::VecBaseRM, w::MatNum, pr::Pr_RR, args...; kwargs...)
+
+Compute the expected value of a risk measure for a portfolio scored over a **weight path**.
+
+**The weight argument's type is the picker.** A [`VecNum`](@ref) is one target weight vector, and it weighs every observation. A [`MatNum`](@ref) `w` is a `T × N` weight path: row `t` holds the weights the portfolio carried **through** observation `t`, which is what a fold scored under a Weight Drift held. [`weight_path`](@ref) is the verb that makes one. This family mirrors the [`VecNum`](@ref) family above method for method, so the entry consults [`risk_input_kind`](@ref) and the composites keep their own explicit methods, exactly as they do there.
+
+## The three input kinds answer a path separately
+
+  - [`NetReturnsInput`](@ref) **computes**. Its method is `r(calc_net_returns(w, X, fees))`, and [`calc_net_returns(w::MatNum, X::MatNum, args...)`](@ref) reads the path, so the measure's own kernel is untouched.
+  - [`WeightsReturnsFeesInput`](@ref) and [`WeightsInput`](@ref) **refuse a path by name**. Their kernels read a weight vector as a cross-section, and a path gives one number per observation, which is a different quantity. The refusal names the measure and its kind, as [`risk_input_kind`](@ref)'s own fallback does, rather than leaving a bare `MethodError` several frames down.
+
+A measure that refuses a path is not a measure the library cannot score under a drift. It is a measure whose question is about the weights and not about the series, so the answer it wants is the one taken over the target weights.
+
+# Arguments
+
+  - `r`: Risk measure, or a vector of risk measures.
+  - `w`: Weight path (observations × assets).
+  - $(arg_dict[:X])
+  - `fees`: [`Fees`](@ref) structure.
+  - `pr`: Prior result or [`ReturnsResult`](@ref) carrying the returns matrix.
+  - `args...`: Additional arguments forwarded to the kind's method.
+
+# Validation
+
+  - Throws an `ArgumentError` when `r` declares [`WeightsReturnsFeesInput`](@ref) or [`WeightsInput`](@ref), naming the measure and its kind.
+
+# Returns
+
+  - `rk::Number`: The expected risk of the path.
+
+# Related
+
+  - [`MatNum`](@ref)
+  - [`weight_path`](@ref): Makes the path this family reads.
+  - [`SelfFinancingDrift`](@ref)
+  - [`risk_input_kind`](@ref)
+  - [`RiskInputKind`](@ref)
+  - [`calc_net_returns`](@ref)
+  - [`expected_risk`](@ref)
+"""
+function expected_risk(r::AbstractBaseRiskMeasure, w::MatNum, args...; kwargs...)
+    assert_resolved_slots(r)
+    assert_calibrated_slots(r)
+    return expected_risk(risk_input_kind(r), r, w, args...; kwargs...)
+end
+function expected_risk(rs::VecBaseRM, w::MatNum, args...; sca::Scalariser = SumScalariser(),
+                       kwargs...)
+    return scalarise(sca, rs) do r
+        return expected_risk(r, w, args...; kwargs...) * r.settings.scale
+    end
+end
+function expected_risk(::NetReturnsInput, r::AbstractBaseRiskMeasure, w::MatNum, X::MatNum,
+                       fees::Option{<:Fees} = nothing; kwargs...)
+    return r(calc_net_returns(w, X, fees))
+end
+# The two weight-reading kinds refuse a path rather than falling through to a `MethodError`.
+# Their kernels contract a weight vector across the assets, so a path is not a wider input to
+# them but a different quantity. The message follows `risk_input_kind`'s own fallback.
+function expected_risk(::WeightsReturnsFeesInput, r::AbstractBaseRiskMeasure, w::MatNum,
+                       args...; kwargs...)
+    return throw(ArgumentError("`$(typeof(r))` declares `WeightsReturnsFeesInput`, so its kernel reads `w` as one cross-section of weights and is called as `r(w, X, fees)`. A `w::MatNum` is a weight path, one row of weights per observation, which is a different quantity and not a wider input to that kernel.\nScore this measure against the target weight vector, `w::VecNum`, which is the first row of the path.\nGot\nsize(w) => $(size(w))"))
+end
+function expected_risk(::WeightsInput, r::AbstractBaseRiskMeasure, w::MatNum, args...;
+                       kwargs...)
+    return throw(ArgumentError("`$(typeof(r))` declares `WeightsInput`, so its kernel reads `w` as one cross-section of weights and is called as `r(w)`. A `w::MatNum` is a weight path, one row of weights per observation, which is a different quantity and not a wider input to that kernel.\nScore this measure against the target weight vector, `w::VecNum`, which is the first row of the path.\nGot\nsize(w) => $(size(w))"))
+end
+# The three ratio composites split by type for the same reason their `VecNum` twins do:
+# `NonOptimisationRiskRatio` names `sca1` and `sca2`, and `RiskRatio` carries neither.
+function expected_risk(r::RiskRatio, w::MatNum, X::MatNum, fees::Option{<:Fees} = nothing;
+                       kwargs...)
+    return expected_risk(r.r1, w, X, fees; kwargs...) /
+           expected_risk(r.r2, w, X, fees; kwargs...)
+end
+function expected_risk(r::NonOptimisationRiskRatio, w::MatNum, X::MatNum,
+                       fees::Option{<:Fees} = nothing; kwargs...)
+    return expected_risk(r.r1, w, X, fees; kwargs..., sca = r.sca1) /
+           expected_risk(r.r2, w, X, fees; kwargs..., sca = r.sca2)
+end
+function expected_risk(r::MeanReturnRiskRatio, w::MatNum, X::MatNum,
+                       fees::Option{<:Fees} = nothing; kwargs...)
+    return (expected_risk(r.rt, w, X, fees; kwargs...) - r.rf) /
+           expected_risk(r.rk, w, X, fees; kwargs..., sca = r.sca)
+end
+function expected_risk(r::AbstractBaseRiskMeasure, w::MatNum, pr::Pr_RR, args...; kwargs...)
+    r, X = resolve_risk_inputs(r, pr)
+    return expected_risk(r, w, X, args...; kwargs...)
+end
+# The vector's own prior route, as above: it resolves the whole vector **once**, so a Deferred
+# Quantity is fitted once per measure rather than once per element evaluation.
+function expected_risk(rs::VecBaseRM, w::MatNum, pr::Pr_RR, args...; kwargs...)
     rs, X = resolve_risk_inputs(rs, pr)
     return expected_risk(rs, w, X, args...; kwargs...)
 end

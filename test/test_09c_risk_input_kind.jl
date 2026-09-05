@@ -218,3 +218,94 @@ end
     @test isnothing(PO.sel(nothing, nothing))
     @test isnothing(PO.nothing_scalar_array_selector(nothing, nothing))
 end
+
+# ── #773: the weight path is the picker for a scorer ──────────────────────────────────────
+# Decision #772. A `VecNum` weight is one target vector and weighs every observation; a
+# `MatNum` weight is a weight path, one row of weights per observation, which is what a fold
+# scored under a Weight Drift held. `expected_risk`'s weight-taking family gains its `MatNum`
+# mirror, and the three input kinds answer a path separately: a `NetReturnsInput` measure
+# computes, and the two weight-reading kinds refuse by name.
+const _path_X = [0.01 0.02; -0.02 0.01; 0.03 -0.01; 0.005 0.02]
+const _path_w = [0.6, 0.4]
+
+@testset "the weight path is the picker, and two kinds refuse it (#773)" begin
+    wd = SelfFinancingDrift()
+    U = PO.weight_path(wd, _path_w, _path_X)
+    Uc = PO.weight_path(nothing, _path_w, _path_X)
+    fees = Fees(; l = 0.001, fl = 0.002)
+    @test U[1, :] == _path_w
+    @test all(row == _path_w for row in eachrow(Uc))
+
+    # A `NetReturnsInput` measure computes, and its answer is the measure over the series
+    # the path produces. The kernel is untouched: `calc_net_returns` is what reads the type.
+    rn = ConditionalValueatRisk()
+    @test PO.risk_input_kind(rn) === PO.NetReturnsInput()
+    @test expected_risk(rn, U, _path_X, fees) == rn(calc_net_returns(U, _path_X, fees))
+    @test expected_risk(rn, U, _path_X) == rn(calc_net_returns(U, _path_X))
+    # A drifted path moves the number, and a constant path reproduces the target reading.
+    @test expected_risk(rn, U, _path_X, fees) != expected_risk(rn, _path_w, _path_X, fees)
+    @test isapprox(expected_risk(rn, Uc, _path_X, fees),
+                   expected_risk(rn, _path_w, _path_X, fees))
+
+    # The prior route resolves the measure and the matrix once, then reads the path.
+    rd = ReturnsResult(; nx = ["A", "B"], X = _path_X)
+    rnr, Xr = PO.resolve_risk_inputs(rn, rd)
+    @test expected_risk(rn, U, rd, fees) == expected_risk(rnr, U, Xr, fees)
+
+    # A vector of measures scalarises over the path, `scale` is its combination weight, and
+    # the vector's own prior route resolves once, exactly as the `VecNum` family does.
+    rns = [ConditionalValueatRisk(), ConditionalValueatRisk(; alpha = 0.3)]
+    @test expected_risk(rns, U, _path_X, fees) ==
+          sum(expected_risk(r, U, _path_X, fees) * r.settings.scale for r in rns)
+    rnsr, Xsr = PO.resolve_risk_inputs(rns, rd)
+    @test expected_risk(rns, U, rd, fees) == expected_risk(rnsr, U, Xsr, fees)
+    @test expected_risk(rns, U, _path_X, fees; sca = MaxScalariser()) !=
+          expected_risk(rns, U, _path_X, fees)
+
+    # The three ratio composites decompose onto the path as they do onto a vector.
+    rr = RiskRatio(; r1 = ConditionalValueatRisk(), r2 = MaximumDrawdown())
+    @test expected_risk(rr, U, _path_X, fees) ==
+          expected_risk(rr.r1, U, _path_X, fees) / expected_risk(rr.r2, U, _path_X, fees)
+    nrr = NonOptimisationRiskRatio(; r1 = ConditionalValueatRisk(), r2 = MaximumDrawdown())
+    @test expected_risk(nrr, U, _path_X, fees) ==
+          expected_risk(nrr.r1, U, _path_X, fees; sca = nrr.sca1) /
+          expected_risk(nrr.r2, U, _path_X, fees; sca = nrr.sca2)
+    mrr = MeanReturnRiskRatio(; rk = ConditionalValueatRisk())
+    @test expected_risk(mrr, U, _path_X, fees) ==
+          (expected_risk(mrr.rt, U, _path_X, fees) - mrr.rf) /
+          expected_risk(mrr.rk, U, _path_X, fees; sca = mrr.sca)
+
+    # `WeightsReturnsFeesInput` refuses a path by name. Its kernel reads `w` as one
+    # cross-section, and a path gives one number per observation, which is a different
+    # quantity rather than a wider input.
+    rw = MedianAbsoluteDeviation()
+    @test PO.risk_input_kind(rw) === PO.WeightsReturnsFeesInput()
+    @test_throws ArgumentError expected_risk(rw, U, _path_X, fees)
+    msg = try
+        expected_risk(rw, U, _path_X, fees)
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("MedianAbsoluteDeviation", msg)
+    @test occursin("WeightsReturnsFeesInput", msg)
+    # It still scores the target weights it does take.
+    @test expected_risk(rw, _path_w, _path_X, fees) == rw(_path_w, _path_X, fees)
+
+    # `WeightsInput` refuses on the same terms.
+    rv = Variance(; sigma = [1.0 0.2; 0.2 1.0])
+    @test PO.risk_input_kind(rv) === PO.WeightsInput()
+    @test_throws ArgumentError expected_risk(rv, U, _path_X, fees)
+    msg = try
+        expected_risk(rv, U, _path_X, fees)
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("Variance", msg)
+    @test occursin("WeightsInput", msg)
+    @test expected_risk(rv, _path_w, _path_X, fees) == rv(_path_w)
+
+    # A refusal is taken by the kind and not by the argument count, so the no-fee call and
+    # the prior route are refused too.
+    @test_throws ArgumentError expected_risk(rw, U, _path_X)
+    @test_throws ArgumentError expected_risk(rv, U, rd)
+end

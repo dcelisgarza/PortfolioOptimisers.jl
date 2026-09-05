@@ -6,7 +6,7 @@
 [provenance]
 julia = "1.12.7"
 julia_syntax = "1.0.2"
-commit = "7e3d080c61"
+commit = "4405198354"
 
 [file]
 "ext/PortfolioOptimisersImputeExt.jl" = { code = 6, doc = 0, comment = 4, blank = 3, total = 13 }
@@ -150,7 +150,7 @@ commit = "7e3d080c61"
 "src/14_UncertaintySets/08_NormBallUncertaintySets.jl" = { code = 70, doc = 171, comment = 5, blank = 72, total = 318 }
 "src/15_Turnover.jl" = { code = 81, doc = 458, comment = 0, blank = 184, total = 723 }
 "src/16_Fees.jl" = { code = 294, doc = 974, comment = 0, blank = 373, total = 1641 }
-"src/17_NetReturnsDrawdowns.jl" = { code = 278, doc = 911, comment = 0, blank = 395, total = 1584 }
+"src/17_NetReturnsDrawdowns.jl" = { code = 281, doc = 961, comment = 0, blank = 415, total = 1657 }
 "src/18_Tracking.jl" = { code = 70, doc = 443, comment = 0, blank = 178, total = 691 }
 "src/19_RiskMeasures/01_Base_RiskMeasures.jl" = { code = 416, doc = 1286, comment = 12, blank = 606, total = 2320 }
 "src/19_RiskMeasures/02_Variance.jl" = { code = 243, doc = 686, comment = 12, blank = 254, total = 1195 }
@@ -179,7 +179,7 @@ commit = "7e3d080c61"
 "src/19_RiskMeasures/24_MedianAbsoluteDeviationRisk.jl" = { code = 95, doc = 186, comment = 3, blank = 74, total = 358 }
 "src/19_RiskMeasures/25_NonOptimisationRiskMeasures.jl" = { code = 116, doc = 279, comment = 5, blank = 108, total = 508 }
 "src/19_RiskMeasures/26_AdjustRiskContributions.jl" = { code = 55, doc = 46, comment = 0, blank = 13, total = 114 }
-"src/19_RiskMeasures/27_ExpectedRisk.jl" = { code = 213, doc = 398, comment = 18, blank = 186, total = 815 }
+"src/19_RiskMeasures/27_ExpectedRisk.jl" = { code = 259, doc = 434, comment = 25, blank = 200, total = 918 }
 "src/19_RiskMeasures/28_RiskMeasureTools.jl" = { code = 84, doc = 95, comment = 0, blank = 51, total = 230 }
 "src/20_Optimisation/01_Base_Optimisation.jl" = { code = 812, doc = 1501, comment = 13, blank = 733, total = 3059 }
 "src/20_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl" = { code = 543, doc = 950, comment = 21, blank = 381, total = 1895 }
@@ -248,7 +248,7 @@ commit = "7e3d080c61"
 "src/20_Optimisation/22_DiscreteFiniteAllocation.jl" = { code = 188, doc = 216, comment = 5, blank = 66, total = 475 }
 "src/20_Optimisation/23_GreedyFiniteAllocation.jl" = { code = 114, doc = 180, comment = 8, blank = 73, total = 375 }
 "src/20_Optimisation/24_RiskMeasureCompatibility.jl" = { code = 42, doc = 61, comment = 4, blank = 20, total = 127 }
-"src/21_ExpectedReturns.jl" = { code = 272, doc = 826, comment = 24, blank = 288, total = 1410 }
+"src/21_ExpectedReturns.jl" = { code = 272, doc = 827, comment = 24, blank = 289, total = 1412 }
 "src/22_Preselection.jl" = { code = 313, doc = 762, comment = 0, blank = 365, total = 1440 }
 "src/23_Pipeline/01_Base_Pipeline.jl" = { code = 154, doc = 348, comment = 0, blank = 152, total = 654 }
 "src/23_Pipeline/02_StepExecution.jl" = { code = 189, doc = 181, comment = 2, blank = 95, total = 467 }

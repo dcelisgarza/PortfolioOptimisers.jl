@@ -23,6 +23,7 @@ held_weights_drift
 held_weights_result
 drift_observations
 calc_net_returns(w::VecNum, X::MatNum, args...)
+calc_net_returns(w::MatNum, X::MatNum, args...)
 calc_net_returns(w::VecVecNum, X::MatNum, fees, wd::AbstractWeightDrift, obs)
 calc_net_asset_returns
 cumulative_returns

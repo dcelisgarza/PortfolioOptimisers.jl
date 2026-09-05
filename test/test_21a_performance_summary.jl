@@ -464,3 +464,50 @@ end
         @test isapprox(performance_summary(mpred; periods_per_year = 4).ann_return, 0.025)
     end
 end
+
+@testset "#773: `performance_summary` reads a weight path, and the caveat is written" begin
+    # Decision #772: the weight argument's type is the picker. `performance_summary` is
+    # bound `ArrNum`, so it admits a matrix already, and the gap was one method deep at the
+    # base verb. `calc_net_returns(U, X, fees)` closes it, so this scorer gains no method.
+    PO = PortfolioOptimisers
+    X = [0.01 0.02; -0.02 0.01; 0.03 -0.01; 0.005 0.02]
+    w = [0.6, 0.4]
+    fees = Fees(; l = 0.001, fl = 0.002)
+    wd = SelfFinancingDrift()
+    U = PO.weight_path(wd, w, X)
+    Uc = PO.weight_path(nothing, w, X)
+
+    # A path is scored as the series that path produces, on the method that already takes a
+    # series. Every statistic agrees, not only the first.
+    ps_path = performance_summary(U, X, fees; periods_per_year = 4)
+    ps_ret = performance_summary(calc_net_returns(U, X, fees); periods_per_year = 4)
+    for f in fieldnames(typeof(ps_path))
+        @test isequal(getfield(ps_path, f), getfield(ps_ret, f))
+    end
+
+    # It is the series the drift route forms from the same window under the same drift.
+    @test isapprox(ps_path.ann_return,
+                   performance_summary(calc_net_returns(w, X, fees, wd);
+                                       periods_per_year = 4).ann_return)
+
+    # A drifted path moves the statistics, and a constant path reproduces the target read.
+    ps_target = performance_summary(w, X, fees; periods_per_year = 4)
+    @test ps_path.ann_return != ps_target.ann_return
+    @test isapprox(performance_summary(Uc, X, fees; periods_per_year = 4).ann_return,
+                   ps_target.ann_return)
+
+    # The returns-result route forwards its weights to the same base verb.
+    rd = ReturnsResult(; nx = ["A", "B"], X = X)
+    @test performance_summary(U, rd, fees; periods_per_year = 4).ann_return ==
+          ps_path.ann_return
+
+    # The caveat rides in both of the places #772 named: the field text every renderer
+    # inherits, and the docstring beside the non-normality paragraph. `sharpe_stderr`
+    # corrects for the third and fourth moments and not for serial dependence, and a
+    # drifted series is serially dependent through the weights it held.
+    @test occursin("serial dependence", PO.field_dict[:ps_sharpe_stderr])
+    doc = string(Base.Docs.doc(Base.Docs.Binding(PO, :performance_summary)))
+    @test occursin("serial dependence", doc)
+    @test occursin("Weight Drift", doc)
+    @test occursin("long-run variance estimator", doc)
+end

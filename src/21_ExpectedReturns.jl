@@ -1301,6 +1301,8 @@ The kurtosis term is ``(g_{2} + 2)/4`` because the source states it as ``(\\gamm
 
 A non-normal return series makes a Sharpe ratio less precise than the naive expression suggests, and negative skew makes it worse. That is the case that matters for a real portfolio, which is why the standard error ships beside the ratio.
 
+The expression corrects for the third and fourth moments and **not** for serial dependence, so it reads every observation as independent of the others. A series scored under a Weight Drift is serially dependent through the weights it held, because a position that grew weighs the next observation more, so on such a series this figure understates the true standard error. The rigorous alternative is a long-run variance estimator, which needs a bandwidth the library would have to defend on every sample. The library does not build one, and it applies no guard and no threshold here: the figure is reported as it stands, and this paragraph is the caveat that rides with it.
+
 # Algorithm
 
 The five other methods reduce to the `ret::VecNum` method, which runs the steps. A method that takes weights nets the returns through [`calc_net_returns`](@ref) first, and a method that takes a prediction result takes the first series when it carries several.
