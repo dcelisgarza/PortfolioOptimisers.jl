@@ -23,7 +23,9 @@ $(DocStringExtensions.FIELDS)
                               th::Real = 0.0, bp::Real = 1.0,
                               mcap::AbstractString = "market_cap",
                               bw::AbstractString = "benchmark_weights", lag::Integer = 1,
-                              minra::Option{<:Integer} = nothing)
+                              minra::Option{<:Integer} = nothing,
+                              rfe::Option{<:AbstractReturnForecastEstimator} = nothing,
+                              lambda::Real = 1.0, c::Real = 1.0)
 
 ## Validation
 
@@ -33,6 +35,7 @@ $(DocStringExtensions.FIELDS)
   - `bp` is finite and `>= 0`.
   - `lag` is `> 0`.
   - `minra`, when it is stated, is `> 0`.
+  - `lambda` and `c` lie in `[0, 1]`.
 
 # Examples
 
@@ -52,6 +55,7 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
   - [`cross_sectional_regression`](@ref)
   - [`factor_family_basis`](@ref)
   - [`neutralise_exposures!`](@ref)
+  - [`AbstractReturnForecastEstimator`](@ref)
 """
 @propagatable @concrete struct CrossSectionalFactorPrior <: AbstractLowOrderPriorEstimator_A
     """
@@ -114,6 +118,18 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
     Smallest eligible asset count an observation may carry, or `nothing` for `max(2K, 30)` over the reduced factor count `K`.
     """
     minra
+    """
+    Return Forecast Estimator whose forecast enters `mu`, or `nothing`. It is fitted on the coverage universe, after the factor model, and its forecast is split against the latest Factor Exposures into the part they span and the part they do not.
+    """
+    @fprop rfe
+    """
+    Shrinkage of the expected factor returns towards the spanned part of the Return Forecast, in `[0, 1]`. A value of one keeps the fitted factor mean, and a value of zero takes the spanned forecast alone. With no Return Forecast Estimator the spanned part is zero, so the value shrinks the factor mean towards zero.
+    """
+    lambda
+    """
+    Confidence in the orthogonal part of the Return Forecast, in `[0, 1]`. It scales the part of the forecast the factors do not span, which the block carries in `b`. A value of zero discards it.
+    """
+    c
     function CrossSectionalFactorPrior(factors::AbstractVector{<:Pair},
                                        neutralise::Option{<:AbstractVector{<:Pair}},
                                        families::Option{<:AbstractVector{<:Pair}},
@@ -124,7 +140,9 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
                                        ce::StatsBase.CovarianceEstimator,
                                        mp::AbstractMatrixProcessingEstimator, th::Real,
                                        bp::Real, mcap::AbstractString, bw::AbstractString,
-                                       lag::Integer, minra::Option{<:Integer})
+                                       lag::Integer, minra::Option{<:Integer},
+                                       rfe::Option{<:AbstractReturnForecastEstimator},
+                                       lambda::Real, c::Real)
         assert_closed_unit_interval(th, :th)
         assert_finite(bp, :bp)
         assert_nonneg(bp, :bp)
@@ -134,20 +152,15 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
         if !isnothing(minra)
             assert_gt0(minra, :minra)
         end
+        assert_closed_unit_interval(lambda, :lambda)
+        assert_closed_unit_interval(c, :c)
         return new{typeof(factors), typeof(neutralise), typeof(families), typeof(cre),
                    typeof(wa), typeof(pe), typeof(ve), typeof(ce), typeof(mp), typeof(th),
-                   typeof(bp), typeof(mcap), typeof(bw), typeof(lag), typeof(minra)}(factors,
-                                                                                     neutralise,
-                                                                                     families,
-                                                                                     cre,
-                                                                                     wa, pe,
-                                                                                     ve, ce,
-                                                                                     mp, th,
-                                                                                     bp,
-                                                                                     mcap,
-                                                                                     bw,
-                                                                                     lag,
-                                                                                     minra)
+                   typeof(bp), typeof(mcap), typeof(bw), typeof(lag), typeof(minra),
+                   typeof(rfe), typeof(lambda), typeof(c)}(factors, neutralise, families,
+                                                           cre, wa, pe, ve, ce, mp, th, bp,
+                                                           mcap, bw, lag, minra, rfe,
+                                                           lambda, c)
     end
 end
 function CrossSectionalFactorPrior(; factors::Dict_VecPair,
@@ -162,12 +175,15 @@ function CrossSectionalFactorPrior(; factors::Dict_VecPair,
                                    th::Real = 0.0, bp::Real = 1.0,
                                    mcap::AbstractString = "market_cap",
                                    bw::AbstractString = "benchmark_weights",
-                                   lag::Integer = 1,
-                                   minra::Option{<:Integer} = nothing)::CrossSectionalFactorPrior
+                                   lag::Integer = 1, minra::Option{<:Integer} = nothing,
+                                   rfe::Option{<:AbstractReturnForecastEstimator} = nothing,
+                                   lambda::Real = 1.0,
+                                   c::Real = 1.0)::CrossSectionalFactorPrior
     return CrossSectionalFactorPrior(cross_sectional_prior_pairs(factors, :factors),
                                      cross_sectional_prior_option(neutralise, :neutralise),
                                      cross_sectional_prior_option(families, :families), cre,
-                                     wa, pe, ve, ce, mp, th, bp, mcap, bw, lag, minra)
+                                     wa, pe, ve, ce, mp, th, bp, mcap, bw, lag, minra, rfe,
+                                     lambda, c)
 end
 """
     cross_sectional_prior_option(x::Nothing, sym::Sym_Str) -> nothing
@@ -217,9 +233,11 @@ Fit a cross-sectional factor model on an Asset Panel, and return the asset prior
  7. Lag the reduced exposures and the market capitalisation by `pe.lag`, and take the eligibility mask of the fit with [`cross_sectional_eligible`](@ref).
  8. Regress each observation's returns on its lagged reduced exposures, through [`cs_weights_initial`](@ref), [`needs_second_pass`](@ref) and [`cs_weights_refine`](@ref).
  9. Take the idiosyncratic variance history with [`variance_series`](@ref), standardise the idiosyncratic returns by it with [`cross_sectional_standardised_residuals`](@ref), and take the latest idiosyncratic covariance with [`cross_sectional_idiosyncratic_covariance`](@ref).
-10. Fit `pe.pe` on the reduced factor returns, and expand its moments onto the raw factor axis with [`cross_sectional_expand`](@ref), so `fpr` states the distribution of the factors the caller named.
-11. Rebuild the asset return scenarios with [`cross_sectional_scenarios`](@ref).
-12. Lift the reduced factor distribution onto the investable assets with [`cross_sectional_lift`](@ref).
+10. Fit `pe.pe` on the reduced factor returns.
+11. Fit the Return Forecast with [`cross_sectional_return_forecast`](@ref), on the carrier restricted to the fitted observations, and blend its spanned part into the factor mean with [`cross_sectional_forecast_mu`](@ref). The block carries the orthogonal part in `b`, and the Result in `rf`.
+12. Expand the blended factor moments onto the raw factor axis with [`cross_sectional_expand`](@ref), so `fpr` states the distribution of the factors the caller named.
+13. Rebuild the asset return scenarios with [`cross_sectional_scenarios`](@ref).
+14. Lift the reduced factor distribution onto the investable assets with [`cross_sectional_lift`](@ref), and add `b` to the expected return it answers.
 
 # Arguments
 
@@ -246,6 +264,8 @@ Fit a cross-sectional factor model on an Asset Panel, and return the asset prior
   - [`LowOrderPrior`](@ref)
   - [`investable_mask`](@ref)
   - [`cross_sectional_lift`](@ref)
+  - [`cross_sectional_return_forecast`](@ref)
+  - [`cross_sectional_forecast_mu`](@ref)
 """
 function prior(pe::CrossSectionalFactorPrior, rd::ReturnsResult; kwargs...)
     X = rd.X
@@ -301,23 +321,27 @@ function prior(pe::CrossSectionalFactorPrior, rd::ReturnsResult; kwargs...)
                                                       vs[end, :])
     f_pr = prior(pe.pe, csr.f)
     fnow = cross_sectional_basis_now(fb.fcb, r)
-    ex = cross_sectional_expand(fb.fcb, r, pe.lag, csr.f, f_pr.mu, f_pr.sigma)
     L = fb.Ms[r[end], :, :]
+    Msr = Msw[r, :, :]
+    Tb = float(promote_type(real(eltype(L)), real(eltype(f_pr.mu))))
+    csfm = CrossSectionalFactorModel(; M = Msr[end, :, :],
+                                     L = cross_sectional_reduced_loadings(fnow, L),
+                                     b = zeros(Tb, size(X, 2)), csr = csr, Ms = Msr,
+                                     vs = vs, esigma = esigma, rw = W, bw = bwr, nf = nf,
+                                     fam = fam, fcb = fnow, lag = pe.lag)
+    (; rr, g) = cross_sectional_return_forecast(pe.rfe, port_opt_view(rd, rw[r], :), csfm,
+                                                pe.cre, pe.c)
+    f_mu = cross_sectional_forecast_mu(pe.lambda, f_pr.mu, g)
+    ex = cross_sectional_expand(fb.fcb, r, pe.lag, csr.f, f_mu, f_pr.sigma)
     ev = vs[end, :]
     idx = cross_sectional_investable(amr[end, :], L, ev)
     @argcheck(!isempty(idx),
               IsEmptyError("no asset is investable at the latest observation: every asset is either inactive, or carries a non-finite idiosyncratic variance or Factor Exposure. Give more observations, or widen the active mask of the Asset Panel."))
     Xs = cross_sectional_scenarios(f_pr.X, L, S, ev)
-    lift = cross_sectional_lift(pe.mp, L, f_pr.mu, f_pr.sigma, esigma, idx, Xs; kwargs...)
-    Msr = Msw[r, :, :]
-    rr = CrossSectionalFactorModel(; M = Msr[end, :, :],
-                                   L = cross_sectional_reduced_loadings(fnow, L),
-                                   b = zeros(eltype(lift.mu), size(X, 2)), csr = csr,
-                                   Ms = Msr, vs = vs, esigma = esigma, rw = W, bw = bwr,
-                                   nf = nf, fam = fam, fcb = fnow, lag = pe.lag)
+    lift = cross_sectional_lift(pe.mp, L, f_mu, f_pr.sigma, esigma, idx, Xs; kwargs...)
     fpr = LowOrderPrior(; X = ex.f, mu = ex.mu, sigma = ex.sigma, w = f_pr.w,
                         ens = f_pr.ens, kld = f_pr.kld, ow = f_pr.ow)
-    return LowOrderPrior(; X = Xs, o_X = Xr, mu = lift.mu, sigma = lift.sigma,
+    return LowOrderPrior(; X = Xs, o_X = Xr, mu = lift.mu + rr.b, sigma = lift.sigma,
                          chol = lift.chol, w = f_pr.w, ens = f_pr.ens, kld = f_pr.kld,
                          ow = f_pr.ow, rr = rr, fpr = fpr,
                          pnl = port_opt_view(pnl, rw[r], :, false))

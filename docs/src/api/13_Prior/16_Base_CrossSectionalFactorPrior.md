@@ -29,4 +29,7 @@ PortfolioOptimisers.cross_sectional_basis_now
 PortfolioOptimisers.cross_sectional_expand
 PortfolioOptimisers.cross_sectional_residual_block
 PortfolioOptimisers.cross_sectional_lift
+PortfolioOptimisers.cross_sectional_alpha_split
+PortfolioOptimisers.cross_sectional_return_forecast
+PortfolioOptimisers.cross_sectional_forecast_mu
 ```

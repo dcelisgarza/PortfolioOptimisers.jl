@@ -11,4 +11,5 @@ CustomValueReturnForecastResult
 
 ```@docs
 return_forecast(rfe::CustomValueReturnForecast, rd::ReturnsResult, csfm::CrossSectionalFactorModel)
+port_opt_view(rf::CustomValueReturnForecastResult, i, args...)
 ```

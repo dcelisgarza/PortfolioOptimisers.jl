@@ -1042,3 +1042,159 @@ function cross_sectional_lift(mp::AbstractMatrixProcessingEstimator, L::MatNum,
     chol[:, idx] = transpose(ci)
     return (; mu = mu, sigma = sigma, chol = chol)
 end
+"""
+    cross_sectional_alpha_split(cre::AbstractCrossSectionalRegressionEstimator, mu::VecNum,
+                                L::MatNum, w::VecNum) -> NamedTuple
+
+Split a Return Forecast into the part the latest Factor Exposures span and the part they do not.
+
+# Algorithm
+
+ 1. A forecast that is zero at every asset spans nothing, so the split is zero on both sides and no regression runs.
+ 2. Zero the weight of every asset whose forecast, or whose row of exposures, is not finite. The weights come from the **lagged** fit, so a positive weight there says nothing about the finiteness of the latest forecast. A cross-section with no positive weight left is the zero split of step 1.
+ 3. Regress the forecast on the exposures across the assets, under those weights and through the prior's own Cross-Sectional Regression Estimator, giving the spanned coefficients `g`.
+ 4. Subtract the spanned part `L * g` from the forecast, giving the orthogonal part. The entry of an asset whose forecast or whose exposures are not finite is `NaN`, which is how the family says that it forecasts nothing there.
+
+Step 4 subtracts `L * g` rather than the fitted values of step 3, so that the split telescopes: the asset expected return is `L * (λ μ_f + (1 - λ) g) + c (mu - L g)`, which is the forecast itself at `λ = 0` and `c = 1`, whatever the regression's own intercept. An intercept the estimator fits is therefore carried by the orthogonal part.
+
+# Arguments
+
+  - `cre`: Cross-Sectional Regression Estimator of the split.
+  - `mu`: The Return Forecast, one entry per asset of the coverage universe.
+  - `L`: The latest Factor Exposures, `assets × factors`, in the basis the fit ran in.
+  - `w`: The regression weights of the latest fit, one entry per asset.
+
+# Validation
+
+  - The rules of [`cross_sectional_regression`](@ref).
+
+# Returns
+
+  - `g::VecNum`: The spanned coefficients, one per factor of `L`.
+  - `ap::VecNum`: The orthogonal part of the forecast, one entry per asset.
+
+# Related
+
+  - [`CrossSectionalFactorPrior`](@ref)
+  - [`cross_sectional_return_forecast`](@ref)
+  - [`cross_sectional_regression`](@ref)
+  - [`AbstractReturnForecastResult`](@ref)
+"""
+function cross_sectional_alpha_split(cre::AbstractCrossSectionalRegressionEstimator,
+                                     mu::VecNum, L::MatNum, w::VecNum)
+    N = size(L, 1)
+    K = size(L, 2)
+    Tf = float(promote_type(real(eltype(mu)), real(eltype(L)), real(eltype(w))))
+    if all(iszero, mu)
+        return (; g = zeros(Tf, K), ap = zeros(Tf, N))
+    end
+    wv = zeros(Tf, N)
+    for i in 1:N
+        if isfinite(mu[i]) && all(isfinite, view(L, i, :))
+            wv[i] = w[i]
+        end
+    end
+    if !any(x -> x > zero(x), wv)
+        return (; g = zeros(Tf, K), ap = zeros(Tf, N))
+    end
+    csr = cross_sectional_regression(cre, reshape(Tf.(L), 1, N, K), reshape(Tf.(mu), 1, N),
+                                     reshape(wv, 1, N))
+    g = csr.f[1, :]
+    return (; g = g, ap = mu - L * g)
+end
+"""
+    cross_sectional_return_forecast(rfe::Nothing, rd::ReturnsResult,
+                                    csfm::CrossSectionalFactorModel,
+                                    cre::AbstractCrossSectionalRegressionEstimator,
+                                    c::Real) -> NamedTuple
+    cross_sectional_return_forecast(rfe::AbstractReturnForecastEstimator, rd::ReturnsResult,
+                                    csfm::CrossSectionalFactorModel,
+                                    cre::AbstractCrossSectionalRegressionEstimator,
+                                    c::Real) -> NamedTuple
+
+Fit the Return Forecast of a [`CrossSectionalFactorPrior`](@ref), and write its split onto the factor-model block.
+
+# Algorithm
+
+The method that Julia selects is the algorithm, and a prior that states no Return Forecast Estimator is the method over `Nothing`: the block passes through with the zero `b` it was built with, and the factor mean is left alone.
+
+ 1. Fit the estimator on the **coverage** universe, through [`return_forecast`](@ref). The carrier and the block share one observation axis, so the forecast is fitted over the observations the factor model was fitted on.
+ 2. Split the forecast against the latest exposures with [`cross_sectional_alpha_split`](@ref).
+ 3. Rebuild the block with `b` the orthogonal part shrunk by `c`, and with the Return Forecast Result in `rf`. `L` is read with `getfield`, because the `swap(L, M)` rule of [`CrossSectionalFactorModel`](@ref) would otherwise materialise it as a copy of `M`.
+
+# Arguments
+
+  - `rfe`: Return Forecast Estimator, or `nothing`.
+  - $(arg_dict[:rd]) It is the carrier restricted to the fitted observations.
+  - `csfm`: The factor-model block, built with a zero `b` and no Return Forecast.
+  - `cre`: Cross-Sectional Regression Estimator of the split.
+  - `c`: Confidence in the orthogonal part of the forecast.
+
+# Validation
+
+  - The rules of [`return_forecast`](@ref) and of [`cross_sectional_alpha_split`](@ref).
+
+# Returns
+
+  - `rr::CrossSectionalFactorModel`: The block, with `b` and `rf` set.
+  - `g::Option{<:VecNum}`: The spanned coefficients, or `nothing` when the prior states no estimator.
+
+# Related
+
+  - [`CrossSectionalFactorPrior`](@ref)
+  - [`cross_sectional_alpha_split`](@ref)
+  - [`cross_sectional_forecast_mu`](@ref)
+  - [`return_forecast`](@ref)
+"""
+function cross_sectional_return_forecast(::Nothing, ::ReturnsResult,
+                                         csfm::CrossSectionalFactorModel,
+                                         ::AbstractCrossSectionalRegressionEstimator,
+                                         ::Real)
+    return (; rr = csfm, g = nothing)
+end
+function cross_sectional_return_forecast(rfe::AbstractReturnForecastEstimator,
+                                         rd::ReturnsResult, csfm::CrossSectionalFactorModel,
+                                         cre::AbstractCrossSectionalRegressionEstimator,
+                                         c::Real)
+    rf = return_forecast(rfe, rd, csfm)
+    rw = csfm.rw
+    (; g, ap) = cross_sectional_alpha_split(cre, rf.mu, csfm.L, rw[size(rw, 1), :])
+    return (;
+            rr = CrossSectionalFactorModel(; M = csfm.M, L = getfield(csfm, :L), b = c * ap,
+                                           csr = csfm.csr, Ms = csfm.Ms, vs = csfm.vs,
+                                           esigma = csfm.esigma, rw = rw, bw = csfm.bw,
+                                           nf = csfm.nf, fam = csfm.fam, fcb = csfm.fcb,
+                                           lag = csfm.lag, rf = rf), g = g)
+end
+"""
+    cross_sectional_forecast_mu(lambda::Real, mu::VecNum, g::Nothing) -> VecNum
+    cross_sectional_forecast_mu(lambda::Real, mu::VecNum, g::VecNum) -> VecNum
+
+Blend the expected factor returns with the spanned part of a Return Forecast.
+
+# Algorithm
+
+The two are blended as `lambda * mu + (1 - lambda) * g`, so `lambda = 1` keeps the fitted factor mean and `lambda = 0` takes the spanned forecast alone. A prior that states no Return Forecast Estimator has a spanned part of zero, which is the method over `Nothing`, so `lambda` there shrinks the factor mean towards zero and `lambda = 0` gives an expected return of zero.
+
+# Arguments
+
+  - `lambda`: Shrinkage of the factor mean towards the spanned forecast.
+  - `mu`: The expected factor returns of the nested factor prior, on the reduced axis.
+  - `g`: The spanned coefficients of the Return Forecast, or `nothing`.
+
+# Returns
+
+  - `mu::VecNum`: The blended expected factor returns, on the reduced axis.
+
+# Related
+
+  - [`CrossSectionalFactorPrior`](@ref)
+  - [`cross_sectional_return_forecast`](@ref)
+  - [`cross_sectional_alpha_split`](@ref)
+"""
+function cross_sectional_forecast_mu(lambda::Real, mu::VecNum, ::Nothing)
+    return lambda * mu
+end
+function cross_sectional_forecast_mu(lambda::Real, mu::VecNum, g::VecNum)
+    return lambda * mu + (one(lambda) - lambda) * g
+end

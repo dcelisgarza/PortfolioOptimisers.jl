@@ -72,7 +72,7 @@ absent together.
         # Every optional field after `b` reads back as `nothing` when it was not given.
         @test all(isnothing,
                   (csfm.csr, csfm.Ms, csfm.vs, csfm.esigma, csfm.rw, csfm.bw, csfm.fam,
-                   csfm.fcb, csfm.lag))
+                   csfm.fcb, csfm.lag, csfm.rf))
     end
 
     @testset "A re-basis makes L narrower than M" begin
@@ -175,6 +175,31 @@ absent together.
         @test v.fam === fam
         @test v.fcb === fcb
         @test v.lag === 1
+    end
+
+    @testset "The Return Forecast is cut on the asset axis, whatever member holds it" begin
+        # The two members that fit nothing carry the two shapes the family states: a member
+        # with no history, and a member with one. The view cuts `mu` on its one axis and
+        # `hist` on its second, and the Descriptor weights follow no asset selection.
+        hist = [0.01 0.02 0.03; 0.04 0.05 0.06; 0.07 0.08 0.09; 0.11 0.12 0.13]
+        stated = CustomValueReturnForecastResult(; mu = [0.001, 0.002, 0.003])
+        fitted = FixedWeightedReturnForecastResult(; mu = hist[end, :], hist = hist,
+                                                   weights = [0.5, -0.5])
+        i = [3, 1]
+        for rf in (stated, fitted)
+            v = PortfolioOptimisers.port_opt_view(full_model(; rf = rf), i)
+            @test v.rf.mu == rf.mu[i]
+            @test isnothing(rf.hist) ? isnothing(v.rf.hist) : v.rf.hist == rf.hist[:, i]
+        end
+        @test PortfolioOptimisers.port_opt_view(full_model(; rf = fitted), i).rf.weights ===
+              fitted.weights
+        # The guard reads the two fields every member answers, and never a member's own.
+        @test_throws DimensionMismatch CrossSectionalFactorModel(; M = M, b = b,
+                                                                 rf = CustomValueReturnForecastResult(;
+                                                                                                      mu = [0.1,
+                                                                                                            0.2]))
+        @test_throws DimensionMismatch CrossSectionalFactorModel(; M = M[1:2, :],
+                                                                 b = b[1:2], rf = fitted)
     end
 
     @testset "A view keeps an unset L unset" begin

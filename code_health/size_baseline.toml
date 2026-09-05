@@ -34,7 +34,7 @@ commit = "36ff46bdd9"
 "src/05_Denoise.jl" = { code = 132, doc = 535, comment = 34, blank = 196, total = 897 }
 "src/06_Detone.jl" = { code = 46, doc = 188, comment = 0, blank = 81, total = 315 }
 "src/07_MatrixProcessing.jl" = { code = 74, doc = 352, comment = 0, blank = 118, total = 544 }
-"src/08_Moments/01_Base_Moments.jl" = { code = 440, doc = 939, comment = 9, blank = 375, total = 1763 }
+"src/08_Moments/01_Base_Moments.jl" = { code = 442, doc = 976, comment = 9, blank = 394, total = 1821 }
 "src/08_Moments/02_SimpleExpectedReturns.jl" = { code = 81, doc = 310, comment = 0, blank = 144, total = 535 }
 "src/08_Moments/03_Covariance.jl" = { code = 172, doc = 674, comment = 0, blank = 274, total = 1120 }
 "src/08_Moments/04_SimpleVariance.jl" = { code = 125, doc = 567, comment = 0, blank = 233, total = 925 }
@@ -74,7 +74,7 @@ commit = "36ff46bdd9"
 "src/08_Moments/38_CrossSectionalRegression.jl" = { code = 198, doc = 504, comment = 0, blank = 210, total = 912 }
 "src/08_Moments/39_CrossSectionalWeights.jl" = { code = 138, doc = 366, comment = 0, blank = 166, total = 670 }
 "src/08_Moments/40_HigherMomentPartialFit.jl" = { code = 145, doc = 526, comment = 0, blank = 275, total = 946 }
-"src/08_Moments/41_CrossSectionalFactorModel.jl" = { code = 190, doc = 349, comment = 7, blank = 131, total = 677 }
+"src/08_Moments/41_CrossSectionalFactorModel.jl" = { code = 209, doc = 376, comment = 7, blank = 141, total = 733 }
 "src/08_Moments/42_FactorExposures/01_Base_Descriptor.jl" = { code = 143, doc = 278, comment = 0, blank = 129, total = 550 }
 "src/08_Moments/42_FactorExposures/02_PanelFieldDescriptors.jl" = { code = 237, doc = 830, comment = 0, blank = 346, total = 1413 }
 "src/08_Moments/42_FactorExposures/03_LagDescriptors.jl" = { code = 109, doc = 324, comment = 0, blank = 132, total = 565 }
@@ -90,10 +90,10 @@ commit = "36ff46bdd9"
 "src/08_Moments/42_FactorExposures/13_ExposureNeutralisation.jl" = { code = 83, doc = 95, comment = 0, blank = 48, total = 226 }
 "src/08_Moments/43_FactorFamilyBasis.jl" = { code = 202, doc = 292, comment = 0, blank = 140, total = 634 }
 "src/08_Moments/44_FactorFamilyBasisTransforms.jl" = { code = 189, doc = 220, comment = 0, blank = 139, total = 548 }
-"src/08_Moments/45_ReturnForecasts/01_Base_ReturnForecast.jl" = { code = 26, doc = 135, comment = 0, blank = 65, total = 226 }
+"src/08_Moments/45_ReturnForecasts/01_Base_ReturnForecast.jl" = { code = 24, doc = 98, comment = 0, blank = 46, total = 168 }
 "src/08_Moments/45_ReturnForecasts/02_DescriptorScores.jl" = { code = 96, doc = 141, comment = 0, blank = 58, total = 295 }
-"src/08_Moments/45_ReturnForecasts/03_CustomValueReturnForecast.jl" = { code = 30, doc = 66, comment = 0, blank = 31, total = 127 }
-"src/08_Moments/45_ReturnForecasts/04_FixedWeightedReturnForecast.jl" = { code = 88, doc = 165, comment = 0, blank = 64, total = 317 }
+"src/08_Moments/45_ReturnForecasts/03_CustomValueReturnForecast.jl" = { code = 34, doc = 81, comment = 0, blank = 40, total = 155 }
+"src/08_Moments/45_ReturnForecasts/04_FixedWeightedReturnForecast.jl" = { code = 103, doc = 182, comment = 0, blank = 74, total = 359 }
 "src/08_Moments/46_CrossSectionalRegressionDiagnostics.jl" = { code = 431, doc = 611, comment = 0, blank = 284, total = 1326 }
 "src/09_Distance/01_Base_Distance.jl" = { code = 24, doc = 222, comment = 0, blank = 89, total = 335 }
 "src/09_Distance/02_Distance.jl" = { code = 158, doc = 350, comment = 0, blank = 157, total = 665 }
@@ -149,8 +149,8 @@ commit = "36ff46bdd9"
 "src/13_Prior/13_OpinionPoolingPrior.jl" = { code = 93, doc = 317, comment = 16, blank = 118, total = 544 }
 "src/13_Prior/14_HighOrderFactorPriorEstimator.jl" = { code = 172, doc = 271, comment = 20, blank = 82, total = 545 }
 "src/13_Prior/15_FeaturePrior.jl" = { code = 141, doc = 476, comment = 31, blank = 211, total = 859 }
-"src/13_Prior/16_Base_CrossSectionalFactorPrior.jl" = { code = 333, doc = 464, comment = 0, blank = 247, total = 1044 }
-"src/13_Prior/17_CrossSectionalFactorPrior.jl" = { code = 159, doc = 156, comment = 7, blank = 44, total = 366 }
+"src/13_Prior/16_Base_CrossSectionalFactorPrior.jl" = { code = 381, doc = 539, comment = 0, blank = 280, total = 1200 }
+"src/13_Prior/17_CrossSectionalFactorPrior.jl" = { code = 166, doc = 173, comment = 7, blank = 44, total = 390 }
 "src/14_UncertaintySets/01_Base_UncertaintySets.jl" = { code = 247, doc = 845, comment = 5, blank = 407, total = 1504 }
 "src/14_UncertaintySets/02_DeltaUncertaintySets.jl" = { code = 42, doc = 249, comment = 0, blank = 93, total = 384 }
 "src/14_UncertaintySets/03_NormalUncertaintySets.jl" = { code = 205, doc = 731, comment = 4, blank = 254, total = 1194 }

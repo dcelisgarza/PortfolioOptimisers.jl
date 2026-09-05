@@ -238,6 +238,44 @@ function assert_cs_regression_assets(csr::CrossSectionalRegression, N::Integer):
     return nothing
 end
 """
+    assert_return_forecast_assets(rf::Nothing, N::Integer)
+    assert_return_forecast_assets(rf::AbstractReturnForecastResult, N::Integer)
+
+Check the Return Forecast of a [`CrossSectionalFactorModel`](@ref) against the asset count `N`.
+
+A model carries the Return Forecast its prior fitted, or `nothing`, and the absent case is the method over `Nothing`. The check reads the two fields every member of the family answers, `mu` and `hist`, and never the member's own fields, so a new member needs no new method here.
+
+# Arguments
+
+  - `rf`: Return Forecast Result, or `nothing`.
+  - `N`: Number of assets the model carries.
+
+# Validation
+
+  - `length(rf.mu) == N`.
+  - The rules of [`cs_history_assets`](@ref) on `rf.hist`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`CrossSectionalFactorModel`](@ref)
+  - [`AbstractReturnForecastResult`](@ref)
+  - [`cs_history_assets`](@ref)
+"""
+function assert_return_forecast_assets(::Nothing, ::Integer)::Nothing
+    return nothing
+end
+function assert_return_forecast_assets(rf::AbstractReturnForecastResult,
+                                       N::Integer)::Nothing
+    @argcheck(length(rf.mu) == N,
+              DimensionMismatch("rf.mu ($(length(rf.mu))) must match the asset count ($N)"))
+    cs_history_assets(rf.hist, N, Symbol("rf.hist"))
+    return nothing
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Holds the loadings, the factor-orthogonal expected return and the fitted history of a factor model fitted per observation across the assets.
@@ -291,7 +329,8 @@ $(DocStringExtensions.FIELDS)
         nf::Option{<:VecStr} = nothing,
         fam::Option{<:VecStr} = nothing,
         fcb::Option{<:AbstractFactorFamilyBasis} = nothing,
-        lag::Option{<:Integer} = nothing
+        lag::Option{<:Integer} = nothing,
+        rf::Option{<:AbstractReturnForecastResult} = nothing
     ) -> CrossSectionalFactorModel
 
 Keywords correspond to the struct's fields.
@@ -309,6 +348,7 @@ Keywords correspond to the struct's fields.
   - Every two of `vs`, `rw` and `bw` that are present agree on the observation axis, so `size(rw) == size(bw) == size(vs)` when all three are present.
   - If provided, `!isempty(esigma)`, and `esigma` carries `size(M, 1)` entries when it is a vector, or is square with `size(M, 1)` rows when it is a matrix.
   - If provided, `lag >= 0`.
+  - If provided, `length(rf.mu) == size(M, 1)`, and `rf.hist` carries `size(M, 1)` columns when the member computes one.
 
 ## View parameters
 
@@ -319,6 +359,7 @@ Keywords correspond to the struct's fields.
   - `Ms` is sliced on its **second** axis, which is the asset axis of a slice.
   - `vs`, `rw` and `bw` are sliced on their **second** axis, which is the asset axis of a per-asset history.
   - `esigma` is sliced by [`idiosyncratic_covariance_view`](@ref), on one axis or on both.
+  - `rf` is viewed by its own [`port_opt_view`](@ref) method, which cuts `mu` and `hist` on the asset axis.
   - `nf`, `fam`, `fcb` and `lag` pass through unchanged. Each is indexed by factor, or by nothing at all, and neither follows an asset selection.
 
 # Examples
@@ -339,7 +380,8 @@ CrossSectionalFactorModel
       nf ┼ nothing
      fam ┼ Vector{String}: ["style", "style"]
      fcb ┼ nothing
-     lag ┴ Int64: 1
+     lag ┼ Int64: 1
+      rf ┴ nothing
 ```
 
 # Related
@@ -349,6 +391,7 @@ CrossSectionalFactorModel
   - [`CrossSectionalRegression`](@ref)
   - [`port_opt_view`](@ref)
   - [`idiosyncratic_covariance_view`](@ref)
+  - [`AbstractReturnForecastResult`](@ref)
 """
 @concrete struct CrossSectionalFactorModel <: AbstractLoadingsRegressionResult
     """
@@ -403,6 +446,10 @@ CrossSectionalFactorModel
     Number of observations by which the exposures lag the returns.
     """
     lag
+    """
+    The Return Forecast the prior fitted, or `nothing`. Its `mu` is the forecast `b` was split out of, so a consumer reads the forecast the split consumed rather than refitting it.
+    """
+    rf
     function CrossSectionalFactorModel(M::MatNum, L::Option{<:MatNum}, b::VecNum,
                                        csr::Option{<:CrossSectionalRegression},
                                        Ms::Option{<:Arr3Num}, vs::Option{<:MatNum},
@@ -410,7 +457,8 @@ CrossSectionalFactorModel
                                        rw::Option{<:MatNum}, bw::Option{<:MatNum},
                                        nf::Option{<:VecStr}, fam::Option{<:VecStr},
                                        fcb::Option{<:AbstractFactorFamilyBasis},
-                                       lag::Option{<:Integer})
+                                       lag::Option{<:Integer},
+                                       rf::Option{<:AbstractReturnForecastResult})
         @argcheck(!isempty(M), IsEmptyError("M cannot be empty"))
         @argcheck(!isempty(b), IsEmptyError("b cannot be empty"))
         N = size(M, 1)
@@ -441,6 +489,7 @@ CrossSectionalFactorModel
         assert_exposure_history(Ms, N, K)
         assert_cs_regression_assets(csr, N)
         assert_idiosyncratic_covariance(esigma, N)
+        assert_return_forecast_assets(rf, N)
         tvs = cs_history_assets(vs, N, :vs)
         trw = cs_history_assets(rw, N, :rw)
         tbw = cs_history_assets(bw, N, :bw)
@@ -449,8 +498,8 @@ CrossSectionalFactorModel
         assert_cs_history_obs(tbw, tvs, :bw, :vs)
         return new{typeof(M), typeof(L), typeof(b), typeof(csr), typeof(Ms), typeof(vs),
                    typeof(esigma), typeof(rw), typeof(bw), typeof(nf), typeof(fam),
-                   typeof(fcb), typeof(lag)}(M, L, b, csr, Ms, vs, esigma, rw, bw, nf, fam,
-                                             fcb, lag)
+                   typeof(fcb), typeof(lag), typeof(rf)}(M, L, b, csr, Ms, vs, esigma, rw,
+                                                         bw, nf, fam, fcb, lag, rf)
     end
 end
 function CrossSectionalFactorModel(; M::MatNum, L::Option{<:MatNum} = nothing, b::VecNum,
@@ -463,9 +512,10 @@ function CrossSectionalFactorModel(; M::MatNum, L::Option{<:MatNum} = nothing, b
                                    nf::Option{<:VecStr} = nothing,
                                    fam::Option{<:VecStr} = nothing,
                                    fcb::Option{<:AbstractFactorFamilyBasis} = nothing,
-                                   lag::Option{<:Integer} = nothing)::CrossSectionalFactorModel
+                                   lag::Option{<:Integer} = nothing,
+                                   rf::Option{<:AbstractReturnForecastResult} = nothing)::CrossSectionalFactorModel
     return CrossSectionalFactorModel(M, L, b, csr, Ms, vs, esigma, rw, bw, nf, fam, fcb,
-                                     lag)
+                                     lag, rf)
 end
 """
     idiosyncratic_variances(rr::AbstractLoadingsRegressionResult)
@@ -534,7 +584,7 @@ end
 # `Nothing` specialisation needs a rule (see [`@forward_properties`](@ref)'s `swap`).
 @forward_properties CrossSectionalFactorModel{<:Any, Nothing, <:Any, <:Any, <:Any, <:Any,
                                               <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                              <:Any} begin
+                                              <:Any, <:Any} begin
     swap(L, M)
 end
 """
@@ -589,7 +639,8 @@ Return a view of a [`CrossSectionalFactorModel`](@ref) result, selecting only th
  3. View the nested fit with its own [`port_opt_view`](@ref) method, which cuts its residuals on the asset axis.
  4. Take a view of `Ms` on its second axis, and of `vs`, `rw` and `bw` on their second axis, giving the histories of the selected assets.
  5. View `esigma` with [`idiosyncratic_covariance_view`](@ref), which reads its shape.
- 6. Build a new [`CrossSectionalFactorModel`](@ref) from the views, passing `nf`, `fam`, `fcb` and `lag` through, which re-runs every guard of the constructor.
+ 6. View the Return Forecast with its own [`port_opt_view`](@ref) method, which cuts `mu` and `hist` on the asset axis.
+ 7. Build a new [`CrossSectionalFactorModel`](@ref) from the views, passing `nf`, `fam`, `fcb` and `lag` through, which re-runs every guard of the constructor.
 
 # Arguments
 
@@ -634,6 +685,7 @@ function port_opt_view(csfm::CrossSectionalFactorModel, i,
     vs = csfm.vs
     rw = csfm.rw
     bw = csfm.bw
+    rf = csfm.rf
     return CrossSectionalFactorModel(; M = view(csfm.M, i, :),
                                      L = isnothing(L) ? nothing : view(L, i, :),
                                      b = view(csfm.b, i),
@@ -647,7 +699,11 @@ function port_opt_view(csfm::CrossSectionalFactorModel, i,
                                      rw = isnothing(rw) ? nothing : view(rw, :, i),
                                      bw = isnothing(bw) ? nothing : view(bw, :, i),
                                      nf = csfm.nf, fam = csfm.fam, fcb = csfm.fcb,
-                                     lag = csfm.lag)
+                                     lag = csfm.lag, rf = if isnothing(rf)
+                                         nothing
+                                     else
+                                         port_opt_view(rf, i, args...)
+                                     end)
 end
 """
     regression(csfm::CrossSectionalFactorModel, args...)

@@ -399,6 +399,64 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
+Abstract supertype for all Return Forecast Estimator types.
+
+A Return Forecast Estimator produces a Return Forecast: the part of an asset's expected return the caller states or fits from Descriptors, over and above the factor mean. It reads an Asset Panel and a fitted [`CrossSectionalFactorModel`](@ref), so it answers [`return_forecast`](@ref) and never `mean(me, X)`: a Return Forecast is not an expected returns estimator, and the two families are kept apart so that no `me` slot admits one.
+
+All concrete types producing a Return Forecast should be subtypes of `AbstractReturnForecastEstimator`.
+
+# Interfaces
+
+In order to implement a new concrete type that works seamlessly with the library, subtype `AbstractReturnForecastEstimator` and implement the following methods:
+
+## `return_forecast`
+
+  - [`return_forecast(rfe::AbstractReturnForecastEstimator, rd::ReturnsResult, csfm::CrossSectionalFactorModel)`](@ref): Computes the Return Forecast of a carrier and a factor-model block.
+
+### Arguments
+
+  - `rfe`: The concrete subtype instance.
+  - `rd`: The returns result that carries the Asset Panel.
+  - `csfm`: The fitted factor-model block.
+
+### Returns
+
+  - `rf::AbstractReturnForecastResult`: The member's own Result.
+
+# Related
+
+  - [`AbstractEstimator`](@ref)
+  - [`AbstractReturnForecastResult`](@ref)
+  - [`return_forecast`](@ref)
+  - [`CustomValueReturnForecast`](@ref)
+  - [`FixedWeightedReturnForecast`](@ref)
+  - [`DescriptorScores`](@ref)
+"""
+abstract type AbstractReturnForecastEstimator <: AbstractEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for all Return Forecast Result types.
+
+Each member of the Return Forecast family carries its own fitted state, so each answers its own Result type. This root states the two reads every one of them answers:
+
+  - `mu`: The latest Return Forecast, in return units, one entry per asset of the coverage universe. It is `NaN` for an asset the member forecasts nothing for.
+  - `hist`: The Return Forecast history, `observations × assets` and in return units, or `nothing` for a member that computes none.
+
+A consumer reads those two fields off any member, and reads the member's own fields only when it knows which member it holds.
+
+# Related
+
+  - [`AbstractResult`](@ref)
+  - [`AbstractReturnForecastEstimator`](@ref)
+  - [`return_forecast`](@ref)
+  - [`CustomValueReturnForecastResult`](@ref)
+  - [`FixedWeightedReturnForecastResult`](@ref)
+"""
+abstract type AbstractReturnForecastResult <: AbstractResult end
+"""
+$(DocStringExtensions.TYPEDEF)
+
 Abstract supertype for all expected returns algorithm types.
 
 All concrete and/or abstract types that implement a specific algorithm used by an expected returns estimator should be subtypes of `AbstractExpectedReturnsAlgorithm`.

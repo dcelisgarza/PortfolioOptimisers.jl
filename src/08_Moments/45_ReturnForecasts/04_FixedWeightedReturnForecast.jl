@@ -326,4 +326,34 @@ function return_forecast(rfe::FixedWeightedReturnForecast, rd::ReturnsResult,
     return FixedWeightedReturnForecastResult(; mu = hist[end, :], hist = hist, weights = wv)
 end
 
+"""
+    port_opt_view(rf::FixedWeightedReturnForecastResult, i, args...)
+
+Return a view of a [`FixedWeightedReturnForecastResult`](@ref), selecting only the assets indexed by `i`.
+
+`mu` is cut on its one axis and `hist` on its **second** axis, which is the asset axis of a per-asset history. The Descriptor weights are indexed by Descriptor, so they pass through unchanged.
+
+# Arguments
+
+  - `rf`: A fixed weighted Return Forecast result.
+  - `i`: Indices of the assets to select.
+  - `args...`: Additional positional arguments (ignored).
+
+# Returns
+
+  - `rf::FixedWeightedReturnForecastResult`: A new result whose per-asset fields are restricted to the selected assets.
+
+# Related
+
+  - [`FixedWeightedReturnForecastResult`](@ref)
+  - [`port_opt_view`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+"""
+function port_opt_view(rf::FixedWeightedReturnForecastResult, i,
+                       args...)::FixedWeightedReturnForecastResult
+    return FixedWeightedReturnForecastResult(; mu = view(rf.mu, i),
+                                             hist = view(rf.hist, :, i),
+                                             weights = rf.weights)
+end
+
 export FixedWeightedReturnForecast, FixedWeightedReturnForecastResult

@@ -14,4 +14,5 @@ return_forecast(rfe::FixedWeightedReturnForecast, rd::ReturnsResult, csfm::Cross
 assert_signed_composite_weights
 signed_composite_weights
 signed_composite_accumulate!
+port_opt_view(rf::FixedWeightedReturnForecastResult, i, args...)
 ```

@@ -1,5 +1,5 @@
 #=
-The Cross-Sectional Factor Prior (issue #725, map #643).
+The Cross-Sectional Factor Prior (issues #725 and #739, map #643).
 
 WHAT THIS FILE GATES. The estimator builds a point-in-time factor model from an Asset Panel and
 lifts it onto the assets. Four identities are exact and are asserted at machine precision, because
@@ -8,7 +8,8 @@ each one is a construction rather than an estimate:
  1. `Ms[t - lag] f_t + eps_t == X_t` on every eligible pair. The realised factor returns expand
     with the LAGGED family ratios exactly so that this holds.
  2. `L F L' + D == sigma` on the investable block, and `chol' chol == sigma` beside it.
- 3. `mu == M fpr.mu + b` on the investable assets.
+ 3. `mu == M fpr.mu + b` on the investable assets. `b` is zero until a Return Forecast
+    Estimator fills it, and the identity holds either way.
  4. A constrained Factor Family drives the benchmark-weighted sum of its factor returns to zero,
     again under the LAGGED ratios.
 
@@ -16,11 +17,16 @@ The recovery testset is statistical, not exact: the synthetic panel's Panel Fiel
 functions of the true loadings, so a fitted exposure correlates with the truth rather than equalling
 it. The one exception is the industry block, which a one-hot exposure recovers exactly.
 
-THE TWO STORED CASES ARE THE REFERENCE IMPLEMENTATION'S OWN OUTPUT.
+THE FOUR STORED CASES ARE THE REFERENCE IMPLEMENTATION'S OWN OUTPUT.
 `assets/CrossSectionalFactorPriorFactorReturns.csv.gz` and
 `assets/CrossSectionalFactorPriorFamilyFactorReturns.csv.gz` hold the factor returns the reference
-implementation's own prior produced, driven on the panel the stored-case testset rebuilds, with the
-same four factors, the same lag, the same two capitalisation powers and the same factor prior. The
+implementation's own prior produced, driven on the panel `csfp_reference_case` rebuilds, with the
+same four factors, the same lag, the same two capitalisation powers and the same factor prior.
+`assets/CrossSectionalFactorPriorForecastMu.csv.gz` and
+`assets/CrossSectionalFactorPriorFamilyForecastMu.csv.gz` hold the expected returns the same prior
+produced on the same panel, with its fixed-weighted forecast over `signal`, a shrinkage of one and a
+confidence of one. The forecast itself agrees BIT FOR BIT, the factor mean to 1.1e-18 and the
+expected returns to 1.6e-17, in both the plain and the constrained-family case. The
 whole fit was diffed the same way before the cases were stored, over 40 assets and 120 observations:
 the loadings and the benchmark weights agree BIT FOR BIT, the regression weights to 5.7e-14, the
 factor returns to 1.3e-16, the idiosyncratic returns to 5.9e-16 and the factor mean to 1.1e-18, in
@@ -28,12 +34,13 @@ both the plain and the constrained-family case. The two libraries solve the same
 squares by different routes -- this one factorises the weighted design, the reference implementation
 solves the normal equations -- so machine precision is the agreement to expect.
 
-The panel of that testset is fully active and carries no blank cell, and its two style exposures are
-standardised in the test rather than by a Descriptor. Both choices are deliberate: they take every
-departure below out of the picture, so the stored cases measure the fit alone. Issue #721 already
-diffed the Factor Exposures themselves.
+The panel of those testsets is fully active and carries no blank cell, and its two style exposures
+are standardised in the test rather than by a Descriptor. Both choices are deliberate: they take
+every departure below out of the picture, so the stored cases measure the fit alone. Issue #721
+already diffed the Factor Exposures themselves.
 
-TWO DEPARTURES FROM THE REFERENCE IMPLEMENTATION, both recorded in the resolution comment of #725.
+THREE DEPARTURES FROM THE REFERENCE IMPLEMENTATION. The first two are recorded in the resolution
+comment of #725, and the third in that of #739.
 
   - The benchmark mask and the eligibility mask both drop a pair whose market capitalisation is not
     finite. The reference implementation lets such a pair carry a `NaN` weight. The library refuses
@@ -43,6 +50,13 @@ TWO DEPARTURES FROM THE REFERENCE IMPLEMENTATION, both recorded in the resolutio
     finite, which happens only where the asset is inactive. The reference implementation's default
     covariance estimator skips such a pair; the library has no exponentially weighted covariance
     with a verb (issue #637), so the default here is the library's own and it admits no `NaN`.
+  - The Return Forecast Estimator is fitted on the carrier restricted to the FITTED observations.
+    The reference implementation pads the fitted histories back onto the whole observation axis and
+    fits the forecast there, so that a Descriptor of the forecast warms up over the whole history
+    rather than over the fit's own window. The library's own contract is the narrower one: a Return
+    Forecast Estimator reads its carrier beside the block, and the two share one observation axis,
+    which `neutralise_scores!` and `forecast_return_units` both need. A Descriptor with no warm-up,
+    which is what the stored cases use, sees the same numbers either way.
 =#
 using Statistics, Distributions, Dates, Random
 include(joinpath(@__DIR__, "test06c_setup.jl"))
@@ -150,6 +164,9 @@ end
         @test pe.bw == "benchmark_weights"
         @test isone(pe.lag)
         @test isnothing(pe.minra)
+        @test isnothing(pe.rfe)
+        @test isone(pe.lambda)
+        @test isone(pe.c)
         @test isnothing(pe.neutralise)
         @test isnothing(pe.families)
     end
@@ -174,6 +191,8 @@ end
         @test_throws DomainError CrossSectionalFactorPrior(; factors = f, bp = -1.0)
         @test_throws DomainError CrossSectionalFactorPrior(; factors = f, lag = 0)
         @test_throws DomainError CrossSectionalFactorPrior(; factors = f, minra = 0)
+        @test_throws DomainError CrossSectionalFactorPrior(; factors = f, lambda = 1.5)
+        @test_throws DomainError CrossSectionalFactorPrior(; factors = f, c = -0.1)
         @test_throws PO.IsEmptyError CrossSectionalFactorPrior(; factors = f, mcap = "")
     end
     @testset "A bare matrix and a missing panel are refused by name" begin
@@ -305,7 +324,7 @@ end
         # The Return Forecast enters `b` after this ticket, so it is zero here.
         @test iszero(rr.b)
     end
-    @testset "The block carries the thirteen facts of the fit" begin
+    @testset "The block carries the fourteen facts of the fit" begin
         @test size(rr.Ms) == (size(rr.csr.f, 1), size(rd.X, 2), length(rr.nf))
         # `isequal`, not `==`: an inactive asset carries a NaN Factor Exposure.
         @test isequal(rr.Ms[end, :, :], rr.M)
@@ -316,6 +335,8 @@ end
         @test rr.fam ==
               ["market", "industry", "industry", "industry", "industry", "style", "style"]
         @test isone(rr.lag)
+        # The prior states no Return Forecast Estimator here, so the block carries none.
+        @test isnothing(rr.rf)
         @test isnothing(getfield(rr, :L))
         @test isnothing(rr.fcb)
         @test !PO.has_family_rebasis(rr)
@@ -455,18 +476,19 @@ end
     end
 end
 
-@testset "The fit matches the reference implementation's own output" begin
+# The panel every stored case is driven on, and the four factors of that fit. A fully active
+# panel with no blank cell: every departure the two libraries have over an inactive or an
+# unobserved cell is then out of the picture, and the stored cases measure the fit alone.
+#
+# The two style fields are standardised here rather than by a Descriptor, so a passthrough
+# exposure is bit-identical on both sides and the diff isolates the fit. `signal` is a field no
+# Factor Exposure reads, so a Return Forecast built on it carries a part the factors do not
+# span, and the stored `mu` measures the split rather than a projection onto the design.
+function csfp_reference_case()
     PO = PortfolioOptimisers
-    # A fully active panel with no blank cell. Every departure the two libraries have over an
-    # inactive or an unobserved cell is then out of the picture, and the two stored cases
-    # measure the fit alone: the regression, its weights, and the family re-basis.
-    res = csfp_panel(; n_assets = 40, n_observations = 120, n_industries = 3,
+    rd0 = csfp_panel(; n_assets = 40, n_observations = 120, n_industries = 3,
                      seed = 725_900, late_listing_proba = 0.0, delisting_proba = 0.0,
-                     missing_ratio = 0.0)
-    rd0 = res.rd
-    @test all(rd0.pnl.amsk)
-    # The two style fields are standardised here rather than by a Descriptor, so a
-    # passthrough exposure is bit-identical on both sides and the diff isolates the fit.
+                     missing_ratio = 0.0).rd
     function csfp_zscore(A)
         B = similar(A)
         for t in axes(A, 1)
@@ -482,6 +504,9 @@ end
           NumericPanelField(; name = "style2",
                             vals = csfp_zscore(PO.panel_field_values(rd0, "book_equity") ./
                                                mcap)))
+    push!(pf,
+          NumericPanelField(; name = "signal",
+                            vals = csfp_zscore(randn(StableRNG(739_100), size(rd0.X)...))))
     rd = ReturnsResult(; nx = rd0.nx, X = rd0.X, ts = rd0.ts,
                        pnl = AssetPanel(; pf = identity.(pf), amsk = rd0.pnl.amsk,
                                         emsk = rd0.pnl.emsk))
@@ -491,6 +516,12 @@ end
     factors = ["market" => ConstantExposure(),
                "industry" => OneHotExposure(; field = "industry", family = "industry"),
                "style1" => csfp_pass("style1"), "style2" => csfp_pass("style2")]
+    return rd, factors
+end
+
+@testset "The fit matches the reference implementation's own output" begin
+    rd, factors = csfp_reference_case()
+    @test all(rd.pnl.amsk)
     for (nm, fams) in (("", nothing), ("Family", ["industry" => nothing]))
         pr = prior(CrossSectionalFactorPrior(; factors = factors, families = fams), rd)
         E = Matrix(CSV.read(joinpath(@__DIR__,
@@ -508,6 +539,105 @@ end
         d, n = csfp_reconciliation(pr, rd, 1)
         @test n > 4000
         @test d < 1e-14
+    end
+end
+
+@testset "The Return Forecast splits into a spanned part and an orthogonal part" begin
+    PO = PortfolioOptimisers
+    rd = csfp_panel().rd
+    # The market factor and the one-hot industry block sum to the same column, so the split's
+    # coefficients are not unique under the four factors the other testsets fit. These three
+    # are independent, so `g` is the vector the forecast was built from.
+    factors = ["market" => ConstantExposure(),
+               "size" =>
+                   CompositeExposure(; descriptors = [LogMarketCap()], family = "style"),
+               "value" =>
+                   CompositeExposure(; descriptors = [BookToPrice()], family = "style")]
+    pr0 = prior(CrossSectionalFactorPrior(; factors = factors), rd)
+    M = pr0.rr.M
+    i = csfp_investable(pr0)
+    N = length(pr0.mu)
+    @testset "A spanned forecast is the factor mean itself at lambda = 0" begin
+        g0 = [0.001, 0.002, -0.003]
+        for c in (0.0, 0.5, 1.0)
+            pr = prior(CrossSectionalFactorPrior(; factors = factors, lambda = 0.0, c = c,
+                                                 rfe = CustomValueReturnForecast(;
+                                                                                 mu = M *
+                                                                                      g0)),
+                       rd)
+            @test isapprox(pr.fpr.mu, g0; atol = 1e-15)
+            @test maximum(abs, view(pr.rr.b, i)) < 1e-15
+            @test isapprox(view(pr.mu, i), view(M * g0, i); atol = 1e-15)
+            @test isa(pr.rr.rf, CustomValueReturnForecastResult)
+        end
+    end
+    @testset "An orthogonal forecast leaves the factor mean alone and scales into b" begin
+        # A forecast the latest exposures do not span, built by projecting a ramp out of the
+        # column space of `M` under the latest regression weights.
+        w = pr0.rr.rw[end, :]
+        fin = findall(k -> w[k] > zero(eltype(w)) && all(isfinite, view(M, k, :)), 1:N)
+        y = zeros(N)
+        y[fin] = collect(range(-0.01, 0.01; length = length(fin)))
+        A = M[fin, :]
+        W = LinearAlgebra.Diagonal(w[fin])
+        ap = copy(y)
+        ap[fin] = view(y, fin) -
+                  A * ((transpose(A) * W * A) \ (transpose(A) * W * view(y, fin)))
+        pr = prior(CrossSectionalFactorPrior(; factors = factors, lambda = 1.0, c = 0.5,
+                                             rfe = CustomValueReturnForecast(; mu = ap)),
+                   rd)
+        @test isapprox(pr.fpr.mu, pr0.fpr.mu; atol = 1e-15)
+        @test isapprox(view(pr.rr.b, i), 0.5 * view(ap, i); atol = 1e-15)
+    end
+    @testset "A forecast of zeros, of NaNs, and no estimator at all" begin
+        # Each of the three states the same thing: nothing to span and nothing to add.
+        for mu in (zeros(N), fill(NaN, N))
+            pr = prior(CrossSectionalFactorPrior(; factors = factors, lambda = 0.0, c = 1.0,
+                                                 rfe = CustomValueReturnForecast(; mu = mu)),
+                       rd)
+            @test iszero(pr.fpr.mu)
+            @test iszero(pr.rr.b)
+            @test iszero(view(pr.mu, i))
+        end
+        # With no estimator the spanned part is zero, so `lambda` shrinks the factor mean.
+        for lambda in (0.0, 0.25, 1.0)
+            pr = prior(CrossSectionalFactorPrior(; factors = factors, lambda = lambda), rd)
+            @test isapprox(pr.fpr.mu, lambda * pr0.fpr.mu; atol = 1e-18)
+            @test iszero(pr.rr.b)
+            @test isnothing(pr.rr.rf)
+        end
+    end
+end
+
+@testset "The Return Forecast split matches the reference implementation's own output" begin
+    rd, factors = csfp_reference_case()
+    # One passthrough Descriptor over `signal`, scored by neither transform, so the forecast
+    # is bit-identical on both sides and the two stored cases measure the split alone.
+    rfe = FixedWeightedReturnForecast(;
+                                      scores = DescriptorScores(;
+                                                                descriptors = [Passthrough(;
+                                                                                           field = "signal")],
+                                                                outlier = nothing,
+                                                                scoring = nothing),
+                                      scale = 0.02)
+    for (nm, fams) in (("", nothing), ("Family", ["industry" => nothing]))
+        pr = prior(CrossSectionalFactorPrior(; factors = factors, families = fams,
+                                             rfe = rfe, lambda = 1.0, c = 1.0), rd)
+        E = vec(Matrix(CSV.read(joinpath(@__DIR__,
+                                         "assets/CrossSectionalFactorPrior$(nm)ForecastMu.csv.gz"),
+                                DataFrame)))
+        @test length(E) == length(pr.mu)
+        @test all(isfinite, E)
+        # The reference implementation's own expected returns, over the same universe. The
+        # split is the last step of the fit, so the stored vector pins the whole chain.
+        @test maximum(abs, pr.mu - E) < 1e-14
+        # The forecast the split consumed travels on the block, and its `mu` is the last
+        # observation of its own history.
+        @test pr.rr.rf.mu == pr.rr.rf.hist[end, :]
+        @test !iszero(pr.rr.b)
+        # `mu` is the loadings through the factor mean plus the orthogonal part, as it is
+        # without a forecast.
+        @test isapprox(pr.mu, pr.rr.M * pr.fpr.mu + pr.rr.b; atol = 1e-15)
     end
 end
 

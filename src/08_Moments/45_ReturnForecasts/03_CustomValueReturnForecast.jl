@@ -124,4 +124,32 @@ function return_forecast(rfe::CustomValueReturnForecast, ::ReturnsResult,
     return CustomValueReturnForecastResult(; mu = rfe.mu)
 end
 
+"""
+    port_opt_view(rf::CustomValueReturnForecastResult, i, args...)
+
+Return a view of a [`CustomValueReturnForecastResult`](@ref), selecting only the assets indexed by `i`.
+
+The member computes no history, so `mu` is the one field the view cuts.
+
+# Arguments
+
+  - `rf`: A stated Return Forecast result.
+  - `i`: Indices of the assets to select.
+  - `args...`: Additional positional arguments (ignored).
+
+# Returns
+
+  - `rf::CustomValueReturnForecastResult`: A new result whose forecast is restricted to the selected assets.
+
+# Related
+
+  - [`CustomValueReturnForecastResult`](@ref)
+  - [`port_opt_view`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+"""
+function port_opt_view(rf::CustomValueReturnForecastResult, i,
+                       args...)::CustomValueReturnForecastResult
+    return CustomValueReturnForecastResult(; mu = view(rf.mu, i))
+end
+
 export CustomValueReturnForecast, CustomValueReturnForecastResult
