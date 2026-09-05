@@ -5,7 +5,7 @@
 julia = "1.12.7"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "36ff46bdd9"
+commit = "33b9681df0"
 
 [file]
 "ext/PortfolioOptimisersImputeExt.jl" = { cyc = 1, cog = 0, arg = 2, cyc_sum = 1, cog_sum = 0, arg_sum = 2, macros = [] }
@@ -147,6 +147,8 @@ commit = "36ff46bdd9"
 "src/13_Prior/13_OpinionPoolingPrior.jl" = { cyc = 5, cog = 8, arg = 7, cyc_sum = 14, cog_sum = 12, arg_sum = 25, macros = ["@propagatable"] }
 "src/13_Prior/14_HighOrderFactorPriorEstimator.jl" = { cyc = 21, cog = 33, arg = 5, cyc_sum = 44, cog_sum = 61, arg_sum = 17, macros = ["@forward_properties", "@propagatable"] }
 "src/13_Prior/15_FeaturePrior.jl" = { cyc = 3, cog = 4, arg = 6, cyc_sum = 28, cog_sum = 13, arg_sum = 42, macros = ["@forward_properties", "@propagatable"] }
+"src/13_Prior/16_Base_CrossSectionalFactorPrior.jl" = { cyc = 9, cog = 11, arg = 8, cyc_sum = 84, cog_sum = 71, arg_sum = 67, macros = [] }
+"src/13_Prior/17_CrossSectionalFactorPrior.jl" = { cyc = 4, cog = 6, arg = 15, cyc_sum = 11, cog_sum = 8, arg_sum = 27, macros = ["@propagatable"] }
 "src/14_UncertaintySets/01_Base_UncertaintySets.jl" = { cyc = 3, cog = 3, arg = 7, cyc_sum = 52, cog_sum = 27, arg_sum = 84, macros = [] }
 "src/14_UncertaintySets/02_DeltaUncertaintySets.jl" = { cyc = 1, cog = 1, arg = 5, cyc_sum = 7, cog_sum = 1, arg_sum = 22, macros = [] }
 "src/14_UncertaintySets/03_NormalUncertaintySets.jl" = { cyc = 3, cog = 3, arg = 9, cyc_sum = 29, cog_sum = 5, arg_sum = 117, macros = [] }

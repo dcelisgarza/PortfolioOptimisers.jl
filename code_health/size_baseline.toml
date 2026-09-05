@@ -148,6 +148,8 @@ commit = "36ff46bdd9"
 "src/13_Prior/13_OpinionPoolingPrior.jl" = { code = 93, doc = 317, comment = 16, blank = 118, total = 544 }
 "src/13_Prior/14_HighOrderFactorPriorEstimator.jl" = { code = 172, doc = 271, comment = 20, blank = 82, total = 545 }
 "src/13_Prior/15_FeaturePrior.jl" = { code = 141, doc = 476, comment = 31, blank = 211, total = 859 }
+"src/13_Prior/16_Base_CrossSectionalFactorPrior.jl" = { code = 333, doc = 464, comment = 0, blank = 247, total = 1044 }
+"src/13_Prior/17_CrossSectionalFactorPrior.jl" = { code = 159, doc = 156, comment = 7, blank = 44, total = 366 }
 "src/14_UncertaintySets/01_Base_UncertaintySets.jl" = { code = 247, doc = 845, comment = 5, blank = 407, total = 1504 }
 "src/14_UncertaintySets/02_DeltaUncertaintySets.jl" = { code = 42, doc = 249, comment = 0, blank = 93, total = 384 }
 "src/14_UncertaintySets/03_NormalUncertaintySets.jl" = { code = 205, doc = 731, comment = 4, blank = 254, total = 1194 }
@@ -265,4 +267,4 @@ commit = "36ff46bdd9"
 "src/23_Pipeline/05_SearchCrossValidation.jl" = { code = 212, doc = 121, comment = 18, blank = 60, total = 411 }
 "src/24_Plotting.jl" = { code = 57, doc = 974, comment = 102, blank = 280, total = 1413 }
 "src/25_Aliases.jl" = { code = 267, doc = 591, comment = 25, blank = 161, total = 1044 }
-"src/PortfolioOptimisers.jl" = { code = 292, doc = 3, comment = 29, blank = 5, total = 329 }
+"src/PortfolioOptimisers.jl" = { code = 294, doc = 3, comment = 29, blank = 5, total = 331 }
