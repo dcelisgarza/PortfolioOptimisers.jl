@@ -225,3 +225,109 @@ end
     @test mro === mr
     @test rdo === rd
 end
+
+# The naive and meta families, issue #676, under ADR 0115. `InverseVolatility`, `Stacking`
+# and `SubsetResampling` each reduce once at their entry through the same shared verb the
+# JuMP prelude uses, and each result expands in its keyword constructor. A meta family
+# composes two masks: its own at its entry, and each inner head's inside its own solve.
+
+@testset "The plain-vector expansion on its own terms" begin
+    imsk = BitVector([1, 1, 0, 1, 1])
+    w = [0.1, 0.2, 0.3, 0.4]
+    # The `nothing` sentinel returns the very object it was given, as the JuMP route does.
+    @test PortfolioOptimisers.expand_investable_weights(nothing, w) === w
+    # A naive head whose finaliser gave up records no weights, and no mask makes them.
+    @test isnothing(PortfolioOptimisers.expand_investable_weights(nothing, nothing))
+    @test isnothing(PortfolioOptimisers.expand_investable_weights(imsk, nothing))
+    @test PortfolioOptimisers.expand_investable_weights(imsk, w) ==
+          [0.1, 0.2, 0.0, 0.3, 0.4]
+    # A failed solve carries `NaN` at each solved position, and the expansion keeps the
+    # distinction between an asset the optimiser tried and one it never could.
+    out = PortfolioOptimisers.expand_investable_weights(imsk, fill(NaN, 4))
+    @test iszero(out[k])
+    @test all(isnan, out[keep])
+    # The frontier route, one weight vector per sweep point.
+    @test PortfolioOptimisers.expand_investable_weights(imsk, [w, reverse(w)]) ==
+          [[0.1, 0.2, 0.0, 0.3, 0.4], [0.4, 0.3, 0.0, 0.2, 0.1]]
+    # A mask and a weight vector from different optimisations are refused where they meet.
+    @test_throws DimensionMismatch PortfolioOptimisers.expand_investable_weights(imsk,
+                                                                                 [0.5, 0.5])
+end
+
+@testset "InverseVolatility reduces and expands" begin
+    res = optimise(InverseVolatility(; pe = prn), rd)
+    oracle = optimise(InverseVolatility(; pe = prk), rdk)
+    # The oracle is the same optimisation with the non-investable asset removed by hand.
+    @test res.imsk == BitVector([1, 1, 0, 1, 1])
+    @test isnothing(oracle.imsk)
+    @test length(res.w) == N
+    @test iszero(res.w[k])
+    @test isapprox(res.w[keep], oracle.w)
+    # The result carries the objects of the reduced universe beside the mask.
+    @test size(res.pr.X, 2) == length(keep)
+    # The all-investable path is the path it was.
+    plain = optimise(InverseVolatility(; pe = pr), rd)
+    @test isnothing(plain.imsk)
+    @test length(plain.w) == N
+    # No investable asset throws where the mask is derived.
+    prz = LowOrderPrior(; X = pr.X, mu = fill(NaN, N), sigma = pr.sigma)
+    @test_throws PortfolioOptimisers.IsEmptyError optimise(InverseVolatility(; pe = prz),
+                                                           rd)
+end
+
+@testset "The prior-free naive heads carry no mask" begin
+    # `EqualWeighted` and `RandomWeighted` fit no prior, so no Prior Result yields a mask
+    # for them and their `imsk` is the `nothing` sentinel. Issue #859 gives them the
+    # Coverage Universe of their window instead, under ADR 0120.
+    @test isnothing(optimise(EqualWeighted(), rd).imsk)
+    @test isnothing(optimise(RandomWeighted(; seed = 42), rd).imsk)
+end
+
+@testset "SubsetResampling draws its subsets from the investable universe" begin
+    sr(pe) = SubsetResampling(; pe = pe, opt = InverseVolatility(), subset_size = 3,
+                              n_subsets = 3, seed = 42)
+    res = optimise(sr(prn), rd)
+    oracle = optimise(sr(prk), rdk)
+    @test res.imsk == BitVector([1, 1, 0, 1, 1])
+    @test length(res.w) == N
+    @test iszero(res.w[k])
+    @test isapprox(res.w[keep], oracle.w)
+    # The subset index is in reduced positions, as `pr`, `wb` and `fees` are, so no subset
+    # can name a dead asset and the draw needs no second filter.
+    @test size(res.idx) == (3, 3)
+    @test all(res.idx .<= length(keep))
+    @test res.idx == oracle.idx
+    # A subset larger than the investable universe refuses where the count is checked,
+    # rather than drawing a dead asset to make up the number.
+    @test_throws ArgumentError optimise(SubsetResampling(; pe = prn,
+                                                         opt = InverseVolatility(),
+                                                         subset_size = 3, n_subsets = 5,
+                                                         seed = 42), rd)
+    # A rebuild never expands a second time: it goes through the positional constructor.
+    @test PortfolioOptimisers.factory(res, nothing).w == res.w
+    @test PortfolioOptimisers.set_retcode(res, OptimisationFailure()).w == res.w
+end
+
+@testset "Stacking reduces once, and its candidates compose their own masks" begin
+    st(pe) = Stacking(; pe = pe, opti = [InverseVolatility(), EqualWeighted()],
+                      opto = InverseVolatility())
+    res = optimise(st(prn), rd)
+    oracle = optimise(st(prk), rdk)
+    @test res.imsk == BitVector([1, 1, 0, 1, 1])
+    @test length(res.w) == N
+    @test iszero(res.w[k])
+    @test isapprox(res.w[keep], oracle.w)
+    # Every candidate solved the reduced universe, so its own record is the reduced width.
+    @test all(r -> length(r.w) == length(keep), res.resi)
+    @test PortfolioOptimisers.set_retcode(res, OptimisationFailure()).w == res.w
+    # A JuMP candidate reduces again inside its own solve, and the two masks compose to the
+    # same answer as the hand-reduced problem.
+    stj(pe) = Stacking(; pe = pe,
+                       opti = [MeanRisk(; opt = JuMPOptimiser(; pe = pe, slv = slv)),
+                               EqualWeighted()], opto = InverseVolatility())
+    res = optimise(stj(prn), rd)
+    oracle = optimise(stj(prk), rdk)
+    @test res.imsk == BitVector([1, 1, 0, 1, 1])
+    @test iszero(res.w[k])
+    @test isapprox(res.w[keep], oracle.w; rtol = 5e-6)
+end

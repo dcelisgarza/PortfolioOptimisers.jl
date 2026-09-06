@@ -38,10 +38,11 @@ $(DocStringExtensions.FIELDS)
         cv::Option{<:OptimisationCrossValidation},
         retcode::OptRetCode_VecOptRetCode,
         w::VecNum_VecVecNum,
+        imsk::Option{<:BitVector} = nothing,
         fb::Option{<:OptE_Opt}
     ) -> StackingResult
 
-Keywords correspond to the struct's fields.
+Keywords correspond to the struct's fields. The keyword constructor expands `w` onto the full asset universe through [`expand_investable_weights`](@ref), which is the one door [`_optimise`](@ref) exits through. The positional constructor never expands, so [`set_retcode`](@ref) and [`factory`](@ref) rebuild without a second pass.
 
 # Related
 
@@ -49,6 +50,7 @@ Keywords correspond to the struct's fields.
   - [`NonFiniteAllocationOptimisationResult`](@ref)
   - [`NestedClusteredResult`](@ref)
   - [`combination_weights`](@ref)
+  - [`expand_investable_weights`](@ref)
 
 # References
 
@@ -88,6 +90,10 @@ Keywords correspond to the struct's fields.
     """
     w
     """
+    $(field_dict[:imsk])
+    """
+    imsk
+    """
     $(field_dict[:fb])
     """
     fb
@@ -97,11 +103,17 @@ Keywords correspond to the struct's fields.
                             reso::OptimisationResult,
                             cv::Option{<:OptimisationCrossValidation},
                             retcode::OptRetCode_VecOptRetCode, w::VecNum_VecVecNum,
-                            fb::Option{<:OptE_Opt})
+                            imsk::Option{<:BitVector}, fb::Option{<:OptE_Opt})
         return new{typeof(pr), typeof(wb), typeof(fees), typeof(resi), typeof(reso),
-                   typeof(cv), typeof(retcode), typeof(w), typeof(fb)}(pr, wb, fees, resi,
-                                                                       reso, cv, retcode, w,
-                                                                       fb)
+                   typeof(cv), typeof(retcode), typeof(w), typeof(imsk), typeof(fb)}(pr, wb,
+                                                                                     fees,
+                                                                                     resi,
+                                                                                     reso,
+                                                                                     cv,
+                                                                                     retcode,
+                                                                                     w,
+                                                                                     imsk,
+                                                                                     fb)
     end
 end
 function StackingResult(; pr::Option{<:AbstractPriorResult}, wb::Option{<:WeightBounds},
@@ -109,8 +121,10 @@ function StackingResult(; pr::Option{<:AbstractPriorResult}, wb::Option{<:Weight
                         resi::AbstractVector{<:NonFiniteAllocationOptimisationResult},
                         reso::OptimisationResult, cv::Option{<:OptimisationCrossValidation},
                         retcode::OptRetCode_VecOptRetCode, w::VecNum_VecVecNum,
+                        imsk::Option{<:BitVector} = nothing,
                         fb::Option{<:OptE_Opt})::StackingResult
-    return StackingResult(pr, wb, fees, resi, reso, cv, retcode, w, fb)
+    return StackingResult(pr, wb, fees, resi, reso, cv, retcode,
+                          expand_investable_weights(imsk, w), imsk, fb)
 end
 """
     set_retcode(res::StackingResult, retcode::OptRetCode_VecOptRetCode)
@@ -136,7 +150,7 @@ The result carries one return code per member of the population, so a member is 
 """
 function set_retcode(res::StackingResult, retcode::OptRetCode_VecOptRetCode)
     return StackingResult(res.pr, res.wb, res.fees, res.resi, res.reso, res.cv, retcode,
-                          res.w, res.fb)
+                          res.w, res.imsk, res.fb)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -544,6 +558,12 @@ function _optimise(st::Stacking, rd::ReturnsResult; dims::Int = 1,
     st = reset_time_dependent_estimator(st)
     rd = returns_result_picker(rd, st.brt)
     pr = prior(st.pe, rd; dims = dims)
+    # The prior fits on the coverage universe and returns a result on the full asset
+    # universe, where an asset it could not estimate carries `NaN`. Reduce once, here,
+    # before the candidate solves: every candidate then sees the investable universe alone,
+    # and each composes its own mask inside its own solve. `StackingResult` expands the
+    # combined weights back.
+    imsk, pr, st, rd = investable_reduction(pr, st, rd)
     X = pr.X
     fees = fees_constraints(st.fees, st.sets; datatype = eltype(X), strict = st.strict)
     opti = st.opti
@@ -567,7 +587,7 @@ function _optimise(st::Stacking, rd::ReturnsResult; dims::Int = 1,
     retcode, w = outer_optimisation_finaliser(wb, st.wf, resi, reso.retcode,
                                               combination_weights(st.scale, reso.w), wi)
     return StackingResult(; pr = pr, wb = wb, fees = fees, resi = resi, reso = reso,
-                          cv = st.cv, retcode = retcode, w = w, fb = nothing)
+                          cv = st.cv, retcode = retcode, w = w, imsk = imsk, fb = nothing)
 end
 """
     optimise(st::Stacking{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,

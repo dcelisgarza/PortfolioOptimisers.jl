@@ -2670,6 +2670,105 @@ function port_opt_view(::NonFiniteAllocationOptimisationResult, ::Any, args...)
     return throw(ArgumentError("a precomputed optimisation result cannot be viewed to an asset subset: its weights were solved over the full universe and a sub-portfolio of them has no defined meaning. A TimeDependent schedule holding precomputed results is therefore incompatible with asset-subsampling cross-validation (e.g. MultipleRandomised); use estimator entries there instead."))
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Derive the Investable Mask of a fitted prior, and reduce the prior, the optimiser and the returns data to the assets it keeps.
+
+A Prior Estimator fits on the coverage universe and hands back a result on the full asset universe, in which an asset it could not estimate carries `NaN` in `mu` and on the diagonal of `sigma`. Nothing downstream of the fit can solve over such an asset, so the reduction happens once, at the optimiser's entry, and every constraint the caller stated over the full universe is sliced by the same index.
+
+Every optimisation family reduces through this one verb, which is why it is bound to [`AbstractOptimisationEstimator`](@ref) and lives here rather than beside the JuMP prelude: the hierarchical, naive and meta files load before that prelude and reach it without a back reference. A meta-optimiser composes two masks, its own at its entry and each inner head's inside its own solve, and both expand.
+
+Three methods, and the branch is dispatch rather than a condition. The first derives the mask; the `nothing` method is the all-investable path and returns its arguments untouched; the `BitVector` method takes the three views. A universe with nothing to exclude therefore costs one pass over two vectors and no allocation.
+
+The optimiser is viewed at `pr.X`, the *unreduced* returns matrix, because [`port_opt_view`](@ref) slices a tracking estimator against it by the same asset index. The prior is reduced after, so the matrix the view reads is still the full one.
+
+The mask rides as a `BitVector` because the expansion needs the length of the full universe and nothing else carries it once the prior is reduced. The three views take `findall(imsk)` instead, which is the integer index every other caller of [`port_opt_view`](@ref) passes.
+
+# Algorithm
+
+ 1. Derive the Investable Mask from the fitted prior with [`investable_mask`](@ref).
+ 2. Return the mask, the prior, the optimiser and the returns data unchanged when the mask is `nothing`.
+ 3. Otherwise return the mask beside a [`port_opt_view`](@ref) of each of the three at `findall(imsk)`.
+
+# Arguments
+
+  - $(arg_dict[:pr])
+  - `opt::AbstractOptimisationEstimator`: The optimisation estimator, holding every constraint estimator the caller stated over the full universe.
+  - $(arg_dict[:rd])
+
+# Returns
+
+  - `(imsk, pr, opt, rd)`: The Investable Mask and the three reduced to it, or `nothing` and the three unchanged.
+
+# Related
+
+  - [`investable_mask`](@ref)
+  - [`expand_investable_weights`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+function investable_reduction(pr::AbstractPriorResult, opt::AbstractOptimisationEstimator,
+                              rd::ReturnsResult)
+    return investable_reduction(investable_mask(pr), pr, opt, rd)
+end
+function investable_reduction(::Nothing, pr::AbstractPriorResult,
+                              opt::AbstractOptimisationEstimator, rd::ReturnsResult)
+    return nothing, pr, opt, rd
+end
+function investable_reduction(imsk::BitVector, pr::AbstractPriorResult,
+                              opt::AbstractOptimisationEstimator, rd::ReturnsResult)
+    idx = findall(imsk)
+    return imsk, port_opt_view(pr, idx), port_opt_view(opt, idx, pr.X),
+           port_opt_view(rd, idx)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Expand a solved weight vector from the investable subset back onto the full asset universe.
+
+The optimiser solves over the assets the Investable Mask keeps, so its weight vector is shorter than the universe the caller stated. This puts each solved weight back at its own asset and writes a zero everywhere else, which is what a non-investable asset holds: the optimiser could not trade it.
+
+A failed solve carries `NaN` at every solved position. The expansion keeps that distinction — `NaN` where the optimiser tried and failed, zero where it never could — rather than flattening both to zero.
+
+The `nothing` mask returns the weights unchanged, so nothing is copied when every asset is investable, and a `nothing` weight vector stays `nothing`, which is what a naive head records when its finaliser gave up. The vector-of-vectors method serves the efficient-frontier route, where one weight vector is recorded per sweep point. [`JuMPOptimisationSolution`](@ref) carries its own methods beside the JuMP prelude.
+
+The **keyword** constructor of each optimisation result is the caller, and every family builds its result through it. The positional constructor never expands, because every return-code rebuild goes through it and a second pass would expand twice.
+
+# Arguments
+
+  - $(arg_dict[:imsk])
+  - `w`: The weights the optimisation solved over the investable universe: one weight vector, or a vector of them on the efficient-frontier route.
+
+# Validation
+
+  - The solved weight vector must hold one weight per investable asset.
+
+# Returns
+
+  - `w`: The weights, or the vector of them, on the full asset universe.
+
+# Related
+
+  - [`investable_mask`](@ref)
+  - [`investable_reduction`](@ref)
+  - [`set_retcode`](@ref)
+"""
+function expand_investable_weights(::Nothing, w::Option{<:VecNum_VecVecNum})
+    return w
+end
+function expand_investable_weights(::BitVector, ::Nothing)
+    return nothing
+end
+function expand_investable_weights(imsk::BitVector, w::VecNum)
+    @argcheck(count(imsk) == length(w),
+              DimensionMismatch("the investable mask keeps $(count(imsk)) of $(length(imsk)) assets, but the solution holds $(length(w)) weights; the mask and the weights must come from the same optimisation"))
+    wf = zeros(eltype(w), length(imsk))
+    wf[imsk] = w
+    return wf
+end
+function expand_investable_weights(imsk::BitVector, w::VecVecNum)
+    return [expand_investable_weights(imsk, wi) for wi in w]
+end
+"""
     optimise(opt::OptimisationEstimator, args...; kwargs...) -> OptimisationResult
     optimise(opt::OptimisationResult, args...; kwargs...) -> OptimisationResult
 

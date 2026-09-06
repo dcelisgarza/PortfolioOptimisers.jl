@@ -246,38 +246,6 @@ function investable_view(optimiser::JuMPOptimisationEstimator, rd::ReturnsResult
     idx = findall(imsk)
     return port_opt_view(optimiser, idx, X), port_opt_view(rd, idx)
 end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Expand a solved weight vector from the investable subset back onto the full asset universe.
-
-The optimiser solves over the assets the Investable Mask keeps, so its weight vector is shorter than the universe the caller stated. This puts each solved weight back at its own asset and writes a zero everywhere else, which is what a non-investable asset holds: the optimiser could not trade it.
-
-A failed solve carries `NaN` at every solved position. The expansion keeps that distinction — `NaN` where the optimiser tried and failed, zero where it never could — rather than flattening both to zero.
-
-The `nothing` method returns the solution unchanged, so nothing is copied when every asset is investable. The vector method serves the efficient-frontier route, where one solution is recorded per sweep point.
-
-[`JuMPOptimisationResult`](@ref)'s **keyword** constructor is the caller, and every JuMP family builds its result through it. The inner constructor is left alone on purpose: it states the field types of `new`, and reassigning `sol` there widens what inference knows about the result's parameters.
-
-# Arguments
-
-  - $(arg_dict[:imsk])
-  - $(arg_dict[:sol])
-
-# Validation
-
-  - The solved weight vector must hold one weight per investable asset.
-
-# Returns
-
-  - `sol`: The solution, or vector of them, on the full asset universe.
-
-# Related
-
-  - [`investable_mask`](@ref)
-  - [`JuMPOptimisationSolution`](@ref)
-  - [`JuMPOptimisationResult`](@ref)
-"""
 function expand_investable_weights(::Nothing, sol::JuMPOptSol_VecJuMPOptSol)
     return sol
 end
@@ -1219,56 +1187,6 @@ function assert_universe_axis_order(sets::Option{<:UniverseSets}, rd::ReturnsRes
                   ArgumentError(misaligned_axis_msg(declared, names, axis, key, sym)))
     end
     return nothing
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Derive the Investable Mask of a fitted prior, and reduce the prior, the optimiser and the returns data to the assets it keeps.
-
-A Prior Estimator fits on the coverage universe and hands back a result on the full asset universe, in which an asset it could not estimate carries `NaN` in `mu` and on the diagonal of `sigma`. Nothing downstream of the fit can solve over such an asset, so the reduction happens once, at the optimiser's entry, and every constraint the caller stated over the full universe is sliced by the same index.
-
-Three methods, and the branch is dispatch rather than a condition. The first derives the mask; the `nothing` method is the all-investable path and returns its arguments untouched; the `BitVector` method takes the three views. A universe with nothing to exclude therefore costs one pass over two vectors and no allocation.
-
-The optimiser is viewed at `pr.X`, the *unreduced* returns matrix, because [`port_opt_view`](@ref) slices a tracking estimator against it by the same asset index. The prior is reduced after, so the matrix the view reads is still the full one.
-
-The mask rides as a `BitVector` because the expansion needs the length of the full universe and nothing else carries it once the prior is reduced. The three views take `findall(imsk)` instead, which is the integer index every other caller of [`port_opt_view`](@ref) passes.
-
-# Algorithm
-
- 1. Derive the Investable Mask from the fitted prior with [`investable_mask`](@ref).
- 2. Return the mask, the prior, the optimiser and the returns data unchanged when the mask is `nothing`.
- 3. Otherwise return the mask beside a [`port_opt_view`](@ref) of each of the three at `findall(imsk)`.
-
-# Arguments
-
-  - $(arg_dict[:pr])
-  - `opt::JuMPOptimiser`: JuMP optimiser configuration, holding every constraint estimator the caller stated over the full universe.
-  - $(arg_dict[:rd])
-
-# Returns
-
-  - `(imsk, pr, opt, rd)`: The Investable Mask and the three reduced to it, or `nothing` and the three unchanged.
-
-# Related
-
-  - [`investable_mask`](@ref)
-  - [`investable_view`](@ref)
-  - [`processed_jump_optimiser_attributes`](@ref)
-  - [`port_opt_view`](@ref)
-"""
-function investable_reduction(pr::AbstractPriorResult, opt::JuMPOptimiser,
-                              rd::ReturnsResult)
-    return investable_reduction(investable_mask(pr), pr, opt, rd)
-end
-function investable_reduction(::Nothing, pr::AbstractPriorResult, opt::JuMPOptimiser,
-                              rd::ReturnsResult)
-    return nothing, pr, opt, rd
-end
-function investable_reduction(imsk::BitVector, pr::AbstractPriorResult, opt::JuMPOptimiser,
-                              rd::ReturnsResult)
-    idx = findall(imsk)
-    return imsk, port_opt_view(pr, idx), port_opt_view(opt, idx, pr.X),
-           port_opt_view(rd, idx)
 end
 """
     processed_jump_optimiser_attributes(

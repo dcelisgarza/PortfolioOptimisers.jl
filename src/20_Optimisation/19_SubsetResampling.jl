@@ -24,6 +24,8 @@ Result type for [`SubsetResampling`](@ref).
 
 `ress` and `idx` are aligned: `ress[m]` is the optimisation of the subset whose asset indices are `idx[:, m]`, and `w` is the average of those results embedded back into the full universe.
 
+`idx` indexes the universe the subsets were drawn from, which is the **reduced** universe when `imsk` is not `nothing`, as `pr`, `wb` and `fees` are. `w` alone is on the full asset universe.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -38,16 +40,18 @@ $(DocStringExtensions.FIELDS)
         idx::MatNum,
         retcode::OptRetCode_VecOptRetCode,
         w::VecNum_VecVecNum,
+        imsk::Option{<:BitVector} = nothing,
         fb::Option{<:OptE_Opt}
     ) -> SubsetResamplingResult
 
-Keywords correspond to the struct's fields.
+Keywords correspond to the struct's fields. The keyword constructor expands `w` onto the full asset universe through [`expand_investable_weights`](@ref), which is the one door [`_optimise`](@ref) exits through. The positional constructor never expands, so [`set_retcode`](@ref) and [`factory`](@ref) rebuild without a second pass.
 
 # Related
 
   - [`SubsetResampling`](@ref)
   - [`NonFiniteAllocationOptimisationResult`](@ref)
   - [`subset_resampling_finaliser`](@ref)
+  - [`expand_investable_weights`](@ref)
 
 # References
 
@@ -71,7 +75,7 @@ Keywords correspond to the struct's fields.
     """
     ress
     """
-    Asset indices of each subset, one **column** per subset, so `size(idx) == (subset_size, n_subsets)`.
+    Asset indices of each subset, one **column** per subset, so `size(idx) == (subset_size, n_subsets)`. They index the reduced universe when `imsk` is not `nothing`.
     """
     idx
     """
@@ -83,6 +87,10 @@ Keywords correspond to the struct's fields.
     """
     w
     """
+    $(field_dict[:imsk])
+    """
+    imsk
+    """
     $(field_dict[:fb])
     """
     fb
@@ -90,19 +98,22 @@ Keywords correspond to the struct's fields.
                                     wb::Option{<:WeightBounds}, fees::Option{<:Fees},
                                     ress::AbstractVector{<:NonFiniteAllocationOptimisationResult},
                                     idx::MatNum, retcode::OptRetCode_VecOptRetCode,
-                                    w::VecNum_VecVecNum, fb::Option{<:OptE_Opt})
+                                    w::VecNum_VecVecNum, imsk::Option{<:BitVector},
+                                    fb::Option{<:OptE_Opt})
         return new{typeof(pr), typeof(wb), typeof(fees), typeof(ress), typeof(idx),
-                   typeof(retcode), typeof(w), typeof(fb)}(pr, wb, fees, ress, idx, retcode,
-                                                           w, fb)
+                   typeof(retcode), typeof(w), typeof(imsk), typeof(fb)}(pr, wb, fees, ress,
+                                                                         idx, retcode, w,
+                                                                         imsk, fb)
     end
 end
 function SubsetResamplingResult(; pr::Option{<:AbstractPriorResult},
                                 wb::Option{<:WeightBounds}, fees::Option{<:Fees},
                                 ress::AbstractVector{<:NonFiniteAllocationOptimisationResult},
                                 idx::MatNum, retcode::OptRetCode_VecOptRetCode,
-                                w::VecNum_VecVecNum,
+                                w::VecNum_VecVecNum, imsk::Option{<:BitVector} = nothing,
                                 fb::Option{<:OptE_Opt})::SubsetResamplingResult
-    return SubsetResamplingResult(pr, wb, fees, ress, idx, retcode, w, fb)
+    return SubsetResamplingResult(pr, wb, fees, ress, idx, retcode,
+                                  expand_investable_weights(imsk, w), imsk, fb)
 end
 """
     set_retcode(res::SubsetResamplingResult, retcode::OptRetCode_VecOptRetCode)
@@ -128,7 +139,7 @@ The result carries one return code per member of the population, so a member is 
 """
 function set_retcode(res::SubsetResamplingResult, retcode::OptRetCode_VecOptRetCode)
     return SubsetResamplingResult(res.pr, res.wb, res.fees, res.ress, res.idx, retcode,
-                                  res.w, res.fb)
+                                  res.w, res.imsk, res.fb)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -136,8 +147,10 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Rebuild a [`SubsetResamplingResult`](@ref) with an updated fallback optimiser `fb`.
 """
 function factory(sr::SubsetResamplingResult, fb::Option{<:OptE_Opt})
-    return SubsetResamplingResult(; pr = sr.pr, wb = sr.wb, fees = sr.fees, ress = sr.ress,
-                                  idx = sr.idx, retcode = sr.retcode, w = sr.w, fb = fb)
+    # The positional constructor, because `sr.w` is already on the full asset universe: the
+    # keyword one expands, and a second pass over an expanded vector is a length error.
+    return SubsetResamplingResult(sr.pr, sr.wb, sr.fees, sr.ress, sr.idx, sr.retcode, sr.w,
+                                  sr.imsk, fb)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -561,6 +574,12 @@ function _optimise(sr::SubsetResampling, rd::ReturnsResult; dims::Int = 1,
     sr = reset_time_dependent_estimator(sr)
     rd = returns_result_picker(rd, sr.brt)
     pr = prior(sr.pe, rd; dims = dims)
+    # The prior fits on the coverage universe and returns a result on the full asset
+    # universe, where an asset it could not estimate carries `NaN`. Reduce once, here,
+    # before the sample: `N` is then the count of investable assets, so every subset is
+    # drawn from the investable universe alone and no subset can hold a dead asset.
+    # `SubsetResamplingResult` expands the averaged weights back.
+    imsk, pr, sr, rd = investable_reduction(pr, sr, rd)
     X = pr.X
     N = size(X, 2)
     (; subset_size, n_subsets, max_comb, rng, seed) = sr
@@ -586,7 +605,8 @@ function _optimise(sr::SubsetResampling, rd::ReturnsResult; dims::Int = 1,
     retcode, w = subset_resampling_finaliser(N, n_subsets, asset_idx, wb, sr.wf, ress,
                                              ress[1].w)
     return SubsetResamplingResult(; pr = pr, wb = wb, fees = fees, ress = ress,
-                                  idx = asset_idx, retcode = retcode, w = w, fb = nothing)
+                                  idx = asset_idx, retcode = retcode, w = w, imsk = imsk,
+                                  fb = nothing)
 end
 """
     optimise(sr::SubsetResampling{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,

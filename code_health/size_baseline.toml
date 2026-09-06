@@ -199,7 +199,7 @@ commit = "97e398ef74"
 "src/19_RiskMeasures/26_AdjustRiskContributions.jl" = { code = 55, doc = 46, comment = 0, blank = 13, total = 114 }
 "src/19_RiskMeasures/27_ExpectedRisk.jl" = { code = 259, doc = 434, comment = 25, blank = 200, total = 918 }
 "src/19_RiskMeasures/28_RiskMeasureTools.jl" = { code = 84, doc = 95, comment = 0, blank = 51, total = 230 }
-"src/20_Optimisation/01_Base_Optimisation.jl" = { code = 845, doc = 1593, comment = 13, blank = 784, total = 3235 }
+"src/20_Optimisation/01_Base_Optimisation.jl" = { code = 875, doc = 1635, comment = 13, blank = 811, total = 3334 }
 "src/20_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl" = { code = 542, doc = 942, comment = 21, blank = 378, total = 1883 }
 "src/20_Optimisation/02_CrossValidation/02_KFold.jl" = { code = 77, doc = 112, comment = 0, blank = 47, total = 236 }
 "src/20_Optimisation/02_CrossValidation/03_Combinatorial.jl" = { code = 251, doc = 290, comment = 7, blank = 121, total = 669 }
@@ -211,7 +211,7 @@ commit = "97e398ef74"
 "src/20_Optimisation/02_CrossValidation/09_Base_SearchCrossValidation.jl" = { code = 287, doc = 369, comment = 6, blank = 124, total = 786 }
 "src/20_Optimisation/02_CrossValidation/10_GridSearchCrossValidation.jl" = { code = 101, doc = 62, comment = 9, blank = 24, total = 196 }
 "src/20_Optimisation/02_CrossValidation/11_RandomisedSearchCrossValidation.jl" = { code = 34, doc = 39, comment = 0, blank = 18, total = 91 }
-"src/20_Optimisation/03_NaiveOptimisation.jl" = { code = 240, doc = 443, comment = 3, blank = 135, total = 821 }
+"src/20_Optimisation/03_NaiveOptimisation.jl" = { code = 243, doc = 449, comment = 8, blank = 135, total = 835 }
 "src/20_Optimisation/04_Base_ClusteringOptimisation.jl" = { code = 182, doc = 346, comment = 4, blank = 91, total = 623 }
 "src/20_Optimisation/05_HierarchicalRiskParity.jl" = { code = 164, doc = 261, comment = 8, blank = 74, total = 507 }
 "src/20_Optimisation/06_SchurComplementHierarchicalRiskParity.jl" = { code = 354, doc = 544, comment = 21, blank = 190, total = 1109 }
@@ -230,7 +230,7 @@ commit = "97e398ef74"
 "src/20_Optimisation/09_JuMPConstraints/11_TrackingErrorConstraints.jl" = { code = 176, doc = 63, comment = 3, blank = 22, total = 264 }
 "src/20_Optimisation/09_JuMPConstraints/12_RegularisationConstraints.jl" = { code = 219, doc = 442, comment = 11, blank = 205, total = 877 }
 "src/20_Optimisation/09_JuMPConstraints/13_WeightNormConstraints.jl" = { code = 92, doc = 160, comment = 2, blank = 70, total = 324 }
-"src/20_Optimisation/10_JuMPOptimiser.jl" = { code = 722, doc = 745, comment = 54, blank = 210, total = 1731 }
+"src/20_Optimisation/10_JuMPOptimiser.jl" = { code = 708, doc = 703, comment = 54, blank = 184, total = 1649 }
 "src/20_Optimisation/11_MeanRisk.jl" = { code = 251, doc = 432, comment = 4, blank = 125, total = 812 }
 "src/20_Optimisation/12_FactorRiskContribution.jl" = { code = 156, doc = 221, comment = 6, blank = 71, total = 454 }
 "src/20_Optimisation/13_NearOptimalCentering.jl" = { code = 606, doc = 594, comment = 15, blank = 198, total = 1413 }
@@ -238,8 +238,8 @@ commit = "97e398ef74"
 "src/20_Optimisation/15_RelaxedRiskBudgeting.jl" = { code = 218, doc = 282, comment = 7, blank = 116, total = 623 }
 "src/20_Optimisation/16_Base_MetaOptimisation.jl" = { code = 275, doc = 370, comment = 16, blank = 180, total = 841 }
 "src/20_Optimisation/17_NestedClustered.jl" = { code = 367, doc = 321, comment = 5, blank = 118, total = 811 }
-"src/20_Optimisation/18_Stacking.jl" = { code = 252, doc = 269, comment = 2, blank = 86, total = 609 }
-"src/20_Optimisation/19_SubsetResampling.jl" = { code = 256, doc = 288, comment = 0, blank = 85, total = 629 }
+"src/20_Optimisation/18_Stacking.jl" = { code = 262, doc = 274, comment = 7, blank = 86, total = 629 }
+"src/20_Optimisation/19_SubsetResampling.jl" = { code = 262, doc = 294, comment = 7, blank = 86, total = 649 }
 "src/20_Optimisation/20_RiskMeasureConstraints/01_BaseRiskConstraints.jl" = { code = 222, doc = 354, comment = 29, blank = 139, total = 744 }
 "src/20_Optimisation/20_RiskMeasureConstraints/02_VarianceConstraints.jl" = { code = 329, doc = 340, comment = 15, blank = 144, total = 828 }
 "src/20_Optimisation/20_RiskMeasureConstraints/03_MomentRiskMeasureConstraints.jl" = { code = 230, doc = 185, comment = 0, blank = 74, total = 489 }

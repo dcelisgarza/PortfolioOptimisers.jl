@@ -141,10 +141,10 @@ $(DocStringExtensions.FIELDS)
     NaiveOptimisationResult(;
         pr::Option{<:Pr_RR},
         wb::Option{<:WeightBounds}, retcode::OptimisationReturnCode, w::Option{<:VecNum},
-        fb::Option{<:OptE_Opt}
+        imsk::Option{<:BitVector} = nothing, fb::Option{<:OptE_Opt}
     ) -> NaiveOptimisationResult
 
-Keywords correspond to the struct's fields.
+Keywords correspond to the struct's fields. The keyword constructor expands `w` onto the full asset universe through [`expand_investable_weights`](@ref), which is the one door [`_optimise`](@ref) exits through. The positional constructor never expands.
 
 # Examples
 
@@ -157,6 +157,7 @@ NaiveOptimisationResult
   retcode ┼ OptimisationSuccess
           │   res ┴ nothing
         w ┼ Vector{Float64}: [0.5, 0.5]
+     imsk ┼ nothing
        fb ┴ nothing
 ```
 
@@ -166,6 +167,7 @@ NaiveOptimisationResult
   - [`InverseVolatility`](@ref)
   - [`EqualWeighted`](@ref)
   - [`RandomWeighted`](@ref)
+  - [`expand_investable_weights`](@ref)
 """
 @concrete struct NaiveOptimisationResult <: NonJuMPOptimisationResult
     """
@@ -185,21 +187,26 @@ NaiveOptimisationResult
     """
     w
     """
+    $(field_dict[:imsk])
+    """
+    imsk
+    """
     $(field_dict[:fb])
     """
     fb
     function NaiveOptimisationResult(pr::Option{<:Pr_RR}, wb::Option{<:WeightBounds},
                                      retcode::OptimisationReturnCode, w::Option{<:VecNum},
-                                     fb::Option{<:OptE_Opt})
-        return new{typeof(pr), typeof(wb), typeof(retcode), typeof(w), typeof(fb)}(pr, wb,
-                                                                                   retcode,
-                                                                                   w, fb)
+                                     imsk::Option{<:BitVector}, fb::Option{<:OptE_Opt})
+        return new{typeof(pr), typeof(wb), typeof(retcode), typeof(w), typeof(imsk),
+                   typeof(fb)}(pr, wb, retcode, w, imsk, fb)
     end
 end
 function NaiveOptimisationResult(; pr::Option{<:Pr_RR}, wb::Option{<:WeightBounds},
                                  retcode::OptimisationReturnCode, w::Option{<:VecNum},
+                                 imsk::Option{<:BitVector} = nothing,
                                  fb::Option{<:OptE_Opt})::NaiveOptimisationResult
-    return NaiveOptimisationResult(pr, wb, retcode, w, fb)
+    return NaiveOptimisationResult(pr, wb, retcode, expand_investable_weights(imsk, w),
+                                   imsk, fb)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -401,11 +408,12 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Run the inverse volatility portfolio optimisation.
 
-Internal dispatch called by [`optimise`](@ref). Computes covariance via the prior estimator, assigns weights inversely proportional to volatility (or variance when `iv.sq = true`), then applies weight bounds.
+Internal dispatch called by [`optimise`](@ref). Computes covariance via the prior estimator, reduces the prior, the optimiser and the returns data to the Investable Mask with [`investable_reduction`](@ref), assigns weights inversely proportional to volatility (or variance when `iv.sq = true`), then applies weight bounds. [`NaiveOptimisationResult`](@ref) expands the weights back onto the full asset universe.
 
 # Related
 
   - [`InverseVolatility`](@ref)
+  - [`investable_reduction`](@ref)
   - [`optimise`](@ref)
   - [`_optimise`](@ref)
 """
@@ -415,6 +423,12 @@ function _optimise(iv::InverseVolatility, rd::ReturnsResult = ReturnsResult();
     iv = reset_time_dependent_estimator(iv)
     rd = returns_result_picker(rd, iv.brt)
     pr = prior(iv.pe, rd; dims = dims)
+    # The prior fits on the coverage universe and returns a result on the full asset
+    # universe, where an asset it could not estimate carries `NaN`. Reduce once, here: the
+    # diagonal below then holds a finite variance at every position, and the bounds are
+    # stated over the investable assets alone. `NaiveOptimisationResult` expands the
+    # weights back.
+    imsk, pr, iv, rd = investable_reduction(pr, iv, rd)
     X = pr.X
     w = LinearAlgebra.diag(pr.sigma)
     w = inv.(!iv.sq ? sqrt.(w) : w)
@@ -425,7 +439,7 @@ function _optimise(iv::InverseVolatility, rd::ReturnsResult = ReturnsResult();
                                    datatype = eltype(X))
     retcode, w = finalise_weight_bounds(iv.wf, wb, w)
     return NaiveOptimisationResult(; pr = pr, wb = wb, retcode = retcode, w = w,
-                                   fb = nothing)
+                                   imsk = imsk, fb = nothing)
 end
 """
     optimise(iv::InverseVolatility{<:Any, <:Any, <:Any, <:Any, Nothing},
