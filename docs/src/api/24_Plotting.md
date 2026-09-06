@@ -52,6 +52,10 @@ plot_cumulative_exposure_ic
 plot_exposure_distribution
 plot_exposure_dispersion
 plot_exposure_stability
+plot_factor_model_summary
+plot_factor_forecast_correlation
+plot_factor_forecast_volatilities
+plot_factor_cumulative_returns
 relevant_assets
 attribution_plot_axis
 ```

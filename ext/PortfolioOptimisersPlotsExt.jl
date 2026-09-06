@@ -2511,4 +2511,123 @@ function PortfolioOptimisers.plot_exposure_stability(pr::PortfolioOptimisers.Abs
                                                        kwargs...)
 end
 
+## ────────────────────────────────────────────────────────────────────────────
+## The factor model summary and the factor forecast figures
+## ────────────────────────────────────────────────────────────────────────────
+# The summary answers on the RAW factor axis, so its figure labels its series off
+# `csfm.nf`. The two forecast figures read `fpr.sigma`, whose axis is the factor axis of
+# the factor prior, so they label off the names the caller passes and fall back to the
+# position of the factor.
+const FACTOR_SUMMARY_LABELS = ["Ann. Return", "Ann. Vol", "Sharpe", "Autocorr", "Mean |t|",
+                               "t Rate", "Mean VIF", "Stability", "Coverage"]
+function factor_summary_columns(fs::PortfolioOptimisers.FactorSummaryResult)
+    vals = Any[fs.ann_return, fs.ann_volatility, fs.sharpe, fs.autocorr, fs.mean_abs_t,
+               fs.t_rate, fs.mean_vif, fs.stability, fs.coverage]
+    keep = [i for i in eachindex(vals) if !isnothing(vals[i])]
+    K = length(fs.ann_return)
+    M = Matrix{Float64}(undef, length(keep), K)
+    for (r, i) in enumerate(keep)
+        v = vals[i]
+        for k in 1:K
+            M[r, k] = Float64(v[k])
+        end
+    end
+    return M, FACTOR_SUMMARY_LABELS[keep], length(keep) < length(vals)
+end
+function PortfolioOptimisers.plot_factor_model_summary(fs::PortfolioOptimisers.FactorSummaryResult;
+                                                       nf::Option{<:AbstractVector} = nothing,
+                                                       kwargs...)
+    M, labels, partial = factor_summary_columns(fs)
+    K = size(M, 2)
+    series = isnothing(nf) ? string.(1:K) : string.(nf)
+    title = partial ? "Factor Model Summary (no exposure history)" : "Factor Model Summary"
+    return groupedbar(M; bar_position = :dodge, xticks = (1:length(labels), labels),
+                      label = reshape(series, 1, K), xrotation = 30, title = title,
+                      ylabel = "Value", legend = true, kwargs...)
+end
+function PortfolioOptimisers.plot_factor_model_summary(csfm::PortfolioOptimisers.CrossSectionalFactorModel;
+                                                       nf::Option{<:AbstractVector} = nothing,
+                                                       ppy::Number = 1,
+                                                       threshold::Number = 2,
+                                                       step::Integer = 21,
+                                                       weighting = PortfolioOptimisers.BenchmarkWeightMetric(),
+                                                       coverage_weighting = PortfolioOptimisers.RegressionWeightMetric(),
+                                                       kwargs...)
+    fs = PortfolioOptimisers.factor_model_summary(csfm; ppy = ppy, threshold = threshold,
+                                                  step = step, weighting = weighting,
+                                                  coverage_weighting = coverage_weighting)
+    labels = exposure_diagnostic_labels(csfm, nf, length(fs.ann_return))
+    return PortfolioOptimisers.plot_factor_model_summary(fs; nf = labels, kwargs...)
+end
+function PortfolioOptimisers.plot_factor_model_summary(pr::PortfolioOptimisers.AbstractPriorResult;
+                                                       nf::Option{<:AbstractVector} = nothing,
+                                                       kwargs...)
+    return PortfolioOptimisers.plot_factor_model_summary(cs_diagnostic_block(pr); nf = nf,
+                                                         kwargs...)
+end
+const NO_FACTOR_FORECAST_LEAD = "a factor forecast figure draws the factor covariance `fpr.sigma`. $NO_FACTOR_BLOCK_HINT Pass the factor covariance directly as the first argument if you hold it."
+function PortfolioOptimisers.plot_factor_forecast_correlation(f_sigma::MatNum,
+                                                              nf::AbstractVector = 1:size(f_sigma,
+                                                                                          1);
+                                                              kwargs...)
+    # Copy before rescaling: `cov2cor!` mutates in place, and `f_sigma` is the caller's.
+    C = Matrix{float(real(eltype(f_sigma)))}(f_sigma)
+    StatsBase.cov2cor!(C, sqrt.(diag(C)))
+    K = size(C, 1)
+    labels = string.(nf)
+    return heatmap(C; xticks = (1:K, labels), yticks = (1:K, labels), xrotation = 90,
+                   clim = (-1.0, 1.0), color = cgrad(:Spectral), yflip = true,
+                   title = "Factor Forecast Correlation", colorbar_title = "ρ", kwargs...)
+end
+function PortfolioOptimisers.plot_factor_forecast_correlation(pr::PortfolioOptimisers.AbstractPriorResult,
+                                                              nf::Option{<:AbstractVector} = nothing;
+                                                              kwargs...)
+    PortfolioOptimisers.assert_prior_regression(pr, :pr; lead = NO_FACTOR_FORECAST_LEAD)
+    nf_use = isnothing(nf) ? (1:size(pr.fpr.sigma, 1)) : nf
+    return PortfolioOptimisers.plot_factor_forecast_correlation(pr.fpr.sigma, nf_use;
+                                                                kwargs...)
+end
+function PortfolioOptimisers.plot_factor_forecast_volatilities(f_sigma::MatNum,
+                                                               nf::AbstractVector = 1:size(f_sigma,
+                                                                                           1);
+                                                               ppy::Number = 1, kwargs...)
+    vol = sqrt.(diag(f_sigma) .* ppy)
+    order = sortperm(vol)
+    labels = string.(nf)[order]
+    K = length(vol)
+    return bar(vol[order]; yticks = (1:K, labels), orientation = :h,
+               title = "Factor Forecast Volatility", xlabel = "Volatility",
+               ylabel = "Factor", legend = false, kwargs...)
+end
+function PortfolioOptimisers.plot_factor_forecast_volatilities(pr::PortfolioOptimisers.AbstractPriorResult,
+                                                               nf::Option{<:AbstractVector} = nothing;
+                                                               ppy::Number = 1, kwargs...)
+    PortfolioOptimisers.assert_prior_regression(pr, :pr; lead = NO_FACTOR_FORECAST_LEAD)
+    nf_use = isnothing(nf) ? (1:size(pr.fpr.sigma, 1)) : nf
+    return PortfolioOptimisers.plot_factor_forecast_volatilities(pr.fpr.sigma, nf_use;
+                                                                 ppy = ppy, kwargs...)
+end
+function PortfolioOptimisers.plot_factor_cumulative_returns(csfm::PortfolioOptimisers.CrossSectionalFactorModel;
+                                                            nf::Option{<:AbstractVector} = nothing,
+                                                            compound::Bool = false,
+                                                            kwargs...)
+    f = PortfolioOptimisers.factor_summary_returns(csfm)
+    # An observation whose factor return is not finite contributes nothing to the running
+    # sum, so one absent cross-section breaks no series.
+    g = [isfinite(x) ? float(x) : zero(float(x)) for x in f]
+    cum = cumulative_returns(g, compound)
+    labels = exposure_diagnostic_labels(csfm, nf, size(cum, 2))
+    kind = compound ? "Compounded" : "Uncompounded"
+    return cs_diagnostic_series(cum, labels, "Factor Cumulative Returns ($kind)",
+                                "Cumulative Return"; kwargs...)
+end
+function PortfolioOptimisers.plot_factor_cumulative_returns(pr::PortfolioOptimisers.AbstractPriorResult;
+                                                            nf::Option{<:AbstractVector} = nothing,
+                                                            compound::Bool = false,
+                                                            kwargs...)
+    return PortfolioOptimisers.plot_factor_cumulative_returns(cs_diagnostic_block(pr);
+                                                              nf = nf, compound = compound,
+                                                              kwargs...)
+end
+
 end

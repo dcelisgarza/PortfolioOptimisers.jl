@@ -8,7 +8,7 @@ jet = "0.12.1"
 filter = "AnyFrameModule"
 attribution = "deepest_repository_frame"
 load_set = ["GraphRecipes", "Impute", "StatsPlots"]
-commit = "36ff46bdd9"
+commit = "e696781eb7"
 
 [run.main]
 load_set = ["GraphRecipes", "Impute", "StatsPlots"]
@@ -104,6 +104,7 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/08_Moments/45_ReturnForecasts/06_TargetReturnForecast.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/46_CrossSectionalRegressionDiagnostics.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/47_CrossSectionalExposureDiagnostics.jl" = { raw = 0, reviewed = 0 }
+"src/08_Moments/48_FactorModelSummary.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/01_Base_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/02_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/03_DistanceDistance.jl" = { raw = 0, reviewed = 0 }
@@ -376,6 +377,7 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/08_Moments/45_ReturnForecasts/06_TargetReturnForecast.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/46_CrossSectionalRegressionDiagnostics.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/47_CrossSectionalExposureDiagnostics.jl" = { raw = 0, reviewed = 0 }
+"src/08_Moments/48_FactorModelSummary.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/01_Base_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/02_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/03_DistanceDistance.jl" = { raw = 0, reviewed = 0 }
@@ -648,6 +650,7 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/08_Moments/45_ReturnForecasts/06_TargetReturnForecast.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/46_CrossSectionalRegressionDiagnostics.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/47_CrossSectionalExposureDiagnostics.jl" = { raw = 0, reviewed = 0 }
+"src/08_Moments/48_FactorModelSummary.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/01_Base_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/02_Distance.jl" = { raw = 0, reviewed = 0 }
 "src/09_Distance/03_DistanceDistance.jl" = { raw = 0, reviewed = 0 }

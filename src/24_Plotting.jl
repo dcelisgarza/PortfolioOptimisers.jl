@@ -2116,6 +2116,187 @@ function relevant_assets(w::VecNum, M::Integer, N_opt::Option{<:Number} = nothin
     return N, idx
 end
 
+"""
+    plot_factor_model_summary(
+        fs::FactorSummaryResult;
+        nf::Option{<:AbstractVector} = nothing,
+        kwargs...
+    ) -> Plot
+    plot_factor_model_summary(
+        csfm::CrossSectionalFactorModel;
+        nf::Option{<:AbstractVector} = nothing,
+        ppy::Number = 1,
+        threshold::Number = 2,
+        step::Integer = 21,
+        weighting = BenchmarkWeightMetric(),
+        coverage_weighting = RegressionWeightMetric(),
+        kwargs...
+    ) -> Plot
+    plot_factor_model_summary(pr::AbstractPriorResult; kwargs...) -> Plot
+
+Plot the columns of a factor model summary as a grouped bar chart, one group per column and one bar per factor.
+
+The figure draws what [`factor_model_summary`](@ref) returns and computes nothing of its own. A column the summary carries as `nothing` is not drawn, and the title says so, so a block with no exposure history draws its four factor return columns alone.
+
+The columns are not on one scale, and the figure rescales none of them. Read a column against its own factors and not against the column beside it.
+
+# Arguments
+
+  - `fs`: A factor model summary.
+  - `csfm`: A cross-sectional factor model block, which the figure summarises first.
+  - `pr`: A prior result whose `rr` is such a block.
+  - `nf`: Factor names of the raw factor axis. `nothing` reads them off the block, and falls back to the position of the factor.
+  - `ppy`: Periods per year the summary annualises with.
+  - `threshold`: Absolute t-statistic the exceedance rate counts against.
+  - `step`: Number of observations between the two cross-sections the stability reads.
+  - `weighting`: The [`AbstractOrthogonalityMetric`](@ref) the stability reads.
+  - `coverage_weighting`: The [`AbstractOrthogonalityMetric`](@ref) whose positive weights are the universe of the coverage.
+  - `kwargs...`: Additional keyword arguments passed to the plotting backend.
+
+# Validation
+
+  - `pr.rr` is not `nothing`.
+
+# Returns
+
+  - `plt::Plot`: The figure.
+
+Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
+
+# Related
+
+  - [`factor_model_summary`](@ref)
+  - [`FactorSummaryResult`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+"""
+function plot_factor_model_summary end
+"""
+    plot_factor_forecast_correlation(
+        f_sigma::MatNum,
+        nf::AbstractVector = 1:size(f_sigma, 1);
+        kwargs...
+    ) -> Plot
+    plot_factor_forecast_correlation(
+        pr::AbstractPriorResult,
+        nf::Option{<:AbstractVector} = nothing;
+        kwargs...
+    ) -> Plot
+
+Plot the forecast correlation of the factor returns as a heatmap.
+
+The figure reads the factor covariance `fpr.sigma` of the prior result and rescales a copy of it to a correlation with `StatsBase.cov2cor!`. It is the forecast the prior carries, and not the realised correlation of the fitted factor return series, so it answers on the factor axis of the factor prior.
+
+[`plot_factor_sigma`](@ref) draws the same matrix unscaled.
+
+# Arguments
+
+  - `f_sigma`: Factor covariance matrix `factors × factors`.
+  - `pr`: A prior result carrying a factor prior.
+  - `nf`: Factor names. `nothing` falls back to the position of the factor.
+  - `kwargs...`: Additional keyword arguments passed to the plotting backend.
+
+# Validation
+
+  - `pr.fpr` is not `nothing`.
+
+# Returns
+
+  - `plt::Plot`: The figure.
+
+Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
+
+# Related
+
+  - [`plot_factor_sigma`](@ref)
+  - [`plot_factor_forecast_volatilities`](@ref)
+"""
+function plot_factor_forecast_correlation end
+"""
+    plot_factor_forecast_volatilities(
+        f_sigma::MatNum,
+        nf::AbstractVector = 1:size(f_sigma, 1);
+        ppy::Number = 1,
+        kwargs...
+    ) -> Plot
+    plot_factor_forecast_volatilities(
+        pr::AbstractPriorResult,
+        nf::Option{<:AbstractVector} = nothing;
+        ppy::Number = 1,
+        kwargs...
+    ) -> Plot
+
+Plot the forecast volatility of every factor return as a horizontal bar chart, ordered from the smallest.
+
+The figure reads the factor covariance `fpr.sigma` of the prior result and draws the square root of `ppy` times its diagonal. It is the forecast the prior carries, and not the realised volatility [`factor_model_summary`](@ref) reports.
+
+# Arguments
+
+  - `f_sigma`: Factor covariance matrix `factors × factors`.
+  - `pr`: A prior result carrying a factor prior.
+  - `nf`: Factor names. `nothing` falls back to the position of the factor.
+  - `ppy`: Periods per year the volatility is annualised with.
+  - `kwargs...`: Additional keyword arguments passed to the plotting backend.
+
+# Validation
+
+  - `pr.fpr` is not `nothing`.
+
+# Returns
+
+  - `plt::Plot`: The figure.
+
+Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
+
+# Related
+
+  - [`plot_factor_forecast_correlation`](@ref)
+  - [`factor_model_summary`](@ref)
+"""
+function plot_factor_forecast_volatilities end
+"""
+    plot_factor_cumulative_returns(
+        csfm::CrossSectionalFactorModel;
+        nf::Option{<:AbstractVector} = nothing,
+        compound::Bool = false,
+        kwargs...
+    ) -> Plot
+    plot_factor_cumulative_returns(
+        pr::AbstractPriorResult;
+        nf::Option{<:AbstractVector} = nothing,
+        compound::Bool = false,
+        kwargs...
+    ) -> Plot
+
+Plot the cumulative return of every factor, one series per factor.
+
+The figure draws [`cumulative_returns`](@ref) of each column of the factor return history `csr.f`, on the raw factor axis. An observation whose factor return is not finite contributes nothing to the running sum, so one absent cross-section breaks no series; this is the convention [`plot_cumulative_exposure_ic`](@ref) already follows.
+
+# Arguments
+
+  - `csfm`: A cross-sectional factor model block.
+  - `pr`: A prior result whose `rr` is such a block.
+  - `nf`: Factor names of the raw factor axis. `nothing` reads them off the block, and falls back to the position of the factor.
+  - `compound`: Whether the cumulative series compounds.
+  - `kwargs...`: Additional keyword arguments passed to the plotting backend.
+
+# Validation
+
+  - `pr.rr` is not `nothing`.
+  - `csfm.csr` is not `nothing`.
+
+# Returns
+
+  - `plt::Plot`: The figure.
+
+Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
+
+# Related
+
+  - [`cumulative_returns`](@ref)
+  - [`plot_cumulative_exposure_ic`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+"""
+function plot_factor_cumulative_returns end
 export plot_portfolio_cumulative_returns, plot_asset_cumulative_returns, plot_composition,
        plot_stacked_bar_composition, plot_stacked_area_composition, plot_dendrogram,
        plot_clusters, plot_drawdowns, plot_risk_contribution, plot_factor_risk_contribution,
@@ -2130,4 +2311,6 @@ export plot_portfolio_cumulative_returns, plot_asset_cumulative_returns, plot_co
        plot_attribution_vol_contrib, plot_attribution_mu_contrib, plot_attribution_exposure,
        plot_attribution_mu_vs_vol, plot_exposure_vif, plot_exposure_condition_number,
        plot_exposure_correlation, plot_cumulative_exposure_ic, plot_exposure_distribution,
-       plot_exposure_dispersion, plot_exposure_stability
+       plot_exposure_dispersion, plot_exposure_stability, plot_factor_model_summary,
+       plot_factor_forecast_correlation, plot_factor_forecast_volatilities,
+       plot_factor_cumulative_returns

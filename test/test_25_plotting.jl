@@ -534,4 +534,67 @@
         @test_throws PortfolioOptimisers.IsNothingError plot_exposure_correlation(no_rr_ex)
         @test_throws PortfolioOptimisers.IsNothingError plot_exposure_distribution(no_rr_ex)
     end
+    @testset "The factor model summary and the factor forecast plots (#801)" begin
+        # The summary figure draws the Result, and the two forecast figures draw the factor
+        # covariance the prior carries.
+        rng_fs = MersenneTwister(801)
+        Tf, Nf, Kf = 12, 8, 3
+        Ms_fs = randn(rng_fs, Tf, Nf, Kf)
+        csr_fs = CrossSectionalRegression(; f = 0.02 * randn(rng_fs, Tf, Kf),
+                                          eps = 0.01 * randn(rng_fs, Tf, Nf),
+                                          n = fill(Nf, Tf))
+        csfm_fs = CrossSectionalFactorModel(; M = Ms_fs[Tf, :, :], b = zeros(Nf),
+                                            csr = csr_fs, Ms = Ms_fs,
+                                            rw = abs.(randn(rng_fs, Tf, Nf)) .+ 0.1,
+                                            bw = fill(1 / Nf, Tf, Nf),
+                                            nf = ["value", "size", "momentum"], lag = 1)
+        f_sigma_fs = Matrix(1.0 * I, Kf, Kf)
+        f_sigma_fs[1, 2] = f_sigma_fs[2, 1] = 0.3
+        fpr_fs = LowOrderPrior(; X = randn(rng_fs, Tf, Kf), mu = zeros(Kf),
+                               sigma = f_sigma_fs)
+        pr_fs = LowOrderPrior(; X = randn(rng_fs, Tf, Nf), mu = zeros(Nf),
+                              sigma = Matrix(1.0 * I, Nf, Nf), rr = csfm_fs, fpr = fpr_fs)
+
+        fs = factor_model_summary(csfm_fs; ppy = 252, step = 3)
+        @test is_plot(plot_factor_model_summary(fs))
+        @test is_plot(plot_factor_model_summary(fs; nf = ["a", "b", "c"]))
+        @test is_plot(plot_factor_model_summary(csfm_fs; ppy = 252, step = 3))
+        @test is_plot(plot_factor_model_summary(pr_fs; ppy = 252, step = 3))
+        @test is_plot(plot_factor_model_summary(csfm_fs; ppy = 252, step = 3,
+                                                nf = ["a", "b", "c"],
+                                                weighting = IdentityMetric(),
+                                                coverage_weighting = IdentityMetric()))
+        # A block with no exposure history draws its four factor return columns alone.
+        bare_fs = CrossSectionalFactorModel(; M = Ms_fs[Tf, :, :], b = zeros(Nf),
+                                            csr = csr_fs, lag = 1)
+        @test is_plot(plot_factor_model_summary(bare_fs; ppy = 252))
+
+        @test is_plot(plot_factor_forecast_correlation(pr_fs))
+        @test is_plot(plot_factor_forecast_correlation(pr_fs, ["a", "b", "c"]))
+        @test is_plot(plot_factor_forecast_correlation(f_sigma_fs))
+        @test is_plot(plot_factor_forecast_volatilities(pr_fs))
+        @test is_plot(plot_factor_forecast_volatilities(pr_fs, ["a", "b", "c"]; ppy = 252))
+        @test is_plot(plot_factor_forecast_volatilities(f_sigma_fs))
+
+        @test is_plot(plot_factor_cumulative_returns(csfm_fs))
+        @test is_plot(plot_factor_cumulative_returns(pr_fs))
+        @test is_plot(plot_factor_cumulative_returns(csfm_fs; compound = true,
+                                                     nf = ["a", "b", "c"]))
+        # An absent factor return contributes nothing to the running sum.
+        f_gap = copy(csr_fs.f)
+        f_gap[4, 2] = NaN
+        gap_fs = CrossSectionalFactorModel(; M = Ms_fs[Tf, :, :], b = zeros(Nf),
+                                           csr = CrossSectionalRegression(; f = f_gap,
+                                                                          eps = csr_fs.eps,
+                                                                          n = csr_fs.n),
+                                           Ms = Ms_fs, lag = 1)
+        @test is_plot(plot_factor_cumulative_returns(gap_fs))
+        # A prior result that carries no factor block names the remedy.
+        no_rr_fs = LowOrderPrior(; X = randn(rng_fs, Tf, Nf), mu = zeros(Nf),
+                                 sigma = Matrix(1.0 * I, Nf, Nf))
+        @test_throws PortfolioOptimisers.IsNothingError plot_factor_model_summary(no_rr_fs)
+        @test_throws PortfolioOptimisers.IsNothingError plot_factor_forecast_correlation(no_rr_fs)
+        @test_throws PortfolioOptimisers.IsNothingError plot_factor_forecast_volatilities(no_rr_fs)
+        @test_throws PortfolioOptimisers.IsNothingError plot_factor_cumulative_returns(no_rr_fs)
+    end
 end
