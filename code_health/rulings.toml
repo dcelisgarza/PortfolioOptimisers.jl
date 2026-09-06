@@ -393,16 +393,6 @@ definition = "LinearConstraint"
 misses = 1
 rationale = "a-signature-line-counter-the-test-job-cannot-reach"
 
-# The definition is `feature_target!`'s fallback method. The key names every `feature_target!`
-# method in the file, and the count of 1 is their sum. This row was keyed `Nothing` until issue
-# #521 was fixed, because `defname` named a definition that declares a return type after the return
-# type. Only the key changed.
-[[coverage_exemption]]
-path = "src/12_ConstraintGeneration/06_AssetSetsMatrix.jl"
-definition = "feature_target!"
-misses = 1
-rationale = "a-return-after-an-unconditional-throw"
-
 # Two constants of one shape, one row each. The `const` line of each holds the `map` closure that
 # builds the union, and the count of 1 is the synthetic zero that the line draws.
 [[coverage_exemption]]
