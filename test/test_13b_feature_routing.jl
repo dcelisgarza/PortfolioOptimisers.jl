@@ -18,6 +18,8 @@ function PortfolioOptimisers.get_observation_weights(::WindowLengthWeights,
     return aweights(collect(range(1, T) ./ sum(1:T)))
 end
 
+include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
+const PO = PortfolioOptimisers
 @testset "Feature matrix routing" begin
     rd0 = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
                                       timestamp = :Date)[(end - 252):end],
@@ -29,45 +31,43 @@ end
     # The user-supplied carrier. Deliberately unrelated to the returns, so a distance
     # derived from it cannot coincide with a correlation distance by accident.
     Zd = abs.(randn(rng, na, 6))
+    nzd = ["z$i" for i in 1:6]
     rd = ReturnsResult(; nx = rd0.nx, X = rd0.X, nf = rd0.nf, F = rd0.F, ts = rd0.ts,
-                       pnl = feature_matrix_panel(["z$i" for i in 1:6], Zd))
-    # The derived carrier: factor loadings, `assets × factors`, computed by the prior.
-    fpe = FeaturePrior(; pe = FactorPrior(), ze = RegressionFeatures())
-    pr_z = prior(fpe, rd)
+                       pnl = matrix_panel(nzd, Zd))
+    # The produced panel: factor loadings, `assets × factors`, built at the point of use.
+    ape = RegressionPanel()
+    pr_fac = prior(FactorPrior(), rd)
+    Zp = PO.panel_field(PO.asset_panel(ape, pr_fac, rd, rd.X), "loadings").vals
     pr_noz = prior(EmpiricalPrior(), rd)
     rd_noz = rd0
     fde = FeatureDistance()
+    pde = FeatureDistance(; ape = ape)
     cde = Distance(; alg = CanonicalDistance())
     slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
                  check_sol = (; allow_local = true, allow_almost = true),
                  settings = Dict("verbose" => false))
 
-    @testset "The routed Z reaches the kernel, and the clusters differ" begin
+    @testset "The panel reaches the kernel, and the clusters differ" begin
         cle_f = ClustersEstimator(; de = fde)
         cle_c = ClustersEstimator(; de = cde)
 
-        # `z_src = :data` is the default: the raw returns result wins.
+        # `nothing` in the `ape` slot reads the panel the data carrier holds.
         clr_d = clusterise(cle_f, rd)
         @test clr_d.D == distance(fde, Zd)
         # And it is genuinely a different clustering from the correlation one, not a
-        # relabelling of it — a test that passes on an ignored `Z` is worthless.
+        # relabelling of it — a test that passes on an ignored panel is worthless.
         clr_c = clusterise(cle_c, rd)
         @test clr_d.D != clr_c.D
         @test clr_d.res.merges != clr_c.res.merges
 
-        # `z_src = :prior` selects the derived carrier instead, and the two carriers give
-        # different answers, so the selector is doing real work.
-        clr_p = clusterise(cle_f, pr_z; z_src = :prior)
-        @test clr_p.D == distance(fde, panel_feature_matrix(pr_z.pnl)[2])
+        # A producer is the other route, and the two give different answers, so the slot is
+        # doing real work.
+        clr_p = clusterise(ClustersEstimator(; de = pde), pr_fac; rd = rd)
+        @test clr_p.D == distance(fde, Zp)
         @test clr_p.D != clr_d.D
 
-        # With both carriers populated, `z_src` picks between them rather than falling back.
-        @test clusterise(cle_f, pr_z; rd = rd, z_src = :data).D == clr_d.D
-        @test clusterise(cle_f, pr_z; rd = rd, z_src = :prior).D == clr_p.D
-
-        # A typo is a throw, not a silent selection of the other carrier.
-        @test_throws ArgumentError clusterise(cle_f, pr_z; rd = rd, z_src = :Prior)
-        @test_throws ArgumentError clusterise(cle_f, pr_z; rd = rd, z_src = :returns)
+        # A producer ignores the carrier's panel entirely: it builds its own.
+        @test clusterise(ClustersEstimator(; de = pde), pr_fac; rd = rd_noz).D == clr_p.D
     end
 
     @testset "Every clustering and network consumer is reachable" begin
@@ -119,7 +119,7 @@ end
         @test average_centrality(cte, fill(inv(na), na), rd) isa Number
     end
 
-    @testset "A missing Z throws, and the message names the cause" begin
+    @testset "An absent panel throws, and the message names the cause" begin
         cle = ClustersEstimator(; de = fde)
 
         # 1. No carrier at all: driven straight from a returns matrix.
@@ -129,67 +129,64 @@ end
             err
         end
         @test isa(e, PortfolioOptimisers.IsNothingError)
-        @test occursin("supplied none", e.msg)
-        @test occursin("distance(de, Z", e.msg)
+        @test occursin("ReturnsResult", e.msg)
+        @test occursin("RegressionPanel", e.msg)
 
-        # 2. A carrier, but neither it nor the returns result holds a feature matrix.
-        for (pr, rdx) in ((rd_noz, nothing), (pr_noz, nothing), (pr_noz, rd_noz))
+        # 2. A carrier that holds no panel, in either slot.
+        for (pr, rdx) in ((rd_noz, nothing), (rd_noz, rd_noz))
             e = try
                 isnothing(rdx) ? clusterise(cle, pr) : clusterise(cle, pr; rd = rdx)
             catch err
                 err
             end
             @test isa(e, PortfolioOptimisers.IsNothingError)
-            @test occursin("neither the returns result nor the prior result", e.msg)
+            @test occursin("asset_panel", e.msg)
         end
 
-        # 3. The selector picked the empty carrier while the other one was populated —
-        #    both directions, each naming the value to switch to.
+        # 3. A prior result alone carries no panel at all, and the message says so.
         e = try
-            clusterise(cle, pr_z; rd = rd_noz, z_src = :data)
+            clusterise(cle, pr_noz)
         catch err
             err
         end
         @test isa(e, PortfolioOptimisers.IsNothingError)
-        @test occursin("z_src = :data", e.msg)
-        @test occursin("set `z_src = :prior`", e.msg)
+        @test occursin("a prior result carries no panel", e.msg)
 
+        # 4. A producer that reads a prior, at a site with none.
         e = try
-            clusterise(cle, pr_noz; rd = rd, z_src = :prior)
+            clusterise(ClustersEstimator(; de = pde), rd)
         catch err
             err
         end
         @test isa(e, PortfolioOptimisers.IsNothingError)
-        @test occursin("z_src = :prior", e.msg)
-        @test occursin("set `z_src = :data`", e.msg)
+        @test occursin("PhylogenyPanel", e.msg)
 
-        # A `Z` that is present but unused stays silent, matching `iv`/`ivpa`/`F`/`B`.
+        # A panel that is present but unused stays silent, matching `iv`/`ivpa`/`F`/`B`.
         @test clusterise(ClustersEstimator(; de = cde), rd).D ==
               clusterise(ClustersEstimator(; de = cde), rd_noz).D
     end
 
     @testset "dims is ignored on the routed path" begin
-        # The ambient `dims` describes `X`; a carried `Z` is canonically assets-major, so
-        # the three-argument methods hardcode `dims = 1`.
+        # The ambient `dims` describes `X`; a stacked Feature Matrix is canonically
+        # assets-major, so the three-argument methods hardcode `dims = 1`.
         cle = ClustersEstimator(; de = fde)
         @test clusterise(cle, rd; dims = 1).D == distance(fde, Zd; dims = 1)
         Zsq = abs.(randn(rng, na, na))
         rd_sq = ReturnsResult(; nx = rd0.nx, X = rd0.X, ts = rd0.ts,
-                              pnl = feature_matrix_panel(["z$i" for i in 1:na], Zsq))
-        # A square `Z` is the only shape where a transposed read would not throw, so it is
+                              pnl = matrix_panel(["z$i" for i in 1:na], Zsq))
+        # A square matrix is the only shape where a transposed read would not throw, so it is
         # the only one that can prove `dims` is not consulted.
         @test clusterise(cle, rd_sq; dims = 2).D == distance(fde, Zsq; dims = 1)
         @test clusterise(cle, rd_sq; dims = 2).D != distance(fde, Zsq; dims = 2)
     end
 
-    @testset "z_src is an optimiser field and drives a full optimisation" begin
+    @testset "The producer slot drives a full optimisation" begin
         hopt_d = HierarchicalOptimiser(; cle = ClustersEstimator(; de = fde), slv = slv)
-        hopt_p = HierarchicalOptimiser(; pe = fpe, cle = ClustersEstimator(; de = fde),
-                                       slv = slv, z_src = :prior)
+        hopt_p = HierarchicalOptimiser(; pe = FactorPrior(),
+                                       cle = ClustersEstimator(; de = pde), slv = slv)
         hopt_c = HierarchicalOptimiser(; cle = ClustersEstimator(; de = cde), slv = slv)
-        @test hopt_d.z_src === :data
-        @test hopt_p.z_src === :prior
-        @test_throws ArgumentError HierarchicalOptimiser(; slv = slv, z_src = :Data)
+        # The source selector is gone: there is one carrier and one producer slot.
+        @test !hasproperty(hopt_d, :z_src)
 
         for oe in (HierarchicalRiskParity, HierarchicalEqualRiskContribution)
             wd = optimise(oe(; opt = hopt_d), rd)
@@ -199,9 +196,9 @@ end
                 @test isapprox(sum(res.w), 1)
                 @test all(isfinite, res.w)
             end
-            # The clusters — hence the weights — actually come from `Z`.
+            # The clusters — hence the weights — actually come from the panel.
             @test wd.clr.D == distance(fde, Zd)
-            @test wp.clr.D == distance(fde, panel_feature_matrix(pr_z.pnl)[2])
+            @test wp.clr.D == distance(fde, Zp)
             @test wd.w != wc.w
             @test wp.w != wd.w
         end
@@ -210,26 +207,22 @@ end
         ws = optimise(SchurComplementHierarchicalRiskParity(; opt = hopt_d), rd)
         @test ws.clr.D == distance(fde, Zd)
 
-        # `NestedClustered` carries its own `z_src`, not `HierarchicalOptimiser`'s.
         jopt = JuMPOptimiser(; slv = slv)
-        @test jopt.z_src === :data
-        @test_throws ArgumentError JuMPOptimiser(; slv = slv, z_src = :none)
+        @test !hasproperty(jopt, :z_src)
         nco = NestedClustered(; cle = ClustersEstimator(; de = fde),
                               opti = MeanRisk(; opt = jopt), opto = MeanRisk(; opt = jopt))
-        @test nco.z_src === :data
+        @test !hasproperty(nco, :z_src)
         wn = optimise(nco, rd)
         @test wn.clr.D == distance(fde, Zd)
         @test isapprox(sum(wn.w), 1)
 
-        # `z_src` survives the constructor round trip through `port_opt_view`, which is
+        # The producer survives the constructor round trip through `port_opt_view`, which is
         # what keeps it stable across NCO clusters and cross-validation folds.
         i = [1, 3, 5, 7]
-        @test PortfolioOptimisers.port_opt_view(hopt_p, i, rd.X).z_src === :prior
-        @test PortfolioOptimisers.port_opt_view(nco, i, rd.X).z_src === :data
-        @test PortfolioOptimisers.port_opt_view(jopt, i, rd.X).z_src === :data
+        @test PortfolioOptimisers.port_opt_view(hopt_p, i, rd.X).cle.de.ape === ape
     end
 
-    @testset "A constraint-generating JuMPOptimiser routes Z too" begin
+    @testset "A constraint-generating JuMPOptimiser routes the panel too" begin
         nte = NetworkEstimator(; de = fde, alg = KruskalTree())
         mr_f = MeanRisk(;
                         opt = JuMPOptimiser(; slv = slv,
@@ -320,7 +313,7 @@ end
         @testset "a nothing selector stacks every Panel Field's values" begin
             @test feature_labels(rd.pnl) == ["z$i" for i in 1:6]
             @test feature_matrix(rd.pnl) == Zd
-            @test distance(FeatureDistance(), nothing, nothing; pnl = rd.pnl) == D_all
+            @test distance(FeatureDistance(), nothing, rd.X; rd = rd) == D_all
             # A mask is never among them: a bare name, and an absent selector, are the
             # values alone.
             @test feature_labels(gpnl) ==
@@ -375,9 +368,9 @@ end
 
         @testset "names select the same columns through the routed entry point" begin
             de_cut = FeatureDistance(; sel = ["z1", "z2"])
-            @test distance(de_cut, nothing, nothing; pnl = rd.pnl) == D_cut
-            @test distance(de_cut, nothing, nothing; pnl = rd.pnl) != D_all
-            S, D = cor_and_dist(de_cut, nothing, nothing; pnl = rd.pnl)
+            @test distance(de_cut, nothing, rd.X; rd = rd) == D_cut
+            @test distance(de_cut, nothing, rd.X; rd = rd) != D_all
+            S, D = cor_and_dist(de_cut, nothing, rd.X; rd = rd)
             @test D == D_cut
             @test S == PortfolioOptimisers.distance_to_similarity(fde.sim; D = D_cut)
             k = [4, 1, 6]
@@ -403,8 +396,7 @@ end
                                                                          ["no1", "no2"])
             @test_throws PortfolioOptimisers.IsEmptyError distance(FeatureDistance(;
                                                                                    sel = ["no1"]),
-                                                                   nothing, nothing;
-                                                                   pnl = rd.pnl)
+                                                                   nothing, rd.X; rd = rd)
             # Two entries that expand to one column double that column's contribution.
             @test_throws ArgumentError feature_matrix(gpnl, ["sector", "sector" => "T"])
         end
@@ -423,53 +415,53 @@ end
             # reference column. Every row survives, so the matrix stays assets x assets.
             nxs = ["A", "B", "C"]
             Zsq = [1.0 0.2 0.1; 0.2 1.0 0.7; 0.1 0.7 1.0]
-            sq_pnl = feature_matrix_panel(nxs, Zsq)
-            @test PortfolioOptimisers.features_are_assets(nxs, nxs)
-            D_sq = distance(FeatureDistance(; sel = ["A", "B"]), nothing, nothing;
-                            pnl = sq_pnl)
+            sq_pnl = asset_panel([TensorPanelInput(; name = "prox", axis = "asset",
+                                                   labels = nxs, vals = Zsq)])
+            @test PO.features_are_assets(PO.panel_field(sq_pnl, "prox"), nxs)
+            rd_sq3 = ReturnsResult(; nx = nxs, X = randn(rng, 40, 3) / 100, pnl = sq_pnl)
+            D_sq = distance(FeatureDistance(; sel = ["prox" => ["A", "B"]]), nothing,
+                            rd_sq3.X; rd = rd_sq3)
             @test size(D_sq) == (3, 3)
             @test D_sq == distance(fde, Zsq[:, 1:2]; dims = 1)
         end
 
-        @testset "the picker carries the panel whole, and each carrier holds its own" begin
-            pnlp, zdiag = PortfolioOptimisers.feature_matrix_picker(pr_noz, rd, :data)
-            @test pnlp === rd.pnl
-            @test zdiag === :data
-            # A produced panel names its columns positionally, so a caller's own name still
-            # cannot resolve against the prior carrier.
-            pnlq, _ = PortfolioOptimisers.feature_matrix_picker(pr_z, rd, :prior)
-            @test pnlq === pr_z.pnl
-            @test isdisjoint(feature_labels(pnlq), feature_labels(pnlp))
+        @testset "the panel travels whole, and a producer builds its own" begin
+            # There is one carrier and one producer slot: the resolution reads either
+            # carrier slot, and a producer ignores both panels and builds a fresh one.
+            @test PO.asset_panel(nothing, pr_noz, rd, rd.X) === rd.pnl
+            @test PO.asset_panel(nothing, rd, nothing, rd.X) === rd.pnl
+            @test isdisjoint(feature_labels(PO.asset_panel(ape, pr_fac, rd, rd.X)),
+                             feature_labels(rd.pnl))
         end
 
         @testset "the selector survives the whole routed path" begin
             de_sel = FeatureDistance(; sel = ["z1", "z2"])
             rd_cut = ReturnsResult(; nx = rd.nx, X = rd.X,
-                                   pnl = feature_matrix_panel(["z1", "z2"], Zd[:, 1:2]))
-            pm_sel = phylogeny_matrix(NetworkEstimator(; de = de_sel), pr_noz; rd = rd,
-                                      z_src = :data)
-            pm_ref = phylogeny_matrix(NetworkEstimator(; de = fde), pr_noz; rd = rd_cut,
-                                      z_src = :data)
-            pm_all = phylogeny_matrix(NetworkEstimator(; de = fde), pr_noz; rd = rd,
-                                      z_src = :data)
+                                   pnl = matrix_panel(["z1", "z2"], Zd[:, 1:2]))
+            pm_sel = phylogeny_matrix(NetworkEstimator(; de = de_sel), rd)
+            pm_ref = phylogeny_matrix(NetworkEstimator(; de = fde), rd_cut)
+            pm_all = phylogeny_matrix(NetworkEstimator(; de = fde), rd)
             @test pm_sel.X == pm_ref.X
             @test pm_sel.X != pm_all.X
-            # A caller's own name still cannot resolve on the derived carrier, whose
-            # columns are named positionally: `strict` names the entry that failed, and
-            # the default drops every entry and reports an empty selection.
-            de_strict = FeatureDistance(; sel = ["z1", "z2"], strict = true)
+            # A name the produced panel does not carry cannot resolve: `strict` names the
+            # entry that failed, and the default drops every entry and reports an empty
+            # selection.
+            de_strict = FeatureDistance(; ape = ape, sel = ["z1", "z2"], strict = true)
             @test_throws ArgumentError phylogeny_matrix(NetworkEstimator(; de = de_strict),
-                                                        pr_z; rd = rd, z_src = :prior)
+                                                        pr_fac; rd = rd)
             @test_throws PortfolioOptimisers.IsEmptyError phylogeny_matrix(NetworkEstimator(;
-                                                                                            de = de_sel),
-                                                                           pr_z; rd = rd,
-                                                                           z_src = :prior)
+                                                                                            de = FeatureDistance(;
+                                                                                                                 ape = ape,
+                                                                                                                 sel = ["z1",
+                                                                                                                        "z2"])),
+                                                                           pr_fac; rd = rd)
         end
 
         @testset "factory carries the new fields" begin
-            de_sel = FeatureDistance(; sel = ["z1", "z2"], strict = true)
+            de_sel = FeatureDistance(; ape = ape, sel = ["z1", "z2"], strict = true)
             f = factory(de_sel, pr_noz)
             @test f.sel == de_sel.sel
+            @test f.ape == de_sel.ape
             @test f.strict === de_sel.strict
         end
     end

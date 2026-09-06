@@ -54,7 +54,7 @@ end
     @test fpr isa LowOrderPrior
     @test fpr.mu == [0.05, 0.06]
     # Every other field is the very same object, not a copy or a recomputation.
-    for sym in (:X, :o_X, :sigma, :chol, :w, :ens, :kld, :ow, :rr, :fpr, :pnl)
+    for sym in (:X, :o_X, :sigma, :chol, :w, :ens, :kld, :ow, :rr, :fpr)
         @test getfield(fpr, sym) === getfield(pr, sym)
     end
     # In particular, the three fields whose silent loss motivated ADR 0046.
@@ -235,18 +235,8 @@ end
                                                                    X = Matrix{Float64}(undef,
                                                                                        0,
                                                                                        0))
-    # The feature matrix keeps its assets-major check.
-    @test_throws DimensionMismatch PO.forward_prior(bare;
-                                                    pnl = feature_matrix_panel(["_z1",
-                                                                                "_z2"],
-                                                                               [1.0 2.0;
-                                                                                3.0 4.0;
-                                                                                5.0 6.0]))
-    @test panel_feature_matrix(PO.forward_prior(bare;
-                                                pnl = feature_matrix_panel(["_z1", "_z2"],
-                                                                           [1.0 2.0;
-                                                                            3.0 4.0])).pnl)[2] ==
-          [1.0 2.0; 3.0 4.0]
+    # A prior result carries no feature data at all, so `pnl` is not a field to patch.
+    @test_throws ArgumentError PO.forward_prior(bare; pnl = nothing)
 end
 
 @testset "forward_prior: HighOrderPrior forwards through the same rule" begin

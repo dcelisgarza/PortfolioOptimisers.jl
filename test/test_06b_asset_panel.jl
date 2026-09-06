@@ -8,6 +8,7 @@ that resolves every blank, and the two `port_opt_view` arities that carry the pa
 with `X`. The derived Feature Matrix is checked where it is derived, not where it is stored,
 because nothing stores it.
 =#
+include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
 @testset "Panel Field types" begin
     num = NumericPanelField(; name = "mcap", vals = [1.0, 2.0, 3.0])
     @test num.name == "mcap"
@@ -165,20 +166,22 @@ end
     @test sZ[:, 1] == [1.0, 2.0]
     @test sZ[:, 4] == [1.0, 1.0]
 
-    # `feature_matrix_panel` is the exact inverse for a matrix of named columns.
-    rt = feature_matrix_panel(nz, Z)
+    #=
+    A panel of one numeric Panel Field per column derives the matrix it was built from. `#807`
+    deleted the library verb that did this, because the collapse returns a panel and a producer
+    builds its tensor field directly, so the round trip is a *test* helper now: it says that
+    the derivation is faithful, which is what every consumer of `panel_feature_matrix` rests on.
+    =#
+    rt = matrix_panel(nz, Z)
     @test panel_feature_matrix(rt) == (nz, Z)
     @test all(f -> isa(f, NumericPanelField), rt.pf)
     @test rt.amsk == trues(2, 2)
-    srt = feature_matrix_panel(snz, sZ)
+    srt = matrix_panel(snz, sZ)
     @test PortfolioOptimisers.panel_is_static(srt)
     @test panel_feature_matrix(srt) == (snz, sZ)
 
-    @test_throws ArgumentError feature_matrix_panel(["a", "a"], ones(2, 2))
-    @test_throws DimensionMismatch feature_matrix_panel(["a"], ones(2, 2))
-    @test_throws DimensionMismatch feature_matrix_panel(["a", "b"], ones(2, 2);
-                                                        amsk = trues(2, 2),
-                                                        emsk = trues(2, 2))
+    # A duplicated column name is still refused, by the panel itself.
+    @test_throws ArgumentError matrix_panel(["a", "a"], ones(2, 2))
     @test PortfolioOptimisers.panel_feature_names(nothing) === nothing
 end
 @testset "AssetPanel views" begin
@@ -216,12 +219,41 @@ end
     @test PortfolioOptimisers.panel_field(sv, "mcap").vals == [2.0, 3.0]
     @test PortfolioOptimisers.panel_field(sv, "beta").vals == reshape([2.0, 3.0], 2, 1)
 
-    # `sq` says the Panel Fields *are* the assets, so the same index cuts both.
-    sq = feature_matrix_panel(["A", "B", "C"], reshape(collect(1.0:18.0), 2, 3, 3))
-    sqv = PortfolioOptimisers.port_opt_view(sq, 1:2, 2:3, true)
-    @test PortfolioOptimisers.panel_feature_names(sqv) == ["B", "C"]
-    @test length(sqv.pf) == 2
-    @test PortfolioOptimisers.panel_field(sqv, "B").vals == [9.0 11.0; 10.0 12.0]
+    #=
+    The square case is derived at the view, by name: a tensor Panel Field whose labels are the
+    carrier's asset names is cut on its label axis by the same asset index. Nothing records the
+    fact, and the comparison is `features_are_assets`.
+    =#
+    Zt = reshape(collect(1.0:18.0), 2, 3, 3)
+    nx = ["A", "B", "C"]
+    sq = asset_panel([TensorPanelInput(; name = "prox", axis = "asset", labels = nx,
+                                       vals = Zt)])
+    @test PortfolioOptimisers.features_are_assets(PortfolioOptimisers.panel_field(sq,
+                                                                                  "prox"),
+                                                  nx)
+    sqv = PortfolioOptimisers.port_opt_view(sq, 1:2, 2:3, nx)
+    @test PortfolioOptimisers.panel_field(sqv, "prox").labels == ["B", "C"]
+    @test PortfolioOptimisers.panel_feature_names(sqv) == ["prox=B", "prox=C"]
+    @test PortfolioOptimisers.panel_field(sqv, "prox").vals == Zt[1:2, 2:3, 2:3]
+
+    # A label vector that is not the asset names leaves the label axis whole.
+    rect = asset_panel([TensorPanelInput(; name = "beta", axis = "factor",
+                                         labels = ["f1", "f2", "f3"], vals = Zt)])
+    @test !PortfolioOptimisers.features_are_assets(PortfolioOptimisers.panel_field(rect,
+                                                                                   "beta"),
+                                                   nx)
+    rv = PortfolioOptimisers.port_opt_view(rect, 1:2, 2:3, nx)
+    @test PortfolioOptimisers.panel_field(rv, "beta").labels == ["f1", "f2", "f3"]
+    @test PortfolioOptimisers.panel_field(rv, "beta").vals == Zt[1:2, 2:3, :]
+
+    # A numeric or categorical Panel Field has no trailing axis, so it is never square.
+    @test !PortfolioOptimisers.features_are_assets(PortfolioOptimisers.panel_field(pnl,
+                                                                                   "mcap"),
+                                                   nx)
+    # And a carrier that does not name its assets makes no claim.
+    @test !PortfolioOptimisers.features_are_assets(PortfolioOptimisers.panel_field(sq,
+                                                                                   "prox"),
+                                                   nothing)
 end
 @testset "Fill policies" begin
     @test PortfolioOptimisers.is_panel_blank(missing)
@@ -363,9 +395,38 @@ end
     @test PortfolioOptimisers.panel_is_static(sp)
     @test panel_feature_matrix(sp)[1] == ["mcap", "mcap::observed", "sector=E", "sector=T"]
     @test panel_feature_matrix(sp)[2][:, 1] == [1.0, 0.0, 3.0]
-    @test_throws DimensionMismatch asset_panel([NumericPanelInput(; name = "a",
-                                                                  vals = [1.0, 2.0])];
-                                               amsk = trues(2, 2), emsk = trues(2, 2))
+    #=
+    Masks beside static inputs alone are a *request* for observations, not a contradiction:
+    the panel couples the masks to the shape, so the build lifts each static input onto the
+    masks' observation count. The lift is lazy, and a lifted Panel Field carries no observed
+    mask, because every cell of a static input was observed.
+    =#
+    lifted = asset_panel([NumericPanelInput(; name = "a", vals = [1.0, 2.0])];
+                         amsk = trues(3, 2), emsk = trues(3, 2))
+    @test !PortfolioOptimisers.panel_is_static(lifted)
+    @test size(PortfolioOptimisers.panel_field(lifted, "a").vals) == (3, 2)
+    @test PortfolioOptimisers.panel_field(lifted, "a").vals == [1.0 2.0; 1.0 2.0; 1.0 2.0]
+    @test PortfolioOptimisers.panel_field(lifted, "a").omsk === nothing
+    # The values are stored once.
+    @test isa(PortfolioOptimisers.panel_field(lifted, "a").vals,
+              PortfolioOptimisers.RepeatedLeading)
+    @test PortfolioOptimisers.panel_field(lifted, "a").vals.parent == [1.0, 2.0]
+    # A view of a lifted field is an ordinary `SubArray`, sliced like any other.
+    lv = PortfolioOptimisers.port_opt_view(lifted, 2:3, [2])
+    @test PortfolioOptimisers.panel_field(lv, "a").vals == reshape([2.0, 2.0], 2, 1)
+    # A static input that meets a time-varying one is lifted the same way.
+    mixed = asset_panel([NumericPanelInput(; name = "t", vals = [1.0 2.0; 3.0 4.0]),
+                         CategoricalPanelInput(; name = "s", vals = ["T", "E"])])
+    @test !PortfolioOptimisers.panel_is_static(mixed)
+    @test PortfolioOptimisers.panel_field(mixed, "s").codes == [2 1; 2 1]
+    @test PortfolioOptimisers.panel_feature_matrix(mixed)[1] == ["t", "s=E", "s=T"]
+    # The lazy array owes `show` too.
+    @test occursin("RepeatedLeading",
+                   sprint(show, PortfolioOptimisers.panel_field(lifted, "a").vals))
+    @test occursin("RepeatedLeading",
+                   sprint(show, MIME"text/plain"(),
+                          PortfolioOptimisers.panel_field(lifted, "a").vals))
+    @test_throws DomainError PortfolioOptimisers.RepeatedLeading([1.0, 2.0], 0)
     @test_throws ArgumentError asset_panel([NumericPanelInput(; name = "a",
                                                               vals = [1.0, 2.0],
                                                               alg = BackwardPanelFill())])
@@ -411,7 +472,7 @@ end
     @test_throws DimensionMismatch ReturnsResult(; nx = nx, X = [0.1 0.2 0.3], pnl = pnl)
     @test_throws IsNothingError ReturnsResult(; pnl = pnl)
     # A static panel binds the asset axis alone, so it needs no observation count.
-    stat = feature_matrix_panel(["f1", "f2"], [1.0 2.0; 3.0 4.0; 5.0 6.0])
+    stat = matrix_panel(["f1", "f2"], [1.0 2.0; 3.0 4.0; 5.0 6.0])
     @test ReturnsResult(; nx = nx, X = X, pnl = stat).pnl === stat
     @test_throws IsNothingError ReturnsResult(; nx = nx, pnl = pnl)
     # A carrier with no panel checks nothing.
@@ -488,7 +549,7 @@ end
     @test PortfolioOptimisers.panel_field(rd.pnl, "mcap").vals == [2.0 5.0 8.0; 3.0 6.0 9.0]
 
     # A static panel binds the asset axis alone, so a timestamp window leaves it whole.
-    sp = feature_matrix_panel(["f1", "f2"], [1.0 2.0; 3.0 4.0; 5.0 6.0])
+    sp = matrix_panel(["f1", "f2"], [1.0 2.0; 3.0 4.0; 5.0 6.0])
     prs = PricesResult(; X = P, pnl = sp)
     @test panel_feature_matrix(PortfolioOptimisers.port_opt_view(prs, ts[2:3]).pnl)[2] ==
           [1.0 2.0; 3.0 4.0; 5.0 6.0]

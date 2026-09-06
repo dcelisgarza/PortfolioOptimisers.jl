@@ -112,7 +112,7 @@ end
         # The positional constructor takes it too, not only the keyword one.
         @test isa(LowOrderPrior(pr_csfm_reb.X, nothing, pr_csfm_reb.mu, pr_csfm_reb.sigma,
                                 nothing, nothing, nothing, nothing, nothing, csfm_reb,
-                                pr_csfm_reb.fpr, nothing), LowOrderPrior)
+                                pr_csfm_reb.fpr), LowOrderPrior)
     end
 
     @testset "The block invariants still read rr.M" begin
@@ -176,13 +176,19 @@ end
         rd = ReturnsResult(; nx = ["A", "B", "C", "D"], X = pr_csfm_reb.X,
                            nf = ["mkt", "size", "value"], F = F_deg)
 
-        # 1. `RegressionFeatures`, at `13_Prior/15_FeaturePrior.jl`.
-        @test feature_matrix(RegressionFeatures(), pr_csfm_reb) ==
-              feature_matrix(RegressionFeatures(), pr_reg_reb) ==
-              L
-        @test feature_matrix(RegressionFeatures(), pr_csfm_flat) ==
-              feature_matrix(RegressionFeatures(), pr_reg_flat) ==
-              M
+        # 1. `RegressionPanel`, at `13_Prior/15_AssetPanelEstimators.jl`. The producer
+        #    reads `pr.rr.L` for both regression results with one method.
+        loadings(pr) = PO.panel_field(PO.asset_panel(RegressionPanel(), pr, rd, rd.X),
+                                      "loadings").vals
+        @test loadings(pr_csfm_reb) == loadings(pr_reg_reb) == L
+        @test loadings(pr_csfm_flat) == loadings(pr_reg_flat) == M
+        # The factor axis is named off the carrier only where it *is* the carrier's, which is
+        # a `Regression` whose loadings are the raw `M`; every other case is positional.
+        labels(pr) = PO.panel_field(PO.asset_panel(RegressionPanel(), pr, rd, rd.X),
+                                    "loadings").labels
+        @test labels(pr_reg_flat) == rd.nf
+        @test labels(pr_csfm_flat) == [string(k) for k in 1:size(M, 2)]
+        @test labels(pr_reg_reb) == [string(k) for k in 1:size(L, 2)]
 
         # 2. `factor_risk_contribution`, at `19_RiskMeasures/27_ExpectedRisk.jl`.
         w = [0.4, 0.1, 0.3, 0.2]

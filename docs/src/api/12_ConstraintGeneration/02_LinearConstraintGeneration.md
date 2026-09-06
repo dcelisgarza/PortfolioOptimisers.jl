@@ -45,7 +45,6 @@ port_opt_view(sets::UniverseSets, i, args...)
 port_opt_view(lc::LinearConstraint, ::Any, args...)
 factor_universe
 factor_axis_key
-feature_universe
 _expr_depth_exceeds
 ```
 

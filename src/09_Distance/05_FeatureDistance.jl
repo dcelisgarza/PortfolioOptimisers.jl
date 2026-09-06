@@ -472,8 +472,8 @@ $(DocStringExtensions.FIELDS)
         metric::Distances.SemiMetric = AngularDist(),
         alg::AbstractFeatureCollapseAlgorithm = LastObservation(),
         sim::AbstractSimilarityMatrixAlgorithm = default_similarity(metric),
-        sel::Option{<:Union{<:VecStr, <:AbstractVector{<:Integer}}} = nothing,
-        sets = nothing,
+        ape::Option{<:AbstractAssetPanelEstimator} = nothing,
+        sel::Option{<:AbstractVector} = nothing,
         strict::Bool = false
     ) -> FeatureDistance
 
@@ -489,6 +489,7 @@ Keywords correspond to the struct's fields.
 When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `alg`: Recursively updated via [`factory`](@ref).
+  - `ape`: Recursively updated via [`factory`](@ref).
 
 # Examples
 
@@ -498,6 +499,7 @@ FeatureDistance
   metric ┼ AngularDist: AngularDist()
      alg ┼ LastObservation()
      sim ┼ AngularSimilarity()
+     ape ┼ nothing
      sel ┼ nothing
   strict ┴ Bool: false
 
@@ -506,6 +508,7 @@ FeatureDistance
   metric ┼ Distances.CosineDist: Distances.CosineDist()
      alg ┼ LastObservation()
      sim ┼ ComplementSimilarity()
+     ape ┼ nothing
      sel ┼ nothing
   strict ┴ Bool: false
 ```
@@ -542,6 +545,10 @@ FeatureDistance
     """
     sim
     """
+    $(field_dict[:fdape])
+    """
+    @fprop ape
+    """
     $(field_dict[:fdsel])
     """
     sel
@@ -552,21 +559,20 @@ FeatureDistance
     function FeatureDistance(metric::Distances.SemiMetric,
                              alg::AbstractFeatureCollapseAlgorithm,
                              sim::AbstractSimilarityMatrixAlgorithm,
+                             ape::Option{<:AbstractAssetPanelEstimator},
                              sel::Option{<:AbstractVector}, strict::Bool)::FeatureDistance
         assert_feature_selector(sel)
-        return new{typeof(metric), typeof(alg), typeof(sim), typeof(sel), typeof(strict)}(metric,
-                                                                                          alg,
-                                                                                          sim,
-                                                                                          sel,
-                                                                                          strict)
+        return new{typeof(metric), typeof(alg), typeof(sim), typeof(ape), typeof(sel),
+                   typeof(strict)}(metric, alg, sim, ape, sel, strict)
     end
 end
 function FeatureDistance(; metric::Distances.SemiMetric = AngularDist(),
                          alg::AbstractFeatureCollapseAlgorithm = LastObservation(),
                          sim::AbstractSimilarityMatrixAlgorithm = default_similarity(metric),
+                         ape::Option{<:AbstractAssetPanelEstimator} = nothing,
                          sel::Option{<:AbstractVector} = nothing,
                          strict::Bool = false)::FeatureDistance
-    return FeatureDistance(metric, alg, sim, sel, strict)
+    return FeatureDistance(metric, alg, sim, ape, sel, strict)
 end
 """
     assert_metric_domain(metric::Distances.SemiMetric, Z::ArrNum, sym::Symbol = :Z)
@@ -1071,92 +1077,103 @@ function cor_and_dist(de::FeatureDistance, Z::Arr3Num; dims::Int = 1, kwargs...)
     return distance_to_similarity(de.sim; D = D), D
 end
 """
-    assert_feature_matrix_supplied(pnl::Option{<:AssetPanel}, z_src::Symbol)
+    feature_matrix(de::FeatureDistance, pr, rd, X) -> AbstractArray{<:Number}
 
-Assert that an [`AssetPanel`](@ref) reached [`FeatureDistance`](@ref)'s three-argument entry point, and name the reason when none did.
+Stack the Feature Matrix a [`FeatureDistance`](@ref) measures, from the panel its `ape` slot resolves.
 
-Every way of failing to supply a panel arrives here identically, as `pnl === nothing`. `z_src` is the diagnostic that tells them apart — resolved by [`feature_matrix_picker`](@ref), and riding the wire beside the panel purely so this message can be specific:
-
-  - `:none`: nothing supplied a panel at all. The estimator was driven from a raw returns matrix, which carries no panel — the two-argument `distance(de, Z; dims)` entry point, a [`ReturnsResult`](@ref) or a prior result is needed.
-  - `:neither`: a carrier was available but neither it nor the returns result holds a panel. The panel has not been supplied or produced.
-  - `:data` / `:prior`: `z_src` selected a carrier that holds no panel, while the *other* one does. This is the typo/wrong-selector case, and the message says which value to use instead.
-  - `:data_only`: the call runs *before* any prior exists, so the data carrier is the only one that could have supplied a panel and it holds none. It is named for the situation rather than for the caller, so any pre-prior site inherits it; [`ClusterGroups`](@ref) is the one that exists today. Sending the user to a [`FeaturePrior`](@ref) — `:neither`'s remedy — would be actively wrong here, because a prior is structurally unreachable from a selector.
-
-Any unrecognised symbol falls through to `:neither`'s text.
+The resolution has **one** site. `asset_panel(de.ape, pr, rd, X)` answers the carrier's panel under a `nothing` producer and builds one otherwise, and [`feature_matrix`](@ref)'s panel method then stacks the columns `de.sel` names. The kernel calls this, and a caller who asks what a clustering measured calls [`feature_labels`](@ref) with the arguments the optimiser received, so the caller's rebuild is the kernel's measurement by construction.
 
 # Algorithm
 
- 1. Return immediately when `pnl` is not `nothing`, which is every call that carries a panel.
- 2. Otherwise select the message by `z_src`, from the five cases above.
- 3. Raise an [`IsNothingError`](@ref) carrying that message.
+ 1. Resolve the panel with [`asset_panel`](@ref).
+ 2. Stack it with [`feature_matrix`](@ref), reading `de.sel` and `de.strict`.
 
 # Arguments
 
-  - `pnl`: Asset Panel that reached the three-argument entry point, or `nothing`.
-  - `z_src::Symbol`: Diagnostic naming the carrier that was selected, which picks the message.
-
-# Validation
-
-  - `!isnothing(Z)`. Raises an [`IsNothingError`](@ref) naming the case that `z_src` selects.
+  - `de`: Feature distance estimator.
+  - $(arg_dict[:pr_rr])
+  - $(arg_dict[:rd])
+  - `X`: Returns matrix of the subproblem, observations × assets. A producer reads it.
 
 # Returns
 
-  - `nothing`.
+  - The Feature Matrix, `assets × features` or `observations × assets × features`.
 
 # Related
 
   - [`FeatureDistance`](@ref)
-  - [`feature_matrix_picker`](@ref)
-  - [`ClusterGroups`](@ref)
-  - [`IsNothingError`](@ref)
+  - [`feature_labels`](@ref)
+  - [`asset_panel`](@ref)
+  - [`AssetPanel`](@ref)
+  - [`cor_and_dist`](@ref)
 """
-function assert_feature_matrix_supplied(pnl::Option{<:AssetPanel}, z_src::Symbol)::Nothing
-    if isnothing(pnl)
-        throw(IsNothingError(if z_src == :none
-                                 "FeatureDistance stacks its Feature Matrix from an AssetPanel, but this call supplied none. It was reached from a raw returns matrix, which carries no panel: drive it from a ReturnsResult or a prior result that carries `pnl`, or call `distance(de, Z; dims = dims)` directly."
-                             elseif z_src == :data
-                                 "FeatureDistance stacks its Feature Matrix from an AssetPanel, but `z_src = :data` selected the returns result and it carries no `pnl`. The prior result does carry one — set `z_src = :prior`."
-                             elseif z_src == :prior
-                                 "FeatureDistance stacks its Feature Matrix from an AssetPanel, but `z_src = :prior` selected the prior result and it carries no `pnl`. The returns result does carry one — set `z_src = :data`."
-                             elseif z_src == :data_only
-                                 "FeatureDistance stacks its Feature Matrix from an AssetPanel, but the returns result carries none. This call runs before any prior exists, so only the data carrier can supply one: set `pnl` on the `ReturnsResult`, for instance with `asset_panel`."
-                             else
-                                 "FeatureDistance stacks its Feature Matrix from an AssetPanel, but neither the returns result nor the prior result carries one. Supply `pnl` on the ReturnsResult, for instance with `asset_panel`."
-                             end))
-    end
-    return nothing
+function feature_matrix(de::FeatureDistance, pr, rd, X)
+    return feature_matrix(asset_panel(de.ape, pr, rd, X), de.sel; strict = de.strict)
 end
 """
-    distance(de::FeatureDistance, ::Any, ::Any; pnl::Option{<:AssetPanel} = nothing,
-             z_src::Symbol = :none, kwargs...)
-    cor_and_dist(de::FeatureDistance, ::Any, ::Any; pnl::Option{<:AssetPanel} = nothing,
-                 z_src::Symbol = :none, kwargs...)
+    feature_labels(de::FeatureDistance, pr, rd, X) -> Vector
+
+Name each column of the Feature Matrix a [`FeatureDistance`](@ref) measures.
+
+The sibling of [`feature_matrix`](@ref), and it resolves the panel and the selector the same way, so the two agree by construction. A label is the selector entry that selects exactly that column, so the label vector is itself a selector that rebuilds the matrix — which is what a caller who asks *what was measured* needs.
+
+The kernel never calls it: no clustering or phylogeny result records the labels, because the estimator and the carriers derive them with no distance computed. A caller who wants them calls `feature_labels(de, res.pr, rd, rd.X)` with the arguments the optimiser received.
+
+# Algorithm
+
+ 1. Resolve the panel with [`asset_panel`](@ref).
+ 2. Label it with [`feature_labels`](@ref), reading `de.sel` and `de.strict`.
+
+# Arguments
+
+  - `de`: Feature distance estimator.
+  - $(arg_dict[:pr_rr])
+  - $(arg_dict[:rd])
+  - `X`: Returns matrix of the subproblem, observations × assets. A producer reads it.
+
+# Returns
+
+  - One label per column of the Feature Matrix.
+
+# Related
+
+  - [`FeatureDistance`](@ref)
+  - [`feature_matrix`](@ref)
+  - [`asset_panel`](@ref)
+  - [`AssetPanel`](@ref)
+"""
+function feature_labels(de::FeatureDistance, pr, rd, X)
+    return feature_labels(asset_panel(de.ape, pr, rd, X), de.sel; strict = de.strict)
+end
+"""
+    distance(de::FeatureDistance, ::Any, X; pr = nothing, rd = nothing, kwargs...)
+    cor_and_dist(de::FeatureDistance, ::Any, X; pr = nothing, rd = nothing, kwargs...)
 
 Three-argument entry points, for the clustering and network estimators.
 
-Every consumer in the clustering and network stack calls `cor_and_dist(de, ce, X; …)` or `distance(de, pl, X; …)`, passing a covariance estimator (or, in [`logo!`](@ref)'s case, a similarity matrix) and a returns matrix. [`FeatureDistance`](@ref) uses neither: it measures a Feature Matrix, which it stacks from the [`AssetPanel`](@ref) travelling beside them on the `pnl` keyword argument, resolved from a carrier by [`feature_matrix_picker`](@ref). Both positionals are therefore ignored, and typed `::Any` rather than bounded — `logo!` puts a similarity matrix where the others put a covariance estimator.
+Every consumer in the clustering and network stack calls `cor_and_dist(de, ce, X; …)` or `distance(de, pl, X; …)`, passing a covariance estimator (or, in [`logo!`](@ref)'s case, a similarity matrix) and a returns matrix. [`FeatureDistance`](@ref) uses the covariance positional not at all, and it is typed `::Any` rather than bounded — `logo!` puts a similarity matrix where the others put a covariance estimator. It **does** read `X`, which a producer measures.
 
-This is the one site that stacks the matrix a distance measures. A caller who asks what a distance measured reads [`feature_labels`](@ref) with the same panel and selector, and gets one entry per column of the same matrix.
+The two carriers ride the keyword tail as `pr` and `rd`, and [`feature_matrix`](@ref) resolves the panel from them and from `de.ape`. A forwarder that takes a prior result passes both through; preselection passes `rd` alone.
 
 **`dims` is ignored and the kernel is called with `dims = 1`.** The ambient `dims` describes the returns matrix `X`, and a stacked Feature Matrix is canonically assets-major regardless of it. `dims` stays meaningful only at the raw-matrix entry point `distance(de, Z; dims)`.
 
 # Algorithm
 
- 1. Check that a panel arrived, with [`assert_feature_matrix_supplied`](@ref), which names `z_src` when none did.
- 2. Stack the Feature Matrix with [`feature_matrix`](@ref), reading `de.sel` and `de.strict`.
- 3. Call the matching two-argument entry point on it, at `dims = 1`.
+ 1. Stack the Feature Matrix with [`feature_matrix`](@ref), which resolves the panel and cuts it to `de.sel`.
+ 2. Call the matching two-argument entry point on it, at `dims = 1`.
 
 # Arguments
 
   - `de`: Feature distance estimator.
-  - The two positional arguments: ignored. Present so this estimator matches the signature every consumer calls.
-  - `pnl`: Asset Panel, carried beside the positionals and resolved by [`feature_matrix_picker`](@ref), or `nothing`.
-  - `z_src::Symbol = :none`: Diagnostic naming the carrier that was selected, read only when `pnl` is `nothing`.
+  - The second positional: ignored. Present so this estimator matches the signature every consumer calls.
+  - `X`: Returns matrix of the subproblem, observations × assets.
+  - $(arg_dict[:pr_rr])
+  - $(arg_dict[:rd])
   - `kwargs...`: Additional keyword arguments (ignored).
 
 # Validation
 
-  - `!isnothing(pnl)`. Raises an [`IsNothingError`](@ref) naming `z_src` (see [`assert_feature_matrix_supplied`](@ref)).
+  - The panel resolves. See [`asset_panel`](@ref), which raises an [`IsNothingError`](@ref) naming the site when it does not.
 
 # Returns
 
@@ -1166,22 +1183,17 @@ This is the one site that stacks the matrix a distance measures. A caller who as
 # Related
 
   - [`FeatureDistance`](@ref)
-  - [`feature_matrix_picker`](@ref)
-  - [`assert_feature_matrix_supplied`](@ref)
   - [`feature_matrix`](@ref)
   - [`feature_labels`](@ref)
+  - [`asset_panel`](@ref)
   - [`clusterise`](@ref)
   - [`phylogeny_matrix`](@ref)
 """
-function distance(de::FeatureDistance, ::Any, ::Any; pnl::Option{<:AssetPanel} = nothing,
-                  z_src::Symbol = :none, kwargs...)
-    assert_feature_matrix_supplied(pnl, z_src)
-    return distance(de, feature_matrix(pnl, de.sel; strict = de.strict); dims = 1)
+function distance(de::FeatureDistance, ::Any, X; pr = nothing, rd = nothing, kwargs...)
+    return distance(de, feature_matrix(de, pr, rd, X); dims = 1)
 end
-function cor_and_dist(de::FeatureDistance, ::Any, ::Any;
-                      pnl::Option{<:AssetPanel} = nothing, z_src::Symbol = :none, kwargs...)
-    assert_feature_matrix_supplied(pnl, z_src)
-    return cor_and_dist(de, feature_matrix(pnl, de.sel; strict = de.strict); dims = 1)
+function cor_and_dist(de::FeatureDistance, ::Any, X; pr = nothing, rd = nothing, kwargs...)
+    return cor_and_dist(de, feature_matrix(de, pr, rd, X); dims = 1)
 end
 
 export AngularDist, MeanCollapse, MedianCollapse, LastObservation, AggregateFeatures,

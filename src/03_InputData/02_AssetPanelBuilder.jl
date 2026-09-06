@@ -994,6 +994,56 @@ function panel_input_field(inp::TensorPanelInput, vals::AbstractArray{Float64},
                             omsk = isa(inp.alg, NoPanelFill) ? nothing : obs)
 end
 """
+    panel_build_observations(inputs::AbstractVector{<:AbstractPanelFieldInput},
+                             amsk::Option{<:AbstractMatrix{Bool}},
+                             emsk::Option{<:AbstractMatrix{Bool}}) -> Option{Int}
+
+Return the observation count an [`asset_panel`](@ref) build takes, or `nothing` when the build is static.
+
+The build is time-varying when any input carries an observation axis, **or** when a universe mask is given. The masks are the second signal because an [`AssetPanel`](@ref) couples them to the shape: they are `nothing` if and only if the panel is static, so masks beside static inputs alone are a request for observations rather than a contradiction. A static input of a time-varying build is lifted by [`panel_field_lift`](@ref).
+
+# Algorithm
+
+ 1. Return the leading axis of the first time-varying input, when there is one.
+ 2. Otherwise return the leading axis of `amsk`, then of `emsk`, whichever is given.
+ 3. Otherwise return `nothing`, which is the static build.
+
+# Arguments
+
+  - `inputs`: The raw Panel Fields.
+  - `amsk`: The active mask, or `nothing`.
+  - `emsk`: The estimation mask, or `nothing`.
+
+# Returns
+
+  - `T::Option{Int}`: The observation count, or `nothing` for a static build.
+
+# Related
+
+  - [`asset_panel`](@ref)
+  - [`panel_field_lift`](@ref)
+  - [`RepeatedLeading`](@ref)
+  - [`panel_input_is_static`](@ref)
+  - [`AssetPanel`](@ref)
+"""
+function panel_build_observations(inputs::AbstractVector{<:AbstractPanelFieldInput},
+                                  amsk::Option{<:AbstractMatrix{Bool}},
+                                  emsk::Option{<:AbstractMatrix{Bool}})
+    for inp in inputs
+        if !panel_input_is_static(inp)
+            return size(inp.vals, 1)
+        end
+    end
+    if !isnothing(amsk)
+        return size(amsk, 1)
+    end
+    if !isnothing(emsk)
+        return size(emsk, 1)
+    end
+    return nothing
+end
+
+"""
     asset_panel(
         inputs::AbstractVector{<:AbstractPanelFieldInput};
         amsk::Option{<:AbstractMatrix{Bool}} = nothing,
@@ -1006,15 +1056,18 @@ This is the **build seam**. It takes each Panel Field's raw values with its fill
 
 The result goes straight into the keyword the carriers have, `ReturnsResult(; nx = nx, X = X, pnl = asset_panel(inputs))`, and the same keyword reaches [`prices_to_returns`](@ref).
 
-The **static entry** is the rank of the raw values. An input whose values carry no observation axis builds a static panel: a fundamentals table or a sector classification with no history is that shape. There [`ForwardPanelFill`](@ref) and [`BackwardPanelFill`](@ref) are refused, because there is no observation axis to carry a value along, and the mask keywords must be `nothing`, because a static panel carries no universe mask.
+The **static entry** is the rank of the raw values. An input whose values carry no observation axis is a static input: a fundamentals table or a sector classification with no history is that shape. There [`ForwardPanelFill`](@ref) and [`BackwardPanelFill`](@ref) are refused, because there is no observation axis to carry a value along.
+
+An input set that is static throughout, with no mask, builds a **static panel**. A static input that meets a time-varying input, or that meets a mask, is **lifted**: [`panel_build_observations`](@ref) reads the observation count the build takes, and [`panel_field_lift`](@ref) wraps the static values in a [`RepeatedLeading`](@ref), which stores them once and indexes a leading observation axis. A lifted Panel Field carries no observed mask, because every cell of a static input was observed.
 
 # Algorithm
 
  1. Check that `inputs` is not empty and that the Panel Field names are unique.
  2. Check each input's fill policy against its shape, with [`assert_panel_input_fill`](@ref).
- 3. Resolve every input with [`panel_resolve`](@ref), which fills its blanks and records the observed cells, and build its Panel Field with [`panel_input_field`](@ref).
- 4. Read the shape the Panel Fields agreed on. When it is static, check that no mask was given and return the panel.
- 5. Otherwise fill in all-`true` masks for the ones that were not given, and return the panel. The [`AssetPanel`](@ref) constructor checks that every Panel Field shares one shape.
+ 3. Read the observation count the build takes, with [`panel_build_observations`](@ref).
+ 4. Resolve every input with [`panel_resolve`](@ref), which fills its blanks and records the observed cells, and build its Panel Field with [`panel_input_field`](@ref). Lift a static Panel Field of a time-varying build with [`panel_field_lift`](@ref).
+ 5. Return the panel with no mask when the build is static.
+ 6. Otherwise fill in all-`true` masks for the ones that were not given, and return the panel. The [`AssetPanel`](@ref) constructor checks that every Panel Field shares one shape.
 
 # Arguments
 
@@ -1027,7 +1080,6 @@ The **static entry** is the rank of the raw values. An input whose values carry 
   - `!isempty(inputs)`. Raises an [`IsEmptyError`](@ref).
   - The Panel Field names are non-empty and unique. See [`assert_panel_labels`](@ref).
   - A static input carries no directional fill policy. See [`assert_panel_input_fill`](@ref).
-  - `amsk` and `emsk` are `nothing` when the Panel Fields are static. Raises a `DimensionMismatch`.
 
 # Returns
 
@@ -1052,6 +1104,9 @@ julia> panel_feature_matrix(pnl)[1]
   - [`AbstractPanelFieldInput`](@ref)
   - [`AbstractPanelFillAlgorithm`](@ref)
   - [`panel_input_field`](@ref)
+  - [`panel_build_observations`](@ref)
+  - [`panel_field_lift`](@ref)
+  - [`RepeatedLeading`](@ref)
   - [`panel_feature_matrix`](@ref)
   - [`ReturnsResult`](@ref)
   - [`prices_to_returns`](@ref)
@@ -1063,21 +1118,42 @@ function asset_panel(inputs::AbstractVector{<:AbstractPanelFieldInput};
     @argcheck(!isempty(inputs),
               IsEmptyError("an Asset Panel needs at least one Panel Field input: an empty build carries no feature data"))
     assert_panel_labels([inp.name for inp in inputs], "the Panel Field names")
+    T = panel_build_observations(inputs, amsk, emsk)
     pf = AbstractPanelField[]
     for inp in inputs
         assert_panel_input_fill(inp)
         v, o = panel_resolve(inp)
-        push!(pf, panel_input_field(inp, v, o))
+        f = panel_input_field(inp, v, o)
+        push!(pf, isnothing(T) || !panel_input_is_static(inp) ? f : panel_field_lift(f, T))
     end
-    ax = panel_field_axes(pf[1])
-    if isone(length(ax))
-        @argcheck(isnothing(amsk) && isnothing(emsk),
-                  DimensionMismatch("the Panel Fields of this build carry no observation axis, so the Asset Panel is static and carries no universe mask; drop amsk and emsk, or give the raw values an observation axis"))
+    if isnothing(T)
         return AssetPanel(; pf = pf)
     end
-    T, N = ax
+    N = panel_field_axes(pf[1])[end]
     return AssetPanel(; pf = pf, amsk = isnothing(amsk) ? trues(T, N) : amsk,
                       emsk = isnothing(emsk) ? trues(T, N) : emsk)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for every producer that builds an [`AssetPanel`](@ref) at the point of use.
+
+A producer is **configuration**, not data: [`FeatureDistance`](@ref) holds one in its `ape` slot, a view passes it through unchanged, and a fold refits it on the subproblem's own prior and returns. It answers one verb, `asset_panel(ape, pr, rd, X)`, and returns a static [`AssetPanel`](@ref) holding one [`TensorPanelField`](@ref): a loadings matrix and a proximity matrix are each one quantity with a labelled third axis.
+
+The family is open: a producer that reads a source no shipped member reads defines a member and an `asset_panel` method for it.
+
+`nothing` in the slot is not a member. It reads the panel the data carrier already holds, which is what the same verb answers for it.
+
+# Related
+
+  - [`asset_panel`](@ref)
+  - [`AssetPanel`](@ref)
+  - [`TensorPanelField`](@ref)
+  - [`FeatureDistance`](@ref)
+  - [`RegressionPanel`](@ref)
+  - [`PhylogenyPanel`](@ref)
+"""
+abstract type AbstractAssetPanelEstimator <: AbstractEstimator end
+
 export asset_panel, NumericPanelInput, CategoricalPanelInput, TensorPanelInput, NoPanelFill,
        ConstantPanelFill, ForwardPanelFill, BackwardPanelFill

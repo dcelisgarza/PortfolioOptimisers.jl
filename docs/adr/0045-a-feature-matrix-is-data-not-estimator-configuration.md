@@ -995,9 +995,8 @@ dispatch, and the refusal names the masks as the lift.
 
 The fourth amendment above is released history and stands as written. `CONTEXT.md` §2 loses
 **Feature Program**, §4.4's **Universe Sets** loses the feature axis, and **Asset Panel** states
-the bridge and the lift. The lift is built by
-[#809](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/809), and the bridge and the
-deletions by [#810](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/810).
+the bridge and the lift. The lift, the bridge and the deletions
+are all built by [#810](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/810).
 
 ## Amendment (2026-09-05): a panel under an asset view, a fold and a meta-optimiser collapse
 
@@ -1133,3 +1132,66 @@ measurement.
 The build is [#810](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/810), which owns the kernel's
 line. The methods stand on the selector verbs of
 [#811](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/811).
+
+## Amendment (2026-09-06): the producers ship, and eight mechanisms are deleted
+
+Map [#802](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/802)'s second build,
+[#810](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/810), ships what the eighth,
+tenth, eleventh and twelfth amendments decided, and deletes the mechanisms they replace. It adds
+no decision of its own; this section records what is now absent from `src/`, and names the
+decision that removed each thing.
+
+**What ships.**
+
+- `AbstractAssetPanelEstimator`, beside the panel builder so the `ape` slot can be bounded by it.
+    `RegressionPanel` returns the field `"loadings"` on the axis `"factor"`, and `PhylogenyPanel`
+    the field `"proximity"` on the axis `"asset"`. `asset_panel(ape, pr, rd, X)` resolves the
+    source by dispatch, and `panel_axis_labels` names the trailing axis off the carrier or
+    positionally (the eighth amendment).
+- `FeatureDistance` holds `metric, alg, sim, ape, sel, strict`. The kernel's three-argument
+    entry takes the two carriers as `pr` and `rd`, and calls `feature_matrix(de, pr, rd, X)`;
+    `feature_labels` is its sibling (the twelfth amendment). `measure_feature_distance` is the half
+    that runs after the selection, so a selector is applied once rather than twice.
+- `panel_input(sets, key)` and its vector form, and the lazy lift: `asset_panel` builds a
+    time-varying panel when any input is time-varying or when the masks are given, and lifts each
+    static input through `RepeatedLeading`, which stores the static array once (the tenth
+    amendment). The lift was owed by
+    [#809](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/809) and lands here.
+- The square case is derived at the view, by name: `port_opt_view(pnl, i, j, nx)` slices a tensor
+    Panel Field on its label axis when its labels are `nx`, and `features_are_assets` is that
+    comparison. `collapse_asset_panel` acts one field at a time and returns a panel; a categorical
+    field becomes a tensor field of membership fractions (the eleventh amendment).
+- `prepare_outer_rd` returns the collapsed panel in place of `nz, Z`, and `rebuild_asset_panel`
+    makes the same call per fold and stacks the fold panels field by field.
+
+**What goes, and by which decision.**
+
+| Deleted | Decision |
+| :------- | :-------- |
+| `FeaturePrior`, and `13_Prior/15_FeaturePrior.jl` whole | the eighth: a producer is configuration on the distance |
+| `RegressionFeatures`, `PhylogenyFeatures`, `AbstractFeatureMatrixEstimator`, `feature_estimator_view` | the eighth |
+| `z_src` on `HierarchicalOptimiser`, `JuMPOptimiser` and `NestedClustered`, and on every forwarder | the eighth: there is one carrier |
+| `feature_matrix_picker`, `carrier_feature_names`, `carrier_asset_panel`, `assert_feature_matrix_supplied` | the eighth |
+| `LowOrderPrior.pnl` | the seventh: no prior result carries feature data |
+| `AssetSetsFeatures`, `asset_sets_features`, `asset_sets_feature_names`, `taxonomy_feature_names`, `Scale`, `AbstractFeatureValue`, `resolve_feature_value`, `UniverseSets.zkey`, `feature_universe` | the tenth: the graded program is a static tensor input |
+| `feature_matrix_panel`, `assert_feature_matrix_columns`, `feature_matrix_view`, `carrier_feature_matrix`, `collapsed_asset_panel`, `collapse_feature_matrix` | the eleventh: the collapse returns a panel, and a producer builds its tensor field directly |
+
+`UniverseSets` therefore declares two axis families rather than three, and its constructor takes
+six key arguments; the prefix-disjointness check drops from 42 ordered comparisons to 30.
+
+**One line the ninth amendment owes is paid here.** `sets` had to leave `FeatureDistance` with
+`feature_universe`, which this build deletes, so the estimator lost it now rather than in the
+selector build,
+[#811](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/811). `sel` keeps the
+name-or-integer form the sixth decision gave it until that build replaces it with the four-form
+grammar; a taxonomy block is already selected by its Panel Field's own column names, because the
+panel names them.
+
+**Two defects found and fixed on the way.**
+
+- `code_health/sweep_check.jl` could not run on a branch that deletes a source file: it read
+    every path the diff reports, and errored on the one no longer in the checkout. A deleted file
+    is now named and dropped from the scope, with the four baselines it owes spelt out.
+- `test/test_18k_constraints.jl` called `factor_universe` with four arguments where it takes
+    five, so three `@test_throws` assertions were catching a `MethodError` instead of the
+    exceptions they name.

@@ -19,7 +19,8 @@ feature_distance
 collapse_features
 stack_observations
 collapse_weights
-assert_feature_matrix_supplied
+feature_matrix
+feature_labels
 ```
 
 ## References

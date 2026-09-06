@@ -172,7 +172,6 @@ BayesianBlackLittermanPrior
              │   utfkey ┼ String: "uf"
              │    cfkey ┼ String: "ncf"
              │   ucfkey ┼ String: "ucf"
-             │     zkey ┼ String: "nz"
              │     dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"], "nf" => ["F1", "F2"])
   views_conf ┼ nothing
           rf ┼ Float64: 0.0

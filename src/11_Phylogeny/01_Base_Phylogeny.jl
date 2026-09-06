@@ -561,7 +561,7 @@ A separation decay turns a **separation** `d >= 0` — how far apart two assets 
 # The contract
 
   - Defined for every `d >= 0`.
-  - `f(0) > 0` and maximal. Self-inclusion is load-bearing rather than cosmetic: a decay that does not put an asset at the top of its own scale silently produces a *structural equivalence* matrix instead of a proximity one — see [`PhylogenyFeatures`](@ref)'s "Why the diagonal includes self".
+  - `f(0) > 0` and maximal. Self-inclusion is load-bearing rather than cosmetic: a decay that does not put an asset at the top of its own scale silently produces a *structural equivalence* matrix instead of a proximity one — see [`PhylogenyPanel`](@ref)'s "Why the diagonal includes self".
   - Monotone non-increasing in `d`.
   - Never assumed to reach zero. **Truncation is a separate knob**: the consumer applies its own budget — [`separation_budget`](@ref) of the [`AbstractSeparationAlgorithm`](@ref) in scope — and the decay only shapes the fall-off inside it. An exponential never reaches zero, so budget and fall-off cannot be the same dial.
   - `f(d) >= 0` for `0 <= d <= dmax`. `0` is the unreachable sentinel, so a negative score *inside* the budget would place a **reachable** pair strictly below an **unreachable** one — an ordering inversion within the producer's own scale. It is not a claim that a signed score is wrong in general: the feature matrix is signed-tolerant by decision, and [`assert_metric_domain`](@ref) checks non-negativity per metric at the consumer rather than blanket. This clause is producer-local, and it is non-negativity rather than strict positivity because a decay that bottoms out at zero says *no relatedness*, which is the same claim an unreachable pair makes.
@@ -588,7 +588,7 @@ The contract is enforced rather than merely documented, by a probing [`assert_se
   - [`assert_separation_decay`](@ref)
   - [`AbstractSeparationAlgorithm`](@ref)
   - [`Proximity`](@ref)
-  - [`PhylogenyFeatures`](@ref)
+  - [`PhylogenyPanel`](@ref)
 """
 abstract type AbstractSeparationDecayAlgorithm <: AbstractAlgorithm end
 """

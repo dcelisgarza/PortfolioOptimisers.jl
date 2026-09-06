@@ -3,6 +3,7 @@
 # which is the mistake the stubs exist to name.
 struct UnimplementedPreprocessing <: PortfolioOptimisers.AbstractPreprocessingEstimator end
 struct UnimplementedPreprocessingResult <: PortfolioOptimisers.AbstractPreprocessingResult end
+include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
 @testset "Tools tests" begin
     using Test, PortfolioOptimisers, DataFrames, TimeSeries, Dates, Random, StableRNGs, CSV,
           Statistics, LinearAlgebra
@@ -111,64 +112,53 @@ struct UnimplementedPreprocessingResult <: PortfolioOptimisers.AbstractPreproces
             # A transposed non-square Z is caught, which is the whole point of fixing the
             # layout rather than inferring it.
             @test_throws DimensionMismatch ReturnsResult(; nx = nx, X = X,
-                                                         pnl = feature_matrix_panel(nz,
-                                                                                    rand(rng,
-                                                                                         2,
-                                                                                         3)))
+                                                         pnl = matrix_panel(nz,
+                                                                            rand(rng, 2, 3)))
             @test_throws DimensionMismatch ReturnsResult(; nx = nx, X = X,
-                                                         pnl = feature_matrix_panel(nz,
-                                                                                    rand(rng,
-                                                                                         3,
-                                                                                         3)))
+                                                         pnl = matrix_panel(nz,
+                                                                            rand(rng, 4, 2)))
             @test_throws ArgumentError ReturnsResult(; nx = nx, X = X,
-                                                     pnl = feature_matrix_panel(["f", "f"],
-                                                                                rand(rng, 3,
-                                                                                     2)))
-            # A feature matrix is never imputed, so a non-finite entry is rejected here
-            # rather than reaching a metric that would map it to a plausible wrong distance.
+                                                     pnl = matrix_panel(["f", "f"],
+                                                                        rand(rng, 3, 2)))
+            # A blank never reaches a carrier: `NaN` is a blank, and the default `NoPanelFill`
+            # refuses it at the build rather than letting it reach a metric that would map it
+            # to a plausible wrong distance.
+            @test_throws ArgumentError ReturnsResult(; nx = nx, X = X,
+                                                     pnl = matrix_panel(nz,
+                                                                        [1.0 NaN;
+                                                                         2.0 3.0;
+                                                                         4.0 5.0]))
             @test_throws PortfolioOptimisers.IsNonFiniteError ReturnsResult(; nx = nx,
                                                                             X = X,
-                                                                            pnl = feature_matrix_panel(nz,
-                                                                                                       [                                  1.0 NaN;
-                                                                                                        2.0 3.0;
-                                                                                                        4.0 5.0]))
-            @test_throws PortfolioOptimisers.IsNonFiniteError ReturnsResult(; nx = nx,
-                                                                            X = X,
-                                                                            pnl = feature_matrix_panel(nz,
-                                                                                                       [                                  1.0 Inf;
-                                                                                                        2.0 3.0;
-                                                                                                        4.0 5.0]))
+                                                                            pnl = matrix_panel(nz,
+                                                                                               [                                  1.0 Inf;
+                                                                                                2.0 3.0;
+                                                                                                4.0 5.0]))
             # A time-varying Z binds its leading axis to the observations, and needs both
             # an asset anchor and an observation anchor to bind to.
             @test_throws DimensionMismatch ReturnsResult(; nx = nx, X = X,
-                                                         pnl = feature_matrix_panel(nz,
-                                                                                    rand(rng,
-                                                                                         4,
-                                                                                         3,
-                                                                                         2)))
+                                                         pnl = matrix_panel(nz,
+                                                                            rand(rng, 4, 3,
+                                                                                 2)))
             @test_throws PortfolioOptimisers.IsNothingError ReturnsResult(; nx = nx,
-                                                                          pnl = feature_matrix_panel(nz,
-                                                                                                     rand(rng,
-                                                                                                          5,
-                                                                                                          3,
-                                                                                                          2)))
+                                                                          pnl = matrix_panel(nz,
+                                                                                             rand(rng,
+                                                                                                  5,
+                                                                                                  3,
+                                                                                                  2)))
             @test_throws PortfolioOptimisers.IsNothingError ReturnsResult(;
-                                                                          pnl = feature_matrix_panel(nz,
-                                                                                                     rand(rng,
-                                                                                                          3,
-                                                                                                          2)))
+                                                                          pnl = matrix_panel(nz,
+                                                                                             rand(rng,
+                                                                                                  3,
+                                                                                                  2)))
             # The price level binds the same two axes to X's columns and rows.
             @test_throws DimensionMismatch PricesResult(; X = Px,
-                                                        pnl = feature_matrix_panel(nz,
-                                                                                   rand(rng,
-                                                                                        2,
-                                                                                        2)))
+                                                        pnl = matrix_panel(nz,
+                                                                           rand(rng, 2, 2)))
             @test_throws DimensionMismatch PricesResult(; X = Px,
-                                                        pnl = feature_matrix_panel(nz,
-                                                                                   rand(rng,
-                                                                                        9,
-                                                                                        3,
-                                                                                        2)))
+                                                        pnl = matrix_panel(nz,
+                                                                           rand(rng, 9, 3,
+                                                                                2)))
         end
 
         @testset "both-or-neither evidence states the truth" begin
@@ -199,10 +189,9 @@ struct UnimplementedPreprocessingResult <: PortfolioOptimisers.AbstractPreproces
         @testset "ReturnsResult views" begin
             X = rand(rng, 5, 3)
             nx = ["A", "B", "C"]
-            rds = ReturnsResult(; nx = nx, X = X, pnl = feature_matrix_panel(nz, Zs))
+            rds = ReturnsResult(; nx = nx, X = X, pnl = matrix_panel(nz, Zs))
             rd3 = ReturnsResult(; nx = nx, X = X,
-                                pnl = feature_matrix_panel(nz,
-                                                           reshape(Float64.(1:30), 5, 3, 2)))
+                                pnl = matrix_panel(nz, reshape(Float64.(1:30), 5, 3, 2)))
 
             # Two-argument arity: assets only. The static shape has no observation axis;
             # the time-varying one keeps all of its rows.
@@ -225,7 +214,7 @@ struct UnimplementedPreprocessingResult <: PortfolioOptimisers.AbstractPreproces
                   panel_feature_matrix(rd3.pnl)[2][2:4, [1, 3], :]
             # The third positional index selects factors and must not touch Z.
             rdf = ReturnsResult(; nx = nx, X = X, nf = ["F1", "F2"], F = rand(rng, 5, 2),
-                                pnl = feature_matrix_panel(nz, Zs))
+                                pnl = matrix_panel(nz, Zs))
             @test panel_feature_matrix(port_opt_view(rdf, 2:4, [1, 3], 1:1).pnl)[2] ==
                   Zs[[1, 3], :]
 
@@ -242,32 +231,43 @@ struct UnimplementedPreprocessingResult <: PortfolioOptimisers.AbstractPreproces
             X = rand(rng, 5, 3)
             nx = ["A", "B", "C"]
             Zsq = Float64[1 2 3; 4 5 6; 7 8 9]
-            rdsq = ReturnsResult(; nx = nx, X = X, pnl = feature_matrix_panel(nx, Zsq))
+            sqp(labels, vals) = asset_panel([TensorPanelInput(; name = "prox",
+                                                              axis = "asset",
+                                                              labels = labels, vals = vals)])
+            rdsq = ReturnsResult(; nx = nx, X = X, pnl = sqp(nx, Zsq))
             vsq = port_opt_view(rdsq, [1, 3])
-            @test panel_feature_matrix(vsq.pnl)[2] == Zsq[[1, 3], [1, 3]]
-            @test panel_feature_matrix(vsq.pnl)[1] == ["A", "C"] == vsq.nx
-            # And the rule survives a second view, because both name vectors are sliced by
-            # the same indices and stay equal.
-            @test PortfolioOptimisers.features_are_assets(panel_feature_matrix(vsq.pnl)[1],
+            @test PortfolioOptimisers.panel_field(vsq.pnl, "prox").vals ==
+                  Zsq[[1, 3], [1, 3]]
+            @test PortfolioOptimisers.panel_field(vsq.pnl, "prox").labels ==
+                  ["A", "C"] ==
+                  vsq.nx
+            # And the rule survives a second view, because the labels and the asset names are
+            # sliced by the same indices and stay equal.
+            @test PortfolioOptimisers.features_are_assets(PortfolioOptimisers.panel_field(vsq.pnl,
+                                                                                          "prox"),
                                                           vsq.nx)
-            @test panel_feature_matrix(port_opt_view(vsq, [2]).pnl)[2] == Zsq[[3], [3]]
+            @test PortfolioOptimisers.panel_field(port_opt_view(vsq, [2]).pnl, "prox").vals ==
+                  Zsq[[3], [3]]
 
             Zsq3 = reshape(Float64.(1:45), 5, 3, 3)
-            rdsq3 = ReturnsResult(; nx = nx, X = X, pnl = feature_matrix_panel(nx, Zsq3))
+            rdsq3 = ReturnsResult(; nx = nx, X = X, pnl = sqp(nx, Zsq3))
             vsq3 = port_opt_view(rdsq3, 2:4, [1, 3])
-            @test panel_feature_matrix(vsq3.pnl)[2] == Zsq3[2:4, [1, 3], [1, 3]]
-            @test panel_feature_matrix(vsq3.pnl)[1] == ["A", "C"]
+            @test PortfolioOptimisers.panel_field(vsq3.pnl, "prox").vals ==
+                  Zsq3[2:4, [1, 3], [1, 3]]
+            @test PortfolioOptimisers.panel_field(vsq3.pnl, "prox").labels == ["A", "C"]
 
             # Equal lengths alone are not a claim that the axes mean the same thing.
-            @test !PortfolioOptimisers.features_are_assets(["f1", "f2", "f3"], nx)
-            rdns = ReturnsResult(; nx = nx, X = X,
-                                 pnl = feature_matrix_panel(["f1", "f2", "f3"], Zsq))
-            @test panel_feature_matrix(port_opt_view(rdns, [1, 3]).pnl)[2] == Zsq[[1, 3], :]
+            rdns = ReturnsResult(; nx = nx, X = X, pnl = sqp(["f1", "f2", "f3"], Zsq))
+            @test !PortfolioOptimisers.features_are_assets(PortfolioOptimisers.panel_field(rdns.pnl,
+                                                                                           "prox"),
+                                                           nx)
+            @test PortfolioOptimisers.panel_field(port_opt_view(rdns, [1, 3]).pnl,
+                                                  "prox").vals == Zsq[[1, 3], :]
         end
 
         @testset "prices_to_returns carries Z across" begin
-            prs = PricesResult(; X = Px, pnl = feature_matrix_panel(nz, Zs))
-            pr3 = PricesResult(; X = Px, pnl = feature_matrix_panel(nz, Z3))
+            prs = PricesResult(; X = Px, pnl = matrix_panel(nz, Zs))
+            pr3 = PricesResult(; X = Px, pnl = matrix_panel(nz, Z3))
 
             # Asset "B" is entirely missing and is dropped; it must take its features with
             # it, or the two matrices desynchronise silently.
@@ -299,27 +299,29 @@ struct UnimplementedPreprocessingResult <: PortfolioOptimisers.AbstractPreproces
                             100 .+ cumsum(rand(StableRNG(7), 10, 2); dims = 1),
                             ["F1", "F2"])
             @test_throws PortfolioOptimisers.IsEmptyError prices_to_returns(Pall, Fok;
-                                                                            pnl = feature_matrix_panel(nz,
-                                                                                                       Zs))
+                                                                            pnl = matrix_panel(nz,
+                                                                                               Zs))
             @test_throws ArgumentError prices_to_returns(Pall)
 
             # A surviving timestamp absent from the price clock cannot be mapped back to a
             # row of Z, and must throw rather than pair assets with another period.
-            @test_throws ArgumentError PortfolioOptimisers.feature_row_indices(Z3,
+            p3 = matrix_panel(nz, Z3)
+            ps = matrix_panel(nz, Zs)
+            @test_throws ArgumentError PortfolioOptimisers.feature_row_indices(p3,
                                                                                [Date(2019,
                                                                                      1, 1)],
                                                                                collect(ts0))
-            @test PortfolioOptimisers.feature_row_indices(Z3, ts0[3:5], collect(ts0)) == 3:5
+            @test PortfolioOptimisers.feature_row_indices(p3, ts0[3:5], collect(ts0)) == 3:5
             # The shapes with no observation axis cost nothing.
-            @test PortfolioOptimisers.feature_row_indices(Zs, ts0[3:5], collect(ts0)) ===
+            @test PortfolioOptimisers.feature_row_indices(ps, ts0[3:5], collect(ts0)) ===
                   Colon()
             @test PortfolioOptimisers.feature_row_indices(nothing, ts0[3:5],
                                                           collect(ts0)) === Colon()
         end
 
         @testset "PricesResult views and preprocessing" begin
-            pr3 = PricesResult(; X = Px, pnl = feature_matrix_panel(nz, Z3))
-            prs = PricesResult(; X = Px, pnl = feature_matrix_panel(nz, Zs))
+            pr3 = PricesResult(; X = Px, pnl = matrix_panel(nz, Z3))
+            prs = PricesResult(; X = Px, pnl = matrix_panel(nz, Zs))
 
             # Timestamp windows slice a time-varying Z positionally against the price clock.
             @test panel_feature_matrix(port_opt_view(pr3, 3:6, [1, 3]).pnl)[2] ==
@@ -354,8 +356,7 @@ struct UnimplementedPreprocessingResult <: PortfolioOptimisers.AbstractPreproces
         @testset "other ReturnsResult constructors thread Z" begin
             # returns_result_picker folds B into X; it must not lose Z on the way.
             rdb = ReturnsResult(; nx = ["A", "B"], X = rand(rng, 4, 2), nb = ["bm"],
-                                B = rand(rng, 4),
-                                pnl = feature_matrix_panel(nz, rand(rng, 2, 2)))
+                                B = rand(rng, 4), pnl = matrix_panel(nz, rand(rng, 2, 2)))
             rp = returns_result_picker(rdb, true)
             @test panel_feature_matrix(rp.pnl)[2] == panel_feature_matrix(rdb.pnl)[2]
             @test panel_feature_matrix(rp.pnl)[1] == panel_feature_matrix(rdb.pnl)[1]
@@ -363,7 +364,7 @@ struct UnimplementedPreprocessingResult <: PortfolioOptimisers.AbstractPreproces
 
             # AssetSelectorResult subselects through port_opt_view, so it is carried for free.
             rds = ReturnsResult(; nx = ["A", "B", "C"], X = rand(rng, 5, 3),
-                                pnl = feature_matrix_panel(nz, Zs))
+                                pnl = matrix_panel(nz, Zs))
             sel = apply_preprocessing(PortfolioOptimisers.AssetSelectorResult(["A", "C"]),
                                       rds)
             @test panel_feature_matrix(sel.pnl)[2] == Zs[[1, 3], :]
@@ -461,7 +462,10 @@ struct UnimplementedPreprocessingResult <: PortfolioOptimisers.AbstractPreproces
         # A time-varying feature matrix cannot be sliced without the surviving timestamps,
         # because its observation axis is parallel to the price clock positionally.
         Z3 = reshape(Float64.(1:40), 5, 4, 2)
-        @test_throws ArgumentError PortfolioOptimisers.feature_row_indices(Z3, nothing, ts)
+        @test_throws ArgumentError PortfolioOptimisers.feature_row_indices(matrix_panel(["f1",
+                                                                                         "f2"],
+                                                                                        Z3),
+                                                                           nothing, ts)
     end
 
     @testset "the preprocessing interface refuses a half-implemented estimator" begin

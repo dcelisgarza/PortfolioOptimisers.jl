@@ -1,3 +1,4 @@
+include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
 @testset "Pipeline base" begin
     using Test, PortfolioOptimisers, TimeSeries, Dates, StableRNGs
 
@@ -259,7 +260,7 @@
         nz = ["f1", "f2"]
         pipe = Pipeline(; steps = (MissingDataFilter(), PricesToReturns()))
 
-        rd = fit(pipe, PricesResult(; X = Px, pnl = feature_matrix_panel(nz, Z3))).ctx.returns
+        rd = fit(pipe, PricesResult(; X = Px, pnl = matrix_panel(nz, Z3))).ctx.returns
         @test !isnothing(rd.pnl)
         @test rd.nx == ["A1", "A3"]
         @test panel_feature_matrix(rd.pnl)[2] == Z3[2:10, [1, 3], :]
@@ -270,7 +271,7 @@
         # A static panel has no observation axis, so only its asset axis is sliced, and it
         # still carries no mask.
         Zs = Float64[1 2; 3 4; 5 6]
-        rds = fit(pipe, PricesResult(; X = Px, pnl = feature_matrix_panel(nz, Zs))).ctx.returns
+        rds = fit(pipe, PricesResult(; X = Px, pnl = matrix_panel(nz, Zs))).ctx.returns
         @test panel_feature_matrix(rds.pnl)[2] == Zs[[1, 3], :]
         @test isnothing(rds.pnl.amsk)
         @test isnothing(rds.pnl.emsk)

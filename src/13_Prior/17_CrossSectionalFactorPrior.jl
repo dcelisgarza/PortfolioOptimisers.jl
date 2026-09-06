@@ -342,8 +342,7 @@ function prior(pe::CrossSectionalFactorPrior, rd::ReturnsResult; kwargs...)
                         ens = f_pr.ens, kld = f_pr.kld, ow = f_pr.ow)
     return LowOrderPrior(; X = Xs, o_X = Xr, mu = lift.mu + rr.b, sigma = lift.sigma,
                          chol = lift.chol, w = f_pr.w, ens = f_pr.ens, kld = f_pr.kld,
-                         ow = f_pr.ow, rr = rr, fpr = fpr,
-                         pnl = port_opt_view(pnl, rw[r], :, false))
+                         ow = f_pr.ow, rr = rr, fpr = fpr)
 end
 """
     prior(pe::CrossSectionalFactorPrior, X::MatNum, args...; kwargs...) -> Union{}

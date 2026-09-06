@@ -453,6 +453,101 @@ function TensorPanelField(; name::AbstractString, axis::AbstractString, labels::
     return TensorPanelField(name, axis, labels, groups, vals, omsk)
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Reads a static array as though it carried a leading observation axis, storing it once.
+
+`RepeatedLeading` is the **lazy lift**: it is how a static Panel Field input joins a time-varying [`AssetPanel`](@ref) without copying itself `T` times. It stores the static array as `parent` and answers `size` as `(n, size(parent)...)`, so `R[t, i]` reads `parent[i]` for every `t`. A `view` of it is an ordinary `SubArray`, which [`port_opt_view`](@ref) slices like any other value array.
+
+It is unexported and Base-only: it owns `size`, `getindex` and `show`, and nothing else in the library dispatches on it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    RepeatedLeading(parent::AbstractArray, n::Integer) -> RepeatedLeading
+
+# Related
+
+  - [`AssetPanel`](@ref)
+  - [`asset_panel`](@ref)
+  - [`panel_field_lift`](@ref)
+  - [`AbstractPanelField`](@ref)
+"""
+struct RepeatedLeading{T, N, A} <: AbstractArray{T, N}
+    """
+    The static array, stored once.
+    """
+    parent::A
+    """
+    Length of the leading observation axis.
+    """
+    n::Int
+end
+function RepeatedLeading(parent::AbstractArray{T, M}, n::Integer) where {T, M}
+    @argcheck(n >= one(n),
+              DomainError(n,
+                          "a lazy lift needs at least one observation to lift a static Panel Field onto"))
+    return RepeatedLeading{T, M + 1, typeof(parent)}(parent, Int(n))
+end
+function Base.size(R::RepeatedLeading)
+    return (R.n, size(R.parent)...)
+end
+Base.@propagate_inbounds function Base.getindex(R::RepeatedLeading, i::Integer,
+                                                j::Integer...)
+    return R.parent[j...]
+end
+function Base.IndexStyle(::Type{<:RepeatedLeading})
+    return IndexCartesian()
+end
+function Base.show(io::IO, R::RepeatedLeading)
+    return print(io, "RepeatedLeading($(R.n) × $(join(size(R.parent), " × ")))")
+end
+function Base.show(io::IO, ::MIME"text/plain", R::RepeatedLeading)
+    return show(io, R)
+end
+"""
+    panel_field_lift(f::NumericPanelField, n::Integer) -> NumericPanelField
+    panel_field_lift(f::CategoricalPanelField, n::Integer) -> CategoricalPanelField
+    panel_field_lift(f::TensorPanelField, n::Integer) -> TensorPanelField
+
+Lift a static Panel Field onto `n` observations, lazily.
+
+A static input that meets a time-varying one, or that meets the two universe masks, joins the panel at the panel's observation count. The values are wrapped in a [`RepeatedLeading`](@ref), which stores them once, and the observed mask is dropped: every cell of a static input was observed, so `nothing` is the mask that says so.
+
+# Algorithm
+
+The method that Julia selects is the algorithm. Each kind rebuilds itself with its value array wrapped in a [`RepeatedLeading`](@ref) and its observed mask set to `nothing`.
+
+# Arguments
+
+  - `f`: The static Panel Field.
+  - `n`: Length of the observation axis to lift onto.
+
+# Returns
+
+  - A Panel Field of the same kind, over `n` observations.
+
+# Related
+
+  - [`RepeatedLeading`](@ref)
+  - [`asset_panel`](@ref)
+  - [`AbstractPanelField`](@ref)
+"""
+function panel_field_lift(f::NumericPanelField, n::Integer)
+    return NumericPanelField(; name = f.name, vals = RepeatedLeading(f.vals, n))
+end
+function panel_field_lift(f::CategoricalPanelField, n::Integer)
+    return CategoricalPanelField(; name = f.name, levels = f.levels,
+                                 codes = RepeatedLeading(f.codes, n))
+end
+function panel_field_lift(f::TensorPanelField, n::Integer)
+    return TensorPanelField(; name = f.name, axis = f.axis, labels = f.labels,
+                            groups = f.groups, vals = RepeatedLeading(f.vals, n))
+end
+"""
     panel_field_axes(f::NumericPanelField) -> Tuple{Vararg{Int}}
     panel_field_axes(f::CategoricalPanelField) -> Tuple{Vararg{Int}}
     panel_field_axes(f::TensorPanelField) -> Tuple{Vararg{Int}}
@@ -616,6 +711,39 @@ function panel_field_stack!(Z::AbstractArray, f::TensorPanelField, cols::VecInt)
     return nothing
 end
 """
+    panel_onehot(f::CategoricalPanelField) -> Array{Float64}
+
+Build the one-hot block a categorical Panel Field contributes to a derived Feature Matrix.
+
+One column per level, `1.0` where the cell carries that level and `0.0` elsewhere: `assets × levels` for a static field, `observations × assets × levels` for a time-varying one. The codes are the storage and this is the matrix form, built only where a matrix is needed.
+
+# Algorithm
+
+ 1. Allocate the zero array, the codes' shape with the levels appended.
+ 2. Write `1.0` at each cell's own level.
+
+# Arguments
+
+  - `f`: The categorical Panel Field.
+
+# Returns
+
+  - `H::Array{Float64}`: The one-hot block.
+
+# Related
+
+  - [`CategoricalPanelField`](@ref)
+  - [`panel_field_stack!`](@ref)
+  - [`collapse_panel_field`](@ref)
+"""
+function panel_onehot(f::CategoricalPanelField)
+    H = zeros(Float64, size(f.codes)..., length(f.levels))
+    for i in CartesianIndices(f.codes)
+        @inbounds H[i, f.codes[i]] = 1.0
+    end
+    return H
+end
+"""
     panel_field_stack_observed!(Z::AbstractArray, f::AbstractPanelField, cols::VecInt) -> nothing
 
 Write one Panel Field's observed mask into a derived Feature Matrix, as `0`/`1` columns.
@@ -702,27 +830,28 @@ function panel_array_view(A::AbstractMatrix, i, j)
     return view(A, i, j)
 end
 """
-    panel_tensor_view(A::Nothing, i, j) -> nothing
-    panel_tensor_view(A::AbstractMatrix, i, j) -> SubArray
-    panel_tensor_view(A::AbstractArray{<:Any, 3}, i, j) -> SubArray
+    panel_tensor_view(A::Nothing, i, j, k) -> nothing
+    panel_tensor_view(A::AbstractMatrix, i, j, k) -> SubArray
+    panel_tensor_view(A::AbstractArray{<:Any, 3}, i, j, k) -> SubArray
 
-View one [`TensorPanelField`](@ref) array over the observations `i` and the assets `j`.
+View one [`TensorPanelField`](@ref) array over the observations `i`, the assets `j` and the labels `k`.
 
-A tensor Panel Field keeps its labels on its **trailing** axis, so its asset axis is the first one when it is static and the second when it is time-varying. The label axis is never touched: it addresses the features, and an asset view does not reach it.
+A tensor Panel Field keeps its labels on its **trailing** axis, so its asset axis is the first one when it is static and the second when it is time-varying. The label index is a `Colon` for every field but the square one, whose labels *are* the assets; [`features_are_assets`](@ref) states when that holds.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
  1. `A` is `nothing`: return `nothing`.
- 2. `A` is a matrix, which is `assets × labels`: return `view(A, j, :)`.
- 3. `A` is a 3-dimensional array, which is `observations × assets × labels`: return `view(A, i, j, :)`.
+ 2. `A` is a matrix, which is `assets × labels`: return `view(A, j, k)`.
+ 3. `A` is a 3-dimensional array, which is `observations × assets × labels`: return `view(A, i, j, k)`.
 
 # Arguments
 
   - `A`: The array to view, or `nothing`.
   - `i`: Observation index.
   - `j`: Asset index.
+  - `k`: Label index.
 
 # Returns
 
@@ -734,23 +863,25 @@ The method that Julia selects is the algorithm.
   - [`panel_array_view`](@ref)
   - [`TensorPanelField`](@ref)
 """
-function panel_tensor_view(::Nothing, ::Any, ::Any)
+function panel_tensor_view(::Nothing, ::Any, ::Any, ::Any)
     return nothing
 end
-function panel_tensor_view(A::AbstractMatrix, ::Any, j)
-    return view(A, j, :)
+function panel_tensor_view(A::AbstractMatrix, ::Any, j, k)
+    return view(A, j, k)
 end
-function panel_tensor_view(A::AbstractArray{<:Any, 3}, i, j)
-    return view(A, i, j, :)
+function panel_tensor_view(A::AbstractArray{<:Any, 3}, i, j, k)
+    return view(A, i, j, k)
 end
 """
-    panel_field_view(f::NumericPanelField, i, j) -> NumericPanelField
-    panel_field_view(f::CategoricalPanelField, i, j) -> CategoricalPanelField
-    panel_field_view(f::TensorPanelField, i, j) -> TensorPanelField
+    panel_field_view(f::NumericPanelField, i, j, nx) -> NumericPanelField
+    panel_field_view(f::CategoricalPanelField, i, j, nx) -> CategoricalPanelField
+    panel_field_view(f::TensorPanelField, i, j, nx) -> TensorPanelField
 
 Return a view of one Panel Field over the observations `i` and the assets `j`.
 
-A static Panel Field has no observation axis, so its caller passes a `Colon` for `i`. The trailing label axis of a tensor Panel Field is not touched: it addresses the features, and an asset view does not reach it.
+A static Panel Field has no observation axis, so its caller passes a `Colon` for `i`.
+
+**The square case is derived here, by name.** A tensor Panel Field whose labels are the carrier's asset names ([`features_are_assets`](@ref)) is sliced on its label axis by the same asset index, together with its labels; its groups are dropped, because a group of the full factor axis says nothing about a cut asset axis. Every other field's trailing axis addresses features, and an asset view does not reach it.
 
 # Algorithm
 
@@ -761,6 +892,7 @@ The method that Julia selects is the algorithm, and each kind views its own valu
   - `f`: The Panel Field.
   - `i`: Observation index.
   - `j`: Asset index.
+  - `nx`: The carrier's asset names, or `nothing`. Read for the square case alone.
 
 # Returns
 
@@ -773,19 +905,63 @@ The method that Julia selects is the algorithm, and each kind views its own valu
   - [`port_opt_view`](@ref)
   - [`AssetPanel`](@ref)
 """
-function panel_field_view(f::NumericPanelField, i, j)
+function panel_field_view(f::NumericPanelField, i, j, ::Any)
     return NumericPanelField(; name = f.name, vals = panel_array_view(f.vals, i, j),
                              omsk = panel_array_view(f.omsk, i, j))
 end
-function panel_field_view(f::CategoricalPanelField, i, j)
+function panel_field_view(f::CategoricalPanelField, i, j, ::Any)
     return CategoricalPanelField(; name = f.name, levels = f.levels,
                                  codes = panel_array_view(f.codes, i, j),
                                  omsk = panel_array_view(f.omsk, i, j))
 end
-function panel_field_view(f::TensorPanelField, i, j)
-    return TensorPanelField(; name = f.name, axis = f.axis, labels = f.labels,
-                            groups = f.groups, vals = panel_tensor_view(f.vals, i, j),
-                            omsk = panel_tensor_view(f.omsk, i, j))
+function panel_field_view(f::TensorPanelField, i, j, nx::Option{<:VecStr})
+    sq = features_are_assets(f, nx)
+    k = sq ? j : Colon()
+    return TensorPanelField(; name = f.name, axis = f.axis,
+                            labels = sq ? f.labels[j] : f.labels,
+                            groups = sq || isnothing(f.groups) ? nothing : f.groups,
+                            vals = panel_tensor_view(f.vals, i, j, k),
+                            omsk = panel_tensor_view(f.omsk, i, j, k))
+end
+"""
+    features_are_assets(f::TensorPanelField, nx::Option{<:VecStr}) -> Bool
+    features_are_assets(f::AbstractPanelField, nx) -> Bool
+
+Report whether one Panel Field's trailing axis *is* the asset axis, so a view must slice both.
+
+True when a tensor Panel Field's labels equal the asset names, which is what a square phylogeny or adjacency matrix put on a carrier produces: an `assets × assets` block whose labels are "adjacent to asset ``k``". Subselecting assets without also subselecting that axis would leave the columns pointing at the full universe while the rows point at the subset — a silently wrong distance rather than an error.
+
+The fact is **derived**, never recorded. Comparing the names rather than the axis lengths is what makes it derivable: a rectangular-by-accident coincidence of counts is not a claim that the two axes mean the same thing, and the comparison stays correct under repeated views, since both name vectors are sliced by the same indices. A numeric or categorical Panel Field has no trailing axis, so it is never square.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. The field is not a tensor: return `false`.
+ 2. `nx` is `nothing`: return `false`. A carrier that does not name its assets makes no claim.
+ 3. Return `f.labels == nx`.
+
+# Arguments
+
+  - `f`: The Panel Field.
+  - `nx`: The carrier's asset names, or `nothing`.
+
+# Returns
+
+  - `Bool`.
+
+# Related
+
+  - [`TensorPanelField`](@ref)
+  - [`panel_field_view`](@ref)
+  - [`port_opt_view`](@ref)
+  - [`FeatureDistance`](@ref)
+"""
+function features_are_assets(f::TensorPanelField, nx::Option{<:VecStr})::Bool
+    return !isnothing(nx) && f.labels == nx
+end
+function features_are_assets(::AbstractPanelField, ::Any)::Bool
+    return false
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1047,7 +1223,6 @@ The method that Julia selects decides whether there is anything to derive.
   - [`panel_field_observed_labels`](@ref)
   - [`panel_field_stack!`](@ref)
   - [`panel_claim!`](@ref)
-  - [`feature_matrix_panel`](@ref)
 """
 function panel_feature_matrix(::Nothing)
     return nothing, nothing
@@ -1069,106 +1244,6 @@ function panel_feature_matrix(pnl::AssetPanel)
         end
     end
     return nz, Z
-end
-"""
-    assert_feature_matrix_columns(nz::VecStr, Z::MatNum_Arr3Num) -> nothing
-
-Check that a Feature Matrix has one usable name per column.
-
-# Algorithm
-
- 1. Check the names with [`assert_panel_labels`](@ref).
- 2. Check that their count matches the trailing axis of `Z`.
-
-# Arguments
-
-  - `nz`: One name per column of `Z`.
-  - `Z`: The Feature Matrix.
-
-# Validation
-
-  - `nz` is non-empty, holds no empty entry and holds no repeat. See [`assert_panel_labels`](@ref).
-  - `length(nz) == size(Z, ndims(Z))`. Raises a `DimensionMismatch`.
-
-# Returns
-
-  - `nothing`.
-
-# Related
-
-  - [`feature_matrix_panel`](@ref)
-  - [`assert_panel_labels`](@ref)
-  - [`MatNum_Arr3Num`](@ref)
-  - [`VecStr`](@ref)
-"""
-function assert_feature_matrix_columns(nz::VecStr, Z::MatNum_Arr3Num)::Nothing
-    assert_panel_labels(nz, :nz)
-    @argcheck(length(nz) == size(Z, ndims(Z)),
-              DimensionMismatch("a Feature Matrix needs one name per column, got length(nz) = $(length(nz)) and $(size(Z, ndims(Z))) column(s)"))
-    return nothing
-end
-"""
-    feature_matrix_panel(nz::VecStr, Z::MatNum; amsk = nothing, emsk = nothing) -> AssetPanel
-    feature_matrix_panel(nz::VecStr, Z::Arr3Num; amsk = nothing, emsk = nothing) -> AssetPanel
-
-Build an [`AssetPanel`](@ref) of one [`NumericPanelField`](@ref) per column of a Feature Matrix.
-
-The inverse of [`panel_feature_matrix`](@ref), and exact: a numeric Panel Field contributes one column under its own name, so the round trip returns the names and the values it was given. It is what a routine that produces a bare matrix — a producer, or a meta-optimiser collapse onto a synthetic universe — puts that matrix on a carrier through.
-
-# Algorithm
-
-The method that Julia selects is the algorithm.
-
- 1. `Z` is a `MatNum`, which is `assets × features`: build a static panel of one numeric Panel Field per column, and check that no mask was given.
- 2. `Z` is an `Arr3Num`, which is `observations × assets × features`: build a time-varying panel of one numeric Panel Field per column, and fill in all-`true` masks when none are given.
-
-# Arguments
-
-  - `nz`: One name per column of `Z`.
-  - `Z`: The Feature Matrix.
-  - `amsk`: The active mask, or `nothing`.
-  - `emsk`: The estimation mask, or `nothing`.
-
-# Validation
-
-  - `nz` names the columns of `Z`. See [`assert_feature_matrix_columns`](@ref).
-  - `amsk` and `emsk` are `nothing` when `Z` is static. Raises a `DimensionMismatch`.
-
-# Returns
-
-  - `pnl::AssetPanel`: The Asset Panel.
-
-# Related
-
-  - [`AssetPanel`](@ref)
-  - [`NumericPanelField`](@ref)
-  - [`panel_feature_matrix`](@ref)
-  - [`assert_feature_matrix_columns`](@ref)
-  - [`MatNum`](@ref)
-  - [`Arr3Num`](@ref)
-  - [`Option`](@ref)
-"""
-function feature_matrix_panel(nz::VecStr, Z::MatNum;
-                              amsk::Option{<:AbstractMatrix{Bool}} = nothing,
-                              emsk::Option{<:AbstractMatrix{Bool}} = nothing)
-    assert_feature_matrix_columns(nz, Z)
-    @argcheck(isnothing(amsk) && isnothing(emsk),
-              DimensionMismatch("a static assets × features Feature Matrix builds a static Asset Panel, which carries no universe mask; pass a time-varying observations × assets × features Z instead"))
-    return AssetPanel(;
-                      pf = [NumericPanelField(; name = String(nz[k]), vals = view(Z, :, k))
-                            for k in eachindex(nz)])
-end
-function feature_matrix_panel(nz::VecStr, Z::Arr3Num;
-                              amsk::Option{<:AbstractMatrix{Bool}} = nothing,
-                              emsk::Option{<:AbstractMatrix{Bool}} = nothing)
-    assert_feature_matrix_columns(nz, Z)
-    T, N = size(Z, 1), size(Z, 2)
-    return AssetPanel(;
-                      pf = [NumericPanelField(; name = String(nz[k]),
-                                              vals = view(Z, :, :, k))
-                            for k in eachindex(nz)],
-                      amsk = isnothing(amsk) ? trues(T, N) : amsk,
-                      emsk = isnothing(emsk) ? trues(T, N) : emsk)
 end
 """
     panel_mask_view(msk::Nothing, i, j) -> nothing
@@ -1203,26 +1278,25 @@ function panel_mask_view(msk::AbstractMatrix{Bool}, i, j)
 end
 """
     port_opt_view(pnl::AssetPanel, i) -> AssetPanel
-    port_opt_view(pnl::AssetPanel, i, j, sq::Bool = false) -> AssetPanel
+    port_opt_view(pnl::AssetPanel, i, j, nx::Option{<:VecStr} = nothing) -> AssetPanel
 
 Return a view of the [`AssetPanel`](@ref) over the observations `i` and the assets `j`.
 
 Every Panel Field owns its values, so an asset view reaches them all: the one-argument arity keeps every observation and selects assets, and the three-argument arity selects both. A static panel has no observation axis and ignores the observation index, which is the same asymmetry the two [`port_opt_view`](@ref) arities have for `ivpa`.
 
-`sq` says that the panel's Panel Fields **are** the assets, one per asset, which is what a square Feature Matrix becomes on a carrier. The Panel Field vector is then selected by the same asset index, so the feature axis follows the universe.
+`nx` is the carrier's asset names, and it is what makes the **square case** derivable: a tensor Panel Field whose labels are those names is sliced on its label axis by the same asset index. Nothing records the fact, and no carrier carries a flag for it; [`features_are_assets`](@ref) states the comparison.
 
 # Algorithm
 
- 1. Select the Panel Fields by `j` when `sq`, and keep them all otherwise.
- 2. View each surviving Panel Field with [`panel_field_view`](@ref), passing a `Colon` for the observation index of a static panel.
- 3. View both masks with [`panel_mask_view`](@ref), which keeps them `nothing` when the panel is static.
+ 1. View each Panel Field with [`panel_field_view`](@ref), passing a `Colon` for the observation index of a static panel and `nx` for the square case.
+ 2. View both masks with [`panel_mask_view`](@ref), which keeps them `nothing` when the panel is static.
 
 # Arguments
 
   - `pnl`: The Asset Panel.
   - `i`: Observation index.
   - `j`: Asset index.
-  - `sq`: Whether the Panel Fields are the assets.
+  - `nx`: The carrier's asset names, or `nothing`.
 
 # Returns
 
@@ -1237,12 +1311,11 @@ Every Panel Field owns its values, so an asset view reaches them all: the one-ar
   - [`ReturnsResult`](@ref)
 """
 function port_opt_view(pnl::AssetPanel, i)
-    return port_opt_view(pnl, :, i, false)
+    return port_opt_view(pnl, :, i, nothing)
 end
-function port_opt_view(pnl::AssetPanel, i, j, sq::Bool = false)
-    pf = sq ? view(pnl.pf, j) : pnl.pf
+function port_opt_view(pnl::AssetPanel, i, j, nx::Option{<:VecStr} = nothing)
     it = panel_is_static(pnl) ? Colon() : i
-    return AssetPanel(; pf = [panel_field_view(f, it, j) for f in pf],
+    return AssetPanel(; pf = [panel_field_view(f, it, j, nx) for f in pnl.pf],
                       amsk = panel_mask_view(pnl.amsk, i, j),
                       emsk = panel_mask_view(pnl.emsk, i, j))
 end
@@ -1307,4 +1380,4 @@ function check_asset_panel(pnl::AssetPanel, na::Option{<:Integer}, nobs::Option{
     return nothing
 end
 export AssetPanel, NumericPanelField, CategoricalPanelField, TensorPanelField, panel_field,
-       panel_feature_matrix, feature_matrix_panel
+       panel_feature_matrix

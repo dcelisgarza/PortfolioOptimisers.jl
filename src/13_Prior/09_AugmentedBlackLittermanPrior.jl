@@ -248,7 +248,6 @@ AugmentedBlackLittermanPrior
                │   utfkey ┼ String: "uf"
                │    cfkey ┼ String: "ncf"
                │   ucfkey ┼ String: "ucf"
-               │     zkey ┼ String: "nz"
                │     dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"], "nf" => ["F1", "F2"])
   a_views_conf ┼ nothing
   f_views_conf ┼ nothing
@@ -552,8 +551,7 @@ function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int
     # directly instead of going through [`forward_prior`](@ref).
     return LowOrderPrior(; X = posterior_X, o_X = X, mu = posterior_mu,
                          sigma = posterior_sigma, w = a_prior.w, ens = a_prior.ens,
-                         kld = a_prior.kld, ow = a_prior.ow, rr = rr, fpr = fpr,
-                         pnl = a_prior.pnl)
+                         kld = a_prior.kld, ow = a_prior.ow, rr = rr, fpr = fpr)
 end
 
 function factor_residual_config(::AugmentedBlackLittermanPrior)

@@ -2233,14 +2233,11 @@
         @test sets.utfkey == "uf"
         @test sets.cfkey == "ncf"
         @test sets.ucfkey == "ucf"
-        @test sets.zkey == "nz"
 
-        # Both factor axes and the feature axis are optional: the asset axis alone must
-        # still construct.
+        # Both factor axes are optional: the asset axis alone must still construct.
         @test UniverseSets(; dict = Dict("nx" => ["A", "B"])).tfkey == "nf"
         @test UniverseSets(; dict = Dict("nx" => ["A", "B"])).cfkey == "ncf"
         @test UniverseSets(; dict = Dict("nx" => ["A", "B"])).ucfkey == "ucf"
-        @test UniverseSets(; dict = Dict("nx" => ["A", "B"])).zkey == "nz"
 
         # The two factor axes are never validated against each other: declaring one alone
         # is a complete, valid object. A problem with only a cross-sectional model is the
@@ -2250,16 +2247,13 @@
                                        "ncf_family" => ["Style"],
                                        "ucf_family" => ["Style"])) isa UniverseSets
 
-        # `zkey` carries *no* length rule and no unique-entry sibling -- nothing is written
-        # over the feature axis, so its list is free to be any length -- but it does carry
-        # `allunique`, so `ReturnsResult`'s own `nz` check cannot be reached with a
-        # duplicate.
-        @test UniverseSets(; dict = Dict("nx" => ["A", "B"], "nz" => ["a", "b", "c"])) isa
-              UniverseSets
-        @test_throws ArgumentError UniverseSets(;
-                                                dict = Dict("nx" => ["A", "B"],
-                                                            "nz" => ["a", "a"]))
-        # And a `zkey`-prefixed key is nothing special: a plain, axis-blind group.
+        # `#806` deleted the declared feature axis: a taxonomy reaches the Asset Panel
+        # through `panel_input`, which reads one `xkey`-prefixed key as one Panel Field, and
+        # the panel names its own columns. So `nz` is a plain, axis-blind group like any
+        # other, of any length and with no uniqueness rule of its own.
+        @test !hasproperty(UniverseSets(; dict = Dict("nx" => ["A", "B"])), :zkey)
+        @test UniverseSets(; dict = Dict("nx" => ["A", "B"], "nz" => ["a", "a"])).dict["nz"] ==
+              ["a", "a"]
         @test UniverseSets(; dict = Dict("nx" => ["A", "B"], "nz_whatever" => ["x"])).dict["nz_whatever"] ==
               ["x"]
 
@@ -2310,28 +2304,19 @@
                                   e
                               end))
 
-        # All seven keys must be pairwise prefix-disjoint, in both orders -- 42 ordered
-        # checks since the two cross-sectional keys joined the loop. In turn: two keys
-        # equal, xkey == tfkey, tfkey prefixes utfkey, xkey prefixes tfkey, uxkey prefixes
-        # utfkey, zkey == xkey, zkey prefixes xkey, xkey prefixes zkey, cfkey == tfkey,
-        # cfkey prefixes ucfkey, tfkey prefixes cfkey, ucfkey prefixes zkey.
-        for (xkey, uxkey, tfkey, utfkey, cfkey, ucfkey, zkey) in
-            (("nx", "nx", "nf", "uf", "ncf", "ucf", "nz"),
-             ("nx", "ux", "nx", "uf", "ncf", "ucf", "nz"),
-             ("nx", "ux", "nf", "nf_", "ncf", "ucf", "nz"),
-             ("n", "ux", "nf", "uf", "ncf", "ucf", "nz"),
-             ("nx", "u", "nf", "uf", "ncf", "ucf", "nz"),
-             ("nx", "ux", "nf", "uf", "ncf", "ucf", "nx"),
-             ("nx", "ux", "nf", "uf", "ncf", "ucf", "n"),
-             ("nx", "ux", "nf", "uf", "ncf", "ucf", "nx_z"),
-             ("nx", "ux", "nf", "uf", "nf", "ucf", "nz"),
-             ("nx", "ux", "nf", "uf", "ncf", "ncf_", "nz"),
-             ("nx", "ux", "nc", "uf", "ncf", "ucf", "nz"),
-             ("nx", "ux", "nf", "uf", "ncf", "ucf", "ucf_z"))
+        # All six keys must be pairwise prefix-disjoint, in both orders -- 30 ordered
+        # checks. In turn: two keys equal, xkey == tfkey, tfkey prefixes utfkey, xkey
+        # prefixes tfkey, uxkey prefixes utfkey, cfkey == tfkey, cfkey prefixes ucfkey,
+        # tfkey prefixes cfkey.
+        for (xkey, uxkey, tfkey, utfkey, cfkey, ucfkey) in
+            (("nx", "nx", "nf", "uf", "ncf", "ucf"), ("nx", "ux", "nx", "uf", "ncf", "ucf"),
+             ("nx", "ux", "nf", "nf_", "ncf", "ucf"), ("n", "ux", "nf", "uf", "ncf", "ucf"),
+             ("nx", "u", "nf", "uf", "ncf", "ucf"), ("nx", "ux", "nf", "uf", "nf", "ucf"),
+             ("nx", "ux", "nf", "uf", "ncf", "ncf_"),
+             ("nx", "ux", "nc", "uf", "ncf", "ucf"))
             @test_throws ArgumentError UniverseSets(; xkey = xkey, uxkey = uxkey,
                                                     tfkey = tfkey, utfkey = utfkey,
                                                     cfkey = cfkey, ucfkey = ucfkey,
-                                                    zkey = zkey,
                                                     dict = Dict("nx" => ["A", "B"],
                                                                 "n" => ["A", "B"]))
         end
@@ -2350,14 +2335,11 @@
         @test v.dict["ncf_family"] === sets.dict["ncf_family"]
         @test v.dict["ucf_family"] === sets.dict["ucf_family"]
         @test v.dict["defensive"] === sets.dict["defensive"]
-        # The feature axis is bit-identical too, but for a *different* reason: some of its
-        # nodes are assets, and it still passes through because the axis is declared rather
-        # than derived. Hence `AAPL` survives even in a view that keeps it, and would
-        # survive as an all-zero column in one that did not.
+        # `nz` is a plain group now, so it passes through for the ordinary reason: nothing
+        # is written over it and an asset index has no meaning on it.
         @test v.dict["nz"] === sets.dict["nz"]
-        @test (v.xkey, v.uxkey, v.tfkey, v.utfkey, v.cfkey, v.ucfkey, v.zkey) ==
-              (sets.xkey, sets.uxkey, sets.tfkey, sets.utfkey, sets.cfkey, sets.ucfkey,
-               sets.zkey)
+        @test (v.xkey, v.uxkey, v.tfkey, v.utfkey, v.cfkey, v.ucfkey) ==
+              (sets.xkey, sets.uxkey, sets.tfkey, sets.utfkey, sets.cfkey, sets.ucfkey)
 
         # A view collapsing the asset universe to one sector recomputes only `ux_sector`.
         v = PortfolioOptimisers.port_opt_view(sets, [1, 2])
@@ -2368,7 +2350,6 @@
         # Non-default axis keys are honoured, not just the defaults.
         alt = UniverseSets(; xkey = "assets", uxkey = "uassets", tfkey = "factors",
                            utfkey = "ufactors", cfkey = "styles", ucfkey = "ustyles",
-                           zkey = "features",
                            dict = Dict("assets" => ["A", "B"],
                                        "assets_sector" => ["Tech", "Fin"],
                                        "factors" => ["F1"], "factors_style" => ["Mom"],
@@ -2385,7 +2366,6 @@
         @test v.dict["features"] === alt.dict["features"]
         @test v.cfkey == "styles"
         @test v.ucfkey == "ustyles"
-        @test v.zkey == "features"
     end
     @testset "factor_axis_key" begin
         sets = UniverseSets(;

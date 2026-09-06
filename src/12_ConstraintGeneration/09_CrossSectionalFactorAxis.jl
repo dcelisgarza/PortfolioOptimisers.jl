@@ -133,7 +133,7 @@ function cross_sectional_factor_sets(factors::AbstractVector{<:Pair}, rd::Return
     else
         UniverseSets(; xkey = sets.xkey, uxkey = sets.uxkey, tfkey = sets.tfkey,
                      utfkey = sets.utfkey, cfkey = sets.cfkey, ucfkey = sets.ucfkey,
-                     zkey = sets.zkey, dict = dict)
+                     dict = dict)
     end
 end
 """

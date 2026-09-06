@@ -1441,8 +1441,7 @@ end
                                            tau = 1 / size(rd.X, 1),
                                            views = LinearConstraintEstimator(;
                                                                              val = ["MTUM == 0.0001"])),
-               EntropyPoolingPrior(; pe = FactorPrior()),
-               FeaturePrior(; pe = FactorPrior(), ze = RegressionFeatures()))
+               EntropyPoolingPrior(; pe = FactorPrior()))
         prf = prior(pe, rd)
         @test prf.fpr isa LowOrderPrior
         @test prf.f_mu === prf.fpr.mu
@@ -2284,8 +2283,8 @@ end
     =#
     pool = PortfolioOptimisers.prior_result_property_pool()
     @test pool ==
-          [:X, :o_X, :mu, :sigma, :chol, :w, :ens, :kld, :ow, :rr, :fpr, :pnl, :pr, :kt,
-           :D2, :L2, :S2, :sk, :V, :skmp]
+          [:X, :o_X, :mu, :sigma, :chol, :w, :ens, :kld, :ow, :rr, :fpr, :pr, :kt, :D2, :L2,
+           :S2, :sk, :V, :skmp]
     @test allunique(pool)
     # `fpr` is a field of both carriers, so the concatenation is not already unique.
     @test :fpr in fieldnames(LowOrderPrior)
@@ -2832,8 +2831,7 @@ lifted through the loadings. Sweep ticket #536.
         # `factor_lift`'s Cholesky identity survives the Black-Litterman moments, and the
         # residual block reaches the factor and the covariance together.
         @test isapprox(transpose(pr.chol) * pr.chol, pr.sigma; atol = 1e-15)
-        # No `Z`, and the factor block drops `chol`.
-        @test isnothing(panel_feature_matrix(pr.pnl)[2])
+        # The factor block drops `chol`.
         @test isnothing(pr.fpr.chol)
     end
     # The residual block is what separates the two branches.

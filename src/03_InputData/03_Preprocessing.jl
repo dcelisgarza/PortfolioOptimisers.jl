@@ -81,99 +81,12 @@ function check_names_and_returns_matrix(names::Option{<:VecStr}, mat::Option{<:M
     return nothing
 end
 """
-    features_are_assets(nz::Option{<:VecStr}, nx::Option{<:VecStr}) -> Bool
+    feature_row_indices(pnl::Nothing, ts_new, ts_old) -> Colon
+    feature_row_indices(pnl::AssetPanel, ts_new, ts_old) -> Union{Colon, VecInt}
 
-Report whether the feature axis *is* the asset axis, so a view must slice both.
+Recover the positional row indices of a time-varying [`AssetPanel`](@ref) from a timestamp window.
 
-True when the feature names equal the asset names, which is what a square phylogeny or adjacency matrix reused as a feature source produces: an `assets × assets` matrix whose features are "adjacent to asset ``k``". Subselecting assets without also subselecting the feature axis would leave the columns pointing at the full universe while the rows point at the subset — a silently wrong distance rather than an error.
-
-Compares the names rather than the axis lengths: a rectangular-by-accident coincidence of counts is not a claim that the axes mean the same thing, and the comparison stays correct under repeated views, since both name vectors are sliced by the same indices.
-
-# Algorithm
-
- 1. If either `nz` or `nx` is `nothing`, return `false`. A carrier that names only one of the two axes makes no claim that the two are the same axis.
- 2. Return `nz == nx`, the elementwise equality of the two name vectors.
-
-# Arguments
-
-  - `nz`: Feature names.
-  - `nx`: Asset names.
-
-# Returns
-
-  - `Bool`.
-
-# Related
-
-  - [`port_opt_view`](@ref)
-  - [`FeatureDistance`](@ref)
-"""
-function features_are_assets(nz::Option{<:VecStr}, nx::Option{<:VecStr})::Bool
-    return !isnothing(nz) && !isnothing(nx) && nz == nx
-end
-"""
-    feature_matrix_view(Z::Nothing, sq::Bool, i, j)
-    feature_matrix_view(Z::MatNum, sq::Bool, i, j)
-    feature_matrix_view(Z::MatNum, sq::Bool, i, j::Colon)
-    feature_matrix_view(Z::Arr3Num, sq::Bool, i, j)
-    feature_matrix_view(Z::Arr3Num, sq::Bool, i, j::Colon)
-
-Subselect a carried feature matrix by observations `i` and assets `j`.
-
-`Z` is assets-major, so the asset index `j` addresses axis 1 of a static feature matrix and axis 2 of a time-varying one. The static shape has no observation axis and therefore ignores `i` — the same asymmetry the two [`port_opt_view`](@ref) arities have for `ivpa`.
-
-When `sq` is `true` the feature axis is the asset axis ([`features_are_assets`](@ref)) and is sliced by `j` as well. A `Colon` asset index touches neither axis, so a static feature matrix passes through unchanged rather than being wrapped in a no-op view — the same passthrough `ivpa` gets when only observations are selected.
-
-# Algorithm
-
-The method that Julia selects is the algorithm. Each step is one method, and no method copies `Z`.
-
- 1. `Z` is `nothing`: return `nothing`.
- 2. `Z` is a `MatNum` and `j` is a `Colon`: return `Z` itself. The asset index reaches neither axis, so no view is built.
- 3. `Z` is a `MatNum`, which is `assets × features`: return `view(Z, j, j)` when `sq` is `true`, and `view(Z, j, :)` otherwise. Axis 1 is the assets, and axis 2 is the features. The observation index `i` is not read, because a static feature matrix has no observation axis.
- 4. `Z` is an `Arr3Num` and `j` is a `Colon`: return `view(Z, i, :, :)`. Only the leading observation axis is selected.
- 5. `Z` is an `Arr3Num`, which is `observations × assets × features`: return `view(Z, i, j, j)` when `sq` is `true`, and `view(Z, i, j, :)` otherwise. Axis 1 is the observations, axis 2 is the assets, and axis 3 is the features.
-
-# Arguments
-
-  - `Z`: Feature matrix.
-  - `sq`: Whether the feature axis is the asset axis.
-  - `i`: Observation indices.
-  - `j`: Asset indices.
-
-# Returns
-
-  - A view of `Z`, or `nothing`.
-
-# Related
-
-  - [`features_are_assets`](@ref)
-  - [`port_opt_view`](@ref)
-"""
-function feature_matrix_view(::Nothing, ::Bool, ::Any, ::Any)
-    return nothing
-end
-function feature_matrix_view(Z::MatNum, sq::Bool, ::Any, j)
-    return sq ? view(Z, j, j) : view(Z, j, :)
-end
-function feature_matrix_view(Z::MatNum, ::Bool, ::Any, ::Colon)
-    return Z
-end
-function feature_matrix_view(Z::Arr3Num, sq::Bool, i, j)
-    return sq ? view(Z, i, j, j) : view(Z, i, j, :)
-end
-function feature_matrix_view(Z::Arr3Num, ::Bool, i, ::Colon)
-    return view(Z, i, :, :)
-end
-"""
-    feature_row_indices(Z::Nothing, ts_new, ts_old) -> Colon
-    feature_row_indices(Z::MatNum, ts_new, ts_old) -> Colon
-    feature_row_indices(Z::Arr3Num, ts_new::Nothing, ts_old)
-    feature_row_indices(Z::Arr3Num, ts_new, ts_old) -> VecInt
-
-Recover the positional row indices of a time-varying feature matrix from a timestamp window.
-
-A feature matrix is a plain array, so its observation axis is parallel to the carrier's clock positionally rather than aligned by timestamp. Whenever a routine selects rows of `X` by timestamp, the surviving timestamps are matched back into the original clock to recover the rows `Z` must keep. A surviving timestamp absent from that clock throws: it means the row bookkeeping has been broken (a synthesised timestamp, or an outer join that introduced a row `X` never had), and slicing `Z` positionally from there would silently pair each asset with another period's features.
+A Panel Field holds a plain array, so its observation axis is parallel to the carrier's clock positionally rather than aligned by timestamp. Whenever a routine selects rows of `X` by timestamp, the surviving timestamps are matched back into the original clock to recover the rows the panel must keep. A surviving timestamp absent from that clock throws: it means the row bookkeeping has been broken (a synthesised timestamp, or an outer join that introduced a row `X` never had), and slicing the panel positionally from there would silently pair each asset with another period's values.
 
 Two sites use it. At **price level** the clock is `TimeSeries.timestamp(X)` and the selection is a timestamp window. At the **cross-validation assembly seam** the clock is `ReturnsResult.ts` and the selection is a fold: [`fold_row_indices`](@ref) recovers a fold's rows from the timestamps its view of the returns already carries, which is why `ts` must be unique — it *keys* the observation axis rather than merely labelling it.
 
@@ -181,30 +94,30 @@ The static and absent shapes have no observation axis, so they return `Colon` an
 
 # Algorithm
 
-The method that Julia selects is the algorithm. Each step is one method.
+The method that Julia selects is the algorithm.
 
- 1. `Z` is `nothing` or a `MatNum`: return `Colon()`. Neither shape has an observation axis, so there is no row to recover and the timestamps are not read.
- 2. `Z` is an `Arr3Num` and `ts_new` is `nothing`: throw. The selection kept no timestamp, so the rows to keep cannot be named.
- 3. `Z` is an `Arr3Num`: match `ts_new` into `ts_old` with `indexin`, giving `rows`, the position each surviving timestamp holds in the original clock. Check that no entry of `rows` is `nothing`. Return `rows` as a `Vector{Int}`.
+ 1. `pnl` is `nothing`, or static: return `Colon()`. Neither has an observation axis, so there is no row to recover and the timestamps are not read.
+ 2. `pnl` is time-varying: match `ts_new` into `ts_old` with [`matched_row_indices`](@ref), which throws when the selection kept no timestamp, or when a surviving timestamp is absent from the original clock.
 
 # Arguments
 
-  - `Z`: Feature matrix.
+  - `pnl`: The Asset Panel, or `nothing`.
   - `ts_new`: Timestamps surviving the selection.
-  - `ts_old`: Timestamps of the clock `Z`'s observation axis is parallel to.
+  - `ts_old`: Timestamps of the clock the panel's observation axis is parallel to.
 
 # Validation
 
-  - `ts_new` is not `nothing` when `Z` is time-varying.
+  - `ts_new` is not `nothing` when the panel is time-varying.
   - Every entry of `ts_new` appears in `ts_old`.
 
 # Returns
 
-  - `Colon` for a static or absent `Z`; otherwise the row indices, as a `Vector{Int}`.
+  - `Colon` for a static or absent panel; otherwise the row indices, as a `Vector{Int}`.
 
 # Related
 
-  - [`feature_matrix_view`](@ref)
+  - [`AssetPanel`](@ref)
+  - [`matched_row_indices`](@ref)
   - [`PricesResult`](@ref)
   - [`prices_to_returns`](@ref)
   - [`fold_row_indices`](@ref)
@@ -212,14 +125,8 @@ The method that Julia selects is the algorithm. Each step is one method.
 function feature_row_indices(::Nothing, ::Any, ::Any)
     return Colon()
 end
-function feature_row_indices(::MatNum, ::Any, ::Any)
-    return Colon()
-end
 function feature_row_indices(pnl::AssetPanel, ts_new, ts_old)
     return panel_is_static(pnl) ? Colon() : matched_row_indices(ts_new, ts_old)
-end
-function feature_row_indices(::Arr3Num, ts_new, ts_old)
-    return matched_row_indices(ts_new, ts_old)
 end
 """
     matched_row_indices(ts_new::Nothing, ts_old) -> Union{}
@@ -272,7 +179,7 @@ end
 
 Name the columns an [`AssetPanel`](@ref) derives, without building the Feature Matrix.
 
-[`features_are_assets`](@ref) asks only for the names, and a carrier view asks it on every slice, so the values are not stacked to answer it.
+A consumer that needs the column names alone reads them here, and the values are not stacked to answer it.
 
 # Algorithm
 
@@ -293,7 +200,6 @@ The method that Julia selects is the algorithm.
 
   - [`AssetPanel`](@ref)
   - [`panel_feature_matrix`](@ref)
-  - [`features_are_assets`](@ref)
 """
 function panel_feature_names(::Nothing)
     return nothing
@@ -309,8 +215,8 @@ function panel_feature_names(pnl::AssetPanel)
     return nz
 end
 """
-    panel_carrier_view(pnl::Nothing, i, j, sq::Bool) -> nothing
-    panel_carrier_view(pnl::AssetPanel, i, j, sq::Bool) -> AssetPanel
+    panel_carrier_view(pnl::Nothing, i, j, nx) -> nothing
+    panel_carrier_view(pnl::AssetPanel, i, j, nx) -> AssetPanel
 
 View a carrier's [`AssetPanel`](@ref), or return `nothing` when the carrier holds none.
 
@@ -341,11 +247,11 @@ The method that Julia selects is the algorithm.
   - [`ReturnsResult`](@ref)
   - [`PricesResult`](@ref)
 """
-function panel_carrier_view(::Nothing, ::Any, ::Any, ::Bool)
+function panel_carrier_view(::Nothing, ::Any, ::Any, ::Any)
     return nothing
 end
-function panel_carrier_view(pnl::AssetPanel, i, j, sq::Bool)
-    return port_opt_view(pnl, i, j, sq)
+function panel_carrier_view(pnl::AssetPanel, i, j, nx::Option{<:VecStr})
+    return port_opt_view(pnl, i, j, nx)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -485,7 +391,7 @@ The method that Julia selects is the algorithm. The timestamp methods do the wor
 
  1. `i` and `j` are both `Colon`: return `pr` itself. No view is built.
 
- 2. `i` is a vector of timestamps and `j` is a `Colon`: index `X`, `F`, `B` and `iv` by the timestamps `i`. Recover the rows of a time-varying `Z` from the surviving timestamps with [`feature_row_indices`](@ref), and view `Z` on that observation axis with [`feature_matrix_view`](@ref). A static `Z` has no observation axis, so it passes through unchanged rather than being wrapped in a no-op view. Carry `ivpa` and `nz` through untouched, because the asset index reaches neither. Rebuild the [`PricesResult`](@ref).
+ 2. `i` is a vector of timestamps and `j` is a `Colon`: index `X`, `F`, `B` and `iv` by the timestamps `i`. Recover the rows of a time-varying Asset Panel from the surviving timestamps with [`feature_row_indices`](@ref), and view the panel on that observation axis with [`panel_carrier_view`](@ref). A static panel has no observation axis and ignores the row index. Carry `ivpa` through untouched, because the asset index does not reach it. Rebuild the [`PricesResult`](@ref).
 
  3. `i` is a vector of timestamps and `j` is a vector of asset indices:
 
@@ -494,7 +400,7 @@ The method that Julia selects is the algorithm. The timestamp methods do the wor
      3. Index `B` by the timestamps `i`. Keep its columns `j` when `B` holds one column per asset, and keep its single column otherwise. The test is `B`'s own width, because a shared benchmark has one column to give whatever `j` asks for.
      4. Index `iv` by the timestamps `i` and the asset columns `j`, and view `ivpa` at `j`.
      5. Read `sq` from [`features_are_assets`](@ref) on `nz` and the asset names of `X`. When `sq` is `true`, view `nz` at `j` as well.
-     6. Recover the rows of a time-varying `Z` with [`feature_row_indices`](@ref), and view `Z` at those rows and the assets `j` with [`feature_matrix_view`](@ref). A static `Z` has no observation axis and is viewed on the assets alone.
+     6. Recover the rows of a time-varying Asset Panel with [`feature_row_indices`](@ref), and view the panel at those rows and the assets `j` with [`panel_carrier_view`](@ref), handing it the asset names so that a square tensor Panel Field is cut on its label axis too.
      7. Rebuild the [`PricesResult`](@ref).
 
  4. `i` and `j` are integer indices, ranges or `Colon`s: read the timestamps `TimeSeries.timestamp(pr.X)[i]`, and call step 2 or step 3 with them. This is the method a caller reaches with `port_opt_view(pr, 2:3)`.
@@ -541,7 +447,7 @@ function port_opt_view(pr::PricesResult, i::AbstractVector{<:Dates.AbstractTime}
     B = isnothing(pr.B) ? nothing : pr.B[i]
     iv = isnothing(pr.iv) ? nothing : pr.iv[i]
     rows = feature_row_indices(pr.pnl, TimeSeries.timestamp(X), TimeSeries.timestamp(pr.X))
-    pnl = panel_carrier_view(pr.pnl, rows, :, false)
+    pnl = panel_carrier_view(pr.pnl, rows, :, nothing)
     return PricesResult(; X = X, F = F, B = B, iv = iv, ivpa = pr.ivpa, pnl = pnl)
 end
 function port_opt_view(pr::PricesResult, i::AbstractVector{<:Dates.AbstractTime},
@@ -561,10 +467,8 @@ function port_opt_view(pr::PricesResult, i::AbstractVector{<:Dates.AbstractTime}
     end
     iv = isnothing(pr.iv) ? nothing : pr.iv[i][TimeSeries.colnames(pr.iv)[j]]
     ivpa = nothing_scalar_array_view(pr.ivpa, j)
-    sq = features_are_assets(panel_feature_names(pr.pnl),
-                             string.(TimeSeries.colnames(pr.X)))
     rows = feature_row_indices(pr.pnl, TimeSeries.timestamp(X), TimeSeries.timestamp(pr.X))
-    pnl = panel_carrier_view(pr.pnl, rows, j, sq)
+    pnl = panel_carrier_view(pr.pnl, rows, j, string.(TimeSeries.colnames(pr.X)))
     return PricesResult(; X = X, F = F, B = B, iv = iv, ivpa = ivpa, pnl = pnl)
 end
 function port_opt_view(pr::PricesResult,
@@ -765,76 +669,6 @@ function ReturnsResult(; nx::Option{<:VecStr} = nothing, X::Option{<:MatNum} = n
     return ReturnsResult(nx, X, nf, F, nb, B, ts, iv, ivpa, pnl)
 end
 """
-    carrier_feature_matrix(rd::ReturnsResult) -> Tuple{Option{Vector{String}}, Option{Array{Float64}}}
-
-Derive a carrier's Feature Matrix, or return two `nothing`s when it holds no [`AssetPanel`](@ref).
-
-The read every consumer that measures a matrix rather than a Panel Field makes: a distance, and the meta-optimiser collapse onto a synthetic universe. Nothing stores the result.
-
-# Algorithm
-
- 1. Return `nothing, nothing` when `rd.pnl` is `nothing`.
- 2. Otherwise return [`panel_feature_matrix`](@ref) of it.
-
-# Arguments
-
-  - `rd`: The returns result.
-
-# Returns
-
-  - `nz::Option{Vector{String}}`: One name per column of the derived Feature Matrix, or `nothing`.
-  - `Z::Option{Array{Float64}}`: The derived Feature Matrix, or `nothing`.
-
-# Related
-
-  - [`ReturnsResult`](@ref)
-  - [`AssetPanel`](@ref)
-  - [`panel_feature_matrix`](@ref)
-  - [`collapsed_asset_panel`](@ref)
-"""
-function carrier_feature_matrix(rd::ReturnsResult)
-    pnl = rd.pnl
-    return isnothing(pnl) ? (nothing, nothing) : panel_feature_matrix(pnl)
-end
-"""
-    collapsed_asset_panel(nz::Nothing, Z::Nothing) -> nothing
-    collapsed_asset_panel(nz::VecStr, Z::MatNum_Arr3Num) -> AssetPanel
-
-Put a collapsed Feature Matrix back on a carrier, as an [`AssetPanel`](@ref).
-
-The meta-optimiser collapses the Feature Matrix onto a synthetic universe as a bare matrix, and the carrier holds a panel, so the matrix returns through [`feature_matrix_panel`](@ref). The round trip is exact, and it is what keeps the synthetic carrier readable by the same consumers as the original.
-
-# Algorithm
-
-The method that Julia selects is the algorithm.
-
- 1. The carrier collapsed no Feature Matrix: return `nothing`.
- 2. Otherwise return [`feature_matrix_panel`](@ref) of the pair.
-
-# Arguments
-
-  - `nz`: One name per column of `Z`, or `nothing`.
-  - `Z`: The collapsed Feature Matrix, or `nothing`.
-
-# Returns
-
-  - `pnl::Option{AssetPanel}`: The Asset Panel, or `nothing`.
-
-# Related
-
-  - [`AssetPanel`](@ref)
-  - [`feature_matrix_panel`](@ref)
-  - [`carrier_feature_matrix`](@ref)
-  - [`VecStr`](@ref)
-  - [`MatNum_Arr3Num`](@ref)
-"""
-function collapsed_asset_panel(::Nothing, ::Nothing)
-    return nothing
-end
-function collapsed_asset_panel(nz::VecStr, Z::MatNum_Arr3Num)
-    return feature_matrix_panel(nz, Z)
-end
-"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return a view of the `ReturnsResult` object for the assets at indices `i`.
@@ -852,7 +686,7 @@ This is the [`port_opt_view`](@ref) method for [`ReturnsResult`](@ref) — the V
  3. When `B` is a matrix, it holds one column per asset: view `nb` at `i`, and view `B` as `view(rd.B, :, i)`. Otherwise — a single shared benchmark, or none at all — `nb` and `B` both pass through untouched.
  4. View the implied volatilities as `view(rd.iv, :, i)`, and the adjustment `ivpa` at `i`.
  5. Read `sq` from [`features_are_assets`](@ref) on `nz` and `nx`. When `sq` is `true`, view `nz` at `i` as well, because the feature axis is the asset axis.
- 6. View the feature matrix with [`feature_matrix_view`](@ref) at `i` on the asset axis. `Z` is carried assets-major, so that axis is axis 1 when `Z` is static and axis 2 when `Z` is time-varying. The observation index is a `Colon`, so a time-varying `Z` keeps every observation.
+ 6. View the Asset Panel with [`panel_carrier_view`](@ref) at `i` on the asset axis, handing it the asset names. The observation index is a `Colon`, so a time-varying panel keeps every observation.
  7. View the [`AssetPanel`](@ref) `pnl` at `i` on the asset axis, which slices every Panel Field's values and both universe masks. A Panel Field's label axis is not touched: it addresses the features, which an asset view does not reach.
  8. Rebuild the [`ReturnsResult`](@ref). The factor names `nf`, the factor returns `F` and the timestamps `ts` pass through untouched, because none of the three has an asset axis.
 
@@ -929,7 +763,7 @@ Return a view of the `ReturnsResult` object for assets at indices `j`, observati
  4. When `B` is a matrix, it holds one column per asset: view `nb` at `j`, and view `B` as `view(rd.B, i, j)`. When `B` is a vector, it is a single shared benchmark: view it as `view(rd.B, i)`, and carry `nb` through.
  5. View the timestamps `ts` at `i`, the implied volatilities as `view(rd.iv, i, j)`, and the adjustment `ivpa` at `j`.
  6. Read `sq` from [`features_are_assets`](@ref) on `nz` and `nx`. When `sq` is `true`, view `nz` at `j` as well.
- 7. View the feature matrix with [`feature_matrix_view`](@ref) at the observations `i` and the assets `j`. A static `Z` has no observation axis and ignores `i`, which is the same asymmetry `ivpa` has on the asset axis.
+ 7. View the Asset Panel with [`panel_carrier_view`](@ref) at the observations `i` and the assets `j`, handing it the asset names. A static panel has no observation axis and ignores `i`, which is the same asymmetry `ivpa` has on the asset axis.
  8. View the [`AssetPanel`](@ref) `pnl` at the observations `i` and the assets `j`, which slices both axes of every Panel Field and of both universe masks.
  9. Rebuild the [`ReturnsResult`](@ref).
 
@@ -994,7 +828,7 @@ Erroring tripwire for [`AbstractReturnsResult`](@ref) subtypes that do not imple
 
 Without it, the universal leaf fallback `port_opt_view(x, i, args...)` would hand back the returns result *unsubselected*, and a meta-optimiser or cross-validation fold would silently train on the full universe. Returns data is never a leaf value, so an unhandled subtype is a missing method, not a pass-through.
 
-Subtypes carrying a feature matrix owe it the same treatment as `X`: subselect its asset axis on every arity, its observation axis on the arities that take one, and — when its features *are* the assets ([`features_are_assets`](@ref)) — its feature axis as well. A feature matrix that survives a fold unsliced is the same silent-wrongness as an unsliced returns matrix, one level down: the distance it produces is finite, plausible, and computed over the wrong universe. [`feature_matrix_view`](@ref) implements the rule; the [`ReturnsResult`](@ref) methods are the reference.
+Subtypes carrying an [`AssetPanel`](@ref) owe it the same treatment as `X`: subselect its asset axis on every arity, its observation axis on the arities that take one, and — when a tensor Panel Field's labels *are* the assets ([`features_are_assets`](@ref)) — that field's label axis as well. A panel that survives a fold unsliced is the same silent-wrongness as an unsliced returns matrix, one level down: the distance it produces is finite, plausible, and computed over the wrong universe. [`port_opt_view`](@ref) implements the rule; the [`ReturnsResult`](@ref) methods are the reference.
 
 # Algorithm
 
@@ -1030,8 +864,7 @@ function port_opt_view(rd::ReturnsResult, i)
     B = !isa(rd.B, MatNum) ? rd.B : view(rd.B, :, i)
     iv = isnothing(rd.iv) ? nothing : view(rd.iv, :, i)
     ivpa = nothing_scalar_array_view(rd.ivpa, i)
-    sq = features_are_assets(panel_feature_names(rd.pnl), rd.nx)
-    pnl = panel_carrier_view(rd.pnl, :, i, sq)
+    pnl = panel_carrier_view(rd.pnl, :, i, rd.nx)
     return ReturnsResult(; nx = nx, X = X, nf = rd.nf, F = rd.F, nb = nb, B = B, ts = rd.ts,
                          iv = iv, ivpa = ivpa, pnl = pnl)
 end
@@ -1051,8 +884,7 @@ function port_opt_view(rd::ReturnsResult, i, j, k = :)
     ts = isnothing(rd.ts) ? rd.ts : view(rd.ts, i)
     iv = isnothing(rd.iv) ? rd.iv : view(rd.iv, i, j)
     ivpa = nothing_scalar_array_view(rd.ivpa, j)
-    sq = features_are_assets(panel_feature_names(rd.pnl), rd.nx)
-    pnl = panel_carrier_view(rd.pnl, i, j, sq)
+    pnl = panel_carrier_view(rd.pnl, i, j, rd.nx)
     return ReturnsResult(; nx = nx, X = X, nf = nf, F = F, nb = nb, B = B, ts = ts, iv = iv,
                          ivpa = ivpa, pnl = pnl)
 end
@@ -1449,7 +1281,7 @@ A benchmark ``B`` is converted by the same rule and **carried alongside** the as
 12. Convert the surviving prices to returns with `TimeSeries.percentchange` under `ret_method` and `padding`. This is the step that applies the formula above. It computes both branches through logarithms — the log return is ``\\ln P_{t,i} - \\ln P_{t-1,i}``, and the simple return is `expm1` of it — so the two agree with the closed forms above to floating point rather than to the last bit. When `padding` is `true` the first observation is kept and its return is `NaN`, so the returns keep the length of the price clock.
 13. Split the surviving column names into the asset names `nx`, the factor names `nf`, the benchmark names `nb`, and the timestamp column, which gives `ts`.
 14. Index the implied volatilities `iv` by `ts`, then check `iv` and `ivpa` against the surviving asset count.
-15. Subselect the feature matrix. Read the surviving assets' positions `acols` in the original asset names, read `sq` from [`features_are_assets`](@ref), recover the surviving rows with [`feature_row_indices`](@ref), and view `Z` with [`feature_matrix_view`](@ref). Materialise the view with `Array`, and view `nz` at `acols` when `sq` is `true`. An asset dropped by steps 9 to 11 takes its features with it, or the two matrices would desynchronise silently. A time-varying `Z` is subselected to the surviving observations as well, matched back into the original price timestamps; a surviving timestamp absent from that clock throws. Under `collapse_args` this gives the aggregated period the features of the row at its representative timestamp, which is last-observation semantics and matches [`LastObservation`](@ref). An [`AssetPanel`](@ref) `pnl` describes those same columns, so it is sliced on the same two axes in the same step, with [`port_opt_view`](@ref); its masks come back as views, because nothing here rebuilds them from a table the way `Z` is rebuilt.
+15. Subselect the [`AssetPanel`](@ref). Read the surviving assets' positions `acols` in the original asset names, recover the surviving rows with [`feature_row_indices`](@ref), and view the panel with [`port_opt_view`](@ref), handing it the surviving asset names so that a square tensor Panel Field is cut on its label axis too. An asset dropped by steps 9 to 11 takes its Panel Field values with it, or the panel and the returns would desynchronise silently. A time-varying panel is subselected to the surviving observations as well, matched back into the original price timestamps; a surviving timestamp absent from that clock throws. Under `collapse_args` this gives the aggregated period the values of the row at its representative timestamp, which is last-observation semantics and matches [`LastObservation`](@ref).
 16. Build the asset, factor and benchmark matrices from the surviving columns. A group whose columns all went is `nothing`.
 17. Return the [`ReturnsResult`](@ref).
 
@@ -1624,9 +1456,8 @@ function prices_to_returns(X::TimeSeries.TimeArray,
         @argcheck(!isempty(nx),
                   IsEmptyError("every asset was dropped during the conversion, so the Asset Panel (pnl) has no asset axis left to bind to"))
         acols = Vector{Int}(indexin(nx, asset_names))
-        sq = features_are_assets(panel_feature_names(pnl), asset_names)
         rows = feature_row_indices(pnl, ts, asset_ts)
-        pnl = port_opt_view(pnl, rows, acols, sq)
+        pnl = port_opt_view(pnl, rows, acols, asset_names)
     end
     if isempty(nf)
         nf = nothing
@@ -2071,7 +1902,7 @@ Return the keep-mask over the asset columns of `rd`.
 
 This is the single method a concrete [`AbstractAssetSelector`](@ref) must implement. It is called by [`fit_preprocessing`](@ref) on the *training* window only; the resulting universe is then replayed on every later window by [`apply_preprocessing`](@ref).
 
-`rd` is read for `nx` and an `observations × assets` `X`; [`ClusterGroups`](@ref) also reads `rd.pnl`, widening the implicit contract to `{nx, X, pnl}` (see [`AbstractReturnsResult`](@ref)). A selector is fitted from returns data alone and never sees a prior result, so `z_src` has no referent here and no selector carries one.
+`rd` is read for `nx` and an `observations × assets` `X`; [`ClusterGroups`](@ref) also reads `rd.pnl`, widening the implicit contract to `{nx, X, pnl}` (see [`AbstractReturnsResult`](@ref)). A selector is fitted from returns data alone and never sees a prior result, so it reads the data carrier and nothing else.
 
 # Arguments
 
@@ -2312,7 +2143,7 @@ This estimator supersedes the `missing_col_percent`/`missing_row_percent` keywor
  3. Rebuild `X` from the kept rows and the kept columns.
  4. Subselect the implied volatilities on the kept columns, and `ivpa` with them when it is a vector. The implied volatility series keeps every row, because its own clock is not the one that was filtered.
  5. Read `sq` from [`features_are_assets`](@ref), and view `nz` at the kept columns when `sq` is `true`.
- 6. View the feature matrix with [`feature_matrix_view`](@ref) at the kept rows and the kept columns.
+ 6. View the Asset Panel with [`panel_carrier_view`](@ref) at the kept rows and the kept columns, handing it the asset names.
  7. Rebuild the [`PricesResult`](@ref). The factor series `F` and the benchmark series `B` pass through untouched.
 
 The two thresholds count opposite axes: `col_thr` counts the missing rows of a column and drops columns, and `row_thr` counts the missing columns of a row and drops rows.
@@ -2428,9 +2259,7 @@ function apply_preprocessing(res::MissingDataFilterResult, pr::PricesResult)::Pr
                                    TimeSeries.colnames(pr.iv)[cols])
         ivm, isa(pr.ivpa, VecNum) ? pr.ivpa[cols] : pr.ivpa
     end
-    sq = features_are_assets(panel_feature_names(pr.pnl),
-                             string.(TimeSeries.colnames(pr.X)))
-    pnl = panel_carrier_view(pr.pnl, rows, cols, sq)
+    pnl = panel_carrier_view(pr.pnl, rows, cols, string.(TimeSeries.colnames(pr.X)))
     return PricesResult(; X = X, F = pr.F, B = pr.B, iv = iv, ivpa = ivpa, pnl = pnl)
 end
 """
@@ -2564,6 +2393,100 @@ function apply_preprocessing(res::ImputerResult, pr::PricesResult)::PricesResult
     return PricesResult(; X = X, F = pr.F, B = pr.B, iv = pr.iv, ivpa = pr.ivpa,
                         pnl = pr.pnl)
 end
+"""
+    asset_panel(ape::Nothing, pr, rd::ReturnsResult, X) -> AssetPanel
+    asset_panel(ape::Nothing, pr::ReturnsResult, rd::Nothing, X) -> AssetPanel
+    asset_panel(ape::Nothing, pr, rd::Nothing, X) -> Union{}
+
+Resolve the [`AssetPanel`](@ref) a [`FeatureDistance`](@ref) with no producer measures.
+
+`nothing` in the `ape` slot says *read the panel the data carrier already holds*. The carriers reach the kernel as the two keywords `pr` and `rd`, and this verb resolves the source by dispatch: a [`ReturnsResult`](@ref) in either slot answers its `pnl`, and `rd` wins when both hold one, because the data carrier is where a panel is data rather than a by-product. `Pr_RR` admits a [`ReturnsResult`](@ref) in the `pr` slot, which is what `clusterise(cle, rd)` and every [`Pipeline`](@ref) step pass, so the second method is not a fallback but the shortest public call.
+
+A prior result alone carries no panel, so it raises an [`IsNothingError`](@ref) naming the two ways forward.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `rd` is a [`ReturnsResult`](@ref): answer `rd.pnl`.
+ 2. `pr` is a [`ReturnsResult`](@ref) and there is no `rd`: answer `pr.pnl`.
+ 3. Neither slot holds a data carrier: raise.
+
+Each of the first two checks that the carrier it read holds a panel, with [`assert_asset_panel_supplied`](@ref).
+
+# Arguments
+
+  - `ape`: `nothing`, which reads the carrier's panel.
+  - $(arg_dict[:pr_rr])
+  - $(arg_dict[:rd])
+  - `X`: Returns matrix of the subproblem. Unread here; a producer reads it.
+
+# Validation
+
+  - A data carrier is present, and it holds an [`AssetPanel`](@ref). Raises an [`IsNothingError`](@ref).
+
+# Returns
+
+  - `pnl::AssetPanel`: The Asset Panel the data carrier holds.
+
+# Related
+
+  - [`AbstractAssetPanelEstimator`](@ref)
+  - [`assert_asset_panel_supplied`](@ref)
+  - [`FeatureDistance`](@ref)
+  - [`AssetPanel`](@ref)
+  - [`ReturnsResult`](@ref)
+  - [`RegressionPanel`](@ref)
+  - [`PhylogenyPanel`](@ref)
+"""
+function asset_panel(::Nothing, ::Any, rd::ReturnsResult, ::Any)
+    return assert_asset_panel_supplied(rd.pnl)
+end
+function asset_panel(::Nothing, pr::ReturnsResult, ::Nothing, ::Any)
+    return assert_asset_panel_supplied(pr.pnl)
+end
+function asset_panel(::Nothing, ::Any, ::Nothing, ::Any)
+    return throw(IsNothingError("`FeatureDistance` with no producer reads the Asset Panel off the data carrier, and this call supplied none: only a prior result reached it, and a prior result carries no panel. Two ways forward:\n  1. Pass the `ReturnsResult` that holds the panel, which every forwarder takes as `rd`.\n  2. Set a producer on the estimator, `FeatureDistance(; ape = RegressionPanel())`, which builds a panel from the prior it is handed."))
+end
+"""
+    assert_asset_panel_supplied(pnl::AssetPanel) -> AssetPanel
+    assert_asset_panel_supplied(pnl::Nothing) -> Union{}
+
+Assert that the data carrier a [`FeatureDistance`](@ref) read holds an [`AssetPanel`](@ref), and return it.
+
+The carrier's `pnl` is optional, so a carrier built without one reaches the kernel as `nothing`. This is the one place that turns it into a diagnostic, and it returns the panel so the caller reads one verb rather than a check and an access.
+
+# Algorithm
+
+The method that Julia selects is the algorithm. A panel is returned; `nothing` raises.
+
+# Arguments
+
+  - `pnl`: The carrier's Asset Panel, or `nothing`.
+
+# Validation
+
+  - `!isnothing(pnl)`. Raises an [`IsNothingError`](@ref).
+
+# Returns
+
+  - `pnl::AssetPanel`: The Asset Panel.
+
+# Related
+
+  - [`asset_panel`](@ref)
+  - [`AssetPanel`](@ref)
+  - [`ReturnsResult`](@ref)
+  - [`FeatureDistance`](@ref)
+  - [`IsNothingError`](@ref)
+"""
+function assert_asset_panel_supplied(pnl::AssetPanel)
+    return pnl
+end
+function assert_asset_panel_supplied(::Nothing)
+    return throw(IsNothingError("`FeatureDistance` with no producer reads the Asset Panel off the data carrier, and the carrier holds none. Build one with `asset_panel(inputs)` and pass it as `ReturnsResult(; …, pnl = pnl)`, or set a producer on the estimator, `FeatureDistance(; ape = RegressionPanel())`."))
+end
+
 export PricesResult, ReturnsResult, prices_to_returns, returns_result_picker,
        fit_preprocessing, apply_preprocessing, PricesToReturns, MissingDataFilter,
        MissingDataFilterResult, Imputer, ImputerResult, AssetSelectorResult,

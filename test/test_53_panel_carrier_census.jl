@@ -1,25 +1,20 @@
 #=
 The Asset Panel reaches every consumer that needs it.
 
-`#646` decided that the panel rides `panel_feature_matrix(rd.pnl)[2]`, `panel_feature_matrix(rd.pnl)[1]` and `rd.pnl`, stops at `ReturnsResult` and
-never travels onto `LowOrderPrior`. That decision rests on one claim: every consumer that needs
-the panel is passed the `rd` that carries it. `#666` audited the claim across the 83 call sites
-of the eleven verbs that can carry an `rd`, and found one place where it fails.
+`#803` decided that the panel is the one carrier of feature data: it rides `rd.pnl`, it names its
+own columns, and no prior result carries one. `#804` decided how it reaches the kernel: both
+carriers travel as the keywords `pr` and `rd`, and one verb, `asset_panel(ape, pr, rd, X)`,
+resolves the source by dispatch. That rests on one claim: every consumer that needs the panel is
+passed a carrier that holds it.
 
 `Pr_RR` is `Union{<:AbstractPriorResult, <:ReturnsResult}`, so a `ReturnsResult` is admitted in
 the `pr` slot as well as in `rd`. `clusterise(cle, rd)` is the shortest public call and the one
-every `Pipeline` step makes, and it puts a full carrier there with no `rd` beside it.
-`feature_matrix_picker` then read `Z` off that carrier and `nz` off `rd`, which was `nothing`,
-so the names of a carrier that holds them were dropped. A `FeatureDistance` column selector
-written as a name could not resolve, and the refusal named `LowOrderPrior` and `z_src = :prior`
-— neither of which the caller had used.
+every `Pipeline` step makes, and it puts a full carrier there with no `rd` beside it. The
+resolution therefore reads **either** slot, and a name selector resolves against the column names
+the panel derives. This census pins that invariant, and pins the interface around it so a new
+entry point cannot forget.
 
-`carrier_asset_panel` closes it: the picker returns **one object**, the panel of the carrier it
-selected, and a Panel Field owns its own name. There is no second value to disagree with it.
-This census pins that invariant, and pins the interface around it so a new entry point cannot
-forget.
-
-The audit's other three classes need no gate, and are recorded here so the next reader need not
+Three neighbouring classes need no gate, and are recorded here so the next reader need not
 re-derive them:
 
   - `set_risk_constraints!` and `set_return_constraints!` forward `kwargs...` transparently, so
@@ -31,7 +26,7 @@ re-derive them:
   - `PredictionReturnsResult` deliberately carries no `pnl`: `reconstruct_rd` collapses the
     asset axis onto one synthetic asset, and a panel over the old assets would be wrong.
 =#
-@testset "Asset Panel carrier census: the names travel with the matrix" begin
+@testset "Asset Panel carrier census: the panel reaches every consumer" begin
     PO = PortfolioOptimisers
 
     rng = StableRNG(20260902)
@@ -42,62 +37,52 @@ re-derive them:
     Z = abs.(randn(rng, na, nk))
     nz = ["z$i" for i in 1:nk]
     nx = ["A$i" for i in 1:na]
-    rd = ReturnsResult(; nx = nx, X = X, pnl = feature_matrix_panel(nz, Z))
+    pnl = asset_panel([NumericPanelInput(; name = nz[k], vals = Z[:, k]) for k in 1:nk])
+    rd = ReturnsResult(; nx = nx, X = X, pnl = pnl)
     w = fill(inv(na), na)
 
     # ---------------------------------------- 1. the invariant this census exists to pin
 
-    @testset "the values and the names come off the same carrier" begin
+    @testset "The panel resolves off either carrier slot" begin
         #=
-        A `ReturnsResult` in the `pr` slot with no `rd` beside it. Both selectors resolve to
-        that one carrier, so both must return its panel. The `:data` arm returned `nothing`
-        names before `#666`, which is the defect the one object removes.
+        A `ReturnsResult` in the `pr` slot with no `rd` beside it, and the same carrier in
+        `rd`. One verb answers both, and the columns it derives carry the caller's own names,
+        so a name selector resolves in either shape.
         =#
-        for z_src in (:prior, :data)
-            pnls, z_diag = PO.feature_matrix_picker(rd, nothing, z_src)
-            @test pnls === rd.pnl
-            @test feature_labels(pnls) == nz
-            @test z_diag === z_src
-        end
+        @test PO.asset_panel(nothing, rd, nothing, X) === pnl
+        @test PO.asset_panel(nothing, nothing, rd, X) === pnl
+        # `rd` wins when both slots hold a carrier, because the data carrier is where a panel
+        # is data rather than a by-product.
+        rd2 = ReturnsResult(; nx = nx, X = X,
+                            pnl = asset_panel([NumericPanelInput(; name = "other",
+                                                                 vals = Z[:, 1])]))
+        @test PO.asset_panel(nothing, rd, rd2, X) === rd2.pnl
 
-        # A separate `rd` wins under `:data` and is inert under `:prior`. The pairing holds
-        # either way, because both carriers here are the same one.
-        for z_src in (:prior, :data)
-            pnls, _ = PO.feature_matrix_picker(rd, rd, z_src)
-            @test pnls === rd.pnl
-            @test feature_labels(pnls) == nz
-        end
+        # The names come off the panel itself, so they cannot disagree with the values.
+        @test PO.panel_feature_names(pnl) == nz
+        @test PO.panel_feature_matrix(pnl)[2] == Z
 
-        # The `X` picker was never at fault, and stays unchanged: `pr.X` is right whichever
-        # carrier sits in the slot.
+        # The `X` picker is unchanged: `pr.X` is right whichever carrier sits in the slot.
         @test PO.returns_matrix_picker(rd, nothing, :prior) === rd.X
         @test PO.returns_matrix_picker(rd, rd, :data) === rd.X
     end
 
-    @testset "A prior result supplies `Z` and names it positionally" begin
+    @testset "A prior result alone carries no panel, and the refusal names the way out" begin
         #=
-        The documented limit. A producer runs inside `prior(pe, X, F; …)` with raw matrices,
-        so the names a *caller* knows are structurally unavailable to it. The panel it builds
-        therefore names its columns positionally, which is what a nameless `Z` offered a
-        selector before: an integer resolves, and a caller's own name does not.
+        The documented limit. No prior result carries feature data at all: the panel is on the
+        data carrier, or a producer builds one at the point of use. A call that reaches the
+        kernel with a prior alone therefore raises, and the message names both routes.
         =#
-        pnz = ["_z$i" for i in 1:nk]
-        pr = LowOrderPrior(; X = X, mu = vec(mean(X; dims = 1)), sigma = cov(X),
-                           pnl = feature_matrix_panel(pnz, Z))
-        @test PO.carrier_asset_panel(pr) === pr.pnl
-        pnls, z_diag = PO.feature_matrix_picker(pr, nothing, :prior)
-        @test feature_matrix(pnls) == Z
-        @test feature_labels(pnls) == pnz
-        @test z_diag === :prior
+        pr = prior(EmpiricalPrior(), rd)
+        @test !hasproperty(pr, :pnl)
+        res = @test_throws PO.IsNothingError PO.asset_panel(nothing, pr, nothing, X)
+        @test occursin("ReturnsResult", res.value.msg)
+        @test occursin("RegressionPanel", res.value.msg)
 
-        # With both carriers populated the selector picks between them, and the names follow
-        # the pick rather than the argument position.
-        @test feature_labels(PO.feature_matrix_picker(pr, rd, :prior)[1]) == pnz
-        @test feature_labels(PO.feature_matrix_picker(pr, rd, :data)[1]) == nz
-
-        # A prior result that carries no panel at all still diagnoses `:neither`.
-        pr_noz = prior(EmpiricalPrior(), ReturnsResult(; nx = nx, X = X))
-        @test PO.feature_matrix_picker(pr_noz, nothing, :data)[2] === :neither
+        # A carrier that holds no panel raises too, and says how to build one.
+        rd_no = ReturnsResult(; nx = nx, X = X)
+        res = @test_throws PO.IsNothingError PO.asset_panel(nothing, nothing, rd_no, X)
+        @test occursin("asset_panel", res.value.msg)
     end
 
     # ---------------------------------------- 2. the interface: every carrier method takes `rd`
@@ -109,8 +94,7 @@ re-derive them:
     reason it reads no feature matrix.
     =#
     @testset "Every `Pr_RR` method declares `rd`, or is excused by name" begin
-        excused = Dict(:feature_matrix_picker => "takes `rd` positionally; it *is* the picker",
-                       :returns_matrix_picker => "takes `rd` positionally; it *is* the picker",
+        excused = Dict(:returns_matrix_picker => "takes `rd` positionally; it *is* the picker",
                        :expected_risk => "reads `pr.X` and the moments; no feature matrix",
                        :calc_net_returns => "reads a returns matrix and fees; no feature matrix")
 
@@ -188,12 +172,9 @@ re-derive them:
                                                                                      sel = ["nope"],
                                                                                      strict = true)),
                                               rd)
-        # And the pre-`#666` state is the refusal this census closes: the values and the
-        # names are now one object, so a carrier that supplies the values without the names
-        # cannot be built. Supplying no panel at all is the only remaining failure, and it
-        # is loud.
-        @test_throws PortfolioOptimisers.IsNothingError clusterise(cle, rd.X; pnl = nothing,
-                                                                   z_src = :data)
+        # And a call that reaches the kernel with no carrier at all is the refusal this census
+        # closes: there is nothing to resolve the panel from.
+        @test_throws PortfolioOptimisers.IsNothingError clusterise(cle, rd.X)
     end
 
     # ---------------------------------------- 4. the four `Pipeline` sites

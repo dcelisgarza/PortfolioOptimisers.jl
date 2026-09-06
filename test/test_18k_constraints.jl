@@ -851,15 +851,15 @@ end
     @test PortfolioOptimisers.universe_axis(fsets, "nf") == "factor"
     @test PortfolioOptimisers.universe_axis(fsets, "nf_style") == "factor"
 
-    # `factor_universe` and `feature_universe` each raise at the point of need, naming the
-    # axis they read and the matrix they reconcile it against.
-    @test_throws KeyError PortfolioOptimisers.factor_universe(sets, 2, "a test", "rr.M")
-    @test_throws DimensionMismatch PortfolioOptimisers.factor_universe(fsets, 3, "a test",
-                                                                       "rr.M")
-    @test PortfolioOptimisers.factor_universe(fsets, 2, "a test", "rr.M") == ["F1", "F2"]
-    @test_throws KeyError PortfolioOptimisers.feature_universe(sets, "a test")
-    zsets = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"], "nz" => ["z1", "z2"]))
-    @test PortfolioOptimisers.feature_universe(zsets, "a test") == ["z1", "z2"]
+    # `factor_universe` raises at the point of need, naming the axis it reads and the matrix
+    # it reconciles it against. It takes the key positionally, because `UniverseSets`
+    # declares two factor axes and a consumer has to say which one it means.
+    @test_throws KeyError PortfolioOptimisers.factor_universe(sets, "nf", 2, "a test",
+                                                              "rr.M")
+    @test_throws DimensionMismatch PortfolioOptimisers.factor_universe(fsets, "nf", 3,
+                                                                       "a test", "rr.M")
+    @test PortfolioOptimisers.factor_universe(fsets, "nf", 2, "a test", "rr.M") ==
+          ["F1", "F2"]
 
     # `estimator_to_val` answers each shape it is given against the same universe.
     @test PortfolioOptimisers.estimator_to_val(nothing, sets) === nothing

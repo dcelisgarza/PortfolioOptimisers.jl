@@ -122,17 +122,17 @@ the panel: [issue #816](https://github.com/dcelisgarza/PortfolioOptimisers.jl/is
 ADR 0045, because the estimator and the carrier derive them with no distance computed, so there is
 nothing a lazy store would save.
 
-`feature_matrix` is `FeaturePrior`'s until the producer build frees the name, so the carrier build
-ships the pair it needs under interim names: `panel_feature_matrix(pnl)`, which stacks every field
-and returns the labels beside the matrix, and `feature_matrix_panel(nz, Z)`, its exact inverse —
-one numeric field per column, under that column's own name. The inverse is how a routine that
-produces a bare matrix, a producer or a meta-optimiser collapse onto a synthetic universe, puts
-that matrix on a carrier. The selector build adds the three verbs above and moves every consumer
-that reads a **selected** matrix onto them; `panel_feature_matrix` keeps the two readers that
-stack the panel whole, `carrier_feature_matrix` and the meta-optimiser collapse. The producer
-build deletes both interim names, because the collapse of
+`panel_feature_matrix(pnl)` stacks the panel **whole** — every field's values and every observed
+mask — and returns the labels beside the matrix. The selector build moved every consumer that reads
+a *selected* matrix onto the three verbs above, and the producer build removed its last two
+consumers, `carrier_feature_matrix` and the meta-optimiser collapse. It stays because it is not
+`feature_matrix(pnl, nothing)`: an absent selector stacks the values and **no** mask, so the two
+answer different questions, and the whole-panel one is what the panel's own tests measure it with.
+
+Its inverse, `feature_matrix_panel(nz, Z)`, is gone: the collapse of
 [issue #807](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/807) returns a panel and
-a producer builds its tensor field directly, so each loses its last reader.
+a producer builds its tensor field directly, so a caller with a bare matrix authors one
+`TensorPanelField`, or one `NumericPanelField` per column.
 
 The three verbs live in `src/03_InputData/05_FeatureSelector.jl`, beside the panel rather than
 inside it. A Feature Selector is its own noun, and the panel's own file is at the size the code
@@ -149,16 +149,10 @@ mask is asked for by name, and the default is the data.
 and the asset count; a static one must match the asset count. `check_asset_panel` keeps its name
 and states that rule: its old body checked the panel against `nz` and `Z` and is gone with them,
 and the axis rule is a check three carriers make, so it stays one named check rather than three
-copies. `LowOrderPrior` loses `Z`, and
-`HighOrderPrior` forwards nothing of it. The `Pr_RR` bridge stays, because `x_src` stays and the
+copies. `LowOrderPrior` loses `Z` and carries no panel of its own, and
+`HighOrderPrior` forwards nothing of either: feature data lives on the data carrier, or a producer
+builds it at the point of use. The `Pr_RR` bridge stays, because `x_src` stays and the
 bridge serves it.
-
-The carrier build gave `LowOrderPrior` a `pnl` field in place of `Z`, as a **shim**: a producer
-still runs and still has to put its matrix somewhere until the producer build deletes
-`FeaturePrior`. A produced matrix is nameless, so the shim names its columns positionally
-(`_z1`, `_z2`, …) through `feature_matrix_panel`. That is what a nameless `Z` offered a selector
-before — an integer resolves and a caller's own name does not — and the producer build deletes
-the field with the producers.
 
 `pnl` follows the library's abbreviated-type-word pattern (`alg`, `opt`, `sim`, `sel`). The strict
 initialism `ap` was considered; `pnl` reads as *panel* and is what map #643's readers already say
@@ -341,8 +335,8 @@ the cross-validated path is time-varying and the static-shape coupling above hol
   `AbstractFeatureValue`, `UniverseSets.zkey` and `feature_universe` have no reader. `UniverseSets`
   loses one name field and its constructor loses one positional, and every doctest that prints a
   `UniverseSets` loses its `zkey` row.
-- **`feature_matrix_panel` is deleted** with its export, its API entry and its catalogue entry,
-  once the producer build removes the shim that reads it. `features_are_assets` compares one tensor
-  field's labels against the asset names, and the matrix collapse gives way to a collapse over the
-  panel's fields.
+- **`feature_matrix_panel` is deleted** with its export, its API entry and its catalogue entry.
+  `features_are_assets` compares one tensor field's labels against the asset names, and the matrix
+  collapse gives way to a collapse over the panel's fields. `panel_feature_matrix` stays, as the
+  verb that stacks the panel whole.
 - **Panel persistence is not built.** It is in scope for map #643 and does not gate its close.

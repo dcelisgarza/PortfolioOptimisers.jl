@@ -462,6 +462,7 @@ function main(args)
                                joinpath(opts.out, "existing.tsv"))
     end
 
+    named = opts.all || !(isempty(opts.files))
     scope, ref = if opts.all
         sort(collect(keys(rows))), "the whole manifest"
     elseif !(isempty(opts.files))
@@ -470,11 +471,19 @@ function main(args)
         changed_files(opts.base)
     end
     # A path named with `--file` is taken on trust, but a path that does not exist can only be a
-    # typo, and measuring it would throw inside the unit counter with no useful message.
-    for f in scope
-        if !(isfile(joinpath(CodeHealth.REPO_ROOT, f)))
+    # typo, and measuring it would throw inside the unit counter with no useful message. A path
+    # the *diff* reports and the checkout does not hold is a **deletion**, which is a legitimate
+    # change: it owes its stale rows removed rather than its units counted, so it is named and
+    # dropped from the scope rather than measured.
+    gone = filter(f -> !(isfile(joinpath(CodeHealth.REPO_ROOT, f))), scope)
+    if named
+        for f in gone
             error("`$f` is not a file in this checkout.")
         end
+    elseif !(isempty(gone))
+        scope = filter(f -> !(f in gone), scope)
+        println("Deleted, so not measured: ", join(gone, ", "), ".")
+        println("A deleted file owes its row removed from `sweep/manifest.toml` and from the complexity, coverage, expansion, JET and size baselines.\n")
     end
 
     println("The sweep conformance check. ", length(scope), " file(s) in scope, against ",

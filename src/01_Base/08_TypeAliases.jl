@@ -333,7 +333,6 @@ UniverseSets
   utfkey ┼ String: "uf"
    cfkey ┼ String: "ncf"
   ucfkey ┼ String: "ucf"
-    zkey ┼ String: "nz"
     dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["sha", "bis", "man"])
 
 julia> estimator_to_val(MyIncreasingValue(), sets)

@@ -8,14 +8,12 @@ Other than [`FiniteAllocationOptimisationEstimator`](@ref), all optimisations wo
 AbstractReturnsResult
 ReturnsResult
 check_names_and_returns_matrix
-features_are_assets
-feature_matrix_view
 feature_row_indices
 PortfolioOptimisers.matched_row_indices
-PortfolioOptimisers.carrier_feature_matrix
-PortfolioOptimisers.collapsed_asset_panel
 PortfolioOptimisers.panel_feature_names
 PortfolioOptimisers.panel_carrier_view
+PortfolioOptimisers.asset_panel(::Nothing, ::Any, ::ReturnsResult, ::Any)
+PortfolioOptimisers.assert_asset_panel_supplied
 prices_to_returns
 port_opt_view(::ReturnsResult, ::Any)
 returns_result_picker
@@ -58,8 +56,12 @@ AssetPanel
 asset_panel
 panel_field
 panel_feature_matrix
-feature_matrix_panel
-feature_labels
+PortfolioOptimisers.features_are_assets
+PortfolioOptimisers.panel_onehot
+PortfolioOptimisers.RepeatedLeading
+PortfolioOptimisers.panel_field_lift
+PortfolioOptimisers.panel_build_observations
+PortfolioOptimisers.AbstractAssetPanelEstimator
 port_opt_view(::AssetPanel, ::Any)
 PortfolioOptimisers.AbstractPanelField
 NumericPanelField
@@ -109,7 +111,6 @@ PortfolioOptimisers.assert_panel_field_mask
 PortfolioOptimisers.assert_panel_masks
 PortfolioOptimisers.assert_feature_selector
 PortfolioOptimisers.assert_selector_entry
-PortfolioOptimisers.assert_feature_matrix_columns
 PortfolioOptimisers.assert_panel_fill
 PortfolioOptimisers.assert_panel_input
 PortfolioOptimisers.assert_panel_input_fill

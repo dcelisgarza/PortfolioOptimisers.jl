@@ -1222,7 +1222,7 @@ A cluster whose best score is tied keeps nobody (see [`groups_argbest`](@ref)).
 
 ## Clustering on a feature matrix
 
-A [`FeatureDistance`](@ref) in the `cle`'s distance slot measures a feature matrix rather than the returns, and `ClusterGroups` derives it from `rd.pnl` — the data carrier the selector is fitted on. There is no `z_src` field here, and that absence is the whole statement: preselection is a *pre-prior* site, so only the data carrier can supply a feature matrix. A selector is fitted by [`fit_preprocessing`](@ref) from the returns data alone and never sees a prior result; in a [`Pipeline`](@ref) it writes `:returns`, which invalidates any `:prior` already computed. An optimiser's `z_src` therefore does not reach here, and setting it changes nothing about this call. Supply an [`AssetPanel`](@ref) on the [`ReturnsResult`](@ref) — for instance from [`asset_panel`](@ref) — or the clustering throws (see [`assert_feature_matrix_supplied`](@ref)).
+A [`FeatureDistance`](@ref) in the `cle`'s distance slot measures a Feature Matrix rather than the returns, and it derives that matrix from the [`AssetPanel`](@ref) on `rd` — the data carrier the selector is fitted on. Preselection is a *pre-prior* site, so it passes `rd` alone: a selector is fitted by [`fit_preprocessing`](@ref) from the returns data alone and never sees a prior result, and in a [`Pipeline`](@ref) it writes `:returns`, which invalidates any `:prior` already computed. A producer that needs a prior therefore raises here, and it names the site. Supply an [`AssetPanel`](@ref) on the [`ReturnsResult`](@ref) — for instance from [`asset_panel`](@ref) — or the clustering throws (see [`asset_panel`](@ref)).
 
 The selection is decided on the *full* universe and the surviving columns are sliced only afterwards, so `Z` is measured over every asset before any is dropped.
 
@@ -1247,7 +1247,7 @@ Keywords correspond to the struct's fields.
   - [`clusterise`](@ref)
   - [`groups_argbest`](@ref)
   - [`FeatureDistance`](@ref)
-  - [`assert_feature_matrix_supplied`](@ref)
+  - [`asset_panel`](@ref)
 """
 @concrete struct ClusterGroups <: AbstractRedundancyAlgorithm
     """
@@ -1269,12 +1269,12 @@ Keep one representative of each cluster under [`ClusterGroups`](@ref).
 
 # Algorithm
 
- 1. Cluster the assets with [`clusterise`](@ref) on `rd.X`, passing `rd.pnl` and `z_src = :data_only`, giving the clustering result `clr`. A [`FeatureDistance`](@ref) stacks its Feature Matrix from that panel.
+ 1. Cluster the assets with [`clusterise`](@ref) on `rd.X`, passing `rd` so that a [`FeatureDistance`](@ref) resolves its panel off the data carrier, giving the clustering result `clr`.
  2. Read the cluster assignment of every asset into `idx`.
  3. Collect the asset indices of each of the `clr.k` clusters into `groups`.
  4. Return the mask [`groups_argbest`](@ref) admits for those groups under `scores` and `bib`.
 
-`z_src` is fixed at `:data_only` because preselection runs before any prior exists, so the data carrier is the only reachable source of a feature matrix. [`ClusterGroups`](@ref) states why the type carries no field for it.
+Only `rd` is passed, because preselection runs before any prior exists, so the data carrier is the only reachable source of a Feature Matrix. [`ClusterGroups`](@ref) states why the type carries no source selector.
 
 # Arguments
 
@@ -1295,7 +1295,7 @@ Keep one representative of each cluster under [`ClusterGroups`](@ref).
 """
 function redundancy_keep(alg::ClusterGroups, rd::AbstractReturnsResult,
                          scores::Option{<:VecNum}, bib::Bool)::BitVector
-    clr = clusterise(alg.cle, rd.X; pnl = rd.pnl, z_src = :data_only)
+    clr = clusterise(alg.cle, rd.X; rd = rd)
     idx = assignments(clr)
     groups = [findall(==(k), idx) for k in 1:(clr.k)]
     return groups_argbest(groups, scores, bib)

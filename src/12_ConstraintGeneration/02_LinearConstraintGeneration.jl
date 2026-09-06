@@ -461,7 +461,7 @@ The counterpart of [`prefixed_sets_keys`](@ref) for the one key with no prefix o
 # Arguments
 
   - `dict`: The [`UniverseSets`](@ref) dictionary being validated.
-  - `claimed`: The other declared axis prefixes, `uxkey`, `tfkey`, `utfkey`, `cfkey`, `ucfkey` and `zkey`.
+  - `claimed`: The other declared axis prefixes, `uxkey`, `tfkey`, `utfkey`, `cfkey` and `ucfkey`.
 
 # Returns
 
@@ -565,7 +565,7 @@ Declares the universes a portfolio problem is written against, and any groupings
 
 Constraint generation and the estimator routines read it to expand group references, to map a group name to its member list, and to validate membership.
 
-It **declares every axis it carries**: `xkey`/`uxkey` for assets, `tfkey`/`utfkey` for time-series factors, `cfkey`/`ucfkey` for cross-sectional factors, and `zkey` for features. Assets are the *primary* axis — `haskey(dict, xkey)` is required, and it is the axis a view slices. The factor and feature axes are **optional**: requiring any of them would invalidate every sets object built for a problem with no factor model or no feature program, so a consumer that needs one and does not find it throws at the point of need rather than at construction.
+It **declares every axis it carries**: `xkey`/`uxkey` for assets, `tfkey`/`utfkey` for time-series factors, and `cfkey`/`ucfkey` for cross-sectional factors. Assets are the *primary* axis — `haskey(dict, xkey)` is required, and it is the axis a view slices. The factor axes are **optional**: requiring either would invalidate every sets object built for a problem with no factor model, so a consumer that needs one and does not find it throws at the point of need rather than at construction.
 
 There are **two factor axes** because the two factor families name different things. A time-series regression fits one loading vector per asset over the observations, so its factors are the columns of `rd.F` and a caller copies `rd.nf` into the dict under `tfkey`. A cross-sectional regression fits one loading vector per observation across the assets, so its factors are the exposures the fit was built from, and they exist only inside the fitted block. One axis carrying both would make a single key mean two different lists on one problem. A consumer never chooses between them by hand: [`factor_axis_key`](@ref) reads the key off the loadings result it already holds.
 
@@ -575,7 +575,7 @@ If a key in `dict` starts with the same value as `uxkey`, it identifies a unique
 
 The `tfkey`/`utfkey` prefixes mean the same thing on the time-series factor axis, and `cfkey`/`ucfkey` mean the same thing again on the cross-sectional one. They buy something different from the asset pair. On the asset side the conventions serve *views*; factors are never sliced by an asset index, so on either factor side they buy length validation at construction and one shared mental model. The two factor axes are validated alike, and neither is validated against the other: a problem may declare one, both, or neither.
 
-`zkey` has **no prefix convention at all**, and that asymmetry is the point. `xkey`, `tfkey` and `cfkey` each have a unique-entry sibling because each names an axis that *partitions are written over*; nothing is written over the feature axis. A graded feature program's taxonomy keys are `xkey`-prefixed and asset-length, and its column nodes are named directly out of the flat list `dict[zkey]`. So `zkey` carries exactly one rule — `allunique(dict[zkey])`, so [`ReturnsResult`](@ref)'s own uniqueness check cannot be reached with a duplicate — and no length rule whatever.
+A taxonomy reaches the Asset Panel through [`panel_input`](@ref), which reads one `xkey`-prefixed key as one Panel Field. The panel names its own columns, so no key declares a feature axis.
 
 A key matching none of the six prefixes is a plain group: expanded by name and **axis-blind**, which is why a factor group needs no machinery of its own.
 
@@ -592,7 +592,6 @@ $(DocStringExtensions.FIELDS)
         utfkey::AbstractString = "uf",
         cfkey::AbstractString = "ncf",
         ucfkey::AbstractString = "ucf",
-        zkey::AbstractString = "nz",
         dict::AbstractDict{<:AbstractString, <:Any}
     ) -> UniverseSets
 
@@ -602,8 +601,7 @@ Keywords correspond to the struct's fields.
 
   - `!isempty(dict)`.
   - `haskey(dict, xkey)`.
-  - No two of `xkey`, `uxkey`, `tfkey`, `utfkey`, `cfkey`, `ucfkey`, `zkey` may be a prefix of one another (42 ordered checks, which also rules out any two being equal).
-  - If `haskey(dict, zkey)`, `allunique(dict[zkey])`.
+  - No two of `xkey`, `uxkey`, `tfkey`, `utfkey`, `cfkey`, `ucfkey` may be a prefix of one another (30 ordered checks, which also rules out any two being equal).
   - If a key in `dict` starts with the same value as `xkey`, `length(dict[k]) == length(dict[xkey])`.
   - If a key in `dict` starts with the same value as `uxkey`, there must be a corresponding key in `dict` where the `uxkey` prefix is replaced by the `xkey` prefix, and its length must equal `length(dict[xkey])`.
   - If a key in `dict` starts with the same value as `tfkey`, `haskey(dict, tfkey)` and `length(dict[k]) == length(dict[tfkey])`.
@@ -617,8 +615,8 @@ Keywords correspond to the struct's fields.
 
   - The method reads the asset index alone. It drops every further positional argument, because no axis but the asset axis is sliced.
   - Every `xkey`-prefixed entry of `dict` is sliced to the selected assets, and every `uxkey`-prefixed entry is rebuilt from the sliced partition it names.
-  - The `tfkey`-, `utfkey`-, `cfkey`-, `ucfkey`- and `zkey`-prefixed entries, and every plain group, are carried through unchanged. [`port_opt_view`](@ref) states why each axis is exempt.
-  - The seven key prefixes are carried through unchanged, so the viewed value declares the same axes as the original.
+  - The `tfkey`-, `utfkey`-, `cfkey`- and `ucfkey`-prefixed entries, and every plain group, are carried through unchanged. [`port_opt_view`](@ref) states why each axis is exempt.
+  - The six key prefixes are carried through unchanged, so the viewed value declares the same axes as the original.
 
 # Examples
 
@@ -631,7 +629,6 @@ UniverseSets
   utfkey ┼ String: "uf"
    cfkey ┼ String: "ncf"
   ucfkey ┼ String: "ucf"
-    zkey ┼ String: "nz"
     dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"], "group1" => ["A", "B"])
 ```
 
@@ -642,7 +639,7 @@ UniverseSets
   - [`linear_constraints`](@ref)
   - [`factor_axis_key`](@ref)
   - [`factor_universe`](@ref)
-  - [`feature_universe`](@ref)
+  - [`panel_input`](@ref)
   - [`prefixed_sets_keys`](@ref)
   - [`unclaimed_sets_keys`](@ref)
   - [`port_opt_view`](@ref)
@@ -673,33 +670,24 @@ UniverseSets
     """
     ucfkey
     """
-    $(field_dict[:us_zkey])
-    """
-    zkey
-    """
     $(field_dict[:dict])
     """
     dict
     function UniverseSets(xkey::AbstractString, uxkey::AbstractString,
                           tfkey::AbstractString, utfkey::AbstractString,
                           cfkey::AbstractString, ucfkey::AbstractString,
-                          zkey::AbstractString,
                           dict::AbstractDict{<:AbstractString, <:Any})::UniverseSets
         @argcheck(!isempty(dict), IsEmptyError)
         @argcheck(haskey(dict, xkey),
-                  KeyError("$xkey (the asset universe), required by UniverseSets. The asset axis is the one mandatory axis: correct the spelling$(suggest_declared_key(xkey, unclaimed_sets_keys(dict, (uxkey, tfkey, utfkey, cfkey, ucfkey, zkey)))), pass `xkey = <the key you wrote>`, or add `$xkey => <asset names>` to `dict`."))
-        knames = ("xkey", "uxkey", "tfkey", "utfkey", "cfkey", "ucfkey", "zkey")
-        kvals = (xkey, uxkey, tfkey, utfkey, cfkey, ucfkey, zkey)
+                  KeyError("$xkey (the asset universe), required by UniverseSets. The asset axis is the one mandatory axis: correct the spelling$(suggest_declared_key(xkey, unclaimed_sets_keys(dict, (uxkey, tfkey, utfkey, cfkey, ucfkey)))), pass `xkey = <the key you wrote>`, or add `$xkey => <asset names>` to `dict`."))
+        knames = ("xkey", "uxkey", "tfkey", "utfkey", "cfkey", "ucfkey")
+        kvals = (xkey, uxkey, tfkey, utfkey, cfkey, ucfkey)
         for i in eachindex(kvals), j in eachindex(kvals)
             i == j && continue
             @argcheck(!startswith(kvals[i], kvals[j]),
                       ArgumentError("$(knames[i]) ($(kvals[i])) must not start with $(knames[j]) ($(kvals[j]))"))
         end
-        if haskey(dict, zkey)
-            @argcheck(allunique(dict[zkey]),
-                      ArgumentError("the declared feature axis `$zkey` must not repeat a node, because a duplicate would silently merge two columns and would be rejected by `ReturnsResult`'s own `nz` uniqueness check anyway"))
-        end
-        for k in setdiff(keys(dict), (xkey, tfkey, cfkey, zkey))
+        for k in setdiff(keys(dict), (xkey, tfkey, cfkey))
             if startswith(k, xkey)
                 @argcheck(length(dict[k]) == length(dict[xkey]),
                           DimensionMismatch("the asset partition `$k` and the asset universe `$xkey` disagree on how many assets there are. Got\nlength(dict[$k]) => $(length(dict[k]))\nlength(dict[$xkey]) => $(length(dict[xkey]))"))
@@ -720,18 +708,15 @@ UniverseSets
             end
         end
         return new{typeof(xkey), typeof(uxkey), typeof(tfkey), typeof(utfkey),
-                   typeof(cfkey), typeof(ucfkey), typeof(zkey), typeof(dict)}(xkey, uxkey,
-                                                                              tfkey, utfkey,
-                                                                              cfkey, ucfkey,
-                                                                              zkey, dict)
+                   typeof(cfkey), typeof(ucfkey), typeof(dict)}(xkey, uxkey, tfkey, utfkey,
+                                                                cfkey, ucfkey, dict)
     end
 end
 function UniverseSets(; xkey::AbstractString = "nx", uxkey::AbstractString = "ux",
                       tfkey::AbstractString = "nf", utfkey::AbstractString = "uf",
                       cfkey::AbstractString = "ncf", ucfkey::AbstractString = "ucf",
-                      zkey::AbstractString = "nz",
                       dict::AbstractDict{<:AbstractString, <:Any})::UniverseSets
-    return UniverseSets(xkey, uxkey, tfkey, utfkey, cfkey, ucfkey, zkey, dict)
+    return UniverseSets(xkey, uxkey, tfkey, utfkey, cfkey, ucfkey, dict)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -740,14 +725,12 @@ Return a view of a [`UniverseSets`](@ref) restricted to the assets at index `i`.
 
 The asset axis is the only axis this view slices, and the other three are exempt for two different reasons. **Both** factor axes are exempt because an asset index has no meaning on either, and they are treated alike: a `cfkey`-prefixed entry comes back bit-identical exactly as a `tfkey`-prefixed one does. Declaring an axis is what makes the exemption a property of the *data*: before the declaration, a factor-flavoured sets sitting in a `@vprop` field was sliced by asset indices and failed with a length mismatch, and the only defence was omitting the annotation by hand, field by field. There is deliberately **no factor-index arity** either. `port_opt_view(rd, i, j, k)` can slice `rd.nf`, but no internal caller passes a non-colon `k`, so a user who slices factors updates their sets themselves.
 
-The feature axis is exempt although some of its nodes *are* assets. It is left alone because the axis is **declared** rather than derived: the caller wrote the node list down, so it is the program's coordinate system and not a summary of the current universe. That is what makes `size(Z, 2)` **fold-invariant** for a graded [`asset_sets_features`](@ref) program — exactly the opposite of the group-name-key path, where the viewed producer rebuilds the axis from the viewed taxonomy and a group left with no members disappears. The consequence is accepted rather than filtered: an asset node whose asset the view dropped survives as an **all-zero column**.
-
 # Algorithm
 
  1. Read `xkey` and `uxkey` from `sets`, and open an empty dictionary `dict` of the type `sets.dict` has.
  2. For an entry of `sets.dict` whose key starts with `xkey`, take `view(v, i)`, the group restricted to the selected assets.
  3. For an entry whose key starts with `uxkey`, take the unique entries of the `xkey`-prefixed partition it names, restricted to `i`. The unique-entry group is therefore derived from the sliced partition and never from the original one.
- 4. Carry every other entry through unchanged, into the same `dict`. The `tfkey`-, `utfkey`-, `cfkey`-, `ucfkey`- and `zkey`-prefixed entries, and every plain group, come back bit-identical.
+ 4. Carry every other entry through unchanged, into the same `dict`. The `tfkey`-, `utfkey`-, `cfkey`- and `ucfkey`-prefixed entries, and every plain group, come back bit-identical.
  5. Return the [`UniverseSets`](@ref) built from `dict` and the seven unchanged key prefixes, which revalidates the prefix grammar over the viewed universe.
 
 # Arguments
@@ -763,7 +746,6 @@ The feature axis is exempt although some of its nodes *are* assets. It is left a
 # Related
 
   - [`UniverseSets`](@ref)
-  - [`asset_sets_features`](@ref)
   - [`port_opt_view`](@ref)
 """
 function port_opt_view(sets::UniverseSets, i, args...)::UniverseSets
@@ -780,7 +762,7 @@ function port_opt_view(sets::UniverseSets, i, args...)::UniverseSets
     end
     return UniverseSets(; xkey = xkey, uxkey = uxkey, tfkey = sets.tfkey,
                         utfkey = sets.utfkey, cfkey = sets.cfkey, ucfkey = sets.ucfkey,
-                        zkey = sets.zkey, dict = dict)
+                        dict = dict)
 end
 """
     factor_universe(sets::UniverseSets, key::AbstractString, K::Integer,
@@ -817,7 +799,6 @@ One helper therefore serves every consumer of either axis, and none of them re-e
   - [`factor_axis_key`](@ref)
   - [`constraint_space_basis`](@ref)
   - [`FactorBlackLittermanPrior`](@ref)
-  - [`feature_universe`](@ref): the same helper for the feature axis, which carries no arity to reconcile.
 """
 function factor_universe(sets::UniverseSets, key::AbstractString, K::Integer,
                          need::AbstractString, source::AbstractString)
@@ -868,39 +849,6 @@ function factor_axis_key(sets::UniverseSets, ::CrossSectionalFactorModel)
 end
 function factor_axis_key(sets::UniverseSets, ::AbstractTimeSeriesRegressionEstimator)
     return sets.tfkey
-end
-"""
-    feature_universe(sets::UniverseSets, need::AbstractString) -> VecStr
-
-Read the **declared** feature axis, `sets.dict[sets.zkey]`, checking that it exists.
-
-The sibling of [`factor_universe`](@ref), written the same way and for the same reason: the axis is optional on [`UniverseSets`](@ref) but is not optional for a consumer written against it, so the failure is diagnosed at the point of need, by one shared helper whose message names the key and says what to add. Existence is the whole check, because the feature axis has no matrix to be reconciled against. It **defines** the width instead: [`asset_sets_features`](@ref) allocates `assets × length(nz)` from this list.
-
-# Arguments
-
-  - `sets`: The [`UniverseSets`](@ref) whose feature axis is read.
-  - `need`: Names the consumer in the diagnostic message, for example `"a graded feature program"`.
-
-# Validation
-
-  - `haskey(sets.dict, sets.zkey)`. A `KeyError` naming `need` is thrown otherwise.
-
-# Returns
-
-  - `nz::VecStr`: The declared feature node names, in the column order the feature matrix is to have.
-
-# Related
-
-  - [`UniverseSets`](@ref)
-  - [`factor_universe`](@ref): the same helper for the factor axis, which also reconciles the axis against a matrix that already exists.
-  - [`asset_sets_features`](@ref)
-  - [`asset_sets_feature_names`](@ref)
-"""
-function feature_universe(sets::UniverseSets, need::AbstractString)
-    zkey = sets.zkey
-    @argcheck(haskey(sets.dict, zkey),
-              KeyError("$zkey (the declared feature axis), required by $need. The feature axis is optional on UniverseSets; it is not optional here: add `sets.zkey => <feature node names>` to `sets.dict`, in the column order the feature matrix is to have."))
-    return sets.dict[zkey]
 end
 """
     name_to_val!(nx::VecStr, sdict::AbstractDict, key::Any, val::Number,

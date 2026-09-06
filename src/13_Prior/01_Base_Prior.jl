@@ -55,8 +55,7 @@ LowOrderPrior
     kld ┼ nothing
      ow ┼ nothing
      rr ┼ nothing
-    fpr ┼ nothing
-    pnl ┴ nothing
+    fpr ┴ nothing
 ```
 
 # Related
@@ -339,14 +338,13 @@ const PrE_Pr = Union{<:AbstractPriorEstimator, <:AbstractPriorResult}
 
 Groups the two carriers that hold an asset returns matrix `X` and a feature matrix `Z`.
 
-`Pr_RR` is the bridge the clustering, phylogeny and centrality forwarders below dispatch on. Each of them reads `X` and the [`AssetPanel`](@ref) off its carrier and delegates to the asset-returns method, so an estimator that needs returns can be driven from a fitted prior or from the raw data with one method apiece rather than two. Where both carriers are present, [`returns_matrix_picker`](@ref) and [`feature_matrix_picker`](@ref) pick between them.
+`Pr_RR` is the bridge the clustering, phylogeny and centrality forwarders below dispatch on. Each of them reads `X` off its carrier and delegates to the asset-returns method, so an estimator that needs returns can be driven from a fitted prior or from the raw data with one method apiece rather than two. Where both carriers are present, [`returns_matrix_picker`](@ref) picks between them; both travel on to the estimator tree as `pr` and `rd`, so a [`FeatureDistance`](@ref) resolves its Asset Panel from them.
 
 # Related
 
   - [`AbstractPriorResult`](@ref)
   - [`ReturnsResult`](@ref)
   - [`returns_matrix_picker`](@ref)
-  - [`feature_matrix_picker`](@ref)
 """
 const Pr_RR = Union{<:AbstractPriorResult, <:ReturnsResult}
 """
@@ -735,92 +733,6 @@ function returns_matrix_picker(pr::Pr_RR, rd::Option{<:ReturnsResult}, x_src::Sy
     return isnothing(rd) || x_src == :prior ? pr.X : rd.X
 end
 """
-    carrier_asset_panel(pr::AbstractPriorResult) -> Option{<:AssetPanel}
-    carrier_asset_panel(rd::ReturnsResult) -> Option{<:AssetPanel}
-
-Read a carrier's own [`AssetPanel`](@ref), or `nothing` when that carrier holds none.
-
-Both carriers a [`Pr_RR`](@ref) can be hold the panel under one field, `pnl`, so the two methods differ only in which carrier they read. A Panel Field owns its values, its levels or labels and its observed mask, so a [`FeatureDistance`](@ref) selector resolves against the panel whichever carrier supplied it.
-
-[`feature_matrix_picker`](@ref) needs this because the carrier it reads the panel off is not always the `rd` argument. `Pr_RR` admits a [`ReturnsResult`](@ref) in the `pr` slot, and `clusterise(cle, rd)` — the shortest public call, and the one every [`Pipeline`](@ref) step makes — puts one there with no `rd` beside it.
-
-# Algorithm
-
-The method that Julia selects is the algorithm. Both read the carrier's `pnl` field.
-
-# Arguments
-
-  - `pr`: The carrier to read, a [`Pr_RR`](@ref).
-
-# Returns
-
-  - `pnl::Option{<:AssetPanel}`: The carrier's Asset Panel, or `nothing`.
-
-# Related
-
-  - [`feature_matrix_picker`](@ref)
-  - [`AssetPanel`](@ref)
-  - [`Pr_RR`](@ref)
-  - [`ReturnsResult`](@ref)
-  - [`LowOrderPrior`](@ref)
-"""
-function carrier_asset_panel(pr::AbstractPriorResult)
-    return pr.pnl
-end
-function carrier_asset_panel(rd::ReturnsResult)
-    return rd.pnl
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Pick the [`AssetPanel`](@ref) a [`FeatureDistance`](@ref) inside the clustering, phylogeny or centrality estimator stacks its Feature Matrix from, and diagnose its absence.
-
-The counterpart of [`returns_matrix_picker`](@ref), with the opposite default: `z_src = :data` prefers the user's own [`ReturnsResult`](@ref) over a derived one, because an explicit panel outranks a produced one. (`x_src = :prior` prefers the prior, because a posterior returns matrix *is* the improvement being asked for. The differing defaults are the argument for naming the source rather than flagging it.)
-
-A missing panel is **not** an error here: it is only required when a [`FeatureDistance`](@ref) is actually in the estimator tree, which this layer cannot see. Resolution therefore returns `nothing` and defers the throw to [`assert_feature_matrix_supplied`](@ref), passing a second return value that names *why* nothing was found — `:neither` when no carrier holds one, and the selector itself when it picked the empty carrier while the other held one.
-
-The panel travels whole rather than as a stacked matrix. A [`FeatureDistance`](@ref) selector names Panel Fields, levels and labels, so it resolves against the panel's own field index and nothing here needs to know which columns it will read.
-
-# Algorithm
-
- 1. Check that `z_src` names one of the two carriers, with [`assert_source_selector`](@ref).
- 2. Read `pp`, the prior carrier's panel, and `pd`, the returns result's, with [`carrier_asset_panel`](@ref). `pd` is `nothing` when there is no returns result.
- 3. Select the panel: `pp` when there is no returns result, or when `z_src` is `:prior`. `pd` otherwise.
- 4. Make the diagnostic `z_diag`: `:neither` when both `pp` and `pd` are `nothing`, and `z_src` itself otherwise. The two cases are distinct, because the second says a panel exists on the carrier that was not selected.
- 5. Return the panel and `z_diag`.
-
-# Arguments
-
-  - $(arg_dict[:pr_rr])
-  - $(arg_dict[:rd]) Consulted only when `z_src` is `:data`.
-  - $(arg_dict[:z_src])
-
-# Validation
-
-  - `z_src in (:prior, :data)`.
-
-# Returns
-
-  - `pnl::Option{<:AssetPanel}`: Asset Panel from the selected carrier, or `nothing`.
-  - `z_diag::Symbol`: The diagnostic to forward as `z_src`; the selector itself, or `:neither`.
-
-# Related
-
-  - [`assert_source_selector`](@ref)
-  - [`returns_matrix_picker`](@ref)
-  - [`carrier_asset_panel`](@ref)
-  - [`assert_feature_matrix_supplied`](@ref)
-  - [`AssetPanel`](@ref)
-  - [`FeatureDistance`](@ref)
-"""
-function feature_matrix_picker(pr::Pr_RR, rd::Option{<:ReturnsResult}, z_src::Symbol)
-    assert_source_selector(z_src, :z_src)
-    pp = carrier_asset_panel(pr)
-    pd = isnothing(rd) ? nothing : rd.pnl
-    return (isnothing(rd) || z_src == :prior ? pp : pd),
-           isnothing(pp) && isnothing(pd) ? :neither : z_src
-end
-"""
     clusterise(cle::AbstractClustersEstimator, pr::AbstractPriorResult; kwargs...)
 
 Clusterise asset or factor returns from a prior result using a clustering estimator.
@@ -830,16 +742,14 @@ Clusterise asset or factor returns from a prior result using a clustering estima
 # Algorithm
 
  1. Pick the asset returns matrix `X` from the carrier that `x_src` names, with [`returns_matrix_picker`](@ref).
- 2. Pick the [`AssetPanel`](@ref) from the carrier that `z_src` names, with [`feature_matrix_picker`](@ref). It also gives `z_diag`, the diagnostic that names why nothing was found.
- 3. Call the asset-returns method of [`clusterise`](@ref) with `X`, passing `Z` and `z_diag` on as `Z` and `z_src`, and return the clustering result it produces.
+ 2. Call the asset-returns method of [`clusterise`](@ref) with `X`, passing both carriers on as `pr` and `rd`, and return the clustering result it produces.
 
 # Arguments
 
   - `cle`: Clustering estimator.
   - $(arg_dict[:pr_rr])
-  - $(arg_dict[:rd]) Consulted only when `x_src` or `z_src` is `:data`.
+  - $(arg_dict[:rd]) Read for `X` only when `x_src` is `:data`, and passed on to the estimator tree.
   - $(arg_dict[:x_src])
-  - $(arg_dict[:z_src])
   - `kwargs...`: Additional keyword arguments passed to the clustering estimator.
 
 # Returns
@@ -852,15 +762,13 @@ Clusterise asset or factor returns from a prior result using a clustering estima
   - [`AbstractPriorResult`](@ref)
   - [`Pr_RR`](@ref)
   - [`returns_matrix_picker`](@ref)
-  - [`feature_matrix_picker`](@ref)
   - [`clusterise`](@ref)
 """
 function clusterise(cle::AbstractClustersEstimator, pr::Pr_RR;
                     rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :prior,
-                    z_src::Symbol = :data, kwargs...)
+                    kwargs...)
     X = returns_matrix_picker(pr, rd, x_src)
-    pnl, z_diag = feature_matrix_picker(pr, rd, z_src)
-    return clusterise(cle, X; pnl = pnl, z_src = z_diag, kwargs...)
+    return clusterise(cle, X; pr = pr, rd = rd, kwargs...)
 end
 """
     phylogeny_matrix(pl::NwE_ClE_Cl, pr::AbstractPriorResult;
@@ -873,16 +781,14 @@ Compute the phylogeny matrix from asset returns in a prior result using a networ
 # Algorithm
 
  1. Pick the asset returns matrix `X` from the carrier that `x_src` names, with [`returns_matrix_picker`](@ref).
- 2. Pick the [`AssetPanel`](@ref) from the carrier that `z_src` names, with [`feature_matrix_picker`](@ref). It also gives `z_diag`, the diagnostic that names why nothing was found.
- 3. Call the asset-returns method of [`phylogeny_matrix`](@ref) with `X`, passing `Z` and `z_diag` on as `Z` and `z_src`, and return the phylogeny result it produces.
+ 2. Call the asset-returns method of [`phylogeny_matrix`](@ref) with `X`, passing both carriers on as `pr` and `rd`, and return the phylogeny result it produces.
 
 # Arguments
 
   - `pl`: Network estimator, clusters estimator, or clustering result.
   - $(arg_dict[:pr_rr])
-  - $(arg_dict[:rd]) Consulted only when `x_src` or `z_src` is `:data`.
+  - $(arg_dict[:rd]) Read for `X` only when `x_src` is `:data`, and passed on to the estimator tree.
   - $(arg_dict[:x_src])
-  - $(arg_dict[:z_src])
   - `kwargs...`: Additional keyword arguments passed to the estimator.
 
 # Returns
@@ -896,14 +802,12 @@ Compute the phylogeny matrix from asset returns in a prior result using a networ
   - [`PhylogenyResult`](@ref)
   - [`Pr_RR`](@ref)
   - [`returns_matrix_picker`](@ref)
-  - [`feature_matrix_picker`](@ref)
   - [`phylogeny_matrix`](@ref)
 """
 function phylogeny_matrix(pl::NwE_ClE_Cl, pr::Pr_RR; rd::Option{<:ReturnsResult} = nothing,
-                          x_src::Symbol = :prior, z_src::Symbol = :data, kwargs...)
+                          x_src::Symbol = :prior, kwargs...)
     X = returns_matrix_picker(pr, rd, x_src)
-    pnl, z_diag = feature_matrix_picker(pr, rd, z_src)
-    return phylogeny_matrix(pl, X; pnl = pnl, z_src = z_diag, kwargs...)
+    return phylogeny_matrix(pl, X; pr = pr, rd = rd, kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -915,16 +819,14 @@ Compute phylogeny constraints from asset returns in a prior result using a phylo
 # Algorithm
 
  1. Pick the asset returns matrix `X` from the carrier that `x_src` names, with [`returns_matrix_picker`](@ref).
- 2. Pick the [`AssetPanel`](@ref) from the carrier that `z_src` names, with [`feature_matrix_picker`](@ref). It also gives `z_diag`, the diagnostic that names why nothing was found.
- 3. Call the asset-returns method of [`phylogeny_constraints`](@ref) with `X`, passing `Z` and `z_diag` on as `Z` and `z_src`, and return the constraint result it produces.
+ 2. Call the asset-returns method of [`phylogeny_constraints`](@ref) with `X`, passing both carriers on as `pr` and `rd`, and return the constraint result it produces.
 
 # Arguments
 
   - `plc`: Phylogeny constraint estimator.
   - $(arg_dict[:pr_rr])
-  - $(arg_dict[:rd]) Consulted only when `x_src` or `z_src` is `:data`.
+  - $(arg_dict[:rd]) Read for `X` only when `x_src` is `:data`, and passed on to the estimator tree.
   - $(arg_dict[:x_src])
-  - $(arg_dict[:z_src])
   - `kwargs...`: Additional keyword arguments passed to the estimator.
 
 # Returns
@@ -937,15 +839,13 @@ Compute phylogeny constraints from asset returns in a prior result using a phylo
   - [`AbstractPriorResult`](@ref)
   - [`Pr_RR`](@ref)
   - [`returns_matrix_picker`](@ref)
-  - [`feature_matrix_picker`](@ref)
   - [`phylogeny_constraints`](@ref)
 """
 function phylogeny_constraints(plc::AbstractPhylogenyConstraintEstimator, pr::Pr_RR;
                                rd::Option{<:ReturnsResult} = nothing,
-                               x_src::Symbol = :prior, z_src::Symbol = :data, kwargs...)
+                               x_src::Symbol = :prior, kwargs...)
     X = returns_matrix_picker(pr, rd, x_src)
-    pnl, z_diag = feature_matrix_picker(pr, rd, z_src)
-    return phylogeny_constraints(plc, X; pnl = pnl, z_src = z_diag, kwargs...)
+    return phylogeny_constraints(plc, X; pr = pr, rd = rd, kwargs...)
 end
 """
     centrality_vector(cte::CentralityEstimator, pr::AbstractPriorResult; kwargs...)
@@ -957,16 +857,14 @@ Compute the centrality vector for a centrality estimator and prior result.
 # Algorithm
 
  1. Pick the asset returns matrix `X` from the carrier that `x_src` names, with [`returns_matrix_picker`](@ref).
- 2. Pick the [`AssetPanel`](@ref) from the carrier that `z_src` names, with [`feature_matrix_picker`](@ref). It also gives `z_diag`, the diagnostic that names why nothing was found.
- 3. Call the asset-returns method of [`centrality_vector`](@ref) with `X`, passing `Z` and `z_diag` on as `Z` and `z_src`, and return the centrality result it produces.
+ 2. Call the asset-returns method of [`centrality_vector`](@ref) with `X`, passing both carriers on as `pr` and `rd`, and return the centrality result it produces.
 
 # Arguments
 
   - $(arg_dict[:cte])
   - $(arg_dict[:pr_rr])
-  - $(arg_dict[:rd]) Consulted only when `x_src` or `z_src` is `:data`.
+  - $(arg_dict[:rd]) Read for `X` only when `x_src` is `:data`, and passed on to the estimator tree.
   - $(arg_dict[:x_src])
-  - $(arg_dict[:z_src])
   - `kwargs...`: Additional keyword arguments.
 
 # Returns
@@ -979,15 +877,13 @@ Compute the centrality vector for a centrality estimator and prior result.
   - [`PhylogenyResult`](@ref)
   - [`Pr_RR`](@ref)
   - [`returns_matrix_picker`](@ref)
-  - [`feature_matrix_picker`](@ref)
   - [`centrality_vector`](@ref)
 """
 function centrality_vector(cte::CentralityEstimator, pr::Pr_RR;
                            rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :prior,
-                           z_src::Symbol = :data, kwargs...)
+                           kwargs...)
     X = returns_matrix_picker(pr, rd, x_src)
-    pnl, z_diag = feature_matrix_picker(pr, rd, z_src)
-    return centrality_vector(cte, X; pnl = pnl, z_src = z_diag, kwargs...)
+    return centrality_vector(cte, X; pr = pr, rd = rd, kwargs...)
 end
 """
     centrality_vector(pl::NwE_ClE_Cl, ct::AbstractCentralityAlgorithm,
@@ -1000,17 +896,15 @@ Compute the centrality vector for a network or clustering estimator and centrali
 # Algorithm
 
  1. Pick the asset returns matrix `X` from the carrier that `x_src` names, with [`returns_matrix_picker`](@ref).
- 2. Pick the [`AssetPanel`](@ref) from the carrier that `z_src` names, with [`feature_matrix_picker`](@ref). It also gives `z_diag`, the diagnostic that names why nothing was found.
- 3. Call the asset-returns method of [`centrality_vector`](@ref) with `X`, passing `Z` and `z_diag` on as `Z` and `z_src`, and return the centrality result it produces.
+ 2. Call the asset-returns method of [`centrality_vector`](@ref) with `X`, passing both carriers on as `pr` and `rd`, and return the centrality result it produces.
 
 # Arguments
 
   - `pl`: Network estimator, clusters estimator, or clustering result.
   - $(arg_dict[:cta])
   - $(arg_dict[:pr_rr])
-  - $(arg_dict[:rd]) Consulted only when `x_src` or `z_src` is `:data`.
+  - $(arg_dict[:rd]) Read for `X` only when `x_src` is `:data`, and passed on to the estimator tree.
   - $(arg_dict[:x_src])
-  - $(arg_dict[:z_src])
   - `kwargs...`: Additional keyword arguments.
 
 # Returns
@@ -1024,15 +918,13 @@ Compute the centrality vector for a network or clustering estimator and centrali
   - [`PhylogenyResult`](@ref)
   - [`Pr_RR`](@ref)
   - [`returns_matrix_picker`](@ref)
-  - [`feature_matrix_picker`](@ref)
   - [`centrality_vector`](@ref)
 """
 function centrality_vector(pl::NwE_ClE_Cl, ct::AbstractCentralityAlgorithm, pr::Pr_RR;
                            rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :prior,
-                           z_src::Symbol = :data, kwargs...)
+                           kwargs...)
     X = returns_matrix_picker(pr, rd, x_src)
-    pnl, z_diag = feature_matrix_picker(pr, rd, z_src)
-    return centrality_vector(pl, ct, X; pnl = pnl, z_src = z_diag, kwargs...)
+    return centrality_vector(pl, ct, X; pr = pr, rd = rd, kwargs...)
 end
 """
     average_centrality(pl::NwE_Pl_ClE_Cl,
@@ -1045,7 +937,7 @@ Compute the weighted average centrality for a network or phylogeny result.
 
 # Algorithm
 
- 1. Compute the centrality result with the [`Pr_RR`](@ref) method of [`centrality_vector`](@ref), forwarding `rd`, `x_src` and `z_src` unchanged. The source selection is therefore made once, there, and this method never reads a carrier itself.
+ 1. Compute the centrality result with the [`Pr_RR`](@ref) method of [`centrality_vector`](@ref), forwarding `rd` and `x_src` unchanged. The source selection is therefore made once, there, and this method never reads a carrier itself.
  2. Return the dot product of that result's `X`, the centrality vector, with the weights `w`.
 
 # Arguments
@@ -1054,9 +946,8 @@ Compute the weighted average centrality for a network or phylogeny result.
   - $(arg_dict[:cta])
   - `w`: Portfolio weights vector.
   - $(arg_dict[:pr_rr])
-  - $(arg_dict[:rd]) Consulted only when `x_src` or `z_src` is `:data`.
+  - $(arg_dict[:rd]) Read for `X` only when `x_src` is `:data`, and passed on to the estimator tree.
   - $(arg_dict[:x_src])
-  - $(arg_dict[:z_src])
   - `kwargs...`: Additional keyword arguments.
 
 # Returns
@@ -1073,9 +964,9 @@ Compute the weighted average centrality for a network or phylogeny result.
 """
 function average_centrality(pl::NwE_Pl_ClE_Cl, ct::AbstractCentralityAlgorithm, w::VecNum,
                             pr::Pr_RR; rd::Option{<:ReturnsResult} = nothing,
-                            x_src::Symbol = :prior, z_src::Symbol = :data, kwargs...)
+                            x_src::Symbol = :prior, kwargs...)
     return LinearAlgebra.dot(centrality_vector(pl, ct, pr; rd = rd, x_src = x_src,
-                                               z_src = z_src, kwargs...).X, w)
+                                               kwargs...).X, w)
 end
 """
     average_centrality(cte::CentralityEstimator, w::VecNum, pr::AbstractPriorResult;
@@ -1088,8 +979,7 @@ Compute the weighted average centrality for a centrality estimator.
 # Algorithm
 
  1. Pick the asset returns matrix `X` from the carrier that `x_src` names, with [`returns_matrix_picker`](@ref).
- 2. Pick the [`AssetPanel`](@ref) from the carrier that `z_src` names, with [`feature_matrix_picker`](@ref). It also gives `z_diag`, the diagnostic that names why nothing was found.
- 3. Call the asset-returns method of [`average_centrality`](@ref) with `X`, passing `Z` and `z_diag` on as `Z` and `z_src`, and return the weighted average it produces.
+ 2. Call the asset-returns method of [`average_centrality`](@ref) with `X`, passing both carriers on as `pr` and `rd`, and return the weighted average it produces.
 
 The estimator method picks the carriers itself, where the network-and-algorithm method above delegates that to [`centrality_vector`](@ref). The two reach the same selection: `cte` carries `pl` and `ct` in its own fields, so the asset-returns method it calls is the one the other method's step 1 would have reached.
 
@@ -1098,9 +988,8 @@ The estimator method picks the carriers itself, where the network-and-algorithm 
   - $(arg_dict[:cte])
   - `w`: Portfolio weights vector.
   - $(arg_dict[:pr_rr])
-  - $(arg_dict[:rd]) Consulted only when `x_src` or `z_src` is `:data`.
+  - $(arg_dict[:rd]) Read for `X` only when `x_src` is `:data`, and passed on to the estimator tree.
   - $(arg_dict[:x_src])
-  - $(arg_dict[:z_src])
   - `kwargs...`: Additional keyword arguments.
 
 # Returns
@@ -1112,16 +1001,14 @@ The estimator method picks the carriers itself, where the network-and-algorithm 
   - [`CentralityEstimator`](@ref)
   - [`Pr_RR`](@ref)
   - [`returns_matrix_picker`](@ref)
-  - [`feature_matrix_picker`](@ref)
   - [`centrality_vector`](@ref)
   - [`average_centrality`](@ref)
 """
 function average_centrality(cte::CentralityEstimator, w::VecNum, pr::Pr_RR;
                             rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :prior,
-                            z_src::Symbol = :data, kwargs...)
+                            kwargs...)
     X = returns_matrix_picker(pr, rd, x_src)
-    pnl, z_diag = feature_matrix_picker(pr, rd, z_src)
-    return average_centrality(cte, w, X; pnl = pnl, z_src = z_diag, kwargs...)
+    return average_centrality(cte, w, X; pr = pr, rd = rd, kwargs...)
 end
 """
     asset_phylogeny(pl::NwE_ClE_Cl,
@@ -1134,17 +1021,15 @@ This function computes the phylogeny matrix from the asset returns in the prior 
 # Algorithm
 
  1. Pick the asset returns matrix `X` from the carrier that `x_src` names, with [`returns_matrix_picker`](@ref).
- 2. Pick the [`AssetPanel`](@ref) from the carrier that `z_src` names, with [`feature_matrix_picker`](@ref). It also gives `z_diag`, the diagnostic that names why nothing was found.
- 3. Call the asset-returns method of [`asset_phylogeny`](@ref) with `X`, passing `Z` and `z_diag` on as `Z` and `z_src`, and return the score it produces.
+ 2. Call the asset-returns method of [`asset_phylogeny`](@ref) with `X`, passing both carriers on as `pr` and `rd`, and return the score it produces.
 
 # Arguments
 
   - `pl`: Phylogeny estimator or clustering result used to compute the phylogeny matrix.
   - `w`: Portfolio weights vector.
   - $(arg_dict[:pr_rr])
-  - $(arg_dict[:rd]) Consulted only when `x_src` or `z_src` is `:data`.
+  - $(arg_dict[:rd]) Read for `X` only when `x_src` is `:data`, and passed on to the estimator tree.
   - $(arg_dict[:x_src])
-  - $(arg_dict[:z_src])
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the phylogeny matrix computation.
 
@@ -1160,15 +1045,13 @@ This function computes the phylogeny matrix from the asset returns in the prior 
   - [`AbstractPriorResult`](@ref)
   - [`Pr_RR`](@ref)
   - [`returns_matrix_picker`](@ref)
-  - [`feature_matrix_picker`](@ref)
   - [`asset_phylogeny`](@ref): The asset-returns methods this one delegates to. They build the phylogeny matrix, add up the gross weight of the related pairs, and divide by the gross weight of every pair. That is where the score's closed form and its numbered steps are stated.
 """
 function asset_phylogeny(pl::NwE_ClE_Cl, w::VecNum, pr::Pr_RR;
                          rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :prior,
-                         z_src::Symbol = :data, kwargs...)
+                         kwargs...)
     X = returns_matrix_picker(pr, rd, x_src)
-    pnl, z_diag = feature_matrix_picker(pr, rd, z_src)
-    return asset_phylogeny(pl, w, X; pnl = pnl, z_src = z_diag, kwargs...)
+    return asset_phylogeny(pl, w, X; pr = pr, rd = rd, kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1180,16 +1063,14 @@ Compute centrality constraints from asset returns in a prior result using a cent
 # Algorithm
 
  1. Pick the asset returns matrix `X` from the carrier that `x_src` names, with [`returns_matrix_picker`](@ref).
- 2. Pick the [`AssetPanel`](@ref) from the carrier that `z_src` names, with [`feature_matrix_picker`](@ref). It also gives `z_diag`, the diagnostic that names why nothing was found.
- 3. Call the asset-returns method of [`centrality_constraints`](@ref) with `X`, passing `Z` and `z_diag` on as `Z` and `z_src`, and return the constraint result it produces.
+ 2. Call the asset-returns method of [`centrality_constraints`](@ref) with `X`, passing both carriers on as `pr` and `rd`, and return the constraint result it produces.
 
 # Arguments
 
   - `ccs`: Centrality constraint estimator or vector thereof.
   - $(arg_dict[:pr_rr])
-  - $(arg_dict[:rd]) Consulted only when `x_src` or `z_src` is `:data`.
+  - $(arg_dict[:rd]) Read for `X` only when `x_src` is `:data`, and passed on to the estimator tree.
   - $(arg_dict[:x_src])
-  - $(arg_dict[:z_src])
   - `kwargs...`: Additional keyword arguments passed to the estimator. `strict` is read by the asset-returns variant, which reports a dropped zero centrality vector through it.
 
 # Returns
@@ -1201,15 +1082,13 @@ Compute centrality constraints from asset returns in a prior result using a cent
   - [`AbstractPriorResult`](@ref)
   - [`Pr_RR`](@ref)
   - [`returns_matrix_picker`](@ref)
-  - [`feature_matrix_picker`](@ref)
   - [`centrality_constraints`](@ref)
 """
 function centrality_constraints(ccs::CC_VecCC, pr::Pr_RR;
                                 rd::Option{<:ReturnsResult} = nothing,
-                                x_src::Symbol = :prior, z_src::Symbol = :data, kwargs...)
+                                x_src::Symbol = :prior, kwargs...)
     X = returns_matrix_picker(pr, rd, x_src)
-    pnl, z_diag = feature_matrix_picker(pr, rd, z_src)
-    return centrality_constraints(ccs, X; pnl = pnl, z_src = z_diag, kwargs...)
+    return centrality_constraints(ccs, X; pr = pr, rd = rd, kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1243,7 +1122,7 @@ Keywords correspond to the struct's fields.
 
 ## The factor block
 
-A prior fit through a factor model carries two distributions: one over the assets, in the carrier's own fields, and one over the factors. The factor one is a **nested `LowOrderPrior`** in `fpr` rather than a set of `f_`-prefixed flat fields, so it gains every field the carrier has — `w`, `ens`, `kld` and `ow` as well as `mu` and `sigma` — and gains any field added in future without a second edit. Its `X` is the factor returns matrix, over the same observations as the asset `X`; `fpr.pnl` is therefore a panel over the factors, which is why an asset-axis panel never comes from it.
+A prior fit through a factor model carries two distributions: one over the assets, in the carrier's own fields, and one over the factors. The factor one is a **nested `LowOrderPrior`** in `fpr` rather than a set of `f_`-prefixed flat fields, so it gains every field the carrier has — `w`, `ens`, `kld` and `ow` as well as `mu` and `sigma` — and gains any field added in future without a second edit. Its `X` is the factor returns matrix, over the same observations as the asset `X`.
 
 `fpr` travels with `rr`: the two are the factor block, and the constructor requires them together or not at all. `rr` is what projects the block onto the assets (`mu ≈ rr.M * fpr.mu + rr.b`), so a factor distribution with no loadings could not be read against this asset axis.
 
@@ -1257,7 +1136,7 @@ The flat names are **virtual reads** of the nested block, so code written agains
 
 **`pr.fpr.mu` is the public read**; the flat `f_`-prefixed names are a **compatibility surface**, kept so that code written against the pre-nesting shape keeps working, and useful where a value-or-`nothing` read without branching is wanted.
 
-The reason is not taste. The flat surface is **partial and frozen**: there are six flat names over twelve fields, so `fpr.X` — the factor returns matrix — and `fpr.pnl`, `fpr.chol` and `fpr.rr` have no flat spelling at all and never will. A surface that cannot express the whole block cannot be the way to read it. The set is fixed at the six here and the seven on [`HighOrderPrior`](@ref); a field added to a carrier in future is reachable as `pr.fpr.<name>` and gains no `f_` counterpart, so nothing has to be added in two places to stay complete.
+The reason is not taste. The flat surface is **partial and frozen**: there are six flat names over eleven fields, so `fpr.X` — the factor returns matrix — and `fpr.chol` and `fpr.rr` have no flat spelling at all and never will. A surface that cannot express the whole block cannot be the way to read it. The set is fixed at the six here and the seven on [`HighOrderPrior`](@ref); a field added to a carrier in future is reachable as `pr.fpr.<name>` and gains no `f_` counterpart, so nothing has to be added in two places to stay complete.
 
 The two reads also differ where the block is absent, which is the one case worth checking before choosing: `pr.f_mu` returns `nothing`, while `pr.fpr.mu` throws, because `fpr` is `nothing`. Guard with [`assert_prior_regression`](@ref) — `rr` and `fpr` are supplied together or not at all, so checking `rr` establishes the whole block — and then read through `fpr`.
 
@@ -1268,16 +1147,6 @@ Most prior estimators wrap another and return a carrier built from the one they 
 > **Forward when forwarding is correct; drop only where forwarding would state something false; document every drop in the estimator's docstring.**
 
 Consistency of the returned result is the criterion, and destroying a value the caller explicitly computed is not an acceptable way to buy it — so forwarding is the default, and each estimator's docstring lists the fields it drops and why. Two fields are *bound* to another and therefore never forwarded alone: `chol` is bound to `sigma` (it takes precedence over `sigma` at every consumer, so a stale factor is silently used in place of the updated covariance), and `ens`, `kld` and `ow` are bound to `w` (they are diagnostics *of* those weights). `forward_prior` refuses a forward that would break either binding.
-
-## The feature matrix
-
-`Z` is **derived only**: it is populated by a producer that declares a matrix to be features — [`FeaturePrior`](@ref) — and never by pass-through of a user's `ReturnsResult.Z`. That is what keeps the two carriers from disagreeing: they cannot both hold the same matrix, so `z_src` selects a provenance rather than one of two copies.
-
-It carries **no feature names**. A producer runs inside `prior(pe, X, F; …)` with raw matrices, so names are structurally unavailable there — and it carries no squareness flag either: the prior carrier has no vocabulary for "the features *are* the assets", because every producer that builds a square feature matrix refits on the subproblem's own universe rather than having a full-universe matrix sliced. Exogenous square structure travels on the *data* carrier, where squareness is derived from `nz` against `nx` and therefore cannot be stated wrongly.
-
-Every prior estimator that wraps another **forwards it**, so nesting order does not matter: `BlackLittermanPrior(; pe = FeaturePrior(…))` and `FeaturePrior(; pe = BlackLittermanPrior(…))` both arrive with `Z` set. This is unconditionally safe because no prior estimator changes the asset set or the observation count. The exceptions are the estimators whose wrapped prior is fit on **factors** rather than assets — [`FactorPrior`](@ref), [`FactorBlackLittermanPrior`](@ref), and the factor half of [`AugmentedBlackLittermanPrior`](@ref) — which drop it, because a factor-space feature matrix does not describe the asset axis.
-
-`FactorPrior`, `FactorBlackLittermanPrior` and `AugmentedBlackLittermanPrior` *reconstruct* `X` as `F * transpose(M) .+ transpose(b)`, so a `Z` forwarded through them is dimension-correct but was derived from the pre-reconstruction returns.
 
 ## The original returns matrix
 
@@ -1301,7 +1170,6 @@ The two matrices are not interchangeable. The reconstruction spans only the fact
   - If the factor block is present, `size(rr.M, 2) == length(fpr.mu) == size(fpr.sigma, 1)`, `size(rr.M, 1) == length(mu)`, and `size(fpr.X, 1) == size(X, 1)` — the two blocks describe the same observations. Everything internal to the factor block, including its own `w` against its own `X`, is validated by its own constructor.
   - If `o_X` is not `nothing`, `o_X !== X`, `size(o_X) == size(X)`, and `rr` is not `nothing`. `o_X !== X` is an **identity** test and not an equality test, so `o_X = copy(X)` is admitted where `o_X = X` raises. The two calls read identically at a call site, and only the first carries a matrix a later change to `X` cannot follow. What the guard rejects is the carrier that has no original distinct from the one it asserts, not a matrix whose values happen to agree.
   - If `chol` is not `nothing`, `!isempty(chol)` and `length(mu) == size(chol, 2)`.
-  - If `pnl` is not `nothing`, its asset axis is `size(X, 2)`, and its observation axis is `size(X, 1)` when it is time-varying (see [`check_asset_panel`](@ref)).
 
 ## View parameters
 
@@ -1310,7 +1178,6 @@ The two matrices are not interchangeable. The reconstruction spans only the fact
   - It reads no argument beyond `i`. Further positional arguments are accepted and ignored.
   - `rr` recurses through [`port_opt_view`](@ref) with `i`, which cuts the loadings down on their asset axis.
   - `X`, `o_X`, `mu`, `sigma` and `chol` are sliced to `i` on the asset axis. `o_X` takes the same cut as `X`, so a subproblem's original returns stay the caller's returns for that subproblem's assets.
-  - `Z` is sliced on its asset axis alone, through [`feature_matrix_view`](@ref). Its feature axis is never cut, and its observations are taken whole.
   - `w`, `ens`, `kld` and `ow` pass through unchanged. They live on the observation axis, and `i` indexes assets.
   - `fpr` passes through unchanged, because it is a distribution over factors rather than over assets. It is why the view keeps `rr` and `fpr` together, and so keeps the carrier's own factor-block rule satisfied.
 
@@ -1330,8 +1197,7 @@ LowOrderPrior
     kld ┼ nothing
      ow ┼ nothing
      rr ┼ nothing
-    fpr ┼ nothing
-    pnl ┴ nothing
+    fpr ┴ nothing
 ```
 
 # Related
@@ -1342,10 +1208,7 @@ LowOrderPrior
   - [`forward_prior`](@ref)
   - [`reconstruct_prior`](@ref)
   - [`port_opt_view`](@ref)
-  - [`feature_matrix_view`](@ref)
-  - [`FeaturePrior`](@ref)
   - [`FeatureDistance`](@ref)
-  - [`check_feature_matrix`](@ref)
 """
 @concrete struct LowOrderPrior <: AbstractPriorResult
     """
@@ -1392,16 +1255,12 @@ LowOrderPrior
     $(field_dict[:fpr])
     """
     fpr
-    """
-    $(field_dict[:pnl_prior])
-    """
-    pnl
     function LowOrderPrior(X::MatNum, o_X::Option{<:MatNum}, mu::VecNum, sigma::MatNum,
                            chol::Option{<:MatNum}, w::Option{<:ObsWeights},
                            ens::Option{<:Number}, kld::Option{<:Num_VecNum},
                            ow::Option{<:VecNum},
                            rr::Option{<:AbstractLoadingsRegressionResult},
-                           fpr::Option{<:LowOrderPrior}, pnl::Option{<:AssetPanel})
+                           fpr::Option{<:LowOrderPrior})
         @argcheck(!isempty(X), IsEmptyError("X cannot be empty"))
         @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
         @argcheck(!isempty(sigma), IsEmptyError("sigma cannot be empty"))
@@ -1456,10 +1315,9 @@ LowOrderPrior
             @argcheck(length(mu) == size(chol, 2),
                       DimensionMismatch("length(mu) ($(length(mu))) must match size(chol, 2) ($(size(chol, 2)))"))
         end
-        check_asset_panel(pnl, size(X, 2), size(X, 1), "size(X, 2)")
         return new{typeof(X), typeof(o_X), typeof(mu), typeof(sigma), typeof(chol),
-                   typeof(w), typeof(ens), typeof(kld), typeof(ow), typeof(rr), typeof(fpr),
-                   typeof(pnl)}(X, o_X, mu, sigma, chol, w, ens, kld, ow, rr, fpr, pnl)
+                   typeof(w), typeof(ens), typeof(kld), typeof(ow), typeof(rr),
+                   typeof(fpr)}(X, o_X, mu, sigma, chol, w, ens, kld, ow, rr, fpr)
     end
 end
 function LowOrderPrior(; X::MatNum, o_X::Option{<:MatNum} = nothing, mu::VecNum,
@@ -1467,9 +1325,8 @@ function LowOrderPrior(; X::MatNum, o_X::Option{<:MatNum} = nothing, mu::VecNum,
                        w::Option{<:ObsWeights} = nothing, ens::Option{<:Number} = nothing,
                        kld::Option{<:Num_VecNum} = nothing, ow::Option{<:VecNum} = nothing,
                        rr::Option{<:AbstractLoadingsRegressionResult} = nothing,
-                       fpr::Option{<:LowOrderPrior} = nothing,
-                       pnl::Option{<:AssetPanel} = nothing)::LowOrderPrior
-    return LowOrderPrior(X, o_X, mu, sigma, chol, w, ens, kld, ow, rr, fpr, pnl)
+                       fpr::Option{<:LowOrderPrior} = nothing)::LowOrderPrior
+    return LowOrderPrior(X, o_X, mu, sigma, chol, w, ens, kld, ow, rr, fpr)
 end
 # The flat `f_`-prefixed names are virtual reads of the nested factor block, so code written
 # against the pre-nesting shape is unaffected, and `f_ens`/`f_kld`/`f_ow` come for free.
@@ -1506,7 +1363,7 @@ The factor block is forwarded **unsliced**: `i` indexes assets, and `fpr` is a d
 
  1. Cut the Cholesky factor to `i` on its column axis, giving `chol`. A carrier that holds none keeps `nothing`.
  2. Cut the original returns matrix to `i` on its asset axis, giving `o_X`. A carrier that holds none keeps `nothing`. It takes the same cut `X` takes in the next step, because the two are assets-major over the same observations.
- 3. Rebuild the carrier through its ordinary keyword constructor, naming every field: `X` and `mu` cut to `i`, `sigma` cut to `i` on both axes, `chol` and `o_X` from the two steps above, `rr` recursed through [`port_opt_view`](@ref) with `i`, `Z` cut with [`feature_matrix_view`](@ref) on its asset axis alone, and `w`, `ens`, `kld`, `ow` and `fpr` forwarded unchanged. Every `@argcheck` of the constructor therefore runs on the view.
+ 3. Rebuild the carrier through its ordinary keyword constructor, naming every field: `X` and `mu` cut to `i`, `sigma` cut to `i` on both axes, `chol` and `o_X` from the two steps above, `rr` recursed through [`port_opt_view`](@ref) with `i`, and `w`, `ens`, `kld`, `ow` and `fpr` forwarded unchanged. Every `@argcheck` of the constructor therefore runs on the view.
 
 # Arguments
 
@@ -1522,7 +1379,6 @@ The factor block is forwarded **unsliced**: `i` indexes assets, and `fpr` is a d
 
   - [`LowOrderPrior`](@ref)
   - [`port_opt_view`](@ref)
-  - [`feature_matrix_view`](@ref)
 """
 function port_opt_view(pr::LowOrderPrior, i, args...)::LowOrderPrior
     chol = isnothing(pr.chol) ? nothing : view(pr.chol, :, i)
@@ -1532,7 +1388,7 @@ function port_opt_view(pr::LowOrderPrior, i, args...)::LowOrderPrior
     return LowOrderPrior(; X = view(pr.X, :, i), o_X = o_X, mu = view(pr.mu, i),
                          sigma = view(pr.sigma, i, i), chol = chol, w = pr.w, ens = pr.ens,
                          kld = pr.kld, ow = pr.ow, rr = port_opt_view(pr.rr, i),
-                         fpr = pr.fpr, pnl = panel_carrier_view(pr.pnl, :, i, false))
+                         fpr = pr.fpr)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1671,8 +1527,7 @@ HighOrderPrior
        │     kld ┼ nothing
        │      ow ┼ nothing
        │      rr ┼ nothing
-       │     fpr ┼ nothing
-       │     pnl ┴ nothing
+       │     fpr ┴ nothing
     kt ┼ 4×4 Matrix{Float64}
     D2 ┼ 4×3 SparseArrays.SparseMatrixCSC{Int64, Int64}
     L2 ┼ 3×4 SparseArrays.SparseMatrixCSC{Int64, Int64}

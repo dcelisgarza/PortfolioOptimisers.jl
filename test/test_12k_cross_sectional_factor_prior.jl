@@ -142,6 +142,11 @@ function csfp_investable(pr)
     return isnothing(msk) ? collect(eachindex(pr.mu)) : findall(msk)
 end
 
+# The fit keeps the tail of the observation axis: the window left after the Descriptors' warm-up
+# and the exposure lag. `pr.X` has one row per surviving observation, so the rows the fit used are
+# recoverable from the carrier and that count alone.
+fit_rows(rd, pr) = (size(rd.X, 1) - size(pr.X, 1) + 1):size(rd.X, 1)
+
 @testset "The estimator, its defaults and its refusals" begin
     PO = PortfolioOptimisers
     pe = CrossSectionalFactorPrior(; factors = csfp_factors())
@@ -288,8 +293,15 @@ end
         @test size(pr.chol, 2) == length(pr.mu)
         @test isa(rr, CrossSectionalFactorModel)
         @test isa(pr.fpr, LowOrderPrior)
-        @test !isnothing(pr.pnl)
-        @test size(pr.pnl.amsk) == size(pr.X)
+        #=
+        `#803` made the Asset Panel the one carrier of feature data, so no prior result
+        carries one. The scenario rows are the tail of the observation axis -- the window
+        left after the Descriptor warm-up and the exposure lag -- so a consumer recovers the
+        masks that produced them from `rd` and the row count, which is what the diagnostics
+        below do.
+        =#
+        @test !hasproperty(pr, :pnl)
+        @test size(view(rd.pnl.amsk, fit_rows(rd, pr), :)) == size(pr.X)
     end
     @testset "A non-investable asset carries NaN, and the mask is derived from it" begin
         @test length(i) < length(pr.mu)
@@ -342,9 +354,10 @@ end
         @test ax.fam == rr.fam
     end
     @testset "The scenarios carry the latest factor and idiosyncratic risk" begin
-        S = PO.cross_sectional_standardised_residuals(rr.csr.eps, rr.vs, pr.pnl.amsk)
+        amsk = view(rd.pnl.amsk, fit_rows(rd, pr), :)
+        S = PO.cross_sectional_standardised_residuals(rr.csr.eps, rr.vs, amsk)
         @test isequal(pr.X, pr.fpr.X * transpose(rr.M) .+ S .* transpose(sqrt.(rr.esigma)))
-        am = view(pr.pnl.amsk, :, i)
+        am = view(amsk, :, i)
         Xi = pr.X[:, i]
         @test all(isfinite, Xi[am])
         # An asset that was not listed at an observation carries NaN in that scenario. The

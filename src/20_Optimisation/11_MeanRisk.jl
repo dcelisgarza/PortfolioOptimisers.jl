@@ -219,7 +219,6 @@ MeanRisk
       │      linf ┼ nothing
       │       brt ┼ Bool: false
       │     x_src ┼ Symbol: :prior
-      │     z_src ┼ Symbol: :data
       │    strict ┴ Bool: false
     r ┼ Variance
       │   settings ┼ RiskMeasureSettings
