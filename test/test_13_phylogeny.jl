@@ -1769,9 +1769,10 @@
         Known and NOT specific to these two types: `@concrete` emits a fully generic
         positional constructor (`ConcreteStructs.jl:146`) that is more specific than
         nothing and shadows the annotated one, so every type bound in the package is
-        bypassable positionally. `PhylogenyFeatures(vector_shaped_result, alg)` does the
-        same thing and predates this. Pinned here so the limit of the guarantee is on the
-        record: the keyword constructor is the enforced API.
+        bypassable positionally. `PhylogenyPanel(vector_shaped_result, alg)` does the
+        same thing, and so does every other `@concrete` type with a bound. Pinned here so
+        the limit of the guarantee is on the record: the keyword constructor is the
+        enforced API.
         =#
         @test isa(SemiDefinitePhylogenyEstimator(plr, 0.05), SemiDefinitePhylogenyEstimator)
 
