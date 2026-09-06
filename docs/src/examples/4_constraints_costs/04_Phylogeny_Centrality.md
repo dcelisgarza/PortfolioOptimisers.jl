@@ -165,7 +165,7 @@ whole component — which is exactly the hazard below.
     optimises successfully and returns a single-asset portfolio (§3.1). State a numeric `dmax` to
     select anything narrower.
 
-The same `sep` is also read by [`PhylogenyFeatures`](@ref), which builds a feature matrix rather
+The same `sep` is also read by [`PhylogenyPanel`](@ref), which builds an Asset Panel rather
 than a constraint. There the budget *shapes* a fall-off instead of selecting pairs — a second knob,
 [`Proximity`](@ref)'s `decay`, says how strongly — so the bare default is the natural choice on
 that path and the trap above on this one. The two knobs live on two different objects and neither

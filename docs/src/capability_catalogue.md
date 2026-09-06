@@ -85,6 +85,133 @@ Selection rules
 - Cut price- or returns-level data into a training window (the head) and a held-out test window (the tail). [`train_test_split`](@ref), [`TrainTestSplit`](@ref), and [`TrainTestSplitResult`](@ref)
 - Return a `ReturnsResult` appropriate for benchmark-tracking optimisations. [`returns_result_picker`](@ref)
 
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Build the [`AssetPanel`](@ref) a carrier holds, from the raw, blank-carrying form of each Panel Field. [`asset_panel`](@ref), [`AssetPanel`](@ref), [`panel_field`](@ref), [`panel_feature_matrix`](@ref), [`feature_matrix`](@ref), [`feature_labels`](@ref), and [`panel_input`](@ref)
+
+```@raw html
+</summary>
+```
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Panel Field kinds
+
+```@raw html
+</summary>
+```
+
+- A Panel Field holding one number per asset, and per observation when it is time-varying. [`NumericPanelField`](@ref)
+- A Panel Field holding one category label per asset, and per observation when it is time-varying. [`CategoricalPanelField`](@ref)
+- A Panel Field whose trailing axis carries its own labels, and optionally its own groups. [`TensorPanelField`](@ref)
+
+```@raw html
+</details>
+```
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Panel Field inputs
+
+```@raw html
+</summary>
+```
+
+- Raw form of a Panel Field holding one numeric quantity per observation and asset. [`NumericPanelInput`](@ref)
+- Raw form of a Panel Field holding one category label per observation and asset. [`CategoricalPanelInput`](@ref)
+- Raw form of a Panel Field whose third axis carries its own labels, and optionally its own groups. [`TensorPanelInput`](@ref)
+
+```@raw html
+</details>
+```
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Blank-cell policies
+
+```@raw html
+</summary>
+```
+
+- Refuses a blank cell instead of resolving one. [`NoPanelFill`](@ref)
+- Resolves every blank cell to one constant. [`ConstantPanelFill`](@ref)
+- Resolves a blank cell to the nearest earlier observed value of the same asset. [`ForwardPanelFill`](@ref)
+- Resolves a blank cell to the nearest later observed value of the same asset. [`BackwardPanelFill`](@ref)
+
+```@raw html
+</details>
+```
+
+```@raw html
+</details>
+```
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Cross-sectional transforms
+
+```@raw html
+</summary>
+```
+
+A cross-sectional transform rescales one observation against the other assets of that same observation, through [`cross_sectional_transform`](@ref). The benchmark weights and the group labels are arguments of the call, and [`cross_sectional_groups`](@ref) derives the labels from a one-hot Panel Field.
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Outlier treatments
+
+```@raw html
+</summary>
+```
+
+- Clips every value of an observation into the band between two percentiles of that observation's cross-section. [`CrossSectionalWinsoriser`](@ref), [`cross_sectional_transform`](@ref), and [`cross_sectional_groups`](@ref)
+- Compresses every value of an observation towards the centre of that observation's cross-section, through a hyperbolic tangent. [`CrossSectionalTanhShrinker`](@ref)
+
+```@raw html
+</details>
+```
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Scoring transforms
+
+```@raw html
+</summary>
+```
+
+- Scores every value of an observation as a cross-sectional z-score, optionally inside its own group first. [`CrossSectionalStandardiser`](@ref)
+- Scores every value of an observation by the inverse normal of its cross-sectional percentile rank. [`CrossSectionalGaussianRank`](@ref)
+- Scores every value of an observation by its percentile rank inside that observation's cross-section. [`CrossSectionalPercentileRank`](@ref)
+
+```@raw html
+</details>
+```
+
+```@raw html
+</details>
+```
+
 ## Matrix processing
 
 - Projects a matrix to the nearest positive definite matrix, typically used for co-moment matrices. [`Posdef`](@ref), [`posdef!`](@ref), and [`posdef`](@ref)
@@ -194,6 +321,520 @@ Estimates a loadings matrix by regressing each asset on the leading components o
 ```@raw html
 </details>
 ```
+
+### Cross-sectional regression types
+
+A cross-sectional regression fits one model per observation across the assets, and implements [`cross_sectional_regression`](@ref), which returns a [`CrossSectionalRegression`](@ref) object. [`cross_sectional_r2`](@ref) and [`mean_cross_sectional_r2`](@ref) score a fit.
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Fits one weighted least squares per observation across the assets, in closed form. [`CrossSectionalLinearRegression`](@ref), [`cross_sectional_regression`](@ref), [`cross_sectional_r2`](@ref), and [`mean_cross_sectional_r2`](@ref)
+
+```@raw html
+</summary>
+```
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Rank deficiency policies
+
+```@raw html
+</summary>
+```
+
+- Solves the full-rank design directly and pseudo-inverts a rank-deficient one. [`PseudoInverseFallback`](@ref)
+- Solves the full-rank design directly and refuses a rank-deficient one. [`RankDeficiencyRefusal`](@ref)
+- Runs no rank test and takes whatever `\` returns. [`UncheckedSolve`](@ref)
+- Always pseudo-inverts, so it runs no rank test and takes no threshold. [`MinimumNormSolve`](@ref)
+
+```@raw html
+</details>
+```
+
+```@raw html
+</details>
+```
+
+- Fits one external regression model per observation across the assets. [`CrossSectionalTargetRegression`](@ref)
+
+### Cross-sectional regression weight policies
+
+A weight policy says what weight an asset carries in the cross-sectional fit of an observation. A one-pass policy reads the cross-section alone, and a two-pass policy reads the residuals of a first fit.
+
+- Weights an asset by a power of its market capitalisation, in one pass. [`MarketCapWeights`](@ref)
+- Blends market capitalisation weights with inverse idiosyncratic variance weights, in two passes. [`BlendedInverseVarianceWeights`](@ref)
+
+### Cross-sectional regression diagnostics
+
+A diagnostic of the cross-sectional fit reads the exposure history, the factor returns and the residuals, and answers a series over the observations or one value per factor. Every verb takes the lag-aligned histories as bare arrays, and takes a [`CrossSectionalFactorModel`](@ref) as well, which lags the exposures and maps them through a Factor Family Basis before it answers.
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Return the weighted Gram history of a cross-sectional regression, one slice per observation. [`cs_gram`](@ref)
+
+```@raw html
+</summary>
+```
+
+- Return the variance inflation factor of every factor, one row per observation. [`exposure_vif`](@ref)
+- Return the two-norm condition number of the cross-sectional design, one entry per observation. [`exposure_condition_number`](@ref)
+
+```@raw html
+</details>
+```
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Fit quality.
+
+```@raw html
+</summary>
+```
+
+- Return the weighted cross-sectional coefficient of determination, one entry per observation. [`cs_regression_r2`](@ref)
+- Return the cross-sectional coefficient of determination adjusted for the regressor count, one entry per observation. [`cs_regression_adjusted_r2`](@ref)
+- Return the Akaike information criterion of every cross-sectional fit, one entry per observation. [`cs_regression_aic`](@ref)
+- Return the Bayesian information criterion of every cross-sectional fit, one entry per observation. [`cs_regression_bic`](@ref)
+
+```@raw html
+</details>
+```
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Significance of a factor return.
+
+```@raw html
+</summary>
+```
+
+- Return the t-statistic of every factor return, one row per observation. [`cs_regression_t_stats`](@ref)
+- Return the fraction of observations at which a factor's t-statistic exceeds a threshold. [`cs_regression_t_stat_exceedance_rate`](@ref)
+
+```@raw html
+</details>
+```
+
+### Cross-sectional exposure diagnostics
+
+A diagnostic of the exposure history reads the history as the Asset Panel wrote it, unlagged and on the raw factor axis, and answers a matrix over the factors, a series over the observations, or one value per factor. Every verb takes the history as bare arrays, and takes a [`CrossSectionalFactorModel`](@ref) as well, which resolves the cross-sectional weights from an [`AbstractOrthogonalityMetric`](@ref).
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Redundancy and turnover of an exposure.
+
+```@raw html
+</summary>
+```
+
+- Return the time-averaged correlation between every pair of factor exposures. [`exposure_correlation`](@ref)
+- Return the stability of every factor exposure, one row per pair of observations. [`exposure_stability`](@ref)
+
+```@raw html
+</details>
+```
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Reach and spread of an exposure.
+
+```@raw html
+</summary>
+```
+
+- Return the weighted cross-sectional standard deviation of every factor exposure, one row per observation. [`exposure_dispersion`](@ref)
+- Return the coverage of every factor exposure, one entry per factor. [`exposure_coverage`](@ref)
+
+```@raw html
+</details>
+```
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Forecasting power of an exposure.
+
+```@raw html
+</summary>
+```
+
+- Return the information coefficient of every factor exposure, one row per pair of observations. [`exposure_ic`](@ref)
+- Return the summary of an information coefficient series, one entry per factor. [`exposure_ic_summary`](@ref)
+
+```@raw html
+</details>
+```
+
+### Cross-sectional idiosyncratic diagnostics
+
+A diagnostic of the idiosyncratic returns divides each residual of the fit by the volatility the fit predicted for it, and reads the cross-section of the answer one observation at a time. Every verb takes the two histories as bare arrays, and takes a [`CrossSectionalFactorModel`](@ref) as well, which reads them off the block. Neither history carries a factor axis, so the group takes no lag and no family re-basis.
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+The kernel every series of the group reads.
+
+```@raw html
+</summary>
+```
+
+- Return the standardised idiosyncratic returns of a cross-sectional fit. [`standardised_idio_returns`](@ref)
+
+```@raw html
+</details>
+```
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Shape of the standardised cross-section.
+
+```@raw html
+</summary>
+```
+
+- Return the cross-sectional standard deviation of the standardised idiosyncratic returns, one entry per observation. [`idio_calibration`](@ref)
+- Return the share of assets whose standardised idiosyncratic return exceeds a threshold, one entry per observation. [`idio_tail_rate`](@ref)
+- Return the cross-sectional excess kurtosis of the standardised idiosyncratic returns, one entry per observation. [`idio_kurtosis`](@ref)
+- Return the cross-sectional skewness of the standardised idiosyncratic returns, one entry per observation. [`idio_skewness`](@ref)
+- Return the five time-aggregated numbers of the calibration of a cross-sectional fit. [`idio_calibration_summary`](@ref)
+
+```@raw html
+</details>
+```
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Ranking power of the predicted volatility.
+
+```@raw html
+</summary>
+```
+
+- Return the information coefficient of the predicted idiosyncratic volatility, one entry per pair of observations. [`idio_vol_ic`](@ref)
+- Return the rank correlation of the predicted idiosyncratic volatility against the next observation's standardised absolute idiosyncratic return, one entry per pair of observations. [`idio_vol_residual_dependence`](@ref)
+
+```@raw html
+</details>
+```
+
+### Factor model summary
+
+The summary is the top of the diagnostic hierarchy. It calls one level-2 verb of the regression group and one of the exposure group per column, aggregates each series over the observations, and answers on the raw factor axis. A column that reads the exposure history is absent as a whole when the block carries none.
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Summarise every factor of a cross-sectional factor model as a [`FactorSummaryResult`](@ref). [`factor_model_summary`](@ref)
+
+```@raw html
+</summary>
+```
+
+- The headline statistics of every factor of a cross-sectional factor model. [`FactorSummaryResult`](@ref)
+
+```@raw html
+</details>
+```
+
+### Descriptors
+
+A Descriptor Estimator maps the Panel Fields of an Asset Panel to one value per observation and asset through [`descriptor`](@ref). Every named Descriptor is a constructor function that fixes the Panel Fields, the window, or the half-life of one archetype, and each accepts a keyword that overrides what it fixes.
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Divides one Panel Field, or a combination of Panel Fields, by another at every observation. [`PanelFieldRatio`](@ref)
+
+```@raw html
+</summary>
+```
+
+- Book equity over market capitalisation, the value Descriptor. [`BookToPrice`](@ref)
+- Trailing operating cash flow over market capitalisation, a value Descriptor. [`CashFlowToPrice`](@ref)
+- Trailing sales over market capitalisation, a value Descriptor. [`SalesToPrice`](@ref)
+- Trailing net income over market capitalisation, the earnings yield Descriptor. [`EarningsToPrice`](@ref)
+- Forward earnings per share over the adjusted close, the forward earnings yield Descriptor. [`ForwardEarningsToPrice`](@ref)
+- Trailing EBITDA over enterprise value, an earnings yield Descriptor that is neutral to the capital structure. [`EbitdaToEnterpriseValue`](@ref)
+- Trailing common dividends over market capitalisation, the dividend yield Descriptor. [`DividendToPrice`](@ref)
+- Forward dividends per share over the adjusted close, the forward dividend yield Descriptor. [`ForwardDividendToPrice`](@ref)
+- Trailing dividends plus net buybacks over market capitalisation, the total payout Descriptor. [`ShareholderYield`](@ref)
+- Total debt over total book capital, the book leverage Descriptor. [`BookLeverage`](@ref)
+- Total debt over total market capital, the market leverage Descriptor. [`MarketLeverage`](@ref)
+- Total debt over total assets, a leverage Descriptor. [`DebtToAssets`](@ref)
+- Gross profit over total assets, the gross profitability Descriptor. [`GrossProfitability`](@ref)
+- Gross profit over sales, the gross margin Descriptor. [`GrossMargin`](@ref)
+- Trailing net income over total assets, the return on assets Descriptor. [`ReturnOnAssets`](@ref)
+- Trailing net income over book equity, the return on equity Descriptor. [`ReturnOnEquity`](@ref)
+- Trailing sales over total assets, the asset turnover Descriptor. [`AssetTurnover`](@ref)
+- Trailing operating cash flow over total assets, a profitability Descriptor. [`CashFlowToAssets`](@ref)
+- Trailing sales over enterprise value, a profitability Descriptor that is neutral to the capital structure. [`SalesToEnterpriseValue`](@ref)
+- Accruals over total assets, the earnings quality Descriptor. [`AccrualsCashFlow`](@ref)
+- Dispersion of the forward earnings estimates over the adjusted close, an earnings quality Descriptor. [`AnalystDispersionToPrice`](@ref)
+- Shares sold short over shares outstanding, the short interest Descriptor. [`ShortInterest`](@ref)
+
+```@raw html
+</details>
+```
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Takes the natural logarithm of one Panel Field at every observation. [`PanelFieldLog`](@ref)
+
+```@raw html
+</summary>
+```
+
+- Natural logarithm of the market capitalisation, the size Descriptor. [`LogMarketCap`](@ref)
+
+```@raw html
+</details>
+```
+
+- Returns one numeric Panel Field unchanged, as a Descriptor. [`Passthrough`](@ref)
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Growth of a non-negative Panel Field over a fixed lag, at every observation. [`GrowthRate`](@ref)
+
+```@raw html
+</summary>
+```
+
+- Growth of total assets over one year, the investment Descriptor. [`AssetsGrowthRate`](@ref)
+- Growth of trailing sales over one year, the growth Descriptor. [`SalesGrowthRate`](@ref)
+- Growth of the split-adjusted share count over one year, the net issuance Descriptor. [`IssuanceGrowthRate`](@ref)
+
+```@raw html
+</details>
+```
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Change of a Panel Field over a fixed lag, scaled by the current value of a second Panel Field. [`ChangeToScale`](@ref)
+
+```@raw html
+</summary>
+```
+
+- Change of trailing net income over one year, divided by the current market capitalisation. [`EarningsChangeToPrice`](@ref)
+
+```@raw html
+</details>
+```
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Change of the ratio of two Panel Fields over a fixed lag. [`ChangeInIntensity`](@ref)
+
+```@raw html
+</summary>
+```
+
+- Change of the capital expenditure to total assets ratio over one year. [`CapexToAssetsChangeInIntensity`](@ref)
+
+```@raw html
+</details>
+```
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Exponentially weighted mean of the log returns, at every observation, with an optional skip. [`EWMean`](@ref)
+
+```@raw html
+</summary>
+```
+
+- Exponentially weighted mean of the log returns of the past year, less the past month. [`EWMomentum`](@ref)
+
+```@raw html
+</details>
+```
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Exponentially weighted mean of a ratio of Panel Fields, at every observation. [`EWVolumeRatio`](@ref)
+
+```@raw html
+</summary>
+```
+
+- Exponentially weighted share turnover, the fraction of the shares outstanding that changes hands. [`EWShareTurnover`](@ref)
+- Exponentially weighted price impact, the absolute return earned per unit of traded amount. [`EWAmihudIlliquidity`](@ref)
+
+```@raw html
+</details>
+```
+
+- Ratio of a Panel Field to the exponentially weighted mean of a second one, at every observation. [`DaysToCover`](@ref)
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Exponentially weighted volatility of the returns, at every observation. [`EWVolatility`](@ref)
+
+```@raw html
+</summary>
+```
+
+- Exponentially weighted volatility of the returns that fall short of a minimum acceptable return. [`EWDownsideVolatility`](@ref)
+
+```@raw html
+</details>
+```
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Exponentially weighted volatility of the market-model residual, at every observation. [`EWResidualVolatility`](@ref)
+
+```@raw html
+</summary>
+```
+
+- Exponentially weighted volatility of the market-model residuals that fall short of a minimum acceptable return. [`EWResidualDownsideVolatility`](@ref)
+
+```@raw html
+</details>
+```
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Exponentially weighted beta of the returns against the market return, at every observation. [`EWBeta`](@ref)
+
+```@raw html
+</summary>
+```
+
+- Exponentially weighted sensitivity of an asset to the market portfolio. [`EWMarketBeta`](@ref)
+
+```@raw html
+</details>
+```
+
+- Exponentially weighted sensitivity of the returns to a reference series, after the market is removed. [`EWMacroSensitivity`](@ref)
+- Exponentially weighted sensitivity of the returns to the falls of the market, at every observation. [`EWDownsideBeta`](@ref)
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Sum of log returns over a fixed window that ends a fixed number of observations back, at every observation. [`RollingLogReturn`](@ref)
+
+```@raw html
+</summary>
+```
+
+- Sum of log returns over one year, ending one month back. [`RollingMomentum`](@ref)
+- Negated sum of log returns over one month, ending at the current observation. [`Reversal`](@ref)
+
+```@raw html
+</details>
+```
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Maximum return over a fixed trailing window, at every observation. [`RollingMax`](@ref)
+
+```@raw html
+</summary>
+```
+
+- Maximum return over one month. [`MaxReturn`](@ref)
+
+```@raw html
+</details>
+```
+
+### Factor exposures
+
+An Exposure Estimator maps Descriptors, one categorical Panel Field, or nothing at all, to one asset loading per observation through [`factor_exposure`](@ref). A member producing one factor returns an observations by assets matrix, and the one-hot member returns one factor per level of its Panel Field.
+
+- A Factor Exposure that is a fixed weighted combination of Descriptors. [`CompositeExposure`](@ref)
+- A Factor Exposure derived from the Factor Exposure of another factor. [`DerivedExposure`](@ref)
+- A Factor Exposure that expands one categorical Panel Field into one factor per level. [`OneHotExposure`](@ref)
+- A Factor Exposure equal to one for every asset at every observation. [`ConstantExposure`](@ref)
+
+### Factor family basis
+
+A Factor Family whose one-hot exposures are collinear with a global factor is re-based before the fit. [`factor_family_basis`](@ref) drops one member per family and returns the compact, time-varying change of basis the fit runs in, and the reduced factor returns expand back to the named raw ones.
+
+- Compact change of basis between the raw factor axis and the reduced axis a re-based Factor Family is fitted in. [`FactorFamilyBasis`](@ref) and [`factor_family_basis`](@ref)
+
+### Return forecasts
+
+A Return Forecast Estimator maps Descriptor Scores and a fitted factor-model block, or a stated vector, to one forecast per asset through [`return_forecast`](@ref). [`descriptor_scores`](@ref) is the recipe every fitted member starts from: each Descriptor is winsorised, standardised, optionally neutralised against named Factor Exposures, and standardised again. The Forecast Unit says what the Descriptors forecast, and the member converts the answer to return units.
+
+- The shared recipe that turns Descriptors into cross-sectional scores. [`DescriptorScores`](@ref) and [`descriptor_scores`](@ref)
+- A Return Forecast the caller states outright. [`CustomValueReturnForecast`](@ref)
+- A Return Forecast that is a fixed signed combination of Descriptor scores. [`FixedWeightedReturnForecast`](@ref)
+- A Return Forecast whose Descriptor weights are fitted by exponentially weighted least squares. [`ExpWeightedReturnForecast`](@ref)
+- A Return Forecast fitted by a regression target over every observation and asset at once. [`TargetReturnForecast`](@ref)
+- The Descriptors forecast the idiosyncratic return itself. [`IdiosyncraticReturnUnit`](@ref)
+- The Descriptors forecast the idiosyncratic return divided by the idiosyncratic volatility. [`IdiosyncraticSharpeUnit`](@ref)
 
 ## Moment estimation
 
@@ -590,6 +1231,15 @@ Every windowed estimator wraps a base moment estimator and recomputes it over a 
 
 - Abstract supertype for estimators that determine the rolling window size. [`WindowSizeEstimator`](@ref)
 
+### Incremental fit
+
+An estimator whose statistic has an exact update from its running state plus one new observation folds observations into that state, and its read-out verb answers from the state without reading the sample again. The state lives in the estimator's `cache` field, and ADR 0106 records why it is the one result an estimator holds. The sample mean, the sample variance and the full-moment sample covariance take part, and so does the `FullMoment` arm of [`Coskewness`](@ref) and of [`Cokurtosis`](@ref). The `SemiMoment` arm does not, because it clips against a centre that a new observation moves.
+
+Two verbs fold, and ADR 0107 records what each promises. [`partial_fit!`](@ref) is the method each family writes, and it is that family's cheapest exact fold; it promises nothing about an estimator kept from before the call. [`partial_fit`](@ref) is one generic method with value semantics: it folds a copy of the state, so the estimator handed over reads what it read before.
+
+- Folds observations into an estimator's partial-fit state, and returns the estimator. [`partial_fit!`](@ref)
+- Folds observations into a copy of an estimator's partial-fit state, and returns the estimator that carries the copy. [`partial_fit`](@ref)
+
 ## Distance matrices
 
 Implements [`distance`](@ref) and [`cor_and_dist`](@ref).
@@ -659,6 +1309,138 @@ Turns a feature matrix into a distance matrix, by applying a metric to the rows 
 ```
 
 - Normalised angular distance metric. [`AngularDist`](@ref)
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Stack the Panel Fields a Feature Selector names into the Feature Matrix a distance measures. [`feature_matrix`](@ref) and [`feature_labels`](@ref)
+
+```@raw html
+</summary>
+```
+
+The Feature Matrix is derived from an [`AssetPanel`](@ref) and stored nowhere. [`feature_matrix`](@ref) stacks the Panel Fields the selector names, and [`feature_labels`](@ref) gives one label per column — a label vector is itself a selector, so it rebuilds the matrix the kernel measured.
+
+```@raw html
+</details>
+```
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Asset Panel producers
+
+```@raw html
+</summary>
+```
+
+`ape` says which [`AssetPanel`](@ref) the metric measures. `nothing` reads the panel the data carrier holds; a producer builds a static one at the point of use, from the prior result and the returns of the subproblem that runs it, so a view passes it through and a fold refits it.
+
+- Builds an Asset Panel holding the factor loadings the wrapped prior fitted. [`RegressionPanel`](@ref)
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Builds an Asset Panel holding a square proximity matrix graded from a graph or a partition. [`PhylogenyPanel`](@ref) and [`phylogeny_features`](@ref)
+
+```@raw html
+</summary>
+```
+
+Grades a graph neighbourhood into a square `assets × assets` proximity block, so the distance measures neighbourhood overlap. The one producer whose trailing axis *is* the asset axis; its source is always an estimator, so every fold and subproblem refits the graph on its own universe.
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Phylogeny feature algorithm scoring each pair by how far apart it sits. [`Proximity`](@ref)
+
+```@raw html
+</summary>
+```
+
+Keeps the step count `phylogeny_matrix`'s clamp throws away, scoring each pair by how far apart it sits. `decay` shapes the fall-off and the source's `sep` truncates it -- two knobs, deliberately separate, because an exponential never reaches zero. Apart from [`NoDecay`](@ref) no decay emits zero inside the budget, so a zero entry means unreachable and nothing else.
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Separations: the open [`AbstractSeparationAlgorithm`](@ref) family, applied by [`separation_matrix`](@ref) and [`separation_budget`](@ref)
+
+```@raw html
+</summary>
+```
+
+Carried by [`NetworkEstimator`](@ref) as `sep`. Says how far apart two assets sit *and* how far is too far, because the two share a unit. It sits on the network estimator rather than on the producer: every consumer of a network needs to know which pairs it relates, and the constraint path never sees the producer at all.
+
+- Separation measured as the number of graph edges between two assets. [`HopCount`](@ref)
+- [`PathLength`](@ref) sums the distances along the shortest path instead of counting its edges, and budgets in the distance estimator's units -- `dmax = nothing` means the observed diameter
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Budget rules: a callable in place of the budget number, resolved by [`resolve_separation`](@ref) once the data is in hand
+
+```@raw html
+</summary>
+```
+
+A budget cannot always be named in advance -- a cross-validation fold and a meta optimiser's subproblem each refit the graph. `HopCount(; n = ⋅)` takes a `HopCountAlgorithm` and `PathLength(; dmax = ⋅)` a `PathLengthAlgorithm`, each a callable struct; a bare `Function` is admitted in either field. The hop obligation is an `Integer`, checked at resolution because a functor's return type is not part of its signature. A rule changes *which* quantity stays put: a stated budget holds the radius still, a quantile rule holds the related-pair count still.
+
+- [`HopCountQuantile`](@ref) places the hop budget at a quantile of the observed hop separations, rounded to a shell -- so it lands near the requested share rather than on it
+- [`PathLengthQuantile`](@ref) does the same in distance units with no rounding, so it hits the requested share of related pairs -- which is how the radius ball's intermediate cardinalities become reachable by name
+
+```@raw html
+</details>
+```
+
+```@raw html
+</details>
+```
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Separation decays: the open [`AbstractSeparationDecayAlgorithm`](@ref) family, applied by [`separation_decay`](@ref)
+
+```@raw html
+</summary>
+```
+
+The argument is a *real* separation, so one family serves a hop count and any continuous separation alike. The contract -- `f(0) > 0` and maximal, monotone non-increasing, non-negative inside the budget, never assumed to reach zero -- is probed by a fail-safe fallback that the shipped members opt out of.
+
+- Separation decay falling off linearly to the edge of the budget. [`LinearDecay`](@ref)
+- Separation decay falling off exponentially. [`ExponentialDecay`](@ref)
+- Separation decay falling off as a power of the separation. [`ReciprocalDecay`](@ref)
+- [`NoDecay`](@ref) is the flat end of the dial, and *not* no truncation: the budget still cuts, so it yields the neighbourhood indicator
+
+```@raw html
+</details>
+```
+
+```@raw html
+</details>
+```
+
+```@raw html
+</details>
+```
+
+```@raw html
+</details>
+```
 
 ```@raw html
 <details class="cap-group" style="margin-left: 2em">
@@ -1037,6 +1819,23 @@ Carries the returns, mean and covariance a low order prior estimator produced. [
 <summary>
 ```
 
+Estimates a point-in-time cross-sectional factor model from an Asset Panel, and lifts it onto the assets. [`CrossSectionalFactorPrior`](@ref)
+
+```@raw html
+</summary>
+```
+
+The cross-sectional counterpart of [`FactorPrior`](@ref). It reads a point-in-time [`AssetPanel`](@ref) rather than a factor-return series, builds one Factor Exposure per named factor, regresses each observation's returns on the lagged exposures across the assets, and returns a [`CrossSectionalFactorModel`](@ref) in the `rr` slot. It composes the Descriptors, the Factor Exposures, the cross-sectional regression, its weight policy and the Factor Family Basis catalogued above.
+
+```@raw html
+</details>
+```
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
 Black-Litterman
 
 ```@raw html
@@ -1104,6 +1903,9 @@ Tail view formulations
 - Grid formulation of an entropic value-at-risk view [EPTail](@cite). [`GridEntropicValueatRiskView`](@ref)
 - Power cone formulation of a relativistic value-at-risk view [EPRLVaR](@cite). [`ConicRelativisticValueatRiskView`](@ref)
 - Grid formulation of a relativistic value-at-risk view. [`GridRelativisticValueatRiskView`](@ref)
+- Sequential convex formulation of a conditional value-at-risk view. [`SequentialConditionalValueatRiskView`](@ref)
+- Sequential convex formulation of an entropic value-at-risk view. [`SequentialEntropicValueatRiskView`](@ref)
+- Sequential convex formulation of a relativistic value-at-risk view. [`SequentialRelativisticValueatRiskView`](@ref)
 
 ```@raw html
 </details>
@@ -1228,158 +2030,6 @@ Opinion pooling prior estimator for asset returns. [`OpinionPoolingPrior`](@ref)
 ```
 
 ```@raw html
-<details class="cap-group" style="margin-left: 2em">
-<summary>
-```
-
-Prior estimator that attaches a feature matrix to the prior it wraps. [`FeaturePrior`](@ref)
-
-```@raw html
-</summary>
-```
-
-A feature prior attaches an `assets × features` matrix to the prior it wraps, without touching a single moment, so any prior becomes a source for [`FeatureDistance`](@ref). The matrix comes from a feature matrix estimator.
-
-- Compute the derived feature matrix. [`feature_matrix`](@ref) and [`AbstractFeatureMatrixEstimator`](@ref)
-- Feature matrix producer that reads the regression loadings off the wrapped prior result. [`RegressionFeatures`](@ref)
-
-```@raw html
-<details class="cap-group" style="margin-left: 2em">
-<summary>
-```
-
-Feature matrix producer reusing a square phylogeny or adjacency matrix as a feature source. [`PhylogenyFeatures`](@ref) and [`phylogeny_features`](@ref)
-
-```@raw html
-</summary>
-```
-
-Reuses a square `assets × assets` phylogeny or adjacency matrix as features, so the distance measures neighbourhood overlap. The only producer whose feature axis *is* the asset axis; its source is always an estimator, so every fold and subproblem refits the graph on its own universe. Exogenous square structure travels on [`ReturnsResult`](@ref) instead.
-
-```@raw html
-<details class="cap-group" style="margin-left: 2em">
-<summary>
-```
-
-Phylogeny feature algorithm scoring each pair by how far apart it sits. [`Proximity`](@ref)
-
-```@raw html
-</summary>
-```
-
-Keeps the step count `phylogeny_matrix`'s clamp throws away, scoring each pair by how far apart it sits. `decay` shapes the fall-off and the source's `sep` truncates it -- two knobs, deliberately separate, because an exponential never reaches zero. Apart from [`NoDecay`](@ref) no decay emits zero inside the budget, so a zero entry means unreachable and nothing else.
-
-```@raw html
-<details class="cap-group" style="margin-left: 2em">
-<summary>
-```
-
-Separations: the open [`AbstractSeparationAlgorithm`](@ref) family, applied by [`separation_matrix`](@ref) and [`separation_budget`](@ref)
-
-```@raw html
-</summary>
-```
-
-Carried by [`NetworkEstimator`](@ref) as `sep`. Says how far apart two assets sit *and* how far is too far, because the two share a unit. It sits on the network estimator rather than on the feature producer: every consumer of a network needs to know which pairs it relates, and the constraint path never sees the producer at all.
-
-- Separation measured as the number of graph edges between two assets. [`HopCount`](@ref)
-- [`PathLength`](@ref) sums the distances along the shortest path instead of counting its edges, and budgets in the distance estimator's units -- `dmax = nothing` means the observed diameter
-
-```@raw html
-<details class="cap-group" style="margin-left: 2em">
-<summary>
-```
-
-Budget rules: a callable in place of the budget number, resolved by [`resolve_separation`](@ref) once the data is in hand
-
-```@raw html
-</summary>
-```
-
-A budget cannot always be named in advance -- a cross-validation fold and a meta optimiser's subproblem each refit the graph. `HopCount(; n = ⋅)` takes a `HopCountAlgorithm` and `PathLength(; dmax = ⋅)` a `PathLengthAlgorithm`, each a callable struct; a bare `Function` is admitted in either field. The hop obligation is an `Integer`, checked at resolution because a functor's return type is not part of its signature. A rule changes *which* quantity stays put: a stated budget holds the radius still, a quantile rule holds the related-pair count still.
-
-- [`HopCountQuantile`](@ref) places the hop budget at a quantile of the observed hop separations, rounded to a shell -- so it lands near the requested share rather than on it
-- [`PathLengthQuantile`](@ref) does the same in distance units with no rounding, so it hits the requested share of related pairs -- which is how the radius ball's intermediate cardinalities become reachable by name
-
-```@raw html
-</details>
-```
-
-```@raw html
-</details>
-```
-
-```@raw html
-<details class="cap-group" style="margin-left: 2em">
-<summary>
-```
-
-Separation decays: the open [`AbstractSeparationDecayAlgorithm`](@ref) family, applied by [`separation_decay`](@ref)
-
-```@raw html
-</summary>
-```
-
-The argument is a *real* separation, so one family serves a hop count and any continuous separation alike. The contract -- `f(0) > 0` and maximal, monotone non-increasing, non-negative inside the budget, never assumed to reach zero -- is probed by a fail-safe fallback that the shipped members opt out of.
-
-- Separation decay falling off linearly to the edge of the budget. [`LinearDecay`](@ref)
-- Separation decay falling off exponentially. [`ExponentialDecay`](@ref)
-- Separation decay falling off as a power of the separation. [`ReciprocalDecay`](@ref)
-- [`NoDecay`](@ref) is the flat end of the dial, and *not* no truncation: the budget still cuts, so it yields the neighbourhood indicator
-
-```@raw html
-</details>
-```
-
-```@raw html
-</details>
-```
-
-```@raw html
-</details>
-```
-
-```@raw html
-<details class="cap-group" style="margin-left: 2em">
-<summary>
-```
-
-Feature matrix producer reading exogenous taxonomy memberships off a [`UniverseSets`](@ref). [`AssetSetsFeatures`](@ref), [`asset_sets_features`](@ref), and [`asset_sets_feature_names`](@ref)
-
-```@raw html
-</summary>
-```
-
-Stacks taxonomy memberships -- sector, industry, country -- from a [`UniverseSets`](@ref) into the feature axis. The only *exogenous* rectangular source: a classification is structure return correlations do not contain, which is what a feature distance exists to bring in. Because every key is a partition, the rows have equal norms and the cosine similarity is exactly the fraction of classification levels two assets agree on. [`asset_sets_features`](@ref) is also public on its own, for building the matrix straight onto a [`ReturnsResult`](@ref).
-
-```@raw html
-<details class="cap-group" style="margin-left: 2em">
-<summary>
-```
-
-Graded programs: `vals` as an ordered edge-authoring program over the axis declared at `sets.zkey`, resolved through [`resolve_feature_value`](@ref) on the open [`AbstractFeatureValue`](@ref) family
-
-```@raw html
-</summary>
-```
-
-The same type's second contract, dispatched on `vals`' element type, and it strictly subsumes the key list -- an all-`1.0` program is bit-identical to stacking the same keys. Entries apply in order and every write is an overwrite, so **last wins**; targets are always fully qualified, node names are bare, and the declared axis makes `size(Z, 2)` fold-invariant. `strict` governs names only: an all-zero row and a one-column matrix are both legal.
-
-- [`Scale`](@ref) multiplies the cell's *natural value* -- the key's own datum for a numeric key, membership otherwise -- where a bare `Number` sets it absolutely
-
-```@raw html
-</details>
-```
-
-```@raw html
-</details>
-```
-
-```@raw html
-</details>
-```
-
-```@raw html
 </details>
 ```
 
@@ -1429,7 +2079,15 @@ In order to make optimisations more robust to noise and measurement error, it is
 </details>
 ```
 
-It also implements various estimators for the uncertainty sets, the following two can generate box and ellipsoidal sets.
+A third shape holds the worst-case variance of a covariance set as a quadratic penalty on the weights, so the optimisation stays a second-order cone programme and lifts no semidefinite block.
+
+- Holds a worst-case variance penalty as a radius, a diagonal metric square root and a basis of the directions the penalty spares. [`CompactCovarianceUncertaintySet`](@ref)
+
+A fourth shape is the image of a norm ball under a geometry map of any rank, on either axis, so a flat set on the directions a factor model does not span needs no full-rank shape matrix. A built ellipsoid converts into it with one Cholesky factorisation.
+
+- [`NormBallUncertaintySet`](@ref) and [`NormBallUncertaintySetAlgorithm`](@ref), which take the same scaling algorithms as the ellipsoid and read them off the geometry map via [`k_norm_ball`](@ref)
+
+It also implements various estimators for the uncertainty sets, the following two can generate box, ellipsoidal and norm-ball sets.
 
 - Fits a box or an ellipsoidal uncertainty set from the sampling laws that normal returns imply: the mean is normal and the covariance is Wishart. [`NormalUncertaintySet`](@ref)
 
@@ -1477,19 +2135,74 @@ Fits an $\ell_1$ uncertainty set on the characteristic vector, mean-only and wit
 </details>
 ```
 
+One estimator reads no returns data at all. It is handed the fitted prior of the optimisation it serves, and confines both of its sets to the directions the prior's factor model does not span.
+
 ```@raw html
 <details class="cap-group" style="margin-left: 2em">
 <summary>
 ```
 
-Ellipsoidal set classes
+Fits both uncertainty sets from the factor model of the optimisation's own prior, confined to the directions the factors do not span. [`OrthogonalUncertaintySet`](@ref)
 
 ```@raw html
 </summary>
 ```
 
-- Tags an [`EllipsoidalUncertaintySet`](@ref) as living on the mean axis, where the shape matrix is $N \times N$. [`MuEllipsoidalUncertaintySet`](@ref)
-- Tags an [`EllipsoidalUncertaintySet`](@ref) as living on the covariance axis, where the shape matrix is $N^{2} \times N^{2}$. [`SigmaEllipsoidalUncertaintySet`](@ref)
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Orthogonality metrics, the cross-sectional weighting the factor span is taken under
+
+```@raw html
+</summary>
+```
+
+- Names the inverse of the idiosyncratic variances as the cross-sectional weight source, the default. [`InverseIdiosyncraticVarianceMetric`](@ref)
+- Names the regression weights as the cross-sectional weight source. [`RegressionWeightMetric`](@ref)
+- Names the benchmark weights as the cross-sectional weight source. [`BenchmarkWeightMetric`](@ref)
+- Names no weight source: every asset carries the same weight. [`IdentityMetric`](@ref)
+
+```@raw html
+</details>
+```
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Scalings of the mean set inside the Orthogonal Subspace
+
+```@raw html
+</summary>
+```
+
+- Gives every direction of the Orthogonal Subspace the same uncertainty, the default. [`IdentityScaling`](@ref)
+- Sizes each direction of the Orthogonal Subspace by the idiosyncratic covariance projected onto it. [`IdiosyncraticVarianceScaling`](@ref)
+
+```@raw html
+</details>
+```
+
+```@raw html
+</details>
+```
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Axis tags of the ellipsoid and the norm ball
+
+```@raw html
+</summary>
+```
+
+- Tags an [`EllipsoidalUncertaintySet`](@ref) or a [`NormBallUncertaintySet`](@ref) as living on the mean axis, where the shape matrix is $N \times N$ and the geometry map has $N$ rows. [`MuUncertaintySetClass`](@ref)
+- Tags an [`EllipsoidalUncertaintySet`](@ref) or a [`NormBallUncertaintySet`](@ref) as living on the covariance axis, where the shape matrix is $N^{2} \times N^{2}$ and the geometry map has $N^{2}$ rows. [`SigmaUncertaintySetClass`](@ref)
 
 ```@raw html
 </details>
@@ -1527,9 +2240,15 @@ Names the per-asset fee rates, for [`fees_constraints`](@ref) to align to a univ
 </details>
 ```
 
+- Spreads the one-off terms of a fee, the turnover charge and the two fixed charges, over a holding period. [`AmortisedFees`](@ref)
+
 ## Portfolio returns and drawdowns
 
 Various risk measures and analyses require the computation of simple and cumulative portfolio returns and drawdowns both in aggregate and per-asset. These are computed by [`calc_net_returns`](@ref), [`calc_net_asset_returns`](@ref), [`cumulative_returns`](@ref), [`drawdowns`](@ref).
+
+A window may instead be scored on the weights a fund holds, which grow at their own asset returns while no trade is placed. The series is then the wealth ratio of the drifted holdings.
+
+- Grows each position at its own asset return and holds no trade in between, so the weights drift and the series is the wealth ratio of the drifted holdings. [`SelfFinancingDrift`](@ref)
 
 ## [Tracking](@id catalogue-tracking)
 
@@ -1576,10 +2295,25 @@ Norm tracking algorithms
 </details>
 ```
 
-It is also possible to track the error in with risk measures [`RiskTrackingError`](@ref) using [`WeightsTracking`](@ref), which allows for two approaches.
+The distance may also be a risk distance rather than a norm of the return difference, measured against a [`WeightsTracking`](@ref) benchmark. Two approaches are available.
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Constrains how far a portfolio's **risk** may stand from a benchmark portfolio's risk. [`RiskTrackingError`](@ref)
+
+```@raw html
+</summary>
+```
 
 - Applies the risk measure to each portfolio, then takes the absolute difference of the two risks. [`DependentVariableTracking`](@ref)
 - Applies the risk measure to the difference between the portfolio weights and the benchmark weights. [`IndependentVariableTracking`](@ref)
+
+```@raw html
+</details>
+```
 
 ## Risk measures
 
@@ -1589,27 +2323,23 @@ Every prior-derived slot on a risk measure -- `mu`, `sigma`, `kt`, `sk` -- takes
 
 ### Calibration
 
-A tail probability and a deformation parameter also take a **rule** in place of the number. The rule goes inside the role that names the end of the distribution the slot addresses, and the role is resolved against the optimisation's own prior, so the quantity refits per cross-validation fold and per meta-optimiser subset where a stated number holds still. The role carries the rule in its `alg` field, and that field takes a callable estimator or a plain function of `(key, pr, w, slv)`. Five rules ship: two compute a significance level, and three compute a deformation parameter. Forty slots across twenty-seven risk measures and weight builders take one: every `alpha` and `beta`, and every `kappa`, `kappa_a` and `kappa_b`. The two inner integration bounds of the tail-Gini family, `alpha_i` and `beta_i`, are starting points rather than quantities to estimate, so they keep their numbers and the joint `0 < alpha_i < alpha < 1` bound is checked against the calibrated `alpha` at fold time.
+A tail probability and a deformation parameter also take a **rule** in place of the number. The slot names the quantity and the end of the distribution it addresses, so the caller writes the rule alone and the slot stores it. The rule is resolved against the optimisation's own prior, so the quantity refits per cross-validation fold and per meta-optimiser subset where a stated number holds still. Each slot's type bound names the one rule family that computes its quantity, and it admits a callable estimator of that family, a plain function of `(key, pr, w, slv, ctx)`, or the number itself. Five rules ship: two compute a significance level, and three compute a deformation parameter. Forty slots across twenty-seven risk measures and weight builders take one: every `alpha` and `beta`, and every `kappa`, `kappa_a` and `kappa_b`. The two inner integration bounds of the tail-Gini family, `alpha_i` and `beta_i`, are starting points rather than quantities to estimate, so they keep their numbers and the joint `0 < alpha_i < alpha < 1` bound is checked against the calibrated `alpha` at fold time.
 
-- Places a significance rule in a slot that addresses the lower tail of the return distribution. [`SignificanceTailCalibration`](@ref)
-- Places a significance rule in a slot that addresses the upper tail of the return distribution. [`SignificanceHeadCalibration`](@ref)
-- Places a deformation rule in a slot that addresses the lower tail of the return distribution. [`DeformationTailCalibration`](@ref)
-- Places a deformation rule in a slot that addresses the upper tail of the return distribution. [`DeformationHeadCalibration`](@ref)
+A significance rule reads the sample length, and reads the effective observation weights where the count it states is a count of observations. A deformation rule reads the probability of its own end, which reaches it in the `CalibrationContext` the slot owner builds. One spends a stated entropy budget on the sample length. The other two read the shape of the sample's own tail and return the reciprocal of its index: one standardises each column and answers per end, so a skewed sample gives two numbers, and one whitens each observation with the covariance matrix and answers one number for both ends.
 
-A significance rule reads the sample length, and reads the effective observation weights where the count it states is a count of observations. A deformation rule reads the probability of its own end, which travels to it through `bind_alpha`. One spends a stated entropy budget on the sample length. The other two read the shape of the sample's own tail and return the reciprocal of its index: one standardises each column and answers per end, so a skewed sample gives two numbers, and one whitens each observation with the covariance matrix and answers one number for both ends.
-
-A rule that reads the shape of a series is told which series to read. A drawdown measure prices the drawdown series of the portfolio rather than its returns, and the slot key names neither, so the measure hands the rule its own series through `bind_series` in the same place it hands over the significance level. The two rules then run the same reading over the drawdown series of each column, in place of the columns themselves: the pooled rule pools those series, and the radial rule whitens their rows with the covariance matrix of that same sample, because a prior result states no drawdown moment. The series belongs to the measure, so a marker stated on a rule serves a caller who runs it by hand and is overwritten wherever a measure resolves it.
+A rule that reads the shape of a series is told which series to read. A drawdown measure prices the drawdown series of the portfolio rather than its returns, and the slot key names neither, so the measure states its own series in the `CalibrationContext` beside the significance level. The two rules then run the same reading over the drawdown series of each column, in place of the columns themselves: the pooled rule pools those series, and the radial rule whitens their rows with the covariance matrix of that same sample, because a prior result states no drawdown moment. The series belongs to the measure, so no rule holds a marker of its own and a caller who runs a rule by hand states the marker in the context the measure would have built.
 
 - Computes a significance level from a count of observations, so that the tail keeps the same number of scenarios whatever the sample length becomes. [`ScenarioCount`](@ref)
 - Computes a significance level that shrinks with the square root of the sample length. [`RateSignificance`](@ref)
 - Computes the Kaniadakis deformation parameter that makes a relativistic measure spend a stated entropy budget. [`EntropyBudget`](@ref)
 - Computes the Kaniadakis deformation parameter whose tail decays at the rate the sample's own tail decays at. [`HillTailDecay`](@ref)
 - Computes the Kaniadakis deformation parameter whose tail decays at the rate the sample's radial series decays at. [`RadialTailDecay`](@ref)
+- Names the returns themselves, the columns of `pr.X` unchanged. [`ReturnsSeries`](@ref)
+- Names the absolute drawdown series of a column, which [`absolute_drawdown_vec`](@ref) builds. [`AbsoluteDrawdownSeries`](@ref)
+- Names the relative drawdown series of a column, which [`relative_drawdown_vec`](@ref) builds. [`RelativeDrawdownSeries`](@ref)
 
-An ambiguity radius takes a rule on the same terms. It names no end of the distribution, so it carries one role rather than two, and it reaches the four regularisation coefficients of [`JuMPOptimiser`](@ref) as well as the two distributionally robust risk measures. Four rules ship, and all four compute a radius. Two shrink the ball at the square-root rate of the sample length, and the third shrinks it at the rate the number of assets sets, which is far slower over a wide universe.
+An ambiguity radius takes a rule on the same terms. It names no end of the distribution, so one bound serves every radius slot, and it reaches the four regularisation coefficients of [`JuMPOptimiser`](@ref) as well as the two distributionally robust risk measures. Four rules ship, and all four compute a radius. Two shrink the ball at the square-root rate of the sample length, and the third shrinks it at the rate the number of assets sets, which is far slower over a wide universe.
 
-- Places an ambiguity-radius rule in a slot that holds the radius of the ball the model prices. [`AmbiguityRadiusCalibration`](@ref)
-- Places a tail-weight rule in a slot that holds the weight of the tail term of an Esfahani-Kuhn loss. [`AmbiguityTailWeightCalibration`](@ref)
 - Computes an ambiguity radius from the concentration of measure, so that the ball shrinks as the sample grows. [`ConcentrationRadius`](@ref)
 - Computes an ambiguity radius that shrinks with the square root of the sample length. [`RateRadius`](@ref)
 - Computes an ambiguity radius that shrinks at the dimensional rate a Wasserstein ball earns, not at the square-root rate. [`DimensionalRateRadius`](@ref)
@@ -1618,13 +2348,12 @@ Those three return one number for every slot, and the eight radius slots do not 
 
 - Computes an ambiguity radius in the ground metric that the slot it stands in names, so that two slots of two different norms get two different numbers. [`DualNormRadius`](@ref)
 
-The tail weight of an Esfahani-Kuhn loss carries a role and a family of its own. One rule ships there, and it prices the tail term of the loss at a stated multiple of its mean term: a stated tail weight is dimensionless and is not scale-free in the sample, so one number is a different trade-off at every sampling frequency. That rule reads the probability of its own slot, which travels to it through `bind_alpha`.
+The tail weight of an Esfahani-Kuhn loss carries a family of its own. One rule ships there, and it prices the tail term of the loss at a stated multiple of its mean term: a stated tail weight is dimensionless and is not scale-free in the sample, so one number is a different trade-off at every sampling frequency. That rule reads the probability of its own slot, which reaches it in the same context.
 
 - Computes the Esfahani-Kuhn tail weight that prices the tail term of the loss at a stated multiple of its mean term. [`TailTermParity`](@ref)
 
-A norm ceiling is a different quantity from a radius, so it carries a role and a family of its own and neither role is admitted in the other's slot. A radius is the coefficient of a norm penalty in the objective; a ceiling bounds that norm in a constraint, and its reciprocal is a floor on the effective number of assets. It reaches the three norm-constraint slots of [`JuMPOptimiser`](@ref), `l2c`, `lpc` and `linfc`. One rule ships, and it holds a stated fraction of the universe effective, so the floor moves with the universe the prior carries. The order the ceiling is read against belongs to the constraint rather than to the rule, so each constraint site hands its own order over before the slot resolves.
+A norm ceiling is a different quantity from a radius, so it carries a family of its own and neither family is admitted in the other's slot. A radius is the coefficient of a norm penalty in the objective; a ceiling bounds that norm in a constraint, and its reciprocal is a floor on the effective number of assets. It reaches the three norm-constraint slots of [`JuMPOptimiser`](@ref), `l2c`, `lpc` and `linfc`. One rule ships, and it holds a stated fraction of the universe effective, so the floor moves with the universe the prior carries. The order the ceiling is read against belongs to the constraint rather than to the rule, so each constraint site hands its own order over before the slot resolves.
 
-- Places a norm-ceiling rule in a slot that bounds a norm of the weight vector from above. [`NormCeilingCalibration`](@ref)
 - Computes a norm ceiling that holds a stated fraction of the universe effective, so that the floor refits whenever the universe changes. [`EffectiveAssetFloor`](@ref)
 
 ### Risk measures for traditional optimisation
@@ -2413,6 +3142,29 @@ Risk contribution
 <summary>
 ```
 
+Factor attribution
+
+```@raw html
+</summary>
+```
+
+[`factor_attribution`](@ref) decomposes a portfolio's volatility and mean return over the factors, the factor families and the assets of a factor model, and returns one [`FactorAttributionResult`](@ref). The predicted methods read the moments the optimiser saw; the realised methods read a net return series, and each has a rolling twin. What the model does not explain is a fourth component of its own.
+
+- Decompose a portfolio's volatility and mean return over the factors of a factor model. [`factor_attribution`](@ref) and [`FactorAttributionResult`](@ref)
+- One row of a factor attribution: the volatility, the volatility contribution, the variance share, the mean return contribution and the correlation of one component of the portfolio return. [`AttributionComponent`](@ref)
+- The factor axis or the family axis of a factor attribution, one entry per row of the axis. [`AttributionBreakdown`](@ref)
+- The asset axis of a factor attribution, one entry per asset. [`AssetAttributionBreakdown`](@ref)
+- The asset-by-factor contributions of a factor attribution, two matrices of assets by factors. [`AssetFactorContribution`](@ref)
+
+```@raw html
+</details>
+```
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
 Compute the expected portfolio return using the specified return estimator. [`expected_return`](@ref)
 
 ```@raw html
@@ -2848,7 +3600,7 @@ Arithmetic [`ArithmeticReturn`](@ref)
 </summary>
 ```
 
-- Holds the element-wise lower and upper bounds of a box uncertainty set on a mean vector or on a covariance matrix. [`BoxUncertaintySet`](@ref), [`BoxUncertaintySetAlgorithm`](@ref), [`EllipsoidalUncertaintySet`](@ref), and [`EllipsoidalUncertaintySetAlgorithm`](@ref)
+- Holds the element-wise lower and upper bounds of a box uncertainty set on a mean vector or on a covariance matrix. [`BoxUncertaintySet`](@ref), [`BoxUncertaintySetAlgorithm`](@ref), [`EllipsoidalUncertaintySet`](@ref), [`EllipsoidalUncertaintySetAlgorithm`](@ref), [`NormBallUncertaintySet`](@ref), and [`NormBallUncertaintySetAlgorithm`](@ref)
 - Custom expected returns vector
 - Deferred expected returns estimator, resolved against the optimisation's own prior
 
@@ -3336,6 +4088,11 @@ Walk forward [`WalkForwardEstimator`](@ref) return a [`WalkForwardResult`](@ref)
 </details>
 ```
 
+A scheme reads a fold under an evaluation convention. [`SelfFinancingDrift`](@ref) reads a fold's series on the weights the fund holds rather than the weights the optimiser chose, and the fold then carries a [`HeldWeightsResult`](@ref). A walk-forward may also thread those held weights into the fold that follows it.
+
+- Thread the weights a fold **held** after its last observation into the fold that follows it. [`DriftedWeights`](@ref)
+- Records what a fold actually held, so a reader can recover the weight path of that fold. [`HeldWeightsResult`](@ref)
+
 ```@raw html
 <details class="cap-group" style="margin-left: 2em">
 <summary>
@@ -3517,6 +4274,93 @@ Factor models
 <summary>
 ```
 
+Cross-sectional regression diagnostics
+
+```@raw html
+</summary>
+```
+
+- Plot the weighted cross-sectional coefficient of determination of every observation. [`plot_cs_regression_r2`](@ref)
+- Plot the adjusted cross-sectional coefficient of determination of every observation. [`plot_cs_regression_adjusted_r2`](@ref)
+- Plot the Akaike information criterion of every cross-sectional fit. [`plot_cs_regression_aic`](@ref)
+- Plot the Bayesian information criterion of every cross-sectional fit. [`plot_cs_regression_bic`](@ref)
+- Plot the t-statistic of every factor return, one series per factor. [`plot_cs_regression_t_stats`](@ref)
+- Plot the fraction of observations at which each factor's t-statistic exceeds a threshold. [`plot_cs_regression_t_stat_exceedance_rate`](@ref)
+- Plot the variance inflation factor of every factor, one series per factor. [`plot_exposure_vif`](@ref)
+- Plot the condition number of the cross-sectional design of every observation. [`plot_exposure_condition_number`](@ref)
+
+```@raw html
+</details>
+```
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Cross-sectional exposure diagnostics
+
+```@raw html
+</summary>
+```
+
+- Plot the time-averaged correlation between every pair of factor exposures as a heatmap. [`plot_exposure_correlation`](@ref)
+- Plot the stability of every factor exposure, one series per factor. [`plot_exposure_stability`](@ref)
+- Plot the weighted cross-sectional standard deviation of every factor exposure, one series per factor. [`plot_exposure_dispersion`](@ref)
+- Plot the cross-sectional distribution of one factor exposure as a histogram. [`plot_exposure_distribution`](@ref)
+- Plot the running sum of the information coefficient of every factor exposure, one series per factor. [`plot_cumulative_exposure_ic`](@ref)
+
+```@raw html
+</details>
+```
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Cross-sectional idiosyncratic diagnostics
+
+```@raw html
+</summary>
+```
+
+- Plot the cross-sectional standard deviation of the standardised idiosyncratic returns against the observation axis. [`plot_idio_calibration`](@ref)
+- Plot the share of assets whose standardised idiosyncratic return exceeds a threshold, against the observation axis. [`plot_idio_tail_rate`](@ref)
+- Plot the cross-sectional excess kurtosis of the standardised idiosyncratic returns against the observation axis. [`plot_idio_kurtosis`](@ref)
+- Plot the cross-sectional skewness of the standardised idiosyncratic returns against the observation axis. [`plot_idio_skewness`](@ref)
+- Plot the information coefficient of the predicted idiosyncratic volatility against the observation axis. [`plot_idio_vol_ic`](@ref)
+- Plot the residual dependence of the standardised idiosyncratic returns on the predicted volatility, against the observation axis. [`plot_idio_vol_residual_dependence`](@ref)
+
+```@raw html
+</details>
+```
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Factor model summary and factor forecasts
+
+```@raw html
+</summary>
+```
+
+- Plot the columns of a factor model summary as a grouped bar chart, one group per column and one bar per factor. [`plot_factor_model_summary`](@ref)
+- Plot the cumulative return of every factor, one series per factor. [`plot_factor_cumulative_returns`](@ref)
+- Plot the forecast correlation of the factor returns as a heatmap. [`plot_factor_forecast_correlation`](@ref)
+- Plot the forecast volatility of every factor return as a horizontal bar chart, ordered from the smallest. [`plot_factor_forecast_volatilities`](@ref)
+
+```@raw html
+</details>
+```
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
 Phylogeny
 
 ```@raw html
@@ -3543,6 +4387,26 @@ Cross validation
 
 - Bar chart of cross-validation scores (one bar per fold or population member). [`plot_cv_scores`](@ref)
 - Four-panel composite plot for a walk-forward cross-validation result: [`plot_cv_dashboard`](@ref)
+
+```@raw html
+</details>
+```
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Factor attribution
+
+```@raw html
+</summary>
+```
+
+- Plot the volatility contribution of each factor, or of each factor family, as a bar chart. [`plot_attribution_vol_contrib`](@ref)
+- Plot the mean return contribution of each factor, or of each factor family, as a bar chart with error bars. [`plot_attribution_mu_contrib`](@ref)
+- Plot the portfolio's exposure to each factor, or to each factor family, as a bar chart with its spread. [`plot_attribution_exposure`](@ref)
+- Plot the mean return contribution of each factor against its volatility contribution, as a labelled scatter. [`plot_attribution_mu_vs_vol`](@ref)
 
 ```@raw html
 </details>

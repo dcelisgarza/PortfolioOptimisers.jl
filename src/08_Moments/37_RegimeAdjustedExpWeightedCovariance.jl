@@ -379,8 +379,8 @@ function RegimeAdjustedExpWeightedCovariance(; decay::Number = exp2(-inv(40.0)),
                                                                           end)),
                                              hac_lags::Option{<:Integer} = nothing,
                                              regime_method::Option{<:RegimeAdjustedMethod} = FirstMomentRegimeAdjusted(),
-                                             regime_decay::Number = exp2(-2 /
-                                                                         inv(log2(inv(decay)))),
+                                             regime_decay::Number = exp2(-2 *
+                                                                         log2(inv(decay))),
                                              regime_min_obs::Integer = round(Int,
                                                                              max(1,
                                                                                  inv(log2(inv(decay))) /

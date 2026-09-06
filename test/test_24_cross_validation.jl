@@ -1644,7 +1644,7 @@
         end
         @testset "the meta results rebuild themselves" begin
             st = StackingResult(nothing, nothing, nothing, [resj], resj, nothing,
-                                OptimisationSuccess(), resj.w, nothing)
+                                OptimisationSuccess(), resj.w, nothing, nothing)
             @test PO.set_retcode(st, rcf).retcode === rcf
             @test PO.set_retcode(st, rcf).w == resj.w
             nc = NestedClusteredResult(nothing, nothing, nothing, nothing, [resj], resj,
