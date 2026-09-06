@@ -360,11 +360,11 @@ The staged route of [`ep_prior`](@ref) searches up to three times, once per stag
  1. Wrap `cvar_views` in a vector when it is a single view, so one loop serves both shapes.
  2. For each view group, read its significance level into `alpha`, and parse its equations accepting `==` alone.
  3. Replace every group name by the assets it spans, and every `prior(...)` reference by the prior conditional value at risk at `alpha` under `w`, through [`replace_prior_views`](@ref).
- 4. Turn the parsed views into the equality block `lcs`, and check the two preconditions of the section below that read it.
+ 4. Turn the parsed views into the equality block `lcs`, and check the two preconditions of the section below that read it. Under `strict = false` every row of the group can drop, and `lcs` is then `nothing`: the group states no view, and the loop skips it.
  5. For each row of the block, read the asset it names into `cols`, its target into `B`, its level into `alphas` and its text into `eqns`. The groups flatten into one search: each level enters only as the divisor of its own view's positive part.
  6. Read the worst realisation of every named asset into `min_X`, and raise when any target reaches it.
  7. Choose the search `d_opt`. One view takes `ds_opt`, or a default [`ConditionalValueatRiskEntropyPooling`](@ref). More than one takes `dm_opt`, or a default [`OptimEntropyPooling`](@ref) over `Optim.Fminbox`.
- 8. Return the loss columns `X`, the targets `B`, the levels `alphas` and the search `d_opt`.
+ 8. Return `nothing` when every group stated no view, which sends the stage down the plain solve. Otherwise return the loss columns `X`, the targets `B`, the levels `alphas` and the search `d_opt`.
 
 # Arguments
 
@@ -385,6 +385,7 @@ The staged route of [`ep_prior`](@ref) searches up to three times, once per stag
 
 # Returns
 
+  - `nothing`: Every group stated no view, because `strict` is `false` and every row of every group was dropped.
   - `cvv::NamedTuple`: The search data, carrying the loss columns `X`, the targets `B`, the levels `alphas` and the search `d_opt`.
 
 # Related
@@ -422,6 +423,12 @@ function ep_cvar_views_setup(cvar_views::CVV_VecCVV, pr::AbstractPriorResult,
         views = replace_group_by_assets(views, sets, false, true, false)
         views = replace_prior_views(views, pr, sets, :cvar, alpha, w; strict = strict)
         lcs = get_linear_constraints(views, sets; datatype = eltype(X0), strict = strict)
+        #! Under `strict = false` a view that names no asset is warned about and dropped,
+        #! and a group whose every row drops parses to `nothing`. The warning is the whole
+        #! diagnosis, so the group states no view and the search skips it. See issue #852.
+        if isnothing(lcs)
+            continue
+        end
         @argcheck(!any(x -> x != 1, count(!iszero, lcs.A_eq; dims = 2)),
                   ArgumentError("Cannot mix multiple assets in a single cvar_view.\n$(views)"))
         @argcheck(!any(x -> x < zero(eltype(x)), lcs.A_eq .* lcs.B_eq),
@@ -436,6 +443,12 @@ function ep_cvar_views_setup(cvar_views::CVV_VecCVV, pr::AbstractPriorResult,
             push!(alphas, alpha)
             push!(eqns, views[i].eqn)
         end
+    end
+    #! Every group dropped every row, so there is no value at risk to search over. `nothing`
+    #! is what `ep_cvar_views_setup` answers when no group was written at all, and it sends
+    #! the stage down the plain solve. See issue #852.
+    if isempty(cols)
+        return nothing
     end
     X = view(X0, :, cols)
     min_X = dropdims(-minimum(X; dims = 1); dims = 1)
@@ -714,9 +727,9 @@ Posterior moments are then read as probability-weighted sample statistics under 
  1. Fit the wrapped prior estimator, giving `pr`. The fit states the observation axis: `T` is `size(pr.X, 1)`, which a nested prior that drops rows makes smaller than `size(X, 1)`.
  2. Read the prior probabilities `w0` on that axis with [`ep_prior_probabilities`](@ref). They are `pe.w` where the caller set one, `pr.w` where the fit answered one, and the uniform `1/T` otherwise. A caller's `pe.w` reaches the wrapped estimator through [`factory`](@ref), and `pr` is refitted under it.
  3. Build the empty constraint dictionary `epc` and the fixing ledger `fixed`. Resolve the `cvar_views` once against that fit, through [`ep_cvar_views_setup`](@ref) into `cvv`. Every stage searches the targets it holds, so a `prior(...)` reference states one number for the whole chain.
- 4. Stage one, the mean and the value at risk. Write the `mu_views` and `var_views` rows into `epc`. When any of `mu_views`, `var_views` and `cvar_views` is present, solve through [`ep_cvar_views_solve!`](@ref) into `w1`, and refit `pr` under it.
- 5. Stage two, the variance and the covariance. Write the `sigma_views` and `cov_views` rows into `epc`, and pin the mean of every asset those rows read with [`fix_mu!`](@ref), so the stage cannot move a moment an earlier stage set. Solve into `w1`, and refit `pr` under it.
- 6. Stage three, the correlation, the skewness and the kurtosis. Write the `sk_views`, `kt_views` and `rho_views` rows into `epc`, and pin the mean and the variance of every asset those rows read with [`fix_mu!`](@ref) and [`fix_sigma!`](@ref). Solve into `w1`, and refit `pr` under it.
+ 4. Stage one, the mean and the value at risk. Write the `mu_views` and `var_views` rows into `epc`. When `epc` holds a row or `cvv` states a search, solve through [`ep_cvar_views_solve!`](@ref) into `w1`, and refit `pr` under it.
+ 5. Stage two, the variance and the covariance. Write the `sigma_views` and `cov_views` rows into `epc`, and pin the mean of every asset those rows read with [`fix_mu!`](@ref), so the stage cannot move a moment an earlier stage set. Under the same emptiness test, solve into `w1`, and refit `pr` under it.
+ 6. Stage three, the correlation, the skewness and the kurtosis. Write the `sk_views`, `kt_views` and `rho_views` rows into `epc`, and pin the mean and the variance of every asset those rows read with [`fix_mu!`](@ref) and [`fix_sigma!`](@ref). Under the same emptiness test, solve into `w1`, and refit `pr` under it.
  7. Read the reference each of steps 5 and 6 solves from: `w0` under [`H1_EntropyPooling`](@ref), and the previous stage's `w1` under [`H2_EntropyPooling`](@ref).
  8. Read the effective number of scenarios `ens` as the exponential of the entropy of `w1`, and the divergence `kld` as the Kullback-Leibler divergence of `w1` from `w0`.
  9. Return a [`LowOrderPrior`](@ref) carrying the last refit's moments, `w1`, `ens` and `kld`. The feature matrix `Z` and the factor block `fpr` are forwarded from that refit unchanged.
@@ -789,7 +802,10 @@ function ep_prior(alg::StagedEP, pe::MeucciEntropyPoolingPrior, X::MatNum,
                               strict = strict)
     ep_mu_views!(pe.mu_views, epc, pr, pe.sets; strict = strict)
     ep_var_views!(pe.var_views, epc, pr, pe.sets, w0; strict = strict)
-    if !isnothing(pe.mu_views) || !isnothing(pe.var_views) || !isnothing(pe.cvar_views)
+    # Every row of every family can drop under `strict = false`, and the stage then states
+    # no view. The prior is the answer, so neither the solve nor the refit runs. See issue
+    # #852.
+    if !isempty(epc) || !isnothing(cvv)
         w1 = ep_cvar_views_solve!(cvv, epc, w0, pe.opt)
         pe = factory(pe, w1)
         pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
@@ -805,10 +821,13 @@ function ep_prior(alg::StagedEP, pe::MeucciEntropyPoolingPrior, X::MatNum,
             to_fix = ep_cov_views!(pe.cov_views, epc, pr, pe.sets; strict = strict)
             fix_mu!(epc, view(fixed, :, 1), to_fix, pr)
         end
-        w1 = ep_cvar_views_solve!(cvv, epc, ifelse(isa(alg, H1_EntropyPooling), w0, w1),
-                                  pe.opt)
-        pe = factory(pe, w1)
-        pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
+        # See the twin note one stage up: a stage that states no view does not solve.
+        if !isempty(epc) || !isnothing(cvv)
+            w1 = ep_cvar_views_solve!(cvv, epc, ifelse(isa(alg, H1_EntropyPooling), w0, w1),
+                                      pe.opt)
+            pe = factory(pe, w1)
+            pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
+        end
     end
     if !isnothing(pe.rho_views) || !isnothing(pe.sk_views) || !isnothing(pe.kt_views)
         # skew
@@ -829,10 +848,13 @@ function ep_prior(alg::StagedEP, pe::MeucciEntropyPoolingPrior, X::MatNum,
             fix_mu!(epc, view(fixed, :, 1), to_fix, pr)
             fix_sigma!(epc, view(fixed, :, 2), to_fix, pr)
         end
-        w1 = ep_cvar_views_solve!(cvv, epc, ifelse(isa(alg, H1_EntropyPooling), w0, w1),
-                                  pe.opt)
-        pe = factory(pe, w1)
-        pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
+        # See the twin note two stages up: a stage that states no view does not solve.
+        if !isempty(epc) || !isnothing(cvv)
+            w1 = ep_cvar_views_solve!(cvv, epc, ifelse(isa(alg, H1_EntropyPooling), w0, w1),
+                                      pe.opt)
+            pe = factory(pe, w1)
+            pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
+        end
     end
     # Entropy pooling reweights observations without touching either axis of `Z`, so the
     # wrapped prior's feature matrix is forwarded unchanged (see [`LowOrderPrior`](@ref)).
@@ -889,7 +911,7 @@ Posterior moments are then read as probability-weighted sample statistics under 
  4. Write the `mu_views` and `var_views` rows into `epc`.
  5. Write the `sigma_views` and `cov_views` rows into `epc`. No moment is pinned, so [`fix_mu!`](@ref) is never called on this route.
  6. Write the `sk_views`, `kt_views` and `rho_views` rows into `epc`.
- 7. Solve the whole accumulated set once through [`ep_cvar_views_solve!`](@ref) into `w1`, and refit `pr` under it.
+ 7. When `epc` holds a row or `cvv` states a search, solve the whole accumulated set once through [`ep_cvar_views_solve!`](@ref) into `w1`, and refit `pr` under it. Every row of every family can drop under `strict = false`, and the view set then states nothing: `w1` is `w0`, `kld` is zero, and no refit runs.
  8. Read the effective number of scenarios `ens` as the exponential of the entropy of `w1`, and the divergence `kld` as the Kullback-Leibler divergence of `w1` from `w0`.
  9. Return a [`LowOrderPrior`](@ref) carrying the refit's moments, `w1`, `ens` and `kld`. The feature matrix `Z` and the factor block `fpr` are forwarded from that refit unchanged.
 
@@ -975,9 +997,15 @@ function ep_prior(alg::H0_EntropyPooling, pe::MeucciEntropyPoolingPrior, X::MatN
             ep_rho_views!(pe.rho_views, epc, pr, pe.sets; strict = strict)
         end
     end
-    w1 = ep_cvar_views_solve!(cvv, epc, w0, pe.opt)
-    pe = factory(pe, w1)
-    pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
+    w1 = w0
+    # Every row of every family can drop under `strict = false`, and the view set then
+    # states nothing. The prior is the answer, so neither the solve nor the refit runs. See
+    # issue #852.
+    if !isempty(epc) || !isnothing(cvv)
+        w1 = ep_cvar_views_solve!(cvv, epc, w0, pe.opt)
+        pe = factory(pe, w1)
+        pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
+    end
     # Entropy pooling reweights observations without touching either axis of `Z`, so the
     # wrapped prior's feature matrix is forwarded unchanged (see [`LowOrderPrior`](@ref)).
     # The factor block is the refit prior's, forwarded whole. It is *not* stamped with the

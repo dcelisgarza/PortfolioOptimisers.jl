@@ -833,7 +833,7 @@ Where:
  1. Parse the view equations of `mu_views.val`, giving one [`ParsingResult`](@ref) per view.
  2. Replace every group name by the assets it spans.
  3. Replace every `prior(...)` reference by the prior mean, through [`replace_prior_views`](@ref).
- 4. Turn the parsed views into the linear constraint blocks `lcs`, one for `:ineq` and one for `:eq`.
+ 4. Turn the parsed views into the linear constraint blocks `lcs`, one for `:ineq` and one for `:eq`. Under `strict = false` every row of the group can drop, and `lcs` is then `nothing`: the group states no view, and the call returns without adding a row.
  5. For each block present, add `A * transpose(X)` against `B` under that key with [`add_ep_constraint!`](@ref).
 
 # Arguments
@@ -863,6 +863,14 @@ function ep_mu_views!(mu_views::LinearConstraintEstimator, epc::AbstractDict,
     mu_views = replace_group_by_assets(mu_views, sets, false, true, false)
     mu_views = replace_prior_views(mu_views, pr, sets, :mu; strict = strict)
     lcs = get_linear_constraints(mu_views, sets; datatype = eltype(X), strict = strict)
+    #! Under `strict = false` a view that names no asset is warned about and dropped, and
+    #! a group whose every row drops parses to `nothing`. The warning is the whole
+    #! diagnosis, so the family states no view and the fit proceeds without one. Reading a
+    #! block off the `nothing` raised a `FieldError` naming an internal field one call after
+    #! that warning. See issue #852.
+    if isnothing(lcs)
+        return nothing
+    end
     for p in (:ineq, :eq)
         if isnothing(getproperty(lcs, p))
             continue
@@ -2545,7 +2553,7 @@ Where:
  1. Parse the view equations of `var_views.val`, accepting `==` and `>=` alone.
  2. Replace every group name by the assets it spans.
  3. Replace every `prior(...)` reference by the prior value at risk at `alpha`, read under `w`, through [`replace_prior_views`](@ref).
- 4. Turn the parsed views into the linear constraint blocks `lcs`, one for `:ineq` and one for `:eq`.
+ 4. Turn the parsed views into the linear constraint blocks `lcs`, one for `:ineq` and one for `:eq`. Under `strict = false` every row of the group can drop, and `lcs` is then `nothing`: the group states no view, and the call returns without adding a row.
  5. Check the three preconditions of the section below.
  6. For each block present, and each row `i` of it, read the asset the row names into `j`, and the observations of `view(X, :, j)` at or below `-abs(B[i])` into `idx`.
  7. Raise when `idx` names no observation.
@@ -2629,6 +2637,14 @@ function ep_var_views!(var_views::LinearConstraintEstimator, epc::AbstractDict,
     var_views = replace_group_by_assets(var_views, sets, false, true, false)
     var_views = replace_prior_views(var_views, pr, sets, :var, alpha, w; strict = strict)
     lcs = get_linear_constraints(var_views, sets; datatype = eltype(X), strict = strict)
+    #! Under `strict = false` a view that names no asset is warned about and dropped, and
+    #! a group whose every row drops parses to `nothing`. The warning is the whole
+    #! diagnosis, so the family states no view and the fit proceeds without one. Reading a
+    #! block off the `nothing` raised a `FieldError` naming an internal field one call after
+    #! that warning. See issue #852.
+    if isnothing(lcs)
+        return nothing
+    end
     #! `all`, not `any`: a row of a universe of more than one asset always carries a zero,
     #! so `any` held for every view and the guard never fired. The body then read the
     #! target off `B` while it discarded the coefficient, which doubles the threshold a
@@ -2772,12 +2788,13 @@ Where:
 
 # Algorithm
 
- 1. Open `A` and `B` with the row that pins the posterior to sum to one, both sides divided by ``\\sqrt{T}``.
- 2. Stack the block of every key of `epc` onto `A` and `B`, and set the box `wb` of that block's dual variables from the key: free for `:eq` and `:cvar_eq`, non-negative for `:ineq`, and ``[-s_{c2},\\, s_{c2}]`` for `:feq`. Raise on any other key. A `:feq` block is left out when ``s_{c2}`` is zero, because that box pins its dual variables to zero and the fixed rows then carry no weight.
- 3. Start every dual variable at ``1/\\sqrt{T}``, clamped into its own box. A `:feq` box is ``[-s_{c2},\\, s_{c2}]``, so an `s_{c2}` below ``1/\\sqrt{T}`` would otherwise place the start outside it.
- 4. Minimise the dual objective over that box with `Optim.optimize`, through the branch `alg` selects. Both the objective and its gradient are multiplied by ``s_{c1}``.
- 5. Raise when `Optim.converged` reports that the solve failed.
- 6. Recover the posterior probabilities from the minimiser, and return them as `StatsBase.pweights`.
+ 1. Return `w` when `epc` holds no row. An empty view set states nothing, so the posterior is the prior, and it is answered exactly rather than solved for.
+ 2. Open `A` and `B` with the row that pins the posterior to sum to one, both sides divided by ``\\sqrt{T}``.
+ 3. Stack the block of every key of `epc` onto `A` and `B`, and set the box `wb` of that block's dual variables from the key: free for `:eq` and `:cvar_eq`, non-negative for `:ineq`, and ``[-s_{c2},\\, s_{c2}]`` for `:feq`. Raise on any other key. A `:feq` block is left out when ``s_{c2}`` is zero, because that box pins its dual variables to zero and the fixed rows then carry no weight.
+ 4. Start every dual variable at ``1/\\sqrt{T}``, clamped into its own box. A `:feq` box is ``[-s_{c2},\\, s_{c2}]``, so an `s_{c2}` below ``1/\\sqrt{T}`` would otherwise place the start outside it.
+ 5. Minimise the dual objective over that box with `Optim.optimize`, through the branch `alg` selects. Both the objective and its gradient are multiplied by ``s_{c1}``.
+ 6. Raise when `Optim.converged` reports that the solve failed.
+ 7. Recover the posterior probabilities from the minimiser, and return them as `StatsBase.pweights`.
 
 # Arguments
 
@@ -2816,6 +2833,13 @@ Where:
 function entropy_pooling(w::VecNum, epc::AbstractDict,
                          opt::OptimEntropyPooling{<:Any, <:Any, <:Any, <:Any,
                                                   <:ExpEntropyPooling})
+    #! An empty view set states nothing, so the posterior is the prior. Every row of every
+    #! family can drop under `strict = false`, and the solve is then skipped rather than run
+    #! over the normalisation row alone: that answers `w` to solver tolerance where this
+    #! answers it exactly, and `kld` is zero rather than a rounding of it. See issue #852.
+    if isempty(epc)
+        return isa(w, StatsBase.ProbabilityWeights) ? w : StatsBase.pweights(w)
+    end
     T = length(w)
     factor = inv(sqrt(T))
     A = fill(factor, 1, T)
@@ -2895,6 +2919,13 @@ end
 function entropy_pooling(w::VecNum, epc::AbstractDict,
                          opt::OptimEntropyPooling{<:Any, <:Any, <:Any, <:Any,
                                                   <:LogEntropyPooling})
+    #! An empty view set states nothing, so the posterior is the prior. Every row of every
+    #! family can drop under `strict = false`, and the solve is then skipped rather than run
+    #! over the normalisation row alone: that answers `w` to solver tolerance where this
+    #! answers it exactly, and `kld` is zero rather than a rounding of it. See issue #852.
+    if isempty(epc)
+        return isa(w, StatsBase.ProbabilityWeights) ? w : StatsBase.pweights(w)
+    end
     T = length(w)
     factor = inv(sqrt(T))
     A = fill(factor, 1, T)
@@ -3117,7 +3148,7 @@ Where:
  1. Parse the view equations of `sigma_views.val`, giving one [`ParsingResult`](@ref) per view.
  2. Replace every group name by the assets it spans.
  3. Replace every `prior(...)` reference by the prior variance, through [`replace_prior_views`](@ref).
- 4. Turn the parsed views into the linear constraint blocks `lcs`, one for `:ineq` and one for `:eq`.
+ 4. Turn the parsed views into the linear constraint blocks `lcs`, one for `:ineq` and one for `:eq`. Under `strict = false` every row of the group can drop, and `lcs` is then `nothing`: the group states no view, and the call returns a `to_fix` that names no asset.
  5. Build `tmp`, the squared deviations of every observation from the prior mean, transposed so a row of `lcs` multiplies it from the left.
  6. For each block present, add `A * tmp` against `B` under that key with [`add_ep_constraint!`](@ref), and mark in `to_fix` every asset the block names.
 
@@ -3149,6 +3180,14 @@ function ep_sigma_views!(sigma_views::LinearConstraintEstimator, epc::AbstractDi
     sigma_views = replace_group_by_assets(sigma_views, sets, false, true, false)
     sigma_views = replace_prior_views(sigma_views, pr, sets, :sigma; strict = strict)
     lcs = get_linear_constraints(sigma_views, sets; datatype = eltype(X), strict = strict)
+    #! Under `strict = false` a view that names no asset is warned about and dropped, and
+    #! a group whose every row drops parses to `nothing`. The warning is the whole
+    #! diagnosis, so the family states no view and the fit proceeds without one. Reading a
+    #! block off the `nothing` raised a `FieldError` naming an internal field one call after
+    #! that warning. See issue #852.
+    if isnothing(lcs)
+        return falses(size(X, 2))
+    end
     tmp = transpose((X .- transpose(pr.mu)) .^ 2)
     to_fix = falses(size(X, 2))
     for p in (:ineq, :eq)
@@ -3783,7 +3822,7 @@ The identity holds only while the posterior mean and variance of asset ``i`` equ
  1. Parse the view equations of `skew_views.val`, giving one [`ParsingResult`](@ref) per view.
  2. Replace every group name by the assets it spans.
  3. Replace every `prior(...)` reference by the prior skewness, through [`replace_prior_views`](@ref).
- 4. Turn the parsed views into the linear constraint blocks `lcs`, one for `:ineq` and one for `:eq`.
+ 4. Turn the parsed views into the linear constraint blocks `lcs`, one for `:ineq` and one for `:eq`. Under `strict = false` every row of the group can drop, and `lcs` is then `nothing`: the group states no view, and the call returns a `to_fix` that names no asset.
  5. Read the prior variances, the diagonal of `pr.sigma`, into `sigma`.
  6. Build `tmp`, the standardised third moment contribution of every observation, transposed so a row of `lcs` multiplies it from the left.
  7. For each block present, add `A * tmp` against `B` under that key with [`add_ep_constraint!`](@ref), and mark in `to_fix` every asset the block names.
@@ -3816,6 +3855,14 @@ function ep_sk_views!(skew_views::LinearConstraintEstimator, epc::AbstractDict,
     skew_views = replace_group_by_assets(skew_views, sets, false, true, false)
     skew_views = replace_prior_views(skew_views, pr, sets, :skew; strict = strict)
     lcs = get_linear_constraints(skew_views, sets; datatype = eltype(X), strict = strict)
+    #! Under `strict = false` a view that names no asset is warned about and dropped, and
+    #! a group whose every row drops parses to `nothing`. The warning is the whole
+    #! diagnosis, so the family states no view and the fit proceeds without one. Reading a
+    #! block off the `nothing` raised a `FieldError` naming an internal field one call after
+    #! that warning. See issue #852.
+    if isnothing(lcs)
+        return falses(size(X, 2))
+    end
     sigma = LinearAlgebra.diag(pr.sigma)
     tmp = transpose((X .^ 3 .- transpose(pr.mu) .^ 3 .- 3 * transpose(pr.mu .* sigma)) ./
                     transpose(sigma .* sqrt.(sigma)))
@@ -3904,7 +3951,7 @@ The identity holds only while the posterior mean and variance of asset ``i`` equ
  1. Parse the view equations of `kurtosis_views.val`, giving one [`ParsingResult`](@ref) per view.
  2. Replace every group name by the assets it spans.
  3. Replace every `prior(...)` reference by the prior kurtosis, through [`replace_prior_views`](@ref).
- 4. Turn the parsed views into the linear constraint blocks `lcs`, one for `:ineq` and one for `:eq`.
+ 4. Turn the parsed views into the linear constraint blocks `lcs`, one for `:ineq` and one for `:eq`. Under `strict = false` every row of the group can drop, and `lcs` is then `nothing`: the group states no view, and the call returns a `to_fix` that names no asset.
  5. Build `X_sq` and `mu_sq`, the squares of the returns and of the prior means.
  6. Build `tmp`, the standardised fourth moment contribution of every observation, transposed so a row of `lcs` multiplies it from the left.
  7. For each block present, add `A * tmp` against `B` under that key with [`add_ep_constraint!`](@ref), and mark in `to_fix` every asset the block names.
@@ -3939,6 +3986,14 @@ function ep_kt_views!(kurtosis_views::LinearConstraintEstimator, epc::AbstractDi
                                          strict = strict)
     lcs = get_linear_constraints(kurtosis_views, sets; datatype = eltype(X),
                                  strict = strict)
+    #! Under `strict = false` a view that names no asset is warned about and dropped, and
+    #! a group whose every row drops parses to `nothing`. The warning is the whole
+    #! diagnosis, so the family states no view and the fit proceeds without one. Reading a
+    #! block off the `nothing` raised a `FieldError` naming an internal field one call after
+    #! that warning. See issue #852.
+    if isnothing(lcs)
+        return falses(size(X, 2))
+    end
     X_sq = X .^ 2
     mu_sq = pr.mu .^ 2
     tmp = transpose((X_sq .* X_sq .- 4 * transpose(pr.mu) .* X_sq .* X .+
@@ -4021,11 +4076,12 @@ Where:
 # Algorithm
 
  1. Raise when `opt` is an [`OptimEntropyPooling`](@ref) and `tvs` names a tail view, and forward to the three-argument form otherwise.
- 2. Solve once with [`ep_jump_entropy_pooling`](@ref), giving `w1`.
- 3. Read `iters`, the largest number of re-solves a carrier of `tvs` asks for, with [`ep_refine_iters`](@ref). It is zero where no carrier is sequential, and the steps below then do not run.
- 4. Re-read every carrier at `w1` with [`ep_refine_tail_view`](@ref), which returns the carrier and whether its surrogate row is tight there. Stop where every carrier is tight.
- 5. Solve again with the re-read carriers, giving a new `w1`, and return to step 4. Take at most `iters` re-solves, so the last posterior can hold a slack row when the sequence has not settled.
- 6. Return `w1` as `StatsBase.pweights`.
+ 2. Return `w` when `epc` holds no row and `tvs` names no tail view. An empty view set states nothing, so the posterior is the prior, and it is answered exactly rather than solved for.
+ 3. Solve once with [`ep_jump_entropy_pooling`](@ref), giving `w1`.
+ 4. Read `iters`, the largest number of re-solves a carrier of `tvs` asks for, with [`ep_refine_iters`](@ref). It is zero where no carrier is sequential, and the steps below then do not run.
+ 5. Re-read every carrier at `w1` with [`ep_refine_tail_view`](@ref), which returns the carrier and whether its surrogate row is tight there. Stop where every carrier is tight.
+ 6. Solve again with the re-read carriers, giving a new `w1`, and return to step 5. Take at most `iters` re-solves, so the last posterior can hold a slack row when the sequence has not settled.
+ 7. Return `w1` as `StatsBase.pweights`.
 
 The re-solves are the sequential convex formulations' half of the work. Each re-read row is tight at the posterior it was read at and still holds there, so that posterior stays feasible and the divergence of the next one is at most its own.
 
@@ -4072,6 +4128,11 @@ function entropy_pooling(w::VecNum, epc::AbstractDict, tvs::VecEPTV,
 end
 function entropy_pooling(w::VecNum, epc::AbstractDict, tvs::VecEPTV,
                          opt::JuMPEntropyPooling)
+    #! See the twin note in the `OptimEntropyPooling` methods: an empty view set states
+    #! nothing, so the posterior is the prior. Issue #852.
+    if isempty(epc) && isempty(tvs)
+        return isa(w, StatsBase.ProbabilityWeights) ? w : StatsBase.pweights(w)
+    end
     w1 = ep_jump_entropy_pooling(w, epc, tvs, opt)
     iters = ep_refine_iters(tvs)
     if iszero(iters)

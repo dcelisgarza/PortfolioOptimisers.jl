@@ -3543,10 +3543,12 @@ Compute entropy pooling prior moments with tail views, enforcing the views in st
  1. Fit the wrapped prior estimator, giving `pr`. The fit states the observation axis: `T` is `size(pr.X, 1)`, which a nested prior that drops rows makes smaller than `size(X, 1)`.
  2. Read the prior probabilities `w0` on that axis with [`ep_prior_probabilities`](@ref). They are `pe.w` where the caller set one, `pr.w` where the fit answered one, and the uniform `1/T` otherwise. A caller's `pe.w` reaches the wrapped estimator through [`factory`](@ref), and `pr` is refitted under it.
  3. Stage one holds the mean, value at risk, conditional, entropic and relativistic value at risk views. Accumulate them into the constraint dictionary `epc` and the tail view vector `tvs`. Where either is non-empty, solve from `w0` with [`entropy_pooling`](@ref), giving `w1`, and refit `pr` at `w1`.
- 4. Stage two holds the variance and covariance views, with the mean of every asset they name pinned by [`fix_mu!`](@ref). Solve from `w0` under [`H1_EntropyPooling`](@ref), or from the previous `w1` under [`H2_EntropyPooling`](@ref), and refit `pr` at the new `w1`.
- 5. Stage three holds the skewness, kurtosis and correlation views, with the mean and the variance of every asset they name pinned by [`fix_mu!`](@ref) and [`fix_sigma!`](@ref). Solve from the same start step 4 takes, and refit `pr` at the new `w1`.
+ 4. Stage two holds the variance and covariance views, with the mean of every asset they name pinned by [`fix_mu!`](@ref). Where `epc` or `tvs` is non-empty, solve from `w0` under [`H1_EntropyPooling`](@ref), or from the previous `w1` under [`H2_EntropyPooling`](@ref), and refit `pr` at the new `w1`.
+ 5. Stage three holds the skewness, kurtosis and correlation views, with the mean and the variance of every asset they name pinned by [`fix_mu!`](@ref) and [`fix_sigma!`](@ref). Under the same emptiness test, solve from the same start step 4 takes, and refit `pr` at the new `w1`.
  6. Compute `ens`, the effective number of scenarios of `w1`, and `kld`, the divergence of `w1` from `w0`.
  7. Return a [`LowOrderPrior`](@ref) carrying the refit moments, `w1`, `ens` and `kld`. The feature matrix and the factor block come from `pr` unchanged.
+
+Every row of every family can drop under `strict = false`, and a stage then states no view. The emptiness test is on the rows the stages hold, not on the fields the caller set, so such a fit answers the prior: `w1` is `w0`, `kld` is zero, and no refit runs.
 
 # Arguments
 
@@ -3620,9 +3622,15 @@ function ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<
             to_fix = ep_cov_views!(pe.cov_views, epc, pr, pe.sets; strict = strict)
             fix_mu!(epc, view(fixed, :, 1), to_fix, pr)
         end
-        w1 = entropy_pooling(ifelse(isa(alg, H1_EntropyPooling), w0, w1), epc, tvs, pe.opt)
-        pe = factory(pe, w1)
-        pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
+        # Every row of every family can drop under `strict = false`, and the stage then
+        # states no view. The prior is the answer, so neither the solve nor the refit runs.
+        # See issue #852.
+        if !isempty(epc) || !isempty(tvs)
+            w1 = entropy_pooling(ifelse(isa(alg, H1_EntropyPooling), w0, w1), epc, tvs,
+                                 pe.opt)
+            pe = factory(pe, w1)
+            pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
+        end
     end
     if !isnothing(pe.rho_views) || !isnothing(pe.sk_views) || !isnothing(pe.kt_views)
         # skew
@@ -3643,9 +3651,13 @@ function ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<
             fix_mu!(epc, view(fixed, :, 1), to_fix, pr)
             fix_sigma!(epc, view(fixed, :, 2), to_fix, pr)
         end
-        w1 = entropy_pooling(ifelse(isa(alg, H1_EntropyPooling), w0, w1), epc, tvs, pe.opt)
-        pe = factory(pe, w1)
-        pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
+        # See the twin note one stage up: a stage that states no view does not solve.
+        if !isempty(epc) || !isempty(tvs)
+            w1 = entropy_pooling(ifelse(isa(alg, H1_EntropyPooling), w0, w1), epc, tvs,
+                                 pe.opt)
+            pe = factory(pe, w1)
+            pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
+        end
     end
     # Entropy pooling reweights observations without touching either axis of `Z`, so the
     # wrapped prior's feature matrix is forwarded unchanged (see [`LowOrderPrior`](@ref)).
@@ -3671,7 +3683,7 @@ Compute entropy pooling prior moments with tail views, enforcing every view in o
  1. Fit the wrapped prior estimator, giving `pr`. The fit states the observation axis: `T` is `size(pr.X, 1)`, which a nested prior that drops rows makes smaller than `size(X, 1)`.
  2. Read the prior probabilities `w0` on that axis with [`ep_prior_probabilities`](@ref). They are `pe.w` where the caller set one, `pr.w` where the fit answered one, and the uniform `1/T` otherwise. A caller's `pe.w` reaches the wrapped estimator through [`factory`](@ref), and `pr` is refitted under it.
  3. Build every view against that one `pr`: the mean, value at risk, conditional, entropic and relativistic value at risk, variance, covariance, skewness, kurtosis and correlation views. Each row that is linear in the posterior probabilities reaches the constraint dictionary `epc`, and each tail view that needs auxiliary variables reaches the tail view vector `tvs`. No asset's mean or variance is pinned.
- 4. Solve once from `w0` with [`entropy_pooling`](@ref), giving `w1`, and refit `pr` at `w1`.
+ 4. Where `epc` or `tvs` is non-empty, solve once from `w0` with [`entropy_pooling`](@ref), giving `w1`, and refit `pr` at `w1`. Every row of every family can drop under `strict = false`, and the view set then states nothing: `w1` is `w0`, `kld` is zero, and no refit runs.
  5. Compute `ens`, the effective number of scenarios of `w1`, and `kld`, the divergence of `w1` from `w0`.
  6. Return a [`LowOrderPrior`](@ref) carrying the refit moments, `w1`, `ens` and `kld`. The feature matrix and the factor block come from `pr` unchanged.
 
@@ -3738,9 +3750,15 @@ function ep_prior(alg::H0_EntropyPooling, pe::EntropyPoolingPrior, X::MatNum,
     if !isnothing(pe.rho_views)
         ep_rho_views!(pe.rho_views, epc, pr, pe.sets; strict = strict)
     end
-    w1 = entropy_pooling(w0, epc, tvs, pe.opt)
-    pe = factory(pe, w1)
-    pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
+    w1 = w0
+    # Every row of every family can drop under `strict = false`, and the view set then
+    # states nothing. The prior is the answer, so neither the solve nor the refit runs. See
+    # issue #852.
+    if !isempty(epc) || !isempty(tvs)
+        w1 = entropy_pooling(w0, epc, tvs, pe.opt)
+        pe = factory(pe, w1)
+        pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
+    end
     # Entropy pooling reweights observations without touching either axis of `Z`, so the
     # wrapped prior's feature matrix is forwarded unchanged (see [`LowOrderPrior`](@ref)).
     # The factor block is the refit prior's, forwarded whole, on the same reasoning as the

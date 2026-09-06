@@ -1477,3 +1477,121 @@ nested fit computed must not be discarded on the way through the wrapper.
     @test isapprox(pr_w.kld, StatsBase.kldivergence(pr_w.w, wnu), rtol = 1e-6)
     @test !isapprox(collect(pr_w.w), collect(pr_out.w), rtol = 1e-3)
 end
+
+#=
+#852: a view group whose every row was dropped under `strict = false` parsed to `nothing`,
+and the family read a constraint block off that `nothing`. The fit raised a `FieldError`
+naming an internal field, one call after the warning that named the cause. The warning is
+the whole diagnosis: a group that states no view adds no row, and a fit whose every family
+states none answers the prior, with `w` the prior probabilities and `kld` zero.
+=#
+@testset "A view group whose every row is dropped states no view" begin
+    pr0 = prior(EmpiricalPrior(), rd)
+    N = size(pr0.X, 2)
+    epc() = Dict{Symbol, Tuple{<:PortfolioOptimisers.MatNum, <:PortfolioOptimisers.VecNum}}()
+    lce(v) = LinearConstraintEstimator(; val = v)
+    vv(s) = ValueatRiskView(; views = lce(s), alpha = 0.05)
+    with_logger(SimpleLogger(stderr, Logging.Error)) do
+        # The two families that answer `nothing` add no row.
+        e = epc()
+        @test isnothing(PortfolioOptimisers.ep_mu_views!(lce("NOPE == 0.002"), e, pr0, sets;
+                                                         strict = false))
+        @test isempty(e)
+        e = epc()
+        @test isnothing(PortfolioOptimisers.ep_var_views!(vv("NOPE == 0.04"), e, pr0, sets,
+                                                          w; strict = false))
+        @test isempty(e)
+        # The three that answer a fixing mask add no row and name no asset to fix.
+        for (f, v) in ((PortfolioOptimisers.ep_sigma_views!, "NOPE == 0.0004"),
+                       (PortfolioOptimisers.ep_sk_views!, "NOPE == 0.1"),
+                       (PortfolioOptimisers.ep_kt_views!, "NOPE == 3"))
+            e = epc()
+            to_fix = f(lce(v), e, pr0, sets; strict = false)
+            @test isempty(e)
+            @test length(to_fix) == N
+            @test !any(to_fix)
+        end
+        # The recursive CVaR route prepares no search, which sends the stage down the plain
+        # solve.
+        cvv = PortfolioOptimisers.ep_cvar_views_setup(ConditionalValueatRiskView(;
+                                                                                 views = lce("NOPE == 0.04"),
+                                                                                 alpha = 0.05),
+                                                      pr0, sets, w, nothing, nothing;
+                                                      strict = false)
+        @test isnothing(cvv)
+    end
+    # The dropped row is reported, not silent, and `strict = true` still raises.
+    @test_logs (:warn,) match_mode = :any PortfolioOptimisers.ep_mu_views!(lce("NOPE == 0.002"),
+                                                                           epc(), pr0, sets;
+                                                                           strict = false)
+    @test_throws ArgumentError PortfolioOptimisers.ep_mu_views!(lce("NOPE == 0.002"), epc(),
+                                                                pr0, sets; strict = true)
+    @test_throws ArgumentError PortfolioOptimisers.ep_sk_views!(lce("NOPE == 0.1"), epc(),
+                                                                pr0, sets; strict = true)
+end
+
+# #852: an empty view set states nothing, so the posterior is the prior. Every route
+# answers it exactly rather than solving over the normalisation row alone.
+@testset "An empty view set answers the prior probabilities" begin
+    e = Dict{Symbol, Tuple{<:PortfolioOptimisers.MatNum, <:PortfolioOptimisers.VecNum}}()
+    for opt in (OptimEntropyPooling(), OptimEntropyPooling(; alg = LogEntropyPooling()),
+                JuMPEntropyPooling(; slv = slv))
+        @test collect(PortfolioOptimisers.entropy_pooling(w, e, opt)) == collect(w)
+    end
+    @test collect(PortfolioOptimisers.entropy_pooling(w, e,
+                                                      PortfolioOptimisers.AbstractEntropyPoolingTailView[],
+                                                      JuMPEntropyPooling(; slv = slv))) ==
+          collect(w)
+end
+
+#=
+#852: the fit a dropped view set answers. Every family is empty, so no solve runs, no refit
+runs, and the answer is the prior the estimator wrapped. The `mu_views` of the issue reads
+`1 == 0.004` against a universe of numeric names: the parser reads `1` as a constant, and
+the row names no asset.
+=#
+@testset "A fit whose every family is empty answers the prior" begin
+    lce(v) = LinearConstraintEstimator(; val = v)
+    nsets = UniverseSets(; dict = Dict("nx" => string.(1:size(rd.X, 2))))
+    pr0 = prior(EmpiricalPrior(), rd)
+    T0 = size(rd.X, 1)
+    with_logger(SimpleLogger(stderr, Logging.Error)) do
+        for pe in (EntropyPoolingPrior(; sets = nsets, mu_views = lce("1 == 0.004")),
+                   EntropyPoolingPrior(; sets = nsets, mu_views = lce("1 == 0.004"),
+                                       alg = H0_EntropyPooling()),
+                   EntropyPoolingPrior(; sets = nsets, sk_views = lce("1 == 0.1")),
+                   EntropyPoolingPrior(; sets = nsets, sigma_views = lce("1 == 0.0004"),
+                                       kt_views = lce("1 == 3")),
+                   MeucciEntropyPoolingPrior(; sets = nsets, mu_views = lce("1 == 0.004")),
+                   MeucciEntropyPoolingPrior(; sets = nsets,
+                                             cvar_views = ConditionalValueatRiskView(;
+                                                                                     views = lce("1 == 0.04"),
+                                                                                     alpha = 0.05)))
+            pr = prior(pe, rd)
+            @test iszero(pr.kld)
+            @test isapprox(pr.ens, T0, rtol = 1e-12)
+            @test collect(pr.w) == collect(range(inv(T0), inv(T0); length = T0))
+            @test pr.mu == pr0.mu
+            @test pr.sigma == pr0.sigma
+        end
+        # A group that keeps one of its two rows still states that row.
+        pr = prior(EntropyPoolingPrior(; sets = sets,
+                                       mu_views = lce(["NOPE == 0.004", "AAPL == 0.004"])),
+                   rd)
+        @test isapprox(pr.mu[1], 0.004, rtol = 1e-7)
+        # An empty stage does not disturb the stage that stated a view, either way round.
+        pr = prior(EntropyPoolingPrior(; sets = sets, mu_views = lce("NOPE == 0.004"),
+                                       sigma_views = lce("AAPL == 0.0005")), rd)
+        @test isapprox(pr.sigma[1, 1], 0.0005 * T0 / (T0 - 1), rtol = 1e-6)
+        pr = prior(EntropyPoolingPrior(; sets = sets, mu_views = lce("AAPL == 0.004"),
+                                       sigma_views = lce("NOPE == 0.0005")), rd)
+        @test isapprox(pr.mu[1], 0.004, rtol = 1e-7)
+    end
+    # The whole point of the issue: the fit answers rather than raising, and it warns.
+    @test_logs (:warn,) match_mode = :any prior(EntropyPoolingPrior(; sets = nsets,
+                                                                    mu_views = lce("1 == 0.004")),
+                                                rd)
+    @test_throws ArgumentError prior(EntropyPoolingPrior(; sets = nsets,
+                                                         mu_views = lce("1 == 0.004")), rd;
+                                     strict = true)
+end
