@@ -33,6 +33,12 @@ partial_fit!(ce::RegimeAdjustedExpWeightedVariance, x::VecNum;
                     kwargs...)
 var(ce::RegimeAdjustedExpWeightedVariance, state::RegimeAdjustedVarianceCache; kwargs...)
 var(ce::RegimeAdjustedExpWeightedVariance; kwargs...)
+std(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::Int = 1,
+                    estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+                    active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+                    kwargs...)
+std(ce::RegimeAdjustedExpWeightedVariance, state::RegimeAdjustedVarianceCache; kwargs...)
+std(ce::RegimeAdjustedExpWeightedVariance; kwargs...)
 PortfolioOptimisers.merge_states(a::RegimeAdjustedVarianceCache, b::RegimeAdjustedVarianceCache)
 Base.copy(x::PortfolioOptimisers.RegimeAdjustedVarianceCache)
 ```

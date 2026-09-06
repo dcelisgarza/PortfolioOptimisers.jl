@@ -326,3 +326,62 @@ always gave.
                                                                regime_lohi_mult = (0.0,
                                                                                    1.6))
 end
+
+#=
+`std` is the root of `var`, and issue #637 names its absence.
+
+Before this change `RegimeAdjustedExpWeightedVariance` declared `var` alone. `std(ce, X)`
+therefore reached the covariance surface's own fallback, which reads `cov(ce, X)`, which reads
+`cor(ce, X)`, which reads `cov(ce, X)` back through `StatsBase`'s generic method. The caller met a
+`StackOverflowError` rather than a number. The three forms below are the three `var` answers under
+their root, so each one closes that cycle for its own arity.
+
+`cov` and `cor` on this type still overflow, because the type still declares neither. Issue #637
+carries that half, and `VERB_EXEMPT` in `test/moment_family_setup.jl` still names the type.
+=#
+@testset "std is the root of var, for each of the three forms" begin
+    rng = StableRNG(4327)
+    X = randn(rng, 90, 4) .* 0.02
+    X[70:end, :] .*= 4.0        # a loud regime, so the regime multiplier is not one
+
+    for ce in
+        (RegimeAdjustedExpWeightedVariance(; decay = 0.94, min_obs = 5, regime_min_obs = 3),
+         RegimeAdjustedExpWeightedVariance(; decay = 0.9, min_obs = 4, regime_min_obs = 2,
+                                           centred = true),
+         RegimeAdjustedExpWeightedVariance(; decay = 0.94, min_obs = 5, regime_min_obs = 3,
+                                           hac_lags = 2),
+         RegimeAdjustedExpWeightedVariance(; decay = 0.94, min_obs = 5, regime_min_obs = 3,
+                                           regime_method = PO.LogRegimeAdjusted()),
+         RegimeAdjustedExpWeightedVariance(; decay = 0.94, min_obs = 5, regime_min_obs = 3,
+                                           regime_method = PO.RootMeanSquaredAdjusted()))
+        # The batch form takes the root of the batch variance, bit for bit.
+        @test isequal(std(ce, X), sqrt.(var(ce, X)))
+        @test isequal(std(ce, permutedims(X); dims = 2), std(ce, X))
+
+        # The state forms take the root of the state variance, bit for bit.
+        fitted = partial_fit!(ce, X)
+        @test isequal(std(fitted), sqrt.(var(fitted)))
+        @test isequal(std(fitted, fitted.cache), std(fitted))
+        @test isequal(std(fitted), std(ce, X))
+    end
+
+    ce = RegimeAdjustedExpWeightedVariance(; decay = 0.94, min_obs = 5, regime_min_obs = 3)
+
+    # The guard is the family's, and the keywords reach `var` unchanged.
+    @test_throws DomainError std(ce, X; dims = 3)
+    estimation_mask = trues(size(X))
+    estimation_mask[1:20, 1] .= false
+    active_mask = trues(size(X))
+    active_mask[1:10, 2] .= false
+    @test isequal(std(ce, X; estimation_mask = estimation_mask, active_mask = active_mask),
+                  sqrt.(var(ce, X; estimation_mask = estimation_mask,
+                            active_mask = active_mask)))
+
+    # An asset with too few observations is `NaN` under the root as it is under the variance.
+    short = RegimeAdjustedExpWeightedVariance(; decay = 0.94, min_obs = 200,
+                                              regime_min_obs = 3)
+    @test all(isnan, std(short, X))
+
+    # An estimator that was given no observation carries no state, so the read is refused.
+    @test_throws ArgumentError std(RegimeAdjustedExpWeightedVariance())
+end

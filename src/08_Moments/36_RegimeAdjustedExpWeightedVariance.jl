@@ -1292,6 +1292,161 @@ function Statistics.var(ce::RegimeAdjustedExpWeightedVariance; kwargs...)
     return var(ce, state)
 end
 """
+    Statistics.std(
+        ce::RegimeAdjustedExpWeightedVariance,
+        X::MatNum;
+        dims::Int = 1,
+        estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+        active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+        kwargs...
+    ) -> Vector{<:Number}
+
+Compute the regime-adjusted exponentially weighted standard deviation for each asset.
+
+The root of [`Statistics.var(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::Int = 1, estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)`](@ref). The variance is a non-negative exponentially weighted average scaled by a squared multiplier, so the root is real. An asset that `var` answers with `NaN` stays `NaN`.
+
+# Arguments
+
+  - `ce`: Regime-adjusted exponentially weighted variance estimator.
+  - $(arg_dict[:X])
+  - $(arg_dict[:dims])
+  - `estimation_mask`: Optional boolean matrix with the same size as `X`. When provided,
+    only assets where `estimation_mask[i, :]` (or `[:, i]`) is `true` contribute to the
+    regime state update for observation `i`.
+  - `active_mask`: Optional boolean matrix with the same size as `X`. When provided,
+    assets that become inactive have their variance and observation count reset.
+  - $(arg_dict[:ignkwargs])
+
+# Validation
+
+  - $(val_dict[:dims])
+  - If `estimation_mask` is not `nothing`, `size(X) == size(estimation_mask)`.
+  - If `active_mask` is not `nothing`, `size(X) == size(active_mask)`.
+
+# Returns
+
+  - `std::Vector{<:Number}`: Per-asset regime-adjusted exponentially weighted standard
+    deviation vector of length `assets`. Assets with fewer than `ce.min_obs` observations
+    return `NaN`.
+
+# Examples
+
+```jldoctest
+julia> X = [0.01 -0.02; -0.015 0.03; 0.02 -0.01; -0.005 0.012];
+
+julia> ce = RegimeAdjustedExpWeightedVariance(; decay = 0.9, min_obs = 2, regime_min_obs = 2);
+
+julia> isapprox(std(ce, X), sqrt.(var(ce, X)))
+true
+```
+
+# Related
+
+  - [`RegimeAdjustedExpWeightedVariance`](@ref)
+  - [`Statistics.var(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::Int = 1, estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)`](@ref)
+"""
+function Statistics.std(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::Int = 1,
+                        estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+                        active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
+    return sqrt.(var(ce, X; dims = dims, estimation_mask = estimation_mask,
+                     active_mask = active_mask, kwargs...))
+end
+"""
+    Statistics.std(
+        ce::RegimeAdjustedExpWeightedVariance,
+        state::RegimeAdjustedVarianceCache;
+        kwargs...
+    ) -> Vector{<:Number}
+
+Read the regime-adjusted standard deviation out of a state held by hand.
+
+The root of [`Statistics.var(ce::RegimeAdjustedExpWeightedVariance, state::RegimeAdjustedVarianceCache; kwargs...)`](@ref), so a state a caller keeps outside an estimator answers the same call as one the estimator holds. The state is read and never written.
+
+# Arguments
+
+  - `ce`: Regime-adjusted exponentially weighted variance estimator.
+  - `state`: Running state of an incremental fit.
+  - $(arg_dict[:ignkwargs])
+
+# Returns
+
+  - `std::Vector{<:Number}`: Per-asset regime-adjusted exponentially weighted standard
+    deviation vector of length `assets`. An asset with fewer than `ce.min_obs` observations
+    is `NaN`.
+
+# Examples
+
+```jldoctest
+julia> X = [0.01 -0.02; -0.015 0.03; 0.02 -0.01; -0.005 0.012];
+
+julia> ce = partial_fit!(RegimeAdjustedExpWeightedVariance(; decay = 0.9, min_obs = 2,
+                                                           regime_min_obs = 2), X);
+
+julia> isequal(std(ce, ce.cache), std(ce))
+true
+```
+
+# Related
+
+  - [`RegimeAdjustedVarianceCache`](@ref)
+  - [`Statistics.var(ce::RegimeAdjustedExpWeightedVariance, state::RegimeAdjustedVarianceCache; kwargs...)`](@ref)
+  - [`Statistics.std(ce::RegimeAdjustedExpWeightedVariance; kwargs...)`](@ref)
+"""
+function Statistics.std(ce::RegimeAdjustedExpWeightedVariance,
+                        state::RegimeAdjustedVarianceCache; kwargs...)
+    return sqrt.(var(ce, state; kwargs...))
+end
+"""
+    Statistics.std(ce::RegimeAdjustedExpWeightedVariance; kwargs...) -> Vector{<:Number}
+
+Read the regime-adjusted standard deviation out of the estimator's own state.
+
+The one-argument form is what an incremental fit answers: [`partial_fit!`](@ref) leaves the state in the `cache` field, and this verb turns it into the ordinary answer. An estimator that has been given no observation carries no state, so the call is refused rather than answered with a zero.
+
+# Arguments
+
+  - `ce`: Regime-adjusted exponentially weighted variance estimator carrying a state.
+  - $(arg_dict[:ignkwargs])
+
+# Validation
+
+  - `ce.cache` is not `nothing`. An `ArgumentError` is thrown otherwise.
+
+# Returns
+
+  - `std::Vector{<:Number}`: Per-asset regime-adjusted exponentially weighted standard
+    deviation vector of length `assets`. An asset with fewer than `ce.min_obs` observations
+    is `NaN`.
+
+# Examples
+
+```jldoctest
+julia> X = [0.01 -0.02; -0.015 0.03; 0.02 -0.01; -0.005 0.012];
+
+julia> ce = partial_fit!(RegimeAdjustedExpWeightedVariance(; decay = 0.9, min_obs = 2,
+                                                           regime_min_obs = 2), X);
+
+julia> length(std(ce))
+2
+
+julia> std(RegimeAdjustedExpWeightedVariance())
+ERROR: ArgumentError: `ce` holds no partial-fit state, so there is nothing to read. Call `partial_fit!(ce, X)` first, or `std(ce, X)` for a fit over a whole sample.
+[...]
+```
+
+# Related
+
+  - [`partial_fit!(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::Int = 1, estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)`](@ref)
+  - [`Statistics.std(ce::RegimeAdjustedExpWeightedVariance, state::RegimeAdjustedVarianceCache; kwargs...)`](@ref)
+  - [`Statistics.var(ce::RegimeAdjustedExpWeightedVariance; kwargs...)`](@ref)
+"""
+function Statistics.std(ce::RegimeAdjustedExpWeightedVariance; kwargs...)
+    state = ce.cache
+    @argcheck(!isnothing(state),
+              ArgumentError("`ce` holds no partial-fit state, so there is nothing to read. Call `partial_fit!(ce, X)` first, or `std(ce, X)` for a fit over a whole sample."))
+    return std(ce, state; kwargs...)
+end
+"""
     merge_states(
         a::RegimeAdjustedVarianceCache,
         b::RegimeAdjustedVarianceCache
