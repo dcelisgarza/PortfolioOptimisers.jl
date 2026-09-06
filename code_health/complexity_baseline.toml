@@ -99,6 +99,7 @@ commit = "e696781eb7"
 "src/08_Moments/46_CrossSectionalRegressionDiagnostics.jl" = { cyc = 7, cog = 14, arg = 5, cyc_sum = 120, cog_sum = 129, arg_sum = 112, macros = [] }
 "src/08_Moments/47_CrossSectionalExposureDiagnostics.jl" = { cyc = 10, cog = 13, arg = 5, cyc_sum = 105, cog_sum = 119, arg_sum = 102, macros = [] }
 "src/08_Moments/48_FactorModelSummary.jl" = { cyc = 6, cog = 8, arg = 5, cyc_sum = 55, cog_sum = 54, arg_sum = 45, macros = [] }
+"src/08_Moments/49_CrossSectionalIdiosyncraticDiagnostics.jl" = { cyc = 6, cog = 8, arg = 3, cyc_sum = 56, cog_sum = 58, arg_sum = 49, macros = [] }
 "src/09_Distance/01_Base_Distance.jl" = { cyc = 2, cog = 1, arg = 2, cyc_sum = 3, cog_sum = 2, arg_sum = 2, macros = [] }
 "src/09_Distance/02_Distance.jl" = { cyc = 2, cog = 2, arg = 5, cyc_sum = 33, cog_sum = 18, arg_sum = 112, macros = [] }
 "src/09_Distance/03_DistanceDistance.jl" = { cyc = 2, cog = 1, arg = 5, cyc_sum = 6, cog_sum = 5, arg_sum = 19, macros = [] }

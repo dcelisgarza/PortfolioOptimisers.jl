@@ -56,6 +56,12 @@ plot_factor_model_summary
 plot_factor_forecast_correlation
 plot_factor_forecast_volatilities
 plot_factor_cumulative_returns
+plot_idio_calibration
+plot_idio_tail_rate
+plot_idio_kurtosis
+plot_idio_skewness
+plot_idio_vol_ic
+plot_idio_vol_residual_dependence
 relevant_assets
 attribution_plot_axis
 ```

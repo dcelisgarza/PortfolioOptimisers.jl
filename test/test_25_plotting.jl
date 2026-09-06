@@ -597,4 +597,37 @@
         @test_throws PortfolioOptimisers.IsNothingError plot_factor_forecast_volatilities(no_rr_fs)
         @test_throws PortfolioOptimisers.IsNothingError plot_factor_cumulative_returns(no_rr_fs)
     end
+    @testset "Cross-sectional idiosyncratic diagnostics (#800)" begin
+        # Each figure draws one level-2 verb. The group reads `csr.eps` and `vs` alone, so
+        # the block carries no exposure history and no weights.
+        rng_id = MersenneTwister(800)
+        Ti, Ni, Ki = 12, 8, 3
+        vs_id = abs.(randn(rng_id, Ti, Ni)) .+ 0.5
+        csr_id = CrossSectionalRegression(; f = 0.02 * randn(rng_id, Ti, Ki),
+                                          eps = sqrt.(vs_id) .* randn(rng_id, Ti, Ni),
+                                          n = fill(Ni, Ti))
+        csfm_id = CrossSectionalFactorModel(; M = randn(rng_id, Ni, Ki), b = zeros(Ni),
+                                            csr = csr_id, vs = vs_id, lag = 1)
+        fpr_id = LowOrderPrior(; X = randn(rng_id, Ti, Ki), mu = zeros(Ki),
+                               sigma = Matrix(1.0 * I, Ki, Ki))
+        pr_id = LowOrderPrior(; X = randn(rng_id, Ti, Ni), mu = zeros(Ni),
+                              sigma = Matrix(1.0 * I, Ni, Ni), rr = csfm_id, fpr = fpr_id)
+        for plt in (plot_idio_calibration, plot_idio_kurtosis, plot_idio_skewness,
+                    plot_idio_vol_ic, plot_idio_vol_residual_dependence)
+            @test is_plot(plt(csfm_id))
+            @test is_plot(plt(pr_id))
+        end
+        @test is_plot(plot_idio_tail_rate(csfm_id))
+        @test is_plot(plot_idio_tail_rate(pr_id))
+        @test is_plot(plot_idio_tail_rate(csfm_id; threshold = 2))
+        # A block that carries no idiosyncratic variance history names the field.
+        no_vs_id = CrossSectionalFactorModel(; M = randn(rng_id, Ni, Ki), b = zeros(Ni),
+                                             csr = csr_id, lag = 1)
+        @test_throws PortfolioOptimisers.IsNothingError plot_idio_calibration(no_vs_id)
+        # A prior result that carries no factor block names the remedy.
+        no_rr_id = LowOrderPrior(; X = randn(rng_id, Ti, Ni), mu = zeros(Ni),
+                                 sigma = Matrix(1.0 * I, Ni, Ni))
+        @test_throws PortfolioOptimisers.IsNothingError plot_idio_calibration(no_rr_id)
+        @test_throws PortfolioOptimisers.IsNothingError plot_idio_vol_ic(no_rr_id)
+    end
 end

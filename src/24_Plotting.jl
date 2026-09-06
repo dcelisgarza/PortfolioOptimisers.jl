@@ -1869,6 +1869,205 @@ Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 function plot_exposure_stability end
 
 ## ────────────────────────────────────────────────────────────────────────────
+## Cross-sectional idiosyncratic diagnostics
+## ────────────────────────────────────────────────────────────────────────────
+"""
+    plot_idio_calibration(csfm::CrossSectionalFactorModel; kwargs...) -> Plot
+    plot_idio_calibration(pr::AbstractPriorResult; kwargs...) -> Plot
+
+Plot the cross-sectional standard deviation of the standardised idiosyncratic returns against the observation axis.
+
+The figure draws what [`idio_calibration`](@ref) returns and computes nothing of its own. A dashed line marks the Gaussian reference of `1`. A series that sits above the line is a fit whose specific risk is too small, and one that sits below it is a fit whose specific risk is too large.
+
+# Arguments
+
+  - `csfm`: A cross-sectional factor model block.
+  - `pr`: A prior result whose `rr` is such a block.
+  - `kwargs...`: Additional keyword arguments passed to the plotting backend.
+
+# Validation
+
+  - `pr.rr` is not `nothing`.
+
+# Returns
+
+  - `plt::Plot`: The figure.
+
+Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
+
+# Related
+
+  - [`idio_calibration`](@ref)
+  - [`plot_idio_tail_rate`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+"""
+function plot_idio_calibration end
+"""
+    plot_idio_tail_rate(
+        csfm::CrossSectionalFactorModel;
+        threshold::Real = 3,
+        kwargs...
+    ) -> Plot
+    plot_idio_tail_rate(
+        pr::AbstractPriorResult;
+        threshold::Real = 3,
+        kwargs...
+    ) -> Plot
+
+Plot the share of assets whose standardised idiosyncratic return exceeds a threshold, against the observation axis.
+
+The figure draws what [`idio_tail_rate`](@ref) returns and computes nothing of its own. A dashed line marks the Gaussian reference ``2 \\Phi(-c)``, which is about `0.0027` at the default threshold. A series above the line is a fit whose standardised returns carry heavier tails than the normal law implies, which is ordinary for an equity universe.
+
+# Arguments
+
+  - `csfm`: A cross-sectional factor model block.
+  - `pr`: A prior result whose `rr` is such a block.
+  - `threshold`: Absolute standardised return above which an asset enters the rate.
+  - `kwargs...`: Additional keyword arguments passed to the plotting backend.
+
+# Validation
+
+  - `pr.rr` is not `nothing`.
+
+# Returns
+
+  - `plt::Plot`: The figure.
+
+Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
+
+# Related
+
+  - [`idio_tail_rate`](@ref)
+  - [`plot_idio_kurtosis`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+"""
+function plot_idio_tail_rate end
+"""
+    plot_idio_kurtosis(csfm::CrossSectionalFactorModel; kwargs...) -> Plot
+    plot_idio_kurtosis(pr::AbstractPriorResult; kwargs...) -> Plot
+
+Plot the cross-sectional excess kurtosis of the standardised idiosyncratic returns against the observation axis.
+
+The figure draws what [`idio_kurtosis`](@ref) returns and computes nothing of its own. A dashed line marks the Gaussian reference of `0`. A positive series is a cross-section whose tails are heavier than the normal law implies.
+
+# Arguments
+
+  - `csfm`: A cross-sectional factor model block.
+  - `pr`: A prior result whose `rr` is such a block.
+  - `kwargs...`: Additional keyword arguments passed to the plotting backend.
+
+# Validation
+
+  - `pr.rr` is not `nothing`.
+
+# Returns
+
+  - `plt::Plot`: The figure.
+
+Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
+
+# Related
+
+  - [`idio_kurtosis`](@ref)
+  - [`plot_idio_skewness`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+"""
+function plot_idio_kurtosis end
+"""
+    plot_idio_skewness(csfm::CrossSectionalFactorModel; kwargs...) -> Plot
+    plot_idio_skewness(pr::AbstractPriorResult; kwargs...) -> Plot
+
+Plot the cross-sectional skewness of the standardised idiosyncratic returns against the observation axis.
+
+The figure draws what [`idio_skewness`](@ref) returns and computes nothing of its own. A dashed line marks the Gaussian reference of `0`. A series that stays on one side of the line is a residual that carries a direction the factors did not take.
+
+# Arguments
+
+  - `csfm`: A cross-sectional factor model block.
+  - `pr`: A prior result whose `rr` is such a block.
+  - `kwargs...`: Additional keyword arguments passed to the plotting backend.
+
+# Validation
+
+  - `pr.rr` is not `nothing`.
+
+# Returns
+
+  - `plt::Plot`: The figure.
+
+Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
+
+# Related
+
+  - [`idio_skewness`](@ref)
+  - [`plot_idio_kurtosis`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+"""
+function plot_idio_skewness end
+"""
+    plot_idio_vol_ic(csfm::CrossSectionalFactorModel; kwargs...) -> Plot
+    plot_idio_vol_ic(pr::AbstractPriorResult; kwargs...) -> Plot
+
+Plot the information coefficient of the predicted idiosyncratic volatility against the observation axis.
+
+The figure draws what [`idio_vol_ic`](@ref) returns and computes nothing of its own. It carries no reference line: the series has no Gaussian reference, and a caller reads its level and its sign. A series that stays high is a fit that ranks specific risk across the assets well.
+
+# Arguments
+
+  - `csfm`: A cross-sectional factor model block.
+  - `pr`: A prior result whose `rr` is such a block.
+  - `kwargs...`: Additional keyword arguments passed to the plotting backend.
+
+# Validation
+
+  - `pr.rr` is not `nothing`.
+
+# Returns
+
+  - `plt::Plot`: The figure.
+
+Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
+
+# Related
+
+  - [`idio_vol_ic`](@ref)
+  - [`plot_idio_vol_residual_dependence`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+"""
+function plot_idio_vol_ic end
+"""
+    plot_idio_vol_residual_dependence(csfm::CrossSectionalFactorModel; kwargs...) -> Plot
+    plot_idio_vol_residual_dependence(pr::AbstractPriorResult; kwargs...) -> Plot
+
+Plot the residual dependence of the standardised idiosyncratic returns on the predicted volatility, against the observation axis.
+
+The figure draws what [`idio_vol_residual_dependence`](@ref) returns and computes nothing of its own. A dashed line marks the reference of `0`, which a well calibrated fit sits on. Read it beside [`plot_idio_vol_ic`](@ref): a fit that ranks well and leaves no residual dependence carries a high information coefficient and a dependence near `0`.
+
+# Arguments
+
+  - `csfm`: A cross-sectional factor model block.
+  - `pr`: A prior result whose `rr` is such a block.
+  - `kwargs...`: Additional keyword arguments passed to the plotting backend.
+
+# Validation
+
+  - `pr.rr` is not `nothing`.
+
+# Returns
+
+  - `plt::Plot`: The figure.
+
+Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
+
+# Related
+
+  - [`idio_vol_residual_dependence`](@ref)
+  - [`plot_idio_vol_ic`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+"""
+function plot_idio_vol_residual_dependence end
+
+## ────────────────────────────────────────────────────────────────────────────
 ## Factor attribution
 ## ────────────────────────────────────────────────────────────────────────────
 """
@@ -2311,6 +2510,8 @@ export plot_portfolio_cumulative_returns, plot_asset_cumulative_returns, plot_co
        plot_attribution_vol_contrib, plot_attribution_mu_contrib, plot_attribution_exposure,
        plot_attribution_mu_vs_vol, plot_exposure_vif, plot_exposure_condition_number,
        plot_exposure_correlation, plot_cumulative_exposure_ic, plot_exposure_distribution,
-       plot_exposure_dispersion, plot_exposure_stability, plot_factor_model_summary,
+       plot_exposure_dispersion, plot_exposure_stability, plot_idio_calibration,
+       plot_idio_tail_rate, plot_idio_kurtosis, plot_idio_skewness, plot_idio_vol_ic,
+       plot_idio_vol_residual_dependence, plot_factor_model_summary,
        plot_factor_forecast_correlation, plot_factor_forecast_volatilities,
        plot_factor_cumulative_returns

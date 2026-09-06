@@ -2630,4 +2630,90 @@ function PortfolioOptimisers.plot_factor_cumulative_returns(pr::PortfolioOptimis
                                                               kwargs...)
 end
 
+## ────────────────────────────────────────────────────────────────────────────
+## Cross-sectional idiosyncratic diagnostics
+## ────────────────────────────────────────────────────────────────────────────
+# The idiosyncratic group answers on the asset axis and aggregates it away, so every figure
+# here draws one series and none of them labels a factor. Five carry the reference the
+# normal law gives the series, and the information coefficient carries none because the
+# normal law says nothing about it.
+function idio_diagnostic_series(vals::VecNum, title::AbstractString, ylabel::AbstractString;
+                                offset::Integer = 0, kwargs...)
+    x = (1 + offset):(length(vals) + offset)
+    return plot(x, vals; title = title, xlabel = "Observation", ylabel = ylabel,
+                legend = false, linewidth = 2, kwargs...)
+end
+function idio_diagnostic_reference!(plt, value::Real)
+    hline!(plt, [value]; label = "", linewidth = 2, color = :red, linestyle = :dash)
+    return plt
+end
+function PortfolioOptimisers.plot_idio_calibration(csfm::PortfolioOptimisers.CrossSectionalFactorModel;
+                                                   kwargs...)
+    plt = idio_diagnostic_series(PortfolioOptimisers.idio_calibration(csfm),
+                                 "Idiosyncratic Calibration",
+                                 "Cross-Sectional Std of Standardised Idio Returns";
+                                 kwargs...)
+    return idio_diagnostic_reference!(plt, 1.0)
+end
+function PortfolioOptimisers.plot_idio_calibration(pr::PortfolioOptimisers.AbstractPriorResult;
+                                                   kwargs...)
+    return PortfolioOptimisers.plot_idio_calibration(cs_diagnostic_block(pr); kwargs...)
+end
+function PortfolioOptimisers.plot_idio_tail_rate(csfm::PortfolioOptimisers.CrossSectionalFactorModel;
+                                                 threshold::Real = 3, kwargs...)
+    plt = idio_diagnostic_series(PortfolioOptimisers.idio_tail_rate(csfm;
+                                                                    threshold = threshold),
+                                 "Idiosyncratic Tail Rate (threshold=$threshold)",
+                                 "Fraction of Assets"; kwargs...)
+    return idio_diagnostic_reference!(plt, 2 * ccdf(Normal(), threshold))
+end
+function PortfolioOptimisers.plot_idio_tail_rate(pr::PortfolioOptimisers.AbstractPriorResult;
+                                                 threshold::Real = 3, kwargs...)
+    return PortfolioOptimisers.plot_idio_tail_rate(cs_diagnostic_block(pr);
+                                                   threshold = threshold, kwargs...)
+end
+function PortfolioOptimisers.plot_idio_kurtosis(csfm::PortfolioOptimisers.CrossSectionalFactorModel;
+                                                kwargs...)
+    plt = idio_diagnostic_series(PortfolioOptimisers.idio_kurtosis(csfm),
+                                 "Cross-Sectional Excess Kurtosis", "Excess Kurtosis";
+                                 kwargs...)
+    return idio_diagnostic_reference!(plt, 0.0)
+end
+function PortfolioOptimisers.plot_idio_kurtosis(pr::PortfolioOptimisers.AbstractPriorResult;
+                                                kwargs...)
+    return PortfolioOptimisers.plot_idio_kurtosis(cs_diagnostic_block(pr); kwargs...)
+end
+function PortfolioOptimisers.plot_idio_skewness(csfm::PortfolioOptimisers.CrossSectionalFactorModel;
+                                                kwargs...)
+    plt = idio_diagnostic_series(PortfolioOptimisers.idio_skewness(csfm),
+                                 "Cross-Sectional Skewness", "Skewness"; kwargs...)
+    return idio_diagnostic_reference!(plt, 0.0)
+end
+function PortfolioOptimisers.plot_idio_skewness(pr::PortfolioOptimisers.AbstractPriorResult;
+                                                kwargs...)
+    return PortfolioOptimisers.plot_idio_skewness(cs_diagnostic_block(pr); kwargs...)
+end
+function PortfolioOptimisers.plot_idio_vol_ic(csfm::PortfolioOptimisers.CrossSectionalFactorModel;
+                                              kwargs...)
+    return idio_diagnostic_series(PortfolioOptimisers.idio_vol_ic(csfm),
+                                  "Idiosyncratic Volatility IC (Spearman)",
+                                  "Rank Correlation"; offset = 1, kwargs...)
+end
+function PortfolioOptimisers.plot_idio_vol_ic(pr::PortfolioOptimisers.AbstractPriorResult;
+                                              kwargs...)
+    return PortfolioOptimisers.plot_idio_vol_ic(cs_diagnostic_block(pr); kwargs...)
+end
+function PortfolioOptimisers.plot_idio_vol_residual_dependence(csfm::PortfolioOptimisers.CrossSectionalFactorModel;
+                                                               kwargs...)
+    plt = idio_diagnostic_series(PortfolioOptimisers.idio_vol_residual_dependence(csfm),
+                                 "Idiosyncratic Volatility Residual Dependence (Spearman)",
+                                 "Rank Correlation"; offset = 1, kwargs...)
+    return idio_diagnostic_reference!(plt, 0.0)
+end
+function PortfolioOptimisers.plot_idio_vol_residual_dependence(pr::PortfolioOptimisers.AbstractPriorResult;
+                                                               kwargs...)
+    return PortfolioOptimisers.plot_idio_vol_residual_dependence(cs_diagnostic_block(pr);
+                                                                 kwargs...)
+end
+
 end
