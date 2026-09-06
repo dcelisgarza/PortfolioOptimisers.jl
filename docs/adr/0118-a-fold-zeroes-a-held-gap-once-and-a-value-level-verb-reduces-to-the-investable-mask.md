@@ -57,16 +57,26 @@ reach it first, and it is paid once there.
 
 ## Decision
 
-### A Net Return at a gapped pair is zero, and the fold pays it once
+### A fold reduces its test window to the Investable Mask, then zeroes a Held Gap once
 
-A **Held Gap** is an (observation, asset) pair at which the portfolio's weight is non-zero and the
-asset's return is missing. A fold filters its test window once, in `predict`, before it forms the
+A fold's test window holds two kinds of gap, and the fold takes them in order. The first is the
+column of an asset the fit found non-investable, whose weight is `0` by ADR 0115. In `predict`,
+before anything reads the window, the fold views the test window and the weights at `res.imsk`,
+so that column is never read, and the fees are viewed with them. The Investable Mask is the one
+record of which assets the fold traded, and this is the rule of ADR 0115 carried to the window the
+weights are scored on. A result whose `imsk` is `nothing` views nothing.
+
+The second is a **Held Gap**: an (observation, asset) pair at which the portfolio's weight is
+non-zero and the asset's return is missing. It arises where the universe changes after the fit, an
+asset that was investable on the training window and delists inside the test window, and the mask
+is a per-fit fact that cannot see it. The fold filters the reduced window once, before it forms the
 series and before the Weight Drift compounds: every non-finite entry becomes `0`, a zero weight at a
 gap is silent, and the Held Gaps are named through `strict_diagnostic`. There is no renormalisation,
 so the missing weight sits in cash on that observation, which is the one reading that invents no
 trade the weights never stated. The filtered window feeds `calc_net_returns` and
-`held_weights_result` alike. `strict` is a field of every cross-validation estimator beside `wd` and
-`store_weight_path`, and a keyword of `predict`.
+`held_weights_result` alike, and the held weights after the last observation expand back to the
+full length, because the next fold's turnover reads them. `strict` is a field of every
+cross-validation estimator beside `wd` and `store_weight_path`, and a keyword of `predict`.
 
 The identity a test pins, with the fee taken over the full weight vector:
 
@@ -78,8 +88,11 @@ returns[t] == sum_i w_i * (isfinite(X[t, i]) ? X[t, i] : 0) - fee
 that a non-finite entry poisons its observation, and that a gapped panel is scored through
 `predict(res, rd)`. The funnel has 70 call sites in 16 files, the hierarchical solves and the risk
 contribution among them, and most hand it a finite matrix. A scan there is paid at every one of
-them on every evaluation. A scan in the fold is paid once, on a window the fold already multiplies
-once, at the one place the library slices a window the caller cannot reach first.
+them on every evaluation. A scan in the fold is paid once, over the investable columns alone, on a
+window the fold already multiplies once, at the one place the library slices a window the caller
+cannot reach first. Ticket
+[#674](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/674) put the mask view before
+the filter, so that both doors of this ADR reduce to the Investable Mask.
 
 ### A value-level verb against a Prior Result reduces at its entry
 
@@ -143,6 +156,7 @@ asserts a finite series and one warning.
 
 | Option | Why it was refused |
 | --- | --- |
+| The fold filters the full window, with no view at the Investable Mask first | The same series, but the filter scans a dead column the fit already excluded, and the fold and the value-level door of this ADR then reduce by two different rules. |
 | A held gap renormalises the live weights to the held budget, the reference's market-return convention | It rebalances into the survivors on that observation, which the caller's weights never said, and the series is no longer linear in the weights. |
 | A held gap refuses with a named error, the census's recommendation | The first delisting inside a test window stops the walk-forward, so the map cannot close. |
 | Any gap refuses | The optimiser's own result on a gapped panel cannot be scored, because the dead asset's zero weight still meets its gap. |

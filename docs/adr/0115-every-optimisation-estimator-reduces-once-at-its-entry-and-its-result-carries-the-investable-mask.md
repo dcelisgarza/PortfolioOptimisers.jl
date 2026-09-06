@@ -90,13 +90,16 @@ changing universe is stated as an estimator.
 
 `investable_mask` throws it where the mask is derived, so every family has the refusal for free.
 
-### The two prior-free naive heads carry no mask
+### The two prior-free naive heads reduce to the Coverage Universe
 
-`EqualWeighted` and `RandomWeighted` fit no prior, so no Investable Mask exists for them. Each
-weights every asset the caller states, its `imsk` is `nothing`, and its docstring says so. The
-per-fold reduction of the returns data before a head that reads no prior belongs to pre-selection
-and to the fold, which ticket [#674](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/674)
-decides.
+`EqualWeighted` and `RandomWeighted` fit no prior, so no Prior Result yields a mask for them. Each
+derives its mask from the Coverage Universe of its window instead, through the one verb the priors
+use, weights the reduced universe, and carries the mask as `imsk`, so its keyword constructor
+expands the weights as every other result's does. A stale finite price during an inactive spell
+weights nothing. Ticket [#674](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/674)
+decided it, in
+[ADR 0120](0120-a-fold-scores-on-the-investable-mask-a-prior-free-head-and-pre-selection-reduce-to-the-coverage-universe-and-a-failed-candidate-loses-the-search.md),
+once ADR 0117 had settled the rule with no threshold. Every result of the library carries `imsk`.
 
 ## Considered options
 
@@ -108,7 +111,7 @@ decides.
 | The exit | The `_optimise` body expands one line before the constructor. | Nine sites can each forget the line. |
 | The exit | `finalise_weight_bounds` takes the mask and expands. | It fuses the bound check and the universe expansion in one verb, and the two meta finalisers must thread the mask through. |
 | A pre-fitted clustering result | Slice it with a `port_opt_view`. | The matrices slice, but dropping a leaf from the dendrogram changes the merges, the branch order and `k`, so the result is no longer the caller's clustering. |
-| The prior-free naive heads | A mask from the returns matrix, or an optional prior slot for the mask alone. | A third mask rule with a threshold the moment decision has not settled, or a prior fit that no weight reads. |
+| The prior-free naive heads | No mask, and the caller reduces through pre-selection; or an optional prior slot for the mask alone. | Two results with no mask, so a reader has two idioms, and a bare equal-weighted benchmark over a point-in-time panel weights a dead asset; or a prior fit that no weight reads. |
 
 ## Consequences
 
