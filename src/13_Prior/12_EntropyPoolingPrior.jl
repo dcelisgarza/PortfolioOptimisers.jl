@@ -3540,8 +3540,8 @@ Compute entropy pooling prior moments with tail views, enforcing the views in st
 
 # Algorithm
 
- 1. Build the prior probabilities `w0`. They are the uniform weights `1/T` where `pe.w` is `nothing`, and `pe.w` itself otherwise, whose length must match `T`.
- 2. Fit the wrapped prior estimator at `w0`, giving `pr`.
+ 1. Fit the wrapped prior estimator, giving `pr`. The fit states the observation axis: `T` is `size(pr.X, 1)`, which a nested prior that drops rows makes smaller than `size(X, 1)`.
+ 2. Read the prior probabilities `w0` on that axis with [`ep_prior_probabilities`](@ref). They are `pe.w` where the caller set one, `pr.w` where the fit answered one, and the uniform `1/T` otherwise. A caller's `pe.w` reaches the wrapped estimator through [`factory`](@ref), and `pr` is refitted under it.
  3. Stage one holds the mean, value at risk, conditional, entropic and relativistic value at risk views. Accumulate them into the constraint dictionary `epc` and the tail view vector `tvs`. Where either is non-empty, solve from `w0` with [`entropy_pooling`](@ref), giving `w1`, and refit `pr` at `w1`.
  4. Stage two holds the variance and covariance views, with the mean of every asset they name pinned by [`fix_mu!`](@ref). Solve from `w0` under [`H1_EntropyPooling`](@ref), or from the previous `w1` under [`H2_EntropyPooling`](@ref), and refit `pr` at the new `w1`.
  5. Stage three holds the skewness, kurtosis and correlation views, with the mean and the variance of every asset they name pinned by [`fix_mu!`](@ref) and [`fix_sigma!`](@ref). Solve from the same start step 4 takes, and refit `pr` at the new `w1`.
@@ -3580,21 +3580,25 @@ Compute entropy pooling prior moments with tail views, enforcing the views in st
 """
 function ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<:MatNum},
                   pnl::Option{<:AssetPanel} = nothing; strict::Bool = false, kwargs...)
-    T, N = size(X)
-    w1 = w0 = if isnothing(pe.w)
-        iT = inv(T)
-        StatsBase.pweights(range(iT, iT; length = T))
-    else
-        @argcheck(length(pe.w) == T,
-                  DimensionMismatch("length(pe.w) ($(length(pe.w))) must match T ($T)"))
-        pe.w
+    # A prior that reweights observations works on the observation axis its nested prior
+    # ANSWERED, not on the axis it was handed: a nested prior may drop rows. So the nested
+    # prior is fitted first, and `ep_prior_probabilities` reads the prior probabilities on
+    # the rows of `pr.X`. See ADR 0116.
+    pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
+    N = size(pr.X, 2)
+    w1 = w0 = ep_prior_probabilities(pe.w, pr, size(X, 1))
+    if !isnothing(pe.w)
+        # A caller's prior probabilities weight the moments the nested estimator measures,
+        # so the estimator is refitted under them. A uniform vector states no tilt, and the
+        # nested result's own `w` is already carried by the fit that answered it, so
+        # neither is pushed.
+        pe = factory(pe, w0)
+        pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
     end
     fixed = falses(N, 2)
     epc = Dict{Symbol, Tuple{<:MatNum, <:VecNum}}()
     tvs = Vector{AbstractEntropyPoolingTailView}(undef, 0)
     # mu, VaR, CVaR, EVaR and RLVaR
-    pe = factory(pe, w0)
-    pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
     ep_mu_views!(pe.mu_views, epc, pr, pe.sets; strict = strict)
     ep_var_views!(pe.var_views, epc, pr, pe.sets, w0; strict = strict)
     ep_tail_views!(pe.cvar_views, epc, tvs, pr, pe.sets, w0; strict = strict)
@@ -3664,8 +3668,8 @@ Compute entropy pooling prior moments with tail views, enforcing every view in o
 
 # Algorithm
 
- 1. Build the prior probabilities `w0`. They are the uniform weights `1/T` where `pe.w` is `nothing`, and `pe.w` itself otherwise, whose length must match `T`.
- 2. Fit the wrapped prior estimator at `w0`, giving `pr`.
+ 1. Fit the wrapped prior estimator, giving `pr`. The fit states the observation axis: `T` is `size(pr.X, 1)`, which a nested prior that drops rows makes smaller than `size(X, 1)`.
+ 2. Read the prior probabilities `w0` on that axis with [`ep_prior_probabilities`](@ref). They are `pe.w` where the caller set one, `pr.w` where the fit answered one, and the uniform `1/T` otherwise. A caller's `pe.w` reaches the wrapped estimator through [`factory`](@ref), and `pr` is refitted under it.
  3. Build every view against that one `pr`: the mean, value at risk, conditional, entropic and relativistic value at risk, variance, covariance, skewness, kurtosis and correlation views. Each row that is linear in the posterior probabilities reaches the constraint dictionary `epc`, and each tail view that needs auxiliary variables reaches the tail view vector `tvs`. No asset's mean or variance is pinned.
  4. Solve once from `w0` with [`entropy_pooling`](@ref), giving `w1`, and refit `pr` at `w1`.
  5. Compute `ens`, the effective number of scenarios of `w1`, and `kld`, the divergence of `w1` from `w0`.
@@ -3694,19 +3698,20 @@ Compute entropy pooling prior moments with tail views, enforcing every view in o
 function ep_prior(alg::H0_EntropyPooling, pe::EntropyPoolingPrior, X::MatNum,
                   F::Option{<:MatNum}, pnl::Option{<:AssetPanel} = nothing;
                   strict::Bool = false, kwargs...)
-    T = size(X, 1)
-    w0 = if isnothing(pe.w)
-        iT = inv(T)
-        StatsBase.pweights(range(iT, iT; length = T))
-    else
-        @argcheck(length(pe.w) == T,
-                  DimensionMismatch("length(pe.w) ($(length(pe.w))) must match T ($T)"))
-        pe.w
+    # See the note at the same seam in the staged method: the nested prior is fitted
+    # first, and the prior probabilities are read on the rows it answered. ADR 0116.
+    pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
+    w0 = ep_prior_probabilities(pe.w, pr, size(X, 1))
+    if !isnothing(pe.w)
+        # A caller's prior probabilities weight the moments the nested estimator measures,
+        # so the estimator is refitted under them. A uniform vector states no tilt, and the
+        # nested result's own `w` is already carried by the fit that answered it, so
+        # neither is pushed.
+        pe = factory(pe, w0)
+        pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
     end
     epc = Dict{Symbol, Tuple{<:MatNum, <:VecNum}}()
     tvs = Vector{AbstractEntropyPoolingTailView}(undef, 0)
-    pe = factory(pe, w0)
-    pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
     # mu, VaR, CVaR, EVaR and RLVaR
     ep_mu_views!(pe.mu_views, epc, pr, pe.sets; strict = strict)
     ep_var_views!(pe.var_views, epc, pr, pe.sets, w0; strict = strict)

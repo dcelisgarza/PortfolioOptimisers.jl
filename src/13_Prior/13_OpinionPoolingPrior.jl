@@ -462,7 +462,7 @@ No field of `pe` is modified, so calling `prior` twice on one estimator gives th
  2. When `pe.pe1` is not `nothing`, replace `X` with the returns of that estimator's prior.
  3. Read the opinion probabilities `ow`, from `pe.w` when it is set and from a uniform `range` over `length(pe.pes)` when it is `nothing`.
  4. Take the remainder `rw` of `ow` against one. When `rw` exceeds `eps`, append it to `ow` and give `pw` a last column of `1/T`, the uniform prior over the observations.
- 5. Fit every estimator of `pe.pes` over the executor `pe.ex`, writing each result's weights into a column of `pw`.
+ 5. Fit every estimator of `pe.pes` over the executor `pe.ex`. Check that each answered on the pool's own observation axis, and write its weights into a column of `pw`.
  6. Penalise `ow` through [`robust_probabilities`](@ref), which is the identity when `pe.p` is `nothing`.
  7. Pool the columns of `pw` under `pe.alg` through [`compute_pooling`](@ref), giving the consensus weights `w`.
  8. Refit `pe.pe2` under `w` through [`factory`](@ref), giving the moments of the result.
@@ -481,6 +481,7 @@ No field of `pe` is modified, so calling `prior` twice on one estimator gives th
 # Validation
 
   - `dims in (1, 2)`.
+  - Every opinion answers on the pool's observation axis, which is `pe.pe1`'s result when `pe.pe1` is set and `X` when it is `nothing`. An opinion whose own wrapped estimator drops rows answers on a shorter axis, and its probabilities are then over other scenarios. That raises a `DimensionMismatch` naming the opinion, both counts, and the fix: move the estimator that drops rows into `pe1`.
 
 # Returns
 
@@ -517,9 +518,16 @@ function prior(pe::OpinionPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing
     else
         pw = Matrix{eltype(X)}(undef, T, M)
     end
-    let X = X, F = F, pnl = pnl, pw = pw
+    let X = X, F = F, pnl = pnl, pw = pw, T = T
         FLoops.@floop pe.ex for (i, pe) in enumerate(pe.pes)
             pr = prior(pe, X, F, pnl; strict = strict, kwargs...)
+            # An opinion pool weights ONE scenario set, so every opinion must answer on the
+            # pool's own observation axis. An opinion whose nested prior drops rows answers
+            # on a shorter one, and its probabilities are then over other scenarios. That is
+            # refused here rather than one line below, where the write states nothing. See
+            # ADR 0116.
+            @argcheck(length(pr.w) == T,
+                      DimensionMismatch("opinion $i, a $(typeof(pe)), answered on $(length(pr.w)) observations and the pool has $T. An opinion pool weights one scenario set, so every opinion must answer on the pool's axis. Move the estimator that drops rows into `pe1`, where it makes that scenario set for every opinion."))
             pw[:, i] = pr.w
         end
     end

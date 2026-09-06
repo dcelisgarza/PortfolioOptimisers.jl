@@ -49,6 +49,7 @@ CVV_VecCVV
 EVV_VecEVV
 RVV_VecRVV
 ep_var_views!
+ep_prior_probabilities
 entropy_pooling
 ep_jump_entropy_pooling
 ep_refine_iters

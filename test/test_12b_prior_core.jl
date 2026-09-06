@@ -805,7 +805,12 @@ end
                                    pe = FactorPrior(;
                                                     re = StepwiseRegression(; crit = :bic)),
                                    sets = sets, opt = opt, mu_views = mu_views), rd)
-    @test isapprox(pr.mu[1], 0.002, rtol = 5e-4)
+    # ADR 0116. The view is enforced on the scenarios, and a `FactorPrior` answers
+    # `B * f_mu + b` rather than the scenario mean, so this tolerance is a proxy for the
+    # view. The relative miss reads 5.0e-4 since the uniform push was removed, because the
+    # nested fit now selects the factors an unweighted `FactorPrior` selects, and that is a
+    # different set for every asset.
+    @test isapprox(pr.mu[1], 0.002, rtol = 1e-3)
     @test isapprox(pr.w,
                    prior(EntropyPoolingPrior(;
                                              pe = FactorPrior(;
@@ -828,6 +833,10 @@ end
                                              sets = sets, opt = jopt, mu_views = mu_views),
                          rd).w, rtol = 5e-5)
 
+    # ADR 0116. This pair compares the two solvers, so both sides state the same prior
+    # probabilities. An explicit uniform `w` is now a different fit from no `w` at all: only
+    # a caller's `w` reaches the nested estimator, and a `StepwiseRegression` under uniform
+    # probability weights selects a different factor set for every asset.
     pr = prior(EntropyPoolingPrior(; w = StatsBase.pweights(range(iT, iT; length = T)),
                                    alg = H0_EntropyPooling(),
                                    pe = FactorPrior(;
@@ -835,7 +844,10 @@ end
                                    sets = sets, opt = opt, mu_views = mu_views), rd)
     @test isapprox(pr.mu[1], 0.002, rtol = 5e-4)
     @test isapprox(pr.w,
-                   prior(EntropyPoolingPrior(; alg = H0_EntropyPooling(),
+                   prior(EntropyPoolingPrior(;
+                                             w = StatsBase.pweights(range(iT, iT;
+                                                                          length = T)),
+                                             alg = H0_EntropyPooling(),
                                              pe = FactorPrior(;
                                                               re = StepwiseRegression(;
                                                                                       crit = :bic)),

@@ -2671,6 +2671,60 @@ function ep_var_views!(var_views::LinearConstraintEstimator, epc::AbstractDict,
     return nothing
 end
 """
+    ep_prior_probabilities(w::Option{<:StatsBase.ProbabilityWeights},
+                           pr::AbstractPriorResult, Ti::Int)
+
+Return the prior probabilities an entropy pooling fit starts from.
+
+A prior that reweights observations works on the observation axis its nested prior **answered**, not on the axis it was handed. A nested prior may drop rows: a [`CrossSectionalFactorPrior`](@ref) drops the observations its Descriptors warm up over and the observations its exposure lag consumes, so its scenarios are the window the fit is defined on. So `pr` is fitted first, and the prior probabilities are read on its rows.
+
+The three sources are read in order. A caller's `pe.w` wins, because it is the one tilt no fit can state. The nested result's own `w` comes next, because a nested pooling prior already tilted the scenarios it answered, and uniform is then not the prior (ADR 0046). Uniform over the rows of `pr.X` is the last.
+
+# Algorithm
+
+ 1. Take `T` as `size(pr.X, 1)`, the observations the nested prior answered.
+ 2. When `w` is not `nothing`, check its length against `T` and return it.
+ 3. When `w` is `nothing` and `pr.w` is not, return `pr.w` as `StatsBase.pweights`.
+ 4. Otherwise return the uniform `1/T` as `StatsBase.pweights`.
+
+# Arguments
+
+  - `w`: A caller's prior probabilities, the `w` field of the pooling estimator, or `nothing`.
+  - `pr`: Prior result of the nested estimator, fitted before this call.
+  - `Ti`: Observations the pooling estimator was handed. It is read only by the refusal message.
+
+# Validation
+
+  - `length(w) == size(pr.X, 1)`. A length that does not match raises a `DimensionMismatch` naming both counts and the count the estimator was handed.
+
+# Returns
+
+  - `w0::StatsBase.ProbabilityWeights`: Prior probabilities, on the rows of `pr.X`.
+
+# Related
+
+  - [`EntropyPoolingPrior`](@ref)
+  - [`MeucciEntropyPoolingPrior`](@ref)
+  - [`entropy_pooling`](@ref)
+  - [`LowOrderPrior`](@ref)
+"""
+function ep_prior_probabilities(::Nothing, pr::AbstractPriorResult, ::Int)
+    return if isnothing(pr.w)
+        T = size(pr.X, 1)
+        iT = inv(T)
+        StatsBase.pweights(range(iT, iT; length = T))
+    else
+        StatsBase.pweights(pr.w)
+    end
+end
+function ep_prior_probabilities(w::StatsBase.ProbabilityWeights, pr::AbstractPriorResult,
+                                Ti::Int)
+    T = size(pr.X, 1)
+    @argcheck(length(w) == T,
+              DimensionMismatch("length(pe.w) ($(length(w))) must match the $T observations the nested prior answered. The estimator was handed $Ti. A prior that reweights observations states its prior probabilities on the scenarios its nested prior produced, so a nested prior that drops rows moves this axis."))
+    return w
+end
+"""
     entropy_pooling(w::VecNum, epc::AbstractDict, opt::OptimEntropyPooling)
 
 Solve the dual of the entropy pooling problem using Optim.jl.

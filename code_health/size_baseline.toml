@@ -149,10 +149,10 @@ commit = "67ae6e5dcb"
 "src/13_Prior/07_BayesianBlackLittermanPrior.jl" = { code = 74, doc = 273, comment = 37, blank = 60, total = 444 }
 "src/13_Prior/08_FactorBlackLittermanPrior.jl" = { code = 83, doc = 251, comment = 41, blank = 54, total = 429 }
 "src/13_Prior/09_AugmentedBlackLittermanPrior.jl" = { code = 124, doc = 305, comment = 66, blank = 69, total = 564 }
-"src/13_Prior/10_Base_EntropyPoolingPrior.jl" = { code = 974, doc = 2396, comment = 60, blank = 920, total = 4350 }
-"src/13_Prior/11_MeucciEntropyPoolingPrior.jl" = { code = 313, doc = 474, comment = 52, blank = 148, total = 987 }
-"src/13_Prior/12_EntropyPoolingPrior.jl" = { code = 1154, doc = 1856, comment = 67, blank = 676, total = 3753 }
-"src/13_Prior/13_OpinionPoolingPrior.jl" = { code = 93, doc = 317, comment = 16, blank = 118, total = 544 }
+"src/13_Prior/10_Base_EntropyPoolingPrior.jl" = { code = 990, doc = 2421, comment = 60, blank = 933, total = 4404 }
+"src/13_Prior/11_MeucciEntropyPoolingPrior.jl" = { code = 307, doc = 480, comment = 66, blank = 148, total = 1001 }
+"src/13_Prior/12_EntropyPoolingPrior.jl" = { code = 1145, doc = 1856, comment = 81, blank = 676, total = 3758 }
+"src/13_Prior/13_OpinionPoolingPrior.jl" = { code = 96, doc = 320, comment = 21, blank = 118, total = 555 }
 "src/13_Prior/14_HighOrderFactorPriorEstimator.jl" = { code = 172, doc = 271, comment = 20, blank = 82, total = 545 }
 "src/13_Prior/15_AssetPanelEstimators.jl" = { code = 93, doc = 346, comment = 14, blank = 163, total = 616 }
 "src/13_Prior/16_Base_CrossSectionalFactorPrior.jl" = { code = 381, doc = 539, comment = 0, blank = 280, total = 1200 }

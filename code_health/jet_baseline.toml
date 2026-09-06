@@ -156,7 +156,7 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/13_Prior/09_AugmentedBlackLittermanPrior.jl" = { raw = 0, reviewed = 0 }
 "src/13_Prior/10_Base_EntropyPoolingPrior.jl" = { raw = 9, reviewed = 9 }
 "src/13_Prior/11_MeucciEntropyPoolingPrior.jl" = { raw = 1, reviewed = 1 }
-"src/13_Prior/12_EntropyPoolingPrior.jl" = { raw = 19, reviewed = 19 }
+"src/13_Prior/12_EntropyPoolingPrior.jl" = { raw = 20, reviewed = 20 }
 "src/13_Prior/13_OpinionPoolingPrior.jl" = { raw = 1, reviewed = 1 }
 "src/13_Prior/14_HighOrderFactorPriorEstimator.jl" = { raw = 0, reviewed = 0 }
 "src/13_Prior/15_AssetPanelEstimators.jl" = { raw = 0, reviewed = 0 }

@@ -376,9 +376,7 @@ estimator that is fitted on a panel composes like any other one.
 The panel of this testset is fully active. A wrapping prior processes the moments it is handed,
 and the fit states `NaN` at an asset it holds no moment for, which such processing refuses.
 
-Neither wrapper here reweights observations. One that does cannot compose this estimator yet: the
-fit answers on fewer rows than it was given, and entropy pooling sizes its prior probabilities from
-the matrix it was handed. Issue #849 holds that decision.
+Neither wrapper here reweights observations. The testset below covers the three that do.
 =#
 @testset "A wrapping prior composes the fit, because the panel travels" begin
     PO = PortfolioOptimisers
@@ -410,6 +408,65 @@ the matrix it was handed. Issue #849 holds that decision.
         @test isa(ho, HighOrderPrior)
         @test ho.pr.mu == pr.mu
         @test isa(ho.pr.rr, CrossSectionalFactorModel)
+    end
+end
+
+#=
+Issue #849, and ADR 0116. A prior that reweights observations works on the observation axis its
+nested prior ANSWERED. This fit drops the observations the Descriptors warm up over and the
+observations the exposure lag consumes, so it answers on fewer rows than it is given. The three
+reweighting priors fit the nested prior first and read their prior probabilities on its rows, so
+all three compose this estimator.
+
+The mean view is enforced on the matrix the constraint was built against, which is the first,
+unweighted fit. The moments of the result come from the refit, so `pr.mu` is not the reweighted
+scenario mean.
+=#
+@testset "A prior that reweights observations composes the fit" begin
+    rd = csfp_panel(; n_assets = 20, n_observations = 60, n_industries = 3, seed = 782_001,
+                    late_listing_proba = 0.0, delisting_proba = 0.0, missing_ratio = 0.0).rd
+    pe = CrossSectionalFactorPrior(; factors = csfp_factors(), minra = 5)
+    pr = prior(pe, rd)
+    sets = UniverseSets(; dict = Dict("nx" => rd.nx))
+    views = LinearConstraintEstimator(; val = "$(rd.nx[1]) == 0.002")
+    T = size(pr.X, 1)
+    @test T < size(rd.X, 1)
+    @testset "Both entropy pooling priors answer on the rows the fit kept" begin
+        for wr in (EntropyPoolingPrior(; pe = pe, sets = sets, mu_views = views),
+                   MeucciEntropyPoolingPrior(; pe = pe, sets = sets, mu_views = views))
+            pw = prior(wr, rd)
+            @test size(pw.X) == size(pr.X)
+            @test length(pw.w) == T
+            @test isapprox(sum(pw.w), 1; rtol = 1e-6)
+            @test isapprox(LinearAlgebra.dot(pw.w, pr.X[:, 1]), 0.002; rtol = 1e-5)
+            @test isa(pw.rr, CrossSectionalFactorModel)
+            @test all(isfinite, pw.mu)
+        end
+    end
+    @testset "An opinion pool makes the scenarios in pe1 and pools over them" begin
+        op = OpinionPoolingPrior(; pe1 = pe,
+                                 pes = [EntropyPoolingPrior(; sets = sets,
+                                                            mu_views = views)])
+        pw = prior(op, rd)
+        @test size(pw.X) == size(pr.X)
+        @test length(pw.w) == T
+        @test isapprox(pw.mu[1], 0.002; rtol = 1e-5)
+    end
+    @testset "An opinion that answers on a shorter axis is refused by name" begin
+        op = OpinionPoolingPrior(;
+                                 pes = [EntropyPoolingPrior(; pe = pe, sets = sets,
+                                                            mu_views = views)])
+        @test_throws DimensionMismatch prior(op, rd)
+    end
+    @testset "A caller's prior probabilities are stated on the axis the fit answered" begin
+        w = StatsBase.pweights(fill(inv(T), T))
+        @test length(prior(EntropyPoolingPrior(; pe = pe, sets = sets, mu_views = views,
+                                               w = w), rd).w) == T
+        Ti = size(rd.X, 1)
+        wbad = StatsBase.pweights(fill(inv(Ti), Ti))
+        @test_throws DimensionMismatch prior(EntropyPoolingPrior(; pe = pe, sets = sets,
+                                                                 mu_views = views,
+                                                                 w = wbad), rd)
     end
 end
 

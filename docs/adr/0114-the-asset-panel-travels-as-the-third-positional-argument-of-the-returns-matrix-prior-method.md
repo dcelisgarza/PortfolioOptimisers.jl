@@ -106,3 +106,14 @@ comes to read one has to reach it another way, and this ADR is where that will b
   was handed, before it fits. That is a second decision about the composition contract, it is not
   taken here, and
   [issue #849](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/849) holds it.
+
+## Amendment (2026-09-06)
+
+The second decision this ADR left untaken is now taken. Issue #849 held it, and
+[ADR 0116](0116-a-prior-that-reweights-observations-works-on-the-axis-its-nested-prior-answered.md)
+records it: a prior that reweights observations works on the observation axis its nested prior
+**answered**, so `ep_prior` fits that prior first and reads its prior probabilities on the rows of
+`pr.X`. All three reweighting priors now compose a `CrossSectionalFactorPrior`.
+
+The last consequence above describes the state of the library before that decision. It is correct
+history, not a defect.

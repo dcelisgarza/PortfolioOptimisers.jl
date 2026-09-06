@@ -761,7 +761,7 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :sc2 => "`sc2`: Scaling parameter for constraint penalties.",#
                                  :epalg => "`alg`: Entropy pooling algorithm.",#
                                  :epoptalg => "`alg`: Entropy pooling optimisation algorithm.",#
-                                 :ep_w => "`w`: Prior observation probability weights. If `nothing`, uniform weights are used.",#
+                                 :ep_w => "`w`: Prior observation probability weights, on the observations the wrapped estimator **answers**, which a wrapped estimator that drops rows makes fewer than the observations it is given. If `nothing`, the wrapped result's own `w` is used, and the uniform weights where it carries none.",#
                                  # Opinion pooling.
                                  :opalg => "`alg`: Opinion pooling algorithm.",#
                                  # Cross-sectional transforms.

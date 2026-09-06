@@ -15,7 +15,12 @@ include(joinpath(@__DIR__, "test12_setup.jl"))
                                    pe = FactorPrior(;
                                                     re = StepwiseRegression(; crit = :bic)),
                                    sets = sets, mu_views = mu_views), rd)
-    @test isapprox(pr.mu[1], 0.002, rtol = 5e-4)
+    # ADR 0116. The view is enforced on the scenarios, and a `FactorPrior` answers
+    # `B * f_mu + b` rather than the scenario mean, so this tolerance is a proxy for the
+    # view. The relative miss reads 5.0e-4 since the uniform push was removed, because the
+    # nested fit now selects the factors an unweighted `FactorPrior` selects, and that is a
+    # different set for every asset.
+    @test isapprox(pr.mu[1], 0.002, rtol = 1e-3)
     @test isapprox(pr.w,
                    prior(EntropyPoolingPrior(;
                                              pe = FactorPrior(;
@@ -38,6 +43,10 @@ include(joinpath(@__DIR__, "test12_setup.jl"))
                                              sets = sets, opt = jopt, mu_views = mu_views),
                          rd).w, rtol = 5e-6)
 
+    # ADR 0116. This pair compares the two solvers, so both sides state the same prior
+    # probabilities. An explicit uniform `w` is now a different fit from no `w` at all: only
+    # a caller's `w` reaches the nested estimator, and a `StepwiseRegression` under uniform
+    # probability weights selects a different factor set for every asset.
     pr = prior(EntropyPoolingPrior(; w = StatsBase.pweights(range(iT, iT; length = T)),
                                    alg = H0_EntropyPooling(),
                                    pe = FactorPrior(;
@@ -45,7 +54,10 @@ include(joinpath(@__DIR__, "test12_setup.jl"))
                                    sets = sets, mu_views = mu_views), rd)
     @test isapprox(pr.mu[1], 0.002, rtol = 5e-4)
     @test isapprox(pr.w,
-                   prior(EntropyPoolingPrior(; alg = H0_EntropyPooling(),
+                   prior(EntropyPoolingPrior(;
+                                             w = StatsBase.pweights(range(iT, iT;
+                                                                          length = T)),
+                                             alg = H0_EntropyPooling(),
                                              pe = FactorPrior(;
                                                               re = StepwiseRegression(;
                                                                                       crit = :bic)),
@@ -1430,4 +1442,38 @@ end
         @test isapprox(sum(pr.w), 1, rtol = 5e-7)
         @test all(>(0), pr.w)
     end
+end
+
+#=
+Issue #849, and ADR 0116. A pooling prior nested inside another already tilted the scenarios it
+answered, so uniform is not the prior the outer estimator wraps. `ep_prior_probabilities` reads the
+nested result's own `w` when the caller states none. ADR 0046 is the rule this closes: a value the
+nested fit computed must not be discarded on the way through the wrapper.
+=#
+@testset "A nested pooling prior's posterior is the outer prior probabilities" begin
+    inner = EntropyPoolingPrior(; sets = sets,
+                                mu_views = LinearConstraintEstimator(;
+                                                                     val = "AAPL == 0.004"))
+    pr_in = prior(inner, rd)
+    T0 = size(rd.X, 1)
+    uni = pweights(range(inv(T0), inv(T0); length = T0))
+    # The inner posterior is far enough from uniform that the two readings separate.
+    @test !isapprox(collect(pr_in.w), collect(uni), rtol = 1e-3)
+    outer = EntropyPoolingPrior(; pe = inner, sets = sets,
+                                mu_views = LinearConstraintEstimator(;
+                                                                     val = "MSFT == 0.003"))
+    pr_out = prior(outer, rd)
+    # `kld` is reported against the prior the estimator actually wrapped, so it is the
+    # divergence from the inner posterior and not the one from uniform.
+    @test isapprox(pr_out.kld, StatsBase.kldivergence(pr_out.w, pr_in.w), rtol = 1e-6)
+    @test !isapprox(pr_out.kld, StatsBase.kldivergence(pr_out.w, uni), rtol = 1e-2)
+    # A caller's own `w` still wins over the nested result's.
+    v = collect(range(0.25, 1.75; length = T0))
+    wnu = pweights(v ./ sum(v))
+    pr_w = prior(EntropyPoolingPrior(; pe = inner, sets = sets, w = wnu,
+                                     mu_views = LinearConstraintEstimator(;
+                                                                          val = "MSFT == 0.003")),
+                 rd)
+    @test isapprox(pr_w.kld, StatsBase.kldivergence(pr_w.w, wnu), rtol = 1e-6)
+    @test !isapprox(collect(pr_w.w), collect(pr_out.w), rtol = 1e-3)
 end
