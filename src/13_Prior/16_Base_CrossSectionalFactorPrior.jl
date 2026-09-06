@@ -1118,14 +1118,14 @@ Fit the Return Forecast of a [`CrossSectionalFactorPrior`](@ref), and write its 
 
 The method that Julia selects is the algorithm, and a prior that states no Return Forecast Estimator is the method over `Nothing`: the block passes through with the zero `b` it was built with, and the factor mean is left alone.
 
- 1. Fit the estimator on the **coverage** universe, through [`return_forecast`](@ref). The carrier and the block share one observation axis, so the forecast is fitted over the observations the factor model was fitted on.
+ 1. Fit the estimator on the **coverage** universe, through [`return_forecast`](@ref). The carrier is the whole one, so the Descriptors of the forecast warm up over every observation the panel has, and the block is the suffix of it [`return_forecast_rows`](@ref) finds by size.
  2. Split the forecast against the latest exposures with [`cross_sectional_alpha_split`](@ref).
  3. Rebuild the block with `b` the orthogonal part shrunk by `c`, and with the Return Forecast Result in `rf`. `L` is read with `getfield`, because the `swap(L, M)` rule of [`CrossSectionalFactorModel`](@ref) would otherwise materialise it as a copy of `M`.
 
 # Arguments
 
   - `rfe`: Return Forecast Estimator, or `nothing`.
-  - $(arg_dict[:rd]) It is the carrier restricted to the fitted observations.
+  - $(arg_dict[:rd]) It is the whole carrier the prior was fitted on, and the block is a suffix of it.
   - `csfm`: The factor-model block, built with a zero `b` and no Return Forecast.
   - `cre`: Cross-Sectional Regression Estimator of the split.
   - `c`: Confidence in the orthogonal part of the forecast.

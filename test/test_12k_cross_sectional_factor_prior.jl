@@ -39,8 +39,9 @@ are standardised in the test rather than by a Descriptor. Both choices are delib
 every departure below out of the picture, so the stored cases measure the fit alone. Issue #721
 already diffed the Factor Exposures themselves.
 
-THREE DEPARTURES FROM THE REFERENCE IMPLEMENTATION. The first two are recorded in the resolution
-comment of #725, and the third in that of #739.
+TWO DEPARTURES FROM THE REFERENCE IMPLEMENTATION, both recorded in the resolution comment of #725.
+A third one, recorded in that of #739, is gone: issue #835 built ADR 0112, so the Return Forecast
+Estimator now reads the WHOLE carrier and answers on the block's rows.
 
   - The benchmark mask and the eligibility mask both drop a pair whose market capitalisation is not
     finite. The reference implementation lets such a pair carry a `NaN` weight. The library refuses
@@ -50,13 +51,6 @@ comment of #725, and the third in that of #739.
     finite, which happens only where the asset is inactive. The reference implementation's default
     covariance estimator skips such a pair; the library has no exponentially weighted covariance
     with a verb (issue #637), so the default here is the library's own and it admits no `NaN`.
-  - The Return Forecast Estimator is fitted on the carrier restricted to the FITTED observations.
-    The reference implementation pads the fitted histories back onto the whole observation axis and
-    fits the forecast there, so that a Descriptor of the forecast warms up over the whole history
-    rather than over the fit's own window. The library's own contract is the narrower one: a Return
-    Forecast Estimator reads its carrier beside the block, and the two share one observation axis,
-    which `neutralise_scores!` and `forecast_return_units` both need. A Descriptor with no warm-up,
-    which is what the stored cases use, sees the same numbers either way.
 =#
 using Statistics, Distributions, Dates, Random
 include(joinpath(@__DIR__, "test06c_setup.jl"))

@@ -164,7 +164,168 @@ function return_forecast_weights(rd::ReturnsResult)::Matrix{Float64}
               IsNothingError("a Return Forecast scores its Descriptors over the estimation universe of each observation, and this Asset Panel is static, so it carries no estimation mask"))
     return Float64.(emsk)
 end
+"""
+    return_forecast_history_rows(A::Nothing) -> Nothing
+    return_forecast_history_rows(A::MatNum_Arr3Num) -> Integer
 
+Return the observation count of one history of a factor-model block, or `nothing`.
+
+Every history of a block lays its observations on the first axis, whatever its rank, so one method reads a per-asset history and one reads an exposure history. An absent history answers `nothing`, which is what lets [`return_forecast_block_observations`](@ref) read the first history the block carries without an `isnothing` test of its own.
+
+# Arguments
+
+  - `A`: One history of the block, or `nothing`.
+
+# Returns
+
+  - `T::Option{<:Integer}`: The observation count, or `nothing` when the block carries no such history.
+
+# Related
+
+  - [`return_forecast_block_observations`](@ref)
+  - [`return_forecast_rows`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+"""
+function return_forecast_history_rows(::Nothing)::Nothing
+    return nothing
+end
+function return_forecast_history_rows(A::MatNum_Arr3Num)::Integer
+    return size(A, 1)
+end
+"""
+    return_forecast_block_observations(csfm::CrossSectionalFactorModel) -> Option{<:Integer}
+
+Return the observation count of the histories of a factor-model block, or `nothing`.
+
+The three per-asset histories `rw`, `vs` and `bw` are pinned to one observation axis by the constructor of [`CrossSectionalFactorModel`](@ref), so the first of them the block carries states the count. A block that carries none of them falls back to the exposure history. A block that carries no history at all states no window, and the answer is `nothing`.
+
+# Arguments
+
+  - `csfm`: The fitted factor-model block.
+
+# Returns
+
+  - `Tb::Option{<:Integer}`: The observation count of the block, or `nothing`.
+
+# Related
+
+  - [`return_forecast_rows`](@ref)
+  - [`return_forecast_history_rows`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+"""
+function return_forecast_block_observations(csfm::CrossSectionalFactorModel)::Option{<:Integer}
+    Tb = return_forecast_history_rows(csfm.rw)
+    Tb = isnothing(Tb) ? return_forecast_history_rows(csfm.vs) : Tb
+    Tb = isnothing(Tb) ? return_forecast_history_rows(csfm.bw) : Tb
+    return isnothing(Tb) ? return_forecast_history_rows(csfm.Ms) : Tb
+end
+"""
+    return_forecast_rows(rd::ReturnsResult, csfm::CrossSectionalFactorModel) -> AbstractUnitRange
+
+Return the rows of the carrier the histories of a factor-model block live on.
+
+A [`CrossSectionalFactorPrior`](@ref) drops the leading observations its Descriptors warm up over and fits on the observations that remain, so the block is always a **suffix** of the carrier. The suffix is found by size rather than by a stored offset: a stored offset would have to survive every view of the block, and the size arithmetic holds on every one.
+
+A Return Forecast Estimator scores its own Descriptors over the whole carrier, so they warm up on every observation the panel has, and each member then cuts to these rows. A carrier of exactly the block's length gives the whole range, which is the call of a caller who hands the already narrowed carrier.
+
+# Arguments
+
+  - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl`.
+  - `csfm`: The fitted factor-model block.
+
+# Validation
+
+  - The rules of [`descriptor_asset_panel`](@ref).
+  - The carrier is at least as long as the block. Raises a `DimensionMismatch`.
+
+# Returns
+
+  - `rows::AbstractUnitRange`: The rows of the carrier the block lives on.
+
+# Related
+
+  - [`return_forecast_block_observations`](@ref)
+  - [`return_forecast_cut`](@ref)
+  - [`return_forecast_pad`](@ref)
+  - [`descriptor_scores`](@ref)
+"""
+function return_forecast_rows(rd::ReturnsResult,
+                              csfm::CrossSectionalFactorModel)::AbstractUnitRange
+    Tc = size(descriptor_asset_panel(rd).amsk, 1)
+    Tb = return_forecast_block_observations(csfm)
+    if isnothing(Tb)
+        return 1:Tc
+    end
+    @argcheck(Tb <= Tc,
+              DimensionMismatch("the factor model block is fitted on a suffix of the carrier, so the carrier ($Tc observations) cannot be shorter than the block ($Tb observations). Hand the carrier the prior was fitted on."))
+    return (Tc - Tb + 1):Tc
+end
+"""
+    return_forecast_cut(A::Nothing, rows::AbstractUnitRange) -> Nothing
+    return_forecast_cut(A::MatNum, rows::AbstractUnitRange) -> MatNum
+    return_forecast_cut(A::Arr3Num, rows::AbstractUnitRange) -> Arr3Num
+
+Cut a history that lives on the carrier's observation axis down to the block's rows.
+
+The Return Forecast family computes its Descriptor scores over the whole carrier and answers on the block's rows, so every whole-axis history it carries beside them is cut once, through this verb. The cut is a copy rather than a view, because a view of an array whose element type is open names no numeric array.
+
+# Arguments
+
+  - `A`: A history on the carrier's observation axis, or `nothing`.
+  - `rows`: The rows of the carrier the block lives on.
+
+# Returns
+
+  - `A`: The same history on the block's rows, or `nothing`.
+
+# Related
+
+  - [`return_forecast_rows`](@ref)
+  - [`return_forecast_pad`](@ref)
+  - [`descriptor_scores`](@ref)
+"""
+function return_forecast_cut(::Nothing, ::AbstractUnitRange)::Nothing
+    return nothing
+end
+function return_forecast_cut(A::MatNum, rows::AbstractUnitRange)::MatNum
+    return A[rows, :]
+end
+function return_forecast_cut(A::Arr3Num, rows::AbstractUnitRange)::Arr3Num
+    return A[rows, :, :]
+end
+"""
+    return_forecast_pad(A::Nothing, rows::AbstractUnitRange, T::Integer) -> Nothing
+    return_forecast_pad(A::MatNum, rows::AbstractUnitRange, T::Integer) -> MatNum
+
+Place a history of a factor-model block into the rows of the carrier it was fitted on.
+
+The rows before the block carry no information of the factor model, so they are `NaN`. A member that fits over the whole carrier reads them as it reads any missing cell: the pair drops out of the fit wherever the history it needs is not finite.
+
+# Arguments
+
+  - `A`: A history on the block's observation axis, or `nothing`.
+  - `rows`: The rows of the carrier the block lives on.
+  - `T`: Number of observations the carrier has.
+
+# Returns
+
+  - `A`: The same history on the carrier's axis, `NaN` before the block, or `nothing`.
+
+# Related
+
+  - [`return_forecast_rows`](@ref)
+  - [`return_forecast_cut`](@ref)
+  - [`TargetReturnForecast`](@ref)
+"""
+function return_forecast_pad(::Nothing, ::AbstractUnitRange, ::Integer)::Nothing
+    return nothing
+end
+function return_forecast_pad(A::MatNum, rows::AbstractUnitRange, T::Integer)::MatNum
+    Tf = float(real(eltype(A)))
+    B = fill(Tf(NaN), T, size(A, 2))
+    B[rows, :] = A
+    return B
+end
 """
     forecast_unit_target(unit::IdiosyncraticReturnUnit, y::MatNum,
                          vs::Option{<:MatNum}) -> MatNum

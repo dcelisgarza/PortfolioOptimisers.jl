@@ -148,12 +148,14 @@ end
     neutralise_scores!(S::AbstractArray{<:Real, 3}, neutralise::Nothing,
                        csfm::CrossSectionalFactorModel, w::MatNum,
                        scoring::Option{<:AbstractCrossSectionalTransform},
-                       groups::Option{<:AbstractMatrix{<:Integer}}) -> nothing
+                       groups::Option{<:AbstractMatrix{<:Integer}},
+                       rows::AbstractUnitRange) -> nothing
     neutralise_scores!(S::AbstractArray{<:Real, 3},
                        neutralise::Union{<:AbstractString, <:VecStr},
                        csfm::CrossSectionalFactorModel, w::MatNum,
                        scoring::Option{<:AbstractCrossSectionalTransform},
-                       groups::Option{<:AbstractMatrix{<:Integer}}) -> nothing
+                       groups::Option{<:AbstractMatrix{<:Integer}},
+                       rows::AbstractUnitRange) -> nothing
 
 Neutralise the Descriptor scores against the named Factor Exposures, in place.
 
@@ -162,18 +164,20 @@ Neutralise the Descriptor scores against the named Factor Exposures, in place.
 The method that Julia selects is the algorithm, and the recipe that names no target does nothing.
 
  1. Resolve the names to raw factor indices, a factor name beating a Factor Family label, and take those columns of the exposure history as the design.
- 2. For each score in turn, build the regression weights: `w`, with a zero wherever the score or a design exposure of that asset is not finite.
+ 2. For each score in turn, build the regression weights over the block's rows: `w`, with a zero wherever the score or a design exposure of that asset is not finite.
  3. Regress the score across the assets on the design under those weights, with no intercept, and take the residual.
  4. Score the residual once more under `w`, so that every score leaves the step on one scale.
+ 5. Write `NaN` on the rows before the block, where the block states no exposure to neutralise against.
 
 # Arguments
 
-  - `S`: The Descriptor scores, `observations × assets × descriptors`. It is changed in place.
+  - `S`: The Descriptor scores, `observations × assets × descriptors`, on the carrier's observation axis. It is changed in place.
   - `neutralise`: The Neutralisation names, or `nothing`.
   - `csfm`: The fitted factor-model block.
   - `w`: Cross-sectional weights, `observations × assets`.
   - `scoring`: The scoring transform, or `nothing`.
   - `groups`: Group label matrix `observations × assets`, or `nothing`.
+  - `rows`: The rows of the carrier the block lives on.
 
 # Validation
 
@@ -193,53 +197,64 @@ The method that Julia selects is the algorithm, and the recipe that names no tar
 function neutralise_scores!(::AbstractArray{<:Real, 3}, ::Nothing,
                             ::CrossSectionalFactorModel, ::MatNum,
                             ::Option{<:AbstractCrossSectionalTransform},
-                            ::Option{<:AbstractMatrix{<:Integer}})::Nothing
+                            ::Option{<:AbstractMatrix{<:Integer}},
+                            ::AbstractUnitRange)::Nothing
     return nothing
 end
 function neutralise_scores!(S::AbstractArray{<:Real, 3},
                             neutralise::Union{<:AbstractString, <:VecStr},
                             csfm::CrossSectionalFactorModel, w::MatNum,
                             scoring::Option{<:AbstractCrossSectionalTransform},
-                            groups::Option{<:AbstractMatrix{<:Integer}})::Nothing
+                            groups::Option{<:AbstractMatrix{<:Integer}},
+                            rows::AbstractUnitRange)::Nothing
     Ms, nf, fam = descriptor_scores_axis(csfm)
     tidx = neutralisation_targets(neutralisation_names(neutralise), nf, fam)
     X = Ms[:, :, tidx]
+    wb = return_forecast_cut(w, rows)
+    gb = return_forecast_cut(groups, rows)
     cre = CrossSectionalLinearRegression()
+    Tf = float(eltype(S))
     for k in axes(S, 3)
-        y = S[:, :, k]
-        W = neutralisation_weights(y, X, w)
+        y = S[rows, :, k]
+        W = neutralisation_weights(y, X, wb)
         csr = cross_sectional_regression(cre, X, y, W)
-        S[:, :, k] = exposure_transform(scoring, csr.eps, w, groups)
+        S[rows, :, k] = exposure_transform(scoring, csr.eps, wb, gb)
+        for t in 1:(first(rows) - 1), i in axes(S, 2)
+            S[t, i, k] = Tf(NaN)
+        end
     end
     return nothing
 end
 """
     descriptor_scores(ds::DescriptorScores, rd::ReturnsResult,
-                      csfm::CrossSectionalFactorModel) -> Array{<:Real, 3}
+                      csfm::CrossSectionalFactorModel) -> NamedTuple
 
 Compute the cross-sectional scores of the Descriptors of a [`DescriptorScores`](@ref).
 
+The Descriptors are computed over the **whole** carrier, so a Descriptor with a warm-up warms up on every observation the panel has rather than a second time inside the block's own window. The verb answers the rows the block lives on beside the scores, and each member cuts to them once.
+
 # Algorithm
 
- 1. Read the cross-sectional weights off the estimation mask of the Asset Panel, and the group labels off the named categorical Panel Field.
- 2. Compute each Descriptor, and apply the outlier slot and then the scoring slot to it.
+ 1. Read the cross-sectional weights off the estimation mask of the Asset Panel, the group labels off the named categorical Panel Field, and the block's rows with [`return_forecast_rows`](@ref).
+ 2. Compute each Descriptor over the whole carrier, and apply the outlier slot and then the scoring slot to it.
  3. Stack the scores on a third axis, in the order the Descriptors are written in.
- 4. When the recipe names Neutralisation targets, residualise every score against those Factor Exposures and score it once more.
+ 4. When the recipe names Neutralisation targets, residualise every score of the block's rows against those Factor Exposures, score it once more, and write `NaN` on the rows before the block.
 
 # Arguments
 
   - `ds`: The Descriptor Scores recipe.
   - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl`.
-  - `csfm`: The fitted factor-model block. It is read only when the recipe names Neutralisation targets.
+  - `csfm`: The fitted factor-model block. Its histories state the block's rows, and its exposure history is read only when the recipe names Neutralisation targets.
 
 # Validation
 
-  - The rules of [`return_forecast_weights`](@ref), of [`exposure_group_labels`](@ref) and of [`cross_sectional_transform`](@ref).
+  - The rules of [`return_forecast_weights`](@ref), of [`return_forecast_rows`](@ref), of [`exposure_group_labels`](@ref) and of [`cross_sectional_transform`](@ref).
   - The rules of [`neutralise_scores!`](@ref) when the recipe names Neutralisation targets.
 
 # Returns
 
-  - `S::Array{<:Real, 3}`: The Descriptor scores, `observations × assets × descriptors`.
+  - `S::Array{<:Real, 3}`: The Descriptor scores, `observations × assets × descriptors`, on the carrier's observation axis.
+  - `rows::AbstractUnitRange`: The rows of the carrier the block lives on.
 
 # Examples
 
@@ -257,7 +272,7 @@ julia> ds = DescriptorScores(;
                                             Passthrough(; field = \"b\")], outlier = nothing,
                              scoring = nothing);
 
-julia> descriptor_scores(ds, rd, csfm)
+julia> descriptor_scores(ds, rd, csfm).S
 2×2×2 Array{Float64, 3}:
 [:, :, 1] =
  1.0  2.0
@@ -274,12 +289,14 @@ julia> descriptor_scores(ds, rd, csfm)
   - [`descriptor`](@ref)
   - [`composite_score`](@ref)
   - [`neutralise_scores!`](@ref)
+  - [`return_forecast_rows`](@ref)
   - [`FixedWeightedReturnForecast`](@ref)
 """
 function descriptor_scores(ds::DescriptorScores, rd::ReturnsResult,
-                           csfm::CrossSectionalFactorModel)::Array{<:Real, 3}
+                           csfm::CrossSectionalFactorModel)
     w = return_forecast_weights(rd)
     groups = exposure_group_labels(rd, ds.group)
+    rows = return_forecast_rows(rd, csfm)
     des = ds.descriptors
     S1 = composite_score(des[1], rd, ds.outlier, ds.scoring, w, groups)
     Tf = float(eltype(S1))
@@ -288,8 +305,8 @@ function descriptor_scores(ds::DescriptorScores, rd::ReturnsResult,
     for k in 2:length(des)
         S[:, :, k] = composite_score(des[k], rd, ds.outlier, ds.scoring, w, groups)
     end
-    neutralise_scores!(S, ds.neutralise, csfm, w, ds.scoring, groups)
-    return S
+    neutralise_scores!(S, ds.neutralise, csfm, w, ds.scoring, groups, rows)
+    return (; S = S, rows = rows)
 end
 
 export DescriptorScores, descriptor_scores

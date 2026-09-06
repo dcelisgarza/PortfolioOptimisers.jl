@@ -122,6 +122,7 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :rf_scale => "`scale`: Multiplicative scale applied to the Return Forecast after it reaches return units. It sets the strength of the forecast without moving the fitted coefficients.",#
                                  :rf_horizon => "`horizon`: Number of forward observations the target of the fit averages over.",#
                                  :rf_lag => "`lag`: Number of observations between the scored observation and the first return of its target window.",#
+                                 :rf_whole_history => "`whole_history`: Whether the fit reads the whole carrier, with the block's histories placed into the rows they were fitted on, rather than the block's rows alone.",#
                                  :crit => "`crit`: Factor selection criterion. A [`PValue`](@ref), or a `Val` of one symbol of [`STEPWISE_REGRESSION_CRITERIA`](@ref).",#
                                  :r2variant => "`variant`: Name of the pseudo-``R^2`` variant a maximisation criterion reads, or `nothing` to take the default of the criterion.",#
                                  :realg => "`alg`: Regression algorithm.",#

@@ -132,7 +132,7 @@ end
                           descriptors = [Passthrough(; field = "a"),
                                          Passthrough(; field = "b")], outlier = nothing,
                           scoring = nothing)
-    S = descriptor_scores(ds, rd, csfm)
+    S = descriptor_scores(ds, rd, csfm).S
 
     @testset "The third axis is the Descriptor axis, in the written order" begin
         @test size(S) == (2, 2, 2)
@@ -163,7 +163,7 @@ end
         blk = forecast_hand_block(2; Ms = Ms, nf = ["style"], fam = ["style"])
         dsn = DescriptorScores(; descriptors = [Passthrough(; field = "a")],
                                neutralise = ["style"], outlier = nothing, scoring = nothing)
-        Sn = descriptor_scores(dsn, rd, blk)
+        Sn = descriptor_scores(dsn, rd, blk).S
         @test all(abs.(Sn) .< 1e-10)
     end
 
@@ -176,7 +176,7 @@ end
                                outlier = nothing,
                                scoring = CrossSectionalStandardiser(; min_group_size = 2),
                                group = "g")
-        @test size(descriptor_scores(dsg, rdg, csfm)) == (2, 2, 1)
+        @test size(descriptor_scores(dsg, rdg, csfm).S) == (2, 2, 1)
     end
 end
 
@@ -260,7 +260,7 @@ end
                                scoring = CrossSectionalStandardiser(; min_group_size = 2))
         rf = return_forecast(FixedWeightedReturnForecast(; scores = ds1, scale = 1.0), rd,
                              csfm)
-        S = descriptor_scores(ds1, rd, csfm)
+        S = descriptor_scores(ds1, rd, csfm).S
         @test rf.hist ≈ S[:, :, 1]
     end
 
@@ -884,5 +884,167 @@ end
         # Every coefficient is zero, so the normal accumulator never leaves zero.
         @test isnan(rf.calib)
         @test all(isnan, rf.mu)
+    end
+end
+
+#=
+Issue #835 finishes the file: the estimator scores the WHOLE carrier and answers on the
+BLOCK's rows. ADR 0112.
+
+THREE MORE CONVENTIONS SHAPE THESE PROBES.
+
+ 9. THE BLOCK IS A SUFFIX OF THE CARRIER, FOUND BY SIZE. The prior drops the leading
+    observations its own Descriptors warm up over, so the block's histories are the trailing
+    rows of the carrier and `return_forecast_rows` finds them from the two observation
+    counts alone. A carrier of exactly the block's length gives the whole range, and a
+    carrier shorter than the block is refused.
+
+10. THE DESCRIPTORS OF THE FORECAST WARM UP OVER THE WHOLE CARRIER. A Descriptor with a
+    warm-up would otherwise warm up a second time inside the block's window, which is the
+    one design the reference implementation cannot express. Every member then cuts to the
+    block's rows, so `hist` still lines up with `vs`, with `csr.eps` and with `pr.o_X`.
+
+11. THE TARGET MEMBER KEEPS THE BOUNDARY BAND. Under `whole_history = true` the block's
+    idiosyncratic returns are placed into the rows they were fitted on, so a signal row
+    before the block whose forward window reaches into the block is a training row. There
+    are exactly `lag + horizon - 1` such rows. Under `false` the fit trains on the block's
+    rows alone, and the reference implementation has no such mode.
+
+    `assets/FixedWeightedReturnForecast3.csv.gz`, `assets/TargetReturnForecast3.csv.gz` and
+    `assets/TargetReturnForecast4.csv.gz` are the reference implementation's own output on
+    the panel this testset rebuilds, with the block padded back onto the whole observation
+    axis as the reference's own prior pads it. Its momentum Descriptor carries a warm-up,
+    which is what the earlier stored cases cannot see. The forecast agrees to a relative
+    1.3e-14 and the calibration coefficient BIT FOR BIT.
+=#
+
+@testset "The estimator scores the whole carrier and answers on the block's rows" begin
+    sp = synthetic_asset_panel(; n_assets = 20, n_observations = 60, n_industries = 4,
+                               late_listing_proba = 0.3, delisting_proba = 0.3,
+                               missing_ratio = 0.08, rng = StableRNG(987654321))
+    rd = sp.rd
+    amsk = rd.pnl.amsk
+    T, N = size(amsk)
+    Tb = 40
+    rows = (T - Tb + 1):T
+    gap = 2
+    vsw = [amsk[t, i] ? 0.0004 * (1.5 + sin(0.3 * t + 0.7 * i)) : NaN
+           for t in 1:T, i in 1:N]
+    epsw = [amsk[t, i] ? 0.01 * sin(0.7 * t + 0.29 * i) + 0.004 * cos(0.11 * t * i) : NaN
+            for t in 1:T, i in 1:N]
+    vs = vsw[rows, :]
+    eps = epsw[rows, :]
+    csr = CrossSectionalRegression(; f = zeros(Tb, 1), eps = eps, n = fill(N, Tb))
+    csfm = CrossSectionalFactorModel(; M = ones(N, 1), b = zeros(N), csr = csr, vs = vs)
+    ds = DescriptorScores(;
+                          descriptors = [EWMomentum(; half_life = 8.0, skip = 2),
+                                         Passthrough(; field = "book_equity")],
+                          outlier = CrossSectionalWinsoriser(),
+                          scoring = CrossSectionalStandardiser(; min_group_size = 2),
+                          group = "industry")
+
+    @testset "The block is the trailing rows, and a shorter carrier is refused" begin
+        @test PO.return_forecast_rows(rd, csfm) == rows
+        # A carrier of exactly the block's length is the whole of it, which is the call a
+        # caller makes when it hands the already narrowed carrier.
+        @test PO.return_forecast_rows(PO.port_opt_view(rd, rows, :), csfm) == 1:Tb
+        @test_throws DimensionMismatch PO.return_forecast_rows(PO.port_opt_view(rd,
+                                                                                (first(rows) + 1):T,
+                                                                                :), csfm)
+        # A block that carries no history states no window.
+        bare = CrossSectionalFactorModel(; M = ones(N, 1), b = zeros(N))
+        @test PO.return_forecast_rows(rd, bare) == 1:T
+        @test isnothing(PO.return_forecast_block_observations(bare))
+        @test PO.return_forecast_block_observations(csfm) == Tb
+    end
+
+    @testset "The Descriptors warm up over the carrier, not inside the block" begin
+        sc = descriptor_scores(ds, rd, csfm)
+        S = sc.S
+        @test size(S) == (T, N, 2)
+        @test sc.rows == rows
+        # The momentum reads a skip of two, so its first two rows read nothing at all.
+        @test all(isnan, view(S, 1:2, :, 1))
+        # The same recipe on the block alone warms up a second time, so it states fewer
+        # scores over the very same rows.
+        Sb = descriptor_scores(ds, PO.port_opt_view(rd, rows, :), csfm).S
+        @test size(Sb) == (Tb, N, 2)
+        @test count(isfinite, S[rows, :, 1]) > count(isfinite, Sb[:, :, 1])
+    end
+
+    @testset "A Neutralisation writes NaN on the rows before the block" begin
+        # The block states an exposure only on its own rows, so a score before them has
+        # nothing to neutralise against. That is also why a Neutralisation drops the
+        # boundary band of the target member: the band's scores leave this step `NaN`.
+        Ms = reshape(descriptor(Passthrough(; field = "market_cap"), rd)[rows, :], Tb, N, 1)
+        blk = CrossSectionalFactorModel(; M = ones(N, 1), b = zeros(N), csr = csr, vs = vs,
+                                        Ms = Ms, nf = ["style"], fam = ["style"])
+        dsn = DescriptorScores(; descriptors = [Passthrough(; field = "book_equity")],
+                               neutralise = ["style"], outlier = nothing, scoring = nothing)
+        sc = descriptor_scores(dsn, rd, blk)
+        @test sc.rows == rows
+        @test all(isnan, view(sc.S, 1:(first(rows) - 1), :, 1))
+        @test any(isfinite, view(sc.S, rows, :, 1))
+    end
+
+    @testset "The fixed weighted member matches the stored case on the block's rows" begin
+        rf = return_forecast(FixedWeightedReturnForecast(; scores = ds, scale = 0.02,
+                                                         weights = [0.4, -0.6],
+                                                         min_coverage = 0.5), rd, csfm)
+        E = Matrix(CSV.read(joinpath(@__DIR__,
+                                     "assets/FixedWeightedReturnForecast3.csv.gz"),
+                            DataFrame))
+        @test size(E) == (T, N)
+        @test size(rf.hist) == (Tb, N)
+        B = E[rows, :]
+        @test isequal(isnan.(rf.hist), isnan.(B))
+        @test rf.hist[isfinite.(B)] ≈ B[isfinite.(B)]
+        @test isequal(rf.mu, rf.hist[end, :])
+    end
+
+    @testset "Every training row before the block lies in the boundary band" begin
+        S = descriptor_scores(ds, rd, csfm).S
+        w = PO.return_forecast_weights(rd)
+        al = PO.target_forecast_alignment(true, S, eps, nothing, w,
+                                          PO.exposure_group_labels(rd, "industry"), rows)
+        @test size(al.eps) == (T, N)
+        @test all(isnan, view(al.eps, 1:(first(rows) - 1), :))
+        fwd = PO.forward_mean_returns(al.eps, 2, 1)
+        # A signal row states a target only where its forward window reaches into the block,
+        # which is the band of `lag + horizon - 1` rows before it and nothing earlier.
+        @test all(isnan, view(fwd, 1:(first(rows) - gap - 1), :))
+        @test any(isfinite, view(fwd, (first(rows) - gap):(first(rows) - 1), :))
+        # The cut alignment states the block's rows and nothing before them.
+        cut = PO.target_forecast_alignment(false, S, eps, nothing, w, nothing, rows)
+        @test size(cut.S) == (Tb, N, 2)
+        @test isequal(cut.eps, eps)
+        @test isnothing(cut.groups)
+    end
+
+    @testset "The target member in return units matches the stored case" begin
+        rf = return_forecast(TargetReturnForecast(; scores = ds, horizon = 2, lag = 1,
+                                                  calibrate = false), rd, csfm)
+        E = vec(Matrix(CSV.read(joinpath(@__DIR__, "assets/TargetReturnForecast3.csv.gz"),
+                                DataFrame)))
+        @test isequal(isnan.(rf.mu), isnan.(E))
+        @test rf.mu[isfinite.(E)] ≈ E[isfinite.(E)]
+        # The block's rows alone lose the boundary band, so the fit is a different one.
+        rb = return_forecast(TargetReturnForecast(; scores = ds, horizon = 2, lag = 1,
+                                                  calibrate = false, whole_history = false),
+                             rd, csfm)
+        @test isequal(isnan.(rb.mu), isnan.(E))
+        @test !isapprox(rb.mu[isfinite.(E)], E[isfinite.(E)])
+    end
+
+    @testset "The calibration reads the variance at the signal row" begin
+        rf = return_forecast(TargetReturnForecast(; scores = ds, horizon = 2, lag = 1,
+                                                  calibrate = true, half_life = 10.0,
+                                                  min_obs = 1, cv = KFold(; n = 5)), rd,
+                             csfm)
+        E = vec(Matrix(CSV.read(joinpath(@__DIR__, "assets/TargetReturnForecast4.csv.gz"),
+                                DataFrame)))
+        # The reference implementation's own coefficient, which the padded rows never enter.
+        @test rf.calib ≈ -0.7730488894268933
+        @test rf.mu[isfinite.(E)] ≈ E[isfinite.(E)]
     end
 end

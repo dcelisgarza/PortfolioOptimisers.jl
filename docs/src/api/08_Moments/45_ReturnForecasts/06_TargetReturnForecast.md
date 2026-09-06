@@ -12,6 +12,7 @@ TargetReturnForecastResult
 ```@docs
 return_forecast(rfe::TargetReturnForecast, rd::ReturnsResult, csfm::CrossSectionalFactorModel)
 target_forecast_variances
+target_forecast_alignment
 target_forecast_samples
 target_forecast_fit
 target_forecast_uncalibrated

@@ -9,6 +9,8 @@ The target of the fit is transformed cross-sectionally before the fit sees it, w
 
 The member computes no history. Its in-sample predictions are not a forecast, so `hist` on its Result is `nothing`.
 
+`whole_history` states the window the fit trains over. Under `true` the block's idiosyncratic returns are placed into the rows they were fitted on, and every pair with a finite score, a finite target and a positive weight is one sample, so a signal row before the block whose forward window reaches into the block trains the model too. Under `false` the fit trains on the block's rows alone. The calibration reads the idiosyncratic variance at the signal row either way, so a row before the block enters the fit and not the calibration.
+
 # Mathematical definition
 
 ```math
@@ -37,6 +39,7 @@ $(DocStringExtensions.TYPEDFIELDS)
     TargetReturnForecast(; scores::DescriptorScores,
                          tgt::AbstractRegressionTarget = LinearModel(),
                          horizon::Integer = 1, lag::Integer = 1,
+                         whole_history::Bool = true,
                          target_outlier::Option{<:AbstractCrossSectionalTransform} = CrossSectionalWinsoriser(),
                          target_scoring::Option{<:AbstractCrossSectionalTransform} = nothing,
                          calibrate::Bool = true, scale::Real = 1.0,
@@ -76,6 +79,7 @@ TargetReturnForecast
                  │   kwargs ┴ @NamedTuple{}: NamedTuple()
          horizon ┼ Int64: 1
              lag ┼ Int64: 1
+   whole_history ┼ Bool: true
   target_outlier ┼ nothing
   target_scoring ┼ nothing
        calibrate ┼ Bool: false
@@ -114,6 +118,10 @@ TargetReturnForecast
     """
     lag
     """
+    $(field_dict[:rf_whole_history])
+    """
+    whole_history
+    """
     Cross-sectional transform applied to the target of the fit before it is scored, or `nothing` to skip the step.
     """
     target_outlier
@@ -146,7 +154,7 @@ TargetReturnForecast
     """
     unit
     function TargetReturnForecast(scores::DescriptorScores, tgt::AbstractRegressionTarget,
-                                  horizon::Integer, lag::Integer,
+                                  horizon::Integer, lag::Integer, whole_history::Bool,
                                   target_outlier::Option{<:AbstractCrossSectionalTransform},
                                   target_scoring::Option{<:AbstractCrossSectionalTransform},
                                   calibrate::Bool, scale::Real, decay::Real,
@@ -159,24 +167,17 @@ TargetReturnForecast
         assert_ew_decay(decay)
         assert_nonempty_gt0_finite_val(min_obs, :min_obs)
         return new{typeof(scores), typeof(tgt), typeof(horizon), typeof(lag),
-                   typeof(target_outlier), typeof(target_scoring), typeof(calibrate),
-                   typeof(scale), typeof(decay), typeof(min_obs), typeof(cv), typeof(unit)}(scores,
-                                                                                            tgt,
-                                                                                            horizon,
-                                                                                            lag,
-                                                                                            target_outlier,
-                                                                                            target_scoring,
-                                                                                            calibrate,
-                                                                                            scale,
-                                                                                            decay,
-                                                                                            min_obs,
-                                                                                            cv,
-                                                                                            unit)
+                   typeof(whole_history), typeof(target_outlier), typeof(target_scoring),
+                   typeof(calibrate), typeof(scale), typeof(decay), typeof(min_obs),
+                   typeof(cv), typeof(unit)}(scores, tgt, horizon, lag, whole_history,
+                                             target_outlier, target_scoring, calibrate,
+                                             scale, decay, min_obs, cv, unit)
     end
 end
 function TargetReturnForecast(; scores::DescriptorScores,
                               tgt::AbstractRegressionTarget = LinearModel(),
                               horizon::Integer = 1, lag::Integer = 1,
+                              whole_history::Bool = true,
                               target_outlier::Option{<:AbstractCrossSectionalTransform} = CrossSectionalWinsoriser(),
                               target_scoring::Option{<:AbstractCrossSectionalTransform} = nothing,
                               calibrate::Bool = true, scale::Real = 1.0,
@@ -185,8 +186,8 @@ function TargetReturnForecast(; scores::DescriptorScores,
                               min_obs::Integer = half_life_min_obs(half_life),
                               cv::Option{<:CrossValidationEstimator} = nothing,
                               unit::AbstractForecastUnit = IdiosyncraticReturnUnit())::TargetReturnForecast
-    return TargetReturnForecast(scores, tgt, horizon, lag, target_outlier, target_scoring,
-                                calibrate, scale, decay, min_obs, cv, unit)
+    return TargetReturnForecast(scores, tgt, horizon, lag, whole_history, target_outlier,
+                                target_scoring, calibrate, scale, decay, min_obs, cv, unit)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -635,6 +636,52 @@ function target_forecast_latest_variances(vs::MatNum)::MatNum
     return vs[size(vs, 1):size(vs, 1), :]
 end
 """
+    target_forecast_alignment(whole_history::Bool, S::Arr3Num, eps::MatNum,
+                              vs::Option{<:MatNum}, w::MatNum,
+                              groups::Option{<:AbstractMatrix{<:Integer}},
+                              rows::AbstractUnitRange) -> NamedTuple
+
+Put the scores of a [`TargetReturnForecast`](@ref) and the histories it fits on one observation axis.
+
+# Algorithm
+
+ 1. `whole_history` is set: the scores, the weights and the group labels stay on the carrier's axis, and the two block histories are placed into the block's rows through [`return_forecast_pad`](@ref). A row before the block carries a `NaN` idiosyncratic return, so it states a target only where its forward window reaches into the block.
+ 2. `whole_history` is not set: the scores, the weights and the group labels are cut to the block's rows through [`return_forecast_cut`](@ref), and the two block histories are already on them.
+
+# Arguments
+
+  - $(arg_dict[:rf_whole_history])
+  - `S`: The Descriptor scores, `observations × assets × descriptors`, on the carrier's axis.
+  - `eps`: Idiosyncratic returns of the block, `observations × assets`.
+  - `vs`: Idiosyncratic variance history of the block, `observations × assets`, or `nothing`.
+  - `w`: Cross-sectional weights, `observations × assets`, on the carrier's axis.
+  - `groups`: Group label matrix on the carrier's axis, or `nothing`.
+  - `rows`: The rows of the carrier the block lives on.
+
+# Returns
+
+  - `(S, eps, vs, w, groups)::NamedTuple`: The same five, on one observation axis.
+
+# Related
+
+  - [`TargetReturnForecast`](@ref)
+  - [`return_forecast_pad`](@ref)
+  - [`return_forecast_cut`](@ref)
+  - [`return_forecast_rows`](@ref)
+"""
+function target_forecast_alignment(whole_history::Bool, S::Arr3Num, eps::MatNum,
+                                   vs::Option{<:MatNum}, w::MatNum,
+                                   groups::Option{<:AbstractMatrix{<:Integer}},
+                                   rows::AbstractUnitRange)
+    if whole_history
+        T = size(S, 1)
+        return (; S = S, eps = return_forecast_pad(eps, rows, T),
+                vs = return_forecast_pad(vs, rows, T), w = w, groups = groups)
+    end
+    return (; S = return_forecast_cut(S, rows), eps = eps, vs = vs,
+            w = return_forecast_cut(w, rows), groups = return_forecast_cut(groups, rows))
+end
+"""
     return_forecast(rfe::TargetReturnForecast, rd::ReturnsResult,
                     csfm::CrossSectionalFactorModel) -> TargetReturnForecastResult
 
@@ -642,17 +689,18 @@ Fit a Return Forecast with a regression target over every observation and asset 
 
 # Algorithm
 
- 1. Compute the Descriptor scores through [`descriptor_scores`](@ref), and read the idiosyncratic returns off the block. The variances are read through [`target_forecast_variances`](@ref), which states when the member needs them.
- 2. Take the forward mean target through [`forward_mean_returns`](@ref), convert it to the Forecast Unit through [`forecast_unit_target`](@ref), and pass it through the outlier slot and then the scoring slot.
- 3. Flatten the observations whose target has matured, which are all but the last `lag + horizon - 1`, into one sample per `(observation, asset)` pair through [`target_forecast_samples`](@ref), and fit the regression target on the valid samples.
- 4. When the member calibrates, predict those samples through [`target_forecast_uncalibrated`](@ref) and fit the calibration coefficient through [`target_forecast_calibration`](@ref).
- 5. Predict the latest observation through [`target_forecast_latest`](@ref), multiply by the calibration coefficient and by `scale`, and convert the row to return units.
+ 1. Compute the Descriptor scores over the whole carrier through [`descriptor_scores`](@ref), and read the idiosyncratic returns off the block. The variances are read through [`target_forecast_variances`](@ref), which states when the member needs them.
+ 2. Put the scores and the two block histories on one observation axis through [`target_forecast_alignment`](@ref), which `whole_history` chooses.
+ 3. Take the forward mean target through [`forward_mean_returns`](@ref), convert it to the Forecast Unit through [`forecast_unit_target`](@ref), and pass it through the outlier slot and then the scoring slot.
+ 4. Flatten the observations whose target has matured, which are all but the last `lag + horizon - 1`, into one sample per `(observation, asset)` pair through [`target_forecast_samples`](@ref), and fit the regression target on the valid samples.
+ 5. When the member calibrates, predict those samples through [`target_forecast_uncalibrated`](@ref) and fit the calibration coefficient through [`target_forecast_calibration`](@ref). It reads the idiosyncratic variance at the signal row, so a row before the block enters the fit and not the calibration.
+ 6. Predict the latest observation through [`target_forecast_latest`](@ref), multiply by the calibration coefficient and by `scale`, and convert the row to return units.
 
 # Arguments
 
   - `rfe`: Target Return Forecast Estimator.
   - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl`.
-  - `csfm`: The fitted factor-model block. It must carry the cross-sectional fit, and the idiosyncratic variance history under a calibration or under [`IdiosyncraticSharpeUnit`](@ref).
+  - `csfm`: The fitted factor-model block. It must carry the cross-sectional fit, its histories state the block's rows, and it must carry the idiosyncratic variance history under a calibration or under [`IdiosyncraticSharpeUnit`](@ref).
 
 # Validation
 
@@ -666,6 +714,7 @@ Fit a Return Forecast with a regression target over every observation and asset 
 
   - [`TargetReturnForecast`](@ref)
   - [`TargetReturnForecastResult`](@ref)
+  - [`target_forecast_alignment`](@ref)
   - [`target_forecast_samples`](@ref)
   - [`target_forecast_calibration`](@ref)
   - [`target_forecast_latest`](@ref)
@@ -674,20 +723,26 @@ Fit a Return Forecast with a regression target over every observation and asset 
 function return_forecast(rfe::TargetReturnForecast, rd::ReturnsResult,
                          csfm::CrossSectionalFactorModel)::TargetReturnForecastResult
     ds = rfe.scores
-    S = descriptor_scores(ds, rd, csfm)
-    fwd = forward_mean_returns(forecast_idiosyncratic_returns(csfm), rfe.horizon, rfe.lag)
-    vs = target_forecast_variances(rfe.unit, csfm, rfe.calibrate)
-    emsk = return_forecast_weights(rd)
-    groups = exposure_group_labels(rd, ds.group)
+    (; S, rows) = descriptor_scores(ds, rd, csfm)
+    al = target_forecast_alignment(rfe.whole_history, S,
+                                   forecast_idiosyncratic_returns(csfm),
+                                   target_forecast_variances(rfe.unit, csfm, rfe.calibrate),
+                                   return_forecast_weights(rd),
+                                   exposure_group_labels(rd, ds.group), rows)
+    Sa = al.S
+    vs = al.vs
+    emsk = al.w
+    groups = al.groups
+    fwd = forward_mean_returns(al.eps, rfe.horizon, rfe.lag)
     y = exposure_transform(rfe.target_scoring,
                            exposure_transform(rfe.target_outlier,
                                               forecast_unit_target(rfe.unit, fwd, vs), emsk,
                                               groups), emsk, groups)
-    nt = max(size(S, 1) - (rfe.lag + rfe.horizon - 1), 0)
-    Sf, yf, ok = target_forecast_samples(S, y, emsk, nt)
+    nt = max(size(Sa, 1) - (rfe.lag + rfe.horizon - 1), 0)
+    Sf, yf, ok = target_forecast_samples(Sa, y, emsk, nt)
     model = target_forecast_fit(rfe, Sf, yf, ok)
     calib = target_forecast_coefficient(rfe, model, Sf, yf, ok, fwd, vs, emsk, nt)
-    P = forecast_return_units(rfe.unit, target_forecast_latest(model, S),
+    P = forecast_return_units(rfe.unit, target_forecast_latest(model, Sa),
                               target_forecast_latest_variances(vs))
     return TargetReturnForecastResult(;
                                       mu = vec(rfe.scale .*

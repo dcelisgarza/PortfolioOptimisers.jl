@@ -123,12 +123,12 @@
 "src/08_Moments/42_FactorExposures/13_ExposureNeutralisation.jl" = { map = 3, units = 5, swept = false }
 "src/08_Moments/43_FactorFamilyBasis.jl" = { map = 3, units = 13, swept = false }
 "src/08_Moments/44_FactorFamilyBasisTransforms.jl" = { map = 3, units = 12, swept = false }
-"src/08_Moments/45_ReturnForecasts/01_Base_ReturnForecast.jl" = { map = 3, units = 10, swept = false }
+"src/08_Moments/45_ReturnForecasts/01_Base_ReturnForecast.jl" = { map = 3, units = 15, swept = false }
 "src/08_Moments/45_ReturnForecasts/02_DescriptorScores.jl" = { map = 3, units = 5, swept = false }
 "src/08_Moments/45_ReturnForecasts/03_CustomValueReturnForecast.jl" = { map = 3, units = 4, swept = false }
 "src/08_Moments/45_ReturnForecasts/04_FixedWeightedReturnForecast.jl" = { map = 3, units = 7, swept = false }
 "src/08_Moments/45_ReturnForecasts/05_ExpWeightedReturnForecast.jl" = { map = 3, units = 9, swept = false }
-"src/08_Moments/45_ReturnForecasts/06_TargetReturnForecast.jl" = { map = 3, units = 14, swept = false }
+"src/08_Moments/45_ReturnForecasts/06_TargetReturnForecast.jl" = { map = 3, units = 15, swept = false }
 "src/08_Moments/46_CrossSectionalRegressionDiagnostics.jl" = { map = 3, units = 31, swept = false }
 "src/08_Moments/47_CrossSectionalExposureDiagnostics.jl" = { map = 3, units = 22, swept = false }
 "src/09_Distance/01_Base_Distance.jl" = { map = 2, units = 8, algorithm = 1, swept = true }

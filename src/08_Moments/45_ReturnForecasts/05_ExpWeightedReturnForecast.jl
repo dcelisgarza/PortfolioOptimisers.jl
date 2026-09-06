@@ -460,7 +460,7 @@ Fit a Return Forecast by exponentially weighted least squares on the forward idi
 
 # Algorithm
 
- 1. Compute the Descriptor scores through [`descriptor_scores`](@ref), and read the idiosyncratic returns and variances off the block.
+ 1. Compute the Descriptor scores over the whole carrier through [`descriptor_scores`](@ref), cut them to the block's rows, and read the idiosyncratic returns and variances off the block. A row before the block carries no idiosyncratic variance, and the fit drops such a row, so the cut is the same answer with less work.
  2. Take the forward mean target through [`forward_mean_returns`](@ref), and convert it to the Forecast Unit through [`forecast_unit_target`](@ref).
  3. Read the regression weights through [`ew_forecast_weights`](@ref) and the eligibility mask through [`ew_forecast_valid`](@ref).
  4. Over the observations whose target is known, which are all but the last `lag + horizon - 1`, advance the normal equations through [`ew_forecast_accumulate!`](@ref) and solve them through [`ew_forecast_solve`](@ref). An observation with no valid asset advances nothing and carries the previous coefficients forward.
@@ -472,7 +472,7 @@ Fit a Return Forecast by exponentially weighted least squares on the forward idi
 
   - `rfe`: Exponentially weighted Return Forecast Estimator.
   - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl`.
-  - `csfm`: The fitted factor-model block. It must carry the cross-sectional fit and the idiosyncratic variance history, and its exposure history is read under a Neutralisation.
+  - `csfm`: The fitted factor-model block. It must carry the cross-sectional fit and the idiosyncratic variance history, its histories state the block's rows, and its exposure history is read under a Neutralisation.
 
 # Validation
 
@@ -489,19 +489,21 @@ Fit a Return Forecast by exponentially weighted least squares on the forward idi
   - [`ew_forecast_accumulate!`](@ref)
   - [`ew_forecast_solve`](@ref)
   - [`ew_forecast_history`](@ref)
+  - [`return_forecast_cut`](@ref)
   - [`forecast_return_units`](@ref)
 """
 function return_forecast(rfe::ExpWeightedReturnForecast, rd::ReturnsResult,
                          csfm::CrossSectionalFactorModel)::ExpWeightedReturnForecastResult
-    S = descriptor_scores(rfe.scores, rd, csfm)
+    (; S, rows) = descriptor_scores(rfe.scores, rd, csfm)
+    Sb = return_forecast_cut(S, rows)
     vs = forecast_idiosyncratic_variances(csfm)
     fwd = forward_mean_returns(forecast_idiosyncratic_returns(csfm), rfe.horizon, rfe.lag)
-    emsk = return_forecast_weights(rd)
+    emsk = return_forecast_cut(return_forecast_weights(rd), rows)
     y = forecast_unit_target(rfe.unit, fwd, vs)
     W = ew_forecast_weights(rfe.unit, emsk, vs)
-    valid = ew_forecast_valid(S, fwd, vs, emsk)
+    valid = ew_forecast_valid(Sb, fwd, vs, emsk)
     T = size(emsk, 1)
-    K = size(S, 3)
+    K = size(Sb, 3)
     gap = rfe.lag + rfe.horizon - 1
     Tf = promote_type(float(real(eltype(y))), float(real(eltype(W))))
     A = zeros(Tf, K, K)
@@ -511,8 +513,8 @@ function return_forecast(rfe::ExpWeightedReturnForecast, rd::ReturnsResult,
     n = 0
     for t in 1:(T - gap)
         if any(view(valid, t, :))
-            Sb, yb, wb = ew_forecast_design(S, y, W, t, valid)
-            ew_forecast_accumulate!(A, c, Sb, yb, wb, rfe.decay, rfe.normalise)
+            St, yt, wt = ew_forecast_design(Sb, y, W, t, valid)
+            ew_forecast_accumulate!(A, c, St, yt, wt, rfe.decay, rfe.normalise)
             n += 1
             coef = ew_forecast_solve(A, c, rfe.ridge, t)
         end
@@ -520,7 +522,7 @@ function return_forecast(rfe::ExpWeightedReturnForecast, rd::ReturnsResult,
             coefs[t, :] = coef
         end
     end
-    hist = forecast_return_units(rfe.unit, rfe.scale .* ew_forecast_history(S, coefs, gap),
+    hist = forecast_return_units(rfe.unit, rfe.scale .* ew_forecast_history(Sb, coefs, gap),
                                  vs)
     return ExpWeightedReturnForecastResult(; mu = hist[end, :], hist = hist, coef = coef,
                                            A = A, c = c, n = n)

@@ -249,7 +249,7 @@ Compute the Return Forecast of a fixed signed combination of Descriptor scores.
 
 # Algorithm
 
- 1. Compute the Descriptor scores through [`descriptor_scores`](@ref).
+ 1. Compute the Descriptor scores over the whole carrier through [`descriptor_scores`](@ref), and cut them to the block's rows.
  2. Normalise the signed weights by their absolute sum.
  3. Accumulate the finite-aware signed weighted sum and the surviving absolute weight of every cell over the Descriptor axis.
  4. Divide, and write `NaN` where the surviving absolute weight is zero or below `min_coverage`.
@@ -261,7 +261,7 @@ Compute the Return Forecast of a fixed signed combination of Descriptor scores.
 
   - `rfe`: Fixed weighted Return Forecast Estimator.
   - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl`.
-  - `csfm`: The fitted factor-model block. Its exposure history is read only under a Neutralisation, and its idiosyncratic variance history only under [`IdiosyncraticSharpeUnit`](@ref).
+  - `csfm`: The fitted factor-model block. Its histories state the block's rows, its exposure history is read only under a Neutralisation, and its idiosyncratic variance history only under [`IdiosyncraticSharpeUnit`](@ref).
 
 # Validation
 
@@ -301,6 +301,7 @@ julia> rf.hist
   - [`FixedWeightedReturnForecast`](@ref)
   - [`FixedWeightedReturnForecastResult`](@ref)
   - [`descriptor_scores`](@ref)
+  - [`return_forecast_cut`](@ref)
   - [`signed_composite_accumulate!`](@ref)
   - [`composite_finalise!`](@ref)
   - [`forecast_return_units`](@ref)
@@ -308,17 +309,19 @@ julia> rf.hist
 function return_forecast(rfe::FixedWeightedReturnForecast, rd::ReturnsResult,
                          csfm::CrossSectionalFactorModel)::FixedWeightedReturnForecastResult
     ds = rfe.scores
-    S = descriptor_scores(ds, rd, csfm)
-    K = size(S, 3)
+    (; S, rows) = descriptor_scores(ds, rd, csfm)
+    Sb = return_forecast_cut(S, rows)
+    K = size(Sb, 3)
     wv = signed_composite_weights(rfe.weights, K)
-    Tf = float(promote_type(eltype(S), eltype(wv)))
-    num = zeros(Tf, size(S, 1), size(S, 2))
-    den = zeros(Tf, size(S, 1), size(S, 2))
-    signed_composite_accumulate!(num, den, S, wv)
+    Tf = float(promote_type(eltype(Sb), eltype(wv)))
+    num = zeros(Tf, size(Sb, 1), size(Sb, 2))
+    den = zeros(Tf, size(Sb, 1), size(Sb, 2))
+    signed_composite_accumulate!(num, den, Sb, wv)
     composite_finalise!(num, den, rfe.min_coverage)
     Z = if K > 1
-        exposure_transform(ds.scoring, num, return_forecast_weights(rd),
-                           exposure_group_labels(rd, ds.group))
+        exposure_transform(ds.scoring, num,
+                           return_forecast_cut(return_forecast_weights(rd), rows),
+                           return_forecast_cut(exposure_group_labels(rd, ds.group), rows))
     else
         num
     end

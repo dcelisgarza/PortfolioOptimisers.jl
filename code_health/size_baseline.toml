@@ -11,7 +11,7 @@ commit = "36ff46bdd9"
 [file]
 "ext/PortfolioOptimisersImputeExt.jl" = { code = 6, doc = 0, comment = 4, blank = 3, total = 13 }
 "ext/PortfolioOptimisersPlotsExt.jl" = { code = 2312, doc = 0, comment = 158, blank = 44, total = 2514 }
-"src/01_Base/01_DocstringDictionaries.jl" = { code = 1102, doc = 113, comment = 122, blank = 43, total = 1380 }
+"src/01_Base/01_DocstringDictionaries.jl" = { code = 1103, doc = 113, comment = 122, blank = 43, total = 1381 }
 "src/01_Base/02_TypeRoots.jl" = { code = 15, doc = 199, comment = 0, blank = 89, total = 303 }
 "src/01_Base/03_PrettyShow.jl" = { code = 117, doc = 138, comment = 0, blank = 76, total = 331 }
 "src/01_Base/04_ScopedConfig.jl" = { code = 163, doc = 491, comment = 2, blank = 214, total = 870 }
@@ -90,12 +90,12 @@ commit = "36ff46bdd9"
 "src/08_Moments/42_FactorExposures/13_ExposureNeutralisation.jl" = { code = 83, doc = 95, comment = 0, blank = 48, total = 226 }
 "src/08_Moments/43_FactorFamilyBasis.jl" = { code = 202, doc = 292, comment = 0, blank = 140, total = 634 }
 "src/08_Moments/44_FactorFamilyBasisTransforms.jl" = { code = 189, doc = 220, comment = 0, blank = 139, total = 548 }
-"src/08_Moments/45_ReturnForecasts/01_Base_ReturnForecast.jl" = { code = 70, doc = 194, comment = 0, blank = 95, total = 359 }
-"src/08_Moments/45_ReturnForecasts/02_DescriptorScores.jl" = { code = 96, doc = 141, comment = 0, blank = 58, total = 295 }
+"src/08_Moments/45_ReturnForecasts/01_Base_ReturnForecast.jl" = { code = 111, doc = 272, comment = 0, blank = 137, total = 520 }
+"src/08_Moments/45_ReturnForecasts/02_DescriptorScores.jl" = { code = 105, doc = 148, comment = 0, blank = 59, total = 312 }
 "src/08_Moments/45_ReturnForecasts/03_CustomValueReturnForecast.jl" = { code = 34, doc = 81, comment = 0, blank = 40, total = 155 }
-"src/08_Moments/45_ReturnForecasts/04_FixedWeightedReturnForecast.jl" = { code = 103, doc = 182, comment = 0, blank = 74, total = 359 }
-"src/08_Moments/45_ReturnForecasts/05_ExpWeightedReturnForecast.jl" = { code = 171, doc = 267, comment = 0, blank = 91, total = 529 }
-"src/08_Moments/45_ReturnForecasts/06_TargetReturnForecast.jl" = { code = 256, doc = 371, comment = 0, blank = 138, total = 765 }
+"src/08_Moments/45_ReturnForecasts/04_FixedWeightedReturnForecast.jl" = { code = 105, doc = 183, comment = 0, blank = 74, total = 362 }
+"src/08_Moments/45_ReturnForecasts/05_ExpWeightedReturnForecast.jl" = { code = 172, doc = 268, comment = 0, blank = 91, total = 531 }
+"src/08_Moments/45_ReturnForecasts/06_TargetReturnForecast.jl" = { code = 268, doc = 404, comment = 0, blank = 148, total = 820 }
 "src/08_Moments/46_CrossSectionalRegressionDiagnostics.jl" = { code = 431, doc = 611, comment = 0, blank = 284, total = 1326 }
 "src/08_Moments/47_CrossSectionalExposureDiagnostics.jl" = { code = 407, doc = 502, comment = 0, blank = 247, total = 1156 }
 "src/09_Distance/01_Base_Distance.jl" = { code = 24, doc = 222, comment = 0, blank = 89, total = 335 }
@@ -153,7 +153,7 @@ commit = "36ff46bdd9"
 "src/13_Prior/14_HighOrderFactorPriorEstimator.jl" = { code = 172, doc = 271, comment = 20, blank = 82, total = 545 }
 "src/13_Prior/15_FeaturePrior.jl" = { code = 141, doc = 476, comment = 31, blank = 211, total = 859 }
 "src/13_Prior/16_Base_CrossSectionalFactorPrior.jl" = { code = 381, doc = 539, comment = 0, blank = 280, total = 1200 }
-"src/13_Prior/17_CrossSectionalFactorPrior.jl" = { code = 166, doc = 173, comment = 7, blank = 44, total = 390 }
+"src/13_Prior/17_CrossSectionalFactorPrior.jl" = { code = 165, doc = 173, comment = 7, blank = 44, total = 389 }
 "src/14_UncertaintySets/01_Base_UncertaintySets.jl" = { code = 247, doc = 845, comment = 5, blank = 407, total = 1504 }
 "src/14_UncertaintySets/02_DeltaUncertaintySets.jl" = { code = 42, doc = 249, comment = 0, blank = 93, total = 384 }
 "src/14_UncertaintySets/03_NormalUncertaintySets.jl" = { code = 205, doc = 731, comment = 4, blank = 254, total = 1194 }

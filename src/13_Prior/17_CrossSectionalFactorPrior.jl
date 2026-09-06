@@ -234,7 +234,7 @@ Fit a cross-sectional factor model on an Asset Panel, and return the asset prior
  8. Regress each observation's returns on its lagged reduced exposures, through [`cs_weights_initial`](@ref), [`needs_second_pass`](@ref) and [`cs_weights_refine`](@ref).
  9. Take the idiosyncratic variance history with [`variance_series`](@ref), standardise the idiosyncratic returns by it with [`cross_sectional_standardised_residuals`](@ref), and take the latest idiosyncratic covariance with [`cross_sectional_idiosyncratic_covariance`](@ref).
 10. Fit `pe.pe` on the reduced factor returns.
-11. Fit the Return Forecast with [`cross_sectional_return_forecast`](@ref), on the carrier restricted to the fitted observations, and blend its spanned part into the factor mean with [`cross_sectional_forecast_mu`](@ref). The block carries the orthogonal part in `b`, and the Result in `rf`.
+11. Fit the Return Forecast with [`cross_sectional_return_forecast`](@ref), on the **whole** carrier, so that a Descriptor of the forecast warms up over every observation the panel has, and blend its spanned part into the factor mean with [`cross_sectional_forecast_mu`](@ref). The block carries the orthogonal part in `b`, and the Result in `rf`.
 12. Expand the blended factor moments onto the raw factor axis with [`cross_sectional_expand`](@ref), so `fpr` states the distribution of the factors the caller named.
 13. Rebuild the asset return scenarios with [`cross_sectional_scenarios`](@ref).
 14. Lift the reduced factor distribution onto the investable assets with [`cross_sectional_lift`](@ref), and add `b` to the expected return it answers.
@@ -329,8 +329,7 @@ function prior(pe::CrossSectionalFactorPrior, rd::ReturnsResult; kwargs...)
                                      b = zeros(Tb, size(X, 2)), csr = csr, Ms = Msr,
                                      vs = vs, esigma = esigma, rw = W, bw = bwr, nf = nf,
                                      fam = fam, fcb = fnow, lag = pe.lag)
-    (; rr, g) = cross_sectional_return_forecast(pe.rfe, port_opt_view(rd, rw[r], :), csfm,
-                                                pe.cre, pe.c)
+    (; rr, g) = cross_sectional_return_forecast(pe.rfe, rd, csfm, pe.cre, pe.c)
     f_mu = cross_sectional_forecast_mu(pe.lambda, f_pr.mu, g)
     ex = cross_sectional_expand(fb.fcb, r, pe.lag, csr.f, f_mu, f_pr.sigma)
     ev = vs[end, :]
