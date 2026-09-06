@@ -195,6 +195,10 @@ In order to implement a new covariance estimator which will work seamlessly with
 
       + $(ret_dict[:stdvarnum])
 
+## Covariance and correlation
+
+`Statistics.cov(ve::AbstractVarianceEstimator, X::MatNum; kwargs...)` and `Statistics.cor(ve::AbstractVarianceEstimator, X::MatNum; kwargs...)` always throw a `MethodError`. A variance estimator resolves one marginal variance per asset and holds no cross-asset structure, so it cannot answer either verb.
+
 ## Factory
 
   - `PortfolioOptimisers.factory(ve::AbstractVarianceEstimator, w::PortfolioOptimisers.ObsWeights) -> AbstractVarianceEstimator`: Factory method for creating instances of the estimator with new observation weights.
@@ -278,6 +282,8 @@ MyVarianceEstimator
 # Related
 
   - [`AbstractCovarianceEstimator`](@ref)
+  - [`Statistics.cov(ve::AbstractVarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
+  - [`Statistics.cor(ve::AbstractVarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
 abstract type AbstractVarianceEstimator <: AbstractCovarianceEstimator end
 @define_pretty_show(AbstractCovarianceEstimator)

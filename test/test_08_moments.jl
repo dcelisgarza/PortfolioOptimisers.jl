@@ -1992,6 +1992,15 @@
         =#
         @test maximum(distance(DistanceDistance(), Cd)) > 1
     end
+    """
+    Minimal `AbstractVarianceEstimator` that answers `var` alone, to pin the fallback that
+    resolves `std` from it directly, never through `cov`.
+    """
+    struct StdFromVarProbe <: PortfolioOptimisers.AbstractVarianceEstimator end
+    function Statistics.var(::StdFromVarProbe, X::PortfolioOptimisers.MatNum; dims::Int = 1,
+                            kwargs...)
+        return Statistics.var(X; dims = dims)
+    end
     @testset "The covariance base sweep of #453" begin
         #=
         Every claim the covariance base and its four wrappers make, pinned by running it.
@@ -2048,6 +2057,10 @@
         @test vec(std(Covariance(), Xsm)) == sqrt.(diag(cov(Covariance(), Xsm)))
         @test size(var(Covariance(), Xsm; dims = 1)) == (1, 2)
         @test size(var(Covariance(), permutedims(Xsm); dims = 2)) == (2, 1)
+        # --- an AbstractVarianceEstimator refuses cov/cor, and answers std from var alone ---
+        @test_throws MethodError cov(SimpleVariance(), Xsm)
+        @test_throws MethodError cor(SimpleVariance(), Xsm)
+        @test std(StdFromVarProbe(), Xsm) == sqrt.(var(StdFromVarProbe(), Xsm))
         # --- the wrappers compose `ce` and then `mp`, in the order their row declares ---
         rng453 = StableRNG(11223344)
         X453 = randn(rng453, 6, 10)

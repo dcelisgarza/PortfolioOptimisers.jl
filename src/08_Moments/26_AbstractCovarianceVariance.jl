@@ -115,6 +115,105 @@ function Statistics.std(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 
     return isone(dims) ? reshape(val, 1, length(val)) : reshape(val, length(val), 1)
 end
 """
+    Statistics.cov(ve::AbstractVarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)
+
+Always throw a `MethodError`. [`AbstractVarianceEstimator`](@ref) resolves one marginal variance per asset and holds no cross-asset structure, so it has no covariance to return.
+
+Without this method, `cov` would fall through to [`Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)`](@ref), which calls `cor`. A variance estimator has no `cor` method of its own either, so that call would fall through in turn to a generic fallback that calls `cov` again, and the two calls would recurse without end. This method throws before that fallback ever runs.
+
+Use a covariance estimator, for example [`Covariance`](@ref), for a covariance matrix.
+
+# Examples
+
+```jldoctest
+julia> try
+           Statistics.cov(SimpleVariance(), [0.01 0.02; 0.03 0.04])
+       catch e
+           e isa MethodError
+       end
+true
+```
+
+# Related
+
+  - [`AbstractVarianceEstimator`](@ref)
+  - [`Statistics.cor(ve::AbstractVarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
+"""
+function Statistics.cov(ve::AbstractVarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)
+    return throw(MethodError(Statistics.cov, (ve, X)))
+end
+"""
+    Statistics.cor(ve::AbstractVarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)
+
+Always throw a `MethodError`. [`AbstractVarianceEstimator`](@ref) resolves one marginal variance per asset and holds no cross-asset structure, so it has no correlation to return.
+
+Without this method, `cor` would fall through to a generic fallback that calls [`Statistics.cov(ve::AbstractVarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)`](@ref), which throws a `MethodError` on its own. This method throws the same kind of error one call sooner, and names `cor` in it, so the error names the verb the caller actually used.
+
+Use a covariance estimator, for example [`Covariance`](@ref), for a correlation matrix.
+
+# Examples
+
+```jldoctest
+julia> try
+           Statistics.cor(SimpleVariance(), [0.01 0.02; 0.03 0.04])
+       catch e
+           e isa MethodError
+       end
+true
+```
+
+# Related
+
+  - [`AbstractVarianceEstimator`](@ref)
+  - [`Statistics.cov(ve::AbstractVarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
+"""
+function Statistics.cor(ve::AbstractVarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)
+    return throw(MethodError(Statistics.cor, (ve, X)))
+end
+"""
+    Statistics.std(ve::AbstractVarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)
+
+Compute the standard deviation vector as the element-wise square root of the variance vector.
+
+This is the fallback for an [`AbstractVarianceEstimator`](@ref) that defines [`Statistics.var`](@ref) alone. It resolves `std` from `var` directly, so it never calls [`Statistics.cov`](@ref), which an [`AbstractVarianceEstimator`](@ref) cannot answer. A member that computes its own standard deviation, for example [`SimpleVariance`](@ref), overrides this method.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\hat{\\sigma}_i &= \\sqrt{\\hat{\\sigma}_i^2}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:sigma_hat_i])
+
+# Algorithm
+
+ 1. Compute the variance vector with `Statistics.var(ve, X; dims = dims, kwargs...)`.
+ 2. Take the element-wise square root.
+
+# Arguments
+
+  - $(arg_dict[:ve])
+  - $(arg_dict[:X])
+  - $(arg_dict[:dims])
+  - `kwargs...`: Additional keyword arguments passed to the variance estimator.
+
+# Returns
+
+  - $(ret_dict[:stdvar])
+
+# Related
+
+  - [`AbstractVarianceEstimator`](@ref)
+  - [`Statistics.var(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
+"""
+function Statistics.std(ve::AbstractVarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)
+    return sqrt.(Statistics.var(ve, X; dims = dims, kwargs...))
+end
+"""
     variance_series(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the point-in-time variance series, one row per observation.

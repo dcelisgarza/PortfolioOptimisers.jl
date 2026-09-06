@@ -93,7 +93,7 @@
 "src/08_Moments/23_DimensionReductionRegression.jl" = { map = 3, units = 10, algorithm = 5, swept = true }
 "src/08_Moments/24_ImpliedVolatility.jl" = { map = 3, units = 11, algorithm = 5, swept = true }
 "src/08_Moments/25_CorrelationCovariance.jl" = { map = 3, units = 3, algorithm = 2, swept = true }
-"src/08_Moments/26_AbstractCovarianceVariance.jl" = { map = 3, units = 3, algorithm = 3, swept = true }
+"src/08_Moments/26_AbstractCovarianceVariance.jl" = { map = 3, units = 6, algorithm = 3, swept = true }
 "src/08_Moments/27_StandardDeviationExpectedReturns.jl" = { map = 3, units = 4, algorithm = 0, swept = true }
 "src/08_Moments/28_WindowedExpectedReturns.jl" = { map = 3, units = 0, algorithm = 0, swept = true }
 "src/08_Moments/29_WindowedCovariance.jl" = { map = 3, units = 0, algorithm = 0, swept = true }
