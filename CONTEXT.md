@@ -559,6 +559,10 @@ Which weights of the previous fold the Fold Loop threads to the next: its target
 The record a fold keeps of what the portfolio actually held: the asset returns it was scored over, the weights after its last observation, and the Weight Drift form that produced them. The weight path itself is rebuilt from that record on demand, and stored only when the scheme's `store_weight_path` asks for it.
 *Avoid*: using it for the target weights. Those are the decision, and they live on the optimisation result.
 
+**Held Gap**
+An observation and asset pair at which the portfolio's weight is non-zero and the asset's return is missing. A fold zeroes every missing return of its test window once, before it forms its Net Returns and before the Weight Drift compounds, so the series is always finite and the missing weight sits in cash on that observation. A zero weight at a missing return is silent. A Held Gap is named through the strictness policy: a warning by default, a refusal under `strict`. See ADR 0118.
+*Avoid*: a non-investable asset, which is a per-fit fact the Investable Mask states and the optimiser reduces away. A Held Gap is per observation, and it arises where the universe changes after the fit.
+
 ### 4.7 Finite Allocation (post-processing)
 
 Discretises continuous weights into whole shares for a fixed cash budget, since real markets have no fractional shares.
@@ -579,7 +583,7 @@ Quantifies portfolio risk. The three-way split by legal usage is **Optimisation*
 A classification orthogonal to legal usage: what a measure consumes when its expected risk is evaluated. The three kinds are **net-returns**, **weights-returns-fees** and **weights-only**.
 
 **Precomputed-returns contract**
-The rule for evaluating a risk measure on an already-reduced net-return series the caller holds directly, with no weights to apply. It is well defined only where the result is a function of the series alone.
+The rule for evaluating a risk measure on an already-reduced net-return series the caller holds directly, with no weights to apply. It is well defined only where the result is a function of the series alone, and only on a finite series: the library does not check the series, because every internal caller hands it a finite one, and a tail measure on a gapped series answers a finite wrong number. A caller who holds a gapped series compacts it first, which reproduces the reference implementation's drop-per-column answer. See ADR 0118.
 
 **XatRisk**
 The naming convention in which "X" stands for "Value" or "Drawdown", the same family applied to returns or to drawdowns. *Relative* variants are the hierarchical drawdown forms, *Range* variants penalise the gap between the two tails, and *Distributionally Robust (DR)* variants optimise against worst-case scenario distributions.
