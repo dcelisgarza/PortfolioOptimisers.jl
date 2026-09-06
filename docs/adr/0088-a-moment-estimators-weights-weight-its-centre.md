@@ -199,3 +199,64 @@ weights do not describe passes it.
   answer the same number under the same weights, that a hand-built weighted estimator and a
   `factory`-built one agree for each of the four, that the unweighted path did not move, and that
   the `mean` keyword still reaches the unweighted centre.
+
+## Amendment (2026-09-06)
+
+The decision above says which quantities a moment estimator's `w` reaches. It does not say **how**
+`w` enters one, because the four estimators it names all enter it the same way: an observation's
+weight scales that observation's contribution to a sum, and the sum is normalised by the weights it
+carries. [`DistanceCovariance`](../../src/08_Moments/07_DistanceCovariance.jl) entered it a second
+way, and
+[#851](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/851) measured the consequence.
+
+### The second way, and what it cost
+
+`calc_pairwise_dists` applied `w` to the **data**, as the element-wise products `v1 ⊙ w` and
+`v2 ⊙ w`, before it took the pairwise distances. Two consequences followed.
+
+- **A uniform weight was not a no-op.** A `StatsBase.pweights` of `1 / T` divided every coordinate
+  by `T`, so every pairwise distance was divided by `T`, and `cov_distance` returned the unweighted
+  answer divided by `T`. Measured on `randn(StableRNG(1), 40, 6)`, `dw[1, 2] / d0[1, 2]` was
+  `0.024999999999999998`, which is exactly `1 / 40`. The five plain moment estimators of this ADR's
+  family agree with their unweighted answers to `2.3e-16` under the same uniform weight.
+- **A low weight shrank an observation toward zero** rather than lowering its contribution to the
+  statistic. Two observations of small magnitude sit close together whatever they measure, so a
+  low-weight pair reported a small distance instead of a small share of the total.
+
+`cor_distance` normalises by the two distance variances, so a common scale cancels there. The defect
+was invisible through the correlation route and visible through the covariance route.
+
+### The rule this ADR now carries
+
+**An observation weight weights the statistic, never the data.** It scales an observation's
+contribution to a sum, and the sum is normalised by the weights it carries. It never multiplies the
+observation before a verb measures it.
+
+The kernel of [`DistanceCovariance`](../../src/08_Moments/07_DistanceCovariance.jl) splits into
+three verbs, and only the last two read `w`:
+
+- `calc_pairwise_dists` takes the metric over the data the caller gave, and takes no weights.
+- `calc_centred_dists` doubly centres one distance matrix, weighting the row means, the column means
+  and the grand mean it subtracts and adds.
+- `calc_dcov2` contracts two centred matrices on both of their indices, ``\sum_{t,s} w_t w_s A_{ts}
+  B_{ts}``, over the square of the sum of the weights.
+
+Every one of those is a ratio of two forms of one degree in the weights, so a constant weight
+cancels from all of them.
+
+### Consequences
+
+- **A constant weight gives the unweighted answer.** Measured against the unweighted matrix on
+  `randn(StableRNG(987654321), 40, 4)`, the weights `1 / T`, `1` and `7.5` each agree to `1e-14`.
+  `test_08g_dependence_covariances.jl` pins all three.
+- **The unweighted path is bit-identical.** Column 15 of `test/assets/covariance.csv.gz`, the
+  unweighted `DistanceCovariance`, matches the stored values to `0.0`.
+- **Every weighted `DistanceCovariance` number moves**, and the golden column 16 of
+  `test/assets/covariance.csv.gz` is regenerated. Under the exponential weight of
+  `test_08_moments.jl` the weighted matrix moves `0.0092` from the stored value, and sits `0.0010`
+  from the unweighted one, where the stored value sat `0.0094` from it. A tilt is now the size of a
+  tilt.
+- **A `FeatureDistance` that carries a weighted `DistanceCovariance` moves with it.** The two sit on
+  one kernel, and the rule is the kernel's.
+- **`calc_pairwise_dists` loses its weighted method.** Its signature is
+  `calc_pairwise_dists(ce, v1, v2)`, and the API page entry moves with it.

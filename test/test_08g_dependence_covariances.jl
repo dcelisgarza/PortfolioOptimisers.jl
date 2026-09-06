@@ -84,19 +84,35 @@ end
     @test cor(ce, permutedims(Xns); dims = 2) == cor(ce, Xns)
 
     # `calc_pairwise_dists` returns two T x T matrices of the metric over the observations.
+    # It takes NO weights: #851 moved them off the data and onto the statistic.
     v1, v2 = view(Xns, :, 1), view(Xns, :, 2)
-    D1, D2 = PortfolioOptimisers.calc_pairwise_dists(ce, v1, v2, nothing)
+    D1, D2 = PortfolioOptimisers.calc_pairwise_dists(ce, v1, v2)
     @test size(D1) == size(D2) == (7, 7)
     @test D1 ≈ [abs(Xns[k, 1] - Xns[l, 1]) for k in 1:7, l in 1:7]
+    @test !hasmethod(PortfolioOptimisers.calc_pairwise_dists,
+                     Tuple{DistanceCovariance, PortfolioOptimisers.VecNum,
+                           PortfolioOptimisers.VecNum, StatsBase.AbstractWeights})
 
-    # The weighted branch scales each COORDINATE by its weight before the distance is taken.
+    # `calc_centred_dists` doubly centres, and its three means carry the weights.
     w = pweights(range(0.5, 1.5; length = 7))
-    Dw1, _ = PortfolioOptimisers.calc_pairwise_dists(ce, v1, v2, w)
-    @test Dw1 ≈ [abs(Xns[k, 1] * w[k] - Xns[l, 1] * w[l]) for k in 1:7, l in 1:7]
-    @test Dw1 != D1
+    A = PortfolioOptimisers.calc_centred_dists(D1, w)
+    mu1 = [sum(w[k] * D1[k, l] for k in 1:7) / sum(w) for l in 1:7]
+    mu2 = [sum(w[l] * D1[k, l] for l in 1:7) / sum(w) for k in 1:7]
+    mu3 = sum(w[k] * w[l] * D1[k, l] for k in 1:7, l in 1:7) / sum(w)^2
+    @test A ≈ [D1[k, l] - mu2[k] - mu1[l] + mu3 for k in 1:7, l in 1:7]
+    @test PortfolioOptimisers.calc_centred_dists(D1, nothing) ≈
+          D1 .- mean(D1; dims = 1) .- mean(D1; dims = 2) .+ mean(D1)
+
+    # `calc_dcov2` contracts the two centred matrices on both indices.
+    B = PortfolioOptimisers.calc_centred_dists(D2, w)
+    @test PortfolioOptimisers.calc_dcov2(A, B, w) ≈
+          sum(w[k] * w[l] * A[k, l] * B[k, l] for k in 1:7, l in 1:7) / sum(w)^2
+    Au = PortfolioOptimisers.calc_centred_dists(D1, nothing)
+    Bu = PortfolioOptimisers.calc_centred_dists(D2, nothing)
+    @test PortfolioOptimisers.calc_dcov2(Au, Bu, nothing) ≈ sum(Au .* Bu) / 7^2
 end
 
-@testset "Distance covariance: the estimator's weights reach the metric" begin
+@testset "Distance covariance: a uniform weight is a no-op, #851" begin
     X = randn(StableRNG(987654321), 40, 4)
     wv = pweights(range(0.5, 1.5; length = 40))
     cew = DistanceCovariance(; w = wv, ex = FLoops.SequentialEx())
@@ -107,6 +123,25 @@ end
           PortfolioOptimisers.cov_distance(cew, view(X, :, 1), view(X, :, 2), resolved)
     @test cov(cew, X) != cov(ceu, X)
     @test isnothing(PortfolioOptimisers.get_observation_weights(ceu.w, X))
+
+    #=
+    #851: the weights used to multiply the DATA, so a uniform `pweights` of `1/T` divided
+    every pairwise distance by `T` and rescaled the whole covariance by `1/T`. They now
+    weight the STATISTIC, so a constant weight cancels from every quotient and gives the
+    unweighted answer back, whatever the constant is. The correlation route always hid the
+    defect, because a common scale cancels in the ratio.
+    =#
+    T = size(X, 1)
+    sigma0 = cov(ceu, X)
+    for wc in (pweights(fill(inv(T), T)), pweights(ones(T)), pweights(fill(7.5, T)))
+        cec = DistanceCovariance(; w = wc, ex = FLoops.SequentialEx())
+        @test isapprox(cov(cec, X), sigma0; rtol = 1e-14)
+        @test isapprox(cor(cec, X), cor(ceu, X); rtol = 1e-14)
+    end
+
+    # A non-uniform weight is a tilt and not a rescale: it moves no single common factor.
+    ratio = cov(cew, X) ./ sigma0
+    @test !isapprox(extrema(ratio)..., rtol = 1e-6)
 end
 
 @testset "Lower tail dependence: the joint count at the quantile" begin

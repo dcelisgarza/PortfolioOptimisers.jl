@@ -4,7 +4,9 @@
 DistanceCovariance
 cov(ce::DistanceCovariance, X::MatNum; dims::Int = 1, kwargs...)
 cor(ce::DistanceCovariance, X::MatNum; dims::Int = 1, kwargs...)
-calc_pairwise_dists(ce::DistanceCovariance, v1::VecNum, v2::VecNum, ::Nothing)
+calc_pairwise_dists(ce::DistanceCovariance, v1::VecNum, v2::VecNum)
+calc_centred_dists(a::MatNum, ::Nothing)
+calc_dcov2(A::MatNum, B::MatNum, ::Nothing)
 cor_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum, w::Option{<:StatsBase.AbstractWeights} = nothing)
 cov_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum, w::Option{<:StatsBase.AbstractWeights} = nothing)
 cor_distance(ce::DistanceCovariance, X::MatNum, w::Option{<:StatsBase.AbstractWeights} = nothing)
