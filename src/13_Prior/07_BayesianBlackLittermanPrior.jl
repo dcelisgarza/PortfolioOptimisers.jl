@@ -258,8 +258,9 @@ end
     forward(pe, me, ce)
 end
 """
-    prior(pe::BayesianBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 1,
-          strict::Bool = false, kwargs...)
+    prior(pe::BayesianBlackLittermanPrior, X::MatNum, F::MatNum,
+          pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, strict::Bool = false,
+          kwargs...)
 
 Compute Bayesian Black-Litterman prior moments for asset returns.
 
@@ -342,6 +343,7 @@ Both are measured. Over a ``250 \\times 5`` sample on three factors with two fac
   - `pe`: Bayesian Black-Litterman prior estimator.
   - `X`: Asset returns matrix (observations × assets).
   - `F`: Factor matrix (observations × factors).
+  - $(arg_dict[:pnl_prior])
   - $(arg_dict[:dims])
   - `strict`: If `true`, enforce strict validation of views and sets. Default is `false`.
   - `kwargs...`: Additional keyword arguments passed to underlying estimators and matrix processing.
@@ -368,8 +370,9 @@ Both are measured. Over a ``250 \\times 5`` sample on three factors with two fac
   - [`forward_prior`](@ref)
   - [`vanilla_posteriors`](@ref): The master equations this estimator does **not** run. Its siblings that take asset views do.
 """
-function prior(pe::BayesianBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 1,
-               strict::Bool = false, kwargs...)
+function prior(pe::BayesianBlackLittermanPrior, X::MatNum, F::MatNum,
+               pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, strict::Bool = false,
+               kwargs...)
     X, F = dims_oriented(dims, X, F)
     # The views update the *factor* distribution — the assets are its projection through the
     # loadings — so they resolve against the declared factor axis, not against `xkey`. Only the
@@ -381,7 +384,7 @@ function prior(pe::BayesianBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int 
                         "BayesianBlackLittermanPrior, whose views are written in factor names",
                         "F")
     end
-    prior_result = prior(pe.pe, X, F; strict = strict, kwargs...)
+    prior_result = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
     assert_prior_regression(prior_result, :pe)
     posterior_X, prior_sigma, fpr, rr = prior_result.X, prior_result.sigma,
                                         prior_result.fpr, prior_result.rr

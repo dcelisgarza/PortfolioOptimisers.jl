@@ -6,7 +6,8 @@ AbstractHiLoOrderPriorEstimator_F
 HighOrderFactorPriorEstimator
 coskewness_residuals
 cokurtosis_residuals
-prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum; dims::Int = 1, kwargs...)
+prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum,
+      pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, kwargs...)
 ```
 
 ## References

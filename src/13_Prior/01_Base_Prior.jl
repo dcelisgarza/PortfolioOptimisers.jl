@@ -9,9 +9,11 @@ Abstract supertype for all prior estimators.
 
 In order to implement a new prior estimator which will work seamlessly with the library, subtype the family that names the returns it reads — [`AbstractLowOrderPriorEstimator_A`](@ref), [`AbstractLowOrderPriorEstimator_F`](@ref), [`AbstractLowOrderPriorEstimator_AF`](@ref) or [`AbstractHighOrderPriorEstimator_F`](@ref) — with all necessary parameters as part of the struct, and implement the following method:
 
-  - `prior(pe::AbstractPriorEstimator, X::MatNum, F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...) -> AbstractPriorResult`: Estimate the prior from the returns matrices.
+  - `prior(pe::AbstractPriorEstimator, X::MatNum, F::Option{<:MatNum} = nothing, pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, kwargs...) -> AbstractPriorResult`: Estimate the prior from the returns matrices and the Asset Panel.
 
 The family fixes the signature. A member of the `_A` family declares `F` as `args...` and never reads it, a member of the `_F` family declares it `F::MatNum` and requires it, and a member of the `_AF` family declares it `F::Option{<:MatNum} = nothing` and reads it when it is there.
+
+`pnl` is the Asset Panel the carrier held, and the [`ReturnsResult`](@ref) method forwards it to every estimator. Take it and ignore it unless the estimator is fitted on a panel, as [`CrossSectionalFactorPrior`](@ref) is. An estimator that wraps another over the assets forwards it unchanged, so that the wrapped estimator composes; one that wraps a prior over the factors does not, because no panel describes a factor axis. An estimator that declares `args...` takes it there and needs no further declaration.
 
 The method returns the carrier of its own order: a low order estimator returns a [`LowOrderPrior`](@ref), and a high order estimator returns a [`HighOrderPrior`](@ref). An estimator that wraps another rebuilds the wrapped result with [`forward_prior`](@ref) rather than by a hand-written constructor call, so that every field it does not name survives the hop.
 
@@ -22,6 +24,7 @@ The [`ReturnsResult`](@ref) method of [`prior`](@ref) is supplied by this file a
   - $(arg_dict[:pe])
   - $(arg_dict[:X])
   - `F`: Factor returns matrix, or `nothing`.
+  - $(arg_dict[:pnl_prior])
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the nested estimators.
 
@@ -360,7 +363,9 @@ This method is the entry point every caller uses, and it is written once here. W
 
  1. Check that `rd` carries asset returns, so that the estimator is not handed a `nothing` for `X`.
  2. When `pe` requires factor returns — when it is a member of [`AbstractHiLoOrderPriorEstimator_F`](@ref) — check that `rd` carries them. The check is made here so that the caller reads a named error against `rd.F` rather than a `MethodError` against the estimator's own signature one call later.
- 3. Call the estimator's returns-matrix method with `rd.X` and `rd.F`, forwarding `rd.iv` and `rd.ivpa` as keyword arguments alongside `kwargs`, and return the prior result it produces.
+ 3. Call the estimator's returns-matrix method with `rd.X`, `rd.F` and `rd.pnl`, forwarding `rd.iv` and `rd.ivpa` as keyword arguments alongside `kwargs`, and return the prior result it produces.
+
+The Asset Panel travels as the third positional argument for the same reason `rd.F` travels as the second: a wrapping prior holds no carrier, so it can compose an estimator that is fitted on a panel only if the panel reaches its own returns-matrix method. Every returns-matrix method takes the argument, every wrapping prior forwards it unchanged to the estimator it nests over the assets, and an estimator that reads no panel ignores it.
 
 # Arguments
 
@@ -392,7 +397,7 @@ function prior(pe::AbstractPriorEstimator, rd::ReturnsResult; kwargs...)
         @argcheck(!isnothing(rd.F),
                   IsNothingError("this is a factor prior; it needs factor returns. ReturnsResult.F is nothing — populate F (e.g. via prices_to_returns on factor prices)."))
     end
-    return prior(pe, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs...)
+    return prior(pe, rd.X, rd.F, rd.pnl; iv = rd.iv, ivpa = rd.ivpa, kwargs...)
 end
 """
     prior_regression_remedy

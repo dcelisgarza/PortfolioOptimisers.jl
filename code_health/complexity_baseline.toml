@@ -141,21 +141,21 @@ commit = "e696781eb7"
 "src/12_ConstraintGeneration/09_CrossSectionalFactorAxis.jl" = { cyc = 5, cog = 6, arg = 3, cyc_sum = 12, cog_sum = 8, arg_sum = 8, macros = [] }
 "src/13_Prior/01_Base_Prior.jl" = { cyc = 10, cog = 7, arg = 11, cyc_sum = 88, cog_sum = 77, arg_sum = 98, macros = ["@forward_properties"] }
 "src/13_Prior/02_EmpiricalPrior.jl" = { cyc = 2, cog = 1, arg = 5, cyc_sum = 6, cog_sum = 2, arg_sum = 14, macros = ["@propagatable"] }
-"src/13_Prior/03_FactorPrior.jl" = { cyc = 3, cog = 2, arg = 9, cyc_sum = 11, cog_sum = 5, arg_sum = 25, macros = ["@forward_properties", "@propagatable"] }
-"src/13_Prior/04_HighOrderPrior.jl" = { cyc = 12, cog = 25, arg = 5, cyc_sum = 40, cog_sum = 56, arg_sum = 22, macros = ["@forward_properties", "@propagatable"] }
+"src/13_Prior/03_FactorPrior.jl" = { cyc = 3, cog = 2, arg = 9, cyc_sum = 11, cog_sum = 5, arg_sum = 26, macros = ["@forward_properties", "@propagatable"] }
+"src/13_Prior/04_HighOrderPrior.jl" = { cyc = 12, cog = 25, arg = 6, cyc_sum = 40, cog_sum = 56, arg_sum = 23, macros = ["@forward_properties", "@propagatable"] }
 "src/13_Prior/05_BlackLittermanViewsGeneration.jl" = { cyc = 8, cog = 14, arg = 5, cyc_sum = 21, cog_sum = 21, arg_sum = 21, macros = [] }
-"src/13_Prior/06_BlackLittermanPrior.jl" = { cyc = 3, cog = 4, arg = 9, cyc_sum = 19, cog_sum = 10, arg_sum = 50, macros = ["@forward_properties", "@propagatable"] }
-"src/13_Prior/07_BayesianBlackLittermanPrior.jl" = { cyc = 2, cog = 2, arg = 8, cyc_sum = 5, cog_sum = 4, arg_sum = 15, macros = ["@forward_properties", "@propagatable"] }
-"src/13_Prior/08_FactorBlackLittermanPrior.jl" = { cyc = 3, cog = 4, arg = 13, cyc_sum = 6, cog_sum = 5, arg_sum = 20, macros = ["@forward_properties", "@propagatable"] }
-"src/13_Prior/09_AugmentedBlackLittermanPrior.jl" = { cyc = 4, cog = 5, arg = 13, cyc_sum = 8, cog_sum = 7, arg_sum = 20, macros = ["@forward_properties", "@propagatable"] }
+"src/13_Prior/06_BlackLittermanPrior.jl" = { cyc = 3, cog = 4, arg = 9, cyc_sum = 19, cog_sum = 10, arg_sum = 51, macros = ["@forward_properties", "@propagatable"] }
+"src/13_Prior/07_BayesianBlackLittermanPrior.jl" = { cyc = 2, cog = 2, arg = 8, cyc_sum = 5, cog_sum = 4, arg_sum = 16, macros = ["@forward_properties", "@propagatable"] }
+"src/13_Prior/08_FactorBlackLittermanPrior.jl" = { cyc = 3, cog = 4, arg = 13, cyc_sum = 6, cog_sum = 5, arg_sum = 21, macros = ["@forward_properties", "@propagatable"] }
+"src/13_Prior/09_AugmentedBlackLittermanPrior.jl" = { cyc = 4, cog = 5, arg = 13, cyc_sum = 8, cog_sum = 7, arg_sum = 21, macros = ["@forward_properties", "@propagatable"] }
 "src/13_Prior/10_Base_EntropyPoolingPrior.jl" = { cyc = 16, cog = 36, arg = 8, cyc_sum = 157, cog_sum = 156, arg_sum = 224, macros = [] }
-"src/13_Prior/11_MeucciEntropyPoolingPrior.jl" = { cyc = 15, cog = 18, arg = 15, cyc_sum = 55, cog_sum = 60, arg_sum = 52, macros = ["@forward_properties", "@propagatable"] }
-"src/13_Prior/12_EntropyPoolingPrior.jl" = { cyc = 18, cog = 18, arg = 16, cyc_sum = 194, cog_sum = 159, arg_sum = 425, macros = ["@forward_properties", "@propagatable"] }
-"src/13_Prior/13_OpinionPoolingPrior.jl" = { cyc = 5, cog = 8, arg = 7, cyc_sum = 14, cog_sum = 12, arg_sum = 25, macros = ["@propagatable"] }
-"src/13_Prior/14_HighOrderFactorPriorEstimator.jl" = { cyc = 21, cog = 33, arg = 5, cyc_sum = 44, cog_sum = 61, arg_sum = 17, macros = ["@forward_properties", "@propagatable"] }
+"src/13_Prior/11_MeucciEntropyPoolingPrior.jl" = { cyc = 15, cog = 18, arg = 15, cyc_sum = 55, cog_sum = 60, arg_sum = 55, macros = ["@forward_properties", "@propagatable"] }
+"src/13_Prior/12_EntropyPoolingPrior.jl" = { cyc = 18, cog = 18, arg = 16, cyc_sum = 194, cog_sum = 159, arg_sum = 428, macros = ["@forward_properties", "@propagatable"] }
+"src/13_Prior/13_OpinionPoolingPrior.jl" = { cyc = 5, cog = 8, arg = 7, cyc_sum = 14, cog_sum = 12, arg_sum = 26, macros = ["@propagatable"] }
+"src/13_Prior/14_HighOrderFactorPriorEstimator.jl" = { cyc = 21, cog = 33, arg = 6, cyc_sum = 44, cog_sum = 61, arg_sum = 18, macros = ["@forward_properties", "@propagatable"] }
 "src/13_Prior/15_AssetPanelEstimators.jl" = { cyc = 3, cog = 4, arg = 4, cyc_sum = 21, cog_sum = 8, arg_sum = 21, macros = ["@propagatable"] }
 "src/13_Prior/16_Base_CrossSectionalFactorPrior.jl" = { cyc = 9, cog = 11, arg = 8, cyc_sum = 94, cog_sum = 77, arg_sum = 87, macros = [] }
-"src/13_Prior/17_CrossSectionalFactorPrior.jl" = { cyc = 4, cog = 6, arg = 18, cyc_sum = 11, cog_sum = 8, arg_sum = 30, macros = ["@propagatable"] }
+"src/13_Prior/17_CrossSectionalFactorPrior.jl" = { cyc = 5, cog = 8, arg = 18, cyc_sum = 12, cog_sum = 11, arg_sum = 34, macros = ["@propagatable"] }
 "src/14_UncertaintySets/01_Base_UncertaintySets.jl" = { cyc = 3, cog = 3, arg = 7, cyc_sum = 52, cog_sum = 27, arg_sum = 84, macros = [] }
 "src/14_UncertaintySets/02_DeltaUncertaintySets.jl" = { cyc = 1, cog = 1, arg = 5, cyc_sum = 7, cog_sum = 1, arg_sum = 22, macros = [] }
 "src/14_UncertaintySets/03_NormalUncertaintySets.jl" = { cyc = 3, cog = 3, arg = 9, cyc_sum = 29, cog_sum = 5, arg_sum = 117, macros = [] }

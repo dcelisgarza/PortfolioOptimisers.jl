@@ -14,9 +14,10 @@ mutable struct CountingPriorEstimator{T} <: PO.AbstractPriorEstimator
     pe::T
     n::Int
 end
-function PortfolioOptimisers.prior(c::CountingPriorEstimator, X, F = nothing; kwargs...)
+function PortfolioOptimisers.prior(c::CountingPriorEstimator, X, F = nothing, pnl = nothing;
+                                   kwargs...)
     c.n += 1
-    return prior(c.pe, X, F; kwargs...)
+    return prior(c.pe, X, F, pnl; kwargs...)
 end
 
 # Declares a deferrable slot and writes no resolver, which is the half of ADR 0051's pair that

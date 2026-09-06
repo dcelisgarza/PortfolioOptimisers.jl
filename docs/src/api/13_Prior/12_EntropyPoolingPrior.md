@@ -54,12 +54,13 @@ add_ep_tail_view!
 ```@docs
 EntropyPoolingPrior
 VecEP
-prior(pe::EntropyPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing;
-      dims::Int = 1, strict::Bool = false, kwargs...)
-ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<:MatNum};
-         strict::Bool = false, kwargs...)
+prior(pe::EntropyPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing,
+      pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, strict::Bool = false, kwargs...)
+ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<:MatNum},
+         pnl::Option{<:AssetPanel} = nothing; strict::Bool = false, kwargs...)
 ep_prior(alg::H0_EntropyPooling, pe::EntropyPoolingPrior, X::MatNum,
-         F::Option{<:MatNum}; strict::Bool = false, kwargs...)
+         F::Option{<:MatNum}, pnl::Option{<:AssetPanel} = nothing; strict::Bool = false,
+         kwargs...)
 ```
 
 ## References

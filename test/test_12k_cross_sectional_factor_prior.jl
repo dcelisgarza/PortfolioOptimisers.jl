@@ -194,9 +194,10 @@ fit_rows(rd, pr) = (size(rd.X, 1) - size(pr.X, 1) + 1):size(rd.X, 1)
         @test_throws DomainError CrossSectionalFactorPrior(; factors = f, c = -0.1)
         @test_throws PO.IsEmptyError CrossSectionalFactorPrior(; factors = f, mcap = "")
     end
-    @testset "A bare matrix and a missing panel are refused by name" begin
+    @testset "A matrix with no panel is refused by name" begin
         rd = csfp_panel(; n_assets = 10, n_observations = 20, n_industries = 2).rd
-        @test_throws ArgumentError prior(pe, rd.X)
+        @test_throws PO.IsNothingError prior(pe, rd.X)
+        @test_throws PO.IsNothingError prior(pe, rd.X, nothing, nothing)
         @test_throws PO.IsNothingError prior(pe, ReturnsResult(; nx = rd.nx, X = rd.X))
         # The residual declaration has no shape that can express this estimator's block.
         @test_throws ArgumentError PO.factor_residual_config(pe)
@@ -364,6 +365,51 @@ end
         # reference implementation leaves the same NaN there, for the same reason: the
         # observation has no idiosyncratic return to standardise.
         @test all(isnan, Xi[.!am])
+    end
+end
+
+#=
+Issue #840. A wrapping prior holds no carrier: it reaches the estimator it nests through the
+returns-matrix method. The Asset Panel travels there as the third positional argument, so an
+estimator that is fitted on a panel composes like any other one.
+
+The panel of this testset is fully active. A wrapping prior processes the moments it is handed,
+and the fit states `NaN` at an asset it holds no moment for, which such processing refuses.
+
+Neither wrapper here reweights observations. One that does cannot compose this estimator yet: the
+fit answers on fewer rows than it was given, and entropy pooling sizes its prior probabilities from
+the matrix it was handed. Issue #849 holds that decision.
+=#
+@testset "A wrapping prior composes the fit, because the panel travels" begin
+    PO = PortfolioOptimisers
+    rd = csfp_panel(; n_assets = 20, n_observations = 60, n_industries = 3, seed = 782_001,
+                    late_listing_proba = 0.0, delisting_proba = 0.0, missing_ratio = 0.0).rd
+    pe = CrossSectionalFactorPrior(; factors = csfp_factors(), minra = 5)
+    pr = prior(pe, rd)
+    @testset "The returns-matrix method fits from the panel alone" begin
+        @test all(isfinite, pr.mu)
+        prm = prior(pe, rd.X, nothing, rd.pnl)
+        @test prm.mu == pr.mu
+        @test prm.sigma == pr.sigma
+        @test prm.X == pr.X
+        @test isa(prm.rr, CrossSectionalFactorModel)
+    end
+    @testset "A Black-Litterman prior replaces the moments and forwards the block" begin
+        sets = UniverseSets(; dict = Dict("nx" => rd.nx))
+        views = LinearConstraintEstimator(; val = "$(rd.nx[1]) == 0.002")
+        bl = prior(BlackLittermanPrior(; pe = pe, sets = sets, views = views), rd)
+        @test size(bl.X) == size(pr.X)
+        @test all(isfinite, bl.mu)
+        @test bl.mu != pr.mu
+        @test isa(bl.rr, CrossSectionalFactorModel)
+        @test bl.rr.M == pr.rr.M
+        @test bl.fpr.mu == pr.fpr.mu
+    end
+    @testset "A high order prior wraps the same fit" begin
+        ho = prior(HighOrderPriorEstimator(; pe = pe), rd)
+        @test isa(ho, HighOrderPrior)
+        @test ho.pr.mu == pr.mu
+        @test isa(ho.pr.rr, CrossSectionalFactorModel)
     end
 end
 

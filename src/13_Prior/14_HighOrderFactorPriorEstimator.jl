@@ -352,7 +352,8 @@ end
     forward(pe, me, ce)
 end
 """
-    prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum; dims::Int = 1,
+    prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum,
+          pnl::Option{<:AssetPanel} = nothing; dims::Int = 1,
           kwargs...)
 
 Compute high order factor prior moments for asset returns using a factor model.
@@ -418,6 +419,7 @@ Steps 9 and 10 are ordered, not independent. [`cokurtosis_residuals`](@ref) is d
   - `pe`: High order factor prior estimator.
   - `X`: Asset returns matrix (observations × assets).
   - `F`: Factor returns matrix (observations × factors).
+  - $(arg_dict[:pnl_prior])
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to underlying estimators.
 
@@ -443,8 +445,8 @@ Steps 9 and 10 are ordered, not independent. [`cokurtosis_residuals`](@ref) is d
   - [`coskewness_residuals`](@ref)
   - [`cokurtosis_residuals`](@ref)
 """
-function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum; dims::Int = 1,
-               kwargs...)
+function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum,
+               pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, kwargs...)
     X, F = dims_oriented(dims, X, F)
     kM = nothing
     D2 = nothing
@@ -456,7 +458,7 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum; dims::In
     posterior_kt = nothing
     posterior_sk = nothing
     posterior_V = nothing
-    pr = prior(pe.pe, X, F; dims = 1, kwargs...)
+    pr = prior(pe.pe, X, F, pnl; dims = 1, kwargs...)
     assert_prior_regression(pr, :pe)
     posterior_X = pr.X
     M = pr.rr.M

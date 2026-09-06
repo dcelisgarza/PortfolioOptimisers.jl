@@ -254,7 +254,8 @@ end
     forward(pe, me, ce)
 end
 """
-    prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 1,
+    prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum,
+          pnl::Option{<:AssetPanel} = nothing; dims::Int = 1,
           strict::Bool = false, kwargs...)
 
 Compute factor Black-Litterman prior moments for asset returns.
@@ -327,6 +328,7 @@ The shift is linear in ``r_f`` and depends on the views through ``\\mathbf{G}``.
   - `pe`: Factor Black-Litterman prior estimator.
   - `X`: Asset returns matrix (observations × assets).
   - `F`: Factor matrix (observations × factors).
+  - $(arg_dict[:pnl_prior]) The prior this estimator nests is fitted on the factors, whose axis no panel describes, so the panel stops here.
   - $(arg_dict[:dims])
   - `strict`: If `true`, enforce strict validation of views and sets. Default is `false`.
   - `kwargs...`: Additional keyword arguments passed to underlying estimators and matrix processing.
@@ -352,8 +354,9 @@ The shift is linear in ``r_f`` and depends on the views through ``\\mathbf{G}``.
   - [`apply_rf`](@ref)
   - [`equilibrium_mu`](@ref)
 """
-function prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 1,
-               strict::Bool = false, kwargs...)
+function prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum,
+               ::Option{<:AssetPanel} = nothing; dims::Int = 1, strict::Bool = false,
+               kwargs...)
     X, F = dims_oriented(dims, X, F)
     # The views land on the *factor* distribution, so they resolve against the declared factor
     # axis — not against `xkey`, which names the assets this estimator projects onto. Only the

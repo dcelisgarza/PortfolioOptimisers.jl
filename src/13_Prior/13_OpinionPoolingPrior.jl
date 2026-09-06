@@ -446,7 +446,8 @@ function compute_pooling(::LogarithmicOpinionPooling, ow::VecNum, pw::MatNum)
     return StatsBase.pweights(vec(exp.(u .- lse)))
 end
 """
-    prior(pe::OpinionPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing;
+    prior(pe::OpinionPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing,
+          pnl::Option{<:AssetPanel} = nothing;
           dims::Int = 1, strict::Bool = false, kwargs...)
 
 Compute opinion pooling prior moments for asset returns.
@@ -472,6 +473,7 @@ No field of `pe` is modified, so calling `prior` twice on one estimator gives th
   - `pe`: Opinion pooling prior estimator.
   - `X`: Asset returns matrix (observations × assets).
   - `F`: Optional factor matrix.
+  - $(arg_dict[:pnl_prior]) It reaches `pe.pe1`, every opinion in `pe.pes`, and the refit `pe.pe2`.
   - $(arg_dict[:dims])
   - `strict`: If `true`, throws error for missing assets; otherwise, issues warnings. Default is `false`.
   - `kwargs...`: Additional keyword arguments passed to underlying estimators and solvers.
@@ -496,10 +498,11 @@ No field of `pe` is modified, so calling `prior` twice on one estimator gives th
   - [`compute_pooling`](@ref)
   - [`LowOrderPrior`](@ref)
 """
-function prior(pe::OpinionPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing;
-               dims::Int = 1, strict::Bool = false, kwargs...)
+function prior(pe::OpinionPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing,
+               pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, strict::Bool = false,
+               kwargs...)
     X, F = dims_oriented(dims, X, F)
-    X = !isnothing(pe.pe1) ? prior(pe.pe1, X, F; strict = strict, kwargs...).X : X
+    X = !isnothing(pe.pe1) ? prior(pe.pe1, X, F, pnl; strict = strict, kwargs...).X : X
     T = size(X, 1)
     M = length(pe.pes)
     ow = isnothing(pe.w) ? range(inv(M), inv(M); length = M) : pe.w
@@ -514,9 +517,9 @@ function prior(pe::OpinionPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing
     else
         pw = Matrix{eltype(X)}(undef, T, M)
     end
-    let X = X, F = F, pw = pw
+    let X = X, F = F, pnl = pnl, pw = pw
         FLoops.@floop pe.ex for (i, pe) in enumerate(pe.pes)
-            pr = prior(pe, X, F; strict = strict, kwargs...)
+            pr = prior(pe, X, F, pnl; strict = strict, kwargs...)
             pw[:, i] = pr.w
         end
     end
@@ -527,7 +530,7 @@ function prior(pe::OpinionPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing
     # pooled prior's feature matrix is forwarded unchanged (see [`LowOrderPrior`](@ref)).
     # The factor block is the refit prior's, forwarded whole rather than stamped with the
     # pooled weights — see the note at the same seam in `12_EntropyPoolingPrior.jl`.
-    (; X, o_X, mu, sigma, chol, rr, fpr) = prior(pe2, X, F; strict = strict, kwargs...)
+    (; X, o_X, mu, sigma, chol, rr, fpr) = prior(pe2, X, F, pnl; strict = strict, kwargs...)
     ens = exp(StatsBase.entropy(w))
     kld = [StatsBase.kldivergence(w, view(pw, :, i)) for i in axes(pw, 2)]
     return LowOrderPrior(; X = X, o_X = o_X, mu = mu, sigma = sigma, chol = chol, w = w,

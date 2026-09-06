@@ -265,10 +265,13 @@ end
     plain = factor_attribution(w, pr)
     # A wrapping prior replaces `mu` and `sigma` and forwards `rr` and `fpr` unchanged (ADR 0046),
     # so the model no longer reproduces the anchors and the two gaps are measurable. The tilt is
-    # built here rather than fitted: `EntropyPoolingPrior` hands its nested estimator a bare returns
-    # matrix, which a Cross-Sectional Factor Prior refuses because it reads an Asset Panel, so the
-    # two cannot yet be composed (issue #840). The carrier this testset builds is exactly what such
-    # a composition would produce, and it is what the anchoring rule is stated over.
+    # built here rather than fitted, for a reason of this fixture rather than of the composition:
+    # issue #840 gave the Asset Panel its seat in the returns-matrix method, so a wrapping prior
+    # does compose a Cross-Sectional Factor Prior, and
+    # `test/test_12k_cross_sectional_factor_prior.jl` fits one. This fixture's panel delists, so
+    # the fit states `NaN` at a non-investable asset and a wrapper's matrix processing refuses the
+    # moments. The carrier this testset builds is exactly what such a composition produces, and it
+    # is what the anchoring rule is stated over.
     tilt = LowOrderPrior(; X = pr.X, mu = pr.mu .+ 0.002, sigma = 1.3 * pr.sigma,
                          rr = pr.rr, fpr = pr.fpr)
     fa = factor_attribution(w, tilt)

@@ -385,7 +385,8 @@ end
     alias(f_ce, f_pe.ce)
 end
 """
-    prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 1,
+    prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum,
+          pnl::Option{<:AssetPanel} = nothing; dims::Int = 1,
           strict::Bool = false, kwargs...)
 
 Compute augmented Black-Litterman prior moments for asset returns.
@@ -399,6 +400,7 @@ When `pe.tau` is `nothing` the blending parameter is `1/T`, where `T` is the num
   - `pe`: Augmented Black-Litterman prior estimator.
   - `X`: Asset returns matrix (observations × assets).
   - `F`: Factor matrix (observations × factors).
+  - $(arg_dict[:pnl_prior]) It reaches `pe.a_pe`, the prior over the assets. `pe.f_pe` is fitted on the factors, whose axis no panel describes, so the panel does not reach it.
   - $(arg_dict[:dims])
   - `strict`: If `true`, enforce strict validation of views and sets. Default is `false`.
   - `kwargs...`: Additional keyword arguments passed to underlying estimators and matrix processing.
@@ -442,8 +444,9 @@ When `pe.tau` is `nothing` the blending parameter is `1/T`, where `T` is the num
   - [`apply_rf`](@ref)
   - [`equilibrium_mu`](@ref)
 """
-function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 1,
-               strict::Bool = false, kwargs...)
+function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum,
+               pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, strict::Bool = false,
+               kwargs...)
     X, F = dims_oriented(dims, X, F)
     # Each axis is checked only by the views that resolve names against it. A
     # `BlackLittermanViews` result carries its own `P` and never touches `sets`, so demanding a
@@ -461,7 +464,7 @@ function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int
                         "F")
     end
     # Asset prior.
-    a_prior = prior(pe.a_pe, X; strict = strict, kwargs...)
+    a_prior = prior(pe.a_pe, X, nothing, pnl; strict = strict, kwargs...)
     a_prior_mu, a_prior_sigma = a_prior.mu, a_prior.sigma
     # Factor prior.
     f_prior = prior(pe.f_pe, F; strict = strict)

@@ -29,7 +29,8 @@ struct FixedPrior{T} <: PortfolioOptimisers.AbstractLowOrderPriorEstimator_F
     f::T
 end
 function PortfolioOptimisers.prior(pe::FixedPrior, ::PortfolioOptimisers.MatNum,
-                                   ::PortfolioOptimisers.Option{<:PortfolioOptimisers.MatNum} = nothing;
+                                   ::PortfolioOptimisers.Option{<:PortfolioOptimisers.MatNum} = nothing,
+                                   ::PortfolioOptimisers.Option{<:PortfolioOptimisers.AssetPanel} = nothing;
                                    dims::Int = 1, kwargs...)
     return pe.f()
 end

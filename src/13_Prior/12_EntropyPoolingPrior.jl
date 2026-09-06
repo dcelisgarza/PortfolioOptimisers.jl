@@ -3487,8 +3487,9 @@ Alias for an abstract vector of entropy pooling prior estimators of either famil
 """
 const VecEP = AbstractVector{<:Union{<:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior}}
 """
-    prior(pe::EntropyPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing;
-          dims::Int = 1, strict::Bool = false, kwargs...)
+    prior(pe::EntropyPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing,
+          pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, strict::Bool = false,
+          kwargs...)
 
 Compute the entropy pooling prior of asset returns with tail views.
 
@@ -3504,6 +3505,7 @@ Compute the entropy pooling prior of asset returns with tail views.
   - `pe`: Entropy pooling prior estimator.
   - `X`: Asset returns matrix.
   - `F`: Optional factor returns matrix.
+  - $(arg_dict[:pnl_prior])
   - `dims`: Dimension along which the observations lie.
   - `strict`: If `true`, throws error for missing assets; otherwise, issue warnings.
   - `kwargs...`: Additional keyword arguments forwarded to the wrapped prior estimator.
@@ -3522,14 +3524,15 @@ Compute the entropy pooling prior of asset returns with tail views.
   - [`ep_prior`](@ref)
   - [`LowOrderPrior`](@ref)
 """
-function prior(pe::EntropyPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing;
-               dims::Int = 1, strict::Bool = false, kwargs...)
+function prior(pe::EntropyPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing,
+               pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, strict::Bool = false,
+               kwargs...)
     X, F = dims_oriented(dims, X, F)
-    return ep_prior(pe.alg, pe, X, F; strict = strict, kwargs...)
+    return ep_prior(pe.alg, pe, X, F, pnl; strict = strict, kwargs...)
 end
 """
-    ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<:MatNum};
-             strict::Bool = false, kwargs...)
+    ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<:MatNum},
+             pnl::Option{<:AssetPanel} = nothing; strict::Bool = false, kwargs...)
 
 Compute entropy pooling prior moments with tail views, enforcing the views in stages.
 
@@ -3558,6 +3561,8 @@ Compute entropy pooling prior moments with tail views, enforcing the views in st
 
   - `F`: Optional factor returns matrix, already oriented.
 
+  - $(arg_dict[:pnl_prior])
+
   - `strict`: If `true`, throws error for missing assets; otherwise, issue warnings.
 
   - `kwargs...`: Additional keyword arguments forwarded to the wrapped prior estimator.
@@ -3573,8 +3578,8 @@ Compute entropy pooling prior moments with tail views, enforcing the views in st
   - [`H2_EntropyPooling`](@ref)
   - [`entropy_pooling`](@ref)
 """
-function ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<:MatNum};
-                  strict::Bool = false, kwargs...)
+function ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<:MatNum},
+                  pnl::Option{<:AssetPanel} = nothing; strict::Bool = false, kwargs...)
     T, N = size(X)
     w1 = w0 = if isnothing(pe.w)
         iT = inv(T)
@@ -3589,7 +3594,7 @@ function ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<
     tvs = Vector{AbstractEntropyPoolingTailView}(undef, 0)
     # mu, VaR, CVaR, EVaR and RLVaR
     pe = factory(pe, w0)
-    pr = prior(pe.pe, X, F; strict = strict, kwargs...)
+    pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
     ep_mu_views!(pe.mu_views, epc, pr, pe.sets; strict = strict)
     ep_var_views!(pe.var_views, epc, pr, pe.sets, w0; strict = strict)
     ep_tail_views!(pe.cvar_views, epc, tvs, pr, pe.sets, w0; strict = strict)
@@ -3598,7 +3603,7 @@ function ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<
     if !isempty(epc) || !isempty(tvs)
         w1 = entropy_pooling(w0, epc, tvs, pe.opt)
         pe = factory(pe, w1)
-        pr = prior(pe.pe, X, F; strict = strict, kwargs...)
+        pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
     end
     if !isnothing(pe.sigma_views) || !isnothing(pe.cov_views)
         # sigma
@@ -3613,7 +3618,7 @@ function ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<
         end
         w1 = entropy_pooling(ifelse(isa(alg, H1_EntropyPooling), w0, w1), epc, tvs, pe.opt)
         pe = factory(pe, w1)
-        pr = prior(pe.pe, X, F; strict = strict, kwargs...)
+        pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
     end
     if !isnothing(pe.rho_views) || !isnothing(pe.sk_views) || !isnothing(pe.kt_views)
         # skew
@@ -3636,7 +3641,7 @@ function ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<
         end
         w1 = entropy_pooling(ifelse(isa(alg, H1_EntropyPooling), w0, w1), epc, tvs, pe.opt)
         pe = factory(pe, w1)
-        pr = prior(pe.pe, X, F; strict = strict, kwargs...)
+        pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
     end
     # Entropy pooling reweights observations without touching either axis of `Z`, so the
     # wrapped prior's feature matrix is forwarded unchanged (see [`LowOrderPrior`](@ref)).
@@ -3650,7 +3655,8 @@ function ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<
 end
 """
     ep_prior(alg::H0_EntropyPooling, pe::EntropyPoolingPrior, X::MatNum,
-             F::Option{<:MatNum}; strict::Bool = false, kwargs...)
+             F::Option{<:MatNum}, pnl::Option{<:AssetPanel} = nothing;
+             strict::Bool = false, kwargs...)
 
 Compute entropy pooling prior moments with tail views, enforcing every view in one optimisation.
 
@@ -3671,6 +3677,7 @@ Compute entropy pooling prior moments with tail views, enforcing every view in o
   - `pe`: Entropy pooling prior estimator.
   - `X`: Asset returns matrix, already oriented.
   - `F`: Optional factor returns matrix, already oriented.
+  - $(arg_dict[:pnl_prior])
   - `strict`: If `true`, throws error for missing assets; otherwise, issue warnings.
   - `kwargs...`: Additional keyword arguments forwarded to the wrapped prior estimator.
 
@@ -3685,7 +3692,8 @@ Compute entropy pooling prior moments with tail views, enforcing every view in o
   - [`entropy_pooling`](@ref)
 """
 function ep_prior(alg::H0_EntropyPooling, pe::EntropyPoolingPrior, X::MatNum,
-                  F::Option{<:MatNum}; strict::Bool = false, kwargs...)
+                  F::Option{<:MatNum}, pnl::Option{<:AssetPanel} = nothing;
+                  strict::Bool = false, kwargs...)
     T = size(X, 1)
     w0 = if isnothing(pe.w)
         iT = inv(T)
@@ -3698,7 +3706,7 @@ function ep_prior(alg::H0_EntropyPooling, pe::EntropyPoolingPrior, X::MatNum,
     epc = Dict{Symbol, Tuple{<:MatNum, <:VecNum}}()
     tvs = Vector{AbstractEntropyPoolingTailView}(undef, 0)
     pe = factory(pe, w0)
-    pr = prior(pe.pe, X, F; strict = strict, kwargs...)
+    pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
     # mu, VaR, CVaR, EVaR and RLVaR
     ep_mu_views!(pe.mu_views, epc, pr, pe.sets; strict = strict)
     ep_var_views!(pe.var_views, epc, pr, pe.sets, w0; strict = strict)
@@ -3727,7 +3735,7 @@ function ep_prior(alg::H0_EntropyPooling, pe::EntropyPoolingPrior, X::MatNum,
     end
     w1 = entropy_pooling(w0, epc, tvs, pe.opt)
     pe = factory(pe, w1)
-    pr = prior(pe.pe, X, F; strict = strict, kwargs...)
+    pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
     # Entropy pooling reweights observations without touching either axis of `Z`, so the
     # wrapped prior's feature matrix is forwarded unchanged (see [`LowOrderPrior`](@ref)).
     # The factor block is the refit prior's, forwarded whole, on the same reasoning as the

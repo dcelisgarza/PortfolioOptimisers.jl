@@ -627,8 +627,9 @@ function ep_cvar_views_solve!(cvv::NamedTuple, epc::AbstractDict,
     return func(res)[1]
 end
 """
-    prior(pe::MeucciEntropyPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing;
-          dims::Int = 1, strict::Bool = false, kwargs...)
+    prior(pe::MeucciEntropyPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing,
+          pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, strict::Bool = false,
+          kwargs...)
 
 Compute entropy pooling prior moments for asset returns.
 
@@ -644,6 +645,7 @@ Compute entropy pooling prior moments for asset returns.
   - `pe`: Entropy pooling prior estimator.
   - `X`: Asset returns matrix (observations × assets).
   - `F`: Optional factor matrix.
+  - $(arg_dict[:pnl_prior])
   - $(arg_dict[:dims])
   - `strict`: If `true`, throws error for missing assets; otherwise, issues warnings.
   - `kwargs...`: Additional keyword arguments passed to underlying estimators and solvers.
@@ -662,13 +664,15 @@ Compute entropy pooling prior moments for asset returns.
   - [`ep_prior`](@ref)
   - [`LowOrderPrior`](@ref)
 """
-function prior(pe::MeucciEntropyPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing;
-               dims::Int = 1, strict::Bool = false, kwargs...)
+function prior(pe::MeucciEntropyPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing,
+               pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, strict::Bool = false,
+               kwargs...)
     X, F = dims_oriented(dims, X, F)
-    return ep_prior(pe.alg, pe, X, F; strict = strict, kwargs...)
+    return ep_prior(pe.alg, pe, X, F, pnl; strict = strict, kwargs...)
 end
 """
-    ep_prior(alg::StagedEP, pe::MeucciEntropyPoolingPrior, X::MatNum, F::Option{<:MatNum};
+    ep_prior(alg::StagedEP, pe::MeucciEntropyPoolingPrior, X::MatNum,
+             F::Option{<:MatNum}, pnl::Option{<:AssetPanel} = nothing;
              strict::Bool = false, kwargs...)
 
 Compute entropy pooling prior moments for asset returns with iterative constraint enforcement.
@@ -723,6 +727,7 @@ Posterior moments are then read as probability-weighted sample statistics under 
   - `pe`: Entropy pooling prior estimator.
   - `X`: Asset returns matrix (observations × assets), oriented by [`prior`](@ref).
   - `F`: Optional factor matrix, oriented by [`prior`](@ref).
+  - $(arg_dict[:pnl_prior])
   - `strict`: If `true`, throws error for missing assets; otherwise, issues warnings.
   - `kwargs...`: Additional keyword arguments passed to underlying estimators and solvers.
 
@@ -757,7 +762,8 @@ Posterior moments are then read as probability-weighted sample statistics under 
   - [`fix_sigma!`](@ref)
 """
 function ep_prior(alg::StagedEP, pe::MeucciEntropyPoolingPrior, X::MatNum,
-                  F::Option{<:MatNum}; strict::Bool = false, kwargs...)
+                  F::Option{<:MatNum}, pnl::Option{<:AssetPanel} = nothing;
+                  strict::Bool = false, kwargs...)
     T, N = size(X)
     w1 = w0 = if isnothing(pe.w)
         iT = inv(T)
@@ -771,7 +777,7 @@ function ep_prior(alg::StagedEP, pe::MeucciEntropyPoolingPrior, X::MatNum,
     epc = Dict{Symbol, Tuple{<:MatNum, <:VecNum}}()
     # mu and VaR
     pe = factory(pe, w0)
-    pr = prior(pe.pe, X, F; strict = strict, kwargs...)
+    pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
     # Every `prior(...)` reference resolves against this first fit, under `w0`. The CVaR
     # search runs once per stage against a refit `pr`, so resolving inside it would state a
     # different target at each stage. It is resolved once, here, and the stages read it.
@@ -782,7 +788,7 @@ function ep_prior(alg::StagedEP, pe::MeucciEntropyPoolingPrior, X::MatNum,
     if !isnothing(pe.mu_views) || !isnothing(pe.var_views) || !isnothing(pe.cvar_views)
         w1 = ep_cvar_views_solve!(cvv, epc, w0, pe.opt)
         pe = factory(pe, w1)
-        pr = prior(pe.pe, X, F; strict = strict, kwargs...)
+        pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
     end
     if !isnothing(pe.sigma_views) || !isnothing(pe.cov_views)
         # sigma
@@ -798,7 +804,7 @@ function ep_prior(alg::StagedEP, pe::MeucciEntropyPoolingPrior, X::MatNum,
         w1 = ep_cvar_views_solve!(cvv, epc, ifelse(isa(alg, H1_EntropyPooling), w0, w1),
                                   pe.opt)
         pe = factory(pe, w1)
-        pr = prior(pe.pe, X, F; strict = strict, kwargs...)
+        pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
     end
     if !isnothing(pe.rho_views) || !isnothing(pe.sk_views) || !isnothing(pe.kt_views)
         # skew
@@ -822,7 +828,7 @@ function ep_prior(alg::StagedEP, pe::MeucciEntropyPoolingPrior, X::MatNum,
         w1 = ep_cvar_views_solve!(cvv, epc, ifelse(isa(alg, H1_EntropyPooling), w0, w1),
                                   pe.opt)
         pe = factory(pe, w1)
-        pr = prior(pe.pe, X, F; strict = strict, kwargs...)
+        pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
     end
     # Entropy pooling reweights observations without touching either axis of `Z`, so the
     # wrapped prior's feature matrix is forwarded unchanged (see [`LowOrderPrior`](@ref)).
@@ -841,7 +847,8 @@ function ep_prior(alg::StagedEP, pe::MeucciEntropyPoolingPrior, X::MatNum,
 end
 """
     ep_prior(alg::H0_EntropyPooling, pe::MeucciEntropyPoolingPrior, X::MatNum,
-             F::Option{<:MatNum}; strict::Bool = false, kwargs...)
+             F::Option{<:MatNum}, pnl::Option{<:AssetPanel} = nothing;
+             strict::Bool = false, kwargs...)
 
 Compute entropy pooling prior moments for asset returns with single-shot constraint enforcement.
 
@@ -888,6 +895,7 @@ Posterior moments are then read as probability-weighted sample statistics under 
   - `pe`: Entropy pooling prior estimator.
   - `X`: Asset returns matrix (observations × assets), oriented by [`prior`](@ref).
   - `F`: Optional factor matrix, oriented by [`prior`](@ref).
+  - $(arg_dict[:pnl_prior])
   - `strict`: If `true`, throws error for missing assets; otherwise, issues warnings.
   - `kwargs...`: Additional keyword arguments passed to underlying estimators and solvers.
 
@@ -918,7 +926,8 @@ Posterior moments are then read as probability-weighted sample statistics under 
   - [`ep_rho_views!`](@ref)
 """
 function ep_prior(alg::H0_EntropyPooling, pe::MeucciEntropyPoolingPrior, X::MatNum,
-                  F::Option{<:MatNum}; strict::Bool = false, kwargs...)
+                  F::Option{<:MatNum}, pnl::Option{<:AssetPanel} = nothing;
+                  strict::Bool = false, kwargs...)
     T = size(X, 1)
     w0 = if isnothing(pe.w)
         iT = inv(T)
@@ -931,7 +940,7 @@ function ep_prior(alg::H0_EntropyPooling, pe::MeucciEntropyPoolingPrior, X::MatN
     epc = Dict{Symbol, Tuple{<:MatNum, <:VecNum}}()
     # mu and VaR
     pe = factory(pe, w0)
-    pr = prior(pe.pe, X, F; strict = strict, kwargs...)
+    pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
     # Every `prior(...)` reference resolves against this fit, under `w0`.
     cvv = ep_cvar_views_setup(pe.cvar_views, pr, pe.sets, w0, pe.ds_opt, pe.dm_opt;
                               strict = strict)
@@ -963,7 +972,7 @@ function ep_prior(alg::H0_EntropyPooling, pe::MeucciEntropyPoolingPrior, X::MatN
     end
     w1 = ep_cvar_views_solve!(cvv, epc, w0, pe.opt)
     pe = factory(pe, w1)
-    pr = prior(pe.pe, X, F; strict = strict, kwargs...)
+    pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
     # Entropy pooling reweights observations without touching either axis of `Z`, so the
     # wrapped prior's feature matrix is forwarded unchanged (see [`LowOrderPrior`](@ref)).
     # The factor block is the refit prior's, forwarded whole. It is *not* stamped with the

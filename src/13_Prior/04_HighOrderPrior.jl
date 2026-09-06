@@ -735,7 +735,7 @@ end
     forward(pe, me, ce)
 end
 """
-    prior(pe::HighOrderPriorEstimator, X::MatNum, F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+    prior(pe::HighOrderPriorEstimator, X::MatNum, F::Option{<:MatNum} = nothing, pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, kwargs...)
 
 Compute high order prior moments for asset returns using a composite estimator.
 
@@ -782,6 +782,7 @@ Where:
   - `pe`: High order prior estimator.
   - `X`: Asset returns matrix (observations × assets).
   - `F`: Optional factor returns matrix (observations × factors).
+  - $(arg_dict[:pnl_prior])
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to underlying estimators.
 
@@ -799,10 +800,10 @@ Where:
   - [`HighOrderPrior`](@ref)
   - [`prior`](@ref)
 """
-function prior(pe::HighOrderPriorEstimator, X::MatNum, F::Option{<:MatNum} = nothing;
-               dims::Int = 1, kwargs...)
+function prior(pe::HighOrderPriorEstimator, X::MatNum, F::Option{<:MatNum} = nothing,
+               pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, kwargs...)
     X, F = dims_oriented(dims, X, F)
-    pr = prior(pe.pe, X, F; kwargs...)
+    pr = prior(pe.pe, X, F, pnl; kwargs...)
     kt = cokurtosis(pe.kte, X; kwargs...)
     D2 = nothing
     L2 = nothing

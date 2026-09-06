@@ -350,8 +350,8 @@ function assert_factor_residual_config(pe::AbstractPriorEstimator, cfg)::Nothing
     return nothing
 end
 """
-    prior(pe::FactorPrior, X::MatNum, F::MatNum; dims::Int = 1, strict::Bool = false,
-          kwargs...)
+    prior(pe::FactorPrior, X::MatNum, F::MatNum, pnl::Option{<:AssetPanel} = nothing;
+          dims::Int = 1, strict::Bool = false, kwargs...)
 
 Compute factor-based prior moments for asset returns using a factor model.
 
@@ -392,6 +392,7 @@ The factor moments ``\\hat{\\boldsymbol{f}}`` and ``\\mathbf{\\Sigma}_f`` come f
   - `pe`: Factor prior estimator.
   - `X`: Asset returns matrix (observations × assets).
   - `F`: Factor returns matrix (observations × factors).
+  - $(arg_dict[:pnl_prior]) The prior this estimator nests is fitted on the factors, whose axis no panel describes, so the panel stops here.
   - $(arg_dict[:dims])
   - $(arg_dict[:strict])
   - `kwargs...`: Additional keyword arguments passed to matrix processing and estimators.
@@ -413,8 +414,8 @@ The factor moments ``\\hat{\\boldsymbol{f}}`` and ``\\mathbf{\\Sigma}_f`` come f
   - [`factor_lift`](@ref)
   - [`prior`](@ref)
 """
-function prior(pe::FactorPrior, X::MatNum, F::MatNum; dims::Int = 1, strict::Bool = false,
-               kwargs...)
+function prior(pe::FactorPrior, X::MatNum, F::MatNum, ::Option{<:AssetPanel} = nothing;
+               dims::Int = 1, strict::Bool = false, kwargs...)
     X, F = dims_oriented(dims, X, F)
     # `strict` reaches the wrapped prior: `pe.pe` admits `BlackLittermanPrior` and
     # `EntropyPoolingPrior`, both of which resolve view names against a universe and honour it.

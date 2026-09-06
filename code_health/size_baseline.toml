@@ -11,7 +11,7 @@ commit = "67ae6e5dcb"
 [file]
 "ext/PortfolioOptimisersImputeExt.jl" = { code = 6, doc = 0, comment = 4, blank = 3, total = 13 }
 "ext/PortfolioOptimisersPlotsExt.jl" = { code = 2498, doc = 0, comment = 175, blank = 46, total = 2719 }
-"src/01_Base/01_DocstringDictionaries.jl" = { code = 1098, doc = 113, comment = 122, blank = 43, total = 1376 }
+"src/01_Base/01_DocstringDictionaries.jl" = { code = 1099, doc = 113, comment = 122, blank = 43, total = 1377 }
 "src/01_Base/02_TypeRoots.jl" = { code = 15, doc = 199, comment = 0, blank = 89, total = 303 }
 "src/01_Base/03_PrettyShow.jl" = { code = 117, doc = 138, comment = 0, blank = 76, total = 331 }
 "src/01_Base/04_ScopedConfig.jl" = { code = 163, doc = 491, comment = 2, blank = 214, total = 870 }
@@ -151,7 +151,7 @@ commit = "67ae6e5dcb"
 "src/13_Prior/09_AugmentedBlackLittermanPrior.jl" = { code = 124, doc = 305, comment = 66, blank = 69, total = 564 }
 "src/13_Prior/10_Base_EntropyPoolingPrior.jl" = { code = 974, doc = 2396, comment = 60, blank = 920, total = 4350 }
 "src/13_Prior/11_MeucciEntropyPoolingPrior.jl" = { code = 313, doc = 474, comment = 52, blank = 148, total = 987 }
-"src/13_Prior/12_EntropyPoolingPrior.jl" = { code = 1152, doc = 1851, comment = 67, blank = 675, total = 3745 }
+"src/13_Prior/12_EntropyPoolingPrior.jl" = { code = 1154, doc = 1856, comment = 67, blank = 676, total = 3753 }
 "src/13_Prior/13_OpinionPoolingPrior.jl" = { code = 93, doc = 317, comment = 16, blank = 118, total = 544 }
 "src/13_Prior/14_HighOrderFactorPriorEstimator.jl" = { code = 172, doc = 271, comment = 20, blank = 82, total = 545 }
 "src/13_Prior/15_AssetPanelEstimators.jl" = { code = 93, doc = 346, comment = 14, blank = 163, total = 616 }

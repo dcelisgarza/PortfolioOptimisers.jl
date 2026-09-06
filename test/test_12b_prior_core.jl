@@ -2479,9 +2479,10 @@ struct ShrunkFactorPrior{T} <: PortfolioOptimisers.AbstractLowOrderPriorEstimato
     pe::T
 end
 function PortfolioOptimisers.prior(pe::ShrunkFactorPrior, X::PortfolioOptimisers.MatNum,
-                                   F::PortfolioOptimisers.Option{<:PortfolioOptimisers.MatNum} = nothing;
+                                   F::PortfolioOptimisers.Option{<:PortfolioOptimisers.MatNum} = nothing,
+                                   pnl::PortfolioOptimisers.Option{<:PortfolioOptimisers.AssetPanel} = nothing;
                                    dims::Int = 1, kwargs...)
-    pr = PortfolioOptimisers.prior(pe.pe, X, F; dims = dims, kwargs...)
+    pr = PortfolioOptimisers.prior(pe.pe, X, F, pnl; dims = dims, kwargs...)
     return PortfolioOptimisers.forward_prior(pr; sigma = pr.sigma * 0.05, chol = nothing)
 end
 function PortfolioOptimisers.factor_residual_config(pe::ShrunkFactorPrior)

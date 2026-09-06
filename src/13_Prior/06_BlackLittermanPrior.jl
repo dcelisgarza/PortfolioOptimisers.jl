@@ -620,7 +620,8 @@ function remove_excl_views(views_conf::VecNum, excl::VecInt)
     return nothing_scalar_array_view(views_conf, setdiff(1:length(views_conf), excl))
 end
 """
-    prior(pe::BlackLittermanPrior, X::MatNum, F::Option{<:MatNum} = nothing;
+    prior(pe::BlackLittermanPrior, X::MatNum, F::Option{<:MatNum} = nothing,
+          pnl::Option{<:AssetPanel} = nothing;
           dims::Int = 1, strict::Bool = false, kwargs...)
 
 Compute the Black-Litterman prior moments for asset returns.
@@ -670,6 +671,7 @@ Where:
   - `pe`: Black-Litterman prior estimator.
   - `X`: Asset returns matrix (observations × assets).
   - `F`: Optional factor matrix.
+  - $(arg_dict[:pnl_prior])
   - $(arg_dict[:dims])
   - `strict`: If `true`, enforce strict validation of views and sets. Default is `false`.
   - `kwargs...`: Additional keyword arguments passed to underlying estimators and matrix processing.
@@ -694,8 +696,9 @@ Where:
   - [`apply_rf`](@ref)
   - [`forward_prior`](@ref)
 """
-function prior(pe::BlackLittermanPrior, X::MatNum, F::Option{<:MatNum} = nothing;
-               dims::Int = 1, strict::Bool = false, kwargs...)
+function prior(pe::BlackLittermanPrior, X::MatNum, F::Option{<:MatNum} = nothing,
+               pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, strict::Bool = false,
+               kwargs...)
     X, F = dims_oriented(dims, X, F)
     # The axis is checked only by the views that resolve names against it. A `BlackLittermanViews`
     # result carries its own `P` and never touches `sets`, so demanding a universe for it would
@@ -705,7 +708,7 @@ function prior(pe::BlackLittermanPrior, X::MatNum, F::Option{<:MatNum} = nothing
         @argcheck(length(pe.sets.dict[pe.sets.xkey]) == size(X, 2),
                   DimensionMismatch("length(pe.sets.dict[pe.sets.xkey]) ($(length(pe.sets.dict[pe.sets.xkey]))) must match size(X, 2) ($(size(X, 2)))"))
     end
-    prior_model = prior(pe.pe, X, F; strict = strict, kwargs...)
+    prior_model = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
     posterior_X, prior_mu, prior_sigma = prior_model.X, prior_model.mu, prior_model.sigma
     (; P, Q, tau, omega) = bl_preroll(pe.views, pe.sets, pe.views_conf, prior_sigma, pe.tau,
                                       size(X, 1), eltype(posterior_X), strict)
