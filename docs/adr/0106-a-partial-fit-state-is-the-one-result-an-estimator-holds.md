@@ -20,7 +20,7 @@ calls. The decision put that state in an optional field on the Estimator, bound 
 The state is a Result under the library's own definition, so the decision breaks the rule as it
 stands. Three facts shaped the exception rather than a rewrite of the rule.
 
-- The library already ships the shape. `RegimeAdjustedVarianceCache` held the running state of
+- The library already ships the shape. `RegimeAdjustedVarianceState` held the running state of
   the regime-adjusted online recursion, and it subtyped `AbstractResult`. Its own docstring calls
   it an implementation detail that is not intended for direct use, so the general Result root read
   as the wrong parent for it.
@@ -58,7 +58,7 @@ assets, and a family whose merge needs more adds a method of its own that calls 
 `chan_merge` carries the mathematics of the merge, once, for every family.
 
 **A family whose state is not a sufficient statistic for its block refuses the pair instead, and
-names the reason.** `RegimeAdjustedVarianceCache` is that case, and issue #701 measured it. Its
+names the reason.** `RegimeAdjustedVarianceState` is that case, and issue #701 measured it. Its
 exponentially weighted accumulator does fold, as `decay^n_B * v_A + v_B`, but the regime state that
 scales the answer reads each observation's standardised squared innovation, gated by the running
 observation count. A block fitted from a cold start therefore skips its own first `min_obs`
@@ -77,7 +77,7 @@ state the wrong contract. The repository's own idiom settles it too: `merge_line
 and `merge_partial_linear_constraints` are the only other `merge_*` verbs, and both are
 unexported.
 
-**`RegimeAdjustedVarianceCache` is re-parented to the new root.** It is the shipped instance of
+**`RegimeAdjustedVarianceState` is re-parented to the new root.** It is the shipped instance of
 the shape, so it moves under the root that names what it is.
 
 ## Consequences
@@ -92,7 +92,7 @@ the shape, so it moves under the root that names what it is.
   `copy` rule and the verbs that call it.
 - The exception is closed. A field of any other Result type on an Estimator is still refused, and
   the type bound is what refuses it. Widening the bound is what a reviewer looks for.
-- `RegimeAdjustedVarianceCache` changes supertype. It is unexported and no doctest renders its
+- `RegimeAdjustedVarianceState` changes supertype. It is unexported and no doctest renders its
   supertype, so no expected output moves.
 
 ## Alternatives considered

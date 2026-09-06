@@ -102,7 +102,7 @@ accumulator has no numerically stable inverse, which is the argument #308 used t
 windowed estimators. So that channel drops, whatever the asset channel does.
 
 **A family whose state has no exact asset slice returns `nothing` and names the reason**, as it
-does for the merge. `RegimeAdjustedVarianceCache` is that family: its regime state reads the
+does for the merge. `RegimeAdjustedVarianceState` is that family: its regime state reads the
 standardised innovations of every asset in the universe, so the regime state of a subset is not a
 function of the state. Its estimator is not `@propagatable` today, so no channel reaches it, and
 the method is owed the day it becomes one.

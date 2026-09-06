@@ -109,7 +109,7 @@ end
     fitted = partial_fit!(ce, X)
     @test isnothing(ce.cache)
     @test isa(fitted.cache, PO.AbstractPartialFitState)
-    @test isa(fitted.cache, PO.RegimeAdjustedVarianceCache)
+    @test isa(fitted.cache, PO.RegimeAdjustedVarianceState)
 
     # An estimator carrying a state still answers any input it is given.
     @test isequal(var(fitted, X), var(ce, X))
@@ -163,7 +163,7 @@ end
 @testset "the seam adds two names to the public surface" begin
     @test Base.isexported(PO, :partial_fit!)
     @test Base.isexported(PO, :partial_fit)
-    for name in (:AbstractPartialFitState, :RegimeAdjustedVarianceCache, :merge_states)
+    for name in (:AbstractPartialFitState, :RegimeAdjustedVarianceState, :merge_states)
         @test !Base.isexported(PO, name)
     end
 end

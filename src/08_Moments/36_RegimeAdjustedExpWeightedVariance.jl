@@ -415,10 +415,10 @@ julia> ce.min_obs
   - [`LogRegimeAdjusted`](@ref)
   - [`FirstMomentRegimeAdjusted`](@ref)
   - [`RootMeanSquaredAdjusted`](@ref)
-  - [`AbstractCovarianceEstimator`](@ref)
+  - [`AbstractVarianceEstimator`](@ref)
   - [`partial_fit!`](@ref)
 """
-@concrete struct RegimeAdjustedExpWeightedVariance <: AbstractCovarianceEstimator
+@concrete struct RegimeAdjustedExpWeightedVariance <: AbstractVarianceEstimator
     """
     $(field_dict[:decay])
     """
@@ -524,7 +524,7 @@ $(DocStringExtensions.FIELDS)
 
   - [`RegimeAdjustedExpWeightedVariance`](@ref)
 """
-@concrete struct RegimeAdjustedVarianceCache <: AbstractPartialFitState
+@concrete struct RegimeAdjustedVarianceState <: AbstractPartialFitState
     """
     $(field_dict[:ret_buffer])
     """
@@ -652,7 +652,7 @@ the result in `cache.X2`.
 
 # Arguments
 
-  - `cache::RegimeAdjustedVarianceCache`: Online variance computation cache.
+  - `cache::RegimeAdjustedVarianceState`: Online variance computation cache.
   - `ce::RegimeAdjustedExpWeightedVariance`: Variance estimator configuration.
   - `X::VecNum`: Current centred returns vector.
   - `finite_mask::AbstractVector{<:Bool}`: Boolean mask of finite entries in `X`.
@@ -663,10 +663,10 @@ the result in `cache.X2`.
 
 # Related
 
-  - [`RegimeAdjustedVarianceCache`](@ref)
+  - [`RegimeAdjustedVarianceState`](@ref)
   - [`RegimeAdjustedExpWeightedVariance`](@ref)
 """
-function hac_squared_returns!(cache::RegimeAdjustedVarianceCache,
+function hac_squared_returns!(cache::RegimeAdjustedVarianceState,
                               ce::RegimeAdjustedExpWeightedVariance, X::VecNum,
                               finite_mask::AbstractVector{<:Bool})
     copyto!(cache.X2, X .^ 2)
@@ -694,7 +694,7 @@ state, so the variance stays the plain exponentially weighted recursion.
 
 # Arguments
 
-  - `cache::RegimeAdjustedVarianceCache`: Online variance computation cache (mutated).
+  - `cache::RegimeAdjustedVarianceState`: Online variance computation cache (mutated).
   - `ce::RegimeAdjustedExpWeightedVariance`: Variance estimator configuration.
   - `X::VecNum`: Returns vector for the current observation.
   - `estimation_mask::Option{<:AbstractVector{<:Bool}}`: Optional mask restricting which
@@ -704,17 +704,17 @@ state, so the variance stays the plain exponentially weighted recursion.
 
 # Returns
 
-  - `cache::RegimeAdjustedVarianceCache`: The cache to read on and to pass to the next observation.
+  - `cache::RegimeAdjustedVarianceState`: The cache to read on and to pass to the next observation.
     The arrays are mutated in place, but `regime_state` and `n_regime_obs` are immutable fields that
     `Accessors.@reset` replaces, so the caller must rebind the cache to this return value. A caller
     that discards it freezes the regime state at its initial value.
 
 # Related
 
-  - [`RegimeAdjustedVarianceCache`](@ref)
+  - [`RegimeAdjustedVarianceState`](@ref)
   - [`RegimeAdjustedExpWeightedVariance`](@ref)
 """
-function process_observation!(cache::RegimeAdjustedVarianceCache,
+function process_observation!(cache::RegimeAdjustedVarianceState,
                               ce::RegimeAdjustedExpWeightedVariance, X::VecNum,
                               estimation_mask::Option{<:AbstractVector{<:Bool}},
                               active_mask::Option{<:AbstractVector{<:Bool}})
@@ -836,11 +836,11 @@ point-in-time series a single forward pass rather than one refit per observation
 
 # Returns
 
-  - `cache::RegimeAdjustedVarianceCache`: The cache after the last observation.
+  - `cache::RegimeAdjustedVarianceState`: The cache after the last observation.
 
 # Related
 
-  - [`RegimeAdjustedVarianceCache`](@ref)
+  - [`RegimeAdjustedVarianceState`](@ref)
   - [`process_observation!`](@ref)
   - [`regime_adjusted_variance`](@ref)
   - [`partial_fit!`](@ref)
@@ -849,7 +849,7 @@ function regime_adjusted_variance_pass!(f, ce::RegimeAdjustedExpWeightedVariance
                                         dims::Int,
                                         estimation_mask::Option{<:AbstractMatrix{<:Bool}},
                                         active_mask::Option{<:AbstractMatrix{<:Bool}},
-                                        state::Option{<:RegimeAdjustedVarianceCache} = nothing)
+                                        state::Option{<:RegimeAdjustedVarianceState} = nothing)
     assert_dims(dims)
     est_flag = !isnothing(estimation_mask)
     act_flag = !isnothing(active_mask)
@@ -866,7 +866,7 @@ function regime_adjusted_variance_pass!(f, ce::RegimeAdjustedExpWeightedVariance
     N = size(X, setdiff((1, 2), (dims,))[1])
 
     cache = if isnothing(state)
-        RegimeAdjustedVarianceCache(if isnothing(ce.hac_lags)
+        RegimeAdjustedVarianceState(if isnothing(ce.hac_lags)
                                         nothing
                                     else
                                         DataStructures.CircularBuffer{Vector{eltype(X)}}(ce.hac_lags)
@@ -907,7 +907,7 @@ before it is squared. Where it is `nothing`, no clamp runs.
 
 # Arguments
 
-  - `cache::RegimeAdjustedVarianceCache`: Online variance computation cache.
+  - `cache::RegimeAdjustedVarianceState`: Online variance computation cache.
   - `ce::RegimeAdjustedExpWeightedVariance`: Variance estimator configuration.
 
 # Returns
@@ -917,10 +917,10 @@ before it is squared. Where it is `nothing`, no clamp runs.
 
 # Related
 
-  - [`RegimeAdjustedVarianceCache`](@ref)
+  - [`RegimeAdjustedVarianceState`](@ref)
   - [`RegimeAdjustedExpWeightedVariance`](@ref)
 """
-function regime_adjusted_variance(cache::RegimeAdjustedVarianceCache,
+function regime_adjusted_variance(cache::RegimeAdjustedVarianceState,
                                   ce::RegimeAdjustedExpWeightedVariance)
     variance = copy(cache.variance)
     correction = ones(eltype(variance), length(variance))
@@ -989,7 +989,7 @@ result by the square of the regime multiplier derived from the smoothed regime s
 # Related
 
   - [`RegimeAdjustedExpWeightedVariance`](@ref)
-  - [`RegimeAdjustedVarianceCache`](@ref)
+  - [`RegimeAdjustedVarianceState`](@ref)
   - [`variance_series(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::Int = 1, estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)`](@ref)
 """
 function Statistics.var(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::Int = 1,
@@ -1119,7 +1119,7 @@ true
 # Related
 
   - [`RegimeAdjustedExpWeightedVariance`](@ref)
-  - [`RegimeAdjustedVarianceCache`](@ref)
+  - [`RegimeAdjustedVarianceState`](@ref)
   - [`regime_adjusted_variance_pass!`](@ref)
   - [`Statistics.var(ce::RegimeAdjustedExpWeightedVariance)`](@ref)
 """
@@ -1201,7 +1201,7 @@ end
 """
     Statistics.var(
         ce::RegimeAdjustedExpWeightedVariance,
-        state::RegimeAdjustedVarianceCache;
+        state::RegimeAdjustedVarianceState;
         kwargs...
     ) -> Vector{<:Number}
 
@@ -1234,12 +1234,12 @@ true
 
 # Related
 
-  - [`RegimeAdjustedVarianceCache`](@ref)
+  - [`RegimeAdjustedVarianceState`](@ref)
   - [`regime_adjusted_variance`](@ref)
   - [`Statistics.var(ce::RegimeAdjustedExpWeightedVariance)`](@ref)
 """
 function Statistics.var(ce::RegimeAdjustedExpWeightedVariance,
-                        state::RegimeAdjustedVarianceCache; kwargs...)
+                        state::RegimeAdjustedVarianceState; kwargs...)
     return regime_adjusted_variance(state, ce)
 end
 """
@@ -1282,8 +1282,8 @@ ERROR: ArgumentError: `ce` holds no partial-fit state, so there is nothing to re
 # Related
 
   - [`partial_fit!(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::Int = 1, estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)`](@ref)
-  - [`Statistics.var(ce::RegimeAdjustedExpWeightedVariance, state::RegimeAdjustedVarianceCache; kwargs...)`](@ref)
-  - [`RegimeAdjustedVarianceCache`](@ref)
+  - [`Statistics.var(ce::RegimeAdjustedExpWeightedVariance, state::RegimeAdjustedVarianceState; kwargs...)`](@ref)
+  - [`RegimeAdjustedVarianceState`](@ref)
 """
 function Statistics.var(ce::RegimeAdjustedExpWeightedVariance; kwargs...)
     state = ce.cache
@@ -1354,13 +1354,13 @@ end
 """
     Statistics.std(
         ce::RegimeAdjustedExpWeightedVariance,
-        state::RegimeAdjustedVarianceCache;
+        state::RegimeAdjustedVarianceState;
         kwargs...
     ) -> Vector{<:Number}
 
 Read the regime-adjusted standard deviation out of a state held by hand.
 
-The root of [`Statistics.var(ce::RegimeAdjustedExpWeightedVariance, state::RegimeAdjustedVarianceCache; kwargs...)`](@ref), so a state a caller keeps outside an estimator answers the same call as one the estimator holds. The state is read and never written.
+The root of [`Statistics.var(ce::RegimeAdjustedExpWeightedVariance, state::RegimeAdjustedVarianceState; kwargs...)`](@ref), so a state a caller keeps outside an estimator answers the same call as one the estimator holds. The state is read and never written.
 
 # Arguments
 
@@ -1388,12 +1388,12 @@ true
 
 # Related
 
-  - [`RegimeAdjustedVarianceCache`](@ref)
-  - [`Statistics.var(ce::RegimeAdjustedExpWeightedVariance, state::RegimeAdjustedVarianceCache; kwargs...)`](@ref)
+  - [`RegimeAdjustedVarianceState`](@ref)
+  - [`Statistics.var(ce::RegimeAdjustedExpWeightedVariance, state::RegimeAdjustedVarianceState; kwargs...)`](@ref)
   - [`Statistics.std(ce::RegimeAdjustedExpWeightedVariance; kwargs...)`](@ref)
 """
 function Statistics.std(ce::RegimeAdjustedExpWeightedVariance,
-                        state::RegimeAdjustedVarianceCache; kwargs...)
+                        state::RegimeAdjustedVarianceState; kwargs...)
     return sqrt.(var(ce, state; kwargs...))
 end
 """
@@ -1437,7 +1437,7 @@ ERROR: ArgumentError: `ce` holds no partial-fit state, so there is nothing to re
 # Related
 
   - [`partial_fit!(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::Int = 1, estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)`](@ref)
-  - [`Statistics.std(ce::RegimeAdjustedExpWeightedVariance, state::RegimeAdjustedVarianceCache; kwargs...)`](@ref)
+  - [`Statistics.std(ce::RegimeAdjustedExpWeightedVariance, state::RegimeAdjustedVarianceState; kwargs...)`](@ref)
   - [`Statistics.var(ce::RegimeAdjustedExpWeightedVariance; kwargs...)`](@ref)
 """
 function Statistics.std(ce::RegimeAdjustedExpWeightedVariance; kwargs...)
@@ -1448,8 +1448,8 @@ function Statistics.std(ce::RegimeAdjustedExpWeightedVariance; kwargs...)
 end
 """
     merge_states(
-        a::RegimeAdjustedVarianceCache,
-        b::RegimeAdjustedVarianceCache
+        a::RegimeAdjustedVarianceState,
+        b::RegimeAdjustedVarianceState
     ) -> Union{}
 
 Refuses a pair of regime-adjusted states, because this family does not merge.
@@ -1490,19 +1490,19 @@ true
 
 # Related
 
-  - [`RegimeAdjustedVarianceCache`](@ref)
+  - [`RegimeAdjustedVarianceState`](@ref)
   - [`merge_states`](@ref)
   - [`assert_mergeable_states`](@ref)
   - [`partial_fit!(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::Int = 1, estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)`](@ref)
 """
-function merge_states(a::RegimeAdjustedVarianceCache, b::RegimeAdjustedVarianceCache)
+function merge_states(a::RegimeAdjustedVarianceState, b::RegimeAdjustedVarianceState)
     assert_mergeable_states(a, b)
-    return throw(ArgumentError("a `RegimeAdjustedVarianceCache` pair does not merge, because a block fitted from a cold start is not what the same block contributes after another one. The regime state reads each observation's standardised squared innovation, which divides by the running variance and is gated by the running observation count. Fold the second block into the first with `partial_fit!` instead."))
+    return throw(ArgumentError("a `RegimeAdjustedVarianceState` pair does not merge, because a block fitted from a cold start is not what the same block contributes after another one. The regime state reads each observation's standardised squared innovation, which divides by the running variance and is gated by the running observation count. Fold the second block into the first with `partial_fit!` instead."))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Copies a [`RegimeAdjustedVarianceCache`](@ref), so the copy shares no array with the original.
+Copies a [`RegimeAdjustedVarianceState`](@ref), so the copy shares no array with the original.
 
 The `copy` method of the [`AbstractPartialFitState`](@ref) interface, which [`partial_fit`](@ref) calls before it folds. Every array field is copied, and the two scalar fields pass through. The circular buffer of recent centred returns is rebuilt at the same capacity, and each observation it holds is copied into it, so a fold on the copy pushes into a buffer of its own.
 
@@ -1519,15 +1519,15 @@ This family answers `copy` and refuses `merge_states`. The two methods are indep
 
 # Returns
 
-  - `state::RegimeAdjustedVarianceCache`: A fresh cache, equal to `x`, whose arrays are fresh.
+  - `state::RegimeAdjustedVarianceState`: A fresh cache, equal to `x`, whose arrays are fresh.
 
 # Related
 
-  - [`RegimeAdjustedVarianceCache`](@ref)
+  - [`RegimeAdjustedVarianceState`](@ref)
   - [`partial_fit`](@ref)
   - [`AbstractPartialFitState`](@ref)
 """
-function Base.copy(x::RegimeAdjustedVarianceCache)
+function Base.copy(x::RegimeAdjustedVarianceState)
     ret_buffer = if isnothing(x.ret_buffer)
         nothing
     else
@@ -1537,7 +1537,7 @@ function Base.copy(x::RegimeAdjustedVarianceCache)
         end
         buffer
     end
-    return RegimeAdjustedVarianceCache(ret_buffer, copy(x.variance), copy(x.X2),
+    return RegimeAdjustedVarianceState(ret_buffer, copy(x.variance), copy(x.X2),
                                        copy(x.X_old_i), copy(x.z2), copy(x.location),
                                        copy(x.obs_count), copy(x.old_obs_count),
                                        copy(x.active), x.regime_state, x.n_regime_obs)

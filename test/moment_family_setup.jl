@@ -127,22 +127,15 @@ function family_verbs(family::Symbol)
 end
 
 #=
-ONE exemption, and it is the subject of the gate rather than a note beside it.
+The exemption is paid, and the tuple is empty.
 
-`RegimeAdjustedExpWeightedCovariance` declares no verb at all, and
-`RegimeAdjustedExpWeightedVariance` declares `var` alone while it sits on the covariance
-surface. Both entered the library with no implementation behind the mathematics their
-docstrings state and with no test: `sweep/manifest.toml` marks both files `swept = false`, and
-ADR 0082 records the same two files as the only two at 0.0 % coverage, which is the case the
-coverage ratchet was built around. ADR 0058 recorded the gap in its Notes when the `dims`
-census met it.
+`RegimeAdjustedExpWeightedCovariance` and `RegimeAdjustedExpWeightedVariance` entered the
+library with no implementation behind the mathematics their docstrings state. Issue #637
+carried that gap, and this tuple named the two types meanwhile. The gap is closed: the
+covariance estimator declares `cov` and `cor`, the variance estimator declares `std` beside its
+`var`, and it subtypes `AbstractVarianceEstimator`, which is the family its answer belongs to.
 
-`test/test_08m_variance_series.jl` has since covered the variance file, so the 0.0 % reading
-ADR 0082 records for it is history. That changes nothing here: the file still declares no
-`std`, and the covariance file still declares nothing at all.
-
-Nothing here can supply the missing mathematics, so issue #637 carries it. This tuple empties
-when that issue closes.
+The tuple stays, empty, because it is the shape the census reads. A name added here must carry
+its own reason and its own issue.
 =#
-const VERB_EXEMPT = (:RegimeAdjustedExpWeightedCovariance,
-                     :RegimeAdjustedExpWeightedVariance)
+const VERB_EXEMPT = ()

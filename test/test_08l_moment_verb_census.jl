@@ -57,19 +57,14 @@ include(joinpath(@__DIR__, "moment_family_setup.jl"))
         end
     end
 
-    # ------------------------------------------------- 2. the exemption is not stale
+    # ------------------------------------------------- 2. the exemption is empty
 
     #=
-    An exemption that has been paid must be deleted, or the next reader takes it for a
-    standing decision. Each name is still a leaf of the covariance family, and each still
-    fails the check the list excuses it from. The day issue #637 lands the missing
-    mathematics, this half reds the build and the tuple empties.
+    An exemption that has been paid must be deleted, or the next reader takes it for a standing
+    decision. Issue #637 paid the only one this census ever carried, so the tuple is empty and
+    the first half above names every leaf without exception.
     =#
-    for name in VERB_EXEMPT
-        S = getfield(PortfolioOptimisers, name)
-        @test S in families.ce
-        @test !answers_family(:ce, S)
-    end
+    @test isempty(VERB_EXEMPT)
 
     # ------------------------------------------- 3. the Correlation Rescale keeps its word
 

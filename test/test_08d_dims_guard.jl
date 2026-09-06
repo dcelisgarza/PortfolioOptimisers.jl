@@ -86,7 +86,7 @@ end
     end
     # The census is closed, so this number moves when an estimator is added. It is here to
     # show that the loop above ran over a real universe rather than an empty one.
-    @test checked == 41
+    @test checked == 45
 end
 
 @testset "no leaf spells the dims guard or the orientation by hand" begin

@@ -629,7 +629,7 @@ end
     # The root buys the length-1 iteration protocol and the pretty show, so it sits under
     # `AbstractResult` and neither `Union` of the protocol moves.
     @test pe.AbstractPartialFitState <: pe.AbstractResult
-    @test supertype(pe.RegimeAdjustedVarianceCache) === pe.AbstractPartialFitState
+    @test supertype(pe.RegimeAdjustedVarianceState) === pe.AbstractPartialFitState
     s = PFSOther(3)
     @test length(s) == 1
     @test s[1] === s

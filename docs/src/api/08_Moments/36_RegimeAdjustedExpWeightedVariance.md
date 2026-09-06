@@ -8,11 +8,16 @@ LogRegimeAdjusted
 FirstMomentRegimeAdjusted
 RootMeanSquaredAdjusted
 RegimeAdjustedExpWeightedVariance
-RegimeAdjustedVarianceCache
+RegimeAdjustedVarianceState
 regime_multiplier
-get_regime_state
+get_regime_state(::RootMeanSquaredAdjusted, z2_valid::VecNum, ::Any)
+get_regime_state(method::FirstMomentRegimeAdjusted, z2_valid::VecNum, ::Any)
+get_regime_state(method::LogRegimeAdjusted, z2_valid::VecNum, min_val::Number)
 hac_squared_returns!
-process_observation!
+process_observation!(cache::RegimeAdjustedVarianceState,
+                    ce::RegimeAdjustedExpWeightedVariance, X::VecNum,
+                    estimation_mask::Option{<:AbstractVector{<:Bool}},
+                    active_mask::Option{<:AbstractVector{<:Bool}})
 regime_adjusted_variance_pass!
 regime_adjusted_variance
 var(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::Int = 1,
@@ -31,14 +36,14 @@ partial_fit!(ce::RegimeAdjustedExpWeightedVariance, x::VecNum;
                     estimation_mask::Option{<:AbstractVector{<:Bool}} = nothing,
                     active_mask::Option{<:AbstractVector{<:Bool}} = nothing,
                     kwargs...)
-var(ce::RegimeAdjustedExpWeightedVariance, state::RegimeAdjustedVarianceCache; kwargs...)
+var(ce::RegimeAdjustedExpWeightedVariance, state::RegimeAdjustedVarianceState; kwargs...)
 var(ce::RegimeAdjustedExpWeightedVariance; kwargs...)
 std(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::Int = 1,
                     estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                     active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                     kwargs...)
-std(ce::RegimeAdjustedExpWeightedVariance, state::RegimeAdjustedVarianceCache; kwargs...)
+std(ce::RegimeAdjustedExpWeightedVariance, state::RegimeAdjustedVarianceState; kwargs...)
 std(ce::RegimeAdjustedExpWeightedVariance; kwargs...)
-PortfolioOptimisers.merge_states(a::RegimeAdjustedVarianceCache, b::RegimeAdjustedVarianceCache)
-Base.copy(x::PortfolioOptimisers.RegimeAdjustedVarianceCache)
+PortfolioOptimisers.merge_states(a::RegimeAdjustedVarianceState, b::RegimeAdjustedVarianceState)
+Base.copy(x::PortfolioOptimisers.RegimeAdjustedVarianceState)
 ```
