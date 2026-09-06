@@ -199,6 +199,118 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
+Abstract supertype of the cross-sectional weightings that name a weight source on a fitted loadings block.
+
+A member of this family **selects** a weight vector a fitted loadings block already carries, and computes none. It is the marker-family form the library uses for a fixed choice among stored quantities, as `class` does on `NormBallUncertaintySet`. Its sibling [`AbstractCrossSectionalWeightsAlgorithm`](@ref) is the other side of the pair: that family computes the cross-sectional weights inside the prior's own fit, and this one names which of the fit's outputs to read back.
+
+Two readers resolve a member to two different shapes, both over the same field of the block. `orthogonality_weights` reads the weights of the **latest** observation, one entry per asset, for an uncertainty set whose geometry serves the next decision. `cs_diagnostic_weights` reads the **whole** observation history, one row per observation, for a diagnostic that scores every observation instead of only the latest.
+
+# Interface
+
+## `orthogonality_weights`
+
+  - `orthogonality_weights(metric::AbstractOrthogonalityMetric, rr::AbstractLoadingsRegressionResult) -> Option{<:VecNum}`: Returns the weights of the latest observation, or `nothing` when the member is the unweighted one.
+
+## `cs_diagnostic_weights`
+
+  - `cs_diagnostic_weights(metric::AbstractOrthogonalityMetric, csfm::CrossSectionalFactorModel) -> Option{<:MatNum}`: Returns the whole observation history the member names, or `nothing` when the member is the unweighted one.
+
+# Related
+
+  - [`BenchmarkWeightMetric`](@ref)
+  - [`RegressionWeightMetric`](@ref)
+  - [`InverseIdiosyncraticVarianceMetric`](@ref)
+  - [`IdentityMetric`](@ref)
+  - [`AbstractCrossSectionalWeightsAlgorithm`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+"""
+abstract type AbstractOrthogonalityMetric <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Names the benchmark weights as the cross-sectional weight source.
+
+A block's `bw` field carries the benchmark weight of every asset at every observation, and a reader takes its latest row for an uncertainty set or its whole history for a diagnostic. A block fitted per asset over the observations carries no such field and refuses.
+
+# Examples
+
+```jldoctest
+julia> BenchmarkWeightMetric()
+BenchmarkWeightMetric()
+```
+
+# Related
+
+  - [`AbstractOrthogonalityMetric`](@ref)
+  - [`RegressionWeightMetric`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+"""
+struct BenchmarkWeightMetric <: AbstractOrthogonalityMetric end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Names the regression weights as the cross-sectional weight source.
+
+A block's `rw` field carries the weight the Cross-Sectional Regression gave every asset at every observation, and a reader takes its latest row for an uncertainty set or its whole history for a diagnostic. A block fitted per asset over the observations carries no such field and refuses.
+
+# Examples
+
+```jldoctest
+julia> RegressionWeightMetric()
+RegressionWeightMetric()
+```
+
+# Related
+
+  - [`AbstractOrthogonalityMetric`](@ref)
+  - [`BenchmarkWeightMetric`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+"""
+struct RegressionWeightMetric <: AbstractOrthogonalityMetric end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Names the inverse of the idiosyncratic variances as the cross-sectional weight source, the default.
+
+An asset whose returns the factors explain well carries a large weight. The variances come from `idiosyncratic_variances` on the loadings block, which reads `esigma`, and a non-positive variance refuses.
+
+# Examples
+
+```jldoctest
+julia> InverseIdiosyncraticVarianceMetric()
+InverseIdiosyncraticVarianceMetric()
+```
+
+# Related
+
+  - [`AbstractOrthogonalityMetric`](@ref)
+  - [`IdentityMetric`](@ref)
+  - [`idiosyncratic_variances`](@ref)
+"""
+struct InverseIdiosyncraticVarianceMetric <: AbstractOrthogonalityMetric end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Names no weight source: every asset carries the same weight.
+
+It is the one member that reads nothing off the loadings block, so it serves a block that carries neither a weight history nor an idiosyncratic variance. Both readers answer `nothing` on this member, which their caller takes as a vector of ones.
+
+# Examples
+
+```jldoctest
+julia> IdentityMetric()
+IdentityMetric()
+```
+
+# Related
+
+  - [`AbstractOrthogonalityMetric`](@ref)
+  - [`InverseIdiosyncraticVarianceMetric`](@ref)
+"""
+struct IdentityMetric <: AbstractOrthogonalityMetric end
+"""
+$(DocStringExtensions.TYPEDEF)
+
 Abstract supertype for all Factor Family Basis result types.
 
 All concrete and/or abstract types representing the change of basis that a re-based Factor Family is written in should be subtypes of `AbstractFactorFamilyBasis`. The root exists so that [`CrossSectionalFactorModel`](@ref) can bind its `fcb` slot to a type rather than to `Any`, and it is declared here rather than beside its member because the block that carries the slot is loaded before the member that fills it.
@@ -1263,4 +1375,5 @@ function regression(re::AbstractTimeSeriesRegressionEstimator, rd::ReturnsResult
     return regression(re, rd.X, rd.F)
 end
 
-export regression, Regression, LinearModel, GeneralisedLinearModel
+export regression, Regression, LinearModel, GeneralisedLinearModel, BenchmarkWeightMetric,
+       RegressionWeightMetric, InverseIdiosyncraticVarianceMetric, IdentityMetric

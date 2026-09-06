@@ -297,7 +297,7 @@ end
 """
     exposure_correlation(B::Arr3Num, w::Option{<:MatNum} = nothing) -> Matrix{<:Real}
     exposure_correlation(csfm::CrossSectionalFactorModel;
-                         weighting = BenchmarkWeightMetric()) -> Matrix{<:Real}
+                         weighting::AbstractOrthogonalityMetric = BenchmarkWeightMetric()) -> Matrix{<:Real}
 
 Return the time-averaged correlation between every pair of factor exposures.
 
@@ -367,7 +367,7 @@ function exposure_correlation(B::Arr3Num, w::Option{<:MatNum} = nothing)
     return Cm
 end
 function exposure_correlation(csfm::CrossSectionalFactorModel;
-                              weighting = BenchmarkWeightMetric())
+                              weighting::AbstractOrthogonalityMetric = BenchmarkWeightMetric())
     return exposure_correlation(cs_diagnostic_exposures(csfm),
                                 cs_diagnostic_weights(weighting, csfm))
 end
@@ -716,7 +716,7 @@ end
     exposure_stability(B::Arr3Num, w::Option{<:MatNum} = nothing;
                        step::Integer = 21) -> Matrix{<:Real}
     exposure_stability(csfm::CrossSectionalFactorModel; step::Integer = 21,
-                       weighting = BenchmarkWeightMetric()) -> Matrix{<:Real}
+                       weighting::AbstractOrthogonalityMetric = BenchmarkWeightMetric()) -> Matrix{<:Real}
 
 Return the stability of every factor exposure, one row per pair of observations.
 
@@ -779,14 +779,14 @@ function exposure_stability(B::Arr3Num, w::Option{<:MatNum} = nothing; step::Int
     return S
 end
 function exposure_stability(csfm::CrossSectionalFactorModel; step::Integer = 21,
-                            weighting = BenchmarkWeightMetric())
+                            weighting::AbstractOrthogonalityMetric = BenchmarkWeightMetric())
     return exposure_stability(cs_diagnostic_exposures(csfm),
                               cs_diagnostic_weights(weighting, csfm); step = step)
 end
 """
     exposure_dispersion(B::Arr3Num, w::Option{<:MatNum} = nothing) -> Matrix{<:Real}
     exposure_dispersion(csfm::CrossSectionalFactorModel;
-                        weighting = BenchmarkWeightMetric()) -> Matrix{<:Real}
+                        weighting::AbstractOrthogonalityMetric = BenchmarkWeightMetric()) -> Matrix{<:Real}
 
 Return the weighted cross-sectional standard deviation of every factor exposure, one row per observation.
 
@@ -883,14 +883,14 @@ function exposure_cross_section_std(B::Arr3Num, u::MatNum, t::Integer, k::Intege
     return sqrt(v)
 end
 function exposure_dispersion(csfm::CrossSectionalFactorModel;
-                             weighting = BenchmarkWeightMetric())
+                             weighting::AbstractOrthogonalityMetric = BenchmarkWeightMetric())
     return exposure_dispersion(cs_diagnostic_exposures(csfm),
                                cs_diagnostic_weights(weighting, csfm))
 end
 """
     exposure_coverage(B::Arr3Num, w::Option{<:MatNum} = nothing) -> Vector{<:Real}
     exposure_coverage(csfm::CrossSectionalFactorModel;
-                      weighting = BenchmarkWeightMetric()) -> Vector{<:Real}
+                      weighting::AbstractOrthogonalityMetric = BenchmarkWeightMetric()) -> Vector{<:Real}
 
 Return the coverage of every factor exposure, one entry per factor.
 
@@ -1004,7 +1004,7 @@ function exposure_covered_count(B::Arr3Num, u::MatNum, t::Integer, k::Integer)
     return n
 end
 function exposure_coverage(csfm::CrossSectionalFactorModel;
-                           weighting = BenchmarkWeightMetric())
+                           weighting::AbstractOrthogonalityMetric = BenchmarkWeightMetric())
     return exposure_coverage(cs_diagnostic_exposures(csfm),
                              cs_diagnostic_weights(weighting, csfm))
 end
