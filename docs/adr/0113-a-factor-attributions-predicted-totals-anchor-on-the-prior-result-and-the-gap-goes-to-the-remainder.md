@@ -109,3 +109,33 @@ components sum to the total, and the asset rows sum to the two components the mo
 [Issue #782](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/782) built the verb, and
 [issue #708](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/708) decided it. The rule
 is decision 5 of that issue's resolution.
+
+## Amendment (2026-09-06)
+
+Issue #844 re-examined the asset axis and kept the decision. It corrects one sentence of the
+reasoning, which was too strong.
+
+The fourth rejected alternative says that the asset axis's share of the remainder has no split,
+because "there is no such split". That is false as a statement of the mathematics. The remainder
+is a quadratic form, `w' (pr.sigma - M F M' - D) w / sigma_P`, and Euler's identity splits any
+quadratic form over the assets exactly: the sum over `i` of `w_i ((pr.sigma - M F M' - D) w)_i`
+is that form. Anchoring the asset axis on `pr.sigma` would therefore make the rows reach the total,
+and each asset's `vol_contrib` would then equal the Euler risk contribution to the variance that
+`risk_contribution` reports.
+
+The split exists, and the library still refuses it, for the reason the decision gives elsewhere:
+the realised asset axis has no carrier moments to read, so anchoring the predicted axis on
+`pr.sigma` would make the two sides state different identities, and a reader who compares a
+predicted attribution against a realised one over the same prior would find the asset rows summing
+to different things. What the carrier split also lacks is an interpretation: under an
+entropy-pooling tilt the difference matrix is a change of observation weights, and an asset's
+Euler share of it is a well-defined number that describes no property of the asset.
+
+The choice changes numbers only when the carrier's moments differ from the block's model. On a
+plain fit with the default matrix processing the two anchors agree to rounding. The gap opens
+under a wrapping prior, under a matrix processing that denoises or detones the lifted covariance,
+and under a `FactorPrior` with `rsd = false`, where the block carries no residual variance. When
+it is open, the totals, the four components, the factor rows, the family rows, the per-asset
+systematic and idiosyncratic rows and the asset-by-factor matrices are the same under both anchors.
+Only the per-asset `vol_contrib`, `pct_var` and `mu_contrib` move, by that asset's Euler share of
+the remainder.

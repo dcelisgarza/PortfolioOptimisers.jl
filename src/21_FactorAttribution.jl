@@ -694,7 +694,7 @@ end
 
 Return an array with every non-finite entry replaced by zero, or the array itself.
 
-A Prior Estimator fits on the coverage universe and answers on the full one, so an asset it could not estimate carries `NaN` in its row of `mu`, of `sigma` and of the block. Such an asset carries no weight, and a factor attribution therefore contributes nothing through it, but `0 * NaN` is `NaN` and would poison every sum. The entries are replaced once here rather than guarded at each of the sums.
+A Prior Estimator fits on the coverage universe and answers on the full one, so an asset it could not estimate carries `NaN` in its row of `mu`, of `sigma` and of the block. A holding in such an asset is reported by [`attribution_investable_diagnostic`](@ref) before the arithmetic starts, and `0 * NaN` is `NaN` and would poison every sum whether the asset is held or not. The entries are replaced once here rather than guarded at each of the sums, so a non-investable asset contributes nothing to any component.
 
 An array that is finite throughout is returned unchanged and is not copied, which is the whole universe's case.
 
@@ -709,27 +709,33 @@ An array that is finite throughout is returned unchanged and is not copied, whic
 # Related
 
   - [`factor_attribution`](@ref)
-  - [`assert_attribution_investable`](@ref)
+  - [`attribution_investable_diagnostic`](@ref)
   - [`investable_mask`](@ref)
 """
 function attribution_finite(A::AbstractArray)
     return all(isfinite, A) ? A : map(x -> isfinite(x) ? x : zero(x), A)
 end
 """
-    assert_attribution_investable(w::VecNum_MatNum, pr::AbstractPriorResult)
+    attribution_investable_diagnostic(w::VecNum_MatNum, pr::AbstractPriorResult,
+                                      strict::Bool)
 
-Refuse a portfolio that holds an asset the prior could not estimate.
+Report a portfolio that holds an asset the prior could not estimate.
 
-A non-investable asset carries `NaN` in `mu` and on the diagonal of `sigma`, so no moment of it exists to attribute. A portfolio that holds none of it is decomposed exactly, with a zero row wherever the asset appears; a portfolio that holds some of it has a return the model cannot describe, and the refusal names the assets rather than reporting a decomposition that silently drops them.
+A non-investable asset carries `NaN` in `mu` and on the diagonal of `sigma`, so no moment of it exists to attribute. A portfolio that holds none of it is decomposed exactly, with a zero row wherever the asset appears. A portfolio that holds some of it is a **term that cannot contribute a row**, and it takes the library's strictness policy through [`strict_diagnostic`](@ref): a warning names the assets and the decomposition proceeds with their contributions zeroed, or an `ArgumentError` names them under `strict`.
+
+The zeroing is the work of [`attribution_finite`](@ref) on every array the decomposition reads, so the held asset contributes nothing to the systematic and idiosyncratic components. On the predicted side the totals read `pr.mu` and `pr.sigma` with the same zeroing, so they describe the portfolio without the holding. On the realised side the net series still carries whatever return the holding earned, and that return lands in the unattributed remainder, which is where the reader looks for what the model does not explain.
+
+A weight history that holds a non-investable asset is the shape a walk-forward produces: a prior fit on the whole history marks every asset that delisted inside it non-investable, and an early fold held it while it was listed. That is why the default is to warn.
 
 # Arguments
 
   - `w`: The constant weights, or the weight history.
   - `pr`: The prior result.
+  - `strict`: Whether a held non-investable asset raises rather than warns.
 
 # Validation
 
-  - Every weight at a non-investable asset is zero, else an `ArgumentError` naming the assets is raised.
+  - Every weight at a non-investable asset is zero, else a warning naming the assets is emitted, or an `ArgumentError` naming them is raised under `strict`.
 
 # Returns
 
@@ -738,26 +744,101 @@ A non-investable asset carries `NaN` in `mu` and on the diagonal of `sigma`, so 
 # Related
 
   - [`factor_attribution`](@ref)
+  - [`strict_diagnostic`](@ref)
   - [`investable_mask`](@ref)
   - [`attribution_finite`](@ref)
 """
-function assert_attribution_investable(w::VecNum_MatNum, pr::AbstractPriorResult)::Nothing
-    return assert_attribution_investable(w, investable_mask(pr))
+function attribution_investable_diagnostic(w::VecNum_MatNum, pr::AbstractPriorResult,
+                                           strict::Bool)::Nothing
+    return attribution_investable_diagnostic(w, investable_mask(pr), strict)
 end
-function assert_attribution_investable(::VecNum_MatNum, ::Nothing)::Nothing
+function attribution_investable_diagnostic(::VecNum_MatNum, ::Nothing, ::Bool)::Nothing
     return nothing
 end
-function assert_attribution_investable(w::VecNum, imsk::BitVector)::Nothing
+function attribution_investable_diagnostic(w::VecNum, imsk::BitVector,
+                                           strict::Bool)::Nothing
     held = findall(i -> !imsk[i] && !iszero(w[i]), eachindex(imsk))
-    @argcheck(isempty(held),
-              ArgumentError("a factor attribution cannot decompose a holding in an asset the prior could not estimate. Assets $(held) are not investable, and the portfolio holds them. Reduce the weights to the investable universe, or refit the prior over a history that covers these assets."))
+    return attribution_investable_diagnostic(held, "the portfolio holds them", strict)
+end
+function attribution_investable_diagnostic(W::MatNum, imsk::BitVector,
+                                           strict::Bool)::Nothing
+    held = findall(i -> !imsk[i] && any(!iszero, view(W, :, i)), eachindex(imsk))
+    return attribution_investable_diagnostic(held, "the weight history holds them", strict)
+end
+function attribution_investable_diagnostic(held::AbstractVector{<:Integer},
+                                           holder::AbstractString, strict::Bool)::Nothing
+    if isempty(held)
+        return nothing
+    end
+    strict_diagnostic("a factor attribution cannot decompose a holding in an asset the prior could not estimate. Assets $(held) are not investable, and $(holder). Their contributions are zeroed, so the systematic and idiosyncratic components describe the portfolio without them, and on the realised side their return lands in the unattributed remainder. Pass `strict = true` to refuse instead, reduce the weights to the investable universe, or refit the prior over a history that covers these assets.",
+                      strict)
     return nothing
 end
-function assert_attribution_investable(W::MatNum, imsk::BitVector)::Nothing
-    held = findall(i -> !imsk[i] && any(!iszero, view(W, :, i)), eachindex(imsk))
-    @argcheck(isempty(held),
-              ArgumentError("a factor attribution cannot decompose a holding in an asset the prior could not estimate. Assets $(held) are not investable, and the weight history holds them. Reduce the weights to the investable universe, or refit the prior over a history that covers these assets."))
-    return nothing
+"""
+    attribution_investable_rows(A::AbstractArray, imsk::Option{BitVector})
+
+Return the loadings or the intercept with the rows of the non-investable assets replaced by zero.
+
+A non-investable asset can carry finite loadings while its idiosyncratic variance is `NaN`: the prior needs three facts to state a moment, and one missing fact is enough. [`attribution_finite`](@ref) replaces only the `NaN`, so the finite loadings of a held non-investable asset would reach the systematic component while the totals, which read `pr.mu` and `pr.sigma`, exclude the asset. The row is zeroed whole, so every component describes the portfolio without the non-investable assets, and the four still sum to the total.
+
+An absent mask means that every asset is investable, and the array is returned unchanged.
+
+# Arguments
+
+  - `A`: The loadings, `assets × factors`, or the intercept, one entry per asset.
+  - `imsk`: The investable mask, or `nothing`.
+
+# Returns
+
+  - `A::AbstractArray`: The array, with the rows of the non-investable assets replaced by zero.
+
+# Related
+
+  - [`factor_attribution`](@ref)
+  - [`attribution_investable_block`](@ref)
+  - [`attribution_investable_diagnostic`](@ref)
+  - [`investable_mask`](@ref)
+"""
+function attribution_investable_rows(A::AbstractArray, ::Nothing)
+    return A
+end
+function attribution_investable_rows(v::VecNum, imsk::BitVector)
+    return v .* imsk
+end
+function attribution_investable_rows(A::MatNum, imsk::BitVector)
+    return imsk .* A
+end
+"""
+    attribution_investable_block(E::VecNum_MatNum, imsk::Option{BitVector})
+
+Return the idiosyncratic covariance with the rows and the columns of the non-investable assets replaced by zero.
+
+The covariance sibling of [`attribution_investable_rows`](@ref). A diagonal covariance travels as a vector and loses the entries, and a full one loses the rows and the columns, so `w' D w` reads nothing of a held non-investable asset through either.
+
+# Arguments
+
+  - `E`: The idiosyncratic variances, one entry per asset, or the idiosyncratic covariance, `assets × assets`.
+  - `imsk`: The investable mask, or `nothing`.
+
+# Returns
+
+  - `E::VecNum_MatNum`: The variances or the covariance, with the non-investable assets replaced by zero.
+
+# Related
+
+  - [`factor_attribution`](@ref)
+  - [`attribution_investable_rows`](@ref)
+  - [`attribution_idiosyncratic_matrix`](@ref)
+  - [`investable_mask`](@ref)
+"""
+function attribution_investable_block(E::VecNum_MatNum, ::Nothing)
+    return E
+end
+function attribution_investable_block(e::VecNum, imsk::BitVector)
+    return e .* imsk
+end
+function attribution_investable_block(E::MatNum, imsk::BitVector)
+    return imsk .* E .* transpose(imsk)
 end
 """
     attribution_prior_block(pr::AbstractPriorResult)
@@ -932,12 +1013,13 @@ function attribution_family_axis(fam::VecStr, fbd::AttributionBreakdown,
 end
 """
     factor_attribution(w::VecNum, pr::AbstractPriorResult; assets::Bool = false,
-                       ppy::Number = 1) -> FactorAttributionResult
+                       ppy::Number = 1, strict::Bool = false) -> FactorAttributionResult
     factor_attribution(res::OptimisationResult, pr::Option{<:Pr_RR} = nothing;
                        kwargs...) -> FactorAttributionResult
     factor_attribution(w::VecNum, pr::AbstractPriorResult, X::MatNum,
                        fees::Option{<:Fees} = nothing; assets::Bool = false,
-                       se::Bool = false, ppy::Number = 1) -> FactorAttributionResult
+                       se::Bool = false, ppy::Number = 1,
+                       strict::Bool = false) -> FactorAttributionResult
     factor_attribution(w::VecNum, pr::AbstractPriorResult, rd::ReturnsResult,
                        fees::Option{<:Fees} = nothing; kwargs...) -> FactorAttributionResult
     factor_attribution(res::OptimisationResult, pr::Option{<:Pr_RR}, rd::ReturnsResult;
@@ -956,6 +1038,8 @@ The verb reads the weights and the factor model block, and returns one [`FactorA
 **The predicted totals anchor on the prior result, not on the model.** `pr.mu` and `pr.sigma` are what the optimiser saw and what [`expected_return`](@ref) and [`expected_risk`](@ref) report, so they are the totals. A wrapping prior replaces them while it forwards the block unchanged, so the model no longer reproduces them, and the two gaps `dot(w, pr.mu - M * fpr.mu - b)` and `dot(w, (pr.sigma - M * F * M' - D) * w) / sigma_P` land in the unattributed remainder. The remainder is therefore present on the predicted side too, and it is at rounding level on a plain fit. ADR 0113 records the rule and the four alternatives it refused.
 
 **Every source of unexplained return lands in the remainder, and no guard reports it.** On the realised side the identity per observation is `portfolio return = systematic + idiosyncratic + unattributed`, and the remainder holds the per-observation intercept share `b_t * sum(w)`, the fees, the cash, the weight drift inside a period and the exposure lag. A large `pct_var` on the remainder means the model does not explain the portfolio, and the reader draws that conclusion.
+
+**A holding the prior could not estimate is warned about and zeroed, and `strict` turns the warning into a refusal.** A non-investable asset carries `NaN` in `mu`, on the diagonal of `sigma` and across its rows of the block, so no moment of it exists to attribute. A portfolio that holds one takes the library's strictness policy through [`attribution_investable_diagnostic`](@ref): under the default `strict = false` a warning names the assets, every `NaN` is replaced by zero, and the decomposition proceeds with nothing attributed to them; under `strict = true` an `ArgumentError` names them. On the realised side a held asset whose return is non-finite at an observation takes the same policy through [`attribution_net_returns`](@ref), which names the observations and the assets, and zeroes those pairs. A weight history from a walk-forward holds exactly this shape whenever an asset delisted inside the history, which is why the default warns rather than refuses. The reference implementation warns and zeroes on its predicted side and zeroes per pair on its realised side, so the default reproduces it.
 
 **The factor shares disagree with [`factor_risk_contribution`](@ref), and the disagreement is one term.** That verb computes `(M' w)_k * (pinv(M) * grad)_k` with `grad` a finite difference of any risk measure, so for the variance and `sigma = M F M' + D` it reads `grad = (M F M' w + D w) / sigma_P` and its factor share is `(M' w)_k * (F M' w + pinv(M) D w)_k / sigma_P`. This decomposition's factor share is the first term alone, `(M' w)_k * (F M' w)_k / sigma_P`, and it holds the second, the **leakage** `(M' w)_k * (pinv(M) D w)_k / sigma_P`, in the idiosyncratic component instead. The two therefore agree exactly when `pinv(M) D w` is zero, and neither is wrong: one is an Euler decomposition through a pseudo-inverse, generic in the risk measure, and this one is the analytic model split, specific to the variance.
 
@@ -983,11 +1067,15 @@ The verb reads the weights and the factor model block, and returns one [`FactorA
   - `assets`: Whether to fill the asset axis and the asset-by-factor matrices.
   - `se`: Whether to fill the standard errors of the mean return contributions.
   - `ppy`: Periods per year the numbers are scaled to.
+  - `strict`: Whether a holding in a non-investable asset, or a non-finite return at a held observation, raises an `ArgumentError` rather than a warning.
 
 # Validation
 
   - `pr` carries a factor model block, else the `IsNothingError` of [`assert_prior_regression`](@ref) is raised.
   - `ppy > 0`, else a `DomainError` is raised.
+  - Every weight at a non-investable asset is zero, else a warning names the assets, or an `ArgumentError` names them under `strict`.
+  - Every held `(observation, asset)` pair of `X` is finite, else a warning names the pairs, or an `ArgumentError` names them under `strict`.
+  - `ret` is finite throughout, else an `IsNonFiniteError` naming the observations is raised.
   - The block carries the fields the chosen decomposition reads, else an `IsNothingError` names the field.
   - The portfolio variance is positive on the predicted side, and the portfolio volatility is positive on the realised side, else a `DomainError` is raised.
   - `1 <= window <= T`, else a `DomainError` is raised.
@@ -1009,18 +1097,20 @@ The verb reads the weights and the factor model block, and returns one [`FactorA
   - [`CrossSectionalFactorModel`](@ref)
 """
 function factor_attribution(w::VecNum, pr::AbstractPriorResult; assets::Bool = false,
-                            ppy::Number = 1)::FactorAttributionResult
+                            ppy::Number = 1, strict::Bool = false)::FactorAttributionResult
     blk = attribution_prior_block(pr)
     rr, fpr = blk.rr, blk.fpr
-    assert_attribution_investable(w, pr)
+    imsk = investable_mask(pr)
+    attribution_investable_diagnostic(w, imsk, strict)
     sc = attribution_scale(ppy)
-    M = attribution_finite(rr.M)
+    M = attribution_investable_rows(attribution_finite(rr.M), imsk)
     F = fpr.sigma
     mu_f = fpr.mu
-    bp = attribution_finite(rr.b)
+    bp = attribution_investable_rows(attribution_finite(rr.b), imsk)
     sigma = attribution_finite(pr.sigma)
     mu = attribution_finite(pr.mu)
-    D = attribution_idiosyncratic_matrix(attribution_finite(attribution_idiosyncratic_covariance(rr)))
+    D = attribution_idiosyncratic_matrix(attribution_investable_block(attribution_finite(attribution_idiosyncratic_covariance(rr)),
+                                                                      imsk))
     bexp = transpose(M) * w
     Fb = F * bexp
     sys_var = LinearAlgebra.dot(bexp, Fb)

@@ -1103,8 +1103,40 @@ function attribution_rolling(W::VecNum_MatNum, ret::VecNum, al::NamedTuple,
                                  se, ppy) for t in window:step:T]
 end
 """
+    attribution_finite_series(ret::VecNum)
+
+Refuse a portfolio return series that carries a non-finite value, naming the observations.
+
+The methods that form the series themselves route a non-finite return through [`attribution_net_returns`](@ref), so a `NaN` that reaches here came in the caller's own series or in a fold's. It is refused before the alignment, so the observations named are the caller's and not the aligned window's, and the refusal names the cause rather than the volatility it would poison.
+
+# Arguments
+
+  - `ret`: The net portfolio return series.
+
+# Validation
+
+  - `ret` is finite throughout, else an `IsNonFiniteError` naming the observations is raised.
+
+# Returns
+
+  - Nothing is returned.
+
+# Related
+
+  - [`factor_attribution`](@ref)
+  - [`attribution_net_returns`](@ref)
+  - [`attribution_realised_entry`](@ref)
+"""
+function attribution_finite_series(ret::VecNum)::Nothing
+    nonfinite = findall(!isfinite, ret)
+    @argcheck(isempty(nonfinite),
+              IsNonFiniteError("the portfolio return series carries a non-finite value at observations $(nonfinite), so no attribution over it exists. A holding earns a return at every observation it is held: form the series over finite returns, or drop the observations."))
+    return nothing
+end
+"""
     attribution_realised_entry(W::VecNum_MatNum, pr::AbstractPriorResult, ret::VecNum;
-                               assets::Bool = false, se::Bool = false, ppy::Number = 1)
+                               assets::Bool = false, se::Bool = false, ppy::Number = 1,
+                               strict::Bool = false)
         -> FactorAttributionResult
 
 Align a factor model block against a realised return series and decompose it.
@@ -1119,6 +1151,7 @@ Every realised method of [`factor_attribution`](@ref) that is not rolling arrive
   - `assets`: Whether to fill the asset axis and the asset-by-factor matrices.
   - `se`: Whether to fill the standard errors of the mean return contributions.
   - `ppy`: Periods per year the numbers are scaled to.
+  - `strict`: Whether a holding in a non-investable asset raises rather than warns.
 
 # Returns
 
@@ -1127,14 +1160,16 @@ Every realised method of [`factor_attribution`](@ref) that is not rolling arrive
 # Related
 
   - [`factor_attribution`](@ref)
+  - [`attribution_investable_diagnostic`](@ref)
   - [`attribution_align`](@ref)
   - [`realised_attribution`](@ref)
 """
 function attribution_realised_entry(W::VecNum_MatNum, pr::AbstractPriorResult, ret::VecNum;
-                                    assets::Bool = false, se::Bool = false,
-                                    ppy::Number = 1)::FactorAttributionResult
+                                    assets::Bool = false, se::Bool = false, ppy::Number = 1,
+                                    strict::Bool = false)::FactorAttributionResult
     rr = attribution_prior_block(pr).rr
-    assert_attribution_investable(W, pr)
+    attribution_investable_diagnostic(W, pr, strict)
+    attribution_finite_series(ret)
     al = attribution_align(rr, pr, length(ret))
     return realised_attribution(attribution_window_weights(W, al.rows), view(ret, al.rows),
                                 al, attribution_families(rr), assets, se, ppy)
@@ -1142,7 +1177,7 @@ end
 """
     attribution_rolling_entry(W::VecNum_MatNum, pr::AbstractPriorResult, ret::VecNum,
                               window::Integer; step::Integer = 1, assets::Bool = false,
-                              se::Bool = false, ppy::Number = 1)
+                              se::Bool = false, ppy::Number = 1, strict::Bool = false)
         -> Vector{<:FactorAttributionResult}
 
 Align a factor model block against a realised return series and roll the decomposition.
@@ -1159,6 +1194,7 @@ Every rolling method of [`factor_attribution`](@ref) arrives here, having formed
   - `assets`: Whether to fill the asset axis and the asset-by-factor matrices.
   - `se`: Whether to fill the standard errors of the mean return contributions.
   - `ppy`: Periods per year the numbers are scaled to.
+  - `strict`: Whether a holding in a non-investable asset raises rather than warns.
 
 # Returns
 
@@ -1167,73 +1203,75 @@ Every rolling method of [`factor_attribution`](@ref) arrives here, having formed
 # Related
 
   - [`factor_attribution`](@ref)
+  - [`attribution_investable_diagnostic`](@ref)
   - [`attribution_rolling`](@ref)
 """
 function attribution_rolling_entry(W::VecNum_MatNum, pr::AbstractPriorResult, ret::VecNum,
                                    window::Integer; step::Integer = 1, assets::Bool = false,
-                                   se::Bool = false, ppy::Number = 1)
+                                   se::Bool = false, ppy::Number = 1, strict::Bool = false)
     rr = attribution_prior_block(pr).rr
-    assert_attribution_investable(W, pr)
+    attribution_investable_diagnostic(W, pr, strict)
+    attribution_finite_series(ret)
     al = attribution_align(rr, pr, length(ret))
     return attribution_rolling(attribution_window_weights(W, al.rows), ret[al.rows], al,
                                attribution_families(rr), assets, se, ppy, window, step)
 end
 """
-    attribution_investable_returns(X::MatNum, pr::AbstractPriorResult)
+    attribution_net_returns(w::VecNum, X::MatNum, fees::Option{<:Fees}, strict::Bool)
 
-Return the asset returns with the columns of the non-investable assets replaced by zero.
+Return the net portfolio return series over the finite entries of the asset returns.
 
-A non-investable asset carries no moment to attribute, and its return column may carry a `NaN` at every observation. The portfolio holds none of it, which [`assert_attribution_investable`](@ref) has already established, so its column contributes nothing and is replaced rather than multiplied by a zero weight, which would answer `NaN`.
+A point-in-time panel carries a `NaN` at every `(observation, asset)` pair where the asset is inactive: before it lists, after it delists, and at a non-investable asset's whole column. `0 * NaN` is `NaN`, so a zero weight does not save the product `X * w`, and the series is formed over the finite entries instead.
 
-A column of an **investable** asset is left as it stands, so a non-finite return there reaches the series and the caller sees it rather than a silently altered history.
+A pair with a **zero** weight contributes nothing whatever it holds, and is never reported. A pair with a **non-zero** weight and a non-finite return is a holding with no return to earn, and it takes the library's strictness policy through [`strict_diagnostic`](@ref): a warning names the observations and the assets and the pair contributes zero, or an `ArgumentError` names them under `strict`. Under a walk-forward the held pairs after a delisting carry a zero weight already, so the default is silent there.
 
 # Arguments
 
+  - `w`: Portfolio weights.
   - `X`: Asset returns, `observations × assets`.
-  - `pr`: The prior result.
+  - `fees`: Fees the net series is formed against, or `nothing`.
+  - `strict`: Whether a non-finite return at a held pair raises rather than warns.
+
+# Validation
+
+  - Every held pair of `X` is finite, else a warning naming the pairs is emitted, or an `ArgumentError` naming them is raised under `strict`.
 
 # Returns
 
-  - `X::MatNum`: The asset returns, with the non-investable columns replaced by zero.
+  - `ret::VecNum`: The net portfolio return series, one entry per observation.
 
 # Related
 
   - [`factor_attribution`](@ref)
-  - [`assert_attribution_investable`](@ref)
-  - [`investable_mask`](@ref)
+  - [`attribution_investable_diagnostic`](@ref)
+  - [`calc_net_returns`](@ref)
+  - [`strict_diagnostic`](@ref)
 """
-function attribution_investable_returns(X::MatNum, pr::AbstractPriorResult)
-    return attribution_investable_returns(X, investable_mask(pr))
-end
-function attribution_investable_returns(X::MatNum, ::Nothing)
-    return X
-end
-function attribution_investable_returns(X::MatNum, imsk::BitVector)
-    Y = copy(X)
-    for i in eachindex(imsk)
-        if !imsk[i]
-            Y[:, i] .= zero(eltype(Y))
-        end
+function attribution_net_returns(w::VecNum, X::MatNum, fees::Option{<:Fees}, strict::Bool)
+    if all(isfinite, X)
+        return calc_net_returns(w, X, fees)
     end
-    return Y
+    held = [(t, i) for i in axes(X, 2) if !iszero(w[i])
+            for t in axes(X, 1) if !isfinite(X[t, i])]
+    if !isempty(held)
+        assets = unique(last.(held))
+        strict_diagnostic("a factor attribution cannot decompose a holding that earns no return. Assets $(assets) carry a non-finite return at $(length(held)) held (observation, asset) pair(s), the first at observation $(first(held)[1]). Those pairs contribute zero to the net series, so the total understates the portfolio by whatever they earned. Pass `strict = true` to refuse instead, zero the weights over the observations the asset is inactive, or pass a weight history.",
+                          strict)
+    end
+    Y = attribution_finite(X)
+    return calc_net_returns(w, Y, fees)
 end
 function factor_attribution(w::VecNum, pr::AbstractPriorResult, X::MatNum,
-                            fees::Option{<:Fees} = nothing;
+                            fees::Option{<:Fees} = nothing; strict::Bool = false,
                             kwargs...)::FactorAttributionResult
-    assert_attribution_investable(w, pr)
-    return attribution_realised_entry(w, pr,
-                                      calc_net_returns(w,
-                                                       attribution_investable_returns(X,
-                                                                                      pr),
-                                                       fees); kwargs...)
+    return attribution_realised_entry(w, pr, attribution_net_returns(w, X, fees, strict);
+                                      strict = strict, kwargs...)
 end
 function factor_attribution(w::VecNum, pr::AbstractPriorResult, X::MatNum,
-                            fees::Option{<:Fees}, window::Integer; kwargs...)
-    assert_attribution_investable(w, pr)
-    return attribution_rolling_entry(w, pr,
-                                     calc_net_returns(w,
-                                                      attribution_investable_returns(X, pr),
-                                                      fees), window; kwargs...)
+                            fees::Option{<:Fees}, window::Integer; strict::Bool = false,
+                            kwargs...)
+    return attribution_rolling_entry(w, pr, attribution_net_returns(w, X, fees, strict),
+                                     window; strict = strict, kwargs...)
 end
 function factor_attribution(w::VecNum, pr::AbstractPriorResult, X::MatNum, window::Integer;
                             kwargs...)

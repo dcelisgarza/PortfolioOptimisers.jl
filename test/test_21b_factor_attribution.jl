@@ -92,8 +92,7 @@ end
 
 # The net portfolio series the realised methods form, over the returns the prior can attribute.
 function fa_net_returns(w, pr, rd)
-    X = PortfolioOptimisers.attribution_investable_returns(rd.X, pr)
-    return PortfolioOptimisers.calc_net_returns(w, X, nothing)
+    return PortfolioOptimisers.attribution_net_returns(w, rd.X, nothing, false)
 end
 
 @testset "The block helpers, and the refusals of their root" begin
@@ -740,19 +739,94 @@ end
     end
 end
 
+@testset "The investable zeroing helpers of the predicted side" begin
+    PO = PortfolioOptimisers
+    imsk = BitVector([true, false, true])
+    A = ones(3, 2)
+    v = ones(3)
+    E = ones(3, 3)
+    @test PO.attribution_investable_rows(A, nothing) === A
+    @test PO.attribution_investable_rows(A, imsk) == [1 1; 0 0; 1 1]
+    @test PO.attribution_investable_rows(v, imsk) == [1, 0, 1]
+    @test PO.attribution_investable_block(E, nothing) === E
+    @test PO.attribution_investable_block(v, imsk) == [1, 0, 1]
+    @test PO.attribution_investable_block(E, imsk) == [1 0 1; 0 0 0; 1 0 1]
+end
 @testset "The refusals" begin
     PO = PortfolioOptimisers
     pr, rd = fa_prior()
     w = fa_weights(pr)
-    @testset "A holding the prior could not estimate is named" begin
+    # Issue #844: a holding in a non-investable asset takes the library's strictness policy.
+    # The default warns, names the assets and zeroes their contributions, which is what the
+    # reference implementation does and what a walk-forward over a panel with a delisting
+    # needs; `strict = true` keeps the refusal.
+    @testset "A holding the prior could not estimate is warned about, and refused under strict" begin
         imsk = PO.investable_mask(pr)
         @test !isnothing(imsk)
+        j = findfirst(!, imsk)
         bad = copy(w)
-        bad[findfirst(!, imsk)] = 0.1
-        @test_throws ArgumentError factor_attribution(bad, pr)
-        @test_throws ArgumentError factor_attribution(bad, pr, rd.X)
-        @test_throws ArgumentError factor_attribution(repeat(transpose(bad), size(rd.X, 1)),
-                                                      pr, rd.X * bad)
+        bad[j] = 0.1
+        T = size(rd.X, 1)
+        W = repeat(transpose(bad), T)
+        holds(l) = occursin("Assets [$(j)] are not investable", l.message)
+        logs, fa = Test.collect_test_logs(() -> factor_attribution(bad, pr; assets = true))
+        @test count(holds, logs) == 1
+        @test isfinite(fa.total.vol_contrib)
+        @test fa.sys.vol_contrib + fa.idio.vol_contrib + fa.unattr.vol_contrib ≈
+              fa.total.vol_contrib
+        @test fa.abd.weight[j] == 0.1
+        @test iszero(fa.abd.sys_vol_contrib[j])
+        @test iszero(fa.abd.idio_vol_contrib[j])
+        @test iszero(fa.abd.mu_contrib[j])
+        # The held asset contributes nothing, so the decomposition is the one of the
+        # portfolio without it.
+        @test fa.sys.vol_contrib ≈ factor_attribution(w, pr).sys.vol_contrib
+        logs, far = Test.collect_test_logs(() -> factor_attribution(bad, pr, rd.X))
+        @test count(holds, logs) == 1
+        @test isfinite(far.total.vol_contrib)
+        ret = PO.attribution_net_returns(bad, rd.X, nothing, false)
+        logs, faw = Test.collect_test_logs(() -> factor_attribution(W, pr, ret))
+        @test count(holds, logs) == 1
+        @test faw.total.vol_contrib ≈ far.total.vol_contrib
+        @test_throws ArgumentError factor_attribution(bad, pr; strict = true)
+        @test_throws ArgumentError factor_attribution(bad, pr, rd.X; strict = true)
+        @test_throws ArgumentError factor_attribution(W, pr, ret; strict = true)
+        @test_throws ArgumentError factor_attribution(W, pr, ret, 30; strict = true)
+    end
+    @testset "A held observation with no return is zeroed with a warning, and refused under strict" begin
+        t = 7
+        i = findfirst(!iszero, w)
+        X = copy(rd.X)
+        X[t, i] = NaN
+        earns(l) = occursin("earns no return", l.message) &&
+                   occursin("the first at observation $(t)", l.message)
+        logs, fa = Test.collect_test_logs(() -> factor_attribution(w, pr, X))
+        @test count(earns, logs) == 1
+        # The zeroed pair is the same series as an explicit zero, which warns about nothing.
+        Y = copy(rd.X)
+        Y[t, i] = 0.0
+        ref = @test_logs min_level = Logging.Warn factor_attribution(w, pr, Y)
+        @test fa.total.vol_contrib ≈ ref.total.vol_contrib
+        @test fa.total.mu_contrib ≈ ref.total.mu_contrib
+        @test_throws ArgumentError factor_attribution(w, pr, X; strict = true)
+        @test_throws ArgumentError factor_attribution(w, pr, X, 30; strict = true)
+        # A zero weight at a non-finite return is silent under both settings.
+        k = findfirst(iszero, w)
+        Z = copy(rd.X)
+        Z[t, k] = NaN
+        @test_logs min_level = Logging.Warn factor_attribution(w, pr, Z; strict = true)
+    end
+    @testset "A non-finite entry in a caller's series is named by observation" begin
+        ret = fa_net_returns(w, pr, rd)
+        ret[3] = NaN
+        W = repeat(transpose(w), length(ret))
+        err = try
+            factor_attribution(W, pr, ret)
+        catch e
+            e
+        end
+        @test err isa IsNonFiniteError
+        @test occursin("observations [3]", err.msg)
     end
     @testset "A prior with no factor block is refused before the arithmetic" begin
         Xp = randn(StableRNG(782_003), 40, 3) ./ 100

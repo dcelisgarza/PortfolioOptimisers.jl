@@ -26,7 +26,9 @@ attribution_idiosyncratic_variances
 assert_attribution_field
 assert_attribution_carrier
 attribution_finite
-assert_attribution_investable
+attribution_investable_diagnostic
+attribution_investable_rows
+attribution_investable_block
 attribution_prior_block
 attribution_scale
 attribution_idiosyncratic_matrix
@@ -65,7 +67,8 @@ attribution_family_errors
 realised_attribution_assets
 realised_attribution_asset_factor
 attribution_rolling
-attribution_investable_returns
+attribution_net_returns
+attribution_finite_series
 attribution_realised_entry
 attribution_rolling_entry
 attribution_prediction_history

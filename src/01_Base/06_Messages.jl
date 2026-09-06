@@ -227,7 +227,7 @@ end
 
 Report a **term that cannot contribute a row**: throw an `ArgumentError` under `strict`, warn otherwise, and in both cases the offending term is dropped.
 
-`strict` governs what is droppable: a name that resolves against nothing, and a row whose coefficients carry no information, as with a zero centrality vector. Nothing else is refused, and a malformed *entry* throws unconditionally, because there is no reading of it to fall back to. Every such diagnostic in the library routes through here, so the strictness policy is one edit.
+`strict` governs what is droppable: a name that resolves against nothing, a row whose coefficients carry no information, as with a zero centrality vector, and a holding a factor attribution cannot attribute, in an asset the prior could not estimate or at an observation with no return. Nothing else is refused, and a malformed *entry* throws unconditionally, because there is no reading of it to fall back to. Every such diagnostic in the library routes through here, so the strictness policy is one edit.
 
 # Algorithm
 
