@@ -12,7 +12,8 @@ RegimeAdjustedVarianceState
 regime_multiplier
 get_regime_state(::RootMeanSquaredAdjusted, z2_valid::VecNum, ::Any)
 get_regime_state(method::FirstMomentRegimeAdjusted, z2_valid::VecNum, ::Any)
-get_regime_state(method::LogRegimeAdjusted, z2_valid::VecNum, min_val::Number)
+get_regime_state(method::LogRegimeAdjusted, z2_valid::VecNum,
+                 min_val::Number = sqrt(eps(eltype(z2_valid))))
 hac_squared_returns!
 process_observation!(cache::RegimeAdjustedVarianceState,
                     ce::RegimeAdjustedExpWeightedVariance, X::VecNum,
