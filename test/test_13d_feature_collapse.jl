@@ -28,13 +28,19 @@ function record!(de::RecordingDistance, Z)
     end
     return nothing
 end
-function PO.distance(de::RecordingDistance, ce, X; Z = nothing, kwargs...)
-    record!(de, Z)
-    return PO.distance(de.de, ce, X; Z = Z, kwargs...)
+# The panel is what travels now, so the instrument stacks the Feature Matrix the kernel
+# will measure, with the wrapped estimator's own selector. The recording is therefore what
+# the metric sees, not what the carrier holds.
+function seen_matrix(de::RecordingDistance, pnl)
+    return isnothing(pnl) ? nothing : feature_matrix(pnl, de.de.sel; strict = de.de.strict)
 end
-function PO.cor_and_dist(de::RecordingDistance, ce, X; Z = nothing, kwargs...)
-    record!(de, Z)
-    return PO.cor_and_dist(de.de, ce, X; Z = Z, kwargs...)
+function PO.distance(de::RecordingDistance, ce, X; pnl = nothing, kwargs...)
+    record!(de, seen_matrix(de, pnl))
+    return PO.distance(de.de, ce, X; pnl = pnl, kwargs...)
+end
+function PO.cor_and_dist(de::RecordingDistance, ce, X; pnl = nothing, kwargs...)
+    record!(de, seen_matrix(de, pnl))
+    return PO.cor_and_dist(de.de, ce, X; pnl = pnl, kwargs...)
 end
 PO.distance(de::RecordingDistance, Z; kwargs...) = PO.distance(de.de, Z; kwargs...)
 function PO.cor_and_dist(de::RecordingDistance, Z; kwargs...)

@@ -127,10 +127,20 @@ ships the pair it needs under interim names: `panel_feature_matrix(pnl)`, which 
 and returns the labels beside the matrix, and `feature_matrix_panel(nz, Z)`, its exact inverse —
 one numeric field per column, under that column's own name. The inverse is how a routine that
 produces a bare matrix, a producer or a meta-optimiser collapse onto a synthetic universe, puts
-that matrix on a carrier. The selector build replaces `panel_feature_matrix` with the three verbs
-above. The producer build deletes the inverse with the shim, because the collapse of
+that matrix on a carrier. The selector build adds the three verbs above and moves every consumer
+that reads a **selected** matrix onto them; `panel_feature_matrix` keeps the two readers that
+stack the panel whole, `carrier_feature_matrix` and the meta-optimiser collapse. The producer
+build deletes both interim names, because the collapse of
 [issue #807](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/807) returns a panel and
-a producer builds its tensor field directly, so the inverse loses its last reader.
+a producer builds its tensor field directly, so each loses its last reader.
+
+The three verbs live in `src/03_InputData/05_FeatureSelector.jl`, beside the panel rather than
+inside it. A Feature Selector is its own noun, and the panel's own file is at the size the code
+health gate governs, so the split is what keeps a later addition to either concept cheap.
+
+The two verbs also stack the panel's own **field** order when `sel` is `nothing`, which is the
+values of every field and no mask. So an absent selector is not "every column of the panel": a
+mask is asked for by name, and the default is the data.
 
 ### The carriers hold one field, `pnl`
 
@@ -315,7 +325,15 @@ the cross-validated path is time-varying and the static-shape coupling above hol
   The readers of `rd.pnl`'s masks change nothing.
 - **The `field_dict` entry `:nz_feat` loses both users and is deleted.**
 - **`feature_matrix`, `feature_labels` and `select_fields` are the one new surface.** Issue #805
-  fixed their signatures, and the selector build of map #802 writes them.
+  fixed their signatures, and the selector build of map #802 wrote them into
+  `src/03_InputData/05_FeatureSelector.jl`, which owes its rows in the sweep manifest and in the
+  size, complexity, coverage and JET baselines.
+- **The panel travels whole from the picker to the kernel.** `feature_matrix_picker` returns the
+  selected carrier's `AssetPanel` and its diagnostic, the eight forwarders pass it as the `pnl`
+  keyword, and preselection passes `rd.pnl`. So the values and the names cannot disagree about
+  which carrier supplied them, and `carrier_feature_names` has no reason to exist. The kernel's
+  raw-matrix entry point `distance(de, Z; dims)` measures the matrix it is handed and applies no
+  selector, because a bare matrix has no field index to resolve against.
 - **`panel_input` is one new exported verb, and the lazy lift is one new unexported array type.**
   The type owes its `size`, `getindex` and `show`, and its rows in the JET, coverage and size
   baselines. Issue #806 named it `RepeatedLeading`, and the build may rename it.

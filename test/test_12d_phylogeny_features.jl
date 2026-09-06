@@ -248,7 +248,8 @@ end
                                                                              NetworkEstimator(;
                                                                                               de = FeatureDistance()),
                                                                              rd.X)
-    @test occursin("FeatureDistance requires a feature matrix", res.value.msg)
+    @test occursin("FeatureDistance stacks its Feature Matrix from an AssetPanel",
+                   res.value.msg)
 end
 
 # The separation family. Like the decay family it lives in `11_Phylogeny/01_Base_Phylogeny.jl`

@@ -339,7 +339,7 @@ const PrE_Pr = Union{<:AbstractPriorEstimator, <:AbstractPriorResult}
 
 Groups the two carriers that hold an asset returns matrix `X` and a feature matrix `Z`.
 
-`Pr_RR` is the bridge the clustering, phylogeny and centrality forwarders below dispatch on. Each of them reads `X` and `Z` off its carrier and delegates to the asset-returns method, so an estimator that needs returns can be driven from a fitted prior or from the raw data with one method apiece rather than two. Where both carriers are present, [`returns_matrix_picker`](@ref) and [`feature_matrix_picker`](@ref) pick between them.
+`Pr_RR` is the bridge the clustering, phylogeny and centrality forwarders below dispatch on. Each of them reads `X` and the [`AssetPanel`](@ref) off its carrier and delegates to the asset-returns method, so an estimator that needs returns can be driven from a fitted prior or from the raw data with one method apiece rather than two. Where both carriers are present, [`returns_matrix_picker`](@ref) and [`feature_matrix_picker`](@ref) pick between them.
 
 # Related
 
@@ -735,21 +735,18 @@ function returns_matrix_picker(pr::Pr_RR, rd::Option{<:ReturnsResult}, x_src::Sy
     return isnothing(rd) || x_src == :prior ? pr.X : rd.X
 end
 """
-    carrier_feature_names(::AbstractPriorResult) -> nothing
-    carrier_feature_names(rd::ReturnsResult) -> Option{<:VecStr}
+    carrier_asset_panel(pr::AbstractPriorResult) -> Option{<:AssetPanel}
+    carrier_asset_panel(rd::ReturnsResult) -> Option{<:AssetPanel}
 
-Read the names of a carrier's own feature axis, or `nothing` when that carrier holds none.
+Read a carrier's own [`AssetPanel`](@ref), or `nothing` when that carrier holds none.
 
-The two carriers a [`Pr_RR`](@ref) can be do not agree on names. [`ReturnsResult`](@ref) carries `Z` beside `nz`, and the pair is checked together at construction. [`LowOrderPrior`](@ref) carries `Z` alone: a producer runs inside `prior(pe, X, F; …)` with raw matrices, so names are structurally unavailable to it.
+Both carriers a [`Pr_RR`](@ref) can be hold the panel under one field, `pnl`, so the two methods differ only in which carrier they read. A Panel Field owns its values, its levels or labels and its observed mask, so a [`FeatureDistance`](@ref) selector resolves against the panel whichever carrier supplied it.
 
-[`feature_matrix_picker`](@ref) needs this because the carrier it reads `Z` off is not always the `rd` argument. `Pr_RR` admits a [`ReturnsResult`](@ref) in the `pr` slot, and `clusterise(cle, rd)` — the shortest public call, and the one every [`Pipeline`](@ref) step makes — puts one there with no `rd` beside it. Reading `nz` off `rd` alone would drop the names of a carrier that holds them, and a [`FeatureDistance`](@ref) column selector written as a name would then fail to resolve on data that names every column.
+[`feature_matrix_picker`](@ref) needs this because the carrier it reads the panel off is not always the `rd` argument. `Pr_RR` admits a [`ReturnsResult`](@ref) in the `pr` slot, and `clusterise(cle, rd)` — the shortest public call, and the one every [`Pipeline`](@ref) step makes — puts one there with no `rd` beside it.
 
 # Algorithm
 
-The method that Julia selects is the algorithm.
-
- 1. `pr` is an [`AbstractPriorResult`](@ref): return `nothing`. The family carries no feature axis.
- 2. `pr` is a [`ReturnsResult`](@ref): return `pr.nz`, which is `nothing` when that carrier holds no feature matrix either.
+The method that Julia selects is the algorithm. Both read the carrier's `pnl` field.
 
 # Arguments
 
@@ -757,11 +754,12 @@ The method that Julia selects is the algorithm.
 
 # Returns
 
-  - `nz::Option{<:VecStr}`: The names of the carrier's feature axis, or `nothing`.
+  - `pnl::Option{<:AssetPanel}`: The carrier's Asset Panel, or `nothing`.
 
 # Related
 
   - [`feature_matrix_picker`](@ref)
+  - [`AssetPanel`](@ref)
   - [`Pr_RR`](@ref)
   - [`ReturnsResult`](@ref)
   - [`LowOrderPrior`](@ref)
@@ -775,20 +773,21 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Pick the feature matrix a [`FeatureDistance`](@ref) inside the clustering, phylogeny or centrality estimator reads, and diagnose its absence.
+Pick the [`AssetPanel`](@ref) a [`FeatureDistance`](@ref) inside the clustering, phylogeny or centrality estimator stacks its Feature Matrix from, and diagnose its absence.
 
-The counterpart of [`returns_matrix_picker`](@ref), with the opposite default: `z_src = :data` prefers the user's own [`ReturnsResult`](@ref) over a derived one, because an explicit feature matrix outranks a produced one. (`x_src = :prior` prefers the prior, because a posterior returns matrix *is* the improvement being asked for. The differing defaults are the argument for naming the source rather than flagging it.)
+The counterpart of [`returns_matrix_picker`](@ref), with the opposite default: `z_src = :data` prefers the user's own [`ReturnsResult`](@ref) over a derived one, because an explicit panel outranks a produced one. (`x_src = :prior` prefers the prior, because a posterior returns matrix *is* the improvement being asked for. The differing defaults are the argument for naming the source rather than flagging it.)
 
-A missing feature matrix is **not** an error here: `Z` is only required when a [`FeatureDistance`](@ref) is actually in the estimator tree, which this layer cannot see. Resolution therefore returns `nothing` and defers the throw to [`assert_feature_matrix_supplied`](@ref), passing a second return value that names *why* nothing was found — `:neither` when no carrier holds one, and the selector itself when it picked the empty carrier while the other held one.
+A missing panel is **not** an error here: it is only required when a [`FeatureDistance`](@ref) is actually in the estimator tree, which this layer cannot see. Resolution therefore returns `nothing` and defers the throw to [`assert_feature_matrix_supplied`](@ref), passing a second return value that names *why* nothing was found — `:neither` when no carrier holds one, and the selector itself when it picked the empty carrier while the other held one.
+
+The panel travels whole rather than as a stacked matrix. A [`FeatureDistance`](@ref) selector names Panel Fields, levels and labels, so it resolves against the panel's own field index and nothing here needs to know which columns it will read.
 
 # Algorithm
 
  1. Check that `z_src` names one of the two carriers, with [`assert_source_selector`](@ref).
- 2. Read `Zp`, the prior carrier's feature matrix, and `Zd`, the returns result's. `Zd` is `nothing` when there is no returns result.
- 3. Select `Z`: `Zp` when there is no returns result, or when `z_src` is `:prior`. `Zd` otherwise.
- 4. Derive `nz` and `Z` together from the panel that was picked, with [`panel_feature_matrix`](@ref). They come off one object, so they cannot disagree about which carrier supplied them.
- 5. Make the diagnostic `z_diag`: `:neither` when both `Zp` and `Zd` are `nothing`, and `z_src` itself otherwise. The two cases are distinct, because the second says a matrix exists on the carrier that was not selected.
- 6. Return `Z`, `nz` and `z_diag`.
+ 2. Read `pp`, the prior carrier's panel, and `pd`, the returns result's, with [`carrier_asset_panel`](@ref). `pd` is `nothing` when there is no returns result.
+ 3. Select the panel: `pp` when there is no returns result, or when `z_src` is `:prior`. `pd` otherwise.
+ 4. Make the diagnostic `z_diag`: `:neither` when both `pp` and `pd` are `nothing`, and `z_src` itself otherwise. The two cases are distinct, because the second says a panel exists on the carrier that was not selected.
+ 5. Return the panel and `z_diag`.
 
 # Arguments
 
@@ -802,23 +801,24 @@ A missing feature matrix is **not** an error here: `Z` is only required when a [
 
 # Returns
 
-  - `Z::Option{<:MatNum_Arr3Num}`: Feature matrix from the selected carrier, or `nothing`.
-  - `nz::Option{<:VecStr}`: Names of `Z`'s feature axis, or `nothing`. A [`FeatureDistance`](@ref) column selector resolves its names against these. They come off the carrier that supplied `Z`, through [`carrier_feature_names`](@ref), and only [`ReturnsResult`](@ref) carries any: [`LowOrderPrior`](@ref) holds `Z` without `nz`, so `nz` is `nothing` when a prior result supplied `Z`, and a name selector cannot resolve there. It **is** non-`nothing` when a [`ReturnsResult`](@ref) supplied `Z` from the `pr` slot, which is what `clusterise(cle, rd)` and every [`Pipeline`](@ref) step do. An integer selector needs no names and serves both carriers.
+  - `pnl::Option{<:AssetPanel}`: Asset Panel from the selected carrier, or `nothing`.
   - `z_diag::Symbol`: The diagnostic to forward as `z_src`; the selector itself, or `:neither`.
 
 # Related
 
   - [`assert_source_selector`](@ref)
   - [`returns_matrix_picker`](@ref)
+  - [`carrier_asset_panel`](@ref)
   - [`assert_feature_matrix_supplied`](@ref)
+  - [`AssetPanel`](@ref)
   - [`FeatureDistance`](@ref)
 """
 function feature_matrix_picker(pr::Pr_RR, rd::Option{<:ReturnsResult}, z_src::Symbol)
     assert_source_selector(z_src, :z_src)
     pp = carrier_asset_panel(pr)
     pd = isnothing(rd) ? nothing : rd.pnl
-    nz, Z = panel_feature_matrix(isnothing(rd) || z_src == :prior ? pp : pd)
-    return Z, nz, isnothing(pp) && isnothing(pd) ? :neither : z_src
+    return (isnothing(rd) || z_src == :prior ? pp : pd),
+           isnothing(pp) && isnothing(pd) ? :neither : z_src
 end
 """
     clusterise(cle::AbstractClustersEstimator, pr::AbstractPriorResult; kwargs...)
@@ -830,7 +830,7 @@ Clusterise asset or factor returns from a prior result using a clustering estima
 # Algorithm
 
  1. Pick the asset returns matrix `X` from the carrier that `x_src` names, with [`returns_matrix_picker`](@ref).
- 2. Pick the feature matrix `Z` from the carrier that `z_src` names, with [`feature_matrix_picker`](@ref). It also gives `z_diag`, the diagnostic that names why nothing was found.
+ 2. Pick the [`AssetPanel`](@ref) from the carrier that `z_src` names, with [`feature_matrix_picker`](@ref). It also gives `z_diag`, the diagnostic that names why nothing was found.
  3. Call the asset-returns method of [`clusterise`](@ref) with `X`, passing `Z` and `z_diag` on as `Z` and `z_src`, and return the clustering result it produces.
 
 # Arguments
@@ -859,8 +859,8 @@ function clusterise(cle::AbstractClustersEstimator, pr::Pr_RR;
                     rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :prior,
                     z_src::Symbol = :data, kwargs...)
     X = returns_matrix_picker(pr, rd, x_src)
-    Z, nz, z_diag = feature_matrix_picker(pr, rd, z_src)
-    return clusterise(cle, X; Z = Z, nz = nz, z_src = z_diag, kwargs...)
+    pnl, z_diag = feature_matrix_picker(pr, rd, z_src)
+    return clusterise(cle, X; pnl = pnl, z_src = z_diag, kwargs...)
 end
 """
     phylogeny_matrix(pl::NwE_ClE_Cl, pr::AbstractPriorResult;
@@ -873,7 +873,7 @@ Compute the phylogeny matrix from asset returns in a prior result using a networ
 # Algorithm
 
  1. Pick the asset returns matrix `X` from the carrier that `x_src` names, with [`returns_matrix_picker`](@ref).
- 2. Pick the feature matrix `Z` from the carrier that `z_src` names, with [`feature_matrix_picker`](@ref). It also gives `z_diag`, the diagnostic that names why nothing was found.
+ 2. Pick the [`AssetPanel`](@ref) from the carrier that `z_src` names, with [`feature_matrix_picker`](@ref). It also gives `z_diag`, the diagnostic that names why nothing was found.
  3. Call the asset-returns method of [`phylogeny_matrix`](@ref) with `X`, passing `Z` and `z_diag` on as `Z` and `z_src`, and return the phylogeny result it produces.
 
 # Arguments
@@ -902,8 +902,8 @@ Compute the phylogeny matrix from asset returns in a prior result using a networ
 function phylogeny_matrix(pl::NwE_ClE_Cl, pr::Pr_RR; rd::Option{<:ReturnsResult} = nothing,
                           x_src::Symbol = :prior, z_src::Symbol = :data, kwargs...)
     X = returns_matrix_picker(pr, rd, x_src)
-    Z, nz, z_diag = feature_matrix_picker(pr, rd, z_src)
-    return phylogeny_matrix(pl, X; Z = Z, nz = nz, z_src = z_diag, kwargs...)
+    pnl, z_diag = feature_matrix_picker(pr, rd, z_src)
+    return phylogeny_matrix(pl, X; pnl = pnl, z_src = z_diag, kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -915,7 +915,7 @@ Compute phylogeny constraints from asset returns in a prior result using a phylo
 # Algorithm
 
  1. Pick the asset returns matrix `X` from the carrier that `x_src` names, with [`returns_matrix_picker`](@ref).
- 2. Pick the feature matrix `Z` from the carrier that `z_src` names, with [`feature_matrix_picker`](@ref). It also gives `z_diag`, the diagnostic that names why nothing was found.
+ 2. Pick the [`AssetPanel`](@ref) from the carrier that `z_src` names, with [`feature_matrix_picker`](@ref). It also gives `z_diag`, the diagnostic that names why nothing was found.
  3. Call the asset-returns method of [`phylogeny_constraints`](@ref) with `X`, passing `Z` and `z_diag` on as `Z` and `z_src`, and return the constraint result it produces.
 
 # Arguments
@@ -944,8 +944,8 @@ function phylogeny_constraints(plc::AbstractPhylogenyConstraintEstimator, pr::Pr
                                rd::Option{<:ReturnsResult} = nothing,
                                x_src::Symbol = :prior, z_src::Symbol = :data, kwargs...)
     X = returns_matrix_picker(pr, rd, x_src)
-    Z, nz, z_diag = feature_matrix_picker(pr, rd, z_src)
-    return phylogeny_constraints(plc, X; Z = Z, nz = nz, z_src = z_diag, kwargs...)
+    pnl, z_diag = feature_matrix_picker(pr, rd, z_src)
+    return phylogeny_constraints(plc, X; pnl = pnl, z_src = z_diag, kwargs...)
 end
 """
     centrality_vector(cte::CentralityEstimator, pr::AbstractPriorResult; kwargs...)
@@ -957,7 +957,7 @@ Compute the centrality vector for a centrality estimator and prior result.
 # Algorithm
 
  1. Pick the asset returns matrix `X` from the carrier that `x_src` names, with [`returns_matrix_picker`](@ref).
- 2. Pick the feature matrix `Z` from the carrier that `z_src` names, with [`feature_matrix_picker`](@ref). It also gives `z_diag`, the diagnostic that names why nothing was found.
+ 2. Pick the [`AssetPanel`](@ref) from the carrier that `z_src` names, with [`feature_matrix_picker`](@ref). It also gives `z_diag`, the diagnostic that names why nothing was found.
  3. Call the asset-returns method of [`centrality_vector`](@ref) with `X`, passing `Z` and `z_diag` on as `Z` and `z_src`, and return the centrality result it produces.
 
 # Arguments
@@ -986,8 +986,8 @@ function centrality_vector(cte::CentralityEstimator, pr::Pr_RR;
                            rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :prior,
                            z_src::Symbol = :data, kwargs...)
     X = returns_matrix_picker(pr, rd, x_src)
-    Z, nz, z_diag = feature_matrix_picker(pr, rd, z_src)
-    return centrality_vector(cte, X; Z = Z, nz = nz, z_src = z_diag, kwargs...)
+    pnl, z_diag = feature_matrix_picker(pr, rd, z_src)
+    return centrality_vector(cte, X; pnl = pnl, z_src = z_diag, kwargs...)
 end
 """
     centrality_vector(pl::NwE_ClE_Cl, ct::AbstractCentralityAlgorithm,
@@ -1000,7 +1000,7 @@ Compute the centrality vector for a network or clustering estimator and centrali
 # Algorithm
 
  1. Pick the asset returns matrix `X` from the carrier that `x_src` names, with [`returns_matrix_picker`](@ref).
- 2. Pick the feature matrix `Z` from the carrier that `z_src` names, with [`feature_matrix_picker`](@ref). It also gives `z_diag`, the diagnostic that names why nothing was found.
+ 2. Pick the [`AssetPanel`](@ref) from the carrier that `z_src` names, with [`feature_matrix_picker`](@ref). It also gives `z_diag`, the diagnostic that names why nothing was found.
  3. Call the asset-returns method of [`centrality_vector`](@ref) with `X`, passing `Z` and `z_diag` on as `Z` and `z_src`, and return the centrality result it produces.
 
 # Arguments
@@ -1031,8 +1031,8 @@ function centrality_vector(pl::NwE_ClE_Cl, ct::AbstractCentralityAlgorithm, pr::
                            rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :prior,
                            z_src::Symbol = :data, kwargs...)
     X = returns_matrix_picker(pr, rd, x_src)
-    Z, nz, z_diag = feature_matrix_picker(pr, rd, z_src)
-    return centrality_vector(pl, ct, X; Z = Z, nz = nz, z_src = z_diag, kwargs...)
+    pnl, z_diag = feature_matrix_picker(pr, rd, z_src)
+    return centrality_vector(pl, ct, X; pnl = pnl, z_src = z_diag, kwargs...)
 end
 """
     average_centrality(pl::NwE_Pl_ClE_Cl,
@@ -1088,7 +1088,7 @@ Compute the weighted average centrality for a centrality estimator.
 # Algorithm
 
  1. Pick the asset returns matrix `X` from the carrier that `x_src` names, with [`returns_matrix_picker`](@ref).
- 2. Pick the feature matrix `Z` from the carrier that `z_src` names, with [`feature_matrix_picker`](@ref). It also gives `z_diag`, the diagnostic that names why nothing was found.
+ 2. Pick the [`AssetPanel`](@ref) from the carrier that `z_src` names, with [`feature_matrix_picker`](@ref). It also gives `z_diag`, the diagnostic that names why nothing was found.
  3. Call the asset-returns method of [`average_centrality`](@ref) with `X`, passing `Z` and `z_diag` on as `Z` and `z_src`, and return the weighted average it produces.
 
 The estimator method picks the carriers itself, where the network-and-algorithm method above delegates that to [`centrality_vector`](@ref). The two reach the same selection: `cte` carries `pl` and `ct` in its own fields, so the asset-returns method it calls is the one the other method's step 1 would have reached.
@@ -1120,8 +1120,8 @@ function average_centrality(cte::CentralityEstimator, w::VecNum, pr::Pr_RR;
                             rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :prior,
                             z_src::Symbol = :data, kwargs...)
     X = returns_matrix_picker(pr, rd, x_src)
-    Z, nz, z_diag = feature_matrix_picker(pr, rd, z_src)
-    return average_centrality(cte, w, X; Z = Z, nz = nz, z_src = z_diag, kwargs...)
+    pnl, z_diag = feature_matrix_picker(pr, rd, z_src)
+    return average_centrality(cte, w, X; pnl = pnl, z_src = z_diag, kwargs...)
 end
 """
     asset_phylogeny(pl::NwE_ClE_Cl,
@@ -1134,7 +1134,7 @@ This function computes the phylogeny matrix from the asset returns in the prior 
 # Algorithm
 
  1. Pick the asset returns matrix `X` from the carrier that `x_src` names, with [`returns_matrix_picker`](@ref).
- 2. Pick the feature matrix `Z` from the carrier that `z_src` names, with [`feature_matrix_picker`](@ref). It also gives `z_diag`, the diagnostic that names why nothing was found.
+ 2. Pick the [`AssetPanel`](@ref) from the carrier that `z_src` names, with [`feature_matrix_picker`](@ref). It also gives `z_diag`, the diagnostic that names why nothing was found.
  3. Call the asset-returns method of [`asset_phylogeny`](@ref) with `X`, passing `Z` and `z_diag` on as `Z` and `z_src`, and return the score it produces.
 
 # Arguments
@@ -1167,8 +1167,8 @@ function asset_phylogeny(pl::NwE_ClE_Cl, w::VecNum, pr::Pr_RR;
                          rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :prior,
                          z_src::Symbol = :data, kwargs...)
     X = returns_matrix_picker(pr, rd, x_src)
-    Z, nz, z_diag = feature_matrix_picker(pr, rd, z_src)
-    return asset_phylogeny(pl, w, X; Z = Z, nz = nz, z_src = z_diag, kwargs...)
+    pnl, z_diag = feature_matrix_picker(pr, rd, z_src)
+    return asset_phylogeny(pl, w, X; pnl = pnl, z_src = z_diag, kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1180,7 +1180,7 @@ Compute centrality constraints from asset returns in a prior result using a cent
 # Algorithm
 
  1. Pick the asset returns matrix `X` from the carrier that `x_src` names, with [`returns_matrix_picker`](@ref).
- 2. Pick the feature matrix `Z` from the carrier that `z_src` names, with [`feature_matrix_picker`](@ref). It also gives `z_diag`, the diagnostic that names why nothing was found.
+ 2. Pick the [`AssetPanel`](@ref) from the carrier that `z_src` names, with [`feature_matrix_picker`](@ref). It also gives `z_diag`, the diagnostic that names why nothing was found.
  3. Call the asset-returns method of [`centrality_constraints`](@ref) with `X`, passing `Z` and `z_diag` on as `Z` and `z_src`, and return the constraint result it produces.
 
 # Arguments
@@ -1208,8 +1208,8 @@ function centrality_constraints(ccs::CC_VecCC, pr::Pr_RR;
                                 rd::Option{<:ReturnsResult} = nothing,
                                 x_src::Symbol = :prior, z_src::Symbol = :data, kwargs...)
     X = returns_matrix_picker(pr, rd, x_src)
-    Z, nz, z_diag = feature_matrix_picker(pr, rd, z_src)
-    return centrality_constraints(ccs, X; Z = Z, nz = nz, z_src = z_diag, kwargs...)
+    pnl, z_diag = feature_matrix_picker(pr, rd, z_src)
+    return centrality_constraints(ccs, X; pnl = pnl, z_src = z_diag, kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDEF)

@@ -855,5 +855,5 @@ function factor_residual_config(pe::FeaturePrior)
     return factor_residual_config(pe.pe)
 end
 
-export RegressionFeatures, FeaturePrior, feature_matrix, Proximity, PhylogenyFeatures,
-       phylogeny_features, AssetSetsFeatures
+export RegressionFeatures, FeaturePrior, Proximity, PhylogenyFeatures, phylogeny_features,
+       AssetSetsFeatures

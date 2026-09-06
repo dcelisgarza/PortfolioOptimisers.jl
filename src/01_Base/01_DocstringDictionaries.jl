@@ -157,9 +157,8 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :fcalg => "`alg`: Feature collapse algorithm, used to reduce a window of time-varying features to a single distance matrix. Inert for a 2-D feature matrix.",#
                                  :calg => "`alg`: Collapse algorithm, the aggregator applied along the observation axis.",#
                                  :fdsim => "`sim`: Similarity matrix algorithm used to derive the similarity counterpart of the feature distance matrix.",#
-                                 :fdsel => "`sel`: Column selector naming the feature slices the distance reads, or `nothing` to read every column. A vector of names resolves against the carrier's `nz`, where an entry that is a key of `sets.dict` expands to that taxonomy's columns. A vector of integers indexes the feature axis directly and needs no names.",#
-                                 :fdsets => "`sets`: Universe sets whose taxonomy keys `sel` may name, or `nothing`. The field is checked at construction rather than bounded by its type, because `UniverseSets` is defined in a later file than this one.",#
-                                 :fdstrict => "`strict`: Whether a `sel` entry that resolves against no feature column throws instead of warning and being dropped.",#
+                                 :fdsel => "`sel`: Feature Selector naming the Panel Fields the Feature Matrix stacks, or `nothing` to stack every field's values. An entry is a field name, a field paired with the levels or labels it keeps, a field paired with one level or label, or a field paired with `:observed`. The vector order is the column order.",#
+                                 :fdstrict => "`strict`: Whether a `sel` entry naming a field, a level or a label the Asset Panel does not hold throws instead of warning and being dropped.",#
                                  # Priors.
                                  :pe => "`pe`: Prior estimator.",#
                                  :pr => "`pr`: Prior result.",#

@@ -38,7 +38,12 @@ A **point-in-time panel** of per-asset fields — market capitalisation, a secto
 factor exposure tensor — is what [`ReturnsResult`](@ref) and [`PricesResult`](@ref) carry in their
 `pnl` slot. Each **Panel Field** owns its own values and its own observed mask, so the panel *is*
 the feature data: no carrier holds a feature matrix beside it, and the Feature Matrix a distance
-measures is derived by [`panel_feature_matrix`](@ref) and stored nowhere.
+measures is derived by [`feature_matrix`](@ref) and stored nowhere.
+
+A **Feature Selector** says which Panel Fields the matrix stacks. An entry names one Panel Field,
+one field with the levels or labels it keeps, one field with a single level or label, or one
+field's observed mask. [`feature_labels`](@ref) names each resulting column with the entry that
+selects exactly it, so a label vector is itself a selector that rebuilds the same matrix.
 
 A panel takes one of two shapes. A **static** panel indexes its Panel Fields by asset alone and
 carries no universe mask; a **time-varying** panel prepends an observation axis and carries both.
@@ -54,6 +59,7 @@ asset_panel
 panel_field
 panel_feature_matrix
 feature_matrix_panel
+feature_labels
 port_opt_view(::AssetPanel, ::Any)
 PortfolioOptimisers.AbstractPanelField
 NumericPanelField
@@ -75,6 +81,15 @@ PortfolioOptimisers.panel_field_observed_labels
 PortfolioOptimisers.panel_field_stack!
 PortfolioOptimisers.panel_field_stack_observed!
 PortfolioOptimisers.panel_field_view
+PortfolioOptimisers.panel_field_keys
+PortfolioOptimisers.panel_value_columns!
+PortfolioOptimisers.panel_key_column!
+PortfolioOptimisers.panel_column_label
+PortfolioOptimisers.panel_field_value_column!
+PortfolioOptimisers.panel_field_observed_column!
+PortfolioOptimisers.select_fields
+PortfolioOptimisers.select_fields_push!
+PortfolioOptimisers.panel_selector_msg
 PortfolioOptimisers.panel_array_view
 PortfolioOptimisers.panel_tensor_view
 PortfolioOptimisers.panel_mask_view
@@ -92,6 +107,8 @@ PortfolioOptimisers.assert_panel_field_name
 PortfolioOptimisers.assert_panel_field_shape
 PortfolioOptimisers.assert_panel_field_mask
 PortfolioOptimisers.assert_panel_masks
+PortfolioOptimisers.assert_feature_selector
+PortfolioOptimisers.assert_selector_entry
 PortfolioOptimisers.assert_feature_matrix_columns
 PortfolioOptimisers.assert_panel_fill
 PortfolioOptimisers.assert_panel_input

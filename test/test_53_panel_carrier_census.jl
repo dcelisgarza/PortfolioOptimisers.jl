@@ -14,8 +14,10 @@ so the names of a carrier that holds them were dropped. A `FeatureDistance` colu
 written as a name could not resolve, and the refusal named `LowOrderPrior` and `z_src = :prior`
 — neither of which the caller had used.
 
-`carrier_feature_names` closes it: the names come off **the carrier that supplied `Z`**. This
-census pins that invariant, and pins the interface around it so a new entry point cannot forget.
+`carrier_asset_panel` closes it: the picker returns **one object**, the panel of the carrier it
+selected, and a Panel Field owns its own name. There is no second value to disagree with it.
+This census pins that invariant, and pins the interface around it so a new entry point cannot
+forget.
 
 The audit's other three classes need no gate, and are recorded here so the next reader need not
 re-derive them:
@@ -45,25 +47,25 @@ re-derive them:
 
     # ---------------------------------------- 1. the invariant this census exists to pin
 
-    @testset "`Z` and `nz` come off the same carrier" begin
+    @testset "the values and the names come off the same carrier" begin
         #=
         A `ReturnsResult` in the `pr` slot with no `rd` beside it. Both selectors resolve to
-        that one carrier, so both must return its names. The `:data` arm returned `nothing`
-        before `#666`, which is the defect.
+        that one carrier, so both must return its panel. The `:data` arm returned `nothing`
+        names before `#666`, which is the defect the one object removes.
         =#
         for z_src in (:prior, :data)
-            Zs, nzs, z_diag = PO.feature_matrix_picker(rd, nothing, z_src)
-            @test Zs == panel_feature_matrix(rd.pnl)[2]
-            @test nzs == nz
+            pnls, z_diag = PO.feature_matrix_picker(rd, nothing, z_src)
+            @test pnls === rd.pnl
+            @test feature_labels(pnls) == nz
             @test z_diag === z_src
         end
 
         # A separate `rd` wins under `:data` and is inert under `:prior`. The pairing holds
         # either way, because both carriers here are the same one.
         for z_src in (:prior, :data)
-            Zs, nzs, _ = PO.feature_matrix_picker(rd, rd, z_src)
-            @test Zs == panel_feature_matrix(rd.pnl)[2]
-            @test nzs == nz
+            pnls, _ = PO.feature_matrix_picker(rd, rd, z_src)
+            @test pnls === rd.pnl
+            @test feature_labels(pnls) == nz
         end
 
         # The `X` picker was never at fault, and stays unchanged: `pr.X` is right whichever
@@ -83,19 +85,19 @@ re-derive them:
         pr = LowOrderPrior(; X = X, mu = vec(mean(X; dims = 1)), sigma = cov(X),
                            pnl = feature_matrix_panel(pnz, Z))
         @test PO.carrier_asset_panel(pr) === pr.pnl
-        Zs, nzs, z_diag = PO.feature_matrix_picker(pr, nothing, :prior)
-        @test Zs == Z
-        @test nzs == pnz
+        pnls, z_diag = PO.feature_matrix_picker(pr, nothing, :prior)
+        @test feature_matrix(pnls) == Z
+        @test feature_labels(pnls) == pnz
         @test z_diag === :prior
 
         # With both carriers populated the selector picks between them, and the names follow
         # the pick rather than the argument position.
-        @test PO.feature_matrix_picker(pr, rd, :prior)[2] == pnz
-        @test PO.feature_matrix_picker(pr, rd, :data)[2] == nz
+        @test feature_labels(PO.feature_matrix_picker(pr, rd, :prior)[1]) == pnz
+        @test feature_labels(PO.feature_matrix_picker(pr, rd, :data)[1]) == nz
 
-        # A prior result that carries no `Z` at all still diagnoses `:neither`.
+        # A prior result that carries no panel at all still diagnoses `:neither`.
         pr_noz = prior(EmpiricalPrior(), ReturnsResult(; nx = nx, X = X))
-        @test PO.feature_matrix_picker(pr_noz, nothing, :data)[3] === :neither
+        @test PO.feature_matrix_picker(pr_noz, nothing, :data)[2] === :neither
     end
 
     # ---------------------------------------- 2. the interface: every carrier method takes `rd`
@@ -186,11 +188,11 @@ re-derive them:
                                                                                      sel = ["nope"],
                                                                                      strict = true)),
                                               rd)
-        # And the pre-`#666` state is the refusal this census closes: hand the inner method
-        # the `nothing` the picker used to produce, and the name cannot resolve.
-        @test_throws PortfolioOptimisers.IsNothingError clusterise(cle, rd.X;
-                                                                   Z = panel_feature_matrix(rd.pnl)[2],
-                                                                   nz = nothing,
+        # And the pre-`#666` state is the refusal this census closes: the values and the
+        # names are now one object, so a carrier that supplies the values without the names
+        # cannot be built. Supplying no panel at all is the only remaining failure, and it
+        # is loud.
+        @test_throws PortfolioOptimisers.IsNothingError clusterise(cle, rd.X; pnl = nothing,
                                                                    z_src = :data)
     end
 

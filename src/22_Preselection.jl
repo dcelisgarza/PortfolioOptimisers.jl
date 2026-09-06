@@ -1269,7 +1269,7 @@ Keep one representative of each cluster under [`ClusterGroups`](@ref).
 
 # Algorithm
 
- 1. Derive the feature matrix and its names from `rd.pnl` with [`panel_feature_matrix`](@ref). Cluster the assets with [`clusterise`](@ref) on `rd.X`, passing both and `z_src = :data_only`, giving the clustering result `clr`.
+ 1. Cluster the assets with [`clusterise`](@ref) on `rd.X`, passing `rd.pnl` and `z_src = :data_only`, giving the clustering result `clr`. A [`FeatureDistance`](@ref) stacks its Feature Matrix from that panel.
  2. Read the cluster assignment of every asset into `idx`.
  3. Collect the asset indices of each of the `clr.k` clusters into `groups`.
  4. Return the mask [`groups_argbest`](@ref) admits for those groups under `scores` and `bib`.
@@ -1295,8 +1295,7 @@ Keep one representative of each cluster under [`ClusterGroups`](@ref).
 """
 function redundancy_keep(alg::ClusterGroups, rd::AbstractReturnsResult,
                          scores::Option{<:VecNum}, bib::Bool)::BitVector
-    nz, Z = isnothing(rd.pnl) ? (nothing, nothing) : panel_feature_matrix(rd.pnl)
-    clr = clusterise(alg.cle, rd.X; Z = Z, nz = nz, z_src = :data_only)
+    clr = clusterise(alg.cle, rd.X; pnl = rd.pnl, z_src = :data_only)
     idx = assignments(clr)
     groups = [findall(==(k), idx) for k in 1:(clr.k)]
     return groups_argbest(groups, scores, bib)

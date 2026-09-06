@@ -152,7 +152,7 @@ cle_cor = ClustersEstimator(; onc = onc)
 cle_fea = ClustersEstimator(; de = FeatureDistance(), onc = onc)
 
 clr_cor = clusterise(cle_cor, pr.X)
-clr_fea = clusterise(cle_fea, pr.X; Z = Z, z_src = :data)
+clr_fea = clusterise(cle_fea, pr.X; pnl = feature_matrix_panel(nz, Z), z_src = :data)
 
 pretty_table(DataFrame("Asset" => rd.nx, "Sector" => [sector[a] for a in rd.nx],
                        "Correlation cut" => cutree(clr_cor.res; k = 4),
@@ -370,7 +370,7 @@ for (sname, sep) in separations, (dname, decay) in decays
     Zg = graph_features(sep, decay)
     off = [Zg[i, j] for i in axes(Zg, 1) for j in axes(Zg, 2) if i != j]
     Dg = distance(FeatureDistance(), Zg; dims = 1)
-    clg = clusterise(cle_fea, pr.X; Z = Zg, z_src = :data)
+    clg = clusterise(cle_fea, pr.X; pnl = feature_matrix_panel(rd.nx, Zg), z_src = :data)
     append!(sweep,
             DataFrame("Separation" => sname, "Decay" => dname, "Self score" => Zg[1, 1],
                       "Largest off-diagonal" => maximum(off),
@@ -476,7 +476,8 @@ recovers the cosine exactly as `cos(πD)`, and everything else gets
 [`ComplementSimilarity`](@ref)'s `1 - D`. Set it explicitly to override.
 =#
 
-clr_pair = cor_and_dist(FeatureDistance(), nothing, pr.X; Z = Z, z_src = :data)
+clr_pair = cor_and_dist(FeatureDistance(), nothing, pr.X; pnl = feature_matrix_panel(nz, Z),
+                        z_src = :data)
 println("S and D share provenance: ", size(clr_pair[1]) == size(clr_pair[2]))
 
 #=

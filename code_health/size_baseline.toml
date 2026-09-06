@@ -30,6 +30,7 @@ commit = "36ff46bdd9"
 "src/03_InputData/02_AssetPanelBuilder.jl" = { code = 265, doc = 567, comment = 0, blank = 251, total = 1083 }
 "src/03_InputData/03_Preprocessing.jl" = { code = 689, doc = 1320, comment = 11, blank = 551, total = 2571 }
 "src/03_InputData/04_CrossSectionalTransforms.jl" = { code = 464, doc = 708, comment = 0, blank = 334, total = 1506 }
+"src/03_InputData/05_FeatureSelector.jl" = { code = 186, doc = 277, comment = 0, blank = 143, total = 606 }
 "src/04_PosdefMatrix.jl" = { code = 44, doc = 155, comment = 0, blank = 73, total = 272 }
 "src/05_Denoise.jl" = { code = 132, doc = 535, comment = 34, blank = 196, total = 897 }
 "src/06_Detone.jl" = { code = 46, doc = 188, comment = 0, blank = 81, total = 315 }
@@ -102,7 +103,7 @@ commit = "36ff46bdd9"
 "src/09_Distance/02_Distance.jl" = { code = 158, doc = 350, comment = 0, blank = 157, total = 665 }
 "src/09_Distance/03_DistanceDistance.jl" = { code = 37, doc = 132, comment = 0, blank = 58, total = 227 }
 "src/09_Distance/04_Similarity.jl" = { code = 61, doc = 354, comment = 0, blank = 159, total = 574 }
-"src/09_Distance/05_FeatureDistance.jl" = { code = 309, doc = 782, comment = 2, blank = 369, total = 1462 }
+"src/09_Distance/05_FeatureDistance.jl" = { code = 239, doc = 646, comment = 2, blank = 301, total = 1188 }
 "src/10_JuMPModelOptimisation.jl" = { code = 91, doc = 206, comment = 2, blank = 92, total = 391 }
 "src/11_Phylogeny/01_Base_Phylogeny.jl" = { code = 121, doc = 585, comment = 10, blank = 278, total = 994 }
 "src/11_Phylogeny/02_Clusters.jl" = { code = 107, doc = 456, comment = 0, blank = 180, total = 743 }
@@ -266,7 +267,7 @@ commit = "36ff46bdd9"
 "src/21_ExpectedReturns.jl" = { code = 272, doc = 827, comment = 24, blank = 289, total = 1412 }
 "src/21_FactorAttribution.jl" = { code = 283, doc = 588, comment = 0, blank = 250, total = 1121 }
 "src/21_FactorAttributionRealised.jl" = { code = 448, doc = 609, comment = 0, blank = 303, total = 1360 }
-"src/22_Preselection.jl" = { code = 314, doc = 762, comment = 0, blank = 365, total = 1441 }
+"src/22_Preselection.jl" = { code = 313, doc = 762, comment = 0, blank = 365, total = 1440 }
 "src/23_Pipeline/01_Base_Pipeline.jl" = { code = 154, doc = 348, comment = 0, blank = 152, total = 654 }
 "src/23_Pipeline/02_StepExecution.jl" = { code = 208, doc = 197, comment = 2, blank = 103, total = 510 }
 "src/23_Pipeline/03_Pipeline.jl" = { code = 422, doc = 399, comment = 6, blank = 215, total = 1042 }

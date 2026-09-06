@@ -1327,7 +1327,6 @@ A name is qualified by its key rather than left as the bare group value because 
   - [`asset_sets_features`](@ref)
   - [`taxonomy_column`](@ref)
   - [`FeatureDistance`](@ref)
-  - [`feature_selection_push!`](@ref)
 """
 function taxonomy_feature_names(sets, key::AbstractString,
                                 need::AbstractString)::Vector{String}

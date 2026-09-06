@@ -136,16 +136,16 @@ leaf ordering.
         @test err isa PO.IsNothingError
         msg = sprint(showerror, err)
         @test occursin("before any prior exists", msg)
-        @test occursin("set `Z` on the `ReturnsResult`", msg)
+        @test occursin("set `pnl` on the `ReturnsResult`", msg)
         @test !occursin("FeaturePrior", msg)
         @test !occursin("z_src", msg)
     end
 
     @testset "the five diagnostics stay distinct" begin
         f = PO.assert_feature_matrix_supplied
-        # a supplied Z never throws, whatever the diagnostic says
-        @test isnothing(f(Z, :data_only))
-        @test isnothing(f(Z, :neither))
+        # a supplied panel never throws, whatever the diagnostic says
+        @test isnothing(f(rd_tax.pnl, :data_only))
+        @test isnothing(f(rd_tax.pnl, :neither))
 
         msgs = Dict(s => sprint(showerror, try
                                     f(nothing, s)
@@ -231,44 +231,40 @@ leaf ordering.
     end
 
     #=
-    A panel presents every slice as a feature, the observed masks and the one-hot levels
-    included, so a redundancy selector that measured all of them would drop assets on a
-    distance the caller never chose. `panel_feature_matrix(rd.pnl)[1]` travels beside `panel_feature_matrix(rd.pnl)[2]` to this site for that
-    reason, and this testset is the proof it arrives: preselection is the one `Z` consumer
-    that reads the carrier directly rather than through `feature_matrix_picker`.
+    A panel presents every Panel Field as a block of columns, the observed masks and the
+    one-hot levels included, so a redundancy selector that measured all of them would drop
+    assets on a distance the caller never chose. The carrier's panel travels whole to this
+    site for that reason, and this testset is the proof it arrives: preselection is the one
+    Feature Matrix consumer that reads the carrier directly rather than through
+    `feature_matrix_picker`.
     =#
-    @testset "sel reaches the pre-prior site through panel_feature_matrix(rd.pnl)[1]" begin
-        # The sector block is the first three columns: `Sector` has three distinct values
-        # and `Industry` six, concatenated in the order of `vals`.
-        rd_sec = ReturnsResult(; nx = nx, X = X,
-                               pnl = feature_matrix_panel(nz[1:3], Z[:, 1:3]))
+    @testset "sel reaches the pre-prior site through the carrier's panel" begin
+        # A taxonomy reaches a distance as a categorical Panel Field, so its key is a field
+        # name and `sel` needs no second namespace.
+        fsec = CategoricalPanelField(; name = "Sector", levels = ["Tech", "Energy", "Fin"],
+                                     codes = repeat([1, 2, 3]; inner = 4))
+        find = CategoricalPanelField(; name = "Industry",
+                                     levels = ["Semis", "Soft", "Oil", "Gas", "Bank",
+                                               "Ins"], codes = repeat(1:6; inner = 2))
+        rd_cat = ReturnsResult(; nx = nx, X = X, pnl = AssetPanel(; pf = [fsec, find]))
+        rd_sec = ReturnsResult(; nx = nx, X = X, pnl = AssetPanel(; pf = [fsec]))
         # The cut is a real one, so the equality below is not two names for one matrix.
-        @test distance(FeatureDistance(), Z; dims = 1) !=
-              distance(FeatureDistance(), Z[:, 1:3]; dims = 1)
+        @test distance(FeatureDistance(), feature_matrix(rd_cat.pnl); dims = 1) !=
+              distance(FeatureDistance(), feature_matrix(rd_sec.pnl); dims = 1)
+        @test feature_matrix(rd_cat.pnl, ["Sector"]) == feature_matrix(rd_sec.pnl)
 
         sel_key = RedundancySelector(;
                                      alg = ClusterGroups(;
                                                          cle = ClustersEstimator(;
                                                                                  de = FeatureDistance(;
-                                                                                                      sel = ["Sector"],
-                                                                                                      sets = sets))),
-                                     score = SCM())
-        sel_idx = RedundancySelector(;
-                                     alg = ClusterGroups(;
-                                                         cle = ClustersEstimator(;
-                                                                                 de = FeatureDistance(;
-                                                                                                      sel = [1,
-                                                                                                             2,
-                                                                                                             3]))),
+                                                                                                      sel = ["Sector"]))),
                                      score = SCM())
         # Selecting the sector block out of the full carrier is the same preselection as
         # carrying the sector block alone.
-        @test fit_preprocessing(sel_key, rd_tax).nx ==
+        @test fit_preprocessing(sel_key, rd_cat).nx ==
               fit_preprocessing(sel_feat, rd_sec).nx
-        @test fit_preprocessing(sel_idx, rd_tax).nx ==
-              fit_preprocessing(sel_feat, rd_sec).nx
-        # `ClusterGroups` carries no `z_src` and needs none, but it does need `nz`: a name
-        # that resolves against nothing still diagnoses here.
+        # `ClusterGroups` carries no `z_src` and needs none, but it does need the panel: a
+        # name that resolves against nothing still diagnoses here.
         sel_bad = RedundancySelector(;
                                      alg = ClusterGroups(;
                                                          cle = ClustersEstimator(;
@@ -276,6 +272,6 @@ leaf ordering.
                                                                                                       sel = ["nope"],
                                                                                                       strict = true))),
                                      score = SCM())
-        @test_throws ArgumentError fit_preprocessing(sel_bad, rd_tax)
+        @test_throws ArgumentError fit_preprocessing(sel_bad, rd_cat)
     end
 end

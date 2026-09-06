@@ -63,6 +63,7 @@
 "src/03_InputData/02_AssetPanelBuilder.jl" = { map = 2, units = 20, swept = false }
 "src/03_InputData/03_Preprocessing.jl" = { map = 2, units = 46, algorithm = 22, swept = false }
 "src/03_InputData/04_CrossSectionalTransforms.jl" = { map = 2, units = 29, swept = false }
+"src/03_InputData/05_FeatureSelector.jl" = { map = 2, units = 13, swept = false }
 "src/04_PosdefMatrix.jl" = { map = 2, units = 4, algorithm = 2, swept = true }
 "src/05_Denoise.jl" = { map = 2, units = 10, algorithm = 7, swept = true }
 "src/06_Detone.jl" = { map = 2, units = 4, algorithm = 2, swept = true }
@@ -135,7 +136,7 @@
 "src/09_Distance/02_Distance.jl" = { map = 2, units = 13, algorithm = 8, swept = true }
 "src/09_Distance/03_DistanceDistance.jl" = { map = 2, units = 4, algorithm = 3, swept = true }
 "src/09_Distance/04_Similarity.jl" = { map = 2, units = 10, algorithm = 8, swept = true }
-"src/09_Distance/05_FeatureDistance.jl" = { map = 2, units = 28, algorithm = 20, swept = true }
+"src/09_Distance/05_FeatureDistance.jl" = { map = 2, units = 23, algorithm = 20, swept = true }
 "src/10_JuMPModelOptimisation.jl" = { map = 10, units = 12, swept = false }
 "src/11_Phylogeny/01_Base_Phylogeny.jl" = { map = 4, units = 24, algorithm = 5, swept = true }
 "src/11_Phylogeny/02_Clusters.jl" = { map = 4, units = 18, algorithm = 4, swept = true }
