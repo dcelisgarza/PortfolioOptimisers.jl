@@ -427,7 +427,16 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    EWVolumeRatio(; num, den, decay::Real, min_obs::Integer) -> EWVolumeRatio
+    EWVolumeRatio(;
+        num::Union{Nothing, <:AbstractString,
+                   <:AbstractVector{<:Pair{<:AbstractString, <:Real}},
+                   <:AbstractVector{<:AbstractString}},
+        den::Union{Nothing, <:AbstractString,
+                   <:AbstractVector{<:Pair{<:AbstractString, <:Real}},
+                   <:AbstractVector{<:AbstractString}},
+        decay::Real,
+        min_obs::Integer
+    ) -> EWVolumeRatio
 
 Keywords correspond to the struct's fields. `decay` and `min_obs` take no default, because they depend on the data frequency: [`EWShareTurnover`](@ref) and [`EWAmihudIlliquidity`](@ref) state a half-life instead.
 

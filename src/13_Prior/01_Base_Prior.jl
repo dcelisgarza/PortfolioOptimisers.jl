@@ -1119,8 +1119,7 @@ $(DocStringExtensions.FIELDS)
         kld::Option{<:Num_VecNum} = nothing,
         ow::Option{<:VecNum} = nothing,
         rr::Option{<:AbstractLoadingsRegressionResult} = nothing,
-        fpr::Option{<:LowOrderPrior} = nothing,
-        Z::Option{<:MatNum_Arr3Num} = nothing
+        fpr::Option{<:LowOrderPrior} = nothing
     ) -> LowOrderPrior
 
 Keywords correspond to the struct's fields.

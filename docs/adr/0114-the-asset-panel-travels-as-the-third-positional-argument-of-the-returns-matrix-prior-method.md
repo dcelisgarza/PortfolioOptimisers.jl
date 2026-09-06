@@ -7,7 +7,7 @@ status: accepted
 ## Context
 
 Every prior estimator implements one method, and
-[`AbstractPriorEstimator`](../src/13_Prior/01_Base_Prior.jl) states it:
+[`AbstractPriorEstimator`](../../src/13_Prior/01_Base_Prior.jl) states it:
 
 ```julia
 prior(pe::AbstractPriorEstimator, X::MatNum, F::Option{<:MatNum} = nothing; dims::Int = 1,
@@ -15,13 +15,13 @@ prior(pe::AbstractPriorEstimator, X::MatNum, F::Option{<:MatNum} = nothing; dims
 ```
 
 The carrier method is written once, in the same file. It reads `rd.X` and `rd.F` off the
-[`ReturnsResult`](../src/03_InputData/03_Preprocessing.jl) and calls the returns-matrix method. A
+[`ReturnsResult`](../../src/03_InputData/03_Preprocessing.jl) and calls the returns-matrix method. A
 wrapping prior holds no carrier: it is itself inside that method, so it reaches the estimator it
 nests through the matrices alone.
 
-[`CrossSectionalFactorPrior`](../src/13_Prior/17_CrossSectionalFactorPrior.jl) is the first
+[`CrossSectionalFactorPrior`](../../src/13_Prior/17_CrossSectionalFactorPrior.jl) is the first
 estimator that is fitted on something a matrix does not carry. It reads per-asset Panel Fields and
-the two universe masks off an [`AssetPanel`](../src/03_InputData/01_AssetPanel.jl), which travels on
+the two universe masks off an [`AssetPanel`](../../src/03_InputData/01_AssetPanel.jl), which travels on
 `rd.pnl`. It therefore carried a carrier method of its own that held the fit, and a returns-matrix
 method that refused every call.
 

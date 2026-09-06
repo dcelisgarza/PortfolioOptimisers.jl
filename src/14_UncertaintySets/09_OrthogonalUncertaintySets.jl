@@ -283,7 +283,7 @@ Where:
   - ``\\mathbf{W} = \\operatorname{diag}(\\boldsymbol{w})``: Cross-sectional metric the [`AbstractOrthogonalityMetric`](@ref) names, the identity on [`IdentityMetric`](@ref).
   - ``\\mathbf{Q}``: Left singular vectors of the weighted loadings kept by the numerical rank ``r_{\\mathbf{B}}``, an orthonormal basis of the weighted factor span.
   - ``\\mathbf{A}``: Orthogonal projector, mapped back through the metric.
-  - ``\\mathbf{V}_{+}``: Eigenvectors of ``\\mathbf{A}^{\\intercal}\\mathbf{A}`` whose eigenvalue clears the tolerance.
+  - ``\\mathbf{V}_{+}``: Eigenvectors of ``\\mathbf{A}^{\\intercal}\\mathbf{A}`` that carry its ``N - r_{\\mathbf{B}}`` largest eigenvalues, which is the rank of the projector.
   - ``\\mathbf{G}``: Orthonormal basis of the Orthogonal Subspace, ``N \\times r``.
   - ``\\mathbf{\\Lambda}``: Scaling the [`AbstractOrthogonalScaling`](@ref) names, ``r \\times r``.
   - ``\\mathbf{L}``: Geometry map of the mean set.
@@ -440,7 +440,7 @@ Builds the mean [`NormBallUncertaintySet`](@ref) on the Orthogonal Subspace, fro
 # Algorithm
 
  1. Form the orthogonal projector `I - Q * Q'` and divide its rows by the metric square root, giving ``\\mathbf{A}``, the projector read back in the asset coordinates.
- 2. Take the symmetric eigendecomposition of `A' * A` and keep the eigenvectors whose eigenvalue clears `max(N * eps, N * maximum(abs, eigenvalues) * eps)`. The two tolerances are the reference implementation's, and the absolute one is what admits a subspace whose eigenvalues are all small.
+ 2. Take the symmetric eigendecomposition of `A' * A` and keep the trailing `N - size(Q, 2)` eigenvectors. The count is exact: `Q` is orthonormal, so `I - Q * Q'` has rank `N - size(Q, 2)`, the metric scaling is an invertible diagonal, and `LinearAlgebra.eigen` on a `Symmetric` orders the eigenvalues from small to large. No tolerance decides the rank here. The reference implementation cuts at `max(N * eps, N * maximum(abs, eigenvalues) * eps)` instead. On its own six-asset case the largest eigenvalue that rule must cut clears the bound by a factor of three, so the rule flips with the reduction order of the machine and states a subspace one dimension too wide. Step 4 of [`orthogonal_factor_span`](@ref) still reads a tolerance, because the rank of the loadings is a property of the data and not of a projector.
  3. Orthonormalise `A * V₊` with a reduced `LinearAlgebra.qr`, giving `G`, and read the dimension `r` of the Orthogonal Subspace off its columns.
  4. When `r` is `0`, return the set with a radius of zero and a map of one zero column. The map keeps a column because the type admits a rank-zero map and a consumer that reads a size finds one either way, and the zero radius leaves the nominal mean.
  5. Otherwise take the scaling ``\\mathbf{\\Lambda}`` through [`orthogonal_scaling`](@ref), form `L = G * sqrt(Λ)` with a symmetric square root, and size the radius with [`k_norm_ball`](@ref) at `r` degrees of freedom.
@@ -473,10 +473,11 @@ function orthogonal_mu_set(ue::OrthogonalUncertaintySet, pr::AbstractPriorResult
     P = LinearAlgebra.I - Q * transpose(Q)
     A = isnothing(w_sqrt) ? Matrix(P) : Matrix(P) ./ w_sqrt
     E = LinearAlgebra.eigen(LinearAlgebra.Symmetric(transpose(A) * A))
-    ev = E.values
-    tol = max(N * eps(float(real(eltype(A)))),
-              N * maximum(abs, ev) * eps(float(real(eltype(A)))))
-    keep = findall(x -> x > tol, ev)
+    # The rank is counted, not cut at a tolerance. `I - Q * Q'` has rank `N - size(Q, 2)`
+    # because `Q` is orthonormal, and the metric scaling is an invertible diagonal, so
+    # `A' * A` has exactly that many non-zero eigenvalues. `eigen` on a `Symmetric` returns
+    # them in ascending order, so the non-zero block is the trailing one.
+    keep = (size(Q, 2) + 1):N
     G = if isempty(keep)
         Matrix{eltype(A)}(undef, N, 0)
     else

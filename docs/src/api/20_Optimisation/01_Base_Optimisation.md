@@ -35,7 +35,8 @@ JuMPWeightFinaliser
 _optimise
 optimise(opt::OptimisationResult, args...; kwargs...)
 optimise(opt::OptimisationEstimator, args...; kwargs...)
-calc_net_returns(res::OptimisationResult, X::MatNum, fees::Option{<:Fees} = nothing)
+calc_net_returns(res::OptimisationResult, X::MatNum, fees::Option{<:Fees} = nothing,
+                 wd::Option{<:AbstractWeightDrift} = nothing, obs = nothing)
 assert_special_nco_requirements(::OptE_Opt)
 assert_special_nco_requirements(opt::VecOptE_Opt)
 needs_previous_weights(::Option{<:Union{<:AbstractEstimator, <:AbstractAlgorithm,

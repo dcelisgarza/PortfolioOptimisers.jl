@@ -485,7 +485,7 @@ $(DocStringExtensions.FIELDS)
 
     NumericPanelInput(;
         name::AbstractString,
-        vals::AbstractMatrix,
+        vals::AbstractArray,
         alg::AbstractPanelFillAlgorithm = NoPanelFill()
     ) -> NumericPanelInput
 
@@ -550,7 +550,7 @@ $(DocStringExtensions.FIELDS)
 
     CategoricalPanelInput(;
         name::AbstractString,
-        vals::AbstractMatrix,
+        vals::AbstractArray,
         levels::Option{<:VecStr} = nothing,
         alg::AbstractPanelFillAlgorithm = NoPanelFill()
     ) -> CategoricalPanelInput
@@ -630,7 +630,7 @@ $(DocStringExtensions.FIELDS)
 
     TensorPanelInput(;
         name::AbstractString,
-        vals::AbstractArray{<:Any, 3},
+        vals::AbstractArray,
         axis::AbstractString,
         labels::VecStr,
         groups::Option{<:VecStr} = nothing,

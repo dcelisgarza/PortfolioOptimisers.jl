@@ -198,6 +198,35 @@ file against itself.
         @test isnothing(orthogonality_weights(IdentityMetric(), rr777))
     end
 
+    @testset "The rank of the complement is counted, not cut at a tolerance" begin
+        # The two ranks add to the number of assets by construction, because the projector
+        # `I - Q * Q'` has rank `N - size(Q, 2)` and the metric scaling is invertible. The
+        # fit counts that rank rather than cutting the eigenvalues of `A' * A` at a
+        # tolerance: on the case above, the largest eigenvalue a tolerance must cut clears
+        # `max(N * eps, N * maximum(abs, ev) * eps)` by a factor of three under the identity
+        # metric and by a factor of four under the regression one, so a cut states a
+        # complement one dimension too wide when the reduction order of the machine moves
+        # the eigenvalue by that much.
+        #
+        # A second column that repeats the first to the last bit leaves the loadings of
+        # numerical rank one, so the span is one column and the complement is `N - 1`. The
+        # identity must hold there as well.
+        Bd = hcat(view(B, :, 1), view(B, :, 1) .* (1 + 1e-14))
+        prd = prior777(Bd, D; rw = RW, bw = BW)
+        for (pr, w_span) in ((pr777, 2), (prd, 1))
+            for metric in (InverseIdiosyncraticVarianceMetric(), RegressionWeightMetric(),
+                           BenchmarkWeightMetric(), IdentityMetric())
+                mu_set, sigma_set = ucs(OrthogonalUncertaintySet(; metric = metric), pr)
+                @test size(sigma_set.Q, 2) == w_span
+                @test size(mu_set.L, 2) == N777 - w_span
+                @test size(mu_set.L, 2) + size(sigma_set.Q, 2) == N777
+                # The map is orthonormal up to the scaling, so it spans a subspace of that
+                # rank and does not carry a dependent direction.
+                @test LinearAlgebra.rank(mu_set.L) == N777 - w_span
+            end
+        end
+    end
+
     @testset "A factor-aligned portfolio pays nothing on either axis" begin
         for (metric, w) in ((InverseIdiosyncraticVarianceMetric(), inv.(D)),
                             (RegressionWeightMetric(), RW), (IdentityMetric(), ones(N777)))

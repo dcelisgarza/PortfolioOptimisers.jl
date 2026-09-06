@@ -327,7 +327,10 @@ end
         @test size(pr.chol, 1) == size(rr.M, 2) + length(i)
     end
     @testset "mu is the loadings through the factor mean, plus the orthogonal part" begin
-        @test view(pr.mu, i) == view(rr.M * pr.fpr.mu + rr.b, i)
+        # `rtol`, not `==`: the fit and this line both form `M * fpr.mu`, and the reduction
+        # order of that product is the BLAS thread count of the machine, so the two answers
+        # differ in the last bit on a CI runner.
+        @test isapprox(view(pr.mu, i), view(rr.M * pr.fpr.mu + rr.b, i); rtol = 1e-14)
         # The Return Forecast enters `b` after this ticket, so it is zero here.
         @test iszero(rr.b)
     end

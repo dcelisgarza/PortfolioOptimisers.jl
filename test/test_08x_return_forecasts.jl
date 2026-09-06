@@ -919,6 +919,7 @@ THREE MORE CONVENTIONS SHAPE THESE PROBES.
 =#
 
 @testset "The estimator scores the whole carrier and answers on the block's rows" begin
+    PO = PortfolioOptimisers
     sp = synthetic_asset_panel(; n_assets = 20, n_observations = 60, n_industries = 4,
                                late_listing_proba = 0.3, delisting_proba = 0.3,
                                missing_ratio = 0.08, rng = StableRNG(987654321))

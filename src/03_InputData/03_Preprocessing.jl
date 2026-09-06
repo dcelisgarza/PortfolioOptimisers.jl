@@ -276,8 +276,7 @@ $(DocStringExtensions.FIELDS)
         B::Option{<:TimeSeries.TimeArray} = nothing,
         iv::Option{<:TimeSeries.TimeArray} = nothing,
         ivpa::Option{<:Num_VecNum} = nothing,
-        nz::Option{<:VecStr} = nothing,
-        Z::Option{<:MatNum_Arr3Num} = nothing,
+        pnl::Option{<:AssetPanel} = nothing,
     ) -> PricesResult
 
 Keywords correspond to the struct's fields.
@@ -503,8 +502,6 @@ $(DocStringExtensions.FIELDS)
         ts::Option{<:VecDate} = nothing,
         iv::Option{<:MatNum} = nothing,
         ivpa::Option{<:Num_VecNum} = nothing,
-        nz::Option{<:VecStr} = nothing,
-        Z::Option{<:MatNum_Arr3Num} = nothing,
         pnl::Option{<:AssetPanel} = nothing,
     ) -> ReturnsResult
 
@@ -1235,8 +1232,6 @@ end
         map_func::Option{<:Function} = nothing,
         join_method::Symbol = :outer,
         impute_method = nothing,
-        nz::Option{<:VecStr} = nothing,
-        Z::Option{<:MatNum_Arr3Num} = nothing,
         pnl::Option{<:AssetPanel} = nothing
     ) -> ReturnsResult
 
@@ -1302,8 +1297,6 @@ Step 8 counts the missing columns of a row, and step 10 counts the missing rows 
   - `map_func`: Optional function to apply to the data before returns calculation.
   - `join_method`: How to join asset, factor data and benchmark data (`:outer`, `:inner`, etc.).
   - `impute_method`: Optional imputation method for missing data. `nothing`, or an `Impute.Imputor` — which requires `using Impute`, since `Impute` is a weak dependency loaded through `PortfolioOptimisersImputeExt`. Unrelated to [`Imputer`](@ref), which is a PortfolioOptimisers estimator and is not accepted here.
-  - `nz`: Optional feature names.
-  - `Z`: Optional feature matrix, static (assets × features) or time-varying (observations × assets × features), with its axes parallel to `X`'s columns and rows.
   - `pnl`: Optional [`AssetPanel`](@ref), as [`asset_panel`](@ref) returns it.
 
 # Validation

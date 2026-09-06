@@ -11,6 +11,7 @@ CrossSectionalFactorModel
 ```@docs
 assert_idiosyncratic_covariance
 idiosyncratic_covariance_view
+idiosyncratic_variances(rr::AbstractLoadingsRegressionResult)
 cs_history_assets
 assert_cs_history_obs
 assert_exposure_history

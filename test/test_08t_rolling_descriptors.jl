@@ -342,5 +342,10 @@ end
     @test isapprox(rev[ok], reference_reversal_21[ok]; rtol = 1e-14)
     @test maximum(abs, rev[ok] - reference_reversal_21[ok]) < 1e-16
     okm = .!isnan.(reference_max_return_21)
-    @test mx[okm] == reference_max_return_21[okm]
+    # The window selects one return of the history, and that return is itself the output of a
+    # product whose reduction order is the BLAS thread count of the machine. A CI runner and a
+    # developer machine therefore differ in the last bit, so the pin is one ulp wide, as the
+    # `rev` pin above is.
+    @test isapprox(mx[okm], reference_max_return_21[okm]; rtol = 1e-14)
+    @test maximum(abs, mx[okm] - reference_max_return_21[okm]) < 1e-16
 end

@@ -16,6 +16,7 @@ fold_row_indices
 fold_weight_matrix
 fold_asset_panel
 fold_feature_anchors
+panel_field_stack(fs::AbstractVector{<:NumericPanelField})
 rebuild_asset_panel
 rebuild_returns_result
 sub_portfolio_predictions
