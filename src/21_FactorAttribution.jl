@@ -295,10 +295,13 @@ end
 """
     attribution_idiosyncratic_covariance(rr::AbstractLoadingsRegressionResult)
     attribution_idiosyncratic_covariance(rr::CrossSectionalFactorModel)
+    attribution_idiosyncratic_covariance(rr::Regression)
 
 Return the idiosyncratic covariance a factor attribution adds to the systematic block.
 
 One of the five reads [`factor_attribution`](@ref) takes off a loadings result. The root refuses, so a loadings result that carries no idiosyncratic block is named rather than silently attributed to zero.
+
+A [`Regression`](@ref) answers its own `esigma`, which [`FactorPrior`](@ref) fills under `rsd = true`. Under `rsd = false` the field is `nothing` and the read answers a vector of zeros rather than refusing, because the carrier's covariance carries no residual block either: the predicted idiosyncratic component is zero, the systematic component reaches the total on its own, and the remainder stays at rounding level. A realised attribution is unaffected, because it measures the idiosyncratic series from the returns rather than from this field.
 
 # Arguments
 
@@ -311,12 +314,13 @@ One of the five reads [`factor_attribution`](@ref) takes off a loadings result. 
 
 # Returns
 
-  - `esigma::VecNum_MatNum`: The idiosyncratic variances, or the idiosyncratic covariance.
+  - `esigma::VecNum_MatNum`: The idiosyncratic variances, or the idiosyncratic covariance. A [`Regression`](@ref) that carries none answers a vector of zeros.
 
 # Related
 
   - [`factor_attribution`](@ref)
   - [`CrossSectionalFactorModel`](@ref)
+  - [`Regression`](@ref)
   - [`idiosyncratic_variances`](@ref)
 """
 function attribution_idiosyncratic_covariance(rr::AbstractLoadingsRegressionResult)
@@ -325,22 +329,38 @@ end
 function attribution_idiosyncratic_covariance(rr::CrossSectionalFactorModel)
     return assert_attribution_field(rr.esigma, :esigma)
 end
+function attribution_idiosyncratic_covariance(rr::Regression)
+    return attribution_idiosyncratic_covariance(rr.esigma, rr.M)
+end
+function attribution_idiosyncratic_covariance(::Nothing, M::MatNum)
+    return zeros(eltype(M), size(M, 1))
+end
+function attribution_idiosyncratic_covariance(esigma::VecNum_MatNum, ::MatNum)
+    return esigma
+end
 """
-    attribution_idiosyncratic_returns(rr::AbstractLoadingsRegressionResult)
-    attribution_idiosyncratic_returns(rr::CrossSectionalFactorModel)
+    attribution_idiosyncratic_returns(rr::AbstractLoadingsRegressionResult,
+                                      pr::AbstractPriorResult)
+    attribution_idiosyncratic_returns(rr::CrossSectionalFactorModel,
+                                      pr::AbstractPriorResult)
+    attribution_idiosyncratic_returns(rr::Regression, pr::AbstractPriorResult)
 
 Return the idiosyncratic return series a realised factor attribution weights by the portfolio.
 
 One of the five reads [`factor_attribution`](@ref) takes off a loadings result. The root refuses, so a loadings result that keeps no residual history is named rather than attributed to zero.
 
+The read takes the carrier beside the block, because a block that stores no series recovers it from the result it travels on. A [`CrossSectionalFactorModel`](@ref) keeps its own residuals and ignores the carrier. A [`Regression`](@ref) keeps none, so the series is `original_returns(pr) - pr.X`: the difference between the returns the carrier was fitted on and the reconstruction `F * M' .+ b'` it holds. A wrapping prior that replaces `X` moves this series, and the difference lands in the unattributed remainder, which is the anchor ADR 0113 states.
+
 # Arguments
 
   - `rr`: A loadings regression result.
+  - `pr`: The prior result the block travels on.
 
 # Validation
 
   - The root method always raises an `ArgumentError` naming the type.
   - A [`CrossSectionalFactorModel`](@ref) whose `csr` is `nothing` raises an `IsNothingError`.
+  - A [`Regression`](@ref) on a carrier whose `o_X` is `nothing` raises an `IsNothingError`, because such a carrier reconstructed nothing and the difference is zero at every observation.
 
 # Returns
 
@@ -351,24 +371,36 @@ One of the five reads [`factor_attribution`](@ref) takes off a loadings result. 
   - [`factor_attribution`](@ref)
   - [`CrossSectionalFactorModel`](@ref)
   - [`CrossSectionalRegression`](@ref)
+  - [`Regression`](@ref)
+  - [`original_returns`](@ref)
 """
-function attribution_idiosyncratic_returns(rr::AbstractLoadingsRegressionResult)
+function attribution_idiosyncratic_returns(rr::AbstractLoadingsRegressionResult,
+                                           ::AbstractPriorResult)
     return throw(ArgumentError("`attribution_idiosyncratic_returns` is not defined for `$(nameof(typeof(rr)))`. A realised factor attribution reads the idiosyncratic return series of the block it decomposes, and every member of `AbstractLoadingsRegressionResult` that a caller attributes must add a method beside its own definition."))
 end
-function attribution_idiosyncratic_returns(rr::CrossSectionalFactorModel)
+function attribution_idiosyncratic_returns(rr::CrossSectionalFactorModel,
+                                           ::AbstractPriorResult)
     return assert_attribution_field(rr.csr, :csr).eps
 end
+function attribution_idiosyncratic_returns(::Regression, pr::AbstractPriorResult)
+    return assert_attribution_carrier(pr.o_X, :o_X) - pr.X
+end
 """
-    attribution_factor_returns(rr::AbstractLoadingsRegressionResult)
-    attribution_factor_returns(rr::CrossSectionalFactorModel)
+    attribution_factor_returns(rr::AbstractLoadingsRegressionResult,
+                               pr::AbstractPriorResult)
+    attribution_factor_returns(rr::CrossSectionalFactorModel, pr::AbstractPriorResult)
+    attribution_factor_returns(rr::Regression, pr::AbstractPriorResult)
 
 Return the factor return series a realised factor attribution multiplies by the exposures.
 
 One of the five reads [`factor_attribution`](@ref) takes off a loadings result. The series is on the **raw** factor axis, which is the axis the loadings name, so a family re-basis does not move it.
 
+The read takes the carrier beside the block, as [`attribution_idiosyncratic_returns`](@ref) does and for the same reason. A [`CrossSectionalFactorModel`](@ref) fits the factor returns itself and ignores the carrier. A [`Regression`](@ref) regresses on factors the caller supplied, so the series is `pr.fpr.X`, the scenarios of the nested factor-axis prior. That field needs no refusal of its own: [`LowOrderPrior`](@ref) admits `rr` and `fpr` only together, so a carrier that answers a loadings result answers a factor-axis prior beside it.
+
 # Arguments
 
   - `rr`: A loadings regression result.
+  - `pr`: The prior result the block travels on.
 
 # Validation
 
@@ -384,20 +416,28 @@ One of the five reads [`factor_attribution`](@ref) takes off a loadings result. 
   - [`factor_attribution`](@ref)
   - [`CrossSectionalFactorModel`](@ref)
   - [`CrossSectionalRegression`](@ref)
+  - [`Regression`](@ref)
 """
-function attribution_factor_returns(rr::AbstractLoadingsRegressionResult)
+function attribution_factor_returns(rr::AbstractLoadingsRegressionResult,
+                                    ::AbstractPriorResult)
     return throw(ArgumentError("`attribution_factor_returns` is not defined for `$(nameof(typeof(rr)))`. A realised factor attribution reads the factor return series of the block it decomposes, and every member of `AbstractLoadingsRegressionResult` that a caller attributes must add a method beside its own definition."))
 end
-function attribution_factor_returns(rr::CrossSectionalFactorModel)
+function attribution_factor_returns(rr::CrossSectionalFactorModel, ::AbstractPriorResult)
     return assert_attribution_field(rr.csr, :csr).f
+end
+function attribution_factor_returns(::Regression, pr::AbstractPriorResult)
+    return pr.fpr.X
 end
 """
     attribution_exposures(rr::AbstractLoadingsRegressionResult)
     attribution_exposures(rr::CrossSectionalFactorModel)
+    attribution_exposures(rr::Regression)
 
 Return the exposure history a realised factor attribution reads, one slice per observation.
 
 One of the five reads [`factor_attribution`](@ref) takes off a loadings result. A block whose exposures do not move answers its loadings matrix, and the attribution then reads one static slice.
+
+A [`Regression`](@ref) fits one loadings matrix over the whole sample, so it always answers that matrix and every observation reads the same slice.
 
 # Arguments
 
@@ -415,6 +455,7 @@ One of the five reads [`factor_attribution`](@ref) takes off a loadings result. 
 
   - [`factor_attribution`](@ref)
   - [`CrossSectionalFactorModel`](@ref)
+  - [`Regression`](@ref)
   - [`attribution_lag`](@ref)
 """
 function attribution_exposures(rr::AbstractLoadingsRegressionResult)
@@ -422,6 +463,9 @@ function attribution_exposures(rr::AbstractLoadingsRegressionResult)
 end
 function attribution_exposures(rr::CrossSectionalFactorModel)
     return attribution_exposures(rr.Ms, rr.M)
+end
+function attribution_exposures(rr::Regression)
+    return rr.M
 end
 function attribution_exposures(::Nothing, M::MatNum)
     return M
@@ -432,10 +476,13 @@ end
 """
     attribution_lag(rr::AbstractLoadingsRegressionResult)
     attribution_lag(rr::CrossSectionalFactorModel)
+    attribution_lag(rr::Regression)
 
 Return the number of observations by which the exposures lag the returns.
 
 One of the five reads [`factor_attribution`](@ref) takes off a loadings result. The attribution keeps the exposures of observation `t - lag` with the returns of observation `t`, so a block that states no lag answers zero and the two axes line up as they stand.
+
+A [`Regression`](@ref) fits the returns of an observation on the factor returns of the same observation, so its lag is zero.
 
 # Arguments
 
@@ -453,6 +500,7 @@ One of the five reads [`factor_attribution`](@ref) takes off a loadings result. 
 
   - [`factor_attribution`](@ref)
   - [`CrossSectionalFactorModel`](@ref)
+  - [`Regression`](@ref)
   - [`cs_regression_lag`](@ref)
 """
 function attribution_lag(rr::AbstractLoadingsRegressionResult)
@@ -460,6 +508,9 @@ function attribution_lag(rr::AbstractLoadingsRegressionResult)
 end
 function attribution_lag(rr::CrossSectionalFactorModel)
     return cs_regression_lag(rr.lag)
+end
+function attribution_lag(::Regression)
+    return 0
 end
 """
     attribution_families(rr::AbstractLoadingsRegressionResult)
@@ -603,6 +654,39 @@ function assert_attribution_field(::Nothing, sym::Symbol)
     return throw(IsNothingError("$(sym) cannot be nothing: a factor attribution reads it off the factor model block it decomposes"))
 end
 function assert_attribution_field(x, ::Symbol)
+    return x
+end
+"""
+    assert_attribution_carrier(x::Nothing, sym::Symbol)
+    assert_attribution_carrier(x, sym::Symbol)
+
+Return an optional field of the prior result a factor model block travels on, or raise naming it.
+
+The sibling of [`assert_attribution_field`](@ref), and it names the carrier rather than the block. A block that stores no return series of its own — a [`Regression`](@ref) — reads the two series off the carrier, so a `nothing` there is a missing input of the attribution and not a missing field of the block.
+
+# Arguments
+
+  - `x`: The field's value.
+  - `sym`: The field's name.
+
+# Validation
+
+  - `x` is not `nothing`, else an `IsNothingError` naming the field is raised.
+
+# Returns
+
+  - `x`: The field's value, unchanged.
+
+# Related
+
+  - [`factor_attribution`](@ref)
+  - [`assert_attribution_field`](@ref)
+  - [`Regression`](@ref)
+"""
+function assert_attribution_carrier(::Nothing, sym::Symbol)
+    return throw(IsNothingError("$(sym) cannot be nothing: a factor attribution over a static loadings block reads the return series it decomposes off the prior result the block travels on"))
+end
+function assert_attribution_carrier(x, ::Symbol)
     return x
 end
 """

@@ -264,8 +264,8 @@ commit = "36ff46bdd9"
 "src/20_Optimisation/23_GreedyFiniteAllocation.jl" = { code = 114, doc = 180, comment = 8, blank = 73, total = 375 }
 "src/20_Optimisation/24_RiskMeasureCompatibility.jl" = { code = 42, doc = 61, comment = 4, blank = 20, total = 127 }
 "src/21_ExpectedReturns.jl" = { code = 272, doc = 827, comment = 24, blank = 289, total = 1412 }
-"src/21_FactorAttribution.jl" = { code = 253, doc = 549, comment = 0, blank = 235, total = 1037 }
-"src/21_FactorAttributionRealised.jl" = { code = 438, doc = 605, comment = 0, blank = 303, total = 1346 }
+"src/21_FactorAttribution.jl" = { code = 283, doc = 588, comment = 0, blank = 250, total = 1121 }
+"src/21_FactorAttributionRealised.jl" = { code = 448, doc = 609, comment = 0, blank = 303, total = 1360 }
 "src/22_Preselection.jl" = { code = 314, doc = 762, comment = 0, blank = 365, total = 1441 }
 "src/23_Pipeline/01_Base_Pipeline.jl" = { code = 154, doc = 348, comment = 0, blank = 152, total = 654 }
 "src/23_Pipeline/02_StepExecution.jl" = { code = 208, doc = 197, comment = 2, blank = 103, total = 510 }

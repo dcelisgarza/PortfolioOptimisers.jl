@@ -1,5 +1,5 @@
 #=
-Factor attribution (issue #782, map #643).
+Factor attribution (issues #782 and #783, map #643).
 
 WHAT THIS FILE GATES. `factor_attribution` decomposes a portfolio's volatility and mean return over
 the factors, the factor families and the assets of a factor model, and returns one
@@ -19,6 +19,11 @@ asserted at machine precision, because each is a construction rather than an est
     shares and the correlations alone.
  7. The `i`-th entry of a rolling call equals the single-window call over that window.
  8. The standard errors equal a direct sandwich, computed by hand on a two-observation fixture.
+ 9. A time-series `FactorPrior` block decomposes the same way (#783). Its loadings are static, its
+    lag is zero, and it names no family, so the family axis and the standard errors are absent
+    rather than empty. Under `rsd = false` the block carries no residual variance, the predicted
+    idiosyncratic variance is zero, and the factor rows then agree with `factor_risk_contribution`
+    exactly, because the leakage term the docstring names is `pinv(M) * D * w` and `D` is zero.
 
 THE ORACLE IS THE REFERENCE IMPLEMENTATION'S OWN ATTRIBUTION MODULE, whose four test files this one
 mirrors. Two departures are deliberate and are recorded in the resolution comment of #708 and in the
@@ -51,6 +56,29 @@ function fa_prior(; n_assets::Integer = 20, n_observations::Integer = 60,
     return prior(pe, rd), rd
 end
 
+# The time-series route of #783: a `FactorPrior` whose block is a `Regression`. The loadings are
+# static, the lag is zero, and the two return series live on the carrier rather than on the block.
+function fa_ts_prior(; rsd::Bool = true, n_assets::Integer = 8, n_factors::Integer = 3,
+                     n_observations::Integer = 90, seed::Integer = 783_001)
+    rng = StableRNG(seed)
+    F = randn(rng, n_observations, n_factors) ./ 100
+    B = randn(rng, n_assets, n_factors)
+    X = F * transpose(B) .+ randn(rng, n_observations, n_assets) ./ 200
+    rd = ReturnsResult(; nx = ["a$(i)" for i in 1:n_assets], X = X,
+                       nf = ["f$(i)" for i in 1:n_factors], F = F)
+    return prior(FactorPrior(; rsd = rsd), rd), rd
+end
+
+# Equal weights over the whole universe. Every asset of the fixture above is investable, so the
+# refusal the cross-sectional route needs does not arise here.
+function fa_ts_weights(pr)
+    return fill(inv(length(pr.mu)), length(pr.mu))
+end
+
+# A member of the loadings family that is neither of the two the library ships. The root refusal of
+# each of the five reads needs one, now that `Regression` answers them all.
+struct FaOtherRegression <: PortfolioOptimisers.AbstractLoadingsRegressionResult end
+
 # A weight vector supported on the investable universe alone. A holding in an asset the prior could
 # not estimate is refused, and every other testset takes weights from here.
 function fa_weights(pr; seed::Integer = 782_002)
@@ -74,8 +102,8 @@ end
     rr = pr.rr
     @testset "The five reads answer the block's own fields" begin
         @test PO.attribution_idiosyncratic_covariance(rr) === rr.esigma
-        @test PO.attribution_idiosyncratic_returns(rr) === rr.csr.eps
-        @test PO.attribution_factor_returns(rr) === rr.csr.f
+        @test PO.attribution_idiosyncratic_returns(rr, pr) === rr.csr.eps
+        @test PO.attribution_factor_returns(rr, pr) === rr.csr.f
         @test PO.attribution_exposures(rr) === rr.Ms
         @test PO.attribution_lag(rr) == rr.lag
     end
@@ -90,27 +118,36 @@ end
         @test PO.attribution_exposures(bare) === bare.M
         @test iszero(PO.attribution_lag(bare))
         @test_throws PO.IsNothingError PO.attribution_idiosyncratic_covariance(bare)
-        @test_throws PO.IsNothingError PO.attribution_idiosyncratic_returns(bare)
-        @test_throws PO.IsNothingError PO.attribution_factor_returns(bare)
+        @test_throws PO.IsNothingError PO.attribution_idiosyncratic_returns(bare, pr)
+        @test_throws PO.IsNothingError PO.attribution_factor_returns(bare, pr)
     end
     @testset "The root of each of the five names the type it cannot read" begin
-        reg = Regression(; M = rr.M, b = rr.b)
-        for v in
-            (PO.attribution_idiosyncratic_covariance, PO.attribution_idiosyncratic_returns,
-             PO.attribution_factor_returns, PO.attribution_exposures, PO.attribution_lag)
+        other = FaOtherRegression()
+        for v in (PO.attribution_idiosyncratic_covariance, PO.attribution_exposures,
+                  PO.attribution_lag)
             e = try
-                v(reg)
+                v(other)
                 nothing
             catch err
                 err
             end
             @test isa(e, ArgumentError)
-            @test occursin("Regression", e.msg)
+            @test occursin("FaOtherRegression", e.msg)
         end
-        @test isnothing(PO.attribution_families(reg))
-        @test isnothing(PO.attribution_family_basis(reg))
-        @test isnothing(PO.attribution_regression_weights(reg))
-        @test isnothing(PO.attribution_idiosyncratic_variances(reg))
+        for v in (PO.attribution_idiosyncratic_returns, PO.attribution_factor_returns)
+            e = try
+                v(other, pr)
+                nothing
+            catch err
+                err
+            end
+            @test isa(e, ArgumentError)
+            @test occursin("FaOtherRegression", e.msg)
+        end
+        @test isnothing(PO.attribution_families(other))
+        @test isnothing(PO.attribution_family_basis(other))
+        @test isnothing(PO.attribution_regression_weights(other))
+        @test isnothing(PO.attribution_idiosyncratic_variances(other))
     end
 end
 
@@ -260,7 +297,7 @@ end
     w = fa_weights(pr)
     fa = factor_attribution(w, pr, rd.X; assets = true)
     ret = fa_net_returns(w, pr, rd)
-    al = PO.attribution_align(pr.rr, length(ret))
+    al = PO.attribution_align(pr.rr, pr, length(ret))
     aret = view(ret, al.rows)
     @testset "The Result reports a mean return over the aligned history" begin
         @test fa.realised
@@ -330,7 +367,7 @@ end
     PO = PortfolioOptimisers
     pr, rd = fa_prior()
     w = fa_weights(pr)
-    al = PO.attribution_align(pr.rr, size(rd.X, 1))
+    al = PO.attribution_align(pr.rr, pr, size(rd.X, 1))
     G = transpose(view(al.B, 1, :, :)) * Diagonal(view(al.rw, 1, :)) * view(al.B, 1, :, :)
     @test PO.cross_sectional_rank(G) < size(G, 2)
     fa = factor_attribution(w, pr, rd.X; se = true)
@@ -367,7 +404,7 @@ end
     pr, rd = fa_prior()
     w = fa_weights(pr)
     ret = fa_net_returns(w, pr, rd)
-    al = PO.attribution_align(pr.rr, length(ret))
+    al = PO.attribution_align(pr.rr, pr, length(ret))
     T = length(al.rows)
     @testset "One window over the whole aligned history is the single-window call" begin
         roll = factor_attribution(w, pr, rd.X, T)
@@ -511,7 +548,7 @@ end
     @test PO.attribution_exposures(rr) === M
     @test iszero(PO.attribution_lag(rr))
     fa = factor_attribution(w, pr, X; assets = true)
-    @test length(PO.attribution_align(rr, 3).rows) == 3
+    @test length(PO.attribution_align(rr, pr, 3).rows) == 3
     # A static block reconstructs the returns exactly, so nothing is left over.
     @test abs(fa.unattr.pct_var) < 1e-12
     @test sum(fa.fbd.vol_contrib) ≈ fa.sys.vol_contrib
@@ -520,6 +557,148 @@ end
     # The exposures do not move, so their spread is zero.
     @test maximum(abs, fa.fbd.exposure_std) < 1e-14
     @test isnothing(fa.fmbd)
+end
+
+@testset "A time-series FactorPrior block decomposes the same way" begin
+    PO = PortfolioOptimisers
+    @testset "The five reads answer the block, and the two series answer the carrier" begin
+        pr, _ = fa_ts_prior()
+        rr = pr.rr
+        @test isa(rr, Regression)
+        @test PO.attribution_idiosyncratic_covariance(rr) === rr.esigma
+        @test PO.attribution_exposures(rr) === rr.M
+        @test iszero(PO.attribution_lag(rr))
+        @test PO.attribution_factor_returns(rr, pr) === pr.fpr.X
+        # `pr.X` is the reconstruction `F * M' .+ b'`, so the difference against the returns the
+        # carrier was fitted on is the residual series the lift measured its variances from.
+        eps = PO.attribution_idiosyncratic_returns(rr, pr)
+        @test eps == pr.o_X - pr.X
+        @test vec(var(eps; dims = 1)) ≈ rr.esigma
+        # A `Regression` carries no family, no regression weighting and no variance history, so
+        # the four optional reads answer through the root.
+        @test isnothing(PO.attribution_families(rr))
+        @test isnothing(PO.attribution_family_basis(rr))
+        @test isnothing(PO.attribution_regression_weights(rr))
+        @test isnothing(PO.attribution_idiosyncratic_variances(rr))
+    end
+    @testset "The predicted totals are the prior's own moments" begin
+        pr, _ = fa_ts_prior()
+        w = fa_ts_weights(pr)
+        fa = factor_attribution(w, pr; assets = true)
+        @test !fa.realised
+        @test fa.total.vol ≈ expected_risk(StandardDeviation(), w, pr)
+        @test fa.total.mu_contrib ≈ expected_return(ArithmeticReturn(), w, pr)
+        @test fa.sys.vol_contrib + fa.idio.vol_contrib + fa.unattr.vol_contrib ≈
+              fa.total.vol_contrib
+        @test fa.sys.mu_contrib + fa.idio.mu_contrib + fa.unattr.mu_contrib ≈
+              fa.total.mu_contrib
+        @test fa.sys.pct_var + fa.idio.pct_var + fa.unattr.pct_var ≈ one(fa.total.pct_var)
+        # `M * F * M' + Diagonal(esigma)` is the carrier's own covariance, so nothing is left.
+        @test abs(fa.unattr.pct_var) < 1e-12
+        # The block names no family, so the family axis is absent rather than empty.
+        @test isnothing(fa.fmbd)
+        @test sum(fa.fbd.vol_contrib) ≈ fa.sys.vol_contrib
+        @test sum(fa.abd.sys_vol_contrib) ≈ fa.sys.vol_contrib
+        @test sum(fa.abd.idio_vol_contrib) ≈ fa.idio.vol_contrib
+        # The loadings do not move, so the exposure is the static loadings against the weights.
+        @test fa.fbd.exposure ≈ transpose(pr.rr.M) * w
+        @test isnothing(fa.fbd.exposure_std)
+    end
+    @testset "The factor rows differ from factor_risk_contribution by the leakage alone" begin
+        pr, _ = fa_ts_prior()
+        w = fa_ts_weights(pr)
+        fa = factor_attribution(w, pr)
+        M, F = pr.rr.M, pr.fpr.sigma
+        D = Diagonal(pr.rr.esigma)
+        K = size(M, 2)
+        sigma_p = sqrt(dot(w, pr.sigma, w))
+        # The docstring of `factor_attribution` states the term in closed form: the Euler share
+        # of `factor_risk_contribution` carries `(M' w)_k * (pinv(M) * D * w)_k / sigma_P` on top
+        # of this decomposition's, and this decomposition holds it in the idiosyncratic component.
+        leak = (transpose(M) * w) .* (pinv(M) * D * w) ./ sigma_p
+        frc = factor_risk_contribution(StandardDeviation(), w, pr)
+        @test length(frc) == K + 1
+        @test maximum(abs, frc[1:K] - leak - fa.fbd.vol_contrib) < 1e-12
+        # The term is not zero on this fit, so the two really do disagree.
+        @test maximum(abs, frc[1:K] - fa.fbd.vol_contrib) > 1e-8
+    end
+    @testset "Under rsd = false the block carries no residual variance" begin
+        pr, rd = fa_ts_prior(; rsd = false)
+        w = fa_ts_weights(pr)
+        @test isnothing(pr.rr.esigma)
+        @test iszero(PO.attribution_idiosyncratic_covariance(pr.rr))
+        fa = factor_attribution(w, pr; assets = true)
+        # The carrier's covariance carries no residual block either, so the systematic component
+        # reaches the total on its own and the remainder stays at rounding level.
+        @test iszero(fa.idio.vol)
+        @test iszero(fa.idio.vol_contrib)
+        @test iszero(fa.idio.pct_var)
+        @test all(iszero, fa.abd.idio_vol_contrib)
+        @test fa.sys.pct_var ≈ one(fa.sys.pct_var)
+        @test abs(fa.unattr.pct_var) < 1e-12
+        # The intercept is a mean and not a variance, so the idiosyncratic mean survives.
+        @test fa.idio.mu_contrib ≈ dot(w, pr.rr.b)
+        # The leakage is `pinv(M) * D * w`, and `D` is zero, so the two decompositions agree.
+        K = size(pr.rr.M, 2)
+        frc = factor_risk_contribution(StandardDeviation(), w, pr)
+        @test maximum(abs, frc[1:K] - fa.fbd.vol_contrib) < 1e-12
+        # `rsd` sizes the predicted residual block alone. The realised idiosyncratic series is
+        # measured from the returns, so it survives `rsd = false` unchanged.
+        far = factor_attribution(w, pr, rd.X)
+        @test far.idio.vol > zero(far.idio.vol)
+        @test far.idio.vol ≈ factor_attribution(w, first(fa_ts_prior()), rd.X).idio.vol
+    end
+    @testset "The realised components sum to the total on the caller's returns" begin
+        for rsd in (true, false)
+            pr, rd = fa_ts_prior(; rsd = rsd)
+            w = fa_ts_weights(pr)
+            fa = factor_attribution(w, pr, rd.X; assets = true)
+            @test fa.realised
+            @test fa.total.mu_contrib ≈ mean(rd.X * w)
+            @test fa.total.vol ≈ std(rd.X * w)
+            @test fa.sys.vol_contrib + fa.idio.vol_contrib + fa.unattr.vol_contrib ≈
+                  fa.total.vol_contrib
+            @test fa.sys.mu_contrib + fa.idio.mu_contrib + fa.unattr.mu_contrib ≈
+                  fa.total.mu_contrib
+            @test fa.sys.pct_var + fa.idio.pct_var + fa.unattr.pct_var ≈
+                  one(fa.total.pct_var)
+            @test sum(fa.fbd.vol_contrib) ≈ fa.sys.vol_contrib
+            @test sum(fa.abd.sys_vol_contrib) ≈ fa.sys.vol_contrib
+            # The model reconstructs the returns exactly, so the remainder is rounding.
+            @test abs(fa.unattr.pct_var) < 1e-12
+        end
+    end
+    @testset "A static block needs no alignment, no family axis and no standard error" begin
+        pr, rd = fa_ts_prior()
+        w = fa_ts_weights(pr)
+        T = size(rd.X, 1)
+        # The lag is zero, so the aligned history is the whole of the caller's series.
+        @test PO.attribution_align(pr.rr, pr, T).rows == 1:T
+        fa = factor_attribution(w, pr, rd.X)
+        @test isnothing(fa.fmbd)
+        @test isnothing(fa.sys.mu_se)
+        @test isnothing(fa.fbd.mu_se)
+        # `se = true` reads the regression weights and the idiosyncratic variance history, and a
+        # `Regression` keeps neither, so the sandwich names the first it cannot read.
+        @test_throws PO.IsNothingError factor_attribution(w, pr, rd.X; se = true)
+        # The returns move even though the loadings do not, so the rolling twin still rolls.
+        fas = factor_attribution(w, pr, rd.X, 30)
+        @test length(fas) == T - 30 + 1
+        @test fas[end].total.mu_contrib ≈ mean(view(rd.X, (T - 29):T, :) * w)
+        @test fas[end].total.vol ≈ std(view(rd.X, (T - 29):T, :) * w)
+    end
+    @testset "A carrier that stored no original returns is refused by name" begin
+        pr, rd = fa_ts_prior()
+        w = fa_ts_weights(pr)
+        stub = LowOrderPrior(; X = pr.X, mu = pr.mu, sigma = pr.sigma, rr = pr.rr,
+                             fpr = pr.fpr)
+        @test isnothing(stub.o_X)
+        # `original_X` falls back to `X` on such a carrier, so the residual series would be zero
+        # at every observation rather than missing, which is why the read refuses instead.
+        @test_throws PO.IsNothingError factor_attribution(w, stub, rd.X)
+        # The predicted side reads no series, so it answers as it did.
+        @test isa(factor_attribution(w, stub), FactorAttributionResult)
+    end
 end
 
 @testset "The entry points that read an optimisation result" begin

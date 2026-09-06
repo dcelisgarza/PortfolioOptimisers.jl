@@ -263,8 +263,8 @@ commit = "33b9681df0"
 "src/20_Optimisation/23_GreedyFiniteAllocation.jl" = { cyc = 9, cog = 14, arg = 6, cyc_sum = 16, cog_sum = 16, arg_sum = 26, macros = [] }
 "src/20_Optimisation/24_RiskMeasureCompatibility.jl" = { cyc = 2, cog = 2, arg = 2, cyc_sum = 15, cog_sum = 6, arg_sum = 15, macros = [] }
 "src/21_ExpectedReturns.jl" = { cyc = 6, cog = 10, arg = 8, cyc_sum = 53, cog_sum = 42, arg_sum = 109, macros = ["@propagatable"] }
-"src/21_FactorAttribution.jl" = { cyc = 3, cog = 6, arg = 6, cyc_sum = 44, cog_sum = 14, arg_sum = 41, macros = [] }
-"src/21_FactorAttributionRealised.jl" = { cyc = 4, cog = 5, arg = 9, cyc_sum = 86, cog_sum = 31, arg_sum = 176, macros = [] }
+"src/21_FactorAttribution.jl" = { cyc = 3, cog = 6, arg = 6, cyc_sum = 53, cog_sum = 15, arg_sum = 60, macros = [] }
+"src/21_FactorAttributionRealised.jl" = { cyc = 4, cog = 5, arg = 9, cyc_sum = 86, cog_sum = 31, arg_sum = 177, macros = [] }
 "src/22_Preselection.jl" = { cyc = 7, cog = 12, arg = 4, cyc_sum = 79, cog_sum = 79, arg_sum = 31, macros = [] }
 "src/23_Pipeline/01_Base_Pipeline.jl" = { cyc = 3, cog = 2, arg = 7, cyc_sum = 46, cog_sum = 8, arg_sum = 51, macros = [] }
 "src/23_Pipeline/02_StepExecution.jl" = { cyc = 5, cog = 9, arg = 3, cyc_sum = 55, cog_sum = 36, arg_sum = 55, macros = [] }

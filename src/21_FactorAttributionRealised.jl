@@ -91,7 +91,8 @@ function attribution_cov(x::VecNum, yc::VecNum)
     return LinearAlgebra.dot(yc, x .- mean(x)) / (length(yc) - 1)
 end
 """
-    attribution_align(rr::AbstractLoadingsRegressionResult, T::Integer)
+    attribution_align(rr::AbstractLoadingsRegressionResult, pr::AbstractPriorResult,
+                      T::Integer)
 
 Return the lag-aligned history a realised factor attribution reads off a factor model block.
 
@@ -102,6 +103,7 @@ A fit that warmed up on the first observations keeps fewer than the caller's ser
 # Arguments
 
   - `rr`: The factor model block.
+  - `pr`: The prior result the block travels on, which carries the two return series of a block that stores none.
   - `T`: The number of observations the caller's return series carries.
 
 # Validation
@@ -125,10 +127,11 @@ A fit that warmed up on the first observations keeps fewer than the caller's ser
   - [`attribution_lag`](@ref)
   - [`cs_regression_data`](@ref)
 """
-function attribution_align(rr::AbstractLoadingsRegressionResult, T::Integer)
+function attribution_align(rr::AbstractLoadingsRegressionResult, pr::AbstractPriorResult,
+                           T::Integer)
     lag = attribution_lag(rr)
-    f = attribution_factor_returns(rr)
-    eps = attribution_idiosyncratic_returns(rr)
+    f = attribution_factor_returns(rr, pr)
+    eps = attribution_idiosyncratic_returns(rr, pr)
     Tb = size(f, 1)
     @argcheck(T >= Tb,
               DimensionMismatch("the return series ($T observations) must carry at least as many observations as the factor model block ($Tb observations)"))
@@ -1132,7 +1135,7 @@ function attribution_realised_entry(W::VecNum_MatNum, pr::AbstractPriorResult, r
                                     ppy::Number = 1)::FactorAttributionResult
     rr = attribution_prior_block(pr).rr
     assert_attribution_investable(W, pr)
-    al = attribution_align(rr, length(ret))
+    al = attribution_align(rr, pr, length(ret))
     return realised_attribution(attribution_window_weights(W, al.rows), view(ret, al.rows),
                                 al, attribution_families(rr), assets, se, ppy)
 end
@@ -1171,7 +1174,7 @@ function attribution_rolling_entry(W::VecNum_MatNum, pr::AbstractPriorResult, re
                                    se::Bool = false, ppy::Number = 1)
     rr = attribution_prior_block(pr).rr
     assert_attribution_investable(W, pr)
-    al = attribution_align(rr, length(ret))
+    al = attribution_align(rr, pr, length(ret))
     return attribution_rolling(attribution_window_weights(W, al.rows), ret[al.rows], al,
                                attribution_families(rr), assets, se, ppy, window, step)
 end
