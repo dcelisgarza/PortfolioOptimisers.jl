@@ -30,4 +30,6 @@ port_opt_view(pr::Union{Nothing, AbstractPriorEstimator}, ::Any, args...)
 port_opt_view(pr::LowOrderPrior, rd, args...)
 port_opt_view(pr::HighOrderPrior, rd, args...)
 investable_mask
+held_non_investable
+investable_weights_view
 ```

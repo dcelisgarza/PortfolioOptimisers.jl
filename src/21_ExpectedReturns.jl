@@ -1,16 +1,22 @@
 """
     expected_return(ret::ArithmeticReturn, w::VecNum, pr::AbstractPriorResult,
-                    fees::Option{<:Fees} = nothing; kwargs...)
+                    fees::Option{<:Fees} = nothing; strict::Bool = false, kwargs...)
     expected_return(ret::LogarithmicReturn, w::VecNum, pr::AbstractPriorResult,
-                    fees::Option{<:Fees} = nothing; kwargs...)
+                    fees::Option{<:Fees} = nothing; strict::Bool = false, kwargs...)
     expected_return(ret::NoReturn, w::VecNum, pr::AbstractPriorResult,
                     fees::Option{<:Fees} = nothing; kwargs...)
     expected_return(ret::JRE_VecJRE, w::VecVecNum, pr::AbstractPriorResult,
-                    fees::Option{<:Fees} = nothing; kwargs...)
+                    fees::Option{<:Fees} = nothing; strict::Bool = false, kwargs...)
 
 Compute the expected portfolio return using the specified return estimator.
 
 `expected_return` computes the expected return for a portfolio given its weights, a prior result, and optional transaction fees. `fees` is **positional** and follows `pr`, on every method.
+
+## The prior route reduces to the Investable Mask
+
+A prior result lives on the **full** asset universe, and an asset it could not estimate carries `NaN` in `mu` and down its column of `pr.X`. So `dot(w, mu)` and `X * w` are `NaN` at **any** weight, the optimiser's own zero included. Each method therefore reduces the prior, the weights and the fees once at its entry, through [`investable_reduction`](@ref), which is the rule ADR 0115 states for an optimiser, taken at the value-level door. A held non-investable asset warns and its weight is dropped, or raises under `strict`. [`NoReturn`](@ref) answers zero at every weight, so it reads nothing and reduces nothing.
+
+The reduction is a **no-op on a prior that is already reduced**, because a reduced prior's moments are finite everywhere and [`investable_mask`](@ref) then answers `nothing`. That is what keeps a vector of terms, a population, and a composite such as [`expected_ratio`](@ref) to exactly one diagnostic.
 
 Each method is the scalar twin of the `ret` expression that `set_return_constraints!` builds for the same estimator, so the two sides charge the same fee. [`NoReturn`](@ref) builds a zero expression and the model charges it nothing, so `settings.fee` is inert on that term and the scalar twin charges nothing either.
 
@@ -71,7 +77,11 @@ Where:
   - [`calc_fees`](@ref)
 """
 function expected_return(r::ArithmeticReturn, w::VecNum, pr::AbstractPriorResult,
-                         fees::Option{<:Fees} = nothing; kwargs...)
+                         fees::Option{<:Fees} = nothing; strict::Bool = false, kwargs...)
+    # The value-level door. A non-investable asset carries `NaN` in `mu`, so `dot(w, mu)` is
+    # `NaN` at any weight, the optimiser's own zero included. The reduction is a no-op on a
+    # prior that is already reduced, which is what keeps a composite to one diagnostic.
+    _, pr, w, fees = investable_reduction(pr, w, fees, strict)
     # The scalar twin of the `ret` expression `set_return_constraints!` builds, so it uses
     # the same ladder. The prior is in hand, so a Deferred Quantity resolves here too.
     r = resolve_deferred_quantities(r, pr)
@@ -79,7 +89,9 @@ function expected_return(r::ArithmeticReturn, w::VecNum, pr::AbstractPriorResult
     return LinearAlgebra.dot(w, mu) - term_fees(w, fees, r.settings.fee)
 end
 function expected_return(ret::LogarithmicReturn, w::VecNum, pr::AbstractPriorResult,
-                         fees::Option{<:Fees} = nothing; kwargs...)
+                         fees::Option{<:Fees} = nothing; strict::Bool = false, kwargs...)
+    # The value-level door — see the note on the arithmetic twin above.
+    _, pr, w, fees = investable_reduction(pr, w, fees, strict)
     rw = ret.w
     X = pr.X
     kret = if isnothing(rw)
@@ -179,7 +191,10 @@ Where:
   - [`NearOptimalCentering`](@ref)
 """
 function expected_return(ret::VecJRE, w::VecNum, pr::AbstractPriorResult,
-                         fees::Option{<:Fees} = nothing; kwargs...)
+                         fees::Option{<:Fees} = nothing; strict::Bool = false, kwargs...)
+    # The vector reduces once, so a held non-investable asset is named once and not once per
+    # term. Every term reduces again on the reduced prior, where the mask is `nothing`.
+    _, pr, w, fees = investable_reduction(pr, w, fees, strict)
     rt = zero(eltype(w))
     for ret_i in ret
         if !ret_i.settings.rte
@@ -190,7 +205,10 @@ function expected_return(ret::VecJRE, w::VecNum, pr::AbstractPriorResult,
     return rt
 end
 function expected_return(ret::JRE_VecJRE, w::VecVecNum, pr::AbstractPriorResult,
-                         fees::Option{<:Fees} = nothing; kwargs...)
+                         fees::Option{<:Fees} = nothing; strict::Bool = false, kwargs...)
+    # The population reduces once, on the mask any member holds an asset under, so the
+    # diagnostic is raised once rather than once per member.
+    _, pr, w, fees = investable_reduction(pr, w, fees, strict)
     return [expected_return(ret, wi, pr, fees; kwargs...) for wi in w]
 end
 """
@@ -261,7 +279,12 @@ Both axes are handed `pr` itself, so both apply the same precedence rule: a stat
 """
 function expected_ratio(r::BaseRM_VecBaseRM, ret::JRE_VecJRE, w::VecNum,
                         pr::AbstractPriorResult, fees::Option{<:Fees} = nothing;
-                        rf::Number = 0, sca::Scalariser = SumScalariser(), kwargs...)
+                        rf::Number = 0, sca::Scalariser = SumScalariser(),
+                        strict::Bool = false, kwargs...)
+    # The value-level door reduces here, at the outermost entry the caller reached, so a
+    # held non-investable asset is named once. Both children reduce again on the reduced
+    # prior, where every moment is finite and the mask is `nothing`, so neither repeats it.
+    _, pr, w, fees = investable_reduction(pr, w, fees, strict)
     # Both axes are handed the prior itself, never `pr.X`. The risk axis then enters
     # `expected_risk`'s own prior route, which resolves the measure through
     # `resolve_risk_inputs` exactly once. Unwrapping the matrix here dropped the prior
@@ -350,7 +373,9 @@ A result with no `r` — one on the [`NonRiskJuMPOptimisationResult`](@ref) half
 function expected_risk_ret_ratio(r::BaseRM_VecBaseRM, ret::JRE_VecJRE, w::VecNum,
                                  pr::AbstractPriorResult, fees::Option{<:Fees} = nothing;
                                  rf::Number = 0, sca::Scalariser = SumScalariser(),
-                                 kwargs...)
+                                 strict::Bool = false, kwargs...)
+    # The value-level door reduces once here — see the note in `expected_ratio`.
+    _, pr, w, fees = investable_reduction(pr, w, fees, strict)
     # The prior, not `pr.X` — see the note in `expected_ratio`.
     rk = expected_risk(r, w, pr, fees; sca = sca, kwargs...)
     rt = expected_return(ret, w, pr, fees; kwargs...)
@@ -457,7 +482,11 @@ The ratio it penalises is [`expected_ratio`](@ref)'s, so it inherits the same ru
 """
 function expected_sric(r::BaseRM_VecBaseRM, ret::JRE_VecJRE, w::VecNum,
                        pr::AbstractPriorResult, fees::Option{<:Fees} = nothing;
-                       rf::Number = 0, sca::Scalariser = SumScalariser(), kwargs...)
+                       rf::Number = 0, sca::Scalariser = SumScalariser(),
+                       strict::Bool = false, kwargs...)
+    # The value-level door reduces once here, so the penalty's asset count is the count of
+    # assets the prior could estimate — see the note in `expected_ratio`.
+    _, pr, w, fees = investable_reduction(pr, w, fees, strict)
     sr = expected_ratio(r, ret, w, pr, fees; rf = rf, sca = sca, kwargs...)
     return sr - sric_penalty(sr, pr)
 end
@@ -521,7 +550,9 @@ The tuple is [`expected_risk_ret_ratio`](@ref)'s with the penalty applied to its
 function expected_risk_ret_sric(r::BaseRM_VecBaseRM, ret::JRE_VecJRE, w::VecNum,
                                 pr::AbstractPriorResult, fees::Option{<:Fees} = nothing;
                                 rf::Number = 0, sca::Scalariser = SumScalariser(),
-                                kwargs...)
+                                strict::Bool = false, kwargs...)
+    # The value-level door reduces once here — see the note in `expected_sric`.
+    _, pr, w, fees = investable_reduction(pr, w, fees, strict)
     rk, rt, sr = expected_risk_ret_ratio(r, ret, w, pr, fees; rf = rf, sca = sca, kwargs...)
     return rk, rt, sr - sric_penalty(sr, pr)
 end
@@ -938,7 +969,10 @@ what this family needs. So the family resolves once here and maps with the prior
   - [`factory`](@ref)
 """
 function expected_risk(r::PrRM, w::VecVecNum, pr::AbstractPriorResult,
-                       fees::Option{<:Fees} = nothing; kwargs...)
+                       fees::Option{<:Fees} = nothing; strict::Bool = false, kwargs...)
+    # The population reduces once, so the diagnostic is raised once rather than once per
+    # member. Every member reduces again on the reduced prior, where the mask is `nothing`.
+    _, pr, w, fees = investable_reduction(pr, w, fees, strict)
     r = factory(r, pr)
     return [expected_risk(r, wi, pr, fees; kwargs...) for wi in w]
 end
@@ -1272,6 +1306,8 @@ end
 Summarise a realised return series as a [`PerformanceSummaryResult`](@ref).
 
 The weight-and-returns methods net the returns through [`calc_net_returns`](@ref) first, so a summary of a portfolio accounts for its fees.
+
+**The Precomputed-returns contract: the series `ret` must be finite.** No method takes a finiteness check, because every internal caller hands one a finite series: the prediction methods read the fold's own funnel output, and a scan on a long series would be paid by all of them. One non-finite entry makes the mean, the volatility and every ratio non-finite, and the tail figure answers a **finite wrong number** rather than a `NaN`, because `partialsort` orders a `NaN` after every real. A caller who holds a gapped series drops the gaps first with `x[isfinite.(x)]`, which reproduces the reference implementation's drop-per-column answer, and a caller who holds a gapped panel scores it through [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref) instead, which filters the Held Gaps once.
 
 # Mathematical definition
 

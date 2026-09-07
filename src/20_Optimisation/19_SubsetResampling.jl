@@ -115,6 +115,11 @@ function SubsetResamplingResult(; pr::Option{<:AbstractPriorResult},
     return SubsetResamplingResult(pr, wb, fees, ress, idx, retcode,
                                   expand_investable_weights(imsk, w), imsk, fb)
 end
+# The subset-resampling family carries the mask on the result itself, so the fold reads it
+# directly.
+function result_investable_mask(res::SubsetResamplingResult)
+    return res.imsk
+end
 """
     set_retcode(res::SubsetResamplingResult, retcode::OptRetCode_VecOptRetCode)
 

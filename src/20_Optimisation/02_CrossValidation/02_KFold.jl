@@ -17,13 +17,14 @@ $(DocStringExtensions.FIELDS)
         embargo_size::Integer = 0,
         wd::Option{<:AbstractWeightDrift} = nothing,
         store_weight_path::Bool = false,
+        strict::Bool = false,
     ) -> KFold
 
 Keyword arguments correspond to the struct's fields.
 
 ## Weight drift
 
-`wd` is the Weight Drift of the scheme, and `nothing` is the library's original behaviour: a fold's return series is `X * w` net of fees, read at the target weights of that fold. A [`SelfFinancingDrift`](@ref) reads the series as the wealth ratio of the drifted holdings instead, and the fold carries a [`HeldWeightsResult`](@ref). `store_weight_path` makes the fold store the weight path it computed, which a reader otherwise rebuilds on demand.
+`wd` is the Weight Drift of the scheme, and `nothing` is the library's original behaviour: a fold's return series is `X * w` net of fees, read at the target weights of that fold. A [`SelfFinancingDrift`](@ref) reads the series as the wealth ratio of the drifted holdings instead, and the fold carries a [`HeldWeightsResult`](@ref). `store_weight_path` makes the fold store the weight path it computed, which a reader otherwise rebuilds on demand. `strict` decides what a **Held Gap** does: an asset that delists inside a test window carries a non-zero weight and a missing return, and the fold zeroes that pair and warns, or refuses with an `ArgumentError` under `strict`.
 
 A k-fold enumeration is not a timeline, so this scheme carries no Previous-Weights Source. Each of its folds is independent of the others, and no fold has a fold behind it to inherit weights from.
 
@@ -42,7 +43,8 @@ KFold
         purged_size ┼ Int64: 7
        embargo_size ┼ Int64: 11
                  wd ┼ nothing
-  store_weight_path ┴ Bool: false
+  store_weight_path ┼ Bool: false
+             strict ┴ Bool: false
 ```
 
 # Related
@@ -79,20 +81,24 @@ KFold
     $(field_dict[:store_weight_path])
     """
     store_weight_path
+    """
+    $(field_dict[:cv_strict])
+    """
+    strict
     function KFold(n::Integer, purged_size::Integer, embargo_size::Integer,
-                   wd::Option{<:AbstractWeightDrift}, store_weight_path::Bool)
+                   wd::Option{<:AbstractWeightDrift}, store_weight_path::Bool, strict::Bool)
         assert_nonempty_gt0_finite_val(n, :n)
         assert_nonempty_finite_val(purged_size, :purged_size)
         assert_nonempty_finite_val(embargo_size, :embargo_size)
         return new{typeof(n), typeof(purged_size), typeof(embargo_size), typeof(wd),
-                   typeof(store_weight_path)}(n, purged_size, embargo_size, wd,
-                                              store_weight_path)
+                   typeof(store_weight_path), typeof(strict)}(n, purged_size, embargo_size,
+                                                              wd, store_weight_path, strict)
     end
 end
 function KFold(; n::Integer = 5, purged_size::Integer = 0, embargo_size::Integer = 0,
-               wd::Option{<:AbstractWeightDrift} = nothing,
-               store_weight_path::Bool = false)::KFold
-    return KFold(n, purged_size, embargo_size, wd, store_weight_path)
+               wd::Option{<:AbstractWeightDrift} = nothing, store_weight_path::Bool = false,
+               strict::Bool = false)::KFold
+    return KFold(n, purged_size, embargo_size, wd, store_weight_path, strict)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -222,7 +228,7 @@ The folds of this scheme are not a timeline, so it carries no Previous-Weights S
 
 # Returns
 
-  - `(; wd, pws, store_weight_path)`: The Weight Drift, the Previous-Weights Source, and the flag that stores a fold's weight path.
+  - `(; wd, pws, store_weight_path, strict)`: The Weight Drift, the Previous-Weights Source, the flag that stores a fold's weight path, and the flag that makes a Held Gap raise rather than warn.
 
 # Related
 
@@ -231,6 +237,7 @@ The folds of this scheme are not a timeline, so it carries no Previous-Weights S
   - [`held_weights_drift`](@ref)
 """
 function fold_evaluation(cv::KFold)
-    return (; wd = cv.wd, pws = nothing, store_weight_path = cv.store_weight_path)
+    return (; wd = cv.wd, pws = nothing, store_weight_path = cv.store_weight_path,
+            strict = cv.strict)
 end
 export KFold, KFoldResult

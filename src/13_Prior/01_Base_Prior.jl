@@ -1447,6 +1447,71 @@ function investable_mask(pr::AbstractPriorResult)::Option{BitVector}
     return all(imsk) ? nothing : imsk
 end
 """
+    held_non_investable(imsk::BitVector, w::VecNum)
+    held_non_investable(imsk::BitVector, w::VecVecNum)
+    held_non_investable(imsk::BitVector, W::MatNum)
+
+Find the assets a portfolio holds and the Investable Mask excludes.
+
+A non-investable asset carries `NaN` in `mu` and on the diagonal of `sigma`, so no moment of it exists. A portfolio that holds none of it is reduced exactly. A portfolio that holds some of it is what a caller must be told about, and this is the one scan that finds those assets. A weight path holds an asset when any of its rows does, and a population holds one when any of its members does.
+
+# Arguments
+
+  - `imsk`: The Investable Mask, `true` at every asset whose prior moments were finite.
+  - `w`: Portfolio weights, a population of them, or a weight path (observations × assets).
+
+# Returns
+
+  - `held::VecInt`: Indices of the held non-investable assets, empty when there are none.
+
+# Related
+
+  - [`investable_mask`](@ref)
+  - [`investable_weights_view`](@ref)
+  - [`attribution_investable_diagnostic`](@ref)
+"""
+function held_non_investable(imsk::BitVector, w::VecNum)
+    return findall(i -> !imsk[i] && !iszero(w[i]), eachindex(imsk))
+end
+function held_non_investable(imsk::BitVector, w::VecVecNum)
+    return findall(i -> !imsk[i] && any(wi -> !iszero(wi[i]), w), eachindex(imsk))
+end
+function held_non_investable(imsk::BitVector, W::MatNum)
+    return findall(i -> !imsk[i] && any(!iszero, view(W, :, i)), eachindex(imsk))
+end
+"""
+    investable_weights_view(imsk::BitVector, w::VecNum)
+    investable_weights_view(imsk::BitVector, w::VecVecNum)
+    investable_weights_view(imsk::BitVector, w::MatNum)
+
+Take the view of the weights at the Investable Mask.
+
+A weight vector is one cross-section, so the mask selects its entries. A weight path is one row of weights per observation, so the mask selects its columns and every row keeps its own observation. A population is reduced member by member.
+
+# Arguments
+
+  - `imsk`: The Investable Mask, `true` at every asset whose prior moments were finite.
+  - `w`: Portfolio weights, a population of them, or a weight path (observations × assets).
+
+# Returns
+
+  - The view of `w` at the investable assets.
+
+# Related
+
+  - [`held_non_investable`](@ref)
+  - [`investable_mask`](@ref)
+"""
+function investable_weights_view(imsk::BitVector, w::VecNum)
+    return view(w, imsk)
+end
+function investable_weights_view(imsk::BitVector, w::VecVecNum)
+    return [view(wi, imsk) for wi in w]
+end
+function investable_weights_view(imsk::BitVector, w::MatNum)
+    return view(w, :, imsk)
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Carries the coskewness and cokurtosis a high order prior estimator produced, over the low order prior it wraps.

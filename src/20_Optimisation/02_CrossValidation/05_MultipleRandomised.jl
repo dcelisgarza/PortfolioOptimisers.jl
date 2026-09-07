@@ -613,7 +613,7 @@ function path_fit_and_predict(opt::OptE_TD, rd::ReturnsResult, train_idx, test_i
                               id = nothing, wd::Option{<:AbstractWeightDrift} = nothing,
                               hwd::Option{<:AbstractWeightDrift} = wd,
                               pws::Option{<:AbstractPreviousWeightsSource} = nothing,
-                              store_weight_path::Bool = false)
+                              store_weight_path::Bool = false, strict::Bool = false)
     # `i` is the fold's position in the path's split enumeration — no ordering is imposed
     # on time-dependent entries (predictions are sorted for reporting only, after the
     # loop); the user keys entries off ctx.train_idx[ctx.i] / ctx.test_idx[ctx.i].
@@ -626,7 +626,7 @@ function path_fit_and_predict(opt::OptE_TD, rd::ReturnsResult, train_idx, test_i
                             pws = pws) do fold
         return fit_and_predict(fold.est, fold.rd; train_idx = fold.train,
                                test_idx = fold.test, wd = wd, hwd = hwd,
-                               store_weight_path = store_weight_path)
+                               store_weight_path = store_weight_path, strict = strict)
     end
     return MultiPeriodPredictionResult(; pred = sort_predictions!(test_idx, predictions),
                                        id = id)
@@ -642,7 +642,7 @@ function fit_and_predict(opt::OptE_TD, rd::ReturnsResult, cv::MRCVR;
     for (train, test, asset, path_id) in zip(train_idx, test_idx, asset_idx, path_ids)
         push!(dict[path_id], (train, test, asset))
     end
-    (; wd, pws, store_weight_path) = fold_evaluation(cv)
+    (; wd, pws, store_weight_path, strict) = fold_evaluation(cv)
     hwd = held_weights_drift(wd, pws)
     predictions = parallel_folds(length(unique_ids), ex, MultiPeriodPredictionResult) do i
         vals = dict[i]
@@ -651,7 +651,7 @@ function fit_and_predict(opt::OptE_TD, rd::ReturnsResult, cv::MRCVR;
         asset = map(x -> x[3], vals)
         return path_fit_and_predict(opt, rd, train, test, asset; ex = ex, id = i, wd = wd,
                                     hwd = hwd, pws = pws,
-                                    store_weight_path = store_weight_path)
+                                    store_weight_path = store_weight_path, strict = strict)
     end
     return PopulationPredictionResult(; pred = predictions)
 end
@@ -665,7 +665,7 @@ The scheme carries no switch of its own. Each of its paths is an inner walk-forw
 
 # Returns
 
-  - `(; wd, pws, store_weight_path)`: The Weight Drift, the Previous-Weights Source, and the flag that stores a fold's weight path.
+  - `(; wd, pws, store_weight_path, strict)`: The Weight Drift, the Previous-Weights Source, the flag that stores a fold's weight path, and the flag that makes a Held Gap raise rather than warn.
 
 # Related
 

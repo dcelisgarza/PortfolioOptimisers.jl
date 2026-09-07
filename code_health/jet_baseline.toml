@@ -419,7 +419,7 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/12_ConstraintGeneration/07_ThresholdConstraintGeneration.jl" = { raw = 0, reviewed = 0 }
 "src/12_ConstraintGeneration/08_ExposureConstraintGeneration.jl" = { raw = 0, reviewed = 0 }
 "src/12_ConstraintGeneration/09_CrossSectionalFactorAxis.jl" = { raw = 0, reviewed = 0 }
-"src/13_Prior/01_Base_Prior.jl" = { raw = 0, reviewed = 0 }
+"src/13_Prior/01_Base_Prior.jl" = { raw = 2, reviewed = 2 }
 "src/13_Prior/02_EmpiricalPrior.jl" = { raw = 0, reviewed = 0 }
 "src/13_Prior/03_FactorPrior.jl" = { raw = 0, reviewed = 0 }
 "src/13_Prior/04_HighOrderPrior.jl" = { raw = 0, reviewed = 0 }

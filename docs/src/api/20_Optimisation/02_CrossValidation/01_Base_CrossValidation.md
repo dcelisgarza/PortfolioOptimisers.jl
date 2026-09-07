@@ -44,6 +44,7 @@ run_folds
 Fold
 folds_are_time_ordered
 fold_evaluation
+investable_fold_view
 previous_weights
 collapse_benchmark(B::Nothing, w::VecNum_VecVecNum, hw)
 ruined_retcodes

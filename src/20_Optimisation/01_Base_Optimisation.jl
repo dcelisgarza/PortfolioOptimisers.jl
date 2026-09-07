@@ -366,6 +366,32 @@ function reset_time_dependent_estimator(opt::OptimisationResult)
     return opt
 end
 """
+    result_investable_mask(res::OptimisationResult) -> Option{BitVector}
+
+Read the Investable Mask an optimisation result reduced on.
+
+ADR 0115 reduces every optimisation to the Investable Mask at its entry and expands the solved weights back to the caller's universe, so the result's own `w` is on the **full** universe and the mask is the record of which assets the optimisation traded. A fold reads that record to view its test window before it scores the weights, which is ADR 0120's first decision.
+
+The mask is read through this verb rather than off a field, because the families carry it in different places: a JuMP result holds it on its processed attribute bundle, and a family that derives no mask answers `nothing`. **A family that gains a mask must add its own method here.** `test/test_54_held_gap_filter.jl` censuses the concrete results and fails when one carries a mask this verb cannot read, so the omission cannot be silent.
+
+# Arguments
+
+  - `res::OptimisationResult`: Fitted optimisation result.
+
+# Returns
+
+  - `imsk::Option{BitVector}`: The Investable Mask, or `nothing` when the optimisation reduced on nothing.
+
+# Related
+
+  - [`investable_mask`](@ref)
+  - [`investable_reduction`](@ref)
+  - [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref)
+"""
+function result_investable_mask(::OptimisationResult)
+    return nothing
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for continuous (non-integer allocation) optimisation results.

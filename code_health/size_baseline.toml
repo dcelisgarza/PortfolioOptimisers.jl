@@ -11,7 +11,7 @@ commit = "97e398ef74"
 [file]
 "ext/PortfolioOptimisersImputeExt.jl" = { code = 6, doc = 0, comment = 4, blank = 3, total = 13 }
 "ext/PortfolioOptimisersPlotsExt.jl" = { code = 2498, doc = 0, comment = 175, blank = 46, total = 2719 }
-"src/01_Base/01_DocstringDictionaries.jl" = { code = 1104, doc = 113, comment = 122, blank = 43, total = 1382 }
+"src/01_Base/01_DocstringDictionaries.jl" = { code = 1105, doc = 113, comment = 122, blank = 43, total = 1383 }
 "src/01_Base/02_TypeRoots.jl" = { code = 15, doc = 199, comment = 0, blank = 89, total = 303 }
 "src/01_Base/03_PrettyShow.jl" = { code = 117, doc = 138, comment = 0, blank = 76, total = 331 }
 "src/01_Base/04_ScopedConfig.jl" = { code = 163, doc = 491, comment = 2, blank = 214, total = 870 }
@@ -199,8 +199,8 @@ commit = "97e398ef74"
 "src/19_RiskMeasures/26_AdjustRiskContributions.jl" = { code = 55, doc = 46, comment = 0, blank = 13, total = 114 }
 "src/19_RiskMeasures/27_ExpectedRisk.jl" = { code = 259, doc = 434, comment = 25, blank = 200, total = 918 }
 "src/19_RiskMeasures/28_RiskMeasureTools.jl" = { code = 84, doc = 95, comment = 0, blank = 51, total = 230 }
-"src/20_Optimisation/01_Base_Optimisation.jl" = { code = 875, doc = 1635, comment = 13, blank = 811, total = 3334 }
-"src/20_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl" = { code = 542, doc = 942, comment = 21, blank = 378, total = 1883 }
+"src/20_Optimisation/01_Base_Optimisation.jl" = { code = 878, doc = 1649, comment = 13, blank = 820, total = 3360 }
+"src/20_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl" = { code = 560, doc = 985, comment = 30, blank = 394, total = 1969 }
 "src/20_Optimisation/02_CrossValidation/02_KFold.jl" = { code = 77, doc = 112, comment = 0, blank = 47, total = 236 }
 "src/20_Optimisation/02_CrossValidation/03_Combinatorial.jl" = { code = 251, doc = 290, comment = 7, blank = 121, total = 669 }
 "src/20_Optimisation/02_CrossValidation/04_WalkForward.jl" = { code = 318, doc = 420, comment = 0, blank = 158, total = 896 }
@@ -230,7 +230,7 @@ commit = "97e398ef74"
 "src/20_Optimisation/09_JuMPConstraints/11_TrackingErrorConstraints.jl" = { code = 176, doc = 63, comment = 3, blank = 22, total = 264 }
 "src/20_Optimisation/09_JuMPConstraints/12_RegularisationConstraints.jl" = { code = 219, doc = 442, comment = 11, blank = 205, total = 877 }
 "src/20_Optimisation/09_JuMPConstraints/13_WeightNormConstraints.jl" = { code = 92, doc = 160, comment = 2, blank = 70, total = 324 }
-"src/20_Optimisation/10_JuMPOptimiser.jl" = { code = 708, doc = 703, comment = 54, blank = 184, total = 1649 }
+"src/20_Optimisation/10_JuMPOptimiser.jl" = { code = 715, doc = 703, comment = 56, blank = 184, total = 1658 }
 "src/20_Optimisation/11_MeanRisk.jl" = { code = 251, doc = 432, comment = 4, blank = 125, total = 812 }
 "src/20_Optimisation/12_FactorRiskContribution.jl" = { code = 156, doc = 221, comment = 6, blank = 71, total = 454 }
 "src/20_Optimisation/13_NearOptimalCentering.jl" = { code = 606, doc = 594, comment = 15, blank = 198, total = 1413 }

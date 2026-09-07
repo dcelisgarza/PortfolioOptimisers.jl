@@ -9,6 +9,8 @@ The fee is one scalar and it is charged in **every** period. [`calc_fees`](@ref)
 
 The per asset returns sum to this series. `vec(sum(calc_net_asset_returns(w, X, fees); dims = 2))` reproduces `calc_net_returns(w, X, fees)`, because [`calc_asset_fees`](@ref) splits over the assets what [`calc_fees`](@ref) contracts into a scalar. The two sides add in a different order, so the identity holds to rounding and not to `==`: on the weights above the largest difference measured `6.9e-18`.
 
+**This verb is the plain product, and a non-finite entry poisons its whole observation.** `0 * NaN` is `NaN`, so a zero weight does not save the row: one `NaN` in `X[t, i]` makes `val[t]` non-finite whatever `w[i]` holds. The verb takes no finiteness check, because it is the funnel of the library and a scan here is paid at each of its call sites on every evaluation. A gapped panel is scored through [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref), which reduces the window to the Investable Mask and filters the Held Gaps once with [`filter_held_gaps`](@ref) before it reaches this verb.
+
 # Mathematical definition
 
 ```math
@@ -70,6 +72,226 @@ function calc_net_returns(w::VecNum, X::MatNum, fees::Fees)
 end
 function calc_net_returns(w::VecVecNum, X::MatNum, args...)
     return [calc_net_returns(wi, X, args...) for wi in w]
+end
+"""
+    investable_reduction(X::MatNum, w, fees::Option{<:Fees}, strict::Bool)
+    investable_reduction(rd::AbstractReturnsResult, w, fees::Option{<:Fees}, strict::Bool)
+    investable_reduction(pr::AbstractPriorResult, w, fees::Option{<:Fees}, strict::Bool)
+    investable_reduction(imsk::Nothing, pr::AbstractPriorResult, w, fees::Option{<:Fees}, strict::Bool)
+    investable_reduction(imsk::BitVector, pr::AbstractPriorResult, w, fees::Option{<:Fees}, strict::Bool)
+
+Reduce a prior result, the weights scored against it and the fees charged on them to the Investable Mask.
+
+This is ADR 0115's rule at the **value-level** door. An optimiser reduces once at its entry, so no optimiser meets a gap. A caller who scores a weight vector against a prior result by hand does meet one: a non-investable asset carries `NaN` in `mu`, on the diagonal of `sigma` and down its column of `pr.X`, so `dot(w, pr.sigma, w)` and `pr.X * w` are `NaN` at **any** weight, the optimiser's own zero included. [`expected_risk`](@ref), [`expected_return`](@ref), [`risk_contribution`](@ref) and [`factor_risk_contribution`](@ref) reduce here instead, and a per-asset answer expands back through [`expand_investable_weights`](@ref).
+
+Every block of the prior is reduced together by the [`port_opt_view`](@ref) method the prior's owner already writes, so a new block cannot be forgotten, and the reduced `pr.X` carries no dead column. The fees travel with the weights, because a [`Fees`](@ref) whose rates are one number per asset is indexed by the same axis and would otherwise meet a shorter weight vector.
+
+A held non-investable asset is a holding the prior cannot value. It takes the library's strictness policy through [`strict_diagnostic`](@ref): a warning names the assets and their weights are dropped, or an `ArgumentError` names them under `strict`.
+
+A bare returns matrix and a [`ReturnsResult`](@ref) carry no moments, so no mask exists to derive and they pass through. That is what lets one door state the reduction once and dispatch decide whether it happens.
+
+# Algorithm
+
+ 1. Return `nothing` and the three arguments unchanged when the carrier is a matrix or a returns result.
+ 2. Derive the Investable Mask once with [`investable_mask`](@ref).
+ 3. Return `nothing` and the three arguments unchanged when every asset is investable.
+ 4. Otherwise report the held non-investable assets through [`strict_diagnostic`](@ref).
+ 5. Return the mask, a [`port_opt_view`](@ref) of the prior and of the fees at `findall(imsk)`, and the view of the weights at the mask.
+
+# Arguments
+
+  - `pr`: Prior result, [`ReturnsResult`](@ref), or asset returns matrix.
+  - `w`: Portfolio weights, a population of them, or a weight path (observations × assets).
+  - `fees`: [`Fees`](@ref) the figure is charged against, or `nothing`.
+  - `strict`: Whether a held non-investable asset raises rather than warns.
+
+# Validation
+
+  - Every asset the weights hold is investable, else a warning naming the assets is emitted, or an `ArgumentError` naming them is raised under `strict`.
+
+# Returns
+
+  - `(imsk, pr, w, fees)`: The Investable Mask and the three reduced to it, or `nothing` and the three unchanged.
+
+# Related
+
+  - [`investable_mask`](@ref)
+  - [`held_non_investable`](@ref)
+  - [`investable_weights_view`](@ref)
+  - [`expand_investable_weights`](@ref)
+  - [`port_opt_view`](@ref)
+  - [`strict_diagnostic`](@ref)
+"""
+function investable_reduction(X::MatNum, w::Union{<:VecNum, <:VecVecNum, <:MatNum},
+                              fees::Option{<:Fees}, ::Bool)
+    return nothing, X, w, fees
+end
+function investable_reduction(rd::AbstractReturnsResult,
+                              w::Union{<:VecNum, <:VecVecNum, <:MatNum},
+                              fees::Option{<:Fees}, ::Bool)
+    return nothing, rd, w, fees
+end
+function investable_reduction(pr::AbstractPriorResult,
+                              w::Union{<:VecNum, <:VecVecNum, <:MatNum},
+                              fees::Option{<:Fees}, strict::Bool)
+    return investable_reduction(investable_mask(pr), pr, w, fees, strict)
+end
+function investable_reduction(::Nothing, pr::AbstractPriorResult,
+                              w::Union{<:VecNum, <:VecVecNum, <:MatNum},
+                              fees::Option{<:Fees}, ::Bool)
+    return nothing, pr, w, fees
+end
+function investable_reduction(imsk::BitVector, pr::AbstractPriorResult,
+                              w::Union{<:VecNum, <:VecVecNum, <:MatNum},
+                              fees::Option{<:Fees}, strict::Bool)
+    held = held_non_investable(imsk, w)
+    if !isempty(held)
+        strict_diagnostic("a value-level verb cannot score a holding the prior could not estimate. Assets $(held) are not investable, and the weights hold them. Their weights are dropped, so the figure describes the portfolio without them. Pass `strict = true` to refuse instead, reduce the weights to the investable universe, or refit the prior over a history that covers these assets.",
+                          strict)
+    end
+    idx = findall(imsk)
+    return imsk, port_opt_view(pr, idx), investable_weights_view(imsk, w),
+           port_opt_view(fees, idx)
+end
+"""
+    investable_returns_view(imsk::Nothing, rd::AbstractReturnsResult)
+    investable_returns_view(imsk::BitVector, rd::AbstractReturnsResult)
+
+Take the view of a returns result at the Investable Mask.
+
+The pairing of [`investable_reduction`](@ref) with the returns data a value-level verb takes beside the prior, so a factor regression that fits its own loadings fits them over the live assets alone.
+
+# Arguments
+
+  - `imsk`: The Investable Mask, or `nothing`.
+  - $(arg_dict[:rd])
+
+# Returns
+
+  - `rd::AbstractReturnsResult`: The returns result reduced to the investable assets, or unchanged.
+
+# Related
+
+  - [`investable_reduction`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+function investable_returns_view(::Nothing, rd::AbstractReturnsResult)
+    return rd
+end
+function investable_returns_view(imsk::BitVector, rd::AbstractReturnsResult)
+    return port_opt_view(rd, findall(imsk))
+end
+"""
+    held_gap_pairs(w::VecNum, X::MatNum)
+    held_gap_pairs(w::VecVecNum, X::MatNum)
+    held_gap_pairs(W::MatNum, X::MatNum)
+
+Find the Held Gaps of a window.
+
+A **Held Gap** is an `(observation, asset)` pair at which the portfolio's weight is non-zero and the asset's return is missing. It arises where the universe changes after the fit: an asset that was investable on the training window and delists inside the test window. A pair with a **zero** weight contributes nothing whatever it holds, and is never a Held Gap.
+
+The weight argument's type is the picker, as it is for [`calc_net_returns`](@ref). A [`VecNum`](@ref) is one target weight vector, and it weighs every observation, so a whole column is held or none of it is. A [`MatNum`](@ref) is a weight path, and each pair is judged by the weight held through its own observation. A [`VecVecNum`](@ref) is a population, and a column is held when any member holds it.
+
+# Arguments
+
+  - `w`: Portfolio weights, a population of them, or a weight path (observations × assets).
+  - `X`: Asset returns, `observations × assets`.
+
+# Returns
+
+  - `held::Vector{Tuple{Int, Int}}`: The `(observation, asset)` pairs, empty when there are none.
+
+# Related
+
+  - [`filter_held_gaps`](@ref)
+  - [`calc_net_returns`](@ref)
+  - [`attribution_net_returns`](@ref)
+"""
+function held_gap_pairs(w::VecNum, X::MatNum)
+    return [(t, i) for i in axes(X, 2) if !iszero(w[i])
+            for t in axes(X, 1) if !isfinite(X[t, i])]
+end
+function held_gap_pairs(w::VecVecNum, X::MatNum)
+    return [(t, i) for i in axes(X, 2) if any(wi -> !iszero(wi[i]), w)
+            for t in axes(X, 1) if !isfinite(X[t, i])]
+end
+function held_gap_pairs(W::MatNum, X::MatNum)
+    return [(t, i) for i in axes(X, 2)
+            for t in axes(X, 1) if !iszero(W[t, i]) && !isfinite(X[t, i])]
+end
+"""
+    filter_held_gaps(w::Union{<:VecNum, <:VecVecNum, <:MatNum}, X::MatNum, strict::Bool)
+
+Return the window with every non-finite entry replaced by zero, and name the Held Gaps.
+
+A point-in-time panel carries a `NaN` at every `(observation, asset)` pair where the asset is inactive: before it lists, and after it delists. `0 * NaN` is `NaN`, so a zero weight does not save the product `X * w`, and one delisting poisons every observation after it. This is the one place a fold cleans the window it is about to score, and it runs **once**, over the investable columns alone, before the series is formed and before a Weight Drift compounds.
+
+A **Held Gap** takes the library's strictness policy through [`strict_diagnostic`](@ref): a warning names the pairs and the pair contributes zero, or an `ArgumentError` names them under `strict`. A zero weight at a gap is silent. Nothing is renormalised, so the missing weight sits in cash on that observation, which is the one reading that invents no trade the weights never stated.
+
+The funnel [`calc_net_returns`](@ref) stays the plain product. A scan there is paid at each of its call sites on every evaluation; a scan here is paid once, on a window the fold already multiplies once.
+
+# Algorithm
+
+ 1. Return `X` itself when every entry of `X` is finite.
+ 2. Otherwise find the Held Gaps with [`held_gap_pairs`](@ref) and report them through [`strict_diagnostic`](@ref).
+ 3. Return a copy of `X` with every non-finite entry replaced by zero.
+
+# Arguments
+
+  - `w`: Portfolio weights, a population of them, or a weight path (observations × assets).
+  - `X`: Asset returns, `observations × assets`.
+  - `strict`: Whether a non-finite return at a held pair raises rather than warns.
+
+# Validation
+
+  - Every held pair of `X` is finite, else a warning naming the pairs is emitted, or an `ArgumentError` naming them is raised under `strict`.
+
+# Returns
+
+  - `X::MatNum`: The window with no non-finite entry.
+
+# Related
+
+  - [`held_gap_pairs`](@ref)
+  - [`calc_net_returns`](@ref)
+  - [`strict_diagnostic`](@ref)
+  - [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref)
+"""
+function filter_held_gaps(w::Union{<:VecNum, <:VecVecNum, <:MatNum}, X::MatNum,
+                          strict::Bool)
+    if all(isfinite, X)
+        return X
+    end
+    held = held_gap_pairs(w, X)
+    if !isempty(held)
+        strict_diagnostic(held_gap_msg(held), strict)
+    end
+    return map(x -> isfinite(x) ? x : zero(x), X)
+end
+"""
+    held_gap_msg(held::AbstractVector{<:Tuple{Integer, Integer}})
+
+Write the message a Held Gap raises.
+
+The message names the assets, the count of pairs and the first observation, so a caller can find the delisting that made them, and it states the consequence: the pair contributes zero and the missing weight sits in cash.
+
+# Arguments
+
+  - `held`: The `(observation, asset)` pairs [`held_gap_pairs`](@ref) found.
+
+# Returns
+
+  - `msg::String`: The message.
+
+# Related
+
+  - [`filter_held_gaps`](@ref)
+  - [`held_gap_pairs`](@ref)
+  - [`strict_diagnostic`](@ref)
+"""
+function held_gap_msg(held::AbstractVector{<:Tuple{Integer, Integer}})
+    assets = unique(last.(held))
+    return "a portfolio cannot earn a return an asset did not have. Assets $(assets) carry a non-finite return at $(length(held)) held (observation, asset) pair(s), the first at observation $(first(held)[1]). Those pairs contribute zero, so the weight of a missing asset sits in cash on that observation and the series understates the portfolio by whatever it would have earned. Pass `strict = true` to refuse instead, zero the weights over the observations the asset is inactive, or pass a weight history."
 end
 """
     calc_net_returns(w::MatNum, X::MatNum, args...)
@@ -155,6 +377,8 @@ The rows sum to the portfolio series. `vec(sum(calc_net_asset_returns(w, X, fees
 Each per asset fee is charged in **every** period, as it is for [`calc_net_returns`](@ref). The `N × 1` fee vector is subtracted from every row of ``\\mathbf{X} \\odot \\boldsymbol{w}^{\\intercal}``, so a `T`-row matrix charges it `T` times.
 
 These are the constant-weight methods: the one vector `w` weighs every observation. The `w::MatNum` methods below read a weight path instead, one row of weights per observation, which is what a fold scored under a Weight Drift held.
+
+**This verb is the plain product, and a non-finite entry poisons its own cell.** `0 * NaN` is `NaN`, so a zero weight does not save the entry, and the row it sits in no longer sums to a finite number. The verb takes no finiteness check, for the reason [`calc_net_returns`](@ref) takes none. A gapped panel is scored through [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref), which filters the Held Gaps once with [`filter_held_gaps`](@ref) before it reaches this verb.
 
 # Mathematical definition
 
@@ -976,6 +1200,8 @@ Compute simple or compounded cumulative returns along a specified dimension.
 
 `cumulative_returns` computes the cumulative returns for an array of asset or portfolio returns. By default, it computes simple cumulative returns using `cumsum`. If `compound` is `true`, it computes compounded cumulative returns using `cumprod(one(eltype(X)) .+ X)`.
 
+**The Precomputed-returns contract: the series the caller hands this verb must be finite.** It takes no finiteness check, because every internal caller hands it the output of [`calc_net_returns`](@ref) and a scan on a long series would be paid by all of them. One non-finite entry poisons every entry after it, because both accumulations carry it forward. A caller who holds a gapped series drops the gaps first with `x[isfinite.(x)]`, which is the reference implementation's own drop-per-column answer, and a caller who holds a gapped panel scores it through [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref) instead.
+
 # Mathematical definition
 
 ## Portfolio cumulative returns
@@ -1135,6 +1361,8 @@ Compute simple or compounded drawdowns along a specified dimension.
 **The running peak starts at the initial capital, not at the first observation**, so a series that is under water from the first period reports a negative drawdown there. `drawdowns([-0.1, 0.05])` returns `[-0.1, -0.05]` and not `[0.0, 0.0]`. `drawdowns` dispatches to [`absolute_drawdown_arr`](@ref) or to [`relative_drawdown_arr`](@ref), which hold the single definition of the peak: the `init` of their `accumulate(max, ...)` is the initial capital, `zero(eltype(X))` for the additive path and `one(eltype(X))` for the compound one.
 
 The two paths agree to first order on a small return. On `[-1e-6, 5e-7]` the additive and the compound answers differ by `5.0e-13`.
+
+**The Precomputed-returns contract: the series the caller hands this verb must be finite.** It takes no finiteness check, for the reason [`cumulative_returns`](@ref) takes none. One non-finite entry poisons the running peak and every drawdown after it. A caller who holds a gapped series drops the gaps first with `x[isfinite.(x)]`, and a caller who holds a gapped panel scores it through [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref) instead.
 
 # Mathematical definition
 
@@ -1652,6 +1880,118 @@ function drift_observations(::Nothing, test_idx)
 end
 function drift_observations(ts, ::Any)
     return ts
+end
+"""
+    expand_investable_columns(imsk::BitVector, A::MatNum)
+
+Expand a per asset history of the investable universe back onto the full asset universe.
+
+The column of a non-investable asset is filled with zero, which is what [`filter_held_gaps`](@ref) writes over its whole `NaN` column anyway. A drift over a zero column at a zero weight moves no wealth, so the expanded history rebuilds the same weight path the reduced one did.
+
+# Arguments
+
+  - `imsk`: The Investable Mask, `true` at every asset whose prior moments were finite.
+  - `A`: A history over the investable assets, `observations × investable assets`.
+
+# Returns
+
+  - `A::MatNum`: The history over the full asset universe.
+
+# Related
+
+  - [`expand_held_weights`](@ref)
+  - [`expand_investable_weights`](@ref)
+  - [`filter_held_gaps`](@ref)
+"""
+function expand_investable_columns(imsk::BitVector, A::MatNum)
+    @argcheck(count(imsk) == size(A, 2),
+              DimensionMismatch("the investable mask keeps $(count(imsk)) of $(length(imsk)) assets, but the history holds $(size(A, 2)) columns; the mask and the history must come from the same reduction"))
+    out = zeros(eltype(A), size(A, 1), length(imsk))
+    out[:, imsk] = A
+    return out
+end
+"""
+    expand_held_weights(imsk::Nothing, hw)
+    expand_held_weights(imsk::BitVector, hw::Nothing)
+    expand_held_weights(imsk::BitVector, hw::HeldWeightsResult)
+
+Expand a fold's Held Weights record back onto the full asset universe.
+
+A fold reduces its test window to the Investable Mask before it reads it, so the record it builds lives on the investable assets alone. The next fold's turnover reads `hw.w`, and it states the previous weights over the caller's own universe, so the record is expanded once here, on the way out of [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref). Every member of the record is expanded together, so a reader that rebuilds the weight path from `hw.X` gets the path the fold ran.
+
+# Algorithm
+
+ 1. Return the record unchanged when the mask is `nothing`, so a universe with nothing to exclude keeps the path it took before the mask existed.
+ 2. Return `nothing` when the fold built no record.
+ 3. Otherwise expand the asset returns, the stored weight path and the held weights, and rebuild the record around them.
+
+# Arguments
+
+  - `imsk`: The Investable Mask, or `nothing`.
+  - `hw`: The fold's Held Weights record, or `nothing`.
+
+# Returns
+
+  - `hw::Option{<:HeldWeightsResult}`: The record over the full asset universe.
+
+# Related
+
+  - [`HeldWeightsResult`](@ref)
+  - [`expand_investable_columns`](@ref)
+  - [`expand_held_member`](@ref)
+  - [`held_weights_result`](@ref)
+"""
+function expand_held_weights(::Nothing, hw)
+    return hw
+end
+function expand_held_weights(::BitVector, ::Nothing)
+    return nothing
+end
+function expand_held_weights(imsk::BitVector, hw::HeldWeightsResult)
+    return HeldWeightsResult(; X = expand_investable_columns(imsk, hw.X),
+                             U = expand_held_member(imsk, hw.U),
+                             w = expand_held_member(imsk, hw.w), wd = hw.wd)
+end
+"""
+    expand_held_member(imsk::BitVector, x::Nothing)
+    expand_held_member(imsk::BitVector, x::VecNum)
+    expand_held_member(imsk::BitVector, x::MatNum)
+    expand_held_member(imsk::BitVector, x::VecVecNum)
+    expand_held_member(imsk::BitVector, x::VecMatNum)
+
+Expand one member of a Held Weights record back onto the full asset universe.
+
+The member's type is the picker, so [`expand_held_weights`](@ref) states no branch of its own. A weight vector expands through [`expand_investable_weights`](@ref) and a weight path through [`expand_investable_columns`](@ref); a population expands member by member; an absent path stays absent.
+
+# Arguments
+
+  - `imsk`: The Investable Mask, `true` at every asset whose prior moments were finite.
+  - `x`: Held weights, a weight path, a population of either, or `nothing`.
+
+# Returns
+
+  - The member over the full asset universe.
+
+# Related
+
+  - [`expand_held_weights`](@ref)
+  - [`expand_investable_columns`](@ref)
+  - [`expand_investable_weights`](@ref)
+"""
+function expand_held_member(::BitVector, ::Nothing)
+    return nothing
+end
+function expand_held_member(imsk::BitVector, x::VecNum)
+    return expand_investable_weights(imsk, x)
+end
+function expand_held_member(imsk::BitVector, x::MatNum)
+    return expand_investable_columns(imsk, x)
+end
+function expand_held_member(imsk::BitVector, x::VecVecNum)
+    return [expand_investable_weights(imsk, xi) for xi in x]
+end
+function expand_held_member(imsk::BitVector, x::VecMatNum)
+    return [expand_investable_columns(imsk, xi) for xi in x]
 end
 export calc_net_returns, calc_net_asset_returns, cumulative_returns, drawdowns,
        SelfFinancingDrift, DriftedWeights, HeldWeightsResult

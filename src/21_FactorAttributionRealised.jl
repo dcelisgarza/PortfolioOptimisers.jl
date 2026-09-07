@@ -1251,8 +1251,7 @@ function attribution_net_returns(w::VecNum, X::MatNum, fees::Option{<:Fees}, str
     if all(isfinite, X)
         return calc_net_returns(w, X, fees)
     end
-    held = [(t, i) for i in axes(X, 2) if !iszero(w[i])
-            for t in axes(X, 1) if !isfinite(X[t, i])]
+    held = held_gap_pairs(w, X)
     if !isempty(held)
         assets = unique(last.(held))
         strict_diagnostic("a factor attribution cannot decompose a holding that earns no return. Assets $(assets) carry a non-finite return at $(length(held)) held (observation, asset) pair(s), the first at observation $(first(held)[1]). Those pairs contribute zero to the net series, so the total understates the portfolio by whatever they earned. Pass `strict = true` to refuse instead, zero the weights over the observations the asset is inactive, or pass a weight history.",

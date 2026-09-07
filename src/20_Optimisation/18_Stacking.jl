@@ -126,6 +126,10 @@ function StackingResult(; pr::Option{<:AbstractPriorResult}, wb::Option{<:Weight
     return StackingResult(pr, wb, fees, resi, reso, cv, retcode,
                           expand_investable_weights(imsk, w), imsk, fb)
 end
+# The stacking family carries the mask on the result itself, so the fold reads it directly.
+function result_investable_mask(res::StackingResult)
+    return res.imsk
+end
 """
     set_retcode(res::StackingResult, retcode::OptRetCode_VecOptRetCode)
 

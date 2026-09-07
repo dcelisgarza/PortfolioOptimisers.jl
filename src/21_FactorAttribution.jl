@@ -757,12 +757,12 @@ function attribution_investable_diagnostic(::VecNum_MatNum, ::Nothing, ::Bool)::
 end
 function attribution_investable_diagnostic(w::VecNum, imsk::BitVector,
                                            strict::Bool)::Nothing
-    held = findall(i -> !imsk[i] && !iszero(w[i]), eachindex(imsk))
+    held = held_non_investable(imsk, w)
     return attribution_investable_diagnostic(held, "the portfolio holds them", strict)
 end
 function attribution_investable_diagnostic(W::MatNum, imsk::BitVector,
                                            strict::Bool)::Nothing
-    held = findall(i -> !imsk[i] && any(!iszero, view(W, :, i)), eachindex(imsk))
+    held = held_non_investable(imsk, W)
     return attribution_investable_diagnostic(held, "the weight history holds them", strict)
 end
 function attribution_investable_diagnostic(held::AbstractVector{<:Integer},

@@ -1276,7 +1276,46 @@ function collapse_benchmark(B::MatNum, w::VecVecNum, hw::HeldWeightsResult)
     return [vec(sum(B ⊙ U; dims = 2)) for U in weight_path(hw, w)]
 end
 """
-    reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult, X, hw = nothing)
+    investable_fold_view(imsk::Nothing, w, rd::ReturnsResult, fees::Option{<:Fees})
+    investable_fold_view(imsk::BitVector, w, rd::ReturnsResult, fees::Option{<:Fees})
+
+View a fold's weights, test window and fees at the Investable Mask.
+
+ADR 0115 reduces an optimisation to the Investable Mask at its entry and expands the solved weights back to the caller's universe, so the weight of an asset the fit found non-investable is `0`. ADR 0120 carries that rule to the window those weights are scored on: the fold views the three together, before anything reads the window, so a dead column is never read at all and the Held Gap filter of [`filter_held_gaps`](@ref) runs over the investable columns alone.
+
+A result whose mask is `nothing` views nothing, which is what keeps a universe with nothing to exclude on the path it took before the mask existed.
+
+# Arguments
+
+  - `imsk`: The Investable Mask, or `nothing`.
+  - `w`: The fold's target weights, or a population of them.
+  - $(arg_dict[:rd])
+  - `fees`: [`Fees`](@ref) the fold is charged, or `nothing`.
+
+# Returns
+
+  - `(w, rd, fees)`: The three reduced to the investable assets, or unchanged.
+
+# Related
+
+  - [`result_investable_mask`](@ref)
+  - [`investable_weights_view`](@ref)
+  - [`filter_held_gaps`](@ref)
+  - [`expand_held_weights`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+function investable_fold_view(::Nothing, w::VecNum_VecVecNum, rd::ReturnsResult,
+                              fees::Option{<:Fees})
+    return w, rd, fees
+end
+function investable_fold_view(imsk::BitVector, w::VecNum_VecVecNum, rd::ReturnsResult,
+                              fees::Option{<:Fees})
+    idx = findall(imsk)
+    return investable_weights_view(imsk, w), port_opt_view(rd, idx),
+           port_opt_view(fees, idx)
+end
+"""
+    reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult, X, hw = nothing, w = res.w)
 
 Reconstruct a `PredictionReturnsResult` from an optimisation result and returns data.
 
@@ -1294,6 +1333,7 @@ The fold does not collapse the carrier's panel. Only one weight vector is in sco
   - `rd::ReturnsResult`: Original returns data.
   - `X`: Portfolio returns (vector or vector of vectors).
   - `hw`: Held Weights record of the fold, or `nothing`.
+  - `w`: The weights the fold's series was formed from. It defaults to `res.w`, and a fold that viewed its window at the Investable Mask passes the view instead, so the collapse reads the same asset axis `rd` carries.
 
 # Returns
 
@@ -1308,41 +1348,46 @@ The fold does not collapse the carrier's panel. Only one weight vector is in sco
   - [`HeldWeightsResult`](@ref)
 """
 function reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
-                        X::VecNum, hw::Option{<:HeldWeightsResult} = nothing)
-    B = collapse_benchmark(rd.B, res.w, hw)
+                        X::VecNum, hw::Option{<:HeldWeightsResult} = nothing,
+                        w::VecNum_VecVecNum = res.w)
+    B = collapse_benchmark(rd.B, w, hw)
     iv = rd.iv
     ivpa = rd.ivpa
     iv_flag = !isnothing(iv)
     ivpa_flag = isa(ivpa, AbstractVector)
     if iv_flag || ivpa_flag
-        # `iv` and `ivpa` are intensive, so they collapse as convex combinations.
-        w = synthetic_asset_weights(res.w)
+        # `iv` and `ivpa` are intensive, so they collapse as convex combinations. They are
+        # collapsed against the same weights the series was formed from, which is the view
+        # at the Investable Mask when the fold took one.
+        cw = synthetic_asset_weights(w)
         if iv_flag
-            iv = iv * w
+            iv = iv * cw
         end
         if ivpa_flag
-            ivpa = LinearAlgebra.dot(rd.ivpa, w)
+            ivpa = LinearAlgebra.dot(rd.ivpa, cw)
         end
     end
     return PredictionReturnsResult(; nx = rd.nx, X = X, nf = rd.nf, F = rd.F, nb = rd.nb,
                                    B = B, ts = rd.ts, iv = iv, ivpa = ivpa)
 end
 function reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
-                        X::VecVecNum, hw::Option{<:HeldWeightsResult} = nothing)
+                        X::VecVecNum, hw::Option{<:HeldWeightsResult} = nothing,
+                        w::VecNum_VecVecNum = res.w)
     nb = rd.nb
-    B = collapse_benchmark(rd.B, res.w, hw)
+    B = collapse_benchmark(rd.B, w, hw)
     iv = rd.iv
     ivpa = rd.ivpa
     iv_flag = !isnothing(iv)
     ivpa_flag = isa(ivpa, AbstractVector)
     if iv_flag || ivpa_flag
-        # `iv` and `ivpa` are intensive, so they collapse as convex combinations.
-        w = [synthetic_asset_weights(wi) for wi in res.w]
+        # `iv` and `ivpa` are intensive, so they collapse as convex combinations, against
+        # the same weights the series was formed from — see the singular twin above.
+        cw = [synthetic_asset_weights(wi) for wi in w]
         if iv_flag
-            iv = [iv * w for w in w]
+            iv = [iv * wi for wi in cw]
         end
         if ivpa_flag
-            ivpa = [LinearAlgebra.dot(ivpa, wi) for wi in w]
+            ivpa = [LinearAlgebra.dot(ivpa, wi) for wi in cw]
         end
     end
     if isa(ivpa, Number)
@@ -1368,12 +1413,41 @@ fee's `fa` overrides this and reaches unchanged. The whole-sample method, `predi
 no such rebuild, so it charges the whole one-off cost unless the fee already carries a stated
 `horizon`.
 
+## The Investable Mask, then the Held Gaps
+
+A test window over a point-in-time universe holds two kinds of gap, and `predict` takes them in
+order.
+
+ 1. **The column of a non-investable asset.** The fit found it, its weight is `0` by ADR 0115, and
+    the fold views the window, the weights and the fees at `res.imsk` through
+    [`investable_fold_view`](@ref) before anything reads them, so the column is never read.
+ 2. **A Held Gap**, an `(observation, asset)` pair at which the weight is non-zero and the return is
+    missing. It is what an asset that delists **inside** the test window makes, and the mask is a
+    per-fit fact that cannot see it. [`filter_held_gaps`](@ref) zeroes every non-finite entry of the
+    reduced window once, before the series is formed and before a Weight Drift compounds on it, and
+    names the held pairs through [`strict_diagnostic`](@ref): a warning by default, an
+    `ArgumentError` under `strict`. Nothing is renormalised, so the missing weight sits in cash on
+    that observation.
+
+The filtered window feeds [`calc_net_returns`](@ref) and [`held_weights_result`](@ref) alike, so the
+drift compounds on the matrix the series was formed from. The Held Weights record expands back to
+the caller's universe through [`expand_held_weights`](@ref), because the next fold's turnover reads
+it. The identity a fold's series satisfies, with the fee taken over the whole weight vector:
+
+```text
+returns[t] == sum_i w_i * (isfinite(X[t, i]) ? X[t, i] : 0) - fee
+```
+
 # Arguments
 
   - `res::NonFiniteAllocationOptimisationResult`: Fitted optimisation result.
   - `rd::ReturnsResult`: Returns data for the prediction period.
   - `test_idx`: Observation index or vector of observation indices for the test fold.
   - `cols`: Column selector. Defaults to `:` (all assets).
+
+# Keyword Arguments
+
+  - `strict::Bool = false`: Whether a Held Gap raises an `ArgumentError` rather than warning.
 
 # Returns
 
@@ -1391,13 +1465,21 @@ no such rebuild, so it charges the whole one-off cost unless the fee already car
 function StatsAPI.predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult;
                           wd::Option{<:AbstractWeightDrift} = nothing,
                           hwd::Option{<:AbstractWeightDrift} = wd,
-                          store_weight_path::Bool = false)
-    X = calc_net_returns(res, rd.X, nothing, wd, rd.ts)
-    (hw, ruined) = held_weights_result(hwd, res.w, rd.X, store_weight_path, rd.ts)
+                          store_weight_path::Bool = false, strict::Bool = false)
+    # The window is viewed at the Investable Mask first, so the column of an asset the fit
+    # found non-investable is never read, and the Held Gaps of the reduced window are
+    # zeroed once, before the series is formed and before a drift compounds on it. The
+    # record expands back to the caller's universe on the way out, because the next fold's
+    # turnover reads its held weights.
+    imsk = result_investable_mask(res)
+    w, rdv, fees = investable_fold_view(imsk, res.w, rd, extract_fees(res, nothing))
+    Xf = filter_held_gaps(w, rdv.X, strict)
+    X = calc_net_returns(w, Xf, fees, wd, rdv.ts)
+    (hw, ruined) = held_weights_result(hwd, w, Xf, store_weight_path, rdv.ts)
     warn_ruined_members(wd, ruined, length(res.w))
     res = mark_ruined_members(res, ruined)
-    rd = reconstruct_rd(res, rd, X, hw)
-    return PredictionResult(; res = res, rd = rd, hw = hw)
+    rdv = reconstruct_rd(res, rdv, X, hw, w)
+    return PredictionResult(; res = res, rd = rdv, hw = expand_held_weights(imsk, hw))
 end
 """
     fit_predict(opt::OptE_Opt, rd::ReturnsResult)
@@ -1428,16 +1510,20 @@ function StatsAPI.predict(res::NonFiniteAllocationOptimisationResult, rd::Return
                           test_idx::VecInt, cols = :;
                           wd::Option{<:AbstractWeightDrift} = nothing,
                           hwd::Option{<:AbstractWeightDrift} = wd,
-                          store_weight_path::Bool = false)
+                          store_weight_path::Bool = false, strict::Bool = false)
     rdi = port_opt_view(rd, test_idx, cols)
     fees = amortise_fees(extract_fees(res, nothing), size(rdi.X, 1))
+    # The mask view and the Held Gap filter, in that order — see the whole-sample method.
+    imsk = result_investable_mask(res)
+    w, rdi, fees = investable_fold_view(imsk, res.w, rdi, fees)
     obs = drift_observations(rdi.ts, test_idx)
-    X = calc_net_returns(res, rdi.X, fees, wd, obs)
-    (hw, ruined) = held_weights_result(hwd, res.w, rdi.X, store_weight_path, obs)
+    Xf = filter_held_gaps(w, rdi.X, strict)
+    X = calc_net_returns(w, Xf, fees, wd, obs)
+    (hw, ruined) = held_weights_result(hwd, w, Xf, store_weight_path, obs)
     warn_ruined_members(wd, ruined, length(res.w))
     res = mark_ruined_members(res, ruined)
-    rdi = reconstruct_rd(res, rdi, X, hw)
-    return PredictionResult(; res = res, rd = rdi, hw = hw)
+    rdi = reconstruct_rd(res, rdi, X, hw, w)
+    return PredictionResult(; res = res, rd = rdi, hw = expand_held_weights(imsk, hw))
 end
 function StatsAPI.predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
                           test_idxs::VecVecInt, cols = :; kwargs...)
@@ -1483,15 +1569,15 @@ function fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::Returns
                          test_idx::VecInt_VecVecInt, cols = :,
                          wd::Option{<:AbstractWeightDrift} = nothing,
                          hwd::Option{<:AbstractWeightDrift} = wd,
-                         store_weight_path::Bool = false, kwargs...)
+                         store_weight_path::Bool = false, strict::Bool = false, kwargs...)
     return StatsAPI.predict(res, rd, test_idx, cols; wd = wd, hwd = hwd,
-                            store_weight_path = store_weight_path)
+                            store_weight_path = store_weight_path, strict = strict)
 end
 function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::ReturnsResult;
                          train_idx::VecInt, test_idx::VecInt_VecVecInt, cols = :,
                          wd::Option{<:AbstractWeightDrift} = nothing,
                          hwd::Option{<:AbstractWeightDrift} = wd,
-                         store_weight_path::Bool = false)
+                         store_weight_path::Bool = false, strict::Bool = false)
     rd_train = port_opt_view(rd, train_idx, cols)
     if !isa(cols, Colon)
         opt = port_opt_view(opt, cols, rd.X)
@@ -1499,7 +1585,7 @@ function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::Retu
     #! Add ability to do callbacks
     res = optimise(opt, rd_train)
     return StatsAPI.predict(res, rd, test_idx, cols; wd = wd, hwd = hwd,
-                            store_weight_path = store_weight_path)
+                            store_weight_path = store_weight_path, strict = strict)
 end
 """
     sort_predictions!(res::VecVecInt, predictions::VecPredRes) -> VecPredRes
@@ -1756,7 +1842,7 @@ The method is per type and takes the scheme itself, so inference reads the answe
 
 # Returns
 
-  - `(; wd, pws, store_weight_path)`: The Weight Drift, the Previous-Weights Source, and the flag that stores a fold's weight path.
+  - `(; wd, pws, store_weight_path, strict)`: The Weight Drift, the Previous-Weights Source, the flag that stores a fold's weight path, and the flag that makes a Held Gap raise rather than warn.
 
 # Related
 
@@ -1767,7 +1853,7 @@ The method is per type and takes the scheme itself, so inference reads the answe
   - [`fold_loop`](@ref)
 """
 function fold_evaluation(::Any)
-    return (; wd = nothing, pws = nothing, store_weight_path = false)
+    return (; wd = nothing, pws = nothing, store_weight_path = false, strict = false)
 end
 """
     fold_loop(fit_fold, est, n::Integer, ex::FLoops.Transducers.Executor,
@@ -1868,13 +1954,13 @@ function fit_and_predict(opt::OptE_Opt_TD, rd::ReturnsResult, cv::NonSeqCVER; co
     cv_res = split(cv, rd)
     (; train_idx, test_idx) = cv_res
     assert_unshuffled_folds(cv, train_idx)
-    (; wd, pws, store_weight_path) = fold_evaluation(cv)
+    (; wd, pws, store_weight_path, strict) = fold_evaluation(cv)
     hwd = held_weights_drift(wd, pws)
     predictions = fold_loop(opt, length(train_idx), ex; rd = rd, train_idx = train_idx,
                             test_idx = test_idx, cv = cv, pws = pws) do fold
         return fit_and_predict(fold.est, fold.rd; train_idx = fold.train,
                                test_idx = fold.test, cols = cols, wd = wd, hwd = hwd,
-                               store_weight_path = store_weight_path)
+                               store_weight_path = store_weight_path, strict = strict)
     end
     return MultiPeriodPredictionResult(; pred = predictions, id = id)
 end

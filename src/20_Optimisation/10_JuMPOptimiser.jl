@@ -329,6 +329,15 @@ function JuMPOptimisationResult(; pa::ProcessedJuMPOptimiserAttributes,
     return JuMPOptimisationResult(pa, retcode, expand_investable_weights(pa.imsk, sol),
                                   model)
 end
+# The JuMP families carry the mask on the processed attribute bundle, and every concrete JuMP
+# result embeds the shared core as `jr`, so two methods cover the whole side.
+function result_investable_mask(res::JuMPOptimisationResult)
+    return res.pa.imsk
+end
+function result_investable_mask(res::Union{<:RiskJuMPOptimisationResult,
+                                           <:NonRiskJuMPOptimisationResult})
+    return result_investable_mask(res.jr)
+end
 """
     set_retcode(res::JuMPOptimisationResult, retcode::OptRetCode_VecOptRetCode)
 

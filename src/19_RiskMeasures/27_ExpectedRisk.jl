@@ -29,10 +29,10 @@ const RkRatioRM = Union{<:RiskRatio, <:NonOptimisationRiskRatio}
     expected_risk(r::RiskRatio, w::VecNum, X::MatNum, fees = nothing; kwargs...)
     expected_risk(r::NonOptimisationRiskRatio, w::VecNum, X::MatNum, fees = nothing; kwargs...)
     expected_risk(r::MeanReturnRiskRatio, w::VecNum, X::MatNum, fees = nothing; kwargs...)
-    expected_risk(r::AbstractBaseRiskMeasure, w::VecNum, pr::Pr_RR, args...; kwargs...)
-    expected_risk(rs::VecBaseRM, w::VecNum, pr::Pr_RR, args...; kwargs...)
+    expected_risk(r::AbstractBaseRiskMeasure, w::VecNum, pr::Pr_RR, fees = nothing; strict = false, kwargs...)
+    expected_risk(rs::VecBaseRM, w::VecNum, pr::Pr_RR, fees = nothing; strict = false, kwargs...)
     expected_risk(r::BaseRM_VecBaseRM, w::VecVecNum, args...; kwargs...)
-    expected_risk(r::BaseRM_VecBaseRM, w::VecVecNum, pr::Pr_RR, args...; kwargs...)
+    expected_risk(r::BaseRM_VecBaseRM, w::VecVecNum, pr::Pr_RR, fees = nothing; strict = false, kwargs...)
 
 Compute the expected value of a risk measure for a portfolio.
 
@@ -64,8 +64,19 @@ Given a bare returns matrix neither can happen. That call has no `pr.w` to threa
 
 A **Calibration Rule** is refused on the same terms, by [`assert_calibrated_slots`](@ref). A rule reads the sample size, the moments and the effective observation weights that a prior result carries, so a bare matrix cannot run one either. The two refusals are separate verbs because the two mechanisms are, and both are taken here.
 
+## The prior route reduces to the Investable Mask
+
+A prior result lives on the **full** asset universe, and an asset it could not estimate carries `NaN` in `mu`, on the diagonal of `sigma` and down its column of `pr.X`. So `dot(w, pr.sigma, w)` and `pr.X * w` are `NaN` at **any** weight, the optimiser's own zero included, and an optimisation result on a gapped panel could not be scored by hand at all.
+
+The prior-taking methods therefore reduce the prior, the weights and the fees once at their entry, through [`investable_reduction`](@ref). This is the rule ADR 0115 states for an optimiser, taken at the value-level door. A held non-investable asset warns and its weight is dropped; `strict = true` refuses instead. A bare returns matrix and a [`ReturnsResult`](@ref) carry no moments, so no mask exists and they pass through unchanged.
+
+# Keyword Arguments
+
+  - `strict::Bool = false`: Whether a held non-investable asset raises rather than warns. Read only on the prior-taking methods.
+
 # Related
 
+  - [`investable_reduction`](@ref)
   - [`risk_input_kind`](@ref)
   - [`RiskInputKind`](@ref)
   - [`RkRatioRM`](@ref)
@@ -320,17 +331,26 @@ function resolve_factor_regression(re::RegE_Reg, rd::ReturnsResult,
               IsNothingError("a factor decomposition needs loadings, and none of the three carriers holds any. `re` is an estimator (`$(nameof(typeof(re)))`), so it must fit them from `rd.X` and `rd.F`; the prior carries no factor block to read them from instead.\nSupply the data as `rd`, or pass a precomputed `Regression` as `re`, or pass a prior fitted through a factor model (e.g. `FactorPrior`), which carries its own loadings in `rr`.\nGot\nisnothing(rd.X) => $(isnothing(rd.X))\nisnothing(rd.F) => $(isnothing(rd.F))\nisnothing(pr) => $(isnothing(pr))"))
     return regression(re, rd)
 end
-function expected_risk(r::AbstractBaseRiskMeasure, w::VecNum, pr::Pr_RR, args...; kwargs...)
+# The value-level door. A non-investable asset carries `NaN` in `mu`, on the diagonal of
+# `sigma` and down its column of `pr.X`, so the figure is `NaN` at any weight, the
+# optimiser's own zero included. `investable_reduction` reduces the prior, the weights and
+# the fees once here, which is ADR 0115's rule at the door a caller reaches by hand. A bare
+# matrix and a `ReturnsResult` carry no moments, so the same call passes them through.
+function expected_risk(r::AbstractBaseRiskMeasure, w::VecNum, pr::Pr_RR,
+                       fees::Option{<:Fees} = nothing; strict::Bool = false, kwargs...)
+    _, pr, w, fees = investable_reduction(pr, w, fees, strict)
     r, X = resolve_risk_inputs(r, pr)
-    return expected_risk(r, w, X, args...; kwargs...)
+    return expected_risk(r, w, X, fees; kwargs...)
 end
 # The vector's own prior route. It resolves the whole vector **once** through
 # `resolve_risk_inputs`, so a Deferred Quantity is fitted once per measure rather than once per
 # element evaluation. Without it the generic vector twin above would resolve the prior inside the
-# scalarise loop.
-function expected_risk(rs::VecBaseRM, w::VecNum, pr::Pr_RR, args...; kwargs...)
+# scalarise loop. It reduces once too, so the vector warns once and not once per element.
+function expected_risk(rs::VecBaseRM, w::VecNum, pr::Pr_RR, fees::Option{<:Fees} = nothing;
+                       strict::Bool = false, kwargs...)
+    _, pr, w, fees = investable_reduction(pr, w, fees, strict)
     rs, X = resolve_risk_inputs(rs, pr)
-    return expected_risk(rs, w, X, args...; kwargs...)
+    return expected_risk(rs, w, X, fees; kwargs...)
 end
 """
     expected_risk(r::AbstractBaseRiskMeasure, w::MatNum, args...; kwargs...)
@@ -423,22 +443,32 @@ function expected_risk(r::MeanReturnRiskRatio, w::MatNum, X::MatNum,
     return (expected_risk(r.rt, w, X, fees; kwargs...) - r.rf) /
            expected_risk(r.rk, w, X, fees; kwargs..., sca = r.sca)
 end
-function expected_risk(r::AbstractBaseRiskMeasure, w::MatNum, pr::Pr_RR, args...; kwargs...)
+# The path's value-level door, and it reduces by the rule the vector's door reduces by: the
+# mask selects the columns of the path and every row keeps its own observation.
+function expected_risk(r::AbstractBaseRiskMeasure, w::MatNum, pr::Pr_RR,
+                       fees::Option{<:Fees} = nothing; strict::Bool = false, kwargs...)
+    _, pr, w, fees = investable_reduction(pr, w, fees, strict)
     r, X = resolve_risk_inputs(r, pr)
-    return expected_risk(r, w, X, args...; kwargs...)
+    return expected_risk(r, w, X, fees; kwargs...)
 end
 # The vector's own prior route, as above: it resolves the whole vector **once**, so a Deferred
 # Quantity is fitted once per measure rather than once per element evaluation.
-function expected_risk(rs::VecBaseRM, w::MatNum, pr::Pr_RR, args...; kwargs...)
+function expected_risk(rs::VecBaseRM, w::MatNum, pr::Pr_RR, fees::Option{<:Fees} = nothing;
+                       strict::Bool = false, kwargs...)
+    _, pr, w, fees = investable_reduction(pr, w, fees, strict)
     rs, X = resolve_risk_inputs(rs, pr)
-    return expected_risk(rs, w, X, args...; kwargs...)
+    return expected_risk(rs, w, X, fees; kwargs...)
 end
 function expected_risk(r::BaseRM_VecBaseRM, w::VecVecNum, args...; kwargs...)
     return [expected_risk(r, wi, args...; kwargs...) for wi in w]
 end
-function expected_risk(r::BaseRM_VecBaseRM, w::VecVecNum, pr::Pr_RR, args...; kwargs...)
+# A population reduces once, on the mask a member holds an asset under. Reducing inside the
+# comprehension would warn once per member of a population that all hold the same dead asset.
+function expected_risk(r::BaseRM_VecBaseRM, w::VecVecNum, pr::Pr_RR,
+                       fees::Option{<:Fees} = nothing; strict::Bool = false, kwargs...)
+    _, pr, w, fees = investable_reduction(pr, w, fees, strict)
     r, X = resolve_risk_inputs(r, pr)
-    return [expected_risk(r, wi, X, args...; kwargs...) for wi in w]
+    return [expected_risk(r, wi, X, fees; kwargs...) for wi in w]
 end
 """
     expected_risk_from_returns(r::AbstractBaseRiskMeasure, X::VecNum; kwargs...) -> Number
@@ -452,10 +482,24 @@ silently consuming `X` as weights (a [`WeightsInput`](@ref) measure) or hitting 
 Internal call sites that hold a precomputed series — cross-validation prediction scoring —
 route through here rather than calling the functor directly.
 
+**The Precomputed-returns contract: the series `X` must be finite.** This entry takes no
+finiteness check, because every internal caller hands it a finite series: the three ratio
+kernels call it for each half at every evaluation, and a scan on a long series would be paid
+by all of them. A tail measure on a gapped series answers a **finite wrong number** rather
+than a `NaN`: `partialsort` orders a `NaN` after every real, so a CVaR reads its order
+statistic off the finite prefix and divides by the poisoned length. A caller who holds a
+gapped series drops the gaps first with `x[isfinite.(x)]`, which reproduces the reference
+implementation's drop-per-column answer exactly, for every kernel but its unbiased
+semi-variance, whose Bessel correction reads the full length. A caller who holds a gapped
+panel scores it through
+[`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref) instead,
+which filters the Held Gaps once.
+
 # Related
 
   - [`supports_precomputed_returns`](@ref)
   - [`expected_risk`](@ref)
+  - [`filter_held_gaps`](@ref)
 """
 function expected_risk_from_returns(r::AbstractBaseRiskMeasure, X::VecNum; kwargs...)
     if !supports_precomputed_returns(r)
@@ -583,6 +627,7 @@ end
         delta::Number = 1e-6,
         marginal::Bool = false,
         sca::Scalariser = SumScalariser(),
+        strict::Bool = false,
         kwargs...
     ) -> Vector
 
@@ -619,13 +664,15 @@ The partial derivative is approximated using a two-sided finite difference with 
   - `delta::Number = 1e-6`: Finite difference step size.
   - `marginal::Bool = false`: If `true`, returns marginal risk contributions (without ``w_i`` weighting).
   - `sca::Scalariser = SumScalariser()`: Scalariser combining a vector `r`. Inert on a single measure.
+  - `strict::Bool = false`: Whether a held non-investable asset raises rather than warns. Read only when `X` is a prior result.
 
 # Returns
 
-  - `Vector`: Risk contributions (or marginal risks) for each asset.
+  - `Vector`: Risk contributions (or marginal risks) for each asset, one entry per asset of the **full** universe.
 
 # Details
 
+  - A prior result reduces to the Investable Mask **once**, before the loop ([`investable_reduction`](@ref)), so no perturbed weight ever meets a `NaN` moment. The answer expands back into a zero vector of the full length, so a non-investable asset reports exactly `0`.
   - A prior result resolves the measure **once**, before the loop ([`resolve_risk_inputs`](@ref)), so a **Deferred Quantity** is fitted once rather than once per finite difference.
   - A vector of measures differentiates the **aggregate**, which is the figure [`expected_risk`](@ref) reports. The homogeneity correction is applied per element inside the loop ([`adjusted_risk`](@ref)), so `Σᵢ wᵢ·rcᵢ` recovers the aggregate exactly even when the elements have different homogeneity degrees.
   - Under a Weight Drift the figures are exact to **first order in the drift** only. The function differentiates one weight vector, and a drifted fold's return series is not linear in that vector, so the contributions sum to the fold's realised risk approximately rather than exactly. The **target** weights are what the figures are reported against, because they are the decision the finite difference perturbs — a weight path holds no single vector for the difference to move.
@@ -644,7 +691,11 @@ The partial derivative is approximated using a two-sided finite difference with 
 function risk_contribution(r::BaseRM_VecBaseRM, w::VecNum, X::MatNum_Pr,
                            fees::Option{<:Fees} = nothing; delta::Number = 1e-6,
                            marginal::Bool = false, sca::Scalariser = SumScalariser(),
-                           kwargs...)
+                           strict::Bool = false, kwargs...)
+    # The value-level door reduces once, before the finite difference, so no perturbed
+    # weight ever meets a `NaN` moment. The per asset answer expands back into a zero
+    # vector of the full length, so a dead asset reports exactly `0`.
+    imsk, X, w, fees = investable_reduction(X, w, fees, strict)
     r, X = resolve_risk_inputs(r, X)
     N = length(w)
     rc = Vector{eltype(w)}(undef, N)
@@ -664,7 +715,7 @@ function risk_contribution(r::BaseRM_VecBaseRM, w::VecNum, X::MatNum_Pr,
     if !marginal
         rc .*= w
     end
-    return rc
+    return expand_investable_weights(imsk, rc)
 end
 """
     factor_risk_contribution(
@@ -675,10 +726,13 @@ end
         re::RegE_Reg = StepwiseRegression(),
         rd::ReturnsResult = ReturnsResult(),
         delta::Number = 1e-6,
+        strict::Bool = false,
         kwargs...
     ) -> Vector
 
 Compute the risk contribution of each factor (and the idiosyncratic component) to the total portfolio risk using a factor regression.
+
+A prior result reduces to the Investable Mask once at the entry, through [`investable_reduction`](@ref), and `rd` is reduced with it, so the loadings are fitted over the live assets alone. A held non-investable asset warns and its weight is dropped, or raises under `strict`. The answer is one figure per factor rather than one per asset, so nothing expands.
 
 # Mathematical definition
 
@@ -734,7 +788,13 @@ function factor_risk_contribution(r::BaseRM_VecBaseRM, w::VecNum, X::MatNum_Pr,
                                   fees::Option{<:Fees} = nothing;
                                   re::RegE_Reg = StepwiseRegression(),
                                   rd::ReturnsResult = ReturnsResult(), delta::Number = 1e-6,
-                                  sca::Scalariser = SumScalariser(), kwargs...)
+                                  sca::Scalariser = SumScalariser(), strict::Bool = false,
+                                  kwargs...)
+    # The value-level door reduces once, and the loadings come from the reduced prior or
+    # from the reduced data, so the regression is fitted over the live assets alone. The
+    # answer is per factor rather than per asset, so nothing expands.
+    imsk, X, w, fees = investable_reduction(X, w, fees, strict)
+    rd = investable_returns_view(imsk, rd)
     rr = resolve_factor_regression(re, rd, isa(X, AbstractPriorResult) ? X : nothing)
     r, X = resolve_factor_risk_inputs(r, X)
     Bt = transpose(rr.L)

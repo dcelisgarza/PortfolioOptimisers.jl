@@ -16,6 +16,7 @@ route_sigma_ucs
 @pipe_route_rkb
 OptimisationAlgorithm
 OptimisationResult
+result_investable_mask
 NonFiniteAllocationOptimisationResult
 OptimisationReturnCode
 VecOptRetCode
@@ -99,7 +100,7 @@ opt_weight_bounds
 finalise_weight_bounds
 port_opt_view(opt::AbstractOptimisationEstimator, ::Any, args...)
 port_opt_view(res::NonFiniteAllocationOptimisationResult, ::Colon, args...)
-investable_reduction
+investable_reduction(pr::AbstractPriorResult, opt::AbstractOptimisationEstimator, rd::ReturnsResult)
 expand_investable_weights
 assert_internal_optimiser(::NonFiniteAllocationOptimisationResult)
 assert_external_optimiser(::NonFiniteAllocationOptimisationResult)

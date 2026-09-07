@@ -22,6 +22,14 @@ rebuild_weight_path
 held_weights_drift
 held_weights_result
 drift_observations
+investable_reduction(X::MatNum, w::Union{<:VecNum, <:VecVecNum, <:MatNum}, fees::Option{<:Fees}, strict::Bool)
+investable_returns_view
+held_gap_pairs
+filter_held_gaps
+held_gap_msg
+expand_investable_columns
+expand_held_weights
+expand_held_member
 calc_net_returns(w::VecNum, X::MatNum, args...)
 calc_net_returns(w::MatNum, X::MatNum, args...)
 calc_net_returns(w::VecVecNum, X::MatNum, fees, wd::AbstractWeightDrift, obs = nothing)
