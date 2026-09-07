@@ -930,5 +930,7 @@ end
     @test TurnoverEstimator(; w = fill(0.25, 4), val = UniformValues()).val ===
           UniformValues()
     @test FeesEstimator(; l = UniformValues()).l === UniformValues()
-    @test PortfolioOptimisers.PortfolioTarget(; w = UniformValues()).w === UniformValues()
+    # `PortfolioTarget`'s `w` was such a slot. It now names the pair of shapes the
+    # regime-adjusted fit can honour, so it refuses the algorithm at the keyword.
+    @test_throws TypeError PortfolioOptimisers.PortfolioTarget(; w = UniformValues())
 end

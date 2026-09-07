@@ -15,9 +15,13 @@ the family root.
 
 - `EstValType` bounds a slot that holds a **value**: `WeightBoundsEstimator`'s `lb` and `ub`,
   `RiskBudgetEstimator`'s `val`, `ThresholdEstimator`'s `val`, `TurnoverEstimator`'s `val`,
-  `FeesEstimator`'s `l`, `s`, `fl` and `fs`, and `PortfolioTarget`'s `w`.
+  and `FeesEstimator`'s `l`, `s`, `fl` and `fs`.
 - `EqnType` bounds a slot that holds **equation text**: `LinearConstraintEstimator`'s `val`, and the
   `eqn` argument of `linear_constraints`, `parse_equation` and `black_litterman_views`.
+
+`PortfolioTarget`'s `w` was such a slot when this decision was written. Commit `a003ca910b`
+narrowed it to `Option{<:Union{<:VecNum, <:MatNum}}`, the pair of shapes the regime-adjusted fit
+can honour, so it left this family and is gated below as a refusal.
 
 The second was wrong, and
 [#633](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/633) is what it cost.
