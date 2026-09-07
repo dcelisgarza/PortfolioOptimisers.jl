@@ -2749,6 +2749,60 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Derive the Coverage Universe of a window, and reduce a prior-free optimiser and its returns data to the assets it keeps.
+
+This is the twin of [`investable_reduction`](@ref) for a head that fits no prior. No Prior Result exists to derive an Investable Mask from, so the head derives the Coverage Universe of its own window instead, through the verb the priors use: an asset is kept when its return is finite and the active mask of the [`AssetPanel`](@ref) is `true` at every row of the window. A stale finite price during an inactive spell is therefore outside the mask, and the asset weights nothing.
+
+The two masks are the same object downstream. The head carries the Coverage Universe as the `imsk` of its result, and the result's keyword constructor expands the weights through [`expand_investable_weights`](@ref), as every other family's does, so every optimisation result of the library carries a mask and a reader has one idiom.
+
+Three methods, and the branch is dispatch rather than a condition, as it is in [`investable_reduction`](@ref). The first derives the mask; the `nothing` method is the all-covered path and returns its arguments untouched; the `BitVector` method takes the two views. The optimiser is viewed at `rd.X`, the *unreduced* returns matrix, because [`port_opt_view`](@ref) slices an estimator against it by the same asset index.
+
+An all-dead window throws an `IsEmptyError` where the mask is derived, so the refusal is [`coverage_mask`](@ref)'s and every prior-free head has it for free.
+
+# Algorithm
+
+ 1. Derive the Coverage Universe of `rd.X` and `rd.pnl` with [`coverage_mask`](@ref).
+ 2. Return the mask, the optimiser and the returns data unchanged when the mask is `nothing`.
+ 3. Otherwise return the mask beside a [`port_opt_view`](@ref) of each of the two at `findall(cmsk)`.
+
+# Arguments
+
+  - `opt::AbstractOptimisationEstimator`: The optimisation estimator, holding every constraint estimator the caller stated over the full universe.
+  - $(arg_dict[:rd])
+  - $(arg_dict[:dims])
+
+# Validation
+
+  - $(val_dict[:dims])
+  - At least one asset must be in the Coverage Universe.
+
+# Returns
+
+  - `(cmsk, opt, rd)`: The Coverage Universe and the two reduced to it, or `nothing` and the two unchanged.
+
+# Related
+
+  - [`coverage_mask`](@ref)
+  - [`investable_reduction`](@ref)
+  - [`expand_investable_weights`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+function coverage_reduction(opt::AbstractOptimisationEstimator, rd::ReturnsResult;
+                            dims::Int = 1)
+    return coverage_reduction(coverage_mask(rd.X, rd.pnl; dims = dims), opt, rd)
+end
+function coverage_reduction(::Nothing, opt::AbstractOptimisationEstimator,
+                            rd::ReturnsResult)
+    return nothing, opt, rd
+end
+function coverage_reduction(cmsk::BitVector, opt::AbstractOptimisationEstimator,
+                            rd::ReturnsResult)
+    idx = findall(cmsk)
+    return cmsk, port_opt_view(opt, idx, rd.X), port_opt_view(rd, idx)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Expand a solved weight vector from the investable subset back onto the full asset universe.
 
 The optimiser solves over the assets the Investable Mask keeps, so its weight vector is shorter than the universe the caller stated. This puts each solved weight back at its own asset and writes a zero everywhere else, which is what a non-investable asset holds: the optimiser could not trade it.

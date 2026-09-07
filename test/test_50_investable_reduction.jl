@@ -275,12 +275,142 @@ end
                                                            rd)
 end
 
-@testset "The prior-free naive heads carry no mask" begin
-    # `EqualWeighted` and `RandomWeighted` fit no prior, so no Prior Result yields a mask
-    # for them and their `imsk` is the `nothing` sentinel. Issue #859 gives them the
-    # Coverage Universe of their window instead, under ADR 0120.
-    @test isnothing(optimise(EqualWeighted(), rd).imsk)
-    @test isnothing(optimise(RandomWeighted(; seed = 42), rd).imsk)
+# The two prior-free naive heads, issue #859, under ADR 0120. `EqualWeighted` and
+# `RandomWeighted` fit no prior, so no Prior Result yields an Investable Mask for them. Each
+# derives the Coverage Universe of its own window instead, through the verb of ADR 0117,
+# weights the assets it keeps, and carries that universe as `imsk`. Every optimisation
+# result of the library therefore carries a mask, and a reader has one idiom.
+#
+# The oracle is the one every other family here uses: the same head on the panel with the
+# dead column removed by hand, weight for weight.
+
+# A listing inside the window: asset `k` has no quote over the first thirty observations.
+Xg = copy(X)
+Xg[1:30, k] .= NaN
+rdg = ReturnsResult(; nx = nx, X = Xg, nf = nf, F = F)
+
+# The same asset, live and quoted, but outside the universe over an inactive spell. Its
+# price is finite at every row, so only the panel's active mask says it must not be traded.
+stale_amsk = trues(T, N)
+stale_amsk[10:20, k] .= false
+function naive_panel(amsk)
+    return AssetPanel(; pf = [NumericPanelField(; name = "mcap", vals = ones(T, N))],
+                      amsk = amsk, emsk = amsk)
+end
+rds = ReturnsResult(; nx = nx, X = X, nf = nf, F = F, pnl = naive_panel(stale_amsk))
+
+@testset "EqualWeighted reduces to the Coverage Universe and expands" begin
+    res = optimise(EqualWeighted(), rdg)
+    oracle = optimise(EqualWeighted(), rdk)
+    @test res.imsk == BitVector([1, 1, 0, 1, 1])
+    @test isnothing(oracle.imsk)
+    # The weights come back on the caller's own universe, and the dead asset holds a zero.
+    @test length(res.w) == N
+    @test iszero(res.w[k])
+    @test isapprox(res.w[keep], oracle.w)
+    @test isapprox(sum(res.w), 1)
+    # The result carries the objects of the reduced universe beside the mask.
+    @test size(res.pr.X, 2) == length(keep)
+    # A stale finite price during an inactive spell weights nothing: the active mask of the
+    # Asset Panel excludes the asset on its own, with every return finite.
+    @test all(isfinite, X)
+    res = optimise(EqualWeighted(), rds)
+    @test res.imsk == BitVector([1, 1, 0, 1, 1])
+    @test iszero(res.w[k])
+    @test isapprox(res.w[keep], oracle.w)
+    # A complete window is the path it was: no mask, no reduction, no expansion.
+    plain = optimise(EqualWeighted(), rd)
+    @test isnothing(plain.imsk)
+    @test length(plain.w) == N
+    @test isapprox(plain.w, fill(inv(N), N))
+    # A weight bound stated over the full universe binds on the right asset, because the
+    # sets and the bounds are viewed by the same index the returns are.
+    sets = UniverseSets(; dict = Dict("nx" => nx))
+    wb = WeightBoundsEstimator(; ub = Dict("e" => 0.1))
+    res = optimise(EqualWeighted(; wb = wb, sets = sets), rdg)
+    @test iszero(res.w[k])
+    @test isapprox(res.w[5], 0.1)
+    @test isapprox(sum(res.w), 1)
+    # An all-dead window has no universe to weight, and the refusal is the one the mask is
+    # derived with.
+    Xdead = copy(X)
+    Xdead[1, :] .= NaN
+    @test_throws PortfolioOptimisers.IsEmptyError optimise(EqualWeighted(),
+                                                           ReturnsResult(; nx = nx,
+                                                                         X = Xdead))
+    @test_throws PortfolioOptimisers.IsEmptyError optimise(EqualWeighted(),
+                                                           ReturnsResult(; nx = nx, X = X,
+                                                                         pnl = naive_panel(falses(T,
+                                                                                                  N))))
+end
+
+@testset "RandomWeighted draws over the Coverage Universe" begin
+    res = optimise(RandomWeighted(; seed = 42), rdg)
+    oracle = optimise(RandomWeighted(; seed = 42), rdk)
+    @test res.imsk == BitVector([1, 1, 0, 1, 1])
+    @test isnothing(oracle.imsk)
+    @test length(res.w) == N
+    @test iszero(res.w[k])
+    @test isapprox(res.w[keep], oracle.w)
+    @test isapprox(sum(res.w), 1)
+    # A vector `alpha` is one concentration per asset of the full universe, so the draw over
+    # the reduced universe is the draw the hand-reduced concentrations give.
+    alpha = collect(1.0:N)
+    res = optimise(RandomWeighted(; alpha = alpha, seed = 42), rdg)
+    oracle = optimise(RandomWeighted(; alpha = alpha[keep], seed = 42), rdk)
+    @test res.imsk == BitVector([1, 1, 0, 1, 1])
+    @test iszero(res.w[k])
+    @test isapprox(res.w[keep], oracle.w)
+    # And its length is checked against the full width, because that is the universe the
+    # caller states it over.
+    @test_throws DimensionMismatch optimise(RandomWeighted(; alpha = alpha[keep],
+                                                           seed = 42), rdg)
+    # The inactive spell excludes the asset here too.
+    res = optimise(RandomWeighted(; seed = 42), rds)
+    @test res.imsk == BitVector([1, 1, 0, 1, 1])
+    @test iszero(res.w[k])
+    # A complete window is the path it was.
+    plain = optimise(RandomWeighted(; seed = 42), rd)
+    @test isnothing(plain.imsk)
+    @test length(plain.w) == N
+end
+
+@testset "A walk-forward over a changing universe weights each fold's live assets" begin
+    # One panel with a listing and a delisting, stated in the returns and in the active mask
+    # alike, as a real panel states them.
+    Xw = copy(X)
+    wamsk = trues(T, N)
+    Xw[1:40, 5] .= NaN            # asset 5 lists at observation 41
+    wamsk[1:40, 5] .= false
+    Xw[151:end, 3] .= NaN         # asset 3 delists after observation 150
+    wamsk[151:end, 3] .= false
+    rdw = ReturnsResult(; nx = nx, X = Xw,
+                        pnl = AssetPanel(;
+                                         pf = [NumericPanelField(; name = "mcap",
+                                                                 vals = ones(T, N))],
+                                         amsk = wamsk, emsk = wamsk))
+    cv = IndexWalkForward(60, 20)
+    (; train_idx) = split(cv, rdw)
+    mpr = PortfolioOptimisers.fit_and_predict(EqualWeighted(), rdw, cv)
+    @test length(mpr.pred) == length(train_idx)
+    for (pred, tr) in zip(mpr.pred, train_idx)
+        # The fold's mask is the Coverage Universe of its own training window, written out
+        # by hand: finite at every row of the window, and active at every row of it.
+        hand = BitVector([all(isfinite, view(Xw, tr, j)) && all(view(wamsk, tr, j))
+                          for j in 1:N])
+        expected = all(hand) ? nothing : hand
+        @test pred.res.imsk == expected
+        # The weights come back on the caller's universe, and an asset the fold could not
+        # trade holds a zero.
+        @test length(pred.res.w) == N
+        @test isapprox(sum(pred.res.w), 1)
+        @test all(iszero, view(pred.res.w, .!hand))
+        @test all(isapprox(inv(count(hand))), view(pred.res.w, hand))
+    end
+    # The two ends of the run disagree about the universe, which is the point of the test.
+    @test mpr.pred[1].res.imsk == BitVector([1, 1, 1, 1, 0])
+    @test isnothing(mpr.pred[3].res.imsk)
+    @test mpr.pred[end].res.imsk == BitVector([1, 1, 0, 1, 1])
 end
 
 @testset "SubsetResampling draws its subsets from the investable universe" begin

@@ -470,6 +470,8 @@ Allocates the same weight to every asset in the universe.
 
 The asset count comes from `rd.X`, so this optimiser reads no prior and no covariance matrix.
 
+``N`` is the size of the **Coverage Universe** of the window, not of the full asset universe. An asset is in it when its return is finite and the active mask of the [`AssetPanel`](@ref) is `true` at every row of the window, so an asset that is not yet listed, is delisted, or carries a stale finite price during an inactive spell, weights nothing and holds a zero. The result carries that universe as its `imsk`. An all-dead window throws an `IsEmptyError`.
+
 # Mathematical definition
 
 ```math
@@ -593,11 +595,14 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Run the equal-weighted portfolio optimisation.
 
-Internal dispatch called by [`optimise`](@ref). Assigns equal weights to all assets, then applies weight bounds.
+Internal dispatch called by [`optimise`](@ref). Reduces the optimiser and the returns data to the Coverage Universe of the window with [`coverage_reduction`](@ref), assigns equal weights to the assets it keeps, then applies weight bounds. [`NaiveOptimisationResult`](@ref) expands the weights back onto the full asset universe.
+
+This head fits no prior, so no Prior Result yields an Investable Mask for it. The Coverage Universe is the mask it derives instead: an asset is kept when its return is finite and the active mask of the [`AssetPanel`](@ref) is `true` at every row of the window. A stale finite price during an inactive spell weights nothing, and an asset outside the mask holds a zero. The result carries the mask as `imsk`, so a reader of a walk-forward has the same idiom here as in every other family. An all-dead window throws an `IsEmptyError`.
 
 # Related
 
   - [`EqualWeighted`](@ref)
+  - [`coverage_reduction`](@ref)
   - [`optimise`](@ref)
   - [`_optimise`](@ref)
 """
@@ -605,14 +610,17 @@ function _optimise(ew::EqualWeighted, rd::ReturnsResult; dims::Int = 1, kwargs..
     @argcheck(!isnothing(rd.X), IsNothingError("rd.X cannot be nothing"))
     assert_dims(dims)
     ew = reset_time_dependent_estimator(ew)
-    dims = ifelse(isone(dims), 2, 1)
-    N = size(rd.X, dims)
+    # This head fits no prior, so it derives the Coverage Universe of its own window and
+    # reduces once, here: the weight bounds and the sets are stated over the full universe
+    # and are viewed by the same index. `NaiveOptimisationResult` expands the weights back.
+    cmsk, ew, rd = coverage_reduction(ew, rd; dims = dims)
+    N = size(rd.X, ifelse(isone(dims), 2, 1))
     w = fill(inv(N), N)
     wb = weight_bounds_constraints(ew.wb, ew.sets; N = N, strict = ew.strict,
                                    datatype = eltype(rd.X))
     retcode, w = finalise_weight_bounds(ew.wf, wb, w)
     return NaiveOptimisationResult(; pr = rd, wb = wb, retcode = retcode, w = w,
-                                   fb = nothing)
+                                   imsk = cmsk, fb = nothing)
 end
 """
     optimise(ew::EqualWeighted{<:Any, <:Any, <:Any, Nothing},
@@ -623,7 +631,7 @@ Run the equal-weighted portfolio optimisation.
 # Arguments
 
   - `ew`: The equal-weighted optimiser to use.
-  - $(arg_dict[:rd]) Used to know how many assets there are.
+  - $(arg_dict[:rd]) Its returns matrix and its Asset Panel give the Coverage Universe of the window, which is the universe the weights are spread over.
   - `dims`: The dimension along which observations advance in time.
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
 """
@@ -637,6 +645,8 @@ $(DocStringExtensions.TYPEDEF)
 Draws portfolio weights at random from a Dirichlet distribution with concentration parameter `alpha`.
 
 Use it for simulation, benchmarking, or stress testing. A scalar `alpha` draws from the symmetric Dirichlet distribution over ``N`` assets; a vector `alpha` must be one entry per asset.
+
+``N`` is the size of the **Coverage Universe** of the window, not of the full asset universe. An asset is in it when its return is finite and the active mask of the [`AssetPanel`](@ref) is `true` at every row of the window, so an asset that is not yet listed, is delisted, or carries a stale finite price during an inactive spell, weights nothing and holds a zero. A vector `alpha` is still stated over the full universe, and is sliced to the Coverage Universe. The result carries that universe as its `imsk`. An all-dead window throws an `IsEmptyError`.
 
 # Mathematical definition
 
@@ -787,11 +797,16 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Run the random-weighted portfolio optimisation.
 
-Internal dispatch called by [`optimise`](@ref). Draws weights from a Dirichlet distribution parameterised by `rw.alpha`, then applies weight bounds.
+Internal dispatch called by [`optimise`](@ref). Reduces the optimiser and the returns data to the Coverage Universe of the window with [`coverage_reduction`](@ref), draws weights over the assets it keeps from a Dirichlet distribution parameterised by `rw.alpha`, then applies weight bounds. [`NaiveOptimisationResult`](@ref) expands the weights back onto the full asset universe.
+
+This head fits no prior, so no Prior Result yields an Investable Mask for it. The Coverage Universe is the mask it derives instead: an asset is kept when its return is finite and the active mask of the [`AssetPanel`](@ref) is `true` at every row of the window. A stale finite price during an inactive spell weights nothing, and an asset outside the mask holds a zero. The result carries the mask as `imsk`, so a reader of a walk-forward has the same idiom here as in every other family. An all-dead window throws an `IsEmptyError`.
+
+A vector `alpha` is one concentration per asset of the **full** universe, because that is the universe the caller states it over. Its length is therefore checked against the full width, before the reduction, and [`port_opt_view`](@ref) then slices it to the Coverage Universe with the rest of the estimator.
 
 # Related
 
   - [`RandomWeighted`](@ref)
+  - [`coverage_reduction`](@ref)
   - [`optimise`](@ref)
   - [`_optimise`](@ref)
 """
@@ -799,12 +814,20 @@ function _optimise(rw::RandomWeighted, rd::ReturnsResult; dims::Int = 1, kwargs.
     @argcheck(!isnothing(rd.X), IsNothingError("rd.X cannot be nothing"))
     assert_dims(dims)
     rw = reset_time_dependent_estimator(rw)
-    dims = ifelse(isone(dims), 2, 1)
-    N = size(rd.X, dims)
+    adim = ifelse(isone(dims), 2, 1)
     if isa(rw.alpha, VecNum)
-        @argcheck(length(rw.alpha) == N,
-                  DimensionMismatch("rw.alpha ($(length(rw.alpha))) must match N ($N)"))
+        # The caller states one concentration per asset of the full universe, so the check
+        # reads the full width. The reduction below slices `alpha` with the rest.
+        Nf = size(rd.X, adim)
+        @argcheck(length(rw.alpha) == Nf,
+                  DimensionMismatch("rw.alpha ($(length(rw.alpha))) must match N ($Nf)"))
     end
+    # This head fits no prior, so it derives the Coverage Universe of its own window and
+    # reduces once, here: the concentrations, the weight bounds and the sets are stated over
+    # the full universe and are viewed by the same index. `NaiveOptimisationResult` expands
+    # the weights back.
+    cmsk, rw, rd = coverage_reduction(rw, rd; dims = dims)
+    N = size(rd.X, adim)
     dist = if isa(rw.alpha, Number)
         Distributions.Dirichlet(N, rw.alpha)
     else
@@ -816,7 +839,7 @@ function _optimise(rw::RandomWeighted, rd::ReturnsResult; dims::Int = 1, kwargs.
                                    datatype = eltype(rd.X))
     retcode, w = finalise_weight_bounds(rw.wf, wb, w)
     return NaiveOptimisationResult(; pr = rd, wb = wb, retcode = retcode, w = w,
-                                   fb = nothing)
+                                   imsk = cmsk, fb = nothing)
 end
 """
     optimise(rw::RandomWeighted{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
@@ -827,7 +850,7 @@ Run the random-weighted portfolio optimisation.
 # Arguments
 
   - `rw`: The random-weighted optimiser to use.
-  - $(arg_dict[:rd]) Used to know how many assets there are.
+  - $(arg_dict[:rd]) Its returns matrix and its Asset Panel give the Coverage Universe of the window, which is the universe the draw is taken over.
   - `dims`: The dimension along which observations advance in time.
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
 """

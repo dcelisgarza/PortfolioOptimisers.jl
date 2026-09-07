@@ -101,6 +101,7 @@ finalise_weight_bounds
 port_opt_view(opt::AbstractOptimisationEstimator, ::Any, args...)
 port_opt_view(res::NonFiniteAllocationOptimisationResult, ::Colon, args...)
 investable_reduction(pr::AbstractPriorResult, opt::AbstractOptimisationEstimator, rd::ReturnsResult)
+coverage_reduction(opt::AbstractOptimisationEstimator, rd::ReturnsResult)
 expand_investable_weights
 assert_internal_optimiser(::NonFiniteAllocationOptimisationResult)
 assert_external_optimiser(::NonFiniteAllocationOptimisationResult)
