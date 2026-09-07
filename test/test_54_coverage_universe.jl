@@ -309,9 +309,13 @@ end
     bad[2, 1] = NaN
     @test_throws IsNonFiniteError PO.matrix_processing_block!(mp, bad, Xlist)
 
-    # A matrix with no finite diagonal entry has no block to repair.
+    # A matrix with no finite diagonal entry has no block to repair, so it goes to the plain
+    # repair and meets its refusal. This helper adds no failure face of its own, so a caller
+    # whose covariance degenerated for an unrelated reason still meets the error it met
+    # before the seam existed.
     none = fill(NaN, N, N)
-    @test_throws IsEmptyError PO.matrix_processing_block!(mp, none, Xlist)
+    @test_throws ArgumentError PO.matrix_processing_block!(mp, none, Xlist)
+    @test_throws ArgumentError matrix_processing!(mp, fill(NaN, N, N), Xlist)
 end
 
 @testset "The composite forwards the panel and repairs the block" begin

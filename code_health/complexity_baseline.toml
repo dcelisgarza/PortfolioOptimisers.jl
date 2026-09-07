@@ -33,7 +33,7 @@ commit = "97e398ef74"
 "src/04_PosdefMatrix.jl" = { cyc = 5, cog = 4, arg = 2, cyc_sum = 10, cog_sum = 5, arg_sum = 4, macros = [] }
 "src/05_Denoise.jl" = { cyc = 4, cog = 6, arg = 7, cyc_sum = 18, cog_sum = 11, arg_sum = 30, macros = [] }
 "src/06_Detone.jl" = { cyc = 3, cog = 2, arg = 2, cyc_sum = 8, cog_sum = 3, arg_sum = 8, macros = [] }
-"src/07_MatrixProcessing.jl" = { cyc = 2, cog = 1, arg = 5, cyc_sum = 13, cog_sum = 2, arg_sum = 48, macros = [] }
+"src/07_MatrixProcessing.jl" = { cyc = 3, cog = 2, arg = 5, cyc_sum = 16, cog_sum = 4, arg_sum = 53, macros = [] }
 "src/08_Moments/01_Base_Moments.jl" = { cyc = 19, cog = 26, arg = 8, cyc_sum = 112, cog_sum = 132, arg_sum = 121, macros = ["@define_pretty_show"] }
 "src/08_Moments/02_SimpleExpectedReturns.jl" = { cyc = 2, cog = 2, arg = 4, cyc_sum = 18, cog_sum = 11, arg_sum = 23, macros = ["@propagatable"] }
 "src/08_Moments/03_Covariance.jl" = { cyc = 2, cog = 2, arg = 5, cyc_sum = 37, cog_sum = 21, arg_sum = 75, macros = ["@propagatable"] }
