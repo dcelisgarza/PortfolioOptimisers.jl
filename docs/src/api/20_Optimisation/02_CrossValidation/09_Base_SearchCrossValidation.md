@@ -5,6 +5,7 @@ AbstractSearchCrossValidationEstimator
 CrossValidationSearchScorer
 CrossValSearchScorer
 HighestMeanScore
+finite_candidate_index
 AbstractSearchCrossValidationResult
 AbstractSearchCrossValidationAlgorithm
 SearchCrossValidationResult

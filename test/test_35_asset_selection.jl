@@ -265,6 +265,67 @@ struct UnimplementedSelector <: PortfolioOptimisers.AbstractAssetSelector end
                                        dims = 1) == [1]
     end
 
+    #=
+    Issue #860, ADR 0120: the pre-selection funnel reduces to the Coverage Universe before
+    every selector, so a selector ranks among the assets that are live throughout the
+    training window and never among one that is not yet listed, is delisted, or is missing a
+    quote.
+
+    The oracle is the hand-reduced panel: the same selector on the window with the gapped
+    columns removed by hand must keep the same names.
+    =#
+    @testset "the funnel reduces to the Coverage Universe" begin
+        rngc = StableRNG(20260907)
+        Tc = 40
+        # A is clean and volatile, B is clean and quiet, C, D and E each leave the universe
+        # one of the three ways: an interior gap, a leading gap, a trailing gap.
+        Xc = randn(rngc, Tc, 5) ./ 100
+        Xc[:, 2] ./= 10                     # B is the quiet one, so a rank rule can order them
+        Xgap = copy(Xc)
+        Xgap[20, 3] = NaN                   # C: an interior gap, a missed quote
+        Xgap[1:5, 4] .= NaN                 # D: a leading gap, not yet listed
+        Xgap[(end - 4):end, 5] .= NaN       # E: a trailing gap, delisted
+        nxc = ["A", "B", "C", "D", "E"]
+        rdgap = ReturnsResult(; nx = nxc, X = Xgap)
+        # the hand-reduced oracle: the two columns that are live throughout
+        rdlive = ReturnsResult(; nx = ["A", "B"], X = Xc[:, 1:2])
+
+        for sel in (ScoreSelector(; score = SCM(), rule = RankRule(; best = 1)),
+                    CompleteAssetSelector(),
+                    RedundancySelector(; alg = PairwiseCorrelation(; t = 0.9)))
+            keep = fit_preprocessing(sel, rdgap).nx
+            @test keep == fit_preprocessing(sel, rdlive).nx
+            @test isempty(intersect(keep, ["C", "D", "E"]))
+        end
+
+        # A complete window gives the result of today: the reduction is the identity on it.
+        # `bigger_is_better(SCM())` is false, so `best` is the lowest variance, which is B.
+        @test fit_preprocessing(ScoreSelector(; score = SCM(), rule = RankRule(; best = 1)),
+                                rdlive).nx == ["B"]
+
+        # The panel's active mask is read too, so a stale finite price during an inactive
+        # spell leaves the asset out. Every return here is finite.
+        amsk = trues(Tc, 5)
+        amsk[10, 2] = false
+        pnl = AssetPanel(; pf = [NumericPanelField(; name = "mcap", vals = ones(Tc, 5))],
+                         amsk = amsk, emsk = amsk)
+        rdmsk = ReturnsResult(; nx = nxc, X = Xc, pnl = pnl)
+        @test all(isfinite, Xc)
+        @test fit_preprocessing(CompleteAssetSelector(), rdmsk).nx == ["A", "C", "D", "E"]
+
+        # An all-dead window is refused where the mask is derived.
+        dead = ReturnsResult(; nx = ["A", "B"], X = [0.1 NaN; NaN 0.2])
+        @test_throws PO.IsEmptyError fit_preprocessing(CompleteAssetSelector(), dead)
+        @test_throws PO.IsEmptyError fit_preprocessing(ScoreSelector(; score = SCM(),
+                                                                     rule = RankRule(;
+                                                                                     best = 1)),
+                                                       dead)
+
+        # The reduction happens once, in the funnel, so a selector that reads values sees a
+        # clean block and `asset_scores` keeps its refusal for a live column.
+        @test_throws DomainError PO.asset_scores(MaximumDrawdown(), [NaN 0.1; NaN 0.2])
+    end
+
     @testset "the fitted universe replays" begin
         Xtr = [0.10 0.01 0.001; -0.10 -0.01 -0.001; 0.05 0.02 0.002]
         Xte = [0.001 0.02 0.10; -0.001 -0.02 -0.10; 0.002 0.01 0.05]

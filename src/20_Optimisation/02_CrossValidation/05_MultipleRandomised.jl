@@ -515,20 +515,46 @@ Unlike combinatorial cross-validation, multiple-randomised resampling draws over
 each fold stay contiguous. That is why it is admissible at the price level for a
 price-starting pipeline — the rolling-window rule that blocks combinatorial does not apply.
 
+## The draw is over the Coverage Universe of the path's own window
+
+Each path draws its window first, then draws `subset_size` assets from the **Coverage
+Universe of that window**: the assets whose price or return is finite at every row of it, and
+whose active mask in the [`AssetPanel`](@ref) is `true` at every row of it. A subset is
+therefore always `subset_size` live assets, and a dead asset is never drawn, so no inner
+optimisation is handed a column it could not have traded.
+
+`max_comb` applies **per path**, because the combination count is now
+`binomial(live_assets, subset_size)` of that path's window rather than one number for the
+whole sample. A window whose Coverage Universe is smaller than `subset_size` throws an
+`IsEmptyError` naming both counts.
+
+!!! warning
+
+    The window draw and the asset draw swapped order in the one random stream the seed
+    governs, so a seeded split gives **different** indices from the released one. The split is
+    still deterministic in `seed`.
+
 # Arguments
 
   - `mrcv::MultipleRandomised`: Multiple randomised cross-validation estimator.
   - `rd::Prices_RR`: Price- or returns-level data to split.
 
+# Validation
+
+  - Every path's Coverage Universe must hold at least `subset_size` assets.
+
 # Returns
 
   - `MultipleRandomisedResult`: Result containing training, test, and asset indices for
-    every fold across all random paths, together with a path identifier for each fold.
+    every fold across all random paths, together with a path identifier for each fold. Every
+    asset index names a column that is live throughout its own path's window.
 
 # Related
 
   - [`MultipleRandomised`](@ref)
   - [`MultipleRandomisedResult`](@ref)
+  - [`cv_live_assets`](@ref)
+  - [`sample_unique_assets`](@ref)
   - [`n_splits`](@ref)
 """
 function Base.split(mrcv::MultipleRandomised, rd::Prices_RR)
@@ -537,15 +563,11 @@ function Base.split(mrcv::MultipleRandomised, rd::Prices_RR)
     subset_size = get_subset_size(subset_size, rd)
     n_subsets = get_n_subsets(n_subsets, rd)
     window_size = get_window_size(window_size, rd)
-    n_comb = binomial(N, subset_size)
-    @argcheck(n_subsets <= n_comb,
-              "n_subsets = $n_subsets must not be greater than `binomial(assets, subset_size) = n_comb => binomial($N, $subset_size) = $n_comb`.")
-    # Resolve once: this single stream must serve BOTH the asset-subset sampling below and the
-    # per-path window offsets (`rand(rng, ...)` in the loop), so `seed` governs the whole split.
-    # `sample_unique_assets` is therefore handed the already-resolved rng and no seed.
+    # Resolve once: this single stream must serve BOTH the per-path window offsets
+    # (`rand(rng, ...)` in the loop) and the asset-subset sampling that follows each of them,
+    # so `seed` governs the whole split. `sample_unique_assets` is therefore handed the
+    # already-resolved rng and no seed.
     rng = resolve_rng(rng, seed)
-    asset_idx = sample_unique_assets(N, subset_size, n_subsets; max_comb = max_comb,
-                                     rng = rng)
     path_ids = Vector{typeof(n_subsets)}(undef, 0)
     train_indices = Vector{UnitRange{typeof(T)}}(undef, 0)
     test_indices = Vector{UnitRange{typeof(T)}}(undef, 0)
@@ -559,6 +581,11 @@ function Base.split(mrcv::MultipleRandomised, rd::Prices_RR)
             idx = start_obs:(start_obs + window_size - 1)
             rdi = port_opt_view(rd, idx, :)
         end
+        live = cv_live_assets(rdi)
+        @argcheck(subset_size <= length(live),
+                  IsEmptyError("path $i draws $subset_size assets from the Coverage Universe of its own window, which holds $(length(live)) of the $N assets; lower subset_size, widen window_size, or give the window assets that are listed and quoted throughout it"))
+        cols = live[vec(sample_unique_assets(length(live), subset_size, 1;
+                                             max_comb = max_comb, rng = rng))]
         start_obs -= 1
         (; train_idx, test_idx) = try
             split(cv, rdi)
@@ -574,7 +601,7 @@ function Base.split(mrcv::MultipleRandomised, rd::Prices_RR)
         append!(path_ids, fill(i, num_splits))
         append!(train_indices, [t .+ start_obs for t in train_idx])
         append!(test_indices, [t .+ start_obs for t in test_idx])
-        append!(asset_indices, Iterators.repeated(view(asset_idx, :, i), num_splits))
+        append!(asset_indices, Iterators.repeated(cols, num_splits))
     end
     return MultipleRandomisedResult(; train_idx = train_indices, test_idx = test_indices,
                                     asset_idx = asset_indices, path_ids = path_ids)

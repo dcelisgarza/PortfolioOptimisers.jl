@@ -10,6 +10,7 @@ The Asset Panel travels as the third positional argument of every moment verb, a
 PortfolioOptimisers.coverage_mask
 PortfolioOptimisers.coverage_sentinel
 PortfolioOptimisers.coverage_reduction(X::MatNum, pnl::Option{<:AssetPanel})
+PortfolioOptimisers.coverage_reduction(rd::AbstractReturnsResult)
 PortfolioOptimisers.coverage_reduced_pair
 PortfolioOptimisers.panel_moment_masks
 ```

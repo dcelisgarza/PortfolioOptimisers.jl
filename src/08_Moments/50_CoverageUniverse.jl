@@ -163,6 +163,69 @@ function coverage_reduction(X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1)
     end
 end
 """
+    coverage_reduction(rd::AbstractReturnsResult;
+                       dims::Int = 1) -> Tuple{Option{BitVector}, AbstractReturnsResult}
+    coverage_reduction(X::MatNum, rd::AbstractReturnsResult;
+                       dims::Int = 1) -> Tuple{Option{BitVector}, AbstractReturnsResult}
+    coverage_reduction(cmsk::Nothing,
+                       rd::AbstractReturnsResult) -> Tuple{Nothing, AbstractReturnsResult}
+    coverage_reduction(cmsk::BitVector,
+                       rd::AbstractReturnsResult) -> Tuple{BitVector, AbstractReturnsResult}
+
+Reduce a returns carrier to the Coverage Universe of its own window.
+
+This is the carrier-level door of the seam. [`coverage_reduction(X::MatNum, pnl::Option{<:AssetPanel})`](@ref) hands a moment estimator a clean block, and this hands a consumer of the whole carrier a clean carrier: `nx`, `X`, the benchmark, the implied volatility surface and the [`AssetPanel`](@ref) are all sliced at the same asset index by [`port_opt_view`](@ref). Pre-selection is the caller: [`fit_preprocessing`](@ref) over an [`AbstractAssetSelector`](@ref) reduces here, so every selector ranks among live assets alone.
+
+Four methods, and every branch is dispatch rather than a condition, as it is in [`coverage_reduction(opt::AbstractOptimisationEstimator, rd::ReturnsResult)`](@ref). The first hands the carrier's returns matrix back as the leading argument; the second derives the mask; the `nothing` method is the all-covered path and returns the carrier untouched; the `BitVector` method takes the view.
+
+The split between the first two is the family's refusal. A carrier whose `X` is not an `observations × assets` matrix has no asset axis to reduce — [`PredictionReturnsResult`](@ref) collapsed it into one portfolio return series — so it matches no method and the call is a `MethodError` naming the carrier. That refusal comes before the panel is read, so a carrier that satisfies neither the `{nx, X}` contract nor the `{nx, X, pnl}` one is named by its returns matrix rather than by a missing field.
+
+An all-dead window throws an `IsEmptyError` where the mask is derived, so the refusal is [`coverage_mask`](@ref)'s and every caller has it for free.
+
+# Algorithm
+
+ 1. Hand `rd.X` back as the leading argument, which refuses a carrier with no asset axis.
+ 2. Derive the Coverage Universe of `X` and `rd.pnl` with [`coverage_mask`](@ref).
+ 3. Return the mask and the carrier unchanged when the mask is `nothing`.
+ 4. Otherwise return the mask beside a [`port_opt_view`](@ref) of the carrier at `findall(cmsk)`.
+
+# Arguments
+
+  - $(arg_dict[:rd])
+  - $(arg_dict[:X])
+  - `cmsk`: The Coverage Universe, or `nothing`.
+  - $(arg_dict[:dims])
+
+# Validation
+
+  - $(val_dict[:dims])
+  - The carrier must hold an `observations × assets` returns matrix.
+  - At least one asset must be in the Coverage Universe.
+
+# Returns
+
+  - `(cmsk, rdc)::Tuple{Option{BitVector}, AbstractReturnsResult}`: The Coverage Universe, and the carrier reduced to it.
+
+# Related
+
+  - [`coverage_mask`](@ref)
+  - [`coverage_reduction(X::MatNum, pnl::Option{<:AssetPanel})`](@ref)
+  - [`fit_preprocessing`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+function coverage_reduction(rd::AbstractReturnsResult; dims::Int = 1)
+    return coverage_reduction(rd.X, rd; dims = dims)
+end
+function coverage_reduction(X::MatNum, rd::AbstractReturnsResult; dims::Int = 1)
+    return coverage_reduction(coverage_mask(X, rd.pnl; dims = dims), rd)
+end
+function coverage_reduction(::Nothing, rd::AbstractReturnsResult)
+    return nothing, rd
+end
+function coverage_reduction(cmsk::BitVector, rd::AbstractReturnsResult)
+    return cmsk, port_opt_view(rd, findall(cmsk))
+end
+"""
     coverage_reduced_pair(A::MatNum, B::MatNum, cmsk::Nothing) -> Tuple{MatNum, MatNum}
     coverage_reduced_pair(A::MatNum, B::MatNum, cmsk::BitVector) -> Tuple{MatNum, MatNum}
 

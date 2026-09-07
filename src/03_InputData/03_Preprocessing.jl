@@ -1854,7 +1854,11 @@ Abstract supertype for returns-level preprocessing estimators that restrict the 
 
 An asset selector answers one question on the training window — *which asset columns survive?* — and that answer is its fitted state. [`apply_preprocessing`](@ref) replays the fitted universe on unseen windows, so a selector is safe inside cross-validation: the selection is made on train data alone and never re-decided on test data.
 
-Concrete subtypes implement a single method, [`select_assets`](@ref); the family shares one [`fit_preprocessing`](@ref) and one [`apply_preprocessing`](@ref). Selectors restrict *columns only*. Observation filtering is a price-level concern ([`MissingDataFilter`](@ref)), because a fitted transformation cannot decide which rows of an unseen window to drop without breaking the weights/returns alignment `assert_universe_aligned` enforces.
+Concrete subtypes implement a single method, [`select_assets`](@ref); the family shares one [`fit_preprocessing`](@ref) and one [`apply_preprocessing`](@ref).
+
+The funnel reduces the training window to its **Coverage Universe** before it calls [`select_assets`](@ref), so a selector ranks among the assets that are live throughout that window and never among an asset that is not yet listed, is delisted, or is missing a quote. A selector therefore needs no finiteness guard of its own, and [`CompleteAssetSelector`](@ref) is the identity on the reduced window.
+
+Selectors restrict *columns only*. Observation filtering is a price-level concern ([`MissingDataFilter`](@ref)), because a fitted transformation cannot decide which rows of an unseen window to drop without breaking the weights/returns alignment `assert_universe_aligned` enforces.
 
 See `docs/adr/0029-asset-selection-is-returns-preprocessing.md` for the design rationale.
 
@@ -1893,9 +1897,11 @@ end
 
 Return the keep-mask over the asset columns of `rd`.
 
-This is the single method a concrete [`AbstractAssetSelector`](@ref) must implement. It is called by [`fit_preprocessing`](@ref) on the *training* window only; the resulting universe is then replayed on every later window by [`apply_preprocessing`](@ref).
+This is the single method a concrete [`AbstractAssetSelector`](@ref) must implement. It is called by [`fit_preprocessing`](@ref) on the **Coverage Universe of the training window** only; the resulting universe is then replayed on every later window by [`apply_preprocessing`](@ref).
 
-`rd` is read for `nx` and an `observations × assets` `X`; [`ClusterGroups`](@ref) also reads `rd.pnl`, widening the implicit contract to `{nx, X, pnl}` (see [`AbstractReturnsResult`](@ref)). A selector is fitted from returns data alone and never sees a prior result, so it reads the data carrier and nothing else.
+`rd` is the *reduced* carrier, so every column it carries is finite at every row and active at every row of the panel. A selector ranks among live assets alone, and it needs no finiteness guard: a non-finite score computed from a live column is a defect of the measure, which is why [`asset_scores`](@ref) keeps its refusal.
+
+`rd` is read for `nx` and an `observations × assets` `X`; the funnel itself reads `rd.pnl`, and [`ClusterGroups`](@ref) reads it too, so the implicit contract of the family is `{nx, X, pnl}` (see [`AbstractReturnsResult`](@ref)). A selector is fitted from returns data alone and never sees a prior result, so it reads the data carrier and nothing else.
 
 # Arguments
 
@@ -1904,12 +1910,13 @@ This is the single method a concrete [`AbstractAssetSelector`](@ref) must implem
 
 # Returns
 
-  - `keep::BitVector`: `true` for each asset column to retain, `length(keep) == size(rd.X, 2)`.
+  - `keep::BitVector`: `true` for each asset column to retain, `length(keep) == size(rd.X, 2)`, over the reduced window.
 
 # Related
 
   - [`AbstractAssetSelector`](@ref)
   - [`fit_preprocessing`](@ref)
+  - [`coverage_reduction(rd::AbstractReturnsResult)`](@ref)
 """
 function select_assets(sel::AbstractAssetSelector, rd::AbstractReturnsResult)
     return throw(ArgumentError("$(typeof(sel)) subtypes AbstractAssetSelector but does not implement select_assets. Extension authors: every AbstractAssetSelector must define select_assets(sel, rd) returning a keep-mask over the asset columns of rd."))
@@ -1919,12 +1926,17 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Fit any [`AbstractAssetSelector`](@ref) by recording the asset universe [`select_assets`](@ref) keeps.
 
+This is the one funnel of the family, and it is where the Coverage Universe is applied. The window is reduced first, so **every** selector ranks among the assets that are live throughout the training window: a score, a redundancy and a rule all read live columns alone, and a new selector cannot forget the rule. An all-dead window throws an `IsEmptyError` where the mask is derived, so the refusal is [`coverage_mask`](@ref)'s.
+
 # Algorithm
 
- 1. Call [`select_assets`](@ref) on the training window, giving the keep-mask `keep`.
- 2. Check that `keep` holds one entry per asset column of `rd`.
- 3. Check that `keep` keeps at least one asset.
- 4. Return an [`AssetSelectorResult`](@ref) holding the names of the kept assets, in their original column order.
+ 1. Reduce the training window to its Coverage Universe with [`coverage_reduction(rd::AbstractReturnsResult)`](@ref).
+ 2. Call [`select_assets`](@ref) on the reduced window, giving the keep-mask `keep`.
+ 3. Check that `keep` holds one entry per asset column of the reduced window.
+ 4. Check that `keep` keeps at least one asset.
+ 5. Return an [`AssetSelectorResult`](@ref) holding the names of the kept assets, in their original column order.
+
+The result records **names**, so the expansion is free: [`apply_preprocessing`](@ref) finds each name in the window it replays on, and a name the reduction dropped is simply absent from the fitted universe.
 
 # Arguments
 
@@ -1933,7 +1945,9 @@ Fit any [`AbstractAssetSelector`](@ref) by recording the asset universe [`select
 
 # Validation
 
-  - `select_assets` must return a mask whose length matches the number of asset columns.
+  - The carrier must hold an `observations × assets` returns matrix; one that collapsed the asset axis matches no method of the reduction and is named by a `MethodError`.
+  - At least one asset must be in the Coverage Universe of the training window.
+  - `select_assets` must return a mask whose length matches the number of asset columns of the reduced window.
   - The selection must keep at least one asset; a selector that empties the universe throws rather than passing a zero-asset problem downstream (the [`MissingDataFilter`](@ref) precedent).
 
 # Returns
@@ -1948,12 +1962,13 @@ Fit any [`AbstractAssetSelector`](@ref) by recording the asset universe [`select
 """
 function fit_preprocessing(sel::AbstractAssetSelector,
                            rd::AbstractReturnsResult)::AssetSelectorResult
-    keep = select_assets(sel, rd)
-    @argcheck(length(keep) == size(rd.X, 2),
-              DimensionMismatch("select_assets for a $(typeof(sel)) returned a mask of length $(length(keep)) for $(size(rd.X, 2)) asset columns"))
+    _, rdc = coverage_reduction(rd)
+    keep = select_assets(sel, rdc)
+    @argcheck(length(keep) == size(rdc.X, 2),
+              DimensionMismatch("select_assets for a $(typeof(sel)) returned a mask of length $(length(keep)) for the $(size(rdc.X, 2)) asset columns of the Coverage Universe of the training window"))
     @argcheck(any(keep),
-              IsEmptyError("a $(typeof(sel)) selects no assets from the training window; loosen its configuration"))
-    return AssetSelectorResult(collect(rd.nx[keep]))
+              IsEmptyError("a $(typeof(sel)) selects no assets from the Coverage Universe of the training window; loosen its configuration"))
+    return AssetSelectorResult(collect(rdc.nx[keep]))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

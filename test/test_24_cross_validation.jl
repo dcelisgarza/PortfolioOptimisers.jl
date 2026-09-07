@@ -652,8 +652,10 @@
         @test all(length.(asset_idx) .== cv.subset_size)
         @test unique(asset_idx) == asset_idx
         @test unique.(asset_idx) == asset_idx
-        @test train_idx == UnitRange{Int64}[177:303, 392:518, 520:646, 329:455, 168:294]
-        @test test_idx == UnitRange{Int64}[304:474, 519:689, 647:817, 456:626, 295:465]
+        # The window draw and the asset draw swapped order in the one stream the seed governs
+        # (ADR 0120), so a seeded split gives different indices from the released one.
+        @test train_idx == UnitRange{Int64}[658:784, 561:687, 424:550, 392:518, 168:294]
+        @test test_idx == UnitRange{Int64}[785:955, 688:858, 551:721, 519:689, 295:465]
         @test path_ids == collect(1:5)
 
         cv = MultipleRandomised(IndexWalkForward(127, 171); rng = StableRNG(666), seed = 69,
@@ -722,6 +724,138 @@
                                      window_size = ws)
             @test n_splits(cvn, rd) == length(split(cvn, rd).path_ids)
         end
+    end
+    #=
+    Issue #860, ADR 0120: a random asset subset is drawn from the Coverage Universe of its
+    own window, so a subset is always `subset_size` live assets and a dead asset is never
+    drawn. The window is drawn first, then the subset, in the one stream the seed governs.
+    =#
+    @testset "MultipleRandomised draws from the Coverage Universe of its window" begin
+        Tm, Nm = 400, 8
+        Xm = randn(StableRNG(860), Tm, Nm) ./ 100
+        Xm[300:end, 3] .= NaN                 # C delists at observation 300
+        Xm[1:60, 7] .= NaN                    # G lists at observation 61
+        rdm = ReturnsResult(; nx = string.('A':'H'), X = Xm)
+
+        cvm = MultipleRandomised(IndexWalkForward(60, 30); rng = StableRNG(666), seed = 7,
+                                 n_subsets = 4, subset_size = 3)
+        resm = split(cvm, rdm)
+        # Every drawn column is live throughout the whole sample, which is every path's
+        # window here, and every subset holds exactly `subset_size` of them.
+        for cols in resm.asset_idx
+            @test length(cols) == cvm.subset_size
+            @test cols == unique(cols)
+            @test isempty(intersect(cols, [3, 7]))
+        end
+
+        # The split is deterministic in `seed`.
+        @test split(cvm, rdm).asset_idx == resm.asset_idx
+
+        # A window whose Coverage Universe is smaller than `subset_size` is refused.
+        cvsmall = MultipleRandomised(IndexWalkForward(60, 30); rng = StableRNG(666),
+                                     seed = 7, n_subsets = 2, subset_size = 7)
+        @test_throws PortfolioOptimisers.IsEmptyError split(cvsmall, rdm)
+
+        # The panel's active mask is read too: a stale finite price during an inactive spell
+        # takes the asset out of every draw.
+        amskm = trues(Tm, Nm)
+        amskm[:, 1] .= false
+        pnlm = AssetPanel(; pf = [NumericPanelField(; name = "mcap", vals = ones(Tm, Nm))],
+                          amsk = amskm, emsk = amskm)
+        rdp = ReturnsResult(; nx = string.('A':'H'), X = Xm, pnl = pnlm)
+        for cols in split(cvm, rdp).asset_idx
+            @test isempty(intersect(cols, [1, 3, 7]))
+        end
+    end
+    #=
+    Issue #860, ADR 0120: a candidate with a non-finite fold score loses the search. The
+    scorer is handed the columns whose every entry is finite, and the index it returns is
+    mapped back to the grid through the list of those columns.
+    =#
+    @testset "a failed candidate never wins the search" begin
+        fci = PortfolioOptimisers.finite_candidate_index
+        hms = PortfolioOptimisers.HighestMeanScore()
+
+        # The census matrix: `argmax` over the column means `[0.80, NaN, 0.50]` returns 2
+        # today, and the winner must be column 1.
+        S = [0.80 NaN 0.50
+             0.80 0.30 0.50]
+        @test argmax(vec(sum(S; dims = 1) ./ 2)) == 2
+        @test fci(hms, S) == 1
+
+        # A failed column BEFORE the winner: the index the scorer returns is a position in
+        # the reduced matrix, and `cols` maps it back to the grid.
+        S2 = [NaN 0.5 0.8
+              0.2 0.5 0.8]
+        @test fci(hms, S2) == 3
+
+        # No candidate finished every fold.
+        S3 = [NaN 1.0
+              1.0 NaN]
+        @test_throws PortfolioOptimisers.IsNonFiniteError fci(hms, S3)
+
+        # A scorer that reads a spread, which the refused `-Inf` substitution would break:
+        # a column holding `-Inf` gives `NaN` for a standard deviation, and the `NaN` wins.
+        # Column 2 wins on mean-minus-spread; column 3 wins on the mean alone.
+        S4 = [NaN 0.5 0.30
+              0.5 0.5 0.90]
+        spread = X -> argmax(vec(sum(X; dims = 1) ./ size(X, 1)) .- vec(std(X; dims = 1)))
+        @test fci(spread, S4) == 2
+        @test fci(hms, S4) == 3
+        # the `-Inf` rule the ADR refused would have picked the failed column
+        S4inf = replace(S4, NaN => -Inf)
+        @test spread(S4inf) == 1
+
+        # The helper reads the matrix and never writes it: the result keeps the raw scores,
+        # so its columns line up with the grid and a reader sees which fold failed.
+        Sraw = copy(S)
+        fci(hms, Sraw)
+        @test isequal(Sraw, S)
+    end
+    #=
+    Issue #860, ADR 0120: the population sorts place a member whose measure is non-finite
+    last whatever `rev` is, and the quantile is taken over the finite members.
+    =#
+    @testset "a non-finite member is last in the population sorts" begin
+        # A prediction result needs no solver: a `NaiveOptimisationResult` is already solved.
+        resok = NaiveOptimisationResult(; pr = nothing, wb = nothing,
+                                        retcode = OptimisationSuccess(), w = [0.5, 0.5],
+                                        fb = nothing)
+        function member(X)
+            return MultiPeriodPredictionResult(;
+                                               pred = [PredictionResult(; res = resok,
+                                                                        rd = PredictionReturnsResult(;
+                                                                                                     nx = ["A",
+                                                                                                           "B"],
+                                                                                                     X = X,
+                                                                                                     ts = nothing))])
+        end
+        quiet = member([0.01, -0.01, 0.02, -0.02])
+        loud = member([0.05, -0.05, 0.06, -0.06])
+        gapped = member([0.01, NaN, 0.02, -0.02])
+        ppred = PopulationPredictionResult(; pred = [quiet, gapped, loud])
+        # `MaximumDrawdown` and `MeanReturn` both read a precomputed series, and they
+        # disagree on `bigger_is_better`, so one testset covers both directions.
+        @test !isfinite(expected_risk(MaximumDrawdown(), gapped))
+        @test PortfolioOptimisers.bigger_is_better(MeanReturn()) !=
+              PortfolioOptimisers.bigger_is_better(MaximumDrawdown())
+
+        # The non-finite member is last under BOTH directions of the ranking. A sort that
+        # put it first under one of them would make it the answer of a `first`.
+        for r in (MaximumDrawdown(), MeanReturn())
+            sorted = sort_by_measure(ppred, r)
+            @test length(sorted) == 3
+            @test !isfinite(expected_risk(r, sorted[end]))
+            @test all(isfinite, [expected_risk(r, p) for p in sorted[1:2]])
+        end
+        # the finite members are still ordered among themselves
+        srt = sort_by_measure(ppred, MaximumDrawdown())
+        @test expected_risk(MaximumDrawdown(), srt[1]) <
+              expected_risk(MaximumDrawdown(), srt[2])
+
+        # the quantile is taken over the finite members, so it does not throw
+        @test PortfolioOptimisers.quantile_by_measure(ppred, MaximumDrawdown(), 0.5) isa
+              MultiPeriodPredictionResult
     end
     @testset "Cross val predict" begin
         w0 = fill(inv(size(rd.X, 2)), size(rd.X, 2))

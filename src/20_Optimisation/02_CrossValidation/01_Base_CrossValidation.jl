@@ -169,6 +169,52 @@ cv_nobs(pr::AbstractPricesResult) = size(TimeSeries.values(pr.X), 1)
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Return the positions of the assets in the Coverage Universe of a cross-validation window.
+
+The sibling of [`cv_nobs`](@ref) for the asset axis. It reads the numeric asset matrix of the window and the window's [`AssetPanel`](@ref), hands both to [`coverage_mask`](@ref), and turns the answer into the positions themselves, so a fold that draws over assets draws over the live ones and never over a column it could not have traded.
+
+Four methods, and both branches are dispatch rather than a condition. The two data-level methods differ only in how the numeric matrix is reached: a returns carrier holds it directly, and a price carrier holds a `TimeArray`. The two mask-level methods take the `nothing` sentinel of an all-covered window and the mask of a gapped one.
+
+An all-dead window throws an `IsEmptyError` where the mask is derived.
+
+# Algorithm
+
+ 1. Derive the Coverage Universe of the window's asset matrix and its panel with [`coverage_mask`](@ref).
+ 2. Return every position of the asset axis on the `nothing` sentinel.
+ 3. Return `findall(cmsk)` otherwise.
+
+# Arguments
+
+  - `data`: Returns-level or price-level data ([`Prices_RR`](@ref)).
+  - `cmsk`: The Coverage Universe, or `nothing`.
+  - `N`: The number of assets of the window.
+
+# Validation
+
+  - At least one asset must be in the Coverage Universe of the window.
+
+# Returns
+
+  - `live::Vector{Int}`: The positions of the covered assets, in increasing order.
+
+# Related
+
+  - [`cv_nobs`](@ref)
+  - [`coverage_mask`](@ref)
+  - [`MultipleRandomised`](@ref)
+"""
+function cv_live_assets(rd::AbstractReturnsResult)
+    return cv_live_assets(coverage_mask(rd.X, rd.pnl; dims = 1), size(rd.X, 2))
+end
+function cv_live_assets(pr::AbstractPricesResult)
+    X = TimeSeries.values(pr.X)
+    return cv_live_assets(coverage_mask(X, pr.pnl; dims = 1), size(X, 2))
+end
+cv_live_assets(::Nothing, N::Integer) = collect(one(N):N)
+cv_live_assets(cmsk::BitVector, ::Integer) = findall(cmsk)
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Return the timestamp vector aligned with the observation rows of `data`, or `nothing` when it has none.
 
 # Arguments
@@ -1148,6 +1194,10 @@ risk under `r`. Paths where any fold returned a non-success retcode are excluded
 
   - `Vector{MultiPeriodPredictionResult}`: Sorted vector of successful path predictions.
 
+## A non-finite measure is last, whatever `rev` is
+
+A path whose measure is not finite is placed **after** every finite one, under both directions of the ranking. A sort that put it first under one direction would make it the answer of a `first`, and a non-finite number is not a best. The finite members are sorted among themselves, and the non-finite ones keep their own order at the tail.
+
 ## A mixed vector is refused here, and accepted by its sibling
 
 The ranking direction comes from [`bigger_is_better`](@ref), which **throws** on a vector whose elements disagree on polarity, because the flag decides which tail of the ranking is best and neither answer would be right. [`quantile_by_measure`](@ref) takes an explicit `sign` instead, so it admits a mixed vector.
@@ -1162,7 +1212,10 @@ The ranking direction comes from [`bigger_is_better`](@ref), which **throws** on
 function sort_by_measure(ppred::PopulationPredictionResult, r::BaseRM_VecBaseRM; kwargs...)
     pred = filter(x -> all(y -> isa(y.res.retcode, OptimisationSuccess), x.pred),
                   ppred.pred)
-    return sort(pred; by = x -> expected_risk(r, x; kwargs...), rev = bigger_is_better(r))
+    rks = [expected_risk(r, x; kwargs...) for x in pred]
+    fin = isfinite.(rks)
+    idx = findall(fin)
+    return [pred[idx[sortperm(rks[idx]; rev = bigger_is_better(r))]]; pred[findall(!, fin)]]
 end
 """
     quantile_by_measure(ppred::PopulationPredictionResult, r::BaseRM_VecBaseRM, q::Real;
@@ -1184,6 +1237,10 @@ Select the successful path in `ppred` whose expected risk under `r` is closest t
 
   - [`MultiPeriodPredictionResult`](@ref): The path closest to the `q`-th quantile.
 
+## The quantile is taken over the finite members
+
+A path whose measure is not finite takes no part: it is dropped before the quantile, so one failed path cannot make the quantile itself non-finite and cannot be returned as the answer. A population in which no member has a finite measure reaches `Statistics.quantile` with an empty vector, which refuses.
+
 ## A mixed vector is accepted here, and refused by its sibling
 
 [`sort_by_measure`](@ref) calls [`bigger_is_better`](@ref) for its `rev` flag, so it **throws** on a vector whose elements disagree on polarity. This function takes an explicit `sign` instead, so the caller has already supplied the one thing `bigger_is_better` cannot infer, and a mixed vector is admitted.
@@ -1200,6 +1257,9 @@ function quantile_by_measure(ppred::PopulationPredictionResult, r::BaseRM_VecBas
     pred = filter(x -> all(y -> isa(y.res.retcode, OptimisationSuccess), x.pred),
                   ppred.pred)
     rks = [sign*expected_risk(r, p; r_kwargs...) for p in pred]
+    fin = findall(isfinite, rks)
+    rks = rks[fin]
+    pred = pred[fin]
     rkq = Statistics.quantile(rks, q; q_kwargs...)
     rk_min = typemax(eltype(rks))
     idx = 1

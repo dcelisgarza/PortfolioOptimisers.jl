@@ -640,6 +640,8 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Select the assets a [`ScoreSelector`](@ref) keeps: score every asset, then apply the rule.
 
+[`fit_preprocessing`](@ref) reduces the training window to its Coverage Universe first, so the ranking is among live assets alone and a dead column never takes a place in it. [`asset_scores`](@ref) keeps its refusal: a non-finite score computed from a live column is a defect of the measure, not a gap in the data.
+
 # Algorithm
 
  1. Score every asset column of `rd.X` with the selector's `score`, using [`asset_scores`](@ref).
@@ -668,11 +670,13 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Asset selector that drops every asset column holding a `NaN` observation.
+Asset selector that keeps the Coverage Universe of the training window, and drops every other asset column.
 
 The returns-level counterpart of [`MissingDataFilter`](@ref)'s column threshold, for pipelines fed returns data directly (where the price stages never run). It has no observation-dropping mode: a fitted selector cannot decide which rows of an unseen window to drop without breaking the weights/returns alignment.
 
-A returns carrier binds `X` to a matrix of numbers, so a `missing` never reaches this selector: [`ReturnsResult`](@ref) rejects a `Matrix{Union{Missing, Float64}}` at construction. [`find_complete_indices`](@ref) reads both sentinels, and [`MissingDataFilter`](@ref) removes a `missing` from the price data upstream.
+Every selector of the family is fitted on the Coverage Universe, so this one is the **identity** on the window it receives, and it is the explicit step that asks for the reduction and for nothing else. It drops an asset whose return is non-finite at any row of the window, and an asset the [`AssetPanel`](@ref) reports inactive at any row of it.
+
+A returns carrier binds `X` to a matrix of numbers, so a `missing` never reaches this selector: [`ReturnsResult`](@ref) rejects a `Matrix{Union{Missing, Float64}}` at construction. [`MissingDataFilter`](@ref) removes a `missing` from the price data upstream.
 
 # Constructors
 
@@ -697,13 +701,15 @@ struct CompleteAssetSelector <: AbstractAssetSelector end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Select the assets a [`CompleteAssetSelector`](@ref) keeps: the asset columns that hold no `NaN`.
+Select the assets a [`CompleteAssetSelector`](@ref) keeps: **every** asset column of the reduced window.
+
+This selector is the identity on the Coverage Universe. [`fit_preprocessing`](@ref) reduces the training window before it calls this method, so the columns that reach here are already the ones that are finite at every row and active at every row of the [`AssetPanel`](@ref). The dropping is the funnel's, and this selector is the explicit step that asks for it and for nothing else.
+
+Reading the panel's active mask is what the reduction adds: a stale finite price during an inactive spell leaves the asset out, where the released selector, which read finiteness alone, kept it.
 
 # Algorithm
 
- 1. Start from a keep-mask of `size(rd.X, 2)` falses.
- 2. Find the asset columns of `rd.X` that hold neither a `missing` nor a `NaN`, with [`find_complete_indices`](@ref) along the observation axis.
- 3. Set the mask at those columns, and return it.
+ 1. Return a keep-mask of `size(rd.X, 2)` trues.
 
 # Arguments
 
@@ -712,17 +718,16 @@ Select the assets a [`CompleteAssetSelector`](@ref) keeps: the asset columns tha
 
 # Returns
 
-  - `keep::BitVector`: Mask `assets × 1` that is `true` for every complete asset column.
+  - `keep::BitVector`: Mask `assets × 1` that is `true` at every column of the reduced window.
 
 # Related
 
   - [`CompleteAssetSelector`](@ref)
-  - [`find_complete_indices`](@ref)
+  - [`fit_preprocessing`](@ref)
+  - [`coverage_mask`](@ref)
 """
 function select_assets(::CompleteAssetSelector, rd::AbstractReturnsResult)::BitVector
-    keep = falses(size(rd.X, 2))
-    keep[find_complete_indices(rd.X; dims = 1)] .= true
-    return keep
+    return trues(size(rd.X, 2))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1404,6 +1409,8 @@ end
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Select the assets a [`RedundancySelector`](@ref) keeps: score every asset when a score is given, then apply the redundancy algorithm.
+
+[`fit_preprocessing`](@ref) reduces the training window to its Coverage Universe first, so the correlation, the clustering and the survivor rule all read live columns alone, and a dead column never joins a group nor wins one.
 
 # Algorithm
 

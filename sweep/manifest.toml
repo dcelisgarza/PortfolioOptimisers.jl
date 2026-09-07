@@ -134,7 +134,7 @@
 "src/08_Moments/47_CrossSectionalExposureDiagnostics.jl" = { map = 3, units = 22, swept = false }
 "src/08_Moments/48_FactorModelSummary.jl" = { map = 3, units = 16, swept = false }
 "src/08_Moments/49_CrossSectionalIdiosyncraticDiagnostics.jl" = { map = 3, units = 15, swept = false }
-"src/08_Moments/50_CoverageUniverse.jl" = { map = 3, units = 22, swept = false }
+"src/08_Moments/50_CoverageUniverse.jl" = { map = 3, units = 23, swept = false }
 "src/08_Moments/51_ExpWeightedExpectedReturns.jl" = { map = 3, units = 13, swept = false }
 "src/08_Moments/52_ExpWeightedVariance.jl" = { map = 3, units = 17, swept = false }
 "src/08_Moments/53_ExpWeightedCovariance.jl" = { map = 3, units = 17, swept = false }
@@ -237,7 +237,7 @@
 "src/19_RiskMeasures/27_ExpectedRisk.jl" = { map = 9, units = 22, swept = false }
 "src/19_RiskMeasures/28_RiskMeasureTools.jl" = { map = 9, units = 7, swept = false }
 "src/20_Optimisation/01_Base_Optimisation.jl" = { map = 10, units = 122, swept = false }
-"src/20_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl" = { map = 12, units = 60, swept = false }
+"src/20_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl" = { map = 12, units = 61, swept = false }
 "src/20_Optimisation/02_CrossValidation/02_KFold.jl" = { map = 12, units = 4, swept = false }
 "src/20_Optimisation/02_CrossValidation/03_Combinatorial.jl" = { map = 12, units = 12, swept = false }
 "src/20_Optimisation/02_CrossValidation/04_WalkForward.jl" = { map = 12, units = 20, swept = false }
@@ -245,7 +245,7 @@
 "src/20_Optimisation/02_CrossValidation/06_Validation.jl" = { map = 12, units = 1, swept = false }
 "src/20_Optimisation/02_CrossValidation/07_Scoring.jl" = { map = 12, units = 6, swept = false }
 "src/20_Optimisation/02_CrossValidation/08_OptimisationCrossValidation.jl" = { map = 12, units = 2, swept = false }
-"src/20_Optimisation/02_CrossValidation/09_Base_SearchCrossValidation.jl" = { map = 12, units = 15, swept = false }
+"src/20_Optimisation/02_CrossValidation/09_Base_SearchCrossValidation.jl" = { map = 12, units = 16, swept = false }
 "src/20_Optimisation/02_CrossValidation/10_GridSearchCrossValidation.jl" = { map = 12, units = 3, swept = false }
 "src/20_Optimisation/02_CrossValidation/11_RandomisedSearchCrossValidation.jl" = { map = 12, units = 2, swept = false }
 "src/20_Optimisation/03_NaiveOptimisation.jl" = { map = 10, units = 19, swept = false }

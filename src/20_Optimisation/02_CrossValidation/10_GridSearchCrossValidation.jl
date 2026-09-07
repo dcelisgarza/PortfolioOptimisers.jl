@@ -73,14 +73,18 @@ Performs grid search cross-validation for portfolio optimisation estimators. Ite
   - Applies cross-validation splits to the returns data.
   - Fits the estimator for each parameter set and split.
   - Scores each configuration using the specified risk measure and scoring function.
-  - Selects the optimal parameter set based on cross-validation scores.
-  - Returns a result object encapsulating the optimal estimator and score matrices.
+  - Selects the optimal parameter set based on cross-validation scores, through [`finite_candidate_index`](@ref): the scorer is handed the candidates that finished every fold, and a candidate that failed one can never win. The result keeps the **raw** score matrix, so its columns line up with the grid and a reader sees which fold failed.
 
 # Related
 
+  - [`finite_candidate_index`](@ref)
+
   - [`NonFiniteAllocationOptimisationEstimator`](@ref)
+
   - [`RandomisedSearchCrossValidation`](@ref)
+
   - [`ReturnsResult`](@ref)
+
   - [`GridSearchCrossValidation`](@ref)
 """
 function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
@@ -112,7 +116,7 @@ function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
             end
         end
     end
-    opt_idx = gscv.scorer(test_scores)
+    opt_idx = finite_candidate_index(gscv.scorer, test_scores)
     opt_lens = lens_grid[opt_idx]
     opt_vals = val_grid[opt_idx]
     for (lens, val) in zip(opt_lens, opt_vals)
@@ -136,7 +140,8 @@ per-path instead: for each candidate the whole scheme is run through [`fit_and_p
 (splits fitted, groups recombined by [`sort_predictions!`](@ref) into a
 [`PopulationPredictionResult`](@ref)), and [`expected_risk`](@ref) yields one score per path.
 The score matrix is therefore `n_paths × n_candidates`; the scorer selects across candidates
-exactly as for the other schemes. The randomised form delegates here through its grid.
+exactly as for the other schemes, through [`finite_candidate_index`](@ref), so a candidate that
+failed a path can never win. The randomised form delegates here through its grid.
 
 `train_scores` (only when `gscv.train_score`) keeps every per-fold in-sample score rather than
 collapsing to one number per path: it is a `Vector` of `n_paths` matrices, one per path, each
@@ -146,6 +151,7 @@ returns pool into a single series, whereas its folds train on distinct in-sample
 # Related
 
   - [`CombinatorialCrossValidation`](@ref)
+  - [`finite_candidate_index`](@ref)
   - [`fit_and_predict`](@ref)
   - [`expected_risk`](@ref)
   - [`search_cross_validation`](@ref)
@@ -185,7 +191,7 @@ function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
             end
         end
     end
-    opt_idx = gscv.scorer(test_scores)
+    opt_idx = finite_candidate_index(gscv.scorer, test_scores)
     for (lens, val) in zip(lens_grid[opt_idx], val_grid[opt_idx])
         opt = Accessors.set(opt, lens, val)
     end

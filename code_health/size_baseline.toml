@@ -28,7 +28,7 @@ commit = "97e398ef74"
 "src/02_Tools.jl" = { code = 808, doc = 2044, comment = 46, blank = 867, total = 3765 }
 "src/03_InputData/01_AssetPanel.jl" = { code = 373, doc = 680, comment = 0, blank = 330, total = 1383 }
 "src/03_InputData/02_AssetPanelBuilder.jl" = { code = 281, doc = 608, comment = 0, blank = 270, total = 1159 }
-"src/03_InputData/03_Preprocessing.jl" = { code = 663, doc = 1285, comment = 11, blank = 535, total = 2494 }
+"src/03_InputData/03_Preprocessing.jl" = { code = 664, doc = 1287, comment = 11, blank = 540, total = 2502 }
 "src/03_InputData/04_CrossSectionalTransforms.jl" = { code = 464, doc = 708, comment = 0, blank = 334, total = 1506 }
 "src/03_InputData/05_FeatureSelector.jl" = { code = 186, doc = 277, comment = 0, blank = 143, total = 606 }
 "src/04_PosdefMatrix.jl" = { code = 44, doc = 155, comment = 0, blank = 73, total = 272 }
@@ -204,7 +204,7 @@ commit = "97e398ef74"
 "src/19_RiskMeasures/27_ExpectedRisk.jl" = { code = 259, doc = 434, comment = 25, blank = 200, total = 918 }
 "src/19_RiskMeasures/28_RiskMeasureTools.jl" = { code = 84, doc = 95, comment = 0, blank = 51, total = 230 }
 "src/20_Optimisation/01_Base_Optimisation.jl" = { code = 891, doc = 1675, comment = 13, blank = 835, total = 3414 }
-"src/20_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl" = { code = 560, doc = 985, comment = 30, blank = 394, total = 1969 }
+"src/20_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl" = { code = 575, doc = 1012, comment = 30, blank = 412, total = 2029 }
 "src/20_Optimisation/02_CrossValidation/02_KFold.jl" = { code = 77, doc = 112, comment = 0, blank = 47, total = 236 }
 "src/20_Optimisation/02_CrossValidation/03_Combinatorial.jl" = { code = 251, doc = 290, comment = 7, blank = 121, total = 669 }
 "src/20_Optimisation/02_CrossValidation/04_WalkForward.jl" = { code = 318, doc = 420, comment = 0, blank = 158, total = 896 }

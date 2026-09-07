@@ -50,7 +50,11 @@ Defines the interface for scoring strategies used in search cross-validation. Im
 
 ## Returns
 
-  - `Int`: Index of the optimal parameter set.
+  - `Int`: Index of the optimal parameter set, **as a position in the matrix the scorer received**.
+
+## A scorer never sees a failed candidate
+
+[`finite_candidate_index`](@ref) hands the scorer the columns whose every entry is finite, and maps the index back to the parameter grid itself. A scorer therefore reads a matrix of finite numbers alone, and it may compute anything on it — a mean, a spread, a rank — without a candidate that failed a fold winning. The matrix a scorer receives is a *view* of the score matrix, and its column count can be smaller than the grid, so a scorer must return a position in that view and must not index the grid itself.
 
 # Examples
 
@@ -451,6 +455,51 @@ julia> scorer(scores)
 struct HighestMeanScore <: CrossValidationSearchScorer end
 function (s::HighestMeanScore)(X::MatNum; dims::Integer = 1)
     return argmax(dropdims(mean(X; dims = dims); dims = dims))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Choose the winning candidate of a search, and never let a failed one win.
+
+A candidate that did not finish every fold carries a non-finite entry in its column of the score matrix, and `argmax` over `[0.80, NaN, 0.50]` returns the position of the `NaN`. So the scorer is handed the columns whose **every** entry is finite, and the index it returns — a position in the matrix it received — is mapped back to the grid through the list of those columns.
+
+The scorer therefore never sees a failed candidate, and it may compute anything on the matrix it receives: a mean, a spread, a rank. A `-Inf` substitution would be safe only for a scorer that reads order alone, because a column holding `-Inf` gives `NaN` for a spread and the `NaN` wins again.
+
+The **raw** matrix stays on the result, so its columns line up with the grid and a reader sees which fold failed.
+
+# Algorithm
+
+ 1. Mark the columns of `test_scores` whose every entry is finite.
+ 2. Throw an `IsNonFiniteError` when no column is finite.
+ 3. Call `scorer` on the view of `test_scores` at the finite columns.
+ 4. Return the finite column the index the scorer gave names.
+
+# Arguments
+
+  - `scorer`: The search scorer ([`CrossValSearchScorer`](@ref)).
+  - `test_scores`: The `folds × candidates`, or `paths × candidates`, score matrix.
+
+# Validation
+
+  - At least one candidate must have finished every fold.
+
+# Returns
+
+  - `opt_idx::Integer`: The position of the winning candidate in the parameter grid.
+
+# Related
+
+  - [`CrossValidationSearchScorer`](@ref)
+  - [`CrossValSearchScorer`](@ref)
+  - [`search_cross_validation`](@ref)
+  - [`IsNonFiniteError`](@ref)
+"""
+function finite_candidate_index(scorer::CrossValSearchScorer, test_scores::MatNum)
+    finite = vec(all(isfinite, test_scores; dims = 1))
+    @argcheck(any(finite),
+              IsNonFiniteError("no parameter set finished every fold: every one of the $(size(test_scores, 2)) columns of the score matrix holds a non-finite entry over its $(size(test_scores, 1)) rows. Every candidate failed a fold, so none can be compared; widen the grid, or find why the folds failed."))
+    cols = findall(finite)
+    return cols[scorer(view(test_scores, :, cols))]
 end
 """
 $(DocStringExtensions.TYPEDEF)

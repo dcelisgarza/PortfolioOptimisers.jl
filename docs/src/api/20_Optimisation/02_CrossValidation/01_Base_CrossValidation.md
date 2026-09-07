@@ -53,5 +53,6 @@ warn_ruined_members
 fold_loop
 assert_unshuffled_folds
 cv_nobs
+cv_live_assets
 cv_timestamps
 ```

@@ -264,7 +264,7 @@ end
     @test res.w[k] == 0
     res_all = optimise(MeanRisk(; opt = JuMPOptimiser(; pe = pr, slv = slv)), rd)
     @test isnothing(PO.result_investable_mask(res_all))
-    # The three families that carry the mask on the result itself answer it directly. The
+    # Every family that carries the mask on the result itself answers it directly. The
     # results are built by hand, because the verb is what the fold reads and a family that
     # gains a mask must answer it whatever route built the result.
     nres = NaiveOptimisationResult(; pr = prk, wb = nothing,
@@ -292,6 +292,18 @@ end
                                                    ro = Variance(), scai = SumScalariser(),
                                                    scao = SumScalariser(), fb = nothing)
     @test PO.result_investable_mask(herc) == imsk
+    ncres = NestedClusteredResult(; pr = prk, clr = nothing, wb = nothing, fees = nothing,
+                                  resi = [nres], reso = nres, cv = nothing,
+                                  retcode = OptimisationSuccess(), w = w_keep, imsk = imsk,
+                                  fb = nothing)
+    @test PO.result_investable_mask(ncres) == imsk
+    scres = SchurComplementHierarchicalRiskParityResult(; pr = prk, wb = nothing,
+                                                        clr = nothing, r = Variance(),
+                                                        gamma = 0.5,
+                                                        retcode = OptimisationSuccess(),
+                                                        w = w_keep, imsk = imsk,
+                                                        fb = nothing)
+    @test PO.result_investable_mask(scres) == imsk
 end
 
 #=
