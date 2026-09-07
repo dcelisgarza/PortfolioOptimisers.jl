@@ -56,7 +56,12 @@ end
             if x.head === :. && length(x.args) == 2 && isa(x.args[2], QuoteNode)
                 return normex(x.args[2].value)   # drop the module qualification
             end
-            return Expr(x.head, map(normex, x.args)...)
+            # Drop the line numbers. A default that spans several lines parses to a block
+            # carrying a `LineNumberNode` per line, and the node prints as `#= none:376 =#`.
+            # The source and the docstring never sit on the same line, so a comparison that
+            # keeps the nodes can never match a multi-line default.
+            args = filter(a -> !isa(a, LineNumberNode), x.args)
+            return Expr(x.head, map(normex, args)...)
         elseif isa(x, QuoteNode)
             return QuoteNode(normex(x.value))
         elseif isa(x, Symbol)

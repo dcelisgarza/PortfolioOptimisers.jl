@@ -240,7 +240,7 @@ $(DocStringExtensions.FIELDS)
     RegimeAdjustedExpWeightedCovariance(;
         decay::Number                                         = exp2(-inv(40.0)),
         cor_decay::Option{<:Number}                           = nothing,
-        min_obs::Integer                                      = round(Int, max(1, inv(log2(inv(decay))))),
+        min_obs::Integer                                      = round(Int, max(1, inv(log2(inv(decay))), isnothing(cor_decay) ? 1 : inv(log2(inv(cor_decay))))),
         hac_lags::Option{<:Integer}                           = nothing,
         regime_method::Option{<:RegimeAdjustedMethod}         = FirstMomentRegimeAdjusted(),
         regime_decay::Number                                  = exp2(-2 / inv(log2(inv(decay)))),
