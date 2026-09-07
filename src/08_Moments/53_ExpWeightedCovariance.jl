@@ -5,6 +5,8 @@ Estimates a covariance matrix by an exponentially weighted recursion that freeze
 
 Each observation updates the sub-block of the assets that are valid at it, so a gap never reaches an entry it did not touch. The recursion is seeded at zero, and the output divides out the damping that the cold start costs through a congruence transform, which keeps the state positive semidefinite and leaves every correlation unchanged.
 
+Keeping a young asset investable has a cost the prior pays for it. A prior fitted with this estimator zero-fills the rows the asset was missing through [`scenario_fill`](@ref), because every consumer of a Prior Result reads its returns matrix; a scenario-based measure then reads a zero return where the asset had none and understates that asset's risk over those rows, while the covariance stays the estimate this recursion made from the rows it saw. The fill is silent at or below [`SCENARIO_FILL_LIMIT`](@ref), warns above it, and refuses any fill under `strict`.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -67,6 +69,8 @@ julia> ce.min_obs
   - [`ExpWeightedVariance`](@ref)
   - [`RegimeAdjustedExpWeightedCovariance`](@ref)
   - [`partial_fit!`](@ref)
+  - [`scenario_fill`](@ref)
+  - [`SCENARIO_FILL_LIMIT`](@ref)
 """
 @concrete struct ExpWeightedCovariance <: AbstractCovarianceEstimator
     """

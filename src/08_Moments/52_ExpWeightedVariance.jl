@@ -5,6 +5,8 @@ Estimates per-asset variance by an exponentially weighted recursion that freezes
 
 The recursion is seeded at zero, so a newly listed asset starts from a cold state and the output divides out the damping that the cold start costs. An asset below `min_obs` valid observations is `NaN`, and so is an asset that the active mask leaves inactive at the last observation.
 
+Keeping a young asset investable has a cost the prior pays for it. A prior fitted with this estimator zero-fills the rows the asset was missing through [`scenario_fill`](@ref), because every consumer of a Prior Result reads its returns matrix; a scenario-based measure then reads a zero return where the asset had none and understates that asset's risk over those rows, while the variance stays the estimate this recursion made from the rows it saw. The fill is silent at or below [`SCENARIO_FILL_LIMIT`](@ref), warns above it, and refuses any fill under `strict`.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -65,6 +67,8 @@ julia> ce.min_obs
   - [`ExpWeightedCovariance`](@ref)
   - [`RegimeAdjustedExpWeightedVariance`](@ref)
   - [`partial_fit!`](@ref)
+  - [`scenario_fill`](@ref)
+  - [`SCENARIO_FILL_LIMIT`](@ref)
 """
 @concrete struct ExpWeightedVariance <: AbstractVarianceEstimator
     """

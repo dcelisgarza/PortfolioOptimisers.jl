@@ -317,6 +317,13 @@ multiplier stays at one and the estimator is the plain exponentially weighted re
 is what a consumer needs when it reads a volatility rather than a regime-scaled risk figure,
 and [`EWVolatility`](@ref) is the one in the library.
 
+This estimator is mask-aware, so a prior fitted with it keeps a young asset investable and
+zero-fills the rows the asset was missing through [`scenario_fill`](@ref): every consumer of a
+Prior Result reads its returns matrix, and a scenario-based measure then reads a zero return
+where the asset had none and understates that asset's risk over those rows, while the variance
+stays the estimate this recursion made from the rows it saw. The fill is silent at or below
+[`SCENARIO_FILL_LIMIT`](@ref), warns above it, and refuses any fill under `strict`.
+
 # Mathematical definition
 
 EWM variance update (decay ``\\lambda``):
@@ -417,6 +424,8 @@ julia> ce.min_obs
   - [`RootMeanSquaredAdjusted`](@ref)
   - [`AbstractVarianceEstimator`](@ref)
   - [`partial_fit!`](@ref)
+  - [`scenario_fill`](@ref)
+  - [`SCENARIO_FILL_LIMIT`](@ref)
 """
 @concrete struct RegimeAdjustedExpWeightedVariance <: AbstractVarianceEstimator
     """

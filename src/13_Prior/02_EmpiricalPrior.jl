@@ -110,7 +110,7 @@ end
 """
     prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing}, X::MatNum,
           F::Option{<:MatNum} = nothing, pnl::Option{<:AssetPanel} = nothing;
-          dims::Int = 1, kwargs...)
+          dims::Int = 1, strict::Bool = false, kwargs...)
 
 Compute empirical prior moments for asset returns (no horizon adjustment).
 
@@ -138,6 +138,10 @@ Every choice inside `pe.me` and `pe.ce` reaches the result. A shrunk mean and a 
 
 This method takes the **arithmetic** moments of `X` directly. It applies no log transform, so it is not the ``h = 1`` case of the horizon method: that one still passes through ``\\log(1 + x_t)`` and back, and the round trip is an identity only in the limit of small returns.
 
+# The scenario fill
+
+Under a **mask-aware** `pe.me` and `pe.ce` — the exponentially weighted family — an asset that lists inside the window is answered from the observations it has, so it is investable and its column of `X` still carries a `NaN` at every earlier row. [`scenario_fill`](@ref) writes `0` at those entries once, so that every consumer of the result reads a finite investable column; a non-investable asset keeps its whole `NaN` column, and `mu` and `sigma` are untouched. The fill costs accuracy in one place: a scenario-based measure reads a zero return where the asset had none, and understates that asset's risk over the filled rows. It is silent while the filled share stays at or below [`SCENARIO_FILL_LIMIT`](@ref), warns above it, and refuses any fill under `strict`. Under a **plain** estimator the fill never fires, because an asset the estimator could not cover leaves the Coverage Universe and is not investable.
+
 # Arguments
 
   - `pe`: Empirical prior estimator.
@@ -145,12 +149,14 @@ This method takes the **arithmetic** moments of `X` directly. It applies no log 
   - `F`: Factor returns matrix (ignored).
   - $(arg_dict[:pnl_moment])
   - $(arg_dict[:dims])
+  - `strict`: Whether a zero-filled scenario raises rather than warns. Any fill raises under `strict`; otherwise a fill above [`SCENARIO_FILL_LIMIT`](@ref) warns.
   - `kwargs...`: Additional keyword arguments passed to mean and covariance estimators.
 
 # Validation
 
   - `dims in (1, 2)`.
   - At least one asset must be in the Coverage Universe.
+  - The zero-filled share of `X` is at or below [`SCENARIO_FILL_LIMIT`](@ref), else a warning naming the assets is emitted, or an `ArgumentError` naming them is raised under `strict`, which any fill raises.
 
 # Returns
 
@@ -162,19 +168,24 @@ This method takes the **arithmetic** moments of `X` directly. It applies no log 
   - [`LowOrderPrior`](@ref)
   - [`prior`](@ref)
   - [`coverage_mask`](@ref)
+  - [`scenario_fill`](@ref)
+  - [`SCENARIO_FILL_LIMIT`](@ref)
 """
 function prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing}, X::MatNum,
                ::Option{<:MatNum} = nothing, pnl::Option{<:AssetPanel} = nothing;
-               dims::Int = 1, kwargs...)
+               dims::Int = 1, strict::Bool = false, kwargs...)
     X = dims_oriented(dims, X)
     mu = vec(Statistics.mean(pe.me, X, pnl; dims = 1, kwargs...))
     sigma = Statistics.cov(pe.ce, X, pnl; dims = 1, kwargs...)
-    return LowOrderPrior(; X = X, mu = mu, sigma = sigma)
+    # A mask-aware estimator answers a young asset from the rows it has, so the asset is
+    # investable and its column still carries the gap. The fill is paid once, here, because
+    # every consumer of the result reads that column (see [`scenario_fill`](@ref)).
+    return LowOrderPrior(; X = scenario_fill(X, mu, sigma, strict), mu = mu, sigma = sigma)
 end
 """
     prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number}, X::MatNum,
           F::Option{<:MatNum} = nothing, pnl::Option{<:AssetPanel} = nothing;
-          dims::Int = 1, kwargs...)
+          dims::Int = 1, strict::Bool = false, kwargs...)
 
 Compute empirical prior moments for asset returns with investment horizon adjustment.
 
@@ -219,7 +230,11 @@ The order of steps 5 to 7 is **not free**. Step 6 reads the `mu` that step 5 lef
  5. Overwrite `mu` with the exponential of the first closed form. This is the arithmetic mean **plus one**, because the subtraction is still to come.
  6. Overwrite `sigma` with the second closed form, whose ``\\hat{\\mu}_i + 1`` factors are the `mu` of step 5.
  7. Subtract one from `mu`, giving ``\\hat{\\boldsymbol{\\mu}}``.
- 8. Return a [`LowOrderPrior`](@ref) carrying the arithmetic `X` of step 1, `mu` and `sigma`.
+ 8. Return a [`LowOrderPrior`](@ref) carrying the arithmetic `X` of step 1 under [`scenario_fill`](@ref), `mu` and `sigma`.
+
+# The scenario fill
+
+Step 8 takes the same fill the no-horizon method takes, on the **arithmetic** `X` the caller handed in and against the arithmetic moments the result carries. Under a mask-aware `pe.me` and `pe.ce` an asset that lists inside the window is investable and its column still carries a `NaN` at every earlier row; [`scenario_fill`](@ref) writes `0` there once, silently at or below [`SCENARIO_FILL_LIMIT`](@ref), with a warning above it, and refuses any fill under `strict`. A scenario-based measure then understates that asset's risk over the filled rows, and `mu` and `sigma` are untouched.
 
 # Arguments
 
@@ -228,12 +243,14 @@ The order of steps 5 to 7 is **not free**. Step 6 reads the `mu` that step 5 lef
   - `F`: Factor returns matrix (ignored).
   - $(arg_dict[:pnl_moment])
   - $(arg_dict[:dims])
+  - `strict`: Whether a zero-filled scenario raises rather than warns. Any fill raises under `strict`; otherwise a fill above [`SCENARIO_FILL_LIMIT`](@ref) warns.
   - `kwargs...`: Additional keyword arguments passed to mean and covariance estimators.
 
 # Validation
 
   - `dims in (1, 2)`.
   - At least one asset must be in the Coverage Universe.
+  - The zero-filled share of `X` is at or below [`SCENARIO_FILL_LIMIT`](@ref), else a warning naming the assets is emitted, or an `ArgumentError` naming them is raised under `strict`, which any fill raises.
 
 # Returns
 
@@ -245,10 +262,12 @@ The order of steps 5 to 7 is **not free**. Step 6 reads the `mu` that step 5 lef
   - [`LowOrderPrior`](@ref)
   - [`prior`](@ref)
   - [`coverage_mask`](@ref)
+  - [`scenario_fill`](@ref)
+  - [`SCENARIO_FILL_LIMIT`](@ref)
 """
 function prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number}, X::MatNum,
                ::Option{<:MatNum} = nothing, pnl::Option{<:AssetPanel} = nothing;
-               dims::Int = 1, kwargs...)
+               dims::Int = 1, strict::Bool = false, kwargs...)
     X = dims_oriented(dims, X)
     X_log = log1p.(X)
     mu = vec(Statistics.mean(pe.me, X_log, pnl; dims = 1, kwargs...))
@@ -258,7 +277,9 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number}, X::MatNum,
     mu .= exp.(mu + 0.5 * LinearAlgebra.diag(sigma))
     sigma .= (mu ⊗ mu) ⊙ (exp.(sigma) .- one(eltype(sigma)))
     mu .-= one(eltype(mu))
-    return LowOrderPrior(; X = X, mu = mu, sigma = sigma)
+    # The fill is on the arithmetic `X` the caller handed in, and it is taken after step 7,
+    # because the Investable Mask is read off the arithmetic moments the result carries.
+    return LowOrderPrior(; X = scenario_fill(X, mu, sigma, strict), mu = mu, sigma = sigma)
 end
 
 function factor_residual_config(::EmpiricalPrior)

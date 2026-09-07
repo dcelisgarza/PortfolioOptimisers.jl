@@ -1447,6 +1447,119 @@ function investable_mask(pr::AbstractPriorResult)::Option{BitVector}
     return all(imsk) ? nothing : imsk
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Find the entries a mask-aware prior fills: the non-finite returns of an **investable** asset.
+
+A non-investable asset keeps its whole `NaN` column, because the Investable Mask is derived from that gap and filling it would erase the mask. Only a column whose moments came back finite is filled.
+
+# Arguments
+
+  - `X`: Asset returns, `observations × assets`.
+  - `imsk`: The Investable Mask, `true` at every asset whose prior moments were finite.
+
+# Returns
+
+  - `filled::Vector{Tuple{Int, Int}}`: The `(observation, asset)` pairs to fill, asset-major.
+
+# Related
+
+  - [`scenario_fill`](@ref)
+  - [`scenario_fill_msg`](@ref)
+  - [`investable_mask`](@ref)
+"""
+function scenario_fill_pairs(X::MatNum, imsk::BitVector)
+    return [(t, i) for i in axes(X, 2) if imsk[i] for t in axes(X, 1) if !isfinite(X[t, i])]
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Write the message a scenario fill raises.
+
+The message names the assets, the count of filled pairs, the share of the returns matrix they are and the first observation, so a caller can find the listing that made them, and it states the consequence: a scenario-based measure understates the risk of those assets over the filled rows, while `mu` and `sigma` are untouched.
+
+# Arguments
+
+  - `filled`: The `(observation, asset)` pairs [`scenario_fill_pairs`](@ref) found.
+  - `frac`: The share of the entries of the returns matrix those pairs are.
+
+# Returns
+
+  - `msg::String`: The message.
+
+# Related
+
+  - [`scenario_fill`](@ref)
+  - [`scenario_fill_pairs`](@ref)
+  - [`SCENARIO_FILL_LIMIT`](@ref)
+  - [`strict_diagnostic`](@ref)
+"""
+function scenario_fill_msg(filled::AbstractVector{<:Tuple{Integer, Integer}}, frac::Real)
+    assets = unique(last.(filled))
+    return "a mask-aware prior estimated an asset from the observations it had, and the returns matrix still carries the gap. Assets $(assets) carry a non-finite return at $(length(filled)) (observation, asset) pair(s) of an investable column, $(frac) of the returns matrix against a limit of $(SCENARIO_FILL_LIMIT[]), the first at observation $(first(filled)[1]). Those entries are filled with zero, so a scenario-based measure (CVaR, EVaR, CDaR and their kin) reads a zero return where the asset had no return at all and understates its risk over the filled rows; `mu` and `sigma` are untouched, because the estimator computed them from the rows it saw. Raise the share with `set_scenario_fill_limit!` or `with_scenario_fill_limit` to accept it in silence, pass `strict = true` to refuse any fill, or fit over a window every asset covers."
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the returns matrix with the missing rows of every investable asset filled with zero, and say so above [`SCENARIO_FILL_LIMIT`](@ref).
+
+A mask-aware moment estimator answers a young asset from the observations it has, so the asset is investable and its returns column still carries a `NaN` at every row before it listed. Every consumer of a Prior Result reads that column — the JuMP model, the meta-optimisers and the value-level door among them — so the fill is paid **once**, here, on the estimator's own pass, rather than at each of them (ADR 0118).
+
+A non-investable asset keeps its `NaN` column, so [`investable_mask`](@ref) is unchanged. `mu`, `sigma` and every other block are untouched, because the estimator computed them from the rows it saw.
+
+The fill is a trade: a scenario-based measure reads a zero return where the asset had no return at all, and understates its risk over those rows. Under `strict = false` the trade is silent while the filled share stays at or below [`SCENARIO_FILL_LIMIT`](@ref), and is named through [`strict_diagnostic`](@ref) above it. Under `strict = true` **any** fill refuses, whatever the share. Under the whole-window rule of ADR 0117 a plain estimator never reaches this verb: an asset it could not cover leaves the Coverage Universe and is not investable.
+
+# Algorithm
+
+ 1. Return `X` itself when every entry of `X` is finite, which is every fit over a complete window.
+ 2. Derive the Investable Mask from `mu` and the diagonal of `sigma`, as [`investable_mask`](@ref) does, and find the pairs to fill with [`scenario_fill_pairs`](@ref). Return `X` itself when there are none, which is a gap that belongs to a non-investable asset alone.
+ 3. Take the share of the entries of `X` those pairs are, and report them through [`strict_diagnostic`](@ref) when `strict` holds, or when the share exceeds `SCENARIO_FILL_LIMIT[]`.
+ 4. Return a copy of `X` with zero written at each of those pairs, and the `NaN` of every non-investable asset left where it is.
+
+# Arguments
+
+  - `X`: Asset returns, `observations × assets`.
+  - `mu`: The expected returns the estimator answered, `NaN` at a non-investable asset.
+  - `sigma`: The covariance the estimator answered, `NaN` on the diagonal at a non-investable asset.
+  - `strict`: If `true`, any fill raises an `ArgumentError`; if `false`, a fill above the share warns.
+
+# Validation
+
+  - The filled share is at or below `SCENARIO_FILL_LIMIT[]`, else a warning naming the assets is emitted, or an `ArgumentError` naming them is raised under `strict`, which any fill raises.
+
+# Returns
+
+  - `X::MatNum`: The returns matrix whose investable columns are finite.
+
+# Related
+
+  - [`scenario_fill_pairs`](@ref)
+  - [`scenario_fill_msg`](@ref)
+  - [`SCENARIO_FILL_LIMIT`](@ref)
+  - [`investable_mask`](@ref)
+  - [`strict_diagnostic`](@ref)
+  - [`filter_held_gaps`](@ref)
+"""
+function scenario_fill(X::MatNum, mu::VecNum, sigma::MatNum, strict::Bool)
+    if all(isfinite, X)
+        return X
+    end
+    imsk = isfinite.(mu) .& isfinite.(LinearAlgebra.diag(sigma))
+    filled = scenario_fill_pairs(X, imsk)
+    if isempty(filled)
+        return X
+    end
+    frac = length(filled) / length(X)
+    if strict || frac > SCENARIO_FILL_LIMIT[]
+        strict_diagnostic(scenario_fill_msg(filled, frac), strict)
+    end
+    Xf = copy(X)
+    for (t, i) in filled
+        Xf[t, i] = zero(eltype(Xf))
+    end
+    return Xf
+end
+"""
     held_non_investable(imsk::BitVector, w::VecNum)
     held_non_investable(imsk::BitVector, w::VecVecNum)
     held_non_investable(imsk::BitVector, W::MatNum)

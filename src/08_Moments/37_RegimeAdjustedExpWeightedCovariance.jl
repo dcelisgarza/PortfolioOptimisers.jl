@@ -179,6 +179,13 @@ that type's [`RegimeAdjustedMethod`](@ref) family, and it adds a [`RegimeAdjuste
 which states what the statistic measures: one portfolio direction, the marginal volatilities
 alone, or the whole covariance structure.
 
+This estimator is mask-aware, so a prior fitted with it keeps a young asset investable and
+zero-fills the rows the asset was missing through [`scenario_fill`](@ref): every consumer of a
+Prior Result reads its returns matrix, and a scenario-based measure then reads a zero return
+where the asset had none and understates that asset's risk over those rows, while the covariance
+stays the estimate this recursion made from the rows it saw. The fill is silent at or below
+[`SCENARIO_FILL_LIMIT`](@ref), warns above it, and refuses any fill under `strict`.
+
 A `regime_method` of `nothing` turns the adjustment off: no regime state advances, so the
 multiplier stays at one and the estimator is the plain exponentially weighted recursion.
 
@@ -283,6 +290,8 @@ true
   - [`RegimeAdjustedExpWeightedVariance`](@ref)
   - [`RegimeAdjustedCovarianceState`](@ref)
   - [`partial_fit!`](@ref)
+  - [`scenario_fill`](@ref)
+  - [`SCENARIO_FILL_LIMIT`](@ref)
 """
 @concrete struct RegimeAdjustedExpWeightedCovariance <: AbstractCovarianceEstimator
     """

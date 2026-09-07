@@ -19,7 +19,7 @@ CrossValidationEstimator
 
 ## Configuration
 
-Package-level configuration values (pretty-printing collapse, fuzzy-suggestion distance, equation-parser resource caps) are held in thread-safe [`ScopedConfig`](@ref) holders: a `set_*!` setter swaps the global default atomically, a `with_*` helper overrides it for the dynamic extent of a call (task-scoped, automatically restored), and per-project defaults can be seeded at load time via Preferences.jl.
+Package-level configuration values (pretty-printing collapse, fuzzy-suggestion distance, equation-parser resource caps, the scenario-fill share) are held in thread-safe [`ScopedConfig`](@ref) holders: a `set_*!` setter swaps the global default atomically, a `with_*` helper overrides it for the dynamic extent of a call (task-scoped, automatically restored), and per-project defaults can be seeded at load time via Preferences.jl.
 
 ```@docs
 ScopedConfig
@@ -37,6 +37,10 @@ assert_resource_cap
 assert_ep_grid_size
 set_resource_limits!
 with_resource_limits
+SCENARIO_FILL_LIMIT
+assert_scenario_fill_limit
+set_scenario_fill_limit!
+with_scenario_fill_limit
 ```
 
 ## Pretty printing
