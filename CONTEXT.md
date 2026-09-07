@@ -674,8 +674,12 @@ Peak-to-trough declines computed from Net Returns, and the input series to drawd
 The composite of holding and trading costs: **long** (management), **short** (borrowing), **turnover** (commission) and **fixed** (a constant charge on any non-zero weight).
 
 **Fee Amortisation**
-The algorithm that spreads a Fees object's one-off terms, turnover and the two fixed charges, over a holding period. `nothing` charges them in full on every observation. A bare form divides by the fold's own length; a stated horizon overrides the fold everywhere the fee is read.
+The algorithm that spreads a Fees object's one-off terms, turnover, the two fixed charges and the two Forced Liquidation charges, over a holding period. `nothing` charges them in full on every observation. A bare form divides by the fold's own length; a stated horizon overrides the fold everywhere the fee is read.
 *Avoid*: fee smoothing, fee spreading, fee timing.
+
+**Forced Liquidation**
+The sale of a position in an asset that has left the Investable Mask. The trade is not chosen, so no turnover bound limits it, and it is not free: a Fees object carries two carriers for it, a proportional one that charges the rate times the absolute previous weight, and a fixed one that charges its amount when the absolute previous weight is not zero. Both are one-off charges and amortise with the turnover term. The carriers hold the previous weights and the rates on the full universe until the optimiser's door reduces the fees, and on the complement of the Investable Mask after it, so a reduced Fees object carries two axes. A fit charges it at its outer level only, never inside a cluster or an inner head, and the fold's realised series and the finite allocation charge it once. See ADR 0121.
+*Avoid*: Turnover, which is the trade the optimiser chooses among investable assets; a Held Gap, which is a missing return on an asset the fold still holds.
 
 **Finite Allocation**
 See §4.7: the discretisation of weights into whole shares within a cash budget.
