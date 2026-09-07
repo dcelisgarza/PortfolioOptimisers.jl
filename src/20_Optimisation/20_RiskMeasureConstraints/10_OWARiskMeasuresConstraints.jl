@@ -28,7 +28,7 @@ function set_owa_constraints!(model::JuMP.Model, X::MatNum; prefix::Symbol = Sym
     return state_build!(model, prefix, :owa) do
         sc = get_constraint_scale(model)
         net_X = set_net_portfolio_returns!(model, X; prefix = prefix)
-        T = size(X, 1)
+        T = get_T(model)
         owa = JuMP.@variable(model, [1:T])
         state_set!(model, prefix, :owac, JuMP.@constraint(model, sc * (net_X - owa) == 0))
         return owa
@@ -105,7 +105,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                args...; prefix::Symbol = Symbol(""), kwargs...)
     sc = get_constraint_scale(model)
     X = pr.X
-    T = size(X, 1)
+    T = get_T(model)
     owa = set_owa_constraints!(model, X; prefix = prefix)
     ovec = range(one(eltype(X)), one(eltype(X)); length = T)
     owa_a, owa_b = JuMP.@variables(model, begin
@@ -191,7 +191,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                args...; prefix::Symbol = Symbol(""), kwargs...)
     sc = get_constraint_scale(model)
     X = pr.X
-    T = size(X, 1)
+    T = get_T(model)
     owa = set_owa_constraints!(model, X; prefix = prefix)
     ovec = range(one(eltype(X)), one(eltype(X)); length = T)
     owa_a, owa_b = JuMP.@variables(model, begin
@@ -304,7 +304,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                kwargs...)
     sc = get_constraint_scale(model)
     X = pr.X
-    T = size(X, 1)
+    T = get_T(model)
     net_X = set_net_portfolio_returns!(model, X; prefix = prefix)
     if !loss
         net_X = -net_X

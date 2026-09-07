@@ -530,6 +530,39 @@ function set_model_scales!(model::JuMP.Model, sc::Number, so::Number)
                       end)
     return nothing
 end
+"""
+    set_model_observations!(model::JuMP.Model, T::Integer)
+
+Register the observation count of the fit as the named entry `model[:T]`.
+
+The sibling of [`set_model_scales!`](@ref), and every head calls it in the same place, before
+any builder runs. The count is a model-wide singleton: one fit produces one returns matrix, and
+its row count is the holding period every builder measures against. Registering it here rather
+than inside a builder means a reader may rely on it whatever the model carries, and
+[`get_T`](@ref) reads it back.
+
+The row count of a **fold**, of a **benchmark**, or of a stacked meta-optimisation panel is a
+different number. A site that means one of those keeps its own `size(..., 1)`.
+
+# Arguments
+
+  - `model::JuMP.Model`: JuMP optimisation model.
+  - `T::Integer`: Observation count of the fit, read back by [`get_T`](@ref).
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`set_model_scales!`](@ref)
+  - [`get_T`](@ref)
+  - [`JuMPOptimiser`](@ref)
+"""
+function set_model_observations!(model::JuMP.Model, T::Integer)
+    shared_set!(model, :T, T)
+    return nothing
+end
 # ---------------------------------------------------------------------------
 # Model-state read interface
 #
@@ -574,6 +607,28 @@ function get_objective_scale(model::JuMP.Model)
     @argcheck(haskey(model, :so),
               ArgumentError("model[:so] (objective scale) has not been registered; call set_model_scales! first"))
     return model[:so]
+end
+"""
+    get_T(model::JuMP.Model)
+
+Return the observation count of the fit, `model[:T]`.
+
+Asserts the count has been registered (via [`set_model_observations!`](@ref)); errors otherwise.
+
+This is the row count of the **fit's own** returns matrix. It is not the row count of a fold, of
+a tracking benchmark, or of a stacked meta-optimisation panel; a site that means one of those
+reads its own matrix instead.
+
+# Related
+
+  - [`set_model_observations!`](@ref)
+  - [`get_constraint_scale`](@ref)
+  - [`get_objective_scale`](@ref)
+"""
+function get_T(model::JuMP.Model)
+    @argcheck(haskey(model, :T),
+              ArgumentError("model[:T] (observation count of the fit) has not been registered; call set_model_observations! first"))
+    return model[:T]
 end
 """
     get_w(model::JuMP.Model)
@@ -965,17 +1020,17 @@ const SHARED_STATE = Set{Symbol}([# Pure functions of the prior `pr`: identical 
                                   :G, :GV, :Gkt, :vals_Akt, :vecs_Akt, :frc_W, :frc_M,
                                   :frc_M_PSD,
                                   # Model-wide singletons established once, before the risk
-                                  # spine runs.
-                                  :sc, :so, :k, :w, :ret, :risk, :fees, :unit_budget,
+                                  # spine runs. `:T` is the observation count of the fit,
+                                  # registered beside `:sc` and `:so` by the head itself, so
+                                  # every builder may rely on it whatever the model carries.
+                                  :sc, :so, :T, :k, :w, :ret, :risk, :fees, :unit_budget,
                                   # The fee spine, established once by the fee builder and
                                   # read by the return and the net-series builders. `:fees`
                                   # holds the per period terms and `:one_time_fees` the two
-                                  # fixed ones, `:fee_fa` names the clock the second falls
-                                  # on, and `:T` is the observation count of the fit, which
-                                  # `add_fees_to_ret!` spreads the one-off cost over. A
-                                  # nested build charges the same fee as its parent, so all
-                                  # four are shared rather than prefixed.
-                                  :one_time_fees, :fee_fa, :T, :decomposition_contract,
+                                  # fixed ones, and `:fee_fa` names the clock the second
+                                  # falls on. A nested build charges the same fee as its
+                                  # parent, so all three are shared rather than prefixed.
+                                  :one_time_fees, :fee_fa, :decomposition_contract,
                                   :mip_indicators, :ss,
                                   # Weight shaping: outer level only. A nested build shifts
                                   # the weights through its own prefixed `:w`; it does not
@@ -1872,7 +1927,7 @@ function set_net_portfolio_returns!(model::JuMP.Model, X::MatNum;
     if haskey(model, :one_time_fees) && !isempty(net)
         # The clock the fee states decides where the two fixed terms land, exactly as
         # `charge_fees` decides it at the value level.
-        net = charge_one_time_fees(model, net, model[:one_time_fees], size(X, 1),
+        net = charge_one_time_fees(model, net, model[:one_time_fees], get_T(model),
                                    model[:fee_fa])
     end
     return state_set!(model, prefix, :net_X, net)

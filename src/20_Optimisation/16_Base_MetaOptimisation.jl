@@ -347,6 +347,9 @@ function prepare_outer_rd(rd::ReturnsResult, wi::MatNum)
     # labels are the synthetic asset names — which is what keeps the square case true one
     # level up.
     pnl = collapse_asset_panel(rd.pnl, wi, rd.nx)
+    # `rd` is the meta-optimiser's own returns result, not a fitted prior, so this row
+    # count is the panel the sub-portfolios were scored over. It is not the model-wide
+    # `:T` a JuMP head registers.
     X = Matrix{eltype(rd.X)}(undef, size(rd.X, 1), size(wi, 2))
     return nb, B, iv, ivpa, pnl, X
 end
@@ -711,6 +714,7 @@ function rebuild_returns_result(rd::ReturnsResult, predictions::VecMPredRes,
     X = reshape(X, :, N)
     # The stacked rows are the fold rows, in fold order. `reshape` above has assumed it
     # since before the feature matrix existed; the recompute below depends on it too.
+    # This count is the folds' own, not the model-wide `:T` of any one sub-portfolio.
     nobs = sum(p -> length(p.rd.X), pred1)
     @argcheck(nobs == size(X, 1),
               DimensionMismatch("the stacked sub-portfolio returns must have one row per cross-validated observation, but the folds cover $(nobs) observations and the stacked returns have $(size(X, 1))"))

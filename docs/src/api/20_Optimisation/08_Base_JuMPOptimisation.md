@@ -32,6 +32,7 @@ add_custom_constraint!
 process_model
 optimise_JuMP_model!
 set_model_scales!
+set_model_observations!
 set_initial_w!
 set_w!
 set_portfolio_returns!
@@ -47,6 +48,7 @@ get_net_X
 get_ddap1
 get_w
 get_objective_scale
+get_T
 get_k
 set_unit_budget!
 is_unit_budget

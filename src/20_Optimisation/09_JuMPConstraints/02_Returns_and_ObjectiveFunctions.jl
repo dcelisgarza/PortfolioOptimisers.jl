@@ -1409,9 +1409,8 @@ function add_fees_to_ret!(model::JuMP.Model, ret, fee::Bool)
     end
     # An expected return is a per period number, so a fee charged one time for the whole
     # holding period enters it divided by the observation count of the fit.
-    if shared_has(model, :one_time_fees) && shared_has(model, :T)
-        JuMP.add_to_expression!(ret,
-                                -shared_get(model, :one_time_fees) / shared_get(model, :T))
+    if shared_has(model, :one_time_fees)
+        JuMP.add_to_expression!(ret, -shared_get(model, :one_time_fees) / get_T(model))
     end
     return nothing
 end

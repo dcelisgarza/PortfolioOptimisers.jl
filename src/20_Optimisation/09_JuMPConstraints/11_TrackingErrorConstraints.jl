@@ -71,7 +71,7 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     net_X = set_net_portfolio_returns!(model, X)
     wb = tracking_benchmark(tr.tr, X)
     err = tr.err
-    T = size(X, 1)
+    T = get_T(model)
     f = err * T
     t_te = state_set!(model, Symbol(""), :t_te_, i, JuMP.@variable(model))
     tr = state_set!(model, Symbol(""), :te_, i, JuMP.@expression(model, net_X - wb * k))
@@ -128,7 +128,7 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     net_X = set_net_portfolio_returns!(model, X)
     wb = tracking_benchmark(tr.tr, X)
     err = tr.err
-    f = tracking_error_soc_factor(tr.alg, err, size(X, 1))
+    f = tracking_error_soc_factor(tr.alg, err, get_T(model))
     t_te = state_set!(model, Symbol(""), :t_te_, i, JuMP.@variable(model))
     tr = state_set!(model, Symbol(""), :te_, i, JuMP.@expression(model, net_X - wb * k))
     cte_soc, cte = JuMP.@constraints(model,
@@ -151,7 +151,7 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     sc = get_constraint_scale(model)
     net_X = set_net_portfolio_returns!(model, X)
     wb = tracking_benchmark(tr.tr, X)
-    T = size(X, 1)
+    T = get_T(model)
     err = tr.err
     p_inv = inv(tr.alg.p)
     scale = T - tr.alg.ddof
@@ -185,7 +185,7 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     sc = get_constraint_scale(model)
     net_X = set_net_portfolio_returns!(model, X)
     wb = tracking_benchmark(tr.tr, X)
-    T = size(X, 1)
+    T = get_T(model)
     err = tr.err
     scale = T - tr.alg.ddof
     f = err * scale

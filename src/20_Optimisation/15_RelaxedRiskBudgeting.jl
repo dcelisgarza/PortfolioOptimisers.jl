@@ -580,6 +580,7 @@ function _optimise(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult(
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, rrb.opt.sc, rrb.opt.so)
+    set_model_observations!(model, size(attrs.pr.X, 1))
     set_maximum_ratio_factor_variables!(model, MinimumRisk())
     prb = set_relaxed_risk_budgeting_constraints!(model, rrb, attrs.pr, attrs.wb, rd)
     assemble_jump_model!(model, rrb, rrb.opt, attrs, rd)

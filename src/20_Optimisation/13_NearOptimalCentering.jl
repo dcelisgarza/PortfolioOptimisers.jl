@@ -1292,9 +1292,7 @@ function assemble_near_optimal_centering_model!(::UnconstrainedNearOptimalCenter
                                                 noc::NearOptimalCentering,
                                                 setup::NearOptimalSetup, rd::ReturnsResult)
     (; r, opt) = setup
-    # `rd` defaults to an empty `ReturnsResult` on this path, so the observation count of
-    # the fit comes from the prior, which always carries its own returns matrix.
-    set_non_fixed_fees!(model, opt.fees, size(opt.pe.X, 1))
+    set_non_fixed_fees!(model, opt.fees)
     set_risk_and_scalarise!(model, r, noc, opt, opt.pe, nothing, opt.fees; rd = rd)
     set_return_constraints!(model, opt.ret, MinimumRisk(), opt.pe; rd = rd)
     assert_frontier_sweep_cap(model)
@@ -1360,6 +1358,9 @@ function _optimise(noc::NearOptimalCentering, rd::ReturnsResult = ReturnsResult(
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, opt.sc, opt.so)
+    # Both variants fit on the prior's returns matrix. `rd` defaults to an empty
+    # `ReturnsResult` on this path, so the prior is the only matrix that is always there.
+    set_model_observations!(model, size(opt.pe.X, 1))
     set_maximum_ratio_factor_variables!(model, MinimumRisk())
     set_w!(model, opt.pe.X, w_opt)
     set_weight_constraints!(model, opt.wb, opt)

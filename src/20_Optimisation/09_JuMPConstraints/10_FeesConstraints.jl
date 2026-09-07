@@ -251,15 +251,15 @@ function set_short_non_fixed_fees!(model::JuMP.Model, fs::Num_VecNum)
     add_to_fees!(model, fs)
     return nothing
 end
-function set_non_fixed_fees!(model::JuMP.Model, fees::Fees, T::Number)
+function set_non_fixed_fees!(model::JuMP.Model, fees::Fees)
     set_long_non_fixed_fees!(model, fees.l)
     set_short_non_fixed_fees!(model, fees.s)
     set_turnover_fees!(model, fees.tn)
-    # The observation count of the fit is the holding period the one-off terms are spread
-    # over, and the clock decides whether they are spread at all. `add_fees_to_ret!` reads
-    # the count, and `set_net_portfolio_returns!` reads the clock.
-    if !shared_has(model, :T)
-        shared_set!(model, :T, T)
+    # The clock decides whether the one-off terms are spread at all, and it belongs to the
+    # fee, so the fee builder registers it. The holding period they are spread over is the
+    # observation count of the fit, which the head has already registered as `:T`.
+    # `set_net_portfolio_returns!` reads the clock, and `add_fees_to_ret!` reads the count.
+    if !shared_has(model, :fee_fa)
         shared_set!(model, :fee_fa, fees.fa)
     end
     return nothing
@@ -286,7 +286,7 @@ count of the fit.
   - $(arg_dict[:model])
   - `net`: The net return expression, already charged the per period terms.
   - `one_time`: The model's `:one_time_fees` expression.
-  - `T`: Observation count of the fit.
+  - `T`: Observation count of the fit, from [`get_T`](@ref).
   - `fa`: The fee's clock, from `:fee_fa`.
 
 # Returns

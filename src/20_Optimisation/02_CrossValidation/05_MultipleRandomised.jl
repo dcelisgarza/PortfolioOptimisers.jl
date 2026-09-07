@@ -448,6 +448,8 @@ function get_window_size(::Nothing, args...)
 end
 function get_window_size(window_size::Integer, rd::Union{<:Pr_RR, <:AbstractPricesResult},
                          args...)
+    # Every row count in this file is the whole sample a cross-validation window is cut out
+    # of. It is not the model-wide `:T` of any one fit, which covers a single window.
     @argcheck(window_size <= size(rd.X, 1),
               "window_size must not be greater than the number of observations")
     return window_size

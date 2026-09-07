@@ -489,6 +489,7 @@
             sopt = setup.opt
             model = PortfolioOptimisers.JuMP.Model()
             PortfolioOptimisers.set_model_scales!(model, sopt.sc, sopt.so)
+            PortfolioOptimisers.set_model_observations!(model, size(sopt.pe.X, 1))
             PortfolioOptimisers.set_maximum_ratio_factor_variables!(model, MinimumRisk())
             PortfolioOptimisers.set_w!(model, sopt.pe.X, setup.w_opt)
             PortfolioOptimisers.set_weight_constraints!(model, sopt.wb, sopt)
@@ -528,6 +529,7 @@
             sopt = setup.opt
             model = PortfolioOptimisers.JuMP.Model()
             PortfolioOptimisers.set_model_scales!(model, sopt.sc, sopt.so)
+            PortfolioOptimisers.set_model_observations!(model, size(sopt.pe.X, 1))
             PortfolioOptimisers.set_maximum_ratio_factor_variables!(model, MinimumRisk())
             PortfolioOptimisers.set_w!(model, sopt.pe.X, setup.w_opt)
             PortfolioOptimisers.set_weight_constraints!(model, sopt.wb, sopt)

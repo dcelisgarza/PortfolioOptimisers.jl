@@ -867,6 +867,7 @@ function _optimise(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult(); dims:
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, rb.opt.sc, rb.opt.so)
+    set_model_observations!(model, size(attrs.pr.X, 1))
     prb = set_risk_budgeting_constraints!(model, rb, attrs.pr, attrs.wb, rd)
     assemble_jump_model!(model, rb, rb.opt, attrs, rd, rb.r, MinimumRisk())
     set_portfolio_objective_function!(model, MinimumRisk(), rb, attrs)

@@ -766,6 +766,7 @@ function _optimise(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int 
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, mr.opt.sc, mr.opt.so)
+    set_model_observations!(model, size(attrs.pr.X, 1))
     set_maximum_ratio_factor_variables!(model, mr.obj)
     set_w!(model, attrs.pr.X, mr.wi)
     set_weight_constraints!(model, attrs.wb, mr.opt)

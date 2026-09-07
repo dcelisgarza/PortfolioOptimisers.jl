@@ -400,6 +400,7 @@ function _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, frc.opt.sc, frc.opt.so)
+    set_model_observations!(model, size(attrs.pr.X, 1))
     set_maximum_ratio_factor_variables!(model, frc.obj)
     b1, rr = set_factor_risk_contribution_constraints!(model, frc.re, rd, attrs.pr,
                                                        frc.flag, frc.wi)
