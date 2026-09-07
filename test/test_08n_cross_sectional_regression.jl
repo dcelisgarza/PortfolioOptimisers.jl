@@ -426,7 +426,7 @@ end
         end
     end
 
-    @testset "An integer panel promotes to a float result" begin
+    @testset "The working type is the one a division of the panel lands in" begin
         Zi = ones(Int, 2, 3, 1)
         Zi[:, 2, 1] .= 2
         Zi[:, 3, 1] .= 3
@@ -435,5 +435,10 @@ end
         csr = cross_sectional_regression(CrossSectionalLinearRegression(), Zi, Xi, Wi)
         @test eltype(csr.f) == Float64
         @test csr.f ≈ [1.0; 2.0;;]
+        # The division widens nothing that is already wide enough.
+        csr32 = cross_sectional_regression(CrossSectionalLinearRegression(),
+                                           Array{Float32}(Zi), Float32.(Xi), Float32.(Wi))
+        @test eltype(csr32.f) == Float32
+        @test csr32.f ≈ [1.0f0; 2.0f0;;]
     end
 end

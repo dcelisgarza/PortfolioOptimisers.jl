@@ -634,7 +634,7 @@ in general. The root of `n` is kept as the diagonal-risk proxy.
   - [`RegimeAdjustedExpWeightedCovariance`](@ref)
 """
 function regime_denom(::FirstMomentRegimeAdjusted, ::DiagonalTarget, n::Integer)
-    return sqrt(float(n))
+    return sqrt(n)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -764,7 +764,7 @@ function safe_regime_cholesky(C::MatNum, min_val::Number)
     else
         max(maximum(abs, S), one(base))
     end
-    ridge = max(min_val * scale, eps(float(scale)) * scale)
+    ridge = max(min_val * scale, eps(scale) * scale)
     for _ in 1:3
         chol = LinearAlgebra.cholesky(LinearAlgebra.Hermitian(S + ridge * LinearAlgebra.I,
                                                               :L); check = false)

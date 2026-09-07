@@ -137,7 +137,7 @@ function panel_field_values(rd::ReturnsResult, name::AbstractString)::Matrix{<:R
               ArgumentError("a Descriptor reads one number per observation and asset, so the Panel Field \"$name\" must be a NumericPanelField, got a $(nameof(typeof(f)))"))
     @argcheck(ndims(f.vals) == 2,
               DimensionMismatch("a Descriptor reads one number per observation and asset, so the Panel Field \"$name\" must be time-varying; this Asset Panel is static"))
-    Tf = float(eltype(f.vals))
+    Tf = eltype(f.vals)
     V = Matrix{Tf}(f.vals)
     omsk = f.omsk
     if !isnothing(omsk)
@@ -370,7 +370,7 @@ function market_return_series(rd::ReturnsResult, mcap::AbstractString)
     W = panel_field_values(rd, mcap)
     X = rd.X
     emsk = pnl.emsk
-    Tf = float(promote_type(eltype(X), eltype(W)))
+    Tf = promote_type(eltype(X), eltype(W))
     rm = Vector{Tf}(undef, size(X, 1))
     for t in axes(X, 1)
         s = zero(Tf)
@@ -463,7 +463,7 @@ julia> B
 function ew_beta_series(X::AbstractMatrix{<:Real}, rm::AbstractVector{<:Real}, decay::Real,
                         min_obs::Integer, min_val::Real,
                         amsk::Option{<:AbstractMatrix{Bool}} = nothing)
-    Tf = float(promote_type(eltype(X), eltype(rm)))
+    Tf = promote_type(eltype(X), eltype(rm))
     T, N = size(X)
     B = fill(Tf(NaN), T, N)
     Vm = Vector{Tf}(undef, T)

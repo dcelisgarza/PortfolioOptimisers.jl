@@ -407,7 +407,7 @@ The test is written out rather than delegated to `LinearAlgebra.rank(::QRPivoted
 
  1. Return `0` when `A` has no row or no column, because a factorisation of it has no pivot to read.
  2. Take the column-pivoted `LinearAlgebra.qr` of `A`. The magnitudes of the diagonal of its `R` are non-increasing, so they rank the columns by how much each adds to the span.
- 3. Count the leading diagonal entries above `min(size(A)...) * eps(float(real(eltype(R)))) * abs(R[1, 1])`, giving the numerical rank. The tolerance is the one `LinearAlgebra.rank` applies to a pivoted `QR`.
+ 3. Count the leading diagonal entries above `min(size(A)...) * eps(real(eltype(R))) * abs(R[1, 1])`, giving the numerical rank. The tolerance is the one `LinearAlgebra.rank` applies to a pivoted `QR`.
 
 # Arguments
 
@@ -428,7 +428,7 @@ function cross_sectional_rank(A::MatNum)::Int
         return 0
     end
     R = LinearAlgebra.qr(A, LinearAlgebra.ColumnNorm()).R
-    tol = m * eps(float(real(eltype(R)))) * abs(R[1, 1])
+    tol = m * eps(real(eltype(R))) * abs(R[1, 1])
     return something(findfirst(i -> abs(R[i, i]) <= tol, 1:m), m + 1) - 1
 end
 """
@@ -634,8 +634,14 @@ function cross_sectional_regression(cre::AbstractCrossSectionalRegressionEstimat
                                     Z::Arr3Num, X::MatNum,
                                     W::MatNum)::CrossSectionalRegression
     act = cross_sectional_design_mask(Z, X, W)
-    Tf = promote_type(float(real(eltype(Z))), float(real(eltype(X))),
-                      float(real(eltype(W))))
+    # The coefficients answer a weighted least squares, so the working type is the one a
+    # division of the inputs lands in rather than the inputs' own promotion. The division
+    # is what widens an integer panel, and it widens nothing that is already wide enough:
+    # a `Float32` panel regresses in `Float32`. The annotation is what inference reads:
+    # `typeof` alone answers an unbounded `DataType`, and the conversions below then call
+    # an unknown type, which JET reads as a call of every constructor in the world.
+    Ts = promote_type(real(eltype(Z)), real(eltype(X)), real(eltype(W)))
+    Tf = typeof(one(Ts) / one(Ts))::Type{<:Number}
     K = size(Z, 3)
     f = zeros(Tf, size(X, 1), K)
     b = cre.intercept ? zeros(Tf, size(X, 1)) : nothing

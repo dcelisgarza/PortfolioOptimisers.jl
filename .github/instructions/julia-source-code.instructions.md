@@ -115,6 +115,45 @@ end
   | `ObsWeights` | `StatsBase.AbstractWeights` |
   | `Option{T}` | `Union{Nothing, T}` |
 
+## Numeric types come from the data
+
+A numeric type is **derived**, never **coerced**. Read it off the arguments with `eltype`,
+`typeof`, `real` and `promote_type`, and let the arithmetic widen it.
+
+```julia
+Tf = eltype(X)                                  # the element type of one argument
+Tf = promote_type(real(eltype(X)), typeof(p))   # the element type of several
+Tf = typeof(one(Ts) / one(Ts))                  # the type one operation lands in
+```
+
+**Do not wrap a derived type in `float`.** `float(Int)` is `Float64`, so one integer argument
+inside a `promote_type` widens the whole computation to `Float64` and a `Float32` caller silently
+loses its precision. The wrapper also decides for a number type the library has never seen: a
+`Rational` argument becomes inexact, and a number type another package defines is converted to
+whatever `float` says rather than to what the arithmetic says. `nextfloat` and `prevfloat` are
+different verbs. They step a value and coerce nothing, so this rule does not reach them.
+
+**Derive from the operation when the operation widens.** A mean, a variance, a correlation and a
+regression coefficient all divide, and a division of two integers lands in a float. Take the type
+from the division rather than from the arguments, as `cross_sectional_regression` in
+[`src/08_Moments/38_CrossSectionalRegression.jl`](../../src/08_Moments/38_CrossSectionalRegression.jl)
+does. The result is wider than `float`, not narrower: an integer panel still regresses in
+`Float64`, a `Float32` panel stays in `Float32`, and an exact type stays exact.
+
+**A concrete type is admitted only when the code really needs that type**, and then only when no
+method converts internally. An index is the usual case.
+
+- An index from a floating-point value takes the in-function conversion: `ceil(Int, x)`,
+  `floor(Int, x)`, `round(Int, x)` and their siblings. Never `Int(ceil(x))`, which rounds in one
+  type and then converts in another.
+- An index or a count from integer arithmetic keeps `eltype`, and divides with `÷` rather than
+  with `/` followed by a conversion.
+
+**Keep a signature as wide as the body allows.** Prefer `VecNum`, `MatNum`, `ArrNum` and
+`<:Number` over a narrower bound, so a caller may bring a number type from another package. Narrow
+to `<:Real` only where the body needs an order, and to a concrete type only where the body needs
+that exact representation.
+
 ## Union Type Aliases and Dispatch Groups
 
 When multiple abstract subtypes share a common interface, define a `const` union alias and dispatch on it:

@@ -263,7 +263,7 @@ function cross_sectional_exposure_history(factors::AbstractVector{<:Pair},
     ord, src = cross_sectional_exposure_order(factors)
     col = cumsum(vcat(1, wid[1:(end - 1)]))
     X = rd.X
-    Tf = promote_type(float(real(eltype(X))), Float64)
+    Tf = real(eltype(X))
     Ms = Array{Tf, 3}(undef, size(X, 1), size(X, 2), length(nf))
     for i in ord
         nm = String(first(factors[i]))
@@ -456,7 +456,7 @@ function cross_sectional_idiosyncratic_covariance(th::Real,
     if iszero(th)
         return ev
     end
-    Z = Matrix{float(real(eltype(S)))}(S)
+    Z = Matrix{real(eltype(S))}(S)
     for k in CartesianIndices(Z)
         if !isfinite(Z[k])
             Z[k] = zero(eltype(Z))
@@ -539,7 +539,7 @@ Each idiosyncratic return is divided by its own contemporaneous idiosyncratic vo
 """
 function cross_sectional_standardised_residuals(eps::MatNum, vs::MatNum,
                                                 amsk::AbstractMatrix{Bool})
-    Tf = promote_type(float(real(eltype(eps))), float(real(eltype(vs))))
+    Tf = promote_type(real(eltype(eps)), real(eltype(vs)))
     S = Matrix{Tf}(undef, size(eps))
     for k in CartesianIndices(S)
         S[k] = amsk[k] ? Tf(eps[k]) / sqrt(Tf(vs[k])) : Tf(NaN)
@@ -1033,7 +1033,7 @@ function cross_sectional_lift(mp::AbstractMatrixProcessingEstimator, L::MatNum,
     posdef!(mp.pdm, si)
     ci = hcat(Li * Matrix(LinearAlgebra.cholesky(f_sigma).L), R)
     N = size(L, 1)
-    Tf = float(real(eltype(si)))
+    Tf = real(eltype(si))
     mu = fill(Tf(NaN), N)
     sigma = fill(Tf(NaN), N, N)
     chol = fill(Tf(NaN), size(ci, 2), N)
@@ -1084,7 +1084,7 @@ function cross_sectional_alpha_split(cre::AbstractCrossSectionalRegressionEstima
                                      mu::VecNum, L::MatNum, w::VecNum)
     N = size(L, 1)
     K = size(L, 2)
-    Tf = float(promote_type(real(eltype(mu)), real(eltype(L)), real(eltype(w))))
+    Tf = promote_type(real(eltype(mu)), real(eltype(L)), real(eltype(w)))
     if all(iszero, mu)
         return (; g = zeros(Tf, K), ap = zeros(Tf, N))
     end

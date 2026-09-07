@@ -21,7 +21,7 @@ Every column of the summary aggregates a series over the observations, and an ob
   - [`factor_model_summary`](@ref)
 """
 function factor_summary_finite_column(A::MatNum, k::Integer)
-    Tf = float(real(eltype(A)))
+    Tf = real(eltype(A))
     v = Vector{Tf}(undef, 0)
     for t in axes(A, 1)
         a = A[t, k]
@@ -98,7 +98,8 @@ A ratio of a summary is a Sharpe ratio, so its denominator is a volatility. A ze
   - [`factor_summary_return_stats`](@ref)
 """
 function factor_summary_ratio(m::Real, v::Real)
-    r = (isnan(v) || iszero(v)) ? oftype(float(m), NaN) : float(m) / v
+    q = m / v
+    r = (isnan(v) || iszero(v)) ? oftype(q, NaN) : q
     return isfinite(r) ? r : oftype(r, NaN)
 end
 """
@@ -138,7 +139,7 @@ Let ``\\boldsymbol{f}_{k}`` be the finite entries of the factor return series of
 """
 function factor_summary_return_stats(f::MatNum, ppy::Number)
     K = size(f, 2)
-    Tf = promote_type(float(real(eltype(f))), float(real(typeof(ppy))))
+    Tf = promote_type(real(eltype(f)), real(typeof(ppy)))
     ann_return = Vector{Tf}(undef, K)
     ann_volatility = Vector{Tf}(undef, K)
     sharpe = Vector{Tf}(undef, K)
@@ -182,7 +183,7 @@ Let ``a_{t} = f_{tk}`` for ``t = 1 \\ldots T - 1``, let ``b_{t} = f_{(t + 1)k}``
 """
 function factor_summary_autocorrelation(f::MatNum)
     T, K = size(f)
-    Tf = float(real(eltype(f)))
+    Tf = real(eltype(f))
     ac = fill(Tf(NaN), K)
     if T < 2
         return ac
@@ -319,7 +320,7 @@ Return a statistic of the reduced factor axis, written onto the raw factor axis.
   - [`factor_model_summary`](@ref)
 """
 function factor_summary_mapped(v::VecNum, pos::AbstractVector{Int})
-    Tf = float(real(eltype(v)))
+    Tf = real(eltype(v))
     m = fill(Tf(NaN), length(pos))
     for k in eachindex(pos)
         j = pos[k]
@@ -371,7 +372,7 @@ function factor_summary_gram(::Arr3Num, csfm::CrossSectionalFactorModel, thresho
     vif = exposure_vif(csfm)
     rate = cs_regression_t_stat_exceedance_rate(csfm; threshold = threshold)
     Kr = size(t, 2)
-    Tf = promote_type(float(real(eltype(t))), float(real(eltype(vif))))
+    Tf = promote_type(real(eltype(t)), real(eltype(vif)))
     at = abs.(t)
     abs_t = Vector{Tf}(undef, Kr)
     mvif = Vector{Tf}(undef, Kr)
@@ -404,7 +405,7 @@ The variance is taken over the finite exposures of the observation and it is not
   - [`factor_summary_constant_exposures`](@ref)
 """
 function factor_summary_exposure_variance(Ms::Arr3Num, t::Integer, k::Integer)
-    Tf = float(real(eltype(Ms)))
+    Tf = real(eltype(Ms))
     n = 0
     s = zero(Tf)
     for i in axes(Ms, 2)
@@ -495,7 +496,7 @@ function factor_summary_stability(Ms::Arr3Num, csfm::CrossSectionalFactorModel;
                                   step::Integer = 21, weighting = BenchmarkWeightMetric())
     con = factor_summary_constant_exposures(Ms)
     K = size(Ms, 3)
-    Tf = float(real(eltype(Ms)))
+    Tf = real(eltype(Ms))
     if size(Ms, 1) <= step
         return Tf[con[k] ? one(Tf) : Tf(NaN) for k in 1:K]
     end

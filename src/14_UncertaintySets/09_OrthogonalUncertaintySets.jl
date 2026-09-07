@@ -429,7 +429,7 @@ function orthogonal_factor_span(ue::OrthogonalUncertaintySet, pr::AbstractPriorR
     # The tolerance reads `s[1]` inside the predicate rather than above the count, so a
     # block with no factor column needs no branch of its own: `count` over an empty vector
     # never calls the predicate, and answers a rank of zero.
-    r = count(x -> x > maximum(size(Bw)) * eps(float(real(eltype(Bw)))) * s[1], s)
+    r = count(x -> x > maximum(size(Bw)) * eps(real(eltype(Bw))) * s[1], s)
     return rr, w_sqrt, F.U[:, 1:r]
 end
 """
@@ -668,7 +668,7 @@ end
 function cs_diagnostic_weights(::InverseIdiosyncraticVarianceMetric,
                                csfm::CrossSectionalFactorModel)
     vs = cs_diagnostic_weight_history(csfm.vs, "vs", "the idiosyncratic variance history")
-    return one(float(real(eltype(vs)))) ./ vs
+    return one(real(eltype(vs))) ./ vs
 end
 """
     cs_diagnostic_weight_history(A::Nothing, name::AbstractString, what::AbstractString)

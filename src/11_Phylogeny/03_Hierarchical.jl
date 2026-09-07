@@ -602,7 +602,7 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SecondOrder
             # `isone(k)` arm below and contribute a zero, where the guard it replaced left
             # `D_list[j]` undefined for `sum` to read.
             M = size(cluster_D, 1)
-            C_list = Vector{eltype(D)}(undef, Int(M * (M - 1) / 2))
+            C_list = Vector{eltype(D)}(undef, M * (M - 1) ÷ 2)
             k = 1
             for col in 1:M
                 for row in (col + 1):M

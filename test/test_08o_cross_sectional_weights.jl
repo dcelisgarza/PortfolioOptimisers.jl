@@ -156,10 +156,18 @@ const REFERENCE_W1_B = [0.3333333333333333 0.16666666666666666 0.5 0.0
                                                                                    p = 0.5,
                                                                                    lambda = 0.3),
                                                      mcap, mask)
-        # An integer panel promotes to a float result.
+        # The weights take the type the power lands in, and coerce nothing. An integer
+        # panel raised to an integer power stays integer, a fractional power lands in a
+        # float, and a `Float32` panel stays `Float32`.
         @test eltype(PortfolioOptimisers.cross_sectional_cap_weights(1, [1 2; 3 4],
-                                                                     trues(2, 2))) <:
-              AbstractFloat
+                                                                     trues(2, 2))) == Int
+        @test eltype(PortfolioOptimisers.cross_sectional_cap_weights(0.5, [1 2; 3 4],
+                                                                     trues(2, 2))) ==
+              Float64
+        @test eltype(PortfolioOptimisers.cross_sectional_cap_weights(0.5f0,
+                                                                     Float32[1 2; 3 4],
+                                                                     trues(2, 2))) ==
+              Float32
     end
 
     @testset "The cap weights refuse a malformed design" begin

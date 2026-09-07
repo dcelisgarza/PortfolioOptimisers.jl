@@ -187,7 +187,7 @@ julia> PortfolioOptimisers.ew_mean_series([1.0; 3.0; NaN; 5.0;;], 0.5, 1)
 """
 function ew_mean_series(R::AbstractMatrix{<:Real}, decay::Real,
                         min_obs::Integer)::Matrix{<:Real}
-    Tf = float(eltype(R))
+    Tf = eltype(R)
     S = fill(Tf(NaN), size(R))
     for i in axes(R, 2)
         s = zero(Tf)
@@ -675,7 +675,7 @@ function descriptor(de::EWMean, rd::ReturnsResult)::Matrix{<:Real}
     pnl = descriptor_asset_panel(rd)
     X = rd.X
     assert_log_returns(X)
-    Tf = float(eltype(X))
+    Tf = eltype(X)
     R = fill(Tf(NaN), size(X))
     skip = de.skip
     for i in axes(X, 2), t in (skip + 1):size(X, 1)

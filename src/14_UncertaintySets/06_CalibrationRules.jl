@@ -1045,7 +1045,7 @@ The element type is bound by the signature, so the pool and the sum it feeds are
 function hill_tail_index(series::AbstractCalibrationSeries, X::AbstractMatrix{E},
                          s::Integer, k::Integer) where {E <: Number}
     T, N = size(X)
-    pool = Vector{float(E)}(undef, T * N)
+    pool = Vector{E}(undef, T * N)
     for j in axes(X, 2)
         col = calibration_series_vec(series, view(X, :, j))
         mu = Statistics.mean(col)
@@ -1368,7 +1368,7 @@ The element type is bound by the signature, so the series and the sum it feeds a
 function radial_tail_index(X::AbstractMatrix{E}, mu::AbstractVector, U::AbstractMatrix,
                            k::Integer) where {E <: Number}
     Z = transpose(U) \ transpose(X .- transpose(mu))
-    d = Vector{float(E)}(undef, size(X, 1))
+    d = Vector{E}(undef, size(X, 1))
     for t in axes(X, 1)
         # The series is negated so that the end of it the estimate reads is the LOWER tail,
         # which lets the selection below run without `rev = true`. `hill_tail_index` signs

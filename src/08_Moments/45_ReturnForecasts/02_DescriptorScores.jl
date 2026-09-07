@@ -213,7 +213,7 @@ function neutralise_scores!(S::AbstractArray{<:Real, 3},
     wb = return_forecast_cut(w, rows)
     gb = return_forecast_cut(groups, rows)
     cre = CrossSectionalLinearRegression()
-    Tf = float(eltype(S))
+    Tf = eltype(S)
     for k in axes(S, 3)
         y = S[rows, :, k]
         W = neutralisation_weights(y, X, wb)
@@ -299,7 +299,7 @@ function descriptor_scores(ds::DescriptorScores, rd::ReturnsResult,
     rows = return_forecast_rows(rd, csfm)
     des = ds.descriptors
     S1 = composite_score(des[1], rd, ds.outlier, ds.scoring, w, groups)
-    Tf = float(eltype(S1))
+    Tf = eltype(S1)
     S = Array{Tf, 3}(undef, size(S1, 1), size(S1, 2), length(des))
     S[:, :, 1] = S1
     for k in 2:length(des)

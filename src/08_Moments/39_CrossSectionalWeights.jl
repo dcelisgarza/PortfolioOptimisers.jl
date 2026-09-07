@@ -334,13 +334,13 @@ function cross_sectional_cap_weights(p::Real, mcap::Option{<:MatNum},
                                      mask::AbstractMatrix{Bool})::MatNum
     @argcheck(!isempty(mask), IsEmptyError("mask cannot be empty"))
     if iszero(p)
-        return Matrix{float(typeof(p))}(mask)
+        return Matrix{typeof(p)}(mask)
     end
     @argcheck(!isnothing(mcap),
               IsNothingError("mcap cannot be nothing when p is not zero, got p = $(p)"))
     @argcheck(size(mcap) == size(mask),
               DimensionMismatch("mcap ($(size(mcap, 1))×$(size(mcap, 2))) must match mask ($(size(mask, 1))×$(size(mask, 2)))"))
-    Tf = promote_type(float(real(eltype(mcap))), float(typeof(p)))
+    Tf = promote_type(real(eltype(mcap)), typeof(p))
     W0 = zeros(Tf, size(mask))
     for t in axes(mask, 1), i in axes(mask, 2)
         if mask[t, i]
@@ -456,7 +456,7 @@ function cross_sectional_lagged_inverse_variance(ve::AbstractCovarianceEstimator
     @argcheck(size(eps) == size(mask),
               DimensionMismatch("eps ($(size(eps, 1))×$(size(eps, 2))) must match mask ($(size(mask, 1))×$(size(mask, 2)))"))
     V = variance_series(ve, eps; dims = 1, kwargs...)
-    Tf = float(real(eltype(V)))
+    Tf = real(eltype(V))
     IV = fill(Tf(NaN), size(eps))
     for t in 2:size(eps, 1), i in axes(eps, 2)
         if mask[t, i]
@@ -656,7 +656,7 @@ function cs_weights_refine(alg::BlendedInverseVarianceWeights, W0::MatNum, eps::
     IV = cross_sectional_lagged_inverse_variance(ve, eps, mask; kwargs...)
     cross_sectional_winsorise!(IV, W0, alg.wins)
     ready = cross_sectional_median_cap!(IV, alg.ratio)
-    Tf = promote_type(eltype(IV), float(real(eltype(W0))), float(typeof(alg.lambda)))
+    Tf = promote_type(eltype(IV), real(eltype(W0)), typeof(alg.lambda))
     Wm = Tf.(W0)
     Wm ./= sum(Wm; dims = 2)
     U = Tf.(IV)

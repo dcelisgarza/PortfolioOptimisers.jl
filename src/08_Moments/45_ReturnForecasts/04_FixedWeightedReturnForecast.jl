@@ -73,7 +73,7 @@ julia> PortfolioOptimisers.signed_composite_weights([2.0, -2.0], 2)
   - [`composite_weights`](@ref)
 """
 function signed_composite_weights(::Nothing, n::Integer)::VecNum
-    return fill(inv(float(n)), n)
+    return fill(inv(n), n)
 end
 function signed_composite_weights(weights::VecNum, ::Integer)::VecNum
     return weights ./ sum(abs, weights)
@@ -313,7 +313,7 @@ function return_forecast(rfe::FixedWeightedReturnForecast, rd::ReturnsResult,
     Sb = return_forecast_cut(S, rows)
     K = size(Sb, 3)
     wv = signed_composite_weights(rfe.weights, K)
-    Tf = float(promote_type(eltype(Sb), eltype(wv)))
+    Tf = promote_type(eltype(Sb), eltype(wv))
     num = zeros(Tf, size(Sb, 1), size(Sb, 2))
     den = zeros(Tf, size(Sb, 1), size(Sb, 2))
     signed_composite_accumulate!(num, den, Sb, wv)

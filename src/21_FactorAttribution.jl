@@ -897,7 +897,7 @@ Means and variances scale by `ppy`, and volatilities by its square root. Shares 
 """
 function attribution_scale(ppy::Number)
     @argcheck(ppy > zero(ppy), DomainError(ppy, "ppy must be positive"))
-    return (; s1 = float(ppy), s2 = sqrt(float(ppy)))
+    return (; s1 = ppy, s2 = sqrt(ppy))
 end
 """
     attribution_idiosyncratic_matrix(esigma::VecNum)
@@ -949,7 +949,7 @@ A factor whose standalone volatility is zero has no correlation with anything, a
 """
 function attribution_safe_corr(cv::Number, s1::Number, s2::Number)
     d = s1 * s2
-    return d > zero(d) ? cv / d : convert(typeof(float(cv / oneunit(d))), NaN)
+    return d > zero(d) ? cv / d : convert(typeof(cv / oneunit(d)), NaN)
 end
 """
     attribution_family_index(fam::VecStr)

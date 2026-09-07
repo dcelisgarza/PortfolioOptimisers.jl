@@ -904,7 +904,7 @@ Where:
   - [`drifted_held_weights`](@ref)
 """
 function drifted_weight_path(P::MatNum, V::VecNum, w::VecNum)
-    U = similar(P, float(eltype(P)))
+    U = similar(P)
     U[1, :] .= w
     if size(P, 1) > 1
         U[2:end, :] .= @view(P[1:(end - 1), :]) ./ @view(V[1:(end - 1)])
@@ -1186,7 +1186,7 @@ julia> calc_net_returns([0.5, 0.5], [0.1 -0.1; 0.2 0.0], nothing, SelfFinancingD
 """
 function calc_net_returns(w::VecVecNum, X::MatNum, fees, wd::AbstractWeightDrift,
                           obs = nothing)
-    Tr = float(promote_type(eltype(X), eltype(first(w))))
+    Tr = promote_type(eltype(X), eltype(first(w)))
     ret = Vector{Vector{Tr}}(undef, length(w))
     ruined = Int[]
     for (i, wi) in pairs(w)
@@ -1811,7 +1811,7 @@ function rebuild_weight_path(::Nothing, wd::AbstractWeightDrift, w::VecNum, X::M
     return weight_path(wd, w, X)
 end
 function rebuild_weight_path(::Nothing, wd::AbstractWeightDrift, w::VecVecNum, X::MatNum)
-    Tw = float(promote_type(eltype(X), eltype(first(w))))
+    Tw = promote_type(eltype(X), eltype(first(w)))
     Us = Vector{Matrix{Tw}}(undef, length(w))
     for (i, wi) in pairs(w)
         P = drift_position_values(wd, wi, X)
@@ -1913,7 +1913,7 @@ function held_weights_result(wd::AbstractWeightDrift, w::VecNum, X::MatNum,
 end
 function held_weights_result(wd::AbstractWeightDrift, w::VecVecNum, X::MatNum,
                              store_weight_path::Bool, obs = nothing)
-    Tw = float(promote_type(eltype(X), eltype(first(w))))
+    Tw = promote_type(eltype(X), eltype(first(w)))
     ws = Vector{Vector{Tw}}(undef, length(w))
     Us = Vector{Matrix{Tw}}(undef, length(w))
     ruined = Int[]

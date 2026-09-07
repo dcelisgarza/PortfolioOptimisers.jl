@@ -496,7 +496,7 @@ function factor_family_basis(families::AbstractVector{<:Pair}, Ms::Arr3Num, bw::
     assert_factor_axis_length(length(nf), K, :nf)
     assert_factor_axis_length(length(fam), K, :fam)
     @argcheck(allunique(nf), ArgumentError("nf must not repeat a factor name"))
-    Tf = promote_type(float(real(eltype(Ms))), float(real(eltype(bw))))
+    Tf = promote_type(real(eltype(Ms)), real(eltype(bw)))
     c = weighted_family_exposures(Ms, bw, Tf)
     fnm = String[]
     fi = Vector{Int}[]

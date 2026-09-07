@@ -31,7 +31,7 @@ Row ``(j-1)m + i`` of the result is ``\\mathrm{vec}(\\mathbf{A}_{ij})^\\intercal
 # Algorithm
 
  1. Read `size(A)` into `mp` and `nq`, and check both divisibility conditions.
- 2. Take the block counts `m = mp / p` and `n = nq / q`.
+ 2. Take the block counts `m = mp ÷ p` and `n = nq ÷ q`.
  3. Allocate `A_vec`, of size `(m * n, p * q)`.
  4. For each block column `j`, build `Aj`, whose `i`-th row is the vectorisation of block `(i, j)` of `A`.
  5. Write `Aj` into rows `j * m + 1` to `(j + 1) * m` of `A_vec`.
@@ -78,8 +78,8 @@ function block_vec_pq(A::MatNum, p::Integer, q::Integer)
               DomainError("size(A, 1) = $mp must be an integer multiple of p = $p"))
     @argcheck(mod(nq, q) == 0,
               DomainError("size(A, 2) = $nq must be an integer multiple of q = $q"))
-    m = Int(mp / p)
-    n = Int(nq / q)
+    m = mp ÷ p
+    n = nq ÷ q
     A_vec = Matrix{eltype(A)}(undef, m * n, p * q)
     for j in 0:(n - 1)
         Aj = Matrix{eltype(A)}(undef, m, p * q)

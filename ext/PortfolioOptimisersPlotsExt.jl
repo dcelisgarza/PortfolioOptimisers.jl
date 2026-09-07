@@ -2588,7 +2588,7 @@ function PortfolioOptimisers.plot_factor_forecast_correlation(f_sigma::MatNum,
                                                                                           1);
                                                               kwargs...)
     # Copy before rescaling: `cov2cor!` mutates in place, and `f_sigma` is the caller's.
-    C = Matrix{float(real(eltype(f_sigma)))}(f_sigma)
+    C = Matrix{real(eltype(f_sigma))}(f_sigma)
     StatsBase.cov2cor!(C, sqrt.(diag(C)))
     K = size(C, 1)
     labels = string.(nf)
@@ -2631,7 +2631,7 @@ function PortfolioOptimisers.plot_factor_cumulative_returns(csfm::PortfolioOptim
     f = PortfolioOptimisers.factor_summary_returns(csfm)
     # An observation whose factor return is not finite contributes nothing to the running
     # sum, so one absent cross-section breaks no series.
-    g = [isfinite(x) ? float(x) : zero(float(x)) for x in f]
+    g = [isfinite(x) ? x : zero(x) for x in f]
     cum = cumulative_returns(g, compound)
     labels = exposure_diagnostic_labels(csfm, nf, size(cum, 2))
     kind = compound ? "Compounded" : "Uncompounded"

@@ -344,7 +344,7 @@ function prior(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum} = n
     fnow = cross_sectional_basis_now(fb.fcb, r)
     L = fb.Ms[r[end], :, :]
     Msr = Msw[r, :, :]
-    Tb = float(promote_type(real(eltype(L)), real(eltype(f_pr.mu))))
+    Tb = promote_type(real(eltype(L)), real(eltype(f_pr.mu)))
     csfm = CrossSectionalFactorModel(; M = Msr[end, :, :],
                                      L = cross_sectional_reduced_loadings(fnow, L),
                                      b = zeros(Tb, size(X, 2)), csr = csr, Ms = Msr,

@@ -125,7 +125,7 @@ Return an orthonormal basis of the column space of `Q`, dropping the columns a r
 
  1. Return `Q` unchanged when it has no column, because a zero-rank basis is already orthonormal and a factorisation of it has no pivot to read.
  2. Take the column-pivoted `LinearAlgebra.qr` of `Q`. The magnitudes of the diagonal of its `R` are non-increasing, so they rank the columns by how much each adds to the span.
- 3. Count the pivots above `maximum(size(Q)) * eps(float(real(eltype(Q)))) * abs(R[1, 1])`, giving `r`, the numerical rank. The tolerance is the one `LinearAlgebra.rank` applies to a singular value.
+ 3. Count the pivots above `maximum(size(Q)) * eps(real(eltype(Q))) * abs(R[1, 1])`, giving `r`, the numerical rank. The tolerance is the one `LinearAlgebra.rank` applies to a singular value.
  4. Return the first `r` columns of the orthogonal factor, materialised as a `Matrix`.
 
 # Arguments
@@ -147,7 +147,7 @@ function orthonormalise_basis(Q::MatNum)
     end
     F = LinearAlgebra.qr(Q, LinearAlgebra.ColumnNorm())
     R = F.R
-    tol = maximum(size(Q)) * eps(float(real(eltype(R)))) * abs(R[1, 1])
+    tol = maximum(size(Q)) * eps(real(eltype(R))) * abs(R[1, 1])
     r = count(j -> abs(R[j, j]) > tol, axes(R, 1))
     return Matrix(F.Q)[:, 1:r]
 end

@@ -448,7 +448,7 @@ function realised_attribution(W::VecNum_MatNum, ret::VecNum, al::NamedTuple,
               DomainError(total_vol,
                           "the portfolio return series must have a positive volatility for an attribution to divide by it"))
     retc = ret .- total_mu
-    Tf = promote_type(float(real(eltype(f))), float(real(eltype(ret))))
+    Tf = promote_type(real(eltype(f)), real(eltype(ret)))
     g = Matrix{Tf}(undef, T, K)
     sysr = Matrix{Tf}(undef, T, N)
     for t in 1:T
@@ -925,7 +925,7 @@ end
 function attribution_family_errors(fam::VecStr, g::MatNum, Vf::AbstractVector{<:MatNum},
                                    scale::Number, T::Integer)
     fi = attribution_family_index(fam)
-    Tf = typeof(float(scale))
+    Tf = typeof(scale)
     out = Vector{Tf}(undef, length(fi.labels))
     for j in eachindex(fi.labels)
         if fi.labels[j] == ATTRIBUTION_CURRENCY_FAMILY

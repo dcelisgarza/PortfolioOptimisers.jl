@@ -199,7 +199,7 @@ The response is one Factor Exposure when a Factor Exposure is neutralised, and o
   - [`cross_sectional_design_mask`](@ref)
 """
 function neutralisation_weights(y::MatNum, X::AbstractArray{<:Real, 3}, bw::MatNum)
-    Tf = promote_type(float(real(eltype(y))), float(real(eltype(bw))))
+    Tf = promote_type(real(eltype(y)), real(eltype(bw)))
     T, N = size(bw)
     W = zeros(Tf, T, N)
     for i in 1:N, t in 1:T

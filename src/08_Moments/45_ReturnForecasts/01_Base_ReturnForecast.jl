@@ -321,7 +321,7 @@ function return_forecast_pad(::Nothing, ::AbstractUnitRange, ::Integer)::Nothing
     return nothing
 end
 function return_forecast_pad(A::MatNum, rows::AbstractUnitRange, T::Integer)::MatNum
-    Tf = float(real(eltype(A)))
+    Tf = real(eltype(A))
     B = fill(Tf(NaN), T, size(A, 2))
     B[rows, :] = A
     return B
@@ -496,7 +496,7 @@ julia> PortfolioOptimisers.forward_mean_returns([1.0; 2.0; NaN; 4.0; 5.0;;], 2, 
   - [`return_forecast`](@ref)
 """
 function forward_mean_returns(X::MatNum, horizon::Integer, lag::Integer)::Matrix{<:Real}
-    Tf = float(real(eltype(X)))
+    Tf = real(eltype(X))
     T = size(X, 1)
     Y = fill(Tf(NaN), T, size(X, 2))
     gap = lag + horizon - 1

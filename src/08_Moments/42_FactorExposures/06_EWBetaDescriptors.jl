@@ -22,7 +22,7 @@ An asset outside the universe has no return at all, so the cell must not advance
   - [`descriptor_active_fill!`](@ref)
 """
 function ew_active_returns(X::AbstractMatrix{<:Real}, pnl::AssetPanel)
-    Xm = Matrix{float(eltype(X))}(X)
+    Xm = Matrix(X)
     descriptor_active_fill!(Xm, pnl)
     return Xm
 end
@@ -57,7 +57,7 @@ julia> PortfolioOptimisers.ew_agg_series([1.0 2.0; 3.0 NaN; 5.0 6.0], 2)
   - [`EWMacroSensitivity`](@ref)
 """
 function ew_agg_series(A::AbstractMatrix{<:Real}, agg_obs::Integer)
-    Tf = float(eltype(A))
+    Tf = eltype(A)
     T, N = size(A)
     K = div(T, agg_obs)
     B = fill(Tf(NaN), K, N)
@@ -148,7 +148,7 @@ julia> PortfolioOptimisers.ew_beta_expand([1.0 2.0; 3.0 4.0], 5, 2)
 """
 function ew_beta_expand(Ba::AbstractMatrix{<:Real}, T::Integer,
                         agg_obs::Integer)::Matrix{<:Real}
-    Tf = float(eltype(Ba))
+    Tf = eltype(Ba)
     B = fill(Tf(NaN), T, size(Ba, 2))
     for t in 1:T
         k = div(t, agg_obs)
@@ -201,7 +201,7 @@ julia> PortfolioOptimisers.ew_beta_residual_variance([0.1 0.2; -0.1 0.3; 0.05 -0
 """
 function ew_beta_residual_variance(X::AbstractMatrix{<:Real}, rm::AbstractVector{<:Real},
                                    B::AbstractMatrix{<:Real}, decay::Real, min_obs::Integer)
-    Tf = float(eltype(B))
+    Tf = eltype(B)
     K, N = size(X)
     Vr = zeros(Tf, K, N)
     v = zeros(Tf, N)
@@ -248,7 +248,7 @@ julia> PortfolioOptimisers.ew_masked_mean([1.0, 2.0, 6.0], [true, false, true])
   - [`ew_beta_shrink`](@ref)
 """
 function ew_masked_mean(v::AbstractVector{<:Real}, msk::AbstractVector{Bool})::Real
-    Tf = float(eltype(v))
+    Tf = eltype(v)
     s = zero(Tf)
     c = 0
     for i in eachindex(v, msk)
@@ -292,7 +292,7 @@ julia> PortfolioOptimisers.ew_masked_weighted_mean([1.0, 2.0, 6.0], [1.0, 1.0, 3
 """
 function ew_masked_weighted_mean(v::AbstractVector{<:Real}, w::AbstractVector{<:Real},
                                  msk::AbstractVector{Bool})::Real
-    Tf = float(promote_type(eltype(v), eltype(w)))
+    Tf = promote_type(eltype(v), eltype(w))
     s = zero(Tf)
     d = zero(Tf)
     for i in eachindex(v, w, msk)
@@ -408,7 +408,7 @@ function ew_beta_shrink(b::AbstractVector{<:Real}, bev::AbstractVector{<:Real},
                         L::AbstractVector{<:Integer}, w::AbstractVector{<:Real},
                         min_group_size::Integer, bounds::Tuple{<:Real, <:Real},
                         min_val::Real)
-    s = [float(x) for x in b]
+    s = collect(b)
     vld = [!isnan(b[i]) &&
                L[i] != CS_MISSING_GROUP &&
                isfinite(w[i]) &&
@@ -667,13 +667,13 @@ function ew_beta_output(group::AbstractString, de::EWBeta, rd::ReturnsResult,
                         Ba::AbstractMatrix{<:Real}, Vm::AbstractVector{<:Real},
                         Xa::AbstractMatrix{<:Real},
                         rma::AbstractVector{<:Real})::Matrix{<:Real}
-    W = Matrix{Float64}(panel_field_values(rd, de.mcap))
+    W = Matrix(panel_field_values(rd, de.mcap))
     L = cross_sectional_groups(descriptor_asset_panel(rd), group)
     Vr = ew_beta_residual_variance(Xa, rma, Ba, de.decay, de.min_obs)
     en = 2 * decay_half_life(de.decay)
     agg_obs = de.agg_obs
     min_obs = de.min_obs
-    Tf = float(eltype(Ba))
+    Tf = eltype(Ba)
     T, N = size(W)
     B = fill(Tf(NaN), T, N)
     s = fill(Tf(NaN), N)
@@ -870,7 +870,7 @@ Where:
 function ew_macro_sensitivity_series(X::AbstractMatrix{<:Real}, rm::AbstractVector{<:Real},
                                      rf::AbstractVector{<:Real}, decay::Real,
                                      min_obs::Integer, min_val::Real)::Matrix{<:Real}
-    Tf = float(promote_type(eltype(X), eltype(rm), eltype(rf)))
+    Tf = promote_type(eltype(X), eltype(rm), eltype(rf))
     T, N = size(X)
     B = fill(Tf(NaN), T, N)
     b = fill(Tf(NaN), N)
@@ -1134,7 +1134,7 @@ Where:
 function ew_downside_beta_series(X::AbstractMatrix{<:Real}, rm::AbstractVector{<:Real},
                                  decay::Real, min_obs::Integer, mar::Real,
                                  min_val::Real)::Matrix{<:Real}
-    Tf = float(promote_type(eltype(X), eltype(rm)))
+    Tf = promote_type(eltype(X), eltype(rm))
     T, N = size(X)
     B = fill(Tf(NaN), T, N)
     cd = zeros(Tf, N)

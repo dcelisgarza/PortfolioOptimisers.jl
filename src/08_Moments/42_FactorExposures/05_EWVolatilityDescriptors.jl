@@ -415,7 +415,7 @@ julia> PortfolioOptimisers.ew_residual_returns([0.1 0.2; NaN 0.0], [0.1, -0.05],
 function ew_residual_returns(X::AbstractMatrix{<:Real}, rm::AbstractVector{<:Real},
                              B::AbstractMatrix{<:Real},
                              amsk::AbstractMatrix{Bool})::Matrix{<:Real}
-    Tf = float(promote_type(eltype(X), eltype(rm), eltype(B)))
+    Tf = promote_type(eltype(X), eltype(rm), eltype(B))
     E = fill(Tf(NaN), size(X))
     for t in axes(X, 1), i in axes(X, 2)
         x = X[t, i]

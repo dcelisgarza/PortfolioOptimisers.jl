@@ -30,7 +30,7 @@ An asset enters the fit of an observation when every one of its exposures is fin
 function cs_estimation_mask_weights(B::Arr3Num, ::Nothing)
     @argcheck(!isempty(B), IsEmptyError("B cannot be empty"))
     T, N, K = size(B)
-    Tf = float(real(eltype(B)))
+    Tf = real(eltype(B))
     mask = fill(false, T, N)
     u = zeros(Tf, T, N)
     for i in 1:N, t in 1:T
@@ -51,7 +51,7 @@ function cs_estimation_mask_weights(B::Arr3Num, w::MatNum)
     T, N, K = size(B)
     @argcheck(size(w, 1) == T && size(w, 2) == N,
               DimensionMismatch("w ($(size(w, 1))×$(size(w, 2))) must match B ($T×$N on its first two axes)"))
-    Tf = promote_type(float(real(eltype(B))), float(real(eltype(w))))
+    Tf = promote_type(real(eltype(B)), real(eltype(w)))
     mask = fill(false, T, N)
     u = zeros(Tf, T, N)
     for i in 1:N, t in 1:T
@@ -157,7 +157,7 @@ Return the weighted Gram history from a mask that a caller has already resolved.
 """
 function cs_gram_from_weights(B::Arr3Num, u::MatNum)
     T, N, K = size(B)
-    Tf = promote_type(float(real(eltype(B))), float(real(eltype(u))))
+    Tf = promote_type(real(eltype(B)), real(eltype(u)))
     G = Array{Tf, 3}(undef, T, K, K)
     A = Matrix{Tf}(undef, N, K)
     for t in 1:T
@@ -212,7 +212,7 @@ Where:
 function cs_gram_inverse_diagonal(G::Arr3Num)
     T = size(G, 1)
     K = size(G, 2)
-    Tf = float(real(eltype(G)))
+    Tf = real(eltype(G))
     D = Matrix{Tf}(undef, T, K)
     Gt = Matrix{Tf}(undef, K, K)
     for t in 1:T
@@ -599,7 +599,7 @@ julia> exposure_condition_number(cs_gram(B))
 function exposure_condition_number(G::Arr3Num)
     T = size(G, 1)
     K = size(G, 2)
-    Tf = float(real(eltype(G)))
+    Tf = real(eltype(G))
     kappa = Vector{Tf}(undef, T)
     Gt = Matrix{Tf}(undef, K, K)
     for t in 1:T
@@ -773,7 +773,7 @@ function cs_regression_t_stats(B::Arr3Num, f::MatNum, eps::MatNum,
     mask, u = cs_diagnostic_mask_weights(B, eps, w)
     Gh = cs_resolved_gram(G, B, u)
     D = cs_gram_inverse_diagonal(Gh)
-    Tf = promote_type(eltype(D), float(real(eltype(f))), float(real(eltype(eps))))
+    Tf = promote_type(eltype(D), real(eltype(f)), real(eltype(eps)))
     T = size(B, 1)
     # The answer starts absent, so an observation the loop skips needs no branch of its own.
     t = fill(convert(Tf, NaN), T, K)
@@ -970,7 +970,7 @@ julia> cs_regression_t_stat_exceedance_rate([3.0 1.0; 1.0 1.0; NaN 1.0])
 function cs_regression_t_stat_exceedance_rate(t::MatNum; threshold::Number = 2)
     @argcheck(!isempty(t), IsEmptyError("t cannot be empty"))
     K = size(t, 2)
-    Tf = float(real(eltype(t)))
+    Tf = real(eltype(t))
     rate = zeros(Tf, K)
     for k in 1:K
         n = 0
@@ -1040,8 +1040,7 @@ function cs_regression_score_parts(B::Arr3Num, f::MatNum, eps::MatNum, w::Option
               DimensionMismatch("f ($(size(f, 1))×$(size(f, 2))) must match B ($T observations, $K factors)"))
     @argcheck(size(eps, 1) == T && size(eps, 2) == N,
               DimensionMismatch("eps ($(size(eps, 1))×$(size(eps, 2))) must match B ($T×$N on its first two axes)"))
-    Tf = promote_type(float(real(eltype(B))), float(real(eltype(f))),
-                      float(real(eltype(eps))))
+    Tf = promote_type(real(eltype(B)), real(eltype(f)), real(eltype(eps)))
     u0 = cs_estimation_weights_only(w, T, N, Tf)
     n = zeros(Int, T)
     rss = Vector{Tf}(undef, T)

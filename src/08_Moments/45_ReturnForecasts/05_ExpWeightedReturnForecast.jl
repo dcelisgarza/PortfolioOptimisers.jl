@@ -97,8 +97,7 @@ The three arrays are materialised at the common floating point type rather than 
 """
 function ew_forecast_design(S::Arr3Num, y::MatNum, W::MatNum, t::Integer,
                             valid::AbstractMatrix{Bool})
-    Tf = promote_type(float(real(eltype(S))), float(real(eltype(y))),
-                      float(real(eltype(W))))
+    Tf = promote_type(real(eltype(S)), real(eltype(y)), real(eltype(W)))
     idx = findall(view(valid, t, :))
     return Tf.(view(S, t, idx, :)), Tf.(view(y, t, idx)), Tf.(view(W, t, idx))
 end
@@ -176,7 +175,7 @@ Solve the ridge stabilised normal equations of an [`ExpWeightedReturnForecast`](
   - [`PseudoInverseFallback`](@ref)
 """
 function ew_forecast_solve(A::MatNum, c::VecNum, ridge::Real, t::Integer)::VecNum
-    Tf = promote_type(float(real(eltype(A))), float(real(eltype(c))))
+    Tf = promote_type(real(eltype(A)), real(eltype(c)))
     K = size(A, 1)
     Ar = Matrix{Tf}(A)
     if ridge > zero(ridge)
@@ -215,7 +214,7 @@ The forecast at observation `t` uses the coefficients estimated from the targets
   - [`forward_mean_returns`](@ref)
 """
 function ew_forecast_history(S::Arr3Num, coefs::MatNum, gap::Integer)::Matrix{<:Real}
-    Tf = promote_type(float(real(eltype(S))), float(real(eltype(coefs))))
+    Tf = promote_type(real(eltype(S)), real(eltype(coefs)))
     T = size(S, 1)
     H = fill(Tf(NaN), T, size(S, 2))
     for t in (gap + 1):T, i in axes(S, 2)
@@ -505,7 +504,7 @@ function return_forecast(rfe::ExpWeightedReturnForecast, rd::ReturnsResult,
     T = size(emsk, 1)
     K = size(Sb, 3)
     gap = rfe.lag + rfe.horizon - 1
-    Tf = promote_type(float(real(eltype(y))), float(real(eltype(W))))
+    Tf = promote_type(real(eltype(y)), real(eltype(W)))
     A = zeros(Tf, K, K)
     c = zeros(Tf, K)
     coefs = fill(Tf(NaN), max(T - gap, 0), K)

@@ -303,7 +303,7 @@ The regression target of this member is not a cross-section: every pair of an ob
   - [`descriptor_scores`](@ref)
 """
 function target_forecast_samples(S::Arr3Num, y::MatNum, w::MatNum, nt::Integer)
-    Tf = promote_type(float(real(eltype(S))), float(real(eltype(y))))
+    Tf = promote_type(real(eltype(S)), real(eltype(y)))
     N = size(S, 2)
     K = size(S, 3)
     Sf = Matrix{Tf}(undef, nt * N, K)
@@ -394,7 +394,7 @@ The method that Julia selects is the algorithm.
 """
 function target_forecast_uncalibrated(::Nothing, ::TargetReturnForecast, model, Sf::MatNum,
                                       ::VecNum, ok::AbstractVector{Bool})::VecNum
-    Tf = float(real(eltype(Sf)))
+    Tf = real(eltype(Sf))
     p = fill(Tf(NaN), length(ok))
     idx = findall(ok)
     p[idx] = StatsAPI.predict(model, Sf[idx, :])
@@ -403,7 +403,7 @@ end
 function target_forecast_uncalibrated(cv::CrossValidationEstimator,
                                       rfe::TargetReturnForecast, ::Any, Sf::MatNum,
                                       yf::VecNum, ok::AbstractVector{Bool})::VecNum
-    Tf = float(real(eltype(Sf)))
+    Tf = real(eltype(Sf))
     idx = findall(ok)
     m = length(idx)
     rdx = ReturnsResult(; nx = ["sample"], X = zeros(Tf, m, 1))
@@ -447,7 +447,7 @@ It is the inverse of the layout [`target_forecast_samples`](@ref) writes, so the
   - [`target_forecast_uncalibrated`](@ref)
 """
 function target_forecast_scatter(p::VecNum, nt::Integer, N::Integer)::Matrix{<:Real}
-    Tf = float(real(eltype(p)))
+    Tf = real(eltype(p))
     P = Matrix{Tf}(undef, nt, N)
     j = 0
     for t in 1:nt, i in 1:N
@@ -483,8 +483,7 @@ An asset enters when it carries a positive cross-sectional weight, a finite idio
 """
 function target_forecast_calibration_design(P::MatNum, fwd::MatNum, vs::MatNum, w::MatNum,
                                             t::Integer)
-    Tf = promote_type(float(real(eltype(P))), float(real(eltype(fwd))),
-                      float(real(eltype(vs))), float(real(eltype(w))))
+    Tf = promote_type(real(eltype(P)), real(eltype(fwd)), real(eltype(vs)), real(eltype(w)))
     idx = Int[]
     for i in axes(P, 2)
         if w[t, i] > zero(w[t, i]) &&
@@ -533,7 +532,7 @@ The regression target of this member is winsorised, and may be standardised, so 
 """
 function target_forecast_calibration(P::MatNum, fwd::MatNum, vs::MatNum, w::MatNum,
                                      decay::Real, min_obs::Integer)::Real
-    Tf = promote_type(float(real(eltype(P))), float(real(eltype(fwd))))
+    Tf = promote_type(real(eltype(P)), real(eltype(fwd)))
     an = zero(Tf)
     ac = zero(Tf)
     calib = Tf(NaN)
@@ -586,11 +585,11 @@ The method that Julia selects is the algorithm.
   - [`return_forecast`](@ref)
 """
 function target_forecast_latest(::Nothing, S::Arr3Num)::Matrix{<:Real}
-    Tf = float(real(eltype(S)))
+    Tf = real(eltype(S))
     return fill(Tf(NaN), 1, size(S, 2))
 end
 function target_forecast_latest(model, S::Arr3Num)::Matrix{<:Real}
-    Tf = float(real(eltype(S)))
+    Tf = real(eltype(S))
     A = Tf.(view(S, size(S, 1), :, :))
     P = fill(Tf(NaN), 1, size(A, 1))
     idx = Int[]

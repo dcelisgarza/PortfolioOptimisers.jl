@@ -1217,8 +1217,8 @@ function cross_sectional_transform(ct::CrossSectionalWinsoriser, X::MatNum;
     assert_cross_sectional_matrix(X)
     assert_cross_sectional_weights(X, w)
     assert_cross_sectional_groups(X, groups)
-    T = float(promote_type(eltype(X), cross_sectional_weight_type(w), typeof(ct.low),
-                           typeof(ct.high)))
+    T = promote_type(eltype(X), cross_sectional_weight_type(w), typeof(ct.low),
+                     typeof(ct.high))
     A = convert(Matrix{T}, X)
     fin = isfinite.(A)
     est = cross_sectional_estimation_mask(fin, w)
@@ -1244,8 +1244,8 @@ function cross_sectional_transform(ct::CrossSectionalTanhShrinker, X::MatNum;
     assert_cross_sectional_matrix(X)
     assert_cross_sectional_weights(X, w)
     assert_cross_sectional_groups(X, groups)
-    T = float(promote_type(eltype(X), cross_sectional_weight_type(w), typeof(ct.knee),
-                           typeof(ct.atol)))
+    T = promote_type(eltype(X), cross_sectional_weight_type(w), typeof(ct.knee),
+                     typeof(ct.atol))
     A = convert(Matrix{T}, X)
     fin = isfinite.(A)
     est = cross_sectional_estimation_mask(fin, w)
@@ -1271,7 +1271,7 @@ function cross_sectional_transform(ct::CrossSectionalStandardiser, X::MatNum;
     assert_cross_sectional_matrix(X)
     assert_cross_sectional_weights(X, w)
     assert_cross_sectional_groups(X, groups)
-    T = float(promote_type(eltype(X), cross_sectional_weight_type(w), typeof(ct.atol)))
+    T = promote_type(eltype(X), cross_sectional_weight_type(w), typeof(ct.atol))
     A = convert(Matrix{T}, X)
     fin = isfinite.(A)
     est = cross_sectional_estimation_mask(fin, w)
@@ -1285,7 +1285,7 @@ function cross_sectional_transform(ct::CrossSectionalGaussianRank, X::MatNum;
     assert_cross_sectional_matrix(X)
     assert_cross_sectional_weights(X, w)
     assert_cross_sectional_groups(X, groups)
-    T = float(promote_type(eltype(X), cross_sectional_weight_type(w), typeof(ct.atol)))
+    T = promote_type(eltype(X), cross_sectional_weight_type(w), typeof(ct.atol))
     A = convert(Matrix{T}, X)
     fin = isfinite.(A)
     est = cross_sectional_estimation_mask(fin, w)
@@ -1301,7 +1301,7 @@ function cross_sectional_transform(ct::CrossSectionalPercentileRank, X::MatNum;
     assert_cross_sectional_matrix(X)
     assert_cross_sectional_weights(X, w)
     assert_cross_sectional_groups(X, groups)
-    T = float(promote_type(eltype(X), cross_sectional_weight_type(w)))
+    T = promote_type(eltype(X), cross_sectional_weight_type(w))
     A = convert(Matrix{T}, X)
     fin = isfinite.(A)
     est = cross_sectional_estimation_mask(fin, w)

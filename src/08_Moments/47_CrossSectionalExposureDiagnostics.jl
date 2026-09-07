@@ -30,7 +30,7 @@ Every diagnostic of this file weights the assets of one observation, and an abse
 """
 function exposure_weights(B::Arr3Num, ::Nothing)
     @argcheck(!isempty(B), IsEmptyError("B cannot be empty"))
-    return ones(float(real(eltype(B))), size(B, 1), size(B, 2))
+    return ones(real(eltype(B)), size(B, 1), size(B, 2))
 end
 function exposure_weights(B::Arr3Num, w::MatNum)
     @argcheck(!isempty(B), IsEmptyError("B cannot be empty"))
@@ -94,8 +94,7 @@ julia> PortfolioOptimisers.cs_weighted_correlation([1.0, 2.0, 3.0], [2.0, 4.0, 6
 """
 function cs_weighted_correlation(a::AbstractVector, b::AbstractVector, u::AbstractVector;
                                  min_count::Integer = 3, eps::Real = 1e-12)
-    Tf = promote_type(float(real(eltype(a))), float(real(eltype(b))),
-                      float(real(eltype(u))))
+    Tf = promote_type(real(eltype(a)), real(eltype(b)), real(eltype(u)))
     N = length(a)
     n = 0
     ws = zero(Tf)
@@ -179,7 +178,7 @@ The rank is the position the entry takes in the sorted order, so two equal value
   - [`cs_spearman_correlation`](@ref)
 """
 function cs_ordinal_ranks(key::AbstractVector, valid::AbstractVector{Bool})
-    Tf = float(real(eltype(key)))
+    Tf = real(eltype(key))
     N = length(key)
     p = sortperm(key)
     r = Vector{Tf}(undef, N)
@@ -222,7 +221,7 @@ It is the unweighted correlation of the ordinal ranks of the two cross-sections,
 """
 function cs_spearman_correlation(a::AbstractVector, b::AbstractVector;
                                  min_count::Integer = 3, eps::Real = 1e-12)
-    Tf = promote_type(float(real(eltype(a))), float(real(eltype(b))))
+    Tf = promote_type(real(eltype(a)), real(eltype(b)))
     N = length(a)
     ka = Vector{Tf}(undef, N)
     kb = Vector{Tf}(undef, N)
@@ -277,7 +276,7 @@ function exposure_forward_mean_return(R::MatNum, horizon::Integer)
     T, N = size(R)
     @argcheck(T > horizon,
               DimensionMismatch("R ($T observations) must carry more observations than horizon ($horizon)"))
-    Tf = float(real(eltype(R)))
+    Tf = real(eltype(R))
     P = T - horizon
     y = Matrix{Tf}(undef, P, N)
     for i in 1:N, t in 1:P
@@ -357,7 +356,7 @@ Where:
 function exposure_correlation(B::Arr3Num, w::Option{<:MatNum} = nothing)
     u = exposure_weights(B, w)
     K = size(B, 3)
-    Tf = promote_type(float(real(eltype(B))), float(real(eltype(u))))
+    Tf = promote_type(real(eltype(B)), real(eltype(u)))
     Cm = Matrix{Tf}(undef, K, K)
     for l in 1:K, k in 1:l
         v = k == l ? one(Tf) : Tf(exposure_pair_correlation(B, u, k, l))
@@ -394,7 +393,7 @@ The pair is correlated at each observation, and the answers are averaged over th
   - [`exposure_pair_observation`](@ref)
 """
 function exposure_pair_correlation(B::Arr3Num, u::MatNum, k::Integer, l::Integer)
-    Tf = promote_type(float(real(eltype(B))), float(real(eltype(u))))
+    Tf = promote_type(real(eltype(B)), real(eltype(u)))
     T = size(B, 1)
     acc = zero(Tf)
     cnt = 0
@@ -438,7 +437,7 @@ The pair is correlated over the assets at which both exposures are finite. It ha
 """
 function exposure_pair_observation(B::Arr3Num, u::MatNum, t::Integer, k::Integer,
                                    l::Integer)
-    Tf = promote_type(float(real(eltype(B))), float(real(eltype(u))))
+    Tf = promote_type(real(eltype(B)), real(eltype(u)))
     m = exposure_pair_sums(B, u, t, k, l)
     if !(m.W > zero(Tf)) || m.nv < 3
         return Tf(NaN), false
@@ -476,7 +475,7 @@ An asset enters when both of its exposures are finite, so the support is the one
   - [`exposure_pair_observation`](@ref)
 """
 function exposure_pair_sums(B::Arr3Num, u::MatNum, t::Integer, k::Integer, l::Integer)
-    Tf = promote_type(float(real(eltype(B))), float(real(eltype(u))))
+    Tf = promote_type(real(eltype(B)), real(eltype(u)))
     N = size(B, 2)
     nv = 0
     W = zero(Tf)
@@ -576,8 +575,7 @@ function exposure_ic(B::Arr3Num, R::MatNum, w::Option{<:MatNum} = nothing;
               DimensionMismatch("R ($(size(R, 1))×$(size(R, 2))) must match B ($T×$N on its first two axes)"))
     @argcheck(horizon >= 1, DomainError(horizon, "horizon must be >= 1"))
     y = exposure_forward_mean_return(R, horizon)
-    Tf = promote_type(float(real(eltype(B))), float(real(eltype(y))),
-                      float(real(eltype(u))))
+    Tf = promote_type(real(eltype(B)), real(eltype(y)), real(eltype(u)))
     P = T - horizon
     ic = Matrix{Tf}(undef, P, K)
     for k in 1:K, t in 1:P
@@ -646,7 +644,7 @@ Where:
 function exposure_ic_summary(ic::MatNum)
     @argcheck(!isempty(ic), IsEmptyError("ic cannot be empty"))
     P, K = size(ic)
-    Tf = float(real(eltype(ic)))
+    Tf = real(eltype(ic))
     mean_ic = Vector{Tf}(undef, K)
     std_ic = Vector{Tf}(undef, K)
     ic_ir = Vector{Tf}(undef, K)
@@ -682,7 +680,7 @@ The mean and the standard deviation read the observations at which the coefficie
 """
 function exposure_ic_factor_summary(ic::MatNum, k::Integer)
     P = size(ic, 1)
-    Tf = float(real(eltype(ic)))
+    Tf = real(eltype(ic))
     n = 0
     s = zero(Tf)
     h = 0
@@ -769,7 +767,7 @@ function exposure_stability(B::Arr3Num, w::Option{<:MatNum} = nothing; step::Int
     @argcheck(step >= 1, DomainError(step, "step must be >= 1"))
     @argcheck(T > step,
               DimensionMismatch("B ($T observations) must carry more observations than step ($step)"))
-    Tf = promote_type(float(real(eltype(B))), float(real(eltype(u))))
+    Tf = promote_type(real(eltype(B)), real(eltype(u)))
     P = T - step
     S = Matrix{Tf}(undef, P, K)
     for k in 1:K, t in 1:P
@@ -832,7 +830,7 @@ Where:
 function exposure_dispersion(B::Arr3Num, w::Option{<:MatNum} = nothing)
     u = exposure_weights(B, w)
     T, N, K = size(B)
-    Tf = promote_type(float(real(eltype(B))), float(real(eltype(u))))
+    Tf = promote_type(real(eltype(B)), real(eltype(u)))
     D = Matrix{Tf}(undef, T, K)
     for k in 1:K, t in 1:T
         D[t, k] = Tf(exposure_cross_section_std(B, u, t, k))
@@ -862,7 +860,7 @@ The weights are normalised over the assets at which the exposure is finite, so a
   - [`exposure_dispersion`](@ref)
 """
 function exposure_cross_section_std(B::Arr3Num, u::MatNum, t::Integer, k::Integer)
-    Tf = promote_type(float(real(eltype(B))), float(real(eltype(u))))
+    Tf = promote_type(real(eltype(B)), real(eltype(u)))
     N = size(B, 2)
     ws = zero(Tf)
     for i in 1:N
@@ -936,7 +934,7 @@ Where:
 function exposure_coverage(B::Arr3Num, w::Option{<:MatNum} = nothing)
     u = exposure_weights(B, w)
     T, N, K = size(B)
-    Tf = promote_type(float(real(eltype(B))), float(real(eltype(u))))
+    Tf = promote_type(real(eltype(B)), real(eltype(u)))
     c = zeros(Tf, K)
     for t in 1:T
         ne = exposure_universe_size(u, t)
@@ -1100,8 +1098,7 @@ function exposure_ic_data(csfm::CrossSectionalFactorModel, Ms::Arr3Num,
               DimensionMismatch("Ms ($T observations) must carry more observations than lag ($lag)"))
     @argcheck(size(csr.f, 1) == T && size(csr.f, 2) == K,
               DimensionMismatch("csr.f ($(size(csr.f, 1))×$(size(csr.f, 2))) must match Ms ($T observations, $K factors)"))
-    Tf = promote_type(float(real(eltype(Ms))), float(real(eltype(csr.f))),
-                      float(real(eltype(csr.eps))))
+    Tf = promote_type(real(eltype(Ms)), real(eltype(csr.f)), real(eltype(csr.eps)))
     start = max(1, lag)
     P = T - start + 1
     R = fill(Tf(NaN), P, N)

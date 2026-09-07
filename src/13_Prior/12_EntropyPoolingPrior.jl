@@ -57,7 +57,7 @@ function ep_evar(x::VecNum, w::VecNum, alpha::Number; args::Tuple = (),
         return z * (LogExpFunctions.logsumexp(lw .+ x ./ z) + ila)
     end
     hi = (maximum(x) - LinearAlgebra.dot(exp.(lw), x)) / ila
-    ehi = eps(float(typeof(hi)))
+    ehi = eps(typeof(hi))
     hi = ifelse(hi > zero(hi), hi, ehi)
     # The default lower end is the one the element type states, which a caller that holds no
     # data cannot, so `nothing` resolves here rather than in the view that carries it.
@@ -425,7 +425,7 @@ function ep_row_tilt(w::VecNum, c::VecNum, b::Number; iters::Integer = 200)
     if !(lo < b < hi)
         return nothing
     end
-    q = Vector{float(promote_type(eltype(w), eltype(c), typeof(b)))}(undef, length(w))
+    q = Vector{promote_type(eltype(w), eltype(c), typeof(b))}(undef, length(w))
     # Each call leaves the unnormalised tilt in `q`, so the last call is the answer.
     row = function (th)
         q .= (-th) .* c

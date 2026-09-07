@@ -64,7 +64,7 @@ Return the descriptor weights a [`CompositeExposure`](@ref) combines its Descrip
   - [`assert_composite_weights`](@ref)
 """
 function composite_weights(::Nothing, n::Integer)::VecNum
-    return fill(inv(float(n)), n)
+    return fill(inv(n), n)
 end
 function composite_weights(weights::VecNum, ::Integer)::VecNum
     return weights
@@ -384,7 +384,7 @@ function factor_exposure(xe::CompositeExposure, rd::ReturnsResult)::Matrix{<:Rea
     des = xe.descriptors
     wv = composite_weights(xe.weights, length(des))
     S = composite_score(des[1], rd, xe.outlier, xe.scoring, w, groups)
-    Tf = float(promote_type(eltype(S), eltype(wv)))
+    Tf = promote_type(eltype(S), eltype(wv))
     num = zeros(Tf, size(S))
     den = zeros(Tf, size(S))
     composite_accumulate!(num, den, S, wv[1])

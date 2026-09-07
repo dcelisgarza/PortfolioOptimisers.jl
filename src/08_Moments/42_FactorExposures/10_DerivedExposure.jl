@@ -168,7 +168,7 @@ function factor_exposure(xe::DerivedExposure, rd::ReturnsResult, xs::MatNum)::Ma
     D0 = xe.f(xs)
     @argcheck(size(D0) == size(xs),
               DimensionMismatch("f maps one Factor Exposure to another, so it must return a matrix of the size it was given, got $(size(D0)) from size(xs) = $(size(xs))"))
-    Tf = float(promote_type(eltype(D0), eltype(xs)))
+    Tf = promote_type(eltype(D0), eltype(xs))
     D = exposure_transform(xe.outlier, convert(Matrix{Tf}, D0), w, groups)
     return exposure_transform(xe.scoring, D, w, groups)
 end

@@ -67,7 +67,7 @@ function descriptor_returns(rd::ReturnsResult)
               IsNothingError("a rolling Descriptor reads returns, and rd.X is nothing. Build the carrier with the returns matrix the Asset Panel was drawn on."))
     @argcheck(!isnothing(pnl),
               IsNothingError("a rolling Descriptor reads the active mask of an Asset Panel, and rd.pnl is nothing. Build the carrier with the `pnl` that asset_panel returns."))
-    return Matrix{float(eltype(X))}(X), pnl
+    return Matrix(X), pnl
 end
 """
     rolling_window_max(X::AbstractMatrix{<:Real}, amsk::AbstractMatrix{Bool},
