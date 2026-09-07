@@ -113,6 +113,12 @@ function NestedClusteredResult(; pr::Option{<:AbstractPriorResult},
     return NestedClusteredResult(pr, clr, wb, fees, resi, reso, cv, retcode,
                                  expand_investable_weights(imsk, w), imsk, fb)
 end
+# The nested-clustered family carries the mask on the result itself, so the fold reads it
+# directly. The inner results are of the reduced universe, so the outer mask is the one the
+# fold scores against.
+function result_investable_mask(res::NestedClusteredResult)
+    return res.imsk
+end
 """
     set_retcode(res::NestedClusteredResult, retcode::OptRetCode_VecOptRetCode)
 

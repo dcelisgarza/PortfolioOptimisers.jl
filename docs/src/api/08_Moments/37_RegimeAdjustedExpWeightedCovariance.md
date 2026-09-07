@@ -58,4 +58,12 @@ cor(ce::RegimeAdjustedExpWeightedCovariance, state::RegimeAdjustedCovarianceStat
 cor(ce::RegimeAdjustedExpWeightedCovariance; kwargs...)
 PortfolioOptimisers.merge_states(a::RegimeAdjustedCovarianceState, b::RegimeAdjustedCovarianceState)
 Base.copy(x::PortfolioOptimisers.RegimeAdjustedCovarianceState)
+cov(ce::RegimeAdjustedExpWeightedCovariance, X::MatNum,
+                        pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+cor(ce::RegimeAdjustedExpWeightedCovariance, X::MatNum,
+                        pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+var(ce::RegimeAdjustedExpWeightedCovariance, X::MatNum,
+                        pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+std(ce::RegimeAdjustedExpWeightedCovariance, X::MatNum,
+                        pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
 ```

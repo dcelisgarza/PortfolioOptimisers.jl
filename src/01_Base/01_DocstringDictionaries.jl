@@ -807,6 +807,9 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :ra_pair_obs_count => "`pair_obs_count`: Pairwise count of co-observations, or `nothing` where one decay governs both the variance and the correlation.",#
                                  :ra_XXt => "`XXt`: Working matrix for the current (possibly HAC-adjusted) outer product of the returns.",#
                                  :ra_Xi => "`Xi`: Working array for the current centred returns.",#
+                                 # Plain exponentially weighted estimators.
+                                 :ew_cache => "`cache`: Running state of an incremental fit, or `nothing` before the first call to [`partial_fit!`](@ref). It is the one Result this estimator holds, and its type bound is the enforcement of the rule that ADR 0106 excepts. A fit over a matrix ignores it.",#
+                                 :ew_mu => "`mu`: Running exponentially weighted mean vector, seeded at zero.",#
                                  :sq => "`sq`: Whether to use variance instead of volatility in the inverse weighting.",#
                                  :wfalg => "`alg`: Weight finaliser error formulation algorithm.",#
                                  :res_retcode => "`res`: Optional result or message from the solver.",#

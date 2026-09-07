@@ -125,6 +125,10 @@ function SchurComplementHierarchicalRiskParityResult(; pr::Option{<:AbstractPrio
                                                        expand_investable_weights(imsk, w),
                                                        imsk, fb)
 end
+# The Schur family carries the mask on the result itself, so the fold reads it directly.
+function result_investable_mask(res::SchurComplementHierarchicalRiskParityResult)
+    return res.imsk
+end
 """
 $(DocStringExtensions.TYPEDEF)
 

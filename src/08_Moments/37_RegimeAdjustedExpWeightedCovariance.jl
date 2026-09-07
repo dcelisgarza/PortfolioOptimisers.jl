@@ -2066,5 +2066,151 @@ function Base.copy(x::RegimeAdjustedCovarianceState)
                                          copy(x.obs_count), copy(x.active), x.regime_state,
                                          x.n_regime_obs)
 end
+"""
+    Statistics.cov(
+        ce::RegimeAdjustedExpWeightedCovariance,
+        X::MatNum,
+        pnl::Option{<:AssetPanel};
+        dims::Int = 1,
+        kwargs...
+    ) -> MatNum
+
+Compute the regime-adjusted exponentially weighted covariance from a window of an Asset Panel.
+
+This estimator is mask-aware, so it overrides the reduce-and-expand root of the verb and reads the panel's two masks itself: the active mask drives the freeze and the reset, and the estimation mask restricts which assets feed the regime statistic. The answer therefore lives on the whole universe rather than on the Coverage Universe, and a young asset that lists inside the window is answered from the observations it has.
+
+# Arguments
+
+  - `ce`: Regime-adjusted exponentially weighted covariance estimator.
+  - $(arg_dict[:X])
+  - $(arg_dict[:pnl_moment])
+  - $(arg_dict[:dims])
+  - $(arg_dict[:ignkwargs])
+
+# Returns
+
+  - `sigma::MatNum`: Covariance matrix of size `assets × assets`.
+
+# Related
+
+  - [`RegimeAdjustedExpWeightedCovariance`](@ref)
+  - [`panel_moment_masks`](@ref)
+  - [`Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref)
+"""
+function Statistics.cov(ce::RegimeAdjustedExpWeightedCovariance, X::MatNum,
+                        pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+    amsk, emsk = panel_moment_masks(pnl)
+    return Statistics.cov(ce, X; dims = dims, estimation_mask = emsk, active_mask = amsk,
+                          kwargs...)
+end
+"""
+    Statistics.cor(
+        ce::RegimeAdjustedExpWeightedCovariance,
+        X::MatNum,
+        pnl::Option{<:AssetPanel};
+        dims::Int = 1,
+        kwargs...
+    ) -> MatNum
+
+Compute the regime-adjusted exponentially weighted correlation from a window of an Asset Panel.
+
+This is the covariance of the same call, rescaled to a unit diagonal, and it reads the panel's two masks through the same override.
+
+# Arguments
+
+  - `ce`: Regime-adjusted exponentially weighted covariance estimator.
+  - $(arg_dict[:X])
+  - $(arg_dict[:pnl_moment])
+  - $(arg_dict[:dims])
+  - $(arg_dict[:ignkwargs])
+
+# Returns
+
+  - `rho::MatNum`: Correlation matrix of size `assets × assets`.
+
+# Related
+
+  - [`RegimeAdjustedExpWeightedCovariance`](@ref)
+  - [`Statistics.cov(ce::RegimeAdjustedExpWeightedCovariance, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref)
+"""
+function Statistics.cor(ce::RegimeAdjustedExpWeightedCovariance, X::MatNum,
+                        pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+    amsk, emsk = panel_moment_masks(pnl)
+    return Statistics.cor(ce, X; dims = dims, estimation_mask = emsk, active_mask = amsk,
+                          kwargs...)
+end
+"""
+    Statistics.var(
+        ce::RegimeAdjustedExpWeightedCovariance,
+        X::MatNum,
+        pnl::Option{<:AssetPanel};
+        dims::Int = 1,
+        kwargs...
+    ) -> MatNum
+
+Compute the marginal variance of the regime-adjusted exponentially weighted covariance from a window of an Asset Panel.
+
+This is the diagonal of the covariance of the same call, and it reads the panel's two masks through the same override.
+
+# Arguments
+
+  - `ce`: Regime-adjusted exponentially weighted covariance estimator.
+  - $(arg_dict[:X])
+  - $(arg_dict[:pnl_moment])
+  - $(arg_dict[:dims])
+  - $(arg_dict[:ignkwargs])
+
+# Returns
+
+  - `var::MatNum`: Marginal variance, as a row where `dims` is `1` and as a column otherwise.
+
+# Related
+
+  - [`RegimeAdjustedExpWeightedCovariance`](@ref)
+  - [`Statistics.cov(ce::RegimeAdjustedExpWeightedCovariance, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref)
+"""
+function Statistics.var(ce::RegimeAdjustedExpWeightedCovariance, X::MatNum,
+                        pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+    amsk, emsk = panel_moment_masks(pnl)
+    return Statistics.var(ce, X; dims = dims, estimation_mask = emsk, active_mask = amsk,
+                          kwargs...)
+end
+"""
+    Statistics.std(
+        ce::RegimeAdjustedExpWeightedCovariance,
+        X::MatNum,
+        pnl::Option{<:AssetPanel};
+        dims::Int = 1,
+        kwargs...
+    ) -> MatNum
+
+Compute the marginal volatility of the regime-adjusted exponentially weighted covariance from a window of an Asset Panel.
+
+This is the square root of the diagonal of the covariance of the same call, and it reads the panel's two masks through the same override.
+
+# Arguments
+
+  - `ce`: Regime-adjusted exponentially weighted covariance estimator.
+  - $(arg_dict[:X])
+  - $(arg_dict[:pnl_moment])
+  - $(arg_dict[:dims])
+  - $(arg_dict[:ignkwargs])
+
+# Returns
+
+  - `std::MatNum`: Marginal volatility, as a row where `dims` is `1` and as a column otherwise.
+
+# Related
+
+  - [`RegimeAdjustedExpWeightedCovariance`](@ref)
+  - [`Statistics.var(ce::RegimeAdjustedExpWeightedCovariance, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref)
+"""
+function Statistics.std(ce::RegimeAdjustedExpWeightedCovariance, X::MatNum,
+                        pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+    amsk, emsk = panel_moment_masks(pnl)
+    return Statistics.std(ce, X; dims = dims, estimation_mask = emsk, active_mask = amsk,
+                          kwargs...)
+end
+
 export RegimeAdjustedTarget, MahalanobisTarget, DiagonalTarget, PortfolioTarget,
        RegimeAdjustedExpWeightedCovariance
