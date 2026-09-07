@@ -107,7 +107,7 @@ function DerivedExposure(; source::AbstractString, f,
 end
 """
     factor_exposure(xe::DerivedExposure, rd::ReturnsResult) -> Union{}
-    factor_exposure(xe::DerivedExposure, rd::ReturnsResult, xs::MatNum) -> Matrix{<:Real}
+    factor_exposure(xe::DerivedExposure, rd::ReturnsResult, xs::MatNum) -> Matrix
 
 Compute the Factor Exposure derived from the Factor Exposure of another factor.
 
@@ -160,7 +160,7 @@ julia> factor_exposure(xe, rd, [1.0 2.0; 3.0 4.0])
 function factor_exposure(xe::DerivedExposure, ::ReturnsResult)
     return throw(ArgumentError("a derived Factor Exposure is computed from the Factor Exposure of the factor \"$(xe.source)\", which it cannot read from the carrier. The caller that holds the factor list computes the factors in dependency order, and passes the source exposure to the three-argument method factor_exposure(xe, rd, xs)"))
 end
-function factor_exposure(xe::DerivedExposure, rd::ReturnsResult, xs::MatNum)::Matrix{<:Real}
+function factor_exposure(xe::DerivedExposure, rd::ReturnsResult, xs::MatNum)::Matrix
     w = exposure_benchmark_weights(rd, xe.bw)
     @argcheck(size(xs) == size(w),
               DimensionMismatch("the source Factor Exposure is observations × assets, like the Asset Panel it was computed on, got size(xs) = $(size(xs)) and $(size(w))"))

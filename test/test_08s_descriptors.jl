@@ -524,3 +524,59 @@ end
         end
     end
 end
+@testset "A widened numeric bound admits a number that is not Real (#909)" begin
+    # These verbs neither order their values nor test them for finiteness, so their bounds
+    # state `<:Number` rather than `<:Real`. The probe is a Complex argument: it carries no
+    # order, so it reaches a widened method and is refused by a narrow one.
+    pnl = AssetPanel(; pf = [NumericPanelField(; name = "a", vals = [1.0 2.0; 3.0 4.0])],
+                     amsk = [true false; true true], emsk = [true false; true true])
+
+    D = Complex{Float64}[1 2; 3 4]
+    PortfolioOptimisers.descriptor_active_fill!(D, pnl)
+    @test isnan(real(D[1, 2]))
+    @test D[1, 1] == 1 && D[2, 1] == 3 && D[2, 2] == 4
+
+    L = Complex{Float64}[1 2; 3 4]
+    PortfolioOptimisers.exposure_active_fill!(L, pnl)
+    @test isnan(real(L[1, 2]))
+
+    L3 = fill(one(Complex{Float64}), 2, 2, 2)
+    PortfolioOptimisers.exposure_active_fill!(L3, pnl)
+    @test isnan(real(L3[1, 2, 1])) && L3[1, 1, 1] == 1
+
+    B = fill(one(Complex{Float64}), 2, 2, 2)
+    PortfolioOptimisers.one_hot_observed_fill!(B, [true false; true true])
+    @test isnan(real(B[1, 2, 1])) && B[1, 1, 1] == 1
+    PortfolioOptimisers.one_hot_observed_fill!(B, nothing)
+    @test B[1, 1, 1] == 1
+
+    X = Complex{Float64}[1 2; 3 4]
+    @test isnan(real(PortfolioOptimisers.ew_active_returns(X, pnl)[1, 2]))
+
+    Ba = Complex{Float64}[1 2; 3 4]
+    @test PortfolioOptimisers.ew_beta_expand(Ba, 4, 2)[2, :] == Complex{Float64}[1, 2]
+
+    v = Complex{Float64}[1, 2, 6]
+    w = Complex{Float64}[1, 1, 3]
+    msk = [true, false, true]
+    @test PortfolioOptimisers.ew_masked_mean(v, msk) == 3.5
+    @test PortfolioOptimisers.ew_masked_weighted_mean(v, w, msk) == 4.75
+
+    mu = Complex{Float64}[1, 2]
+    cv = Complex{Float64}[3, 4]
+    PortfolioOptimisers.ew_beta_reset!([true false; true true], mu, cv, [1, 1],
+                                       [true, true], 1)
+    @test iszero(mu[2]) && iszero(cv[2])
+    PortfolioOptimisers.ew_beta_reset!(nothing, mu, cv, [1, 1], [true, true], 1)
+
+    @test PortfolioOptimisers.ew_volatility_input(FullMoment(), X, 0) === X
+
+    Ms = zeros(Complex{Float64}, 2, 2, 2)
+    PortfolioOptimisers.cross_sectional_exposure_write!(Ms, X, 1, 1, "f")
+    @test Ms[:, :, 1] == X
+    PortfolioOptimisers.cross_sectional_exposure_write!(Ms, reshape(X, 2, 2, 1), 2, 1, "f")
+    @test Ms[:, :, 2] == X
+
+    @test PortfolioOptimisers.target_forecast_multiplier(true, 2 + 0im) == 2 + 0im
+    @test PortfolioOptimisers.target_forecast_multiplier(false, 2 + 0im) == 1
+end

@@ -223,14 +223,14 @@ $(DocStringExtensions.TYPEDFIELDS)
     The calibration coefficient, or `NaN` when the member did not calibrate or the calibration is in its warm-up.
     """
     calib
-    function TargetReturnForecastResult(mu::VecNum, model, calib::Real)
+    function TargetReturnForecastResult(mu::VecNum, model, calib::Number)
         @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
         return new{typeof(mu), Nothing, typeof(model), typeof(calib)}(mu, nothing, model,
                                                                       calib)
     end
 end
 function TargetReturnForecastResult(; mu::VecNum, model = nothing,
-                                    calib::Real = NaN)::TargetReturnForecastResult
+                                    calib::Number = NaN)::TargetReturnForecastResult
     return TargetReturnForecastResult(mu, model, calib)
 end
 """
@@ -750,7 +750,7 @@ function return_forecast(rfe::TargetReturnForecast, rd::ReturnsResult,
                                       model = model, calib = calib)
 end
 """
-    target_forecast_multiplier(calibrate::Bool, calib::Real) -> Real
+    target_forecast_multiplier(calibrate::Bool, calib::Number) -> Number
 
 Return the multiplier a [`TargetReturnForecast`](@ref) applies to its uncalibrated prediction.
 
@@ -770,7 +770,7 @@ A member that does not calibrate publishes the prediction as it stands, so its m
   - [`TargetReturnForecast`](@ref)
   - [`target_forecast_calibration`](@ref)
 """
-function target_forecast_multiplier(calibrate::Bool, calib::Real)::Real
+function target_forecast_multiplier(calibrate::Bool, calib::Number)::Number
     return calibrate ? calib : one(calib)
 end
 """

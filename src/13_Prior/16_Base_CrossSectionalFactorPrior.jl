@@ -174,9 +174,9 @@ function cross_sectional_exposure_widths(factors::AbstractVector{<:Pair},
     return wid
 end
 """
-    cross_sectional_exposure_write!(Ms::AbstractArray{<:Real, 3}, A::MatNum, c::Integer,
+    cross_sectional_exposure_write!(Ms::AbstractArray{<:Number, 3}, A::MatNum, c::Integer,
                                     w::Integer, nm::AbstractString) -> nothing
-    cross_sectional_exposure_write!(Ms::AbstractArray{<:Real, 3}, A::Arr3Num, c::Integer,
+    cross_sectional_exposure_write!(Ms::AbstractArray{<:Number, 3}, A::Arr3Num, c::Integer,
                                     w::Integer, nm::AbstractString) -> nothing
 
 Write one factor's Factor Exposure into the exposure history, in place.
@@ -204,7 +204,7 @@ A member answers a matrix when it contributes one factor and a three-dimensional
   - [`factor_exposure`](@ref)
   - [`cross_sectional_exposure_history`](@ref)
 """
-function cross_sectional_exposure_write!(Ms::AbstractArray{<:Real, 3}, A::MatNum,
+function cross_sectional_exposure_write!(Ms::AbstractArray{<:Number, 3}, A::MatNum,
                                          c::Integer, w::Integer,
                                          nm::AbstractString)::Nothing
     @argcheck(isone(w),
@@ -214,7 +214,7 @@ function cross_sectional_exposure_write!(Ms::AbstractArray{<:Real, 3}, A::MatNum
     Ms[:, :, c] = A
     return nothing
 end
-function cross_sectional_exposure_write!(Ms::AbstractArray{<:Real, 3}, A::Arr3Num,
+function cross_sectional_exposure_write!(Ms::AbstractArray{<:Number, 3}, A::Arr3Num,
                                          c::Integer, w::Integer,
                                          nm::AbstractString)::Nothing
     @argcheck(size(A) == (size(Ms, 1), size(Ms, 2), w),

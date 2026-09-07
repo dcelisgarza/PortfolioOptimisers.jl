@@ -1,5 +1,5 @@
 """
-    ew_active_returns(X::AbstractMatrix{<:Real}, pnl::AssetPanel) -> Matrix{<:Real}
+    ew_active_returns(X::AbstractMatrix{<:Number}, pnl::AssetPanel) -> Matrix
 
 Copy the returns with every inactive cell written to `NaN`.
 
@@ -21,7 +21,7 @@ An asset outside the universe has no return at all, so the cell must not advance
   - [`EWMacroSensitivity`](@ref)
   - [`descriptor_active_fill!`](@ref)
 """
-function ew_active_returns(X::AbstractMatrix{<:Real}, pnl::AssetPanel)
+function ew_active_returns(X::AbstractMatrix{<:Number}, pnl::AssetPanel)
     Xm = Matrix(X)
     descriptor_active_fill!(Xm, pnl)
     return Xm
@@ -112,7 +112,7 @@ function ew_agg_vector(v::AbstractVector{<:Real}, agg_obs::Integer)
     return vec(ew_agg_series(reshape(v, :, 1), agg_obs))
 end
 """
-    ew_beta_expand(Ba::AbstractMatrix{<:Real}, T::Integer, agg_obs::Integer) -> Matrix{<:Real}
+    ew_beta_expand(Ba::AbstractMatrix{<:Number}, T::Integer, agg_obs::Integer) -> Matrix
 
 Spread an aggregated beta series back over the observations it was aggregated from.
 
@@ -146,8 +146,7 @@ julia> PortfolioOptimisers.ew_beta_expand([1.0 2.0; 3.0 4.0], 5, 2)
   - [`EWBeta`](@ref)
   - [`EWMacroSensitivity`](@ref)
 """
-function ew_beta_expand(Ba::AbstractMatrix{<:Real}, T::Integer,
-                        agg_obs::Integer)::Matrix{<:Real}
+function ew_beta_expand(Ba::AbstractMatrix{<:Number}, T::Integer, agg_obs::Integer)::Matrix
     Tf = eltype(Ba)
     B = fill(Tf(NaN), T, size(Ba, 2))
     for t in 1:T
@@ -222,7 +221,7 @@ function ew_beta_residual_variance(X::AbstractMatrix{<:Real}, rm::AbstractVector
     return Vr
 end
 """
-    ew_masked_mean(v::AbstractVector{<:Real}, msk::AbstractVector{Bool}) -> Real
+    ew_masked_mean(v::AbstractVector{<:Number}, msk::AbstractVector{Bool}) -> Number
 
 Mean of the entries a mask selects.
 
@@ -247,7 +246,7 @@ julia> PortfolioOptimisers.ew_masked_mean([1.0, 2.0, 6.0], [true, false, true])
   - [`ew_masked_weighted_mean`](@ref)
   - [`ew_beta_shrink`](@ref)
 """
-function ew_masked_mean(v::AbstractVector{<:Real}, msk::AbstractVector{Bool})::Real
+function ew_masked_mean(v::AbstractVector{<:Number}, msk::AbstractVector{Bool})::Number
     Tf = eltype(v)
     s = zero(Tf)
     c = 0
@@ -260,8 +259,8 @@ function ew_masked_mean(v::AbstractVector{<:Real}, msk::AbstractVector{Bool})::R
     return s / c
 end
 """
-    ew_masked_weighted_mean(v::AbstractVector{<:Real}, w::AbstractVector{<:Real},
-                            msk::AbstractVector{Bool}) -> Real
+    ew_masked_weighted_mean(v::AbstractVector{<:Number}, w::AbstractVector{<:Number},
+                            msk::AbstractVector{Bool}) -> Number
 
 Weighted mean of the entries a mask selects.
 
@@ -290,8 +289,8 @@ julia> PortfolioOptimisers.ew_masked_weighted_mean([1.0, 2.0, 6.0], [1.0, 1.0, 3
   - [`ew_masked_mean`](@ref)
   - [`ew_beta_shrink`](@ref)
 """
-function ew_masked_weighted_mean(v::AbstractVector{<:Real}, w::AbstractVector{<:Real},
-                                 msk::AbstractVector{Bool})::Real
+function ew_masked_weighted_mean(v::AbstractVector{<:Number}, w::AbstractVector{<:Number},
+                                 msk::AbstractVector{Bool})::Number
     Tf = promote_type(eltype(v), eltype(w))
     s = zero(Tf)
     d = zero(Tf)

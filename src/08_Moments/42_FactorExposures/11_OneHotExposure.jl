@@ -183,8 +183,9 @@ function one_hot_level_fill!(B::AbstractArray{<:Real, 3})::Nothing
     return nothing
 end
 """
-    one_hot_observed_fill!(B::AbstractArray{<:Real, 3}, Z::Arr3Num, ocols::Nothing) -> nothing
-    one_hot_observed_fill!(B::AbstractArray{<:Real, 3}, Z::Arr3Num, ocols::VecInt) -> nothing
+    one_hot_observed_fill!(B::AbstractArray{<:Number, 3}, omsk::Nothing) -> nothing
+    one_hot_observed_fill!(B::AbstractArray{<:Number, 3},
+                           omsk::AbstractMatrix{Bool}) -> nothing
 
 Write `NaN` across every level of a one-hot Factor Exposure where the Panel Field was not observed, in place.
 
@@ -193,8 +194,7 @@ A blank never reaches a carrier: the builder resolves it to a fill value and rec
 # Arguments
 
   - `B`: The one-hot block, `observations × assets × levels`, changed in place.
-  - `Z`: Time-varying feature matrix `observations × assets × features` the observed-mask column lives in.
-  - `ocols`: Columns of `Z` holding the Panel Field's observed mask, or `nothing` when the Panel Field cannot blank.
+  - `omsk`: The Panel Field's observed mask, `observations × assets`, or `nothing` when the Panel Field cannot blank.
 
 # Returns
 
@@ -206,10 +206,10 @@ A blank never reaches a carrier: the builder resolves it to a fill value and rec
   - [`one_hot_level_fill!`](@ref)
   - [`factor_exposure`](@ref)
 """
-function one_hot_observed_fill!(::AbstractArray{<:Real, 3}, ::Nothing)::Nothing
+function one_hot_observed_fill!(::AbstractArray{<:Number, 3}, ::Nothing)::Nothing
     return nothing
 end
-function one_hot_observed_fill!(B::AbstractArray{<:Real, 3},
+function one_hot_observed_fill!(B::AbstractArray{<:Number, 3},
                                 omsk::AbstractMatrix{Bool})::Nothing
     Tf = eltype(B)
     for t in axes(B, 1), i in axes(B, 2)
@@ -277,7 +277,7 @@ julia> factor_exposure(OneHotExposure(; field = \"sector\", family = \"sector\")
 function factor_exposure(xe::OneHotExposure, rd::ReturnsResult)::Array{<:Real, 3}
     f = one_hot_field(rd, xe.field)
     codes = f.codes
-    Tf = Float64
+    Tf = real(eltype(rd.X))
     B = zeros(Tf, size(codes, 1), size(codes, 2), length(f.levels))
     for i in CartesianIndices(codes)
         B[i, codes[i]] = one(Tf)

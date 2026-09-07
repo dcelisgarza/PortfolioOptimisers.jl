@@ -239,8 +239,8 @@ function exposure_transform(ct::AbstractCrossSectionalTransform, X::MatNum,
     return cross_sectional_transform(ct, X; w = w, groups = groups)
 end
 """
-    exposure_active_fill!(L::AbstractMatrix{<:Real}, pnl::AssetPanel) -> nothing
-    exposure_active_fill!(L::AbstractArray{<:Real, 3}, pnl::AssetPanel) -> nothing
+    exposure_active_fill!(L::AbstractMatrix{<:Number}, pnl::AssetPanel) -> nothing
+    exposure_active_fill!(L::AbstractArray{<:Number, 3}, pnl::AssetPanel) -> nothing
 
 Write `NaN` into every cell of a Factor Exposure where the active mask of the Asset Panel is `false`, in place.
 
@@ -266,10 +266,10 @@ An asset that is not listed at an observation has no Factor Exposure there, what
   - [`ConstantExposure`](@ref)
   - [`descriptor_active_fill!`](@ref)
 """
-function exposure_active_fill!(L::AbstractMatrix{<:Real}, pnl::AssetPanel)::Nothing
+function exposure_active_fill!(L::AbstractMatrix{<:Number}, pnl::AssetPanel)::Nothing
     return descriptor_active_fill!(L, pnl)
 end
-function exposure_active_fill!(L::AbstractArray{<:Real, 3}, pnl::AssetPanel)::Nothing
+function exposure_active_fill!(L::AbstractArray{<:Number, 3}, pnl::AssetPanel)::Nothing
     amsk = pnl.amsk
     @argcheck(size(L)[1:2] == size(amsk),
               DimensionMismatch("a one-hot Factor Exposure is observations × assets × factors, so its first two axes must match the active mask of the Asset Panel, got size(L) = $(size(L)) and size(pnl.amsk) = $(size(amsk))"))

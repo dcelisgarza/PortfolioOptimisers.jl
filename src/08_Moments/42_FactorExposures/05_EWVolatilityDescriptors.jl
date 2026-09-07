@@ -122,8 +122,8 @@ function EWVolatility(; half_life::Real = 40.0,
     return EWVolatility(ce, alg, mar)
 end
 """
-    ew_volatility_input(alg::FullMoment, X::AbstractMatrix{<:Real},
-                        mar::Real) -> AbstractMatrix{<:Real}
+    ew_volatility_input(alg::FullMoment, X::AbstractMatrix{<:Number},
+                        mar::Number) -> AbstractMatrix
     ew_volatility_input(alg::SemiMoment, X::AbstractMatrix{<:Real},
                         mar::Real) -> AbstractMatrix{<:Real}
 
@@ -155,8 +155,8 @@ julia> PortfolioOptimisers.ew_volatility_input(SemiMoment(), [0.1 -0.2], 0.0)
   - [`EWDownsideVolatility`](@ref)
   - [`descriptor`](@ref)
 """
-function ew_volatility_input(::FullMoment, X::AbstractMatrix{<:Real},
-                             ::Real)::AbstractMatrix{<:Real}
+function ew_volatility_input(::FullMoment, X::AbstractMatrix{<:Number},
+                             ::Number)::AbstractMatrix
     return X
 end
 function ew_volatility_input(::SemiMoment, X::AbstractMatrix{<:Real},

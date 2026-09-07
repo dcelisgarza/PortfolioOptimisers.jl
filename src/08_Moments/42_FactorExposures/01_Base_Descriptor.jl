@@ -224,7 +224,7 @@ function assert_log_returns(X::AbstractMatrix{<:Real})::Nothing
     return nothing
 end
 """
-    descriptor_active_fill!(D::AbstractMatrix{<:Real}, pnl::AssetPanel) -> nothing
+    descriptor_active_fill!(D::AbstractMatrix{<:Number}, pnl::AssetPanel) -> nothing
 
 Write `NaN` into every cell of a Descriptor where the active mask of the Asset Panel is `false`, in place.
 
@@ -264,7 +264,7 @@ julia> D
   - [`descriptor`](@ref)
   - [`AssetPanel`](@ref)
 """
-function descriptor_active_fill!(D::AbstractMatrix{<:Real}, pnl::AssetPanel)::Nothing
+function descriptor_active_fill!(D::AbstractMatrix{<:Number}, pnl::AssetPanel)::Nothing
     amsk = pnl.amsk
     @argcheck(size(D) == size(amsk),
               DimensionMismatch("a Descriptor is observations × assets, so it must match the active mask of the Asset Panel, got size(D) = $(size(D)) and size(pnl.amsk) = $(size(amsk))"))
@@ -499,10 +499,11 @@ function ew_beta_series(X::AbstractMatrix{<:Real}, rm::AbstractVector{<:Real}, d
     return B, Vm
 end
 """
-    ew_beta_reset!(amsk::Nothing, mu::AbstractVector{<:Real}, cv::AbstractVector{<:Real},
+    ew_beta_reset!(amsk::Nothing, mu::AbstractVector{<:Number},
+                   cv::AbstractVector{<:Number},
                    n::AbstractVector{<:Integer}, act::AbstractVector{Bool},
                    t::Integer) -> nothing
-    ew_beta_reset!(amsk::AbstractMatrix{Bool}, mu::AbstractVector{<:Real},
+    ew_beta_reset!(amsk::AbstractMatrix{Bool}, mu::AbstractVector{<:Number},
                    cv::AbstractVector{<:Real}, n::AbstractVector{<:Integer},
                    act::AbstractVector{Bool}, t::Integer) -> nothing
 
@@ -528,13 +529,13 @@ The optional active mask of [`ew_beta_series`](@ref) is read here by dispatch ra
   - [`ew_beta_series`](@ref)
   - [`EWResidualVolatility`](@ref)
 """
-function ew_beta_reset!(::Nothing, ::AbstractVector{<:Real}, ::AbstractVector{<:Real},
+function ew_beta_reset!(::Nothing, ::AbstractVector{<:Number}, ::AbstractVector{<:Number},
                         ::AbstractVector{<:Integer}, ::AbstractVector{Bool},
                         ::Integer)::Nothing
     return nothing
 end
-function ew_beta_reset!(amsk::AbstractMatrix{Bool}, mu::AbstractVector{<:Real},
-                        cv::AbstractVector{<:Real}, n::AbstractVector{<:Integer},
+function ew_beta_reset!(amsk::AbstractMatrix{Bool}, mu::AbstractVector{<:Number},
+                        cv::AbstractVector{<:Number}, n::AbstractVector{<:Integer},
                         act::AbstractVector{Bool}, t::Integer)::Nothing
     for i in eachindex(mu, cv, n, act)
         if act[i] && !amsk[t, i]
