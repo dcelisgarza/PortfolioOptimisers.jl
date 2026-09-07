@@ -1279,9 +1279,11 @@ end
     investable_fold_view(imsk::Nothing, w, rd::ReturnsResult, fees::Option{<:Fees})
     investable_fold_view(imsk::BitVector, w, rd::ReturnsResult, fees::Option{<:Fees})
 
-View a fold's weights, test window and fees at the Investable Mask.
+View a fold's weights and test window at the Investable Mask, and pass its fees through.
 
-ADR 0115 reduces an optimisation to the Investable Mask at its entry and expands the solved weights back to the caller's universe, so the weight of an asset the fit found non-investable is `0`. ADR 0120 carries that rule to the window those weights are scored on: the fold views the three together, before anything reads the window, so a dead column is never read at all and the Held Gap filter of [`filter_held_gaps`](@ref) runs over the investable columns alone.
+ADR 0115 reduces an optimisation to the Investable Mask at its entry and expands the solved weights back to the caller's universe, so the weight of an asset the fit found non-investable is `0`. ADR 0120 carries that rule to the window those weights are scored on: the fold views the weights and the window together, before anything reads the window, so a dead column is never read at all and the Held Gap filter of [`filter_held_gaps`](@ref) runs over the investable columns alone.
+
+The fees are **not** viewed. A result carries the objects of the universe it solved on beside the mask, ADR 0115's rule, so `res.fees` is on the investable universe already and a second view would index its per-asset rates by positions of the full universe. The fees ride along so the verb hands the fold the three things it scores with in one call.
 
 A result whose mask is `nothing` views nothing, which is what keeps a universe with nothing to exclude on the path it took before the mask existed.
 
@@ -1290,11 +1292,11 @@ A result whose mask is `nothing` views nothing, which is what keeps a universe w
   - `imsk`: The Investable Mask, or `nothing`.
   - `w`: The fold's target weights, or a population of them.
   - $(arg_dict[:rd])
-  - `fees`: [`Fees`](@ref) the fold is charged, or `nothing`.
+  - `fees`: [`Fees`](@ref) the fold is charged, on the investable universe, or `nothing`.
 
 # Returns
 
-  - `(w, rd, fees)`: The three reduced to the investable assets, or unchanged.
+  - `(w, rd, fees)`: The weights and the window reduced to the investable assets, or unchanged, and the fees as given.
 
 # Related
 
@@ -1310,9 +1312,7 @@ function investable_fold_view(::Nothing, w::VecNum_VecVecNum, rd::ReturnsResult,
 end
 function investable_fold_view(imsk::BitVector, w::VecNum_VecVecNum, rd::ReturnsResult,
                               fees::Option{<:Fees})
-    idx = findall(imsk)
-    return investable_weights_view(imsk, w), port_opt_view(rd, idx),
-           port_opt_view(fees, idx)
+    return investable_weights_view(imsk, w), port_opt_view(rd, findall(imsk)), fees
 end
 """
     reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult, X, hw = nothing, w = res.w)
@@ -1419,8 +1419,9 @@ A test window over a point-in-time universe holds two kinds of gap, and `predict
 order.
 
  1. **The column of a non-investable asset.** The fit found it, its weight is `0` by ADR 0115, and
-    the fold views the window, the weights and the fees at `res.imsk` through
-    [`investable_fold_view`](@ref) before anything reads them, so the column is never read.
+    the fold views the window and the weights at `res.imsk` through
+    [`investable_fold_view`](@ref) before anything reads them, so the column is never read. The
+    fees are not viewed, because the result carries them on the investable universe already.
  2. **A Held Gap**, an `(observation, asset)` pair at which the weight is non-zero and the return is
     missing. It is what an asset that delists **inside** the test window makes, and the mask is a
     per-fit fact that cannot see it. [`filter_held_gaps`](@ref) zeroes every non-finite entry of the
@@ -1469,6 +1470,7 @@ function StatsAPI.predict(res::NonFiniteAllocationOptimisationResult, rd::Return
     # The window is viewed at the Investable Mask first, so the column of an asset the fit
     # found non-investable is never read, and the Held Gaps of the reduced window are
     # zeroed once, before the series is formed and before a drift compounds on it. The
+    # fees are already on that universe, because the result carries what it solved on. The
     # record expands back to the caller's universe on the way out, because the next fold's
     # turnover reads its held weights.
     imsk = result_investable_mask(res)

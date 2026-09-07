@@ -58,8 +58,9 @@ over the full width.
 ### A fold reduces its test window to the Investable Mask, then zeroes a Held Gap
 
 In `predict`, before anything reads the test window, the fold views the window and the weights at
-`res.imsk`, so the column of a non-investable asset is never read, and the fees are viewed with
-them. The Held Gap filter of ADR 0118 then runs over the investable columns alone, and the held
+`res.imsk`, so the column of a non-investable asset is never read. The fees are not viewed: the
+result carries them on the universe it solved on, ADR 0115's rule, so they are on the investable
+universe already. The Held Gap filter of ADR 0118 then runs over the investable columns alone, and the held
 weights after the last observation expand back to the full length, because the next fold's
 turnover reads them. ADR 0118 is rewritten to this order, so both of its doors reduce to the
 Investable Mask. A result whose `imsk` is `nothing` views nothing. This is the rule of ADR 0115

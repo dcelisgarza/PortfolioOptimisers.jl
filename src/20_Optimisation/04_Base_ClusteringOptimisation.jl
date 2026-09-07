@@ -347,6 +347,37 @@ end
     forward(hr)
 end
 """
+    result_investable_mask(res::HierarchicalResult)
+    result_investable_mask(res::HierarchicalRiskParityResult)
+    result_investable_mask(res::HierarchicalEqualRiskContributionResult)
+
+Read the Investable Mask a hierarchical result reduced on.
+
+The core carries the mask as `imsk`, and the two leaves carry the core as `hr`. A leaf answers through the core rather than through its forwarded `res.imsk`, because the verb dispatches on the type and a forwarded property is invisible to it: without these methods the leaf falls back to `nothing`, the fold keeps the full weights, and a per-asset fee the result carries reduced is charged against them (#892).
+
+# Arguments
+
+  - `res`: A hierarchical result, or one of its two leaves.
+
+# Returns
+
+  - `imsk::Option{BitVector}`: The Investable Mask, or `nothing` when the optimisation reduced on nothing.
+
+# Related
+
+  - [`result_investable_mask`](@ref)
+  - [`HierarchicalResult`](@ref)
+  - [`HierarchicalRiskParityResult`](@ref)
+  - [`HierarchicalEqualRiskContributionResult`](@ref)
+"""
+function result_investable_mask(res::HierarchicalResult)
+    return res.imsk
+end
+function result_investable_mask(res::Union{<:HierarchicalRiskParityResult,
+                                           <:HierarchicalEqualRiskContributionResult})
+    return result_investable_mask(res.hr)
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Base configuration for hierarchical clustering-based portfolio optimisers.

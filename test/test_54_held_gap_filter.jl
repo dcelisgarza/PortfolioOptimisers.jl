@@ -6,10 +6,11 @@ The Held Gap filter, the value-level doors, and the tripwire that keeps them hon
 
 `#856` builds the first half of `#673` (ADR 0118) and the first decision of `#674` (ADR 0120):
 
-  - A fold views its test window, its weights and its fees at the Investable Mask, then zeroes the
-    Held Gaps of the reduced window **once**, before the series is formed and before a Weight Drift
+  - A fold views its test window and its weights at the Investable Mask, then zeroes the Held
+    Gaps of the reduced window **once**, before the series is formed and before a Weight Drift
     compounds on it. A Held Gap is an (observation, asset) pair at which the weight is non-zero and
-    the return is missing, which is what an asset that delists *inside* the test window makes.
+    the return is missing, which is what an asset that delists *inside* the test window makes. The
+    fees are not viewed: the result carries them on the universe it solved on (#892).
   - A value-level verb against a Prior Result reduces to the Investable Mask at its entry and
     expands a per-asset answer back to the full length.
   - A series the caller holds is documented, not checked.
@@ -243,11 +244,16 @@ end
 
 @testset "result_investable_mask: a result that carries a mask cannot hide it" begin
     fallback = which(PO.result_investable_mask, Tuple{PO.OptimisationResult})
+    base_getproperty = which(Base.getproperty, Tuple{Any, Symbol})
     # Every concrete result that carries an `imsk` field must answer it through the verb the
     # fold reads. Nothing else keeps a family that gains a mask from being scored on the wrong
-    # window, in silence.
+    # window, in silence. A leaf that overrides `getproperty` carries its core's mask as a
+    # forwarded property, which `fieldnames` cannot see and the verb cannot dispatch on, so
+    # such a leaf is held to the same rule (#892: the two hierarchical leaves fell back).
     for U in all_concrete(PO.OptimisationResult)
-        if parentmodule(U) === PO && :imsk in fieldnames(U)
+        parentmodule(U) === PO || continue
+        forwards = which(Base.getproperty, Tuple{U, Symbol}) !== base_getproperty
+        if :imsk in fieldnames(U) || forwards
             @test which(PO.result_investable_mask, Tuple{U}) !== fallback
         end
     end
@@ -274,6 +280,18 @@ end
                           reso = nres, cv = nothing, retcode = OptimisationSuccess(),
                           w = w_keep, imsk = imsk, fb = nothing)
     @test PO.result_investable_mask(kres) == imsk
+    # The hierarchical core answers directly, and its two leaves answer through the core.
+    hres = HierarchicalResult(; pr = prk, clr = nothing, wb = nothing, fees = nothing,
+                              retcode = OptimisationSuccess(), w = w_keep, imsk = imsk)
+    @test PO.result_investable_mask(hres) == imsk
+    @test hres.w == w_full
+    hrp = HierarchicalRiskParityResult(; hr = hres, r = Variance(), sca = SumScalariser(),
+                                       fb = nothing)
+    @test PO.result_investable_mask(hrp) == imsk
+    herc = HierarchicalEqualRiskContributionResult(; hr = hres, ri = Variance(),
+                                                   ro = Variance(), scai = SumScalariser(),
+                                                   scao = SumScalariser(), fb = nothing)
+    @test PO.result_investable_mask(herc) == imsk
 end
 
 #=
@@ -338,6 +356,46 @@ end
     @test all(iszero, view(pred.hw.U, :, k))
     # The rebuilt path is the stored one, on the expanded record as on the reduced one.
     @test PO.weight_path(pred.hw, res.w) == pred.hw.U
+end
+
+@testset "The fold charges the fees the result carries, and views them no second time" begin
+    # A result carries its `Fees` on the universe it solved on (ADR 0115), so the fold must not
+    # view them again at the mask: a per-asset rate indexed by full-universe positions is a
+    # `BoundsError`, and a scalar rate hides it because a scalar passes through the view (#892).
+    # The oracle is the hand-reduced fee: the same rates and previous weights on `keep`.
+    w_prev = [0.2, 0.2, 0.2, 0.2, 0.2]
+    rate = [0.001, 0.002, 0.010, 0.003, 0.004]
+    l = [0.0005, 0.0010, 0.0015, 0.0020, 0.0025]
+    fees = Fees(; tn = Turnover(; w = w_prev, val = rate), l = l)
+    fees_keep = Fees(; tn = Turnover(; w = w_prev[keep], val = rate[keep]), l = l[keep])
+    Xc = copy(X)
+    Xc[:, k] .= NaN
+    rdc = ReturnsResult(; nx = nx, X = Xc)
+    test_idx = collect(150:T)
+    for opt in (MeanRisk(; opt = JuMPOptimiser(; pe = prn, slv = slv, fees = fees)),
+                HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = prn, fees = fees)))
+        res = optimise(opt, rd)
+        @test PO.result_investable_mask(res) == imsk
+        @test length(res.w) == N
+        @test res.w[k] == 0
+        @test length(res.fees.tn.val) == length(keep)
+        wk = res.w[keep]
+        # The whole-sample door and the fold door both charge the reduced fee once.
+        pred = predict(res, rdc)
+        @test isapprox(pred.rd.X, Xc[:, keep] * wk .- calc_fees(wk, fees_keep))
+        predf = predict(res, rdc, test_idx)
+        @test isapprox(predf.rd.X, Xc[test_idx, keep] * wk .- calc_fees(wk, fees_keep))
+    end
+    # A bare amortisation divides the one-off terms by the fold's length, on the same reduced
+    # fee, and the pass-through carries the amortised fee rather than the stored one.
+    feesa = Fees(; tn = Turnover(; w = w_prev, val = rate), l = l, fa = AmortisedFees())
+    resa = optimise(MeanRisk(; opt = JuMPOptimiser(; pe = prn, slv = slv, fees = feesa)),
+                    rd)
+    wk = resa.w[keep]
+    feesa_keep = Fees(; tn = Turnover(; w = w_prev[keep], val = rate[keep]), l = l[keep],
+                      fa = AmortisedFees(; horizon = length(test_idx)))
+    preda = predict(resa, rdc, test_idx)
+    @test isapprox(preda.rd.X, Xc[test_idx, keep] * wk .- calc_fees(wk, feesa_keep))
 end
 
 @testset "The scheme carries `strict`, and the fold reads it" begin
