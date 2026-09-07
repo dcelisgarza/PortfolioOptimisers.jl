@@ -126,3 +126,145 @@
     @test PortfolioOptimisers.roundmult(26.58, 1) == 26.0
     @test PortfolioOptimisers.roundmult(7.5, 2) != round(7.5 / 2) * 2
 end
+# Issue #900: a fee is a cost of the portfolio the allocator actually buys. It is priced
+# on `x .* p`, the money in each position, and it is charged inside the allocation rather
+# than deducted from the cash beforehand.
+@testset "Finite allocation fees" begin
+    using PortfolioOptimisers, HiGHS, Test, LinearAlgebra
+    PO = PortfolioOptimisers
+    mip_slv = Solver(; name = :highs1, solver = HiGHS.Optimizer,
+                     settings = Dict("log_to_console" => false),
+                     check_sol = (; allow_local = true, allow_almost = true))
+    da = DiscreteAllocation(; slv = mip_slv, fb = nothing)
+    ga = GreedyAllocation()
+
+    # `prev_cash` defaults to `cash`, and it must be non-negative.
+    fai = FiniteAllocationInput(; w = [0.6, 0.4], prices = [10.0, 20.0], cash = 1000.0)
+    @test fai.prev_cash == fai.cash == 1000.0
+    @test FiniteAllocationInput(; w = [0.6, 0.4], prices = [10.0, 20.0], cash = 1000.0,
+                                prev_cash = 0.0).prev_cash == 0.0
+    @test_throws DomainError FiniteAllocationInput(; w = [0.6, 0.4], prices = [10.0, 20.0],
+                                                   cash = 1000.0, prev_cash = -1.0)
+
+    # The charge is money, and it is the by-hand table of #898. On `w = [0.5, 0.5]`,
+    # `p = [100.0, 200.0]`, `cash = 1e6`, `T = 252`, `l = 0.01` and `tn.val = 0.002`
+    # against `w0 = [0, 0]`, a fully invested book owes `252 * 10_000` proportional,
+    # `252 * 2_000` turnover and `2 * 5.0` fixed. The deleted price-carrying family
+    # charged `rate * dot(w, p)`, which is `1.5` and `0.3` per period.
+    fmoney = Fees(; l = 0.01, fl = 5.0, tn = Turnover(; w = [0.0, 0.0], val = 0.002))
+    lsf, _ = PO.allocation_side_fees(fmoney, 252, 1e6, [true, true], Float64[])
+    @test PO.allocation_fee(lsf, [100.0, 200.0], [5000.0, 2500.0]) ==
+          252 * 0.01 * 1e6 + 252 * 0.002 * 1e6 + 10.0
+    # A side that states no fee is charged nothing, whatever it holds.
+    @test iszero(PO.allocation_fee(nothing, [100.0, 200.0], [5000.0, 2500.0]))
+
+    # The delta of one purchase agrees with the difference of two whole charges.
+    sh0 = [3.0, 7.0]
+    sh1 = [4.0, 7.0]
+    @test isapprox(PO.greedy_fee_delta(lsf, [100.0, 200.0], sh0, 1, 1.0),
+                   PO.allocation_fee(lsf, [100.0, 200.0], sh1) -
+                   PO.allocation_fee(lsf, [100.0, 200.0], sh0))
+    # A position that is opened by the purchase pays the fixed fee one time.
+    @test PO.greedy_fee_delta(lsf, [100.0, 200.0], [0.0, 7.0], 1, 1.0) -
+          PO.greedy_fee_delta(lsf, [100.0, 200.0], [3.0, 7.0], 1, 1.0) == 5.0
+
+    # A long-only allocation pays the charge of the shares it bought, and the cash it
+    # reports is what is left after both the shares and the fee.
+    w = [0.6, 0.4]
+    p = [10.0, 20.0]
+    cash = 1000.0
+    T = 12
+    fee = Fees(; l = 0.001, fl = 2.0)
+    for alloc in (da, ga)
+        r = optimise(alloc,
+                     FiniteAllocationInput(; w = w, prices = p, cash = cash, horizon = T,
+                                           fees = fee))
+        shares = collect(r.shares)
+        cost = collect(r.cost)
+        @test isapprox(r.fees, T * 0.001 * sum(cost) + 2.0 * count(!iszero, shares))
+        @test isapprox(sum(cost) + r.cash + r.fees, cash)
+        @test r.cash >= 0
+        # The same book, priced by the shared verb, is the number the result reports.
+        lsf2, _ = PO.allocation_side_fees(fee, T, cash, [true, true], Float64[])
+        @test isapprox(r.fees, PO.allocation_fee(lsf2, p, shares))
+    end
+
+    # A fee competes with a position, so a book that pays one buys no more than a book
+    # that pays none, and the free book spends the whole budget.
+    for alloc in (da, ga)
+        r_free = optimise(alloc, FiniteAllocationInput(; w = w, prices = p, cash = cash))
+        r_fee = optimise(alloc,
+                         FiniteAllocationInput(; w = w, prices = p, cash = cash,
+                                               horizon = T, fees = fee))
+        @test iszero(r_free.fees)
+        @test isapprox(sum(collect(r_free.cost)) + r_free.cash, cash)
+        @test sum(collect(r_fee.cost)) <= sum(collect(r_free.cost))
+    end
+
+    # A fixed fee prices a small position out. The third asset is worth about 30 of the
+    # 1000, and a fixed fee of 40 buys too little tracking to be worth holding.
+    w3 = [0.5, 0.47, 0.03]
+    p3 = [10.0, 20.0, 30.0]
+    r_small = optimise(da,
+                       FiniteAllocationInput(; w = w3, prices = p3, cash = 1000.0,
+                                             horizon = 1, fees = Fees(; fl = 40.0)))
+    @test iszero(collect(r_small.shares)[3])
+    r_nofee = optimise(da, FiniteAllocationInput(; w = w3, prices = p3, cash = 1000.0))
+    @test !iszero(collect(r_nofee.shares)[3])
+
+    # `prev_cash` states the money held before the trade, so it moves the turnover fee.
+    # A book that already held the target owes less than one that starts from nothing.
+    ftn = Fees(; tn = Turnover(; w = [0.6, 0.4], val = 0.002))
+    for alloc in (da, ga)
+        r_held = optimise(alloc,
+                          FiniteAllocationInput(; w = w, prices = p, cash = cash,
+                                                prev_cash = cash, horizon = T, fees = ftn))
+        r_fresh = optimise(alloc,
+                           FiniteAllocationInput(; w = w, prices = p, cash = cash,
+                                                 prev_cash = 0.0, horizon = T, fees = ftn))
+        @test r_held.fees < r_fresh.fees
+        # Selling out is a trade, so a book that held money and buys nothing still owes.
+        # No share of a price of 1e6 is affordable out of 100, and the exit of the 1000
+        # held before the trade costs `1 * 0.002 * 1000`, which 100 pays.
+        r_none = optimise(alloc,
+                          FiniteAllocationInput(; w = w, prices = [1e6, 1e6], cash = 100.0,
+                                                prev_cash = cash, horizon = 1, fees = ftn))
+        @test all(iszero, collect(r_none.shares))
+        @test isapprox(r_none.fees, 0.002 * cash)
+        @test isapprox(r_none.cash, 100.0 - 0.002 * cash)
+    end
+
+    # A fee larger than the cash makes the budget of the MIP infeasible. The model then
+    # holds no finite value, so the book is read as empty and the return code carries the
+    # failure rather than the read-back raising on the conversion to `Int`.
+    r_broke = optimise(da,
+                       FiniteAllocationInput(; w = w, prices = [1e6, 1e6], cash = 1.0,
+                                             prev_cash = cash, horizon = T, fees = ftn))
+    @test isa(r_broke.retcode, PortfolioOptimisers.OptimisationFailure)
+    @test all(iszero, collect(r_broke.shares))
+    @test isapprox(r_broke.fees, T * 0.002 * cash)
+    # The greedy allocator has no budget constraint to break, so it answers the same book
+    # and reports the debt as a negative leftover.
+    r_broke_g = optimise(ga,
+                         FiniteAllocationInput(; w = w, prices = [1e6, 1e6], cash = 1.0,
+                                               prev_cash = cash, horizon = T, fees = ftn))
+    @test all(iszero, collect(r_broke_g.shares))
+    @test isapprox(r_broke_g.fees, T * 0.002 * cash)
+    @test r_broke_g.cash < 0
+
+    # A long-short book charges each side its own rates, and the reported fee is never
+    # signed. `l` and `fl` reach the long side, `s` and `fs` the short one.
+    wls = [0.7, -0.3]
+    fls = Fees(; l = 0.001, s = 0.004, fl = 1.0, fs = 3.0)
+    for alloc in (da, ga)
+        rls = optimise(alloc,
+                       FiniteAllocationInput(; w = wls, prices = p, cash = cash,
+                                             horizon = T, fees = fls))
+        money = collect(rls.shares) .* p
+        @test rls.fees > 0
+        @test isapprox(rls.fees,
+                       T * (0.001 * money[1] - 0.004 * money[2]) +
+                       1.0 * !iszero(money[1]) +
+                       3.0 * !iszero(money[2]))
+    end
+end

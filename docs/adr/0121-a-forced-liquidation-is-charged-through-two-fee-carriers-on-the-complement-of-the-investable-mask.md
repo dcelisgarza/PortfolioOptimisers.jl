@@ -111,8 +111,10 @@ charges nothing until it gains them.
 
 ### The finite allocation charges the liquidation inside its own model
 
-[#900](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/900) removes the cash
-pre-adjustment and the whole price-carrying fee family with it. The allocation holds the share
+[#900](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/900) removed the cash
+pre-adjustment and the whole price-carrying fee family with it, and
+[ADR 0123](0123-the-finite-allocation-charges-its-fees-inside-its-own-model-on-the-money-it-buys.md)
+records that decision. The allocation holds the share
 counts and the prices, so it holds the money in each position exactly, and it charges every fee
 inside its model, through a budget constraint on `x .* p`. The two liquidation carriers therefore
 enter that model's own fee expression, priced on the complement's previous money, which the

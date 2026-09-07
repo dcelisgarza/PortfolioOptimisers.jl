@@ -91,7 +91,7 @@ Every fee field accepts a dictionary, a pair, or a vector of pairs keyed by asse
 
 !!! warning
 
-    `l`, `s` and `tn` are rates per period in both fee families, and each of them charges on every observation of a return series. `fa` reaches none of the three. `fl` and `fs` charge each non-zero position one time for the whole holding period: the price-carrying family reads them as a currency amount, and the no-price family as a fraction of capital. `fa` names the clock they fall on, and a `nothing` `fa` charges them on the first observation. The units of the fees and returns must also be consistent.
+    `l`, `s` and `tn` are rates per period, and each of them charges on every observation of a return series. `fa` reaches none of the three. `fl` and `fs` charge each non-zero position one time for the whole holding period. A return series reads them as a fraction of capital, and the finite allocation reads them as a currency amount. `fa` names the clock they fall on, and a `nothing` `fa` charges them on the first observation. The units of the fees and returns must also be consistent.
 
 # Fields
 
@@ -271,7 +271,7 @@ Fee values can be specified as scalars (applied to all assets) or as vectors of 
 
 !!! warning
 
-    `l`, `s` and `tn` are rates per period in both fee families, and each of them charges on every observation of a return series. `fa` reaches none of the three. `fl` and `fs` charge each non-zero position one time for the whole holding period: the price-carrying family reads them as a currency amount, and the no-price family as a fraction of capital. `fa` names the clock they fall on, and a `nothing` `fa` charges them on the first observation. The units of the fees and returns must also be consistent.
+    `l`, `s` and `tn` are rates per period, and each of them charges on every observation of a return series. `fa` reaches none of the three. `fl` and `fs` charge each non-zero position one time for the whole holding period. A return series reads them as a fraction of capital, and the finite allocation reads them as a currency amount. `fa` names the clock they fall on, and a `nothing` `fa` charges them on the first observation. The units of the fees and returns must also be consistent.
 
 # Mathematical definition
 
@@ -288,20 +288,7 @@ F_{\\text{f}}(\\boldsymbol{w}) &= 1\\left\\{\\boldsymbol{w} \\geq 0 \\land \\bol
 \\end{align}
 ```
 
-The finite optimisations use fees somewhat differently because they use a finite amount of capital as well as asset prices to compute the actual fees incurred when buying or selling assets. As such, these fees require a vector of asset prices to compute the actual fees incurred.
-
-This method lets us automatically adjust the available cash amount during the optimisation so that fees are discounted from the available cash. It also lets us account for the budget constraints properly when fees are involved.
-
-```math
-\\begin{align}
-F_{\\text{t}}(\\boldsymbol{w}) &\\coloneqq F_{\\text{Tn}} + F_{\\text{p}} + F_{\\text{f}} \\\\
-F_{\\text{Tn}}(\\boldsymbol{w}) &= \\left(\\boldsymbol{Tn} \\odot \\boldsymbol{X} \\right) \\cdot \\boldsymbol{f}_{\\text{Tn}}\\\\
-F_{\\text{p}}(\\boldsymbol{w}) &= \\left(1\\left\\{\\boldsymbol{w} \\geq 0\\right\\} \\odot \\boldsymbol{w} \\odot \\boldsymbol{X}\\right) \\cdot \\boldsymbol{f}_{\\text{p}}^{+} - \\left(1\\left\\{\\boldsymbol{w} \\lt 0\\right\\} \\odot \\boldsymbol{w} \\odot \\boldsymbol{X}\\right) \\cdot \\boldsymbol{f}_{\\text{p}}^{-} \\\\
-F_{\\text{f}}(\\boldsymbol{w}) &= 1\\left\\{\\boldsymbol{w} \\geq 0 \\land \\boldsymbol{w} \\neq 0\\right\\} \\cdot \\boldsymbol{f}_{\\text{f}}^{+} + 1\\left\\{\\boldsymbol{w} \\lt 0 \\land \\boldsymbol{w} \\neq 0\\right\\} \\cdot \\boldsymbol{f}_{\\text{f}}^{-}
-\\end{align}
-```
-
-The fixed term carries no ``\\boldsymbol{X}``. The price-carrying family reads `fl` and `fs` as a currency amount already, so the price vector reaches only the two terms that are stated as a fraction of the position. The no-price family below subtracts the same numbers from a return series, where they read as a fraction of capital per period instead.
+The finite allocation charges the same three terms on the money it actually buys. It holds the share counts and the prices, so ``\\boldsymbol{x} \\odot \\boldsymbol{p}`` is the money in each position exactly. [`set_allocation_fees!`](@ref) writes the terms in the allocation's own variables, and the charge enters the budget constraint rather than the cash. A return series reads `fl` and `fs` as a fraction of capital, and the allocation reads them as a currency amount.
 
 ## Per asset fees
 
@@ -316,23 +303,9 @@ It is also possible to compute per-asset fees incurred using the same definition
 \\end{align}
 ```
 
-The finite optimisation uses fees somewhat differently because it uses a finite amount of capital and utilises the asset prices to compute the actual fees incurred when buying or selling assets. As such, these fees require a vector of asset prices to compute the actual fees incurred.
-
-```math
-\\begin{align}
-\\boldsymbol{F}_{\\text{t}}(\\boldsymbol{w}) &\\coloneqq \\boldsymbol{F}_{\\text{Tn}} + \\boldsymbol{F}_{\\text{p}} + \\boldsymbol{F}_{\\text{f}} \\\\
-\\boldsymbol{F}_{\\text{Tn}}(\\boldsymbol{w}) &= \\left(\\boldsymbol{Tn} \\odot \\boldsymbol{X} \\right) \\odot \\boldsymbol{f}_{\\text{Tn}} \\\\
-\\boldsymbol{F}_{\\text{p}}(\\boldsymbol{w}) &= \\left(1\\left\\{\\boldsymbol{w} \\geq 0\\right\\} \\odot \\boldsymbol{w} \\odot \\boldsymbol{X}\\right) \\odot \\boldsymbol{f}_{\\text{p}}^{+} - \\left(1\\left\\{\\boldsymbol{w} \\lt 0\\right\\} \\odot \\boldsymbol{w} \\odot \\boldsymbol{X}\\right) \\odot \\boldsymbol{f}_{\\text{p}}^{-} \\\\
-\\boldsymbol{F}_{\\text{f}}(\\boldsymbol{w}) &= 1\\left\\{\\boldsymbol{w} \\geq 0 \\land \\boldsymbol{w} \\neq 0\\right\\} \\odot \\boldsymbol{f}_{\\text{f}}^{+} + 1\\left\\{\\boldsymbol{w} \\lt 0 \\land \\boldsymbol{w} \\neq 0\\right\\} \\odot \\boldsymbol{f}_{\\text{f}}^{-}
-\\end{align}
-```
-
-Where:
-
   - $(math_dict[:w_port])
   - ``F``: Portfolio fee.
   - ``\\boldsymbol{F}``: `N × 1` per asset vector of portfolio fees.
-  - ``\\boldsymbol{X}``: `N × 1` asset price vector.
   - ``\\boldsymbol{f}``: `N × 1` per asset fee vector. If it is a scalar, it is broadcasted to all assets.
   - ``\\boldsymbol{Tn}``: `N × 1` turnover vector as defined in [`Turnover`](@ref). The benchmark weight vector is encoded in the `w` field of the turnover object and the new weight vector is the portfolio weight vector.
   - ``+,\\, -``: Superscripts denote long and short fees respectively. This is because brokers sometimes charge different fees for long and short positions.
@@ -345,7 +318,7 @@ The short proportional term is **subtracted**. ``\\boldsymbol{w}`` is negative w
 
 ## The per asset fees sum to the portfolio fee
 
-The two families compute one definition. [`calc_asset_fees`](@ref) splits over the assets what [`calc_fees`](@ref) contracts into a scalar, so the entries of the vector sum to the scalar. The sums differ in the order in which they add, so the identity holds to rounding and not to `==`. On ``\\boldsymbol{w} = [0.6,\\, -0.4,\\, 0,\\, 0.25]`` with all four rate fields set, a [`Turnover`](@ref) whose `w` differs from the candidate, and prices ``[100,\\, 50,\\, 20,\\, 10]``, both sides gave `12.530000000000001`. Without the price vector they gave `11.036000000000001` and `11.036`, a difference of `1.8e-15`.
+The two families compute one definition. [`calc_asset_fees`](@ref) splits over the assets what [`calc_fees`](@ref) contracts into a scalar, so the entries of the vector sum to the scalar. The sums differ in the order in which they add, so the identity holds to rounding and not to `==`. On ``\\boldsymbol{w} = [0.6,\\, -0.4,\\, 0,\\, 0.25]`` with all four rate fields set and a [`Turnover`](@ref) whose `w` differs from the candidate, they gave `11.036000000000001` and `11.036`, a difference of `1.8e-15`.
 
 ## The JuMP model charges the same fee only when the decomposition is pinned
 
@@ -746,193 +719,13 @@ function fees_constraints(fees::Option{<:Fees}, args...; kwargs...)::Option{<:Fe
     return fees
 end
 """
-    calc_fees(w::VecNum, p::VecNum, ::Nothing, ::Function)
-    calc_fees(w::VecNum, p::VecNum, fees::Number, op::Function)
-    calc_fees(w::VecNum, p::VecNum, fees::VecNum, op::Function)
-
-Compute the actual proportional fees for portfolio weights and prices.
-
-This is one term of the total fee, not the whole fee. [`calc_fees(w::VecNum, p::VecNum, fees::Fees)`](@ref) calls it twice, under `.>=` for the long side and under `.<` for the short side, and negates the short call. [`Fees`](@ref) states the closed form as ``F_{\\text{p}}``.
-
-# Algorithm
-
- 1. On a `nothing` `fees`, return `zero(promote_type(eltype(w), eltype(p)))`. The method reads neither `w` nor `op`.
- 2. Otherwise build `idx`, the mask of the assets that `op` selects against a zero of the promoted element type.
- 3. On a `Number` `fees`, contract the selected weights with the selected prices, and scale that sum by the one rate.
- 4. On a `VecNum` `fees`, contract the selected rates with the selected weights multiplied elementwise by the selected prices.
-
-# Arguments
-
-  - `w`: Portfolio weights.
-
-  - `p`: Asset prices.
-
-  - `fees`: Scalar fee value.
-
-      + `nothing`: No proportional fee, returns zero.
-      + `Number`: Single fee applied to all relevant assets.
-      + `VecNum`: Vector of fee values per asset.
-
-  - `op`: Function to select assets, `.>=` for long, `<` for short (ignored if `fees` is `nothing`).
-
-# Returns
-
-  - `val::Number`: Total actual proportional fee.
-
-# Examples
-
-```jldoctest
-julia> calc_fees([0.1, 0.2], [100, 200], 0.01, .>=)
-0.5
-```
-
-# Related
-
-  - [`Fees`](@ref)
-  - [`VecNum`](@ref)
-  - [`calc_asset_fees`](@ref)
-  - [`calc_fixed_fees`](@ref)
-  - [`calc_asset_fixed_fees`](@ref)
-  - [`calc_net_returns`](@ref)
-"""
-function calc_fees(w::VecNum, p::VecNum, ::Nothing, ::Function)
-    return zero(promote_type(eltype(w), eltype(p)))
-end
-function calc_fees(w::VecNum, p::VecNum, fees::Number, op::Function)
-    idx = op(w, zero(promote_type(eltype(w), eltype(p), eltype(fees))))
-    return fees * LinearAlgebra.dot(w[idx], p[idx])
-end
-function calc_fees(w::VecNum, p::VecNum, fees::VecNum, op::Function)
-    idx = op(w, zero(promote_type(eltype(w), eltype(p), eltype(fees))))
-    return LinearAlgebra.dot(fees[idx], w[idx] .* p[idx])
-end
-"""
-    calc_fees(w::VecNum, p::VecNum, ::Nothing)
-    calc_fees(w::VecNum, p::VecNum, tn::Turnover)
-
-Compute the actual turnover fees for portfolio weights and prices.
-
-This is one term of the total fee, not the whole fee. [`Fees`](@ref) states the closed form as ``F_{\\text{Tn}}``, and reads `tn.val` as a per-asset fee rate rather than as a bound. The `fixed` flag of [`Turnover`](@ref) reaches no method here: it decides which reference weights `tn.w` holds, through [`factory`](@ref), and by the time this method runs `tn.w` is already the vector the fee must be charged against.
-
-# Algorithm
-
- 1. On a `nothing` `tn`, return `zero(promote_type(eltype(w), eltype(p)))`. The method reads neither `w` nor `p`.
- 2. Otherwise form the traded amount per asset, the absolute difference between `w` and the reference weights `tn.w`.
- 3. On a `Number` `tn.val`, contract the traded amount with the prices, and scale that sum by the one rate.
- 4. On a `VecNum` `tn.val`, contract the rates with the traded amount multiplied elementwise by the prices.
-
-Steps 3 and 4 are not the same expression. They agree to rounding when `tn.val` is a constant vector, and they differed by `-2.22e-16` on `w = [0.6, -0.4, 0.0, 0.25]`, `p = [100.0, 50.0, 20.0, 10.0]`, `tn.w = [0.1, 0.2, 0.3, 0.4]` and a rate of `0.02`.
-
-# Arguments
-
-  - `w`: Portfolio weights.
-
-  - `p`: Asset prices.
-
-  - `tn`: Turnover structure.
-
-      + `nothing`: No turnover fee, returns zero.
-      + `tn.val::Number`: Single turnover fee applied to all assets.
-      + `tn.val::VecNum`: Vector of turnover fees per asset.
-
-# Returns
-
-  - `val::Number`: Actual turnover fee.
-
-# Examples
-
-```jldoctest
-julia> calc_fees([0.1, 0.2], [100, 200], Turnover(; w = [0.0, 0.0], val = 0.01))
-0.5
-```
-
-# Related
-
-  - [`Fees`](@ref)
-  - [`VecNum`](@ref)
-  - [`Turnover`](@ref)
-  - [`calc_asset_fees`](@ref)
-  - [`calc_fixed_fees`](@ref)
-  - [`calc_asset_fixed_fees`](@ref)
-  - [`calc_net_returns`](@ref)
-"""
-function calc_fees(w::VecNum, p::VecNum, ::Nothing)
-    return zero(promote_type(eltype(w), eltype(p)))
-end
-function calc_fees(w::VecNum, p::VecNum, tn::Turnover{<:Any, <:Number})
-    return tn.val * LinearAlgebra.dot(abs.(w - tn.w), p)
-end
-function calc_fees(w::VecNum, p::VecNum, tn::Turnover{<:Any, <:VecNum})
-    return LinearAlgebra.dot(tn.val, abs.(w - tn.w) .* p)
-end
-"""
-    calc_fees(w::VecNum, p::VecNum, T::Number, fees::Fees)
-
-Compute total actual fees for portfolio weights and prices.
-
-Sums actual proportional, fixed, and turnover fees for all assets. [`calc_asset_fees(w::VecNum, p::VecNum, fees::Fees)`](@ref) splits the same total over the assets, and its sum is this number up to the order of summation.
-
-The verb returns a pair, `(amortised, one_time)`. `l`, `s` and `tn` are rates per period, so they charge on every observation and land in `amortised`. `fl` and `fs` are currency amounts charged one time for the whole holding period, so `fees.fa` decides where they land: a `nothing` `fa` puts them in `one_time`, and an [`AmortisedFees`](@ref) divides them by `T`, adds them to `amortised` and leaves `one_time` zero.
-
-`T` is the observation count the calling site charges over, and the site always knows it, so no fee stores one. [`charge_fees`](@ref) hands the length of the series it lays the pair onto, and [`calc_total_fees`](@ref) contracts the pair to the cost of a whole holding period.
-
-# Algorithm
-
- 1. Charge the per period terms, the call of [`calc_periodic_fees`](@ref).
- 2. Charge the one-off terms, the call of [`calc_one_off_fees`](@ref).
- 3. On a `nothing` `fees.fa`, return the two charges unchanged.
- 4. On an [`AmortisedFees`](@ref) `fees.fa`, divide the one-off charge by `T`, add it to the per period charge, and return that number beside a zero of the same type.
-
-# Arguments
-
-  - `w`: Portfolio weights.
-  - `p`: Asset prices.
-  - `T`: Observation count the fee is charged over.
-  - `fees`: [`Fees`](@ref) structure.
-
-# Returns
-
-  - `amortised::Number`: The charge every observation carries.
-  - `one_time::Number`: The charge the first observation carries alone.
-
-# Examples
-
-```jldoctest
-julia> fees = Fees(; l = [0.01, 0.02], s = [0.01, 0.02], fl = [5.0, 0.0], fs = [0.0, 10.0]);
-
-julia> calc_fees([0.1, -0.2], [100, 200], 21, fees)
-(0.9, 15.0)
-```
-
-# Related
-
-  - [`Fees`](@ref)
-  - [`VecNum`](@ref)
-  - [`calc_fees`](@ref)
-  - [`calc_asset_fees`](@ref)
-  - [`calc_fixed_fees`](@ref)
-  - [`calc_asset_fixed_fees`](@ref)
-  - [`calc_net_returns`](@ref)
-"""
-function calc_fees(w::VecNum, p::VecNum, T::Number, fees::Fees)
-    return calc_fees(w, p, T, fees, fees.fa)
-end
-function calc_fees(w::VecNum, p::VecNum, ::Number, fees::Fees,
-                   ::Union{Nothing, <:FirstObservationFees})
-    return (calc_periodic_fees(w, p, fees), calc_one_off_fees(w, fees))
-end
-function calc_fees(w::VecNum, p::VecNum, T::Number, fees::Fees, ::AmortisedFees)
-    val = calc_periodic_fees(w, p, fees) + calc_one_off_fees(w, fees) / T
-    return (val, zero(val))
-end
-"""
     calc_fees(w::VecNum, ::Nothing, ::Function)
     calc_fees(w::VecNum, fees::Number, op::Function)
     calc_fees(w::VecNum, fees::VecNum, op::Function)
 
 Compute the proportional fees for portfolio weights.
 
-This is one term of the total fee, not the whole fee. [`calc_fees(w::VecNum, fees::Fees)`](@ref) calls it twice, under `.>=` for the long side and under `.<` for the short side, and negates the short call. [`Fees`](@ref) states the closed form as ``F_{\\text{p}}``, in the pair of equations that carries no price vector.
+This is one term of the total fee, not the whole fee. [`calc_fees(w::VecNum, fees::Fees)`](@ref) calls it twice, under `.>=` for the long side and under `.<` for the short side, and negates the short call. [`Fees`](@ref) states the closed form as ``F_{\\text{p}}``.
 
 # Algorithm
 
@@ -990,7 +783,7 @@ end
 
 Compute the turnover fees for portfolio weights.
 
-This is one term of the total fee, not the whole fee. [`Fees`](@ref) states the closed form as ``F_{\\text{Tn}}``, in the pair of equations that carries no price vector. The `fixed` flag of [`Turnover`](@ref) reaches no method here, for the reason [`calc_fees(w::VecNum, p::VecNum, tn::Turnover)`](@ref) gives.
+This is one term of the total fee, not the whole fee. [`Fees`](@ref) states the closed form as ``F_{\\text{Tn}}``, and reads `tn.val` as a per-asset fee rate rather than as a bound. The `fixed` flag of [`Turnover`](@ref) reaches no method here: it decides which reference weights `tn.w` holds, through [`factory`](@ref), and by the time this method runs `tn.w` is already the vector the fee must be charged against.
 
 # Algorithm
 
@@ -999,7 +792,7 @@ This is one term of the total fee, not the whole fee. [`Fees`](@ref) states the 
  3. On a `Number` `tn.val`, sum the traded amount and scale it by the one rate.
  4. On a `VecNum` `tn.val`, contract the rates with the traded amount.
 
-Steps 3 and 4 are not the same expression. They differed by `3.47e-18` on the sample that [`calc_fees(w::VecNum, p::VecNum, tn::Turnover)`](@ref) names.
+Steps 3 and 4 are not the same expression. They agree to rounding when `tn.val` is a constant vector, and they differed by `3.47e-18` on `w = [0.6, -0.4, 0.0, 0.25]`, `tn.w = [0.1, 0.2, 0.3, 0.4]` and a rate of `0.02`.
 
 # Arguments
 
@@ -1048,7 +841,7 @@ end
 
 Compute the fixed portfolio fees for assets that have been allocated.
 
-A fixed fee is charged per position held, whatever its size, so no price vector reaches this name: the fee is a currency amount already. [`Fees`](@ref) states the closed form as ``F_{\\text{f}}``, which is the one term that carries no ``\\boldsymbol{X}`` in either pair of equations.
+A fixed fee is charged per position held, whatever its size. [`Fees`](@ref) states the closed form as ``F_{\\text{f}}``.
 
 # Algorithm
 
@@ -1163,197 +956,13 @@ function calc_fees(w::VecNum, T::Number, fees::Fees, ::AmortisedFees)
     return (val, zero(val))
 end
 """
-    calc_asset_fees(w::VecNum, p::VecNum, ::Nothing, ::Function)
-    calc_asset_fees(w::VecNum, p::VecNum, fees::Number, op::Function)
-    calc_asset_fees(w::VecNum, p::VecNum, fees::VecNum, op::Function)
-
-Compute the actual proportional per asset fees for portfolio weights and prices.
-
-This is one term of the total fee, not the whole fee. It is the elementwise form of [`calc_fees(w::VecNum, p::VecNum, fees::Number, op::Function)`](@ref), and [`Fees`](@ref) states the closed form as ``\\boldsymbol{F}_{\\text{p}}``.
-
-# Algorithm
-
- 1. Allocate `fees_w`, a vector of zeros one entry long per asset, in the promoted element type. An asset the mask of step 2 leaves out keeps its zero.
- 2. On a `nothing` `fees`, return `fees_w`. The method reads neither `w` nor `op` beyond their element types.
- 3. Otherwise build `idx`, the mask of the assets that `op` selects against a zero of the promoted element type.
- 4. On a `Number` `fees`, write the selected weights, multiplied elementwise by the selected prices and scaled by the one rate, into the selected entries of `fees_w`.
- 5. On a `VecNum` `fees`, write the same product, weighted by the selected per-asset rates, into the selected entries of `fees_w`.
-
-# Arguments
-
-  - `w`: Portfolio weights.
-
-  - `p`: Asset prices.
-
-  - `fees`: Scalar fee value.
-
-      + `nothing`: No proportional fee, returns zero.
-      + `Number`: Single fee applied to all relevant assets.
-      + `VecNum`: Vector of fee values per asset.
-
-  - `op`: Function to select assets, `.>=` for long, `<` for short (ignored if `fees` is `nothing`).
-
-# Returns
-
-  - `val::VecNum`: Total actual proportional per asset fee.
-
-# Examples
-
-```jldoctest
-julia> calc_asset_fees([0.1, 0.2], [100, 200], 0.01, .>=)
-2-element Vector{Float64}:
- 0.1
- 0.4
-```
-
-# Related
-
-  - [`Fees`](@ref)
-  - [`VecNum`](@ref)
-  - [`calc_fees`](@ref)
-  - [`calc_fixed_fees`](@ref)
-  - [`calc_asset_fixed_fees`](@ref)
-  - [`calc_net_returns`](@ref)
-"""
-function calc_asset_fees(w::VecNum, p::VecNum, ::Nothing, ::Function)
-    return zeros(promote_type(eltype(w), eltype(p)), length(w))
-end
-function calc_asset_fees(w::VecNum, p::VecNum, fees::Number, op::Function)
-    fees_w = zeros(promote_type(eltype(w), eltype(p), eltype(fees)), length(w))
-    idx = op(w, zero(promote_type(eltype(w), eltype(p), eltype(fees))))
-    fees_w[idx] = fees * w[idx] ⊙ p[idx]
-    return fees_w
-end
-function calc_asset_fees(w::VecNum, p::VecNum, fees::VecNum, op::Function)
-    fees_w = zeros(promote_type(eltype(w), eltype(p), eltype(fees)), length(w))
-    idx = op(w, zero(promote_type(eltype(w), eltype(p), eltype(fees))))
-    fees_w[idx] = fees[idx] ⊙ w[idx] ⊙ p[idx]
-    return fees_w
-end
-"""
-    calc_asset_fees(w::VecNum, p::VecNum, ::Nothing)
-    calc_asset_fees(w::VecNum, p::VecNum, tn::Turnover)
-
-Compute the actual per asset turnover fees for portfolio weights and prices.
-
-This is one term of the total fee, not the whole fee. It is the elementwise form of [`calc_fees(w::VecNum, p::VecNum, tn::Turnover)`](@ref), and [`Fees`](@ref) states the closed form as ``\\boldsymbol{F}_{\\text{Tn}}``. The `fixed` flag of [`Turnover`](@ref) reaches no method here, for the reason [`calc_fees(w::VecNum, p::VecNum, tn::Turnover)`](@ref) gives.
-
-# Algorithm
-
- 1. On a `nothing` `tn`, return a vector of zeros one entry long per asset, in the promoted element type.
- 2. Otherwise form the traded amount per asset, the absolute difference between `w` and the reference weights `tn.w`.
- 3. On a `Number` `tn.val`, multiply the traded amount elementwise by the prices, and scale it by the one rate.
- 4. On a `VecNum` `tn.val`, multiply the traded amount elementwise by the prices and by the per-asset rates.
-
-# Arguments
-
-  - `w`: Portfolio weights.
-
-  - `p`: Asset prices.
-
-  - `tn`: Turnover structure.
-
-      + `nothing`: No turnover fee, returns zero.
-      + `tn.val::Number`: Single turnover fee applied to all assets.
-      + `tn.val::VecNum`: Vector of turnover fees per asset.
-
-# Returns
-
-  - `val::VecNum`: Actual per asset turnover fee.
-
-# Examples
-
-```jldoctest
-julia> calc_asset_fees([0.1, 0.2], [100, 200], Turnover(; w = [0.0, 0.0], val = 0.01))
-2-element Vector{Float64}:
- 0.1
- 0.4
-```
-
-# Related
-
-  - [`Fees`](@ref)
-  - [`VecNum`](@ref)
-  - [`calc_fees`](@ref)
-  - [`calc_fixed_fees`](@ref)
-  - [`calc_asset_fixed_fees`](@ref)
-  - [`calc_net_returns`](@ref)
-"""
-function calc_asset_fees(w::VecNum, p::VecNum, ::Nothing)
-    return zeros(promote_type(eltype(w), eltype(p)), length(w))
-end
-function calc_asset_fees(w::VecNum, p::VecNum, tn::Turnover{<:Any, <:Number})
-    return tn.val * abs.(w - tn.w) ⊙ p
-end
-function calc_asset_fees(w::VecNum, p::VecNum, tn::Turnover{<:Any, <:VecNum})
-    return tn.val ⊙ abs.(w - tn.w) ⊙ p
-end
-"""
-    calc_asset_fees(w::VecNum, p::VecNum, T::Number, fees::Fees)
-
-Compute total actual per asset fees for portfolio weights and prices.
-
-Sums actual proportional, fixed, and turnover fees for all assets. The entries sum to the number [`calc_fees(w::VecNum, p::VecNum, fees::Fees)`](@ref) returns, up to the order of summation.
-
-The verb returns a pair, `(amortised, one_time)`. `l`, `s` and `tn` are rates per period, so they charge on every observation and land in `amortised`. `fl` and `fs` are currency amounts charged one time for the whole holding period, so `fees.fa` decides where they land: a `nothing` `fa` puts them in `one_time`, and an [`AmortisedFees`](@ref) divides them by `T`, adds them to `amortised` and leaves `one_time` zero.
-
-`T` is the observation count the calling site charges over, and the site always knows it, so no fee stores one. [`charge_fees`](@ref) hands the length of the series it lays the pair onto, and [`calc_total_fees`](@ref) contracts the pair to the cost of a whole holding period.
-
-# Algorithm
-
- 1. Charge the per period terms, the call of [`calc_asset_periodic_fees`](@ref).
- 2. Charge the one-off terms, the call of [`calc_asset_one_off_fees`](@ref).
- 3. On a `nothing` `fees.fa`, return the two charges unchanged.
- 4. On an [`AmortisedFees`](@ref) `fees.fa`, divide the one-off charge by `T`, add it to the per period charge, and return that vector beside a zero of the same type.
-
-# Arguments
-
-  - `w`: Portfolio weights.
-  - `p`: Asset prices.
-  - `T`: Observation count the fee is charged over.
-  - `fees`: [`Fees`](@ref) structure.
-
-# Returns
-
-  - `amortised::VecNum`: The per asset charge every observation carries.
-  - `one_time::VecNum`: The per asset charge the first observation carries alone.
-
-# Examples
-
-```jldoctest
-julia> fees = Fees(; l = [0.01, 0.02], s = [0.01, 0.02], fl = [5.0, 0.0], fs = [0.0, 10.0]);
-
-julia> calc_asset_fees([0.1, -0.2], [100, 200], 21, fees)
-([0.1, 0.8], [5.0, 10.0])
-```
-
-# Related
-
-  - [`Fees`](@ref)
-  - [`VecNum`](@ref)
-  - [`calc_fees`](@ref)
-  - [`calc_asset_fixed_fees`](@ref)
-  - [`calc_net_returns`](@ref)
-"""
-function calc_asset_fees(w::VecNum, p::VecNum, T::Number, fees::Fees)
-    return calc_asset_fees(w, p, T, fees, fees.fa)
-end
-function calc_asset_fees(w::VecNum, p::VecNum, ::Number, fees::Fees,
-                         ::Union{Nothing, <:FirstObservationFees})
-    return (calc_asset_periodic_fees(w, p, fees), calc_asset_one_off_fees(w, fees))
-end
-function calc_asset_fees(w::VecNum, p::VecNum, T::Number, fees::Fees, ::AmortisedFees)
-    val = calc_asset_periodic_fees(w, p, fees) + calc_asset_one_off_fees(w, fees) / T
-    return (val, zero(val))
-end
-"""
     calc_asset_fees(w::VecNum, ::Nothing, ::Function)
     calc_asset_fees(w::VecNum, fees::Number, op::Function)
     calc_asset_fees(w::VecNum, fees::VecNum, op::Function)
 
 Compute the proportional per asset fees for portfolio weights.
 
-This is one term of the total fee, not the whole fee. It is the elementwise form of [`calc_fees(w::VecNum, fees::Number, op::Function)`](@ref), and [`Fees`](@ref) states the closed form as ``\\boldsymbol{F}_{\\text{p}}``, in the pair of equations that carries no price vector.
+This is one term of the total fee, not the whole fee. It is the elementwise form of [`calc_fees(w::VecNum, fees::Number, op::Function)`](@ref), and [`Fees`](@ref) states the closed form as ``\\boldsymbol{F}_{\\text{p}}``.
 
 # Algorithm
 
@@ -1418,7 +1027,7 @@ end
 
 Compute the per asset turnover fees for portfolio weights.
 
-This is one term of the total fee, not the whole fee. It is the elementwise form of [`calc_fees(w::VecNum, tn::Turnover)`](@ref), and [`Fees`](@ref) states the closed form as ``\\boldsymbol{F}_{\\text{Tn}}``, in the pair of equations that carries no price vector. The `fixed` flag of [`Turnover`](@ref) reaches no method here, for the reason [`calc_fees(w::VecNum, p::VecNum, tn::Turnover)`](@ref) gives.
+This is one term of the total fee, not the whole fee. It is the elementwise form of [`calc_fees(w::VecNum, tn::Turnover)`](@ref), and [`Fees`](@ref) states the closed form as ``\\boldsymbol{F}_{\\text{Tn}}``. The `fixed` flag of [`Turnover`](@ref) reaches no method here, for the reason that name gives.
 
 # Algorithm
 
@@ -1475,7 +1084,7 @@ end
 
 Compute the per asset fixed portfolio fees for assets that have been allocated.
 
-This is the elementwise form of [`calc_fixed_fees`](@ref), and its entries sum to the number that name returns. No price vector reaches it, and [`Fees`](@ref) states the closed form as ``\\boldsymbol{F}_{\\text{f}}``.
+This is the elementwise form of [`calc_fixed_fees`](@ref), and its entries sum to the number that name returns. [`Fees`](@ref) states the closed form as ``\\boldsymbol{F}_{\\text{f}}``.
 
 # Algorithm
 
@@ -1599,7 +1208,6 @@ end
 
 """
     calc_periodic_fees(w::VecNum, fees::Fees)
-    calc_periodic_fees(w::VecNum, p::VecNum, fees::Fees)
 
 Charge the terms of a fee that fall on every observation.
 
@@ -1615,7 +1223,6 @@ Charge the terms of a fee that fall on every observation.
 # Arguments
 
   - `w`: Portfolio weights.
-  - `p`: Asset prices, on the method that carries them.
   - `fees`: [`Fees`](@ref) structure.
 
 # Returns
@@ -1643,13 +1250,8 @@ julia> PortfolioOptimisers.calc_periodic_fees([0.5, 0.5], fees)
 function calc_periodic_fees(w::VecNum, fees::Fees)
     return calc_fees(w, fees.l, .>=) - calc_fees(w, fees.s, .<) + calc_fees(w, fees.tn)
 end
-function calc_periodic_fees(w::VecNum, p::VecNum, fees::Fees)
-    return calc_fees(w, p, fees.l, .>=) - calc_fees(w, p, fees.s, .<) +
-           calc_fees(w, p, fees.tn)
-end
 """
     calc_asset_periodic_fees(w::VecNum, fees::Fees)
-    calc_asset_periodic_fees(w::VecNum, p::VecNum, fees::Fees)
 
 Split over the assets the terms of a fee that fall on every observation.
 
@@ -1665,7 +1267,6 @@ The per asset twin of [`calc_periodic_fees`](@ref). Its entries sum to that numb
 # Arguments
 
   - `w`: Portfolio weights.
-  - `p`: Asset prices, on the method that carries them.
   - `fees`: [`Fees`](@ref) structure.
 
 # Returns
@@ -1695,10 +1296,6 @@ julia> PortfolioOptimisers.calc_asset_periodic_fees([0.5, 0.5], fees)
 function calc_asset_periodic_fees(w::VecNum, fees::Fees)
     return calc_asset_fees(w, fees.l, .>=) - calc_asset_fees(w, fees.s, .<) +
            calc_asset_fees(w, fees.tn)
-end
-function calc_asset_periodic_fees(w::VecNum, p::VecNum, fees::Fees)
-    return calc_asset_fees(w, p, fees.l, .>=) - calc_asset_fees(w, p, fees.s, .<) +
-           calc_asset_fees(w, p, fees.tn)
 end
 """
     calc_one_off_fees(w::VecNum, fees::Fees)
@@ -1792,7 +1389,6 @@ function calc_asset_one_off_fees(w::VecNum, fees::Fees)
 end
 """
     calc_total_fees(w::VecNum, T::Number, fees::Option{<:Fees})
-    calc_total_fees(w::VecNum, p::VecNum, T::Number, fees::Option{<:Fees})
 
 Charge the whole cost of holding a portfolio for `T` periods.
 
@@ -1807,7 +1403,6 @@ Charge the whole cost of holding a portfolio for `T` periods.
 # Arguments
 
   - `w`: Portfolio weights.
-  - `p`: Asset prices, on the method that carries them.
   - `T`: Horizon, in periods.
   - `fees`: [`Fees`](@ref) structure, or `nothing`.
 
@@ -1839,15 +1434,8 @@ end
 function calc_total_fees(w::VecNum, T::Number, fees::Fees)
     return T * calc_periodic_fees(w, fees) + calc_one_off_fees(w, fees)
 end
-function calc_total_fees(w::VecNum, p::VecNum, ::Number, ::Nothing)
-    return zero(promote_type(eltype(w), eltype(p)))
-end
-function calc_total_fees(w::VecNum, p::VecNum, T::Number, fees::Fees)
-    return T * calc_periodic_fees(w, p, fees) + calc_one_off_fees(w, fees)
-end
 """
     calc_total_asset_fees(w::VecNum, T::Number, fees::Option{<:Fees})
-    calc_total_asset_fees(w::VecNum, p::VecNum, T::Number, fees::Option{<:Fees})
 
 Split over the assets the whole cost of holding a portfolio for `T` periods.
 
@@ -1862,7 +1450,6 @@ The per asset twin of [`calc_total_fees`](@ref). Its entries sum to that number,
 # Arguments
 
   - `w`: Portfolio weights.
-  - `p`: Asset prices, on the method that carries them.
   - `T`: Horizon, in periods.
   - `fees`: [`Fees`](@ref) structure, or `nothing`.
 
@@ -1895,12 +1482,6 @@ function calc_total_asset_fees(w::VecNum, ::Number, ::Nothing)
 end
 function calc_total_asset_fees(w::VecNum, T::Number, fees::Fees)
     return T * calc_asset_periodic_fees(w, fees) + calc_asset_one_off_fees(w, fees)
-end
-function calc_total_asset_fees(w::VecNum, p::VecNum, ::Number, ::Nothing)
-    return zeros(promote_type(eltype(w), eltype(p)), length(w))
-end
-function calc_total_asset_fees(w::VecNum, p::VecNum, T::Number, fees::Fees)
-    return T * calc_asset_periodic_fees(w, p, fees) + calc_asset_one_off_fees(w, fees)
 end
 
 export FeesEstimator, Fees, AmortisedFees, FirstObservationFees, fees_constraints,

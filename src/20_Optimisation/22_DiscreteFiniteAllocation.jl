@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Result type for [`DiscreteAllocation`](@ref).
 
-`shares`, `cost` and `w` are signed: a short position carries a negative share count, a negative cost and a negative weight. `retcode` is a failure when either sub-problem failed; `s_retcode` and `l_retcode` carry the short-side and long-side return codes on their own, and `s_model` and `l_model` carry the two JuMP models when `save` is `true`.
+`shares`, `cost` and `w` are signed: a short position carries a negative share count, a negative cost and a negative weight. `fees` is the charge the two sub-problems paid over the whole horizon, and it is never signed. `retcode` is a failure when either sub-problem failed; `s_retcode` and `l_retcode` carry the short-side and long-side return codes on their own, and `s_model` and `l_model` carry the two JuMP models when `save` is `true`.
 
 # Fields
 
@@ -19,6 +19,7 @@ $(DocStringExtensions.FIELDS)
         cost::VecNum,
         w::VecNum,
         cash::Number,
+        fees::Number,
         s_model::Option{<:JuMP.Model},
         l_model::Option{<:JuMP.Model},
         fb::Option{<:OptE_Opt}
@@ -66,6 +67,10 @@ Keywords correspond to the struct's fields.
     """
     cash
     """
+    $(field_dict[:fees_alloc])
+    """
+    fees
+    """
     $(field_dict[:s_model])
     """
     s_model
@@ -81,23 +86,23 @@ Keywords correspond to the struct's fields.
                                       s_retcode::Option{<:OptimisationReturnCode},
                                       l_retcode::Option{<:OptimisationReturnCode},
                                       shares::VecNum, cost::VecNum, w::VecNum, cash::Number,
-                                      s_model::Option{<:JuMP.Model},
+                                      fees::Number, s_model::Option{<:JuMP.Model},
                                       l_model::Option{<:JuMP.Model}, fb::Option{<:OptE_Opt})
         return new{typeof(retcode), typeof(s_retcode), typeof(l_retcode), typeof(shares),
-                   typeof(cost), typeof(w), typeof(cash), typeof(s_model), typeof(l_model),
-                   typeof(fb)}(retcode, s_retcode, l_retcode, shares, cost, w, cash,
-                               s_model, l_model, fb)
+                   typeof(cost), typeof(w), typeof(cash), typeof(fees), typeof(s_model),
+                   typeof(l_model), typeof(fb)}(retcode, s_retcode, l_retcode, shares, cost,
+                                                w, cash, fees, s_model, l_model, fb)
     end
 end
 function DiscreteAllocationResult(; retcode::OptimisationReturnCode,
                                   s_retcode::Option{<:OptimisationReturnCode},
                                   l_retcode::Option{<:OptimisationReturnCode},
                                   shares::VecNum, cost::VecNum, w::VecNum, cash::Number,
-                                  s_model::Option{<:JuMP.Model},
+                                  fees::Number, s_model::Option{<:JuMP.Model},
                                   l_model::Option{<:JuMP.Model},
                                   fb::Option{<:OptE_Opt})::DiscreteAllocationResult
     return DiscreteAllocationResult(retcode, s_retcode, l_retcode, shares, cost, w, cash,
-                                    s_model, l_model, fb)
+                                    fees, s_model, l_model, fb)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -116,7 +121,8 @@ One sub-problem, under the default [`AbsoluteErrorWeightFinaliser`](@ref):
 \\begin{align}
 \\underset{\\boldsymbol{x} \\in \\mathbb{Z}_{\\geq 0}^N}{\\min} \\quad & u + r\\,, \\\\
 \\text{s.t.} \\quad & u \\geq \\lVert \\boldsymbol{w} C - \\boldsymbol{x} \\odot \\boldsymbol{p} \\rVert_1\\,, \\\\
-& r = C - \\boldsymbol{x}^\\intercal \\boldsymbol{p} \\geq 0\\,.
+& r = C - \\boldsymbol{x}^\\intercal \\boldsymbol{p}\\,, \\\\
+& r - F(\\boldsymbol{x}) \\geq 0\\,.
 \\end{align}
 ```
 
@@ -125,11 +131,14 @@ Where:
   - ``\\boldsymbol{x}``: Integer share vector.
   - ``u``: Tracking error auxiliary variable.
   - ``r``: Residual cash.
+  - ``F(\\boldsymbol{x})``: Fee of this sub-problem, of [`set_allocation_fees!`](@ref). It is zero when the input states no fee.
   - ``\\boldsymbol{w}``: Target weight vector of this sub-problem.
   - ``C``: Cash allocated to this sub-problem.
   - ``\\boldsymbol{p}``: Asset price vector.
   - ``\\odot``: Element-wise (Hadamard) product.
   - ``N``: Number of assets in this sub-problem.
+
+The fee enters the budget and never the objective. The objective reads *track well, and leave no capital idle*, so a fee added to ``r`` and minimised would reward the model for paying **more** fees: a larger fee shrinks the leftover. The budget instead states that the fee must be affordable. The objective still pushes ``\\boldsymbol{x}^\\intercal \\boldsymbol{p}`` up, so every unit of fee competes with a unit of position, and the model drops a position whose fixed fee buys too little tracking.
 
 `wf` selects the deviation that ``u`` bounds. The objective, the integrality and the cash constraint do not change with it.
 
@@ -325,12 +334,109 @@ function set_discrete_error!(model::JuMP.Model, w::VecNum, p::VecNum, cash::Numb
     return nothing
 end
 """
+    set_allocation_fees!(model::JuMP.Model, p::VecNum, cash::Number, sf::Option{<:NamedTuple})
+
+Write one side's fee in the allocation model's own variables, and return it.
+
+A fee is a cost of the portfolio the allocator actually buys. The model holds the share vector `x` and the prices `p`, so `x .* p` is the money in each position exactly. Every term is written against that money, and no weight and no price appears on its own. This is the rule ADR 0123 states.
+
+`sf` is one side's charge, of [`allocation_side_fees`](@ref). A `nothing` `sf` writes nothing and returns a zero expression, so the caller needs no branch.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\boldsymbol{m} &= \\boldsymbol{x} \\odot \\boldsymbol{p}\\,, \\\\
+t_{i} &\\geq \\lvert m_{i} - m_{0,i} \\rvert\\,, \\\\
+b_{i} &\\leq x_{i} \\leq \\left\\lfloor C / p_{i} \\right\\rfloor b_{i}\\,, \\\\
+F(\\boldsymbol{x}) &= T \\left( \\boldsymbol{f}_{\\text{p}}^\\intercal \\boldsymbol{m} + \\boldsymbol{f}_{\\text{Tn}}^\\intercal \\boldsymbol{t} \\right) + \\boldsymbol{f}_{\\text{f}}^\\intercal \\boldsymbol{b}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{m}``: Money in each position.
+  - ``\\boldsymbol{m}_{0}``: Money in each position before the trade, `sf.prev_money`.
+  - ``\\boldsymbol{t}``: Epigraph of the money traded.
+  - ``\\boldsymbol{b}``: Binary saying whether the position is held at all.
+  - ``C``: Cash allocated to this sub-problem.
+  - ``T``: Horizon, in periods.
+  - ``\\boldsymbol{f}_{\\text{p}},\\, \\boldsymbol{f}_{\\text{Tn}},\\, \\boldsymbol{f}_{\\text{f}}``: Proportional, turnover and fixed rates of this side.
+
+The rates `l`, `s` and `tn` charge on each of the `T` periods, and the fixed amounts `fl` and `fs` charge one time for the whole horizon. That is the rule [`calc_total_fees`](@ref) states, written in the model's own variables.
+
+A binary is emitted only when the side states a fixed fee, so a problem that states none keeps the variable count it had. `x` is integer and non-negative, so `b <= x` and `x <= ub * b` make `b` the indicator of `x > 0` exactly.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `p::VecNum`: Asset prices of this side.
+  - `cash::Number`: Cash allocated to this side. It bounds the shares a binary can switch on.
+  - `sf::Option{<:NamedTuple}`: This side's charge, or `nothing`.
+
+# Returns
+
+  - `fee`: The fee expression. It is registered as `model[:fee]`.
+
+# Related
+
+  - [`allocation_side_fees`](@ref)
+  - [`finite_sub_allocation`](@ref)
+  - [`DiscreteAllocation`](@ref)
+  - [`Fees`](@ref)
+"""
+function set_allocation_fees!(model::JuMP.Model, ::VecNum, ::Number, ::Nothing)
+    return model[:fee] = zero(JuMP.AffExpr)
+end
+function set_allocation_fees!(model::JuMP.Model, p::VecNum, cash::Number, sf::NamedTuple)
+    x = model[:x]
+    sc = get_constraint_scale(model)
+    N = length(p)
+    T = sf.T
+    fee = zero(JuMP.AffExpr)
+    # The money in each position, exactly. No weight and no price appears on its own.
+    JuMP.@expression(model, money, x .* p)
+    prop = sf.prop
+    if !isnothing(prop)
+        # Per period: the proportional rate of this side.
+        JuMP.@expression(model, fee_prop, dot_scalar(prop, money))
+        JuMP.add_to_expression!(fee, T, fee_prop)
+    end
+    tn_val = sf.tn_val
+    if !isnothing(tn_val)
+        # Per period: the turnover. An absolute value needs an epigraph.
+        prev_money = sf.prev_money
+        JuMP.@variable(model, t_ftn[1:N] >= 0)
+        JuMP.@constraints(model, begin
+                              cftn_ub, sc * (money .- prev_money .- t_ftn) .<= 0
+                              cftn_lb, sc * (prev_money .- money .- t_ftn) .<= 0
+                          end)
+        JuMP.@expression(model, fee_tn, dot_scalar(tn_val, t_ftn))
+        JuMP.add_to_expression!(fee, T, fee_tn)
+    end
+    fixed = sf.fixed
+    if !isnothing(fixed)
+        # One time: a fixed fee is charged per position held, so it needs a bit saying
+        # whether the position is there at all. `ub` is the most shares this cash can buy.
+        ub = floor.(cash ./ p)
+        JuMP.@variable(model, b[1:N], Bin)
+        JuMP.@constraints(model, begin
+                              cb_ub, sc * (x .- ub .* b) .<= 0
+                              cb_lb, sc * (b .- x) .<= 0
+                          end)
+        JuMP.@expression(model, fee_fixed, dot_scalar(fixed, b))
+        JuMP.add_to_expression!(fee, fee_fixed)
+    end
+    return model[:fee] = fee
+end
+"""
     finite_sub_allocation(w::VecNum, p::VecNum, cash::Number, bgt::Number,
-                          da::DiscreteAllocation, str_names::Bool = false)
+                          sf::Option{<:NamedTuple}, da::DiscreteAllocation,
+                          str_names::Bool = false)
 
 Build and solve the discrete allocation MIP for one side, long or short, of the portfolio.
 
-Implements the sub-problem of [`DiscreteAllocation`](@ref). An empty `w` returns three empty vectors, the untouched `cash`, and `nothing` for both the return code and the model.
+Implements the sub-problem of [`DiscreteAllocation`](@ref). An empty `w` returns three empty vectors, the untouched `cash`, a zero fee, and `nothing` for both the return code and the model.
 
 # Arguments
 
@@ -338,6 +444,7 @@ Implements the sub-problem of [`DiscreteAllocation`](@ref). An empty `w` returns
   - `p::VecNum`: Asset prices of this side, in the same order as `w`.
   - `cash::Number`: Cash allocated to this side.
   - `bgt::Number`: Budget of this side, used to rescale the realised weights.
+  - `sf::Option{<:NamedTuple}`: This side's charge, of [`allocation_side_fees`](@ref), or `nothing`.
   - `da::DiscreteAllocation`: Allocator carrying the solvers, the scales and the formulation `wf`.
   - `str_names::Bool = false`: Whether to give the JuMP variables string names.
 
@@ -346,7 +453,8 @@ Implements the sub-problem of [`DiscreteAllocation`](@ref). An empty `w` returns
   - `shares::VecNum`: Share count per asset, rounded to `Int`.
   - `cost::VecNum`: `shares .* p`.
   - `aw::VecNum`: Realised weights, rescaled to sum to `bgt`. All zero when nothing was bought.
-  - `acash::Number`: Residual cash `r` of the solved model.
+  - `acash::Number`: Cash left over, `cash` less the cost of the shares and the fee.
+  - `fee::Number`: The fee this side paid over the whole horizon.
   - `res::OptimisationReturnCode`: An [`OptimisationSuccess`](@ref) or an [`OptimisationFailure`](@ref) carrying the solver trials.
   - `model::JuMP.Model`: The solved model.
 
@@ -354,20 +462,24 @@ Implements the sub-problem of [`DiscreteAllocation`](@ref). An empty `w` returns
 
   - The share vector is declared integer and non-negative, so a short side must be passed with its weights already negated.
   - [`set_discrete_error!`](@ref) adds the one constraint that `da.wf` selects. Everything else in the model is common to the four formulations.
-  - `shares` is read back with `round(Int, ...)`, because a MIP solver returns an integer only to within its own tolerance.
+  - [`set_allocation_fees!`](@ref) adds the fee. It enters the budget constraint and never the objective.
+  - The fee this verb **reports** is [`allocation_fee`](@ref) of the realised shares, not the value of the model's own expression. The turnover term of that expression is an epigraph, and only the budget pushes it down, so a solver leaves it slack whenever the budget does not bind. A slack epigraph overstates the fee, so the allocation the model bought is affordable under the exact charge.
+  - `shares` is read back with `round(Int, ...)`, because a MIP solver returns an integer only to within its own tolerance. A fee larger than the cash makes the budget infeasible, and an infeasible model holds no finite value, so the book is then read as empty and `res` carries the failure.
 
 # Related
 
   - [`DiscreteAllocation`](@ref)
   - [`set_discrete_error!`](@ref)
+  - [`set_allocation_fees!`](@ref)
   - [`setup_alloc_optim`](@ref)
   - [`adjust_long_cash`](@ref)
 """
 function finite_sub_allocation(w::VecNum, p::VecNum, cash::Number, bgt::Number,
-                               da::DiscreteAllocation, str_names::Bool = false)
+                               sf::Option{<:NamedTuple}, da::DiscreteAllocation,
+                               str_names::Bool = false)
     if isempty(w)
         return Vector{eltype(w)}(undef, 0), Vector{eltype(w)}(undef, 0),
-               Vector{eltype(w)}(undef, 0), cash, nothing, nothing
+               Vector{eltype(w)}(undef, 0), cash, zero(cash), nothing, nothing
     end
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
@@ -384,7 +496,8 @@ function finite_sub_allocation(w::VecNum, p::VecNum, cash::Number, bgt::Number,
     # r := remaining money
     # eta := ideal_investment - discrete_investment
     JuMP.@expression(model, r, cash - LinearAlgebra.dot(x, p))
-    JuMP.@constraint(model, cr, sc * r >= 0)
+    fee = set_allocation_fees!(model, p, cash, sf)
+    JuMP.@constraint(model, cr, sc * (r - fee) >= 0)
     set_discrete_error!(model, w, p, cash, da.wf)
     JuMP.@objective(model, Min, so * (u + r))
     res = optimise_JuMP_model!(model, da.slv)
@@ -393,29 +506,43 @@ function finite_sub_allocation(w::VecNum, p::VecNum, cash::Number, bgt::Number,
     else
         OptimisationFailure(; res = res.trials)
     end
-    shares = round.(Int, JuMP.value.(x))
+    xv = JuMP.value.(x)
+    # A fee larger than the cash makes the budget constraint infeasible, and an infeasible
+    # model holds no solution, so its values are not finite. `res` carries the failure, and
+    # the book is read as empty rather than raising on the conversion to `Int`.
+    shares = all(isfinite, xv) ? round.(Int, xv) : zeros(Int, N)
     cost = shares .* p
     aw = if any(!iszero, cost)
         cost / sum(cost) * bgt
     else
         range(zero(eltype(w)), zero(eltype(w)); length = N)
     end
-    acash = JuMP.value(r)
-    return shares, cost, aw, acash, res, model
+    # The reported fee is priced on the realised integer shares, not read off the model.
+    # `t_ftn` is an epigraph, and only the budget constraint pushes it down, so the solver
+    # leaves it slack whenever the budget does not bind. A slack epigraph only overstates
+    # the fee, so the allocation it bought stays affordable.
+    afee = allocation_fee(sf, p, shares)
+    acash = cash - sum(cost) - afee
+    return shares, cost, aw, acash, afee, res, model
 end
 function _optimise(da::DiscreteAllocation, fai::FiniteAllocationInput;
                    str_names::Bool = false, save::Bool = true, kwargs...)
-    w, p, cash, T, fees = fai.w, fai.prices, fai.cash, fai.horizon, fai.fees
-    cash, bgt, lbgt, sbgt, lidx, sidx, lcash, scash = setup_alloc_optim(w, p, cash, T, fees)
-    sshares, scost, sw, scash, sretcode, smodel = finite_sub_allocation(-view(w, sidx),
-                                                                        view(p, sidx),
-                                                                        scash, sbgt, da,
-                                                                        str_names)
+    w, p, cash, pcash, T, fees = fai.w, fai.prices, fai.cash, fai.prev_cash, fai.horizon,
+                                 fai.fees
+    bgt, lbgt, sbgt, lidx, sidx, lcash, scash = setup_alloc_optim(w, cash)
+    lsf, ssf = allocation_side_fees(fees, T, pcash, lidx, sidx)
+    sshares, scost, sw, scash, sfee, sretcode, smodel = finite_sub_allocation(-view(w,
+                                                                                    sidx),
+                                                                              view(p, sidx),
+                                                                              scash, sbgt,
+                                                                              ssf, da,
+                                                                              str_names)
     lcash = adjust_long_cash(bgt, lcash, scash)
-    lshares, lcost, lw, lcash, lretcode, lmodel = finite_sub_allocation(view(w, lidx),
-                                                                        view(p, lidx),
-                                                                        lcash, lbgt, da,
-                                                                        str_names)
+    lshares, lcost, lw, lcash, lfee, lretcode, lmodel = finite_sub_allocation(view(w, lidx),
+                                                                              view(p, lidx),
+                                                                              lcash, lbgt,
+                                                                              lsf, da,
+                                                                              str_names)
 
     res = Matrix{eltype(w)}(undef, length(w), 3)
     res[lidx, 1] = lshares
@@ -438,7 +565,8 @@ function _optimise(da::DiscreteAllocation, fai::FiniteAllocationInput;
     return DiscreteAllocationResult(; retcode = retcode, s_retcode = sretcode,
                                     l_retcode = lretcode, shares = view(res, :, 1),
                                     cost = view(res, :, 2), w = view(res, :, 3),
-                                    cash = lcash, s_model = ifelse(save, smodel, nothing),
+                                    cash = lcash, fees = lfee + sfee,
+                                    s_model = ifelse(save, smodel, nothing),
                                     l_model = ifelse(save, lmodel, nothing), fb = nothing)
 end
 """

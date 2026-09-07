@@ -31,6 +31,38 @@
     res = optimise(MeanRisk(;
                             opt = JuMPOptimiser(; wb = WeightBounds(; lb = -1, ub = 1),
                                                 sbgt = 1, bgt = 1, pe = pr, slv = slv)))
+    # Issue #900: the fee of a finite allocation, priced by hand on the money the
+    # allocator actually bought. `shares .* p` is that money exactly. The long side takes
+    # `l` and `fl`, the short side takes `s` and `fs`, and the turnover charges the money
+    # traded against `prev_cash .* tn.w`, whose absolute value is the same on both sides.
+    function alloc_fee_by_hand(alloc, wt, p, T, fe, prev_cash)
+        dot_scalar = PortfolioOptimisers.dot_scalar
+        money = collect(alloc.shares) .* p
+        lidx = wt .>= 0
+        sidx = .!lidx
+        fee = zero(eltype(money))
+        if !isnothing(fe.l)
+            fee += T * dot_scalar(PortfolioOptimisers.nothing_scalar_array_view(fe.l, lidx),
+                                  view(money, lidx))
+        end
+        if !isnothing(fe.s)
+            fee -= T * dot_scalar(PortfolioOptimisers.nothing_scalar_array_view(fe.s, sidx),
+                                  view(money, sidx))
+        end
+        if !isnothing(fe.tn)
+            prev = prev_cash * fe.tn.w
+            fee += T * dot_scalar(fe.tn.val, abs.(money - prev))
+        end
+        if !isnothing(fe.fl)
+            fee += dot_scalar(PortfolioOptimisers.nothing_scalar_array_view(fe.fl, lidx),
+                              .!iszero.(view(money, lidx)))
+        end
+        if !isnothing(fe.fs)
+            fee += dot_scalar(PortfolioOptimisers.nothing_scalar_array_view(fe.fs, sidx),
+                              .!iszero.(view(money, sidx)))
+        end
+        return fee
+    end
     @testset "Fees" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/Fees.csv.gz"), DataFrame)
         f1s = [0.02002313426946848, 0.12149580659357644]
@@ -43,30 +75,12 @@
             @test isapprox(f1s[i], f1)
             f2 = sum(calc_asset_fees(res.w, T, fe))
             @test isapprox(df[!, "$(2*(i-1)+1)"], f2)
-            f3 = sum(calc_asset_fees(res.w, vec(values(X[end])), T, fe))
-            @test isapprox(df[!, "$(2*(i-1)+2)"], f3)
-            fopt1 = calc_total_fees(res.w, vec(values(X[end])), T, fe)
-            fopt2 = 1000 - (sum(res_mip.cost) + res_mip.cash)
-            result = isapprox(fopt1, fopt2)
-            if !result
-                fopt2_t = if i == 1
-                    67.80797690253598
-                elseif i == 2
-                    138.48615533295037
-                else
-                    fopt1
-                end
-                result = isapprox(fopt2, fopt2_t; rtol = 1e-6)
-                if !result
-                    println("Counter: $i")
-                    println("fopt1: $fopt1")
-                    println("fopt2: $fopt2")
-                    findtol(fopt1, fopt2)
-                end
-                @test result
-            else
-                @test result
-            end
+            # Issue #900: the allocation charges its fee inside its own model, on the
+            # money it actually buys, so the result reports the charge of the realised
+            # share counts and not of the target weights.
+            fopt1 = alloc_fee_by_hand(res_mip, res.w, vec(values(X[end])), T, fe, 1000)
+            @test isapprox(res_mip.fees, fopt1)
+            @test res_mip.fees > 0
             # Issue #898: `fa` is `nothing` here, so the per period charge falls on every
             # row and the one-off charge falls on the first row alone.
             sched = fill(PortfolioOptimisers.calc_periodic_fees(res.w, fe), size(pr.X, 1))
@@ -82,8 +96,16 @@
         end
         @test all(iszero, calc_fees(res.w, T, Fees()))
         @test all(iszero, sum(calc_asset_fees(res.w, T, Fees())))
-        @test all(iszero, calc_fees(res.w, vec(values(X[end])), T, Fees()))
-        @test all(iszero, sum(calc_asset_fees(res.w, vec(values(X[end])), T, Fees())))
+        # An input that states no fee pays none, and the whole cash is spent or left over.
+        res_free = optimise(da,
+                            FiniteAllocationInput(; w = res.w, prices = vec(values(X[end])),
+                                                  cash = 1000))
+        @test iszero(res_free.fees)
+        res_greedy = optimise(GreedyAllocation(),
+                              FiniteAllocationInput(; w = res.w,
+                                                    prices = vec(values(X[end])),
+                                                    cash = 1000))
+        @test iszero(res_greedy.fees)
     end
     @testset "Expected Returns" begin
         r = factory(Variance(), pr, slv)
@@ -194,7 +216,6 @@
     # numbers rather than read.
     @testset "Fee terms, the per-asset identity and name resolution" begin
         wf = [0.6, -0.4, 0.0, 0.25]
-        pf = [100.0, 50.0, 20.0, 10.0]
         tnf = Turnover(; w = [0.1, 0.2, 0.3, 0.4], val = [0.01, 0.02, 0.03, 0.04])
         fev = Fees(; tn = tnf, l = [0.001, 0.002, 0.003, 0.004],
                    s = [0.005, 0.006, 0.007, 0.008], fl = [1.0, 2.0, 3.0, 4.0],
@@ -203,24 +224,25 @@
         fesc = Fees(; tn = tns, l = 0.001, s = 0.005, fl = 1.0, fs = 5.0)
 
         # The per-asset fee sums to the portfolio fee, up to the order of summation.
-        @test all(isapprox.(sum.(calc_asset_fees(wf, pf, 21, fev)),
-                            calc_fees(wf, pf, 21, fev)))
         @test all(isapprox.(sum.(calc_asset_fees(wf, 21, fev)), calc_fees(wf, 21, fev)))
-        @test all(isapprox.(sum.(calc_asset_fees(wf, pf, 21, fesc)),
-                            calc_fees(wf, pf, 21, fesc)))
         @test all(isapprox.(sum.(calc_asset_fees(wf, 21, fesc)), calc_fees(wf, 21, fesc)))
 
         # The short proportional term is a positive charge, not a credit.
         @test sum(calc_fees([0.6, -0.4], 21, Fees(; s = 0.01))) == 0.004
         @test sum(calc_asset_fees([0.6, -0.4], 21, Fees(; s = 0.01))) == [0.0, 0.004]
-        @test sum(calc_fees([0.6, -0.4], [100.0, 50.0], 21, Fees(; s = 0.01))) == 0.2
 
-        # The fixed term carries no price: change `p` and read the same number.
+        # Issue #900: the fee family carries no price. A price reaches the finite
+        # allocation alone, which holds the share counts and prices the money it buys.
         ffx = Fees(; fl = 3.0, fs = 7.0)
-        @test sum(calc_fees([0.6, -0.4], [100.0, 50.0], 21, ffx)) ==
-              sum(calc_fees([0.6, -0.4], [1.0, 1.0], 21, ffx)) ==
-              sum(calc_fees([0.6, -0.4], 21, ffx)) ==
-              10.0
+        @test sum(calc_fees([0.6, -0.4], 21, ffx)) == 10.0
+        @test isempty(methods(calc_fees,
+                              Tuple{Vector{Float64}, Vector{Float64}, Int, Fees}))
+        @test isempty(methods(calc_total_fees,
+                              Tuple{Vector{Float64}, Vector{Float64}, Int, Fees}))
+        @test isempty(methods(calc_asset_fees,
+                              Tuple{Vector{Float64}, Vector{Float64}, Int, Fees}))
+        @test isempty(methods(calc_total_asset_fees,
+                              Tuple{Vector{Float64}, Vector{Float64}, Int, Fees}))
         @test calc_fixed_fees([0.6, -0.4], 3.0, (; atol = 1e-8), .>=) == 3.0
         @test calc_fixed_fees([0.6, -0.4], 7.0, (; atol = 1e-8), .<) == 7.0
 
@@ -245,10 +267,7 @@
                                     .<) == [2.0, 0.0, 4.0]
 
         # The turnover term, against the two expressions computed by hand.
-        @test calc_fees(wf, pf, tns) == tns.val * dot(abs.(wf - tns.w), pf)
         tnc = Turnover(; w = tns.w, val = fill(0.02, 4))
-        @test calc_fees(wf, pf, tnc) == dot(tnc.val, abs.(wf - tnc.w) .* pf)
-        @test isapprox(calc_fees(wf, pf, tns), calc_fees(wf, pf, tnc))
         @test calc_fees(wf, tns) == tns.val * sum(abs.(wf - tns.w))
         @test calc_fees(wf, tnc) == dot(tnc.val, abs.(wf - tnc.w))
         @test isapprox(calc_fees(wf, tns), calc_fees(wf, tnc))
@@ -256,23 +275,16 @@
         # `fixed` is a `factory` flag; no `calc_fees` method reads it.
         tn_fx = Turnover(; w = tns.w, val = 0.02, fixed = true)
         tn_fr = Turnover(; w = tns.w, val = 0.02, fixed = false)
-        @test calc_fees(wf, pf, tn_fx) == calc_fees(wf, pf, tn_fr)
         @test calc_fees(wf, tn_fx) == calc_fees(wf, tn_fr)
-        @test calc_asset_fees(wf, pf, tn_fx) == calc_asset_fees(wf, pf, tn_fr)
         @test calc_asset_fees(wf, tn_fx) == calc_asset_fees(wf, tn_fr)
         @test calc_fees(wf, factory(tn_fx, wf)) == calc_fees(wf, tn_fx)
         @test iszero(calc_fees(wf, factory(tn_fr, wf)))
 
-        # The `Nothing` methods return a typed zero, and the priced ones promote `w` and `p`.
+        # The `Nothing` methods return a typed zero.
         w32 = Float32[0.6, -0.4]
-        p64 = [100.0, 50.0]
-        @test typeof(calc_fees(w32, p64, nothing, .>=)) === Float64
-        @test typeof(calc_fees(w32, p64, nothing)) === Float64
         @test typeof(calc_fees(w32, nothing, .>=)) === Float32
         @test typeof(calc_fees(w32, nothing)) === Float32
         @test typeof(calc_fixed_fees(w32, nothing, (; atol = 1e-8), .>=)) === Float32
-        @test eltype(calc_asset_fees(w32, p64, nothing, .>=)) === Float64
-        @test eltype(calc_asset_fees(w32, p64, nothing)) === Float64
         @test eltype(calc_asset_fees(w32, nothing, .>=)) === Float32
         @test eltype(calc_asset_fees(w32, nothing)) === Float32
         @test eltype(calc_asset_fixed_fees(w32, nothing, (; atol = 1e-8), .>=)) === Float32
@@ -334,7 +346,6 @@
     # charges over.
     @testset "Fee amortisation" begin
         wf = [0.6, -0.4, 0.0, 0.25]
-        pf = [100.0, 50.0, 20.0, 10.0]
         tnf = Turnover(; w = [0.1, 0.2, 0.3, 0.4], val = 0.02)
         fee0 = Fees(; tn = tnf, l = 0.001, s = 0.002, fl = 0.5, fs = 1.0)
         feeA = Fees(; tn = tnf, l = 0.001, s = 0.002, fl = 0.5, fs = 1.0,
@@ -367,10 +378,6 @@
         # families, to the order of summation.
         @test all(isapprox.(sum.(calc_asset_fees(wf, 3, fee0)), calc_fees(wf, 3, fee0)))
         @test all(isapprox.(sum.(calc_asset_fees(wf, 3, feeA)), calc_fees(wf, 3, feeA)))
-        @test all(isapprox.(sum.(calc_asset_fees(wf, pf, 3, fee0)),
-                            calc_fees(wf, pf, 3, fee0)))
-        @test all(isapprox.(sum.(calc_asset_fees(wf, pf, 3, feeA)),
-                            calc_fees(wf, pf, 3, feeA)))
 
         # The whole holding period: `T` periods of the rates, and the fixed terms one time.
         # The clock does not move that total, only where the cost lands on a series.
@@ -378,12 +385,10 @@
         @test isapprox(calc_total_fees(wf, 3, fee0), calc_total_fees(wf, 3, feeA))
         @test isapprox(sum(calc_total_asset_fees(wf, 3, fee0)),
                        calc_total_fees(wf, 3, fee0))
-        @test isapprox(sum(calc_total_asset_fees(wf, pf, 3, feeA)),
-                       calc_total_fees(wf, pf, 3, feeA))
+        @test isapprox(sum(calc_total_asset_fees(wf, 3, feeA)),
+                       calc_total_fees(wf, 3, feeA))
         @test iszero(calc_total_fees(wf, 3, nothing))
         @test all(iszero, calc_total_asset_fees(wf, 3, nothing))
-        @test iszero(calc_total_fees(wf, pf, 3, nothing))
-        @test all(iszero, calc_total_asset_fees(wf, pf, 3, nothing))
 
         # The two clocks charge the same total over a series, and land it differently.
         Xf = [0.01 0.02 -0.01 0.03; 0.03 0.04 0.02 -0.02; -0.01 0.005 0.01 0.04]
@@ -414,7 +419,6 @@
     # first-observation clock has a word for it. On a `Fees` it is a synonym for `nothing`.
     @testset "FirstObservationFees is the word for the nothing clock" begin
         wf2 = [0.6, -0.4, 0.0, 0.25]
-        pf2 = [100.0, 50.0, 20.0, 10.0]
         tnf2 = Turnover(; w = [0.1, 0.2, 0.3, 0.4], val = 0.02)
         fee0 = Fees(; tn = tnf2, l = 0.001, s = 0.002, fl = 0.5, fs = 1.0)
         feeF = Fees(; tn = tnf2, l = 0.001, s = 0.002, fl = 0.5, fs = 1.0,
@@ -425,12 +429,10 @@
         @test isempty(fieldnames(FirstObservationFees))
         @test FirstObservationFees() isa PortfolioOptimisers.AbstractFeeAmortisation
 
-        # The four value-level verbs answer the same under the leaf as under `nothing`.
+        # The two value-level verbs answer the same under the leaf as under `nothing`.
+        # Issue #900 deleted the price-carrying family, so only the no-price pair remains.
         @test all(isapprox.(calc_fees(wf2, 3, feeF), calc_fees(wf2, 3, fee0)))
-        @test all(isapprox.(calc_fees(wf2, pf2, 3, feeF), calc_fees(wf2, pf2, 3, fee0)))
         @test all(isapprox.(calc_asset_fees(wf2, 3, feeF), calc_asset_fees(wf2, 3, fee0)))
-        @test all(isapprox.(calc_asset_fees(wf2, pf2, 3, feeF),
-                            calc_asset_fees(wf2, pf2, 3, fee0)))
 
         # The supertype decides no answer: each leaf carries its own method, so a third
         # clock added to the family would get a `MethodError` rather than silently

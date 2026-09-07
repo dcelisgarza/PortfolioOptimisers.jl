@@ -204,7 +204,7 @@
 "src/14_UncertaintySets/08_NormBallUncertaintySets.jl" = { map = 7, units = 11, swept = false }
 "src/14_UncertaintySets/09_OrthogonalUncertaintySets.jl" = { map = 7, units = 16, swept = false }
 "src/15_Turnover.jl" = { map = 8, units = 15, algorithm = 8, swept = true }
-"src/16_Fees.jl" = { map = 8, units = 30, algorithm = 19, swept = true }
+"src/16_Fees.jl" = { map = 8, units = 24, algorithm = 18, swept = true }
 "src/17_NetReturnsDrawdowns.jl" = { map = 8, units = 41, algorithm = 8, swept = false }
 "src/18_Tracking.jl" = { map = 8, units = 14, algorithm = 4, swept = true }
 "src/19_RiskMeasures/01_Base_RiskMeasures.jl" = { map = 9, units = 89, swept = false }
@@ -299,9 +299,9 @@
 "src/20_Optimisation/20_RiskMeasureConstraints/19_PowerNormXatRiskConstraints.jl" = { map = 11, units = 4, swept = false }
 "src/20_Optimisation/20_RiskMeasureConstraints/20_VarianceSkewKurtosisConstraints.jl" = { map = 11, units = 1, swept = false }
 "src/20_Optimisation/20_RiskMeasureConstraints/21_GenericValueatRiskRangeConstraints.jl" = { map = 11, units = 1, swept = false }
-"src/20_Optimisation/21_Base_FiniteAllocation.jl" = { map = 10, units = 7, swept = false }
-"src/20_Optimisation/22_DiscreteFiniteAllocation.jl" = { map = 10, units = 5, swept = false }
-"src/20_Optimisation/23_GreedyFiniteAllocation.jl" = { map = 10, units = 5, swept = false }
+"src/20_Optimisation/21_Base_FiniteAllocation.jl" = { map = 10, units = 11, swept = false }
+"src/20_Optimisation/22_DiscreteFiniteAllocation.jl" = { map = 10, units = 6, swept = false }
+"src/20_Optimisation/23_GreedyFiniteAllocation.jl" = { map = 10, units = 6, swept = false }
 "src/20_Optimisation/24_RiskMeasureCompatibility.jl" = { map = 10, units = 3, swept = false }
 "src/21_ExpectedReturns.jl" = { map = 8, units = 21, algorithm = 5, swept = true }
 "src/21_FactorAttribution.jl" = { map = 8, units = 28, swept = false }

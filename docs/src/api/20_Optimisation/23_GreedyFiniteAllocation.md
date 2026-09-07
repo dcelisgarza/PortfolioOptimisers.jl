@@ -6,6 +6,7 @@ factory(res::GreedyAllocationResult, fb::Option{<:FOptE_FOpt})
 GreedyAllocation
 roundmult
 finite_sub_allocation!
+greedy_fee_delta
 optimise(::GreedyAllocation{<:Any, <:Any, <:Any, Nothing}, ::FiniteAllocationInput)
 ```
 

@@ -579,8 +579,12 @@ Discretises continuous weights into whole shares for a fixed cash budget, since 
 - **GreedyAllocation**: heuristic greedy rounding.
 
 **FiniteAllocationInput**
-The problem data fed to a Finite Allocation optimiser: target weights, asset prices, cash budget, and optional horizon and fees.
+The problem data fed to a Finite Allocation optimiser: target weights, asset prices, cash budget, the cash held before the trade, and optional horizon and fees.
 *Avoid*: FiniteAllocation (that is the family), AllocationProblem, AllocationInput.
+
+**Allocation Fee**
+A fee charged inside a Finite Allocation, on the money in each position rather than on a weight. The allocator holds the share counts and the prices, so `shares ⊙ prices` is that money exactly. The charge enters the budget constraint of each sub-problem and never its objective, so every unit of fee competes with a unit of position, and the result carries the charge it paid. The cash held before the trade is a field of the FiniteAllocationInput, because the turnover term prices the money traded. See ADR 0123.
+*Avoid*: a fee taken out of the cash before the allocation runs, and any fee priced as a rate times a weight times a price, which names no quantity.
 
 ## 5. Risk Measures
 
@@ -671,14 +675,14 @@ Portfolio returns adjusted for fees and turnover costs. Computed before drawdown
 Peak-to-trough declines computed from Net Returns, and the input series to drawdown-based risk measures.
 
 **Fees**
-The composite of holding and trading costs: **long** (management), **short** (borrowing), **turnover** (commission) and **fixed** (a constant charge on any non-zero weight). The long, short and turnover rates are charged **every period**, at the frequency of the returns. The two fixed amounts are charged **one time** for the whole holding period. See issue #898.
+The composite of holding and trading costs: **long** (management), **short** (borrowing), **turnover** (commission) and **fixed** (a constant charge on any non-zero weight). The long, short and turnover rates are charged **every period**, at the frequency of the returns. The two fixed amounts are charged **one time** for the whole holding period. See issue #898. A return series reads the two fixed amounts as a fraction of capital, and an Allocation Fee reads them as a currency amount.
 
 **Fee Amortisation**
 The algorithm that spreads a Fees object's one-off terms, the two fixed charges and the fixed Forced Liquidation charge, evenly over a holding period. It names a clock and carries no count: `nothing` charges those terms one time, on the first observation of the series, and a stated algorithm spreads them over the observations the charging site knows. Every site that charges a fee knows that count and hands it in, so no count is stored on a fee and none goes stale. It reaches no other term, because the proportional and turnover rates are charged every period.
 *Avoid*: fee smoothing, fee spreading, fee timing.
 
 **Forced Liquidation**
-The sale of a position in an asset that has left the Investable Mask. The trade is not chosen, so no turnover bound limits it, and it is not free: a Fees object carries two carriers for it, a proportional one that charges the rate times the absolute previous weight, and a fixed one that charges its amount when the absolute previous weight is not zero. The proportional carrier is a rate per period and is charged on every observation beside the turnover term. The fixed carrier is a currency amount charged one time, and it falls on the clock the Fee Amortisation names. The carriers hold the previous weights and the rates on the full universe until the optimiser's door reduces the fees, and on the complement of the Investable Mask after it, so a reduced Fees object carries two axes. A fit charges it at its outer level only, never inside a cluster or an inner head, and the fold's realised series and the finite allocation charge it once. See ADR 0121.
+The sale of a position in an asset that has left the Investable Mask. The trade is not chosen, so no turnover bound limits it, and it is not free: a Fees object carries two carriers, a proportional one that charges the rate times the absolute previous weight, and a fixed one that charges its amount when the absolute previous weight is not zero. The proportional carrier is a rate per period and is charged on every observation beside the turnover term. The fixed carrier is a currency amount charged one time, and it falls on the clock the Fee Amortisation names. The carriers hold the previous weights and the rates on the full universe until the optimiser's door reduces the fees, and on the complement of the Investable Mask after it, so a reduced Fees object carries two axes. A fit charges it at its outer level only, never inside a cluster or an inner head, and the fold's realised series and the finite allocation charge it once, the allocation as an Allocation Fee. See ADR 0121 and 0123.
 *Avoid*: Turnover, which is the trade the optimiser chooses among investable assets; a Held Gap, which is a missing return on an asset the fold still holds.
 
 **Finite Allocation**

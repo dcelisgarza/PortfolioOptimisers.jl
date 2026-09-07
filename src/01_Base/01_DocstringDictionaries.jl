@@ -649,6 +649,7 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :shares => "`shares`: Number of shares allocated per asset.",#
                                  :cost_alloc => "`cost`: Cost of the allocation.",#
                                  :cash_alloc => "`cash`: Remaining uninvested cash after allocation.",#
+                                 :fees_alloc => "`fees`: Fee the allocation paid over the whole horizon. It is the sum of the two sides' charges, and it is never signed.",#
                                  :unit => "`unit`: Minimum purchase unit (e.g., price per share or lot size).",#
                                  # Cluster node.
                                  :id_node => "`id`: Node identifier.",#
