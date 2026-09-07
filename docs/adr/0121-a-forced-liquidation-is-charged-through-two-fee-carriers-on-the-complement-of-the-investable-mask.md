@@ -162,7 +162,7 @@ are zero for the exit, so nothing else is owed.
 - `Fees` and `FeesEstimator` gain two fields, so every constructor call that spells the positional
   form changes, and the docstrings of both, of `Turnover`, of `calc_fees`, of `calc_asset_fees`,
   of `calc_net_asset_returns` and of `predict` state the rule.
-- Twelve fit sites change one call and gain one binding. The finite allocation input learns the
+- Fourteen fit sites change one call and gain one binding. The finite allocation input learns the
   mask.
 - Reporting a per-fold turnover that includes the liquidation, as the reference does, is not
   decided here: the library reports no per-fold turnover today, so there is no reader to be wrong.
