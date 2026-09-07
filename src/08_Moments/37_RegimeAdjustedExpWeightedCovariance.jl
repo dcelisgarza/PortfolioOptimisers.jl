@@ -243,7 +243,7 @@ $(DocStringExtensions.FIELDS)
         min_obs::Integer                                      = round(Int, max(1, inv(log2(inv(decay))), isnothing(cor_decay) ? 1 : inv(log2(inv(cor_decay))))),
         hac_lags::Option{<:Integer}                           = nothing,
         regime_method::Option{<:RegimeAdjustedMethod}         = FirstMomentRegimeAdjusted(),
-        regime_decay::Number                                  = exp2(-2 / inv(log2(inv(decay)))),
+        regime_decay::Number                                  = exp2(-2 * log2(inv(decay))),
         regime_min_obs::Integer                               = round(Int, max(1, inv(log2(inv(decay))) / 2)),
         regime_target::RegimeAdjustedTarget                   = PortfolioTarget(),
         regime_lohi_mult::Option{<:Tuple{<:Number, <:Number}} = nothing,
