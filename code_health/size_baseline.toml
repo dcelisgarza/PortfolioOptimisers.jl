@@ -11,7 +11,7 @@ commit = "fda13accfd"
 [file]
 "ext/PortfolioOptimisersImputeExt.jl" = { code = 6, doc = 0, comment = 4, blank = 3, total = 13 }
 "ext/PortfolioOptimisersPlotsExt.jl" = { code = 2507, doc = 0, comment = 183, blank = 46, total = 2736 }
-"src/01_Base/01_DocstringDictionaries.jl" = { code = 1109, doc = 113, comment = 123, blank = 43, total = 1388 }
+"src/01_Base/01_DocstringDictionaries.jl" = { code = 1111, doc = 113, comment = 123, blank = 43, total = 1390 }
 "src/01_Base/02_TypeRoots.jl" = { code = 15, doc = 199, comment = 0, blank = 89, total = 303 }
 "src/01_Base/03_PrettyShow.jl" = { code = 117, doc = 138, comment = 0, blank = 76, total = 331 }
 "src/01_Base/04_ScopedConfig.jl" = { code = 163, doc = 491, comment = 2, blank = 214, total = 870 }
@@ -171,8 +171,8 @@ commit = "fda13accfd"
 "src/14_UncertaintySets/08_NormBallUncertaintySets.jl" = { code = 116, doc = 311, comment = 5, blank = 134, total = 566 }
 "src/14_UncertaintySets/09_OrthogonalUncertaintySets.jl" = { code = 155, doc = 372, comment = 7, blank = 166, total = 700 }
 "src/15_Turnover.jl" = { code = 81, doc = 458, comment = 0, blank = 184, total = 723 }
-"src/16_Fees.jl" = { code = 238, doc = 897, comment = 0, blank = 354, total = 1489 }
-"src/17_NetReturnsDrawdowns.jl" = { code = 400, doc = 1169, comment = 0, blank = 520, total = 2089 }
+"src/16_Fees.jl" = { code = 291, doc = 955, comment = 3, blank = 366, total = 1615 }
+"src/17_NetReturnsDrawdowns.jl" = { code = 400, doc = 1169, comment = 3, blank = 520, total = 2092 }
 "src/18_Tracking.jl" = { code = 70, doc = 443, comment = 0, blank = 178, total = 691 }
 "src/19_RiskMeasures/01_Base_RiskMeasures.jl" = { code = 416, doc = 1286, comment = 12, blank = 606, total = 2320 }
 "src/19_RiskMeasures/02_Variance.jl" = { code = 248, doc = 690, comment = 16, blank = 255, total = 1209 }
@@ -234,7 +234,7 @@ commit = "fda13accfd"
 "src/20_Optimisation/09_JuMPConstraints/11_TrackingErrorConstraints.jl" = { code = 176, doc = 63, comment = 3, blank = 22, total = 264 }
 "src/20_Optimisation/09_JuMPConstraints/12_RegularisationConstraints.jl" = { code = 219, doc = 442, comment = 11, blank = 205, total = 877 }
 "src/20_Optimisation/09_JuMPConstraints/13_WeightNormConstraints.jl" = { code = 92, doc = 160, comment = 2, blank = 70, total = 324 }
-"src/20_Optimisation/10_JuMPOptimiser.jl" = { code = 711, doc = 703, comment = 56, blank = 184, total = 1654 }
+"src/20_Optimisation/10_JuMPOptimiser.jl" = { code = 711, doc = 703, comment = 60, blank = 184, total = 1658 }
 "src/20_Optimisation/11_MeanRisk.jl" = { code = 252, doc = 432, comment = 4, blank = 125, total = 813 }
 "src/20_Optimisation/12_FactorRiskContribution.jl" = { code = 157, doc = 221, comment = 6, blank = 71, total = 455 }
 "src/20_Optimisation/13_NearOptimalCentering.jl" = { code = 607, doc = 594, comment = 17, blank = 198, total = 1416 }

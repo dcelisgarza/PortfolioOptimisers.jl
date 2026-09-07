@@ -691,7 +691,7 @@ function port_opt_view(nco::NestedClustered, i, X::MatNum, args...)
     X = isa(nco.pe, AbstractPriorResult) ? nco.pe.X : X
     pe = port_opt_view(nco.pe, i)
     wb = port_opt_view(nco.wb, i)
-    fees = port_opt_view(nco.fees, i)
+    fees = port_opt_view(nco.fees, i, X)
     sets = port_opt_view(nco.sets, i)
     opti = port_opt_view(nco.opti, i, X)
     opto = port_opt_view(nco.opto, i, X)

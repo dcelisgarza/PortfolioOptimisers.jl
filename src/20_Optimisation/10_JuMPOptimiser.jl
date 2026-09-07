@@ -1143,7 +1143,11 @@ function port_opt_view(opt::JuMPOptimiser, i, X::MatNum, args...)::JuMPOptimiser
     tn = port_opt_view(opt.tn, i)
     lcse = port_opt_view(opt.lcse, i)
     sets = port_opt_view(opt.sets, i)
-    fees = port_opt_view(opt.fees, i)
+    # A fee spans two axes: the five per-asset fields on the investable assets, and the two
+    # liquidation carriers on the complement. Its view derives that complement from the
+    # width of the unreduced `X`, so this is the one constraint that must be handed the
+    # matrix rather than the index alone.
+    fees = port_opt_view(opt.fees, i, X)
     tr = port_opt_view(opt.tr, i, X)
     ret = port_opt_view(opt.ret, i)
     ccnt = port_opt_view(opt.ccnt, i)

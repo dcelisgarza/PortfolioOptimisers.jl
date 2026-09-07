@@ -124,16 +124,20 @@ Keywords correspond to the struct's fields.
 When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `tn`: Recursively updated via [`factory`](@ref).
+  - `lq`: Recursively updated via [`factory`](@ref).
+  - `flq`: Recursively updated via [`factory`](@ref).
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+This type spans **two axes**, so [`port_opt_view`](@ref) is written by hand for it rather than generated from `@vprop` tags, and no field carries one. `tn`, `l`, `s`, `fl` and `fs` price the positions the portfolio holds, so they are sliced to the selected indices. `lq` and `flq` price the positions it is forced to sell, so they are sliced to the **complement** of those indices, which the verb derives from the width of the unreduced returns matrix it is handed:
 
-  - `tn`: Recursively viewed via [`port_opt_view`](@ref).
-  - `l`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `s`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `fl`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `fs`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `tn`: Recursively viewed at the selected indices via [`port_opt_view`](@ref).
+  - `l`: Sliced to the selected indices.
+  - `s`: Sliced to the selected indices.
+  - `fl`: Sliced to the selected indices.
+  - `fs`: Sliced to the selected indices.
+  - `lq`: Recursively viewed at the **complement** of the selected indices.
+  - `flq`: Recursively viewed at the **complement** of the selected indices.
 
 # Examples
 
@@ -151,6 +155,8 @@ FeesEstimator
        s ┼ Vector{Pair{String, Float64}}: ["A" => 0.001, "B" => 0.002]
       fl ┼ Dict{String, Float64}: Dict("A" => 5.0)
       fs ┼ Vector{Pair{String, Float64}}: ["B" => 10.0]
+      lq ┼ nothing
+     flq ┼ nothing
       dl ┼ nothing
       ds ┼ nothing
      dfl ┼ nothing
@@ -178,23 +184,31 @@ FeesEstimator
     """
     $(field_dict[:tn_fees])
     """
-    @fprop @vprop tn
+    @fprop tn
     """
     $(field_dict[:l_fees])
     """
-    @vprop l
+    l
     """
     $(field_dict[:s_fees])
     """
-    @vprop s
+    s
     """
     $(field_dict[:fl])
     """
-    @vprop fl
+    fl
     """
     $(field_dict[:fs])
     """
-    @vprop fs
+    fs
+    """
+    $(field_dict[:lq_fees])
+    """
+    @fprop lq
+    """
+    $(field_dict[:flq_fees])
+    """
+    @fprop flq
     """
     $(field_dict[:dl])
     """
@@ -224,6 +238,7 @@ FeesEstimator
                            s::Option{<:EstValType{<:VectorAbstractEstimatorValueAlgorithm}},
                            fl::Option{<:EstValType{<:VectorAbstractEstimatorValueAlgorithm}},
                            fs::Option{<:EstValType{<:VectorAbstractEstimatorValueAlgorithm}},
+                           lq::Option{<:TnE_Tn} = nothing, flq::Option{<:TnE_Tn} = nothing,
                            dl::Option{<:Number} = nothing, ds::Option{<:Number} = nothing,
                            dfl::Option{<:Number} = nothing, dfs::Option{<:Number} = nothing,
                            fa::Option{<:AbstractFeeAmortisation} = nothing,
@@ -236,15 +251,10 @@ FeesEstimator
         assert_nonempty_nonneg_finite_val(ds, :ds)
         assert_nonempty_nonneg_finite_val(dfl, :dfl)
         assert_nonempty_nonneg_finite_val(dfs, :dfs)
-        return new{typeof(tn), typeof(l), typeof(s), typeof(fl), typeof(fs), typeof(dl),
-                   typeof(ds), typeof(dfl), typeof(dfs), typeof(fa), typeof(kwargs)}(tn, l,
-                                                                                     s, fl,
-                                                                                     fs, dl,
-                                                                                     ds,
-                                                                                     dfl,
-                                                                                     dfs,
-                                                                                     fa,
-                                                                                     kwargs)
+        return new{typeof(tn), typeof(l), typeof(s), typeof(fl), typeof(fs), typeof(lq),
+                   typeof(flq), typeof(dl), typeof(ds), typeof(dfl), typeof(dfs),
+                   typeof(fa), typeof(kwargs)}(tn, l, s, fl, fs, lq, flq, dl, ds, dfl, dfs,
+                                               fa, kwargs)
     end
 end
 function FeesEstimator(; tn::Option{<:TnE_Tn} = nothing,
@@ -252,11 +262,12 @@ function FeesEstimator(; tn::Option{<:TnE_Tn} = nothing,
                        s::Option{<:EstValType{<:VectorAbstractEstimatorValueAlgorithm}} = nothing,
                        fl::Option{<:EstValType{<:VectorAbstractEstimatorValueAlgorithm}} = nothing,
                        fs::Option{<:EstValType{<:VectorAbstractEstimatorValueAlgorithm}} = nothing,
+                       lq::Option{<:TnE_Tn} = nothing, flq::Option{<:TnE_Tn} = nothing,
                        dl::Option{<:Number} = nothing, ds::Option{<:Number} = nothing,
                        dfl::Option{<:Number} = nothing, dfs::Option{<:Number} = nothing,
                        fa::Option{<:AbstractFeeAmortisation} = nothing,
                        kwargs::NamedTuple = (; atol = 1e-8))::FeesEstimator
-    return FeesEstimator(tn, l, s, fl, fs, dl, ds, dfl, dfs, fa, kwargs)
+    return FeesEstimator(tn, l, s, fl, fs, lq, flq, dl, ds, dfl, dfs, fa, kwargs)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -371,16 +382,20 @@ Keywords correspond to the struct's fields.
 When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `tn`: Recursively updated via [`factory`](@ref).
+  - `lq`: Recursively updated via [`factory`](@ref).
+  - `flq`: Recursively updated via [`factory`](@ref).
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+This type spans **two axes**, so [`port_opt_view`](@ref) is written by hand for it rather than generated from `@vprop` tags, and no field carries one. `tn`, `l`, `s`, `fl` and `fs` price the positions the portfolio holds, so they are sliced to the selected indices. `lq` and `flq` price the positions it is forced to sell, so they are sliced to the **complement** of those indices, which the verb derives from the width of the unreduced returns matrix it is handed:
 
-  - `tn`: Recursively viewed via [`port_opt_view`](@ref).
-  - `l`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `s`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `fl`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `fs`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `tn`: Recursively viewed at the selected indices via [`port_opt_view`](@ref).
+  - `l`: Sliced to the selected indices.
+  - `s`: Sliced to the selected indices.
+  - `fl`: Sliced to the selected indices.
+  - `fs`: Sliced to the selected indices.
+  - `lq`: Recursively viewed at the **complement** of the selected indices.
+  - `flq`: Recursively viewed at the **complement** of the selected indices.
 
 # Examples
 
@@ -396,6 +411,8 @@ Fees
        s ┼ Vector{Float64}: [0.001, 0.002, 0.0]
       fl ┼ Vector{Float64}: [5.0, 0.0, 0.0]
       fs ┼ Vector{Float64}: [0.0, 10.0, 0.0]
+      lq ┼ nothing
+     flq ┼ nothing
       fa ┼ nothing
   kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
 ```
@@ -436,23 +453,31 @@ Fees
     """
     $(field_dict[:tnr])
     """
-    @fprop @vprop tn
+    @fprop tn
     """
     $(field_dict[:l_fees])
     """
-    @vprop l
+    l
     """
     $(field_dict[:s_fees])
     """
-    @vprop s
+    s
     """
     $(field_dict[:fl])
     """
-    @vprop fl
+    fl
     """
     $(field_dict[:fs])
     """
-    @vprop fs
+    fs
+    """
+    $(field_dict[:lq_fees])
+    """
+    @fprop lq
+    """
+    $(field_dict[:flq_fees])
+    """
+    @fprop flq
     """
     $(field_dict[:fa_fees])
     """
@@ -463,22 +488,25 @@ Fees
     kwargs
     function Fees(tn::Option{<:Turnover}, l::Option{<:Num_VecNum}, s::Option{<:Num_VecNum},
                   fl::Option{<:Num_VecNum}, fs::Option{<:Num_VecNum},
+                  lq::Option{<:Turnover} = nothing, flq::Option{<:Turnover} = nothing,
                   fa::Option{<:AbstractFeeAmortisation} = nothing,
                   kwargs::NamedTuple = (; atol = 1e-8))::Fees
         assert_nonempty_nonneg_finite_val(l, :l)
         assert_nonempty_nonneg_finite_val(s, :s)
         assert_nonempty_nonneg_finite_val(fl, :fl)
         assert_nonempty_nonneg_finite_val(fs, :fs)
-        return new{typeof(tn), typeof(l), typeof(s), typeof(fl), typeof(fs), typeof(fa),
-                   typeof(kwargs)}(tn, l, s, fl, fs, fa, kwargs)
+        return new{typeof(tn), typeof(l), typeof(s), typeof(fl), typeof(fs), typeof(lq),
+                   typeof(flq), typeof(fa), typeof(kwargs)}(tn, l, s, fl, fs, lq, flq, fa,
+                                                            kwargs)
     end
 end
 function Fees(; tn::Option{<:Turnover} = nothing, l::Option{<:Num_VecNum} = nothing,
               s::Option{<:Num_VecNum} = nothing, fl::Option{<:Num_VecNum} = nothing,
-              fs::Option{<:Num_VecNum} = nothing,
+              fs::Option{<:Num_VecNum} = nothing, lq::Option{<:Turnover} = nothing,
+              flq::Option{<:Turnover} = nothing,
               fa::Option{<:AbstractFeeAmortisation} = nothing,
               kwargs::NamedTuple = (; atol = 1e-8))::Fees
-    return Fees(tn, l, s, fl, fs, fa, kwargs)
+    return Fees(tn, l, s, fl, fs, lq, flq, fa, kwargs)
 end
 """
     override_fee_amortisation(fees::Option{<:Fees}, fa::Nothing)
@@ -522,8 +550,8 @@ function override_fee_amortisation(::Nothing, ::AbstractFeeAmortisation)
     return nothing
 end
 function override_fee_amortisation(fees::Fees, fa::AbstractFeeAmortisation)
-    return Fees(; tn = fees.tn, l = fees.l, s = fees.s, fl = fees.fl, fs = fees.fs, fa = fa,
-                kwargs = fees.kwargs)
+    return Fees(; tn = fees.tn, l = fees.l, s = fees.s, fl = fees.fl, fs = fees.fs,
+                lq = fees.lq, flq = fees.flq, fa = fa, kwargs = fees.kwargs)
 end
 """
     const FeesE_Fees = Union{<:Fees, <:FeesEstimator}
@@ -563,7 +591,94 @@ Only the turnover term reads a previous weight vector. The proportional and fixe
   - [`Fees`](@ref)
 """
 function needs_previous_weights(fe::FeesE_Fees)::Bool
-    return needs_previous_weights(fe.tn)
+    return needs_previous_weights(fe.tn) ||
+           needs_previous_weights(fe.lq) ||
+           needs_previous_weights(fe.flq)
+end
+"""
+    port_opt_view(fees::Fees, i, X::MatNum, args...)
+    port_opt_view(fees::FeesEstimator, i, X::MatNum, args...)
+    port_opt_view(fees::FeesE_Fees, i, args...)
+
+Sub-select a fee to the assets an optimisation keeps, on **both** of its axes.
+
+A [`Fees`](@ref) spans two axes once an optimisation has reduced to its Investable Mask. `tn`, `l`, `s`, `fl` and `fs` price the positions the portfolio **holds**, so they live on the investable axis and are sliced at `i`. `lq` and `flq` price the positions it is **forced to sell**, so they live on the **complement** of that axis and are sliced at the assets `i` leaves out.
+
+That is why neither carrier is tagged `@vprop` and why this verb is written by hand rather than generated: the generic machinery threads one index through every tagged field, and here the two groups need different ones. The complement is derived and never stored, from `i` and the width of `X`. `X` is the **unreduced** returns matrix, which is what [`investable_reduction`](@ref) and [`investable_view`](@ref) already pass, so `size(X, 2)` is the full universe.
+
+The three-argument method serves a caller that hands no matrix. It cannot derive a complement, so it slices the five per-asset fields and passes the two carriers through untouched, which is correct because they already sit on their own axis.
+
+# Algorithm
+
+ 1. Build `j`, the complement of `i` in `1:size(X, 2)`.
+ 2. Slice `tn` at `i` through [`port_opt_view`](@ref), whose `@vprop` tags take `w` and a vector `val` and leave a scalar or dictionary `val` alone.
+ 3. Slice `l`, `s`, `fl` and `fs` at `i` through [`nothing_scalar_array_view`](@ref).
+ 4. On an empty `j` no asset left the universe, so set `lq` and `flq` to `nothing`: there is nothing to liquidate, and a [`Turnover`](@ref) refuses an empty `w` in any case. Otherwise slice both at `j`, by the same verb as step 2.
+ 5. Rebuild through the keyword constructor, carrying `fa` and `kwargs` unchanged.
+
+# Arguments
+
+  - `fees`: The fee to reduce.
+  - `i`: Indices of the assets the optimisation keeps.
+  - `X`: The **unreduced** returns matrix, read for its width alone.
+
+# Returns
+
+  - `fees::typeof(fees)`: The fee on the two reduced axes.
+
+# Related
+
+  - [`Fees`](@ref)
+  - [`FeesEstimator`](@ref)
+  - [`Turnover`](@ref)
+  - [`port_opt_view`](@ref)
+  - [`nothing_scalar_array_view`](@ref)
+  - [`investable_reduction`](@ref)
+"""
+function port_opt_view(fees::Fees, i, X::MatNum, args...)::Fees
+    j = setdiff(1:size(X, 2), i)
+    # An empty complement means no asset left the universe, so there is nothing to
+    # liquidate and the carriers go. A `Turnover` refuses an empty `w`, so this is the
+    # answer the type asks for as well as the one the rule asks for.
+    ex = !isempty(j)
+    return Fees(; tn = port_opt_view(fees.tn, i, X, args...),
+                l = nothing_scalar_array_view(fees.l, i),
+                s = nothing_scalar_array_view(fees.s, i),
+                fl = nothing_scalar_array_view(fees.fl, i),
+                fs = nothing_scalar_array_view(fees.fs, i),
+                lq = ex ? port_opt_view(fees.lq, j, X, args...) : nothing,
+                flq = ex ? port_opt_view(fees.flq, j, X, args...) : nothing, fa = fees.fa,
+                kwargs = fees.kwargs)
+end
+function port_opt_view(fees::FeesEstimator, i, X::MatNum, args...)::FeesEstimator
+    j = setdiff(1:size(X, 2), i)
+    ex = !isempty(j)
+    return FeesEstimator(; tn = port_opt_view(fees.tn, i, X, args...),
+                         l = nothing_scalar_array_view(fees.l, i),
+                         s = nothing_scalar_array_view(fees.s, i),
+                         fl = nothing_scalar_array_view(fees.fl, i),
+                         fs = nothing_scalar_array_view(fees.fs, i),
+                         lq = ex ? port_opt_view(fees.lq, j, X, args...) : nothing,
+                         flq = ex ? port_opt_view(fees.flq, j, X, args...) : nothing,
+                         dl = fees.dl, ds = fees.ds, dfl = fees.dfl, dfs = fees.dfs,
+                         fa = fees.fa, kwargs = fees.kwargs)
+end
+function port_opt_view(fees::Fees, i, args...)::Fees
+    return Fees(; tn = port_opt_view(fees.tn, i, args...),
+                l = nothing_scalar_array_view(fees.l, i),
+                s = nothing_scalar_array_view(fees.s, i),
+                fl = nothing_scalar_array_view(fees.fl, i),
+                fs = nothing_scalar_array_view(fees.fs, i), lq = fees.lq, flq = fees.flq,
+                fa = fees.fa, kwargs = fees.kwargs)
+end
+function port_opt_view(fees::FeesEstimator, i, args...)::FeesEstimator
+    return FeesEstimator(; tn = port_opt_view(fees.tn, i, args...),
+                         l = nothing_scalar_array_view(fees.l, i),
+                         s = nothing_scalar_array_view(fees.s, i),
+                         fl = nothing_scalar_array_view(fees.fl, i),
+                         fs = nothing_scalar_array_view(fees.fs, i), lq = fees.lq,
+                         flq = fees.flq, dl = fees.dl, ds = fees.ds, dfl = fees.dfl,
+                         dfs = fees.dfs, fa = fees.fa, kwargs = fees.kwargs)
 end
 """
     fees_constraints(fees::FeesEstimator, sets::UniverseSets; datatype::DataType = Float64,
@@ -618,6 +733,8 @@ Fees
        s ┼ Vector{Float64}: [0.001, 0.002, 0.0]
       fl ┼ Vector{Float64}: [5.0, 0.0, 0.0]
       fs ┼ Vector{Float64}: [0.0, 10.0, 0.0]
+      lq ┼ nothing
+     flq ┼ nothing
       fa ┼ nothing
   kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
 
@@ -637,6 +754,8 @@ Fees
        s ┼ Vector{Float64}: [0.001, 0.002, 0.0]
       fl ┼ Vector{Float64}: [5.0, 0.0, 0.0]
       fs ┼ Vector{Float64}: [0.0, 10.0, 0.0]
+      lq ┼ nothing
+     flq ┼ nothing
       fa ┼ nothing
   kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
 ```
@@ -663,7 +782,12 @@ function fees_constraints(fees::FeesEstimator, sets::UniverseSets;
                 fl = estimator_to_val(fees.fl, sets, fees.dfl; datatype = datatype,
                                       strict = strict),
                 fs = estimator_to_val(fees.fs, sets, fees.dfs; datatype = datatype,
-                                      strict = strict), fa = fees.fa, kwargs = fees.kwargs)
+                                      strict = strict),
+                lq = turnover_constraints(fees.lq, sets; datatype = datatype,
+                                          strict = strict),
+                flq = turnover_constraints(fees.flq, sets; datatype = datatype,
+                                           strict = strict), fa = fees.fa,
+                kwargs = fees.kwargs)
 end
 """
     fees_constraints(fees::Option{<:Fees}, args...; kwargs...)
@@ -702,6 +826,8 @@ Fees
        s ┼ nothing
       fl ┼ nothing
       fs ┼ nothing
+      lq ┼ nothing
+     flq ┼ nothing
       fa ┼ nothing
   kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
 

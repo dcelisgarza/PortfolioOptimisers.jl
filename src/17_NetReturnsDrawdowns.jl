@@ -242,8 +242,11 @@ function investable_reduction(imsk::BitVector, pr::AbstractPriorResult,
                           strict)
     end
     idx = findall(imsk)
+    # The fee is viewed at `pr.X`, the prior's **unreduced** returns matrix, because its two
+    # liquidation carriers live on the complement of the mask and the view derives that
+    # complement from the full width. Every other argument here takes the index alone.
     return imsk, port_opt_view(pr, idx), investable_weights_view(imsk, w),
-           port_opt_view(fees, idx)
+           port_opt_view(fees, idx, pr.X)
 end
 """
     investable_returns_view(imsk::Nothing, rd::AbstractReturnsResult)

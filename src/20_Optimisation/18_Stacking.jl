@@ -548,7 +548,7 @@ function port_opt_view(st::Stacking, i, X::MatNum, args...)::Stacking
     X = isa(st.pe, AbstractPriorResult) ? st.pe.X : X
     pe = port_opt_view(st.pe, i)
     wb = port_opt_view(st.wb, i)
-    fees = port_opt_view(st.fees, i)
+    fees = port_opt_view(st.fees, i, X)
     sets = port_opt_view(st.sets, i)
     opti = port_opt_view(st.opti, i, X)
     opto = port_opt_view(st.opto, i, X)

@@ -473,7 +473,7 @@ function port_opt_view(sr::SubsetResampling, i, X::MatNum, args...)::SubsetResam
     X = isa(sr.pe, AbstractPriorResult) ? sr.pe.X : X
     pe = port_opt_view(sr.pe, i)
     wb = port_opt_view(sr.wb, i)
-    fees = port_opt_view(sr.fees, i)
+    fees = port_opt_view(sr.fees, i, X)
     sets = port_opt_view(sr.sets, i)
     opt = port_opt_view(sr.opt, i, X)
     return SubsetResampling(; pe = pe, wb = wb, fees = fees, sets = sets, opt = opt,
