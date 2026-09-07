@@ -914,6 +914,7 @@ function StatsAPI.predict(res::PipelineResult, data::AbstractPricesResult,
                           test_idx = Colon(), cols = Colon();
                           wd::Option{<:AbstractWeightDrift} = nothing,
                           hwd::Option{<:AbstractWeightDrift} = wd,
+                          fa::Option{<:AbstractFeeAmortisation} = nothing,
                           store_weight_path::Bool = false, strict::Bool = false)
     opt = res.ctx.opt
     @argcheck(!isnothing(opt),
@@ -923,7 +924,7 @@ function StatsAPI.predict(res::PipelineResult, data::AbstractPricesResult,
     @argcheck(isa(rd, AbstractReturnsResult),
               ArgumentError("the pipeline's fitted steps do not convert price-level data to returns; predicting on a $(Base.typename(typeof(data)).wrapper) requires a PricesToReturns step"))
     assert_universe_aligned(res, rd)
-    return StatsAPI.predict(opt, rd; wd = wd, hwd = hwd,
+    return StatsAPI.predict(opt, rd; wd = wd, hwd = hwd, fa = fa,
                             store_weight_path = store_weight_path, strict = strict)
 end
 function StatsAPI.predict(res::PipelineResult, data::AbstractPricesResult,
@@ -935,6 +936,7 @@ function StatsAPI.predict(res::PipelineResult, data::AbstractReturnsResult,
                           test_idx = Colon(), cols = Colon();
                           wd::Option{<:AbstractWeightDrift} = nothing,
                           hwd::Option{<:AbstractWeightDrift} = wd,
+                          fa::Option{<:AbstractFeeAmortisation} = nothing,
                           store_weight_path::Bool = false, strict::Bool = false)
     opt = res.ctx.opt
     @argcheck(!isnothing(opt),
@@ -946,7 +948,7 @@ function StatsAPI.predict(res::PipelineResult, data::AbstractReturnsResult,
     end
     rd = apply_fitted_steps(res.results, rd)
     assert_universe_aligned(res, rd)
-    return StatsAPI.predict(opt, rd; wd = wd, hwd = hwd,
+    return StatsAPI.predict(opt, rd; wd = wd, hwd = hwd, fa = fa,
                             store_weight_path = store_weight_path, strict = strict)
 end
 function StatsAPI.predict(res::PipelineResult, data::AbstractReturnsResult,
@@ -958,17 +960,19 @@ function fit_and_predict(res::PipelineResult, data::AbstractReturnsResult;
                          test_idx::VecInt_VecVecInt, cols = :,
                          wd::Option{<:AbstractWeightDrift} = nothing,
                          hwd::Option{<:AbstractWeightDrift} = wd,
+                         fa::Option{<:AbstractFeeAmortisation} = nothing,
                          store_weight_path::Bool = false, strict::Bool = false, kwargs...)
     opt = res.ctx.opt
     @argcheck(!isnothing(opt),
               IsNothingError("the pipeline produced no optimisation result; add a terminal optimisation step before predicting"))
-    return StatsAPI.predict(res, data, test_idx, cols; wd = wd, hwd = hwd,
+    return StatsAPI.predict(res, data, test_idx, cols; wd = wd, hwd = hwd, fa = fa,
                             store_weight_path = store_weight_path, strict = strict)
 end
 function fit_and_predict(pipe::Pipeline, data::Prices_RR; train_idx::VecInt,
                          test_idx::VecInt_VecVecInt, cols = :,
                          wd::Option{<:AbstractWeightDrift} = nothing,
                          hwd::Option{<:AbstractWeightDrift} = wd,
+                         fa::Option{<:AbstractFeeAmortisation} = nothing,
                          store_weight_path::Bool = false, strict::Bool = false)
     data_train = pipeline_data_view(data, train_idx, cols)
     #! Maybe we should define a port_opt_view for pipelines?
@@ -976,7 +980,7 @@ function fit_and_predict(pipe::Pipeline, data::Prices_RR; train_idx::VecInt,
     #     opt = port_opt_view(pipe, cols)
     # end
     res = StatsAPI.fit(pipe, data_train)
-    return StatsAPI.predict(res, data, test_idx, cols; wd = wd, hwd = hwd,
+    return StatsAPI.predict(res, data, test_idx, cols; wd = wd, hwd = hwd, fa = fa,
                             store_weight_path = store_weight_path, strict = strict)
 end
 """

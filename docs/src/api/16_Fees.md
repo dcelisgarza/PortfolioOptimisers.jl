@@ -7,6 +7,7 @@ AbstractFeeAmortisation
 FeesEstimator
 Fees
 AmortisedFees
+FirstObservationFees
 FeesE_Fees
 fees_constraints
 calc_fees
@@ -19,6 +20,7 @@ calc_asset_periodic_fees
 calc_asset_one_off_fees
 calc_total_fees
 calc_total_asset_fees
+override_fee_amortisation
 needs_previous_weights(fe::FeesE_Fees)
 ```
 

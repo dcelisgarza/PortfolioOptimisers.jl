@@ -16,6 +16,7 @@ $(DocStringExtensions.FIELDS)
         purged_size::Integer = 0,
         embargo_size::Integer = 0,
         wd::Option{<:AbstractWeightDrift} = nothing,
+        fa::Option{<:AbstractFeeAmortisation} = nothing,
         store_weight_path::Bool = false,
         strict::Bool = false,
     ) -> KFold
@@ -27,6 +28,10 @@ Keyword arguments correspond to the struct's fields.
 `wd` is the Weight Drift of the scheme, and `nothing` is the library's original behaviour: a fold's return series is `X * w` net of fees, read at the target weights of that fold. A [`SelfFinancingDrift`](@ref) reads the series as the wealth ratio of the drifted holdings instead, and the fold carries a [`HeldWeightsResult`](@ref). `store_weight_path` makes the fold store the weight path it computed, which a reader otherwise rebuilds on demand. `strict` decides what a **Held Gap** does: an asset that delists inside a test window carries a non-zero weight and a missing return, and the fold zeroes that pair and warns, or refuses with an `ArgumentError` under `strict`.
 
 A k-fold enumeration is not a timeline, so this scheme carries no Previous-Weights Source. Each of its folds is independent of the others, and no fold has a fold behind it to inherit weights from.
+
+## Fee clock
+
+`fa` is the clock the fold's **realised** series charges the two fixed fee terms on, and it overrides the `fa` of the fee itself. `nothing` inherits that fee's clock, which is the library's original behaviour. A [`FirstObservationFees`](@ref) charges the two terms on the first observation of the fold, and an [`AmortisedFees`](@ref) spreads them over the fold. The field reaches the fit not at all, so the optimiser keeps pricing the fee the way its own objective must.
 
 ## Validation
 
@@ -43,6 +48,7 @@ KFold
         purged_size ┼ Int64: 7
        embargo_size ┼ Int64: 11
                  wd ┼ nothing
+                 fa ┼ nothing
   store_weight_path ┼ Bool: false
              strict ┴ Bool: false
 ```
@@ -78,6 +84,10 @@ KFold
     """
     wd
     """
+    $(field_dict[:fa_cv])
+    """
+    fa
+    """
     $(field_dict[:store_weight_path])
     """
     store_weight_path
@@ -86,19 +96,24 @@ KFold
     """
     strict
     function KFold(n::Integer, purged_size::Integer, embargo_size::Integer,
-                   wd::Option{<:AbstractWeightDrift}, store_weight_path::Bool, strict::Bool)
+                   wd::Option{<:AbstractWeightDrift}, fa::Option{<:AbstractFeeAmortisation},
+                   store_weight_path::Bool, strict::Bool)
         assert_nonempty_gt0_finite_val(n, :n)
         assert_nonempty_finite_val(purged_size, :purged_size)
         assert_nonempty_finite_val(embargo_size, :embargo_size)
         return new{typeof(n), typeof(purged_size), typeof(embargo_size), typeof(wd),
-                   typeof(store_weight_path), typeof(strict)}(n, purged_size, embargo_size,
-                                                              wd, store_weight_path, strict)
+                   typeof(fa), typeof(store_weight_path), typeof(strict)}(n, purged_size,
+                                                                          embargo_size, wd,
+                                                                          fa,
+                                                                          store_weight_path,
+                                                                          strict)
     end
 end
 function KFold(; n::Integer = 5, purged_size::Integer = 0, embargo_size::Integer = 0,
-               wd::Option{<:AbstractWeightDrift} = nothing, store_weight_path::Bool = false,
-               strict::Bool = false)::KFold
-    return KFold(n, purged_size, embargo_size, wd, store_weight_path, strict)
+               wd::Option{<:AbstractWeightDrift} = nothing,
+               fa::Option{<:AbstractFeeAmortisation} = nothing,
+               store_weight_path::Bool = false, strict::Bool = false)::KFold
+    return KFold(n, purged_size, embargo_size, wd, fa, store_weight_path, strict)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -224,20 +239,21 @@ end
 
 Read the evaluation switches of a [`KFold`](@ref).
 
-The folds of this scheme are not a timeline, so it carries no Previous-Weights Source and the triple names `nothing` for it. There is no previous fold whose weights a fold of this scheme could inherit.
+The folds of this scheme are not a timeline, so it carries no Previous-Weights Source and the tuple names `nothing` for it. There is no previous fold whose weights a fold of this scheme could inherit.
 
 # Returns
 
-  - `(; wd, pws, store_weight_path, strict)`: The Weight Drift, the Previous-Weights Source, the flag that stores a fold's weight path, and the flag that makes a Held Gap raise rather than warn.
+  - `(; wd, pws, fa, store_weight_path, strict)`: The Weight Drift, the Previous-Weights Source, the Fee Clock of the fold's realised series, the flag that stores a fold's weight path, and the flag that makes a Held Gap raise rather than warn.
 
 # Related
 
   - [`fold_evaluation`](@ref)
   - [`KFold`](@ref)
   - [`held_weights_drift`](@ref)
+  - [`override_fee_amortisation`](@ref)
 """
 function fold_evaluation(cv::KFold)
-    return (; wd = cv.wd, pws = nothing, store_weight_path = cv.store_weight_path,
-            strict = cv.strict)
+    return (; wd = cv.wd, pws = nothing, fa = cv.fa,
+            store_weight_path = cv.store_weight_path, strict = cv.strict)
 end
 export KFold, KFoldResult

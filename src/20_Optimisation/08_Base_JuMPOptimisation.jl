@@ -1892,10 +1892,10 @@ Calls [`set_portfolio_returns!`](@ref) and subtracts the fees if any are registe
 `:fees` expression holds the per period terms `l`, `s` and `tn`, which are rates per period, so it
 is subtracted from every observation. The model's `:one_time_fees` expression holds the two fixed
 terms, which are charged one time for the whole holding period, and `:fee_fa` names the clock they
-fall on: a `nothing` clock subtracts them from the first observation alone, and an
-[`AmortisedFees`](@ref) spreads them over the observation count of the fit. That is the rule
-[`charge_fees`](@ref) states at the value level, and [`charge_one_time_fees`](@ref) applies it
-here.
+fall on: a `nothing` or [`FirstObservationFees`](@ref) clock subtracts them from the first
+observation alone, and an [`AmortisedFees`](@ref) spreads them over the observation count of the
+fit. That is the rule [`charge_fees`](@ref) states at the value level, and
+[`charge_one_time_fees`](@ref) applies it here.
 
 # Arguments
 

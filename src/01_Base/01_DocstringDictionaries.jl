@@ -518,7 +518,7 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :ds => "`ds`: Default short proportional fee.",#
                                  :dfl => "`dfl`: Default long fixed fee.",#
                                  :dfs => "`dfs`: Default short fixed fee.",#
-                                 :fa_fees => "`fa`: Fee amortisation algorithm, and the clock the two fixed fee terms fall on. `nothing` charges them one time, on the first observation of a return series. An [`AmortisedFees`](@ref) spreads them evenly over the observation count the charging site hands in. It reaches no other term, because `l`, `s` and `tn` are rates per period.",#
+                                 :fa_fees => "`fa`: Fee amortisation algorithm, and the clock the two fixed fee terms fall on. `nothing` and a [`FirstObservationFees`](@ref) charge them one time, on the first observation of a return series. An [`AmortisedFees`](@ref) spreads them evenly over the observation count the charging site hands in. It reaches no other term, because `l`, `s` and `tn` are rates per period.",#
                                  :kwargs_fee => "`kwargs`: Named tuple of keyword arguments for fee computation.",#
                                  # Optimisation results.
                                  :pa => "`pa`: Processed optimisation attributes.",#
@@ -621,6 +621,7 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :q_kwargs => "`q_kwargs`: Keyword arguments passed to `quantile`.",#
                                  :p_cv => "`p`: Hyperparameter search grid.",#
                                  :wd => "`wd`: Weight drift the fold's return series is read under, or `nothing` to read it at the target weights of the fold.",#
+                                 :fa_cv => "`fa`: Fee amortisation algorithm the fold's realised series charges the two fixed fee terms on, or `nothing` to inherit the clock the fee itself states. It overrides `Fees.fa` for that series alone, and it reaches the fit not at all.",#
                                  :pws => "`pws`: Previous-weights source the fold loop threads into the next fold, or `nothing` to thread the target weights of the previous fold.",#
                                  :store_weight_path => "`store_weight_path`: If `true`, the fold stores the weight path it computed; if `false`, a reader rebuilds it on demand.",#
                                  :cv_strict => "`strict`: If `true`, a Held Gap raises an `ArgumentError`; if `false`, it warns and the pair contributes zero. A Held Gap is an (observation, asset) pair at which the fold's weight is non-zero and the asset's return is missing, which is what a delisting inside a test window makes.",#

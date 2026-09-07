@@ -1465,8 +1465,14 @@ optionally columns `cols`) of `rd` are used for the prediction.
 The fee needs no horizon stamped onto it. `charge_fees` hands in the length of the series it
 charges, so a fold spreads a one-off cost over its own observations and the whole-sample method
 spreads it over the whole sample, each without a number stored on the fee. `fees.fa` names the
-clock alone: `nothing` charges the two fixed terms on the first observation of the series, and an
-`AmortisedFees` spreads them evenly over it.
+clock alone: a `nothing` or `FirstObservationFees` charges the two fixed terms on the first
+observation of the series, and an `AmortisedFees` spreads them evenly over it.
+
+The `fa` keyword **overrides** that clock for the series this method builds, and it reaches the
+result not at all. `nothing` inherits the clock the fee itself states, which is the library's
+original behaviour. This is what lets a report charge a fixed fee the way a fund saw it while the
+optimiser prices the same fee the way its own objective must. [`override_fee_amortisation`](@ref)
+is the verb, and the cross-validation schemes state the keyword in a field of the same name.
 
 ## The Investable Mask, then the Held Gaps
 
@@ -1503,6 +1509,7 @@ returns[t] == sum_i w_i * (isfinite(X[t, i]) ? X[t, i] : 0) - fee
 
 # Keyword Arguments
 
+  - `fa::Option{<:AbstractFeeAmortisation} = nothing`: The clock the series charges the two fixed fee terms on, or `nothing` to inherit the clock the fee itself states.
   - `strict::Bool = false`: Whether a Held Gap raises an `ArgumentError` rather than warning.
 
 # Returns
@@ -1516,10 +1523,12 @@ returns[t] == sum_i w_i * (isfinite(X[t, i]) ? X[t, i] : 0) - fee
   - [`PredictionResult`](@ref)
   - [`MultiPeriodPredictionResult`](@ref)
   - [`extract_fees`](@ref)
+  - [`override_fee_amortisation`](@ref)
 """
 function StatsAPI.predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult;
                           wd::Option{<:AbstractWeightDrift} = nothing,
                           hwd::Option{<:AbstractWeightDrift} = wd,
+                          fa::Option{<:AbstractFeeAmortisation} = nothing,
                           store_weight_path::Bool = false, strict::Bool = false)
     # The window is viewed at the Investable Mask first, so the column of an asset the fit
     # found non-investable is never read, and the Held Gaps of the reduced window are
@@ -1529,6 +1538,10 @@ function StatsAPI.predict(res::NonFiniteAllocationOptimisationResult, rd::Return
     # turnover reads its held weights.
     imsk = result_investable_mask(res)
     w, rdv, fees = investable_fold_view(imsk, res.w, rd, extract_fees(res, nothing))
+    # The clock the series is charged on is the caller's, not the fit's: `fa` overrides
+    # `fees.fa` here and reaches nothing the result carries, so `res.fees` still states
+    # what the optimiser priced. A `nothing` `fa` inherits and rebuilds no fee.
+    fees = override_fee_amortisation(fees, fa)
     Xf = filter_held_gaps(w, rdv.X, strict)
     X = calc_net_returns(w, Xf, fees, wd, rdv.ts)
     (hw, ruined) = held_weights_result(hwd, w, Xf, store_weight_path, rdv.ts)
@@ -1566,12 +1579,14 @@ function StatsAPI.predict(res::NonFiniteAllocationOptimisationResult, rd::Return
                           test_idx::VecInt, cols = :;
                           wd::Option{<:AbstractWeightDrift} = nothing,
                           hwd::Option{<:AbstractWeightDrift} = wd,
+                          fa::Option{<:AbstractFeeAmortisation} = nothing,
                           store_weight_path::Bool = false, strict::Bool = false)
     rdi = port_opt_view(rd, test_idx, cols)
     fees = extract_fees(res, nothing)
     # The mask view and the Held Gap filter, in that order — see the whole-sample method.
     imsk = result_investable_mask(res)
     w, rdi, fees = investable_fold_view(imsk, res.w, rdi, fees)
+    fees = override_fee_amortisation(fees, fa)
     obs = drift_observations(rdi.ts, test_idx)
     Xf = filter_held_gaps(w, rdi.X, strict)
     X = calc_net_returns(w, Xf, fees, wd, obs)
@@ -1625,14 +1640,16 @@ function fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::Returns
                          test_idx::VecInt_VecVecInt, cols = :,
                          wd::Option{<:AbstractWeightDrift} = nothing,
                          hwd::Option{<:AbstractWeightDrift} = wd,
+                         fa::Option{<:AbstractFeeAmortisation} = nothing,
                          store_weight_path::Bool = false, strict::Bool = false, kwargs...)
-    return StatsAPI.predict(res, rd, test_idx, cols; wd = wd, hwd = hwd,
+    return StatsAPI.predict(res, rd, test_idx, cols; wd = wd, hwd = hwd, fa = fa,
                             store_weight_path = store_weight_path, strict = strict)
 end
 function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::ReturnsResult;
                          train_idx::VecInt, test_idx::VecInt_VecVecInt, cols = :,
                          wd::Option{<:AbstractWeightDrift} = nothing,
                          hwd::Option{<:AbstractWeightDrift} = wd,
+                         fa::Option{<:AbstractFeeAmortisation} = nothing,
                          store_weight_path::Bool = false, strict::Bool = false)
     rd_train = port_opt_view(rd, train_idx, cols)
     if !isa(cols, Colon)
@@ -1640,7 +1657,7 @@ function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::Retu
     end
     #! Add ability to do callbacks
     res = optimise(opt, rd_train)
-    return StatsAPI.predict(res, rd, test_idx, cols; wd = wd, hwd = hwd,
+    return StatsAPI.predict(res, rd, test_idx, cols; wd = wd, hwd = hwd, fa = fa,
                             store_weight_path = store_weight_path, strict = strict)
 end
 """
@@ -1890,26 +1907,29 @@ folds_are_time_ordered(::NonSeqCVER) = false
 """
     fold_evaluation(cv)
 
-Read the evaluation switches of a cross-validation scheme, in one named triple.
+Read the evaluation switches of a cross-validation scheme, in one named tuple.
 
-Every scheme entry point reads the same three settings before it runs its folds, and each scheme states them for itself through a method of its own. A scheme that carries none of them, and a call site that holds a split result rather than the scheme that made it, reach the fallback and get today's behaviour: no drift, no drifted previous weights, and no stored weight path.
+Every scheme entry point reads the same settings before it runs its folds, and each scheme states them for itself through a method of its own. A scheme that carries none of them, and a call site that holds a split result rather than the scheme that made it, reach the fallback and get today's behaviour: no drift, no drifted previous weights, no fee-clock override, and no stored weight path.
 
 The method is per type and takes the scheme itself, so inference reads the answer from the type of `cv`, exactly as [`folds_are_time_ordered`](@ref) does.
 
 # Returns
 
-  - `(; wd, pws, store_weight_path, strict)`: The Weight Drift, the Previous-Weights Source, the flag that stores a fold's weight path, and the flag that makes a Held Gap raise rather than warn.
+  - `(; wd, pws, fa, store_weight_path, strict)`: The Weight Drift, the Previous-Weights Source, the Fee Clock of the fold's realised series, the flag that stores a fold's weight path, and the flag that makes a Held Gap raise rather than warn.
 
 # Related
 
   - [`folds_are_time_ordered`](@ref)
   - [`held_weights_drift`](@ref)
+  - [`override_fee_amortisation`](@ref)
   - [`AbstractWeightDrift`](@ref)
   - [`AbstractPreviousWeightsSource`](@ref)
+  - [`AbstractFeeAmortisation`](@ref)
   - [`fold_loop`](@ref)
 """
 function fold_evaluation(::Any)
-    return (; wd = nothing, pws = nothing, store_weight_path = false, strict = false)
+    return (; wd = nothing, pws = nothing, fa = nothing, store_weight_path = false,
+            strict = false)
 end
 """
     fold_loop(fit_fold, est, n::Integer, ex::FLoops.Transducers.Executor,
@@ -2010,13 +2030,14 @@ function fit_and_predict(opt::OptE_Opt_TD, rd::ReturnsResult, cv::NonSeqCVER; co
     cv_res = split(cv, rd)
     (; train_idx, test_idx) = cv_res
     assert_unshuffled_folds(cv, train_idx)
-    (; wd, pws, store_weight_path, strict) = fold_evaluation(cv)
+    (; wd, pws, fa, store_weight_path, strict) = fold_evaluation(cv)
     hwd = held_weights_drift(wd, pws)
     predictions = fold_loop(opt, length(train_idx), ex; rd = rd, train_idx = train_idx,
                             test_idx = test_idx, cv = cv, pws = pws) do fold
         return fit_and_predict(fold.est, fold.rd; train_idx = fold.train,
                                test_idx = fold.test, cols = cols, wd = wd, hwd = hwd,
-                               store_weight_path = store_weight_path, strict = strict)
+                               fa = fa, store_weight_path = store_weight_path,
+                               strict = strict)
     end
     return MultiPeriodPredictionResult(; pred = predictions, id = id)
 end

@@ -1465,15 +1465,19 @@
         end
         @testset "fold_evaluation reads each scheme, and the wrappers inherit" begin
             @test PO.fold_evaluation(KFold(; n = 3, wd = sfd, store_weight_path = true)) ==
-                  (; wd = sfd, pws = nothing, store_weight_path = true, strict = false)
+                  (; wd = sfd, pws = nothing, fa = nothing, store_weight_path = true,
+                   strict = false)
             @test PO.fold_evaluation(CombinatorialCrossValidation(; wd = sfd)) ==
-                  (; wd = sfd, pws = nothing, store_weight_path = false, strict = false)
+                  (; wd = sfd, pws = nothing, fa = nothing, store_weight_path = false,
+                   strict = false)
             iwf = IndexWalkForward(200, 50; wd = sfd, pws = dw, store_weight_path = true)
             dwf = DateWalkForward(200, 1; wd = sfd, pws = dw)
             @test PO.fold_evaluation(iwf) ==
-                  (; wd = sfd, pws = dw, store_weight_path = true, strict = false)
+                  (; wd = sfd, pws = dw, fa = nothing, store_weight_path = true,
+                   strict = false)
             @test PO.fold_evaluation(dwf) ==
-                  (; wd = sfd, pws = dw, store_weight_path = false, strict = false)
+                  (; wd = sfd, pws = dw, fa = nothing, store_weight_path = false,
+                   strict = false)
             mrand = MultipleRandomised(iwf; subset_size = 5, n_subsets = 2)
             @test PO.fold_evaluation(mrand) == PO.fold_evaluation(iwf)
             pgrid = ["opt.l1" => [0.0005, 0.0008]]
@@ -1482,7 +1486,84 @@
             @test PO.fold_evaluation(gscv.cv) == PO.fold_evaluation(iwf)
             @test PO.fold_evaluation(rscv.cv) == PO.fold_evaluation(iwf)
             @test PO.fold_evaluation(nothing) ==
-                  (; wd = nothing, pws = nothing, store_weight_path = false, strict = false)
+                  (; wd = nothing, pws = nothing, fa = nothing, store_weight_path = false,
+                   strict = false)
+        end
+        # Issue #902: the Fee Clock of a fold's realised series is a switch of the scheme,
+        # beside `wd` and `pws`. Every scheme carries it, every wrapper inherits it, and
+        # `nothing` inherits the clock the fee itself states. ADR 0122 records the rule.
+        @testset "The Fee Clock is a switch of its own, and the wrappers inherit it" begin
+            af = AmortisedFees()
+            fof = FirstObservationFees()
+            @test isnothing(KFold().fa)
+            @test isnothing(CombinatorialCrossValidation().fa)
+            @test isnothing(IndexWalkForward(200, 50).fa)
+            @test isnothing(DateWalkForward(200, 1).fa)
+            @test PO.fold_evaluation(KFold(; n = 3, fa = af)).fa === af
+            @test PO.fold_evaluation(CombinatorialCrossValidation(; fa = fof)).fa === fof
+            iwff = IndexWalkForward(200, 50; fa = af)
+            @test PO.fold_evaluation(iwff).fa === af
+            @test PO.fold_evaluation(DateWalkForward(200, 1; fa = fof)).fa === fof
+            @test PO.fold_evaluation(MultipleRandomised(iwff; subset_size = 5,
+                                                        n_subsets = 2)).fa === af
+            fgrid = ["opt.l1" => [0.0005, 0.0008]]
+            @test PO.fold_evaluation(GridSearchCrossValidation(fgrid; cv = iwff,
+                                                               r = Variance()).cv).fa === af
+            @test PO.fold_evaluation(RandomisedSearchCrossValidation(fgrid; cv = iwff,
+                                                                     r = Variance()).cv).fa ===
+                  af
+            # The scheme carries no Previous-Weights Source where it cannot honour one, and
+            # the Fee Clock reaches every scheme, because every scheme reports a series.
+            @test !hasproperty(MultipleRandomised(iwff; subset_size = 5, n_subsets = 2),
+                               :fa)
+        end
+        @testset "The scheme's Fee Clock charges the fold, and the fit keeps its own" begin
+            # `SubsetResampling` charges its fee at the outer level, so a fixed term needs
+            # no MIP builder in a model, and the fee reaches `predict` through the result.
+            fee902 = Fees(; fl = 0.02, fa = AmortisedFees())
+            sr902 = SubsetResampling(; opt = InverseVolatility(), fees = fee902,
+                                     subset_size = 0.5, n_subsets = 3, seed = 12345)
+            res902 = optimise(sr902, rd)
+            @test isa(res902.retcode, PO.OptimisationSuccess)
+            oneoff902 = PO.calc_one_off_fees(res902.w, fee902)
+            @test oneoff902 > zero(oneoff902)
+
+            # The keyword: `nothing` inherits, so it agrees with the fee's own clock.
+            test902 = 501:800
+            base902 = predict(res902, rd, test902)
+            spread902 = predict(res902, rd, test902; fa = AmortisedFees())
+            first902 = predict(res902, rd, test902; fa = FirstObservationFees())
+            @test base902.rd.X == spread902.rd.X
+            # The stated first-observation clock moves the whole one-off cost onto the
+            # first observation of the fold, and refunds the share the spread charged.
+            T902 = length(test902)
+            @test isapprox(first902.rd.X[1], base902.rd.X[1] - oneoff902 + oneoff902 / T902)
+            @test isapprox(first902.rd.X[2:end], base902.rd.X[2:end] .+ oneoff902 / T902)
+            # The two clocks charge the same total, and land it differently.
+            @test isapprox(sum(first902.rd.X), sum(base902.rd.X))
+            # The result the fold carries is the fit's, so the clock the optimiser priced
+            # is unmoved. The override reaches the series alone.
+            @test first902.res.fees.fa === fee902.fa
+            @test first902.res.w == base902.res.w
+
+            # The scheme states the same override, and every fold of it obeys.
+            cv902a = IndexWalkForward(300, 150)
+            cv902f = IndexWalkForward(300, 150; fa = FirstObservationFees())
+            pred902a = cross_val_predict(sr902, rd, cv902a)
+            pred902f = cross_val_predict(sr902, rd, cv902f)
+            for (a, f) in zip(pred902a.pred, pred902f.pred)
+                oo = PO.calc_one_off_fees(a.res.w, PO.extract_fees(a.res, nothing))
+                Ti = length(a.rd.X)
+                @test a.res.w == f.res.w
+                @test isapprox(sum(a.rd.X), sum(f.rd.X))
+                @test isapprox(f.rd.X[1], a.rd.X[1] - oo + oo / Ti)
+                @test isapprox(f.rd.X[end], a.rd.X[end] + oo / Ti)
+            end
+            # A fold whose result carries no fee has no clock to override, and the run is
+            # unmoved by the field.
+            ivol902 = InverseVolatility()
+            @test cross_val_predict(ivol902, rd, cv902f).pred[1].rd.X ==
+                  cross_val_predict(ivol902, rd, cv902a).pred[1].rd.X
         end
         @testset "held_weights_drift resolves the one drift that runs" begin
             @test isnothing(PO.held_weights_drift(nothing, nothing))

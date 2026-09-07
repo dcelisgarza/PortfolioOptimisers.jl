@@ -641,6 +641,7 @@ function path_fit_and_predict(opt::OptE_TD, rd::ReturnsResult, train_idx, test_i
                               ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                               id = nothing, wd::Option{<:AbstractWeightDrift} = nothing,
                               hwd::Option{<:AbstractWeightDrift} = wd,
+                              fa::Option{<:AbstractFeeAmortisation} = nothing,
                               pws::Option{<:AbstractPreviousWeightsSource} = nothing,
                               store_weight_path::Bool = false, strict::Bool = false)
     # `i` is the fold's position in the path's split enumeration — no ordering is imposed
@@ -654,7 +655,7 @@ function path_fit_and_predict(opt::OptE_TD, rd::ReturnsResult, train_idx, test_i
                             test_idx = test_idx, path_id = id, fold_view = asset_view,
                             pws = pws) do fold
         return fit_and_predict(fold.est, fold.rd; train_idx = fold.train,
-                               test_idx = fold.test, wd = wd, hwd = hwd,
+                               test_idx = fold.test, wd = wd, hwd = hwd, fa = fa,
                                store_weight_path = store_weight_path, strict = strict)
     end
     return MultiPeriodPredictionResult(; pred = sort_predictions!(test_idx, predictions),
@@ -671,7 +672,7 @@ function fit_and_predict(opt::OptE_TD, rd::ReturnsResult, cv::MRCVR;
     for (train, test, asset, path_id) in zip(train_idx, test_idx, asset_idx, path_ids)
         push!(dict[path_id], (train, test, asset))
     end
-    (; wd, pws, store_weight_path, strict) = fold_evaluation(cv)
+    (; wd, pws, fa, store_weight_path, strict) = fold_evaluation(cv)
     hwd = held_weights_drift(wd, pws)
     predictions = parallel_folds(length(unique_ids), ex, MultiPeriodPredictionResult) do i
         vals = dict[i]
@@ -679,7 +680,7 @@ function fit_and_predict(opt::OptE_TD, rd::ReturnsResult, cv::MRCVR;
         test = map(x -> x[2], vals)
         asset = map(x -> x[3], vals)
         return path_fit_and_predict(opt, rd, train, test, asset; ex = ex, id = i, wd = wd,
-                                    hwd = hwd, pws = pws,
+                                    hwd = hwd, fa = fa, pws = pws,
                                     store_weight_path = store_weight_path, strict = strict)
     end
     return PopulationPredictionResult(; pred = predictions)
@@ -690,17 +691,18 @@ end
 
 Read the evaluation switches of a [`MultipleRandomised`](@ref).
 
-The scheme carries no switch of its own. Each of its paths is an inner walk-forward, so it inherits both switches from the scheme in its `cv` field, and a caller sets them there.
+The scheme carries no switch of its own. Each of its paths is an inner walk-forward, so it inherits every switch from the scheme in its `cv` field, and a caller sets them there.
 
 # Returns
 
-  - `(; wd, pws, store_weight_path, strict)`: The Weight Drift, the Previous-Weights Source, the flag that stores a fold's weight path, and the flag that makes a Held Gap raise rather than warn.
+  - `(; wd, pws, fa, store_weight_path, strict)`: The Weight Drift, the Previous-Weights Source, the Fee Clock of the fold's realised series, the flag that stores a fold's weight path, and the flag that makes a Held Gap raise rather than warn.
 
 # Related
 
   - [`fold_evaluation`](@ref)
   - [`MultipleRandomised`](@ref)
   - [`held_weights_drift`](@ref)
+  - [`override_fee_amortisation`](@ref)
 """
 function fold_evaluation(cv::MultipleRandomised)
     return fold_evaluation(cv.cv)

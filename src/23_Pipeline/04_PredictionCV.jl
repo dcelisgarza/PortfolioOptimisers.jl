@@ -238,13 +238,13 @@ function cross_val_predict(pipe::Pipeline, data::Prices_RR,
     cv_res = split(cv, data)
     (; train_idx, test_idx) = cv_res
     assert_unshuffled_folds(cv, train_idx)
-    (; wd, pws, store_weight_path, strict) = fold_evaluation(cv)
+    (; wd, pws, fa, store_weight_path, strict) = fold_evaluation(cv)
     hwd = held_weights_drift(wd, pws)
     predictions = fold_loop(pipe, length(train_idx), ex, Vector{PredictionResult};
                             rd = data, train_idx = train_idx, test_idx = test_idx, cv = cv
                             ) do fold
         res = StatsAPI.fit(fold.est, pipeline_data_view(fold.rd, fold.train))
-        return [StatsAPI.predict(res, fold.rd, group; wd = wd, hwd = hwd,
+        return [StatsAPI.predict(res, fold.rd, group; wd = wd, hwd = hwd, fa = fa,
                                  store_weight_path = store_weight_path, strict = strict)
                 for group in fold.test]
     end
@@ -266,6 +266,7 @@ function pipeline_path_fit_and_predict(pipe::Pipeline, data::Prices_RR, folds, p
                                        ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                                        wd::Option{<:AbstractWeightDrift} = nothing,
                                        hwd::Option{<:AbstractWeightDrift} = wd,
+                                       fa::Option{<:AbstractFeeAmortisation} = nothing,
                                        pws::Option{<:AbstractPreviousWeightsSource} = nothing,
                                        store_weight_path::Bool = false,
                                        strict::Bool = false)
@@ -276,7 +277,7 @@ function pipeline_path_fit_and_predict(pipe::Pipeline, data::Prices_RR, folds, p
                             test_idx = test_idx, path_id = path_id, fold_view = asset_view,
                             pws = pws) do fold
         res = StatsAPI.fit(fold.est, pipeline_data_view(fold.rd, fold.train))
-        return StatsAPI.predict(res, fold.rd, fold.test; wd = wd, hwd = hwd,
+        return StatsAPI.predict(res, fold.rd, fold.test; wd = wd, hwd = hwd, fa = fa,
                                 store_weight_path = store_weight_path, strict = strict)
     end
     return MultiPeriodPredictionResult(; pred = sort_predictions!(test_idx, predictions),
@@ -308,11 +309,11 @@ function cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::MultipleRandomis
     for (train, test, asset, path_id) in zip(train_idx, test_idx, asset_idx, path_ids)
         push!(dict[path_id], (train, test, asset))
     end
-    (; wd, pws, store_weight_path, strict) = fold_evaluation(cv)
+    (; wd, pws, fa, store_weight_path, strict) = fold_evaluation(cv)
     hwd = held_weights_drift(wd, pws)
     predictions = parallel_folds(length(unique_ids), ex, MultiPeriodPredictionResult) do i
         return pipeline_path_fit_and_predict(pipe, data, dict[i], i; ex = ex, wd = wd,
-                                             hwd = hwd, pws = pws,
+                                             hwd = hwd, fa = fa, pws = pws,
                                              store_weight_path = store_weight_path,
                                              strict = strict)
     end
@@ -371,12 +372,12 @@ function cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::CVER = KFold();
     assert_unshuffled_folds(cv, train_idx)
     # @argcheck(isa(test_idx[1], VecInt),
     #           ArgumentError("pipeline cross-validation requires non-combinatorial (VecInt) test indices, but got $(typeof(test_idx[1])); combinatorial schemes recombine non-contiguous test groups, which a fitted workflow cannot replay"))
-    (; wd, pws, store_weight_path, strict) = fold_evaluation(cv)
+    (; wd, pws, fa, store_weight_path, strict) = fold_evaluation(cv)
     hwd = held_weights_drift(wd, pws)
     predictions = fold_loop(pipe, length(train_idx), ex; rd = data, train_idx = train_idx,
                             test_idx = test_idx, cv = cv, pws = pws) do fold
         res = StatsAPI.fit(fold.est, pipeline_data_view(fold.rd, fold.train))
-        return StatsAPI.predict(res, fold.rd, fold.test; wd = wd, hwd = hwd,
+        return StatsAPI.predict(res, fold.rd, fold.test; wd = wd, hwd = hwd, fa = fa,
                                 store_weight_path = store_weight_path, strict = strict)
     end
     return MultiPeriodPredictionResult(; pred = predictions, id = id)

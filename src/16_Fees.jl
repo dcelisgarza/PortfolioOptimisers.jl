@@ -3,13 +3,19 @@ $(DocStringExtensions.TYPEDEF)
 
 Supertype for the algorithms that name the clock a one-off fee charge falls on.
 
-[`Fees`](@ref) and [`FeesEstimator`](@ref) each carry this family in their `fa` field, bound to `Option{<:AbstractFeeAmortisation}`. The field decides where the two fixed charges `fl` and `fs` land on a return series, and it reaches no other term, because `l`, `s` and `tn` are rates per period and charge on every observation. `nothing` charges the two fixed amounts one time, on the first observation, and is the default. [`AmortisedFees`](@ref) is the family's one leaf, and it spreads them evenly over a horizon instead.
+[`Fees`](@ref) and [`FeesEstimator`](@ref) each carry this family in their `fa` field, bound to `Option{<:AbstractFeeAmortisation}`. The field decides where the two fixed charges `fl` and `fs` land on a return series, and it reaches no other term, because `l`, `s` and `tn` are rates per period and charge on every observation. The family has two leaves. [`FirstObservationFees`](@ref) charges the two fixed amounts one time, on the first observation, and [`AmortisedFees`](@ref) spreads them evenly over a horizon instead. A `nothing` `fa` is the default, and it names the first-observation clock.
+
+Every site that reads the field dispatches on the leaf it holds rather than on this supertype, so a third clock added to the family gets a `MethodError` until its own methods are written. The supertype names the question, and it decides no answer.
+
+The cross-validation schemes carry the same family in a field of the same name, where it overrides the fee's own clock for a fold's realised series. [`fold_evaluation`](@ref) reads it, and there a `nothing` inherits the fee's clock rather than naming one.
 
 # Related
 
   - [`AmortisedFees`](@ref)
+  - [`FirstObservationFees`](@ref)
   - [`Fees`](@ref)
   - [`FeesEstimator`](@ref)
+  - [`fold_evaluation`](@ref)
   - [`Option`](@ref)
   - [`AbstractAlgorithm`](@ref)
 """
@@ -21,7 +27,7 @@ Spreads the one-off terms of a fee, the two fixed charges `fl` and `fs`, evenly 
 
 The algorithm carries no number. Every site that charges a fee knows the observation count it charges over, and hands it in: [`charge_fees`](@ref) hands the length of the series, [`calc_total_fees`](@ref) takes the horizon as an argument, and the model hands the observation count of the fit. So the count of the holding period is never stored, and never stale.
 
-A `nothing` `fa` names the other clock, which charges the two fixed terms one time, on the first observation.
+[`FirstObservationFees`](@ref) names the other clock, which charges the two fixed terms one time, on the first observation. A `nothing` `fa` names that clock too.
 
 The turnover charge `tn` is a rate per period, so it charges on every observation beside `l` and `s`. This algorithm never divides it.
 
@@ -45,6 +51,37 @@ AmortisedFees()
   - [`charge_fees`](@ref)
 """
 struct AmortisedFees <: AbstractFeeAmortisation end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Charges the one-off terms of a fee, the two fixed charges `fl` and `fs`, on the first observation of a return series.
+
+The algorithm carries no number, and it names the clock a `nothing` `fa` names. On a [`Fees`](@ref) it is therefore a synonym for `nothing`, and it exists so that a caller who must *state* this clock has a word for it. A cross-validation scheme's `fa` field is that caller: `nothing` there means inherit the fee's own clock, so the two answers a `Fees` spells one way each need two words.
+
+The turnover charge `tn` is a rate per period, so it charges on every observation beside `l` and `s`. This algorithm never moves it.
+
+# Constructors
+
+    FirstObservationFees() -> FirstObservationFees
+
+# Examples
+
+```jldoctest
+julia> FirstObservationFees()
+FirstObservationFees()
+```
+
+# Related
+
+  - [`AbstractFeeAmortisation`](@ref)
+  - [`AmortisedFees`](@ref)
+  - [`Fees`](@ref)
+  - [`FeesEstimator`](@ref)
+  - [`calc_fees`](@ref)
+  - [`charge_fees`](@ref)
+  - [`fold_evaluation`](@ref)
+"""
+struct FirstObservationFees <: AbstractFeeAmortisation end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -471,6 +508,51 @@ function Fees(; tn::Option{<:Turnover} = nothing, l::Option{<:Num_VecNum} = noth
     return Fees(tn, l, s, fl, fs, fa, kwargs)
 end
 """
+    override_fee_amortisation(fees::Option{<:Fees}, fa::Nothing)
+    override_fee_amortisation(fees::Nothing, fa::AbstractFeeAmortisation)
+    override_fee_amortisation(fees::Fees, fa::AbstractFeeAmortisation)
+
+Return the fee a report charges, from the fee a fit saw and the clock the report states.
+
+A [`Fees`](@ref) answers one question with its `fa` field: the clock the two fixed charges `fl` and `fs` fall on. A cross-validation scheme asks a second question with a field of the same name, and the two answers need not agree. The optimiser prices a fixed fee the way the objective must, and the report charges it the way a fund saw it. This verb resolves the pair, and it reaches the fold's realised series alone.
+
+A `nothing` `fa` on the scheme inherits, so the fee comes back unchanged and no object is built. A stated `fa` rebuilds the fee with that clock and leaves every other field of it alone. The rate fields `l`, `s` and `tn` charge on every observation whatever the clock is, so the override moves no number of theirs.
+
+# Algorithm
+
+ 1. On a `nothing` `fa`, return `fees` unchanged, whether it is a [`Fees`](@ref) or `nothing`.
+ 2. On a stated `fa` and a `nothing` `fees`, return `nothing`. There is no fee to charge, so there is no clock to state.
+ 3. On a stated `fa` and a [`Fees`](@ref), rebuild the fee with that `fa` and its own five fee fields and `kwargs`.
+
+# Arguments
+
+  - `fees`: The fee the fit saw, or `nothing`.
+  - `fa`: The clock the scheme states, or `nothing` to inherit the fee's own.
+
+# Returns
+
+  - `Option{<:Fees}`: The fee the report charges.
+
+# Related
+
+  - [`Fees`](@ref)
+  - [`AbstractFeeAmortisation`](@ref)
+  - [`AmortisedFees`](@ref)
+  - [`FirstObservationFees`](@ref)
+  - [`fold_evaluation`](@ref)
+  - [`charge_fees`](@ref)
+"""
+function override_fee_amortisation(fees::Option{<:Fees}, ::Nothing)
+    return fees
+end
+function override_fee_amortisation(::Nothing, ::AbstractFeeAmortisation)
+    return nothing
+end
+function override_fee_amortisation(fees::Fees, fa::AbstractFeeAmortisation)
+    return Fees(; tn = fees.tn, l = fees.l, s = fees.s, fl = fees.fl, fs = fees.fs, fa = fa,
+                kwargs = fees.kwargs)
+end
+"""
     const FeesE_Fees = Union{<:Fees, <:FeesEstimator}
 
 Union type for fee constraint objects and estimators.
@@ -835,10 +917,11 @@ julia> calc_fees([0.1, -0.2], [100, 200], 21, fees)
 function calc_fees(w::VecNum, p::VecNum, T::Number, fees::Fees)
     return calc_fees(w, p, T, fees, fees.fa)
 end
-function calc_fees(w::VecNum, p::VecNum, ::Number, fees::Fees, ::Nothing)
+function calc_fees(w::VecNum, p::VecNum, ::Number, fees::Fees,
+                   ::Union{Nothing, <:FirstObservationFees})
     return (calc_periodic_fees(w, p, fees), calc_one_off_fees(w, fees))
 end
-function calc_fees(w::VecNum, p::VecNum, T::Number, fees::Fees, ::AbstractFeeAmortisation)
+function calc_fees(w::VecNum, p::VecNum, T::Number, fees::Fees, ::AmortisedFees)
     val = calc_periodic_fees(w, p, fees) + calc_one_off_fees(w, fees) / T
     return (val, zero(val))
 end
@@ -1071,10 +1154,11 @@ julia> calc_fees([0.1, -0.2], 21, fees)
 function calc_fees(w::VecNum, T::Number, fees::Fees)
     return calc_fees(w, T, fees, fees.fa)
 end
-function calc_fees(w::VecNum, ::Number, fees::Fees, ::Nothing)
+function calc_fees(w::VecNum, ::Number, fees::Fees,
+                   ::Union{Nothing, <:FirstObservationFees})
     return (calc_periodic_fees(w, fees), calc_one_off_fees(w, fees))
 end
-function calc_fees(w::VecNum, T::Number, fees::Fees, ::AbstractFeeAmortisation)
+function calc_fees(w::VecNum, T::Number, fees::Fees, ::AmortisedFees)
     val = calc_periodic_fees(w, fees) + calc_one_off_fees(w, fees) / T
     return (val, zero(val))
 end
@@ -1254,11 +1338,11 @@ julia> calc_asset_fees([0.1, -0.2], [100, 200], 21, fees)
 function calc_asset_fees(w::VecNum, p::VecNum, T::Number, fees::Fees)
     return calc_asset_fees(w, p, T, fees, fees.fa)
 end
-function calc_asset_fees(w::VecNum, p::VecNum, ::Number, fees::Fees, ::Nothing)
+function calc_asset_fees(w::VecNum, p::VecNum, ::Number, fees::Fees,
+                         ::Union{Nothing, <:FirstObservationFees})
     return (calc_asset_periodic_fees(w, p, fees), calc_asset_one_off_fees(w, fees))
 end
-function calc_asset_fees(w::VecNum, p::VecNum, T::Number, fees::Fees,
-                         ::AbstractFeeAmortisation)
+function calc_asset_fees(w::VecNum, p::VecNum, T::Number, fees::Fees, ::AmortisedFees)
     val = calc_asset_periodic_fees(w, p, fees) + calc_asset_one_off_fees(w, fees) / T
     return (val, zero(val))
 end
@@ -1504,10 +1588,11 @@ julia> calc_asset_fees([0.1, -0.2], 21, fees)
 function calc_asset_fees(w::VecNum, T::Number, fees::Fees)
     return calc_asset_fees(w, T, fees, fees.fa)
 end
-function calc_asset_fees(w::VecNum, ::Number, fees::Fees, ::Nothing)
+function calc_asset_fees(w::VecNum, ::Number, fees::Fees,
+                         ::Union{Nothing, <:FirstObservationFees})
     return (calc_asset_periodic_fees(w, fees), calc_asset_one_off_fees(w, fees))
 end
-function calc_asset_fees(w::VecNum, T::Number, fees::Fees, ::AbstractFeeAmortisation)
+function calc_asset_fees(w::VecNum, T::Number, fees::Fees, ::AmortisedFees)
     val = calc_asset_periodic_fees(w, fees) + calc_asset_one_off_fees(w, fees) / T
     return (val, zero(val))
 end
@@ -1818,5 +1903,6 @@ function calc_total_asset_fees(w::VecNum, p::VecNum, T::Number, fees::Fees)
     return T * calc_asset_periodic_fees(w, p, fees) + calc_asset_one_off_fees(w, fees)
 end
 
-export FeesEstimator, Fees, AmortisedFees, fees_constraints, calc_fees, calc_fixed_fees,
-       calc_asset_fees, calc_asset_fixed_fees, calc_total_fees, calc_total_asset_fees
+export FeesEstimator, Fees, AmortisedFees, FirstObservationFees, fees_constraints,
+       calc_fees, calc_fixed_fees, calc_asset_fees, calc_asset_fixed_fees, calc_total_fees,
+       calc_total_asset_fees

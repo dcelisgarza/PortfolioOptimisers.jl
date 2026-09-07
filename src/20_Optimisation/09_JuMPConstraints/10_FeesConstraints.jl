@@ -271,15 +271,16 @@ end
 Lay the model's one-off fee expression onto a net return series, on the clock the fee states.
 
 The model's twin of [`charge_fees`](@ref), and it states the same rule. The two fixed fees are
-charged one time for the whole holding period, so a `nothing` clock subtracts them from the first
-observation alone, and an [`AmortisedFees`](@ref) spreads them evenly over `T`, the observation
-count of the fit.
+charged one time for the whole holding period, so a `nothing` or [`FirstObservationFees`](@ref)
+clock subtracts them from the first observation alone, and an [`AmortisedFees`](@ref) spreads them
+evenly over `T`, the observation count of the fit.
 
 # Algorithm
 
- 1. On a `nothing` `fa`, subtract `one_time` from the first entry of `net` and leave the rest.
- 2. On an [`AbstractFeeAmortisation`](@ref) `fa`, subtract `one_time` divided by `T` from every
-    entry of `net`.
+ 1. On a `nothing` or [`FirstObservationFees`](@ref) `fa`, subtract `one_time` from the first entry
+    of `net` and leave the rest.
+ 2. On an [`AmortisedFees`](@ref) `fa`, subtract `one_time` divided by `T` from every entry of
+    `net`.
 
 # Arguments
 
@@ -299,14 +300,15 @@ count of the fit.
   - [`add_to_one_time_fees!`](@ref)
   - [`set_net_portfolio_returns!`](@ref)
   - [`AmortisedFees`](@ref)
+  - [`FirstObservationFees`](@ref)
 """
-function charge_one_time_fees(model::JuMP.Model, net, one_time, ::Number, ::Nothing)
+function charge_one_time_fees(model::JuMP.Model, net, one_time, ::Number,
+                              ::Union{Nothing, <:FirstObservationFees})
     c = zeros(Int, length(net))
     c[1] = one(Int)
     return JuMP.@expression(model, net .- c * one_time)
 end
-function charge_one_time_fees(model::JuMP.Model, net, one_time, T::Number,
-                              ::AbstractFeeAmortisation)
+function charge_one_time_fees(model::JuMP.Model, net, one_time, T::Number, ::AmortisedFees)
     return JuMP.@expression(model, net .- one_time / T)
 end
 """

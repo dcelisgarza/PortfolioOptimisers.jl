@@ -410,6 +410,68 @@
         festA = FeesEstimator(; l = Dict("A" => 0.001), fa = AmortisedFees())
         @test fees_constraints(festA, fsets2).fa === festA.fa
     end
+    # Issue #902: the family gained a second leaf, so a caller who must *state* the
+    # first-observation clock has a word for it. On a `Fees` it is a synonym for `nothing`.
+    @testset "FirstObservationFees is the word for the nothing clock" begin
+        wf2 = [0.6, -0.4, 0.0, 0.25]
+        pf2 = [100.0, 50.0, 20.0, 10.0]
+        tnf2 = Turnover(; w = [0.1, 0.2, 0.3, 0.4], val = 0.02)
+        fee0 = Fees(; tn = tnf2, l = 0.001, s = 0.002, fl = 0.5, fs = 1.0)
+        feeF = Fees(; tn = tnf2, l = 0.001, s = 0.002, fl = 0.5, fs = 1.0,
+                    fa = FirstObservationFees())
+        feeA = Fees(; tn = tnf2, l = 0.001, s = 0.002, fl = 0.5, fs = 1.0,
+                    fa = AmortisedFees())
+
+        @test isempty(fieldnames(FirstObservationFees))
+        @test FirstObservationFees() isa PortfolioOptimisers.AbstractFeeAmortisation
+
+        # The four value-level verbs answer the same under the leaf as under `nothing`.
+        @test all(isapprox.(calc_fees(wf2, 3, feeF), calc_fees(wf2, 3, fee0)))
+        @test all(isapprox.(calc_fees(wf2, pf2, 3, feeF), calc_fees(wf2, pf2, 3, fee0)))
+        @test all(isapprox.(calc_asset_fees(wf2, 3, feeF), calc_asset_fees(wf2, 3, fee0)))
+        @test all(isapprox.(calc_asset_fees(wf2, pf2, 3, feeF),
+                            calc_asset_fees(wf2, pf2, 3, fee0)))
+
+        # The supertype decides no answer: each leaf carries its own method, so a third
+        # clock added to the family would get a `MethodError` rather than silently
+        # inheriting the amortised arm. No clock-reading method binds the bare supertype.
+        clock_param(m) = m.sig.parameters[end]
+        clock_readers = [PortfolioOptimisers.calc_fees, PortfolioOptimisers.calc_asset_fees,
+                         PortfolioOptimisers.charge_one_time_fees]
+        for verb in clock_readers
+            bound = unique(clock_param(m) for m in methods(verb))
+            @test !any(t -> t === PortfolioOptimisers.AbstractFeeAmortisation, bound)
+            @test any(t -> t === AmortisedFees, bound)
+            @test any(t -> t === Union{Nothing, FirstObservationFees}, bound)
+        end
+
+        # The series lands the one-off cost the same way under both spellings.
+        Xf2 = [0.01 0.02 -0.01 0.03; 0.03 0.04 0.02 -0.02; -0.01 0.005 0.01 0.04]
+        @test calc_net_returns(wf2, Xf2, feeF) == calc_net_returns(wf2, Xf2, fee0)
+        @test calc_net_asset_returns(wf2, Xf2, feeF) ==
+              calc_net_asset_returns(wf2, Xf2, fee0)
+
+        # `override_fee_amortisation` resolves the scheme's clock against the fee's own.
+        @test PortfolioOptimisers.override_fee_amortisation(fee0, nothing) === fee0
+        @test isnothing(PortfolioOptimisers.override_fee_amortisation(nothing, nothing))
+        @test isnothing(PortfolioOptimisers.override_fee_amortisation(nothing,
+                                                                      AmortisedFees()))
+        ov = PortfolioOptimisers.override_fee_amortisation(feeA, FirstObservationFees())
+        @test isa(ov.fa, FirstObservationFees)
+        @test ov.tn === feeA.tn
+        @test ov.l == feeA.l
+        @test ov.s == feeA.s
+        @test ov.fl == feeA.fl
+        @test ov.fs == feeA.fs
+        @test ov.kwargs == feeA.kwargs
+        # The override charges the fee the report states, and leaves the fee it was
+        # given untouched.
+        @test calc_net_returns(wf2, Xf2, ov) == calc_net_returns(wf2, Xf2, fee0)
+        @test isa(feeA.fa, AmortisedFees)
+        # Round trip: the other direction rebuilds the amortised clock.
+        @test isa(PortfolioOptimisers.override_fee_amortisation(fee0, AmortisedFees()).fa,
+                  AmortisedFees)
+    end
     # Ticket #765, settled by #898: a `WeightsTracking` benchmark fee needs no fold. The
     # verb that charges it hands in the length of the series it charges, so an
     # `AmortisedFees` clock spreads the two fixed terms over that series and needs nothing

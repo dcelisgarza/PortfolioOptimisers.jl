@@ -36,6 +36,7 @@ $(DocStringExtensions.FIELDS)
         purged_size::Integer = 0,
         embargo_size::Integer = 0,
         wd::Option{<:AbstractWeightDrift} = nothing,
+        fa::Option{<:AbstractFeeAmortisation} = nothing,
         store_weight_path::Bool = false,
         strict::Bool = false,
         max_comb::Integer = 100_000,
@@ -48,6 +49,10 @@ Keyword arguments correspond to the struct's fields.
 `wd` is the Weight Drift of the scheme, and `nothing` is the library's original behaviour: a fold's return series is `X * w` net of fees, read at the target weights of that fold. A [`SelfFinancingDrift`](@ref) reads the series as the wealth ratio of the drifted holdings instead, and the fold carries a [`HeldWeightsResult`](@ref). `store_weight_path` makes the fold store the weight path it computed, which a reader otherwise rebuilds on demand. `strict` decides what a **Held Gap** does: an asset that delists inside a test window carries a non-zero weight and a missing return, and the fold zeroes that pair and warns, or refuses with an `ArgumentError` under `strict`.
 
 A combinatorial enumeration is not a timeline, so this scheme carries no Previous-Weights Source. Its splits recombine into several paths, and a split's folds are independent of the others.
+
+## Fee clock
+
+`fa` is the clock the fold's **realised** series charges the two fixed fee terms on, and it overrides the `fa` of the fee itself. `nothing` inherits that fee's clock, which is the library's original behaviour. A [`FirstObservationFees`](@ref) charges the two terms on the first observation of the fold, and an [`AmortisedFees`](@ref) spreads them over the fold. The field reaches the fit not at all, so the optimiser keeps pricing the fee the way its own objective must.
 
 The default holds out `2` of `10` folds for testing. This gives `binomial(10, 2) = 45` splits, `9` recombined test paths, and an average training set of `80%` of the observations. Because `binomial(n, k) == binomial(n, n - k)`, a transposed pair such as `n_test_folds = 8` produces the same number of splits on a training set of only `20%` of the observations. Choose `n_test_folds` well below `div(n_folds, 2)`, or let [`optimal_number_folds`](@ref) choose the pair.
 
@@ -70,6 +75,7 @@ CombinatorialCrossValidation
         purged_size ┼ Int64: 2
        embargo_size ┼ Int64: 1
                  wd ┼ nothing
+                 fa ┼ nothing
   store_weight_path ┼ Bool: false
              strict ┴ Bool: false
 ```
@@ -112,6 +118,10 @@ CombinatorialCrossValidation
     """
     wd
     """
+    $(field_dict[:fa_cv])
+    """
+    fa
+    """
     $(field_dict[:store_weight_path])
     """
     store_weight_path
@@ -123,6 +133,7 @@ CombinatorialCrossValidation
                                           purged_size::Integer, embargo_size::Integer,
                                           max_comb::Integer = 100_000,
                                           wd::Option{<:AbstractWeightDrift} = nothing,
+                                          fa::Option{<:AbstractFeeAmortisation} = nothing,
                                           store_weight_path::Bool = false,
                                           strict::Bool = false)
         assert_nonempty_gt0_finite_val(n_folds, :n_folds)
@@ -133,18 +144,19 @@ CombinatorialCrossValidation
                   ArgumentError("The number of splits for `n_folds = $n_folds` and `n_test_folds = $n_test_folds` is `$(binomial(n_folds, n_test_folds))`, which is greater than the maximum allowed `$max_comb`. The number of combinations should typically be between 10^1 to 10^4 for statistical power. Such a large number of combinations may lead to long computation times and memory issues. Consider reducing `n_folds` or shifting `n_test_folds` further away from being equal to `div(n_folds, 2) = $(div(n_folds, 2))`."))
 
         return new{typeof(n_folds), typeof(n_test_folds), typeof(purged_size),
-                   typeof(embargo_size), typeof(wd), typeof(store_weight_path),
-                   typeof(strict)}(n_folds, n_test_folds, purged_size, embargo_size, wd,
+                   typeof(embargo_size), typeof(wd), typeof(fa), typeof(store_weight_path),
+                   typeof(strict)}(n_folds, n_test_folds, purged_size, embargo_size, wd, fa,
                                    store_weight_path, strict)
     end
 end
 function CombinatorialCrossValidation(; n_folds::Integer = 10, n_test_folds::Integer = 2,
                                       purged_size::Integer = 0, embargo_size::Integer = 0,
                                       wd::Option{<:AbstractWeightDrift} = nothing,
+                                      fa::Option{<:AbstractFeeAmortisation} = nothing,
                                       store_weight_path::Bool = false, strict::Bool = false,
                                       max_comb::Integer = 100_000)::CombinatorialCrossValidation
     return CombinatorialCrossValidation(n_folds, n_test_folds, purged_size, embargo_size,
-                                        max_comb, wd, store_weight_path, strict)
+                                        max_comb, wd, fa, store_weight_path, strict)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -621,7 +633,7 @@ function fit_and_predict(opt::OptE_TD, rd::ReturnsResult, cv::CombCVER; cols = :
     cv_res = split(cv, rd)
     (; train_idx, test_idx) = cv_res
     assert_unshuffled_folds(cv, train_idx)
-    (; wd, pws, store_weight_path, strict) = fold_evaluation(cv)
+    (; wd, pws, fa, store_weight_path, strict) = fold_evaluation(cv)
     hwd = held_weights_drift(wd, pws)
     # A fold is a train/test split and `i` is its position in the split enumeration —
     # no ordering is imposed on time-dependent entries; the user keys them off the
@@ -630,7 +642,8 @@ function fit_and_predict(opt::OptE_TD, rd::ReturnsResult, cv::CombCVER; cols = :
                             train_idx = train_idx, test_idx = test_idx, cv = cv) do fold
         return fit_and_predict(fold.est, fold.rd; train_idx = fold.train,
                                test_idx = fold.test, cols = cols, wd = wd, hwd = hwd,
-                               store_weight_path = store_weight_path, strict = strict)
+                               fa = fa, store_weight_path = store_weight_path,
+                               strict = strict)
     end
     return PopulationPredictionResult(; pred = sort_predictions!(cv_res, predictions))
 end
@@ -640,10 +653,10 @@ function fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::Returns
     cv_res = split(cv, rd)
     test_idx = cv_res.test_idx
     assert_unshuffled_folds(cv, cv_res.train_idx)
-    (; wd, pws, store_weight_path, strict) = fold_evaluation(cv)
+    (; wd, pws, fa, store_weight_path, strict) = fold_evaluation(cv)
     hwd = held_weights_drift(wd, pws)
     predictions = parallel_folds(length(test_idx), ex, Vector{PredictionResult}) do i
-        return StatsAPI.predict(res, rd, test_idx[i], :; wd = wd, hwd = hwd,
+        return StatsAPI.predict(res, rd, test_idx[i], :; wd = wd, hwd = hwd, fa = fa,
                                 store_weight_path = store_weight_path, strict = strict)
     end
     return PopulationPredictionResult(; pred = sort_predictions!(cv_res, predictions))
@@ -654,21 +667,22 @@ end
 
 Read the evaluation switches of a [`CombinatorialCrossValidation`](@ref).
 
-The folds of this scheme are not a timeline, so it carries no Previous-Weights Source and the triple names `nothing` for it. There is no previous fold whose weights a fold of this scheme could inherit.
+The folds of this scheme are not a timeline, so it carries no Previous-Weights Source and the tuple names `nothing` for it. There is no previous fold whose weights a fold of this scheme could inherit.
 
 # Returns
 
-  - `(; wd, pws, store_weight_path, strict)`: The Weight Drift, the Previous-Weights Source, the flag that stores a fold's weight path, and the flag that makes a Held Gap raise rather than warn.
+  - `(; wd, pws, fa, store_weight_path, strict)`: The Weight Drift, the Previous-Weights Source, the Fee Clock of the fold's realised series, the flag that stores a fold's weight path, and the flag that makes a Held Gap raise rather than warn.
 
 # Related
 
   - [`fold_evaluation`](@ref)
   - [`CombinatorialCrossValidation`](@ref)
   - [`held_weights_drift`](@ref)
+  - [`override_fee_amortisation`](@ref)
 """
 function fold_evaluation(cv::CombinatorialCrossValidation)
-    return (; wd = cv.wd, pws = nothing, store_weight_path = cv.store_weight_path,
-            strict = cv.strict)
+    return (; wd = cv.wd, pws = nothing, fa = cv.fa,
+            store_weight_path = cv.store_weight_path, strict = cv.strict)
 end
 export CombinatorialCrossValidation, CombinatorialCrossValidationResult,
        optimal_number_folds

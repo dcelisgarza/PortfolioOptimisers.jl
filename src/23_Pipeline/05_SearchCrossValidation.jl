@@ -219,10 +219,10 @@ function fit_and_score(pipe::Pipeline,
                                   <:RandomisedSearchCrossValidation{<:Any, <:Any}},
                        cv::CrossValidationResult, rd::Prices_RR, i::Integer)
     assert_no_holdout(pipe)
-    (; wd, pws, store_weight_path, strict) = fold_evaluation(scv.cv)
+    (; wd, pws, fa, store_weight_path, strict) = fold_evaluation(scv.cv)
     hwd = held_weights_drift(wd, pws)
     prediction = fit_and_predict(pipe, rd; train_idx = cv.train_idx[i],
-                                 test_idx = cv.test_idx[i], wd = wd, hwd = hwd,
+                                 test_idx = cv.test_idx[i], wd = wd, hwd = hwd, fa = fa,
                                  store_weight_path = store_weight_path, strict = strict)
     r = scv.r
     sign = ifelse(bigger_is_better(r), 1, -1)
@@ -240,11 +240,11 @@ function fit_and_score(pipe::Pipeline,
                                                                     <:MultipleRandomised}},
                        cv::MultipleRandomisedResult, rd::Prices_RR, i::Integer)
     assert_no_holdout(pipe)
-    (; wd, pws, store_weight_path, strict) = fold_evaluation(scv.cv)
+    (; wd, pws, fa, store_weight_path, strict) = fold_evaluation(scv.cv)
     hwd = held_weights_drift(wd, pws)
     prediction = fit_and_predict(pipe, rd; train_idx = cv.train_idx[i],
                                  test_idx = cv.test_idx[i], cols = cv.asset_idx[i], wd = wd,
-                                 hwd = hwd, store_weight_path = store_weight_path,
+                                 hwd = hwd, fa = fa, store_weight_path = store_weight_path,
                                  strict = strict)
     r = scv.r
     sign = ifelse(bigger_is_better(r), 1, -1)
