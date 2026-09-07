@@ -18,8 +18,9 @@ them the **Previous-Weights Source**.
 
 The two questions are two switches, `wd` and `pws`, and they are independent. `nothing` on either
 one is the library's original behaviour, so nothing in a caller's existing run moves until that
-caller sets a field. [ADR 0110](https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/main/docs/adr/0110-the-two-evaluation-switches-are-separate-and-the-library-does-not-bundle-them.md)
-records why the library keeps them apart.
+caller sets a field. See
+`docs/adr/0110-the-two-evaluation-switches-are-separate-and-the-library-does-not-bundle-them.md`
+for why the library keeps them apart.
 
 !!! tip "When to reach for this"
     Reach for `wd` when the number you report is meant to be the number a fund earned, and the
