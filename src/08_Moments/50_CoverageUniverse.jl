@@ -709,3 +709,61 @@ function cokurtosis(kte::CokurtosisEstimator, X::MatNum, pnl::Option{<:AssetPane
     cmsk, Xc = coverage_reduction(X, pnl; dims = dims)
     return expand_moment(cokurtosis(kte, Xc; dims = dims, kwargs...), cmsk, Val(:kt))
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+The point-in-time series root of the Asset Panel seam.
+
+[`variance_series`](@ref) refits its estimator once per observation, so every window meets the refusal of [`assert_finite_sample`](@ref) on its own. A window is therefore reduced to **its own** Coverage Universe rather than to the sample's: an asset that lists inside the window is outside the Coverage Universe of every window that reaches back past its listing, and inside the Coverage Universe of none. That is one reduction per row, and it is what a point-in-time series of a gapped panel means.
+
+A **mask-aware** estimator overrides this method and takes the whole window, as it overrides [`Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref).
+
+# Algorithm
+
+ 1. Orient `X` so that the observations lie on the rows.
+ 2. Allocate a `NaN` frame of the shape of `X` with [`coverage_nan_frame`](@ref).
+ 3. For each observation `t`, take the assets whose window is finite throughout and, when the Asset Panel carries an active mask, active throughout.
+ 4. Fit the estimator on that block, and write the answer into the covered entries of row `t`. An asset outside the window's Coverage Universe keeps its `NaN`, and a window that covers no asset leaves the whole row at `NaN`.
+ 5. Return the series, transposed when `dims == 2`.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - $(arg_dict[:X])
+  - $(arg_dict[:pnl_moment])
+  - $(arg_dict[:dims])
+  - `kwargs...`: Additional keyword arguments passed to the estimator.
+
+# Validation
+
+  - $(val_dict[:dims])
+
+# Returns
+
+  - `val::Matrix{<:Number}`: Variance series on the full asset universe, shaped as `(T, N)` if `dims == 1` or `(N, T)` if `dims == 2`, carrying `NaN` outside each window's Coverage Universe.
+
+# Related
+
+  - [`variance_series(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
+  - [`coverage_nan_frame`](@ref)
+  - [`Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref)
+  - [`AssetPanel`](@ref)
+"""
+function variance_series(ce::AbstractCovarianceEstimator, X::MatNum,
+                         pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+    X = dims_oriented(dims, X)
+    amsk, _ = panel_moment_masks(pnl)
+    val = coverage_nan_frame(X, size(X))
+    for t in axes(X, 1)
+        Xt = view(X, 1:t, :)
+        cmsk = vec(all(isfinite, Xt; dims = 1))
+        if !isnothing(amsk)
+            cmsk .&= vec(all(view(amsk, 1:t, :); dims = 1))
+        end
+        if !any(cmsk)
+            continue
+        end
+        val[t, cmsk] = vec(Statistics.var(ce, Xt[:, cmsk]; dims = 1, kwargs...))
+    end
+    return isone(dims) ? val : permutedims(val)
+end

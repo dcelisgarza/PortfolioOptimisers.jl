@@ -372,3 +372,43 @@ end
     @test fp.rr.M[keep, :] == fpk.rr.M
     @test all(isnan, fp.rr.M[4, :])
 end
+
+@testset "The expanding-window variance series reduces each window" begin
+    # `variance_series` refits a plain estimator per observation, so each window meets the
+    # refusal on its own. The panel root reduces the window to the assets it covers, and an
+    # asset the window does not cover keeps the `NaN` of the frame.
+    ve = SimpleVariance(; corrected = false)
+    got = PO.variance_series(ve, Xhol, pnl_full)
+    # Asset 2 misses observation 15, so every window from 15 on leaves it at `NaN`.
+    @test all(isfinite, got[:, [1, 3, 4]])
+    @test all(isfinite, view(got, 1:14, 2))
+    @test all(isnan, view(got, 15:T, 2))
+    # The covered assets read the same as a fit on the hand-reduced window.
+    for t in (1, 14, 15, 30, T)
+        cmsk = vec(all(isfinite, view(Xhol, 1:t, :); dims = 1))
+        want = vec(Statistics.var(ve, Xhol[1:t, cmsk]; dims = 1))
+        @test got[t, cmsk] ≈ want
+    end
+    # `dims = 2` transposes the same series.
+    @test isequal(PO.variance_series(ve, permutedims(Xhol), pnl_full; dims = 2),
+                  permutedims(got))
+    # No panel is the finiteness-only scan, and it names the same series.
+    @test isequal(PO.variance_series(ve, Xhol, nothing), got)
+    # An inactive row leaves the asset outside every window that reaches it.
+    act = PO.variance_series(ve, X0, pnl_inactive)
+    @test all(isnan, view(act, 20:T, 1))
+    @test all(isfinite, act[:, 2:end])
+    # A window that covers no asset leaves the whole row at `NaN`.
+    Xnone = copy(X0)
+    Xnone[2, :] .= NaN
+    none = PO.variance_series(ve, Xnone, nothing)
+    @test all(isfinite, view(none, 1, :))
+    @test all(isnan, view(none, 2:T, :))
+    # The bare method carries no panel, so it meets the refusal like every plain verb.
+    @test_throws PO.IsNonFiniteError PO.variance_series(ve, Xhol)
+    # A mask-aware estimator overrides the root and takes the whole window.
+    ra = RegimeAdjustedExpWeightedVariance(; decay = 0.94, min_obs = 4, regime_min_obs = 2)
+    @test isequal(PO.variance_series(ra, Xhol, pnl_full),
+                  PO.variance_series(ra, Xhol; estimation_mask = pnl_full.emsk,
+                                     active_mask = pnl_full.amsk))
+end

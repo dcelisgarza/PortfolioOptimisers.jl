@@ -216,7 +216,7 @@ julia> descriptor(EWVolatility(; half_life = 1), rd)
 function descriptor(de::EWVolatility, rd::ReturnsResult)::Matrix{<:Real}
     pnl = descriptor_asset_panel(rd)
     Y = ew_volatility_input(de.alg, rd.X, de.mar)
-    V = variance_series(de.ce, Y; dims = 1, active_mask = pnl.amsk)
+    V = variance_series(de.ce, Y, pnl; dims = 1)
     D = sqrt.(V)
     descriptor_active_fill!(D, pnl)
     return D
@@ -488,7 +488,7 @@ function descriptor(de::EWResidualVolatility, rd::ReturnsResult)::Matrix{<:Real}
     B, _ = ew_beta_series(X, rm, de.beta_decay, 1, de.min_val, amsk)
     E = ew_residual_returns(X, rm, B, amsk)
     Y = ew_volatility_input(de.alg, E, de.mar)
-    V = variance_series(de.ce, Y; dims = 1, active_mask = amsk)
+    V = variance_series(de.ce, Y, pnl; dims = 1)
     D = sqrt.(V)
     descriptor_active_fill!(D, pnl)
     return D

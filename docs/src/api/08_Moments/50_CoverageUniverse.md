@@ -50,4 +50,6 @@ coskewness(ske::CoskewnessEstimator, X::MatNum, pnl::Option{<:AssetPanel};
                     dims::Int = 1, kwargs...)
 cokurtosis(kte::CokurtosisEstimator, X::MatNum, pnl::Option{<:AssetPanel};
                     dims::Int = 1, kwargs...)
+PortfolioOptimisers.variance_series(ce::AbstractCovarianceEstimator, X::MatNum,
+                         pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
 ```

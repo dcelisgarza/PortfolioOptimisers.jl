@@ -75,8 +75,8 @@ path, so no covariance is built from pairwise-complete observations and no repai
 
 ### The Asset Panel is the third positional argument of the moment verbs
 
-`cov`, `cor`, `mean`, `var`, `std`, `coskewness` and `cokurtosis` gain a third positional
-argument, `pnl::Option{<:AssetPanel}`, with `nothing` as the default, as the prior method has.
+`cov`, `cor`, `mean`, `var`, `std`, `coskewness`, `cokurtosis` and `variance_series` gain a
+third positional argument, `pnl::Option{<:AssetPanel}`, as the prior method has.
 The root method of each verb is the reduce-and-expand:
 
 ```julia
@@ -91,6 +91,12 @@ A mask-aware estimator overrides the panel method and reads `pnl.amsk` and `pnl.
 the whole window and emits its own frame, because it alone knows its warm-up and its resets.
 `RegimeAdjustedExpWeightedVariance` forwards them to the two keywords it already has. A plain
 estimator needs no edit and no declaration.
+
+`variance_series` takes the same third positional argument. It refits its estimator once per
+observation, so every window meets the refusal on its own, and the root reduces each window to
+**its own** Coverage Universe rather than to the sample's. Its two-argument method is unchanged, so
+a caller that holds no panel keeps the behaviour it had, and a mask-aware estimator overrides the
+panel method as it overrides every other root.
 
 ### A composite forwards the panel, then repairs the finite block
 

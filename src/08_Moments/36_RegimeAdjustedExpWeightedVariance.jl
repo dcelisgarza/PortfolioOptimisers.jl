@@ -1547,6 +1547,8 @@ end
                    pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...) -> MatNum
     Statistics.std(ce::RegimeAdjustedExpWeightedVariance, X::MatNum,
                    pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...) -> MatNum
+    variance_series(ce::RegimeAdjustedExpWeightedVariance, X::MatNum,
+                    pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...) -> MatNum
 
 Take the whole window, and read the two universe masks of the Asset Panel.
 
@@ -1588,6 +1590,12 @@ function Statistics.std(ce::RegimeAdjustedExpWeightedVariance, X::MatNum,
     amsk, emsk = panel_moment_masks(pnl)
     return Statistics.std(ce, X; dims = dims, estimation_mask = emsk, active_mask = amsk,
                           kwargs...)
+end
+function variance_series(ce::RegimeAdjustedExpWeightedVariance, X::MatNum,
+                         pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+    amsk, emsk = panel_moment_masks(pnl)
+    return variance_series(ce, X; dims = dims, estimation_mask = emsk, active_mask = amsk,
+                           kwargs...)
 end
 
 export LogRegimeAdjusted, FirstMomentRegimeAdjusted, RootMeanSquaredAdjusted,
