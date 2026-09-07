@@ -379,7 +379,7 @@ function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.BaseR
                                                     fees::Option{<:Fees} = nothing;
                                                     kwargs...)
     hw = pred.hw
-    fees = PortfolioOptimisers.amortise_fees(extract_fees(pred.res, fees), size(hw.X, 1))
+    fees = extract_fees(pred.res, fees)
     nx = isnothing(pred.rd.nx) ? (1:size(hw.X, 2)) : pred.rd.nx
     return PortfolioOptimisers.plot_risk_contribution(r, pred.res.w, hw.X, fees; nx = nx,
                                                       kwargs...)
@@ -410,7 +410,7 @@ function PortfolioOptimisers.plot_factor_risk_contribution(r::PortfolioOptimiser
                                                            fees::Option{<:Fees} = nothing;
                                                            kwargs...)
     hw = pred.hw
-    fees = PortfolioOptimisers.amortise_fees(extract_fees(pred.res, fees), size(hw.X, 1))
+    fees = extract_fees(pred.res, fees), size(hw.X, 1)
     rd = ReturnsResult(; nx = pred.rd.nx, X = hw.X, nf = pred.rd.nf, F = pred.rd.F)
     return PortfolioOptimisers.plot_factor_risk_contribution(r, pred.res.w, hw.X, fees;
                                                              rd = rd, kwargs...)
