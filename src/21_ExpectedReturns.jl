@@ -86,7 +86,7 @@ function expected_return(r::ArithmeticReturn, w::VecNum, pr::AbstractPriorResult
     # the same ladder. The prior is in hand, so a Deferred Quantity resolves here too.
     r = resolve_deferred_quantities(r, pr)
     mu = nothing_scalar_array_selector(r.mu, pr.mu)
-    return LinearAlgebra.dot(w, mu) - term_fees(w, fees, r.settings.fee)
+    return LinearAlgebra.dot(w, mu) - term_fees(w, fees, size(pr.X, 1), r.settings.fee)
 end
 function expected_return(ret::LogarithmicReturn, w::VecNum, pr::AbstractPriorResult,
                          fees::Option{<:Fees} = nothing; strict::Bool = false, kwargs...)
@@ -99,7 +99,7 @@ function expected_return(ret::LogarithmicReturn, w::VecNum, pr::AbstractPriorRes
     else
         Statistics.mean(log1p.(X * w), rw)
     end
-    return kret - term_fees(w, fees, ret.settings.fee)
+    return kret - term_fees(w, fees, size(X, 1), ret.settings.fee)
 end
 function expected_return(::NoReturn, w::VecNum, ::AbstractPriorResult,
                          ::Option{<:Fees} = nothing; kwargs...)
@@ -120,11 +120,12 @@ model expression and its scalar twin rather than widening one.
 
   - `w`: Portfolio weights.
   - `fees`: Optional fees.
+  - `T`: Observation count of the fit, over which the one-off terms are spread.
   - `fee`: The term's `settings.fee` flag.
 
 # Returns
 
-  - `f::Number`: [`calc_fees`](@ref) of `w` and `fees` when `fee` is `true`, and a zero of the element type of `w` otherwise.
+  - `f::Number`: The per period charge, [`calc_periodic_fees`](@ref) plus [`calc_one_off_fees`](@ref) divided by `T`, when `fee` is `true`, and a zero of the element type of `w` otherwise.
 
 # Related
 
@@ -132,8 +133,16 @@ model expression and its scalar twin rather than widening one.
   - [`JuMPReturnsSettings`](@ref)
   - [`calc_fees`](@ref)
 """
-function term_fees(w::VecNum, fees::Option{<:Fees}, fee::Bool)
-    return fee ? calc_fees(w, fees) : zero(eltype(w))
+function term_fees(w::VecNum, ::Nothing, ::Number, ::Bool)
+    return zero(eltype(w))
+end
+function term_fees(w::VecNum, fees::Fees, T::Number, fee::Bool)
+    if !fee
+        return zero(eltype(w))
+    end
+    # An expected return is a per period number, so the one-off terms are always spread over
+    # the observation count of the fit, whatever clock `fees.fa` names for a realised series.
+    return calc_periodic_fees(w, fees) + calc_one_off_fees(w, fees) / T
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

@@ -178,7 +178,7 @@ Both finite allocators solve one sub-problem per side. This routine charges the 
   - `w::VecNum`: Target portfolio weights over the whole universe.
   - `p::VecNum`: Asset prices, in the same order as `w`.
   - `cash::Number`: Cash available before fees.
-  - `T::Option{<:Number} = nothing`: Time horizon over which the fees are charged.
+  - `T::Option{<:Number} = nothing`: Horizon, in periods, over which the fees are charged.
   - `fees::Option{<:Fees} = nothing`: Fees to charge. Ignored unless `T` is also given.
 
 # Returns
@@ -195,7 +195,7 @@ Both finite allocators solve one sub-problem per side. This routine charges the 
 # Details
 
   - A zero weight counts as long, because the test is `w .>= 0`.
-  - The fees are charged once against the whole `cash`, before the split, so both sides see the net figure.
+  - The fees are charged once against the whole `cash`, before the split, so both sides see the net figure. The charge is [`calc_total_fees`](@ref) over `T` periods: `l`, `s` and `tn` are rates per period, so each of them charges on every one of the `T` periods, and the fixed amounts `fl` and `fs` charge one time for the whole horizon.
   - `lcash` is the long side's share of the **gross** cash. It is only correct once the short side has reported what it did not spend, which is why [`adjust_long_cash`](@ref) runs between the two sub-problems.
 
 # Related
@@ -208,7 +208,7 @@ Both finite allocators solve one sub-problem per side. This routine charges the 
 function setup_alloc_optim(w::VecNum, p::VecNum, cash::Number,
                            T::Option{<:Number} = nothing, fees::Option{<:Fees} = nothing)
     if !isnothing(T) && !isnothing(fees)
-        cash -= calc_fees(w, p, fees) * T
+        cash -= calc_total_fees(w, p, T, fees)
     end
     bgt = sum(w)
     lidx = w .>= zero(eltype(w))

@@ -70,10 +70,17 @@ generic view must leave them alone. `fixed` keeps its meaning on a carrier and i
 
 The proportional charge is the rate times the absolute previous weight, summed over the carrier's
 entries. The fixed charge is the amount for every entry whose absolute previous weight is not
-`isapprox` to zero under `kwargs.atol`, the threshold `fl` and `fs` use. Both are one-off terms,
-divided by the amortisation divisor beside `tn`, `fl` and `fs`. The open question of
-[#815](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/815), whether the model
-divides, covers the two carriers as it covers `tn`.
+`isapprox` to zero under `kwargs.atol`, the threshold `fl` and `fs` use.
+
+**The two carriers are on different clocks**, which
+[#898](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/898) settles. `lq` is a
+proportional rate, so it is a turnover-like term and charges on every period beside `l`, `s` and
+`tn`; no clock reaches it. `flq` is a currency amount charged one time for the whole holding
+period, so it falls on the clock `fa` names, beside `fl` and `fs`: a `nothing` `fa` charges it on
+the first observation of the series, and an `AmortisedFees` spreads it evenly over the observation
+count the charging site knows. The model states the same rule, and always spreads the one-off
+terms into an expected return, which answers for the fixed terms the open question of
+[#815](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/815).
 
 ### One verb at the fit sites resolves on the full universe and splits by the mask
 
@@ -102,14 +109,16 @@ An inner head of a meta-optimiser is viewed to a universe of investable assets, 
 meets a mask of `nothing` and it charges none. The Schur optimiser reads no fees today, so it
 charges nothing until it gains them.
 
-### The finite allocation charges the liquidation with the complement's prices
+### The finite allocation charges the liquidation inside its own model
 
-The finite allocation charges fees against cash with prices, on the full weight vector a result
-hands it. It must read the five per-asset fields on the investable axis and price the two carriers
-with the prices of the assets outside the mask, which needs the mask beside the weights and the
-prices. How the input carries the mask is the build's to settle; the requirement is that a result's
-reduced `Fees` is accepted beside its full-length weights and prices, and that the liquidation is
-charged once, with the complement's prices.
+[#900](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/900) removes the cash
+pre-adjustment and the whole price-carrying fee family with it. The allocation holds the share
+counts and the prices, so it holds the money in each position exactly, and it charges every fee
+inside its model, through a budget constraint on `x .* p`. The two liquidation carriers therefore
+enter that model's own fee expression, priced on the complement's previous money, which the
+`prev_cash` field of `FiniteAllocationInput` supplies. The requirement is that a result's reduced
+`Fees` is accepted beside its full-length weights and prices, and that the liquidation is charged
+one time on the complement.
 
 ### The per-asset split returns a pair
 

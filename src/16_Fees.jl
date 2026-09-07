@@ -1,16 +1,15 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Supertype for the algorithms that spread a one-off fee charge over a holding period.
+Supertype for the algorithms that name the clock a one-off fee charge falls on.
 
-[`Fees`](@ref) and [`FeesEstimator`](@ref) each carry this family in their `fa` field, bound to `Option{<:AbstractFeeAmortisation}`. `nothing` charges the turnover and fixed fee terms in full on every observation, which is the library's original behaviour and stays its default. [`AmortisedFees`](@ref) is the family's one leaf.
+[`Fees`](@ref) and [`FeesEstimator`](@ref) each carry this family in their `fa` field, bound to `Option{<:AbstractFeeAmortisation}`. The field decides where the two fixed charges `fl` and `fs` land on a return series, and it reaches no other term, because `l`, `s` and `tn` are rates per period and charge on every observation. `nothing` charges the two fixed amounts one time, on the first observation, and is the default. [`AmortisedFees`](@ref) is the family's one leaf, and it spreads them evenly over a horizon instead.
 
 # Related
 
   - [`AmortisedFees`](@ref)
   - [`Fees`](@ref)
   - [`FeesEstimator`](@ref)
-  - [`amortise_fees`](@ref)
   - [`Option`](@ref)
   - [`AbstractAlgorithm`](@ref)
 """
@@ -18,34 +17,23 @@ abstract type AbstractFeeAmortisation <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Spreads the one-off terms of a fee, the turnover charge and the two fixed charges, over a holding period.
+Spreads the one-off terms of a fee, the two fixed charges `fl` and `fs`, evenly over a holding period.
 
-A bare `AmortisedFees()` divides by the observation count of the fold the fee is charged against, resolved by [`amortise_fees`](@ref) at the point a fold's length is known. A stated `horizon` overrides the fold and reaches every site that reads the fee, including one that holds no fold at all.
+The algorithm carries no number. Every site that charges a fee knows the observation count it charges over, and hands it in: [`charge_fees`](@ref) hands the length of the series, [`calc_total_fees`](@ref) takes the horizon as an argument, and the model hands the observation count of the fit. So the count of the holding period is never stored, and never stale.
 
-# Fields
+A `nothing` `fa` names the other clock, which charges the two fixed terms one time, on the first observation.
 
-$(DocStringExtensions.FIELDS)
+The turnover charge `tn` is a rate per period, so it charges on every observation beside `l` and `s`. This algorithm never divides it.
 
 # Constructors
 
-    AmortisedFees(; horizon::Option{<:Number} = nothing) -> AmortisedFees
-
-Keywords correspond to the struct's fields.
-
-## Validation
-
-  - `horizon`: if not `nothing`, positive and finite.
+    AmortisedFees() -> AmortisedFees
 
 # Examples
 
 ```jldoctest
 julia> AmortisedFees()
-AmortisedFees
-  horizon ┴ nothing
-
-julia> AmortisedFees(; horizon = 21)
-AmortisedFees
-  horizon ┴ Int64: 21
+AmortisedFees()
 ```
 
 # Related
@@ -53,60 +41,10 @@ AmortisedFees
   - [`AbstractFeeAmortisation`](@ref)
   - [`Fees`](@ref)
   - [`FeesEstimator`](@ref)
-  - [`amortise_fees`](@ref)
-  - [`Option`](@ref)
-"""
-@concrete struct AmortisedFees <: AbstractFeeAmortisation
-    """
-    $(field_dict[:fa_horizon])
-    """
-    horizon
-    function AmortisedFees(horizon::Option{<:Number})::AmortisedFees
-        if !isnothing(horizon)
-            assert_gt0(horizon, :horizon)
-            assert_finite(horizon, :horizon)
-        end
-        return new{typeof(horizon)}(horizon)
-    end
-end
-function AmortisedFees(; horizon::Option{<:Number} = nothing)::AmortisedFees
-    return AmortisedFees(horizon)
-end
-"""
-    amortisation_divisor(fa::Option{<:AbstractFeeAmortisation})
-
-Read the divisor a fee's one-off terms are charged through, by dispatch on `fa`.
-
-# Algorithm
-
- 1. `nothing`: return `1`. Today's charge, unmoved.
- 2. An [`AmortisedFees`](@ref) whose `horizon` is `nothing`: return `1`. No fold and no stated `horizon` charges the whole cost, as today.
- 3. An [`AmortisedFees`](@ref) whose `horizon` is a `Number`: return that `horizon`.
-
-# Arguments
-
-  - `fa`: Fee amortisation algorithm, or `nothing`.
-
-# Returns
-
-  - `d::Number`: The divisor.
-
-# Related
-
-  - [`AmortisedFees`](@ref)
-  - [`amortise_fees`](@ref)
   - [`calc_fees`](@ref)
-  - [`calc_asset_fees`](@ref)
+  - [`charge_fees`](@ref)
 """
-function amortisation_divisor(::Nothing)
-    return 1
-end
-function amortisation_divisor(::AmortisedFees{Nothing})
-    return 1
-end
-function amortisation_divisor(fa::AmortisedFees{<:Number})
-    return fa.horizon
-end
+struct AmortisedFees <: AbstractFeeAmortisation end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -116,7 +54,7 @@ Every fee field accepts a dictionary, a pair, or a vector of pairs keyed by asse
 
 !!! warning
 
-    `l` and `s` are rates per period in both fee families, and `fa` never reaches them. `fl` and `fs` charge each non-zero position: the price-carrying family reads them as a currency amount, and the no-price family subtracts the same number from a return series, where they are a fraction of capital per period. `tn` is a one-off charge on the trade in both families. When `fa` is `nothing`, divide `fl`, `fs` and `tn` by the holding period by hand; a stated `fa` does that division instead, through [`amortise_fees`](@ref). The units of the fees and returns must also be consistent.
+    `l`, `s` and `tn` are rates per period in both fee families, and each of them charges on every observation of a return series. `fa` reaches none of the three. `fl` and `fs` charge each non-zero position one time for the whole holding period: the price-carrying family reads them as a currency amount, and the no-price family as a fraction of capital. `fa` names the clock they fall on, and a `nothing` `fa` charges them on the first observation. The units of the fees and returns must also be consistent.
 
 # Fields
 
@@ -296,7 +234,7 @@ Fee values can be specified as scalars (applied to all assets) or as vectors of 
 
 !!! warning
 
-    `l` and `s` are rates per period in both fee families, and `fa` never reaches them. `fl` and `fs` charge each non-zero position: the price-carrying family reads them as a currency amount, and the no-price family subtracts the same number from a return series, where they are a fraction of capital per period. `tn` is a one-off charge on the trade in both families. When `fa` is `nothing`, divide `fl`, `fs` and `tn` by the holding period by hand; a stated `fa` does that division instead, through [`amortise_fees`](@ref). The units of the fees and returns must also be consistent.
+    `l`, `s` and `tn` are rates per period in both fee families, and each of them charges on every observation of a return series. `fa` reaches none of the three. `fl` and `fs` charge each non-zero position one time for the whole holding period: the price-carrying family reads them as a currency amount, and the no-price family as a fraction of capital. `fa` names the clock they fall on, and a `nothing` `fa` charges them on the first observation. The units of the fees and returns must also be consistent.
 
 # Mathematical definition
 
@@ -386,7 +324,15 @@ A long-only model needs no pinning. With `lb = 0`, `bgt = 1` and `l = 0.002` as 
 
 ## Fee amortisation
 
-`tn`, `fl` and `fs` are naturally one-off quantities, charged once per trade or per holding period, and both [`calc_fees`](@ref) and [`calc_asset_fees`](@ref) charge them in full on every observation of a return series when `fa` is `nothing`. Setting `fa` to an [`AmortisedFees`](@ref) divides those three terms, and never `l` or `s`, by a divisor read from `fa` through [`amortisation_divisor`](@ref): a bare `AmortisedFees()` divides by the observation count of the fold [`amortise_fees`](@ref) settles it against, and a stated `horizon` overrides the fold everywhere the fee is read, including a site that holds no fold at all.
+`l`, `s` and `tn` are rates per period. Each of them charges one time per observation of a return series, and `fa` reaches none of them.
+
+`fl` and `fs` are currency amounts charged one time for the whole holding period, and the `fa` field names the clock they fall on. Both [`calc_fees`](@ref) and [`calc_asset_fees`](@ref) return a pair, `(amortised, one_time)`.
+
+A `nothing` `fa` puts the two fixed charges in `one_time`, and [`charge_fees`](@ref) subtracts that from the first observation alone. An [`AmortisedFees`](@ref) divides them by the observation count and adds them to `amortised`, so every observation carries an equal share and `one_time` is zero.
+
+The field carries no count. Every site that charges a fee knows the count it charges over and hands it in, so the count is never stored and never stale. The JuMP model states the same rule, through `:one_time_fees` and [`charge_one_time_fees`](@ref).
+
+The two clocks charge the same total over a horizon of `T` observations, which is the number [`calc_total_fees`](@ref) reports. They give a different drawdown, because one charges the whole cost on one observation and the other charges a fraction of it on each.
 
 # Fields
 
@@ -458,8 +404,7 @@ Fees
   - [`AbstractResult`](@ref)
   - [`AbstractFeeAmortisation`](@ref)
   - [`AmortisedFees`](@ref)
-  - [`amortise_fees`](@ref)
-  - [`amortisation_divisor`](@ref)
+  - [`charge_fees`](@ref)
   - [`assert_nonempty_nonneg_finite_val`](@ref)
   - [`fees_constraints`](@ref)
   - [`calc_fees`](@ref)
@@ -524,77 +469,6 @@ function Fees(; tn::Option{<:Turnover} = nothing, l::Option{<:Num_VecNum} = noth
               fa::Option{<:AbstractFeeAmortisation} = nothing,
               kwargs::NamedTuple = (; atol = 1e-8))::Fees
     return Fees(tn, l, s, fl, fs, fa, kwargs)
-end
-"""
-    amortise_fees(fees::Nothing, T)
-    amortise_fees(fees::Fees, T)
-
-Settle the amortisation horizon of a fee against a fold's length.
-
-Unexported: only [`predict`](@ref) calls it. Returns its argument unchanged in three cases: a
-`nothing` fee, a `nothing` `fa`, and an `fa.horizon` that is already stated. That last case is the
-maintainer's precedence rule — a stated `horizon` overrides the fold. Only a bare `AmortisedFees()`
-whose `horizon` is `nothing` is rebuilt, with `horizon` set to `T`.
-
-# Algorithm
-
- 1. On a `nothing` fee, return `nothing`. `T` is read by no method here.
- 2. On a `Fees`, dispatch on `fees.fa`.
- 3. A `nothing` `fees.fa`: return `fees` unchanged.
- 4. An `fa.horizon` that is already a `Number`: return `fees` unchanged.
- 5. An `fa.horizon` that is `nothing`: return a new [`Fees`](@ref), identical to `fees` except that
-    `fa` is a new [`AmortisedFees`](@ref) whose `horizon` is `T`.
-
-# Arguments
-
-  - `fees`: Fee constraint, or `nothing`.
-  - `T`: The fold's observation count.
-
-# Returns
-
-  - `fe::Option{<:Fees}`: The fee, its amortisation horizon settled.
-
-# Examples
-
-```jldoctest
-julia> PortfolioOptimisers.amortise_fees(nothing, 21)
-
-julia> fees = Fees(; tn = Turnover(; w = [0.2, 0.3, 0.5], val = 0.01), fa = AmortisedFees());
-
-julia> PortfolioOptimisers.amortise_fees(fees, 21).fa
-AmortisedFees
-  horizon ┴ Int64: 21
-
-julia> fees = Fees(; tn = Turnover(; w = [0.2, 0.3, 0.5], val = 0.01),
-                   fa = AmortisedFees(; horizon = 5));
-
-julia> PortfolioOptimisers.amortise_fees(fees, 21).fa
-AmortisedFees
-  horizon ┴ Int64: 5
-```
-
-# Related
-
-  - [`Fees`](@ref)
-  - [`AmortisedFees`](@ref)
-  - [`amortisation_divisor`](@ref)
-  - [`predict`](@ref)
-"""
-function amortise_fees(fees::Nothing, ::Any)
-    return fees
-end
-function amortise_fees(fees::Fees, T)
-    return amortise_fees(fees, fees.fa, T)
-end
-function amortise_fees(fees::Fees, ::Nothing, ::Any)
-    return fees
-end
-function amortise_fees(fees::Fees, ::AmortisedFees{<:Number}, ::Any)
-    return fees
-end
-function amortise_fees(fees::Fees, ::AmortisedFees{Nothing}, T)
-    return Fees(; tn = fees.tn, l = fees.l, s = fees.s, fl = fees.fl, fs = fees.fs,
-                fa = AmortisedFees(; horizon = T), kwargs = fees.kwargs)
 end
 """
     const FeesE_Fees = Union{<:Fees, <:FeesEstimator}
@@ -910,41 +784,42 @@ function calc_fees(w::VecNum, p::VecNum, tn::Turnover{<:Any, <:VecNum})
     return LinearAlgebra.dot(tn.val, abs.(w - tn.w) .* p)
 end
 """
-    calc_fees(w::VecNum, p::VecNum, fees::Fees)
+    calc_fees(w::VecNum, p::VecNum, T::Number, fees::Fees)
 
 Compute total actual fees for portfolio weights and prices.
 
 Sums actual proportional, fixed, and turnover fees for all assets. [`calc_asset_fees(w::VecNum, p::VecNum, fees::Fees)`](@ref) splits the same total over the assets, and its sum is this number up to the order of summation.
 
-The fixed and turnover terms are divided by [`amortisation_divisor`](@ref) of `fees.fa`. The divisor is `1` when `fees.fa` is `nothing`, so a caller who never sets `fa` gets today's number back exactly.
+The verb returns a pair, `(amortised, one_time)`. `l`, `s` and `tn` are rates per period, so they charge on every observation and land in `amortised`. `fl` and `fs` are currency amounts charged one time for the whole holding period, so `fees.fa` decides where they land: a `nothing` `fa` puts them in `one_time`, and an [`AmortisedFees`](@ref) divides them by `T`, adds them to `amortised` and leaves `one_time` zero.
+
+`T` is the observation count the calling site charges over, and the site always knows it, so no fee stores one. [`charge_fees`](@ref) hands the length of the series it lays the pair onto, and [`calc_total_fees`](@ref) contracts the pair to the cost of a whole holding period.
 
 # Algorithm
 
- 1. Charge the long proportional term `fees_long`, the call of [`calc_fees(w::VecNum, p::VecNum, fees::Number, op::Function)`](@ref) on `fees.l` under `.>=`. Never divided.
- 2. Charge the short proportional term `fees_short`, the negated call of the same name on `fees.s` under `.<`. `w` is negative on that side, so the negation is what makes the term a positive charge. Never divided.
- 3. Read `d`, the call of [`amortisation_divisor`](@ref) on `fees.fa`.
- 4. Charge the long fixed term `fees_fixed_long`, the call of [`calc_fixed_fees`](@ref) on `fees.fl` under `.>=`, divided by `d`. It carries no price, because a fixed fee is a currency amount already.
- 5. Charge the short fixed term `fees_fixed_short`, the call of the same name on `fees.fs` under `.<`, divided by `d`.
- 6. Charge the turnover term `fees_turnover`, the call of [`calc_fees(w::VecNum, p::VecNum, tn::Turnover)`](@ref) on `fees.tn`, divided by `d`.
- 7. Return the sum of the five terms.
+ 1. Charge the per period terms, the call of [`calc_periodic_fees`](@ref).
+ 2. Charge the one-off terms, the call of [`calc_one_off_fees`](@ref).
+ 3. On a `nothing` `fees.fa`, return the two charges unchanged.
+ 4. On an [`AmortisedFees`](@ref) `fees.fa`, divide the one-off charge by `T`, add it to the per period charge, and return that number beside a zero of the same type.
 
 # Arguments
 
   - `w`: Portfolio weights.
   - `p`: Asset prices.
+  - `T`: Observation count the fee is charged over.
   - `fees`: [`Fees`](@ref) structure.
 
 # Returns
 
-  - `val::Number`: Total actual fees.
+  - `amortised::Number`: The charge every observation carries.
+  - `one_time::Number`: The charge the first observation carries alone.
 
 # Examples
 
 ```jldoctest
 julia> fees = Fees(; l = [0.01, 0.02], s = [0.01, 0.02], fl = [5.0, 0.0], fs = [0.0, 10.0]);
 
-julia> calc_fees([0.1, -0.2], [100, 200], fees)
-15.9
+julia> calc_fees([0.1, -0.2], [100, 200], 21, fees)
+(0.9, 15.0)
 ```
 
 # Related
@@ -956,16 +831,16 @@ julia> calc_fees([0.1, -0.2], [100, 200], fees)
   - [`calc_fixed_fees`](@ref)
   - [`calc_asset_fixed_fees`](@ref)
   - [`calc_net_returns`](@ref)
-  - [`amortisation_divisor`](@ref)
 """
-function calc_fees(w::VecNum, p::VecNum, fees::Fees)
-    fees_long = calc_fees(w, p, fees.l, .>=)
-    fees_short = -calc_fees(w, p, fees.s, .<)
-    d = amortisation_divisor(fees.fa)
-    fees_fixed_long = calc_fixed_fees(w, fees.fl, fees.kwargs, .>=) / d
-    fees_fixed_short = calc_fixed_fees(w, fees.fs, fees.kwargs, .<) / d
-    fees_turnover = calc_fees(w, p, fees.tn) / d
-    return fees_long + fees_short + fees_fixed_long + fees_fixed_short + fees_turnover
+function calc_fees(w::VecNum, p::VecNum, T::Number, fees::Fees)
+    return calc_fees(w, p, T, fees, fees.fa)
+end
+function calc_fees(w::VecNum, p::VecNum, ::Number, fees::Fees, ::Nothing)
+    return (calc_periodic_fees(w, p, fees), calc_one_off_fees(w, fees))
+end
+function calc_fees(w::VecNum, p::VecNum, T::Number, fees::Fees, ::AbstractFeeAmortisation)
+    val = calc_periodic_fees(w, p, fees) + calc_one_off_fees(w, fees) / T
+    return (val, zero(val))
 end
 """
     calc_fees(w::VecNum, ::Nothing, ::Function)
@@ -1148,40 +1023,41 @@ function calc_fixed_fees(w::VecNum, fees::VecNum, kwargs::NamedTuple, op::Functi
     return sum(fees[idx1][idx2])
 end
 """
-    calc_fees(w::VecNum, fees::Fees)
+    calc_fees(w::VecNum, T::Number, fees::Fees)
 
 Compute total fees for portfolio weights.
 
 Sums proportional, fixed, and turnover fees for all assets. [`calc_asset_fees(w::VecNum, fees::Fees)`](@ref) splits the same total over the assets, and its sum is this number up to the order of summation.
 
-The fixed and turnover terms are divided by [`amortisation_divisor`](@ref) of `fees.fa`. The divisor is `1` when `fees.fa` is `nothing`, so a caller who never sets `fa` gets today's number back exactly.
+The verb returns a pair, `(amortised, one_time)`. `l`, `s` and `tn` are rates per period, so they charge on every observation and land in `amortised`. `fl` and `fs` are currency amounts charged one time for the whole holding period, so `fees.fa` decides where they land: a `nothing` `fa` puts them in `one_time`, and an [`AmortisedFees`](@ref) divides them by `T`, adds them to `amortised` and leaves `one_time` zero.
+
+`T` is the observation count the calling site charges over, and the site always knows it, so no fee stores one. [`charge_fees`](@ref) hands the length of the series it lays the pair onto, and [`calc_total_fees`](@ref) contracts the pair to the cost of a whole holding period.
 
 # Algorithm
 
- 1. Charge the long proportional term `fees_long`, the call of [`calc_fees(w::VecNum, fees::Number, op::Function)`](@ref) on `fees.l` under `.>=`. Never divided.
- 2. Charge the short proportional term `fees_short`, the negated call of the same name on `fees.s` under `.<`. `w` is negative on that side, so the negation is what makes the term a positive charge. Never divided.
- 3. Read `d`, the call of [`amortisation_divisor`](@ref) on `fees.fa`.
- 4. Charge the long fixed term `fees_fixed_long`, the call of [`calc_fixed_fees`](@ref) on `fees.fl` under `.>=`, divided by `d`.
- 5. Charge the short fixed term `fees_fixed_short`, the call of the same name on `fees.fs` under `.<`, divided by `d`.
- 6. Charge the turnover term `fees_turnover`, the call of [`calc_fees(w::VecNum, tn::Turnover)`](@ref) on `fees.tn`, divided by `d`.
- 7. Return the sum of the five terms.
+ 1. Charge the per period terms, the call of [`calc_periodic_fees`](@ref).
+ 2. Charge the one-off terms, the call of [`calc_one_off_fees`](@ref).
+ 3. On a `nothing` `fees.fa`, return the two charges unchanged.
+ 4. On an [`AmortisedFees`](@ref) `fees.fa`, divide the one-off charge by `T`, add it to the per period charge, and return that number beside a zero of the same type.
 
 # Arguments
 
   - `w`: Portfolio weights.
+  - `T`: Observation count the fee is charged over.
   - `fees`: [`Fees`](@ref) structure.
 
 # Returns
 
-  - `val::Number`: Total fees.
+  - `amortised::Number`: The charge every observation carries.
+  - `one_time::Number`: The charge the first observation carries alone.
 
 # Examples
 
 ```jldoctest
 julia> fees = Fees(; l = [0.01, 0.02], s = [0.01, 0.02], fl = [5.0, 0.0], fs = [0.0, 10.0]);
 
-julia> calc_fees([0.1, -0.2], fees)
-15.004999999999999
+julia> calc_fees([0.1, -0.2], 21, fees)
+(0.005, 15.0)
 ```
 
 # Related
@@ -1191,16 +1067,16 @@ julia> calc_fees([0.1, -0.2], fees)
   - [`calc_asset_fees`](@ref)
   - [`calc_fixed_fees`](@ref)
   - [`calc_net_returns`](@ref)
-  - [`amortisation_divisor`](@ref)
 """
-function calc_fees(w::VecNum, fees::Fees)
-    fees_long = calc_fees(w, fees.l, .>=)
-    fees_short = -calc_fees(w, fees.s, .<)
-    d = amortisation_divisor(fees.fa)
-    fees_fixed_long = calc_fixed_fees(w, fees.fl, fees.kwargs, .>=) / d
-    fees_fixed_short = calc_fixed_fees(w, fees.fs, fees.kwargs, .<) / d
-    fees_turnover = calc_fees(w, fees.tn) / d
-    return fees_long + fees_short + fees_fixed_long + fees_fixed_short + fees_turnover
+function calc_fees(w::VecNum, T::Number, fees::Fees)
+    return calc_fees(w, T, fees, fees.fa)
+end
+function calc_fees(w::VecNum, ::Number, fees::Fees, ::Nothing)
+    return (calc_periodic_fees(w, fees), calc_one_off_fees(w, fees))
+end
+function calc_fees(w::VecNum, T::Number, fees::Fees, ::AbstractFeeAmortisation)
+    val = calc_periodic_fees(w, fees) + calc_one_off_fees(w, fees) / T
+    return (val, zero(val))
 end
 """
     calc_asset_fees(w::VecNum, p::VecNum, ::Nothing, ::Function)
@@ -1329,43 +1205,42 @@ function calc_asset_fees(w::VecNum, p::VecNum, tn::Turnover{<:Any, <:VecNum})
     return tn.val ⊙ abs.(w - tn.w) ⊙ p
 end
 """
-    calc_asset_fees(w::VecNum, p::VecNum, fees::Fees)
+    calc_asset_fees(w::VecNum, p::VecNum, T::Number, fees::Fees)
 
 Compute total actual per asset fees for portfolio weights and prices.
 
 Sums actual proportional, fixed, and turnover fees for all assets. The entries sum to the number [`calc_fees(w::VecNum, p::VecNum, fees::Fees)`](@ref) returns, up to the order of summation.
 
-The fixed and turnover terms are divided by [`amortisation_divisor`](@ref) of `fees.fa`. The divisor is `1` when `fees.fa` is `nothing`, so a caller who never sets `fa` gets today's numbers back exactly.
+The verb returns a pair, `(amortised, one_time)`. `l`, `s` and `tn` are rates per period, so they charge on every observation and land in `amortised`. `fl` and `fs` are currency amounts charged one time for the whole holding period, so `fees.fa` decides where they land: a `nothing` `fa` puts them in `one_time`, and an [`AmortisedFees`](@ref) divides them by `T`, adds them to `amortised` and leaves `one_time` zero.
+
+`T` is the observation count the calling site charges over, and the site always knows it, so no fee stores one. [`charge_fees`](@ref) hands the length of the series it lays the pair onto, and [`calc_total_fees`](@ref) contracts the pair to the cost of a whole holding period.
 
 # Algorithm
 
- 1. Charge the long proportional term `fees_long`, the call of [`calc_asset_fees(w::VecNum, p::VecNum, fees::Number, op::Function)`](@ref) on `fees.l` under `.>=`. Never divided.
- 2. Charge the short proportional term `fees_short`, the negated call of the same name on `fees.s` under `.<`. `w` is negative on that side, so the negation is what makes the term a positive charge. Never divided.
- 3. Read `d`, the call of [`amortisation_divisor`](@ref) on `fees.fa`.
- 4. Charge the long fixed term `fees_fixed_long`, the call of [`calc_asset_fixed_fees`](@ref) on `fees.fl` under `.>=`, divided by `d`. It carries no price, because a fixed fee is a currency amount already.
- 5. Charge the short fixed term `fees_fixed_short`, the call of the same name on `fees.fs` under `.<`, divided by `d`.
- 6. Charge the turnover term `fees_turnover`, the call of [`calc_asset_fees(w::VecNum, p::VecNum, tn::Turnover)`](@ref) on `fees.tn`, divided by `d`.
- 7. Return the elementwise sum of the five vectors.
+ 1. Charge the per period terms, the call of [`calc_asset_periodic_fees`](@ref).
+ 2. Charge the one-off terms, the call of [`calc_asset_one_off_fees`](@ref).
+ 3. On a `nothing` `fees.fa`, return the two charges unchanged.
+ 4. On an [`AmortisedFees`](@ref) `fees.fa`, divide the one-off charge by `T`, add it to the per period charge, and return that vector beside a zero of the same type.
 
 # Arguments
 
   - `w`: Portfolio weights.
   - `p`: Asset prices.
+  - `T`: Observation count the fee is charged over.
   - `fees`: [`Fees`](@ref) structure.
 
 # Returns
 
-  - `val::VecNum`: Total actual per asset fees.
+  - `amortised::VecNum`: The per asset charge every observation carries.
+  - `one_time::VecNum`: The per asset charge the first observation carries alone.
 
 # Examples
 
 ```jldoctest
 julia> fees = Fees(; l = [0.01, 0.02], s = [0.01, 0.02], fl = [5.0, 0.0], fs = [0.0, 10.0]);
 
-julia> calc_asset_fees([0.1, -0.2], [100, 200], fees)
-2-element Vector{Float64}:
-  5.1
- 10.8
+julia> calc_asset_fees([0.1, -0.2], [100, 200], 21, fees)
+([0.1, 0.8], [5.0, 10.0])
 ```
 
 # Related
@@ -1375,16 +1250,17 @@ julia> calc_asset_fees([0.1, -0.2], [100, 200], fees)
   - [`calc_fees`](@ref)
   - [`calc_asset_fixed_fees`](@ref)
   - [`calc_net_returns`](@ref)
-  - [`amortisation_divisor`](@ref)
 """
-function calc_asset_fees(w::VecNum, p::VecNum, fees::Fees)
-    fees_long = calc_asset_fees(w, p, fees.l, .>=)
-    fees_short = -calc_asset_fees(w, p, fees.s, .<)
-    d = amortisation_divisor(fees.fa)
-    fees_fixed_long = calc_asset_fixed_fees(w, fees.fl, fees.kwargs, .>=) / d
-    fees_fixed_short = calc_asset_fixed_fees(w, fees.fs, fees.kwargs, .<) / d
-    fees_turnover = calc_asset_fees(w, p, fees.tn) / d
-    return fees_long + fees_short + fees_fixed_long + fees_fixed_short + fees_turnover
+function calc_asset_fees(w::VecNum, p::VecNum, T::Number, fees::Fees)
+    return calc_asset_fees(w, p, T, fees, fees.fa)
+end
+function calc_asset_fees(w::VecNum, p::VecNum, ::Number, fees::Fees, ::Nothing)
+    return (calc_asset_periodic_fees(w, p, fees), calc_asset_one_off_fees(w, fees))
+end
+function calc_asset_fees(w::VecNum, p::VecNum, T::Number, fees::Fees,
+                         ::AbstractFeeAmortisation)
+    val = calc_asset_periodic_fees(w, p, fees) + calc_asset_one_off_fees(w, fees) / T
+    return (val, zero(val))
 end
 """
     calc_asset_fees(w::VecNum, ::Nothing, ::Function)
@@ -1580,42 +1456,41 @@ function calc_asset_fixed_fees(w::VecNum, fees::VecNum, kwargs::NamedTuple, op::
     return fees_w
 end
 """
-    calc_asset_fees(w::VecNum, fees::Fees)
+    calc_asset_fees(w::VecNum, T::Number, fees::Fees)
 
 Compute total per asset fees for portfolio weights.
 
 Sums proportional, fixed, and turnover fees for all assets. The entries sum to the number [`calc_fees(w::VecNum, fees::Fees)`](@ref) returns, up to the order of summation.
 
-The fixed and turnover terms are divided by [`amortisation_divisor`](@ref) of `fees.fa`. The divisor is `1` when `fees.fa` is `nothing`, so a caller who never sets `fa` gets today's numbers back exactly.
+The verb returns a pair, `(amortised, one_time)`. `l`, `s` and `tn` are rates per period, so they charge on every observation and land in `amortised`. `fl` and `fs` are currency amounts charged one time for the whole holding period, so `fees.fa` decides where they land: a `nothing` `fa` puts them in `one_time`, and an [`AmortisedFees`](@ref) divides them by `T`, adds them to `amortised` and leaves `one_time` zero.
+
+`T` is the observation count the calling site charges over, and the site always knows it, so no fee stores one. [`charge_fees`](@ref) hands the length of the series it lays the pair onto, and [`calc_total_fees`](@ref) contracts the pair to the cost of a whole holding period.
 
 # Algorithm
 
- 1. Charge the long proportional term `fees_long`, the call of [`calc_asset_fees(w::VecNum, fees::Number, op::Function)`](@ref) on `fees.l` under `.>=`. Never divided.
- 2. Charge the short proportional term `fees_short`, the negated call of the same name on `fees.s` under `.<`. `w` is negative on that side, so the negation is what makes the term a positive charge. Never divided.
- 3. Read `d`, the call of [`amortisation_divisor`](@ref) on `fees.fa`.
- 4. Charge the long fixed term `fees_fixed_long`, the call of [`calc_asset_fixed_fees`](@ref) on `fees.fl` under `.>=`, divided by `d`.
- 5. Charge the short fixed term `fees_fixed_short`, the call of the same name on `fees.fs` under `.<`, divided by `d`.
- 6. Charge the turnover term `fees_turnover`, the call of [`calc_asset_fees(w::VecNum, tn::Turnover)`](@ref) on `fees.tn`, divided by `d`.
- 7. Return the elementwise sum of the five vectors.
+ 1. Charge the per period terms, the call of [`calc_asset_periodic_fees`](@ref).
+ 2. Charge the one-off terms, the call of [`calc_asset_one_off_fees`](@ref).
+ 3. On a `nothing` `fees.fa`, return the two charges unchanged.
+ 4. On an [`AmortisedFees`](@ref) `fees.fa`, divide the one-off charge by `T`, add it to the per period charge, and return that vector beside a zero of the same type.
 
 # Arguments
 
   - `w`: Portfolio weights.
+  - `T`: Observation count the fee is charged over.
   - `fees`: [`Fees`](@ref) structure.
 
 # Returns
 
-  - `val::VecNum`: Total per asset fees.
+  - `amortised::VecNum`: The per asset charge every observation carries.
+  - `one_time::VecNum`: The per asset charge the first observation carries alone.
 
 # Examples
 
 ```jldoctest
 julia> fees = Fees(; l = [0.01, 0.02], s = [0.01, 0.02], fl = [5.0, 0.0], fs = [0.0, 10.0]);
 
-julia> calc_asset_fees([0.1, -0.2], fees)
-2-element Vector{Float64}:
-  5.001
- 10.004
+julia> calc_asset_fees([0.1, -0.2], 21, fees)
+([0.001, 0.004], [5.0, 10.0])
 ```
 
 # Related
@@ -1625,17 +1500,323 @@ julia> calc_asset_fees([0.1, -0.2], fees)
   - [`calc_fees`](@ref)
   - [`calc_asset_fixed_fees`](@ref)
   - [`calc_net_returns`](@ref)
-  - [`amortisation_divisor`](@ref)
 """
-function calc_asset_fees(w::VecNum, fees::Fees)
-    fees_long = calc_asset_fees(w, fees.l, .>=)
-    fees_short = -calc_asset_fees(w, fees.s, .<)
-    d = amortisation_divisor(fees.fa)
-    fees_fixed_long = calc_asset_fixed_fees(w, fees.fl, fees.kwargs, .>=) / d
-    fees_fixed_short = calc_asset_fixed_fees(w, fees.fs, fees.kwargs, .<) / d
-    fees_turnover = calc_asset_fees(w, fees.tn) / d
-    return fees_long + fees_short + fees_fixed_long + fees_fixed_short + fees_turnover
+function calc_asset_fees(w::VecNum, T::Number, fees::Fees)
+    return calc_asset_fees(w, T, fees, fees.fa)
+end
+function calc_asset_fees(w::VecNum, ::Number, fees::Fees, ::Nothing)
+    return (calc_asset_periodic_fees(w, fees), calc_asset_one_off_fees(w, fees))
+end
+function calc_asset_fees(w::VecNum, T::Number, fees::Fees, ::AbstractFeeAmortisation)
+    val = calc_asset_periodic_fees(w, fees) + calc_asset_one_off_fees(w, fees) / T
+    return (val, zero(val))
+end
+
+"""
+    calc_periodic_fees(w::VecNum, fees::Fees)
+    calc_periodic_fees(w::VecNum, p::VecNum, fees::Fees)
+
+Charge the terms of a fee that fall on every observation.
+
+`l`, `s` and `tn` are rates per period, so each of them charges one time per observation of a return series. `fees.fa` reaches none of the three. [`calc_fees`](@ref) adds this number to the one-off terms of [`calc_one_off_fees`](@ref), and [`calc_total_fees`](@ref) multiplies it by the horizon.
+
+# Algorithm
+
+ 1. Charge the long proportional term, the call of [`calc_fees`](@ref) on `fees.l` under `.>=`.
+ 2. Charge the short proportional term, the negated call of the same name on `fees.s` under `.<`. `w` is negative on that side, so the negation is what makes the term a positive charge.
+ 3. Charge the turnover term, the call of [`calc_fees`](@ref) on `fees.tn`.
+ 4. Return the sum of the three terms.
+
+# Arguments
+
+  - `w`: Portfolio weights.
+  - `p`: Asset prices, on the method that carries them.
+  - `fees`: [`Fees`](@ref) structure.
+
+# Returns
+
+  - `val::Number`: The per period charge, before the one-off terms.
+
+# Examples
+
+```jldoctest
+julia> fees = Fees(; l = 0.01, fl = 5.0, tn = Turnover(; w = [0.0, 0.0], val = 0.002));
+
+julia> PortfolioOptimisers.calc_periodic_fees([0.5, 0.5], fees)
+0.012
+```
+
+# Related
+
+  - [`Fees`](@ref)
+  - [`VecNum`](@ref)
+  - [`calc_fees`](@ref)
+  - [`calc_one_off_fees`](@ref)
+  - [`calc_total_fees`](@ref)
+  - [`calc_asset_periodic_fees`](@ref)
+"""
+function calc_periodic_fees(w::VecNum, fees::Fees)
+    return calc_fees(w, fees.l, .>=) - calc_fees(w, fees.s, .<) + calc_fees(w, fees.tn)
+end
+function calc_periodic_fees(w::VecNum, p::VecNum, fees::Fees)
+    return calc_fees(w, p, fees.l, .>=) - calc_fees(w, p, fees.s, .<) +
+           calc_fees(w, p, fees.tn)
+end
+"""
+    calc_asset_periodic_fees(w::VecNum, fees::Fees)
+    calc_asset_periodic_fees(w::VecNum, p::VecNum, fees::Fees)
+
+Split over the assets the terms of a fee that fall on every observation.
+
+The per asset twin of [`calc_periodic_fees`](@ref). Its entries sum to that number, up to the order of summation.
+
+# Algorithm
+
+ 1. Charge the long proportional term, the call of [`calc_asset_fees`](@ref) on `fees.l` under `.>=`.
+ 2. Charge the short proportional term, the negated call of the same name on `fees.s` under `.<`.
+ 3. Charge the turnover term, the call of [`calc_asset_fees`](@ref) on `fees.tn`.
+ 4. Return the elementwise sum of the three vectors.
+
+# Arguments
+
+  - `w`: Portfolio weights.
+  - `p`: Asset prices, on the method that carries them.
+  - `fees`: [`Fees`](@ref) structure.
+
+# Returns
+
+  - `val::VecNum`: The per period charge per asset, before the one-off terms.
+
+# Examples
+
+```jldoctest
+julia> fees = Fees(; l = 0.01, fl = 5.0, tn = Turnover(; w = [0.0, 0.0], val = 0.002));
+
+julia> PortfolioOptimisers.calc_asset_periodic_fees([0.5, 0.5], fees)
+2-element Vector{Float64}:
+ 0.006
+ 0.006
+```
+
+# Related
+
+  - [`Fees`](@ref)
+  - [`VecNum`](@ref)
+  - [`calc_asset_fees`](@ref)
+  - [`calc_asset_one_off_fees`](@ref)
+  - [`calc_total_asset_fees`](@ref)
+  - [`calc_periodic_fees`](@ref)
+"""
+function calc_asset_periodic_fees(w::VecNum, fees::Fees)
+    return calc_asset_fees(w, fees.l, .>=) - calc_asset_fees(w, fees.s, .<) +
+           calc_asset_fees(w, fees.tn)
+end
+function calc_asset_periodic_fees(w::VecNum, p::VecNum, fees::Fees)
+    return calc_asset_fees(w, p, fees.l, .>=) - calc_asset_fees(w, p, fees.s, .<) +
+           calc_asset_fees(w, p, fees.tn)
+end
+"""
+    calc_one_off_fees(w::VecNum, fees::Fees)
+
+Charge the terms of a fee that fall one time over a holding period.
+
+`fl` and `fs` are currency amounts charged one time for the whole holding period, and they are the only terms `fees.fa` reaches. The method carries no price, because a fixed fee is a currency amount already.
+
+# Algorithm
+
+ 1. Charge the long fixed term, the call of [`calc_fixed_fees`](@ref) on `fees.fl` under `.>=`.
+ 2. Charge the short fixed term, the call of the same name on `fees.fs` under `.<`.
+ 3. Return the sum of the two terms.
+
+# Arguments
+
+  - `w`: Portfolio weights.
+  - `fees`: [`Fees`](@ref) structure.
+
+# Returns
+
+  - `val::Number`: The charge of one holding period.
+
+# Examples
+
+```jldoctest
+julia> fees = Fees(; l = 0.01, fl = 5.0, tn = Turnover(; w = [0.0, 0.0], val = 0.002));
+
+julia> PortfolioOptimisers.calc_one_off_fees([0.5, 0.5], fees)
+10.0
+```
+
+# Related
+
+  - [`Fees`](@ref)
+  - [`VecNum`](@ref)
+  - [`calc_fixed_fees`](@ref)
+  - [`calc_periodic_fees`](@ref)
+  - [`calc_total_fees`](@ref)
+  - [`calc_asset_one_off_fees`](@ref)
+"""
+function calc_one_off_fees(w::VecNum, fees::Fees)
+    return calc_fixed_fees(w, fees.fl, fees.kwargs, .>=) +
+           calc_fixed_fees(w, fees.fs, fees.kwargs, .<)
+end
+"""
+    calc_asset_one_off_fees(w::VecNum, fees::Fees)
+
+Split over the assets the terms of a fee that fall one time over a holding period.
+
+The per asset twin of [`calc_one_off_fees`](@ref). Its entries sum to that number, up to the order of summation.
+
+# Algorithm
+
+ 1. Charge the long fixed term, the call of [`calc_asset_fixed_fees`](@ref) on `fees.fl` under `.>=`.
+ 2. Charge the short fixed term, the call of the same name on `fees.fs` under `.<`.
+ 3. Return the elementwise sum of the two vectors.
+
+# Arguments
+
+  - `w`: Portfolio weights.
+  - `fees`: [`Fees`](@ref) structure.
+
+# Returns
+
+  - `val::VecNum`: The charge of one holding period per asset.
+
+# Examples
+
+```jldoctest
+julia> fees = Fees(; l = 0.01, fl = 5.0, tn = Turnover(; w = [0.0, 0.0], val = 0.002));
+
+julia> PortfolioOptimisers.calc_asset_one_off_fees([0.5, 0.5], fees)
+2-element Vector{Float64}:
+ 5.0
+ 5.0
+```
+
+# Related
+
+  - [`Fees`](@ref)
+  - [`VecNum`](@ref)
+  - [`calc_asset_fixed_fees`](@ref)
+  - [`calc_asset_periodic_fees`](@ref)
+  - [`calc_total_asset_fees`](@ref)
+  - [`calc_one_off_fees`](@ref)
+"""
+function calc_asset_one_off_fees(w::VecNum, fees::Fees)
+    return calc_asset_fixed_fees(w, fees.fl, fees.kwargs, .>=) +
+           calc_asset_fixed_fees(w, fees.fs, fees.kwargs, .<)
+end
+"""
+    calc_total_fees(w::VecNum, T::Number, fees::Option{<:Fees})
+    calc_total_fees(w::VecNum, p::VecNum, T::Number, fees::Option{<:Fees})
+
+Charge the whole cost of holding a portfolio for `T` periods.
+
+[`calc_fees`](@ref) answers one observation of a return series. This verb answers the whole holding period, so it charges the per period terms `T` times and the one-off terms one time. It needs the rates, the fixed amounts and the horizon, and nothing else. `fees.fa` reaches no term here, because that field names where a one-off cost lands on a return series, and this verb reports no series. The finite allocation reads this verb to take the fees out of the cash before it allocates.
+
+# Algorithm
+
+ 1. Charge `T` times the per period terms, the call of [`calc_periodic_fees`](@ref).
+ 2. Charge the one-off terms one time, the call of [`calc_one_off_fees`](@ref).
+ 3. Return the sum of the two terms.
+
+# Arguments
+
+  - `w`: Portfolio weights.
+  - `p`: Asset prices, on the method that carries them.
+  - `T`: Horizon, in periods.
+  - `fees`: [`Fees`](@ref) structure, or `nothing`.
+
+# Returns
+
+  - `val::Number`: The whole cost of the holding period.
+
+# Examples
+
+```jldoctest
+julia> fees = Fees(; l = 0.01, fl = 5.0, tn = Turnover(; w = [0.0, 0.0], val = 0.002));
+
+julia> calc_total_fees([0.5, 0.5], 252, fees)
+13.024000000000001
+```
+
+# Related
+
+  - [`Fees`](@ref)
+  - [`VecNum`](@ref)
+  - [`calc_fees`](@ref)
+  - [`calc_periodic_fees`](@ref)
+  - [`calc_one_off_fees`](@ref)
+  - [`calc_total_asset_fees`](@ref)
+"""
+function calc_total_fees(w::VecNum, ::Number, ::Nothing)
+    return zero(eltype(w))
+end
+function calc_total_fees(w::VecNum, T::Number, fees::Fees)
+    return T * calc_periodic_fees(w, fees) + calc_one_off_fees(w, fees)
+end
+function calc_total_fees(w::VecNum, p::VecNum, ::Number, ::Nothing)
+    return zero(promote_type(eltype(w), eltype(p)))
+end
+function calc_total_fees(w::VecNum, p::VecNum, T::Number, fees::Fees)
+    return T * calc_periodic_fees(w, p, fees) + calc_one_off_fees(w, fees)
+end
+"""
+    calc_total_asset_fees(w::VecNum, T::Number, fees::Option{<:Fees})
+    calc_total_asset_fees(w::VecNum, p::VecNum, T::Number, fees::Option{<:Fees})
+
+Split over the assets the whole cost of holding a portfolio for `T` periods.
+
+The per asset twin of [`calc_total_fees`](@ref). Its entries sum to that number, up to the order of summation.
+
+# Algorithm
+
+ 1. Charge `T` times the per period terms, the call of [`calc_asset_periodic_fees`](@ref).
+ 2. Charge the one-off terms one time, the call of [`calc_asset_one_off_fees`](@ref).
+ 3. Return the elementwise sum of the two vectors.
+
+# Arguments
+
+  - `w`: Portfolio weights.
+  - `p`: Asset prices, on the method that carries them.
+  - `T`: Horizon, in periods.
+  - `fees`: [`Fees`](@ref) structure, or `nothing`.
+
+# Returns
+
+  - `val::VecNum`: The whole cost of the holding period per asset.
+
+# Examples
+
+```jldoctest
+julia> fees = Fees(; l = 0.01, fl = 5.0, tn = Turnover(; w = [0.0, 0.0], val = 0.002));
+
+julia> calc_total_asset_fees([0.5, 0.5], 252, fees)
+2-element Vector{Float64}:
+ 6.5120000000000005
+ 6.5120000000000005
+```
+
+# Related
+
+  - [`Fees`](@ref)
+  - [`VecNum`](@ref)
+  - [`calc_asset_fees`](@ref)
+  - [`calc_asset_periodic_fees`](@ref)
+  - [`calc_asset_one_off_fees`](@ref)
+  - [`calc_total_fees`](@ref)
+"""
+function calc_total_asset_fees(w::VecNum, ::Number, ::Nothing)
+    return zeros(eltype(w), length(w))
+end
+function calc_total_asset_fees(w::VecNum, T::Number, fees::Fees)
+    return T * calc_asset_periodic_fees(w, fees) + calc_asset_one_off_fees(w, fees)
+end
+function calc_total_asset_fees(w::VecNum, p::VecNum, ::Number, ::Nothing)
+    return zeros(promote_type(eltype(w), eltype(p)), length(w))
+end
+function calc_total_asset_fees(w::VecNum, p::VecNum, T::Number, fees::Fees)
+    return T * calc_asset_periodic_fees(w, p, fees) + calc_asset_one_off_fees(w, fees)
 end
 
 export FeesEstimator, Fees, AmortisedFees, fees_constraints, calc_fees, calc_fixed_fees,
-       calc_asset_fees, calc_asset_fixed_fees
+       calc_asset_fees, calc_asset_fixed_fees, calc_total_fees, calc_total_asset_fees

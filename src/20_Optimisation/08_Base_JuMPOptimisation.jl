@@ -967,7 +967,16 @@ const SHARED_STATE = Set{Symbol}([# Pure functions of the prior `pr`: identical 
                                   # Model-wide singletons established once, before the risk
                                   # spine runs.
                                   :sc, :so, :k, :w, :ret, :risk, :fees, :unit_budget,
-                                  :decomposition_contract, :mip_indicators, :ss,
+                                  # The fee spine, established once by the fee builder and
+                                  # read by the return and the net-series builders. `:fees`
+                                  # holds the per period terms and `:one_time_fees` the two
+                                  # fixed ones, `:fee_fa` names the clock the second falls
+                                  # on, and `:T` is the observation count of the fit, which
+                                  # `add_fees_to_ret!` spreads the one-off cost over. A
+                                  # nested build charges the same fee as its parent, so all
+                                  # four are shared rather than prefixed.
+                                  :one_time_fees, :fee_fa, :T, :decomposition_contract,
+                                  :mip_indicators, :ss,
                                   # Weight shaping: outer level only. A nested build shifts
                                   # the weights through its own prefixed `:w`; it does not
                                   # reshape the long/short parts.
@@ -1824,7 +1833,14 @@ end
 
 Compute and register net portfolio returns (after fees) in the JuMP model.
 
-Calls [`set_portfolio_returns!`](@ref) and subtracts fees if present.
+Calls [`set_portfolio_returns!`](@ref) and subtracts the fees if any are registered. The model's
+`:fees` expression holds the per period terms `l`, `s` and `tn`, which are rates per period, so it
+is subtracted from every observation. The model's `:one_time_fees` expression holds the two fixed
+terms, which are charged one time for the whole holding period, and `:fee_fa` names the clock they
+fall on: a `nothing` clock subtracts them from the first observation alone, and an
+[`AmortisedFees`](@ref) spreads them over the observation count of the fit. That is the rule
+[`charge_fees`](@ref) states at the value level, and [`charge_one_time_fees`](@ref) applies it
+here.
 
 # Arguments
 
@@ -1845,14 +1861,21 @@ function set_net_portfolio_returns!(model::JuMP.Model, X::MatNum;
     if haskey(model, Symbol(prefix, :net_X))
         return model[Symbol(prefix, :net_X)]
     end
-    X = set_portfolio_returns!(model, X; prefix = prefix)
-    # `:fees` is shared and not recreated by a nested build, so it is read bare.
-    if haskey(model, :fees)
-        fees = model[:fees]
-        return state_set!(model, prefix, :net_X, JuMP.@expression(model, X .- fees))
-    else
-        return state_set!(model, prefix, :net_X, JuMP.@expression(model, X))
+    Xe = set_portfolio_returns!(model, X; prefix = prefix)
+    # `:fees` and `:one_time_fees` are shared and not recreated by a nested build, so both
+    # are read bare.
+    if !haskey(model, :fees)
+        return state_set!(model, prefix, :net_X, JuMP.@expression(model, Xe))
     end
+    fees = model[:fees]
+    net = JuMP.@expression(model, Xe .- fees)
+    if haskey(model, :one_time_fees) && !isempty(net)
+        # The clock the fee states decides where the two fixed terms land, exactly as
+        # `charge_fees` decides it at the value level.
+        net = charge_one_time_fees(model, net, model[:one_time_fees], size(X, 1),
+                                   model[:fee_fa])
+    end
+    return state_set!(model, prefix, :net_X, net)
 end
 """
     set_asset_returns_plus_one!(model::JuMP.Model, X::MatNum)

@@ -195,7 +195,7 @@ Where:
   - ``\\boldsymbol{w}_{b}``: `N × 1` benchmark weight vector, the `w` field.
   - ``\\boldsymbol{F}(\\boldsymbol{w}_{b})``: Per-period fee charged on the benchmark, from the `fees` field. It is zero when `fees` is `nothing`. See [`calc_net_returns`](@ref).
 
-The `fees` field reads no fold. [`amortise_fees`](@ref) is the one verb that stamps a fold length onto a fee, and [`predict`](@ref) calls it on the portfolio's own fee, never on this one. A bare [`AmortisedFees`](@ref) here therefore charges `tn`, `fl` and `fs` in full on every observation, exactly as a `nothing` `fa` does. State a `horizon` on the [`AmortisedFees`](@ref) to divide them, because a stated horizon overrides the fold at every site.
+The `fees` field reads no fold, and it needs none. [`charge_fees`](@ref) charges this fee over the benchmark series it builds, so an [`AmortisedFees`](@ref) `fa` spreads the two fixed charges over that series, and a `nothing` `fa` charges them on its first observation. The count is never stored on the fee, so this site needs no fold to settle one.
 
 # Fields
 
@@ -373,13 +373,13 @@ Compute the benchmark portfolio returns for a weights-based tracking algorithm.
 
 `tracking_benchmark` computes the net portfolio returns for the benchmark weights stored in a [`WeightsTracking`](@ref) object, optionally adjusting for transaction fees if specified. The asset return matrix `X` is multiplied by the benchmark weights, and fees are deducted if present.
 
-This method restates no definition of its own. It is [`calc_net_returns(tr.w, X, tr.fees)`](@ref), so the fee is the one scalar that function subtracts from every period. On the three-period matrix `[0.01 0.02 -0.01 0.03; 0.03 0.04 0.02 -0.02; -0.01 0.005 0.01 0.04]` and ``\\boldsymbol{w}_{b} = [0.3,\\, 0.2,\\, 0.4,\\, 0.1]``, the benchmark measured `[0.006, 0.023, 0.006]` with no fee, and `[0.005, 0.022, 0.005]` under `Fees(; l = 0.001)`, whose fee is `0.001`.
+This method restates no definition of its own. It is [`calc_net_returns(tr.w, X, tr.fees)`](@ref), so the fee falls on the clock that function reads from `tr.fees.fa`. On the three-period matrix `[0.01 0.02 -0.01 0.03; 0.03 0.04 0.02 -0.02; -0.01 0.005 0.01 0.04]` and ``\\boldsymbol{w}_{b} = [0.3,\\, 0.2,\\, 0.4,\\, 0.1]``, the benchmark measured `[0.006, 0.023, 0.006]` with no fee, and `[0.005, 0.022, 0.005]` under `Fees(; l = 0.001)`, whose fee is `0.001`.
 
 # Algorithm
 
  1. Forward `tr.w`, `X` and `tr.fees` to [`calc_net_returns`](@ref).
  2. A `nothing` `tr.fees` reaches the `args...` method of [`calc_net_returns`](@ref), which returns `X * tr.w`. It does not reach the `Fees` method and charge a zero fee.
- 3. A [`Fees`](@ref) `tr.fees` reaches the `Fees` method, which subtracts the one scalar `calc_fees(tr.w, tr.fees)` from every entry of `X * tr.w`.
+ 3. A [`Fees`](@ref) `tr.fees` reaches the `Fees` method, which hands `X * tr.w` to [`charge_fees`](@ref).
 
 # Arguments
 

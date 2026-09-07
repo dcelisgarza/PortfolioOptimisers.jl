@@ -31,7 +31,7 @@ Where:
 
  1. Contract `X` with `w`, giving `X * w`, the `T × 1` gross portfolio return series.
  2. On the `args...` method, return that series unchanged. The method reads none of its trailing arguments, so a `nothing` `fees` reaches it and charges nothing rather than charging a zero fee.
- 3. On the `fees::Fees` method, compute the one scalar `calc_fees(w, fees)` and subtract it from every entry of the series.
+ 3. On the `fees::Fees` method, hand the series to [`charge_fees`](@ref), which subtracts the per period charge from every entry, and the one-off charge on the clock `fees.fa` names.
  4. On the `w::VecVecNum` method, apply steps 1 to 3 to each weight vector `wi` of `w`, and collect one return series per weight vector.
 
 # Arguments
@@ -68,10 +68,102 @@ function calc_net_returns(w::VecNum, X::MatNum, args...)
     return X * w
 end
 function calc_net_returns(w::VecNum, X::MatNum, fees::Fees)
-    return X * w .- calc_fees(w, fees)
+    return charge_fees(X * w, w, fees)
 end
 function calc_net_returns(w::VecVecNum, X::MatNum, args...)
     return [calc_net_returns(wi, X, args...) for wi in w]
+end
+"""
+    charge_fees(r::VecNum, w::VecNum, fees::Option{<:Fees})
+
+Subtract a fee from a portfolio return series, on the clock the fee states.
+
+`l`, `s` and `tn` are rates per period, so they charge on every observation. `fl` and `fs` are currency amounts charged one time for the whole holding period, so the clock decides where in the series they land, and `fees.fa` names that clock. The length of the holding period is the length of the series, which this verb hands to [`calc_fees`](@ref).
+
+# Algorithm
+
+ 1. A `nothing` `fees` returns `r` unchanged. It charges no fee rather than a zero fee.
+ 2. Read the pair `(amortised, one_time)` of [`calc_fees`](@ref), over the length of `r`. This site knows the series it charges, so it hands that length in.
+ 3. Subtract `amortised` from every observation.
+ 4. Subtract `one_time` from the first observation alone. Under an [`AmortisedFees`](@ref) that carries a horizon it is zero, because step 2 spread that cost into `amortised`, and `iszero` gates the pass away.
+
+Both clocks charge the same total when the horizon is the length of `r`. They give a different drawdown, because the first charges the whole cost on one observation and the second charges a fraction of it on each.
+
+# Arguments
+
+  - `r`: Gross portfolio return series.
+  - `w`: Portfolio weights.
+  - `fees`: [`Fees`](@ref) structure, or `nothing`.
+
+# Returns
+
+  - `val::VecNum`: The net return series.
+
+# Related
+
+  - [`Fees`](@ref)
+  - [`AmortisedFees`](@ref)
+  - [`VecNum`](@ref)
+  - [`calc_net_returns`](@ref)
+  - [`calc_periodic_fees`](@ref)
+  - [`calc_one_off_fees`](@ref)
+  - [`charge_asset_fees`](@ref)
+"""
+function charge_fees(r::VecNum, ::VecNum, ::Nothing)
+    return r
+end
+function charge_fees(r::VecNum, w::VecNum, fees::Fees)
+    amortised, one_time = calc_fees(w, length(r), fees)
+    val = r .- amortised
+    if !iszero(one_time) && !isempty(val)
+        val[1] -= one_time
+    end
+    return val
+end
+"""
+    charge_asset_fees(R::MatNum, w::VecNum, fees::Option{<:Fees})
+
+Subtract a per asset fee from a per asset return matrix, on the clock the fee states.
+
+The per asset twin of [`charge_fees`](@ref). Its row sums are the series that verb returns, up to the order of summation.
+
+# Algorithm
+
+ 1. A `nothing` `fees` returns `R` unchanged.
+ 2. Read the pair `(amortised, one_time)` of [`calc_asset_fees`](@ref), over the row count of `R`.
+ 3. Subtract the `amortised` vector from every row.
+ 4. Subtract the `one_time` vector from the first row alone. Under an [`AmortisedFees`](@ref) that carries a horizon it is a zero vector, and `iszero` gates the pass away.
+
+# Arguments
+
+  - `R`: Gross per asset return matrix (observations × assets).
+  - `w`: Portfolio weights.
+  - `fees`: [`Fees`](@ref) structure, or `nothing`.
+
+# Returns
+
+  - `val::MatNum`: The net per asset return matrix.
+
+# Related
+
+  - [`Fees`](@ref)
+  - [`AmortisedFees`](@ref)
+  - [`MatNum`](@ref)
+  - [`calc_net_asset_returns`](@ref)
+  - [`calc_asset_periodic_fees`](@ref)
+  - [`calc_asset_one_off_fees`](@ref)
+  - [`charge_fees`](@ref)
+"""
+function charge_asset_fees(R::MatNum, ::VecNum, ::Nothing)
+    return R
+end
+function charge_asset_fees(R::MatNum, w::VecNum, fees::Fees)
+    amortised, one_time = calc_asset_fees(w, size(R, 1), fees)
+    val = R .- transpose(amortised)
+    if !iszero(one_time) && size(val, 1) > 0
+        view(val, 1, :) .-= one_time
+    end
+    return val
 end
 """
     investable_reduction(X::MatNum, w, fees::Option{<:Fees}, strict::Bool)
@@ -401,7 +493,7 @@ Where:
 
  1. Scale each column of `X` by its weight, giving `X ⊙ transpose(w)`, the `T × N` matrix of gross per asset contributions.
  2. On the `args...` method, return that matrix unchanged. The method reads none of its trailing arguments, so a `nothing` `fees` reaches it and charges nothing rather than charging a zero fee.
- 3. On the `fees::Fees` method, compute the `N × 1` vector `calc_asset_fees(w, fees)` and subtract its transpose from every row of the matrix.
+ 3. On the `fees::Fees` method, hand the matrix to [`charge_asset_fees`](@ref), which subtracts the per asset per period charge from every row, and the one-off charge on the clock `fees.fa` names.
 
 # Arguments
 
@@ -436,7 +528,7 @@ function calc_net_asset_returns(w::VecNum, X::MatNum, args...)
     return X ⊙ transpose(w)
 end
 function calc_net_asset_returns(w::VecNum, X::MatNum, fees::Fees)
-    return X ⊙ transpose(w) .- transpose(calc_asset_fees(w, fees))
+    return charge_asset_fees(X ⊙ transpose(w), w, fees)
 end
 """
     calc_net_asset_returns(w::MatNum, X::MatNum, args...)
@@ -472,7 +564,7 @@ Where:
 
  1. Scale each observation of `X` by the weights held through it, giving `X ⊙ w`, the `T × N` matrix of gross per asset contributions.
  2. On the `args...` method, return that matrix unchanged. The method reads none of its trailing arguments, so a `nothing` `fees` reaches it and charges nothing rather than charging a zero fee.
- 3. On the `fees::Fees` method, compute the `N × 1` vector `calc_asset_fees(view(w, 1, :), fees)` from the path's first row, and subtract its transpose from every row of the matrix.
+ 3. On the `fees::Fees` method, hand the matrix and the path's first row to [`charge_asset_fees`](@ref), which subtracts the per asset per period charge from every row, and the one-off charge on the clock `fees.fa` names.
 
 # Validation
 
@@ -511,7 +603,7 @@ function calc_net_asset_returns(w::MatNum, X::MatNum, args...)
     return X ⊙ w
 end
 function calc_net_asset_returns(w::MatNum, X::MatNum, fees::Fees)
-    return X ⊙ w .- transpose(calc_asset_fees(view(w, 1, :), fees))
+    return charge_asset_fees(X ⊙ w, view(w, 1, :), fees)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1101,7 +1193,7 @@ function calc_net_returns(w::VecVecNum, X::MatNum, fees, wd::AbstractWeightDrift
         P = drift_position_values(wd, wi, X)
         V = drift_wealth(P, wi)
         if isnothing(non_positive_wealth_index(V))
-            ret[i] = drift_returns(V) .- calc_fees(wi, fees)
+            ret[i] = charge_fees(drift_returns(V), wi, fees)
         else
             push!(ruined, i)
             ret[i] = fill(convert(Tr, NaN), size(X, 1))
@@ -1120,7 +1212,7 @@ function calc_net_returns(w::VecNum, X::MatNum, fees, wd::AbstractWeightDrift,
     P = drift_position_values(wd, w, X)
     V = drift_wealth(P, w)
     assert_positive_wealth(V, obs)
-    return drift_returns(V) .- calc_fees(w, fees)
+    return charge_fees(drift_returns(V), w, fees)
 end
 function calc_net_returns(w::VecNum, X::MatNum, fees, ::Nothing, args...)
     return calc_net_returns(w, X, fees)

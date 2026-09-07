@@ -1612,7 +1612,7 @@ function assemble_jump_model!(model::JuMP.Model, optimiser::JuMPOptimisationEsti
     set_lp_regularisation!(model, factory(opt.lp, pr, opt.slv))
     set_linf_regularisation!(model,
                              resolve_calibration_slot(opt.linf, :linf, pr, pr.w, opt.slv))
-    set_non_fixed_fees!(model, fees)
+    set_non_fixed_fees!(model, fees, size(pr.X, 1))
     set_risk_and_scalarise!(model, r, optimiser, opt, pr, plr, fees, b1; rd = rd)
     set_return_constraints!(model, ret, obj, pr; rd = rd)
     set_iplg_constraints!(model, plr)

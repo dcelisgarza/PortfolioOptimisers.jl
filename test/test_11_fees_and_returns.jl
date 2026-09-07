@@ -39,13 +39,13 @@
                                FiniteAllocationInput(; w = res.w,
                                                      prices = vec(values(X[end])),
                                                      cash = 1000, horizon = T, fees = fe))
-            f1 = calc_fees(res.w, fe)
+            f1 = sum(calc_fees(res.w, T, fe))
             @test isapprox(f1s[i], f1)
-            f2 = calc_asset_fees(res.w, fe)
+            f2 = sum(calc_asset_fees(res.w, T, fe))
             @test isapprox(df[!, "$(2*(i-1)+1)"], f2)
-            f3 = calc_asset_fees(res.w, vec(values(X[end])), fe)
+            f3 = sum(calc_asset_fees(res.w, vec(values(X[end])), T, fe))
             @test isapprox(df[!, "$(2*(i-1)+2)"], f3)
-            fopt1 = calc_fees(res.w, vec(values(X[end])), fe) * T
+            fopt1 = calc_total_fees(res.w, vec(values(X[end])), T, fe)
             fopt2 = 1000 - (sum(res_mip.cost) + res_mip.cash)
             result = isapprox(fopt1, fopt2)
             if !result
@@ -67,20 +67,30 @@
             else
                 @test result
             end
-            @test all(isapprox(calc_net_returns(res.w, pr.X) .- calc_fees(res.w, fe),
+            # Issue #898: `fa` is `nothing` here, so the per period charge falls on every
+            # row and the one-off charge falls on the first row alone.
+            sched = fill(PortfolioOptimisers.calc_periodic_fees(res.w, fe), size(pr.X, 1))
+            sched[1] += PortfolioOptimisers.calc_one_off_fees(res.w, fe)
+            @test all(isapprox(calc_net_returns(res.w, pr.X) .- sched,
                                calc_net_returns(res.w, pr.X, fe)))
-            @test all(isapprox(calc_net_asset_returns(res.w, pr.X) .-
-                               transpose(calc_asset_fees(res.w, fes[1])),
+            asched = repeat(transpose(PortfolioOptimisers.calc_asset_periodic_fees(res.w,
+                                                                                   fes[1])),
+                            size(pr.X, 1), 1)
+            asched[1, :] .+= PortfolioOptimisers.calc_asset_one_off_fees(res.w, fes[1])
+            @test all(isapprox(calc_net_asset_returns(res.w, pr.X) .- asched,
                                calc_net_asset_returns(res.w, pr.X, fes[1])))
         end
-        @test iszero(calc_fees(res.w, Fees()))
-        @test all(iszero, calc_asset_fees(res.w, Fees()))
-        @test iszero(calc_fees(res.w, vec(values(X[end])), Fees()))
-        @test all(iszero, calc_asset_fees(res.w, vec(values(X[end])), Fees()))
+        @test all(iszero, calc_fees(res.w, T, Fees()))
+        @test all(iszero, sum(calc_asset_fees(res.w, T, Fees())))
+        @test all(iszero, calc_fees(res.w, vec(values(X[end])), T, Fees()))
+        @test all(iszero, sum(calc_asset_fees(res.w, vec(values(X[end])), T, Fees())))
     end
     @testset "Expected Returns" begin
         r = factory(Variance(), pr, slv)
-        f = calc_fees(res.w, fes[1])
+        # Issue #898: an expected return is a per period number, so the one-off terms
+        # enter it spread over the observation count of the fit.
+        f = PortfolioOptimisers.calc_periodic_fees(res.w, fes[1]) +
+            PortfolioOptimisers.calc_one_off_fees(res.w, fes[1]) / T
         rt = expected_return(res.ret, res.w, pr)
         rtf = expected_return(res.ret, res.w, pr, fes[1])
         rk = expected_risk(r, res.w, pr, fes[1])
@@ -101,8 +111,7 @@
         @test all(isapprox.((rk, rtf, srfic),
                             expected_risk_ret_sric(r, res.ret, res.w, pr, fes[1]; rf = rf)))
 
-        @test isapprox(expected_risk(ExpectedReturn(), res.w, pr, fes[1]),
-                       rt - calc_fees(res.w, fes[1]))
+        @test isapprox(expected_risk(ExpectedReturn(), res.w, pr, fes[1]), rt - f)
         @test isapprox(expected_risk(factory(ExpectedReturnRiskRatio(; rf = rf), pr), res.w,
                                      pr, fes[1]), srf)
     end
@@ -194,31 +203,35 @@
         fesc = Fees(; tn = tns, l = 0.001, s = 0.005, fl = 1.0, fs = 5.0)
 
         # The per-asset fee sums to the portfolio fee, up to the order of summation.
-        @test isapprox(sum(calc_asset_fees(wf, pf, fev)), calc_fees(wf, pf, fev))
-        @test isapprox(sum(calc_asset_fees(wf, fev)), calc_fees(wf, fev))
-        @test isapprox(sum(calc_asset_fees(wf, pf, fesc)), calc_fees(wf, pf, fesc))
-        @test isapprox(sum(calc_asset_fees(wf, fesc)), calc_fees(wf, fesc))
+        @test all(isapprox.(sum.(calc_asset_fees(wf, pf, 21, fev)),
+                            calc_fees(wf, pf, 21, fev)))
+        @test all(isapprox.(sum.(calc_asset_fees(wf, 21, fev)), calc_fees(wf, 21, fev)))
+        @test all(isapprox.(sum.(calc_asset_fees(wf, pf, 21, fesc)),
+                            calc_fees(wf, pf, 21, fesc)))
+        @test all(isapprox.(sum.(calc_asset_fees(wf, 21, fesc)), calc_fees(wf, 21, fesc)))
 
         # The short proportional term is a positive charge, not a credit.
-        @test calc_fees([0.6, -0.4], Fees(; s = 0.01)) == 0.004
-        @test calc_asset_fees([0.6, -0.4], Fees(; s = 0.01)) == [0.0, 0.004]
-        @test calc_fees([0.6, -0.4], [100.0, 50.0], Fees(; s = 0.01)) == 0.2
+        @test sum(calc_fees([0.6, -0.4], 21, Fees(; s = 0.01))) == 0.004
+        @test sum(calc_asset_fees([0.6, -0.4], 21, Fees(; s = 0.01))) == [0.0, 0.004]
+        @test sum(calc_fees([0.6, -0.4], [100.0, 50.0], 21, Fees(; s = 0.01))) == 0.2
 
         # The fixed term carries no price: change `p` and read the same number.
         ffx = Fees(; fl = 3.0, fs = 7.0)
-        @test calc_fees([0.6, -0.4], [100.0, 50.0], ffx) ==
-              calc_fees([0.6, -0.4], [1.0, 1.0], ffx) ==
-              calc_fees([0.6, -0.4], ffx) ==
+        @test sum(calc_fees([0.6, -0.4], [100.0, 50.0], 21, ffx)) ==
+              sum(calc_fees([0.6, -0.4], [1.0, 1.0], 21, ffx)) ==
+              sum(calc_fees([0.6, -0.4], 21, ffx)) ==
               10.0
         @test calc_fixed_fees([0.6, -0.4], 3.0, (; atol = 1e-8), .>=) == 3.0
         @test calc_fixed_fees([0.6, -0.4], 7.0, (; atol = 1e-8), .<) == 7.0
 
         # `kwargs` decides how near zero counts as zero, and `atol` moves the boundary.
         @test Fees(; fl = 2.0).kwargs == (; atol = 1e-8)
-        @test calc_fees([1e-9, 0.5], Fees(; fl = 2.0)) == 2.0
-        @test calc_fees([1e-7, 0.5], Fees(; fl = 2.0)) == 4.0
-        @test calc_fees([1e-7, 0.5], Fees(; fl = 2.0, kwargs = (; atol = 1e-6))) == 2.0
-        @test calc_fees([1e-9, 0.5], Fees(; fl = 2.0, kwargs = (; atol = 1e-10))) == 4.0
+        @test sum(calc_fees([1e-9, 0.5], 21, Fees(; fl = 2.0))) == 2.0
+        @test sum(calc_fees([1e-7, 0.5], 21, Fees(; fl = 2.0))) == 4.0
+        @test sum(calc_fees([1e-7, 0.5], 21, Fees(; fl = 2.0, kwargs = (; atol = 1e-6)))) ==
+              2.0
+        @test sum(calc_fees([1e-9, 0.5], 21, Fees(; fl = 2.0, kwargs = (; atol = 1e-10)))) ==
+              4.0
 
         # Issue #546: `calc_asset_fixed_fees` on a vector rate used to raise a
         # `DimensionMismatch` whenever the selected side held a near-zero weight, because
@@ -287,10 +300,10 @@
         # `atol` a caller set never reached the fixed-fee boundary.
         festk = FeesEstimator(; fl = Dict("A" => 2.0), dfl = 2.0, kwargs = (; atol = 1e-4))
         @test fees_constraints(festk, fsets).kwargs === festk.kwargs
-        @test calc_fees([1e-5, 0.5, 0.5], fees_constraints(festk, fsets)) == 4.0
-        @test calc_fees([1e-5, 0.5, 0.5],
-                        fees_constraints(FeesEstimator(; fl = Dict("A" => 2.0), dfl = 2.0),
-                                         fsets)) == 6.0
+        @test sum(calc_fees([1e-5, 0.5, 0.5], 21, fees_constraints(festk, fsets))) == 4.0
+        @test sum(calc_fees([1e-5, 0.5, 0.5], 21,
+                            fees_constraints(FeesEstimator(; fl = Dict("A" => 2.0),
+                                                           dfl = 2.0), fsets))) == 6.0
 
         # An unmatched name raises when `strict` is set, and warns otherwise.
         festx = FeesEstimator(; l = Dict("Z" => 0.001), dl = 0.01)
@@ -315,132 +328,124 @@
         @test !PortfolioOptimisers.needs_previous_weights(Fees(; tn = tn_fx))
         @test !PortfolioOptimisers.needs_previous_weights(Fees(; l = 0.01, fl = 1.0))
     end
-    # Issue #754/#760: fee amortisation spreads the one-off terms, `tn`, `fl` and `fs`,
-    # over a holding period, and `l`/`s` are never touched.
+    # Issue #898: `l`, `s` and `tn` are rates per period, and `fl` and `fs` are charged
+    # one time for the whole holding period. `fa` names the clock the two fixed terms fall
+    # on, and it carries no number: every site that charges a fee hands in the count it
+    # charges over.
     @testset "Fee amortisation" begin
         wf = [0.6, -0.4, 0.0, 0.25]
         pf = [100.0, 50.0, 20.0, 10.0]
         tnf = Turnover(; w = [0.1, 0.2, 0.3, 0.4], val = 0.02)
         fee0 = Fees(; tn = tnf, l = 0.001, s = 0.002, fl = 0.5, fs = 1.0)
-
-        # `fa` defaults to `nothing` on both fee types.
-        @test isnothing(Fees().fa)
-        @test isnothing(FeesEstimator().fa)
-
-        # `AmortisedFees` validates a stated `horizon`, positive and finite.
-        @test isnothing(AmortisedFees().horizon)
-        @test AmortisedFees(; horizon = 21).horizon == 21
-        @test_throws DomainError AmortisedFees(; horizon = 0)
-        @test_throws DomainError AmortisedFees(; horizon = -1)
-        @test_throws DomainError AmortisedFees(; horizon = Inf)
-        @test_throws DomainError AmortisedFees(; horizon = NaN)
-
-        # `amortise_fees` returns its argument unchanged in three cases: a `nothing` fee, a
-        # `nothing` `fa`, and an `fa.horizon` that is already stated.
-        @test isnothing(PortfolioOptimisers.amortise_fees(nothing, 3))
-        @test PortfolioOptimisers.amortise_fees(fee0, 3) === fee0
-        feeH = Fees(; tn = tnf, l = 0.001, s = 0.002, fl = 0.5, fs = 1.0,
-                    fa = AmortisedFees(; horizon = 5))
-        @test PortfolioOptimisers.amortise_fees(feeH, 3) === feeH
-
-        # A bare `AmortisedFees()` settles its horizon to the fold's length.
         feeA = Fees(; tn = tnf, l = 0.001, s = 0.002, fl = 0.5, fs = 1.0,
                     fa = AmortisedFees())
-        famort = PortfolioOptimisers.amortise_fees(feeA, 3)
-        @test famort.fa.horizon == 3
 
-        # `fa === nothing` reproduces every current number: the census fixture, one trade
-        # charged in full on every one of the fold's three rows.
-        @test isapprox(calc_fees(wf, fee0) * 3, 6.09795)
+        # `fa` defaults to `nothing` on both fee types, and `AmortisedFees` is field-less.
+        @test isnothing(Fees().fa)
+        @test isnothing(FeesEstimator().fa)
+        @test isempty(fieldnames(AmortisedFees))
+        @test AmortisedFees() isa PortfolioOptimisers.AbstractFeeAmortisation
 
-        # A site that holds no fold and no `horizon` charges the whole cost, as today: a
-        # bare, unresolved `AmortisedFees()` divides by `1`, exactly like `fa === nothing`.
-        @test PortfolioOptimisers.amortisation_divisor(nothing) == 1
-        @test PortfolioOptimisers.amortisation_divisor(AmortisedFees()) == 1
-        @test PortfolioOptimisers.amortisation_divisor(AmortisedFees(; horizon = 7)) == 7
-        @test isapprox(calc_fees(wf, feeA), calc_fees(wf, fee0))
-        @test isapprox(calc_asset_fees(wf, feeA), calc_asset_fees(wf, fee0))
-        @test isapprox(calc_fees(wf, pf, feeA), calc_fees(wf, pf, fee0))
-        @test isapprox(calc_asset_fees(wf, pf, feeA), calc_asset_fees(wf, pf, fee0))
+        # The two halves. `l`, `s` and `tn` charge every period; `fl` and `fs` charge once.
+        periodic = PortfolioOptimisers.calc_periodic_fees(wf, fee0)
+        oneoff = PortfolioOptimisers.calc_one_off_fees(wf, fee0)
+        @test isapprox(periodic,
+                       calc_fees(wf, fee0.l, .>=) - calc_fees(wf, fee0.s, .<) +
+                       calc_fees(wf, tnf))
+        @test isapprox(oneoff,
+                       calc_fixed_fees(wf, fee0.fl, fee0.kwargs, .>=) +
+                       calc_fixed_fees(wf, fee0.fs, fee0.kwargs, .<))
 
-        # `AmortisedFees()` over a 3-row fold charges the one-off part exactly one time:
-        # `l` and `s` still charge on every row, `tn`, `fl` and `fs` charge once in total.
-        l_term = calc_fees(wf, fee0.l, .>=)
-        s_term = -calc_fees(wf, fee0.s, .<)
-        fixedlong = PortfolioOptimisers.calc_fixed_fees(wf, fee0.fl, fee0.kwargs, .>=)
-        fixedshort = PortfolioOptimisers.calc_fixed_fees(wf, fee0.fs, fee0.kwargs, .<)
-        turn = calc_fees(wf, tnf)
-        oneoff = fixedlong + fixedshort + turn
-        @test isapprox(calc_fees(wf, famort) * 3, 2.0359499999999997)
-        @test isapprox(calc_fees(wf, famort), l_term + s_term + oneoff / 3)
+        # A `nothing` clock reports the two halves apart, whatever count it is handed.
+        @test all(isapprox.(calc_fees(wf, 3, fee0), (periodic, oneoff)))
+        @test all(isapprox.(calc_fees(wf, 5, fee0), (periodic, oneoff)))
+        # An `AmortisedFees` clock spreads the one-off half over the count it is handed.
+        @test all(isapprox.(calc_fees(wf, 3, feeA), (periodic + oneoff / 3, 0.0)))
+        @test all(isapprox.(calc_fees(wf, 5, feeA), (periodic + oneoff / 5, 0.0)))
 
-        # A stated `horizon` overrides the fold everywhere the fee is read.
-        @test isapprox(calc_fees(wf, feeH), l_term + s_term + oneoff / 5)
+        # The per asset split sums to the portfolio pair, under both clocks and both
+        # families, to the order of summation.
+        @test all(isapprox.(sum.(calc_asset_fees(wf, 3, fee0)), calc_fees(wf, 3, fee0)))
+        @test all(isapprox.(sum.(calc_asset_fees(wf, 3, feeA)), calc_fees(wf, 3, feeA)))
+        @test all(isapprox.(sum.(calc_asset_fees(wf, pf, 3, fee0)),
+                            calc_fees(wf, pf, 3, fee0)))
+        @test all(isapprox.(sum.(calc_asset_fees(wf, pf, 3, feeA)),
+                            calc_fees(wf, pf, 3, feeA)))
 
-        # `l` and `s` are unmoved under every state of `fa`.
-        @test famort.l == fee0.l && famort.s == fee0.s
-        @test feeH.l == fee0.l && feeH.s == fee0.s
+        # The whole holding period: `T` periods of the rates, and the fixed terms one time.
+        # The clock does not move that total, only where the cost lands on a series.
+        @test isapprox(calc_total_fees(wf, 3, fee0), 3 * periodic + oneoff)
+        @test isapprox(calc_total_fees(wf, 3, fee0), calc_total_fees(wf, 3, feeA))
+        @test isapprox(sum(calc_total_asset_fees(wf, 3, fee0)),
+                       calc_total_fees(wf, 3, fee0))
+        @test isapprox(sum(calc_total_asset_fees(wf, pf, 3, feeA)),
+                       calc_total_fees(wf, pf, 3, feeA))
+        @test iszero(calc_total_fees(wf, 3, nothing))
+        @test all(iszero, calc_total_asset_fees(wf, 3, nothing))
+        @test iszero(calc_total_fees(wf, pf, 3, nothing))
+        @test all(iszero, calc_total_asset_fees(wf, pf, 3, nothing))
 
-        # The per-asset identity holds under every state of `fa`, to rounding.
-        @test isapprox(sum(calc_asset_fees(wf, famort)), calc_fees(wf, famort))
-        @test isapprox(sum(calc_asset_fees(wf, feeH)), calc_fees(wf, feeH))
-        @test isapprox(sum(calc_asset_fees(wf, pf, famort)), calc_fees(wf, pf, famort))
-        @test isapprox(sum(calc_asset_fees(wf, pf, feeH)), calc_fees(wf, pf, feeH))
+        # The two clocks charge the same total over a series, and land it differently.
+        Xf = [0.01 0.02 -0.01 0.03; 0.03 0.04 0.02 -0.02; -0.01 0.005 0.01 0.04]
+        gross = Xf * wf
+        net0 = calc_net_returns(wf, Xf, fee0)
+        netA = calc_net_returns(wf, Xf, feeA)
+        @test isapprox(sum(gross) - sum(net0), calc_total_fees(wf, 3, fee0))
+        @test isapprox(sum(gross) - sum(netA), calc_total_fees(wf, 3, feeA))
+        # The `nothing` clock puts the whole one-off cost on the first observation.
+        @test isapprox(gross[1] - net0[1], periodic + oneoff)
+        @test isapprox(gross[2] - net0[2], periodic)
+        @test isapprox(gross[3] - net0[3], periodic)
+        # The `AmortisedFees` clock puts an equal share on each.
+        @test all(isapprox.(gross .- netA, periodic + oneoff / 3))
+        # The per asset rows sum to the portfolio series, under both clocks.
+        @test isapprox(vec(sum(calc_net_asset_returns(wf, Xf, fee0); dims = 2)), net0)
+        @test isapprox(vec(sum(calc_net_asset_returns(wf, Xf, feeA); dims = 2)), netA)
 
-        # The price-carrying family divides the same three terms.
-        l_termp = calc_fees(wf, pf, fee0.l, .>=)
-        s_termp = -calc_fees(wf, pf, fee0.s, .<)
-        fixedlongp = PortfolioOptimisers.calc_fixed_fees(wf, fee0.fl, fee0.kwargs, .>=)
-        fixedshortp = PortfolioOptimisers.calc_fixed_fees(wf, fee0.fs, fee0.kwargs, .<)
-        turnp = calc_fees(wf, pf, tnf)
-        oneoffp = fixedlongp + fixedshortp + turnp
-        @test isapprox(calc_fees(wf, pf, famort), l_termp + s_termp + oneoffp / 3)
-        @test isapprox(calc_fees(wf, pf, feeH), l_termp + s_termp + oneoffp / 5)
+        # `l` and `s` are unmoved by the clock.
+        @test feeA.l == fee0.l && feeA.s == fee0.s
 
         # `fees_constraints` carries the estimator's `fa` to the result, unchanged.
         fsets2 = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"]))
-        festA = FeesEstimator(; l = Dict("A" => 0.001), fa = AmortisedFees(; horizon = 10))
+        festA = FeesEstimator(; l = Dict("A" => 0.001), fa = AmortisedFees())
         @test fees_constraints(festA, fsets2).fa === festA.fa
     end
-    # Ticket #765: a `WeightsTracking` benchmark fee reads no fold. `amortise_fees` is the
-    # one verb that stamps a fold length onto a fee, and `predict` calls it on the
-    # portfolio's own fee, never on `tr.fees`.
-    @testset "a WeightsTracking fee reads no fold" begin
+    # Ticket #765, settled by #898: a `WeightsTracking` benchmark fee needs no fold. The
+    # verb that charges it hands in the length of the series it charges, so an
+    # `AmortisedFees` clock spreads the two fixed terms over that series and needs nothing
+    # stamped onto it.
+    @testset "a WeightsTracking fee needs no fold" begin
         Xt = [0.01 0.02 -0.01 0.03; 0.03 0.04 0.02 -0.02; -0.01 0.005 0.01 0.04]
         wbt = [0.3, 0.2, 0.4, 0.1]
         tnb = Turnover(; w = [0.25, 0.25, 0.25, 0.25], val = 0.02)
         fee_n = Fees(; tn = tnb, l = 0.001, fl = 0.5)
         fee_b = Fees(; tn = tnb, l = 0.001, fl = 0.5, fa = AmortisedFees())
-        fee_h = Fees(; tn = tnb, l = 0.001, fl = 0.5, fa = AmortisedFees(; horizon = 21))
         tr_n = WeightsTracking(; fees = fee_n, w = wbt)
         tr_b = WeightsTracking(; fees = fee_b, w = wbt)
-        tr_h = WeightsTracking(; fees = fee_h, w = wbt)
+        Tt = size(Xt, 1)
 
-        # A bare `AmortisedFees()` charges the one-off terms in full, exactly as a
-        # `nothing` `fa` does, because no fold length reaches this fee.
-        @test PortfolioOptimisers.tracking_benchmark(tr_b, Xt) ==
-              PortfolioOptimisers.tracking_benchmark(tr_n, Xt)
-
-        # A stated `horizon` is the only way to divide them, and it divides `fl` and `tn`
-        # while it leaves `l` alone.
         bn = PortfolioOptimisers.tracking_benchmark(tr_n, Xt)
-        bh = PortfolioOptimisers.tracking_benchmark(tr_h, Xt)
-        oneoff = PortfolioOptimisers.calc_fixed_fees(wbt, fee_n.fl, fee_n.kwargs, .>=) +
-                 calc_fees(wbt, tnb)
-        @test isapprox(bh .- bn, fill(oneoff * (1 - inv(21)), size(Xt, 1)))
+        bb = PortfolioOptimisers.tracking_benchmark(tr_b, Xt)
+        oneoff = PortfolioOptimisers.calc_one_off_fees(wbt, fee_n)
+        @test oneoff > zero(oneoff)
 
-        # Both halves of the tracking norm read one clock: the benchmark's fee and the
-        # portfolio's fee are charged at the same site, over the same `X`, and a bare
-        # `AmortisedFees()` divides neither.
+        # The two clocks charge the same total over the benchmark series.
+        @test isapprox(sum(bn), sum(bb))
+        # They differ on where the one-off cost lands. The `nothing` clock puts it all on
+        # the first observation; the `AmortisedFees` clock puts a third of it on each.
+        @test isapprox(bb[1] - bn[1], oneoff * (1 - inv(Tt)))
+        @test isapprox(bb[2] - bn[2], -oneoff / Tt)
+        @test isapprox(bb[3] - bn[3], -oneoff / Tt)
+        # The turnover term is a rate per period, so the clock never reaches it.
+        @test all(isapprox.(bb .- bb[1], 0.0; atol = 1e-15)) == false ||
+              isapprox(bb[1], bb[2])
+
+        # `factory` advances the benchmark's reference weights and leaves the clock alone.
         wpt = [0.25, 0.25, 0.3, 0.2]
-        @test TrackingRiskMeasure(; tr = tr_b)(wpt, Xt, fee_b) ==
-              TrackingRiskMeasure(; tr = tr_n)(wpt, Xt, fee_n)
-
-        # `factory` advances the benchmark's reference weights and stamps no horizon.
         trf = factory(tr_b, wpt)
         @test trf.w == wpt
         @test trf.fees.tn.w == wbt
-        @test isa(trf.fees.fa, AmortisedFees) && isnothing(trf.fees.fa.horizon)
+        @test isa(trf.fees.fa, AmortisedFees)
     end
 end
 
@@ -466,18 +471,22 @@ end
         @test calc_net_returns(wn, Xn) ≈ vec(sum(calc_net_asset_returns(wn, Xn); dims = 2))
     end
 
-    @testset "the fee is charged in every period" begin
-        # `calc_fees` returns one number for the whole weight vector, and it is
-        # subtracted from every row of `X * w`, so a `T`-row matrix charges it `T` times.
-        f = PO.calc_fees(wn, fn)
-        @test f == 0.0429
+    @testset "the fee is charged on the clock the fee names" begin
+        # Issue #898: `calc_fees` returns the pair `(amortised, one_time)`. The first is
+        # charged on every row, and the second on the first row alone, because `fn.fa` is
+        # `nothing`. The two together are the number the old scalar returned.
+        amortised, one_time = PO.calc_fees(wn, size(Xn, 1), fn)
+        @test amortised + one_time == 0.0429
+        f = fill(amortised, size(Xn, 1))
+        f[1] += one_time
         @test calc_net_returns(wn, Xn, fn) ≈ Xn * wn .- f
         @test all(calc_net_returns(wn, Xn) - calc_net_returns(wn, Xn, fn) .≈ f)
 
-        # the per asset form charges its own vector in every period too
-        fa = PO.calc_asset_fees(wn, fn)
-        @test calc_net_asset_returns(wn, Xn, fn) ≈
-              calc_net_asset_returns(wn, Xn) .- transpose(fa)
+        # the per asset form charges its own vectors on the same clock
+        av, ov = PO.calc_asset_fees(wn, size(Xn, 1), fn)
+        F = repeat(transpose(av), size(Xn, 1), 1)
+        F[1, :] .+= ov
+        @test calc_net_asset_returns(wn, Xn, fn) ≈ calc_net_asset_returns(wn, Xn) .- F
     end
 
     @testset "a nothing fee reaches the args... method" begin
@@ -513,9 +522,10 @@ end
 
         # The fee is charged from the path's first row, which is the target weights, so
         # the same `N × 1` vector is subtracted from every row here as there.
-        fa = PO.calc_asset_fees(wn, fn)
-        @test calc_net_asset_returns(U, Xn, fn) ≈
-              calc_net_asset_returns(U, Xn) .- transpose(fa)
+        av, ov = PO.calc_asset_fees(wn, size(Xn, 1), fn)
+        F = repeat(transpose(av), size(Xn, 1), 1)
+        F[1, :] .+= ov
+        @test calc_net_asset_returns(U, Xn, fn) ≈ calc_net_asset_returns(U, Xn) .- F
 
         # The constant path is the reader-facing shape of a window that ran no drift, so
         # the `MatNum` methods reproduce the `VecNum` ones on it, exactly.
@@ -643,7 +653,7 @@ end
         # every observation, so `fa` stays `nothing` here.
         w = [0.5, 0.3, 0.2]
         fees = Fees(; l = 0.001, tn = Turnover(; w = [0.4, 0.4, 0.2], val = 0.002))
-        @test PO.calc_fees(w, fees) == 0.0014
+        @test sum(PO.calc_fees(w, size(R1, 1), fees)) == 0.0014
         @test isapprox(calc_net_returns(w, R1, fees, wd),
                        [0.04060000000000004, 0.006834165067178446, 0.016108233547183447];
                        rtol = rtol, atol = atol)

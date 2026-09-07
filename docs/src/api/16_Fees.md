@@ -13,9 +13,13 @@ calc_fees
 calc_fixed_fees
 calc_asset_fees
 calc_asset_fixed_fees
+calc_periodic_fees
+calc_one_off_fees
+calc_asset_periodic_fees
+calc_asset_one_off_fees
+calc_total_fees
+calc_total_asset_fees
 needs_previous_weights(fe::FeesE_Fees)
-amortisation_divisor
-amortise_fees
 ```
 
 ## References

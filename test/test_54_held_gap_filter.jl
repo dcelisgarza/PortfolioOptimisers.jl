@@ -394,20 +394,24 @@ end
         wk = res.w[keep]
         # The whole-sample door and the fold door both charge the reduced fee once.
         pred = predict(res, rdc)
-        @test isapprox(pred.rd.X, Xc[:, keep] * wk .- calc_fees(wk, fees_keep))
+        @test isapprox(pred.rd.X, Xc[:, keep] * wk .- PO.calc_periodic_fees(wk, fees_keep))
         predf = predict(res, rdc, test_idx)
-        @test isapprox(predf.rd.X, Xc[test_idx, keep] * wk .- calc_fees(wk, fees_keep))
+        @test isapprox(predf.rd.X,
+                       Xc[test_idx, keep] * wk .- PO.calc_periodic_fees(wk, fees_keep))
     end
-    # A bare amortisation divides the one-off terms by the fold's length, on the same reduced
-    # fee, and the pass-through carries the amortised fee rather than the stored one.
+    # Issue #898: the clock reaches the two fixed terms alone, and this fee carries none,
+    # so an `AmortisedFees()` leaves every number where it was. The pass-through still
+    # carries the clock through to the reduced fee on the result.
     feesa = Fees(; tn = Turnover(; w = w_prev, val = rate), l = l, fa = AmortisedFees())
     resa = optimise(MeanRisk(; opt = JuMPOptimiser(; pe = prn, slv = slv, fees = feesa)),
                     rd)
     wk = resa.w[keep]
     feesa_keep = Fees(; tn = Turnover(; w = w_prev[keep], val = rate[keep]), l = l[keep],
-                      fa = AmortisedFees(; horizon = length(test_idx)))
+                      fa = AmortisedFees())
     preda = predict(resa, rdc, test_idx)
-    @test isapprox(preda.rd.X, Xc[test_idx, keep] * wk .- calc_fees(wk, feesa_keep))
+    @test isa(resa.fees.fa, AmortisedFees)
+    @test isapprox(preda.rd.X,
+                   Xc[test_idx, keep] * wk .- PO.calc_periodic_fees(wk, feesa_keep))
 end
 
 @testset "The scheme carries `strict`, and the fold reads it" begin

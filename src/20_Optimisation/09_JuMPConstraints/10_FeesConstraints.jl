@@ -34,6 +34,42 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Accumulate a one-off fee expression into the model's `:one_time_fees` expression.
+
+The twin of [`add_to_fees!`](@ref), for the terms that are charged one time for the whole holding
+period rather than on every observation. Only the two fixed fees reach it, because `l`, `s` and
+`tn` are rates per period. [`set_net_portfolio_returns!`](@ref) subtracts this expression from the
+first observation alone, and [`add_fees_to_ret!`](@ref) divides it by the observation count,
+because an expected return is a per period number.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `expr`: The fee expression to accumulate.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`add_to_fees!`](@ref)
+  - [`set_fixed_fees!`](@ref)
+  - [`set_net_portfolio_returns!`](@ref)
+  - [`add_fees_to_ret!`](@ref)
+"""
+function add_to_one_time_fees!(model::JuMP.Model, expr::JuMP.AbstractJuMPScalar)
+    if !shared_has(model, :one_time_fees)
+        JuMP.@expression(model, one_time_fees, expr)
+    else
+        one_time_fees = shared_get(model, :one_time_fees)
+        JuMP.add_to_expression!(one_time_fees, expr)
+    end
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Add a turnover-based transaction fee expression to the JuMP optimisation model.
 
 The fall-through method does nothing. The concrete method computes `val' * |w - wt|` via NormOneCone constraints and accumulates the result into the model's `:fees` expression via [`add_to_fees!`](@ref).
@@ -215,11 +251,63 @@ function set_short_non_fixed_fees!(model::JuMP.Model, fs::Num_VecNum)
     add_to_fees!(model, fs)
     return nothing
 end
-function set_non_fixed_fees!(model::JuMP.Model, fees::Fees)
+function set_non_fixed_fees!(model::JuMP.Model, fees::Fees, T::Number)
     set_long_non_fixed_fees!(model, fees.l)
     set_short_non_fixed_fees!(model, fees.s)
     set_turnover_fees!(model, fees.tn)
+    # The observation count of the fit is the holding period the one-off terms are spread
+    # over, and the clock decides whether they are spread at all. `add_fees_to_ret!` reads
+    # the count, and `set_net_portfolio_returns!` reads the clock.
+    if !shared_has(model, :T)
+        shared_set!(model, :T, T)
+        shared_set!(model, :fee_fa, fees.fa)
+    end
     return nothing
+end
+"""
+    charge_one_time_fees(model::JuMP.Model, net, one_time, T::Number,
+                         fa::Option{<:AbstractFeeAmortisation})
+
+Lay the model's one-off fee expression onto a net return series, on the clock the fee states.
+
+The model's twin of [`charge_fees`](@ref), and it states the same rule. The two fixed fees are
+charged one time for the whole holding period, so a `nothing` clock subtracts them from the first
+observation alone, and an [`AmortisedFees`](@ref) spreads them evenly over `T`, the observation
+count of the fit.
+
+# Algorithm
+
+ 1. On a `nothing` `fa`, subtract `one_time` from the first entry of `net` and leave the rest.
+ 2. On an [`AbstractFeeAmortisation`](@ref) `fa`, subtract `one_time` divided by `T` from every
+    entry of `net`.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `net`: The net return expression, already charged the per period terms.
+  - `one_time`: The model's `:one_time_fees` expression.
+  - `T`: Observation count of the fit.
+  - `fa`: The fee's clock, from `:fee_fa`.
+
+# Returns
+
+  - The net return expression, charged the one-off terms.
+
+# Related
+
+  - [`charge_fees`](@ref)
+  - [`add_to_one_time_fees!`](@ref)
+  - [`set_net_portfolio_returns!`](@ref)
+  - [`AmortisedFees`](@ref)
+"""
+function charge_one_time_fees(model::JuMP.Model, net, one_time, ::Number, ::Nothing)
+    c = zeros(Int, length(net))
+    c[1] = one(Int)
+    return JuMP.@expression(model, net .- c * one_time)
+end
+function charge_one_time_fees(model::JuMP.Model, net, one_time, T::Number,
+                              ::AbstractFeeAmortisation)
+    return JuMP.@expression(model, net .- one_time / T)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -275,12 +363,12 @@ function set_fixed_fees!(model::JuMP.Model, sp::AbstractMIPSpace,
     if ffl_flag
         ffl = model[mip_key(sp, :ffl)] = JuMP.@expression(model,
                                                           dot_scalar(ffl, long_bin(ind)))
-        add_to_fees!(model, ffl)
+        add_to_one_time_fees!(model, ffl)
     end
     if ffs_flag
         ffs = model[mip_key(sp, :ffs)] = JuMP.@expression(model,
                                                           dot_scalar(ffs, short_bin(ind)))
-        add_to_fees!(model, ffs)
+        add_to_one_time_fees!(model, ffs)
     end
     return nothing
 end

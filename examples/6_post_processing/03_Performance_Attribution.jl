@@ -132,20 +132,25 @@ pretty_table(DataFrame(scorecard);
 ## 5. Cost attribution: gross vs net returns
 
 A book that looks good gross can be mediocre net of trading costs. [`calc_net_returns`](@ref)
-applies a [`Fees`](@ref) schedule to the realised returns; [`calc_fees`](@ref) reports the cost
-of holding the weights for a *single* period.
+applies a [`Fees`](@ref) schedule to the realised returns; [`calc_fees`](@ref) reports that cost
+as a **pair**, the charge every observation carries beside the one-off charge the first observation
+carries alone, and [`calc_total_fees`](@ref) contracts the pair to the cost of a whole holding
+period.
 
-The important subtlety is the time base: `calc_net_returns(w, X, fees)` deducts the fee on
-**every row** of `X` — it models paying the rebalancing cost *each period*. So with 252 daily
-observations a per-period fee of `l` accumulates to roughly `252 · l` over the year before
-compounding. We therefore use a modest per-rebalance fee of 5 bps (`l = 0.0005`), which is about
-a 12–13% annualised cost, and compare gross and net compounded wealth.
+The important subtlety is the time base. `l`, `s` and `tn` are rates per period, so
+`calc_net_returns(w, X, fees)` deducts them on **every row** of `X`: it models paying the
+rebalancing cost *each period*. With 252 daily observations a per-period fee of `l` therefore
+accumulates to roughly `252 · l` over the year before compounding. `fl` and `fs` are different:
+they are currency amounts charged one time for the whole holding period, and `fees.fa` decides
+where on the series that one charge lands. We use a modest per-rebalance fee of 5 bps
+(`l = 0.0005`), which is about a 12–13% annualised cost, and compare gross and net compounded
+wealth.
 =#
 
 fees = Fees(; l = 0.0005)
 gross_ret = rd.X * w_ratio
 net_ret = calc_net_returns(w_ratio, rd.X, fees)
-single_period_fee = calc_fees(w_ratio, fees)
+single_period_fee, _ = calc_fees(w_ratio, size(rd.X, 1), fees)
 
 pretty_table(DataFrame(;
                        quantity = ["Gross compounded wealth (×)",
@@ -155,7 +160,7 @@ pretty_table(DataFrame(;
                        value = [round(cumulative_returns(gross_ret, true)[end]; digits = 4),
                                 round(cumulative_returns(net_ret, true)[end]; digits = 4),
                                 round(single_period_fee; digits = 5),
-                                round(252 * single_period_fee; digits = 4)]);
+                                round(calc_total_fees(w_ratio, 252, fees); digits = 4)]);
              title = "Fee drag on the maximum-ratio book (5 bps per rebalance)")
 
 #=
@@ -219,10 +224,14 @@ output, a benchmark, or any externally-supplied portfolio.
 #src   risk shares track its weights almost exactly (JNJ 37%, MRK 17%) since it is built on the
 #src   same covariance.
 #src - FINDING (semantic gotcha → post-processing rollup): `calc_net_returns(w, X, fees)` deducts
-#src   the fee on EVERY row of `X` (per-period rebalance cost), whereas `calc_fees(w, fees)`
-#src   returns the SINGLE-period fee. A naïve "20 bps" (`l = 0.002`) on a 252-row daily series
-#src   therefore compounds into a ~40% wealth drag (net 0.98 vs gross 1.62) — surprising and easy
-#src   to misread. The page uses `l = 0.0005` and spells out the per-period time base. Worth a
-#src   docstring note that `calc_net_returns` models a per-period rebalancing cost (annual ≈ 252·l).
+#src   the per period terms on EVERY row of `X` (per-period rebalance cost), whereas
+#src   `calc_fees(w, T, fees)` returns the pair `(amortised, one_time)` for ONE observation. A
+#src   naïve "20 bps" (`l = 0.002`) on a 252-row daily series therefore compounds into a ~40%
+#src   wealth drag (net 0.98 vs gross 1.62) — surprising and easy to misread. The page uses
+#src   `l = 0.0005` and spells out the per-period time base.
+#src   RESOLVED by #898: the rule is now stated in the type. `l`, `s` and `tn` are rates per
+#src   period; `fl` and `fs` are charged one time for the whole holding period, and `fees.fa`
+#src   names the clock they land on. `calc_total_fees(w, T, fees)` reports the whole horizon, so
+#src   the annualised row of the table below is a library call rather than a hand multiplication.
 #src - CONFIRMED known gotcha (shared with 02_Plotting_and_Reporting): `risk_contribution` needs
 #src   `factory(Variance(), pr)`, not a bare `Variance()`; documented inline in §6.

@@ -518,8 +518,7 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :ds => "`ds`: Default short proportional fee.",#
                                  :dfl => "`dfl`: Default long fixed fee.",#
                                  :dfs => "`dfs`: Default short fixed fee.",#
-                                 :fa_fees => "`fa`: Fee amortisation algorithm. `nothing` charges the turnover and fixed fees in full on every observation. A stated algorithm spreads them over a holding period, through [`amortise_fees`](@ref).",#
-                                 :fa_horizon => "`horizon`: Number of observations the one-off fee terms are spread over. `nothing` defers to the fold's own length, resolved by [`amortise_fees`](@ref).",#
+                                 :fa_fees => "`fa`: Fee amortisation algorithm, and the clock the two fixed fee terms fall on. `nothing` charges them one time, on the first observation of a return series. An [`AmortisedFees`](@ref) spreads them evenly over the observation count the charging site hands in. It reaches no other term, because `l`, `s` and `tn` are rates per period.",#
                                  :kwargs_fee => "`kwargs`: Named tuple of keyword arguments for fee computation.",#
                                  # Optimisation results.
                                  :pa => "`pa`: Processed optimisation attributes.",#

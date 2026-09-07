@@ -1001,12 +1001,11 @@
                        rtol = 5e-5)
         @test isa(eff_front_combinatorial_pred.pred[1].res, AbstractVector)
 
-        # Issue #754/#760: `predict` settles a bare `AmortisedFees()` against the fold's own
-        # length. `fa` never reaches the objective (it is read only by `calc_fees` and
-        # `calc_asset_fees`, both value-level, post-solve verbs), so the three runs below
-        # solve to the same weights per fold; the only difference is the value-level fee
-        # charged in `pred.rd.X`. The turnover term is the one-off term a conic solver can
-        # carry without a MIP builder, so it is the one used here; `fl`/`fs` would need one.
+        # Issue #898: `tn` is a rate per period, so the clock `fa` names never reaches it.
+        # A fee whose only term is a turnover is therefore unmoved by `fa`, and the two
+        # runs below agree fold for fold, weights and series alike. `fl` and `fs` are the
+        # terms the clock moves, and they need a MIP builder in the model, so the clock is
+        # exercised at the value level in `test_11`.
         fsets = UniverseSets(; dict = Dict("nx" => rd.nx))
         fwb = WeightBounds(; lb = 0, ub = 1)
         fest_plain = FeesEstimator(; tn = TurnoverEstimator(; w = w0, val = 0.0005))
@@ -1023,61 +1022,46 @@
         pred_amort = cross_val_predict(mr_amort, rd, cv)
         for (pp, pa) in zip(pred_plain.pred, pred_amort.pred)
             @test pp.res.w == pa.res.w
-            T = size(pp.rd.X, 1)
-            fee_plain = calc_fees(pp.res.w,
+            @test pp.rd.X == pa.rd.X
+            fee_plain = calc_fees(pp.res.w, size(pp.rd.X, 1),
                                   PortfolioOptimisers.extract_fees(pp.res, nothing))
-            fee_amort = calc_fees(pa.res.w,
-                                  PortfolioOptimisers.amortise_fees(PortfolioOptimisers.extract_fees(pa.res,
-                                                                                                     nothing),
-                                                                    T))
-            diff_expected = fee_amort - fee_plain
-            @test all(x -> isapprox(x, diff_expected; atol = 1e-8), pp.rd.X .- pa.rd.X)
-        end
-
-        # A stated `horizon` overrides every fold's own length.
-        fest_horizon = FeesEstimator(; tn = TurnoverEstimator(; w = w0, val = 0.0005),
-                                     fa = AmortisedFees(; horizon = 21))
-        mr_horizon = MeanRisk(;
-                              opt = JuMPOptimiser(; sets = fsets, wb = fwb, bgt = 1,
-                                                  fees = fest_horizon, slv = slv))
-        pred_horizon = cross_val_predict(mr_horizon, rd, cv)
-        for (pp, ph) in zip(pred_plain.pred, pred_horizon.pred)
-            @test pp.res.w == ph.res.w
-            fee_plain = calc_fees(pp.res.w,
-                                  PortfolioOptimisers.extract_fees(pp.res, nothing))
-            hfee = PortfolioOptimisers.extract_fees(ph.res, nothing)
-            fee_h = calc_fees(ph.res.w,
-                              PortfolioOptimisers.amortise_fees(hfee, size(pp.rd.X, 1)))
-            fee_h_direct = calc_fees(ph.res.w, hfee)
-            @test isapprox(fee_h, fee_h_direct)
-            diff_expected = fee_h - fee_plain
-            @test all(x -> isapprox(x, diff_expected; atol = 1e-8), pp.rd.X .- ph.rd.X)
+            fee_amort = calc_fees(pa.res.w, size(pa.rd.X, 1),
+                                  PortfolioOptimisers.extract_fees(pa.res, nothing))
+            # Both halves agree, and the one-off half is zero, because the fee carries no
+            # fixed term for the clock to move.
+            @test all(isapprox.(fee_plain, fee_amort))
+            @test iszero(fee_plain[2])
         end
     end
-    # Ticket #765: `tr.fees` is charged only inside the fit, over the training matrix. No
-    # site stamps a fold length onto it, so a bare `AmortisedFees()` on a `WeightsTracking`
-    # benchmark reproduces `fa === nothing` exactly, over folds of unequal length.
-    @testset "a fold length never reaches tr.fees" begin
+    # Ticket #765, settled by #898: `tr.fees` needs no fold stamped onto it, because the
+    # verb that charges it hands in the length of the series it charges. The clock therefore
+    # reaches it, over folds of unequal length, and needs no horizon on the fee.
+    @testset "the clock reaches tr.fees over the fold's own series" begin
         wbt = fill(inv(size(rd.X, 2)), size(rd.X, 2))
         tnb = Turnover(; w = wbt, val = 0.02)
         fee_n = Fees(; tn = tnb, l = 0.001, fl = 0.5)
         fee_b = Fees(; tn = tnb, l = 0.001, fl = 0.5, fa = AmortisedFees())
         cv765 = DateWalkForward(12, 3; period = Month(1))
 
-        # The test folds are of unequal length, so a fold-length divisor would move the
-        # numbers if one ever reached `tr.fees`.
+        # The folds are of unequal length, so each one spreads the one-off cost over its own
+        # count rather than over a number stored on the fee.
         (; test_idx) = split(cv765, rd)
         @test length(unique(length.(test_idx))) > 1
 
-        function tracked_pred(fees)
-            r = TrackingRiskMeasure(; tr = WeightsTracking(; fees = fees, w = wbt))
-            return cross_val_predict(MeanRisk(; r = r, opt = JuMPOptimiser(; slv = slv)),
-                                     rd, cv765)
+        oneoff = PortfolioOptimisers.calc_one_off_fees(wbt, fee_n)
+        @test oneoff > zero(oneoff)
+        for idx in test_idx
+            Xi = view(rd.X, idx, :)
+            Ti = length(idx)
+            bn = PortfolioOptimisers.tracking_benchmark(WeightsTracking(; fees = fee_n,
+                                                                        w = wbt), Xi)
+            bb = PortfolioOptimisers.tracking_benchmark(WeightsTracking(; fees = fee_b,
+                                                                        w = wbt), Xi)
+            # The two clocks charge the same total, and land it differently.
+            @test isapprox(sum(bn), sum(bb))
+            @test isapprox(bb[1] - bn[1], oneoff * (1 - inv(Ti)))
+            @test isapprox(bb[end] - bn[end], -oneoff / Ti)
         end
-        pred_n = tracked_pred(fee_n)
-        pred_b = tracked_pred(fee_b)
-        @test [p.res.w for p in pred_n.pred] == [p.res.w for p in pred_b.pred]
-        @test [p.rd.X for p in pred_n.pred] == [p.rd.X for p in pred_b.pred]
     end
     @testset "The rolling window measure reads a prediction's own series (#770)" begin
         # The realised-history reading takes a fold result and reads nothing but the series
@@ -1584,7 +1568,7 @@
                 @test all(p -> isnothing(p.hw), pred.pred)
                 for (i, p) in pairs(pred.pred)
                     rdi = PO.port_opt_view(rd, test_idx[i], :)
-                    fees = PO.amortise_fees(PO.extract_fees(p.res, nothing), size(rdi.X, 1))
+                    fees = PO.extract_fees(p.res, nothing)
                     @test p.rd.X == PO.calc_net_returns(p.res.w, rdi.X, fees)
                 end
             end
@@ -1601,7 +1585,7 @@
                 @test p.hw.wd === sfd
                 @test isnothing(p.hw.U)
                 @test p.res.w == b.res.w
-                fees = PO.amortise_fees(PO.extract_fees(p.res, nothing), size(p.hw.X, 1))
+                fees = PO.extract_fees(p.res, nothing)
                 @test p.rd.X == PO.calc_net_returns(p.res.w, p.hw.X, fees, sfd)
                 @test p.hw.w == PO.held_weights(sfd, p.res.w, p.hw.X)
                 @test p.rd.X != b.rd.X
@@ -1731,11 +1715,10 @@
             @test size(split) == size(p.hw.X)
             @test vec(sum(split; dims = 2)) ≈ p.rd.X
             @test split == calc_net_asset_returns(PO.weight_path(p.hw, p.res.w), p.hw.X,
-                                                  PO.amortise_fees(PO.extract_fees(p.res, nothing),
-                                                                   size(p.hw.X, 1)))
+                                                  PO.extract_fees(p.res, nothing))
 
             # The risk contributions read the target weights and the fold's asset returns.
-            fees = PO.amortise_fees(PO.extract_fees(p.res, nothing), size(p.hw.X, 1))
+            fees = PO.extract_fees(p.res, nothing)
             @test risk_contribution(rw, p) == risk_contribution(rw, p.res.w, p.hw.X, fees)
             @test length(risk_contribution(rw, p)) == length(p.res.w)
             @test factor_risk_contribution(rw, p) ==

@@ -124,9 +124,12 @@ const ER_MU = [0.01, 0.02, 0.03, 0.04]
     @testset "the fee is subtracted exactly once" begin
         r = ArithmeticReturn(; mu = ER_MU)
         fees = Fees(; l = 0.01)
-        f = calc_fees(ER_W, fees)
+        # Issue #898: `calc_fees` returns the pair `(amortised, one_time)`. `l` is a rate
+        # per period, so the whole charge is in the first half and the second is zero.
+        f, f_one_off = calc_fees(ER_W, size(ER_X, 1), fees)
         # `calc_fees` is 0.01 on a long-only unit budget, so the net figure is 0.01.
         @test isapprox(f, 0.01)
+        @test iszero(f_one_off)
         @test isapprox(expected_return(r, ER_W, ER_PR, fees), 0.02 - f)
     end
 
@@ -153,7 +156,7 @@ const ER_MU = [0.01, 0.02, 0.03, 0.04]
         # The fee reaches this term too.
         fees = Fees(; l = 0.01)
         @test isapprox(expected_return(LogarithmicReturn(), ER_W, ER_PR, fees),
-                       unweighted - calc_fees(ER_W, fees))
+                       unweighted - first(calc_fees(ER_W, size(ER_X, 1), fees)))
     end
 
     @testset "`NoReturn` is a typed zero that charges no fee" begin
@@ -169,14 +172,16 @@ end
 
 @testset "#549: `term_fees` follows the fee flag alone" begin
     fees = Fees(; l = 0.01)
-    @test isapprox(PO.term_fees(ER_W, fees, true), calc_fees(ER_W, fees))
-    @test iszero(PO.term_fees(ER_W, fees, false))
-    @test iszero(PO.term_fees(ER_W, nothing, true))
+    @test isapprox(PO.term_fees(ER_W, fees, size(ER_X, 1), true),
+                   first(calc_fees(ER_W, size(ER_X, 1), fees)))
+    @test iszero(PO.term_fees(ER_W, fees, size(ER_X, 1), false))
+    @test iszero(PO.term_fees(ER_W, nothing, size(ER_X, 1), true))
     # The gross figure comes back when the term's own flag is `false`.
     gross = ArithmeticReturn(; mu = ER_MU, settings = JuMPReturnsSettings(; fee = false))
     net = ArithmeticReturn(; mu = ER_MU, settings = JuMPReturnsSettings(; fee = true))
     @test expected_return(gross, ER_W, ER_PR, fees) == 0.02
-    @test isapprox(expected_return(net, ER_W, ER_PR, fees), 0.02 - calc_fees(ER_W, fees))
+    @test isapprox(expected_return(net, ER_W, ER_PR, fees),
+                   0.02 - first(calc_fees(ER_W, size(ER_X, 1), fees)))
 end
 
 @testset "#549: the aggregate is aggregate over aggregate" begin
@@ -250,7 +255,8 @@ end
         fees = Fees(; l = 0.01)
         r = ExpectedReturn(; rt = ArithmeticReturn(; mu = ER_MU))
         @test expected_risk(r, ER_W, ER_PR) == 0.02
-        @test isapprox(expected_risk(r, ER_W, ER_PR, fees), 0.02 - calc_fees(ER_W, fees))
+        @test isapprox(expected_risk(r, ER_W, ER_PR, fees),
+                       0.02 - first(calc_fees(ER_W, size(ER_X, 1), fees)))
         @test expected_risk(ExpectedReturn(; rt = [rA, rB]), ER_W, ER_PR) == 0.04
         @test keys(PO.deferred_slots(r)) == (:rt,)
         @test_throws PortfolioOptimisers.IsEmptyError ExpectedReturn(;
@@ -429,11 +435,13 @@ end
               base.ann_return
         @test performance_summary(ER_W, rd; periods_per_year = 12).ann_return ==
               base.ann_return
-        # The fee is charged in every period, so it moves the annualised return by
-        # `periods_per_year * calc_fees`.
+        # `l` is a rate per period, so it is charged on every observation and moves the
+        # annualised return by `periods_per_year` times the per period charge. A fixed fee
+        # would not, because it is charged one time for the whole holding period.
         fees = Fees(; l = 0.01)
         net = performance_summary(ER_W, ER_X, fees; periods_per_year = 12)
-        @test isapprox(net.ann_return, base.ann_return - 12 * calc_fees(ER_W, fees))
+        @test isapprox(net.ann_return,
+                       base.ann_return - 12 * first(calc_fees(ER_W, size(ER_X, 1), fees)))
     end
 
     @testset "the optimisation-result route" begin

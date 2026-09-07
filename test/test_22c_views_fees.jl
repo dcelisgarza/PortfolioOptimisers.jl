@@ -19,9 +19,17 @@ include(joinpath(@__DIR__, "test22_setup.jl"))
     idx = findall(x -> x == idxc, clusters)
     idx = findfirst(x -> x == "PG", rd.nx[idx])
     @test isapprox(res.resi[idxc].w[idx], 0.05)
+    # The two proportional rates price their assets out, as they always did.
     @test isapprox(res.w[findfirst(x -> x == "MRK", rd.nx)], 0)
     @test isapprox(res.w[findfirst(x -> x == "BAC", rd.nx)], 0)
-    @test isapprox(res.w[findfirst(x -> x == "PFE", rd.nx)], 0)
+    # Issue #898: `fs` is a fixed fee, charged one time for the whole holding period rather
+    # than on every observation, so the model spreads it over the observation count of the
+    # fit. It is therefore far cheaper in the objective than it was, and it no longer prices
+    # the position out. `MRK` and `BAC` are unmoved, because a proportional rate is a rate
+    # per period and the clock never reaches it.
+    @test !isapprox(res.w[findfirst(x -> x == "PFE", rd.nx)], 0)
+    @test isapprox(res.w[findfirst(x -> x == "PFE", rd.nx)], -0.2020353648758373;
+                   rtol = 1e-4)
 
     opti = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1,
                          wb = WeightBounds(; lb = -1, ub = 1),

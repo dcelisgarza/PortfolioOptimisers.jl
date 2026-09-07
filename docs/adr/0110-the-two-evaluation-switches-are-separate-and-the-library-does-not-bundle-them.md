@@ -72,9 +72,15 @@ the weight path when the scheme asked for it. It rides in an `Option`-bound `hw`
 refuses the fold that does not, separated by dispatch rather than by an `isnothing` branch.
 
 **The one-off cost has a clock of its own, and it is a third switch on a third type.** `Fees` and
-`FeesEstimator` carry `fa::Option{<:AbstractFeeAmortisation}`, whose one leaf `AmortisedFees`
-spreads the turnover and the two fixed charges over a holding period. It is orthogonal to both
-evaluation switches: a caller can drift without amortising, and amortise without drifting.
+`FeesEstimator` carry `fa::Option{<:AbstractFeeAmortisation}`, which names where the two fixed
+charges `fl` and `fs` land on a return series. `nothing` charges them one time, on the first
+observation, and the one leaf `AmortisedFees` spreads them evenly instead. It reaches no other
+term, because `l`, `s` and `tn` are rates per period and charge on every observation, and it
+carries no count, because every site that charges a fee knows the count it charges over and hands
+it in. The rule and the shape of every fee verb are settled by
+[#898](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/898). The switch is orthogonal
+to both evaluation switches: a caller can drift without amortising, and amortise without
+drifting.
 
 ## Consequences
 

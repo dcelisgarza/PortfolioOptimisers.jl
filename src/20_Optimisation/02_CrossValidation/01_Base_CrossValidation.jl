@@ -788,15 +788,13 @@ A fold that carries no Held Weights record raises. `pred.rd.X` is the **portfoli
   - [`calc_net_asset_returns`](@ref)
   - [`HeldWeightsResult`](@ref)
   - [`weight_path`](@ref)
-  - [`amortise_fees`](@ref)
   - [`PredictionResult`](@ref)
 """
 function calc_net_asset_returns(pred::PredictionResult{<:Any, <:Any, <:HeldWeightsResult},
                                 fees::Option{<:Fees} = nothing)
     hw = pred.hw
     return calc_net_asset_returns(weight_path(hw, pred.res.w), hw.X,
-                                  amortise_fees(extract_fees(pred.res, fees),
-                                                size(hw.X, 1)))
+                                  extract_fees(pred.res, fees))
 end
 function calc_net_asset_returns(::PredictionResult{<:Any, <:Any, Nothing}, args...)
     return throw(ArgumentError("`calc_net_asset_returns(pred::PredictionResult)` needs the fold's asset returns, and this fold kept none: `pred.rd.X` is the portfolio return series, and `pred.hw` is absent because the fold's scheme set neither `wd` nor `pws`.\nSet one of them so the fold records its asset returns, or call `calc_net_asset_returns(w, X, fees)` with the returns you fitted on."))
@@ -839,9 +837,7 @@ function risk_contribution(r::BaseRM_VecBaseRM,
                            pred::PredictionResult{<:Any, <:Any, <:HeldWeightsResult},
                            fees::Option{<:Fees} = nothing; kwargs...)
     hw = pred.hw
-    return risk_contribution(r, pred.res.w, hw.X,
-                             amortise_fees(extract_fees(pred.res, fees), size(hw.X, 1));
-                             kwargs...)
+    return risk_contribution(r, pred.res.w, hw.X, extract_fees(pred.res, fees); kwargs...)
 end
 function risk_contribution(::BaseRM_VecBaseRM, ::PredictionResult{<:Any, <:Any, Nothing},
                            args...; kwargs...)
@@ -892,9 +888,8 @@ function factor_risk_contribution(r::BaseRM_VecBaseRM,
                                                                     F = pred.rd.F),
                                   kwargs...)
     hw = pred.hw
-    return factor_risk_contribution(r, pred.res.w, hw.X,
-                                    amortise_fees(extract_fees(pred.res, fees),
-                                                  size(hw.X, 1)); rd = rd, kwargs...)
+    return factor_risk_contribution(r, pred.res.w, hw.X, extract_fees(pred.res, fees);
+                                    rd = rd, kwargs...)
 end
 function factor_risk_contribution(::BaseRM_VecBaseRM,
                                   ::PredictionResult{<:Any, <:Any, Nothing}, args...;
@@ -1467,11 +1462,11 @@ Apply an optimisation result `res` to returns data `rd` to produce a
 When `test_idx` is provided, only the rows (observations) indexed by `test_idx` (and
 optionally columns `cols`) of `rd` are used for the prediction.
 
-The `test_idx` method settles the fee's amortisation horizon against the fold's own length before
-charging it: `amortise_fees(extract_fees(res, nothing), size(rdi.X, 1))`. A stated `horizon` on the
-fee's `fa` overrides this and reaches unchanged. The whole-sample method, `predict(res, rd)`, gets
-no such rebuild, so it charges the whole one-off cost unless the fee already carries a stated
-`horizon`.
+The fee needs no horizon stamped onto it. `charge_fees` hands in the length of the series it
+charges, so a fold spreads a one-off cost over its own observations and the whole-sample method
+spreads it over the whole sample, each without a number stored on the fee. `fees.fa` names the
+clock alone: `nothing` charges the two fixed terms on the first observation of the series, and an
+`AmortisedFees` spreads them evenly over it.
 
 ## The Investable Mask, then the Held Gaps
 
@@ -1520,7 +1515,6 @@ returns[t] == sum_i w_i * (isfinite(X[t, i]) ? X[t, i] : 0) - fee
   - [`fit_and_predict`](@ref)
   - [`PredictionResult`](@ref)
   - [`MultiPeriodPredictionResult`](@ref)
-  - [`amortise_fees`](@ref)
   - [`extract_fees`](@ref)
 """
 function StatsAPI.predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult;
@@ -1574,7 +1568,7 @@ function StatsAPI.predict(res::NonFiniteAllocationOptimisationResult, rd::Return
                           hwd::Option{<:AbstractWeightDrift} = wd,
                           store_weight_path::Bool = false, strict::Bool = false)
     rdi = port_opt_view(rd, test_idx, cols)
-    fees = amortise_fees(extract_fees(res, nothing), size(rdi.X, 1))
+    fees = extract_fees(res, nothing)
     # The mask view and the Held Gap filter, in that order — see the whole-sample method.
     imsk = result_investable_mask(res)
     w, rdi, fees = investable_fold_view(imsk, res.w, rdi, fees)

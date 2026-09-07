@@ -1374,6 +1374,12 @@ Subtract the fees expression from one term's return expression.
 
 Does nothing when the term's `settings.fee` is `false`, or when no fees are registered.
 
+The model carries two fee expressions. `:fees` holds the per period terms `l`, `s` and `tn`, and it
+enters the return unchanged. `:one_time_fees` holds the two fixed terms, which are charged one time
+for the whole holding period, so it enters divided by `:T`, the observation count of the fit.
+An expected return is a per period number, so the one-off cost is always spread here, whatever
+clock the fee's `horizon` names for a realised series.
+
 The charge stays **inside** each builder, so with *k* terms the multiplier on the fee is
 ``\\sum_{i:\\,\\mathrm{fee}} s_i``. That multiplier is deliberately unconstrained: a blend of
 two terms at `scale = 0.5` charges the fee once, and two terms at `scale = 1` charge it
@@ -1395,10 +1401,18 @@ twice.
   - [`set_return_constraints!`](@ref)
 """
 function add_fees_to_ret!(model::JuMP.Model, ret, fee::Bool)
-    if !fee || !shared_has(model, :fees)
+    if !fee
         return nothing
     end
-    JuMP.add_to_expression!(ret, -shared_get(model, :fees))
+    if shared_has(model, :fees)
+        JuMP.add_to_expression!(ret, -shared_get(model, :fees))
+    end
+    # An expected return is a per period number, so a fee charged one time for the whole
+    # holding period enters it divided by the observation count of the fit.
+    if shared_has(model, :one_time_fees) && shared_has(model, :T)
+        JuMP.add_to_expression!(ret,
+                                -shared_get(model, :one_time_fees) / shared_get(model, :T))
+    end
     return nothing
 end
 """
