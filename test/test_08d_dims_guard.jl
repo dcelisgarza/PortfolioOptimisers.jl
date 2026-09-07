@@ -85,8 +85,10 @@ end
         end
     end
     # The census is closed, so this number moves when an estimator is added. It is here to
-    # show that the loop above ran over a real universe rather than an empty one.
-    @test checked == 45
+    # show that the loop above ran over a real universe rather than an empty one. Issue #854
+    # added `ExpWeightedExpectedReturns`, `ExpWeightedVariance` and `ExpWeightedCovariance`,
+    # which carry one, two and two verbs, so the number rose by five.
+    @test checked == 50
 end
 
 @testset "no leaf spells the dims guard or the orientation by hand" begin
