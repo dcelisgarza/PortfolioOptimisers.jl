@@ -211,9 +211,9 @@ commit = "97e398ef74"
 "src/20_Optimisation/02_CrossValidation/10_GridSearchCrossValidation.jl" = { cyc = 7, cog = 11, arg = 3, cyc_sum = 17, cog_sum = 23, arg_sum = 9, macros = [] }
 "src/20_Optimisation/02_CrossValidation/11_RandomisedSearchCrossValidation.jl" = { cyc = 2, cog = 2, arg = 4, cyc_sum = 6, cog_sum = 6, arg_sum = 16, macros = [] }
 "src/20_Optimisation/03_NaiveOptimisation.jl" = { cyc = 3, cog = 3, arg = 8, cyc_sum = 36, cog_sum = 21, arg_sum = 44, macros = ["@propagatable"] }
-"src/20_Optimisation/04_Base_ClusteringOptimisation.jl" = { cyc = 3, cog = 2, arg = 10, cyc_sum = 25, cog_sum = 16, arg_sum = 40, macros = ["@forward_properties", "@propagatable"] }
+"src/20_Optimisation/04_Base_ClusteringOptimisation.jl" = { cyc = 3, cog = 2, arg = 10, cyc_sum = 26, cog_sum = 16, arg_sum = 41, macros = ["@forward_properties", "@propagatable"] }
 "src/20_Optimisation/05_HierarchicalRiskParity.jl" = { cyc = 4, cog = 3, arg = 9, cyc_sum = 22, cog_sum = 15, arg_sum = 31, macros = ["@pipe_delegates", "@pipe_route_sigma_ucs", "@propagatable"] }
-"src/20_Optimisation/06_SchurComplementHierarchicalRiskParity.jl" = { cyc = 10, cog = 24, arg = 8, cyc_sum = 55, cog_sum = 61, arg_sum = 63, macros = ["@propagatable"] }
+"src/20_Optimisation/06_SchurComplementHierarchicalRiskParity.jl" = { cyc = 10, cog = 24, arg = 9, cyc_sum = 55, cog_sum = 61, arg_sum = 64, macros = ["@propagatable"] }
 "src/20_Optimisation/07_HierarchicalEqualRiskContribution.jl" = { cyc = 6, cog = 9, arg = 8, cyc_sum = 48, cog_sum = 35, arg_sum = 88, macros = ["@propagatable"] }
 "src/20_Optimisation/08_Base_JuMPOptimisation.jl" = { cyc = 8, cog = 12, arg = 5, cyc_sum = 124, cog_sum = 54, arg_sum = 206, macros = [] }
 "src/20_Optimisation/09_JuMPConstraints/01_MIPIndicators.jl" = { cyc = 22, cog = 13, arg = 15, cyc_sum = 88, cog_sum = 43, arg_sum = 129, macros = [] }
@@ -236,7 +236,7 @@ commit = "97e398ef74"
 "src/20_Optimisation/14_RiskBudgeting.jl" = { cyc = 4, cog = 3, arg = 6, cyc_sum = 42, cog_sum = 19, arg_sum = 75, macros = ["@forward_properties", "@pipe_delegates", "@pipe_route_rkb", "@pipe_route_sigma_ucs", "@propagatable"] }
 "src/20_Optimisation/15_RelaxedRiskBudgeting.jl" = { cyc = 3, cog = 3, arg = 6, cyc_sum = 27, cog_sum = 17, arg_sum = 54, macros = ["@forward_properties", "@pipe_delegates", "@pipe_route_rkb", "@propagatable"] }
 "src/20_Optimisation/16_Base_MetaOptimisation.jl" = { cyc = 10, cog = 16, arg = 8, cyc_sum = 67, cog_sum = 63, arg_sum = 104, macros = [] }
-"src/20_Optimisation/17_NestedClustered.jl" = { cyc = 9, cog = 8, arg = 14, cyc_sum = 74, cog_sum = 42, arg_sum = 66, macros = ["@propagatable"] }
+"src/20_Optimisation/17_NestedClustered.jl" = { cyc = 9, cog = 8, arg = 14, cyc_sum = 74, cog_sum = 42, arg_sum = 67, macros = ["@propagatable"] }
 "src/20_Optimisation/18_Stacking.jl" = { cyc = 9, cog = 11, arg = 13, cyc_sum = 46, cog_sum = 34, arg_sum = 46, macros = ["@propagatable"] }
 "src/20_Optimisation/19_SubsetResampling.jl" = { cyc = 6, cog = 7, arg = 15, cyc_sum = 42, cog_sum = 32, arg_sum = 63, macros = ["@propagatable"] }
 "src/20_Optimisation/20_RiskMeasureConstraints/01_BaseRiskConstraints.jl" = { cyc = 4, cog = 4, arg = 9, cyc_sum = 39, cog_sum = 23, arg_sum = 98, macros = [] }

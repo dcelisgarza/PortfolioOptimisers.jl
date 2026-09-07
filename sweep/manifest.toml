@@ -245,7 +245,7 @@
 "src/20_Optimisation/02_CrossValidation/10_GridSearchCrossValidation.jl" = { map = 12, units = 3, swept = false }
 "src/20_Optimisation/02_CrossValidation/11_RandomisedSearchCrossValidation.jl" = { map = 12, units = 2, swept = false }
 "src/20_Optimisation/03_NaiveOptimisation.jl" = { map = 10, units = 19, swept = false }
-"src/20_Optimisation/04_Base_ClusteringOptimisation.jl" = { map = 10, units = 14, swept = false }
+"src/20_Optimisation/04_Base_ClusteringOptimisation.jl" = { map = 10, units = 15, swept = false }
 "src/20_Optimisation/05_HierarchicalRiskParity.jl" = { map = 10, units = 9, swept = false }
 "src/20_Optimisation/06_SchurComplementHierarchicalRiskParity.jl" = { map = 10, units = 23, swept = false }
 "src/20_Optimisation/07_HierarchicalEqualRiskContribution.jl" = { map = 10, units = 11, swept = false }

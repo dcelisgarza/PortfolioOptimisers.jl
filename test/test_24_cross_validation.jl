@@ -1648,7 +1648,8 @@
             @test PO.set_retcode(st, rcf).retcode === rcf
             @test PO.set_retcode(st, rcf).w == resj.w
             nc = NestedClusteredResult(nothing, nothing, nothing, nothing, [resj], resj,
-                                       nothing, OptimisationSuccess(), resj.w, nothing)
+                                       nothing, OptimisationSuccess(), resj.w, nothing,
+                                       nothing)
             @test PO.set_retcode(nc, rcf).retcode === rcf
             sr = SubsetResamplingResult(nothing, nothing, nothing, [resj],
                                         reshape(collect(1.0:length(resj.w)), length(resj.w),

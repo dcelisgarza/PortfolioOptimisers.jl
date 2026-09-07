@@ -21,16 +21,21 @@ $(DocStringExtensions.FIELDS)
         cv::Option{<:OptimisationCrossValidation},
         retcode::OptRetCode_VecOptRetCode,
         w::VecNum_VecVecNum,
+        imsk::Option{<:BitVector} = nothing,
         fb::Option{<:OptE_Opt}
     ) -> NestedClusteredResult
 
 Keywords correspond to the struct's fields.
+
+The keyword constructor is the one door `_optimise` exits through, so it is where the aggregated weights expand back onto the full asset universe, through [`expand_investable_weights`](@ref). The positional constructor never expands: [`set_retcode`](@ref) rebuilds through it, and a second pass would expand twice. `pr`, `clr`, `wb`, `fees` and every member of `resi` are the objects of the reduced universe, because that is what the algorithm ran on.
 
 # Related
 
   - [`NestedClustered`](@ref)
   - [`NonFiniteAllocationOptimisationResult`](@ref)
   - [`StackingResult`](@ref)
+  - [`investable_reduction`](@ref)
+  - [`expand_investable_weights`](@ref)
 
 # References
 
@@ -76,6 +81,10 @@ Keywords correspond to the struct's fields.
     """
     w
     """
+    $(field_dict[:imsk])
+    """
+    imsk
+    """
     $(field_dict[:fb])
     """
     fb
@@ -86,17 +95,10 @@ Keywords correspond to the struct's fields.
                                    reso::OptimisationResult,
                                    cv::Option{<:OptimisationCrossValidation},
                                    retcode::OptRetCode_VecOptRetCode, w::VecNum_VecVecNum,
-                                   fb::Option{<:OptE_Opt})
+                                   imsk::Option{<:BitVector}, fb::Option{<:OptE_Opt})
         return new{typeof(pr), typeof(clr), typeof(wb), typeof(fees), typeof(resi),
-                   typeof(reso), typeof(cv), typeof(retcode), typeof(w), typeof(fb)}(pr,
-                                                                                     clr,
-                                                                                     wb,
-                                                                                     fees,
-                                                                                     resi,
-                                                                                     reso,
-                                                                                     cv,
-                                                                                     retcode,
-                                                                                     w, fb)
+                   typeof(reso), typeof(cv), typeof(retcode), typeof(w), typeof(imsk),
+                   typeof(fb)}(pr, clr, wb, fees, resi, reso, cv, retcode, w, imsk, fb)
     end
 end
 function NestedClusteredResult(; pr::Option{<:AbstractPriorResult},
@@ -106,8 +108,10 @@ function NestedClusteredResult(; pr::Option{<:AbstractPriorResult},
                                reso::OptimisationResult,
                                cv::Option{<:OptimisationCrossValidation},
                                retcode::OptRetCode_VecOptRetCode, w::VecNum_VecVecNum,
+                               imsk::Option{<:BitVector} = nothing,
                                fb::Option{<:OptE_Opt})::NestedClusteredResult
-    return NestedClusteredResult(pr, clr, wb, fees, resi, reso, cv, retcode, w, fb)
+    return NestedClusteredResult(pr, clr, wb, fees, resi, reso, cv, retcode,
+                                 expand_investable_weights(imsk, w), imsk, fb)
 end
 """
     set_retcode(res::NestedClusteredResult, retcode::OptRetCode_VecOptRetCode)
@@ -133,7 +137,7 @@ The result carries one return code per member of the population, so a member is 
 """
 function set_retcode(res::NestedClusteredResult, retcode::OptRetCode_VecOptRetCode)
     return NestedClusteredResult(res.pr, res.clr, res.wb, res.fees, res.resi, res.reso,
-                                 res.cv, retcode, res.w, res.fb)
+                                 res.cv, retcode, res.w, res.imsk, res.fb)
 end
 """
     assert_internal_optimiser(opt)
@@ -741,9 +745,15 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
     nco = reset_time_dependent_estimator(nco)
     rd = returns_result_picker(rd, nco.brt)
     pr = prior(nco.pe, rd; dims = dims)
+    # The prior fits on the coverage universe and returns a result on the full asset
+    # universe, where an asset it could not estimate carries `NaN`. Reduce once, here, so
+    # that no cluster holds a non-investable asset and every cluster slice below indexes
+    # the reduced axis. The weights are expanded back in `NestedClusteredResult`.
+    imsk, pr, nco, rd = investable_reduction(pr, nco, rd)
     X = pr.X
     clr = clusterise(nco.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa, dims = dims,
                      branchorder = branchorder, x_src = nco.x_src)
+    assert_clustering_universe(clr, size(X, 2))
     fees = fees_constraints(nco.fees, nco.sets; datatype = eltype(X), strict = nco.strict)
     idx = assignments(clr)
     cls = [findall(x -> x == i, idx) for i in 1:(clr.k)]
@@ -770,7 +780,7 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
     retcode, w = outer_optimisation_finaliser(wb, nco.wf, resi, reso.retcode, reso.w, wi)
     return NestedClusteredResult(; pr = pr, clr = clr, wb = wb, fees = fees, resi = resi,
                                  reso = reso, cv = nco.cv, retcode = retcode, w = w,
-                                 fb = nothing)
+                                 imsk = imsk, fb = nothing)
 end
 """
     optimise(nco::NestedClustered{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,

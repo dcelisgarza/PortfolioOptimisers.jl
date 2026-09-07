@@ -741,9 +741,16 @@ function _optimise(hec::HierarchicalEqualRiskContribution,
     hec = reset_time_dependent_estimator(hec)
     rd = returns_result_picker(rd, hec.opt.brt)
     pr = prior(hec.opt.pe, rd; dims = dims)
+    # The prior fits on the coverage universe and returns a result on the full asset
+    # universe, where an asset it could not estimate carries `NaN`. Reduce once, here:
+    # the distance the clustering is built from never sees a `NaN`, and the cluster count
+    # is chosen on the investable universe. The weights are expanded back in
+    # `HierarchicalResult`.
+    imsk, pr, hec, rd = investable_reduction(pr, hec, rd)
     X = pr.X
     clr = clusterise(hec.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa, dims = dims,
                      branchorder = branchorder, x_src = hec.opt.x_src)
+    assert_clustering_universe(clr, size(X, 2))
     idx = assignments(clr)
     cls = [findall(x -> x == i, idx) for i in 1:(clr.k)]
     w, rkcl, fees, ri, ro = herc_risk(hec, pr, cls)
@@ -788,8 +795,9 @@ function _optimise(hec::HierarchicalEqualRiskContribution,
                                                                            wb = wb,
                                                                            fees = fees,
                                                                            retcode = retcode,
-                                                                           w = w), ri = ri,
-                                                   ro = ro, scai = hec.scai,
+                                                                           w = w,
+                                                                           imsk = imsk),
+                                                   ri = ri, ro = ro, scai = hec.scai,
                                                    scao = hec.scao, fb = nothing)
 end
 """

@@ -250,11 +250,7 @@ function expand_investable_weights(::Nothing, sol::JuMPOptSol_VecJuMPOptSol)
     return sol
 end
 function expand_investable_weights(imsk::BitVector, sol::JuMPOptimisationSolution)
-    @argcheck(count(imsk) == length(sol.w),
-              DimensionMismatch("the investable mask keeps $(count(imsk)) of $(length(imsk)) assets, but the solution holds $(length(sol.w)) weights; the mask and the solution must come from the same optimisation"))
-    w = zeros(eltype(sol.w), length(imsk))
-    w[imsk] = sol.w
-    return JuMPOptimisationSolution(; w = w)
+    return JuMPOptimisationSolution(; w = expand_investable_weights(imsk, sol.w))
 end
 function expand_investable_weights(imsk::BitVector, sol::VecJuMPOptSol)
     return [expand_investable_weights(imsk, s) for s in sol]

@@ -331,3 +331,146 @@ end
     @test iszero(res.w[k])
     @test isapprox(res.w[keep], oracle.w; rtol = 5e-6)
 end
+
+# The hierarchical, and the nested clustered, families, issue #675, under ADR 0115. The rule
+# is the JuMP one, carried outward: reduce once at the entry, immediately after the prior fit
+# and before the clustering, then expand in the keyword constructor of the result. The oracle
+# is again the same optimisation with the non-investable asset removed by hand.
+
+# Every hierarchical head takes the same pair of configurations: the full universe with a
+# `NaN` asset, and the universe that survives it.
+optn = HierarchicalOptimiser(; pe = prn)
+optk = HierarchicalOptimiser(; pe = prk)
+
+function test_hierarchical_parity(res, ref)
+    @test isa(res.retcode, PortfolioOptimisers.OptimisationSuccess)
+    @test isa(ref.retcode, PortfolioOptimisers.OptimisationSuccess)
+    # The weights come back on the caller's own universe.
+    @test length(res.w) == N
+    @test length(ref.w) == length(keep)
+    # A non-investable asset holds a zero: the optimiser could not trade it.
+    @test iszero(res.w[k])
+    # And every other weight is the weight the hand-reduced problem solved for.
+    @test isapprox(res.w[keep], ref.w; rtol = 1e-10)
+    @test isapprox(sum(res.w), 1; rtol = 1e-10)
+    # The mask reaches the result, so a reader of a walk-forward can tell which assets each
+    # fold could trade, with the same idiom the JuMP results answer.
+    @test res.imsk == BitVector([1, 1, 0, 1, 1])
+    @test isnothing(ref.imsk)
+    # The result carries the objects of the reduced universe beside the mask.
+    @test size(res.pr.X, 2) == length(keep)
+    @test length(res.wb.lb) == length(keep)
+    return nothing
+end
+
+@testset "Hierarchical Risk Parity reduces and expands" begin
+    # One measure.
+    test_hierarchical_parity(optimise(HierarchicalRiskParity(; opt = optn), rd),
+                             optimise(HierarchicalRiskParity(; opt = optk), rdk))
+    # And a vector of them, which takes the scalarised branch.
+    rs = [Variance(), ConditionalValueatRisk()]
+    test_hierarchical_parity(optimise(HierarchicalRiskParity(; r = rs, opt = optn), rd),
+                             optimise(HierarchicalRiskParity(; r = rs, opt = optk), rdk))
+    # The clustering is built from the reduced prior, so it holds one leaf per live asset.
+    res = optimise(HierarchicalRiskParity(; opt = optn), rd)
+    @test length(assignments(res.clr)) == length(keep)
+end
+
+@testset "Hierarchical Equal Risk Contribution reduces and expands" begin
+    test_hierarchical_parity(optimise(HierarchicalEqualRiskContribution(; opt = optn), rd),
+                             optimise(HierarchicalEqualRiskContribution(; opt = optk), rdk))
+    test_hierarchical_parity(optimise(HierarchicalEqualRiskContribution(; ri = [Variance()],
+                                                                        ro = Variance(),
+                                                                        opt = optn), rd),
+                             optimise(HierarchicalEqualRiskContribution(; ri = [Variance()],
+                                                                        ro = Variance(),
+                                                                        opt = optk), rdk))
+end
+
+@testset "Schur Complement HRP reduces and expands" begin
+    # One parameter bundle.
+    test_hierarchical_parity(optimise(SchurComplementHierarchicalRiskParity(; opt = optn),
+                                      rd),
+                             optimise(SchurComplementHierarchicalRiskParity(; opt = optk),
+                                      rdk))
+    # And a vector of them, which blends over portfolios.
+    ps = [SchurComplementParams(; gamma = 0.5), SchurComplementParams(; gamma = 0.25)]
+    test_hierarchical_parity(optimise(SchurComplementHierarchicalRiskParity(; params = ps,
+                                                                            opt = optn),
+                                      rd),
+                             optimise(SchurComplementHierarchicalRiskParity(; params = ps,
+                                                                            opt = optk),
+                                      rdk))
+end
+
+@testset "Nested Clustered reduces once, and the cluster slice indexes the reduced axis" begin
+    # The reduction happens before the clustering, so no cluster holds a non-investable
+    # asset and every `port_opt_view(opti, cl, X)` below indexes the reduced universe.
+    res = optimise(NestedClustered(; pe = prn, opti = HierarchicalRiskParity(),
+                                   opto = HierarchicalRiskParity()), rd)
+    ref = optimise(NestedClustered(; pe = prk, opti = HierarchicalRiskParity(),
+                                   opto = HierarchicalRiskParity()), rdk)
+    test_hierarchical_parity(res, ref)
+    # Every inner result is a result of its own cluster of live assets, so the widths sum to
+    # the reduced universe rather than to the full one.
+    @test sum(length(r.w) for r in res.resi) == length(keep)
+end
+
+@testset "A pre-fitted clustering of the wrong width is refused" begin
+    # `clusterise` returns a fitted result unchanged and nothing slices its leaf order, so a
+    # clustering of the full universe against a reduced one would index the wrong columns.
+    clr = optimise(HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = pr)), rd).clr
+    @test length(assignments(clr)) == N
+    # The same clustering is correct when nothing is reduced.
+    res = optimise(HierarchicalRiskParity(;
+                                          opt = HierarchicalOptimiser(; pe = pr, cle = clr)),
+                   rd)
+    @test isa(res.retcode, PortfolioOptimisers.OptimisationSuccess)
+    # And refused when the mask has narrowed the universe under it.
+    for opt in
+        (HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = prn, cle = clr)),
+         HierarchicalEqualRiskContribution(;
+                                           opt = HierarchicalOptimiser(; pe = prn,
+                                                                       cle = clr)),
+         SchurComplementHierarchicalRiskParity(;
+                                               opt = HierarchicalOptimiser(; pe = prn,
+                                                                           cle = clr)),
+         NestedClustered(; pe = prn, cle = clr, opti = HierarchicalRiskParity(),
+                         opto = HierarchicalRiskParity()))
+        @test_throws DimensionMismatch optimise(opt, rd)
+    end
+end
+
+@testset "The hierarchical all-investable path is the path it was" begin
+    # No mask, no reduction, no expansion, and every result of the family says so the same
+    # way.
+    for opt in (HierarchicalRiskParity(; opt = optk),
+                HierarchicalEqualRiskContribution(; opt = optk),
+                SchurComplementHierarchicalRiskParity(; opt = optk),
+                NestedClustered(; pe = prk, opti = HierarchicalRiskParity(),
+                                opto = HierarchicalRiskParity()))
+        res = optimise(opt, rdk)
+        @test isnothing(res.imsk)
+        @test length(res.w) == length(keep)
+        @test isapprox(sum(res.w), 1; rtol = 1e-10)
+    end
+end
+
+@testset "The reduction verb takes a hierarchical head" begin
+    # One verb, bound to the root, so the head itself is what reduces outside the JuMP
+    # families: its own `port_opt_view` slices every estimator it holds.
+    hrp = HierarchicalRiskParity(; opt = optn)
+    imsk, pro, hrpo, rdo = PortfolioOptimisers.investable_reduction(prn, hrp, rd)
+    @test imsk == BitVector([1, 1, 0, 1, 1])
+    @test size(pro.X, 2) == length(keep)
+    @test size(rdo.X, 2) == length(keep)
+    @test size(hrpo.opt.pe.X, 2) == length(keep)
+    @test isa(hrpo, HierarchicalRiskParity)
+    # And the `nothing` method returns the head untouched.
+    hrp = HierarchicalRiskParity(; opt = optk)
+    imsk, pro, hrpo, rdo = PortfolioOptimisers.investable_reduction(prk, hrp, rdk)
+    @test isnothing(imsk)
+    @test pro === prk
+    @test hrpo === hrp
+    @test rdo === rdk
+end

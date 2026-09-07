@@ -6,6 +6,7 @@ ClusteringOptimisationEstimator
 BaseHierarchicalOptimisationResult
 HierarchicalOptimisationResult
 HierarchicalResult
+assert_clustering_universe
 HierarchicalRiskParityResult
 factory(res::HierarchicalRiskParityResult, fb::Option{<:OptE_Opt})
 HierarchicalEqualRiskContributionResult

@@ -2755,7 +2755,7 @@ The optimiser solves over the assets the Investable Mask keeps, so its weight ve
 
 A failed solve carries `NaN` at every solved position. The expansion keeps that distinction — `NaN` where the optimiser tried and failed, zero where it never could — rather than flattening both to zero.
 
-The `nothing` mask returns the weights unchanged, so nothing is copied when every asset is investable, and a `nothing` weight vector stays `nothing`, which is what a naive head records when its finaliser gave up. The vector-of-vectors method serves the efficient-frontier route, where one weight vector is recorded per sweep point. [`JuMPOptimisationSolution`](@ref) carries its own methods beside the JuMP prelude.
+The `nothing` mask returns the weights unchanged, so nothing is copied when every asset is investable, and a `nothing` weight vector stays `nothing`, which is what a naive head records when its finaliser gave up. The vector-of-vectors method serves the efficient-frontier route, where one weight vector is recorded per sweep point. [`JuMPOptimisationSolution`](@ref) carries its own methods beside the JuMP prelude, and they delegate to the plain weight vector here, so one length check and one message serve every family.
 
 The **keyword** constructor of each optimisation result is the caller, and every family builds its result through it. The positional constructor never expands, because every return-code rebuild goes through it and a second pass would expand twice.
 

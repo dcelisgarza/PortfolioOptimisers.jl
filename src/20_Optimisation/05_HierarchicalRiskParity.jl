@@ -324,11 +324,18 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
     hrp = reset_time_dependent_estimator(hrp)
     rd = returns_result_picker(rd, hrp.opt.brt)
     pr = prior(hrp.opt.pe, rd; dims = dims)
+    # The prior fits on the coverage universe and returns a result on the full asset
+    # universe, where an asset it could not estimate carries `NaN`. Reduce once, here:
+    # the distance the clustering is built from never sees a `NaN`, and the cluster count
+    # is chosen on the investable universe. The weights are expanded back in
+    # `HierarchicalResult`.
+    imsk, pr, hrp, rd = investable_reduction(pr, hrp, rd)
     X = pr.X
     # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
     # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).
     clr = clusterise(hrp.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa, dims = dims,
                      x_src = hrp.opt.x_src)
+    assert_clustering_universe(clr, size(X, 2))
     r = factory(hrp.r, pr, hrp.opt.slv)
     wu = Matrix{eltype(X)}(undef, size(X, 2), 2)
     fees = fees_constraints(hrp.opt.fees, hrp.opt.sets; strict = hrp.opt.strict,
@@ -364,8 +371,9 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
     return HierarchicalRiskParityResult(;
                                         hr = HierarchicalResult(; pr = pr, clr = clr,
                                                                 wb = wb, fees = fees,
-                                                                retcode = retcode, w = w),
-                                        r = r, sca = hrp.sca, fb = nothing)
+                                                                retcode = retcode, w = w,
+                                                                imsk = imsk), r = r,
+                                        sca = hrp.sca, fb = nothing)
 end
 """
     hrp_scalarised_risk(sca::Scalariser, wu::MatNum, wk::VecNum, rku::VecNum,
@@ -437,11 +445,18 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
     hrp = reset_time_dependent_estimator(hrp)
     rd = returns_result_picker(rd, hrp.opt.brt)
     pr = prior(hrp.opt.pe, rd; dims = dims)
+    # The prior fits on the coverage universe and returns a result on the full asset
+    # universe, where an asset it could not estimate carries `NaN`. Reduce once, here:
+    # the distance the clustering is built from never sees a `NaN`, and the cluster count
+    # is chosen on the investable universe. The weights are expanded back in
+    # `HierarchicalResult`.
+    imsk, pr, hrp, rd = investable_reduction(pr, hrp, rd)
     X = pr.X
     # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
     # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).
     clr = clusterise(hrp.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa, dims = dims,
                      x_src = hrp.opt.x_src)
+    assert_clustering_universe(clr, size(X, 2))
     r = factory(hrp.r, pr, hrp.opt.slv)
     wu = Matrix{eltype(X)}(undef, size(X, 2), 2)
     wk = zeros(eltype(X), size(X, 2))
@@ -472,8 +487,9 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
     return HierarchicalRiskParityResult(;
                                         hr = HierarchicalResult(; pr = pr, clr = clr,
                                                                 wb = wb, fees = fees,
-                                                                retcode = retcode, w = w),
-                                        r = r, sca = hrp.sca, fb = nothing)
+                                                                retcode = retcode, w = w,
+                                                                imsk = imsk), r = r,
+                                        sca = hrp.sca, fb = nothing)
 end
 """
     optimise(hrp::HierarchicalRiskParity{<:Any, <:Any, <:Any, <:Nothing},

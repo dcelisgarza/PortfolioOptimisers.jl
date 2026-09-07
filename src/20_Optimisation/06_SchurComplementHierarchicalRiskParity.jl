@@ -43,16 +43,21 @@ It carries **no scalariser**, because it carries no vector of measures to combin
         gamma::Union{<:Number, <:VecNum},
         retcode::OptimisationReturnCode,
         w::Option{<:VecNum},
+        imsk::Option{<:BitVector} = nothing,
         fb::Option{<:OptE_Opt}
     ) -> SchurComplementHierarchicalRiskParityResult
 
 Keywords correspond to the struct's fields.
+
+The keyword constructor is the one door `_optimise` exits through, so it is where the solved weights expand back onto the full asset universe, through [`expand_investable_weights`](@ref). The positional constructor never expands, because a rebuild goes through it and a second pass would expand twice.
 
 # Related
 
   - [`SchurComplementHierarchicalRiskParity`](@ref)
   - [`HierarchicalOptimisationResult`](@ref)
   - [`NonFiniteAllocationOptimisationResult`](@ref)
+  - [`investable_reduction`](@ref)
+  - [`expand_investable_weights`](@ref)
 """
 @concrete struct SchurComplementHierarchicalRiskParityResult <:
                  HierarchicalOptimisationResult
@@ -85,6 +90,10 @@ Keywords correspond to the struct's fields.
     """
     w
     """
+    $(field_dict[:imsk])
+    """
+    imsk
+    """
     $(field_dict[:fb])
     """
     fb
@@ -95,10 +104,12 @@ Keywords correspond to the struct's fields.
                                                          gamma::Union{<:Number, <:VecNum},
                                                          retcode::OptimisationReturnCode,
                                                          w::Option{<:VecNum},
+                                                         imsk::Option{<:BitVector},
                                                          fb::Option{<:OptE_Opt})
         return new{typeof(pr), typeof(wb), typeof(clr), typeof(r), typeof(gamma),
-                   typeof(retcode), typeof(w), typeof(fb)}(pr, wb, clr, r, gamma, retcode,
-                                                           w, fb)
+                   typeof(retcode), typeof(w), typeof(imsk), typeof(fb)}(pr, wb, clr, r,
+                                                                         gamma, retcode, w,
+                                                                         imsk, fb)
     end
 end
 function SchurComplementHierarchicalRiskParityResult(; pr::Option{<:AbstractPriorResult},
@@ -108,9 +119,11 @@ function SchurComplementHierarchicalRiskParityResult(; pr::Option{<:AbstractPrio
                                                      gamma::Union{<:Number, <:VecNum},
                                                      retcode::OptimisationReturnCode,
                                                      w::Option{<:VecNum},
+                                                     imsk::Option{<:BitVector} = nothing,
                                                      fb::Option{<:OptE_Opt})::SchurComplementHierarchicalRiskParityResult
-    return SchurComplementHierarchicalRiskParityResult(pr, wb, clr, r, gamma, retcode, w,
-                                                       fb)
+    return SchurComplementHierarchicalRiskParityResult(pr, wb, clr, r, gamma, retcode,
+                                                       expand_investable_weights(imsk, w),
+                                                       imsk, fb)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1019,11 +1032,18 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
     sh = reset_time_dependent_estimator(sh)
     rd = returns_result_picker(rd, sh.opt.brt)
     pr = prior(sh.opt.pe, rd; dims = dims)
+    # The prior fits on the coverage universe and returns a result on the full asset
+    # universe, where an asset it could not estimate carries `NaN`. Reduce once, here: the
+    # augmented matrix the Schur complement builds is finite, and the leaf permutation
+    # indexes the investable universe. The weights are expanded back in
+    # `SchurComplementHierarchicalRiskParityResult`.
+    imsk, pr, sh, rd = investable_reduction(pr, sh, rd)
     X = pr.X
     # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
     # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).
     clr = clusterise(sh.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa, dims = dims,
                      x_src = sh.opt.x_src)
+    assert_clustering_universe(clr, size(X, 2))
     items = [clr.res.order]
     wb = weight_bounds_constraints(sh.opt.wb, sh.opt.sets; N = size(X, 2),
                                    strict = sh.opt.strict, datatype = eltype(X))
@@ -1032,7 +1052,7 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
     retcode, w = finalise_weight_bounds(sh.opt.wf, wb, w)
     return SchurComplementHierarchicalRiskParityResult(; pr = pr, wb = wb, clr = clr, r = r,
                                                        gamma = gamma, retcode = retcode,
-                                                       w = w, fb = nothing)
+                                                       w = w, imsk = imsk, fb = nothing)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1052,11 +1072,18 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVe
     sh = reset_time_dependent_estimator(sh)
     rd = returns_result_picker(rd, sh.opt.brt)
     pr = prior(sh.opt.pe, rd; dims = dims)
+    # The prior fits on the coverage universe and returns a result on the full asset
+    # universe, where an asset it could not estimate carries `NaN`. Reduce once, here: the
+    # augmented matrix the Schur complement builds is finite, and the leaf permutation
+    # indexes the investable universe. The weights are expanded back in
+    # `SchurComplementHierarchicalRiskParityResult`.
+    imsk, pr, sh, rd = investable_reduction(pr, sh, rd)
     X = pr.X
     # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
     # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).
     clr = clusterise(sh.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa, dims = dims,
                      x_src = sh.opt.x_src)
+    assert_clustering_universe(clr, size(X, 2))
     items = [clr.res.order]
     wb = weight_bounds_constraints(sh.opt.wb, sh.opt.sets; N = size(X, 2),
                                    strict = sh.opt.strict, datatype = eltype(X))
@@ -1075,7 +1102,7 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVe
     return SchurComplementHierarchicalRiskParityResult(; pr = pr, wb = wb, clr = clr,
                                                        r = [rs...], gamma = gammas,
                                                        retcode = retcode, w = w,
-                                                       fb = nothing)
+                                                       imsk = imsk, fb = nothing)
 end
 """
     optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any, Nothing},

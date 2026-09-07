@@ -101,16 +101,21 @@ $(DocStringExtensions.FIELDS)
         wb::Option{<:WeightBounds},
         fees::Option{<:Fees},
         retcode::OptimisationReturnCode,
-        w::Option{<:VecNum}
+        w::Option{<:VecNum},
+        imsk::Option{<:BitVector} = nothing
     ) -> HierarchicalResult
 
 Keywords correspond to the struct's fields.
+
+The keyword constructor is the one door a hierarchical `_optimise` exits through, so it is where the solved weights expand back onto the full asset universe, through [`expand_investable_weights`](@ref). The positional constructor never expands: every retcode rebuild goes through it, and a second pass would expand twice.
 
 # Related
 
   - [`BaseHierarchicalOptimisationResult`](@ref)
   - [`HierarchicalRiskParityResult`](@ref)
   - [`HierarchicalEqualRiskContributionResult`](@ref)
+  - [`investable_reduction`](@ref)
+  - [`expand_investable_weights`](@ref)
 """
 @concrete struct HierarchicalResult <: BaseHierarchicalOptimisationResult
     """
@@ -137,20 +142,66 @@ Keywords correspond to the struct's fields.
     $(field_dict[:pw])
     """
     w
+    """
+    $(field_dict[:imsk])
+    """
+    imsk
     function HierarchicalResult(pr::Option{<:AbstractPriorResult},
                                 clr::Option{<:AbstractClusteringResult},
                                 wb::Option{<:WeightBounds}, fees::Option{<:Fees},
-                                retcode::OptimisationReturnCode, w::Option{<:VecNum})
+                                retcode::OptimisationReturnCode, w::Option{<:VecNum},
+                                imsk::Option{<:BitVector})
         return new{typeof(pr), typeof(clr), typeof(wb), typeof(fees), typeof(retcode),
-                   typeof(w)}(pr, clr, wb, fees, retcode, w)
+                   typeof(w), typeof(imsk)}(pr, clr, wb, fees, retcode, w, imsk)
     end
 end
 function HierarchicalResult(; pr::Option{<:AbstractPriorResult},
                             clr::Option{<:AbstractClusteringResult},
                             wb::Option{<:WeightBounds}, fees::Option{<:Fees},
-                            retcode::OptimisationReturnCode,
-                            w::Option{<:VecNum})::HierarchicalResult
-    return HierarchicalResult(pr, clr, wb, fees, retcode, w)
+                            retcode::OptimisationReturnCode, w::Option{<:VecNum},
+                            imsk::Option{<:BitVector} = nothing)::HierarchicalResult
+    return HierarchicalResult(pr, clr, wb, fees, retcode,
+                              expand_investable_weights(imsk, w), imsk)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Assert that a clustering covers exactly the universe the optimisation is about to allocate over.
+
+[`clusterise`](@ref) returns a fitted [`AbstractClusteringResult`](@ref) unchanged, so a caller who states one instead of an estimator states the leaf order as well. Nothing slices that order. Under an Investable Mask, or inside a subset or a nested view, the universe below the call is narrower than the one the caller clustered, and the leaf order would index the wrong columns. The weights would still come back, and they would be wrong, so the mismatch is refused where it is first visible.
+
+A fixed clustering under a changing universe is stated as a [`ClustersEstimator`](@ref), which refits per window and always matches.
+
+# Algorithm
+
+ 1. Read one cluster label per asset with [`assignments`](@ref).
+ 2. Throw a `DimensionMismatch` when their count is not `N`.
+
+# Arguments
+
+  - `clr`: Clustering result, fitted or just built.
+  - `N`: Number of assets the optimisation runs on, after the reduction.
+
+# Validation
+
+  - The clustering must carry one label per asset of the reduced universe.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`clusterise`](@ref)
+  - [`Clusters`](@ref)
+  - [`ClustersEstimator`](@ref)
+  - [`investable_reduction`](@ref)
+"""
+function assert_clustering_universe(clr::AbstractClusteringResult, N::Integer)::Nothing
+    Nc = length(assignments(clr))
+    @argcheck(Nc == N,
+              DimensionMismatch("the clustering covers $(Nc) assets, but the optimisation runs on $(N). A fitted clustering result is used exactly as stated, so it must be stated over the universe the optimisation runs on. State a `ClustersEstimator` instead when the universe changes."))
+    return nothing
 end
 """
 $(DocStringExtensions.TYPEDEF)
