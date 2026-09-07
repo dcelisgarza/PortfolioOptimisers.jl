@@ -43,6 +43,8 @@
 
 Plot the cumulative returns of a portfolio.
 
+A gapped panel reaches this figure only through the returns the caller hands it. A prediction arity is finite already, because the fold zeroed the Held Gap once in [`predict`](@ref). A `w, X` or `w, rd` arity computes on the matrix the caller holds and checks nothing: `X * w` is `NaN` at a gap even where the weight is zero. Score a gapped panel through `predict(res, rd)` and plot the prediction.
+
 # Arguments
 
   - `w`: Portfolio weights vector or vector of weight vectors.
@@ -83,6 +85,8 @@ function plot_portfolio_cumulative_returns end
 
 Plot the cumulative returns of individual assets, selecting the most relevant via `N`.
 Assets beyond the top `N` are aggregated into an "Others" series.
+
+A per-asset line **keeps its gap**, which the backend draws as a break, and that break is the delisting. Read against a prediction the same line is flat, because the fold zeroed the Held Gap before the series was formed. The "Others" aggregate cannot keep a gap: one `NaN` poisons every date of the sum, at any weight, so it excludes a column that is not finite throughout, through [`finite_columns`](@ref). The aggregate therefore describes the rest of the universe without the assets it cannot value.
 
 # Arguments
 
@@ -407,6 +411,8 @@ function plot_clusters end
 Plot portfolio drawdown over time. Marks AverageDrawdown, UlcerIndex, DaR, CDaR and
 MaximumDrawdown with horizontal lines, plus EDaR and RLDaR when `slv` is provided.
 
+A gapped panel reaches this figure only through the returns the caller hands it. A prediction arity is finite already, because the fold zeroed the Held Gap once in [`predict`](@ref). A `w, X` or `w, rd` arity computes on the matrix the caller holds and checks nothing: `X * w` is `NaN` at a gap even where the weight is zero. Score a gapped panel through `predict(res, rd)` and plot the prediction.
+
 # Arguments
 
   - `w`: Portfolio weights.
@@ -452,6 +458,8 @@ function plot_drawdowns end
     plot_measures(ppred::PopulationPredictionResult; x, y, z, c, slv, factory, kwargs...) -> Plot
 
 Scatter plot of risk/return measures across a collection of portfolio weight vectors.
+
+Each axis is one [`expected_risk`](@ref) call, and that verb reduces to the Investable Mask at its own entry against a Prior Result, which is ADR 0118's value-level door. So a gapped prior is handled one level below this figure, and no check is added here. A prediction arity is finite already, because the fold zeroed the Held Gap once in [`predict`](@ref).
 
 # Arguments
 
@@ -508,6 +516,8 @@ function plot_measures end
 Plot a histogram of portfolio returns with vertical risk-measure lines and an optional
 fitted Normal distribution.
 
+A gapped panel reaches this figure only through the returns the caller hands it. A prediction arity is finite already, because the fold zeroed the Held Gap once in [`predict`](@ref). A `w, X` or `w, rd` arity computes on the matrix the caller holds and checks nothing: `X * w` is `NaN` at a gap even where the weight is zero. Score a gapped panel through `predict(res, rd)` and plot the prediction.
+
 # Arguments
 
   - `w`: Portfolio weights.
@@ -549,6 +559,8 @@ Plot the asset network (MST, PMFG, TMFG, or adjacency) as a graph using
 `GraphRecipes.graphplot`. Node size is uniform by default; pass `w` to scale node
 area proportionally to portfolio weight.
 
+A non-investable asset is **not drawn**. The figure fits a phylogeny matrix on `pr.X`, and a plain moment estimator refuses a gapped sample, so the prior arity reduces itself, its names and its weights to the Investable Mask at its entry through [`investable_plot_view`](@ref). The graph is the investable universe, and no edge of a dead asset is drawn. The bare `X` and [`ReturnsResult`](@ref) arities carry no moments, so no mask exists to derive and they compute on the matrix the caller holds.
+
 # Arguments
 
   - `pl`: Network or clustering estimator.
@@ -584,6 +596,8 @@ function plot_network end
 
 Bar chart of asset centrality scores, sorted in descending order.
 
+A non-investable asset is **not drawn**. The figure fits a centrality vector on `pr.X`, and a plain moment estimator refuses a gapped sample, so the prior arity reduces to the Investable Mask at its entry through [`investable_plot_view`](@ref). The axis is the investable universe. The bare `X` and [`ReturnsResult`](@ref) arities carry no moments, so no mask exists to derive and they compute on the matrix the caller holds.
+
 # Arguments
 
   - $(arg_dict[:cte])
@@ -615,6 +629,8 @@ function plot_centrality end
 Standalone correlation (or covariance) heatmap without clustering or dendrograms.
 If the input contains a covariance matrix, it is normalised to a correlation matrix before plotting.
 
+A non-investable asset is drawn rather than removed. It carries `NaN` down its row and its column of `sigma`, so those cells are blank, and the blank is the record of the gap. The colour limits of a correlation are fixed at `(-1, 1)`, so one gap does not flatten the scale.
+
 Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
 # Related
@@ -639,6 +655,8 @@ function plot_correlation end
     plot_mu(pred::PredictionResult[, rd]; N, kwargs...) -> Plot
 
 Bar chart of per-asset expected returns (μ vector).
+
+A non-investable asset is drawn rather than removed. It carries `NaN` in the prior's moments, so its bar is blank, and that blank is the record of the gap. The ranking reads [`finite_magnitudes`](@ref), so the blank never takes the top slot from a live asset, and the frame is unchanged when the count does not truncate.
 
 # Arguments
 
@@ -673,6 +691,8 @@ function plot_mu end
     plot_sigma(pred::PredictionResult[, rd]; variance, N, kwargs...) -> Plot
 
 Bar chart of per-asset volatility (√diag(Σ)).
+
+A non-investable asset is drawn rather than removed. It carries `NaN` on the diagonal of `sigma`, so its bar is blank, and that blank is the record of the gap. The ranking reads [`finite_magnitudes`](@ref), so the blank never takes the top slot from a live asset, and the frame is unchanged when the count does not truncate.
 
 # Arguments
 
@@ -710,6 +730,8 @@ function plot_sigma end
 Heatmap of the factor loadings matrix B (assets × factors) from a prior with a regression
 model. Uses a diverging colour scale centred at zero.
 
+A non-investable asset is drawn rather than removed. It carries `NaN` down its row of the loadings, so that row is blank cells, and the blank is the record of the gap. The colour limits are [`finite_symmetric_clim`](@ref), so one gap does not flatten the scale. The factor axis is unaffected: the gap is on the asset axis alone.
+
 Requires that the prior carries a factor block, checked by [`assert_prior_regression`](@ref):
 `pr.rr` must not be `nothing`. The matrix arity takes `M` directly and needs no prior.
 
@@ -739,6 +761,8 @@ function plot_factor_loadings end
 
 Correlation/covariance heatmap of the factor covariance matrix (`pr.fpr.sigma`). Behaves
 identically to [`plot_correlation`](@ref) but operates on the factor space.
+
+The figure draws the **factor** axis, and a non-investable asset is on the asset axis, so a gap never reaches it. It needs neither a blank nor a reduction.
 
 Requires that the prior carries a factor block, checked by [`assert_prior_regression`](@ref):
 `fpr` travels with `rr`, so the check is on `rr` and establishes the whole block. The matrix
@@ -771,6 +795,8 @@ function plot_factor_sigma end
     plot_eigenspectrum(pred::PredictionResult[, rd]; reference, kwargs...) -> Plot
 
 Bar chart of eigenvalues of the covariance/correlation matrix, sorted in descending order.
+
+A non-investable asset is **not drawn**. `eigvals(Symmetric(sigma))` refuses a `NaN`, so the prior arity reduces to the Investable Mask at its entry through [`investable_plot_view`](@ref), and the spectrum is the spectrum of the investable block. The bare `sigma` arity computes on the matrix the caller holds, and a gap in it raises rather than reduces.
 
 # Arguments
 
@@ -808,6 +834,8 @@ function plot_eigenspectrum end
     plot_rolling_measure(r, ppred::PopulationPredictionResult; rolling, sca, kwargs...) -> Plot
 
 Line plot of a risk or return measure evaluated over a rolling window of portfolio returns.
+
+A gapped panel reaches this figure only through the returns the caller hands it. A prediction arity is finite already, because the fold zeroed the Held Gap once in [`predict`](@ref). A `w, X` or `w, rd` arity computes on the matrix the caller holds and checks nothing: `X * w` is `NaN` at a gap even where the weight is zero. Score a gapped panel through `predict(res, rd)` and plot the prediction.
 
 # Arguments
 
@@ -945,6 +973,8 @@ Three-panel composite plot summarising a prior result:
  2. Asset volatility bar chart ([`plot_sigma`](@ref)).
  3. Correlation heatmap ([`plot_correlation`](@ref)).
 
+Every panel draws, so a non-investable asset is drawn rather than removed, and the three panels agree on the frame. Each panel's own docstring states what its blank means.
+
 # Arguments
 
   - `pr::AbstractPriorResult`: Prior result containing `mu` and `sigma`.
@@ -979,6 +1009,8 @@ function plot_prior end
     plot_factor_mu(pred::PredictionResult[, rd]; N, kwargs...) -> Plot
 
 Bar chart of per-factor expected returns (`pr.fpr.mu`, from a factor model prior).
+
+The figure draws the **factor** axis, and a non-investable asset is on the asset axis, so a gap never reaches it. It needs neither a blank nor a reduction.
 
 Requires that the prior carries a factor block, checked by [`assert_prior_regression`](@ref):
 `fpr` travels with `rr`, so the check is on `rr` and establishes the whole block. The vector
@@ -1059,6 +1091,8 @@ function plot_benchmark end
 Heatmap of the coskewness matrix (N × N²) from a [`HighOrderPrior`](@ref).
 Uses a diverging colour scale centred at zero.
 
+A non-investable asset is drawn rather than removed. It carries `NaN` down its row and every column of a pair it belongs to, so those cells are blank, and the blank is the record of the gap. The colour limits are [`finite_symmetric_clim`](@ref), so one gap does not flatten the scale.
+
 Requires that `pr.sk` is not `nothing` (i.e. the prior was estimated with higher moments).
 
 Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
@@ -1087,6 +1121,8 @@ function plot_coskewness end
     plot_cokurtosis(pred::PredictionResult[, rd]; heatmap, reference, kwargs...) -> Plot
 
 Eigenvalue spectrum of the cokurtosis matrix (N² × N²) from a [`HighOrderPrior`](@ref).
+
+The two arities of the figure take opposite sides of ADR 0118's rule, because one draws and the other computes. Under `heatmap = true` the figure **draws**: a non-investable asset keeps its rows and its columns, they are blank cells, and the colour limits are [`finite_symmetric_clim`](@ref) so one gap does not flatten the scale. Under the default the figure **computes**: `eigvals(Symmetric(kt))` refuses a `NaN`, so the prior arity reduces to the Investable Mask at its entry through [`investable_plot_view`](@ref), and the spectrum is that of the investable block, which is `Nᵢ²` long rather than `N²`. The bare `kt` arity computes on the matrix the caller holds, and a gap in it raises rather than reduces.
 
 # Arguments
 
@@ -1140,6 +1176,8 @@ Four-panel composite plot for a single optimisation result:
 Note: panel 3 requires raw asset returns. Pass `rd::ReturnsResult` (original returns),
 not a `PredictionResult`, for the risk contribution panel.
 
+Each panel takes its own side of ADR 0118's rule, and this figure adds no rule of its own. Panel 1 draws a weight, which is zero at a non-investable asset. Panel 3 goes through [`risk_contribution`](@ref), which reduces to the Investable Mask at its own entry against a Prior Result and expands the per-asset answer. Panels 2 and 4 compute on the returns the caller hands them, so a gapped panel is scored through `predict(res, rd)` first.
+
 # Arguments
 
   - `res::OptimisationResult`: Optimisation result.
@@ -1184,6 +1222,8 @@ Four-panel composite plot for a walk-forward cross-validation result:
  2. Fold-shaded cumulative returns ([`plot_portfolio_cumulative_returns`](@ref)).
  3. Turnover per fold ([`plot_turnover`](@ref)).
  4. Weight stability box plot ([`plot_weight_stability`](@ref)).
+
+Every panel reads a walk-forward prediction, whose fold zeroed its Held Gaps once in [`predict`](@ref) and whose weights are full length at every fold. So the four panels share one frame across folds, and this figure adds no rule of its own.
 
 # Arguments
 
@@ -1284,6 +1324,8 @@ Every method other than the first computes a [`PerformanceSummaryResult`](@ref) 
 there, not here, so a caller who wants the numbers rather than the bars can call
 [`performance_summary`](@ref) directly and needs no plotting package.
 
+A gapped panel reaches this figure only through the returns the caller hands it. A prediction arity is finite already, because the fold zeroed the Held Gap once in [`predict`](@ref). A `w, X` or `w, rd` arity computes on the matrix the caller holds and checks nothing: `X * w` is `NaN` at a gap even where the weight is zero. Score a gapped panel through `predict(res, rd)` and plot the prediction.
+
 # Arguments
 
   - `ps`: A [`PerformanceSummaryResult`](@ref) to render.
@@ -1331,6 +1373,8 @@ function plot_performance_summary end
     plot_rolling_drawdowns(mpred::MultiPeriodPredictionResult; rolling, compound, kwargs...) -> Plot
 
 Line plot of the rolling maximum drawdown over a sliding window.
+
+A gapped panel reaches this figure only through the returns the caller hands it. A prediction arity is finite already, because the fold zeroed the Held Gap once in [`predict`](@ref). A `w, X` or `w, rd` arity computes on the matrix the caller holds and checks nothing: `X * w` is `NaN` at a gap even where the weight is zero. Score a gapped panel through `predict(res, rd)` and plot the prediction.
 
 # Arguments
 
@@ -2276,6 +2320,10 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Select the top-N assets from a weight vector by absolute weight magnitude.
 
+The ranking is taken over [`finite_magnitudes`](@ref), so a non-investable asset ranks below
+every live one and counts for nothing. The frame is unchanged when the count does not
+truncate, which is the drawn plots' rule.
+
 # Arguments
 
   - `w::VecNum`: Portfolio weight vector.
@@ -2286,11 +2334,11 @@ Select the top-N assets from a weight vector by absolute weight magnitude.
 # Returns
 
   - `Tuple{Int, Vector{Int}}`: `(N, idx)` where `N` is the number of selected assets and
-    `idx` is a permutation vector sorted descending by `|w|`.
+    `idx` is a permutation vector sorted descending by `|w|`, with a non-finite entry last.
 
 # Details
 
-  - When `N_opt` is `nothing`, `N_eff = number_effective_assets(w)`.
+  - When `N_opt` is `nothing`, `N_eff = number_effective_assets(finite_magnitudes(w))`.
   - When `0 < N_eff ≤ 1`, `N_eff` is treated as a concentration threshold: `N` is the
     smallest index such that the cumulative normalised absolute weight covers at least
     `1 - N_eff` of the total; falls back to `M` if no such index exists.
@@ -2299,10 +2347,11 @@ Select the top-N assets from a weight vector by absolute weight magnitude.
 # Related
 
   - [`number_effective_assets`](@ref)
+  - [`finite_magnitudes`](@ref)
 """
 function relevant_assets(w::VecNum, M::Integer, N_opt::Option{<:Number} = nothing)
-    N_eff = isnothing(N_opt) ? number_effective_assets(w) : N_opt
-    abs_w = abs.(w)
+    abs_w = finite_magnitudes(w)
+    N_eff = isnothing(N_opt) ? number_effective_assets(abs_w) : N_opt
     idx = sortperm(abs_w; rev = true)
     abs_w_norm = abs_w ./ sum(abs_w)
     N = if one(N_eff) >= N_eff > zero(N_eff)
@@ -2313,6 +2362,148 @@ function relevant_assets(w::VecNum, M::Integer, N_opt::Option{<:Number} = nothin
         clamp(ceil(Int, N_eff), 1, M)
     end
     return N, idx
+end
+
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Take the ranking magnitudes of a per-asset vector, with a non-finite entry ranked last.
+
+A figure that shows the top assets sorts by the size of a per-asset number. A non-investable asset carries `NaN` in that number, and `NaN` sorts **first** under `rev = true`, so a blank bar would take the top slot from a live asset. The same `NaN` poisons every reduction the ranking needs: `inv(dot(v, v))` and `sum(v)` are both `NaN`, and `ceil(Int, NaN)` throws an `InexactError`.
+
+Mapping a non-finite entry to zero settles all three. The entry ranks below every live asset, it counts for nothing, and the frame is unchanged when the count does not truncate. A vector whose entries are all finite is untouched, because the ranking already read `abs`.
+
+# Arguments
+
+  - `v`: A per-asset number the figure ranks by, such as an expected return, a volatility, a centrality score or a weight.
+
+# Returns
+
+  - `m::Vector`: `abs(vᵢ)` at every finite entry, and zero at every other.
+
+# Related
+
+  - [`relevant_assets`](@ref)
+  - [`finite_symmetric_clim`](@ref)
+  - [`investable_mask`](@ref)
+"""
+function finite_magnitudes(v::VecNum)
+    return map(vi -> isfinite(vi) ? abs(vi) : zero(vi), v)
+end
+
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Take the symmetric colour limits of a heatmap over its finite entries alone.
+
+`maximum(abs, A)` is `NaN` when any entry of `A` is, and a `NaN` colour limit paints every cell one colour. A drawn plot of a Prior Result keeps the full universe, so it does meet a `NaN`: a non-investable asset carries one down its row and its column. The limits are therefore taken over the finite entries, and the blank cell is drawn against the scale the live cells set.
+
+# Arguments
+
+  - `A`: The matrix the heatmap draws.
+
+# Returns
+
+  - `clim::Tuple`: `(-c, c)`, where `c` is the largest finite absolute entry of `A`.
+
+# Related
+
+  - [`finite_magnitudes`](@ref)
+  - [`investable_mask`](@ref)
+"""
+function finite_symmetric_clim(A::MatNum)
+    c = maximum(x -> isfinite(x) ? abs(x) : zero(x), A)
+    return (-c, c)
+end
+
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Keep the columns of `idx` whose column of `X` is finite throughout.
+
+A figure that draws one line per asset keeps a gapped asset, and the break in its line is the delisting. A figure that sums several assets into **one** aggregate line cannot: a single `NaN` in the sum poisons every date of it, at any weight, the zero an optimiser gave a non-investable asset included. Such a series draws nothing at all, so the aggregate excludes the asset instead of carrying it.
+
+The rule reads the column rather than a mask, because the aggregate is formed from a returns matrix the caller holds and no prior travels with it.
+
+# Arguments
+
+  - `X`: Asset returns matrix (observations × assets).
+  - `idx`: Column indices the aggregate would sum.
+
+# Returns
+
+  - `keep::VecInt`: The entries of `idx` whose column of `X` holds no non-finite entry.
+
+# Related
+
+  - [`plot_asset_cumulative_returns`](@ref)
+  - [`investable_mask`](@ref)
+"""
+function finite_columns(X::MatNum, idx::AbstractVector{<:Integer})
+    return [i for i in idx if all(isfinite, view(X, :, i))]
+end
+
+"""
+    investable_plot_view(pr::AbstractPriorResult, nx = nothing, w = nothing)
+    investable_plot_view(rd::AbstractReturnsResult, nx = nothing, w = nothing)
+    investable_plot_view(imsk::Nothing, pr::AbstractPriorResult, nx, w)
+    investable_plot_view(imsk::BitVector, pr::AbstractPriorResult, nx, w)
+
+Reduce a prior result, the axis names and the weights a computed figure draws to the Investable Mask.
+
+This is ADR 0118's rule at the figure's door. A **drawn** plot keeps the frame: a heatmap or a bar chart of a Prior Result shows the full universe, and the backend leaves a blank cell and a missing bar where the asset is not investable. A **computed** plot has no such option. `eigvals(Symmetric(sigma))` refuses a `NaN`, and a phylogeny or a centrality score is fitted by a plain moment estimator, which refuses one too. Such a figure reduces here instead, and it draws the investable universe alone.
+
+The reduction is the one [`port_opt_view`](@ref) the prior's owner already writes, so a new block cannot be forgotten and the reduced `pr.X` carries no dead column. The names and the weights ride the asset axis, so they take the mask directly.
+
+A [`ReturnsResult`](@ref) carries no moments, so no mask exists to derive and it passes through. That is what lets one door state the reduction once and dispatch decide whether it happens.
+
+No diagnostic is emitted. A figure is a drawing rather than a number a caller acts on, and the docstring of each computed plot says that a non-investable asset is not drawn.
+
+# Algorithm
+
+ 1. Return the three arguments unchanged when the carrier is a returns result.
+ 2. Derive the Investable Mask once with [`investable_mask`](@ref).
+ 3. Return the three unchanged when every asset is investable.
+ 4. Otherwise return a [`port_opt_view`](@ref) of the prior at `findall(imsk)`, and the views of the names and the weights at the mask.
+
+# Arguments
+
+  - `pr`: Prior result, or [`ReturnsResult`](@ref).
+  - `nx`: Asset names of the axis, or `nothing`.
+  - `w`: Portfolio weights the figure sizes by, or `nothing`.
+  - `imsk`: The Investable Mask, or `nothing` when every asset is investable.
+
+# Returns
+
+  - `(pr, nx, w)`: The three reduced to the Investable Mask, or unchanged.
+
+# Related
+
+  - [`investable_mask`](@ref)
+  - [`investable_reduction`](@ref)
+  - [`port_opt_view`](@ref)
+  - [`plot_eigenspectrum`](@ref)
+  - [`plot_network`](@ref)
+  - [`plot_centrality`](@ref)
+"""
+function investable_plot_view(pr::AbstractPriorResult,
+                              nx::Option{<:AbstractVector} = nothing,
+                              w::Option{<:VecNum} = nothing)
+    return investable_plot_view(investable_mask(pr), pr, nx, w)
+end
+function investable_plot_view(rd::AbstractReturnsResult,
+                              nx::Option{<:AbstractVector} = nothing,
+                              w::Option{<:VecNum} = nothing)
+    return rd, nx, w
+end
+function investable_plot_view(::Nothing, pr::AbstractPriorResult,
+                              nx::Option{<:AbstractVector}, w::Option{<:VecNum})
+    return pr, nx, w
+end
+function investable_plot_view(imsk::BitVector, pr::AbstractPriorResult,
+                              nx::Option{<:AbstractVector}, w::Option{<:VecNum})
+    return port_opt_view(pr, findall(imsk)), nothing_scalar_array_view(nx, imsk),
+           nothing_scalar_array_view(w, imsk)
 end
 
 """

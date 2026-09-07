@@ -563,6 +563,14 @@ The record a fold keeps of what the portfolio actually held: the asset returns i
 An observation and asset pair at which the portfolio's weight is non-zero and the asset's return is missing. A fold views its test window at the Investable Mask first, then zeroes every missing return of the investable columns once, before it forms its Net Returns and before the Weight Drift compounds, so the series is always finite and the missing weight sits in cash on that observation. A zero weight at a missing return is silent. A Held Gap is named through the strictness policy: a warning by default, a refusal under `strict`. See ADR 0118.
 *Avoid*: a non-investable asset, which is a per-fit fact the Investable Mask states and the optimiser reduces away. A Held Gap is per observation, and it arises where the universe changes after the fit.
 
+**Drawn Plot**
+A figure that renders a block of a prior result as it stands: a heatmap of `sigma`, a bar chart of `mu`, a heatmap of the loadings or of the coskewness. It keeps the **full** universe, and the backend leaves a blank cell or a missing bar where an asset is not investable, so the blank is the record of the gap. Its ranking and its colour limits read the finite entries alone, because `NaN` sorts first and poisons every reduction. See ADR 0118.
+*Avoid*: a Computed Plot (below), which cannot keep the frame. `plot_cokurtosis` is both, one arity each.
+
+**Computed Plot**
+A figure that computes a new quantity from a block of a prior result before it draws: an eigenspectrum, a phylogeny network, a centrality bar chart. `eigvals` refuses a `NaN`, and a plain moment estimator refuses a gapped sample, so such a figure reduces to the Investable Mask at its entry and draws the investable universe alone. Its docstring says that a non-investable asset is not drawn. See ADR 0118.
+*Avoid*: a Drawn Plot (above). The two differ by whether the figure computes, not by whether it is a heatmap or a bar chart.
+
 ### 4.7 Finite Allocation (post-processing)
 
 Discretises continuous weights into whole shares for a fixed cash budget, since real markets have no fractional shares.

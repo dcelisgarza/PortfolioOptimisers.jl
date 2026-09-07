@@ -9,7 +9,9 @@ import PortfolioOptimisers: ArrNum, VecNum, MatNum, Option, VecNum_VecVecNum, Sl
                             AbstractClustersEstimator, AbstractClusteringResult,
                             AbstractBaseRiskMeasure, BaseRM_VecBaseRM, VecBaseRM,
                             Scalariser, SumScalariser, measure_label, extract_pr,
-                            relevant_assets, extract_fees, OptimisationResult
+                            relevant_assets, extract_fees, OptimisationResult,
+                            finite_magnitudes, finite_symmetric_clim, finite_columns,
+                            investable_plot_view
 
 ## plot_portfolio_cumulative_returns
 function PortfolioOptimisers.plot_portfolio_cumulative_returns(net_ret::VecNum_VecVecNum;
@@ -120,7 +122,7 @@ function PortfolioOptimisers.plot_asset_cumulative_returns(w::VecNum, X::MatNum,
         plot!(f, ts, view(ret_sorted, :, i); label = string(nx_sorted[i]))
     end
     if M > N
-        rest_idx = view(idx, (N + 1):M)
+        rest_idx = finite_columns(X, view(idx, (N + 1):M))
         rest_ret = cumulative_returns(calc_net_returns(view(w, rest_idx),
                                                        view(X, :, rest_idx),
                                                        PortfolioOptimisers.port_opt_view(fees,
@@ -209,8 +211,11 @@ function PortfolioOptimisers.plot_asset_cumulative_returns(pred::MultiPeriodPred
         plot!(f, ts, view(ret_sorted, :, i); label = string(nx_sorted[i]))
     end
     if M > N
-        rest_idx = view(idx, (N + 1):M)
-        rest_ret = vec(sum(X; dims = 2) - sum(view(X, :, 1:N); dims = 2))
+        # The rest is the assets the ranking left out, which is `view(idx, (N + 1):M)` and
+        # not the first `N` columns of `X`: `idx` is a ranking, so the two coincide only
+        # when the ranking is the identity.
+        rest_idx = finite_columns(X, view(idx, (N + 1):M))
+        rest_ret = vec(sum(view(X, :, rest_idx); dims = 2))
         plot!(f, ts, rest_ret; label = "Others")
     end
     plot!(f; legend = :outerright, kwargs...)
@@ -438,20 +443,22 @@ function PortfolioOptimisers.plot_network(pl::NwE_ClE_Cl, pr::Pr_RR,
     if isa(pr, ReturnsResult) && !isnothing(pr.nx)
         nx = pr.nx
     end
-    return PortfolioOptimisers.plot_network(pl, pr.X, nx, w; kwargs...)
+    pr_i, nx_i, w_i = investable_plot_view(pr, nx, w)
+    return PortfolioOptimisers.plot_network(pl, pr_i.X, nx_i, w_i; kwargs...)
 end
 function PortfolioOptimisers.plot_network(pl::NwE_ClE_Cl, res::OptimisationResult;
                                           rd::Option{<:Pr_RR} = nothing,
                                           nx::AbstractVector = 1:length(res.w), kwargs...)
-    pr = if isa(rd, ReturnsResult)
-        if !isnothing(rd.nx)
-            nx = rd.nx
-        end
-        rd
-    elseif isnothing(rd)
-        extract_pr(res, pr)
-    end
-    return PortfolioOptimisers.plot_network(pl, rd.X, nx, res.w; kwargs...)
+    # A result carries the prior of the universe it *solved*, which ADR 0115 reduced, while
+    # its weights and the caller's names are on the full universe the solution expanded
+    # onto. The two axes are therefore paired here and not in the prior arity, whose mask is
+    # already `nothing`. Issue #884 carries the same pairing to every other result arity,
+    # and to the fees, which ride the weights' axis.
+    pr = extract_pr(res, rd)
+    imsk = isnothing(rd) ? PortfolioOptimisers.result_investable_mask(res) : nothing
+    w = isnothing(imsk) ? res.w : PortfolioOptimisers.investable_weights_view(imsk, res.w)
+    nx = isnothing(imsk) ? nx : nx[imsk]
+    return PortfolioOptimisers.plot_network(pl, pr, w; nx = nx, kwargs...)
 end
 ## plot_dendrogram
 function PortfolioOptimisers.plot_dendrogram(clr::AbstractClusteringResult,
@@ -789,7 +796,8 @@ function PortfolioOptimisers.plot_centrality(cte::AbstractCentralityEstimator,
                                              nx::AbstractVector = 1:size(pr.X, 2);
                                              N::Option{<:Number} = nothing,
                                              percentage::Bool = true, kwargs...)
-    return PortfolioOptimisers.plot_centrality(cte, pr.X, nx; N = N,
+    pr_i, nx_i = investable_plot_view(pr, nx)
+    return PortfolioOptimisers.plot_centrality(cte, pr_i.X, nx_i; N = N,
                                                percentage = percentage, kwargs...)
 end
 function PortfolioOptimisers.plot_centrality(cte::AbstractCentralityEstimator,
@@ -964,14 +972,16 @@ end
 ## plot_eigenspectrum
 function PortfolioOptimisers.plot_eigenspectrum(pr::PortfolioOptimisers.AbstractPriorResult;
                                                 reference::Bool = true, kwargs...)
-    return PortfolioOptimisers.plot_eigenspectrum(pr.sigma; reference = reference,
+    pr_i, = investable_plot_view(pr)
+    return PortfolioOptimisers.plot_eigenspectrum(pr_i.sigma; reference = reference,
                                                   kwargs...)
 end
 function PortfolioOptimisers.plot_eigenspectrum(pr::PortfolioOptimisers.AbstractPriorResult,
                                                 rd::ReturnsResult; reference::Bool = true,
                                                 kwargs...)
     T = isnothing(rd.X) ? nothing : size(rd.X, 1)
-    return PortfolioOptimisers.plot_eigenspectrum(pr.sigma; N_obs = T,
+    pr_i, = investable_plot_view(pr)
+    return PortfolioOptimisers.plot_eigenspectrum(pr_i.sigma; N_obs = T,
                                                   reference = reference, kwargs...)
 end
 function PortfolioOptimisers.plot_eigenspectrum(res::OptimisationResult;
@@ -1178,19 +1188,28 @@ end
 ## plot_cokurtosis
 function PortfolioOptimisers.plot_cokurtosis(pr::HighOrderPrior,
                                              nx::AbstractVector = 1:isqrt(size(pr.kt, 1));
-                                             reference::Bool = true, kwargs...)
+                                             heatmap::Bool = false, reference::Bool = true,
+                                             kwargs...)
     if isnothing(pr.kt)
         throw(ArgumentError("prior has no cokurtosis matrix (`kt` is `nothing`)"))
     end
-    return PortfolioOptimisers.plot_cokurtosis(pr.kt, nx; reference = reference, kwargs...)
+    if heatmap
+        return PortfolioOptimisers.plot_cokurtosis(pr.kt, nx; heatmap = true,
+                                                   reference = reference, kwargs...)
+    end
+    pr_i, = investable_plot_view(pr)
+    return PortfolioOptimisers.plot_cokurtosis(pr_i.kt, nx; heatmap = false,
+                                               reference = reference, kwargs...)
 end
 function PortfolioOptimisers.plot_cokurtosis(pr::HighOrderPrior, rd::ReturnsResult;
-                                             reference::Bool = true, kwargs...)
+                                             heatmap::Bool = false, reference::Bool = true,
+                                             kwargs...)
     if isnothing(pr.kt)
         throw(ArgumentError("prior has no cokurtosis matrix (`kt` is `nothing`)"))
     end
     nx = isnothing(rd.nx) ? (1:isqrt(size(pr.kt, 1))) : rd.nx
-    return PortfolioOptimisers.plot_cokurtosis(pr.kt, nx; reference = reference, kwargs...)
+    return PortfolioOptimisers.plot_cokurtosis(pr, nx; heatmap = heatmap,
+                                               reference = reference, kwargs...)
 end
 function PortfolioOptimisers.plot_cokurtosis(res::OptimisationResult;
                                              reference::Bool = true, kwargs...)
@@ -1591,7 +1610,7 @@ function PortfolioOptimisers.plot_sigma(sigma::MatNum,
     vals = variance ? LinearAlgebra.diag(sigma) : sqrt.(LinearAlgebra.diag(sigma))
     ylabel_str = variance ? "Variance (σ²)" : "Volatility (σ)"
     M = length(vals)
-    idx = sortperm(vals; rev = true)
+    idx = sortperm(finite_magnitudes(vals); rev = true)
     N_show = isnothing(N) ? M : clamp(ceil(Int, N), 1, M)
     top_idx = idx[1:N_show]
     sort!(top_idx)
@@ -1608,10 +1627,9 @@ function PortfolioOptimisers.plot_factor_loadings(M::MatNum,
                                                   nf::AbstractVector = 1:size(M, 2);
                                                   kwargs...)
     Na, Nf = size(M)
-    clim_val = maximum(abs, M)
     return heatmap(M; xticks = (1:Nf, string.(nf)), yticks = (1:Na, string.(nx)),
                    xrotation = 90, color = cgrad(:RdBu; rev = true),
-                   clim = (-clim_val, clim_val), title = "Factor Loadings",
+                   clim = finite_symmetric_clim(M), title = "Factor Loadings",
                    colorbar_title = "β", yflip = true, kwargs...)
 end
 ## ────────────────────────────────────────────────────────────────────────────
@@ -1868,7 +1886,6 @@ function PortfolioOptimisers.plot_coskewness(sk::MatNum, nx::AbstractVector = 1:
                                              kwargs...)
     N = size(sk, 1)
     N2 = size(sk, 2)
-    clim_val = maximum(abs, sk)
     tick_step = max(1, div(N2, 20))
     col_ticks = collect(1:tick_step:N2)
     col_labels = if N <= 10
@@ -1878,7 +1895,7 @@ function PortfolioOptimisers.plot_coskewness(sk::MatNum, nx::AbstractVector = 1:
     end
     return heatmap(sk; yticks = (1:N, string.(nx)), xticks = (col_ticks, col_labels),
                    xrotation = 90, color = cgrad(:RdBu; rev = true),
-                   clim = (-clim_val, clim_val), title = "Coskewness Matrix",
+                   clim = finite_symmetric_clim(sk), title = "Coskewness Matrix",
                    colorbar_title = "S̃", yflip = true, kwargs...)
 end
 ## ────────────────────────────────────────────────────────────────────────────
@@ -1890,10 +1907,10 @@ function PortfolioOptimisers.plot_cokurtosis(kt::MatNum,
                                              heatmap::Bool = false, reference::Bool = true,
                                              kwargs...)
     if heatmap
-        clim_val = maximum(abs, kt)
         return StatsPlots.heatmap(kt; color = cgrad(:RdBu; rev = true),
-                                  clim = (-clim_val, clim_val), title = "Cokurtosis Matrix",
-                                  colorbar_title = "K̃", yflip = true, kwargs...)
+                                  clim = finite_symmetric_clim(kt),
+                                  title = "Cokurtosis Matrix", colorbar_title = "K̃",
+                                  yflip = true, kwargs...)
     else
         ev = sort(real.(eigvals(Symmetric(kt))); rev = true)
         N2 = length(ev)

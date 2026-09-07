@@ -63,5 +63,9 @@ plot_idio_skewness
 plot_idio_vol_ic
 plot_idio_vol_residual_dependence
 relevant_assets
+finite_magnitudes
+finite_symmetric_clim
+finite_columns
+investable_plot_view
 attribution_plot_axis
 ```

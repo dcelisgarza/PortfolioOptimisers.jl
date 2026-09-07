@@ -309,6 +309,6 @@
 "src/23_Pipeline/03_Pipeline.jl" = { map = 12, units = 27, swept = false }
 "src/23_Pipeline/04_PredictionCV.jl" = { map = 12, units = 14, swept = false }
 "src/23_Pipeline/05_SearchCrossValidation.jl" = { map = 12, units = 9, swept = false }
-"src/24_Plotting.jl" = { map = 13, units = 63, swept = false }
+"src/24_Plotting.jl" = { map = 13, units = 67, swept = false }
 "src/25_Aliases.jl" = { map = 1, units = 132, algorithm = 0, swept = true }
 "src/PortfolioOptimisers.jl" = { map = 1, units = 1, algorithm = 0, swept = true }

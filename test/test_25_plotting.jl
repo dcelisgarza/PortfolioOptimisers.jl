@@ -630,4 +630,147 @@
         @test_throws PortfolioOptimisers.IsNothingError plot_idio_calibration(no_rr_id)
         @test_throws PortfolioOptimisers.IsNothingError plot_idio_vol_ic(no_rr_id)
     end
+
+    @testset "A drawn plot keeps the frame, a computed plot reduces (#857)" begin
+        # ADR 0118's plotting half. A heatmap or a bar chart of a Prior Result draws the
+        # full universe and leaves a blank for a non-investable asset; a plot that computes
+        # on the prior's blocks reduces to the Investable Mask first, because `eigvals` and
+        # a plain moment estimator both refuse a `NaN`.
+        #
+        # The oracle for a computed plot is the same figure over the universe with the dead
+        # asset removed **by hand**, which is the oracle `test/test_50_investable_reduction.jl`
+        # uses for the optimiser side.
+        rng_pv = MersenneTwister(857)
+        T_pv, N_pv = 160, 5
+        X_pv = randn(rng_pv, T_pv, N_pv) ./ 100 .+ 0.0005
+        nx_pv = ["a", "b", "c", "d", "e"]
+        k_pv, keep_pv = 3, [1, 2, 4, 5]
+        rd_pv = ReturnsResult(; nx = nx_pv, X = X_pv)
+        pr_pv = prior(EmpiricalPrior(), rd_pv)
+        hpr_pv = prior(HighOrderPriorEstimator(), rd_pv)
+
+        mu_pv = collect(pr_pv.mu)
+        sigma_pv = collect(pr_pv.sigma)
+        Xn_pv = collect(pr_pv.X)
+        mu_pv[k_pv] = NaN
+        sigma_pv[k_pv, :] .= NaN
+        sigma_pv[:, k_pv] .= NaN
+        Xn_pv[:, k_pv] .= NaN
+        prn_pv = LowOrderPrior(; X = Xn_pv, mu = mu_pv, sigma = sigma_pv)
+        prk_pv = LowOrderPrior(; X = pr_pv.X[:, keep_pv], mu = pr_pv.mu[keep_pv],
+                               sigma = pr_pv.sigma[keep_pv, keep_pv])
+
+        skn_pv = collect(hpr_pv.sk)
+        ktn_pv = collect(hpr_pv.kt)
+        skn_pv[k_pv, :] .= NaN
+        ktn_pv[k_pv, :] .= NaN
+        ktn_pv[:, k_pv] .= NaN
+        hprn_pv = HighOrderPrior(; pr = prn_pv, kt = ktn_pv, D2 = hpr_pv.D2, L2 = hpr_pv.L2,
+                                 S2 = hpr_pv.S2, sk = skn_pv, V = hpr_pv.V,
+                                 skmp = hpr_pv.skmp)
+        hprk_pv = PortfolioOptimisers.port_opt_view(hpr_pv, keep_pv)
+
+        w_pv = [0.4, 0.3, 0.0, 0.2, 0.1]
+        # A bar series is a polygon whose vertices are separated by `NaN`, so two figures are
+        # compared with `isequal` rather than `==`.
+        sy_pv(p, i = 1) = p.series_list[i][:y]
+        same_pv(a, b) = length(a) == length(b) && all(isequal.(a, b))
+
+        # ── the three ranking and colour rules ────────────────────────────────────────
+        @test PortfolioOptimisers.finite_magnitudes([1.0, -2.0, NaN, 0.5]) ==
+              [1.0, 2.0, 0.0, 0.5]
+        @test PortfolioOptimisers.finite_magnitudes([1.0, -2.0]) == [1.0, 2.0]
+        @test PortfolioOptimisers.finite_symmetric_clim([1.0 NaN; -3.0 2.0]) == (-3.0, 3.0)
+        @test PortfolioOptimisers.finite_columns([1.0 NaN 3.0; 4.0 5.0 6.0], [1, 2, 3]) ==
+              [1, 3]
+        # The blank never takes a top slot from a live asset, and it ranks last.
+        N_rel, idx_rel = PortfolioOptimisers.relevant_assets([0.4, 0.3, NaN, 0.2, 0.1], 5,
+                                                             3)
+        @test N_rel == 3
+        @test idx_rel == [1, 2, 4, 5, 3]
+
+        # ── the reduction verb ────────────────────────────────────────────────────────
+        prv_pv, nxv_pv, wv_pv = PortfolioOptimisers.investable_plot_view(prn_pv, nx_pv,
+                                                                         w_pv)
+        @test length(prv_pv.mu) == length(keep_pv)
+        @test collect(nxv_pv) == nx_pv[keep_pv]
+        @test collect(wv_pv) == w_pv[keep_pv]
+        # A complete prior and a returns result are the identity, objects included.
+        @test PortfolioOptimisers.investable_plot_view(pr_pv, nx_pv, w_pv) ===
+              (pr_pv, nx_pv, w_pv)
+        @test PortfolioOptimisers.investable_plot_view(rd_pv, nx_pv, w_pv) ===
+              (rd_pv, nx_pv, w_pv)
+
+        # ── piece 1: the drawn plots keep the frame ───────────────────────────────────
+        for p_pv in (plot_mu(prn_pv, nx_pv), plot_mu(prn_pv, nx_pv; N = 3),
+                     plot_sigma(prn_pv, nx_pv), plot_sigma(prn_pv, nx_pv; N = 3),
+                     plot_correlation(prn_pv, nx_pv), plot_prior(prn_pv, nx_pv),
+                     plot_coskewness(hprn_pv, nx_pv),
+                     plot_cokurtosis(hprn_pv, nx_pv; heatmap = true))
+            @test is_plot(p_pv)
+        end
+        # The frame is the full universe: the axis carries every asset, gapped or not. The
+        # bar itself is missing, which is what the backend draws at a `NaN`, so the gapped
+        # figure holds fewer polygon vertices than the complete one.
+        @test plot_mu(prn_pv, nx_pv)[1][:xaxis][:ticks][2] == nx_pv
+        @test plot_sigma(prn_pv, nx_pv)[1][:xaxis][:ticks][2] == nx_pv
+        @test length(sy_pv(plot_mu(prn_pv, nx_pv))) < length(sy_pv(plot_mu(pr_pv, nx_pv)))
+        @test length(sy_pv(plot_sigma(prn_pv, nx_pv))) <
+              length(sy_pv(plot_sigma(pr_pv, nx_pv)))
+        # A blank never takes a top slot, so a truncated frame holds live assets alone.
+        @test nx_pv[k_pv] ∉ plot_mu(prn_pv, nx_pv; N = 3)[1][:xaxis][:ticks][2]
+        @test nx_pv[k_pv] ∉ plot_sigma(prn_pv, nx_pv; N = 3)[1][:xaxis][:ticks][2]
+        @test size(plot_correlation(prn_pv, nx_pv).series_list[1][:z]) == (N_pv, N_pv)
+        @test size(plot_coskewness(hprn_pv, nx_pv).series_list[1][:z]) == (N_pv, N_pv^2)
+        @test size(plot_cokurtosis(hprn_pv, nx_pv; heatmap = true).series_list[1][:z]) ==
+              (N_pv^2, N_pv^2)
+        # A gapped loadings row leaves a blank, and the colour limit stays finite.
+        M_pv = randn(rng_pv, N_pv, 3)
+        M_pv[k_pv, :] .= NaN
+        nf_pv = ["f1", "f2", "f3"]
+        @test is_plot(plot_factor_loadings(M_pv, nx_pv, nf_pv))
+        @test all(isfinite, PortfolioOptimisers.finite_symmetric_clim(M_pv))
+
+        # ── piece 2: the computed plots reduce ────────────────────────────────────────
+        cte_pv = CentralityEstimator()
+        ne_pv = NetworkEstimator()
+        @test same_pv(sy_pv(plot_eigenspectrum(prn_pv)), sy_pv(plot_eigenspectrum(prk_pv)))
+        @test !same_pv(sy_pv(plot_eigenspectrum(prn_pv)), sy_pv(plot_eigenspectrum(pr_pv)))
+        @test same_pv(sy_pv(plot_eigenspectrum(prn_pv, rd_pv)),
+                      sy_pv(plot_eigenspectrum(prk_pv, rd_pv)))
+        @test same_pv(sy_pv(plot_centrality(cte_pv, prn_pv, nx_pv)),
+                      sy_pv(plot_centrality(cte_pv, prk_pv, nx_pv[keep_pv])))
+        @test same_pv(sy_pv(plot_cokurtosis(hprn_pv, nx_pv)),
+                      sy_pv(plot_cokurtosis(hprk_pv, nx_pv[keep_pv])))
+        # The returns-result arity takes both sides through the same door.
+        @test same_pv(sy_pv(plot_cokurtosis(hprn_pv, rd_pv)),
+                      sy_pv(plot_cokurtosis(hprn_pv, nx_pv)))
+        @test is_plot(plot_cokurtosis(hprn_pv, rd_pv; heatmap = true))
+        @test is_plot(plot_network(ne_pv, prn_pv, w_pv))
+        @test is_plot(plot_network(ne_pv, prn_pv))
+
+        # ── piece 4: the "rest" aggregate excludes what it cannot value ───────────────
+        p_ac_pv = plot_asset_cumulative_returns(w_pv, prn_pv; N = 2)
+        @test all(s_pv -> all(isfinite, s_pv[:y]), p_ac_pv.series_list)
+
+        # ── piece 3: a prediction is finite by the fold's filter ──────────────────────
+        Xd_pv = copy(X_pv)
+        Xd_pv[:, k_pv] .= NaN
+        Xd_pv[140:end, 5] .= NaN
+        rdd_pv = ReturnsResult(; nx = nx_pv, X = Xd_pv)
+        res_pv = optimise(MeanRisk(; opt = JuMPOptimiser(; pe = prn_pv, slv = slv)), rd_pv)
+        pred_pv = predict(res_pv, rdd_pv, collect(130:T_pv))
+        @test all(isfinite, sy_pv(plot_portfolio_cumulative_returns(pred_pv)))
+        @test is_plot(plot_drawdowns(pred_pv))
+
+        # The optimisation-result arity of `plot_network` resolved its own prior through a
+        # local that was not yet defined, so it raised an `UndefVarError` on every call.
+        # Behind that stood a second defect: the result carries the prior of the universe it
+        # solved, which ADR 0115 reduced, and weights the solution expanded onto the full
+        # one, so the two axes must be paired. Issue #884 owns the rest of that class.
+        @test PortfolioOptimisers.result_investable_mask(res_pv) ==
+              BitVector([1, 1, 0, 1, 1])
+        @test is_plot(plot_network(ne_pv, res_pv))
+        @test is_plot(plot_network(ne_pv, res_pv; rd = rd_pv))
+    end
 end

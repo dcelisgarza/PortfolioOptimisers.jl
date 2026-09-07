@@ -136,11 +136,19 @@ scenario-based measure. Under `strict = true` any fill refuses, whatever the fra
 ### A drawn plot keeps the frame, and a computed plot reduces
 
 A heatmap or a bar chart of a Prior Result, `plot_mu`, `plot_sigma`, `plot_correlation`,
-`plot_prior`, the factor plots, `plot_coskewness` and `plot_cokurtosis`, draws the full universe and
-the backend leaves a blank for a non-investable asset. A plot that computes on the matrix,
-`plot_eigenspectrum`, `plot_network` and `plot_centrality`, reduces to the Investable Mask first.
+`plot_prior`, the factor plots, `plot_coskewness` and `plot_cokurtosis` under `heatmap = true`,
+draws the full universe and the backend leaves a blank for a non-investable asset. A plot that
+computes on the matrix, `plot_eigenspectrum`, `plot_cokurtosis` under its default, `plot_network`
+and `plot_centrality`, reduces to the Investable Mask first. `plot_cokurtosis` takes both sides
+because its two arities are two figures: one draws the matrix and the other takes its eigenvalues.
 A series plot reads the funnel, and its prediction methods are finite by the fold's filter. A
-per-asset plot keeps the gap, which draws as a break. A weight plot draws the zero.
+per-asset plot keeps the gap, which draws as a break, and an aggregate of several assets excludes
+what it cannot value, because one `NaN` poisons a whole sum. A weight plot draws the zero.
+
+The ranking and the colour limits of a drawn plot read the **finite** entries alone. `NaN` sorts
+first under `rev = true`, so a blank bar would take the top slot from a live asset; `inv(dot(v, v))`
+and `maximum(abs, A)` are both `NaN`, and `ceil(Int, NaN)` raises. A frame that keeps the gap must
+therefore reduce over the finite entries wherever it ranks or scales.
 
 ### The tripwire is a census test by reflection
 
