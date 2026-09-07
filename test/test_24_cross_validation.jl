@@ -1652,7 +1652,8 @@
             @test PO.set_retcode(nc, rcf).retcode === rcf
             sr = SubsetResamplingResult(nothing, nothing, nothing, [resj],
                                         reshape(collect(1.0:length(resj.w)), length(resj.w),
-                                                1), OptimisationSuccess(), resj.w, nothing)
+                                                1), OptimisationSuccess(), resj.w, nothing,
+                                        nothing)
             @test PO.set_retcode(sr, rcf).retcode === rcf
         end
         @testset "mark_ruined_members fails the members that were dropped" begin
