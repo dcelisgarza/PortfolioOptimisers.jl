@@ -608,13 +608,15 @@ This head fits no prior, so no Prior Result yields an Investable Mask for it. Th
 """
 function _optimise(ew::EqualWeighted, rd::ReturnsResult; dims::Int = 1, kwargs...)
     @argcheck(!isnothing(rd.X), IsNothingError("rd.X cannot be nothing"))
-    assert_dims(dims)
+    assert_returns_result_dims(dims)
     ew = reset_time_dependent_estimator(ew)
     # This head fits no prior, so it derives the Coverage Universe of its own window and
     # reduces once, here: the weight bounds and the sets are stated over the full universe
     # and are viewed by the same index. `NaiveOptimisationResult` expands the weights back.
     cmsk, ew, rd = coverage_reduction(ew, rd; dims = dims)
-    N = size(rd.X, ifelse(isone(dims), 2, 1))
+    # `rd.X` is always observations by assets, whatever `dims` the caller passed, so the
+    # asset count is `size(rd.X, 2)` unconditionally.
+    N = size(rd.X, 2)
     w = fill(inv(N), N)
     wb = weight_bounds_constraints(ew.wb, ew.sets; N = N, strict = ew.strict,
                                    datatype = eltype(rd.X))
@@ -632,7 +634,7 @@ Run the equal-weighted portfolio optimisation.
 
   - `ew`: The equal-weighted optimiser to use.
   - $(arg_dict[:rd]) Its returns matrix and its Asset Panel give the Coverage Universe of the window, which is the universe the weights are spread over.
-  - `dims`: The dimension along which observations advance in time.
+  - `dims`: Must be `1`. A `ReturnsResult` is always observations × assets, so `dims == 2` throws `ConflictingArgumentError`; build one in this layout with `prices_to_returns`.
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
 """
 function optimise(ew::EqualWeighted{<:Any, <:Any, <:Any, Nothing}, rd::ReturnsResult;
@@ -812,13 +814,14 @@ A vector `alpha` is one concentration per asset of the **full** universe, becaus
 """
 function _optimise(rw::RandomWeighted, rd::ReturnsResult; dims::Int = 1, kwargs...)
     @argcheck(!isnothing(rd.X), IsNothingError("rd.X cannot be nothing"))
-    assert_dims(dims)
+    assert_returns_result_dims(dims)
     rw = reset_time_dependent_estimator(rw)
-    adim = ifelse(isone(dims), 2, 1)
+    # `rd.X` is always observations by assets, whatever `dims` the caller passed, so the
+    # asset count is `size(rd.X, 2)` unconditionally.
     if isa(rw.alpha, VecNum)
         # The caller states one concentration per asset of the full universe, so the check
         # reads the full width. The reduction below slices `alpha` with the rest.
-        Nf = size(rd.X, adim)
+        Nf = size(rd.X, 2)
         @argcheck(length(rw.alpha) == Nf,
                   DimensionMismatch("rw.alpha ($(length(rw.alpha))) must match N ($Nf)"))
     end
@@ -827,7 +830,7 @@ function _optimise(rw::RandomWeighted, rd::ReturnsResult; dims::Int = 1, kwargs.
     # the full universe and are viewed by the same index. `NaiveOptimisationResult` expands
     # the weights back.
     cmsk, rw, rd = coverage_reduction(rw, rd; dims = dims)
-    N = size(rd.X, adim)
+    N = size(rd.X, 2)
     dist = if isa(rw.alpha, Number)
         Distributions.Dirichlet(N, rw.alpha)
     else
@@ -851,7 +854,7 @@ Run the random-weighted portfolio optimisation.
 
   - `rw`: The random-weighted optimiser to use.
   - $(arg_dict[:rd]) Its returns matrix and its Asset Panel give the Coverage Universe of the window, which is the universe the draw is taken over.
-  - `dims`: The dimension along which observations advance in time.
+  - `dims`: Must be `1`. A `ReturnsResult` is always observations × assets, so `dims == 2` throws `ConflictingArgumentError`; build one in this layout with `prices_to_returns`.
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
 """
 function optimise(rw::RandomWeighted{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
