@@ -19,6 +19,14 @@ cov(ce::ExpWeightedCovariance, X::MatNum, pnl::Option{<:AssetPanel};
                         dims::Int = 1, kwargs...)
 cor(ce::ExpWeightedCovariance, X::MatNum, pnl::Option{<:AssetPanel};
                         dims::Int = 1, kwargs...)
+var(ce::ExpWeightedCovariance, X::MatNum, pnl::Option{<:AssetPanel};
+                        dims::Int = 1, kwargs...)
+std(ce::ExpWeightedCovariance, X::MatNum, pnl::Option{<:AssetPanel};
+                        dims::Int = 1, kwargs...)
+variance_series(ce::ExpWeightedCovariance, X::MatNum; dims::Int = 1,
+                         active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
+variance_series(ce::ExpWeightedCovariance, X::MatNum, pnl::Option{<:AssetPanel};
+                         dims::Int = 1, kwargs...)
 partial_fit!(ce::ExpWeightedCovariance, X::MatNum; dims::Int = 1,
                       active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
 partial_fit!(ce::ExpWeightedCovariance, x::VecNum;

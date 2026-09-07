@@ -412,3 +412,90 @@ end
                   PO.variance_series(ra, Xhol; estimation_mask = pnl_full.emsk,
                                      active_mask = pnl_full.amsk))
 end
+
+@testset "The mask-aware family answers the series and the marginals, issue #896" begin
+    # A mask-aware estimator overrides every panel verb it answers, so the panel call and the
+    # masked keyword call name the same answer. Where the override is missing the call lands on
+    # the reduce-and-expand root, which reduces the window and undoes the estimator.
+    #
+    # The three holes this closes: `variance_series` on `RegimeAdjustedExpWeightedCovariance`
+    # and on `ExpWeightedVariance`, and `var`, `std` and `variance_series` on
+    # `ExpWeightedCovariance`.
+    rac = RegimeAdjustedExpWeightedCovariance(; decay = 0.94, min_obs = 4,
+                                              regime_min_obs = 2)
+    ewv = ExpWeightedVariance(; decay = 0.94, min_obs = 4)
+    ewc = ExpWeightedCovariance(; decay = 0.94, min_obs = 4)
+
+    # The panel call and the masked keyword call agree, for every verb of every member.
+    @test isequal(PO.variance_series(rac, Xhol, pnl_full),
+                  PO.variance_series(rac, Xhol; estimation_mask = pnl_full.emsk,
+                                     active_mask = pnl_full.amsk))
+    @test isequal(PO.variance_series(ewv, Xhol, pnl_full),
+                  PO.variance_series(ewv, Xhol; active_mask = pnl_full.amsk))
+    @test isequal(PO.variance_series(ewc, Xhol, pnl_full),
+                  PO.variance_series(ewc, Xhol; active_mask = pnl_full.amsk))
+    @test isequal(Statistics.var(ewc, Xhol, pnl_full),
+                  Statistics.var(ewc, Xhol; active_mask = pnl_full.amsk))
+    @test isequal(Statistics.std(ewc, Xhol, pnl_full),
+                  Statistics.std(ewc, Xhol; active_mask = pnl_full.amsk))
+
+    # The forward pass names the expanding-window definition: row `t` is the fit on the first
+    # `t` observations, and no row reads an observation after its own.
+    for (ce, series) in
+        ((rac, PO.variance_series(rac, X0)), (ewv, PO.variance_series(ewv, X0)),
+         (ewc, PO.variance_series(ewc, X0)))
+        @test size(series) == (T, N)
+        for t in (1, 3, 4, 5, 30, T)
+            @test isequal(series[t, :], vec(Statistics.var(ce, view(X0, 1:t, :); dims = 1)))
+        end
+    end
+
+    # `dims = 2` transposes the same series. A mask-aware estimator reads its mask in the
+    # orientation of `X`, so a transposed call carries a transposed mask, or none.
+    for ce in (rac, ewv, ewc)
+        @test isequal(PO.variance_series(ce, permutedims(X0); dims = 2),
+                      permutedims(PO.variance_series(ce, X0)))
+    end
+    @test isequal(PO.variance_series(ewv, permutedims(X0); dims = 2,
+                                     active_mask = permutedims(pnl_full.amsk)),
+                  permutedims(PO.variance_series(ewv, X0, pnl_full)))
+
+    # No panel, and a static panel, both take the estimator's unmasked path.
+    @test isequal(PO.variance_series(ewv, X0, nothing), PO.variance_series(ewv, X0))
+    @test isequal(Statistics.var(ewc, X0, nothing), Statistics.var(ewc, X0))
+    @test isequal(Statistics.std(ewc, X0, nothing), Statistics.std(ewc, X0))
+
+    # The marginal of the covariance member is the diagonal of the covariance of the same call.
+    sigma = Statistics.cov(ewc, Xhol, pnl_full)
+    @test isequal(vec(Statistics.var(ewc, Xhol, pnl_full)), diag(sigma))
+    @test isequal(vec(Statistics.std(ewc, Xhol, pnl_full)), sqrt.(diag(sigma)))
+
+    # The defect the issue names: asset 4 lists at observation 31. The reduce-and-expand root
+    # drops it from every window and answers `NaN`; the override answers from the observations
+    # it has, once the warm-up is served.
+    plain = PO.variance_series(SimpleVariance(; corrected = false), Xlist, pnl_full)
+    @test all(isnan, view(plain, :, 4))
+    for ce in (rac, ewv, ewc)
+        got = PO.variance_series(ce, Xlist, pnl_full)
+        @test all(isnan, view(got, 1:30, 4))
+        @test all(isfinite, view(got, 35:T, 4))
+        # The three assets that never leave the window are untouched by the gap.
+        @test all(isfinite, view(got, 5:T, [1, 2, 3]))
+    end
+    @test all(isfinite, Statistics.var(ewc, Xlist, pnl_full))
+    @test all(isfinite, Statistics.std(ewc, Xlist, pnl_full))
+
+    # An inactive row resets the asset, so its count restarts and the warm-up runs again.
+    act = PO.variance_series(ewv, X0, pnl_inactive)
+    @test isnan(act[20, 1])
+    @test all(isfinite, view(act, 5:19, 1))
+    @test all(isfinite, view(act, 24:T, 1))
+
+    # `dims` is checked before the pass runs.
+    @test_throws DomainError PO.variance_series(ewv, X0; dims = 3)
+    @test_throws DomainError PO.variance_series(ewc, X0; dims = 3)
+    @test_throws DomainError PO.variance_series(rac, X0; dims = 3)
+    # A mask of the wrong size is refused by the pass.
+    @test_throws DimensionMismatch PO.variance_series(ewv, X0;
+                                                      active_mask = trues(T, N + 1))
+end

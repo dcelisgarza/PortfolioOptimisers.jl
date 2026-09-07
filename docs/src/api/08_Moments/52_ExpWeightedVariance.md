@@ -19,6 +19,10 @@ var(ce::ExpWeightedVariance, X::MatNum, pnl::Option{<:AssetPanel};
                         dims::Int = 1, kwargs...)
 std(ce::ExpWeightedVariance, X::MatNum, pnl::Option{<:AssetPanel};
                         dims::Int = 1, kwargs...)
+variance_series(ce::ExpWeightedVariance, X::MatNum; dims::Int = 1,
+                         active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
+variance_series(ce::ExpWeightedVariance, X::MatNum, pnl::Option{<:AssetPanel};
+                         dims::Int = 1, kwargs...)
 partial_fit!(ce::ExpWeightedVariance, X::MatNum; dims::Int = 1,
                       active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
 partial_fit!(ce::ExpWeightedVariance, x::VecNum;

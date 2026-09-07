@@ -66,4 +66,9 @@ var(ce::RegimeAdjustedExpWeightedCovariance, X::MatNum,
                         pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
 std(ce::RegimeAdjustedExpWeightedCovariance, X::MatNum,
                         pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+variance_series(ce::RegimeAdjustedExpWeightedCovariance, X::MatNum; dims::Int = 1,
+                         estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+                         active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
+variance_series(ce::RegimeAdjustedExpWeightedCovariance, X::MatNum,
+                         pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
 ```

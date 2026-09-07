@@ -2212,5 +2212,101 @@ function Statistics.std(ce::RegimeAdjustedExpWeightedCovariance, X::MatNum,
                           kwargs...)
 end
 
+"""
+    variance_series(
+        ce::RegimeAdjustedExpWeightedCovariance,
+        X::MatNum;
+        dims::Int = 1,
+        estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+        active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+        kwargs...
+    ) -> Matrix{<:Number}
+
+Compute the point-in-time regime-adjusted exponentially weighted variance series.
+
+Row `t` holds the diagonal of what `cov` returns for the first `t` observations of `X`, so no row reads an observation after its own. The update is a recursion over one observation, so this method overrides the expanding-window fallback with a **single forward pass**: it reads the cache after each observation instead of refitting.
+
+The fallback cannot answer this estimator. It slices `X` once per row and passes every keyword unsliced, so a mask of the whole window meets a window of `t` observations and the size check refuses the call.
+
+# Arguments
+
+  - `ce`: Regime-adjusted exponentially weighted covariance estimator.
+  - $(arg_dict[:X])
+  - $(arg_dict[:dims])
+  - `estimation_mask`: Optional boolean matrix with the same size as `X`. When provided,
+    only assets where `estimation_mask[i, :]` (or `[:, i]`) is `true` contribute to the
+    regime state update for observation `i`.
+  - `active_mask`: Optional boolean matrix with the same size as `X`. When provided,
+    assets that become inactive have their covariance and observation count reset.
+  - $(arg_dict[:ignkwargs])
+
+# Validation
+
+  - $(val_dict[:dims])
+  - If `estimation_mask` is not `nothing`, `size(X) == size(estimation_mask)`.
+  - If `active_mask` is not `nothing`, `size(X) == size(active_mask)`.
+
+# Returns
+
+  - `val::Matrix{<:Number}`: Variance series, shaped as `(T, N)` if `dims == 1` or `(N, T)` if
+    `dims == 2`. An asset with fewer than `ce.min_obs` observations at row `t` is `NaN` there.
+
+# Related
+
+  - [`RegimeAdjustedExpWeightedCovariance`](@ref)
+  - [`regime_adjusted_covariance`](@ref)
+  - [`variance_series(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
+"""
+function variance_series(ce::RegimeAdjustedExpWeightedCovariance, X::MatNum; dims::Int = 1,
+                         estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+                         active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
+    assert_dims(dims)
+    val = Matrix{eltype(X)}(undef, size(X, dims), size(X, setdiff((1, 2), (dims,))[1]))
+    regime_adjusted_covariance_pass!(ce, X, dims, estimation_mask, active_mask) do i, cache
+        val[i, :] = LinearAlgebra.diag(regime_adjusted_covariance(cache, ce))
+        return nothing
+    end
+
+    return isone(dims) ? val : permutedims(val)
+end
+"""
+    variance_series(
+        ce::RegimeAdjustedExpWeightedCovariance,
+        X::MatNum,
+        pnl::Option{<:AssetPanel};
+        dims::Int = 1,
+        kwargs...
+    ) -> Matrix{<:Number}
+
+Compute the point-in-time regime-adjusted exponentially weighted variance series from a window of an Asset Panel.
+
+This is the diagonal of the covariance of the same call, read after each observation, and it reads the panel's two masks through the same override.
+
+# Arguments
+
+  - `ce`: Regime-adjusted exponentially weighted covariance estimator.
+  - $(arg_dict[:X])
+  - $(arg_dict[:pnl_moment])
+  - $(arg_dict[:dims])
+  - $(arg_dict[:ignkwargs])
+
+# Returns
+
+  - `val::Matrix{<:Number}`: Variance series on the full asset universe, shaped as `(T, N)` if
+    `dims == 1` or `(N, T)` if `dims == 2`.
+
+# Related
+
+  - [`RegimeAdjustedExpWeightedCovariance`](@ref)
+  - [`variance_series(ce::RegimeAdjustedExpWeightedCovariance, X::MatNum; dims::Int = 1, estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)`](@ref)
+  - [`variance_series(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref)
+"""
+function variance_series(ce::RegimeAdjustedExpWeightedCovariance, X::MatNum,
+                         pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+    amsk, emsk = panel_moment_masks(pnl)
+    return variance_series(ce, X; dims = dims, estimation_mask = emsk, active_mask = amsk,
+                           kwargs...)
+end
+
 export RegimeAdjustedTarget, MahalanobisTarget, DiagonalTarget, PortfolioTarget,
        RegimeAdjustedExpWeightedCovariance

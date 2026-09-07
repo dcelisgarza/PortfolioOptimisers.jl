@@ -372,6 +372,56 @@ function Statistics.cor(ce::ExpWeightedCovariance, X::MatNum; dims::Int = 1,
                                            kwargs...))
 end
 """
+    variance_series(
+        ce::ExpWeightedCovariance,
+        X::MatNum;
+        dims::Int = 1,
+        active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+        kwargs...
+    ) -> Matrix{<:Number}
+
+Compute the point-in-time exponentially weighted variance series.
+
+Row `t` holds the diagonal of what `cov` returns for the first `t` observations of `X`, so no row reads an observation after its own. The update is a recursion over one observation, so this method overrides the expanding-window fallback with a **single forward pass**: it reads the cache after each observation instead of refitting.
+
+The fallback cannot answer this estimator. It slices `X` once per row and passes every keyword unsliced, so a mask of the whole window meets a window of `t` observations and the size check refuses the call.
+
+# Arguments
+
+  - `ce`: Exponentially weighted covariance estimator.
+  - $(arg_dict[:X])
+  - $(arg_dict[:dims])
+  - `active_mask`: Optional boolean matrix with the same size as `X`.
+  - $(arg_dict[:ignkwargs])
+
+# Validation
+
+  - $(val_dict[:dims])
+  - If `active_mask` is not `nothing`, `size(X) == size(active_mask)`.
+
+# Returns
+
+  - `val::Matrix{<:Number}`: Variance series, shaped as `(T, N)` if `dims == 1` or `(N, T)` if
+    `dims == 2`. An asset with fewer than `ce.min_obs` observations at row `t` is `NaN` there.
+
+# Related
+
+  - [`ExpWeightedCovariance`](@ref)
+  - [`exp_weighted_moment(cache::ExpWeightedCovarianceState, est::ExpWeightedCovariance)`](@ref)
+  - [`variance_series(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
+"""
+function variance_series(ce::ExpWeightedCovariance, X::MatNum; dims::Int = 1,
+                         active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
+    assert_dims(dims)
+    val = Matrix{eltype(X)}(undef, size(X, dims), size(X, setdiff((1, 2), (dims,))[1]))
+    exp_weighted_pass!(ce, X, dims, active_mask) do i, cache
+        val[i, :] = LinearAlgebra.diag(exp_weighted_moment(cache, ce))
+        return nothing
+    end
+
+    return isone(dims) ? val : permutedims(val)
+end
+"""
     Statistics.cov(
         ce::ExpWeightedCovariance,
         X::MatNum,
@@ -441,6 +491,113 @@ function Statistics.cor(ce::ExpWeightedCovariance, X::MatNum, pnl::Option{<:Asse
                         dims::Int = 1, kwargs...)
     amsk, _ = panel_moment_masks(pnl)
     return Statistics.cor(ce, X; dims = dims, active_mask = amsk, kwargs...)
+end
+"""
+    Statistics.var(
+        ce::ExpWeightedCovariance,
+        X::MatNum,
+        pnl::Option{<:AssetPanel};
+        dims::Int = 1,
+        kwargs...
+    ) -> MatNum
+
+Compute the marginal exponentially weighted variance from a window of an Asset Panel.
+
+This is the diagonal of the covariance of the same call, and it reads the panel's active mask through the same override.
+
+# Arguments
+
+  - `ce`: Exponentially weighted covariance estimator.
+  - $(arg_dict[:X])
+  - $(arg_dict[:pnl_moment])
+  - $(arg_dict[:dims])
+  - $(arg_dict[:ignkwargs])
+
+# Returns
+
+  - `var::MatNum`: Marginal variance, as a row where `dims` is `1` and as a column otherwise.
+
+# Related
+
+  - [`ExpWeightedCovariance`](@ref)
+  - [`Statistics.cov(ce::ExpWeightedCovariance, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref)
+"""
+function Statistics.var(ce::ExpWeightedCovariance, X::MatNum, pnl::Option{<:AssetPanel};
+                        dims::Int = 1, kwargs...)
+    amsk, _ = panel_moment_masks(pnl)
+    return Statistics.var(ce, X; dims = dims, active_mask = amsk, kwargs...)
+end
+"""
+    Statistics.std(
+        ce::ExpWeightedCovariance,
+        X::MatNum,
+        pnl::Option{<:AssetPanel};
+        dims::Int = 1,
+        kwargs...
+    ) -> MatNum
+
+Compute the marginal exponentially weighted volatility from a window of an Asset Panel.
+
+This is the square root of the diagonal of the covariance of the same call, and it reads the panel's active mask through the same override.
+
+# Arguments
+
+  - `ce`: Exponentially weighted covariance estimator.
+  - $(arg_dict[:X])
+  - $(arg_dict[:pnl_moment])
+  - $(arg_dict[:dims])
+  - $(arg_dict[:ignkwargs])
+
+# Returns
+
+  - `std::MatNum`: Marginal volatility, as a row where `dims` is `1` and as a column otherwise.
+
+# Related
+
+  - [`ExpWeightedCovariance`](@ref)
+  - [`Statistics.var(ce::ExpWeightedCovariance, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref)
+"""
+function Statistics.std(ce::ExpWeightedCovariance, X::MatNum, pnl::Option{<:AssetPanel};
+                        dims::Int = 1, kwargs...)
+    amsk, _ = panel_moment_masks(pnl)
+    return Statistics.std(ce, X; dims = dims, active_mask = amsk, kwargs...)
+end
+"""
+    variance_series(
+        ce::ExpWeightedCovariance,
+        X::MatNum,
+        pnl::Option{<:AssetPanel};
+        dims::Int = 1,
+        kwargs...
+    ) -> Matrix{<:Number}
+
+Compute the point-in-time exponentially weighted variance series from a window of an Asset Panel.
+
+This is the diagonal of the covariance of the same call, read after each observation, and it reads the panel's active mask through the same override. A Descriptor that holds this estimator therefore keeps a number for a young asset, where the reduce-and-expand root would reduce every window and answer `NaN`.
+
+# Arguments
+
+  - `ce`: Exponentially weighted covariance estimator.
+  - $(arg_dict[:X])
+  - $(arg_dict[:pnl_moment])
+  - $(arg_dict[:dims])
+  - $(arg_dict[:ignkwargs])
+
+# Returns
+
+  - `val::Matrix{<:Number}`: Variance series on the full asset universe, shaped as `(T, N)` if
+    `dims == 1` or `(N, T)` if `dims == 2`.
+
+# Related
+
+  - [`ExpWeightedCovariance`](@ref)
+  - [`variance_series(ce::ExpWeightedCovariance, X::MatNum; dims::Int = 1, active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)`](@ref)
+  - [`variance_series(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref)
+"""
+function variance_series(ce::ExpWeightedCovariance, X::MatNum, pnl::Option{<:AssetPanel};
+                         dims::Int = 1, kwargs...)
+    amsk, _ = panel_moment_masks(pnl)
+    return variance_series(ce, X; dims = dims, active_mask = amsk, kwargs...)
 end
 """
     partial_fit!(
