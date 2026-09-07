@@ -78,6 +78,7 @@ ForwardPanelFill
 BackwardPanelFill
 PortfolioOptimisers.panel_is_static
 PortfolioOptimisers.panel_field_axes
+PortfolioOptimisers.panel_value_eltype
 PortfolioOptimisers.panel_field_labels
 PortfolioOptimisers.panel_field_observed_labels
 PortfolioOptimisers.panel_field_stack!

@@ -59,7 +59,7 @@
 "src/01_Base/13_KappaLog.jl" = { map = 1, units = 1, algorithm = 0, swept = true }
 "src/01_Base/14_PartialFit.jl" = { map = 1, units = 9, swept = false }
 "src/02_Tools.jl" = { map = 1, units = 69, algorithm = 49, swept = true }
-"src/03_InputData/01_AssetPanel.jl" = { map = 2, units = 30, swept = false }
+"src/03_InputData/01_AssetPanel.jl" = { map = 2, units = 31, swept = false }
 "src/03_InputData/02_AssetPanelBuilder.jl" = { map = 2, units = 22, swept = false }
 "src/03_InputData/03_Preprocessing.jl" = { map = 2, units = 44, algorithm = 22, swept = false }
 "src/03_InputData/04_CrossSectionalTransforms.jl" = { map = 2, units = 29, swept = false }

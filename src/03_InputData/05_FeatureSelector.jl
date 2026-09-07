@@ -521,7 +521,7 @@ function panel_field_observed_column!(zc::AbstractArray, f::TensorPanelField)::N
     return nothing
 end
 """
-    feature_matrix(pnl::AssetPanel, sel = nothing; strict::Bool = false) -> Array{Float64}
+    feature_matrix(pnl::AssetPanel, sel = nothing; strict::Bool = false) -> Array
 
 Stack the Panel Fields a Feature Selector names into the Feature Matrix a distance measures.
 
@@ -532,8 +532,9 @@ A static panel gives an `assets × features` matrix, and a time-varying one an `
 # Algorithm
 
  1. Resolve `sel` against the panel with [`select_fields`](@ref).
- 2. Allocate the matrix as zeros, over the panel's own observation and asset axes and the resolved column count.
- 3. Write each column, with [`panel_field_value_column!`](@ref) or [`panel_field_observed_column!`](@ref).
+ 2. Derive the element type, as the promotion over the Panel Fields whose **value** columns were resolved. An observed-mask column is a `0`/`1` column that every type carries, so it contributes nothing, and neither does an indicator. A selection of mask columns alone stacks in `Float64`. See [`panel_value_eltype`](@ref).
+ 3. Allocate the matrix as zeros, over the panel's own observation and asset axes and the resolved column count.
+ 4. Write each column, with [`panel_field_value_column!`](@ref) or [`panel_field_observed_column!`](@ref).
 
 # Arguments
 
@@ -547,18 +548,22 @@ A static panel gives an `assets × features` matrix, and a time-varying one an `
 
 # Returns
 
-  - `Z::Array{Float64}`: The Feature Matrix.
+  - `Z::Array`: The Feature Matrix, in the type derived over the Panel Fields it stacks.
 
 # Related
 
   - [`AssetPanel`](@ref)
   - [`feature_labels`](@ref)
   - [`select_fields`](@ref)
+  - [`panel_value_eltype`](@ref)
   - [`FeatureDistance`](@ref)
 """
 function feature_matrix(pnl::AssetPanel, sel = nothing; strict::Bool = false)
     cols = select_fields(pnl, sel, strict)
-    Z = zeros(Float64, panel_field_axes(pnl.pf[1])..., length(cols))
+    T = mapreduce(promote_type, cols; init = Union{}) do col
+        return col[3] === :observed ? Union{} : panel_value_eltype(pnl.pf[col[1]])
+    end
+    Z = zeros(T === Union{} ? Float64 : T, panel_field_axes(pnl.pf[1])..., length(cols))
     for (c, col) in pairs(cols)
         k, l, part = col
         zc = selectdim(Z, ndims(Z), c)

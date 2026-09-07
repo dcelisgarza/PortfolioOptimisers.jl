@@ -868,19 +868,20 @@ function panel_fill_array(vals::AbstractArray, alg::AbstractPanelFillAlgorithm,
     return out
 end
 """
-    panel_resolve(inp::NumericPanelInput) -> Tuple{Array{Float64}, BitArray}
+    panel_resolve(inp::NumericPanelInput) -> Tuple{Array, BitArray}
     panel_resolve(inp::CategoricalPanelInput) -> Tuple{Array{String}, BitArray}
-    panel_resolve(inp::TensorPanelInput) -> Tuple{Array{Float64}, BitArray}
+    panel_resolve(inp::TensorPanelInput) -> Tuple{Array, BitArray}
 
 Resolve one raw Panel Field's blanks, and record which of its cells were observed.
 
 # Algorithm
 
-The method that Julia selects is the algorithm, and the three differ only in the element type they resolve into.
+The method that Julia selects is the algorithm, and the three differ only in the element type they resolve into. A categorical Panel Field resolves into `String`. A numeric and a tensor Panel Field resolve into the type their own filled cells carry, which [`panel_value_eltype`](@ref) derives: the raw array's element type is `Union{Missing, Float64}`, `Union{Nothing, Float64}` or `Any`, and none of those is the type the cells carry. Narrowing by the values is what drops the blank from the resolved field, and it is also what keeps a `Float32` field in `Float32`.
 
  1. Fill the blanks with [`panel_fill_array`](@ref).
- 2. Walk the raw cells, recording which were observed and copying the filled value into the output.
- 3. Check that a numeric or a tensor Panel Field carries no non-finite value, with [`assert_panel_finite`](@ref).
+ 2. Derive the resolved element type from the filled cells, with [`panel_value_eltype`](@ref).
+ 3. Walk the raw cells, recording which were observed and copying the filled value into the output.
+ 4. Check that a numeric or a tensor Panel Field carries no non-finite value, with [`assert_panel_finite`](@ref).
 
 # Arguments
 
@@ -900,7 +901,7 @@ The method that Julia selects is the algorithm, and the three differ only in the
 """
 function panel_resolve(inp::NumericPanelInput)
     f = panel_fill_array(inp.vals, inp.alg, inp.name, !panel_input_is_static(inp))
-    out = Array{Float64}(undef, size(inp.vals))
+    out = Array{panel_value_eltype(f)}(undef, size(inp.vals))
     obs = BitArray(undef, size(inp.vals))
     for i in CartesianIndices(inp.vals)
         obs[i] = !is_panel_blank(inp.vals[i])
@@ -921,7 +922,7 @@ function panel_resolve(inp::CategoricalPanelInput)
 end
 function panel_resolve(inp::TensorPanelInput)
     f = panel_fill_array(inp.vals, inp.alg, inp.name, !panel_input_is_static(inp))
-    out = Array{Float64}(undef, size(inp.vals))
+    out = Array{panel_value_eltype(f)}(undef, size(inp.vals))
     obs = BitArray(undef, size(inp.vals))
     for i in CartesianIndices(inp.vals)
         obs[i] = !is_panel_blank(inp.vals[i])
@@ -968,7 +969,7 @@ The observed mask rides only when the fill policy is not [`NoPanelFill`](@ref): 
   - [`panel_resolve`](@ref)
   - [`asset_panel`](@ref)
 """
-function panel_input_field(inp::NumericPanelInput, vals::AbstractArray{Float64},
+function panel_input_field(inp::NumericPanelInput, vals::AbstractArray{<:Real},
                            obs::BitArray)
     return NumericPanelField(; name = inp.name, vals = vals,
                              omsk = isa(inp.alg, NoPanelFill) ? nothing : obs)
@@ -987,7 +988,7 @@ function panel_input_field(inp::CategoricalPanelInput, vals::AbstractArray{Strin
     return CategoricalPanelField(; name = inp.name, levels = levels, codes = codes,
                                  omsk = isa(inp.alg, NoPanelFill) ? nothing : obs)
 end
-function panel_input_field(inp::TensorPanelInput, vals::AbstractArray{Float64},
+function panel_input_field(inp::TensorPanelInput, vals::AbstractArray{<:Real},
                            obs::BitArray)
     return TensorPanelField(; name = inp.name, axis = inp.axis, labels = inp.labels,
                             groups = inp.groups, vals = vals,

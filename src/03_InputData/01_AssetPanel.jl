@@ -584,6 +584,62 @@ function panel_field_axes(f::TensorPanelField)
     return size(f.vals)[1:(ndims(f.vals) - 1)]
 end
 """
+    panel_value_eltype(vals::AbstractArray) -> Type
+    panel_value_eltype(f::NumericPanelField) -> Type
+    panel_value_eltype(f::CategoricalPanelField) -> Type
+    panel_value_eltype(f::TensorPanelField) -> Type
+    panel_value_eltype(fs::AbstractVector{<:AbstractPanelField}) -> Type
+
+Return the numeric type a Panel Field carries, or the one a Feature Matrix over several of them stacks into.
+
+The type comes from the values, never from a written type. A raw field arrives as `Union{Missing, Float64}`, as `Union{Nothing, Float64}` or as `Any`, and none of those is the type its cells carry, so the cells are read and their types promoted. A `Float32` field resolves in `Float32`, a blank-carrying `Union{Missing, Float64}` field in `Float64`, and an integer field stays exact.
+
+A categorical Panel Field contributes nothing. An indicator is built rather than read, so it carries no type of its own and takes the type of the blocks it is stacked beside. A Feature Matrix that stacks indicators alone has nothing to derive from, and stacks in `Float64`.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `AbstractArray`: the element type when it is already concrete, and otherwise the promotion of the types its own cells carry. An empty array carries no type, and gives `Union{}`.
+ 2. [`NumericPanelField`](@ref) and [`TensorPanelField`](@ref): the type of their values.
+ 3. [`CategoricalPanelField`](@ref): `Union{}`, which promotes away against every other type.
+ 4. A vector of Panel Fields: the promotion over the fields, and `Float64` when none of them contributes a type.
+
+# Arguments
+
+  - `vals`: The values.
+  - `f`: The Panel Field.
+  - `fs`: The Panel Fields a Feature Matrix stacks.
+
+# Returns
+
+  - `T::Type`: The numeric type.
+
+# Related
+
+  - [`AbstractPanelField`](@ref)
+  - [`AssetPanel`](@ref)
+  - [`panel_resolve`](@ref)
+  - [`panel_feature_matrix`](@ref)
+"""
+function panel_value_eltype(vals::AbstractArray)
+    T = eltype(vals)
+    return isconcretetype(T) ? T : mapreduce(typeof, promote_type, vals; init = Union{})
+end
+function panel_value_eltype(f::NumericPanelField)
+    return panel_value_eltype(f.vals)
+end
+function panel_value_eltype(::CategoricalPanelField)
+    return Union{}
+end
+function panel_value_eltype(f::TensorPanelField)
+    return panel_value_eltype(f.vals)
+end
+function panel_value_eltype(fs::AbstractVector{<:AbstractPanelField})
+    T = mapreduce(panel_value_eltype, promote_type, fs; init = Union{})
+    return T === Union{} ? Float64 : T
+end
+"""
     panel_field_labels(f::NumericPanelField) -> Vector{String}
     panel_field_labels(f::CategoricalPanelField) -> Vector{String}
     panel_field_labels(f::TensorPanelField) -> Vector{String}
@@ -711,24 +767,27 @@ function panel_field_stack!(Z::AbstractArray, f::TensorPanelField, cols::VecInt)
     return nothing
 end
 """
-    panel_onehot(f::CategoricalPanelField) -> Array{Float64}
+    panel_onehot(f::CategoricalPanelField; datatype::DataType = Float64) -> Array
 
 Build the one-hot block a categorical Panel Field contributes to a derived Feature Matrix.
 
-One column per level, `1.0` where the cell carries that level and `0.0` elsewhere: `assets × levels` for a static field, `observations × assets × levels` for a time-varying one. The codes are the storage and this is the matrix form, built only where a matrix is needed.
+One column per level, `one(datatype)` where the cell carries that level and `zero(datatype)` elsewhere: `assets × levels` for a static field, `observations × assets × levels` for a time-varying one. The codes are the storage and this is the matrix form, built only where a matrix is needed.
+
+An indicator is built rather than read, so it carries no type of its own and the caller names the one the block is stacked beside. Every caller inside the library derives that type from the data it stacks the block against, so the default is what a caller who stacks the block against nothing gets. [`panel_field_stack!`](@ref) writes the same block into a Feature Matrix under construction without building it, and takes its type from the matrix.
 
 # Algorithm
 
  1. Allocate the zero array, the codes' shape with the levels appended.
- 2. Write `1.0` at each cell's own level.
+ 2. Write `one(datatype)` at each cell's own level.
 
 # Arguments
 
   - `f`: The categorical Panel Field.
+  - `datatype`: The element type of the block.
 
 # Returns
 
-  - `H::Array{Float64}`: The one-hot block.
+  - `H::Array{datatype}`: The one-hot block.
 
 # Related
 
@@ -736,10 +795,10 @@ One column per level, `1.0` where the cell carries that level and `0.0` elsewher
   - [`panel_field_stack!`](@ref)
   - [`collapse_panel_field`](@ref)
 """
-function panel_onehot(f::CategoricalPanelField)
-    H = zeros(Float64, size(f.codes)..., length(f.levels))
+function panel_onehot(f::CategoricalPanelField; datatype::DataType = Float64)
+    H = zeros(datatype, size(f.codes)..., length(f.levels))
     for i in CartesianIndices(f.codes)
-        @inbounds H[i, f.codes[i]] = 1.0
+        @inbounds H[i, f.codes[i]] = one(datatype)
     end
     return H
 end
@@ -1189,7 +1248,7 @@ function panel_claim!(nz::AbstractVector{String}, labels::AbstractVector{String}
 end
 """
     panel_feature_matrix(pnl::Nothing) -> Tuple{Nothing, Nothing}
-    panel_feature_matrix(pnl::AssetPanel) -> Tuple{Vector{String}, Array{Float64}}
+    panel_feature_matrix(pnl::AssetPanel) -> Tuple{Vector{String}, Array}
 
 Derive the Feature Matrix an [`AssetPanel`](@ref)'s Panel Fields stack into, and name its columns.
 
@@ -1204,7 +1263,7 @@ The column order is the Panel Field order, and within one Panel Field its value 
 The method that Julia selects decides whether there is anything to derive.
 
  1. Walk the Panel Fields in order. Claim each one's value columns from [`panel_field_labels`](@ref), then its observed-mask columns from [`panel_field_observed_labels`](@ref) when it carries a mask.
- 2. Allocate the matrix as zeros, over the panel's own observation and asset axes and the claimed column count.
+ 2. Allocate the matrix as zeros, over the panel's own observation and asset axes and the claimed column count, in the type [`panel_value_eltype`](@ref) derives over the Panel Fields.
  3. Write each Panel Field's values with [`panel_field_stack!`](@ref) and its mask with [`panel_field_stack_observed!`](@ref).
 
 # Arguments
@@ -1214,7 +1273,7 @@ The method that Julia selects decides whether there is anything to derive.
 # Returns
 
   - `nz::Vector{String}`: One name per column of the derived Feature Matrix.
-  - `Z::Array{Float64}`: The derived Feature Matrix.
+  - `Z::Array`: The derived Feature Matrix, in the type [`panel_value_eltype`](@ref) derives over the Panel Fields it stacks.
 
 # Related
 
@@ -1236,7 +1295,7 @@ function panel_feature_matrix(pnl::AssetPanel)
         push!(ocols,
               isnothing(f.omsk) ? Int[] : panel_claim!(nz, panel_field_observed_labels(f)))
     end
-    Z = zeros(Float64, panel_field_axes(pnl.pf[1])..., length(nz))
+    Z = zeros(panel_value_eltype(pnl.pf), panel_field_axes(pnl.pf[1])..., length(nz))
     for (k, f) in pairs(pnl.pf)
         panel_field_stack!(Z, f, cols[k])
         if !isempty(ocols[k])

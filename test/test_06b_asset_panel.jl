@@ -557,3 +557,65 @@ end
           [1.0 2.0; 5.0 6.0]
     @test isnothing(prices_to_returns(PricesToReturns(), prs).pnl.amsk)
 end
+@testset "The panel's numeric type comes from its values (#910)" begin
+    # A field resolves in the type its own cells carry, so a Float32 panel stays Float32
+    # and a blank-carrying Union{Missing, Float64} field still resolves in Float64.
+    p32 = asset_panel([NumericPanelInput(; name = "a", vals = Float32[1, 2, 3]),
+                       CategoricalPanelInput(; name = "s", vals = ["x", "y", "x"])])
+    @test eltype(PortfolioOptimisers.panel_field(p32, "a").vals) === Float32
+
+    pmiss = asset_panel([NumericPanelInput(; name = "a",
+                                           vals = Union{Missing, Float64}[1.0, missing,
+                                                                          3.0],
+                                           alg = ConstantPanelFill(; val = 0.0))])
+    @test eltype(PortfolioOptimisers.panel_field(pmiss, "a").vals) === Float64
+
+    # An integer field stays exact, and a heterogeneous raw field promotes over its cells.
+    pint = asset_panel([NumericPanelInput(; name = "a", vals = [1, 2, 3])])
+    @test eltype(PortfolioOptimisers.panel_field(pint, "a").vals) === Int
+    pany = asset_panel([NumericPanelInput(; name = "a", vals = Any[1, 2.0f0, 3])])
+    @test eltype(PortfolioOptimisers.panel_field(pany, "a").vals) === Float32
+
+    # A tensor field resolves the same way.
+    ptn = asset_panel([TensorPanelInput(; name = "t", axis = "factor",
+                                        labels = ["f1", "f2"],
+                                        vals = Float32[1 2; 3 4; 5 6])])
+    @test eltype(PortfolioOptimisers.panel_field(ptn, "t").vals) === Float32
+
+    # The Feature Matrix takes the promotion over the Panel Fields it stacks. An indicator
+    # carries no type of its own, so it does not widen the block it is stacked beside.
+    @test eltype(feature_matrix(p32)) === Float32
+    @test eltype(panel_feature_matrix(p32)[2]) === Float32
+    @test eltype(feature_matrix(pmiss)) === Float64
+    @test eltype(feature_matrix(pint)) === Int
+
+    # A selection of indicators alone has nothing to derive from, and stacks in Float64.
+    pcat = asset_panel([CategoricalPanelInput(; name = "s", vals = ["x", "y", "x"])])
+    @test eltype(feature_matrix(pcat)) === Float64
+    @test eltype(panel_feature_matrix(pcat)[2]) === Float64
+
+    # A selection that names only a mask column derives nothing either.
+    pmsk = asset_panel([NumericPanelInput(; name = "a",
+                                          vals = Union{Missing, Float32}[1, missing, 3],
+                                          alg = ConstantPanelFill(; val = 0.0f0))])
+    @test eltype(feature_matrix(pmsk)) === Float32
+    @test eltype(feature_matrix(pmsk, ["a" => :observed])) === Float64
+
+    # The Panel Field kinds report the type they contribute.
+    @test PortfolioOptimisers.panel_value_eltype(PortfolioOptimisers.panel_field(p32, "a")) ===
+          Float32
+    @test PortfolioOptimisers.panel_value_eltype(PortfolioOptimisers.panel_field(p32, "s")) ===
+          Union{}
+    @test PortfolioOptimisers.panel_value_eltype(PortfolioOptimisers.panel_field(ptn, "t")) ===
+          Float32
+    @test PortfolioOptimisers.panel_value_eltype(Float64[]) === Float64
+    @test PortfolioOptimisers.panel_value_eltype(Any[]) === Union{}
+
+    # An indicator is built rather than read, so its caller names the type of the block it
+    # is stacked beside. The default is what a caller who stacks it beside nothing gets.
+    onehot = PortfolioOptimisers.panel_onehot(PortfolioOptimisers.panel_field(p32, "s"))
+    @test eltype(onehot) === Float64
+    @test onehot == [1 0; 0 1; 1 0]
+    @test eltype(PortfolioOptimisers.panel_onehot(PortfolioOptimisers.panel_field(p32, "s");
+                                                  datatype = Float32)) === Float32
+end
