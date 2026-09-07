@@ -395,3 +395,22 @@ end
     one_at_a_time = foldl((c, i) -> partial_fit!(c, view(Xg, i, :)), axes(Xg, 1); init = me)
     @test isequal(mean(one_at_a_time), mean(me, Xg))
 end
+
+@testset "Exponentially weighted moments: the pass without a callback" begin
+    X = oracle_returns()
+    amsk = oracle_active_mask()
+    Xg = gapped(X, amsk)
+
+    # Issue #877. The callback of `exp_weighted_pass!` is what makes a point-in-time series one
+    # forward pass, and every other caller wants the last cache alone. The method that takes no
+    # callback runs the same recursion, so the two caches read the same moment.
+    for est in (ExpWeightedExpectedReturns(; decay = EW_DECAY),
+                ExpWeightedVariance(; decay = EW_DECAY),
+                ExpWeightedCovariance(; decay = EW_DECAY))
+        with_f = PortfolioOptimisers.exp_weighted_pass!((args...) -> nothing, est, Xg, 1,
+                                                        amsk)
+        without_f = PortfolioOptimisers.exp_weighted_pass!(est, Xg, 1, amsk)
+        @test isequal(PortfolioOptimisers.exp_weighted_moment(with_f, est),
+                      PortfolioOptimisers.exp_weighted_moment(without_f, est))
+    end
+end

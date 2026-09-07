@@ -242,6 +242,22 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Covariance method of [`exp_weighted_pass!`](@ref). Runs one forward pass of the online covariance update over the observations of `X`, and reads no intermediate cache.
+
+# Related
+
+  - [`ExpWeightedCovariance`](@ref)
+  - [`ExpWeightedCovarianceState`](@ref)
+  - [`exp_weighted_pass!`](@ref)
+"""
+function exp_weighted_pass!(est::ExpWeightedCovariance, X::MatNum, dims::Int,
+                            active_mask::Option{<:AbstractMatrix{<:Bool}},
+                            state::Option{<:ExpWeightedCovarianceState} = nothing)
+    return exp_weighted_pass!((args...) -> nothing, est, X, dims, active_mask, state)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Covariance method of [`exp_weighted_moment`](@ref). Reads the exponentially weighted covariance out of a cache, as it stands.
 
 Applies the congruence correction, blanks the whole row and column of every asset that is not ready, and re-symmetrises the block that is left, so no transpose can pull a `NaN` into it. The cache is read, never written, so the same cache answers this call after every observation of a forward pass.
@@ -328,7 +344,7 @@ julia> size(cov(ce, X))
 """
 function Statistics.cov(ce::ExpWeightedCovariance, X::MatNum; dims::Int = 1,
                         active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
-    cache = exp_weighted_pass!((args...) -> nothing, ce, X, dims, active_mask)
+    cache = exp_weighted_pass!(ce, X, dims, active_mask)
     if !ce.centred && any(.!cache.active)
         cache.location[.!cache.active] .= NaN
     end
@@ -638,7 +654,7 @@ The estimator carries the state in its `cache` field, so a second call continues
 """
 function partial_fit!(ce::ExpWeightedCovariance, X::MatNum; dims::Int = 1,
                       active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
-    cache = exp_weighted_pass!((args...) -> nothing, ce, X, dims, active_mask, ce.cache)
+    cache = exp_weighted_pass!(ce, X, dims, active_mask, ce.cache)
     Accessors.@reset ce.cache = cache
     return ce
 end

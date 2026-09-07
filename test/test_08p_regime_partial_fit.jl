@@ -219,3 +219,18 @@ end
     # No slice of a state exists on the observation axis, so the root drops it.
     @test isnothing(PO.obs_weights_view(warm.cache, 1:10))
 end
+
+@testset "the pass without a callback runs the same recursion" begin
+    X = ra_sample()
+
+    # Issue #877. The callback of `regime_adjusted_variance_pass!` is what makes `variance_series`
+    # one forward pass. `var` and `partial_fit!` want the last cache alone, so they read the
+    # method that takes no callback, and the two caches read the same variance.
+    for ce in RA_CONFIGS
+        with_f = PO.regime_adjusted_variance_pass!((args...) -> nothing, ce, X, 1, nothing,
+                                                   nothing)
+        without_f = PO.regime_adjusted_variance_pass!(ce, X, 1, nothing, nothing)
+        @test isequal(PO.regime_adjusted_variance(with_f, ce),
+                      PO.regime_adjusted_variance(without_f, ce))
+    end
+end

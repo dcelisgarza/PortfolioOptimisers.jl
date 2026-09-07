@@ -814,7 +814,7 @@ point-in-time series a single forward pass rather than one refit per observation
 # Arguments
 
   - `f`: Function of `(i, cache)` called after observation `i` is processed. A caller that wants
-    only the final cache passes a function that does nothing.
+    only the final cache reads the method that takes no `f`.
   - `ce`: Regime-adjusted exponentially weighted variance estimator.
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
@@ -888,6 +888,49 @@ function regime_adjusted_variance_pass!(f, ce::RegimeAdjustedExpWeightedVariance
     end
 
     return cache
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Run one forward pass of the online variance update over the observations of `X`, and read no
+intermediate cache.
+
+This is the callback method with a callback that does nothing, so a verb that wants the last
+cache alone states no callback of its own. `var` and `partial_fit!` read the pass this way, and
+`variance_series` reads the callback method.
+
+# Arguments
+
+  - `ce`: Regime-adjusted exponentially weighted variance estimator.
+  - $(arg_dict[:X])
+  - $(arg_dict[:dims])
+  - `estimation_mask`: Optional boolean matrix with the same size as `X`. When provided,
+    only assets where `estimation_mask[i, :]` (or `[:, i]`) is `true` contribute to the
+    regime state update for observation `i`.
+  - `active_mask`: Optional boolean matrix with the same size as `X`. When provided,
+    assets that become inactive have their variance and observation count reset.
+  - `state`: Optional cache to continue from. The default `nothing` builds the cold cache, which
+    is what a fit over a whole sample needs. [`partial_fit!`](@ref) passes the estimator's own
+    state instead, so the pass continues where the last call stopped.
+
+# Returns
+
+  - `cache::RegimeAdjustedVarianceState`: The cache after the last observation.
+
+# Related
+
+  - [`RegimeAdjustedVarianceState`](@ref)
+  - [`regime_adjusted_variance_pass!`](@ref)
+  - [`regime_adjusted_variance`](@ref)
+  - [`partial_fit!`](@ref)
+"""
+function regime_adjusted_variance_pass!(ce::RegimeAdjustedExpWeightedVariance, X::MatNum,
+                                        dims::Int,
+                                        estimation_mask::Option{<:AbstractMatrix{<:Bool}},
+                                        active_mask::Option{<:AbstractMatrix{<:Bool}},
+                                        state::Option{<:RegimeAdjustedVarianceState} = nothing)
+    return regime_adjusted_variance_pass!((args...) -> nothing, ce, X, dims,
+                                          estimation_mask, active_mask, state)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -995,8 +1038,7 @@ result by the square of the regime multiplier derived from the smoothed regime s
 function Statistics.var(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::Int = 1,
                         estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                         active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
-    cache = regime_adjusted_variance_pass!((args...) -> nothing, ce, X, dims,
-                                           estimation_mask, active_mask)
+    cache = regime_adjusted_variance_pass!(ce, X, dims, estimation_mask, active_mask)
     if !ce.centred && any(.!cache.active)
         cache.location[.!cache.active] .= NaN
     end
@@ -1126,8 +1168,8 @@ true
 function partial_fit!(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::Int = 1,
                       estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                       active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
-    cache = regime_adjusted_variance_pass!((args...) -> nothing, ce, X, dims,
-                                           estimation_mask, active_mask, ce.cache)
+    cache = regime_adjusted_variance_pass!(ce, X, dims, estimation_mask, active_mask,
+                                           ce.cache)
     Accessors.@reset ce.cache = cache
     return ce
 end

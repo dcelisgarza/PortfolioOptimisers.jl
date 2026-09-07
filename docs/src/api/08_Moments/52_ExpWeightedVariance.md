@@ -10,6 +10,9 @@ process_observation!(cache::ExpWeightedVarianceState, ce::ExpWeightedVariance,
 exp_weighted_pass!(f, est::ExpWeightedVariance, X::MatNum, dims::Int,
                             active_mask::Option{<:AbstractMatrix{<:Bool}},
                             state::Option{<:ExpWeightedVarianceState} = nothing)
+exp_weighted_pass!(est::ExpWeightedVariance, X::MatNum, dims::Int,
+                            active_mask::Option{<:AbstractMatrix{<:Bool}},
+                            state::Option{<:ExpWeightedVarianceState} = nothing)
 exp_weighted_moment(cache::ExpWeightedVarianceState, est::ExpWeightedVariance)
 var(ce::ExpWeightedVariance, X::MatNum; dims::Int = 1,
                         active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)

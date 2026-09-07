@@ -233,6 +233,35 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Run one forward pass of an exponentially weighted update over the observations of `X`, and read no intermediate cache.
+
+This is the callback method with a callback that does nothing, so a verb that wants the last cache alone states no callback of its own. The callback method owns the recursion, the argument validation and the cache.
+
+# Arguments
+
+  - `est`: Estimator of the exponentially weighted family.
+  - $(arg_dict[:X])
+  - `dims::Int`: Dimension along which the observations run.
+  - `active_mask::Option{<:AbstractMatrix{<:Bool}}`: Optional boolean matrix with the same size as `X`.
+  - `state`: Optional state to continue from. A `nothing` starts from the cold state.
+
+# Returns
+
+  - `cache`: The cache after the last observation.
+
+# Related
+
+  - [`ExpWeightedExpectedReturns`](@ref)
+  - [`exp_weighted_moment`](@ref)
+"""
+function exp_weighted_pass!(est::ExpWeightedExpectedReturns, X::MatNum, dims::Int,
+                            active_mask::Option{<:AbstractMatrix{<:Bool}},
+                            state::Option{<:ExpWeightedExpectedReturnsState} = nothing)
+    return exp_weighted_pass!((args...) -> nothing, est, X, dims, active_mask, state)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Read the exponentially weighted mean out of a cache, as it stands.
 
 Applies the cold-start bias correction and blanks every asset that is not ready. The cache is read, never written, so the same cache answers this call after every observation of a forward pass.
@@ -317,7 +346,7 @@ julia> length(mean(me, X))
 """
 function Statistics.mean(me::ExpWeightedExpectedReturns, X::MatNum; dims::Int = 1,
                          active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
-    cache = exp_weighted_pass!((args...) -> nothing, me, X, dims, active_mask)
+    cache = exp_weighted_pass!(me, X, dims, active_mask)
     return exp_weighted_moment(cache, me)
 end
 """
@@ -396,7 +425,7 @@ The estimator carries the state in its `cache` field, so a second call continues
 """
 function partial_fit!(me::ExpWeightedExpectedReturns, X::MatNum; dims::Int = 1,
                       active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
-    cache = exp_weighted_pass!((args...) -> nothing, me, X, dims, active_mask, me.cache)
+    cache = exp_weighted_pass!(me, X, dims, active_mask, me.cache)
     Accessors.@reset me.cache = cache
     return me
 end

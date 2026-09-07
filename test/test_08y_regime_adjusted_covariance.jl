@@ -456,3 +456,21 @@ lines, and each one is driven here on purpose.
                    init = ce)
     @test isequal(cov(folded), cov(ce, X; active_mask = active, estimation_mask = est))
 end
+
+@testset "the pass without a callback runs the same recursion" begin
+    rng = StableRNG(8877)
+    X = randn(rng, 60, 3) .* 0.02
+    X[45:end, :] .*= 4.0
+
+    # Issue #877. The callback of `regime_adjusted_covariance_pass!` is what makes
+    # `variance_series` one forward pass. `cov` and `partial_fit!` want the last cache alone, so
+    # they read the method that takes no callback, and the two caches read the same covariance.
+    for ce in (oracle_estimator(), oracle_estimator(; hac_lags = 2),
+               oracle_estimator(; regime_method = PO.LogRegimeAdjusted()))
+        with_f = PO.regime_adjusted_covariance_pass!((args...) -> nothing, ce, X, 1,
+                                                     nothing, nothing)
+        without_f = PO.regime_adjusted_covariance_pass!(ce, X, 1, nothing, nothing)
+        @test isequal(PO.regime_adjusted_covariance(with_f, ce),
+                      PO.regime_adjusted_covariance(without_f, ce))
+    end
+end

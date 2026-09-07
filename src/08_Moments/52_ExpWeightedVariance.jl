@@ -237,6 +237,22 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Variance method of [`exp_weighted_pass!`](@ref). Runs one forward pass of the online variance update over the observations of `X`, and reads no intermediate cache.
+
+# Related
+
+  - [`ExpWeightedVariance`](@ref)
+  - [`ExpWeightedVarianceState`](@ref)
+  - [`exp_weighted_pass!`](@ref)
+"""
+function exp_weighted_pass!(est::ExpWeightedVariance, X::MatNum, dims::Int,
+                            active_mask::Option{<:AbstractMatrix{<:Bool}},
+                            state::Option{<:ExpWeightedVarianceState} = nothing)
+    return exp_weighted_pass!((args...) -> nothing, est, X, dims, active_mask, state)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Variance method of [`exp_weighted_moment`](@ref). Reads the exponentially weighted variance out of a cache, as it stands.
 
 Applies the cold-start bias correction and blanks every asset that is not ready. The cache is read, never written, so the same cache answers this call after every observation of a forward pass.
@@ -315,7 +331,7 @@ julia> length(var(ce, X))
 """
 function Statistics.var(ce::ExpWeightedVariance, X::MatNum; dims::Int = 1,
                         active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
-    cache = exp_weighted_pass!((args...) -> nothing, ce, X, dims, active_mask)
+    cache = exp_weighted_pass!(ce, X, dims, active_mask)
     if !ce.centred && any(.!cache.active)
         cache.location[.!cache.active] .= NaN
     end
@@ -553,7 +569,7 @@ The estimator carries the state in its `cache` field, so a second call continues
 """
 function partial_fit!(ce::ExpWeightedVariance, X::MatNum; dims::Int = 1,
                       active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
-    cache = exp_weighted_pass!((args...) -> nothing, ce, X, dims, active_mask, ce.cache)
+    cache = exp_weighted_pass!(ce, X, dims, active_mask, ce.cache)
     Accessors.@reset ce.cache = cache
     return ce
 end
