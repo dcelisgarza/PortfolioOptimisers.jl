@@ -25,6 +25,8 @@ var(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::Int = 1,
                     estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                     active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                     kwargs...)
+var(ce::RegimeAdjustedExpWeightedVariance, X::MatNum,
+                        pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
 variance_series(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::Int = 1,
                     estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                     active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,

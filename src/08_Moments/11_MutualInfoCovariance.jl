@@ -148,6 +148,7 @@ The result is bounded by ``[0, 1]`` with a unit diagonal only when `ce.normalise
 """
 function Statistics.cor(ce::MutualInfoCovariance, X::MatNum; dims::Int = 1, kwargs...)
     X = dims_oriented(dims, X)
+    assert_finite_sample(X)
     return mutual_info(X, ce.bins, ce.normalise)
 end
 

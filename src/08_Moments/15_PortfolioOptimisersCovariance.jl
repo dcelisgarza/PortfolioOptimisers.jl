@@ -120,12 +120,73 @@ same orientation and neither takes a `dims` of its own.
 """
 function Statistics.cov(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1, kwargs...)
     X = dims_oriented(dims, X)
+    assert_finite_sample(X)
     sigma = Statistics.cov(ce.ce, X; kwargs...)
     if !ismutable(sigma)
         sigma = Matrix(sigma)
     end
     matrix_processing!(ce.mp, sigma, X; kwargs...)
     return sigma
+end
+"""
+    Statistics.cov(ce::PortfolioOptimisersCovariance, X::MatNum,
+                   pnl::Option{<:AssetPanel}; dims = 1, kwargs...) -> MatNum
+    Statistics.cor(ce::PortfolioOptimisersCovariance, X::MatNum,
+                   pnl::Option{<:AssetPanel}; dims = 1, kwargs...) -> MatNum
+
+Forward the Asset Panel to the estimator that this composite wraps, then repair the finite block of the frame it gets back.
+
+This is the composite's override of the reduce-and-expand root. The inner estimator owns the reduction, because it alone knows whether it is plain or mask-aware, and this method owns the repair. The repair runs on the finite block through [`matrix_processing_block!`](@ref), so an asset outside the Coverage Universe keeps its `NaN` row and column and nothing else is touched.
+
+# Algorithm
+
+ 1. Check `dims` and orient `X` to `observations × assets`.
+ 2. Compute the matrix with the inner estimator, forwarding `pnl` as its third positional argument.
+ 3. When the matrix is immutable, copy it into a `Matrix`, because step 4 writes in place.
+ 4. Repair its finite block with [`matrix_processing_block!`](@ref), under `ce.mp` and the columns of `X` the block names.
+ 5. Return the matrix.
+
+# Arguments
+
+  - `ce`: Composite covariance estimator with post-processing.
+  - $(arg_dict[:X])
+  - $(arg_dict[:pnl_moment])
+  - $(arg_dict[:dims])
+  - `kwargs...`: Additional keyword arguments passed to the underlying estimator and to the matrix processing step.
+
+# Validation
+
+  - $(val_dict[:dims])
+
+# Returns
+
+  - `sigma::MatNum`: The processed covariance matrix, or correlation matrix, on the full asset universe.
+
+# Related
+
+  - [`PortfolioOptimisersCovariance`](@ref)
+  - [`matrix_processing_block!`](@ref)
+  - [`coverage_reduction`](@ref)
+"""
+function Statistics.cov(ce::PortfolioOptimisersCovariance, X::MatNum,
+                        pnl::Option{<:AssetPanel}; dims = 1, kwargs...)
+    X = dims_oriented(dims, X)
+    sigma = Statistics.cov(ce.ce, X, pnl; dims = 1, kwargs...)
+    if !ismutable(sigma)
+        sigma = Matrix(sigma)
+    end
+    matrix_processing_block!(ce.mp, sigma, X; kwargs...)
+    return sigma
+end
+function Statistics.cor(ce::PortfolioOptimisersCovariance, X::MatNum,
+                        pnl::Option{<:AssetPanel}; dims = 1, kwargs...)
+    X = dims_oriented(dims, X)
+    rho = Statistics.cor(ce.ce, X, pnl; dims = 1, kwargs...)
+    if !ismutable(rho)
+        rho = Matrix(rho)
+    end
+    matrix_processing_block!(ce.mp, rho, X; kwargs...)
+    return rho
 end
 """
     Statistics.cor(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1, kwargs...)
@@ -169,6 +230,7 @@ same orientation and neither takes a `dims` of its own.
 """
 function Statistics.cor(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1, kwargs...)
     X = dims_oriented(dims, X)
+    assert_finite_sample(X)
     rho = Statistics.cor(ce.ce, X; kwargs...)
     if !ismutable(rho)
         rho = Matrix(rho)

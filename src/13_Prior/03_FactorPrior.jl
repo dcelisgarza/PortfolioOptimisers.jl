@@ -414,15 +414,21 @@ The factor moments ``\\hat{\\boldsymbol{f}}`` and ``\\mathbf{\\Sigma}_f`` come f
   - [`factor_lift`](@ref)
   - [`prior`](@ref)
 """
-function prior(pe::FactorPrior, X::MatNum, F::MatNum, ::Option{<:AssetPanel} = nothing;
+function prior(pe::FactorPrior, X::MatNum, F::MatNum, pnl::Option{<:AssetPanel} = nothing;
                dims::Int = 1, strict::Bool = false, kwargs...)
     X, F = dims_oriented(dims, X, F)
+    # The regression is a per-asset fit, so it takes the Coverage Universe before it runs
+    # rather than a frame after it: a stepwise search over a gapped column has no answer, and
+    # `chol` is the factorisation of the block, not of the frame. Every block the result
+    # carries is expanded at the end, the regression result included, because a Prior Result
+    # has no mask field and every block it carries lives on the full asset universe.
+    cmsk, Xc = coverage_reduction(X, pnl; dims = 1)
     # `strict` reaches the wrapped prior: `pe.pe` admits `BlackLittermanPrior` and
     # `EntropyPoolingPrior`, both of which resolve view names against a universe and honour it.
     f_prior = prior(pe.pe, F; strict = strict)
-    rr, posterior_X = factor_reconstruction(pe.re, X, F)
+    rr, posterior_X = factor_reconstruction(pe.re, Xc, F)
     (; mu, sigma, chol, esigma) = factor_lift(pe.mp, pe.ve, pe.rsd, rr, f_prior.mu,
-                                              f_prior.sigma, X, posterior_X; kwargs...)
+                                              f_prior.sigma, Xc, posterior_X; kwargs...)
     # The lift already measured the residual variances, so the block carries them instead of
     # making every consumer recompute them from the reconstruction error. Under `rsd = false`
     # the lift added no residual block and `esigma` is `nothing`, which is what the field then
@@ -441,9 +447,11 @@ function prior(pe::FactorPrior, X::MatNum, F::MatNum, ::Option{<:AssetPanel} = n
     # existence and it is over the right observation axis. Its `ens`/`kld`/`ow` travel with it
     # — a weighting with no provenance cannot be interrogated (ADR 0046), and `ens` is what
     # sizes every uncertainty set built on this result.
-    return LowOrderPrior(; X = posterior_X, o_X = X, mu = mu, sigma = sigma, chol = chol,
-                         w = f_prior.w, ens = f_prior.ens, kld = f_prior.kld,
-                         ow = f_prior.ow, rr = rr, fpr = f_prior)
+    return LowOrderPrior(; X = expand_columns(posterior_X, cmsk), o_X = X,
+                         mu = expand_vector(mu, cmsk), sigma = expand_moment(sigma, cmsk),
+                         chol = expand_columns(chol, cmsk), w = f_prior.w,
+                         ens = f_prior.ens, kld = f_prior.kld, ow = f_prior.ow,
+                         rr = expand_regression(rr, cmsk), fpr = f_prior)
 end
 
 export FactorPrior

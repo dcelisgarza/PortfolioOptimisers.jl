@@ -2427,6 +2427,7 @@ The standard deviations serve two purposes at once. They scale the thresholds th
 """
 function Statistics.cor(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, kwargs...)
     X = dims_oriented(dims, X)
+    assert_finite_sample(X)
     sd = Statistics.std(ce.ve, X; dims = 1, kwargs...)
     sd .= max.(sd, eps(eltype(sd)))
     X = demean_returns(X, ce.me; dims = 1, kwargs...)
@@ -2495,6 +2496,7 @@ The covariance is the correlation of [`cor`](@ref) rescaled by the same standard
 """
 function Statistics.cov(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, kwargs...)
     X = dims_oriented(dims, X)
+    assert_finite_sample(X)
     sd = Statistics.std(ce.ve, X; dims = 1, kwargs...)
     sd .= max.(sd, eps(eltype(sd)))
     X = demean_returns(X, ce.me; dims = 1, kwargs...)

@@ -1565,6 +1565,7 @@ The mean and the standard deviation are computed by the estimator's own `me` and
 """
 function Statistics.cor(ce::SmythBrobyCovariance, X::MatNum; dims::Int = 1, kwargs...)
     X = dims_oriented(dims, X)
+    assert_finite_sample(X)
     sd = Statistics.std(ce.ve, X; dims = 1, kwargs...)
     sd .= max.(sd, eps(eltype(sd)))
     mu = Statistics.mean(ce.me, X; dims = 1, kwargs...)
@@ -1609,6 +1610,7 @@ The correlation matrix is rescaled by the same `sd` the zoning read, so the cova
 """
 function Statistics.cov(ce::SmythBrobyCovariance, X::MatNum; dims::Int = 1, kwargs...)
     X = dims_oriented(dims, X)
+    assert_finite_sample(X)
     sd = Statistics.std(ce.ve, X; dims = 1, kwargs...)
     sd .= max.(sd, eps(eltype(sd)))
     mu = Statistics.mean(ce.me, X; dims = 1, kwargs...)

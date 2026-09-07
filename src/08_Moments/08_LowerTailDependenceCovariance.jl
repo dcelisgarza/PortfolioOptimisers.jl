@@ -222,6 +222,7 @@ julia> cor(ce, X)
 function Statistics.cor(ce::LowerTailDependenceCovariance, X::MatNum; dims::Int = 1,
                         kwargs...)
     X = dims_oriented(dims, X)
+    assert_finite_sample(X)
     return lower_tail_dependence(X, ce.alpha, ce.ex)
 end
 

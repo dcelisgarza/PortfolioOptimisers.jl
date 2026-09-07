@@ -148,6 +148,7 @@ julia> cor(KendallCovariance(), X)
 """
 function Statistics.cor(::KendallCovariance, X::MatNum; dims::Int = 1, kwargs...)
     X = dims_oriented(dims, X)
+    assert_finite_sample(X)
     return StatsBase.corkendall(X)
 end
 """
@@ -284,6 +285,7 @@ julia> cor(SpearmanCovariance(), X)
 """
 function Statistics.cor(::SpearmanCovariance, X::MatNum; dims::Int = 1, kwargs...)
     X = dims_oriented(dims, X)
+    assert_finite_sample(X)
     return StatsBase.corspearman(X)
 end
 export KendallCovariance, SpearmanCovariance

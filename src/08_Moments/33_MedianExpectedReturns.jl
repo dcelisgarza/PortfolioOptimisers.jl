@@ -141,6 +141,7 @@ Two consequences follow, and both separate this from an order statistic.
 function Statistics.mean(me::MedianExpectedReturns{Nothing}, X::MatNum; dims::Int = 1,
                          kwargs...)
     assert_dims(dims)
+    assert_finite_sample(X)
     return Statistics.median(X; dims = dims)
 end
 """
@@ -165,6 +166,7 @@ The weighted branch has no matrix-wide method to call, so it reduces one column 
 function Statistics.mean(me::MedianExpectedReturns{<:ObsWeights}, X::MatNum; dims::Int = 1,
                          kwargs...)
     X = dims_oriented(dims, X)
+    assert_finite_sample(X)
     w = get_observation_weights(me.w, X)
     Y = Vector{eltype(X)}(undef, size(X, 2))
     for i in axes(X, 2)

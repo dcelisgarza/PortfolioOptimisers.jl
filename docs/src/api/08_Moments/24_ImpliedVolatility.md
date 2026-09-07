@@ -16,6 +16,10 @@ cov(ce::ImpliedVolatility, X::MatNum; dims::Int = 1, mean = nothing,
                         iv::MatNum, ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
 cor(ce::ImpliedVolatility, X::MatNum; dims::Int = 1, mean = nothing,
                         iv::MatNum, ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
+PortfolioOptimisers.coverage_reduced_ivpa
+cov(ce::ImpliedVolatility, X::MatNum, pnl::Option{<:AssetPanel};
+                        dims::Int = 1, mean = nothing, iv::MatNum,
+                        ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
 ```
 
 ## References

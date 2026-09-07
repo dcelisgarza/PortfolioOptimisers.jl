@@ -90,6 +90,7 @@ commit = "8610300"
 "src/08_Moments/47_CrossSectionalExposureDiagnostics.jl" = { lines = 319, misses = 0 }
 "src/08_Moments/48_FactorModelSummary.jl" = { lines = 159, misses = 0 }
 "src/08_Moments/49_CrossSectionalIdiosyncraticDiagnostics.jl" = { lines = 182, misses = 0 }
+"src/08_Moments/50_CoverageUniverse.jl" = { lines = 143, misses = 0 }
 "src/09_Distance/01_Base_Distance.jl" = { lines = 12, misses = 0 }
 "src/09_Distance/02_Distance.jl" = { lines = 72, misses = 0 }
 "src/09_Distance/03_DistanceDistance.jl" = { lines = 14, misses = 0 }

@@ -57,7 +57,7 @@ commit = "97e398ef74"
 "src/08_Moments/21_Base_Regression.jl" = { cyc = 3, cog = 4, arg = 4, cyc_sum = 37, cog_sum = 17, arg_sum = 38, macros = ["@forward_properties"] }
 "src/08_Moments/22_StepwiseRegression.jl" = { cyc = 7, cog = 12, arg = 5, cyc_sum = 41, cog_sum = 49, arg_sum = 32, macros = ["@propagatable"] }
 "src/08_Moments/23_DimensionReductionRegression.jl" = { cyc = 3, cog = 3, arg = 6, cyc_sum = 17, cog_sum = 10, arg_sum = 23, macros = ["@propagatable"] }
-"src/08_Moments/24_ImpliedVolatility.jl" = { cyc = 4, cog = 2, arg = 7, cyc_sum = 19, cog_sum = 8, arg_sum = 44, macros = ["@propagatable"] }
+"src/08_Moments/24_ImpliedVolatility.jl" = { cyc = 4, cog = 2, arg = 8, cyc_sum = 24, cog_sum = 8, arg_sum = 66, macros = ["@propagatable"] }
 "src/08_Moments/25_CorrelationCovariance.jl" = { cyc = 1, cog = 1, arg = 4, cyc_sum = 4, cog_sum = 1, arg_sum = 9, macros = ["@propagatable"] }
 "src/08_Moments/26_AbstractCovarianceVariance.jl" = { cyc = 3, cog = 3, arg = 4, cyc_sum = 7, cog_sum = 7, arg_sum = 12, macros = [] }
 "src/08_Moments/27_StandardDeviationExpectedReturns.jl" = { cyc = 1, cog = 1, arg = 4, cyc_sum = 6, cog_sum = 2, arg_sum = 10, macros = ["@propagatable"] }
@@ -100,6 +100,7 @@ commit = "97e398ef74"
 "src/08_Moments/47_CrossSectionalExposureDiagnostics.jl" = { cyc = 10, cog = 13, arg = 5, cyc_sum = 105, cog_sum = 119, arg_sum = 102, macros = [] }
 "src/08_Moments/48_FactorModelSummary.jl" = { cyc = 6, cog = 8, arg = 5, cyc_sum = 55, cog_sum = 54, arg_sum = 45, macros = [] }
 "src/08_Moments/49_CrossSectionalIdiosyncraticDiagnostics.jl" = { cyc = 6, cog = 8, arg = 3, cyc_sum = 56, cog_sum = 58, arg_sum = 49, macros = [] }
+"src/08_Moments/50_CoverageUniverse.jl" = { cyc = 7, cog = 12, arg = 5, cyc_sum = 52, cog_sum = 32, arg_sum = 92, macros = [] }
 "src/09_Distance/01_Base_Distance.jl" = { cyc = 2, cog = 1, arg = 2, cyc_sum = 3, cog_sum = 2, arg_sum = 2, macros = [] }
 "src/09_Distance/02_Distance.jl" = { cyc = 2, cog = 2, arg = 5, cyc_sum = 33, cog_sum = 18, arg_sum = 112, macros = [] }
 "src/09_Distance/03_DistanceDistance.jl" = { cyc = 2, cog = 1, arg = 5, cyc_sum = 6, cog_sum = 5, arg_sum = 19, macros = [] }
@@ -140,7 +141,7 @@ commit = "97e398ef74"
 "src/12_ConstraintGeneration/08_ExposureConstraintGeneration.jl" = { cyc = 4, cog = 5, arg = 7, cyc_sum = 20, cog_sum = 15, arg_sum = 26, macros = [] }
 "src/12_ConstraintGeneration/09_CrossSectionalFactorAxis.jl" = { cyc = 5, cog = 6, arg = 3, cyc_sum = 12, cog_sum = 8, arg_sum = 8, macros = [] }
 "src/13_Prior/01_Base_Prior.jl" = { cyc = 10, cog = 7, arg = 11, cyc_sum = 97, cog_sum = 80, arg_sum = 110, macros = ["@forward_properties"] }
-"src/13_Prior/02_EmpiricalPrior.jl" = { cyc = 2, cog = 1, arg = 5, cyc_sum = 6, cog_sum = 2, arg_sum = 14, macros = ["@propagatable"] }
+"src/13_Prior/02_EmpiricalPrior.jl" = { cyc = 2, cog = 1, arg = 6, cyc_sum = 6, cog_sum = 2, arg_sum = 16, macros = ["@propagatable"] }
 "src/13_Prior/03_FactorPrior.jl" = { cyc = 3, cog = 2, arg = 9, cyc_sum = 11, cog_sum = 5, arg_sum = 26, macros = ["@forward_properties", "@propagatable"] }
 "src/13_Prior/04_HighOrderPrior.jl" = { cyc = 12, cog = 25, arg = 6, cyc_sum = 40, cog_sum = 56, arg_sum = 23, macros = ["@forward_properties", "@propagatable"] }
 "src/13_Prior/05_BlackLittermanViewsGeneration.jl" = { cyc = 8, cog = 14, arg = 5, cyc_sum = 21, cog_sum = 21, arg_sum = 21, macros = [] }

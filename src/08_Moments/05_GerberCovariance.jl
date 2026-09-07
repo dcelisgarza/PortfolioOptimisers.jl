@@ -711,6 +711,7 @@ Compute the Gerber correlation matrix using the algorithm specified in `ce.alg`.
 """
 function Statistics.cor(ce::GerberCovariance, X::MatNum; dims::Int = 1, kwargs...)
     X = dims_oriented(dims, X)
+    assert_finite_sample(X)
     sd = Statistics.std(ce.ve, X; dims = 1, kwargs...)
     sd .= max.(sd, eps(eltype(sd)))
     X = demean_returns(X, ce.me; dims = 1, kwargs...)
@@ -780,6 +781,7 @@ The Gerber statistic sets the correlations alone, so the variances come from `ce
 """
 function Statistics.cov(ce::GerberCovariance, X::MatNum; dims::Int = 1, kwargs...)
     X = dims_oriented(dims, X)
+    assert_finite_sample(X)
     sd = Statistics.std(ce.ve, X; dims = 1, kwargs...)
     sd .= max.(sd, eps(eltype(sd)))
     X = demean_returns(X, ce.me; dims = 1, kwargs...)

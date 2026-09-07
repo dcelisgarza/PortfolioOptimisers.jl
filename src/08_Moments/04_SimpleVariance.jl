@@ -191,6 +191,7 @@ function simple_variance_kernel(f::F, ve::SimpleVariance,
                                 me::AbstractExpectedReturnsEstimator, X::MatNum;
                                 dims::Int = 1, mean = nothing, kwargs...) where {F}
     assert_dims(dims)
+    assert_finite_sample(X)
     mu = weighted_centre(X, me, ve.w; dims = dims, mean = mean, kwargs...)
     w = get_observation_weights(ve.w, X; dims = dims, kwargs...)
     return if isnothing(w)
@@ -201,6 +202,7 @@ function simple_variance_kernel(f::F, ve::SimpleVariance,
 end
 function simple_variance_kernel(f::F, ve::SimpleVariance, X::VecNum;
                                 mean = nothing) where {F}
+    assert_finite_sample(X)
     w = get_observation_weights(ve.w, X)
     return if isnothing(w)
         f(X; corrected = ve.corrected, mean = mean)

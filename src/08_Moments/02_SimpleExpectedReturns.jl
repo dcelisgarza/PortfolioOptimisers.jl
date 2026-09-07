@@ -197,6 +197,7 @@ julia> mean(serw, X)
 """
 function Statistics.mean(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
     assert_dims(dims)
+    assert_finite_sample(X)
     w = get_observation_weights(me.w, X; dims = dims, kwargs...)
     return if isnothing(w)
         Statistics.mean(X; dims = dims)

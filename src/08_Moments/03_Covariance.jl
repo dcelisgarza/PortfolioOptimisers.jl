@@ -173,6 +173,7 @@ julia> cov(GeneralCovariance(), X)
 """
 function Statistics.cov(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing,
                         kwargs...)
+    assert_finite_sample(X)
     w = get_observation_weights(ce.w, X; dims = dims, kwargs...)
     return if isnothing(w)
         robust_cov(ce.ce, X; dims = dims, mean = mean, kwargs...)
@@ -231,6 +232,7 @@ julia> cor(GeneralCovariance(), X)
 """
 function Statistics.cor(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing,
                         kwargs...)
+    assert_finite_sample(X)
     w = get_observation_weights(ce.w, X; dims = dims, kwargs...)
     if isnothing(w)
         robust_cor(ce.ce, X; dims = dims, mean = mean, kwargs...)

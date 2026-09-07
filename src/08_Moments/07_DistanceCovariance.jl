@@ -398,6 +398,7 @@ julia> cor(ce, X)
 """
 function Statistics.cor(ce::DistanceCovariance, X::MatNum; dims::Int = 1, kwargs...)
     X = dims_oriented(dims, X)
+    assert_finite_sample(X)
     w = get_observation_weights(ce.w, X)
     return cor_distance(ce, X, w)
 end
@@ -566,6 +567,7 @@ julia> cov(ce, X)
 """
 function Statistics.cov(ce::DistanceCovariance, X::MatNum; dims::Int = 1, kwargs...)
     X = dims_oriented(dims, X)
+    assert_finite_sample(X)
     w = get_observation_weights(ce.w, X)
     return cov_distance(ce, X, w)
 end

@@ -298,6 +298,7 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :ignkwargs => "`kwargs`: Additional keyword arguments (ignored).",
                                  :rd => "`rd`: The returns result to use.",
                                  :pnl_prior => "`pnl`: Optional [`AssetPanel`](@ref), the panel the carrier held. A wrapping prior forwards it unchanged, so that it can compose an estimator that is fitted on a panel. An estimator that reads no panel ignores it.",
+                                 :pnl_moment => "`pnl`: Optional [`AssetPanel`](@ref), whose active mask the Coverage Universe of the fit is derived from. `nothing` makes the rule finiteness alone.",
                                  :window => "`window`: Observation window. An integer selects the last `window` observations, and a vector of indices selects those observations.",
                                  # Prior results.
                                  :chol => "`chol`: Cholesky factorisation of the covariance matrix.",#

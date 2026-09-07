@@ -1542,5 +1542,53 @@ function Base.copy(x::RegimeAdjustedVarianceState)
                                        copy(x.obs_count), copy(x.old_obs_count),
                                        copy(x.active), x.regime_state, x.n_regime_obs)
 end
+"""
+    Statistics.var(ce::RegimeAdjustedExpWeightedVariance, X::MatNum,
+                   pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...) -> MatNum
+    Statistics.std(ce::RegimeAdjustedExpWeightedVariance, X::MatNum,
+                   pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...) -> MatNum
+
+Take the whole window, and read the two universe masks of the Asset Panel.
+
+[`RegimeAdjustedExpWeightedVariance`](@ref) is **mask-aware**, so it overrides the reduce-and-expand root of its verb. It knows its own warm-up, its freeze on a holiday and its reset on an inactive period, so it emits its own frame over the whole window rather than taking a clean block from [`coverage_reduction`](@ref). An asset outside the Coverage Universe therefore keeps a number here, where a plain estimator would carry `NaN`.
+
+The panel travels as the third positional argument, and this method unpacks it onto the `active_mask` and `estimation_mask` keywords the estimator already has. No panel, and a static panel, both give the unmasked path.
+
+# Algorithm
+
+ 1. Read the two masks with [`panel_moment_masks`](@ref).
+ 2. Delegate to the two-argument method with them on its keywords.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - $(arg_dict[:X])
+  - $(arg_dict[:pnl_moment])
+  - $(arg_dict[:dims])
+  - `kwargs...`: Additional keyword arguments passed to the two-argument method.
+
+# Returns
+
+  - `sigma::MatNum`: The variance, or the standard deviation, of every asset of the window.
+
+# Related
+
+  - [`RegimeAdjustedExpWeightedVariance`](@ref)
+  - [`panel_moment_masks`](@ref)
+  - [`coverage_reduction`](@ref)
+"""
+function Statistics.var(ce::RegimeAdjustedExpWeightedVariance, X::MatNum,
+                        pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+    amsk, emsk = panel_moment_masks(pnl)
+    return Statistics.var(ce, X; dims = dims, estimation_mask = emsk, active_mask = amsk,
+                          kwargs...)
+end
+function Statistics.std(ce::RegimeAdjustedExpWeightedVariance, X::MatNum,
+                        pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+    amsk, emsk = panel_moment_masks(pnl)
+    return Statistics.std(ce, X; dims = dims, estimation_mask = emsk, active_mask = amsk,
+                          kwargs...)
+end
+
 export LogRegimeAdjusted, FirstMomentRegimeAdjusted, RootMeanSquaredAdjusted,
        RegimeAdjustedExpWeightedVariance

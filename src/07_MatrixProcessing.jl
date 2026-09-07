@@ -541,4 +541,66 @@ function matrix_processing(mp::AbstractMatrixProcessingEstimator, sigma::MatNum,
     return sigma
 end
 
+"""
+    matrix_processing_block!(mp::Option{<:AbstractMatrixProcessingEstimator},
+                             sigma::MatNum, X::MatNum, args...; kwargs...) -> MatNum
+
+Repair the finite block of a covariance-like frame in place, and leave the frame around it alone.
+
+A composite estimator that forwards an Asset Panel to the estimator it wraps can get a **frame** back: a matrix whose rows and columns outside the Coverage Universe are `NaN`. The repair has no answer for a `NaN`, so it runs on the finite block alone, and the frame around the block is written back unchanged.
+
+The block is derived from the diagonal, exactly as [`investable_mask`](@ref) derives the Investable Mask from it. An off-diagonal `NaN` **inside** the block is refused with an `IsNonFiniteError`, and is not peeled away. No estimator of the library can make one: an asset that a fit could not estimate ends its window inactive, so its own diagonal is `NaN` and it is outside the block already. A peel here would hide a defect rather than repair a matrix.
+
+The bare [`matrix_processing!`](@ref) and [`posdef!`](@ref) are unchanged, so a `NaN` that reaches a plain path is still refused there.
+
+# Algorithm
+
+ 1. Take the block `blk` as `isfinite.(diag(sigma))`.
+ 2. Return `sigma` untouched when `blk` holds no `false`, after the ordinary repair.
+ 3. Throw an `IsEmptyError` when `blk` holds no `true`.
+ 4. Copy the block out, and refuse a non-finite entry inside it with an `IsNonFiniteError`.
+ 5. Repair the copy with [`matrix_processing!`](@ref), under the columns of `X` that the block names.
+ 6. Write the repaired copy back into `sigma`, and return `sigma`.
+
+# Arguments
+
+  - $(arg_dict[:mp])
+  - $(arg_dict[:sigrho])
+  - $(arg_dict[:X])
+  - `args...`: Additional positional arguments passed to [`matrix_processing!`](@ref).
+  - `kwargs...`: Additional keyword arguments passed to [`matrix_processing!`](@ref).
+
+# Validation
+
+  - At least one asset must be inside the block.
+  - The block of `sigma` must be finite.
+
+# Returns
+
+  - `sigma::MatNum`: The input matrix, whose block was repaired in place.
+
+# Related
+
+  - [`matrix_processing!`](@ref)
+  - [`investable_mask`](@ref)
+  - [`IsNonFiniteError`](@ref)
+  - [`IsEmptyError`](@ref)
+"""
+function matrix_processing_block!(mp::Option{<:AbstractMatrixProcessingEstimator},
+                                  sigma::MatNum, X::MatNum, args...; kwargs...)
+    blk = isfinite.(LinearAlgebra.diag(sigma))
+    if all(blk)
+        matrix_processing!(mp, sigma, X, args...; kwargs...)
+        return sigma
+    end
+    @argcheck(any(blk),
+              IsEmptyError("no asset of the matrix is inside the finite block: every diagonal entry is non-finite. Check that the window holds at least one asset in the Coverage Universe."))
+    block = sigma[blk, blk]
+    @argcheck(all(isfinite, block),
+              IsNonFiniteError("the finite block of the matrix carries $(count(!isfinite, block)) non-finite off-diagonal entries, the first at $(findfirst(!isfinite, block)). Every asset of the block has a finite diagonal, so an estimator wrote a gap into a pair it claimed to have estimated."))
+    matrix_processing!(mp, block, X[:, blk], args...; kwargs...)
+    sigma[blk, blk] = block
+    return sigma
+end
+
 export MatrixProcessing, matrix_processing, matrix_processing!

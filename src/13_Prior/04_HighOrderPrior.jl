@@ -804,11 +804,15 @@ function prior(pe::HighOrderPriorEstimator, X::MatNum, F::Option{<:MatNum} = not
                pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, kwargs...)
     X, F = dims_oriented(dims, X, F)
     pr = prior(pe.pe, X, F, pnl; kwargs...)
-    kt = cokurtosis(pe.kte, X; kwargs...)
+    # The co-moments take the same seam the low order moments take: the panel travels as the
+    # third positional argument, the tensor is fitted on the Coverage Universe, and it is
+    # expanded onto the full asset universe. `D2`, `L2` and `S2` are then sized from the full
+    # width of `pr.X`, which is what the expanded tensors carry.
+    kt = cokurtosis(pe.kte, X, pnl; kwargs...)
     D2 = nothing
     L2 = nothing
     S2 = nothing
-    sk, V = coskewness(pe.ske, X; kwargs...)
+    sk, V = coskewness(pe.ske, X, pnl; kwargs...)
     if !isnothing(kt) && !isnothing(sk)
         D2, L2, S2 = dup_elim_sum_matrices(size(pr.X, 2))
     elseif !isnothing(kt) && isnothing(sk)

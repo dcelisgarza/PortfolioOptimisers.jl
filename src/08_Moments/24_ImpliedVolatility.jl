@@ -744,6 +744,7 @@ function Statistics.cov(ce::ImpliedVolatility, X::MatNum; dims::Int = 1, mean = 
                         iv::MatNum, ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
     X, iv = dims_oriented(dims, X, iv)
     @argcheck(size(X) == size(iv), DimensionMismatch)
+    assert_finite_sample(X)
     sigma = Statistics.cor(ce.ce, X; dims = 1, mean = mean, iv = iv, kwargs...)
     iv = iv / sqrt(ce.af)
     iv = predict_realised_vols(ce.alg, iv, X, ivpa)
@@ -802,6 +803,7 @@ function Statistics.cor(ce::ImpliedVolatility, X::MatNum; dims::Int = 1, mean = 
                         iv::MatNum, ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
     X, iv = dims_oriented(dims, X, iv)
     @argcheck(size(X) == size(iv), DimensionMismatch)
+    assert_finite_sample(X)
     rho = Statistics.cor(ce.ce, X; dims = 1, mean = mean, iv = iv, kwargs...)
     # The prediction is discarded. It runs so that `cor` refuses what `cov` refuses.
     predict_realised_vols(ce.alg, iv / sqrt(ce.af), X, ivpa)
@@ -809,4 +811,104 @@ function Statistics.cor(ce::ImpliedVolatility, X::MatNum; dims::Int = 1, mean = 
     matrix_processing!(ce.mp, rho, X; kwargs...)
     return rho
 end
+"""
+    coverage_reduced_ivpa(ivpa::Option{<:Number}, cmsk) -> Option{<:Number}
+    coverage_reduced_ivpa(ivpa::VecNum, cmsk::BitVector) -> VecNum
+
+Reduce a per-asset implied volatility premium to the Coverage Universe.
+
+A scalar premium applies to every asset, so it survives the reduction untouched. A vector premium carries one entry per asset, so it takes the same slice `X` takes.
+
+# Arguments
+
+  - `ivpa`: The implied volatility premium adjustment, a scalar, a vector, or `nothing`.
+  - `cmsk`: The Coverage Universe, or `nothing`.
+
+# Returns
+
+  - `ivpa`: The premium on the Coverage Universe.
+
+# Related
+
+  - [`ImpliedVolatility`](@ref)
+  - [`coverage_reduction`](@ref)
+"""
+function coverage_reduced_ivpa(ivpa, ::Nothing)
+    return ivpa
+end
+function coverage_reduced_ivpa(ivpa::Option{<:Number}, ::BitVector)
+    return ivpa
+end
+function coverage_reduced_ivpa(ivpa::VecNum, cmsk::BitVector)
+    return ivpa[cmsk]
+end
+"""
+    Statistics.cov(ce::ImpliedVolatility, X::MatNum, pnl::Option{<:AssetPanel};
+                   dims::Int = 1, mean = nothing, iv::MatNum,
+                   ivpa::Option{<:Num_VecNum} = nothing, kwargs...) -> MatNum
+    Statistics.cor(ce::ImpliedVolatility, X::MatNum, pnl::Option{<:AssetPanel};
+                   dims::Int = 1, mean = nothing, iv::MatNum,
+                   ivpa::Option{<:Num_VecNum} = nothing, kwargs...) -> MatNum
+
+Fit an implied volatility estimate on the Coverage Universe, and expand it to the full asset universe.
+
+[`ImpliedVolatility`](@ref) overrides the reduce-and-expand root of its verb because it reads two more per-asset inputs than the root knows about: the implied volatility surface `iv`, which is `observations × assets`, and the premium `ivpa`, which is one number per asset where it is a vector. Both take the slice `X` takes, so that the three inputs describe the same universe.
+
+# Algorithm
+
+ 1. Check `dims`, and orient `X` and `iv` to `observations × assets`.
+ 2. Derive the Coverage Universe of `X` with [`coverage_mask`](@ref).
+ 3. Slice `X`, `iv` and `ivpa` onto it.
+ 4. Call the two-argument method on the clean block.
+ 5. Expand the matrix with [`expand_moment`](@ref).
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - $(arg_dict[:X])
+  - $(arg_dict[:pnl_moment])
+  - $(arg_dict[:dims])
+  - $(arg_dict[:omean])
+  - `iv`: Implied volatility surface `observations × assets`.
+  - `ivpa`: Implied volatility premium adjustment.
+  - `kwargs...`: Additional keyword arguments passed to the two-argument method.
+
+# Validation
+
+  - $(val_dict[:dims])
+  - `size(X) == size(iv)`.
+
+# Returns
+
+  - `sigma::MatNum`: The covariance matrix, or the correlation matrix, on the full asset universe.
+
+# Related
+
+  - [`ImpliedVolatility`](@ref)
+  - [`coverage_mask`](@ref)
+  - [`expand_moment`](@ref)
+"""
+function Statistics.cov(ce::ImpliedVolatility, X::MatNum, pnl::Option{<:AssetPanel};
+                        dims::Int = 1, mean = nothing, iv::MatNum,
+                        ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
+    X, iv = dims_oriented(dims, X, iv)
+    @argcheck(size(X) == size(iv), DimensionMismatch)
+    cmsk = coverage_mask(X, pnl; dims = 1)
+    Xc, ivc = coverage_reduced_pair(X, iv, cmsk)
+    sigma = Statistics.cov(ce, Xc; dims = 1, mean = mean, iv = ivc,
+                           ivpa = coverage_reduced_ivpa(ivpa, cmsk), kwargs...)
+    return expand_moment(sigma, cmsk)
+end
+function Statistics.cor(ce::ImpliedVolatility, X::MatNum, pnl::Option{<:AssetPanel};
+                        dims::Int = 1, mean = nothing, iv::MatNum,
+                        ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
+    X, iv = dims_oriented(dims, X, iv)
+    @argcheck(size(X) == size(iv), DimensionMismatch)
+    cmsk = coverage_mask(X, pnl; dims = 1)
+    Xc, ivc = coverage_reduced_pair(X, iv, cmsk)
+    rho = Statistics.cor(ce, Xc; dims = 1, mean = mean, iv = ivc,
+                         ivpa = coverage_reduced_ivpa(ivpa, cmsk), kwargs...)
+    return expand_moment(rho, cmsk)
+end
+
 export ImpliedVolatility, ImpliedVolatilityPremium, ImpliedVolatilityRegression

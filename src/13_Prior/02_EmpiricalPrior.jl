@@ -108,8 +108,9 @@ function EmpiricalPrior(;
     return EmpiricalPrior(ce, me, horizon)
 end
 """
-    prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing}, X::MatNum, args...; dims::Int = 1,
-          kwargs...)
+    prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing}, X::MatNum,
+          F::Option{<:MatNum} = nothing, pnl::Option{<:AssetPanel} = nothing;
+          dims::Int = 1, kwargs...)
 
 Compute empirical prior moments for asset returns (no horizon adjustment).
 
@@ -141,13 +142,15 @@ This method takes the **arithmetic** moments of `X` directly. It applies no log 
 
   - `pe`: Empirical prior estimator.
   - `X`: Asset returns matrix (observations × assets).
-  - `args...`: Additional positional arguments (ignored).
+  - `F`: Factor returns matrix (ignored).
+  - $(arg_dict[:pnl_moment])
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to mean and covariance estimators.
 
 # Validation
 
   - `dims in (1, 2)`.
+  - At least one asset must be in the Coverage Universe.
 
 # Returns
 
@@ -158,17 +161,20 @@ This method takes the **arithmetic** moments of `X` directly. It applies no log 
   - [`EmpiricalPrior`](@ref)
   - [`LowOrderPrior`](@ref)
   - [`prior`](@ref)
+  - [`coverage_mask`](@ref)
 """
-function prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing}, X::MatNum, args...; dims::Int = 1,
-               kwargs...)
+function prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing}, X::MatNum,
+               ::Option{<:MatNum} = nothing, pnl::Option{<:AssetPanel} = nothing;
+               dims::Int = 1, kwargs...)
     X = dims_oriented(dims, X)
-    mu = vec(Statistics.mean(pe.me, X; kwargs...))
-    sigma = Statistics.cov(pe.ce, X; kwargs...)
+    mu = vec(Statistics.mean(pe.me, X, pnl; dims = 1, kwargs...))
+    sigma = Statistics.cov(pe.ce, X, pnl; dims = 1, kwargs...)
     return LowOrderPrior(; X = X, mu = mu, sigma = sigma)
 end
 """
-    prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number}, X::MatNum, args...; dims::Int = 1,
-          kwargs...)
+    prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number}, X::MatNum,
+          F::Option{<:MatNum} = nothing, pnl::Option{<:AssetPanel} = nothing;
+          dims::Int = 1, kwargs...)
 
 Compute empirical prior moments for asset returns with investment horizon adjustment.
 
@@ -219,13 +225,15 @@ The order of steps 5 to 7 is **not free**. Step 6 reads the `mu` that step 5 lef
 
   - `pe`: Empirical prior estimator.
   - `X`: Asset returns matrix (observations × assets).
-  - `args...`: Additional positional arguments (ignored).
+  - `F`: Factor returns matrix (ignored).
+  - $(arg_dict[:pnl_moment])
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to mean and covariance estimators.
 
 # Validation
 
   - `dims in (1, 2)`.
+  - At least one asset must be in the Coverage Universe.
 
 # Returns
 
@@ -236,13 +244,15 @@ The order of steps 5 to 7 is **not free**. Step 6 reads the `mu` that step 5 lef
   - [`EmpiricalPrior`](@ref)
   - [`LowOrderPrior`](@ref)
   - [`prior`](@ref)
+  - [`coverage_mask`](@ref)
 """
-function prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number}, X::MatNum, args...;
+function prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number}, X::MatNum,
+               ::Option{<:MatNum} = nothing, pnl::Option{<:AssetPanel} = nothing;
                dims::Int = 1, kwargs...)
     X = dims_oriented(dims, X)
     X_log = log1p.(X)
-    mu = vec(Statistics.mean(pe.me, X_log; kwargs...))
-    sigma = Statistics.cov(pe.ce, X_log; kwargs...)
+    mu = vec(Statistics.mean(pe.me, X_log, pnl; dims = 1, kwargs...))
+    sigma = Statistics.cov(pe.ce, X_log, pnl; dims = 1, kwargs...)
     mu .*= pe.horizon
     sigma .*= pe.horizon
     mu .= exp.(mu + 0.5 * LinearAlgebra.diag(sigma))

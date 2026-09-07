@@ -393,6 +393,7 @@ julia> cokurtosis(Cokurtosis(), X)
 function cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:FullMoment}, X::MatNum; dims::Int = 1,
                     mean = nothing, kwargs...)
     X = dims_oriented(dims, X)
+    assert_finite_sample(X)
     w = get_observation_weights(kte.w, X; dims = 1, kwargs...)
     mu = weighted_centre(X, kte.me, kte.w; dims = 1, mean = mean, kwargs...)
     X = X .- mu
@@ -401,6 +402,7 @@ end
 function cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:SemiMoment}, X::MatNum; dims::Int = 1,
                     mean = nothing, kwargs...)
     X = dims_oriented(dims, X)
+    assert_finite_sample(X)
     w = get_observation_weights(kte.w, X; dims = 1, kwargs...)
     mu = weighted_centre(X, kte.me, kte.w; dims = 1, mean = mean, kwargs...)
     X = min.(X .- mu, zero(eltype(X)))

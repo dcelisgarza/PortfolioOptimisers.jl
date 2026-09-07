@@ -489,6 +489,7 @@ julia> V
 function coskewness(ske::Coskewness{<:Any, <:Any, <:FullMoment}, X::MatNum; dims::Int = 1,
                     mean = nothing, kwargs...)
     X = dims_oriented(dims, X)
+    assert_finite_sample(X)
     w = get_observation_weights(ske.w, X; dims = 1, kwargs...)
     mu = weighted_centre(X, ske.me, ske.w; dims = 1, mean = mean, kwargs...)
     Y = X .- mu
@@ -497,6 +498,7 @@ end
 function coskewness(ske::Coskewness{<:Any, <:Any, <:SemiMoment}, X::MatNum; dims::Int = 1,
                     mean = nothing, kwargs...)
     X = dims_oriented(dims, X)
+    assert_finite_sample(X)
     w = get_observation_weights(ske.w, X; dims = 1, kwargs...)
     mu = weighted_centre(X, ske.me, ske.w; dims = 1, mean = mean, kwargs...)
     Y = min.(X .- mu, zero(eltype(X)))
