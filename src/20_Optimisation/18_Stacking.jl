@@ -562,23 +562,25 @@ function _optimise(st::Stacking, rd::ReturnsResult; dims::Int = 1,
     st = reset_time_dependent_estimator(st)
     rd = returns_result_picker(rd, st.brt)
     pr = prior(st.pe, rd; dims = dims)
+    # Resolve the fee on the caller's own universe, before the door below narrows `sets`.
+    # A name stated over that universe must not be refused because the data delisted the
+    # asset, and a carrier keyed by name cannot resolve at all once its `w` sits on the
+    # complement while `sets` sits on the mask. `investable_fees_view` then places the
+    # resolved fee on the axes the mask leaves.
+    imsk = investable_mask(pr)
+    fees = investable_fees_view(fees_constraints(st.fees, st.sets; datatype = eltype(pr.X),
+                                                 strict = st.strict), imsk, pr.X)
+    # A forced exit is charged once, against the full-universe weight vector the fit
+    # rebuilds, so it rides on the result alone. No sub-problem below holds that vector —
+    # the exiting asset is in no cluster, its column being `NaN` — so none prices an exit.
+    cfees = strip_liquidation_carriers(fees, nothing)
     # The prior fits on the coverage universe and returns a result on the full asset
     # universe, where an asset it could not estimate carries `NaN`. Reduce once, here,
     # before the candidate solves: every candidate then sees the investable universe alone,
     # and each composes its own mask inside its own solve. `StackingResult` expands the
     # combined weights back.
-    imsk, pr, st, rd = investable_reduction(pr, st, rd)
+    _, pr, st, rd = investable_reduction(imsk, pr, st, rd)
     X = pr.X
-    # An all-investable window derives no mask, so the door above short-circuits and the
-    # two liquidation carriers never meet a complement. Nothing exited, so nothing is
-    # owed: `strip_liquidation_carriers` states why this is stripped rather than viewed.
-    fees = strip_liquidation_carriers(fees_constraints(st.fees, st.sets;
-                                                       datatype = eltype(X),
-                                                       strict = st.strict), imsk)
-    # A forced exit is charged once, against the full-universe weight vector the fit
-    # rebuilds, so it rides on the result alone. No sub-problem below holds that vector —
-    # the exiting asset is in no cluster, its column being `NaN` — so none prices an exit.
-    cfees = strip_liquidation_carriers(fees, nothing)
     opti = st.opti
     Ni = length(opti)
     wi = zeros(eltype(X), size(X, 2), Ni)

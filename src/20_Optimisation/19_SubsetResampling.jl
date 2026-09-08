@@ -579,12 +579,20 @@ function _optimise(sr::SubsetResampling, rd::ReturnsResult; dims::Int = 1,
     sr = reset_time_dependent_estimator(sr)
     rd = returns_result_picker(rd, sr.brt)
     pr = prior(sr.pe, rd; dims = dims)
+    # Resolve the fee on the caller's own universe, before the door below narrows `sets`.
+    # A name stated over that universe must not be refused because the data delisted the
+    # asset, and a carrier keyed by name cannot resolve at all once its `w` sits on the
+    # complement while `sets` sits on the mask. `investable_fees_view` then places the
+    # resolved fee on the axes the mask leaves.
+    imsk = investable_mask(pr)
+    fees = investable_fees_view(fees_constraints(sr.fees, sr.sets; datatype = eltype(pr.X),
+                                                 strict = sr.strict), imsk, pr.X)
     # The prior fits on the coverage universe and returns a result on the full asset
     # universe, where an asset it could not estimate carries `NaN`. Reduce once, here,
     # before the sample: `N` is then the count of investable assets, so every subset is
     # drawn from the investable universe alone and no subset can hold a dead asset.
     # `SubsetResamplingResult` expands the averaged weights back.
-    imsk, pr, sr, rd = investable_reduction(pr, sr, rd)
+    _, pr, sr, rd = investable_reduction(imsk, pr, sr, rd)
     X = pr.X
     N = size(X, 2)
     (; subset_size, n_subsets, max_comb, rng, seed) = sr
@@ -595,12 +603,6 @@ function _optimise(sr::SubsetResampling, rd::ReturnsResult; dims::Int = 1,
               "n_subsets = $n_subsets must not be greater than `binomial(assets, subset_size) = n_comb => binomial($N, $subset_size) = $n_comb`.")
     asset_idx = sample_unique_assets(N, subset_size, n_subsets; max_comb = max_comb,
                                      rng = rng, seed = seed)
-    # An all-investable window derives no mask, so the door above short-circuits and the
-    # two liquidation carriers never meet a complement. Nothing exited, so nothing is
-    # owed: `strip_liquidation_carriers` states why this is stripped rather than viewed.
-    fees = strip_liquidation_carriers(fees_constraints(sr.fees, sr.sets;
-                                                       datatype = eltype(X),
-                                                       strict = sr.strict), imsk)
     opt = sr.opt
     ress = Vector{NonFiniteAllocationOptimisationResult}(undef, n_subsets)
     FLoops.@floop sr.ex for i in 1:n_subsets

@@ -265,29 +265,17 @@
         @test collect(opte_v.fees.lq.w) == collect(opt_v.fees.lq.w)
         @test collect(opte_v.fees.flq.w) == collect(opt_v.fees.flq.w)
         @test collect(opte_v.fees.tn.w) == collect(opt_v.fees.tn.w)
-        # **The one thing the view cannot fix: the resolution order.**
+        # **The resolution order (#911).** A `Fees` is already resolved, so the view is the
+        # whole story for it, and every assertion above passes. A `FeesEstimator` is not,
+        # and resolving one *after* the door could never work for a name-keyed carrier: the
+        # departed asset's name is no longer in the universe, so `strict` refused a name
+        # that was correct when the caller stated it, and the carrier's `w` already sat on
+        # the complement while `sets` sat on the mask, so the two lengths could not agree.
         #
-        # A `Fees` is already resolved, so the view is the whole story for it, and every
-        # assertion above passes. A `FeesEstimator` is not. Today every family resolves it
-        # *after* the door, against the reduced `sets`, and by then two things have gone
-        # wrong for a name-keyed carrier: the departed asset's name is no longer in the
-        # universe, so its rate is dropped with a warning under `strict = false`; and the
-        # carrier's `w` already sits on the complement while `sets` sits on the mask, so the
-        # two lengths cannot agree.
-        #
-        # The fix is not a new verb. It is to resolve `fees_constraints` on the **full**
-        # `sets` *before* `investable_reduction`, and let this view split the resolved
-        # `Fees`. That reorders the fourteen fit sites and changes what `strict` refuses, so
-        # it is issue #911 rather than a change made here.
-        #
-        # **This assertion is a tripwire.** It pins today's behaviour, so it fails when #911
-        # lands. Whoever fixes the order should delete it and keep the positive assertions
-        # below, which already state the answer the fixed order must reach.
-        reduced_sets = UniverseSets(; dict = Dict("nx" => nx[keep]))
-        @test_throws DimensionMismatch fees_constraints(opte_v.fees, reduced_sets)
-
-        # Resolving on the FULL sets first, then viewing, is the order that works, and it
-        # reaches exactly the two axes the hand-written `Fees` reached.
+        # Every family now resolves on the **full** `sets` before the door and hands the
+        # resolved `Fees` to `investable_fees_view`, which is the split asserted below.
+        # Resolving on the FULL sets first, then viewing, reaches exactly the two axes the
+        # hand-written `Fees` reached.
         resolved_first = fees_constraints(fest, sets)
         split_after = PortfolioOptimisers.port_opt_view(resolved_first, keep, prn.X)
         @test collect(split_after.l) == lval[keep]
@@ -434,6 +422,68 @@
             @test fees_del.lq.val == 0.01
             @test fees_del.flq.val == 5.0
         end
+    end
+
+    @testset "A name-keyed fee resolves over the caller's own universe" begin
+        using StableRNGs
+
+        # A caller names their constraints over the universe they were given. An asset that
+        # delists is not a typo, and they cannot know in advance which one it will be, so
+        # `strict` must not refuse the name. Resolving before the door is what makes that
+        # true, and it is the only order in which a name-keyed **carrier** resolves at all:
+        # after the door its `w` sits on the complement while `sets` sits on the mask.
+        rng = StableRNG(987654321)
+        nx = ["a", "b", "c", "d", "e"]
+        X_all = randn(rng, 200, 5) ./ 100 .+ 0.0005
+        X_del = copy(X_all)
+        X_del[120:end, 3] .= NaN          # `c` delists
+        rd_all = ReturnsResult(; nx = nx, X = X_all)
+        rd_del = ReturnsResult(; nx = nx, X = X_del)
+        sets = UniverseSets(; dict = Dict("nx" => nx))
+
+        # `c`'s own rate on every axis: a holding fee, and both carriers.
+        fest = FeesEstimator(; l = Dict("a" => 0.002, "c" => 0.001),
+                             lq = TurnoverEstimator(; w = fill(0.2, 5),
+                                                    val = Dict("c" => 0.01)),
+                             flq = TurnoverEstimator(; w = fill(0.2, 5),
+                                                     val = Dict("c" => 5.0)))
+        hopt = HierarchicalOptimiser(; pe = EmpiricalPrior(), sets = sets, fees = fest,
+                                     strict = true)
+        inner = HierarchicalRiskParity()
+        fams = ["HierarchicalRiskParity" => HierarchicalRiskParity(; opt = hopt),
+                "HierarchicalEqualRiskContribution" =>
+                    HierarchicalEqualRiskContribution(; opt = hopt),
+                "NestedClustered" =>
+                    NestedClustered(; pe = EmpiricalPrior(), sets = sets, fees = fest,
+                                    opti = inner, opto = inner, strict = true),
+                "Stacking" => Stacking(; pe = EmpiricalPrior(), sets = sets, fees = fest,
+                                       opti = [inner], opto = inner, strict = true),
+                "SubsetResampling" =>
+                    SubsetResampling(; pe = EmpiricalPrior(), sets = sets, fees = fest,
+                                     opt = inner, subset_size = 3, n_subsets = 4,
+                                     strict = true)]
+        @testset "$name" for (name, est) in fams
+            # `strict = true` no longer refuses `c`, and the carrier lands on `c`'s own
+            # axis carrying `c`'s own rate.
+            fees_del = optimise(est, rd_del).fees
+            @test collect(fees_del.l) == [0.002, 0.0, 0.0, 0.0]
+            @test collect(fees_del.lq.val) == [0.01]
+            @test collect(fees_del.flq.val) == [5.0]
+
+            # Nothing exited, so `c` keeps its holding fee in place and owes no exit.
+            fees_all = optimise(est, rd_all).fees
+            @test collect(fees_all.l) == [0.002, 0.0, 0.001, 0.0, 0.0]
+            @test isnothing(fees_all.lq)
+            @test isnothing(fees_all.flq)
+        end
+
+        # `strict` still does the job it exists for. `zz` is in no universe, mask or no
+        # mask, so it is a typo and is refused — and the message counts the caller's own
+        # five assets, not the four the door left.
+        typo = HierarchicalOptimiser(; pe = EmpiricalPrior(), sets = sets,
+                                     fees = FeesEstimator(; l = Dict("zz" => 0.001)),
+                                     strict = true)
+        @test_throws ArgumentError optimise(HierarchicalRiskParity(; opt = typo), rd_del)
     end
 
     @testset "A cluster-level risk figure prices no forced exit" begin

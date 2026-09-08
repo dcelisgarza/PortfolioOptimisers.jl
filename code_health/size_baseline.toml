@@ -234,7 +234,7 @@ commit = "fda13accfd"
 "src/20_Optimisation/09_JuMPConstraints/11_TrackingErrorConstraints.jl" = { code = 176, doc = 63, comment = 3, blank = 22, total = 264 }
 "src/20_Optimisation/09_JuMPConstraints/12_RegularisationConstraints.jl" = { code = 219, doc = 442, comment = 11, blank = 205, total = 877 }
 "src/20_Optimisation/09_JuMPConstraints/13_WeightNormConstraints.jl" = { code = 92, doc = 160, comment = 2, blank = 70, total = 324 }
-"src/20_Optimisation/10_JuMPOptimiser.jl" = { code = 711, doc = 703, comment = 60, blank = 184, total = 1658 }
+"src/20_Optimisation/10_JuMPOptimiser.jl" = { code = 714, doc = 703, comment = 65, blank = 184, total = 1666 }
 "src/20_Optimisation/11_MeanRisk.jl" = { code = 252, doc = 432, comment = 4, blank = 125, total = 813 }
 "src/20_Optimisation/12_FactorRiskContribution.jl" = { code = 157, doc = 221, comment = 6, blank = 71, total = 455 }
 "src/20_Optimisation/13_NearOptimalCentering.jl" = { code = 607, doc = 594, comment = 17, blank = 198, total = 1416 }

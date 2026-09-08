@@ -1235,12 +1235,21 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
     rd = returns_result_picker(rd, opt.brt)
     assert_universe_axis_order(opt.sets, rd)
     pr = prior(opt.pe, rd; dims = dims)
+    # Resolve the fee on the caller's own universe, before the door below narrows `sets`.
+    # A name stated over that universe must not be refused because the data delisted the
+    # asset, and a carrier keyed by name cannot resolve at all once its `w` sits on the
+    # complement while `sets` sits on the mask. `investable_fees_view` then places the
+    # resolved fee on the axes the mask leaves.
+    imsk = investable_mask(pr)
+    fees = investable_fees_view(fees_constraints(opt.fees, opt.sets;
+                                                 datatype = eltype(pr.X),
+                                                 strict = opt.strict), imsk, pr.X)
     # The prior fits on the coverage universe and returns a result on the full asset
     # universe, where an asset it could not estimate carries `NaN`. Reduce once, here:
     # every builder below then states its constraint over the investable assets alone, on
     # inputs `port_opt_view` has sliced by the same index. The weights are expanded back
     # in `JuMPOptimisationResult`.
-    imsk, pr, opt, rd = investable_reduction(pr, opt, rd)
+    _, pr, opt, rd = investable_reduction(imsk, pr, opt, rd)
     X = pr.X
     datatype = eltype(X)
     wb = weight_bounds_constraints(opt.wb, opt.sets; N = size(X, 2), strict = opt.strict,
@@ -1278,12 +1287,6 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
                                      strict = opt.strict)
     end
     tn = turnover_constraints(opt.tn, opt.sets; datatype = datatype, strict = opt.strict)
-    # An all-investable window derives no mask, so the door above short-circuits and the
-    # two liquidation carriers never meet a complement. Nothing exited, so nothing is
-    # owed: `strip_liquidation_carriers` states why this is stripped rather than viewed.
-    fees = strip_liquidation_carriers(fees_constraints(opt.fees, opt.sets;
-                                                       datatype = datatype,
-                                                       strict = opt.strict), imsk)
     plr = phylogeny_constraints(opt.ple, pr; iv = rd.iv, ivpa = rd.ivpa, rd = rd,
                                 x_src = opt.x_src, kwargs...)
     ret = factory(opt.ret, pr)

@@ -324,12 +324,25 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
     hrp = reset_time_dependent_estimator(hrp)
     rd = returns_result_picker(rd, hrp.opt.brt)
     pr = prior(hrp.opt.pe, rd; dims = dims)
+    # Resolve the fee on the caller's own universe, before the door below narrows `sets`.
+    # A name stated over that universe must not be refused because the data delisted the
+    # asset, and a carrier keyed by name cannot resolve at all once its `w` sits on the
+    # complement while `sets` sits on the mask. `investable_fees_view` then places the
+    # resolved fee on the axes the mask leaves.
+    imsk = investable_mask(pr)
+    fees = investable_fees_view(fees_constraints(hrp.opt.fees, hrp.opt.sets;
+                                                 strict = hrp.opt.strict,
+                                                 datatype = eltype(pr.X)), imsk, pr.X)
+    # A forced exit is charged once, against the full-universe weight vector the fit
+    # rebuilds, so it rides on the result alone. No sub-problem below holds that vector —
+    # the exiting asset is in no cluster, its column being `NaN` — so none prices an exit.
+    cfees = strip_liquidation_carriers(fees, nothing)
     # The prior fits on the coverage universe and returns a result on the full asset
     # universe, where an asset it could not estimate carries `NaN`. Reduce once, here:
     # the distance the clustering is built from never sees a `NaN`, and the cluster count
     # is chosen on the investable universe. The weights are expanded back in
     # `HierarchicalResult`.
-    imsk, pr, hrp, rd = investable_reduction(pr, hrp, rd)
+    _, pr, hrp, rd = investable_reduction(imsk, pr, hrp, rd)
     X = pr.X
     # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
     # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).
@@ -338,16 +351,6 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
     assert_clustering_universe(clr, size(X, 2))
     r = factory(hrp.r, pr, hrp.opt.slv)
     wu = Matrix{eltype(X)}(undef, size(X, 2), 2)
-    # An all-investable window derives no mask, so the door above short-circuits and the
-    # two liquidation carriers never meet a complement. Nothing exited, so nothing is
-    # owed: `strip_liquidation_carriers` states why this is stripped rather than viewed.
-    fees = strip_liquidation_carriers(fees_constraints(hrp.opt.fees, hrp.opt.sets;
-                                                       strict = hrp.opt.strict,
-                                                       datatype = eltype(X)), imsk)
-    # A forced exit is charged once, against the full-universe weight vector the fit
-    # rebuilds, so it rides on the result alone. No sub-problem below holds that vector —
-    # the exiting asset is in no cluster, its column being `NaN` — so none prices an exit.
-    cfees = strip_liquidation_carriers(fees, nothing)
     rku = unitary_expected_risks(r, X, cfees)
     wb = weight_bounds_constraints(hrp.opt.wb, hrp.opt.sets; N = size(X, 2),
                                    strict = hrp.opt.strict, datatype = eltype(X))
@@ -453,12 +456,25 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
     hrp = reset_time_dependent_estimator(hrp)
     rd = returns_result_picker(rd, hrp.opt.brt)
     pr = prior(hrp.opt.pe, rd; dims = dims)
+    # Resolve the fee on the caller's own universe, before the door below narrows `sets`.
+    # A name stated over that universe must not be refused because the data delisted the
+    # asset, and a carrier keyed by name cannot resolve at all once its `w` sits on the
+    # complement while `sets` sits on the mask. `investable_fees_view` then places the
+    # resolved fee on the axes the mask leaves.
+    imsk = investable_mask(pr)
+    fees = investable_fees_view(fees_constraints(hrp.opt.fees, hrp.opt.sets;
+                                                 strict = hrp.opt.strict,
+                                                 datatype = eltype(pr.X)), imsk, pr.X)
+    # A forced exit is charged once, against the full-universe weight vector the fit
+    # rebuilds, so it rides on the result alone. No sub-problem below holds that vector —
+    # the exiting asset is in no cluster, its column being `NaN` — so none prices an exit.
+    cfees = strip_liquidation_carriers(fees, nothing)
     # The prior fits on the coverage universe and returns a result on the full asset
     # universe, where an asset it could not estimate carries `NaN`. Reduce once, here:
     # the distance the clustering is built from never sees a `NaN`, and the cluster count
     # is chosen on the investable universe. The weights are expanded back in
     # `HierarchicalResult`.
-    imsk, pr, hrp, rd = investable_reduction(pr, hrp, rd)
+    _, pr, hrp, rd = investable_reduction(imsk, pr, hrp, rd)
     X = pr.X
     # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
     # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).
@@ -469,16 +485,6 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
     wu = Matrix{eltype(X)}(undef, size(X, 2), 2)
     wk = zeros(eltype(X), size(X, 2))
     rku = Vector{eltype(X)}(undef, size(X, 2))
-    # An all-investable window derives no mask, so the door above short-circuits and the
-    # two liquidation carriers never meet a complement. Nothing exited, so nothing is
-    # owed: `strip_liquidation_carriers` states why this is stripped rather than viewed.
-    fees = strip_liquidation_carriers(fees_constraints(hrp.opt.fees, hrp.opt.sets;
-                                                       strict = hrp.opt.strict,
-                                                       datatype = eltype(X)), imsk)
-    # A forced exit is charged once, against the full-universe weight vector the fit
-    # rebuilds, so it rides on the result alone. No sub-problem below holds that vector —
-    # the exiting asset is in no cluster, its column being `NaN` — so none prices an exit.
-    cfees = strip_liquidation_carriers(fees, nothing)
     wb = weight_bounds_constraints(hrp.opt.wb, hrp.opt.sets; N = size(X, 2),
                                    strict = hrp.opt.strict, datatype = eltype(X))
     w = ones(eltype(X), size(X, 2))

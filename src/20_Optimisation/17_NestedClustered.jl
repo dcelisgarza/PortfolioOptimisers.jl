@@ -751,25 +751,28 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
     nco = reset_time_dependent_estimator(nco)
     rd = returns_result_picker(rd, nco.brt)
     pr = prior(nco.pe, rd; dims = dims)
-    # The prior fits on the coverage universe and returns a result on the full asset
-    # universe, where an asset it could not estimate carries `NaN`. Reduce once, here, so
-    # that no cluster holds a non-investable asset and every cluster slice below indexes
-    # the reduced axis. The weights are expanded back in `NestedClusteredResult`.
-    imsk, pr, nco, rd = investable_reduction(pr, nco, rd)
-    X = pr.X
-    clr = clusterise(nco.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa, dims = dims,
-                     branchorder = branchorder, x_src = nco.x_src)
-    assert_clustering_universe(clr, size(X, 2))
-    # An all-investable window derives no mask, so the door above short-circuits and the
-    # two liquidation carriers never meet a complement. Nothing exited, so nothing is
-    # owed: `strip_liquidation_carriers` states why this is stripped rather than viewed.
-    fees = strip_liquidation_carriers(fees_constraints(nco.fees, nco.sets;
-                                                       datatype = eltype(X),
-                                                       strict = nco.strict), imsk)
+    # Resolve the fee on the caller's own universe, before the door below narrows `sets`.
+    # A name stated over that universe must not be refused because the data delisted the
+    # asset, and a carrier keyed by name cannot resolve at all once its `w` sits on the
+    # complement while `sets` sits on the mask. `investable_fees_view` then places the
+    # resolved fee on the axes the mask leaves.
+    imsk = investable_mask(pr)
+    fees = investable_fees_view(fees_constraints(nco.fees, nco.sets;
+                                                 datatype = eltype(pr.X),
+                                                 strict = nco.strict), imsk, pr.X)
     # A forced exit is charged once, against the full-universe weight vector the fit
     # rebuilds, so it rides on the result alone. No sub-problem below holds that vector —
     # the exiting asset is in no cluster, its column being `NaN` — so none prices an exit.
     cfees = strip_liquidation_carriers(fees, nothing)
+    # The prior fits on the coverage universe and returns a result on the full asset
+    # universe, where an asset it could not estimate carries `NaN`. Reduce once, here, so
+    # that no cluster holds a non-investable asset and every cluster slice below indexes
+    # the reduced axis. The weights are expanded back in `NestedClusteredResult`.
+    _, pr, nco, rd = investable_reduction(imsk, pr, nco, rd)
+    X = pr.X
+    clr = clusterise(nco.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa, dims = dims,
+                     branchorder = branchorder, x_src = nco.x_src)
+    assert_clustering_universe(clr, size(X, 2))
     idx = assignments(clr)
     cls = [findall(x -> x == i, idx) for i in 1:(clr.k)]
     wi = zeros(eltype(X), size(X, 2), clr.k)

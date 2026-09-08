@@ -644,6 +644,44 @@ function strip_liquidation_carriers(fees::Fees, ::Nothing)
     end
 end
 """
+    investable_fees_view(fees, imsk, X)
+
+Place a fee resolved over the caller's universe onto the axes an Investable Mask leaves.
+
+A fee is resolved **before** the door, against the `sets` the caller stated, and this verb takes it through. That order is what lets a name-keyed fee name an asset the data later delists: after the door `sets` holds the investable names alone, so the name is gone and `strict` refuses it, and a carrier keyed by name cannot resolve at all, because its `w` already sits on the complement while `sets` sits on the mask. Resolving first and viewing after removes both, and needs no new arithmetic: [`port_opt_view`](@ref) already splits a resolved [`Fees`](@ref) across its two axes.
+
+The two methods are the two things a mask can be. A `BitVector` means assets left, so the view runs at `findall(imsk)` and derives the complement from the width of the **unreduced** `X`. A `nothing` mask means every asset is investable, so there is no complement to slice to and [`strip_liquidation_carriers`](@ref) drops both carriers instead, which is what keeps that path allocation-free.
+
+# Algorithm
+
+ 1. On a `nothing` mask, hand the fee to [`strip_liquidation_carriers`](@ref), which drops both carriers and returns a fee carrying neither untouched.
+ 2. On a `BitVector` mask, take [`port_opt_view`](@ref) at `findall(imsk)` with the unreduced `X`, which slices the five per-asset fields to the mask and the two carriers to its complement.
+
+# Arguments
+
+  - `fees`: The fee resolved over the caller's full universe, or `nothing`.
+  - `imsk`: The Investable Mask, or `nothing` when every asset is investable.
+  - `X`: The **unreduced** returns matrix. Only its width is read, to derive the complement.
+
+# Returns
+
+  - `fees::typeof(fees)`: The fee on the axes the mask leaves.
+
+# Related
+
+  - [`Fees`](@ref)
+  - [`port_opt_view`](@ref)
+  - [`strip_liquidation_carriers`](@ref)
+  - [`investable_mask`](@ref)
+  - [`fees_constraints`](@ref)
+"""
+function investable_fees_view(fees, ::Nothing, ::Any)
+    return strip_liquidation_carriers(fees, nothing)
+end
+function investable_fees_view(fees, imsk::BitVector, X::MatNum)
+    return port_opt_view(fees, findall(imsk), X)
+end
+"""
     port_opt_view(fees::Fees, i, X::MatNum, args...)
     port_opt_view(fees::FeesEstimator, i, X::MatNum, args...)
     port_opt_view(fees::FeesE_Fees, i, args...)
