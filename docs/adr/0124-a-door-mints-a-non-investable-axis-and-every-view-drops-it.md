@@ -106,8 +106,12 @@ diagnostic, not a repair — the row genuinely cannot follow the door.
 
 ## Consequences
 
-- A constraint, bound, threshold or rate stated for an asset that later delists no longer refuses
-  under `strict = true`, in any family, at any door.
+- A bound, threshold, rate or risk budget stated for an asset that later delists no longer refuses
+  under `strict = true`, at any door. That is the **value-keyed** family, which resolves through
+  `name_to_val!`. The **row** family — `lcse`, `gcarde`, `sgcarde` and every prior view — resolves
+  through `get_linear_constraints`, which this ADR does not touch;
+  [ADR 0125](0125-a-view-row-that-names-a-departed-asset-is-dropped-whole.md) gives it the
+  counterpart axis and decides the unit of its drop.
 - Every optimisation over a departure logs one `@info`. A long walk-forward over a delisting logs
   it once per window, which is silenced with a logger.
 - `UniverseSets` prints an eighth field, so every doctest that shows one was regenerated.
