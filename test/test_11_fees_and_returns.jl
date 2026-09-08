@@ -491,6 +491,16 @@ using JuMP: JuMP
         # Both clocks charge the same total over the horizon.
         @test isapprox(sum(JuMP.coefficient(first_obs[i], vj[1]) for i in 1:3),
                        sum(JuMP.coefficient(spread[i], vj[1]) for i in 1:3))
+        # Both arms charge in place, so the caller's own vector is the one that comes back.
+        # That is what lets the builder skip a second array the length of the series, and
+        # it is safe because `set_net_portfolio_returns!` builds `net` and hands it straight
+        # here.
+        inplace = mknet(mdl)
+        @test PortfolioOptimisers.charge_one_time_fees(mdl, inplace, ot, 3, nothing) ===
+              inplace
+        inplace = mknet(mdl)
+        @test PortfolioOptimisers.charge_one_time_fees(mdl, inplace, ot, 3,
+                                                       AmortisedFees()) === inplace
 
         # The series lands the one-off cost the same way under both spellings.
         Xf2 = [0.01 0.02 -0.01 0.03; 0.03 0.04 0.02 -0.02; -0.01 0.005 0.01 0.04]

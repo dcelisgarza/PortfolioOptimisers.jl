@@ -378,8 +378,8 @@ evenly over `T`, the observation count of the fit.
 
  1. On a `nothing` or [`FirstObservationFees`](@ref) `fa`, subtract `one_time` from the first entry
     of `net` and leave the rest.
- 2. On an [`AmortisedFees`](@ref) `fa`, subtract `one_time` divided by `T` from every entry of
-    `net`.
+ 2. On an [`AmortisedFees`](@ref) `fa`, build the share `one_time / T` once and subtract it
+    from every entry of `net`.
 
 # Arguments
 
@@ -411,7 +411,15 @@ function charge_one_time_fees(model::JuMP.Model, net, one_time, ::Number,
     return net
 end
 function charge_one_time_fees(model::JuMP.Model, net, one_time, T::Number, ::AmortisedFees)
-    return JuMP.@expression(model, net .- one_time / T)
+    # Every entry is charged, but all of them are charged the same share, so the share is
+    # built once rather than once per observation. Writing it as a broadcast would build a
+    # second array the length of `net` and throw the first away. `net` is built by the one
+    # caller and handed straight here, so the term is added in place.
+    share = JuMP.@expression(model, one_time / T)
+    for n in net
+        JuMP.add_to_expression!(n, -1, share)
+    end
+    return net
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
