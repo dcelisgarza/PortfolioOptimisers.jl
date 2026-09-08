@@ -141,7 +141,7 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/11_Phylogeny/23_CentralityQueries.jl" = { raw = 0, reviewed = 0 }
 "src/11_Phylogeny/24_AssetPhylogeny.jl" = { raw = 0, reviewed = 0 }
 "src/12_ConstraintGeneration/01_Base_ConstraintGeneration.jl" = { raw = 0, reviewed = 0 }
-"src/12_ConstraintGeneration/02_LinearConstraintGeneration.jl" = { raw = 1, reviewed = 1 }
+"src/12_ConstraintGeneration/02_LinearConstraintGeneration.jl" = { raw = 2, reviewed = 2 }
 "src/12_ConstraintGeneration/03_RiskBudgetConstraintGeneration.jl" = { raw = 0, reviewed = 0 }
 "src/12_ConstraintGeneration/04_PhylogenyConstraintGeneration.jl" = { raw = 1, reviewed = 1 }
 "src/12_ConstraintGeneration/05_WeightBoundsConstraintGeneration.jl" = { raw = 0, reviewed = 0 }
@@ -159,8 +159,8 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/13_Prior/08_FactorBlackLittermanPrior.jl" = { raw = 0, reviewed = 0 }
 "src/13_Prior/09_AugmentedBlackLittermanPrior.jl" = { raw = 0, reviewed = 0 }
 "src/13_Prior/10_Base_EntropyPoolingPrior.jl" = { raw = 9, reviewed = 9 }
-"src/13_Prior/11_MeucciEntropyPoolingPrior.jl" = { raw = 1, reviewed = 1 }
-"src/13_Prior/12_EntropyPoolingPrior.jl" = { raw = 20, reviewed = 20 }
+"src/13_Prior/11_MeucciEntropyPoolingPrior.jl" = { raw = 11, reviewed = 11 }
+"src/13_Prior/12_EntropyPoolingPrior.jl" = { raw = 30, reviewed = 30 }
 "src/13_Prior/13_OpinionPoolingPrior.jl" = { raw = 1, reviewed = 1 }
 "src/13_Prior/14_HighOrderFactorPriorEstimator.jl" = { raw = 0, reviewed = 0 }
 "src/13_Prior/15_AssetPanelEstimators.jl" = { raw = 0, reviewed = 0 }

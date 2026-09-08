@@ -2049,8 +2049,9 @@ Resolve one parsed tail view into the assets it names, their coefficients, its o
   - [`comparison_sign_ineq_flag`](@ref)
 """
 function ep_view_terms(res::ParsingResult, sets::UniverseSets, X::MatNum;
-                       strict::Bool = false)
-    lc = get_linear_constraints([res], sets; datatype = eltype(X), strict = strict)
+                       strict::Bool = false, ledger::Option{<:AbstractVector} = nothing)
+    lc = get_linear_constraints([res], sets; datatype = eltype(X), strict = strict,
+                                ledger = ledger)
     if isnothing(lc)
         return nothing
     end
@@ -3123,11 +3124,12 @@ The two kernels below carry everything that differs between the conditional, the
 """
 function ep_tail_views!(tail_views::AbstractEntropyPoolingTailViewEstimator,
                         epc::AbstractDict, tvs::AbstractVector, pr::AbstractPriorResult,
-                        sets::UniverseSets, w::VecNum; strict::Bool = false)
+                        sets::UniverseSets, w::VecNum; strict::Bool = false,
+                        ledger::Option{<:AbstractVector} = nothing)
     X = pr.X
     views = parse_equation(tail_views.views.val; ops1 = ("==", ">=", "<="),
                            ops2 = (:call, :(==), :(>=), :(<=)), datatype = eltype(X))
-    views = replace_group_by_assets(views, sets, false, true, false)
+    views = replace_group_by_assets(views, sets, false, true, false; ledger = ledger)
     views = replace_prior_views(views, pr, sets, ep_tail_view_prior_args(tail_views, w)...;
                                 strict = strict)
     if !isa(views, AbstractVector)
@@ -3135,7 +3137,7 @@ function ep_tail_views!(tail_views::AbstractEntropyPoolingTailViewEstimator,
     end
     algs = ep_view_formulations(tail_views.alg, length(views), :alg)
     for (res, algi) in zip(views, algs)
-        terms = ep_view_terms(res, sets, X; strict = strict)
+        terms = ep_view_terms(res, sets, X; strict = strict, ledger = ledger)
         if isnothing(terms)
             continue
         end
@@ -3588,7 +3590,6 @@ function ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<
     # prior is fitted first, and `ep_prior_probabilities` reads the prior probabilities on
     # the rows of `pr.X`. See ADR 0116.
     pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
-    N = size(pr.X, 2)
     w1 = w0 = ep_prior_probabilities(pe.w, pr, size(X, 1))
     if !isnothing(pe.w)
         # A caller's prior probabilities weight the moments the nested estimator measures,
@@ -3598,30 +3599,41 @@ function ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<
         pe = factory(pe, w0)
         pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
     end
-    fixed = falses(N, 2)
+    # A view is a dense linear form over the asset axis, and `0 * NaN` is `NaN`, so every
+    # row is built on the investable columns alone. The mask does not move between stages,
+    # so it is derived once and each refit is viewed at it. Nothing is expanded: an `epc`
+    # row runs over observations, and the moments come from the refit prior, which already
+    # carries the full-universe frame. See ADR 0115 and ADR 0125.
+    idx, vsets, ni = ep_investable_views(pr, pe.sets)
+    led = String[]
+    vpr = ep_investable_prior(idx, pr)
+    fixed = falses(size(vpr.X, 2), 2)
     epc = Dict{Symbol, Tuple{<:MatNum, <:VecNum}}()
     tvs = Vector{AbstractEntropyPoolingTailView}(undef, 0)
     # mu, VaR, CVaR, EVaR and RLVaR
-    ep_mu_views!(pe.mu_views, epc, pr, pe.sets; strict = strict)
-    ep_var_views!(pe.var_views, epc, pr, pe.sets, w0; strict = strict)
-    ep_tail_views!(pe.cvar_views, epc, tvs, pr, pe.sets, w0; strict = strict)
-    ep_tail_views!(pe.evar_views, epc, tvs, pr, pe.sets, w0; strict = strict)
-    ep_tail_views!(pe.rlvar_views, epc, tvs, pr, pe.sets, w0; strict = strict)
+    ep_mu_views!(pe.mu_views, epc, vpr, vsets; strict = strict, ledger = led)
+    ep_var_views!(pe.var_views, epc, vpr, vsets, w0; strict = strict, ledger = led)
+    ep_tail_views!(pe.cvar_views, epc, tvs, vpr, vsets, w0; strict = strict, ledger = led)
+    ep_tail_views!(pe.evar_views, epc, tvs, vpr, vsets, w0; strict = strict, ledger = led)
+    ep_tail_views!(pe.rlvar_views, epc, tvs, vpr, vsets, w0; strict = strict, ledger = led)
     if !isempty(epc) || !isempty(tvs)
         w1 = entropy_pooling(w0, epc, tvs, pe.opt)
         pe = factory(pe, w1)
         pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
+        vpr = ep_investable_prior(idx, pr)
     end
     if !isnothing(pe.sigma_views) || !isnothing(pe.cov_views)
         # sigma
         if !isnothing(pe.sigma_views)
-            to_fix = ep_sigma_views!(pe.sigma_views, epc, pr, pe.sets; strict = strict)
-            fix_mu!(epc, view(fixed, :, 1), to_fix, pr)
+            to_fix = ep_sigma_views!(pe.sigma_views, epc, vpr, vsets; strict = strict,
+                                     ledger = led)
+            fix_mu!(epc, view(fixed, :, 1), to_fix, vpr)
         end
         # cov
         if !isnothing(pe.cov_views)
-            to_fix = ep_cov_views!(pe.cov_views, epc, pr, pe.sets; strict = strict)
-            fix_mu!(epc, view(fixed, :, 1), to_fix, pr)
+            to_fix = ep_cov_views!(pe.cov_views, epc, vpr, vsets; strict = strict,
+                                   ledger = led)
+            fix_mu!(epc, view(fixed, :, 1), to_fix, vpr)
         end
         # Every row of every family can drop under `strict = false`, and the stage then
         # states no view. The prior is the answer, so neither the solve nor the refit runs.
@@ -3631,26 +3643,30 @@ function ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<
                                  pe.opt)
             pe = factory(pe, w1)
             pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
+            vpr = ep_investable_prior(idx, pr)
         end
     end
     if !isnothing(pe.rho_views) || !isnothing(pe.sk_views) || !isnothing(pe.kt_views)
         # skew
         if !isnothing(pe.sk_views)
-            to_fix = ep_sk_views!(pe.sk_views, epc, pr, pe.sets; strict = strict)
-            fix_mu!(epc, view(fixed, :, 1), to_fix, pr)
-            fix_sigma!(epc, view(fixed, :, 2), to_fix, pr)
+            to_fix = ep_sk_views!(pe.sk_views, epc, vpr, vsets; strict = strict,
+                                  ledger = led)
+            fix_mu!(epc, view(fixed, :, 1), to_fix, vpr)
+            fix_sigma!(epc, view(fixed, :, 2), to_fix, vpr)
         end
         # kurtosis
         if !isnothing(pe.kt_views)
-            to_fix = ep_kt_views!(pe.kt_views, epc, pr, pe.sets; strict = strict)
-            fix_mu!(epc, view(fixed, :, 1), to_fix, pr)
-            fix_sigma!(epc, view(fixed, :, 2), to_fix, pr)
+            to_fix = ep_kt_views!(pe.kt_views, epc, vpr, vsets; strict = strict,
+                                  ledger = led)
+            fix_mu!(epc, view(fixed, :, 1), to_fix, vpr)
+            fix_sigma!(epc, view(fixed, :, 2), to_fix, vpr)
         end
         # rho
         if !isnothing(pe.rho_views)
-            to_fix = ep_rho_views!(pe.rho_views, epc, pr, pe.sets; strict = strict)
-            fix_mu!(epc, view(fixed, :, 1), to_fix, pr)
-            fix_sigma!(epc, view(fixed, :, 2), to_fix, pr)
+            to_fix = ep_rho_views!(pe.rho_views, epc, vpr, vsets; strict = strict,
+                                   ledger = led)
+            fix_mu!(epc, view(fixed, :, 1), to_fix, vpr)
+            fix_sigma!(epc, view(fixed, :, 2), to_fix, vpr)
         end
         # See the twin note one stage up: a stage that states no view does not solve.
         if !isempty(epc) || !isempty(tvs)
@@ -3660,6 +3676,7 @@ function ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<
             pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
         end
     end
+    announce_ep_departures(ni, led, isempty(epc) && isempty(tvs) && !isempty(led))
     # Entropy pooling reweights observations without touching either axis of `Z`, so the
     # wrapped prior's feature matrix is forwarded unchanged (see [`LowOrderPrior`](@ref)).
     # The factor block is the refit prior's, forwarded whole, on the same reasoning as the
@@ -3723,34 +3740,40 @@ function ep_prior(alg::H0_EntropyPooling, pe::EntropyPoolingPrior, X::MatNum,
         pe = factory(pe, w0)
         pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
     end
+    # See the note at the same seam in the staged method: every row is built on the
+    # investable columns, because `0 * NaN` is `NaN`. ADR 0115 and ADR 0125.
+    idx, vsets, ni = ep_investable_views(pr, pe.sets)
+    led = String[]
+    vpr = ep_investable_prior(idx, pr)
     epc = Dict{Symbol, Tuple{<:MatNum, <:VecNum}}()
     tvs = Vector{AbstractEntropyPoolingTailView}(undef, 0)
     # mu, VaR, CVaR, EVaR and RLVaR
-    ep_mu_views!(pe.mu_views, epc, pr, pe.sets; strict = strict)
-    ep_var_views!(pe.var_views, epc, pr, pe.sets, w0; strict = strict)
-    ep_tail_views!(pe.cvar_views, epc, tvs, pr, pe.sets, w0; strict = strict)
-    ep_tail_views!(pe.evar_views, epc, tvs, pr, pe.sets, w0; strict = strict)
-    ep_tail_views!(pe.rlvar_views, epc, tvs, pr, pe.sets, w0; strict = strict)
+    ep_mu_views!(pe.mu_views, epc, vpr, vsets; strict = strict, ledger = led)
+    ep_var_views!(pe.var_views, epc, vpr, vsets, w0; strict = strict, ledger = led)
+    ep_tail_views!(pe.cvar_views, epc, tvs, vpr, vsets, w0; strict = strict, ledger = led)
+    ep_tail_views!(pe.evar_views, epc, tvs, vpr, vsets, w0; strict = strict, ledger = led)
+    ep_tail_views!(pe.rlvar_views, epc, tvs, vpr, vsets, w0; strict = strict, ledger = led)
     # sigma
     if !isnothing(pe.sigma_views)
-        ep_sigma_views!(pe.sigma_views, epc, pr, pe.sets; strict = strict)
+        ep_sigma_views!(pe.sigma_views, epc, vpr, vsets; strict = strict, ledger = led)
     end
     # cov
     if !isnothing(pe.cov_views)
-        ep_cov_views!(pe.cov_views, epc, pr, pe.sets; strict = strict)
+        ep_cov_views!(pe.cov_views, epc, vpr, vsets; strict = strict, ledger = led)
     end
     # skew
     if !isnothing(pe.sk_views)
-        ep_sk_views!(pe.sk_views, epc, pr, pe.sets; strict = strict)
+        ep_sk_views!(pe.sk_views, epc, vpr, vsets; strict = strict, ledger = led)
     end
     # kurtosis
     if !isnothing(pe.kt_views)
-        ep_kt_views!(pe.kt_views, epc, pr, pe.sets; strict = strict)
+        ep_kt_views!(pe.kt_views, epc, vpr, vsets; strict = strict, ledger = led)
     end
     # rho
     if !isnothing(pe.rho_views)
-        ep_rho_views!(pe.rho_views, epc, pr, pe.sets; strict = strict)
+        ep_rho_views!(pe.rho_views, epc, vpr, vsets; strict = strict, ledger = led)
     end
+    announce_ep_departures(ni, led, isempty(epc) && isempty(tvs) && !isempty(led))
     w1 = w0
     # Every row of every family can drop under `strict = false`, and the view set then
     # states nothing. The prior is the answer, so neither the solve nor the refit runs. See

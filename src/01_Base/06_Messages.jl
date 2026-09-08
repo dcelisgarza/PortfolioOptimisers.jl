@@ -76,6 +76,8 @@ Build the warning/error text for a constraint or view variable `v` that is absen
 
 `axis` names the universe the variable was looked up in. It defaults to `"asset"` because that is the axis every constraint resolved against before [`ExposureConstraintEstimator`](@ref); a re-based constraint resolves its names against the *factor* universe and passes `"factor"`, so the message names the axis the user actually wrote in.
 
+`consequence` states what the failure cost, because the unit of a drop differs by shape. A **value** keyed by the name loses that entry alone, which is [`name_to_val!`](@ref) and the default `"term dropped"`. A **row** is a joint statement over several names with one right-hand side, so it goes whole — fitting `a + c == 0.05` as `a == 0.05` would assert something the caller never wrote — and [`get_linear_constraints`](@ref) passes `"row dropped"`. Saying "term dropped" there sent a reader looking for a row that was still fitted.
+
 Shared by [`get_linear_constraints`](@ref), Black-Litterman view generation, entropy-pooling view generation, and [`name_to_val!`](@ref) so the message (and its info-leak-safe shape) lives in exactly one place.
 
 # Arguments
@@ -85,6 +87,7 @@ Shared by [`get_linear_constraints`](@ref), Black-Litterman view generation, ent
   - `key`: The key the universe is stored under.
   - `candidates = nx`: Pool searched for the typo suggestion.
   - `axis::AbstractString = "asset"`: Name of the universe the variable was looked up in.
+  - `consequence::AbstractString = "term dropped"`: What the failure cost — `"row dropped"` where the row is the unit.
 
 # Returns
 
@@ -96,8 +99,9 @@ Shared by [`get_linear_constraints`](@ref), Black-Litterman view generation, ent
   - [`empty_row_msg`](@ref)
   - [`empty_projected_row_msg`](@ref)
 """
-function unknown_variable_msg(v, nx, key; candidates = nx, axis::AbstractString = "asset")
-    return "variable `$(v)` not in $(axis) universe ($(length(nx)) $(axis)s under key `$(key)`); term dropped" *
+function unknown_variable_msg(v, nx, key; candidates = nx, axis::AbstractString = "asset",
+                              consequence::AbstractString = "term dropped")
+    return "variable `$(v)` not in $(axis) universe ($(length(nx)) $(axis)s under key `$(key)`); $(consequence)" *
            did_you_mean(string(v), candidates)
 end
 """

@@ -48,7 +48,12 @@ factor_axis_key
 _expr_depth_exceeds
 assert_investable_constraint_width
 non_investable_sets
+non_investable_names
+record_non_investable_drop!
+record_group_shed!
+announce_non_investable
 counterpart_axis_names
+shed_departed_members
 ```
 
 ## References

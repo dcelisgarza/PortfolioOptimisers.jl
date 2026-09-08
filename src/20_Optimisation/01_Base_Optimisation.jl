@@ -2696,38 +2696,6 @@ function port_opt_view(::NonFiniteAllocationOptimisationResult, ::Any, args...)
     return throw(ArgumentError("a precomputed optimisation result cannot be viewed to an asset subset: its weights were solved over the full universe and a sub-portfolio of them has no defined meaning. A TimeDependent schedule holding precomputed results is therefore incompatible with asset-subsampling cross-validation (e.g. MultipleRandomised); use estimator entries there instead."))
 end
 """
-    non_investable_names(nx::Nothing, imsk::BitVector) -> VecStr
-    non_investable_names(nx::VecStr, imsk::BitVector) -> VecStr
-
-Read the names the Investable Mask leaves out, in the order the complement of the mask visits them.
-
-The order is the whole point. A forced-liquidation carrier is sliced to the complement of the mask by index, and the rate that prices it is resolved against these names by position, so the two must walk the complement the same way. Both do: this indexes `nx` with `.!imsk`, which is ascending, and [`port_opt_view`](@ref)`(::Fees, i, X)` takes the complement of `i` over the width of `X`, which is ascending too.
-
-Unnamed returns data answers an empty vector rather than throwing. Names are what the axis is made of, so a problem with no names has no Non-Investable Axis to mint — and no name-keyed constraint to resolve against one either.
-
-# Arguments
-
-  - `nx`: The asset names of the *unreduced* returns data, or `nothing`.
-  - $(arg_dict[:imsk])
-
-# Returns
-
-  - `ni::VecStr`: The names the mask leaves out, or an empty vector.
-
-# Related
-
-  - [`investable_mask`](@ref)
-  - [`non_investable_sets`](@ref)
-  - [`non_investable_universe`](@ref)
-  - [`investable_reduction`](@ref)
-"""
-function non_investable_names(::Nothing, ::BitVector)::VecStr
-    return String[]
-end
-function non_investable_names(nx::VecStr, imsk::BitVector)::VecStr
-    return nx[.!imsk]
-end
-"""
     non_investable_universe(opt::AbstractOptimisationEstimator, ni::VecStr)
     non_investable_universe(opt, ni::VecStr)
 
@@ -2756,38 +2724,6 @@ The generic method returns `opt` untouched, and it is the right answer for every
 """
 function non_investable_universe(opt, ::VecStr)
     return opt
-end
-"""
-    announce_non_investable(ni::VecStr) -> Nothing
-
-Announce, once per door, the assets that left the investable universe.
-
-The door is the only place that knows a departure happened *as an event* rather than as a shape. Downstream, a departed asset is simply absent: a constraint stated for it resolves on the Non-Investable Axis and is skipped in silence, because the name was correct when the caller wrote it and no caller can foresee which asset a prior will fail to estimate. Reporting that per constraint would say the same thing several times over and offer nothing to act on, so it is said once, here, and every per-name diagnostic downstream stays quiet.
-
-It is `@info`, not a warning and not a [`strict_diagnostic`](@ref). Nothing is wrong: the data moved, and the optimisation is proceeding correctly over what is left. Making it raise under `strict` would put back the refusal this whole path exists to remove.
-
-An empty `ni` says nothing at all, which is the all-investable path and the unnamed-data path alike.
-
-# Arguments
-
-  - `ni`: The names the Investable Mask left out.
-
-# Returns
-
-  - `nothing`.
-
-# Related
-
-  - [`non_investable_names`](@ref)
-  - [`investable_reduction`](@ref)
-  - [`coverage_reduction`](@ref)
-"""
-function announce_non_investable(ni::VecStr)::Nothing
-    if isempty(ni)
-        return nothing
-    end
-    @info("$(length(ni)) asset(s) left the investable universe and are excluded from this optimisation: $(ni). A constraint, bound or rate stated for one of them is dropped, and a forced-liquidation carrier is priced over them.")
-    return nothing
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

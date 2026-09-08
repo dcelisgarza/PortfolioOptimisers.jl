@@ -834,9 +834,14 @@ end
     v = [lc, lce]
     @test linear_constraints(v, nothing) === v
 
-    # A row whose every term matched no name is dropped, so a constraint that keeps no
-    # row at all answers `nothing` rather than an empty matrix.
-    @test isnothing(@test_logs (:warn,) (:warn,) linear_constraints("Z <= 1", sets))
+    # A row carrying a name that matched nothing is dropped whole (ADR 0125), so a
+    # constraint that keeps no row at all answers `nothing` rather than an empty matrix.
+    # One warning, not two: the row goes at the name, so it never reaches the empty-row
+    # report that used to say the same thing a second time.
+    @test isnothing(@test_logs (:warn,) linear_constraints("Z <= 1", sets))
+    @test occursin("row dropped",
+                   PortfolioOptimisers.unknown_variable_msg("Z", ["A", "B", "C"], "nx";
+                                                            consequence = "row dropped"))
     @test_throws ArgumentError linear_constraints("Z <= 1", sets; strict = true)
 
     # A missing asset universe suggests only keys no other declared axis speaks for, so a

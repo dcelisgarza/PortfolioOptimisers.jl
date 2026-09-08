@@ -16,6 +16,9 @@ AbstractEntropyPoolingOptimiser
 AbstractEntropyPoolingAlgorithm
 AbstractEntropyPoolingOptAlgorithm
 add_ep_constraint!
+ep_investable_views
+ep_investable_prior
+announce_ep_departures
 replace_prior_views
 replace_coprior_views
 get_pr_value

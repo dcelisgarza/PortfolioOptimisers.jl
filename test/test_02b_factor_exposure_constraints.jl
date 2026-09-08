@@ -240,7 +240,9 @@
         @test occursin("not in factor universe", msg)
         @test occursin("3 factors under key `nf`", msg)
         @test occursin("did you mean `MTUM`?", msg)
-        # Non-strict warns and drops, then reports the row as empty against the factor axis.
+        # Non-strict warns once and drops the row whole (ADR 0125). It does *not* also
+        # report the row as empty: the row went at the name it could not resolve, so the
+        # second message would have been the same news twice.
         logs, _ = Test.collect_test_logs() do
             return linear_constraints(ExposureConstraintEstimator(;
                                                                   lce = LinearConstraintEstimator(;
@@ -250,7 +252,8 @@
         end
         msgs = [l.message for l in logs]
         @test any(m -> occursin("not in factor universe", m), msgs)
-        @test any(m -> occursin("matched no factors in the universe", m), msgs)
+        @test !any(m -> occursin("matched no factors in the universe", m), msgs)
+        @test length(msgs) == 1
         # A row whose names *did* resolve but whose loadings annihilate it is a different
         # failure, and says so: reporting "matched no factors" would send a user hunting for
         # a typo that is not there.

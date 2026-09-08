@@ -1,4 +1,4 @@
-using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Clarabel
+using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Clarabel, Logging
 
 # The investable reduction and the weight expansion, issue #678, under the contract #647 fixed.
 #
@@ -911,4 +911,328 @@ end
     @test all(isfinite, hoa.sk)
     @test all(isfinite, hoa.V)
     @test size(hoa.kt) == (N^2, N^2)
+end
+
+# ---------------------------------------------------------------------------------------
+# Issue #922: an entropy pooling view is built on the investable universe.
+#
+# A view is a dense linear form over the asset axis, and `0 * NaN` is `NaN`, so before this
+# a view naming only LIVE assets came back an all-`NaN` constraint row and the solve failed
+# naming the solver. The builders now receive a carrier reduced by `port_opt_view` and sets
+# carrying the Non-Investable Axis, so a row is written over the investable columns alone.
+#
+# Nothing is expanded: an `epc` row runs over observations, and the moments come from the
+# refit wrapped prior, which already carries the full-universe frame. The oracle is
+# therefore the same fit with the dead column removed by hand, and the parity is exact.
+# ---------------------------------------------------------------------------------------
+
+# A real gapped panel: `c` delists after observation 150, in the returns and in the active
+# mask alike, so `EmpiricalPrior` mints the `NaN` column itself.
+Xd = copy(X)
+damsk = trues(T, N)
+Xd[151:end, k] .= NaN
+damsk[151:end, k] .= false
+rdd = ReturnsResult(; nx = nx, X = Xd,
+                    pnl = AssetPanel(;
+                                     pf = [NumericPanelField(; name = "mcap",
+                                                             vals = ones(T, N))],
+                                     amsk = damsk, emsk = damsk))
+rddk = ReturnsResult(; nx = nx[keep], X = Xd[:, keep],
+                     pnl = AssetPanel(;
+                                      pf = [NumericPanelField(; name = "mcap",
+                                                              vals = ones(T, length(keep)))],
+                                      amsk = damsk[:, keep], emsk = damsk[:, keep]))
+setsd = UniverseSets(; dict = Dict("nx" => nx))
+setsdk = UniverseSets(; dict = Dict("nx" => nx[keep]))
+epview = LinearConstraintEstimator(; val = "a == 0.001")
+
+@testset "The counterpart axis sheds a group's departed members, before the spread" begin
+    other = ["c"]
+    led = String[]
+    shed = PortfolioOptimisers.shed_departed_members
+    # The survivors keep their order, and an empty counterpart axis is the identity that
+    # records nothing.
+    @test shed(["a", "c", "b"], other, led, "grp", "grp == 1") == ["a", "b"]
+    @test length(led) == 1
+    @test shed(["a", "b"], String[], led, "grp", "grp == 1") == ["a", "b"]
+    @test length(led) == 1
+    # A group that lost every member keeps the first of them, so the row it leaves names a
+    # departed asset rather than nothing at all.
+    @test shed(["c"], other, led, "grp", "grp == 1") == ["c"]
+    @test occursin("lost every member", led[end])
+    # A pair sheds jointly: a position goes when either of its names did, which is what
+    # keeps the two lists the same length.
+    m1, m2 = shed(["a", "b"], ["c", "d"], other, nothing, "grp", "e")
+    @test m1 == ["b"]
+    @test m2 == ["d"]
+    m1, m2 = shed(["a", "c"], ["d", "e"], other, nothing, "grp", "e")
+    @test m1 == ["a"]
+    @test m2 == ["d"]
+    # And an all-lost pair group keeps its first pair, on the same reasoning.
+    m1, m2 = shed(["c"], ["c"], other, nothing, "grp", "e")
+    @test m1 == ["c"]
+    @test m2 == ["c"]
+    # An empty counterpart axis is the identity for the pair form too, and records nothing.
+    m1, m2 = shed(["a", "c"], ["d", "e"], String[], led, "grp", "e")
+    @test m1 == ["a", "c"]
+    @test m2 == ["d", "e"]
+    # The mean divides by the SURVIVING count, so the row still computes what its
+    # right-hand side asserts. `bl_flag = true` is the mean expansion.
+    sred = UniverseSets(;
+                        dict = Dict("nx" => nx[keep], "ni" => [nx[k]],
+                                    "grp" => [nx[1], nx[k], nx[2]]))
+    res = PortfolioOptimisers.replace_group_by_assets(parse_equation("grp == 0.05"), sred,
+                                                      true)
+    @test res.vars == [nx[1], nx[2]]
+    @test res.coef == [0.5, 0.5]
+    # The sum expansion repeats the coefficient over the survivors instead.
+    res = PortfolioOptimisers.replace_group_by_assets(parse_equation("grp == 0.05"), sred,
+                                                      false, true, false)
+    @test res.coef == [1.0, 1.0]
+    # A group that loses every member *is* a row naming a departed asset, so it expands to
+    # one — not to nothing — and the counterpart rule drops the row whole, in silence, one
+    # door later. Expanding to nothing would make it indistinguishable from a caller's
+    # constant row, `1 == 0.004`, which must still be diagnosed.
+    sall = UniverseSets(; dict = Dict("nx" => nx[keep], "ni" => [nx[k]], "grp" => [nx[k]]))
+    res = PortfolioOptimisers.replace_group_by_assets(parse_equation("grp == 0.05"), sall,
+                                                      true)
+    @test res.vars == [nx[k]]
+    @test isnothing(@test_logs PortfolioOptimisers.get_linear_constraints([res], sall;
+                                                                          strict = true))
+    # The constant row keeps its own diagnosis, under both settings of `strict`.
+    const_row = parse_equation("1 == 0.004")
+    @test isempty(const_row.vars)
+    @test isnothing(@test_logs (:warn,) PortfolioOptimisers.get_linear_constraints([const_row],
+                                                                                   sall))
+    @test_throws ArgumentError PortfolioOptimisers.get_linear_constraints([const_row], sall;
+                                                                          strict = true)
+end
+
+@testset "A row naming a departed asset is dropped whole, and a typo still names itself" begin
+    sred = UniverseSets(; dict = Dict("nx" => nx[keep], "ni" => [nx[k]]))
+    # The whole row goes, not the term: fitting `a + c == 0.05` as `a == 0.05` would assert
+    # something the caller never wrote. Silent, and `strict` does not refuse.
+    rows = parse_equation(["a + c == 0.05", "b == 0.02"])
+    lcs = @test_logs PortfolioOptimisers.get_linear_constraints(rows, sred; strict = true)
+    @test size(lcs.eq.A, 1) == 1
+    @test lcs.eq.A[1, :] == [0.0, 1.0, 0.0, 0.0]
+    @test lcs.eq.B == [0.02]
+    # A name on neither axis is a typo, is reported, and now takes its row with it. One
+    # warning, not two: the row never reaches the empty-row report.
+    zz = parse_equation(["a + zz == 0.05"])
+    @test isnothing(@test_logs (:warn,) PortfolioOptimisers.get_linear_constraints(zz,
+                                                                                   sred))
+    @test_throws ArgumentError PortfolioOptimisers.get_linear_constraints(zz, sred;
+                                                                          strict = true)
+    # The message says what the failure cost, and the unit differs by shape.
+    @test occursin("row dropped",
+                   PortfolioOptimisers.unknown_variable_msg("zz", nx[keep], "nx";
+                                                            consequence = "row dropped"))
+    @test occursin("term dropped",
+                   PortfolioOptimisers.unknown_variable_msg("zz", nx[keep], "nx"))
+end
+
+@testset "The departure ledger records what a drop cost, and nothing when nobody collects" begin
+    led = String[]
+    @test isnothing(PortfolioOptimisers.record_non_investable_drop!(nothing, "x"))
+    PortfolioOptimisers.record_non_investable_drop!(led, "the row `a == 1`")
+    @test led == ["the row `a == 1`"]
+    # A shed of nothing records nothing, so the all-investable path costs one comparison.
+    PortfolioOptimisers.record_group_shed!(led, "grp", 0, 3, "grp == 1")
+    @test length(led) == 1
+    # Some members lost: the row survives, and the ledger counts them.
+    PortfolioOptimisers.record_group_shed!(led, "grp", 1, 2, "grp == 1")
+    @test occursin("1 departed member(s) of the group `grp`", led[2])
+    # Every member lost: the row went, and the ledger says so instead.
+    PortfolioOptimisers.record_group_shed!(led, "grp", 3, 0, "grp == 1")
+    @test occursin("lost every member", led[3])
+    @test isnothing(PortfolioOptimisers.record_group_shed!(nothing, "grp", 1, 1, "e"))
+end
+
+@testset "The entropy pooling door reduces, and no view is expanded back" begin
+    prd = prior(EmpiricalPrior(), rdd)
+    @test PortfolioOptimisers.investable_mask(prd) == BitVector([1, 1, 0, 1, 1])
+    idx, vsets, ni = PortfolioOptimisers.ep_investable_views(prd, setsd)
+    @test idx == keep
+    @test ni == [nx[k]]
+    @test vsets.dict["nx"] == nx[keep]
+    @test vsets.dict["ni"] == [nx[k]]
+    # The prior is viewed at the same index, and the view is exact.
+    vpr = PortfolioOptimisers.ep_investable_prior(idx, prd)
+    @test vpr.mu == prd.mu[keep]
+    @test vpr.sigma == prd.sigma[keep, keep]
+    # The all-investable path returns its arguments untouched, and views nothing.
+    prk2 = prior(EmpiricalPrior(), rddk)
+    idxk, vsetsk, nik = PortfolioOptimisers.ep_investable_views(prk2, setsdk)
+    @test isnothing(idxk)
+    @test vsetsk === setsdk
+    @test isempty(nik)
+    @test PortfolioOptimisers.ep_investable_prior(idxk, prk2) === prk2
+    # Sets that do not cover the fitted universe are named, not a BoundsError.
+    @test_throws DimensionMismatch PortfolioOptimisers.ep_investable_views(prd, setsdk)
+    # No sets is no views, so there is nothing to reduce for.
+    idxn, vsetsn, nin = PortfolioOptimisers.ep_investable_views(prd, nothing)
+    @test isnothing(idxn)
+    @test isnothing(vsetsn)
+    @test isempty(nin)
+end
+
+@testset "An entropy pooling view on live assets reaches the hand-reduced fit exactly" begin
+    # This is the ticket's defect: on `dev` the row came back all-`NaN` and the solve raised
+    # `ErrorException` blaming the caller's views. The parity is exact, not approximate,
+    # because the reduction is a slice and the solve sees identical numbers.
+    oracle = prior(EntropyPoolingPrior(; pe = EmpiricalPrior(), mu_views = epview,
+                                       sets = setsdk), rddk)
+    gapped = prior(EntropyPoolingPrior(; pe = EmpiricalPrior(), mu_views = epview,
+                                       sets = setsd), rdd)
+    @test gapped.w == oracle.w
+    @test gapped.ens == oracle.ens
+    @test gapped.kld == oracle.kld
+    # The posterior lives on the full universe, and the departed asset keeps its `NaN`.
+    @test length(gapped.mu) == N
+    @test isnan(gapped.mu[k])
+    @test PortfolioOptimisers.investable_mask(gapped) == BitVector([1, 1, 0, 1, 1])
+    # The Meucci route takes the same door.
+    moracle = prior(MeucciEntropyPoolingPrior(; pe = EmpiricalPrior(), mu_views = epview,
+                                              sets = setsdk), rddk)
+    mgapped = prior(MeucciEntropyPoolingPrior(; pe = EmpiricalPrior(), mu_views = epview,
+                                              sets = setsd), rdd)
+    @test mgapped.w == moracle.w
+end
+
+@testset "A view naming a departed asset drops its row, and strict does not refuse" begin
+    oracle = prior(EntropyPoolingPrior(; pe = EmpiricalPrior(), mu_views = epview,
+                                       sets = setsdk), rddk)
+    # The departed row goes; the live row is fitted, and the answer is the oracle's.
+    both = LinearConstraintEstimator(; val = ["a == 0.001", "c == 0.002"])
+    res = prior(EntropyPoolingPrior(; pe = EmpiricalPrior(), mu_views = both, sets = setsd),
+                rdd)
+    @test res.w == oracle.w
+    # `strict` refuses a typo and not a departure, which is the whole of the distinction.
+    @test res.w ==
+          prior(EntropyPoolingPrior(; pe = EmpiricalPrior(), mu_views = both, sets = setsd),
+                rdd; strict = true).w
+    typo = LinearConstraintEstimator(; val = ["a == 0.001", "zz == 0.002"])
+    @test_throws ArgumentError prior(EntropyPoolingPrior(; pe = EmpiricalPrior(),
+                                                         mu_views = typo, sets = setsd),
+                                     rdd; strict = true)
+    # A joint row goes whole rather than being fitted without its departed leg.
+    joint = LinearConstraintEstimator(; val = "a + c == 0.001")
+    viewless = prior(EntropyPoolingPrior(; pe = EmpiricalPrior(), mu_views = joint,
+                                         sets = setsd), rdd)
+    @test viewless.kld == 0
+    @test viewless.w == fill(1 / T, T)
+    # A group sheds its departed member instead, and the surviving sum is the oracle.
+    setsg = UniverseSets(; dict = Dict("nx" => nx, "grp" => [nx[1], nx[k]]))
+    grouped = prior(EntropyPoolingPrior(; pe = EmpiricalPrior(),
+                                        mu_views = LinearConstraintEstimator(;
+                                                                             val = "grp == 0.002"),
+                                        sets = setsg), rdd)
+    goracle = prior(EntropyPoolingPrior(; pe = EmpiricalPrior(),
+                                        mu_views = LinearConstraintEstimator(;
+                                                                             val = "a == 0.002"),
+                                        sets = setsdk), rddk)
+    @test grouped.w == goracle.w
+end
+
+@testset "The door reports once, naming its own process and what the departure cost" begin
+    # A standalone prior fit used to say nothing at all: only an optimisation door
+    # announced. It now names itself, and the casualties its departures caused.
+    both = LinearConstraintEstimator(; val = ["a == 0.001", "c == 0.002"])
+    logs, _ = Test.collect_test_logs() do
+        return prior(EntropyPoolingPrior(; pe = EmpiricalPrior(), mu_views = both,
+                                         sets = setsd), rdd)
+    end
+    msgs = [string(l.message) for l in logs]
+    @test length(msgs) == 1
+    @test occursin("entropy pooling fit", msgs[1])
+    @test occursin("[\"c\"]", msgs[1])
+    @test occursin("the row `c == 0.002`", msgs[1])
+    @test logs[1].level == Logging.Info
+    # A departure that takes the LAST view changes the model rather than trimming it, so
+    # the one report is raised to a warning and says the posterior is unconditioned.
+    joint = LinearConstraintEstimator(; val = "a + c == 0.001")
+    logs, _ = Test.collect_test_logs() do
+        return prior(EntropyPoolingPrior(; pe = EmpiricalPrior(), mu_views = joint,
+                                         sets = setsd), rdd)
+    end
+    @test length(logs) == 1
+    @test logs[1].level == Logging.Warn
+    @test occursin("no view at all", string(logs[1].message))
+    # A shed group is counted rather than named: the departed asset is named once already.
+    setsg = UniverseSets(; dict = Dict("nx" => nx, "grp" => [nx[1], nx[k]]))
+    logs, _ = Test.collect_test_logs() do
+        return prior(EntropyPoolingPrior(; pe = EmpiricalPrior(),
+                                         mu_views = LinearConstraintEstimator(;
+                                                                              val = "grp == 0.002"),
+                                         sets = setsg), rdd)
+    end
+    @test occursin("1 departed member(s) of the group `grp`", string(logs[1].message))
+    # The all-investable path says nothing, and pays nothing.
+    logs, _ = Test.collect_test_logs() do
+        return prior(EntropyPoolingPrior(; pe = EmpiricalPrior(), mu_views = epview,
+                                         sets = setsdk), rddk)
+    end
+    @test isempty(logs)
+end
+
+@testset "announce_non_investable names the process and the consequence it is given" begin
+    logs, _ = Test.collect_test_logs() do
+        return PortfolioOptimisers.announce_non_investable(["c"], ["the row `x`"],
+                                                           "widget fit", "Nothing breaks.")
+    end
+    msg = string(logs[1].message)
+    @test occursin("excluded from this widget fit", msg)
+    @test occursin("Nothing breaks.", msg)
+    @test occursin("Dropped over them: the row `x`.", msg)
+    @test logs[1].level == Logging.Info
+    # The optimisation door's wording is the default, so it reads as it always did.
+    logs, _ = Test.collect_test_logs() do
+        return PortfolioOptimisers.announce_non_investable(["c"])
+    end
+    @test occursin("excluded from this optimisation", string(logs[1].message))
+    @test !occursin("Dropped over them", string(logs[1].message))
+    # Nothing left, nothing said.
+    logs, _ = Test.collect_test_logs() do
+        return PortfolioOptimisers.announce_non_investable(String[], ["the row `x`"])
+    end
+    @test isempty(logs)
+end
+
+@testset "A prior reference and a pair group shed their departed members too" begin
+    setsp = UniverseSets(; dict = Dict("nx" => nx, "grp" => [nx[1], nx[k]]))
+    # `prior(grp)` expands exactly as the plain group does, and sheds the same members
+    # before its coefficient is spread, so the reference resolves over the survivors.
+    res = PortfolioOptimisers.replace_group_by_assets(parse_equation("prior(grp) + b == 0.002"),
+                                                      UniverseSets(;
+                                                                   dict = Dict("nx" =>
+                                                                                   nx[keep],
+                                                                               "ni" =>
+                                                                                   [nx[k]],
+                                                                               "grp" =>
+                                                                                   [nx[1],
+                                                                                    nx[k]])),
+                                                      false, true, false)
+    @test "prior($(nx[1]))" ∈ res.vars
+    @test "prior($(nx[k]))" ∉ res.vars
+    # A pair group sheds jointly, so the two sides stay the same length and every surviving
+    # pair still names two live assets.
+    sredp = UniverseSets(;
+                         dict = Dict("nx" => nx[keep], "ni" => [nx[k]],
+                                     "gA" => [nx[1], nx[k]], "gB" => [nx[2], nx[4]]))
+    res = PortfolioOptimisers.replace_group_by_assets(parse_equation("(gA, gB) == 0.1"),
+                                                      sredp, false, true, true)
+    @test res.vars == ["([$(nx[1])], [$(nx[2])])"]
+    # And end to end: a correlation view over groups, one of whose members delisted, equals
+    # the same view stated over the survivors on the hand-reduced panel.
+    setsg = UniverseSets(;
+                         dict = Dict("nx" => nx, "gA" => [nx[1], nx[k]],
+                                     "gB" => [nx[2], nx[4]]))
+    setsgk = UniverseSets(; dict = Dict("nx" => nx[keep], "gA" => [nx[1]], "gB" => [nx[2]]))
+    rv = LinearConstraintEstimator(; val = "(gA, gB) == 0.1")
+    gapped = prior(EntropyPoolingPrior(; pe = EmpiricalPrior(), rho_views = rv,
+                                       sets = setsg), rdd)
+    oracle = prior(EntropyPoolingPrior(; pe = EmpiricalPrior(), rho_views = rv,
+                                       sets = setsgk), rddk)
+    @test gapped.w == oracle.w
 end

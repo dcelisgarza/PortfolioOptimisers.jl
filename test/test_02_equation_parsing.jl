@@ -514,7 +514,9 @@ end
         # tuple survives the fold and becomes one opaque name.
         @test parse_equation("(A, B) <= 1").vars == ["(A, B)"]
         sets = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"]))
-        @test isnothing(@test_logs (:warn,) (:warn,) linear_constraints("A/B <= 1", sets))
+        # One warning, not two: an unresolved name takes its whole row (ADR 0125), so the
+        # empty-row report it used to reach a line later cannot fire.
+        @test isnothing(@test_logs (:warn,) linear_constraints("A/B <= 1", sets))
         @test_throws ArgumentError linear_constraints("A/B <= 1", sets; strict = true)
 
         # `datatype` names the numeric domain of the coefficients as well as of the

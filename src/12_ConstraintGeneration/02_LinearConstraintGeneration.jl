@@ -839,6 +839,172 @@ function non_investable_sets(sets::UniverseSets, ni::VecStr)::UniverseSets
                         nikey = sets.nikey, dict = dict)
 end
 """
+    non_investable_names(nx::Nothing, imsk::BitVector) -> VecStr
+    non_investable_names(nx::VecStr, imsk::BitVector) -> VecStr
+
+Read the names the Investable Mask leaves out, in the order the complement of the mask visits them.
+
+The order is the whole point. A forced-liquidation carrier is sliced to the complement of the mask by index, and the rate that prices it is resolved against these names by position, so the two must walk the complement the same way. Both do: this indexes `nx` with `.!imsk`, which is ascending, and [`port_opt_view`](@ref)`(::Fees, i, X)` takes the complement of `i` over the width of `X`, which is ascending too.
+
+Unnamed returns data answers an empty vector rather than throwing. Names are what the axis is made of, so a problem with no names has no Non-Investable Axis to mint — and no name-keyed constraint to resolve against one either.
+
+It lives here, beside [`non_investable_sets`](@ref), rather than beside the optimisation door that first needed it, because a wrapping prior mints the axis at its own entry too and loads seven directories earlier. The vocabulary of the Non-Investable Axis is therefore one file, and no layer reaches it by a back reference.
+
+# Arguments
+
+  - `nx`: The asset names of the *unreduced* returns data, or `nothing`.
+  - $(arg_dict[:imsk])
+
+# Returns
+
+  - `ni::VecStr`: The names the mask leaves out, or an empty vector.
+
+# Related
+
+  - [`investable_mask`](@ref)
+  - [`non_investable_sets`](@ref)
+  - [`non_investable_universe`](@ref)
+  - [`investable_reduction`](@ref)
+  - [`announce_non_investable`](@ref)
+"""
+function non_investable_names(::Nothing, ::BitVector)::VecStr
+    return String[]
+end
+function non_investable_names(nx::VecStr, imsk::BitVector)::VecStr
+    return nx[.!imsk]
+end
+"""
+    record_non_investable_drop!(ledger::Nothing, what::AbstractString) -> Nothing
+    record_non_investable_drop!(ledger::AbstractVector, what::AbstractString) -> Nothing
+
+Record, for the door to report, one thing a departure cost.
+
+A departed name is dropped where it is met — a view row here, a group member there — and each of those places is far from the door that derived the mask and knows the departure happened *as an event*. Reporting at the site would say the same thing once per row per window of a walk-forward, which is what [ADR 0125](../adr/0125-a-view-row-that-names-a-departed-asset-is-dropped-whole.md) refused. Reporting nothing leaves a caller who wrote three views and got one fitted with no way to learn it. So the site writes what it dropped into a **ledger**, and the door reads the ledger once and says both things together, through [`announce_non_investable`](@ref).
+
+A `nothing` ledger is the no-collection path, and it is the default everywhere: a caller who assembles constraints outside a door has no door to report to, and pays nothing for the ledger it does not keep. The branch is dispatch rather than a condition, as it is throughout the reduction machinery.
+
+`what` is a noun phrase naming the casualty, not a sentence: the door joins them into one message and supplies the verb.
+
+# Arguments
+
+  - `ledger`: The door's ledger, or `nothing` when nobody is collecting.
+  - `what`: A noun phrase naming what was dropped, for example ``"the view row `a + c == 0.05`"``.
+
+# Returns
+
+  - `nothing`. A vector ledger is appended to in place.
+
+# Related
+
+  - [`announce_non_investable`](@ref)
+  - [`get_linear_constraints`](@ref)
+  - [`replace_group_by_assets`](@ref)
+  - [`counterpart_axis_names`](@ref)
+"""
+function record_non_investable_drop!(::Nothing, ::AbstractString)::Nothing
+    return nothing
+end
+function record_non_investable_drop!(ledger::AbstractVector, what::AbstractString)::Nothing
+    push!(ledger, what)
+    return nothing
+end
+"""
+    record_group_shed!(ledger::Option{<:AbstractVector}, group::AbstractString,
+                       shed::Integer, kept::Integer, eqn::AbstractString) -> Nothing
+
+Record what a group shed to a departure, for the door to report through [`announce_non_investable`](@ref).
+
+A group that loses some of its members still describes the rest, so its row survives at a coefficient spread over the survivors; a group that loses **all** of them describes nothing, and its row goes with it. The two are different news to a caller, so they are phrased differently, and this is the one place either sentence is written. [`replace_group_by_assets`](@ref) is the only caller, at each of its four expansion branches.
+
+Counts, not names: the departed assets are named once by the door, and repeating them per group would make the message longer than what it reports.
+
+A shed of nothing records nothing, so the all-investable path costs one comparison.
+
+# Arguments
+
+  - `ledger`: The door's ledger, or `nothing` when nobody is collecting.
+  - `group`: The group name as the caller wrote it, or the pair `"(a, b)"` for a correlation view.
+  - `shed`: How many members the group lost.
+  - `kept`: How many members survived.
+  - `eqn`: The row the group appears in, as the caller wrote it.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`record_non_investable_drop!`](@ref)
+  - [`replace_group_by_assets`](@ref)
+  - [`shed_departed_members`](@ref)
+  - [`announce_non_investable`](@ref)
+"""
+function record_group_shed!(ledger::Option{<:AbstractVector}, group::AbstractString,
+                            shed::Integer, kept::Integer, eqn::AbstractString)::Nothing
+    if iszero(shed)
+        return nothing
+    end
+    what = if iszero(kept)
+        "the row `$(eqn)`, whose group `$(group)` lost every member"
+    else
+        "$(shed) departed member(s) of the group `$(group)` in the row `$(eqn)`"
+    end
+    return record_non_investable_drop!(ledger, what)
+end
+"""
+    announce_non_investable(ni::VecStr, drops::VecStr = String[],
+                            process::AbstractString = "optimisation",
+                            consequence::AbstractString = "…";
+                            warn::Bool = false) -> Nothing
+
+Announce, once per door, the assets that left the investable universe and what their leaving cost.
+
+The door is the only place that knows a departure happened *as an event* rather than as a shape. Downstream, a departed asset is simply absent: a bound stated for it resolves on the Non-Investable Axis and is skipped, a view row naming it is dropped whole. Reporting each of those where it happens would say the same thing once per row per window of a walk-forward, so each site writes its casualty into a ledger with [`record_non_investable_drop!`](@ref) and the door says everything once, here.
+
+`process` names the work the departure is excluded from, because more than one kind of door mints the axis: an optimisation reduces at its entry, and a wrapping prior reduces at its own before it builds a view. Hard-coding `"optimisation"` made the message wrong for the second. `consequence` states what a departure means to *this* door — a forced-liquidation carrier is priced by an optimisation and by nothing else — and both are ordinary defaults, so the optimisation door reads as it always did.
+
+It is `@info` by default, not a warning and not a [`strict_diagnostic`](@ref). Nothing is wrong: the data moved, and the work is proceeding correctly over what is left. Making it raise under `strict` would put back the refusal this whole path exists to remove. `warn` raises it to `@warn` for the one case that is not routine — a departure that took the **last** of something the caller asked for, such as the final view of a view set, because handing back the unconditioned answer changes the result and the caller has no other way to learn it.
+
+An empty `ni` says nothing at all, which is the all-investable path and the unnamed-data path alike. An empty `drops` says who left and stops there, which is the door that has not yet resolved anything over them.
+
+# Arguments
+
+  - `ni`: The names the Investable Mask left out.
+  - `drops`: The ledger of casualties, as [`record_non_investable_drop!`](@ref) filled it.
+  - `process`: Noun phrase naming the work, for example `"optimisation"` or `"entropy pooling fit"`.
+  - `consequence`: Sentence stating what a departure means to this door.
+  - `warn`: Raise the message to `@warn`, for a departure that changed the model rather than trimming it.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`non_investable_names`](@ref)
+  - [`record_non_investable_drop!`](@ref)
+  - [`investable_reduction`](@ref)
+  - [`coverage_reduction`](@ref)
+"""
+function announce_non_investable(ni::VecStr, drops::VecStr = String[],
+                                 process::AbstractString = "optimisation",
+                                 consequence::AbstractString = "A constraint, bound or rate stated for one of them is dropped, and a forced-liquidation carrier is priced over them.";
+                                 warn::Bool = false)::Nothing
+    if isempty(ni)
+        return nothing
+    end
+    msg = "$(length(ni)) asset(s) left the investable universe and are excluded from this $(process): $(ni). $(consequence)"
+    if !isempty(drops)
+        msg *= " Dropped over them: $(join(drops, "; "))."
+    end
+    if warn
+        @warn(msg)
+    else
+        @info(msg)
+    end
+    return nothing
+end
+"""
     factor_universe(sets::UniverseSets, key::AbstractString, K::Integer,
                     need::AbstractString, source::AbstractString) -> VecStr
 
@@ -960,6 +1126,71 @@ function counterpart_axis_names(sets::UniverseSets, nxkey::AbstractString)::VecS
         return String[]
     end
     return get(sets.dict, key, String[])
+end
+"""
+    shed_departed_members(members::AbstractVector, other::VecStr,
+                          ledger::Option{<:AbstractVector}, group::AbstractString,
+                          eqn::AbstractString) -> AbstractVector
+    shed_departed_members(members1::AbstractVector, members2::AbstractVector,
+                          other::VecStr, ledger::Option{<:AbstractVector},
+                          group::AbstractString, eqn::AbstractString) -> Tuple
+
+Strike from a group's member list the names that sit on the counterpart axis, and tell the door's ledger what went.
+
+A group is a **description the data resolves**, not a term the caller chose: `"tech"` means the technology assets of this problem, and when one of them delists the description still names the rest. [`replace_group_by_assets`](@ref) therefore sheds the departed members *before* it spreads the group's coefficient, so a Black–Litterman mean divides by the surviving count and an entropy pooling sum runs over the survivors — the row still computes what its right-hand side asserts. Striking a member afterwards would leave `k - 1` legs of `c/k` against an unchanged target. [ADR 0125](../adr/0125-a-view-row-that-names-a-departed-asset-is-dropped-whole.md) states the rule and the reason it differs from a written-out name, which takes its row with it.
+
+A group that loses **every** member keeps the first of them rather than answering empty, because a group that describes nobody *is* a row naming a departed asset, and saying so is what makes it drop by the counterpart rule one door later — whole, and in silence. Answering empty would leave a row with no variable in it, which is what a caller writing `1 == 0.004` produces, and that one still has to be diagnosed.
+
+The second method is the **pair** form, for a correlation view written over two groups. The two lists are walked together, and a position is kept only when *both* of its names survived: a pair is one correlation, so a pair that has lost either side has nothing left to measure, and shedding jointly is also what keeps the two lists the same length, which [`replace_group_by_assets`](@ref) has already checked. The all-lost case keeps the first pair, on the same reasoning.
+
+An empty `other` is the all-investable path, and both methods then return their arguments untouched and record nothing, so a problem with no departure pays one comparison and no allocation.
+
+The recording lives here rather than at the four call sites so that [`replace_group_by_assets`](@ref) spends one line per branch on the whole of it. The four branches are otherwise identical, and four copies of the shed, the record and the all-lost fallback is where they would drift.
+
+# Arguments
+
+  - `members` / `members1`, `members2`: The group's member names, as `sets.dict` holds them.
+  - `other`: The counterpart axis, read with [`counterpart_axis_names`](@ref). Usually the Non-Investable Axis.
+  - `ledger`: The door's ledger, or `nothing` when nobody is collecting.
+  - `group`: The group name as the caller wrote it, for the ledger.
+  - `eqn`: The row the group appears in, for the ledger.
+
+# Returns
+
+  - `members::AbstractVector`: The members that are not on `other`, in their original order, or the first departed member when none survived.
+  - `(members1, members2)::Tuple`: The pair form, restricted to the positions both lists survived, or the first pair when none did.
+
+# Related
+
+  - [`replace_group_by_assets`](@ref)
+  - [`record_group_shed!`](@ref)
+  - [`counterpart_axis_names`](@ref)
+  - [`non_investable_sets`](@ref)
+  - [`UniverseSets`](@ref)
+"""
+function shed_departed_members(members::AbstractVector, other::VecStr,
+                               ledger::Option{<:AbstractVector}, group::AbstractString,
+                               eqn::AbstractString)
+    if isempty(other)
+        return members
+    end
+    kept = filter(!in(other), members)
+    record_group_shed!(ledger, group, length(members) - length(kept), length(kept), eqn)
+    return isempty(kept) ? members[1:1] : kept
+end
+function shed_departed_members(members1::AbstractVector, members2::AbstractVector,
+                               other::VecStr, ledger::Option{<:AbstractVector},
+                               group::AbstractString, eqn::AbstractString)
+    if isempty(other)
+        return members1, members2
+    end
+    keep = [m1 ∉ other && m2 ∉ other for (m1, m2) in zip(members1, members2)]
+    record_group_shed!(ledger, group, count(!, keep), count(keep), eqn)
+    return if any(keep)
+        members1[keep], members2[keep]
+    else
+        members1[1:1], members2[1:1]
+    end
 end
 """
     name_to_val!(nx::VecStr, sdict::AbstractDict, key::Any, val::Number,
@@ -1921,11 +2152,11 @@ The two lines are different operations. The first repeats the coefficient on eve
 
  1. Copy `res.vars` and `res.coef` into `variables_new` and `coeffs_new`, and open the empty accumulators `variables_tmp`, `coeffs_tmp` and `idx_rm`.
  2. For each variable name of `res.vars`, match it against the prior pattern `prior(...)` and against the correlation pattern `(a, b)`. The four combinations of the two matches select steps 3 to 6.
- 3. A name matching neither pattern, with `rho_flag` false, is a plain name. Look it up in `sets.dict`, and leave it where it stands when the dictionary does not hold it, because a name that is not a group is already the name of one column. A group name expands to its members, each carrying the coefficient the mathematics above gives, and the index of the group joins `idx_rm`.
- 4. A name matching the correlation pattern expands to one entry naming the two member lists, and that entry carries the coefficient of the view unchanged. A correlation view is one row over a pair of universes, so no coefficient is spread over members.
+ 3. A name matching neither pattern, with `rho_flag` false, is a plain name. Look it up in `sets.dict`, and leave it where it stands when the dictionary does not hold it, because a name that is not a group is already the name of one column. A group name sheds its departed members with [`shed_departed_members`](@ref), then expands to what survived, each member carrying the coefficient the mathematics above gives over the **surviving** count, and the index of the group joins `idx_rm`. A group that shed every member expands to nothing and its index joins `idx_rm` all the same.
+ 4. A name matching the correlation pattern expands to one entry naming the two member lists, and that entry carries the coefficient of the view unchanged. A correlation view is one row over a pair of universes, so no coefficient is spread over members. The two lists shed jointly, so a pair survives only when both of its names did.
  5. A name matching the prior pattern expands the name inside `prior(...)` exactly as step 3 does, and wraps each member back in `prior(...)`.
  6. A name matching both patterns expands as step 4 does, and wraps each of the two member lists in `prior(...)`.
- 7. Return `res` unchanged when nothing expanded, so an equation written in asset names costs no allocation.
+ 7. Return `res` unchanged when nothing was struck, so an equation written in asset names costs no allocation.
  8. Delete the entries at `idx_rm` from `variables_new` and `coeffs_new`, append the two accumulators to them, and render the expanded equation string.
  9. Return the [`ParsingResult`](@ref) built from the new names and coefficients, together with the operator and the right-hand side of `res`, which the expansion leaves untouched.
 
@@ -1936,6 +2167,7 @@ The two lines are different operations. The first repeats the coefficient on eve
   - `bl_flag`: Selects which of the two expansions above runs. `false` takes the first, which constrains the sum over the group. `true` takes the second, the Black-Litterman-style expansion, which constrains the mean.
   - `ep_flag`: If `true`, enables expansion of `prior(...)` expressions for entropy pooling.
   - `rho_flag`: If `true`, enables expansion of correlation views `(A, B)` for entropy pooling.
+  - `ledger`: The door's ledger of departure casualties, or `nothing` when nobody is collecting. A shed group is recorded into it through [`record_group_shed!`](@ref).
 
 # Validation
 
@@ -1986,14 +2218,23 @@ ParsingResult
   - [`parse_equation`](@ref)
   - [`get_linear_constraints`](@ref)
   - [`linear_constraints`](@ref)
+  - [`shed_departed_members`](@ref)
+  - [`record_group_shed!`](@ref)
 """
 function replace_group_by_assets(res::ParsingResult, sets::UniverseSets,
                                  bl_flag::Bool = false, ep_flag::Bool = false,
-                                 rho_flag::Bool = false)::ParsingResult
+                                 rho_flag::Bool = false;
+                                 ledger::Option{<:AbstractVector} = nothing)::ParsingResult
     @argcheck(!(bl_flag && (rho_flag || ep_flag)),
               ArgumentError("bl_flag can only be true if ep_flag and rho_flag are false. Got\nbl_flag => $(bl_flag)\nep_flag => $(ep_flag)\nrho_flag => $(rho_flag)."))
     @argcheck(!(rho_flag && !ep_flag),
               ArgumentError("rho_flag can only be true if ep_flag is also true. Got\nrho_flag => $rho_flag\nep_flag => $ep_flag"))
+    # A group is a description the data resolves, so it sheds the members that left the
+    # Investable Mask *before* the coefficient is spread: the mean then divides by the
+    # surviving count, and the row still computes what its right-hand side asserts. A name
+    # written out in the equation is the caller pointing at one asset, and that one takes
+    # its row with it, one door later. See ADR 0125.
+    other = counterpart_axis_names(sets, sets.xkey)
     variables, coeffs = res.vars, res.coef
     variables_new = copy(variables)
     coeffs_new = copy(coeffs)
@@ -2011,10 +2252,11 @@ function replace_group_by_assets(res::ParsingResult, sets::UniverseSets,
                 if isnothing(asset)
                     continue
                 end
+                asset = shed_departed_members(asset, other, ledger, v, res.eqn)
+                push!(idx_rm, i)
                 c = !bl_flag ? coeffs[i] : coeffs[i] / length(asset)
                 append!(variables_tmp, asset)
                 append!(coeffs_tmp, Iterators.repeated(c, length(asset)))
-                push!(idx_rm, i)
             else
                 @argcheck(ep_flag && rho_flag,
                           ArgumentError("The pattern '(a, b)' can only be used for rho_views (rho_flag is true) in entropy pooling (ep_flag is true). Got\nep_flag => $(ep_flag)\nrho_flag => $(rho_flag)."))
@@ -2030,9 +2272,12 @@ function replace_group_by_assets(res::ParsingResult, sets::UniverseSets,
                 @argcheck(!isnothing(asset1), IsNothingError)
                 @argcheck(!isnothing(asset2), IsNothingError)
                 @argcheck(length(asset1) == length(asset2), DimensionMismatch)
+                asset1, asset2 = shed_departed_members(asset1, asset2, other, ledger,
+                                                       "($(n.captures[1]), $(n.captures[2]))",
+                                                       res.eqn)
+                push!(idx_rm, i)
                 push!(variables_tmp, "([$(join(asset1, ", "))], [$(join(asset2, ", "))])")
                 push!(coeffs_tmp, coeffs[i])
-                push!(idx_rm, i)
             end
         else
             @argcheck(ep_flag,
@@ -2043,10 +2288,11 @@ function replace_group_by_assets(res::ParsingResult, sets::UniverseSets,
                 if isnothing(asset)
                     continue
                 end
+                asset = shed_departed_members(asset, other, ledger, v[7:(end - 1)], res.eqn)
+                push!(idx_rm, i)
                 c = !bl_flag ? coeffs[i] : coeffs[i] / length(asset)
                 append!(variables_tmp, ["prior($a)" for a in asset])
                 append!(coeffs_tmp, Iterators.repeated(c, length(asset)))
-                push!(idx_rm, i)
             else
                 @argcheck(rho_flag,
                           ArgumentError("The pattern 'prior(a, b)' can only be used for rho_views (rho_flag is true) in entropy pooling (ep_flag is true). Got\nep_flag => $(ep_flag)\nrho_flag => $(rho_flag)."))
@@ -2062,14 +2308,20 @@ function replace_group_by_assets(res::ParsingResult, sets::UniverseSets,
                 @argcheck(!isnothing(asset1), IsNothingError)
                 @argcheck(!isnothing(asset2), IsNothingError)
                 @argcheck(length(asset1) == length(asset2), DimensionMismatch)
+                asset1, asset2 = shed_departed_members(asset1, asset2, other, ledger,
+                                                       "prior($(n.captures[1]), $(n.captures[2]))",
+                                                       res.eqn)
+                push!(idx_rm, i)
                 push!(variables_tmp,
                       "prior([$(join(asset1, ", "))], [$(join(asset2, ", "))])")
                 push!(coeffs_tmp, coeffs[i])
-                push!(idx_rm, i)
             end
         end
     end
-    if isempty(variables_tmp)
+    # `idx_rm`, not `variables_tmp`: a group that sheds its every member expands to nothing
+    # and leaves the second accumulator empty, and returning `res` there would put the
+    # group name back into a row that no longer names anything.
+    if isempty(idx_rm)
         return res
     end
     deleteat!(variables_new, idx_rm)
@@ -2083,8 +2335,8 @@ function replace_group_by_assets(res::ParsingResult, sets::UniverseSets,
     return ParsingResult(variables_new, coeffs_new, res.op, res.rhs,
                          "$(eqn) $(res.op) $(res.rhs)")
 end
-function replace_group_by_assets(res::VecPR, sets::UniverseSets, args...)
-    return replace_group_by_assets.(res, sets, args...)
+function replace_group_by_assets(res::VecPR, sets::UniverseSets, args...; kwargs...)
+    return [replace_group_by_assets(resi, sets, args...; kwargs...) for resi in res]
 end
 """
     universe_axis(sets::UniverseSets, key::AbstractString) -> String
@@ -2218,18 +2470,21 @@ Convert parsed linear constraint equations into a `LinearConstraint` object.
 
 A row takes one of two shapes. Without `rr` it runs over the universe the names resolve against. With `rr` it runs over the assets, because the loadings re-base each term as the row is assembled and what leaves the function is an ordinary asset-space row.
 
+**A row is the unit of a drop.** A row is a joint statement over several names with one right-hand side, so a name this function cannot resolve takes the whole row with it rather than only its own term: `a + c == 0.05` assembled without `c` would fit `a == 0.05`, a different and stronger claim than the caller wrote. What the name's failure was decides only whether the drop is *reported*. A name on the **counterpart axis** — read with [`counterpart_axis_names`](@ref), and in practice the Non-Investable Axis a door minted — is dropped in silence under both settings of `strict`, because it was a correct name over the universe the caller was handed and the data moved it; the departure is announced once, by the door. A name on neither axis is a typo, and is reported exactly as before. [ADR 0125](../adr/0125-a-view-row-that-names-a-departed-asset-is-dropped-whole.md) states the rule.
+
 # Algorithm
 
- 1. Take `k` as `key`, or `sets.xkey` when `key` is `nothing`, read the universe `nx` from `sets.dict` under it, and name the axis with [`universe_axis`](@ref).
+ 1. Take `k` as `key`, or `sets.xkey` when `key` is `nothing`, read the universe `nx` from `sets.dict` under it, name the axis with [`universe_axis`](@ref), and read the counterpart axis with [`counterpart_axis_names`](@ref).
  2. Take `N`, the row length, from [`constraint_row_length`](@ref), and allocate the working row `At` of that length.
- 3. Zero `At` for each parsing result, and start that result with no matched name.
- 4. Build the indicator of each variable name of the result over `nx`. A name that matches no entry is reported through [`strict_diagnostic`](@ref) and is dropped, and the row is assembled from whatever did match.
+ 3. Zero `At` for each parsing result, and start that result not dropped.
+ 4. Build the indicator of each variable name of the result over `nx`. A name that matches no entry marks the row dropped, and is reported through [`strict_diagnostic`](@ref) unless it names the counterpart axis. Every name of the row is still visited, so a row carrying two typos names both.
  5. Add the contribution [`constraint_row_term`](@ref) gives for the name and its coefficient to `At`. With `rr` the contribution arrives already projected, so `At` is asset-length while it is accumulated.
- 6. Report the row through [`strict_diagnostic`](@ref) and drop it when `At` is still zero. The message separates a row whose names missed the universe from a row whose names hit it and whose loadings annihilated it, because the second is not a typo for the reader to hunt.
- 7. Read the sign and the inequality flag of the operator from [`comparison_sign_ineq_flag`](@ref), and scale the row and its right-hand side by the sign. That negates a `>=` row, so both senses of an inequality are written in the `<=` sense, which is the convention [`LinearConstraint`](@ref) states.
- 8. Append the row to the inequality accumulator when the flag is `true`, and to the equality accumulator when it is `false`.
- 9. Reshape each accumulator that holds a row into a matrix of `N` columns, and build the [`PartialLinearConstraint`](@ref) of that half.
-10. Return the [`LinearConstraint`](@ref) holding the halves that were built, or `nothing` when neither half holds a row.
+ 6. Move to the next result when the row was marked dropped.
+ 7. Report the row through [`strict_diagnostic`](@ref) and drop it when `At` is still zero. Every name resolved to get here, so the message says the row was annihilated — by the loadings under `rr`, by its own cancelling coefficients otherwise, or by there being no name in it at all — and never that a name was mistyped.
+ 8. Read the sign and the inequality flag of the operator from [`comparison_sign_ineq_flag`](@ref), and scale the row and its right-hand side by the sign. That negates a `>=` row, so both senses of an inequality are written in the `<=` sense, which is the convention [`LinearConstraint`](@ref) states.
+ 9. Append the row to the inequality accumulator when the flag is `true`, and to the equality accumulator when it is `false`.
+10. Reshape each accumulator that holds a row into a matrix of `N` columns, and build the [`PartialLinearConstraint`](@ref) of that half.
+11. Return the [`LinearConstraint`](@ref) holding the halves that were built, or `nothing` when neither half holds a row.
 
 # Arguments
 
@@ -2239,11 +2494,13 @@ A row takes one of two shapes. Without `rr` it runs over the universe the names 
   - `datatype`: Numeric type for coefficients and right-hand side.
   - `strict`: If `true`, throws an error if a variable or group is not found in `sets`; if `false`, issues a warning.
   - `rr`: Loadings to re-base through, or `nothing` for an ordinary asset-space constraint. See [`ExposureConstraintEstimator`](@ref) — callers do not pass this directly.
+  - `ledger`: The door's ledger of departure casualties, or `nothing` when nobody is collecting. A row dropped for a name on the counterpart axis is recorded into it through [`record_non_investable_drop!`](@ref).
 
 # Validation
 
   - `lcs` is non-empty, when it is a vector.
-  - A variable name that matches no entry of the universe raises when `strict` is `true`, and issues a warning otherwise. The row is assembled from the names that did match either way.
+  - A variable name that matches no entry of the universe and none of the counterpart axis raises when `strict` is `true`, and issues a warning otherwise. The row is dropped either way.
+  - A variable name on the counterpart axis drops its row in silence, under both settings of `strict`.
   - A row whose terms all fall away raises when `strict` is `true`, and issues a warning otherwise. The row is dropped either way.
   - Each `op` is one of `"=="`, `"<="` or `">="`, which [`comparison_sign_ineq_flag`](@ref) enforces.
 
@@ -2261,11 +2518,14 @@ A row takes one of two shapes. Without `rr` it runs over the universe the names 
   - [`constraint_row_length`](@ref)
   - [`universe_axis`](@ref)
   - [`comparison_sign_ineq_flag`](@ref)
+  - [`counterpart_axis_names`](@ref)
+  - [`shed_departed_members`](@ref)
 """
 function get_linear_constraints(lcs::PR_VecPR, sets::UniverseSets,
                                 key::Option{<:AbstractString} = nothing;
                                 datatype::DataType = Float64, strict::Bool = false,
-                                rr::Option{<:AbstractLoadingsRegressionResult} = nothing)
+                                rr::Option{<:AbstractLoadingsRegressionResult} = nothing,
+                                ledger::Option{<:AbstractVector} = nothing)
     if isa(lcs, AbstractVector)
         @argcheck(!isempty(lcs), IsEmptyError)
     end
@@ -2276,27 +2536,45 @@ function get_linear_constraints(lcs::PR_VecPR, sets::UniverseSets,
     k = ifelse(isnothing(key), sets.xkey, key)
     nx = sets.dict[k]
     axis = universe_axis(sets, k)
+    other = counterpart_axis_names(sets, k)
     N = constraint_row_length(rr, nx)
     At = Vector{datatype}(undef, N)
     for lc in lcs
         fill!(At, zero(eltype(At)))
-        matched = false
+        dropped = false
         for (v, c) in zip(lc.vars, lc.coef)
             Ai = (nx .== v)
             if !any(isone, Ai)
-                msg = unknown_variable_msg(v, nx, k; axis = axis)
-                strict_diagnostic(msg, strict)
+                # A view is a **row**: `a + c == 0.05` fitted without `c` asserts
+                # `a == 0.05`, which is a different and stronger claim than the caller
+                # wrote. So the row goes whole, whatever the name's failure was. A name on
+                # the counterpart axis goes in silence — it was correct over the universe
+                # the caller was handed, and the data moved it — and a name on neither axis
+                # is still a typo and is still reported. See ADR 0125.
+                if v ∉ other
+                    msg = unknown_variable_msg(v, nx, k; axis = axis,
+                                               consequence = "row dropped")
+                    strict_diagnostic(msg, strict)
+                elseif !dropped
+                    # Once per row, not once per departed name in it: the row is the unit
+                    # that went, and `ni` already names every asset that left.
+                    record_non_investable_drop!(ledger, "the row `$(lc.eqn)`")
+                end
+                dropped = true
                 continue
             end
             matched = true
             At .+= constraint_row_term(rr, Ai, c)
         end
+        if dropped
+            continue
+        end
         if !any(!iszero, At)
-            # Two distinct failures land here once a re-basis is possible: the names missed the
-            # universe (`matched === false`, the pre-existing diagnosis), or they hit it and the
-            # loadings annihilated them. Reporting the first for the second would send a user
-            # hunting for a typo that is not there.
-            msg = if matched && !isnothing(rr)
+            # Every name of the row resolved — one that did not took the row with it above —
+            # so what is left here is a row that resolved and still summed to zero: the
+            # loadings annihilated it, or its own coefficients cancelled. Reporting a typo
+            # for either would send a user hunting for one that is not there.
+            msg = if !isnothing(rr)
                 empty_projected_row_msg(lc.eqn, nx, k, N)
             else
                 empty_row_msg(lc.eqn, nx, k; axis = axis)

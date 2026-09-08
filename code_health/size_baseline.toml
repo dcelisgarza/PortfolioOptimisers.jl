@@ -16,7 +16,7 @@ commit = "fda13accfd"
 "src/01_Base/03_PrettyShow.jl" = { code = 117, doc = 138, comment = 0, blank = 76, total = 331 }
 "src/01_Base/04_ScopedConfig.jl" = { code = 163, doc = 491, comment = 2, blank = 214, total = 870 }
 "src/01_Base/05_Preferences.jl" = { code = 134, doc = 131, comment = 0, blank = 57, total = 322 }
-"src/01_Base/06_Messages.jl" = { code = 80, doc = 219, comment = 0, blank = 114, total = 413 }
+"src/01_Base/06_Messages.jl" = { code = 81, doc = 221, comment = 0, blank = 115, total = 417 }
 "src/01_Base/07_Errors.jl" = { code = 29, doc = 203, comment = 0, blank = 86, total = 318 }
 "src/01_Base/08_TypeAliases.jl" = { code = 49, doc = 385, comment = 0, blank = 159, total = 593 }
 "src/01_Base/09_ObservationWeights.jl" = { code = 17, doc = 40, comment = 0, blank = 22, total = 79 }
@@ -136,7 +136,7 @@ commit = "fda13accfd"
 "src/11_Phylogeny/23_CentralityQueries.jl" = { code = 46, doc = 147, comment = 1, blank = 67, total = 261 }
 "src/11_Phylogeny/24_AssetPhylogeny.jl" = { code = 13, doc = 64, comment = 0, blank = 33, total = 110 }
 "src/12_ConstraintGeneration/01_Base_ConstraintGeneration.jl" = { code = 39, doc = 169, comment = 0, blank = 94, total = 302 }
-"src/12_ConstraintGeneration/02_LinearConstraintGeneration.jl" = { code = 757, doc = 1345, comment = 50, blank = 593, total = 2745 }
+"src/12_ConstraintGeneration/02_LinearConstraintGeneration.jl" = { code = 855, doc = 1457, comment = 69, blank = 645, total = 3026 }
 "src/12_ConstraintGeneration/03_RiskBudgetConstraintGeneration.jl" = { code = 50, doc = 263, comment = 10, blank = 119, total = 442 }
 "src/12_ConstraintGeneration/04_PhylogenyConstraintGeneration.jl" = { code = 190, doc = 585, comment = 5, blank = 210, total = 990 }
 "src/12_ConstraintGeneration/05_WeightBoundsConstraintGeneration.jl" = { code = 124, doc = 385, comment = 0, blank = 163, total = 672 }
@@ -153,9 +153,9 @@ commit = "fda13accfd"
 "src/13_Prior/07_BayesianBlackLittermanPrior.jl" = { code = 75, doc = 275, comment = 37, blank = 60, total = 447 }
 "src/13_Prior/08_FactorBlackLittermanPrior.jl" = { code = 84, doc = 253, comment = 41, blank = 54, total = 432 }
 "src/13_Prior/09_AugmentedBlackLittermanPrior.jl" = { code = 125, doc = 307, comment = 66, blank = 69, total = 567 }
-"src/13_Prior/10_Base_EntropyPoolingPrior.jl" = { code = 1014, doc = 2423, comment = 95, blank = 933, total = 4465 }
-"src/13_Prior/11_MeucciEntropyPoolingPrior.jl" = { code = 320, doc = 481, comment = 80, blank = 148, total = 1029 }
-"src/13_Prior/12_EntropyPoolingPrior.jl" = { code = 1154, doc = 1857, comment = 88, blank = 677, total = 3776 }
+"src/13_Prior/10_Base_EntropyPoolingPrior.jl" = { code = 1072, doc = 2490, comment = 113, blank = 968, total = 4643 }
+"src/13_Prior/11_MeucciEntropyPoolingPrior.jl" = { code = 337, doc = 482, comment = 85, blank = 148, total = 1052 }
+"src/13_Prior/12_EntropyPoolingPrior.jl" = { code = 1170, doc = 1858, comment = 95, blank = 677, total = 3800 }
 "src/13_Prior/13_OpinionPoolingPrior.jl" = { code = 96, doc = 320, comment = 21, blank = 118, total = 555 }
 "src/13_Prior/14_HighOrderFactorPriorEstimator.jl" = { code = 172, doc = 273, comment = 20, blank = 82, total = 547 }
 "src/13_Prior/15_AssetPanelEstimators.jl" = { code = 93, doc = 346, comment = 14, blank = 163, total = 616 }
@@ -203,7 +203,7 @@ commit = "fda13accfd"
 "src/19_RiskMeasures/26_AdjustRiskContributions.jl" = { code = 55, doc = 46, comment = 0, blank = 13, total = 114 }
 "src/19_RiskMeasures/27_ExpectedRisk.jl" = { code = 273, doc = 458, comment = 40, blank = 207, total = 978 }
 "src/19_RiskMeasures/28_RiskMeasureTools.jl" = { code = 84, doc = 95, comment = 0, blank = 51, total = 230 }
-"src/20_Optimisation/01_Base_Optimisation.jl" = { code = 913, doc = 1730, comment = 19, blank = 863, total = 3525 }
+"src/20_Optimisation/01_Base_Optimisation.jl" = { code = 900, doc = 1698, comment = 19, blank = 844, total = 3461 }
 "src/20_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl" = { code = 578, doc = 1021, comment = 38, blank = 414, total = 2051 }
 "src/20_Optimisation/02_CrossValidation/02_KFold.jl" = { code = 85, doc = 125, comment = 0, blank = 49, total = 259 }
 "src/20_Optimisation/02_CrossValidation/03_Combinatorial.jl" = { code = 255, doc = 303, comment = 7, blank = 123, total = 688 }

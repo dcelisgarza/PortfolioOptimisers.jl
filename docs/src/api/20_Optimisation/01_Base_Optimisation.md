@@ -124,6 +124,4 @@ PortfolioOptimisers.collapse_panel_tensor
 PortfolioOptimisers.collapse_panel_mask
 PortfolioOptimisers.collapse_categorical_mask
 non_investable_universe
-non_investable_names
-announce_non_investable
 ```
