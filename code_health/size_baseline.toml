@@ -12,7 +12,7 @@ commit = "fda13accfd"
 "ext/PortfolioOptimisersImputeExt.jl" = { code = 6, doc = 0, comment = 4, blank = 3, total = 13 }
 "ext/PortfolioOptimisersPlotsExt.jl" = { code = 2508, doc = 0, comment = 183, blank = 46, total = 2737 }
 "src/01_Base/01_DocstringDictionaries.jl" = { code = 1112, doc = 113, comment = 123, blank = 43, total = 1391 }
-"src/01_Base/02_TypeRoots.jl" = { code = 15, doc = 199, comment = 0, blank = 89, total = 303 }
+"src/01_Base/02_TypeRoots.jl" = { code = 18, doc = 241, comment = 0, blank = 115, total = 374 }
 "src/01_Base/03_PrettyShow.jl" = { code = 117, doc = 138, comment = 0, blank = 76, total = 331 }
 "src/01_Base/04_ScopedConfig.jl" = { code = 163, doc = 491, comment = 2, blank = 214, total = 870 }
 "src/01_Base/05_Preferences.jl" = { code = 134, doc = 131, comment = 0, blank = 57, total = 322 }
@@ -164,15 +164,16 @@ commit = "fda13accfd"
 "src/13_Prior/15_AssetPanelEstimators.jl" = { code = 93, doc = 346, comment = 14, blank = 163, total = 616 }
 "src/13_Prior/16_Base_CrossSectionalFactorPrior.jl" = { code = 381, doc = 539, comment = 0, blank = 280, total = 1200 }
 "src/13_Prior/17_CrossSectionalFactorPrior.jl" = { code = 171, doc = 187, comment = 15, blank = 47, total = 420 }
-"src/14_UncertaintySets/01_Base_UncertaintySets.jl" = { code = 261, doc = 889, comment = 5, blank = 422, total = 1577 }
+"src/14_UncertaintySets/01_Base_UncertaintySets.jl" = { code = 263, doc = 916, comment = 5, blank = 435, total = 1619 }
 "src/14_UncertaintySets/02_DeltaUncertaintySets.jl" = { code = 42, doc = 249, comment = 0, blank = 93, total = 384 }
 "src/14_UncertaintySets/03_NormalUncertaintySets.jl" = { code = 293, doc = 965, comment = 0, blank = 347, total = 1605 }
 "src/14_UncertaintySets/04_BootstrapUncertaintySets.jl" = { code = 261, doc = 675, comment = 0, blank = 240, total = 1176 }
 "src/14_UncertaintySets/05_L1UncertaintySets.jl" = { code = 235, doc = 576, comment = 5, blank = 248, total = 1064 }
 "src/14_UncertaintySets/06_CalibrationRules.jl" = { code = 482, doc = 1467, comment = 31, blank = 660, total = 2640 }
-"src/14_UncertaintySets/07_CompactUncertaintySets.jl" = { code = 53, doc = 121, comment = 0, blank = 48, total = 222 }
+"src/14_UncertaintySets/07_CompactUncertaintySets.jl" = { code = 53, doc = 123, comment = 0, blank = 49, total = 225 }
 "src/14_UncertaintySets/08_NormBallUncertaintySets.jl" = { code = 116, doc = 311, comment = 5, blank = 134, total = 566 }
-"src/14_UncertaintySets/09_OrthogonalUncertaintySets.jl" = { code = 155, doc = 372, comment = 7, blank = 166, total = 700 }
+"src/14_UncertaintySets/09_OrthogonalUncertaintySets.jl" = { code = 160, doc = 377, comment = 9, blank = 166, total = 712 }
+"src/14_UncertaintySets/10_CompactRadiusRules.jl" = { code = 95, doc = 207, comment = 8, blank = 83, total = 393 }
 "src/15_Turnover.jl" = { code = 81, doc = 458, comment = 0, blank = 184, total = 723 }
 "src/16_Fees.jl" = { code = 291, doc = 955, comment = 3, blank = 366, total = 1615 }
 "src/17_NetReturnsDrawdowns.jl" = { code = 400, doc = 1169, comment = 3, blank = 520, total = 2092 }
@@ -206,7 +207,7 @@ commit = "fda13accfd"
 "src/19_RiskMeasures/26_AdjustRiskContributions.jl" = { code = 55, doc = 46, comment = 0, blank = 13, total = 114 }
 "src/19_RiskMeasures/27_ExpectedRisk.jl" = { code = 273, doc = 458, comment = 40, blank = 207, total = 978 }
 "src/19_RiskMeasures/28_RiskMeasureTools.jl" = { code = 84, doc = 95, comment = 0, blank = 51, total = 230 }
-"src/20_Optimisation/01_Base_Optimisation.jl" = { code = 900, doc = 1698, comment = 19, blank = 844, total = 3461 }
+"src/20_Optimisation/01_Base_Optimisation.jl" = { code = 897, doc = 1657, comment = 19, blank = 819, total = 3392 }
 "src/20_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl" = { code = 578, doc = 1021, comment = 38, blank = 414, total = 2051 }
 "src/20_Optimisation/02_CrossValidation/02_KFold.jl" = { code = 85, doc = 125, comment = 0, blank = 49, total = 259 }
 "src/20_Optimisation/02_CrossValidation/03_Combinatorial.jl" = { code = 255, doc = 303, comment = 7, blank = 123, total = 688 }
@@ -284,4 +285,4 @@ commit = "fda13accfd"
 "src/23_Pipeline/05_SearchCrossValidation.jl" = { code = 213, doc = 121, comment = 18, blank = 60, total = 412 }
 "src/24_Plotting.jl" = { code = 134, doc = 1812, comment = 111, blank = 651, total = 2708 }
 "src/25_Aliases.jl" = { code = 267, doc = 591, comment = 25, blank = 161, total = 1044 }
-"src/PortfolioOptimisers.jl" = { code = 308, doc = 3, comment = 29, blank = 5, total = 345 }
+"src/PortfolioOptimisers.jl" = { code = 311, doc = 3, comment = 29, blank = 5, total = 348 }

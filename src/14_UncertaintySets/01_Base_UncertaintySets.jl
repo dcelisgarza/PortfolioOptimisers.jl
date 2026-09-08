@@ -201,6 +201,48 @@ const Num_UcSK = Union{<:AbstractUncertaintyKAlgorithm, <:Number}
 """
 $(DocStringExtensions.TYPEDEF)
 
+Computes the radius ``\\kappa`` of a [`CompactCovarianceUncertaintySet`](@ref) from the prior result and the geometry the set was built on, so that the radius refits whenever the sample or the factor span moves.
+
+A member stands in the `kappa` slot of an [`OrthogonalUncertaintySet`](@ref), whose bound is [`Num_CptRad`](@ref). A plain number in that slot is the radius itself, exactly as it is today, and [`k_compact`](@ref) returns it unchanged.
+
+**This family is not the calibration channel of ADR 0095, and the two do not meet.** A **Calibration Rule** reads `(pr, w, slv, ctx)` and nothing else. The compact radius cannot be sized from those alone, because its units move with a sibling field of its own owner: the penalty is ``\\kappa \\lVert (\\mathbf{I} - \\mathbf{Q}\\mathbf{Q}^{\\intercal})\\mathbf{C}\\boldsymbol{w} \\rVert_{2}^{2}`` with ``\\mathbf{C} = \\mathbf{W}^{-1/2}``, so under [`IdentityMetric`](@ref) ``\\kappa`` carries variance units and under [`InverseIdiosyncraticVarianceMetric`](@ref) it is dimensionless. A rule that saw only the prior result would have to state one of the two readings and be wrong under the other. So the radius is sized **in family**, where the metric, the loadings block and the span are all in hand, exactly as the mean radius of the same estimator is sized by [`k_norm_ball`](@ref) through the `method` slot. ADR 0070 is the Authority for a radius slot admitting the rule that computes it.
+
+A rule is named for the **method** it runs, on ADR 0015's reading, and neither bare word is claimed elsewhere in the library. [`ResidualInflation`](@ref) inflates the residual variance to a confidence bound, and [`VarianceFraction`](@ref) matches the penalty to a fraction of the nominal variance at a reference portfolio.
+
+# Interface
+
+## `k_compact`
+
+  - `k_compact(alg::AbstractCompactRadiusAlgorithm, q::Number, metric::AbstractOrthogonalityMetric, pr::AbstractPriorResult, rr::AbstractLoadingsRegressionResult, C::VecNum, Q::MatNum) -> Number`: Returns the radius, finite and `>= 0`. The owner's own constructor states the range, so a rule writes no range check of its own.
+
+# Related
+
+  - [`ResidualInflation`](@ref)
+  - [`VarianceFraction`](@ref)
+  - [`Num_CptRad`](@ref)
+  - [`k_compact`](@ref)
+  - [`OrthogonalUncertaintySet`](@ref)
+  - [`CompactCovarianceUncertaintySet`](@ref)
+  - [`AbstractCalibrationAlgorithm`](@ref): the parallel channel, which sizes a quantity whose units do not move with a sibling field.
+"""
+abstract type AbstractCompactRadiusAlgorithm <: AbstractAlgorithm end
+"""
+    const Num_CptRad = Union{<:AbstractCompactRadiusAlgorithm, <:Number}
+
+Field bound for the compact covariance radius: the radius itself, or a rule of [`AbstractCompactRadiusAlgorithm`](@ref) that computes one.
+
+The union names one family and no other, so a rule of any other family is refused **at construction**, where the caller wrote it. It admits no plain `Function`, because a rule of this family reads seven arguments the site settles — the metric, the loadings block, the diagonal metric and the span among them — and a closure over a caller's own data would have to restate every one of them to be called at all.
+
+# Related
+
+  - [`AbstractCompactRadiusAlgorithm`](@ref)
+  - [`k_compact`](@ref)
+  - [`OrthogonalUncertaintySet`](@ref)
+"""
+const Num_CptRad = Union{<:AbstractCompactRadiusAlgorithm, <:Number}
+"""
+$(DocStringExtensions.TYPEDEF)
+
 Computes the radius `eps` of an ``\\ell_1`` uncertainty set, which controls how far the true characteristic vector may lie from its estimate, and therefore how many assets the portfolio holds.
 
 All concrete subtypes should subtype `AbstractUncertaintyEpsAlgorithm`. A plain number in place of one is the radius itself. It is the counterpart of [`AbstractUncertaintyKAlgorithm`](@ref) for the ``\\ell_1`` family.
@@ -562,7 +604,7 @@ function sigma_ucs(ue::AbstractPriorUncertaintySetEstimator, ::AbstractPriorResu
 end
 """
     ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult, ::AbstractPriorResult; kwargs...)
-    ucs(uc::AbstractPriorUncertaintySetEstimator, ::ReturnsResult, pr::AbstractPriorResult; kwargs...)
+    ucs(uc::AbstractPriorUncertaintySetEstimator, rd::ReturnsResult, pr::AbstractPriorResult; kwargs...)
 
 Fits both uncertainty sets from an estimator that is handed the returns data **and** the prior result the optimisation is solving on.
 
@@ -597,13 +639,13 @@ function ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult, ::AbstractP
              kwargs...)
     return ucs(uc, rd; kwargs...)
 end
-function ucs(uc::AbstractPriorUncertaintySetEstimator, ::ReturnsResult,
+function ucs(uc::AbstractPriorUncertaintySetEstimator, rd::ReturnsResult,
              pr::AbstractPriorResult; kwargs...)
-    return ucs(uc, pr; kwargs...)
+    return ucs(uc, pr; rd = rd, kwargs...)
 end
 """
     mu_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult, ::AbstractPriorResult; kwargs...)
-    mu_ucs(uc::AbstractPriorUncertaintySetEstimator, ::ReturnsResult, pr::AbstractPriorResult; kwargs...)
+    mu_ucs(uc::AbstractPriorUncertaintySetEstimator, rd::ReturnsResult, pr::AbstractPriorResult; kwargs...)
 
 Fits the mean uncertainty set from an estimator that is handed the returns data **and** the prior result the optimisation is solving on.
 
@@ -630,13 +672,13 @@ function mu_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult,
                 ::AbstractPriorResult; kwargs...)
     return mu_ucs(uc, rd; kwargs...)
 end
-function mu_ucs(uc::AbstractPriorUncertaintySetEstimator, ::ReturnsResult,
+function mu_ucs(uc::AbstractPriorUncertaintySetEstimator, rd::ReturnsResult,
                 pr::AbstractPriorResult; kwargs...)
-    return mu_ucs(uc, pr; kwargs...)
+    return mu_ucs(uc, pr; rd = rd, kwargs...)
 end
 """
     sigma_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult, ::AbstractPriorResult; kwargs...)
-    sigma_ucs(uc::AbstractPriorUncertaintySetEstimator, ::ReturnsResult, pr::AbstractPriorResult; kwargs...)
+    sigma_ucs(uc::AbstractPriorUncertaintySetEstimator, rd::ReturnsResult, pr::AbstractPriorResult; kwargs...)
 
 Fits the covariance uncertainty set from an estimator that is handed the returns data **and** the prior result the optimisation is solving on.
 
@@ -663,9 +705,9 @@ function sigma_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult,
                    ::AbstractPriorResult; kwargs...)
     return sigma_ucs(uc, rd; kwargs...)
 end
-function sigma_ucs(uc::AbstractPriorUncertaintySetEstimator, ::ReturnsResult,
+function sigma_ucs(uc::AbstractPriorUncertaintySetEstimator, rd::ReturnsResult,
                    pr::AbstractPriorResult; kwargs...)
-    return sigma_ucs(uc, pr; kwargs...)
+    return sigma_ucs(uc, pr; rd = rd, kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDEF)

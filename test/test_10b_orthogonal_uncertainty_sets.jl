@@ -501,4 +501,311 @@ file against itself.
         @test isapprox(collect(sigma_ucs(uereg, prcs).C), collect(sigma_ucs(ue777, prcs).C);
                        rtol = 1e-10)
     end
+
+    #=
+    Issue #928 gives the covariance radius a family of rules, so that the one radius of this
+    estimator that was a bare number can be sized from the sample and the span. The mean
+    radius was already sized this way, through `method::Num_UcSK` and `k_norm_ball`; this is
+    the covariance axis's counterpart, through `kappa::Num_CptRad` and `k_compact`.
+
+    The probes below re-derive each rule's number in plain Julia from the formula in its own
+    docstring, rather than storing a literal: both rules are closed forms over quantities the
+    prior result and the span already carry, so a literal would only restate the arithmetic.
+    =#
+    @testset "Issue 928: the covariance radius is sized by a rule" begin
+        using PortfolioOptimisers: k_compact, compact_radius_dof,
+                                   compact_radius_sample_size, compact_reference_weights,
+                                   parse_lens
+        using Accessors
+        # A time-series block, so `compact_radius_dof` takes its `Regression` reading. The
+        # cross-sectional block of `prior777` takes the other one, and both are probed below.
+        rng928 = StableRNG(928928928)
+        T928, N928, K928 = 260, 7, 3
+        F928 = randn(rng928, T928, K928) * 0.01
+        B928 = randn(rng928, N928, K928)
+        X928 = F928 * transpose(B928) + randn(rng928, T928, N928) * 0.02
+        d928 = vec(var(X928 - F928 * transpose(B928); dims = 1))
+        rr928 = Regression(; M = B928, b = zeros(N928), esigma = d928)
+        fpr928 = LowOrderPrior(; X = F928, mu = vec(mean(F928; dims = 1)),
+                               sigma = cov(F928))
+        pr928 = LowOrderPrior(; X = X928, mu = vec(mean(X928; dims = 1)), sigma = cov(X928),
+                              rr = rr928, fpr = fpr928)
+        # The relative inflation the rule is built on, stated here from the formula alone.
+        rho928(q, dof) = dof / quantile(Chisq(dof), q) - 1
+
+        @testset "A stated number still passes through untouched" begin
+            # The whole point of the widening is that it costs the existing caller nothing.
+            for k in (0.0, 1.0, 2.5, 100.0)
+                @test sigma_ucs(OrthogonalUncertaintySet(; kappa = k), pr928).kappa == k
+            end
+            # `k_compact` on a number ignores every other argument, which is what makes the
+            # resolution free on the stated path.
+            @test k_compact(3.25) == 3.25
+            @test k_compact(3.25, 0.05, IdentityMetric(), pr928, rr928, ones(N928),
+                            zeros(N928, 1), nothing) == 3.25
+        end
+
+        @testset "ResidualInflation is the relative inflation under the default metric" begin
+            #=
+            `W = D^{-1}` leaves a bare projector inside the operator norm, whose norm is 1,
+            so the metric-generic formula collapses to `rho` itself. This is the identity the
+            rule's docstring claims, and it is why the number is dimensionless there.
+            =#
+            ue = OrthogonalUncertaintySet(; kappa = ResidualInflation(), q = 0.05)
+            k = sigma_ucs(ue, pr928).kappa
+            @test isapprox(k, rho928(0.05, T928 - K928 - 1); rtol = 1e-12)
+            # `pr.rr` is a `Regression`, so the derived count is `T - K - 1`.
+            @test compact_radius_dof(rr928, T928, N928, K928) == T928 - K928 - 1
+            @test compact_radius_sample_size(pr928) == T928
+        end
+
+        @testset "ResidualInflation carries variance units where the metric needs them" begin
+            #=
+            Under `IdentityMetric` the penalty matrix is dimensionless, so the radius must
+            carry the variance itself. The generic formula does that without a method of its
+            own: the same operator norm is `lambda_max(P D P)` there.
+            =#
+            ue = OrthogonalUncertaintySet(; kappa = ResidualInflation(), q = 0.05,
+                                          metric = IdentityMetric())
+            _, w_sqrt, Q = orthogonal_factor_span(ue, pr928)
+            @test isnothing(w_sqrt)
+            P = I - Q * transpose(Q)
+            expected = rho928(0.05, T928 - K928 - 1) * opnorm(sqrt.(d928) .* P)^2
+            @test isapprox(sigma_ucs(ue, pr928).kappa, expected; rtol = 1e-12)
+            # The two metrics give two different numbers, which is the whole reason the rule
+            # is sized in family rather than through the calibration channel.
+            @test !isapprox(sigma_ucs(ue, pr928).kappa,
+                            sigma_ucs(OrthogonalUncertaintySet(;
+                                                               kappa = ResidualInflation()),
+                                      pr928).kappa; rtol = 1e-3)
+        end
+
+        @testset "The rule's own q overrides the estimator's, and a tighter q widens it" begin
+            base = sigma_ucs(OrthogonalUncertaintySet(; kappa = ResidualInflation(),
+                                                      q = 0.05), pr928).kappa
+            tight = sigma_ucs(OrthogonalUncertaintySet(;
+                                                       kappa = ResidualInflation(;
+                                                                                 q = 0.01),
+                                                       q = 0.05), pr928).kappa
+            @test tight > base
+            @test isapprox(tight, rho928(0.01, T928 - K928 - 1); rtol = 1e-12)
+            # Stating the owner's own level on the rule is the same number as reading it.
+            @test isapprox(sigma_ucs(OrthogonalUncertaintySet(;
+                                                              kappa = ResidualInflation(;
+                                                                                        q = 0.05),
+                                                              q = 0.20), pr928).kappa, base;
+                           rtol = 1e-12)
+        end
+
+        @testset "A stated dof overrides the derivation, and the block types derive apart" begin
+            k = sigma_ucs(OrthogonalUncertaintySet(;
+                                                   kappa = ResidualInflation(; dof = 120)),
+                          pr928).kappa
+            @test isapprox(k, rho928(0.05, 120); rtol = 1e-12)
+            # A cross-sectional fit spends `K` of the `N` assets each period rather than `K`
+            # of the `T` observations once, so its count is the larger of the two here.
+            csfm = prior777(B, D).rr
+            @test compact_radius_dof(csfm, T777, N777, 2) == T777 * (N777 - 2) / N777
+            @test compact_radius_dof(csfm, T777, N777, 2) !=
+                  compact_radius_dof(rr928, T777, N777, 2)
+            kcs = sigma_ucs(OrthogonalUncertaintySet(; kappa = ResidualInflation()),
+                            prior777(B, D)).kappa
+            @test isapprox(kcs, rho928(0.05, T777 * (N777 - 2) / N777); rtol = 1e-10)
+        end
+
+        @testset "ResidualInflation refuses a block with no idiosyncratic variances" begin
+            # The rule reads `D`, and a block whose prior added no residual block carries
+            # none. The refusal is `idiosyncratic_variances`'s own, so the message names the
+            # field and the fit that left it unset.
+            bare = Regression(; M = B928, b = zeros(N928))
+            prbare = LowOrderPrior(; X = X928, mu = vec(mean(X928; dims = 1)),
+                                   sigma = cov(X928), rr = bare, fpr = fpr928)
+            @test_throws PortfolioOptimisers.IsNothingError sigma_ucs(OrthogonalUncertaintySet(;
+                                                                                               kappa = ResidualInflation(),
+                                                                                               metric = IdentityMetric()),
+                                                                      prbare)
+        end
+
+        @testset "A fit that left no degrees of freedom refuses, naming the counts" begin
+            # Fewer observations than regressors leaves `T - K - 1 <= 0`, and no chi-squared
+            # bound is defined there. The message carries `T`, `N` and `K` so the caller can
+            # see which of the three is the problem.
+            fshort = LowOrderPrior(; X = F928[1:3, :], mu = vec(mean(F928; dims = 1)),
+                                   sigma = cov(F928))
+            short = LowOrderPrior(; X = X928[1:3, :], mu = vec(mean(X928; dims = 1)),
+                                  sigma = cov(X928), rr = rr928, fpr = fshort)
+            err = try
+                sigma_ucs(OrthogonalUncertaintySet(; kappa = ResidualInflation()), short)
+                nothing
+            catch e
+                e
+            end
+            @test isa(err, DomainError)
+            @test occursin("degrees of freedom", sprint(showerror, err))
+        end
+
+        @testset "VarianceFraction puts the penalty at exactly f of the nominal variance" begin
+            #=
+            The rule's whole content is the unit it gives the caller, so the probe measures
+            that unit rather than the number: the penalty the reference portfolio pays at
+            the returned radius is `f` times the variance it pays at the nominal covariance.
+            =#
+            for f in (0.05, 0.1, 0.5)
+                ue = OrthogonalUncertaintySet(; kappa = VarianceFraction(; f = f))
+                s = sigma_ucs(ue, pr928)
+                w0 = fill(1 / N928, N928)
+                Cw = collect(s.C) .* w0
+                penalty = sum(abs2, Cw - s.Q * (transpose(s.Q) * Cw))
+                @test isapprox(s.kappa * penalty, f * dot(w0, pr928.sigma, w0);
+                               rtol = 1e-12)
+            end
+            # A stated vector is the reference portfolio itself.
+            wb = abs.(randn(StableRNG(5), N928))
+            wb ./= sum(wb)
+            s = sigma_ucs(OrthogonalUncertaintySet(;
+                                                   kappa = VarianceFraction(; f = 0.2,
+                                                                            w0 = wb)),
+                          pr928)
+            Cwb = collect(s.C) .* wb
+            @test isapprox(s.kappa * sum(abs2, Cwb - s.Q * (transpose(s.Q) * Cwb)),
+                           0.2 * dot(wb, pr928.sigma, wb); rtol = 1e-12)
+            @test compact_reference_weights(nothing, 4, nothing, Float64) == fill(0.25, 4)
+            @test_throws DimensionMismatch sigma_ucs(OrthogonalUncertaintySet(;
+                                                                              kappa = VarianceFraction(;
+                                                                                                       w0 = [0.5,
+                                                                                                             0.5])),
+                                                     pr928)
+        end
+
+        @testset "VarianceFraction runs an optimiser, and says so when it cannot" begin
+            #=
+            `w0` admits any non-finite-allocation optimiser, and each carries its own solver,
+            so nothing is threaded into the fit. The returns data reaches the rule through
+            the three-argument form the JuMP builders call, which used to discard it.
+            =#
+            rd928 = ReturnsResult(; X = X928, nx = ["A$(i)" for i in 1:N928])
+            ue = OrthogonalUncertaintySet(;
+                                          kappa = VarianceFraction(; f = 0.1,
+                                                                   w0 = InverseVolatility()))
+            s = sigma_ucs(ue, rd928, pr928)
+            w0 = optimise(InverseVolatility(), rd928).w
+            Cw = collect(s.C) .* w0
+            @test isapprox(s.kappa * sum(abs2, Cw - s.Q * (transpose(s.Q) * Cw)),
+                           0.1 * dot(w0, pr928.sigma, w0); rtol = 1e-10)
+            # `EqualWeighted` reproduces the `nothing` default, which is the same portfolio.
+            @test isapprox(sigma_ucs(OrthogonalUncertaintySet(;
+                                                              kappa = VarianceFraction(;
+                                                                                       w0 = EqualWeighted())),
+                                     rd928, pr928).kappa,
+                           sigma_ucs(OrthogonalUncertaintySet(; kappa = VarianceFraction()),
+                                     pr928).kappa; rtol = 1e-10)
+            # The two-argument form carries no returns data, so an optimiser has nothing to
+            # run on and the refusal names the field rather than failing inside `optimise`.
+            @test_throws PortfolioOptimisers.IsNothingError sigma_ucs(ue, pr928)
+        end
+
+        @testset "A span that covers the cross-section leaves an inert set, not a refusal" begin
+            #=
+            `r == N` makes the projector zero, so the penalty is zero on every portfolio and
+            no radius changes the set. `ResidualInflation` reaches zero through the operator
+            norm; `VarianceFraction` would divide by zero, so it carries the rank branch. The
+            mean axis already returns a zero radius for the same span.
+            =#
+            Bfull = Matrix(1.0I, N928, N928)
+            rrfull = Regression(; M = Bfull, b = zeros(N928), esigma = d928)
+            fprfull = LowOrderPrior(; X = randn(StableRNG(7), T928, N928), mu = zeros(N928),
+                                    sigma = Matrix(0.01I, N928, N928))
+            prfull = LowOrderPrior(; X = X928, mu = vec(mean(X928; dims = 1)),
+                                   sigma = cov(X928), rr = rrfull, fpr = fprfull)
+            _, _, Qf = orthogonal_factor_span(OrthogonalUncertaintySet(), prfull)
+            @test size(Qf, 2) == N928
+            @test iszero(sigma_ucs(OrthogonalUncertaintySet(; kappa = ResidualInflation()),
+                                   prfull).kappa)
+            @test iszero(sigma_ucs(OrthogonalUncertaintySet(; kappa = VarianceFraction()),
+                                   prfull).kappa)
+            @test iszero(mu_ucs(OrthogonalUncertaintySet(), prfull).kappa)
+        end
+
+        @testset "A reference portfolio inside the span sends the radius to infinity" begin
+            #=
+            `C * w0` in the column space of `Q` makes the penalty vanish at `w0` while other
+            portfolios still pay it, so no finite radius states a fraction of it and the
+            quotient diverges. In exact arithmetic it is not finite and
+            `CompactCovarianceUncertaintySet`'s own range check refuses it; in floating point
+            the projector leaves a rounding residue instead, so the number is finite and
+            enormous. Either way the set is useless, and the probe pins the divergence rather
+            than a refusal that only the exact case reaches.
+            =#
+            ue = OrthogonalUncertaintySet(; kappa = VarianceFraction(),
+                                          metric = IdentityMetric())
+            _, _, Q = orthogonal_factor_span(ue, pr928)
+            generic = sigma_ucs(ue, pr928).kappa
+            inside = sigma_ucs(OrthogonalUncertaintySet(;
+                                                        kappa = VarianceFraction(;
+                                                                                 w0 = Q[:,
+                                                                                        1]),
+                                                        metric = IdentityMetric()), pr928).kappa
+            @test inside > 1e10 * generic
+            # An exactly vanishing penalty is the case the set's constructor refuses, and it
+            # refuses on the number rather than on the rule that produced it.
+            @test_throws DomainError CompactCovarianceUncertaintySet(; kappa = Inf,
+                                                                     C = ones(3),
+                                                                     Q = zeros(3, 1))
+        end
+
+        @testset "The rules refuse a value outside their own range, at construction" begin
+            @test_throws DomainError ResidualInflation(; q = 0.0)
+            @test_throws DomainError ResidualInflation(; q = 1.0)
+            @test_throws DomainError ResidualInflation(; dof = 0)
+            @test_throws DomainError ResidualInflation(; dof = Inf)
+            @test_throws DomainError VarianceFraction(; f = 0.0)
+            @test_throws DomainError VarianceFraction(; f = -1.0)
+            @test_throws PortfolioOptimisers.IsEmptyError VarianceFraction(; w0 = Float64[])
+            # A bare call constructs, so a caller reads each rule's shape before choosing.
+            @test ResidualInflation() isa PortfolioOptimisers.AbstractCompactRadiusAlgorithm
+            @test VarianceFraction() isa PortfolioOptimisers.AbstractCompactRadiusAlgorithm
+            # The bound admits a number and a rule of this family, and refuses another's.
+            # The refusal is the keyword constructor's own type annotation, so it is a
+            # `TypeError` raised where the caller wrote the field.
+            @test_throws TypeError OrthogonalUncertaintySet(;
+                                                            kappa = ScenarioCount(; n = 10))
+            # A number still meets the estimator's own range check.
+            @test_throws DomainError OrthogonalUncertaintySet(; kappa = -1.0)
+            @test_throws DomainError OrthogonalUncertaintySet(; kappa = Inf)
+        end
+
+        @testset "The radius is searchable: `ucs.kappa` is a lens over numbers and rules" begin
+            #=
+            The ticket's other half. Walk-forward selection of the radius needed nothing
+            built -- `kappa` is a plain field, so a search grid's `"key.path" => values` pair
+            reaches it -- but nothing pinned that, and neither the docstring nor the example
+            said so. This is the pin: the lens the grid builds resolves onto the field, and
+            the grid may hold rules beside numbers.
+            =#
+            lens = parse_lens("kappa")
+            for v in (0.0, 1.0, 100.0, ResidualInflation(), VarianceFraction(; f = 0.25))
+                ue = Accessors.set(OrthogonalUncertaintySet(), lens, v)
+                @test ue.kappa === v
+                @test sigma_ucs(ue, pr928) isa CompactCovarianceUncertaintySet
+            end
+            # The path a caller actually writes reaches the field through the measure that
+            # holds the set. `parse_lens` builds the same chain from the dotted string.
+            nested = parse_lens("ucs.kappa")
+            r = UncertaintySetVariance(; ucs = OrthogonalUncertaintySet())
+            r2 = Accessors.set(r, nested, ResidualInflation(; q = 0.01))
+            @test r2.ucs.kappa == ResidualInflation(; q = 0.01)
+            @test isapprox(sigma_ucs(r2.ucs, pr928).kappa, rho928(0.01, T928 - K928 - 1);
+                           rtol = 1e-12)
+        end
+
+        @testset "A view slices the set and carries the resolved number" begin
+            # A set is a Result, so the radius it carries is a number whichever way it was
+            # produced. `port_opt_view` has no estimator, no prior and no metric to re-run a
+            # rule with, so the number crosses the slice unchanged.
+            s = sigma_ucs(OrthogonalUncertaintySet(; kappa = ResidualInflation()), pr928)
+            v = PortfolioOptimisers.port_opt_view(s, [1, 2, 3, 4])
+            @test v.kappa === s.kappa
+            @test length(v.C) == 4
+        end
+    end
 end

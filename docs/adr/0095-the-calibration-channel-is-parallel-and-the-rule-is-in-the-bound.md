@@ -449,3 +449,24 @@ second channel for what the host already varies.
   does not. `radial_series_inputs` carries the same asymmetry. Closing it needs a rule that holds a
   **prior estimator** and fits it to the drawdown sample, which is a design the maintainer has raised
   and which this ADR does not decide.
+
+## Amendment (2026-09-08)
+
+A radius may be sized outside this channel, and one now is.
+
+`OrthogonalUncertaintySet.kappa` is the radius of the compact covariance set, and it takes a rule of
+`AbstractCompactRadiusAlgorithm` in a `Num_CptRad` slot rather than a Calibration Rule. The reason is
+the one condition this channel cannot meet: a rule here reads `(key, pr, w, slv, ctx)` and nothing
+else, and that radius's **units move with a sibling field of its own owner**. The penalty is
+`κ‖(I − QQᵀ)Cw‖²` with `C = W^{-1/2}`, so `κ` is dimensionless under the estimator's default metric
+and carries variance units under `IdentityMetric`. A rule holding only the prior result would have to
+commit to one reading and be wrong under the other, and no argument this channel carries names which.
+
+So the test is not whether a quantity is a quantile. `ResidualInflation`, the rule that ships, *is* a
+quantile — a chi-squared bound on the idiosyncratic variance. The test is whether the quantity can be
+computed from what this channel hands a rule. Where it cannot, the quantity is sized in family,
+beside the geometry it depends on, which is what ADR 0070 already permits for a radius slot.
+
+Nothing in this channel changes: the five families, the five bounds, the eleven rules and the five
+verbs are as stated above. [ADR 0127](0127-the-compact-covariance-radius-is-sized-in-family-not-through-the-calibration-channel.md)
+carries the decision and states the whole reading.

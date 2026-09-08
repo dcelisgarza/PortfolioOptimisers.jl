@@ -236,6 +236,77 @@ Stacktrace:
 """
 abstract type DynamicAbstractWeights <: AbstractEstimator end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for all portfolio optimisation estimators.
+
+All optimisers and optimisation components should subtype `AbstractOptimisationEstimator` to participate in the optimisation dispatch system.
+
+# Interfaces
+
+`AbstractOptimisationEstimator` declares no method of its own. It carries the default [`port_opt_view`](@ref), which returns the estimator unchanged, and it splits into two halves. Subtype [`BaseOptimisationEstimator`](@ref) for a configuration an optimiser holds, and [`OptimisationEstimator`](@ref) for an estimator [`optimise`](@ref) runs.
+
+The root stands here rather than beside the optimisers it heads because a field bound earlier in the load order names it. `VarianceFraction.w0` admits a [`NonFiniteAllocationOptimisationEstimator`](@ref) as its reference portfolio, and it is declared in `src/14_UncertaintySets/`, which loads a hundred includes before `src/20_Optimisation/`. A bound is the enforcement the library prefers over a runtime check, so the chain the bound names is hoisted rather than the check weakened. [`CrossValidationEstimator`](@ref) stands here for the same reason.
+
+# Related
+
+  - [`BaseOptimisationEstimator`](@ref)
+  - [`OptimisationEstimator`](@ref)
+  - [`NonFiniteAllocationOptimisationEstimator`](@ref)
+"""
+abstract type AbstractOptimisationEstimator <: AbstractEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for portfolio optimisation estimators that produce portfolio weights.
+
+Subtype `OptimisationEstimator` to implement concrete portfolio optimisers. All optimisers that can be invoked with `optimise` should subtype this.
+
+# Interfaces
+
+In order to implement a new optimiser that works seamlessly with the library, subtype `OptimisationEstimator`, give it an `fb` field, and implement the following method:
+
+## `_optimise`
+
+  - `_optimise(opt::MyOptimiser, rd::ReturnsResult, args...; kwargs...) -> OptimisationResult`: Solves the problem `opt` states over the data in `rd`, and returns the optimiser's own result type.
+
+### Arguments
+
+  - `opt`: The concrete subtype instance.
+  - `rd`: Returns data.
+  - `args...`, `kwargs...`: Forwarded from [`optimise`](@ref).
+
+### Returns
+
+  - `res::OptimisationResult`: The result, whose `retcode` decides whether [`optimise`](@ref) walks on to the fallback.
+
+## The `fb` field
+
+[`optimise`](@ref) reads `opt.fb` to walk the fallback chain, so every subtype carries one. It holds the next optimiser to try, or `nothing` to end the chain.
+
+# Related
+
+  - [`NonFiniteAllocationOptimisationEstimator`](@ref)
+  - [`AbstractOptimisationEstimator`](@ref)
+"""
+abstract type OptimisationEstimator <: AbstractOptimisationEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for portfolio optimisation estimators that produce continuous (non-integer) portfolio weights.
+
+# Interfaces
+
+`NonFiniteAllocationOptimisationEstimator` adds no method to [`OptimisationEstimator`](@ref). It marks the optimisers whose weights are continuous, which is what admits them to the cross-validation and meta-optimisation entry points (see [`OptE_Opt`](@ref)).
+
+# Related
+
+  - [`OptimisationEstimator`](@ref)
+  - [`NaiveOptimisationEstimator`](@ref)
+  - [`ClusteringOptimisationEstimator`](@ref)
+"""
+abstract type NonFiniteAllocationOptimisationEstimator <: OptimisationEstimator end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Make estimators, algorithms, and results behave as length-1 iterables, returning the object itself on the first iteration and `nothing` thereafter.

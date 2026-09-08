@@ -415,6 +415,99 @@ pretty_table(DataFrame("kappa" => kappa_grid,
                            end], title = "The compact covariance radius")
 
 #=
+### Calibrating the covariance radius instead of stating it
+
+The sweep above is the honest way to explore `κ`, and it is also an admission: the numbers in
+`kappa_grid` were chosen by hand, and nothing in the data suggested them. `κ` can instead be
+**sized from the sample**, by a rule of [`AbstractCompactRadiusAlgorithm`](@ref) placed in the
+same field. The estimator resolves it inside the fit, where the metric, the loadings block and
+the factor span are all in hand, and the set that comes out carries a plain number.
+
+Two rules ship, and they answer two different questions.
+
+  - [`ResidualInflation`](@ref) treats `κ` as a **confidence level**. The penalty lives exactly
+    where the idiosyncratic variance lives, so the question is how far the *estimate* of that
+    variance can sit from the truth, and a variance has a chi-squared bound. Under this model's
+    default metric the answer is dimensionless — it is the relative inflation itself.
+  - [`VarianceFraction`](@ref) treats `κ` as a **magnitude with a unit**. It sizes the penalty so
+    that a reference portfolio pays a stated fraction of its nominal variance, which is a number a
+    desk can argue about: *robustify by ten percent*.
+=#
+
+calibrated = ["Stated" => 100.0, "ResidualInflation()" => ResidualInflation(),
+              "ResidualInflation(; q = 0.01)" => ResidualInflation(; q = 0.01),
+              "VarianceFraction(; f = 0.1)" => VarianceFraction(; f = 0.1),
+              "VarianceFraction(; f = 0.5)" => VarianceFraction(; f = 0.5)]
+calibrated_sets = [sigma_ucs(OrthogonalUncertaintySet(; kappa = k), rd, pr)
+                   for (_, k) in calibrated]
+calibrated_books = [book(; kappa = k) for (_, k) in calibrated]
+
+pretty_table(DataFrame("kappa" => first.(calibrated),
+                       "Resolved" => [s.kappa for s in calibrated_sets],
+                       "Outside the span" =>
+                           [orthogonal_share(r.w, sigma_set) for r in calibrated_books],
+                       "Volatility" =>
+                           [sqrt(dot(r.w, pr.sigma * r.w)) for r in calibrated_books],
+                       "Names" => [count(>(1e-6), r.w) for r in calibrated_books]);
+             formatters = [(v, i, j) -> if j == 2
+                               round(v; sigdigits = 4)
+                           elseif j == 3
+                               "$(round(v * 100, digits = 2)) %"
+                           elseif j == 4
+                               "$(round(v * 10_000, digits = 2)) bp"
+                           else
+                               v
+                           end], title = "A radius the sample chose")
+
+#=
+The two rules land in different places, and the gap between them is the whole reading.
+`ResidualInflation` returns about `0.13` here — three orders of magnitude below the `100.0` the
+sweep above needed to move the book — and that is the point rather than a defect: a chi-squared
+bound on a residual variance is a statement about *estimation error*, and over this sample that
+error is small. A radius that size barely moves the book, and the table says so: 90% of the
+metric-scaled weight still sits outside the factor span. `VarianceFraction` is the rule to reach
+for when you want the book to *move*, because it is sized against the nominal variance rather
+than against the sampling error, and it is linear in `f` — the `f = 0.5` row is exactly five
+times the `f = 0.1` row.
+
+Neither answer is more correct than the other. They price different things, and stating `100.0`
+prices a third thing that nothing in the sample asked for. What the rules buy is that the number
+now moves with the data instead of holding still across every fold.
+
+`VarianceFraction` reads a reference portfolio, and `w0` admits a weight vector or any
+non-finite-allocation optimiser — the optimiser carries its own solver, so nothing extra is
+threaded into the fit. `nothing` reads the equal-weight book.
+
+Two notes on where each rule applies. `ResidualInflation` reads the idiosyncratic variances off
+`rr.esigma`, so it refuses a block fitted without a residual term; `VarianceFraction` reads none
+and serves that block too. And `ResidualInflation`'s own `q` defaults to the estimator's, so one
+confidence level governs both axes unless you state otherwise — the two are tail probabilities
+over different errors, but they tighten in the same direction.
+=#
+
+vf_book = book(; kappa = VarianceFraction(; f = 0.1, w0 = InverseVolatility()))
+pretty_table(DataFrame("Reference" => ["Equal weight (default)", "InverseVolatility()"],
+                       "Outside the span" =>
+                           [orthogonal_share(calibrated_books[4].w, sigma_set),
+                            orthogonal_share(vf_book.w, sigma_set)]);
+             formatters = [(v, i, j) -> j == 2 ? "$(round(v * 100, digits = 2)) %" : v],
+             title = "The fraction is measured at a portfolio you choose")
+
+#=
+### The radius is also searchable
+
+Nothing above had to be chosen in advance. `kappa` is a plain field, so its lens path
+`"ucs.kappa"` is a key a search grid ranges over, and the grid may hold **rules beside numbers**:
+each candidate is fitted per fold, and the walk-forward score decides. That is the third route,
+after stating a size and calibrating one.
+
+```julia
+grid = ["r.ucs.kappa" => [0.0, 1.0, 100.0, ResidualInflation(), VarianceFraction(; f = 0.1)]]
+search_cross_validation(mr, GridSearchCrossValidation(grid; cv = IndexWalkForward(252, 63)), rd)
+```
+=#
+
+#=
 ### The mean radius is a threshold, not a dial
 
 The mean set behaves differently, and the difference is worth understanding. Its penalty is a

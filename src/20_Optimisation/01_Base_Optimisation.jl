@@ -1,22 +1,4 @@
 """
-$(DocStringExtensions.TYPEDEF)
-
-Abstract supertype for all portfolio optimisation estimators.
-
-All optimisers and optimisation components should subtype `AbstractOptimisationEstimator` to participate in the optimisation dispatch system.
-
-# Interfaces
-
-`AbstractOptimisationEstimator` declares no method of its own. It carries the default [`port_opt_view`](@ref), which returns the estimator unchanged, and it splits into two halves. Subtype [`BaseOptimisationEstimator`](@ref) for a configuration an optimiser holds, and [`OptimisationEstimator`](@ref) for an estimator [`optimise`](@ref) runs.
-
-# Related
-
-  - [`BaseOptimisationEstimator`](@ref)
-  - [`OptimisationEstimator`](@ref)
-  - [`NonFiniteAllocationOptimisationEstimator`](@ref)
-"""
-abstract type AbstractOptimisationEstimator <: AbstractEstimator end
-"""
     const VecOptE = AbstractVector{<:AbstractOptimisationEstimator}
 
 Alias for a vector of portfolio optimisation estimators.
@@ -57,60 +39,9 @@ A subtype gains the time-dependent host methods from this supertype: [`is_time_d
   - [`OptimisationEstimator`](@ref)
 """
 abstract type BaseOptimisationEstimator <: AbstractOptimisationEstimator end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Abstract supertype for portfolio optimisation estimators that produce portfolio weights.
-
-Subtype `OptimisationEstimator` to implement concrete portfolio optimisers. All optimisers that can be invoked with `optimise` should subtype this.
-
-# Interfaces
-
-In order to implement a new optimiser that works seamlessly with the library, subtype `OptimisationEstimator`, give it an `fb` field, and implement the following method:
-
-## `_optimise`
-
-  - `_optimise(opt::MyOptimiser, rd::ReturnsResult, args...; kwargs...) -> OptimisationResult`: Solves the problem `opt` states over the data in `rd`, and returns the optimiser's own result type.
-
-### Arguments
-
-  - `opt`: The concrete subtype instance.
-  - `rd`: Returns data.
-  - `args...`, `kwargs...`: Forwarded from [`optimise`](@ref).
-
-### Returns
-
-  - `res::OptimisationResult`: The result, whose `retcode` decides whether [`optimise`](@ref) walks on to the fallback.
-
-## The `fb` field
-
-[`optimise`](@ref) reads `opt.fb` to walk the fallback chain, so every subtype carries one. It holds the next optimiser to try, or `nothing` to end the chain.
-
-# Related
-
-  - [`NonFiniteAllocationOptimisationEstimator`](@ref)
-  - [`AbstractOptimisationEstimator`](@ref)
-"""
-abstract type OptimisationEstimator <: AbstractOptimisationEstimator end
 function reset_time_dependent_estimator(opt::OptimisationEstimator)
     return opt
 end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Abstract supertype for portfolio optimisation estimators that produce continuous (non-integer) portfolio weights.
-
-# Interfaces
-
-`NonFiniteAllocationOptimisationEstimator` adds no method to [`OptimisationEstimator`](@ref). It marks the optimisers whose weights are continuous, which is what admits them to the cross-validation and meta-optimisation entry points (see [`OptE_Opt`](@ref)).
-
-# Related
-
-  - [`OptimisationEstimator`](@ref)
-  - [`NaiveOptimisationEstimator`](@ref)
-  - [`ClusteringOptimisationEstimator`](@ref)
-"""
-abstract type NonFiniteAllocationOptimisationEstimator <: OptimisationEstimator end
 """
     pipe_route(x, ::Val{target}, v)
 

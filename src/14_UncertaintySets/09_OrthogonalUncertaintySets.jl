@@ -302,7 +302,7 @@ $(DocStringExtensions.FIELDS)
         q::Number = 0.05,
         method::Num_UcSK = ChiSqKUncertaintyAlgorithm(),
         scaling::AbstractOrthogonalScaling = IdentityScaling(),
-        kappa::Number = 1.0,
+        kappa::Num_CptRad = 1.0,
         metric::AbstractOrthogonalityMetric = InverseIdiosyncraticVarianceMetric()
     ) -> OrthogonalUncertaintySet
 
@@ -311,7 +311,7 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - `0 < q < 1`.
-  - `isfinite(kappa)` and `kappa >= 0`.
+  - If `kappa` is a number: `isfinite(kappa)` and `kappa >= 0`. A rule is checked where its number lands, by the constructor of [`CompactCovarianceUncertaintySet`](@ref).
 
 # Examples
 
@@ -357,7 +357,7 @@ OrthogonalUncertaintySet
     """
     scaling
     """
-    Radius ``\\kappa \\geq 0`` of the covariance set, the multiplier of its quadratic penalty. It is a size the caller states rather than a quantile, and `0` leaves the nominal variance.
+    Radius ``\\kappa \\geq 0`` of the covariance set, the multiplier of its quadratic penalty, and `0` leaves the nominal variance. It is a size the caller states, a rule of [`AbstractCompactRadiusAlgorithm`](@ref) that computes one from the sample and the span, or a value a search picks: `kappa` is a plain field, so `"ucs.kappa"` is a lens path a [`GridSearchCrossValidation`](@ref) or a [`RandomisedSearchCrossValidation`](@ref) grid ranges over, and a grid may hold rules beside numbers.
     """
     kappa
     """
@@ -365,11 +365,15 @@ OrthogonalUncertaintySet
     """
     metric
     function OrthogonalUncertaintySet(q::Number, method::Num_UcSK,
-                                      scaling::AbstractOrthogonalScaling, kappa::Number,
+                                      scaling::AbstractOrthogonalScaling, kappa::Num_CptRad,
                                       metric::AbstractOrthogonalityMetric)
         @argcheck(zero(q) < q < one(q), DomainError(q, "q must be in (0, 1)"))
-        @argcheck(isfinite(kappa) && kappa >= zero(kappa),
-                  DomainError(kappa, "kappa must be finite and >= 0"))
+        # A rule states no number yet, so its range is checked where the number lands, in
+        # `CompactCovarianceUncertaintySet`'s own constructor.
+        if isa(kappa, Number)
+            @argcheck(isfinite(kappa) && kappa >= zero(kappa),
+                      DomainError(kappa, "kappa must be finite and >= 0"))
+        end
         return new{typeof(q), typeof(method), typeof(scaling), typeof(kappa),
                    typeof(metric)}(q, method, scaling, kappa, metric)
     end
@@ -377,7 +381,7 @@ end
 function OrthogonalUncertaintySet(; q::Number = 0.05,
                                   method::Num_UcSK = ChiSqKUncertaintyAlgorithm(),
                                   scaling::AbstractOrthogonalScaling = IdentityScaling(),
-                                  kappa::Number = 1.0,
+                                  kappa::Num_CptRad = 1.0,
                                   metric::AbstractOrthogonalityMetric = InverseIdiosyncraticVarianceMetric())::OrthogonalUncertaintySet
     return OrthogonalUncertaintySet(q, method, scaling, kappa, metric)
 end
@@ -504,7 +508,7 @@ Builds the covariance [`CompactCovarianceUncertaintySet`](@ref) on the Orthogona
 
  1. Take the element-wise inverse of the metric square root as the diagonal metric ``\\mathbf{C}``, or a vector of ones on [`IdentityMetric`](@ref).
  2. Hand the weighted factor span `Q` to the set as the basis it spares. A rank of zero leaves a basis with no column, which the type admits and which leaves the penalty on every direction.
- 3. Carry `ue.kappa` as the radius and `pr.sigma` as the nominal covariance.
+ 3. Settle the radius with [`k_compact`](@ref) and carry `pr.sigma` as the nominal covariance. A stated number passes through unchanged; a rule of [`AbstractCompactRadiusAlgorithm`](@ref) is handed the confidence level, the metric, the prior result, the loadings block, `C` and `Q`, which is everything a radius of this set can be sized from.
 
 The set spares the span and penalises its complement, which is the same subspace the mean set lives in. The two axes are therefore built from one decomposition, and the estimator computes it once.
 
@@ -512,8 +516,10 @@ The set spares the span and penalises its complement, which is the same subspace
 
   - `ue`: Orthogonal uncertainty set estimator.
   - `pr`: Prior result the span came from.
+  - `rr`: Loadings block the span came from.
   - `w_sqrt`: Element-wise square root of the metric, or `nothing`.
   - `Q`: Orthonormal basis of the weighted factor span.
+  - `rd`: Returns data the set was fitted beside, or `nothing`. Only a [`VarianceFraction`](@ref) holding an optimiser reads it.
 
 # Returns
 
@@ -524,11 +530,14 @@ The set spares the span and penalises its complement, which is the same subspace
   - [`OrthogonalUncertaintySet`](@ref)
   - [`CompactCovarianceUncertaintySet`](@ref)
   - [`orthogonal_factor_span`](@ref)
+  - [`k_compact`](@ref)
 """
 function orthogonal_sigma_set(ue::OrthogonalUncertaintySet, pr::AbstractPriorResult,
-                              w_sqrt::Option{<:VecNum}, Q::MatNum)
+                              rr::AbstractLoadingsRegressionResult,
+                              w_sqrt::Option{<:VecNum}, Q::MatNum, rd = nothing)
     C = isnothing(w_sqrt) ? ones(eltype(Q), size(Q, 1)) : inv.(w_sqrt)
-    return CompactCovarianceUncertaintySet(; kappa = ue.kappa, C = C, Q = Q, val = pr.sigma)
+    kappa = k_compact(ue.kappa, ue.q, ue.metric, pr, rr, C, Q, rd)
+    return CompactCovarianceUncertaintySet(; kappa = kappa, C = C, Q = Q, val = pr.sigma)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -546,6 +555,7 @@ A caller that needs one axis alone calls [`mu_ucs`](@ref) or [`sigma_ucs`](@ref)
 
   - `ue`: Orthogonal uncertainty set estimator.
   - `pr`: Prior result the optimisation is solving on.
+  - `rd`: Returns data the set is being fitted beside, or `nothing`. Only a [`VarianceFraction`](@ref) holding an optimiser reads it, and the three-argument forms of [`ucs`](@ref) fill it in.
   - `kwargs...`: Additional keyword arguments (ignored).
 
 # Returns
@@ -560,10 +570,10 @@ A caller that needs one axis alone calls [`mu_ucs`](@ref) or [`sigma_ucs`](@ref)
   - [`sigma_ucs`](@ref)
   - [`orthogonal_factor_span`](@ref)
 """
-function ucs(ue::OrthogonalUncertaintySet, pr::AbstractPriorResult; kwargs...)
+function ucs(ue::OrthogonalUncertaintySet, pr::AbstractPriorResult; rd = nothing, kwargs...)
     rr, w_sqrt, Q = orthogonal_factor_span(ue, pr)
-    return orthogonal_mu_set(ue, pr, rr, w_sqrt, Q), orthogonal_sigma_set(ue, pr, w_sqrt,
-                                                                          Q)
+    return orthogonal_mu_set(ue, pr, rr, w_sqrt, Q),
+           orthogonal_sigma_set(ue, pr, rr, w_sqrt, Q, rd)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -609,6 +619,7 @@ Fits the covariance uncertainty set of an [`OrthogonalUncertaintySet`](@ref) fro
 
   - `ue`: Orthogonal uncertainty set estimator.
   - `pr`: Prior result the optimisation is solving on.
+  - `rd`: Returns data the set is being fitted beside, or `nothing`. Only a [`VarianceFraction`](@ref) holding an optimiser reads it, and the three-argument forms of [`sigma_ucs`](@ref) fill it in.
   - `kwargs...`: Additional keyword arguments (ignored).
 
 # Returns
@@ -621,9 +632,10 @@ Fits the covariance uncertainty set of an [`OrthogonalUncertaintySet`](@ref) fro
   - [`ucs`](@ref)
   - [`orthogonal_sigma_set`](@ref)
 """
-function sigma_ucs(ue::OrthogonalUncertaintySet, pr::AbstractPriorResult; kwargs...)
-    _, w_sqrt, Q = orthogonal_factor_span(ue, pr)
-    return orthogonal_sigma_set(ue, pr, w_sqrt, Q)
+function sigma_ucs(ue::OrthogonalUncertaintySet, pr::AbstractPriorResult; rd = nothing,
+                   kwargs...)
+    rr, w_sqrt, Q = orthogonal_factor_span(ue, pr)
+    return orthogonal_sigma_set(ue, pr, rr, w_sqrt, Q, rd)
 end
 
 """

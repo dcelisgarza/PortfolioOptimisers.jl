@@ -32,6 +32,8 @@ AbstractUncertaintyEpsAlgorithm
 UcSE_UcS
 Num_UcSK
 Num_UcSEps
+AbstractCompactRadiusAlgorithm
+Num_CptRad
 AbstractUncertaintySetClass
 ucs_selector
 k_ucs

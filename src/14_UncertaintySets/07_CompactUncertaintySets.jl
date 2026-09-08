@@ -74,7 +74,7 @@ CompactCovarianceUncertaintySet
 """
 @concrete struct CompactCovarianceUncertaintySet <: AbstractUncertaintySetResult
     """
-    Radius ``\\kappa \\geq 0``, the multiplier of the quadratic penalty. It is a user-set size rather than a quantile, and `0` disables the penalty and leaves the nominal variance.
+    Radius ``\\kappa \\geq 0``, the multiplier of the quadratic penalty, and `0` disables the penalty and leaves the nominal variance. A set is a Result, so this is always a number: an [`OrthogonalUncertaintySet`](@ref) whose own `kappa` held an [`AbstractCompactRadiusAlgorithm`](@ref) resolved it before building the set.
     """
     kappa
     """
@@ -163,7 +163,9 @@ The restricted penalty is the projection onto the sliced span, and **not** the s
  1. Take `view(risk_ucs.C, i)`, the diagonal of the metric square root restricted to the selected assets.
  2. Take `view(risk_ucs.Q, i, :)`, the rows of the basis the selected assets occupy, and pass it through [`orthonormalise_basis`](@ref). The rank can fall, because the columns of a slice can become dependent.
  3. Take `nothing_scalar_array_view(risk_ucs.val, i)`, the nominal covariance restricted to the same assets on both axes, which passes a `nothing` through unchanged.
- 4. Build a [`CompactCovarianceUncertaintySet`](@ref) from the three, carrying `kappa` through unchanged. The radius is a size the caller set rather than a quantile of a dimension, so the smaller universe does not recalibrate it.
+ 4. Build a [`CompactCovarianceUncertaintySet`](@ref) from the three, carrying `kappa` through unchanged. A set is a Result, so it carries the radius as a **number** and holds no rule that could be run again: whether the number was stated by the caller or computed by an [`AbstractCompactRadiusAlgorithm`](@ref), the estimator, the prior result and the metric that would size it are all out of reach here.
+
+Step 2 can lower the rank, so a radius sized against the full span is no longer the tightest one for the sliced problem. It stays a valid multiplier of the sliced penalty, and the mean axis already carries the same staleness: its radius is a quantile at the dimension of the Orthogonal Subspace, and a slice moves that dimension too. A caller who needs the radius sized against the smaller universe fits the set on a prior that was reduced first, which is the route the two JuMP builders already take.
 
 # Arguments
 
@@ -180,6 +182,7 @@ The restricted penalty is the projection onto the sliced span, and **not** the s
   - [`CompactCovarianceUncertaintySet`](@ref)
   - [`orthonormalise_basis`](@ref)
   - [`port_opt_view`](@ref)
+  - [`AbstractCompactRadiusAlgorithm`](@ref)
 """
 function port_opt_view(risk_ucs::CompactCovarianceUncertaintySet, i,
                        args...)::CompactCovarianceUncertaintySet

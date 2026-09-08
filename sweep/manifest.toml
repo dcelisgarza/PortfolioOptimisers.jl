@@ -45,7 +45,7 @@
 "ext/PortfolioOptimisersImputeExt.jl" = { map = 13, units = 0, swept = false }
 "ext/PortfolioOptimisersPlotsExt.jl" = { map = 13, units = 0, swept = false }
 "src/01_Base/01_DocstringDictionaries.jl" = { map = 1, units = 8, algorithm = 1, swept = true }
-"src/01_Base/02_TypeRoots.jl" = { map = 1, units = 8, algorithm = 2, swept = true }
+"src/01_Base/02_TypeRoots.jl" = { map = 1, units = 11, algorithm = 2, swept = true }
 "src/01_Base/03_PrettyShow.jl" = { map = 1, units = 7, algorithm = 5, swept = true }
 "src/01_Base/04_ScopedConfig.jl" = { map = 1, units = 28, algorithm = 16, swept = true }
 "src/01_Base/05_Preferences.jl" = { map = 1, units = 6, algorithm = 4, swept = true }
@@ -197,7 +197,7 @@
 "src/13_Prior/15_AssetPanelEstimators.jl" = { map = 6, units = 11, swept = false }
 "src/13_Prior/16_Base_CrossSectionalFactorPrior.jl" = { map = 6, units = 29, swept = false }
 "src/13_Prior/17_CrossSectionalFactorPrior.jl" = { map = 6, units = 4, swept = false }
-"src/14_UncertaintySets/01_Base_UncertaintySets.jl" = { map = 7, units = 40, algorithm = 11, swept = true }
+"src/14_UncertaintySets/01_Base_UncertaintySets.jl" = { map = 7, units = 42, algorithm = 11, swept = true }
 "src/14_UncertaintySets/02_DeltaUncertaintySets.jl" = { map = 7, units = 6, algorithm = 5, swept = true }
 "src/14_UncertaintySets/03_NormalUncertaintySets.jl" = { map = 7, units = 25, algorithm = 24, swept = true }
 "src/14_UncertaintySets/04_BootstrapUncertaintySets.jl" = { map = 7, units = 19, algorithm = 13, swept = true }
@@ -206,6 +206,7 @@
 "src/14_UncertaintySets/07_CompactUncertaintySets.jl" = { map = 7, units = 4, swept = false }
 "src/14_UncertaintySets/08_NormBallUncertaintySets.jl" = { map = 7, units = 11, swept = false }
 "src/14_UncertaintySets/09_OrthogonalUncertaintySets.jl" = { map = 7, units = 16, swept = false }
+"src/14_UncertaintySets/10_CompactRadiusRules.jl" = { map = 7, units = 6, swept = false }
 "src/15_Turnover.jl" = { map = 8, units = 15, algorithm = 8, swept = true }
 "src/16_Fees.jl" = { map = 8, units = 35, algorithm = 24, swept = false }
 "src/17_NetReturnsDrawdowns.jl" = { map = 8, units = 44, algorithm = 8, swept = false }
@@ -239,7 +240,7 @@
 "src/19_RiskMeasures/26_AdjustRiskContributions.jl" = { map = 9, units = 6, swept = false }
 "src/19_RiskMeasures/27_ExpectedRisk.jl" = { map = 9, units = 22, swept = false }
 "src/19_RiskMeasures/28_RiskMeasureTools.jl" = { map = 9, units = 7, swept = false }
-"src/20_Optimisation/01_Base_Optimisation.jl" = { map = 10, units = 123, swept = false }
+"src/20_Optimisation/01_Base_Optimisation.jl" = { map = 10, units = 120, swept = false }
 "src/20_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl" = { map = 12, units = 61, swept = false }
 "src/20_Optimisation/02_CrossValidation/02_KFold.jl" = { map = 12, units = 4, swept = false }
 "src/20_Optimisation/02_CrossValidation/03_Combinatorial.jl" = { map = 12, units = 12, swept = false }
