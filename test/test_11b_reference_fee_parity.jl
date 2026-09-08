@@ -302,6 +302,152 @@
         end
     end
 
+    @testset "A walk-forward over a delisting, with a liquidation carrier" begin
+        using StableRNGs, LinearAlgebra, Clarabel
+
+        # The test that verifies the port end to end. An asset delists inside the last test
+        # fold, so the mask derives itself from the data, the fold that loses it charges a
+        # forced exit, and the folds that lose nothing charge none.
+        #
+        # **What can and cannot be compared.** The reference reaches a delisting only
+        # through its exponentially weighted moments with `active_mask` routing, because its
+        # plain prior refuses a `NaN`. This library's plain prior handles the gap natively.
+        # The two therefore fit different moments and solve to different weights, so the
+        # series cannot be compared. What can be compared exactly is the **charge**, which
+        # is arithmetic on the weights: the first half below feeds this library's fee verbs
+        # the reference's own per fold weights and matches its reported cost to rounding.
+        # The second half then drives this library's whole pipeline and pins the invariants
+        # the reference cannot speak to.
+
+        T3, N3 = 120, 5
+        seed3 = 12345
+        v3 = Vector{Float64}(undef, T3 * N3)
+        for i in 1:(T3 * N3)
+            seed3 = mod(1103515245 * seed3 + 12345, 2^31)
+            v3[i] = (seed3 / 2^31 - 0.5) * 0.04
+        end
+        X3 = permutedims(reshape(v3, N3, T3))
+        k3 = 3
+        X3[81:end, k3] .= NaN          # asset "c" delists inside the last test fold
+        nx3 = ["a", "b", "c", "d", "e"]
+        rd3 = ReturnsResult(; nx = nx3, X = X3)
+        inv3 = [1, 2, 4, 5]
+        tc3 = [0.001, 0.002, 0.010, 0.003, 0.004]
+        mgmt3 = [0.0005, 0.0004, 0.0003, 0.0002, 0.0006]
+        slv3 = Solver(; name = :cl, solver = Clarabel.Optimizer,
+                      check_sol = (; allow_local = true, allow_almost = true),
+                      settings = Dict("verbose" => false, "max_step_fraction" => 0.75))
+
+        @testset "The charge matches the reference, fold for fold" begin
+            # The reference's own weights for the fold that loses the asset, and the fold
+            # before it, so the comparison carries no solver or moment difference at all.
+            wprev = [0.17137301967228055, 0.1666189142652727, 0.1961303186945051,
+                     0.1587711481740035, 0.30710659919393823]
+            wexit = [0.16730556399117805, 0.26717172952111706, 0.0, 0.2450269918497811,
+                     0.32049571463792387]
+            @test iszero(wexit[k3])
+
+            # Transaction costs. The reference reported `total_cost = 0.002478800265941117`
+            # for this fold, which is the reduced turnover plus the exit.
+            ftn = Fees(; tn = Turnover(; w = wprev[inv3], val = tc3[inv3]),
+                       lq = Turnover(; w = [wprev[k3]], val = [tc3[k3]]))
+            @test isapprox(PortfolioOptimisers.calc_periodic_fees(wexit[inv3], ftn),
+                           0.002478800265941117; atol = atol)
+            # The exit is the whole of the difference the carrier makes.
+            @test isapprox(PortfolioOptimisers.calc_liquidation_fees(wexit[inv3], ftn.lq),
+                           tc3[k3] * wprev[k3]; atol = atol)
+
+            # The proportional holding fee. The reference reported
+            # `total_fee = 0.0004318243009567464`, and it charges no exit, because a
+            # holding fee prices the book held and not the trade that leaves it.
+            fmg = Fees(; l = mgmt3[inv3])
+            @test isapprox(PortfolioOptimisers.calc_periodic_fees(wexit[inv3], fmg),
+                           0.0004318243009567464; atol = atol)
+
+            # Both together, which the reference reports as the same two numbers.
+            fbo = Fees(; tn = Turnover(; w = wprev[inv3], val = tc3[inv3]), l = mgmt3[inv3],
+                       lq = Turnover(; w = [wprev[k3]], val = [tc3[k3]]))
+            @test isapprox(PortfolioOptimisers.calc_periodic_fees(wexit[inv3], fbo),
+                           0.002478800265941117 + 0.0004318243009567464; atol = atol)
+
+            # A fold that loses nothing owes no exit, which is the reference's first fold.
+            @test isapprox(PortfolioOptimisers.calc_periodic_fees(wexit[inv3],
+                                                                  Fees(;
+                                                                       tn = Turnover(;
+                                                                                     w = wprev[inv3],
+                                                                                     val = tc3[inv3]))),
+                           0.002478800265941117 - tc3[k3] * wprev[k3]; atol = atol)
+        end
+
+        @testset "This library's pipeline, across drift and compound" begin
+            w03 = fill(0.2, N3)
+            cases = ["tn" => Fees(; tn = Turnover(; w = w03, val = tc3),
+                                  lq = Turnover(; w = w03, val = tc3)),
+                     "mgmt" => Fees(; l = mgmt3, lq = Turnover(; w = w03, val = tc3)),
+                     "both" => Fees(; tn = Turnover(; w = w03, val = tc3), l = mgmt3,
+                                    lq = Turnover(; w = w03, val = tc3))]
+            schemes = ["flat" => IndexWalkForward(60, 20),
+                       "drift" => IndexWalkForward(60, 20; wd = SelfFinancingDrift(),
+                                                   pws = DriftedWeights())]
+
+            for (_, fee) in cases, (sl, cv) in schemes
+                mr3 = MeanRisk(;
+                               opt = JuMPOptimiser(; wb = WeightBounds(; lb = 0, ub = 1),
+                                                   bgt = 1, fees = fee, slv = slv3))
+                pred = cross_val_predict(mr3, rd3, cv)
+                @test length(pred.pred) == 3
+
+                # The mask derives itself: the first two folds see every asset, the last
+                # loses one.
+                @test isnothing(pred.pred[1].res.imsk)
+                @test isnothing(pred.pred[2].res.imsk)
+                @test pred.pred[3].res.imsk == BitVector([1, 1, 0, 1, 1])
+
+                # A fold that loses nothing carries no carrier and owes no exit. This is
+                # the defect the end-to-end run found: the carrier is stated on the full
+                # universe, and without the strip it was charged in full here.
+                for i in 1:2
+                    @test isnothing(pred.pred[i].res.fees.lq)
+                    @test isapprox(PortfolioOptimisers.calc_liquidation_fees([0.0],
+                                                                             pred.pred[i].res.fees.lq),
+                                   0.0; atol = atol)
+                end
+
+                # The fold that loses the asset expands its weight to zero, and carries the
+                # carrier on the complement, holding the previous fold's weight in it.
+                exit_res = pred.pred[3].res
+                @test length(exit_res.w) == N3
+                @test iszero(exit_res.w[k3])
+                @test length(exit_res.fees.lq.w) == 1
+                held = only(exit_res.fees.lq.w)
+                # The charge is the rate times the weight the fold actually threaded, which
+                # is the reference's arithmetic on this library's own weights.
+                @test isapprox(PortfolioOptimisers.calc_liquidation_fees([0.0],
+                                                                         exit_res.fees.lq),
+                               tc3[k3] * held; atol = atol)
+                # **Which** weight that is, is the `pws` switch, and the exit obeys it like
+                # every other turnover term. Budgeting against the targets charges the exit
+                # at the previous fold's target; threading the drifted holdings charges it
+                # at what was actually held when the asset left, which is a different
+                # number.
+                if sl == "flat"
+                    @test isapprox(held, pred.pred[2].res.w[k3]; atol = atol)
+                else
+                    @test !isapprox(held, pred.pred[2].res.w[k3]; atol = 1e-6)
+                    @test isapprox(held, pred.pred[2].res.w[k3]; atol = 5e-3)
+                end
+
+                # The series is finite under both schemes, and the two cumulative
+                # conventions agree with their own definitions on it.
+                r3 = pred.mrd.X
+                @test all(isfinite, r3)
+                @test isapprox(cumulative_returns(r3)[end], sum(r3); atol = 1e-12)
+                @test isapprox(cumulative_returns(r3, true)[end],
+                               prod(one(eltype(r3)) .+ r3); atol = 1e-12)
+            end
+        end
+    end
+
     @testset "The drawdown peak includes the starting capital, and the reference's does not" begin
         # Found while pinning the walk-forward above, where the cost-heavy cases disagreed
         # on the maximum drawdown by `1.1e-2` while their return series agreed to `7e-6`.
