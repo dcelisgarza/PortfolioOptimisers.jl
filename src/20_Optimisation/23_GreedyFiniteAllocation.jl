@@ -118,7 +118,7 @@ Where:
   - ``\\boldsymbol{p}``: Asset price vector.
   - ``\\mathrm{unit}``: Minimum share purchase unit.
   - ``\\boldsymbol{d}``: Weight deficit, the target weight less the realised weight.
-  - ``F(\\boldsymbol{x})``: Fee of this sub-problem, of [`allocation_fee`](@ref). It is zero when the input states no fee.
+  - ``F(\\boldsymbol{x})``: Fee of this sub-problem, of [`allocation_fee`](@ref). It is zero when the input states no fee, and it carries the constant forced exit of [`allocation_liquidation_fee`](@ref) when the universe lost an asset.
   - ``\\Delta F_i``: What buying the asset ``i`` adds to the fee, of [`greedy_fee_delta`](@ref).
   - ``i^*``: Affordable asset with the largest weight deficit.
   - ``\\odot``: Element-wise (Hadamard) product.
@@ -318,12 +318,13 @@ Implements the two passes of [`GreedyAllocation`](@ref) for a single side. An em
 
   - The assets are sorted by descending target weight, and the answer is permuted back before it is returned. [`permute_side_fees`](@ref) puts the rates into the same order.
   - The affordability test of both passes is on the cost of the purchase **plus** what it adds to the fee, which is [`greedy_fee_delta`](@ref). Testing the shares alone overdraws the budget whenever a fee is stated.
-  - The pass starts owing [`allocation_fee`](@ref) of the empty book. That is zero unless the side held money before the trade, because selling out is a trade and the turnover fee charges it.
+  - The pass starts owing [`allocation_fee`](@ref) of the empty book. That is zero unless the side held money before the trade, because selling out is a trade and the turnover fee charges it, or unless the universe lost an asset, because the forced exit of [`allocation_liquidation_fee`](@ref) is owed whatever the side buys.
 
 # Related
 
   - [`GreedyAllocation`](@ref)
   - [`allocation_fee`](@ref)
+  - [`allocation_liquidation_fee`](@ref)
   - [`greedy_fee_delta`](@ref)
   - [`roundmult`](@ref)
   - [`finite_sub_allocation`](@ref)
@@ -331,8 +332,12 @@ Implements the two passes of [`GreedyAllocation`](@ref) for a single side. An em
 function finite_sub_allocation!(w::VecNum, p::VecNum, cash::Number, bgt::Number,
                                 sf::Option{<:NamedTuple}, ga::GreedyAllocation, args...)
     if isempty(w)
+        # An empty side buys nothing, but it can still owe the forced exit: a delisted asset
+        # carries a zero target weight, so it lands on the long side even when that side
+        # holds nothing else. `allocation_fee` of the empty book is that charge exactly.
+        fee = allocation_fee(sf, p, w)
         return Vector{eltype(w)}(undef, 0), Vector{eltype(w)}(undef, 0),
-               Vector{eltype(w)}(undef, 0), cash, zero(cash)
+               Vector{eltype(w)}(undef, 0), cash - fee, fee
     end
 
     idx = sortperm(w; rev = true)
@@ -405,7 +410,7 @@ function _optimise(ga::GreedyAllocation, fai::FiniteAllocationInput; kwargs...)
     w, p, cash, pcash, T, fees = fai.w, fai.prices, fai.cash, fai.prev_cash, fai.horizon,
                                  fai.fees
     bgt, lbgt, sbgt, lidx, sidx, lcash, scash = setup_alloc_optim(w, cash)
-    lsf, ssf = allocation_side_fees(fees, T, pcash, lidx, sidx)
+    lsf, ssf = allocation_side_fees(fees, fai.imsk, T, pcash, lidx, sidx)
     sshares, scost, sw, scash, sfee = finite_sub_allocation!(-view(w, sidx), view(p, sidx),
                                                              scash, sbgt, ssf, ga)
     lcash = adjust_long_cash(bgt, lcash, scash)

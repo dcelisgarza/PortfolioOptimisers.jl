@@ -729,6 +729,137 @@ function port_opt_view(fees::FeesEstimator, i, args...)::FeesEstimator
                          dfs = fees.dfs, fa = fees.fa, kwargs = fees.kwargs)
 end
 """
+    lift_fees(fees::Nothing, imsk)
+    lift_fees(fees::Fees, imsk::Nothing)
+    lift_fees(fees::Fees, imsk::BitVector)
+
+Put a fee an optimisation reduced back onto the full universe, on **both** of its axes.
+
+The inverse of [`port_opt_view`](@ref). ADR 0115 reduces an optimisation to its Investable Mask and expands the solved weights back to the caller's universe, so a result pairs a **full-length** `w` with a fee that spans two **reduced** axes: `tn`, `l`, `s`, `fl` and `fs` on the investable assets, `lq` and `flq` on the complement. A consumer that indexes the fee by the full-length weights meets a four-element field and a five-element selector, which is the defect of #914.
+
+This verb closes the gap by moving the fee onto the axis the weights already live on. Every per-asset field comes back at `length(imsk)`, zero-filled where it says nothing: the five holding fields carry a zero at each asset that left, and the two carriers carry a zero at each asset that stayed. A zero rate charges nothing and a zero reference weight trades nothing, so the lift moves no number the reduced fee already charged. A scalar rate applies to every asset whatever the axis is, so it is carried through untouched.
+
+# Algorithm
+
+ 1. On a `nothing` `fees`, or a `nothing` `imsk`, return `fees` unchanged. A `nothing` mask means the optimisation reduced on nothing, so the fee is on the full universe already.
+ 2. Lift `tn` at `imsk` with [`lift_turnover`](@ref), and `l`, `s`, `fl` and `fs` with [`lift_fee_rate`](@ref).
+ 3. Lift `lq` and `flq` at `.!imsk`, the complement the two carriers live on, by the same verb as step 2.
+ 4. Rebuild through the keyword constructor, carrying `fa` and `kwargs` unchanged.
+
+# Arguments
+
+  - `fees`: The fee to lift, or `nothing`.
+  - `imsk`: The Investable Mask the fee was reduced on, or `nothing` when it was reduced on nothing.
+
+# Returns
+
+  - `fees::typeof(fees)`: The fee on the full universe.
+
+# Examples
+
+```jldoctest
+julia> fees = Fees(; l = [0.001, 0.002], lq = Turnover(; w = [0.25], val = [0.01]));
+
+julia> PortfolioOptimisers.lift_fees(fees, BitVector([true, false, true])).l
+3-element Vector{Float64}:
+ 0.001
+ 0.0
+ 0.002
+
+julia> PortfolioOptimisers.lift_fees(fees, BitVector([true, false, true])).lq.w
+3-element Vector{Float64}:
+ 0.0
+ 0.25
+ 0.0
+```
+
+# Related
+
+  - [`Fees`](@ref)
+  - [`lift_fee_rate`](@ref)
+  - [`lift_turnover`](@ref)
+  - [`port_opt_view`](@ref)
+  - [`result_investable_mask`](@ref)
+  - [`FiniteAllocationInput`](@ref)
+"""
+function lift_fees(::Nothing, ::Any)
+    return nothing
+end
+function lift_fees(fees::Fees, ::Nothing)
+    return fees
+end
+function lift_fees(fees::Fees, imsk::BitVector)::Fees
+    # The complement is where the two carriers live, so it is the mask they lift at.
+    cmsk = .!imsk
+    return Fees(; tn = lift_turnover(fees.tn, imsk), l = lift_fee_rate(fees.l, imsk),
+                s = lift_fee_rate(fees.s, imsk), fl = lift_fee_rate(fees.fl, imsk),
+                fs = lift_fee_rate(fees.fs, imsk), lq = lift_turnover(fees.lq, cmsk),
+                flq = lift_turnover(fees.flq, cmsk), fa = fees.fa, kwargs = fees.kwargs)
+end
+"""
+    lift_fee_rate(x::Nothing, ::BitVector)
+    lift_fee_rate(x::Number, ::BitVector)
+    lift_fee_rate(x::VecNum, imsk::BitVector)
+
+Put one per-asset fee rate back onto the full universe, zero where the mask is `false`.
+
+The per-field step of [`lift_fees`](@ref). A `nothing` field states no fee and a scalar field states one rate for every asset, so neither carries an axis and both are returned untouched. A vector field carries one entry per asset of the reduced axis, so it is expanded with [`expand_investable_weights`](@ref).
+
+# Arguments
+
+  - `x`: The rate to lift: `nothing`, a scalar, or one entry per asset of the reduced axis.
+  - `imsk`: The mask the rate was reduced on.
+
+# Returns
+
+  - `x`: The rate on the full universe.
+
+# Related
+
+  - [`lift_fees`](@ref)
+  - [`lift_turnover`](@ref)
+  - [`expand_investable_weights`](@ref)
+"""
+function lift_fee_rate(::Nothing, ::BitVector)
+    return nothing
+end
+function lift_fee_rate(x::Number, ::BitVector)
+    return x
+end
+function lift_fee_rate(x::VecNum, imsk::BitVector)
+    return expand_investable_weights(imsk, x)
+end
+"""
+    lift_turnover(tn::Nothing, ::BitVector)
+    lift_turnover(tn::Turnover, imsk::BitVector)
+
+Put a turnover carrier back onto the full universe, zero where the mask is `false`.
+
+The nested step of [`lift_fees`](@ref). A [`Turnover`](@ref) holds a reference weight per asset and a rate that is either a scalar or one entry per asset, so `w` always expands and `val` expands through [`lift_fee_rate`](@ref). A zero reference weight trades nothing, so an asset the mask leaves out is charged nothing.
+
+# Arguments
+
+  - `tn`: The carrier to lift, or `nothing`.
+  - `imsk`: The mask the carrier was reduced on.
+
+# Returns
+
+  - `tn`: The carrier on the full universe, or `nothing`.
+
+# Related
+
+  - [`lift_fees`](@ref)
+  - [`lift_fee_rate`](@ref)
+  - [`Turnover`](@ref)
+"""
+function lift_turnover(::Nothing, ::BitVector)
+    return nothing
+end
+function lift_turnover(tn::Turnover, imsk::BitVector)::Turnover
+    return Turnover(; w = expand_investable_weights(imsk, tn.w),
+                    val = lift_fee_rate(tn.val, imsk), fixed = tn.fixed)
+end
+"""
     fees_constraints(fees::FeesEstimator, sets::UniverseSets; datatype::DataType = Float64,
                      strict::Bool = false)
 
@@ -1659,9 +1790,7 @@ The per asset twin of [`calc_periodic_fees`](@ref). Its entries sum to that numb
 julia> fees = Fees(; l = 0.01, fl = 5.0, tn = Turnover(; w = [0.0, 0.0], val = 0.002));
 
 julia> PortfolioOptimisers.calc_asset_periodic_fees([0.5, 0.5], fees)
-2-element Vector{Float64}:
- 0.006
- 0.006
+([0.006, 0.006], Float64[])
 ```
 
 # Related
@@ -1750,9 +1879,7 @@ The per asset twin of [`calc_one_off_fees`](@ref). Its entries sum to that numbe
 julia> fees = Fees(; l = 0.01, fl = 5.0, tn = Turnover(; w = [0.0, 0.0], val = 0.002));
 
 julia> PortfolioOptimisers.calc_asset_one_off_fees([0.5, 0.5], fees)
-2-element Vector{Float64}:
- 5.0
- 5.0
+([5.0, 5.0], Float64[])
 ```
 
 # Related

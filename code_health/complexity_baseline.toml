@@ -265,7 +265,7 @@ commit = "97e398ef74"
 "src/20_Optimisation/20_RiskMeasureConstraints/19_PowerNormXatRiskConstraints.jl" = { cyc = 2, cog = 2, arg = 9, cyc_sum = 5, cog_sum = 2, arg_sum = 34, macros = [] }
 "src/20_Optimisation/20_RiskMeasureConstraints/20_VarianceSkewKurtosisConstraints.jl" = { cyc = 1, cog = 0, arg = 8, cyc_sum = 1, cog_sum = 0, arg_sum = 8, macros = [] }
 "src/20_Optimisation/20_RiskMeasureConstraints/21_GenericValueatRiskRangeConstraints.jl" = { cyc = 1, cog = 0, arg = 8, cyc_sum = 1, cog_sum = 0, arg_sum = 8, macros = [] }
-"src/20_Optimisation/21_Base_FiniteAllocation.jl" = { cyc = 4, cog = 3, arg = 6, cyc_sum = 21, cog_sum = 10, arg_sum = 41, macros = [] }
+"src/20_Optimisation/21_Base_FiniteAllocation.jl" = { cyc = 5, cog = 5, arg = 7, cyc_sum = 34, cog_sum = 23, arg_sum = 52, macros = [] }
 "src/20_Optimisation/22_DiscreteFiniteAllocation.jl" = { cyc = 5, cog = 7, arg = 11, cyc_sum = 26, cog_sum = 20, arg_sum = 61, macros = [] }
 "src/20_Optimisation/23_GreedyFiniteAllocation.jl" = { cyc = 9, cog = 14, arg = 7, cyc_sum = 23, cog_sum = 20, arg_sum = 38, macros = [] }
 "src/20_Optimisation/24_RiskMeasureCompatibility.jl" = { cyc = 2, cog = 2, arg = 2, cyc_sum = 15, cog_sum = 6, arg_sum = 15, macros = [] }

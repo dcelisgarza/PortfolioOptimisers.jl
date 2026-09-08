@@ -349,7 +349,7 @@ A fee is a cost of the portfolio the allocator actually buys. The model holds th
 \\boldsymbol{m} &= \\boldsymbol{x} \\odot \\boldsymbol{p}\\,, \\\\
 t_{i} &\\geq \\lvert m_{i} - m_{0,i} \\rvert\\,, \\\\
 b_{i} &\\leq x_{i} \\leq \\left\\lfloor C / p_{i} \\right\\rfloor b_{i}\\,, \\\\
-F(\\boldsymbol{x}) &= T \\left( \\boldsymbol{f}_{\\text{p}}^\\intercal \\boldsymbol{m} + \\boldsymbol{f}_{\\text{Tn}}^\\intercal \\boldsymbol{t} \\right) + \\boldsymbol{f}_{\\text{f}}^\\intercal \\boldsymbol{b}\\,.
+F(\\boldsymbol{x}) &= T \\left( \\boldsymbol{f}_{\\text{p}}^\\intercal \\boldsymbol{m} + \\boldsymbol{f}_{\\text{Tn}}^\\intercal \\boldsymbol{t} \\right) + \\boldsymbol{f}_{\\text{f}}^\\intercal \\boldsymbol{b} + F_{\\text{lq}}\\,.
 \\end{align}
 ```
 
@@ -362,6 +362,7 @@ Where:
   - ``C``: Cash allocated to this sub-problem.
   - ``T``: Horizon, in periods.
   - ``\\boldsymbol{f}_{\\text{p}},\\, \\boldsymbol{f}_{\\text{Tn}},\\, \\boldsymbol{f}_{\\text{f}}``: Proportional, turnover and fixed rates of this side.
+  - ``F_{\\text{lq}}``: Forced exit of [`allocation_liquidation_fee`](@ref), `sf.liq`. It is a constant, because the assets it sells are not among the share counts this model solves for.
 
 The rates `l`, `s` and `tn` charge on each of the `T` periods, and the fixed amounts `fl` and `fs` charge one time for the whole horizon. That is the rule [`calc_total_fees`](@ref) states, written in the model's own variables.
 
@@ -380,6 +381,7 @@ A binary is emitted only when the side states a fixed fee, so a problem that sta
 
 # Related
 
+  - [`allocation_liquidation_fee`](@ref)
   - [`allocation_side_fees`](@ref)
   - [`finite_sub_allocation`](@ref)
   - [`DiscreteAllocation`](@ref)
@@ -393,7 +395,10 @@ function set_allocation_fees!(model::JuMP.Model, p::VecNum, cash::Number, sf::Na
     sc = get_constraint_scale(model)
     N = length(p)
     T = sf.T
-    fee = zero(JuMP.AffExpr)
+    # The forced exit of `allocation_liquidation_fee` is a constant: the assets it sells are
+    # not among the share counts this model solves for, so it needs no variable. It still
+    # enters the budget, which is the whole point of charging it here.
+    fee = zero(JuMP.AffExpr) + sf.liq
     # The money in each position, exactly. No weight and no price appears on its own.
     JuMP.@expression(model, money, x .* p)
     prop = sf.prop
@@ -478,8 +483,12 @@ function finite_sub_allocation(w::VecNum, p::VecNum, cash::Number, bgt::Number,
                                sf::Option{<:NamedTuple}, da::DiscreteAllocation,
                                str_names::Bool = false)
     if isempty(w)
+        # An empty side buys nothing, but it can still owe the forced exit: a delisted asset
+        # carries a zero target weight, so it lands on the long side even when that side
+        # holds nothing else. `allocation_fee` of the empty book is that charge exactly.
+        fee = allocation_fee(sf, p, w)
         return Vector{eltype(w)}(undef, 0), Vector{eltype(w)}(undef, 0),
-               Vector{eltype(w)}(undef, 0), cash, zero(cash), nothing, nothing
+               Vector{eltype(w)}(undef, 0), cash - fee, fee, nothing, nothing
     end
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
@@ -530,7 +539,7 @@ function _optimise(da::DiscreteAllocation, fai::FiniteAllocationInput;
     w, p, cash, pcash, T, fees = fai.w, fai.prices, fai.cash, fai.prev_cash, fai.horizon,
                                  fai.fees
     bgt, lbgt, sbgt, lidx, sidx, lcash, scash = setup_alloc_optim(w, cash)
-    lsf, ssf = allocation_side_fees(fees, T, pcash, lidx, sidx)
+    lsf, ssf = allocation_side_fees(fees, fai.imsk, T, pcash, lidx, sidx)
     sshares, scost, sw, scash, sfee, sretcode, smodel = finite_sub_allocation(-view(w,
                                                                                     sidx),
                                                                               view(p, sidx),

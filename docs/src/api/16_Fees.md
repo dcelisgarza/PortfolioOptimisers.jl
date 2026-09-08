@@ -23,6 +23,9 @@ calc_total_asset_fees
 override_fee_amortisation
 needs_previous_weights(fe::FeesE_Fees)
 port_opt_view(fees::Fees, i, X::MatNum, args...)
+lift_fees
+lift_fee_rate
+lift_turnover
 ```
 
 ## References
