@@ -73,7 +73,8 @@
                                                      cash = 1000, horizon = T, fees = fe))
             f1 = sum(calc_fees(res.w, T, fe))
             @test isapprox(f1s[i], f1)
-            f2 = sum(calc_asset_fees(res.w, T, fe))
+            fa2, fo2 = calc_asset_fees(res.w, T, fe)
+            f2 = fa2[1] .+ fo2[1]
             @test isapprox(df[!, "$(2*(i-1)+1)"], f2)
             # Issue #900: the allocation charges its fee inside its own model, on the
             # money it actually buys, so the result reports the charge of the realised
@@ -88,14 +89,19 @@
             @test all(isapprox(calc_net_returns(res.w, pr.X) .- sched,
                                calc_net_returns(res.w, pr.X, fe)))
             asched = repeat(transpose(PortfolioOptimisers.calc_asset_periodic_fees(res.w,
-                                                                                   fes[1])),
+                                                                                   fes[1])[1]),
                             size(pr.X, 1), 1)
-            asched[1, :] .+= PortfolioOptimisers.calc_asset_one_off_fees(res.w, fes[1])
-            @test all(isapprox(calc_net_asset_returns(res.w, pr.X) .- asched,
-                               calc_net_asset_returns(res.w, pr.X, fes[1])))
+            asched[1, :] .+= PortfolioOptimisers.calc_asset_one_off_fees(res.w, fes[1])[1]
+            # The split spans two axes now. This fee carries no liquidation carrier, so the
+            # second matrix is empty and the investable one is the whole answer.
+            @test isempty(calc_net_asset_returns(res.w, pr.X, fes[1])[2])
+            @test all(isapprox(calc_net_asset_returns(res.w, pr.X)[1] .- asched,
+                               calc_net_asset_returns(res.w, pr.X, fes[1])[1]))
         end
         @test all(iszero, calc_fees(res.w, T, Fees()))
-        @test all(iszero, sum(calc_asset_fees(res.w, T, Fees())))
+        @test all(iszero,
+                  calc_asset_fees(res.w, T, Fees())[1][1] .+
+                  calc_asset_fees(res.w, T, Fees())[2][1])
         # An input that states no fee pays none, and the whole cash is spent or left over.
         res_free = optimise(da,
                             FiniteAllocationInput(; w = res.w, prices = vec(values(X[end])),
@@ -224,12 +230,17 @@
         fesc = Fees(; tn = tns, l = 0.001, s = 0.005, fl = 1.0, fs = 5.0)
 
         # The per-asset fee sums to the portfolio fee, up to the order of summation.
-        @test all(isapprox.(sum.(calc_asset_fees(wf, 21, fev)), calc_fees(wf, 21, fev)))
-        @test all(isapprox.(sum.(calc_asset_fees(wf, 21, fesc)), calc_fees(wf, 21, fesc)))
+        tot2 = p -> sum(p[1]) + sum(p[2])
+        @test all(isapprox.(map(tot2, calc_asset_fees(wf, 21, fev)),
+                            calc_fees(wf, 21, fev)))
+        @test all(isapprox.(map(tot2, calc_asset_fees(wf, 21, fesc)),
+                            calc_fees(wf, 21, fesc)))
 
         # The short proportional term is a positive charge, not a credit.
         @test sum(calc_fees([0.6, -0.4], 21, Fees(; s = 0.01))) == 0.004
-        @test sum(calc_asset_fees([0.6, -0.4], 21, Fees(; s = 0.01))) == [0.0, 0.004]
+        let p = calc_asset_fees([0.6, -0.4], 21, Fees(; s = 0.01))
+            @test p[1][1] .+ p[2][1] == [0.0, 0.004]
+        end
 
         # Issue #900: the fee family carries no price. A price reaches the finite
         # allocation alone, which holds the share counts and prices the money it buys.
@@ -376,16 +387,19 @@
 
         # The per asset split sums to the portfolio pair, under both clocks and both
         # families, to the order of summation.
-        @test all(isapprox.(sum.(calc_asset_fees(wf, 3, fee0)), calc_fees(wf, 3, fee0)))
-        @test all(isapprox.(sum.(calc_asset_fees(wf, 3, feeA)), calc_fees(wf, 3, feeA)))
+        tot3 = p -> sum(p[1]) + sum(p[2])
+        @test all(isapprox.(map(tot3, calc_asset_fees(wf, 3, fee0)),
+                            calc_fees(wf, 3, fee0)))
+        @test all(isapprox.(map(tot3, calc_asset_fees(wf, 3, feeA)),
+                            calc_fees(wf, 3, feeA)))
 
         # The whole holding period: `T` periods of the rates, and the fixed terms one time.
         # The clock does not move that total, only where the cost lands on a series.
         @test isapprox(calc_total_fees(wf, 3, fee0), 3 * periodic + oneoff)
         @test isapprox(calc_total_fees(wf, 3, fee0), calc_total_fees(wf, 3, feeA))
-        @test isapprox(sum(calc_total_asset_fees(wf, 3, fee0)),
+        @test isapprox(tot3(calc_total_asset_fees(wf, 3, fee0)),
                        calc_total_fees(wf, 3, fee0))
-        @test isapprox(sum(calc_total_asset_fees(wf, 3, feeA)),
+        @test isapprox(tot3(calc_total_asset_fees(wf, 3, feeA)),
                        calc_total_fees(wf, 3, feeA))
         @test iszero(calc_total_fees(wf, 3, nothing))
         @test all(iszero, calc_total_asset_fees(wf, 3, nothing))
@@ -404,8 +418,8 @@
         # The `AmortisedFees` clock puts an equal share on each.
         @test all(isapprox.(gross .- netA, periodic + oneoff / 3))
         # The per asset rows sum to the portfolio series, under both clocks.
-        @test isapprox(vec(sum(calc_net_asset_returns(wf, Xf, fee0); dims = 2)), net0)
-        @test isapprox(vec(sum(calc_net_asset_returns(wf, Xf, feeA); dims = 2)), netA)
+        @test isapprox(vec(sum(calc_net_asset_returns(wf, Xf, fee0)[1]; dims = 2)), net0)
+        @test isapprox(vec(sum(calc_net_asset_returns(wf, Xf, feeA)[1]; dims = 2)), netA)
 
         # `l` and `s` are unmoved by the clock.
         @test feeA.l == fee0.l && feeA.s == fee0.s
@@ -432,7 +446,10 @@
         # The two value-level verbs answer the same under the leaf as under `nothing`.
         # Issue #900 deleted the price-carrying family, so only the no-price pair remains.
         @test all(isapprox.(calc_fees(wf2, 3, feeF), calc_fees(wf2, 3, fee0)))
-        @test all(isapprox.(calc_asset_fees(wf2, 3, feeF), calc_asset_fees(wf2, 3, fee0)))
+        @test all(isapprox.(calc_asset_fees(wf2, 3, feeF)[1],
+                            calc_asset_fees(wf2, 3, fee0)[1]))
+        @test all(isapprox.(calc_asset_fees(wf2, 3, feeF)[2],
+                            calc_asset_fees(wf2, 3, fee0)[2]))
 
         # The supertype decides no answer: each leaf carries its own method, so a third
         # clock added to the family would get a `MethodError` rather than silently
@@ -450,8 +467,8 @@
         # The series lands the one-off cost the same way under both spellings.
         Xf2 = [0.01 0.02 -0.01 0.03; 0.03 0.04 0.02 -0.02; -0.01 0.005 0.01 0.04]
         @test calc_net_returns(wf2, Xf2, feeF) == calc_net_returns(wf2, Xf2, fee0)
-        @test calc_net_asset_returns(wf2, Xf2, feeF) ==
-              calc_net_asset_returns(wf2, Xf2, fee0)
+        @test calc_net_asset_returns(wf2, Xf2, feeF)[1] ==
+              calc_net_asset_returns(wf2, Xf2, fee0)[1]
 
         # `override_fee_amortisation` resolves the scheme's clock against the fee's own.
         @test PortfolioOptimisers.override_fee_amortisation(fee0, nothing) === fee0
@@ -527,12 +544,13 @@ end
         # subtracts the per-asset `calc_asset_fees`. The two sides add in a different
         # order, so the identity holds to rounding and not to `==`.
         a = calc_net_returns(wn, Xn, fn)
-        b = vec(sum(calc_net_asset_returns(wn, Xn, fn); dims = 2))
+        b = vec(sum(calc_net_asset_returns(wn, Xn, fn)[1]; dims = 2))
         @test a ≈ b
         @test maximum(abs, a - b) < 1e-16
 
         # and with no fee at all
-        @test calc_net_returns(wn, Xn) ≈ vec(sum(calc_net_asset_returns(wn, Xn); dims = 2))
+        @test calc_net_returns(wn, Xn) ≈
+              vec(sum(calc_net_asset_returns(wn, Xn)[1]; dims = 2))
     end
 
     @testset "the fee is charged on the clock the fee names" begin
@@ -548,9 +566,9 @@ end
 
         # the per asset form charges its own vectors on the same clock
         av, ov = PO.calc_asset_fees(wn, size(Xn, 1), fn)
-        F = repeat(transpose(av), size(Xn, 1), 1)
-        F[1, :] .+= ov
-        @test calc_net_asset_returns(wn, Xn, fn) ≈ calc_net_asset_returns(wn, Xn) .- F
+        F = repeat(transpose(av[1]), size(Xn, 1), 1)
+        F[1, :] .+= ov[1]
+        @test calc_net_asset_returns(wn, Xn, fn)[1] ≈ calc_net_asset_returns(wn, Xn)[1] .- F
     end
 
     @testset "a nothing fee reaches the args... method" begin
@@ -559,7 +577,7 @@ end
         @test m.file ==
               Symbol(joinpath(dirname(@__DIR__), "src", "17_NetReturnsDrawdowns.jl"))
         @test calc_net_returns(wn, Xn, nothing) == Xn * wn
-        @test calc_net_asset_returns(wn, Xn, nothing) == Xn .* transpose(wn)
+        @test calc_net_asset_returns(wn, Xn, nothing)[1] == Xn .* transpose(wn)
     end
 
     @testset "a vector of weight vectors gives one series each" begin
@@ -578,25 +596,25 @@ end
         @test U[1, :] == wn
 
         a = calc_net_returns(wn, Xn, fn, wdn)
-        b = vec(sum(calc_net_asset_returns(U, Xn, fn); dims = 2))
+        b = vec(sum(calc_net_asset_returns(U, Xn, fn)[1]; dims = 2))
         @test a ≈ b
         @test maximum(abs, a - b) < 1e-15
         @test calc_net_returns(wn, Xn, nothing, wdn) ≈
-              vec(sum(calc_net_asset_returns(U, Xn); dims = 2))
+              vec(sum(calc_net_asset_returns(U, Xn)[1]; dims = 2))
 
         # The fee is charged from the path's first row, which is the target weights, so
         # the same `N × 1` vector is subtracted from every row here as there.
         av, ov = PO.calc_asset_fees(wn, size(Xn, 1), fn)
-        F = repeat(transpose(av), size(Xn, 1), 1)
-        F[1, :] .+= ov
-        @test calc_net_asset_returns(U, Xn, fn) ≈ calc_net_asset_returns(U, Xn) .- F
+        F = repeat(transpose(av[1]), size(Xn, 1), 1)
+        F[1, :] .+= ov[1]
+        @test calc_net_asset_returns(U, Xn, fn)[1] ≈ calc_net_asset_returns(U, Xn)[1] .- F
 
         # The constant path is the reader-facing shape of a window that ran no drift, so
         # the `MatNum` methods reproduce the `VecNum` ones on it, exactly.
         Uc = PO.weight_path(nothing, wn, Xn)
-        @test calc_net_asset_returns(Uc, Xn, fn) == calc_net_asset_returns(wn, Xn, fn)
-        @test calc_net_asset_returns(Uc, Xn) == calc_net_asset_returns(wn, Xn)
-        @test calc_net_asset_returns(Uc, Xn, nothing) == Xn .* transpose(wn)
+        @test calc_net_asset_returns(Uc, Xn, fn)[1] == calc_net_asset_returns(wn, Xn, fn)[1]
+        @test calc_net_asset_returns(Uc, Xn)[1] == calc_net_asset_returns(wn, Xn)[1]
+        @test calc_net_asset_returns(Uc, Xn, nothing)[1] == Xn .* transpose(wn)
 
         # A `nothing` fee reaches the `args...` method here too, and charges nothing.
         m = which(calc_net_asset_returns, (typeof(U), typeof(Xn), Nothing))
@@ -615,8 +633,9 @@ end
         U = PO.weight_path(wdn, wn, Xn)
 
         @test calc_net_returns(U, Xn, fn) ==
-              vec(sum(calc_net_asset_returns(U, Xn, fn); dims = 2))
-        @test calc_net_returns(U, Xn) == vec(sum(calc_net_asset_returns(U, Xn); dims = 2))
+              vec(sum(calc_net_asset_returns(U, Xn, fn)[1]; dims = 2))
+        @test calc_net_returns(U, Xn) ==
+              vec(sum(calc_net_asset_returns(U, Xn)[1]; dims = 2))
 
         # It is the series the drift route forms from the same window under the same drift.
         # The two sides add in a different order, so this needs an absolute tolerance.

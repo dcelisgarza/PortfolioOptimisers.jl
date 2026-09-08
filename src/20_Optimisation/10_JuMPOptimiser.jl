@@ -1278,7 +1278,13 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
                                      strict = opt.strict)
     end
     tn = turnover_constraints(opt.tn, opt.sets; datatype = datatype, strict = opt.strict)
-    fees = fees_constraints(opt.fees, opt.sets; datatype = datatype, strict = opt.strict)
+    # A window in which every asset is investable derives no mask, so the door above
+    # short-circuits and the two liquidation carriers never meet a complement to be sliced
+    # to. Nothing exited, so nothing is owed: strip them explicitly rather than take the
+    # view on this path, which is what keeps the `nothing` mask allocation-free.
+    fees = strip_liquidation_carriers(fees_constraints(opt.fees, opt.sets;
+                                                       datatype = datatype,
+                                                       strict = opt.strict), imsk)
     plr = phylogeny_constraints(opt.ple, pr; iv = rd.iv, ivpa = rd.ivpa, rd = rd,
                                 x_src = opt.x_src, kwargs...)
     ret = factory(opt.ret, pr)

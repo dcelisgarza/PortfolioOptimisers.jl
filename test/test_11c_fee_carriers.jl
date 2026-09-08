@@ -298,6 +298,73 @@
         @test collect(split_after.lq.val) == collect(opt_v.fees.lq.val)
     end
 
+    @testset "Both axes are charged, and the row sums reproduce the series" begin
+        atol = 1e-14
+        # The invariant the two axes exist to preserve. Every fixture here sets **both**
+        # carriers, because a fixture that left `flq` unset would pass whether or not the
+        # one-off liquidation is charged at all — which is exactly how an unwired carrier
+        # slipped through before.
+        #
+        # A liquidated asset earns no return, so its column of the charge matrix holds the
+        # charge alone. The per period part lands on every observation and the one-off part
+        # at the index the clock names, which is the same two steps the investable axis
+        # takes. That is what keeps one clock across both axes.
+        X3 = [0.010 -0.020 0.030
+              -0.015 0.025 0.012
+              0.020 0.010 -0.008
+              -0.005 -0.030 0.018
+              0.008 0.014 0.006]
+        w3 = [0.4, -0.3, 0.9]
+        mkf = fa -> Fees(; tn = Turnover(; w = fill(0.25, 3), val = [0.001, 0.002, 0.003]),
+                         fl = [1.0, 0.0, 2.0], lq = Turnover(; w = [0.25], val = [0.010]),
+                         flq = Turnover(; w = [0.25], val = [5.0]), fa = fa)
+        tot = p -> sum(p[1]) + sum(p[2])
+
+        for fa in (nothing, FirstObservationFees(), AmortisedFees())
+            fees = mkf(fa)
+
+            # The split sums to the scalar, on both halves of the clock. Before the
+            # carriers were charged, the periodic gap here was the exit itself.
+            @test isapprox(tot(PortfolioOptimisers.calc_asset_periodic_fees(w3, fees)),
+                           PortfolioOptimisers.calc_periodic_fees(w3, fees); atol = atol)
+            @test isapprox(tot(PortfolioOptimisers.calc_asset_one_off_fees(w3, fees)),
+                           PortfolioOptimisers.calc_one_off_fees(w3, fees); atol = atol)
+
+            # And the two matrices together reproduce the portfolio series, under every
+            # clock — including the one that lands the fixed charge on one observation.
+            A, C = calc_net_asset_returns(w3, X3, fees)
+            @test size(A) == (5, 3)
+            @test size(C) == (5, 1)
+            @test isapprox(vec(sum(A; dims = 2)) .+ vec(sum(C; dims = 2)),
+                           calc_net_returns(w3, X3, fees); atol = atol)
+        end
+
+        # The clock actually moves the charge, so the loop above is not vacuous: a spreading
+        # clock puts the fixed exit on every observation, the default puts it on the first.
+        Cfirst = calc_net_asset_returns(w3, X3, mkf(FirstObservationFees()))[2]
+        Cspread = calc_net_asset_returns(w3, X3, mkf(AmortisedFees()))[2]
+        @test Cfirst[1, 1] != Cfirst[2, 1]
+        @test isapprox(Cspread[1, 1], Cspread[2, 1]; atol = atol)
+        # Either way the whole fixed exit is paid exactly once over the series.
+        @test isapprox(sum(Cfirst), sum(Cspread); atol = atol)
+        # `5.0` fixed, plus `0.010 * 0.25` per period over five observations.
+        @test isapprox(-sum(Cfirst), 5.0 + 5 * 0.010 * 0.25; atol = atol)
+
+        # With no carrier the charge matrix is empty, so a caller destructures the same
+        # shape whether or not an asset left.
+        A0, C0 = calc_net_asset_returns(w3, X3,
+                                        Fees(;
+                                             tn = Turnover(; w = fill(0.25, 3),
+                                                           val = [0.001, 0.002, 0.003])))
+        @test size(C0) == (5, 0)
+        @test isapprox(vec(sum(A0; dims = 2)),
+                       calc_net_returns(w3, X3,
+                                        Fees(;
+                                             tn = Turnover(; w = fill(0.25, 3),
+                                                           val = [0.001, 0.002, 0.003])));
+                       atol = atol)
+    end
+
     @testset "The amortisation override carries both carriers" begin
         # `override_fee_amortisation` rebuilds a `Fees` field by field, so it is the one
         # site that silently drops a field the type gains.

@@ -155,15 +155,27 @@ The per asset twin of [`charge_fees`](@ref). Its row sums are the series that ve
   - [`charge_fees`](@ref)
 """
 function charge_asset_fees(R::MatNum, ::VecNum, ::Nothing)
-    return R
+    return R, zeros(eltype(R), size(R, 1), 0)
 end
 function charge_asset_fees(R::MatNum, w::VecNum, fees::Fees)
-    amortised, one_time = calc_asset_fees(w, size(R, 1), fees)
-    val = R .- transpose(amortised)
-    if !iszero(one_time) && size(val, 1) > 0
-        view(val, 1, :) .-= one_time
+    (am_i, am_l), (ot_i, ot_l) = calc_asset_fees(w, size(R, 1), fees)
+    T = size(R, 1)
+    # The investable axis: the per period charge on every observation, the one-off charge at
+    # the observation the clock names.
+    val = R .- transpose(am_i)
+    if !iszero(ot_i) && T > 0
+        view(val, 1, :) .-= ot_i
     end
-    return val
+    # The liquidation axis, by the **same two steps**. A liquidated asset earns no return, so
+    # its column holds the charge alone, and the one-off amount lands at the same index it
+    # lands on for `fl` and `fs`. That is what puts both axes on one clock and lets the row
+    # sums reproduce the series under every setting of `fees.fa`.
+    chg = zeros(eltype(val), T, length(am_l))
+    chg .-= transpose(am_l)
+    if !iszero(ot_l) && T > 0
+        view(chg, 1, :) .-= ot_l
+    end
+    return val, chg
 end
 """
     investable_reduction(X::MatNum, w, fees::Option{<:Fees}, strict::Bool)
@@ -459,7 +471,8 @@ julia> calc_net_returns([0.5 0.5; 0.6 0.4], [0.01 0.02; 0.03 0.04])
   - [`Fees`](@ref)
 """
 function calc_net_returns(w::MatNum, X::MatNum, args...)
-    return vec(sum(calc_net_asset_returns(w, X, args...); dims = 2))
+    A, chg = calc_net_asset_returns(w, X, args...)
+    return vec(sum(A; dims = 2)) .+ vec(sum(chg; dims = 2))
 end
 """
     calc_net_asset_returns(w::VecNum, X::MatNum, args...)
@@ -513,9 +526,7 @@ Where:
 
 ```jldoctest
 julia> calc_net_asset_returns([0.5, 0.5], [0.01 0.02; 0.03 0.04])
-2×2 Matrix{Float64}:
- 0.005  0.01
- 0.015  0.02
+([0.005 0.01; 0.015 0.02], Matrix{Float64}(undef, 2, 0))
 ```
 
 # Related
@@ -528,7 +539,7 @@ julia> calc_net_asset_returns([0.5, 0.5], [0.01 0.02; 0.03 0.04])
   - [`Fees`](@ref)
 """
 function calc_net_asset_returns(w::VecNum, X::MatNum, args...)
-    return X ⊙ transpose(w)
+    return X ⊙ transpose(w), zeros(eltype(X), size(X, 1), 0)
 end
 function calc_net_asset_returns(w::VecNum, X::MatNum, fees::Fees)
     return charge_asset_fees(X ⊙ transpose(w), w, fees)
@@ -588,9 +599,7 @@ Where:
 
 ```jldoctest
 julia> calc_net_asset_returns([0.5 0.5; 0.6 0.4], [0.01 0.02; 0.03 0.04])
-2×2 Matrix{Float64}:
- 0.005  0.01
- 0.018  0.016
+([0.005 0.01; 0.018 0.016], Matrix{Float64}(undef, 2, 0))
 ```
 
 # Related
@@ -603,7 +612,7 @@ julia> calc_net_asset_returns([0.5 0.5; 0.6 0.4], [0.01 0.02; 0.03 0.04])
   - [`Fees`](@ref)
 """
 function calc_net_asset_returns(w::MatNum, X::MatNum, args...)
-    return X ⊙ w
+    return X ⊙ w, zeros(eltype(X), size(X, 1), 0)
 end
 function calc_net_asset_returns(w::MatNum, X::MatNum, fees::Fees)
     return charge_asset_fees(X ⊙ w, view(w, 1, :), fees)

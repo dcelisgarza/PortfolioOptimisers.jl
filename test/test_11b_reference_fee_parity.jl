@@ -69,8 +69,12 @@
         @test isapprox(calc_net_returns(w, X, fees),
                        [0.020300000000000002, -0.0179, 0.0050999999999999995, 0.02,
                         -0.015299999999999998]; atol = atol)
-        # The per asset split sums to the series the scalar verb charges.
-        @test isapprox(vec(sum(calc_net_asset_returns(w, X, fees); dims = 2)),
+        # The per asset split sums to the series the scalar verb charges. The split now
+        # spans two axes, so both matrices enter the row sum; the second is empty here
+        # because this book has no forced exit.
+        A, C = calc_net_asset_returns(w, X, fees)
+        @test size(C, 2) == 0
+        @test isapprox(vec(sum(A; dims = 2)) .+ vec(sum(C; dims = 2)),
                        calc_net_returns(w, X, fees); atol = atol)
     end
 
@@ -110,63 +114,87 @@
               [0.0, -0.0033600000000001407, 0.0, 0.0, -5.999999999994898e-5]
     end
 
-    @testset "A forced liquidation is a trade to zero at the previous weight" begin
+    @testset "A forced liquidation is charged through a reduced `Fees`" begin
         # ADR 0121 charges an asset that leaves the Investable Mask through a `Turnover`
-        # carrier on the complement of the mask. The charge needs no new verb: a forced exit
-        # trades to zero, so the established `Turnover` method priced at a zero target is
-        # the reference's arithmetic exactly. This testset pins that equivalence before
-        # issue #897 wires the carrier onto `Fees`.
+        # carrier on the complement of the mask. This testset walks the path a caller
+        # actually takes: a reduced `Fees` carrying `lq`, read by the ordinary fee verbs.
+        # The reference meets the same charge the same way — it holds a named
+        # `previous_weights` that includes an asset absent from `X`, and reports the cost
+        # through the portfolio's `total_cost`.
         #
         # Asset "c" leaves a four-asset universe holding a quarter of the book in each.
+        # `w` is the surviving book. The liquidation term does not read it, because the
+        # exiting asset sits on the other axis, and that independence is itself contract.
+        w = [0.4, -0.3, 0.9]
 
         # A per asset rate. The reference reported turnover `0.25` and cost `0.0025`.
         lq = Turnover(; w = [0.25], val = [0.010])
-        @test isapprox(calc_fees(zeros(1), lq), 0.0025; atol = atol)
+        @test isapprox(PortfolioOptimisers.calc_periodic_fees(w, Fees(; lq = lq)), 0.0025;
+                       atol = atol)
         @test isapprox(sum(abs, lq.w), 0.25; atol = atol)
+        # `lq` is a rate per period, so it never lands in the one-off half.
+        @test isapprox(PortfolioOptimisers.calc_one_off_fees(w, Fees(; lq = lq)), 0.0;
+                       atol = atol)
 
         # One scalar rate over every exit. The reference reported cost `0.001`.
-        @test isapprox(calc_fees(zeros(1), Turnover(; w = [0.25], val = 0.004)), 0.001;
-                       atol = atol)
+        sc = Fees(; lq = Turnover(; w = [0.25], val = 0.004))
+        @test isapprox(PortfolioOptimisers.calc_periodic_fees(w, sc), 0.001; atol = atol)
 
         # Two exits of opposite sign: "b" short at `-0.4` and "c" long at `0.25`. The
         # reference reported turnover `0.65` and cost `0.0033`, so the charge reads the
         # absolute previous weight and does not credit the short.
         lq2 = Turnover(; w = [-0.4, 0.25], val = [0.002, 0.010])
-        @test isapprox(calc_fees(zeros(2), lq2), 0.0033; atol = atol)
+        @test isapprox(PortfolioOptimisers.calc_periodic_fees(w, Fees(; lq = lq2)), 0.0033;
+                       atol = atol)
         @test isapprox(sum(abs, lq2.w), 0.65; atol = atol)
 
-        # The per asset split names the asset that caused each charge.
+        # A position already at zero is not traded, so it is charged nothing.
+        z = Fees(; lq = Turnover(; w = [0.0, 0.25], val = [0.002, 0.010]))
+        @test isapprox(PortfolioOptimisers.calc_periodic_fees(w, z), 0.0025; atol = atol)
+
+        # The arithmetic underneath is the established `Turnover` method priced at a zero
+        # target, which is why the charge took no verb of its own.
+        @test isapprox(calc_fees(zeros(2), lq2), 0.0033; atol = atol)
         @test isapprox(calc_asset_fees(zeros(2), lq2), [0.0008, 0.0025]; atol = atol)
         @test isapprox(sum(calc_asset_fees(zeros(2), lq2)), calc_fees(zeros(2), lq2);
-                       atol = atol)
-
-        # A position already at zero is not traded, so it is charged nothing.
-        @test isapprox(calc_fees(zeros(2),
-                                 Turnover(; w = [0.0, 0.25], val = [0.002, 0.010])), 0.0025;
                        atol = atol)
     end
 
     @testset "A reduced fit charges the exit on every observation" begin
-        # The whole of ADR 0121's clock decision, measured against the reference: a fit that
-        # reduced to the three investable assets still owes the exit, and the charge rides
-        # on every observation beside the reduced turnover rather than one time.
+        # The whole of ADR 0121's clock decision, walked end to end through the ordinary
+        # verbs. A fit that reduced to the three investable assets still owes the exit, and
+        # the charge rides on every observation beside the reduced turnover rather than one
+        # time.
+        #
+        # This is the reference's own reduced portfolio: it was handed `X` for "a", "b" and
+        # "d" with a named `previous_weights` still naming "c", and it reported
+        # `total_cost = 0.0057` — the reduced turnover `0.0032` plus the exit `0.0025` —
+        # subtracted from each of the five observations.
         Xred = X[:, [1, 2, 4]]
         wred = [0.4, -0.3, 0.9]
-        red_tn = calc_fees(wred, Turnover(; w = fill(0.25, 3), val = [0.001, 0.002, 0.003]))
-        liq = calc_fees(zeros(1), Turnover(; w = [0.25], val = [0.010]))
-        # The reference reported `total_cost = 0.0057` for the reduced portfolio, which is
-        # the reduced turnover `0.0032` plus the exit `0.0025`.
-        @test isapprox(red_tn, 0.0032; atol = atol)
-        @test isapprox(liq, 0.0025; atol = atol)
-        @test isapprox(red_tn + liq, 0.0057; atol = atol)
-        @test isapprox(Xred * wred .- (red_tn + liq),
+        fees = Fees(; tn = Turnover(; w = fill(0.25, 3), val = [0.001, 0.002, 0.003]),
+                    lq = Turnover(; w = [0.25], val = [0.010]))
+
+        @test isapprox(PortfolioOptimisers.calc_periodic_fees(wred, fees), 0.0057;
+                       atol = atol)
+        # The two halves of that total, so a regression names which one moved.
+        @test isapprox(calc_fees(wred, fees.tn), 0.0032; atol = atol)
+        @test isapprox(PortfolioOptimisers.calc_liquidation_fees(wred, fees.lq), 0.0025;
+                       atol = atol)
+
+        # The whole charge lands on every observation, which is the reference's series.
+        @test isapprox(calc_net_returns(wred, Xred, fees),
                        [0.031299999999999994, -0.0084, -0.0079, 0.017499999999999998,
                         -0.001299999999999999]; atol = atol)
+
         # Charging the exit one time instead would leave four of the five observations
         # short by the whole charge, so the two clocks are distinguishable here.
-        @test !isapprox(Xred * wred .- red_tn,
-                        [0.031299999999999994, -0.0084, -0.0079, 0.017499999999999998,
-                         -0.001299999999999999]; atol = atol)
+        notn = Fees(; tn = Turnover(; w = fill(0.25, 3), val = [0.001, 0.002, 0.003]))
+        @test !isapprox(calc_net_returns(wred, Xred, notn),
+                        calc_net_returns(wred, Xred, fees); atol = atol)
+        # And the gap between them is exactly the exit, on every observation.
+        @test isapprox(calc_net_returns(wred, Xred, notn) .-
+                       calc_net_returns(wred, Xred, fees), fill(0.0025, 5); atol = atol)
     end
 
     @testset "A solved walk-forward" begin
