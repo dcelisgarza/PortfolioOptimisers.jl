@@ -1591,23 +1591,24 @@ function add_liquidation_terms(a::VecNum, b::VecNum)
 end
 
 """
-    calc_liquidation_fees(w::VecNum, ::Nothing)
-    calc_liquidation_fees(w::VecNum, lq::Turnover)
+    calc_liquidation_fees(::Nothing)
+    calc_liquidation_fees(lq::Turnover{<:Any, <:Number})
+    calc_liquidation_fees(lq::Turnover{<:Any, <:VecNum})
 
 Charge the proportional cost of the positions a forced exit sells.
 
-`lq` lives on the **complement** of the Investable Mask, so its entries are the assets that left and never the assets `w` holds. A forced exit is a trade to zero, so the target weight of every entry is zero and the charge is the rate times the absolute previous weight. That is exactly what the [`Turnover`](@ref) method of [`calc_fees`](@ref) computes against a zero target, so this verb states the target and reuses it rather than restating the arithmetic.
+`lq` lives on the **complement** of the Investable Mask, so its entries are the assets that left, never the assets the programme holds. A forced exit is a trade to zero, so the target weight of every entry is zero, the turnover `|target - lq.w|` is `abs.(lq.w)`, and the charge is the rate times the absolute previous weight. The carrier is the whole of the input: the verb needs no weight vector and takes none.
 
-`w` is read for its element type alone, which is what gives the `nothing` method a zero of the right type. The charge is a rate, so it falls on every period beside `l`, `s` and `tn`, and [`calc_periodic_fees`](@ref) adds it there.
+The charge is a rate, so it falls on every period beside `l`, `s` and `tn`, and [`calc_periodic_fees`](@ref) adds it there.
 
 # Algorithm
 
- 1. On a `nothing` `lq`, return a zero in the element type of `w`. Nothing left the universe, so nothing is owed.
- 2. Otherwise call [`calc_fees`](@ref) on `lq` against a zero vector the length of `lq.w`, which gives `dot(lq.val, abs.(lq.w))` for a per asset rate and `lq.val * sum(abs.(lq.w))` for a scalar one.
+ 1. On a `nothing` `lq`, return `false`. Nothing left the universe, so nothing is owed, and a `Bool` zero adds to a charge of any element type without widening it.
+ 2. On a scalar rate, return `lq.val * sum(abs, lq.w)`.
+ 3. On a per asset rate, return `dot(lq.val, abs.(lq.w))`.
 
 # Arguments
 
-  - `w`: Portfolio weights, read for their element type.
   - `lq`: The proportional liquidation carrier, or `nothing`.
 
 # Returns
@@ -1617,10 +1618,10 @@ Charge the proportional cost of the positions a forced exit sells.
 # Examples
 
 ```jldoctest
-julia> PortfolioOptimisers.calc_liquidation_fees([0.5, 0.5], nothing)
-0.0
+julia> PortfolioOptimisers.calc_liquidation_fees(nothing)
+false
 
-julia> PortfolioOptimisers.calc_liquidation_fees([0.5, 0.5], Turnover(; w = [0.25], val = [0.01]))
+julia> PortfolioOptimisers.calc_liquidation_fees(Turnover(; w = [0.25], val = [0.01]))
 0.0025
 ```
 
@@ -1632,19 +1633,22 @@ julia> PortfolioOptimisers.calc_liquidation_fees([0.5, 0.5], Turnover(; w = [0.2
   - [`calc_periodic_fees`](@ref)
   - [`calc_fixed_liquidation_fees`](@ref)
 """
-function calc_liquidation_fees(w::VecNum, ::Nothing)
-    return zero(eltype(w))
+function calc_liquidation_fees(::Nothing)
+    return false
 end
-function calc_liquidation_fees(w::VecNum, lq::Turnover)
-    return calc_fees(zeros(eltype(w), length(lq.w)), lq)
+function calc_liquidation_fees(lq::Turnover{<:Any, <:Number})
+    return lq.val * sum(abs, lq.w)
+end
+function calc_liquidation_fees(lq::Turnover{<:Any, <:VecNum})
+    return LinearAlgebra.dot(lq.val, abs.(lq.w))
 end
 """
-    calc_fixed_liquidation_fees(w::VecNum, ::Nothing, ::NamedTuple)
-    calc_fixed_liquidation_fees(w::VecNum, flq::Turnover, kwargs::NamedTuple)
+    calc_fixed_liquidation_fees(::Nothing, ::NamedTuple)
+    calc_fixed_liquidation_fees(flq::Turnover, kwargs::NamedTuple)
 
 Charge the fixed cost of the positions a forced exit sells.
 
-The fixed twin of [`calc_liquidation_fees`](@ref). `flq` lives on the complement of the Investable Mask, and its amount is charged once for each entry whose absolute previous weight is not `isapprox` to zero under `kwargs`, the threshold `fl` and `fs` already use.
+The fixed twin of [`calc_liquidation_fees`](@ref), and it takes no weight vector for the same reason. `flq` lives on the complement of the Investable Mask, and its amount is charged once for each entry whose absolute previous weight is not `isapprox` to zero under `kwargs`, the threshold `fl` and `fs` already use.
 
 A liquidated short is a trade as much as a liquidated long, so **both sides are charged**. The verb therefore calls [`calc_fixed_fees`](@ref) twice against `flq.w`, once under `.>=` and once under `.<`, which is the pattern [`calc_one_off_fees`](@ref) spells for `fl` and `fs` with one rate serving both sides. The two selections are disjoint, so no entry is charged twice.
 
@@ -1652,14 +1656,13 @@ The charge is a currency amount, so it falls one time for the whole holding peri
 
 # Algorithm
 
- 1. On a `nothing` `flq`, return a zero in the element type of `w`.
+ 1. On a `nothing` `flq`, return `false`, the same `Bool` zero [`calc_liquidation_fees`](@ref) returns.
  2. Otherwise charge [`calc_fixed_fees`](@ref) on `flq.w` and `flq.val` under `.>=`, the liquidated long positions.
  3. Charge the same under `.<`, the liquidated short positions.
  4. Return the sum of the two.
 
 # Arguments
 
-  - `w`: Portfolio weights, read for their element type.
   - `flq`: The fixed liquidation carrier, or `nothing`.
   - `kwargs`: Forwarded to `isapprox` to decide how near zero counts as zero.
 
@@ -1670,11 +1673,10 @@ The charge is a currency amount, so it falls one time for the whole holding peri
 # Examples
 
 ```jldoctest
-julia> PortfolioOptimisers.calc_fixed_liquidation_fees([0.5, 0.5], nothing, (; atol = 1e-8))
-0.0
+julia> PortfolioOptimisers.calc_fixed_liquidation_fees(nothing, (; atol = 1e-8))
+false
 
-julia> PortfolioOptimisers.calc_fixed_liquidation_fees([0.5, 0.5],
-                                                       Turnover(; w = [0.25, -0.4],
+julia> PortfolioOptimisers.calc_fixed_liquidation_fees(Turnover(; w = [0.25, -0.4],
                                                                 val = [5.0, 7.0]), (; atol = 1e-8))
 12.0
 ```
@@ -1687,10 +1689,10 @@ julia> PortfolioOptimisers.calc_fixed_liquidation_fees([0.5, 0.5],
   - [`calc_one_off_fees`](@ref)
   - [`calc_liquidation_fees`](@ref)
 """
-function calc_fixed_liquidation_fees(w::VecNum, ::Nothing, ::NamedTuple)
-    return zero(eltype(w))
+function calc_fixed_liquidation_fees(::Nothing, ::NamedTuple)
+    return false
 end
-function calc_fixed_liquidation_fees(::VecNum, flq::Turnover, kwargs::NamedTuple)
+function calc_fixed_liquidation_fees(flq::Turnover, kwargs::NamedTuple)
     return calc_fixed_fees(flq.w, flq.val, kwargs, .>=) +
            calc_fixed_fees(flq.w, flq.val, kwargs, .<)
 end
@@ -1835,7 +1837,7 @@ julia> PortfolioOptimisers.calc_periodic_fees([0.5, 0.5], fees)
 function calc_periodic_fees(w::VecNum, fees::Fees)
     return calc_fees(w, fees.l, .>=) - calc_fees(w, fees.s, .<) +
            calc_fees(w, fees.tn) +
-           calc_liquidation_fees(w, fees.lq)
+           calc_liquidation_fees(fees.lq)
 end
 """
     calc_asset_periodic_fees(w::VecNum, fees::Fees)
@@ -1929,7 +1931,7 @@ julia> PortfolioOptimisers.calc_one_off_fees([0.5, 0.5], fees)
 function calc_one_off_fees(w::VecNum, fees::Fees)
     return calc_fixed_fees(w, fees.fl, fees.kwargs, .>=) +
            calc_fixed_fees(w, fees.fs, fees.kwargs, .<) +
-           calc_fixed_liquidation_fees(w, fees.flq, fees.kwargs)
+           calc_fixed_liquidation_fees(fees.flq, fees.kwargs)
 end
 """
     calc_asset_one_off_fees(w::VecNum, fees::Fees)

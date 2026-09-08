@@ -401,7 +401,7 @@ function allocation_liquidation_fee(fees::Fees, T::Number, prev_cash::Number)
     if !isnothing(flq)
         # One time: a currency amount, charged once per position the exit sold. Both sides
         # of the book are charged, which is what `calc_fixed_liquidation_fees` sums.
-        fee += calc_fixed_liquidation_fees(flq.w, flq, fees.kwargs)
+        fee += calc_fixed_liquidation_fees(flq, fees.kwargs)
     end
     return fee
 end

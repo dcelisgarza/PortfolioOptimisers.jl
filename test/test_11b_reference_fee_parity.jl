@@ -178,7 +178,7 @@
                        atol = atol)
         # The two halves of that total, so a regression names which one moved.
         @test isapprox(calc_fees(wred, fees.tn), 0.0032; atol = atol)
-        @test isapprox(PortfolioOptimisers.calc_liquidation_fees(wred, fees.lq), 0.0025;
+        @test isapprox(PortfolioOptimisers.calc_liquidation_fees(fees.lq), 0.0025;
                        atol = atol)
 
         # The whole charge lands on every observation, which is the reference's series.
@@ -435,7 +435,7 @@
                     # Only the fold that loses an asset owes an exit, and it owes the rate
                     # times the previous weight the scheme threaded.
                     if f == 3 && use_tn
-                        @test isapprox(PortfolioOptimisers.calc_liquidation_fees(wf, fe.lq),
+                        @test isapprox(PortfolioOptimisers.calc_liquidation_fees(fe.lq),
                                        tc3[k3] * pw[3][k3]; atol = atol)
                     else
                         @test isnothing(fe.lq)
@@ -490,8 +490,7 @@
                 # universe, and without the strip it was charged in full here.
                 for i in 1:2
                     @test isnothing(pred.pred[i].res.fees.lq)
-                    @test isapprox(PortfolioOptimisers.calc_liquidation_fees([0.0],
-                                                                             pred.pred[i].res.fees.lq),
+                    @test isapprox(PortfolioOptimisers.calc_liquidation_fees(pred.pred[i].res.fees.lq),
                                    0.0; atol = atol)
                 end
 
@@ -504,8 +503,7 @@
                 held = only(exit_res.fees.lq.w)
                 # The charge is the rate times the weight the fold actually threaded, which
                 # is the reference's arithmetic on this library's own weights.
-                @test isapprox(PortfolioOptimisers.calc_liquidation_fees([0.0],
-                                                                         exit_res.fees.lq),
+                @test isapprox(PortfolioOptimisers.calc_liquidation_fees(exit_res.fees.lq),
                                tc3[k3] * held; atol = atol)
                 # **Which** weight that is, is the `pws` switch, and the exit obeys it like
                 # every other turnover term. Budgeting against the targets charges the exit

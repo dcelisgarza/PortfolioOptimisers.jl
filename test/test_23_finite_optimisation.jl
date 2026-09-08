@@ -315,10 +315,9 @@ end
         @test lift.flq.w == [0.0, 0.2, 0.0, 0.0]
         @test lift.flq.val == [0.0, 10.0, 0.0, 0.0]
         # A lift charges what the reduced fee charged: the entries it added are zero.
-        @test isapprox(PO.calc_liquidation_fees([0.0], red.lq),
-                       PO.calc_liquidation_fees([0.0], lift.lq))
-        @test isapprox(PO.calc_fixed_liquidation_fees([0.0], red.flq, red.kwargs),
-                       PO.calc_fixed_liquidation_fees([0.0], lift.flq, lift.kwargs))
+        @test isapprox(PO.calc_liquidation_fees(red.lq), PO.calc_liquidation_fees(lift.lq))
+        @test isapprox(PO.calc_fixed_liquidation_fees(red.flq, red.kwargs),
+                       PO.calc_fixed_liquidation_fees(lift.flq, lift.kwargs))
         # A fee that states neither carrier owes no forced exit, and neither does a
         # `nothing` fee: the two methods answer a zero in the type the horizon and the
         # cash promote to.

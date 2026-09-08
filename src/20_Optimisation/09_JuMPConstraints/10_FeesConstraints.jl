@@ -149,7 +149,7 @@ The constant is multiplied by the homogenising variable `k`, exactly as the turn
 
  1. On a `nothing` `lq`, do nothing. No asset left the universe.
  2. Otherwise read `k`, the homogenising variable.
- 3. Compute the constant through [`calc_liquidation_fees`](@ref), against a zero vector in the element type of `lq.w`, so the numeric type is derived from the data.
+ 3. Compute the constant through [`calc_liquidation_fees`](@ref), which reads the carrier alone: a forced exit trades to zero, so the charge is the rate times `abs.(lq.w)`.
  4. Register `constant * k` and add it to `:fees` through [`add_to_fees!`](@ref).
 
 # Arguments
@@ -175,7 +175,7 @@ function set_liquidation_fees!(::JuMP.Model, ::Nothing)
 end
 function set_liquidation_fees!(model::JuMP.Model, lq::Turnover)
     k = get_k(model)
-    val = calc_liquidation_fees(zeros(eltype(lq.w), length(lq.w)), lq)
+    val = calc_liquidation_fees(lq)
     JuMP.@expression(model, flq_prop, val * k)
     add_to_fees!(model, flq_prop)
     return nothing
@@ -221,7 +221,7 @@ function set_fixed_liquidation_fees!(::JuMP.Model, ::Nothing, ::NamedTuple)
 end
 function set_fixed_liquidation_fees!(model::JuMP.Model, flq::Turnover, kwargs::NamedTuple)
     k = get_k(model)
-    val = calc_fixed_liquidation_fees(zeros(eltype(flq.w), length(flq.w)), flq, kwargs)
+    val = calc_fixed_liquidation_fees(flq, kwargs)
     JuMP.@expression(model, flq_fixed, val * k)
     add_to_one_time_fees!(model, flq_fixed)
     return nothing
