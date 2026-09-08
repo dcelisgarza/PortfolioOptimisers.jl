@@ -422,8 +422,14 @@ function attribution_factor_returns(rr::AbstractLoadingsRegressionResult,
                                     ::AbstractPriorResult)
     return throw(ArgumentError("`attribution_factor_returns` is not defined for `$(nameof(typeof(rr)))`. A realised factor attribution reads the factor return series of the block it decomposes, and every member of `AbstractLoadingsRegressionResult` that a caller attributes must add a method beside its own definition."))
 end
-function attribution_factor_returns(rr::CrossSectionalFactorModel, ::AbstractPriorResult)
-    return assert_attribution_field(rr.csr, :csr).f
+function attribution_factor_returns(rr::CrossSectionalFactorModel, pr::AbstractPriorResult)
+    f = assert_attribution_field(rr.csr, :csr).f
+    # `csr.f` holds the coefficients in the basis the fit solved in, and a Factor Family
+    # re-basis drops one column per constrained family. The contract above is the raw factor
+    # axis -- the axis `Ms` names -- so a re-based block reads the nested factor-axis prior,
+    # which carries the same coefficients already expanded onto that axis. The two series are
+    # equal when no family is constrained.
+    return has_family_rebasis(rr) ? pr.fpr.X : f
 end
 function attribution_factor_returns(::Regression, pr::AbstractPriorResult)
     return pr.fpr.X

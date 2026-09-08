@@ -871,3 +871,39 @@ end
         @test_throws PO.IsNothingError factor_attribution(w, stub, rd.X; se = true)
     end
 end
+
+# A Factor Family re-basis drops one column per constrained family from the basis the fit solves
+# in, so `csr.f` is narrower than the exposure history it is read against. The realised methods
+# align the two, and before this testset existed they raised a `DimensionMismatch` instead: every
+# fixture above leaves `families` unset, where the two axes happen to agree.
+@testset "A constrained Factor Family leaves the realised decomposition on the raw axis" begin
+    PO = PortfolioOptimisers
+    pr, rd = fa_prior(; families = ["industry" => nothing])
+    rr = pr.rr
+    w = fa_weights(pr)
+    @testset "The read answers the raw factor axis, not the basis the fit solved in" begin
+        @test PO.has_family_rebasis(rr)
+        @test size(rr.csr.f, 2) < size(rr.Ms, 3)
+        f = PO.attribution_factor_returns(rr, pr)
+        @test size(f, 2) == size(rr.Ms, 3) == length(rr.nf)
+        @test f === pr.fpr.X
+    end
+    @testset "The realised decomposition runs, and its identities close" begin
+        fa = factor_attribution(w, pr, rd.X; assets = true)
+        @test isa(fa, FactorAttributionResult)
+        @test fa.realised
+        @test length(fa.fbd.vol_contrib) == length(rr.nf)
+        @test fa.sys.vol_contrib + fa.idio.vol_contrib + fa.unattr.vol_contrib ≈
+              fa.total.vol_contrib
+        @test fa.sys.mu_contrib + fa.idio.mu_contrib + fa.unattr.mu_contrib ≈
+              fa.total.mu_contrib
+        @test fa.sys.pct_var + fa.idio.pct_var + fa.unattr.pct_var ≈ one(fa.total.pct_var)
+        @test sum(fa.fbd.vol_contrib) ≈ fa.sys.vol_contrib
+        @test sum(fa.fmbd.vol_contrib) ≈ fa.sys.vol_contrib
+    end
+    @testset "The predicted decomposition answers the same axis" begin
+        fa = factor_attribution(w, pr)
+        @test length(fa.fbd.vol_contrib) == length(rr.nf)
+        @test sum(fa.fbd.vol_contrib) ≈ fa.sys.vol_contrib
+    end
+end
