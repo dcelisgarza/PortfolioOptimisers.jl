@@ -51,11 +51,27 @@ A blank cell never reaches a carrier. [`asset_panel`](@ref) resolves every one o
 Panel Field comes out finite, and each Panel Field that can blank carries the observed mask that
 says which cells the resolution touched.
 
+The library persists no panel of its own, and it needs no format to: [`panel_dataframe`](@ref)
+renders a panel as a `DataFrames.DataFrame`, and a caller writes that with whatever they already
+use. One Panel Field name gives that field laid out as it stands, a `:long` layout gives one row
+per `(observation, asset)` filtered by the active mask, and a `:wide` layout gives one column per
+`(Panel Field column, asset)` and keeps every cell. A [`TensorPanelField`](@ref) spreads into one
+column per trailing-axis label there, under the same `"<field>=<label>"` name it takes in a
+Feature Matrix.
+
 ```@docs
 AssetPanel
 asset_panel
 panel_field
 panel_feature_matrix
+panel_dataframe
+PortfolioOptimisers.panel_frame_columns
+PortfolioOptimisers.panel_frame_fields
+PortfolioOptimisers.panel_frame_assets
+PortfolioOptimisers.panel_frame_block!
+PortfolioOptimisers.panel_frame_field
+PortfolioOptimisers.panel_frame_long
+PortfolioOptimisers.panel_frame_wide
 PortfolioOptimisers.features_are_assets
 PortfolioOptimisers.panel_onehot
 PortfolioOptimisers.RepeatedLeading
