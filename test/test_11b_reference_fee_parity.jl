@@ -338,45 +338,128 @@
                       check_sol = (; allow_local = true, allow_almost = true),
                       settings = Dict("verbose" => false, "max_step_fraction" => 0.75))
 
-        @testset "The charge matches the reference, fold for fold" begin
-            # The reference's own weights for the fold that loses the asset, and the fold
-            # before it, so the comparison carries no solver or moment difference at all.
-            wprev = [0.17137301967228055, 0.1666189142652727, 0.1961303186945051,
-                     0.1587711481740035, 0.30710659919393823]
-            wexit = [0.16730556399117805, 0.26717172952111706, 0.0, 0.2450269918497811,
-                     0.32049571463792387]
-            @test iszero(wexit[k3])
+        @testset "The parity matrix, over the delisting" begin
+            # The matrix the port is verified by: every fee the reference supports, against
+            # both weight-drift settings, summarised under both settings of `compound` —
+            # all of it over a panel where an asset delists, so every cell charges a forced
+            # exit at the fold that loses it.
+            #
+            # The comparison is driven from the **reference's own per fold weights**. That
+            # is not a shortcut, it is the only way the cells are comparable: the reference
+            # reaches a delisting solely through its exponentially weighted moments with
+            # `active_mask` routing, because its plain prior refuses a `NaN`, while this
+            # library's plain prior handles the gap natively. The two therefore fit
+            # different moments and solve to different weights. Holding the weights fixed
+            # removes that difference and leaves exactly what is being verified: the fee
+            # arithmetic, the clock, the drift and the two cumulative conventions.
+            #
+            # The reference solved the same weights in all six cells, because its default
+            # objective minimises risk and a proportional cost does not move that argmin.
+            W = [[0.23372395184635317, 0.14070442963485008, 0.18641912894883597,
+                  0.17987749947299542, 0.2592749900969653],
+                 [0.17137301967228055, 0.1666189142652727, 0.1961303186945051,
+                  0.1587711481740035, 0.30710659919393823],
+                 [0.16730556399117805, 0.26717172952111706, 0.0, 0.2450269918497811,
+                  0.32049571463792387]]
+            # Budgeting against the targets threads the previous fold's target; threading
+            # the drifted holdings threads what was actually held. The exit is priced
+            # against whichever the scheme names, so the two columns differ.
+            PW = Dict("flat" => [zeros(5), W[1], W[2]],
+                      "drift" => [zeros(5),
+                                  [0.2433787797334486, 0.13742235801900893, 0.18262568039164098,
+                                   0.1665151048099047, 0.27005807704599694],
+                                  [0.17016331410170402, 0.16136630292859214, 0.19165843402333646,
+                                   0.13656907313225372, 0.34024287581411367]])
+            # The last fold loses asset "c"; the first two keep every asset, because the
+            # mask is derived from each fold's own training window.
+            iv = [[1, 2, 3, 4, 5], [1, 2, 3, 4, 5], [1, 2, 4, 5]]
+            rows = [61:80, 81:100, 101:120]
+            @test iszero(W[3][k3])
 
-            # Transaction costs. The reference reported `total_cost = 0.002478800265941117`
-            # for this fold, which is the reduced turnover plus the exit.
-            ftn = Fees(; tn = Turnover(; w = wprev[inv3], val = tc3[inv3]),
-                       lq = Turnover(; w = [wprev[k3]], val = [tc3[k3]]))
-            @test isapprox(PortfolioOptimisers.calc_periodic_fees(wexit[inv3], ftn),
-                           0.002478800265941117; atol = atol)
-            # The exit is the whole of the difference the carrier makes.
-            @test isapprox(PortfolioOptimisers.calc_liquidation_fees(wexit[inv3], ftn.lq),
-                           tc3[k3] * wprev[k3]; atol = atol)
+            # Per fold `total_cost` and `total_fee` as the reference reported them.
+            cost = Dict("tn_flat" => [0.003956056559411261, 0.0004659372891764765,
+                                      0.002478800265941117],
+                        "tn_drift" => [0.003956056559411261, 0.0004368712140818054,
+                                       0.0025354153443862817], "mgmt_flat" => zeros(3),
+                        "mgmt_drift" => zeros(3))
+            cost["both_flat"] = cost["tn_flat"]
+            cost["both_drift"] = cost["tn_drift"]
+            mfee = [0.0004206099804145457, 0.0004271913603017645, 0.0004318243009567464]
+            fee = Dict("tn_flat" => zeros(3), "tn_drift" => zeros(3), "mgmt_flat" => mfee,
+                       "mgmt_drift" => mfee, "both_flat" => mfee, "both_drift" => mfee)
+            # The last cumulative return of the whole path, simple and compounded.
+            smp = Dict("tn_flat" => -0.11758386526314575,
+                       "tn_drift" => -0.11615253012097801,
+                       "mgmt_flat" => -0.005160495806029792,
+                       "mgmt_drift" => -0.0031781805968521953,
+                       "both_flat" => -0.1431763780966069,
+                       "both_drift" => -0.14174504295443915)
+            cmp = Dict("tn_flat" => 0.8881733007938063, "tn_drift" => 0.889433288044936,
+                       "mgmt_flat" => 0.994108461599983, "mgmt_drift" => 0.9960704820919892,
+                       "both_flat" => 0.8656826445068109,
+                       "both_drift" => 0.8669112374385091)
 
-            # The proportional holding fee. The reference reported
-            # `total_fee = 0.0004318243009567464`, and it charges no exit, because a
-            # holding fee prices the book held and not the trade that leaves it.
-            fmg = Fees(; l = mgmt3[inv3])
-            @test isapprox(PortfolioOptimisers.calc_periodic_fees(wexit[inv3], fmg),
-                           0.0004318243009567464; atol = atol)
+            # The fee a fold charges: the five per asset fields on the assets it keeps, and
+            # the liquidation carrier on the ones it lost, priced at the previous weights.
+            fold_fee = function (f, pw, use_tn, use_mg)
+                keep = iv[f]
+                gone = setdiff(1:N3, keep)
+                return Fees(; tn = if use_tn
+                                Turnover(; w = pw[keep], val = tc3[keep])
+                            else
+                                nothing
+                            end, l = use_mg ? mgmt3[keep] : nothing,
+                            lq = if (use_tn && !isempty(gone))
+                                Turnover(; w = pw[gone], val = tc3[gone])
+                            else
+                                nothing
+                            end)
+            end
 
-            # Both together, which the reference reports as the same two numbers.
-            fbo = Fees(; tn = Turnover(; w = wprev[inv3], val = tc3[inv3]), l = mgmt3[inv3],
-                       lq = Turnover(; w = [wprev[k3]], val = [tc3[k3]]))
-            @test isapprox(PortfolioOptimisers.calc_periodic_fees(wexit[inv3], fbo),
-                           0.002478800265941117 + 0.0004318243009567464; atol = atol)
+            for (fl, use_tn, use_mg) in
+                (("tn", true, false), ("mgmt", false, true), ("both", true, true)),
+                (dl, wd) in (("flat", nothing), ("drift", SelfFinancingDrift()))
 
-            # A fold that loses nothing owes no exit, which is the reference's first fold.
-            @test isapprox(PortfolioOptimisers.calc_periodic_fees(wexit[inv3],
-                                                                  Fees(;
-                                                                       tn = Turnover(;
-                                                                                     w = wprev[inv3],
-                                                                                     val = tc3[inv3]))),
-                           0.002478800265941117 - tc3[k3] * wprev[k3]; atol = atol)
+                tag = fl * "_" * dl
+                pw = PW[dl]
+                r = Float64[]
+                for f in 1:3
+                    keep = iv[f]
+                    fe = fold_fee(f, pw[f], use_tn, use_mg)
+                    wf = W[f][keep]
+
+                    # The charge this library computes for the fold, against the two
+                    # numbers the reference reported for it.
+                    @test isapprox(PortfolioOptimisers.calc_periodic_fees(wf, fe),
+                                   cost[tag][f] + fee[tag][f]; atol = atol)
+
+                    # Only the fold that loses an asset owes an exit, and it owes the rate
+                    # times the previous weight the scheme threaded.
+                    if f == 3 && use_tn
+                        @test isapprox(PortfolioOptimisers.calc_liquidation_fees(wf, fe.lq),
+                                       tc3[k3] * pw[3][k3]; atol = atol)
+                    else
+                        @test isnothing(fe.lq)
+                    end
+
+                    # The fold's realised series. A fold may hold an asset over a window
+                    # where it has no return — fold two holds "c" after it delists — and
+                    # the fold zeroes that Held Gap once, which this reconstruction does
+                    # through the same verb.
+                    Xc = PortfolioOptimisers.filter_held_gaps(wf, X3[rows[f], keep], false)
+                    append!(r, if isnothing(wd)
+                                calc_net_returns(wf, Xc, fe)
+                            else
+                                calc_net_returns(wf, Xc, fe, wd)
+                            end)
+                end
+
+                @test length(r) == 60
+                @test all(isfinite, r)
+                # Both cumulative conventions, against the reference's own summaries.
+                @test isapprox(cumulative_returns(r)[end], smp[tag]; atol = 1e-14)
+                @test isapprox(cumulative_returns(r, true)[end], cmp[tag]; atol = 1e-14)
+            end
         end
 
         @testset "This library's pipeline, across drift and compound" begin
