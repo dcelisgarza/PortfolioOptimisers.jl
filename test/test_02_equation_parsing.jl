@@ -154,9 +154,14 @@ end
     @test occursin("3 assets under key `nx`", m1)
     @test occursin("did you mean `AAPL`?", m1)
     @test !occursin("GOOG", m1)              # universe not dumped
-    # All-zero-row message: no suggestion, noun switches for views.
-    @test occursin("constraint `APL >= 0.05` matched no assets",
+    # All-zero-row message: no suggestion, noun switches for views. The row reached this
+    # branch with every name resolved -- one that did not took the row with it -- so the
+    # text says the row cancelled, never that a name missed the universe (#943).
+    @test occursin("constraint `APL >= 0.05` resolved every name against the universe",
                    pe.empty_row_msg("APL >= 0.05", nx, "nx"))
+    @test occursin("still summed to zero, so it constrains nothing; row dropped",
+                   pe.empty_row_msg("APL >= 0.05", nx, "nx"))
+    @test !occursin("matched no", pe.empty_row_msg("APL >= 0.05", nx, "nx"))
     @test occursin("view `", pe.empty_row_msg("APL == 0.02", nx, "nx"; noun = "view"))
     @test !occursin("did you mean", pe.empty_row_msg("APL >= 0.05", nx, "nx"))
     # Global default: threshold gates, metric is swappable (ScopedConfig setter).

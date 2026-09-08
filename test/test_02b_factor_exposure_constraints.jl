@@ -252,11 +252,11 @@
         end
         msgs = [l.message for l in logs]
         @test any(m -> occursin("not in factor universe", m), msgs)
-        @test !any(m -> occursin("matched no factors in the universe", m), msgs)
+        @test !any(m -> occursin("summed to zero", m), msgs)
         @test length(msgs) == 1
         # A row whose names *did* resolve but whose loadings annihilate it is a different
-        # failure, and says so: reporting "matched no factors" would send a user hunting for
-        # a typo that is not there.
+        # failure, and says so: reporting the row's own arithmetic for it would send a user
+        # auditing coefficients that are fine.
         rrz = Regression(; M = [0.0 0.0 0.2; 0.0 0.5 0.0; 0.0 1.0 0.7])
         msg = try
             linear_constraints(ExposureConstraintEstimator(;

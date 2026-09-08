@@ -1563,4 +1563,17 @@ end
     @test_throws ArgumentError PortfolioOptimisers.get_black_litterman_views(parse_equation("A - A == 0.0"),
                                                                              bsets;
                                                                              strict = true)
+    # `A` is in the universe, so the refusal must not say the row matched nothing: it says
+    # the row resolved and cancelled, which is the failure the user has to fix (#943).
+    msg = try
+        PortfolioOptimisers.get_black_litterman_views(parse_equation("A - A == 0.0"), bsets;
+                                                      strict = true)
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("view `", msg)
+    @test occursin("resolved every name against the universe (3 assets under key `nx`)",
+                   msg)
+    @test occursin("still summed to zero, so it constrains nothing; row dropped", msg)
+    @test !occursin("matched no", msg)
 end

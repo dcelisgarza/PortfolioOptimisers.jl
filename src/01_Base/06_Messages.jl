@@ -108,14 +108,16 @@ end
     empty_row_msg(eqn, nx, key; noun::AbstractString = "constraint",
                   axis::AbstractString = "asset") -> String
 
-Build the warning/error text for a parsed equation `eqn` whose every term missed the universe `nx` (stored under `key`), leaving an all-zero row that is dropped. Names the equation and the universe *size* only — never the full universe or the parsed struct. `noun` is `"constraint"` for linear constraints or `"view"` for Black-Litterman views; `axis` names the universe, as in [`unknown_variable_msg`](@ref).
+Build the warning/error text for a parsed equation `eqn` whose every name *resolved* against the universe `nx` (stored under `key`) and whose row is nonetheless all zero, so it is dropped. Names the equation and the universe *size* only — never the full universe or the parsed struct. `noun` is `"constraint"` for linear constraints or `"view"` for Black-Litterman views; `axis` names the universe, as in [`unknown_variable_msg`](@ref).
+
+A name that misses the universe never reaches this message: the row is the unit, so an unresolved name takes the whole row with it at the name, reported by [`unknown_variable_msg`](@ref) with `consequence = "row dropped"` (see `docs/adr/0125-a-view-row-that-names-a-departed-asset-is-dropped-whole.md`). What is left here summed to zero for a different reason: coefficients that cancel, as in `A - A == 0.0`, which parses to the single term `0.0*A`, or a row that carries no variable at all, as in `1 == 0.004`. Reporting a typo for either would send a user hunting for one that is not there — the same discipline as [`empty_projected_row_msg`](@ref) and [`zero_centrality_msg`](@ref).
 
 Shared by [`get_linear_constraints`](@ref) and Black-Litterman view generation.
 
 # Arguments
 
-  - `eqn`: The parsed equation whose every term missed the universe.
-  - `nx`: The universe the terms missed. Only its length reaches the message.
+  - `eqn`: The parsed equation that resolved and still summed to zero.
+  - `nx`: The universe the terms resolved against. Only its length reaches the message.
   - `key`: The key the universe is stored under.
   - `noun::AbstractString = "constraint"`: `"constraint"` for a linear constraint, `"view"` for a Black-Litterman view.
   - `axis::AbstractString = "asset"`: Name of the universe, as in [`unknown_variable_msg`](@ref).
@@ -131,14 +133,14 @@ Shared by [`get_linear_constraints`](@ref) and Black-Litterman view generation.
 """
 function empty_row_msg(eqn, nx, key; noun::AbstractString = "constraint",
                        axis::AbstractString = "asset")
-    return "$(noun) `$(eqn)` matched no $(axis)s in the universe ($(length(nx)) $(axis)s under key `$(key)`); row dropped"
+    return "$(noun) `$(eqn)` resolved every name against the universe ($(length(nx)) $(axis)s under key `$(key)`) and still summed to zero, so it constrains nothing; row dropped"
 end
 """
     empty_projected_row_msg(eqn, nf, key, n; noun::AbstractString = "constraint") -> String
 
 Build the warning/error text for a re-based equation `eqn` whose terms *did* resolve against the factor universe `nf` (stored under `key`), but whose projection through the loadings is an all-zero row over `n` assets.
 
-This diagnosis exists only under a re-basis, and it is a different failure from [`empty_row_msg`](@ref): there the names missed the universe, here they hit it and the basis annihilated them. Reporting the first for the second would send a user hunting for a typo that is not there — the real cause is a factor no asset loads on.
+This diagnosis exists only under a re-basis, and it is a different failure from [`empty_row_msg`](@ref): there the row's own coefficients came to zero, here they did not and the basis annihilated them. The real cause is a factor no asset loads on, and naming the equation's own arithmetic for it would send a user auditing coefficients that are fine.
 
 # Arguments
 
