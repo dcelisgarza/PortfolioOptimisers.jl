@@ -11,7 +11,7 @@ commit = "fda13accfd"
 [file]
 "ext/PortfolioOptimisersImputeExt.jl" = { code = 6, doc = 0, comment = 4, blank = 3, total = 13 }
 "ext/PortfolioOptimisersPlotsExt.jl" = { code = 2508, doc = 0, comment = 183, blank = 46, total = 2737 }
-"src/01_Base/01_DocstringDictionaries.jl" = { code = 1112, doc = 113, comment = 123, blank = 43, total = 1391 }
+"src/01_Base/01_DocstringDictionaries.jl" = { code = 1113, doc = 113, comment = 123, blank = 43, total = 1392 }
 "src/01_Base/02_TypeRoots.jl" = { code = 18, doc = 241, comment = 0, blank = 115, total = 374 }
 "src/01_Base/03_PrettyShow.jl" = { code = 117, doc = 138, comment = 0, blank = 76, total = 331 }
 "src/01_Base/04_ScopedConfig.jl" = { code = 163, doc = 491, comment = 2, blank = 214, total = 870 }
@@ -226,7 +226,7 @@ commit = "fda13accfd"
 "src/20_Optimisation/07_HierarchicalEqualRiskContribution.jl" = { code = 408, doc = 326, comment = 10, blank = 88, total = 832 }
 "src/20_Optimisation/08_Base_JuMPOptimisation.jl" = { code = 552, doc = 999, comment = 57, blank = 447, total = 2055 }
 "src/20_Optimisation/09_JuMPConstraints/01_MIPIndicators.jl" = { code = 331, doc = 534, comment = 20, blank = 211, total = 1096 }
-"src/20_Optimisation/09_JuMPConstraints/02_Returns_and_ObjectiveFunctions.jl" = { code = 624, doc = 1011, comment = 32, blank = 388, total = 2055 }
+"src/20_Optimisation/09_JuMPConstraints/02_Returns_and_ObjectiveFunctions.jl" = { code = 647, doc = 1090, comment = 36, blank = 406, total = 2179 }
 "src/20_Optimisation/09_JuMPConstraints/03_BudgetConstraints.jl" = { code = 430, doc = 434, comment = 0, blank = 152, total = 1016 }
 "src/20_Optimisation/09_JuMPConstraints/04_WeightConstraints.jl" = { code = 93, doc = 102, comment = 2, blank = 51, total = 248 }
 "src/20_Optimisation/09_JuMPConstraints/05_SDPConstraints.jl" = { code = 73, doc = 66, comment = 0, blank = 36, total = 175 }
