@@ -413,17 +413,19 @@ end
         crashing: generation already decided the condition was recoverable and
         returned nothing, and the slot's job is to carry constraints, not to
         re-diagnose that.
+
+        One warning, not two: an unresolved name takes its whole row (ADR 0125), so
+        the row never reaches the empty-row report that used to say the same thing a
+        second time.
         =#
         ece_none = ExposureConstraintEstimator(;
                                                lce = LinearConstraintEstimator(;
                                                                                val = "NOPE <= 0.3"),
                                                space = FactorSpace())
-        res_none = (@test_logs (:warn,) (:warn,) fit(Pipeline(;
-                                                              steps = (FactorPrior(),
-                                                                       ece_none,
-                                                                       MeanRisk(;
-                                                                                opt = jopt()))),
-                                                     rd))
+        res_none = (@test_logs (:warn,) fit(Pipeline(;
+                                                     steps = (FactorPrior(), ece_none,
+                                                              MeanRisk(; opt = jopt()))),
+                                            rd))
         @test isnothing(res_none.ctx.constraints)
         @test isapprox(sum(res_none.w), 1)
         #=
