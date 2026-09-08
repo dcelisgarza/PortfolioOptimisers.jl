@@ -327,17 +327,21 @@ Both are measured. Over a ``250 \\times 5`` sample on three factors with two fac
 # Algorithm
 
  1. Orient `X` and `F` with [`dims_oriented`](@ref), to `observations × assets` and `observations × factors`.
- 2. When `pe.views` resolves names, check the declared factor axis against the width of `F` with [`factor_universe`](@ref). A precomputed [`BlackLittermanViews`](@ref) resolves no name, so step 4 checks its width instead.
- 3. Fit the wrapped prior `pe.pe` on `(X, F)`, giving `prior_result`, check it carries a regression with [`assert_prior_regression`](@ref), read `posterior_X`, `prior_sigma`, `fpr` and `rr` off it, and refuse a `rr` that states a re-based Factor Family through [`has_family_rebasis`](@ref).
- 4. Assemble the views and their uncertainty with [`bl_preroll`](@ref), over the **factor** prior covariance and `size(F, 1)` observations, giving `P`, `Q` and `omega`. The axis is `:tfkey`, because these views land on the factors.
- 5. Build the posterior factor precision ``\\mathbf{H}`` as `sigma_hat`.
- 6. Solve `sigma_hat` against the sum of the two precision-weighted means, giving `mu_hat`, the posterior factor mean ``\\bar{\\boldsymbol{\\Pi}}_f``.
- 7. Build the posterior asset covariance from ``\\mathbf{H}``, the loadings and `prior_sigma`, giving `posterior_sigma`.
- 8. Process `posterior_sigma` in place with [`matrix_processing!`](@ref), under `pe.mp` and `posterior_X`.
- 9. Build the posterior asset mean from the same quantities, add `rr.b`, and add `pe.rf` with [`apply_rf`](@ref). This is the one site that adds the rate.
-10. Invert `sigma_hat` for the posterior factor covariance ``\\bar{\\mathbf{\\Sigma}}_f``, and process it in place under `pe.f_mp` and `F`.
-11. Forward the factor block with [`forward_prior`](@ref), replacing `mu` and `sigma` by the posterior factor pair and dropping `chol`.
-12. Forward the whole of `prior_result` with [`forward_prior`](@ref), replacing `mu` and `sigma` by the posterior asset pair, dropping `chol`, and replacing `fpr` by the block of step 11.
+ 2. When `pe.views` resolves names, check the declared factor axis against the width of `F` with [`factor_universe`](@ref). A precomputed [`BlackLittermanViews`](@ref) resolves no name, so step 6 checks its width instead.
+ 3. Fit the wrapped prior `pe.pe` on `(X, F)`, giving `prior_result`, and check it carries a regression with [`assert_prior_regression`](@ref).
+ 4. Derive the Investable Mask with [`investable_mask`](@ref) and view the fitted prior at it with [`investable_prior`](@ref). The mask alone, and not [`investable_views`](@ref): the views land on the factors, so there is no Non-Investable Axis to mint and no asset universe this member otherwise reads.
+ 5. Read `posterior_X`, `prior_sigma`, `fpr` and `rr` off the *reduced* prior, and refuse a `rr` that states a re-based Factor Family through [`has_family_rebasis`](@ref).
+ 6. Assemble the views and their uncertainty with [`bl_preroll`](@ref), over the **factor** prior covariance and `size(F, 1)` observations, giving `P`, `Q` and `omega`. The axis is `:tfkey`, because these views land on the factors.
+ 7. Build the posterior factor precision ``\\mathbf{H}`` as `sigma_hat`.
+ 8. Solve `sigma_hat` against the sum of the two precision-weighted means, giving `mu_hat`, the posterior factor mean ``\\bar{\\boldsymbol{\\Pi}}_f``.
+ 9. Build the posterior asset covariance from ``\\mathbf{H}``, the loadings and `prior_sigma`, giving `posterior_sigma`.
+10. Process `posterior_sigma` in place with [`matrix_processing!`](@ref), under `pe.mp` and `posterior_X`.
+11. Build the posterior asset mean from the same quantities, add `rr.b`, and add `pe.rf` with [`apply_rf`](@ref). This is the one site that adds the rate.
+12. Invert `sigma_hat` for the posterior factor covariance ``\\bar{\\mathbf{\\Sigma}}_f``, and process it in place under `pe.f_mp` and `F`.
+13. Forward the factor block with [`forward_prior`](@ref), replacing `mu` and `sigma` by the posterior factor pair and dropping `chol`. It is not expanded: the reduction never touched the factor axis.
+14. Announce the departures once with [`announce_bl_departures`](@ref), naming them with [`investable_universe_names`](@ref).
+15. Write both asset posteriors back onto the full asset universe with [`expand_moment`](@ref), so a non-investable asset carries `NaN` in `mu` and on the diagonal of `sigma`.
+16. Forward the whole of `prior_result` with [`forward_prior`](@ref), replacing `mu` and `sigma` by the expanded asset pair, dropping `chol`, and replacing `fpr` by the block of step 13.
 
 # Arguments
 
@@ -387,8 +391,18 @@ function prior(pe::BayesianBlackLittermanPrior, X::MatNum, F::MatNum,
     end
     prior_result = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
     assert_prior_regression(prior_result, :pe)
-    posterior_X, prior_sigma, fpr, rr = prior_result.X, prior_result.sigma,
-                                        prior_result.fpr, prior_result.rr
+    # The reduction, once, at this estimator's entry. The views land on the *factors*, so the
+    # view axis is untouched by a departure and no view row can be dropped for one — which is
+    # why this member reduces with the mask alone rather than through [`investable_views`](@ref):
+    # it has no Non-Investable Axis to mint, and demanding an asset universe it otherwise
+    # never reads would refuse a legitimate factor-only `sets`.
+    #
+    # What a departure does poison is the asset side, and it poisons all of it: `prior_sigma`
+    # is inverted twice below, so one `NaN` column reaches every entry of both posteriors and
+    # the fit fails inside LAPACK, naming neither the asset that left nor why it mattered.
+    imsk = investable_mask(prior_result)
+    vpr = investable_prior(imsk, prior_result)
+    posterior_X, prior_sigma, fpr, rr = vpr.X, vpr.sigma, vpr.fpr, vpr.rr
     # The views land on the factors, so the update below inverts `f_sigma` twice. A factor
     # model fitted in a re-based Factor Family states a raw factor axis that is a linear
     # image of a smaller one, so a covariance on that axis is singular by construction.
@@ -402,6 +416,9 @@ function prior(pe::BayesianBlackLittermanPrior, X::MatNum, F::MatNum,
     @argcheck(!has_family_rebasis(rr),
               ArgumentError("`pe` returned a prior whose factor model was fitted in a re-based Factor Family, so `pr.fpr.sigma` sits on the raw factor axis of `pr.rr.M` and that axis is a linear image of a smaller one. $(nameof(BayesianBlackLittermanPrior)) applies its views to the factor distribution and inverts that covariance, which is singular by construction, so the update has no answer.\nApply the views on the asset axis with `$(nameof(BlackLittermanPrior))`, which reads no factor covariance, or wrap a prior whose factor model re-bases no family.\nGot\npe => $(nameof(typeof(pe.pe)))\nrr => $(nameof(typeof(rr)))"))
     f_mu, f_sigma = fpr.mu, fpr.sigma
+    # `pe.sets` goes through unreduced and unminted: the views resolve against `tfkey`, and
+    # the reduction took asset columns, which that universe does not describe. No ledger
+    # either — nothing on this path can drop a view row.
     (; P, Q, omega) = bl_preroll(pe.views, pe.sets, pe.views_conf, f_sigma, pe.tau,
                                  size(F, 1), eltype(posterior_X), strict, :tfkey)
     (; b, M) = rr
@@ -430,6 +447,13 @@ function prior(pe::BayesianBlackLittermanPrior, X::MatNum, F::MatNum,
     # that weighting's diagnostics forward untouched (ADR 0046).
     posterior_fpr = forward_prior(fpr; mu = mu_hat, sigma = f_posterior_sigma,
                                   chol = nothing)
+    announce_bl_departures(investable_universe_names(pe.sets, imsk), String[], false)
+    # The expansion, onto the caller's own universe: a prior result lives on the FULL asset
+    # axis, with a `NaN` in `mu` and on the diagonal of `sigma` for an asset that is not
+    # investable, so that the next layer derives the same mask this one did. The factor block
+    # is not expanded — the reduction never touched the factor axis.
+    posterior_mu = expand_moment(posterior_mu, imsk, 1)
+    posterior_sigma = expand_moment(posterior_sigma, imsk)
     # Everything else the wrapped prior carried is forwarded (see [`forward_prior`](@ref));
     # `chol` is the only drop, because `posterior_sigma` supersedes the covariance it
     # factorises. `posterior_X` is `prior_result.X` unchanged, so the wrapped `w` still

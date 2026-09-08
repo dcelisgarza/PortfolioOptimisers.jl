@@ -2563,7 +2563,6 @@ function get_linear_constraints(lcs::PR_VecPR, sets::UniverseSets,
                 dropped = true
                 continue
             end
-            matched = true
             At .+= constraint_row_term(rr, Ai, c)
         end
         if dropped

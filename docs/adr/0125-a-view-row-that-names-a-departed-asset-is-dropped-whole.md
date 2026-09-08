@@ -164,6 +164,33 @@ caller has no other way to learn it.
 `bl_preroll`'s named error is kept for the case it was written for: a view set that was empty, or
 mistyped, from the start.
 
+### A precomputed view matrix over a gapped universe is refused by name
+
+Every rule above works by resolving the caller's view **names** against the universe that survives.
+A `BlackLittermanViews` passed in ready-made resolves none: `black_litterman_views` hands it back
+untouched, because it was assembled against whatever universe the caller held and nothing
+downstream can re-check it. So its `P` cannot be reduced — there is no way to tell which of its rows
+the departed asset belonged to — and there is nothing to reduce it *by*, because an estimator whose
+views are precomputed is permitted to carry no `sets` at all.
+
+Left alone this is the defect the rest of this ADR removes, unfixed for one configuration and
+**silent**: the update forms `P * sigma * transpose(P)` over the full universe, `0 * NaN` is `NaN`,
+and every entry of the posterior comes back `NaN`. Under the default matrix processing that
+surfaces one layer later as `ArgumentError: matrix contains Infs or NaNs`, naming the wrong cause;
+under a matrix processing estimator that does nothing — a legitimate configuration — the fit
+*succeeds* and the caller is handed an empty universe.
+
+So a Black–Litterman estimator whose `sets` is `nothing` refuses, by name, when the wrapped prior
+left any asset out. The message states why the pair cannot be reduced and names the two ways out:
+state the views as a `LinearConstraintEstimator` over a `UniverseSets`, which resolves names and
+drops only the rows a departure actually took, or fit over a universe in which every asset is
+investable. This is the map's rule where it has to be — handle it, or throw a named error — and it
+is the only place in the family where the second half applies.
+
+The refusal is scoped to the two members whose views land on the **asset** axis. A precomputed
+*factor* view matrix is unaffected by an asset departure, so `BayesianBlackLittermanPrior` and
+`FactorBlackLittermanPrior` reduce their asset side and carry a precomputed `P` through unchanged.
+
 ## Consequences
 
 - A view naming an asset that delists no longer poisons a posterior, refuses under `strict = true`,
@@ -191,6 +218,20 @@ mistyped, from the start.
 - A walk-forward whose views name an asset that delists mid-sample runs to the end, and the windows
   after the delisting are fitted on fewer views than the windows before it. The per-window record is
   the only place that difference is visible.
+- A **precomputed** asset-side view matrix over a gapped universe is refused by name rather than
+  reduced. It is the one configuration in the family that cannot be reduced, and the one place this
+  ADR's rule falls to the second half of the map's: handle it, or throw a named error.
+- The Black–Litterman family expands where the entropy pooling family does not, and the asymmetry is
+  structural rather than a difference of care. An entropy pooling row runs over **observations**, so
+  its solved probabilities carry no asset axis; a Black–Litterman posterior is a moment pair over
+  the reduced assets, and the contract says a prior result lives on the full universe. So the four
+  Black–Litterman members write theirs back with `expand_moment`, and `FactorBlackLittermanPrior`
+  and `AugmentedBlackLittermanPrior` write their reconstruction and their regression back too. A
+  Cholesky factor is the one thing dropped rather than expanded: a `NaN` frame has no factorisation.
+- The `w` a prior estimator carries is per-asset configuration and is sliced to the reduced axis
+  with `investable_weights_view`, the verb the optimisation side already had. Without that,
+  `FactorBlackLittermanPrior` and `AugmentedBlackLittermanPrior` met a narrower loadings matrix with
+  a full-universe weight vector and raised a bare `DimensionMismatch` naming no asset.
 
 ## Alternatives refused
 
@@ -220,8 +261,17 @@ mistyped, from the start.
   diagnostics closest to what the caller wrote. Refused because the builder still needs the mask to
   shed a group's departed members, so the axis is required either way, and the assembled pair would
   come out at a width the rest of the reduced path does not use.
-- **Announce the departure at the prior too**, so a standalone fit reports it. Refused because the
-  door announces the same names immediately after every fit that happens inside an optimisation.
 - **Keep `bl_preroll`'s refusal when every view drops.** Refused for the reason the strict refusal
   was: the caller could not have known, and the window is the one place the refusal is least
   actionable.
+- **Reduce a precomputed `P` by slicing its columns at the mask**, dropping the rows left with no
+  nonzero coefficient. Refused because it guesses at what the caller wrote: a row can be annihilated
+  by its own coefficients rather than by a departure, and the two are indistinguishable once the
+  names are gone. A caller who wants a departure handled has a way to say so — resolve the views by
+  name — and the refusal names it.
+- **Answer the empty-view algebra rather than the wrapped prior**, letting a `0 × N` view matrix run
+  through the master equations. Refused because the covariance term adds the estimation-error block
+  ``\tau\mathbf{\Sigma}``, so an empty ``\mathbf{P}`` widens the posterior to
+  ``(1 + \tau)\mathbf{\Sigma}`` — a covariance produced by views that no longer exist. The augmented
+  member is the one place the empty block *is* right, and there for the opposite reason: its factor
+  views survived and still condition the joint posterior.

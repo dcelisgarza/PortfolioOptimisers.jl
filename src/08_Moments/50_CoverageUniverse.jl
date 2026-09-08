@@ -346,6 +346,39 @@ function expand_columns(A::MatNum, cmsk::BitVector)
     return frame
 end
 """
+    reduce_columns(A::MatNum, cmsk::Nothing) -> A
+    reduce_columns(A::MatNum, cmsk::BitVector) -> MatNum
+
+Take the columns of an `observations × assets` block that a mask keeps.
+
+This is the inverse of [`expand_columns`](@ref), and it is written beside it so that the pair cannot drift. [`coverage_reduction`](@ref) does the same slice for a mask it derives itself; this is for a caller that already holds one — an [`AugmentedBlackLittermanPrior`](@ref) reduces its returns by the Investable Mask its *asset prior* answered, which is not the same mask the returns alone would give: a column can be quoted throughout the window and still be unestimable.
+
+A copy and not a view, because the block goes on to a regression, and a `SubArray` of an open-eltype array is where the compiler stops inferring.
+
+`nothing` is the all-covered path and returns the block untouched.
+
+# Arguments
+
+  - `A`: The block to reduce, `observations × assets`.
+  - `cmsk`: The mask to keep, or `nothing`.
+
+# Returns
+
+  - The block over the kept columns.
+
+# Related
+
+  - [`expand_columns`](@ref)
+  - [`coverage_reduction`](@ref)
+  - [`investable_mask`](@ref)
+"""
+function reduce_columns(A::MatNum, ::Nothing)
+    return A
+end
+function reduce_columns(A::MatNum, cmsk::BitVector)
+    return A[:, cmsk]
+end
+"""
     expand_rows(A::MatNum, cmsk::Nothing) -> A
     expand_rows(A::MatNum, cmsk::BitVector) -> MatNum
 

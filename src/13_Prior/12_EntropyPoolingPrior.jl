@@ -3604,9 +3604,9 @@ function ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<
     # so it is derived once and each refit is viewed at it. Nothing is expanded: an `epc`
     # row runs over observations, and the moments come from the refit prior, which already
     # carries the full-universe frame. See ADR 0115 and ADR 0125.
-    idx, vsets, ni = ep_investable_views(pr, pe.sets)
+    imsk, vsets, ni = investable_views(pr, pe.sets)
     led = String[]
-    vpr = ep_investable_prior(idx, pr)
+    vpr = investable_prior(imsk, pr)
     fixed = falses(size(vpr.X, 2), 2)
     epc = Dict{Symbol, Tuple{<:MatNum, <:VecNum}}()
     tvs = Vector{AbstractEntropyPoolingTailView}(undef, 0)
@@ -3620,7 +3620,7 @@ function ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<
         w1 = entropy_pooling(w0, epc, tvs, pe.opt)
         pe = factory(pe, w1)
         pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
-        vpr = ep_investable_prior(idx, pr)
+        vpr = investable_prior(imsk, pr)
     end
     if !isnothing(pe.sigma_views) || !isnothing(pe.cov_views)
         # sigma
@@ -3643,7 +3643,7 @@ function ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<
                                  pe.opt)
             pe = factory(pe, w1)
             pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
-            vpr = ep_investable_prior(idx, pr)
+            vpr = investable_prior(imsk, pr)
         end
     end
     if !isnothing(pe.rho_views) || !isnothing(pe.sk_views) || !isnothing(pe.kt_views)
@@ -3742,9 +3742,9 @@ function ep_prior(alg::H0_EntropyPooling, pe::EntropyPoolingPrior, X::MatNum,
     end
     # See the note at the same seam in the staged method: every row is built on the
     # investable columns, because `0 * NaN` is `NaN`. ADR 0115 and ADR 0125.
-    idx, vsets, ni = ep_investable_views(pr, pe.sets)
+    imsk, vsets, ni = investable_views(pr, pe.sets)
     led = String[]
-    vpr = ep_investable_prior(idx, pr)
+    vpr = investable_prior(imsk, pr)
     epc = Dict{Symbol, Tuple{<:MatNum, <:VecNum}}()
     tvs = Vector{AbstractEntropyPoolingTailView}(undef, 0)
     # mu, VaR, CVaR, EVaR and RLVaR

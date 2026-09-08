@@ -21,6 +21,7 @@ PortfolioOptimisers.panel_moment_masks
 PortfolioOptimisers.coverage_nan_frame
 PortfolioOptimisers.coverage_pair_index
 PortfolioOptimisers.expand_columns
+PortfolioOptimisers.reduce_columns
 PortfolioOptimisers.expand_rows
 PortfolioOptimisers.expand_vector
 PortfolioOptimisers.expand_moment

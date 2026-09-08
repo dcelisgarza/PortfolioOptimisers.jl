@@ -797,9 +797,9 @@ function ep_prior(alg::StagedEP, pe::MeucciEntropyPoolingPrior, X::MatNum,
     # See the note at the same seam in `EntropyPoolingPrior`'s staged `ep_prior`: every row
     # is built on the investable columns, because `0 * NaN` is `NaN`, and the mask does not
     # move between stages. ADR 0115 and ADR 0125.
-    idx, vsets, ni = ep_investable_views(pr, pe.sets)
+    imsk, vsets, ni = investable_views(pr, pe.sets)
     led = String[]
-    vpr = ep_investable_prior(idx, pr)
+    vpr = investable_prior(imsk, pr)
     fixed = falses(size(vpr.X, 2), 2)
     epc = Dict{Symbol, Tuple{<:MatNum, <:VecNum}}()
     # mu and VaR
@@ -817,7 +817,7 @@ function ep_prior(alg::StagedEP, pe::MeucciEntropyPoolingPrior, X::MatNum,
         w1 = ep_cvar_views_solve!(cvv, epc, w0, pe.opt)
         pe = factory(pe, w1)
         pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
-        vpr = ep_investable_prior(idx, pr)
+        vpr = investable_prior(imsk, pr)
     end
     if !isnothing(pe.sigma_views) || !isnothing(pe.cov_views)
         # sigma
@@ -838,7 +838,7 @@ function ep_prior(alg::StagedEP, pe::MeucciEntropyPoolingPrior, X::MatNum,
                                       pe.opt)
             pe = factory(pe, w1)
             pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
-            vpr = ep_investable_prior(idx, pr)
+            vpr = investable_prior(imsk, pr)
         end
     end
     if !isnothing(pe.rho_views) || !isnothing(pe.sk_views) || !isnothing(pe.kt_views)
@@ -984,9 +984,9 @@ function ep_prior(alg::H0_EntropyPooling, pe::MeucciEntropyPoolingPrior, X::MatN
     end
     # See the note at the same seam in the staged method: every row is built on the
     # investable columns, because `0 * NaN` is `NaN`. ADR 0115 and ADR 0125.
-    idx, vsets, ni = ep_investable_views(pr, pe.sets)
+    imsk, vsets, ni = investable_views(pr, pe.sets)
     led = String[]
-    vpr = ep_investable_prior(idx, pr)
+    vpr = investable_prior(imsk, pr)
     epc = Dict{Symbol, Tuple{<:MatNum, <:VecNum}}()
     # mu and VaR
     # Every `prior(...)` reference resolves against the fit above.

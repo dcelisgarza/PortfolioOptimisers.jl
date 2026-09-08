@@ -1052,27 +1052,31 @@ end
 @testset "The entropy pooling door reduces, and no view is expanded back" begin
     prd = prior(EmpiricalPrior(), rdd)
     @test PortfolioOptimisers.investable_mask(prd) == BitVector([1, 1, 0, 1, 1])
-    idx, vsets, ni = PortfolioOptimisers.ep_investable_views(prd, setsd)
-    @test idx == keep
+    # The door hands back the Investable Mask itself, not the positions: it is what
+    # `investable_prior` views at and what `expand_moment` writes back through, so a caller
+    # that reduces and expands — the Black-Litterman family does both — needs nothing else.
+    imsk, vsets, ni = PortfolioOptimisers.investable_views(prd, setsd)
+    @test imsk == BitVector([1, 1, 0, 1, 1])
+    @test findall(imsk) == keep
     @test ni == [nx[k]]
     @test vsets.dict["nx"] == nx[keep]
     @test vsets.dict["ni"] == [nx[k]]
-    # The prior is viewed at the same index, and the view is exact.
-    vpr = PortfolioOptimisers.ep_investable_prior(idx, prd)
+    # The prior is viewed at the same mask, and the view is exact.
+    vpr = PortfolioOptimisers.investable_prior(imsk, prd)
     @test vpr.mu == prd.mu[keep]
     @test vpr.sigma == prd.sigma[keep, keep]
     # The all-investable path returns its arguments untouched, and views nothing.
     prk2 = prior(EmpiricalPrior(), rddk)
-    idxk, vsetsk, nik = PortfolioOptimisers.ep_investable_views(prk2, setsdk)
-    @test isnothing(idxk)
+    imskk, vsetsk, nik = PortfolioOptimisers.investable_views(prk2, setsdk)
+    @test isnothing(imskk)
     @test vsetsk === setsdk
     @test isempty(nik)
-    @test PortfolioOptimisers.ep_investable_prior(idxk, prk2) === prk2
+    @test PortfolioOptimisers.investable_prior(imskk, prk2) === prk2
     # Sets that do not cover the fitted universe are named, not a BoundsError.
-    @test_throws DimensionMismatch PortfolioOptimisers.ep_investable_views(prd, setsdk)
+    @test_throws DimensionMismatch PortfolioOptimisers.investable_views(prd, setsdk)
     # No sets is no views, so there is nothing to reduce for.
-    idxn, vsetsn, nin = PortfolioOptimisers.ep_investable_views(prd, nothing)
-    @test isnothing(idxn)
+    imskn, vsetsn, nin = PortfolioOptimisers.investable_views(prd, nothing)
+    @test isnothing(imskn)
     @test isnothing(vsetsn)
     @test isempty(nin)
 end
@@ -1235,4 +1239,328 @@ end
     oracle = prior(EntropyPoolingPrior(; pe = EmpiricalPrior(), rho_views = rv,
                                        sets = setsgk), rddk)
     @test gapped.w == oracle.w
+end
+
+# ---------------------------------------------------------------------------------------
+# Issue #921: the Black-Litterman family reduces once at its entry and expands its
+# posterior back to the full universe.
+#
+# A view is a dense linear form over the asset axis, and `0 * NaN` is `NaN`, so before this
+# a departed asset poisoned `omega` and with it every entry of both posteriors — under a
+# view naming only LIVE assets exactly as thoroughly as under one naming the asset that
+# left. #919 measured all four members on `dev`: `BlackLittermanPrior` returned an
+# all-`NaN` result whose Investable Mask was empty, and the other three raised an unnamed
+# `ArgumentError` or `BoundsError` from LAPACK, the regression or `posdef!`.
+#
+# Unlike the entropy pooling family, this one owes an EXPANSION: an `epc` row runs over
+# observations, but a Black-Litterman posterior is a moment pair over the reduced assets,
+# and the contract is that a prior result lives on the full asset universe.
+#
+# The oracle throughout is the same fit with the dead column removed by hand.
+# ---------------------------------------------------------------------------------------
+
+# The family needs factors, which `rdd` does not carry.
+rddf = ReturnsResult(; nx = nx, X = Xd, nf = nf, F = F,
+                     pnl = AssetPanel(;
+                                      pf = [NumericPanelField(; name = "mcap",
+                                                              vals = ones(T, N))],
+                                      amsk = damsk, emsk = damsk))
+rddfk = ReturnsResult(; nx = nx[keep], X = Xd[:, keep], nf = nf, F = F,
+                      pnl = AssetPanel(;
+                                       pf = [NumericPanelField(; name = "mcap",
+                                                               vals = ones(T, length(keep)))],
+                                       amsk = damsk[:, keep], emsk = damsk[:, keep]))
+setsdf = UniverseSets(; dict = Dict("nx" => nx, "nf" => nf))
+setsdfk = UniverseSets(; dict = Dict("nx" => nx[keep], "nf" => nf))
+blview = LinearConstraintEstimator(; val = ["a == 0.001", "b == 0.0008"])
+blfview = LinearConstraintEstimator(; val = ["f1 == 0.002", "f2 == 0.001"])
+
+@testset "A Black-Litterman view on live assets reaches the hand-reduced fit exactly" begin
+    # This is the ticket's defect. On `dev` the gapped fit came back all-`NaN` with an empty
+    # Investable Mask, and said nothing at all about it. The parity is exact, not
+    # approximate, because the reduction is a slice and the master equations see identical
+    # numbers.
+    oracle = prior(BlackLittermanPrior(; pe = EmpiricalPrior(), views = blview,
+                                       sets = setsdfk), rddfk)
+    gapped = prior(BlackLittermanPrior(; pe = EmpiricalPrior(), views = blview,
+                                       sets = setsdf), rddf)
+    @test gapped.mu[keep] == oracle.mu
+    @test gapped.sigma[keep, keep] == oracle.sigma
+    # The posterior lives on the full universe, and the departed asset keeps its `NaN`, so
+    # the next layer derives the same mask this one did.
+    @test length(gapped.mu) == N
+    @test isnan(gapped.mu[k])
+    @test isnan(gapped.sigma[k, k])
+    @test PortfolioOptimisers.investable_mask(gapped) == BitVector([1, 1, 0, 1, 1])
+    # The reduction takes columns and never rows, so the observation axis is untouched and
+    # the wrapped weighting still describes the rows of the returned `X`.
+    @test size(gapped.X) == (T, N)
+end
+
+@testset "A Black-Litterman row naming a departed asset goes whole, and strict does not refuse" begin
+    oracle = prior(BlackLittermanPrior(; pe = EmpiricalPrior(), views = blview,
+                                       sets = setsdfk), rddfk)
+    both = LinearConstraintEstimator(; val = ["a == 0.001", "b == 0.0008", "c == 0.002"])
+    res = prior(BlackLittermanPrior(; pe = EmpiricalPrior(), views = both, sets = setsdf),
+                rddf)
+    @test res.mu[keep] == oracle.mu
+    # `strict` refuses a typo and not a departure, which is the whole of the distinction.
+    @test res.mu[keep] ==
+          prior(BlackLittermanPrior(; pe = EmpiricalPrior(), views = both, sets = setsdf),
+                rddf; strict = true).mu[keep]
+    typo = LinearConstraintEstimator(; val = ["a == 0.001", "zz == 0.002"])
+    @test_throws ArgumentError prior(BlackLittermanPrior(; pe = EmpiricalPrior(),
+                                                         views = typo, sets = setsdf), rddf;
+                                     strict = true)
+    # A joint row goes whole rather than being fitted without its departed leg: `a + c`
+    # assembled without `c` would assert `a == 0.001`, which the caller never wrote.
+    joint = LinearConstraintEstimator(; val = ["a + c == 0.001", "b == 0.0008"])
+    jref = prior(BlackLittermanPrior(; pe = EmpiricalPrior(),
+                                     views = LinearConstraintEstimator(;
+                                                                       val = ["b == 0.0008"]),
+                                     sets = setsdfk), rddfk)
+    @test prior(BlackLittermanPrior(; pe = EmpiricalPrior(), views = joint, sets = setsdf),
+                rddf).mu[keep] == jref.mu
+    # A per-view confidence vector keeps its alignment across the dropped row: the dropped
+    # index joins `excl`, so `remove_excl_views` drops the matching entry.
+    cnf = LinearConstraintEstimator(; val = ["c == 0.002", "a == 0.001", "b == 0.0008"])
+    cref = prior(BlackLittermanPrior(; pe = EmpiricalPrior(), views = blview,
+                                     sets = setsdfk, views_conf = [0.2, 0.7]), rddfk)
+    @test prior(BlackLittermanPrior(; pe = EmpiricalPrior(), views = cnf, sets = setsdf,
+                                    views_conf = [0.9, 0.2, 0.7]), rddf).mu[keep] == cref.mu
+    # A group sheds its departed member before the coefficient is spread, so the mean
+    # divides by the SURVIVING count.
+    setsg = UniverseSets(; dict = Dict("nx" => nx, "nf" => nf, "grp" => [nx[1], nx[k]]))
+    grouped = prior(BlackLittermanPrior(; pe = EmpiricalPrior(),
+                                        views = LinearConstraintEstimator(;
+                                                                          val = "grp == 0.002"),
+                                        sets = setsg), rddf)
+    goracle = prior(BlackLittermanPrior(; pe = EmpiricalPrior(),
+                                        views = LinearConstraintEstimator(;
+                                                                          val = "a == 0.002"),
+                                        sets = setsdfk), rddfk)
+    @test grouped.mu[keep] == goracle.mu
+end
+
+@testset "A departure that takes the last view leaves the wrapped prior, and warns" begin
+    # ADR 0125's singled-out case: nothing is left to condition on, so the posterior is the
+    # wrapped prior and the caller is told, because they have no other way to learn it.
+    wrapped = prior(EmpiricalPrior(), rddf)
+    onlyc = LinearConstraintEstimator(; val = "c == 0.002")
+    viewless = prior(BlackLittermanPrior(; pe = EmpiricalPrior(), views = onlyc,
+                                         sets = setsdf), rddf)
+    @test all(isequal(0), filter(isfinite, viewless.mu .- wrapped.mu))
+    @test all(isequal(0), filter(isfinite, viewless.sigma .- wrapped.sigma))
+    @test isnan(viewless.mu[k])
+    logs, _ = Test.collect_test_logs() do
+        return prior(BlackLittermanPrior(; pe = EmpiricalPrior(), views = onlyc,
+                                         sets = setsdf), rddf)
+    end
+    warns = filter(l -> l.level == Logging.Warn, logs)
+    @test length(warns) == 1
+    @test occursin("no view at all", warns[1].message)
+    @test occursin("its wrapped prior", warns[1].message)
+    @test occursin("the view row `c == 0.002`", warns[1].message)
+    # A view set that was empty or mistyped FROM THE START is still a refusal, which is
+    # #852's case: no departure wrote into the ledger, so nothing distinguishes it from a
+    # caller who stated views the universe never held.
+    @test_throws PortfolioOptimisers.IsNothingError prior(BlackLittermanPrior(;
+                                                                              pe = EmpiricalPrior(),
+                                                                              views = LinearConstraintEstimator(;
+                                                                                                                val = "zz == 0.002"),
+                                                                              sets = setsdf),
+                                                          rddf)
+end
+
+@testset "A precomputed view matrix over a gapped universe is refused by name" begin
+    # A precomputed `P` resolves no name, so there is no way to tell which of its rows the
+    # departed asset belonged to and no way to reduce it. Left alone this is the ticket's
+    # defect, unfixed and silent, so it refuses instead.
+    pre = PortfolioOptimisers.BlackLittermanViews(; P = [1.0 0 0 0 0; 0 1 0 0 0],
+                                                  Q = [0.001, 0.0008])
+    @test_throws ArgumentError prior(BlackLittermanPrior(; pe = EmpiricalPrior(),
+                                                         views = pre), rddf)
+    # And it says nothing on a universe with no gap in it, which is the path it was.
+    prek = PortfolioOptimisers.BlackLittermanViews(; P = [1.0 0 0 0; 0 1 0 0],
+                                                   Q = [0.001, 0.0008])
+    @test all(isfinite,
+              prior(BlackLittermanPrior(; pe = EmpiricalPrior(), views = prek), rddfk).mu)
+end
+
+@testset "The three factor-view members reduce their asset side and expand it back" begin
+    # These three write their views on the FACTOR axis, so no view row can be dropped for a
+    # departed asset and the counterpart axis never bites. What a departure poisons is the
+    # asset side, and it poisons all of it.
+    #
+    # `BayesianBlackLittermanPrior` inverts the asset covariance twice, so on `dev` this
+    # raised an unnamed `ArgumentError` out of LAPACK.
+    bo = prior(BayesianBlackLittermanPrior(; pe = FactorPrior(), views = blfview,
+                                           sets = setsdfk), rddfk)
+    bg = prior(BayesianBlackLittermanPrior(; pe = FactorPrior(), views = blfview,
+                                           sets = setsdf), rddf)
+    @test isapprox(bg.mu[keep], bo.mu; rtol = 1e-12)
+    @test isapprox(bg.sigma[keep, keep], bo.sigma; rtol = 1e-12)
+    # The factor block is not expanded, because the reduction never touched the factor axis.
+    @test bg.fpr.mu == bo.fpr.mu
+    @test length(bg.mu) == N
+    @test isnan(bg.mu[k])
+    @test PortfolioOptimisers.investable_mask(bg) == BitVector([1, 1, 0, 1, 1])
+
+    # `FactorBlackLittermanPrior` wraps a FACTOR prior, so there is no asset-side prior
+    # result to read a mask off: the gap arrives in `X` itself and `coverage_mask` reads it,
+    # panel included. On `dev` the `NaN` column reached `StepwiseRegression`, which selected
+    # zero factors and raised `BoundsError … at index [1:200, [0]]`.
+    fo = prior(FactorBlackLittermanPrior(; views = blfview, sets = setsdfk), rddfk)
+    fg = prior(FactorBlackLittermanPrior(; views = blfview, sets = setsdf), rddf)
+    @test fg.mu[keep] == fo.mu
+    @test fg.sigma[keep, keep] == fo.sigma
+    # Every asset-axis block it produced goes back: the loadings, the intercept and the
+    # reconstruction, not only the moment pair.
+    @test fg.rr.M[keep, :] == fo.rr.M
+    @test fg.rr.b[keep] == fo.rr.b
+    @test fg.X[:, keep] == fo.X
+    @test all(isnan, fg.rr.M[k, :])
+    @test size(fg.X) == (T, N)
+    # `chol` factorises `sigma`, and a `NaN` frame has no factorisation, so it is dropped on
+    # the gapped path and kept on the clean one.
+    @test isnothing(fg.chol)
+    @test !isnothing(fo.chol)
+
+    # `AugmentedBlackLittermanPrior` stacks `[assets; factors]`, so the reduction applies to
+    # the asset half and the truncation back to it is where the expansion goes.
+    ao = prior(AugmentedBlackLittermanPrior(; a_views = blview, f_views = blfview,
+                                            sets = setsdfk), rddfk)
+    ag = prior(AugmentedBlackLittermanPrior(; a_views = blview, f_views = blfview,
+                                            sets = setsdf), rddf)
+    @test ag.mu[keep] == ao.mu
+    @test ag.sigma[keep, keep] == ao.sigma
+    @test ag.fpr.mu == ao.fpr.mu
+    @test ag.rr.M[keep, :] == ao.rr.M
+    @test isnan(ag.mu[k])
+    @test size(ag.X) == (T, N)
+    # Its asset half drops a departed row whole, like the plain member's.
+    withc = LinearConstraintEstimator(; val = ["a == 0.001", "b == 0.0008", "c == 0.002"])
+    @test prior(AugmentedBlackLittermanPrior(; a_views = withc, f_views = blfview,
+                                             sets = setsdf), rddf).mu[keep] == ao.mu
+    # When the departure empties the ASSET half, the stack does NOT collapse to the prior:
+    # the factor views the departure never touched still condition the joint posterior, so
+    # the answer moves with them.
+    onlyc = LinearConstraintEstimator(; val = "c == 0.002")
+    emptied = prior(AugmentedBlackLittermanPrior(; a_views = onlyc, f_views = blfview,
+                                                 sets = setsdf), rddf)
+    other = prior(AugmentedBlackLittermanPrior(; a_views = onlyc,
+                                               f_views = LinearConstraintEstimator(;
+                                                                                   val = ["f1 == 0.01"]),
+                                               sets = setsdf), rddf)
+    @test all(isfinite, emptied.mu[keep])
+    @test isnan(emptied.mu[k])
+    @test !isapprox(emptied.mu[keep], other.mu[keep])
+end
+
+@testset "The Black-Litterman all-investable path is the path it was" begin
+    # No mask, no reduction, no expansion, no message. `expand_moment`'s `nothing` methods
+    # are the identity, so the gap-free fit allocates nothing for a contract it does not use.
+    logs, res = Test.collect_test_logs() do
+        return prior(BlackLittermanPrior(; pe = EmpiricalPrior(), views = blview,
+                                         sets = setsdfk), rddfk)
+    end
+    @test isnothing(PortfolioOptimisers.investable_mask(res))
+    @test isempty(filter(l -> occursin("left the investable universe", string(l.message)),
+                         logs))
+    # The same holds one member along, where the announcement reads its names off the sets.
+    @test isempty(PortfolioOptimisers.investable_universe_names(setsdfk, nothing))
+    @test PortfolioOptimisers.investable_universe_names(setsdf,
+                                                        BitVector([1, 1, 0, 1, 1])) ==
+          [nx[k]]
+    # An estimator whose views land on the factor axis need state no asset universe at all,
+    # and one that has not stated one has named nobody to report.
+    @test isempty(PortfolioOptimisers.investable_universe_names(nothing,
+                                                                BitVector([1, 1, 0, 1, 1])))
+    # And a universe of the wrong length is the same silence, not a refusal: this reads
+    # names for a message, and refusing a message is not its job.
+    @test isempty(PortfolioOptimisers.investable_universe_names(setsdfk,
+                                                                BitVector([1, 1, 0, 1, 1])))
+end
+
+@testset "The Black-Litterman collapse and the empty view block on their own terms" begin
+    mu = [0.1, 0.2]
+    sigma = [1.0 0.2; 0.2 1.0]
+    # No view is the prior pair itself, and NOT the empty-view algebra: `vanilla_posteriors`
+    # adds the estimation-error term, so an empty `P` would answer `(1 + tau) * sigma`, a
+    # wider covariance produced by views that no longer exist.
+    pmu, psigma = PortfolioOptimisers.bl_posteriors(nothing, mu, sigma)
+    @test pmu === mu
+    @test psigma == sigma
+    # The covariance is a copy, because every caller hands it to `matrix_processing!`, which
+    # writes in place, and the prior result must not be mutated under a caller holding it.
+    @test psigma !== sigma
+    psigma[1, 1] = 99
+    @test sigma[1, 1] == 1.0
+    # The empty block is `0 x n`, so the stack it joins carries no phantom view.
+    P, Q, omega = PortfolioOptimisers.bl_view_block(nothing, 2, Float64)
+    @test size(P) == (0, 2)
+    @test isempty(Q)
+    @test size(omega) == (0, 0)
+    # The stacked products the augmented member forms are all well defined over it.
+    @test size(transpose(P) * (omega \ P)) == (2, 2)
+    @test all(iszero, transpose(P) * (omega \ P))
+    blp = (; P = [1.0 0.0], Q = [0.5], omega = Diagonal([0.1]), tau = 0.01)
+    @test PortfolioOptimisers.bl_view_block(blp, 2, Float64) === (blp.P, blp.Q, blp.omega)
+end
+
+@testset "reduce_columns is the inverse of expand_columns" begin
+    A = [1.0 2.0 3.0; 4.0 5.0 6.0]
+    msk = BitVector([1, 0, 1])
+    @test PortfolioOptimisers.reduce_columns(A, msk) == [1.0 3.0; 4.0 6.0]
+    # A copy, not a view: the block goes on to a regression.
+    @test isa(PortfolioOptimisers.reduce_columns(A, msk), Matrix)
+    # The round trip restores the covered columns and marks the rest.
+    B = PortfolioOptimisers.expand_columns(PortfolioOptimisers.reduce_columns(A, msk), msk)
+    @test B[:, msk] == A[:, msk]
+    @test all(isnan, B[:, 2])
+    # `nothing` is the identity on both halves, and the same object comes back.
+    @test PortfolioOptimisers.reduce_columns(A, nothing) === A
+    @test PortfolioOptimisers.expand_columns(A, nothing) === A
+end
+
+@testset "A prior estimator reduces its own per-asset weights" begin
+    # `pe.w` is per-asset configuration written against the caller's full universe, and it
+    # meets a reduced axis for the same reason a per-asset bound does. Unsliced it raises a
+    # bare `DimensionMismatch` from a matrix product that names no asset.
+    w = fill(1 / N, N)
+    fo = prior(FactorBlackLittermanPrior(; views = blfview, sets = setsdfk, l = 1,
+                                         w = fill(1 / N, length(keep))), rddfk)
+    fg = prior(FactorBlackLittermanPrior(; views = blfview, sets = setsdf, l = 1, w = w),
+               rddf)
+    @test fg.mu[keep] == fo.mu
+    ao = prior(AugmentedBlackLittermanPrior(; a_views = blview, f_views = blfview,
+                                            sets = setsdfk, l = 1,
+                                            w = fill(1 / N, length(keep))), rddfk)
+    ag = prior(AugmentedBlackLittermanPrior(; a_views = blview, f_views = blfview,
+                                            sets = setsdf, l = 1, w = w), rddf)
+    @test ag.mu[keep] == ao.mu
+    # Both `nothing` sentinels answer the argument they were handed.
+    @test PortfolioOptimisers.investable_weights_view(nothing, w) === w
+    @test isnothing(PortfolioOptimisers.investable_weights_view(BitVector([1, 1, 0, 1, 1]),
+                                                                nothing))
+end
+
+@testset "A view row that resolves and cancels is still dropped, and is not a typo" begin
+    # The empty-row path narrowed rather than disappeared. A name that does not resolve now
+    # takes its row at the name, so the only way left to reach this branch is a row whose
+    # names all resolve and whose coefficients annihilate it -- `A - A`, which
+    # `parse_equation` folds to a single term with coefficient zero.
+    bsets = UniverseSets(; xkey = "nx", dict = Dict("nx" => ["A", "B", "C"]))
+    blv = PortfolioOptimisers.get_black_litterman_views(parse_equation(["A - A == 0.0",
+                                                                        "B == 0.01"]),
+                                                        bsets)
+    @test size(blv.P) == (1, 3)
+    @test blv.Q == [0.01]
+    # It joins `excl`, so a per-view confidence vector keeps its alignment.
+    @test blv.excl == [1]
+    @test collect(PortfolioOptimisers.remove_excl_views([0.1, 0.2], blv.excl)) == [0.2]
+    # And `strict` still refuses it, because nothing about it is a departure.
+    @test_throws ArgumentError PortfolioOptimisers.get_black_litterman_views(parse_equation("A - A == 0.0"),
+                                                                             bsets;
+                                                                             strict = true)
 end

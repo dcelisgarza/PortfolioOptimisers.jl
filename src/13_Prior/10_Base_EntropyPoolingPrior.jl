@@ -607,103 +607,6 @@ function add_ep_constraint!(epc::AbstractDict, lhs::MatNum, rhs::VecNum, key::Sy
     return nothing
 end
 """
-    ep_investable_views(pr::AbstractPriorResult, sets::Nothing) -> Tuple
-    ep_investable_views(pr::AbstractPriorResult, sets::UniverseSets) -> Tuple
-
-Derive the Investable Mask of the wrapped fit, and give the view builders the universe they may write rows over.
-
-A view is a **dense linear form over the asset axis**, and a departed asset carries `NaN` in `mu` and on the diagonal of `sigma`. `A[i] == 0` does not protect a row from it, because `0 * NaN` is `NaN`, so a view naming only *live* assets is poisoned exactly as thoroughly as one naming the asset that left: the row reaches the solver all `NaN`, and the solve fails naming the solver and blaming the caller's views. Building the row on the investable columns is the whole fix, and it is the same reduction every optimiser takes at its entry — [`port_opt_view`](@ref) of the carrier at `findall(imsk)`, which [ADR 0115](../../../adr/0115-every-optimisation-estimator-reduces-once-at-its-entry-and-its-result-carries-the-investable-mask.md) states and [#919](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/919) measured bit-exact against the hand-reduced oracle.
-
-Nothing is expanded afterwards, and that is what makes this family cheaper than the Black–Litterman one. An `epc` row runs over **observations**, not assets, so the solved probabilities need no asset axis at all; the moments come from the refit wrapped prior, which already carries the full-universe `NaN` frame.
-
-The door also **mints the Non-Investable Axis** on the sets it hands the builders, with [`non_investable_sets`](@ref) after [`port_opt_view`](@ref) — after, because the view drops the axis so that a sub-problem cannot inherit its parent's departures. That is what lets a builder tell a departed name from a typo: [ADR 0125](../../../adr/0125-a-view-row-that-names-a-departed-asset-is-dropped-whole.md) drops the row whole and in silence for the first, and keeps today's `strict_diagnostic` for the second.
-
-**`sets` splits by dispatch and the mask by a condition**, and the asymmetry is the whole of the reason. `sets` is a field of a `@concrete` estimator, so whether it is `nothing` is a **type** fact, fixed per instantiation: the pair is static dispatch, it costs nothing, and it is what keeps the returned sets concretely a [`UniverseSets`](@ref). A single method over `Option{<:UniverseSets}` would answer a value-level `Union`, and the view builders declare `sets::UniverseSets` — so JET finds no method for the `Nothing` half at **every** builder call site, ten of them, none reachable. [`investable_mask`](@ref), by contrast, answers a `Union{Nothing, BitVector}` that depends on the **data**: Julia union-splits a two-member `Union` and compiles a method pair back into this very branch, so dispatching on it would buy nothing and cost a unit in a swept file. Dispatch where the fact is a type; branch where it is a value.
-
-`sets` of `nothing` returns early whatever the mask says: the estimator's constructor refuses `nothing` sets the moment any view is stated, so there is nothing to build and nothing to reduce for. The all-investable path returns its arguments untouched, so a gap-free fit pays one pass over two vectors and allocates nothing.
-
-# Algorithm
-
- 1. Return `nothing`, `sets` and no departed names when `sets` is `nothing`, which is the method the estimator's own field type selects.
- 2. Otherwise derive the Investable Mask from the fitted prior with [`investable_mask`](@ref), and return `nothing`, `sets` and no departed names when it is `nothing`.
- 3. Read the asset universe off `sets.dict[sets.xkey]`, and check it against the mask.
- 4. Read the departed names with [`non_investable_names`](@ref).
- 5. Take a [`port_opt_view`](@ref) of `sets` at `findall(imsk)`, mint the Non-Investable Axis on it with [`non_investable_sets`](@ref), and return the index, the minted sets and the departed names.
-
-# Arguments
-
-  - $(arg_dict[:pr])
-  - `sets`: The estimator's [`UniverseSets`](@ref), or `nothing`.
-
-# Validation
-
-  - `length(sets.dict[sets.xkey]) == length(imsk)`. A `DimensionMismatch` naming both counts is thrown otherwise, in place of the `BoundsError` the complement would raise.
-
-# Returns
-
-  - `(idx, sets, ni)`: The investable positions or `nothing`, the reduced sets carrying the Non-Investable Axis, and the departed names.
-
-# Related
-
-  - [`ep_investable_prior`](@ref)
-  - [`investable_mask`](@ref)
-  - [`non_investable_sets`](@ref)
-  - [`non_investable_names`](@ref)
-  - [`announce_non_investable`](@ref)
-  - [`port_opt_view`](@ref)
-  - [`EntropyPoolingPrior`](@ref)
-  - [`MeucciEntropyPoolingPrior`](@ref)
-"""
-function ep_investable_views(::AbstractPriorResult, sets::Nothing)
-    return nothing, sets, String[]
-end
-function ep_investable_views(pr::AbstractPriorResult, sets::UniverseSets)
-    imsk = investable_mask(pr)
-    # A condition here, where the split above is dispatch, and the asymmetry is the point.
-    # `sets` is a field of a `@concrete` estimator, so its `nothing` is a TYPE fact and the
-    # method pair is static — and it has to be, or the builders' `sets::UniverseSets` has no
-    # method for what this returns and every call site reds JET. `imsk` is a VALUE fact, a
-    # `Union` Julia union-splits back into this very branch. See the docstring.
-    if isnothing(imsk)
-        return nothing, sets, String[]
-    end
-    nx = sets.dict[sets.xkey]
-    @argcheck(length(nx) == length(imsk),
-              DimensionMismatch("the asset universe `$(sets.xkey)` and the fitted prior disagree on how many assets there are. Got\nlength(sets.dict[$(sets.xkey)]) => $(length(nx))\nassets in the prior => $(length(imsk))"))
-    idx = findall(imsk)
-    ni = non_investable_names(nx, imsk)
-    return idx, non_investable_sets(port_opt_view(sets, idx), ni), ni
-end
-"""
-    ep_investable_prior(idx::Option{<:AbstractVector{<:Integer}},
-                        pr::AbstractPriorResult) -> AbstractPriorResult
-
-View a fitted prior at the investable positions [`ep_investable_views`](@ref) derived.
-
-It is separate from [`ep_investable_views`](@ref) because a staged entropy pooling fit **refits** its wrapped prior between stages, once per solve, and every refit has to be viewed again before the next stage's builders read it. The mask itself does not move — a column that could not be estimated stays unestimable under any reweighting of the observations — so it is derived once and this is applied many times.
-
-`nothing` is the all-investable path and hands the prior straight back, so a gap-free fit allocates nothing. It is a condition rather than a method pair for the reason [`ep_investable_views`](@ref) gives: the index is a value-level `Union`, and dispatching on one is not static dispatch.
-
-# Arguments
-
-  - `idx`: The investable positions, or `nothing` when every asset is investable.
-  - $(arg_dict[:pr])
-
-# Returns
-
-  - `pr::AbstractPriorResult`: The prior over the investable assets, or the prior unchanged.
-
-# Related
-
-  - [`ep_investable_views`](@ref)
-  - [`port_opt_view`](@ref)
-  - [`investable_mask`](@ref)
-"""
-function ep_investable_prior(idx::Option{<:AbstractVector{<:Integer}},
-                             pr::AbstractPriorResult)
-    return isnothing(idx) ? pr : port_opt_view(pr, idx)
-end
-"""
     announce_ep_departures(ni::VecStr, ledger::VecStr, viewless::Bool) -> Nothing
 
 Report, once per entropy pooling fit, who left the investable universe and what their leaving cost the view set.
@@ -716,7 +619,7 @@ It is said **at the end of the fit**, not at the reduction. A staged algorithm i
 
 # Arguments
 
-  - `ni`: The names the Investable Mask left out, from [`ep_investable_views`](@ref).
+  - `ni`: The names the Investable Mask left out, from [`investable_views`](@ref).
   - `ledger`: What the departures cost, as the view builders recorded it.
   - `viewless`: Whether the fit ended up with no view at all *because* of the departures.
 
@@ -727,7 +630,7 @@ It is said **at the end of the fit**, not at the reduction. A staged algorithm i
 # Related
 
   - [`announce_non_investable`](@ref)
-  - [`ep_investable_views`](@ref)
+  - [`investable_views`](@ref)
   - [`record_non_investable_drop!`](@ref)
   - [`EntropyPoolingPrior`](@ref)
   - [`MeucciEntropyPoolingPrior`](@ref)

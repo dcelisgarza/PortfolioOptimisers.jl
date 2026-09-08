@@ -1447,6 +1447,146 @@ function investable_mask(pr::AbstractPriorResult)::Option{BitVector}
     return all(imsk) ? nothing : imsk
 end
 """
+    investable_views(pr::AbstractPriorResult, sets::Nothing) -> Tuple
+    investable_views(pr::AbstractPriorResult, sets::UniverseSets) -> Tuple
+
+Derive the Investable Mask of a fitted prior, and give a view builder the universe it may write rows over.
+
+A view is a **dense linear form over the asset axis**, and a departed asset carries `NaN` in `mu` and on the diagonal of `sigma`. `A[i] == 0` does not protect a row from it, because `0 * NaN` is `NaN`, so a view naming only *live* assets is poisoned exactly as thoroughly as one naming the asset that left: the row reaches the solver all `NaN`, and the fit fails naming something that is not the cause. Building the row on the investable columns is the whole fix, and it is the same reduction every optimiser takes at its entry — [`port_opt_view`](@ref) of the carrier at `findall(imsk)`, which [ADR 0115](../../../adr/0115-every-optimisation-estimator-reduces-once-at-its-entry-and-its-result-carries-the-investable-mask.md) states and [#919](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/919) measured bit-exact against the hand-reduced oracle.
+
+**Both view-taking prior families reduce here, and what they owe afterwards is theirs, not this door's.** An entropy pooling row runs over *observations*, so its solved probabilities carry no asset axis and nothing is expanded back — the moments come from the refit wrapped prior, which already holds the full-universe `NaN` frame. A Black–Litterman posterior is a *moment pair over the reduced assets*, so it has to be written back into a `NaN` frame of the full width with [`expand_moment`](@ref) before it leaves the estimator. That is the whole of the difference, and it is why this verb hands back the index rather than swallowing it.
+
+The door also **mints the Non-Investable Axis** on the sets it hands the builders, with [`non_investable_sets`](@ref) after [`port_opt_view`](@ref) — after, because the view drops the axis so that a sub-problem cannot inherit its parent's departures. That is what lets a builder tell a departed name from a typo: [ADR 0125](../../../adr/0125-a-view-row-that-names-a-departed-asset-is-dropped-whole.md) drops the row whole and in silence for the first, and keeps today's `strict_diagnostic` for the second.
+
+**`sets` splits by dispatch and the mask by a condition**, and the asymmetry is the whole of the reason. `sets` is a field of a `@concrete` estimator, so whether it is `nothing` is a **type** fact, fixed per instantiation: the pair is static dispatch, it costs nothing, and it is what keeps the returned sets concretely a [`UniverseSets`](@ref). A single method over `Option{<:UniverseSets}` would answer a value-level `Union`, and the view builders declare `sets::UniverseSets` — so JET finds no method for the `Nothing` half at every builder call site, none of them reachable. [`investable_mask`](@ref), by contrast, answers a `Union{Nothing, BitVector}` that depends on the **data**: Julia union-splits a two-member `Union` and compiles a method pair back into this very branch, so dispatching on it would buy nothing and cost a unit in a swept file. Dispatch where the fact is a type; branch where it is a value.
+
+`sets` of `nothing` returns early whatever the mask says: a view-taking estimator's constructor refuses `nothing` sets the moment any view is stated, so there is nothing to build and nothing to reduce for. The all-investable path returns its arguments untouched, so a gap-free fit pays one pass over two vectors and allocates nothing.
+
+# Algorithm
+
+ 1. Return `nothing`, `sets` and no departed names when `sets` is `nothing`, which is the method the estimator's own field type selects.
+ 2. Otherwise derive the Investable Mask from the fitted prior with [`investable_mask`](@ref), and return `nothing`, `sets` and no departed names when it is `nothing`.
+ 3. Read the asset universe off `sets.dict[sets.xkey]`, and check it against the mask.
+ 4. Read the departed names with [`non_investable_names`](@ref).
+ 5. Take a [`port_opt_view`](@ref) of `sets` at `findall(imsk)`, mint the Non-Investable Axis on it with [`non_investable_sets`](@ref), and return the mask, the minted sets and the departed names.
+
+# Arguments
+
+  - $(arg_dict[:pr])
+  - `sets`: The estimator's [`UniverseSets`](@ref), or `nothing`.
+
+# Validation
+
+  - `length(sets.dict[sets.xkey]) == length(imsk)`. A `DimensionMismatch` naming both counts is thrown otherwise, in place of the `BoundsError` the complement would raise.
+
+# Returns
+
+  - `(imsk, sets, ni)`: The Investable Mask or `nothing`, the reduced sets carrying the Non-Investable Axis, and the departed names. The mask is what [`investable_prior`](@ref) views at and what [`expand_moment`](@ref) writes back through, so a caller that reduces and expands needs nothing else.
+
+# Related
+
+  - [`investable_prior`](@ref)
+  - [`investable_mask`](@ref)
+  - [`non_investable_sets`](@ref)
+  - [`non_investable_names`](@ref)
+  - [`announce_non_investable`](@ref)
+  - [`expand_moment`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+function investable_views(::AbstractPriorResult, sets::Nothing)
+    return nothing, sets, String[]
+end
+function investable_views(pr::AbstractPriorResult, sets::UniverseSets)
+    imsk = investable_mask(pr)
+    # A condition here, where the split above is dispatch, and the asymmetry is the point.
+    # `sets` is a field of a `@concrete` estimator, so its `nothing` is a TYPE fact and the
+    # method pair is static — and it has to be, or the builders' `sets::UniverseSets` has no
+    # method for what this returns and every call site reds JET. `imsk` is a VALUE fact, a
+    # `Union` Julia union-splits back into this very branch. See the docstring.
+    if isnothing(imsk)
+        return nothing, sets, String[]
+    end
+    nx = sets.dict[sets.xkey]
+    @argcheck(length(nx) == length(imsk),
+              DimensionMismatch("the asset universe `$(sets.xkey)` and the fitted prior disagree on how many assets there are. Got\nlength(sets.dict[$(sets.xkey)]) => $(length(nx))\nassets in the prior => $(length(imsk))"))
+    ni = non_investable_names(nx, imsk)
+    return imsk, non_investable_sets(port_opt_view(sets, findall(imsk)), ni), ni
+end
+"""
+    investable_prior(imsk::Nothing, pr::AbstractPriorResult) -> AbstractPriorResult
+    investable_prior(imsk::BitVector, pr::AbstractPriorResult) -> AbstractPriorResult
+
+View a fitted prior at the Investable Mask [`investable_views`](@ref) derived.
+
+It is separate from [`investable_views`](@ref) because a staged entropy pooling fit **refits** its wrapped prior between stages, once per solve, and every refit has to be viewed again before the next stage's builders read it. The mask itself does not move — a column that could not be estimated stays unestimable under any reweighting of the observations — so it is derived once and this is applied many times.
+
+`nothing` is the all-investable path and hands the prior straight back, so a gap-free fit allocates nothing. The split is a method pair here and a condition inside [`investable_views`](@ref), and the two are not in conflict: the mask arrives from a local whose `Union` Julia has already split at the call site, so each branch reaches this with a concrete argument. What it must not become is one method over `Option{BitVector}`, which would put the union back.
+
+# Arguments
+
+  - `imsk`: The Investable Mask, or `nothing` when every asset is investable.
+  - $(arg_dict[:pr])
+
+# Returns
+
+  - `pr::AbstractPriorResult`: The prior over the investable assets, or the prior unchanged.
+
+# Related
+
+  - [`investable_views`](@ref)
+  - [`port_opt_view`](@ref)
+  - [`investable_mask`](@ref)
+"""
+function investable_prior(::Nothing, pr::AbstractPriorResult)
+    return pr
+end
+function investable_prior(imsk::BitVector, pr::AbstractPriorResult)
+    return port_opt_view(pr, findall(imsk))
+end
+"""
+    investable_universe_names(sets::Nothing, imsk) -> VecStr
+    investable_universe_names(sets::UniverseSets, imsk::Nothing) -> VecStr
+    investable_universe_names(sets::UniverseSets, imsk::BitVector) -> VecStr
+
+Name the departed assets for an estimator that reduces its **asset** axis while its views live on another one.
+
+[`investable_views`](@ref) is the door for an estimator whose views resolve against `xkey`: it reduces the sets, mints the Non-Investable Axis on them, and the names fall out on the way. [`BayesianBlackLittermanPrior`](@ref) and [`FactorBlackLittermanPrior`](@ref) write their views on the **factor** axis, so they reduce their asset side and touch no view axis at all — there is nothing for them to mint, and going through that door would make them demand an asset universe they have no other use for. They still have a departure to report, and this is the least they need to report it.
+
+Sets that are not stated at all answer an empty list rather than throwing, and an empty list is what [`announce_non_investable`](@ref) says nothing about. That is the honest outcome, and it is a real configuration: both members admit `sets` of `nothing` entirely, because a precomputed [`BlackLittermanViews`](@ref) resolves no name and needs no universe. A stated universe that does not describe this fit answers the same silence, because neither member reads an asset name for any other purpose and so nothing else has checked its length.
+
+# Arguments
+
+  - `sets`: The estimator's [`UniverseSets`](@ref), or `nothing`.
+  - `imsk`: The Investable Mask, or `nothing` when every asset is investable.
+
+# Returns
+
+  - `ni::VecStr`: The names the mask left out, or an empty vector.
+
+# Related
+
+  - [`investable_views`](@ref)
+  - [`non_investable_names`](@ref)
+  - [`announce_non_investable`](@ref)
+  - [`BayesianBlackLittermanPrior`](@ref)
+  - [`FactorBlackLittermanPrior`](@ref)
+"""
+function investable_universe_names(::Nothing, ::Any)::VecStr
+    return String[]
+end
+function investable_universe_names(::UniverseSets, ::Nothing)::VecStr
+    return String[]
+end
+function investable_universe_names(sets::UniverseSets, imsk::BitVector)::VecStr
+    # The asset universe is the one axis [`UniverseSets`](@ref) makes mandatory, so it is
+    # always there to read. Its *length* is not checked anywhere on these two members —
+    # neither reads an asset name for any other purpose — and a universe that does not
+    # describe this fit answers silence rather than a refusal, because this reads names for
+    # a message and refusing a message is not its job.
+    nx = sets.dict[sets.xkey]
+    return length(nx) == length(imsk) ? non_investable_names(nx, imsk) : String[]
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Find the entries a mask-aware prior fills: the non-finite returns of an **investable** asset.
@@ -1593,6 +1733,8 @@ function held_non_investable(imsk::BitVector, W::MatNum)
     return findall(i -> !imsk[i] && any(!iszero, view(W, :, i)), eachindex(imsk))
 end
 """
+    investable_weights_view(imsk::Nothing, w)
+    investable_weights_view(imsk::BitVector, w::Nothing)
     investable_weights_view(imsk::BitVector, w::VecNum)
     investable_weights_view(imsk::BitVector, w::VecVecNum)
     investable_weights_view(imsk::BitVector, w::MatNum)
@@ -1601,20 +1743,32 @@ Take the view of the weights at the Investable Mask.
 
 A weight vector is one cross-section, so the mask selects its entries. A weight path is one row of weights per observation, so the mask selects its columns and every row keeps its own observation. A population is reduced member by member.
 
+Both `nothing` sentinels answer the argument they were handed. `imsk` of `nothing` is the all-investable universe, so there is nothing to select and the weights come back untouched. `w` of `nothing` is a caller who stated no weights at all — [`equilibrium_mu`](@ref) falls back to equal weights over whatever axis it is handed — so there is nothing to reduce, and reducing it would have to invent a length. Both are dispatch, so a caller holding neither pays nothing.
+
+The `w` a **prior estimator** carries is per-asset configuration written against the caller's full universe, and it meets a reduced axis for the same reason a per-asset bound does. That is why this verb, first written for the weights an optimisation returns, is also the one a prior reduces its own weights with: it is one operation, and it is stated in one place.
+
 # Arguments
 
-  - `imsk`: The Investable Mask, `true` at every asset whose prior moments were finite.
-  - `w`: Portfolio weights, a population of them, or a weight path (observations × assets).
+  - `imsk`: The Investable Mask, `true` at every asset whose prior moments were finite, or `nothing` when every asset is investable.
+  - `w`: Portfolio weights, a population of them, a weight path (observations × assets), or `nothing`.
 
 # Returns
 
-  - The view of `w` at the investable assets.
+  - The view of `w` at the investable assets, or `w` itself when either argument is `nothing`.
 
 # Related
 
   - [`held_non_investable`](@ref)
   - [`investable_mask`](@ref)
+  - [`investable_views`](@ref)
+  - [`equilibrium_mu`](@ref)
 """
+function investable_weights_view(::Nothing, w)
+    return w
+end
+function investable_weights_view(::BitVector, ::Nothing)
+    return nothing
+end
 function investable_weights_view(imsk::BitVector, w::VecNum)
     return view(w, imsk)
 end

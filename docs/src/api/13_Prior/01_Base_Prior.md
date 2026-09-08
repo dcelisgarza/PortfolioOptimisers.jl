@@ -30,6 +30,9 @@ port_opt_view(pr::Union{Nothing, AbstractPriorEstimator}, ::Any, args...)
 port_opt_view(pr::LowOrderPrior, rd, args...)
 port_opt_view(pr::HighOrderPrior, rd, args...)
 investable_mask
+investable_views
+investable_prior
+investable_universe_names
 scenario_fill_pairs
 scenario_fill_msg
 scenario_fill

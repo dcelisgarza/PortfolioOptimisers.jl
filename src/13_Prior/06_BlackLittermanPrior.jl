@@ -248,6 +248,8 @@ The selector is a *field of* [`UniverseSets`](@ref) rather than a key resolved f
 
 This is also where `P` meets the distribution it updates, so it is where their widths are reconciled. A `P` assembled from names is the right width by construction; a **precomputed** [`BlackLittermanViews`](@ref) resolves no names and is checked nowhere else.
 
+**No view left is two different pieces of news, and the ledger tells them apart.** A view set that was empty or mistyped from the start is a refusal, and stays one — that is [#852](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/852)'s case. A view set whose last row was taken by a **departure** is not: the caller wrote names that were correct over the universe they were handed, and the data moved. [ADR 0125](../../../adr/0125-a-view-row-that-names-a-departed-asset-is-dropped-whole.md) says the fit proceeds view-free there, and a Black-Litterman posterior with no view is its wrapped prior, so this answers `nothing` and each estimator forwards the prior pair. Only a departed name writes into the ledger, so a non-empty ledger *is* the evidence, and it is the same fact the door reads to raise its announcement to a warning.
+
 The returned `omega` already carries ``\\tau``, so a caller passes it to [`vanilla_posteriors`](@ref) as it stands. That scaling has a consequence worth knowing: [`calc_omega`](@ref) is homogeneous of degree one in the covariance it reads, so ``\\tau`` multiplies both ``\\mathbf{P}\\tau\\mathbf{\\Sigma}\\mathbf{P}^\\intercal`` and ``\\mathbf{\\Omega}``, and cancels out of the posterior **mean** on every confidence branch. It does not cancel out of the posterior covariance. [`vanilla_posteriors`](@ref) states the measurement.
 
 # Algorithm
@@ -255,7 +257,7 @@ The returned `omega` already carries ``\\tau``, so a caller passes it to [`vanil
  1. Check that `axis` names a declared axis a view can land on.
  2. Resolve `axis` to a universe key. When `sets` is `nothing` the key is `nothing` too, because a precomputed views object resolves no name and needs none.
  3. Assemble the views with [`black_litterman_views`](@ref) under that key, giving `blv`.
- 4. Check that at least one view survived, so that `blv` is not `nothing`.
+ 4. When no view survived, answer `nothing` if the ledger holds a departure casualty, and refuse otherwise.
  5. Read `P`, `Q` and `excl` off `blv`.
  6. Check that `P` is as wide as `prior_sigma` is tall.
  7. Resolve `tau`, which is `pe_tau` when the estimator carries one and `1/T` otherwise.
@@ -265,7 +267,7 @@ The returned `omega` already carries ``\\tau``, so a caller passes it to [`vanil
 # Validation
 
   - `axis in (:xkey, :tfkey, :cfkey)`.
-  - At least one view resolves, so [`black_litterman_views`](@ref) does not answer `nothing`.
+  - At least one view resolves, unless a departure took the last one and the ledger records it.
   - `size(P, 2) == size(prior_sigma, 1)`.
 
 # Arguments
@@ -279,6 +281,7 @@ The returned `omega` already carries ``\\tau``, so a caller passes it to [`vanil
   - $(arg_dict[:datatype])
   - $(arg_dict[:strict])
   - $(arg_dict[:bl_axis])
+  - `ledger`: The door's ledger of departure casualties, or `nothing` when nobody is collecting. It is threaded into [`black_litterman_views`](@ref), and it is what tells a view set emptied by a departure from one that was empty or mistyped from the start.
 
 # Returns
 
@@ -289,6 +292,8 @@ The returned `omega` already carries ``\\tau``, so a caller passes it to [`vanil
       + `tau::Number`: Resolved blending parameter.
       + `omega::LinearAlgebra.Diagonal`: Scaled view uncertainty matrix `tau * Ω`.
 
+  - `nothing`: Every view was dropped by a departure, so the fit proceeds view-free.
+
 # Related
 
   - [`BlackLittermanPrior`](@ref)
@@ -296,9 +301,11 @@ The returned `omega` already carries ``\\tau``, so a caller passes it to [`vanil
   - [`calc_omega`](@ref)
   - [`remove_excl_views`](@ref)
   - [`vanilla_posteriors`](@ref)
+  - [`announce_bl_departures`](@ref)
+  - [`investable_views`](@ref)
 """
 function bl_preroll(views, sets, views_conf, prior_sigma, pe_tau, T, datatype, strict,
-                    axis::Symbol = :xkey)
+                    axis::Symbol = :xkey; ledger::Option{<:AbstractVector} = nothing)
     @argcheck(axis in (:xkey, :tfkey, :cfkey),
               DomainError(axis,
                           "axis must name a declared axis a view can land on, :xkey, :tfkey or :cfkey"))
@@ -306,13 +313,25 @@ function bl_preroll(views, sets, views_conf, prior_sigma, pe_tau, T, datatype, s
     # lets a caller which admits `sets === nothing` — precomputed views resolve no names —
     # say which distribution its views update without guarding the sets it may not have.
     key = isnothing(sets) ? nothing : getproperty(sets, axis)
-    blv = black_litterman_views(views, sets, key; datatype = datatype, strict = strict)
-    # Under `strict = false` an unresolvable name only warns, so a set of views none of which
-    # resolves leaves `get_black_litterman_views` with no row to return and it answers
-    # `nothing`. Destructuring that gave `FieldError: type Nothing has no field P`, which names
-    # neither the views nor the universe they failed against.
-    @argcheck(!isnothing(blv),
-              IsNothingError("no view resolved against the universe under $(repr(key)), so there is no view matrix to update the distribution with. Pass strict = true to raise on the first name that does not resolve"))
+    blv = black_litterman_views(views, sets, key; datatype = datatype, strict = strict,
+                                ledger = ledger)
+    if isnothing(blv)
+        # Two ways to end with no row, and they are different news. A departure took the
+        # last view: the caller wrote a view set that was correct over the universe it was
+        # handed, the data moved, and ADR 0125 says the fit proceeds view-free rather than
+        # refusing — a Black-Litterman posterior with no view is its wrapped prior. The
+        # ledger is the evidence, because only a departed name writes into it, and the door
+        # raises its announcement to a warning on the strength of the same fact.
+        #
+        # Otherwise the view set was empty or mistyped from the start, and that is #852's
+        # case and still a refusal. Under `strict = false` an unresolvable name only warns,
+        # so this is where it surfaces; destructuring the `nothing` gave
+        # `FieldError: type Nothing has no field P`, which names neither the views nor the
+        # universe they failed against.
+        @argcheck(!isnothing(ledger) && !isempty(ledger),
+                  IsNothingError("no view resolved against the universe under $(repr(key)), so there is no view matrix to update the distribution with. Pass strict = true to raise on the first name that does not resolve"))
+        return nothing
+    end
     (; P, Q, excl) = blv
     # A `P` assembled from names is the right width by construction — the universe it resolved
     # against is the one the caller already checked. A **precomputed** `P` resolves no names, so
@@ -324,6 +343,157 @@ function bl_preroll(views, sets, views_conf, prior_sigma, pe_tau, T, datatype, s
     views_conf = remove_excl_views(views_conf, excl)
     omega = tau * calc_omega(views_conf, P, prior_sigma)
     return (; P, Q, tau, omega)
+end
+"""
+    announce_bl_departures(ni::VecStr, ledger::VecStr, viewless::Bool) -> Nothing
+
+Report, once per Black-Litterman fit, who left the investable universe and what their leaving cost the view set.
+
+This is the family's call of [`announce_non_investable`](@ref), written once so the four `prior` methods each spend one line on it and none of them can word it differently. It names the process a Black-Litterman fit, because the message is otherwise the optimisation door's and would tell a standalone `prior(pe, X)` call that it is inside an optimisation it is not.
+
+The sentence is one sentence for all four members, and it is exactly true of each. Two of them write their views on the **factor** axis, where no asset name ever appears, so the view clause simply does not bite for them; what does bite for every member is the first clause, because all four estimate their posterior over the assets that remain.
+
+`viewless` raises the message to a warning, and it is the case [ADR 0125](../../../adr/0125-a-view-row-that-names-a-departed-asset-is-dropped-whole.md) singles out: a departure that took the **last** surviving view leaves the fit with nothing to condition on, so the posterior is the wrapped prior and the answer is not the one the caller asked for. Every other drop trims the view set and is `@info`.
+
+# Arguments
+
+  - `ni`: The names the Investable Mask left out, from [`investable_views`](@ref).
+  - `ledger`: What the departures cost, as the view builder recorded it.
+  - `viewless`: Whether the fit ended up with no view at all *because* of the departures.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`announce_non_investable`](@ref)
+  - [`investable_views`](@ref)
+  - [`record_non_investable_drop!`](@ref)
+  - [`bl_preroll`](@ref)
+  - [`BlackLittermanPrior`](@ref)
+"""
+function announce_bl_departures(ni::VecStr, ledger::VecStr, viewless::Bool)::Nothing
+    consequence = if viewless
+        "Every view stated named one of them, so the fit proceeds with no view at all and its posterior is its wrapped prior."
+    else
+        "The posterior is estimated over the assets that remain, an asset-side view row naming one of them is dropped whole, and a group sheds them before its coefficient is spread."
+    end
+    return announce_non_investable(ni, ledger, "Black-Litterman fit", consequence;
+                                   warn = viewless)
+end
+"""
+    bl_posteriors(::Nothing, prior_mu::VecNum, prior_sigma::MatNum) -> Tuple
+    bl_posteriors(blp::NamedTuple, prior_mu::VecNum, prior_sigma::MatNum) -> Tuple
+
+Run the master equations, or hand back the prior pair when a departure left no view to run them with.
+
+[`bl_preroll`](@ref) answers `nothing` for exactly one case: every view the caller stated named an asset that has since left the investable universe. [ADR 0125](../../../adr/0125-a-view-row-that-names-a-departed-asset-is-dropped-whole.md) says the fit proceeds rather than refusing, and a Black-Litterman posterior with no view **is** its wrapped prior — so that is what this returns.
+
+It is the prior pair itself and not the empty-view algebra, and the difference is not rounding. [`vanilla_posteriors`](@ref) adds the estimation-error term ``[(\\tau\\mathbf{\\Sigma})^{-1}]^{-1} = \\tau\\mathbf{\\Sigma}`` to the covariance, so an empty ``\\mathbf{P}`` would answer ``(1 + \\tau)\\mathbf{\\Sigma}`` — a *wider* covariance than the prior, produced by views that no longer exist. Forwarding the prior pair is what makes the departure cost the caller the view and nothing else.
+
+The covariance is copied, because every caller of this passes what it gets to [`matrix_processing!`](@ref), which writes in place, and the prior result must not be mutated under a caller still holding it.
+
+The split is dispatch: [`bl_preroll`](@ref) answers a concrete `NamedTuple` or a literal `nothing` at each call site, so the method pair is resolved statically.
+
+# Arguments
+
+  - `blp`: What [`bl_preroll`](@ref) answered, or `nothing`.
+  - `prior_mu`: The prior mean of the distribution the views update.
+  - `prior_sigma`: The prior covariance of that distribution.
+
+# Returns
+
+  - `(posterior_mu, posterior_sigma)::Tuple{VecNum, MatNum}`: The posterior pair, or the prior pair when there is no view.
+
+# Related
+
+  - [`bl_preroll`](@ref)
+  - [`vanilla_posteriors`](@ref)
+  - [`announce_bl_departures`](@ref)
+"""
+function bl_posteriors(::Nothing, prior_mu::VecNum, prior_sigma::MatNum)
+    return prior_mu, copy(prior_sigma)
+end
+function bl_posteriors(blp::NamedTuple, prior_mu::VecNum, prior_sigma::MatNum)
+    return vanilla_posteriors(blp.tau, prior_mu, prior_sigma, blp.omega, blp.P, blp.Q)
+end
+"""
+    bl_view_block(::Nothing, n::Integer, datatype::DataType) -> Tuple
+    bl_view_block(blp::NamedTuple, ::Integer, ::DataType) -> Tuple
+
+Read the `P`, `Q` and `omega` of one half of a stacked view system, as a block with no row when that half has no view left.
+
+[`AugmentedBlackLittermanPrior`](@ref) stacks an asset-side view block above a factor-side one. Only the asset side can be emptied by a departure — a factor axis holds no asset name, so [`counterpart_axis_names`](@ref) answers empty there and no factor view is ever dropped for a departure. So the two halves are not symmetric, and the asset half needs a shape to contribute when it has nothing to say.
+
+An empty block is the right answer rather than a collapse to the prior, and this is where the augmented system differs from the plain one: the *joint* posterior is still conditioned, by the factor views the departure did not touch. Handing back the prior stack there would throw away views the caller stated and that still resolve.
+
+The block is `0 × n` rather than a zero row, so the stack it joins carries no phantom view and `aug_Q` is one entry shorter rather than one entry of zero.
+
+# Arguments
+
+  - `blp`: What [`bl_preroll`](@ref) answered for this half, or `nothing`.
+  - `n`: The width of this half's axis, for the empty `P`.
+  - `datatype`: The numeric type of the stack.
+
+# Returns
+
+  - `(P, Q, omega)::Tuple`: This half's view matrix, view returns and uncertainty, with no row when the half was emptied.
+
+# Related
+
+  - [`bl_preroll`](@ref)
+  - [`AugmentedBlackLittermanPrior`](@ref)
+  - [`bl_posteriors`](@ref)
+"""
+function bl_view_block(::Nothing, n::Integer, datatype::DataType)
+    return Matrix{datatype}(undef, 0, n), Vector{datatype}(undef, 0),
+           LinearAlgebra.Diagonal(Vector{datatype}(undef, 0))
+end
+function bl_view_block(blp::NamedTuple, ::Integer, ::DataType)
+    return blp.P, blp.Q, blp.omega
+end
+"""
+    assert_bl_precomputed_universe(sets::UniverseSets, pr::AbstractPriorResult) -> Nothing
+    assert_bl_precomputed_universe(sets::Nothing, pr::AbstractPriorResult) -> Nothing
+
+Refuse the one configuration in which an asset-side Black-Litterman view cannot be reduced: a **precomputed** view matrix over a universe an asset has left.
+
+The reduction works by resolving the caller's view *names* against the universe that survives, which is what lets a row naming a departed asset be dropped whole and every other row be rebuilt over the investable columns. A [`BlackLittermanViews`](@ref) passed in ready-made resolves no name — [`black_litterman_views`](@ref) hands it straight back, and its docstring says why: it was assembled against whatever universe the caller held, and nothing downstream can re-check it. So its `P` cannot be reduced, and there is nothing to reduce it *by*: an estimator whose views are precomputed is permitted to carry no `sets` at all.
+
+Left alone, this is the defect the whole ticket is about, unfixed for one configuration and **silent**: `calc_omega` forms `P * sigma * transpose(P)` over the full universe, `0 * NaN` is `NaN`, and the posterior comes back all `NaN`. Under the default `mp` that surfaces one layer later as `ArgumentError: matrix contains Infs or NaNs` from `posdef!`, which names the wrong cause; under a matrix processing estimator that does nothing, the fit *succeeds* and hands the caller an empty universe. This is the map's rule applied where it has to be: handle it, or refuse by name.
+
+The split is dispatch on the type of `sets`, which is a field of a `@concrete` estimator and so a type fact. The `UniverseSets` method is the whole of the ordinary path and costs a dispatch; only the sets-less path derives the mask, and only to refuse.
+
+# Arguments
+
+  - $(arg_dict[:sets])
+  - $(arg_dict[:pr])
+
+# Validation
+
+  - When `sets` is `nothing`, every asset of `pr` must be investable.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`investable_views`](@ref)
+  - [`investable_mask`](@ref)
+  - [`BlackLittermanViews`](@ref)
+  - [`black_litterman_views`](@ref)
+  - [`BlackLittermanPrior`](@ref)
+  - [`AugmentedBlackLittermanPrior`](@ref)
+"""
+function assert_bl_precomputed_universe(::UniverseSets, ::AbstractPriorResult)::Nothing
+    return nothing
+end
+function assert_bl_precomputed_universe(::Nothing, pr::AbstractPriorResult)::Nothing
+    @argcheck(isnothing(investable_mask(pr)),
+              ArgumentError("the wrapped prior left at least one asset out of the investable universe, and this estimator carries no `sets`, so its views are a precomputed `$(nameof(BlackLittermanViews))`. Such a `P` was assembled against the universe the caller held and names nothing, so there is no way to tell which of its rows the departed asset belonged to, and no way to reduce it. Building the update over the full universe instead would return an all-NaN posterior, because `0 * NaN` is `NaN` and a zero coefficient does not protect a row.\nState the views as a `$(nameof(LinearConstraintEstimator))` over a `$(nameof(UniverseSets))`, which resolves names and drops only the rows a departure actually took, or fit over a universe in which every asset is investable."))
+    return nothing
 end
 """
     calc_omega(::Nothing, P::MatNum, sigma::MatNum) -> LinearAlgebra.Diagonal
@@ -660,12 +830,16 @@ Where:
 
  1. Orient `X` and `F` with [`dims_oriented`](@ref), to `observations × assets` and `observations × factors`.
  2. When `pe.views` resolves names, check that the asset universe is as long as `X` is wide. A precomputed [`BlackLittermanViews`](@ref) resolves no name, so it is not checked here; step 4 checks its width instead.
- 3. Fit the wrapped prior `pe.pe` on `(X, F)`, giving `prior_model`, and read `posterior_X`, `prior_mu` and `prior_sigma` off it.
- 4. Assemble the views and their uncertainty with [`bl_preroll`](@ref), over `prior_sigma` and `size(X, 1)` observations, giving `P`, `Q`, `tau` and `omega`. The axis is left at its default, `:xkey`, because these views land on the assets.
- 5. Run the master equations with [`vanilla_posteriors`](@ref), giving `posterior_mu` and `posterior_sigma`.
- 6. Add `pe.rf` to `posterior_mu` with [`apply_rf`](@ref). This is the one site that adds it.
- 7. Process `posterior_sigma` in place with [`matrix_processing!`](@ref), under `pe.mp` and `posterior_X`.
- 8. Forward the whole of `prior_model` with [`forward_prior`](@ref), replacing `mu` and `sigma` by the posterior pair and dropping `chol`.
+ 3. Fit the wrapped prior `pe.pe` on `(X, F)`, giving `prior_model`.
+ 4. Derive the Investable Mask and the reduced view universe with [`investable_views`](@ref), and refuse a precomputed view matrix over a gapped universe with [`assert_bl_precomputed_universe`](@ref).
+ 5. View the fitted prior at the mask with [`investable_prior`](@ref), and read `posterior_X`, `prior_mu` and `prior_sigma` off *that*.
+ 6. Assemble the views and their uncertainty with [`bl_preroll`](@ref), over the reduced `prior_sigma` and `size(X, 1)` observations, giving `P`, `Q`, `tau` and `omega`, or `nothing` when a departure took the last view. The axis is left at its default, `:xkey`, because these views land on the assets.
+ 7. Run the master equations with [`bl_posteriors`](@ref), giving `posterior_mu` and `posterior_sigma` over the investable assets.
+ 8. Add `pe.rf` to `posterior_mu` with [`apply_rf`](@ref). This is the one site that adds it.
+ 9. Process `posterior_sigma` in place with [`matrix_processing!`](@ref), under `pe.mp` and `posterior_X`, while it is still the reduced block a factorisation exists for.
+10. Announce the departures once with [`announce_bl_departures`](@ref).
+11. Write both posteriors back onto the full asset universe with [`expand_moment`](@ref), so a non-investable asset carries `NaN` in `mu` and on the diagonal of `sigma`.
+12. Forward the whole of `prior_model` with [`forward_prior`](@ref), replacing `mu` and `sigma` by the expanded pair and dropping `chol`.
 
 # Arguments
 
@@ -710,21 +884,42 @@ function prior(pe::BlackLittermanPrior, X::MatNum, F::Option{<:MatNum} = nothing
                   DimensionMismatch("length(pe.sets.dict[pe.sets.xkey]) ($(length(pe.sets.dict[pe.sets.xkey]))) must match size(X, 2) ($(size(X, 2)))"))
     end
     prior_model = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
-    posterior_X, prior_mu, prior_sigma = prior_model.X, prior_model.mu, prior_model.sigma
-    (; P, Q, tau, omega) = bl_preroll(pe.views, pe.sets, pe.views_conf, prior_sigma, pe.tau,
-                                      size(X, 1), eltype(posterior_X), strict)
-    posterior_mu, posterior_sigma = vanilla_posteriors(tau, prior_mu, prior_sigma, omega, P,
-                                                       Q)
+    # The reduction, once, at this estimator's entry. A view is a dense linear form over the
+    # asset axis and `0 * NaN` is `NaN`, so a single departed asset poisons `omega` and with
+    # it every entry of both posteriors — including under a view naming only live assets.
+    # See [`investable_views`](@ref); the whole of the fix is building on the investable
+    # columns, and the expansion below is what puts the answer back on the caller's universe.
+    imsk, vsets, ni = investable_views(prior_model, pe.sets)
+    assert_bl_precomputed_universe(pe.sets, prior_model)
+    vpr = investable_prior(imsk, prior_model)
+    posterior_X, prior_mu, prior_sigma = vpr.X, vpr.mu, vpr.sigma
+    ledger = String[]
+    blp = bl_preroll(pe.views, vsets, pe.views_conf, prior_sigma, pe.tau, size(X, 1),
+                     eltype(posterior_X), strict; ledger = ledger)
+    # `nothing` is the view set a departure emptied, and the pair is then the prior's own.
+    posterior_mu, posterior_sigma = bl_posteriors(blp, prior_mu, prior_sigma)
     # `pe.rf` is applied here and only here (see [`apply_rf`](@ref)): once, on the asset
     # expected returns this estimator returns. `prior_model.mu` is the wrapped prior's own
     # answer and is used as it stands, so a rate that prior applied internally is left alone.
     posterior_mu = apply_rf(pe.rf, posterior_mu)
+    # Processed on the reduced covariance, before the expansion: `posdef!` and the denoise
+    # and detone steps all read every entry, and a `NaN` frame has no factorisation.
     matrix_processing!(pe.mp, posterior_sigma, posterior_X; kwargs...)
+    announce_bl_departures(ni, ledger, isnothing(blp))
+    # The expansion. The contract is that a prior result lives on the FULL asset universe
+    # with a `NaN` in `mu` and on the diagonal of `sigma` for an asset that is not
+    # investable, so that the next layer derives the same mask this one did. `expand_moment`
+    # is the [`coverage_reduction`](@ref) family's own idiom for it, and its `nothing`
+    # methods are the all-investable path — no branch here, and no allocation there.
+    posterior_mu = expand_moment(posterior_mu, imsk, 1)
+    posterior_sigma = expand_moment(posterior_sigma, imsk)
     # Everything the wrapped prior carried is forwarded (see [`forward_prior`](@ref)); `chol`
     # is the only drop, because `posterior_sigma` supersedes the covariance it factorises.
-    # Black-Litterman leaves the observation axis untouched (`posterior_X === prior_model.X`),
-    # so the wrapped `w` still describes exactly the rows of the returned `X`, its `ens`/`kld`/
-    # `ow` still describe that `w`.
+    # `prior_model` is forwarded, not `vpr`: the reduction is this estimator's own working
+    # universe and nothing outside it may see a narrowed carrier. Black-Litterman leaves the
+    # observation axis untouched — the reduction takes columns, never rows — so the wrapped
+    # `w` still describes exactly the rows of the returned `X`, and its `ens`/`kld`/`ow`
+    # still describe that `w`.
     # `rr` is structural — the regression of `X` on `F`, over data Black-Litterman does not
     # modify — and the factor block `fpr` travels with it.
     return forward_prior(prior_model; mu = posterior_mu, sigma = posterior_sigma,
