@@ -131,7 +131,8 @@
 "src/08_Moments/45_ReturnForecasts/04_FixedWeightedReturnForecast.jl" = { map = 3, units = 7, swept = false }
 "src/08_Moments/45_ReturnForecasts/05_ExpWeightedReturnForecast.jl" = { map = 3, units = 9, swept = false }
 "src/08_Moments/45_ReturnForecasts/06_TargetReturnForecast.jl" = { map = 3, units = 15, swept = false }
-"src/08_Moments/45_ReturnForecasts/07_ForecastEvaluation.jl" = { map = 3, units = 9, swept = false }
+"src/08_Moments/45_ReturnForecasts/07_ForecastEvaluation.jl" = { map = 3, units = 10, swept = false }
+"src/08_Moments/45_ReturnForecasts/08_ForecastHistory.jl" = { map = 3, units = 3, swept = false }
 "src/08_Moments/46_CrossSectionalRegressionDiagnostics.jl" = { map = 3, units = 31, swept = false }
 "src/08_Moments/47_CrossSectionalExposureDiagnostics.jl" = { map = 3, units = 22, swept = false }
 "src/08_Moments/48_FactorModelSummary.jl" = { map = 3, units = 16, swept = false }

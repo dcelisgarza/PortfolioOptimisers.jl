@@ -98,7 +98,8 @@ commit = "fda13accfd"
 "src/08_Moments/45_ReturnForecasts/04_FixedWeightedReturnForecast.jl" = { code = 105, doc = 183, comment = 0, blank = 74, total = 362 }
 "src/08_Moments/45_ReturnForecasts/05_ExpWeightedReturnForecast.jl" = { code = 172, doc = 268, comment = 0, blank = 91, total = 531 }
 "src/08_Moments/45_ReturnForecasts/06_TargetReturnForecast.jl" = { code = 268, doc = 404, comment = 0, blank = 148, total = 820 }
-"src/08_Moments/45_ReturnForecasts/07_ForecastEvaluation.jl" = { code = 99, doc = 247, comment = 0, blank = 104, total = 450 }
+"src/08_Moments/45_ReturnForecasts/07_ForecastEvaluation.jl" = { code = 120, doc = 285, comment = 0, blank = 114, total = 519 }
+"src/08_Moments/45_ReturnForecasts/08_ForecastHistory.jl" = { code = 61, doc = 67, comment = 0, blank = 32, total = 160 }
 "src/08_Moments/46_CrossSectionalRegressionDiagnostics.jl" = { code = 464, doc = 752, comment = 1, blank = 352, total = 1569 }
 "src/08_Moments/47_CrossSectionalExposureDiagnostics.jl" = { code = 407, doc = 502, comment = 0, blank = 247, total = 1156 }
 "src/08_Moments/48_FactorModelSummary.jl" = { code = 224, doc = 318, comment = 2, blank = 150, total = 694 }
