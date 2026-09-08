@@ -306,6 +306,8 @@ WeightsTracking
         │        s ┼ nothing
         │       fl ┼ nothing
         │       fs ┼ nothing
+        │       lq ┼ nothing
+        │      flq ┼ nothing
         │       fa ┼ nothing
         │   kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
       w ┼ Vector{Float64}: [0.5, 0.5]
@@ -319,6 +321,8 @@ WeightsTracking
         │        s ┼ nothing
         │       fl ┼ nothing
         │       fs ┼ nothing
+        │       lq ┼ nothing
+        │      flq ┼ nothing
         │       fa ┼ nothing
         │   kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
       w ┼ Vector{Float64}: [0.6, 0.4]
@@ -332,6 +336,8 @@ WeightsTracking
         │        s ┼ nothing
         │       fl ┼ nothing
         │       fs ┼ nothing
+        │       lq ┼ nothing
+        │      flq ┼ nothing
         │       fa ┼ nothing
         │   kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
       w ┼ Vector{Float64}: [0.5, 0.5]
@@ -345,6 +351,8 @@ WeightsTracking
         │        s ┼ nothing
         │       fl ┼ nothing
         │       fs ┼ nothing
+        │       lq ┼ nothing
+        │      flq ┼ nothing
         │       fa ┼ nothing
         │   kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
       w ┼ Vector{Float64}: [0.5, 0.5]
