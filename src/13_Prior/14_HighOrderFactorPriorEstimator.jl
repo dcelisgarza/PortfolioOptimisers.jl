@@ -399,18 +399,19 @@ The factor comoments come from `pe.kte` and `pe.ske` fit on `F`, so a non-defaul
 # Algorithm
 
  1. Orient `X` and `F` to `observations × variables` with [`dims_oriented`](@ref).
- 2. Compute the low order block `pr` with `pe.pe`, and check that it carries a regression result. Take the reconstructed returns `posterior_X = pr.X` and the loadings `M = pr.rr.M`.
+ 2. Compute the low order block `pr` with `pe.pe`, and check that it carries a regression result. Derive the Investable Mask from it with [`investable_mask`](@ref), and reduce the whole carrier to the investable universe with [`port_opt_view`](@ref), giving `rpr`; `X` is an argument rather than a block of the carrier, so it is cut alongside as `Xr`. Take the reconstructed returns `posterior_X = rpr.X` and the loadings `M = rpr.rr.M`. The `nothing` sentinel of an all-investable universe reduces nothing, and every step below then runs on the carrier itself. The reduction happens **before** the lift because the lift squares the reach of a non-investable asset: one `NaN` loading row makes a whole `NaN` band of `kron(M, M)`, and the projection carries it across most of the cokurtosis, where [`posdef!`](@ref) refuses it in the name of LAPACK rather than of the asset.
  3. Compute the factor square cokurtosis `f_kt` with `pe.kte` on `F`. When it exists, build `kM = kron(M, M)`, project `posterior_kt = kM * f_kt * transpose(kM)`, and process it with `pe.kte.mp`.
  4. Compute the factor coskewness `f_sk` and its negative spectral form `f_V` with `pe.ske` on `F`. When `f_sk` exists, build `kM` if step 3 did not, and project `posterior_sk = M * f_sk * transpose(kM)`.
- 5. Build the structure matrices with [`dup_elim_sum_matrices`](@ref), twice: at the asset count for `D2`, `L2` and `S2`, and at the factor count for `f_D2`, `f_L2` and `f_S2`. The all-or-none rule is the one `prior(::HighOrderPriorEstimator, …)` applies, at both dimensions.
- 6. When `pe.rsd` is `true`, take the reconstruction error `err = X - posterior_X`.
+ 5. Build the structure matrices with [`dup_elim_sum_matrices`](@ref), twice: at the **full** asset count for `D2`, `L2` and `S2`, and at the factor count for `f_D2`, `f_L2` and `f_S2`. The asset count is the full one because step 12 expands the co-moments, and the constructor validates the triple against `length(pr.mu)`. The all-or-none rule is the one `prior(::HighOrderPriorEstimator, …)` applies, at both dimensions.
+ 6. When `pe.rsd` is `true`, take the reconstruction error `err = Xr - posterior_X`.
  7. Still under `pe.rsd`, add [`coskewness_residuals`](@ref)`(err, pe.ske.me)` to the `posterior_sk` of step 4, when there is one.
  8. Still under `pe.rsd`, and when step 3 produced a `posterior_kt`, read the wrapped estimator's residual declaration with [`factor_residual_config`](@ref) and check its shape with [`assert_factor_residual_config`](@ref).
- 9. Recover the systematic covariance `sigma` from `pr.sigma`. A `nothing` declaration, and one whose `rsd` is `false`, both mean that no residual block was added, so `sigma` is `pr.sigma` unchanged. Otherwise size the block as `err_sigma`, the column variances of `err` under `rsd_cfg.ve`, subtract its diagonal matrix from `pr.sigma`, and re-condition the difference with [`posdef!`](@ref) under `rsd_cfg.pdm`. When any entry of `err_sigma` exceeds the matching diagonal entry of `pr.sigma` the subtraction would leave a negative variance, so the step warns and keeps `pr.sigma` whole. That happens when the wrapped estimator reports a covariance the block was never added to — a posterior that shrank it, rather than the lift's own sum.
+ 9. Recover the systematic covariance `sigma` from `rpr.sigma`. A `nothing` declaration, and one whose `rsd` is `false`, both mean that no residual block was added, so `sigma` is `rpr.sigma` unchanged. Otherwise size the block as `err_sigma`, the column variances of `err` under `rsd_cfg.ve`, subtract its diagonal matrix from `rpr.sigma`, and re-condition the difference with [`posdef!`](@ref) under `rsd_cfg.pdm`. When any entry of `err_sigma` exceeds the matching diagonal entry of `rpr.sigma` the subtraction would leave a negative variance, so the step warns and keeps `rpr.sigma` whole. That happens when the wrapped estimator reports a covariance the block was never added to — a posterior that shrank it, rather than the lift's own sum.
 10. Still under `pe.rsd`, add [`cokurtosis_residuals`](@ref)`(sigma, err, pe.kte.me, pe.ex)` to `posterior_kt`, and re-condition the sum with [`posdef!`](@ref) under `pe.kte.mp.pdm`.
 11. When step 4 produced a `posterior_sk`, recompute `posterior_V` from it with [`negative_spectral_coskewness`](@ref), so `V` describes the corrected coskewness rather than the projected one.
-12. Build the nested factor carrier `fpr` over `pr.fpr`, from the factor moments of steps 3 to 5. It is `nothing` when neither `f_kt` nor `f_sk` exists.
-13. Assemble the asset [`HighOrderPrior`](@ref) through its keyword constructor.
+12. Expand `posterior_kt`, `posterior_sk` and `posterior_V` back to the full asset universe with [`expand_moment`](@ref), `NaN` outside the investable block. `V` is expanded rather than recomputed, because it is a spectral quantity of the reduced coskewness and the frame carries no reduced returns to rebuild it from. The all-investable sentinel needs no branch of its own: [`expand_moment`](@ref) on a `nothing` mask hands the block straight back, at every one of its arities.
+13. Build the nested factor carrier `fpr` over `pr.fpr`, from the factor moments of steps 3 to 5. It is `nothing` when neither `f_kt` nor `f_sk` exists. The factor block is untouched by steps 2 and 12: `i` indexes assets, and these co-moments live on the factor axis.
+14. Assemble the asset [`HighOrderPrior`](@ref) through its keyword constructor, over the **full** `pr` rather than the reduced `rpr`, so the carrier lives on the full asset universe as the contract requires.
 
 Steps 9 and 10 are ordered, not independent. [`cokurtosis_residuals`](@ref) is defined on the systematic covariance, so step 9 has to undo the residual block that the wrapped estimator's own lift added before step 10 adds the residual cokurtosis.
 
@@ -431,15 +432,19 @@ Steps 9 and 10 are ordered, not independent. [`cokurtosis_residuals`](@ref) is d
 
 # Returns
 
-  - `pr::HighOrderPrior`: Result object containing asset returns, mean, covariance, coskewness tensor, cokurtosis tensor, and factor moments. Its `fpr` is a nested [`HighOrderPrior`](@ref) built over the wrapped prior's own factor block, so `fpr.pr === pr.fpr`: the factor co-moments and the low order factor moments describe one distribution, reachable by either route.
+  - `pr::HighOrderPrior`: Result object containing asset returns, mean, covariance, coskewness tensor, cokurtosis tensor, and factor moments, on the **full** asset universe. An asset the wrapped prior could not estimate carries `NaN` in `mu`, on the diagonal of `sigma`, and at every fourth-moment index that names it in `kt`, `sk` and `V` — the carrier [`HighOrderPriorEstimator`](@ref) makes on the same gapped panel, which [`port_opt_view`](@ref) slices clean. Its `fpr` is a nested [`HighOrderPrior`](@ref) built over the wrapped prior's own factor block, so `fpr.pr === pr.fpr`: the factor co-moments and the low order factor moments describe one distribution, reachable by either route.
 
 # Related
 
   - [`HighOrderFactorPriorEstimator`](@ref)
   - [`assert_prior_regression`](@ref)
   - [`HighOrderPrior`](@ref)
+  - [`HighOrderPriorEstimator`](@ref)
   - [`FactorPrior`](@ref)
   - [`prior`](@ref)
+  - [`investable_mask`](@ref): the mask step 2 derives, and the `nothing` sentinel that keeps an all-investable universe on the path it took.
+  - [`port_opt_view`](@ref): the reduction of step 2, which cuts every block the lift reads.
+  - [`expand_moment`](@ref): the expansion of step 12.
   - [`factor_residual_config`](@ref): the declaration that names the residual block step 9 removes. `pe.pe` is bounded [`AbstractLowOrderPriorEstimator_F_AF`](@ref), and only [`FactorPrior`](@ref) and [`FactorBlackLittermanPrior`](@ref) carry the fields the block is sized from, so a wrapper over either forwards the declaration and everything else declares `nothing` in an explicit method.
   - [`assert_factor_residual_config`](@ref): the shape check that runs on that declaration.
   - [`coskewness_residuals`](@ref)
@@ -460,8 +465,34 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum,
     posterior_V = nothing
     pr = prior(pe.pe, X, F, pnl; dims = 1, kwargs...)
     assert_prior_regression(pr, :pe)
-    posterior_X = pr.X
-    M = pr.rr.M
+    # The lift *squares* the reach of a non-investable asset. One `NaN` loading row makes a
+    # whole `NaN` band of `kron(M, M)`, and `kM * f_kt * transpose(kM)` carries it across most
+    # of the cokurtosis — 369 entries of 625 for one asset in five — which `matrix_processing!`
+    # then refuses through `posdef!` with a message that names LAPACK rather than the asset.
+    # So the estimator applies the contract's two halves, in the order every optimiser applies
+    # them: reduce once here, lift on the investable universe alone, and expand the co-moments
+    # back into a `NaN` frame of the full width below. `nothing` is the all-investable
+    # sentinel, and it takes the path this estimator always took.
+    #
+    # `port_opt_view` cuts every block the lift reads — `X`, `mu`, `sigma`, and `rr` on its
+    # asset axis — but the caller's `X` is an argument rather than a block of the carrier, so
+    # it is cut here alongside, on the same index.
+    #
+    # A branch, where the expansion below is dispatch. The mask is a *value*, and
+    # `investable_mask` is inferred `Union{Nothing, BitVector}`, so a `(::Nothing, …)`/
+    # `(::BitVector, …)` pair on it is union-split back into this very branch rather than
+    # resolved statically: `report_opt` reports the same 47 either way. Dispatch would buy no
+    # inference here and would owe two units in a swept file. `expand_moment` is dispatch
+    # because that family already exists, not because the mask is any more static there.
+    imsk = investable_mask(pr)
+    rpr, Xr = if isnothing(imsk)
+        pr, X
+    else
+        i = findall(imsk)
+        port_opt_view(pr, i), X[:, i]
+    end
+    posterior_X = rpr.X
+    M = rpr.rr.M
     f_kt = cokurtosis(pe.kte, F; kwargs...)
     if !isnothing(f_kt)
         kM = kron(M, M)
@@ -477,15 +508,18 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum,
     end
     # The same all-or-none branching the asset block gets, at the factor dimension: the
     # nested carrier validates its own `kt`/`L2`/`S2` triple against `length(pr.fpr.mu)`.
+    # The structure matrices are sized from the *full* asset count, not from the reduced
+    # `posterior_X`: the co-moments are expanded before the carrier is assembled, so the
+    # triple the constructor validates against `length(pr.mu)` has to describe that width.
     if !isnothing(f_kt) && !isnothing(f_sk)
-        D2, L2, S2 = dup_elim_sum_matrices(size(posterior_X, 2))
+        D2, L2, S2 = dup_elim_sum_matrices(length(pr.mu))
         f_D2, f_L2, f_S2 = dup_elim_sum_matrices(size(F, 2))
     elseif !isnothing(f_kt) && isnothing(f_sk)
-        L2, S2 = dup_elim_sum_matrices(size(posterior_X, 2))[2:3]
+        L2, S2 = dup_elim_sum_matrices(length(pr.mu))[2:3]
         f_L2, f_S2 = dup_elim_sum_matrices(size(F, 2))[2:3]
     end
     if pe.rsd
-        err = X - posterior_X
+        err = Xr - posterior_X
         if !isnothing(f_sk)
             posterior_sk .+= coskewness_residuals(err, pe.ske.me)
         end
@@ -502,15 +536,15 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum,
             rsd_cfg = factor_residual_config(pe.pe)
             assert_factor_residual_config(pe.pe, rsd_cfg)
             sigma = if isnothing(rsd_cfg) || !rsd_cfg.rsd
-                pr.sigma
+                rpr.sigma
             else
                 err_sigma = vec(Statistics.var(rsd_cfg.ve, err; dims = 1))
                 sigma = if any(map((x, y) -> x > y, err_sigma,
-                                   LinearAlgebra.diag(pr.sigma)))
+                                   LinearAlgebra.diag(rpr.sigma)))
                     @warn("Some residual variances are larger than prior variances; using the prior variances to error correct the posterior kurtosis.")
-                    pr.sigma
+                    rpr.sigma
                 else
-                    pr.sigma - LinearAlgebra.diagm(err_sigma)
+                    rpr.sigma - LinearAlgebra.diagm(err_sigma)
                 end
                 posdef!(rsd_cfg.pdm, sigma)
                 sigma
@@ -522,6 +556,21 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum,
     end
     if !isnothing(f_sk)
         posterior_V = negative_spectral_coskewness(posterior_sk, posterior_X, pe.ske.mp)
+    end
+    # The expansion, the second half of the contract. Every asset-side co-moment goes back
+    # into a `NaN` frame of the full width through the same [`expand_moment`](@ref) the
+    # moment estimators use, so this estimator's carrier is the one
+    # [`HighOrderPriorEstimator`](@ref) makes on the same gapped panel — the fourth-moment
+    # index of a non-investable asset is `NaN` and nothing else is — and `port_opt_view`
+    # slices it clean again. `V` is expanded rather than recomputed: it is a spectral
+    # quantity of the *reduced* coskewness, and the frame has no reduced returns to rebuild
+    # it from. The all-investable sentinel needs no condition of its own: `expand_moment` on a
+    # `nothing` mask hands the block straight back, at every one of its arities.
+    if !isnothing(posterior_kt)
+        posterior_kt = expand_moment(posterior_kt, imsk, Val(:kt))
+    end
+    if !isnothing(posterior_sk)
+        posterior_sk, posterior_V = expand_moment((posterior_sk, posterior_V), imsk)
     end
     # The nested block's `pr` is the wrapped prior's own factor block, which is what the
     # `fpr.pr === pr.fpr` invariant asks for — the factor co-moments and the factor

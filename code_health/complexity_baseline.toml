@@ -156,7 +156,7 @@ commit = "97e398ef74"
 "src/13_Prior/11_MeucciEntropyPoolingPrior.jl" = { cyc = 18, cog = 23, arg = 15, cyc_sum = 62, cog_sum = 69, arg_sum = 55, macros = ["@forward_properties", "@propagatable"] }
 "src/13_Prior/12_EntropyPoolingPrior.jl" = { cyc = 18, cog = 23, arg = 16, cyc_sum = 200, cog_sum = 165, arg_sum = 428, macros = ["@forward_properties", "@propagatable"] }
 "src/13_Prior/13_OpinionPoolingPrior.jl" = { cyc = 5, cog = 8, arg = 7, cyc_sum = 14, cog_sum = 12, arg_sum = 26, macros = ["@propagatable"] }
-"src/13_Prior/14_HighOrderFactorPriorEstimator.jl" = { cyc = 21, cog = 33, arg = 6, cyc_sum = 44, cog_sum = 61, arg_sum = 18, macros = ["@forward_properties", "@propagatable"] }
+"src/13_Prior/14_HighOrderFactorPriorEstimator.jl" = { cyc = 22, cog = 37, arg = 6, cyc_sum = 47, cog_sum = 65, arg_sum = 18, macros = ["@forward_properties", "@propagatable"] }
 "src/13_Prior/15_AssetPanelEstimators.jl" = { cyc = 3, cog = 4, arg = 4, cyc_sum = 21, cog_sum = 8, arg_sum = 21, macros = ["@propagatable"] }
 "src/13_Prior/16_Base_CrossSectionalFactorPrior.jl" = { cyc = 10, cog = 14, arg = 8, cyc_sum = 95, cog_sum = 81, arg_sum = 88, macros = [] }
 "src/13_Prior/17_CrossSectionalFactorPrior.jl" = { cyc = 5, cog = 8, arg = 18, cyc_sum = 12, cog_sum = 11, arg_sum = 34, macros = ["@propagatable"] }

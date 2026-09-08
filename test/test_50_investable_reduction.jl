@@ -821,3 +821,94 @@ end
                                                                                           length(keep),
                                                                                           "gcarde")
 end
+
+@testset "HighOrderFactorPriorEstimator reduces before the lift and expands its co-moments" begin
+    # Issue #923. The lift squares the reach of a non-investable asset: one `NaN` loading row
+    # makes a `NaN` band of `kron(M, M)`, and `kM * f_kt * transpose(kM)` carries it across
+    # 369 of the 625 cokurtosis entries of a five-asset panel. `matrix_processing!` then
+    # refused the whole fit with `ArgumentError: matrix contains Infs or NaNs`, which names
+    # LAPACK rather than the asset that caused it.
+    #
+    # The gapped panel a delisting makes. `FactorPrior` reduces to the Coverage Universe and
+    # expands, so its `rr.M` carries the `NaN` row that the lift squares.
+    Xg = copy(X)
+    Xg[141:end, k] .= NaN
+    # The fourth-moment indices that name the non-investable asset, and its own row.
+    kpairs = [(a - 1) * N + b for a in 1:N for b in 1:N if a == k || b == k]
+    kmask = falses(N^2)
+    kmask[kpairs] .= true
+
+    pe = HighOrderFactorPriorEstimator()
+    hop = prior(pe, Xg, F; dims = 1)
+    hok = prior(pe, Xg[:, keep], F; dims = 1)
+
+    # The carrier lives on the FULL asset universe, and the mask is still derivable from it.
+    @test length(hop.mu) == N
+    @test PortfolioOptimisers.investable_mask(hop) == BitVector([1, 1, 0, 1, 1])
+    # The structure matrices are sized from the full asset count, which is what the
+    # constructor validates the expanded `kt` against.
+    @test size(hop.kt) == (N^2, N^2)
+    @test size(hop.sk) == (N, N^2)
+    @test size(hop.V) == (N, N)
+    @test size(hop.L2) == size(hop.S2) == (div(N * (N + 1), 2), N^2)
+    @test size(hop.D2) == (N^2, div(N * (N + 1), 2))
+
+    # The `NaN` reaches exactly the fourth-moment indices of the non-investable asset, and
+    # nothing else. That is the carrier `HighOrderPriorEstimator` makes on the same panel.
+    @test [!isfinite(hop.kt[i, j]) for i in 1:(N ^ 2), j in 1:(N ^ 2)] ==
+          [kmask[i] || kmask[j] for i in 1:(N ^ 2), j in 1:(N ^ 2)]
+    @test count(!isfinite, hop.kt) == 369
+    @test [!isfinite(hop.sk[i, j]) for i in 1:N, j in 1:(N ^ 2)] ==
+          [i == k || kmask[j] for i in 1:N, j in 1:(N ^ 2)]
+    @test count(!isfinite, hop.sk) == 61
+    @test [!isfinite(hop.V[i, j]) for i in 1:N, j in 1:N] ==
+          [i == k || j == k for i in 1:N, j in 1:N]
+    @test count(!isfinite, hop.V) == 9
+
+    # The oracle is the same fit with the non-investable asset removed by hand, and the
+    # reduction of the returned carrier must reach it block for block, at 0.0.
+    v = PortfolioOptimisers.port_opt_view(hop, keep)
+    for f in (:mu, :sigma, :X, :kt, :sk, :V)
+        @test all(isfinite, getproperty(v, f))
+        @test getproperty(v, f) == getproperty(hok, f)
+    end
+
+    # The factor block sits on the factor axis, which the reduction does not touch, and the
+    # two routes to the low order factor prior are still the same object.
+    @test hop.fpr.pr === hop.pr.fpr
+    @test hop.f_kt == hok.f_kt
+    @test hop.f_sk == hok.f_sk
+    @test hop.f_V == hok.f_V
+
+    # Every co-moment configuration reduces and expands: the residual correction reads the
+    # reconstruction error and the wrapped declaration, both of which follow the reduction,
+    # and either estimator set to `nothing` drops its moment from both ends.
+    for cpe in (HighOrderFactorPriorEstimator(; rsd = false),
+                HighOrderFactorPriorEstimator(; ske = nothing),
+                HighOrderFactorPriorEstimator(; kte = nothing))
+        chop = prior(cpe, Xg, F; dims = 1)
+        chok = prior(cpe, Xg[:, keep], F; dims = 1)
+        cv = PortfolioOptimisers.port_opt_view(chop, keep)
+        @test length(chop.mu) == N
+        for f in (:mu, :sigma, :X)
+            @test getproperty(cv, f) == getproperty(chok, f)
+        end
+        for f in (:kt, :sk, :V)
+            a, b = getproperty(cv, f), getproperty(chok, f)
+            @test isnothing(a) == isnothing(b)
+            if !isnothing(a)
+                @test all(isfinite, a)
+                @test a == b
+            end
+        end
+    end
+
+    # The all-investable path is the path it was: the `nothing` sentinel reduces nothing,
+    # expands nothing, and the co-moments are finite throughout.
+    hoa = prior(pe, X, F; dims = 1)
+    @test isnothing(PortfolioOptimisers.investable_mask(hoa))
+    @test all(isfinite, hoa.kt)
+    @test all(isfinite, hoa.sk)
+    @test all(isfinite, hoa.V)
+    @test size(hoa.kt) == (N^2, N^2)
+end
