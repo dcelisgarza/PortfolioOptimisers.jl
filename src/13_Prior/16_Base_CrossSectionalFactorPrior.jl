@@ -424,10 +424,12 @@ Return the idiosyncratic covariance of the latest observation.
 # Algorithm
 
  1. A threshold of zero answers the latest idiosyncratic variances, so the block carries a vector and the asset covariance takes a diagonal.
- 2. Otherwise, take the standardised idiosyncratic returns, write a zero at every cell that is still not finite, and estimate their covariance with `ce`. A cell is left non-finite only where the asset is inactive, and a zero is the neutral value of a standardised series, so such a pair pulls the correlation toward the threshold it is dropped by.
- 3. Convert the covariance to a correlation.
- 4. Zero every correlation whose magnitude does not exceed the threshold, and keep the diagonal. A correlation that is not finite is zeroed by the same step.
- 5. Rescale the correlation by the latest idiosyncratic volatilities, and make the block of assets with a finite variance positive definite.
+ 2. Otherwise, ask `ce` what a gapped cell of the standardised idiosyncratic returns is worth to it with [`gap_fill_value`](@ref). A cell is left non-finite only where the asset is inactive.
+ 3. A finite answer is written over every such cell, and `ce` estimates the covariance of a sample with no gap left in it. Zero, the fallback, is the neutral value of a standardised series, so a gapped pair pulls the correlation toward the threshold it is dropped by.
+ 4. A non-finite answer hands the sample as it stands, with `amsk` as the `active_mask`, so a gap-aware `ce` freezes an inactive asset's block instead of decaying it.
+ 5. Convert the covariance to a correlation.
+ 6. Zero every correlation whose magnitude does not exceed the threshold, and keep the diagonal. A correlation that is not finite is zeroed by the same step.
+ 7. Rescale the correlation by the latest idiosyncratic volatilities, and make the block of assets with a finite variance positive definite.
 
 # Arguments
 
@@ -436,6 +438,7 @@ Return the idiosyncratic covariance of the latest observation.
   - `pdm`: Positive definite matrix estimator, or `nothing`.
   - `S`: Standardised idiosyncratic returns, `observations × assets`.
   - `ev`: The latest idiosyncratic variances, one per asset.
+  - `amsk`: The active mask, `observations × assets`. It is read only by a `ce` that answers a non-finite [`gap_fill_value`](@ref).
 
 # Returns
 
@@ -445,6 +448,7 @@ Return the idiosyncratic covariance of the latest observation.
 # Related
 
   - [`cross_sectional_standardised_residuals`](@ref)
+  - [`gap_fill_value`](@ref)
   - [`CrossSectionalFactorPrior`](@ref)
   - [`CrossSectionalFactorModel`](@ref)
   - [`posdef!`](@ref)
@@ -452,17 +456,23 @@ Return the idiosyncratic covariance of the latest observation.
 function cross_sectional_idiosyncratic_covariance(th::Real,
                                                   ce::StatsBase.CovarianceEstimator,
                                                   pdm::Option{<:AbstractPosdefEstimator},
-                                                  S::MatNum, ev::VecNum)
+                                                  S::MatNum, ev::VecNum,
+                                                  amsk::AbstractMatrix{<:Bool})
     if iszero(th)
         return ev
     end
-    Z = Matrix{real(eltype(S))}(S)
-    for k in CartesianIndices(Z)
-        if !isfinite(Z[k])
-            Z[k] = zero(eltype(Z))
+    fv = gap_fill_value(ce)
+    C = if isfinite(fv)
+        Z = Matrix{real(eltype(S))}(S)
+        for k in CartesianIndices(Z)
+            if !isfinite(Z[k])
+                Z[k] = fv
+            end
         end
+        Statistics.cov(ce, Z; dims = 1)
+    else
+        Statistics.cov(ce, S; dims = 1, active_mask = amsk)
     end
-    C = Statistics.cov(ce, Z; dims = 1)
     s = sqrt.(LinearAlgebra.diag(C))
     R = StatsBase.cov2cor(Matrix(C), s)
     for k in CartesianIndices(R)

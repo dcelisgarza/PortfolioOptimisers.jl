@@ -414,3 +414,65 @@ end
                       PortfolioOptimisers.exp_weighted_moment(without_f, est))
     end
 end
+
+@testset "The gap fill value is keyed by the estimator" begin
+    # Issue #925. A consumer that holds a gapped sample and an arbitrary covariance estimator
+    # asks the estimator what a gapped cell is worth to it. A plain moment estimator takes the
+    # fallback zero and never sees the gap; a gap-aware one answers `NaN`, which leaves the gap
+    # where it is and asks for the mask that explains it. Adding a gap-aware estimator is that
+    # one method, so the trait is checked here rather than at the one consumer.
+    @test iszero(PortfolioOptimisers.gap_fill_value(PortfolioOptimisersCovariance()))
+    @test iszero(PortfolioOptimisers.gap_fill_value(Covariance()))
+    @test isnan(PortfolioOptimisers.gap_fill_value(ExpWeightedCovariance()))
+    @test isnan(PortfolioOptimisers.gap_fill_value(RegimeAdjustedExpWeightedCovariance()))
+
+    # The two answers are the two routes: a finite one is written over the gap, and a non-finite
+    # one is not, so `isfinite` is the whole branch the consumer takes.
+    @test isfinite(PortfolioOptimisers.gap_fill_value(PortfolioOptimisersCovariance()))
+    @test !isfinite(PortfolioOptimisers.gap_fill_value(ExpWeightedCovariance()))
+
+    # An estimator that answers a non-finite value owns the masked verb the consumer then calls.
+    for ce in (ExpWeightedCovariance(), RegimeAdjustedExpWeightedCovariance())
+        m = which(Statistics.cov, Tuple{typeof(ce), Matrix{Float64}})
+        @test m.sig.parameters[2] === typeof(ce).name.wrapper
+        @test :active_mask in Base.kwarg_decl(m)
+    end
+
+    # A covariance estimator nests, so the answer recurses. A composite that forwards the
+    # sample and its keywords untouched answers what it wraps; one that reads the sample
+    # itself before it delegates keeps the fallback, because it refuses the gap on its own
+    # account and no answer of its inner estimator changes that. `ProcessedCovariance` and
+    # `DenoiseCovariance` are constructors that build a `PortfolioOptimisersCovariance`, so
+    # they take the recursion of the type they build.
+    ew = ExpWeightedCovariance(; centred = true)
+    for nest in (PortfolioOptimisersCovariance(; ce = ew), ProcessedCovariance(; ce = ew),
+                 DenoiseCovariance(; ce = ew), CorrelationCovariance(; ce = ew),
+                 PortfolioOptimisersCovariance(; ce = CorrelationCovariance(; ce = ew)))
+        @test isnan(PortfolioOptimisers.gap_fill_value(nest))
+    end
+    for nest in (Covariance(; ce = ew), GeneralCovariance(; ce = ew),
+                 PortfolioOptimisersCovariance(; ce = Covariance(; ce = ew)),
+                 PortfolioOptimisersCovariance(), Covariance())
+        @test iszero(PortfolioOptimisers.gap_fill_value(nest))
+    end
+
+    # The trait is the estimator's own promise, so it holds on a gapped sample: every nest
+    # that answers `NaN` answers the masked verb, and every nest that answers zero refuses it.
+    T, N = 60, 4
+    rng = StableRNG(925_002)
+    Xg = 0.7 .* randn(rng, T) .+ 0.7 .* randn(rng, T, N)
+    amsk = trues(T, N)
+    amsk[41:T, 4] .= false
+    Xg[41:T, 4] .= NaN
+    for nest in
+        (ew, PortfolioOptimisersCovariance(; ce = ew), ProcessedCovariance(; ce = ew),
+         CorrelationCovariance(; ce = ew))
+        @test size(cov(nest, Xg; dims = 1, active_mask = amsk)) == (N, N)
+        @test size(cor(nest, Xg; dims = 1, active_mask = amsk)) == (N, N)
+    end
+    for nest in (Covariance(; ce = ew), GeneralCovariance(; ce = ew),
+                 PortfolioOptimisersCovariance(; ce = Covariance(; ce = ew)))
+        @test_throws PortfolioOptimisers.IsNonFiniteError cov(nest, Xg; dims = 1,
+                                                              active_mask = amsk)
+    end
+end

@@ -16,6 +16,7 @@ exp_weighted_pass!(est::ExpWeightedCovariance, X::MatNum, dims::Int,
 exp_weighted_moment(cache::ExpWeightedCovarianceState, est::ExpWeightedCovariance)
 cov(ce::ExpWeightedCovariance, X::MatNum; dims::Int = 1,
                         active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
+gap_fill_value(::ExpWeightedCovariance)
 cor(ce::ExpWeightedCovariance, X::MatNum; dims::Int = 1,
                         active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
 cov(ce::ExpWeightedCovariance, X::MatNum, pnl::Option{<:AssetPanel};

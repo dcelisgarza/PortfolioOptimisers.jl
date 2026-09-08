@@ -638,6 +638,36 @@ function Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 
                               Statistics.std(ce.ve, X; dims = dims, kwargs...))
 end
 """
+    gap_fill_value(ce::StatsBase.CovarianceEstimator) -> Number
+
+Return the value that stands in for a gapped cell of a sample handed to `ce`.
+
+A gapped sample carries a non-finite cell because the asset was not there, not because a number went wrong. A consumer that holds such a sample and an arbitrary covariance estimator cannot know which of the two the estimator wants of it, so it asks the estimator, and the answer is a property of the estimator alone.
+
+A **finite** answer is written over every gapped cell before the sample is handed over, so the estimator sees a complete sample and no mask. A **non-finite** answer leaves the gap where it is, and the consumer hands the active mask that explains it to `Statistics.cov(ce, X; dims, active_mask)`, which an estimator answering a non-finite value owns.
+
+The fallback is zero: a plain moment estimator refuses a gapped sample outright, and zero is the neutral value of a standardised series. A gap-aware estimator answers `NaN` instead, and that one method is the whole cost of adding one.
+
+A covariance estimator nests, so the answer recurses. An estimator that wraps another and forwards the sample and its keywords untouched — [`PortfolioOptimisersCovariance`](@ref) and [`CorrelationCovariance`](@ref) — answers what the estimator it wraps answers, so wrapping a gap-aware estimator keeps the gap. One that reads the sample itself before it delegates, as [`Covariance`](@ref) does through its own expected-returns estimator, keeps the fallback: it refuses the gap on its own account, and no answer of its inner estimator changes that.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+
+# Returns
+
+  - `fv::Number`: The value a gapped cell takes, zero for a plain estimator and `NaN` for a gap-aware one.
+
+# Related
+
+  - [`ExpWeightedCovariance`](@ref)
+  - [`RegimeAdjustedExpWeightedCovariance`](@ref)
+  - [`cross_sectional_idiosyncratic_covariance`](@ref)
+"""
+function gap_fill_value(::StatsBase.CovarianceEstimator)
+    return 0
+end
+"""
     densify(X::MatNum) -> MatNum
 
 Materialise a lazy or sparse observation matrix as a dense `Matrix`.

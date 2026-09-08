@@ -34,6 +34,7 @@ assert_regime_target
 regime_adjusted_covariance_pass!
 regime_adjusted_covariance
 regime_adjusted_correlation
+gap_fill_value(::RegimeAdjustedExpWeightedCovariance)
 cov(ce::RegimeAdjustedExpWeightedCovariance, X::MatNum; dims::Int = 1,
                     estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                     active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,

@@ -79,19 +79,23 @@ function PortfolioOptimisersCovariance(; ce::StatsBase.CovarianceEstimator = Cov
     return PortfolioOptimisersCovariance(ce, mp)
 end
 """
-    Statistics.cov(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1, kwargs...)
+    Statistics.cov(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1,
+                   active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
 
 Compute the covariance matrix with post-processing using a [`PortfolioOptimisersCovariance`](@ref) estimator.
 
 This method computes the covariance matrix for the input data matrix `X` using the underlying covariance estimator in `ce`, and then applies the matrix post-processing step specified by `ce.mp`.
 
+The composite is transparent to a gap: it forwards `X` and `active_mask` to `ce.ce` untouched, so [`gap_fill_value`](@ref) on it is [`gap_fill_value`](@ref) on `ce.ce`. A composite that wraps a gap-aware estimator therefore takes no finiteness refusal of its own, and repairs the finite block rather than the whole frame, which is what the [`AssetPanel`](@ref) method beside it does.
+
 # Algorithm
 
- 1. Check `dims` and orient `X` to `observations × assets`, transposing it when `dims == 2`.
- 2. Compute `sigma` with `Statistics.cov(ce.ce, X; kwargs...)`.
- 3. When `sigma` is immutable, copy it into a `Matrix`, because step 4 writes in place.
- 4. Apply [`matrix_processing!`](@ref) with `ce.mp` to `sigma`, in place.
- 5. Return `sigma`.
+ 1. Check `dims`, and orient `X` and `active_mask` to `observations × assets`, transposing them when `dims == 2`.
+ 2. Refuse a gapped sample with [`assert_finite_sample`](@ref) when [`gap_fill_value`](@ref) on `ce` is finite, because `ce.ce` is then a plain estimator that has no answer for one.
+ 3. Compute `sigma` with `Statistics.cov(ce.ce, X; kwargs...)`, adding `active_mask` when one is given.
+ 4. When `sigma` is immutable, copy it into a `Matrix`, because step 5 writes in place.
+ 5. Apply [`matrix_processing!`](@ref) with `ce.mp` to `sigma`, in place, or [`matrix_processing_block!`](@ref) when `ce.ce` is gap-aware, so an asset outside the Coverage Universe keeps its `NaN` row and column.
+ 6. Return `sigma`.
 
 `ce.ce` runs before `ce.mp`, and `ce.mp.order` fixes the order of the steps inside the
 post-processing. Step 1 orients `X` once, so the estimator and the post-processing both read the
@@ -102,6 +106,7 @@ same orientation and neither takes a `dims` of its own.
   - `ce`: Composite covariance estimator with post-processing.
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
+  - `active_mask`: Optional boolean matrix with the same size as `X`, forwarded to `ce.ce` when it is given.
   - `kwargs...`: Additional keyword arguments passed to the underlying covariance estimator and matrix processing step.
 
 # Validation
@@ -118,15 +123,50 @@ same orientation and neither takes a `dims` of its own.
   - [`matrix_processing!`](@ref)
   - [`Statistics.cov`](https://juliastats.org/StatsBase.jl/stable/cov/#Statistics.cov-Tuple%7BCovarianceEstimator,%20AbstractMatrix%7D)
 """
-function Statistics.cov(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1, kwargs...)
-    X = dims_oriented(dims, X)
-    assert_finite_sample(X)
-    sigma = Statistics.cov(ce.ce, X; kwargs...)
+function Statistics.cov(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1,
+                        active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
+    X, amsk = dims_oriented(dims, X, active_mask)
+    plain = isfinite(gap_fill_value(ce))
+    if plain
+        assert_finite_sample(X)
+    end
+    sigma = if isnothing(amsk)
+        Statistics.cov(ce.ce, X; kwargs...)
+    else
+        Statistics.cov(ce.ce, X; active_mask = amsk, kwargs...)
+    end
     if !ismutable(sigma)
         sigma = Matrix(sigma)
     end
-    matrix_processing!(ce.mp, sigma, X; kwargs...)
+    if plain
+        matrix_processing!(ce.mp, sigma, X; kwargs...)
+    else
+        matrix_processing_block!(ce.mp, sigma, X; kwargs...)
+    end
     return sigma
+end
+"""
+    gap_fill_value(ce::PortfolioOptimisersCovariance) -> Number
+
+Answer what `ce.ce` answers, because the composite forwards the sample and the mask untouched.
+
+The composite adds matrix processing to an inner estimator and reads no cell of the sample itself, so a gap is the inner estimator's to keep or to lose. A composite wrapping a gap-aware estimator is therefore gap-aware, and one wrapping a plain estimator is not.
+
+# Arguments
+
+  - `ce`: Composite covariance estimator with post-processing.
+
+# Returns
+
+  - `fv::Number`: [`gap_fill_value`](@ref) of `ce.ce`.
+
+# Related
+
+  - [`PortfolioOptimisersCovariance`](@ref)
+  - [`gap_fill_value`](@ref)
+"""
+function gap_fill_value(ce::PortfolioOptimisersCovariance)
+    return gap_fill_value(ce.ce)
 end
 """
     Statistics.cov(ce::PortfolioOptimisersCovariance, X::MatNum,
@@ -189,7 +229,8 @@ function Statistics.cor(ce::PortfolioOptimisersCovariance, X::MatNum,
     return rho
 end
 """
-    Statistics.cor(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1, kwargs...)
+    Statistics.cor(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1,
+                   active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
 
 Compute the correlation matrix with post-processing using a [`PortfolioOptimisersCovariance`](@ref) estimator.
 
@@ -212,6 +253,7 @@ same orientation and neither takes a `dims` of its own.
   - `ce`: Composite covariance estimator with post-processing.
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
+  - `active_mask`: Optional boolean matrix with the same size as `X`, forwarded to `ce.ce` when it is given.
   - `kwargs...`: Additional keyword arguments passed to the underlying covariance estimator and matrix processing step.
 
 # Validation
@@ -228,14 +270,26 @@ same orientation and neither takes a `dims` of its own.
   - [`matrix_processing!`](@ref)
   - [`Statistics.cor`](https://juliastats.org/StatsBase.jl/stable/cov/#Statistics.cor)
 """
-function Statistics.cor(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1, kwargs...)
-    X = dims_oriented(dims, X)
-    assert_finite_sample(X)
-    rho = Statistics.cor(ce.ce, X; kwargs...)
+function Statistics.cor(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1,
+                        active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
+    X, amsk = dims_oriented(dims, X, active_mask)
+    plain = isfinite(gap_fill_value(ce))
+    if plain
+        assert_finite_sample(X)
+    end
+    rho = if isnothing(amsk)
+        Statistics.cor(ce.ce, X; kwargs...)
+    else
+        Statistics.cor(ce.ce, X; active_mask = amsk, kwargs...)
+    end
     if !ismutable(rho)
         rho = Matrix(rho)
     end
-    matrix_processing!(ce.mp, rho, X; kwargs...)
+    if plain
+        matrix_processing!(ce.mp, rho, X; kwargs...)
+    else
+        matrix_processing_block!(ce.mp, rho, X; kwargs...)
+    end
     return rho
 end
 """

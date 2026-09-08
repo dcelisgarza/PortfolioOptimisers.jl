@@ -39,21 +39,25 @@ are standardised in the test rather than by a Descriptor. Both choices are delib
 every departure below out of the picture, so the stored cases measure the fit alone. Issue #721
 already diffed the Factor Exposures themselves.
 
-TWO DEPARTURES FROM THE REFERENCE IMPLEMENTATION, both recorded in the resolution comment of #725.
-A third one, recorded in that of #739, is gone: issue #835 built ADR 0112, so the Return Forecast
-Estimator now reads the WHOLE carrier and answers on the block's rows.
+ONE DEPARTURE FROM THE REFERENCE IMPLEMENTATION, recorded in the resolution comment of #725. Two
+others are gone. The first, recorded in that of #739, went with issue #835, which built ADR 0112, so
+the Return Forecast Estimator now reads the WHOLE carrier and answers on the block's rows. The
+second went with issue #925, below.
 
   - The benchmark mask and the eligibility mask both drop a pair whose market capitalisation is not
     finite. The reference implementation lets such a pair carry a `NaN` weight. The library refuses
     a non-finite capitalisation on an eligible pair, and `exposure_benchmark_weights` already zeroes
     a non-finite weight, so dropping the pair is what the library's own convention asks for.
-  - The idiosyncratic correlation overlay writes a zero at a standardised residual that is still not
-    finite, which happens only where the asset is inactive. The reference implementation's default
-    covariance estimator skips such a pair. The overlay fills before it estimates, and the fill is
-    unconditional rather than keyed on `ce`, so no estimator in that slot ever sees the gap. The
-    fill is there because the slot's default is a plain moment estimator, which refuses a gapped
-    sample outright. Issue #925 proposes the three edits that reach the reference implementation's
-    answer to machine precision, and holds the measurement.
+
+THE IDIOSYNCRATIC OVERLAY'S FILL VALUE IS KEYED ON THE ESTIMATOR (issue #925). The overlay used to
+write a zero at every standardised residual that was still not finite, which happens only where the
+asset is inactive, and it wrote it unconditionally: no estimator in the `ce` slot ever saw the gap.
+It now asks `ce` what a gapped cell is worth to it with `gap_fill_value`. A plain moment estimator
+takes the fallback zero, because it refuses a gapped sample outright; a gap-aware one answers `NaN`,
+which leaves the gap where it is and is handed the panel's active mask beside it. The slot's default
+is now `ExpWeightedCovariance(; centred = true)`, which is what the reference implementation's own
+default is, so the overlay reaches its answer to machine precision. `gap_fill_value` recurses
+through a composite that forwards the sample untouched, and `test_08z` gates the trait itself.
 =#
 using Statistics, Distributions, Dates, Random
 include(joinpath(@__DIR__, "test06c_setup.jl"))
@@ -160,6 +164,11 @@ fit_rows(rd, pr) = (size(rd.X, 1) - size(pr.X, 1) + 1):size(rd.X, 1)
         @test pe.wa.p == 0.5
         @test isa(pe.pe, EmpiricalPrior)
         @test isa(pe.ve, RegimeAdjustedExpWeightedVariance)
+        # Issue #925. `EWCovariance(assume_centered=True, nearest=False)` is the reference
+        # implementation's own default, and `centred` is the whole residual against it.
+        @test isa(pe.ce, ExpWeightedCovariance)
+        @test pe.ce.centred
+        @test isnan(PO.gap_fill_value(pe.ce))
         @test iszero(pe.th)
         @test isone(pe.bp)
         @test pe.mcap == "market_cap"
@@ -561,6 +570,83 @@ end
         @test isapprox(S, pr.sigma[i, i]; atol = 1e-14)
         C = pr.chol[:, i]
         @test isapprox(transpose(C) * C, pr.sigma[i, i]; atol = 1e-14)
+    end
+    @testset "The overlay asks the estimator what a gapped cell is worth" begin
+        # Issue #925. The overlay used to fill before it estimated, so no estimator in the slot
+        # ever saw the gap. It now asks. The two answers are the two routes, and this testset
+        # pins each against the estimator call it is supposed to make: nothing downstream of
+        # that call differs between them.
+        T, N, th = 80, 4, 0.2
+        rng = StableRNG(925_001)
+        g = randn(rng, T)
+        # A shared driver, so the pairwise correlations clear the threshold and the testset is
+        # not measuring a block of structural zeroes.
+        S = 0.7 .* g .+ 0.7 .* randn(rng, T, N)
+        amsk = trues(T, N)
+        amsk[51:T, 4] .= false                    # asset 4 delists
+        amsk[1:20, 3] .= false                    # asset 3 lists late
+        S[51:T, 4] .= NaN
+        S[1:20, 3] .= NaN
+        ev = fill(0.04, N)
+        se = sqrt.(ev)
+        Z = map(x -> isfinite(x) ? x : 0.0, S)
+        # The tail of the overlay, which is the same on both routes. `pdm` is `nothing` below,
+        # so the identity is exact rather than up to a positive definite repair.
+        function overlay_tail(C)
+            R = StatsBase.cov2cor(Matrix(C), sqrt.(LinearAlgebra.diag(C)))
+            for k in CartesianIndices(R)
+                if k[1] != k[2] && !(abs(R[k]) > th)
+                    R[k] = zero(eltype(R))
+                end
+            end
+            for i in axes(R, 1)
+                R[i, i] = one(eltype(R))
+            end
+            return R .* se .* transpose(se)
+        end
+
+        # A threshold of zero answers the variances and never reads `ce`, so it never asks.
+        @test PO.cross_sectional_idiosyncratic_covariance(0.0,
+                                                          PortfolioOptimisersCovariance(),
+                                                          nothing, S, ev, amsk) === ev
+
+        # A plain moment estimator refuses a gapped sample, so the overlay fills for it, and
+        # the fill is the fallback zero and nothing else.
+        plain = PortfolioOptimisersCovariance()
+        @test iszero(PO.gap_fill_value(plain))
+        @test_throws PO.IsNonFiniteError Statistics.cov(plain, S; dims = 1)
+        Dp = PO.cross_sectional_idiosyncratic_covariance(th, plain, nothing, S, ev, amsk)
+        @test isapprox(Dp, overlay_tail(Statistics.cov(plain, Z; dims = 1)))
+        @test all(isfinite, Dp)
+
+        # The gap-aware default is handed the gap and the mask instead, so its answer is the
+        # masked estimator's own.
+        ce = ExpWeightedCovariance(; centred = true)
+        @test isnan(PO.gap_fill_value(ce))
+        Dg = PO.cross_sectional_idiosyncratic_covariance(th, ce, nothing, S, ev, amsk)
+        @test isapprox(Dg,
+                       overlay_tail(Statistics.cov(ce, S; dims = 1, active_mask = amsk)))
+        # The fill would have moved it: the mask freezes a delisted asset's block, and the
+        # fill keeps decaying it, so the two routes part on the pairs the gap touches.
+        Df = overlay_tail(Statistics.cov(ce, Z; dims = 1))
+        @test !isapprox(Dg, Df)
+        @test iszero(Dg[1, 4]) && !iszero(Df[1, 4])
+        # Nothing non-finite survives the tail, which is what lets the warm-up `NaN` through.
+        @test all(isfinite, Dg)
+
+        # A composite that forwards the sample untouched keeps the gap, so the overlay takes
+        # the same route through it as it takes through the estimator it wraps.
+        for w in (PortfolioOptimisersCovariance(; ce = ce), ProcessedCovariance(; ce = ce),
+                  CorrelationCovariance(; ce = ce))
+            @test isnan(PO.gap_fill_value(w))
+        end
+        @test isapprox(PO.cross_sectional_idiosyncratic_covariance(th,
+                                                                   PortfolioOptimisersCovariance(;
+                                                                                                 ce = ce,
+                                                                                                 mp = MatrixProcessing(;
+                                                                                                                       pdm = nothing)),
+                                                                   nothing, S, ev, amsk),
+                       Dg)
     end
     @testset "A power of zero reads no market capitalisation" begin
         @test !PO.cross_sectional_needs_market_cap(0.0, MarketCapWeights(; p = 0.0))

@@ -356,6 +356,30 @@ function Statistics.cov(ce::ExpWeightedCovariance, X::MatNum; dims::Int = 1,
     return exp_weighted_moment(cache, ce)
 end
 """
+    gap_fill_value(ce::ExpWeightedCovariance) -> Float64
+
+Answer `NaN`, so a gapped sample reaches the recursion with its gaps intact.
+
+The recursion updates only the sub-block of the assets that are valid at each observation, so a gap never reaches an entry it did not touch, and a fill would decay a block the mask freezes. The consumer therefore hands the sample as it stands, together with the active mask that explains the gap.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+
+# Returns
+
+  - `fv::Float64`: `NaN`.
+
+# Related
+
+  - [`ExpWeightedCovariance`](@ref)
+  - [`gap_fill_value`](@ref)
+  - [`Statistics.cov(ce::ExpWeightedCovariance, X::MatNum; dims::Int = 1, active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)`](@ref)
+"""
+function gap_fill_value(::ExpWeightedCovariance)
+    return NaN
+end
+"""
     Statistics.cor(
         ce::ExpWeightedCovariance,
         X::MatNum;

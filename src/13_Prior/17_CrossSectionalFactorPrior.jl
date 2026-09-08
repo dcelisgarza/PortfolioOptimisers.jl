@@ -18,7 +18,7 @@ $(DocStringExtensions.FIELDS)
                               wa::AbstractCrossSectionalWeightsAlgorithm = MarketCapWeights(),
                               pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
                               ve::AbstractCovarianceEstimator = RegimeAdjustedExpWeightedVariance(),
-                              ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
+                              ce::StatsBase.CovarianceEstimator = ExpWeightedCovariance(; centred = true),
                               mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                               th::Real = 0.0, bp::Real = 1.0,
                               mcap::AbstractString = "market_cap",
@@ -87,7 +87,7 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
     """
     @fprop @vprop ve
     """
-    $(field_dict[:ce]) It estimates the covariance of the standardised idiosyncratic returns, and it is read only when `th` is positive.
+    $(field_dict[:ce]) It estimates the covariance of the standardised idiosyncratic returns, and it is read only when `th` is positive. [`gap_fill_value`](@ref) on it decides what an inactive asset's cell is worth: the default answers `NaN`, so the estimator is handed the gap and the panel's active mask, and a plain moment estimator takes a zero in its place.
     """
     @fprop @vprop ce
     """
@@ -170,7 +170,8 @@ function CrossSectionalFactorPrior(; factors::Dict_VecPair,
                                    wa::AbstractCrossSectionalWeightsAlgorithm = MarketCapWeights(),
                                    pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
                                    ve::AbstractCovarianceEstimator = RegimeAdjustedExpWeightedVariance(),
-                                   ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
+                                   ce::StatsBase.CovarianceEstimator = ExpWeightedCovariance(;
+                                                                                             centred = true),
                                    mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                                    th::Real = 0.0, bp::Real = 1.0,
                                    mcap::AbstractString = "market_cap",
@@ -339,7 +340,7 @@ function prior(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum} = n
     vs = variance_series(pe.ve, csr.eps; dims = 1)
     S = cross_sectional_standardised_residuals(csr.eps, vs, amr)
     esigma = cross_sectional_idiosyncratic_covariance(pe.th, pe.ce, pe.mp.pdm, S,
-                                                      vs[end, :])
+                                                      vs[end, :], amr)
     f_pr = prior(pe.pe, csr.f)
     fnow = cross_sectional_basis_now(fb.fcb, r)
     L = fb.Ms[r[end], :, :]

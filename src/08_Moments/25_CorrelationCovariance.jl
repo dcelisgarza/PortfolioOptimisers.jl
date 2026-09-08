@@ -99,6 +99,29 @@ function Statistics.cov(ce::CorrelationCovariance, X::MatNum; dims::Int = 1, kwa
     return Statistics.cor(ce.ce, X; dims = dims, kwargs...)
 end
 """
+    gap_fill_value(ce::CorrelationCovariance) -> Number
+
+Answer what `ce.ce` answers, because the estimator forwards the sample and its keywords untouched.
+
+This estimator reads no cell of the sample itself: it calls the correlation verb of `ce.ce` and answers what comes back. A gap is therefore the inner estimator's to keep or to lose.
+
+# Arguments
+
+  - `ce`: Correlation covariance estimator.
+
+# Returns
+
+  - `fv::Number`: [`gap_fill_value`](@ref) of `ce.ce`.
+
+# Related
+
+  - [`CorrelationCovariance`](@ref)
+  - [`gap_fill_value`](@ref)
+"""
+function gap_fill_value(ce::CorrelationCovariance)
+    return gap_fill_value(ce.ce)
+end
+"""
     Statistics.cor(ce::CorrelationCovariance, X::MatNum; dims::Int = 1,
                    kwargs...)
 

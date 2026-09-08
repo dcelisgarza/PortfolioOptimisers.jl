@@ -1646,6 +1646,30 @@ function Statistics.cov(ce::RegimeAdjustedExpWeightedCovariance, X::MatNum; dims
     return regime_adjusted_covariance(cache, ce)
 end
 """
+    gap_fill_value(ce::RegimeAdjustedExpWeightedCovariance) -> Float64
+
+Answer `NaN`, so a gapped sample reaches the recursion with its gaps intact.
+
+The recursion updates only the sub-block of the assets that are valid at each observation, and the regime weight is taken from that sub-block alone, so a fill would both decay a frozen block and move the regime it is weighted by. The consumer therefore hands the sample as it stands, together with the active mask that explains the gap.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+
+# Returns
+
+  - `fv::Float64`: `NaN`.
+
+# Related
+
+  - [`RegimeAdjustedExpWeightedCovariance`](@ref)
+  - [`gap_fill_value`](@ref)
+  - [`Statistics.cov(ce::RegimeAdjustedExpWeightedCovariance, X::MatNum; dims::Int = 1, estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)`](@ref)
+"""
+function gap_fill_value(::RegimeAdjustedExpWeightedCovariance)
+    return NaN
+end
+"""
     Statistics.cor(
         ce::RegimeAdjustedExpWeightedCovariance,
         X::MatNum;
