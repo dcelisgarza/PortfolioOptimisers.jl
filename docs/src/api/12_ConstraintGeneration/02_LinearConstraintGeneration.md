@@ -46,6 +46,9 @@ port_opt_view(lc::LinearConstraint, ::Any, args...)
 factor_universe
 factor_axis_key
 _expr_depth_exceeds
+assert_investable_constraint_width
+non_investable_sets
+counterpart_axis_names
 ```
 
 ## References
