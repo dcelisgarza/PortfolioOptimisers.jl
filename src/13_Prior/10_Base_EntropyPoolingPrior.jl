@@ -615,7 +615,7 @@ This is the family's call of [`announce_non_investable`](@ref), written once so 
 
 It is said **at the end of the fit**, not at the reduction. A staged algorithm interleaves its view builders with its solves, so the ledger is only complete when the last stage has stated its views; reporting earlier would report a third of the truth and reporting per stage would be three messages for one departure.
 
-`viewless` raises the message to a warning, and it is the case [ADR 0125](../../../adr/0125-a-view-row-that-names-a-departed-asset-is-dropped-whole.md) singles out: a departure that took the **last** surviving view leaves the fit with nothing to condition on, so the posterior is the prior probabilities and the answer is not the one the caller asked for. Every other drop trims the view set and is `@info`.
+`viewless` raises the message to a warning, and it is the case ADR 0125 singles out: a departure that took the **last** surviving view leaves the fit with nothing to condition on, so the posterior is the prior probabilities and the answer is not the one the caller asked for. Every other drop trims the view set and is `@info`.
 
 # Arguments
 

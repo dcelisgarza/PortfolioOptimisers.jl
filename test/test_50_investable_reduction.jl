@@ -1361,15 +1361,40 @@ end
     @test occursin("no view at all", warns[1].message)
     @test occursin("its wrapped prior", warns[1].message)
     @test occursin("the view row `c == 0.002`", warns[1].message)
-    # A view set that was empty or mistyped FROM THE START is still a refusal, which is
-    # #852's case: no departure wrote into the ledger, so nothing distinguishes it from a
-    # caller who stated views the universe never held.
-    @test_throws PortfolioOptimisers.IsNothingError prior(BlackLittermanPrior(;
-                                                                              pe = EmpiricalPrior(),
-                                                                              views = LinearConstraintEstimator(;
-                                                                                                                val = "zz == 0.002"),
-                                                                              sets = setsdf),
-                                                          rddf)
+    #=
+    A view set emptied any OTHER way is the same answer, and no longer a refusal. What
+    emptied it does not change what is left to condition on. The refusal that stood here
+    could not tell a typo from a name that is simply outside the universe THIS fit was
+    handed — a cluster of a nested optimisation, a subset of a resampling — and it killed
+    the second along with the first.
+    =#
+    typo = LinearConstraintEstimator(; val = "zz == 0.002")
+    mistyped = prior(BlackLittermanPrior(; pe = EmpiricalPrior(), views = typo,
+                                         sets = setsdf), rddf)
+    @test all(isequal(0), filter(isfinite, mistyped.mu .- wrapped.mu))
+    @test all(isequal(0), filter(isfinite, mistyped.sigma .- wrapped.sigma))
+    @test isnan(mistyped.mu[k])
+    # The name is still reported where it is met, and `strict` still refuses it there. That
+    # is the report that names the cause; the refusal removed above named only the symptom.
+    @test_throws ArgumentError prior(BlackLittermanPrior(; pe = EmpiricalPrior(),
+                                                         views = typo, sets = setsdf), rddf;
+                                     strict = true)
+    #=
+    The two view-free cases are announced differently, because they are different news. A
+    departure emptying the set is ADR 0125's singled-out case and speaks in the departure's
+    words, above. Nothing departed here — `zz` is a typo — so the ledger is empty, the
+    departure of `c` is reported as the ordinary trim it is, and the view-free fit gets a
+    warning of its own.
+    =#
+    logs, _ = Test.collect_test_logs() do
+        return prior(BlackLittermanPrior(; pe = EmpiricalPrior(), views = typo,
+                                         sets = setsdf), rddf)
+    end
+    viewless_warns = filter(l -> l.level == Logging.Warn &&
+                                 occursin("no view at all", l.message), logs)
+    @test length(viewless_warns) == 1
+    @test occursin("the unconditioned one", viewless_warns[1].message)
+    @test !occursin("its wrapped prior", viewless_warns[1].message)
 end
 
 @testset "A precomputed view matrix over a gapped universe is refused by name" begin

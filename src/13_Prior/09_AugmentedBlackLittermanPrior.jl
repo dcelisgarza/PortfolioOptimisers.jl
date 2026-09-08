@@ -427,11 +427,11 @@ When `pe.tau` is `nothing` the blending parameter is `1/T`, where `T` is the num
  5. Derive the Investable Mask and the reduced asset view universe with [`investable_views`](@ref), refuse a precomputed asset view matrix over a gapped universe with [`assert_bl_precomputed_universe`](@ref), and view `a_prior` at the mask with [`investable_prior`](@ref). `N` is the reduced asset count from here on.
  6. Fit `pe.f_pe` on `F`, giving `f_prior`.
  7. Regress the reduced `X` — [`reduce_columns`](@ref) at the mask — on `F` with [`factor_reconstruction`](@ref) under `pe.re`, giving `rr` and the reconstructed returns `posterior_X`, both on the reduced asset axis.
- 8. Assemble the asset views with [`bl_preroll`](@ref) at the default `:xkey`, over the reduced asset prior covariance, and the factor views at `:tfkey`, over the factor prior covariance. Only the asset half can be emptied by a departure, and [`bl_view_block`](@ref) then gives it no row rather than collapsing the stack — the joint posterior is still conditioned by the factor views.
+ 8. Assemble the asset views with [`bl_preroll`](@ref) at the default `:xkey`, over the reduced asset prior covariance, and the factor views at `:tfkey`, over the factor prior covariance. Either half can be emptied, and [`bl_view_block`](@ref) then gives that half no row rather than collapsing the stack — the joint posterior is still conditioned by whatever the other half kept. Only the asset half can be emptied by a *departure*: a factor axis holds no asset name. When **both** halves empty there is nothing left to condition on, and step 12 takes the joint prior.
  9. Build ``\\boldsymbol{\\Sigma}_{aug}``, whose off-diagonal blocks are the model-implied cross-covariance ``\\mathbf{M}\\boldsymbol{\\Sigma}_f`` and its transpose.
 10. Stack ``\\mathbf{P}_{aug}`` block-diagonally, ``\\boldsymbol{q}_{aug}`` and ``\\boldsymbol{\\Omega}_{aug}`` to match, the asset rows above the factor rows.
 11. Put the stacked prior mean on the total-return scale the views are written on, giving `aug_prior_mu`. When `pe.l` is `nothing` this is the stacked wrapped means, which are on that scale already. When `pe.l` is set it is the equilibrium mean of [`equilibrium_mu`](@ref), a bare risk premium, over `pe.w` sliced to the reduced axis by [`investable_weights_view`](@ref), plus `pe.rf` by [`apply_rf`](@ref) and plus `rr.b` on the asset half.
-12. Run the master equations with [`vanilla_posteriors`](@ref) over the augmented space, giving the augmented posterior pair.
+12. Run the master equations with [`vanilla_posteriors`](@ref) over the augmented space, giving the augmented posterior pair. When **neither** half stated a surviving view the stack has nothing to condition on, and [`bl_posteriors`](@ref) hands back the joint prior instead: an empty ``\\mathbf{P}_{aug}`` run through the master equations would add ``\\tau\\boldsymbol{\\Sigma}_{aug}`` and widen the joint covariance on the strength of views that are not there.
 13. Process the augmented posterior covariance in place with [`matrix_processing!`](@ref), under `pe.mp` and the two return matrices side by side.
 14. Truncate the asset half from `1:N`. Nothing is added to it: the intercept and the rate went into the prior mean at step 11, and the update is affine in that mean.
 15. Truncate the factor half from `N+1:N+K`, and forward the factor block with [`forward_prior`](@ref), dropping `chol`. The half takes no intercept, because the intercept is the regression's and hence asset-only, no rate, because the stack reached the update carrying the one it needed, and no second processing pass, because a principal submatrix of a processed matrix is already processed. It is not expanded: the reduction never touched the factor axis.
@@ -501,8 +501,13 @@ function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum,
     P, Q, a_omega = bl_view_block(a_result, N, dt)
     f_result = bl_preroll(pe.f_views, vsets, pe.f_views_conf, f_prior_sigma, pe.tau, T, dt,
                           strict, :tfkey)
-    f_P, f_Q, f_omega = f_result.P, f_result.Q, f_result.omega
-    tau = f_result.tau
+    f_P, f_Q, f_omega = bl_view_block(f_result, size(f_prior_sigma, 1), dt)
+    # Both halves resolve the same blending parameter from the same `pe.tau` and the same
+    # `T`, so reading it off either result gives the same number — but either result can now
+    # be `nothing`, and there is no half left to read it from when both are. `bl_preroll`
+    # states the rule and this restates it, which is the one place in the family it is
+    # written twice.
+    tau = isnothing(pe.tau) ? inv(T) : pe.tau
     aug_prior_sigma = hcat(vcat(a_prior_sigma, f_prior_sigma * transpose(M)),
                            vcat(M * f_prior_sigma, f_prior_sigma))
     aug_P = hcat(vcat(P, zeros(size(f_P, 1), size(P, 2))),
@@ -540,9 +545,17 @@ function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum,
     else
         vcat(a_prior_mu, f_prior_mu)
     end
-    aug_posterior_mu, aug_posterior_sigma = vanilla_posteriors(tau, aug_prior_mu,
-                                                               aug_prior_sigma, aug_omega,
-                                                               aug_P, aug_Q)
+    # An empty half contributes no row and the stack is still conditioned by the other one,
+    # which is why each half takes an empty block rather than collapsing to its prior. Both
+    # halves empty is the case that has nothing left: `aug_P` is then `0 × (N + K)`, and
+    # running the master equations over it would add the estimation-error term
+    # `tau * aug_prior_sigma` and widen the joint covariance on the strength of views that
+    # are not there. The joint posterior of a stack with no view is the joint prior.
+    aug_posterior_mu, aug_posterior_sigma = if isnothing(a_result) && isnothing(f_result)
+        bl_posteriors(nothing, aug_prior_mu, aug_prior_sigma)
+    else
+        vanilla_posteriors(tau, aug_prior_mu, aug_prior_sigma, aug_omega, aug_P, aug_Q)
+    end
     matrix_processing!(pe.mp, aug_posterior_sigma, hcat(posterior_X, F))
     # Nothing is added here. `aug_prior_mu` reached the update on the scale this estimator
     # returns, and the update is affine in it, so the asset half comes off that scale with
@@ -578,7 +591,7 @@ function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum,
     # `posterior_sigma` supersedes the covariance `a_prior.chol` factorises. This site merges
     # two priors rather than forwarding one along its own axis, so it builds the carrier
     # directly instead of going through [`forward_prior`](@ref).
-    announce_bl_departures(ni, ledger, false)
+    announce_bl_departures(ni, ledger, isnothing(a_result) && isnothing(f_result))
     # The expansion, onto the caller's own universe. The moment pair goes back through
     # [`expand_moment`](@ref), the reconstruction through [`expand_columns`](@ref) and the
     # regression through [`expand_regression`](@ref), so a prior result again lives on the

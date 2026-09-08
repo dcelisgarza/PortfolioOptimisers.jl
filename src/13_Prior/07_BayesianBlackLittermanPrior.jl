@@ -331,7 +331,7 @@ Both are measured. Over a ``250 \\times 5`` sample on three factors with two fac
  3. Fit the wrapped prior `pe.pe` on `(X, F)`, giving `prior_result`, and check it carries a regression with [`assert_prior_regression`](@ref).
  4. Derive the Investable Mask with [`investable_mask`](@ref) and view the fitted prior at it with [`investable_prior`](@ref). The mask alone, and not [`investable_views`](@ref): the views land on the factors, so there is no Non-Investable Axis to mint and no asset universe this member otherwise reads.
  5. Read `posterior_X`, `prior_sigma`, `fpr` and `rr` off the *reduced* prior, and refuse a `rr` that states a re-based Factor Family through [`has_family_rebasis`](@ref).
- 6. Assemble the views and their uncertainty with [`bl_preroll`](@ref), over the **factor** prior covariance and `size(F, 1)` observations, giving `P`, `Q` and `omega`. The axis is `:tfkey`, because these views land on the factors.
+ 6. Assemble the views and their uncertainty with [`bl_preroll`](@ref), over the **factor** prior covariance and `size(F, 1)` observations, and read `P`, `Q` and `omega` off the result with [`bl_view_block`](@ref). The axis is `:tfkey`, because these views land on the factors. A view set with no row left gives a `0 × K` block, and the steps below then answer the moments this member's factor model implies — see the note under `bl_view_block`, and note that it is *not* the wrapped prior.
  7. Build the posterior factor precision ``\\mathbf{H}`` as `sigma_hat`.
  8. Solve `sigma_hat` against the sum of the two precision-weighted means, giving `mu_hat`, the posterior factor mean ``\\bar{\\boldsymbol{\\Pi}}_f``.
  9. Build the posterior asset covariance from ``\\mathbf{H}``, the loadings and `prior_sigma`, giving `posterior_sigma`.
@@ -419,8 +419,20 @@ function prior(pe::BayesianBlackLittermanPrior, X::MatNum, F::MatNum,
     # `pe.sets` goes through unreduced and unminted: the views resolve against `tfkey`, and
     # the reduction took asset columns, which that universe does not describe. No ledger
     # either — nothing on this path can drop a view row.
-    (; P, Q, omega) = bl_preroll(pe.views, pe.sets, pe.views_conf, f_sigma, pe.tau,
-                                 size(F, 1), eltype(posterior_X), strict, :tfkey)
+    blp = bl_preroll(pe.views, pe.sets, pe.views_conf, f_sigma, pe.tau, size(F, 1),
+                     eltype(posterior_X), strict, :tfkey)
+    # A view set with no row left takes an empty block rather than the prior pair, and this
+    # is the one member where that is the *right* answer rather than a stacking convenience.
+    # The update below is a precision sum — `sigma_hat = inv(f_sigma) + P'Ω⁻¹P` — so a
+    # `0 × K` `P` adds exactly zero and there is no `tau * sigma` estimation-error term for
+    # it to inflate, which is what rules the empty block out for the members that run
+    # `vanilla_posteriors`. What comes out is `f_sigma` and `f_mu` unchanged on the factor
+    # side, and by Woodbury `sigma_a + M * f_sigma * M'` with `M * f_mu + b` on the asset
+    # side: the moments this member's factor model implies. That is NOT its wrapped prior,
+    # and it cannot be — this member transforms the prior it wraps whether or not a view is
+    # stated, so there is no unadjusted answer for it to fall back to. See
+    # [`bl_view_block`](@ref).
+    P, Q, omega = bl_view_block(blp, size(f_sigma, 1), eltype(posterior_X))
     (; b, M) = rr
     sigma_hat = f_sigma \ LinearAlgebra.I + transpose(P) * (omega \ P)
     mu_hat = sigma_hat \ (f_sigma \ f_mu + transpose(P) * (omega \ Q))
@@ -447,7 +459,8 @@ function prior(pe::BayesianBlackLittermanPrior, X::MatNum, F::MatNum,
     # that weighting's diagnostics forward untouched (ADR 0046).
     posterior_fpr = forward_prior(fpr; mu = mu_hat, sigma = f_posterior_sigma,
                                   chol = nothing)
-    announce_bl_departures(investable_universe_names(pe.sets, imsk), String[], false)
+    announce_bl_departures(investable_universe_names(pe.sets, imsk), String[],
+                           isnothing(blp))
     # The expansion, onto the caller's own universe: a prior result lives on the FULL asset
     # axis, with a `NaN` in `mu` and on the diagonal of `sigma` for an asset that is not
     # investable, so that the next layer derives the same mask this one did. The factor block

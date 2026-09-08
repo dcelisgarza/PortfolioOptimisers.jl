@@ -145,7 +145,7 @@ pooling algorithm interleaves its view builders with its solves, so the ledger i
 the last stage has stated its views; reporting at the reduction would report who left and nothing
 about what it cost, and reporting per stage would be three messages for one departure.
 
-### When a departure drops the last view, the fit proceeds view-free and says so once
+### A view set with no row left is a fit with no view, whatever emptied it
 
 A view set whose every row has been dropped leaves nothing to assemble, and
 [#852](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/852) settled what that means
@@ -153,16 +153,56 @@ today: `get_black_litterman_views` returns `nothing`, and `bl_preroll` turns it 
 Under this ADR a delisting can empty the set, and refusing then would put back exactly the
 unforeseeable refusal every rule above removes.
 
-So when the last surviving row was dropped by a **departure**, the fit proceeds with no views. A
-Black–Litterman posterior with no view is its wrapped prior, and an entropy pooling fit with no view
-is its prior probabilities, which is what that family already does. The door's one report is raised
-from `@info` to `@warn` there, and says so in its own words: every view named a departed asset, so
-the posterior is the unconditioned one. This is the one case that is not routine — handing back the
-wrapped prior where the caller asked for views changes the answer rather than trimming it, and the
-caller has no other way to learn it.
+A delisting is not the only way, and that is what decides the rule. The row-whole unit above means a
+view set empties whenever **every** row carries at least one name the builder cannot resolve, and
+three quite different things produce that: a departure, a **sub-universe** — a cluster of a nested
+optimisation, a subset of a resampling — in which the caller's names sit outside the axis this
+particular fit was handed, and a typo. The second is the one that made the refusal untenable. A
+`NestedClustered` fit takes `port_opt_view` of its estimator per cluster, so a view naming an asset
+in another cluster is neither a departure nor a mistake; it is a correct name over the universe the
+caller stated it against, met by a fit that only holds part of that universe.
 
-`bl_preroll`'s named error is kept for the case it was written for: a view set that was empty, or
-mistyped, from the start.
+So `bl_preroll` answers `nothing` whenever no row survived, and the fit proceeds with no view. A
+Black–Litterman posterior with no view is the distribution it was going to update, and an entropy
+pooling fit with no view is its prior probabilities, which is what that family already does — the
+two families now agree, where the refusal was the one place they did not.
+
+Nothing is lost by dropping the refusal, because it was the **second** report of a fact already
+reported. An unresolved name goes through `strict_diagnostic` where it is met, naming the name and
+the universe it failed against: an `ArgumentError` under `strict = true`, a warning otherwise. That
+report names the cause. The refusal named only the symptom, one layer down, and could not tell a
+typo from a sub-universe — so it killed the second along with the first, and `strict = true` remains
+the way to make a typo fatal.
+
+It is not silent. The fit reports that it went view-free, and the two ways it can happen are
+reported differently because they are different news. When the **ledger** holds a departure
+casualty, the door's one report is raised from `@info` to `@warn` and speaks in the departure's
+words: every view named an asset that left, so the posterior is the unconditioned one. When the
+ledger is empty nobody departed, so the departure report is silent — it has no name to carry — and
+the view-free fit gets a warning of its own instead. Either way the caller learns it, because
+handing back an unconditioned answer where views were asked for changes the answer rather than
+trimming it.
+
+### What "no view" means differs by member, and one of them has no prior to hand back
+
+Three of the four members answer the distribution the views were going to update. `bl_posteriors`
+is that verb: `BlackLittermanPrior` forwards the wrapped prior's moment pair,
+`FactorBlackLittermanPrior` forwards the prior **factor** pair and lifts it exactly as it lifts a
+posterior one, and `AugmentedBlackLittermanPrior` takes the joint prior when — and only when — both
+halves of its stack are empty, since either half alone still leaves the joint posterior conditioned
+by the other. In none of them is the empty-view *algebra* the answer: `vanilla_posteriors` adds the
+estimation-error term ``[(\tau\Sigma)^{-1}]^{-1} = \tau\Sigma``, so an empty ``P`` would widen the
+covariance to ``(1 + \tau)\Sigma`` on the strength of views that are not there.
+
+`BayesianBlackLittermanPrior` is the exception, and it is an exception in both directions. Its
+update is a **precision sum**, ``\hat{\Sigma}^{-1} = \Sigma_f^{-1} + P^\intercal\Omega^{-1}P``, so a
+``0 \times K`` ``P`` contributes exactly zero and carries no estimation-error term to inflate: the
+empty block is safe there, where it is wrong everywhere else. But the answer it produces is not that
+member's wrapped prior. With ``\hat{\Sigma} = \Sigma_f`` and ``\hat{\mu} = \mu_f`` the asset block
+collapses, by Woodbury, to ``\Sigma_a + M\Sigma_f M^\intercal`` with mean ``M\mu_f + b`` — the
+moments its factor model implies. That member transforms the prior it wraps whether or not a view is
+stated, so it has no unadjusted answer to fall back to, and the empty-block algebra is the honest
+one. `bl_view_block` is the verb, shared with the augmented member's halves.
 
 ### A precomputed view matrix over a gapped universe is refused by name
 
@@ -218,6 +258,18 @@ The refusal is scoped to the two members whose views land on the **asset** axis.
 - A walk-forward whose views name an asset that delists mid-sample runs to the end, and the windows
   after the delisting are fitted on fewer views than the windows before it. The per-window record is
   the only place that difference is visible.
+- `bl_preroll` no longer refuses a view set with no row left, so #852's named error is gone and a
+  Black–Litterman fit can no longer die because its views did not resolve. A **sub-universe** fit is
+  what this buys: a `NestedClustered` optimisation whose per-cluster views name assets in other
+  clusters now fits each cluster on the views that cluster holds, and on none where it holds none,
+  rather than raising. That case reached CI as the failure this rule was written from.
+- A caller who *wants* an unresolved view to be fatal says `strict = true`, and gets an
+  `ArgumentError` naming the name and the universe. That was always the better report and is now the
+  only one; a caller who leaves `strict = false` gets a warning per unresolved name and a second
+  warning saying the fit went view-free.
+- A view-free fit is reported two ways, because it happens two ways: a departure that took the last
+  view raises the door's own report to `@warn`, and every other cause gets a warning of its own,
+  since the door has no departed name to report and would otherwise say nothing at all.
 - A **precomputed** asset-side view matrix over a gapped universe is refused by name rather than
   reduced. It is the one configuration in the family that cannot be reduced, and the one place this
   ADR's rule falls to the second half of the map's: handle it, or throw a named error.
@@ -261,9 +313,13 @@ The refusal is scoped to the two members whose views land on the **asset** axis.
   diagnostics closest to what the caller wrote. Refused because the builder still needs the mask to
   shed a group's departed members, so the axis is required either way, and the assembled pair would
   come out at a width the rest of the reduced path does not use.
-- **Keep `bl_preroll`'s refusal when every view drops.** Refused for the reason the strict refusal
-  was: the caller could not have known, and the window is the one place the refusal is least
-  actionable.
+- **Keep `bl_preroll`'s refusal for a view set that was empty or mistyped from the start**, letting
+  it stand wherever no departure wrote into the ledger. Refused because the ledger does not separate
+  the cases it would have to: a sub-universe — a cluster, a resampled subset — writes into it
+  exactly as little as a typo does, so the refusal would kill a view set that is correct over the
+  universe the caller stated it against. It was also the second report of a fact `strict_diagnostic`
+  already reports at the name, and the weaker of the two: it named the symptom, one layer below the
+  cause. `strict = true` remains the way to make an unresolved name fatal.
 - **Reduce a precomputed `P` by slicing its columns at the mask**, dropping the rows left with no
   nonzero coefficient. Refused because it guesses at what the caller wrote: a row can be annihilated
   by its own coefficients rather than by a departure, and the two are indistinguishable once the
@@ -272,6 +328,8 @@ The refusal is scoped to the two members whose views land on the **asset** axis.
 - **Answer the empty-view algebra rather than the wrapped prior**, letting a `0 × N` view matrix run
   through the master equations. Refused because the covariance term adds the estimation-error block
   ``\tau\mathbf{\Sigma}``, so an empty ``\mathbf{P}`` widens the posterior to
-  ``(1 + \tau)\mathbf{\Sigma}`` — a covariance produced by views that no longer exist. The augmented
-  member is the one place the empty block *is* right, and there for the opposite reason: its factor
-  views survived and still condition the joint posterior.
+  ``(1 + \tau)\mathbf{\Sigma}`` — a covariance produced by views that no longer exist. Two members
+  take the empty block anyway, and neither contradicts this: the augmented member's *halves* do,
+  because a half that emptied still leaves the joint posterior conditioned by the other one, and
+  `BayesianBlackLittermanPrior` does because its update is a precision sum with no estimation-error
+  term for an empty ``\mathbf{P}`` to inflate.

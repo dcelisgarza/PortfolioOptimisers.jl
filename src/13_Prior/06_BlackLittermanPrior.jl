@@ -248,7 +248,9 @@ The selector is a *field of* [`UniverseSets`](@ref) rather than a key resolved f
 
 This is also where `P` meets the distribution it updates, so it is where their widths are reconciled. A `P` assembled from names is the right width by construction; a **precomputed** [`BlackLittermanViews`](@ref) resolves no names and is checked nowhere else.
 
-**No view left is two different pieces of news, and the ledger tells them apart.** A view set that was empty or mistyped from the start is a refusal, and stays one — that is [#852](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/852)'s case. A view set whose last row was taken by a **departure** is not: the caller wrote names that were correct over the universe they were handed, and the data moved. [ADR 0125](../../../adr/0125-a-view-row-that-names-a-departed-asset-is-dropped-whole.md) says the fit proceeds view-free there, and a Black-Litterman posterior with no view is its wrapped prior, so this answers `nothing` and each estimator forwards the prior pair. Only a departed name writes into the ledger, so a non-empty ledger *is* the evidence, and it is the same fact the door reads to raise its announcement to a warning.
+**No view left answers `nothing`, whatever emptied the set.** A row a builder cannot assemble is dropped whole rather than fitted without its term, so a view set can end with no row for several reasons: a departure took the last one, the universe this fit was handed is a *sub-universe* — a cluster of a nested optimisation, a subset of a resampling — in which the names sit outside, or the caller mistyped. None of them changes what is left to condition on, so none of them changes the answer: the fit carries on as though no view had been stated, and each estimator spells what that means for it through [`bl_posteriors`](@ref) or [`bl_view_block`](@ref).
+
+The unresolved name is still reported where it is met, by [`strict_diagnostic`](@ref) — an `ArgumentError` under `strict = true`, a warning otherwise, naming the name and the universe it failed against. That report names the cause; a refusal here could only name the symptom, and could not tell a typo from a name that is legitimately outside a sub-universe. The ledger still separates the two *for the announcement*: only a departed name writes into it, and [`announce_bl_departures`](@ref) reads it to say which of the two happened.
 
 The returned `omega` already carries ``\\tau``, so a caller passes it to [`vanilla_posteriors`](@ref) as it stands. That scaling has a consequence worth knowing: [`calc_omega`](@ref) is homogeneous of degree one in the covariance it reads, so ``\\tau`` multiplies both ``\\mathbf{P}\\tau\\mathbf{\\Sigma}\\mathbf{P}^\\intercal`` and ``\\mathbf{\\Omega}``, and cancels out of the posterior **mean** on every confidence branch. It does not cancel out of the posterior covariance. [`vanilla_posteriors`](@ref) states the measurement.
 
@@ -257,7 +259,7 @@ The returned `omega` already carries ``\\tau``, so a caller passes it to [`vanil
  1. Check that `axis` names a declared axis a view can land on.
  2. Resolve `axis` to a universe key. When `sets` is `nothing` the key is `nothing` too, because a precomputed views object resolves no name and needs none.
  3. Assemble the views with [`black_litterman_views`](@ref) under that key, giving `blv`.
- 4. When no view survived, answer `nothing` if the ledger holds a departure casualty, and refuse otherwise.
+ 4. When no view survived, answer `nothing`. The caller decides what a view-free fit is.
  5. Read `P`, `Q` and `excl` off `blv`.
  6. Check that `P` is as wide as `prior_sigma` is tall.
  7. Resolve `tau`, which is `pe_tau` when the estimator carries one and `1/T` otherwise.
@@ -267,8 +269,7 @@ The returned `omega` already carries ``\\tau``, so a caller passes it to [`vanil
 # Validation
 
   - `axis in (:xkey, :tfkey, :cfkey)`.
-  - At least one view resolves, unless a departure took the last one and the ledger records it.
-  - `size(P, 2) == size(prior_sigma, 1)`.
+  - `size(P, 2) == size(prior_sigma, 1)`, when a view survived.
 
 # Arguments
 
@@ -281,7 +282,7 @@ The returned `omega` already carries ``\\tau``, so a caller passes it to [`vanil
   - $(arg_dict[:datatype])
   - $(arg_dict[:strict])
   - $(arg_dict[:bl_axis])
-  - `ledger`: The door's ledger of departure casualties, or `nothing` when nobody is collecting. It is threaded into [`black_litterman_views`](@ref), and it is what tells a view set emptied by a departure from one that was empty or mistyped from the start.
+  - `ledger`: The door's ledger of departure casualties, or `nothing` when nobody is collecting. It is threaded into [`black_litterman_views`](@ref), and it is what tells a view set emptied by a departure from one emptied any other way — a distinction the *announcement* makes, not the answer.
 
 # Returns
 
@@ -292,7 +293,7 @@ The returned `omega` already carries ``\\tau``, so a caller passes it to [`vanil
       + `tau::Number`: Resolved blending parameter.
       + `omega::LinearAlgebra.Diagonal`: Scaled view uncertainty matrix `tau * Ω`.
 
-  - `nothing`: Every view was dropped by a departure, so the fit proceeds view-free.
+  - `nothing`: Every view was dropped, so the fit proceeds view-free.
 
 # Related
 
@@ -316,20 +317,20 @@ function bl_preroll(views, sets, views_conf, prior_sigma, pe_tau, T, datatype, s
     blv = black_litterman_views(views, sets, key; datatype = datatype, strict = strict,
                                 ledger = ledger)
     if isnothing(blv)
-        # Two ways to end with no row, and they are different news. A departure took the
-        # last view: the caller wrote a view set that was correct over the universe it was
-        # handed, the data moved, and ADR 0125 says the fit proceeds view-free rather than
-        # refusing — a Black-Litterman posterior with no view is its wrapped prior. The
-        # ledger is the evidence, because only a departed name writes into it, and the door
-        # raises its announcement to a warning on the strength of the same fact.
+        # A row that cannot be assembled is dropped, and a view set with every row dropped
+        # is a view set with nothing in it. What emptied it does not change what is left to
+        # condition on, so it does not change the answer either: the fit carries on as
+        # though the caller had stated no view. ADR 0125 states the rule, and the callers
+        # spell what "no view" means for each of them — the wrapped prior wherever there is
+        # one to hand back, and the empty-block algebra where there is not.
         #
-        # Otherwise the view set was empty or mistyped from the start, and that is #852's
-        # case and still a refusal. Under `strict = false` an unresolvable name only warns,
-        # so this is where it surfaces; destructuring the `nothing` gave
-        # `FieldError: type Nothing has no field P`, which names neither the views nor the
-        # universe they failed against.
-        @argcheck(!isnothing(ledger) && !isempty(ledger),
-                  IsNothingError("no view resolved against the universe under $(repr(key)), so there is no view matrix to update the distribution with. Pass strict = true to raise on the first name that does not resolve"))
+        # A name that resolved against nothing is still reported where it is met, through
+        # `strict_diagnostic`: an `ArgumentError` under `strict = true` and a warning
+        # otherwise, naming the name and the universe it failed against. That is the report
+        # a caller can act on, and it is strictly more than a refusal here could say. The
+        # refusal this replaces could not tell a typo from a name that is simply outside the
+        # universe *this* fit was handed — a cluster of a nested optimisation, a subset of a
+        # resampling — and it killed the second along with the first.
         return nothing
     end
     (; P, Q, excl) = blv
@@ -353,13 +354,13 @@ This is the family's call of [`announce_non_investable`](@ref), written once so 
 
 The sentence is one sentence for all four members, and it is exactly true of each. Two of them write their views on the **factor** axis, where no asset name ever appears, so the view clause simply does not bite for them; what does bite for every member is the first clause, because all four estimate their posterior over the assets that remain.
 
-`viewless` raises the message to a warning, and it is the case [ADR 0125](../../../adr/0125-a-view-row-that-names-a-departed-asset-is-dropped-whole.md) singles out: a departure that took the **last** surviving view leaves the fit with nothing to condition on, so the posterior is the wrapped prior and the answer is not the one the caller asked for. Every other drop trims the view set and is `@info`.
+`viewless` says the fit ended with no view at all, and it is reported two ways because it happens two ways. When the **ledger** is non-empty a departure took the last surviving view, which is the case ADR 0125 singles out: the message is raised to a warning and says so in the departure's own words. When the ledger is empty nobody departed, so [`announce_non_investable`](@ref) is silent — it has no name to report — and the view-free fit gets a warning of its own instead. That is the sub-universe case: a cluster of a nested optimisation or a subset of a resampling holds none of the names the caller wrote, every row is dropped whole, and the caller is handed an unconditioned answer with nothing else to tell them. Every drop that only *trims* the view set stays `@info`.
 
 # Arguments
 
   - `ni`: The names the Investable Mask left out, from [`investable_views`](@ref).
-  - `ledger`: What the departures cost, as the view builder recorded it.
-  - `viewless`: Whether the fit ended up with no view at all *because* of the departures.
+  - `ledger`: What the departures cost, as the view builder recorded it. Non-empty is what makes a view-free fit a *departure's* doing.
+  - `viewless`: Whether the fit ended up with no view at all.
 
 # Returns
 
@@ -374,23 +375,38 @@ The sentence is one sentence for all four members, and it is exactly true of eac
   - [`BlackLittermanPrior`](@ref)
 """
 function announce_bl_departures(ni::VecStr, ledger::VecStr, viewless::Bool)::Nothing
-    consequence = if viewless
+    # A departure emptied the set only if a departure wrote into the ledger. Every other
+    # view-free fit — a sub-universe the names sit outside, a typo, a row that cancelled —
+    # left the ledger empty, and has news of its own that the departure sentence would
+    # misreport.
+    departure_emptied = viewless && !isempty(ledger)
+    consequence = if departure_emptied
         "Every view stated named one of them, so the fit proceeds with no view at all and its posterior is its wrapped prior."
     else
         "The posterior is estimated over the assets that remain, an asset-side view row naming one of them is dropped whole, and a group sheds them before its coefficient is spread."
     end
-    return announce_non_investable(ni, ledger, "Black-Litterman fit", consequence;
-                                   warn = viewless)
+    announce_non_investable(ni, ledger, "Black-Litterman fit", consequence;
+                            warn = departure_emptied)
+    if viewless && !departure_emptied
+        # Nothing above is guaranteed to have said anything: `announce_non_investable` is
+        # silent when nobody departed, which is exactly the sub-universe case. Handing back
+        # an unconditioned answer where the caller asked for views changes the answer rather
+        # than trimming it, and this is the caller's only way to learn it.
+        @warn("No Black-Litterman view resolved against the universe this fit was handed, so it proceeds with no view at all and its posterior is the unconditioned one. A view row is dropped whole when a name in it does not resolve, so a universe narrowed to a sub-problem — a cluster, a resampled subset — can empty a view set that is correct over the universe the caller stated it against.")
+    end
+    return nothing
 end
 """
     bl_posteriors(::Nothing, prior_mu::VecNum, prior_sigma::MatNum) -> Tuple
     bl_posteriors(blp::NamedTuple, prior_mu::VecNum, prior_sigma::MatNum) -> Tuple
 
-Run the master equations, or hand back the prior pair when a departure left no view to run them with.
+Run the master equations, or hand back the prior pair when nothing is left to run them with.
 
-[`bl_preroll`](@ref) answers `nothing` for exactly one case: every view the caller stated named an asset that has since left the investable universe. [ADR 0125](../../../adr/0125-a-view-row-that-names-a-departed-asset-is-dropped-whole.md) says the fit proceeds rather than refusing, and a Black-Litterman posterior with no view **is** its wrapped prior — so that is what this returns.
+[`bl_preroll`](@ref) answers `nothing` whenever no view row survived — a departure took the last one, the universe this fit was handed holds none of the names, or the caller mistyped. ADR 0125 says the fit proceeds rather than refusing, and a Black-Litterman posterior with no view **is** the distribution it was going to update — so that is what this returns.
 
-It is the prior pair itself and not the empty-view algebra, and the difference is not rounding. [`vanilla_posteriors`](@ref) adds the estimation-error term ``[(\\tau\\mathbf{\\Sigma})^{-1}]^{-1} = \\tau\\mathbf{\\Sigma}`` to the covariance, so an empty ``\\mathbf{P}`` would answer ``(1 + \\tau)\\mathbf{\\Sigma}`` — a *wider* covariance than the prior, produced by views that no longer exist. Forwarding the prior pair is what makes the departure cost the caller the view and nothing else.
+It is the prior pair itself and not the empty-view algebra, and the difference is not rounding. [`vanilla_posteriors`](@ref) adds the estimation-error term ``[(\\tau\\mathbf{\\Sigma})^{-1}]^{-1} = \\tau\\mathbf{\\Sigma}`` to the covariance, so an empty ``\\mathbf{P}`` would answer ``(1 + \\tau)\\mathbf{\\Sigma}`` — a *wider* covariance than the prior, produced by views that are not there. Forwarding the prior pair is what makes the missing view cost the caller the view and nothing else.
+
+[`BayesianBlackLittermanPrior`](@ref) is the member this verb does **not** serve, and the reason is worth stating: its update is a precision sum, ``\\hat{\\mathbf{\\Sigma}}^{-1} = \\mathbf{\\Sigma}_f^{-1} + \\mathbf{P}^\\intercal\\mathbf{\\Omega}^{-1}\\mathbf{P}``, so an empty ``\\mathbf{P}`` contributes exactly zero and carries no ``\\tau\\mathbf{\\Sigma}`` term to inflate anything. Its no-view answer is therefore the empty-block algebra of [`bl_view_block`](@ref) — which is *not* its wrapped prior: it collapses by Woodbury to ``\\mathbf{\\Sigma}_a + \\mathbf{M}\\mathbf{\\Sigma}_f\\mathbf{M}^\\intercal`` and ``\\mathbf{M}\\boldsymbol{\\mu}_f + \\mathbf{b}``, the moments the factor model implies. That member has no unadjusted prior to hand back, because it transforms its wrapped prior whether or not a view is stated.
 
 The covariance is copied, because every caller of this passes what it gets to [`matrix_processing!`](@ref), which writes in place, and the prior result must not be mutated under a caller still holding it.
 
@@ -422,28 +438,29 @@ end
     bl_view_block(::Nothing, n::Integer, datatype::DataType) -> Tuple
     bl_view_block(blp::NamedTuple, ::Integer, ::DataType) -> Tuple
 
-Read the `P`, `Q` and `omega` of one half of a stacked view system, as a block with no row when that half has no view left.
+Read the `P`, `Q` and `omega` of a view system, as a block with no row when it has no view left.
 
-[`AugmentedBlackLittermanPrior`](@ref) stacks an asset-side view block above a factor-side one. Only the asset side can be emptied by a departure — a factor axis holds no asset name, so [`counterpart_axis_names`](@ref) answers empty there and no factor view is ever dropped for a departure. So the two halves are not symmetric, and the asset half needs a shape to contribute when it has nothing to say.
+Two members need this rather than [`bl_posteriors`](@ref), and for two different reasons.
 
-An empty block is the right answer rather than a collapse to the prior, and this is where the augmented system differs from the plain one: the *joint* posterior is still conditioned, by the factor views the departure did not touch. Handing back the prior stack there would throw away views the caller stated and that still resolve.
+[`AugmentedBlackLittermanPrior`](@ref) stacks an asset-side view block above a factor-side one, and **either half can empty on its own**. An empty half contributes no row rather than collapsing the stack to the prior, because the *joint* posterior is still conditioned by whatever the other half kept: handing back the prior stack there would throw away views the caller stated and that still resolve. Only when both halves empty is there nothing left, and that member reads the pair itself to take the prior stack. The block is `0 × n` rather than a zero row, so the stack carries no phantom view and `aug_Q` is one entry shorter rather than one entry of zero.
 
-The block is `0 × n` rather than a zero row, so the stack it joins carries no phantom view and `aug_Q` is one entry shorter rather than one entry of zero.
+[`BayesianBlackLittermanPrior`](@ref) has one view system and no stack, and takes an empty block because for it the empty-block algebra **is** the no-view answer. Its update is a precision sum, ``\\hat{\\mathbf{\\Sigma}}^{-1} = \\mathbf{\\Sigma}_f^{-1} + \\mathbf{P}^\\intercal\\mathbf{\\Omega}^{-1}\\mathbf{P}``, so a `0 × n` ``\\mathbf{P}`` adds exactly zero and there is no ``\\tau\\mathbf{\\Sigma}`` estimation-error term for it to inflate — which is precisely what stops [`bl_posteriors`](@ref) from serving the members that run [`vanilla_posteriors`](@ref). What comes out is not that member's wrapped prior but ``\\mathbf{\\Sigma}_a + \\mathbf{M}\\mathbf{\\Sigma}_f\\mathbf{M}^\\intercal``, the moments its factor model implies, and it has no unadjusted prior to offer instead.
 
 # Arguments
 
-  - `blp`: What [`bl_preroll`](@ref) answered for this half, or `nothing`.
-  - `n`: The width of this half's axis, for the empty `P`.
-  - `datatype`: The numeric type of the stack.
+  - `blp`: What [`bl_preroll`](@ref) answered for this system, or `nothing`.
+  - `n`: The width of this system's axis, for the empty `P`.
+  - `datatype`: The numeric type of the block.
 
 # Returns
 
-  - `(P, Q, omega)::Tuple`: This half's view matrix, view returns and uncertainty, with no row when the half was emptied.
+  - `(P, Q, omega)::Tuple`: The view matrix, view returns and uncertainty, with no row when the system was emptied.
 
 # Related
 
   - [`bl_preroll`](@ref)
   - [`AugmentedBlackLittermanPrior`](@ref)
+  - [`BayesianBlackLittermanPrior`](@ref)
   - [`bl_posteriors`](@ref)
 """
 function bl_view_block(::Nothing, n::Integer, datatype::DataType)

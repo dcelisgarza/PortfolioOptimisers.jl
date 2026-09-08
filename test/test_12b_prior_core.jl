@@ -1861,7 +1861,9 @@ no name, and the two guards that stand between a view and the wrong axis. Sweep 
     When every view is dropped there is no row left, and `get_black_litterman_views`
     answers `nothing`. `bl_preroll` destructured that and the caller read `FieldError: type
     Nothing has no field P`, which names neither the views nor the universe they failed
-    against. Fixed under #535.
+    against (#535). It then refused by name, and no longer does: ADR 0125 makes a view set
+    with no row left a fit with no view, whatever emptied it, so the posterior is the
+    distribution the views were going to update.
     =#
     @test isnothing(PortfolioOptimisers.get_black_litterman_views(parse_equation(["YY == 0.01",
                                                                                   "ZZ == 0.02"]),
@@ -1869,7 +1871,13 @@ no name, and the two guards that stand between a view and the wrong axis. Sweep 
     Xb = randn(StableRNG(123456789), 60, 3) .* 0.01
     gone = BlackLittermanPrior(; views = LinearConstraintEstimator(; val = ["ZZ == 0.01"]),
                                sets = bsets)
-    @test_throws IsNothingError prior(gone, Xb)
+    viewless = prior(gone, Xb)
+    wrapped = prior(gone.pe, Xb)
+    @test viewless.mu == wrapped.mu
+    @test viewless.sigma == wrapped.sigma
+    # The name is still a typo and `strict` is still what refuses one, at the name and not
+    # one layer down where the cause has been lost.
+    @test_throws ArgumentError prior(gone, Xb; strict = true)
 
     # The three `remove_excl_views` methods.
     @test PortfolioOptimisers.remove_excl_views(0.4, [2]) == 0.4
@@ -2800,12 +2808,26 @@ view matrix, and the one site that adds the rate. Sweep ticket #536.
     @test_throws DimensionMismatch prior(BayesianBlackLittermanPrior(; sets = afs,
                                                                      views = wide),
                                          BL536_Xr, F)
-    # Views written in asset names resolve nothing against the factor universe.
-    @test_throws PortfolioOptimisers.IsNothingError prior(BayesianBlackLittermanPrior(;
-                                                                                      sets = afs,
-                                                                                      views = LinearConstraintEstimator(;
-                                                                                                                        val = ["A1 == 0.004"])),
-                                                          BL536_Xr, F)
+    #=
+    Views written in asset names resolve nothing against the factor universe. Every row is
+    dropped whole and the fit carries on with no view — ADR 0125 — and this member is the
+    one that cannot answer its wrapped prior, because its update transforms that prior
+    whether or not a view is stated. Its no-view answer is the empty-block algebra: the
+    update is a precision sum, `sigma_hat = inv(f_sigma) + P'Ω⁻¹P`, so a `0 × K` `P` adds
+    exactly nothing, the factor block comes back the PRIOR factor block, and the asset mean
+    is `M * f_mu + b` — which is `M * mu_hat + b` with `mu_hat == f_mu`, so the carrier's own
+    internal consistency is what pins it.
+    =#
+    aname = LinearConstraintEstimator(; val = ["A1 == 0.004"])
+    nvpe = BayesianBlackLittermanPrior(; sets = afs, views = aname)
+    nv = prior(nvpe, BL536_Xr, F)
+    nvw = prior(nvpe.pe, BL536_Xr, F)
+    @test isapprox(nv.fpr.mu, nvw.fpr.mu)
+    @test isapprox(nv.fpr.sigma, nvw.fpr.sigma)
+    @test isapprox(nv.mu, nvw.rr.M * nvw.fpr.mu + nvw.rr.b)
+    # The name is still a typo on this axis, and `strict` is still what refuses one — at the
+    # name, where the cause is, rather than one layer down where only the symptom is left.
+    @test_throws ArgumentError prior(nvpe, BL536_Xr, F; strict = true)
 
     # The rate is added once, on the assets, and the factor block never carries it.
     p0 = prior(BayesianBlackLittermanPrior(; sets = afs, views = fv, rf = 0.0), BL536_Xr, F)

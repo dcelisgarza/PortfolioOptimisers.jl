@@ -316,9 +316,9 @@ The shift is linear in ``r_f`` and depends on the views through ``\\mathbf{G}``.
  3. Reduce `X` to the assets it can be fitted over with [`coverage_reduction`](@ref), under `pnl`, giving the mask and `Xi`. This member wraps a *factor* prior, so there is no asset-side prior result to read an Investable Mask off and the gap is read out of the returns themselves.
  4. Fit the wrapped prior `pe.pe` on `F` alone, giving `f_prior`, and read `prior_mu` and `prior_sigma` off it. The wrapped estimator is bounded over the asset axis, but the matrix it is handed here is the factor one.
  5. Regress `Xi` on `F` with [`factor_reconstruction`](@ref) under `pe.re`, giving the regression result `rr` and the reconstructed returns `posterior_X`.
- 6. Assemble the views and their uncertainty with [`bl_preroll`](@ref), over `prior_sigma` and `size(Xi, 1)` observations, giving `P`, `Q`, `tau` and `omega`. The axis is `:tfkey`, so no view row is ever dropped for a departed asset and no ledger is kept.
+ 6. Assemble the views and their uncertainty with [`bl_preroll`](@ref), over `prior_sigma` and `size(Xi, 1)` observations, giving `blp`. The axis is `:tfkey`, so no view row is ever dropped for a departed asset and no ledger is kept.
  7. Put the prior mean on the total-return scale the views are written on, giving `prior_total_mu`. When `pe.l` is set this is the equilibrium mean of [`equilibrium_mu`](@ref), a risk premium, plus `pe.rf` by [`apply_rf`](@ref), over `pe.w` sliced to the reduced axis by [`investable_weights_view`](@ref); otherwise it is `prior_mu`, which is on that scale already.
- 8. Run the master equations with [`vanilla_posteriors`](@ref), giving the posterior factor pair.
+ 8. Run the master equations with [`bl_posteriors`](@ref), giving the posterior factor pair. When no view row survived it hands back `prior_total_mu` and the factor prior covariance instead, and step 10 lifts those exactly as it lifts a posterior pair.
  9. Process the posterior factor covariance in place with [`matrix_processing!`](@ref), under `pe.f_mp` and `F`.
 10. Lift the posterior factor pair onto the reduced assets with [`factor_lift`](@ref), giving `mu`, `sigma`, `chol` and `esigma`. This is the lift [`FactorPrior`](@ref) applies; only the factor moments handed to it differ. It adds the residual block when `pe.rsd` is `true`, and processes `sigma` under `pe.mp`.
 11. Write `esigma` onto the `esigma` field of `rr`. Under `pe.rsd = true` the field holds the residual variances the lift measured, and under `pe.rsd = false` it holds `nothing`, because the lift added no residual block.
@@ -394,8 +394,8 @@ function prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum,
     # `pe.sets` goes through unreduced and unminted, and with no ledger, for the reason
     # [`BayesianBlackLittermanPrior`](@ref) gives: the views resolve against `tfkey`, so
     # nothing on this path can drop a view row for a departed asset.
-    (; P, Q, tau, omega) = bl_preroll(pe.views, pe.sets, pe.views_conf, prior_sigma, pe.tau,
-                                      size(Xi, 1), eltype(posterior_X), strict, :tfkey)
+    blp = bl_preroll(pe.views, pe.sets, pe.views_conf, prior_sigma, pe.tau, size(Xi, 1),
+                     eltype(posterior_X), strict, :tfkey)
     # `pe.l` replaces the factor prior's own mean with an equilibrium one implied by the asset
     # weights `pe.w`. The expression and its equal-weight fallback belong to
     # [`equilibrium_mu`](@ref).
@@ -418,8 +418,13 @@ function prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum,
     else
         prior_mu
     end
-    f_posterior_mu, f_posterior_sigma = vanilla_posteriors(tau, prior_total_mu, prior_sigma,
-                                                           omega, P, Q)
+    # A view set with no row left leaves the factor moments the ones this member was going
+    # to update — `prior_total_mu` and the factor prior's covariance — and the Factor Lift
+    # below carries them to the assets exactly as it carries a posterior pair. The empty-view
+    # algebra is not the answer here: `vanilla_posteriors` would add `tau * prior_sigma` and
+    # widen the factor covariance on the strength of views that are not there. See
+    # [`bl_posteriors`](@ref).
+    f_posterior_mu, f_posterior_sigma = bl_posteriors(blp, prior_total_mu, prior_sigma)
     matrix_processing!(pe.f_mp, f_posterior_sigma, F)
     # Reconstruct the posteriors using the black litterman adjusted factor statistics. The lift
     # is the same one `FactorPrior` applies; only the factor moments handed to it differ.
@@ -442,7 +447,8 @@ function prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum,
     # the factor prior carried — its `w` and that weighting's diagnostics — is forwarded.
     fpr = forward_prior(f_prior; mu = f_posterior_mu, sigma = f_posterior_sigma,
                         chol = nothing)
-    announce_bl_departures(investable_universe_names(pe.sets, imsk), String[], false)
+    announce_bl_departures(investable_universe_names(pe.sets, imsk), String[],
+                           isnothing(blp))
     # The expansion, onto the caller's own universe. Everything the lift produced is on the
     # asset axis and every one of them goes back: the moment pair through
     # [`expand_moment`](@ref), the reconstruction through [`expand_columns`](@ref), and the
