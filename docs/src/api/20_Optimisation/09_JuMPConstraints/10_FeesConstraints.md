@@ -9,4 +9,6 @@ set_non_fixed_fees!
 set_long_non_fixed_fees!
 set_short_non_fixed_fees!
 set_fixed_fees!
+set_liquidation_fees!
+set_fixed_liquidation_fees!
 ```

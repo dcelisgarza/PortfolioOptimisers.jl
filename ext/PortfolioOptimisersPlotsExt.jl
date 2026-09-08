@@ -195,7 +195,8 @@ function PortfolioOptimisers.plot_asset_cumulative_returns(pred::MultiPeriodPred
         pr = extract_pr(res)
         fees = extract_fees(res)
         mean_w .+= w
-        net_asset_ret = calc_net_asset_returns(w, pr.X, fees)
+        net_asset_ret = calc_net_asset_returns(w, pr.X, fees,
+                                               PortfolioOptimisers.result_investable_mask(res))
         ret = cumulative_returns(net_asset_ret, compound)
         append!(X, vec(ret))
         append!(ts, res.rd.ts)

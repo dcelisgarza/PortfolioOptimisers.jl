@@ -793,8 +793,13 @@ A fold that carries no Held Weights record raises. `pred.rd.X` is the **portfoli
 function calc_net_asset_returns(pred::PredictionResult{<:Any, <:Any, <:HeldWeightsResult},
                                 fees::Option{<:Fees} = nothing)
     hw = pred.hw
+    # The record was expanded back to the caller's universe on the way out of `predict`, so
+    # its matrix and its weight path span every asset while the result's fee spans the two
+    # reduced axes. The mask is what reunites them: it says which columns the five per asset
+    # fields were priced on and which columns the two liquidation carriers were priced on.
     return calc_net_asset_returns(weight_path(hw, pred.res.w), hw.X,
-                                  extract_fees(pred.res, fees))
+                                  extract_fees(pred.res, fees),
+                                  result_investable_mask(pred.res))
 end
 function calc_net_asset_returns(::PredictionResult{<:Any, <:Any, Nothing}, args...)
     return throw(ArgumentError("`calc_net_asset_returns(pred::PredictionResult)` needs the fold's asset returns, and this fold kept none: `pred.rd.X` is the portfolio return series, and `pred.hw` is absent because the fold's scheme set neither `wd` nor `pws`.\nSet one of them so the fold records its asset returns, or call `calc_net_asset_returns(w, X, fees)` with the returns you fitted on."))

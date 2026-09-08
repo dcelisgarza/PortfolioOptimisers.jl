@@ -69,13 +69,12 @@
         @test isapprox(calc_net_returns(w, X, fees),
                        [0.020300000000000002, -0.0179, 0.0050999999999999995, 0.02,
                         -0.015299999999999998]; atol = atol)
-        # The per asset split sums to the series the scalar verb charges. The split now
-        # spans two axes, so both matrices enter the row sum; the second is empty here
-        # because this book has no forced exit.
-        A, C = calc_net_asset_returns(w, X, fees)
-        @test size(C, 2) == 0
-        @test isapprox(vec(sum(A; dims = 2)) .+ vec(sum(C; dims = 2)),
-                       calc_net_returns(w, X, fees); atol = atol)
+        # The per asset split sums to the series the scalar verb charges. It is one matrix
+        # on the caller's universe, and this book has no forced exit, so every column of it
+        # is an investable one.
+        A = calc_net_asset_returns(w, X, fees)
+        @test size(A) == size(X)
+        @test isapprox(vec(sum(A; dims = 2)), calc_net_returns(w, X, fees); atol = atol)
     end
 
     @testset "The proportional charge on a long-only book" begin

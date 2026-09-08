@@ -32,6 +32,9 @@ expand_held_weights
 expand_held_member
 charge_fees
 charge_asset_fees
+charges_nothing
+charge_fee_axis!
+assert_fee_axis_width
 calc_net_returns(w::VecNum, X::MatNum, args...)
 calc_net_returns(w::MatNum, X::MatNum, args...)
 calc_net_returns(w::VecVecNum, X::MatNum, fees, wd::AbstractWeightDrift, obs = nothing)

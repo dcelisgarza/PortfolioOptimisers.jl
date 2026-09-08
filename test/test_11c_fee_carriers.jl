@@ -293,16 +293,24 @@
         # one-off liquidation is charged at all — which is exactly how an unwired carrier
         # slipped through before.
         #
-        # A liquidated asset earns no return, so its column of the charge matrix holds the
-        # charge alone. The per period part lands on every observation and the one-off part
-        # at the index the clock names, which is the same two steps the investable axis
-        # takes. That is what keeps one clock across both axes.
+        # A liquidated asset earns no return, so its column of the matrix holds the charge
+        # alone. The per period part lands on every observation and the one-off part at the
+        # index the clock names, which is the same two steps the investable axis takes. That
+        # is what keeps one clock across both axes.
+        #
+        # The split is **one** matrix on the caller's universe, and the Investable Mask is
+        # what says which columns each axis owns: the five per asset fields were sliced to
+        # `imsk` at the door and the two carriers to its complement. Here asset 4 is the one
+        # that left, so its column of `X4` is zero, as `expand_investable_columns` leaves it.
         X3 = [0.010 -0.020 0.030
               -0.015 0.025 0.012
               0.020 0.010 -0.008
               -0.005 -0.030 0.018
               0.008 0.014 0.006]
         w3 = [0.4, -0.3, 0.9]
+        imsk = BitVector([true, true, true, false])
+        X4 = hcat(X3, zeros(5))
+        w4 = vcat(w3, 0.0)
         mkf = fa -> Fees(; tn = Turnover(; w = fill(0.25, 3), val = [0.001, 0.002, 0.003]),
                          fl = [1.0, 0.0, 2.0], lq = Turnover(; w = [0.25], val = [0.010]),
                          flq = Turnover(; w = [0.25], val = [5.0]), fa = fa)
@@ -318,39 +326,83 @@
             @test isapprox(tot(PortfolioOptimisers.calc_asset_one_off_fees(w3, fees)),
                            PortfolioOptimisers.calc_one_off_fees(w3, fees); atol = atol)
 
-            # And the two matrices together reproduce the portfolio series, under every
-            # clock — including the one that lands the fixed charge on one observation.
-            A, C = calc_net_asset_returns(w3, X3, fees)
-            @test size(A) == (5, 3)
-            @test size(C) == (5, 1)
-            @test isapprox(vec(sum(A; dims = 2)) .+ vec(sum(C; dims = 2)),
-                           calc_net_returns(w3, X3, fees); atol = atol)
+            # And the one matrix reproduces the portfolio series, under every clock —
+            # including the one that lands the fixed charge on a single observation.
+            R = calc_net_asset_returns(w4, X4, fees, imsk)
+            @test size(R) == (5, 4)
+            @test isapprox(vec(sum(R; dims = 2)), calc_net_returns(w3, X3, fees);
+                           atol = atol)
         end
 
         # The clock actually moves the charge, so the loop above is not vacuous: a spreading
         # clock puts the fixed exit on every observation, the default puts it on the first.
-        Cfirst = calc_net_asset_returns(w3, X3, mkf(FirstObservationFees()))[2]
-        Cspread = calc_net_asset_returns(w3, X3, mkf(AmortisedFees()))[2]
-        @test Cfirst[1, 1] != Cfirst[2, 1]
-        @test isapprox(Cspread[1, 1], Cspread[2, 1]; atol = atol)
+        Cfirst = calc_net_asset_returns(w4, X4, mkf(FirstObservationFees()), imsk)[:, 4]
+        Cspread = calc_net_asset_returns(w4, X4, mkf(AmortisedFees()), imsk)[:, 4]
+        @test Cfirst[1] != Cfirst[2]
+        @test isapprox(Cspread[1], Cspread[2]; atol = atol)
         # Either way the whole fixed exit is paid exactly once over the series.
         @test isapprox(sum(Cfirst), sum(Cspread); atol = atol)
         # `5.0` fixed, plus `0.010 * 0.25` per period over five observations.
         @test isapprox(-sum(Cfirst), 5.0 + 5 * 0.010 * 0.25; atol = atol)
+        # The exit is charged in its **own** column and nowhere else, so no investable asset
+        # is billed for it. This is the property the pro rata spreading would have broken.
+        @test isapprox(calc_net_asset_returns(w4, X4, mkf(nothing), imsk)[:, 1:3],
+                       calc_net_asset_returns(w3, X3,
+                                              Fees(;
+                                                   tn = Turnover(; w = fill(0.25, 3),
+                                                                 val = [0.001, 0.002,
+                                                                        0.003]),
+                                                   fl = [1.0, 0.0, 2.0])); atol = atol)
 
-        # With no carrier the charge matrix is empty, so a caller destructures the same
-        # shape whether or not an asset left.
-        A0, C0 = calc_net_asset_returns(w3, X3,
-                                        Fees(;
-                                             tn = Turnover(; w = fill(0.25, 3),
-                                                           val = [0.001, 0.002, 0.003])))
-        @test size(C0) == (5, 0)
-        @test isapprox(vec(sum(A0; dims = 2)),
-                       calc_net_returns(w3, X3,
-                                        Fees(;
-                                             tn = Turnover(; w = fill(0.25, 3),
-                                                           val = [0.001, 0.002, 0.003])));
+        # With no carrier the mask is not needed, and the matrix spans the caller's universe
+        # whether or not an asset left.
+        nofees = Fees(; tn = Turnover(; w = fill(0.25, 3), val = [0.001, 0.002, 0.003]))
+        A0 = calc_net_asset_returns(w3, X3, nofees)
+        @test size(A0) == (5, 3)
+        @test isapprox(vec(sum(A0; dims = 2)), calc_net_returns(w3, X3, nofees);
                        atol = atol)
+
+        # A carrier with no mask has nowhere to land, and saying so is the only honest
+        # answer: dropping it would understate the return and spreading it would bill an
+        # asset that did not leave.
+        @test_throws ArgumentError calc_net_asset_returns(w3, X3, mkf(nothing))
+        # A mask that does not span the matrix is refused by width, naming both.
+        @test_throws DimensionMismatch calc_net_asset_returns(w3, X3, mkf(nothing), imsk)
+    end
+
+    @testset "One carrier set without the other is charged, on every clock" begin
+        # `lq` and `flq` are set independently. A step gated on the wrong vector would drop
+        # the charge in silence, and under `AmortisedFees` the two terms were added
+        # elementwise, which raised on the empty one.
+        atol = 1e-14
+        X3 = [0.010 -0.020 0.030
+              -0.015 0.025 0.012
+              0.020 0.010 -0.008]
+        w3 = [0.4, -0.3, 0.9]
+        imsk = BitVector([true, true, true, false])
+        X4 = hcat(X3, zeros(3))
+        w4 = vcat(w3, 0.0)
+        onlylq = fa -> Fees(; l = 0.001, lq = Turnover(; w = [0.25], val = [0.010]),
+                            fa = fa)
+        onlyflq = fa -> Fees(; l = 0.001, flq = Turnover(; w = [0.25], val = [5.0]),
+                             fa = fa)
+        for fa in (nothing, FirstObservationFees(), AmortisedFees())
+            for mk in (onlylq, onlyflq)
+                fees = mk(fa)
+                R = calc_net_asset_returns(w4, X4, fees, imsk)
+                @test isapprox(vec(sum(R; dims = 2)), calc_net_returns(w3, X3, fees);
+                               atol = atol)
+                # The exit column carries the whole charge, and it is not zero: a dropped
+                # charge would leave this column empty and still sum correctly against a
+                # series that had also dropped it.
+                @test !isapprox(sum(view(R, :, 4)), 0.0; atol = atol)
+            end
+        end
+        # `lq` is a per period rate over three observations; `flq` is paid once.
+        @test isapprox(-sum(calc_net_asset_returns(w4, X4, onlylq(nothing), imsk)[:, 4]),
+                       3 * 0.010 * 0.25; atol = atol)
+        @test isapprox(-sum(calc_net_asset_returns(w4, X4, onlyflq(nothing), imsk)[:, 4]),
+                       5.0; atol = atol)
     end
 
     @testset "The amortisation override carries both carriers" begin

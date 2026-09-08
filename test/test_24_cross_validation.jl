@@ -1796,7 +1796,8 @@
             @test size(split) == size(p.hw.X)
             @test vec(sum(split; dims = 2)) ≈ p.rd.X
             @test split == calc_net_asset_returns(PO.weight_path(p.hw, p.res.w), p.hw.X,
-                                                  PO.extract_fees(p.res, nothing))
+                                                  PO.extract_fees(p.res, nothing),
+                                                  PO.result_investable_mask(p.res))
 
             # The risk contributions read the target weights and the fold's asset returns.
             fees = PO.extract_fees(p.res, nothing)

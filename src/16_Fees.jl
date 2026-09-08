@@ -105,6 +105,8 @@ $(DocStringExtensions.FIELDS)
         s::Option{<:EstValType{<:VectorAbstractEstimatorValueAlgorithm}} = nothing,
         fl::Option{<:EstValType{<:VectorAbstractEstimatorValueAlgorithm}} = nothing,
         fs::Option{<:EstValType{<:VectorAbstractEstimatorValueAlgorithm}} = nothing,
+        lq::Option{<:TnE_Tn} = nothing,
+        flq::Option{<:TnE_Tn} = nothing,
         dl::Option{<:Number} = nothing,
         ds::Option{<:Number} = nothing,
         dfl::Option{<:Number} = nothing,
@@ -367,6 +369,8 @@ $(DocStringExtensions.FIELDS)
         s::Option{<:Num_VecNum} = nothing,
         fl::Option{<:Num_VecNum} = nothing,
         fs::Option{<:Num_VecNum} = nothing,
+        lq::Option{<:Turnover} = nothing,
+        flq::Option{<:Turnover} = nothing,
         fa::Option{<:AbstractFeeAmortisation} = nothing,
         kwargs::NamedTuple = (; atol = 1e-8)
     ) -> Fees
@@ -1498,16 +1502,16 @@ Compute total per asset fees for portfolio weights.
 
 Sums proportional, fixed, and turnover fees for all assets. The entries sum to the number [`calc_fees(w::VecNum, fees::Fees)`](@ref) returns, up to the order of summation.
 
-The verb returns a pair, `(amortised, one_time)`. `l`, `s` and `tn` are rates per period, so they charge on every observation and land in `amortised`. `fl` and `fs` are currency amounts charged one time for the whole holding period, so `fees.fa` decides where they land: a `nothing` `fa` puts them in `one_time`, and an [`AmortisedFees`](@ref) divides them by `T`, adds them to `amortised` and leaves `one_time` zero.
+The verb returns a pair, `(amortised, one_time)`, and **each half is itself a pair**, one entry per axis of a reduced [`Fees`](@ref): the charge of the assets that stayed, and the charge of the assets that left. `l`, `s` and `tn` are rates per period and land in `amortised`, as `lq` does on the other axis. `fl` and `fs` are currency amounts charged one time for the whole holding period, so `fees.fa` decides where they land, as it does for `flq`: a `nothing` `fa` puts them in `one_time`, and an [`AmortisedFees`](@ref) divides them by `T`, adds them to `amortised` and leaves `one_time` zero. The doctest below shows all four vectors.
 
-`T` is the observation count the calling site charges over, and the site always knows it, so no fee stores one. [`charge_fees`](@ref) hands the length of the series it lays the pair onto, and [`calc_total_fees`](@ref) contracts the pair to the cost of a whole holding period.
+`T` is the observation count the calling site charges over, and the site always knows it, so no fee stores one. [`charge_asset_fees`](@ref) hands the row count of the matrix it lays the pair onto, and [`calc_total_asset_fees`](@ref) contracts the pair to the cost of a whole holding period.
 
 # Algorithm
 
- 1. Charge the per period terms, the call of [`calc_asset_periodic_fees`](@ref).
- 2. Charge the one-off terms, the call of [`calc_asset_one_off_fees`](@ref).
+ 1. Charge the per period terms, the call of [`calc_asset_periodic_fees`](@ref), which answers both axes.
+ 2. Charge the one-off terms, the call of [`calc_asset_one_off_fees`](@ref), which answers both axes.
  3. On a `nothing` `fees.fa`, return the two charges unchanged.
- 4. On an [`AmortisedFees`](@ref) `fees.fa`, divide the one-off charge by `T`, add it to the per period charge, and return that vector beside a zero of the same type.
+ 4. On an [`AmortisedFees`](@ref) `fees.fa`, divide each one-off charge by `T`, add it to the per period charge of its own axis, and return those beside zeros of the same type. The liquidation axis adds through [`add_liquidation_terms`](@ref), because `lq` and `flq` are set independently and an unset one is an empty vector.
 
 # Arguments
 
@@ -1517,8 +1521,8 @@ The verb returns a pair, `(amortised, one_time)`. `l`, `s` and `tn` are rates pe
 
 # Returns
 
-  - `amortised::VecNum`: The per asset charge every observation carries.
-  - `one_time::VecNum`: The per asset charge the first observation carries alone.
+  - `amortised::Tuple{<:VecNum, <:VecNum}`: The charge every observation carries, per asset that stayed and per asset that left.
+  - `one_time::Tuple{<:VecNum, <:VecNum}`: The charge the first observation carries alone, on the same two axes. Zero under an [`AmortisedFees`](@ref), which spread it into `amortised`.
 
 # Examples
 
@@ -1548,8 +1552,42 @@ function calc_asset_fees(w::VecNum, T::Number, fees::Fees, ::AmortisedFees)
     pi, pl = calc_asset_periodic_fees(w, fees)
     oi, ol = calc_asset_one_off_fees(w, fees)
     vi = pi + oi / T
-    vl = pl + ol / T
+    vl = add_liquidation_terms(pl, ol / T)
     return ((vi, vl), (zero(vi), zero(vl)))
+end
+"""
+    add_liquidation_terms(a::VecNum, b::VecNum)
+
+Add the two terms of the liquidation axis, either of which may be unset.
+
+`lq` and `flq` are set independently, and the verb that prices an unset carrier returns an empty vector rather than a vector of zeros, because it holds no length to build one from: the axis is the complement of the Investable Mask, and a `Fees` does not carry the mask. So a `Fees` that sets `flq` and no `lq` gives one term spanning the complement and one spanning nothing, and adding them elementwise would raise a `DimensionMismatch` on a fee the caller set correctly.
+
+An empty term is a term that charges nothing, so the sum is the other term. Two set terms span the same complement and add elementwise. The investable axis needs no such verb: its terms are built from `w`, so they always span it.
+
+# Arguments
+
+  - `a`: One term of the axis.
+  - `b`: The other term of the axis.
+
+# Returns
+
+  - `val::VecNum`: The two terms summed, or whichever of them is set.
+
+# Related
+
+  - [`calc_asset_fees`](@ref)
+  - [`calc_asset_liquidation_fees`](@ref)
+  - [`calc_asset_fixed_liquidation_fees`](@ref)
+  - [`AmortisedFees`](@ref)
+"""
+function add_liquidation_terms(a::VecNum, b::VecNum)
+    return if isempty(a)
+        b
+    elseif isempty(b)
+        a
+    else
+        a + b
+    end
 end
 
 """
@@ -1811,7 +1849,8 @@ The per asset twin of [`calc_periodic_fees`](@ref). Its entries sum to that numb
  1. Charge the long proportional term, the call of [`calc_asset_fees`](@ref) on `fees.l` under `.>=`.
  2. Charge the short proportional term, the negated call of the same name on `fees.s` under `.<`.
  3. Charge the turnover term, the call of [`calc_asset_fees`](@ref) on `fees.tn`.
- 4. Return the elementwise sum of the three vectors.
+ 4. Charge the proportional forced exit, the call of [`calc_asset_liquidation_fees`](@ref) on `fees.lq`. `lq` is a rate, so it falls on every period beside `l`, `s` and `tn`, and no clock reaches it.
+ 5. Return the pair: the elementwise sum of the three vectors of steps 1 to 3, and the vector of step 4.
 
 # Arguments
 
@@ -1820,7 +1859,10 @@ The per asset twin of [`calc_periodic_fees`](@ref). Its entries sum to that numb
 
 # Returns
 
-  - `val::VecNum`: The per period charge per asset, before the one-off terms.
+The verb returns a pair, one entry per axis of a reduced [`Fees`](@ref).
+
+  - `investable::VecNum`: The per period charge of each asset that stayed, from `l`, `s` and `tn`, which were sliced to the Investable Mask.
+  - `liquidation::VecNum`: The per period charge of each asset that left, from `lq`, which was sliced to the mask's complement. Empty when `lq` is unset, because the axis has no length to build a vector of zeros from.
 
 # Examples
 
@@ -1900,7 +1942,8 @@ The per asset twin of [`calc_one_off_fees`](@ref). Its entries sum to that numbe
 
  1. Charge the long fixed term, the call of [`calc_asset_fixed_fees`](@ref) on `fees.fl` under `.>=`.
  2. Charge the short fixed term, the call of the same name on `fees.fs` under `.<`.
- 3. Return the elementwise sum of the two vectors.
+ 3. Charge the fixed forced exit, the call of [`calc_asset_fixed_liquidation_fees`](@ref) on `fees.flq`. `flq` is a currency amount charged one time, so it falls on the clock `fees.fa` names, beside `fl` and `fs`.
+ 4. Return the pair: the elementwise sum of the two vectors of steps 1 and 2, and the vector of step 3.
 
 # Arguments
 
@@ -1909,7 +1952,10 @@ The per asset twin of [`calc_one_off_fees`](@ref). Its entries sum to that numbe
 
 # Returns
 
-  - `val::VecNum`: The charge of one holding period per asset.
+The verb returns a pair, one entry per axis of a reduced [`Fees`](@ref).
+
+  - `investable::VecNum`: The one-off charge of each asset that stayed, from `fl` and `fs`, which were sliced to the Investable Mask.
+  - `liquidation::VecNum`: The one-off charge of each asset that left, from `flq`, which was sliced to the mask's complement. Empty when `flq` is unset, because the axis has no length to build a vector of zeros from.
 
 # Examples
 
@@ -1990,9 +2036,9 @@ The per asset twin of [`calc_total_fees`](@ref). Its entries sum to that number,
 
 # Algorithm
 
- 1. Charge `T` times the per period terms, the call of [`calc_asset_periodic_fees`](@ref).
- 2. Charge the one-off terms one time, the call of [`calc_asset_one_off_fees`](@ref).
- 3. Return the elementwise sum of the two vectors.
+ 1. Charge `T` times the per period terms, the call of [`calc_asset_periodic_fees`](@ref). Both halves of its pair are scaled, because both are rates.
+ 2. Charge the one-off terms one time, the call of [`calc_asset_one_off_fees`](@ref). Neither half is scaled, because both are currency amounts.
+ 3. Return the pair, each axis summed with its own half: the investable total, and the liquidation total through [`add_liquidation_terms`](@ref), which answers the axis whose two terms are set independently.
 
 # Arguments
 
@@ -2002,7 +2048,10 @@ The per asset twin of [`calc_total_fees`](@ref). Its entries sum to that number,
 
 # Returns
 
-  - `val::VecNum`: The whole cost of the holding period per asset.
+The verb returns a pair, one entry per axis of a reduced [`Fees`](@ref).
+
+  - `investable::VecNum`: The whole cost of the holding period for each asset that stayed, from `l`, `s`, `tn`, `fl` and `fs`, which were sliced to the Investable Mask.
+  - `liquidation::VecNum`: The whole cost of the forced exit of each asset that left, from `lq` and `flq`, which were sliced to the mask's complement. Empty when neither carrier is set.
 
 # Examples
 
@@ -2028,7 +2077,7 @@ end
 function calc_total_asset_fees(w::VecNum, T::Number, fees::Fees)
     pi, pl = calc_asset_periodic_fees(w, fees)
     oi, ol = calc_asset_one_off_fees(w, fees)
-    return (T * pi + oi, T * pl + ol)
+    return (T * pi + oi, add_liquidation_terms(T * pl, ol))
 end
 
 export FeesEstimator, Fees, AmortisedFees, FirstObservationFees, fees_constraints,

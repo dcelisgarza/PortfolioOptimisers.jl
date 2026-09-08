@@ -122,12 +122,34 @@ enter that model's own fee expression, priced on the complement's previous money
 `Fees` is accepted beside its full-length weights and prices, and that the liquidation is charged
 one time on the complement.
 
-### The per-asset split returns a pair
+### The per-asset split is one matrix, and the mask says which columns each axis owns
 
 `calc_asset_fees` returns two vectors, the split on the investable axis and the charge per
-liquidated asset. `calc_net_asset_returns` returns the same pair, a matrix on the investable axis
-and a constant charge per liquidated asset, and the row sums of the matrix minus the sum of the
-charges equal the net return series.
+liquidated asset. The separation exists so each charge reaches the right place, and it ends
+there: `calc_net_asset_returns` returns **one** matrix, on the caller's own universe, whose row
+sums are the net return series.
+
+`calc_net_asset_returns(w, X, fees, imsk)` takes the Investable Mask as a fourth argument,
+defaulting to `nothing`. `w` and `X` span the caller's universe; `fees` spans the two reduced
+axes, because the door sliced it. The mask is what reunites them, and `charge_asset_fees` charges
+each axis in the columns it owns, by the same two steps: the per period vector on every
+observation, and the one-off vector on the observation `fees.fa` names. A liquidated asset earns
+no return, so its column is zero and holds its charge alone — the charge is neither smeared over
+the assets that stayed nor carried in a matrix of its own.
+
+Nothing is materialised for the one-off terms. They are a vector written into one row of the
+columns their axis owns, or, under an `AmortisedFees`, folded into the per period vector and
+charged on every row.
+
+A `nothing` mask charges the investable axis alone. A `Fees` that carries `lq` or `flq` then has
+nowhere to put its charge, and is refused with an `ArgumentError` naming the mask: dropping the
+charge would understate the return, which is the defect this ADR exists to fix. Only a hand-built
+`Fees` reaches that refusal, because a carrier is set by `port_opt_view`, which holds the mask.
+
+`lq` and `flq` are set independently, and the verb that prices an unset carrier returns an empty
+vector rather than a vector of zeros, because it holds no length to build one from. So each step
+is skipped by its own vector and never by the other's, and `add_liquidation_terms` sums the two
+terms of the axis when only one of them is set.
 
 ### What is not changed
 

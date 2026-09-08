@@ -403,9 +403,12 @@ evenly over `T`, the observation count of the fit.
 """
 function charge_one_time_fees(model::JuMP.Model, net, one_time, ::Number,
                               ::Union{Nothing, <:FirstObservationFees})
-    c = zeros(Int, length(net))
-    c[1] = one(Int)
-    return JuMP.@expression(model, net .- c * one_time)
+    # One entry is charged, so one entry is touched. Writing the charge as a selector vector
+    # times `one_time` would build two arrays and put a zero multiple of the fee into every
+    # other observation's expression, which the model then carries for nothing. `net` is
+    # built by the one caller and handed straight here, so the term is added in place.
+    JuMP.add_to_expression!(net[1], -1, one_time)
+    return net
 end
 function charge_one_time_fees(model::JuMP.Model, net, one_time, T::Number, ::AmortisedFees)
     return JuMP.@expression(model, net .- one_time / T)

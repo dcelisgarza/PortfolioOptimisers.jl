@@ -1,3 +1,4 @@
+using JuMP: JuMP
 @testset "Fees" begin
     using PortfolioOptimisers, Test, DataFrames, TimeSeries, CSV, Clarabel, HiGHS
     X = TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
@@ -92,11 +93,11 @@
                                                                                    fes[1])[1]),
                             size(pr.X, 1), 1)
             asched[1, :] .+= PortfolioOptimisers.calc_asset_one_off_fees(res.w, fes[1])[1]
-            # The split spans two axes now. This fee carries no liquidation carrier, so the
-            # second matrix is empty and the investable one is the whole answer.
-            @test isempty(calc_net_asset_returns(res.w, pr.X, fes[1])[2])
-            @test all(isapprox(calc_net_asset_returns(res.w, pr.X)[1] .- asched,
-                               calc_net_asset_returns(res.w, pr.X, fes[1])[1]))
+            # The split is one matrix on the caller's own universe. This fee carries no
+            # liquidation carrier, so every column is an investable one.
+            @test size(calc_net_asset_returns(res.w, pr.X, fes[1])) == size(pr.X)
+            @test all(isapprox(calc_net_asset_returns(res.w, pr.X) .- asched,
+                               calc_net_asset_returns(res.w, pr.X, fes[1])))
         end
         @test all(iszero, calc_fees(res.w, T, Fees()))
         @test all(iszero,
@@ -418,8 +419,8 @@
         # The `AmortisedFees` clock puts an equal share on each.
         @test all(isapprox.(gross .- netA, periodic + oneoff / 3))
         # The per asset rows sum to the portfolio series, under both clocks.
-        @test isapprox(vec(sum(calc_net_asset_returns(wf, Xf, fee0)[1]; dims = 2)), net0)
-        @test isapprox(vec(sum(calc_net_asset_returns(wf, Xf, feeA)[1]; dims = 2)), netA)
+        @test isapprox(vec(sum(calc_net_asset_returns(wf, Xf, fee0); dims = 2)), net0)
+        @test isapprox(vec(sum(calc_net_asset_returns(wf, Xf, feeA); dims = 2)), netA)
 
         # `l` and `s` are unmoved by the clock.
         @test feeA.l == fee0.l && feeA.s == fee0.s
@@ -464,11 +465,38 @@
             @test any(t -> t === Union{Nothing, FirstObservationFees}, bound)
         end
 
+        # The model's one-off charge lands on the first observation and touches no other,
+        # which is the rule `charge_one_time_fees` documents. Only its dispatch was checked
+        # before, so the arm that charges the first observation asserted no number at all.
+        mknet = m -> [JuMP.@expression(m, 1 * m[:vj][1]),
+                      JuMP.@expression(m, 2 * m[:vj][1]),
+                      JuMP.@expression(m, 3 * m[:vj][1])]
+        mdl = JuMP.Model()
+        JuMP.@variable(mdl, vj[1:1])
+        mdl[:vj] = vj
+        ot = JuMP.@expression(mdl, 10 * vj[1])
+        first_obs = PortfolioOptimisers.charge_one_time_fees(mdl, mknet(mdl), ot, 3,
+                                                             nothing)
+        @test JuMP.coefficient(first_obs[1], vj[1]) == 1 - 10
+        @test JuMP.coefficient(first_obs[2], vj[1]) == 2
+        @test JuMP.coefficient(first_obs[3], vj[1]) == 3
+        # The named clock is the same arm, and the amortising one spreads it over `T`.
+        named = PortfolioOptimisers.charge_one_time_fees(mdl, mknet(mdl), ot, 3,
+                                                         FirstObservationFees())
+        @test all(JuMP.coefficient(named[i], vj[1]) ==
+                  JuMP.coefficient(first_obs[i], vj[1]) for i in 1:3)
+        spread = PortfolioOptimisers.charge_one_time_fees(mdl, mknet(mdl), ot, 3,
+                                                          AmortisedFees())
+        @test all(isapprox(JuMP.coefficient(spread[i], vj[1]), i - 10 / 3) for i in 1:3)
+        # Both clocks charge the same total over the horizon.
+        @test isapprox(sum(JuMP.coefficient(first_obs[i], vj[1]) for i in 1:3),
+                       sum(JuMP.coefficient(spread[i], vj[1]) for i in 1:3))
+
         # The series lands the one-off cost the same way under both spellings.
         Xf2 = [0.01 0.02 -0.01 0.03; 0.03 0.04 0.02 -0.02; -0.01 0.005 0.01 0.04]
         @test calc_net_returns(wf2, Xf2, feeF) == calc_net_returns(wf2, Xf2, fee0)
-        @test calc_net_asset_returns(wf2, Xf2, feeF)[1] ==
-              calc_net_asset_returns(wf2, Xf2, fee0)[1]
+        @test calc_net_asset_returns(wf2, Xf2, feeF) ==
+              calc_net_asset_returns(wf2, Xf2, fee0)
 
         # `override_fee_amortisation` resolves the scheme's clock against the fee's own.
         @test PortfolioOptimisers.override_fee_amortisation(fee0, nothing) === fee0
@@ -544,13 +572,12 @@ end
         # subtracts the per-asset `calc_asset_fees`. The two sides add in a different
         # order, so the identity holds to rounding and not to `==`.
         a = calc_net_returns(wn, Xn, fn)
-        b = vec(sum(calc_net_asset_returns(wn, Xn, fn)[1]; dims = 2))
+        b = vec(sum(calc_net_asset_returns(wn, Xn, fn); dims = 2))
         @test a ≈ b
         @test maximum(abs, a - b) < 1e-16
 
         # and with no fee at all
-        @test calc_net_returns(wn, Xn) ≈
-              vec(sum(calc_net_asset_returns(wn, Xn)[1]; dims = 2))
+        @test calc_net_returns(wn, Xn) ≈ vec(sum(calc_net_asset_returns(wn, Xn); dims = 2))
     end
 
     @testset "the fee is charged on the clock the fee names" begin
@@ -568,7 +595,7 @@ end
         av, ov = PO.calc_asset_fees(wn, size(Xn, 1), fn)
         F = repeat(transpose(av[1]), size(Xn, 1), 1)
         F[1, :] .+= ov[1]
-        @test calc_net_asset_returns(wn, Xn, fn)[1] ≈ calc_net_asset_returns(wn, Xn)[1] .- F
+        @test calc_net_asset_returns(wn, Xn, fn) ≈ calc_net_asset_returns(wn, Xn) .- F
     end
 
     @testset "a nothing fee reaches the args... method" begin
@@ -577,7 +604,7 @@ end
         @test m.file ==
               Symbol(joinpath(dirname(@__DIR__), "src", "17_NetReturnsDrawdowns.jl"))
         @test calc_net_returns(wn, Xn, nothing) == Xn * wn
-        @test calc_net_asset_returns(wn, Xn, nothing)[1] == Xn .* transpose(wn)
+        @test calc_net_asset_returns(wn, Xn, nothing) == Xn .* transpose(wn)
     end
 
     @testset "a vector of weight vectors gives one series each" begin
@@ -596,25 +623,25 @@ end
         @test U[1, :] == wn
 
         a = calc_net_returns(wn, Xn, fn, wdn)
-        b = vec(sum(calc_net_asset_returns(U, Xn, fn)[1]; dims = 2))
+        b = vec(sum(calc_net_asset_returns(U, Xn, fn); dims = 2))
         @test a ≈ b
         @test maximum(abs, a - b) < 1e-15
         @test calc_net_returns(wn, Xn, nothing, wdn) ≈
-              vec(sum(calc_net_asset_returns(U, Xn)[1]; dims = 2))
+              vec(sum(calc_net_asset_returns(U, Xn); dims = 2))
 
         # The fee is charged from the path's first row, which is the target weights, so
         # the same `N × 1` vector is subtracted from every row here as there.
         av, ov = PO.calc_asset_fees(wn, size(Xn, 1), fn)
         F = repeat(transpose(av[1]), size(Xn, 1), 1)
         F[1, :] .+= ov[1]
-        @test calc_net_asset_returns(U, Xn, fn)[1] ≈ calc_net_asset_returns(U, Xn)[1] .- F
+        @test calc_net_asset_returns(U, Xn, fn) ≈ calc_net_asset_returns(U, Xn) .- F
 
         # The constant path is the reader-facing shape of a window that ran no drift, so
         # the `MatNum` methods reproduce the `VecNum` ones on it, exactly.
         Uc = PO.weight_path(nothing, wn, Xn)
-        @test calc_net_asset_returns(Uc, Xn, fn)[1] == calc_net_asset_returns(wn, Xn, fn)[1]
-        @test calc_net_asset_returns(Uc, Xn)[1] == calc_net_asset_returns(wn, Xn)[1]
-        @test calc_net_asset_returns(Uc, Xn, nothing)[1] == Xn .* transpose(wn)
+        @test calc_net_asset_returns(Uc, Xn, fn) == calc_net_asset_returns(wn, Xn, fn)
+        @test calc_net_asset_returns(Uc, Xn) == calc_net_asset_returns(wn, Xn)
+        @test calc_net_asset_returns(Uc, Xn, nothing) == Xn .* transpose(wn)
 
         # A `nothing` fee reaches the `args...` method here too, and charges nothing.
         m = which(calc_net_asset_returns, (typeof(U), typeof(Xn), Nothing))
@@ -633,9 +660,8 @@ end
         U = PO.weight_path(wdn, wn, Xn)
 
         @test calc_net_returns(U, Xn, fn) ==
-              vec(sum(calc_net_asset_returns(U, Xn, fn)[1]; dims = 2))
-        @test calc_net_returns(U, Xn) ==
-              vec(sum(calc_net_asset_returns(U, Xn)[1]; dims = 2))
+              vec(sum(calc_net_asset_returns(U, Xn, fn); dims = 2))
+        @test calc_net_returns(U, Xn) == vec(sum(calc_net_asset_returns(U, Xn); dims = 2))
 
         # It is the series the drift route forms from the same window under the same drift.
         # The two sides add in a different order, so this needs an absolute tolerance.
