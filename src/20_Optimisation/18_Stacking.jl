@@ -569,7 +569,16 @@ function _optimise(st::Stacking, rd::ReturnsResult; dims::Int = 1,
     # combined weights back.
     imsk, pr, st, rd = investable_reduction(pr, st, rd)
     X = pr.X
-    fees = fees_constraints(st.fees, st.sets; datatype = eltype(X), strict = st.strict)
+    # An all-investable window derives no mask, so the door above short-circuits and the
+    # two liquidation carriers never meet a complement. Nothing exited, so nothing is
+    # owed: `strip_liquidation_carriers` states why this is stripped rather than viewed.
+    fees = strip_liquidation_carriers(fees_constraints(st.fees, st.sets;
+                                                       datatype = eltype(X),
+                                                       strict = st.strict), imsk)
+    # A forced exit is charged once, against the full-universe weight vector the fit
+    # rebuilds, so it rides on the result alone. No sub-problem below holds that vector —
+    # the exiting asset is in no cluster, its column being `NaN` — so none prices an exit.
+    cfees = strip_liquidation_carriers(fees, nothing)
     opti = st.opti
     Ni = length(opti)
     wi = zeros(eltype(X), size(X, 2), Ni)
@@ -583,7 +592,7 @@ function _optimise(st::Stacking, rd::ReturnsResult; dims::Int = 1,
         wi[:, i] = res.w
         resi[i] = res
     end
-    rdo = predict_outer_returns(st.cv, st, FullUniverse(), rd, pr, fees, wi, resi)
+    rdo = predict_outer_returns(st.cv, st, FullUniverse(), rd, pr, cfees, wi, resi)
     reso = optimise(st.opto, rdo; dims = dims, branchorder = branchorder,
                     str_names = str_names, save = save, kwargs...)
     wb = weight_bounds_constraints(st.wb, st.sets; N = size(X, 2), strict = st.strict,

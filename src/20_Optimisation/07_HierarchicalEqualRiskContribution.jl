@@ -323,7 +323,7 @@ function port_opt_view(hec::HierarchicalEqualRiskContribution, i, X::MatNum,
         ri = port_opt_view(ri, i, X)
         ro = port_opt_view(ro, i, X)
     end
-    opt = port_opt_view(hec.opt, i)
+    opt = port_opt_view(hec.opt, i, X)
     return HierarchicalEqualRiskContribution(; ri = ri, ro = ro, opt = opt, scai = hec.scai,
                                              scao = hec.scao, ex = hec.ex, fb = hec.fb)
 end
@@ -510,13 +510,17 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationR
     ri = factory(hec.ri, pr, hec.opt.slv)
     fees = fees_constraints(hec.opt.fees, hec.opt.sets; strict = hec.opt.strict,
                             datatype = eltype(X))
-    riku = unitary_expected_risks(ri, X, fees)
+    # A forced exit is charged once, against the full-universe weight vector the fit
+    # rebuilds, so it rides on the result alone. No sub-problem below holds that vector —
+    # the exiting asset is in no cluster, its column being `NaN` — so none prices an exit.
+    cfees = strip_liquidation_carriers(fees, nothing)
+    riku = unitary_expected_risks(ri, X, cfees)
     if hec.ri === hec.ro
         ro = ri
         roku = riku
     else
         ro = factory(hec.ro, pr, hec.opt.slv)
-        roku = unitary_expected_risks(ro, X, fees)
+        roku = unitary_expected_risks(ro, X, cfees)
     end
     rkbo = zeros(eltype(X), size(X, 2))
     rkcl = Vector{eltype(X)}(undef, length(cls))
@@ -528,7 +532,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationR
             w[cl] ./= sum(view(w, cl))
             rkbo[cl] .= inv.(view(roku_i, cl))
             rkbo[cl] ./= sum(view(rkbo, cl))
-            rkcl[i] = expected_risk(ro_i, rkbo, X, fees)
+            rkcl[i] = expected_risk(ro_i, rkbo, X, cfees)
             rkbo[cl] .= zero(eltype(X))
         end
     end
@@ -543,13 +547,17 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationR
     ri = factory(hec.ri, pr, hec.opt.slv)
     fees = fees_constraints(hec.opt.fees, hec.opt.sets; strict = hec.opt.strict,
                             datatype = eltype(X))
-    riku = unitary_expected_risks(ri, X, fees)
+    # A forced exit is charged once, against the full-universe weight vector the fit
+    # rebuilds, so it rides on the result alone. No sub-problem below holds that vector —
+    # the exiting asset is in no cluster, its column being `NaN` — so none prices an exit.
+    cfees = strip_liquidation_carriers(fees, nothing)
+    riku = unitary_expected_risks(ri, X, cfees)
     if hec.ri === hec.ro
         ro = ri
         roku = riku
     else
         ro = factory(hec.ro, pr, hec.opt.slv)
-        roku = unitary_expected_risks(ro, X, fees)
+        roku = unitary_expected_risks(ro, X, cfees)
     end
     Nc = length(cls)
     rkbo = zeros(eltype(X), size(X, 2), Nc)
@@ -562,7 +570,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationR
             w[cl] ./= sum(view(w, cl))
             rkbo[cl, i] .= inv.(view(roku_i, cl))
             rkbo[cl, i] ./= sum(view(rkbo, cl, i))
-            rkcl[i] = expected_risk(ro_i, view(rkbo, :, i), X, fees)
+            rkcl[i] = expected_risk(ro_i, view(rkbo, :, i), X, cfees)
         end
     end
     return w, rkcl, fees, ri, ro
@@ -586,11 +594,15 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:VecOptRM, <:V
     rkbo = zeros(eltype(X), size(X, 2))
     fees = fees_constraints(hec.opt.fees, hec.opt.sets; strict = hec.opt.strict,
                             datatype = eltype(X))
+    # A forced exit is charged once, against the full-universe weight vector the fit
+    # rebuilds, so it rides on the result alone. No sub-problem below holds that vector —
+    # the exiting asset is in no cluster, its column being `NaN` — so none prices an exit.
+    cfees = strip_liquidation_carriers(fees, nothing)
     let
         rku_i, ro_i = rku, ro
         FLoops.@floop hec.ex for (i, cl) in pairs(cls)
-            w[cl] = herc_scalarised_risk_i!(hec.scai, wk, rku_i, cl, ri, X, fees)
-            rkcl[i] = herc_scalarised_risk_o!(hec.scao, wk, rku_i, rkbo, cl, ro_i, X, fees)
+            w[cl] = herc_scalarised_risk_i!(hec.scai, wk, rku_i, cl, ri, X, cfees)
+            rkcl[i] = herc_scalarised_risk_o!(hec.scao, wk, rku_i, rkbo, cl, ro_i, X, cfees)
             rkbo[cl] .= zero(eltype(X))
         end
     end
@@ -615,13 +627,17 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:VecOptRM, <:V
     rkbo = zeros(eltype(X), size(X, 2), Nc)
     fees = fees_constraints(hec.opt.fees, hec.opt.sets; strict = hec.opt.strict,
                             datatype = eltype(X))
+    # A forced exit is charged once, against the full-universe weight vector the fit
+    # rebuilds, so it rides on the result alone. No sub-problem below holds that vector —
+    # the exiting asset is in no cluster, its column being `NaN` — so none prices an exit.
+    cfees = strip_liquidation_carriers(fees, nothing)
     let
         ro_i = ro
         FLoops.@floop hec.ex for (i, cl) in pairs(cls)
             w[cl] = herc_scalarised_risk_i!(hec.scai, view(wk, :, i), view(rku, :, i), cl,
-                                            ri, X, fees)
+                                            ri, X, cfees)
             rkcl[i] = herc_scalarised_risk_o!(hec.scao, view(wk, :, i), view(rku, :, i),
-                                              view(rkbo, :, i), cl, ro_i, X, fees)
+                                              view(rkbo, :, i), cl, ro_i, X, cfees)
         end
     end
     return w, rkcl, fees, ri, ro
@@ -634,7 +650,11 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationR
     ri = factory(hec.ri, pr, hec.opt.slv)
     fees = fees_constraints(hec.opt.fees, hec.opt.sets; strict = hec.opt.strict,
                             datatype = eltype(X))
-    riku = unitary_expected_risks(ri, X, fees)
+    # A forced exit is charged once, against the full-universe weight vector the fit
+    # rebuilds, so it rides on the result alone. No sub-problem below holds that vector —
+    # the exiting asset is in no cluster, its column being `NaN` — so none prices an exit.
+    cfees = strip_liquidation_carriers(fees, nothing)
+    riku = unitary_expected_risks(ri, X, cfees)
     ro = factory(hec.ro, pr, hec.opt.slv)
     rkcl = Vector{eltype(X)}(undef, length(cls))
     w = Vector{eltype(X)}(undef, size(X, 2))
@@ -644,7 +664,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationR
     FLoops.@floop hec.ex for (i, cl) in pairs(cls)
         w[cl] .= inv.(view(riku, cl))
         w[cl] ./= sum(view(w, cl))
-        rkcl[i] = herc_scalarised_risk_o!(hec.scao, wk, roku, rkbo, cl, ro, X, fees)
+        rkcl[i] = herc_scalarised_risk_o!(hec.scao, wk, roku, rkbo, cl, ro, X, cfees)
         rkbo[cl] .= zero(eltype(X))
     end
     return w, rkcl, fees, ri, ro
@@ -657,7 +677,11 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationR
     ri = factory(hec.ri, pr, hec.opt.slv)
     fees = fees_constraints(hec.opt.fees, hec.opt.sets; strict = hec.opt.strict,
                             datatype = eltype(X))
-    riku = unitary_expected_risks(ri, X, fees)
+    # A forced exit is charged once, against the full-universe weight vector the fit
+    # rebuilds, so it rides on the result alone. No sub-problem below holds that vector —
+    # the exiting asset is in no cluster, its column being `NaN` — so none prices an exit.
+    cfees = strip_liquidation_carriers(fees, nothing)
+    riku = unitary_expected_risks(ri, X, cfees)
     ro = factory(hec.ro, pr, hec.opt.slv)
     Nc = length(cls)
     rkcl = Vector{eltype(X)}(undef, Nc)
@@ -669,7 +693,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationR
         w[cl] .= inv.(view(riku, cl))
         w[cl] ./= sum(view(w, cl))
         rkcl[i] = herc_scalarised_risk_o!(hec.scao, view(wk, :, i), view(roku, :, i),
-                                          view(rkbo, :, i), cl, ro, X, fees)
+                                          view(rkbo, :, i), cl, ro, X, cfees)
     end
     return w, rkcl, fees, ri, ro
 end
@@ -682,17 +706,21 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:VecOptRM,
     ro = factory(hec.ro, pr, hec.opt.slv)
     fees = fees_constraints(hec.opt.fees, hec.opt.sets; strict = hec.opt.strict,
                             datatype = eltype(X))
-    roku = unitary_expected_risks(ro, X, fees)
+    # A forced exit is charged once, against the full-universe weight vector the fit
+    # rebuilds, so it rides on the result alone. No sub-problem below holds that vector —
+    # the exiting asset is in no cluster, its column being `NaN` — so none prices an exit.
+    cfees = strip_liquidation_carriers(fees, nothing)
+    roku = unitary_expected_risks(ro, X, cfees)
     rkcl = Vector{eltype(X)}(undef, length(cls))
     w = Vector{eltype(X)}(undef, size(X, 2))
     wk = zeros(eltype(X), size(X, 2))
     riku = Vector{eltype(X)}(undef, size(X, 2))
     rkbo = zeros(eltype(X), size(X, 2))
     FLoops.@floop hec.ex for (i, cl) in pairs(cls)
-        w[cl] = herc_scalarised_risk_i!(hec.scai, wk, riku, cl, ri, X, fees)
+        w[cl] = herc_scalarised_risk_i!(hec.scai, wk, riku, cl, ri, X, cfees)
         rkbo[cl] .= inv.(view(roku, cl))
         rkbo[cl] ./= sum(view(rkbo, cl))
-        rkcl[i] = expected_risk(ro, rkbo, X, fees)
+        rkcl[i] = expected_risk(ro, rkbo, X, cfees)
         rkbo[cl] .= zero(eltype(X))
     end
     return w, rkcl, fees, ri, ro
@@ -707,7 +735,11 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:VecOptRM,
     ro = factory(hec.ro, pr, hec.opt.slv)
     fees = fees_constraints(hec.opt.fees, hec.opt.sets; strict = hec.opt.strict,
                             datatype = eltype(X))
-    roku = unitary_expected_risks(ro, X, fees)
+    # A forced exit is charged once, against the full-universe weight vector the fit
+    # rebuilds, so it rides on the result alone. No sub-problem below holds that vector —
+    # the exiting asset is in no cluster, its column being `NaN` — so none prices an exit.
+    cfees = strip_liquidation_carriers(fees, nothing)
+    roku = unitary_expected_risks(ro, X, cfees)
     Nc = length(cls)
     rkcl = Vector{eltype(X)}(undef, Nc)
     w = Vector{eltype(X)}(undef, size(X, 2))
@@ -716,10 +748,10 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:VecOptRM,
     rkbo = zeros(eltype(X), size(X, 2), Nc)
     FLoops.@floop hec.ex for (i, cl) in pairs(cls)
         w[cl] = herc_scalarised_risk_i!(hec.scai, view(wk, :, i), view(riku, :, i), cl, ri,
-                                        X, fees)
+                                        X, cfees)
         rkbo[cl, i] .= inv.(view(roku, cl))
         rkbo[cl, i] ./= sum(view(rkbo, cl, i))
-        rkcl[i] = expected_risk(ro, view(rkbo, :, i), X, fees)
+        rkcl[i] = expected_risk(ro, view(rkbo, :, i), X, cfees)
     end
     return w, rkcl, fees, ri, ro
 end
@@ -754,6 +786,10 @@ function _optimise(hec::HierarchicalEqualRiskContribution,
     idx = assignments(clr)
     cls = [findall(x -> x == i, idx) for i in 1:(clr.k)]
     w, rkcl, fees, ri, ro = herc_risk(hec, pr, cls)
+    # An all-investable window derives no mask, so the door above short-circuits and the
+    # two liquidation carriers never meet a complement. Nothing exited, so nothing is
+    # owed: `strip_liquidation_carriers` states why this is stripped rather than viewed.
+    fees = strip_liquidation_carriers(fees, imsk)
     nd = to_tree(clr.res)[2]
     hs = [i.height for i in nd]
     nd = nd[sortperm(hs; rev = true)]

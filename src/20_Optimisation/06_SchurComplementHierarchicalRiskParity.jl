@@ -630,7 +630,7 @@ Return a view of [`SchurComplementHierarchicalRiskParity`](@ref) `sh` sliced to 
 function port_opt_view(sh::SchurComplementHierarchicalRiskParity, i, X::MatNum,
                        args...)::SchurComplementHierarchicalRiskParity
     X = isa(sh.opt.pe, AbstractPriorResult) ? sh.opt.pe.X : X
-    opt = port_opt_view(sh.opt, i)
+    opt = port_opt_view(sh.opt, i, X)
     params = port_opt_view(sh.params, i, X)
     return SchurComplementHierarchicalRiskParity(; opt = opt, params = params, fb = sh.fb)
 end

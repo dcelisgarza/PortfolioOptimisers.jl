@@ -760,7 +760,16 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
     clr = clusterise(nco.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa, dims = dims,
                      branchorder = branchorder, x_src = nco.x_src)
     assert_clustering_universe(clr, size(X, 2))
-    fees = fees_constraints(nco.fees, nco.sets; datatype = eltype(X), strict = nco.strict)
+    # An all-investable window derives no mask, so the door above short-circuits and the
+    # two liquidation carriers never meet a complement. Nothing exited, so nothing is
+    # owed: `strip_liquidation_carriers` states why this is stripped rather than viewed.
+    fees = strip_liquidation_carriers(fees_constraints(nco.fees, nco.sets;
+                                                       datatype = eltype(X),
+                                                       strict = nco.strict), imsk)
+    # A forced exit is charged once, against the full-universe weight vector the fit
+    # rebuilds, so it rides on the result alone. No sub-problem below holds that vector —
+    # the exiting asset is in no cluster, its column being `NaN` — so none prices an exit.
+    cfees = strip_liquidation_carriers(fees, nothing)
     idx = assignments(clr)
     cls = [findall(x -> x == i, idx) for i in 1:(clr.k)]
     wi = zeros(eltype(X), size(X, 2), clr.k)
@@ -777,7 +786,7 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
         wi[cl, i] = res.w
         resi[i] = res
     end
-    rdo = predict_outer_returns(nco.cv, nco, ClusterUniverse(cls), rd, pr, fees, wi, resi)
+    rdo = predict_outer_returns(nco.cv, nco, ClusterUniverse(cls), rd, pr, cfees, wi, resi)
     nco = _update_asset_sets(nco, rdo)
     reso = optimise(nco.opto, rdo; dims = dims, branchorder = branchorder,
                     str_names = str_names, save = save, kwargs...)

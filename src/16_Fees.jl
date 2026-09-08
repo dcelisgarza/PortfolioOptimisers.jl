@@ -606,7 +606,7 @@ This verb closes that gap explicitly rather than by taking the view on the commo
 
 # Algorithm
 
- 1. On a `nothing` `fees`, or a `BitVector` `imsk`, return `fees` unchanged.
+ 1. On a `nothing` `fees`, or a `BitVector` `imsk`, return `fees` unchanged. A stated `nothing` fee under a derived mask satisfies both, so a third method names that pair and breaks the ambiguity.
  2. On a `nothing` `imsk` with both carriers already `nothing`, return `fees` unchanged, so the common case allocates nothing.
  3. Otherwise rebuild the fee with `lq` and `flq` set to `nothing`, carrying every other field through.
 
@@ -630,6 +630,9 @@ function strip_liquidation_carriers(fees, ::BitVector)
     return fees
 end
 function strip_liquidation_carriers(::Nothing, ::Any)
+    return nothing
+end
+function strip_liquidation_carriers(::Nothing, ::BitVector)
     return nothing
 end
 function strip_liquidation_carriers(fees::Fees, ::Nothing)

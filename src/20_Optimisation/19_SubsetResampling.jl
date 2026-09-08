@@ -595,7 +595,12 @@ function _optimise(sr::SubsetResampling, rd::ReturnsResult; dims::Int = 1,
               "n_subsets = $n_subsets must not be greater than `binomial(assets, subset_size) = n_comb => binomial($N, $subset_size) = $n_comb`.")
     asset_idx = sample_unique_assets(N, subset_size, n_subsets; max_comb = max_comb,
                                      rng = rng, seed = seed)
-    fees = fees_constraints(sr.fees, sr.sets; datatype = eltype(X), strict = sr.strict)
+    # An all-investable window derives no mask, so the door above short-circuits and the
+    # two liquidation carriers never meet a complement. Nothing exited, so nothing is
+    # owed: `strip_liquidation_carriers` states why this is stripped rather than viewed.
+    fees = strip_liquidation_carriers(fees_constraints(sr.fees, sr.sets;
+                                                       datatype = eltype(X),
+                                                       strict = sr.strict), imsk)
     opt = sr.opt
     ress = Vector{NonFiniteAllocationOptimisationResult}(undef, n_subsets)
     FLoops.@floop sr.ex for i in 1:n_subsets

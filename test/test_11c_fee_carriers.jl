@@ -376,4 +376,91 @@
         @test o.flq === fees.flq
         @test isa(o.fa, AmortisedFees)
     end
+
+    @testset "An all-investable window strips both carriers in every family" begin
+        using StableRNGs
+
+        # A caller states the carriers over the FULL universe, because they cannot know
+        # which asset will delist. A window in which every asset is investable derives no
+        # mask, so the door short-circuits and the carriers never meet a complement to be
+        # sliced to. Left alone they survive at full width and are charged in full, for
+        # assets that never left. `strip_liquidation_carriers` closes that, and this pins
+        # it in every family that resolves a fee, not the JuMP prelude alone.
+        rng = StableRNG(987654321)
+        nx = ["a", "b", "c", "d", "e"]
+        X_all = randn(rng, 200, 5) ./ 100 .+ 0.0005
+        X_del = copy(X_all)
+        X_del[120:end, 3] .= NaN          # `c` delists, so the mask derives itself
+        rd_all = ReturnsResult(; nx = nx, X = X_all)
+        rd_del = ReturnsResult(; nx = nx, X = X_del)
+        sets = UniverseSets(; dict = Dict("nx" => nx))
+        fees = Fees(; l = 0.001, lq = Turnover(; w = fill(0.2, 5), val = 0.01),
+                    flq = Turnover(; w = fill(0.2, 5), val = 5.0))
+
+        # A stated `nothing` fee under a derived mask satisfies both the `nothing` fee
+        # method and the `BitVector` mask method. Without a third method naming that pair
+        # the call is ambiguous, so every family below fails on a delisting window that
+        # states no fee at all.
+        @test isnothing(PortfolioOptimisers.strip_liquidation_carriers(nothing,
+                                                                       BitVector([1, 0, 1])))
+
+        hopt = HierarchicalOptimiser(; pe = EmpiricalPrior(), sets = sets, fees = fees)
+        inner = HierarchicalRiskParity()
+        fams = ["HierarchicalRiskParity" => HierarchicalRiskParity(; opt = hopt),
+                "HierarchicalEqualRiskContribution" =>
+                    HierarchicalEqualRiskContribution(; opt = hopt),
+                "NestedClustered" =>
+                    NestedClustered(; pe = EmpiricalPrior(), sets = sets, fees = fees,
+                                    opti = inner, opto = inner),
+                "Stacking" => Stacking(; pe = EmpiricalPrior(), sets = sets, fees = fees,
+                                       opti = [inner], opto = inner),
+                "SubsetResampling" =>
+                    SubsetResampling(; pe = EmpiricalPrior(), sets = sets, fees = fees,
+                                     opt = inner, subset_size = 3, n_subsets = 4)]
+        @testset "$name" for (name, est) in fams
+            # Nothing exited, so nothing is owed, and the five older fields are untouched.
+            fees_all = optimise(est, rd_all).fees
+            @test isnothing(fees_all.lq)
+            @test isnothing(fees_all.flq)
+            @test fees_all.l == fees.l
+
+            # One asset left, so both carriers land on its axis alone. The hierarchical
+            # families reached this only once their own view stopped dropping the returns
+            # matrix on the way into `opt`, which is what derives the complement.
+            fees_del = optimise(est, rd_del).fees
+            @test collect(fees_del.lq.w) == [0.2]
+            @test collect(fees_del.flq.w) == [0.2]
+            # A scalar rate is not on either axis, so the view leaves it alone.
+            @test fees_del.lq.val == 0.01
+            @test fees_del.flq.val == 5.0
+        end
+    end
+
+    @testset "A cluster-level risk figure prices no forced exit" begin
+        using StableRNGs
+
+        # A forced exit is charged once, against the full-universe weight vector the fit
+        # rebuilds, so it rides on the result alone. The exiting asset is in no cluster,
+        # its column being `NaN`, so no intra- or inter-cluster risk may carry its charge.
+        # Stating the carriers therefore cannot move a single weight.
+        rng = StableRNG(987654321)
+        nx = ["a", "b", "c", "d", "e"]
+        X = randn(rng, 200, 5) ./ 100 .+ 0.0005
+        X[120:end, 3] .= NaN
+        rd = ReturnsResult(; nx = nx, X = X)
+        sets = UniverseSets(; dict = Dict("nx" => nx))
+        plain = Fees(; l = 0.001)
+        carried = Fees(; l = 0.001, lq = Turnover(; w = fill(0.2, 5), val = 0.01),
+                       flq = Turnover(; w = fill(0.2, 5), val = 5.0))
+        opt_p = HierarchicalOptimiser(; pe = EmpiricalPrior(), sets = sets, fees = plain)
+        opt_c = HierarchicalOptimiser(; pe = EmpiricalPrior(), sets = sets, fees = carried)
+
+        @test optimise(HierarchicalRiskParity(; opt = opt_p), rd).w ==
+              optimise(HierarchicalRiskParity(; opt = opt_c), rd).w
+        @test optimise(HierarchicalEqualRiskContribution(; opt = opt_p), rd).w ==
+              optimise(HierarchicalEqualRiskContribution(; opt = opt_c), rd).w
+
+        # The charge is not lost, it is deferred: the result carries it on the complement.
+        @test optimise(HierarchicalRiskParity(; opt = opt_c), rd).fees.lq.val == 0.01
+    end
 end

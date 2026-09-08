@@ -254,7 +254,7 @@ function port_opt_view(hrp::HierarchicalRiskParity, i, X::MatNum,
                        args...)::HierarchicalRiskParity
     X = isa(hrp.opt.pe, AbstractPriorResult) ? hrp.opt.pe.X : X
     r = port_opt_view(hrp.r, i, X)
-    opt = port_opt_view(hrp.opt, i)
+    opt = port_opt_view(hrp.opt, i, X)
     return HierarchicalRiskParity(; r = r, opt = opt, sca = hrp.sca, fb = hrp.fb)
 end
 """
@@ -338,9 +338,17 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
     assert_clustering_universe(clr, size(X, 2))
     r = factory(hrp.r, pr, hrp.opt.slv)
     wu = Matrix{eltype(X)}(undef, size(X, 2), 2)
-    fees = fees_constraints(hrp.opt.fees, hrp.opt.sets; strict = hrp.opt.strict,
-                            datatype = eltype(X))
-    rku = unitary_expected_risks(r, X, fees)
+    # An all-investable window derives no mask, so the door above short-circuits and the
+    # two liquidation carriers never meet a complement. Nothing exited, so nothing is
+    # owed: `strip_liquidation_carriers` states why this is stripped rather than viewed.
+    fees = strip_liquidation_carriers(fees_constraints(hrp.opt.fees, hrp.opt.sets;
+                                                       strict = hrp.opt.strict,
+                                                       datatype = eltype(X)), imsk)
+    # A forced exit is charged once, against the full-universe weight vector the fit
+    # rebuilds, so it rides on the result alone. No sub-problem below holds that vector —
+    # the exiting asset is in no cluster, its column being `NaN` — so none prices an exit.
+    cfees = strip_liquidation_carriers(fees, nothing)
+    rku = unitary_expected_risks(r, X, cfees)
     wb = weight_bounds_constraints(hrp.opt.wb, hrp.opt.sets; N = size(X, 2),
                                    strict = hrp.opt.strict, datatype = eltype(X))
     w = ones(eltype(X), size(X, 2))
@@ -357,8 +365,8 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
             wu[lc, 1] ./= sum(view(wu, lc, 1))
             wu[rc, 2] .= inv.(view(rku, rc))
             wu[rc, 2] ./= sum(view(wu, rc, 2))
-            lrisk = expected_risk(r, view(wu, :, 1), X, fees)
-            rrisk = expected_risk(r, view(wu, :, 2), X, fees)
+            lrisk = expected_risk(r, view(wu, :, 1), X, cfees)
+            rrisk = expected_risk(r, view(wu, :, 2), X, cfees)
             # Allocate weight to clusters.
             alpha = one(lrisk) - lrisk / (lrisk + rrisk)
             alpha = split_factor_weight_constraints(alpha, wb, w, lc, rc)
@@ -461,8 +469,16 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
     wu = Matrix{eltype(X)}(undef, size(X, 2), 2)
     wk = zeros(eltype(X), size(X, 2))
     rku = Vector{eltype(X)}(undef, size(X, 2))
-    fees = fees_constraints(hrp.opt.fees, hrp.opt.sets; strict = hrp.opt.strict,
-                            datatype = eltype(X))
+    # An all-investable window derives no mask, so the door above short-circuits and the
+    # two liquidation carriers never meet a complement. Nothing exited, so nothing is
+    # owed: `strip_liquidation_carriers` states why this is stripped rather than viewed.
+    fees = strip_liquidation_carriers(fees_constraints(hrp.opt.fees, hrp.opt.sets;
+                                                       strict = hrp.opt.strict,
+                                                       datatype = eltype(X)), imsk)
+    # A forced exit is charged once, against the full-universe weight vector the fit
+    # rebuilds, so it rides on the result alone. No sub-problem below holds that vector —
+    # the exiting asset is in no cluster, its column being `NaN` — so none prices an exit.
+    cfees = strip_liquidation_carriers(fees, nothing)
     wb = weight_bounds_constraints(hrp.opt.wb, hrp.opt.sets; N = size(X, 2),
                                    strict = hrp.opt.strict, datatype = eltype(X))
     w = ones(eltype(X), size(X, 2))
@@ -474,7 +490,7 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
         for i in 1:2:length(items)
             lc = items[i]
             rc = items[i + 1]
-            lrisk, rrisk = hrp_scalarised_risk(hrp.sca, wu, wk, rku, lc, rc, r, X, fees)
+            lrisk, rrisk = hrp_scalarised_risk(hrp.sca, wu, wk, rku, lc, rc, r, X, cfees)
             # Allocate weight to clusters.
             alpha = one(lrisk) - lrisk / (lrisk + rrisk)
             alpha = split_factor_weight_constraints(alpha, wb, w, lc, rc)
