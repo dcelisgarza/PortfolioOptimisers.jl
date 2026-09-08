@@ -251,6 +251,7 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :beta => "`beta`: Quantile level for the upper tail. The bound is [`Num_SigCal`](@ref), so the slot takes the level itself, an [`AbstractSignificanceCalibrationAlgorithm`](@ref) that computes it from the prior result, or a plain function of the same five arguments.",#
                                  :l => "`l`: Risk aversion parameter.",#
                                  :ohf => "`ohf`: Objective homogenisation factor for the ratio problem, or `nothing` to size it from the resolved characteristic.",#
+                                 :kmin => "`kmin`: Floor on the ratio problem's homogenisation variable `k`, or `nothing` to size it from the resolved characteristic. It keeps the solver off the degenerate ray `k = 0`, on which every homogeneous constraint holds vacuously.",#
                                  :i_ret_term => "`i`: Index of the return term to maximise.",#
                                  :bgt_cost_target => "`bgt`: Budget target or range that the weights and their trading costs must meet together.",#
                                  :vp_cost => "`vp`: Cost coefficients for positive weight changes. Non-negative.",#

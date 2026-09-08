@@ -354,6 +354,37 @@
                                                      sets = osets, lcse = hand)), rdo)
         @test isapprox(res.w, resh.w; rtol = 5e-5)
     end
+    @testset "A re-based row survives the ratio's scale floor (#924)" begin
+        # A `FactorSpace` row is dense by construction — one column per asset, all of them
+        # non-zero — so it is the row that carried the largest violation when `MaximumRatio`
+        # answered on the degenerate homogenised ray. The floor `MaximumRatio` now writes is
+        # what keeps it binding; `kmin` set below the collapse reproduces the defect exactly.
+        # See the scale floor section of `MaximumRatio` for the mechanism.
+        ue = EllipsoidalUncertaintySet(; sigma = Matrix(0.1I, 3, 3), k = 1e3,
+                                       class = MuUncertaintySetClass())
+        cap = ExposureConstraintEstimator(;
+                                          lce = LinearConstraintEstimator(;
+                                                                          val = "MTUM >= 0.9"),
+                                          space = fs)
+        ratio(obj) = optimise(MeanRisk(; obj = obj,
+                                       opt = JuMPOptimiser(; pe = FactorPrior(), slv = oslv,
+                                                           sets = osets, bgt = 1.0,
+                                                           wb = WeightBounds(; lb = 0.0,
+                                                                             ub = 1.0),
+                                                           lcse = cap,
+                                                           ret = ArithmeticReturn(;
+                                                                                  ucs = ue))),
+                              rdo)
+        held = ratio(MaximumRatio())
+        @test isa(held.retcode, PortfolioOptimisers.OptimisationSuccess)
+        @test dot(held.pa.pr.rr.M[:, 1], held.w) >= 0.9 - 1e-5
+        # Which the collapsed scale did not: a floor below the ray reports the same success
+        # and hands back weights that break the mandate the caller wrote.
+        broken = ratio(MaximumRatio(; kmin = 1e-12))
+        @test isa(broken.retcode, PortfolioOptimisers.OptimisationSuccess)
+        @test dot(broken.pa.pr.rr.M[:, 1], broken.w) < 0.9 - 1e-3
+    end
+
     @testset "Every JuMP optimiser inherits it" begin
         # They all share `JuMPOptimiser`, so the wiring is one edit rather than one per
         # optimiser.

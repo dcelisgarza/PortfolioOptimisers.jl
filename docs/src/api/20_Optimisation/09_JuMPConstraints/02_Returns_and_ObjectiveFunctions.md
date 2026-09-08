@@ -24,6 +24,7 @@ MaximumReturn
 MaximumElementReturn
 set_maximum_ratio_factor_variables!
 set_maximum_ratio_normalisation!
+set_maximum_ratio_scale_floor!
 set_return_bounds!
 set_return_expression!
 scalarise_return_expression!

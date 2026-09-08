@@ -257,7 +257,7 @@
 "src/20_Optimisation/07_HierarchicalEqualRiskContribution.jl" = { map = 10, units = 11, swept = false }
 "src/20_Optimisation/08_Base_JuMPOptimisation.jl" = { map = 10, units = 91, swept = false }
 "src/20_Optimisation/09_JuMPConstraints/01_MIPIndicators.jl" = { map = 11, units = 32, swept = false }
-"src/20_Optimisation/09_JuMPConstraints/02_Returns_and_ObjectiveFunctions.jl" = { map = 11, units = 38, swept = false }
+"src/20_Optimisation/09_JuMPConstraints/02_Returns_and_ObjectiveFunctions.jl" = { map = 11, units = 39, swept = false }
 "src/20_Optimisation/09_JuMPConstraints/03_BudgetConstraints.jl" = { map = 11, units = 15, swept = false }
 "src/20_Optimisation/09_JuMPConstraints/04_WeightConstraints.jl" = { map = 11, units = 5, swept = false }
 "src/20_Optimisation/09_JuMPConstraints/05_SDPConstraints.jl" = { map = 11, units = 4, swept = false }

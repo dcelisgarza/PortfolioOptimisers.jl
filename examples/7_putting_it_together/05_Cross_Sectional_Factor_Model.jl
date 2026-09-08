@@ -444,13 +444,16 @@ pretty_table(DataFrame("Radius" => radius_grid,
                            end], title = "The mean norm-ball radius")
 
 #=
-!!! warning "The tangency objective and a mean uncertainty set"
-    [`MaximumRatio`](@ref) solves a homogenised problem in a scaled variable, and a mean
-    uncertainty set can drive that scale to zero. Every constraint is then satisfied to within the
-    solver's tolerance at a scale where it means nothing, and the recovered weights can violate
-    the constraints the caller wrote while the result still reports success. The books on this
-    page use [`MinimumRisk`](@ref) and [`MaximumReturn`](@ref), whose scale is fixed at one. See
-    issue #924.
+!!! note "The tangency objective and a mean uncertainty set"
+    [`MaximumRatio`](@ref) solves a homogenised problem in a scaled variable `k`, and a mean
+    uncertainty set wide enough that no feasible portfolio's worst case beats `rf` leaves nothing
+    to pin that scale: the objective is then non-positive along every ray and its supremum sits at
+    the origin. `MaximumRatio` writes a floor `k >= kmin` for exactly this, so the constraints
+    stay meaningful and the recovered weights keep the mandate. A `k` that comes back **on** the
+    floor is the signal that there was no tangency portfolio to find, and that the weights beside
+    it maximise the return expression at that scale rather than the ratio. The books on this page
+    use [`MinimumRisk`](@ref) and [`MaximumReturn`](@ref), whose scale is fixed at one, so the
+    question does not arise for them.
 
 ## 5. A walk-forward, under a factor mandate
 

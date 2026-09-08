@@ -218,3 +218,86 @@ end
     @test_throws ArgumentError HierarchicalRiskParity(; r = NoRisk())
     @test_throws ArgumentError HierarchicalEqualRiskContribution(; ri = NoRisk())
 end
+
+@testset "Degeneracy guard: the ratio's scale floor closes the homogenised ray (#924)" begin
+    # Homogenisation carries a second degeneracy, and it is the mirror of the two above: the
+    # objective is not identically zero here, it is non-positive, and the supremum of a
+    # homogeneous objective that never rises above zero is zero at the origin. A mean
+    # uncertainty set of a large enough radius puts the model there, because no feasible
+    # portfolio's worst-case return can then beat `rf`. Every constraint the model writes is
+    # homogeneous, so all of them hold on that ray, and `w = y / k` came back breaking the
+    # bound the caller wrote while the result reported success.
+    T, N = size(pr.X)
+    # A hand-built set rather than a calibrated one: the radius is the whole fixture, and a
+    # calibration would obscure which side of the collapse the test is on.
+    ue(kappa) = EllipsoidalUncertaintySet(; sigma = Matrix(Diagonal(diag(pr.sigma) ./ T)),
+                                          k = kappa, class = MuUncertaintySetClass())
+    # `group1` is a dense row over half the universe; the single-asset row is the sparse one.
+    # A denser row carries more of the violation, so both are pinned.
+    function ratio(kappa; obj = MaximumRatio(), val = "$(rd.nx[1]) >= 0.09")
+        return optimise(MeanRisk(; r = Variance(), obj = obj,
+                                 opt = JuMPOptimiser(; pe = pr, slv = slv, bgt = 1.0,
+                                                     wb = WeightBounds(; lb = 0.0,
+                                                                       ub = 0.1),
+                                                     sets = sets,
+                                                     lcse = LinearConstraintEstimator(;
+                                                                                      val = val),
+                                                     ret = ArithmeticReturn(;
+                                                                            ucs = ue(kappa)))),
+                        rd)
+    end
+    kof(res) = JuMP.value(PortfolioOptimisers.get_k(res.jr.model))
+    # The floor the `nothing` rule sizes, re-derived from the same two numbers it reads.
+    ohf = min(1e3, max(1e-3, mean(abs.(pr.mu))))
+    kfloor = 1e-4 * ohf / max(ohf, maximum(pr.mu))
+
+    @testset "It is inert where the ratio has a tangency portfolio to find" begin
+        # A radius small enough that the worst case still beats `rf` pins `k` through the
+        # risk cap alone, and the floor is orders below it. The proof that it is inert is
+        # that a floor a million times smaller gives the same answer.
+        tight = ratio(1e-6)
+        loose = ratio(1e-6; obj = MaximumRatio(; kmin = kfloor * 1e-6))
+        @test isa(tight.retcode, PortfolioOptimisers.OptimisationSuccess)
+        @test kof(tight) > 1e3 * kfloor
+        @test isapprox(kof(tight), kof(loose); rtol = 1e-6)
+        @test isapprox(tight.w, loose.w; atol = 1e-7)
+    end
+
+    @testset "It closes the ray, and the caller's constraints survive it" begin
+        for val in ("$(rd.nx[1]) >= 0.09", "group1 >= 0.5")
+            res = ratio(1e3; val = val)
+            @test isa(res.retcode, PortfolioOptimisers.OptimisationSuccess)
+            # `k` comes back sitting on the floor: nothing else pins it here.
+            @test isapprox(kof(res), kfloor; rtol = 1e-3)
+            # Which is the whole point. The recovered weights meet the row that was written,
+            # and the bound that was not, both of which the collapsed ray broke. The
+            # tolerance is what a floored `k` costs: `w = y / k` carries the solver's
+            # residual on `y` divided by `k`, and `k` sits at `kfloor` here, five orders
+            # below the scale a tangency portfolio would have pinned.
+            @test all(x -> x <= 0.1 + 1e-4, res.w)
+            @test isapprox(sum(res.w), 1.0; atol = 1e-7)
+        end
+        @test ratio(1e3).w[1] >= 0.09 - 1e-4
+        # The dense row is the one that carried the larger violation before the floor.
+        gidx = [findfirst(==(x), rd.nx) for x in sets.dict["group1"]]
+        @test sum(ratio(1e3; val = "group1 >= 0.5").w[gidx]) >= 0.5 - 1e-4
+    end
+
+    @testset "The floor is caller-visible, and a `k` on it is the signal" begin
+        # A floor the caller sets is used as written, which is how a model that wants the
+        # old scale asks for it.
+        res = ratio(1e3; obj = MaximumRatio(; kmin = 0.05))
+        @test isapprox(kof(res), 0.05; rtol = 1e-5)
+        # And it is a floor, not a target: raising it on a model that has a tangency
+        # portfolio above it leaves that answer alone.
+        @test isapprox(kof(ratio(1e-6; obj = MaximumRatio(; kmin = 0.05))),
+                       kof(ratio(1e-6)); rtol = 1e-5)
+    end
+
+    @testset "`kmin` is validated where `ohf` is" begin
+        @test isnothing(MaximumRatio().kmin)
+        @test MaximumRatio(; kmin = 0.5).kmin == 0.5
+        @test_throws DomainError MaximumRatio(; kmin = 0.0)
+        @test_throws DomainError MaximumRatio(; kmin = -1e-8)
+    end
+end
