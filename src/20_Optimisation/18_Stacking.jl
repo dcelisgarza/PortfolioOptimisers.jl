@@ -556,6 +556,9 @@ function port_opt_view(st::Stacking, i, X::MatNum, args...)::Stacking
                     opti = opti, opto = opto, cv = st.cv, wf = st.wf, ex = st.ex,
                     fb = st.fb, brt = st.brt, strict = st.strict)
 end
+function non_investable_universe(st::Stacking, ni::VecStr)::Stacking
+    return rebuild_estimator(st, (; sets = non_investable_sets(st.sets, ni)))
+end
 function _optimise(st::Stacking, rd::ReturnsResult; dims::Int = 1,
                    branchorder::Symbol = :optimal, str_names::Bool = false,
                    save::Bool = true, kwargs...)

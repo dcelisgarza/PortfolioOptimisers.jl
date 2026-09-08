@@ -385,6 +385,9 @@ function InverseVolatility(; pe::TD{<:PrE_Pr} = EmpiricalPrior(),
                            brt::Bool = false, strict::Bool = false)::InverseVolatility
     return InverseVolatility(pe, wb, sets, wf, fb, sq, brt, strict)
 end
+function non_investable_universe(iv::InverseVolatility, ni::VecStr)::InverseVolatility
+    return rebuild_estimator(iv, (; sets = non_investable_sets(iv.sets, ni)))
+end
 function time_dependent_field_defaults(::InverseVolatility)::NamedTuple
     return merge(naive_optimiser_td_defaults(), (; pe = EmpiricalPrior()))
 end
@@ -590,6 +593,9 @@ function EqualWeighted(; wb::TD_Option{<:WbE_Wb} = WeightBounds(),
                        strict::Bool = false)::EqualWeighted
     return EqualWeighted(wb, sets, wf, fb, strict)
 end
+function non_investable_universe(ew::EqualWeighted, ni::VecStr)::EqualWeighted
+    return rebuild_estimator(ew, (; sets = non_investable_sets(ew.sets, ni)))
+end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -790,6 +796,9 @@ function RandomWeighted(; alpha::Num_VecNum = 1,
                         fb::TDO_Option{<:OptE_Opt} = nothing,
                         strict::Bool = false)::RandomWeighted
     return RandomWeighted(alpha, rng, seed, wb, sets, wf, fb, strict)
+end
+function non_investable_universe(rw::RandomWeighted, ni::VecStr)::RandomWeighted
+    return rebuild_estimator(rw, (; sets = non_investable_sets(rw.sets, ni)))
 end
 function time_dependent_field_defaults(::RandomWeighted)::NamedTuple
     return (; wf = IterativeWeightFinaliser())

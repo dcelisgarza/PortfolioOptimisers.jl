@@ -604,3 +604,220 @@ end
     @test hrpo === hrp
     @test rdo === rdk
 end
+
+# The Non-Investable Axis, issue #911 and ADR 0124.
+#
+# Every name-keyed estimator but the fee is resolved AFTER the door, against a `sets` the
+# view has already narrowed. A name the caller stated over the universe they were given is
+# gone from it by then, so the term was dropped under `strict = false` and refused with an
+# `ArgumentError` under `strict = true` — on a name that was correct when it was written,
+# for a departure the caller could not foresee.
+#
+# The door now declares the departed names on the sets under `nikey`, after it takes the
+# view. Resolution finds them there and skips them in silence; a name on neither axis is
+# still refused, because that is what `strict` is for.
+
+@testset "The Non-Investable Axis is minted, validated, and dropped by a view" begin
+    # Bare and unique: a departure happens once, and an asset is investable or it is not.
+    @test_throws ArgumentError UniverseSets(;
+                                            dict = Dict("nx" => ["a", "b"],
+                                                        "ni" => ["c", "c"]))
+    @test_throws ArgumentError UniverseSets(;
+                                            dict = Dict("nx" => ["a", "b", "c"],
+                                                        "ni" => ["c"]))
+    # The seventh prefix joins the mutual-exclusion grammar.
+    @test_throws ArgumentError UniverseSets(; xkey = "ni", nikey = "n",
+                                            dict = Dict("ni" => ["a", "b"]))
+
+    sred = UniverseSets(; dict = Dict("nx" => nx[keep]))
+    # Minting declares the axis; an empty complement declares nothing, because nothing left.
+    smint = PortfolioOptimisers.non_investable_sets(sred, [nx[k]])
+    @test smint.dict["ni"] == [nx[k]]
+    @test smint.nikey == "ni"
+    @test PortfolioOptimisers.non_investable_sets(sred, String[]) === sred
+    @test isnothing(PortfolioOptimisers.non_investable_sets(nothing, [nx[k]]))
+    # The mask is the truth inside a door: a hand-authored axis is overwritten, not merged.
+    shand = UniverseSets(; dict = Dict("nx" => nx[keep], "ni" => ["zz"]))
+    @test PortfolioOptimisers.non_investable_sets(shand, [nx[k]]).dict["ni"] == [nx[k]]
+
+    # A view drops the axis, matched EXACTLY: only a door mints one, and a plain group whose
+    # name merely starts with the key is not swept away with it.
+    slook = UniverseSets(;
+                         dict = Dict("nx" => nx[keep], "ni" => [nx[k]],
+                                     "nikkei225" => ["a", "b"]))
+    sview = PortfolioOptimisers.port_opt_view(slook, [1, 2])
+    @test !haskey(sview.dict, "ni")
+    @test sview.dict["nikkei225"] == ["a", "b"]
+    @test sview.dict["nx"] == ["a", "b"]
+    @test sview.nikey == "ni"
+end
+
+@testset "A door declares the axis, and announces the departure once" begin
+    sets = UniverseSets(; dict = Dict("nx" => nx))
+    # The prior-fitting door.
+    opt = JuMPOptimiser(; pe = prn, sets = sets, slv = slv)
+    _, _, opto, _ = @test_logs (:info,) PortfolioOptimisers.investable_reduction(prn, opt,
+                                                                                 rd)
+    @test opto.sets.dict["ni"] == [nx[k]]
+    @test opto.sets.dict["nx"] == nx[keep]
+    # A head that reaches its sets through a nested optimiser is served by a forwarder.
+    hrp = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = prn, sets = sets))
+    _, _, hrpo, _ = PortfolioOptimisers.investable_reduction(prn, hrp, rd)
+    @test hrpo.opt.sets.dict["ni"] == [nx[k]]
+    # The all-investable path declares nothing and says nothing.
+    optf = JuMPOptimiser(; pe = prk, sets = UniverseSets(; dict = Dict("nx" => nx[keep])),
+                         slv = slv)
+    _, _, optfo, _ = PortfolioOptimisers.investable_reduction(prk, optf, rdk)
+    @test !haskey(optfo.sets.dict, "ni")
+    # The prior-free door is a door too: a Coverage Universe declares the axis as well.
+    Xc = collect(X)
+    Xc[:, k] .= NaN
+    rdc = ReturnsResult(; nx = nx, X = Xc)
+    ew = EqualWeighted(; sets = sets)
+    _, ewo, _ = PortfolioOptimisers.coverage_reduction(ew, rdc)
+    @test ewo.sets.dict["ni"] == [nx[k]]
+end
+
+@testset "A departed name resolves in silence, and a typo still refuses" begin
+    sets = UniverseSets(;
+                        dict = Dict("nx" => nx[keep], "ni" => [nx[k]],
+                                    "grp" => [nx[1], nx[k]]))
+    # The name is on the counterpart axis, so it is known-good rather than mistyped: no
+    # term is written, nothing is logged, and `strict` does not refuse.
+    @test PortfolioOptimisers.estimator_to_val(Dict(nx[k] => 0.5), sets, nothing, nothing;
+                                               strict = true) == zeros(length(keep))
+    # A group whose departed members are all accounted for is silent, and its live members
+    # still bind.
+    @test PortfolioOptimisers.estimator_to_val(Dict("grp" => 0.3), sets, nothing, nothing;
+                                               strict = true) == [0.3, 0.0, 0.0, 0.0]
+    # A name on neither axis is what `strict` exists for, and it is refused as before.
+    @test_throws ArgumentError PortfolioOptimisers.estimator_to_val(Dict("zz" => 0.5), sets,
+                                                                    nothing, nothing;
+                                                                    strict = true)
+    # The relation is symmetric: resolving ON the axis, a name that stayed is skipped.
+    @test PortfolioOptimisers.estimator_to_val(Dict(nx[k] => 0.5, nx[1] => 0.9), sets,
+                                               nothing, "ni"; strict = true) == [0.5]
+end
+
+@testset "A constraint naming a departed asset no longer refuses under strict" begin
+    # Resolution is what #911 is about, so each builder is asked directly, on the sets a
+    # door leaves. Under `strict = true` every one of these raised an `ArgumentError` on a
+    # name that was correct over the universe the caller was handed.
+    sred = UniverseSets(; dict = Dict("nx" => nx[keep], "ni" => [nx[k]]))
+    dep = Dict(nx[k] => 0.3)
+    wbr = weight_bounds_constraints(WeightBoundsEstimator(; lb = 0, ub = dep), sred;
+                                    N = length(keep), strict = true)
+    @test all(iszero, wbr.lb)
+    @test all(isone, wbr.ub)
+    thr = threshold_constraints(ThresholdEstimator(; val = dep), sred; strict = true)
+    @test all(iszero, thr.val)
+    tnr = turnover_constraints(TurnoverEstimator(; w = fill(0.2, length(keep)), val = dep),
+                               sred; strict = true)
+    @test all(iszero, tnr.val)
+    rkb = risk_budget_constraints(RiskBudgetEstimator(; val = dep), sred, "nx";
+                                  N = length(keep), strict = true)
+    @test length(rkb.val) == length(keep)
+    # The same names on the same sets, one of them mistyped, is still refused: `strict`
+    # keeps the job it exists for.
+    @test_throws ArgumentError weight_bounds_constraints(WeightBoundsEstimator(; lb = 0,
+                                                                               ub = Dict("zz" =>
+                                                                                             0.3)),
+                                                         sred; N = length(keep),
+                                                         strict = true)
+
+    # And end to end. The bound names the asset that leaves, `strict` is on, and the solve
+    # reaches the hand-reduced oracle rather than an `ArgumentError`.
+    sets = UniverseSets(; dict = Dict("nx" => nx))
+    oracle = optimise(MeanRisk(;
+                               opt = JuMPOptimiser(; pe = prk, slv = slv, bgt = 1,
+                                                   wb = WeightBounds(; lb = 0, ub = 1))),
+                      rdk)
+    opt = JuMPOptimiser(; pe = prn, sets = sets, slv = slv, strict = true, bgt = 1,
+                        wb = WeightBoundsEstimator(; lb = 0, ub = Dict(nx[k] => 0.3)))
+    res = optimise(MeanRisk(; opt = opt), rd)
+    @test length(res.w) == length(nx)
+    @test iszero(res.w[k])
+    @test isapprox(sum(res.w), 1; atol = 1e-8)
+    @test isapprox(res.w[keep], oracle.w; rtol = 1e-5)
+    optz = JuMPOptimiser(; pe = prn, sets = sets, slv = slv, strict = true, bgt = 1,
+                         wb = WeightBoundsEstimator(; lb = 0, ub = Dict("zz" => 0.3)))
+    @test_throws ArgumentError optimise(MeanRisk(; opt = optz), rd)
+end
+
+@testset "A precomputed linear constraint is refused by name, not by DimensionMismatch" begin
+    # `port_opt_view(::LinearConstraint, i)` is deliberately the identity, because position
+    # is the only link between a column of `A` and an asset. So the row survives the door at
+    # its original width and meets a shorter weight vector. Say so at the seam.
+    sets = UniverseSets(; dict = Dict("nx" => nx))
+    lc = LinearConstraint(;
+                          ineq = PartialLinearConstraint(; A = ones(1, length(nx)),
+                                                         B = [1.0]))
+    opt = JuMPOptimiser(; pe = prn, sets = sets, slv = slv, lcse = lc, bgt = 1,
+                        wb = WeightBounds(; lb = 0, ub = 1))
+    @test_throws DimensionMismatch optimise(MeanRisk(; opt = opt), rd)
+    # The same row over the universe the door leaves is not this failure, and passes.
+    lck = LinearConstraint(;
+                           ineq = PartialLinearConstraint(; A = ones(1, length(keep)),
+                                                          B = [1.0]))
+    PortfolioOptimisers.assert_investable_constraint_width(lck, length(keep), "lcse")
+    @test isnothing(PortfolioOptimisers.assert_investable_constraint_width(nothing,
+                                                                           length(keep),
+                                                                           "lcse"))
+end
+
+@testset "Every head that owns a sets declares the axis, and one that owns none is untouched" begin
+    # The verb is written per type, so every head that carries a `UniverseSets` needs its
+    # own line and the generic method must leave everything else alone. One assertion per
+    # method, because a head that silently keeps the caller's sets refuses the name that
+    # this whole path exists to accept.
+    sets = UniverseSets(; dict = Dict("nx" => nx[keep]))
+    ni = [nx[k]]
+    mrk = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
+    heads = (JuMPOptimiser(; pe = prk, sets = sets, slv = slv),
+             HierarchicalOptimiser(; pe = prk, sets = sets),
+             HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = prk, sets = sets)),
+             HierarchicalEqualRiskContribution(;
+                                               opt = HierarchicalOptimiser(; pe = prk,
+                                                                           sets = sets)),
+             SchurComplementHierarchicalRiskParity(;
+                                                   opt = HierarchicalOptimiser(; pe = prk,
+                                                                               sets = sets)),
+             NestedClustered(; pe = prk, sets = sets, opti = mrk, opto = mrk),
+             Stacking(; pe = prk, sets = sets, opti = [mrk], opto = mrk),
+             SubsetResampling(; pe = prk, sets = sets, opt = mrk),
+             InverseVolatility(; pe = prk, sets = sets), EqualWeighted(; sets = sets),
+             RandomWeighted(; sets = sets),
+             RiskBudgeting(; opt = JuMPOptimiser(; pe = prk, slv = slv),
+                           rba = AssetRiskBudgeting(; sets = sets)),
+             RelaxedRiskBudgeting(; opt = JuMPOptimiser(; pe = prk, slv = slv),
+                                  rba = AssetRiskBudgeting(; sets = sets)))
+    function head_sets(h)
+        return if hasproperty(h, :rba)
+            h.rba.sets
+        elseif hasproperty(h, :sets) && isa(getfield(h, :sets), UniverseSets)
+            h.sets
+        else
+            h.opt.sets
+        end
+    end
+    for h in heads
+        @test head_sets(PortfolioOptimisers.non_investable_universe(h, ni)).dict["ni"] == ni
+    end
+    # A head that carries no sets is returned untouched by the generic method.
+    @test PortfolioOptimisers.non_investable_universe(mrk, ni) === mrk
+    # And an unnamed returns result mints nothing, because names are what the axis is.
+    @test isempty(PortfolioOptimisers.non_investable_names(nothing, BitVector([1, 0, 1])))
+    # The vector method of the width guard walks its elements.
+    lck = LinearConstraint(;
+                           ineq = PartialLinearConstraint(; A = ones(1, length(keep)),
+                                                          B = [1.0]))
+    @test isnothing(PortfolioOptimisers.assert_investable_constraint_width([lck, lck],
+                                                                           length(keep),
+                                                                           "gcarde"))
+    lcn = LinearConstraint(;
+                           eq = PartialLinearConstraint(; A = ones(1, length(nx)),
+                                                        B = [1.0]))
+    @test_throws DimensionMismatch PortfolioOptimisers.assert_investable_constraint_width([lcn],
+                                                                                          length(keep),
+                                                                                          "gcarde")
+end

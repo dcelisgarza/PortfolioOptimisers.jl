@@ -2696,6 +2696,100 @@ function port_opt_view(::NonFiniteAllocationOptimisationResult, ::Any, args...)
     return throw(ArgumentError("a precomputed optimisation result cannot be viewed to an asset subset: its weights were solved over the full universe and a sub-portfolio of them has no defined meaning. A TimeDependent schedule holding precomputed results is therefore incompatible with asset-subsampling cross-validation (e.g. MultipleRandomised); use estimator entries there instead."))
 end
 """
+    non_investable_names(nx::Nothing, imsk::BitVector) -> VecStr
+    non_investable_names(nx::VecStr, imsk::BitVector) -> VecStr
+
+Read the names the Investable Mask leaves out, in the order the complement of the mask visits them.
+
+The order is the whole point. A forced-liquidation carrier is sliced to the complement of the mask by index, and the rate that prices it is resolved against these names by position, so the two must walk the complement the same way. Both do: this indexes `nx` with `.!imsk`, which is ascending, and [`port_opt_view`](@ref)`(::Fees, i, X)` takes the complement of `i` over the width of `X`, which is ascending too.
+
+Unnamed returns data answers an empty vector rather than throwing. Names are what the axis is made of, so a problem with no names has no Non-Investable Axis to mint — and no name-keyed constraint to resolve against one either.
+
+# Arguments
+
+  - `nx`: The asset names of the *unreduced* returns data, or `nothing`.
+  - $(arg_dict[:imsk])
+
+# Returns
+
+  - `ni::VecStr`: The names the mask leaves out, or an empty vector.
+
+# Related
+
+  - [`investable_mask`](@ref)
+  - [`non_investable_sets`](@ref)
+  - [`non_investable_universe`](@ref)
+  - [`investable_reduction`](@ref)
+"""
+function non_investable_names(::Nothing, ::BitVector)::VecStr
+    return String[]
+end
+function non_investable_names(nx::VecStr, imsk::BitVector)::VecStr
+    return nx[.!imsk]
+end
+"""
+    non_investable_universe(opt::AbstractOptimisationEstimator, ni::VecStr)
+    non_investable_universe(opt, ni::VecStr)
+
+Mint the Non-Investable Axis on the [`UniverseSets`](@ref) an optimisation estimator carries.
+
+A door calls this **after** it has viewed the estimator, and it is the only caller. Minting before the view would not survive it: [`port_opt_view`](@ref)`(::UniverseSets, i)` drops the axis, precisely so that a cluster of a nested optimisation cannot inherit its parent's departures and charge every one of them again. So the door reads the departed names off the *unreduced* returns data, takes the view, and declares the axis on what comes back.
+
+The generic method returns `opt` untouched, and it is the right answer for every estimator that carries no sets: there is no axis to declare one on. A head that owns a `sets` field writes one method beside its own [`port_opt_view`](@ref), and a head that reaches one through a nested optimiser forwards to that optimiser's method. Both are one line, and they are written per type rather than derived by reflection for the reason [`port_opt_view`](@ref) is: a field's meaning is the type's to state.
+
+# Arguments
+
+  - `opt`: The optimisation estimator, already reduced to the Investable Mask.
+  - `ni`: The names the mask left out, from [`non_investable_names`](@ref).
+
+# Returns
+
+  - `opt`: The estimator, carrying the Non-Investable Axis where it carries a [`UniverseSets`](@ref).
+
+# Related
+
+  - [`non_investable_sets`](@ref)
+  - [`non_investable_names`](@ref)
+  - [`investable_reduction`](@ref)
+  - [`coverage_reduction`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+function non_investable_universe(opt, ::VecStr)
+    return opt
+end
+"""
+    announce_non_investable(ni::VecStr) -> Nothing
+
+Announce, once per door, the assets that left the investable universe.
+
+The door is the only place that knows a departure happened *as an event* rather than as a shape. Downstream, a departed asset is simply absent: a constraint stated for it resolves on the Non-Investable Axis and is skipped in silence, because the name was correct when the caller wrote it and no caller can foresee which asset a prior will fail to estimate. Reporting that per constraint would say the same thing several times over and offer nothing to act on, so it is said once, here, and every per-name diagnostic downstream stays quiet.
+
+It is `@info`, not a warning and not a [`strict_diagnostic`](@ref). Nothing is wrong: the data moved, and the optimisation is proceeding correctly over what is left. Making it raise under `strict` would put back the refusal this whole path exists to remove.
+
+An empty `ni` says nothing at all, which is the all-investable path and the unnamed-data path alike.
+
+# Arguments
+
+  - `ni`: The names the Investable Mask left out.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`non_investable_names`](@ref)
+  - [`investable_reduction`](@ref)
+  - [`coverage_reduction`](@ref)
+"""
+function announce_non_investable(ni::VecStr)::Nothing
+    if isempty(ni)
+        return nothing
+    end
+    @info("$(length(ni)) asset(s) left the investable universe and are excluded from this optimisation: $(ni). A constraint, bound or rate stated for one of them is dropped, and a forced-liquidation carrier is priced over them.")
+    return nothing
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Derive the Investable Mask of a fitted prior, and reduce the prior, the optimiser and the returns data to the assets it keeps.
@@ -2714,7 +2808,9 @@ The mask rides as a `BitVector` because the expansion needs the length of the fu
 
  1. Derive the Investable Mask from the fitted prior with [`investable_mask`](@ref).
  2. Return the mask, the prior, the optimiser and the returns data unchanged when the mask is `nothing`.
- 3. Otherwise return the mask beside a [`port_opt_view`](@ref) of each of the three at `findall(imsk)`.
+ 3. Otherwise read the departed names off the *unreduced* `rd.nx` with [`non_investable_names`](@ref), and announce them once with [`announce_non_investable`](@ref).
+ 4. Take a [`port_opt_view`](@ref) of each of the three at `findall(imsk)`.
+ 5. Declare the Non-Investable Axis on the viewed optimiser with [`non_investable_universe`](@ref), and return it beside the mask and the other two views. The axis is declared after the view because the view drops one, so a name-keyed constraint stated for a departed asset resolves here and nowhere deeper.
 
 # Arguments
 
@@ -2731,6 +2827,9 @@ The mask rides as a `BitVector` because the expansion needs the length of the fu
   - [`investable_mask`](@ref)
   - [`expand_investable_weights`](@ref)
   - [`port_opt_view`](@ref)
+  - [`non_investable_names`](@ref)
+  - [`non_investable_universe`](@ref)
+  - [`announce_non_investable`](@ref)
 """
 function investable_reduction(pr::AbstractPriorResult, opt::AbstractOptimisationEstimator,
                               rd::ReturnsResult)
@@ -2743,7 +2842,13 @@ end
 function investable_reduction(imsk::BitVector, pr::AbstractPriorResult,
                               opt::AbstractOptimisationEstimator, rd::ReturnsResult)
     idx = findall(imsk)
-    return imsk, port_opt_view(pr, idx), port_opt_view(opt, idx, pr.X),
+    # Read the departed names before the view, declare them after it: the view drops the
+    # Non-Investable Axis, so this door is the one place a name-keyed constraint stated
+    # for an asset that left can still be resolved.
+    ni = non_investable_names(rd.nx, imsk)
+    announce_non_investable(ni)
+    return imsk, port_opt_view(pr, idx),
+           non_investable_universe(port_opt_view(opt, idx, pr.X), ni),
            port_opt_view(rd, idx)
 end
 """
@@ -2763,7 +2868,7 @@ An all-dead window throws an `IsEmptyError` where the mask is derived, so the re
 
  1. Derive the Coverage Universe of `rd.X` and `rd.pnl` with [`coverage_mask`](@ref).
  2. Return the mask, the optimiser and the returns data unchanged when the mask is `nothing`.
- 3. Otherwise return the mask beside a [`port_opt_view`](@ref) of each of the two at `findall(cmsk)`.
+ 3. Otherwise read the departed names with [`non_investable_names`](@ref), announce them once with [`announce_non_investable`](@ref), take a [`port_opt_view`](@ref) of each of the two at `findall(cmsk)`, and declare the Non-Investable Axis on the viewed optimiser with [`non_investable_universe`](@ref).
 
 # Arguments
 
@@ -2798,7 +2903,13 @@ end
 function coverage_reduction(cmsk::BitVector, opt::AbstractOptimisationEstimator,
                             rd::ReturnsResult)
     idx = findall(cmsk)
-    return cmsk, port_opt_view(opt, idx, rd.X), port_opt_view(rd, idx)
+    # A door is a door: the Coverage Universe and the Investable Mask are the same object
+    # downstream, so a prior-free head declares the Non-Investable Axis exactly as a
+    # prior-fitting one does, and a departure behaves the same in every family.
+    ni = non_investable_names(rd.nx, cmsk)
+    announce_non_investable(ni)
+    return cmsk, non_investable_universe(port_opt_view(opt, idx, rd.X), ni),
+           port_opt_view(rd, idx)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

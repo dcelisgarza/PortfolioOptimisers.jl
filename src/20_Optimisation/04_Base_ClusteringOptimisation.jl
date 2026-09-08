@@ -584,6 +584,9 @@ function HierarchicalOptimiser(; pe::TD{<:PrE_Pr} = EmpiricalPrior(),
                                strict::Bool = false)::HierarchicalOptimiser
     return HierarchicalOptimiser(pe, cle, slv, wb, fees, sets, wf, brt, x_src, strict)
 end
+function non_investable_universe(opt::HierarchicalOptimiser, ni::VecStr)
+    return rebuild_estimator(opt, (; sets = non_investable_sets(opt.sets, ni)))
+end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 

@@ -393,6 +393,10 @@ function port_opt_view(rrb::RelaxedRiskBudgeting, i, X::MatNum,
     wi = nothing_scalar_array_view(rrb.wi, i)
     return RelaxedRiskBudgeting(; opt = opt, rba = rba, wi = wi, alg = rrb.alg, fb = rrb.fb)
 end
+function non_investable_universe(rrb::RelaxedRiskBudgeting,
+                                 ni::VecStr)::RelaxedRiskBudgeting
+    return rebuild_estimator(rrb, (; rba = non_investable_universe(rrb.rba, ni)))
+end
 """
     set_relaxed_risk_budgeting_alg_constraints!(alg, model, w, sigma, chol)
 

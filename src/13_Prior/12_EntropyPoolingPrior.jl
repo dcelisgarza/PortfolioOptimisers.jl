@@ -3291,6 +3291,7 @@ EntropyPoolingPrior
               │   utfkey ┼ String: "uf"
               │    cfkey ┼ String: "ncf"
               │   ucfkey ┼ String: "ucf"
+              │    nikey ┼ String: "ni"
               │     dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
           opt ┼ OptimEntropyPooling
               │     args ┼ Tuple{}: ()

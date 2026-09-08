@@ -481,6 +481,9 @@ function port_opt_view(sr::SubsetResampling, i, X::MatNum, args...)::SubsetResam
                             n_subsets = sr.n_subsets, max_comb = sr.max_comb, rng = sr.rng,
                             seed = sr.seed, fb = sr.fb, brt = sr.brt, strict = sr.strict)
 end
+function non_investable_universe(sr::SubsetResampling, ni::VecStr)::SubsetResampling
+    return rebuild_estimator(sr, (; sets = non_investable_sets(sr.sets, ni)))
+end
 """
     subset_resampling_retcode(ress::VecOpt, retcode::OptimisationReturnCode)
 

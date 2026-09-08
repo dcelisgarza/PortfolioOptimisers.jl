@@ -327,6 +327,9 @@ function port_opt_view(hec::HierarchicalEqualRiskContribution, i, X::MatNum,
     return HierarchicalEqualRiskContribution(; ri = ri, ro = ro, opt = opt, scai = hec.scai,
                                              scao = hec.scao, ex = hec.ex, fb = hec.fb)
 end
+function non_investable_universe(hec::HierarchicalEqualRiskContribution, ni::VecStr)
+    return rebuild_estimator(hec, (; opt = non_investable_universe(hec.opt, ni)))
+end
 """
     herc_scalarised_risk_o!(sca::Scalariser, wk::VecNum, roku::VecNum_MatNum,
                             rkbo::VecNum, cl::VecInt, ros::VecOptRM, X::MatNum,

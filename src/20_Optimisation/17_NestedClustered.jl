@@ -700,6 +700,9 @@ function port_opt_view(nco::NestedClustered, i, X::MatNum, args...)
                            fb = nco.fb, brt = nco.brt, x_src = nco.x_src,
                            strict = nco.strict)
 end
+function non_investable_universe(nco::NestedClustered, ni::VecStr)::NestedClustered
+    return rebuild_estimator(nco, (; sets = non_investable_sets(nco.sets, ni)))
+end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 

@@ -244,7 +244,13 @@ function investable_view(optimiser::JuMPOptimisationEstimator, rd::ReturnsResult
                          pr::AbstractPriorResult, imsk::BitVector)
     X = isnothing(rd.X) ? pr.X : rd.X
     idx = findall(imsk)
-    return port_opt_view(optimiser, idx, X), port_opt_view(rd, idx)
+    # The head takes the same view of itself that the bundle's door took of the optimiser,
+    # so it declares the Non-Investable Axis on whatever sets it carries — a risk budget
+    # keyed by name is resolved from here, after this view. It stays quiet: the door has
+    # already announced the departure, and one event is reported once.
+    return non_investable_universe(port_opt_view(optimiser, idx, X),
+                                   non_investable_names(rd.nx, imsk)),
+           port_opt_view(rd, idx)
 end
 function expand_investable_weights(::Nothing, sol::JuMPOptSol_VecJuMPOptSol)
     return sol
@@ -1163,6 +1169,9 @@ function port_opt_view(opt::JuMPOptimiser, i, X::MatNum, args...)::JuMPOptimiser
                          l1 = opt.l1, l2 = opt.l2, lp = opt.lp, linf = opt.linf,
                          brt = opt.brt, x_src = opt.x_src, strict = opt.strict)
 end
+function non_investable_universe(opt::JuMPOptimiser, ni::VecStr)::JuMPOptimiser
+    return rebuild_estimator(opt, (; sets = non_investable_sets(opt.sets, ni)))
+end
 """
     assert_universe_axis_order(sets::Option{<:UniverseSets}, rd::ReturnsResult) -> Nothing
 
@@ -1262,6 +1271,15 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
                                  x_src = opt.x_src, strict = opt.strict, kwargs...)
     gcardr = linear_constraints(opt.gcarde, opt.sets; datatype = Int, strict = opt.strict)
     sgcardr = linear_constraints(opt.sgcarde, opt.sets; datatype = Int, strict = opt.strict)
+    # A name-keyed estimator follows the door: a name that left resolves on the
+    # Non-Investable Axis. A precomputed constraint cannot, because its `A` is bound to its
+    # columns by position. Say so here rather than let the model meet two numbers.
+    if !isnothing(imsk)
+        N = size(X, 2)
+        assert_investable_constraint_width(lcsr, N, "lcse")
+        assert_investable_constraint_width(gcardr, N, "gcarde")
+        assert_investable_constraint_width(sgcardr, N, "sgcarde")
+    end
     if opt.smtx === opt.sgmtx
         smtx = sgmtx = asset_sets_matrix(opt.smtx, opt.sets)
     else

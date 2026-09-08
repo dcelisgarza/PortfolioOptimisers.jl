@@ -257,6 +257,10 @@ function port_opt_view(hrp::HierarchicalRiskParity, i, X::MatNum,
     opt = port_opt_view(hrp.opt, i, X)
     return HierarchicalRiskParity(; r = r, opt = opt, sca = hrp.sca, fb = hrp.fb)
 end
+function non_investable_universe(hrp::HierarchicalRiskParity,
+                                 ni::VecStr)::HierarchicalRiskParity
+    return rebuild_estimator(hrp, (; opt = non_investable_universe(hrp.opt, ni)))
+end
 """
     split_factor_weight_constraints(alpha::Number, wb::WeightBounds, w::VecNum,
                                     lc::VecNum, rc::VecNum) -> Number

@@ -169,7 +169,7 @@
 "src/11_Phylogeny/23_CentralityQueries.jl" = { map = 4, units = 5, algorithm = 3, swept = true }
 "src/11_Phylogeny/24_AssetPhylogeny.jl" = { map = 4, units = 3, algorithm = 2, swept = true }
 "src/12_ConstraintGeneration/01_Base_ConstraintGeneration.jl" = { map = 5, units = 6, algorithm = 2, swept = true }
-"src/12_ConstraintGeneration/02_LinearConstraintGeneration.jl" = { map = 5, units = 50, algorithm = 29, swept = true }
+"src/12_ConstraintGeneration/02_LinearConstraintGeneration.jl" = { map = 5, units = 53, algorithm = 29, swept = false }
 "src/12_ConstraintGeneration/03_RiskBudgetConstraintGeneration.jl" = { map = 5, units = 7, algorithm = 4, swept = true }
 "src/12_ConstraintGeneration/04_PhylogenyConstraintGeneration.jl" = { map = 5, units = 22, algorithm = 2, swept = true }
 "src/12_ConstraintGeneration/05_WeightBoundsConstraintGeneration.jl" = { map = 5, units = 11, algorithm = 7, swept = true }
@@ -236,7 +236,7 @@
 "src/19_RiskMeasures/26_AdjustRiskContributions.jl" = { map = 9, units = 6, swept = false }
 "src/19_RiskMeasures/27_ExpectedRisk.jl" = { map = 9, units = 22, swept = false }
 "src/19_RiskMeasures/28_RiskMeasureTools.jl" = { map = 9, units = 7, swept = false }
-"src/20_Optimisation/01_Base_Optimisation.jl" = { map = 10, units = 122, swept = false }
+"src/20_Optimisation/01_Base_Optimisation.jl" = { map = 10, units = 125, swept = false }
 "src/20_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl" = { map = 12, units = 61, swept = false }
 "src/20_Optimisation/02_CrossValidation/02_KFold.jl" = { map = 12, units = 4, swept = false }
 "src/20_Optimisation/02_CrossValidation/03_Combinatorial.jl" = { map = 12, units = 12, swept = false }

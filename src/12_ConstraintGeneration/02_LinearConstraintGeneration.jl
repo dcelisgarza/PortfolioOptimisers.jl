@@ -565,7 +565,7 @@ Declares the universes a portfolio problem is written against, and any groupings
 
 Constraint generation and the estimator routines read it to expand group references, to map a group name to its member list, and to validate membership.
 
-It **declares every axis it carries**: `xkey`/`uxkey` for assets, `tfkey`/`utfkey` for time-series factors, and `cfkey`/`ucfkey` for cross-sectional factors. Assets are the *primary* axis — `haskey(dict, xkey)` is required, and it is the axis a view slices. The factor axes are **optional**: requiring either would invalidate every sets object built for a problem with no factor model, so a consumer that needs one and does not find it throws at the point of need rather than at construction.
+It **declares every axis it carries**: `xkey`/`uxkey` for assets, `tfkey`/`utfkey` for time-series factors, `cfkey`/`ucfkey` for cross-sectional factors, and `nikey` for the Non-Investable Axis. Assets are the *primary* axis — `haskey(dict, xkey)` is required, and it is the axis a view slices. The factor axes are **optional**: requiring either would invalidate every sets object built for a problem with no factor model, so a consumer that needs one and does not find it throws at the point of need rather than at construction.
 
 There are **two factor axes** because the two factor families name different things. A time-series regression fits one loading vector per asset over the observations, so its factors are the columns of `rd.F` and a caller copies `rd.nf` into the dict under `tfkey`. A cross-sectional regression fits one loading vector per observation across the assets, so its factors are the exposures the fit was built from, and they exist only inside the fitted block. One axis carrying both would make a single key mean two different lists on one problem. A consumer never chooses between them by hand: [`factor_axis_key`](@ref) reads the key off the loadings result it already holds.
 
@@ -577,7 +577,9 @@ The `tfkey`/`utfkey` prefixes mean the same thing on the time-series factor axis
 
 A taxonomy reaches the Asset Panel through [`panel_input`](@ref), which reads one `xkey`-prefixed key as one Panel Field. The panel names its own columns, so no key declares a feature axis.
 
-A key matching none of the six prefixes is a plain group: expanded by name and **axis-blind**, which is why a factor group needs no machinery of its own.
+`nikey` declares the **Non-Investable Axis**: the names the Investable Mask left out, which is the axis a forced liquidation is priced on. It is unlike the other six in three ways, and each is deliberate. It is **minted, not authored** — a door writes it after it reduces an optimiser to the Investable Mask, so a caller who states one by hand is overwritten there; authoring one is still the way to resolve a liquidation rate outside a door. It is **dropped by every view**, so a sets that carries it was reduced by exactly one door for exactly one problem, and a cluster of a nested optimisation can never inherit its parent's departures and charge them again. And it is **bare** — no prefixed partition and no unique-entry twin — because its entries are unique by construction, and a plain group already reaches it.
+
+A key matching none of the seven prefixes is a plain group: expanded by name and **axis-blind**, which is why a factor group needs no machinery of its own, and why a group resolves on the Non-Investable Axis with no `nikey`-prefixed machinery at all.
 
 # Fields
 
@@ -592,6 +594,7 @@ $(DocStringExtensions.FIELDS)
         utfkey::AbstractString = "uf",
         cfkey::AbstractString = "ncf",
         ucfkey::AbstractString = "ucf",
+        nikey::AbstractString = "ni",
         dict::AbstractDict{<:AbstractString, <:Any}
     ) -> UniverseSets
 
@@ -601,13 +604,14 @@ Keywords correspond to the struct's fields.
 
   - `!isempty(dict)`.
   - `haskey(dict, xkey)`.
-  - No two of `xkey`, `uxkey`, `tfkey`, `utfkey`, `cfkey`, `ucfkey` may be a prefix of one another (30 ordered checks, which also rules out any two being equal).
+  - No two of `xkey`, `uxkey`, `tfkey`, `utfkey`, `cfkey`, `ucfkey`, `nikey` may be a prefix of one another (42 ordered checks, which also rules out any two being equal).
   - If a key in `dict` starts with the same value as `xkey`, `length(dict[k]) == length(dict[xkey])`.
   - If a key in `dict` starts with the same value as `uxkey`, there must be a corresponding key in `dict` where the `uxkey` prefix is replaced by the `xkey` prefix, and its length must equal `length(dict[xkey])`.
   - If a key in `dict` starts with the same value as `tfkey`, `haskey(dict, tfkey)` and `length(dict[k]) == length(dict[tfkey])`.
   - If a key in `dict` starts with the same value as `utfkey`, there must be a corresponding key in `dict` where the `utfkey` prefix is replaced by the `tfkey` prefix, and its length must equal `length(dict[tfkey])`.
   - If a key in `dict` starts with the same value as `cfkey`, `haskey(dict, cfkey)` and `length(dict[k]) == length(dict[cfkey])`.
   - If a key in `dict` starts with the same value as `ucfkey`, there must be a corresponding key in `dict` where the `ucfkey` prefix is replaced by the `cfkey` prefix, and its length must equal `length(dict[cfkey])`.
+  - If `dict` carries `nikey`, its entries are unique, and none of them is also in `dict[xkey]`. An asset is investable or it is not, and a name on both axes would be priced twice — once as a holding and once as a forced exit.
 
 ## View parameters
 
@@ -616,7 +620,8 @@ Keywords correspond to the struct's fields.
   - The method reads the asset index alone. It drops every further positional argument, because no axis but the asset axis is sliced.
   - Every `xkey`-prefixed entry of `dict` is sliced to the selected assets, and every `uxkey`-prefixed entry is rebuilt from the sliced partition it names.
   - The `tfkey`-, `utfkey`-, `cfkey`- and `ucfkey`-prefixed entries, and every plain group, are carried through unchanged. [`port_opt_view`](@ref) states why each axis is exempt.
-  - The six key prefixes are carried through unchanged, so the viewed value declares the same axes as the original.
+  - The `nikey` entry is **dropped**, because only a door mints one. The key itself is matched exactly rather than by prefix, so a plain group whose name merely starts with it survives.
+  - The seven key prefixes are carried through unchanged, so the viewed value declares the same axes as the original.
 
 # Examples
 
@@ -629,6 +634,7 @@ UniverseSets
   utfkey ┼ String: "uf"
    cfkey ┼ String: "ncf"
   ucfkey ┼ String: "ucf"
+   nikey ┼ String: "ni"
     dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"], "group1" => ["A", "B"])
 ```
 
@@ -670,24 +676,36 @@ UniverseSets
     """
     ucfkey
     """
+    $(field_dict[:us_nikey])
+    """
+    nikey
+    """
     $(field_dict[:dict])
     """
     dict
     function UniverseSets(xkey::AbstractString, uxkey::AbstractString,
                           tfkey::AbstractString, utfkey::AbstractString,
                           cfkey::AbstractString, ucfkey::AbstractString,
+                          nikey::AbstractString,
                           dict::AbstractDict{<:AbstractString, <:Any})::UniverseSets
         @argcheck(!isempty(dict), IsEmptyError)
         @argcheck(haskey(dict, xkey),
-                  KeyError("$xkey (the asset universe), required by UniverseSets. The asset axis is the one mandatory axis: correct the spelling$(suggest_declared_key(xkey, unclaimed_sets_keys(dict, (uxkey, tfkey, utfkey, cfkey, ucfkey)))), pass `xkey = <the key you wrote>`, or add `$xkey => <asset names>` to `dict`."))
-        knames = ("xkey", "uxkey", "tfkey", "utfkey", "cfkey", "ucfkey")
-        kvals = (xkey, uxkey, tfkey, utfkey, cfkey, ucfkey)
+                  KeyError("$xkey (the asset universe), required by UniverseSets. The asset axis is the one mandatory axis: correct the spelling$(suggest_declared_key(xkey, unclaimed_sets_keys(dict, (uxkey, tfkey, utfkey, cfkey, ucfkey, nikey)))), pass `xkey = <the key you wrote>`, or add `$xkey => <asset names>` to `dict`."))
+        knames = ("xkey", "uxkey", "tfkey", "utfkey", "cfkey", "ucfkey", "nikey")
+        kvals = (xkey, uxkey, tfkey, utfkey, cfkey, ucfkey, nikey)
         for i in eachindex(kvals), j in eachindex(kvals)
             i == j && continue
             @argcheck(!startswith(kvals[i], kvals[j]),
                       ArgumentError("$(knames[i]) ($(kvals[i])) must not start with $(knames[j]) ($(kvals[j]))"))
         end
-        for k in setdiff(keys(dict), (xkey, tfkey, cfkey))
+        if haskey(dict, nikey)
+            ni = dict[nikey]
+            @argcheck(allunique(ni),
+                      ArgumentError("the non-investable axis `$nikey` names an asset twice. A departure happens once, so a repeated name would price one forced exit more than once: deduplicate `dict[$nikey]`."))
+            @argcheck(isdisjoint(ni, dict[xkey]),
+                      ArgumentError("$(length(intersect(ni, dict[xkey]))) name(s) are on both the asset universe `$xkey` and the non-investable axis `$nikey`. An asset is investable or it is not, and a name on both would be priced twice, once as a holding and once as a forced exit: remove it from whichever axis it does not belong to."))
+        end
+        for k in setdiff(keys(dict), (xkey, tfkey, cfkey, nikey))
             if startswith(k, xkey)
                 @argcheck(length(dict[k]) == length(dict[xkey]),
                           DimensionMismatch("the asset partition `$k` and the asset universe `$xkey` disagree on how many assets there are. Got\nlength(dict[$k]) => $(length(dict[k]))\nlength(dict[$xkey]) => $(length(dict[xkey]))"))
@@ -708,15 +726,20 @@ UniverseSets
             end
         end
         return new{typeof(xkey), typeof(uxkey), typeof(tfkey), typeof(utfkey),
-                   typeof(cfkey), typeof(ucfkey), typeof(dict)}(xkey, uxkey, tfkey, utfkey,
-                                                                cfkey, ucfkey, dict)
+                   typeof(cfkey), typeof(ucfkey), typeof(nikey), typeof(dict)}(xkey, uxkey,
+                                                                               tfkey,
+                                                                               utfkey,
+                                                                               cfkey,
+                                                                               ucfkey,
+                                                                               nikey, dict)
     end
 end
 function UniverseSets(; xkey::AbstractString = "nx", uxkey::AbstractString = "ux",
                       tfkey::AbstractString = "nf", utfkey::AbstractString = "uf",
                       cfkey::AbstractString = "ncf", ucfkey::AbstractString = "ucf",
+                      nikey::AbstractString = "ni",
                       dict::AbstractDict{<:AbstractString, <:Any})::UniverseSets
-    return UniverseSets(xkey, uxkey, tfkey, utfkey, cfkey, ucfkey, dict)
+    return UniverseSets(xkey, uxkey, tfkey, utfkey, cfkey, ucfkey, nikey, dict)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -730,8 +753,9 @@ The asset axis is the only axis this view slices, and the other three are exempt
  1. Read `xkey` and `uxkey` from `sets`, and open an empty dictionary `dict` of the type `sets.dict` has.
  2. For an entry of `sets.dict` whose key starts with `xkey`, take `view(v, i)`, the group restricted to the selected assets.
  3. For an entry whose key starts with `uxkey`, take the unique entries of the `xkey`-prefixed partition it names, restricted to `i`. The unique-entry group is therefore derived from the sliced partition and never from the original one.
- 4. Carry every other entry through unchanged, into the same `dict`. The `tfkey`-, `utfkey`-, `cfkey`- and `ucfkey`-prefixed entries, and every plain group, come back bit-identical.
- 5. Return the [`UniverseSets`](@ref) built from `dict` and the seven unchanged key prefixes, which revalidates the prefix grammar over the viewed universe.
+ 4. Skip the `nikey` entry, matched **exactly**. Only a door mints the Non-Investable Axis, so a view never carries one: a cluster of a nested optimisation would otherwise inherit its parent's departures and charge every one of them again, once per cluster. The match is exact rather than by prefix so that a plain group whose name merely starts with `nikey` — `"nikkei225"` under the default `"ni"` — is not silently dropped with it.
+ 5. Carry every other entry through unchanged, into the same `dict`. The `tfkey`-, `utfkey`-, `cfkey`- and `ucfkey`-prefixed entries, and every plain group, come back bit-identical.
+ 6. Return the [`UniverseSets`](@ref) built from `dict` and the eight unchanged key prefixes, which revalidates the prefix grammar over the viewed universe.
 
 # Arguments
 
@@ -751,18 +775,68 @@ The asset axis is the only axis this view slices, and the other three are exempt
 function port_opt_view(sets::UniverseSets, i, args...)::UniverseSets
     xkey = sets.xkey
     uxkey = sets.uxkey
+    nikey = sets.nikey
     dict = typeof(sets.dict)()
     for (k, v) in sets.dict
         if startswith(k, xkey)
             v = view(v, i)
         elseif startswith(k, uxkey)
             v = unique(view(sets.dict[xkey * chopprefix(k, uxkey)], i))
+        elseif k == nikey
+            continue
         end
         push!(dict, k => v)
     end
     return UniverseSets(; xkey = xkey, uxkey = uxkey, tfkey = sets.tfkey,
                         utfkey = sets.utfkey, cfkey = sets.cfkey, ucfkey = sets.ucfkey,
-                        dict = dict)
+                        nikey = nikey, dict = dict)
+end
+"""
+    non_investable_sets(sets::Nothing, ni) -> Nothing
+    non_investable_sets(sets::UniverseSets, ni::VecStr) -> UniverseSets
+
+Mint the Non-Investable Axis on `sets`: declare `ni`, the names the Investable Mask left out, under `sets.nikey`.
+
+This is the **only** way the axis comes to exist. A door calls it after it has reduced an optimiser to the Investable Mask, so a [`UniverseSets`](@ref) that carries the axis was reduced by exactly one door, for exactly one problem, and [`port_opt_view`](@ref) drops it rather than pass it to a sub-problem that did not earn it.
+
+A caller may still declare the axis by hand, and outside a door that is the only way to resolve a forced-liquidation rate — [`fees_constraints`](@ref) called directly, with no optimisation around it. Inside a door the mask is the truth, so a hand-authored entry is **overwritten** here rather than merged: the two can only disagree, and the mask is the one derived from the data.
+
+An empty `ni` returns `sets` untouched. Nothing left the universe, so nothing is owed, and declaring an empty axis would make [`fees_constraints`](@ref) resolve a carrier that prices no position.
+
+# Algorithm
+
+ 1. Return `sets` unchanged when `ni` is empty.
+ 2. Otherwise copy `sets.dict`, write `ni` under `sets.nikey`, and rebuild the [`UniverseSets`](@ref) from it and the seven unchanged key prefixes, which revalidates uniqueness and disjointness over the minted axis.
+
+# Arguments
+
+  - `sets`: The [`UniverseSets`](@ref) to mint the axis on, or `nothing`.
+  - `ni`: The names the Investable Mask left out, in the order the complement of the mask visits them.
+
+# Returns
+
+  - `sets`: The [`UniverseSets`](@ref) carrying the Non-Investable Axis, or `nothing`.
+
+# Related
+
+  - [`UniverseSets`](@ref)
+  - [`port_opt_view`](@ref)
+  - [`investable_reduction`](@ref)
+  - [`coverage_reduction`](@ref)
+  - [`fees_constraints`](@ref)
+"""
+function non_investable_sets(::Nothing, ::Any)
+    return nothing
+end
+function non_investable_sets(sets::UniverseSets, ni::VecStr)::UniverseSets
+    if isempty(ni)
+        return sets
+    end
+    dict = copy(sets.dict)
+    dict[sets.nikey] = ni
+    return UniverseSets(; xkey = sets.xkey, uxkey = sets.uxkey, tfkey = sets.tfkey,
+                        utfkey = sets.utfkey, cfkey = sets.cfkey, ucfkey = sets.ucfkey,
+                        nikey = sets.nikey, dict = dict)
 end
 """
     factor_universe(sets::UniverseSets, key::AbstractString, K::Integer,
@@ -851,19 +925,62 @@ function factor_axis_key(sets::UniverseSets, ::AbstractTimeSeriesRegressionEstim
     return sets.tfkey
 end
 """
+    counterpart_axis_names(sets::UniverseSets, nxkey::AbstractString) -> VecStr
+
+Return the asset axis that `nxkey` is the counterpart of, or an empty vector when it has none.
+
+[`UniverseSets`](@ref) declares two axes over assets: the investable universe under `xkey`, and the Non-Investable Axis under `nikey`, which a door mints from the complement of the Investable Mask. A name-keyed estimator resolves against one of them, and a name it does not find there may still be a perfectly good name on the other — a bound stated for an asset that has since left, or a forced-liquidation rate stated for one that stayed. [`name_to_val!`](@ref) needs that list to tell such a name from a typo, and this is where the pairing is written down.
+
+The relation is symmetric and covers only these two. A factor axis names factors, so no asset name is ever a departed factor and the answer is empty; a caller-supplied `key` naming some other list is treated the same way.
+
+An axis that `sets` does not declare answers empty, which is the common case: a problem in which every asset is investable carries no `nikey` entry at all.
+
+# Arguments
+
+  - `sets`: The [`UniverseSets`](@ref) whose axes are read.
+  - `nxkey`: The key of the axis being resolved against.
+
+# Returns
+
+  - `other::VecStr`: The counterpart axis, or an empty vector.
+
+# Related
+
+  - [`UniverseSets`](@ref)
+  - [`name_to_val!`](@ref)
+  - [`estimator_to_val`](@ref)
+  - [`non_investable_sets`](@ref)
+"""
+function counterpart_axis_names(sets::UniverseSets, nxkey::AbstractString)::VecStr
+    key = if nxkey == sets.xkey
+        sets.nikey
+    elseif nxkey == sets.nikey
+        sets.xkey
+    else
+        return String[]
+    end
+    return get(sets.dict, key, String[])
+end
+"""
     name_to_val!(nx::VecStr, sdict::AbstractDict, key::Any, val::Number,
-                 arr::VecNum, strict::Bool, nxkey::AbstractString)
+                 arr::VecNum, strict::Bool, nxkey::AbstractString,
+                 other::VecStr = String[])
 
 Set values in a vector for the asset or the group of assets that `key` names.
 
 `name_to_val!` resolves `key` through [`resolve_axis_name`](@ref) — an asset name resolves to itself, a group name expands to its members — maps the result to indices in the asset universe `nx`, and sets the corresponding entries of `arr` to `val`. If `key` names neither, the function either throws an error or issues a warning, depending on the `strict` flag. Every diagnostic message names the *size* of the universe and never the universe itself or the input value dictionary, because each is routed through a shared message builder in `01_Base/06_Messages.jl`.
 
+`other` is the **counterpart axis**: the asset names that this call is not resolving against, but that the same [`UniverseSets`](@ref) declares. A name found there is **skipped in silence**, under `strict` or not, and that is the whole of what `strict` gives up. `strict` exists to catch a caller's typo, and a name on the counterpart axis is the opposite of a typo: it was a correct name over the universe the caller was given, and the data moved it. A caller cannot know in advance which asset a prior will fail to estimate, so refusing them — or even warning, once per constraint, per window of a walk-forward — reports something no one can act on. The departure itself is announced once, by the door that derived the mask.
+
+The two asset axes are counterparts of each other, and the relation is symmetric. Resolving on the asset universe, `other` is the Non-Investable Axis, so a bound stated for an asset that left is dropped. Resolving on the Non-Investable Axis — which is how a forced-liquidation rate is priced — `other` is the asset universe, so a liquidation rate stated for an asset that stayed is dropped by the same rule. A factor axis has no counterpart, and `other` is then empty.
+
 # Algorithm
 
  1. Resolve `key` through [`resolve_axis_name`](@ref), giving `members`. An asset name resolves to itself, and a group name expands to a copy of its member list. An asset name takes precedence over a group name of the same spelling.
- 2. Report through [`strict_diagnostic`](@ref) and return when `members` is `nothing`, because `key` names neither an asset nor a group. The suggestion pool is widened from `nx` to `nx` together with the keys of `sdict`, because a missing name may be a mistyped asset or a mistyped group.
- 3. Map `members` to positions in `nx` with [`axis_name_indices`](@ref), giving `idx`. Members that miss the universe are dropped, and they are reported once through [`strict_diagnostic`](@ref).
- 4. Set the entries of `arr` at `idx` to `val`.
+ 2. Return in silence when `members` is `nothing` and `key` names an entry of `other`, because the name is on the counterpart axis: it is known-good, and this axis has no entry to write it into.
+ 3. Report through [`strict_diagnostic`](@ref) and return when `members` is `nothing`, because `key` names neither an asset nor a group. The suggestion pool is widened from `nx` to `nx` together with the keys of `sdict`, because a missing name may be a mistyped asset or a mistyped group.
+ 4. Map `members` to positions in `nx` with [`axis_name_indices`](@ref), giving `idx`. Members that miss the universe are dropped. Those on `other` are struck from the report by the same rule as step 2, and any that remain are reported once through [`strict_diagnostic`](@ref) — so a group whose departed members are all accounted for is silent, and one holding a genuine typo still names it.
+ 5. Set the entries of `arr` at `idx` to `val`.
 
 # Arguments
 
@@ -874,11 +991,12 @@ Set values in a vector for the asset or the group of assets that `key` names.
   - `arr`: The array to be modified in-place.
   - `strict`: If `true`, throws an error if `key` resolves to nothing; if `false`, issues a warning.
   - `nxkey`: Name of the asset-universe key in `sets.dict` (e.g. `"nx"`), used only to name the universe in the diagnostic message — see [`unknown_variable_msg`](@ref) / [`missing_group_assets_msg`](@ref).
+  - `other`: The counterpart asset axis, whose names are skipped in silence rather than reported.
 
 # Validation
 
-  - `key` names an asset of `nx` or a group of `sdict`. An `ArgumentError` is thrown when `strict` is `true`, and a warning is issued otherwise.
-  - Every member of a resolved group names an entry of `nx`. A member that misses the universe is dropped, and the drop raises when `strict` is `true` and issues a warning otherwise.
+  - `key` names an asset of `nx`, a group of `sdict`, or an entry of `other`. An `ArgumentError` is thrown when `strict` is `true`, and a warning is issued otherwise.
+  - Every member of a resolved group names an entry of `nx` or of `other`. A member that misses both is dropped, and the drop raises when `strict` is `true` and issues a warning otherwise.
 
 # Returns
 
@@ -895,9 +1013,16 @@ Set values in a vector for the asset or the group of assets that `key` names.
   - [`missing_group_assets_msg`](@ref)
 """
 function name_to_val!(nx::VecStr, sdict::AbstractDict, key::Any, val::Number, arr::VecNum,
-                      strict::Bool, nxkey::AbstractString)::Nothing
+                      strict::Bool, nxkey::AbstractString,
+                      other::VecStr = String[])::Nothing
     members = resolve_axis_name(key, nx, sdict)
     if isnothing(members)
+        # A name on the counterpart axis is known-good, not a typo: it was correct over the
+        # universe the caller was given, and the data moved it to the other axis. Silent
+        # under `strict` too — the door that derived the mask announces the departure once.
+        if any(isequal(key), other)
+            return nothing
+        end
         # A missing key may be a mistyped asset *or* a mistyped group/set name, so widen the
         # suggestion pool beyond the raw universe to include the group/set keys.
         return strict_diagnostic(unknown_variable_msg(key, nx, nxkey;
@@ -906,8 +1031,16 @@ function name_to_val!(nx::VecStr, sdict::AbstractDict, key::Any, val::Number, ar
                                  strict)
     end
     idx = axis_name_indices(members, nx,
-                            m -> strict_diagnostic(missing_group_assets_msg(key, m, nx,
-                                                                            nxkey), strict))
+                            function (m)
+                                m = filter(x -> !any(isequal(x), other), m)
+                                return if isempty(m)
+                                    nothing
+                                else
+                                    strict_diagnostic(missing_group_assets_msg(key, m, nx,
+                                                                               nxkey),
+                                                      strict)
+                                end
+                            end)
     arr[idx] .= val
     return nothing
 end
@@ -934,8 +1067,9 @@ The function creates the vector and sets the values for assets or groups as spec
  1. Take `val` as the fill value, or `zero(datatype)` when `val` is `nothing`.
  2. Take `key` as the universe key `nxkey`, or `sets.xkey` when `key` is `nothing`, and read the universe `nx` from `sets.dict` under it.
  3. Allocate `arr`, one entry per name of `nx`, filled with the value of step 1.
- 4. For each `(key, val)` pair of `dict`, in the order `dict` iterates in, write `val` into `arr` through [`name_to_val!`](@ref). A key that names an asset writes one entry, a key that names a group writes one entry per member, and a key that names neither is reported through the `strict` flag.
- 5. Return `arr`.
+ 4. Read the counterpart axis with [`counterpart_axis_names`](@ref), the other of the two asset axes [`UniverseSets`](@ref) declares.
+ 5. For each `(key, val)` pair of `dict`, in the order `dict` iterates in, write `val` into `arr` through [`name_to_val!`](@ref). A key that names an asset writes one entry, a key that names a group writes one entry per member, a key that names the counterpart axis is skipped in silence, and a key that names none of them is reported through the `strict` flag.
+ 6. Return `arr`.
 
 # Arguments
 
@@ -948,7 +1082,7 @@ The function creates the vector and sets the values for assets or groups as spec
 
 # Validation
 
-  - A key of `dict` that names neither an asset nor a group raises an `ArgumentError` when `strict` is `true`. A warning is issued otherwise.
+  - A key of `dict` that names neither an asset, nor a group, nor an entry of the counterpart axis raises an `ArgumentError` when `strict` is `true`. A warning is issued otherwise.
 
 # Returns
 
@@ -967,9 +1101,10 @@ function estimator_to_val(dict::MultiEstValType, sets::UniverseSets,
     val = ifelse(isnothing(val), zero(datatype), val)
     nxkey = ifelse(isnothing(key), sets.xkey, key)
     nx = sets.dict[nxkey]
+    other = counterpart_axis_names(sets, nxkey)
     arr = fill(val, length(nx))
     for (key, val) in dict
-        name_to_val!(nx, sets.dict, key, val, arr, strict, nxkey)
+        name_to_val!(nx, sets.dict, key, val, arr, strict, nxkey, other)
     end
     return arr
 end
@@ -982,7 +1117,8 @@ function estimator_to_val(dict::PairStrNum, sets::UniverseSets,
     nx = sets.dict[nxkey]
     arr = fill(val, length(nx))
     key, val = dict
-    name_to_val!(nx, sets.dict, key, val, arr, strict, nxkey)
+    name_to_val!(nx, sets.dict, key, val, arr, strict, nxkey,
+                 counterpart_axis_names(sets, nxkey))
     return arr
 end
 """
@@ -2400,6 +2536,67 @@ A constraint reaching a meta-optimiser through an [`ExposureConstraintEstimator`
 """
 function port_opt_view(lc::LinearConstraint, ::Any, args...)::LinearConstraint
     return lc
+end
+"""
+    assert_investable_constraint_width(lcs::Nothing, N::Integer, slot::AbstractString)
+    assert_investable_constraint_width(lc::LinearConstraint, N::Integer,
+                                       slot::AbstractString)
+    assert_investable_constraint_width(lcs::VecLc, N::Integer, slot::AbstractString)
+
+Refuse a **precomputed** [`LinearConstraint`](@ref) whose rows are wider than the investable universe, and say why.
+
+A name-keyed estimator survives a reduction to the Investable Mask: it resolves against the [`UniverseSets`](@ref) the door hands it, and a name that left resolves on the Non-Investable Axis instead of being refused. A precomputed constraint cannot. Its `A` is a matrix, and position is the only link between a column and an asset, so there is no name to re-resolve and no honest way to narrow it — dropping a column silently changes what `Ax ≤ B` means, and [`port_opt_view`](@ref)`(::LinearConstraint, i)` is deliberately the identity for that reason.
+
+So the row survives the door at its original width and meets a shorter weight vector. Left alone that surfaces inside the model as a bare `DimensionMismatch` between two numbers, with nothing to connect either to the asset that delisted. This says it once, at the seam, in terms of what the caller did and what they can do instead.
+
+The repair is always the same: state the constraint as a [`LinearConstraintEstimator`](@ref). A name-keyed constraint is re-resolved over whatever universe the door leaves, which is the whole point of stating it by name.
+
+# Algorithm
+
+ 1. Return when there is nothing to check: a `nothing` slot, or a `nothing` half of a [`LinearConstraint`](@ref).
+ 2. Otherwise compare `size(A, 2)` of each half against `N` and throw a `DimensionMismatch` naming the slot, the two widths and the repair when they disagree.
+
+# Arguments
+
+  - `lcs`: The resolved constraint, a vector of them, or `nothing`.
+  - `N`: The number of investable assets the optimisation runs over.
+  - `slot`: Names the field the constraint came from in the message, for example `"lcse"`.
+
+# Validation
+
+  - Every half of every precomputed constraint has one column per investable asset.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`LinearConstraint`](@ref)
+  - [`LinearConstraintEstimator`](@ref)
+  - [`port_opt_view`](@ref)
+  - [`non_investable_sets`](@ref)
+"""
+function assert_investable_constraint_width(::Nothing, ::Integer, ::AbstractString)::Nothing
+    return nothing
+end
+function assert_investable_constraint_width(lc::LinearConstraint, N::Integer,
+                                            slot::AbstractString)::Nothing
+    for half in (lc.ineq, lc.eq)
+        if isnothing(half)
+            continue
+        end
+        @argcheck(size(half.A, 2) == N,
+                  DimensionMismatch("the precomputed linear constraint in `$slot` is written over $(size(half.A, 2)) assets, but this optimisation runs over $N. An asset left the investable universe, and a precomputed constraint cannot follow it: its `A` is bound to its columns by position, so no column can be dropped without changing what the constraint means. State it as a LinearConstraintEstimator, which is resolved by name against whatever universe the door leaves."))
+    end
+    return nothing
+end
+function assert_investable_constraint_width(lcs::VecLc, N::Integer,
+                                            slot::AbstractString)::Nothing
+    for lc in lcs
+        assert_investable_constraint_width(lc, N, slot)
+    end
+    return nothing
 end
 function linear_constraints(lcs::AbstractVector{<:LinearConstraint}, ::Nothing, args...;
                             kwargs...)::AbstractVector{<:LinearConstraint}

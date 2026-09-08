@@ -634,6 +634,9 @@ function port_opt_view(sh::SchurComplementHierarchicalRiskParity, i, X::MatNum,
     params = port_opt_view(sh.params, i, X)
     return SchurComplementHierarchicalRiskParity(; opt = opt, params = params, fb = sh.fb)
 end
+function non_investable_universe(sh::SchurComplementHierarchicalRiskParity, ni::VecStr)
+    return rebuild_estimator(sh, (; opt = non_investable_universe(sh.opt, ni)))
+end
 """
     symmetric_step_up_matrix(n1::Integer, n2::Integer) -> AbstractMatrix
 

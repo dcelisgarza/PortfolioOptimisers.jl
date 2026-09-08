@@ -11,7 +11,7 @@ commit = "fda13accfd"
 [file]
 "ext/PortfolioOptimisersImputeExt.jl" = { code = 6, doc = 0, comment = 4, blank = 3, total = 13 }
 "ext/PortfolioOptimisersPlotsExt.jl" = { code = 2507, doc = 0, comment = 183, blank = 46, total = 2736 }
-"src/01_Base/01_DocstringDictionaries.jl" = { code = 1111, doc = 113, comment = 123, blank = 43, total = 1390 }
+"src/01_Base/01_DocstringDictionaries.jl" = { code = 1112, doc = 113, comment = 123, blank = 43, total = 1391 }
 "src/01_Base/02_TypeRoots.jl" = { code = 15, doc = 199, comment = 0, blank = 89, total = 303 }
 "src/01_Base/03_PrettyShow.jl" = { code = 117, doc = 138, comment = 0, blank = 76, total = 331 }
 "src/01_Base/04_ScopedConfig.jl" = { code = 163, doc = 491, comment = 2, blank = 214, total = 870 }
@@ -136,7 +136,7 @@ commit = "fda13accfd"
 "src/11_Phylogeny/23_CentralityQueries.jl" = { code = 46, doc = 147, comment = 1, blank = 67, total = 261 }
 "src/11_Phylogeny/24_AssetPhylogeny.jl" = { code = 13, doc = 64, comment = 0, blank = 33, total = 110 }
 "src/12_ConstraintGeneration/01_Base_ConstraintGeneration.jl" = { code = 39, doc = 169, comment = 0, blank = 94, total = 302 }
-"src/12_ConstraintGeneration/02_LinearConstraintGeneration.jl" = { code = 682, doc = 1265, comment = 47, blank = 554, total = 2548 }
+"src/12_ConstraintGeneration/02_LinearConstraintGeneration.jl" = { code = 757, doc = 1345, comment = 50, blank = 593, total = 2745 }
 "src/12_ConstraintGeneration/03_RiskBudgetConstraintGeneration.jl" = { code = 50, doc = 263, comment = 10, blank = 119, total = 442 }
 "src/12_ConstraintGeneration/04_PhylogenyConstraintGeneration.jl" = { code = 190, doc = 585, comment = 5, blank = 210, total = 990 }
 "src/12_ConstraintGeneration/05_WeightBoundsConstraintGeneration.jl" = { code = 124, doc = 385, comment = 0, blank = 163, total = 672 }
@@ -203,7 +203,7 @@ commit = "fda13accfd"
 "src/19_RiskMeasures/26_AdjustRiskContributions.jl" = { code = 55, doc = 46, comment = 0, blank = 13, total = 114 }
 "src/19_RiskMeasures/27_ExpectedRisk.jl" = { code = 273, doc = 458, comment = 40, blank = 207, total = 978 }
 "src/19_RiskMeasures/28_RiskMeasureTools.jl" = { code = 84, doc = 95, comment = 0, blank = 51, total = 230 }
-"src/20_Optimisation/01_Base_Optimisation.jl" = { code = 891, doc = 1675, comment = 13, blank = 835, total = 3414 }
+"src/20_Optimisation/01_Base_Optimisation.jl" = { code = 913, doc = 1730, comment = 19, blank = 863, total = 3525 }
 "src/20_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl" = { code = 577, doc = 1021, comment = 34, blank = 414, total = 2046 }
 "src/20_Optimisation/02_CrossValidation/02_KFold.jl" = { code = 85, doc = 125, comment = 0, blank = 49, total = 259 }
 "src/20_Optimisation/02_CrossValidation/03_Combinatorial.jl" = { code = 255, doc = 303, comment = 7, blank = 123, total = 688 }
@@ -234,7 +234,7 @@ commit = "fda13accfd"
 "src/20_Optimisation/09_JuMPConstraints/11_TrackingErrorConstraints.jl" = { code = 176, doc = 63, comment = 3, blank = 22, total = 264 }
 "src/20_Optimisation/09_JuMPConstraints/12_RegularisationConstraints.jl" = { code = 219, doc = 442, comment = 11, blank = 205, total = 877 }
 "src/20_Optimisation/09_JuMPConstraints/13_WeightNormConstraints.jl" = { code = 92, doc = 160, comment = 2, blank = 70, total = 324 }
-"src/20_Optimisation/10_JuMPOptimiser.jl" = { code = 714, doc = 703, comment = 65, blank = 184, total = 1666 }
+"src/20_Optimisation/10_JuMPOptimiser.jl" = { code = 725, doc = 703, comment = 72, blank = 184, total = 1684 }
 "src/20_Optimisation/11_MeanRisk.jl" = { code = 252, doc = 432, comment = 4, blank = 125, total = 813 }
 "src/20_Optimisation/12_FactorRiskContribution.jl" = { code = 157, doc = 221, comment = 6, blank = 71, total = 455 }
 "src/20_Optimisation/13_NearOptimalCentering.jl" = { code = 607, doc = 594, comment = 17, blank = 198, total = 1416 }
