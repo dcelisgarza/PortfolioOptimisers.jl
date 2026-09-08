@@ -49,8 +49,11 @@ Estimator now reads the WHOLE carrier and answers on the block's rows.
     a non-finite weight, so dropping the pair is what the library's own convention asks for.
   - The idiosyncratic correlation overlay writes a zero at a standardised residual that is still not
     finite, which happens only where the asset is inactive. The reference implementation's default
-    covariance estimator skips such a pair; the library has no exponentially weighted covariance
-    with a verb (issue #637), so the default here is the library's own and it admits no `NaN`.
+    covariance estimator skips such a pair. The overlay fills before it estimates, and the fill is
+    unconditional rather than keyed on `ce`, so no estimator in that slot ever sees the gap. The
+    fill is there because the slot's default is a plain moment estimator, which refuses a gapped
+    sample outright. Issue #925 proposes the three edits that reach the reference implementation's
+    answer to machine precision, and holds the measurement.
 =#
 using Statistics, Distributions, Dates, Random
 include(joinpath(@__DIR__, "test06c_setup.jl"))
