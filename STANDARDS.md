@@ -70,6 +70,7 @@ picking a side — a contradiction between standards files is itself a defect.
 | A capability the package offers | [`docs/capability_catalogue.jl`](docs/capability_catalogue.jl), ADR 0040 | `test/test_26_docs.jl` |
 | A standards file, or a name or a path one cites | [`STANDARDS.md`](STANDARDS.md) § *Changing a standard* | `test/test_46_standards_citation_census.jl` |
 | A generated docs file | [`CLAUDE.md`](CLAUDE.md) § Editing | CI regenerates and overwrites |
+| An `@docs` entry's placement in `docs/src/public_api/` or `docs/src/private_api/` | [ADR 0128](docs/adr/0128-the-docs-split-into-mirrored-public-and-private-api-trees-and-a-census-gates-placement.md) | a new census file parallel to `test/test_43_exported_abstract_type_census.jl`, not yet created — its test_4x number is picked at migration time, against `origin/dev` |
 | The paper's code listing | the recipe comment at the top of [`docs/paper/main.typ`](docs/paper/main.typ) | `.github/workflows/Paper.yml` |
 | A decision worth recording | [`docs/adr/README.md`](docs/adr/README.md) | none — unenforced |
 | A dependency | `Project.toml` | `.github/workflows/Aqua.yml` |
