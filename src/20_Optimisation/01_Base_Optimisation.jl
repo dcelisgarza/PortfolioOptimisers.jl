@@ -806,6 +806,8 @@ The fold-less value is the field's static default, unless `default` overrides it
 
 A vector whose entries are all optimisers or precomputed results ([`OptE_Opt`](@ref)) is stored as a `Vector{OptE_Opt}`, so a *mixed* schedule — fold `i` optimising or predicting depending on what entry `i` is — is admissible in an optimiser-valued field on its element type alone (see [`TD_OptE_Opt`](@ref)) rather than falling out to a `Vector{Any}` the field cannot accept.
 
+A schedule and an [`Online`](@ref) do not wrap each other, and the reason is when each resolves: a wrapper resolves **once**, at warm-up, because the sample buffer it seeds is threaded from step to step, while a schedule resolves **per fold**, because its value is that fold's. So neither `val`, nor a vector entry of `val`, nor `default` may be an `Online` — a wrapper reached through one of them would be resolved at no fold at all, or re-seeded at every fold, throwing the buffer away. They do compose the other way round: an estimator an `Online` wraps may hold schedules of its own, which resolve per fold after the seeding, and one host may hold a wrapper in one field and a schedule in another.
+
 Schedules do not nest: neither `val`, nor a vector entry of `val`, nor `default` may be a `TimeDependent`. Entry `i` is fold `i`'s *complete* field value, and the fold-less value is by definition outside every fold loop, so nesting has no meaning. An estimator swapped in by a schedule may itself carry schedules — those resolve against the same fold context after the swap — but they live in *its* fields, not inside this wrapper.
 
 **Recovering which entry a fold ran** needs no stored provenance, because a vector schedule is keyed by the fold index and nothing else. Entry `i` runs at fold `i` of the consuming scheme's `split` enumeration ([`time_dependent_value`](@ref) indexes `val[ctx.i]`), so `val[i]` *is* fold `i`'s value — the same index you keyed the schedule by. Under the time-ordered schemes (walk-forward, unshuffled [`KFold`](@ref), [`Pipeline`](@ref)) fold `i` is also the `i`-th entry of the returned [`MultiPeriodPredictionResult`](@ref); under schemes that regroup for reporting ([`MultipleRandomised`](@ref) sorts by test index, combinatorial recombines each split's test groups into paths) the prediction order no longer tracks the fold order, so re-run `split(cv, rd)` and read the fold→path map off its `path_ids` — it is keyed by the very enumeration index the schedule was, so entry `k` still governs enumeration fold `k`. A **callable** schedule computes its value rather than selecting an entry, so there is no index to recover: what it returned is knowable only by re-running it on the fold's [`TimeDependentContext`](@ref), or by having it record its own choice. Recording is a logging concern the caller owns, and the [`TimeDependentCallable`](@ref) struct interface is its natural home — a functor can stash the regime it picked per fold in a field of its own.
@@ -824,9 +826,9 @@ $(DocStringExtensions.FIELDS)
 
 ## Validation
 
-  - If `val` is a vector: `!isempty(val)`, and no entry is a `TimeDependent`.
-  - `val` is not a `TimeDependent`.
-  - `default` is not a `TimeDependent`.
+  - If `val` is a vector: `!isempty(val)`, and no entry is a `TimeDependent` or an [`Online`](@ref).
+  - `val` is not a `TimeDependent` or an [`Online`](@ref).
+  - `default` is not a `TimeDependent` or an [`Online`](@ref).
   - `bind in (:outermost, :nearest)`.
 
 # Examples
@@ -872,12 +874,16 @@ struct TimeDependent{T1, T2} <: AbstractEstimator
             @argcheck(!isempty(val), IsEmptyError("val cannot be empty"))
             @argcheck(!any(x -> isa(x, TimeDependent), val),
                       ArgumentError("no entry of val may be a TimeDependent: entry i is fold i's complete field value, so schedules do not nest. To vary parts of a vector-valued field, assemble the fold's vector in a callable: TimeDependent(ctx -> [dynamic(ctx), static])."))
+            @argcheck(!any(x -> isa(x, Online), val),
+                      ArgumentError("no entry of val may be an Online: a schedule resolves once per fold, and an `Online` resolves once at warm-up, before the fold loop runs. A wrapper reached through an entry would therefore either be resolved at no fold at all, or re-seeded at every one, throwing away the buffer the step threads. Wrap the estimator that holds the schedule instead, or wrap each entry's own inner estimator."))
             if !(eltype(val) <: OptE_Opt) && all(x -> isa(x, OptE_Opt), val)
                 val = convert(Vector{OptE_Opt}, val)
             end
         end
         @argcheck(!isa(default, TimeDependent),
                   ArgumentError("default cannot be a TimeDependent: it is the field's value outside every fold loop, where a schedule is undefined."))
+        @argcheck(!isa(default, Online),
+                  ArgumentError("default cannot be an Online: it is the field's value outside every fold loop, and an `Online` is resolved at warm-up rather than per fold, so a wrapper there is resolved at no fold at all. Wrap the estimator that holds the schedule instead."))
         @argcheck(bind in (:outermost, :nearest),
                   ArgumentError("bind must be :outermost or :nearest, got :$bind"))
         return new{typeof(val), typeof(default)}(val, bind, default)
@@ -885,6 +891,9 @@ struct TimeDependent{T1, T2} <: AbstractEstimator
 end
 function TimeDependent(::TimeDependent, args...; kwargs...)
     return throw(ArgumentError("val cannot be a TimeDependent: schedules do not nest. An estimator swapped in by a schedule may carry schedules of its own — they resolve against the same fold context after the swap — but they belong in its fields, not inside this wrapper."))
+end
+function Online(::TimeDependent, args...; kwargs...)
+    return throw(ArgumentError("est cannot be a TimeDependent: a schedule is not one estimator, so there is nothing for a buffer to belong to. The two wrappers resolve at different times and neither wraps the other — an `Online` resolves once at warm-up, because the buffer it seeds is threaded from step to step, and a schedule resolves once per fold, because its value is the fold's. They compose in the other order: an estimator an `Online` wraps may hold schedules of its own, which resolve per fold after the seeding, and one host may hold a wrapper in one field and a schedule in another."))
 end
 function TimeDependent(;
                        val::Union{<:AbstractVector, <:Base.Callable,

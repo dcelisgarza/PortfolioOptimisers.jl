@@ -845,7 +845,8 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :ps_calmar => "`calmar`: Annualised return divided by the absolute maximum drawdown. `NaN` if there is no drawdown.",#
                                  :ps_max_drawdown => "`max_drawdown`: Maximum drawdown, in return space, so it is non-positive.",#
                                  :ps_cvar => "`cvar`: Conditional Value-at-Risk at `alpha`, in return space, so a tail loss is negative.",#
-                                 :pf_M => "`M`: Running second-moment accumulator of the observations folded into the state, about `mu`.")
+                                 :pf_M => "`M`: Running second-moment accumulator of the observations folded into the state, about `mu`.",
+                                 :pf_max_history => "`max_history`: Optional cap on the number of observations the carry buffer keeps. `nothing` keeps every observation folded so far. A cap bounds memory and nothing else: it does not make the estimator windowed, because an estimate that folds exactly is fitted over every observation whatever the buffer holds.")
 """
     field_dict
 

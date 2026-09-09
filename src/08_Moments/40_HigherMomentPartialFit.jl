@@ -620,7 +620,7 @@ Refuses an incremental fit of a [`Coskewness`](@ref) estimator under [`SemiMomen
 # Arguments
 
   - `ske`: Coskewness estimator with a [`SemiMoment`](@ref) moment algorithm.
-  - `args...`: Ignored.
+  - `::VecNum_MatNum`: The observations, ignored.
   - `kwargs...`: Ignored.
 
 # Validation
@@ -633,7 +633,7 @@ Refuses an incremental fit of a [`Coskewness`](@ref) estimator under [`SemiMomen
   - [`SemiMoment`](@ref)
   - [`partial_fit!`](@ref)
 """
-function partial_fit!(::Coskewness{<:Any, <:Any, <:SemiMoment}, args...; kwargs...)
+function partial_fit!(::Coskewness{<:Any, <:Any, <:SemiMoment}, ::VecNum_MatNum; kwargs...)
     return throw(ArgumentError("a `Coskewness` estimator with a `SemiMoment` moment algorithm cannot be fitted incrementally, because the clip against the sample mean moves when the mean moves, so a past observation's membership of the clipped set flips. Use a `FullMoment` algorithm, or run the batch verb."))
 end
 """
@@ -773,7 +773,7 @@ The same refusal as the [`Coskewness`](@ref) one, for the same reason: [`SemiMom
 # Arguments
 
   - `kte`: Cokurtosis estimator with a [`SemiMoment`](@ref) moment algorithm.
-  - `args...`: Ignored.
+  - `::VecNum_MatNum`: The observations, ignored.
   - `kwargs...`: Ignored.
 
 # Validation
@@ -786,7 +786,7 @@ The same refusal as the [`Coskewness`](@ref) one, for the same reason: [`SemiMom
   - [`SemiMoment`](@ref)
   - [`partial_fit!`](@ref)
 """
-function partial_fit!(::Cokurtosis{<:Any, <:Any, <:SemiMoment}, args...; kwargs...)
+function partial_fit!(::Cokurtosis{<:Any, <:Any, <:SemiMoment}, ::VecNum_MatNum; kwargs...)
     return throw(ArgumentError("a `Cokurtosis` estimator with a `SemiMoment` moment algorithm cannot be fitted incrementally, because the clip against the sample mean moves when the mean moves, so a past observation's membership of the clipped set flips. Use a `FullMoment` algorithm, or run the batch verb."))
 end
 """

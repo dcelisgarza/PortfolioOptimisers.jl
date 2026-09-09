@@ -24,6 +24,7 @@ commit = "97e398ef74"
 "src/01_Base/12_NormError.jl" = { cyc = 2, cog = 2, arg = 4, cyc_sum = 28, cog_sum = 6, arg_sum = 52, macros = [] }
 "src/01_Base/13_KappaLog.jl" = { cyc = 1, cog = 0, arg = 2, cyc_sum = 1, cog_sum = 0, arg_sum = 2, macros = [] }
 "src/01_Base/14_PartialFit.jl" = { cyc = 4, cog = 4, arg = 6, cyc_sum = 15, cog_sum = 6, arg_sum = 25, macros = [] }
+"src/01_Base/15_Online.jl" = { cyc = 7, cog = 7, arg = 4, cyc_sum = 42, cog_sum = 30, arg_sum = 39, macros = [] }
 "src/02_Tools.jl" = { cyc = 45, cog = 96, arg = 6, cyc_sum = 238, cog_sum = 233, arg_sum = 262, macros = ["@propagatable"] }
 "src/03_InputData/01_AssetPanel.jl" = { cyc = 7, cog = 9, arg = 6, cyc_sum = 90, cog_sum = 53, arg_sum = 89, macros = [] }
 "src/03_InputData/02_AssetPanelBuilder.jl" = { cyc = 7, cog = 10, arg = 6, cyc_sum = 67, cog_sum = 55, arg_sum = 56, macros = [] }

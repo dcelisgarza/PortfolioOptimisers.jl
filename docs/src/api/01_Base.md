@@ -1,6 +1,6 @@
 # Base
 
-[`src/01_Base/`](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/src/01_Base) implements the most basal symbols used in `PortfolioOptimisers.jl`. One file per concept: the docstring dictionaries, the type roots, the pretty-show macro, the `ScopedConfig` holders, the load-time preferences, the message builders, the error hierarchy, the type aliases, the observation weights, the `assert_*` family, `VecScalar`, the `NormError` family, the Kaniadakis logarithm and the partial-fit state seam.
+[`src/01_Base/`](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/src/01_Base) implements the most basal symbols used in `PortfolioOptimisers.jl`. One file per concept: the docstring dictionaries, the type roots, the pretty-show macro, the `ScopedConfig` holders, the load-time preferences, the message builders, the error hierarchy, the type aliases, the observation weights, the `assert_*` family, `VecScalar`, the `NormError` family, the Kaniadakis logarithm, the partial-fit state seam and the sample buffer the online step folds into.
 
 ```@docs
 PortfolioOptimisers
@@ -236,6 +236,32 @@ PortfolioOptimisers.chan_merge
 PortfolioOptimisers.assert_partial_fit_state
 PortfolioOptimisers.partial_fit_cache
 PortfolioOptimisers.obs_weights_view(::PortfolioOptimisers.AbstractPartialFitState, ::Any)
+```
+
+## The online step
+
+An estimator with no exact incremental fold keeps the observations it has seen in a [`PortfolioOptimisers.SampleBufferState`](@ref), and [`Online`](@ref) is the configuration that seeds one. The wrapper is transient: [`PortfolioOptimisers.update_online_estimator`](@ref) resolves it at warm-up, so no wrapper survives into the run.
+
+```@docs
+PortfolioOptimisers.SampleBufferState
+PortfolioOptimisers.assert_sample_buffer_state
+PortfolioOptimisers.sample_buffer
+PortfolioOptimisers.assert_sample_buffer(est::Union{<:PortfolioOptimisers.AbstractEstimator, <:StatsBase.CovarianceEstimator})
+PortfolioOptimisers.assert_sample_buffer(::PortfolioOptimisers.Online)
+PortfolioOptimisers.sample_buffer_seed
+PortfolioOptimisers.fold_buffer
+PortfolioOptimisers.partial_fit!(state::PortfolioOptimisers.SampleBufferState, X::PortfolioOptimisers.MatNum; dims::Int = 1)
+PortfolioOptimisers.partial_fit!(state::PortfolioOptimisers.SampleBufferState, x::PortfolioOptimisers.VecNum)
+PortfolioOptimisers.reserve_sample_buffer
+PortfolioOptimisers.partial_fit!(est::Union{<:PortfolioOptimisers.AbstractEstimator, <:StatsBase.CovarianceEstimator}, X::PortfolioOptimisers.VecNum_MatNum; dims::Int = 1)
+PortfolioOptimisers.merge_states(a::PortfolioOptimisers.SampleBufferState, b::PortfolioOptimisers.SampleBufferState)
+Base.copy(x::PortfolioOptimisers.SampleBufferState)
+PortfolioOptimisers.port_opt_view(x::PortfolioOptimisers.SampleBufferState, i, args...)
+Online
+PortfolioOptimisers.Online_Option
+PortfolioOptimisers.online_candidate_fields
+PortfolioOptimisers.online_fields
+PortfolioOptimisers.update_online_estimator
 ```
 
 ## Iteration and indexing
