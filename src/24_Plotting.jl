@@ -2688,6 +2688,598 @@ Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
   - [`CrossSectionalFactorModel`](@ref)
 """
 function plot_factor_cumulative_returns end
+"""
+    plot_forecast_cumulative_ic(
+        fe::ForecastEvaluationResult,
+        w::Option{<:MatNum} = nothing;
+        min_count::Integer = fe.min_count,
+        kwargs...
+    ) -> Plot
+    plot_forecast_cumulative_ic(
+        fe::ForecastEvaluationResult,
+        csfm::CrossSectionalFactorModel;
+        weighting = IdentityMetric(),
+        min_count::Integer = fe.min_count,
+        kwargs...
+    ) -> Plot
+
+Plot the running sum of both information coefficients of a Return Forecast, one series each.
+
+The figure draws the running sum of what [`forecast_ic`](@ref) returns and computes nothing else of its own. A series that rises through the sample is a forecast that ordered the cross-section, a flat series is one that carried no ordering, and a falling series is one whose ordering had the opposite sign. An evaluation date that carries no coefficient contributes nothing to the running sum, so one thin cross-section breaks no series.
+
+# The figure takes the evaluation and not the block
+
+Every figure of this group takes the [`ForecastEvaluationResult`](@ref), where the cross-sectional diagnostics take the block. Those verbs read a block that is already fitted, so a figure that calls one costs nothing; here the Return Forecast history can cost a rolling refit through [`forecast_history`](@ref), so a caller pairs once with [`forecast_evaluation`](@ref) and every figure reads that pairing. A weighting still reaches the figure the way it reaches the level-2 verbs: as a bare weight history positionally, or as the block whose [`AbstractOrthogonalityMetric`](@ref) resolves one.
+
+# Arguments
+
+  - `fe`: The evaluation to draw, from [`forecast_evaluation`](@ref).
+  - `w`: Cross-sectional weight history `observations × assets`, on the axis of the forecast, or `nothing` for equal weights.
+  - `csfm`: A cross-sectional factor model block, whose weight history `weighting` names.
+  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history the block is read with.
+  - `min_count`: Least number of assets a cross-section needs before a coefficient of it is reported.
+  - `kwargs...`: Additional keyword arguments passed to the plotting backend.
+
+# Validation
+
+  - The rules of [`forecast_ic`](@ref).
+
+# Returns
+
+  - `plt::Plot`: The figure.
+
+Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
+
+# Related
+
+  - [`forecast_ic`](@ref)
+  - [`forecast_ic_summary`](@ref)
+  - [`plot_forecast_rolling_ic`](@ref)
+  - [`plot_cumulative_exposure_ic`](@ref)
+  - [`ForecastEvaluationResult`](@ref)
+"""
+function plot_forecast_cumulative_ic end
+"""
+    plot_forecast_rolling_ic(
+        fe::ForecastEvaluationResult,
+        w::Option{<:MatNum} = nothing;
+        rolling::Integer = 0,
+        min_count::Integer = fe.min_count,
+        kwargs...
+    ) -> Plot
+    plot_forecast_rolling_ic(
+        fe::ForecastEvaluationResult,
+        csfm::CrossSectionalFactorModel;
+        weighting = IdentityMetric(),
+        rolling::Integer = 0,
+        min_count::Integer = fe.min_count,
+        kwargs...
+    ) -> Plot
+
+Plot the running mean of both information coefficients of a Return Forecast over a window.
+
+The figure draws the mean of the last `rolling` evaluation dates of what [`forecast_ic`](@ref) returns, one series per coefficient. Where [`plot_forecast_cumulative_ic`](@ref) shows what the forecast earned over the whole sample, this shows where in the sample it earned it. An evaluation date that carries no coefficient is left out of the mean of every window it falls in, so the series is the mean of the dates that scored.
+
+`rolling` follows [`plot_rolling_measure`](@ref): `0` takes the square root of the number of evaluation dates, rounded up.
+
+The figure takes the evaluation and not the block, for the reason [`plot_forecast_cumulative_ic`](@ref) states.
+
+# Arguments
+
+  - `fe`: The evaluation to draw, from [`forecast_evaluation`](@ref).
+  - `w`: Cross-sectional weight history `observations × assets`, on the axis of the forecast, or `nothing` for equal weights.
+  - `csfm`: A cross-sectional factor model block, whose weight history `weighting` names.
+  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history the block is read with.
+  - `rolling`: Number of evaluation dates in the window, or `0` for the square root of their number.
+  - `min_count`: Least number of assets a cross-section needs before a coefficient of it is reported.
+  - `kwargs...`: Additional keyword arguments passed to the plotting backend.
+
+# Validation
+
+  - `rolling` resolves to a window in `1:length(fe.dates)`.
+  - The rules of [`forecast_ic`](@ref).
+
+# Returns
+
+  - `plt::Plot`: The figure.
+
+Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
+
+# Related
+
+  - [`forecast_ic`](@ref)
+  - [`plot_forecast_cumulative_ic`](@ref)
+  - [`plot_rolling_measure`](@ref)
+  - [`ForecastEvaluationResult`](@ref)
+"""
+function plot_forecast_rolling_ic end
+"""
+    plot_forecast_cumulative_returns(
+        fe::ForecastEvaluationResult;
+        kinds = (:rank, :zscore),
+        compound::Bool = false,
+        kwargs...
+    ) -> Plot
+
+Plot the cumulative return of the books a Return Forecast states on its own, one series each.
+
+The figure draws the running sum of the return series of [`forecast_portfolio`](@ref) and computes nothing else of its own. Both books are centred and rescaled to the same gross exposure, so the two series are read against each other and against the same series of another forecast. An evaluation date whose cross-section carried no book is held flat, which is what [`plot_factor_cumulative_returns`](@ref) does to an absent factor return.
+
+The figure takes the evaluation and not the block, for the reason [`plot_forecast_cumulative_ic`](@ref) states.
+
+# Arguments
+
+  - `fe`: The evaluation to draw, from [`forecast_evaluation`](@ref).
+  - `kinds`: The books to draw, each `:rank` or `:zscore`, as [`forecast_portfolio_weights`](@ref) names them.
+  - `compound`: Whether the cumulative series compounds.
+  - `kwargs...`: Additional keyword arguments passed to the plotting backend.
+
+# Validation
+
+  - The rules of [`forecast_portfolio`](@ref).
+
+# Returns
+
+  - `plt::Plot`: The figure.
+
+Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
+
+# Related
+
+  - [`forecast_portfolio`](@ref)
+  - [`forecast_portfolio_weights`](@ref)
+  - [`cumulative_returns`](@ref)
+  - [`plot_forecast_quantile_returns`](@ref)
+  - [`ForecastEvaluationResult`](@ref)
+"""
+function plot_forecast_cumulative_returns end
+"""
+    plot_forecast_quantile_returns(
+        fe::ForecastEvaluationResult;
+        quantiles = (0.1,),
+        compound::Bool = false,
+        kwargs...
+    ) -> Plot
+
+Plot the cumulative top-minus-bottom spread of a Return Forecast, one series per quantile.
+
+The figure draws the running sum of the spread series of [`forecast_quantile_spread`](@ref) and computes nothing else of its own. A spread that keeps rising as the tail narrows is a forecast whose ordering is sharpest at its ends, and one that flattens is a forecast whose ordering is spread across the whole cross-section. An evaluation date whose cross-section carried no spread is held flat.
+
+The figure takes the evaluation and not the block, for the reason [`plot_forecast_cumulative_ic`](@ref) states.
+
+# Arguments
+
+  - `fe`: The evaluation to draw, from [`forecast_evaluation`](@ref).
+  - `quantiles`: Tail fractions the spreads are cut at, each in `(0, 0.5]`.
+  - `compound`: Whether the cumulative series compounds.
+  - `kwargs...`: Additional keyword arguments passed to the plotting backend.
+
+# Validation
+
+  - The rules of [`forecast_quantile_spread`](@ref).
+
+# Returns
+
+  - `plt::Plot`: The figure.
+
+Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
+
+# Related
+
+  - [`forecast_quantile_spread`](@ref)
+  - [`forecast_tail_spread`](@ref)
+  - [`cumulative_returns`](@ref)
+  - [`plot_forecast_cumulative_returns`](@ref)
+  - [`ForecastEvaluationResult`](@ref)
+"""
+function plot_forecast_quantile_returns end
+"""
+    plot_forecast_calibration(
+        fe::ForecastEvaluationResult,
+        w::Option{<:MatNum} = nothing;
+        bins::Integer = 10,
+        kwargs...
+    ) -> Plot
+    plot_forecast_calibration(
+        fe::ForecastEvaluationResult,
+        csfm::CrossSectionalFactorModel;
+        weighting = IdentityMetric(),
+        bins::Integer = 10,
+        kwargs...
+    ) -> Plot
+
+Plot the calibration curve of a Return Forecast against the slope fitted through it.
+
+The figure draws the curve of [`forecast_calibration`](@ref) as a scatter of the mean realised target of each bin against the mean forecast of that bin, and lays the zero-intercept slope of the same call over it. The two answer different questions: the curve says whether the relation is a straight line, and the slope says what multiplier maps the forecast onto realised units. A curve that sits below the slope at its right end is a forecast whose largest values are the least believable.
+
+This is the one reading of a forecast a rescaling moves. The coefficients correlate and the books are rescaled to a fixed gross exposure, so both are invariant to the units the forecast is stated in; the slope is not, and that is what it is for.
+
+The figure takes the evaluation and not the block, for the reason [`plot_forecast_cumulative_ic`](@ref) states.
+
+# Arguments
+
+  - `fe`: The evaluation to draw, from [`forecast_evaluation`](@ref).
+  - `w`: Cross-sectional weight history `observations × assets`, on the axis of the forecast, or `nothing` for equal weights.
+  - `csfm`: A cross-sectional factor model block, whose weight history `weighting` names.
+  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history the block is read with.
+  - `bins`: Number of quantile bins the curve is cut into.
+  - `kwargs...`: Additional keyword arguments passed to the plotting backend.
+
+# Validation
+
+  - The rules of [`forecast_calibration`](@ref).
+
+# Returns
+
+  - `plt::Plot`: The figure.
+
+Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
+
+# Related
+
+  - [`forecast_calibration`](@ref)
+  - [`forecast_calibration_curve`](@ref)
+  - [`forecast_calibration_slope`](@ref)
+  - [`ForecastEvaluationResult`](@ref)
+"""
+function plot_forecast_calibration end
+"""
+    plot_forecast_ic_by_holding_period(
+        fe::ForecastEvaluationResult,
+        X::MatNum,
+        w::Option{<:MatNum} = nothing;
+        n::Integer = 10,
+        min_count::Integer = fe.min_count,
+        kwargs...
+    ) -> Plot
+    plot_forecast_ic_by_holding_period(
+        fe::ForecastEvaluationResult,
+        rd::ReturnsResult,
+        csfm::CrossSectionalFactorModel;
+        weighting = IdentityMetric(),
+        n::Integer = 10,
+        min_count::Integer = fe.min_count,
+        kwargs...
+    ) -> Plot
+
+Plot both mean information coefficients of a Return Forecast against the holding period.
+
+The figure draws two columns of the table of [`forecast_holding_period`](@ref) against its period and computes nothing of its own. A column that holds as the window lengthens is a forecast about a slow quantity, and one that falls away is a forecast whose book must be turned over to capture it.
+
+Every row of the table is read on one date set, so the figure is internally comparable and is **not** comparable to the same figure at another `n`. A caller who compares two depths draws the deeper one.
+
+The figure takes the evaluation and not the block, for the reason [`plot_forecast_cumulative_ic`](@ref) states. The target history is the second argument for the same reason the verb takes it: a re-windowing needs the history the target was built from, and the evaluation carries only the matured target.
+
+# Arguments
+
+  - `fe`: The evaluation to draw, from [`forecast_evaluation`](@ref).
+  - `X`: Target history `observations × assets`, on the axis of the forecast, from [`forecast_target_history`](@ref).
+  - `rd`: The carrier the target history is built from.
+  - `w`: Cross-sectional weight history `observations × assets`, on the axis of the forecast, or `nothing` for equal weights.
+  - `csfm`: A cross-sectional factor model block, whose weight history `weighting` names.
+  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history the block is read with.
+  - `n`: Number of holding periods the table reaches.
+  - `min_count`: Least number of assets a cross-section needs before a statistic of it is reported.
+  - `kwargs...`: Additional keyword arguments passed to the plotting backend.
+
+# Validation
+
+  - The rules of [`forecast_holding_period`](@ref).
+
+# Returns
+
+  - `plt::Plot`: The figure.
+
+Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
+
+# Related
+
+  - [`forecast_holding_period`](@ref)
+  - [`plot_forecast_portfolio_by_holding_period`](@ref)
+  - [`plot_forecast_ic_decay`](@ref)
+  - [`ForecastEvaluationResult`](@ref)
+"""
+function plot_forecast_ic_by_holding_period end
+"""
+    plot_forecast_portfolio_by_holding_period(
+        fe::ForecastEvaluationResult,
+        X::MatNum,
+        w::Option{<:MatNum} = nothing;
+        n::Integer = 10,
+        min_count::Integer = fe.min_count,
+        kwargs...
+    ) -> Plot
+    plot_forecast_portfolio_by_holding_period(
+        fe::ForecastEvaluationResult,
+        rd::ReturnsResult,
+        csfm::CrossSectionalFactorModel;
+        weighting = IdentityMetric(),
+        n::Integer = 10,
+        min_count::Integer = fe.min_count,
+        kwargs...
+    ) -> Plot
+
+Plot the annualised return and the Sharpe ratio of both books against the holding period.
+
+The figure draws four columns of the table of [`forecast_holding_period`](@ref) against its period and computes nothing of its own. It is the book-level reading of what [`plot_forecast_ic_by_holding_period`](@ref) shows at the coefficient level, and the two are read together: a coefficient that survives a longer window is only worth holding if the book built on it does too.
+
+The four columns carry two units, so the axis is labelled `Value` and read column by column, which is what [`plot_factor_model_summary`](@ref) does with the same mix.
+
+Every row of the table is read on one date set, so the figure is internally comparable and is **not** comparable to the same figure at another `n`.
+
+The figure takes the evaluation and not the block, for the reason [`plot_forecast_cumulative_ic`](@ref) states.
+
+# Arguments
+
+  - `fe`: The evaluation to draw, from [`forecast_evaluation`](@ref).
+  - `X`: Target history `observations × assets`, on the axis of the forecast, from [`forecast_target_history`](@ref).
+  - `rd`: The carrier the target history is built from.
+  - `w`: Cross-sectional weight history `observations × assets`, on the axis of the forecast, or `nothing` for equal weights.
+  - `csfm`: A cross-sectional factor model block, whose weight history `weighting` names.
+  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history the block is read with.
+  - `n`: Number of holding periods the table reaches.
+  - `min_count`: Least number of assets a cross-section needs before a statistic of it is reported.
+  - `kwargs...`: Additional keyword arguments passed to the plotting backend.
+
+# Validation
+
+  - The rules of [`forecast_holding_period`](@ref).
+
+# Returns
+
+  - `plt::Plot`: The figure.
+
+Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
+
+# Related
+
+  - [`forecast_holding_period`](@ref)
+  - [`plot_forecast_ic_by_holding_period`](@ref)
+  - [`plot_forecast_portfolio_decay`](@ref)
+  - [`ForecastEvaluationResult`](@ref)
+"""
+function plot_forecast_portfolio_by_holding_period end
+"""
+    plot_forecast_ic_decay(
+        fe::ForecastEvaluationResult,
+        X::MatNum,
+        w::Option{<:MatNum} = nothing;
+        n::Integer = 10,
+        min_count::Integer = fe.min_count,
+        kwargs...
+    ) -> Plot
+    plot_forecast_ic_decay(
+        fe::ForecastEvaluationResult,
+        rd::ReturnsResult,
+        csfm::CrossSectionalFactorModel;
+        weighting = IdentityMetric(),
+        n::Integer = 10,
+        min_count::Integer = fe.min_count,
+        kwargs...
+    ) -> Plot
+
+Plot both mean information coefficients of a Return Forecast against the forward window.
+
+The figure draws two columns of the table of [`forecast_decay`](@ref) against its period and computes nothing of its own. The windows are disjoint rather than cumulative, so the figure answers how long the forecast keeps forecasting: the first period is the horizon it was paired at, and a later period is the same forecast scored against a window it never saw.
+
+Every row of the table is read on one date set, so the figure is internally comparable and is **not** comparable to the same figure at another `n`.
+
+The figure takes the evaluation and not the block, for the reason [`plot_forecast_cumulative_ic`](@ref) states.
+
+# Arguments
+
+  - `fe`: The evaluation to draw, from [`forecast_evaluation`](@ref).
+  - `X`: Target history `observations × assets`, on the axis of the forecast, from [`forecast_target_history`](@ref).
+  - `rd`: The carrier the target history is built from.
+  - `w`: Cross-sectional weight history `observations × assets`, on the axis of the forecast, or `nothing` for equal weights.
+  - `csfm`: A cross-sectional factor model block, whose weight history `weighting` names.
+  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history the block is read with.
+  - `n`: Number of forward windows the table reaches.
+  - `min_count`: Least number of assets a cross-section needs before a statistic of it is reported.
+  - `kwargs...`: Additional keyword arguments passed to the plotting backend.
+
+# Validation
+
+  - The rules of [`forecast_decay`](@ref).
+
+# Returns
+
+  - `plt::Plot`: The figure.
+
+Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
+
+# Related
+
+  - [`forecast_decay`](@ref)
+  - [`plot_forecast_portfolio_decay`](@ref)
+  - [`plot_forecast_ic_by_holding_period`](@ref)
+  - [`ForecastEvaluationResult`](@ref)
+"""
+function plot_forecast_ic_decay end
+"""
+    plot_forecast_portfolio_decay(
+        fe::ForecastEvaluationResult,
+        X::MatNum,
+        w::Option{<:MatNum} = nothing;
+        n::Integer = 10,
+        min_count::Integer = fe.min_count,
+        kwargs...
+    ) -> Plot
+    plot_forecast_portfolio_decay(
+        fe::ForecastEvaluationResult,
+        rd::ReturnsResult,
+        csfm::CrossSectionalFactorModel;
+        weighting = IdentityMetric(),
+        n::Integer = 10,
+        min_count::Integer = fe.min_count,
+        kwargs...
+    ) -> Plot
+
+Plot the annualised return and the Sharpe ratio of both books against the forward window.
+
+The figure draws four columns of the table of [`forecast_decay`](@ref) against its period and computes nothing of its own. It is the book-level reading of what [`plot_forecast_ic_decay`](@ref) shows at the coefficient level.
+
+The four columns carry two units, so the axis is labelled `Value` and read column by column.
+
+Every row of the table is read on one date set, so the figure is internally comparable and is **not** comparable to the same figure at another `n`.
+
+The figure takes the evaluation and not the block, for the reason [`plot_forecast_cumulative_ic`](@ref) states.
+
+# Arguments
+
+  - `fe`: The evaluation to draw, from [`forecast_evaluation`](@ref).
+  - `X`: Target history `observations × assets`, on the axis of the forecast, from [`forecast_target_history`](@ref).
+  - `rd`: The carrier the target history is built from.
+  - `w`: Cross-sectional weight history `observations × assets`, on the axis of the forecast, or `nothing` for equal weights.
+  - `csfm`: A cross-sectional factor model block, whose weight history `weighting` names.
+  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history the block is read with.
+  - `n`: Number of forward windows the table reaches.
+  - `min_count`: Least number of assets a cross-section needs before a statistic of it is reported.
+  - `kwargs...`: Additional keyword arguments passed to the plotting backend.
+
+# Validation
+
+  - The rules of [`forecast_decay`](@ref).
+
+# Returns
+
+  - `plt::Plot`: The figure.
+
+Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
+
+# Related
+
+  - [`forecast_decay`](@ref)
+  - [`plot_forecast_ic_decay`](@ref)
+  - [`plot_forecast_portfolio_by_holding_period`](@ref)
+  - [`ForecastEvaluationResult`](@ref)
+"""
+function plot_forecast_portfolio_decay end
+"""
+    plot_forecast_factor_correlation(
+        fe::ForecastEvaluationResult,
+        B::Arr3Num,
+        w::Option{<:MatNum} = nothing;
+        nf::Option{<:AbstractVector} = nothing,
+        rank::Bool = false,
+        min_count::Integer = fe.min_count,
+        kwargs...
+    ) -> Plot
+    plot_forecast_factor_correlation(
+        fe::ForecastEvaluationResult,
+        csfm::CrossSectionalFactorModel;
+        nf::Option{<:AbstractVector} = nothing,
+        weighting = IdentityMetric(),
+        kwargs...
+    ) -> Plot
+
+Plot the contemporaneous correlation of a Return Forecast with every factor exposure.
+
+The figure draws what [`forecast_factor_correlation`](@ref) returns and computes nothing of its own, one series per factor. Nothing here is forward looking: the correlation is taken on the date the forecast is stated, so the figure says what the forecast **is**, not what it earned. A series that sits near one is a forecast that restates an exposure the risk model already holds, and the return it earns is that factor's return under another name.
+
+A neutralised forecast does not read zero here. The cross-sectional fit that neutralises it carries no intercept, so its residual is orthogonal to its target in the uncentred sense and keeps a correlation with it.
+
+The figure takes the evaluation and not the block, for the reason [`plot_forecast_cumulative_ic`](@ref) states.
+
+# Arguments
+
+  - `fe`: The evaluation to draw, from [`forecast_evaluation`](@ref).
+  - `B`: Exposure history `observations × assets × factors`, on the axis of the forecast.
+  - `w`: Cross-sectional weight history `observations × assets`, on the axis of the forecast, or `nothing` for equal weights.
+  - `csfm`: A cross-sectional factor model block, whose exposure history and weight history are read.
+  - `nf`: Factor names of the answer's axis. `nothing` reads them off the block, and falls back to the position of the factor.
+  - `rank`: Take the rank correlation when `true`, and the weighted correlation otherwise.
+  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history the block is read with.
+  - `min_count`: Least number of assets a cross-section needs before a correlation of it is reported.
+  - `kwargs...`: Additional keyword arguments passed to the plotting backend.
+
+# Validation
+
+  - The rules of [`forecast_factor_correlation`](@ref).
+
+# Returns
+
+  - `plt::Plot`: The figure.
+
+Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
+
+# Related
+
+  - [`forecast_factor_correlation`](@ref)
+  - [`forecast_factor_exposures`](@ref)
+  - [`exposure_ic_summary`](@ref)
+  - [`ForecastEvaluationResult`](@ref)
+"""
+function plot_forecast_factor_correlation end
+"""
+    plot_forecast_evaluation_summary(fs::ForecastSummaryResult; kwargs...) -> Plot
+    plot_forecast_evaluation_summary(
+        fes::AbstractVector{<:ForecastEvaluationResult},
+        w::Option{<:MatNum} = nothing;
+        names = nothing,
+        bins::Integer = 10,
+        quantiles = nothing,
+        kwargs...
+    ) -> Plot
+    plot_forecast_evaluation_summary(
+        fes::AbstractVector{<:ForecastEvaluationResult},
+        csfm::CrossSectionalFactorModel;
+        weighting = IdentityMetric(),
+        names = nothing,
+        bins::Integer = 10,
+        quantiles = nothing,
+        kwargs...
+    ) -> Plot
+    plot_forecast_evaluation_summary(
+        fe::ForecastEvaluationResult,
+        w::Option{<:MatNum} = nothing;
+        kwargs...
+    ) -> Plot
+    plot_forecast_evaluation_summary(
+        fe::ForecastEvaluationResult,
+        csfm::CrossSectionalFactorModel;
+        kwargs...
+    ) -> Plot
+
+Plot a [`ForecastSummaryResult`](@ref) as a grouped bar chart, one series per forecast.
+
+The figure draws the ten headline columns of the summary — both mean information coefficients and their information ratios, the annualised return and the Sharpe ratio of each book, the calibration slope and the mean coverage — with the statistic on the axis and the forecast as the series, which is the shape [`plot_factor_model_summary`](@ref) takes. A single evaluation is the length-1 case and a set of them **is** the comparison, exactly as the Result is.
+
+The quantile-spread block is drawn when the summary carries one, as one bar group per quantile. A summary built with no quantile carries the block as `nothing`, and then the block is **not drawn** and the title says so.
+
+The columns carry several units, so the axis is labelled `Value` and read group by group. The columns the summary carries that this figure does not draw are read off the Result, which prints all of them.
+
+# Arguments
+
+  - `fs`: The summary to draw, from [`forecast_evaluation_summary`](@ref).
+  - `fes`: The evaluations to summarise and draw, at least one.
+  - `fe`: One evaluation. It is drawn as the length-1 case.
+  - `w`: Cross-sectional weight history `observations × assets`, on the axis of the forecasts, or `nothing` for equal weights.
+  - `csfm`: A cross-sectional factor model block, whose weight history `weighting` names.
+  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history the block is read with.
+  - `names`: One name per evaluation, or `nothing` to number them.
+  - `bins`: Number of quantile bins the calibration curve cuts.
+  - `quantiles`: Tail fractions the quantile spreads are cut at, each in `(0, 0.5]`, or `nothing` for none.
+  - `kwargs...`: Additional keyword arguments passed to the plotting backend.
+
+# Validation
+
+  - The rules of [`forecast_evaluation_summary`](@ref).
+
+# Returns
+
+  - `plt::Plot`: The figure.
+
+Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
+
+# Related
+
+  - [`forecast_evaluation_summary`](@ref)
+  - [`ForecastSummaryResult`](@ref)
+  - [`plot_factor_model_summary`](@ref)
+  - [`ForecastEvaluationResult`](@ref)
+"""
+function plot_forecast_evaluation_summary end
 export plot_portfolio_cumulative_returns, plot_asset_cumulative_returns, plot_composition,
        plot_stacked_bar_composition, plot_stacked_area_composition, plot_dendrogram,
        plot_clusters, plot_drawdowns, plot_risk_contribution, plot_factor_risk_contribution,
@@ -2706,4 +3298,9 @@ export plot_portfolio_cumulative_returns, plot_asset_cumulative_returns, plot_co
        plot_idio_tail_rate, plot_idio_kurtosis, plot_idio_skewness, plot_idio_vol_ic,
        plot_idio_vol_residual_dependence, plot_factor_model_summary,
        plot_factor_forecast_correlation, plot_factor_forecast_volatilities,
-       plot_factor_cumulative_returns
+       plot_factor_cumulative_returns, plot_forecast_cumulative_ic,
+       plot_forecast_rolling_ic, plot_forecast_cumulative_returns,
+       plot_forecast_quantile_returns, plot_forecast_calibration,
+       plot_forecast_ic_by_holding_period, plot_forecast_portfolio_by_holding_period,
+       plot_forecast_ic_decay, plot_forecast_portfolio_decay,
+       plot_forecast_factor_correlation, plot_forecast_evaluation_summary

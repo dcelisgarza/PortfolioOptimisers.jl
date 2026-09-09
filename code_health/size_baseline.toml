@@ -10,7 +10,7 @@ commit = "fda13accfd"
 
 [file]
 "ext/PortfolioOptimisersImputeExt.jl" = { code = 6, doc = 0, comment = 4, blank = 3, total = 13 }
-"ext/PortfolioOptimisersPlotsExt.jl" = { code = 2507, doc = 0, comment = 183, blank = 46, total = 2736 }
+"ext/PortfolioOptimisersPlotsExt.jl" = { code = 2881, doc = 0, comment = 204, blank = 47, total = 3132 }
 "src/01_Base/01_DocstringDictionaries.jl" = { code = 1113, doc = 113, comment = 123, blank = 43, total = 1392 }
 "src/01_Base/02_TypeRoots.jl" = { code = 18, doc = 241, comment = 0, blank = 115, total = 374 }
 "src/01_Base/03_PrettyShow.jl" = { code = 117, doc = 138, comment = 0, blank = 76, total = 331 }
@@ -289,6 +289,6 @@ commit = "fda13accfd"
 "src/23_Pipeline/03_Pipeline.jl" = { code = 426, doc = 399, comment = 6, blank = 215, total = 1046 }
 "src/23_Pipeline/04_PredictionCV.jl" = { code = 175, doc = 132, comment = 15, blank = 63, total = 385 }
 "src/23_Pipeline/05_SearchCrossValidation.jl" = { code = 213, doc = 121, comment = 18, blank = 60, total = 412 }
-"src/24_Plotting.jl" = { code = 134, doc = 1813, comment = 111, blank = 651, total = 2709 }
+"src/24_Plotting.jl" = { code = 150, doc = 2251, comment = 111, blank = 794, total = 3306 }
 "src/25_Aliases.jl" = { code = 267, doc = 591, comment = 25, blank = 161, total = 1044 }
 "src/PortfolioOptimisers.jl" = { code = 313, doc = 3, comment = 29, blank = 5, total = 350 }

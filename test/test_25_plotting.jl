@@ -637,6 +637,178 @@
         @test_throws PortfolioOptimisers.IsNothingError plot_idio_calibration(no_rr_id)
         @test_throws PortfolioOptimisers.IsNothingError plot_idio_vol_ic(no_rr_id)
     end
+    @testset "The forecast evaluation figures (#942)" begin
+        # Every figure takes the `ForecastEvaluationResult` and never the block, which is
+        # the one place this group diverges from the diagnostics above: the forecast
+        # history can cost a rolling refit, so the caller pairs once and every figure reads
+        # that pairing. What a figure draws is read from the axis ticks, the number of
+        # series and the series' own values, never from the length of a drawn polygon.
+        rng_fp = MersenneTwister(942)
+        T_fp, N_fp, K_fp = 24, 6, 3
+        eps_fp = randn(rng_fp, T_fp, N_fp) ./ 100
+        y_fp = PortfolioOptimisers.forward_mean_returns(eps_fp, 1, 1)
+        # The forecast is the next observation's residual with noise on it, so every figure
+        # has an ordering to find rather than a flat series to draw.
+        alpha_fp = [t < T_fp ? eps_fp[t + 1, i] + randn(rng_fp) / 400 : randn(rng_fp) / 100
+                    for t in 1:T_fp, i in 1:N_fp]
+        fe_fp = forecast_evaluation(alpha_fp, y_fp; ppy = 252)
+        Ms_fp = randn(rng_fp, T_fp, N_fp, K_fp)
+        csr_fp = CrossSectionalRegression(; f = 0.02 * randn(rng_fp, T_fp, K_fp),
+                                          eps = eps_fp, n = fill(N_fp, T_fp))
+        csfm_fp = CrossSectionalFactorModel(; M = Ms_fp[T_fp, :, :], b = zeros(N_fp),
+                                            csr = csr_fp, Ms = Ms_fp,
+                                            rw = abs.(randn(rng_fp, T_fp, N_fp)) .+ 0.1,
+                                            bw = fill(1 / N_fp, T_fp, N_fp),
+                                            nf = ["value", "size", "momentum"], lag = 1)
+        rd_fp = ReturnsResult(; nx = string.(1:N_fp), X = eps_fp)
+
+        # ── the two coefficient figures ───────────────────────────────────────
+        ic_fp = forecast_ic(fe_fp)
+        p_cic = plot_forecast_cumulative_ic(fe_fp)
+        @test is_plot(p_cic)
+        @test length(p_cic.series_list) == 2
+        @test p_cic[1][:title] == "Cumulative Forecast IC"
+        # A date that carries no coefficient contributes nothing to the running sum, so
+        # each series ends at the sum of the finite entries of its column.
+        @test p_cic.series_list[1][:y][end] ≈ sum(filter(isfinite, ic_fp[:, 1]))
+        @test p_cic.series_list[2][:y][end] ≈ sum(filter(isfinite, ic_fp[:, 2]))
+        @test [s[:label] for s in p_cic.series_list] == ["Spearman", "Pearson"]
+        @test is_plot(plot_forecast_cumulative_ic(fe_fp, csfm_fp))
+        @test is_plot(plot_forecast_cumulative_ic(fe_fp, csfm_fp;
+                                                  weighting = RegressionWeightMetric(),
+                                                  min_count = 4))
+
+        p_ric = plot_forecast_rolling_ic(fe_fp; rolling = 4)
+        @test is_plot(p_ric)
+        @test length(p_ric.series_list) == 2
+        @test p_ric[1][:title] == "Rolling Forecast IC (window=4)"
+        # The first three windows are not complete, so they carry no mean.
+        @test all(isnan, p_ric.series_list[1][:y][1:3])
+        @test isfinite(p_ric.series_list[1][:y][4])
+        @test p_ric.series_list[1][:y][4] ≈ Statistics.mean(ic_fp[1:4, 1])
+        # `rolling = 0` takes the square root of the number of evaluation dates.
+        w0_fp = ceil(Int, sqrt(length(fe_fp.dates)))
+        @test plot_forecast_rolling_ic(fe_fp)[1][:title] ==
+              "Rolling Forecast IC (window=$(w0_fp))"
+        @test_throws DomainError plot_forecast_rolling_ic(fe_fp;
+                                                          rolling = length(fe_fp.dates) + 1)
+        @test is_plot(plot_forecast_rolling_ic(fe_fp, csfm_fp; rolling = 5))
+
+        # ── the two book figures ──────────────────────────────────────────────
+        p_cr = plot_forecast_cumulative_returns(fe_fp)
+        @test is_plot(p_cr)
+        @test length(p_cr.series_list) == 2
+        @test p_cr[1][:title] == "Forecast Book Cumulative Returns (Uncompounded)"
+        @test [s[:label] for s in p_cr.series_list] == ["Rank", "Z-Score"]
+        rank_ret_fp = forecast_portfolio(fe_fp; kind = :rank).ret
+        @test p_cr.series_list[1][:y][end] ≈ sum(filter(isfinite, rank_ret_fp))
+        @test plot_forecast_cumulative_returns(fe_fp; compound = true)[1][:title] ==
+              "Forecast Book Cumulative Returns (Compounded)"
+        # One book alone draws one series.
+        @test length(plot_forecast_cumulative_returns(fe_fp; kinds = (:zscore,)).series_list) ==
+              1
+
+        s_fp = forecast_quantile_spread(fe_fp; quantiles = (0.1, 0.3))
+        p_qr = plot_forecast_quantile_returns(fe_fp; quantiles = (0.1, 0.3))
+        @test is_plot(p_qr)
+        @test length(p_qr.series_list) == 2
+        @test p_qr[1][:title] == "Forecast Quantile Spread Returns (Uncompounded)"
+        @test [s[:label] for s in p_qr.series_list] == ["q = 0.1", "q = 0.3"]
+        @test p_qr.series_list[2][:y][end] ≈ sum(filter(isfinite, s_fp.spread[:, 2]))
+
+        # ── the calibration ───────────────────────────────────────────────────
+        c_fp = forecast_calibration(fe_fp; bins = 4)
+        p_cal = plot_forecast_calibration(fe_fp; bins = 4)
+        @test is_plot(p_cal)
+        # The curve is drawn as a scatter and the slope is laid over it as a line, so the
+        # figure carries exactly the two series the verb answers.
+        @test length(p_cal.series_list) == 2
+        @test p_cal.series_list[1][:x] ≈ c_fp.curve.mean_alpha
+        @test p_cal.series_list[1][:y] ≈ c_fp.curve.mean_y
+        @test p_cal.series_list[2][:y] ≈ c_fp.slope .* c_fp.curve.mean_alpha
+        @test is_plot(plot_forecast_calibration(fe_fp, csfm_fp; bins = 4))
+
+        # ── the four window figures ───────────────────────────────────────────
+        t_hp = forecast_holding_period(fe_fp, eps_fp; n = 3)
+        p_hic = plot_forecast_ic_by_holding_period(fe_fp, eps_fp; n = 3)
+        @test is_plot(p_hic)
+        @test length(p_hic.series_list) == 2
+        @test p_hic[1][:title] == "Forecast IC by Holding Period"
+        @test p_hic.series_list[1][:x] == t_hp.period
+        @test all(isequal.(p_hic.series_list[1][:y], t_hp.spearman_mean_ic))
+        @test all(isequal.(p_hic.series_list[2][:y], t_hp.pearson_mean_ic))
+        p_hbk = plot_forecast_portfolio_by_holding_period(fe_fp, eps_fp; n = 3)
+        @test length(p_hbk.series_list) == 4
+        @test p_hbk[1][:title] == "Forecast Books by Holding Period"
+        @test all(isequal.(p_hbk.series_list[2][:y], t_hp.rank_sharpe))
+        @test all(isequal.(p_hbk.series_list[3][:y], t_hp.zscore_ann_return))
+
+        t_dc = forecast_decay(fe_fp, eps_fp; n = 3)
+        p_dic = plot_forecast_ic_decay(fe_fp, eps_fp; n = 3)
+        @test length(p_dic.series_list) == 2
+        @test p_dic[1][:title] == "Forecast IC Decay"
+        @test all(isequal.(p_dic.series_list[2][:y], t_dc.pearson_mean_ic))
+        p_dbk = plot_forecast_portfolio_decay(fe_fp, eps_fp; n = 3)
+        @test length(p_dbk.series_list) == 4
+        @test p_dbk[1][:title] == "Forecast Books by Decay Window"
+        @test all(isequal.(p_dbk.series_list[4][:y], t_dc.zscore_sharpe))
+        # The carrier-and-block arity builds the target history off the block, so it draws
+        # the same table without the caller holding one.
+        @test all(isequal.(plot_forecast_ic_decay(fe_fp, rd_fp, csfm_fp; n = 3).series_list[2][:y],
+                           t_dc.pearson_mean_ic))
+        @test is_plot(plot_forecast_ic_by_holding_period(fe_fp, rd_fp, csfm_fp; n = 2))
+        @test is_plot(plot_forecast_portfolio_by_holding_period(fe_fp, rd_fp, csfm_fp;
+                                                                n = 2))
+        @test is_plot(plot_forecast_portfolio_decay(fe_fp, rd_fp, csfm_fp; n = 2))
+
+        # ── the factor correlation ────────────────────────────────────────────
+        p_fc = plot_forecast_factor_correlation(fe_fp, Ms_fp)
+        @test is_plot(p_fc)
+        @test length(p_fc.series_list) == K_fp
+        @test p_fc[1][:title] == "Forecast Factor Correlation (Pearson)"
+        @test [s[:label] for s in p_fc.series_list] == ["1", "2", "3"]
+        @test all(isequal.(p_fc.series_list[2][:y],
+                           forecast_factor_correlation(fe_fp, Ms_fp)[:, 2]))
+        @test plot_forecast_factor_correlation(fe_fp, Ms_fp; rank = true)[1][:title] ==
+              "Forecast Factor Correlation (Spearman)"
+        # The block arity labels its series off the block's own factor names.
+        @test [s[:label]
+               for s in plot_forecast_factor_correlation(fe_fp, csfm_fp).series_list] ==
+              csfm_fp.nf
+        @test [s[:label]
+               for s in
+                   plot_forecast_factor_correlation(fe_fp, csfm_fp; nf = ["a", "b", "c"]).series_list] ==
+              ["a", "b", "c"]
+
+        # ── the summary ───────────────────────────────────────────────────────
+        fs_fp = forecast_evaluation_summary([fe_fp, fe_fp]; names = ["a", "b"])
+        p_sum = plot_forecast_evaluation_summary(fs_fp)
+        @test is_plot(p_sum)
+        # A summary that carries no quantile block draws the ten headline columns alone,
+        # and its title says which block it is missing.
+        @test length(p_sum[1][:xaxis][:ticks][2]) == 10
+        @test p_sum[1][:title] == "Forecast Evaluation Summary (no quantile spread)"
+        # A grouped bar draws a `:shape` and a `:scatter` per group, so the series count
+        # is twice the number of forecasts and the label is what says which is which.
+        @test unique([sr[:label] for sr in p_sum.series_list]) == ["a", "b"]
+        # A quantile block contributes one column per quantile and clears the title.
+        fs_q = forecast_evaluation_summary([fe_fp, fe_fp]; names = ["a", "b"],
+                                           quantiles = (0.1, 0.25))
+        p_sq = plot_forecast_evaluation_summary(fs_q)
+        @test length(p_sq[1][:xaxis][:ticks][2]) == 12
+        @test p_sq[1][:xaxis][:ticks][2][11] == "Spread Sharpe q = 0.1"
+        @test p_sq[1][:title] == "Forecast Evaluation Summary"
+        # A single evaluation is the length-1 case, and the four computing arities reach
+        # the same figure.
+        @test unique([sr[:label]
+                      for sr in plot_forecast_evaluation_summary(fe_fp).series_list]) ==
+              ["Forecast 1"]
+        @test is_plot(plot_forecast_evaluation_summary(fe_fp, csfm_fp))
+        @test is_plot(plot_forecast_evaluation_summary([fe_fp]; quantiles = (0.2,)))
+        @test is_plot(plot_forecast_evaluation_summary([fe_fp], csfm_fp;
+                                                       weighting = RegressionWeightMetric(),
+                                                       names = ["a"], bins = 4))
+    end
 
     @testset "A drawn plot keeps the frame, a computed plot reduces (#857)" begin
         # ADR 0118's plotting half. A heatmap or a bar chart of a Prior Result draws the
