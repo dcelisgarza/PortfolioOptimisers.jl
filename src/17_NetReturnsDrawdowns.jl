@@ -737,6 +737,82 @@ function calc_net_asset_returns(w::MatNum, X::MatNum, fees::Fees,
     return charge_asset_fees(X ⊙ w, view(w, 1, :), fees, imsk)
 end
 """
+    calc_turnover(w::AbstractMatrix{<:Number})
+    calc_turnover(w::AbstractVector{<:AbstractVector{<:Number}})
+
+Compute the one-way turnover of a weight path.
+
+The turnover of an observation is the sum of the absolute weight changes the rebalance into it costs. It is the value-level reading of the quantity [`Turnover`](@ref) bounds and [`set_turnover_fees!`](@ref) charges, and it is what [`plot_turnover`](@ref) draws.
+
+The first observation has no predecessor, so its turnover is `NaN` rather than zero: a path that opens a book from cash trades its whole gross, and a path that inherits one trades nothing, and the series cannot tell the two apart. The answer therefore has one entry per observation of `w`, and the caller drops or keeps the leading gap.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{TO}_{t} &= \\sum_{i=1}^{N} \\left\\lvert w_{t,i} - w_{t-1,i} \\right\\rvert\\,, \\qquad t = 2,\\, \\dots,\\, T\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathrm{TO}_{t}``: Turnover of observation ``t``.
+  - ``w_{t,i}``: Weight of asset ``i`` at observation ``t``.
+  - $(math_dict[:T])
+  - $(math_dict[:N])
+
+# Algorithm
+
+ 1. Allocate `tn`, one entry per observation of `w`, and write `NaN` into every entry.
+ 2. For each observation `t` after the first, sum the absolute differences of the two consecutive weight vectors, giving `tn[t]`.
+
+# Arguments
+
+  - `w`: Weight path. A matrix carries one observation per row, and a vector of vectors carries one observation per element.
+
+# Returns
+
+  - `tn::VecNum`: Turnover, one entry per observation of `w`, `NaN` at the first.
+
+# Examples
+
+```jldoctest
+julia> calc_turnover([0.5 0.5; 0.25 0.75])
+2-element Vector{Float64}:
+ NaN
+   0.5
+```
+
+# Related
+
+  - [`Turnover`](@ref)
+  - [`plot_turnover`](@ref)
+  - [`forecast_portfolio`](@ref)
+  - [`calc_net_returns`](@ref)
+"""
+function calc_turnover(w::AbstractMatrix{<:Number})
+    Tf = real(eltype(w))
+    T = size(w, 1)
+    tn = fill(Tf(NaN), T)
+    for t in 2:T
+        s = zero(Tf)
+        for i in axes(w, 2)
+            s += abs(w[t, i] - w[t - 1, i])
+        end
+        tn[t] = s
+    end
+    return tn
+end
+function calc_turnover(w::AbstractVector{<:AbstractVector{<:Number}})
+    Tf = real(eltype(eltype(w)))
+    T = length(w)
+    tn = fill(Tf(NaN), T)
+    for t in 2:T
+        tn[t] = sum(abs, w[t] .- w[t - 1])
+    end
+    return tn
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Supertype for the algorithms that let a portfolio's weights drift with its own returns over the observations it is scored on.
@@ -2216,5 +2292,5 @@ end
 function expand_held_member(imsk::BitVector, x::VecMatNum)
     return [expand_investable_columns(imsk, xi) for xi in x]
 end
-export calc_net_returns, calc_net_asset_returns, cumulative_returns, drawdowns,
-       SelfFinancingDrift, DriftedWeights, HeldWeightsResult
+export calc_net_returns, calc_net_asset_returns, calc_turnover, cumulative_returns,
+       drawdowns, SelfFinancingDrift, DriftedWeights, HeldWeightsResult

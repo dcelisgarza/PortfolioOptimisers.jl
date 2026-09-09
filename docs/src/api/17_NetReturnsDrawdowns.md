@@ -39,6 +39,7 @@ calc_net_returns(w::VecNum, X::MatNum, args...)
 calc_net_returns(w::MatNum, X::MatNum, args...)
 calc_net_returns(w::VecVecNum, X::MatNum, fees, wd::AbstractWeightDrift, obs = nothing)
 calc_net_asset_returns
+calc_turnover
 cumulative_returns
 drawdowns
 absolute_drawdown_arr

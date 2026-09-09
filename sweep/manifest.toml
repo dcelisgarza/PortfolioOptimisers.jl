@@ -134,6 +134,7 @@
 "src/08_Moments/45_ReturnForecasts/07_ForecastEvaluation.jl" = { map = 3, units = 10, swept = false }
 "src/08_Moments/45_ReturnForecasts/08_ForecastHistory.jl" = { map = 3, units = 3, swept = false }
 "src/08_Moments/45_ReturnForecasts/09_ForecastInformationCoefficient.jl" = { map = 3, units = 4, swept = false }
+"src/08_Moments/45_ReturnForecasts/10_ForecastPortfolios.jl" = { map = 3, units = 8, swept = false }
 "src/08_Moments/46_CrossSectionalRegressionDiagnostics.jl" = { map = 3, units = 31, swept = false }
 "src/08_Moments/47_CrossSectionalExposureDiagnostics.jl" = { map = 3, units = 22, swept = false }
 "src/08_Moments/48_FactorModelSummary.jl" = { map = 3, units = 16, swept = false }
@@ -210,7 +211,7 @@
 "src/14_UncertaintySets/10_CompactRadiusRules.jl" = { map = 7, units = 6, swept = false }
 "src/15_Turnover.jl" = { map = 8, units = 15, algorithm = 8, swept = true }
 "src/16_Fees.jl" = { map = 8, units = 35, algorithm = 24, swept = false }
-"src/17_NetReturnsDrawdowns.jl" = { map = 8, units = 44, algorithm = 8, swept = false }
+"src/17_NetReturnsDrawdowns.jl" = { map = 8, units = 45, algorithm = 9, swept = false }
 "src/18_Tracking.jl" = { map = 8, units = 14, algorithm = 4, swept = true }
 "src/19_RiskMeasures/01_Base_RiskMeasures.jl" = { map = 9, units = 89, swept = false }
 "src/19_RiskMeasures/02_Variance.jl" = { map = 9, units = 24, swept = false }

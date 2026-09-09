@@ -200,6 +200,13 @@
         w_series = [normalize(abs.(randn(rng, N)), 1) for _ in 1:K]
         @test is_plot(plot_turnover(w_series))
         @test is_plot(plot_turnover(w_series; ts = 1:K))
+        # #937 moved the sum out of the extension and into `calc_turnover`, so the plot now
+        # draws a verb rather than computing one. The series it draws is unchanged: the
+        # expression below is the one the extension carried inline before the move.
+        expected = [sum(abs, w_series[t] .- w_series[t - 1]) for t in 2:K]
+        @test PortfolioOptimisers.calc_turnover(w_series)[2:end] ≈ expected
+        @test plot_turnover(w_series).series_list[1][:y] ≈ expected
+        @test plot_turnover(w_series).series_list[1][:x] == 2:K
     end
 
     @testset "plot_factor_mu" begin

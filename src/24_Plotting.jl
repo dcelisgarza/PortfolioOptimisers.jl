@@ -943,13 +943,14 @@ function plot_cv_scores end
 
 Line plot of portfolio turnover (L1 weight change) over time.
 
-Turnover at step `t` is defined as `∑ |w_t − w_{t−1}|`.
+Turnover at step `t` is defined as `∑ |w_t − w_{t−1}|`, and [`calc_turnover`](@ref) is what computes it. The first step has no predecessor, so the verb answers a `NaN` there and the plot drops it.
 
 Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
 # Related
 
   - [`MultiPeriodPredictionResult`](@ref)
+  - [`calc_turnover`](@ref)
 """
 function plot_turnover end
 

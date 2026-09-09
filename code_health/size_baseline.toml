@@ -10,7 +10,7 @@ commit = "fda13accfd"
 
 [file]
 "ext/PortfolioOptimisersImputeExt.jl" = { code = 6, doc = 0, comment = 4, blank = 3, total = 13 }
-"ext/PortfolioOptimisersPlotsExt.jl" = { code = 2508, doc = 0, comment = 183, blank = 46, total = 2737 }
+"ext/PortfolioOptimisersPlotsExt.jl" = { code = 2507, doc = 0, comment = 183, blank = 46, total = 2736 }
 "src/01_Base/01_DocstringDictionaries.jl" = { code = 1113, doc = 113, comment = 123, blank = 43, total = 1392 }
 "src/01_Base/02_TypeRoots.jl" = { code = 18, doc = 241, comment = 0, blank = 115, total = 374 }
 "src/01_Base/03_PrettyShow.jl" = { code = 117, doc = 138, comment = 0, blank = 76, total = 331 }
@@ -101,6 +101,7 @@ commit = "fda13accfd"
 "src/08_Moments/45_ReturnForecasts/07_ForecastEvaluation.jl" = { code = 120, doc = 285, comment = 0, blank = 114, total = 519 }
 "src/08_Moments/45_ReturnForecasts/08_ForecastHistory.jl" = { code = 61, doc = 67, comment = 0, blank = 32, total = 160 }
 "src/08_Moments/45_ReturnForecasts/09_ForecastInformationCoefficient.jl" = { code = 64, doc = 150, comment = 0, blank = 72, total = 286 }
+"src/08_Moments/45_ReturnForecasts/10_ForecastPortfolios.jl" = { code = 155, doc = 212, comment = 0, blank = 102, total = 469 }
 "src/08_Moments/46_CrossSectionalRegressionDiagnostics.jl" = { code = 464, doc = 752, comment = 1, blank = 352, total = 1569 }
 "src/08_Moments/47_CrossSectionalExposureDiagnostics.jl" = { code = 408, doc = 507, comment = 0, blank = 248, total = 1163 }
 "src/08_Moments/48_FactorModelSummary.jl" = { code = 224, doc = 318, comment = 2, blank = 150, total = 694 }
@@ -177,7 +178,7 @@ commit = "fda13accfd"
 "src/14_UncertaintySets/10_CompactRadiusRules.jl" = { code = 95, doc = 207, comment = 8, blank = 83, total = 393 }
 "src/15_Turnover.jl" = { code = 81, doc = 458, comment = 0, blank = 184, total = 723 }
 "src/16_Fees.jl" = { code = 291, doc = 955, comment = 3, blank = 366, total = 1615 }
-"src/17_NetReturnsDrawdowns.jl" = { code = 400, doc = 1169, comment = 3, blank = 520, total = 2092 }
+"src/17_NetReturnsDrawdowns.jl" = { code = 453, doc = 1262, comment = 15, blank = 566, total = 2296 }
 "src/18_Tracking.jl" = { code = 70, doc = 443, comment = 0, blank = 178, total = 691 }
 "src/19_RiskMeasures/01_Base_RiskMeasures.jl" = { code = 416, doc = 1286, comment = 12, blank = 606, total = 2320 }
 "src/19_RiskMeasures/02_Variance.jl" = { code = 248, doc = 690, comment = 16, blank = 255, total = 1209 }
@@ -284,6 +285,6 @@ commit = "fda13accfd"
 "src/23_Pipeline/03_Pipeline.jl" = { code = 426, doc = 399, comment = 6, blank = 215, total = 1046 }
 "src/23_Pipeline/04_PredictionCV.jl" = { code = 175, doc = 132, comment = 15, blank = 63, total = 385 }
 "src/23_Pipeline/05_SearchCrossValidation.jl" = { code = 213, doc = 121, comment = 18, blank = 60, total = 412 }
-"src/24_Plotting.jl" = { code = 134, doc = 1812, comment = 111, blank = 651, total = 2708 }
+"src/24_Plotting.jl" = { code = 134, doc = 1813, comment = 111, blank = 651, total = 2709 }
 "src/25_Aliases.jl" = { code = 267, doc = 591, comment = 25, blank = 161, total = 1044 }
 "src/PortfolioOptimisers.jl" = { code = 313, doc = 3, comment = 29, blank = 5, total = 350 }

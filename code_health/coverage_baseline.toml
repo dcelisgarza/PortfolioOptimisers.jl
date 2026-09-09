@@ -90,6 +90,7 @@ commit = "8610300"
 "src/08_Moments/45_ReturnForecasts/07_ForecastEvaluation.jl" = { lines = 54, misses = 0 }
 "src/08_Moments/45_ReturnForecasts/08_ForecastHistory.jl" = { lines = 33, misses = 0 }
 "src/08_Moments/45_ReturnForecasts/09_ForecastInformationCoefficient.jl" = { lines = 47, misses = 0 }
+"src/08_Moments/45_ReturnForecasts/10_ForecastPortfolios.jl" = { lines = 123, misses = 0 }
 "src/08_Moments/46_CrossSectionalRegressionDiagnostics.jl" = { lines = 339, misses = 0 }
 "src/08_Moments/47_CrossSectionalExposureDiagnostics.jl" = { lines = 319, misses = 0 }
 "src/08_Moments/48_FactorModelSummary.jl" = { lines = 159, misses = 0 }

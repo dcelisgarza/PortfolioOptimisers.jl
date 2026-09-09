@@ -1,11 +1,12 @@
 #=
 Check `src/08_Moments/45_ReturnForecasts/07_ForecastEvaluation.jl`,
 `src/08_Moments/45_ReturnForecasts/08_ForecastHistory.jl` and
-`src/08_Moments/45_ReturnForecasts/09_ForecastInformationCoefficient.jl` against the
-contract their docstrings state, and against the reference implementation the map of issue
-#931 ports. Issues #934, #935 and #936.
+`src/08_Moments/45_ReturnForecasts/09_ForecastInformationCoefficient.jl` and
+`src/08_Moments/45_ReturnForecasts/10_ForecastPortfolios.jl` against the contract their
+docstrings state, and against the reference implementation the map of issue #931 ports.
+Issues #934, #935, #936 and #937.
 
-FIVE CONVENTIONS SHAPE THE PROBES.
+SEVEN CONVENTIONS SHAPE THE PROBES.
 
 1. THE TWO OBSERVATION AXES ARE RECONCILED BY THE TARGET, NOT BY THE EVALUATION. A Return
    Forecast history lives on the factor-model block's rows, and the block is a suffix of the
@@ -38,6 +39,22 @@ FIVE CONVENTIONS SHAPE THE PROBES.
    miss, where the reference reads it against the dates that carried one. That is
    `exposure_ic_factor_summary`'s convention, which both summaries now share, and it is
    asserted as a divergence rather than papered over.
+
+6. THE TWO ALPHA PORTFOLIOS ARE PINNED BY THEIR INVARIANTS, NOT BY A STORED NUMBER. Both
+   are centred and scaled to 200 % gross, so every date holds one unit long and one unit
+   short and nets to zero whatever the forecast is. A perfect forecast -- `alpha` set to
+   `y` itself -- must earn a positive mean, and its negation must earn exactly the
+   opposite, which pins the sign convention without a fixture that carries signal.
+
+7. THE PORTFOLIO SUMMARY IS OF THE COMPRESSED PATH, AND THAT IS ASSERTED RATHER THAN
+   AVOIDED. A date below `min_count` has no portfolio return, and `performance_summary`
+   states that its series must be finite. The gaps are dropped before the call, so
+   `max_drawdown` and `calmar` read a path that joins the date before a gap to the date
+   after it. The probes assert the compressed answer and, beside it, what the uncompressed
+   series would have answered, which is what makes the caveat legible. The hit rate beside
+   that summary therefore counts against the FINITE dates, which is the opposite of
+   convention 5's denominator: the two summaries are computed on different series, and each
+   docstring states which.
 =#
 include(joinpath(@__DIR__, "test06c_setup.jl"))
 
@@ -769,5 +786,257 @@ end
         @test abs(s.spearman.mean_ic) < 0.2
         @test abs(s.spearman.t_stat) < 5
         @test s.spearman.hit_rate < 0.5
+    end
+end
+
+@testset "The alpha portfolios hold the forecast and nothing else" begin
+    PO = PortfolioOptimisers
+    fx = evaluation_fixture()
+    rd, csfm, scores = fx.rd, fx.csfm, fx.scores
+    fw = FixedWeightedReturnForecast(; scores = scores, scale = 1.0, weights = [0.4, 0.6])
+    fe = forecast_evaluation(fw, rd, csfm; horizon = 2, lag = 1, step = 1)
+
+    @testset "Both kinds are dollar neutral at 200 % gross" begin
+        for kind in (:rank, :zscore)
+            p = forecast_portfolio(fe; kind = kind)
+            @test size(p.w) == (length(fe.dates), fx.N)
+            gross = [sum(abs, view(p.w, k, :)) for k in axes(p.w, 1)]
+            net = [sum(view(p.w, k, :)) for k in axes(p.w, 1)]
+            @test all(g -> isapprox(g, 2) || iszero(g), gross)
+            @test any(g -> isapprox(g, 2), gross)
+            @test maximum(abs, net) < 1e-12
+        end
+    end
+
+    @testset "A `:zscore` weight is the centred forecast, rescaled" begin
+        p = forecast_portfolio(fe; kind = :zscore)
+        k = 1
+        t = fe.dates[k]
+        v = [isfinite(fe.alpha[t, i]) && isfinite(fe.y[t, i]) for i in 1:(fx.N)]
+        a = [v[i] ? fe.alpha[t, i] : 0.0 for i in 1:(fx.N)]
+        c = [v[i] ? a[i] - sum(a) / count(v) : 0.0 for i in 1:(fx.N)]
+        @test view(p.w, k, :) ≈ 2 * c / sum(abs, c)
+    end
+
+    @testset "A `:rank` weight reads the order and not the level" begin
+        # Pushing the date's largest forecast far further out leaves it largest, so every
+        # ordinal rank is unchanged and the rank book is too. The z-score book is not,
+        # because it reads the level. That is the whole difference between the two kinds.
+        alpha = copy(Matrix(fe.alpha))
+        t = fe.dates[1]
+        v = [isfinite(alpha[t, j]) && isfinite(fe.y[t, j]) for j in 1:(fx.N)]
+        i = argmax([v[j] ? alpha[t, j] : -Inf for j in 1:(fx.N)])
+        alpha[t, i] += 1e3 * (abs(alpha[t, i]) + 1)
+        blown = forecast_evaluation(alpha, fe.y; step = fe.step, min_count = fe.min_count)
+        @test view(forecast_portfolio(blown; kind = :rank).w, 1, :) ≈
+              view(forecast_portfolio(fe; kind = :rank).w, 1, :)
+        @test !isapprox(view(forecast_portfolio(blown; kind = :zscore).w, 1, :),
+                        view(forecast_portfolio(fe; kind = :zscore).w, 1, :))
+    end
+
+    @testset "The portfolio return is the contraction of the weights with the target" begin
+        p = forecast_portfolio(fe; kind = :rank)
+        ref = map(enumerate(fe.dates)) do (k, t)
+            yr = [isfinite(fe.alpha[t, i]) && isfinite(fe.y[t, i]) ? fe.y[t, i] : 0.0
+                  for i in 1:(fx.N)]
+            return only(calc_net_returns(view(p.w, k, :), reshape(yr, 1, :)))
+        end
+        fin = isfinite.(p.ret)
+        @test all(fin)
+        @test p.ret[fin] ≈ ref[fin]
+    end
+
+    @testset "`min_count` gates the return and the turnover together" begin
+        p = forecast_portfolio(fe; kind = :rank)
+        @test isnan(p.turnover[1])
+        @test all(k -> isfinite(p.turnover[k]) == isfinite(p.ret[k]), 2:length(p.ret))
+        @test p.turnover[2:end] ≈ PO.calc_turnover(p.w)[2:end]
+        @test p.hit_rate ≈
+              count(x -> x > 0, filter(isfinite, p.ret)) / count(isfinite, p.ret)
+        @test p.mean_turnover ≈
+              sum(filter(isfinite, p.turnover)) / count(isfinite, p.turnover)
+    end
+
+    @testset "A cross-section no date can fill leaves nothing to summarise" begin
+        # `performance_summary` needs one finite return, and the refusal is its own rather
+        # than a guard this verb adds. The spread answers `NaN` instead, because it
+        # summarises each column and never builds a path.
+        hi = forecast_evaluation(fe.alpha, fe.y; min_count = fx.N + 1)
+        @test_throws ArgumentError forecast_portfolio(hi)
+        @test all(isnan, forecast_quantile_spread(hi).spread)
+        @test all(isnan, forecast_quantile_spread(hi).ann_mean)
+    end
+
+    @testset "`kind` takes two values and refuses every other" begin
+        @test_throws PO.ConflictingArgumentError forecast_portfolio(fe; kind = :equal)
+        @test_throws PO.ConflictingArgumentError PO.forecast_portfolio_weights(fe.alpha,
+                                                                               fe.y,
+                                                                               fe.dates,
+                                                                               :inverse_vol)
+    end
+end
+
+@testset "A perfect forecast earns, and its negation loses exactly as much" begin
+    PO = PortfolioOptimisers
+    fx = evaluation_fixture()
+    fw = FixedWeightedReturnForecast(; scores = fx.scores, scale = 1.0,
+                                     weights = [0.4, 0.6])
+    fe = forecast_evaluation(fw, fx.rd, fx.csfm; horizon = 2, lag = 1, step = 1)
+    perfect = forecast_evaluation(fe.y, fe.y; min_count = 3)
+    inverted = forecast_evaluation(-fe.y, fe.y; min_count = 3)
+    mean_finite(x) = sum(filter(isfinite, x)) / count(isfinite, x)
+
+    @testset "The rank portfolio of a perfect forecast is positive" begin
+        pp = forecast_portfolio(perfect; kind = :rank)
+        pi_ = forecast_portfolio(inverted; kind = :rank)
+        @test mean_finite(pp.ret) > 0
+        @test mean_finite(pp.ret) ≈ -mean_finite(pi_.ret)
+        @test pp.summary.ann_return > 0
+        @test pp.hit_rate == 1
+    end
+
+    @testset "The z-score portfolio of a perfect forecast is positive" begin
+        pz = forecast_portfolio(perfect; kind = :zscore)
+        @test mean_finite(pz.ret) > 0
+        @test pz.hit_rate == 1
+    end
+
+    @testset "The quantile spread of a perfect forecast is positive at every quantile" begin
+        q = forecast_quantile_spread(perfect; quantiles = (0.1, 0.25, 0.5))
+        @test all(>(0), q.ann_mean)
+        @test all(q.hit_rate .== 1)
+        qi = forecast_quantile_spread(inverted; quantiles = (0.1, 0.25, 0.5))
+        @test all(<(0), qi.ann_mean)
+        @test q.ann_mean ≈ -qi.ann_mean
+    end
+end
+
+@testset "`ppy` annualises the summaries and leaves the turnover alone" begin
+    fx = evaluation_fixture()
+    fw = FixedWeightedReturnForecast(; scores = fx.scores, scale = 1.0,
+                                     weights = [0.4, 0.6])
+    fe1 = forecast_evaluation(fw, fx.rd, fx.csfm; horizon = 2, lag = 1, step = 1, ppy = 1)
+    fe4 = forecast_evaluation(fw, fx.rd, fx.csfm; horizon = 2, lag = 1, step = 1, ppy = 4)
+
+    @testset "The portfolio summary scales and the turnover does not" begin
+        p1 = forecast_portfolio(fe1)
+        p4 = forecast_portfolio(fe4)
+        @test p4.summary.periods_per_year == 4
+        @test p4.summary.ann_return ≈ 4 * p1.summary.ann_return
+        @test p4.summary.ann_volatility ≈ 2 * p1.summary.ann_volatility
+        @test p4.summary.sharpe ≈ 2 * p1.summary.sharpe
+        @test p4.mean_turnover ≈ p1.mean_turnover
+        @test p4.hit_rate == p1.hit_rate
+        @test p4.w == p1.w
+        @test isequal(p4.ret, p1.ret)
+    end
+
+    @testset "The quantile summary scales the same way" begin
+        q1 = forecast_quantile_spread(fe1; quantiles = (0.1, 0.3))
+        q4 = forecast_quantile_spread(fe4; quantiles = (0.1, 0.3))
+        @test size(q1.spread) == (length(fe1.dates), 2)
+        @test isequal(q4.spread, q1.spread)
+        @test q4.ann_mean ≈ 4 * q1.ann_mean
+        @test q4.ann_vol ≈ 2 * q1.ann_vol
+        @test q4.ann_ir ≈ 2 * q1.ann_ir
+        @test q4.hit_rate == q1.hit_rate
+    end
+end
+
+@testset "The quantile spread cuts two tails and refuses an impossible cut" begin
+    PO = PortfolioOptimisers
+    fx = evaluation_fixture()
+    fw = FixedWeightedReturnForecast(; scores = fx.scores, scale = 1.0,
+                                     weights = [0.4, 0.6])
+    fe = forecast_evaluation(fw, fx.rd, fx.csfm; horizon = 2, lag = 1, step = 1)
+
+    @testset "The spread is the top mean less the bottom mean" begin
+        q = forecast_quantile_spread(fe; quantiles = (0.2,))
+        k = 1
+        t = fe.dates[k]
+        v = [isfinite(fe.alpha[t, i]) && isfinite(fe.y[t, i]) for i in 1:(fx.N)]
+        av = [fe.alpha[t, i] for i in 1:(fx.N) if v[i]]
+        yv = [fe.y[t, i] for i in 1:(fx.N) if v[i]]
+        lo = quantile(av, 0.2)
+        hi = quantile(av, 0.8)
+        top = [yv[i] for i in eachindex(av) if av[i] >= hi]
+        bot = [yv[i] for i in eachindex(av) if av[i] <= lo]
+        @test q.spread[k, 1] ≈ sum(top) / length(top) - sum(bot) / length(bot)
+    end
+
+    @testset "A half-quantile splits the cross-section in two" begin
+        q = forecast_quantile_spread(fe; quantiles = (0.5,))
+        k = 1
+        t = fe.dates[k]
+        v = [isfinite(fe.alpha[t, i]) && isfinite(fe.y[t, i]) for i in 1:(fx.N)]
+        av = [fe.alpha[t, i] for i in 1:(fx.N) if v[i]]
+        yv = [fe.y[t, i] for i in 1:(fx.N) if v[i]]
+        m = quantile(av, 0.5)
+        top = [yv[i] for i in eachindex(av) if av[i] >= m]
+        bot = [yv[i] for i in eachindex(av) if av[i] <= m]
+        @test q.spread[k, 1] ≈ sum(top) / length(top) - sum(bot) / length(bot)
+    end
+
+    @testset "One column per quantile, in the order they were asked for" begin
+        q = forecast_quantile_spread(fe; quantiles = (0.1, 0.3, 0.5))
+        @test size(q.spread) == (length(fe.dates), 3)
+        @test length(q.ann_mean) == length(q.ann_vol) == length(q.ann_ir) == 3
+        for (j, p) in enumerate((0.1, 0.3, 0.5))
+            @test q.spread[:, j] ≈
+                  forecast_quantile_spread(fe; quantiles = (p,)).spread[:, 1]
+        end
+    end
+
+    @testset "A quantile outside `(0, 0.5]` is refused" begin
+        @test_throws PO.IsEmptyError forecast_quantile_spread(fe; quantiles = ())
+        @test_throws DomainError forecast_quantile_spread(fe; quantiles = (0.0,))
+        @test_throws DomainError forecast_quantile_spread(fe; quantiles = (0.6,))
+        @test_throws DomainError forecast_quantile_spread(fe; quantiles = (0.1, NaN))
+    end
+end
+
+@testset "The portfolio summary is of the compressed path" begin
+    PO = PortfolioOptimisers
+    # Row 2 carries one asset, so it is below `min_count` and has no portfolio return. The
+    # summary is therefore taken over rows 1, 3, 4 and 5 joined end to end.
+    alpha = [3.0 1.0 2.0 4.0
+             1.0 NaN NaN NaN
+             2.0 4.0 1.0 3.0
+             4.0 3.0 2.0 1.0
+             1.0 2.0 4.0 3.0]
+    y = [0.02 -0.01 0.00 0.03
+         0.01 0.02 0.03 0.04
+         0.05 -0.04 0.06 -0.02
+         -0.03 -0.01 0.02 0.04
+         -0.01 0.00 0.02 0.01]
+    fe = forecast_evaluation(alpha, y; min_count = 3, ppy = 1)
+    p = forecast_portfolio(fe; kind = :rank)
+
+    @testset "The gapped date drops out of the series and out of the summary" begin
+        @test fe.dates == 1:5
+        @test isnan(p.ret[2])
+        @test count(isfinite, p.ret) == 4
+        @test p.summary.n_periods == 4
+        @test p.summary ==
+              performance_summary(p.ret[isfinite.(p.ret)]; periods_per_year = 1)
+    end
+
+    @testset "The uncompressed series is what the compression avoids" begin
+        # `performance_summary`'s Precomputed-returns contract: a `NaN` makes the mean and
+        # the drawdown non-finite, and the tail figure answers a number rather than a `NaN`.
+        raw = performance_summary(p.ret; periods_per_year = 1)
+        @test isnan(raw.ann_return)
+        @test isnan(raw.max_drawdown)
+        @test isfinite(raw.cvar)
+        @test isfinite(p.summary.max_drawdown)
+        @test p.summary.max_drawdown < 0
+    end
+
+    @testset "The turnover into and out of the gap is dropped with it" begin
+        @test isnan(p.turnover[1])
+        @test isnan(p.turnover[2])
+        @test isfinite(p.turnover[3])
+        @test p.mean_turnover ≈
+              sum(filter(isfinite, p.turnover)) / count(isfinite, p.turnover)
     end
 end

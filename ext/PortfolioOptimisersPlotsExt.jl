@@ -1733,8 +1733,7 @@ end
 function PortfolioOptimisers.plot_turnover(w_series::AbstractVector{<:VecNum};
                                            ts::AbstractVector = 1:length(w_series),
                                            kwargs...)
-    n = length(w_series)
-    turnover = [sum(abs, w_series[t] .- w_series[t - 1]) for t in 2:n]
+    turnover = view(PortfolioOptimisers.calc_turnover(w_series), 2:length(w_series))
     return plot(ts[2:end], turnover; title = "Portfolio Turnover",
                 ylabel = "Turnover (∑|Δw|)", xlabel = "Date", legend = false, linewidth = 2,
                 kwargs...)
