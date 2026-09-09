@@ -419,6 +419,40 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Refuse a fit whose factor prior states a non-finite factor moment.
+
+A Descriptor's warm-up and the factor prior's own warm-up are **cumulative**: the Descriptors fix the first observation of the factor-return history, and the estimator that reads that history warms up over it in turn. A window that clears the first warm-up can still be too short for the second, and a factor prior that answers a `NaN` rather than raising leaves the whole prior non-finite. So the fit reads what the factor prior answered and refuses by name, rather than handing a `NaN` moment to a consumer that meets it as an anonymous factorisation failure.
+
+# Arguments
+
+  - `mu`: The factor means the factor prior stated.
+  - `sigma`: The factor covariance the factor prior stated.
+  - `n`: The count of fitted observations the factor prior read.
+
+# Validation
+
+  - Every factor mean and every entry of the factor covariance is finite. Raises an [`IsNonFiniteError`](@ref).
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`cross_sectional_warmup`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+"""
+function assert_cross_sectional_factor_moments(mu::VecNum, sigma::MatNum,
+                                               n::Integer)::Nothing
+    nfm = count(!isfinite, mu)
+    nfs = count(!isfinite, sigma)
+    @argcheck(iszero(nfm) && iszero(nfs),
+              IsNonFiniteError("the factor prior read the $n observation(s) left after the Descriptor warm-up and the exposure lag, and stated $nfm non-finite factor mean(s) and $nfs non-finite factor covariance entr(ies). A Descriptor's warm-up and the factor prior's own warm-up are cumulative, so a window must cover both. Give more observations, shorten the warm-up of the Descriptors, or give pe a factor prior that estimates from fewer observations."))
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Return the idiosyncratic covariance of the latest observation.
 
 # Algorithm

@@ -5,6 +5,8 @@ Estimates a point-in-time cross-sectional factor model from an Asset Panel, and 
 
 The estimator reads per-asset Panel Fields, builds a Factor Exposure from each one, regresses every observation's returns on the **lagged** exposures across the assets, and returns the asset moments beside a [`CrossSectionalFactorModel`](@ref) block. It is the cross-sectional counterpart of [`FactorPrior`](@ref), which regresses each asset's returns on a factor-return series over time.
 
+The window a fit needs is **cumulative**, and a caller who sizes one must add up three warm-ups rather than take the longest. The Descriptors warm up first, and their longest warm-up fixes the first observation of the factor-return history; `lag` takes one more. `pe` then warms up over that history, and `ve` over the idiosyncratic returns beside it. A window that clears the Descriptors alone can still leave `pe` too little to state a factor covariance from, and the fit refuses by name when it does. This bites hardest in **cross-validation**, because a fold hands the estimator only its own rows, so the Descriptors restart in every fold and a rolling train window never grows to absorb the warm-up. Size the train window against the sum, not against the Descriptors.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -238,7 +240,7 @@ This is the returns-matrix method every prior estimator implements, and it holds
  7. Lag the reduced exposures and the market capitalisation by `pe.lag`, and take the eligibility mask of the fit with [`cross_sectional_eligible`](@ref).
  8. Regress each observation's returns on its lagged reduced exposures, through [`cs_weights_initial`](@ref), [`needs_second_pass`](@ref) and [`cs_weights_refine`](@ref).
  9. Take the idiosyncratic variance history with [`variance_series`](@ref), standardise the idiosyncratic returns by it with [`cross_sectional_standardised_residuals`](@ref), and take the latest idiosyncratic covariance with [`cross_sectional_idiosyncratic_covariance`](@ref).
-10. Fit `pe.pe` on the reduced factor returns.
+10. Fit `pe.pe` on the reduced factor returns, and refuse a non-finite factor moment with [`assert_cross_sectional_factor_moments`](@ref).
 11. Fit the Return Forecast with [`cross_sectional_return_forecast`](@ref), on the **whole** carrier, so that a Descriptor of the forecast warms up over every observation the panel has, and blend its spanned part into the factor mean with [`cross_sectional_forecast_mu`](@ref). The block carries the orthogonal part in `b`, and the Result in `rf`.
 12. Expand the blended factor moments onto the raw factor axis with [`cross_sectional_expand`](@ref), so `fpr` states the distribution of the factors the caller named.
 13. Rebuild the asset return scenarios with [`cross_sectional_scenarios`](@ref).
@@ -260,7 +262,9 @@ This is the returns-matrix method every prior estimator implements, and it holds
   - `pnl` is not `nothing`. Raises an [`IsNothingError`](@ref).
   - The Asset Panel is time-varying. Raises an `ArgumentError`.
   - The history is longer than the exposure lag. Raises an `ArgumentError`.
+  - At least two observations are left after the Descriptor warm-up and the exposure lag, because a covariance of one observation is not a number. Raises an `ArgumentError`.
   - Every fitted observation carries at least `minra` eligible assets. Raises an `ArgumentError`.
+  - The factor prior states a finite factor mean and a finite factor covariance. Raises an [`IsNonFiniteError`](@ref).
   - At least one asset is investable at the latest observation. Raises an [`IsEmptyError`](@ref).
   - The rules of every verb the algorithm names.
 
@@ -318,6 +322,8 @@ function prior(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum} = n
     fb = cross_sectional_family_basis(pe.families, Msw, bww, nf, fam)
     @argcheck(length(rw) > pe.lag,
               ArgumentError("the exposures lag the returns by lag = $(pe.lag), so a fit needs more than $(pe.lag) observations after the Descriptor warm-up, and $(length(rw)) are left. Give more observations, shorten the warm-up of the Descriptors, or lower lag."))
+    @argcheck(length(rw) - pe.lag >= 2,
+              ArgumentError("the factor prior states a covariance of the factor returns, and a covariance of one observation is not a number, so a fit needs at least two observations after the Descriptor warm-up and the exposure lag of $(pe.lag), and $(length(rw) - pe.lag) is left. Give more observations, or shorten the warm-up of the Descriptors."))
     r = (pe.lag + 1):length(rw)
     Zl = fb.Ms[r .- pe.lag, :, :]
     Xr = Xw[r, :]
@@ -342,6 +348,7 @@ function prior(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum} = n
     esigma = cross_sectional_idiosyncratic_covariance(pe.th, pe.ce, pe.mp.pdm, S,
                                                       vs[end, :], amr)
     f_pr = prior(pe.pe, csr.f)
+    assert_cross_sectional_factor_moments(f_pr.mu, f_pr.sigma, length(r))
     fnow = cross_sectional_basis_now(fb.fcb, r)
     L = fb.Ms[r[end], :, :]
     Msr = Msw[r, :, :]

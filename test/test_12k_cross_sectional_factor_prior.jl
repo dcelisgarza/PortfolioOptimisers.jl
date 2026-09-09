@@ -921,3 +921,79 @@ end
         @test 0.8 < Statistics.median(ev[ok] ./ truth.ivar[ok]) < 1.5
     end
 end
+
+@testset "A window too short for the warm-ups it must cover is refused by name (#956)" begin
+    PO = PortfolioOptimisers
+    # A Descriptor's warm-up and the factor prior's own warm-up are cumulative, and a
+    # cross-validation fold hands the estimator its own rows alone, so a rolling train
+    # window never grows to absorb either. Every band of a window too short for the sum
+    # must refuse by name: the fit cannot state a correct answer, so it must say so.
+    factors = csfp_factors()
+    @testset "A covariance of one observation is not a number" begin
+        # These Factor Exposures read levels, so they warm up over nothing and the whole
+        # window reaches the regression. `lag` takes one observation, and what is left is
+        # the factor-return history the factor prior reads.
+        rd = csfp_panel(; n_observations = 3).rd
+        pe = CrossSectionalFactorPrior(; factors = factors, lag = 1)
+        # One observation left. The message names the factor prior's covariance, so the
+        # caller is not left to read a LAPACK failure out of a factorisation.
+        rd2 = PO.port_opt_view(rd, [1, 2], :)
+        e = try
+            prior(pe, rd2)
+        catch err
+            err
+        end
+        @test isa(e, ArgumentError)
+        @test occursin("covariance of one observation is not a number", e.msg)
+        # The floor is exactly two, and no wider: at three observations the fit clears it
+        # and stops at the NEXT warm-up in the chain, the idiosyncratic variance
+        # estimator's, which refuses under its own name. Every band is named.
+        @test_throws PO.IsEmptyError prior(pe, rd)
+    end
+    @testset "A factor prior that warms up over the factor returns" begin
+        # The reference implementation's own case: a factor prior whose covariance
+        # estimator carries a warm-up longer than the factor-return history left to it.
+        # It answers `NaN` rather than raising, so only a check on its answer catches it.
+        # These Factor Exposures warm up over nothing, so the whole window reaches the
+        # factor prior and the refusal below is its warm-up alone, not the Descriptors'.
+        rd = csfp_panel(; n_observations = 300).rd
+        pe = CrossSectionalFactorPrior(; factors = factors, lag = 1,
+                                       pe = EmpiricalPrior(;
+                                                           ce = ExpWeightedCovariance(;
+                                                                                      min_obs = 500)))
+        @test_throws PO.IsNonFiniteError prior(pe, rd)
+        # The same fit stands once the factor prior's warm-up fits inside the history, so
+        # the refusal reads the warm-up and not merely the estimator.
+        pe2 = CrossSectionalFactorPrior(; factors = factors, lag = 1,
+                                        pe = EmpiricalPrior(;
+                                                            ce = ExpWeightedCovariance(;
+                                                                                       min_obs = 40)))
+        @test isa(prior(pe2, rd), LowOrderPrior)
+    end
+    @testset "The refusal reads the moments it was handed" begin
+        # The verb itself, over bare arrays. A finite pair passes; a gap in either the
+        # mean or the covariance is named and counted.
+        @test isnothing(PO.assert_cross_sectional_factor_moments([1.0, 2.0],
+                                                                 [1.0 0.0; 0.0 1.0], 5))
+        @test_throws PO.IsNonFiniteError PO.assert_cross_sectional_factor_moments([1.0,
+                                                                                   NaN],
+                                                                                  [1.0 0.0;
+                                                                                   0.0 1.0],
+                                                                                  5)
+        @test_throws PO.IsNonFiniteError PO.assert_cross_sectional_factor_moments([1.0,
+                                                                                   2.0],
+                                                                                  [1.0 NaN;
+                                                                                   NaN 1.0],
+                                                                                  1)
+    end
+    @testset "A fold's own train window takes the same refusal" begin
+        # The scenario the issue names: the fold, not a hand-cut slice. The scheme's own
+        # split supplies the train rows, and the prior refuses on them by name.
+        rd = csfp_panel(; n_observations = 40).rd
+        pe = CrossSectionalFactorPrior(; factors = factors, lag = 1)
+        cv = IndexWalkForward(2, 5)
+        (; train_idx) = PO.split(cv, rd)
+        @test length(first(train_idx)) == 2
+        @test_throws ArgumentError prior(pe, PO.port_opt_view(rd, first(train_idx), :))
+    end
+end
