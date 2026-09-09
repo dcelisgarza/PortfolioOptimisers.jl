@@ -92,7 +92,7 @@ commit = "97e398ef74"
 "src/08_Moments/43_FactorFamilyBasis.jl" = { cyc = 6, cog = 12, arg = 5, cyc_sum = 32, cog_sum = 30, arg_sum = 10, macros = [] }
 "src/08_Moments/44_FactorFamilyBasisTransforms.jl" = { cyc = 5, cog = 7, arg = 3, cyc_sum = 39, cog_sum = 33, arg_sum = 29, macros = [] }
 "src/08_Moments/45_ReturnForecasts/01_Base_ReturnForecast.jl" = { cyc = 5, cog = 8, arg = 0, cyc_sum = 29, cog_sum = 17, arg_sum = 0, macros = [] }
-"src/08_Moments/45_ReturnForecasts/02_DescriptorScores.jl" = { cyc = 3, cog = 3, arg = 5, cyc_sum = 14, cog_sum = 8, arg_sum = 9, macros = [] }
+"src/08_Moments/45_ReturnForecasts/02_DescriptorScores.jl" = { cyc = 3, cog = 3, arg = 6, cyc_sum = 14, cog_sum = 8, arg_sum = 10, macros = [] }
 "src/08_Moments/45_ReturnForecasts/03_CustomValueReturnForecast.jl" = { cyc = 1, cog = 1, arg = 1, cyc_sum = 6, cog_sum = 2, arg_sum = 2, macros = [] }
 "src/08_Moments/45_ReturnForecasts/04_FixedWeightedReturnForecast.jl" = { cyc = 4, cog = 6, arg = 5, cyc_sum = 15, cog_sum = 10, arg_sum = 8, macros = [] }
 "src/08_Moments/45_ReturnForecasts/05_ExpWeightedReturnForecast.jl" = { cyc = 5, cog = 5, arg = 9, cyc_sum = 27, cog_sum = 24, arg_sum = 20, macros = [] }

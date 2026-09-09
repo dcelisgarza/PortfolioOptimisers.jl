@@ -167,6 +167,39 @@ end
         @test all(abs.(Sn) .< 1e-10)
     end
 
+    @testset "`cre` decides whether the residual is merely orthogonal or uncorrelated (#950)" begin
+        # A target exposure with a non-zero cross-sectional mean under equal weights, and a
+        # score that is not a multiple of it, so the two fits disagree.
+        x = reshape([1.0, 2.0, 6.0], 1, 3, 1)
+        y = [1.0 3.0 2.0]
+        rd3 = forecast_hand_panel(["a" => y])
+        blk3 = forecast_hand_block(3; Ms = x, nf = ["style"], fam = ["style"])
+        xv = vec(x)
+
+        @testset "The default carries no intercept, and the residual stays correlated" begin
+            ds0 = DescriptorScores(; descriptors = [Passthrough(; field = "a")],
+                                   neutralise = ["style"], outlier = nothing,
+                                   scoring = nothing)
+            @test isa(ds0.cre, CrossSectionalLinearRegression)
+            @test !ds0.cre.intercept
+            eps0 = vec(descriptor_scores(ds0, rd3, blk3).S)
+            # Orthogonal to the raw exposure...
+            @test dot(xv, eps0) ≈ 0 atol = 1e-10
+            # ...but not to its cross-sectional deviation from the mean, so a Pearson
+            # correlation with `x` survives the Neutralisation.
+            @test dot(xv .- mean(xv), eps0) ≈ -225 / 41 atol = 1e-8
+        end
+
+        @testset "`intercept = true` removes the centred projection, and the residual decorrelates" begin
+            dsi = DescriptorScores(; descriptors = [Passthrough(; field = "a")],
+                                   neutralise = ["style"],
+                                   cre = CrossSectionalLinearRegression(; intercept = true),
+                                   outlier = nothing, scoring = nothing)
+            epsi = vec(descriptor_scores(dsi, rd3, blk3).S)
+            @test dot(xv .- mean(xv), epsi) ≈ 0 atol = 1e-10
+        end
+    end
+
     @testset "A group name partitions each observation" begin
         pf = [NumericPanelInput(; name = "a", vals = a, alg = ForwardPanelFill()),
               CategoricalPanelInput(; name = "g", vals = ["x" "y"; "x" "y"])]

@@ -11,6 +11,15 @@ The Descriptors carry no names, because nothing reads them: the weights of a mem
 
 $(DocStringExtensions.TYPEDFIELDS)
 
+# Constructors
+
+    DescriptorScores(; descriptors::AbstractVector{<:AbstractDescriptorEstimator},
+                     neutralise::Option{<:Union{<:AbstractString, <:VecStr}} = nothing,
+                     cre::AbstractCrossSectionalRegressionEstimator = CrossSectionalLinearRegression(),
+                     outlier::Option{<:AbstractCrossSectionalTransform} = CrossSectionalWinsoriser(),
+                     scoring::Option{<:AbstractCrossSectionalTransform} = CrossSectionalStandardiser(),
+                     group::Option{<:AbstractString} = nothing)
+
 # Related
 
   - [`descriptor_scores`](@ref)
@@ -18,6 +27,7 @@ $(DocStringExtensions.TYPEDFIELDS)
   - [`AbstractCrossSectionalTransform`](@ref)
   - [`FixedWeightedReturnForecast`](@ref)
   - [`CrossSectionalFactorModel`](@ref)
+  - [`CrossSectionalLinearRegression`](@ref)
 """
 @concrete struct DescriptorScores <: AbstractEstimator
     """
@@ -28,6 +38,10 @@ $(DocStringExtensions.TYPEDFIELDS)
     Names of the factors or the Factor Families every score is neutralised against, or `nothing` to neutralise none.
     """
     neutralise
+    """
+    Cross-Sectional Regression Estimator of the Neutralisation. Its `intercept` decides what the residual is orthogonal to: `false` (the default) removes the component along the raw exposure, and `true` removes the component along the exposure's cross-sectional deviation from its mean, which is what makes the residual **uncorrelated** with the exposure rather than merely orthogonal to it.
+    """
+    cre
     """
     Cross-sectional transform applied to each Descriptor before it is scored, or `nothing` to skip the step.
     """
@@ -42,6 +56,7 @@ $(DocStringExtensions.TYPEDFIELDS)
     group
     function DescriptorScores(descriptors::AbstractVector{<:AbstractDescriptorEstimator},
                               neutralise::Option{<:Union{<:AbstractString, <:VecStr}},
+                              cre::AbstractCrossSectionalRegressionEstimator,
                               outlier::Option{<:AbstractCrossSectionalTransform},
                               scoring::Option{<:AbstractCrossSectionalTransform},
                               group::Option{<:AbstractString})
@@ -53,17 +68,18 @@ $(DocStringExtensions.TYPEDFIELDS)
         if !isnothing(group)
             assert_panel_terms(group, :group)
         end
-        return new{typeof(descriptors), typeof(neutralise), typeof(outlier),
-                   typeof(scoring), typeof(group)}(descriptors, neutralise, outlier,
+        return new{typeof(descriptors), typeof(neutralise), typeof(cre), typeof(outlier),
+                   typeof(scoring), typeof(group)}(descriptors, neutralise, cre, outlier,
                                                    scoring, group)
     end
 end
 function DescriptorScores(; descriptors::AbstractVector{<:AbstractDescriptorEstimator},
                           neutralise::Option{<:Union{<:AbstractString, <:VecStr}} = nothing,
+                          cre::AbstractCrossSectionalRegressionEstimator = CrossSectionalLinearRegression(),
                           outlier::Option{<:AbstractCrossSectionalTransform} = CrossSectionalWinsoriser(),
                           scoring::Option{<:AbstractCrossSectionalTransform} = CrossSectionalStandardiser(),
                           group::Option{<:AbstractString} = nothing)::DescriptorScores
-    return DescriptorScores(descriptors, neutralise, outlier, scoring, group)
+    return DescriptorScores(descriptors, neutralise, cre, outlier, scoring, group)
 end
 """
     assert_neutralisation_names(neutralise::AbstractString) -> nothing
@@ -146,12 +162,14 @@ function descriptor_scores_axis(csfm::CrossSectionalFactorModel)
 end
 """
     neutralise_scores!(S::AbstractArray{<:Real, 3}, neutralise::Nothing,
+                       cre::AbstractCrossSectionalRegressionEstimator,
                        csfm::CrossSectionalFactorModel, w::MatNum,
                        scoring::Option{<:AbstractCrossSectionalTransform},
                        groups::Option{<:AbstractMatrix{<:Integer}},
                        rows::AbstractUnitRange) -> nothing
     neutralise_scores!(S::AbstractArray{<:Real, 3},
                        neutralise::Union{<:AbstractString, <:VecStr},
+                       cre::AbstractCrossSectionalRegressionEstimator,
                        csfm::CrossSectionalFactorModel, w::MatNum,
                        scoring::Option{<:AbstractCrossSectionalTransform},
                        groups::Option{<:AbstractMatrix{<:Integer}},
@@ -165,7 +183,7 @@ The method that Julia selects is the algorithm, and the recipe that names no tar
 
  1. Resolve the names to raw factor indices, a factor name beating a Factor Family label, and take those columns of the exposure history as the design.
  2. For each score in turn, build the regression weights over the block's rows: `w`, with a zero wherever the score or a design exposure of that asset is not finite.
- 3. Regress the score across the assets on the design under those weights, with no intercept, and take the residual.
+ 3. Regress the score across the assets on the design under those weights with `cre`, and take the residual. `cre.intercept` decides whether the residual is merely orthogonal to the raw design (`false`) or uncorrelated with it (`true`); see [`CrossSectionalLinearRegression`](@ref).
  4. Score the residual once more under `w`, so that every score leaves the step on one scale.
  5. Write `NaN` on the rows before the block, where the block states no exposure to neutralise against.
 
@@ -173,6 +191,7 @@ The method that Julia selects is the algorithm, and the recipe that names no tar
 
   - `S`: The Descriptor scores, `observations × assets × descriptors`, on the carrier's observation axis. It is changed in place.
   - `neutralise`: The Neutralisation names, or `nothing`.
+  - `cre`: Cross-Sectional Regression Estimator that fits the residualisation.
   - `csfm`: The fitted factor-model block.
   - `w`: Cross-sectional weights, `observations × assets`.
   - `scoring`: The scoring transform, or `nothing`.
@@ -193,8 +212,10 @@ The method that Julia selects is the algorithm, and the recipe that names no tar
   - [`descriptor_scores`](@ref)
   - [`cross_sectional_regression`](@ref)
   - [`neutralisation_weights`](@ref)
+  - [`CrossSectionalLinearRegression`](@ref)
 """
 function neutralise_scores!(::AbstractArray{<:Real, 3}, ::Nothing,
+                            ::AbstractCrossSectionalRegressionEstimator,
                             ::CrossSectionalFactorModel, ::MatNum,
                             ::Option{<:AbstractCrossSectionalTransform},
                             ::Option{<:AbstractMatrix{<:Integer}},
@@ -203,6 +224,7 @@ function neutralise_scores!(::AbstractArray{<:Real, 3}, ::Nothing,
 end
 function neutralise_scores!(S::AbstractArray{<:Real, 3},
                             neutralise::Union{<:AbstractString, <:VecStr},
+                            cre::AbstractCrossSectionalRegressionEstimator,
                             csfm::CrossSectionalFactorModel, w::MatNum,
                             scoring::Option{<:AbstractCrossSectionalTransform},
                             groups::Option{<:AbstractMatrix{<:Integer}},
@@ -212,7 +234,6 @@ function neutralise_scores!(S::AbstractArray{<:Real, 3},
     X = Ms[:, :, tidx]
     wb = return_forecast_cut(w, rows)
     gb = return_forecast_cut(groups, rows)
-    cre = CrossSectionalLinearRegression()
     Tf = eltype(S)
     for k in axes(S, 3)
         y = S[rows, :, k]
@@ -305,7 +326,7 @@ function descriptor_scores(ds::DescriptorScores, rd::ReturnsResult,
     for k in 2:length(des)
         S[:, :, k] = composite_score(des[k], rd, ds.outlier, ds.scoring, w, groups)
     end
-    neutralise_scores!(S, ds.neutralise, csfm, w, ds.scoring, groups, rows)
+    neutralise_scores!(S, ds.neutralise, ds.cre, csfm, w, ds.scoring, groups, rows)
     return (; S = S, rows = rows)
 end
 

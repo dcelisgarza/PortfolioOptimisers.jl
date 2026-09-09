@@ -1233,13 +1233,30 @@ end
     end
 
     @testset "The neutralised one is less correlated with it, and not near zero" begin
-        # THE ASSERTION IS DIRECTIONAL, AND ISSUE #950 IS WHY. A Neutralisation fits
-        # `CrossSectionalLinearRegression()`, whose `intercept` defaults to `false`, so the
-        # residual is exactly orthogonal to the target in the UNCENTRED sense and keeps a
-        # large Pearson correlation with it. Tighten this to a near-zero assertion when
-        # #950 is settled.
+        # THE ASSERTION IS DIRECTIONAL, AND ISSUE #950 IS WHY. `DescriptorScores`'s `cre`
+        # defaults to `CrossSectionalLinearRegression()`, whose `intercept` defaults to
+        # `false` to reproduce the reference implementation, so the residual is exactly
+        # orthogonal to the target in the UNCENTRED sense and keeps a large Pearson
+        # correlation with it. This is the library's default behaviour, not a bug left
+        # open: see the next testset for the opt-in fix.
         @test mneu < mraw
         @test mneu > 0.5
+    end
+
+    @testset "`cre = CrossSectionalLinearRegression(; intercept = true)` narrows it further (#950)" begin
+        # An opt-in fix, not a changed default: the re-standardisation and the grouping
+        # after the fit reintroduce some correlation, so this does not reach zero, but it
+        # is well below the no-intercept default's floor.
+        dni = DescriptorScores(; descriptors = ds.descriptors, neutralise = "style",
+                               cre = CrossSectionalLinearRegression(; intercept = true),
+                               outlier = ds.outlier, scoring = ds.scoring, group = ds.group)
+        nei = FixedWeightedReturnForecast(; scores = dni, scale = 1.0, weights = [0.4, 0.6])
+        cni = forecast_factor_correlation(forecast_evaluation(nei, rd, csfm; horizon = 2),
+                                          csfm)
+        mnei = abs(sum(filter(isfinite, view(cni, :, 1))) /
+                   count(isfinite, view(cni, :, 1)))
+        @test mnei < mneu
+        @test mnei < 0.4
     end
 end
 
