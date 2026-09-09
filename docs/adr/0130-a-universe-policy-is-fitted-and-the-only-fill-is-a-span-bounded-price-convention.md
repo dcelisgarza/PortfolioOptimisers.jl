@@ -127,8 +127,13 @@ price is the one a caller reaching for a fill normally wants.
 The fill is **bounded by the Listing Span**. It fills only where `first[i] <= t <= last[i]`, so it
 touches Held Gaps alone and can never fabricate a price where the asset was not yet listed or has
 been delisted. This is the guarantee the reference's ingestion fill lacks and its panel fill has.
-A carrier holding gaps and no span derives one window-locally and warns, refusing under `strict` —
-the same strictness policy the conversion uses.
+The span is asked of the carrier, and a carrier that states none **is not filled**: under
+[ADR 0133](0133-the-conversion-computes-a-return-and-ingestion-is-the-only-door.md) every carrier
+the layer builds states one, so a carrier without a span was built by hand and the step has no
+listing calendar to bound itself by. It says so — it warns that it filled nothing and why, and
+refuses under `strict` — rather than filling window-locally, because a window-local span reads a
+suspension straddling the window's edge as an inception and fills the wrong cells. That ADR rewrote
+this paragraph, which previously derived the span window-locally and filled from it.
 
 ### A fill runs at the price level; a drop runs at the returns level
 
@@ -150,13 +155,19 @@ truth about the data as converted. No fourth mask state is minted, and none coul
 were: `coverage_mask` reads finiteness and the active mask and never the estimation mask, so a
 finite cell flagged non-estimable would enter every plain moment estimator's fit regardless.
 
-A **drop** runs at the returns level, after both masks, as a Universe Policy. `port_opt_view` slices
-the masks and the Panel Fields out with the column, so `assert_panel_masks` holds by construction:
-both masks are still present together, still match the Panel Fields' shape, and `emsk ⊆ amsk` is
-untouched by a column removal.
+A **drop** runs after the span, at either level. At the returns level it is an
+`AbstractAssetSelector`, and `port_opt_view` slices the masks and the Panel Fields out with the
+column, so `assert_panel_masks` holds by construction: both masks are still present together, still
+match the Panel Fields' shape, and `emsk ⊆ amsk` is untouched by a column removal. At the price
+level it is `MissingDataFilter`, and `span_carrier_view` slices the span with the rows and columns
+that survived rather than re-deriving one — which is what keeps a row drop from erasing the trailing
+gaps a delisting is read from.
 
 The span is read before either, so neither can move it. A fill cannot erase a delisting, and a drop
-cannot resurrect one.
+cannot resurrect one. That ordering, not the level, is the rule:
+[ADR 0133](0133-the-conversion-computes-a-return-and-ingestion-is-the-only-door.md) makes the
+price-level drop the route that replaces the conversion's own deletion, and rewrote this paragraph,
+which previously placed every drop at the returns level.
 
 ### Names
 
@@ -178,9 +189,9 @@ unseen window, so it is where the convention `apply_preprocessing` dispatches on
 where the refusal has to be read from.
 
 The span the fill is bounded by is asked of the carrier rather than derived by the step, so the two
-never disagree. That question is one verb, and a price carrier that states no listing calendar is
-its default answer — which is what makes the window-local fallback above a live path rather than a
-hypothetical one.
+never disagree. That question is one verb, and under ADR 0133 every carrier the ingestion layer
+builds answers it, so on the layer's path the fill is always bounded. A hand-built carrier is the
+only one that answers `nothing`, and the step reports rather than guesses.
 
 The name deliberately does not reuse `gap_fill_value`, which is a trait on a covariance estimator
 naming the value it substitutes internally for a gap it was handed. That is an estimator's private

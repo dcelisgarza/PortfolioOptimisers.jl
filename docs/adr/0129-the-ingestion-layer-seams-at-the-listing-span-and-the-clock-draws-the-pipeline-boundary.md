@@ -118,9 +118,14 @@ before the split, is that **a listing calendar is a fact about the instruments, 
 from returns**. The split rule guards against a *stateful* step learning from held-out rows; a span
 learns nothing. This is why #958 measured it leak-free rather than merely convenient.
 
-A conversion that meets a carrier holding gaps and no span derives one window-locally and **warns**
-by default, refusing under `strict`. That is the strictness policy the Held Gap already uses, and a
-carrier with no gaps is not at risk: with no gaps, window-local and panel-wide derivation agree.
+A conversion that meets a carrier holding gaps and no span **states no universe**: it carries the
+gaps into the returns and emits no panel, so `pnl === nothing` keeps its one meaning. It does not
+derive a span window-locally, because a window-local span reads a delisting that straddles the
+window end as dead rather than held — the divergence above — and a silently wrong universe is worse
+than none. The gaps are still handled downstream: with no panel the Coverage Universe reads
+finiteness alone.
+[ADR 0133](0133-the-conversion-computes-a-return-and-ingestion-is-the-only-door.md) rewrote this
+paragraph, which previously derived the span window-locally, warned, and refused under `strict`.
 
 ### Moving the observation clock is what puts work outside the Pipeline
 
@@ -201,9 +206,8 @@ than as the panel's defining content.
 `assert_split_position` keeps its present rule. The decomposition adds no construction-time gate to
 `Pipeline`.
 
-A caller who builds a price carrier by hand, outside `PriceIngestion`, gets a span of `nothing`. If
-that carrier holds gaps, the conversion warns and derives window-locally, and refuses under
-`strict`. A clean carrier is unaffected.
+A caller who builds a price carrier by hand, outside `PriceIngestion`, gets a span of `nothing`, and
+the conversion emits no panel for it whether or not it holds gaps. A clean carrier is unaffected.
 
 The filtering and imputation policy inherits its position rather than choosing it, and the seams
 above split it by what it does. A policy that **drops** a row or a column runs at the returns level,
