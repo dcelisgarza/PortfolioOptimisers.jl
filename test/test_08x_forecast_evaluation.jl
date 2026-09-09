@@ -3,12 +3,13 @@ Check `src/08_Moments/45_ReturnForecasts/07_ForecastEvaluation.jl`,
 `src/08_Moments/45_ReturnForecasts/08_ForecastHistory.jl` and
 `src/08_Moments/45_ReturnForecasts/09_ForecastInformationCoefficient.jl`,
 `src/08_Moments/45_ReturnForecasts/10_ForecastPortfolios.jl`,
-`src/08_Moments/45_ReturnForecasts/11_ForecastFactorCorrelation.jl` and
-`src/08_Moments/45_ReturnForecasts/12_ForecastForwardWindows.jl` against the contract their
+`src/08_Moments/45_ReturnForecasts/11_ForecastFactorCorrelation.jl`,
+`src/08_Moments/45_ReturnForecasts/12_ForecastForwardWindows.jl` and
+`src/08_Moments/45_ReturnForecasts/13_ForecastCalibration.jl` against the contract their
 docstrings state, and against the reference implementation the map of issue #931 ports.
-Issues #934, #935, #936, #937, #939 and #940.
+Issues #934, #935, #936, #937, #938, #939 and #940.
 
-NINE CONVENTIONS SHAPE THE PROBES.
+TEN CONVENTIONS SHAPE THE PROBES.
 
 1. THE TWO OBSERVATION AXES ARE RECONCILED BY THE TARGET, NOT BY THE EVALUATION. A Return
    Forecast history lives on the factor-model block's rows, and the block is a suffix of the
@@ -81,6 +82,15 @@ NINE CONVENTIONS SHAPE THE PROBES.
    ticket asked for the opposite -- that shortening `n` leave the rows that remain -- and
    that is FALSE in general and asserted as false. It holds only when the base evaluation
    already stops before the deepest window matures, and that case is asserted beside it.
+
+10. THE CALIBRATION IS POOLED OVER PAIRS, SO IT READS NO THRESHOLD. Every other statistic
+    here is a statistic of a cross-section and refuses one that carries fewer than
+    `min_count` assets. The slope, the curve and the pooled moments read the pairs of every
+    evaluation date as one sample, so a thin cross-section contributes few pairs rather
+    than an unreliable number: there is nothing to threshold, and the probes assert that
+    raising `min_count` past the universe moves none of the four answers. The slope is also
+    the one reading of a forecast that a rescaling moves, and that is asserted beside the
+    two readings it does not move.
 =#
 include(joinpath(@__DIR__, "test06c_setup.jl"))
 
@@ -1561,5 +1571,252 @@ end
         @test isapprox(t4.spearman_mean_ic, t1.spearman_mean_ic)
         @test isapprox(t4.pearson_t_stat, t1.pearson_t_stat)
         @test t4.mean_coverage == t1.mean_coverage
+    end
+end
+
+# The oracle of the calibration, measured by running the reference implementation on
+# `IC_ALPHA` and its forward target -- the same two matrices the information coefficients
+# are oracled on, so the two sets of literals describe one forecast. `IC_ALPHA` spaces its
+# assets very unevenly, which is what makes a scale statistic worth taking on it: the
+# forecast of `40` at the second date drags the slope far below `1` while the ordering it
+# states is good. Issue #938.
+const CAL_REF_SLOPE = 0.29795686719636777
+const CAL_REF_SLOPE_W = 0.14120994309673554
+const CAL_REF_MEAN_ALPHA = 6.333333333333333
+const CAL_REF_STD_ALPHA = 10.790006599823858
+const CAL_REF_MEAN_Y = 6.083333333333333
+const CAL_REF_STD_Y = 10.799480907839406
+# The reference numbers its buckets from zero and the library from one, so the indices below
+# are its `[0, 2, 4, 5, 7, 8]` shifted by one. The four bins it never fills are dropped by
+# both.
+const CAL_REF_BIN = [1, 3, 5, 6, 8, 9]
+const CAL_REF_BIN_ALPHA = [1.0, 2.0, 3.0, 4.0, 5.0, 24.0]
+const CAL_REF_BIN_Y = [2.5, 2.0, 5.5, 5.0, 1.5, 21.5]
+const CAL_REF_BIN_COUNT = [2, 3, 2, 1, 2, 2]
+
+@testset "The calibration reproduces the reference implementation" begin
+    PO = PortfolioOptimisers
+    y = PO.forward_mean_returns(IC_ALPHA, 1, 1)
+    fe = forecast_evaluation(IC_ALPHA, y)
+    c = forecast_calibration(fe)
+
+    @testset "The slope and the pooled moments match, weighted and unweighted" begin
+        @test c.slope ≈ CAL_REF_SLOPE
+        @test forecast_calibration(fe, IC_W).slope ≈ CAL_REF_SLOPE_W
+        @test c.mean_alpha ≈ CAL_REF_MEAN_ALPHA
+        @test c.std_alpha ≈ CAL_REF_STD_ALPHA
+        @test c.mean_y ≈ CAL_REF_MEAN_Y
+        @test c.std_y ≈ CAL_REF_STD_Y
+        # A good ordering and a bad scale: the coefficients of #936 are positive at the
+        # first two dates and the slope is a third of one all the same.
+        @test c.slope < 0.5
+    end
+
+    @testset "The curve matches bin for bin, and the empty bins are dropped" begin
+        @test c.n_bins == length(CAL_REF_BIN)
+        @test c.curve.bin == CAL_REF_BIN
+        @test c.curve.mean_alpha ≈ CAL_REF_BIN_ALPHA
+        @test c.curve.mean_y ≈ CAL_REF_BIN_Y
+        @test c.curve.count == CAL_REF_BIN_COUNT
+        @test c.n_bins < 10
+    end
+
+    @testset "The curve reads every pair, and only the pairs" begin
+        n = sum(t -> count(i -> isfinite(fe.alpha[t, i]) && isfinite(fe.y[t, i]),
+                           axes(fe.alpha, 2)), fe.dates)
+        @test sum(c.curve.count) == n
+        @test issorted(c.curve.mean_alpha)
+    end
+end
+
+@testset "The calibration slope states a scale and nothing else" begin
+    PO = PortfolioOptimisers
+    y = PO.forward_mean_returns(IC_ALPHA, 1, 1)
+    fe = forecast_evaluation(IC_ALPHA, y)
+
+    @testset "A perfect forecast is already in target units" begin
+        perfect = forecast_evaluation(fe.y, fe.y)
+        @test forecast_calibration(perfect).slope == 1
+        @test forecast_calibration(perfect, ones(size(fe.y))).slope == 1
+    end
+
+    @testset "Scaling the forecast by `c` scales the slope by `1/c`" begin
+        for k in (0.5, 2.0, 10.0)
+            @test forecast_calibration(forecast_evaluation(k * IC_ALPHA, y)).slope ≈
+                  forecast_calibration(fe).slope / k
+        end
+        @test forecast_calibration(forecast_evaluation(-IC_ALPHA, y)).slope ≈ -CAL_REF_SLOPE
+    end
+
+    @testset "The line is pinned through the origin" begin
+        # A fitted intercept would absorb a shift of the forecast and leave the slope where
+        # it was. This one does not, which is what makes it a statement about scale.
+        shifted = forecast_calibration(forecast_evaluation(IC_ALPHA .+ 100.0, y)).slope
+        @test !isapprox(shifted, CAL_REF_SLOPE)
+    end
+
+    @testset "A forecast that is identically zero states no scale" begin
+        @test isnan(forecast_calibration(forecast_evaluation(zeros(size(IC_ALPHA)), y)).slope)
+        @test isnan(PO.forecast_calibration_slope(Float64[], Float64[], Float64[]))
+    end
+end
+
+@testset "The calibration curve cuts quantile bins" begin
+    PO = PortfolioOptimisers
+
+    @testset "The edges are the quantiles, and they are answered once each" begin
+        # The cut writes out the linear interpolation `Statistics.quantile` applies by
+        # default, so it must answer exactly what that verb answers -- which is what keeps
+        # the curve at parity with the reference implementation.
+        for x in ([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0], [1.0, 1.0, 2.0, 40.0],
+                  collect(range(-3.0, 5.0, 17)))
+            for bins in (1, 2, 3, 10)
+                @test PO.forecast_calibration_edges(x, bins) ≈
+                      unique([quantile(x, p) for p in range(0, 1, bins + 1)])
+            end
+        end
+        @test PO.forecast_calibration_edges([2.0, 2.0, 2.0], 4) == [2.0]
+        @test length(PO.forecast_calibration_edges(collect(1.0:100.0), 10)) == 11
+    end
+
+    @testset "An empty pooling answers four empty vectors" begin
+        e = PO.forecast_calibration_curve(Float64[], Float64[], 3)
+        @test isempty(e.bin)
+        @test isempty(e.mean_alpha)
+        @test isempty(e.mean_y)
+        @test isempty(e.count)
+    end
+
+    @testset "A forecast with one distinct value leaves one bin" begin
+        f = PO.forecast_calibration_curve(fill(2.0, 5), collect(1.0:5.0), 4)
+        @test f.bin == [1]
+        @test f.mean_alpha == [2.0]
+        @test f.mean_y == [3.0]
+        @test f.count == [5]
+    end
+
+    @testset "A tie that spans an edge collapses the bins it spans" begin
+        t = PO.forecast_calibration_curve([1.0, 1.0, 1.0, 2.0], [1.0, 2.0, 3.0, 4.0], 4)
+        @test t.bin == [1, 2]
+        @test t.count == [3, 1]
+        @test t.mean_alpha == [1.0, 2.0]
+        @test t.mean_y == [2.0, 4.0]
+    end
+
+    @testset "`bins = 1` pools everything and `bins = 0` is refused" begin
+        o = PO.forecast_calibration_curve([1.0, 2.0, 3.0], [1.0, 2.0, 3.0], 1)
+        @test o.bin == [1]
+        @test o.count == [3]
+        @test_throws DomainError PO.forecast_calibration_curve([1.0], [1.0], 0)
+        @test_throws DomainError forecast_calibration(forecast_evaluation(IC_ALPHA,
+                                                                          PO.forward_mean_returns(IC_ALPHA,
+                                                                                                  1,
+                                                                                                  1));
+                                                      bins = 0)
+    end
+
+    @testset "The pooled moments answer `NaN` where they cannot be taken" begin
+        @test PO.forecast_pooled_moments([1.0]).mean == 1
+        @test isnan(PO.forecast_pooled_moments([1.0]).std)
+        @test isnan(PO.forecast_pooled_moments(Float64[]).mean)
+        @test isnan(PO.forecast_pooled_moments(Float64[]).std)
+    end
+end
+
+@testset "A weight shapes the slope alone, and the threshold reaches nothing" begin
+    PO = PortfolioOptimisers
+    y = PO.forward_mean_returns(IC_ALPHA, 1, 1)
+    fe = forecast_evaluation(IC_ALPHA, y)
+    plain = forecast_calibration(fe)
+
+    @testset "A zero weight drops a pair from the slope and keeps it everywhere else" begin
+        w = ones(size(IC_ALPHA))
+        w[1, 1] = 0.0
+        c = forecast_calibration(fe, w)
+        @test !isapprox(c.slope, plain.slope)
+        @test c.curve == plain.curve
+        @test c.mean_alpha == plain.mean_alpha
+        @test c.mean_y == plain.mean_y
+        @test c.n_bins == plain.n_bins
+    end
+
+    @testset "A weight that is not finite is read as a zero one" begin
+        w = ones(size(IC_ALPHA))
+        w[1, 1] = 0.0
+        wn = ones(size(IC_ALPHA))
+        wn[1, 1] = NaN
+        @test forecast_calibration(fe, wn).slope == forecast_calibration(fe, w).slope
+        @test forecast_calibration(fe, wn).curve == plain.curve
+    end
+
+    @testset "A history of ones is the equal-weight case" begin
+        @test forecast_calibration(fe, ones(size(IC_ALPHA))).slope == plain.slope
+    end
+
+    @testset "The weight history is checked against the forecast" begin
+        @test_throws DimensionMismatch forecast_calibration(fe, ones(2, 2))
+        @test_throws DomainError forecast_calibration(fe, -ones(size(IC_ALPHA)))
+    end
+
+    @testset "`min_count` is not a parameter of this statistic" begin
+        # Every other statistic of an evaluation refuses a thin cross-section. This one
+        # pools the pairs of every date and reads them as one sample, so there is no
+        # cross-sectional count to threshold and the answer does not move with it.
+        hi = forecast_evaluation(IC_ALPHA, y; min_count = size(IC_ALPHA, 2) + 1)
+        c = forecast_calibration(hi)
+        @test c.slope == plain.slope
+        @test c.curve == plain.curve
+        @test c.mean_alpha == plain.mean_alpha
+        @test c.n_bins == plain.n_bins
+    end
+end
+
+@testset "The calibration of a fitted member is measured on the panel" begin
+    PO = PortfolioOptimisers
+    fx = evaluation_fixture(; planted = true)
+    fw = FixedWeightedReturnForecast(; scores = fx.scores, scale = 1.0,
+                                     weights = [0.4, 0.6])
+    fe = forecast_evaluation(fw, fx.rd, fx.csfm; horizon = 2, lag = 1, step = 1)
+
+    @testset "A member that never calibrated states whatever scale it carries" begin
+        # `FixedWeightedReturnForecast` blends standardised Descriptor scores, so its
+        # magnitude is that of a score and not that of a return. The slope is therefore
+        # very small and finite, and the curve still has ten bins to report it over.
+        c = forecast_calibration(fe)
+        @test isfinite(c.slope)
+        @test c.slope > 0
+        @test c.slope < 0.01
+        @test c.n_bins == 10
+        @test sum(c.curve.count) ==
+              sum(t -> count(i -> isfinite(fe.alpha[t, i]) && isfinite(fe.y[t, i]),
+                             axes(fe.alpha, 2)), fe.dates)
+        @test issorted(c.curve.mean_alpha)
+        @test abs(c.mean_alpha) < abs(c.std_alpha)
+    end
+
+    @testset "The block method resolves the weights the metric names" begin
+        c = forecast_calibration(fe, fx.csfm)
+        @test c.slope == forecast_calibration(fe,
+                               PO.cs_diagnostic_weights(PO.IdentityMetric(), fx.csfm)).slope
+        @test c.curve == forecast_calibration(fe).curve
+        cb = forecast_calibration(fe, fx.csfm;
+                                  weighting = PO.InverseIdiosyncraticVarianceMetric(),
+                                  bins = 4)
+        @test cb.n_bins == 4
+        @test !isapprox(cb.slope, c.slope)
+        @test cb.curve != c.curve
+        # A metric the block cannot serve is refused by name, by the resolver rather than
+        # by this verb: the fixture's block carries no benchmark weight history.
+        @test_throws PO.IsNothingError forecast_calibration(fe, fx.csfm;
+                                                            weighting = PO.BenchmarkWeightMetric())
+    end
+
+    @testset "The scale is the one reading a rescaling moves" begin
+        # The coefficients and the portfolio are invariant to a rescaling of the forecast,
+        # and the calibration is not. That is the whole reason this verb exists.
+        scaled = forecast_evaluation(100 .* fe.alpha, fe.y; horizon = 2, lag = 1, step = 1)
+        @test forecast_ic(scaled)[:, 1] ≈ forecast_ic(fe)[:, 1]
+        @test forecast_portfolio(scaled).ret ≈ forecast_portfolio(fe).ret
+        @test forecast_calibration(scaled).slope ≈ forecast_calibration(fe).slope / 100
     end
 end

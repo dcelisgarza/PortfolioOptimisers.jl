@@ -155,6 +155,10 @@ The cross-sectional scores of a set of Descriptors: each winsorised and standard
 **Forecast Unit**
 The unit a Return Forecast Estimator's descriptors forecast in: the idiosyncratic return, or the idiosyncratic Sharpe ratio, which the estimator converts back with the idiosyncratic volatility so a Return Forecast is always in return units.
 
+**Forecast Calibration**
+The out-of-sample scale of a Return Forecast: the slope of a weighted zero-intercept regression of the realised forward target on the forecast, pooled over every scorable pair of an evaluation, together with the curve of that relation over quantile bins of the forecast. A slope of `1` says the forecast is already in the units of the target, a slope above `1` that its magnitude is too small, and one below `1` that it is too large. It is the one reading of a forecast that is not invariant to a rescaling of it, so it is what an optimiser that reads the forecast as a mean depends on.
+*Avoid*: Calibration Rule and Calibration Slot (§3.9), which compute the number a slot of an uncertainty set would otherwise state; the calibration of a fitted factor model, which is the standard deviation of its standardised idiosyncratic returns and is measured in sample; and a Return Forecast Estimator's own calibration coefficient, which puts a member's predictions into return units at fit time rather than measuring whether they landed there.
+
 ### 3.2 Covariance & Variance (Moments)
 
 **Covariance Estimator**
