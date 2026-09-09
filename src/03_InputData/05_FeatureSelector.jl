@@ -563,7 +563,7 @@ function feature_matrix(pnl::AssetPanel, sel = nothing; strict::Bool = false)
     T = mapreduce(promote_type, cols; init = Union{}) do col
         return col[3] === :observed ? Union{} : panel_value_eltype(pnl.pf[col[1]])
     end
-    Z = zeros(T === Union{} ? Float64 : T, panel_field_axes(pnl.pf[1])..., length(cols))
+    Z = zeros(T === Union{} ? Float64 : T, panel_axes(pnl)..., length(cols))
     for (c, col) in pairs(cols)
         k, l, part = col
         zc = selectdim(Z, ndims(Z), c)

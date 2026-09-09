@@ -510,7 +510,7 @@ function fold_asset_panel(pnl::AssetPanel, nx::Option{<:VecStr}, wi::MatNum, anc
     if panel_is_static(pnl)
         c = collapse_asset_panel(pnl, wi, nx)
         n = Int(anchor)
-        na = panel_field_axes(c.pf[1])[end]
+        na = panel_axes(c)[end]
         return AssetPanel(; pf = [panel_field_lift(f, n) for f in c.pf],
                           amsk = trues(n, na), emsk = trues(n, na))
     end

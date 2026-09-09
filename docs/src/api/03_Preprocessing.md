@@ -65,6 +65,41 @@ PortfolioOptimisers.ListingSpan
 PortfolioOptimisers.project_span
 ```
 
+## The ingestion layer
+
+[`PriceIngestion`](@ref) assembles raw price series into the carrier the conversion reads. It runs
+**once on the whole panel** and is deliberately not a [`Pipeline`](@ref) step: unification of the
+two absent-price conventions, the factor and benchmark join, and the frequency collapse each move
+or renumber the observations, folds are cut once on the carrier's clock, and a hyperparameter that
+changes the test set cannot be scored against one that does not. Running outside the `Pipeline` is
+also what lets the **Span Rule** read the whole panel, which a step — seeing only a window — cannot.
+
+The carrier it emits holds the Listing Span in its `span` field. [`PricesToReturns`](@ref) projects
+that onto the returns clock and hands the [`ReturnsResult`](@ref) an [`AssetPanel`](@ref) stating
+the universe — **always**, a gapless panel included, so `pnl === nothing` on a returns carrier means
+one thing only: the carrier was not built by the layer. The gapless case costs nothing to say: both
+masks become a [`PortfolioOptimisers.AllTrueMask`](@ref), which stores no cell.
+
+Convert an ingested carrier with `PricesToReturns(; nan_to_missing = false)`. The layer spells an
+absent price `NaN` precisely so that no deletion step reads it, and a conversion that reads it as
+absent again deletes the gaps the span describes; it warns when asked to, and refuses under
+`strict`. See
+`docs/adr/0129-the-ingestion-layer-seams-at-the-listing-span-and-the-clock-draws-the-pipeline-boundary.md`
+and
+`docs/adr/0132-the-layer-emits-one-carrier-and-alignment-splits-into-a-fixed-axis-and-a-provenance-check.md`.
+
+```@docs
+PriceIngestion
+price_ingestion
+PortfolioOptimisers.unify_gaps
+PortfolioOptimisers.assert_span_convertible
+PortfolioOptimisers.returns_universe_masks
+PortfolioOptimisers.compress_all_true
+PortfolioOptimisers.attach_universe_masks
+PortfolioOptimisers.AllTrueMask
+PortfolioOptimisers.span_carrier_view
+```
+
 ## The price gap fill
 
 A **Held Price** is the last priced observation of an asset, carried forward across a gap. Stating
@@ -129,6 +164,7 @@ Feature Matrix.
 AssetPanel
 asset_panel
 panel_field
+PortfolioOptimisers.panel_axes
 panel_feature_matrix
 panel_dataframe
 PortfolioOptimisers.panel_frame_columns

@@ -143,10 +143,18 @@ $(DocStringExtensions.FIELDS)
 end
 """
     carrier_listing_span(pr::AbstractPricesResult) -> Nothing
+    carrier_listing_span(pr::PricesResult) -> Option{<:AbstractMatrix{Bool}}
 
 Read the Listing Span a price carrier states, or `nothing` when it states none.
 
-ADR 0129 rides the span on the price carrier, so a step that needs one asks the carrier rather than deriving its own. This is the family's default answer, and it is what a carrier assembled by hand gives: such a carrier states no listing calendar, so the step that asked must fall back and say so. A carrier built by the ingestion layer answers with its span instead.
+ADR 0129 rides the span on the price carrier, so a step that needs one asks the carrier rather than deriving its own. A [`PricesResult`](@ref) answers with its `span` field, which [`price_ingestion`](@ref) fills and a carrier assembled by hand leaves `nothing`; every other member of the family answers `nothing`, because a carrier that carries no span states no listing calendar and the step that asked must fall back and say so.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. Any price carrier: `nothing`. The family states no span of its own.
+ 2. A [`PricesResult`](@ref): its `span` field.
 
 # Arguments
 
@@ -154,16 +162,21 @@ ADR 0129 rides the span on the price carrier, so a step that needs one asks the 
 
 # Returns
 
-  - `span::Nothing`: The carrier states no Listing Span.
+  - `span::Option{<:AbstractMatrix{Bool}}`: The carrier's Listing Span, or `nothing`.
 
 # Related
 
   - [`PortfolioOptimisers.gap_fill_span`](@ref)
   - [`listing_span`](@ref)
+  - [`price_ingestion`](@ref)
   - [`PricesResult`](@ref)
+  - [`Option`](@ref)
 """
 function carrier_listing_span(::AbstractPricesResult)
     return nothing
+end
+function carrier_listing_span(pr::PricesResult)
+    return pr.span
 end
 """
     gap_fill_span(span::AbstractMatrix{Bool}, X::AbstractMatrix, strict::Bool) -> AbstractMatrix{Bool}
@@ -336,8 +349,11 @@ function apply_preprocessing(res::PriceGapFillResult, pr::PricesResult)::PricesR
         gap_fill_column!(res.fill, vals, span, j, v)
     end
     X = TimeSeries.TimeArray(TimeSeries.timestamp(pr.X), vals, names)
+    #! A fill states a price, not a listing, so the span passes through untouched: it is
+    #! what bounded the fill, and the Span Rule reads the same listing off the filled
+    #! panel as off the raw one.
     return PricesResult(; X = X, F = pr.F, B = pr.B, iv = pr.iv, ivpa = pr.ivpa,
-                        pnl = pr.pnl)
+                        pnl = pr.pnl, span = pr.span)
 end
 
 export CarriedPrice, PriceGapFill, PriceGapFillResult

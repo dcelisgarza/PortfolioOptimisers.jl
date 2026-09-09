@@ -277,6 +277,7 @@ $(DocStringExtensions.FIELDS)
         iv::Option{<:TimeSeries.TimeArray} = nothing,
         ivpa::Option{<:Num_VecNum} = nothing,
         pnl::Option{<:AssetPanel} = nothing,
+        span::Option{<:AbstractMatrix{Bool}} = nothing,
     ) -> PricesResult
 
 Keywords correspond to the struct's fields.
@@ -289,6 +290,7 @@ Keywords correspond to the struct's fields.
   - If `iv` is not `nothing`: `!isempty(iv)`, `all(x -> x >= 0, values(iv))`, `all(x -> isfinite(x), values(iv))`, and `size(values(iv), 2) == size(values(X), 2)`.
   - If `ivpa` is not `nothing`: `all(x -> x > 0, ivpa)`, `all(x -> isfinite(x), ivpa)`; if a vector, `length(ivpa) == size(values(X), 2)`.
   - `pnl`'s asset axis is `size(values(X), 2)`, and its observation axis is `size(values(X), 1)` when it is time-varying. See [`check_asset_panel`](@ref).
+  - If `span` is not `nothing`: `size(span) == size(values(X))`. Raises a `DimensionMismatch`.
 
 # Examples
 
@@ -338,10 +340,14 @@ julia> size(values(pr.X))
     Optional [`AssetPanel`](@ref): the Panel Fields of the universe, and its two universe masks. Not a `TimeArray`: its axes are held positionally parallel to `X`.
     """
     pnl
+    """
+    Optional **Listing Span**: which assets are listed at each observation of the price clock, `observations × assets`, held positionally parallel to `X`. A [`PortfolioOptimisers.ListingSpan`](@ref) when [`PriceIngestion`](@ref) derived it by the Span Rule, and any other `AbstractMatrix{Bool}` when a caller declared their own listing calendar. `nothing` says the carrier was not built by the ingestion layer.
+    """
+    span
     function PricesResult(X::TimeSeries.TimeArray, F::Option{<:TimeSeries.TimeArray},
                           B::Option{<:TimeSeries.TimeArray},
                           iv::Option{<:TimeSeries.TimeArray}, ivpa::Option{<:Num_VecNum},
-                          pnl::Option{<:AssetPanel})
+                          pnl::Option{<:AssetPanel}, span::Option{<:AbstractMatrix{Bool}})
         @argcheck(!isempty(X), IsEmptyError)
         if !isnothing(F)
             @argcheck(!isempty(F), IsEmptyError)
@@ -361,12 +367,12 @@ julia> size(values(pr.X))
             end
         end
         check_asset_panel(pnl, size(values(X), 2), size(values(X), 1), "size(values(X), 2)")
-        return new{typeof(X), typeof(F), typeof(B), typeof(iv), typeof(ivpa), typeof(pnl)}(X,
-                                                                                           F,
-                                                                                           B,
-                                                                                           iv,
-                                                                                           ivpa,
-                                                                                           pnl)
+        if !isnothing(span)
+            @argcheck(size(span) == size(values(X)),
+                      DimensionMismatch("a Listing Span states which assets are listed at each observation of the price clock, so it is the shape of the asset prices; got size(span) = $(size(span)) and size(values(X)) = $(size(values(X)))"))
+        end
+        return new{typeof(X), typeof(F), typeof(B), typeof(iv), typeof(ivpa), typeof(pnl),
+                   typeof(span)}(X, F, B, iv, ivpa, pnl, span)
     end
 end
 function PricesResult(; X::TimeSeries.TimeArray,
@@ -374,8 +380,9 @@ function PricesResult(; X::TimeSeries.TimeArray,
                       B::Option{<:TimeSeries.TimeArray} = nothing,
                       iv::Option{<:TimeSeries.TimeArray} = nothing,
                       ivpa::Option{<:Num_VecNum} = nothing,
-                      pnl::Option{<:AssetPanel} = nothing)::PricesResult
-    return PricesResult(X, F, B, iv, ivpa, pnl)
+                      pnl::Option{<:AssetPanel} = nothing,
+                      span::Option{<:AbstractMatrix{Bool}} = nothing)::PricesResult
+    return PricesResult(X, F, B, iv, ivpa, pnl, span)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -390,7 +397,7 @@ The method that Julia selects is the algorithm. The timestamp methods do the wor
 
  1. `i` and `j` are both `Colon`: return `pr` itself. No view is built.
 
- 2. `i` is a vector of timestamps and `j` is a `Colon`: index `X`, `F`, `B` and `iv` by the timestamps `i`. Recover the rows of a time-varying Asset Panel from the surviving timestamps with [`feature_row_indices`](@ref), and view the panel on that observation axis with [`panel_carrier_view`](@ref). A static panel has no observation axis and ignores the row index. Carry `ivpa` through untouched, because the asset index does not reach it. Rebuild the [`PricesResult`](@ref).
+ 2. `i` is a vector of timestamps and `j` is a `Colon`: index `X`, `F`, `B` and `iv` by the timestamps `i`. Recover the rows of a time-varying Asset Panel from the surviving timestamps with [`feature_row_indices`](@ref), and view the panel on that observation axis with [`panel_carrier_view`](@ref). A static panel has no observation axis and ignores the row index. View the Listing Span on the same surviving timestamps with [`span_carrier_view`](@ref). Carry `ivpa` through untouched, because the asset index does not reach it. Rebuild the [`PricesResult`](@ref).
 
  3. `i` is a vector of timestamps and `j` is a vector of asset indices:
 
@@ -400,7 +407,8 @@ The method that Julia selects is the algorithm. The timestamp methods do the wor
      4. Index `iv` by the timestamps `i` and the asset columns `j`, and view `ivpa` at `j`.
      5. Read `sq` from [`features_are_assets`](@ref) on `nz` and the asset names of `X`. When `sq` is `true`, view `nz` at `j` as well.
      6. Recover the rows of a time-varying Asset Panel with [`feature_row_indices`](@ref), and view the panel at those rows and the assets `j` with [`panel_carrier_view`](@ref), handing it the asset names so that a square tensor Panel Field is cut on its label axis too.
-     7. Rebuild the [`PricesResult`](@ref).
+     7. View the Listing Span at the surviving timestamps and the assets `j` with [`span_carrier_view`](@ref).
+     8. Rebuild the [`PricesResult`](@ref).
 
  4. `i` and `j` are integer indices, ranges or `Colon`s: read the timestamps `TimeSeries.timestamp(pr.X)[i]`, and call step 2 or step 3 with them. This is the method a caller reaches with `port_opt_view(pr, 2:3)`.
 
@@ -447,7 +455,10 @@ function port_opt_view(pr::PricesResult, i::AbstractVector{<:Dates.AbstractTime}
     iv = isnothing(pr.iv) ? nothing : pr.iv[i]
     rows = feature_row_indices(pr.pnl, TimeSeries.timestamp(X), TimeSeries.timestamp(pr.X))
     pnl = panel_carrier_view(pr.pnl, rows, :, nothing)
-    return PricesResult(; X = X, F = F, B = B, iv = iv, ivpa = pr.ivpa, pnl = pnl)
+    span = span_carrier_view(pr.span, TimeSeries.timestamp(X), TimeSeries.timestamp(pr.X),
+                             :)
+    return PricesResult(; X = X, F = F, B = B, iv = iv, ivpa = pr.ivpa, pnl = pnl,
+                        span = span)
 end
 function port_opt_view(pr::PricesResult, i::AbstractVector{<:Dates.AbstractTime},
                        j::AbstractVector)
@@ -468,7 +479,9 @@ function port_opt_view(pr::PricesResult, i::AbstractVector{<:Dates.AbstractTime}
     ivpa = nothing_scalar_array_view(pr.ivpa, j)
     rows = feature_row_indices(pr.pnl, TimeSeries.timestamp(X), TimeSeries.timestamp(pr.X))
     pnl = panel_carrier_view(pr.pnl, rows, j, string.(TimeSeries.colnames(pr.X)))
-    return PricesResult(; X = X, F = F, B = B, iv = iv, ivpa = ivpa, pnl = pnl)
+    span = span_carrier_view(pr.span, TimeSeries.timestamp(X), TimeSeries.timestamp(pr.X),
+                             j)
+    return PricesResult(; X = X, F = F, B = B, iv = iv, ivpa = ivpa, pnl = pnl, span = span)
 end
 function port_opt_view(pr::PricesResult,
                        i::Union{<:VecInt, <:AbstractRange{<:Integer}, Colon} = :,
@@ -1540,8 +1553,9 @@ A benchmark ``B`` is converted by the same rule and **carried alongside** the as
 14. Split the surviving column names into the asset names `nx`, the factor names `nf`, the benchmark names `nb`, and the timestamp column, which gives `ts`.
 15. Index the implied volatilities `iv` by `ts`, then check `iv` and `ivpa` against the surviving asset count.
 16. Subselect the [`AssetPanel`](@ref). Read the surviving assets' positions `acols` in the original asset names, recover the surviving rows with [`feature_row_indices`](@ref), and view the panel with [`port_opt_view`](@ref), handing it the surviving asset names so that a square tensor Panel Field is cut on its label axis too. An asset dropped by steps 9 to 11 takes its Panel Field values with it, or the panel and the returns would desynchronise silently. A time-varying panel is subselected to the surviving observations as well, matched back into the original price timestamps; a surviving timestamp absent from that clock throws. Under `collapse_args` this gives the aggregated period the values of the row at its representative timestamp, which is last-observation semantics and matches [`LastObservation`](@ref).
-17. Build the asset, factor and benchmark matrices from the surviving columns. A group whose columns all went is `nothing`.
-18. Return the [`ReturnsResult`](@ref).
+17. State the universe. Cut `span` to the price rows and the assets that survived with [`span_carrier_view`](@ref), and hand it, the surviving price panel and the converted returns to [`returns_universe_masks`](@ref), which projects it onto the returns clock and intersects it with finiteness. [`attach_universe_masks`](@ref) puts the pair onto the Asset Panel, keeping whatever Panel Fields it already carried, and mints one with no field when the carrier held none.
+18. Build the asset, factor and benchmark matrices from the surviving columns. A group whose columns all went is `nothing`.
+19. Return the [`ReturnsResult`](@ref).
 
 Step 8 counts the missing columns of a row, and step 10 counts the missing rows of a column. The name of each keyword reads as the axis it counts, and the axis it drops is the other one. Both filters read the same table, because step 10 counts only over the rows that step 9 kept.
 
@@ -1563,6 +1577,8 @@ Step 8 counts the missing columns of a row, and step 10 counts the missing rows 
   - `join_method`: How to join asset, factor data and benchmark data (`:outer`, `:inner`, etc.).
   - `impute_method`: Optional imputation method for missing data. `nothing`, or an `Impute.Imputor` — which requires `using Impute`, since `Impute` is a weak dependency loaded through `PortfolioOptimisersImputeExt`. Unrelated to [`Imputer`](@ref), which is a PortfolioOptimisers estimator and is not accepted here.
   - `pnl`: Optional [`AssetPanel`](@ref), as [`asset_panel`](@ref) returns it.
+  - `span`: Optional **Listing Span** on the price clock, as [`PriceIngestion`](@ref) derives it or a caller declares it. Given one, the conversion projects it onto the returns clock with [`universe_masks`](@ref) and hands the returns carrier an [`AssetPanel`](@ref) stating the universe — always, a gapless panel included, so `pnl === nothing` means one thing only: the carrier was not built by the ingestion layer. `nothing` with gapped prices derives the span from this window alone and warns, because a delisting straddling the window end reads as an asset that was never listed; `nothing` with gap-free prices states no universe and emits no panel.
+  - `strict`: Whether the two situations a carrier the layer did not build reaches are refused rather than warned about: a carrier holding gaps and no `span`, and a `span` whose gaps `nan_to_missing = true` deletes.
 
 # Validation
 
@@ -1573,6 +1589,9 @@ Step 8 counts the missing columns of a row, and step 10 counts the missing rows 
   - If `F` is not `nothing`, `!isempty(F)`.
   - If `B` is not `nothing`, `!isempty(B)`, and `size(values(B), 2) in (1, size(values(X), 2))`.
   - If `iv` is not `nothing`, the timestamps of the merged data matrix must be a subset of `TimeSeries.timestamp(iv)`, then `iv = values(iv)`, `!isempty(iv)`, `all(x -> x >= 0, iv)`, `all(x -> isfinite(x), iv)`, and `size(iv) == size(X)`.
+  - If `span` is not `nothing`, `size(span) == (size(values(X), 1), size(values(X), 2))`. Raises a `DimensionMismatch`.
+  - If `span` is not `nothing`, `nan_to_missing` is `false` under `strict`. Raises a [`ConflictingArgumentError`](@ref).
+  - If `span` is `nothing` and the converted prices hold a gap, `strict` is `false`. Raises an [`IsNothingError`](@ref).
   - `ivpa` is validated in that same branch, so it is checked only when `iv` is given: `all(x -> x > 0, ivpa)`, `all(x -> isfinite(x), ivpa)`, and, if a vector, `length(ivpa) == size(iv, 2)`. The bound is strict — a zero adjustment is rejected.
 
 # Returns
@@ -1621,6 +1640,12 @@ ReturnsResult
   - [`apply_gap_return`](@ref)
   - [`AbstractGapReturnAlgorithm`](@ref)
   - [`CatchUpGapReturn`](@ref)
+  - [`PriceIngestion`](@ref)
+  - [`price_ingestion`](@ref)
+  - [`returns_universe_masks`](@ref)
+  - [`attach_universe_masks`](@ref)
+  - [`assert_span_convertible`](@ref)
+  - [`span_carrier_view`](@ref)
   - [`returns_result_picker`](@ref): subtracts the carried benchmark, and only when the optimisation tracks it.
 """
 function prices_to_returns(X::TimeSeries.TimeArray,
@@ -1635,7 +1660,9 @@ function prices_to_returns(X::TimeSeries.TimeArray,
                            collapse_args::Tuple = (),
                            map_func::Option{<:Function} = nothing,
                            join_method::Symbol = :outer, impute_method = nothing,
-                           pnl::Option{<:AssetPanel} = nothing)
+                           pnl::Option{<:AssetPanel} = nothing,
+                           span::Option{<:AbstractMatrix{Bool}} = nothing,
+                           strict::Bool = false)
     @argcheck(!isempty(X), IsEmptyError)
     @argcheck(zero(missing_col_percent) < missing_col_percent <= one(missing_col_percent),
               DomainError)
@@ -1648,6 +1675,8 @@ function prices_to_returns(X::TimeSeries.TimeArray,
     asset_ts = TimeSeries.timestamp(X)
     check_asset_panel(pnl, length(asset_names), length(asset_ts),
                       "the number of asset price columns")
+    assert_span_convertible(span, length(asset_ts), length(asset_names), nan_to_missing,
+                            strict)
     factor_names = String[]
     benchmark_names = String[]
     if !isnothing(F)
@@ -1737,6 +1766,17 @@ function prices_to_returns(X::TimeSeries.TimeArray,
         acols = Vector{Int}(indexin(nx, asset_names))
         rows = feature_row_indices(pnl, ts, asset_ts)
         pnl = port_opt_view(pnl, rows, acols, asset_names)
+    end
+    if !isempty(nx)
+        #! The span is on the price clock and the masks are on the returns clock, so the
+        #! span is cut to the price rows and assets that survived and universe_masks does
+        #! the crossing. Both padding conventions reach it, and it reads which from the
+        #! two row counts.
+        cols = Vector{Int}(indexin(nx, asset_names))
+        amsk, emsk = returns_universe_masks(span_carrier_view(span, P[!, :timestamp],
+                                                              asset_ts, cols),
+                                            Matrix(P[!, nx]), Matrix(X[!, nx]), strict)
+        pnl = attach_universe_masks(pnl, amsk, emsk)
     end
     if isempty(nf)
         nf = nothing
@@ -2306,16 +2346,18 @@ Preprocessing estimator converting price-level data into returns-level data.
 
 Missing-data filtering is deliberately *not* part of this estimator (the corresponding [`prices_to_returns`](@ref) keywords are held at their permissive defaults); use [`MissingDataFilter`](@ref) and [`Imputer`](@ref) as separate, independently tunable steps.
 
+The step is stateless, and it does not need to be stateful to fix an asset universe: the carrier states one. A [`PricesResult`](@ref) that [`price_ingestion`](@ref) built carries a **Listing Span**, and this step projects it onto the returns clock and hands the [`ReturnsResult`](@ref) an [`AssetPanel`](@ref) whose two masks say which assets are in the universe and which of them can be estimated at each observation. The asset axis is fixed before the split, so every window of every fold carries every asset and a window can no longer silently lose a column.
+
 !!! warning
 
-    Because this step is stateless, it does not define an asset universe. Under `nan_to_missing`, [`prices_to_returns`](@ref) drops assets that are entirely missing in the window being converted, so a training window in which an asset has no history produces a different universe from a clean test window. Two ways out, and they answer different questions. Set `nan_to_missing = false` to carry the gap instead: every asset keeps its column in every window, so the universe no longer moves between train and test, and the assets a window cannot estimate are excluded downstream by the Coverage Universe rather than by deletion here. Or precede this estimator with a [`MissingDataFilter`](@ref) (which fits the universe on the training window) and an [`Imputer`](@ref) (which fills the remaining gaps with training statistics), which is what a consumer that cannot hold a gap needs — at the cost of an invented price. A `Pipeline` enforces the alignment either way via `assert_universe_aligned`.
+    A carrier the ingestion layer did not build states no universe, and then this step's statelessness bites. Under `nan_to_missing`, [`prices_to_returns`](@ref) drops assets that are entirely missing in the window being converted, so a training window in which an asset has no history produces a different universe from a clean test window. Build the carrier with [`price_ingestion`](@ref), or, converting one by hand, set `nan_to_missing = false` so every asset keeps its column in every window and the ones a window cannot estimate are excluded downstream by the Coverage Universe. `strict = true` refuses the two situations rather than warning about them.
 
 # Algorithm
 
 The estimator is stateless, so both verbs are thin.
 
  1. [`fit_preprocessing`](@ref) returns the estimator itself. There is no state to fit.
- 2. [`apply_preprocessing`](@ref) calls [`prices_to_returns`](@ref) with the seven fields as keywords, and with `X`, `F`, `B`, `iv`, `ivpa` and `pnl` read off the [`PricesResult`](@ref). It returns the [`ReturnsResult`](@ref).
+ 2. [`apply_preprocessing`](@ref) calls [`prices_to_returns`](@ref) with the eight fields as keywords, and with `X`, `F`, `B`, `iv`, `ivpa`, `pnl` and `span` read off the [`PricesResult`](@ref). It returns the [`ReturnsResult`](@ref).
 
 The two threshold keywords of [`prices_to_returns`](@ref) are not fields of this estimator, so they hold their permissive defaults and every row and column reaches the conversion. `nan_to_missing` *is* a field, because it decides whether a gap survives the conversion at all rather than how much of one is tolerated, and `gap_return_alg` is one because it decides what the surviving gap's observations carry.
 
@@ -2333,6 +2375,7 @@ $(DocStringExtensions.FIELDS)
         collapse_args::Tuple = (),
         map_func::Option{<:Function} = nothing,
         join_method::Symbol = :outer,
+        strict::Bool = false,
     ) -> PricesToReturns
 
 Keywords correspond to the struct's fields.
@@ -2398,25 +2441,32 @@ julia> rr.nx
     How asset, factor, and benchmark data are joined (`:outer`, `:inner`, etc.).
     """
     join_method
+    """
+    Whether a carrier the ingestion layer did not build is refused rather than warned about. It reaches two situations: a carrier holding gaps and no **Listing Span**, whose universe is then derived from the window alone, and a span that `nan_to_missing = true` would delete the gaps of. See [`prices_to_returns`](@ref).
+    """
+    strict
     function PricesToReturns(ret_method::Symbol, padding::Bool,
                              gap_return_alg::Option{<:AbstractGapReturnAlgorithm},
                              nan_to_missing::Bool, collapse_args::Tuple,
-                             map_func::Option{<:Function}, join_method::Symbol)
+                             map_func::Option{<:Function}, join_method::Symbol,
+                             strict::Bool)
         @argcheck(ret_method in (:simple, :log),
                   ArgumentError("ret_method must be :simple or :log, got :$ret_method"))
         return new{typeof(ret_method), typeof(padding), typeof(gap_return_alg),
                    typeof(nan_to_missing), typeof(collapse_args), typeof(map_func),
-                   typeof(join_method)}(ret_method, padding, gap_return_alg, nan_to_missing,
-                                        collapse_args, map_func, join_method)
+                   typeof(join_method), typeof(strict)}(ret_method, padding, gap_return_alg,
+                                                        nan_to_missing, collapse_args,
+                                                        map_func, join_method, strict)
     end
 end
 function PricesToReturns(; ret_method::Symbol = :simple, padding::Bool = false,
                          gap_return_alg::Option{<:AbstractGapReturnAlgorithm} = nothing,
                          nan_to_missing::Bool = true, collapse_args::Tuple = (),
                          map_func::Option{<:Function} = nothing,
-                         join_method::Symbol = :outer)::PricesToReturns
+                         join_method::Symbol = :outer,
+                         strict::Bool = false)::PricesToReturns
     return PricesToReturns(ret_method, padding, gap_return_alg, nan_to_missing,
-                           collapse_args, map_func, join_method)
+                           collapse_args, map_func, join_method, strict)
 end
 function prices_to_returns(ptr::PricesToReturns, pr::PricesResult)::ReturnsResult
     return prices_to_returns(pr.X, pr.F; B = pr.B, iv = pr.iv, ivpa = pr.ivpa,
@@ -2424,7 +2474,8 @@ function prices_to_returns(ptr::PricesToReturns, pr::PricesResult)::ReturnsResul
                              gap_return_alg = ptr.gap_return_alg,
                              nan_to_missing = ptr.nan_to_missing,
                              collapse_args = ptr.collapse_args, map_func = ptr.map_func,
-                             join_method = ptr.join_method, pnl = pr.pnl)
+                             join_method = ptr.join_method, pnl = pr.pnl, span = pr.span,
+                             strict = ptr.strict)
 end
 function fit_preprocessing(ptr::PricesToReturns, ::PricesResult)
     return ptr
@@ -2573,7 +2624,12 @@ function apply_preprocessing(res::MissingDataFilterResult, pr::PricesResult)::Pr
         ivm, isa(pr.ivpa, VecNum) ? pr.ivpa[cols] : pr.ivpa
     end
     pnl = panel_carrier_view(pr.pnl, rows, cols, string.(TimeSeries.colnames(pr.X)))
-    return PricesResult(; X = X, F = pr.F, B = pr.B, iv = iv, ivpa = ivpa, pnl = pnl)
+    #! The span is a fact about the instruments, so the surviving window's span is the
+    #! carrier's viewed at the rows and columns that survived, never one re-derived.
+    span = span_carrier_view(pr.span, TimeSeries.timestamp(X), TimeSeries.timestamp(pr.X),
+                             cols)
+    return PricesResult(; X = X, F = pr.F, B = pr.B, iv = iv, ivpa = ivpa, pnl = pnl,
+                        span = span)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -2703,8 +2759,10 @@ function apply_preprocessing(res::ImputerResult, pr::PricesResult)::PricesResult
         end
     end
     X = TimeSeries.TimeArray(TimeSeries.timestamp(pr.X), vals, names)
+    #! A fill states a price, not a listing, so the span passes through untouched: the
+    #! clock and the asset axis are the ones it was derived on.
     return PricesResult(; X = X, F = pr.F, B = pr.B, iv = pr.iv, ivpa = pr.ivpa,
-                        pnl = pr.pnl)
+                        pnl = pr.pnl, span = pr.span)
 end
 """
     asset_panel(ape::Nothing, pr, rd::ReturnsResult, X) -> AssetPanel

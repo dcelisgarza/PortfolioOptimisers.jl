@@ -509,6 +509,80 @@ function Base.show(io::IO, ::MIME"text/plain", R::RepeatedLeading)
     return show(io, R)
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Reads a universe mask that is true everywhere, storing no cell.
+
+`AllTrueMask` is the shape a gapless ingestion emits for both of an [`AssetPanel`](@ref)'s universe masks. Every asset is listed at every observation and every return is finite, so the mask is a constant, and storing it as one costs two integers instead of `observations × assets` bits. It answers `size` as `(n, N)` and `getindex` as `true`.
+
+It is unexported and Base-only, exactly as [`PortfolioOptimisers.ListingSpan`](@ref) is: it owns `size`, `getindex` and `show`, and the public bound stays `AbstractMatrix{Bool}`. A method specialised on it is a library-internal fast path, not a contract an extension author may rely on. A `view` of it is an ordinary `SubArray` over a lazy matrix, so [`port_opt_view`](@ref) slices it correctly and still allocates no cell.
+
+The library's usual spelling for "all of them" — a `nothing` Coverage Universe or Investable Mask — is unavailable here: `nothing` masks on an [`AssetPanel`](@ref) already mean the panel is *static*, and a second meaning on the same field would cost that reading.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    AllTrueMask(n::Integer, N::Integer) -> AllTrueMask
+
+## Validation
+
+  - `n >= 0` and `N >= 0`. Raises a `DomainError`.
+
+# Examples
+
+```jldoctest
+julia> msk = PortfolioOptimisers.AllTrueMask(3, 2)
+AllTrueMask(3 × 2)
+
+julia> Matrix(msk)
+3×2 Matrix{Bool}:
+ 1  1
+ 1  1
+ 1  1
+```
+
+# Related
+
+  - [`AssetPanel`](@ref)
+  - [`PortfolioOptimisers.ListingSpan`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+struct AllTrueMask <: AbstractMatrix{Bool}
+    """
+    Number of observations.
+    """
+    n::Int
+    """
+    Number of assets.
+    """
+    N::Int
+    function AllTrueMask(n::Integer, N::Integer)
+        @argcheck(n >= zero(n) && N >= zero(N),
+                  DomainError((n, N),
+                              "an all-true universe mask is observations × assets, so neither axis is negative"))
+        return new(Int(n), Int(N))
+    end
+end
+function Base.size(msk::AllTrueMask)
+    return (msk.n, msk.N)
+end
+Base.@propagate_inbounds function Base.getindex(msk::AllTrueMask, t::Integer, i::Integer)
+    @boundscheck checkbounds(msk, t, i)
+    return true
+end
+function Base.IndexStyle(::Type{<:AllTrueMask})
+    return IndexCartesian()
+end
+function Base.show(io::IO, msk::AllTrueMask)
+    return print(io, "AllTrueMask($(msk.n) × $(msk.N))")
+end
+function Base.show(io::IO, ::MIME"text/plain", msk::AllTrueMask)
+    return show(io, msk)
+end
+"""
     panel_field_lift(f::NumericPanelField, n::Integer) -> NumericPanelField
     panel_field_lift(f::CategoricalPanelField, n::Integer) -> CategoricalPanelField
     panel_field_lift(f::TensorPanelField, n::Integer) -> TensorPanelField
@@ -1027,12 +1101,14 @@ $(DocStringExtensions.TYPEDEF)
 
 The Asset Panel: the Panel Fields of one universe, and the two point-in-time universe masks.
 
-The panel **is** the feature data. Its Panel Fields own their values, so nothing else on a carrier holds a feature matrix, and the Feature Matrix a distance measures is derived from the panel by [`panel_feature_matrix`](@ref) and stored nowhere.
+The two universe masks are the panel's **defining content**, and the Panel Fields are optional payload. A panel with fields owns their values, so nothing else on a carrier holds a feature matrix, and the Feature Matrix a distance measures is derived from the panel by [`panel_feature_matrix`](@ref) and stored nowhere. A panel with **no** field is the ingestion layer's common case: a caller holding only prices has no market capitalisation and no sector, and the panel states a universe and nothing else. A panel with neither a field nor a mask carries nothing at all and is refused.
 
 One panel takes one of two shapes, and its type parameters say which.
 
-  - **Static**: every Panel Field is `assets` or `assets × labels`, and both masks are `nothing`. A fundamentals table or a sector classification with no history is this shape.
+  - **Static**: every Panel Field is `assets` or `assets × labels`, and both masks are `nothing`. A fundamentals table or a sector classification with no history is this shape. It needs at least one Panel Field, because nothing else would state its asset axis.
   - **Time-varying**: every Panel Field prepends an observation axis, and both masks are `observations × assets`. A point-in-time panel is this shape.
+
+`nothing` masks therefore read as *static, or hand-built*, and never as *gapless*: a panel the ingestion layer emits always carries both, all true where the price table held no gap.
 
 # Fields
 
@@ -1046,7 +1122,7 @@ $(DocStringExtensions.FIELDS)
 
 # Validation
 
-  - `!isempty(pf)`. Raises an [`IsEmptyError`](@ref).
+  - The panel carries at least one Panel Field or an active mask. See [`panel_axes`](@ref).
   - The Panel Field names are non-empty and unique. See [`assert_panel_labels`](@ref).
   - Every Panel Field shares one [`panel_field_axes`](@ref). Raises a `DimensionMismatch`.
   - The masks are both `nothing` when the Panel Fields are static, and both given when they are time-varying. See [`assert_panel_masks`](@ref).
@@ -1081,21 +1157,74 @@ $(DocStringExtensions.FIELDS)
     function AssetPanel(pf::AbstractVector{<:AbstractPanelField},
                         amsk::Option{<:AbstractMatrix{Bool}},
                         emsk::Option{<:AbstractMatrix{Bool}})
-        @argcheck(!isempty(pf),
-                  IsEmptyError("an Asset Panel needs at least one Panel Field: an empty panel carries no feature data"))
-        assert_panel_labels([f.name for f in pf], "the Panel Field names")
-        ax = panel_field_axes(pf[1])
-        k = findfirst(f -> panel_field_axes(f) != ax, pf)
-        @argcheck(isnothing(k),
-                  DimensionMismatch("every Panel Field of one Asset Panel shares its observation axis and its asset axis, and \"$(isnothing(k) ? "" : pf[k].name)\" does not: got $(isnothing(k) ? "" : string(panel_field_axes(pf[k]))) against the $ax of \"$(pf[1].name)\""))
+        ax = panel_axes(pf, amsk)
+        if !isempty(pf)
+            assert_panel_labels([f.name for f in pf], "the Panel Field names")
+            k = findfirst(f -> panel_field_axes(f) != ax, pf)
+            @argcheck(isnothing(k),
+                      DimensionMismatch("every Panel Field of one Asset Panel shares its observation axis and its asset axis, and \"$(isnothing(k) ? "" : pf[k].name)\" does not: got $(isnothing(k) ? "" : string(panel_field_axes(pf[k]))) against the $ax of \"$(pf[1].name)\""))
+        end
         assert_panel_masks(ax, amsk, emsk)
         return new{typeof(pf), typeof(amsk), typeof(emsk)}(pf, amsk, emsk)
     end
 end
-function AssetPanel(; pf::AbstractVector{<:AbstractPanelField},
+function AssetPanel(; pf::AbstractVector{<:AbstractPanelField} = AbstractPanelField[],
                     amsk::Option{<:AbstractMatrix{Bool}} = nothing,
                     emsk::Option{<:AbstractMatrix{Bool}} = nothing)::AssetPanel
     return AssetPanel(pf, amsk, emsk)
+end
+"""
+    panel_axes(pf::AbstractVector{<:AbstractPanelField},
+               amsk::Option{<:AbstractMatrix{Bool}}) -> Tuple
+    panel_axes(pnl::AssetPanel) -> Tuple
+
+Read the axes one [`AssetPanel`](@ref) is stated on.
+
+The two universe masks are the panel's defining content and the Panel Fields are optional payload, so the axes are read from the fields when the panel has any and from the active mask when it has none. The ingestion layer's common case is the second: a caller holding only prices has no market capitalisation and no sector, and the panel it emits states a universe and nothing else.
+
+A panel with neither a Panel Field nor a mask carries nothing at all, and is refused here rather than answering an empty tuple that every reader would then have to test.
+
+# Algorithm
+
+The method that Julia selects reads the panel apart or whole; the rule is one.
+
+ 1. `pf` is non-empty: return [`panel_field_axes`](@ref) of its first Panel Field. The constructor has already checked that every field agrees.
+ 2. `pf` is empty: return `size(amsk)`.
+ 3. An [`AssetPanel`](@ref): read its own Panel Fields and active mask by steps 1 and 2. This is the form every consumer calls; the two-argument form is the constructor's, which has no panel yet.
+
+# Arguments
+
+  - `pf`: The Panel Fields, possibly none.
+  - `amsk`: The active mask, or `nothing`.
+  - `pnl`: The Asset Panel, for the second form.
+
+# Validation
+
+  - `amsk` is not `nothing` when `pf` is empty. Raises an [`IsEmptyError`](@ref).
+
+# Returns
+
+  - `ax::Tuple`: `(assets,)` for a static panel, and `(observations, assets)` for a time-varying one.
+
+# Related
+
+  - [`AssetPanel`](@ref)
+  - [`panel_field_axes`](@ref)
+  - [`assert_panel_masks`](@ref)
+  - [`check_asset_panel`](@ref)
+  - [`Option`](@ref)
+"""
+function panel_axes(pf::AbstractVector{<:AbstractPanelField},
+                    amsk::Option{<:AbstractMatrix{Bool}})::Tuple
+    if !isempty(pf)
+        return panel_field_axes(pf[1])
+    end
+    @argcheck(!isnothing(amsk),
+              IsEmptyError("an Asset Panel with no Panel Field is stated by its two universe masks, so it needs them: a panel with neither carries nothing at all. Pass amsk and emsk, or pass at least one Panel Field."))
+    return size(amsk)
+end
+function panel_axes(pnl::AssetPanel)::Tuple
+    return panel_axes(pnl.pf, pnl.amsk)
 end
 """
     assert_panel_masks(ax::Tuple, amsk::Nothing, emsk::Nothing) -> nothing
@@ -1295,7 +1424,7 @@ function panel_feature_matrix(pnl::AssetPanel)
         push!(ocols,
               isnothing(f.omsk) ? Int[] : panel_claim!(nz, panel_field_observed_labels(f)))
     end
-    Z = zeros(panel_value_eltype(pnl.pf), panel_field_axes(pnl.pf[1])..., length(nz))
+    Z = zeros(panel_value_eltype(pnl.pf), panel_axes(pnl)..., length(nz))
     for (k, f) in pairs(pnl.pf)
         panel_field_stack!(Z, f, cols[k])
         if !isempty(ocols[k])
@@ -1374,8 +1503,11 @@ function port_opt_view(pnl::AssetPanel, i)
 end
 function port_opt_view(pnl::AssetPanel, i, j, nx::Option{<:VecStr} = nothing)
     it = panel_is_static(pnl) ? Colon() : i
-    return AssetPanel(; pf = [panel_field_view(f, it, j, nx) for f in pnl.pf],
-                      amsk = panel_mask_view(pnl.amsk, i, j),
+    #! A panel with no Panel Field is the ingestion layer's shape. The comprehension
+    #! would answer an empty vector of an inferred element type; passing the panel's
+    #! own empty vector through keeps the field type it was built with.
+    pf = isempty(pnl.pf) ? pnl.pf : [panel_field_view(f, it, j, nx) for f in pnl.pf]
+    return AssetPanel(; pf = pf, amsk = panel_mask_view(pnl.amsk, i, j),
                       emsk = panel_mask_view(pnl.emsk, i, j))
 end
 """
@@ -1391,7 +1523,7 @@ The panel owns its own values, so this is the only check a carrier owes it: that
 The method that Julia selects is the algorithm.
 
  1. `pnl` is `nothing`: the carrier has no panel, so there is nothing to check.
- 2. `pnl` is an [`AssetPanel`](@ref): read its shape from [`panel_field_axes`](@ref), check the asset axis against `na`, and check the observation axis against `nobs` when the panel is time-varying.
+ 2. `pnl` is an [`AssetPanel`](@ref): read its shape from [`panel_axes`](@ref), check the asset axis against `na`, and check the observation axis against `nobs` when the panel is time-varying.
 
 # Arguments
 
@@ -1415,7 +1547,7 @@ The method that Julia selects is the algorithm.
   - [`AssetPanel`](@ref)
   - [`ReturnsResult`](@ref)
   - [`PricesResult`](@ref)
-  - [`panel_field_axes`](@ref)
+  - [`panel_axes`](@ref)
   - [`Option`](@ref)
   - [`Sym_Str`](@ref)
 """
@@ -1425,7 +1557,7 @@ function check_asset_panel(::Nothing, ::Option{<:Integer}, ::Option{<:Integer},
 end
 function check_asset_panel(pnl::AssetPanel, na::Option{<:Integer}, nobs::Option{<:Integer},
                            na_sym::Sym_Str)::Nothing
-    ax = panel_field_axes(pnl.pf[1])
+    ax = panel_axes(pnl)
     @argcheck(!isnothing(na),
               IsNothingError("an Asset Panel (pnl) describes a universe, so it needs an asset axis to bind to, but $na_sym is nothing"))
     @argcheck(ax[end] == na,

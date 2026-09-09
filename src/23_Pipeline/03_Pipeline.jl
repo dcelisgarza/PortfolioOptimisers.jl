@@ -765,16 +765,25 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Assert that replaying a pipeline's fitted steps on a test window reproduces the training asset universe.
+Assert that a test window came from the same ingestion as the training window.
 
-The terminal weights are indexed by the *training* universe, so a test window whose transformed returns carry a different asset set (or a different asset order) would silently misalign weights and returns. This is the failure the fit/apply contract exists to prevent, so it is reported as an error naming both universes rather than surfacing as a dimension mismatch inside the risk calculation.
+This is a **provenance** check. The terminal weights are indexed by the *training* universe, so a test window carrying a different asset set — or the same set described by a different universe statement — would silently misalign weights and returns, and it is reported here by name rather than surfacing as a dimension mismatch inside the risk calculation.
 
-The usual cause is relying on [`PricesToReturns`](@ref) alone to define the universe: it is stateless, and by default the underlying [`prices_to_returns`](@ref) reads a gap as an absent price and drops assets that are entirely missing in the window being converted, which differs between train and test. Two ways out. Carry the gap instead — `PricesToReturns(; nan_to_missing = false)` — so that every asset keeps its column in every window and the ones a window cannot estimate are excluded downstream by the Coverage Universe. Or pin the universe with a [`MissingDataFilter`](@ref) step and fill the remaining gaps with an [`Imputer`](@ref) step before converting, which is what a consumer that cannot hold a gap needs, at the cost of an invented price.
+It reads two things. `nx` equality answers the asset axis, and [`check_asset_panel`](@ref) binds an [`AssetPanel`](@ref)'s asset axis to its carrier's at construction, so `nx` equality compares the panel's axis transitively and no separate assertion is owed. Panel-presence parity answers where the universe was stated: a window with a panel and a fitted context without one, or the reverse, did not come from one ingestion.
+
+The alignment guarantee it once carried alone has since split, and both halves are now held elsewhere. **The axis half is structural.** The ingestion layer fixes the asset axis before the split and [`port_opt_view`](@ref) slices it, so every window of every fold carries every asset, reduce-and-expand always expands onto a fixed axis, and no policy of the layer's own drops a row or a column. **The semantic half was never this check's**: an asset present in both windows and non-investable in one is a **Held Gap**, which `filter_held_gaps` reads off the weights and the returns under the strictness policy.
+
+What is left is the population that can still break the invariant, and its message names both: a carrier built outside the layer, and a third-party step that changes the asset set. On the layer's path neither can arise, so no remedy is prescribed here.
 
 # Arguments
 
   - `res`: The fitted [`PipelineResult`](@ref).
   - `rd`: The transformed test-window returns.
+
+# Validation
+
+  - `rd.nx == train.nx`. Raises an `ArgumentError`.
+  - The window and the fitted context either both carry an [`AssetPanel`](@ref) or neither does. Raises an `ArgumentError`.
 
 # Returns
 
@@ -783,8 +792,9 @@ The usual cause is relying on [`PricesToReturns`](@ref) alone to define the univ
 # Related
 
   - [`predict(res::PipelineResult, data::AbstractPricesResult, window)`](@ref)
-  - [`MissingDataFilter`](@ref)
-  - [`Imputer`](@ref)
+  - [`PriceIngestion`](@ref)
+  - [`price_ingestion`](@ref)
+  - [`AssetPanel`](@ref)
 """
 function assert_universe_aligned(res::PipelineResult, rd::AbstractReturnsResult)::Nothing
     train = res.ctx.returns
@@ -792,7 +802,9 @@ function assert_universe_aligned(res::PipelineResult, rd::AbstractReturnsResult)
         return nothing
     end
     @argcheck(rd.nx == train.nx,
-              ArgumentError("the pipeline's fitted steps produced a test-window universe $(rd.nx) that differs from the training universe $(train.nx), so the weights and the test returns would not be aligned. PricesToReturns is stateless and by default drops assets that are entirely missing in the window it converts. Either carry the gaps instead, with PricesToReturns(; nan_to_missing = false), so every window keeps every asset; or pin the universe with a MissingDataFilter step (and an Imputer step to fill the remaining gaps) before converting to returns."))
+              ArgumentError("the pipeline's fitted steps produced a test-window universe $(rd.nx) that differs from the training universe $(train.nx), so the weights and the test returns would not be aligned. The ingestion layer fixes the asset axis before the split, so this reaches two situations only: a returns carrier built outside it, and a step of your own that changes the asset set. Build the carrier with price_ingestion(PriceIngestion(), X)."))
+    @argcheck(isnothing(rd.pnl) == isnothing(train.pnl),
+              ArgumentError("the pipeline's fitted steps produced a test window that $(isnothing(rd.pnl) ? "states no universe" : "states a universe") while the training window $(isnothing(train.pnl) ? "states none" : "states one"), so the two did not come from one ingestion. A returns carrier the ingestion layer built always carries an Asset Panel, so pnl === nothing on one of them says that one was built outside it."))
     return nothing
 end
 """

@@ -40,6 +40,7 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/03_InputData/06_PanelDataFrame.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/07_ListingSpan.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/08_PriceGapFill.jl" = { raw = 0, reviewed = 0 }
+"src/03_InputData/09_PriceIngestion.jl" = { raw = 0, reviewed = 0 }
 "src/04_PosdefMatrix.jl" = { raw = 14, reviewed = 14 }
 "src/05_Denoise.jl" = { raw = 1, reviewed = 1 }
 "src/06_Detone.jl" = { raw = 0, reviewed = 0 }
@@ -331,6 +332,7 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/03_InputData/06_PanelDataFrame.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/07_ListingSpan.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/08_PriceGapFill.jl" = { raw = 0, reviewed = 0 }
+"src/03_InputData/09_PriceIngestion.jl" = { raw = 0, reviewed = 0 }
 "src/04_PosdefMatrix.jl" = { raw = 0, reviewed = 0 }
 "src/05_Denoise.jl" = { raw = 0, reviewed = 0 }
 "src/06_Detone.jl" = { raw = 0, reviewed = 0 }
@@ -622,6 +624,7 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/03_InputData/06_PanelDataFrame.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/07_ListingSpan.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/08_PriceGapFill.jl" = { raw = 0, reviewed = 0 }
+"src/03_InputData/09_PriceIngestion.jl" = { raw = 0, reviewed = 0 }
 "src/04_PosdefMatrix.jl" = { raw = 0, reviewed = 0 }
 "src/05_Denoise.jl" = { raw = 0, reviewed = 0 }
 "src/06_Detone.jl" = { raw = 0, reviewed = 0 }

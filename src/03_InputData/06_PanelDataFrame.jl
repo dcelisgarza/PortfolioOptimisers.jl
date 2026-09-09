@@ -432,7 +432,7 @@ function panel_dataframe(pnl::AssetPanel; nx::Option{<:VecStr} = nothing,
                          assets = nothing, layout::Symbol = :long, decode::Bool = true)
     @argcheck(layout in (:long, :wide),
               ArgumentError("`layout` is `:long`, one row per (observation, asset), or `:wide`, one column per (Panel Field column, asset). Got layout => :$(layout)"))
-    ax = panel_field_axes(pnl.pf[1])
+    ax = panel_axes(pnl)
     nxa = isnothing(nx) ? string.(1:ax[end]) : nx
     @argcheck(length(nxa) == ax[end],
               DimensionMismatch("`nx` names the assets of the panel's universe, so it is as long as the panel's asset axis, got length(nx) = $(length(nxa)) and $(ax[end]) assets"))
