@@ -29,3 +29,21 @@ merge_states(a::SimpleVarianceState, b::SimpleVarianceState)
 Base.copy(x::SimpleVarianceState)
 port_opt_view(x::SimpleVarianceState, i, args...)
 ```
+
+## Available-case fit
+
+With a [`CoveragePolicy`](@ref) in its `cvg` field the estimator fits each asset on that asset's own finite and active observations, and [`PortfolioOptimisers.coverage_variance`](@ref) routes between that arm and the Coverage Universe one.
+
+```@docs
+PortfolioOptimisers.coverage_variance
+PortfolioOptimisers.coverage_variance(f, ve::SimpleVariance, ::Nothing, me::AbstractExpectedReturnsEstimator, X::MatNum)
+PortfolioOptimisers.coverage_variance(f, ve::SimpleVariance, cvg::CoveragePolicy, ::AbstractExpectedReturnsEstimator, X::MatNum)
+PortfolioOptimisers.coverage_variance(f, ve::SimpleVariance, ::Nothing, X::VecNum)
+PortfolioOptimisers.coverage_variance(f, ve::SimpleVariance, cvg::CoveragePolicy, X::VecNum)
+PortfolioOptimisers.coverage_variance(ve::SimpleVariance, ::Nothing, state::SimpleVarianceState)
+PortfolioOptimisers.coverage_variance(ve::SimpleVariance, cvg::CoveragePolicy, state::SimpleVarianceState)
+PortfolioOptimisers.coverage_moment_map
+partial_fit!(state::SimpleVarianceState, x::VecNum, ::Nothing, ::Option{<:AbstractVector{<:Bool}})
+partial_fit!(state::SimpleVarianceState, x::VecNum, cvg::CoveragePolicy, active_mask::Option{<:AbstractVector{<:Bool}})
+PortfolioOptimisers.fold_inactive!(::ResetCoverage, state::SimpleVarianceState, ni::AbstractVector{<:Bool})
+```

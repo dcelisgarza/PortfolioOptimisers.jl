@@ -59,6 +59,7 @@
 "src/01_Base/13_KappaLog.jl" = { map = 1, units = 1, algorithm = 0, swept = true }
 "src/01_Base/14_PartialFit.jl" = { map = 1, units = 9, swept = false }
 "src/01_Base/15_Online.jl" = { map = 1, units = 19, swept = false }
+"src/01_Base/16_CoveragePolicy.jl" = { map = 1, units = 23, swept = false }
 "src/02_Tools.jl" = { map = 1, units = 69, algorithm = 49, swept = true }
 "src/03_InputData/01_AssetPanel.jl" = { map = 2, units = 33, swept = false }
 "src/03_InputData/02_AssetPanelBuilder.jl" = { map = 2, units = 22, swept = false }
@@ -74,9 +75,9 @@
 "src/06_Detone.jl" = { map = 2, units = 4, algorithm = 2, swept = true }
 "src/07_MatrixProcessing.jl" = { map = 2, units = 9, algorithm = 4, swept = true }
 "src/08_Moments/01_Base_Moments.jl" = { map = 3, units = 37, algorithm = 17, swept = true }
-"src/08_Moments/02_SimpleExpectedReturns.jl" = { map = 3, units = 12, algorithm = 6, swept = true }
-"src/08_Moments/03_Covariance.jl" = { map = 3, units = 27, algorithm = 14, swept = true }
-"src/08_Moments/04_SimpleVariance.jl" = { map = 3, units = 18, algorithm = 10, swept = true }
+"src/08_Moments/02_SimpleExpectedReturns.jl" = { map = 3, units = 20, algorithm = 9, swept = true }
+"src/08_Moments/03_Covariance.jl" = { map = 3, units = 39, algorithm = 17, swept = true }
+"src/08_Moments/04_SimpleVariance.jl" = { map = 3, units = 29, algorithm = 12, swept = true }
 "src/08_Moments/05_GerberCovariance.jl" = { map = 3, units = 13, algorithm = 9, swept = true }
 "src/08_Moments/06_SmythBrobyCovariance.jl" = { map = 3, units = 35, algorithm = 24, swept = true }
 "src/08_Moments/07_DistanceCovariance.jl" = { map = 3, units = 10, algorithm = 9, swept = true }
@@ -147,7 +148,7 @@
 "src/08_Moments/47_CrossSectionalExposureDiagnostics.jl" = { map = 3, units = 22, swept = false }
 "src/08_Moments/48_FactorModelSummary.jl" = { map = 3, units = 16, swept = false }
 "src/08_Moments/49_CrossSectionalIdiosyncraticDiagnostics.jl" = { map = 3, units = 15, swept = false }
-"src/08_Moments/50_CoverageUniverse.jl" = { map = 3, units = 24, swept = false }
+"src/08_Moments/50_CoverageUniverse.jl" = { map = 3, units = 39, swept = false }
 "src/08_Moments/51_ExpWeightedExpectedReturns.jl" = { map = 3, units = 14, swept = false }
 "src/08_Moments/52_ExpWeightedVariance.jl" = { map = 3, units = 20, swept = false }
 "src/08_Moments/53_ExpWeightedCovariance.jl" = { map = 3, units = 23, swept = false }

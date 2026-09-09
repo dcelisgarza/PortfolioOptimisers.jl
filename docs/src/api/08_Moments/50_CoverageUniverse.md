@@ -55,3 +55,25 @@ cokurtosis(kte::CokurtosisEstimator, X::MatNum, pnl::Option{<:AssetPanel};
 PortfolioOptimisers.variance_series(ce::AbstractCovarianceEstimator, X::MatNum,
                          pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
 ```
+
+## The available-case seam
+
+An estimator that carries a [`CoveragePolicy`](@ref) is a mask-aware estimator, so its panel method hands it the whole window and the panel's active mask instead of reducing to the Coverage Universe.
+
+```@docs
+PortfolioOptimisers.coverage_panel_moment
+PortfolioOptimisers.coverage_panel_moment(f, est, ::Nothing, X::MatNum, pnl::Option{<:AssetPanel}, expand)
+PortfolioOptimisers.coverage_panel_moment(f, est, ::CoveragePolicy, X::MatNum, pnl::Option{<:AssetPanel}, ::Any)
+PortfolioOptimisers.coverage_variance_series
+PortfolioOptimisers.coverage_variance_series(ce::AbstractCovarianceEstimator, ::Nothing, X::MatNum, pnl::Option{<:AssetPanel})
+PortfolioOptimisers.coverage_variance_series(ce::AbstractCovarianceEstimator, ::CoveragePolicy, X::MatNum, pnl::Option{<:AssetPanel})
+mean(me::SimpleExpectedReturns, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+var(ve::SimpleVariance, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+std(ve::SimpleVariance, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+cov(ce::Covariance, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+cor(ce::Covariance, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+var(ce::Covariance, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+std(ce::Covariance, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+PortfolioOptimisers.variance_series(ce::Covariance, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+PortfolioOptimisers.variance_series(ve::SimpleVariance, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+```

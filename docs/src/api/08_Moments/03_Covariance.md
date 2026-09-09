@@ -46,6 +46,25 @@ partial_fit_corrected(ce::Covariance{<:Any, <:Any, <:FullMoment})
 partial_fit_corrected(ce::StatsBase.CovarianceEstimator)
 ```
 
+## Available-case fit
+
+With a [`CoveragePolicy`](@ref) in its `cvg` field the estimator fits each pair on the observations that pair shares, and [`PortfolioOptimisers.coverage_covariance`](@ref) routes between that arm and the Coverage Universe one.
+
+```@docs
+PortfolioOptimisers.coverage_covariance
+PortfolioOptimisers.coverage_covariance(f, ce::Covariance{<:Any, <:Any, <:FullMoment}, ::Nothing, X::MatNum)
+PortfolioOptimisers.coverage_covariance(f, ce::Covariance{<:Any, <:Any, <:FullMoment}, cvg::CoveragePolicy, X::MatNum)
+PortfolioOptimisers.coverage_covariance(f, ce::Covariance{<:Any, <:Any, <:SemiMoment}, ::Nothing, X::MatNum)
+PortfolioOptimisers.coverage_covariance(f, ce::Covariance{<:Any, <:Any, <:SemiMoment}, cvg::CoveragePolicy, X::MatNum)
+PortfolioOptimisers.coverage_covariance(ce::Union{<:GeneralCovariance, <:Covariance{<:Any, <:Any, <:FullMoment}}, ::Nothing, state::CovarianceState)
+PortfolioOptimisers.coverage_covariance(ce::Covariance{<:Any, <:Any, <:FullMoment}, cvg::CoveragePolicy, state::CovarianceState)
+PortfolioOptimisers.coverage_correlation
+PortfolioOptimisers.coverage_policy
+partial_fit!(state::CovarianceState, x::VecNum, ::Nothing, ::Option{<:AbstractVector{<:Bool}})
+partial_fit!(state::CovarianceState, x::VecNum, cvg::CoveragePolicy, active_mask::Option{<:AbstractVector{<:Bool}})
+PortfolioOptimisers.fold_inactive!(::ResetCoverage, state::CovarianceState, ni::AbstractVector{<:Bool})
+```
+
 ## References
 
 ```@bibliography

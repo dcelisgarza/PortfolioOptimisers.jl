@@ -262,6 +262,7 @@ $(DocStringExtensions.FIELDS)
         ce::StatsBase.CovarianceEstimator = GeneralCovariance(),
         alg::AbstractMomentAlgorithm = FullMoment(),
         w::Option{<:ObsWeights} = nothing,
+        cvg::Option{<:CoveragePolicy} = nothing,
         cache::Option{<:AbstractPartialFitState} = nothing
     ) -> Covariance
 
@@ -355,24 +356,29 @@ Covariance
     """
     @wprop w
     """
+    $(field_dict[:cvg])
+    """
+    cvg
+    """
     $(field_dict[:pfcache])
     """
     @fprop @vprop cache
     function Covariance(me::AbstractExpectedReturnsEstimator,
                         ce::StatsBase.CovarianceEstimator, alg::AbstractMomentAlgorithm,
-                        w::Option{<:ObsWeights}, cache::Option{<:AbstractPartialFitState})
+                        w::Option{<:ObsWeights}, cvg::Option{<:CoveragePolicy},
+                        cache::Option{<:AbstractPartialFitState})
         assert_nonempty_nonneg_finite_val(w, :w)
-        return new{typeof(me), typeof(ce), typeof(alg), typeof(w), typeof(cache)}(me, ce,
-                                                                                  alg, w,
-                                                                                  cache)
+        return new{typeof(me), typeof(ce), typeof(alg), typeof(w), typeof(cvg),
+                   typeof(cache)}(me, ce, alg, w, cvg, cache)
     end
 end
 function Covariance(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                     ce::StatsBase.CovarianceEstimator = GeneralCovariance(),
                     alg::AbstractMomentAlgorithm = FullMoment(),
                     w::Option{<:ObsWeights} = nothing,
+                    cvg::Option{<:CoveragePolicy} = nothing,
                     cache::Option{<:AbstractPartialFitState} = nothing)::Covariance
-    return Covariance(me, ce, alg, w, cache)
+    return Covariance(me, ce, alg, w, cvg, cache)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -387,15 +393,18 @@ The state a `cache` holds is the running detail of an incremental fit, not the c
 
 # Returns
 
-  - `fields::Tuple`: The field names to render, which is `(:me, :ce, :alg, :w)`.
+  - `fields::Tuple`: The field names to render, which is `(:me, :ce, :alg, :w)` with no policy and `(:me, :ce, :alg, :w, :cvg)` with one.
 
 # Related
 
   - [`Covariance`](@ref)
+  - [`CoveragePolicy`](@ref)
   - [`show_fields`](@ref)
   - [`set_show_nothing_fields!`](@ref)
 """
-show_fields(::Covariance) = (:me, :ce, :alg, :w)
+function show_fields(ce::Covariance)
+    return isnothing(ce.cvg) ? (:me, :ce, :alg, :w) : (:me, :ce, :alg, :w, :cvg)
+end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -524,9 +533,118 @@ julia> cov(Covariance(; alg = SemiMoment()), X)
   - [`cor(ce::Covariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
 function Statistics.cov(ce::Covariance{<:Any, <:Any, <:FullMoment}, X::MatNum;
-                        dims::Int = 1, mean = nothing, kwargs...)
+                        dims::Int = 1, mean = nothing,
+                        active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
+    return coverage_covariance(Statistics.cov, ce, ce.cvg, X; dims = dims, mean = mean,
+                               active_mask = active_mask, kwargs...)
+end
+"""
+    coverage_covariance(f, ce, cvg, X; dims::Int = 1, mean = nothing,
+                        active_mask = nothing, kwargs...) -> MatNum
+
+Routes a covariance or correlation fit to the Coverage Universe arm or to the available-case arm.
+
+The `cvg` field of the estimator is passed as the third argument, so the arm is chosen by **dispatch on the policy** rather than by a branch on its value, exactly as [`coverage_mean`](@ref) does for a sample mean. `f` is `Statistics.cov` or `Statistics.cor`, and the moment algorithm of `ce` chooses between the [`FullMoment`](@ref) arms, which fold, and the [`SemiMoment`](@ref) arms, which have no recursion and run a two-pass over the block.
+
+# Arguments
+
+  - `f`: `Statistics.cov` or `Statistics.cor`.
+  - $(arg_dict[:ce])
+  - `cvg`: The policy the estimator carries, which selects the arm.
+  - $(arg_dict[:X])
+  - $(arg_dict[:dims])
+  - `mean`: A precomputed centre, or `nothing`.
+  - `active_mask`: The active mask of the Asset Panel, `observations × assets`, or `nothing`. The Coverage Universe arms ignore it.
+  - `kwargs...`: Additional keyword arguments passed to the centring estimator and the inner covariance estimator.
+
+# Returns
+
+  - `sigma::MatNum`: The covariance or correlation matrix.
+
+# Related
+
+  - [`CoveragePolicy`](@ref)
+  - [`Covariance`](@ref)
+  - [`coverage_mean`](@ref)
+  - [`coverage_semi_moment`](@ref)
+"""
+function coverage_covariance end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+`Nothing` method of the [`FullMoment`](@ref) arm of [`coverage_covariance`](@ref). The Coverage Universe arm, which resolves the centre and the inner estimator with [`covariance_centre_and_estimator`](@ref) and delegates, and which is the body the verb has always had.
+
+# Related
+
+  - [`coverage_covariance`](@ref)
+  - [`covariance_centre_and_estimator`](@ref)
+"""
+function coverage_covariance(f::F, ce::Covariance{<:Any, <:Any, <:FullMoment}, ::Nothing,
+                             X::MatNum; dims::Int = 1, mean = nothing,
+                             active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+                             kwargs...) where {F}
     mu, cel = covariance_centre_and_estimator(ce, X; dims = dims, mean = mean, kwargs...)
-    return Statistics.cov(cel, X; dims = dims, mean = mu, kwargs...)
+    return f(cel, X; dims = dims, mean = mu, kwargs...)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+[`CoveragePolicy`](@ref) method of the [`FullMoment`](@ref) arm of [`coverage_covariance`](@ref). The available-case arm: each pair is fitted on the observations at which both of its assets are finite and active, and the batch answer **is** the incremental one, because the arm folds the block through [`partial_fit!`](@ref) and reads the state out.
+
+The centre of a pair is that pair's own mean, which is what a pairwise Welford recursion carries, so the diagonal is each asset's ordinary available-case variance and an off-diagonal entry is centred on the observations the pair shares. `ce.ce`, `ce.me` and `ce.w` are refused where an incremental fit does not reproduce them, by [`partial_fit_corrected`](@ref).
+
+# Algorithm
+
+ 1. Read the Bessel correction, and refuse a configuration no incremental fit reproduces, with [`partial_fit_corrected`](@ref).
+ 2. Fold every row of `X` into a fresh state with [`partial_fit!`](@ref), carrying the active mask.
+ 3. Read the state out with [`cov(ce::Covariance, state::CovarianceState)`](@ref), and rescale to a unit diagonal when the verb is `Statistics.cor`.
+
+# Related
+
+  - [`coverage_covariance`](@ref)
+  - [`CoveragePolicy`](@ref)
+  - [`coverage_correlation`](@ref)
+  - [`partial_fit!`](@ref)
+"""
+function coverage_covariance(f::F, ce::Covariance{<:Any, <:Any, <:FullMoment},
+                             cvg::CoveragePolicy, X::MatNum; dims::Int = 1, mean = nothing,
+                             active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+                             kwargs...) where {F}
+    @argcheck(isnothing(mean),
+              ArgumentError("an available-case covariance centres each pair on that pair's own observations, so it cannot take a centre fitted over the whole window. Pass `mean = nothing`, or clear `cvg`."))
+    partial_fit_corrected(ce)
+    ce = partial_fit!(Covariance(; me = ce.me, ce = ce.ce, alg = ce.alg, w = ce.w,
+                                 cvg = cvg), X; dims = dims, active_mask = active_mask)
+    return coverage_correlation(f, Statistics.cov(ce))
+end
+"""
+    coverage_correlation(f::typeof(Statistics.cov), sigma::MatNum) -> MatNum
+    coverage_correlation(f::typeof(Statistics.cor), sigma::MatNum) -> MatNum
+
+Maps an available-case covariance onto the answer the caller's verb asks for.
+
+An available-case fit produces a covariance whichever verb called it, because the state carries a co-moment accumulator and nothing else, so the correlation is that covariance rescaled by the square roots of its own diagonal. Dispatching on the verb rather than comparing it keeps the choice at compile time.
+
+# Arguments
+
+  - `f`: `Statistics.cov` or `Statistics.cor`.
+  - `sigma`: The available-case covariance.
+
+# Returns
+
+  - `val::MatNum`: `sigma` itself, or `sigma` rescaled to a unit diagonal.
+
+# Related
+
+  - [`coverage_covariance`](@ref)
+  - [`Covariance`](@ref)
+"""
+function coverage_correlation(::typeof(Statistics.cov), sigma::MatNum)
+    return sigma
+end
+function coverage_correlation(::typeof(Statistics.cor), sigma::MatNum)
+    s = sqrt.(LinearAlgebra.diag(sigma))
+    return sigma ./ (s * transpose(s))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -540,10 +658,65 @@ $(DocStringExtensions.TYPEDSIGNATURES)
  3. Delegate to `Statistics.cov(cel, X; dims = dims, mean = 0, kwargs...)`. The zero mean is what stops the clipped returns being centred a second time.
 """
 function Statistics.cov(ce::Covariance{<:Any, <:Any, <:SemiMoment}, X::MatNum;
-                        dims::Int = 1, mean = nothing, kwargs...)
+                        dims::Int = 1, mean = nothing,
+                        active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
+    return coverage_covariance(Statistics.cov, ce, ce.cvg, X; dims = dims, mean = mean,
+                               active_mask = active_mask, kwargs...)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+`Nothing` method of the [`SemiMoment`](@ref) arm of [`coverage_covariance`](@ref). The Coverage Universe arm, which clips the de-meaned returns at zero and delegates with a zero centre, and which is the body the verb has always had.
+
+# Related
+
+  - [`coverage_covariance`](@ref)
+  - [`SemiMoment`](@ref)
+"""
+function coverage_covariance(f::F, ce::Covariance{<:Any, <:Any, <:SemiMoment}, ::Nothing,
+                             X::MatNum; dims::Int = 1, mean = nothing,
+                             active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+                             kwargs...) where {F}
     mu, cel = covariance_centre_and_estimator(ce, X; dims = dims, mean = mean, kwargs...)
     X = min.(X .- mu, zero(eltype(X)))
-    return Statistics.cov(cel, X; dims = dims, mean = zero(eltype(X)), kwargs...)
+    return f(cel, X; dims = dims, mean = zero(eltype(X)), kwargs...)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+[`CoveragePolicy`](@ref) method of the [`SemiMoment`](@ref) arm of [`coverage_covariance`](@ref). The available-case arm, run as a two-pass over the block rather than as a fold, because a semi-covariance has no incremental recursion: the clip is taken about a centre the whole window fixes, so a new observation moves every past term.
+
+The centre is each asset's available-case mean, its own finite and active observations alone, and not the pair's own mean as the [`FullMoment`](@ref) arm's is. That is the same asymmetry the plain path already has, where the clip is taken about a centre and the co-moment about zero.
+
+# Algorithm
+
+ 1. Read the valid entries of the block with [`coverage_valid_block`](@ref).
+ 2. Centre each asset on its own available-case mean, clip the deviations at zero and zero the invalid entries.
+ 3. Take the numerator as the cross product of the clipped block, and the denominator as the cross product of the valid mask, which counts the observations of each pair.
+ 4. Divide and frame with [`coverage_divide`](@ref), and rescale to a unit diagonal when the verb is `Statistics.cor`.
+
+# Related
+
+  - [`coverage_covariance`](@ref)
+  - [`coverage_valid_block`](@ref)
+  - [`coverage_divide`](@ref)
+"""
+function coverage_covariance(f::F, ce::Covariance{<:Any, <:Any, <:SemiMoment},
+                             cvg::CoveragePolicy, X::MatNum; dims::Int = 1, mean = nothing,
+                             active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+                             kwargs...) where {F}
+    assert_dims(dims)
+    assert_partial_fittable(ce.me, ce.w, "Covariance")
+    @argcheck(isnothing(mean),
+              ArgumentError("an available-case semi-covariance centres each asset on that asset's own observations, so it cannot take a centre fitted over the whole window. Pass `mean = nothing`, or clear `cvg`."))
+    Xo, msk, mu, active, stale = coverage_valid_block(X, active_mask; dims = dims)
+    Y = min.(Xo .- transpose(mu), zero(eltype(mu)))
+    Y[.!msk] .= zero(eltype(Y))
+    mski = Int.(msk)
+    nu = transpose(mski) * mski
+    cmsk = coverage_admission(cvg, CoverageCounts(nu, nothing, active, stale), size(Xo, 1))
+    sigma = coverage_divide(transpose(Y) * Y, nu, partial_fit_corrected(ce.ce), cmsk)
+    return coverage_correlation(f, sigma)
 end
 """
     Statistics.cor(
@@ -618,9 +791,10 @@ julia> cor(Covariance(), X)
   - [`cov(ce::Covariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
 function Statistics.cor(ce::Covariance{<:Any, <:Any, <:FullMoment}, X::MatNum;
-                        dims::Int = 1, mean = nothing, kwargs...)
-    mu, cel = covariance_centre_and_estimator(ce, X; dims = dims, mean = mean, kwargs...)
-    return Statistics.cor(cel, X; dims = dims, mean = mu, kwargs...)
+                        dims::Int = 1, mean = nothing,
+                        active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
+    return coverage_covariance(Statistics.cor, ce, ce.cvg, X; dims = dims, mean = mean,
+                               active_mask = active_mask, kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -634,10 +808,10 @@ $(DocStringExtensions.TYPEDSIGNATURES)
  3. Delegate to `Statistics.cor(cel, X; dims = dims, mean = 0, kwargs...)`. The zero mean is what stops the clipped returns being centred a second time.
 """
 function Statistics.cor(ce::Covariance{<:Any, <:Any, <:SemiMoment}, X::MatNum;
-                        dims::Int = 1, mean = nothing, kwargs...)
-    mu, cel = covariance_centre_and_estimator(ce, X; dims = dims, mean = mean, kwargs...)
-    X = min.(X .- mu, zero(eltype(X)))
-    return Statistics.cor(cel, X; dims = dims, mean = zero(eltype(X)), kwargs...)
+                        dims::Int = 1, mean = nothing,
+                        active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
+    return coverage_covariance(Statistics.cor, ce, ce.cvg, X; dims = dims, mean = mean,
+                               active_mask = active_mask, kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -679,9 +853,10 @@ When [`port_opt_view`](@ref) is called on this type, its fields are subset to th
 ```jldoctest
 julia> PortfolioOptimisers.CovarianceState(; mu = [0.0, 0.0])
 PortfolioOptimisers.CovarianceState
-   n ┼ Int64: 0
-  mu ┼ Vector{Float64}: [0.0, 0.0]
-   M ┴ 2×2 Matrix{Float64}
+    n ┼ Int64: 0
+   mu ┼ Vector{Float64}: [0.0, 0.0]
+    M ┼ 2×2 Matrix{Float64}
+  cvg ┴ nothing
 ```
 
 # Related
@@ -705,11 +880,16 @@ PortfolioOptimisers.CovarianceState
     $(field_dict[:pf_M])
     """
     M
+    """
+    $(field_dict[:pf_cvg])
+    """
+    cvg
 end
 function CovarianceState(; n::Integer = 0, mu::VecNum,
-                         M::MatNum = zeros(eltype(mu), length(mu), length(mu)))::CovarianceState
+                         M::MatNum = zeros(eltype(mu), length(mu), length(mu)),
+                         cvg::Option{<:CoverageCounts} = nothing)::CovarianceState
     assert_partial_fit_state(n, mu, M)
-    return CovarianceState(n, mu, M)
+    return CovarianceState(n, mu, M, cvg)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -742,8 +922,31 @@ Folds two [`CovarianceState`](@ref) fitted on disjoint blocks into the state of 
 """
 function merge_states(a::CovarianceState, b::CovarianceState)
     assert_mergeable_states(a, b)
-    n, mu, M = chan_merge(a.n, a.mu, a.M, b.n, b.mu, b.M)
-    return CovarianceState(n, mu, M)
+    ca, cb = a.cvg, b.cvg
+    if isnothing(ca) || isnothing(cb)
+        n, mu, M = chan_merge(a.n, a.mu, a.M, b.n, b.mu, b.M)
+        return CovarianceState(n, mu, M, nothing)
+    end
+    nu = ca.nu .+ cb.nu
+    centre = similar(ca.centre)
+    M = similar(a.M)
+    for j in axes(nu, 2), i in axes(nu, 1)
+        if iszero(nu[i, j])
+            centre[i, j] = zero(eltype(centre))
+            M[i, j] = zero(eltype(M))
+        else
+            di = cb.centre[i, j] - ca.centre[i, j]
+            dj = cb.centre[j, i] - ca.centre[j, i]
+            centre[i, j] = ca.centre[i, j] + di * (cb.nu[i, j] / nu[i, j])
+            M[i, j] = a.M[i, j] +
+                      b.M[i, j] +
+                      di * dj * (ca.nu[i, j] * cb.nu[i, j] / nu[i, j])
+        end
+    end
+    mu = [centre[i, i] for i in axes(centre, 1)]
+    return CovarianceState(a.n + b.n, mu, M,
+                           CoverageCounts(nu, centre, copy(cb.active),
+                                          coverage_merge_stale(ca, cb, b.n)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -767,7 +970,8 @@ The `copy` method of the [`AbstractPartialFitState`](@ref) interface, which [`pa
   - [`AbstractPartialFitState`](@ref)
 """
 function Base.copy(x::CovarianceState)
-    return CovarianceState(x.n, copy(x.mu), copy(x.M))
+    return CovarianceState(x.n, copy(x.mu), copy(x.M),
+                           isnothing(x.cvg) ? nothing : copy(x.cvg))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -793,7 +997,7 @@ The Welford accumulator of one pair of assets reads those two assets' observatio
   - [`partial_fit!`](@ref)
 """
 function port_opt_view(x::CovarianceState, i, args...)
-    return CovarianceState(x.n, x.mu[i], x.M[i, i])
+    return CovarianceState(x.n, x.mu[i], x.M[i, i], coverage_counts_view(x.cvg, i))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -870,12 +1074,15 @@ Both covariance estimators of the seam seed the same state from the same observa
   - [`CovarianceState`](@ref)
   - [`partial_fit!`](@ref)
 """
-function covariance_state_seed(cache::Option{<:CovarianceState}, x::VecNum)
+function covariance_state_seed(cache::Option{<:CovarianceState}, x::VecNum,
+                               cvg::Option{<:CoveragePolicy} = nothing)
+    N = length(x)
+    Tf = float(eltype(x))
     return if isnothing(cache)
-        CovarianceState(0, zeros(eltype(x), length(x)),
-                        zeros(eltype(x), length(x), length(x)))
+        CovarianceState(0, zeros(Tf, N), zeros(Tf, N, N),
+                        coverage_counts_seed(cvg, nothing, N, Tf, true))
     else
-        cache
+        Accessors.@reset cache.cvg = coverage_counts_seed(cvg, cache.cvg, N, Tf, true)
     end
 end
 """
@@ -921,6 +1128,131 @@ function partial_fit!(state::CovarianceState, x::VecNum)
     state.mu .+= d ./ n
     state.M .+= d .* transpose(x .- state.mu)
     return Accessors.@reset state.n = n
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+`Nothing` method of the coverage arm of [`partial_fit!`](@ref) for a [`CovarianceState`](@ref). An estimator that carries no [`CoveragePolicy`](@ref) folds through [`partial_fit!(state::CovarianceState, x::VecNum)`](@ref), and the active mask is ignored.
+
+# Related
+
+  - [`partial_fit!`](@ref)
+  - [`CoveragePolicy`](@ref)
+  - [`CovarianceState`](@ref)
+"""
+function partial_fit!(state::CovarianceState, x::VecNum, ::Nothing,
+                      ::Option{<:AbstractVector{<:Bool}})
+    return partial_fit!(state, x)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+[`CoveragePolicy`](@ref) method of the coverage arm of [`partial_fit!`](@ref) for a [`CovarianceState`](@ref). Folds one observation into the running per-pair count, centre and co-moment accumulator, reading each pair's own observations alone.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\nu_{jk} &\\leftarrow \\nu_{jk} + 1\\\\
+d_{jk} &= r_{tj} - c_{jk}\\\\
+c_{jk} &\\leftarrow c_{jk} + \\frac{d_{jk}}{\\nu_{jk}}\\\\
+d_{kj} &= r_{tk} - c_{kj}\\\\
+c_{kj} &\\leftarrow c_{kj} + \\frac{d_{kj}}{\\nu_{jk}}\\\\
+M_{jk} &\\leftarrow M_{jk} + d_{jk} (r_{tk} - c_{kj})\\, ,
+\\end{align}
+```
+
+for every pair ``(j, k)`` both of whose assets are finite and active at observation ``t``, and no line at all for a pair that is not. Where:
+
+  - ``\\nu_{jk}``: the number of observations at which both assets of the pair were finite and active.
+  - $(math_dict[:r_tj])
+  - ``c_{jk}``: the running mean of asset ``j`` over the observations of the pair ``(j, k)``, so that ``c_{kj}`` is the running mean of asset ``k`` over those same observations.
+  - ``M_{jk}``: the running co-moment accumulator of the pair.
+
+This is Welford's recursion per pair, so a covariance folded observation by observation is the covariance of the same rows fitted as a block, and the diagonal is each asset's ordinary available-case variance. The pair is the unit of the centre as well as of the count, which is what makes the recursion exact: an entry centred on the whole window's mean would need every past term corrected as the window grows.
+
+# Algorithm
+
+ 1. Refuse an observation whose length is not the number of assets the state describes.
+ 2. Read the valid assets and the newly inactive ones with [`coverage_valid`](@ref).
+ 3. Apply the algorithm's fold-time rule with [`fold_inactive!`](@ref).
+ 4. Fold the observation into every pair of valid assets, taking the upper triangle and mirroring it, so that the accumulator stays exactly symmetric.
+ 5. Copy the diagonal of the centre onto `mu`, which is each asset's own available-case mean.
+ 6. Move the per-asset bookkeeping on with [`coverage_step!`](@ref), add one to the observation count, and return the state.
+
+# Arguments
+
+  - `state`: The state to fold into, mutated in place.
+  - `x`: One observation, one entry per asset.
+  - `cvg`: The policy the estimator carries.
+  - `active_mask`: The active mask of the Asset Panel at this observation, or `nothing`.
+
+# Validation
+
+  - `length(x)` is the number of assets the state describes. A `DimensionMismatch` is thrown otherwise.
+
+# Returns
+
+  - `state::CovarianceState`: The state after the observation.
+
+# Related
+
+  - [`partial_fit!`](@ref)
+  - [`CoveragePolicy`](@ref)
+  - [`coverage_valid`](@ref)
+  - [`fold_inactive!`](@ref)
+  - [`coverage_step!`](@ref)
+"""
+function partial_fit!(state::CovarianceState, x::VecNum, cvg::CoveragePolicy,
+                      active_mask::Option{<:AbstractVector{<:Bool}})
+    @argcheck(length(x) == length(state.mu),
+              DimensionMismatch("the observation must have one entry per asset, but the state describes $(length(state.mu)) assets and `x` has $(length(x)) entries."))
+    valid, ni = coverage_valid(x, active_mask, state.cvg)
+    state = fold_inactive!(cvg.alg, state, ni)
+    counts = state.cvg
+    nu, centre, M = counts.nu, counts.centre, state.M
+    idx = findall(valid)
+    for a in eachindex(idx)
+        i = idx[a]
+        n = nu[i, i] + 1
+        d = x[i] - centre[i, i]
+        centre[i, i] += d / n
+        M[i, i] += d * (x[i] - centre[i, i])
+        nu[i, i] = n
+        state.mu[i] = centre[i, i]
+        for b in (a + 1):length(idx)
+            j = idx[b]
+            m = nu[i, j] + 1
+            di = x[i] - centre[i, j]
+            centre[i, j] += di / m
+            dj = x[j] - centre[j, i]
+            centre[j, i] += dj / m
+            M[i, j] += di * (x[j] - centre[j, i])
+            M[j, i] = M[i, j]
+            nu[i, j] = m
+            nu[j, i] = m
+        end
+    end
+    coverage_step!(counts, valid, active_mask)
+    return Accessors.@reset state.n = state.n + 1
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+[`CovarianceState`](@ref) method of [`fold_inactive!`](@ref) under [`ResetCoverage`](@ref). Zeroes the count, the centre and the accumulator of every row and column that touches an asset that has just gone inactive, so that a relisting starts every pair the asset belongs to cold.
+
+# Related
+
+  - [`fold_inactive!`](@ref)
+  - [`ResetCoverage`](@ref)
+  - [`CovarianceState`](@ref)
+"""
+function fold_inactive!(::ResetCoverage, state::CovarianceState, ni::AbstractVector{<:Bool})
+    coverage_reset!(state.cvg.nu, ni)
+    coverage_reset!(state.cvg.centre, ni)
+    coverage_reset!(state.mu, ni)
+    coverage_reset!(state.M, ni)
+    return state
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1007,10 +1339,17 @@ The block arm of the [`partial_fit!`](@ref) interface. Welford's update reads on
   - [`Covariance`](@ref)
   - [`partial_fit!`](@ref)
 """
-function partial_fit!(ce::Covariance{<:Any, <:Any, <:FullMoment}, X::MatNum; dims::Int = 1)
+function partial_fit!(ce::Covariance{<:Any, <:Any, <:FullMoment}, X::MatNum; dims::Int = 1,
+                      active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing)
     X = dims_oriented(dims, X)
+    amsk = isnothing(active_mask) ? nothing : dims_oriented(dims, active_mask)
+    if !isnothing(amsk)
+        @argcheck(size(amsk) == size(X),
+                  DimensionMismatch("size(X) ($(size(X))) must match size(active_mask) ($(size(amsk)))"))
+    end
     for i in axes(X, 1)
-        ce = partial_fit!(ce, view(X, i, :))
+        ce = partial_fit!(ce, view(X, i, :);
+                          active_mask = isnothing(amsk) ? nothing : view(amsk, i, :))
     end
     return ce
 end
@@ -1026,9 +1365,11 @@ $(DocStringExtensions.TYPEDSIGNATURES)
  3. Fold `x` into the state.
  4. Rebind `ce.cache` with `Accessors.@reset`, and return the estimator.
 """
-function partial_fit!(ce::Covariance{<:Any, <:Any, <:FullMoment}, x::VecNum)
+function partial_fit!(ce::Covariance{<:Any, <:Any, <:FullMoment}, x::VecNum;
+                      active_mask::Option{<:AbstractVector{<:Bool}} = nothing)
     partial_fit_corrected(ce)
-    return Accessors.@reset ce.cache = partial_fit!(covariance_state_seed(ce.cache, x), x)
+    state = covariance_state_seed(ce.cache, x, ce.cvg)
+    return Accessors.@reset ce.cache = partial_fit!(state, x, ce.cvg, active_mask)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1111,8 +1452,73 @@ julia> cov(ce)
 function Statistics.cov(ce::Union{<:GeneralCovariance,
                                   <:Covariance{<:Any, <:Any, <:FullMoment}},
                         state::CovarianceState)
+    return coverage_covariance(ce, coverage_policy(ce), state)
+end
+"""
+    coverage_policy(ce::GeneralCovariance) -> Nothing
+    coverage_policy(ce::Covariance) -> Option{<:CoveragePolicy}
+
+Reads the [`CoveragePolicy`](@ref) a covariance estimator carries, out of an estimator that may have no such field.
+
+[`GeneralCovariance`](@ref) and [`Covariance`](@ref) share one state and one read-out, and only the second has a `cvg` field. The read-out therefore asks for the policy through this verb rather than for the field, so that the arm is still chosen by dispatch and the estimator without the field answers `nothing`.
+
+# Arguments
+
+  - `ce`: Covariance estimator.
+
+# Returns
+
+  - `cvg::Option{<:CoveragePolicy}`: The policy the estimator carries, or `nothing`.
+
+# Related
+
+  - [`CoveragePolicy`](@ref)
+  - [`GeneralCovariance`](@ref)
+  - [`Covariance`](@ref)
+  - [`coverage_covariance`](@ref)
+"""
+function coverage_policy(::GeneralCovariance)
+    return nothing
+end
+function coverage_policy(ce::Covariance)
+    return ce.cvg
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+`Nothing` method of the read-out arm of [`coverage_covariance`](@ref). Every pair shares one count, so the whole answer is `NaN` until the count passes the Bessel correction.
+
+[`GeneralCovariance`](@ref) carries no `cvg` field and reads the same state, so it always reaches this arm.
+
+# Related
+
+  - [`coverage_covariance`](@ref)
+  - [`CovarianceState`](@ref)
+"""
+function coverage_covariance(ce::Union{<:GeneralCovariance,
+                                       <:Covariance{<:Any, <:Any, <:FullMoment}}, ::Nothing,
+                             state::CovarianceState)
     k = state.n - partial_fit_corrected(ce)
     return k >= one(k) ? state.M ./ k : fill(convert(eltype(state.M), NaN), size(state.M))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+[`CoveragePolicy`](@ref) method of the read-out arm of [`coverage_covariance`](@ref). Each pair's accumulator is divided by that pair's own count less the Bessel correction, and an asset the policy refuses is `NaN` across its whole row and column.
+
+A pair whose two assets are each admitted but which share no observation is `NaN` on its own, because a covariance of no observations is not a number. That is available-case estimation's own cost, and it is what a consumer of the matrix must be ready for.
+
+# Related
+
+  - [`coverage_covariance`](@ref)
+  - [`coverage_admission`](@ref)
+  - [`coverage_divide`](@ref)
+"""
+function coverage_covariance(ce::Covariance{<:Any, <:Any, <:FullMoment},
+                             cvg::CoveragePolicy, state::CovarianceState)
+    counts = state.cvg
+    return coverage_divide(state.M, counts.nu, partial_fit_corrected(ce),
+                           coverage_admission(cvg, counts, state.n))
 end
 function Statistics.cov(ce::Union{<:GeneralCovariance,
                                   <:Covariance{<:Any, <:Any, <:FullMoment}})

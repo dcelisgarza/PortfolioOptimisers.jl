@@ -11,7 +11,7 @@ commit = "fda13accfd"
 [file]
 "ext/PortfolioOptimisersImputeExt.jl" = { code = 6, doc = 0, comment = 4, blank = 3, total = 13 }
 "ext/PortfolioOptimisersPlotsExt.jl" = { code = 2881, doc = 0, comment = 204, blank = 47, total = 3132 }
-"src/01_Base/01_DocstringDictionaries.jl" = { code = 1115, doc = 113, comment = 123, blank = 43, total = 1394 }
+"src/01_Base/01_DocstringDictionaries.jl" = { code = 1117, doc = 113, comment = 123, blank = 43, total = 1396 }
 "src/01_Base/02_TypeRoots.jl" = { code = 18, doc = 241, comment = 0, blank = 115, total = 374 }
 "src/01_Base/03_PrettyShow.jl" = { code = 117, doc = 138, comment = 0, blank = 76, total = 331 }
 "src/01_Base/04_ScopedConfig.jl" = { code = 163, doc = 491, comment = 2, blank = 214, total = 870 }
@@ -26,6 +26,7 @@ commit = "fda13accfd"
 "src/01_Base/13_KappaLog.jl" = { code = 3, doc = 36, comment = 0, blank = 18, total = 57 }
 "src/01_Base/14_PartialFit.jl" = { code = 66, doc = 204, comment = 0, blank = 114, total = 384 }
 "src/01_Base/15_Online.jl" = { code = 185, doc = 377, comment = 0, blank = 194, total = 756 }
+"src/01_Base/16_CoveragePolicy.jl" = { code = 198, doc = 406, comment = 0, blank = 195, total = 799 }
 "src/02_Tools.jl" = { code = 808, doc = 2044, comment = 46, blank = 867, total = 3765 }
 "src/03_InputData/01_AssetPanel.jl" = { code = 373, doc = 680, comment = 0, blank = 330, total = 1383 }
 "src/03_InputData/02_AssetPanelBuilder.jl" = { code = 281, doc = 608, comment = 0, blank = 270, total = 1159 }
@@ -41,9 +42,9 @@ commit = "fda13accfd"
 "src/06_Detone.jl" = { code = 46, doc = 188, comment = 0, blank = 81, total = 315 }
 "src/07_MatrixProcessing.jl" = { code = 88, doc = 380, comment = 3, blank = 133, total = 604 }
 "src/08_Moments/01_Base_Moments.jl" = { code = 442, doc = 980, comment = 9, blank = 396, total = 1827 }
-"src/08_Moments/02_SimpleExpectedReturns.jl" = { code = 82, doc = 310, comment = 0, blank = 144, total = 536 }
-"src/08_Moments/03_Covariance.jl" = { code = 174, doc = 674, comment = 0, blank = 274, total = 1122 }
-"src/08_Moments/04_SimpleVariance.jl" = { code = 127, doc = 567, comment = 0, blank = 233, total = 927 }
+"src/08_Moments/02_SimpleExpectedReturns.jl" = { code = 165, doc = 432, comment = 0, blank = 191, total = 788 }
+"src/08_Moments/03_Covariance.jl" = { code = 330, doc = 852, comment = 0, blank = 346, total = 1528 }
+"src/08_Moments/04_SimpleVariance.jl" = { code = 255, doc = 722, comment = 0, blank = 292, total = 1269 }
 "src/08_Moments/05_GerberCovariance.jl" = { code = 96, doc = 495, comment = 6, blank = 195, total = 792 }
 "src/08_Moments/06_SmythBrobyCovariance.jl" = { code = 225, doc = 978, comment = 0, blank = 420, total = 1623 }
 "src/08_Moments/07_DistanceCovariance.jl" = { code = 98, doc = 331, comment = 0, blank = 146, total = 575 }
@@ -114,7 +115,7 @@ commit = "fda13accfd"
 "src/08_Moments/47_CrossSectionalExposureDiagnostics.jl" = { code = 408, doc = 507, comment = 0, blank = 248, total = 1163 }
 "src/08_Moments/48_FactorModelSummary.jl" = { code = 224, doc = 318, comment = 2, blank = 150, total = 694 }
 "src/08_Moments/49_CrossSectionalIdiosyncraticDiagnostics.jl" = { code = 230, doc = 368, comment = 0, blank = 184, total = 782 }
-"src/08_Moments/50_CoverageUniverse.jl" = { code = 233, doc = 399, comment = 0, blank = 200, total = 832 }
+"src/08_Moments/50_CoverageUniverse.jl" = { code = 334, doc = 562, comment = 0, blank = 268, total = 1164 }
 "src/08_Moments/51_ExpWeightedExpectedReturns.jl" = { code = 135, doc = 324, comment = 0, blank = 156, total = 615 }
 "src/08_Moments/52_ExpWeightedVariance.jl" = { code = 183, doc = 423, comment = 0, blank = 195, total = 801 }
 "src/08_Moments/53_ExpWeightedCovariance.jl" = { code = 207, doc = 469, comment = 0, blank = 212, total = 888 }

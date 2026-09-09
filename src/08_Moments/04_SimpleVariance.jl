@@ -17,6 +17,7 @@ $(DocStringExtensions.FIELDS)
         me::Option{<:AbstractExpectedReturnsEstimator} = SimpleExpectedReturns(),
         w::Option{<:ObsWeights} = nothing,
         corrected::Bool = true,
+        cvg::Option{<:CoveragePolicy} = nothing,
         cache::Option{<:AbstractPartialFitState} = nothing
     ) -> SimpleVariance
 
@@ -98,46 +99,57 @@ SimpleVariance
     """
     corrected
     """
+    $(field_dict[:cvg])
+    """
+    cvg
+    """
     $(field_dict[:pfcache])
     """
     @fprop @vprop cache
     function SimpleVariance(me::Option{<:AbstractExpectedReturnsEstimator},
                             w::Option{<:ObsWeights}, corrected::Bool,
+                            cvg::Option{<:CoveragePolicy},
                             cache::Option{<:AbstractPartialFitState})
         assert_nonempty_nonneg_finite_val(w, :w)
-        return new{typeof(me), typeof(w), typeof(corrected), typeof(cache)}(me, w,
-                                                                            corrected,
-                                                                            cache)
+        return new{typeof(me), typeof(w), typeof(corrected), typeof(cvg), typeof(cache)}(me,
+                                                                                         w,
+                                                                                         corrected,
+                                                                                         cvg,
+                                                                                         cache)
     end
 end
 function SimpleVariance(;
                         me::Option{<:AbstractExpectedReturnsEstimator} = SimpleExpectedReturns(),
                         w::Option{<:ObsWeights} = nothing, corrected::Bool = true,
+                        cvg::Option{<:CoveragePolicy} = nothing,
                         cache::Option{<:AbstractPartialFitState} = nothing)::SimpleVariance
-    return SimpleVariance(me, w, corrected, cache)
+    return SimpleVariance(me, w, corrected, cvg, cache)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Renders every field of a [`SimpleVariance`](@ref) except `cache`.
+Renders every field of a [`SimpleVariance`](@ref) except `cache`, and `cvg` only where a policy is set.
 
-The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:SimpleVariance, true)` to render it. ADR 0105 records the decision.
+The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:SimpleVariance, true)` to render it. ADR 0105 records the decision. `cvg` is read from the instance rather than from the type, as it is for [`SimpleExpectedReturns`](@ref), which states the reason.
 
 # Arguments
 
-  - `::SimpleVariance`: Variance estimator, read for its type alone.
+  - `ve`: Variance estimator, read for its `cvg` field.
 
 # Returns
 
-  - `fields::Tuple`: The field names to render, which is `(:me, :w, :corrected)`.
+  - `fields::Tuple`: The field names to render, which is `(:me, :w, :corrected)` with no policy and `(:me, :w, :corrected, :cvg)` with one.
 
 # Related
 
   - [`SimpleVariance`](@ref)
+  - [`CoveragePolicy`](@ref)
   - [`show_fields`](@ref)
   - [`set_show_nothing_fields!`](@ref)
 """
-show_fields(::SimpleVariance) = (:me, :w, :corrected)
+function show_fields(ve::SimpleVariance)
+    return isnothing(ve.cvg) ? (:me, :w, :corrected) : (:me, :w, :corrected, :cvg)
+end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -189,7 +201,60 @@ The two methods reach one centre by two routes. The matrix method resolves a cen
 """
 function simple_variance_kernel(f::F, ve::SimpleVariance,
                                 me::AbstractExpectedReturnsEstimator, X::MatNum;
-                                dims::Int = 1, mean = nothing, kwargs...) where {F}
+                                dims::Int = 1, mean = nothing,
+                                active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+                                kwargs...) where {F}
+    return coverage_variance(f, ve, ve.cvg, me, X; dims = dims, mean = mean,
+                             active_mask = active_mask, kwargs...)
+end
+"""
+    coverage_variance(f, ve, cvg, me, X; dims::Int = 1, mean = nothing,
+                      active_mask = nothing, kwargs...) -> ArrNum
+    coverage_variance(f, ve, cvg, X::VecNum; mean = nothing) -> Number
+
+Routes a dispersion fit to the Coverage Universe arm or to the available-case arm.
+
+The `cvg` field of the estimator is passed as the third argument, so the arm is chosen by **dispatch on the policy** rather than by a branch on its value, exactly as [`coverage_mean`](@ref) does for a sample mean. `f` is `Statistics.var` or `Statistics.std`, and the available-case arm maps one onto the other through [`coverage_moment_map`](@ref).
+
+# Arguments
+
+  - `f`: `Statistics.var` or `Statistics.std`.
+  - `ve`: Variance estimator.
+  - `cvg`: The policy the estimator carries, which selects the arm.
+  - `me`: The estimator that centres the fit.
+  - $(arg_dict[:X])
+  - $(arg_dict[:dims])
+  - `mean`: A precomputed centre, or `nothing`.
+  - `active_mask`: The active mask of the Asset Panel, `observations × assets`, or `nothing`. The Coverage Universe arm ignores it.
+  - `kwargs...`: Additional keyword arguments passed to the centring estimator and the weights.
+
+# Returns
+
+  - `val`: The dispersion, of the shape `f` gives.
+
+# Related
+
+  - [`CoveragePolicy`](@ref)
+  - [`SimpleVariance`](@ref)
+  - [`coverage_mean`](@ref)
+  - [`coverage_moment_map`](@ref)
+"""
+function coverage_variance end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+`Nothing` method of [`coverage_variance`](@ref). The Coverage Universe arm, which is the body [`simple_variance_kernel`](@ref) has always had: it refuses a gapped sample with [`assert_finite_sample`](@ref) and ignores the active mask.
+
+# Related
+
+  - [`coverage_variance`](@ref)
+  - [`simple_variance_kernel`](@ref)
+"""
+function coverage_variance(f::F, ve::SimpleVariance, ::Nothing,
+                           me::AbstractExpectedReturnsEstimator, X::MatNum; dims::Int = 1,
+                           mean = nothing,
+                           active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+                           kwargs...) where {F}
     assert_dims(dims)
     assert_finite_sample(X)
     mu = weighted_centre(X, me, ve.w; dims = dims, mean = mean, kwargs...)
@@ -200,14 +265,113 @@ function simple_variance_kernel(f::F, ve::SimpleVariance,
         f(X, w, dims; corrected = ve.corrected, mean = mu)
     end
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+[`CoveragePolicy`](@ref) method of [`coverage_variance`](@ref). The available-case arm: each asset's dispersion is fitted on that asset's own finite and active observations, and the batch answer **is** the incremental one, because the arm folds the block through [`partial_fit!`](@ref) and reads the state out.
+
+The centre is the fold's own running mean, so a `mean` a caller passes is refused rather than silently dropped: an available-case fit centres each asset on that asset's own observations, and a centre fitted over the whole window is not that.
+
+# Algorithm
+
+ 1. Fold every row of `X` into a fresh state with [`partial_fit!`](@ref), carrying the active mask.
+ 2. Read the state out with [`var(ve::SimpleVariance, state::SimpleVarianceState)`](@ref).
+ 3. Map the variance onto the answer `f` asks for with [`coverage_moment_map`](@ref), and orient it as the caller's `dims` asks.
+
+# Related
+
+  - [`coverage_variance`](@ref)
+  - [`CoveragePolicy`](@ref)
+  - [`coverage_moment_map`](@ref)
+  - [`partial_fit!`](@ref)
+"""
+function coverage_variance(f::F, ve::SimpleVariance, cvg::CoveragePolicy,
+                           ::AbstractExpectedReturnsEstimator, X::MatNum; dims::Int = 1,
+                           mean = nothing,
+                           active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+                           kwargs...) where {F}
+    assert_dims(dims)
+    @argcheck(isnothing(mean),
+              ArgumentError("an available-case variance centres each asset on that asset's own observations, so it cannot take a centre fitted over the whole window. Pass `mean = nothing`, or clear `cvg`."))
+    ve = partial_fit!(SimpleVariance(; w = ve.w, corrected = ve.corrected, cvg = cvg), X;
+                      dims = dims, active_mask = active_mask)
+    val = coverage_moment_map(f, Statistics.var(ve))
+    return isone(dims) ? permutedims(val) : reshape(val, :, 1)
+end
+"""
+    coverage_moment_map(f::typeof(Statistics.var), v::VecNum) -> VecNum
+    coverage_moment_map(f::typeof(Statistics.std), v::VecNum) -> VecNum
+
+Maps an available-case variance onto the answer the caller's verb asks for.
+
+[`coverage_variance`](@ref) fits a variance whichever verb called it, because the state carries a second-moment accumulator and nothing else, so the standard deviation is its square root. Dispatching on the verb rather than comparing it keeps the choice at compile time.
+
+# Arguments
+
+  - `f`: `Statistics.var` or `Statistics.std`.
+  - `v`: The available-case variance.
+
+# Returns
+
+  - `val::VecNum`: `v` itself, or its entrywise square root.
+
+# Related
+
+  - [`coverage_variance`](@ref)
+  - [`SimpleVariance`](@ref)
+"""
+function coverage_moment_map(::typeof(Statistics.var), v::VecNum)
+    return v
+end
+function coverage_moment_map(::typeof(Statistics.std), v::VecNum)
+    return sqrt.(v)
+end
 function simple_variance_kernel(f::F, ve::SimpleVariance, X::VecNum;
                                 mean = nothing) where {F}
+    return coverage_variance(f, ve, ve.cvg, X; mean = mean)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+`Nothing` method of the vector arm of [`coverage_variance`](@ref). The Coverage Universe arm over one asset's series, which refuses a gapped series with [`assert_finite_sample`](@ref).
+
+# Related
+
+  - [`coverage_variance`](@ref)
+  - [`simple_variance_kernel`](@ref)
+"""
+function coverage_variance(f::F, ve::SimpleVariance, ::Nothing, X::VecNum;
+                           mean = nothing) where {F}
     assert_finite_sample(X)
     w = get_observation_weights(ve.w, X)
     return if isnothing(w)
         f(X; corrected = ve.corrected, mean = mean)
     else
         f(X, w; corrected = ve.corrected, mean = mean)
+    end
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+[`CoveragePolicy`](@ref) method of the vector arm of [`coverage_variance`](@ref). One asset has no pair, so available-case estimation over its series is the ordinary fit over the finite entries of it, and the coverage floor is read against the length of the series.
+
+# Related
+
+  - [`coverage_variance`](@ref)
+  - [`CoveragePolicy`](@ref)
+  - [`admits`](@ref)
+"""
+function coverage_variance(f::F, ve::SimpleVariance, cvg::CoveragePolicy, X::VecNum;
+                           mean = nothing) where {F}
+    @argcheck(isnothing(mean),
+              ArgumentError("an available-case variance centres each asset on that asset's own observations, so it cannot take a centre fitted over the whole window. Pass `mean = nothing`, or clear `cvg`."))
+    Xf = filter(isfinite, X)
+    Tf = float(eltype(X))
+    return if length(Xf) - ve.corrected < 1 ||
+              !admits(cvg.alg, length(Xf) / max(length(X), 1), true, 0, cvg.min_coverage)
+        Tf(NaN)
+    else
+        f(Xf; corrected = ve.corrected, mean = nothing)
     end
 end
 """
@@ -608,9 +772,10 @@ When [`port_opt_view`](@ref) is called on this type, its fields are subset to th
 ```jldoctest
 julia> PortfolioOptimisers.SimpleVarianceState(; mu = [0.0, 0.0])
 PortfolioOptimisers.SimpleVarianceState
-   n ┼ Int64: 0
-  mu ┼ Vector{Float64}: [0.0, 0.0]
-   M ┴ Vector{Float64}: [0.0, 0.0]
+    n ┼ Int64: 0
+   mu ┼ Vector{Float64}: [0.0, 0.0]
+    M ┼ Vector{Float64}: [0.0, 0.0]
+  cvg ┴ nothing
 ```
 
 # Related
@@ -633,11 +798,16 @@ PortfolioOptimisers.SimpleVarianceState
     $(field_dict[:pf_M])
     """
     M
+    """
+    $(field_dict[:pf_cvg])
+    """
+    cvg
 end
 function SimpleVarianceState(; n::Integer = 0, mu::VecNum,
-                             M::VecNum = zeros(eltype(mu), length(mu)))::SimpleVarianceState
+                             M::VecNum = zeros(eltype(mu), length(mu)),
+                             cvg::Option{<:CoverageCounts} = nothing)::SimpleVarianceState
     assert_partial_fit_state(n, mu, M)
-    return SimpleVarianceState(n, mu, M)
+    return SimpleVarianceState(n, mu, M, cvg)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -670,8 +840,27 @@ Folds two [`SimpleVarianceState`](@ref) fitted on disjoint blocks into the state
 """
 function merge_states(a::SimpleVarianceState, b::SimpleVarianceState)
     assert_mergeable_states(a, b)
-    n, mu, M = chan_merge(a.n, a.mu, a.M, b.n, b.mu, b.M)
-    return SimpleVarianceState(n, mu, M)
+    ca, cb = a.cvg, b.cvg
+    if isnothing(ca) || isnothing(cb)
+        n, mu, M = chan_merge(a.n, a.mu, a.M, b.n, b.mu, b.M)
+        return SimpleVarianceState(n, mu, M, nothing)
+    end
+    nu = ca.nu .+ cb.nu
+    mu = similar(a.mu)
+    M = similar(a.M)
+    for i in eachindex(mu, nu)
+        if iszero(nu[i])
+            mu[i] = zero(eltype(mu))
+            M[i] = zero(eltype(M))
+        else
+            d = b.mu[i] - a.mu[i]
+            mu[i] = a.mu[i] + d * (cb.nu[i] / nu[i])
+            M[i] = a.M[i] + b.M[i] + d^2 * (ca.nu[i] * cb.nu[i] / nu[i])
+        end
+    end
+    return SimpleVarianceState(a.n + b.n, mu, M,
+                               CoverageCounts(nu, nothing, copy(cb.active),
+                                              coverage_merge_stale(ca, cb, b.n)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -695,7 +884,8 @@ The `copy` method of the [`AbstractPartialFitState`](@ref) interface, which [`pa
   - [`AbstractPartialFitState`](@ref)
 """
 function Base.copy(x::SimpleVarianceState)
-    return SimpleVarianceState(x.n, copy(x.mu), copy(x.M))
+    return SimpleVarianceState(x.n, copy(x.mu), copy(x.M),
+                               isnothing(x.cvg) ? nothing : copy(x.cvg))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -721,7 +911,7 @@ The Welford accumulator of one asset reads that asset's observations alone, and 
   - [`partial_fit!`](@ref)
 """
 function port_opt_view(x::SimpleVarianceState, i, args...)
-    return SimpleVarianceState(x.n, x.mu[i], x.M[i])
+    return SimpleVarianceState(x.n, x.mu[i], x.M[i], coverage_counts_view(x.cvg, i))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -770,6 +960,116 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+`Nothing` method of the coverage arm of [`partial_fit!`](@ref) for a [`SimpleVarianceState`](@ref). An estimator that carries no [`CoveragePolicy`](@ref) folds through [`partial_fit!(state::SimpleVarianceState, x::VecNum)`](@ref), and the active mask is ignored.
+
+# Related
+
+  - [`partial_fit!`](@ref)
+  - [`CoveragePolicy`](@ref)
+  - [`SimpleVarianceState`](@ref)
+"""
+function partial_fit!(state::SimpleVarianceState, x::VecNum, ::Nothing,
+                      ::Option{<:AbstractVector{<:Bool}})
+    return partial_fit!(state, x)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+[`CoveragePolicy`](@ref) method of the coverage arm of [`partial_fit!`](@ref) for a [`SimpleVarianceState`](@ref). Folds one observation into the running per-asset count, mean and accumulator, reading each asset's own observations alone.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\nu_j &\\leftarrow \\nu_j + 1\\\\
+d_j &= r_{tj} - \\mu_j\\\\
+\\mu_j &\\leftarrow \\mu_j + \\frac{d_j}{\\nu_j}\\\\
+M_j &\\leftarrow M_j + d_j (r_{tj} - \\mu_j)\\, ,
+\\end{align}
+```
+
+for every asset ``j`` that is finite and active at observation ``t``, and no line at all for an asset that is not. Where:
+
+  - ``\\nu_j``: the number of observations at which asset ``j`` was finite and active.
+  - $(math_dict[:r_tj])
+  - ``\\mu_j``: the running mean of asset ``j``.
+  - ``d_j``: the deviation of asset ``j`` from its mean before the fold.
+  - ``M_j``: the running second-moment accumulator of asset ``j``.
+
+The last line reads ``\\mu_j`` after the third line moved it, which is Welford's asymmetry, so the accumulator is exact per asset and a skipped observation costs the asset nothing.
+
+# Algorithm
+
+ 1. Refuse an observation whose length is not the number of assets the state describes.
+ 2. Read the valid assets and the newly inactive ones with [`coverage_valid`](@ref).
+ 3. Apply the algorithm's fold-time rule with [`fold_inactive!`](@ref).
+ 4. Fold each valid asset's return into its own count, mean and accumulator.
+ 5. Move the per-asset bookkeeping on with [`coverage_step!`](@ref), add one to the observation count, and return the state.
+
+# Arguments
+
+  - `state`: The state to fold into, mutated in place.
+  - `x`: One observation, one entry per asset.
+  - `cvg`: The policy the estimator carries.
+  - `active_mask`: The active mask of the Asset Panel at this observation, or `nothing`.
+
+# Validation
+
+  - `length(x)` is the number of assets the state describes. A `DimensionMismatch` is thrown otherwise.
+
+# Returns
+
+  - `state::SimpleVarianceState`: The state after the observation.
+
+# Related
+
+  - [`partial_fit!`](@ref)
+  - [`CoveragePolicy`](@ref)
+  - [`coverage_valid`](@ref)
+  - [`fold_inactive!`](@ref)
+  - [`coverage_step!`](@ref)
+"""
+function partial_fit!(state::SimpleVarianceState, x::VecNum, cvg::CoveragePolicy,
+                      active_mask::Option{<:AbstractVector{<:Bool}})
+    @argcheck(length(x) == length(state.mu),
+              DimensionMismatch("the observation must have one entry per asset, but the state describes $(length(state.mu)) assets and `x` has $(length(x)) entries."))
+    valid, ni = coverage_valid(x, active_mask, state.cvg)
+    state = fold_inactive!(cvg.alg, state, ni)
+    counts = state.cvg
+    for i in eachindex(x, valid)
+        if valid[i]
+            nu = counts.nu[i] + 1
+            counts.nu[i] = nu
+            d = x[i] - state.mu[i]
+            state.mu[i] += d / nu
+            state.M[i] += d * (x[i] - state.mu[i])
+        end
+    end
+    coverage_step!(counts, valid, active_mask)
+    return Accessors.@reset state.n = state.n + 1
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+[`SimpleVarianceState`](@ref) method of [`fold_inactive!`](@ref) under [`ResetCoverage`](@ref). Zeroes the count, the centre, the running mean and the accumulator of every asset that has just gone inactive, so that a relisting starts the asset cold. The centre of a per-asset state is `nothing`, because its `mu` is already the cell's centre, and [`coverage_reset!`](@ref) passes that through.
+
+# Related
+
+  - [`fold_inactive!`](@ref)
+  - [`ResetCoverage`](@ref)
+  - [`SimpleVarianceState`](@ref)
+"""
+function fold_inactive!(::ResetCoverage, state::SimpleVarianceState,
+                        ni::AbstractVector{<:Bool})
+    coverage_reset!(state.cvg.nu, ni)
+    coverage_reset!(state.cvg.centre, ni)
+    coverage_reset!(state.mu, ni)
+    coverage_reset!(state.M, ni)
+    return state
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Folds every observation of a block into the partial-fit state of a [`SimpleVariance`](@ref) estimator.
 
 The block arm of the [`partial_fit!`](@ref) interface. Welford's update reads one observation at a time, so the block is folded row by row and the answer is the answer of the same rows handed over one at a time.
@@ -798,10 +1098,17 @@ The block arm of the [`partial_fit!`](@ref) interface. Welford's update reads on
   - [`SimpleVariance`](@ref)
   - [`partial_fit!`](@ref)
 """
-function partial_fit!(ve::SimpleVariance, X::MatNum; dims::Int = 1)
+function partial_fit!(ve::SimpleVariance, X::MatNum; dims::Int = 1,
+                      active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing)
     X = dims_oriented(dims, X)
+    amsk = isnothing(active_mask) ? nothing : dims_oriented(dims, active_mask)
+    if !isnothing(amsk)
+        @argcheck(size(amsk) == size(X),
+                  DimensionMismatch("size(X) ($(size(X))) must match size(active_mask) ($(size(amsk)))"))
+    end
     for i in axes(X, 1)
-        ve = partial_fit!(ve, view(X, i, :))
+        ve = partial_fit!(ve, view(X, i, :);
+                          active_mask = isnothing(amsk) ? nothing : view(amsk, i, :))
     end
     return ve
 end
@@ -817,9 +1124,11 @@ $(DocStringExtensions.TYPEDSIGNATURES)
  3. Fold `x` into the state.
  4. Rebind `ve.cache` with `Accessors.@reset`, and return the estimator.
 """
-function partial_fit!(ve::SimpleVariance, x::VecNum)
+function partial_fit!(ve::SimpleVariance, x::VecNum;
+                      active_mask::Option{<:AbstractVector{<:Bool}} = nothing)
     assert_partial_fittable(ve.me, ve.w, "SimpleVariance")
-    return Accessors.@reset ve.cache = partial_fit!(variance_state_seed(ve.cache, x), x)
+    state = variance_state_seed(ve.cache, x, ve.cvg)
+    return Accessors.@reset ve.cache = partial_fit!(state, x, ve.cvg, active_mask)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -842,11 +1151,15 @@ The seed is written here rather than inside [`partial_fit!`](@ref), so the fold 
   - [`SimpleVarianceState`](@ref)
   - [`partial_fit!`](@ref)
 """
-function variance_state_seed(cache::Option{<:SimpleVarianceState}, x::VecNum)
+function variance_state_seed(cache::Option{<:SimpleVarianceState}, x::VecNum,
+                             cvg::Option{<:CoveragePolicy} = nothing)
+    N = length(x)
+    Tf = float(eltype(x))
     return if isnothing(cache)
-        SimpleVarianceState(0, zeros(eltype(x), length(x)), zeros(eltype(x), length(x)))
+        SimpleVarianceState(0, zeros(Tf, N), zeros(Tf, N),
+                            coverage_counts_seed(cvg, nothing, N, Tf, false))
     else
-        cache
+        Accessors.@reset cache.cvg = coverage_counts_seed(cvg, cache.cvg, N, Tf, false)
     end
 end
 """
@@ -918,8 +1231,38 @@ julia> var(ve)
 """
 function Statistics.var(ve::SimpleVariance, state::SimpleVarianceState)
     assert_partial_fittable(ve.me, ve.w, "SimpleVariance")
+    return coverage_variance(ve, ve.cvg, state)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+`Nothing` method of the read-out arm of [`coverage_variance`](@ref). Every asset shares one count, so the whole answer is `NaN` until the count passes the Bessel correction.
+
+# Related
+
+  - [`coverage_variance`](@ref)
+  - [`SimpleVarianceState`](@ref)
+"""
+function coverage_variance(ve::SimpleVariance, ::Nothing, state::SimpleVarianceState)
     k = state.n - ve.corrected
     return k >= one(k) ? state.M ./ k : fill(convert(eltype(state.M), NaN), length(state.M))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+[`CoveragePolicy`](@ref) method of the read-out arm of [`coverage_variance`](@ref). Each asset's accumulator is divided by that asset's own count less the Bessel correction, and an asset the policy refuses is `NaN`.
+
+# Related
+
+  - [`coverage_variance`](@ref)
+  - [`coverage_admission`](@ref)
+  - [`coverage_divide`](@ref)
+"""
+function coverage_variance(ve::SimpleVariance, cvg::CoveragePolicy,
+                           state::SimpleVarianceState)
+    counts = state.cvg
+    return coverage_divide(state.M, counts.nu, ve.corrected,
+                           coverage_admission(cvg, counts, state.n))
 end
 function Statistics.var(ve::SimpleVariance)
     return Statistics.var(ve, partial_fit_cache(ve))

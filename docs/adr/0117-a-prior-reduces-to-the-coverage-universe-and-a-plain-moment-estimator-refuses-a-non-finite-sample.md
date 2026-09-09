@@ -66,12 +66,53 @@ The rule has one cost, stated here so that no docstring hides it. One non-finite
 inactive row, inside the window puts the asset outside the Coverage Universe for that fit. A caller
 with a holiday imputes it in `prices_to_returns`, or uses a mask-aware estimator.
 
-### A plain moment estimator refuses a non-finite sample
+### A plain moment estimator refuses a non-finite sample, unless it carries a Coverage Policy
 
 Every plain moment verb asserts that its sample is finite, through `assert_all_finite`, and throws
 `IsNonFiniteError`. A caller that bypasses the prior gets a named refusal whose message says to fit
-through a prior or to use a mask-aware estimator. No plain estimator gains a masked or a pairwise
-path, so no covariance is built from pairwise-complete observations and no repair needs a mask.
+through a prior or to use a mask-aware estimator.
+
+### A moment estimator may opt into available-case estimation
+
+The all-or-nothing rule above is **monotone non-increasing** over an expanding window. `coverage_mask`
+ANDs over every row, and an expanding walk-forward pins `train_start = 1`, so one non-finite or
+inactive row anywhere in `[1..t]` puts an asset out and growing the window never puts it back. An
+asset that lists after the window's first row is therefore outside the Coverage Universe of every
+fold, forever, and a late listing discards the survivors' whole history with it. That is a defect to
+route around rather than behaviour to reproduce, because the machinery to be robust to gaps — the
+finite-aware renormalising combination, the forced-liquidation fees and the `NaN` moment frame — is
+already in the library.
+
+A moment estimator therefore gains one field, `cvg::Option{<:CoveragePolicy}`, defaulting to
+`nothing`. The `nothing` arm is read by dispatch and is exactly the reduce-and-expand path above, so
+an estimator that carries no policy costs nothing and behaves as it did. With a policy set the
+estimator is a **mask-aware** estimator in the sense this ADR already defines: it takes the whole
+window, reads `pnl.amsk` itself, and emits its own frame.
+
+Available-case estimation means one rule at every cell. A cell is fitted on the observations at
+which every asset of that cell is finite and active, and it carries its own denominator, of the
+shape of its accumulator. The frame is then the per-asset half: an asset reaches the answer only
+where `admits(alg, share, active, stale, min_coverage)` says so, with `share` that asset's own
+observation count over the number of observations fitted. What happens to a delisted asset is a
+dispatchable family, `AbstractCoverageAlgorithm`, mirroring `AbstractMomentAlgorithm`:
+`DecayCoverage` keeps the history and drops the asset the moment it goes inactive, `ResetCoverage`
+zeroes it so a relisting starts cold, and `ExpireCoverage(; after)` holds it in the frame for a
+stated staleness. A caller whose rule is none of the three subtypes the root and implements
+`fold_inactive!` and `admits`.
+
+The centre of a cell is that cell's own mean, which is what makes the fold exact: a per-pair Welford
+recursion carries a per-pair count and a per-pair centre, so an available-case covariance folded
+observation by observation is the available-case covariance of the same rows fitted as a block, to
+the last bit. The batch arm **is** the fold, so there is one recursion and no second implementation
+to drift. A semi-moment has no such recursion, because the clip is taken about a centre the whole
+window fixes, so its available-case arm is a two-pass over the block and its centre is each asset's
+own available-case mean.
+
+Two costs are stated here so that no docstring hides them. A pair whose two assets are each admitted
+but which share no observation is `NaN` on its own, because a covariance of no observations is not a
+number; and an available-case correlation may exceed one in absolute value, because its cells are
+centred on different observation sets. Both are available-case estimation's own costs, and a
+consumer of the matrix repairs them through `posdef!` on the surviving block.
 
 ### The Asset Panel is the third positional argument of the moment verbs
 
@@ -127,7 +168,11 @@ for a covariance.
 | Question | Refused | Why |
 | --- | --- | --- |
 | Where the gap logic lives | The verb itself reduces and expands, for every caller. | 55 per-type methods renamed to an inner verb, and the three direct callers outside the priors already sit below the optimiser's reduction. |
-| Where the gap logic lives | An available-case path per estimator: a masked mean, a pairwise-complete covariance, a masked repair. | About 25 masked paths, a covariance that is not positive semidefinite, and no oracle, because the reference has none. |
+| Where the gap logic lives | An available-case path in every estimator, always on. | Every existing fit would change behaviour, and most callers have no gap to pay for. The opt-in `cvg` field gives the path to the caller who asks for it and nothing to the caller who does not. |
+| Available-case estimation | Refusing it outright. | The all-or-nothing rule is monotone non-increasing over an expanding window, so a plain estimator could never hold an asset that lists after the first row. Its three original objections are answered: one masked path per family rather than about 25, `posdef!` on the surviving block, and the batch-parity identity of the fold as the oracle. |
+| The available-case centre | The whole window's per-asset mean for every cell. | The recursion is then not exact: a cell's count and its centre's count differ, so the Welford identity no longer telescopes and a fold would not equal its own batch fit. |
+| The delisting rule | One hard-coded rule. | A delisting has no single right answer, and the maintainer asked for an algorithm per rule, overridable by subtype. |
+| The coverage floor | A count of observations. | A count is not comparable across windows of different lengths, and the floor is asked as "how much of this window did the asset quote for". |
 | Where the gap logic lives | A write gate over the silent frame. | It cannot help the thirteen estimators that throw before they write, and it cannot correct the Gerber IQ leak. |
 | The Coverage Universe | Finite at every row, active at the last row. | A stale finite return during an inactive spell enters the moments as a real return. |
 | The Coverage Universe | Finiteness alone. | A delisted asset whose price series continues stays investable. |
@@ -141,7 +186,14 @@ for a covariance.
 - One build ticket writes the reduction, the seam, the block repair and the refusals. A second,
   blocked by it, ports the exponentially weighted family and writes the fit of #692.
 - The fog item of map [#667](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/667) on
-  the repair of a pairwise estimate closes: no estimator computes over a gap.
+  the repair of a pairwise estimate reopens under the `cvg` field: an estimator that carries a
+  policy does compute over a gap, and its answer is repaired on the surviving block.
+- The `cvg` field lands on `SimpleExpectedReturns`, `SimpleVariance` and `Covariance`. The third and
+  fourth order do not carry one yet: a coskewness and a cokurtosis are read through a spectral and
+  a matrix-processing step whose behaviour on a partially-`NaN` tensor is undecided, and deciding it
+  is a decision rather than a build.
+  [#983](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/983) holds it, with the
+  arithmetic already worked out.
 - Under the exponentially weighted family a young asset is investable while its early scenario
   rows are `NaN`. The reference zero-fills those rows and warns. What the library does with them
   is the measures decision of the map.

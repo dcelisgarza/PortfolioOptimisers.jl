@@ -863,3 +863,302 @@ function variance_series(ce::AbstractCovarianceEstimator, X::MatNum,
     end
     return isone(dims) ? val : permutedims(val)
 end
+"""
+    coverage_panel_moment(f, est, cvg, X, pnl, expand; dims::Int = 1, kwargs...)
+
+Routes a moment verb's Asset Panel method to the Coverage Universe seam or to the available-case one.
+
+An estimator that carries a [`CoveragePolicy`](@ref) is a **mask-aware** estimator in the sense the covariance root of this file states: it takes the whole window and reads `pnl.amsk` itself, so the panel method must hand it the mask rather than reduce the window to its Coverage Universe. The `cvg` field is passed as the third argument, so the two seams are chosen by dispatch, and the `Nothing` method is the reduce-and-expand the root has always run.
+
+`expand` is the framing the verb needs, because the four moment shapes frame differently: a covariance frames as a matrix, a marginal along its asset axis alone, and a co-moment at the pair index. It is passed rather than chosen here, so that this routing is written once for every verb.
+
+# Arguments
+
+  - `f`: The plain, panel-free method of the verb.
+  - `est`: The estimator.
+  - `cvg`: The policy the estimator carries, which selects the seam.
+  - $(arg_dict[:X])
+  - $(arg_dict[:pnl_moment])
+  - `expand`: The framing, called as `expand(val, cmsk)` on the Coverage Universe seam and unused on the other.
+  - $(arg_dict[:dims])
+  - `kwargs...`: Additional keyword arguments passed to the estimator.
+
+# Returns
+
+  - `val`: The moment on the full asset universe.
+
+# Related
+
+  - [`CoveragePolicy`](@ref)
+  - [`coverage_reduction`](@ref)
+  - [`expand_moment`](@ref)
+  - [`panel_moment_masks`](@ref)
+  - [`Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref)
+"""
+function coverage_panel_moment end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+`Nothing` method of [`coverage_panel_moment`](@ref). The Coverage Universe seam: reduce the window with [`coverage_reduction`](@ref), fit the plain estimator on the clean block, and frame the answer.
+
+# Related
+
+  - [`coverage_panel_moment`](@ref)
+  - [`coverage_reduction`](@ref)
+"""
+function coverage_panel_moment(f::F, est, ::Nothing, X::MatNum, pnl::Option{<:AssetPanel},
+                               expand::E; dims::Int = 1, kwargs...) where {F, E}
+    cmsk, Xc = coverage_reduction(X, pnl; dims = dims)
+    return expand(f(est, Xc; dims = dims, kwargs...), cmsk)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+[`CoveragePolicy`](@ref) method of [`coverage_panel_moment`](@ref). The available-case seam: hand the estimator the whole window and the panel's active mask, and let it write its own frame.
+
+# Related
+
+  - [`coverage_panel_moment`](@ref)
+  - [`CoveragePolicy`](@ref)
+  - [`panel_moment_masks`](@ref)
+"""
+function coverage_panel_moment(f::F, est, ::CoveragePolicy, X::MatNum,
+                               pnl::Option{<:AssetPanel}, ::E; dims::Int = 1,
+                               kwargs...) where {F, E}
+    amsk, _ = panel_moment_masks(pnl)
+    return f(est, X; dims = dims, active_mask = amsk, kwargs...)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Asset Panel method of `Statistics.mean` for a [`SimpleExpectedReturns`](@ref), which routes on its `cvg` field with [`coverage_panel_moment`](@ref).
+
+# Related
+
+  - [`coverage_panel_moment`](@ref)
+  - [`SimpleExpectedReturns`](@ref)
+  - [`CoveragePolicy`](@ref)
+"""
+function Statistics.mean(me::SimpleExpectedReturns, X::MatNum, pnl::Option{<:AssetPanel};
+                         dims::Int = 1, kwargs...)
+    return coverage_panel_moment(Statistics.mean, me, me.cvg, X, pnl,
+                                 (m, cmsk) -> expand_moment(m, cmsk, dims); dims = dims,
+                                 kwargs...)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Asset Panel method of `Statistics.var` for a [`SimpleVariance`](@ref), which routes on its `cvg` field with [`coverage_panel_moment`](@ref).
+
+# Related
+
+  - [`coverage_panel_moment`](@ref)
+  - [`SimpleVariance`](@ref)
+  - [`CoveragePolicy`](@ref)
+"""
+function Statistics.var(ve::SimpleVariance, X::MatNum, pnl::Option{<:AssetPanel};
+                        dims::Int = 1, kwargs...)
+    return coverage_panel_moment(Statistics.var, ve, ve.cvg, X, pnl,
+                                 (m, cmsk) -> expand_moment(m, cmsk, dims); dims = dims,
+                                 kwargs...)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Asset Panel method of `Statistics.std` for a [`SimpleVariance`](@ref), which routes on its `cvg` field with [`coverage_panel_moment`](@ref).
+
+# Related
+
+  - [`coverage_panel_moment`](@ref)
+  - [`SimpleVariance`](@ref)
+  - [`CoveragePolicy`](@ref)
+"""
+function Statistics.std(ve::SimpleVariance, X::MatNum, pnl::Option{<:AssetPanel};
+                        dims::Int = 1, kwargs...)
+    return coverage_panel_moment(Statistics.std, ve, ve.cvg, X, pnl,
+                                 (m, cmsk) -> expand_moment(m, cmsk, dims); dims = dims,
+                                 kwargs...)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Asset Panel method of `Statistics.cov` for a [`Covariance`](@ref), which routes on its `cvg` field with [`coverage_panel_moment`](@ref).
+
+# Related
+
+  - [`coverage_panel_moment`](@ref)
+  - [`Covariance`](@ref)
+  - [`CoveragePolicy`](@ref)
+"""
+function Statistics.cov(ce::Covariance, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1,
+                        kwargs...)
+    return coverage_panel_moment(Statistics.cov, ce, ce.cvg, X, pnl, expand_moment;
+                                 dims = dims, kwargs...)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Asset Panel method of `Statistics.cor` for a [`Covariance`](@ref), which routes on its `cvg` field with [`coverage_panel_moment`](@ref).
+
+# Related
+
+  - [`coverage_panel_moment`](@ref)
+  - [`Covariance`](@ref)
+  - [`CoveragePolicy`](@ref)
+"""
+function Statistics.cor(ce::Covariance, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1,
+                        kwargs...)
+    return coverage_panel_moment(Statistics.cor, ce, ce.cvg, X, pnl, expand_moment;
+                                 dims = dims, kwargs...)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Asset Panel method of `Statistics.var` for a [`Covariance`](@ref), which routes on its `cvg` field with [`coverage_panel_moment`](@ref). The answer is a marginal, so it frames along its asset axis alone.
+
+# Related
+
+  - [`coverage_panel_moment`](@ref)
+  - [`Covariance`](@ref)
+  - [`CoveragePolicy`](@ref)
+"""
+function Statistics.var(ce::Covariance, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1,
+                        kwargs...)
+    return coverage_panel_moment(Statistics.var, ce, ce.cvg, X, pnl,
+                                 (m, cmsk) -> expand_moment(m, cmsk, dims); dims = dims,
+                                 kwargs...)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Asset Panel method of `Statistics.std` for a [`Covariance`](@ref), which routes on its `cvg` field with [`coverage_panel_moment`](@ref). The answer is a marginal, so it frames along its asset axis alone.
+
+# Related
+
+  - [`coverage_panel_moment`](@ref)
+  - [`Covariance`](@ref)
+  - [`CoveragePolicy`](@ref)
+"""
+function Statistics.std(ce::Covariance, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1,
+                        kwargs...)
+    return coverage_panel_moment(Statistics.std, ce, ce.cvg, X, pnl,
+                                 (m, cmsk) -> expand_moment(m, cmsk, dims); dims = dims,
+                                 kwargs...)
+end
+"""
+    coverage_variance_series(ce, cvg, X, pnl; dims::Int = 1, kwargs...) -> MatNum
+
+Routes a point-in-time variance series to the Coverage Universe seam or to the available-case one.
+
+The series counterpart of [`coverage_panel_moment`](@ref), written apart from it because the series refits per observation and frames per row rather than once at the end.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - `cvg`: The policy the estimator carries, which selects the seam.
+  - $(arg_dict[:X])
+  - $(arg_dict[:pnl_moment])
+  - $(arg_dict[:dims])
+  - `kwargs...`: Additional keyword arguments passed to the estimator.
+
+# Returns
+
+  - `val::Matrix{<:Number}`: Variance series on the full asset universe.
+
+# Related
+
+  - [`coverage_panel_moment`](@ref)
+  - [`variance_series`](@ref)
+  - [`CoveragePolicy`](@ref)
+"""
+function coverage_variance_series end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+`Nothing` method of [`coverage_variance_series`](@ref). The Coverage Universe seam: each window is reduced to **its own** Coverage Universe and the estimator is fitted on that block, which is the rule [`variance_series(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref) states.
+
+# Related
+
+  - [`coverage_variance_series`](@ref)
+  - [`variance_series`](@ref)
+"""
+function coverage_variance_series(ce::AbstractCovarianceEstimator, ::Nothing, X::MatNum,
+                                  pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+    X = dims_oriented(dims, X)
+    amsk, _ = panel_moment_masks(pnl)
+    val = coverage_nan_frame(X, size(X))
+    for t in axes(X, 1)
+        Xt = view(X, 1:t, :)
+        cmsk = vec(all(isfinite, Xt; dims = 1))
+        if !isnothing(amsk)
+            cmsk .&= vec(all(view(amsk, 1:t, :); dims = 1))
+        end
+        if !any(cmsk)
+            continue
+        end
+        val[t, cmsk] = vec(Statistics.var(ce, Xt[:, cmsk]; dims = 1, kwargs...))
+    end
+    return isone(dims) ? val : permutedims(val)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+[`CoveragePolicy`](@ref) method of [`coverage_variance_series`](@ref). Each window is fitted available-case over the **whole** universe rather than reduced to its own Coverage Universe, so an asset that lists inside the window carries a number from its listing on instead of `NaN` throughout.
+
+# Algorithm
+
+ 1. Orient `X`, and the panel's active mask, to `observations × assets`.
+ 2. For each observation `t`, fit the estimator on the window `1:t` with the mask of those rows.
+ 3. Write the answer into row `t`, and return the series, transposed when `dims == 2`.
+
+# Related
+
+  - [`coverage_variance_series`](@ref)
+  - [`CoveragePolicy`](@ref)
+"""
+function coverage_variance_series(ce::AbstractCovarianceEstimator, ::CoveragePolicy,
+                                  X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1,
+                                  kwargs...)
+    X = dims_oriented(dims, X)
+    amsk, _ = panel_moment_masks(pnl)
+    val = coverage_nan_frame(X, size(X))
+    for t in axes(X, 1)
+        val[t, :] = vec(Statistics.var(ce, view(X, 1:t, :); dims = 1,
+                                       active_mask = if isnothing(amsk)
+                                           nothing
+                                       else
+                                           view(amsk, 1:t, :)
+                                       end, kwargs...))
+    end
+    return isone(dims) ? val : permutedims(val)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Asset Panel method of [`variance_series`](@ref) for a [`Covariance`](@ref), which routes on its `cvg` field with [`coverage_variance_series`](@ref).
+
+# Related
+
+  - [`coverage_variance_series`](@ref)
+  - [`Covariance`](@ref)
+  - [`CoveragePolicy`](@ref)
+"""
+function variance_series(ce::Covariance, X::MatNum, pnl::Option{<:AssetPanel};
+                         dims::Int = 1, kwargs...)
+    return coverage_variance_series(ce, ce.cvg, X, pnl; dims = dims, kwargs...)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Asset Panel method of [`variance_series`](@ref) for a [`SimpleVariance`](@ref), which routes on its `cvg` field with [`coverage_variance_series`](@ref).
+
+# Related
+
+  - [`coverage_variance_series`](@ref)
+  - [`SimpleVariance`](@ref)
+  - [`CoveragePolicy`](@ref)
+"""
+function variance_series(ve::SimpleVariance, X::MatNum, pnl::Option{<:AssetPanel};
+                         dims::Int = 1, kwargs...)
+    return coverage_variance_series(ve, ve.cvg, X, pnl; dims = dims, kwargs...)
+end
