@@ -562,8 +562,10 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    Online(est; max_history::Option{<:Integer} = nothing)
-    Online(; est, max_history::Option{<:Integer} = nothing)
+    Online(est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEstimator};
+           max_history::Option{<:Integer} = nothing)
+    Online(; est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEstimator},
+           max_history::Option{<:Integer} = nothing)
 
 ## Validation
 

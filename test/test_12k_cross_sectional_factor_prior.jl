@@ -997,3 +997,36 @@ end
         @test_throws ArgumentError prior(pe, PO.port_opt_view(rd, first(train_idx), :))
     end
 end
+
+@testset "The factor covariance takes its own matrix processing estimator" begin
+    PO = PortfolioOptimisers
+    # The asset covariance and the factor covariance are different matrices, so each takes
+    # its own estimator: `mp` processes the asset block, `f_mp` the factor one. The factor
+    # block is the one `cross_sectional_lift` factorises for the low-rank square root, and
+    # it is estimated over a factor axis a constrained Family has already reduced, so it can
+    # come back positive SEMI-definite -- the fixture below sits at a condition number of
+    # about 1e16, and whether its smallest eigenvalue lands above or below zero depends on
+    # the LAPACK build. Unprocessed, that is a `PosDefException` out of the Cholesky on one
+    # machine and a fit on another.
+    rd = csfp_panel(; n_observations = 300).rd
+    factors = csfp_factors()
+    base = CrossSectionalFactorPrior(; factors = factors, lag = 1)
+    # The default is the same estimator the asset block gets, and it is a no-op on a matrix
+    # that is already positive definite, so an ordinary fit is untouched by its presence.
+    @test isa(base.f_mp, MatrixProcessing)
+    dt = CrossSectionalFactorPrior(; factors = factors, lag = 1,
+                                   f_mp = MatrixProcessing(; dt = Detone()))
+    pa = prior(base, rd)
+    pb = prior(dt, rd)
+    @test isa(pa, LowOrderPrior)
+    @test isa(pb, LowOrderPrior)
+    # The estimator is read, and it is read on the FACTOR block: a detoned `f_mp` moves the
+    # factor distribution the fit forwards.
+    @test !isapprox(pa.fpr.sigma, pb.fpr.sigma; nans = true)
+    # The asset block moves with it, because the lift is handed the PROCESSED factor
+    # covariance rather than the raw one. That is what puts the repair before the Cholesky.
+    @test !isapprox(pa.sigma, pb.sigma; nans = true)
+    # `mp` still owns the asset block alone: it is the estimator the idiosyncratic
+    # covariance and the lifted asset covariance are processed under.
+    @test isa(base.mp, MatrixProcessing)
+end

@@ -172,7 +172,7 @@ commit = "97e398ef74"
 "src/13_Prior/14_HighOrderFactorPriorEstimator.jl" = { cyc = 22, cog = 37, arg = 6, cyc_sum = 47, cog_sum = 65, arg_sum = 18, macros = ["@forward_properties", "@propagatable"] }
 "src/13_Prior/15_AssetPanelEstimators.jl" = { cyc = 3, cog = 4, arg = 4, cyc_sum = 21, cog_sum = 8, arg_sum = 21, macros = ["@propagatable"] }
 "src/13_Prior/16_Base_CrossSectionalFactorPrior.jl" = { cyc = 10, cog = 14, arg = 8, cyc_sum = 95, cog_sum = 81, arg_sum = 88, macros = [] }
-"src/13_Prior/17_CrossSectionalFactorPrior.jl" = { cyc = 5, cog = 8, arg = 18, cyc_sum = 12, cog_sum = 11, arg_sum = 34, macros = ["@propagatable"] }
+"src/13_Prior/17_CrossSectionalFactorPrior.jl" = { cyc = 5, cog = 8, arg = 19, cyc_sum = 12, cog_sum = 11, arg_sum = 35, macros = ["@propagatable"] }
 "src/14_UncertaintySets/01_Base_UncertaintySets.jl" = { cyc = 3, cog = 3, arg = 7, cyc_sum = 52, cog_sum = 27, arg_sum = 84, macros = [] }
 "src/14_UncertaintySets/02_DeltaUncertaintySets.jl" = { cyc = 1, cog = 1, arg = 5, cyc_sum = 7, cog_sum = 1, arg_sum = 22, macros = [] }
 "src/14_UncertaintySets/03_NormalUncertaintySets.jl" = { cyc = 3, cog = 3, arg = 9, cyc_sum = 29, cog_sum = 5, arg_sum = 117, macros = [] }

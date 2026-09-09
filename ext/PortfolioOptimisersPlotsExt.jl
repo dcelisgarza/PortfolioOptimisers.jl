@@ -2761,7 +2761,12 @@ end
 # eye, and computes no statistic the library does not already hold.
 function forecast_rolling_mean(x::AbstractVector{<:Real}, window::Integer)
     T = length(x)
-    Tf = float(eltype(x))
+    # A mean divides, so the type comes from the division and not from the argument: an
+    # integer series averages in `Float64` and a `Float32` series stays in `Float32`. The
+    # divisor is the finite count, an `Int`. The annotation is what inference reads, because
+    # `typeof` alone answers an unbounded `DataType` and `Tf(NaN)` below would then read as a
+    # call of every constructor in the world.
+    Tf = typeof(one(eltype(x)) / one(Int))::Type{<:Number}
     out = fill(Tf(NaN), T)
     for t in window:T
         s = zero(Tf)
@@ -2819,7 +2824,9 @@ function PortfolioOptimisers.plot_forecast_rolling_ic(fe::PortfolioOptimisers.Fo
     if !(1 <= window <= T)
         throw(DomainError(rolling, "rolling must be in 1:$(T), or 0 for √T"))
     end
-    Tf = float(real(eltype(ic)))
+    # The same derivation `forecast_rolling_mean` makes, over the same values, so the matrix
+    # it fills and the vectors it answers agree on their element type.
+    Tf = typeof(one(real(eltype(ic))) / one(Int))::Type{<:Number}
     roll = Matrix{Tf}(undef, T, 2)
     for k in 1:2
         roll[:, k] = forecast_rolling_mean(ic[:, k], window)

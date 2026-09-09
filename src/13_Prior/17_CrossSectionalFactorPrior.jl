@@ -21,6 +21,7 @@ $(DocStringExtensions.FIELDS)
                               pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
                               ve::AbstractCovarianceEstimator = RegimeAdjustedExpWeightedVariance(),
                               ce::StatsBase.CovarianceEstimator = ExpWeightedCovariance(; centred = true),
+                              f_mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                               mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                               th::Real = 0.0, bp::Real = 1.0,
                               mcap::AbstractString = "market_cap",
@@ -93,6 +94,10 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
     """
     @fprop @vprop ce
     """
+    $(field_dict[:f_mp]) It processes the factor covariance `pe` answered, which is a different matrix from the asset one `mp` processes: it lives on the factor axis, it is estimated from the factor-return series, and a Factor Family that sheds a member can leave it singular. [`cross_sectional_lift`](@ref) takes its Cholesky factor for the low-rank square root, so a factor covariance that is not positive definite fails there rather than in the asset block.
+    """
+    @fprop f_mp
+    """
     $(field_dict[:mp])
     """
     @fprop mp
@@ -140,6 +145,7 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
                                        pe::AbstractLowOrderPriorEstimator_A_AF,
                                        ve::AbstractCovarianceEstimator,
                                        ce::StatsBase.CovarianceEstimator,
+                                       f_mp::AbstractMatrixProcessingEstimator,
                                        mp::AbstractMatrixProcessingEstimator, th::Real,
                                        bp::Real, mcap::AbstractString, bw::AbstractString,
                                        lag::Integer, minra::Option{<:Integer},
@@ -157,12 +163,15 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
         assert_closed_unit_interval(lambda, :lambda)
         assert_closed_unit_interval(c, :c)
         return new{typeof(factors), typeof(neutralise), typeof(families), typeof(cre),
-                   typeof(wa), typeof(pe), typeof(ve), typeof(ce), typeof(mp), typeof(th),
-                   typeof(bp), typeof(mcap), typeof(bw), typeof(lag), typeof(minra),
-                   typeof(rfe), typeof(lambda), typeof(c)}(factors, neutralise, families,
-                                                           cre, wa, pe, ve, ce, mp, th, bp,
-                                                           mcap, bw, lag, minra, rfe,
-                                                           lambda, c)
+                   typeof(wa), typeof(pe), typeof(ve), typeof(ce), typeof(f_mp), typeof(mp),
+                   typeof(th), typeof(bp), typeof(mcap), typeof(bw), typeof(lag),
+                   typeof(minra), typeof(rfe), typeof(lambda), typeof(c)}(factors,
+                                                                          neutralise,
+                                                                          families, cre, wa,
+                                                                          pe, ve, ce, f_mp,
+                                                                          mp, th, bp, mcap,
+                                                                          bw, lag, minra,
+                                                                          rfe, lambda, c)
     end
 end
 function CrossSectionalFactorPrior(; factors::Dict_VecPair,
@@ -174,6 +183,7 @@ function CrossSectionalFactorPrior(; factors::Dict_VecPair,
                                    ve::AbstractCovarianceEstimator = RegimeAdjustedExpWeightedVariance(),
                                    ce::StatsBase.CovarianceEstimator = ExpWeightedCovariance(;
                                                                                              centred = true),
+                                   f_mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                                    mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                                    th::Real = 0.0, bp::Real = 1.0,
                                    mcap::AbstractString = "market_cap",
@@ -185,8 +195,8 @@ function CrossSectionalFactorPrior(; factors::Dict_VecPair,
     return CrossSectionalFactorPrior(cross_sectional_prior_pairs(factors, :factors),
                                      cross_sectional_prior_option(neutralise, :neutralise),
                                      cross_sectional_prior_option(families, :families), cre,
-                                     wa, pe, ve, ce, mp, th, bp, mcap, bw, lag, minra, rfe,
-                                     lambda, c)
+                                     wa, pe, ve, ce, f_mp, mp, th, bp, mcap, bw, lag, minra,
+                                     rfe, lambda, c)
 end
 """
     cross_sectional_prior_option(x::Nothing, sym::Sym_Str) -> nothing
@@ -240,7 +250,7 @@ This is the returns-matrix method every prior estimator implements, and it holds
  7. Lag the reduced exposures and the market capitalisation by `pe.lag`, and take the eligibility mask of the fit with [`cross_sectional_eligible`](@ref).
  8. Regress each observation's returns on its lagged reduced exposures, through [`cs_weights_initial`](@ref), [`needs_second_pass`](@ref) and [`cs_weights_refine`](@ref).
  9. Take the idiosyncratic variance history with [`variance_series`](@ref), standardise the idiosyncratic returns by it with [`cross_sectional_standardised_residuals`](@ref), and take the latest idiosyncratic covariance with [`cross_sectional_idiosyncratic_covariance`](@ref).
-10. Fit `pe.pe` on the reduced factor returns, and refuse a non-finite factor moment with [`assert_cross_sectional_factor_moments`](@ref).
+10. Fit `pe.pe` on the reduced factor returns, refuse a non-finite factor moment with [`assert_cross_sectional_factor_moments`](@ref), and process the factor covariance in place under `pe.f_mp`, which is the factor axis's own matrix processing estimator and not the asset one.
 11. Fit the Return Forecast with [`cross_sectional_return_forecast`](@ref), on the **whole** carrier, so that a Descriptor of the forecast warms up over every observation the panel has, and blend its spanned part into the factor mean with [`cross_sectional_forecast_mu`](@ref). The block carries the orthogonal part in `b`, and the Result in `rf`.
 12. Expand the blended factor moments onto the raw factor axis with [`cross_sectional_expand`](@ref), so `fpr` states the distribution of the factors the caller named.
 13. Rebuild the asset return scenarios with [`cross_sectional_scenarios`](@ref).
@@ -349,6 +359,15 @@ function prior(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum} = n
                                                       vs[end, :], amr)
     f_pr = prior(pe.pe, csr.f)
     assert_cross_sectional_factor_moments(f_pr.mu, f_pr.sigma, length(r))
+    # The factor covariance takes its own estimator for the reason the asset one takes
+    # `pe.mp`: they are different matrices. This one is estimated from the factor-return
+    # series over a factor axis a constrained Family has already reduced, and
+    # `cross_sectional_lift` factorises it for the low-rank square root, so a covariance
+    # that is merely positive SEMI-definite -- a short warm-up, a collinear Family -- raises
+    # a `PosDefException` out of the Cholesky rather than answering. The default `pdm` is a
+    # no-op on a matrix that is already positive definite, so a healthy fit is untouched,
+    # and `f_pr` is local to this method: nothing outside it holds the matrix.
+    matrix_processing!(pe.f_mp, f_pr.sigma, csr.f; kwargs...)
     fnow = cross_sectional_basis_now(fb.fcb, r)
     L = fb.Ms[r[end], :, :]
     Msr = Msw[r, :, :]
