@@ -288,6 +288,9 @@ ExpWeightedReturnForecast
             │   descriptors ┼ 1-element Vector{Passthrough}
             │               │ Passthrough ⋯
             │    neutralise ┼ nothing
+            │           cre ┼ CrossSectionalLinearRegression
+            │               │         alg ┼ PseudoInverseFallback()
+            │               │   intercept ┴ Bool: false
             │       outlier ┼ CrossSectionalWinsoriser
             │               │    low ┼ Float64: 0.01
             │               │   high ┴ Float64: 0.99
