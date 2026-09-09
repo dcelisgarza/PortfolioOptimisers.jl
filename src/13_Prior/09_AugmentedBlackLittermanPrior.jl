@@ -502,6 +502,10 @@ function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum,
     f_result = bl_preroll(pe.f_views, vsets, pe.f_views_conf, f_prior_sigma, pe.tau, T, dt,
                           strict, :tfkey)
     f_P, f_Q, f_omega = bl_view_block(f_result, size(f_prior_sigma, 1), dt)
+    # Neither half kept a row, which is the one case the stack has nothing to condition on.
+    # It is read twice below -- once by the master equations and once by the announcement --
+    # and stating it once keeps the two readings from drifting apart.
+    viewless = isnothing(a_result) && isnothing(f_result)
     # Both halves resolve the same blending parameter from the same `pe.tau` and the same
     # `T`, so reading it off either result gives the same number — but either result can now
     # be `nothing`, and there is no half left to read it from when both are. `bl_preroll`
@@ -551,7 +555,7 @@ function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum,
     # running the master equations over it would add the estimation-error term
     # `tau * aug_prior_sigma` and widen the joint covariance on the strength of views that
     # are not there. The joint posterior of a stack with no view is the joint prior.
-    aug_posterior_mu, aug_posterior_sigma = if isnothing(a_result) && isnothing(f_result)
+    aug_posterior_mu, aug_posterior_sigma = if viewless
         bl_posteriors(nothing, aug_prior_mu, aug_prior_sigma)
     else
         vanilla_posteriors(tau, aug_prior_mu, aug_prior_sigma, aug_omega, aug_P, aug_Q)
@@ -591,7 +595,7 @@ function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum,
     # `posterior_sigma` supersedes the covariance `a_prior.chol` factorises. This site merges
     # two priors rather than forwarding one along its own axis, so it builds the carrier
     # directly instead of going through [`forward_prior`](@ref).
-    announce_bl_departures(ni, ledger, isnothing(a_result) && isnothing(f_result))
+    announce_bl_departures(ni, ledger, viewless)
     # The expansion, onto the caller's own universe. The moment pair goes back through
     # [`expand_moment`](@ref), the reconstruction through [`expand_columns`](@ref) and the
     # regression through [`expand_regression`](@ref), so a prior result again lives on the

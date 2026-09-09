@@ -159,10 +159,10 @@ commit = "97e398ef74"
 "src/13_Prior/03_FactorPrior.jl" = { cyc = 3, cog = 2, arg = 9, cyc_sum = 11, cog_sum = 5, arg_sum = 26, macros = ["@forward_properties", "@propagatable"] }
 "src/13_Prior/04_HighOrderPrior.jl" = { cyc = 12, cog = 25, arg = 6, cyc_sum = 40, cog_sum = 56, arg_sum = 23, macros = ["@forward_properties", "@propagatable"] }
 "src/13_Prior/05_BlackLittermanViewsGeneration.jl" = { cyc = 11, cog = 21, arg = 6, cyc_sum = 24, cog_sum = 28, arg_sum = 24, macros = [] }
-"src/13_Prior/06_BlackLittermanPrior.jl" = { cyc = 5, cog = 6, arg = 10, cyc_sum = 29, cog_sum = 14, arg_sum = 64, macros = ["@forward_properties", "@propagatable"] }
+"src/13_Prior/06_BlackLittermanPrior.jl" = { cyc = 5, cog = 5, arg = 10, cyc_sum = 29, cog_sum = 14, arg_sum = 64, macros = ["@forward_properties", "@propagatable"] }
 "src/13_Prior/07_BayesianBlackLittermanPrior.jl" = { cyc = 2, cog = 2, arg = 8, cyc_sum = 5, cog_sum = 4, arg_sum = 16, macros = ["@forward_properties", "@propagatable"] }
 "src/13_Prior/08_FactorBlackLittermanPrior.jl" = { cyc = 4, cog = 6, arg = 13, cyc_sum = 7, cog_sum = 7, arg_sum = 21, macros = ["@forward_properties", "@propagatable"] }
-"src/13_Prior/09_AugmentedBlackLittermanPrior.jl" = { cyc = 4, cog = 5, arg = 13, cyc_sum = 8, cog_sum = 7, arg_sum = 21, macros = ["@forward_properties", "@propagatable"] }
+"src/13_Prior/09_AugmentedBlackLittermanPrior.jl" = { cyc = 7, cog = 10, arg = 13, cyc_sum = 8, cog_sum = 7, arg_sum = 21, macros = ["@forward_properties", "@propagatable"] }
 "src/13_Prior/10_Base_EntropyPoolingPrior.jl" = { cyc = 20, cog = 44, arg = 8, cyc_sum = 184, cog_sum = 193, arg_sum = 242, macros = [] }
 "src/13_Prior/11_MeucciEntropyPoolingPrior.jl" = { cyc = 20, cog = 24, arg = 15, cyc_sum = 66, cog_sum = 71, arg_sum = 56, macros = ["@forward_properties", "@propagatable"] }
 "src/13_Prior/12_EntropyPoolingPrior.jl" = { cyc = 20, cog = 24, arg = 16, cyc_sum = 204, cog_sum = 167, arg_sum = 430, macros = ["@forward_properties", "@propagatable"] }
