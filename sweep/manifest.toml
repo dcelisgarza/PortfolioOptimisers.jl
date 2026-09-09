@@ -138,6 +138,7 @@
 "src/08_Moments/45_ReturnForecasts/11_ForecastFactorCorrelation.jl" = { map = 3, units = 2, swept = false }
 "src/08_Moments/45_ReturnForecasts/12_ForecastForwardWindows.jl" = { map = 3, units = 6, swept = false }
 "src/08_Moments/45_ReturnForecasts/13_ForecastCalibration.jl" = { map = 3, units = 6, swept = false }
+"src/08_Moments/45_ReturnForecasts/14_ForecastSummary.jl" = { map = 3, units = 9, swept = false }
 "src/08_Moments/46_CrossSectionalRegressionDiagnostics.jl" = { map = 3, units = 31, swept = false }
 "src/08_Moments/47_CrossSectionalExposureDiagnostics.jl" = { map = 3, units = 22, swept = false }
 "src/08_Moments/48_FactorModelSummary.jl" = { map = 3, units = 16, swept = false }

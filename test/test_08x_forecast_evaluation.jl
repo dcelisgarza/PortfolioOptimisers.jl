@@ -4,12 +4,13 @@ Check `src/08_Moments/45_ReturnForecasts/07_ForecastEvaluation.jl`,
 `src/08_Moments/45_ReturnForecasts/09_ForecastInformationCoefficient.jl`,
 `src/08_Moments/45_ReturnForecasts/10_ForecastPortfolios.jl`,
 `src/08_Moments/45_ReturnForecasts/11_ForecastFactorCorrelation.jl`,
-`src/08_Moments/45_ReturnForecasts/12_ForecastForwardWindows.jl` and
-`src/08_Moments/45_ReturnForecasts/13_ForecastCalibration.jl` against the contract their
+`src/08_Moments/45_ReturnForecasts/12_ForecastForwardWindows.jl`,
+`src/08_Moments/45_ReturnForecasts/13_ForecastCalibration.jl` and
+`src/08_Moments/45_ReturnForecasts/14_ForecastSummary.jl` against the contract their
 docstrings state, and against the reference implementation the map of issue #931 ports.
-Issues #934, #935, #936, #937, #938, #939 and #940.
+Issues #934, #935, #936, #937, #938, #939, #940 and #941.
 
-TEN CONVENTIONS SHAPE THE PROBES.
+ELEVEN CONVENTIONS SHAPE THE PROBES.
 
 1. THE TWO OBSERVATION AXES ARE RECONCILED BY THE TARGET, NOT BY THE EVALUATION. A Return
    Forecast history lives on the factor-model block's rows, and the block is a suffix of the
@@ -91,6 +92,20 @@ TEN CONVENTIONS SHAPE THE PROBES.
     raising `min_count` past the universe moves none of the four answers. The slope is also
     the one reading of a forecast that a rescaling moves, and that is asserted beside the
     two readings it does not move.
+
+11. THE SUMMARY IS ORACLED WHOLE, AND ITS PLUMBING IS PINNED SEPARATELY. Every column of
+    `ForecastSummaryResult` was put through the reference implementation's own five
+    summary methods over `IC_ALPHA` and over the gapped variant, and `FS_REF` and
+    `FS_REF_GAP` are what it answered, to every digit -- the coefficients, both books,
+    the calibration, the coverage and the quantile spread alike. Beside those literals
+    sits a second set of probes asserting that each column IS the level-2 verb it reads,
+    which is what a summary that computes nothing of its own owes: a literal that matches
+    proves the number, and the identity proves the number came from the verb rather than
+    from a second copy of it. The gapped fixture is what separates `mean_coverage` from
+    `min_coverage`, because a full panel reads 1 for both. The two hit-rate denominators
+    of conventions 5 and 7 meet here for the first time, and they are asserted APART
+    rather than reconciled: a silenced date is a miss for a coefficient and no trade for
+    a book, and the Result names the two columns apart and states each denominator.
 =#
 include(joinpath(@__DIR__, "test06c_setup.jl"))
 
@@ -1835,5 +1850,401 @@ end
         @test forecast_ic(scaled)[:, 1] ≈ forecast_ic(fe)[:, 1]
         @test forecast_portfolio(scaled).ret ≈ forecast_portfolio(fe).ret
         @test forecast_calibration(scaled).slope ≈ forecast_calibration(fe).slope / 100
+    end
+end
+
+# The oracle of the summary, measured by running the reference implementation's own
+# `ic_summary`, `portfolio_summary`, `quantile_summary`, `calibration_summary` and
+# `coverage_summary` over `IC_ALPHA` and over the gapped variant, on the evaluation dates
+# both agree on. Convention 11. Issue #941.
+const FS_REF = (; spearman_mean_ic = 0.3333333333333333,
+                spearman_std_ic = 0.7023769168568493, spearman_ic_ir = 0.4745789978762494,
+                spearman_t_stat = 0.8219949365267862,
+                spearman_hit_rate = 0.6666666666666666,
+                pearson_mean_ic = 0.2567790285367673, pearson_std_ic = 0.6206266852224849,
+                pearson_ic_ir = 0.4137415207093715, pearson_t_stat = 0.7166213350694421,
+                pearson_hit_rate = 0.6666666666666666, rank_ann_return = 9.75,
+                rank_ann_volatility = 16.68270062070287, rank_sharpe = 0.5844377491196157,
+                rank_hit_rate = 0.6666666666666666, rank_mean_turnover = 1.0,
+                zscore_ann_return = 11.604040404040402,
+                zscore_ann_volatility = 20.853167491514082,
+                zscore_sharpe = 0.5564641634784026, zscore_hit_rate = 0.6666666666666666,
+                zscore_mean_turnover = 1.5737373737373739,
+                calibration_slope = 0.29795686719636777, mean_alpha = 6.333333333333333,
+                std_alpha = 10.790006599823858, mean_y = 6.083333333333333,
+                std_y = 10.799480907839406, n_bins = 6, mean_coverage = 1.0,
+                min_coverage = 1.0, mean_n_scored = 4.0, min_n_scored = 4.0,
+                spread_ann_return = 12.666666666666666,
+                spread_ann_volatility = 22.03028218914441,
+                spread_sharpe = 0.5749661560353623, spread_hit_rate = 0.6666666666666666)
+const FS_REF_GAP = (; spearman_mean_ic = 0.8333333333333334,
+                    spearman_std_ic = 0.28867513459481287,
+                    spearman_ic_ir = 2.886751345948129, spearman_t_stat = 5.0,
+                    spearman_hit_rate = 1.0, pearson_mean_ic = 0.9068588973742973,
+                    pearson_std_ic = 0.16132512202070398, pearson_ic_ir = 5.621312328887709,
+                    pearson_t_stat = 9.736398558846842, pearson_hit_rate = 1.0,
+                    rank_ann_return = 2.3333333333333335,
+                    rank_ann_volatility = 1.1547005383792515,
+                    rank_sharpe = 2.0207259421636903, rank_hit_rate = 1.0,
+                    rank_mean_turnover = 1.0, zscore_ann_return = 2.266666666666666,
+                    zscore_ann_volatility = 1.10151410945722,
+                    zscore_sharpe = 2.0577736110739284, zscore_hit_rate = 1.0,
+                    zscore_mean_turnover = 1.2000000000000002, calibration_slope = 1.015625,
+                    mean_alpha = 2.5, std_alpha = 1.4142135623730951, mean_y = 3.0,
+                    std_y = 1.6903085094570331, n_bins = 5,
+                    mean_coverage = 0.6666666666666666, min_coverage = 0.5,
+                    mean_n_scored = 2.6666666666666665, min_n_scored = 2.0,
+                    spread_ann_return = 2.3333333333333335,
+                    spread_ann_volatility = 1.1547005383792515,
+                    spread_sharpe = 2.0207259421636903, spread_hit_rate = 1.0)
+
+# The thirty columns whose axis is the forecast, in the order the Result declares them.
+const FS_CORE = (:spearman_mean_ic, :spearman_std_ic, :spearman_ic_ir, :spearman_t_stat,
+                 :spearman_hit_rate, :pearson_mean_ic, :pearson_std_ic, :pearson_ic_ir,
+                 :pearson_t_stat, :pearson_hit_rate, :rank_ann_return, :rank_ann_volatility,
+                 :rank_sharpe, :rank_hit_rate, :rank_mean_turnover, :zscore_ann_return,
+                 :zscore_ann_volatility, :zscore_sharpe, :zscore_hit_rate,
+                 :zscore_mean_turnover, :calibration_slope, :mean_alpha, :std_alpha,
+                 :mean_y, :std_y, :n_bins, :mean_coverage, :min_coverage, :mean_n_scored,
+                 :min_n_scored)
+const FS_SPREAD = (:spread_ann_return, :spread_ann_volatility, :spread_sharpe,
+                   :spread_hit_rate)
+
+@testset "The summary reproduces the reference implementation, column for column" begin
+    PO = PortfolioOptimisers
+
+    @testset "Every core column matches, bit for bit" begin
+        fs = forecast_evaluation_summary(forecast_evaluation(IC_ALPHA,
+                                                             PO.forward_mean_returns(IC_ALPHA,
+                                                                                     1, 1));
+                                         quantiles = (0.1,))
+        for f in FS_CORE
+            @test getfield(fs, f)[1] ≈ getfield(FS_REF, f)
+        end
+        for f in FS_SPREAD
+            @test getfield(fs, f)[1, 1] ≈ getfield(FS_REF, f)
+        end
+    end
+
+    @testset "A gapped panel moves the coverage block, and the reference agrees" begin
+        # Two gaps thin two of the three cross-sections, so the coverage columns stop
+        # reading the whole universe and the count columns say how far they fell. This is
+        # the fixture that separates `mean_coverage` from `min_coverage`, which a full
+        # panel cannot.
+        gap = ic_gap_fixture()
+        fs = forecast_evaluation_summary(forecast_evaluation(gap,
+                                                             PO.forward_mean_returns(gap, 1,
+                                                                                     1);
+                                                             min_count = 2);
+                                         quantiles = (0.25,))
+        for f in FS_CORE
+            @test getfield(fs, f)[1] ≈ getfield(FS_REF_GAP, f)
+        end
+        for f in FS_SPREAD
+            @test getfield(fs, f)[1, 1] ≈ getfield(FS_REF_GAP, f)
+        end
+        @test fs.mean_coverage[1] ≈ sum(IC_REF_GAP_COVERAGE) / 3
+        @test fs.min_coverage[1] ≈ minimum(IC_REF_GAP_COVERAGE)
+        @test fs.mean_n_scored[1] ≈ sum(IC_REF_GAP_COVERAGE .* 4) / 3
+        @test fs.min_n_scored[1] == 2
+    end
+end
+
+@testset "Every column is the level-2 verb it reads, and nothing else" begin
+    PO = PortfolioOptimisers
+    fe = forecast_evaluation(IC_ALPHA, PO.forward_mean_returns(IC_ALPHA, 1, 1); ppy = 12)
+    fs = forecast_evaluation_summary(fe; quantiles = (0.1, 0.25), bins = 4)
+    ic = forecast_ic_summary(forecast_ic(fe))
+    rk = forecast_portfolio(fe; kind = :rank)
+    zs = forecast_portfolio(fe; kind = :zscore)
+    cb = forecast_calibration(fe; bins = 4)
+    qs = forecast_quantile_spread(fe; quantiles = (0.1, 0.25))
+    c = forecast_coverage(fe)
+
+    @testset "The coefficient block is the shared summary kernel" begin
+        for (p, s) in ((:spearman, ic.spearman), (:pearson, ic.pearson))
+            @test getfield(fs, Symbol(p, :_mean_ic))[1] == s.mean_ic
+            @test getfield(fs, Symbol(p, :_std_ic))[1] == s.std_ic
+            @test getfield(fs, Symbol(p, :_ic_ir))[1] == s.ic_ir
+            @test getfield(fs, Symbol(p, :_t_stat))[1] == s.t_stat
+            @test getfield(fs, Symbol(p, :_hit_rate))[1] == s.hit_rate
+        end
+    end
+
+    @testset "The two books are the two kinds of the portfolio verb" begin
+        for (p, b) in ((:rank, rk), (:zscore, zs))
+            @test getfield(fs, Symbol(p, :_ann_return))[1] == b.summary.ann_return
+            @test getfield(fs, Symbol(p, :_ann_volatility))[1] == b.summary.ann_volatility
+            @test getfield(fs, Symbol(p, :_sharpe))[1] == b.summary.sharpe
+            @test getfield(fs, Symbol(p, :_hit_rate))[1] == b.hit_rate
+            @test getfield(fs, Symbol(p, :_mean_turnover))[1] == b.mean_turnover
+        end
+    end
+
+    @testset "The calibration, the spreads and the coverage are their own verbs" begin
+        @test fs.calibration_slope[1] == cb.slope
+        @test fs.mean_alpha[1] == cb.mean_alpha
+        @test fs.std_alpha[1] == cb.std_alpha
+        @test fs.mean_y[1] == cb.mean_y
+        @test fs.std_y[1] == cb.std_y
+        @test fs.n_bins[1] == cb.n_bins
+        @test fs.spread_ann_return[1, :] == qs.ann_mean
+        @test fs.spread_ann_volatility[1, :] == qs.ann_vol
+        @test fs.spread_sharpe[1, :] == qs.ann_ir
+        @test fs.spread_hit_rate[1, :] == qs.hit_rate
+        @test fs.mean_coverage[1] ≈ sum(c) / length(c)
+        @test fs.min_coverage[1] ≈ minimum(c)
+    end
+
+    @testset "The annualisation is the evaluation's own, and it is carried" begin
+        # `ppy` reaches the summary off the Result rather than as a keyword of its own, so
+        # a caller cannot annualise a table under a factor the evaluation did not use.
+        @test fs.ppy == 12
+        @test fs.rank_ann_return[1] ≈
+              12 *
+              forecast_portfolio(forecast_evaluation(fe.alpha, fe.y)).summary.ann_return
+    end
+
+    @testset "The drawdown family is one call down, not a column" begin
+        @test !any(f -> occursin("calmar", String(f)) ||
+                        occursin("drawdown", String(f)) ||
+                        occursin("sortino", String(f)) ||
+                        occursin("cvar", String(f)), fieldnames(typeof(fs)))
+        @test isfinite(rk.summary.calmar) || isnan(rk.summary.calmar)
+    end
+end
+
+@testset "One evaluation is the length-1 case of the comparison" begin
+    PO = PortfolioOptimisers
+    fe = forecast_evaluation(IC_ALPHA, PO.forward_mean_returns(IC_ALPHA, 1, 1))
+    one = forecast_evaluation_summary(fe)
+    two = forecast_evaluation_summary([fe, fe]; names = ["a", "b"])
+
+    @testset "The two carry the same type and the same columns" begin
+        @test typeof(one) === typeof(two)
+        @test fieldnames(typeof(one)) == fieldnames(typeof(two))
+        @test isa(one, PO.AbstractResult)
+    end
+
+    @testset "Two evaluations of one forecast compare as identical rows" begin
+        @test two.names == ["a", "b"]
+        for f in FS_CORE
+            v = getfield(two, f)
+            @test length(v) == 2
+            @test v[1] == v[2]
+            @test v[1] == getfield(one, f)[1]
+        end
+    end
+
+    @testset "An unnamed summary numbers its rows in the order they were given" begin
+        @test one.names == ["Forecast 1"]
+        @test forecast_evaluation_summary([fe, fe, fe]).names ==
+              ["Forecast 1", "Forecast 2", "Forecast 3"]
+        @test_throws DimensionMismatch forecast_evaluation_summary([fe, fe]; names = ["a"])
+    end
+
+    @testset "A vector method with no evaluation has nothing to summarise" begin
+        @test_throws PO.IsEmptyError forecast_evaluation_summary(ForecastEvaluationResult[])
+    end
+end
+
+@testset "An incomparable pair is refused, and the message names the field" begin
+    PO = PortfolioOptimisers
+    y = PO.forward_mean_returns(IC_ALPHA, 1, 1)
+    fe = forecast_evaluation(IC_ALPHA, y)
+
+    @testset "Each of the seven parameters is checked, and the asset axis with them" begin
+        for (nm, other) in
+            (("target", forecast_evaluation(IC_ALPHA, y; target = PO.AssetReturnTarget())),
+             ("horizon", forecast_evaluation(IC_ALPHA, y; horizon = 2)),
+             ("lag", forecast_evaluation(IC_ALPHA, y; lag = 0)),
+             ("step", forecast_evaluation(IC_ALPHA, y; step = 2)),
+             ("min_count", forecast_evaluation(IC_ALPHA, y; min_count = 2)),
+             ("ppy", forecast_evaluation(IC_ALPHA, y; ppy = 252)))
+            err = try
+                forecast_evaluation_summary([fe, other])
+                nothing
+            catch e
+                e
+            end
+            @test isa(err, PO.ConflictingArgumentError)
+            @test occursin("`$(nm)`", err.msg)
+        end
+    end
+
+    @testset "A different date set and a different universe are refused too" begin
+        # `step = 2` moves both `step` and `dates`, so the date rule is checked on a pair
+        # that agrees on every parameter: a forecast whose last row carries no finite value
+        # scores one date fewer.
+        short = copy(IC_ALPHA)
+        short[3, :] .= NaN
+        e1 = try
+            forecast_evaluation_summary([fe,
+                                         forecast_evaluation(short,
+                                                             PO.forward_mean_returns(short,
+                                                                                     1, 1))])
+            nothing
+        catch e
+            e
+        end
+        @test isa(e1, PO.ConflictingArgumentError)
+        @test occursin("`dates`", e1.msg)
+
+        wide = hcat(IC_ALPHA, IC_ALPHA[:, 1])
+        e2 = try
+            forecast_evaluation_summary([fe,
+                                         forecast_evaluation(wide,
+                                                             PO.forward_mean_returns(wide,
+                                                                                     1, 1))])
+            nothing
+        catch e
+            e
+        end
+        @test isa(e2, PO.ConflictingArgumentError)
+        @test occursin("asset axis", e2.msg)
+    end
+
+    @testset "A Panel Field target is the same target only where it names the same field" begin
+        @test PO.forecast_summary_same_target(PO.IdiosyncraticTarget(),
+                                              PO.IdiosyncraticTarget())
+        @test !PO.forecast_summary_same_target(PO.IdiosyncraticTarget(),
+                                               PO.AssetReturnTarget())
+        @test PO.forecast_summary_same_target(PanelFieldTarget(; name = "volume"),
+                                              PanelFieldTarget(; name = "volume"))
+        @test !PO.forecast_summary_same_target(PanelFieldTarget(; name = "volume"),
+                                               PanelFieldTarget(; name = "market_cap"))
+    end
+end
+
+@testset "The quantile block is absent unless a quantile is asked for" begin
+    PO = PortfolioOptimisers
+    fe = forecast_evaluation(IC_ALPHA, PO.forward_mean_returns(IC_ALPHA, 1, 1))
+
+    @testset "No quantile leaves the five entries `nothing`, read by dispatch" begin
+        fs = forecast_evaluation_summary(fe)
+        @test isnothing(fs.quantiles)
+        for f in FS_SPREAD
+            @test isnothing(getfield(fs, f))
+        end
+        @test PO.forecast_summary_spreads([fe], nothing) ==
+              (nothing, nothing, nothing, nothing, nothing)
+    end
+
+    @testset "One column per quantile, in the order they were asked for" begin
+        fs = forecast_evaluation_summary([fe, fe]; quantiles = (0.5, 0.1))
+        @test fs.quantiles == [0.5, 0.1]
+        for f in FS_SPREAD
+            @test size(getfield(fs, f)) == (2, 2)
+        end
+        @test fs.spread_ann_return[1, :] ==
+              forecast_quantile_spread(fe; quantiles = (0.5, 0.1)).ann_mean
+        @test fs.spread_ann_return[1, :] == fs.spread_ann_return[2, :]
+    end
+
+    @testset "An impossible cut is refused by the verb that owns it" begin
+        @test_throws DomainError forecast_evaluation_summary(fe; quantiles = (0.9,))
+        @test_throws PO.IsEmptyError forecast_evaluation_summary(fe; quantiles = ())
+    end
+end
+
+@testset "The two hit-rate denominators are kept apart and both are reported" begin
+    PO = PortfolioOptimisers
+    # A threshold no cross-section reaches silences every coefficient, so the coefficient
+    # hit rate reads zero against every date while the book, which is computed on the dates
+    # that scored, has no date left at all. The two denominators are what makes those two
+    # answers different, and they sit in one Result.
+    y = PO.forward_mean_returns(IC_ALPHA, 1, 1)
+    fe = forecast_evaluation(IC_ALPHA, y; min_count = size(IC_ALPHA, 2) + 1)
+    gap = ic_gap_fixture()
+    thin = forecast_evaluation(gap, PO.forward_mean_returns(gap, 1, 1); min_count = 3)
+    fs = forecast_evaluation_summary(thin)
+
+    @testset "The coefficient hit rate counts a silenced date as a miss" begin
+        # The middle date carries two assets, under the threshold of three, so it takes no
+        # coefficient. Two of three dates score, and both score positive.
+        @test fs.spearman_hit_rate[1] ≈ 2 / 3
+        @test fs.pearson_hit_rate[1] ≈ 2 / 3
+        @test count(isfinite, forecast_ic(thin)[:, 1]) == 2
+    end
+
+    @testset "The book hit rate counts against the dates that traded" begin
+        rk = forecast_portfolio(thin; kind = :rank)
+        @test count(isfinite, rk.ret) == 2
+        @test fs.rank_hit_rate[1] ≈ 1.0
+        @test fs.zscore_hit_rate[1] ≈ 1.0
+    end
+
+    @testset "The two denominators disagree, which is why the columns are named apart" begin
+        @test fs.spearman_hit_rate[1] != fs.rank_hit_rate[1]
+        @test fs.spearman_hit_rate[1] ==
+              PO.exposure_ic_factor_summary(forecast_ic(thin), 1).hit_rate
+        @test fs.rank_hit_rate[1] ==
+              PO.forecast_hit_rate(forecast_portfolio(thin; kind = :rank).ret)
+    end
+
+    @testset "A sample no date can score is refused by the portfolio verb" begin
+        @test_throws ArgumentError forecast_evaluation_summary(fe)
+    end
+end
+
+@testset "Two members of the family are compared on the synthetic panel" begin
+    # The closing condition of map #931: two of the four shipped members are scored on the
+    # panel of #656 and set side by side in one Result. The fixture is `planted`, so the
+    # member that fits a relation has one to find and the member that only weights its
+    # Descriptors does not -- which is what makes the comparison a measurement rather than
+    # a pair of numbers. Convention 4.
+    PO = PortfolioOptimisers
+    px = evaluation_fixture(; planted = true)
+    fw = FixedWeightedReturnForecast(; scores = px.scores, scale = 1.0,
+                                     weights = [0.4, 0.6])
+    tgt = TargetReturnForecast(; scores = px.scores, horizon = 2, lag = 1,
+                               calibrate = false)
+    fes = [forecast_evaluation(m, px.rd, px.csfm; horizon = 2, lag = 1, step = 1,
+                               ppy = 252) for m in (fw, tgt)]
+    fs = forecast_evaluation_summary(fes; names = ["fixed weighted", "target"],
+                                     quantiles = (0.2,))
+
+    @testset "Both members carry a row, and the rows are not the same row" begin
+        @test fs.names == ["fixed weighted", "target"]
+        @test length(fs.spearman_mean_ic) == 2
+        @test fs.spearman_mean_ic[1] != fs.spearman_mean_ic[2]
+        @test size(fs.spread_ann_return) == (2, 1)
+        @test fs.ppy == 252
+    end
+
+    @testset "Every column of both rows is a number a caller can read" begin
+        for f in FS_CORE
+            v = getfield(fs, f)
+            @test length(v) == 2
+            @test all(x -> isa(x, Real), v)
+        end
+    end
+
+    @testset "The planted relation is what the summary reports as skill" begin
+        # The member that refits against the idiosyncratic return finds the planted
+        # relation; the one that only weights its Descriptors scores nothing like it.
+        @test fs.spearman_mean_ic[2] > 0.5
+        @test fs.spearman_t_stat[2] > 2
+        @test fs.rank_ann_return[2] > 0
+        @test fs.mean_coverage[2] > 0.5
+        @test fs.min_n_scored[2] >= fes[2].min_count
+    end
+
+    @testset "The comparison is the same call as the single evaluation" begin
+        alone = forecast_evaluation_summary(fes[2]; names = ["target"], quantiles = (0.2,))
+        @test alone.names == ["target"]
+        for f in FS_CORE
+            @test getfield(alone, f)[1] == getfield(fs, f)[2]
+        end
+        @test alone.spread_ann_return[1, :] == fs.spread_ann_return[2, :]
+    end
+
+    @testset "The block method resolves the weights the metric names" begin
+        wf = forecast_evaluation_summary(fes, px.csfm;
+                                         weighting = PO.InverseIdiosyncraticVarianceMetric())
+        @test wf.spearman_mean_ic == fs.spearman_mean_ic
+        @test wf.pearson_mean_ic != fs.pearson_mean_ic
+        @test forecast_evaluation_summary(fes[1], px.csfm).pearson_mean_ic[1] ==
+              fs.pearson_mean_ic[1]
     end
 end
