@@ -769,7 +769,7 @@ Assert that replaying a pipeline's fitted steps on a test window reproduces the 
 
 The terminal weights are indexed by the *training* universe, so a test window whose transformed returns carry a different asset set (or a different asset order) would silently misalign weights and returns. This is the failure the fit/apply contract exists to prevent, so it is reported as an error naming both universes rather than surfacing as a dimension mismatch inside the risk calculation.
 
-The usual cause is relying on [`PricesToReturns`](@ref) alone to define the universe: it is stateless, and the underlying [`prices_to_returns`](@ref) drops assets that are entirely missing in the window being converted, which differs between train and test. Pin the universe with a [`MissingDataFilter`](@ref) step, and fill the remaining gaps with an [`Imputer`](@ref) step, before converting.
+The usual cause is relying on [`PricesToReturns`](@ref) alone to define the universe: it is stateless, and by default the underlying [`prices_to_returns`](@ref) reads a gap as an absent price and drops assets that are entirely missing in the window being converted, which differs between train and test. Two ways out. Carry the gap instead — `PricesToReturns(; nan_to_missing = false)` — so that every asset keeps its column in every window and the ones a window cannot estimate are excluded downstream by the Coverage Universe. Or pin the universe with a [`MissingDataFilter`](@ref) step and fill the remaining gaps with an [`Imputer`](@ref) step before converting, which is what a consumer that cannot hold a gap needs, at the cost of an invented price.
 
 # Arguments
 
@@ -792,7 +792,7 @@ function assert_universe_aligned(res::PipelineResult, rd::AbstractReturnsResult)
         return nothing
     end
     @argcheck(rd.nx == train.nx,
-              ArgumentError("the pipeline's fitted steps produced a test-window universe $(rd.nx) that differs from the training universe $(train.nx), so the weights and the test returns would not be aligned. PricesToReturns is stateless and drops assets that are entirely missing in the window it converts; pin the universe with a MissingDataFilter step (and an Imputer step to fill the remaining gaps) before converting to returns."))
+              ArgumentError("the pipeline's fitted steps produced a test-window universe $(rd.nx) that differs from the training universe $(train.nx), so the weights and the test returns would not be aligned. PricesToReturns is stateless and by default drops assets that are entirely missing in the window it converts. Either carry the gaps instead, with PricesToReturns(; nan_to_missing = false), so every window keeps every asset; or pin the universe with a MissingDataFilter step (and an Imputer step to fill the remaining gaps) before converting to returns."))
     return nothing
 end
 """

@@ -16,14 +16,19 @@ It records two answers, and the second is the one that costs.
     `assert_universe_aligned` never fires -- because reduce-and-expand keeps the result on the
     full universe, so the train and test universes are the same names either way.
 
- 2. **At the price level nothing carries it.** `prices_to_returns` deletes every observation
-    row holding a gap, so a panel with three gapped assets loses 60% of its history without a
-    warning; and because that deletion is window-local, a walk-forward's train and test
-    windows disagree on the universe and `assert_universe_aligned` refuses the fold by name.
-    The remedy its message prescribes -- a `MissingDataFilter` then an `Imputer` -- makes the
-    fold run, and it does so by inventing prices for assets that were not listed. What stops
-    that invention from reaching the weights is the Asset Panel: with one, a delisted asset
-    holds exactly zero; without one, it holds a quarter of the book.
+ 2. **At the price level, only if it is asked to.** `prices_to_returns` reads a `NaN` price as
+    `missing` and deletes every observation row holding one, so a panel with three gapped
+    assets loses 60% of its history without a warning; and because that deletion is
+    window-local, a walk-forward's train and test windows disagree on the universe and
+    `assert_universe_aligned` refuses the fold by name. The remedy that refusal's message
+    prescribes -- a `MissingDataFilter` then an `Imputer` -- makes the fold run by inventing
+    prices for assets that were not listed, and only the Asset Panel then keeps the invention
+    out of the weights: with one a delisted asset holds exactly zero, without one it holds a
+    quarter of the book.
+
+    `nan_to_missing = false` is the other answer, and it needs no imputer and no panel. The
+    gap reaches the returns, where every consumer already handles one, and the run agrees
+    weight for weight with the returns level.
 
 The panel-wide-versus-per-window question the map settled at charting is verified here rather
 than re-decided: deriving the active mask once over the whole panel gives every fold the same
@@ -341,5 +346,54 @@ pipe_fix58 = Pipeline(;
                                                                              1:N58))).w
         @test !iszero(got[jc])
         @test iszero(ref[jc])
+    end
+end
+
+@testset "A carried gap needs no imputer and no panel" begin
+    # `nan_to_missing = false` is the price level's other answer, and it is the one the map's
+    # destination wants: the gap reaches the returns instead of deleting the observation that
+    # holds it, and every consumer downstream already handles one.
+    pipe_carry58 = Pipeline(;
+                            steps = (PricesToReturns(; nan_to_missing = false),
+                                     EmpiricalPrior(), mr58))
+
+    @testset "nothing is deleted, and the gap stays where it is" begin
+        got = prices_to_returns(Pta58; nan_to_missing = false, pnl = pnlP58)
+        # The whole clock and the whole universe survive, against 48 rows by deletion.
+        @test got.nx == nx58
+        @test size(got.X) == (T58, N58)
+        @test size(prices_to_returns(Pta58).X) == (48, N58)
+        # A run of `k` gapped prices makes exactly the `k + 1` returns that read one of them,
+        # and the two ungapped assets are untouched.
+        @test all(isfinite, view(got.X, :, 1))
+        @test all(isfinite, view(got.X, :, 2))
+        @test findall(!isfinite, view(got.X, :, 3)) == collect(1:31)
+        @test findall(!isfinite, view(got.X, :, 4)) == collect(91:T58)
+        @test findall(!isfinite, view(got.X, :, 5)) == collect(55:66)
+        # The panel is carried and sliced to the returns.
+        @test size(got.pnl.amsk) == size(got.pnl.emsk) == size(got.X)
+    end
+
+    @testset "the walk-forward runs, and the panel changes nothing" begin
+        # `assert_universe_aligned` has nothing to catch: every window keeps every asset.
+        pp = cross_val_predict(pipe_carry58, PricesResult(; X = Pta58, pnl = pnlP58), iwf58)
+        pn = cross_val_predict(pipe_carry58, PricesResult(; X = Pta58), iwf58)
+        @test length(pp.pred) == length(pn.pred) == 3
+        for k in 1:3
+            # Carrying the gap removes the look-ahead at the source, so the mask has nothing
+            # left to defend against and the two runs agree exactly. Under the imputer they
+            # do not: there a delisted asset takes 0.247 of the book without a panel.
+            @test pp.pred[k].res.w == pn.pred[k].res.w
+        end
+        # An asset the fold cannot estimate holds exactly zero, with or without the panel.
+        @test iszero(pp.pred[1].res.w[3]) && iszero(pn.pred[1].res.w[3])
+        @test iszero(pp.pred[3].res.w[4]) && iszero(pn.pred[3].res.w[4])
+    end
+
+    @testset "the default is untouched" begin
+        # The deleting path is still the default, so no released caller changes behaviour.
+        @test PricesToReturns().nan_to_missing
+        @test_throws ArgumentError cross_val_predict(pipe_price58,
+                                                     PricesResult(; X = Pta58), iwf58)
     end
 end

@@ -610,4 +610,94 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         @test prices_to_returns(Y; missing_col_percent = 0.5,
                                 missing_row_percent = nothing).nx == ["B", "C"]
     end
+
+    @testset "nan_to_missing carries a gapped price into a gapped return" begin
+        # Map #955. A `NaN` price is an absent price, and reading it as `missing` hands it to
+        # the deletion steps: the observation goes, or the asset does. `nan_to_missing =
+        # false` carries it to the returns instead, where the library already holds a gap.
+        ts6 = collect(Date(2020, 1, 1):Day(1):Date(2020, 1, 6))
+        # `A` is priced throughout, `B` has no price until observation 3, `C` loses its
+        # price at observation 5.
+        Z = TimeArray(ts6,
+                      [10.0 NaN 30.0; 11.0 NaN 31.0; 12.0 20.0 32.0
+                       13.0 21.0 33.0; 14.0 22.0 NaN; 15.0 23.0 NaN], [:A, :B, :C])
+
+        # The default deletes: every row holding a gap goes, and four of the five returns
+        # with it.
+        kept = prices_to_returns(Z)
+        @test kept.nx == ["A", "B", "C"]
+        @test size(kept.X) == (1, 3)
+        @test all(isfinite, kept.X)
+
+        # Carrying keeps the whole clock and the whole universe.
+        got = prices_to_returns(Z; nan_to_missing = false)
+        @test got.nx == ["A", "B", "C"]
+        @test size(got.X) == (5, 3)
+
+        # The gap does not spread. A run of `k` gapped prices makes exactly the `k + 1`
+        # returns that read one of them, and every later return of that column is finite.
+        @test all(isfinite, view(got.X, :, 1))                 # A is never gapped
+        @test findall(!isfinite, view(got.X, :, 2)) == [1, 2]   # B: prices 1:2 gapped
+        @test findall(!isfinite, view(got.X, :, 3)) == [4, 5]   # C: prices 5:6 gapped
+        # The finite entries are the ordinary returns, unchanged by the gap beside them.
+        @test got.X[3, 2] ≈ 21.0 / 20.0 - 1
+        @test got.X[3, 3] ≈ 33.0 / 32.0 - 1
+
+        # A column that is gapped throughout keeps its place in the universe rather than
+        # vanishing from it, which is what moves the universe between windows.
+        Zdead = TimeArray(ts6, [10.0 NaN; 11.0 NaN; 12.0 NaN; 13.0 NaN; 14.0 NaN; 15.0 NaN],
+                          [:A, :B])
+        @test prices_to_returns(Zdead).nx == ["A"]
+        dead = prices_to_returns(Zdead; nan_to_missing = false)
+        @test dead.nx == ["A", "B"]
+        @test all(!isfinite, view(dead.X, :, 2))
+
+        # Both thresholds read either convention, so they mean the same thing under either
+        # setting: `B` holds two gaps over six rows and goes when the fraction is tightened.
+        @test prices_to_returns(Z; nan_to_missing = false, missing_row_percent = 0.1).nx ==
+              ["A"]
+
+        # The estimator carries the flag, and its default is the deleting one.
+        @test PricesToReturns().nan_to_missing
+        pr6 = PricesResult(; X = Z)
+        @test size(apply_preprocessing(PricesToReturns(), pr6).X) == (1, 3)
+        @test size(apply_preprocessing(PricesToReturns(; nan_to_missing = false), pr6).X) ==
+              (5, 3)
+
+        # A source spells an absent price either way, so the flag unifies both conventions
+        # rather than only one. A wide table built from a tidy one holds `missing`, and it
+        # must reach the returns as the same gap a `NaN` does.
+        Zm = TimeArray(ts6,
+                       [10.0 missing 30.0; 11.0 missing 31.0; 12.0 20.0 32.0
+                        13.0 21.0 33.0; 14.0 22.0 missing; 15.0 23.0 missing], [:A, :B, :C])
+        @test eltype(values(Zm)) == Union{Missing, Float64}
+        mgot = prices_to_returns(Zm; nan_to_missing = false)
+        @test mgot.nx == ["A", "B", "C"]
+        @test size(mgot.X) == (5, 3)
+        @test findall(!isfinite, view(mgot.X, :, 2)) == [1, 2]
+        @test findall(!isfinite, view(mgot.X, :, 3)) == [4, 5]
+        # The two sources agree entry for entry.
+        @test isequal(mgot.X, got.X)
+
+        # An `impute_method` still sees the entries it was given to fill: the unification
+        # runs after it, so only what it leaves behind becomes a gap. `Impute` is absent from
+        # the test environment (ADR 0042), so the `nothing` path is what is checked here.
+        @test isequal(prices_to_returns(Zm; nan_to_missing = false,
+                                        impute_method = nothing).X, mgot.X)
+
+        # The ergonomics this buys: ragged per-asset histories, outer-joined and converted
+        # without losing an observation. `TimeSeries.merge` pads a `Float64` array with `NaN`.
+        Aw = TimeArray(Date(2020, 1, 1):Day(1):Date(2020, 1, 6), [10.0, 11, 12, 13, 14, 15],
+                       ["A"])
+        Bw = TimeArray(Date(2020, 1, 3):Day(1):Date(2020, 1, 5), [20.0, 21, 22], ["B"])
+        joined = merge(Aw, Bw; method = :outer)
+        @test isnan(values(joined)[1, 2])
+        wide = prices_to_returns(joined; nan_to_missing = false)
+        @test wide.nx == ["A", "B"]
+        @test size(wide.X) == (5, 2)
+        @test all(isfinite, view(wide.X, :, 1))
+        @test findall(!isfinite, view(wide.X, :, 2)) == [1, 2, 5]
+        # The default keeps only the observations every asset shares.
+        @test size(prices_to_returns(joined).X) == (2, 2)
+    end
 end
