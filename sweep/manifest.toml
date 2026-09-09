@@ -102,7 +102,7 @@
 "src/08_Moments/31_WindowedCoskewness.jl" = { map = 3, units = 0, algorithm = 0, swept = true }
 "src/08_Moments/32_WindowedCokurtosis.jl" = { map = 3, units = 0, algorithm = 0, swept = true }
 "src/08_Moments/33_MedianExpectedReturns.jl" = { map = 3, units = 3, algorithm = 1, swept = true }
-"src/08_Moments/34_CustomValueExpectedReturns.jl" = { map = 3, units = 7, algorithm = 1, swept = true }
+"src/08_Moments/34_CustomValueExpectedReturns.jl" = { map = 3, units = 8, algorithm = 2, swept = true }
 "src/08_Moments/35_GerberIQCovariance.jl" = { map = 3, units = 36, algorithm = 13, swept = true }
 "src/08_Moments/36_RegimeAdjustedExpWeightedVariance.jl" = { map = 3, units = 29, swept = false }
 "src/08_Moments/37_RegimeAdjustedExpWeightedCovariance.jl" = { map = 3, units = 50, swept = false }

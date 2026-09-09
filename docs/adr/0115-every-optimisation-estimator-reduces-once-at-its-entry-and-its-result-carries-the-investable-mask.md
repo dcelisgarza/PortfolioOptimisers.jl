@@ -101,6 +101,42 @@ decided it, in
 [ADR 0120](0120-a-fold-scores-on-the-investable-mask-a-prior-free-head-and-pre-selection-reduce-to-the-coverage-universe-and-a-failed-candidate-loses-the-search.md),
 once ADR 0117 had settled the rule with no threshold. Every result of the library carries `imsk`.
 
+### A per-asset field of an estimator is declared, never inferred
+
+The reduction slices the **sample**. An estimator whose own fields are one entry per asset of the
+full universe therefore meets a narrower sample than its configuration describes, and the seam
+cannot tell which field that is: the identity methods
+`port_opt_view(::StatsBase.CovarianceEstimator, …)` and
+`port_opt_view(::AbstractExpectedReturnsEstimator, …)` are right for almost every estimator and
+silently wrong for one that carries an asset axis.
+
+So the estimator declares the axis and the seam executes the declaration. There are two ways to
+write it, and the field's bound picks which:
+
+- An `@vprop` tag, for a field that is **always** on the asset axis. `@propagatable` emits
+    `port_opt_view(x.field, i, args...)` for it, and `nothing_scalar_array_view` slices a vector,
+    carries a scalar through and recurses into a child. `EquilibriumExpectedReturns`'s `w` and
+    `ImpliedVolatility` take this route.
+- A `port_opt_view` method on the **parameterisation** whose field is, for a field whose bound is
+    a union of shapes of which only some are on the asset axis. `CustomValueExpectedReturns`'s
+    `val` is the worked example: it is a scalar, a per-asset vector, or a callable, and only the
+    vector is one entry per asset. A tag would slice all three, and a callable has no slice.
+
+A field on the **observation** axis is not this question. `ObsWeights` carries `@wprop` and
+`obs_weights_view` is its verb, so `MedianExpectedReturns` and `DistanceCovariance` keep the
+identity.
+
+Neither is a partial-fit state. `cache`, bound to `Option{<:AbstractPartialFitState}`, holds arrays
+that are one entry per asset, and slicing them would change no answer: no consumer reads the cache,
+which is the exemption [ADR 0106](0106-a-partial-fit-state-is-the-one-result-an-estimator-holds.md)
+grants. `mean`, `var` and `cov` rebuild from the sample they are handed. The five exponentially
+weighted and regime-adjusted estimators keep the identity for that reason.
+
+`test_08l_moment_verb_census.jl` holds the tripwire. It walks the concrete leaves of the three
+moment families, names those that take an identity method, and reds the build when one is not
+accounted for — so a leaf added with a per-asset field must either declare its axis or state why
+it has none. Closed polarity, as ADR 0037's rules have it.
+
 ## Considered options
 
 | Question | Refused | Why |
@@ -110,6 +146,9 @@ once ADR 0117 had settled the rule with no threshold. Every result of the librar
 | The verb | Three lines and a condition per site. | Nine copies of one idiom, nine conditions the complexity gate counts, and nine places that drift. |
 | The exit | The `_optimise` body expands one line before the constructor. | Nine sites can each forget the line. |
 | The exit | `finalise_weight_bounds` takes the mask and expands. | It fuses the bound check and the universe expansion in one verb, and the two meta finalisers must thread the mask through. |
+| A per-asset field of an estimator | Infer the asset axis at the seam, by reflecting over field types. | A `VecNum` field may be per-asset, per-observation or neither, so the type cannot say; and the repository prefers a per-type method to reflection. |
+| A per-asset field of an estimator | Leave the `DimensionMismatch` that `CustomValueExpectedReturns` threw: loud, not wrong. | The rule's second half is that a layer which CAN state a correct answer must do so, and this one can — the slice is `view(val, i)`. |
+| A partial-fit `cache` | Slice it too, for symmetry with `SimpleExpectedReturns`. | No consumer reads it, so the slice changes no answer and adds a method per state type. |
 | A pre-fitted clustering result | Slice it with a `port_opt_view`. | The matrices slice, but dropping a leaf from the dendrogram changes the merges, the branch order and `k`, so the result is no longer the caller's clustering. |
 | The prior-free naive heads | No mask, and the caller reduces through pre-selection; or an optional prior slot for the mask alone. | Two results with no mask, so a reader has two idioms, and a bare equal-weighted benchmark over a point-in-time panel weights a dead asset; or a prior fit that no weight reads. |
 
@@ -123,3 +162,8 @@ once ADR 0117 had settled the rule with no threshold. Every result of the librar
 - The base file of the optimisation directory grows by the verb, so its size baseline rises.
 - The subset index on a `SubsetResamplingResult` is in reduced positions when a mask was applied,
   as its `pr` and `wb` are.
+- `CustomValueExpectedReturns{<:VecNum}` gains a `port_opt_view` method, so a caller may state one
+  expected return per asset of the full universe and let the reduction align it. The scalar and the
+  callable shapes are unchanged.
+- `test_08l_moment_verb_census.jl` gains the asset-axis tripwire and its allowlist of the eight
+  leaves that take an identity method, each with the reason it carries no asset axis.

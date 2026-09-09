@@ -234,5 +234,52 @@ function Statistics.mean(me::CustomValueExpectedReturns{<:Union{<:Function,
     assert_custom_expected_returns_val(val, _ncols, "val(X; dims = $dims, kwargs...)")
     return val
 end
+"""
+    port_opt_view(
+        me::CustomValueExpectedReturns{<:VecNum},
+        i,
+        args...
+    ) -> CustomValueExpectedReturns
+
+[`port_opt_view`](@ref) method for the per-asset vector shape of
+[`CustomValueExpectedReturns`](@ref): slices `val` to the selected assets.
+
+`val` is the one field of the estimator, and it sits on the asset axis in this shape alone. A
+scalar is universe-independent, and a callable receives the already-reduced matrix and answers one
+value per column of it, so both keep the identity method of
+[`AbstractExpectedReturnsEstimator`](@ref). A stored vector is one entry per asset of the universe
+the caller wrote it against, so a reduction that left it whole would carry the full universe into a
+narrower sample, and [`mean(me::CustomValueExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
+would throw a `DimensionMismatch` against the sample it was handed.
+
+The bound of `val` is a union of the three shapes, so this declaration is a method on the shape
+that is on the asset axis rather than an [`@vprop`](@ref) tag on the field, which would slice all
+three. ADR 0115 records the decision.
+
+# Algorithm
+
+ 1. Return a new estimator whose `val` is `view(me.val, i)`.
+
+# Arguments
+
+  - `me::CustomValueExpectedReturns{<:VecNum}`: The estimator whose `val` is one entry per asset.
+  - `i`: Asset index or mask to select.
+  - `args...`: Threaded tail, unused.
+
+# Returns
+
+  - `me::CustomValueExpectedReturns`: A new estimator whose `val` is restricted to the selected
+    assets.
+
+# Related
+
+  - [`CustomValueExpectedReturns`](@ref)
+  - [`port_opt_view`](@ref)
+  - [`investable_reduction`](@ref)
+"""
+function port_opt_view(me::CustomValueExpectedReturns{<:VecNum}, i,
+                       args...)::CustomValueExpectedReturns
+    return CustomValueExpectedReturns(; val = view(me.val, i))
+end
 
 export CustomValueExpectedReturns
