@@ -131,6 +131,15 @@ It remains a deterministic function of the price gaps, so ADR 0129's panel-wide 
 untouched, and it holds for the whole Gap Return family, since no algorithm can write before an
 asset's first price.
 
+ADR 0129 lets a caller's own `AbstractMatrix{Bool}` enter where the Listing Span does, and such a
+declaration is not an interval, so `[first + 1, last]` does not name it. The rule generalises rather
+than doubling: **a return is active exactly when both prices of its pair lie inside the
+declaration**, `span[a, i] && span[a + 1, i]`, with `a` the earlier price of the pair under whichever
+padding convention is in force. On an interval that is `[first + 1, last]` again — `first <= a` and
+`a + 1 <= last` is `a + 1 ∈ [first + 1, last]` — so the Listing Span is a compression of the general
+rule and not a special case beside it, and a constituency that leaves and rejoins books no return
+across its absence, which is the same refusal the sentence above gives a re-pricing.
+
 ### A contradicted algorithm reports an `@info`
 
 Under `nan_to_missing = true`, `dropmissing!` removes every row still holding a gap before the
