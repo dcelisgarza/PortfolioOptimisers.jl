@@ -205,10 +205,13 @@ A caller who builds a price carrier by hand, outside `PriceIngestion`, gets a sp
 that carrier holds gaps, the conversion warns and derives window-locally, and refuses under
 `strict`. A clean carrier is unaffected.
 
-The filtering and imputation policy inherits its position rather than choosing it: both masks are
-fixed before any policy drops a row or a column, so the policy surface that
-[#960](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/960) decides sits at the
-returns level, after the conversion.
+The filtering and imputation policy inherits its position rather than choosing it, and the seams
+above split it by what it does. A policy that **drops** a row or a column runs at the returns level,
+after both masks, because the masks are the truth it is judged against. A policy that **fills** runs
+at the price level, after the span and before the masks, because a price convention cannot be stated
+after the conversion — and the span is read first either way, so neither can move it.
+[ADR 0130](0130-a-universe-policy-is-fitted-and-the-only-fill-is-a-span-bounded-price-convention.md)
+owns that rule and the policy surface itself.
 
 What the layer emits as a whole — one object carrying its own panel, or two a caller composes — and
 how a fold replays it are not settled here. The seams this ADR fixes are what make those questions
