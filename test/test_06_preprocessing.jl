@@ -3,6 +3,14 @@
 # which is the mistake the stubs exist to name.
 struct UnimplementedPreprocessing <: PortfolioOptimisers.AbstractPreprocessingEstimator end
 struct UnimplementedPreprocessingResult <: PortfolioOptimisers.AbstractPreprocessingResult end
+# A Gap Return algorithm that ignores the invariant entirely and answers the whole column with
+# one sentinel. `apply_gap_return` reads back only the writable cells, so the invariant is the
+# driver's and not the algorithm's, and this is what proves it.
+struct RogueGapReturn <: PortfolioOptimisers.AbstractGapReturnAlgorithm end
+function PortfolioOptimisers.gap_return(::RogueGapReturn, ::AbstractVector,
+                                        r::AbstractVector, ::Symbol)
+    return fill(-99.0, length(r))
+end
 include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
 @testset "Tools tests" begin
     using Test, PortfolioOptimisers, DataFrames, TimeSeries, Dates, Random, StableRNGs, CSV,
@@ -699,5 +707,120 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         @test findall(!isfinite, view(wide.X, :, 2)) == [1, 2, 5]
         # The default keeps only the observations every asset shares.
         @test size(prices_to_returns(joined).X) == (2, 2)
+    end
+    @testset "the Gap Return family writes only the cells a gap left non-finite" begin
+        # One complete column, and one carrying all three gap positions at once: an inception
+        # gap, an interior suspension of k = 2, and a delisting. The span rule reads the
+        # position, so the one column exercises every clause of the invariant.
+        gts = Date(2020, 1, 1):Day(1):Date(2020, 1, 8)
+        pA = [10.0, 11, 12, 13, 14, 15, 16, 17]
+        pB = [NaN, 20.0, 21, NaN, NaN, 24, 25, NaN]
+        Zg = TimeArray(gts, hcat(pA, pB), ["A", "B"])
+
+        @testset "the writable set is the invariant, held once" begin
+            base = prices_to_returns(Zg; nan_to_missing = false)
+            rB = view(base.X, :, 2)
+            # `percentchange` reads two consecutive prices, so the k = 2 suspension leaves
+            # k + 1 = 3 non-finite returns, and the inception and the delisting one each.
+            @test findall(!isfinite, rB) == [1, 3, 4, 5, 7]
+            @test findall(!isfinite, view(base.X, :, 1)) == Int[]
+
+            wB = PortfolioOptimisers.gap_return_writable(pB, collect(rB))
+            # The Listing Span of B is prices 2 to 7, which projects to returns 2 to 6, so
+            # the inception cell (1) and the delisting cell (7) are outside it. Only the
+            # suspension's three cells are writable.
+            @test findall(wB) == [3, 4, 5]
+            # A complete column admits nothing, and neither does a column with no price.
+            @test !any(PortfolioOptimisers.gap_return_writable(pA,
+                                                               collect(view(base.X, :, 1))))
+            @test !any(PortfolioOptimisers.gap_return_writable(fill(NaN, 8), fill(NaN, 7)))
+
+            # Under `padding` the clocks line up and the row every asset is padded on is
+            # return 1, which no column admits: it has no earlier observed price.
+            padded = prices_to_returns(Zg; nan_to_missing = false, padding = true)
+            @test size(padded.X, 1) == 8
+            @test all(!isfinite, view(padded.X, 1, :))
+            wpad = PortfolioOptimisers.gap_return_writable(pB,
+                                                           collect(view(padded.X, :, 2)))
+            @test !wpad[1]
+            @test findall(wpad) == [4, 5, 6]
+            @test !any(PortfolioOptimisers.gap_return_writable(pA,
+                                                               collect(view(padded.X, :, 1))))
+        end
+
+        @testset "CatchUpGapReturn books the move on the observation that ends the gap" begin
+            base = prices_to_returns(Zg; nan_to_missing = false)
+            got = prices_to_returns(Zg; nan_to_missing = false,
+                                    gap_return_alg = CatchUpGapReturn())
+            rB = view(got.X, :, 2)
+            # The Held Gap shortens from k + 1 = 3 to k = 2: the two unpriced observations
+            # stay non-finite and the re-pricing observation carries the whole move. The
+            # inception cell (1) and the delisting cell (7) are untouched.
+            @test findall(!isfinite, rB) == [1, 3, 4, 7]
+            @test rB[5] ≈ 24 / 21 - 1
+            @test rB[5] == expm1(log(24.0) - log(21.0))
+            # No return is written before the first price, and none after the last.
+            @test !isfinite(rB[1])
+            @test !isfinite(rB[7])
+            # A cell computed from two observed prices is frozen, bit for bit, and so is
+            # every cell of a column that carries no gap.
+            @test rB[2] === base.X[2, 2]
+            @test rB[6] === base.X[6, 2]
+            @test view(got.X, :, 1) == view(base.X, :, 1)
+
+            # The log branch reads the same pair of prices through the same arithmetic.
+            glog = prices_to_returns(Zg; nan_to_missing = false, ret_method = :log,
+                                     gap_return_alg = CatchUpGapReturn())
+            @test glog.X[5, 2] == log(24.0) - log(21.0)
+
+            # Under `padding` the padded row stays untouched for every asset.
+            gpad = prices_to_returns(Zg; nan_to_missing = false, padding = true,
+                                     gap_return_alg = CatchUpGapReturn())
+            @test all(!isfinite, view(gpad.X, 1, :))
+            @test findall(!isfinite, view(gpad.X, :, 2)) == [1, 2, 4, 5, 8]
+            @test gpad.X[6, 2] ≈ 24 / 21 - 1
+        end
+
+        @testset "the driver freezes what the algorithm has no licence to write" begin
+            base = prices_to_returns(Zg; nan_to_missing = false)
+            rogue = prices_to_returns(Zg; nan_to_missing = false,
+                                      gap_return_alg = RogueGapReturn())
+            # `RogueGapReturn` answers every cell with -99.0. Only the three writable cells
+            # of B take it; everything else is exactly what the default rule computed.
+            @test findall(==(-99.0), rogue.X) == CartesianIndex.([3, 4, 5], 2)
+            @test view(rogue.X, :, 1) == view(base.X, :, 1)
+            @test isequal(view(rogue.X, [1, 2, 6, 7], 2), view(base.X, [1, 2, 6, 7], 2))
+        end
+
+        @testset "the default rule is bit-identical, and a contradicted algorithm informs" begin
+            base = prices_to_returns(Zg; nan_to_missing = false)
+            @test isequal(prices_to_returns(Zg; nan_to_missing = false,
+                                            gap_return_alg = nothing).X, base.X)
+
+            # `nan_to_missing` deletes every row holding a gap before the conversion, so the
+            # writable set is provably empty. That is an `@info`, not a refusal and not a
+            # warning: the returns it computed are correct, they are simply the default's.
+            dropped = prices_to_returns(Zg)
+            got = @test_logs (:info,) match_mode=:any prices_to_returns(Zg;
+                                                                        gap_return_alg = CatchUpGapReturn())
+            @test isequal(got.X, dropped.X)
+            # A gapless table reports the same thing for the same reason.
+            clean = TimeArray(gts, hcat(pA, pA .+ 1), ["A", "B"])
+            @test_logs (:info,) match_mode=:any prices_to_returns(clean;
+                                                                  nan_to_missing = false,
+                                                                  gap_return_alg = CatchUpGapReturn())
+        end
+
+        @testset "PricesToReturns carries the algorithm" begin
+            @test isnothing(PricesToReturns().gap_return_alg)
+            ptr = PricesToReturns(; nan_to_missing = false,
+                                  gap_return_alg = CatchUpGapReturn())
+            @test isa(ptr.gap_return_alg, CatchUpGapReturn)
+            pg = PricesResult(; X = Zg)
+            @test isequal(apply_preprocessing(ptr, pg).X,
+                          prices_to_returns(Zg; nan_to_missing = false,
+                                            gap_return_alg = CatchUpGapReturn()).X)
+            @test fit_preprocessing(ptr, pg) === ptr
+        end
     end
 end

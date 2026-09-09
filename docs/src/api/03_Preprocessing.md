@@ -15,6 +15,12 @@ PortfolioOptimisers.panel_carrier_view
 PortfolioOptimisers.asset_panel(::Nothing, ::Any, ::ReturnsResult, ::Any)
 PortfolioOptimisers.assert_asset_panel_supplied
 prices_to_returns
+PortfolioOptimisers.AbstractGapReturnAlgorithm
+CatchUpGapReturn
+PortfolioOptimisers.gap_return
+PortfolioOptimisers.gap_return_writable
+PortfolioOptimisers.gap_return_value
+PortfolioOptimisers.apply_gap_return
 port_opt_view(::ReturnsResult, ::Any)
 returns_result_picker
 Prices_RR
