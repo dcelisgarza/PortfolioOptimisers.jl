@@ -642,6 +642,7 @@ Where:
 
   - [`exposure_ic`](@ref)
   - [`exposure_ic_factor_summary`](@ref)
+  - [`forecast_factor_correlation`](@ref)
   - [`CrossSectionalFactorModel`](@ref)
 """
 function exposure_ic_summary(ic::MatNum)

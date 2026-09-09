@@ -101,6 +101,7 @@ commit = "97e398ef74"
 "src/08_Moments/45_ReturnForecasts/08_ForecastHistory.jl" = { cyc = 8, cog = 15, arg = 4, cyc_sum = 14, cog_sum = 20, arg_sum = 4, macros = [] }
 "src/08_Moments/45_ReturnForecasts/09_ForecastInformationCoefficient.jl" = { cyc = 6, cog = 10, arg = 4, cyc_sum = 15, cog_sum = 15, arg_sum = 17, macros = [] }
 "src/08_Moments/45_ReturnForecasts/10_ForecastPortfolios.jl" = { cyc = 8, cog = 15, arg = 5, cyc_sum = 41, cog_sum = 67, arg_sum = 24, macros = [] }
+"src/08_Moments/45_ReturnForecasts/11_ForecastFactorCorrelation.jl" = { cyc = 3, cog = 4, arg = 5, cyc_sum = 6, cog_sum = 6, arg_sum = 12, macros = [] }
 "src/08_Moments/46_CrossSectionalRegressionDiagnostics.jl" = { cyc = 7, cog = 14, arg = 5, cyc_sum = 120, cog_sum = 129, arg_sum = 112, macros = [] }
 "src/08_Moments/47_CrossSectionalExposureDiagnostics.jl" = { cyc = 10, cog = 13, arg = 5, cyc_sum = 105, cog_sum = 119, arg_sum = 102, macros = [] }
 "src/08_Moments/48_FactorModelSummary.jl" = { cyc = 6, cog = 8, arg = 5, cyc_sum = 55, cog_sum = 54, arg_sum = 45, macros = [] }

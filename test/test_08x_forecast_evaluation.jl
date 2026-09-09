@@ -2,11 +2,12 @@
 Check `src/08_Moments/45_ReturnForecasts/07_ForecastEvaluation.jl`,
 `src/08_Moments/45_ReturnForecasts/08_ForecastHistory.jl` and
 `src/08_Moments/45_ReturnForecasts/09_ForecastInformationCoefficient.jl` and
-`src/08_Moments/45_ReturnForecasts/10_ForecastPortfolios.jl` against the contract their
-docstrings state, and against the reference implementation the map of issue #931 ports.
-Issues #934, #935, #936 and #937.
+`src/08_Moments/45_ReturnForecasts/10_ForecastPortfolios.jl` and
+`src/08_Moments/45_ReturnForecasts/11_ForecastFactorCorrelation.jl` against the contract
+their docstrings state, and against the reference implementation the map of issue #931
+ports. Issues #934, #935, #936, #937 and #940.
 
-SEVEN CONVENTIONS SHAPE THE PROBES.
+EIGHT CONVENTIONS SHAPE THE PROBES.
 
 1. THE TWO OBSERVATION AXES ARE RECONCILED BY THE TARGET, NOT BY THE EVALUATION. A Return
    Forecast history lives on the factor-model block's rows, and the block is a suffix of the
@@ -55,6 +56,20 @@ SEVEN CONVENTIONS SHAPE THE PROBES.
    that summary therefore counts against the FINITE dates, which is the opposite of
    convention 5's denominator: the two summaries are computed on different series, and each
    docstring states which.
+
+8. THE FACTOR CORRELATION IS PINNED BY A DESIGN, NOT BY A LITERAL. It is contemporaneous,
+   so there is nothing forward-looking to oracle: the probes build a cross-section whose
+   correlation is exactly 1 and exactly 0 by construction, under BOTH the weighted form and
+   the rank form, so the two are separable without a stored number. `FC_ORTHO` is the
+   permutation whose centred values and whose ordinal ranks are both orthogonal to
+   `[1, 2, 3, 4]`, which an arbitrary orthogonal vector would not be -- a tied vector such
+   as `[1, -1, -1, 1]` is Pearson-orthogonal and reads 0.4 under ordinal ranks. The
+   `ExposureNeutralisation` probe is the one that reads a real fixture, and it is
+   DIRECTIONAL rather than near-zero: issue #950 records that a Neutralisation fits a
+   cross-sectional regression with no intercept, so its residual is orthogonal to the
+   target in the UNCENTRED sense and keeps a large Pearson correlation with it. The probe
+   asserts the un-neutralised correlation above 0.9, the neutralised one below it and
+   still above 0.5, and it is tightened when #950 is settled.
 =#
 include(joinpath(@__DIR__, "test06c_setup.jl"))
 
@@ -1038,5 +1053,226 @@ end
         @test isfinite(p.turnover[3])
         @test p.mean_turnover ≈
               sum(filter(isfinite, p.turnover)) / count(isfinite, p.turnover)
+    end
+end
+
+# The forecast-against-exposure design of convention 8. Each row of `FC_ALPHA` is an
+# increasing affine function of `[1, 2, 3, 4]`, so it correlates exactly `1` with the first
+# exposure under both the weighted and the rank form. The second exposure is the
+# permutation `[3, 1, 4, 2]`, whose centred values AND whose ordinal ranks are both
+# orthogonal to `[1, 2, 3, 4]`, so it correlates exactly `0` under both forms and the two
+# answers are separable. Issue #940.
+const FC_ALPHA = [1.0 2.0 3.0 4.0
+                  2.0 4.0 6.0 8.0
+                  0.5 1.0 1.5 2.0
+                  3.0 4.0 5.0 6.0]
+const FC_TIED = repeat([1.0 2.0 3.0 4.0], 4, 1)
+const FC_ORTHO = repeat([3.0 1.0 4.0 2.0], 4, 1)
+const FC_B = cat(FC_TIED, FC_ORTHO; dims = 3)
+# A weight that breaks the orthogonality of `FC_ORTHO`. `IC_W` does not: its rows happen to
+# leave the weighted covariance of `[1, 2, 3, 4]` against `[3, 1, 4, 2]` at exactly zero.
+const FC_W = repeat([1.0 1.0 1.0 5.0], 4, 1)
+# A per-date exposure design. Every row of `FC_TIED` and `FC_ORTHO` is the same, so a
+# forecast whose rows are affine in `[1, 2, 3, 4]` correlates identically at every date and
+# a summary of it has no dispersion to report. `FC_G` varies by row, so the series it
+# produces against `IC_ALPHA` does.
+const FC_G = [1.0 0.0 1.0 0.0
+              0.0 1.0 0.0 1.0
+              1.0 1.0 0.0 0.0
+              0.0 0.0 1.0 1.0]
+const FC_BG = cat(FC_G, reverse(FC_G; dims = 2); dims = 3)
+
+@testset "The exposure axis is checked against the forecast, once" begin
+    PO = PortfolioOptimisers
+    fe = forecast_evaluation(FC_ALPHA, PO.forward_mean_returns(FC_ALPHA, 1, 1))
+
+    @testset "The checked history is handed back unchanged" begin
+        @test PO.forecast_factor_exposures(fe.alpha, FC_B) === FC_B
+    end
+
+    @testset "An empty tensor and a mismatched axis are refused" begin
+        @test_throws PO.IsEmptyError PO.forecast_factor_exposures(fe.alpha,
+                                                                  Array{Float64, 3}(undef,
+                                                                                    0, 0,
+                                                                                    0))
+        # One observation short, and one asset short.
+        @test_throws DimensionMismatch PO.forecast_factor_exposures(fe.alpha,
+                                                                    FC_B[1:3, :, :])
+        @test_throws DimensionMismatch PO.forecast_factor_exposures(fe.alpha,
+                                                                    FC_B[:, 1:3, :])
+        @test_throws DimensionMismatch forecast_factor_correlation(fe, FC_B[1:3, :, :])
+    end
+
+    @testset "A threshold below one is refused" begin
+        @test_throws DomainError forecast_factor_correlation(fe, FC_B; min_count = 0)
+    end
+end
+
+@testset "A forecast is correlated against the exposures it is meant to add alpha over" begin
+    PO = PortfolioOptimisers
+    fe = forecast_evaluation(FC_ALPHA, PO.forward_mean_returns(FC_ALPHA, 1, 1))
+    c = forecast_factor_correlation(fe, FC_B)
+
+    @testset "A pure multiple of an exposure correlates one with it and zero with an orthogonal one" begin
+        @test size(c) == (length(fe.dates), 2)
+        @test c[:, 1] ≈ ones(length(fe.dates))
+        @test c[:, 2] ≈ zeros(length(fe.dates)) atol = 1e-12
+    end
+
+    @testset "The rank form agrees where the design is rank-orthogonal too" begin
+        cr = forecast_factor_correlation(fe, FC_B; rank = true)
+        @test cr[:, 1] ≈ ones(length(fe.dates))
+        @test cr[:, 2] ≈ zeros(length(fe.dates)) atol = 1e-12
+    end
+
+    @testset "Each entry is the cross-sectional helper applied to the pairing" begin
+        cr = forecast_factor_correlation(fe, FC_B; rank = true)
+        u = ones(size(FC_ALPHA, 2))
+        for k in 1:2, (j, t) in enumerate(fe.dates)
+            a = view(fe.alpha, t, :)
+            b = view(FC_B, t, :, k)
+            @test c[j, k] == PO.cs_weighted_correlation(a, b, u; min_count = fe.min_count)
+            @test cr[j, k] == PO.cs_spearman_correlation(a, b; min_count = fe.min_count)
+        end
+    end
+
+    @testset "A weighting moves the weighted form and leaves the rank one" begin
+        cw = forecast_factor_correlation(fe, FC_B, FC_W)
+        # A perfect linear relation is weight invariant, and an orthogonal one is not.
+        @test cw[:, 1] ≈ ones(length(fe.dates))
+        @test !isapprox(cw[:, 2], zeros(length(fe.dates)); atol = 1e-12)
+        @test isequal(forecast_factor_correlation(fe, FC_B, FC_W; rank = true),
+                      forecast_factor_correlation(fe, FC_B; rank = true))
+    end
+
+    @testset "A cross-section under the threshold carries no correlation" begin
+        gap = copy(FC_ALPHA)
+        gap[2, 3] = NaN
+        gap[2, 4] = NaN
+        fg = forecast_evaluation(gap, PO.forward_mean_returns(gap, 1, 1); min_count = 2)
+        cg = forecast_factor_correlation(fg, FC_B; min_count = 3)
+        j = findfirst(==(2), fg.dates)
+        @test all(isnan, cg[j, :])
+        @test all(isfinite, forecast_factor_correlation(fg, FC_B; min_count = 2)[j, :])
+    end
+end
+
+@testset "The block method reads both histories off the block" begin
+    PO = PortfolioOptimisers
+    fx = evaluation_fixture()
+    rd, csfm = fx.rd, fx.csfm
+    fw = FixedWeightedReturnForecast(; scores = fx.scores, scale = 1.0,
+                                     weights = [0.4, 0.6])
+    fb = forecast_evaluation(fw, rd, csfm; horizon = 2, lag = 1)
+
+    @testset "The exposure history is the block's own, unlagged" begin
+        @test isequal(forecast_factor_correlation(fb, csfm),
+                      forecast_factor_correlation(fb, PO.cs_diagnostic_exposures(csfm)))
+        @test size(forecast_factor_correlation(fb, csfm), 2) == length(csfm.nf)
+    end
+
+    @testset "A weighting moves the weighted form and leaves the rank one" begin
+        cw = forecast_factor_correlation(fb, csfm;
+                                         weighting = InverseIdiosyncraticVarianceMetric())
+        @test !isequal(cw, forecast_factor_correlation(fb, csfm))
+        @test isequal(forecast_factor_correlation(fb, csfm; rank = true,
+                                                  weighting = InverseIdiosyncraticVarianceMetric()),
+                      forecast_factor_correlation(fb, csfm; rank = true))
+        # A metric naming a history the block does not carry refuses by name.
+        @test_throws PO.IsNothingError forecast_factor_correlation(fb, csfm;
+                                                                   weighting = BenchmarkWeightMetric())
+    end
+
+    @testset "A block that carries no exposure history refuses by name" begin
+        bare = CrossSectionalFactorModel(; M = csfm.M, b = csfm.b, csr = csfm.csr,
+                                         nf = csfm.nf, fam = csfm.fam)
+        @test_throws PO.IsNothingError forecast_factor_correlation(fb, bare)
+    end
+end
+
+@testset "A neutralised forecast is less correlated with what it was neutralised against" begin
+    fx = evaluation_fixture()
+    rd, csfm = fx.rd, fx.csfm
+    ds = fx.scores
+    # The Descriptors and the style factor are built from the same two Panel Fields, so an
+    # un-neutralised forecast restates the style factor rather than adding alpha over it.
+    # `neutralise = "style"` is the `ExposureNeutralisation` path, and it is what the
+    # correlation must see.
+    dn = DescriptorScores(; descriptors = ds.descriptors, neutralise = "style",
+                          outlier = ds.outlier, scoring = ds.scoring, group = ds.group)
+    raw = FixedWeightedReturnForecast(; scores = ds, scale = 1.0, weights = [0.4, 0.6])
+    neu = FixedWeightedReturnForecast(; scores = dn, scale = 1.0, weights = [0.4, 0.6])
+    cr = forecast_factor_correlation(forecast_evaluation(raw, rd, csfm; horizon = 2), csfm)
+    cn = forecast_factor_correlation(forecast_evaluation(neu, rd, csfm; horizon = 2), csfm)
+    mraw = abs(sum(filter(isfinite, view(cr, :, 1))) / count(isfinite, view(cr, :, 1)))
+    mneu = abs(sum(filter(isfinite, view(cn, :, 1))) / count(isfinite, view(cn, :, 1)))
+
+    @testset "The un-neutralised forecast restates the style factor" begin
+        @test mraw > 0.9
+    end
+
+    @testset "The neutralised one is less correlated with it, and not near zero" begin
+        # THE ASSERTION IS DIRECTIONAL, AND ISSUE #950 IS WHY. A Neutralisation fits
+        # `CrossSectionalLinearRegression()`, whose `intercept` defaults to `false`, so the
+        # residual is exactly orthogonal to the target in the UNCENTRED sense and keeps a
+        # large Pearson correlation with it. Tighten this to a near-zero assertion when
+        # #950 is settled.
+        @test mneu < mraw
+        @test mneu > 0.5
+    end
+end
+
+@testset "The correlation series is summarised by the shared kernel" begin
+    PO = PortfolioOptimisers
+    # `FC_BG` varies by date, so the series has dispersion and the ratio and the
+    # t-statistic are numbers rather than the `NaN` a constant series earns.
+    fe = forecast_evaluation(IC_ALPHA, PO.forward_mean_returns(IC_ALPHA, 1, 1))
+    c = forecast_factor_correlation(fe, FC_BG)
+    s = exposure_ic_summary(c)
+
+    @testset "No third summary ships, and the kernel answers one entry per factor" begin
+        @test keys(s) == (:mean_ic, :std_ic, :ic_ir, :t_stat, :hit_rate)
+        @test all(v -> length(v) == 2, values(s))
+        @test all(isfinite, s.mean_ic)
+        @test all(isfinite, s.std_ic)
+        @test all(isfinite, s.ic_ir)
+        @test all(isfinite, s.t_stat)
+        # The two factors are one another's mirror, so their correlations are the negatives
+        # of each other and every figure of the summary follows.
+        @test s.mean_ic[1] ≈ -s.mean_ic[2]
+        @test s.std_ic[1] ≈ s.std_ic[2]
+        @test s.ic_ir[1] ≈ -s.ic_ir[2]
+        @test all(h -> 0 <= h <= 1, s.hit_rate)
+    end
+
+    @testset "It is the same helper the information coefficient summary reads" begin
+        for k in 1:2
+            m = PO.exposure_ic_factor_summary(c, k)
+            @test isequal(m.mean_ic, s.mean_ic[k])
+            @test isequal(m.std_ic, s.std_ic[k])
+            @test isequal(m.ic_ir, s.ic_ir[k])
+            @test isequal(m.t_stat, s.t_stat[k])
+            @test isequal(m.hit_rate, s.hit_rate[k])
+        end
+        # The two-column case is exactly what `forecast_ic_summary` names, so the two
+        # summaries agree figure for figure on the same input.
+        fs = forecast_ic_summary(c)
+        @test isequal(fs.spearman, PO.exposure_ic_factor_summary(c, 1))
+        @test isequal(fs.pearson, PO.exposure_ic_factor_summary(c, 2))
+    end
+
+    @testset "A constant series is summarised, and its ratio has no answer" begin
+        # The `FC_B` design is constant across dates by construction, which is what pins
+        # the exact `1` and `0`; a series with no dispersion has no ratio.
+        cc = forecast_factor_correlation(forecast_evaluation(FC_ALPHA,
+                                                             PO.forward_mean_returns(FC_ALPHA,
+                                                                                     1, 1)),
+                                         FC_B)
+        sc = exposure_ic_summary(cc)
+        @test sc.mean_ic ≈ [1.0, 0.0] atol = 1e-12
+        @test sc.std_ic ≈ [0.0, 0.0] atol = 1e-12
+        @test sc.hit_rate ≈ [1.0, 0.0]
+        @test all(isnan, sc.ic_ir)
+        @test all(isnan, sc.t_stat)
     end
 end
