@@ -105,6 +105,7 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/08_Moments/45_ReturnForecasts/06_TargetReturnForecast.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/45_ReturnForecasts/07_ForecastEvaluation.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/45_ReturnForecasts/08_ForecastHistory.jl" = { raw = 0, reviewed = 0 }
+"src/08_Moments/45_ReturnForecasts/09_ForecastInformationCoefficient.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/46_CrossSectionalRegressionDiagnostics.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/47_CrossSectionalExposureDiagnostics.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/48_FactorModelSummary.jl" = { raw = 0, reviewed = 0 }
@@ -387,6 +388,7 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/08_Moments/45_ReturnForecasts/06_TargetReturnForecast.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/45_ReturnForecasts/07_ForecastEvaluation.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/45_ReturnForecasts/08_ForecastHistory.jl" = { raw = 0, reviewed = 0 }
+"src/08_Moments/45_ReturnForecasts/09_ForecastInformationCoefficient.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/46_CrossSectionalRegressionDiagnostics.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/47_CrossSectionalExposureDiagnostics.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/48_FactorModelSummary.jl" = { raw = 0, reviewed = 0 }
@@ -669,6 +671,7 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/08_Moments/45_ReturnForecasts/06_TargetReturnForecast.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/45_ReturnForecasts/07_ForecastEvaluation.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/45_ReturnForecasts/08_ForecastHistory.jl" = { raw = 0, reviewed = 0 }
+"src/08_Moments/45_ReturnForecasts/09_ForecastInformationCoefficient.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/46_CrossSectionalRegressionDiagnostics.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/47_CrossSectionalExposureDiagnostics.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/48_FactorModelSummary.jl" = { raw = 0, reviewed = 0 }

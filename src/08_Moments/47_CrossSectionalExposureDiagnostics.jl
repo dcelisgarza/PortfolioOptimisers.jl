@@ -601,7 +601,7 @@ end
 
 Return the summary of an information coefficient series, one entry per factor.
 
-The mean states the average score, the standard deviation states how much the score moves, their ratio states the score per unit of movement, and the hit rate states how often the score was positive. The hit rate counts an observation whose score is `NaN` as a miss, so the four entries are read against the same number of observations.
+The mean states the average score, the standard deviation states how much the score moves, their ratio states the score per unit of movement, the t-statistic states whether the mean is far enough from zero to believe over the observations that carried a score, and the hit rate states how often the score was positive. The hit rate counts an observation whose score is `NaN` as a miss, so it is read against every observation while the other four are read against the observations that carried a score.
 
 # Mathematical definition
 
@@ -609,6 +609,8 @@ The mean states the average score, the standard deviation states how much the sc
 \\overline{\\mathrm{IC}}_{k} = \\frac{1}{|\\mathcal{T}_{k}|} \\sum_{t \\in \\mathcal{T}_{k}} \\mathrm{IC}_{tk}
 \\qquad
 \\mathrm{IR}_{k} = \\frac{\\overline{\\mathrm{IC}}_{k}}{s_{k}}
+\\qquad
+t_{k} = \\mathrm{IR}_{k} \\sqrt{\\left| \\mathcal{T}_{k} \\right|}
 \\qquad
 \\mathrm{hit}_{k} = \\frac{1}{T} \\sum_{t=1}^{T} \\mathbb{1}\\left[\\mathrm{IC}_{tk} > 0\\right]
 ```
@@ -634,11 +636,12 @@ Where:
 
 # Returns
 
-  - `summary::NamedTuple`: `(; mean_ic, std_ic, ic_ir, hit_rate)`, each one entry per factor.
+  - `summary::NamedTuple`: `(; mean_ic, std_ic, ic_ir, t_stat, hit_rate)`, each one entry per factor.
 
 # Related
 
   - [`exposure_ic`](@ref)
+  - [`exposure_ic_factor_summary`](@ref)
   - [`CrossSectionalFactorModel`](@ref)
 """
 function exposure_ic_summary(ic::MatNum)
@@ -648,22 +651,27 @@ function exposure_ic_summary(ic::MatNum)
     mean_ic = Vector{Tf}(undef, K)
     std_ic = Vector{Tf}(undef, K)
     ic_ir = Vector{Tf}(undef, K)
+    t_stat = Vector{Tf}(undef, K)
     hit_rate = Vector{Tf}(undef, K)
     for k in 1:K
         m = exposure_ic_factor_summary(ic, k)
         mean_ic[k] = m.mean_ic
         std_ic[k] = m.std_ic
         ic_ir[k] = m.ic_ir
+        t_stat[k] = m.t_stat
         hit_rate[k] = m.hit_rate
     end
-    return (; mean_ic = mean_ic, std_ic = std_ic, ic_ir = ic_ir, hit_rate = hit_rate)
+    return (; mean_ic = mean_ic, std_ic = std_ic, ic_ir = ic_ir, t_stat = t_stat,
+            hit_rate = hit_rate)
 end
 """
     exposure_ic_factor_summary(ic::MatNum, k::Integer)
 
 Return the four summary numbers of one factor's information coefficient series.
 
-The mean and the standard deviation read the observations at which the coefficient is defined, and the hit rate reads every observation, so an observation with no coefficient counts as a miss. The ratio has no answer where either of its two terms has none, and none where the standard deviation is zero.
+The mean and the standard deviation read the observations at which the coefficient is defined, and the hit rate reads every observation, so an observation with no coefficient counts as a miss. The ratio has no answer where either of its two terms has none, and none where the standard deviation is zero. The t-statistic scales the ratio by the root of the number of observations that carried a coefficient, so it says whether the mean is far enough from zero to believe over the evidence there was; it inherits the ratio's absence.
+
+It is the kernel of every summary of a per-observation correlation series, so [`forecast_ic_summary`](@ref) reads it too, and a coefficient of a factor exposure and a coefficient of a Return Forecast are summarised on the same terms.
 
 # Arguments
 
@@ -672,11 +680,12 @@ The mean and the standard deviation read the observations at which the coefficie
 
 # Returns
 
-  - `m::NamedTuple`: `(; mean_ic, std_ic, ic_ir, hit_rate)`, four numbers.
+  - `m::NamedTuple`: `(; mean_ic, std_ic, ic_ir, t_stat, hit_rate)`, five numbers.
 
 # Related
 
   - [`exposure_ic_summary`](@ref)
+  - [`forecast_ic_summary`](@ref)
 """
 function exposure_ic_factor_summary(ic::MatNum, k::Integer)
     P = size(ic, 1)
@@ -703,7 +712,8 @@ function exposure_ic_factor_summary(ic::MatNum, k::Integer)
     end
     sd = n > 1 ? sqrt(q / (n - 1)) : Tf(NaN)
     ir = isfinite(m) && isfinite(sd) && sd > zero(Tf) ? m / sd : Tf(NaN)
-    return (; mean_ic = m, std_ic = sd, ic_ir = ir, hit_rate = Tf(h) / Tf(P))
+    return (; mean_ic = m, std_ic = sd, ic_ir = ir, t_stat = ir * sqrt(Tf(n)),
+            hit_rate = Tf(h) / Tf(P))
 end
 function exposure_ic_summary(csfm::CrossSectionalFactorModel; horizon::Integer = 1,
                              rank::Bool = true, reduced::Bool = false)

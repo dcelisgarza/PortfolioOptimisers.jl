@@ -100,8 +100,9 @@ commit = "fda13accfd"
 "src/08_Moments/45_ReturnForecasts/06_TargetReturnForecast.jl" = { code = 268, doc = 404, comment = 0, blank = 148, total = 820 }
 "src/08_Moments/45_ReturnForecasts/07_ForecastEvaluation.jl" = { code = 120, doc = 285, comment = 0, blank = 114, total = 519 }
 "src/08_Moments/45_ReturnForecasts/08_ForecastHistory.jl" = { code = 61, doc = 67, comment = 0, blank = 32, total = 160 }
+"src/08_Moments/45_ReturnForecasts/09_ForecastInformationCoefficient.jl" = { code = 64, doc = 150, comment = 0, blank = 72, total = 286 }
 "src/08_Moments/46_CrossSectionalRegressionDiagnostics.jl" = { code = 464, doc = 752, comment = 1, blank = 352, total = 1569 }
-"src/08_Moments/47_CrossSectionalExposureDiagnostics.jl" = { code = 407, doc = 502, comment = 0, blank = 247, total = 1156 }
+"src/08_Moments/47_CrossSectionalExposureDiagnostics.jl" = { code = 408, doc = 507, comment = 0, blank = 248, total = 1163 }
 "src/08_Moments/48_FactorModelSummary.jl" = { code = 224, doc = 318, comment = 2, blank = 150, total = 694 }
 "src/08_Moments/49_CrossSectionalIdiosyncraticDiagnostics.jl" = { code = 230, doc = 368, comment = 0, blank = 184, total = 782 }
 "src/08_Moments/50_CoverageUniverse.jl" = { code = 233, doc = 399, comment = 0, blank = 200, total = 832 }
@@ -285,4 +286,4 @@ commit = "fda13accfd"
 "src/23_Pipeline/05_SearchCrossValidation.jl" = { code = 213, doc = 121, comment = 18, blank = 60, total = 412 }
 "src/24_Plotting.jl" = { code = 134, doc = 1812, comment = 111, blank = 651, total = 2708 }
 "src/25_Aliases.jl" = { code = 267, doc = 591, comment = 25, blank = 161, total = 1044 }
-"src/PortfolioOptimisers.jl" = { code = 311, doc = 3, comment = 29, blank = 5, total = 348 }
+"src/PortfolioOptimisers.jl" = { code = 313, doc = 3, comment = 29, blank = 5, total = 350 }

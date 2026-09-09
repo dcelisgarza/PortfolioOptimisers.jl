@@ -1,10 +1,11 @@
 #=
-Check `src/08_Moments/45_ReturnForecasts/07_ForecastEvaluation.jl` and
-`src/08_Moments/45_ReturnForecasts/08_ForecastHistory.jl` against the contract their
-docstrings state, and against the reference implementation the map of issue #931 ports.
-Issues #934 and #935.
+Check `src/08_Moments/45_ReturnForecasts/07_ForecastEvaluation.jl`,
+`src/08_Moments/45_ReturnForecasts/08_ForecastHistory.jl` and
+`src/08_Moments/45_ReturnForecasts/09_ForecastInformationCoefficient.jl` against the
+contract their docstrings state, and against the reference implementation the map of issue
+#931 ports. Issues #934, #935 and #936.
 
-FOUR CONVENTIONS SHAPE THE PROBES.
+FIVE CONVENTIONS SHAPE THE PROBES.
 
 1. THE TWO OBSERVATION AXES ARE RECONCILED BY THE TARGET, NOT BY THE EVALUATION. A Return
    Forecast history lives on the factor-model block's rows, and the block is a suffix of the
@@ -29,6 +30,14 @@ FOUR CONVENTIONS SHAPE THE PROBES.
    score, so a refitted `TargetReturnForecast` has something real to find and its
    information coefficient is a measurement rather than noise. Both are asserted, because a
    positive coefficient means nothing without the fixture that reports none.
+
+5. THE STATISTICS ARE ORACLED BY RUNNING THE REFERENCE, NOT BY READING IT. `IC_ALPHA` and
+   its gapped variant were put through the reference's own diagnostic and its correlation
+   summary, and the literals below are what it answered. The one place the port diverges is
+   the hit rate: the library reads it against every date, so a date with no coefficient is a
+   miss, where the reference reads it against the dates that carried one. That is
+   `exposure_ic_factor_summary`'s convention, which both summaries now share, and it is
+   asserted as a divergence rather than papered over.
 =#
 include(joinpath(@__DIR__, "test06c_setup.jl"))
 
@@ -464,5 +473,301 @@ end
               for t in fe.dates]
         ic = filter(isfinite, ic)
         @test abs(sum(ic) / length(ic)) < 0.2
+    end
+end
+
+# The oracle of the information coefficients, measured by running the reference
+# implementation on the same two matrices. `IC_ALPHA` is a forecast whose ordering of the
+# four assets is good at the first date, mixed at the second and wrong at the third, and
+# whose *spacing* is uneven, so the rank column and the level column disagree — which is the
+# whole reason both are answered. Issue #936.
+const IC_ALPHA = [1.0 2.0 4.0 8.0; 2.0 3.0 5.0 40.0; 1.0 5.0 2.0 3.0; 3.0 1.0 2.0 6.0]
+const IC_W = [1.0 1.0 1.0 1.0; 1.0 2.0 3.0 4.0; 4.0 3.0 2.0 1.0; 1.0 1.0 1.0 1.0]
+const IC_REF_SPEARMAN = [1.0, 0.4, -0.4]
+const IC_REF_PEARSON = [0.9404839524466372, 0.10090550403524001, -0.2710523708715754]
+const IC_REF_PEARSON_W = [0.9404839524466372, 0.0521748308303865, -0.49733055872774606]
+const IC_REF_GAP_SPEARMAN = [1.0, 1.0, 0.5]
+const IC_REF_GAP_PEARSON = [1.0, 1.0, 0.720576692122892]
+const IC_REF_GAP_COVERAGE = [0.75, 0.5, 0.75]
+
+function ic_gap_fixture()
+    alpha = copy(IC_ALPHA)
+    alpha[2, 4] = NaN
+    alpha[3, 2] = NaN
+    return alpha
+end
+
+@testset "The information coefficients reproduce the reference implementation" begin
+    PO = PortfolioOptimisers
+    y = PO.forward_mean_returns(IC_ALPHA, 1, 1)
+    fe = forecast_evaluation(IC_ALPHA, y)
+
+    @testset "Both columns are answered, and both match the reference" begin
+        ic = forecast_ic(fe)
+        @test size(ic) == (length(fe.dates), 2)
+        @test ic[:, 1] ≈ IC_REF_SPEARMAN
+        @test ic[:, 2] ≈ IC_REF_PEARSON
+        # The two columns disagree, which is why the verb answers both rather than one.
+        @test !isapprox(ic[:, 1], ic[:, 2])
+    end
+
+    @testset "Each column is the cross-sectional helper applied to the pairing" begin
+        ic = forecast_ic(fe)
+        for (j, t) in enumerate(fe.dates)
+            a = view(fe.alpha, t, :)
+            b = view(fe.y, t, :)
+            @test ic[j, 1] == PO.cs_spearman_correlation(a, b; min_count = fe.min_count)
+            @test ic[j, 2] == PO.cs_weighted_correlation(a, b, ones(size(IC_ALPHA, 2));
+                                                         min_count = fe.min_count)
+        end
+    end
+
+    @testset "A weighting moves the Pearson column and leaves the Spearman one" begin
+        ic = forecast_ic(fe, IC_W)
+        @test ic[:, 1] ≈ IC_REF_SPEARMAN
+        @test ic[:, 2] ≈ IC_REF_PEARSON_W
+        @test !isapprox(ic[:, 2], IC_REF_PEARSON)
+    end
+
+    @testset "The block method reads the weight history the metric names" begin
+        # `IdentityMetric` resolves to no history, so the block method and the bare method
+        # with no weights are the same call.
+        fx = evaluation_fixture()
+        rd, csfm = fx.rd, fx.csfm
+        fw = FixedWeightedReturnForecast(; scores = fx.scores, scale = 1.0,
+                                         weights = [0.4, 0.6])
+        fb = forecast_evaluation(fw, rd, csfm; horizon = 2, lag = 1)
+        @test isequal(forecast_ic(fb, csfm), forecast_ic(fb))
+        # A block whose regression weights vary over the assets moves the Pearson column.
+        icr = forecast_ic(fb, csfm; weighting = InverseIdiosyncraticVarianceMetric())
+        @test isequal(icr[:, 1], forecast_ic(fb)[:, 1])
+        @test !isequal(icr[:, 2], forecast_ic(fb)[:, 2])
+        # A metric naming a history the block does not carry refuses by name.
+        @test_throws PO.IsNothingError forecast_ic(fb, csfm;
+                                                   weighting = BenchmarkWeightMetric())
+    end
+
+    @testset "A gap in the panel moves both columns, as it does in the reference" begin
+        gap = ic_gap_fixture()
+        fg = forecast_evaluation(gap, PO.forward_mean_returns(gap, 1, 1); min_count = 2)
+        ic = forecast_ic(fg)
+        @test ic[:, 1] ≈ IC_REF_GAP_SPEARMAN
+        @test ic[:, 2] ≈ IC_REF_GAP_PEARSON
+    end
+end
+
+@testset "The summary names its two series and reports a t-statistic" begin
+    PO = PortfolioOptimisers
+    y = PO.forward_mean_returns(IC_ALPHA, 1, 1)
+    ic = forecast_ic(forecast_evaluation(IC_ALPHA, y))
+    s = forecast_ic_summary(ic)
+
+    @testset "The five figures of each series match the reference" begin
+        @test keys(s) == (:spearman, :pearson)
+        @test keys(s.spearman) == (:mean_ic, :std_ic, :ic_ir, :t_stat, :hit_rate)
+        @test s.spearman.mean_ic ≈ 0.3333333333333333
+        @test s.spearman.std_ic ≈ 0.7023769168568493
+        @test s.spearman.ic_ir ≈ 0.4745789978762494
+        @test s.spearman.t_stat ≈ 0.8219949365267862
+        @test s.spearman.hit_rate ≈ 0.6666666666666666
+        @test s.pearson.mean_ic ≈ 0.2567790285367673
+        @test s.pearson.std_ic ≈ 0.6206266852224849
+        @test s.pearson.ic_ir ≈ 0.4137415207093715
+        @test s.pearson.t_stat ≈ 0.7166213350694421
+        @test s.pearson.hit_rate ≈ 0.6666666666666666
+    end
+
+    @testset "The t-statistic is the mean over the standard error of the mean" begin
+        for k in 1:2
+            v = filter(isfinite, ic[:, k])
+            n = length(v)
+            mu = sum(v) / n
+            sd = sqrt(sum(x -> (x - mu)^2, v) / (n - 1))
+            sk = getfield(s, k == 1 ? :spearman : :pearson)
+            @test sk.t_stat ≈ mu / (sd / sqrt(n))
+            @test sk.t_stat ≈ sk.ic_ir * sqrt(n)
+        end
+    end
+
+    @testset "The two series are named, and the naming is what the columns lack" begin
+        @test s.spearman == PO.exposure_ic_factor_summary(ic, 1)
+        @test s.pearson == PO.exposure_ic_factor_summary(ic, 2)
+    end
+
+    @testset "The summary refuses a series it cannot name" begin
+        @test_throws PO.IsEmptyError forecast_ic_summary(Matrix{Float64}(undef, 0, 0))
+        @test_throws DimensionMismatch forecast_ic_summary(ones(3, 1))
+        @test_throws DimensionMismatch forecast_ic_summary(ones(3, 3))
+    end
+end
+
+@testset "A date under the threshold carries no coefficient, and counts as a miss" begin
+    PO = PortfolioOptimisers
+    # A forecast and its target are paired one observation apart, so a row of gaps thins two
+    # dates: the one it is the forecast of, and the one it is the target of. Here that is the
+    # middle pair, which carries two finite pairs against four at the ends, so a threshold of
+    # three silences the middle two dates and leaves the ends.
+    alpha = [1.0 2.0 4.0 8.0; 2.0 3.0 5.0 40.0; 1.0 5.0 NaN NaN; 3.0 1.0 2.0 6.0;
+             2.0 4.0 1.0 3.0]
+    y = PO.forward_mean_returns(alpha, 1, 1)
+    fe = forecast_evaluation(alpha, y; min_count = 3)
+
+    @testset "The silenced dates are NaN in both columns" begin
+        ic = forecast_ic(fe)
+        @test fe.dates == [1, 2, 3, 4]
+        @test all(isnan, ic[2, :])
+        @test all(isnan, ic[3, :])
+        @test all(isfinite, ic[1, :])
+        @test all(isfinite, ic[4, :])
+    end
+
+    @testset "The threshold is re-parameterisable without re-pairing" begin
+        loose = forecast_ic(fe; min_count = 2)
+        @test all(isfinite, loose[2, :])
+        @test all(isfinite, loose[3, :])
+        @test isequal(forecast_ic(fe; min_count = 3), forecast_ic(fe))
+        @test_throws DomainError forecast_ic(fe; min_count = 0)
+    end
+
+    @testset "The hit rate counts a NaN as a miss, and the t-statistic drops it" begin
+        # The library's convention, which `exposure_ic_factor_summary` already holds: the
+        # hit rate is read against every date and the other four against the dates that
+        # carried a score. The reference divides its hit rate by the finite count instead, so
+        # it would report 1/2 where this reports 1/4.
+        ic = forecast_ic(fe)
+        s = forecast_ic_summary(ic)
+        v = filter(isfinite, ic[:, 1])
+        @test length(v) == 2
+        @test count(>(0), v) == 1
+        @test s.spearman.hit_rate == 1 / 4
+        @test s.spearman.hit_rate == count(>(0), v) / length(fe.dates)
+        @test s.spearman.t_stat ≈ s.spearman.ic_ir * sqrt(2)
+    end
+
+    @testset "A threshold no date reaches gives no score and a hit rate of zero" begin
+        none = forecast_ic(fe; min_count = 5)
+        @test all(isnan, none)
+        s = forecast_ic_summary(none)
+        @test isnan(s.spearman.mean_ic)
+        @test isnan(s.spearman.std_ic)
+        @test isnan(s.spearman.ic_ir)
+        @test isnan(s.spearman.t_stat)
+        @test s.spearman.hit_rate == 0
+    end
+end
+
+@testset "The coverage says what share of the universe was scored" begin
+    PO = PortfolioOptimisers
+    gap = ic_gap_fixture()
+    fg = forecast_evaluation(gap, PO.forward_mean_returns(gap, 1, 1); min_count = 2)
+
+    @testset "It matches the reference, one entry per evaluation date" begin
+        c = forecast_coverage(fg)
+        @test length(c) == length(fg.dates)
+        @test c ≈ IC_REF_GAP_COVERAGE
+    end
+
+    @testset "It counts the assets carrying a finite pair over the universe" begin
+        c = forecast_coverage(fg)
+        for (j, t) in enumerate(fg.dates)
+            n = count(i -> isfinite(fg.alpha[t, i]) && isfinite(fg.y[t, i]),
+                      axes(fg.alpha, 2))
+            @test c[j] == n / size(fg.alpha, 2)
+        end
+    end
+
+    @testset "The threshold is deliberately not applied to the coverage" begin
+        # The coverage is what says why a date carries no coefficient, so it answers where
+        # the coefficient does not.
+        tight = forecast_evaluation(gap, PO.forward_mean_returns(gap, 1, 1); min_count = 4)
+        @test all(isnan, forecast_ic(tight)[2, :])
+        @test isequal(forecast_coverage(tight), forecast_coverage(fg))
+        @test all(isfinite, forecast_coverage(tight))
+    end
+
+    @testset "A weight history is the universe, and an empty one has nothing to cover" begin
+        # The first date's universe is empty, so it carries `NaN` rather than a share. The
+        # other two narrow the denominator to the assets of positive weight, and the numerator
+        # to the ones of those that carry a finite pair.
+        u = [0.0 0.0 0.0 0.0; 1.0 1.0 0.0 0.0; 1.0 1.0 1.0 0.0; 1.0 1.0 1.0 1.0]
+        c = forecast_coverage(fg, u)
+        @test isnan(c[1])
+        @test c[2] == 1 / 2
+        @test c[3] == 2 / 3
+        for (j, t) in enumerate(fg.dates)
+            n = count(i -> u[t, i] > 0, axes(fg.alpha, 2))
+            k = count(i -> u[t, i] > 0 && isfinite(fg.alpha[t, i]) && isfinite(fg.y[t, i]),
+                      axes(fg.alpha, 2))
+            @test isequal(c[j], n > 0 ? k / n : NaN)
+        end
+    end
+
+    @testset "The block method reads the weight history the metric names" begin
+        fx = evaluation_fixture()
+        fw = FixedWeightedReturnForecast(; scores = fx.scores, scale = 1.0,
+                                         weights = [0.4, 0.6])
+        fb = forecast_evaluation(fw, fx.rd, fx.csfm; horizon = 2, lag = 1)
+        @test isequal(forecast_coverage(fb, fx.csfm), forecast_coverage(fb))
+        cv = forecast_coverage(fb, fx.csfm;
+                               weighting = InverseIdiosyncraticVarianceMetric())
+        @test all(x -> isnan(x) || 0 <= x <= 1, cv)
+        @test length(cv) == length(fb.dates)
+    end
+
+    @testset "A weight history that does not fit the forecast is refused" begin
+        @test_throws DimensionMismatch forecast_coverage(fg, ones(2, 4))
+        @test_throws DimensionMismatch forecast_ic(fg, ones(4, 3))
+        @test_throws DomainError forecast_ic(fg, fill(-1.0, 4, 4))
+        @test_throws DomainError forecast_coverage(fg, fill(-1.0, 4, 4))
+        @test PO.forecast_ic_weights(gap, nothing) == ones(4, 4)
+        @test PO.forecast_ic_weights(gap, IC_W) === IC_W
+    end
+end
+
+@testset "The exposure summary gained the same t-statistic" begin
+    PO = PortfolioOptimisers
+    # One statistic, one kernel: `exposure_ic_factor_summary` is what both summaries read,
+    # so the exposure diagnostics report a t-statistic on the same terms rather than
+    # diverging from the evaluation.
+    ic = [0.1 0.4; -0.2 NaN; 0.3 0.5; NaN 0.1]
+    s = PO.exposure_ic_summary(ic)
+    @test keys(s) == (:mean_ic, :std_ic, :ic_ir, :t_stat, :hit_rate)
+    for k in 1:2
+        m = PO.exposure_ic_factor_summary(ic, k)
+        v = filter(isfinite, ic[:, k])
+        @test s.t_stat[k] ≈ m.ic_ir * sqrt(length(v))
+        @test m.t_stat ≈ m.ic_ir * sqrt(length(v))
+    end
+    @test length(s.t_stat) == 2
+end
+
+@testset "A planted forecast scores, and an unplanted one does not" begin
+    PO = PortfolioOptimisers
+    tgt_of(fx) = TargetReturnForecast(; scores = fx.scores, horizon = 2, lag = 1,
+                                      calibrate = false)
+
+    @testset "The planted fixture reports a coefficient the summary believes" begin
+        px = evaluation_fixture(; planted = true)
+        fe = forecast_evaluation(tgt_of(px), px.rd, px.csfm; horizon = 2, lag = 1, step = 1)
+        s = forecast_ic_summary(forecast_ic(fe))
+        @test s.spearman.mean_ic > 0.5
+        @test s.spearman.t_stat > 20
+        @test s.spearman.hit_rate > 0.9
+        @test s.pearson.mean_ic > 0.5
+        # The panel lists and delists assets and drops 8% of its cells, so the universe is
+        # never wholly scored and the coverage is what says so.
+        cv = forecast_coverage(fe)
+        @test all(x -> 0.4 < x <= 1, cv)
+        @test sum(cv) / length(cv) > 0.75
+        @test any(x -> x < 1, cv)
+    end
+
+    @testset "The unplanted fixture reports none, which is what proves the planted one" begin
+        fx = evaluation_fixture()
+        fe = forecast_evaluation(tgt_of(fx), fx.rd, fx.csfm; horizon = 2, lag = 1, step = 1)
+        s = forecast_ic_summary(forecast_ic(fe))
+        @test abs(s.spearman.mean_ic) < 0.2
+        @test abs(s.spearman.t_stat) < 5
+        @test s.spearman.hit_rate < 0.5
     end
 end
