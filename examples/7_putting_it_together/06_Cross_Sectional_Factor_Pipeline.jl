@@ -235,4 +235,6 @@ pretty_table(DataFrame("max |predicted returns difference|" =>
     version of every estimator on this page.
   - [Pipelines](../5_validation_tuning/03_Pipelines.md) covers the slots, the routing and the
     hyper-parameter search this page only touches.
+  - [Reading a Return Forecast before an optimiser sees it](07_Forecast_Evaluation.md) scores the
+    Return Forecast this page's prior carries, before any optimiser acts on it.
 =#

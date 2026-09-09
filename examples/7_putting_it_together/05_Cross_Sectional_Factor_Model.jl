@@ -668,6 +668,8 @@ pretty_table(DataFrame("Family" => rr.fam, "Factor" => rr.nf,
 
   - [Cross-sectional factor model through a Pipeline](06_Cross_Sectional_Factor_Pipeline.md)
     reaches the very same weights with the panel entering as a Pipeline Data Slot.
+  - [Reading a Return Forecast before an optimiser sees it](07_Forecast_Evaluation.md) scores the
+    `rfe` of §2 out of sample, against what actually happened next, and compares it with another.
   - [Factor priors](../2_moments_priors/04_Factor_Priors.md) is the time-series counterpart of §2.
   - [Uncertainty sets](../2_moments_priors/09_Uncertainty_Sets.md) covers the box, ellipsoidal and
     norm-ball shapes the orthogonal sets of §4 specialise.
