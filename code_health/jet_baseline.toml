@@ -108,6 +108,7 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/08_Moments/45_ReturnForecasts/09_ForecastInformationCoefficient.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/45_ReturnForecasts/10_ForecastPortfolios.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/45_ReturnForecasts/11_ForecastFactorCorrelation.jl" = { raw = 0, reviewed = 0 }
+"src/08_Moments/45_ReturnForecasts/12_ForecastForwardWindows.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/46_CrossSectionalRegressionDiagnostics.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/47_CrossSectionalExposureDiagnostics.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/48_FactorModelSummary.jl" = { raw = 0, reviewed = 0 }
@@ -393,6 +394,7 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/08_Moments/45_ReturnForecasts/09_ForecastInformationCoefficient.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/45_ReturnForecasts/10_ForecastPortfolios.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/45_ReturnForecasts/11_ForecastFactorCorrelation.jl" = { raw = 0, reviewed = 0 }
+"src/08_Moments/45_ReturnForecasts/12_ForecastForwardWindows.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/46_CrossSectionalRegressionDiagnostics.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/47_CrossSectionalExposureDiagnostics.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/48_FactorModelSummary.jl" = { raw = 0, reviewed = 0 }
@@ -678,6 +680,7 @@ load_set = ["GraphRecipes", "Impute", "StatsPlots"]
 "src/08_Moments/45_ReturnForecasts/09_ForecastInformationCoefficient.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/45_ReturnForecasts/10_ForecastPortfolios.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/45_ReturnForecasts/11_ForecastFactorCorrelation.jl" = { raw = 0, reviewed = 0 }
+"src/08_Moments/45_ReturnForecasts/12_ForecastForwardWindows.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/46_CrossSectionalRegressionDiagnostics.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/47_CrossSectionalExposureDiagnostics.jl" = { raw = 0, reviewed = 0 }
 "src/08_Moments/48_FactorModelSummary.jl" = { raw = 0, reviewed = 0 }

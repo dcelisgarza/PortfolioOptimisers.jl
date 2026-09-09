@@ -1,13 +1,14 @@
 #=
 Check `src/08_Moments/45_ReturnForecasts/07_ForecastEvaluation.jl`,
 `src/08_Moments/45_ReturnForecasts/08_ForecastHistory.jl` and
-`src/08_Moments/45_ReturnForecasts/09_ForecastInformationCoefficient.jl` and
-`src/08_Moments/45_ReturnForecasts/10_ForecastPortfolios.jl` and
-`src/08_Moments/45_ReturnForecasts/11_ForecastFactorCorrelation.jl` against the contract
-their docstrings state, and against the reference implementation the map of issue #931
-ports. Issues #934, #935, #936, #937 and #940.
+`src/08_Moments/45_ReturnForecasts/09_ForecastInformationCoefficient.jl`,
+`src/08_Moments/45_ReturnForecasts/10_ForecastPortfolios.jl`,
+`src/08_Moments/45_ReturnForecasts/11_ForecastFactorCorrelation.jl` and
+`src/08_Moments/45_ReturnForecasts/12_ForecastForwardWindows.jl` against the contract their
+docstrings state, and against the reference implementation the map of issue #931 ports.
+Issues #934, #935, #936, #937, #939 and #940.
 
-EIGHT CONVENTIONS SHAPE THE PROBES.
+NINE CONVENTIONS SHAPE THE PROBES.
 
 1. THE TWO OBSERVATION AXES ARE RECONCILED BY THE TARGET, NOT BY THE EVALUATION. A Return
    Forecast history lives on the factor-model block's rows, and the block is a suffix of the
@@ -70,6 +71,16 @@ EIGHT CONVENTIONS SHAPE THE PROBES.
    target in the UNCENTRED sense and keeps a large Pearson correlation with it. The probe
    asserts the un-neutralised correlation above 0.9, the neutralised one below it and
    still above 0.5, and it is tightened when #950 is settled.
+
+9. A FORWARD-WINDOW TABLE IS PINNED ROW BY ROW AGAINST THE REFERENCE, AND ITS DATE RULE IS
+   PINNED SEPARATELY. `WINDOW_ALPHA` was put through the reference's own holding-period and
+   decay diagnostics and the twenty-two literals below are what it answered, to every digit
+   it printed. The date rule is the one thing those literals cannot pin, because the
+   reference and the port agree on it: every row of a table is read on the dates every
+   window of the grid can be scored at, so `n` sets the sample as well as the depth. The
+   ticket asked for the opposite -- that shortening `n` leave the rows that remain -- and
+   that is FALSE in general and asserted as false. It holds only when the base evaluation
+   already stops before the deepest window matures, and that case is asserted beside it.
 =#
 include(joinpath(@__DIR__, "test06c_setup.jl"))
 
@@ -1274,5 +1285,281 @@ end
         @test sc.hit_rate ≈ [1.0, 0.0]
         @test all(isnan, sc.ic_ir)
         @test all(isnan, sc.t_stat)
+    end
+end
+
+# The 8 x 4 forecast the forward-window tables are oracled on. Every entry is a permutation
+# of `1:4` down to a constant column, so the ranks move at every observation and the two
+# books differ from each other only where the levels do. Convention 9.
+const WINDOW_ALPHA = [1.0 2.0 3.0 4.0; 3.0 1.0 2.0 4.0; 2.0 3.0 1.0 4.0; 1.0 3.0 2.0 4.0;
+                      2.0 1.0 3.0 4.0; 4.0 2.0 1.0 3.0; 1.0 4.0 3.0 2.0; 3.0 2.0 4.0 1.0]
+
+@testset "The forward-window grid places the two tables' windows" begin
+    PO = PortfolioOptimisers
+
+    @testset "A cumulative grid lengthens the window and holds its start" begin
+        @test PO.forecast_window_grid(2, 1, 3, :cumulative) == [(2, 1), (4, 1), (6, 1)]
+        @test PO.forecast_window_grid(1, 0, 4, :cumulative) ==
+              [(1, 0), (2, 0), (3, 0), (4, 0)]
+    end
+
+    @testset "A disjoint grid holds the window and pushes its start out" begin
+        @test PO.forecast_window_grid(2, 1, 3, :disjoint) == [(2, 1), (2, 3), (2, 5)]
+        @test PO.forecast_window_grid(1, 0, 4, :disjoint) ==
+              [(1, 0), (1, 1), (1, 2), (1, 3)]
+    end
+
+    @testset "The two grids agree at the first period and nowhere else" begin
+        c = PO.forecast_window_grid(3, 2, 5, :cumulative)
+        d = PO.forecast_window_grid(3, 2, 5, :disjoint)
+        @test c[1] == d[1] == (3, 2)
+        @test all(c[p] != d[p] for p in 2:5)
+    end
+
+    @testset "A depth below one and an unknown kind are refused" begin
+        @test_throws DomainError PO.forecast_window_grid(1, 1, 0, :cumulative)
+        @test_throws PO.ConflictingArgumentError PO.forecast_window_grid(1, 1, 2, :rolling)
+    end
+end
+
+@testset "The common dates are intersected across the whole grid" begin
+    PO = PortfolioOptimisers
+    alpha = WINDOW_ALPHA
+    ys = [PO.forward_mean_returns(alpha, h, 1) for h in 1:3]
+
+    @testset "A deeper window shortens the set the whole table is read on" begin
+        @test PO.forecast_common_dates(alpha, ys[1:1], 1:7, 3) == collect(1:7)
+        @test PO.forecast_common_dates(alpha, ys[1:2], 1:7, 3) == collect(1:6)
+        @test PO.forecast_common_dates(alpha, ys, 1:7, 3) == collect(1:5)
+    end
+
+    @testset "A grid deeper than the sample leaves no date at all" begin
+        deep = [PO.forward_mean_returns(alpha, h, 1) for h in 1:8]
+        @test isempty(PO.forecast_common_dates(alpha, deep, 1:7, 3))
+    end
+
+    @testset "`min_count` gates a date under every window" begin
+        gapped = copy(alpha)
+        gapped[3, 2:4] .= NaN
+        gys = [PO.forward_mean_returns(gapped, h, 1) for h in 1:2]
+        @test 3 ∉ PO.forecast_common_dates(gapped, gys, 1:6, 3)
+        @test 3 ∈ PO.forecast_common_dates(gapped, gys, 1:6, 1)
+    end
+
+    @testset "A threshold below one is refused" begin
+        @test_throws DomainError PO.forecast_common_dates(alpha, ys, 1:7, 0)
+    end
+end
+
+@testset "The two tables reproduce the reference implementation" begin
+    PO = PortfolioOptimisers
+    alpha = WINDOW_ALPHA
+    fe = forecast_evaluation(alpha, PO.forward_mean_returns(alpha, 1, 1); step = 1)
+    h = forecast_holding_period(fe, alpha; n = 3)
+    d = forecast_decay(fe, alpha; n = 3)
+
+    @testset "Both tables carry fifteen columns and three rows" begin
+        @test keys(h) ==
+              keys(d) ==
+              (:period, :horizon, :lag, :dates, :spearman_mean_ic, :spearman_ic_ir,
+               :spearman_t_stat, :pearson_mean_ic, :pearson_ic_ir, :pearson_t_stat,
+               :rank_ann_return, :rank_sharpe, :zscore_ann_return, :zscore_sharpe,
+               :mean_coverage)
+        @test h.period == d.period == [1, 2, 3]
+        @test h.horizon == [1, 2, 3]
+        @test h.lag == [1, 1, 1]
+        @test d.horizon == [1, 1, 1]
+        @test d.lag == [1, 2, 3]
+        @test h.dates == d.dates == [1, 2, 3, 4, 5]
+    end
+
+    @testset "The holding-period table is what the reference answered" begin
+        @test isapprox(h.spearman_mean_ic, [0.4, 0.12, 0.28])
+        @test isapprox(h.spearman_ic_ir, [1.414214, 0.395628, 0.639010]; rtol = 1e-6)
+        @test isapprox(h.spearman_t_stat, [3.162278, 0.884652, 1.428869]; rtol = 1e-6)
+        @test isapprox(h.pearson_mean_ic, [0.4, 0.180180, 0.400988]; rtol = 1e-5)
+        @test isapprox(h.pearson_ic_ir, [1.414214, 0.371014, 0.605921]; rtol = 1e-6)
+        @test isapprox(h.pearson_t_stat, [3.162278, 0.829613, 1.354880]; rtol = 1e-6)
+        @test isapprox(h.rank_ann_return, [1.0, 0.55, 0.733333]; rtol = 1e-6)
+        @test isapprox(h.rank_sharpe, [1.414214, 0.792825, 0.964764]; rtol = 1e-6)
+        @test isapprox(h.zscore_ann_return, h.rank_ann_return)
+        @test isapprox(h.zscore_sharpe, h.rank_sharpe)
+        @test h.mean_coverage == [1.0, 1.0, 1.0]
+    end
+
+    @testset "The decay table is what the reference answered" begin
+        @test isapprox(d.spearman_mean_ic, [0.4, 0.04, 0.44])
+        @test isapprox(d.spearman_ic_ir, [1.414214, 0.121716, 1.073490]; rtol = 1e-6)
+        @test isapprox(d.spearman_t_stat, [3.162278, 0.272166, 2.400397]; rtol = 1e-6)
+        @test isapprox(d.pearson_mean_ic, d.spearman_mean_ic)
+        @test isapprox(d.pearson_ic_ir, d.spearman_ic_ir)
+        @test isapprox(d.pearson_t_stat, d.spearman_t_stat)
+        @test isapprox(d.rank_ann_return, [1.0, 0.1, 1.1]; rtol = 1e-6)
+        @test isapprox(d.rank_sharpe, [1.414214, 0.121716, 1.073490]; rtol = 1e-6)
+        @test isapprox(d.zscore_ann_return, d.rank_ann_return)
+        @test isapprox(d.zscore_sharpe, d.rank_sharpe)
+        @test d.mean_coverage == [1.0, 1.0, 1.0]
+    end
+end
+
+@testset "The first row of both tables is the base evaluation, on the common dates" begin
+    PO = PortfolioOptimisers
+    alpha = WINDOW_ALPHA
+    y = PO.forward_mean_returns(alpha, 1, 1)
+    fe = forecast_evaluation(alpha, y; step = 1)
+    h = forecast_holding_period(fe, alpha; n = 3)
+    d = forecast_decay(fe, alpha; n = 3)
+    fb = PO.ForecastEvaluationResult(alpha, y, h.dates, fe.target, fe.horizon, fe.lag,
+                                     fe.step, fe.min_count, fe.ppy)
+    ic = forecast_ic_summary(forecast_ic(fb))
+    rk = forecast_portfolio(fb; kind = :rank)
+    zs = forecast_portfolio(fb; kind = :zscore)
+
+    @testset "The two tables agree at the first period" begin
+        for k in (:spearman_mean_ic, :spearman_ic_ir, :spearman_t_stat, :pearson_mean_ic,
+                  :pearson_ic_ir, :pearson_t_stat, :rank_ann_return, :rank_sharpe,
+                  :zscore_ann_return, :zscore_sharpe, :mean_coverage)
+            @test h[k][1] == d[k][1]
+        end
+    end
+
+    @testset "The first period is the base evaluation restricted to those dates" begin
+        @test h.spearman_mean_ic[1] == ic.spearman.mean_ic
+        @test h.spearman_ic_ir[1] == ic.spearman.ic_ir
+        @test h.spearman_t_stat[1] == ic.spearman.t_stat
+        @test h.pearson_mean_ic[1] == ic.pearson.mean_ic
+        @test h.rank_ann_return[1] == rk.summary.ann_return
+        @test h.rank_sharpe[1] == rk.summary.sharpe
+        @test h.zscore_ann_return[1] == zs.summary.ann_return
+        @test h.mean_coverage[1] ==
+              sum(forecast_coverage(fb)) / length(forecast_coverage(fb))
+    end
+end
+
+@testset "The depth sets the common dates, so it moves every row it keeps" begin
+    PO = PortfolioOptimisers
+    alpha = WINDOW_ALPHA
+
+    @testset "A shallower table is read on more dates, so its rows differ" begin
+        fe = forecast_evaluation(alpha, PO.forward_mean_returns(alpha, 1, 1); step = 1)
+        t1 = forecast_holding_period(fe, alpha; n = 1)
+        t3 = forecast_holding_period(fe, alpha; n = 3)
+        @test t1.dates == collect(1:7)
+        @test t3.dates == collect(1:5)
+        @test t1.spearman_mean_ic[1] != t3.spearman_mean_ic[1]
+    end
+
+    @testset "A base evaluation that already stops early is depth invariant" begin
+        y = PO.forward_mean_returns(alpha, 1, 1)
+        y[6:8, :] .= NaN
+        fe = forecast_evaluation(alpha, y; step = 1)
+        @test fe.dates == collect(1:5)
+        t1 = forecast_holding_period(fe, alpha; n = 1)
+        t3 = forecast_holding_period(fe, alpha; n = 3)
+        @test t1.dates == t3.dates == collect(1:5)
+        @test t1.spearman_mean_ic[1] == t3.spearman_mean_ic[1]
+        @test t1.rank_sharpe[1] == t3.rank_sharpe[1]
+    end
+end
+
+@testset "A perfect forecast scores one at the first decay period" begin
+    PO = PortfolioOptimisers
+    fx = evaluation_fixture()
+    X = PO.forecast_target_history(IdiosyncraticTarget(), fx.rd, fx.csfm)
+    y = PO.forward_mean_returns(X, 1, 1)
+    fe = forecast_evaluation(y, y; step = 1)
+
+    @testset "The first period of both tables is a perfect coefficient" begin
+        d = forecast_decay(fe, X; n = 3)
+        h = forecast_holding_period(fe, X; n = 3)
+        @test isapprox(d.spearman_mean_ic[1], 1)
+        @test isapprox(d.pearson_mean_ic[1], 1)
+        @test isapprox(h.spearman_mean_ic[1], 1)
+    end
+
+    @testset "The later periods score a target the forecast is not aimed at" begin
+        d = forecast_decay(fe, X; n = 3)
+        @test all(abs(v) < 1 for v in d.spearman_mean_ic[2:3])
+        @test all(isfinite, d.rank_ann_return)
+    end
+end
+
+@testset "The block method builds the target and the weights the bare one takes" begin
+    PO = PortfolioOptimisers
+    fx = evaluation_fixture(; planted = true)
+    rd, csfm = fx.rd, fx.csfm
+    rfe = TargetReturnForecast(; scores = fx.scores, horizon = 1, lag = 1)
+    fe = forecast_evaluation(rfe, rd, csfm; step = 3)
+    X = PO.forecast_target_history(fe.target, rd, csfm)
+
+    @testset "The two methods answer the same table" begin
+        a = forecast_holding_period(fe, rd, csfm; n = 3)
+        b = forecast_holding_period(fe, X, PO.cs_diagnostic_weights(IdentityMetric(), csfm);
+                                    n = 3)
+        @test a.dates == b.dates
+        @test isapprox(a.spearman_mean_ic, b.spearman_mean_ic)
+        @test isapprox(a.pearson_mean_ic, b.pearson_mean_ic)
+    end
+
+    @testset "A planted fixture finds signal at the first period of both tables" begin
+        h = forecast_holding_period(fe, rd, csfm; n = 3)
+        d = forecast_decay(fe, rd, csfm; n = 3)
+        @test h.spearman_mean_ic[1] > 0.5
+        @test d.spearman_mean_ic[1] == h.spearman_mean_ic[1]
+        @test all(0 .<= filter(isfinite, h.mean_coverage) .<= 1)
+    end
+end
+
+@testset "A table refuses what it cannot score and prints what it cannot fill" begin
+    PO = PortfolioOptimisers
+    alpha = WINDOW_ALPHA
+    fe = forecast_evaluation(alpha, PO.forward_mean_returns(alpha, 1, 1); step = 1)
+
+    @testset "A target history of the wrong shape is refused" begin
+        @test_throws DimensionMismatch forecast_holding_period(fe, alpha[:, 1:3]; n = 2)
+        @test_throws DimensionMismatch forecast_decay(fe, alpha[1:4, :]; n = 2)
+    end
+
+    @testset "An empty grid is refused" begin
+        @test_throws PO.IsEmptyError PO.forecast_window_table(fe, alpha, nothing,
+                                                              Tuple{Int, Int}[], 3)
+    end
+
+    @testset "A grid deeper than the sample prints a table of NaN" begin
+        t = forecast_holding_period(fe, alpha; n = 8)
+        @test isempty(t.dates)
+        @test t.period == collect(1:8)
+        @test all(isnan, t.spearman_mean_ic)
+        @test all(isnan, t.rank_sharpe)
+        @test all(isnan, t.mean_coverage)
+    end
+
+    @testset "`min_count` is overridden without a second pairing" begin
+        gapped = copy(alpha)
+        gapped[3, 3:4] .= NaN
+        fg = forecast_evaluation(gapped, PO.forward_mean_returns(gapped, 1, 1); step = 1)
+        @test 3 ∉ forecast_holding_period(fg, gapped; n = 2).dates
+        @test 3 ∈ forecast_holding_period(fg, gapped; n = 2, min_count = 2).dates
+    end
+end
+
+@testset "`ppy` annualises the table's portfolio columns" begin
+    PO = PortfolioOptimisers
+    alpha = WINDOW_ALPHA
+    y = PO.forward_mean_returns(alpha, 1, 1)
+    t1 = forecast_holding_period(forecast_evaluation(alpha, y; step = 1), alpha; n = 3)
+    t4 = forecast_holding_period(forecast_evaluation(alpha, y; step = 1, ppy = 4), alpha;
+                                 n = 3)
+
+    @testset "The return scales by `ppy` and the ratio by its square root" begin
+        @test isapprox(t4.rank_ann_return, 4 * t1.rank_ann_return)
+        @test isapprox(t4.rank_sharpe, sqrt(4) * t1.rank_sharpe)
+        @test isapprox(t4.zscore_ann_return, 4 * t1.zscore_ann_return)
+    end
+
+    @testset "The coefficients and the coverage do not scale" begin
+        @test isapprox(t4.spearman_mean_ic, t1.spearman_mean_ic)
+        @test isapprox(t4.pearson_t_stat, t1.pearson_t_stat)
+        @test t4.mean_coverage == t1.mean_coverage
     end
 end

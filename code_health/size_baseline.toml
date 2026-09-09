@@ -103,6 +103,7 @@ commit = "fda13accfd"
 "src/08_Moments/45_ReturnForecasts/09_ForecastInformationCoefficient.jl" = { code = 64, doc = 150, comment = 0, blank = 72, total = 286 }
 "src/08_Moments/45_ReturnForecasts/10_ForecastPortfolios.jl" = { code = 155, doc = 212, comment = 0, blank = 102, total = 469 }
 "src/08_Moments/45_ReturnForecasts/11_ForecastFactorCorrelation.jl" = { code = 37, doc = 83, comment = 0, blank = 37, total = 157 }
+"src/08_Moments/45_ReturnForecasts/12_ForecastForwardWindows.jl" = { code = 120, doc = 234, comment = 0, blank = 99, total = 453 }
 "src/08_Moments/46_CrossSectionalRegressionDiagnostics.jl" = { code = 464, doc = 752, comment = 1, blank = 352, total = 1569 }
 "src/08_Moments/47_CrossSectionalExposureDiagnostics.jl" = { code = 408, doc = 507, comment = 0, blank = 248, total = 1163 }
 "src/08_Moments/48_FactorModelSummary.jl" = { code = 224, doc = 318, comment = 2, blank = 150, total = 694 }
