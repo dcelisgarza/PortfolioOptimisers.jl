@@ -217,6 +217,30 @@
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/08_Moments/45_ReturnForecasts/06_TargetReturnForecast/</loc>
   </url>
   <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/08_Moments/45_ReturnForecasts/07_ForecastEvaluation/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/08_Moments/45_ReturnForecasts/08_ForecastHistory/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/08_Moments/45_ReturnForecasts/09_ForecastInformationCoefficient/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/08_Moments/45_ReturnForecasts/10_ForecastPortfolios/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/08_Moments/45_ReturnForecasts/11_ForecastFactorCorrelation/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/08_Moments/45_ReturnForecasts/12_ForecastForwardWindows/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/08_Moments/45_ReturnForecasts/13_ForecastCalibration/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/08_Moments/45_ReturnForecasts/14_ForecastSummary/</loc>
+  </url>
+  <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/08_Moments/46_CrossSectionalRegressionDiagnostics/</loc>
   </url>
   <url>
@@ -434,6 +458,9 @@
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/14_UncertaintySets/09_OrthogonalUncertaintySets/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/14_UncertaintySets/10_CompactRadiusRules/</loc>
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/15_Turnover/</loc>
@@ -955,6 +982,9 @@
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/7_putting_it_together/06_Cross_Sectional_Factor_Pipeline/</loc>
   </url>
   <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/7_putting_it_together/07_Forecast_Evaluation/</loc>
+  </url>
+  <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/user_guide/00_User_Guide/</loc>
   </url>
   <url>
@@ -977,5 +1007,8 @@
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/user_guide/07_Choosing_a_Strategy/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/user_guide/08_Point_in_Time_Universe/</loc>
   </url>
 </urlset>
