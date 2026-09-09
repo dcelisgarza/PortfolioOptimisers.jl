@@ -34,6 +34,7 @@ commit = "fda13accfd"
 "src/03_InputData/05_FeatureSelector.jl" = { code = 186, doc = 278, comment = 0, blank = 143, total = 607 }
 "src/03_InputData/06_PanelDataFrame.jl" = { code = 140, doc = 220, comment = 0, blank = 100, total = 460 }
 "src/03_InputData/07_ListingSpan.jl" = { code = 77, doc = 132, comment = 0, blank = 63, total = 272 }
+"src/03_InputData/08_PriceGapFill.jl" = { code = 95, doc = 169, comment = 0, blank = 79, total = 343 }
 "src/04_PosdefMatrix.jl" = { code = 44, doc = 155, comment = 0, blank = 73, total = 272 }
 "src/05_Denoise.jl" = { code = 132, doc = 535, comment = 34, blank = 196, total = 897 }
 "src/06_Detone.jl" = { code = 46, doc = 188, comment = 0, blank = 81, total = 315 }

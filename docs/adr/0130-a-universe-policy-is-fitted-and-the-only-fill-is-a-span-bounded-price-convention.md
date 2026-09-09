@@ -161,16 +161,26 @@ cannot resurrect one.
 ### Names
 
 `PriceGapFill` is the estimator, an `AbstractPricesPreprocessingEstimator` and an ordinary
-`Pipeline` step. Its one field is `fill`, bound to `Union{CarriedPrice, Num_VecToScaM}`:
+`Pipeline` step. Its convention field is `fill`, bound to `Union{CarriedPrice, Num_VecToScaM}`:
 `CarriedPrice()` is a fieldless singleton stating the Held Price convention, and a `Num_VecToScaM`
 is the per-asset reduction, reusing the union the library already spends on a
-vector-to-scalar measure.
+vector-to-scalar measure. It carries `strict` beside it, because the refusal above is the
+estimator's own and `fit_preprocessing` takes no keywords: the strictness policy reaches the step
+through a field or not at all.
 
 One result type serves both conventions, as `AssetSelectorResult` serves the whole selector family:
 `PriceGapFillResult` holds `nx` and one value per asset. Under `CarriedPrice` that value is the last
 observed **training** price, which seeds a carry-forward when a window opens inside a gap; under a
 reduction it is the reduced scalar. `apply_preprocessing` then runs the convention forward through
-the window, seeded by the fitted value and bounded by the span.
+the window, seeded by the fitted value and bounded by the span. The result carries `fill` and
+`strict` too, and neither is a copy for the reader's benefit: the fitted object is what runs on an
+unseen window, so it is where the convention `apply_preprocessing` dispatches on has to live, and
+where the refusal has to be read from.
+
+The span the fill is bounded by is asked of the carrier rather than derived by the step, so the two
+never disagree. That question is one verb, and a price carrier that states no listing calendar is
+its default answer — which is what makes the window-local fallback above a live path rather than a
+hypothetical one.
 
 The name deliberately does not reuse `gap_fill_value`, which is a trait on a covariance estimator
 naming the value it substitutes internally for a gap it was handed. That is an estimator's private

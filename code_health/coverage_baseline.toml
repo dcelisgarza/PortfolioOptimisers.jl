@@ -32,6 +32,7 @@ commit = "8610300"
 "src/03_InputData/05_FeatureSelector.jl" = { lines = 127, misses = 0 }
 "src/03_InputData/06_PanelDataFrame.jl" = { lines = 97, misses = 0 }
 "src/03_InputData/07_ListingSpan.jl" = { lines = 51, misses = 0 }
+"src/03_InputData/08_PriceGapFill.jl" = { lines = 57, misses = 0 }
 "src/04_PosdefMatrix.jl" = { lines = 26, misses = 0 }
 "src/05_Denoise.jl" = { lines = 80, misses = 0 }
 "src/06_Detone.jl" = { lines = 30, misses = 0 }
