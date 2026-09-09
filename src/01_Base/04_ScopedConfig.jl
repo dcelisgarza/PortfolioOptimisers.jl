@@ -7,7 +7,7 @@ Reads go through `cfg[]`, which returns the innermost active scoped override whe
 
 Configs held this way store *immutable* structs (or bits values); changing any knob builds a new value and swaps it in, never mutates in place.
 
-Used by [`COMPACT_SHOW`](@ref), [`SHOW_NOTHING_FIELDS`](@ref), [`STRING_DISTANCE`](@ref), [`EQUATION_LIMITS`](@ref), and [`SCENARIO_FILL_LIMIT`](@ref); their global defaults are set via the `set_*!` setters, scoped overrides via the `with_*` helpers, and load-time per-project defaults via Preferences.jl (see [`apply_preferences!`](@ref)).
+Used by [`COMPACT_SHOW`](@ref), [`SHOW_NOTHING_FIELDS`](@ref), [`STRING_DISTANCE`](@ref), [`EQUATION_LIMITS`](@ref) and [`RESOURCE_LIMITS`](@ref); their global defaults are set via the `set_*!` setters, scoped overrides via the `with_*` helpers, and load-time per-project defaults via Preferences.jl (see [`apply_preferences!`](@ref)).
 
 # Related
 
@@ -15,7 +15,7 @@ Used by [`COMPACT_SHOW`](@ref), [`SHOW_NOTHING_FIELDS`](@ref), [`STRING_DISTANCE
   - [`set_show_nothing_fields!`](@ref) / [`with_show_nothing_fields`](@ref)
   - [`set_string_distance!`](@ref) / [`with_string_distance`](@ref)
   - [`set_equation_limits!`](@ref) / [`with_equation_limits`](@ref)
-  - [`set_scenario_fill_limit!`](@ref) / [`with_scenario_fill_limit`](@ref)
+  - [`set_resource_limits!`](@ref) / [`with_resource_limits`](@ref)
   - [`apply_preferences!`](@ref)
 """
 mutable struct ScopedConfig{T}
@@ -868,115 +868,4 @@ function with_resource_limits(f; max_n_sim::Integer = RESOURCE_LIMITS[].max_n_si
     return with_config(f, RESOURCE_LIMITS,
                        ResourceLimits(; max_n_sim, max_n_subsets, max_frontier, max_bins,
                                       max_hop_count, max_search_grid, max_ep_grid))
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Check a scenario-fill share and widen it to a `Float64`. The one validation both [`set_scenario_fill_limit!`](@ref) and [`with_scenario_fill_limit`](@ref) run, so the two doors cannot drift.
-
-# Arguments
-
-  - `x`: The share to check.
-
-# Validation
-
-  - `0 <= x <= 1`. The value is a share of the entries of one returns matrix, so nothing outside the unit interval names a reachable fraction: a negative share warns on a fit that filled nothing, and a share above `1` is the same silence as `1` written in a way that hides it.
-
-# Returns
-
-  - `x::Float64`: The checked share.
-
-# Related
-
-  - [`SCENARIO_FILL_LIMIT`](@ref)
-  - [`set_scenario_fill_limit!`](@ref)
-  - [`with_scenario_fill_limit`](@ref)
-"""
-function assert_scenario_fill_limit(x::Real)::Float64
-    @argcheck(0 <= x <= 1,
-              ArgumentError("the scenario fill limit is a share of the entries of a returns matrix, so it must lie in [0, 1]; got $(x). Pass `0` to be told about every fill, and `1` to be told about none."))
-    return Float64(x)
-end
-"""
-    SCENARIO_FILL_LIMIT = ScopedConfig(0.05)
-
-Share of the entries of a returns matrix a mask-aware prior may zero-fill before it says so. Read as `SCENARIO_FILL_LIMIT[]`; the default may be seeded per project at load time via the `"scenario_fill_limit"` preference (see [`apply_preferences!`](@ref)).
-
-A prior fitted with a mask-aware moment estimator keeps a young asset investable and fills the rows before it listed with `0`, so that every consumer reads a finite investable column. A scenario-based measure then reads a zero where the asset had no return at all, and understates that asset's risk over those rows. This is the share above which [`scenario_fill`](@ref) says so: at or below it the fill is silent, above it the fill warns and names the assets. Under `strict` any fill refuses, whatever this value is.
-
-The default is `0.05`. Raising it is a **widened** guard, so a load-time preference that raises it is announced (see [`relaxed_preferences_msg`](@ref)).
-
-# Related
-
-  - [`set_scenario_fill_limit!`](@ref)
-  - [`with_scenario_fill_limit`](@ref)
-  - [`scenario_fill`](@ref)
-  - [`apply_preferences!`](@ref)
-"""
-const SCENARIO_FILL_LIMIT = ScopedConfig(0.05)
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Configure the global default share of zero-filled entries a mask-aware prior fills in silence (see [`SCENARIO_FILL_LIMIT`](@ref)). The store is atomic (see [`ScopedConfig`](@ref)); for a temporary, task-scoped override use [`with_scenario_fill_limit`](@ref).
-
-# Algorithm
-
- 1. Check `x` with [`assert_scenario_fill_limit`](@ref), which is where the validation below runs.
- 2. Store it as the global default of [`SCENARIO_FILL_LIMIT`](@ref) through [`set_default!`](@ref).
-
-# Arguments
-
-  - `x::Real`: Share of the entries of a returns matrix that may be filled in silence.
-
-# Validation
-
-  - `0 <= x <= 1`, enforced by [`assert_scenario_fill_limit`](@ref).
-
-# Returns
-
-  - `x::Float64`: The new global default.
-
-# Related
-
-  - [`SCENARIO_FILL_LIMIT`](@ref)
-  - [`with_scenario_fill_limit`](@ref)
-  - [`scenario_fill`](@ref)
-"""
-function set_scenario_fill_limit!(x::Real)
-    return set_default!(SCENARIO_FILL_LIMIT, assert_scenario_fill_limit(x))
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Run `f()` with the scenario-fill share (see [`SCENARIO_FILL_LIMIT`](@ref)) overridden for the dynamic extent of the call, restoring the previous share on exit. Task-scoped and thread-safe (see [`ScopedConfig`](@ref)); the global default is untouched.
-
-Useful to hear about every fill of one walk-forward (`0`), or to silence a run over a panel whose listings are known and priced in (`1`), without affecting other concurrent work.
-
-# Algorithm
-
- 1. Check `x` with [`assert_scenario_fill_limit`](@ref), which is where the validation below runs.
- 2. Run `f()` with [`SCENARIO_FILL_LIMIT`](@ref) bound to that value through [`with_config`](@ref).
-
-# Arguments
-
-  - `f`: Zero-argument function to run under the override.
-  - `x::Real`: Share of the entries of a returns matrix that may be filled in silence.
-
-# Validation
-
-  - `0 <= x <= 1`, enforced by [`assert_scenario_fill_limit`](@ref).
-
-# Returns
-
-  - The value that `f()` returns.
-
-# Related
-
-  - [`set_scenario_fill_limit!`](@ref)
-  - [`SCENARIO_FILL_LIMIT`](@ref)
-  - [`with_config`](@ref)
-  - [`scenario_fill`](@ref)
-"""
-function with_scenario_fill_limit(f, x::Real)
-    return with_config(f, SCENARIO_FILL_LIMIT, assert_scenario_fill_limit(x))
 end

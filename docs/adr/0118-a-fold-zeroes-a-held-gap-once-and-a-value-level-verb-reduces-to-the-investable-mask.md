@@ -126,12 +126,34 @@ computed them from the rows it saw. Every consumer, the JuMP model, the meta-opt
 value-level door among them, then reads finite investable columns. The fill is paid once, on the
 estimator's own pass.
 
-Under `strict = false` the prior warns when the filled fraction exceeds `SCENARIO_FILL_LIMIT`, a
-scoped config after the pattern of `STRING_DISTANCE`, with `set_scenario_fill_limit!`,
-`with_scenario_fill_limit` and the preference key `"scenario_fill_limit"`, default `0.05`. The
-fraction is the count of filled entries over the count of entries of the returns matrix, the
-reference's denominator. The warning names the assets, the count and the consequence for a
-scenario-based measure. Under `strict = true` any fill refuses, whatever the fraction.
+Under `strict = false` the prior warns when the filled fraction exceeds `fill_limit`, a **field of
+`EmpiricalPrior`** holding an `Option{<:Real}` in `(0, 1]`, default `nothing`. The fraction is the
+count of filled entries over the count of entries of the returns matrix, the reference's
+denominator. The warning names the assets, the count, the limit it was measured against and the
+consequence for a scenario-based measure. Under `strict = true` any fill refuses, whatever the
+fraction.
+
+The limit is a field rather than a global because the decision it governs is a property of **one
+fit**. A caller who wants two priors in one program to fill at two different shares says so on the
+two estimators; dynamic scope could not express that, because it colours whatever fits inside its
+block rather than the estimator that fills. This is the shape `strict` already takes in this ADR,
+and the shape the library gives every other piece of configuration: the value is inspectable on the
+estimator and it prints under `show`.
+
+`nothing` is the default, and it means that **no** share passes in silence: an investable asset is
+asked to cover every observation, so a caller who has not weighed the trade is told that it
+happened. `0` is therefore not a value the field accepts — `nothing` already spells that answer, and
+a second spelling of one answer is a defect waiting to be found. The upper end is closed: `1`
+accepts the whole matrix.
+
+`EmpiricalPrior` is the only estimator that carries the field, and it is the only one eligible. A
+prior is eligible when it holds a mask-aware moment estimator **directly** and puts the caller's own
+returns matrix into the result's `X`. Every other low-order prior wraps an inner prior estimator and
+synthesises its `X` — a posterior matrix, an expanded matrix, or a reweighted one — so the fill is
+paid once, at the `EmpiricalPrior` at the bottom of the chain, and the field rides there through
+`factory`. `CrossSectionalFactorPrior` holds a `ce` directly, but it estimates the covariance of
+standardised idiosyncratic residuals, carries its own investability guard, and synthesises its
+scenarios, so it never reaches the verb.
 
 ### A drawn plot keeps the frame, and a computed plot reduces
 
@@ -194,7 +216,8 @@ asserts a finite series and one warning.
   who wants the honest two-asset portfolio zeros the weights over the observations the asset is
   inactive, or passes a weight history.
 - A scenario-based measure understates the risk of a young asset over its filled rows under a
-  mask-aware estimator. The docstrings of the family state it, and `SCENARIO_FILL_LIMIT` is where a
-  caller tightens the notice.
+  mask-aware estimator. The docstrings of the family state it, and `EmpiricalPrior`'s `fill_limit`
+  is where a caller loosens the notice. It is tight by default: every fill is named until the caller
+  says how much of the trade to accept.
 - `CONTEXT.md` gains the **Held Gap** entry, and the **Precomputed-returns contract** entry states
   the finiteness rule.

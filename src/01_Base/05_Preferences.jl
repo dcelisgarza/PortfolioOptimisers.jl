@@ -29,7 +29,6 @@ The Preferences.jl keys read at package load to seed the global config defaults 
   - `"max_n_sim"` / `"max_n_subsets"` / `"max_frontier"` / `"max_bins"` / `"max_hop_count"` / `"max_search_grid"` / `"max_ep_grid"`: positive integers for [`RESOURCE_LIMITS`](@ref).
   - `"suggestion_min_score"`: real number for the [`STRING_DISTANCE`](@ref) threshold.
   - `"suggestion_distance"`: a [`PREFERENCE_DISTANCES`](@ref) name for the [`STRING_DISTANCE`](@ref) metric.
-  - `"scenario_fill_limit"`: real number in `[0, 1]` for [`SCENARIO_FILL_LIMIT`](@ref).
   - `"compact_show"`: boolean or integer for [`COMPACT_SHOW`](@ref).
   - `"show_nothing_fields"`: boolean for the global switch of [`SHOW_NOTHING_FIELDS`](@ref).
   - `"show_nothing_fields_by_type"`: a table of booleans, one per type name, for the per-name entries of [`SHOW_NOTHING_FIELDS`](@ref).
@@ -46,14 +45,14 @@ A valid value is applied, but a value that *widens* a guard is announced with a 
 const PREFERENCE_KEYS = ("equation_max_length", "equation_max_depth", "max_n_sim",
                          "max_n_subsets", "max_frontier", "max_bins", "max_hop_count",
                          "max_search_grid", "max_ep_grid", "suggestion_min_score",
-                         "suggestion_distance", "scenario_fill_limit", "compact_show",
-                         "show_nothing_fields", "show_nothing_fields_by_type")
+                         "suggestion_distance", "compact_show", "show_nothing_fields",
+                         "show_nothing_fields_by_type")
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Build the warning text for the load-time preferences that widened a guard (see [`apply_preferences!`](@ref)). One line per key: the key, the default it replaced, and the value the project asked for.
 
-A preference file is data. It ships with a cloned project or a template, it is often untracked, and [`__init__`](@ref PortfolioOptimisers.__init__) applies it at `using PortfolioOptimisers`, before any user code runs. A value that *tightens* a guard needs no announcement, so the warning names the widened guards alone: the [`RESOURCE_LIMITS`](@ref) and [`EQUATION_LIMITS`](@ref) caps a file raised, a [`STRING_DISTANCE`](@ref) suggestion threshold it lowered (a lower threshold admits more candidates, which is the info-leak direction of `docs/adr/0026-lenient-constraint-names-with-suggestions.md`), and a [`SCENARIO_FILL_LIMIT`](@ref) share it raised (a larger share zero-fills more of a returns matrix in silence).
+A preference file is data. It ships with a cloned project or a template, it is often untracked, and [`__init__`](@ref PortfolioOptimisers.__init__) applies it at `using PortfolioOptimisers`, before any user code runs. A value that *tightens* a guard needs no announcement, so the warning names the widened guards alone: the [`RESOURCE_LIMITS`](@ref) and [`EQUATION_LIMITS`](@ref) caps a file raised, and a [`STRING_DISTANCE`](@ref) suggestion threshold it lowered (a lower threshold admits more candidates, which is the info-leak direction of `docs/adr/0026-lenient-constraint-names-with-suggestions.md`).
 
 Never interpolates the whole preference dictionary, so a key the message does not name stays out of the log — the same info-leak-safe message discipline as [`unknown_variable_msg`](@ref).
 
@@ -83,7 +82,7 @@ function relaxed_preferences_msg(relaxations::AbstractVector)
         msg *= "\n  $(key): $(repr(default)) → $(repr(val))"
     end
     return msg *
-           "\nThe values come from the `[PortfolioOptimisers]` section of the active project's `LocalPreferences.toml`. Delete a key there to restore the default, or widen the guard for one call only with `with_equation_limits`, `with_resource_limits`, `with_string_distance` or `with_scenario_fill_limit`."
+           "\nThe values come from the `[PortfolioOptimisers]` section of the active project's `LocalPreferences.toml`. Delete a key there to restore the default, or widen the guard for one call only with `with_equation_limits`, `with_resource_limits` or `with_string_distance`."
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -140,11 +139,11 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Apply load-time preference values to the global config defaults ([`EQUATION_LIMITS`](@ref), [`RESOURCE_LIMITS`](@ref), [`STRING_DISTANCE`](@ref), [`SCENARIO_FILL_LIMIT`](@ref), [`COMPACT_SHOW`](@ref), [`SHOW_NOTHING_FIELDS`](@ref)). Called by the package `__init__` with the [`PREFERENCE_KEYS`](@ref) values read via `Preferences.load_preference`; `nothing` values (unset preferences) are skipped and keep the shipped default.
+Apply load-time preference values to the global config defaults ([`EQUATION_LIMITS`](@ref), [`RESOURCE_LIMITS`](@ref), [`STRING_DISTANCE`](@ref), [`COMPACT_SHOW`](@ref), [`SHOW_NOTHING_FIELDS`](@ref)). Called by the package `__init__` with the [`PREFERENCE_KEYS`](@ref) values read via `Preferences.load_preference`; `nothing` values (unset preferences) are skipped and keep the shipped default.
 
 Fails closed on an *invalid* value: it throws a typed `ArgumentError` naming the key and value, so the package refuses to load rather than silently running with a value the project got wrong. Values are applied through the `set_*!` setters, so they receive the same validation as runtime calls.
 
-A *valid* value is applied whatever its size — the caps exist to turn an OOM kill into a typed error, not to second-guess a sizing choice, and a project on a large machine may legitimately raise one. A value that widens a guard is announced with a `@warn` built by [`relaxed_preferences_msg`](@ref), because the channel needs no code: a `LocalPreferences.toml` is data, it travels with a cloned project, and it applies before any user code runs. Widening means a raised [`RESOURCE_LIMITS`](@ref) or [`EQUATION_LIMITS`](@ref) cap, a lowered [`STRING_DISTANCE`](@ref) suggestion threshold, or a raised [`SCENARIO_FILL_LIMIT`](@ref) share. A value that tightens a guard, or that equals the default it replaces, is silent. The comparison is against the default *in effect when the preference is applied*, which at load is the shipped default. See the amendment of `docs/adr/0041-one-resource-cap-per-sink.md`.
+A *valid* value is applied whatever its size — the caps exist to turn an OOM kill into a typed error, not to second-guess a sizing choice, and a project on a large machine may legitimately raise one. A value that widens a guard is announced with a `@warn` built by [`relaxed_preferences_msg`](@ref), because the channel needs no code: a `LocalPreferences.toml` is data, it travels with a cloned project, and it applies before any user code runs. Widening means a raised [`RESOURCE_LIMITS`](@ref) or [`EQUATION_LIMITS`](@ref) cap, or a lowered [`STRING_DISTANCE`](@ref) suggestion threshold. A value that tightens a guard, or that equals the default it replaces, is silent. The comparison is against the default *in effect when the preference is applied*, which at load is the shipped default. See the amendment of `docs/adr/0041-one-resource-cap-per-sink.md`.
 
 To persist a configuration, put the keys in the active project's `LocalPreferences.toml`, e.g.:
 
@@ -161,7 +160,6 @@ max_search_grid = 10_000
 max_ep_grid = 500
 suggestion_min_score = 0.8
 suggestion_distance = "damerau_levenshtein"
-scenario_fill_limit = 0.01
 compact_show = 4
 show_nothing_fields = true
 
@@ -176,10 +174,9 @@ SimpleVariance = false
  3. Read the seven resource keys and repeat step 2 against [`RESOURCE_LIMITS`](@ref) and [`set_resource_limits!`](@ref).
  4. Read `"suggestion_min_score"`. When it is set, check that it is a real number, record a triple when it is below the current threshold, and apply it through [`set_string_distance!`](@ref). A lower threshold widens the guard, which is the opposite direction from a cap.
  5. Read `"suggestion_distance"`. When it is set, check that it is a string, and look it up in [`PREFERENCE_DISTANCES`](@ref). An unknown name raises, and the message carries a [`did_you_mean`](@ref) suggestion. Apply the resolved distance through [`set_string_distance!`](@ref).
- 6. Read `"scenario_fill_limit"`. When it is set, check that it is a real number, record a triple when it is above the current share, and apply it through [`set_scenario_fill_limit!`](@ref). A larger share fills more of a returns matrix in silence, so it widens the guard the way a raised cap does.
- 7. Read `"compact_show"`. When it is set, check that it is a boolean or an integer, and apply it through [`set_compact_show!`](@ref). This key guards nothing, so it records no triple.
- 8. Hand `prefs` to [`apply_show_preferences!`](@ref), which reads `"show_nothing_fields"` and `"show_nothing_fields_by_type"`. Neither key guards anything, so neither records a triple.
- 9. When `relaxations` is not empty, emit the text of [`relaxed_preferences_msg`](@ref) as a warning.
+ 6. Read `"compact_show"`. When it is set, check that it is a boolean or an integer, and apply it through [`set_compact_show!`](@ref). This key guards nothing, so it records no triple.
+ 7. Hand `prefs` to [`apply_show_preferences!`](@ref), which reads `"show_nothing_fields"` and `"show_nothing_fields_by_type"`. Neither key guards anything, so neither records a triple.
+ 8. When `relaxations` is not empty, emit the text of [`relaxed_preferences_msg`](@ref) as a warning.
 
 # Arguments
 
@@ -190,7 +187,6 @@ SimpleVariance = false
   - Each of the nine cap keys is a positive integer that is not a `Bool`.
   - `"suggestion_min_score"` is a real number that is not a `Bool`.
   - `"suggestion_distance"` is a string, and it names an entry of [`PREFERENCE_DISTANCES`](@ref).
-  - `"scenario_fill_limit"` is a real number that is not a `Bool`, and it lies in `[0, 1]`, which [`set_scenario_fill_limit!`](@ref) enforces.
   - `"compact_show"` is a `Bool` or an `Integer`.
   - `"show_nothing_fields"` is a `Bool`, and `"show_nothing_fields_by_type"` is a table of `Bool` values, both checked by [`apply_show_preferences!`](@ref).
   - A breach of any rule above raises an `ArgumentError` that names the key and the value, so the package refuses to load.
@@ -206,7 +202,6 @@ SimpleVariance = false
   - [`set_equation_limits!`](@ref)
   - [`set_resource_limits!`](@ref)
   - [`set_string_distance!`](@ref)
-  - [`set_scenario_fill_limit!`](@ref)
   - [`set_compact_show!`](@ref)
   - [`apply_show_preferences!`](@ref)
   - [`relaxed_preferences_msg`](@ref)
@@ -283,16 +278,6 @@ function apply_preferences!(prefs::AbstractDict{<:AbstractString, <:Any})
                                 did_you_mean(dn, collect(keys(PREFERENCE_DISTANCES)))))
         end
         set_string_distance!(; dist = dist)
-    end
-    sf = get(prefs, "scenario_fill_limit", nothing)
-    if !isnothing(sf)
-        @argcheck(sf isa Real && !(sf isa Bool),
-                  ArgumentError("preference `scenario_fill_limit = $(repr(sf))` must be a real number."))
-        sfd = @atomic SCENARIO_FILL_LIMIT.default
-        if sf > sfd
-            push!(relaxations, ("scenario_fill_limit", sfd, sf))
-        end
-        set_scenario_fill_limit!(sf)
     end
     cs = get(prefs, "compact_show", nothing)
     if !isnothing(cs)

@@ -37,10 +37,6 @@ assert_resource_cap
 assert_ep_grid_size
 set_resource_limits!
 with_resource_limits
-SCENARIO_FILL_LIMIT
-assert_scenario_fill_limit
-set_scenario_fill_limit!
-with_scenario_fill_limit
 ```
 
 ## Pretty printing

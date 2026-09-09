@@ -1618,10 +1618,13 @@ Write the message a scenario fill raises.
 
 The message names the assets, the count of filled pairs, the share of the returns matrix they are and the first observation, so a caller can find the listing that made them, and it states the consequence: a scenario-based measure understates the risk of those assets over the filled rows, while `mu` and `sigma` are untouched.
 
+It also names the limit it was measured against, and that limit is the estimator's own `fill_limit` field. A `fill_limit` of `nothing` demands every observation of every investable asset, so the message says so rather than printing a share no caller chose.
+
 # Arguments
 
   - `filled`: The `(observation, asset)` pairs [`scenario_fill_pairs`](@ref) found.
   - `frac`: The share of the entries of the returns matrix those pairs are.
+  - `fill_limit`: The share the fit allowed in silence, or `nothing` when it allowed none.
 
 # Returns
 
@@ -1631,29 +1634,35 @@ The message names the assets, the count of filled pairs, the share of the return
 
   - [`scenario_fill`](@ref)
   - [`scenario_fill_pairs`](@ref)
-  - [`SCENARIO_FILL_LIMIT`](@ref)
+  - [`EmpiricalPrior`](@ref)
   - [`strict_diagnostic`](@ref)
 """
-function scenario_fill_msg(filled::AbstractVector{<:Tuple{Integer, Integer}}, frac::Real)
+function scenario_fill_msg(filled::AbstractVector{<:Tuple{Integer, Integer}}, frac::Real,
+                           fill_limit::Option{<:Real})
     assets = unique(last.(filled))
-    return "a mask-aware prior estimated an asset from the observations it had, and the returns matrix still carries the gap. Assets $(assets) carry a non-finite return at $(length(filled)) (observation, asset) pair(s) of an investable column, $(frac) of the returns matrix against a limit of $(SCENARIO_FILL_LIMIT[]), the first at observation $(first(filled)[1]). Those entries are filled with zero, so a scenario-based measure (CVaR, EVaR, CDaR and their kin) reads a zero return where the asset had no return at all and understates its risk over the filled rows; `mu` and `sigma` are untouched, because the estimator computed them from the rows it saw. Raise the share with `set_scenario_fill_limit!` or `with_scenario_fill_limit` to accept it in silence, pass `strict = true` to refuse any fill, or fit over a window every asset covers."
+    against = if isnothing(fill_limit)
+        "against `fill_limit = nothing`, which asks that every investable asset cover every observation"
+    else
+        "against a limit of $(fill_limit)"
+    end
+    return "a mask-aware prior estimated an asset from the observations it had, and the returns matrix still carries the gap. Assets $(assets) carry a non-finite return at $(length(filled)) (observation, asset) pair(s) of an investable column, $(frac) of the returns matrix $(against), the first at observation $(first(filled)[1]). Those entries are filled with zero, so a scenario-based measure (CVaR, EVaR, CDaR and their kin) reads a zero return where the asset had no return at all and understates its risk over the filled rows; `mu` and `sigma` are untouched, because the estimator computed them from the rows it saw. Accept a share of the matrix in silence with the estimator's own field, `EmpiricalPrior(; fill_limit = ...)`, pass `strict = true` to refuse any fill, or fit over a window every asset covers."
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return the returns matrix with the missing rows of every investable asset filled with zero, and say so above [`SCENARIO_FILL_LIMIT`](@ref).
+Return the returns matrix with the missing rows of every investable asset filled with zero, and say so above the fitting estimator's `fill_limit`.
 
 A mask-aware moment estimator answers a young asset from the observations it has, so the asset is investable and its returns column still carries a `NaN` at every row before it listed. Every consumer of a Prior Result reads that column — the JuMP model, the meta-optimisers and the value-level door among them — so the fill is paid **once**, here, on the estimator's own pass, rather than at each of them (ADR 0118).
 
 A non-investable asset keeps its `NaN` column, so [`investable_mask`](@ref) is unchanged. `mu`, `sigma` and every other block are untouched, because the estimator computed them from the rows it saw.
 
-The fill is a trade: a scenario-based measure reads a zero return where the asset had no return at all, and understates its risk over those rows. Under `strict = false` the trade is silent while the filled share stays at or below [`SCENARIO_FILL_LIMIT`](@ref), and is named through [`strict_diagnostic`](@ref) above it. Under `strict = true` **any** fill refuses, whatever the share. Under the whole-window rule of ADR 0117 a plain estimator never reaches this verb: an asset it could not cover leaves the Coverage Universe and is not investable.
+The fill is a trade: a scenario-based measure reads a zero return where the asset had no return at all, and understates its risk over those rows. How much of that trade passes in silence is the fitting estimator's own answer, carried in its `fill_limit` field and handed here — the share is a property of one fit, not of the session, so two priors in one program may answer differently. Under `strict = false` the trade is silent while the filled share stays at or below `fill_limit`, and is named through [`strict_diagnostic`](@ref) above it. A `fill_limit` of `nothing` allows no share at all, so every fill is named; that is the default, because a caller who has not weighed the trade is told that it happened. Under `strict = true` **any** fill refuses, whatever `fill_limit` holds. Under the whole-window rule of ADR 0117 a plain estimator never reaches this verb: an asset it could not cover leaves the Coverage Universe and is not investable.
 
 # Algorithm
 
  1. Return `X` itself when every entry of `X` is finite, which is every fit over a complete window.
  2. Derive the Investable Mask from `mu` and the diagonal of `sigma`, as [`investable_mask`](@ref) does, and find the pairs to fill with [`scenario_fill_pairs`](@ref). Return `X` itself when there are none, which is a gap that belongs to a non-investable asset alone.
- 3. Take the share of the entries of `X` those pairs are, and report them through [`strict_diagnostic`](@ref) when `strict` holds, or when the share exceeds `SCENARIO_FILL_LIMIT[]`.
+ 3. Take the share of the entries of `X` those pairs are, and report them through [`strict_diagnostic`](@ref) when `strict` holds, when `fill_limit` is `nothing`, or when the share exceeds `fill_limit`.
  4. Return a copy of `X` with zero written at each of those pairs, and the `NaN` of every non-investable asset left where it is.
 
 # Arguments
@@ -1662,10 +1671,11 @@ The fill is a trade: a scenario-based measure reads a zero return where the asse
   - `mu`: The expected returns the estimator answered, `NaN` at a non-investable asset.
   - `sigma`: The covariance the estimator answered, `NaN` on the diagonal at a non-investable asset.
   - `strict`: If `true`, any fill raises an `ArgumentError`; if `false`, a fill above the share warns.
+  - `fill_limit`: The share of the entries of `X` the fitting estimator accepts in silence, or `nothing` when it accepts none.
 
 # Validation
 
-  - The filled share is at or below `SCENARIO_FILL_LIMIT[]`, else a warning naming the assets is emitted, or an `ArgumentError` naming them is raised under `strict`, which any fill raises.
+  - The filled share is at or below `fill_limit`, else a warning naming the assets is emitted, or an `ArgumentError` naming them is raised under `strict`, which any fill raises. A `fill_limit` of `nothing` is at or below no share, so any fill is named.
 
 # Returns
 
@@ -1675,12 +1685,13 @@ The fill is a trade: a scenario-based measure reads a zero return where the asse
 
   - [`scenario_fill_pairs`](@ref)
   - [`scenario_fill_msg`](@ref)
-  - [`SCENARIO_FILL_LIMIT`](@ref)
+  - [`EmpiricalPrior`](@ref)
   - [`investable_mask`](@ref)
   - [`strict_diagnostic`](@ref)
   - [`filter_held_gaps`](@ref)
 """
-function scenario_fill(X::MatNum, mu::VecNum, sigma::MatNum, strict::Bool)
+function scenario_fill(X::MatNum, mu::VecNum, sigma::MatNum, strict::Bool,
+                       fill_limit::Option{<:Real})
     if all(isfinite, X)
         return X
     end
@@ -1690,8 +1701,8 @@ function scenario_fill(X::MatNum, mu::VecNum, sigma::MatNum, strict::Bool)
         return X
     end
     frac = length(filled) / length(X)
-    if strict || frac > SCENARIO_FILL_LIMIT[]
-        strict_diagnostic(scenario_fill_msg(filled, frac), strict)
+    if strict || isnothing(fill_limit) || frac > fill_limit
+        strict_diagnostic(scenario_fill_msg(filled, frac, fill_limit), strict)
     end
     Xf = copy(X)
     for (t, i) in filled

@@ -156,7 +156,7 @@ commit = "97e398ef74"
 "src/12_ConstraintGeneration/08_ExposureConstraintGeneration.jl" = { cyc = 4, cog = 5, arg = 7, cyc_sum = 20, cog_sum = 15, arg_sum = 26, macros = [] }
 "src/12_ConstraintGeneration/09_CrossSectionalFactorAxis.jl" = { cyc = 5, cog = 6, arg = 3, cyc_sum = 12, cog_sum = 8, arg_sum = 8, macros = [] }
 "src/13_Prior/01_Base_Prior.jl" = { cyc = 10, cog = 7, arg = 11, cyc_sum = 97, cog_sum = 80, arg_sum = 110, macros = ["@forward_properties"] }
-"src/13_Prior/02_EmpiricalPrior.jl" = { cyc = 2, cog = 1, arg = 7, cyc_sum = 6, cog_sum = 2, arg_sum = 18, macros = ["@propagatable"] }
+"src/13_Prior/02_EmpiricalPrior.jl" = { cyc = 3, cog = 2, arg = 7, cyc_sum = 7, cog_sum = 3, arg_sum = 19, macros = ["@propagatable"] }
 "src/13_Prior/03_FactorPrior.jl" = { cyc = 3, cog = 2, arg = 9, cyc_sum = 11, cog_sum = 5, arg_sum = 26, macros = ["@forward_properties", "@propagatable"] }
 "src/13_Prior/04_HighOrderPrior.jl" = { cyc = 12, cog = 25, arg = 6, cyc_sum = 40, cog_sum = 56, arg_sum = 23, macros = ["@forward_properties", "@propagatable"] }
 "src/13_Prior/05_BlackLittermanViewsGeneration.jl" = { cyc = 11, cog = 21, arg = 6, cyc_sum = 24, cog_sum = 28, arg_sum = 24, macros = [] }

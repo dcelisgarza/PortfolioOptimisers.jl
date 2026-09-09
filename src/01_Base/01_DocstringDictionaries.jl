@@ -311,6 +311,7 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :reg_rr => "`rr`: Regression result.",#
                                  # Prior estimators.
                                  :horizon => "`horizon`: Optional investment horizon for log-normalising returns. If `nothing`, returns are not adjusted.",#
+                                 :fill_limit => "`fill_limit`: Share of the entries of the returns matrix a [`scenario_fill`](@ref) may write in silence. If `nothing`, no share passes in silence, so every fill is named: an investable asset is asked to cover every observation.",#
                                  :tau => "`tau`: Blending parameter controlling the weight given to the prior relative to the views.",#
                                  :views => "`views`: Views estimator or result.",#
                                  :views_conf => "`views_conf`: Views confidence estimator or result.",#

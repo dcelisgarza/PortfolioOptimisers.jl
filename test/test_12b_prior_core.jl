@@ -29,7 +29,7 @@ using LinearAlgebra, FLoops, SparseArrays, StableRNGs
 end
 
 #=
-The horizon conversion of `prior(::EmpiricalPrior{<:Any, <:Any, <:Number}, …)` runs in three
+The horizon conversion of `prior(::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any}, …)` runs in three
 lines whose order is load-bearing: the covariance reads the `mu` that still holds
 `\hat{\mu}_i + 1`, because the decrement has not run yet. The `# Algorithm` of that method
 states it, and these are the numbers behind the statement. Sweep ticket #533.

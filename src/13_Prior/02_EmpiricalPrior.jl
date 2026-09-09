@@ -14,7 +14,8 @@ $(DocStringExtensions.FIELDS)
     EmpiricalPrior(;
         ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
         me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-        horizon::Option{<:Number} = nothing
+        horizon::Option{<:Number} = nothing,
+        fill_limit::Option{<:Real} = nothing
     ) -> EmpiricalPrior
 
 Keywords correspond to the struct's fields.
@@ -22,6 +23,7 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - If `horizon` is not `nothing`, `horizon > 0`.
+  - If `fill_limit` is not `nothing`, `0 < fill_limit <= 1`. Zero is not a value, because `nothing` already means that no fill passes in silence.
 
 ## Propagated parameters
 
@@ -42,26 +44,27 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
 ```jldoctest
 julia> EmpiricalPrior()
 EmpiricalPrior
-       ce ┼ PortfolioOptimisersCovariance
-          │   ce ┼ Covariance
-          │      │    me ┼ SimpleExpectedReturns
-          │      │       │   w ┴ nothing
-          │      │    ce ┼ GeneralCovariance
-          │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-          │      │       │    w ┴ nothing
-          │      │   alg ┼ FullMoment()
-          │      │     w ┴ nothing
-          │   mp ┼ MatrixProcessing
-          │      │     pdm ┼ Posdef
-          │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-          │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-          │      │      dn ┼ nothing
-          │      │      dt ┼ nothing
-          │      │     alg ┼ nothing
-          │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-       me ┼ SimpleExpectedReturns
-          │   w ┴ nothing
-  horizon ┴ nothing
+          ce ┼ PortfolioOptimisersCovariance
+             │   ce ┼ Covariance
+             │      │    me ┼ SimpleExpectedReturns
+             │      │       │   w ┴ nothing
+             │      │    ce ┼ GeneralCovariance
+             │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+             │      │       │    w ┴ nothing
+             │      │   alg ┼ FullMoment()
+             │      │     w ┴ nothing
+             │   mp ┼ MatrixProcessing
+             │      │     pdm ┼ Posdef
+             │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+             │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+             │      │      dn ┼ nothing
+             │      │      dt ┼ nothing
+             │      │     alg ┼ nothing
+             │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+          me ┼ SimpleExpectedReturns
+             │   w ┴ nothing
+     horizon ┼ nothing
+  fill_limit ┴ nothing
 ```
 
 # Related
@@ -93,22 +96,35 @@ EmpiricalPrior
     $(field_dict[:horizon])
     """
     horizon
+    """
+    $(field_dict[:fill_limit])
+    """
+    fill_limit
     function EmpiricalPrior(ce::StatsBase.CovarianceEstimator,
-                            me::AbstractExpectedReturnsEstimator, horizon::Option{<:Number})
+                            me::AbstractExpectedReturnsEstimator, horizon::Option{<:Number},
+                            fill_limit::Option{<:Real})
         if !isnothing(horizon)
             @argcheck(horizon > 0, DomainError(horizon, "horizon must be > 0"))
         end
-        return new{typeof(ce), typeof(me), typeof(horizon)}(ce, me, horizon)
+        if !isnothing(fill_limit)
+            @argcheck(0 < fill_limit <= 1,
+                      DomainError(fill_limit,
+                                  "fill_limit is a share of the entries of a returns matrix, so it must lie in (0, 1]. Pass `nothing`, the default, to be told about every fill; `1` to be told about none."))
+        end
+        return new{typeof(ce), typeof(me), typeof(horizon), typeof(fill_limit)}(ce, me,
+                                                                                horizon,
+                                                                                fill_limit)
     end
 end
 function EmpiricalPrior(;
                         ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
                         me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                        horizon::Option{<:Number} = nothing)::EmpiricalPrior
-    return EmpiricalPrior(ce, me, horizon)
+                        horizon::Option{<:Number} = nothing,
+                        fill_limit::Option{<:Real} = nothing)::EmpiricalPrior
+    return EmpiricalPrior(ce, me, horizon, fill_limit)
 end
 """
-    prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing}, X::MatNum,
+    prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing, <:Any}, X::MatNum,
           F::Option{<:MatNum} = nothing, pnl::Option{<:AssetPanel} = nothing;
           dims::Int = 1, strict::Bool = false, kwargs...)
 
@@ -140,7 +156,7 @@ This method takes the **arithmetic** moments of `X` directly. It applies no log 
 
 # The scenario fill
 
-Under a **mask-aware** `pe.me` and `pe.ce` — the exponentially weighted family — an asset that lists inside the window is answered from the observations it has, so it is investable and its column of `X` still carries a `NaN` at every earlier row. [`scenario_fill`](@ref) writes `0` at those entries once, so that every consumer of the result reads a finite investable column; a non-investable asset keeps its whole `NaN` column, and `mu` and `sigma` are untouched. The fill costs accuracy in one place: a scenario-based measure reads a zero return where the asset had none, and understates that asset's risk over the filled rows. It is silent while the filled share stays at or below [`SCENARIO_FILL_LIMIT`](@ref), warns above it, and refuses any fill under `strict`. Under a **plain** estimator the fill never fires, because an asset the estimator could not cover leaves the Coverage Universe and is not investable.
+Under a **mask-aware** `pe.me` and `pe.ce` — the exponentially weighted family — an asset that lists inside the window is answered from the observations it has, so it is investable and its column of `X` still carries a `NaN` at every earlier row. [`scenario_fill`](@ref) writes `0` at those entries once, so that every consumer of the result reads a finite investable column; a non-investable asset keeps its whole `NaN` column, and `mu` and `sigma` are untouched. The fill costs accuracy in one place: a scenario-based measure reads a zero return where the asset had none, and understates that asset's risk over the filled rows. It is silent while the filled share stays at or below `pe.fill_limit`, warns above it, and refuses any fill under `strict`. `pe.fill_limit` defaults to `nothing`, which accepts no share in silence, so a fill is named unless the caller has weighed the trade and said how much of it to accept. Under a **plain** estimator the fill never fires, because an asset the estimator could not cover leaves the Coverage Universe and is not investable.
 
 # Arguments
 
@@ -149,14 +165,14 @@ Under a **mask-aware** `pe.me` and `pe.ce` — the exponentially weighted family
   - `F`: Factor returns matrix (ignored).
   - $(arg_dict[:pnl_moment])
   - $(arg_dict[:dims])
-  - `strict`: Whether a zero-filled scenario raises rather than warns. Any fill raises under `strict`; otherwise a fill above [`SCENARIO_FILL_LIMIT`](@ref) warns.
+  - `strict`: Whether a zero-filled scenario raises rather than warns. Any fill raises under `strict`; otherwise a fill above `pe.fill_limit` warns, and every fill warns while `pe.fill_limit` is `nothing`.
   - `kwargs...`: Additional keyword arguments passed to mean and covariance estimators.
 
 # Validation
 
   - `dims in (1, 2)`.
   - At least one asset must be in the Coverage Universe.
-  - The zero-filled share of `X` is at or below [`SCENARIO_FILL_LIMIT`](@ref), else a warning naming the assets is emitted, or an `ArgumentError` naming them is raised under `strict`, which any fill raises.
+  - The zero-filled share of `X` is at or below `pe.fill_limit`, else a warning naming the assets is emitted, or an `ArgumentError` naming them is raised under `strict`, which any fill raises. A `pe.fill_limit` of `nothing` is at or below no share, so any fill is named.
 
 # Returns
 
@@ -169,9 +185,8 @@ Under a **mask-aware** `pe.me` and `pe.ce` — the exponentially weighted family
   - [`prior`](@ref)
   - [`coverage_mask`](@ref)
   - [`scenario_fill`](@ref)
-  - [`SCENARIO_FILL_LIMIT`](@ref)
 """
-function prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing}, X::MatNum,
+function prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing, <:Any}, X::MatNum,
                ::Option{<:MatNum} = nothing, pnl::Option{<:AssetPanel} = nothing;
                dims::Int = 1, strict::Bool = false, kwargs...)
     X = dims_oriented(dims, X)
@@ -180,10 +195,11 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing}, X::MatNum,
     # A mask-aware estimator answers a young asset from the rows it has, so the asset is
     # investable and its column still carries the gap. The fill is paid once, here, because
     # every consumer of the result reads that column (see [`scenario_fill`](@ref)).
-    return LowOrderPrior(; X = scenario_fill(X, mu, sigma, strict), mu = mu, sigma = sigma)
+    return LowOrderPrior(; X = scenario_fill(X, mu, sigma, strict, pe.fill_limit), mu = mu,
+                         sigma = sigma)
 end
 """
-    prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number}, X::MatNum,
+    prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any}, X::MatNum,
           F::Option{<:MatNum} = nothing, pnl::Option{<:AssetPanel} = nothing;
           dims::Int = 1, strict::Bool = false, kwargs...)
 
@@ -234,7 +250,7 @@ The order of steps 5 to 7 is **not free**. Step 6 reads the `mu` that step 5 lef
 
 # The scenario fill
 
-Step 8 takes the same fill the no-horizon method takes, on the **arithmetic** `X` the caller handed in and against the arithmetic moments the result carries. Under a mask-aware `pe.me` and `pe.ce` an asset that lists inside the window is investable and its column still carries a `NaN` at every earlier row; [`scenario_fill`](@ref) writes `0` there once, silently at or below [`SCENARIO_FILL_LIMIT`](@ref), with a warning above it, and refuses any fill under `strict`. A scenario-based measure then understates that asset's risk over the filled rows, and `mu` and `sigma` are untouched.
+Step 8 takes the same fill the no-horizon method takes, on the **arithmetic** `X` the caller handed in and against the arithmetic moments the result carries. Under a mask-aware `pe.me` and `pe.ce` an asset that lists inside the window is investable and its column still carries a `NaN` at every earlier row; [`scenario_fill`](@ref) writes `0` there once, silently at or below `pe.fill_limit`, with a warning above it, and refuses any fill under `strict`. `pe.fill_limit` defaults to `nothing`, which accepts no share in silence. A scenario-based measure then understates that asset's risk over the filled rows, and `mu` and `sigma` are untouched.
 
 # Arguments
 
@@ -243,14 +259,14 @@ Step 8 takes the same fill the no-horizon method takes, on the **arithmetic** `X
   - `F`: Factor returns matrix (ignored).
   - $(arg_dict[:pnl_moment])
   - $(arg_dict[:dims])
-  - `strict`: Whether a zero-filled scenario raises rather than warns. Any fill raises under `strict`; otherwise a fill above [`SCENARIO_FILL_LIMIT`](@ref) warns.
+  - `strict`: Whether a zero-filled scenario raises rather than warns. Any fill raises under `strict`; otherwise a fill above `pe.fill_limit` warns, and every fill warns while `pe.fill_limit` is `nothing`.
   - `kwargs...`: Additional keyword arguments passed to mean and covariance estimators.
 
 # Validation
 
   - `dims in (1, 2)`.
   - At least one asset must be in the Coverage Universe.
-  - The zero-filled share of `X` is at or below [`SCENARIO_FILL_LIMIT`](@ref), else a warning naming the assets is emitted, or an `ArgumentError` naming them is raised under `strict`, which any fill raises.
+  - The zero-filled share of `X` is at or below `pe.fill_limit`, else a warning naming the assets is emitted, or an `ArgumentError` naming them is raised under `strict`, which any fill raises. A `pe.fill_limit` of `nothing` is at or below no share, so any fill is named.
 
 # Returns
 
@@ -263,9 +279,8 @@ Step 8 takes the same fill the no-horizon method takes, on the **arithmetic** `X
   - [`prior`](@ref)
   - [`coverage_mask`](@ref)
   - [`scenario_fill`](@ref)
-  - [`SCENARIO_FILL_LIMIT`](@ref)
 """
-function prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number}, X::MatNum,
+function prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any}, X::MatNum,
                ::Option{<:MatNum} = nothing, pnl::Option{<:AssetPanel} = nothing;
                dims::Int = 1, strict::Bool = false, kwargs...)
     X = dims_oriented(dims, X)
@@ -279,7 +294,8 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number}, X::MatNum,
     mu .-= one(eltype(mu))
     # The fill is on the arithmetic `X` the caller handed in, and it is taken after step 7,
     # because the Investable Mask is read off the arithmetic moments the result carries.
-    return LowOrderPrior(; X = scenario_fill(X, mu, sigma, strict), mu = mu, sigma = sigma)
+    return LowOrderPrior(; X = scenario_fill(X, mu, sigma, strict, pe.fill_limit), mu = mu,
+                         sigma = sigma)
 end
 
 function factor_residual_config(::EmpiricalPrior)

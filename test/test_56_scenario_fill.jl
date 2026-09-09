@@ -12,8 +12,15 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, StatsBase, Statistic
 # rows it saw.
 #
 # The fill is a trade: a scenario-based measure reads a zero return where the asset had none.
-# It is silent at or below `SCENARIO_FILL_LIMIT`, warns above it, and refuses any fill under
-# `strict`.
+# How much of that trade passes in silence is the FITTING ESTIMATOR'S OWN ANSWER, carried in
+# `EmpiricalPrior`'s `fill_limit` field, issue #975. It is silent at or below `fill_limit`,
+# warns above it, and refuses any fill under `strict`. `fill_limit` defaults to `nothing`,
+# which accepts no share in silence: an investable asset is asked to cover every observation.
+#
+# `EmpiricalPrior` is the only estimator eligible for the field. A prior is eligible when it
+# holds a mask-aware moment estimator DIRECTLY and puts the CALLER'S OWN returns matrix into
+# the result's `X`; every other prior wraps an inner prior estimator and synthesises its `X`,
+# so the fill is paid once, at the `EmpiricalPrior` at the bottom of the chain.
 #
 # The reference implementation gives no oracle for the share: it zero-fills its portfolio
 # return series at one line and announces nothing, so it has no fill limit and no denominator
@@ -55,12 +62,12 @@ pnl_full = make_panel(trues(T, N))
 
 me = ExpWeightedExpectedReturns(; decay = 0.9, min_obs = 2)
 ce = ExpWeightedCovariance(; decay = 0.9, min_obs = 2, centred = true)
-pe = EmpiricalPrior(; me = me, ce = ce)
+# The estimator that accepts the whole matrix in silence, and the one that accepts none.
+pe = EmpiricalPrior(; me = me, ce = ce, fill_limit = 1)
+pe0 = EmpiricalPrior(; me = me, ce = ce)
 
 @testset "The fill writes zero at the investable gap alone" begin
-    pr = PO.with_scenario_fill_limit(1.0) do
-        return prior(pe, Xmix, nothing, pnl_mix)
-    end
+    pr = prior(pe, Xmix, nothing, pnl_mix)
     # The young asset is investable, the dead one is not, and the fill did not move the mask.
     @test PO.investable_mask(pr) == BitVector([1, 1, 0, 1])
     @test all(isfinite, view(pr.X, :, [1, 2, 4]))
@@ -75,10 +82,8 @@ pe = EmpiricalPrior(; me = me, ce = ce)
     @test isequal(pr.sigma, Statistics.cov(ce, Xmix, pnl_mix; dims = 1))
 
     # The horizon variant travels the same seam, on the arithmetic returns it carries.
-    prh = PO.with_scenario_fill_limit(1.0) do
-        return prior(EmpiricalPrior(; me = me, ce = ce, horizon = 5), Xmix, nothing,
-                     pnl_mix)
-    end
+    prh = prior(EmpiricalPrior(; me = me, ce = ce, horizon = 5, fill_limit = 1), Xmix,
+                nothing, pnl_mix)
     @test PO.investable_mask(prh) == BitVector([1, 1, 0, 1])
     @test all(isfinite, view(prh.X, :, [1, 2, 4]))
     @test all(iszero, view(prh.X, 1:30, 4))
@@ -93,6 +98,9 @@ pe = EmpiricalPrior(; me = me, ce = ce)
     # A complete window returns the caller's matrix untouched, with no scan of the mask.
     pc = @test_logs prior(pe, X0, nothing, pnl_full)
     @test pc.X === X0
+    # The default `fill_limit` reaches the same conclusion by the same short circuit: there is
+    # nothing to fill, so there is nothing to name.
+    @test (@test_logs prior(pe0, X0, nothing, pnl_full)).X === X0
 end
 
 @testset "The share, the diagnostic and the refusal" begin
@@ -105,91 +113,103 @@ end
     # The dead column is never a pair, whatever its gap.
     @test isempty(PO.scenario_fill_pairs(view(Xmix, :, 3:3), BitVector([0])))
 
-    # Above the shipped 5%: one warning, naming the asset, the count and the consequence.
-    @test PO.SCENARIO_FILL_LIMIT[] == 0.05
-    @test_logs (:warn, r"Assets \[4\]") prior(pe, Xmix, nothing, pnl_mix)
-    @test_logs (:warn, r"30 \(observation, asset\) pair") prior(pe, Xmix, nothing, pnl_mix)
-    @test_logs (:warn, r"understates its risk") prior(pe, Xmix, nothing, pnl_mix)
+    # Above the estimator's own share: one warning, naming the asset, the count, the limit it
+    # was measured against and the consequence.
+    pe5 = EmpiricalPrior(; me = me, ce = ce, fill_limit = 0.05)
+    @test_logs (:warn, r"Assets \[4\]") prior(pe5, Xmix, nothing, pnl_mix)
+    @test_logs (:warn, r"30 \(observation, asset\) pair") prior(pe5, Xmix, nothing, pnl_mix)
+    @test_logs (:warn, r"against a limit of 0\.05") prior(pe5, Xmix, nothing, pnl_mix)
+    @test_logs (:warn, r"understates its risk") prior(pe5, Xmix, nothing, pnl_mix)
+    # The remedy the message names is the field, not a global.
+    @test_logs (:warn, r"EmpiricalPrior\(; fill_limit = \.\.\.\)") prior(pe5, Xmix, nothing,
+                                                                         pnl_mix)
     # Raise the share above it and the same fit is silent.
-    PO.with_scenario_fill_limit(0.2) do
-        return @test_logs prior(pe, Xmix, nothing, pnl_mix)
-    end
+    @test_logs prior(EmpiricalPrior(; me = me, ce = ce, fill_limit = 0.2), Xmix, nothing,
+                     pnl_mix)
 
-    # One filled entry is 1/240 of the matrix, so it is silent under the shipped share.
-    ph = @test_logs prior(pe, Xhol, nothing, pnl_full)
+    # TWO PRIORS IN ONE PROGRAM, TWO ANSWERS. This is what the field buys over the global that
+    # preceded it: the share travels with the estimator that fills, not with the session.
+    loud = EmpiricalPrior(; me = me, ce = ce, fill_limit = 0.05)
+    quiet = EmpiricalPrior(; me = me, ce = ce, fill_limit = 0.2)
+    @test_logs (:warn, r"Assets \[4\]") prior(loud, Xmix, nothing, pnl_mix)
+    @test_logs prior(quiet, Xmix, nothing, pnl_mix)
+    @test isequal(prior(quiet, Xmix, nothing, pnl_mix).X,
+                  (@test_logs (:warn, r"Assets \[4\]") prior(loud, Xmix, nothing, pnl_mix)).X)
+
+    # One filled entry is 1/240 of the matrix, so a 5% share passes it in silence.
+    ph = @test_logs prior(pe5, Xhol, nothing, pnl_full)
     @test iszero(ph.X[15, 2])
     @test count(!isfinite, ph.X) == 0
     @test isnothing(PO.investable_mask(ph))
-    # A zero share is told about every fill.
-    PO.with_scenario_fill_limit(0.0) do
-        return @test_logs (:warn, r"Assets \[2\]") prior(pe, Xhol, nothing, pnl_full)
-    end
+
+    # THE DEFAULT. `fill_limit = nothing` accepts no share at all, so a single filled entry is
+    # named, and the message says what was asked rather than printing a share no caller chose.
+    @test_logs (:warn, r"Assets \[2\]") prior(pe0, Xhol, nothing, pnl_full)
+    @test_logs (:warn, r"`fill_limit = nothing`") prior(pe0, Xhol, nothing, pnl_full)
+    @test_logs (:warn, r"cover every observation") prior(pe0, Xhol, nothing, pnl_full)
+    @test_logs (:warn, r"Assets \[4\]") prior(pe0, Xmix, nothing, pnl_mix)
+    # It changes what is SAID, never what is COMPUTED.
+    @test isequal((@test_logs (:warn, r"Assets \[4\]") prior(pe0, Xmix, nothing, pnl_mix)).X,
+                  prior(pe, Xmix, nothing, pnl_mix).X)
 
     # `strict` refuses any fill, whatever the share.
-    @test_throws ArgumentError prior(pe, Xhol, nothing, pnl_full; strict = true)
-    PO.with_scenario_fill_limit(1.0) do
-        return @test_throws ArgumentError prior(pe, Xmix, nothing, pnl_mix; strict = true)
-    end
+    @test_throws ArgumentError prior(pe5, Xhol, nothing, pnl_full; strict = true)
+    @test_throws ArgumentError prior(pe, Xmix, nothing, pnl_mix; strict = true)
+    @test_throws ArgumentError prior(pe0, Xmix, nothing, pnl_mix; strict = true)
     # A fit with nothing to fill is silent under `strict` too.
     @test_logs prior(pe, X0, nothing, pnl_full; strict = true)
+    @test_logs prior(pe0, X0, nothing, pnl_full; strict = true)
     @test_logs prior(EmpiricalPrior(), Xmix, nothing, pnl_mix; strict = true)
 end
 
-@testset "The scoped config, the setter and the preference key" begin
-    @test PO.SCENARIO_FILL_LIMIT[] == 0.05
-    # The share is a fraction, so nothing outside the unit interval names a reachable one.
-    @test_throws ArgumentError PO.assert_scenario_fill_limit(-0.1)
-    @test_throws ArgumentError PO.assert_scenario_fill_limit(1.5)
-    @test_throws ArgumentError PO.set_scenario_fill_limit!(-eps())
-    @test_throws ArgumentError PO.with_scenario_fill_limit(() -> nothing, 2)
-    @test PO.assert_scenario_fill_limit(1) === 1.0
-    # The scoped override composes and restores.
-    @test PO.with_scenario_fill_limit(0.4) do
-        return PO.with_scenario_fill_limit(0.1) do
-            return PO.SCENARIO_FILL_LIMIT[]
-        end
-    end == 0.1
-    @test PO.SCENARIO_FILL_LIMIT[] == 0.05
+@testset "The field, its validation and its default" begin
+    # The default is `nothing`: no share passes in silence.
+    @test isnothing(EmpiricalPrior().fill_limit)
+    @test isnothing(EmpiricalPrior(; me = me, ce = ce).fill_limit)
+    @test EmpiricalPrior(; fill_limit = 0.2).fill_limit == 0.2
+    # The value is inspectable on the estimator, which is the whole point of the field.
+    @test :fill_limit in fieldnames(EmpiricalPrior)
+    @test occursin("fill_limit", sprint(show, EmpiricalPrior(; fill_limit = 0.2)))
 
-    try
-        # The setter and the preference key seed the same global default.
-        @test PO.set_scenario_fill_limit!(0.3) === 0.3
-        @test PO.SCENARIO_FILL_LIMIT[] == 0.3
-        PO.set_scenario_fill_limit!(0.05)
-        @test "scenario_fill_limit" in PO.PREFERENCE_KEYS
-        # A tightened share applies in silence.
-        @test_logs PO.apply_preferences!(Dict{String, Any}("scenario_fill_limit" => 0.01))
-        @test PO.SCENARIO_FILL_LIMIT[] == 0.01
-        # A raised share widens the guard, so the load-time message names it.
-        PO.set_scenario_fill_limit!(0.05)
-        @test_logs (:warn, r"scenario_fill_limit") PO.apply_preferences!(Dict{String, Any}("scenario_fill_limit" =>
-                                                                                               0.5))
-        @test PO.SCENARIO_FILL_LIMIT[] == 0.5
-        msg = PO.relaxed_preferences_msg([("scenario_fill_limit", 0.05, 0.5)])
-        @test occursin("scenario_fill_limit", msg)
-        @test occursin("with_scenario_fill_limit", msg)
-        # An invalid value fails closed, as every other preference does.
-        @test_throws ArgumentError PO.apply_preferences!(Dict{String, Any}("scenario_fill_limit" => "0.5"))
-        @test_throws ArgumentError PO.apply_preferences!(Dict{String, Any}("scenario_fill_limit" =>
-                                                                               true))
-        @test_throws ArgumentError PO.apply_preferences!(Dict{String, Any}("scenario_fill_limit" =>
-                                                                               1.5))
-    finally
-        PO.set_scenario_fill_limit!(0.05)
-    end
-    @test PO.SCENARIO_FILL_LIMIT[] == 0.05
+    # The share is a fraction, so nothing outside the unit interval names a reachable one.
+    @test_throws DomainError EmpiricalPrior(; fill_limit = -0.1)
+    @test_throws DomainError EmpiricalPrior(; fill_limit = 1.5)
+    @test_throws DomainError EmpiricalPrior(; fill_limit = -eps())
+    @test_throws DomainError EmpiricalPrior(; fill_limit = 2)
+    # ZERO IS NOT A VALUE. `nothing` already means that no fill passes in silence, so a `0`
+    # that also meant it would be a second spelling of one answer.
+    @test_throws DomainError EmpiricalPrior(; fill_limit = 0)
+    @test_throws DomainError EmpiricalPrior(; fill_limit = 0.0)
+    # The closed upper end is reachable, and it accepts the whole matrix.
+    @test EmpiricalPrior(; fill_limit = 1).fill_limit == 1
+    @test EmpiricalPrior(; fill_limit = 1.0).fill_limit == 1.0
+
+    # The field rides along a nested prior through `factory`, so a caller who buries an
+    # `EmpiricalPrior` inside another prior still sets the share in one place. It survives a
+    # view too, because a share is not per-asset configuration.
+    inner = EmpiricalPrior(; me = me, ce = ce, fill_limit = 0.2)
+    @test PO.factory(inner).fill_limit == 0.2
+    @test PO.factory(FactorPrior(; pe = inner)).pe.fill_limit == 0.2
+    @test PO.factory(HighOrderPriorEstimator(; pe = inner)).pe.fill_limit == 0.2
+    @test PO.port_opt_view(inner, [1, 2]).fill_limit == 0.2
+
+    # THE GLOBAL IS GONE. Nothing in the package answers to the scoped config that preceded
+    # the field, and no preference key seeds it.
+    @test !isdefined(PO, :SCENARIO_FILL_LIMIT)
+    @test !isdefined(PO, :set_scenario_fill_limit!)
+    @test !isdefined(PO, :with_scenario_fill_limit)
+    @test !isdefined(PO, :assert_scenario_fill_limit)
+    @test !("scenario_fill_limit" in PO.PREFERENCE_KEYS)
+    @test !occursin("scenario_fill_limit",
+                    PO.relaxed_preferences_msg([("max_bins", 500, 900)]))
 end
 
 @testset "The filled prior reaches every consumer" begin
     rd = ReturnsResult(; nx = nx, X = Xmix, pnl = pnl_mix)
-    resj = PO.with_scenario_fill_limit(1.0) do
-        return optimise(MeanRisk(; r = ConditionalValueatRisk(),
-                                 opt = JuMPOptimiser(; pe = pe, slv = slv)), rd)
-    end
-    resh = PO.with_scenario_fill_limit(1.0) do
-        return optimise(HierarchicalRiskParity(; r = ConditionalValueatRisk(),
-                                               opt = HierarchicalOptimiser(; pe = pe)), rd)
-    end
+    resj = optimise(MeanRisk(; r = ConditionalValueatRisk(),
+                             opt = JuMPOptimiser(; pe = pe, slv = slv)), rd)
+    resh = optimise(HierarchicalRiskParity(; r = ConditionalValueatRisk(),
+                                           opt = HierarchicalOptimiser(; pe = pe)), rd)
     # A scenario measure over a `NaN` column has no answer at all, so both solves are the
     # proof that the fill reached the model.
     @test isa(resj.retcode, PO.OptimisationSuccess)
@@ -203,9 +223,7 @@ end
 
     # The value-level door reduces to the Investable Mask and reads the filled matrix, so it
     # equals the same measure on the filled columns by hand.
-    pr = PO.with_scenario_fill_limit(1.0) do
-        return prior(pe, Xmix, nothing, pnl_mix)
-    end
+    pr = prior(pe, Xmix, nothing, pnl_mix)
     w = fill(0.25, N)
     keep = [1, 2, 4]
     r = @test_logs (:warn, r"not investable") expected_risk(ConditionalValueatRisk(), w, pr)

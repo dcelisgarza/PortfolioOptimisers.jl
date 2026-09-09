@@ -322,7 +322,8 @@ zero-fills the rows the asset was missing through [`scenario_fill`](@ref): every
 Prior Result reads its returns matrix, and a scenario-based measure then reads a zero return
 where the asset had none and understates that asset's risk over those rows, while the variance
 stays the estimate this recursion made from the rows it saw. The fill is silent at or below
-[`SCENARIO_FILL_LIMIT`](@ref), warns above it, and refuses any fill under `strict`.
+the fitting prior's own `fill_limit` field, warns above it, and refuses any fill under `strict`;
+`fill_limit` defaults to `nothing`, which accepts no share in silence.
 
 # Mathematical definition
 
@@ -425,7 +426,7 @@ julia> ce.min_obs
   - [`AbstractVarianceEstimator`](@ref)
   - [`partial_fit!`](@ref)
   - [`scenario_fill`](@ref)
-  - [`SCENARIO_FILL_LIMIT`](@ref)
+  - [`EmpiricalPrior`](@ref)
 """
 @concrete struct RegimeAdjustedExpWeightedVariance <: AbstractVarianceEstimator
     """
