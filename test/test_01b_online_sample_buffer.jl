@@ -7,12 +7,15 @@ partial-fit state a member with no exact incremental fold keeps its observations
 and no wrapper survives into the run. Issue #865 settled the design, and its resolution
 comment is the specification these tests read.
 
-Two probe types stand in for the members the layers above will be. No estimator shipped
-today takes a sample buffer -- the eleven that carry the seam all fold exactly and keep
-their own family state -- so the generic buffering fold and the wrapper's field walk have
-no in-library subject until the prior, optimiser and pipeline tickets land. The probes are
-the shape those members will have: a `cache` field and a keyword constructor, which is all
-the seam and `rebuild_estimator` read.
+Two probe types stand in for the members the layers above will be. They are the shape those
+members have: a `cache` field and a keyword constructor, which is all the seam and
+`rebuild_estimator` read.
+
+Issue #997 then made the eleven shipped families subjects of their own. Each narrows the
+`cache` type parameter of its own `partial_fit!` methods to the state its exact fold reads,
+so a wrapped estimator falls through to the generic buffering method and answers every
+read-out verb by running the batch verb over the buffer's rows. The last testset drives all
+eleven, uncapped and capped.
 =#
 struct BufferProbe{T} <: PortfolioOptimisers.AbstractEstimator
     cache::T
@@ -295,5 +298,99 @@ end
         @test_throws DomainError po.SampleBufferState(; X = zeros(2, 2), max_history = 0)
         @test_throws DomainError po.SampleBufferState(; n = -1, X = zeros(2, 2))
         @test_throws DomainError po.SampleBufferState(; off = -1, X = zeros(2, 2))
+    end
+    @testset "Online over every family that folds exactly" begin
+        # Issue #997. A family that folds exactly narrows the `cache` type parameter of its
+        # own `partial_fit!` methods, so a wrapped estimator never meets them: it buffers,
+        # and every read-out verb answers by running the batch verb over the buffer's rows.
+        # The cap is the window -- there is no special case for an estimator that would
+        # otherwise fold.
+        rng2 = StableRNG(135792468)
+        Y = randn(rng2, 60, 4) ./ 100
+        # Wider than the `min_obs` of the exponentially weighted families, which answer
+        # `NaN` over a shorter window, and narrower than the sample, so the capped read-out
+        # and the uncapped one are different numbers.
+        w = 45
+        families = ((; name = "SimpleExpectedReturns", est = SimpleExpectedReturns(),
+                     readout = e -> Statistics.mean(e, po.partial_fit_cache(e)),
+                     batch = (e, Z) -> Statistics.mean(e, Z), exact = true),
+                    (; name = "SimpleVariance", est = SimpleVariance(),
+                     readout = e -> Statistics.var(e, po.partial_fit_cache(e)),
+                     batch = (e, Z) -> Statistics.var(e, Z), exact = true),
+                    (; name = "GeneralCovariance", est = GeneralCovariance(),
+                     readout = e -> Statistics.cov(e, po.partial_fit_cache(e)),
+                     batch = (e, Z) -> Statistics.cov(e, Z), exact = true),
+                    (; name = "Covariance", est = Covariance(),
+                     readout = e -> Statistics.cov(e, po.partial_fit_cache(e)),
+                     batch = (e, Z) -> Statistics.cov(e, Z), exact = true),
+                    (; name = "Covariance/SemiMoment",
+                     est = Covariance(; alg = SemiMoment()),
+                     readout = e -> Statistics.cov(e, po.partial_fit_cache(e)),
+                     batch = (e, Z) -> Statistics.cov(e, Z), exact = false),
+                    (; name = "Coskewness", est = Coskewness(),
+                     readout = e -> first(coskewness(e, po.partial_fit_cache(e))),
+                     batch = (e, Z) -> first(coskewness(e, Z)), exact = true),
+                    (; name = "Cokurtosis", est = Cokurtosis(),
+                     readout = e -> cokurtosis(e, po.partial_fit_cache(e)),
+                     batch = (e, Z) -> cokurtosis(e, Z), exact = true),
+                    (; name = "ExpWeightedExpectedReturns",
+                     est = ExpWeightedExpectedReturns(),
+                     readout = e -> Statistics.mean(e, po.partial_fit_cache(e)),
+                     batch = (e, Z) -> Statistics.mean(e, Z), exact = true),
+                    (; name = "ExpWeightedVariance", est = ExpWeightedVariance(),
+                     readout = e -> Statistics.var(e, po.partial_fit_cache(e)),
+                     batch = (e, Z) -> Statistics.var(e, Z), exact = true),
+                    (; name = "ExpWeightedCovariance", est = ExpWeightedCovariance(),
+                     readout = e -> Statistics.cov(e, po.partial_fit_cache(e)),
+                     batch = (e, Z) -> Statistics.cov(e, Z), exact = true),
+                    (; name = "RegimeAdjustedExpWeightedVariance",
+                     est = RegimeAdjustedExpWeightedVariance(),
+                     readout = e -> Statistics.var(e, po.partial_fit_cache(e)),
+                     batch = (e, Z) -> Statistics.var(e, Z), exact = true),
+                    (; name = "RegimeAdjustedExpWeightedCovariance",
+                     est = RegimeAdjustedExpWeightedCovariance(),
+                     readout = e -> Statistics.cov(e, po.partial_fit_cache(e)),
+                     batch = (e, Z) -> Statistics.cov(e, Z), exact = true))
+        @testset "$(fam.name)" for fam in families
+            # Wrapping seeds a buffer, and the fold reaches the generic buffering method
+            # rather than the family's own, whether that method folds or refuses.
+            wrapped = po.update_online_estimator(Online(fam.est))
+            @test isa(wrapped.cache, po.SampleBufferState)
+            folded = partial_fit!(wrapped, Y)
+            @test isa(folded.cache, po.SampleBufferState)
+            @test isequal(po.sample_buffer(folded), Y)
+            # An uncapped buffer answers what a batch fit over every observation answers.
+            @test isapprox(fam.readout(folded), fam.batch(fam.est, Y))
+            # The cap is the window: a capped buffer answers what a batch fit over the last
+            # `max_history` observations answers, for a family that folds exactly too.
+            capped = partial_fit!(po.update_online_estimator(Online(fam.est;
+                                                                    max_history = w)), Y)
+            @test isequal(po.sample_buffer(capped), Y[(end - w + 1):end, :])
+            @test isapprox(fam.readout(capped), fam.batch(fam.est, Y[(end - w + 1):end, :]))
+            # An estimator left unwrapped is untouched: it still folds into its own family
+            # state, and its own state is not a buffer.
+            if fam.exact
+                unwrapped = partial_fit!(fam.est, Y)
+                @test !isa(unwrapped.cache, po.SampleBufferState)
+                @test isa(unwrapped.cache, po.AbstractPartialFitState)
+            else
+                @test_throws ArgumentError partial_fit!(fam.est, Y)
+            end
+        end
+        # A buffer records no per-observation activity, so it refuses a Coverage Policy mask
+        # rather than folding a block whose mask it would have to discard.
+        wrapped = po.update_online_estimator(Online(Covariance()))
+        @test_throws ArgumentError partial_fit!(wrapped, Y; active_mask = trues(size(Y)))
+        @test_throws ArgumentError partial_fit!(wrapped, view(Y, 1, :);
+                                                active_mask = trues(size(Y, 2)))
+        @test_throws ArgumentError partial_fit!(po.update_online_estimator(Online(RegimeAdjustedExpWeightedCovariance())),
+                                                Y; estimation_mask = trues(size(Y)))
+        # The one-argument read-out is bound to every moment algorithm, so a wrapped
+        # `SemiMoment` covariance answers it and an unwrapped one that carries nothing meets
+        # the named refusal rather than a `MethodError`.
+        semi = Covariance(; alg = SemiMoment())
+        @test isapprox(Statistics.cov(partial_fit!(po.update_online_estimator(Online(semi)),
+                                                   Y)), Statistics.cov(semi, Y))
+        @test_throws ArgumentError Statistics.cov(semi)
     end
 end

@@ -636,7 +636,9 @@ Refuses an incremental fit of a [`Coskewness`](@ref) estimator under [`SemiMomen
   - [`SemiMoment`](@ref)
   - [`partial_fit!`](@ref)
 """
-function partial_fit!(::Coskewness{<:Any, <:Any, <:SemiMoment}, ::VecNum_MatNum; kwargs...)
+function partial_fit!(::Coskewness{<:Any, <:Any, <:SemiMoment, <:Any, <:Any,
+                                   <:Option{<:CoskewnessPartialFitState}}, ::VecNum_MatNum;
+                      kwargs...)
     return throw(ArgumentError("a `Coskewness` estimator with a `SemiMoment` moment algorithm cannot be fitted incrementally, because the clip against the sample mean moves when the mean moves, so a past observation's membership of the clipped set flips. Use a `FullMoment` algorithm, or run the batch verb."))
 end
 """
@@ -792,7 +794,9 @@ The same refusal as the [`Coskewness`](@ref) one, for the same reason: [`SemiMom
   - [`SemiMoment`](@ref)
   - [`partial_fit!`](@ref)
 """
-function partial_fit!(::Cokurtosis{<:Any, <:Any, <:SemiMoment}, ::VecNum_MatNum; kwargs...)
+function partial_fit!(::Cokurtosis{<:Any, <:Any, <:SemiMoment, <:Any, <:Any,
+                                   <:Option{<:CokurtosisPartialFitState}}, ::VecNum_MatNum;
+                      kwargs...)
     return throw(ArgumentError("a `Cokurtosis` estimator with a `SemiMoment` moment algorithm cannot be fitted incrementally, because the clip against the sample mean moves when the mean moves, so a past observation's membership of the clipped set flips. Use a `FullMoment` algorithm, or run the batch verb."))
 end
 """
@@ -1004,4 +1008,56 @@ function cokurtosis(kte::Cokurtosis)
     @argcheck(!isnothing(kte.cache),
               ArgumentError("this `Cokurtosis` estimator carries no partial-fit state, so there is nothing to read out. Call `partial_fit!` first, or pass a data matrix."))
     return cokurtosis(kte, kte.cache)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Reads a coskewness tensor out of a [`SampleBufferState`](@ref), by running the batch verb over the observations the buffer holds.
+
+The buffer read-out arm of `coskewness`. An estimator wrapped in [`Online`](@ref) carries a buffer rather than a family state, so it takes no exact fold, and its estimate is whatever a batch fit over the rows the buffer holds gives — every observation folded so far when the buffer is uncapped, and the last `max_history` of them when it is capped. It runs no [`assert_partial_fittable`](@ref) check of its own: the batch verb answers configurations an incremental fold cannot, and a wrapper is how a caller reaches them.
+
+# Arguments
+
+  - $(arg_dict[:ske])
+  - `state`: The buffer to read.
+
+# Returns
+
+  - `(cskew, V)::Tuple`: The coskewness tensor of the observations the buffer holds, and its negative spectral shape.
+
+# Related
+
+  - [`SampleBufferState`](@ref)
+  - [`Online`](@ref)
+  - [`sample_buffer`](@ref)
+  - [`partial_fit!`](@ref)
+"""
+function coskewness(ske::CoskewnessEstimator, state::SampleBufferState)
+    return coskewness(ske, sample_buffer(state))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Reads a cokurtosis matrix out of a [`SampleBufferState`](@ref), by running the batch verb over the observations the buffer holds.
+
+The buffer read-out arm of `cokurtosis`. An estimator wrapped in [`Online`](@ref) carries a buffer rather than a family state, so it takes no exact fold, and its estimate is whatever a batch fit over the rows the buffer holds gives — every observation folded so far when the buffer is uncapped, and the last `max_history` of them when it is capped. It runs no [`assert_partial_fittable`](@ref) check of its own: the batch verb answers configurations an incremental fold cannot, and a wrapper is how a caller reaches them.
+
+# Arguments
+
+  - $(arg_dict[:kte])
+  - `state`: The buffer to read.
+
+# Returns
+
+  - `ckurt::MatNum`: Cokurtosis matrix of the observations the buffer holds.
+
+# Related
+
+  - [`SampleBufferState`](@ref)
+  - [`Online`](@ref)
+  - [`sample_buffer`](@ref)
+  - [`partial_fit!`](@ref)
+"""
+function cokurtosis(kte::CokurtosisEstimator, state::SampleBufferState)
+    return cokurtosis(kte, sample_buffer(state))
 end

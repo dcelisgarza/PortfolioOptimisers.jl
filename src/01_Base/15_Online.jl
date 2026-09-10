@@ -504,24 +504,30 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Folds observations into the sample buffer an estimator carries.
 
-The buffering arm of [`partial_fit!`](@ref), and the method every estimator with no exact incremental fold of its own reaches. A family that folds exactly writes methods of its own for its own type, which are more specific and win on dispatch; this one is what remains, so nothing refuses the step.
+The buffering arm of [`partial_fit!`](@ref), and the method every estimator carrying a [`SampleBufferState`](@ref) reaches. A family that folds exactly writes methods of its own, and each of them narrows the `cache` type parameter of its own estimator to the state that fold reads, so a buffer never meets them and this method is what remains. The state's type is therefore the whole route, and nothing refuses the step.
 
 It is one method over both arms of the interface rather than two, because the families that refuse the step declare one method over both arms too, and a pair of narrower methods here would be ambiguous against each of them. So the arm is chosen by the type of `X` inside the body, which is statically resolved at every call site.
 
+A buffer carries observations alone. It records no per-observation activity, so it cannot tell a delisting from a holiday on read-out, and this method refuses a [`CoveragePolicy`](@ref) mask rather than folding a block whose mask it would have to discard.
+
 # Algorithm
 
- 1. Read the buffer out of the `cache` field with [`assert_sample_buffer`](@ref), which refuses an estimator that was never wrapped in [`Online`](@ref).
- 2. Fold a matrix through the block arm of [`partial_fit!`](@ref), and a vector through the single-observation arm.
- 3. Rebind `est.cache` with `Accessors.@reset`, and return the estimator.
+ 1. Refuse a mask, which a buffer has nowhere to record.
+ 2. Read the buffer out of the `cache` field with [`assert_sample_buffer`](@ref), which refuses an estimator that was never wrapped in [`Online`](@ref).
+ 3. Fold a matrix through the block arm of [`partial_fit!`](@ref), and a vector through the single-observation arm.
+ 4. Rebind `est.cache` with `Accessors.@reset`, and return the estimator.
 
 # Arguments
 
   - `est`: Estimator whose buffer is folded forward.
   - `X`: Observations to fold. A matrix holds one observation per row when `dims == 1`, and one per column when `dims == 2`. A vector is a single observation across the assets, and `dims` is ignored.
   - $(arg_dict[:dims])
+  - `active_mask`: Accepted so a wrapped estimator meets a named refusal rather than a `MethodError` on the keyword. Must be `nothing`.
+  - `estimation_mask`: Accepted for the same reason. Must be `nothing`.
 
 # Validation
 
+  - `active_mask` and `estimation_mask` are both `nothing`. An `ArgumentError` is thrown otherwise.
   - `est` carries a [`SampleBufferState`](@ref). An `ArgumentError` is thrown otherwise.
   - $(val_dict[:dims])
 
@@ -536,7 +542,10 @@ It is one method over both arms of the interface rather than two, because the fa
   - [`partial_fit!`](@ref)
 """
 function partial_fit!(est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEstimator},
-                      X::VecNum_MatNum; dims::Int = 1)
+                      X::VecNum_MatNum; dims::Int = 1, active_mask = nothing,
+                      estimation_mask = nothing)
+    @argcheck(isnothing(active_mask) && isnothing(estimation_mask),
+              ArgumentError("a sample buffer carries observations alone, so it has nowhere to record which cells were active at each one. A cell that is finite but inactive would then be fitted on read-out, and a delisting would read as a holiday. Fold the estimator unwrapped, which carries the mask into its own accumulator, or drop the mask."))
     state = assert_sample_buffer(est)
     state = isa(X, MatNum) ? partial_fit!(state, X; dims = dims) : partial_fit!(state, X)
     return Accessors.@reset est.cache = state
@@ -550,11 +559,13 @@ An `Online` is stored *directly in the estimator field it wraps* — e.g. `Empir
 
 It differs from [`TimeDependent`](@ref) in when it resolves, and the difference is deliberate. A schedule re-resolves every fold, because its value changes every fold. An `Online` resolves **once**, at warm-up, because after warm-up the state is what is threaded from step to step and a second resolution would throw the buffer away.
 
-Wrap an estimator whose estimate has **no** exact incremental fold of its own, or one that folds exactly and carries its observations for a consumer downstream. An estimator that folds exactly and carries nothing needs no wrapper: it already answers [`partial_fit!`](@ref), seeding its own state on the first call, and wrapping it would put a buffer where its own fold expects its own state.
+A wrapper **replaces** an exact fold; it does not add to one. Every family that folds exactly narrows the `cache` type parameter of its own [`partial_fit!`](@ref) methods to the state that fold reads, so a wrapped estimator never meets them: it buffers its observations and answers every read-out verb by running the batch verb over the rows the buffer holds. The state's type is the whole route, and it is decided by whether the caller wrapped the estimator.
+
+So wrap an estimator whose estimate has **no** exact incremental fold of its own, one that folds exactly and carries its observations for a consumer downstream, or one whose estimate you want fitted over a window rather than over every observation. An estimator that folds exactly and carries nothing needs no wrapper: unwrapped it already answers [`partial_fit!`](@ref), seeding its own state on the first call, and it folds in the memory one state costs rather than the memory a buffer costs.
 
 A wrapper and a [`TimeDependent`](@ref) schedule do not wrap each other, and the difference in *when* they resolve is the whole reason. Neither `Online(TimeDependent(…))` nor a schedule whose entry or `default` is an `Online` is admissible: a wrapper reached through a schedule entry would be resolved at no fold at all, or re-seeded at every fold, throwing away the buffer the step threads. They compose the other way round, and both ways are ordinary. An estimator an `Online` wraps may hold schedules of its own, which survive the seeding untouched and resolve per fold afterwards; and one host may hold a wrapper in one field and a schedule in another, each resolving at its own time. The two field scans are disjoint by construction — a field holding one is invisible to the other's candidate list — so neither resolution can reach the other's wrapper.
 
-`max_history` caps that buffer, and it is a memory knob rather than a mode. Capping bounds the memory the buffer holds and changes what a consumer that reads the observations answers — the scenario risk measures, so CVaR, EVaR and CDaR — while an estimate that folds exactly is unaffected and stays fitted over every observation folded so far.
+`max_history` caps that buffer, and the cap **is** the window. An uncapped buffer answers exactly what a batch fit over every observation folded so far answers, and a capped one answers exactly what a batch fit over the last `max_history` observations answers — for the estimate itself and for every consumer that reads the observations, the scenario risk measures among them, so CVaR, EVaR and CDaR. There is one rule and no special case: a buffer means the batch verb over the buffer's rows. An estimator left unwrapped is unaffected, folds exactly, and stays fitted over every observation.
 
 # Fields
 

@@ -680,7 +680,9 @@ The estimator carries the state in its `cache` field, so a second call continues
   - [`ExpWeightedCovarianceState`](@ref)
   - [`Statistics.cov(ce::ExpWeightedCovariance; kwargs...)`](@ref)
 """
-function partial_fit!(ce::ExpWeightedCovariance, X::MatNum; dims::Int = 1,
+function partial_fit!(ce::ExpWeightedCovariance{<:Any, <:Any, <:Any,
+                                                <:Option{<:ExpWeightedCovarianceState}},
+                      X::MatNum; dims::Int = 1,
                       active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
     cache = exp_weighted_pass!(ce, X, dims, active_mask, ce.cache)
     Accessors.@reset ce.cache = cache
@@ -732,8 +734,10 @@ true
   - [`partial_fit!(ce::ExpWeightedCovariance, X::MatNum; dims::Int = 1, active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)`](@ref)
   - [`ExpWeightedCovariance`](@ref)
 """
-function partial_fit!(ce::ExpWeightedCovariance, x::VecNum;
-                      active_mask::Option{<:AbstractVector{<:Bool}} = nothing, kwargs...)
+function partial_fit!(ce::ExpWeightedCovariance{<:Any, <:Any, <:Any,
+                                                <:Option{<:ExpWeightedCovarianceState}},
+                      x::VecNum; active_mask::Option{<:AbstractVector{<:Bool}} = nothing,
+                      kwargs...)
     return partial_fit!(ce, permutedims(x); dims = 1,
                         active_mask = if isnothing(active_mask)
                             nothing

@@ -623,7 +623,9 @@ The block arm of the [`partial_fit!`](@ref) interface. Welford's update reads on
   - [`SimpleExpectedReturns`](@ref)
   - [`partial_fit!`](@ref)
 """
-function partial_fit!(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1,
+function partial_fit!(me::SimpleExpectedReturns{<:Any, <:Any,
+                                                <:Option{<:SimpleExpectedReturnsState}},
+                      X::MatNum; dims::Int = 1,
                       active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing)
     X = dims_oriented(dims, X)
     amsk = isnothing(active_mask) ? nothing : dims_oriented(dims, active_mask)
@@ -649,8 +651,9 @@ $(DocStringExtensions.TYPEDSIGNATURES)
  3. Fold `x` into the state.
  4. Rebind `me.cache` with `Accessors.@reset`, and return the estimator.
 """
-function partial_fit!(me::SimpleExpectedReturns, x::VecNum;
-                      active_mask::Option{<:AbstractVector{<:Bool}} = nothing)
+function partial_fit!(me::SimpleExpectedReturns{<:Any, <:Any,
+                                                <:Option{<:SimpleExpectedReturnsState}},
+                      x::VecNum; active_mask::Option{<:AbstractVector{<:Bool}} = nothing)
     assert_partial_fittable(me, me.w, "SimpleExpectedReturns")
     state = expected_returns_state_seed(me.cache, x, me.cvg)
     return Accessors.@reset me.cache = partial_fit!(state, x, me.cvg, active_mask)

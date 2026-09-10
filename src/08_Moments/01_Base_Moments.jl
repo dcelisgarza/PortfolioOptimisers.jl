@@ -294,6 +294,110 @@ function factory_child(v::AbstractArray{<:AbstractCovarianceEstimator}, args...;
     return [factory_child(vi, args...; kwargs...) for vi in v]
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Reads a covariance matrix out of a [`SampleBufferState`](@ref), by running the batch verb over the observations the buffer holds.
+
+The buffer read-out arm of `Statistics.cov`. An estimator wrapped in [`Online`](@ref) carries a buffer rather than a family state, so it takes no exact fold, and its estimate is whatever a batch fit over the rows the buffer holds gives — every observation folded so far when the buffer is uncapped, and the last `max_history` of them when it is capped. It runs no [`assert_partial_fittable`](@ref) check of its own: the batch verb answers configurations an incremental fold cannot, and a wrapper is how a caller reaches them.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - `state`: The buffer to read.
+
+# Returns
+
+  - `sigma::MatNum`: Covariance matrix of the observations the buffer holds.
+
+# Related
+
+  - [`SampleBufferState`](@ref)
+  - [`Online`](@ref)
+  - [`sample_buffer`](@ref)
+  - [`partial_fit!`](@ref)
+"""
+function Statistics.cov(ce::AbstractCovarianceEstimator, state::SampleBufferState)
+    return Statistics.cov(ce, sample_buffer(state))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Reads a correlation matrix out of a [`SampleBufferState`](@ref), by running the batch verb over the observations the buffer holds.
+
+The buffer read-out arm of `Statistics.cor`. An estimator wrapped in [`Online`](@ref) carries a buffer rather than a family state, so it takes no exact fold, and its estimate is whatever a batch fit over the rows the buffer holds gives — every observation folded so far when the buffer is uncapped, and the last `max_history` of them when it is capped. It runs no [`assert_partial_fittable`](@ref) check of its own: the batch verb answers configurations an incremental fold cannot, and a wrapper is how a caller reaches them.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - `state`: The buffer to read.
+
+# Returns
+
+  - `rho::MatNum`: Correlation matrix of the observations the buffer holds.
+
+# Related
+
+  - [`SampleBufferState`](@ref)
+  - [`Online`](@ref)
+  - [`sample_buffer`](@ref)
+  - [`partial_fit!`](@ref)
+"""
+function Statistics.cor(ce::AbstractCovarianceEstimator, state::SampleBufferState)
+    return Statistics.cor(ce, sample_buffer(state))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Reads a variance out of a [`SampleBufferState`](@ref), by running the batch verb over the observations the buffer holds.
+
+The buffer read-out arm of `Statistics.var`. An estimator wrapped in [`Online`](@ref) carries a buffer rather than a family state, so it takes no exact fold, and its estimate is whatever a batch fit over the rows the buffer holds gives — every observation folded so far when the buffer is uncapped, and the last `max_history` of them when it is capped. It runs no [`assert_partial_fittable`](@ref) check of its own: the batch verb answers configurations an incremental fold cannot, and a wrapper is how a caller reaches them.
+
+# Arguments
+
+  - $(arg_dict[:ve])
+  - `state`: The buffer to read.
+
+# Returns
+
+  - `sigma2::ArrNum`: Variance of the observations the buffer holds, one entry per asset.
+
+# Related
+
+  - [`SampleBufferState`](@ref)
+  - [`Online`](@ref)
+  - [`sample_buffer`](@ref)
+  - [`partial_fit!`](@ref)
+"""
+function Statistics.var(ve::AbstractVarianceEstimator, state::SampleBufferState)
+    return Statistics.var(ve, sample_buffer(state))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Reads a standard deviation out of a [`SampleBufferState`](@ref), by running the batch verb over the observations the buffer holds.
+
+The buffer read-out arm of `Statistics.std`. An estimator wrapped in [`Online`](@ref) carries a buffer rather than a family state, so it takes no exact fold, and its estimate is whatever a batch fit over the rows the buffer holds gives — every observation folded so far when the buffer is uncapped, and the last `max_history` of them when it is capped. It runs no [`assert_partial_fittable`](@ref) check of its own: the batch verb answers configurations an incremental fold cannot, and a wrapper is how a caller reaches them.
+
+# Arguments
+
+  - $(arg_dict[:ve])
+  - `state`: The buffer to read.
+
+# Returns
+
+  - `sigma::ArrNum`: Standard deviation of the observations the buffer holds, one entry per asset.
+
+# Related
+
+  - [`SampleBufferState`](@ref)
+  - [`Online`](@ref)
+  - [`sample_buffer`](@ref)
+  - [`partial_fit!`](@ref)
+"""
+function Statistics.std(ve::AbstractVarianceEstimator, state::SampleBufferState)
+    return Statistics.std(ve, sample_buffer(state))
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all expected returns estimator types.
@@ -380,6 +484,32 @@ MyExpectedReturnsEstimator
   - [`AbstractExpectedReturnsAlgorithm`](@ref)
 """
 abstract type AbstractExpectedReturnsEstimator <: AbstractEstimator end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Reads an expected returns vector out of a [`SampleBufferState`](@ref), by running the batch verb over the observations the buffer holds.
+
+The buffer read-out arm of `Statistics.mean`. An estimator wrapped in [`Online`](@ref) carries a buffer rather than a family state, so it takes no exact fold, and its estimate is whatever a batch fit over the rows the buffer holds gives — every observation folded so far when the buffer is uncapped, and the last `max_history` of them when it is capped. It runs no [`assert_partial_fittable`](@ref) check of its own: the batch verb answers configurations an incremental fold cannot, and a wrapper is how a caller reaches them.
+
+# Arguments
+
+  - $(arg_dict[:me])
+  - `state`: The buffer to read.
+
+# Returns
+
+  - `mu::VecNum`: Expected returns of the observations the buffer holds, `assets × 1`.
+
+# Related
+
+  - [`SampleBufferState`](@ref)
+  - [`Online`](@ref)
+  - [`sample_buffer`](@ref)
+  - [`partial_fit!`](@ref)
+"""
+function Statistics.mean(me::AbstractExpectedReturnsEstimator, state::SampleBufferState)
+    return Statistics.mean(me, sample_buffer(state))
+end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 

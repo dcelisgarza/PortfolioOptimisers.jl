@@ -1286,7 +1286,8 @@ The block arm of the [`partial_fit!`](@ref) interface. Welford's update reads on
   - [`GeneralCovariance`](@ref)
   - [`partial_fit!`](@ref)
 """
-function partial_fit!(ce::GeneralCovariance, X::MatNum; dims::Int = 1)
+function partial_fit!(ce::GeneralCovariance{<:Any, <:Any, <:Option{<:CovarianceState}},
+                      X::MatNum; dims::Int = 1)
     X = dims_oriented(dims, X)
     for i in axes(X, 1)
         ce = partial_fit!(ce, view(X, i, :))
@@ -1305,7 +1306,8 @@ $(DocStringExtensions.TYPEDSIGNATURES)
  3. Fold `x` into the state.
  4. Rebind `ce.cache` with `Accessors.@reset`, and return the estimator.
 """
-function partial_fit!(ce::GeneralCovariance, x::VecNum)
+function partial_fit!(ce::GeneralCovariance{<:Any, <:Any, <:Option{<:CovarianceState}},
+                      x::VecNum)
     partial_fit_corrected(ce)
     return Accessors.@reset ce.cache = partial_fit!(covariance_state_seed(ce.cache, x), x)
 end
@@ -1340,7 +1342,8 @@ The block arm of the [`partial_fit!`](@ref) interface. Welford's update reads on
   - [`Covariance`](@ref)
   - [`partial_fit!`](@ref)
 """
-function partial_fit!(ce::Covariance{<:Any, <:Any, <:FullMoment}, X::MatNum; dims::Int = 1,
+function partial_fit!(ce::Covariance{<:Any, <:Any, <:FullMoment, <:Any, <:Any,
+                                     <:Option{<:CovarianceState}}, X::MatNum; dims::Int = 1,
                       active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing)
     X = dims_oriented(dims, X)
     amsk = isnothing(active_mask) ? nothing : dims_oriented(dims, active_mask)
@@ -1366,7 +1369,8 @@ $(DocStringExtensions.TYPEDSIGNATURES)
  3. Fold `x` into the state.
  4. Rebind `ce.cache` with `Accessors.@reset`, and return the estimator.
 """
-function partial_fit!(ce::Covariance{<:Any, <:Any, <:FullMoment}, x::VecNum;
+function partial_fit!(ce::Covariance{<:Any, <:Any, <:FullMoment, <:Any, <:Any,
+                                     <:Option{<:CovarianceState}}, x::VecNum;
                       active_mask::Option{<:AbstractVector{<:Bool}} = nothing)
     partial_fit_corrected(ce)
     state = covariance_state_seed(ce.cache, x, ce.cvg)
@@ -1379,7 +1383,9 @@ Fallback [`Covariance`](@ref) method of [`partial_fit!`](@ref). Refuses every mo
 
 [`SemiMoment`](@ref) clamps the de-meaned returns at zero **before** the covariance, and the centre it de-means by is a statistic of the whole sample. So a centre that moves moves every past clamp, and a past observation's membership of the downside flips. An incremental fit never reads a past observation again, so it cannot re-clamp one, and the batch method is the one that answers.
 """
-function partial_fit!(ce::Covariance, ::VecNum_MatNum; kwargs...)
+function partial_fit!(ce::Covariance{<:Any, <:Any, <:Any, <:Any, <:Any,
+                                     <:Option{<:CovarianceState}}, ::VecNum_MatNum;
+                      kwargs...)
     return throw(ArgumentError("an incremental covariance fit folds one observation into a Welford accumulator, which reproduces the `FullMoment` sample covariance alone. `$(typeof(ce.alg))` reads the whole sample at every observation, so use the batch method."))
 end
 """
@@ -1387,13 +1393,13 @@ end
         ce::Union{<:GeneralCovariance, <:Covariance{<:Any, <:Any, <:FullMoment}},
         state::CovarianceState
     ) -> MatNum
-    Statistics.cov(
-        ce::Union{<:GeneralCovariance, <:Covariance{<:Any, <:Any, <:FullMoment}}
-    ) -> MatNum
+    Statistics.cov(ce::Union{<:GeneralCovariance, <:Covariance}) -> MatNum
 
 Read the covariance matrix of an incremental fit out of a [`CovarianceState`](@ref).
 
 The two-argument method reads a state the caller holds, and the one-argument method reads the state the `cache` field of `ce` carries. The bias correction comes from the innermost `StatsBase.SimpleCovariance`, which [`partial_fit_corrected`](@ref) resolves.
+
+The one-argument method is bound to every moment algorithm, not to [`FullMoment`](@ref) alone, because an estimator wrapped in [`Online`](@ref) carries a [`SampleBufferState`](@ref) rather than a [`CovarianceState`](@ref), and reading it runs the batch verb over the buffer's rows — which every algorithm answers. It dispatches on what `cache` holds, so a [`SemiMoment`](@ref) estimator answers when it was wrapped and meets the named refusal of [`partial_fit_cache`](@ref) when it carries nothing.
 
 # Mathematical definition
 
@@ -1521,8 +1527,7 @@ function coverage_covariance(ce::Covariance{<:Any, <:Any, <:FullMoment},
     return coverage_divide(state.M, counts.nu, partial_fit_corrected(ce),
                            coverage_admission(cvg, counts, state.n))
 end
-function Statistics.cov(ce::Union{<:GeneralCovariance,
-                                  <:Covariance{<:Any, <:Any, <:FullMoment}})
+function Statistics.cov(ce::Union{<:GeneralCovariance, <:Covariance})
     return Statistics.cov(ce, partial_fit_cache(ce))
 end
 

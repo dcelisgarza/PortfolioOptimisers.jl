@@ -1795,7 +1795,11 @@ true
   - [`regime_adjusted_covariance_pass!`](@ref)
   - [`Statistics.cov(ce::RegimeAdjustedExpWeightedCovariance)`](@ref)
 """
-function partial_fit!(ce::RegimeAdjustedExpWeightedCovariance, X::MatNum; dims::Int = 1,
+function partial_fit!(ce::RegimeAdjustedExpWeightedCovariance{<:Any, <:Any, <:Any, <:Any,
+                                                              <:Any, <:Any, <:Any, <:Any,
+                                                              <:Any, <:Any, <:Any,
+                                                              <:Option{<:RegimeAdjustedCovarianceState}},
+                      X::MatNum; dims::Int = 1,
                       estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                       active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
     cache = regime_adjusted_covariance_pass!(ce, X, dims, estimation_mask, active_mask,
@@ -1858,7 +1862,11 @@ true
   - [`RegimeAdjustedExpWeightedCovariance`](@ref)
   - [`Statistics.cov(ce::RegimeAdjustedExpWeightedCovariance)`](@ref)
 """
-function partial_fit!(ce::RegimeAdjustedExpWeightedCovariance, x::VecNum;
+function partial_fit!(ce::RegimeAdjustedExpWeightedCovariance{<:Any, <:Any, <:Any, <:Any,
+                                                              <:Any, <:Any, <:Any, <:Any,
+                                                              <:Any, <:Any, <:Any,
+                                                              <:Option{<:RegimeAdjustedCovarianceState}},
+                      x::VecNum;
                       estimation_mask::Option{<:AbstractVector{<:Bool}} = nothing,
                       active_mask::Option{<:AbstractVector{<:Bool}} = nothing, kwargs...)
     return partial_fit!(ce, permutedims(x); dims = 1,

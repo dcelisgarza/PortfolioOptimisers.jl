@@ -1099,7 +1099,9 @@ The block arm of the [`partial_fit!`](@ref) interface. Welford's update reads on
   - [`SimpleVariance`](@ref)
   - [`partial_fit!`](@ref)
 """
-function partial_fit!(ve::SimpleVariance, X::MatNum; dims::Int = 1,
+function partial_fit!(ve::SimpleVariance{<:Any, <:Any, <:Any, <:Any,
+                                         <:Option{<:SimpleVarianceState}}, X::MatNum;
+                      dims::Int = 1,
                       active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing)
     X = dims_oriented(dims, X)
     amsk = isnothing(active_mask) ? nothing : dims_oriented(dims, active_mask)
@@ -1125,7 +1127,8 @@ $(DocStringExtensions.TYPEDSIGNATURES)
  3. Fold `x` into the state.
  4. Rebind `ve.cache` with `Accessors.@reset`, and return the estimator.
 """
-function partial_fit!(ve::SimpleVariance, x::VecNum;
+function partial_fit!(ve::SimpleVariance{<:Any, <:Any, <:Any, <:Any,
+                                         <:Option{<:SimpleVarianceState}}, x::VecNum;
                       active_mask::Option{<:AbstractVector{<:Bool}} = nothing)
     assert_partial_fittable(ve.me, ve.w, "SimpleVariance")
     state = variance_state_seed(ve.cache, x, ve.cvg)

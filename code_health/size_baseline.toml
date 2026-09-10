@@ -83,7 +83,7 @@ commit = "fda13accfd"
 "src/08_Moments/34_CustomValueExpectedReturns.jl" = { code = 45, doc = 129, comment = 0, blank = 64, total = 238 }
 "src/08_Moments/35_GerberIQCovariance.jl" = { code = 532, doc = 1431, comment = 0, blank = 545, total = 2508 }
 "src/08_Moments/36_RegimeAdjustedExpWeightedVariance.jl" = { code = 386, doc = 908, comment = 2, blank = 358, total = 1654 }
-"src/08_Moments/37_RegimeAdjustedExpWeightedCovariance.jl" = { code = 617, doc = 1253, comment = 0, blank = 515, total = 2385 }
+"src/08_Moments/37_RegimeAdjustedExpWeightedCovariance.jl" = { code = 625, doc = 1253, comment = 0, blank = 515, total = 2393 }
 "src/08_Moments/38_CrossSectionalRegression.jl" = { code = 198, doc = 504, comment = 0, blank = 210, total = 912 }
 "src/08_Moments/39_CrossSectionalWeights.jl" = { code = 138, doc = 366, comment = 0, blank = 166, total = 670 }
 "src/08_Moments/40_HigherMomentPartialFit.jl" = { code = 145, doc = 526, comment = 0, blank = 275, total = 946 }

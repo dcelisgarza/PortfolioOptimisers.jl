@@ -427,7 +427,9 @@ The estimator carries the state in its `cache` field, so a second call continues
   - [`exp_weighted_pass!`](@ref)
   - [`Statistics.mean(me::ExpWeightedExpectedReturns; kwargs...)`](@ref)
 """
-function partial_fit!(me::ExpWeightedExpectedReturns, X::MatNum; dims::Int = 1,
+function partial_fit!(me::ExpWeightedExpectedReturns{<:Any, <:Any,
+                                                     <:Option{<:ExpWeightedExpectedReturnsState}},
+                      X::MatNum; dims::Int = 1,
                       active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
     cache = exp_weighted_pass!(me, X, dims, active_mask, me.cache)
     Accessors.@reset me.cache = cache
@@ -479,8 +481,10 @@ true
   - [`partial_fit!(me::ExpWeightedExpectedReturns, X::MatNum; dims::Int = 1, active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)`](@ref)
   - [`ExpWeightedExpectedReturns`](@ref)
 """
-function partial_fit!(me::ExpWeightedExpectedReturns, x::VecNum;
-                      active_mask::Option{<:AbstractVector{<:Bool}} = nothing, kwargs...)
+function partial_fit!(me::ExpWeightedExpectedReturns{<:Any, <:Any,
+                                                     <:Option{<:ExpWeightedExpectedReturnsState}},
+                      x::VecNum; active_mask::Option{<:AbstractVector{<:Bool}} = nothing,
+                      kwargs...)
     return partial_fit!(me, permutedims(x); dims = 1,
                         active_mask = if isnothing(active_mask)
                             nothing
