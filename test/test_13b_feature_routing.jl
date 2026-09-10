@@ -151,9 +151,10 @@ const PO = PortfolioOptimisers
 
         # 2b. A carrier the layer *did* build holds a panel with no Panel Field, which is
         # the layer's common case: a caller holding only prices has no market
-        # capitalisation and no sector. The feature matrix it derives is empty, so the
-        # refusal is `assert_nonempty`'s rather than the one above, and it names the
-        # emptiness rather than the cause. Issue #1003.
+        # capitalisation and no sector. Such a panel states a universe and carries no
+        # feature data, and the refusal names that cause — the panel, the Feature Matrix
+        # and `asset_panel` — rather than the emptiness of the matrix it would otherwise
+        # have derived. Issue #1003.
         e = try
             clusterise(cle, rd0)
         catch err
@@ -162,6 +163,27 @@ const PO = PortfolioOptimisers
         @test isa(e, PortfolioOptimisers.IsEmptyError)
         @test isa(rd0.pnl, AssetPanel)
         @test isempty(rd0.pnl.pf)
+        @test occursin("Panel Field", e.msg)
+        @test occursin("Feature Matrix", e.msg)
+        @test occursin("asset_panel", e.msg)
+        # The refusal is the resolution's, not the kernel's, so the labels a caller
+        # rebuilds refuse with the same message.
+        el = try
+            feature_labels(rd0.pnl)
+        catch err
+            err
+        end
+        @test isa(el, PortfolioOptimisers.IsEmptyError)
+        @test el.msg == e.msg
+        # And it outranks the selector's own emptiness diagnostic: a `sel` naming a Panel
+        # Field a fieldless panel cannot hold is refused for the panel, not for the entry.
+        es = try
+            feature_matrix(rd0.pnl, [nzd[1]])
+        catch err
+            err
+        end
+        @test isa(es, PortfolioOptimisers.IsEmptyError)
+        @test es.msg == e.msg
 
         # 3. A prior result alone carries no panel at all, and the message says so.
         e = try

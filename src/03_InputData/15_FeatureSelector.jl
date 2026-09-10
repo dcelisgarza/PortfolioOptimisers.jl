@@ -337,11 +337,12 @@ The order of `sel` is the column order, so a caller decides it. A `nothing` sele
 
 # Algorithm
 
- 1. Validate `sel` with [`assert_feature_selector`](@ref).
- 2. `sel` is `nothing`: push every Panel Field's value columns in panel order, and return.
- 3. Otherwise resolve each entry with [`select_fields_push!`](@ref), in the order `sel` writes them.
- 4. Check that no two entries resolved to one column.
- 5. Check that the selection is not empty, which happens when every entry resolved against nothing and was dropped.
+ 1. Check that the panel holds a Panel Field. A panel with none carries no feature data at all, so it is refused here, where the cause is still known, rather than downstream where only the empty matrix is visible.
+ 2. Validate `sel` with [`assert_feature_selector`](@ref).
+ 3. `sel` is `nothing`: push every Panel Field's value columns in panel order, and return.
+ 4. Otherwise resolve each entry with [`select_fields_push!`](@ref), in the order `sel` writes them.
+ 5. Check that no two entries resolved to one column.
+ 6. Check that the selection is not empty, which happens when every entry resolved against nothing and was dropped.
 
 # Arguments
 
@@ -351,6 +352,7 @@ The order of `sel` is the column order, so a caller decides it. A `nothing` sele
 
 # Validation
 
+  - `!isempty(pnl.pf)`. Raises an [`IsEmptyError`](@ref) naming the panel, the Feature Matrix and [`asset_panel`](@ref).
   - `sel` is well formed. See [`assert_feature_selector`](@ref).
   - No two entries resolve to one column. Raises an `ArgumentError`.
   - The selection is not empty. Raises an [`IsEmptyError`](@ref).
@@ -368,6 +370,8 @@ The order of `sel` is the column order, so a caller decides it. A `nothing` sele
   - [`assert_feature_selector`](@ref)
 """
 function select_fields(pnl::AssetPanel, sel, strict::Bool)
+    @argcheck(!isempty(pnl.pf),
+              IsEmptyError("a Feature Matrix stacks the Panel Fields of an Asset Panel, and this panel carries none: it states a universe and carries no feature data, which is what a carrier built from prices alone holds. Build the panel the Feature Matrix is to stack with `asset_panel(inputs)` and pass it as `ReturnsResult(; …, pnl = pnl)`, or set a producer on the estimator, `FeatureDistance(; ape = RegressionPanel())`, which builds one from the prior it is handed."))
     assert_feature_selector(sel)
     cols = Tuple{Int, Int, Symbol}[]
     if isnothing(sel)
@@ -544,7 +548,7 @@ A static panel gives an `assets × features` matrix, and a time-varying one an `
 
 # Validation
 
-  - `sel` resolves to at least one column. See [`select_fields`](@ref).
+  - The panel holds a Panel Field, and `sel` resolves to at least one column. See [`select_fields`](@ref).
 
 # Returns
 
