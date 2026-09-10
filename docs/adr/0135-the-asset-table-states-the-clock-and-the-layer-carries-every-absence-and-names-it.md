@@ -165,8 +165,9 @@ steps, which is also the only place the layer's pieces are visible.
   than deferring to it.
 
 - **Three defects were found while deciding, and are filed rather than folded in.**
-  `assert_finite(val::ArrNum)` is `any(isfinite, val)`, so one finite cell satisfies a check named
-  *finite*; it sits under a family with 291 call sites, so the blast radius is the maintainer's.
+  `assert_finite(val::ArrNum)` was `any(isfinite, val)`, so one finite cell satisfied a check named
+  *finite*; it sits under a family with 291 call sites, so the blast radius was the maintainer's,
+  and it is filed as #993 and fixed there rather than here.
   `test_55_numeric_coercion_census.jl` does not match the `Float64(` spelling of the coercion it
   gates. The unguarded `cov(ce::ImpliedVolatility, X; iv = …)` keyword path is filed with its fix
   named, being closed by the coverage decision above.

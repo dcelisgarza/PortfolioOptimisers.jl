@@ -24,15 +24,15 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `w`, through [`assert_nonempty_finite_val`](@ref): `!isempty(w)` and `any(isfinite, w)`.
+  - `w`, through [`assert_nonempty_finite_val`](@ref): `!isempty(w)` and `all(isfinite, w)`.
 
   - `val`, through [`assert_nonempty_nonneg_finite_val`](@ref):
 
-      + `AbstractDict`: `!isempty(val)`, `any(isfinite, values(val))` and `all(x -> x >= 0, values(val))`.
-      + Vector of pairs: `!isempty(val)`, `any(isfinite, getindex.(val, 2))` and `all(x -> x[2] >= 0, val)`.
+      + `AbstractDict`: `!isempty(val)`, `all(isfinite, values(val))` and `all(x -> x >= 0, values(val))`.
+      + Vector of pairs: `!isempty(val)`, `all(isfinite, getindex.(val, 2))` and `all(x -> x[2] >= 0, val)`.
       + `Pair`: `isfinite(val[2])` and `val[2] >= 0`.
 
-  - `dval`: if not `nothing`, `dval >= 0`.
+  - `dval`: if not `nothing`, `dval >= 0`. An infinity is admitted here where a named cap in `val` is not: `dval` is the cap of every asset `val` does not name, and `+Inf` is how it leaves them uncapped, `dval = nothing` filling zero and freezing them instead.
 
 ## View parameters
 
@@ -85,6 +85,10 @@ TurnoverEstimator
         assert_nonempty_finite_val(w, :w)
         assert_nonempty_nonneg_finite_val(val, :val)
         if !isnothing(dval)
+            # `dval` is the cap every asset `val` does not name, and `+Inf` is how it says
+            # they are uncapped. `dval = nothing` fills zero, which freezes them instead,
+            # so an infinity is the only spelling of an uncapped default and is admitted
+            # here where a named cap is not.
             @argcheck(zero(dval) <= dval, DomainError)
         end
         return new{typeof(w), typeof(val), typeof(dval), typeof(fixed)}(w, val, dval, fixed)
@@ -266,12 +270,14 @@ Keywords correspond to the struct's fields.
 
 The rules are listed in the order of the raises, so the first rule a value breaks is the one it is told about.
 
-  - `w`, through [`assert_nonempty_finite_val`](@ref): `!isempty(w)` and `any(isfinite, w)`.
+  - `w`, through [`assert_nonempty_finite_val`](@ref): `!isempty(w)` and `all(isfinite, w)`.
 
-  - `val`, through [`assert_nonempty_nonneg_finite_val`](@ref):
+  - `val`, through [`assert_nonempty`](@ref) and [`assert_nonneg`](@ref):
 
-      + `AbstractVector`: `!isempty(val)`, `any(isfinite, val)` and `all(x -> x >= 0, val)`.
-      + `Number`: `isfinite(val)` and `val >= 0`.
+      + `AbstractVector`: `!isempty(val)` and `all(x -> x >= 0, val)`.
+      + `Number`: `val >= 0`.
+
+    A cap of `+Inf` is an uncapped asset, so `val` is not held to finiteness. A `NaN` and a `-Inf` are refused, neither being `>= 0`.
 
   - `length(w) == length(val)` when `val` is an `AbstractVector`, raising a `DimensionMismatch`. This rule is checked last.
 
@@ -331,7 +337,9 @@ Turnover
     fixed
     function Turnover(w::VecNum, val::Num_VecNum, fixed::Bool)::Turnover
         assert_nonempty_finite_val(w, :w)
-        assert_nonempty_nonneg_finite_val(val, :val)
+        # `+Inf` is the uncapped cap, as it is on the estimator this expands from.
+        assert_nonempty(val, :val)
+        assert_nonneg(val, :val)
         if isa(val, VecNum)
             @argcheck(length(val) == length(w), DimensionMismatch)
         end

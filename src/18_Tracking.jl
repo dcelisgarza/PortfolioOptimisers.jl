@@ -213,7 +213,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `w`, through [`assert_nonempty_finite_val`](@ref): `!isempty(w)` and `any(isfinite, w)`. One finite entry is enough, so `[0.5, NaN]` is admitted and `[NaN, NaN]` is not.
+  - `w`, through [`assert_nonempty_finite_val`](@ref): `!isempty(w)` and `all(isfinite, w)`. Every entry must be finite, so `[0.5, NaN]` is refused.
 
 ## View parameters
 
@@ -445,7 +445,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `w`, through [`assert_nonempty_finite_val`](@ref): `!isempty(w)` and `any(isfinite, w)`. One finite entry is enough, so `[0.01, NaN]` is admitted and `[NaN, NaN]` is not.
+  - `w`, through [`assert_nonempty_finite_val`](@ref): `!isempty(w)` and `all(isfinite, w)`. Every entry must be finite, so `[0.01, NaN]` is refused.
 
 # Examples
 

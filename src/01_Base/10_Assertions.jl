@@ -59,15 +59,15 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Assert that `val` contains at least one finite element.
+Assert that every element of `val` is finite.
 
 # Algorithm
 
 The method Julia selects on the type of `val` is the algorithm. Each method checks one predicate and raises a `DomainError` that names `sym` and the predicate it failed.
 
- 1. An `AbstractDict` checks `any(isfinite, values(val))`, so the keys are not read.
- 2. A `VecPair` checks `any(isfinite, getindex.(val, 2))`, so the second element of each pair is the value.
- 3. An `ArrNum` checks `any(isfinite, val)`.
+ 1. An `AbstractDict` checks `all(isfinite, values(val))`, so the keys are not read.
+ 2. A `VecPair` checks `all(isfinite, getindex.(val, 2))`, so the second element of each pair is the value.
+ 3. An `ArrNum` checks `all(isfinite, val)`.
  4. A `Pair` checks `isfinite(val[2])`.
  5. A `Number` checks `isfinite(val)`.
 
@@ -78,7 +78,7 @@ The method Julia selects on the type of `val` is the algorithm. Each method chec
 
 # Validation
 
-  - At least one element of `val` is finite, under the predicate that its type selects. A breach raises a `DomainError`.
+  - Every element of `val` is finite, under the predicate that its type selects. A `NaN` and an infinity both breach it, and a breach raises a `DomainError`.
 
 # Returns
 
@@ -94,18 +94,18 @@ The method Julia selects on the type of `val` is the algorithm. Each method chec
   - [`assert_nonempty_finite_val`](@ref)
 """
 function assert_finite(val::AbstractDict, sym::Sym_Str = :val)::Nothing
-    @argcheck(any(isfinite, values(val)),
-              DomainError("any(isfinite, values($sym)) must hold. Got\nany(isfinite, values($sym)) => $(any(isfinite, values(val)))"))
+    @argcheck(all(isfinite, values(val)),
+              DomainError("all(isfinite, values($sym)) must hold. Got\nall(isfinite, values($sym)) => $(all(isfinite, values(val)))"))
     return nothing
 end
 function assert_finite(val::VecPair, sym::Sym_Str = :val)::Nothing
-    @argcheck(any(isfinite, getindex.(val, 2)),
-              DomainError("any(isfinite, getindex.($sym, 2)) must hold. Got\nany(isfinite, getindex.($sym, 2)) => $(any(isfinite, getindex.(val, 2)))"))
+    @argcheck(all(isfinite, getindex.(val, 2)),
+              DomainError("all(isfinite, getindex.($sym, 2)) must hold. Got\nall(isfinite, getindex.($sym, 2)) => $(all(isfinite, getindex.(val, 2)))"))
     return nothing
 end
 function assert_finite(val::ArrNum, sym::Sym_Str = :val)::Nothing
-    @argcheck(any(isfinite, val),
-              DomainError("any(isfinite, $sym) must hold. Got\nany(isfinite, $sym) => $(any(isfinite, val))"))
+    @argcheck(all(isfinite, val),
+              DomainError("all(isfinite, $sym) must hold. Got\nall(isfinite, $sym) => $(all(isfinite, val))"))
     return nothing
 end
 function assert_finite(val::Pair, sym::Sym_Str = :val)::Nothing
@@ -123,7 +123,7 @@ end
 
 Assert that *every* element of `val` is finite, failing closed with an [`IsNonFiniteError`](@ref) otherwise.
 
-Unlike [`assert_finite`](@ref), which only requires *one* finite element, this demands the whole array be finite. It guards the comparison-based covariance estimators ([`GerberCovariance`](@ref), [`SmythBrobyCovariance`](@ref)): their `X .>= sd` / `X .<= -sd` comparisons silently evaluate a `NaN` entry as `false`, masking it as "no co-movement" and yielding a finite, plausible, *wrong* covariance rather than an error. Clean returns first with an asset selector (e.g. [`CompleteAssetSelector`](@ref)) or [`MissingDataFilter`](@ref) — non-finite entries in a returns matrix are a supported input to *those*, but not to a comparison-based estimator. The message reports the count of offending entries and the first offending index only — never the data values.
+[`assert_finite`](@ref) checks the same predicate and raises a `DomainError` alongside its [`assert_nonneg`](@ref) and [`assert_gt0`](@ref) siblings; this one raises an [`IsNonFiniteError`](@ref) and reports where the breach is, so a caller can find the offending entry without the message quoting the data. It guards the comparison-based covariance estimators ([`GerberCovariance`](@ref), [`SmythBrobyCovariance`](@ref)): their `X .>= sd` / `X .<= -sd` comparisons silently evaluate a `NaN` entry as `false`, masking it as "no co-movement" and yielding a finite, plausible, *wrong* covariance rather than an error. Clean returns first with an asset selector (e.g. [`CompleteAssetSelector`](@ref)) or [`MissingDataFilter`](@ref) — non-finite entries in a returns matrix are a supported input to *those*, but not to a comparison-based estimator. The message reports the count of offending entries and the first offending index only — never the data values.
 
 # Arguments
 
@@ -500,9 +500,9 @@ Validate that the input value is non-empty, non-negative and finite.
 
 Each rule is the one that `val`'s own type selects in the three functions of step 1.
 
-  - `::AbstractDict`: `!isempty(val)`, `any(isfinite, values(val))`, `all(x -> x >= 0, values(val))`.
-  - `::VecPair`: `!isempty(val)`, `any(isfinite, getindex.(val, 2))`, `all(x -> x[2] >= 0, val)`.
-  - `::ArrNum`: `!isempty(val)`, `any(isfinite, val)`, `all(x -> x >= 0, val)`.
+  - `::AbstractDict`: `!isempty(val)`, `all(isfinite, values(val))`, `all(x -> x >= 0, values(val))`.
+  - `::VecPair`: `!isempty(val)`, `all(isfinite, getindex.(val, 2))`, `all(x -> x[2] >= 0, val)`.
+  - `::ArrNum`: `!isempty(val)`, `all(isfinite, val)`, `all(x -> x >= 0, val)`.
   - `::Pair`: `isfinite(val[2])` and `val[2] >= 0`.
   - `::Number`: `isfinite(val)` and `val >= 0`.
   - Any other type: no rule, so the call always passes.
@@ -553,9 +553,9 @@ Validate that the input value is non-empty, greater than zero, and finite.
 
 Each rule is the one that `val`'s own type selects in the three functions of step 1.
 
-  - `::AbstractDict`: `!isempty(val)`, `any(isfinite, values(val))`, `all(x -> x > 0, values(val))`.
-  - `::VecPair`: `!isempty(val)`, `any(isfinite, getindex.(val, 2))`, `all(x -> x[2] > 0, val)`.
-  - `::ArrNum`: `!isempty(val)`, `any(isfinite, val)`, `all(x -> x > 0, val)`.
+  - `::AbstractDict`: `!isempty(val)`, `all(isfinite, values(val))`, `all(x -> x > 0, values(val))`.
+  - `::VecPair`: `!isempty(val)`, `all(isfinite, getindex.(val, 2))`, `all(x -> x[2] > 0, val)`.
+  - `::ArrNum`: `!isempty(val)`, `all(isfinite, val)`, `all(x -> x > 0, val)`.
   - `::Pair`: `isfinite(val[2])` and `val[2] > 0`.
   - `::Number`: `isfinite(val)` and `val > 0`.
   - Any other type: no rule, so the call always passes.
@@ -606,9 +606,9 @@ Validate that the input value is non-empty and finite.
 
 Each rule is the one that `val`'s own type selects in the two functions of step 1.
 
-  - `::AbstractDict`: `!isempty(val)`, `any(isfinite, values(val))`.
-  - `::VecPair`: `!isempty(val)`, `any(isfinite, getindex.(val, 2))`.
-  - `::ArrNum`: `!isempty(val)`, `any(isfinite, val)`.
+  - `::AbstractDict`: `!isempty(val)`, `all(isfinite, values(val))`.
+  - `::VecPair`: `!isempty(val)`, `all(isfinite, getindex.(val, 2))`.
+  - `::ArrNum`: `!isempty(val)`, `all(isfinite, val)`.
   - `::Pair`: `isfinite(val[2])`.
   - `::Number`: `isfinite(val)`.
   - Any other type: no rule, so the call always passes.

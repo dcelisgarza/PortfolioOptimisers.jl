@@ -533,6 +533,48 @@ end
     @test isnothing(pe.assert_nonempty_nonneg_finite_val(nothing))
     @test isnothing(pe.assert_nonempty_finite_val(nothing))
 end
+@testset "assert_finite refuses a container that carries one non-finite entry" begin
+    pe = PortfolioOptimisers
+    # The guard is named for what it demands of the whole container, so one bad cell fails
+    # it. It used to be `any`, which let a matrix that is all but one cell `NaN` satisfy a
+    # check named *finite*, and left an `Inf` admitted by every composite that calls it.
+    @test isnothing(pe.assert_finite(Dict(:a => 1.0, :b => 2.0)))
+    @test_throws DomainError pe.assert_finite(Dict(:a => 1.0, :b => NaN))
+    @test_throws DomainError pe.assert_finite(Dict(:a => 1.0, :b => Inf))
+    @test isnothing(pe.assert_finite([:a => 1.0, :b => 2.0]))
+    @test_throws DomainError pe.assert_finite([:a => 1.0, :b => NaN])
+    @test_throws DomainError pe.assert_finite([:a => 1.0, :b => Inf])
+    @test isnothing(pe.assert_finite([1.0 2.0; 3.0 4.0]))
+    @test_throws DomainError pe.assert_finite([1.0 2.0; NaN 4.0])
+    @test_throws DomainError pe.assert_finite([1.0 2.0; Inf 4.0])
+    # The scalar shapes were already strict, and stay so.
+    @test isnothing(pe.assert_finite(:a => 1.0))
+    @test_throws DomainError pe.assert_finite(:a => NaN)
+    @test isnothing(pe.assert_finite(1.0))
+    @test_throws DomainError pe.assert_finite(Inf)
+    # The message names the predicate, so a refusal reports finiteness rather than the
+    # non-negativity check that used to fire first on a `NaN` and never fired on an `Inf`.
+    err = try
+        pe.assert_nonempty_nonneg_finite_val([0.2 0.3; Inf 0.31], :iv)
+        nothing
+    catch e
+        e
+    end
+    @test err isa DomainError
+    @test occursin("all(isfinite, iv) must hold", err.val)
+    err = try
+        pe.assert_nonempty_nonneg_finite_val([0.2 0.3; NaN 0.31], :iv)
+        nothing
+    catch e
+        e
+    end
+    @test err isa DomainError
+    @test occursin("all(isfinite, iv) must hold", err.val)
+    # `assert_all_finite` checks the same predicate over an array; it differs in the error
+    # type it raises and in reporting where the breach is without quoting the data.
+    @test isnothing(pe.assert_all_finite([1.0 2.0; 3.0 4.0]))
+    @test_throws pe.IsNonFiniteError pe.assert_all_finite([1.0 2.0; NaN 4.0])
+end
 @testset "The two unit-interval guards differ only at the ends" begin
     pe = PortfolioOptimisers
     # The open guard refuses both ends; the closed one takes them. That is the whole of the

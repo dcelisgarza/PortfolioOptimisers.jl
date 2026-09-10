@@ -250,17 +250,28 @@
         @test_throws DomainError TurnoverEstimator(; w = Float64[Inf], val = "a" => 1)
 
         @test_throws DomainError TurnoverEstimator(; w = [1], val = "a" => -1)
-        @test_throws DomainError TurnoverEstimator(; w = [1], val = "a" => Inf)
-
         @test_throws DomainError TurnoverEstimator(; w = [1], val = ["a" => -1])
-        @test_throws DomainError TurnoverEstimator(; w = [1], val = ["a" => Inf])
-
         @test_throws DomainError TurnoverEstimator(; w = [1], val = Dict("a" => -1))
-        @test_throws DomainError TurnoverEstimator(; w = [1], val = Dict("a" => Inf))
 
-        @test_throws IsEmptyError TurnoverEstimator(; w = [1, Inf],
+        # A named cap is finite. `assert_finite` used to be `any`, so a multi-entry `val`
+        # carrying an infinity slipped through while the single-entry case below was
+        # refused; both are refused now.
+        @test_throws DomainError TurnoverEstimator(; w = [1], val = "a" => Inf)
+        @test_throws DomainError TurnoverEstimator(; w = [1], val = ["a" => Inf])
+        @test_throws DomainError TurnoverEstimator(; w = [1], val = Dict("a" => Inf))
+        @test_throws DomainError TurnoverEstimator(; w = [1, 2],
+                                                   val = ["a" => 0.1, "b" => Inf])
+        @test_throws DomainError TurnoverEstimator(; w = [1, 2],
+                                                   val = Dict("a" => 0.1, "b" => Inf))
+
+        # `dval` is the exception: it caps every asset `val` does not name, and `+Inf` is
+        # how it leaves them uncapped. `dval = nothing` fills zero, which freezes them.
+        @test TurnoverEstimator(; w = [1], val = "a" => 0.1, dval = Inf).dval == Inf
+        @test_throws DomainError TurnoverEstimator(; w = [1], val = "a" => 0.1, dval = NaN)
+
+        @test_throws IsEmptyError TurnoverEstimator(; w = [1, 2],
                                                     val = Dict{String, Number}())
-        @test_throws IsEmptyError TurnoverEstimator(; w = [1, Inf],
+        @test_throws IsEmptyError TurnoverEstimator(; w = [1, 2],
                                                     val = Pair{String, Number}[])
 
         @test_throws DomainError TurnoverEstimator(; w = [1], val =  val = "a" => 1 ,
@@ -299,10 +310,15 @@
         @test_throws IsEmptyError Turnover(; w = Float64[], val = 0)
 
         @test_throws DomainError Turnover(; w = Float64[Inf], val = 0)
-        @test_throws DomainError Turnover(; w = [1], val = Inf)
-        @test_throws DomainError Turnover(; w = [1], val = [Inf])
         @test_throws DomainError Turnover(; w = [1], val = -1)
         @test_throws DomainError Turnover(; w = [1], val = [-1])
+
+        # The reference weights are held to finiteness; the cap is not. `+Inf` is the
+        # uncapped cap, which `turnover_constraints` expands `dval = Inf` into.
+        @test Turnover(; w = [1], val = Inf).val == Inf
+        @test Turnover(; w = [1], val = [Inf]).val == [Inf]
+        @test_throws DomainError Turnover(; w = [1], val = NaN)
+        @test_throws DomainError Turnover(; w = [1], val = [NaN])
 
         @test_throws DimensionMismatch Turnover(; w = [1], val = [1, 2])
     end
@@ -2502,12 +2518,15 @@ end
     Xt = [0.01 0.02 -0.01 0.03; 0.03 0.04 0.02 -0.02; -0.01 0.005 0.01 0.04]
 
     @testset "the constructors validate w and err" begin
-        # `assert_nonempty_finite_val` demands one finite entry, not every entry.
+        # `assert_nonempty_finite_val` demands every entry, not one. A single non-finite
+        # weight makes the tracking benchmark non-finite, so it is refused at the door.
         @test_throws PortfolioOptimisers.IsEmptyError WeightsTracking(; w = Float64[])
         @test_throws PortfolioOptimisers.IsEmptyError ReturnsTracking(; w = Float64[])
         @test_throws DomainError WeightsTracking(; w = [NaN, NaN])
         @test_throws DomainError ReturnsTracking(; w = [Inf, NaN])
-        @test WeightsTracking(; w = [0.5, NaN]).w[1] == 0.5
+        @test_throws DomainError WeightsTracking(; w = [0.5, NaN])
+        @test_throws DomainError ReturnsTracking(; w = [0.5, Inf])
+        @test WeightsTracking(; w = [0.5, 0.5]).w[1] == 0.5
 
         tr = WeightsTracking(; w = wb)
         @test_throws DomainError TrackingError(; tr = tr, err = -0.01)
