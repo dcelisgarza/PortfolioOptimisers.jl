@@ -28,6 +28,13 @@ Two verbs fold observations into it, and ADR 0107 records what each promises. `p
 **State Merge**
 The combination of two Partial Fit States fitted on disjoint blocks of observations into the state of the concatenated block, under the verb `merge_states`. It is a sum rather than a right-operand-wins overwrite, which is why the verb is not `Base.merge`, and it is what makes an incremental fit parallel and associative: a sample split into any set of disjoint blocks gives the state of the whole sample, whatever order the blocks are folded in. A family whose state is not a sufficient statistic for its own block refuses the merge and names the reason, and its route is a sequential fit instead.
 
+**Sample Buffer**
+The observations a member keeps verbatim, non-finite entries included, in the Partial Fit State slot. It serves one of two roles, and the two take two state types because the state's type is the route. A **refit** has no recursion at all, so its read-out is the batch verb over the buffer's rows and the buffer's cap *is* a window. A **carry** folds its estimate exactly and keeps the rows only because a consumer downstream reads them — a Prior Result carries `X` for the scenario risk measures — so its cap bounds the carried rows alone and leaves the estimate fitted over every observation. The `Online` wrapper is the declaration that seeds a refit buffer; a carrying member seeds its own, because it has no choice about holding what its Result must carry. ADR 0106 and ADR 0136.
+
+**Scenario Cap**
+The number of observations a fold-and-carry Prior Estimator keeps in its Result's `X`, written `max_scenarios` and applied in batch and online alike. It bounds memory and the zero-filled share a Scenario Fill reports, and it does **not** move `mu` or `sigma`, which stay fitted over every observation — so a capped fit equals no batch fit, and that divergence is documented rather than tested. ADR 0136.
+*Avoid*: reading it as `max_history`, the `Online` wrapper's cap, which windows the whole fit and does have a batch equal. Both may be set on one estimator, and they nest.
+
 **Choice Surface**
 The set of things a caller picks when specifying a problem: every concrete type the package declares that is a leaf Estimator, a leaf Algorithm, a leaf `AbstractCovarianceEstimator`, or an export under its own name. Results and errors are what comes back, never what is chosen, so they are not on it. `AbstractCovarianceEstimator` is named on its own because it descends from `StatsBase.CovarianceEstimator` rather than from Estimator, and the export rule catches whatever family takes a root nothing here names.
 
