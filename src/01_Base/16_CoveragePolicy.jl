@@ -492,7 +492,7 @@ function coverage_valid_block(X::MatNum, active_mask::Option{<:AbstractMatrix{<:
         F .&= amsk
     end
     T, N = size(Xo)
-    Tf = float(eltype(Xo))
+    Tf = typeof(zero(eltype(Xo)) / one(Int))
     mu = zeros(Tf, N)
     stale = zeros(Int, N)
     for j in axes(Xo, 2)
@@ -694,6 +694,8 @@ Divides an available-case accumulator by its per-cell denominator, and frames th
 
 The tail every available-case read-out shares. A cell whose denominator has not reached one is `NaN`, which is the per-cell half of the rule, and an asset [`coverage_admission`](@ref) refuses is `NaN` across its whole row and column, which is the per-asset half.
 
+The answer's element type is the type of the division itself, so a `Float32` accumulator reads out as `Float32` and is never widened by the sentinel. An element type that cannot hold `NaN` cannot hold the answer either: an exact accumulator, a `Rational` among them, raises an `InexactError` at the first cell the policy refuses rather than silently reading out as `Float64`. A window with no refused cell is unaffected.
+
 # Algorithm
 
  1. Divide each entry of `M` by its entry of `nu` less `corrected`, writing `NaN` where that denominator is below one.
@@ -718,11 +720,11 @@ The tail every available-case read-out shares. A cell whose denominator has not 
 """
 function coverage_divide(M::AbstractArray, nu::AbstractArray, corrected::Bool,
                          cmsk::Option{BitVector})
-    Tf = float(eltype(M))
+    Tf = typeof(zero(eltype(M)) / one(eltype(nu)))
     val = Array{Tf}(undef, size(M))
     for k in eachindex(val, M, nu)
         d = nu[k] - corrected
-        val[k] = d >= one(d) ? Tf(M[k]) / d : Tf(NaN)
+        val[k] = d >= one(d) ? M[k] / d : Tf(NaN)
     end
     coverage_refuse!(val, cmsk)
     return val
@@ -733,6 +735,8 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Frames an available-case estimate that needs no division, and frames the assets the policy refuses.
 
 The read-out of a quantity that is already a ratio, which is what a running per-asset mean is: the value is copied where its cell has an observation and is `NaN` where it has none, and [`coverage_refuse!`](@ref) then writes the frame. It exists beside [`coverage_divide`](@ref) so that a Welford mean is never multiplied by its count and divided by it again, which would move the last bits of an answer the fold computed exactly.
+
+The answer carries the element type of `A`, which the fold already derived from its own division. As in [`coverage_divide`](@ref), an exact element type cannot hold the `NaN` sentinel and raises an `InexactError` at the first cell that has no observation.
 
 # Arguments
 
@@ -751,10 +755,10 @@ The read-out of a quantity that is already a ratio, which is what a running per-
   - [`coverage_admission`](@ref)
 """
 function coverage_frame(A::AbstractArray, nu::AbstractArray, cmsk::Option{BitVector})
-    Tf = float(eltype(A))
+    Tf = eltype(A)
     val = Array{Tf}(undef, size(A))
     for k in eachindex(val, A, nu)
-        val[k] = nu[k] >= one(nu[k]) ? Tf(A[k]) : Tf(NaN)
+        val[k] = nu[k] >= one(nu[k]) ? A[k] : Tf(NaN)
     end
     coverage_refuse!(val, cmsk)
     return val

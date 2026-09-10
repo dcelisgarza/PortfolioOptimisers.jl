@@ -261,7 +261,7 @@ axis is labelled with the factor names off the carrier. Loadings are **signed**,
 for the metric choice in §5.
 =#
 
-F = TimeArray(CSV.File(joinpath(@__DIR__, "..", "Factors.csv.gz")); timestamp = :Date)
+F = TimeArray(CSV.File(joinpath(@__DIR__, "..", "Factors.csv.gz")); timestamp = :Date)[(end - 252):end]
 rdf = prices_to_returns(X, F)
 pr_loadings = prior(FactorPrior(), rdf)
 pnl_loadings = asset_panel(RegressionPanel(), pr_loadings, rdf, rdf.X)

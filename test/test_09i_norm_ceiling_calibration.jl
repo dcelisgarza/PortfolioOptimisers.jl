@@ -459,6 +459,11 @@ and ADR 0095 grants none.
     @test length(families) == 5
     counted = Dict{Symbol, Int}()
     for n in names(PO; all = true)
+        # `names(; all = true)` also answers the compiler's own bindings, and a gensym
+        # such as `#6593#val` is bound to the very alias its keyword annotates. It is not
+        # a slot bound and counting it would count each alias twice, which is what Julia
+        # 1.13 started doing here.
+        Base.isgensym(n) && continue
         isdefined(PO, n) || continue
         v = getfield(PO, n)
         isa(v, Type) || continue

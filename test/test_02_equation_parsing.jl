@@ -5,22 +5,31 @@
     # a reused worker (see ParallelTestRunner worker pool), randomly emptying their
     # `@test_logs` captures. `with_logger` is task-local and restores on exit.
     with_logger(SimpleLogger(stderr, Logging.Error)) do
+        # `parse_equation` collects its terms in a `Dict`, so the order of `vars` and of
+        # `coef` is the dictionary's and is no part of the answer. Each comparison below
+        # sorts BOTH sides by their own names: `idx` orders the result and `jdx` orders
+        # the literal. One permutation applied to both sides compares two different
+        # orderings, and passes only while the dictionary happens to iterate in the order
+        # the literal was written, which it did until Julia 1.13 rehashed it.
         res = parse_equation("2*sqrt(prior(a ,   1b1)) /2*  5 + cbrt(3)^3*f >= 5/5 + d-69/3*c")
         idx = sortperm(res.vars)
-        @test res.vars[idx] == ["d", "f", "c", "sqrt(prior(a, 1b1))"][idx]
-        @test res.coef[idx] == [-1.0, 3.0, 23.0, 5.0][idx]
+        jdx = sortperm(["d", "f", "c", "sqrt(prior(a, 1b1))"])
+        @test res.vars[idx] == ["d", "f", "c", "sqrt(prior(a, 1b1))"][jdx]
+        @test res.coef[idx] == [-1.0, 3.0, 23.0, 5.0][jdx]
         @test res.op == ">="
         @test res.rhs == 1.0
         res = parse_equation("2*sqrt(prior(a ,   b)) /2*  5 - - - -6 + cbrt(3)^3*f  -69/3*c <= - d")
         idx = sortperm(res.vars)
-        @test res.vars[idx] == ["sqrt(prior(a, b))", "f", "c", "d"][idx]
-        @test res.coef[idx] == [5.0, 3.0, -23.0, 1.0][idx]
+        jdx = sortperm(["sqrt(prior(a, b))", "f", "c", "d"])
+        @test res.vars[idx] == ["sqrt(prior(a, b))", "f", "c", "d"][jdx]
+        @test res.coef[idx] == [5.0, 3.0, -23.0, 1.0][jdx]
         @test res.op == "<="
         @test res.rhs == -6.0
         res = parse_equation("0 == 2*sqrt(prior(a ,   b)) /2*  5 - 6 + 7 + -  - cbrt(3)^3 *f  - - 69/ 3*c-d+(3*2)/(3*(1+1))*d")
         idx = sortperm(res.vars)
-        @test res.vars[idx] == ["sqrt(prior(a, b))", "f", "c", "d"][idx]
-        @test res.coef[idx] == [-5.0, -3.0, -23.0, 0.0][idx]
+        jdx = sortperm(["sqrt(prior(a, b))", "f", "c", "d"])
+        @test res.vars[idx] == ["sqrt(prior(a, b))", "f", "c", "d"][jdx]
+        @test res.coef[idx] == [-5.0, -3.0, -23.0, 0.0][jdx]
         @test res.op == "=="
         @test res.rhs == 1.0
         # An empty side fails closed: assuming zero would silently create a constraint
@@ -44,29 +53,33 @@
                                                       d - 69 / 3 * c))
         res = parse_equation("1/3*x/((2^z)*y)+5z==1-5")
         idx = sortperm(res.vars)
-        @test res.vars[idx] == ["z", "(0.3333333333333333x) / (2 ^ z * y)"][idx]
-        @test res.coef[idx] == [5.0, 1.0][idx]
+        jdx = sortperm(["z", "(0.3333333333333333x) / (2 ^ z * y)"])
+        @test res.vars[idx] == ["z", "(0.3333333333333333x) / (2 ^ z * y)"][jdx]
+        @test res.coef[idx] == [5.0, 1.0][jdx]
         @test res.op == "=="
         @test res.rhs == -4.0
         # @test res.eqn == "5.0*z + (0.3333333333333333x) / (2 ^ z * y) == -4.0"
         res = parse_equation("-x>=-1.0y+2")
         idx = sortperm(res.vars)
-        @test res.vars[idx] == ["x", "y"][idx]
-        @test res.coef[idx] == [-1.0, 1.0][idx]
+        jdx = sortperm(["x", "y"])
+        @test res.vars[idx] == ["x", "y"][jdx]
+        @test res.coef[idx] == [-1.0, 1.0][jdx]
         @test res.op == ">="
         @test res.rhs == 2.0
         # @test res.eqn == "-x + y >= 2.0"
         res = parse_equation("-_1*_3<=-1.1y+2")
         idx = sortperm(res.vars)
-        @test res.vars[idx] == ["-_1 * _3", "y"][idx]
-        @test res.coef[idx] == [1.0, 1.1][idx]
+        jdx = sortperm(["-_1 * _3", "y"])
+        @test res.vars[idx] == ["-_1 * _3", "y"][jdx]
+        @test res.coef[idx] == [1.0, 1.1][jdx]
         @test res.op == "<="
         @test res.rhs == 2.0
         # @test res.eqn == "-_1 * _3 + 1.1*y <= 2.0"
         res = parse_equation("Inf*a<=Inf")
         idx = sortperm(res.vars)
-        @test res.vars[idx] == ["a"][idx]
-        @test res.coef[idx] == [Inf][idx]
+        jdx = sortperm(["a"])
+        @test res.vars[idx] == ["a"][jdx]
+        @test res.coef[idx] == [Inf][jdx]
         @test res.op == "<="
         @test res.rhs == Inf
         # @test res.eqn == "Inf*a <= Inf"

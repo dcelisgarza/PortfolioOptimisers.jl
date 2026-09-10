@@ -421,7 +421,7 @@ struct StringDistanceConfig
     function StringDistanceConfig(dist::StringDistances.StringDistance, min_score::Real)
         @argcheck(min_score > 0,
                   ArgumentError("min_score must be positive; got $(min_score). A value above 1 legitimately disables suggestions, but a zero or negative threshold admits every candidate with any nonzero similarity, making `did_you_mean` echo a real asset name for near-miss probes and defeating the info-leak-safe boundary (ADR 0026)."))
-        return new(dist, Float64(min_score))
+        return new(dist, min_score)
     end
 end
 """
@@ -472,7 +472,7 @@ Configure the global default fuzzy-suggestion settings read by [`did_you_mean`](
 function set_string_distance!(;
                               dist::StringDistances.StringDistance = (@atomic STRING_DISTANCE.default).dist,
                               min_score::Real = (@atomic STRING_DISTANCE.default).min_score)
-    return set_default!(STRING_DISTANCE, StringDistanceConfig(dist, Float64(min_score)))
+    return set_default!(STRING_DISTANCE, StringDistanceConfig(dist, min_score))
 end
 """
     with_string_distance(f; dist::StringDistances.StringDistance = STRING_DISTANCE[].dist,
@@ -513,7 +513,7 @@ Useful around a meta-optimiser run to silence suggestions (`min_score` above `1`
 function with_string_distance(f;
                               dist::StringDistances.StringDistance = STRING_DISTANCE[].dist,
                               min_score::Real = STRING_DISTANCE[].min_score)
-    return with_config(f, STRING_DISTANCE, StringDistanceConfig(dist, Float64(min_score)))
+    return with_config(f, STRING_DISTANCE, StringDistanceConfig(dist, min_score))
 end
 """
 $(DocStringExtensions.TYPEDEF)

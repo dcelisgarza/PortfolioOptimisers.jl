@@ -1078,7 +1078,7 @@ Both covariance estimators of the seam seed the same state from the same observa
 function covariance_state_seed(cache::Option{<:CovarianceState}, x::VecNum,
                                cvg::Option{<:CoveragePolicy} = nothing)
     N = length(x)
-    Tf = float(eltype(x))
+    Tf = typeof(zero(eltype(x)) / one(Int))
     return if isnothing(cache)
         CovarianceState(0, zeros(Tf, N), zeros(Tf, N, N),
                         coverage_counts_seed(cvg, nothing, N, Tf, true))

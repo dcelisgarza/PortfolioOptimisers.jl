@@ -2546,7 +2546,7 @@ function factor_summary_columns(fs::PortfolioOptimisers.FactorSummaryResult)
     for (r, i) in enumerate(keep)
         v = vals[i]
         for k in 1:K
-            M[r, k] = Float64(v[k])
+            M[r, k] = v[k]
         end
     end
     return M, FACTOR_SUMMARY_LABELS[keep], length(keep) < length(vals)
@@ -3084,7 +3084,7 @@ function forecast_summary_columns(fs::PortfolioOptimisers.ForecastSummaryResult)
     for r in eachindex(vals)
         v = vals[r]
         for k in 1:K
-            M[r, k] = Float64(v[k])
+            M[r, k] = v[k]
         end
     end
     return M, labels, partial

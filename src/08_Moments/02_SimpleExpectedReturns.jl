@@ -682,7 +682,7 @@ The seed is written here rather than inside [`partial_fit!`](@ref), so the fold 
 function expected_returns_state_seed(cache::Option{<:SimpleExpectedReturnsState}, x::VecNum,
                                      cvg::Option{<:CoveragePolicy} = nothing)
     N = length(x)
-    Tf = float(eltype(x))
+    Tf = typeof(zero(eltype(x)) / one(Int))
     return if isnothing(cache)
         SimpleExpectedReturnsState(0, zeros(Tf, N),
                                    coverage_counts_seed(cvg, nothing, N, Tf, false))

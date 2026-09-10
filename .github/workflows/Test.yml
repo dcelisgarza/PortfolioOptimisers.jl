@@ -21,13 +21,18 @@ jobs:
       version: ${{ matrix.version }}
       arch: ${{ matrix.arch }}
       allow_failure: ${{ matrix.allow_failure }}
-      run_codecov: ${{ matrix.version == '1' && matrix.os == 'ubuntu-latest' }}
+      run_codecov: ${{ matrix.version == '1.12' && matrix.os == 'ubuntu-latest' }}
     secrets:
       codecov_token: ${{ secrets.CODECOV_TOKEN }}
     strategy:
       fail-fast: false
       matrix:
-        version: ["1"]
+        # The newest version `Project.toml` declares. `"1"` is whatever Julia is newest,
+        # and on 2026-09-10 that became 1.13, one release past the declared compat and a
+        # release that rehashes `Dict`: the doctests, the equation parser's term order and
+        # the `names(; all = true)` censuses all read differently under it. Widening compat
+        # to 1.13 is a deliberate change to `Project.toml`, and this matrix follows it.
+        version: ["1.12"]
         os: [ubuntu-latest]
         # , macOS-latest]
         arch: [x64]

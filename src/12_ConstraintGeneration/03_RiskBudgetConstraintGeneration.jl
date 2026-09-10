@@ -356,7 +356,7 @@ The normalisation divides by a computed sum, so the result lands within round-of
 julia> sets = UniverseSets(; xkey = \"nx\",
                            dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"], \"group1\" => [\"A\", \"B\"]));
 
-julia> risk_budget_constraints(Dict(\"A\" => 0.2, \"group1\" => 0.8), sets)
+julia> risk_budget_constraints([\"A\" => 0.2, \"group1\" => 0.8], sets)
 RiskBudget
   val ┴ Vector{Float64}: [0.41379310344827586, 0.41379310344827586, 0.17241379310344826]
 ```
