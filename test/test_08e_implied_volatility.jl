@@ -573,4 +573,112 @@ end
         @test_throws DomainError cor(few, X; iv = iv)
         @test_throws DomainError cov(few, X; iv = iv)
     end
+
+    @testset "the Coverage Universe of the fit reads the implied volatilities too" begin
+        #=
+        Issue #995, under ADR 0135. The layer carries an absent implied volatility as a
+        padded `NaN`, exactly as it carries an absent return, and `PricesResult`'s guard on
+        `iv` relaxed to non-negative WHERE A VALUE IS PRESENT. So the carrier is no longer
+        the thing that keeps a non-finite implied volatility out of the arithmetic, and the
+        estimator that reads one becomes it.
+
+        What a `NaN` did if it got through, before this narrowing existed. Every one of
+        these is a wrong number rather than an error, which is why the assertions below are
+        on the EXPANDED moment and not only on the mask:
+
+          - `cor2cov!(sigma, iv)` writes a `NaN` row AND column into the covariance, and
+            `matrix_processing!` then sees a matrix it cannot repair.
+          - `predict_realised_vols(::ImpliedVolatilityPremium, ...)` reads ONLY the last
+            row, so a `NaN` there poisons that asset's volatility and a `NaN` anywhere else
+            is ignored entirely.
+          - `predict_realised_vols(::ImpliedVolatilityRegression, ...)` takes `log.(iv)` on
+            a strided subsample; `fit` returns `NaN` coefficients rather than throwing.
+
+        The two algorithms therefore read DIFFERENT parts of `iv`, and the loop below plants
+        the absence at four rows -- the first, two the regression's stride lands on either
+        side of, and the last -- so that a mask derived from ANY absent cell excludes the
+        column under both.
+        =#
+        cep = ImpliedVolatility(; alg = ImpliedVolatilityPremium())
+        creg = ImpliedVolatility()
+        keep = [i != 3 for i in 1:N]
+
+        # A complete surface narrows nothing, and takes the `nothing` sentinel.
+        @test isnothing(PortfolioOptimisers.coverage_mask(X, iv, nothing))
+
+        for row in (1, 7, 8, T), bad in (NaN, Inf, -Inf)
+            ivg = copy(iv)
+            ivg[row, 3] = bad
+            @test PortfolioOptimisers.coverage_mask(X, ivg, nothing) == BitVector(keep)
+            for (ce, kw) in ((cep, (; ivpa = 1.2)), (cep, (; ivpa = ivpav)), (creg, (;)))
+                for f in (cov, cor)
+                    m = f(ce, X, nothing; iv = ivg, kw...)
+                    # The absent column takes a `NaN` row and column, as an absent return
+                    # does, and every other entry is finite.
+                    @test all(isnan, view(m, 3, :))
+                    @test all(isnan, view(m, :, 3))
+                    @test all(isfinite, view(m, keep, keep))
+                    # The surviving block is the fit run on those columns alone.
+                    kwc = if haskey(kw, :ivpa) && isa(kw.ivpa, AbstractVector)
+                        (; ivpa = kw.ivpa[keep])
+                    else
+                        kw
+                    end
+                    @test view(m, keep, keep) ==
+                          f(ce, X[:, keep]; iv = ivg[:, keep], kwc...)
+                end
+            end
+        end
+
+        #=
+        The narrowing INTERSECTS the mask it is handed rather than replacing it. A gapped
+        return, an inactive row of the Asset Panel and an absent implied volatility each
+        remove their own column, and the estimator fits on what all three leave.
+        =#
+        Xg = copy(X)
+        Xg[4, 1] = NaN
+        ivg = copy(iv)
+        ivg[9, 2] = NaN
+        amsk = trues(T, N)
+        amsk[11, 3] = false
+        pnl = AssetPanel(; pf = [NumericPanelField(; name = "mcap", vals = ones(T, N))],
+                         amsk = amsk, emsk = amsk)
+        keep3 = [i > 3 for i in 1:N]
+        @test PortfolioOptimisers.coverage_mask(Xg, ivg, pnl) == BitVector(keep3)
+        # The returns alone would have kept assets 2 and 3.
+        @test PortfolioOptimisers.coverage_mask(Xg, pnl) ==
+              BitVector([i != 1 && i != 3 for i in 1:N])
+
+        sigma = cov(cep, Xg, pnl; iv = ivg, ivpa = 1.2)
+        @test all(isnan, view(sigma, 1:3, :))
+        @test all(isnan, view(sigma, :, 1:3))
+        @test view(sigma, keep3, keep3) ==
+              cov(cep, Xg[:, keep3]; iv = ivg[:, keep3], ivpa = 1.2)
+
+        #=
+        `dims = 2` takes the same path through `dims_oriented`, so it must answer the same
+        mask and the same moment. A moment is assets x assets whichever way the sample was
+        handed in, so the two answers are compared entry for entry.
+        =#
+        @test PortfolioOptimisers.coverage_mask(transpose(Xg), transpose(ivg), pnl;
+                                                dims = 2) == BitVector(keep3)
+        for f in (cov, cor)
+            @test isequal(f(cep, transpose(Xg), pnl; dims = 2, iv = transpose(ivg),
+                            ivpa = 1.2), f(cep, Xg, pnl; iv = ivg, ivpa = 1.2))
+        end
+
+        #=
+        An empty Coverage Universe is refused by name. The message must reach the implied
+        volatilities: the tail `coverage_sentinel` writes by default names the returns and
+        the Asset Panel alone, and would send the caller looking in the wrong place.
+        =#
+        err = try
+            PortfolioOptimisers.coverage_mask(X, fill(NaN, T, N), nothing)
+        catch e
+            e
+        end
+        @test isa(err, IsEmptyError)
+        @test occursin("implied volatility", err.msg)
+        @test_throws IsEmptyError cov(cep, X, nothing; iv = fill(NaN, T, N), ivpa = 1.2)
+    end
 end

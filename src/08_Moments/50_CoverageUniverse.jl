@@ -85,21 +85,85 @@ function coverage_mask(X::MatNum, pnl::AssetPanel; dims::Int = 1)::Option{BitVec
     return coverage_sentinel(cmsk)
 end
 """
-    coverage_sentinel(cmsk::BitVector) -> Option{BitVector}
+    coverage_mask(X::MatNum, iv::MatNum, pnl::Option{<:AssetPanel};
+                  dims::Int = 1) -> Option{BitVector}
 
-Refuse an empty Coverage Universe, and collapse a complete one onto the `nothing` sentinel.
+Derive the Coverage Universe of one [`ImpliedVolatility`](@ref) fit, which reads an implied volatility surface beside its returns.
 
-This is the tail that the two [`coverage_mask`](@ref) methods share, so the refusal and the sentinel are written once and cannot drift apart.
+The estimator fits on the assets whose returns qualify under [`coverage_mask`](@ref) **and** whose implied volatilities are finite at every row of the window. An implied volatility series is padded `NaN` where it is silent, exactly as a return is, so an asset the estimator cannot price is named by the same rule that names an asset it cannot estimate, and reduce-and-expand writes its `NaN` row and column.
+
+This narrows the *asset* universe by reading a second input. It is not a second mask and not a different Coverage Universe: nothing on the implied volatility axis is named, and every consumer of the expanded moment reads it exactly as it reads an absent return.
+
+The narrowing sits in the estimator's own reduce-and-expand, rather than at the carrier that assembled `iv`. A caller reaching `Statistics.cov(ce, X; iv = …)` with a surface of their own has crossed no carrier boundary, and neither has a nested estimator receiving the forwarded `iv`; both are downstream of this reduction, so both see a block whose implied volatilities are complete.
 
 # Algorithm
 
- 1. Throw an `IsEmptyError` when `cmsk` holds no `true`.
+ 1. Orient `X` and `iv` to `observations × assets` with [`dims_oriented`](@ref).
+ 2. Derive the Coverage Universe of `X` with [`coverage_mask`](@ref).
+ 3. Scan each column of `iv`. An asset stays in while its implied volatility is finite at every row.
+ 4. Intersect the two, and hand the result to [`coverage_sentinel`](@ref) with a refusal that names the implied volatilities.
+
+# Arguments
+
+  - $(arg_dict[:X])
+  - `iv`: Implied volatility surface `observations × assets`.
+  - $(arg_dict[:pnl_moment])
+  - $(arg_dict[:dims])
+
+# Validation
+
+  - $(val_dict[:dims])
+  - The asset axis of `pnl.amsk` must be the asset axis of the oriented `X`.
+  - At least one asset must be covered.
+
+# Returns
+
+  - `cmsk::Option{BitVector}`: `true` at every covered asset, or `nothing` when every asset is covered.
+
+# Related
+
+  - [`ImpliedVolatility`](@ref)
+  - [`coverage_mask`](@ref)
+  - [`coverage_sentinel`](@ref)
+  - [`expand_moment`](@ref)
+"""
+function coverage_mask(X::MatNum, iv::MatNum, pnl::Option{<:AssetPanel};
+                       dims::Int = 1)::Option{BitVector}
+    Xo, ivo = dims_oriented(dims, X, iv)
+    cmsk = coverage_mask(Xo, pnl; dims = 1)
+    imsk = isnothing(cmsk) ? trues(size(ivo, 2)) : copy(cmsk)
+    for i in axes(ivo, 2)
+        if !imsk[i]
+            continue
+        end
+        for t in axes(ivo, 1)
+            if !isfinite(ivo[t, i])
+                imsk[i] = false
+                break
+            end
+        end
+    end
+    return coverage_sentinel(imsk,
+                             "no asset is in the Coverage Universe of this window: every asset carries a non-finite return, an inactive row of the Asset Panel, or a non-finite implied volatility, at some observation. Check that the window holds at least one asset that is listed and quoted throughout it, and whose implied volatility series is complete over it.")
+end
+"""
+    coverage_sentinel(cmsk::BitVector) -> Option{BitVector}
+    coverage_sentinel(cmsk::BitVector, msg::AbstractString) -> Option{BitVector}
+
+Refuse an empty Coverage Universe, and collapse a complete one onto the `nothing` sentinel.
+
+This is the tail that every [`coverage_mask`](@ref) method shares, so the refusal and the sentinel are written once and cannot drift apart. A method that reads an input the two-argument one does not passes its own `msg`, because the reason an asset left the Coverage Universe is the one thing the tail cannot know: [`coverage_mask`](@ref) reads an implied volatility surface as well, and a message naming only the returns and the Asset Panel would send its caller looking in the wrong place.
+
+# Algorithm
+
+ 1. Throw an `IsEmptyError` carrying `msg` when `cmsk` holds no `true`.
  2. Return `nothing` when `cmsk` holds no `false`.
  3. Return `cmsk` otherwise.
 
 # Arguments
 
   - `cmsk`: The raw coverage mask, one entry per asset.
+  - `msg`: The refusal message, naming every input the mask was derived from.
 
 # Validation
 
@@ -115,8 +179,11 @@ This is the tail that the two [`coverage_mask`](@ref) methods share, so the refu
   - [`IsEmptyError`](@ref)
 """
 function coverage_sentinel(cmsk::BitVector)::Option{BitVector}
-    @argcheck(any(cmsk),
-              IsEmptyError("no asset is in the Coverage Universe of this window: every asset carries a non-finite return, or an inactive row of the Asset Panel, at some observation. Check that the window holds at least one asset that is listed and quoted throughout it."))
+    return coverage_sentinel(cmsk,
+                             "no asset is in the Coverage Universe of this window: every asset carries a non-finite return, or an inactive row of the Asset Panel, at some observation. Check that the window holds at least one asset that is listed and quoted throughout it.")
+end
+function coverage_sentinel(cmsk::BitVector, msg::AbstractString)::Option{BitVector}
+    @argcheck(any(cmsk), IsEmptyError(msg))
     return all(cmsk) ? nothing : cmsk
 end
 """

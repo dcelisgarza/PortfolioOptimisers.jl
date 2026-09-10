@@ -154,7 +154,7 @@
 "src/08_Moments/47_CrossSectionalExposureDiagnostics.jl" = { map = 3, units = 22, swept = false }
 "src/08_Moments/48_FactorModelSummary.jl" = { map = 3, units = 16, swept = false }
 "src/08_Moments/49_CrossSectionalIdiosyncraticDiagnostics.jl" = { map = 3, units = 15, swept = false }
-"src/08_Moments/50_CoverageUniverse.jl" = { map = 3, units = 41, swept = false }
+"src/08_Moments/50_CoverageUniverse.jl" = { map = 3, units = 42, swept = false }
 "src/08_Moments/51_ExpWeightedExpectedReturns.jl" = { map = 3, units = 14, swept = false }
 "src/08_Moments/52_ExpWeightedVariance.jl" = { map = 3, units = 20, swept = false }
 "src/08_Moments/53_ExpWeightedCovariance.jl" = { map = 3, units = 23, swept = false }

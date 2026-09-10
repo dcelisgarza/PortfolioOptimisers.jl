@@ -854,10 +854,12 @@ Fit an implied volatility estimate on the Coverage Universe, and expand it to th
 
 [`ImpliedVolatility`](@ref) overrides the reduce-and-expand root of its verb because it reads two more per-asset inputs than the root knows about: the implied volatility surface `iv`, which is `observations × assets`, and the premium `ivpa`, which is one number per asset where it is a vector. Both take the slice `X` takes, so that the three inputs describe the same universe.
 
+The surface also *narrows* that universe. An implied volatility is padded `NaN` where it is silent, exactly as a return is, so the Coverage Universe of this fit is the one [`coverage_mask`](@ref) derives: an asset whose returns are complete but whose implied volatilities are not is excluded from the fit, and [`expand_moment`](@ref) writes its `NaN` row and column.
+
 # Algorithm
 
  1. Check `dims`, and orient `X` and `iv` to `observations × assets`.
- 2. Derive the Coverage Universe of `X` with [`coverage_mask`](@ref).
+ 2. Derive the Coverage Universe of `X` and `iv` with [`coverage_mask`](@ref).
  3. Slice `X`, `iv` and `ivpa` onto it.
  4. Call the two-argument method on the clean block.
  5. Expand the matrix with [`expand_moment`](@ref).
@@ -877,6 +879,7 @@ Fit an implied volatility estimate on the Coverage Universe, and expand it to th
 
   - $(val_dict[:dims])
   - `size(X) == size(iv)`.
+  - At least one asset must be covered.
 
 # Returns
 
@@ -893,7 +896,7 @@ function Statistics.cov(ce::ImpliedVolatility, X::MatNum, pnl::Option{<:AssetPan
                         ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
     X, iv = dims_oriented(dims, X, iv)
     @argcheck(size(X) == size(iv), DimensionMismatch)
-    cmsk = coverage_mask(X, pnl; dims = 1)
+    cmsk = coverage_mask(X, iv, pnl; dims = 1)
     Xc, ivc = coverage_reduced_pair(X, iv, cmsk)
     sigma = Statistics.cov(ce, Xc; dims = 1, mean = mean, iv = ivc,
                            ivpa = coverage_reduced_ivpa(ivpa, cmsk), kwargs...)
@@ -904,7 +907,7 @@ function Statistics.cor(ce::ImpliedVolatility, X::MatNum, pnl::Option{<:AssetPan
                         ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
     X, iv = dims_oriented(dims, X, iv)
     @argcheck(size(X) == size(iv), DimensionMismatch)
-    cmsk = coverage_mask(X, pnl; dims = 1)
+    cmsk = coverage_mask(X, iv, pnl; dims = 1)
     Xc, ivc = coverage_reduced_pair(X, iv, cmsk)
     rho = Statistics.cor(ce, Xc; dims = 1, mean = mean, iv = ivc,
                          ivpa = coverage_reduced_ivpa(ivpa, cmsk), kwargs...)
