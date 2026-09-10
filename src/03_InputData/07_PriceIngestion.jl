@@ -132,8 +132,9 @@ The layer spells an absent price `NaN`, which is the library's one spelling for 
  4. Collapse the joined series to a lower frequency when `collapse_args` is non-empty, which renumbers every observation.
  5. Split the joined series back into their asset, factor and benchmark blocks, all now on one clock.
  6. Align the implied volatilities to that clock, and carry `ivpa` through: an implied volatility is a volatility rather than a price, so it is carried, never converted.
- 7. Read the **Listing Span** off the asset block with [`listing_span`](@ref), unless the caller declared one, in which case theirs is taken outright.
- 8. Return the [`PricesResult`](@ref) carrying all of it.
+ 7. Put a caller's [`AssetPanel`](@ref) on the emitted clock with [`project_panel_clock`](@ref). A caller states a Panel Field on the clock of the table they hold, and the collapse is the only step here that renumbers it, so this is where it is projected: the aggregated period takes the values of the row at its representative timestamp, which is last-observation semantics and matches [`LastObservation`](@ref). A static panel has no observation axis and is carried through untouched.
+ 8. Read the **Listing Span** off the asset block with [`listing_span`](@ref), unless the caller declared one, in which case theirs is taken outright.
+ 9. Return the [`PricesResult`](@ref) carrying all of it.
 
 # Arguments
 
@@ -185,6 +186,8 @@ julia> Matrix(pr.span)
   - [`PricesToReturns`](@ref)
   - [`listing_span`](@ref)
   - [`unify_gaps`](@ref)
+  - [`project_panel_clock`](@ref)
+  - [`LastObservation`](@ref)
 """
 function price_ingestion(est::PriceIngestion, X::TimeSeries.TimeArray;
                          F::Option{<:TimeSeries.TimeArray} = nothing,
@@ -217,6 +220,12 @@ function price_ingestion(est::PriceIngestion, X::TimeSeries.TimeArray;
                   IsEmptyError("the implied volatilities are carried on the clock the ingestion emits, so that clock is a subset of theirs; $(length(setdiff(ts, TimeSeries.timestamp(iv)))) of the $(length(ts)) emitted observations are absent from iv"))
         iv[ts]
     end
+    #! The collapse is the one step here that renumbers an observation, and a Panel Field is
+    #! stated on the clock of the table the caller holds, so the projection is owed here
+    #! rather than by the conversion: after the door, the carrier states one clock and
+    #! everything it carries is on it.
+    pnl = project_panel_clock(pnl, TimeSeries.timestamp(Xa), TimeSeries.timestamp(X),
+                              string.(nx))
     span = isnothing(est.span) ? listing_span(values(Xa)) : est.span
     return PricesResult(; X = Xa, F = Fa, B = Ba, iv = iva, ivpa = ivpa, pnl = pnl,
                         span = span)
@@ -224,6 +233,52 @@ end
 function price_ingestion(est::PriceIngestion, pr::PricesResult)::PricesResult
     return price_ingestion(est, pr.X; F = pr.F, B = pr.B, iv = pr.iv, ivpa = pr.ivpa,
                            pnl = pr.pnl)
+end
+"""
+    project_panel_clock(pnl::Nothing, ts_new, ts_old, nx::VecStr) -> nothing
+    project_panel_clock(pnl::AssetPanel, ts_new, ts_old, nx::VecStr) -> AssetPanel
+
+Put a caller's [`AssetPanel`](@ref) on the clock the ingestion emits.
+
+A caller states a Panel Field on the clock of the table they hold, and the collapse is the one step of [`price_ingestion`](@ref) that renumbers an observation, so the projection is owed at the door: after it, the carrier states one clock and everything the carrier holds is on it. A static panel has no observation axis, so [`feature_row_indices`](@ref) answers `Colon()` for one and it rides through unchanged.
+
+# Algorithm
+
+ 1. A carrier holding no panel projects to none.
+ 2. Otherwise check the panel against the asset axis and the incoming clock with [`check_asset_panel`](@ref).
+ 3. Recover the emitted clock's rows in the incoming one with [`feature_row_indices`](@ref), and view the panel over them with [`port_opt_view`](@ref). The asset axis is whole, and it is still named so that a square tensor Panel Field is cut on its label axis too.
+
+# Arguments
+
+  - `pnl`: The caller's [`AssetPanel`](@ref), or `nothing`.
+  - `ts_new`: The timestamps the ingestion emits.
+  - `ts_old`: The timestamps of the asset table the caller handed in.
+  - `nx`: The asset names.
+
+# Validation
+
+  - The panel describes `length(nx)` assets and `length(ts_old)` observations. Raises a `DimensionMismatch`.
+
+# Returns
+
+  - `pnl′::Option{<:AssetPanel}`: The panel on the emitted clock, or `nothing`.
+
+# Related
+
+  - [`price_ingestion`](@ref)
+  - [`AssetPanel`](@ref)
+  - [`feature_row_indices`](@ref)
+  - [`port_opt_view`](@ref)
+  - [`check_asset_panel`](@ref)
+  - [`LastObservation`](@ref)
+"""
+function project_panel_clock(::Nothing, ::Any, ::Any, ::VecStr)
+    return nothing
+end
+function project_panel_clock(pnl::AssetPanel, ts_new, ts_old, nx::VecStr)::AssetPanel
+    check_asset_panel(pnl, length(nx), length(ts_old), "the number of asset price columns")
+    return port_opt_view(pnl, feature_row_indices(pnl, ts_new, ts_old),
+                         collect(eachindex(nx)), nx)
 end
 """
     span_carrier_view(span::Nothing, ts_new, ts_old, j) -> nothing

@@ -81,10 +81,13 @@ end
     using Test, PortfolioOptimisers, DataFrames, TimeSeries, CSV, StableRNGs, StatsBase,
           Statistics, LinearAlgebra
 
-    rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
-                                     timestamp = :Date)[(end - 252):end],
-                           TimeArray(CSV.File(joinpath(@__DIR__, "./assets/Factors.csv.gz"));
-                                     timestamp = :Date)[(end - 252):end])
+    rd = prices_to_returns(price_ingestion(PriceIngestion(),
+                                           TimeArray(CSV.File(joinpath(@__DIR__,
+                                                                       "./assets/SP500.csv.gz"));
+                                                     timestamp = :Date)[(end - 252):end];
+                                           F = TimeArray(CSV.File(joinpath(@__DIR__,
+                                                                           "./assets/Factors.csv.gz"));
+                                                         timestamp = :Date)[(end - 252):end]))
     X = rd.X
     T, N = size(X)
 

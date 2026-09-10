@@ -94,11 +94,13 @@ end
     # It carries its own `obj` and had NO return-side guard at all, so it was refused under
     # `MaximumRatio` (a model-build check) and accepted under `MaximumReturn` (a `MeanRisk`
     # constructor check) — uneven against itself. The shared seam closes both.
-    rd_f = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
-                                       timestamp = :Date)[(end - 252):end],
-                             TimeArray(CSV.File(joinpath(@__DIR__,
-                                                         "./assets/Factors.csv.gz"));
-                                       timestamp = :Date)[(end - 252):end])
+    rd_f = prices_to_returns(price_ingestion(PriceIngestion(),
+                                             TimeArray(CSV.File(joinpath(@__DIR__,
+                                                                         "./assets/SP500.csv.gz"));
+                                                       timestamp = :Date)[(end - 252):end];
+                                             F = TimeArray(CSV.File(joinpath(@__DIR__,
+                                                                             "./assets/Factors.csv.gz"));
+                                                           timestamp = :Date)[(end - 252):end]))
     pr_f = prior(EmpiricalPrior(), rd_f)
     for ret in (NoReturn(), ArithmeticReturn(; settings = rte_off))
         frc = FactorRiskContribution(; r = Variance(), obj = MaximumReturn(),

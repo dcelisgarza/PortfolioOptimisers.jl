@@ -54,9 +54,11 @@
                 "2022-12-27", "2022-12-28"])
     iv = TimeArray(ts, rand(StableRNG(123), 252, 20))
     ivpa = rand(StableRNG(123), 20)
-    rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
-                                     timestamp = :Date)[(end - 252):end]; iv = iv,
-                           ivpa = ivpa)
+    rd = prices_to_returns(price_ingestion(PriceIngestion(),
+                                           TimeArray(CSV.File(joinpath(@__DIR__,
+                                                                       "./assets/SP500.csv.gz"));
+                                                     timestamp = :Date)[(end - 252):end];
+                                           iv = iv, ivpa = ivpa))
     slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
                   check_sol = (; allow_local = false, allow_almost = false),
                   settings = Dict("verbose" => false)),
@@ -191,10 +193,11 @@
     end
     @testset "Constrained" begin
         ivpa = rand(StableRNG(123))
-        rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__,
-                                                           "./assets/SP500.csv.gz"));
-                                         timestamp = :Date)[(end - 252):end]; iv = iv,
-                               ivpa = ivpa)
+        rd = prices_to_returns(price_ingestion(PriceIngestion(),
+                                               TimeArray(CSV.File(joinpath(@__DIR__,
+                                                                           "./assets/SP500.csv.gz"));
+                                                         timestamp = :Date)[(end - 252):end];
+                                               iv = iv, ivpa = ivpa))
         pr = prior(HighOrderPriorEstimator(), rd)
         df = CSV.read(joinpath(@__DIR__, "./assets/NearOptimalCenteringFrontier3.csv.gz"),
                       DataFrame)

@@ -14,10 +14,13 @@
     sigma = cov(X)
     nx = string.('A':'E')
 
-    rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
-                                     timestamp = :Date)[(end - 252):end],
-                           TimeArray(CSV.File(joinpath(@__DIR__, "./assets/Factors.csv.gz"));
-                                     timestamp = :Date)[(end - 252):end])
+    rd = prices_to_returns(price_ingestion(PriceIngestion(),
+                                           TimeArray(CSV.File(joinpath(@__DIR__,
+                                                                       "./assets/SP500.csv.gz"));
+                                                     timestamp = :Date)[(end - 252):end];
+                                           F = TimeArray(CSV.File(joinpath(@__DIR__,
+                                                                           "./assets/Factors.csv.gz"));
+                                                         timestamp = :Date)[(end - 252):end]))
 
     # w_rd matches the number of assets in rd (SP500 slice, typically 20)
     w_rd = fill(1 / size(rd.X, 2), size(rd.X, 2))

@@ -484,7 +484,7 @@ end
                              [:A, :B, :C])
     pnl = asset_panel([NumericPanelInput(; name = "mcap", vals = reshape(1.0:9.0, 3, 3))];
                       amsk = trues(3, 3), emsk = trues(3, 3))
-    rd = prices_to_returns(P; pnl = pnl)
+    rd = prices_to_returns(PricesResult(; X = P, pnl = pnl))
     # Two returns rows survive the difference, so the panel is sliced to them.
     @test size(rd.X) == (2, 3)
     @test size(rd.pnl.amsk) == (2, 3)
@@ -493,8 +493,8 @@ end
 
     # A static panel has no observation axis to recover, so it rides through whole.
     sp = asset_panel([NumericPanelInput(; name = "mcap", vals = [1.0, 2.0, 3.0])])
-    @test PortfolioOptimisers.panel_field(prices_to_returns(P; pnl = sp).pnl, "mcap").vals ==
-          [1.0, 2.0, 3.0]
+    @test PortfolioOptimisers.panel_field(prices_to_returns(PricesResult(; X = P, pnl = sp)).pnl,
+                                          "mcap").vals == [1.0, 2.0, 3.0]
 end
 @testset "PricesResult carries the panel through both views" begin
     ts = [Dates.Date(2020, 1, i) for i in 1:3]

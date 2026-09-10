@@ -224,4 +224,12 @@ The ingestion layer is the single entry point for cleaning price data:
     removed all four: a keyword survives on the conversion if and only if it changes the arithmetic
     of a return. Filling is [`PriceGapFill`](@ref)'s and deleting is [`MissingDataFilter`](@ref)'s,
     whose thresholds admit `0.0` for *no gap is tolerated*.
+
+    Three keywords pass the rule — `ret_method`, `padding` and `gap_return_alg` — and the rest of
+    what the conversion used to take is now a field of the [`PricesResult`](@ref) it reads.
+    `join_method` and `collapse_args` move the observation clock, so they belong to
+    [`PriceIngestion`](@ref). `prices_to_returns(X)` on a bare price table is exactly
+    `prices_to_returns(price_ingestion(PriceIngestion(), X))`, so the friendliest call in the
+    library is the layer's own path, and a caller wanting a different join, a collapse, a declared
+    span, or factor and benchmark series writes the two steps.
 =#

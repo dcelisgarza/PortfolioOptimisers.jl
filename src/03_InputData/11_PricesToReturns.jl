@@ -259,28 +259,75 @@ function apply_gap_return(alg::AbstractGapReturnAlgorithm, R::DataFrames.DataFra
     return R
 end
 """
+    append_carrier_block!(P::DataFrames.DataFrame, A::Nothing, ts, sym::Symbol) -> Vector{String}
+    append_carrier_block!(P::DataFrames.DataFrame, A::TimeSeries.TimeArray, ts, sym::Symbol) -> Vector{String}
+
+Lay one of the carrier's price blocks beside the asset block, on the asset clock.
+
+The carrier states one clock, so a factor or benchmark series is read at the asset timestamps rather than joined onto them: a join adds or drops observations, which is a clock move, and [ADR 0129](https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/main/docs/adr/0129-the-ingestion-layer-seams-at-the-listing-span-and-the-clock-draws-the-pipeline-boundary.md) gives every clock move to [`price_ingestion`](@ref). Laying the columns out one by one also frees [`prices_to_returns`](@ref) of `TimeSeries.merge`'s one-value-type requirement, so a `Float32` factor table beside a `Float64` asset table converts instead of raising a `MethodError`.
+
+# Algorithm
+
+ 1. A block that is `nothing` contributes no column and no name.
+ 2. Otherwise check that the block states the asset clock, and refuse by name if it does not.
+ 3. Spell every absent price `NaN` with [`unify_gaps`](@ref), the verb the ingestion door runs. It is idempotent on a carrier the layer built, and it is what makes a hand-built carrier holding `missing` convert like one holding `NaN`.
+ 4. Write each of the block's columns into `P` under its own name, and return the names in order.
+
+# Arguments
+
+  - `P`: The table the conversion is assembling, already carrying the clock and the asset columns.
+  - `A`: The factor or benchmark price series, or `nothing`.
+  - `ts`: The asset timestamps, which are the carrier's clock.
+  - `sym`: The block's name in the refusal, `:F` or `:B`.
+
+# Validation
+
+  - `TimeSeries.timestamp(A) == ts`. Raises a [`ConflictingArgumentError`](@ref) naming [`price_ingestion`](@ref), which is what puts two series on one clock.
+
+# Returns
+
+  - `n::Vector{String}`: The block's column names, empty when the block is `nothing`.
+
+# Related
+
+  - [`prices_to_returns`](@ref)
+  - [`price_ingestion`](@ref)
+  - [`unify_gaps`](@ref)
+  - [`PricesResult`](@ref)
+"""
+function append_carrier_block!(::DataFrames.DataFrame, ::Nothing, ::Any, ::Symbol)
+    return String[]
+end
+function append_carrier_block!(P::DataFrames.DataFrame, A::TimeSeries.TimeArray, ts,
+                               sym::Symbol)
+    @argcheck(TimeSeries.timestamp(A) == ts,
+              ConflictingArgumentError("`$sym` is carried on the asset clock, and `price_ingestion` is what puts it there:\n\tlength(timestamp($sym)) => $(length(TimeSeries.timestamp(A)))\n\tlength(timestamp(X)) => $(length(ts))"))
+    n = string.(TimeSeries.colnames(A))
+    v = values(unify_gaps(A))
+    for (j, nm) in pairs(n)
+        P[!, nm] = v[:, j]
+    end
+    return n
+end
+"""
     prices_to_returns(
-        X::TimeSeries.TimeArray,
-        F::Option{<:TimeSeries.TimeArray} = nothing;
-        B::Option{<:TimeSeries.TimeArray} = nothing,
-        iv::Option{<:TimeSeries.TimeArray} = nothing,
-        ivpa::Option{<:Num_VecNum} = nothing,
-        ret_method::Symbol = :simple, padding::Bool = false,
-        gap_return_alg::Option{<:AbstractGapReturnAlgorithm} = nothing,
-        collapse_args::Tuple = (),
-        map_func::Option{<:Function} = nothing,
-        join_method::Symbol = :outer,
-        pnl::Option{<:AssetPanel} = nothing,
-        span::Option{<:AbstractMatrix{Bool}} = nothing
+        pr::PricesResult;
+        ret_method::Symbol = :simple,
+        padding::Bool = false,
+        gap_return_alg::Option{<:AbstractGapReturnAlgorithm} = nothing
+    ) -> ReturnsResult
+    prices_to_returns(
+        X::TimeSeries.TimeArray;
+        kwargs...
     ) -> ReturnsResult
 
-Convert `TimeSeries.TimeArray` price data to returns. Handles factor data, a price gap, and
-optional implied volatility information.
+Compute returns from the price carrier, and nothing else.
 
-An absent price has one spelling, `NaN`, and the conversion carries it into the returns rather
-than deleting the observation or the asset that holds one. Filling a gap is
-[`PriceGapFill`](@ref)'s and deleting one is [`MissingDataFilter`](@ref)'s, both of them fitted
-steps; ADR 0133 owns the rule.
+A keyword survives here if and only if it changes the arithmetic of a return, which is the rule ADR 0133 states and the reason there are three. Every datum the conversion reads — the asset prices, the factors, the benchmark, the implied volatilities, the **Listing Span** and the [`AssetPanel`](@ref) — is already a field of the [`PricesResult`](@ref), so naming one as a keyword would be a second way to say what the carrier says.
+
+The second method is the friendliest call in the library, and it is the layer's own path rather than a way around it: it runs [`price_ingestion`](@ref) with a default [`PriceIngestion`](@ref) and converts what that emits. A caller wanting a different join, a collapse, a declared span, or factor, benchmark and implied-volatility series writes the two steps.
+
+An absent price has one spelling, `NaN`, and the conversion carries it into the returns rather than deleting the observation or the asset that holds one. Filling a gap is [`PriceGapFill`](@ref)'s and deleting one is [`MissingDataFilter`](@ref)'s, both of them fitted steps; ADR 0133 owns the rule.
 
 # Mathematical definition
 
@@ -306,50 +353,35 @@ A benchmark ``B`` is converted by the same rule and **carried alongside** the as
 
 # Algorithm
 
- 1. Check `X`, and check that the asset, factor and benchmark series can still be named after the merge with [`assert_distinct_series_names`](@ref). Read the asset names and the asset timestamps from `X`, and check `pnl` against them with [`check_asset_panel`](@ref).
- 2. Merge the factor prices `F` into `X` under `join_method`, and record the factor names.
- 3. Merge the benchmark prices `B` into `X` under `join_method`, and record the benchmark names. A benchmark is one shared column, or one column per asset.
- 4. Apply `map_func` to every entry, when one is given.
- 5. Collapse the time series with `collapse_args`, when they are given. This is the step that changes the frequency.
- 6. Convert the table to a `DataFrames.DataFrame`.
- 7. Replace every `missing` with `NaN`, so that the two conventions a source spells an absent price with become one: an outer join of per-asset series pads with `NaN`, and a wide table built from a tidy one leaves `missing`. This is the only unification, it runs unconditionally, and it is what makes the two ragged-history sources behave alike. It is also the last step that touches an absent price: every row and every column of the table reaches the conversion, whatever it holds.
- 8. Convert the prices to returns with `TimeSeries.percentchange` under `ret_method` and `padding`. This is the step that applies the formula above. It computes both branches through logarithms — the log return is ``\\ln P_{t,i} - \\ln P_{t-1,i}``, and the simple return is `expm1` of it — so the two agree with the closed forms above to floating point rather than to the last bit. When `padding` is `true` the first observation is kept and its return is `NaN`, so the returns keep the length of the price clock. **A gap carried here does not spread.** The formula reads two prices, so a run of `k` gapped prices makes exactly the `k + 1` returns that read one of them non-finite, and every later return of that column is computed from two observed prices and is finite. A gap is confined to its own column for the same reason: no asset's return reads another's price.
- 9. Resolve the cells the conversion left non-finite with [`apply_gap_return`](@ref), under `gap_return_alg`. `nothing` is the default rule, and its method returns the table untouched, so the arithmetic step 8 produced is bit-identical. An algorithm may write only a non-finite cell inside a column's Listing Span that has an earlier observed price, which is what freezes every return computed from two observed prices, and it reports an `@info` when it finds no such cell.
-10. Name the three blocks. Step 1 refused every name two of the tables shared and the clock's own name `timestamp`, so the asset names `nx`, the factor names `nf` and the benchmark names `nb` are the lists read off the three tables, and `ts` is the `timestamp` column the `DataFrames.DataFrame` conversion wrote. Each is the typed vector its table held, rather than whatever is left once the other groups have taken what they recognise.
-11. Index the implied volatilities `iv` by `ts`, then check `iv` and `ivpa` against the asset count.
-12. Subselect the [`AssetPanel`](@ref). Read the assets' positions `acols` in the original asset names, recover the surviving rows with [`feature_row_indices`](@ref), and view the panel with [`port_opt_view`](@ref), handing it the asset names so that a square tensor Panel Field is cut on its label axis too. The conversion removes no column, so `acols` is the whole asset axis and the subselection that bites is the observation one: a time-varying panel is cut to the surviving observations, matched back into the original price timestamps, and a surviving timestamp absent from that clock throws. Under `collapse_args` this gives the aggregated period the values of the row at its representative timestamp, which is last-observation semantics and matches [`LastObservation`](@ref).
-13. State the universe. Cut `span` to the price rows with [`span_carrier_view`](@ref), and hand it and the converted returns to [`returns_universe_masks`](@ref), which projects it onto the returns clock and intersects it with finiteness. A carrier that states no span states no universe, and the conversion emits no panel. [`attach_universe_masks`](@ref) puts the pair onto the Asset Panel, keeping whatever Panel Fields it already carried, and mints one with no field when the carrier held none.
-14. Build the asset, factor and benchmark matrices from the columns of each group. The asset group is always present, because the conversion removes no column; a factor or benchmark group given no column is `nothing`.
-15. Return the [`ReturnsResult`](@ref).
+ 1. Check that the asset, factor and benchmark series can still be named side by side with [`assert_distinct_series_names`](@ref). Read the asset names and the asset timestamps from `pr.X`, and check `pr.pnl` against them with [`check_asset_panel`](@ref) and `pr.span` with [`assert_span_shape`](@ref).
+ 2. Lay the three price blocks side by side on the carrier's clock with [`append_carrier_block!`](@ref), spelling every absent price `NaN` with [`unify_gaps`](@ref). The carrier states one clock, so a factor or benchmark series is read at the asset timestamps rather than joined onto them, and one stating a different clock is refused by name: a join adds or drops observations, and [`price_ingestion`](@ref) owns every clock move. A benchmark is one shared column, or one column per asset.
+ 3. Convert the prices to returns with `TimeSeries.percentchange` under `ret_method` and `padding`. This is the step that applies the formula above. It computes both branches through logarithms — the log return is ``\\ln P_{t,i} - \\ln P_{t-1,i}``, and the simple return is `expm1` of it — so the two agree with the closed forms above to floating point rather than to the last bit. When `padding` is `true` the first observation is kept and its return is `NaN`, so the returns keep the length of the price clock. **A gap carried here does not spread.** The formula reads two prices, so a run of `k` gapped prices makes exactly the `k + 1` returns that read one of them non-finite, and every later return of that column is computed from two observed prices and is finite. A gap is confined to its own column for the same reason: no asset's return reads another's price.
+ 4. Resolve the cells the conversion left non-finite with [`apply_gap_return`](@ref), under `gap_return_alg`. `nothing` is the default rule, and its method returns the table untouched, so the arithmetic step 3 produced is bit-identical. An algorithm may write only a non-finite cell inside a column's Listing Span that has an earlier observed price, which is what freezes every return computed from two observed prices, and it reports an `@info` when it finds no such cell.
+ 5. Name the three blocks. Step 1 refused every name two of the tables shared and the clock's own name `timestamp`, so the asset names `nx`, the factor names `nf` and the benchmark names `nb` are the lists read off the three tables, and `ts` is the `timestamp` column the `DataFrames.DataFrame` conversion wrote. Each is the typed vector its table held, rather than whatever is left once the other groups have taken what they recognise.
+ 6. Index the implied volatilities `pr.iv` by `ts`, then check them and `pr.ivpa` against the asset count. The returns clock is the price clock less the observation `padding` costs, so a carrier the layer built covers it.
+ 7. Subselect the [`AssetPanel`](@ref). Recover the surviving rows with [`feature_row_indices`](@ref) and view the panel with [`port_opt_view`](@ref), handing it the asset names so that a square tensor Panel Field is cut on its label axis too. The conversion removes no column, so the asset axis reaches the panel whole and the subselection that bites is the observation one: a time-varying panel is cut to the surviving observations and matched back into the price timestamps.
+ 8. State the universe. Cut `pr.span` to the asset axis with [`span_carrier_view`](@ref), and hand it and the converted returns to [`returns_universe_masks`](@ref), which projects it onto the returns clock and intersects it with finiteness. A carrier that states no span states no universe, and the conversion emits no panel. [`attach_universe_masks`](@ref) puts the pair onto the Asset Panel, keeping whatever Panel Fields it already carried, and mints one with no field when the carrier held none.
+ 9. Build the asset, factor and benchmark matrices from the columns of each group. The asset group is always present, because the conversion removes no column; a factor or benchmark group given no column is `nothing`.
+10. Return the [`ReturnsResult`](@ref).
 
 **The conversion removes no observation and no asset.** Deleting either is a **Universe Policy**, and a policy is fitted on a training window and replayed by name, which a stateless conversion cannot do; [`MissingDataFilter`](@ref) owns it, with `col_thr` deleting an asset and `row_thr` an observation. ADR 0133 states the rule that a keyword survives here if and only if it changes the arithmetic of a return.
 
 # Arguments
 
-  - `X`: Asset price data (observations × assets).
-  - `F`: Optional Factor price data (observations × factors).
-  - `B`: Optional Benchmark price data (observations × assets) or (observations × 1).
-  - `iv`: Optional Implied volatility data.
-  - `ivpa`: Optional Implied volatility risk premium adjustment.
+  - `pr`: The price carrier, as [`price_ingestion`](@ref) emits it or a caller builds it.
+  - `X`: Asset price data (observations × assets), converted through a default [`PriceIngestion`](@ref).
   - `ret_method`: Return calculation method (`:simple` or `:log`).
   - `padding`: Whether to pad missing values in returns calculation.
   - `gap_return_alg`: What the observations a price gap left non-finite carry. `nothing` is the arithmetic — a return is the change between two consecutive observations, so a run of `k` gapped prices leaves `k + 1` non-finite returns and the move across the gap is recorded nowhere — and [`CatchUpGapReturn`](@ref) books that move on the observation the asset resumes trading instead, shortening the Held Gap to `k`. Any algorithm may write only a non-finite cell inside an asset's Listing Span that has an earlier observed price in its column, so a return computed from two observed prices is frozen whichever one is stated. It has no cell to write over a gap-free table, and reports an `@info` there.
-  - `collapse_args`: Arguments for collapsing the time series (e.g., to lower frequency).
-  - `map_func`: Optional function to apply to the data before returns calculation.
-  - `join_method`: How to join asset, factor data and benchmark data (`:outer`, `:inner`, etc.).
-  - `pnl`: Optional [`AssetPanel`](@ref), as [`asset_panel`](@ref) returns it.
-  - `span`: Optional **Listing Span** on the price clock, as [`PriceIngestion`](@ref) derives it or a caller declares it. Given one, the conversion projects it onto the returns clock with [`universe_masks`](@ref) and hands the returns carrier an [`AssetPanel`](@ref) stating the universe — always, a gapless panel included, so `pnl === nothing` means one thing only: the carrier was not built by the ingestion layer. `nothing` states no universe and emits no panel, whether or not the prices hold a gap; a window-local span cannot answer the question, because a delisting straddling the window end reads there as an asset that was never listed.
 
 # Validation
 
-  - Every price reaching step 11 is positive. `TimeSeries.percentchange` takes a logarithm on both branches, so a negative price raises a `DomainError` from inside it, on the simple branch as well.
-  - `!isempty(X)`.
+  - Every price reaching step 3 is positive. `TimeSeries.percentchange` takes a logarithm on both branches, so a negative price raises a `DomainError` from inside it, on the simple branch as well.
   - The asset, factor and benchmark column names are pairwise disjoint, and none of them is `timestamp`. Raises a [`ConflictingArgumentError`](@ref) naming the offending columns.
-  - If `F` is not `nothing`, `!isempty(F)`.
-  - If `B` is not `nothing`, `!isempty(B)`, and `size(values(B), 2) in (1, size(values(X), 2))`.
-  - If `iv` is not `nothing`, the timestamps of the merged data matrix must be a subset of `TimeSeries.timestamp(iv)`, then `iv = values(iv)`, `!isempty(iv)`, `all(x -> x >= 0, iv)`, `all(x -> isfinite(x), iv)`, and `size(iv) == size(X)`.
-  - If `span` is not `nothing`, `size(span) == (size(values(X), 1), size(values(X), 2))`. Raises a `DimensionMismatch`.
-  - `ivpa` is validated in that same branch, so it is checked only when `iv` is given: `all(x -> x > 0, ivpa)`, `all(x -> isfinite(x), ivpa)`, and, if a vector, `length(ivpa) == size(iv, 2)`. The bound is strict — a zero adjustment is rejected.
+  - If `pr.F` or `pr.B` is not `nothing`, its timestamps equal the asset timestamps. Raises a [`ConflictingArgumentError`](@ref) naming [`price_ingestion`](@ref), which is what puts two series on one clock.
+  - If `pr.iv` is not `nothing`, the returns timestamps are a subset of `TimeSeries.timestamp(pr.iv)`, then `iv = values(iv[ts])`, `!isempty(iv)`, `all(x -> x >= 0, iv)`, `all(x -> isfinite(x), iv)`, and `size(iv) == size(X)`.
+  - If `pr.span` is not `nothing`, `size(pr.span) == size(values(pr.X))`. Raises a `DimensionMismatch`.
+  - `pr.ivpa` is validated in that same branch, so it is checked only when `pr.iv` is given: `all(x -> x > 0, ivpa)`, `all(x -> isfinite(x), ivpa)`, and, if a vector, `length(ivpa) == size(iv, 2)`. The bound is strict — a zero adjustment is rejected.
 
 # Returns
 
@@ -380,11 +412,15 @@ ReturnsResult
     ts ┼ Vector{Dates.Date}: [Dates.Date("2020-01-02"), Dates.Date("2020-01-03")]
     iv ┼ nothing
   ivpa ┼ nothing
-   pnl ┴ nothing
+   pnl ┼ AssetPanel
+       │     pf ┼ Vector{PortfolioOptimisers.AbstractPanelField}: PortfolioOptimisers.AbstractPanelField[]
+       │   amsk ┼ 2×2 PortfolioOptimisers.AllTrueMask
+       │   emsk ┴ 2×2 PortfolioOptimisers.AllTrueMask
 ```
 
 # Related
 
+  - [`PricesResult`](@ref)
   - [`ReturnsResult`](@ref)
   - [`Option`](@ref)
   - [`VecStr`](@ref)
@@ -397,61 +433,27 @@ ReturnsResult
   - [`CatchUpGapReturn`](@ref)
   - [`PriceIngestion`](@ref)
   - [`price_ingestion`](@ref)
+  - [`append_carrier_block!`](@ref)
+  - [`unify_gaps`](@ref)
   - [`returns_universe_masks`](@ref)
   - [`attach_universe_masks`](@ref)
   - [`span_carrier_view`](@ref)
   - [`returns_result_picker`](@ref): subtracts the carried benchmark, and only when the optimisation tracks it.
 """
-function prices_to_returns(X::TimeSeries.TimeArray,
-                           F::Option{<:TimeSeries.TimeArray} = nothing;
-                           B::Option{<:TimeSeries.TimeArray} = nothing,
-                           iv::Option{<:TimeSeries.TimeArray} = nothing,
-                           ivpa::Option{<:Num_VecNum} = nothing,
-                           ret_method::Symbol = :simple, padding::Bool = false,
-                           gap_return_alg::Option{<:AbstractGapReturnAlgorithm} = nothing,
-                           collapse_args::Tuple = (),
-                           map_func::Option{<:Function} = nothing,
-                           join_method::Symbol = :outer,
-                           pnl::Option{<:AssetPanel} = nothing,
-                           span::Option{<:AbstractMatrix{Bool}} = nothing)
-    @argcheck(!isempty(X), IsEmptyError)
-    assert_distinct_series_names(X, F, B)
-    asset_names = string.(TimeSeries.colnames(X))
-    asset_ts = TimeSeries.timestamp(X)
-    check_asset_panel(pnl, length(asset_names), length(asset_ts),
-                      "the number of asset price columns")
-    assert_span_shape(span, length(asset_ts), length(asset_names))
-    factor_names = String[]
-    benchmark_names = String[]
-    if !isnothing(F)
-        @argcheck(!isempty(F), IsEmptyError)
-        factor_names = string.(TimeSeries.colnames(F))
-        X = TimeSeries.merge(X, F; method = join_method)
-    end
-    if !isnothing(B)
-        @argcheck(!isempty(B), IsEmptyError)
-        benchmark_names = string.(TimeSeries.colnames(B))
-        @argcheck(length(benchmark_names) in (1, length(asset_names)), DimensionMismatch)
-        X = TimeSeries.merge(X, B; method = join_method)
-    end
-    if !isnothing(map_func)
-        X = map(map_func, X)
-    end
-    if !isempty(collapse_args)
-        X = TimeSeries.collapse(X, collapse_args...)
-    end
-    X = DataFrames.DataFrame(X)
-
-    # Absence has one spelling and it is `NaN`, because the returns level must carry it in a
-    # `Matrix{Float64}`. A source spells it either way -- an outer join of ragged histories
-    # pads with `NaN`, a wide table built from a tidy one leaves `missing` -- so this is the
-    # one unification, and after it nothing below asks about spelling again.
-    DataFrames.transform!(X,
-                          2:DataFrames.DataAPI.ncol(X) .=>
-                              DataFrames.ByRow((x) -> ifelse(ismissing(x), NaN, x));
-                          renamecols = false)
-    P = X
-    X = TimeSeries.percentchange(TimeSeries.TimeArray(X; timestamp = :timestamp),
+function prices_to_returns(pr::PricesResult; ret_method::Symbol = :simple,
+                           padding::Bool = false,
+                           gap_return_alg::Option{<:AbstractGapReturnAlgorithm} = nothing)::ReturnsResult
+    assert_distinct_series_names(pr.X, pr.F, pr.B)
+    asset_names = string.(TimeSeries.colnames(pr.X))
+    asset_ts = TimeSeries.timestamp(pr.X)
+    N = length(asset_names)
+    check_asset_panel(pr.pnl, N, length(asset_ts), "the number of asset price columns")
+    assert_span_shape(pr.span, length(asset_ts), N)
+    P = DataFrames.DataFrame(values(unify_gaps(pr.X)), asset_names)
+    DataFrames.insertcols!(P, 1, :timestamp => asset_ts)
+    factor_names = append_carrier_block!(P, pr.F, asset_ts, :F)
+    benchmark_names = append_carrier_block!(P, pr.B, asset_ts, :B)
+    X = TimeSeries.percentchange(TimeSeries.TimeArray(P; timestamp = :timestamp),
                                  ret_method; padding = padding)
     X = DataFrames.DataFrame(X)
     X = apply_gap_return(gap_return_alg, X, P, ret_method)
@@ -464,8 +466,9 @@ function prices_to_returns(X::TimeSeries.TimeArray,
     nx = asset_names
     nf = factor_names
     nb = benchmark_names
-    N = length(nx)
     ts = X[!, :timestamp]
+    iv = pr.iv
+    ivpa = pr.ivpa
     if !isnothing(iv)
         @argcheck(issubset(ts, TimeSeries.timestamp(iv)),
                   ArgumentError("ts must be a subset of the timestamps in iv"))
@@ -478,35 +481,33 @@ function prices_to_returns(X::TimeSeries.TimeArray,
         end
     end
     #! The conversion removes no column, so the assets reach it in their original order and
-    #! `acols` is the whole asset axis. It is still read rather than assumed, because it is
-    #! what pairs a Panel Field and a span column with the asset they describe.
-    acols = Vector{Int}(indexin(nx, asset_names))
+    #! `acols` is the whole asset axis. It is still handed to the panel view, because it is
+    #! what pairs a square tensor Panel Field's label axis with the assets it describes.
+    acols = collect(1:N)
+    pnl = pr.pnl
     if !isnothing(pnl)
         rows = feature_row_indices(pnl, ts, asset_ts)
         pnl = port_opt_view(pnl, rows, acols, asset_names)
     end
-    #! The span is on the price clock and the masks are on the returns clock, so the span is
-    #! cut to the price rows the merge and the collapse left and universe_masks does the
-    #! crossing. Both padding conventions reach it, and it reads which from the two row
-    #! counts.
-    amsk, emsk = returns_universe_masks(span_carrier_view(span, P[!, :timestamp], asset_ts,
+    #! The span is on the price clock and the masks are on the returns clock, and
+    #! `universe_masks` does the crossing. Both padding conventions reach it, and it reads
+    #! which from the two row counts.
+    amsk, emsk = returns_universe_masks(span_carrier_view(pr.span, asset_ts, asset_ts,
                                                           acols), Matrix(X[!, nx]))
     pnl = attach_universe_masks(pnl, amsk, emsk)
-    if isempty(nf)
-        nf = nothing
-        F = nothing
+    F = isempty(nf) ? nothing : Matrix(X[!, nf])
+    B = if isempty(nb)
+        nothing
     else
-        F = Matrix(X[!, nf])
+        length(nb) == 1 ? X[!, nb[1]] : Matrix(X[!, nb])
     end
-    if isempty(nb)
-        nb = nothing
-        B = nothing
-    else
-        B = length(nb) == 1 ? X[!, nb[1]] : Matrix(X[!, nb])
-    end
-    X = Matrix(X[!, nx])
-    return ReturnsResult(; ts = ts, nx = nx, X = X, nf = nf, F = F, nb = nb, B = B, iv = iv,
-                         ivpa = ivpa, pnl = pnl)
+    return ReturnsResult(; ts = ts, nx = nx, X = Matrix(X[!, nx]),
+                         nf = isempty(nf) ? nothing : nf, F = F,
+                         nb = isempty(nb) ? nothing : nb, B = B, iv = iv, ivpa = ivpa,
+                         pnl = pnl)
+end
+function prices_to_returns(X::TimeSeries.TimeArray; kwargs...)::ReturnsResult
+    return prices_to_returns(price_ingestion(PriceIngestion(), X); kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -515,7 +516,7 @@ Preprocessing estimator converting price-level data into returns-level data.
 
 `PricesToReturns` is the estimator form of [`prices_to_returns`](@ref): it consumes a [`PricesResult`](@ref) and produces a [`ReturnsResult`](@ref). It is stateless — applying it to any window simply runs the conversion — so its fitted object is the estimator itself.
 
-Missing-data filtering is deliberately *not* part of this estimator, and [`prices_to_returns`](@ref) carries no keyword that would put it there; use [`MissingDataFilter`](@ref) and [`PriceGapFill`](@ref) as separate, independently tunable steps. Deleting an observation or an asset is a **Universe Policy**, and a policy is fitted on a training window and replayed by name; this step is stateless, so it holds none.
+Its three fields are the three keywords that survive the rule ADR 0133 states: a keyword belongs to the conversion if and only if it changes the arithmetic of a return. Joining and collapsing move the observation clock and are [`PriceIngestion`](@ref)'s; filling is [`PriceGapFill`](@ref)'s and deleting is [`MissingDataFilter`](@ref)'s, both fitted steps; and every datum the conversion reads is a field of the [`PricesResult`](@ref) it consumes.
 
 The step is stateless, and it does not need to be stateful to fix an asset universe: the carrier states one. A [`PricesResult`](@ref) that [`price_ingestion`](@ref) built carries a **Listing Span**, and this step projects it onto the returns clock and hands the [`ReturnsResult`](@ref) an [`AssetPanel`](@ref) whose two masks say which assets are in the universe and which of them can be estimated at each observation. The asset axis is fixed before the split, so every window of every fold carries every asset and a window can no longer silently lose a column.
 
@@ -528,7 +529,7 @@ The step is stateless, and it does not need to be stateful to fix an asset unive
 The estimator is stateless, so both verbs are thin.
 
  1. [`fit_preprocessing`](@ref) returns the estimator itself. There is no state to fit.
- 2. [`apply_preprocessing`](@ref) calls [`prices_to_returns`](@ref) with the six fields as keywords, and with `X`, `F`, `B`, `iv`, `ivpa`, `pnl` and `span` read off the [`PricesResult`](@ref). It returns the [`ReturnsResult`](@ref).
+ 2. [`apply_preprocessing`](@ref) calls [`prices_to_returns`](@ref) with the three fields as keywords, handing it the [`PricesResult`](@ref) whole. It returns the [`ReturnsResult`](@ref).
 
 Every row and every column of the window reaches the conversion, because the conversion has no way to drop one. `gap_return_alg` is a field, because it decides what the observations a gap left non-finite carry, which is the arithmetic of a return rather than a policy about the universe.
 
@@ -541,10 +542,7 @@ $(DocStringExtensions.FIELDS)
     PricesToReturns(;
         ret_method::Symbol = :simple,
         padding::Bool = false,
-        gap_return_alg::Option{<:AbstractGapReturnAlgorithm} = nothing,
-        collapse_args::Tuple = (),
-        map_func::Option{<:Function} = nothing,
-        join_method::Symbol = :outer
+        gap_return_alg::Option{<:AbstractGapReturnAlgorithm} = nothing
     ) -> PricesToReturns
 
 Keywords correspond to the struct's fields.
@@ -578,6 +576,7 @@ julia> rr.nx
   - [`prices_to_returns`](@ref)
   - [`AbstractGapReturnAlgorithm`](@ref)
   - [`CatchUpGapReturn`](@ref)
+  - [`PriceIngestion`](@ref)
   - [`PricesResult`](@ref)
   - [`ReturnsResult`](@ref)
 """
@@ -594,46 +593,22 @@ julia> rr.nx
     What the observations a price gap left non-finite carry. `nothing` is the arithmetic, and [`CatchUpGapReturn`](@ref) books the move across the gap on the observation that ends it. See [`AbstractGapReturnAlgorithm`](@ref).
     """
     gap_return_alg
-    """
-    Arguments for collapsing the time series (e.g. to lower frequency).
-    """
-    collapse_args
-    """
-    Optional function applied to the data before the returns calculation.
-    """
-    map_func
-    """
-    How asset, factor, and benchmark data are joined (`:outer`, `:inner`, etc.).
-    """
-    join_method
     function PricesToReturns(ret_method::Symbol, padding::Bool,
-                             gap_return_alg::Option{<:AbstractGapReturnAlgorithm},
-                             collapse_args::Tuple, map_func::Option{<:Function},
-                             join_method::Symbol)
+                             gap_return_alg::Option{<:AbstractGapReturnAlgorithm})
         @argcheck(ret_method in (:simple, :log),
                   ArgumentError("ret_method must be :simple or :log, got :$ret_method"))
-        return new{typeof(ret_method), typeof(padding), typeof(gap_return_alg),
-                   typeof(collapse_args), typeof(map_func), typeof(join_method)}(ret_method,
-                                                                                 padding,
-                                                                                 gap_return_alg,
-                                                                                 collapse_args,
-                                                                                 map_func,
-                                                                                 join_method)
+        return new{typeof(ret_method), typeof(padding), typeof(gap_return_alg)}(ret_method,
+                                                                                padding,
+                                                                                gap_return_alg)
     end
 end
 function PricesToReturns(; ret_method::Symbol = :simple, padding::Bool = false,
-                         gap_return_alg::Option{<:AbstractGapReturnAlgorithm} = nothing,
-                         collapse_args::Tuple = (), map_func::Option{<:Function} = nothing,
-                         join_method::Symbol = :outer)::PricesToReturns
-    return PricesToReturns(ret_method, padding, gap_return_alg, collapse_args, map_func,
-                           join_method)
+                         gap_return_alg::Option{<:AbstractGapReturnAlgorithm} = nothing)::PricesToReturns
+    return PricesToReturns(ret_method, padding, gap_return_alg)
 end
 function prices_to_returns(ptr::PricesToReturns, pr::PricesResult)::ReturnsResult
-    return prices_to_returns(pr.X, pr.F; B = pr.B, iv = pr.iv, ivpa = pr.ivpa,
-                             ret_method = ptr.ret_method, padding = ptr.padding,
-                             gap_return_alg = ptr.gap_return_alg,
-                             collapse_args = ptr.collapse_args, map_func = ptr.map_func,
-                             join_method = ptr.join_method, pnl = pr.pnl, span = pr.span)
+    return prices_to_returns(pr; ret_method = ptr.ret_method, padding = ptr.padding,
+                             gap_return_alg = ptr.gap_return_alg)
 end
 function fit_preprocessing(ptr::PricesToReturns, ::PricesResult)
     return ptr

@@ -14,6 +14,8 @@ PortfolioOptimisers.panel_feature_names
 PortfolioOptimisers.panel_carrier_view
 PortfolioOptimisers.asset_panel(::Nothing, ::Any, ::ReturnsResult, ::Any)
 PortfolioOptimisers.assert_asset_panel_supplied
+PortfolioOptimisers.project_panel_clock
+PortfolioOptimisers.append_carrier_block!
 prices_to_returns
 PortfolioOptimisers.AbstractGapReturnAlgorithm
 CatchUpGapReturn

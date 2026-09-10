@@ -168,10 +168,12 @@ end
     @test_throws cae price_ingestion(PriceIngestion(), X59; B = Bc)
     @test_throws cae price_ingestion(PriceIngestion(), X59; F = Fg, B = Bg)
 
-    # And at the conversion's own door, which is the form issue #990 reported.
-    @test_throws cae prices_to_returns(X59, Fb)
-    @test_throws cae prices_to_returns(X59; B = Bc)
-    @test_throws cae prices_to_returns(X59, Fg; B = Bg)
+    # And at the conversion's own door, which is the form issue #990 reported. The
+    # conversion takes a carrier, so the collision reaches it on one: a hand-built
+    # `PricesResult` is the one route that does not pass the ingestion door first.
+    @test_throws cae prices_to_returns(PricesResult(; X = X59, F = Fb))
+    @test_throws cae prices_to_returns(PricesResult(; X = X59, B = Bc))
+    @test_throws cae prices_to_returns(PricesResult(; X = X59, F = Fg, B = Bg))
 
     # The error names the shared column, because a caller has to know which one to rename.
     err = try
@@ -208,7 +210,7 @@ end
     # The names the refusal guarantees are what lets the conversion name its blocks outright.
     # The clock is the `timestamp` column, typed, and never a `Vector{Any}` of interleaved
     # dates and prices.
-    rd = prices_to_returns(X59, Ff; B = one59("bmk"))
+    rd = prices_to_returns(price_ingestion(PriceIngestion(), X59; F = Ff, B = one59("bmk")))
     @test isa(rd.ts, Vector{Date})
     @test rd.nx == nx59
     @test rd.nf == ["f"]
@@ -418,7 +420,12 @@ end
 
     # A span that does not fit the price clock is refused outright.
     @test_throws DimensionMismatch PricesResult(; X = X59, span = trues(T59 + 1, N59))
-    @test_throws DimensionMismatch prices_to_returns(X59; span = trues(T59, N59 + 1))
+    @test_throws DimensionMismatch PricesResult(; X = X59, span = trues(T59, N59 + 1))
+    # The conversion checks the shape again, because a `span` reaches it on a carrier that
+    # a caller may have rebuilt around a different price table.
+    @test_throws DimensionMismatch PortfolioOptimisers.assert_span_shape(trues(T59,
+                                                                               N59 + 1),
+                                                                         T59, N59)
 end
 
 @testset "assert_universe_aligned narrows to a provenance check" begin
@@ -517,12 +524,15 @@ end
     @test iszero(res.w[3]) && iszero(res.w[4])
 
     # What the deleted path did, reproduced by hand: delete every observation row that holds
-    # a gap and the table is 26 of 39 rows, states no universe, and the two dead names take
-    # 43% of the book because nothing is left to say they are dead.
+    # a gap and the table is 26 of 39 rows, and the two dead names take 43% of the book
+    # because nothing is left to say they are dead. Ingestion is the only door, so the
+    # universe is still stated -- and what it states is the falsehood the deletion
+    # manufactured: every asset listed and estimable at every surviving observation.
     kept = [t for t in 1:T if all(isfinite, view(P, t, :))]
     rdd = prices_to_returns(TimeArray(ts[kept], P[kept, :], nx))
     @test size(rdd.X, 1) == 26
-    @test isnothing(rdd.pnl)
+    @test all(rdd.pnl.amsk)
+    @test all(rdd.pnl.emsk)
     resd = optimise(MeanRisk(; obj = MinimumRisk(),
                              opt = JuMPOptimiser(; pe = prior(EmpiricalPrior(), rdd),
                                                  slv = slv985)))
@@ -536,4 +546,29 @@ end
                             price_ingestion(PriceIngestion(), TimeArray(ts, Pm, nx)))
     @test isequal(rdm.X, rd.X)
     @test Matrix(rdm.pnl.emsk) == Matrix(rd.pnl.emsk)
+end
+
+# Map #955, ADR 0133. The conversion takes a carrier, so the implied volatilities reach it as a
+# field rather than as a keyword, and the one thing it does with them is project them onto the
+# returns clock: a return costs the first observation unless `padding` keeps it.
+@testset "the carrier's implied volatilities are cut to the returns clock" begin
+    iv59 = TimeArray(collect(ts59), fill(0.2, T59, N59), nx59)
+    pri = price_ingestion(PriceIngestion(), X59; iv = iv59, ivpa = 1.5)
+
+    rd = prices_to_returns(pri)
+    @test size(rd.iv) == (T59 - 1, N59)
+    @test all(rd.iv .== 0.2)
+    @test rd.ivpa == 1.5
+
+    # Under `padding` the returns keep the price clock, so the implied volatilities do too.
+    @test size(prices_to_returns(pri; padding = true).iv) == (T59, N59)
+
+    # A per-asset adjustment is checked against the asset axis rather than carried blindly.
+    prv = price_ingestion(PriceIngestion(), X59; iv = iv59, ivpa = fill(1.5, N59))
+    @test length(prices_to_returns(prv).ivpa) == N59
+
+    # A carrier built by hand can state implied volatilities that do not cover the returns
+    # clock, and the conversion refuses rather than padding: only the door pads.
+    short = PricesResult(; X = X59, iv = iv59[collect(ts59)[1:(T59 - 2)]])
+    @test_throws ArgumentError prices_to_returns(short)
 end

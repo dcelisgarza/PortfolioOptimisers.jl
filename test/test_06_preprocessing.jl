@@ -41,7 +41,7 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         # and five factors that survived it. The conversion now deletes nothing, so the
         # gap column arrives as a column of gaps and the oracle covers the columns beside
         # it, bit for bit.
-        rd = prices_to_returns(Px, Py)
+        rd = prices_to_returns(price_ingestion(PriceIngestion(), Px; F = Py))
         ts1 = rd.ts
         X1 = rd.X
         F1 = rd.F
@@ -260,15 +260,27 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
             @test all(!isfinite, view(kept.X, :, 2))
 
             # The static shape keeps its whole asset axis, because no keyword can cut one:
-            # the conversion has nothing that drops a column.
-            rrs = prices_to_returns(Px; pnl = matrix_panel(nz, Zs))
+            # the conversion has nothing that drops a column. Through the layer it also
+            # gains an observation axis: the carrier states a Listing Span, so the panel
+            # gains the two masks, and `attach_universe_masks` lifts a static field onto
+            # the clock they live on rather than leaving the two shapes side by side.
+            rrs = prices_to_returns(price_ingestion(PriceIngestion(), Px;
+                                                    pnl = matrix_panel(nz, Zs)))
             @test rrs.nx == ["A", "B", "C"]
-            @test panel_feature_matrix(rrs.pnl)[2] == Zs
+            @test size(panel_feature_matrix(rrs.pnl)[2]) == (9, 3, 2)
+            @test all(panel_feature_matrix(rrs.pnl)[2][t, :, :] == Zs
+                      for t in 1:length(rrs.ts))
             @test panel_feature_matrix(rrs.pnl)[1] == nz
+
+            # A carrier built outside the layer states no span, so it states no universe,
+            # and a static field stays static: there is no observation axis to lift onto.
+            rrs_bare = prices_to_returns(PricesResult(; X = Px, pnl = matrix_panel(nz, Zs)))
+            @test panel_feature_matrix(rrs_bare.pnl)[2] == Zs
 
             # The observation axis is the one the conversion does cut, and it cuts it by
             # exactly the observation the percentage change costs: rows 2:10, every asset.
-            rr3 = prices_to_returns(Px; pnl = matrix_panel(nz, Z3))
+            rr3 = prices_to_returns(price_ingestion(PriceIngestion(), Px;
+                                                    pnl = matrix_panel(nz, Z3)))
             @test size(panel_feature_matrix(rr3.pnl)[2]) == (9, 3, 2)
             @test panel_feature_matrix(rr3.pnl)[2] == Z3[2:10, :, :]
             @test length(rr3.ts) ==
@@ -276,9 +288,14 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
                   size(rr3.X, 1)
 
             # Under collapse_args the aggregated period takes the features of the row at its
-            # representative timestamp -- last-observation semantics.
-            rc = prices_to_returns(Px; pnl = matrix_panel(nz, Z3),
-                                   collapse_args = (week, last))
+            # representative timestamp -- last-observation semantics. The collapse is the
+            # step that renumbers the observation, so `price_ingestion` is what projects the
+            # panel onto the clock it emits; the conversion moves no clock and cuts only the
+            # observation `padding` costs.
+            rc = prices_to_returns(price_ingestion(PriceIngestion(;
+                                                                  collapse_args = (week,
+                                                                                   last)),
+                                                   Px; pnl = matrix_panel(nz, Z3)))
             @test rc.ts == [Date(2020, 1, 10)]
             @test panel_feature_matrix(rc.pnl)[2] == Z3[[10], :, :]
 
@@ -290,10 +307,12 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
             Fok = TimeArray(collect(ts0),
                             100 .+ cumsum(rand(StableRNG(7), 10, 2); dims = 1),
                             ["F1", "F2"])
-            rall = prices_to_returns(Pall, Fok; pnl = matrix_panel(nz, Zs))
+            rall = prices_to_returns(price_ingestion(PriceIngestion(), Pall; F = Fok,
+                                                     pnl = matrix_panel(nz, Zs)))
             @test rall.nx == ["A", "B", "C"]
             @test all(!isfinite, rall.X)
-            @test panel_feature_matrix(rall.pnl)[2] == Zs
+            @test all(panel_feature_matrix(rall.pnl)[2][t, :, :] == Zs
+                      for t in 1:length(rall.ts))
             rnof = prices_to_returns(Pall)
             @test rnof.nx == ["A", "B", "C"]
             @test all(!isfinite, rnof.X)
@@ -405,11 +424,15 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         @test all(!isfinite, view(rm.X, :, 1))
         @test rm.X[:, 2] ≈ [45 / 50 - 1, 54 / 45 - 1]
 
-        # `map_func` is applied to every row of the merged table, before the collapse. A
-        # common scale factor leaves a return unchanged; a shift does not.
-        @test prices_to_returns(P; map_func = (t, v) -> (t, 2 .* v)).X ≈ simple
-        @test prices_to_returns(P; map_func = (t, v) -> (t, v .+ 100.0)).X ≈
+        # An elementwise map is not a keyword of the conversion: it changes a price rather
+        # than the arithmetic that turns two prices into a return, so ADR 0129 gives it a
+        # `:prices -> :prices` step of its own. Until that step is built (#1001), a caller
+        # maps the table they hold. A common scale factor leaves a return unchanged; a
+        # shift does not.
+        @test prices_to_returns(map((t, v) -> (t, 2 .* v), P)).X ≈ simple
+        @test prices_to_returns(map((t, v) -> (t, v .+ 100.0), P)).X ≈
               [210/200-1 145/150-1; 221/210-1 154/145-1]
+        @test_throws MethodError prices_to_returns(P; map_func = (t, v) -> (t, 2 .* v))
 
         # Both branches run through a logarithm, so both need a positive price. The simple
         # branch throws too, although the closed form it documents is defined there.
@@ -431,7 +454,7 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         ts5 = collect(Date(2020, 1, 1):Day(1):Date(2020, 1, 5))
         Pa = TimeArray(ts5, reshape([100.0, NaN, NaN, NaN, 104.0], 5, 1), [:a])
         Pf = TimeArray(ts5, reshape(Float64.(101:105), 5, 1), [:f1])
-        rdrop = prices_to_returns(Pa, Pf)
+        rdrop = prices_to_returns(price_ingestion(PriceIngestion(), Pa; F = Pf))
         @test rdrop.nx == ["a"]
         @test findall(!isfinite, view(rdrop.X, :, 1)) == [1, 2, 3, 4]
         @test rdrop.nf == ["f1"]
@@ -710,15 +733,16 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
                         13.0 33.0; 14.0 34.0; 15.0 35.0], [:A, :C])
         tsb = collect(Date(2019, 12, 25):Day(1):Date(2020, 1, 6))
         Bb = TimeArray(tsb, collect(200.0:(200.0 + length(tsb) - 1)), ["BM"])
-        wideb = prices_to_returns(Xa; B = Bb)
+        wideb = prices_to_returns(price_ingestion(PriceIngestion(), Xa; B = Bb))
         @test size(wideb.X, 1) == length(tsb) - 1
         @test count(!isfinite, wideb.X) == 2 * (length(tsb) - length(ts6))
         @test all(isfinite, wideb.B)
 
         # A caller who means "the benchmark on my asset clock" says so, by slicing it or by
         # asking for an inner join. Both give the asset clock back, gapless.
-        for got in (prices_to_returns(Xa; B = Bb[ts6]),
-                    prices_to_returns(Xa; B = Bb, join_method = :inner))
+        for got in (prices_to_returns(price_ingestion(PriceIngestion(), Xa; B = Bb[ts6])),
+                    prices_to_returns(price_ingestion(PriceIngestion(; join_method = :inner), Xa;
+                                                      B = Bb)))
             @test size(got.X) == (5, 2)
             @test all(isfinite, got.X)
         end
@@ -827,5 +851,52 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
                           prices_to_returns(Zg; gap_return_alg = CatchUpGapReturn()).X)
             @test fit_preprocessing(ptr, pg) === ptr
         end
+    end
+    @testset "the conversion takes a carrier, and a bare table runs the layer" begin
+        # Map #955, ADR 0133. A keyword survives on the conversion if and only if it changes
+        # the arithmetic of a return, so the estimator carries three fields and the verb
+        # takes three keywords beside the carrier it converts.
+        @test fieldnames(PricesToReturns) == (:ret_method, :padding, :gap_return_alg)
+        tsc = collect(Date(2020, 1, 1):Day(1):Date(2020, 1, 5))
+        Xc = TimeArray(tsc, [10.0 30.0; 11.0 31.0; 12.0 32.0; 13.0 33.0; 14.0 34.0],
+                       [:A, :B])
+        Fc = TimeArray(tsc, reshape(collect(50.0:54.0), 5, 1), [:F1])
+
+        # Every datum the conversion reads is already a field of `PricesResult`, so naming
+        # one as a keyword would be a second way to say what the carrier says. None of them
+        # is a keyword any more, on the verb or on the estimator.
+        for kw in
+            (:F, :B, :iv, :ivpa, :pnl, :span, :join_method, :collapse_args, :map_func)
+            @test_throws MethodError prices_to_returns(Xc; (kw => nothing,)...)
+        end
+        for f in (:collapse_args, :map_func, :join_method)
+            @test f ∉ fieldnames(PricesToReturns)
+        end
+        # The second positional argument goes with them: a factor block reaches the
+        # conversion on the carrier, which is where the layer puts it.
+        @test_throws MethodError prices_to_returns(Xc, Fc)
+
+        # The bare call is exactly the two steps, and it is the layer's own path rather than
+        # a way around it, so it emits the `AssetPanel` the layer always emits. A carrier
+        # built by hand states no span, and therefore no universe.
+        pr = price_ingestion(PriceIngestion(), Xc)
+        routed = prices_to_returns(Xc)
+        @test isequal(routed.X, prices_to_returns(pr).X)
+        @test routed.ts == tsc[2:end]
+        @test isa(routed.pnl, AssetPanel)
+        @test isnothing(prices_to_returns(PricesResult(; X = Xc)).pnl)
+
+        # The three surviving keywords reach the carrier form unchanged.
+        @test prices_to_returns(pr; ret_method = :log).X ≈
+              prices_to_returns(Xc; ret_method = :log).X
+        @test size(prices_to_returns(pr; padding = true).X, 1) == length(tsc)
+
+        # A carrier whose covariate series states a clock of its own is refused by name
+        # rather than joined onto the asset clock: a join adds or drops an observation, and
+        # `price_ingestion` owns every clock move.
+        @test_throws ConflictingArgumentError prices_to_returns(PricesResult(; X = Xc,
+                                                                             F = Fc[tsc[1:4]]))
+        @test_throws ConflictingArgumentError prices_to_returns(PricesResult(; X = Xc,
+                                                                             B = Fc[tsc[1:4]]))
     end
 end

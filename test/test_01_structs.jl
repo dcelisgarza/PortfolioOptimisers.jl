@@ -363,10 +363,13 @@
         @test !PortfolioOptimisers.needs_previous_weights(f)
         @test PortfolioOptimisers.needs_previous_weights(Fees(; tn = Turnover(; w = [1])))
     end
-    rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
-                                     timestamp = :Date)[(end - 252):end],
-                           TimeArray(CSV.File(joinpath(@__DIR__, "./assets/Factors.csv.gz"));
-                                     timestamp = :Date)[(end - 252):end])
+    rd = prices_to_returns(price_ingestion(PriceIngestion(),
+                                           TimeArray(CSV.File(joinpath(@__DIR__,
+                                                                       "./assets/SP500.csv.gz"));
+                                                     timestamp = :Date)[(end - 252):end];
+                                           F = TimeArray(CSV.File(joinpath(@__DIR__,
+                                                                           "./assets/Factors.csv.gz"));
+                                                         timestamp = :Date)[(end - 252):end]))
     slv = Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
                  check_sol = (; allow_local = true, allow_almost = true),
                  settings = Dict("verbose" => false))

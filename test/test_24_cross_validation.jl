@@ -1,10 +1,13 @@
 @testset "Cross Validation" begin
     using Test, PortfolioOptimisers, DataFrames, TimeSeries, CSV, Clarabel, Dates,
           StableRNGs, Distributions, OrderedCollections, Accessors
-    rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
-                                     timestamp = :Date)[(end - 252 * 4):end],
-                           TimeArray(CSV.File(joinpath(@__DIR__, "./assets/Factors.csv.gz"));
-                                     timestamp = :Date)[(end - 252 * 4):end])
+    rd = prices_to_returns(price_ingestion(PriceIngestion(),
+                                           TimeArray(CSV.File(joinpath(@__DIR__,
+                                                                       "./assets/SP500.csv.gz"));
+                                                     timestamp = :Date)[(end - 252 * 4):end];
+                                           F = TimeArray(CSV.File(joinpath(@__DIR__,
+                                                                           "./assets/Factors.csv.gz"));
+                                                         timestamp = :Date)[(end - 252 * 4):end]))
     slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
                   check_sol = (; allow_local = true, allow_almost = true),
                   settings = "verbose" => false),

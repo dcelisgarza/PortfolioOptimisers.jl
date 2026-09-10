@@ -189,7 +189,7 @@ factor prior so we should use use a [`EmpiricalPrior`](@ref).
 =#
 
 F = TimeArray(CSV.File(joinpath(@__DIR__, "..", "Factors.csv.gz")); timestamp = :Date)[(end - 252):end]
-rdf = prices_to_returns(X, F)
+rdf = prices_to_returns(price_ingestion(PriceIngestion(), X; F = F))
 prf = prior(EmpiricalPrior(), rdf)
 optf = JuMPOptimiser(; pe = prf, slv = slv)
 Nf = length(rdf.nf)

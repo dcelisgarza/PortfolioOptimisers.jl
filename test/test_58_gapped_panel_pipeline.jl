@@ -386,7 +386,7 @@ end
     pipe_carry58 = Pipeline(; steps = (PricesToReturns(), EmpiricalPrior(), mr58))
 
     @testset "nothing is deleted, and the gap stays where it is" begin
-        got = prices_to_returns(Pta58; pnl = pnlP58)
+        got = prices_to_returns(PricesResult(; X = Pta58, pnl = pnlP58))
         # The whole clock and the whole universe survive.
         @test got.nx == nx58
         @test size(got.X) == (T58, N58)

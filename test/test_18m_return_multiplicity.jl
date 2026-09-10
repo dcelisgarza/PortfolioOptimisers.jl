@@ -288,11 +288,13 @@ end
     one = ArithmeticReturn(; mu = mu1 .+ mu2)
     r = Variance()
     # `FactorRiskContribution` needs factor data, so it gets its own fixture.
-    rd_f = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
-                                       timestamp = :Date)[(end - 252):end],
-                             TimeArray(CSV.File(joinpath(@__DIR__,
-                                                         "./assets/Factors.csv.gz"));
-                                       timestamp = :Date)[(end - 252):end])
+    rd_f = prices_to_returns(price_ingestion(PriceIngestion(),
+                                             TimeArray(CSV.File(joinpath(@__DIR__,
+                                                                         "./assets/SP500.csv.gz"));
+                                                       timestamp = :Date)[(end - 252):end];
+                                             F = TimeArray(CSV.File(joinpath(@__DIR__,
+                                                                             "./assets/Factors.csv.gz"));
+                                                           timestamp = :Date)[(end - 252):end]))
     pr_f = prior(EmpiricalPrior(), rd_f)
     mu1f = pr_f.mu .* 0.6
     mu2f = pr_f.mu .* 0.4

@@ -3,10 +3,13 @@
           StableRNGs, StatsBase, Statistics, LinearAlgebra, SparseArrays, Distributions,
           FLoops
     rng = StableRNG(123456789)
-    rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
-                                     timestamp = :Date)[(end - 252):end],
-                           TimeArray(CSV.File(joinpath(@__DIR__, "./assets/Factors.csv.gz"));
-                                     timestamp = :Date)[(end - 252):end])
+    rd = prices_to_returns(price_ingestion(PriceIngestion(),
+                                           TimeArray(CSV.File(joinpath(@__DIR__,
+                                                                       "./assets/SP500.csv.gz"));
+                                                     timestamp = :Date)[(end - 252):end];
+                                           F = TimeArray(CSV.File(joinpath(@__DIR__,
+                                                                           "./assets/Factors.csv.gz"));
+                                                         timestamp = :Date)[(end - 252):end]))
     ew = eweights(1:size(rd.X, 1), inv(size(rd.X, 1)); scale = true)
     fw = fweights(rand(rng, size(rd.X, 1)))
     pw = pweights(fill(inv(size(rd.X, 1)), size(rd.X, 1)))
@@ -2413,10 +2416,13 @@ function Statistics.cor(::IVProbe, ::PortfolioOptimisers.MatNum; iv = nothing, k
 end
 @testset "Windowed estimator family" begin
     using Test, PortfolioOptimisers, DataFrames, TimeSeries, CSV, StatsBase, Statistics
-    rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
-                                     timestamp = :Date)[(end - 252):end],
-                           TimeArray(CSV.File(joinpath(@__DIR__, "./assets/Factors.csv.gz"));
-                                     timestamp = :Date)[(end - 252):end])
+    rd = prices_to_returns(price_ingestion(PriceIngestion(),
+                                           TimeArray(CSV.File(joinpath(@__DIR__,
+                                                                       "./assets/SP500.csv.gz"));
+                                                     timestamp = :Date)[(end - 252):end];
+                                           F = TimeArray(CSV.File(joinpath(@__DIR__,
+                                                                           "./assets/Factors.csv.gz"));
+                                                         timestamp = :Date)[(end - 252):end]))
     ew = eweights(1:size(rd.X, 1), inv(size(rd.X, 1)); scale = true)
     win = 1:50
 

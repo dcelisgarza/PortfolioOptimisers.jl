@@ -112,11 +112,13 @@ end
                                             opt = JuMPOptimiser(; pe = pr, slv = slv,
                                                                 ret = NoReturn())))
     @test isa(res_rrb.retcode, PortfolioOptimisers.OptimisationSuccess)
-    rd_f = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
-                                       timestamp = :Date)[(end - 252):end],
-                             TimeArray(CSV.File(joinpath(@__DIR__,
-                                                         "./assets/Factors.csv.gz"));
-                                       timestamp = :Date)[(end - 252):end])
+    rd_f = prices_to_returns(price_ingestion(PriceIngestion(),
+                                             TimeArray(CSV.File(joinpath(@__DIR__,
+                                                                         "./assets/SP500.csv.gz"));
+                                                       timestamp = :Date)[(end - 252):end];
+                                             F = TimeArray(CSV.File(joinpath(@__DIR__,
+                                                                             "./assets/Factors.csv.gz"));
+                                                           timestamp = :Date)[(end - 252):end]))
     pr_f = prior(EmpiricalPrior(), rd_f)
     res_frc = optimise(FactorRiskContribution(; r = Variance(),
                                               opt = JuMPOptimiser(; pe = pr_f, slv = slv,

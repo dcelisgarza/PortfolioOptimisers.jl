@@ -21,11 +21,13 @@ end
 include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
 const PO = PortfolioOptimisers
 @testset "Feature matrix routing" begin
-    rd0 = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
-                                      timestamp = :Date)[(end - 252):end],
-                            TimeArray(CSV.File(joinpath(@__DIR__,
-                                                        "./assets/Factors.csv.gz"));
-                                      timestamp = :Date)[(end - 252):end])
+    rd0 = prices_to_returns(price_ingestion(PriceIngestion(),
+                                            TimeArray(CSV.File(joinpath(@__DIR__,
+                                                                        "./assets/SP500.csv.gz"));
+                                                      timestamp = :Date)[(end - 252):end];
+                                            F = TimeArray(CSV.File(joinpath(@__DIR__,
+                                                                            "./assets/Factors.csv.gz"));
+                                                          timestamp = :Date)[(end - 252):end]))
     na = size(rd0.X, 2)
     rng = StableRNG(20260728)
     # The user-supplied carrier. Deliberately unrelated to the returns, so a distance
@@ -39,7 +41,11 @@ const PO = PortfolioOptimisers
     pr_fac = prior(FactorPrior(), rd)
     Zp = PO.panel_field(PO.asset_panel(ape, pr_fac, rd, rd.X), "loadings").vals
     pr_noz = prior(EmpiricalPrior(), rd)
-    rd_noz = rd0
+    # A carrier the ingestion layer did not build states no universe, and `pnl === nothing`
+    # is the one meaning ADR 0132 gives that. `rd0` runs through the layer, so it carries a
+    # panel — one with no Panel Field, which is the layer's common case — and the no-panel
+    # fixture is therefore built without the layer rather than taken from it.
+    rd_noz = ReturnsResult(; nx = rd0.nx, X = rd0.X, nf = rd0.nf, F = rd0.F, ts = rd0.ts)
     fde = FeatureDistance()
     pde = FeatureDistance(; ape = ape)
     cde = Distance(; alg = CanonicalDistance())
@@ -142,6 +148,20 @@ const PO = PortfolioOptimisers
             @test isa(e, PortfolioOptimisers.IsNothingError)
             @test occursin("asset_panel", e.msg)
         end
+
+        # 2b. A carrier the layer *did* build holds a panel with no Panel Field, which is
+        # the layer's common case: a caller holding only prices has no market
+        # capitalisation and no sector. The feature matrix it derives is empty, so the
+        # refusal is `assert_nonempty`'s rather than the one above, and it names the
+        # emptiness rather than the cause. Issue #1003.
+        e = try
+            clusterise(cle, rd0)
+        catch err
+            err
+        end
+        @test isa(e, PortfolioOptimisers.IsEmptyError)
+        @test isa(rd0.pnl, AssetPanel)
+        @test isempty(rd0.pnl.pf)
 
         # 3. A prior result alone carries no panel at all, and the message says so.
         e = try
