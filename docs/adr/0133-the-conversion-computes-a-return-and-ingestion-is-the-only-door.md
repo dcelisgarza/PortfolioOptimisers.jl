@@ -239,9 +239,11 @@ is no other.
   Four test fixtures relied on that deletion to mean *the benchmark on my asset clock*, and each now
   says so — by slicing the benchmark to the same window its asset and factor series already use, or
   by asking for `:inner`. This is not an argument for the deletion: a caller who did not notice the
-  clock move would not have noticed the silent 97% row loss either. It is the reason
-  `join_method`'s default is a decision of its own, and it belongs to the sibling ticket that
-  settles `PriceIngestion`'s defaults.
+  clock move would not have noticed the silent 97% row loss either. It is why `join_method`'s
+  default is a decision of its own, and
+  [ADR 0135](0135-the-asset-table-states-the-clock-and-the-layer-carries-every-absence-and-names-it.md)
+  takes it: the asset table states the universe, so it states the clock, and the default becomes
+  `:left`.
 - **A caller who wanted the dense matrix composes it**, and gains the fitted replay they did not
   have:
 
@@ -261,9 +263,10 @@ is no other.
   it filled nothing and why, and refuses under `strict`, rather than guessing a span from a window.
 - **`CONTEXT.md`** mints no term. Its **Universe Policy** entry loses the exception the conversion
   was, and its **Span Rule** *Avoid* line is unchanged.
-- **What this ADR does not settle**, left to the builds it graduates: what `PriceIngestion`'s own
-  defaults are once a bare `TimeArray` call runs it. Whether `Imputer` survives beside
-  `PriceGapFill` was the other, and
+- **What this ADR left open is now settled.** What `PriceIngestion`'s own defaults are once a bare
+  `TimeArray` call runs it is answered by
+  [ADR 0135](0135-the-asset-table-states-the-clock-and-the-layer-carries-every-absence-and-names-it.md).
+  Whether `Imputer` survives beside `PriceGapFill` was the other, and
   [ADR 0130](0130-a-universe-policy-is-fitted-and-the-only-fill-is-a-span-bounded-price-convention.md)
   now answers it: it does not, because it is `PriceGapFill` with the span bound missing, and the
   unbounded fill it alone offers is the fabrication that bound forbids.
