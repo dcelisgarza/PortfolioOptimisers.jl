@@ -1262,3 +1262,79 @@ function variance_series(ve::SimpleVariance, X::MatNum, pnl::Option{<:AssetPanel
                          dims::Int = 1, kwargs...)
     return coverage_variance_series(ve, ve.cvg, X, pnl; dims = dims, kwargs...)
 end
+"""
+    coverage_floor(cvg::Nothing)
+    coverage_floor(cvg::CoveragePolicy)
+    coverage_floor(me::AbstractExpectedReturnsEstimator)
+    coverage_floor(ce::StatsBase.CovarianceEstimator)
+    coverage_floor(me::SimpleExpectedReturns)
+    coverage_floor(ve::SimpleVariance)
+    coverage_floor(ce::Covariance)
+    coverage_floor(ce::PortfolioOptimisersCovariance)
+    coverage_floor(a::Nothing, b::Nothing)
+    coverage_floor(a::Nothing, b::Real)
+    coverage_floor(a::Real, b::Nothing)
+    coverage_floor(a::Real, b::Real)
+
+Read the coverage floor an estimator admits on, and take the binding one of two arms.
+
+A [`CoveragePolicy`](@ref) is a field of one estimator, so the floor a fit admits on is not a property of the fit as a whole until someone reads it off the arms. The one-argument methods do that read: a carrier answers its own `cvg`, a wrapper forwards to the estimator it holds, and every other estimator answers `nothing`, which says that this arm states no floor rather than that it states a floor of zero. The two-argument method takes the **maximum** of two arms, because admission is their conjunction — the Investable Mask needs `mu` and the diagonal of `sigma` finite, and [`coverage_admission`](@ref) reads the same per-asset count for both — so a floor stated on either arm bounds every investable column whatever the other arm does.
+
+The reader is [`resolve_fill_limit`](@ref), which turns the floor into the share a [`scenario_fill`](@ref) may invent in silence. An estimator with no method answers `nothing` through its root's method, so a policy buried inside a wrapper this verb does not forward through names every fill rather than none: the conservative answer, and never a silence the caller did not ask for.
+
+The two-argument methods are dispatch rather than a branch, so a call site holding two `Option`s finds a method for every arm of its union split.
+
+# Arguments
+
+  - `cvg`: A [`CoveragePolicy`](@ref) or `nothing`.
+  - `me`, `ve`, `ce`: A moment estimator whose floor is being read.
+  - `a`, `b`: The floors of two arms, each a `Real` or `nothing`.
+
+# Returns
+
+  - `floor::Option{<:Real}`: The coverage floor, or `nothing` when none is stated.
+
+# Related
+
+  - [`CoveragePolicy`](@ref)
+  - [`admits`](@ref)
+  - [`coverage_admission`](@ref)
+  - [`resolve_fill_limit`](@ref)
+  - [`scenario_fill`](@ref)
+"""
+function coverage_floor(::Nothing)
+    return nothing
+end
+function coverage_floor(cvg::CoveragePolicy)
+    return cvg.min_coverage
+end
+function coverage_floor(::AbstractExpectedReturnsEstimator)
+    return nothing
+end
+function coverage_floor(::StatsBase.CovarianceEstimator)
+    return nothing
+end
+function coverage_floor(me::SimpleExpectedReturns)
+    return coverage_floor(me.cvg)
+end
+function coverage_floor(ve::SimpleVariance)
+    return coverage_floor(ve.cvg)
+end
+function coverage_floor(ce::Covariance)
+    return coverage_floor(ce.cvg)
+end
+function coverage_floor(ce::PortfolioOptimisersCovariance)
+    return coverage_floor(ce.ce)
+end
+function coverage_floor(::Nothing, ::Nothing)
+    return nothing
+end
+function coverage_floor(::Nothing, b::Real)
+    return b
+end
+function coverage_floor(a::Real, ::Nothing)
+    return a
+end
+function coverage_floor(a::Real, b::Real)
+    return max(a, b)
+end

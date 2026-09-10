@@ -35,6 +35,7 @@ investable_prior
 investable_universe_names
 scenario_fill_pairs
 scenario_fill_msg
+resolve_fill_limit
 scenario_fill
 held_non_investable
 investable_weights_view

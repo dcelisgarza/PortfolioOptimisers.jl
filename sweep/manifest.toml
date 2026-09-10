@@ -154,7 +154,7 @@
 "src/08_Moments/47_CrossSectionalExposureDiagnostics.jl" = { map = 3, units = 22, swept = false }
 "src/08_Moments/48_FactorModelSummary.jl" = { map = 3, units = 16, swept = false }
 "src/08_Moments/49_CrossSectionalIdiosyncraticDiagnostics.jl" = { map = 3, units = 15, swept = false }
-"src/08_Moments/50_CoverageUniverse.jl" = { map = 3, units = 42, swept = false }
+"src/08_Moments/50_CoverageUniverse.jl" = { map = 3, units = 43, swept = false }
 "src/08_Moments/51_ExpWeightedExpectedReturns.jl" = { map = 3, units = 14, swept = false }
 "src/08_Moments/52_ExpWeightedVariance.jl" = { map = 3, units = 20, swept = false }
 "src/08_Moments/53_ExpWeightedCovariance.jl" = { map = 3, units = 23, swept = false }
@@ -197,8 +197,8 @@
 "src/12_ConstraintGeneration/07_ThresholdConstraintGeneration.jl" = { map = 5, units = 10, algorithm = 3, swept = true }
 "src/12_ConstraintGeneration/08_ExposureConstraintGeneration.jl" = { map = 5, units = 14, algorithm = 4, swept = true }
 "src/12_ConstraintGeneration/09_CrossSectionalFactorAxis.jl" = { map = 5, units = 4, swept = false }
-"src/13_Prior/01_Base_Prior.jl" = { map = 6, units = 47, algorithm = 21, swept = true }
-"src/13_Prior/02_EmpiricalPrior.jl" = { map = 6, units = 3, algorithm = 1, swept = true }
+"src/13_Prior/01_Base_Prior.jl" = { map = 6, units = 48, algorithm = 21, swept = true }
+"src/13_Prior/02_EmpiricalPrior.jl" = { map = 6, units = 4, algorithm = 1, swept = true }
 "src/13_Prior/03_FactorPrior.jl" = { map = 6, units = 6, algorithm = 3, swept = true }
 "src/13_Prior/04_HighOrderPrior.jl" = { map = 6, units = 12, algorithm = 8, swept = true }
 "src/13_Prior/05_BlackLittermanViewsGeneration.jl" = { map = 6, units = 5, algorithm = 2, swept = true }

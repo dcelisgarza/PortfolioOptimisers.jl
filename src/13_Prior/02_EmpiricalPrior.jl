@@ -23,7 +23,7 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - If `horizon` is not `nothing`, `horizon > 0`.
-  - If `fill_limit` is not `nothing`, `0 < fill_limit <= 1`. Zero is not a value, because `nothing` already means that no fill passes in silence.
+  - If `fill_limit` is not `nothing`, `0 < fill_limit <= 1`. Zero is not a value, because `nothing` already means that no fill passes in silence. The fit refuses a value looser than `1 - min_coverage` over the arms that state a coverage floor, because such a value could never fire.
 
 ## Propagated parameters
 
@@ -109,7 +109,7 @@ EmpiricalPrior
         if !isnothing(fill_limit)
             @argcheck(0 < fill_limit <= 1,
                       DomainError(fill_limit,
-                                  "fill_limit is a share of the entries of a returns matrix, so it must lie in (0, 1]. Pass `nothing`, the default, to be told about every fill; `1` to be told about none."))
+                                  "fill_limit is a share of an investable column's own observations, so it must lie in (0, 1]. Pass `nothing`, the default, to derive it from the arms' coverage floor, or to be told about every fill where no arm states one; `1` to be told about none."))
         end
         return new{typeof(ce), typeof(me), typeof(horizon), typeof(fill_limit)}(ce, me,
                                                                                 horizon,
@@ -122,6 +122,31 @@ function EmpiricalPrior(;
                         horizon::Option{<:Number} = nothing,
                         fill_limit::Option{<:Real} = nothing)::EmpiricalPrior
     return EmpiricalPrior(ce, me, horizon, fill_limit)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+[`EmpiricalPrior`](@ref) method of [`coverage_floor`](@ref), the binding floor of its two arms.
+
+`pe.me` and `pe.ce` may each carry a [`CoveragePolicy`](@ref), and either bounds every investable column on its own, because the Investable Mask is the conjunction of the two admissions and both read the same per-asset observation count. The binding floor is therefore the **maximum** of the floors the arms state, and a mixed configuration needs no rule of its own (ADR 0118).
+
+# Arguments
+
+  - `pe`: The empirical prior estimator.
+
+# Returns
+
+  - `floor::Option{<:Real}`: The binding coverage floor, or `nothing` when neither arm states one.
+
+# Related
+
+  - [`coverage_floor`](@ref)
+  - [`resolve_fill_limit`](@ref)
+  - [`CoveragePolicy`](@ref)
+  - [`EmpiricalPrior`](@ref)
+"""
+function coverage_floor(pe::EmpiricalPrior)
+    return coverage_floor(coverage_floor(pe.me), coverage_floor(pe.ce))
 end
 """
     prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing, <:Any}, X::MatNum,
@@ -156,7 +181,7 @@ This method takes the **arithmetic** moments of `X` directly. It applies no log 
 
 # The scenario fill
 
-Under a **mask-aware** `pe.me` and `pe.ce` — the exponentially weighted family — an asset that lists inside the window is answered from the observations it has, so it is investable and its column of `X` still carries a `NaN` at every earlier row. [`scenario_fill`](@ref) writes `0` at those entries once, so that every consumer of the result reads a finite investable column; a non-investable asset keeps its whole `NaN` column, and `mu` and `sigma` are untouched. The fill costs accuracy in one place: a scenario-based measure reads a zero return where the asset had none, and understates that asset's risk over the filled rows. It is silent while the filled share stays at or below `pe.fill_limit`, warns above it, and refuses any fill under `strict`. `pe.fill_limit` defaults to `nothing`, which accepts no share in silence, so a fill is named unless the caller has weighed the trade and said how much of it to accept. Under a **plain** estimator the fill never fires, because an asset the estimator could not cover leaves the Coverage Universe and is not investable.
+Under a **mask-aware** `pe.me` and `pe.ce` — the exponentially weighted family, and the plain family wherever a [`CoveragePolicy`](@ref) is set — an asset that lists inside the window is answered from the observations it has, so it is investable and its column of `X` still carries a `NaN` at every earlier row. [`scenario_fill`](@ref) writes `0` at those entries once, so that every consumer of the result reads a finite investable column; a non-investable asset keeps its whole `NaN` column, and `mu` and `sigma` are untouched. The fill costs accuracy at four consumers, and the message names all four: a scenario-based measure understates that asset's risk over the filled rows, a hierarchical optimiser may branch the asset alone and overweight it, an entropy pooling view on it is calibrated on the filled column, and a meta-optimiser carries the fill into the outer problem. It is silent while the **worst investable column's own** filled share stays at or below the limit [`resolve_fill_limit`](@ref) derives, warns above it, and refuses any fill under `strict`. `pe.fill_limit` defaults to `nothing`, which derives `1 - min_coverage` from the arms' coverage floor and never fires, and which names every fill where no arm states a floor. Under a **plain** estimator with no policy the fill never fires, because an asset the estimator could not cover leaves the Coverage Universe and is not investable.
 
 # Arguments
 
@@ -165,14 +190,15 @@ Under a **mask-aware** `pe.me` and `pe.ce` — the exponentially weighted family
   - `F`: Factor returns matrix (ignored).
   - $(arg_dict[:pnl_moment])
   - $(arg_dict[:dims])
-  - `strict`: Whether a zero-filled scenario raises rather than warns. Any fill raises under `strict`; otherwise a fill above `pe.fill_limit` warns, and every fill warns while `pe.fill_limit` is `nothing`.
+  - `strict`: Whether a zero-filled scenario raises rather than warns. Any fill raises under `strict`; otherwise a column filled above the limit [`resolve_fill_limit`](@ref) derives warns, and every fill warns while that limit is `nothing`.
   - `kwargs...`: Additional keyword arguments passed to mean and covariance estimators.
 
 # Validation
 
   - `dims in (1, 2)`.
   - At least one asset must be in the Coverage Universe.
-  - The zero-filled share of `X` is at or below `pe.fill_limit`, else a warning naming the assets is emitted, or an `ArgumentError` naming them is raised under `strict`, which any fill raises. A `pe.fill_limit` of `nothing` is at or below no share, so any fill is named.
+  - `pe.fill_limit` is at most `1 - min_coverage` over the arms that state a coverage floor, else a `DomainError` is thrown at the fit, because a looser limit is dead by construction.
+  - The zero-filled share of the worst investable column of `X` is at or below the limit [`resolve_fill_limit`](@ref) derives, else a warning naming the assets is emitted, or an `ArgumentError` naming them is raised under `strict`, which any fill raises. A limit of `nothing` — no arm states a floor and `pe.fill_limit` is `nothing` — is at or below no share, so any fill is named.
 
 # Returns
 
@@ -190,12 +216,17 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing, <:Any}, X::MatNum,
                ::Option{<:MatNum} = nothing, pnl::Option{<:AssetPanel} = nothing;
                dims::Int = 1, strict::Bool = false, kwargs...)
     X = dims_oriented(dims, X)
+    # The limit resolves against the arms' coverage floor at the fit, not at construction,
+    # because a floor is a field of the arm and the estimator cannot see it from its own
+    # constructor. A limit looser than admission refuses here (see
+    # [`resolve_fill_limit`](@ref)).
+    fill_limit = resolve_fill_limit(pe.fill_limit, coverage_floor(pe))
     mu = vec(Statistics.mean(pe.me, X, pnl; dims = 1, kwargs...))
     sigma = Statistics.cov(pe.ce, X, pnl; dims = 1, kwargs...)
     # A mask-aware estimator answers a young asset from the rows it has, so the asset is
     # investable and its column still carries the gap. The fill is paid once, here, because
     # every consumer of the result reads that column (see [`scenario_fill`](@ref)).
-    return LowOrderPrior(; X = scenario_fill(X, mu, sigma, strict, pe.fill_limit), mu = mu,
+    return LowOrderPrior(; X = scenario_fill(X, mu, sigma, strict, fill_limit), mu = mu,
                          sigma = sigma)
 end
 """
@@ -250,7 +281,7 @@ The order of steps 5 to 7 is **not free**. Step 6 reads the `mu` that step 5 lef
 
 # The scenario fill
 
-Step 8 takes the same fill the no-horizon method takes, on the **arithmetic** `X` the caller handed in and against the arithmetic moments the result carries. Under a mask-aware `pe.me` and `pe.ce` an asset that lists inside the window is investable and its column still carries a `NaN` at every earlier row; [`scenario_fill`](@ref) writes `0` there once, silently at or below `pe.fill_limit`, with a warning above it, and refuses any fill under `strict`. `pe.fill_limit` defaults to `nothing`, which accepts no share in silence. A scenario-based measure then understates that asset's risk over the filled rows, and `mu` and `sigma` are untouched.
+Step 8 takes the same fill the no-horizon method takes, on the **arithmetic** `X` the caller handed in and against the arithmetic moments the result carries. Under a mask-aware `pe.me` and `pe.ce` an asset that lists inside the window is investable and its column still carries a `NaN` at every earlier row; [`scenario_fill`](@ref) writes `0` there once, silently while the worst investable column's own filled share stays at or below the limit [`resolve_fill_limit`](@ref) derives, with a warning above it, and refuses any fill under `strict`. `pe.fill_limit` defaults to `nothing`, which derives `1 - min_coverage` from the arms' coverage floor and names every fill where no arm states one. A scenario-based measure then understates that asset's risk over the filled rows, and `mu` and `sigma` are untouched.
 
 # Arguments
 
@@ -259,14 +290,15 @@ Step 8 takes the same fill the no-horizon method takes, on the **arithmetic** `X
   - `F`: Factor returns matrix (ignored).
   - $(arg_dict[:pnl_moment])
   - $(arg_dict[:dims])
-  - `strict`: Whether a zero-filled scenario raises rather than warns. Any fill raises under `strict`; otherwise a fill above `pe.fill_limit` warns, and every fill warns while `pe.fill_limit` is `nothing`.
+  - `strict`: Whether a zero-filled scenario raises rather than warns. Any fill raises under `strict`; otherwise a column filled above the limit [`resolve_fill_limit`](@ref) derives warns, and every fill warns while that limit is `nothing`.
   - `kwargs...`: Additional keyword arguments passed to mean and covariance estimators.
 
 # Validation
 
   - `dims in (1, 2)`.
   - At least one asset must be in the Coverage Universe.
-  - The zero-filled share of `X` is at or below `pe.fill_limit`, else a warning naming the assets is emitted, or an `ArgumentError` naming them is raised under `strict`, which any fill raises. A `pe.fill_limit` of `nothing` is at or below no share, so any fill is named.
+  - `pe.fill_limit` is at most `1 - min_coverage` over the arms that state a coverage floor, else a `DomainError` is thrown at the fit, because a looser limit is dead by construction.
+  - The zero-filled share of the worst investable column of `X` is at or below the limit [`resolve_fill_limit`](@ref) derives, else a warning naming the assets is emitted, or an `ArgumentError` naming them is raised under `strict`, which any fill raises. A limit of `nothing` — no arm states a floor and `pe.fill_limit` is `nothing` — is at or below no share, so any fill is named.
 
 # Returns
 
@@ -284,6 +316,7 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any}, X::MatNum,
                ::Option{<:MatNum} = nothing, pnl::Option{<:AssetPanel} = nothing;
                dims::Int = 1, strict::Bool = false, kwargs...)
     X = dims_oriented(dims, X)
+    fill_limit = resolve_fill_limit(pe.fill_limit, coverage_floor(pe))
     X_log = log1p.(X)
     mu = vec(Statistics.mean(pe.me, X_log, pnl; dims = 1, kwargs...))
     sigma = Statistics.cov(pe.ce, X_log, pnl; dims = 1, kwargs...)
@@ -294,7 +327,7 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any}, X::MatNum,
     mu .-= one(eltype(mu))
     # The fill is on the arithmetic `X` the caller handed in, and it is taken after step 7,
     # because the Investable Mask is read off the arithmetic moments the result carries.
-    return LowOrderPrior(; X = scenario_fill(X, mu, sigma, strict, pe.fill_limit), mu = mu,
+    return LowOrderPrior(; X = scenario_fill(X, mu, sigma, strict, fill_limit), mu = mu,
                          sigma = sigma)
 end
 

@@ -1616,15 +1616,19 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Write the message a scenario fill raises.
 
-The message names the assets, the count of filled pairs, the share of the returns matrix they are and the first observation, so a caller can find the listing that made them, and it states the consequence: a scenario-based measure understates the risk of those assets over the filled rows, while `mu` and `sigma` are untouched.
+The message names the assets, the count of filled pairs and the first observation, so a caller can find the listing that made them. It then names the **worst investable column**, the share of its own observations the fill invented, and the limit that share was measured against — that share is the one the fill tests, because a matrix-wide denominator scales with the universe and hides the column the notice exists to catch. The matrix-wide share is reported beside it as context, and it trips nothing.
 
-It also names the limit it was measured against, and that limit is the estimator's own `fill_limit` field. A `fill_limit` of `nothing` demands every observation of every investable asset, so the message says so rather than printing a share no caller chose.
+It states the consequence at each of the four consumers that a census of the readers of `pr.X` found, because a caller told only about the tail will not look for the other three, and it states the tail's cost as the identity rather than the adjective: the invented zeros do not enter the tail, they inflate the denominator, so a measure at level `alpha` over an admitted column of coverage `c` reads that column's observed `alpha / c` level.
+
+The limit it names is the estimator's own, after [`resolve_fill_limit`](@ref). A `fill_limit` of `nothing` demands every observation of every investable asset, so the message says so rather than printing a share no caller chose.
 
 # Arguments
 
   - `filled`: The `(observation, asset)` pairs [`scenario_fill_pairs`](@ref) found.
-  - `frac`: The share of the entries of the returns matrix those pairs are.
-  - `fill_limit`: The share the fit allowed in silence, or `nothing` when it allowed none.
+  - `wi`: The index of the worst investable column, the one with the most filled entries.
+  - `worst`: The share of its own observations that column's fill invented.
+  - `frac`: The share of the entries of the returns matrix every filled pair is, as context.
+  - `fill_limit`: The share of a column the fit allowed in silence, or `nothing` when it allowed none.
 
 # Returns
 
@@ -1634,35 +1638,91 @@ It also names the limit it was measured against, and that limit is the estimator
 
   - [`scenario_fill`](@ref)
   - [`scenario_fill_pairs`](@ref)
+  - [`resolve_fill_limit`](@ref)
   - [`EmpiricalPrior`](@ref)
   - [`strict_diagnostic`](@ref)
 """
-function scenario_fill_msg(filled::AbstractVector{<:Tuple{Integer, Integer}}, frac::Real,
-                           fill_limit::Option{<:Real})
+function scenario_fill_msg(filled::AbstractVector{<:Tuple{Integer, Integer}}, wi::Integer,
+                           worst::Real, frac::Real, fill_limit::Option{<:Real})
     assets = unique(last.(filled))
     against = if isnothing(fill_limit)
         "against `fill_limit = nothing`, which asks that every investable asset cover every observation"
     else
         "against a limit of $(fill_limit)"
     end
-    return "a mask-aware prior estimated an asset from the observations it had, and the returns matrix still carries the gap. Assets $(assets) carry a non-finite return at $(length(filled)) (observation, asset) pair(s) of an investable column, $(frac) of the returns matrix $(against), the first at observation $(first(filled)[1]). Those entries are filled with zero, so a scenario-based measure (CVaR, EVaR, CDaR and their kin) reads a zero return where the asset had no return at all and understates its risk over the filled rows; `mu` and `sigma` are untouched, because the estimator computed them from the rows it saw. Accept a share of the matrix in silence with the estimator's own field, `EmpiricalPrior(; fill_limit = ...)`, pass `strict = true` to refuse any fill, or fit over a window every asset covers."
+    return "a mask-aware prior estimated an asset from the observations it had, and the returns matrix still carries the gap. Assets $(assets) carry a non-finite return at $(length(filled)) (observation, asset) pair(s) of an investable column, the first at observation $(first(filled)[1]). The worst column is asset $(wi), $(worst) of whose own observations are invented, measured $(against); the whole matrix is $(frac) invented, which is context and trips nothing. Those entries are filled with zero, and four consumers read them. A scenario-based measure (CVaR, EVaR, CDaR and their kin) understates its risk over the filled rows, and the cost is exact: the zeros do not enter the tail, they inflate the denominator, so a measure at level `alpha` over an admitted column of coverage `c` reads that column's observed `alpha / c` level, and at `c = 0.3` a 5% CVaR is a 16.7% CVaR. A hierarchical optimiser may branch the asset alone and then overweight it, because `clusterise` recomputes its correlation from the returns matrix rather than from `sigma`, an invented column reads as idiosyncratic, and an inverse-variance allocation over that branch buys more of it. An entropy pooling view on the asset is calibrated on the filled column, because the view resolvers read the matrix column by column. And a meta-optimiser carries the fill into the outer problem, whose returns matrix is built from the inner Sub-Portfolios' net returns over this one. `mu` and `sigma` are untouched, because the estimator computed them from the rows it saw. Accept a share of an investable column in silence with the estimator's own field, `EmpiricalPrior(; fill_limit = ...)`, state the share as a `CoveragePolicy`'s `min_coverage` so that admission and the notice are the one number, pass `strict = true` to refuse any fill, or fit over a window every asset covers."
+end
+"""
+    resolve_fill_limit(fill_limit::Nothing, floor::Nothing)
+    resolve_fill_limit(fill_limit::Nothing, floor::Real)
+    resolve_fill_limit(fill_limit::Real, floor::Nothing)
+    resolve_fill_limit(fill_limit::Real, floor::Real)
+
+Resolve the share of an investable column a [`scenario_fill`](@ref) may invent in silence, at the fit.
+
+`fill_limit` and a [`CoveragePolicy`](@ref)'s `min_coverage` are two spellings of one number. [`admits`](@ref) reads an asset's coverage share as its own observation count over the number of observations folded, and the fill counts that column's non-finite entries over the same denominator, so `filled_share == 1 - coverage_share` identically and the admission test **is** the fill test. A limit that did not know this would fire on nearly every fold of an available-case walk-forward, naming the caller for doing precisely what they configured.
+
+So `nothing` **derives**. Where any arm of the fitting estimator states a floor, `nothing` means `1 - floor`, and it never fires: every admitted column satisfies it by construction. Where no arm states one — the exponentially weighted family is mask-aware without a policy, gating on `min_obs`, a *count* that says nothing about the share of a long window — `nothing` keeps its original meaning and names every fill, because a caller who set no floor has weighed no trade.
+
+An explicit `fill_limit` overrides the derivation and must be **tighter** than admission. A value above `1 - floor` is refused, because it is dead by construction: nothing that reaches the fill could trip it, and a knob that cannot fire is worse than no knob. What an explicit value buys is the one configuration the derivation cannot express — admit broadly and be told anyway, `min_coverage = 0.3` with `fill_limit = 0.5` (ADR 0118).
+
+The four methods are dispatch rather than a branch, so a call site holding two `Option`s finds a method for every arm of its union split.
+
+# Arguments
+
+  - `fill_limit`: The estimator's own `fill_limit` field, or `nothing` to derive one.
+  - `floor`: The binding coverage floor of the estimator's arms, or `nothing` when no arm states one.
+
+# Validation
+
+  - `fill_limit <= 1 - floor` where both are stated, else a `DomainError` naming both is thrown.
+
+# Returns
+
+  - `fill_limit::Option{<:Real}`: The share of an investable column the fill may invent in silence, or `nothing` when it may invent none.
+
+# Related
+
+  - [`scenario_fill`](@ref)
+  - [`coverage_floor`](@ref)
+  - [`CoveragePolicy`](@ref)
+  - [`EmpiricalPrior`](@ref)
+"""
+function resolve_fill_limit(::Nothing, ::Nothing)
+    return nothing
+end
+function resolve_fill_limit(::Nothing, floor::Real)
+    return one(floor) - floor
+end
+function resolve_fill_limit(fill_limit::Real, ::Nothing)
+    return fill_limit
+end
+function resolve_fill_limit(fill_limit::Real, floor::Real)
+    @argcheck(fill_limit <= one(floor) - floor,
+              DomainError(fill_limit,
+                          "fill_limit must be tighter than the coverage floor it is measured against, so it must be at most 1 - min_coverage = $(one(floor) - floor). A looser limit is dead by construction: an asset the fit admits covers at least $(floor) of the observations folded, so its column is at most $(one(floor) - floor) invented, and nothing that reaches the fill could trip $(fill_limit). Pass `nothing`, the default, to derive $(one(floor) - floor) and be told only when a coverage algorithm admits a column thinner than the floor it was given."))
+    return fill_limit
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return the returns matrix with the missing rows of every investable asset filled with zero, and say so above the fitting estimator's `fill_limit`.
+Return the returns matrix with the missing rows of every investable asset filled with zero, and say so above the fitting estimator's resolved `fill_limit`.
 
 A mask-aware moment estimator answers a young asset from the observations it has, so the asset is investable and its returns column still carries a `NaN` at every row before it listed. Every consumer of a Prior Result reads that column — the JuMP model, the meta-optimisers and the value-level door among them — so the fill is paid **once**, here, on the estimator's own pass, rather than at each of them (ADR 0118).
 
 A non-investable asset keeps its `NaN` column, so [`investable_mask`](@ref) is unchanged. `mu`, `sigma` and every other block are untouched, because the estimator computed them from the rows it saw.
 
-The fill is a trade: a scenario-based measure reads a zero return where the asset had no return at all, and understates its risk over those rows. How much of that trade passes in silence is the fitting estimator's own answer, carried in its `fill_limit` field and handed here — the share is a property of one fit, not of the session, so two priors in one program may answer differently. Under `strict = false` the trade is silent while the filled share stays at or below `fill_limit`, and is named through [`strict_diagnostic`](@ref) above it. A `fill_limit` of `nothing` allows no share at all, so every fill is named; that is the default, because a caller who has not weighed the trade is told that it happened. Under `strict = true` **any** fill refuses, whatever `fill_limit` holds. Under the whole-window rule of ADR 0117 a plain estimator never reaches this verb: an asset it could not cover leaves the Coverage Universe and is not investable.
+**The share the fill tests is per asset**: the worst investable column's own count of filled entries over the number of observations. A matrix-wide denominator scales with the universe, so the column the notice exists to catch disappears inside it — one asset of a hundred whose column is seven-tenths invented is seven thousandths of the matrix, under any limit a caller would set. The matrix-wide share is reported in the message as context and trips nothing.
+
+How much of the trade passes in silence is the fitting estimator's own answer, carried in its `fill_limit` field and resolved at the fit by [`resolve_fill_limit`](@ref) against the coverage floor of its arms — the share is a property of one fit, not of the session, so two priors in one program may answer differently. Under `strict = false` the trade is silent while the worst column's share stays at or below the resolved limit, and is named through [`strict_diagnostic`](@ref) above it. Under `strict = true` **any** fill refuses, whatever the limit holds.
+
+Two mask-aware families reach this verb. The exponentially weighted family carries no [`CoveragePolicy`](@ref), so a `fill_limit` of `nothing` names every fill there. The plain family is mask-aware exactly where a policy is set, and a policy derives a limit that never fires, so an available-case fit names nothing while it does what it was configured to do. A plain estimator with no policy never reaches this verb at all: under the whole-window rule of ADR 0117 an asset it could not cover leaves the Coverage Universe and is not investable.
 
 # Algorithm
 
  1. Return `X` itself when every entry of `X` is finite, which is every fit over a complete window.
  2. Derive the Investable Mask from `mu` and the diagonal of `sigma`, as [`investable_mask`](@ref) does, and find the pairs to fill with [`scenario_fill_pairs`](@ref). Return `X` itself when there are none, which is a gap that belongs to a non-investable asset alone.
- 3. Take the share of the entries of `X` those pairs are, and report them through [`strict_diagnostic`](@ref) when `strict` holds, when `fill_limit` is `nothing`, or when the share exceeds `fill_limit`.
+ 3. Count the pairs per asset, take the worst column's share of its own observations, and report through [`strict_diagnostic`](@ref) when `strict` holds, when `fill_limit` is `nothing`, or when that share exceeds `fill_limit`.
  4. Return a copy of `X` with zero written at each of those pairs, and the `NaN` of every non-investable asset left where it is.
 
 # Arguments
@@ -1671,11 +1731,11 @@ The fill is a trade: a scenario-based measure reads a zero return where the asse
   - `mu`: The expected returns the estimator answered, `NaN` at a non-investable asset.
   - `sigma`: The covariance the estimator answered, `NaN` on the diagonal at a non-investable asset.
   - `strict`: If `true`, any fill raises an `ArgumentError`; if `false`, a fill above the share warns.
-  - `fill_limit`: The share of the entries of `X` the fitting estimator accepts in silence, or `nothing` when it accepts none.
+  - `fill_limit`: The share of an investable column the fitting estimator accepts in silence, after [`resolve_fill_limit`](@ref), or `nothing` when it accepts none.
 
 # Validation
 
-  - The filled share is at or below `fill_limit`, else a warning naming the assets is emitted, or an `ArgumentError` naming them is raised under `strict`, which any fill raises. A `fill_limit` of `nothing` is at or below no share, so any fill is named.
+  - The worst investable column's filled share is at or below `fill_limit`, else a warning naming the assets is emitted, or an `ArgumentError` naming them is raised under `strict`, which any fill raises. A `fill_limit` of `nothing` is at or below no share, so any fill is named.
 
 # Returns
 
@@ -1685,6 +1745,7 @@ The fill is a trade: a scenario-based measure reads a zero return where the asse
 
   - [`scenario_fill_pairs`](@ref)
   - [`scenario_fill_msg`](@ref)
+  - [`resolve_fill_limit`](@ref)
   - [`EmpiricalPrior`](@ref)
   - [`investable_mask`](@ref)
   - [`strict_diagnostic`](@ref)
@@ -1700,9 +1761,15 @@ function scenario_fill(X::MatNum, mu::VecNum, sigma::MatNum, strict::Bool,
     if isempty(filled)
         return X
     end
+    counts = zeros(Int, size(X, 2))
+    for (_, i) in filled
+        counts[i] += 1
+    end
+    wi = argmax(counts)
+    worst = counts[wi] / size(X, 1)
     frac = length(filled) / length(X)
-    if strict || isnothing(fill_limit) || frac > fill_limit
-        strict_diagnostic(scenario_fill_msg(filled, frac, fill_limit), strict)
+    if strict || isnothing(fill_limit) || worst > fill_limit
+        strict_diagnostic(scenario_fill_msg(filled, wi, worst, frac, fill_limit), strict)
     end
     Xf = copy(X)
     for (t, i) in filled

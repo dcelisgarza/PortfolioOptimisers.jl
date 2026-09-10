@@ -76,4 +76,5 @@ var(ce::Covariance, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs.
 std(ce::Covariance, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
 PortfolioOptimisers.variance_series(ce::Covariance, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
 PortfolioOptimisers.variance_series(ve::SimpleVariance, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+PortfolioOptimisers.coverage_floor
 ```
