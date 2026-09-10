@@ -10,7 +10,7 @@ commit = "fda13accfd"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt.jl" = { code = 2881, doc = 0, comment = 204, blank = 47, total = 3132 }
-"src/01_Base/01_DocstringDictionaries.jl" = { code = 1117, doc = 113, comment = 123, blank = 43, total = 1396 }
+"src/01_Base/01_DocstringDictionaries.jl" = { code = 1121, doc = 113, comment = 123, blank = 43, total = 1400 }
 "src/01_Base/02_TypeRoots.jl" = { code = 18, doc = 241, comment = 0, blank = 115, total = 374 }
 "src/01_Base/03_PrettyShow.jl" = { code = 117, doc = 138, comment = 0, blank = 76, total = 331 }
 "src/01_Base/04_ScopedConfig.jl" = { code = 163, doc = 491, comment = 2, blank = 214, total = 870 }
@@ -24,7 +24,7 @@ commit = "fda13accfd"
 "src/01_Base/12_NormError.jl" = { code = 106, doc = 313, comment = 0, blank = 129, total = 548 }
 "src/01_Base/13_KappaLog.jl" = { code = 3, doc = 36, comment = 0, blank = 18, total = 57 }
 "src/01_Base/14_PartialFit.jl" = { code = 66, doc = 204, comment = 0, blank = 114, total = 384 }
-"src/01_Base/15_Online.jl" = { code = 185, doc = 377, comment = 0, blank = 194, total = 756 }
+"src/01_Base/15_Online.jl" = { code = 329, doc = 634, comment = 0, blank = 318, total = 1281 }
 "src/01_Base/16_CoveragePolicy.jl" = { code = 198, doc = 406, comment = 0, blank = 195, total = 799 }
 "src/02_Tools.jl" = { code = 808, doc = 2044, comment = 46, blank = 867, total = 3765 }
 "src/03_InputData/01_AssetPanel.jl" = { code = 373, doc = 680, comment = 0, blank = 330, total = 1383 }

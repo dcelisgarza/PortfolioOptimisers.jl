@@ -377,14 +377,25 @@ end
                 @test_throws ArgumentError partial_fit!(fam.est, Y)
             end
         end
-        # A buffer records no per-observation activity, so it refuses a Coverage Policy mask
-        # rather than folding a block whose mask it would have to discard.
-        wrapped = po.update_online_estimator(Online(Covariance()))
-        @test_throws ArgumentError partial_fit!(wrapped, Y; active_mask = trues(size(Y)))
-        @test_throws ArgumentError partial_fit!(wrapped, view(Y, 1, :);
-                                                active_mask = trues(size(Y, 2)))
-        @test_throws ArgumentError partial_fit!(po.update_online_estimator(Online(RegimeAdjustedExpWeightedCovariance())),
-                                                Y; estimation_mask = trues(size(Y)))
+        # Issue #999. A buffer records the per-observation masks beside the observations, so
+        # a wrapped estimator takes a Coverage Policy mask rather than refusing one, and it
+        # records it whether the fold is a block or one observation.
+        wrapped = partial_fit!(po.update_online_estimator(Online(Covariance())), Y;
+                               active_mask = trues(size(Y)))
+        @test po.sample_buffer_kwargs(wrapped.cache).active_mask == trues(size(Y))
+        one_by_one = po.update_online_estimator(Online(Covariance()))
+        for t in axes(Y, 1)
+            one_by_one = partial_fit!(one_by_one, view(Y, t, :);
+                                      active_mask = trues(size(Y, 2)))
+        end
+        @test po.sample_buffer_kwargs(one_by_one.cache).active_mask == trues(size(Y))
+        @test isnothing(wrapped.cache.E)
+        # The estimation mask is carried on the same terms, and only the two regime-adjusted
+        # families read it.
+        regime = partial_fit!(po.update_online_estimator(Online(RegimeAdjustedExpWeightedCovariance())),
+                              Y; estimation_mask = trues(size(Y)))
+        @test po.sample_buffer_kwargs(regime.cache).estimation_mask == trues(size(Y))
+        @test isnothing(regime.cache.A)
         # The one-argument read-out is bound to every moment algorithm, so a wrapped
         # `SemiMoment` covariance answers it and an unwrapped one that carries nothing meets
         # the named refusal rather than a `MethodError`.
@@ -392,5 +403,197 @@ end
         @test isapprox(Statistics.cov(partial_fit!(po.update_online_estimator(Online(semi)),
                                                    Y)), Statistics.cov(semi, Y))
         @test_throws ArgumentError Statistics.cov(semi)
+    end
+end
+#=
+The per-observation masks the buffer carries, issue #999.
+
+`SampleBufferState` holds the observations verbatim, and #999 made it hold the masks that
+explain them on the same terms. A `CoveragePolicy` reads two facts out of an active mask
+that the rows alone do not carry -- a cell that is finite but inactive is excluded, and an
+asset active at one observation and inactive at the next is a delisting rather than a
+holiday -- so before this the generic buffering arm refused a mask rather than dropping it
+silently. It now records one, and a wrapped estimator folded under a policy matches a batch
+fit over the same window exactly, as it already did without one. The estimation mask the two
+regime-adjusted families read is carried on the same terms, because it has the same shape,
+the same per-observation nature and the same silent failure.
+=#
+@testset "The sample buffer carries the per-observation masks" begin
+    using Test, PortfolioOptimisers, StableRNGs, Statistics
+    po = PortfolioOptimisers
+    rng = StableRNG(19990101)
+    T, N = 40, 4
+    Y = randn(rng, T, N) ./ 100
+    M = trues(T, N)
+    # Asset 2 lists at observation 6, asset 4 delists at observation 31.
+    M[1:5, 2] .= false
+    M[31:end, 4] .= false
+    Y[1:5, 2] .= NaN
+    Y[31:end, 4] .= NaN
+    cvg = CoveragePolicy(; min_coverage = 0.2)
+    w = 25
+    rows = (T - w + 1):T
+    # The valid region of a mask, which is what a read-out sees: the backing matrix
+    # carries spare capacity, and its spare rows hold no meaning.
+    amask(s) = po.sample_buffer_kwargs(s).active_mask
+    families = ((; name = "SimpleExpectedReturns", est = SimpleExpectedReturns(; cvg = cvg),
+                 readout = e -> Statistics.mean(e, po.partial_fit_cache(e)),
+                 batch = (e, Z, A) -> Statistics.mean(e, Z; active_mask = A)),
+                (; name = "SimpleVariance", est = SimpleVariance(; cvg = cvg),
+                 readout = e -> Statistics.var(e, po.partial_fit_cache(e)),
+                 batch = (e, Z, A) -> Statistics.var(e, Z; active_mask = A)),
+                (; name = "Covariance", est = Covariance(; cvg = cvg),
+                 readout = e -> Statistics.cov(e, po.partial_fit_cache(e)),
+                 batch = (e, Z, A) -> Statistics.cov(e, Z; active_mask = A)),
+                (; name = "Covariance/SemiMoment",
+                 est = Covariance(; alg = SemiMoment(), cvg = cvg),
+                 readout = e -> Statistics.cov(e, po.partial_fit_cache(e)),
+                 batch = (e, Z, A) -> Statistics.cov(e, Z; active_mask = A)),
+                (; name = "Coskewness", est = Coskewness(; cvg = cvg),
+                 readout = e -> first(coskewness(e, po.partial_fit_cache(e))),
+                 batch = (e, Z, A) -> first(coskewness(e, Z; active_mask = A))),
+                (; name = "Cokurtosis", est = Cokurtosis(; cvg = cvg),
+                 readout = e -> cokurtosis(e, po.partial_fit_cache(e)),
+                 batch = (e, Z, A) -> cokurtosis(e, Z; active_mask = A)))
+    @testset "$(fam.name) wrapped under a policy equals the batch fit" for fam in families
+        # A family that folds exactly and one that does not both reach the generic buffering
+        # arm once wrapped, and both answer what the batch fit answers.
+        block = partial_fit!(po.update_online_estimator(Online(fam.est)), Y;
+                             active_mask = M)
+        @test isequal(po.sample_buffer(block), Y)
+        @test amask(block.cache) == M
+        @test isapprox(fam.readout(block), fam.batch(fam.est, Y, M); nans = true)
+        # One observation at a time reaches the same buffer, the same mask and the same
+        # answer.
+        stepped = po.update_online_estimator(Online(fam.est))
+        for t in axes(Y, 1)
+            stepped = partial_fit!(stepped, view(Y, t, :); active_mask = view(M, t, :))
+        end
+        @test amask(stepped.cache) == M
+        @test isapprox(fam.readout(stepped), fam.batch(fam.est, Y, M); nans = true)
+        # The capped buffer evicts the mask rows with the observation rows they belong to,
+        # so the cap is the window for the mask as much as for the observations.
+        capped = po.update_online_estimator(Online(fam.est; max_history = w))
+        for t in axes(Y, 1)
+            capped = partial_fit!(capped, view(Y, t, :); active_mask = view(M, t, :))
+        end
+        @test isequal(po.sample_buffer(capped), Y[rows, :])
+        @test po.sample_buffer_kwargs(capped.cache).active_mask == M[rows, :]
+        @test isapprox(fam.readout(capped), fam.batch(fam.est, Y[rows, :], M[rows, :]);
+                       nans = true)
+        # A block longer than the cap truncates the mask with the rows.
+        one_block = partial_fit!(po.update_online_estimator(Online(fam.est;
+                                                                   max_history = w)), Y;
+                                 active_mask = M)
+        @test isequal(po.sample_buffer(one_block), Y[rows, :])
+        @test isapprox(fam.readout(one_block), fam.batch(fam.est, Y[rows, :], M[rows, :]);
+                       nans = true)
+    end
+    @testset "The Coverage Universe agrees wrapped and unwrapped" begin
+        # A gapped panel with a listing and a delisting reaches the same Coverage Universe
+        # through the buffer that it reaches through the estimator's own counts.
+        est = Covariance(; cvg = cvg)
+        wrapped = partial_fit!(po.update_online_estimator(Online(est)), Y; active_mask = M)
+        unwrapped = partial_fit!(est, Y; active_mask = M)
+        refused = Statistics.cov(est, po.partial_fit_cache(wrapped))
+        @test isapprox(refused, Statistics.cov(est, po.partial_fit_cache(unwrapped));
+                       nans = true)
+        # The delisted asset is refused by both and the late-listed one is admitted by both,
+        # so the two agree on the frame and not only on the numbers.
+        @test all(isnan, view(refused, 4, :))
+        @test all(isfinite, view(refused, 2, [1, 2, 3]))
+        # Without the mask the same panel reads every gap as a holiday, so the delisted
+        # asset survives -- the silent wrong answer the mask exists to prevent.
+        no_mask = partial_fit!(po.update_online_estimator(Online(est)), Y)
+        @test !isequal(Statistics.cov(est, po.partial_fit_cache(no_mask)), refused)
+    end
+    @testset "The estimation mask rides beside the active mask" begin
+        # The two masks are carried on the same terms, and a family that reads both is
+        # folded with both. `sample_buffer_kwargs` then names both, and the read-out is the
+        # batch fit under both.
+        E = trues(T, N)
+        E[1:10, 1] .= false
+        est = RegimeAdjustedExpWeightedCovariance()
+        both = partial_fit!(po.update_online_estimator(Online(est)), Y; active_mask = M,
+                            estimation_mask = E)
+        kw = po.sample_buffer_kwargs(both.cache)
+        @test keys(kw) == (:active_mask, :estimation_mask)
+        @test kw.active_mask == M
+        @test kw.estimation_mask == E
+        @test isapprox(Statistics.cov(est, po.partial_fit_cache(both)),
+                       Statistics.cov(est, Y; active_mask = M, estimation_mask = E);
+                       nans = true)
+        # The estimation mask alone is carried too, and it does not invent an active mask.
+        alone = partial_fit!(po.update_online_estimator(Online(est)), Y;
+                             estimation_mask = E)
+        @test keys(po.sample_buffer_kwargs(alone.cache)) == (:estimation_mask,)
+        @test isnothing(alone.cache.A)
+    end
+    @testset "The mixture is refused" begin
+        # A buffer whose activity is known for some rows and not for others answers neither
+        # question, so a fold that disagrees with what the buffer records is refused in both
+        # directions.
+        with = partial_fit!(po.update_online_estimator(Online(Covariance())), Y;
+                            active_mask = M)
+        @test_throws ArgumentError partial_fit!(with, Y)
+        without = partial_fit!(po.update_online_estimator(Online(Covariance())), Y)
+        @test_throws ArgumentError partial_fit!(without, Y; active_mask = M)
+        @test_throws ArgumentError partial_fit!(with, Y; active_mask = M,
+                                                estimation_mask = M)
+        # A buffer holding no observations has nothing to disagree with, so it adopts.
+        seed = po.update_online_estimator(Online(Covariance()))
+        @test isnothing(seed.cache.A)
+        @test amask(partial_fit!(seed, Y; active_mask = M).cache) == M
+        # A mask that is not of the shape of the block is refused before anything is
+        # recorded.
+        @test_throws DimensionMismatch partial_fit!(seed, Y; active_mask = trues(T, N + 1))
+        @test_throws DimensionMismatch po.SampleBufferState(; n = 1, X = zeros(1, 2),
+                                                            A = trues(1, 3))
+        @test_throws DimensionMismatch po.SampleBufferState(; n = 1, X = zeros(1, 2),
+                                                            E = trues(2, 2))
+    end
+    @testset "Every channel carries the masks" begin
+        # `dims = 2` orients the masks with the observations.
+        by_column = partial_fit!(po.SampleBufferState(), permutedims(Y); dims = 2,
+                                 active_mask = permutedims(M))
+        @test isequal(po.sample_buffer(by_column), Y)
+        @test amask(by_column) == M
+        # `merge_states` concatenates the masks with the rows they explain, and refuses two
+        # buffers that do not record the same masks.
+        a = partial_fit!(po.SampleBufferState(), view(Y, 1:10, :);
+                         active_mask = view(M, 1:10, :))
+        b = partial_fit!(po.SampleBufferState(), view(Y, 11:T, :);
+                         active_mask = view(M, 11:T, :))
+        merged = po.merge_states(a, b)
+        @test isequal(po.sample_buffer(merged), Y)
+        @test amask(merged) == M
+        @test_throws ArgumentError po.merge_states(a,
+                                                   partial_fit!(po.SampleBufferState(),
+                                                                view(Y, 11:T, :)))
+        # A capped merge keeps the last rows of the mask with the last rows of the sample.
+        ac = partial_fit!(po.SampleBufferState(; max_history = w), view(Y, 1:10, :);
+                          active_mask = view(M, 1:10, :))
+        bc = partial_fit!(po.SampleBufferState(; max_history = w), view(Y, 11:T, :);
+                          active_mask = view(M, 11:T, :))
+        merged_cap = po.merge_states(ac, bc)
+        @test isequal(po.sample_buffer(merged_cap), Y[rows, :])
+        @test po.sample_buffer_kwargs(merged_cap).active_mask == M[rows, :]
+        # `copy` shares no array with the original, the masks included.
+        dup = copy(merged)
+        @test amask(dup) == M
+        @test dup.A !== merged.A
+        # `port_opt_view` slices the masks by the same indices as the observations, and
+        # copies rather than views.
+        sliced = po.port_opt_view(merged, [1, 3])
+        @test isequal(po.sample_buffer(sliced), Y[:, [1, 3]])
+        @test amask(sliced) == M[:, [1, 3]]
+        @test !isa(sliced.A, SubArray)
+        # `obs_weights_view` drops the state, masks and all.
+        @test isnothing(po.obs_weights_view(merged, 1:5))
+        # A buffer that records no mask hands the batch verb no keyword, which is the whole
+        # of the behaviour before #999.
+        plain = partial_fit!(po.SampleBufferState(), Y)
+        @test isempty(po.sample_buffer_kwargs(plain))
+        @test keys(po.sample_buffer_kwargs(merged)) == (:active_mask,)
     end
 end

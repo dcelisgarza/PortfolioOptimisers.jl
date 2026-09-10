@@ -849,7 +849,7 @@ Reads a coskewness out of a sample buffer, by refitting the batch verb over the 
 
 The buffer read-out of [`coskewness`](@ref), and the whole of the online form at this order. Neither the third nor the fourth co-moment folds exactly under a [`CoveragePolicy`](@ref) — an exact per-cell recursion needs the pairwise second co-moments over each triple's own observation set — so an [`Online`](@ref) wrapper seeds a [`SampleBufferState`](@ref) and the read-out refits from it. The answer is therefore bit-exact with the batch arm over the same rows, by construction rather than by arithmetic coincidence.
 
-The buffer holds the observations verbatim, `NaN` included, so the available-case arm reads the same gaps from it that it would read from the caller's own matrix. With no active mask a gap is a holiday rather than a delisting, which is what [`coverage_valid_block`](@ref) states.
+The buffer holds the observations verbatim, `NaN` included, so the available-case arm reads the same gaps from it that it would read from the caller's own matrix, and it holds the active mask that explains them beside them. With no active mask a gap is a holiday rather than a delisting, which is what [`coverage_valid_block`](@ref) states; with one, the read-out reads the delisting the fold was told about.
 
 # Arguments
 
@@ -869,7 +869,7 @@ The buffer holds the observations verbatim, `NaN` included, so the available-cas
   - [`coverage_coskewness`](@ref)
 """
 function coskewness(ske::Coskewness, state::SampleBufferState)
-    return coskewness(ske, sample_buffer(state); dims = 1)
+    return coskewness(ske, sample_buffer(state); dims = 1, sample_buffer_kwargs(state)...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -954,7 +954,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Reads a cokurtosis out of a sample buffer, by refitting the batch verb over the observations the buffer holds.
 
-The buffer read-out of [`cokurtosis`](@ref), and the whole of the online form at this order. The [`Coskewness`](@ref) method states the rule; carried one order further, an exact per-cell recursion would need the second and third co-moments over each quadruple's own observation set.
+The buffer read-out of [`cokurtosis`](@ref), and the whole of the online form at this order. The [`Coskewness`](@ref) method states the rule; carried one order further, an exact per-cell recursion would need the second and third co-moments over each quadruple's own observation set. The masks the buffer holds are handed to the batch verb on the same terms.
 
 # Arguments
 
@@ -973,7 +973,7 @@ The buffer read-out of [`cokurtosis`](@ref), and the whole of the online form at
   - [`coverage_cokurtosis`](@ref)
 """
 function cokurtosis(kte::Cokurtosis, state::SampleBufferState)
-    return cokurtosis(kte, sample_buffer(state); dims = 1)
+    return cokurtosis(kte, sample_buffer(state); dims = 1, sample_buffer_kwargs(state)...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1014,7 +1014,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Reads a coskewness tensor out of a [`SampleBufferState`](@ref), by running the batch verb over the observations the buffer holds.
 
-The buffer read-out arm of `coskewness`. An estimator wrapped in [`Online`](@ref) carries a buffer rather than a family state, so it takes no exact fold, and its estimate is whatever a batch fit over the rows the buffer holds gives — every observation folded so far when the buffer is uncapped, and the last `max_history` of them when it is capped. It runs no [`assert_partial_fittable`](@ref) check of its own: the batch verb answers configurations an incremental fold cannot, and a wrapper is how a caller reaches them.
+The buffer read-out arm of `coskewness`. An estimator wrapped in [`Online`](@ref) carries a buffer rather than a family state, so it takes no exact fold, and its estimate is whatever a batch fit over the rows the buffer holds gives — every observation folded so far when the buffer is uncapped, and the last `max_history` of them when it is capped. It runs no [`assert_partial_fittable`](@ref) check of its own: the batch verb answers configurations an incremental fold cannot, and a wrapper is how a caller reaches them. The buffer also holds the per-observation masks it was folded with, so the batch verb is given the mask that explains the rows and a wrapped estimator under a [`CoveragePolicy`](@ref) answers what an unwrapped one answers.
 
 # Arguments
 
@@ -1033,14 +1033,14 @@ The buffer read-out arm of `coskewness`. An estimator wrapped in [`Online`](@ref
   - [`partial_fit!`](@ref)
 """
 function coskewness(ske::CoskewnessEstimator, state::SampleBufferState)
-    return coskewness(ske, sample_buffer(state))
+    return coskewness(ske, sample_buffer(state); sample_buffer_kwargs(state)...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Reads a cokurtosis matrix out of a [`SampleBufferState`](@ref), by running the batch verb over the observations the buffer holds.
 
-The buffer read-out arm of `cokurtosis`. An estimator wrapped in [`Online`](@ref) carries a buffer rather than a family state, so it takes no exact fold, and its estimate is whatever a batch fit over the rows the buffer holds gives — every observation folded so far when the buffer is uncapped, and the last `max_history` of them when it is capped. It runs no [`assert_partial_fittable`](@ref) check of its own: the batch verb answers configurations an incremental fold cannot, and a wrapper is how a caller reaches them.
+The buffer read-out arm of `cokurtosis`. An estimator wrapped in [`Online`](@ref) carries a buffer rather than a family state, so it takes no exact fold, and its estimate is whatever a batch fit over the rows the buffer holds gives — every observation folded so far when the buffer is uncapped, and the last `max_history` of them when it is capped. It runs no [`assert_partial_fittable`](@ref) check of its own: the batch verb answers configurations an incremental fold cannot, and a wrapper is how a caller reaches them. The buffer also holds the per-observation masks it was folded with, so the batch verb is given the mask that explains the rows and a wrapped estimator under a [`CoveragePolicy`](@ref) answers what an unwrapped one answers.
 
 # Arguments
 
@@ -1059,5 +1059,5 @@ The buffer read-out arm of `cokurtosis`. An estimator wrapped in [`Online`](@ref
   - [`partial_fit!`](@ref)
 """
 function cokurtosis(kte::CokurtosisEstimator, state::SampleBufferState)
-    return cokurtosis(kte, sample_buffer(state))
+    return cokurtosis(kte, sample_buffer(state); sample_buffer_kwargs(state)...)
 end

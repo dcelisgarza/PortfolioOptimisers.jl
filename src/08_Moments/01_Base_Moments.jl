@@ -298,7 +298,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Reads a covariance matrix out of a [`SampleBufferState`](@ref), by running the batch verb over the observations the buffer holds.
 
-The buffer read-out arm of `Statistics.cov`. An estimator wrapped in [`Online`](@ref) carries a buffer rather than a family state, so it takes no exact fold, and its estimate is whatever a batch fit over the rows the buffer holds gives — every observation folded so far when the buffer is uncapped, and the last `max_history` of them when it is capped. It runs no [`assert_partial_fittable`](@ref) check of its own: the batch verb answers configurations an incremental fold cannot, and a wrapper is how a caller reaches them.
+The buffer read-out arm of `Statistics.cov`. An estimator wrapped in [`Online`](@ref) carries a buffer rather than a family state, so it takes no exact fold, and its estimate is whatever a batch fit over the rows the buffer holds gives — every observation folded so far when the buffer is uncapped, and the last `max_history` of them when it is capped. It runs no [`assert_partial_fittable`](@ref) check of its own: the batch verb answers configurations an incremental fold cannot, and a wrapper is how a caller reaches them. The buffer also holds the per-observation masks it was folded with, so the batch verb is given the mask that explains the rows and a wrapped estimator under a [`CoveragePolicy`](@ref) answers what an unwrapped one answers.
 
 # Arguments
 
@@ -317,14 +317,14 @@ The buffer read-out arm of `Statistics.cov`. An estimator wrapped in [`Online`](
   - [`partial_fit!`](@ref)
 """
 function Statistics.cov(ce::AbstractCovarianceEstimator, state::SampleBufferState)
-    return Statistics.cov(ce, sample_buffer(state))
+    return Statistics.cov(ce, sample_buffer(state); sample_buffer_kwargs(state)...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Reads a correlation matrix out of a [`SampleBufferState`](@ref), by running the batch verb over the observations the buffer holds.
 
-The buffer read-out arm of `Statistics.cor`. An estimator wrapped in [`Online`](@ref) carries a buffer rather than a family state, so it takes no exact fold, and its estimate is whatever a batch fit over the rows the buffer holds gives — every observation folded so far when the buffer is uncapped, and the last `max_history` of them when it is capped. It runs no [`assert_partial_fittable`](@ref) check of its own: the batch verb answers configurations an incremental fold cannot, and a wrapper is how a caller reaches them.
+The buffer read-out arm of `Statistics.cor`. An estimator wrapped in [`Online`](@ref) carries a buffer rather than a family state, so it takes no exact fold, and its estimate is whatever a batch fit over the rows the buffer holds gives — every observation folded so far when the buffer is uncapped, and the last `max_history` of them when it is capped. It runs no [`assert_partial_fittable`](@ref) check of its own: the batch verb answers configurations an incremental fold cannot, and a wrapper is how a caller reaches them. The buffer also holds the per-observation masks it was folded with, so the batch verb is given the mask that explains the rows and a wrapped estimator under a [`CoveragePolicy`](@ref) answers what an unwrapped one answers.
 
 # Arguments
 
@@ -343,14 +343,14 @@ The buffer read-out arm of `Statistics.cor`. An estimator wrapped in [`Online`](
   - [`partial_fit!`](@ref)
 """
 function Statistics.cor(ce::AbstractCovarianceEstimator, state::SampleBufferState)
-    return Statistics.cor(ce, sample_buffer(state))
+    return Statistics.cor(ce, sample_buffer(state); sample_buffer_kwargs(state)...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Reads a variance out of a [`SampleBufferState`](@ref), by running the batch verb over the observations the buffer holds.
 
-The buffer read-out arm of `Statistics.var`. An estimator wrapped in [`Online`](@ref) carries a buffer rather than a family state, so it takes no exact fold, and its estimate is whatever a batch fit over the rows the buffer holds gives — every observation folded so far when the buffer is uncapped, and the last `max_history` of them when it is capped. It runs no [`assert_partial_fittable`](@ref) check of its own: the batch verb answers configurations an incremental fold cannot, and a wrapper is how a caller reaches them.
+The buffer read-out arm of `Statistics.var`. An estimator wrapped in [`Online`](@ref) carries a buffer rather than a family state, so it takes no exact fold, and its estimate is whatever a batch fit over the rows the buffer holds gives — every observation folded so far when the buffer is uncapped, and the last `max_history` of them when it is capped. It runs no [`assert_partial_fittable`](@ref) check of its own: the batch verb answers configurations an incremental fold cannot, and a wrapper is how a caller reaches them. The buffer also holds the per-observation masks it was folded with, so the batch verb is given the mask that explains the rows and a wrapped estimator under a [`CoveragePolicy`](@ref) answers what an unwrapped one answers.
 
 # Arguments
 
@@ -369,14 +369,14 @@ The buffer read-out arm of `Statistics.var`. An estimator wrapped in [`Online`](
   - [`partial_fit!`](@ref)
 """
 function Statistics.var(ve::AbstractVarianceEstimator, state::SampleBufferState)
-    return Statistics.var(ve, sample_buffer(state))
+    return Statistics.var(ve, sample_buffer(state); sample_buffer_kwargs(state)...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Reads a standard deviation out of a [`SampleBufferState`](@ref), by running the batch verb over the observations the buffer holds.
 
-The buffer read-out arm of `Statistics.std`. An estimator wrapped in [`Online`](@ref) carries a buffer rather than a family state, so it takes no exact fold, and its estimate is whatever a batch fit over the rows the buffer holds gives — every observation folded so far when the buffer is uncapped, and the last `max_history` of them when it is capped. It runs no [`assert_partial_fittable`](@ref) check of its own: the batch verb answers configurations an incremental fold cannot, and a wrapper is how a caller reaches them.
+The buffer read-out arm of `Statistics.std`. An estimator wrapped in [`Online`](@ref) carries a buffer rather than a family state, so it takes no exact fold, and its estimate is whatever a batch fit over the rows the buffer holds gives — every observation folded so far when the buffer is uncapped, and the last `max_history` of them when it is capped. It runs no [`assert_partial_fittable`](@ref) check of its own: the batch verb answers configurations an incremental fold cannot, and a wrapper is how a caller reaches them. The buffer also holds the per-observation masks it was folded with, so the batch verb is given the mask that explains the rows and a wrapped estimator under a [`CoveragePolicy`](@ref) answers what an unwrapped one answers.
 
 # Arguments
 
@@ -395,7 +395,7 @@ The buffer read-out arm of `Statistics.std`. An estimator wrapped in [`Online`](
   - [`partial_fit!`](@ref)
 """
 function Statistics.std(ve::AbstractVarianceEstimator, state::SampleBufferState)
-    return Statistics.std(ve, sample_buffer(state))
+    return Statistics.std(ve, sample_buffer(state); sample_buffer_kwargs(state)...)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -489,7 +489,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Reads an expected returns vector out of a [`SampleBufferState`](@ref), by running the batch verb over the observations the buffer holds.
 
-The buffer read-out arm of `Statistics.mean`. An estimator wrapped in [`Online`](@ref) carries a buffer rather than a family state, so it takes no exact fold, and its estimate is whatever a batch fit over the rows the buffer holds gives — every observation folded so far when the buffer is uncapped, and the last `max_history` of them when it is capped. It runs no [`assert_partial_fittable`](@ref) check of its own: the batch verb answers configurations an incremental fold cannot, and a wrapper is how a caller reaches them.
+The buffer read-out arm of `Statistics.mean`. An estimator wrapped in [`Online`](@ref) carries a buffer rather than a family state, so it takes no exact fold, and its estimate is whatever a batch fit over the rows the buffer holds gives — every observation folded so far when the buffer is uncapped, and the last `max_history` of them when it is capped. It runs no [`assert_partial_fittable`](@ref) check of its own: the batch verb answers configurations an incremental fold cannot, and a wrapper is how a caller reaches them. The buffer also holds the per-observation masks it was folded with, so the batch verb is given the mask that explains the rows and a wrapped estimator under a [`CoveragePolicy`](@ref) answers what an unwrapped one answers.
 
 # Arguments
 
@@ -508,7 +508,7 @@ The buffer read-out arm of `Statistics.mean`. An estimator wrapped in [`Online`]
   - [`partial_fit!`](@ref)
 """
 function Statistics.mean(me::AbstractExpectedReturnsEstimator, state::SampleBufferState)
-    return Statistics.mean(me, sample_buffer(state))
+    return Statistics.mean(me, sample_buffer(state); sample_buffer_kwargs(state)...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
