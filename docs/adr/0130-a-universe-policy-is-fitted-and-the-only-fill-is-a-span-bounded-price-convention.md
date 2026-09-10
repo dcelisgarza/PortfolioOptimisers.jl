@@ -197,6 +197,47 @@ The name deliberately does not reuse `gap_fill_value`, which is a trait on a cov
 naming the value it substitutes internally for a gap it was handed. That is an estimator's private
 repair; a Held Price is a caller's statement about the data.
 
+### One estimator occupies the fill role, and `Imputer` is not it
+
+"Exactly one fill" is literal. `Imputer` and `ImputerResult` are removed, and `PriceGapFill` is the
+whole of the fill role.
+
+`Imputer` predates the Listing Span. It is fitted and replayed, which is the half this ADR requires,
+but it is `PriceGapFill` with one guard missing and one convention missing, and neither omission is
+a case it serves:
+
+- **Its configuration space is contained.** `Imputer.stat` is bound to `Num_VecToScaM`;
+  `PriceGapFill.fill` is bound to `Union{CarriedPrice, Num_VecToScaM}` — the same union with the
+  Held Price added.
+- **The two fit the same number.** Both collect a column's observed prices, skip a column that holds
+  none, and reduce the rest; `gap_fill_seed(::Num_VecToScaM, obs)` *is* the
+  `vec_to_real_measure(stat, obs)` call `Imputer` makes.
+- **The two applies differ by one guard**, `span[t, j] &&`, which is the bound this ADR exists to
+  place.
+
+So the only behaviour `Imputer` holds alone is the **unbounded** fill — a price written before an
+asset's first listing or after its delisting. That is not a case the layer declines to serve by
+oversight; it is the fabrication the bound was introduced to forbid, and it is the one thing
+`Imputer` actually does on this repo's own fixtures. Measured on an eight-observation, three-asset
+panel with one inception, one suspension and one delisting: `Imputer(; stat = MedianValue())`
+invents a price for the asset that had not yet listed and for the asset that had been delisted, and
+`PriceGapFill(; fill = MedianValue())` under the same reduction writes only the suspension.
+
+**A caller who genuinely wants the unbounded fill is not blocked, and is not given a switch.** They
+state a listing calendar in which nothing is ever unlisted:
+
+```julia
+pr = PricesResult(; X = Xm, span = trues(size(values(Xm))))
+Pipeline(; steps = (PriceGapFill(; fill = MedianValue()), PricesToReturns(), …))
+```
+
+That is ADR 0129's caller-calendar route, used as intended, and it is **bit-identical** to
+`Imputer(; stat = MedianValue())` — verified on the panel above. The difference is where the
+assumption is written: a declared span states *every asset is listed at every observation*, which
+is a claim a reader can check against the data, where an unbounded fill states nothing and is
+checked by nobody. The bound is therefore a property of the type rather than a default on it, and
+no `bound` field is added to `PriceGapFill` to hold the alternative.
+
 ## Consequences
 
 `CONTEXT.md` mints **Universe Policy** and **Held Price**, and the *Avoid* line on Held Price
@@ -215,6 +256,26 @@ the Coverage Universe. The per-estimator warm-up is `min_obs`, and stays with it
 `AbstractAssetSelector`, its funnel and the Coverage Universe are unchanged. No abstract type is
 added, no `Pipeline` slot is added, and `assert_split_position` keeps its rule: a `PriceGapFill` is
 a stateful step and sits after the split like any other.
+
+**`Imputer` and `ImputerResult` are removed**, and with them a second estimator in the fill role and
+a second entry in the `Pipeline` step list a caller reads first. This is a hard break, and the map's
+destination accepts one. `MissingDataFilter` keeps `src/03_InputData/09_PriceFilters.jl`; the
+Catalogue's `Cap(:Imputer, :ImputerResult)` row goes, as do the two type-hierarchy rows and the
+`docs/src/api/03_Preprocessing.md` entries.
+
+**The examples' leakage exemplar moves to `CarriedPrice`.**
+`examples/5_validation_tuning/03_Pipelines.jl` §2.3 teaches that a fill's parameters are fitted
+state by fitting an imputer on two windows and showing the numbers disagree. It keeps teaching that,
+through `PriceGapFill` on a carrier that states a span: the fitted value is the last observed
+*training* price, which disagrees across two windows exactly as sharply, and the page now teaches
+the Held Price and the Span Rule alongside the leakage lesson. The fixture's leading run on one
+asset stays non-finite and the Asset Panel keeps it out of the weights, which is the point the old
+text could not make while the imputer was filling it. That page's prose about the conversion
+silently dropping assets is stale under ADR 0133 and is rewritten in the same change.
+
+**`CONTEXT.md` needs nothing.** It never named `Imputer`, and its **Held Price** entry already
+speaks of *the* fill in the singular and states the Listing Span bound as that fill's property. The
+removal makes the entry true rather than aspirational.
 
 The descriptor whose warm-up exceeds a fold's training window is not settled here. It is a fact
 about a descriptor rather than about ingestion, and it is owned elsewhere.

@@ -261,6 +261,9 @@ is no other.
   it filled nothing and why, and refuses under `strict`, rather than guessing a span from a window.
 - **`CONTEXT.md`** mints no term. Its **Universe Policy** entry loses the exception the conversion
   was, and its **Span Rule** *Avoid* line is unchanged.
-- **What this ADR does not settle**, left to the builds it graduates: whether `Imputer` survives
-  beside `PriceGapFill`, and what `PriceIngestion`'s own defaults are once a bare `TimeArray` call
-  runs it.
+- **What this ADR does not settle**, left to the builds it graduates: what `PriceIngestion`'s own
+  defaults are once a bare `TimeArray` call runs it. Whether `Imputer` survives beside
+  `PriceGapFill` was the other, and
+  [ADR 0130](0130-a-universe-policy-is-fitted-and-the-only-fill-is-a-span-bounded-price-convention.md)
+  now answers it: it does not, because it is `PriceGapFill` with the span bound missing, and the
+  unbounded fill it alone offers is the fabrication that bound forbids.
