@@ -1451,8 +1451,6 @@ end
         ivpa::Option{<:Num_VecNum} = nothing,
         ret_method::Symbol = :simple, padding::Bool = false,
         gap_return_alg::Option{<:AbstractGapReturnAlgorithm} = nothing,
-        missing_col_percent::Number = 1.0,
-        missing_row_percent::Option{<:Number} = 1.0,
         collapse_args::Tuple = (),
         map_func::Option{<:Function} = nothing,
         join_method::Symbol = :outer,
@@ -1492,26 +1490,23 @@ A benchmark ``B`` is converted by the same rule and **carried alongside** the as
 
 # Algorithm
 
- 1. Check `X`, `missing_col_percent` and `missing_row_percent`. Read the asset names and the asset timestamps from `X`, and check `pnl` against them with [`check_asset_panel`](@ref).
+ 1. Check `X`. Read the asset names and the asset timestamps from `X`, and check `pnl` against them with [`check_asset_panel`](@ref).
  2. Merge the factor prices `F` into `X` under `join_method`, and record the factor names.
  3. Merge the benchmark prices `B` into `X` under `join_method`, and record the benchmark names. A benchmark is one shared column, or one column per asset.
  4. Apply `map_func` to every entry, when one is given.
  5. Collapse the time series with `collapse_args`, when they are given. This is the step that changes the frequency.
  6. Convert the table to a `DataFrames.DataFrame`.
- 7. Replace every `missing` with `NaN`, so that the two conventions a source spells an absent price with become one and no later step deletes it: an outer join of per-asset series pads with `NaN`, and a wide table built from a tidy one leaves `missing`. This is the only unification, it runs unconditionally, and it is what makes the two ragged-history sources behave alike.
- 8. Count the gapped entries of each row of the table with [`is_missing_value`](@ref), which reads both conventions because it stands at the door.
- 9. Drop each row whose count of missing columns exceeds `missing_col_percent` of the column total.
-10. Count the missing entries of each column over the rows that step 9 kept. Drop each column whose count exceeds `missing_row_percent` of the surviving row total. When `missing_row_percent` is `nothing`, keep instead the columns whose count equals the mode of the counts.
-11. Convert the surviving prices to returns with `TimeSeries.percentchange` under `ret_method` and `padding`. This is the step that applies the formula above. It computes both branches through logarithms — the log return is ``\\ln P_{t,i} - \\ln P_{t-1,i}``, and the simple return is `expm1` of it — so the two agree with the closed forms above to floating point rather than to the last bit. When `padding` is `true` the first observation is kept and its return is `NaN`, so the returns keep the length of the price clock. **A gap carried here does not spread.** The formula reads two prices, so a run of `k` gapped prices makes exactly the `k + 1` returns that read one of them non-finite, and every later return of that column is computed from two observed prices and is finite. A gap is confined to its own column for the same reason: no asset's return reads another's price.
-12. Resolve the cells the conversion left non-finite with [`apply_gap_return`](@ref), under `gap_return_alg`. `nothing` is the default rule, and its method returns the table untouched, so the arithmetic step 11 produced is bit-identical. An algorithm may write only a non-finite cell inside a column's Listing Span that has an earlier observed price, which is what freezes every return computed from two observed prices, and it reports an `@info` when it finds no such cell.
-13. Split the surviving column names into the asset names `nx`, the factor names `nf`, the benchmark names `nb`, and the timestamp column, which gives `ts`.
-14. Index the implied volatilities `iv` by `ts`, then check `iv` and `ivpa` against the surviving asset count.
-15. Subselect the [`AssetPanel`](@ref). Read the surviving assets' positions `acols` in the original asset names, recover the surviving rows with [`feature_row_indices`](@ref), and view the panel with [`port_opt_view`](@ref), handing it the surviving asset names so that a square tensor Panel Field is cut on its label axis too. An asset dropped by steps 9 and 10 takes its Panel Field values with it, or the panel and the returns would desynchronise silently. A time-varying panel is subselected to the surviving observations as well, matched back into the original price timestamps; a surviving timestamp absent from that clock throws. Under `collapse_args` this gives the aggregated period the values of the row at its representative timestamp, which is last-observation semantics and matches [`LastObservation`](@ref).
-16. State the universe. Cut `span` to the price rows and the assets that survived with [`span_carrier_view`](@ref), and hand it and the converted returns to [`returns_universe_masks`](@ref), which projects it onto the returns clock and intersects it with finiteness. A carrier that states no span states no universe, and the conversion emits no panel. [`attach_universe_masks`](@ref) puts the pair onto the Asset Panel, keeping whatever Panel Fields it already carried, and mints one with no field when the carrier held none.
-17. Build the asset, factor and benchmark matrices from the surviving columns. A group whose columns all went is `nothing`.
-18. Return the [`ReturnsResult`](@ref).
+ 7. Replace every `missing` with `NaN`, so that the two conventions a source spells an absent price with become one: an outer join of per-asset series pads with `NaN`, and a wide table built from a tidy one leaves `missing`. This is the only unification, it runs unconditionally, and it is what makes the two ragged-history sources behave alike. It is also the last step that touches an absent price: every row and every column of the table reaches the conversion, whatever it holds.
+ 8. Convert the prices to returns with `TimeSeries.percentchange` under `ret_method` and `padding`. This is the step that applies the formula above. It computes both branches through logarithms — the log return is ``\\ln P_{t,i} - \\ln P_{t-1,i}``, and the simple return is `expm1` of it — so the two agree with the closed forms above to floating point rather than to the last bit. When `padding` is `true` the first observation is kept and its return is `NaN`, so the returns keep the length of the price clock. **A gap carried here does not spread.** The formula reads two prices, so a run of `k` gapped prices makes exactly the `k + 1` returns that read one of them non-finite, and every later return of that column is computed from two observed prices and is finite. A gap is confined to its own column for the same reason: no asset's return reads another's price.
+ 9. Resolve the cells the conversion left non-finite with [`apply_gap_return`](@ref), under `gap_return_alg`. `nothing` is the default rule, and its method returns the table untouched, so the arithmetic step 8 produced is bit-identical. An algorithm may write only a non-finite cell inside a column's Listing Span that has an earlier observed price, which is what freezes every return computed from two observed prices, and it reports an `@info` when it finds no such cell.
+10. Split the column names into the asset names `nx`, the factor names `nf`, the benchmark names `nb`, and the timestamp column, which gives `ts`.
+11. Index the implied volatilities `iv` by `ts`, then check `iv` and `ivpa` against the asset count.
+12. Subselect the [`AssetPanel`](@ref). Read the assets' positions `acols` in the original asset names, recover the surviving rows with [`feature_row_indices`](@ref), and view the panel with [`port_opt_view`](@ref), handing it the asset names so that a square tensor Panel Field is cut on its label axis too. The conversion removes no column, so `acols` is the whole asset axis and the subselection that bites is the observation one: a time-varying panel is cut to the surviving observations, matched back into the original price timestamps, and a surviving timestamp absent from that clock throws. Under `collapse_args` this gives the aggregated period the values of the row at its representative timestamp, which is last-observation semantics and matches [`LastObservation`](@ref).
+13. State the universe. Cut `span` to the price rows with [`span_carrier_view`](@ref), and hand it and the converted returns to [`returns_universe_masks`](@ref), which projects it onto the returns clock and intersects it with finiteness. A carrier that states no span states no universe, and the conversion emits no panel. [`attach_universe_masks`](@ref) puts the pair onto the Asset Panel, keeping whatever Panel Fields it already carried, and mints one with no field when the carrier held none.
+14. Build the asset, factor and benchmark matrices from the columns of each group. The asset group is always present, because the conversion removes no column; a factor or benchmark group given no column is `nothing`.
+15. Return the [`ReturnsResult`](@ref).
 
-Step 8 counts the missing columns of a row, and step 10 counts the missing rows of a column. The name of each keyword reads as the axis it counts, and the axis it drops is the other one. Both filters read the same table, because step 10 counts only over the rows that step 9 kept.
+**The conversion removes no observation and no asset.** Deleting either is a **Universe Policy**, and a policy is fitted on a training window and replayed by name, which a stateless conversion cannot do; [`MissingDataFilter`](@ref) owns it, with `col_thr` deleting an asset and `row_thr` an observation. ADR 0133 states the rule that a keyword survives here if and only if it changes the arithmetic of a return.
 
 # Arguments
 
@@ -1523,8 +1518,6 @@ Step 8 counts the missing columns of a row, and step 10 counts the missing rows 
   - `ret_method`: Return calculation method (`:simple` or `:log`).
   - `padding`: Whether to pad missing values in returns calculation.
   - `gap_return_alg`: What the observations a price gap left non-finite carry. `nothing` is the arithmetic — a return is the change between two consecutive observations, so a run of `k` gapped prices leaves `k + 1` non-finite returns and the move across the gap is recorded nowhere — and [`CatchUpGapReturn`](@ref) books that move on the observation the asset resumes trading instead, shortening the Held Gap to `k`. Any algorithm may write only a non-finite cell inside an asset's Listing Span that has an earlier observed price in its column, so a return computed from two observed prices is frozen whichever one is stated. It has no cell to write over a gap-free table, and reports an `@info` there.
-  - `missing_col_percent`: Maximum allowed fraction `(0, 1]` of missing **columns** in an observation row. A row above it is dropped. The name reads as the axis that is counted, not the axis that is dropped.
-  - `missing_row_percent`: Maximum allowed fraction `(0, 1]` of missing **rows** in a column, counted over the rows that `missing_col_percent` kept. A column above it is dropped. `nothing` keeps the columns whose missing count equals the mode of the counts instead, which is the shape of a panel whose assets share one history.
   - `collapse_args`: Arguments for collapsing the time series (e.g., to lower frequency).
   - `map_func`: Optional function to apply to the data before returns calculation.
   - `join_method`: How to join asset, factor data and benchmark data (`:outer`, `:inner`, etc.).
@@ -1535,8 +1528,6 @@ Step 8 counts the missing columns of a row, and step 10 counts the missing rows 
 
   - Every price reaching step 11 is positive. `TimeSeries.percentchange` takes a logarithm on both branches, so a negative price raises a `DomainError` from inside it, on the simple branch as well.
   - `!isempty(X)`.
-  - `0 < missing_col_percent <= 1`
-  - `0 < missing_row_percent <= 1`.
   - If `F` is not `nothing`, `!isempty(F)`.
   - If `B` is not `nothing`, `!isempty(B)`, and `size(values(B), 2) in (1, size(values(X), 2))`.
   - If `iv` is not `nothing`, the timestamps of the merged data matrix must be a subset of `TimeSeries.timestamp(iv)`, then `iv = values(iv)`, `!isempty(iv)`, `all(x -> x >= 0, iv)`, `all(x -> isfinite(x), iv)`, and `size(iv) == size(X)`.
@@ -1601,21 +1592,12 @@ function prices_to_returns(X::TimeSeries.TimeArray,
                            ivpa::Option{<:Num_VecNum} = nothing,
                            ret_method::Symbol = :simple, padding::Bool = false,
                            gap_return_alg::Option{<:AbstractGapReturnAlgorithm} = nothing,
-                           missing_col_percent::Number = 1.0,
-                           missing_row_percent::Option{<:Number} = 1.0,
                            collapse_args::Tuple = (),
                            map_func::Option{<:Function} = nothing,
                            join_method::Symbol = :outer,
                            pnl::Option{<:AssetPanel} = nothing,
                            span::Option{<:AbstractMatrix{Bool}} = nothing)
     @argcheck(!isempty(X), IsEmptyError)
-    @argcheck(zero(missing_col_percent) < missing_col_percent <= one(missing_col_percent),
-              DomainError)
-    if !isnothing(missing_row_percent)
-        @argcheck(zero(missing_row_percent) <
-                  missing_row_percent <=
-                  one(missing_row_percent), DomainError)
-    end
     asset_names = string.(TimeSeries.colnames(X))
     asset_ts = TimeSeries.timestamp(X)
     check_asset_panel(pnl, length(asset_names), length(asset_ts),
@@ -1650,19 +1632,6 @@ function prices_to_returns(X::TimeSeries.TimeArray,
                           2:DataFrames.DataAPI.ncol(X) .=>
                               DataFrames.ByRow((x) -> ifelse(ismissing(x), NaN, x));
                           renamecols = false)
-    missing_mtx = is_missing_value.(Matrix(X[!, 2:end]))
-    missings_cols = vec(count(missing_mtx; dims = 2))
-    keep_rows = missings_cols .<= (DataFrames.DataAPI.ncol(X) - 1) * missing_col_percent
-    X = X[keep_rows, :]
-    # Both filters read the same table: count the missing entries of a column over the rows
-    # that survived the row filter, never over the rows that filter already dropped.
-    missings_rows = vec(count(view(missing_mtx, keep_rows, :); dims = 1))
-    keep_cols = if !isnothing(missing_row_percent)
-        missings_rows .<= DataFrames.DataAPI.nrow(X) * missing_row_percent
-    else
-        missings_rows .== StatsBase.mode(missings_rows)
-    end
-    X = X[!, [true; keep_cols]]
     P = X
     X = TimeSeries.percentchange(TimeSeries.TimeArray(X; timestamp = :timestamp),
                                  ret_method; padding = padding)
@@ -1689,24 +1658,21 @@ function prices_to_returns(X::TimeSeries.TimeArray,
             @argcheck(length(ivpa) == size(iv, 2), DimensionMismatch)
         end
     end
+    #! The conversion removes no column, so the assets reach it in their original order and
+    #! `acols` is the whole asset axis. It is still read rather than assumed, because it is
+    #! what pairs a Panel Field and a span column with the asset they describe.
+    acols = Vector{Int}(indexin(nx, asset_names))
     if !isnothing(pnl)
-        @argcheck(!isempty(nx),
-                  IsEmptyError("every asset was dropped during the conversion, so the Asset Panel (pnl) has no asset axis left to bind to"))
-        acols = Vector{Int}(indexin(nx, asset_names))
         rows = feature_row_indices(pnl, ts, asset_ts)
         pnl = port_opt_view(pnl, rows, acols, asset_names)
     end
-    if !isempty(nx)
-        #! The span is on the price clock and the masks are on the returns clock, so the
-        #! span is cut to the price rows and assets that survived and universe_masks does
-        #! the crossing. Both padding conventions reach it, and it reads which from the
-        #! two row counts.
-        cols = Vector{Int}(indexin(nx, asset_names))
-        amsk, emsk = returns_universe_masks(span_carrier_view(span, P[!, :timestamp],
-                                                              asset_ts, cols),
-                                            Matrix(X[!, nx]))
-        pnl = attach_universe_masks(pnl, amsk, emsk)
-    end
+    #! The span is on the price clock and the masks are on the returns clock, so the span is
+    #! cut to the price rows the merge and the collapse left and universe_masks does the
+    #! crossing. Both padding conventions reach it, and it reads which from the two row
+    #! counts.
+    amsk, emsk = returns_universe_masks(span_carrier_view(span, P[!, :timestamp], asset_ts,
+                                                          acols), Matrix(X[!, nx]))
+    pnl = attach_universe_masks(pnl, amsk, emsk)
     if isempty(nf)
         nf = nothing
         F = nothing
@@ -1719,12 +1685,7 @@ function prices_to_returns(X::TimeSeries.TimeArray,
     else
         B = length(nb) == 1 ? X[!, nb[1]] : Matrix(X[!, nb])
     end
-    if isempty(nx)
-        nx = nothing
-        X = nothing
-    else
-        X = Matrix(X[!, nx])
-    end
+    X = Matrix(X[!, nx])
     return ReturnsResult(; ts = ts, nx = nx, X = X, nf = nf, F = F, nb = nb, B = B, iv = iv,
                          ivpa = ivpa, pnl = pnl)
 end
@@ -2273,7 +2234,7 @@ Preprocessing estimator converting price-level data into returns-level data.
 
 `PricesToReturns` is the estimator form of [`prices_to_returns`](@ref): it consumes a [`PricesResult`](@ref) and produces a [`ReturnsResult`](@ref). It is stateless — applying it to any window simply runs the conversion — so its fitted object is the estimator itself.
 
-Missing-data filtering is deliberately *not* part of this estimator (the corresponding [`prices_to_returns`](@ref) keywords are held at their permissive defaults); use [`MissingDataFilter`](@ref) and [`PriceGapFill`](@ref) as separate, independently tunable steps. Deleting an observation or an asset is a **Universe Policy**, and a policy is fitted on a training window and replayed by name; this step is stateless, so it holds none.
+Missing-data filtering is deliberately *not* part of this estimator, and [`prices_to_returns`](@ref) carries no keyword that would put it there; use [`MissingDataFilter`](@ref) and [`PriceGapFill`](@ref) as separate, independently tunable steps. Deleting an observation or an asset is a **Universe Policy**, and a policy is fitted on a training window and replayed by name; this step is stateless, so it holds none.
 
 The step is stateless, and it does not need to be stateful to fix an asset universe: the carrier states one. A [`PricesResult`](@ref) that [`price_ingestion`](@ref) built carries a **Listing Span**, and this step projects it onto the returns clock and hands the [`ReturnsResult`](@ref) an [`AssetPanel`](@ref) whose two masks say which assets are in the universe and which of them can be estimated at each observation. The asset axis is fixed before the split, so every window of every fold carries every asset and a window can no longer silently lose a column.
 
@@ -2288,7 +2249,7 @@ The estimator is stateless, so both verbs are thin.
  1. [`fit_preprocessing`](@ref) returns the estimator itself. There is no state to fit.
  2. [`apply_preprocessing`](@ref) calls [`prices_to_returns`](@ref) with the six fields as keywords, and with `X`, `F`, `B`, `iv`, `ivpa`, `pnl` and `span` read off the [`PricesResult`](@ref). It returns the [`ReturnsResult`](@ref).
 
-The two threshold keywords of [`prices_to_returns`](@ref) are not fields of this estimator, so they hold their permissive defaults and every row and column reaches the conversion. `gap_return_alg` *is* a field, because it decides what the observations a gap left non-finite carry, which is the arithmetic of a return rather than a policy about the universe.
+Every row and every column of the window reaches the conversion, because the conversion has no way to drop one. `gap_return_alg` is a field, because it decides what the observations a gap left non-finite carry, which is the arithmetic of a return rather than a policy about the universe.
 
 # Fields
 
@@ -2407,7 +2368,7 @@ Preprocessing estimator dropping assets and observations with excessive missing 
 
 The *asset universe is fitted state*: the training window decides which assets survive (per-column missing fraction at most `col_thr`), and applying the fitted result to an unseen window subsets it to that same universe — so train weights and test returns always refer to the same assets. Observation (row) filtering is window-local: rows whose missing fraction across the surviving assets exceeds `row_thr` are dropped from whichever window is being transformed.
 
-This estimator supersedes the `missing_col_percent`/`missing_row_percent` keywords of [`prices_to_returns`](@ref), making the thresholds fitted state and independently tunable. Only the asset series `X` (and the matching implied volatility columns, and the feature matrix, whose axes are parallel to `X`) participate; factor and benchmark series pass through unchanged.
+This estimator is the library's **only** missing-data filter: [`prices_to_returns`](@ref) removes no observation and no asset, because deleting either is a **Universe Policy** and a policy is fitted on a training window and replayed by name, which a stateless conversion cannot do (ADR 0133). Only the asset series `X` (and the matching implied volatility columns, and the feature matrix, whose axes are parallel to `X`) participate; factor and benchmark series pass through unchanged.
 
 # Algorithm
 
@@ -2442,10 +2403,12 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+Both thresholds admit zero, which is the tightest policy the estimator can state: `col_thr = 0` keeps the assets with no gap at all, and `row_thr = 0` keeps the observations with no gap at all.
+
 ## Validation
 
-  - `0 < col_thr <= 1`.
-  - `0 < row_thr <= 1`.
+  - `0 <= col_thr <= 1`.
+  - `0 <= row_thr <= 1`.
 
 # Examples
 
@@ -2471,16 +2434,16 @@ julia> res.nx
 """
 @concrete struct MissingDataFilter <: AbstractPricesPreprocessingEstimator
     """
-    Maximum allowed fraction `(0, 1]` of missing observations per asset column; assets above it are dropped from the universe at fit time.
+    Maximum allowed fraction `[0, 1]` of missing observations per asset column; assets above it are dropped from the universe at fit time. `0` tolerates no gap at all, and keeps the assets priced at every observation of the training window.
     """
     col_thr
     """
-    Maximum allowed fraction `(0, 1]` of missing assets per observation row; rows above it are dropped from the window being transformed.
+    Maximum allowed fraction `[0, 1]` of missing assets per observation row; rows above it are dropped from the window being transformed. `0` tolerates no gap at all, and keeps the observations at which every surviving asset is priced.
     """
     row_thr
     function MissingDataFilter(col_thr::Number, row_thr::Number)
-        @argcheck(zero(col_thr) < col_thr <= one(col_thr), DomainError)
-        @argcheck(zero(row_thr) < row_thr <= one(row_thr), DomainError)
+        @argcheck(zero(col_thr) <= col_thr <= one(col_thr), DomainError)
+        @argcheck(zero(row_thr) <= row_thr <= one(row_thr), DomainError)
         return new{typeof(col_thr), typeof(row_thr)}(col_thr, row_thr)
     end
 end
@@ -2510,7 +2473,7 @@ $(DocStringExtensions.FIELDS)
     """
     nx
     """
-    Maximum allowed fraction `(0, 1]` of missing assets per observation row.
+    Maximum allowed fraction `[0, 1]` of missing assets per observation row.
     """
     row_thr
 end

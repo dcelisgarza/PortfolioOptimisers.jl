@@ -45,9 +45,13 @@
     end
 
     @testset "MissingDataFilter" begin
-        @test_throws DomainError MissingDataFilter(; col_thr = 0.0)
+        # The domain is `[0, 1]`: zero is the tightest policy the estimator can state, and
+        # it is a spelling rather than an arithmetic accident (ADR 0133).
+        @test_throws DomainError MissingDataFilter(; col_thr = -0.1)
         @test_throws DomainError MissingDataFilter(; col_thr = 1.5)
-        @test_throws DomainError MissingDataFilter(; row_thr = 0.0)
+        @test_throws DomainError MissingDataFilter(; row_thr = -0.1)
+        @test_throws DomainError MissingDataFilter(; row_thr = 1.5)
+        @test MissingDataFilter(; col_thr = 0.0, row_thr = 0.0) isa MissingDataFilter
 
         X, ts = make_prices()
         vals = copy(values(X))
@@ -99,6 +103,116 @@
         fitted, ctx2 = PortfolioOptimisers.run_step(mdf, ctx)
         @test fitted isa MissingDataFilterResult
         @test TimeSeries.colnames(ctx2.prices.X) == [:A1, :A3, :A4]
+    end
+
+    @testset "MissingDataFilter at the zero threshold" begin
+        # Map #955, ADR 0133. `prices_to_returns` deletes nothing, so this estimator is the
+        # only filter there is, and `0.0` is the tightest policy it can state: no gap is
+        # tolerated. It is what `dropmissing!` used to do inside the conversion, said by
+        # name and split correctly across the fit/apply seam.
+        ts = collect(Date(2020, 1, 1):Day(1):Date(2020, 1, 6))
+        # `A1` is priced throughout; `A2` and `A5` are listed from observation 3; `A3` is
+        # suspended at observation 4; `A4` is delisted after observation 4. The two
+        # inceptions make the leading rows the gappiest, so a row threshold between them
+        # and the rest opens the window without touching the delisting.
+        vals = [10.0 NaN 30.0 40.0 NaN
+                11.0 NaN 31.0 41.0 NaN
+                12.0 20.0 32.0 42.0 50.0
+                13.0 21.0 NaN 43.0 51.0
+                14.0 22.0 34.0 NaN 52.0
+                15.0 23.0 35.0 NaN 53.0]
+        Xg = TimeArray(ts, vals, string.("A", 1:5))
+        pr = PricesResult(; X = Xg, span = listing_span(vals))
+
+        # `col_thr = 0.0` keeps the columns with no gap at all, and nothing else. Only `A1`
+        # is priced at every observation of the training window.
+        zc = PortfolioOptimisers.fit_preprocessing(MissingDataFilter(; col_thr = 0.0), pr)
+        @test zc.nx == [:A1]
+        # A column holding one gap in six is above zero, so the boundary is `count == 0`
+        # and not a small fraction: `A3` needs the threshold raised to its own fraction.
+        @test PortfolioOptimisers.fit_preprocessing(MissingDataFilter(; col_thr = 1 / 6),
+                                                    pr).nx == [:A1, :A3]
+
+        # `row_thr = 0.0` keeps the observations at which every surviving asset is priced.
+        # Over the whole universe that is observation 3 alone.
+        zr = PortfolioOptimisers.fit_preprocessing(MissingDataFilter(; col_thr = 1.0,
+                                                                     row_thr = 0.0), pr)
+        pv = PortfolioOptimisers.apply_preprocessing(zr, pr)
+        @test TimeSeries.timestamp(pv.X) == [ts[3]]
+        @test !any(PortfolioOptimisers.is_missing_value, values(pv.X))
+        # A row holding one gap in five is above zero, so the row boundary is `count == 0`
+        # too, and it takes `1/5` to admit one.
+        loose = PortfolioOptimisers.fit_preprocessing(MissingDataFilter(; col_thr = 1.0,
+                                                                        row_thr = 1 / 5),
+                                                      pr)
+        @test TimeSeries.timestamp(PortfolioOptimisers.apply_preprocessing(loose, pr).X) ==
+              ts[[3, 4, 5, 6]]
+
+        # A **column** drop leaves every row where it was, so the Span Rule reads the same
+        # `first` and `last` off the filtered panel as off the raw one for every asset the
+        # filter kept. This is the reading the ticket asked for, and it holds on the axis
+        # the fitted universe cuts.
+        raw = listing_span(vals)
+        conly = PortfolioOptimisers.fit_preprocessing(MissingDataFilter(; col_thr = 1 / 6,
+                                                                        row_thr = 1.0), pr)
+        cpr = PortfolioOptimisers.apply_preprocessing(conly, pr)
+        @test conly.nx == [:A1, :A3]
+        cut = listing_span(values(cpr.X))
+        cols = Vector{Int}(indexin(conly.nx, TimeSeries.colnames(pr.X)))
+        @test cut.first == raw.first[cols]
+        @test cut.last == raw.last[cols]
+
+        # A **row** drop does move an observation, so re-deriving the rule off the filtered
+        # panel is *not* the same reading — which is exactly why the estimator never
+        # re-derives. The span it hands on is the carrier's, viewed at the surviving rows
+        # and columns, so every surviving observation says of every kept asset what it said
+        # before the filter ran.
+        for thr in (0.0, 1 / 5, 2 / 5, 1.0)
+            res = PortfolioOptimisers.fit_preprocessing(MissingDataFilter(; col_thr = 1.0,
+                                                                          row_thr = thr),
+                                                        pr)
+            fpr = PortfolioOptimisers.apply_preprocessing(res, pr)
+            rows = Vector{Int}(indexin(TimeSeries.timestamp(fpr.X), ts))
+            @test fpr.span == view(pr.span, rows, 1:length(res.nx))
+        end
+
+        # And that is what keeps a delisting readable. At `row_thr = 1/5` the window opens
+        # at observation 3, and `A4`'s two trailing gaps are still outside its span.
+        f4 = PortfolioOptimisers.apply_preprocessing(loose, pr)
+        @test TimeSeries.timestamp(f4.X) == ts[[3, 4, 5, 6]]
+        @test f4.span[:, 4] == [true, true, false, false]
+        # The inception `A2` and `A5` carry is inside the surviving window on both
+        # readings, so nothing about them turns on the view here.
+        @test f4.span[:, 2] == [true, true, true, true]
+
+        # The case that proves a re-derivation would be wrong rather than merely different:
+        # a row drop can take away every priced observation an asset has inside its
+        # listing. `B2` is priced at observations 2 and 5 and suspended between them, and
+        # `row_thr = 0.0` keeps observations 3 and 4 alone. The carried span still reports
+        # it listed there -- a Held Gap -- where the rule read off the surviving prices
+        # would report an asset that was never listed at all.
+        ts2 = collect(Date(2020, 1, 1):Day(1):Date(2020, 1, 6))
+        v2 = [10.0 NaN
+              11.0 20.0
+              12.0 NaN
+              13.0 NaN
+              14.0 23.0
+              NaN NaN]
+        pr2 = PricesResult(; X = TimeArray(ts2, v2, ["B1", "B2"]), span = listing_span(v2))
+        # Observations 3 and 4 hold a gap in `B2` alone, so no row survives `row_thr = 0`;
+        # `1/2` keeps every row whose gap count is at most one, which is 1 through 5.
+        r2 = PortfolioOptimisers.fit_preprocessing(MissingDataFilter(; col_thr = 1.0,
+                                                                     row_thr = 1 / 2), pr2)
+        f2 = PortfolioOptimisers.apply_preprocessing(r2, pr2)
+        @test TimeSeries.timestamp(f2.X) == ts2[1:5]
+        # The carried span says B2 is listed from observation 2 to observation 5.
+        @test f2.span[:, 2] == [false, true, true, true, true]
+        # A re-derivation would agree here, because the priced observations survived. Now
+        # take them away: keep observations 3 and 4 by hand and compare the two readings.
+        kept_rows = [3, 4]
+        @test view(pr2.span, kept_rows, :)[:, 2] == [true, true]
+        rederived = listing_span(v2[kept_rows, :])
+        @test rederived.last[2] < rederived.first[2]
     end
 
     @testset "Imputer" begin

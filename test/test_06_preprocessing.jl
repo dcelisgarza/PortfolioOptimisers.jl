@@ -27,39 +27,47 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         Px = TimeArray(dfx; timestamp = :date)
 
         dfy = DataFrame(Fx, [:fx1, :fx2, :fx3, :fx4, :fx5])
-        dfy.all_missing = fill(NaN, nrow(dfy))
+        # Named apart from the asset table's gap column on purpose. The conversion splits
+        # the merged names by `intersect`, so a name shared by `X` and `F` lands in both
+        # `nx` and `nf` and the renamed duplicate the merge minted lands in neither. Issue
+        # #990; the released thresholds hid it by deleting both columns.
+        dfy.all_missing_f = fill(NaN, nrow(dfy))
         dfy[!, :date] = (today() - Day(100)):Day(1):today()
         Py = TimeArray(dfy; timestamp = :date)
 
-        rd = prices_to_returns(Px, Py; missing_col_percent = 0.1, missing_row_percent = 0.5)
+        # The `all_missing` column of each table used to be deleted by
+        # `missing_row_percent`, and the oracles below were recorded on the twenty assets
+        # and five factors that survived it. The conversion now deletes nothing, so the
+        # gap column arrives as a column of gaps and the oracle covers the columns beside
+        # it, bit for bit.
+        rd = prices_to_returns(Px, Py)
         ts1 = rd.ts
         X1 = rd.X
         F1 = rd.F
-        rd = prices_to_returns(Px, Py; missing_col_percent = 0.1,
-                               missing_row_percent = nothing)
-        ts2 = rd.ts
-        X2 = rd.X
-        F2 = rd.F
+        @test rd.nx[end] == "all_missing"
+        @test rd.nf[end] == "all_missing_f"
+        @test all(!isfinite, view(X1, :, 21))
+        @test all(!isfinite, view(F1, :, 6))
 
         df = CSV.read(joinpath(@__DIR__, "assets/prices_to_returns_X_F.csv.gz"), DataFrame)
-        @test hcat(vcat(X1, X2), vcat(F1, F2)) == Matrix(df)
+        # The oracle stacks the two settings the two calls used to differ in; they always
+        # agreed, so one call answers both halves.
+        oracle = Matrix(df)
+        @test oracle[1:100, :] == oracle[101:200, :]
+        @test hcat(view(X1, :, 1:20), view(F1, :, 1:5)) == view(oracle, 1:100, :)
 
-        rd = prices_to_returns(Px; missing_col_percent = 0.1, missing_row_percent = 0.5)
+        rd = prices_to_returns(Px)
         ts3 = rd.ts
         X3 = rd.X
-        F3 = rd.F
-        @test isnothing(F3)
-
-        rd = prices_to_returns(Px; missing_col_percent = 0.1, missing_row_percent = nothing)
-        ts4 = rd.ts
-        X4 = rd.X
-        F4 = rd.F
-        @test isnothing(F4)
+        @test isnothing(rd.F)
+        @test all(!isfinite, view(X3, :, 21))
 
         df = CSV.read(joinpath(@__DIR__, "assets/prices_to_returns_X.csv.gz"), DataFrame)
-        @test vcat(X3, X4) == Matrix(df)
+        oracle = Matrix(df)
+        @test oracle[1:100, :] == oracle[101:200, :]
+        @test view(X3, :, 1:20) == view(oracle, 1:100, :)
 
-        @test dfy[2:end, :date] == ts1 == ts2 == ts3 == ts4
+        @test dfy[2:end, :date] == ts1 == ts3
     end
 
     @testset "feature matrix through prices, returns and views" begin
@@ -250,21 +258,18 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
             @test panel_feature_matrix(kept.pnl)[2] == Zs
             @test all(!isfinite, view(kept.X, :, 2))
 
-            # A threshold is what drops an asset, and a dropped asset must take its features
-            # with it or the two matrices desynchronise silently. "B" is missing in all ten
-            # rows, so it goes when the tolerated fraction falls below one.
-            rrs = prices_to_returns(Px; pnl = matrix_panel(nz, Zs),
-                                    missing_row_percent = 0.5)
-            @test rrs.nx == ["A", "C"]
-            @test panel_feature_matrix(rrs.pnl)[2] == Zs[[1, 3], :]
+            # The static shape keeps its whole asset axis, because no keyword can cut one:
+            # the conversion has nothing that drops a column.
+            rrs = prices_to_returns(Px; pnl = matrix_panel(nz, Zs))
+            @test rrs.nx == ["A", "B", "C"]
+            @test panel_feature_matrix(rrs.pnl)[2] == Zs
             @test panel_feature_matrix(rrs.pnl)[1] == nz
 
-            # The time-varying shape drops the same asset AND the observation lost to the
-            # percentage change, so rows 2:10 and assets 1 and 3 survive.
-            rr3 = prices_to_returns(Px; pnl = matrix_panel(nz, Z3),
-                                    missing_row_percent = 0.5)
-            @test size(panel_feature_matrix(rr3.pnl)[2]) == (9, 2, 2)
-            @test panel_feature_matrix(rr3.pnl)[2] == Z3[2:10, [1, 3], :]
+            # The observation axis is the one the conversion does cut, and it cuts it by
+            # exactly the observation the percentage change costs: rows 2:10, every asset.
+            rr3 = prices_to_returns(Px; pnl = matrix_panel(nz, Z3))
+            @test size(panel_feature_matrix(rr3.pnl)[2]) == (9, 3, 2)
+            @test panel_feature_matrix(rr3.pnl)[2] == Z3[2:10, :, :]
             @test length(rr3.ts) ==
                   size(panel_feature_matrix(rr3.pnl)[2], 1) ==
                   size(rr3.X, 1)
@@ -272,22 +277,25 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
             # Under collapse_args the aggregated period takes the features of the row at its
             # representative timestamp -- last-observation semantics.
             rc = prices_to_returns(Px; pnl = matrix_panel(nz, Z3),
-                                   missing_row_percent = 0.5, collapse_args = (week, last))
+                                   collapse_args = (week, last))
             @test rc.ts == [Date(2020, 1, 10)]
-            @test panel_feature_matrix(rc.pnl)[2] == Z3[[10], [1, 3], :]
+            @test panel_feature_matrix(rc.pnl)[2] == Z3[[10], :, :]
 
-            # Dropping every asset leaves Z with nothing to bind to. Reachable only when
-            # something else survives the conversion -- all-missing prices with no factors
-            # already die earlier, inside the TimeArray reconstruction, with or without Z.
+            # A table that is a gap throughout is still a universe: every asset keeps its
+            # column, its features and its place, and every return is non-finite. Nothing
+            # is left with nothing to bind to, which is why the conversion no longer
+            # carries a refusal for an emptied asset axis.
             Pall = TimeArray(collect(ts0), fill(NaN, 10, 3), ["A", "B", "C"])
             Fok = TimeArray(collect(ts0),
                             100 .+ cumsum(rand(StableRNG(7), 10, 2); dims = 1),
                             ["F1", "F2"])
-            @test_throws PortfolioOptimisers.IsEmptyError prices_to_returns(Pall, Fok;
-                                                                            pnl = matrix_panel(nz,
-                                                                                               Zs),
-                                                                            missing_row_percent = 0.5)
-            @test_throws ArgumentError prices_to_returns(Pall; missing_row_percent = 0.5)
+            rall = prices_to_returns(Pall, Fok; pnl = matrix_panel(nz, Zs))
+            @test rall.nx == ["A", "B", "C"]
+            @test all(!isfinite, rall.X)
+            @test panel_feature_matrix(rall.pnl)[2] == Zs
+            rnof = prices_to_returns(Pall)
+            @test rnof.nx == ["A", "B", "C"]
+            @test all(!isfinite, rnof.X)
 
             # A surviving timestamp absent from the price clock cannot be mapped back to a
             # row of Z, and must throw rather than pair assets with another period.
@@ -413,14 +421,15 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         @test prices_to_returns(zero_px).X[:, 1] == [-1.0, Inf]
         @test prices_to_returns(zero_px; ret_method = :log).X[:, 1] == [-Inf, Inf]
 
-        # Every asset column can go while a factor column survives. The result then carries
-        # no asset data at all, rather than an empty matrix.
+        # An asset that is a gap for most of the window keeps its column beside a factor
+        # that is not, and the result carries both. The asset group is never `nothing`,
+        # because the conversion removes no column.
         ts5 = collect(Date(2020, 1, 1):Day(1):Date(2020, 1, 5))
         Pa = TimeArray(ts5, reshape([100.0, NaN, NaN, NaN, 104.0], 5, 1), [:a])
         Pf = TimeArray(ts5, reshape(Float64.(101:105), 5, 1), [:f1])
-        rdrop = prices_to_returns(Pa, Pf; missing_row_percent = 0.3)
-        @test isnothing(rdrop.nx)
-        @test isnothing(rdrop.X)
+        rdrop = prices_to_returns(Pa, Pf)
+        @test rdrop.nx == ["a"]
+        @test findall(!isfinite, view(rdrop.X, :, 1)) == [1, 2, 3, 4]
         @test rdrop.nf == ["f1"]
     end
 
@@ -564,38 +573,39 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         @test_throws PortfolioOptimisers.IsEmptyError apply_preprocessing(fitted, other)
     end
 
-    @testset "the column filter of prices_to_returns reads the surviving rows" begin
-        # Issue #473. The column filter used to count the missing entries over the table as
-        # it was before the row filter ran, and to divide that count by the surviving row
-        # total. A column was then dropped for missing entries that sat only in rows that
-        # were already gone.
+    @testset "prices_to_returns filters neither axis" begin
+        # Issue #473 was a defect in the interaction of the conversion's two threshold
+        # keywords: the column filter counted the missing entries over the table as it was
+        # before the row filter ran, and divided by the surviving row total. Map #955 and
+        # ADR 0133 removed both keywords rather than the arithmetic -- deleting a row or a
+        # column is a Universe Policy, and a stateless conversion cannot fit one -- so the
+        # interaction the defect lived in no longer exists. `MissingDataFilter` owns both
+        # axes, and `test_31` covers the split across its fit/apply seam.
         ts4 = collect(Date(2020, 1, 1):Day(1):Date(2020, 1, 4))
         # Row 1 alone is incomplete. `A` and `B` are missing there, and `C` is complete.
         X = TimeArray(ts4, [NaN NaN 1.0; 2.0 2.0 2.0; 3.0 3.0 3.0; 4.0 4.0 4.0],
                       [:A, :B, :C])
+        rd473 = prices_to_returns(X)
+        @test rd473.nx == ["A", "B", "C"]
+        @test rd473.ts == ts4[2:end]
+        @test findall(!isfinite, view(rd473.X, :, 1)) == [1]
 
-        # `missing_col_percent = 1.0` admits row 1, so every column keeps its one missing
-        # entry and the threshold of `0.3 * 4` rows admits it.
-        @test prices_to_returns(X; missing_col_percent = 1.0, missing_row_percent = 0.3).nx ==
-              ["A", "B", "C"]
-        # `missing_col_percent = 0.5` drops row 1. `A` and `B` then hold no missing entry at
-        # all, so tightening the row filter must not cost a column.
-        @test prices_to_returns(X; missing_col_percent = 0.5, missing_row_percent = 0.3).nx ==
-              ["A", "B", "C"]
+        # There is no keyword left that would cut either axis, on the verb or the estimator.
+        @test_throws MethodError prices_to_returns(X; missing_col_percent = 0.5)
+        @test_throws MethodError prices_to_returns(X; missing_row_percent = 0.3)
+        @test_throws MethodError prices_to_returns(X; missing_row_percent = nothing)
+        @test :missing_col_percent ∉ fieldnames(PricesToReturns)
+        @test :missing_row_percent ∉ fieldnames(PricesToReturns)
 
-        # The column filter still drops a column whose missing entries survive the row
-        # filter. `A` is missing in rows 1, 2 and 3, and only row 1 goes.
+        # A column that is a gap over most of the window is kept whole, where the released
+        # thresholds would have deleted it.
         ts5 = collect(Date(2020, 1, 1):Day(1):Date(2020, 1, 5))
         Y = TimeArray(ts5, [NaN NaN 1.0; NaN 2.0 2.0; NaN 3.0 3.0; 4.0 4.0 4.0
                             5.0 5.0 5.0], [:A, :B, :C])
-        # Four rows survive, so the threshold is `0.2 * 4 = 0.8`. `A` holds two missing
-        # entries over those rows and goes; `B`'s one missing entry went with row 1.
-        @test prices_to_returns(Y; missing_col_percent = 0.5, missing_row_percent = 0.2).nx ==
-              ["B", "C"]
-        # The `nothing` branch reads the same counts. Over the surviving rows they are
-        # `[2, 0, 0]`, so the mode is `0` and the same two columns survive.
-        @test prices_to_returns(Y; missing_col_percent = 0.5,
-                                missing_row_percent = nothing).nx == ["B", "C"]
+        rdY = prices_to_returns(Y)
+        @test rdY.nx == ["A", "B", "C"]
+        @test size(rdY.X) == (4, 3)
+        @test findall(!isfinite, view(rdY.X, :, 1)) == [1, 2, 3]
     end
 
     @testset "the conversion carries every gap, and there is no flag" begin
@@ -640,10 +650,12 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         @test dead.nx == ["A", "B"]
         @test all(!isfinite, view(dead.X, :, 2))
 
-        # Deleting is still expressible, and it is the thresholds' job rather than the
-        # conversion's own: `B` holds two gaps over six rows and goes when the fraction is
-        # tightened. Both conventions are counted, because `is_missing_value` reads both.
-        @test prices_to_returns(Z; missing_row_percent = 0.1).nx == ["A"]
+        # Deleting is still expressible, and it is a fitted step's job rather than the
+        # conversion's own: `B` and `C` each hold two gaps over six rows and go when
+        # `MissingDataFilter`'s tolerated fraction is tightened below a third.
+        mdfZ = PortfolioOptimisers.fit_preprocessing(MissingDataFilter(; col_thr = 0.1),
+                                                     PricesResult(; X = Z))
+        @test mdfZ.nx == [:A]
 
         # The estimator runs the same path, and carries no flag to change it.
         pr6 = PricesResult(; X = Z)

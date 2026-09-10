@@ -67,12 +67,12 @@ Xmiss = TimeArray(ts, vals, Symbol.(nx))
 ## 2. Diagnose the missingness
 
 Before deciding what to carry, fill or drop, measure it. The per-column and per-row missing
-fractions are the quantities the two threshold keywords of [`prices_to_returns`](@ref) count.
+fractions are the quantities [`MissingDataFilter`](@ref)'s two thresholds count.
 
-Their names read as the axis that is *counted*, not the axis that is dropped:
-`missing_row_percent` counts the missing **rows** of a column and drops the column;
-`missing_col_percent` counts the missing **columns** of a row and drops the row. Both default to
-`1.0`, so nothing is dropped unless you ask.
+Their names read as the axis that is *counted*, not the axis that is dropped: `col_thr` counts the
+missing rows of a column and drops the column, and `row_thr` counts the missing columns of a row
+and drops the row. Both default to `1.0`, so nothing is dropped unless you ask, and both admit
+`0.0`, which tolerates no gap at all. The conversion itself drops neither axis.
 =#
 
 col_missing = vec(mean(ismissing, vals; dims = 1))
@@ -151,14 +151,16 @@ pretty_table(DataFrame(; table = ["carried", "filled with the Held Price"],
 ## 6. Drop what is too sparse to trust
 
 Asset 3 is missing ~64% of the window. Carrying it costs nothing — it simply never enters a
-cross-section it cannot be estimated in — but a caller who wants it gone entirely says so with a
-threshold. In a walk-forward, reach for [`MissingDataFilter`](@ref) instead: it records the
-surviving names on the training window and replays them, so the universe is not re-chosen with
-each window's own hindsight.
+cross-section it cannot be estimated in — but a caller who wants it gone entirely says so with
+[`MissingDataFilter`](@ref), and only with it: the conversion deletes no asset and no observation,
+because deleting either is a **Universe Policy** and a policy is fitted on a training window and
+replayed by name. That is exactly what this step does — it records the surviving names on the
+training window and replays them — so the universe is not re-chosen with each window's own
+hindsight.
 =#
 
-rd_dropped = prices_to_returns(Xmiss; missing_row_percent = 0.5)
-println("Assets kept after the 50% column filter: $(length(rd_dropped.nx)) of $N")
+mdf = fit_preprocessing(MissingDataFilter(; col_thr = 0.5), pr)
+println("Assets kept after the 50% column filter: $(length(mdf.nx)) of $N")
 
 #=
 ## 7. Straight into the pipeline
@@ -210,14 +212,16 @@ The ingestion layer is the single entry point for cleaning price data:
   - [`prices_to_returns`](@ref) computes returns and carries every gap, handing back an
     [`AssetPanel`](@ref) that states which assets are estimable when.
   - [`PriceGapFill`](@ref) states a price convention across a **Held Gap**, bounded by the span;
-    [`MissingDataFilter`](@ref) and the two threshold keywords delete what is too sparse to trust.
-    Both are fitted on a training window and replayed, because a universe chosen with hindsight is
-    a look-ahead.
+    [`MissingDataFilter`](@ref) deletes what is too sparse to trust, and it is the only thing that
+    deletes anything. Both are fitted on a training window and replayed, because a universe chosen
+    with hindsight is a look-ahead.
 =#
 
 #=
 !!! note "ADR 0133"
-    `nan_to_missing` and `impute_method` used to live on `prices_to_returns`, and the default
-    deleted every observation row holding a gap. ADR 0133 removed both: a keyword survives on the
-    conversion if and only if it changes the arithmetic of a return.
+    `nan_to_missing`, `impute_method`, `missing_col_percent` and `missing_row_percent` used to live
+    on `prices_to_returns`, and the default deleted every observation row holding a gap. ADR 0133
+    removed all four: a keyword survives on the conversion if and only if it changes the arithmetic
+    of a return. Filling is [`PriceGapFill`](@ref)'s and deleting is [`MissingDataFilter`](@ref)'s,
+    whose thresholds admit `0.0` for *no gap is tolerated*.
 =#

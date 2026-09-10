@@ -25,7 +25,7 @@ Mark a topic covered (✅) only when all of the following hold:
 | Status | Topic | File |
 | ------ | ----- | ---- |
 | ✅ | Getting started — `prices_to_returns`, `ReturnsResult`, basic `MeanRisk` solve | `examples/1_foundations/01_Getting_Started.jl` |
-| ✅ | Data preprocessing and imputation — `missing_col_percent`, `missing_row_percent`, `Impute.jl` imputors (`LOCF`, `Interpolate`), handling stale prices and gaps before `prices_to_returns` | `examples/1_foundations/02_Data_Preprocessing.jl` |
+| ✅ | Data preprocessing — `price_ingestion`, the Listing Span, `PriceGapFill`, `MissingDataFilter`, handling stale prices and gaps around `prices_to_returns` | `examples/1_foundations/02_Data_Preprocessing.jl` |
 | ✅ | Asset selection — `ScoreSelector` with `ThresholdRule`/`RankRule`/`QuantileRule`, `ZeroVarianceFilter`, `CompleteAssetSelector`, `RedundancySelector` with `PairwiseCorrelation` vs `CorrelationComponents` vs `ClusterGroups`, the universe as fitted state, step-order invalidation, tuning `best` as a hyperparameter, the trust-neither tie policy | `examples/1_foundations/03_Asset_Selection.jl` |
 
 ## 2. Moments and priors

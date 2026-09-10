@@ -135,6 +135,17 @@ Its two thresholds are widened from `(0, 1]` to `[0, 1]`, so that `row_thr = 0.0
 `col_thr = 0.0` spell *no gap is tolerated*. Under the released domain the nearest spelling is
 `row_thr = 1e-6`, which expresses the intent by arithmetic accident rather than by saying it.
 
+**`missing_row_percent = nothing` is dropped, and `MissingDataFilter` does not gain it.** That mode
+kept the columns whose missing count equals `StatsBase.mode` of the counts, and it is the one
+capability this ADR removes rather than rehouses. It states no threshold: it reads the panel's modal
+history shape and keeps the assets that match it, so on a panel where most assets carry three gaps
+it drops the asset with none — a complete history discarded for being atypical, which is the
+opposite of what every other filter here does. Its genuine use was an inception cut on a panel whose
+assets share one history and whose latecomers pad with `missing`; the modal count there is zero, and
+`col_thr = 0.0` says exactly that by naming the condition instead of inferring it. And under the
+ingestion layer *not enough history* is answered per window by the Coverage Universe (ADR 0130), a
+question a panel-wide modal selector cannot be asked at all.
+
 ### Filling is `PriceGapFill`, and `impute_method` goes with the flag
 
 ADR 0130 fixed the layer's one fill: `PriceGapFill`, off by default, bounded by the Listing Span so
