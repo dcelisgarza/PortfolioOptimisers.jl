@@ -118,7 +118,10 @@ end
 ## Numeric types come from the data
 
 A numeric type is **derived**, never **coerced**. Read it off the arguments with `eltype`,
-`typeof`, `real` and `promote_type`, and let the arithmetic widen it.
+`typeof`, `real` and `promote_type`, and let the arithmetic widen it. The library must stay open to
+number types it has never seen — an automatic-differentiation dual, a unit-carrying quantity, an
+arbitrary-precision float — because each one arrives through a caller's array and never through a
+change here. Every forced type closes the library to one of them.
 
 ```julia
 Tf = eltype(X)                                  # the element type of one argument

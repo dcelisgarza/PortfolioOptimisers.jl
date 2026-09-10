@@ -89,6 +89,14 @@ before you merge so you lower the number that is current.
   a partial-fit state is a Result that no consumer reads, so an estimator may hold one in a field
   bound to `Union{Nothing, <:AbstractPartialFitState}`. That bound is the enforcement, and it still
   refuses every other Result.
+- **A numeric type is derived, never coerced.** Read it off the arguments with `eltype`, `typeof`,
+  `real` and `promote_type`, or off the operation that widens it, and take an index with the
+  in-function conversion `ceil(Int, x)` rather than `Int(ceil(x))`. Never wrap a derived type in
+  `float`. The library must stay open to number types it has never seen — an AD dual, a unit-carrying
+  quantity, a `Rational`, a number type another package defines — and every forced type closes it to
+  one of them. [`.github/instructions/julia-source-code.instructions.md`](.github/instructions/julia-source-code.instructions.md)
+  § *Numeric types come from the data* owns the rule, and
+  `test/test_55_numeric_coercion_census.jl` gates it.
 - **Prefer a per-type method over a new dependency** for reflection-style work. Derive the field
   list, write the constructor name once per type, and use the ordinary keyword constructor.
 - Docstring field text is centralised in `field_dict` / `arg_dict` in
