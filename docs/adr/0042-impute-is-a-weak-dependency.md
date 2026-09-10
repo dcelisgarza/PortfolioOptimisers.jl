@@ -76,3 +76,29 @@ The dispatch check the annotation used to perform moves into a fallback method t
 `src/03_Preprocessing.jl` is now `src/03_InputData/03_Preprocessing.jl`. ADR 0104 moved the four
 `03_` files of `src/` into a directory of their own, and changed no line of any of them. The link
 in the Context section above is retained as it was written at the time of the decision.
+
+## Amendment (2026-09-10): the seam and the weak dependency are deleted
+
+[ADR 0133](0133-the-conversion-computes-a-return-and-ingestion-is-the-only-door.md) deletes
+`impute_method` from `prices_to_returns`: a keyword survives on the conversion if and only if it
+changes the arithmetic of a return, and an unfitted, unbounded fill does not. ADR 0130 had already
+fixed the ingestion layer's one fill as `PriceGapFill`, span-bounded and fitted on a training
+window.
+
+`apply_impute_method` exists to serve that keyword and nothing else. Censused on the branch that
+removed it, `prices_to_returns` was its only caller in `src/`, and the extension supplied its only
+other method. So the seam, `ext/PortfolioOptimisersImputeExt.jl`, the `[weakdeps]` and
+`[extensions]` entries, the `Impute` `[compat]` bound and the `Impute` entry of `docs/Project.toml`
+are all deleted. What would have remained is a public wrapper over one line of `Impute` that
+nothing in the library calls, and a caller who wants an imputor can apply it to their own price
+table before handing it to `price_ingestion`.
+
+The decision this ADR records was correct for the releases that carried it, and the shape it
+prescribes — a named seam in the main module with an informative fallback, rather than a type
+annotation on a keyword — still governs the next optional integration. `PortfolioOptimisersPlotsExt`
+is now the only extension, and it follows the same shape.
+
+The `HTTP` measurement in the Context section is why the deletion is worth recording rather than
+merely doing: with `Impute` gone from `docs/Project.toml` the docs environment no longer carries
+`DataDeps` on this account, though `GR` and `YFinance` still cap `HTTP` at `1` there, so the docs
+pin is unchanged and remains a separate problem.

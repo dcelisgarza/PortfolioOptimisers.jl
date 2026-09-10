@@ -27,9 +27,9 @@ using Pkg, TOML
 # The load set, loaded before anything measures. `report_package`'s number moves with it: 315
 # reports with the package alone and 312 once the three extension triggers load (issue #337), so
 # the baseline pins the set and the script asserts it.
-const LOAD_SET = ["GraphRecipes", "Impute", "StatsPlots"]
+const LOAD_SET = ["GraphRecipes", "StatsPlots"]
 
-using GraphRecipes, Impute, StatsPlots
+using GraphRecipes, StatsPlots
 using PortfolioOptimisers
 using JET
 
@@ -155,8 +155,7 @@ end
 
 # --- measurement -----------------------------------------------------------
 
-const RUNS = ("main" => :package, "plots_ext" => :PortfolioOptimisersPlotsExt,
-              "impute_ext" => :PortfolioOptimisersImputeExt)
+const RUNS = ("main" => :package, "plots_ext" => :PortfolioOptimisersPlotsExt)
 
 function target_module(name::Symbol)
     m = Base.get_extension(PortfolioOptimisers, name)

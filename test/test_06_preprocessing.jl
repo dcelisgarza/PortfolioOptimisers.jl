@@ -62,40 +62,6 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         @test dfy[2:end, :date] == ts1 == ts2 == ts3 == ts4
     end
 
-    @testset "impute_method without Impute loaded" begin
-        # `Impute` is a weak dependency (ADR 0042) and is deliberately absent from the test
-        # environment, so this testset exercises the not-loaded half of the seam.
-        @test isnothing(Base.get_extension(PortfolioOptimisers,
-                                           :PortfolioOptimisersImputeExt))
-
-        rng = StableRNG(123456789)
-        dfx = DataFrame(rand(rng, 21, 4), :auto)
-        dfx[!, :date] = (today() - Day(20)):Day(1):today()
-        Px = TimeArray(dfx; timestamp = :date)
-
-        # The default path must not need `Impute`, whether the keyword is omitted or given
-        # explicitly as `nothing`.
-        rd = prices_to_returns(Px)
-        @test prices_to_returns(Px; impute_method = nothing).X == rd.X
-        @test PortfolioOptimisers.apply_impute_method(dfx, nothing) === dfx
-
-        # Anything else is an ArgumentError naming both the missing `using Impute` and the
-        # unrelated `Imputer` estimator the name collides with.
-        for bad in (Imputer(), :LOCF, "LOCF")
-            err = try
-                prices_to_returns(Px; impute_method = bad)
-                nothing
-            catch e
-                e
-            end
-            @test isa(err, ArgumentError)
-            @test occursin("using Impute", err.msg)
-            @test occursin("`Impute` is not loaded", err.msg)
-            @test occursin("Imputer", err.msg)
-        end
-        @test_throws ArgumentError PortfolioOptimisers.apply_impute_method(dfx, Imputer())
-    end
-
     @testset "feature matrix through prices, returns and views" begin
         # The carried feature matrix is canonically assets-major: `assets × features` when
         # static, `observations × assets × features` when time-varying. `port_opt_view` has
@@ -277,16 +243,26 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
             prs = PricesResult(; X = Px, pnl = matrix_panel(nz, Zs))
             pr3 = PricesResult(; X = Px, pnl = matrix_panel(nz, Z3))
 
-            # Asset "B" is entirely missing and is dropped; it must take its features with
-            # it, or the two matrices desynchronise silently.
-            rrs = prices_to_returns(PricesToReturns(), prs)
+            # The conversion itself deletes nothing (ADR 0133), so asset "B" keeps its
+            # column and its features even though it is missing throughout.
+            kept = prices_to_returns(PricesToReturns(), prs)
+            @test kept.nx == ["A", "B", "C"]
+            @test panel_feature_matrix(kept.pnl)[2] == Zs
+            @test all(!isfinite, view(kept.X, :, 2))
+
+            # A threshold is what drops an asset, and a dropped asset must take its features
+            # with it or the two matrices desynchronise silently. "B" is missing in all ten
+            # rows, so it goes when the tolerated fraction falls below one.
+            rrs = prices_to_returns(Px; pnl = matrix_panel(nz, Zs),
+                                    missing_row_percent = 0.5)
             @test rrs.nx == ["A", "C"]
             @test panel_feature_matrix(rrs.pnl)[2] == Zs[[1, 3], :]
             @test panel_feature_matrix(rrs.pnl)[1] == nz
 
             # The time-varying shape drops the same asset AND the observation lost to the
             # percentage change, so rows 2:10 and assets 1 and 3 survive.
-            rr3 = prices_to_returns(PricesToReturns(), pr3)
+            rr3 = prices_to_returns(Px; pnl = matrix_panel(nz, Z3),
+                                    missing_row_percent = 0.5)
             @test size(panel_feature_matrix(rr3.pnl)[2]) == (9, 2, 2)
             @test panel_feature_matrix(rr3.pnl)[2] == Z3[2:10, [1, 3], :]
             @test length(rr3.ts) ==
@@ -295,7 +271,8 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
 
             # Under collapse_args the aggregated period takes the features of the row at its
             # representative timestamp -- last-observation semantics.
-            rc = prices_to_returns(PricesToReturns(; collapse_args = (week, last)), pr3)
+            rc = prices_to_returns(Px; pnl = matrix_panel(nz, Z3),
+                                   missing_row_percent = 0.5, collapse_args = (week, last))
             @test rc.ts == [Date(2020, 1, 10)]
             @test panel_feature_matrix(rc.pnl)[2] == Z3[[10], [1, 3], :]
 
@@ -308,8 +285,9 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
                             ["F1", "F2"])
             @test_throws PortfolioOptimisers.IsEmptyError prices_to_returns(Pall, Fok;
                                                                             pnl = matrix_panel(nz,
-                                                                                               Zs))
-            @test_throws ArgumentError prices_to_returns(Pall)
+                                                                                               Zs),
+                                                                            missing_row_percent = 0.5)
+            @test_throws ArgumentError prices_to_returns(Pall; missing_row_percent = 0.5)
 
             # A surviving timestamp absent from the price clock cannot be mapped back to a
             # row of Z, and must throw rather than pair assets with another period.
@@ -406,13 +384,14 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         @test all(isnan, rp.X[1, :])
         @test rp.X[2:3, :] ≈ simple
 
-        # A `NaN` price becomes `missing`, and its row is dropped before the conversion. The
-        # surviving returns therefore span the gap: the 01-03 return is measured against
-        # 01-01, not against the row that went.
+        # A `NaN` price is carried, not deleted. The clock keeps its row, and the two
+        # returns of `a` that read the absent price are the ones left non-finite: nothing
+        # spans the gap, because a return is the change between two consecutive observations.
         Pm = TimeArray(ts, [100.0 50.0; NaN 45.0; 121.0 54.0], [:a, :b])
         rm = prices_to_returns(Pm)
-        @test rm.ts == [ts[3]]
-        @test rm.X ≈ [121/100-1 54/50-1]
+        @test rm.ts == ts[2:3]
+        @test all(!isfinite, view(rm.X, :, 1))
+        @test rm.X[:, 2] ≈ [45 / 50 - 1, 54 / 45 - 1]
 
         # `map_func` is applied to every row of the merged table, before the collapse. A
         # common scale factor leaves a return unchanged; a shift does not.
@@ -619,10 +598,11 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
                                 missing_row_percent = nothing).nx == ["B", "C"]
     end
 
-    @testset "nan_to_missing carries a gapped price into a gapped return" begin
-        # Map #955. A `NaN` price is an absent price, and reading it as `missing` hands it to
-        # the deletion steps: the observation goes, or the asset does. `nan_to_missing =
-        # false` carries it to the returns instead, where the library already holds a gap.
+    @testset "the conversion carries every gap, and there is no flag" begin
+        # Map #955, ADR 0133. An absent price has one spelling, `NaN`, and the conversion
+        # carries it into the returns: it deletes no observation and no asset. There is no
+        # keyword that says otherwise, which is what makes the gap-carrying path the only
+        # path.
         ts6 = collect(Date(2020, 1, 1):Day(1):Date(2020, 1, 6))
         # `A` is priced throughout, `B` has no price until observation 3, `C` loses its
         # price at observation 5.
@@ -630,17 +610,18 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
                       [10.0 NaN 30.0; 11.0 NaN 31.0; 12.0 20.0 32.0
                        13.0 21.0 33.0; 14.0 22.0 NaN; 15.0 23.0 NaN], [:A, :B, :C])
 
-        # The default deletes: every row holding a gap goes, and four of the five returns
-        # with it.
-        kept = prices_to_returns(Z)
-        @test kept.nx == ["A", "B", "C"]
-        @test size(kept.X) == (1, 3)
-        @test all(isfinite, kept.X)
-
-        # Carrying keeps the whole clock and the whole universe.
-        got = prices_to_returns(Z; nan_to_missing = false)
+        # The whole clock and the whole universe survive, with no keyword given.
+        got = prices_to_returns(Z)
         @test got.nx == ["A", "B", "C"]
         @test size(got.X) == (5, 3)
+
+        # There is no flag: the field is gone from the estimator, and the keyword from the
+        # verb.
+        @test :nan_to_missing ∉ fieldnames(PricesToReturns)
+        @test_throws MethodError prices_to_returns(Z; nan_to_missing = false)
+        @test_throws MethodError PricesToReturns(; nan_to_missing = false)
+        @test :impute_method ∉ fieldnames(PricesToReturns)
+        @test_throws MethodError prices_to_returns(Z; impute_method = nothing)
 
         # The gap does not spread. A run of `k` gapped prices makes exactly the `k + 1`
         # returns that read one of them, and every later return of that column is finite.
@@ -655,43 +636,34 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         # vanishing from it, which is what moves the universe between windows.
         Zdead = TimeArray(ts6, [10.0 NaN; 11.0 NaN; 12.0 NaN; 13.0 NaN; 14.0 NaN; 15.0 NaN],
                           [:A, :B])
-        @test prices_to_returns(Zdead).nx == ["A"]
-        dead = prices_to_returns(Zdead; nan_to_missing = false)
+        dead = prices_to_returns(Zdead)
         @test dead.nx == ["A", "B"]
         @test all(!isfinite, view(dead.X, :, 2))
 
-        # Both thresholds read either convention, so they mean the same thing under either
-        # setting: `B` holds two gaps over six rows and goes when the fraction is tightened.
-        @test prices_to_returns(Z; nan_to_missing = false, missing_row_percent = 0.1).nx ==
-              ["A"]
+        # Deleting is still expressible, and it is the thresholds' job rather than the
+        # conversion's own: `B` holds two gaps over six rows and goes when the fraction is
+        # tightened. Both conventions are counted, because `is_missing_value` reads both.
+        @test prices_to_returns(Z; missing_row_percent = 0.1).nx == ["A"]
 
-        # The estimator carries the flag, and its default is the deleting one.
-        @test PricesToReturns().nan_to_missing
+        # The estimator runs the same path, and carries no flag to change it.
         pr6 = PricesResult(; X = Z)
-        @test size(apply_preprocessing(PricesToReturns(), pr6).X) == (1, 3)
-        @test size(apply_preprocessing(PricesToReturns(; nan_to_missing = false), pr6).X) ==
-              (5, 3)
+        @test size(apply_preprocessing(PricesToReturns(), pr6).X) == (5, 3)
 
-        # A source spells an absent price either way, so the flag unifies both conventions
-        # rather than only one. A wide table built from a tidy one holds `missing`, and it
-        # must reach the returns as the same gap a `NaN` does.
+        # A source spells an absent price either way, and the one unification makes them one
+        # gap. A wide table built from a tidy one holds `missing`, and it must reach the
+        # returns as the same gap a `NaN` does.
         Zm = TimeArray(ts6,
                        [10.0 missing 30.0; 11.0 missing 31.0; 12.0 20.0 32.0
                         13.0 21.0 33.0; 14.0 22.0 missing; 15.0 23.0 missing], [:A, :B, :C])
         @test eltype(values(Zm)) == Union{Missing, Float64}
-        mgot = prices_to_returns(Zm; nan_to_missing = false)
+        mgot = prices_to_returns(Zm)
         @test mgot.nx == ["A", "B", "C"]
         @test size(mgot.X) == (5, 3)
         @test findall(!isfinite, view(mgot.X, :, 2)) == [1, 2]
         @test findall(!isfinite, view(mgot.X, :, 3)) == [4, 5]
-        # The two sources agree entry for entry.
+        # The two sources agree entry for entry. With `impute_method` deleted there is no
+        # path left on which the two spellings could behave differently.
         @test isequal(mgot.X, got.X)
-
-        # An `impute_method` still sees the entries it was given to fill: the unification
-        # runs after it, so only what it leaves behind becomes a gap. `Impute` is absent from
-        # the test environment (ADR 0042), so the `nothing` path is what is checked here.
-        @test isequal(prices_to_returns(Zm; nan_to_missing = false,
-                                        impute_method = nothing).X, mgot.X)
 
         # The ergonomics this buys: ragged per-asset histories, outer-joined and converted
         # without losing an observation. `TimeSeries.merge` pads a `Float64` array with `NaN`.
@@ -700,13 +672,33 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         Bw = TimeArray(Date(2020, 1, 3):Day(1):Date(2020, 1, 5), [20.0, 21, 22], ["B"])
         joined = merge(Aw, Bw; method = :outer)
         @test isnan(values(joined)[1, 2])
-        wide = prices_to_returns(joined; nan_to_missing = false)
+        wide = prices_to_returns(joined)
         @test wide.nx == ["A", "B"]
         @test size(wide.X) == (5, 2)
         @test all(isfinite, view(wide.X, :, 1))
         @test findall(!isfinite, view(wide.X, :, 2)) == [1, 2, 5]
-        # The default keeps only the observations every asset shares.
-        @test size(prices_to_returns(joined).X) == (2, 2)
+
+        # And the cost of that, which the deletion used to hide: an OUTER join is symmetric,
+        # so a benchmark or factor series whose history is longer than the asset slice
+        # expands the observation clock to the UNION rather than onto the asset clock. The
+        # padding is real data absence and is carried like any other gap.
+        Xa = TimeArray(ts6,
+                       [10.0 30.0; 11.0 31.0; 12.0 32.0
+                        13.0 33.0; 14.0 34.0; 15.0 35.0], [:A, :C])
+        tsb = collect(Date(2019, 12, 25):Day(1):Date(2020, 1, 6))
+        Bb = TimeArray(tsb, collect(200.0:(200.0 + length(tsb) - 1)), ["BM"])
+        wideb = prices_to_returns(Xa; B = Bb)
+        @test size(wideb.X, 1) == length(tsb) - 1
+        @test count(!isfinite, wideb.X) == 2 * (length(tsb) - length(ts6))
+        @test all(isfinite, wideb.B)
+
+        # A caller who means "the benchmark on my asset clock" says so, by slicing it or by
+        # asking for an inner join. Both give the asset clock back, gapless.
+        for got in (prices_to_returns(Xa; B = Bb[ts6]),
+                    prices_to_returns(Xa; B = Bb, join_method = :inner))
+            @test size(got.X) == (5, 2)
+            @test all(isfinite, got.X)
+        end
     end
     @testset "the Gap Return family writes only the cells a gap left non-finite" begin
         # One complete column, and one carrying all three gap positions at once: an inception
@@ -718,7 +710,7 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         Zg = TimeArray(gts, hcat(pA, pB), ["A", "B"])
 
         @testset "the writable set is the invariant, held once" begin
-            base = prices_to_returns(Zg; nan_to_missing = false)
+            base = prices_to_returns(Zg)
             rB = view(base.X, :, 2)
             # `percentchange` reads two consecutive prices, so the k = 2 suspension leaves
             # k + 1 = 3 non-finite returns, and the inception and the delisting one each.
@@ -737,7 +729,7 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
 
             # Under `padding` the clocks line up and the row every asset is padded on is
             # return 1, which no column admits: it has no earlier observed price.
-            padded = prices_to_returns(Zg; nan_to_missing = false, padding = true)
+            padded = prices_to_returns(Zg; padding = true)
             @test size(padded.X, 1) == 8
             @test all(!isfinite, view(padded.X, 1, :))
             wpad = PortfolioOptimisers.gap_return_writable(pB,
@@ -749,9 +741,8 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         end
 
         @testset "CatchUpGapReturn books the move on the observation that ends the gap" begin
-            base = prices_to_returns(Zg; nan_to_missing = false)
-            got = prices_to_returns(Zg; nan_to_missing = false,
-                                    gap_return_alg = CatchUpGapReturn())
+            base = prices_to_returns(Zg)
+            got = prices_to_returns(Zg; gap_return_alg = CatchUpGapReturn())
             rB = view(got.X, :, 2)
             # The Held Gap shortens from k + 1 = 3 to k = 2: the two unpriced observations
             # stay non-finite and the re-pricing observation carries the whole move. The
@@ -769,12 +760,12 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
             @test view(got.X, :, 1) == view(base.X, :, 1)
 
             # The log branch reads the same pair of prices through the same arithmetic.
-            glog = prices_to_returns(Zg; nan_to_missing = false, ret_method = :log,
+            glog = prices_to_returns(Zg; ret_method = :log,
                                      gap_return_alg = CatchUpGapReturn())
             @test glog.X[5, 2] == log(24.0) - log(21.0)
 
             # Under `padding` the padded row stays untouched for every asset.
-            gpad = prices_to_returns(Zg; nan_to_missing = false, padding = true,
+            gpad = prices_to_returns(Zg; padding = true,
                                      gap_return_alg = CatchUpGapReturn())
             @test all(!isfinite, view(gpad.X, 1, :))
             @test findall(!isfinite, view(gpad.X, :, 2)) == [1, 2, 4, 5, 8]
@@ -782,9 +773,8 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         end
 
         @testset "the driver freezes what the algorithm has no licence to write" begin
-            base = prices_to_returns(Zg; nan_to_missing = false)
-            rogue = prices_to_returns(Zg; nan_to_missing = false,
-                                      gap_return_alg = RogueGapReturn())
+            base = prices_to_returns(Zg)
+            rogue = prices_to_returns(Zg; gap_return_alg = RogueGapReturn())
             # `RogueGapReturn` answers every cell with -99.0. Only the three writable cells
             # of B take it; everything else is exactly what the default rule computed.
             @test findall(==(-99.0), rogue.X) == CartesianIndex.([3, 4, 5], 2)
@@ -793,33 +783,25 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         end
 
         @testset "the default rule is bit-identical, and a contradicted algorithm informs" begin
-            base = prices_to_returns(Zg; nan_to_missing = false)
-            @test isequal(prices_to_returns(Zg; nan_to_missing = false,
-                                            gap_return_alg = nothing).X, base.X)
+            base = prices_to_returns(Zg)
+            @test isequal(prices_to_returns(Zg; gap_return_alg = nothing).X, base.X)
 
-            # `nan_to_missing` deletes every row holding a gap before the conversion, so the
-            # writable set is provably empty. That is an `@info`, not a refusal and not a
-            # warning: the returns it computed are correct, they are simply the default's.
-            dropped = prices_to_returns(Zg)
-            got = @test_logs (:info,) match_mode=:any prices_to_returns(Zg;
-                                                                        gap_return_alg = CatchUpGapReturn())
-            @test isequal(got.X, dropped.X)
-            # A gapless table reports the same thing for the same reason.
+            # A gapless table admits no cell, so the writable set is provably empty. That is
+            # an `@info`, not a refusal and not a warning: the returns it computed are
+            # correct, they are simply the default's.
             clean = TimeArray(gts, hcat(pA, pA .+ 1), ["A", "B"])
-            @test_logs (:info,) match_mode=:any prices_to_returns(clean;
-                                                                  nan_to_missing = false,
-                                                                  gap_return_alg = CatchUpGapReturn())
+            got = @test_logs (:info,) match_mode=:any prices_to_returns(clean;
+                                                                        gap_return_alg = CatchUpGapReturn())
+            @test isequal(got.X, prices_to_returns(clean).X)
         end
 
         @testset "PricesToReturns carries the algorithm" begin
             @test isnothing(PricesToReturns().gap_return_alg)
-            ptr = PricesToReturns(; nan_to_missing = false,
-                                  gap_return_alg = CatchUpGapReturn())
+            ptr = PricesToReturns(; gap_return_alg = CatchUpGapReturn())
             @test isa(ptr.gap_return_alg, CatchUpGapReturn)
             pg = PricesResult(; X = Zg)
             @test isequal(apply_preprocessing(ptr, pg).X,
-                          prices_to_returns(Zg; nan_to_missing = false,
-                                            gap_return_alg = CatchUpGapReturn()).X)
+                          prices_to_returns(Zg; gap_return_alg = CatchUpGapReturn()).X)
             @test fit_preprocessing(ptr, pg) === ptr
         end
     end

@@ -1183,55 +1183,6 @@ function returns_result_picker(rd::ReturnsResult{<:Any, <:MatNum, <:Any, <:Any, 
     end
 end
 """
-    apply_impute_method(X, impute_method) -> Any
-
-Apply the `impute_method` given to [`prices_to_returns`](@ref) to the price table `X`.
-
-`Impute` is a weak dependency, so this is the seam that keeps it optional. The identity method on
-`nothing` is the default path and lives here; the method accepting an `Impute.Imputor` is supplied
-by `PortfolioOptimisersImputeExt` and only exists once the caller has run `using Impute`. Anything
-else throws.
-
-# Algorithm
-
-The method that Julia selects is the algorithm. Each step is one method, and the second lives in an extension.
-
- 1. `impute_method` is `nothing`: return `X` unchanged. This is the default path, and it loads nothing.
- 2. `impute_method` is an `Impute.Imputor`: apply it to `X`. `PortfolioOptimisersImputeExt` supplies this method, so it exists only after the caller runs `using Impute`.
- 3. Any other `impute_method`: read whether the extension is loaded with `Base.get_extension`, and throw an `ArgumentError` that names which of the two mistakes happened. `Impute` not being loaded and a wrong type are different mistakes, and the caller cannot tell them apart from the type alone.
-
-# Arguments
-
-  - `X`: Price table (a `DataFrames.DataFrame` as built by [`prices_to_returns`](@ref)).
-  - `impute_method`: `nothing` (no imputation), or an `Impute.Imputor` when `Impute` is loaded.
-
-# Validation
-
-  - Throws an `ArgumentError` for any `impute_method` that is neither `nothing` nor an
-    `Impute.Imputor`, distinguishing "`Impute` is not loaded" from "wrong type". Note that
-    [`Imputer`](@ref) is a PortfolioOptimisers estimator unrelated to `Impute.jl` and is not
-    accepted here.
-
-# Returns
-
-  - `X`: Unchanged when `impute_method` is `nothing`, otherwise the imputed table.
-
-# Related
-
-  - [`prices_to_returns`](@ref)
-  - [`Imputer`](@ref)
-  - [`Impute`](https://github.com/invenia/Impute.jl)
-"""
-apply_impute_method(X, ::Nothing) = X
-function apply_impute_method(::Any, impute_method)
-    reason = if isnothing(Base.get_extension(@__MODULE__, :PortfolioOptimisersImputeExt))
-        "`Impute` is not loaded, so no imputor can be recognised; run `using Impute` (adding it to your project if needed)"
-    else
-        "`Impute` is loaded, but a $(typeof(impute_method)) is not an `Impute.Imputor`"
-    end
-    return throw(ArgumentError("`impute_method` accepts only `nothing` or an `Impute.Imputor` such as `Impute.LOCF()` or `Impute.Interpolate()`: $(reason). Note that `Imputer` is a PortfolioOptimisers preprocessing estimator, entirely unrelated to `Impute.jl` despite the similar name — it fills gaps with per-asset statistics fitted on a training window and is used as a `Pipeline` step, not passed to `prices_to_returns`."))
-end
-"""
 $(DocStringExtensions.TYPEDEF)
 
 Supertype of the policies that write a return into the cells a price gap left non-finite.
@@ -1446,7 +1397,7 @@ The rule is per-column arithmetic on consecutive observations and reads no asset
  1. Walk the series columns of `R`, taking each column's prices from `P` by name.
  2. Derive the writable cells with [`gap_return_writable`](@ref).
  3. Call [`gap_return`](@ref) on the column and copy back **only** the writable cells, so every other cell is frozen whatever the algorithm returned.
- 4. Report an `@info` when no column admitted a single cell. Under `nan_to_missing`, `DataFrames.dropmissing!` leaves the table gap-free before the conversion, so the writable set is provably empty and the configuration contradicts itself. It is neither a refusal, which would reject a configuration that computes a correct answer, nor a warning, which could not tell that case from a panel that simply holds no gap.
+ 4. Report an `@info` when no column admitted a single cell. A table that holds no gap admits none, which is the ordinary case rather than a mistake, so this is neither a refusal, which would reject a configuration that computes a correct answer, nor a warning, which could not tell that case from one where the caller expected a gap.
 
 # Arguments
 
@@ -1487,7 +1438,7 @@ function apply_gap_return(alg::AbstractGapReturnAlgorithm, R::DataFrames.DataFra
         r[w] .= out[w]
     end
     if !wrote
-        @info("`gap_return_alg` is a $(typeof(alg)) and no cell is writable, so the returns are the ones the default rule computed. A Gap Return writes only a non-finite return inside an asset's Listing Span, and the table reaching the conversion holds no gap — under `nan_to_missing = true` it never can, because `DataFrames.dropmissing!` deletes every row that holds one. Set `nan_to_missing = false` to carry the gaps into the conversion.")
+        @info("`gap_return_alg` is a $(typeof(alg)) and no cell is writable, so the returns are the ones the default rule computed. A Gap Return writes only a non-finite return inside an asset's Listing Span that has an earlier observed price in its column, and the table reaching the conversion holds no such cell.")
     end
     return R
 end
@@ -1500,18 +1451,22 @@ end
         ivpa::Option{<:Num_VecNum} = nothing,
         ret_method::Symbol = :simple, padding::Bool = false,
         gap_return_alg::Option{<:AbstractGapReturnAlgorithm} = nothing,
-        nan_to_missing::Bool = true,
         missing_col_percent::Number = 1.0,
         missing_row_percent::Option{<:Number} = 1.0,
         collapse_args::Tuple = (),
         map_func::Option{<:Function} = nothing,
         join_method::Symbol = :outer,
-        impute_method = nothing,
-        pnl::Option{<:AssetPanel} = nothing
+        pnl::Option{<:AssetPanel} = nothing,
+        span::Option{<:AbstractMatrix{Bool}} = nothing
     ) -> ReturnsResult
 
-Convert `TimeSeries.TimeArray` price data to returns. Handles factor data, missing data,
-imputation, and optional implied volatility information.
+Convert `TimeSeries.TimeArray` price data to returns. Handles factor data, a price gap, and
+optional implied volatility information.
+
+An absent price has one spelling, `NaN`, and the conversion carries it into the returns rather
+than deleting the observation or the asset that holds one. Filling a gap is
+[`PriceGapFill`](@ref)'s and deleting one is [`MissingDataFilter`](@ref)'s, both of them fitted
+steps; ADR 0133 owns the rule.
 
 # Mathematical definition
 
@@ -1542,20 +1497,19 @@ A benchmark ``B`` is converted by the same rule and **carried alongside** the as
  3. Merge the benchmark prices `B` into `X` under `join_method`, and record the benchmark names. A benchmark is one shared column, or one column per asset.
  4. Apply `map_func` to every entry, when one is given.
  5. Collapse the time series with `collapse_args`, when they are given. This is the step that changes the frequency.
- 6. Convert the table to a `DataFrames.DataFrame`. Under `nan_to_missing`, replace every `NaN` with `missing`, so that the two conventions for an absent price become one and steps 9 to 11 delete the gap.
- 7. Impute the missing entries with [`apply_impute_method`](@ref), which does nothing unless the caller gives an `Impute.Imputor`. Then, without `nan_to_missing`, unify the two conventions the other way instead: replace every `missing` with `NaN`, which no later step deletes, so the gap reaches the returns. Unifying *after* the imputation means an `impute_method` the caller asked for still sees the entries it was given to fill, and only what it leaves behind becomes a gap. This is also what makes the two ragged-history sources behave alike: an outer join of per-asset series pads with `NaN`, and a wide table built from a tidy one leaves `missing`.
- 8. Count the gapped entries of each row of the table with [`is_missing_value`](@ref), which reads both conventions. The two thresholds therefore mean the same thing under either setting of `nan_to_missing`.
+ 6. Convert the table to a `DataFrames.DataFrame`.
+ 7. Replace every `missing` with `NaN`, so that the two conventions a source spells an absent price with become one and no later step deletes it: an outer join of per-asset series pads with `NaN`, and a wide table built from a tidy one leaves `missing`. This is the only unification, it runs unconditionally, and it is what makes the two ragged-history sources behave alike.
+ 8. Count the gapped entries of each row of the table with [`is_missing_value`](@ref), which reads both conventions because it stands at the door.
  9. Drop each row whose count of missing columns exceeds `missing_col_percent` of the column total.
 10. Count the missing entries of each column over the rows that step 9 kept. Drop each column whose count exceeds `missing_row_percent` of the surviving row total. When `missing_row_percent` is `nothing`, keep instead the columns whose count equals the mode of the counts.
-11. Drop every column that is still typed as missing, then every row that still holds a missing entry. Both are no-ops for a gap that `nan_to_missing` left as a `NaN`: a column of gaps keeps its place in the universe instead of vanishing from it, and an observation keeps its place on the clock instead of being deleted for one asset's gap.
-12. Convert the surviving prices to returns with `TimeSeries.percentchange` under `ret_method` and `padding`. This is the step that applies the formula above. It computes both branches through logarithms — the log return is ``\\ln P_{t,i} - \\ln P_{t-1,i}``, and the simple return is `expm1` of it — so the two agree with the closed forms above to floating point rather than to the last bit. When `padding` is `true` the first observation is kept and its return is `NaN`, so the returns keep the length of the price clock. **A gap carried here does not spread.** The formula reads two prices, so a run of `k` gapped prices makes exactly the `k + 1` returns that read one of them non-finite, and every later return of that column is computed from two observed prices and is finite. A gap is confined to its own column for the same reason: no asset's return reads another's price.
-13. Resolve the cells the conversion left non-finite with [`apply_gap_return`](@ref), under `gap_return_alg`. `nothing` is the default rule, and its method returns the table untouched, so the arithmetic step 12 produced is bit-identical. An algorithm may write only a non-finite cell inside a column's Listing Span that has an earlier observed price, which is what freezes every return computed from two observed prices, and it reports an `@info` when it finds no such cell.
-14. Split the surviving column names into the asset names `nx`, the factor names `nf`, the benchmark names `nb`, and the timestamp column, which gives `ts`.
-15. Index the implied volatilities `iv` by `ts`, then check `iv` and `ivpa` against the surviving asset count.
-16. Subselect the [`AssetPanel`](@ref). Read the surviving assets' positions `acols` in the original asset names, recover the surviving rows with [`feature_row_indices`](@ref), and view the panel with [`port_opt_view`](@ref), handing it the surviving asset names so that a square tensor Panel Field is cut on its label axis too. An asset dropped by steps 9 to 11 takes its Panel Field values with it, or the panel and the returns would desynchronise silently. A time-varying panel is subselected to the surviving observations as well, matched back into the original price timestamps; a surviving timestamp absent from that clock throws. Under `collapse_args` this gives the aggregated period the values of the row at its representative timestamp, which is last-observation semantics and matches [`LastObservation`](@ref).
-17. State the universe. Cut `span` to the price rows and the assets that survived with [`span_carrier_view`](@ref), and hand it, the surviving price panel and the converted returns to [`returns_universe_masks`](@ref), which projects it onto the returns clock and intersects it with finiteness. [`attach_universe_masks`](@ref) puts the pair onto the Asset Panel, keeping whatever Panel Fields it already carried, and mints one with no field when the carrier held none.
-18. Build the asset, factor and benchmark matrices from the surviving columns. A group whose columns all went is `nothing`.
-19. Return the [`ReturnsResult`](@ref).
+11. Convert the surviving prices to returns with `TimeSeries.percentchange` under `ret_method` and `padding`. This is the step that applies the formula above. It computes both branches through logarithms — the log return is ``\\ln P_{t,i} - \\ln P_{t-1,i}``, and the simple return is `expm1` of it — so the two agree with the closed forms above to floating point rather than to the last bit. When `padding` is `true` the first observation is kept and its return is `NaN`, so the returns keep the length of the price clock. **A gap carried here does not spread.** The formula reads two prices, so a run of `k` gapped prices makes exactly the `k + 1` returns that read one of them non-finite, and every later return of that column is computed from two observed prices and is finite. A gap is confined to its own column for the same reason: no asset's return reads another's price.
+12. Resolve the cells the conversion left non-finite with [`apply_gap_return`](@ref), under `gap_return_alg`. `nothing` is the default rule, and its method returns the table untouched, so the arithmetic step 11 produced is bit-identical. An algorithm may write only a non-finite cell inside a column's Listing Span that has an earlier observed price, which is what freezes every return computed from two observed prices, and it reports an `@info` when it finds no such cell.
+13. Split the surviving column names into the asset names `nx`, the factor names `nf`, the benchmark names `nb`, and the timestamp column, which gives `ts`.
+14. Index the implied volatilities `iv` by `ts`, then check `iv` and `ivpa` against the surviving asset count.
+15. Subselect the [`AssetPanel`](@ref). Read the surviving assets' positions `acols` in the original asset names, recover the surviving rows with [`feature_row_indices`](@ref), and view the panel with [`port_opt_view`](@ref), handing it the surviving asset names so that a square tensor Panel Field is cut on its label axis too. An asset dropped by steps 9 and 10 takes its Panel Field values with it, or the panel and the returns would desynchronise silently. A time-varying panel is subselected to the surviving observations as well, matched back into the original price timestamps; a surviving timestamp absent from that clock throws. Under `collapse_args` this gives the aggregated period the values of the row at its representative timestamp, which is last-observation semantics and matches [`LastObservation`](@ref).
+16. State the universe. Cut `span` to the price rows and the assets that survived with [`span_carrier_view`](@ref), and hand it and the converted returns to [`returns_universe_masks`](@ref), which projects it onto the returns clock and intersects it with finiteness. A carrier that states no span states no universe, and the conversion emits no panel. [`attach_universe_masks`](@ref) puts the pair onto the Asset Panel, keeping whatever Panel Fields it already carried, and mints one with no field when the carrier held none.
+17. Build the asset, factor and benchmark matrices from the surviving columns. A group whose columns all went is `nothing`.
+18. Return the [`ReturnsResult`](@ref).
 
 Step 8 counts the missing columns of a row, and step 10 counts the missing rows of a column. The name of each keyword reads as the axis it counts, and the axis it drops is the other one. Both filters read the same table, because step 10 counts only over the rows that step 9 kept.
 
@@ -1568,21 +1522,18 @@ Step 8 counts the missing columns of a row, and step 10 counts the missing rows 
   - `ivpa`: Optional Implied volatility risk premium adjustment.
   - `ret_method`: Return calculation method (`:simple` or `:log`).
   - `padding`: Whether to pad missing values in returns calculation.
-  - `gap_return_alg`: What the observations a price gap left non-finite carry. `nothing` is the arithmetic — a return is the change between two consecutive observations, so a run of `k` gapped prices leaves `k + 1` non-finite returns and the move across the gap is recorded nowhere — and [`CatchUpGapReturn`](@ref) books that move on the observation the asset resumes trading instead, shortening the Held Gap to `k`. Any algorithm may write only a non-finite cell inside an asset's Listing Span that has an earlier observed price in its column, so a return computed from two observed prices is frozen whichever one is stated. It has no cell to write under `nan_to_missing`, where the table reaching step 12 is gap-free, and reports an `@info` there.
-  - `nan_to_missing`: Which convention an absent price takes, and so whether it survives the conversion. A source spells one either way: an outer join of per-asset series with ragged histories pads with `NaN`, and a wide table built from a tidy one leaves `missing`. `true` unifies them as `missing`, so steps 9 to 11 delete the observation or the asset that holds one — which is what a consumer that cannot hold a gap requires. `false` unifies them as `NaN` instead, which no step deletes, so the gap reaches the returns and becomes one the library already handles: an [`AssetPanel`](@ref)'s universe masks describe it, the Coverage Universe excludes the asset from the windows it spoils, and a fold reports it as a Held Gap. Prefer `false` for a point-in-time panel, where an observation deleted for one asset's gap is an observation lost for every other asset too.
+  - `gap_return_alg`: What the observations a price gap left non-finite carry. `nothing` is the arithmetic — a return is the change between two consecutive observations, so a run of `k` gapped prices leaves `k + 1` non-finite returns and the move across the gap is recorded nowhere — and [`CatchUpGapReturn`](@ref) books that move on the observation the asset resumes trading instead, shortening the Held Gap to `k`. Any algorithm may write only a non-finite cell inside an asset's Listing Span that has an earlier observed price in its column, so a return computed from two observed prices is frozen whichever one is stated. It has no cell to write over a gap-free table, and reports an `@info` there.
   - `missing_col_percent`: Maximum allowed fraction `(0, 1]` of missing **columns** in an observation row. A row above it is dropped. The name reads as the axis that is counted, not the axis that is dropped.
   - `missing_row_percent`: Maximum allowed fraction `(0, 1]` of missing **rows** in a column, counted over the rows that `missing_col_percent` kept. A column above it is dropped. `nothing` keeps the columns whose missing count equals the mode of the counts instead, which is the shape of a panel whose assets share one history.
   - `collapse_args`: Arguments for collapsing the time series (e.g., to lower frequency).
   - `map_func`: Optional function to apply to the data before returns calculation.
   - `join_method`: How to join asset, factor data and benchmark data (`:outer`, `:inner`, etc.).
-  - `impute_method`: Optional imputation method for missing data. `nothing`, or an `Impute.Imputor` — which requires `using Impute`, since `Impute` is a weak dependency loaded through `PortfolioOptimisersImputeExt`. Unrelated to [`Imputer`](@ref), which is a PortfolioOptimisers estimator and is not accepted here.
   - `pnl`: Optional [`AssetPanel`](@ref), as [`asset_panel`](@ref) returns it.
-  - `span`: Optional **Listing Span** on the price clock, as [`PriceIngestion`](@ref) derives it or a caller declares it. Given one, the conversion projects it onto the returns clock with [`universe_masks`](@ref) and hands the returns carrier an [`AssetPanel`](@ref) stating the universe — always, a gapless panel included, so `pnl === nothing` means one thing only: the carrier was not built by the ingestion layer. `nothing` with gapped prices derives the span from this window alone and warns, because a delisting straddling the window end reads as an asset that was never listed; `nothing` with gap-free prices states no universe and emits no panel.
-  - `strict`: Whether the two situations a carrier the layer did not build reaches are refused rather than warned about: a carrier holding gaps and no `span`, and a `span` whose gaps `nan_to_missing = true` deletes.
+  - `span`: Optional **Listing Span** on the price clock, as [`PriceIngestion`](@ref) derives it or a caller declares it. Given one, the conversion projects it onto the returns clock with [`universe_masks`](@ref) and hands the returns carrier an [`AssetPanel`](@ref) stating the universe — always, a gapless panel included, so `pnl === nothing` means one thing only: the carrier was not built by the ingestion layer. `nothing` states no universe and emits no panel, whether or not the prices hold a gap; a window-local span cannot answer the question, because a delisting straddling the window end reads there as an asset that was never listed.
 
 # Validation
 
-  - Every price reaching step 12 is positive. `TimeSeries.percentchange` takes a logarithm on both branches, so a negative price raises a `DomainError` from inside it, on the simple branch as well.
+  - Every price reaching step 11 is positive. `TimeSeries.percentchange` takes a logarithm on both branches, so a negative price raises a `DomainError` from inside it, on the simple branch as well.
   - `!isempty(X)`.
   - `0 < missing_col_percent <= 1`
   - `0 < missing_row_percent <= 1`.
@@ -1590,8 +1541,6 @@ Step 8 counts the missing columns of a row, and step 10 counts the missing rows 
   - If `B` is not `nothing`, `!isempty(B)`, and `size(values(B), 2) in (1, size(values(X), 2))`.
   - If `iv` is not `nothing`, the timestamps of the merged data matrix must be a subset of `TimeSeries.timestamp(iv)`, then `iv = values(iv)`, `!isempty(iv)`, `all(x -> x >= 0, iv)`, `all(x -> isfinite(x), iv)`, and `size(iv) == size(X)`.
   - If `span` is not `nothing`, `size(span) == (size(values(X), 1), size(values(X), 2))`. Raises a `DimensionMismatch`.
-  - If `span` is not `nothing`, `nan_to_missing` is `false` under `strict`. Raises a [`ConflictingArgumentError`](@ref).
-  - If `span` is `nothing` and the converted prices hold a gap, `strict` is `false`. Raises an [`IsNothingError`](@ref).
   - `ivpa` is validated in that same branch, so it is checked only when `iv` is given: `all(x -> x > 0, ivpa)`, `all(x -> isfinite(x), ivpa)`, and, if a vector, `length(ivpa) == size(iv, 2)`. The bound is strict — a zero adjustment is rejected.
 
 # Returns
@@ -1635,8 +1584,6 @@ ReturnsResult
   - [`VecDate`](@ref)
   - [`Num_VecNum`](@ref)
   - [`TimeSeries`](https://juliastats.org/TimeSeries.jl/stable/timearray/#The-TimeArray-time-series-type)
-  - [`apply_impute_method`](@ref)
-  - [`Impute`](https://github.com/invenia/Impute.jl)
   - [`apply_gap_return`](@ref)
   - [`AbstractGapReturnAlgorithm`](@ref)
   - [`CatchUpGapReturn`](@ref)
@@ -1644,7 +1591,6 @@ ReturnsResult
   - [`price_ingestion`](@ref)
   - [`returns_universe_masks`](@ref)
   - [`attach_universe_masks`](@ref)
-  - [`assert_span_convertible`](@ref)
   - [`span_carrier_view`](@ref)
   - [`returns_result_picker`](@ref): subtracts the carried benchmark, and only when the optimisation tracks it.
 """
@@ -1655,14 +1601,13 @@ function prices_to_returns(X::TimeSeries.TimeArray,
                            ivpa::Option{<:Num_VecNum} = nothing,
                            ret_method::Symbol = :simple, padding::Bool = false,
                            gap_return_alg::Option{<:AbstractGapReturnAlgorithm} = nothing,
-                           nan_to_missing::Bool = true, missing_col_percent::Number = 1.0,
+                           missing_col_percent::Number = 1.0,
                            missing_row_percent::Option{<:Number} = 1.0,
                            collapse_args::Tuple = (),
                            map_func::Option{<:Function} = nothing,
-                           join_method::Symbol = :outer, impute_method = nothing,
+                           join_method::Symbol = :outer,
                            pnl::Option{<:AssetPanel} = nothing,
-                           span::Option{<:AbstractMatrix{Bool}} = nothing,
-                           strict::Bool = false)
+                           span::Option{<:AbstractMatrix{Bool}} = nothing)
     @argcheck(!isempty(X), IsEmptyError)
     @argcheck(zero(missing_col_percent) < missing_col_percent <= one(missing_col_percent),
               DomainError)
@@ -1675,8 +1620,7 @@ function prices_to_returns(X::TimeSeries.TimeArray,
     asset_ts = TimeSeries.timestamp(X)
     check_asset_panel(pnl, length(asset_names), length(asset_ts),
                       "the number of asset price columns")
-    assert_span_convertible(span, length(asset_ts), length(asset_names), nan_to_missing,
-                            strict)
+    assert_span_shape(span, length(asset_ts), length(asset_names))
     factor_names = String[]
     benchmark_names = String[]
     if !isnothing(F)
@@ -1698,27 +1642,14 @@ function prices_to_returns(X::TimeSeries.TimeArray,
     end
     X = DataFrames.DataFrame(X)
 
-    if nan_to_missing
-        DataFrames.transform!(X,
-                              2:DataFrames.DataAPI.ncol(X) .=>
-                                  DataFrames.ByRow((x) -> ifelse((isa(x, Number) &&
-                                                                  isnan(x)), missing, x));
-                              renamecols = false)
-    end
-    X = apply_impute_method(X, impute_method)
-    if !nan_to_missing
-        # The other direction, and it runs after the imputation so that an `impute_method` a
-        # caller asked for still sees the entries it was given to fill. A source spells an
-        # absent price either way -- an outer join of ragged histories pads with `NaN`, a
-        # wide table built from a tidy one leaves `missing` -- and every deletion step below
-        # reads only `missing`, so this is what makes the two sources behave alike.
-        DataFrames.transform!(X,
-                              2:DataFrames.DataAPI.ncol(X) .=>
-                                  DataFrames.ByRow((x) -> ifelse(ismissing(x), NaN, x));
-                              renamecols = false)
-    end
-    # Both gap conventions are counted, whether or not `nan_to_missing` merged them, so the
-    # two thresholds mean the same thing under either setting.
+    # Absence has one spelling and it is `NaN`, because the returns level must carry it in a
+    # `Matrix{Float64}`. A source spells it either way -- an outer join of ragged histories
+    # pads with `NaN`, a wide table built from a tidy one leaves `missing` -- so this is the
+    # one unification, and after it nothing below asks about spelling again.
+    DataFrames.transform!(X,
+                          2:DataFrames.DataAPI.ncol(X) .=>
+                              DataFrames.ByRow((x) -> ifelse(ismissing(x), NaN, x));
+                          renamecols = false)
     missing_mtx = is_missing_value.(Matrix(X[!, 2:end]))
     missings_cols = vec(count(missing_mtx; dims = 2))
     keep_rows = missings_cols .<= (DataFrames.DataAPI.ncol(X) - 1) * missing_col_percent
@@ -1732,8 +1663,6 @@ function prices_to_returns(X::TimeSeries.TimeArray,
         missings_rows .== StatsBase.mode(missings_rows)
     end
     X = X[!, [true; keep_cols]]
-    DataFrames.select!(X, DataFrames.InvertedIndices.Not(names(X, Missing)))
-    DataFrames.dropmissing!(X)
     P = X
     X = TimeSeries.percentchange(TimeSeries.TimeArray(X; timestamp = :timestamp),
                                  ret_method; padding = padding)
@@ -1775,7 +1704,7 @@ function prices_to_returns(X::TimeSeries.TimeArray,
         cols = Vector{Int}(indexin(nx, asset_names))
         amsk, emsk = returns_universe_masks(span_carrier_view(span, P[!, :timestamp],
                                                               asset_ts, cols),
-                                            Matrix(P[!, nx]), Matrix(X[!, nx]), strict)
+                                            Matrix(X[!, nx]))
         pnl = attach_universe_masks(pnl, amsk, emsk)
     end
     if isempty(nf)
@@ -2344,22 +2273,22 @@ Preprocessing estimator converting price-level data into returns-level data.
 
 `PricesToReturns` is the estimator form of [`prices_to_returns`](@ref): it consumes a [`PricesResult`](@ref) and produces a [`ReturnsResult`](@ref). It is stateless — applying it to any window simply runs the conversion — so its fitted object is the estimator itself.
 
-Missing-data filtering is deliberately *not* part of this estimator (the corresponding [`prices_to_returns`](@ref) keywords are held at their permissive defaults); use [`MissingDataFilter`](@ref) and [`Imputer`](@ref) as separate, independently tunable steps.
+Missing-data filtering is deliberately *not* part of this estimator (the corresponding [`prices_to_returns`](@ref) keywords are held at their permissive defaults); use [`MissingDataFilter`](@ref) and [`PriceGapFill`](@ref) as separate, independently tunable steps. Deleting an observation or an asset is a **Universe Policy**, and a policy is fitted on a training window and replayed by name; this step is stateless, so it holds none.
 
 The step is stateless, and it does not need to be stateful to fix an asset universe: the carrier states one. A [`PricesResult`](@ref) that [`price_ingestion`](@ref) built carries a **Listing Span**, and this step projects it onto the returns clock and hands the [`ReturnsResult`](@ref) an [`AssetPanel`](@ref) whose two masks say which assets are in the universe and which of them can be estimated at each observation. The asset axis is fixed before the split, so every window of every fold carries every asset and a window can no longer silently lose a column.
 
 !!! warning
 
-    A carrier the ingestion layer did not build states no universe, and then this step's statelessness bites. Under `nan_to_missing`, [`prices_to_returns`](@ref) drops assets that are entirely missing in the window being converted, so a training window in which an asset has no history produces a different universe from a clean test window. Build the carrier with [`price_ingestion`](@ref), or, converting one by hand, set `nan_to_missing = false` so every asset keeps its column in every window and the ones a window cannot estimate are excluded downstream by the Coverage Universe. `strict = true` refuses the two situations rather than warning about them.
+    A carrier the ingestion layer did not build states no universe, and the conversion does not guess one from the window: a window-local span reads a delisting straddling the window end as an asset that was never listed. Its gaps are still carried and still handled — with no panel the Coverage Universe reads finiteness alone — but the fold is left to infer the universe it would otherwise have been told. Build the carrier with [`price_ingestion`](@ref), or declare a listing calendar as its `span`.
 
 # Algorithm
 
 The estimator is stateless, so both verbs are thin.
 
  1. [`fit_preprocessing`](@ref) returns the estimator itself. There is no state to fit.
- 2. [`apply_preprocessing`](@ref) calls [`prices_to_returns`](@ref) with the eight fields as keywords, and with `X`, `F`, `B`, `iv`, `ivpa`, `pnl` and `span` read off the [`PricesResult`](@ref). It returns the [`ReturnsResult`](@ref).
+ 2. [`apply_preprocessing`](@ref) calls [`prices_to_returns`](@ref) with the six fields as keywords, and with `X`, `F`, `B`, `iv`, `ivpa`, `pnl` and `span` read off the [`PricesResult`](@ref). It returns the [`ReturnsResult`](@ref).
 
-The two threshold keywords of [`prices_to_returns`](@ref) are not fields of this estimator, so they hold their permissive defaults and every row and column reaches the conversion. `nan_to_missing` *is* a field, because it decides whether a gap survives the conversion at all rather than how much of one is tolerated, and `gap_return_alg` is one because it decides what the surviving gap's observations carry.
+The two threshold keywords of [`prices_to_returns`](@ref) are not fields of this estimator, so they hold their permissive defaults and every row and column reaches the conversion. `gap_return_alg` *is* a field, because it decides what the observations a gap left non-finite carry, which is the arithmetic of a return rather than a policy about the universe.
 
 # Fields
 
@@ -2371,7 +2300,6 @@ $(DocStringExtensions.FIELDS)
         ret_method::Symbol = :simple,
         padding::Bool = false,
         gap_return_alg::Option{<:AbstractGapReturnAlgorithm} = nothing,
-        nan_to_missing::Bool = true,
         collapse_args::Tuple = (),
         map_func::Option{<:Function} = nothing,
         join_method::Symbol = :outer,
@@ -2426,10 +2354,6 @@ julia> rr.nx
     """
     gap_return_alg
     """
-    Whether a `NaN` price is read as an absent price and deleted (`true`), or carried through to the returns as a gap (`false`). See [`prices_to_returns`](@ref).
-    """
-    nan_to_missing
-    """
     Arguments for collapsing the time series (e.g. to lower frequency).
     """
     collapse_args
@@ -2441,41 +2365,34 @@ julia> rr.nx
     How asset, factor, and benchmark data are joined (`:outer`, `:inner`, etc.).
     """
     join_method
-    """
-    Whether a carrier the ingestion layer did not build is refused rather than warned about. It reaches two situations: a carrier holding gaps and no **Listing Span**, whose universe is then derived from the window alone, and a span that `nan_to_missing = true` would delete the gaps of. See [`prices_to_returns`](@ref).
-    """
-    strict
     function PricesToReturns(ret_method::Symbol, padding::Bool,
                              gap_return_alg::Option{<:AbstractGapReturnAlgorithm},
-                             nan_to_missing::Bool, collapse_args::Tuple,
-                             map_func::Option{<:Function}, join_method::Symbol,
-                             strict::Bool)
+                             collapse_args::Tuple, map_func::Option{<:Function},
+                             join_method::Symbol)
         @argcheck(ret_method in (:simple, :log),
                   ArgumentError("ret_method must be :simple or :log, got :$ret_method"))
         return new{typeof(ret_method), typeof(padding), typeof(gap_return_alg),
-                   typeof(nan_to_missing), typeof(collapse_args), typeof(map_func),
-                   typeof(join_method), typeof(strict)}(ret_method, padding, gap_return_alg,
-                                                        nan_to_missing, collapse_args,
-                                                        map_func, join_method, strict)
+                   typeof(collapse_args), typeof(map_func), typeof(join_method)}(ret_method,
+                                                                                 padding,
+                                                                                 gap_return_alg,
+                                                                                 collapse_args,
+                                                                                 map_func,
+                                                                                 join_method)
     end
 end
 function PricesToReturns(; ret_method::Symbol = :simple, padding::Bool = false,
                          gap_return_alg::Option{<:AbstractGapReturnAlgorithm} = nothing,
-                         nan_to_missing::Bool = true, collapse_args::Tuple = (),
-                         map_func::Option{<:Function} = nothing,
-                         join_method::Symbol = :outer,
-                         strict::Bool = false)::PricesToReturns
-    return PricesToReturns(ret_method, padding, gap_return_alg, nan_to_missing,
-                           collapse_args, map_func, join_method, strict)
+                         collapse_args::Tuple = (), map_func::Option{<:Function} = nothing,
+                         join_method::Symbol = :outer)::PricesToReturns
+    return PricesToReturns(ret_method, padding, gap_return_alg, collapse_args, map_func,
+                           join_method)
 end
 function prices_to_returns(ptr::PricesToReturns, pr::PricesResult)::ReturnsResult
     return prices_to_returns(pr.X, pr.F; B = pr.B, iv = pr.iv, ivpa = pr.ivpa,
                              ret_method = ptr.ret_method, padding = ptr.padding,
                              gap_return_alg = ptr.gap_return_alg,
-                             nan_to_missing = ptr.nan_to_missing,
                              collapse_args = ptr.collapse_args, map_func = ptr.map_func,
-                             join_method = ptr.join_method, pnl = pr.pnl, span = pr.span,
-                             strict = ptr.strict)
+                             join_method = ptr.join_method, pnl = pr.pnl, span = pr.span)
 end
 function fit_preprocessing(ptr::PricesToReturns, ::PricesResult)
     return ptr
@@ -2862,4 +2779,3 @@ export PricesResult, ReturnsResult, prices_to_returns, returns_result_picker,
        fit_preprocessing, apply_preprocessing, PricesToReturns, CatchUpGapReturn,
        MissingDataFilter, MissingDataFilterResult, Imputer, ImputerResult,
        AssetSelectorResult, train_test_split, TrainTestSplit, TrainTestSplitResult
-public apply_impute_method

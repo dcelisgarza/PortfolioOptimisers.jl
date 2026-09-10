@@ -142,6 +142,14 @@ it touches Held Gaps alone, stating a **Held Price** or a per-asset reduction. `
 unfitted, unbounded fill reaching the same job around that ruling, and its presence is what made the
 spelling asymmetry above observable at all. It is deleted with the flag.
 
+`apply_impute_method` — the seam that kept `Impute` a weak dependency, and the whole reason for
+[ADR 0042](0042-impute-is-a-weak-dependency.md) — exists only to serve that keyword, and
+`prices_to_returns` was its only caller. So it is deleted too, with
+`ext/PortfolioOptimisersImputeExt.jl` and the `Impute` weak dependency behind it. Keeping a public
+seam that nothing in the library calls would leave a wrapper over one line of `Impute`, which is a
+thing a caller can write for themselves. ADR 0042 is amended rather than rewritten: it reached
+`main`, so it is correct history for the releases that carried the extension.
+
 Whether `Imputer` — the fitted per-asset constant fill that predates `PriceGapFill` — survives
 beside it is a consequence to measure, not something this ADR settles.
 
@@ -163,8 +171,11 @@ non-investable cells carry `NaN`, together with an `AssetPanel` stating the two 
 ### Two reports are deleted rather than reworded, and a refusal goes with them
 
 `assert_span_convertible` exists because a span-carrying carrier can be handed to a conversion that
-deletes the gaps the span describes. With no flag that combination cannot be written, so the check,
-its warning and its `strict` refusal are deleted.
+deletes the gaps the span describes. With no flag that combination cannot be written, so the
+contradiction it reported, its warning and its `strict` refusal are deleted. What survives is the
+shape check it also carried — a span states which assets are listed at each observation of the
+price clock, so it is the shape of the asset prices — and that is all the verb is left doing, so it
+is renamed `assert_span_shape` and takes the three arguments it reads.
 
 `returns_universe_masks`' window-local branch — *"the price carrier holds gaps and no Listing
 Span"* — derives a span from the window when the carrier states none. A window-local span reads a
@@ -174,9 +185,12 @@ gap. It is deleted, with its warning, its `strict` refusal and its `listing_span
 total two-line rule:
 
 ```julia
-returns_universe_masks(::Nothing, ::Any, ::Any) = nothing, nothing
-returns_universe_masks(span::AbstractMatrix{Bool}, P, R) = compress_all_true(universe_masks(span, R)...)
+returns_universe_masks(::Nothing, ::AbstractMatrix) = nothing, nothing
+returns_universe_masks(span::AbstractMatrix{Bool}, R) = compress_all_true(universe_masks(span, R)...)
 ```
+
+The price panel `P` was read only by the deleted branch, so it leaves the signature with it: what
+remains reads the span and the returns and nothing else.
 
 A hand-built carrier holding gaps therefore states **no universe** rather than a window-local guess
 at one. Its gaps are still handled: with no panel the Coverage Universe reads finiteness alone, and
@@ -199,11 +213,24 @@ is no other.
   conversion was the one place that broke it. The rule now holds by construction rather than by
   convention.
 - **A hard break of the released preprocessing API.** Fourteen keywords are removed from
-  `prices_to_returns` and from `PricesToReturns`'s fields. The map's destination accepts one, and
-  weighs no option by what it costs to rewrite.
-- **Nothing shipped changes numerically.** `examples/SP500.csv.gz` holds no gap in 8,313 × 20, and a
-  gapless table converts bit-identically with or without the deleted flag, emitting no panel under
-  either. Every example, user-guide page and doctest is unaffected.
+  `prices_to_returns` and from `PricesToReturns`'s fields, and the `Impute` weak dependency goes
+  with `impute_method`. The map's destination accepts one, and weighs no option by what it costs to
+  rewrite.
+- **Nothing shipped changes numerically on a square table.** `examples/SP500.csv.gz` holds no gap in
+  8,313 × 20, and a gapless table converts bit-identically with or without the deleted flag,
+  emitting no panel under either. Every example, user-guide page and doctest is unaffected.
+- **A ragged join is the case that does move, and the deletion was hiding it.** `TimeSeries.merge`
+  is symmetric, so an `:outer` join against a benchmark or factor series whose history is longer
+  than the asset table expands the observation clock to the **union** rather than onto the asset
+  clock, and the padding is carried like any other gap. Measured on the test fixtures while
+  building #985: a 253-row asset slice joined against the full 8,313-row index benchmark returns
+  8,312 observations with 161,200 non-finite asset cells, where `dropmissing!` used to return 252.
+  Four test fixtures relied on that deletion to mean *the benchmark on my asset clock*, and each now
+  says so — by slicing the benchmark to the same window its asset and factor series already use, or
+  by asking for `:inner`. This is not an argument for the deletion: a caller who did not notice the
+  clock move would not have noticed the silent 97% row loss either. It is the reason
+  `join_method`'s default is a decision of its own, and it belongs to the sibling ticket that
+  settles `PriceIngestion`'s defaults.
 - **A caller who wanted the dense matrix composes it**, and gains the fitted replay they did not
   have:
 

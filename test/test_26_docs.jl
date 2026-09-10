@@ -467,29 +467,26 @@ they are of two kinds and only one kind can red a file that no child map has swe
   and so is `# Validation precedes # Returns`, which #406 already widened.
 
   A PRESENCE check says "the file must state X". It reds a file the moment its scope reaches
-  it. `ext/` carries ZERO docstrings over 2145 lines, so a presence check widened
-  unconditionally would red the build across both files on the day it landed. It reads the
-  sweep manifest instead: a file marked `swept = true` must satisfy it, and an unswept file
-  is exempt. Both `ext/` rows are `swept = false` today, so the testset below asserts the
-  exemption and nothing else. Child map 13 sweeps the two files and flips the flags.
+  it. `ext/` carries ZERO docstrings, so a presence check widened unconditionally would red
+  the build on the day it landed. It reads the sweep manifest instead: a file marked
+  `swept = true` must satisfy it, and an unswept file is exempt. The `ext/` row is
+  `swept = false` today, so the testset below asserts the exemption and nothing else. Child
+  map 13 sweeps the file and flips the flag.
 
 --------------------------------------------------- what an extension file has to document
 
 An extension is a module of its own, so `Base.undocumented_names` -- the instrument the
 first testset in this file already uses -- answers for it directly. It also answers the
-right question rather than a widened one, and what the two files hold is why:
+right question rather than a widened one, and what the one file holds is why:
 
   - `ext/PortfolioOptimisersPlotsExt.jl` defines 171 methods of 34 functions, and every one
     of the 34 is declared as a bare `function ... end` stub in `src/24_Plotting.jl`, which
     carries its docstring. Beyond those methods it declares four module-local `const`s
     holding error-message text, and nothing else.
-  - `ext/PortfolioOptimisersImputeExt.jl` defines one method of
-    `PortfolioOptimisers.apply_impute_method`, a seam declared in
-    `src/03_InputData/03_Preprocessing.jl`.
 
-A method binds in the module that declares the FUNCTION, so none of those 172 methods
+A method binds in the module that declares the FUNCTION, so none of those 171 methods
 reaches `names(ext; all = true)` and the census asks for a docstring on none of them. That
-is the right demand: 172 docstrings restating 35 would be 137 copies free to drift, which is
+is the right demand: 171 docstrings restating 34 would be 137 copies free to drift, which is
 what `ref_dict` and `field_dict` exist to stop. What the census does ask for is the four
 `const`s and the extension module's own docstring -- the names the extension declares
 itself. The main module carries a docstring under exactly that rule, so this is one rule and
@@ -507,7 +504,7 @@ not two.
     is why `every exported function is accounted for` is green today. ADR 0040 owns the
     catalogue and needs no amendment. An extension that declared a user-facing name of its
     own would be the smell, not the case to cater for: the declaration belongs in `src/` as
-    a stub, which is the pattern both extensions already follow.
+    a stub, which is the pattern the extension already follows.
  3. AN `ext/` DOCSTRING MAY CITE, by the same rule as a `src/` one, and the API page that
     renders that docstring carries the bibliography block. Under rule 1 the page is always
     the page of the `src/` declaration -- `docs/src/api/24_Plotting.md` for the plotting

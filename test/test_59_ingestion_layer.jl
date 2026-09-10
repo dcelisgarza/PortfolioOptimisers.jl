@@ -31,7 +31,7 @@ rather than assumed:
 The closing test is the destination itself: a caller holding a gapped price table reaches a
 walk-forward fold with no hand-built `ReturnsResult` and no hand-built mask.
 =#
-using Dates
+using Dates, Clarabel
 
 # The fixture carries all three span cases in one table, because the Span Rule reads position.
 # `a` is priced throughout, so no window's universe is ever empty.
@@ -54,7 +54,7 @@ Xm59 = TimeArray(collect(ts59), Pm59, nx59)
 Pg59 = 100.0 .+ cumsum(randn(StableRNG(9731), T59, N59) ./ 10; dims = 1)
 Xg59 = TimeArray(collect(ts59), Pg59, nx59)
 
-ptr59 = PricesToReturns(; nan_to_missing = false)
+ptr59 = PricesToReturns()
 rd59 = prices_to_returns(ptr59, price_ingestion(PriceIngestion(), X59))
 
 @testset "PriceIngestion assembles the span-carrying price carrier" begin
@@ -319,28 +319,30 @@ end
     # `pnl === nothing` meaning one thing only.
     @test isnothing(prices_to_returns(ptr59, PricesResult(; X = Xg59)).pnl)
 
-    # No span and gaps: the span is derived from this window alone, and that warns.
+    # No span and gaps: still no universe, and still no panel. ADR 0133 deleted the
+    # window-local derivation rather than rewording it -- a delisting straddling the window
+    # end reads there as an asset that was never listed, so the branch answered a question it
+    # could not answer correctly. The gaps are carried either way, and with no panel the
+    # Coverage Universe reads finiteness alone.
     bare = PricesResult(; X = X59)
-    rdw = @test_logs (:warn,) match_mode=:any prices_to_returns(ptr59, bare)
-    @test !isnothing(rdw.pnl)
-    @test_throws PortfolioOptimisers.IsNothingError prices_to_returns(PricesToReturns(;
-                                                                                      nan_to_missing = false,
-                                                                                      strict = true),
-                                                                      bare)
+    rdw = prices_to_returns(ptr59, bare)
+    @test isnothing(rdw.pnl)
+    @test size(rdw.X) == (T59 - 1, N59)
+    @test any(!isfinite, rdw.X)
+    # The rule is total: two methods, and neither of them warns or refuses.
+    @test PortfolioOptimisers.returns_universe_masks(nothing, rdw.X) === (nothing, nothing)
+    @test length(methods(PortfolioOptimisers.returns_universe_masks)) == 2
 
-    # A span whose gaps `nan_to_missing = true` would delete: warned about, refused under
-    # strict, because the panel that survives says the universe was never gapped.
+    # The contradiction `assert_span_convertible` reported cannot be written any more: there
+    # is no keyword that would delete the gaps a span describes.
+    @test !isdefined(PortfolioOptimisers, :assert_span_convertible)
     pr = price_ingestion(PriceIngestion(), X59)
-    rdn = @test_logs (:warn,) match_mode=:any prices_to_returns(PricesToReturns(), pr)
-    @test all(rdn.pnl.emsk)
-    @test_throws PortfolioOptimisers.ConflictingArgumentError prices_to_returns(PricesToReturns(;
-                                                                                                strict = true),
-                                                                                pr)
+    rdn = prices_to_returns(PricesToReturns(), pr)
+    @test !all(rdn.pnl.emsk)
 
     # A span that does not fit the price clock is refused outright.
     @test_throws DimensionMismatch PricesResult(; X = X59, span = trues(T59 + 1, N59))
-    @test_throws DimensionMismatch prices_to_returns(X59; span = trues(T59, N59 + 1),
-                                                     nan_to_missing = false)
+    @test_throws DimensionMismatch prices_to_returns(X59; span = trues(T59, N59 + 1))
 end
 
 @testset "assert_universe_aligned narrows to a provenance check" begin
@@ -402,4 +404,60 @@ end
         v = PortfolioOptimisers.port_opt_view(rd, tr, 1:N59)
         @test Matrix(v.pnl.amsk) == Matrix(rd.pnl.amsk)[tr, :]
     end
+end
+
+@testset "The conversion deletes nothing, and the universe is stated rather than survived" begin
+    # Issue #985, ADR 0133. The evidence the ticket asks to reproduce, re-measured here.
+    # A 40 x 4 table, one asset delisted after observation 30 and one suspended for three
+    # observations, and no leading gap: the question is what the conversion does with them,
+    # not what the Span Rule reads.
+    T, N = 40, 4
+    ts = collect(Date(2020, 1, 1):Day(1):(Date(2020, 1, 1) + Day(T - 1)))
+    nx = ["a", "b", "c", "d"]
+    P = 100.0 .+ cumsum(randn(StableRNG(985), T, N) ./ 10; dims = 1)
+    P[31:40, 3] .= NaN          # c delists after observation 30
+    P[18:20, 4] .= NaN          # d is suspended for three observations
+    X = TimeArray(ts, P, nx)
+    slv985 = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                    settings = Dict("verbose" => false),
+                    check_sol = (; allow_local = true, allow_almost = true))
+
+    # The conversion keeps the whole clock and the whole universe, and the gaps land where
+    # the arithmetic puts them: 10 + 1 non-finite returns for the delisting and 3 + 1 for the
+    # suspension, 14 in all.
+    pr = price_ingestion(PriceIngestion(), X)
+    rd = prices_to_returns(PricesToReturns(), pr)
+    @test size(rd.X) == (T - 1, N)
+    @test count(!isfinite, rd.X) == 14
+    @test !isnothing(rd.pnl)
+
+    # The universe the panel states excludes exactly the two assets the window cannot
+    # estimate, and they hold zero rather than a small number.
+    res = optimise(MeanRisk(; obj = MinimumRisk(),
+                            opt = JuMPOptimiser(; pe = prior(EmpiricalPrior(), rd),
+                                                slv = slv985)))
+    @test res.imsk == Bool[1, 1, 0, 0]
+    @test isapprox(res.w, [0.5217, 0.4783, 0.0, 0.0]; atol = 1e-4)
+    @test iszero(res.w[3]) && iszero(res.w[4])
+
+    # What the deleted path did, reproduced by hand: delete every observation row that holds
+    # a gap and the table is 26 of 39 rows, states no universe, and the two dead names take
+    # 43% of the book because nothing is left to say they are dead.
+    kept = [t for t in 1:T if all(isfinite, view(P, t, :))]
+    rdd = prices_to_returns(TimeArray(ts[kept], P[kept, :], nx))
+    @test size(rdd.X, 1) == 26
+    @test isnothing(rdd.pnl)
+    resd = optimise(MeanRisk(; obj = MinimumRisk(),
+                             opt = JuMPOptimiser(; pe = prior(EmpiricalPrior(), rdd),
+                                                 slv = slv985)))
+    @test resd.w[3] + resd.w[4] > 0.4
+
+    # The two spellings are one gap, and with `impute_method` deleted there is no path left
+    # on which they could differ.
+    Pm = Matrix{Union{Missing, Float64}}(P)
+    Pm[.!isfinite.(P)] .= missing
+    rdm = prices_to_returns(PricesToReturns(),
+                            price_ingestion(PriceIngestion(), TimeArray(ts, Pm, nx)))
+    @test isequal(rdm.X, rd.X)
+    @test Matrix(rdm.pnl.emsk) == Matrix(rd.pnl.emsk)
 end

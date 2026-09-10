@@ -9,12 +9,14 @@ Listing Span so it touches Held Gaps alone, and it is fitted on a training windo
 `Num_VecToScaM` reduction states a constant and manufactures two moves the market never printed.
 Both are asserted below, so the difference between them is pinned rather than assumed.
 
-The span the fill is bounded by is the carrier's whenever the carrier states one. A carrier
-assembled by hand states none, so `gap_fill_span` derives one from the window and diagnoses that:
-a window-local derivation reads a suspension straddling the window's edge as an inception or a
-delisting. The seed path — a window that opens inside a gap — is therefore driven through
-`gap_fill_span` and `gap_fill_column!` with a stated span, which is the same public
-`AbstractMatrix{Bool}` bound a caller's listing calendar enters at.
+The span the fill is bounded by is the carrier's, always. A carrier that states none bounds the
+fill by nothing at all and no price is written, because the window cannot supply one: a suspension
+straddling its edge reads there as an inception or a delisting, so a window-local derivation fills
+the wrong cells rather than fewer of them (ADR 0133). The carriers below therefore state a span, as
+`price_ingestion` builds them, and the span-less case is asserted in its own testset. The seed path
+— a window that opens inside a gap — is driven through `gap_fill_span` and `gap_fill_column!` with
+a stated span, which is the same public `AbstractMatrix{Bool}` bound a caller's listing calendar
+enters at.
 =#
 function pgf_970_prices()
     # observations × assets, one column per case:
@@ -31,11 +33,14 @@ function pgf_970_prices()
 end
 function pgf_970_carrier(X::AbstractMatrix)
     ts = Date(2020, 1, 1):Day(1):(Date(2020, 1, 1) + Day(size(X, 1) - 1))
-    return PricesResult(; X = TimeArray(collect(ts), X, ["A", "B", "C", "D"]))
+    # The carrier states the Span Rule's reading of the whole panel, which is what
+    # `price_ingestion` puts in the field. Nothing below relies on a window deriving one.
+    return PricesResult(; X = TimeArray(collect(ts), X, ["A", "B", "C", "D"]),
+                        span = listing_span(X))
 end
 function pgf_970_quiet_apply(res, pr)
-    # Every carrier below states no span, so each apply reports the window-local derivation. The
-    # report itself is asserted in its own testset; here it is noise.
+    # A carrier that states a span reports nothing, so this is a belt-and-braces silence: the
+    # one carrier that reports is the span-less one, and it has its own testset.
     return Logging.with_logger(Logging.NullLogger()) do
         return apply_preprocessing(res, pr)
     end
@@ -148,29 +153,35 @@ end
     @test isnan(bounded[5])
     @test bounded[2:4] == [102.0, 130.0, 130.0]
 end
-@testset "A carrier that states no Listing Span is reported, and refused under strict" begin
+@testset "A carrier that states no Listing Span fills nothing, and refuses under strict" begin
     X = pgf_970_prices()
-    pr = pgf_970_carrier(X)
-    res = fit_preprocessing(PriceGapFill(), pr)
+    ts = Date(2020, 1, 1):Day(1):(Date(2020, 1, 1) + Day(size(X, 1) - 1))
+    bare = PricesResult(; X = TimeArray(collect(ts), copy(X), ["A", "B", "C", "D"]))
+    @test isnothing(PortfolioOptimisers.carrier_listing_span(bare))
+    res = fit_preprocessing(PriceGapFill(), bare)
     @test !res.strict
-    @test_logs (:warn,) match_mode = :any apply_preprocessing(res, pr)
-    strict = fit_preprocessing(PriceGapFill(; strict = true), pr)
+    out = @test_logs (:warn,) match_mode = :any apply_preprocessing(res, bare)
+    # An all-`false` span bounds the fill by nothing, so not one cell is written: the window
+    # cannot answer the question, and answering it wrongly is worse than not answering it.
+    @test isequal(values(out.X), X)
+    @test PortfolioOptimisers.gap_fill_span(nothing, X, false) == falses(size(X))
+    strict = fit_preprocessing(PriceGapFill(; strict = true), bare)
     @test strict.strict
-    @test_throws ArgumentError apply_preprocessing(strict, pr)
-    # A window that holds no gap has nothing to fill and nothing to get wrong, so the derivation
-    # is silent and the values pass through untouched.
-    clean = pgf_970_carrier(100.0 .+ collect(1.0:8.0) * ones(1, 4))
+    @test_throws ArgumentError apply_preprocessing(strict, bare)
+    # A window that holds no gap has nothing to fill and nothing to get wrong, so a carrier
+    # stating no span is silent there and the values pass through untouched.
+    cleanX = 100.0 .+ collect(1.0:8.0) * ones(1, 4)
+    clean = PricesResult(; X = TimeArray(collect(ts), cleanX, ["A", "B", "C", "D"]))
     quiet = fit_preprocessing(PriceGapFill(; strict = true), clean)
-    out = @test_logs apply_preprocessing(quiet, clean)
-    @test values(out.X) == values(clean.X)
+    cout = @test_logs apply_preprocessing(quiet, clean)
+    @test values(cout.X) == values(clean.X)
     # The carrier is not mutated by an apply, and every field but `X` passes through.
+    pr = pgf_970_carrier(X)
     @test all(isnan, values(pr.X)[4:5, 1])
-    filled = pgf_970_quiet_apply(res, pr)
+    filled = pgf_970_quiet_apply(fit_preprocessing(PriceGapFill(), pr), pr)
     @test TimeSeries.timestamp(filled.X) == TimeSeries.timestamp(pr.X)
     @test TimeSeries.colnames(filled.X) == TimeSeries.colnames(pr.X)
     @test isnothing(filled.F) && isnothing(filled.B) && isnothing(filled.pnl)
-    # A price carrier states no span by default, which is what makes the fallback live.
-    @test isnothing(PortfolioOptimisers.carrier_listing_span(pr))
     # A stated span must fit the window it bounds.
     @test_throws DimensionMismatch PortfolioOptimisers.gap_fill_span(trues(3, 4), X, false)
 end
@@ -179,12 +190,14 @@ end
     res = fit_preprocessing(PriceGapFill(), pgf_970_carrier(X))
     # A window that carries only some of the fitted names fills those and skips the rest.
     ts = Date(2021, 1, 1):Day(1):(Date(2021, 1, 1) + Day(size(X, 1) - 1))
-    sub = PricesResult(; X = TimeArray(collect(ts), X[:, [1, 4]], ["A", "D"]))
+    sub = PricesResult(; X = TimeArray(collect(ts), X[:, [1, 4]], ["A", "D"]),
+                       span = listing_span(X[:, [1, 4]]))
     out = pgf_970_quiet_apply(res, sub)
     @test TimeSeries.colnames(out.X) == [:A, :D]
     @test values(out.X)[4:5, 1] == [102.0, 102.0]
     @test all(isnan, values(out.X)[:, 2])
     # A window whose names the fit never saw is left alone entirely.
-    other = PricesResult(; X = TimeArray(collect(ts), X[:, 1:1], ["Z"]))
+    other = PricesResult(; X = TimeArray(collect(ts), X[:, 1:1], ["Z"]),
+                         span = listing_span(X[:, 1:1]))
     @test isequal(values(pgf_970_quiet_apply(res, other).X), values(other.X))
 end

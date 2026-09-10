@@ -46,7 +46,7 @@ It runs at the price level, before [`PricesToReturns`](@ref), because a carried 
 ## Apply
 
  1. Copy the price values of the window, so the input is not mutated.
- 2. Read the Listing Span that bounds the fill with [`PortfolioOptimisers.gap_fill_span`](@ref).
+ 2. Read the Listing Span that bounds the fill with [`PortfolioOptimisers.gap_fill_span`](@ref). A carrier that states none bounds the fill by nothing, so no cell is written.
  3. For each fitted asset name, find its column in the window. Skip a name the window does not carry.
  4. Run the convention forward through that column with [`PortfolioOptimisers.gap_fill_column!`](@ref), seeded by the fitted value and bounded by the span.
  5. Rebuild `X` from the filled values, keeping the timestamps and the column names, then rebuild the [`PricesResult`](@ref). Every other field passes through untouched.
@@ -180,11 +180,11 @@ function carrier_listing_span(pr::PricesResult)
 end
 """
     gap_fill_span(span::AbstractMatrix{Bool}, X::AbstractMatrix, strict::Bool) -> AbstractMatrix{Bool}
-    gap_fill_span(span::Nothing, X::AbstractMatrix, strict::Bool) -> ListingSpan
+    gap_fill_span(span::Nothing, X::AbstractMatrix, strict::Bool) -> BitMatrix
 
 Resolve the Listing Span that bounds a [`PriceGapFill`](@ref) over one window.
 
-The span is the carrier's whenever the carrier states one, because a listing calendar is a fact about the instruments and a window cannot see all of it. A carrier that states none leaves only the window in hand, and the derivation from it is diagnosed rather than silent: a suspension straddling the window's edge reads as an inception or a delisting there, so the fill stops short of a Held Gap it would otherwise have filled. The diagnostic fires only when the window actually holds a gap, since a gapless window has nothing to fill and nothing to get wrong.
+The span is the carrier's, because a listing calendar is a fact about the instruments and a window cannot see all of it. A carrier that states none leaves only the window in hand, and the window cannot answer: a suspension straddling its edge reads there as an inception or a delisting, so a window-local derivation fills the wrong cells rather than fewer of them. So the fill is bounded by nothing at all — an all-`false` span, under which every cell lies outside a listing and no price is written — and it says so by name, refusing under `strict`. The diagnostic fires only when the window actually holds a gap, since a gapless window has nothing to fill and nothing to get wrong.
 
 The refusal is [`strict_diagnostic`](@ref)'s, which is the library's one strictness policy.
 
@@ -193,7 +193,7 @@ The refusal is [`strict_diagnostic`](@ref)'s, which is the library's one strictn
 The method that Julia selects is the algorithm.
 
  1. `span` is an `AbstractMatrix{Bool}`: check its shape against `X` and answer it. A caller's own declaration and a derived [`PortfolioOptimisers.ListingSpan`](@ref) enter alike, under the public bound.
- 2. `span` is `nothing`: report through [`strict_diagnostic`](@ref) when `X` holds a gap, then derive the span from `X` with [`listing_span`](@ref).
+ 2. `span` is `nothing`: report through [`strict_diagnostic`](@ref) when `X` holds a gap, then answer an all-`false` span of `X`'s shape, which fills nothing.
 
 # Arguments
 
@@ -208,7 +208,7 @@ The method that Julia selects is the algorithm.
 
 # Returns
 
-  - `span`: The listing statement on the price clock of `X`.
+  - `span`: The listing statement on the price clock of `X`, or an all-`false` span when the carrier states none.
 
 # Related
 
@@ -224,10 +224,10 @@ function gap_fill_span(span::AbstractMatrix{Bool}, X::AbstractMatrix, ::Bool)
 end
 function gap_fill_span(::Nothing, X::AbstractMatrix, strict::Bool)
     if any(is_missing_value, X)
-        strict_diagnostic("`PriceGapFill` is bounded by the Listing Span, and the price carrier states none, so the span was derived from the window being transformed. A window-local derivation reads a suspension straddling the window's edge as an inception or a delisting, so a Held Gap there is left unfilled. Build the carrier through the ingestion layer, which states a span.",
+        strict_diagnostic("`PriceGapFill` is bounded by the Listing Span, and the price carrier states none, so nothing was filled. The window cannot supply one: a suspension straddling its edge reads there as an inception or a delisting, so a window-local derivation fills the wrong cells rather than fewer of them. Build the carrier through the ingestion layer, which states a span.",
                           strict)
     end
-    return listing_span(X)
+    return falses(size(X))
 end
 """
     gap_fill_seed(fill::CarriedPrice, obs::VecNum) -> Number

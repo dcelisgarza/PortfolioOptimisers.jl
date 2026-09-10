@@ -142,16 +142,18 @@ across its absence, which is the same refusal the sentence above gives a re-pric
 
 ### A contradicted algorithm reports an `@info`
 
-Under `nan_to_missing = true`, `dropmissing!` removes every row still holding a gap before the
-conversion, so the table reaching `percentchange` is gap-free and the writable set is provably
-empty for every algorithm. A non-`nothing` `gap_return_alg` that finds no cell to write reports an
-`@info` at conversion.
+A table that holds no gap admits no writable cell, so a non-`nothing` `gap_return_alg` has nothing
+to write and the returns are the ones the default rule computed. It reports an `@info` at
+conversion.
 
 It is neither a refusal nor a warning. A refusal would reject a configuration that computes a
-correct answer, and a warning cannot distinguish a self-contradicting configuration from a panel
-that simply holds no gap, so it would fire where nothing is wrong. Sweeping `nan_to_missing` to
-escape the report is not available in any case: it moves the observation clock, and ADR 0129 rules a
-clock-changing hyperparameter unsearchable in principle.
+correct answer, and a warning cannot distinguish a caller who expected a gap from a panel that
+simply holds none, so it would fire where nothing is wrong.
+[ADR 0133](0133-the-conversion-computes-a-return-and-ingestion-is-the-only-door.md) rewrote this
+section, which previously read the empty writable set off `nan_to_missing = true` and
+`dropmissing!`. With the flag deleted the conversion never deletes a gap, so a gapless table is the
+only way to reach the report — and a caller cannot escape it by moving the clock either, since
+ADR 0129 rules a clock-changing hyperparameter unsearchable in principle.
 
 ## Consequences
 

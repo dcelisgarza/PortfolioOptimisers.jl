@@ -315,11 +315,13 @@ end
         @test panel_feature_matrix(res_f.ctx.returns.pnl)[2] == Zsqp[keep, keep]
         @test rf.seen[1] == Zsqp[keep, keep]
 
-        # A clustering step in the pipeline reaches the same bridge, so it is routed too.
+        # A clustering step in the pipeline reaches the same bridge, so it is routed too. It
+        # carries the same filter: the conversion deletes no asset (ADR 0133), so the drop
+        # that gives this pipeline its seven-asset universe is the filter's.
         rc = RecordingDistance(FeatureDistance())
         pipe_c = Pipeline(;
-                          steps = (PricesToReturns(), ClustersEstimator(; de = rc),
-                                   plain_hrp()))
+                          steps = (MissingDataFilter(; col_thr = 0.5), PricesToReturns(),
+                                   ClustersEstimator(; de = rc), plain_hrp()))
         fit(pipe_c, prm)
         @test length(rc.seen) == 1
         @test rc.seen[1] == Zsqp[keep, keep]

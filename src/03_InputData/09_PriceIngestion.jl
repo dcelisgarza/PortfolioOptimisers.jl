@@ -122,7 +122,7 @@ Assemble raw price series into the span-carrying price carrier.
 
 The three clock-moving steps run here rather than in a [`Pipeline`](@ref), and the **Span Rule** reads the whole panel once they have. What the caller gets back is an ordinary [`PricesResult`](@ref) whose `span` field states which assets are listed at each observation, ready for [`PricesToReturns`](@ref) to project onto the returns clock.
 
-Convert it with `PricesToReturns(; nan_to_missing = false)`: the layer spells an absent price `NaN` precisely so that no deletion step reads it, and a conversion that reads it as absent again deletes the gaps the span describes. The conversion warns when it is asked to.
+The layer spells an absent price `NaN`, which is the library's one spelling for absence, and the conversion carries it into the returns rather than deleting the observation or the asset that holds one.
 
 # Algorithm
 
@@ -278,33 +278,29 @@ function span_carrier_view(span::ListingSpan, ts_new, ts_old, j)
     end
 end
 """
-    assert_span_convertible(span::Nothing, nobs, na, nan_to_missing::Bool, strict::Bool) -> nothing
-    assert_span_convertible(span::AbstractMatrix{Bool}, nobs::Integer, na::Integer,
-                            nan_to_missing::Bool, strict::Bool) -> nothing
+    assert_span_shape(span::Nothing, nobs, na) -> nothing
+    assert_span_shape(span::AbstractMatrix{Bool}, nobs::Integer, na::Integer) -> nothing
 
-Check that a Listing Span fits the price panel it rides on, and that the conversion will not delete the gaps it describes.
+Check that a Listing Span fits the price panel it rides on.
 
-The ingestion layer spells an absent price `NaN` precisely so that no deletion step reads it. `nan_to_missing = true` reads it as absent again and deletes the observation or the asset that holds one, so the universe the emitted [`AssetPanel`](@ref) states is the one that *survives the deletion* rather than the one the span describes — an all-true panel over a table whose gaps were the point. That is a silently wrong answer rather than a broken one, so it warns by name, and refuses under `strict`.
+A span states which assets are listed at each observation of the price clock, so it is the shape of the asset prices. A carrier that states none states no universe, and there is nothing to check.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
  1. `span` is `nothing`: the carrier states no universe, so there is nothing to check.
- 2. Otherwise check the span's shape against the price panel's, and then the conversion's own convention against the span's purpose.
+ 2. Otherwise check the span's shape against the price panel's.
 
 # Arguments
 
   - `span`: The Listing Span on the price clock, or `nothing`.
   - `nobs`: Observation count of the price panel.
   - `na`: Asset count of the price panel.
-  - `nan_to_missing`: Whether the conversion reads a `NaN` price as absent and deletes it.
-  - `strict`: Whether the contradiction is refused rather than warned about.
 
 # Validation
 
   - `size(span) == (nobs, na)`. Raises a `DimensionMismatch`.
-  - `nan_to_missing` is `false` under `strict`. Raises a [`ConflictingArgumentError`](@ref).
 
 # Returns
 
@@ -317,21 +313,12 @@ The method that Julia selects is the algorithm.
   - [`price_ingestion`](@ref)
   - [`returns_universe_masks`](@ref)
 """
-function assert_span_convertible(::Nothing, ::Any, ::Any, ::Bool, ::Bool)::Nothing
+function assert_span_shape(::Nothing, ::Any, ::Any)::Nothing
     return nothing
 end
-function assert_span_convertible(span::AbstractMatrix{Bool}, nobs::Integer, na::Integer,
-                                 nan_to_missing::Bool, strict::Bool)::Nothing
+function assert_span_shape(span::AbstractMatrix{Bool}, nobs::Integer, na::Integer)::Nothing
     @argcheck(size(span) == (nobs, na),
               DimensionMismatch("a Listing Span states which assets are listed at each observation of the price clock, so it is the shape of the asset prices; got size(span) = $(size(span)) and $nobs × $na prices"))
-    if !nan_to_missing
-        return nothing
-    end
-    msg = "the price carrier states a Listing Span, and nan_to_missing = true reads its gaps as absent prices and deletes them, so the universe the emitted Asset Panel states is the one that survives the deletion rather than the one the span describes. Convert with PricesToReturns(; nan_to_missing = false)."
-    if strict
-        throw(ConflictingArgumentError(msg))
-    end
-    @warn(msg)
     return nothing
 end
 """
@@ -370,30 +357,24 @@ function compress_all_true(amsk::AbstractMatrix{Bool}, emsk::AbstractMatrix{Bool
     return msk, msk
 end
 """
-    returns_universe_masks(span::Option{<:AbstractMatrix{Bool}}, P::AbstractMatrix,
-                           R::AbstractMatrix, strict::Bool)
+    returns_universe_masks(span::Nothing, R::AbstractMatrix)
+    returns_universe_masks(span::AbstractMatrix{Bool}, R::AbstractMatrix)
 
 Derive the two universe masks the returns carrier's [`AssetPanel`](@ref) states.
 
-The layer's carrier arrives with a **Listing Span**, and this projects it onto the returns clock and intersects it with finiteness. A carrier built outside the layer arrives without one: if its prices hold no gap there is no universe to state and the conversion emits no panel, and if they do the span is derived **window-locally**, which warns because a delisting straddling the window end reads as an asset that was never listed.
+The layer's carrier arrives with a **Listing Span**, and this projects it onto the returns clock and intersects it with finiteness. A carrier built outside the layer arrives without one and states **no universe**, whether or not its prices hold a gap: a window-local derivation reads a delisting straddling the window end as an asset that was never listed, so it answers a question it cannot answer correctly. The gaps of such a carrier are still handled — with no panel the Coverage Universe reads finiteness alone — and `pnl === nothing` keeps its single meaning: the carrier was not built by the layer.
 
 # Algorithm
 
- 1. `span` is given: project and intersect it with [`universe_masks`](@ref).
- 2. `span` is `nothing` and `P` holds no gap: return `nothing, nothing`. The carrier was not built by the layer and states no universe.
- 3. `span` is `nothing` and `P` holds a gap: raise under `strict`, warn otherwise, derive the span from `P` with [`listing_span`](@ref), and project it.
- 4. Compress the pair with [`compress_all_true`](@ref).
+The method that Julia selects is the algorithm.
+
+ 1. `span` is `nothing`: return `nothing, nothing`.
+ 2. `span` is given: project and intersect it with [`universe_masks`](@ref), then compress the pair with [`compress_all_true`](@ref).
 
 # Arguments
 
   - `span`: The Listing Span over the surviving price rows and assets, or `nothing`.
-  - `P`: The surviving price panel the conversion read, `price observations × assets`.
   - `R`: The returns panel the conversion produced, `observations × assets`.
-  - `strict`: Whether a carrier holding gaps and no span is refused rather than warned about.
-
-# Validation
-
-  - `span` is not `nothing` when `P` holds a gap and `strict` is `true`. Raises an [`IsNothingError`](@ref).
 
 # Returns
 
@@ -402,26 +383,15 @@ The layer's carrier arrives with a **Listing Span**, and this projects it onto t
 # Related
 
   - [`universe_masks`](@ref)
-  - [`listing_span`](@ref)
   - [`compress_all_true`](@ref)
   - [`attach_universe_masks`](@ref)
   - [`prices_to_returns`](@ref)
 """
-function returns_universe_masks(span::Option{<:AbstractMatrix{Bool}}, P::AbstractMatrix,
-                                R::AbstractMatrix, strict::Bool)
-    if isnothing(span)
-        if !any(is_missing_value, P)
-            return nothing, nothing
-        end
-        msg = "the price carrier holds gaps and no Listing Span, so the universe they imply is derived from this window alone. A window-local derivation reads a delisting that straddles the window end as an asset that was never listed, which is why the panel-wide derivation exists. Build the carrier with price_ingestion(PriceIngestion(), X), or declare a listing calendar as its span."
-        if strict
-            throw(IsNothingError(msg))
-        end
-        @warn(msg)
-        span = listing_span(P)
-    end
-    amsk, emsk = universe_masks(span, R)
-    return compress_all_true(amsk, emsk)
+function returns_universe_masks(::Nothing, ::AbstractMatrix)
+    return nothing, nothing
+end
+function returns_universe_masks(span::AbstractMatrix{Bool}, R::AbstractMatrix)
+    return compress_all_true(universe_masks(span, R)...)
 end
 """
     attach_universe_masks(pnl, amsk::Nothing, emsk::Nothing)

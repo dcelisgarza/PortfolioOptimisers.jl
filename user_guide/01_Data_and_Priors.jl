@@ -24,18 +24,19 @@ end;
 
 Price data usually arrives from an API and must be converted to returns.
 [`prices_to_returns`](@ref) handles asset, factor, and benchmark prices (plus implied
-volatilities and volatility premiums), validates that the series are consistent, and can impute
-missing prices ([Impute.jl](https://github.com/invenia/Impute.jl)) and collapse to lower
-frequencies ([TimeSeries.jl](https://github.com/JuliaStats/TimeSeries.jl)). Given a single
-`TimeArray` of prices it returns a [`ReturnsResult`](@ref) holding the asset names `nx` and the
-return matrix `X`.
+volatilities and volatility premiums), validates that the series are consistent, and can collapse
+to lower frequencies ([TimeSeries.jl](https://github.com/JuliaStats/TimeSeries.jl)). Given a
+single `TimeArray` of prices it returns a [`ReturnsResult`](@ref) holding the asset names `nx` and
+the return matrix `X`.
 
 Real price tables are rarely clean — newly listed or delisted names leave leading/trailing gaps,
-halts and stale quotes leave flat stretches, and exchanges keep different holiday calendars. The
-`missing_col_percent` / `missing_row_percent` filters and `impute_method` handle all of it in this
-one call, *before* differencing prices into returns; the
-[Data preprocessing and imputation](../examples/1_foundations/02_Data_Preprocessing.md) example is
-the deep dive.
+halts and stale quotes leave flat stretches, and exchanges keep different holiday calendars.
+[`price_ingestion`](@ref) reads each asset's **Listing Span** off the panel and the conversion
+**carries** every gap into the returns, handing back an [`AssetPanel`](@ref) that says which
+assets are estimable when; filling a gap is [`PriceGapFill`](@ref)'s and deleting one is
+[`MissingDataFilter`](@ref)'s. The
+[Data preprocessing and the ingestion layer](../examples/1_foundations/02_Data_Preprocessing.md)
+example is the deep dive.
 =#
 
 X = TimeArray(CSV.File(joinpath(@__DIR__, "../examples/SP500.csv.gz")); timestamp = :Date)[(end - 252):end]

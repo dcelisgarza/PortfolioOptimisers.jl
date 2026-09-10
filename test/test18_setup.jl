@@ -63,7 +63,8 @@ rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv
                                  timestamp = :Date)[(end - 252):end];
                        B = TimeArray(CSV.File(joinpath(@__DIR__,
                                                        "./assets/SP500_idx.csv.gz"));
-                                     timestamp = :Date), iv = iv, ivpa = ivpa)
+                                     timestamp = :Date)[(end - 252):end], iv = iv,
+                       ivpa = ivpa)
 slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
               check_sol = (; allow_local = true, allow_almost = true),
               settings = "verbose" => false),

@@ -16,19 +16,20 @@ It records two answers, and the second is the one that costs.
     `assert_universe_aligned` never fires -- because reduce-and-expand keeps the result on the
     full universe, so the train and test universes are the same names either way.
 
- 2. **At the price level, only if it is asked to.** `prices_to_returns` reads a `NaN` price as
-    `missing` and deletes every observation row holding one, so a panel with three gapped
-    assets loses 60% of its history without a warning; and because that deletion is
-    window-local, a walk-forward's train and test windows disagree on the universe and
-    `assert_universe_aligned` refuses the fold by name. The remedy that refusal's message
-    prescribes -- a `MissingDataFilter` then an `Imputer` -- makes the fold run by inventing
-    prices for assets that were not listed, and only the Asset Panel then keeps the invention
-    out of the weights: with one a delisted asset holds exactly zero, without one it holds a
-    quarter of the book.
+ 2. **At the price level it now does too, and ADR 0133 is why.** When this file was written
+    `prices_to_returns` read a `NaN` price as `missing` and deleted every observation row
+    holding one, so a panel with three gapped assets lost 60% of its history without a
+    warning; and because that deletion was window-local, a walk-forward's train and test
+    windows disagreed on the universe and `assert_universe_aligned` refused the fold by name.
+    Issue #985 deleted that path. The conversion carries the gap unconditionally, so the
+    whole clock and the whole universe survive every window and the fold runs with no
+    imputer and no panel, agreeing weight for weight with the returns level.
 
-    `nan_to_missing = false` is the other answer, and it needs no imputer and no panel. The
-    gap reaches the returns, where every consumer already handles one, and the run agrees
-    weight for weight with the returns level.
+    The imputer is still measured here, because it is still in the library and it is still
+    what a caller reaching for `MissingDataFilter` then `Imputer` gets: it makes the fold run
+    by inventing prices for assets that were not listed, and only the Asset Panel then keeps
+    the invention out of the weights -- with one a delisted asset holds exactly zero, without
+    one it holds a quarter of the book.
 
 The panel-wide-versus-per-window question the map settled at charting is verified here rather
 than re-decided: deriving the active mask once over the whole panel gives every fold the same
@@ -258,40 +259,36 @@ pipe_fix58 = Pipeline(;
                       steps = (MissingDataFilter(), Imputer(), PricesToReturns(),
                                EmpiricalPrior(), mr58))
 
-@testset "The price level carries no gapped panel" begin
-    @testset "prices_to_returns deletes the observations rather than the gaps" begin
-        # Every column survives -- none is missing outright -- but `dropmissing!` at
-        # `src/03_InputData/03_Preprocessing.jl:1423` takes every ROW that holds a gap. Three
-        # gapped assets cost 72 of the 120 returns, and nothing is warned or refused.
+@testset "The price level carries a gapped panel" begin
+    @testset "prices_to_returns deletes nothing, in every window" begin
+        # ADR 0133. The conversion computes a return and nothing else: no observation row and
+        # no asset column is deleted, so the whole clock and the whole universe survive.
         r = prices_to_returns(Pta58)
         @test r.nx == nx58
-        @test size(r.X) == (48, N58)
-        @test all(isfinite, r.X)
+        @test size(r.X) == (T58, N58)
+        @test !all(isfinite, r.X)
 
-        # The deletion is window-local, so each window keeps a different history, and the
-        # last one loses `d` from the universe outright.
-        for (w, nrow, names) in
-            ((1:61, 23, nx58), (61:81, 14, nx58), (21:81, 38, nx58), (81:101, 10, nx58),
-             (41:101, 39, nx58), (101:121, 20, ["a", "b", "c", "e"]))
+        # There is nothing window-local left to disagree about: every window keeps every row
+        # and every name, whatever the gaps inside it are doing.
+        for w in (1:61, 61:81, 21:81, 81:101, 41:101, 101:121)
             rw = prices_to_returns(TimeArray(TimeSeries.timestamp(Pta58)[w], P58[w, :],
                                              nx58))
-            @test rw.nx == names
-            @test size(rw.X, 1) == nrow
+            @test rw.nx == nx58
+            @test size(rw.X, 1) == length(w) - 1
         end
     end
 
-    @testset "the walk-forward refuses the fold by name" begin
-        # Fold 3 trains on a window holding every asset and tests on one where `d` is gone,
-        # so the fitted steps produce two different universes and the fit/apply contract
-        # refuses at `src/23_Pipeline/03_Pipeline.jl:794`.
+    @testset "the walk-forward runs, with a panel and without one" begin
+        # The universe no longer moves between the train and the test window, so the fit/apply
+        # contract at `src/23_Pipeline/03_Pipeline.jl:794` has nothing to catch.
         for pr in (PricesResult(; X = Pta58, pnl = pnlP58), PricesResult(; X = Pta58))
-            @test_throws ArgumentError cross_val_predict(pipe_price58, pr, iwf58)
+            @test length(cross_val_predict(pipe_price58, pr, iwf58).pred) == 3
         end
     end
 
-    @testset "the prescribed remedy runs, and the panel is what makes it honest" begin
-        # `MissingDataFilter` then `Imputer` is the remedy the refusal's own message
-        # prescribes. It pins the universe and fills the gaps, so every fold runs.
+    @testset "the imputer runs, and the panel is what makes it honest" begin
+        # `MissingDataFilter` then `Imputer` is what a caller reaching for the released
+        # remedy gets. It pins the universe and fills the gaps, so every fold runs.
         pr_p = PricesResult(; X = Pta58, pnl = pnlP58)
         pr_n = PricesResult(; X = Pta58)
         pp = cross_val_predict(pipe_fix58, pr_p, iwf58)
@@ -350,19 +347,16 @@ pipe_fix58 = Pipeline(;
 end
 
 @testset "A carried gap needs no imputer and no panel" begin
-    # `nan_to_missing = false` is the price level's other answer, and it is the one the map's
-    # destination wants: the gap reaches the returns instead of deleting the observation that
-    # holds it, and every consumer downstream already handles one.
-    pipe_carry58 = Pipeline(;
-                            steps = (PricesToReturns(; nan_to_missing = false),
-                                     EmpiricalPrior(), mr58))
+    # The gap reaches the returns instead of deleting the observation that holds it, and
+    # every consumer downstream already handles one. This is the map's destination at the
+    # price level, and after ADR 0133 it is the only path.
+    pipe_carry58 = Pipeline(; steps = (PricesToReturns(), EmpiricalPrior(), mr58))
 
     @testset "nothing is deleted, and the gap stays where it is" begin
-        got = prices_to_returns(Pta58; nan_to_missing = false, pnl = pnlP58)
-        # The whole clock and the whole universe survive, against 48 rows by deletion.
+        got = prices_to_returns(Pta58; pnl = pnlP58)
+        # The whole clock and the whole universe survive.
         @test got.nx == nx58
         @test size(got.X) == (T58, N58)
-        @test size(prices_to_returns(Pta58).X) == (48, N58)
         # A run of `k` gapped prices makes exactly the `k + 1` returns that read one of them,
         # and the two ungapped assets are untouched.
         @test all(isfinite, view(got.X, :, 1))
@@ -390,10 +384,14 @@ end
         @test iszero(pp.pred[3].res.w[4]) && iszero(pn.pred[3].res.w[4])
     end
 
-    @testset "the default is untouched" begin
-        # The deleting path is still the default, so no released caller changes behaviour.
-        @test PricesToReturns().nan_to_missing
-        @test_throws ArgumentError cross_val_predict(pipe_price58,
-                                                     PricesResult(; X = Pta58), iwf58)
+    @testset "the carrying pipeline is the plain one" begin
+        # There is no flag, so `pipe_carry58` and `pipe_price58` are the same programme, and
+        # a gapless table is unaffected by any of it.
+        @test :nan_to_missing ∉ fieldnames(PricesToReturns)
+        pc = cross_val_predict(pipe_carry58, PricesResult(; X = Pta58), iwf58)
+        pp = cross_val_predict(pipe_price58, PricesResult(; X = Pta58), iwf58)
+        for k in 1:3
+            @test pc.pred[k].res.w == pp.pred[k].res.w
+        end
     end
 end

@@ -249,8 +249,10 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
     @testset "a price-starting Pipeline keeps the Asset Panel" begin
         # The panel enters as part of the :prices Data Slot, and every step between it and
         # the :returns slot owes it the slice that step's own axes take. MissingDataFilter
-        # drops an asset at price level and PricesToReturns drops the first observation, so
-        # a panel that reaches :returns intact has survived both.
+        # drops an asset at price level and PricesToReturns drops the first observation to
+        # the percentage change, so a panel that reaches :returns intact has survived both.
+        # The filter is what drops the asset: the conversion itself deletes nothing (ADR
+        # 0133), so `col_thr` has to say so.
         ts = Date(2020, 1, 1):Day(1):Date(2020, 1, 10)
         Pv = 100 .+ cumsum(rand(StableRNG(987654321), 10, 3); dims = 1)
         Pv[:, 2] .= NaN                       # asset "A2" is entirely missing
@@ -258,7 +260,7 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         # Z3[i, j, k] == i + 10(j - 1) + 30(k - 1), so every entry names its own position.
         Z3 = reshape(Float64.(1:60), 10, 3, 2)
         nz = ["f1", "f2"]
-        pipe = Pipeline(; steps = (MissingDataFilter(), PricesToReturns()))
+        pipe = Pipeline(; steps = (MissingDataFilter(; col_thr = 0.5), PricesToReturns()))
 
         rd = fit(pipe, PricesResult(; X = Px, pnl = matrix_panel(nz, Z3))).ctx.returns
         @test !isnothing(rd.pnl)

@@ -177,11 +177,12 @@ end
         @test_throws ArgumentError PortfolioOptimisers.predict(broken, pr, 1:10)
     end
 
-    @testset "universe drift between train and test is an error" begin
-        # PricesToReturns is stateless, and prices_to_returns drops assets that are
-        # entirely missing in the window it converts. A train window in which one
-        # asset is fully missing therefore yields fewer assets than a clean test
-        # window -- weights and test returns would silently misalign.
+    @testset "the conversion cannot drift a universe, so the fold aligns" begin
+        # ADR 0133. `PricesToReturns` is stateless, and it now deletes no asset and no
+        # observation: a train window in which one asset is fully missing yields the same
+        # universe as a clean test window, so the drift this testset was written for is not
+        # reachable through the conversion at all. That is the point -- the drift used to be
+        # an unfitted universe policy hiding inside a stateless step.
         X = make_prices(; T = 60, N = 4)
         vals = copy(values(X))
         vals[1:30, 2] .= NaN     # A2 fully missing across the train window 1:30
@@ -190,20 +191,32 @@ end
 
         pipe = Pipeline(; steps = (PricesToReturns(), EmpiricalPrior(), EqualWeighted()))
         res = fit(pipe, PortfolioOptimisers.port_opt_view(pr, 1:30))
-        @test res.ctx.returns.nx == ["A1", "A3", "A4"]
-        @test length(res.w) == 3
+        @test res.ctx.returns.nx == ["A1", "A2", "A3", "A4"]
+        @test length(res.w) == 4
 
-        # predicting on a window where A2 is present must fail loudly, not misalign
-        @test_throws ArgumentError PortfolioOptimisers.predict(res, pr, 31:60)
+        # A2 carries no finite return over the training window, so the Coverage Universe
+        # excludes it and it holds exactly zero -- stated by the reduction rather than by an
+        # asset vanishing from the table.
+        @test iszero(res.w[2])
 
-        # pinning the universe with a filter (and filling gaps) makes it well defined
+        # Predicting on a window where A2 is priced now aligns and runs, rather than
+        # refusing a fold whose universes never needed to differ. `predict` replays on the
+        # universe the fitted result reduced to, which is reduce-and-expand doing its job.
+        pred = PortfolioOptimisers.predict(res, pr, 31:60)
+        @test pred.rd.nx == ["A1", "A3", "A4"]
+        @test size(pred.rd.X, 1) == 29
+
+        # Deleting the asset is still expressible, and it is a fitted step: the filter
+        # records the surviving names on the training window and replays them, so both
+        # windows carry the same three names and the fold aligns for that reason instead.
         pipe_ok = Pipeline(;
-                           steps = (MissingDataFilter(; col_thr = 0.5), Imputer(),
-                                    PricesToReturns(), EmpiricalPrior(), EqualWeighted()))
+                           steps = (MissingDataFilter(; col_thr = 0.5), PricesToReturns(),
+                                    EmpiricalPrior(), EqualWeighted()))
         res_ok = fit(pipe_ok, PortfolioOptimisers.port_opt_view(pr, 1:30))
         @test res_ok.ctx.returns.nx == ["A1", "A3", "A4"]
-        pred = PortfolioOptimisers.predict(res_ok, pr, 31:60)
-        @test size(pred.rd.X, 1) == 29
+        pred_ok = PortfolioOptimisers.predict(res_ok, pr, 31:60)
+        @test pred_ok.rd.nx == ["A1", "A3", "A4"]
+        @test size(pred_ok.rd.X, 1) == 29
     end
 
     @testset "nested pipelines replay recursively" begin

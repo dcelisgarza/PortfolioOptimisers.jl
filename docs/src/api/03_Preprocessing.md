@@ -24,17 +24,14 @@ PortfolioOptimisers.apply_gap_return
 port_opt_view(::ReturnsResult, ::Any)
 returns_result_picker
 Prices_RR
-PortfolioOptimisers.apply_impute_method
 ```
 
-!!! note "`Impute` is optional; `Imputer` is not `Impute`"
-    The `impute_method` keyword of [`prices_to_returns`](@ref) takes an
-    [`Impute.jl`](https://github.com/invenia/Impute.jl) imputor, and `Impute` is a **weak**
-    dependency: add it to your project and `using Impute` to load `PortfolioOptimisersImputeExt`,
-    which supplies the method. Without it, passing an imputor raises an `ArgumentError` rather than
-    working silently. This is unrelated to [`Imputer`](@ref), PortfolioOptimisers' own imputation
-    estimator for pipelines, despite the similar name. See
-    `docs/adr/0042-impute-is-a-weak-dependency.md`.
+!!! note "An absent price has one spelling"
+    The conversion unifies `missing` and `NaN` as `NaN` and carries the gap into the returns; it
+    deletes nothing. Filling a gap is [`PriceGapFill`](@ref)'s, bounded by the **Listing Span**, and
+    deleting an observation or an asset is [`MissingDataFilter`](@ref)'s — both of them fitted steps,
+    because a **Universe Policy** is fitted on a training window and replayed by name. See
+    `docs/adr/0133-the-conversion-computes-a-return-and-ingestion-is-the-only-door.md`.
 
 ## The Listing Span
 
@@ -80,10 +77,11 @@ the universe — **always**, a gapless panel included, so `pnl === nothing` on a
 one thing only: the carrier was not built by the layer. The gapless case costs nothing to say: both
 masks become a [`PortfolioOptimisers.AllTrueMask`](@ref), which stores no cell.
 
-Convert an ingested carrier with `PricesToReturns(; nan_to_missing = false)`. The layer spells an
-absent price `NaN` precisely so that no deletion step reads it, and a conversion that reads it as
-absent again deletes the gaps the span describes; it warns when asked to, and refuses under
-`strict`. See
+The layer spells an absent price `NaN`, which is the library's one spelling for absence, and the
+conversion carries it into the returns rather than deleting the observation or the asset that holds
+one. A carrier the layer did not build states no span, and then no universe: the conversion does not
+guess one from the window, because a delisting straddling the window end reads there as an asset
+that was never listed. See
 `docs/adr/0129-the-ingestion-layer-seams-at-the-listing-span-and-the-clock-draws-the-pipeline-boundary.md`
 and
 `docs/adr/0132-the-layer-emits-one-carrier-and-alignment-splits-into-a-fixed-axis-and-a-provenance-check.md`.
@@ -92,7 +90,7 @@ and
 PriceIngestion
 price_ingestion
 PortfolioOptimisers.unify_gaps
-PortfolioOptimisers.assert_span_convertible
+PortfolioOptimisers.assert_span_shape
 PortfolioOptimisers.returns_universe_masks
 PortfolioOptimisers.compress_all_true
 PortfolioOptimisers.attach_universe_masks

@@ -1,41 +1,34 @@
 #=
-# Data preprocessing and imputation
+# Data preprocessing and the ingestion layer
 
 Real price data is rarely clean. Assets list partway through the window (leading gaps), trade
 halts and stale quotes leave flat or missing stretches, names get delisted (trailing gaps), and
 exchanges keep different holiday calendars so timestamps do not line up. Feeding that straight
-into an optimiser is a recipe for silent errors. [`prices_to_returns`](@ref) handles all of it in
-one call, *before* it computes returns, through three cooperating controls:
+into an optimiser is a recipe for silent errors.
 
-  - `missing_col_percent` — drop any **asset** whose fraction of missing observations exceeds
-    this threshold (too sparse to trust).
-  - `missing_row_percent` — drop any **timestamp** whose fraction of missing values across assets
-    exceeds this threshold (e.g. a misaligned holiday).
-  - `impute_method` — fill the *remaining* gaps with an [`Impute`](https://github.com/invenia/Impute.jl)
-    imputor before differencing prices into returns.
+The library answers it in one place. [`price_ingestion`](@ref) is the door: it unifies the two
+spellings an absent price arrives under, joins and collapses the series, and reads the **Span
+Rule** off the panel to state each asset's **Listing Span** — where a leading run of gaps is an
+asset not yet listed, a trailing run is a delisting, and an interior run is a suspension on an
+asset that is still listed. [`prices_to_returns`](@ref) then computes returns and **carries every
+gap**, handing the [`ReturnsResult`](@ref) an [`AssetPanel`](@ref) that says which assets are in
+the universe and which of them can be estimated at each observation.
 
-The order matters: filter the hopeless rows/columns first, then impute what is left, then compute
-returns.
+Nothing on that path deletes an observation or an asset, and that is deliberate: an observation
+deleted for one asset's gap is an observation lost for every other asset too. Deleting is a
+separate, *fitted* step ([`MissingDataFilter`](@ref)), and so is filling
+([`PriceGapFill`](@ref)) — a **Universe Policy** is fitted on a training window and replayed by
+name, or a walk-forward scores a fold against a universe the future chose.
 
 !!! tip "When to reach for this"
-    Reach for these whenever the raw price table has missing values — newly listed or delisted
-    assets, halted or stale prices, or non-overlapping trading calendars. The decision for each
-    asset or date is *drop or fill*: drop what is too sparse to trust (`missing_*_percent`), fill
-    what is recoverable (`impute_method`), and let `prices_to_returns` do both in one pass.
-
-!!! note "Impute.jl imputors"
-    Imputation methods are [`Impute.jl`](https://github.com/invenia/Impute.jl) imputors passed via
-    `impute_method`. `Impute` is an *optional* dependency of PortfolioOptimisers — add it to your
-    project and `using Impute` to load `PortfolioOptimisersImputeExt`, which is what teaches
-    `prices_to_returns` to accept an imputor; without it, passing one is an error. Note that this
-    is unrelated to [`Imputer`](@ref), PortfolioOptimisers' own imputation *estimator* for
-    pipelines. The two most useful imputors for prices are
-    `Impute.LOCF()` (last observation carried forward — the right model for a halt or stale quote,
-    since it holds the last traded price) and `Impute.Interpolate()` (linear interpolation —
-    natural for short gaps between two good prices).
+    Reach for the layer whenever the raw price table has missing values — newly listed or
+    delisted assets, halted or stale prices, or non-overlapping trading calendars. The decision
+    for each gap is *carry, fill, or drop*: carrying is the default and needs no configuration,
+    filling states a price convention across a suspension, and dropping is for an asset too
+    sparse to trust.
 =#
 
-using PortfolioOptimisers, PrettyTables, DataFrames, Statistics, Impute
+using PortfolioOptimisers, PrettyTables, DataFrames, Statistics
 
 resfmt = (v, i, j) -> begin
     if j == 1
@@ -49,8 +42,8 @@ end;
 ## 1. A clean slice, then realistic damage
 
 We start from the usual S&P 500 slice and deliberately injure it to mimic the messes above: one
-asset that is mostly missing (a late lister we will want to drop), a halted block of one asset,
-and scattered single-day gaps across the rest.
+asset that is mostly missing (a late lister), a halted block of one asset, and scattered
+single-day gaps across the rest.
 =#
 
 using CSV, TimeSeries
@@ -61,8 +54,8 @@ nx = string.(colnames(X))
 T, N = size(values(X))
 
 vals = Matrix{Union{Float64, Missing}}(values(X))
-vals[1:160, 3] .= missing                 # asset 3: mostly missing (late lister → drop)
-vals[100:120, 2] .= missing               # asset 2: a ~3-week trading halt (fillable)
+vals[1:160, 3] .= missing                 # asset 3: a late lister, missing for 160 days
+vals[100:120, 2] .= missing               # asset 2: a ~3-week trading halt
 using StableRNGs
 rng = StableRNG(42)
 for _ in 1:60                              # scattered single-day gaps elsewhere
@@ -73,8 +66,13 @@ Xmiss = TimeArray(ts, vals, Symbol.(nx))
 #=
 ## 2. Diagnose the missingness
 
-Before deciding what to drop or fill, measure it. The per-column and per-row missing fractions
-are exactly the quantities `missing_col_percent` and `missing_row_percent` threshold against.
+Before deciding what to carry, fill or drop, measure it. The per-column and per-row missing
+fractions are the quantities the two threshold keywords of [`prices_to_returns`](@ref) count.
+
+Their names read as the axis that is *counted*, not the axis that is dropped:
+`missing_row_percent` counts the missing **rows** of a column and drops the column;
+`missing_col_percent` counts the missing **columns** of a row and drops the row. Both default to
+`1.0`, so nothing is dropped unless you ask.
 =#
 
 col_missing = vec(mean(ismissing, vals; dims = 1))
@@ -84,64 +82,118 @@ pretty_table(first(worst_cols, 6); formatters = [resfmt],
              title = "Missing fraction per asset (worst six)")
 
 #=
-Asset 3 is missing ~64% of the time — there is no honest way to impute that, so it should be
-dropped. Asset 2's halt and the scattered single-day gaps, by contrast, are short and
-recoverable.
+## 3. Ingest, and read the Listing Span
 
-## 3. Drop the hopeless, keep the rest
+`price_ingestion` unifies `missing` and `NaN` as `NaN` — the one spelling the returns level can
+carry in a `Matrix{Float64}` — and reads the Span Rule off the whole panel. Reading it *once*,
+outside any fold, is what makes it a fact about the instruments rather than a judgement a window
+made.
 
-`missing_col_percent = 0.5` drops any asset more than half missing (asset 3), while
-`missing_row_percent = 0.5` would drop any date more than half missing across assets. With no
-imputation yet, the kept assets still contain gaps, so we ask only how many assets survive the
-filter.
+Asset 3 is missing for its first 160 observations, so the span says it is not yet listed there.
+Asset 2's halt is interior, so the span says it is listed throughout and the halt is a **Held
+Gap**.
 =#
 
-rd_droponly = prices_to_returns(Xmiss; missing_col_percent = 0.5, missing_row_percent = 0.5,
-                                impute_method = Impute.LOCF())
-println("Assets kept after the 50% column filter: $(length(rd_droponly.nx)) of $N")
+pr = price_ingestion(PriceIngestion(), Xmiss)
+span = Matrix(pr.span)
+pretty_table(DataFrame(; asset = nx[[3, 2, 4]],
+                       listed_from = [findfirst(view(span, :, j)) for j in (3, 2, 4)],
+                       listed_to = [findlast(view(span, :, j)) for j in (3, 2, 4)],
+                       observations = fill(T, 3));
+             title = "The Span Rule: a leading run is not-yet-listed, an interior one is a halt")
 
 #=
-## 4. Impute the survivors
+## 4. Carry the gaps into the returns
 
-The kept assets still have a halt and scattered gaps. We fill them with two different imputors
-and compare. `Impute.LOCF()` carries the last observed *price* forward — so a halt becomes a flat
-price stretch and therefore zero returns through the halt, which is the honest accounting for a
-non-trading period. `Impute.Interpolate()` draws a straight line across the gap, spreading a
-small constant return over the missing days.
+The conversion computes returns and nothing else. Every asset keeps its column, every date keeps
+its row, and the cells a gap left behind are non-finite. A run of `k` gapped prices makes exactly
+the `k + 1` returns that read one of them — the gap does not spread, because no asset's return
+reads another's price.
+
+The [`AssetPanel`](@ref) that comes back states the universe: `amsk` is the span projected onto
+the returns clock, and `emsk` is that intersected with finiteness.
 =#
 
-rd_locf = prices_to_returns(Xmiss; missing_col_percent = 0.5, impute_method = Impute.LOCF())
-rd_interp = prices_to_returns(Xmiss; missing_col_percent = 0.5,
-                              impute_method = Impute.Interpolate())
-
-pretty_table(DataFrame(; method = ["LOCF", "Interpolate"],
-                       assets = [length(rd_locf.nx), length(rd_interp.nx)],
-                       observations = [size(rd_locf.X, 1), size(rd_interp.X, 1)]);
-             title = "Both imputors yield a complete returns matrix")
+rd = prices_to_returns(PricesToReturns(), pr)
+pretty_table(DataFrame(;
+                       quantity = ["assets", "observations", "non-finite return cells",
+                                   "estimable cells"],
+                       value = [length(rd.nx), size(rd.X, 1), count(!isfinite, rd.X),
+                                count(Matrix(rd.pnl.emsk))]);
+             title = "Nothing is deleted, and the panel states what is estimable")
 
 #=
-## 5. Straight into the pipeline
+## 5. State a price convention across the halts
 
-A cleaned [`ReturnsResult`](@ref) is just an ordinary one — it flows into the rest of the package
-with no special handling. We solve a minimum-variance [`MeanRisk`](@ref) on the LOCF-imputed data
-to confirm the preprocessing produced something usable end to end.
+Carrying a gap is enough for everything downstream — the Coverage Universe excludes an asset from
+the windows it spoils. A caller who instead wants to *say* what happened during a halt reaches for
+[`PriceGapFill`](@ref): it is fitted on a training window, replayed by name, and bounded by the
+Listing Span, so it touches Held Gaps alone and can never fabricate a price where an asset was not
+yet listed or has been delisted.
+
+[`CarriedPrice`](@ref) states the **Held Price** — the last priced observation carried forward — so
+a halt becomes a flat stretch and zero returns through it, with the whole move landing on the
+observation that ends it. A per-asset reduction such as `MedianValue()` states a constant instead,
+which manufactures two moves the market never printed. Both conserve wealth across the gap; they
+differ in where the move lands.
+=#
+
+fill_res = fit_preprocessing(PriceGapFill(), pr)
+pr_filled = apply_preprocessing(fill_res, pr)
+rd_filled = prices_to_returns(PricesToReturns(), pr_filled)
+
+pretty_table(DataFrame(; table = ["carried", "filled with the Held Price"],
+                       non_finite = [count(!isfinite, rd.X), count(!isfinite, rd_filled.X)],
+                       asset_3_still_unlisted = [true, !isfinite(rd_filled.X[1, 3])]);
+             title = "The fill closes the halts, and stops at asset 3's listing")
+
+#=
+## 6. Drop what is too sparse to trust
+
+Asset 3 is missing ~64% of the window. Carrying it costs nothing — it simply never enters a
+cross-section it cannot be estimated in — but a caller who wants it gone entirely says so with a
+threshold. In a walk-forward, reach for [`MissingDataFilter`](@ref) instead: it records the
+surviving names on the training window and replays them, so the universe is not re-chosen with
+each window's own hindsight.
+=#
+
+rd_dropped = prices_to_returns(Xmiss; missing_row_percent = 0.5)
+println("Assets kept after the 50% column filter: $(length(rd_dropped.nx)) of $N")
+
+#=
+## 7. Straight into the pipeline
+
+A [`ReturnsResult`](@ref) carrying a panel is an ordinary one — it flows into the rest of the
+package with no special handling, and the panel is what keeps an asset the window cannot estimate
+out of the weights.
+
+Solving on both tables shows what the fill buys. The **Coverage Universe** admits an asset only
+where its return is finite over the whole window, so the scattered single-day gaps alone exclude
+most of the book from the carried table. Closing the Held Gaps brings them back, and asset 3 stays
+out because it was not listed — which is the distinction the span exists to draw.
 =#
 
 using Clarabel
 slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
              settings = Dict("verbose" => false),
              check_sol = (; allow_local = true, allow_almost = true))
-res = optimise(MeanRisk(; obj = MinimumRisk(),
-                        opt = JuMPOptimiser(; pe = prior(EmpiricalPrior(), rd_locf),
-                                            slv = slv)))
-println("Min-variance solve on cleaned data: $(res.retcode), $(count(>(1e-6), res.w)) active names")
+function mv(rr)
+    return optimise(MeanRisk(; obj = MinimumRisk(),
+                             opt = JuMPOptimiser(; pe = prior(EmpiricalPrior(), rr),
+                                                 slv = slv)))
+end
+res = mv(rd)
+res_filled = mv(rd_filled)
+pretty_table(DataFrame(; table = ["carried", "filled with the Held Price"],
+                       estimable = [count(res.imsk), count(res_filled.imsk)],
+                       active_names = [count(>(1e-6), res.w), count(>(1e-6), res_filled.w)]);
+             title = "The panel keeps what the window cannot estimate out of the weights")
 
 #=
-## 6. Visualising the damage
+## 8. Visualising the damage
 
-A heatmap of the missingness mask makes the structure obvious: the wide band is asset 3 (dropped
-by the column filter), the short block is asset 2's halt, and the speckle is the scattered gaps
-that imputation fills.
+A heatmap of the missingness mask makes the structure obvious: the wide band is asset 3's late
+listing, the short block is asset 2's halt, and the speckle is the scattered gaps.
 =#
 
 using StatsPlots, GraphRecipes
@@ -151,20 +203,21 @@ heatmap(1:N, 1:T, Float64.(ismissing.(vals)); xlabel = "Asset", ylabel = "Day",
 #=
 ## Summary
 
-`prices_to_returns` is the single entry point for cleaning price data:
+The ingestion layer is the single entry point for cleaning price data:
 
-  - `missing_col_percent` / `missing_row_percent` drop assets and dates that are too sparse to
-    trust, before any returns are computed.
-  - `impute_method` fills the recoverable gaps with an `Impute.jl` imputor — `Impute.LOCF()` for
-    halts and stale quotes, `Impute.Interpolate()` for short gaps.
-  - The result is an ordinary [`ReturnsResult`](@ref) that feeds the rest of the pipeline
-    unchanged.
+  - [`price_ingestion`](@ref) unifies the two absent-price spellings, joins and collapses the
+    series, and reads the **Listing Span** off the whole panel.
+  - [`prices_to_returns`](@ref) computes returns and carries every gap, handing back an
+    [`AssetPanel`](@ref) that states which assets are estimable when.
+  - [`PriceGapFill`](@ref) states a price convention across a **Held Gap**, bounded by the span;
+    [`MissingDataFilter`](@ref) and the two threshold keywords delete what is too sparse to trust.
+    Both are fitted on a training window and replayed, because a universe chosen with hindsight is
+    a look-ahead.
 =#
 
-#src ## Findings (authoring dogfooding — stripped from rendered docs)
-#src - New page; closes the data-preprocessing backlog item for 1_foundations.
-#src - TODO-on-run: confirm Impute.LOCF()/Impute.Interpolate() are the correct 0.6 imputor names
-#src   and that prices_to_returns(; impute_method=...) fills the halt + scattered gaps so the
-#src   returns matrix is complete and the downstream MeanRisk solves. Check whether the leading
-#src   missings on a late-lister need NOCB/row-drop rather than LOCF (LOCF cannot fill a leading
-#src   gap), and record the behaviour. Impute added to docs/Project.toml for this page.
+#=
+!!! note "ADR 0133"
+    `nan_to_missing` and `impute_method` used to live on `prices_to_returns`, and the default
+    deleted every observation row holding a gap. ADR 0133 removed both: a keyword survives on the
+    conversion if and only if it changes the arithmetic of a return.
+=#
