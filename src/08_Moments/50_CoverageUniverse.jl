@@ -1046,6 +1046,39 @@ function Statistics.std(ce::Covariance, X::MatNum, pnl::Option{<:AssetPanel}; di
                                  kwargs...)
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Asset Panel method of [`coskewness`](@ref) for a [`Coskewness`](@ref), which routes on its `cvg` field with [`coverage_panel_moment`](@ref). The answer is a pair, so the Coverage Universe seam frames the tensor at the pair index and the negative spectral skewness matrix as a covariance-like matrix.
+
+# Related
+
+  - [`coverage_panel_moment`](@ref)
+  - [`Coskewness`](@ref)
+  - [`CoveragePolicy`](@ref)
+"""
+function coskewness(ske::Coskewness, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1,
+                    kwargs...)
+    return coverage_panel_moment(coskewness, ske, ske.cvg, X, pnl, expand_moment;
+                                 dims = dims, kwargs...)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Asset Panel method of [`cokurtosis`](@ref) for a [`Cokurtosis`](@ref), which routes on its `cvg` field with [`coverage_panel_moment`](@ref). The answer is `assets² × assets²`, so the Coverage Universe seam frames it at the pair index on both axes.
+
+# Related
+
+  - [`coverage_panel_moment`](@ref)
+  - [`Cokurtosis`](@ref)
+  - [`CoveragePolicy`](@ref)
+"""
+function cokurtosis(kte::Cokurtosis, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1,
+                    kwargs...)
+    return coverage_panel_moment(cokurtosis, kte, kte.cvg, X, pnl,
+                                 (m, cmsk) -> expand_moment(m, cmsk, Val(:kt)); dims = dims,
+                                 kwargs...)
+end
+"""
     coverage_variance_series(ce, cvg, X, pnl; dims::Int = 1, kwargs...) -> MatNum
 
 Routes a point-in-time variance series to the Coverage Universe seam or to the available-case one.

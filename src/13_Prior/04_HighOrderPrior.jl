@@ -819,8 +819,117 @@ function prior(pe::HighOrderPriorEstimator, X::MatNum, F::Option{<:MatNum} = not
     elseif !isnothing(kt) && isnothing(sk)
         L2, S2 = dup_elim_sum_matrices(size(pr.X, 2))[2:3]
     end
-    return HighOrderPrior(; pr = pr, kt = kt, D2 = D2, L2 = L2, S2 = S2, sk = sk, V = V,
-                          skmp = isnothing(sk) ? nothing : pe.ske.mp)
+    hop = HighOrderPrior(; pr = pr, kt = kt, D2 = D2, L2 = L2, S2 = S2, sk = sk, V = V,
+                         skmp = isnothing(sk) ? nothing : pe.ske.mp)
+    assert_matched_coverage(hop)
+    return hop
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Reads the per-asset diagonal of every co-moment a [`HighOrderPrior`](@ref) holds, and answers where all of them are finite.
+
+The higher-order half of the Investable Mask. A coskewness tensor's per-asset diagonal is `sk[i, (i - 1) * N + i]`, which is asset `i`'s third central moment, and a cokurtosis matrix's is `kt[j, j]` at the pair column `j = (i - 1) * N + i`, which is its fourth. Both are finite exactly where the fit answered for that asset, which is the same rule [`investable_mask`](@ref) reads off the diagonal of `sigma`. A moment the carrier does not hold constrains nothing, so a `nothing` reads as every asset admitted.
+
+# Arguments
+
+  - `sk`: The coskewness tensor, `assets × assets²`, or `nothing`.
+  - `kt`: The square cokurtosis matrix, `assets² × assets²`, or `nothing`.
+  - `N`: Number of assets.
+
+# Returns
+
+  - `msk::BitVector`: `true` at every asset whose higher-order moments are finite.
+
+# Related
+
+  - [`HighOrderPrior`](@ref)
+  - [`investable_mask`](@ref)
+  - [`assert_matched_coverage`](@ref)
+"""
+function comoment_investable(sk::Option{<:MatNum}, kt::Option{<:MatNum}, N::Integer)
+    msk = trues(N)
+    for i in 1:N
+        j = (i - 1) * N + i
+        if !isnothing(sk)
+            msk[i] &= isfinite(sk[i, j])
+        end
+        if !isnothing(kt)
+            msk[i] &= isfinite(kt[j, j])
+        end
+    end
+    return msk
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Derive the Investable Mask of a [`HighOrderPrior`](@ref), which reads every order the carrier holds.
+
+The [`AbstractPriorResult`](@ref) method reads `mu` and the diagonal of `sigma`, which under a [`CoveragePolicy`](@ref) no longer implies that the higher-order tensors are finite where it admits: the policy is set per estimator, so `pe.pe` may carry one while `pe.ske` and `pe.kte` do not. This method therefore ANDs the per-asset diagonals of `sk` and `kt` into it with [`comoment_investable`](@ref), so an asset the higher orders could not estimate leaves the problem rather than reaching a spectral step that throws.
+
+The narrowing is silent here, because a mask is derived at every optimiser entry and a derivation owes no side effect. The one warning belongs to the fit, and [`assert_matched_coverage`](@ref) raises it there.
+
+# Arguments
+
+  - $(arg_dict[:pr])
+
+# Validation
+
+  - At least one asset must be investable.
+
+# Returns
+
+  - `imsk::Option{BitVector}`: `true` at every investable asset, or `nothing` when every asset is investable.
+
+# Related
+
+  - [`HighOrderPrior`](@ref)
+  - [`investable_mask`](@ref)
+  - [`comoment_investable`](@ref)
+  - [`assert_matched_coverage`](@ref)
+"""
+function investable_mask(pr::HighOrderPrior)::Option{BitVector}
+    imsk = isfinite.(pr.mu) .& isfinite.(LinearAlgebra.diag(pr.sigma))
+    imsk .&= comoment_investable(pr.sk, pr.kt, length(pr.mu))
+    @argcheck(any(imsk),
+              IsEmptyError("no asset of the prior result is investable: every asset carries a NaN in `mu`, on the diagonal of `sigma`, or on the per-asset diagonal of `sk` or `kt`. Check that the prior estimator received enough observations, that the universe holds at least one active asset, and that `ske` and `kte` carry the same `cvg` as the low order estimators."))
+    return all(imsk) ? nothing : imsk
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Says so, once, when the higher orders of a fitted [`HighOrderPrior`](@ref) cover fewer assets than its low order block does.
+
+A [`CoveragePolicy`](@ref) is a field of one estimator, so a caller may set one on `pe.pe`'s mean and covariance and leave `pe.ske` and `pe.kte` on the Coverage Universe. That configuration is legal and well defined — the low orders answer an asset that lists inside the window and the higher orders do not — but the Investable Mask then narrows back to the Coverage Universe, and the caller has bought nothing where the panel is gappiest. It is only the silence that is refused, exactly as [`scenario_fill`](@ref) refuses it for a zero-filled scenario.
+
+The check runs once, at the fit, rather than in [`investable_mask`](@ref), which a fold loop calls at every optimiser entry.
+
+# Arguments
+
+  - `pr`: The fitted high order prior.
+
+# Validation
+
+  - Every asset the low order block holds is held by the higher orders too. A warning naming the assets is emitted otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`HighOrderPrior`](@ref)
+  - [`comoment_investable`](@ref)
+  - [`investable_mask`](@ref)
+  - [`CoveragePolicy`](@ref)
+"""
+function assert_matched_coverage(pr::HighOrderPrior)::Nothing
+    lo = isfinite.(pr.mu) .& isfinite.(LinearAlgebra.diag(pr.sigma))
+    dropped = findall(lo .& .!comoment_investable(pr.sk, pr.kt, length(pr.mu)))
+    if !isempty(dropped)
+        @warn("the low order block of this high order prior holds $(length(dropped)) asset(s) that its higher orders do not, so the Investable Mask narrows back to the assets the higher orders could estimate. Assets $(dropped) carry a finite `mu` and a finite diagonal of `sigma`, and a non-finite per-asset diagonal of `sk` or `kt`. A `CoveragePolicy` is a field of one estimator, so set the same one on `ske` and `kte` as on the low order estimators — `HighOrderPriorEstimator(; ske = Coskewness(; cvg = ...), kte = Cokurtosis(; cvg = ...))` — or clear it everywhere to fit the whole prior on the Coverage Universe.")
+    end
+    return nothing
 end
 
 function factor_residual_config(pe::HighOrderPriorEstimator)

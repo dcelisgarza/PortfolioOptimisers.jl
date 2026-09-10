@@ -127,6 +127,7 @@ $(DocStringExtensions.FIELDS)
         mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
         alg::AbstractMomentAlgorithm = FullMoment(),
         w::Option{<:ObsWeights} = nothing,
+        cvg::Option{<:CoveragePolicy} = nothing,
         cache::Option{<:AbstractPartialFitState} = nothing
     ) -> Cokurtosis
 
@@ -212,24 +213,57 @@ Cokurtosis
     """
     @wprop w
     """
+    $(field_dict[:cvg])
+    """
+    cvg
+    """
     $(field_dict[:pfcache])
     """
     @fprop @vprop cache
     function Cokurtosis(me::AbstractExpectedReturnsEstimator,
                         mp::AbstractMatrixProcessingEstimator, alg::AbstractMomentAlgorithm,
-                        w::Option{<:ObsWeights}, cache::Option{<:AbstractPartialFitState})
+                        w::Option{<:ObsWeights}, cvg::Option{<:CoveragePolicy},
+                        cache::Option{<:AbstractPartialFitState})
         assert_nonempty_nonneg_finite_val(w, :w)
-        return new{typeof(me), typeof(mp), typeof(alg), typeof(w), typeof(cache)}(me, mp,
-                                                                                  alg, w,
-                                                                                  cache)
+        return new{typeof(me), typeof(mp), typeof(alg), typeof(w), typeof(cvg),
+                   typeof(cache)}(me, mp, alg, w, cvg, cache)
     end
 end
 function Cokurtosis(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                     mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                     alg::AbstractMomentAlgorithm = FullMoment(),
                     w::Option{<:ObsWeights} = nothing,
+                    cvg::Option{<:CoveragePolicy} = nothing,
                     cache::Option{<:AbstractPartialFitState} = nothing)::Cokurtosis
-    return Cokurtosis(me, mp, alg, w, cache)
+    return Cokurtosis(me, mp, alg, w, cvg, cache)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Renders every field of a [`Cokurtosis`](@ref) but the `cvg` it does not carry.
+
+A `cvg` of `nothing` is the reduce-and-expand path every estimator took before the policy existed, so rendering it there would move every doctest in the library and tell a reader nothing. A policy that is set is configuration, and prints.
+
+# Arguments
+
+  - `kte`: Cokurtosis estimator, read for its `cvg` field alone.
+
+# Returns
+
+  - `fields::Tuple`: The field names to render, which is `(:me, :mp, :alg, :w, :cache)` with no policy and `(:me, :mp, :alg, :w, :cvg, :cache)` with one.
+
+# Related
+
+  - [`Cokurtosis`](@ref)
+  - [`CoveragePolicy`](@ref)
+  - [`show_fields`](@ref)
+"""
+function show_fields(kte::Cokurtosis)
+    return if isnothing(kte.cvg)
+        (:me, :mp, :alg, :w, :cache)
+    else
+        (:me, :mp, :alg, :w, :cvg, :cache)
+    end
 end
 """
     _cokurtosis(X::MatNum, mp::AbstractMatrixProcessingEstimator, w::Option{<:ObsWeights}) -> MatNum
@@ -391,7 +425,61 @@ julia> cokurtosis(Cokurtosis(), X)
   - [`weighted_centre`](@ref)
 """
 function cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:FullMoment}, X::MatNum; dims::Int = 1,
-                    mean = nothing, kwargs...)
+                    mean = nothing, active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+                    kwargs...)
+    return coverage_cokurtosis(kte, kte.cvg, X; dims = dims, mean = mean,
+                               active_mask = active_mask, kwargs...)
+end
+function cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:SemiMoment}, X::MatNum; dims::Int = 1,
+                    mean = nothing, active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+                    kwargs...)
+    return coverage_cokurtosis(kte, kte.cvg, X; dims = dims, mean = mean,
+                               active_mask = active_mask, kwargs...)
+end
+"""
+    coverage_cokurtosis(kte, cvg, X; dims::Int = 1, mean = nothing,
+                        active_mask = nothing, kwargs...) -> MatNum
+
+Fits a square cokurtosis matrix over the arm the estimator's coverage policy selects.
+
+The `cvg` field of the estimator is passed as the second argument, so the arm is chosen by **dispatch on the policy** rather than by a branch on its value, exactly as [`coverage_covariance`](@ref) does for a covariance. The moment algorithm of `kte` chooses between the [`FullMoment`](@ref) arm, which centres on each asset's own mean and takes the deviations whole, and the [`SemiMoment`](@ref) arm, which clips them at zero first.
+
+# Arguments
+
+  - `kte`: Cokurtosis estimator.
+  - `cvg`: The policy the estimator carries, which selects the arm.
+  - `X`: Data matrix (observations × assets).
+  - $(arg_dict[:dims])
+  - `mean`: Optional mean vector. The available-case arm refuses one.
+  - `active_mask`: The active mask of the Asset Panel over the window, or `nothing`. The Coverage Universe arm ignores it.
+  - `kwargs...`: Additional keyword arguments passed to the mean estimator.
+
+# Returns
+
+  - $(ret_dict[:ckurt])
+
+# Related
+
+  - [`Cokurtosis`](@ref)
+  - [`CoveragePolicy`](@ref)
+  - [`coverage_covariance`](@ref)
+  - [`coverage_comoment_block`](@ref)
+"""
+function coverage_cokurtosis end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+`Nothing` method of the [`FullMoment`](@ref) arm of [`coverage_cokurtosis`](@ref). The Coverage Universe arm, which centres the whole window on one vector and delegates to [`_cokurtosis`](@ref), and which is the body the verb has always had.
+
+# Related
+
+  - [`coverage_cokurtosis`](@ref)
+  - [`_cokurtosis`](@ref)
+"""
+function coverage_cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:FullMoment}, ::Nothing,
+                             X::MatNum; dims::Int = 1, mean = nothing,
+                             active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+                             kwargs...)
     X = dims_oriented(dims, X)
     assert_finite_sample(X)
     w = get_observation_weights(kte.w, X; dims = 1, kwargs...)
@@ -399,14 +487,65 @@ function cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:FullMoment}, X::MatNum; dims
     X = X .- mu
     return _cokurtosis(X, kte.mp, w)
 end
-function cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:SemiMoment}, X::MatNum; dims::Int = 1,
-                    mean = nothing, kwargs...)
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+`Nothing` method of the [`SemiMoment`](@ref) arm of [`coverage_cokurtosis`](@ref). The Coverage Universe arm, which clips the de-meaned returns at zero before delegating, and which is the body the verb has always had.
+
+# Related
+
+  - [`coverage_cokurtosis`](@ref)
+  - [`_cokurtosis`](@ref)
+"""
+function coverage_cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:SemiMoment}, ::Nothing,
+                             X::MatNum; dims::Int = 1, mean = nothing,
+                             active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+                             kwargs...)
     X = dims_oriented(dims, X)
     assert_finite_sample(X)
     w = get_observation_weights(kte.w, X; dims = 1, kwargs...)
     mu = weighted_centre(X, kte.me, kte.w; dims = 1, mean = mean, kwargs...)
     X = min.(X .- mu, zero(eltype(X)))
     return _cokurtosis(X, kte.mp, w)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+[`CoveragePolicy`](@ref) method of [`coverage_cokurtosis`](@ref). The available-case arm: each quadruple is fitted on the observations at which its four assets are all finite and active, and each cell carries its own denominator.
+
+The centre is each asset's own available-case mean, its own finite and active observations alone, and not the quadruple's; [`coverage_coskewness`](@ref) states why. An external `mean` is refused for the same reason.
+
+The repair sees the **block**, which [`matrix_processing_block!`](@ref) already derives correctly here: the diagonal of a cokurtosis matrix at the pair `(i, j)` is `E[yᵢ²yⱼ²]`, finite exactly where the pair shares an observation, so the block is the set of pairs the fit answered for and the frame is left alone.
+
+Neither this order nor the third folds: an exact per-cell recursion here needs the second and third co-moments over each quadruple's own observation set, so the online form of an available-case cokurtosis is a buffer refit through [`Online`](@ref).
+
+# Algorithm
+
+ 1. Read the valid entries, the per-asset available-case centre and the per-asset bookkeeping of the block with [`coverage_comoment_block`](@ref).
+ 2. Take the numerator as `transpose(z) * z` and the denominator as `transpose(zc) * zc`, the pairwise expansions of the zeroed deviations and of the valid mask.
+ 3. Divide with [`coverage_divide`](@ref), and frame the refused assets down both pair axes with [`coverage_refuse_comoment!`](@ref).
+ 4. Repair the block with [`matrix_processing_block!`](@ref).
+
+# Related
+
+  - [`coverage_cokurtosis`](@ref)
+  - [`coverage_comoment_block`](@ref)
+  - [`coverage_divide`](@ref)
+  - [`matrix_processing_block!`](@ref)
+"""
+function coverage_cokurtosis(kte::Cokurtosis, cvg::CoveragePolicy, X::MatNum; dims::Int = 1,
+                             mean = nothing,
+                             active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+                             kwargs...)
+    assert_dims(dims)
+    assert_partial_fittable(kte.me, kte.w, "Cokurtosis")
+    @argcheck(isnothing(mean),
+              ArgumentError("an available-case cokurtosis centres each asset on that asset's own observations, so it cannot take a centre fitted over the whole window. Pass `mean = nothing`, or clear `cvg`."))
+    Xo, _, _, z, zc, cmsk = coverage_comoment_block(kte.alg, cvg, X, active_mask, dims)
+    ckurt = coverage_divide(transpose(z) * z, transpose(zc) * zc, false, nothing)
+    coverage_refuse_comoment!(ckurt, cmsk, Val(:kt))
+    matrix_processing_block!(kte.mp, ckurt, Xo)
+    return ckurt
 end
 function cokurtosis(::Nothing, args...; kwargs...)
     return nothing

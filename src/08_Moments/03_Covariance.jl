@@ -829,7 +829,8 @@ $(DocStringExtensions.FIELDS)
     CovarianceState(;
         n::Integer = 0,
         mu::VecNum,
-        M::MatNum = zeros(eltype(mu), length(mu), length(mu))
+        M::MatNum = zeros(eltype(mu), length(mu), length(mu)),
+        cvg::Option{<:CoverageCounts} = nothing
     ) -> CovarianceState
 
 Keywords correspond to the struct's fields. A state seeded for `N` assets is `CovarianceState(; mu = zeros(N))`, which [`partial_fit!`](@ref) builds when the `cache` field of the estimator holds `nothing`.

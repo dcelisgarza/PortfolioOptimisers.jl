@@ -245,13 +245,21 @@ for a covariance.
 - The `cvg` field lands on `SimpleExpectedReturns`, `SimpleVariance` and `Covariance` first, and on
   `Coskewness` and `Cokurtosis` in the build that
   [#983](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/983) decided. Between the two,
-  the orders estimate over different universes and nothing reconciles them: a high-order prior whose
-  low-order prior carries a policy has a finite `mu` and `sigma`, a mask admitting every asset, and
-  an `sk` and `kt` of `NaN`, and `port_opt_view` throws LAPACK's message. The build closes that gap.
-- The block refusal is owed a second reading. `matrix_processing_block!` short-circuits to the plain
-  repair when every diagonal is finite, so an empty pair among fully admitted assets bypasses the
-  named refusal it was written for and reaches LAPACK instead. The rule is on the matrix, not on the
-  frame around it.
+  the orders estimated over different universes and nothing reconciled them: a high-order prior whose
+  low-order prior carried a policy had a finite `mu` and `sigma`, a mask admitting every asset, and
+  an `sk` and `kt` of `NaN`, and `port_opt_view` threw LAPACK's message.
+  [#992](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/992) closed that gap.
+- The block refusal is on the matrix, not on the frame around it, so it covers the **complete**
+  matrix too. `matrix_processing_block!` used to short-circuit to the plain repair whenever every
+  diagonal was finite, which is exactly the shape an available-case pair with an empty intersection
+  has, so the case the named refusal was written for reached LAPACK instead. Only a matrix with no
+  finite diagonal now takes the plain repair, because it carries no block to refuse anything inside.
+  The helper cuts `X` to the block's columns only where the axis of the matrix **is** the asset
+  axis: a cokurtosis matrix is indexed by asset pairs, so its block names no column of `X`, and the
+  whole returns matrix is handed over as the plain path already does at that order.
+- The mixed-configuration warning belongs to the **fit**, not to `investable_mask`. A mask is
+  derived at every optimiser entry and a derivation owes no side effect, so `assert_matched_coverage`
+  runs once, where the high-order prior is assembled, and the mask narrows in silence.
 - Under the exponentially weighted family a young asset is investable while its early scenario
   rows are `NaN`. The reference zero-fills those rows and warns. What the library does with them
   is the measures decision of the map.

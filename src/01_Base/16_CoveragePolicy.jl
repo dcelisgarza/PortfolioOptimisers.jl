@@ -795,5 +795,50 @@ function coverage_refuse!(val::AbstractArray, cmsk::BitVector)::Nothing
     end
     return nothing
 end
+"""
+    coverage_refuse_comoment!(val::AbstractMatrix, cmsk::Nothing, ::Val) -> Nothing
+    coverage_refuse_comoment!(val::AbstractMatrix, cmsk::BitVector, ::Val{:sk}) -> Nothing
+    coverage_refuse_comoment!(val::AbstractMatrix, cmsk::BitVector, ::Val{:kt}) -> Nothing
 
+Writes `NaN` into every entry of a higher-order co-moment answer that touches an asset the policy refuses.
+
+The co-moment form of [`coverage_refuse!`](@ref), for an answer whose axes are not all the asset axis. A coskewness tensor is `assets × assets²`, so its rows take the asset mask and its columns the pair mask; a cokurtosis matrix is `assets² × assets²`, so both of its axes take the pair mask. The `Val` marker names the shape, exactly as it does for [`expand_moment`](@ref), and the mask stays one argument so the arm is a plain dispatch rather than a product of two `Option`s.
+
+A pair is admitted when both of its assets are, and a co-moment tensor indexes the pair `(i, j)` at the column `(i - 1) * N + j`, which is the layout [`coverage_pair_index`](@ref) states. `kron(cmsk, cmsk)` is that conjunction in that order, entry for entry.
+
+# Arguments
+
+  - `val`: The answer, mutated in place.
+  - `cmsk`: The admitted assets, or `nothing` when every asset is admitted.
+  - `::Val`: `Val(:sk)` for a coskewness tensor and `Val(:kt)` for a cokurtosis matrix.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`coverage_refuse!`](@ref)
+  - [`coverage_admission`](@ref)
+  - [`coverage_pair_index`](@ref)
+  - [`expand_moment`](@ref)
+"""
+function coverage_refuse_comoment!(::AbstractMatrix, ::Nothing, ::Val)::Nothing
+    return nothing
+end
+function coverage_refuse_comoment!(val::AbstractMatrix, cmsk::BitVector,
+                                   ::Val{:sk})::Nothing
+    nan = convert(eltype(val), NaN)
+    val[.!cmsk, :] .= nan
+    val[:, .!BitVector(kron(cmsk, cmsk))] .= nan
+    return nothing
+end
+function coverage_refuse_comoment!(val::AbstractMatrix, cmsk::BitVector,
+                                   ::Val{:kt})::Nothing
+    nan = convert(eltype(val), NaN)
+    pout = .!BitVector(kron(cmsk, cmsk))
+    val[pout, :] .= nan
+    val[:, pout] .= nan
+    return nothing
+end
 export CoveragePolicy, DecayCoverage, ResetCoverage, ExpireCoverage

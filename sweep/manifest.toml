@@ -58,7 +58,7 @@
 "src/01_Base/13_KappaLog.jl" = { map = 1, units = 1, algorithm = 0, swept = true }
 "src/01_Base/14_PartialFit.jl" = { map = 1, units = 9, swept = false }
 "src/01_Base/15_Online.jl" = { map = 1, units = 19, swept = false }
-"src/01_Base/16_CoveragePolicy.jl" = { map = 1, units = 23, swept = false }
+"src/01_Base/16_CoveragePolicy.jl" = { map = 1, units = 24, swept = false }
 "src/02_Tools.jl" = { map = 1, units = 69, algorithm = 49, swept = true }
 "src/03_InputData/01_AssetPanel.jl" = { map = 2, units = 33, swept = false }
 "src/03_InputData/02_AssetPanelBuilder.jl" = { map = 2, units = 22, swept = false }
@@ -79,8 +79,8 @@
 "src/04_PosdefMatrix.jl" = { map = 2, units = 4, algorithm = 2, swept = true }
 "src/05_Denoise.jl" = { map = 2, units = 10, algorithm = 7, swept = true }
 "src/06_Detone.jl" = { map = 2, units = 4, algorithm = 2, swept = true }
-"src/07_MatrixProcessing.jl" = { map = 2, units = 9, algorithm = 4, swept = true }
-"src/08_Moments/01_Base_Moments.jl" = { map = 3, units = 37, algorithm = 17, swept = true }
+"src/07_MatrixProcessing.jl" = { map = 2, units = 10, algorithm = 4, swept = true }
+"src/08_Moments/01_Base_Moments.jl" = { map = 3, units = 39, algorithm = 18, swept = true }
 "src/08_Moments/02_SimpleExpectedReturns.jl" = { map = 3, units = 20, algorithm = 9, swept = true }
 "src/08_Moments/03_Covariance.jl" = { map = 3, units = 39, algorithm = 17, swept = true }
 "src/08_Moments/04_SimpleVariance.jl" = { map = 3, units = 29, algorithm = 12, swept = true }
@@ -98,8 +98,8 @@
 "src/08_Moments/16_ShrunkExpectedReturns.jl" = { map = 3, units = 14, algorithm = 7, swept = true }
 "src/08_Moments/17_EquilibriumExpectedReturns.jl" = { map = 3, units = 3, algorithm = 2, swept = true }
 "src/08_Moments/18_ExcessExpectedReturns.jl" = { map = 3, units = 2, algorithm = 0, swept = true }
-"src/08_Moments/19_Coskewness.jl" = { map = 3, units = 5, algorithm = 3, swept = true }
-"src/08_Moments/20_Cokurtosis.jl" = { map = 3, units = 4, algorithm = 2, swept = true }
+"src/08_Moments/19_Coskewness.jl" = { map = 3, units = 11, algorithm = 4, swept = true }
+"src/08_Moments/20_Cokurtosis.jl" = { map = 3, units = 9, algorithm = 3, swept = true }
 "src/08_Moments/21_Base_Regression.jl" = { map = 3, units = 41, algorithm = 7, swept = true }
 "src/08_Moments/22_StepwiseRegression.jl" = { map = 3, units = 12, algorithm = 8, swept = true }
 "src/08_Moments/23_DimensionReductionRegression.jl" = { map = 3, units = 10, algorithm = 5, swept = true }
@@ -119,7 +119,7 @@
 "src/08_Moments/37_RegimeAdjustedExpWeightedCovariance.jl" = { map = 3, units = 50, swept = false }
 "src/08_Moments/38_CrossSectionalRegression.jl" = { map = 3, units = 18, swept = false }
 "src/08_Moments/39_CrossSectionalWeights.jl" = { map = 3, units = 10, swept = false }
-"src/08_Moments/40_HigherMomentPartialFit.jl" = { map = 3, units = 25, swept = false }
+"src/08_Moments/40_HigherMomentPartialFit.jl" = { map = 3, units = 27, swept = false }
 "src/08_Moments/41_CrossSectionalFactorModel.jl" = { map = 3, units = 12, algorithm = 1, swept = true }
 "src/08_Moments/42_FactorExposures/01_Base_Descriptor.jl" = { map = 3, units = 10, swept = false }
 "src/08_Moments/42_FactorExposures/02_PanelFieldDescriptors.jl" = { map = 3, units = 32, swept = false }
@@ -154,7 +154,7 @@
 "src/08_Moments/47_CrossSectionalExposureDiagnostics.jl" = { map = 3, units = 22, swept = false }
 "src/08_Moments/48_FactorModelSummary.jl" = { map = 3, units = 16, swept = false }
 "src/08_Moments/49_CrossSectionalIdiosyncraticDiagnostics.jl" = { map = 3, units = 15, swept = false }
-"src/08_Moments/50_CoverageUniverse.jl" = { map = 3, units = 39, swept = false }
+"src/08_Moments/50_CoverageUniverse.jl" = { map = 3, units = 41, swept = false }
 "src/08_Moments/51_ExpWeightedExpectedReturns.jl" = { map = 3, units = 14, swept = false }
 "src/08_Moments/52_ExpWeightedVariance.jl" = { map = 3, units = 20, swept = false }
 "src/08_Moments/53_ExpWeightedCovariance.jl" = { map = 3, units = 23, swept = false }
@@ -200,7 +200,7 @@
 "src/13_Prior/01_Base_Prior.jl" = { map = 6, units = 47, algorithm = 21, swept = true }
 "src/13_Prior/02_EmpiricalPrior.jl" = { map = 6, units = 3, algorithm = 1, swept = true }
 "src/13_Prior/03_FactorPrior.jl" = { map = 6, units = 6, algorithm = 3, swept = true }
-"src/13_Prior/04_HighOrderPrior.jl" = { map = 6, units = 9, algorithm = 8, swept = true }
+"src/13_Prior/04_HighOrderPrior.jl" = { map = 6, units = 12, algorithm = 8, swept = true }
 "src/13_Prior/05_BlackLittermanViewsGeneration.jl" = { map = 6, units = 5, algorithm = 2, swept = true }
 "src/13_Prior/06_BlackLittermanPrior.jl" = { map = 6, units = 14, algorithm = 7, swept = true }
 "src/13_Prior/07_BayesianBlackLittermanPrior.jl" = { map = 6, units = 2, algorithm = 1, swept = true }

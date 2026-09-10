@@ -748,7 +748,8 @@ $(DocStringExtensions.FIELDS)
     SimpleVarianceState(;
         n::Integer = 0,
         mu::VecNum,
-        M::VecNum = zeros(eltype(mu), length(mu))
+        M::VecNum = zeros(eltype(mu), length(mu)),
+        cvg::Option{<:CoverageCounts} = nothing
     ) -> SimpleVarianceState
 
 Keywords correspond to the struct's fields. A state seeded for `N` assets is `SimpleVarianceState(; mu = zeros(N))`, which [`partial_fit!`](@ref) builds when the `cache` field of the estimator holds `nothing`.

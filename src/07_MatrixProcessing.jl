@@ -549,17 +549,19 @@ Repair the finite block of a covariance-like frame in place, and leave the frame
 
 A composite estimator that forwards an Asset Panel to the estimator it wraps can get a **frame** back: a matrix whose rows and columns outside the Coverage Universe are `NaN`. The repair has no answer for a `NaN`, so it runs on the finite block alone, and the frame around the block is written back unchanged.
 
-The block is derived from the diagonal, exactly as [`investable_mask`](@ref) derives the Investable Mask from it. An off-diagonal `NaN` **inside** the block is refused with an `IsNonFiniteError`, and is not peeled away. No estimator of the library can make one: an asset that a fit could not estimate ends its window inactive, so its own diagonal is `NaN` and it is outside the block already. A peel here would hide a defect rather than repair a matrix.
+The block is derived from the diagonal, exactly as [`investable_mask`](@ref) derives the Investable Mask from it. An off-diagonal `NaN` **inside** the block is refused with an `IsNonFiniteError`, and is not peeled away. A [`CoveragePolicy`](@ref) makes one whenever a pair shares no observation while both of its assets have observations of their own, so the refusal is the one the caller of an available-case fit meets. A peel here would hide it rather than repair a matrix.
 
-The bare [`matrix_processing!`](@ref) and [`posdef!`](@ref) are unchanged, so a `NaN` that reaches a plain path is still refused there. This helper **adds no failure face of its own** beyond that one refusal: a complete matrix and a matrix with no finite diagonal both go to the plain repair, so a caller whose covariance degenerated for a reason that has nothing to do with the Coverage Universe still meets the error it met before.
+The block is the whole matrix when every diagonal entry is finite, and **the refusal covers that case too**: a complete diagonal is what an available-case pair with an empty intersection has, so a short-circuit past the refusal would send exactly the case the message was written for to LAPACK. A matrix with no finite diagonal is the one case that still goes straight to the plain repair, because it has no block to refuse anything inside.
+
+The bare [`matrix_processing!`](@ref) and [`posdef!`](@ref) are unchanged, so a `NaN` that reaches a plain path is still refused there.
 
 # Algorithm
 
  1. Take the block `blk` as `isfinite.(diag(sigma))`.
- 2. Run the ordinary repair and return where `blk` holds no `false`, and where it holds no `true`. A complete matrix has no frame to leave alone, and a matrix with no finite diagonal has no block to repair, so both belong to the plain repair and meet its refusal.
- 3. Copy the block out, and refuse a non-finite entry inside it with an `IsNonFiniteError`.
- 4. Repair the copy with [`matrix_processing!`](@ref), under the columns of `X` that the block names.
- 5. Write the repaired copy back into `sigma`, and return `sigma`.
+ 2. Run the ordinary repair and return where `blk` holds no `true`. A matrix with no finite diagonal has no block to repair, so it belongs to the plain repair and meets its refusal.
+ 3. Refuse a non-finite entry inside the block with an `IsNonFiniteError`.
+ 4. Run the ordinary repair on `sigma` itself and return where `blk` holds no `false`. A complete matrix has no frame to leave alone.
+ 5. Copy the block out, repair the copy with [`matrix_processing!`](@ref) under the columns of `X` that the block names, write it back into `sigma`, and return `sigma`. `X` is cut only where the axis of `sigma` is the asset axis: a cokurtosis matrix is indexed by asset pairs, so its block names no column of `X` and the whole returns matrix is handed over, which is what the plain path does at that order.
 
 # Arguments
 
@@ -586,19 +588,58 @@ The bare [`matrix_processing!`](@ref) and [`posdef!`](@ref) are unchanged, so a 
 function matrix_processing_block!(mp::Option{<:AbstractMatrixProcessingEstimator},
                                   sigma::MatNum, X::MatNum, args...; kwargs...)
     blk = isfinite.(LinearAlgebra.diag(sigma))
-    # A complete matrix has no frame to leave alone, and a matrix with no finite diagonal has
-    # no block to repair. Both are the plain repair's, and its refusal is the one their caller
-    # already met: this helper adds a failure face to neither.
-    if all(blk) || !any(blk)
+    # A matrix with no finite diagonal has no block to repair, so it is the plain repair's and
+    # its refusal is the one its caller already met.
+    if !any(blk)
+        matrix_processing!(mp, sigma, X, args...; kwargs...)
+        return sigma
+    end
+    assert_finite_block(view(sigma, blk, blk))
+    # A complete matrix has no frame to leave alone, so the repair runs on it whole. The
+    # refusal above has already covered its block, which is the matrix itself.
+    if all(blk)
         matrix_processing!(mp, sigma, X, args...; kwargs...)
         return sigma
     end
     block = sigma[blk, blk]
-    @argcheck(all(isfinite, block),
-              IsNonFiniteError("the finite block of the matrix carries $(count(!isfinite, block)) non-finite off-diagonal entries, the first at $(findfirst(!isfinite, block)). Every asset of the block has a finite diagonal, so an estimator wrote a gap into a pair it claimed to have estimated."))
-    matrix_processing!(mp, block, X[:, blk], args...; kwargs...)
+    # `X` is cut only where the axis of the matrix IS the asset axis. A cokurtosis matrix is
+    # indexed by asset pairs, so its block mask is `assets²` long and names no column of `X`;
+    # the plain path hands `matrix_processing!` the whole returns matrix at that order too.
+    Xb = size(X, 2) == length(blk) ? X[:, blk] : X
+    matrix_processing!(mp, block, Xb, args...; kwargs...)
     sigma[blk, blk] = block
     return sigma
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Refuses a co-moment block that carries a non-finite entry, naming the count and the first cell.
+
+The one refusal of the block rule, shared by [`matrix_processing_block!`](@ref) and [`negative_spectral_coskewness`](@ref). A block is the set of cells among assets a fit answered for, so a non-finite cell inside it is a pair or a triple whose assets were each estimated and whose intersection was empty. The repair has no answer for it, and neither has the spectral step: Julia's LAPACK wrappers check first, so `eigen` and `nearest_cor!` both throw `ArgumentError: matrix contains Infs or NaNs`, which names neither coverage nor the cell that caused it.
+
+# Arguments
+
+  - `block`: The block of the answer, as a view or an array.
+
+# Validation
+
+  - Every entry of `block` is finite. An `IsNonFiniteError` is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`matrix_processing_block!`](@ref)
+  - [`negative_spectral_coskewness`](@ref)
+  - [`CoveragePolicy`](@ref)
+  - [`IsNonFiniteError`](@ref)
+"""
+function assert_finite_block(block::AbstractArray)::Nothing
+    @argcheck(all(isfinite, block),
+              IsNonFiniteError("the finite block of the answer carries $(count(!isfinite, block)) non-finite entries, the first at $(findfirst(!isfinite, block)) of a block of size $(size(block)), indexed over the block's own assets and not the full universe. Every asset of the block was estimated on its own, so this cell names assets that share no observation. An axis of length `n` is the asset axis and an axis of length `n^2` is the pair axis, on which the position `c` is the asset pair `(fld(c - 1, n) + 1, mod1(c, n))`. Lower `min_coverage`, fit over a window the cells of the block share, or clear `cvg` to fall back on the Coverage Universe."))
+    return nothing
 end
 
 export MatrixProcessing, matrix_processing, matrix_processing!

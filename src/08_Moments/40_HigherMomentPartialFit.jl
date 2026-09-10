@@ -540,7 +540,9 @@ true
   - [`coskewness`](@ref)
   - [`merge_states`](@ref)
 """
-function partial_fit!(ske::Coskewness{<:Any, <:Any, <:FullMoment}, X::MatNum; dims::Int = 1)
+function partial_fit!(ske::Coskewness{<:Any, <:Any, <:FullMoment, <:Any, Nothing,
+                                      <:Option{<:CoskewnessPartialFitState}}, X::MatNum;
+                      dims::Int = 1)
     assert_partial_fittable(ske.me, ske.w, "Coskewness")
     X = dims_oriented(dims, X)
     n, mu, M2, M3, _ = comoment_block(X)
@@ -577,7 +579,8 @@ The single-observation arm of the [`partial_fit!`](@ref) interface. The entries 
   - [`Coskewness`](@ref)
   - [`partial_fit!`](@ref)
 """
-function partial_fit!(ske::Coskewness{<:Any, <:Any, <:FullMoment}, x::VecNum)
+function partial_fit!(ske::Coskewness{<:Any, <:Any, <:FullMoment, <:Any, Nothing,
+                                      <:Option{<:CoskewnessPartialFitState}}, x::VecNum)
     return partial_fit!(ske, reshape(x, 1, length(x)))
 end
 """
@@ -693,7 +696,9 @@ true
   - [`cokurtosis`](@ref)
   - [`merge_states`](@ref)
 """
-function partial_fit!(kte::Cokurtosis{<:Any, <:Any, <:FullMoment}, X::MatNum; dims::Int = 1)
+function partial_fit!(kte::Cokurtosis{<:Any, <:Any, <:FullMoment, <:Any, Nothing,
+                                      <:Option{<:CokurtosisPartialFitState}}, X::MatNum;
+                      dims::Int = 1)
     assert_partial_fittable(kte.me, kte.w, "Cokurtosis")
     X = dims_oriented(dims, X)
     n, mu, M2, M3, z = comoment_block(X)
@@ -730,7 +735,8 @@ The single-observation arm of the [`partial_fit!`](@ref) interface. The entries 
   - [`Cokurtosis`](@ref)
   - [`partial_fit!`](@ref)
 """
-function partial_fit!(kte::Cokurtosis{<:Any, <:Any, <:FullMoment}, x::VecNum)
+function partial_fit!(kte::Cokurtosis{<:Any, <:Any, <:FullMoment, <:Any, Nothing,
+                                      <:Option{<:CokurtosisPartialFitState}}, x::VecNum)
     return partial_fit!(kte, reshape(x, 1, length(x)))
 end
 """
@@ -835,6 +841,35 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Reads a coskewness out of a sample buffer, by refitting the batch verb over the observations the buffer holds.
+
+The buffer read-out of [`coskewness`](@ref), and the whole of the online form at this order. Neither the third nor the fourth co-moment folds exactly under a [`CoveragePolicy`](@ref) — an exact per-cell recursion needs the pairwise second co-moments over each triple's own observation set — so an [`Online`](@ref) wrapper seeds a [`SampleBufferState`](@ref) and the read-out refits from it. The answer is therefore bit-exact with the batch arm over the same rows, by construction rather than by arithmetic coincidence.
+
+The buffer holds the observations verbatim, `NaN` included, so the available-case arm reads the same gaps from it that it would read from the caller's own matrix. With no active mask a gap is a holiday rather than a delisting, which is what [`coverage_valid_block`](@ref) states.
+
+# Arguments
+
+  - `ske`: Coskewness estimator.
+  - `state`: The sample buffer the wrapper seeded.
+
+# Returns
+
+  - $(ret_dict[:cskew])
+  - $(ret_dict[:cskewV])
+
+# Related
+
+  - [`Coskewness`](@ref)
+  - [`SampleBufferState`](@ref)
+  - [`Online`](@ref)
+  - [`coverage_coskewness`](@ref)
+"""
+function coskewness(ske::Coskewness, state::SampleBufferState)
+    return coskewness(ske, sample_buffer(state); dims = 1)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Reads the coskewness tensor and its negative spectral skewness matrix out of the state the estimator carries.
 
 The one-argument forwarder of [`coskewness`](@ref). It reads `ske.cache`, which [`partial_fit!`](@ref) writes, and refuses an estimator that has been shown no observation.
@@ -846,7 +881,7 @@ The one-argument forwarder of [`coskewness`](@ref). It reads `ske.cache`, which 
 
 # Arguments
 
-  - `ske`: Coskewness estimator with a [`FullMoment`](@ref) moment algorithm.
+  - `ske`: Coskewness estimator.
 
 # Validation
 
@@ -862,7 +897,7 @@ The one-argument forwarder of [`coskewness`](@ref). It reads `ske.cache`, which 
   - [`Coskewness`](@ref)
   - [`partial_fit!`](@ref)
 """
-function coskewness(ske::Coskewness{<:Any, <:Any, <:FullMoment})
+function coskewness(ske::Coskewness)
     @argcheck(!isnothing(ske.cache),
               ArgumentError("this `Coskewness` estimator carries no partial-fit state, so there is nothing to read out. Call `partial_fit!` first, or pass a data matrix."))
     return coskewness(ske, ske.cache)
@@ -913,6 +948,32 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Reads a cokurtosis out of a sample buffer, by refitting the batch verb over the observations the buffer holds.
+
+The buffer read-out of [`cokurtosis`](@ref), and the whole of the online form at this order. The [`Coskewness`](@ref) method states the rule; carried one order further, an exact per-cell recursion would need the second and third co-moments over each quadruple's own observation set.
+
+# Arguments
+
+  - `kte`: Cokurtosis estimator.
+  - `state`: The sample buffer the wrapper seeded.
+
+# Returns
+
+  - $(ret_dict[:ckurt])
+
+# Related
+
+  - [`Cokurtosis`](@ref)
+  - [`SampleBufferState`](@ref)
+  - [`Online`](@ref)
+  - [`coverage_cokurtosis`](@ref)
+"""
+function cokurtosis(kte::Cokurtosis, state::SampleBufferState)
+    return cokurtosis(kte, sample_buffer(state); dims = 1)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Reads the square cokurtosis matrix out of the state the estimator carries.
 
 The one-argument forwarder of [`cokurtosis`](@ref). It reads `kte.cache`, which [`partial_fit!`](@ref) writes, and refuses an estimator that has been shown no observation.
@@ -924,7 +985,7 @@ The one-argument forwarder of [`cokurtosis`](@ref). It reads `kte.cache`, which 
 
 # Arguments
 
-  - `kte`: Cokurtosis estimator with a [`FullMoment`](@ref) moment algorithm.
+  - `kte`: Cokurtosis estimator.
 
 # Validation
 
@@ -939,7 +1000,7 @@ The one-argument forwarder of [`cokurtosis`](@ref). It reads `kte.cache`, which 
   - [`Cokurtosis`](@ref)
   - [`partial_fit!`](@ref)
 """
-function cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:FullMoment})
+function cokurtosis(kte::Cokurtosis)
     @argcheck(!isnothing(kte.cache),
               ArgumentError("this `Cokurtosis` estimator carries no partial-fit state, so there is nothing to read out. Call `partial_fit!` first, or pass a data matrix."))
     return cokurtosis(kte, kte.cache)

@@ -544,8 +544,7 @@ $(DocStringExtensions.FIELDS)
         gap_return_alg::Option{<:AbstractGapReturnAlgorithm} = nothing,
         collapse_args::Tuple = (),
         map_func::Option{<:Function} = nothing,
-        join_method::Symbol = :outer,
-        strict::Bool = false,
+        join_method::Symbol = :outer
     ) -> PricesToReturns
 
 Keywords correspond to the struct's fields.

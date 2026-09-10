@@ -589,6 +589,86 @@ SemiMoment()
 """
 struct SemiMoment <: AbstractMomentAlgorithm end
 """
+    coverage_comoment_deviations(alg::FullMoment, Xo::MatNum, mu::VecNum) -> MatNum
+    coverage_comoment_deviations(alg::SemiMoment, Xo::MatNum, mu::VecNum) -> MatNum
+
+Centres an available-case block on each asset's own mean, and clips the deviations where the moment algorithm asks for it.
+
+The one line the two arms of a higher-order available-case fit differ in, taken out so that [`coverage_comoment_block`](@ref) is one body. [`FullMoment`](@ref) keeps the deviations whole and [`SemiMoment`](@ref) clips every positive one to zero, which is the same asymmetry the plain path already has.
+
+# Arguments
+
+  - `alg`: Moment algorithm of the estimator.
+  - `Xo`: The oriented block, `observations × assets`, whose invalid entries are still non-finite.
+  - `mu`: Each asset's available-case mean, over its own finite and active observations.
+
+# Returns
+
+  - `Y::MatNum`: The deviations, non-finite wherever `Xo` is.
+
+# Related
+
+  - [`coverage_comoment_block`](@ref)
+  - [`FullMoment`](@ref)
+  - [`SemiMoment`](@ref)
+"""
+function coverage_comoment_deviations(::FullMoment, Xo::MatNum, mu::VecNum)
+    return Xo .- transpose(mu)
+end
+function coverage_comoment_deviations(::SemiMoment, Xo::MatNum, mu::VecNum)
+    return min.(Xo .- transpose(mu), zero(eltype(mu)))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Builds the pairwise expansions and the admission mask a higher-order available-case fit reads.
+
+The block half of the available-case arm, shared by [`coverage_coskewness`](@ref) and [`coverage_cokurtosis`](@ref). A third and a fourth co-moment differ in which pair of expansions they multiply, and in nothing else, so this returns both expansions and lets each order take its own product. Neither order folds, so the block is seen whole and there is no state.
+
+The deviations are centred on each asset's **own** available-case mean and the invalid entries are then zeroed, so an observation at which an asset has no quote contributes to neither the numerator nor the denominator of any cell that asset appears in. The mask expansion `zc` is the same product over the mask, so the denominator of a cell is the count of observations at which every asset of that cell is valid.
+
+# Algorithm
+
+ 1. Read the valid entries, the per-asset available-case mean and the per-asset bookkeeping of the block with [`coverage_valid_block`](@ref).
+ 2. Centre and clip the block with [`coverage_comoment_deviations`](@ref), and zero the invalid entries.
+ 3. Take the valid mask as integers, `Mi`.
+ 4. Build the pairwise expansions `z` of the deviations and `zc` of the mask, both `observations × assets²`.
+ 5. Admit the assets with [`coverage_admission`](@ref), against each asset's own observation count.
+
+# Arguments
+
+  - `alg`: Moment algorithm of the estimator.
+  - `cvg`: The policy the estimator carries.
+  - `X`: Data matrix.
+  - `active_mask`: The active mask of the Asset Panel over the window, or `nothing`.
+  - $(arg_dict[:dims])
+
+# Returns
+
+  - `(Xo, Y, Mi, z, zc, cmsk)::Tuple`: The oriented block, the zeroed deviations, the valid mask as integers, the pairwise expansion of each, and the admitted assets or `nothing`.
+
+# Related
+
+  - [`coverage_comoment_deviations`](@ref)
+  - [`coverage_valid_block`](@ref)
+  - [`coverage_admission`](@ref)
+  - [`coverage_coskewness`](@ref)
+  - [`coverage_cokurtosis`](@ref)
+"""
+function coverage_comoment_block(alg::AbstractMomentAlgorithm, cvg::CoveragePolicy,
+                                 X::MatNum, active_mask::Option{<:AbstractMatrix{<:Bool}},
+                                 dims::Int)
+    Xo, msk, mu, active, stale = coverage_valid_block(X, active_mask; dims = dims)
+    Y = coverage_comoment_deviations(alg, Xo, mu)
+    Y[.!msk] .= zero(eltype(Y))
+    Mi = Int.(msk)
+    o = transpose(ones(Int, size(Xo, 2)))
+    z = kron(o, Y) ⊙ kron(Y, o)
+    zc = kron(o, Mi) ⊙ kron(Mi, o)
+    counts = CoverageCounts(vec(sum(Mi; dims = 1)), nothing, active, stale)
+    return Xo, Y, Mi, z, zc, coverage_admission(cvg, counts, size(Xo, 1))
+end
+"""
     Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)
 
 Generic covariance fallback assembling the covariance matrix from the estimator's correlation matrix and the marginal standard deviations of its variance estimator `ce.ve`.

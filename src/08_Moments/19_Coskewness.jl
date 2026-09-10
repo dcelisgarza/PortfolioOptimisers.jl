@@ -133,6 +133,7 @@ $(DocStringExtensions.FIELDS)
         mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
         alg::AbstractMomentAlgorithm = FullMoment(),
         w::Option{<:ObsWeights} = nothing,
+        cvg::Option{<:CoveragePolicy} = nothing,
         cache::Option{<:AbstractPartialFitState} = nothing
     ) -> Coskewness
 
@@ -220,24 +221,93 @@ Coskewness
     """
     @wprop w
     """
+    $(field_dict[:cvg])
+    """
+    cvg
+    """
     $(field_dict[:pfcache])
     """
     @fprop @vprop cache
     function Coskewness(me::AbstractExpectedReturnsEstimator,
                         mp::AbstractMatrixProcessingEstimator, alg::AbstractMomentAlgorithm,
-                        w::Option{<:ObsWeights}, cache::Option{<:AbstractPartialFitState})
+                        w::Option{<:ObsWeights}, cvg::Option{<:CoveragePolicy},
+                        cache::Option{<:AbstractPartialFitState})
         assert_nonempty_nonneg_finite_val(w, :w)
-        return new{typeof(me), typeof(mp), typeof(alg), typeof(w), typeof(cache)}(me, mp,
-                                                                                  alg, w,
-                                                                                  cache)
+        return new{typeof(me), typeof(mp), typeof(alg), typeof(w), typeof(cvg),
+                   typeof(cache)}(me, mp, alg, w, cvg, cache)
     end
 end
 function Coskewness(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                     mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                     alg::AbstractMomentAlgorithm = FullMoment(),
                     w::Option{<:ObsWeights} = nothing,
+                    cvg::Option{<:CoveragePolicy} = nothing,
                     cache::Option{<:AbstractPartialFitState} = nothing)::Coskewness
-    return Coskewness(me, mp, alg, w, cache)
+    return Coskewness(me, mp, alg, w, cvg, cache)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Renders every field of a [`Coskewness`](@ref) but the `cvg` it does not carry.
+
+A `cvg` of `nothing` is the reduce-and-expand path every estimator took before the policy existed, so rendering it there would move every doctest in the library and tell a reader nothing. A policy that is set is configuration, and prints.
+
+# Arguments
+
+  - `ske`: Coskewness estimator, read for its `cvg` field alone.
+
+# Returns
+
+  - `fields::Tuple`: The field names to render, which is `(:me, :mp, :alg, :w, :cache)` with no policy and `(:me, :mp, :alg, :w, :cvg, :cache)` with one.
+
+# Related
+
+  - [`Coskewness`](@ref)
+  - [`CoveragePolicy`](@ref)
+  - [`show_fields`](@ref)
+"""
+function show_fields(ske::Coskewness)
+    return if isnothing(ske.cvg)
+        (:me, :mp, :alg, :w, :cache)
+    else
+        (:me, :mp, :alg, :w, :cvg, :cache)
+    end
+end
+"""
+    negative_spectral_part(vals::AbstractVector{<:Real}, vecs::MatNum, Tf::Type) -> MatNum
+    negative_spectral_part(vals::AbstractVector{<:Complex}, vecs::MatNum, Tf::Type) -> MatNum
+
+Rebuilds one block of a coskewness tensor from the negative part of its spectrum alone.
+
+The inner step of [`negative_spectral_coskewness`](@ref), taken out so the real and the complex spectrum are two methods rather than one branch. `LinearAlgebra.eigen` of a general real matrix answers a real spectrum or a complex one, and only the value says which, so a branch on `eltype(vals)` is a runtime test that no caller's types settle: the two methods settle it on the argument instead, and each body then sees a concrete element type.
+
+Every non-negative eigenvalue is clamped to zero and every negative one is kept, so the reconstruction is the negative semidefinite part of the block. The caller subtracts it, which is what makes the accumulated matrix positive semidefinite.
+
+The complex method is a fallback rather than a second definition: a block of the tensor is symmetric, so its spectrum is real, and `eigen` answers a complex one only where round-off has left the block asymmetric. It clamps the real and the imaginary parts the same way and takes the real part of the reconstruction.
+
+# Arguments
+
+  - `vals`: The eigenvalues of the block.
+  - `vecs`: The eigenvectors of the block.
+  - `Tf`: Element type of the tensor, which sets the clamp's bounds.
+
+# Returns
+
+  - `S::MatNum`: The negative semidefinite part of the block, of the shape of the block.
+
+# Related
+
+  - [`negative_spectral_coskewness`](@ref)
+  - [`Coskewness`](@ref)
+"""
+function negative_spectral_part(vals::AbstractVector{<:Real}, vecs::MatNum, Tf::Type)
+    v = clamp.(vals, typemin(Tf), zero(Tf))
+    return vecs * LinearAlgebra.Diagonal(v) * transpose(vecs)
+end
+function negative_spectral_part(vals::AbstractVector{<:Complex}, vecs::MatNum, Tf::Type)
+    v = clamp.(real.(vals), typemin(Tf), zero(Tf)) +
+        clamp.(imag.(vals), typemin(Tf), zero(Tf))im
+    return real(vecs * LinearAlgebra.Diagonal(v) * transpose(vecs))
 end
 """
     negative_spectral_coskewness(cskew::MatNum, X::MatNum,
@@ -246,6 +316,10 @@ end
 Internal helper that builds the negative spectral skewness matrix.
 
 `negative_spectral_coskewness` splits the coskewness tensor into its `N` symmetric blocks of size `N x N`, keeps the negative part of the spectrum of each block, and sums the negated parts into one `N x N` matrix. The matrix processing estimator runs once, on the summed result, and not on the individual blocks.
+
+**The reduction runs on the block**, which is the same law [`matrix_processing_block!`](@ref) keeps for a covariance frame, read at this quantity's own resolution. An available-case fit under a [`CoveragePolicy`](@ref) emits a **frame**: the tensor carries `NaN` across the rows and the pair columns of every asset the policy refused. The block is derived from the tensor's own per-asset diagonal, `cskew[i, (i - 1) * N + i]`, which is asset `i`'s third central moment and is finite exactly where the fit answered for that asset. A non-finite cell **inside** the block — a triple whose three assets were each estimated and which share no observation — is refused by name with [`assert_finite_block`](@ref), and never fed to `eigen`. The spectral step and `mp` then run on the block alone, and the answer is written back into a `NaN` frame of the full width, so an asset the policy refused leaves this verb as it entered it.
+
+This verb is the one place that rule is written for a coskewness, and the three call sites that reduce one — [`_coskewness`](@ref), [`port_opt_view`](@ref) of a [`HighOrderPrior`](@ref) and the high order factor prior — all reach it.
 
 # Mathematical definition
 
@@ -271,30 +345,41 @@ The entry ``\\mathbf{S}_{i,\\,aj}`` is the third comoment of the deviations of t
 
 # Algorithm
 
- 1. Read `N` from the row count of `cskew`, and allocate the ``N \\times N`` accumulator `V` of zeros.
- 2. For each block index `i`, take `coskew_jk`, the view of the columns `(i - 1) * N + 1` to `i * N` of `cskew`.
- 3. Eigendecompose `coskew_jk`, giving the eigenvalues `vals` and the eigenvectors `vecs`.
- 4. When `vals` is real, clamp every entry to zero from above, so a non-negative eigenvalue becomes zero and a negative one is kept. Subtract the reconstruction `vecs * Diagonal(vals) * transpose(vecs)` from `V`.
- 5. When `vals` is complex, clamp the real part and the imaginary part the same way, and subtract the real part of the reconstruction. `LinearAlgebra.eigen` returns a complex spectrum only when round-off leaves the block asymmetric, so this branch is a fallback and not the definition above.
- 6. Run [`matrix_processing!`](@ref) once, on the accumulated `V`. No block is processed on its own.
+ 1. Read `N` from the row count of `cskew`, and take the block `blk` as `isfinite.(cskew[i, (i - 1) * N + i])` over `i`.
+ 2. Reduce the tensor whole when `blk` holds no `true`. It carries no block to refuse anything inside, so it is the plain path's and meets its refusal.
+ 3. Refuse a non-finite cell inside the block with [`assert_finite_block`](@ref). The block is the whole tensor when `blk` holds no `false`, and the refusal covers that case too.
+ 4. Cut the tensor to the block, at the rows `blk` and the pair columns of [`coverage_pair_index`](@ref), and cut `X` to the same assets. Both are the objects themselves where `blk` holds no `false`.
+ 5. Allocate the accumulator `V` of zeros at the width of the block.
+ 6. For each block index `i`, take `coskew_jk`, the view of the columns `(i - 1) * N + 1` to `i * N` of the cut tensor.
+ 7. Eigendecompose `coskew_jk`, giving the eigenvalues `vals` and the eigenvectors `vecs`, and subtract from `V` the negative semidefinite part that [`negative_spectral_part`](@ref) rebuilds from them.
+ 8. Run [`matrix_processing!`](@ref) once, on the accumulated `V`. No block is processed on its own.
+ 9. Return `V` where the block is the whole tensor, and write `V` into the block of a `NaN` frame of the full width otherwise.
 
 # Arguments
 
-  - `cskew`: Coskewness tensor, `assets × assets²`, laid out as `N` blocks of `N` columns.
+  - `cskew`: Coskewness tensor, `assets × assets²`, laid out as `N` blocks of `N` columns. It may be a frame, whose refused assets carry `NaN` across their rows and their pair columns.
   - `X`: Data matrix (observations × assets). [`matrix_processing!`](@ref) reads it, and the spectral step does not.
   - $(arg_dict[:omp])
       + `::AbstractMatrixProcessingEstimator`: The estimator processes the accumulated `V` in-place.
       + `::Nothing`: No-op. `V` is the raw sum of the negated negative parts.
 
+# Validation
+
+  - The block of `cskew` is finite. An `IsNonFiniteError` naming the cell is thrown otherwise.
+
 # Returns
 
-  - $(ret_dict[:cskewV]) It is the ``\\mathbf{V}`` above, so a portfolio's negative quadratic skewness is the quadratic form ``\\boldsymbol{w}^{\\intercal} \\mathbf{V} \\boldsymbol{w}``.
+  - $(ret_dict[:cskewV]) It is the ``\\mathbf{V}`` above, so a portfolio's negative quadratic skewness is the quadratic form ``\\boldsymbol{w}^{\\intercal} \\mathbf{V} \\boldsymbol{w}``. An asset outside the block carries `NaN` across its row and its column.
 
 # Related
 
   - [`Coskewness`](@ref)
   - [`_coskewness`](@ref)
   - [`matrix_processing!`](@ref)
+  - [`matrix_processing_block!`](@ref)
+  - [`negative_spectral_part`](@ref)
+  - [`assert_finite_block`](@ref)
+  - [`CoveragePolicy`](@ref)
   - [`coskewness`](@ref)
 
 # References
@@ -304,24 +389,34 @@ The entry ``\\mathbf{S}_{i,\\,aj}`` is the third comoment of the deviations of t
 """
 function negative_spectral_coskewness(cskew::MatNum, X::MatNum,
                                       mp::Option{<:AbstractMatrixProcessingEstimator})
-    N = size(cskew, 1)
-    V = zeros(eltype(cskew), N, N)
+    N0 = size(cskew, 1)
+    blk = BitVector(isfinite(cskew[i, (i - 1) * N0 + i]) for i in 1:N0)
+    # A tensor with no finite per-asset diagonal has no block, so it is the plain path's and
+    # meets its refusal. Everything else is refused by name, the complete tensor included:
+    # an available-case triple with an empty intersection has a complete diagonal, so a
+    # short-circuit past the refusal would send the case it was written for to LAPACK.
+    frame = any(blk) && !all(blk)
+    Xb = frame ? X[:, blk] : X
+    cskew_b = frame ? cskew[blk, coverage_pair_index(blk)] : cskew
+    if any(blk)
+        assert_finite_block(cskew_b)
+    end
+    N = size(cskew_b, 1)
+    V = zeros(eltype(cskew_b), N, N)
     for i in 1:N
         j = (i - 1) * N + 1
         k = i * N
-        coskew_jk = view(cskew, :, j:k)
+        coskew_jk = view(cskew_b, :, j:k)
         vals, vecs = LinearAlgebra.eigen(coskew_jk)
-        if eltype(vals) <: Real
-            vals .= clamp.(vals, typemin(eltype(cskew)), zero(eltype(cskew)))
-            V .-= vecs * LinearAlgebra.Diagonal(vals) * transpose(vecs)
-        else
-            vals .= clamp.(real.(vals), typemin(eltype(cskew)), zero(eltype(cskew))) +
-                    clamp.(imag.(vals), typemin(eltype(cskew)), zero(eltype(cskew)))im
-            V .-= real(vecs * LinearAlgebra.Diagonal(vals) * transpose(vecs))
-        end
+        V .-= negative_spectral_part(vals, vecs, eltype(cskew_b))
     end
-    matrix_processing!(mp, V, X)
-    return V
+    matrix_processing!(mp, V, Xb)
+    if !frame
+        return V
+    end
+    Vf = coverage_nan_frame(V, (N0, N0))
+    Vf[blk, blk] = V
+    return Vf
 end
 """
     _coskewness(Y::MatNum, X::MatNum, mp::AbstractMatrixProcessingEstimator, w::Option{<:StatsBase.AbstractWeights}) -> (MatNum, MatNum)
@@ -487,7 +582,62 @@ julia> V
   - [`negative_spectral_coskewness`](@ref)
 """
 function coskewness(ske::Coskewness{<:Any, <:Any, <:FullMoment}, X::MatNum; dims::Int = 1,
-                    mean = nothing, kwargs...)
+                    mean = nothing, active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+                    kwargs...)
+    return coverage_coskewness(ske, ske.cvg, X; dims = dims, mean = mean,
+                               active_mask = active_mask, kwargs...)
+end
+function coskewness(ske::Coskewness{<:Any, <:Any, <:SemiMoment}, X::MatNum; dims::Int = 1,
+                    mean = nothing, active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+                    kwargs...)
+    return coverage_coskewness(ske, ske.cvg, X; dims = dims, mean = mean,
+                               active_mask = active_mask, kwargs...)
+end
+"""
+    coverage_coskewness(ske, cvg, X; dims::Int = 1, mean = nothing,
+                        active_mask = nothing, kwargs...) -> (MatNum, MatNum)
+
+Fits a coskewness tensor over the arm the estimator's coverage policy selects.
+
+The `cvg` field of the estimator is passed as the second argument, so the arm is chosen by **dispatch on the policy** rather than by a branch on its value, exactly as [`coverage_covariance`](@ref) does for a covariance. The moment algorithm of `ske` chooses between the [`FullMoment`](@ref) arm, which centres on each asset's own mean and takes the deviations whole, and the [`SemiMoment`](@ref) arm, which clips them at zero first.
+
+# Arguments
+
+  - `ske`: Coskewness estimator.
+  - `cvg`: The policy the estimator carries, which selects the arm.
+  - `X`: Data matrix (observations × assets).
+  - $(arg_dict[:dims])
+  - `mean`: Optional mean vector. The available-case arms refuse one.
+  - `active_mask`: The active mask of the Asset Panel over the window, or `nothing`. The Coverage Universe arm ignores it.
+  - `kwargs...`: Additional keyword arguments passed to the mean estimator.
+
+# Returns
+
+  - $(ret_dict[:cskew])
+  - $(ret_dict[:cskewV])
+
+# Related
+
+  - [`Coskewness`](@ref)
+  - [`CoveragePolicy`](@ref)
+  - [`coverage_covariance`](@ref)
+  - [`coverage_comoment_block`](@ref)
+"""
+function coverage_coskewness end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+`Nothing` method of the [`FullMoment`](@ref) arm of [`coverage_coskewness`](@ref). The Coverage Universe arm, which centres the whole window on one vector and delegates to [`_coskewness`](@ref), and which is the body the verb has always had.
+
+# Related
+
+  - [`coverage_coskewness`](@ref)
+  - [`_coskewness`](@ref)
+"""
+function coverage_coskewness(ske::Coskewness{<:Any, <:Any, <:FullMoment}, ::Nothing,
+                             X::MatNum; dims::Int = 1, mean = nothing,
+                             active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+                             kwargs...)
     X = dims_oriented(dims, X)
     assert_finite_sample(X)
     w = get_observation_weights(ske.w, X; dims = 1, kwargs...)
@@ -495,14 +645,62 @@ function coskewness(ske::Coskewness{<:Any, <:Any, <:FullMoment}, X::MatNum; dims
     Y = X .- mu
     return _coskewness(Y, X, ske.mp, w)
 end
-function coskewness(ske::Coskewness{<:Any, <:Any, <:SemiMoment}, X::MatNum; dims::Int = 1,
-                    mean = nothing, kwargs...)
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+`Nothing` method of the [`SemiMoment`](@ref) arm of [`coverage_coskewness`](@ref). The Coverage Universe arm, which clips the de-meaned returns at zero before delegating, and which is the body the verb has always had.
+
+# Related
+
+  - [`coverage_coskewness`](@ref)
+  - [`_coskewness`](@ref)
+"""
+function coverage_coskewness(ske::Coskewness{<:Any, <:Any, <:SemiMoment}, ::Nothing,
+                             X::MatNum; dims::Int = 1, mean = nothing,
+                             active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+                             kwargs...)
     X = dims_oriented(dims, X)
     assert_finite_sample(X)
     w = get_observation_weights(ske.w, X; dims = 1, kwargs...)
     mu = weighted_centre(X, ske.me, ske.w; dims = 1, mean = mean, kwargs...)
     Y = min.(X .- mu, zero(eltype(X)))
     return _coskewness(Y, X, ske.mp, w)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+[`CoveragePolicy`](@ref) method of [`coverage_coskewness`](@ref). The available-case arm: each triple is fitted on the observations at which its three assets are all finite and active, and each cell carries its own denominator.
+
+The centre is each asset's own available-case mean, its own finite and active observations alone, and not the triple's. A per-triple centre would be `assets³` running means, which is the same reason the [`SemiMoment`](@ref) arm of [`coverage_covariance`](@ref) centres per asset. So an external `mean` is refused, as it is there.
+
+The [`SemiMoment`](@ref) arm differs in one line, the clip, which is why the two share this body through [`coverage_comoment_block`](@ref). Neither folds: an exact per-cell recursion at this order needs the pairwise second co-moments over each triple's own observation set, so the online form of an available-case coskewness is a buffer refit through [`Online`](@ref).
+
+# Algorithm
+
+ 1. Read the valid entries, the per-asset available-case centre and the per-asset bookkeeping of the block with [`coverage_comoment_block`](@ref).
+ 2. Take the numerator as `transpose(Y) * z` and the denominator as `transpose(Mi) * zc`, where `z` and `zc` are the pairwise expansions of the zeroed deviations and of the valid mask.
+ 3. Divide with [`coverage_divide`](@ref), and frame the refused assets down the asset axis and the pair axis with [`coverage_refuse_comoment!`](@ref).
+ 4. Reduce the frame with [`negative_spectral_coskewness`](@ref), which keeps the block rule.
+
+# Related
+
+  - [`coverage_coskewness`](@ref)
+  - [`coverage_comoment_block`](@ref)
+  - [`coverage_divide`](@ref)
+  - [`negative_spectral_coskewness`](@ref)
+"""
+function coverage_coskewness(ske::Coskewness, cvg::CoveragePolicy, X::MatNum; dims::Int = 1,
+                             mean = nothing,
+                             active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+                             kwargs...)
+    assert_dims(dims)
+    assert_partial_fittable(ske.me, ske.w, "Coskewness")
+    @argcheck(isnothing(mean),
+              ArgumentError("an available-case coskewness centres each asset on that asset's own observations, so it cannot take a centre fitted over the whole window. Pass `mean = nothing`, or clear `cvg`."))
+    Xo, Y, Mi, z, zc, cmsk = coverage_comoment_block(ske.alg, cvg, X, active_mask, dims)
+    cskew = coverage_divide(transpose(Y) * z, transpose(Mi) * zc, false, nothing)
+    coverage_refuse_comoment!(cskew, cmsk, Val(:sk))
+    return cskew, negative_spectral_coskewness(cskew, Xo, ske.mp)
 end
 function coskewness(::Nothing, args...; kwargs...)
     return nothing, nothing

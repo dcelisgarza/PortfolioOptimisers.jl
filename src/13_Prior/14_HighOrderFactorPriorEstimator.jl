@@ -582,9 +582,14 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum,
         HighOrderPrior(; pr = pr.fpr, kt = f_kt, D2 = f_D2, L2 = f_L2, S2 = f_S2, sk = f_sk,
                        V = f_V, skmp = isnothing(f_sk) ? nothing : pe.ske.mp)
     end
-    return HighOrderPrior(; pr = pr, kt = posterior_kt, D2 = D2, L2 = L2, S2 = S2,
-                          sk = posterior_sk, V = posterior_V,
-                          skmp = isnothing(f_sk) ? nothing : pe.ske.mp, fpr = fpr)
+    hop = HighOrderPrior(; pr = pr, kt = posterior_kt, D2 = D2, L2 = L2, S2 = S2,
+                         sk = posterior_sk, V = posterior_V,
+                         skmp = isnothing(f_sk) ? nothing : pe.ske.mp, fpr = fpr)
+    # The posterior co-moments run through this estimator's own `ske` and `kte`, so a policy
+    # set on the low order alone narrows the Investable Mask here exactly as it does for a
+    # plain high order prior. The fit is the one place that says so.
+    assert_matched_coverage(hop)
+    return hop
 end
 
 function factor_residual_config(pe::HighOrderFactorPriorEstimator)

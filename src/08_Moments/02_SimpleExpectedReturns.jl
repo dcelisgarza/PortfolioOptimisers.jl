@@ -298,7 +298,8 @@ $(DocStringExtensions.FIELDS)
 
     SimpleExpectedReturnsState(;
         n::Integer = 0,
-        mu::VecNum
+        mu::VecNum,
+        cvg::Option{<:CoverageCounts} = nothing
     ) -> SimpleExpectedReturnsState
 
 Keywords correspond to the struct's fields. A state seeded for `N` assets is `SimpleExpectedReturnsState(; mu = zeros(N))`, which [`partial_fit!`](@ref) builds when the `cache` field of the estimator holds `nothing`.

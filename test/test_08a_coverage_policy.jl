@@ -17,6 +17,21 @@ function coverage_panel(amsk)
                                                 omsk = trues(size(amsk)...))]
     return AssetPanel(; pf = pf, amsk = amsk, emsk = copy(amsk))
 end
+# The per-cell oracle of a higher-order available-case fit: each asset is centred on its own
+# finite observations, and a cell is the mean of the product over the observations its assets
+# share. `clip` is `identity` for a `FullMoment` arm and `x -> min(x, 0)` for a `SemiMoment` one.
+function comoment_deviations(X, clip)
+    mu = [mean(filter(isfinite, view(X, :, j))) for j in axes(X, 2)]
+    return clip.(X .- transpose(mu))
+end
+function comoment_cell(Y, idx)
+    rows = findall(t -> all(i -> isfinite(Y[t, i]), idx), axes(Y, 1))
+    return if isempty(rows)
+        NaN
+    else
+        sum(prod(Y[t, i] for i in idx) for t in rows) / length(rows)
+    end
+end
 @testset "CoveragePolicy construction and the algorithm family" begin
     @test CoveragePolicy().min_coverage == 0.0
     @test isa(CoveragePolicy().alg, DecayCoverage)
@@ -353,4 +368,155 @@ end
                                                   cvg = CoveragePolicy(;
                                                                        alg = AdmitEverything())),
                             X; active_mask = amsk))[2])
+end
+@testset "The third and fourth order read each cell's own observations" begin
+    X = [1.0 2.0 NaN; 3.0 4.0 5.0; 5.0 NaN 7.0; 7.0 8.0 9.0; 2.0 6.0 4.0; 4.0 1.0 8.0]
+    cvg = CoveragePolicy()
+    N = size(X, 2)
+    Y = comoment_deviations(X, identity)
+    sk, V = coskewness(Coskewness(; cvg = cvg), X)
+    # The repair moves a cokurtosis away from its own fit, so the parity oracle reads the raw
+    # one. The repair has its own test, and the third order is never processed.
+    kt = cokurtosis(Cokurtosis(; mp = MatrixProcessing(; pdm = nothing), cvg = cvg), X)
+    for a in 1:N, i in 1:N, j in 1:N
+        @test sk[a, (i - 1) * N + j] ≈ comoment_cell(Y, (a, i, j))
+    end
+    for i in 1:N, j in 1:N, k in 1:N, l in 1:N
+        @test kt[(i - 1) * N + j, (k - 1) * N + l] ≈ comoment_cell(Y, (i, j, k, l))
+    end
+    # The tensor's per-asset diagonal is the asset's own third and fourth central moment.
+    for i in 1:N
+        @test sk[i, (i - 1) * N + i] ≈ comoment_cell(Y, (i, i, i))
+        @test kt[(i - 1) * N + i, (i - 1) * N + i] ≈ comoment_cell(Y, (i, i, i, i))
+    end
+    @test size(V) == (N, N)
+    @test all(isfinite, V)
+end
+@testset "The semi arms of the third and fourth order take the policy" begin
+    X = [1.0 2.0 NaN; 3.0 4.0 5.0; 5.0 NaN 7.0; 7.0 8.0 9.0; 2.0 6.0 4.0; 4.0 1.0 8.0]
+    cvg = CoveragePolicy()
+    N = size(X, 2)
+    Y = comoment_deviations(X, x -> min(x, zero(x)))
+    sk, _ = coskewness(Coskewness(; alg = SemiMoment(), cvg = cvg), X)
+    kt = cokurtosis(Cokurtosis(; alg = SemiMoment(), mp = MatrixProcessing(; pdm = nothing),
+                               cvg = cvg), X)
+    for a in 1:N, i in 1:N, j in 1:N
+        @test sk[a, (i - 1) * N + j] ≈ comoment_cell(Y, (a, i, j))
+    end
+    for i in 1:N, j in 1:N, k in 1:N, l in 1:N
+        @test kt[(i - 1) * N + j, (k - 1) * N + l] ≈ comoment_cell(Y, (i, j, k, l))
+    end
+    # The clip is taken about each asset's own available-case mean, so a centre fitted over the
+    # whole window is refused, at both orders and under both moment algorithms.
+    for alg in (FullMoment(), SemiMoment())
+        @test_throws ArgumentError coskewness(Coskewness(; alg = alg, cvg = cvg), X;
+                                              mean = zeros(1, N))
+        @test_throws ArgumentError cokurtosis(Cokurtosis(; alg = alg, cvg = cvg), X;
+                                              mean = zeros(1, N))
+    end
+end
+@testset "A refused asset is framed across its rows and its pair columns" begin
+    X = [1.0 2.0 3.0; 3.0 4.0 5.0; 5.0 6.0 7.0; 7.0 8.0 9.0; 2.0 6.0 NaN; 4.0 1.0 NaN]
+    amsk = trues(size(X)...)
+    amsk[5:6, 3] .= false
+    N = size(X, 2)
+    # Asset 3 covers four of six observations and is inactive at the last, so `DecayCoverage`
+    # refuses it above that share.
+    cvg = CoveragePolicy(; min_coverage = 0.9)
+    sk, V = coskewness(Coskewness(; cvg = cvg), X; active_mask = amsk)
+    kt = cokurtosis(Cokurtosis(; cvg = cvg), X; active_mask = amsk)
+    @test all(isnan, view(sk, 3, :))
+    @test all(isfinite, view(sk, 1:2, [(i - 1) * N + j for i in 1:2 for j in 1:2]))
+    for i in 1:N, j in 1:N
+        touches = i == 3 || j == 3
+        @test all(isnan, view(sk, :, (i - 1) * N + j)) == touches
+        @test all(isnan, view(kt, (i - 1) * N + j, :)) == touches
+        @test all(isnan, view(kt, :, (i - 1) * N + j)) == touches
+    end
+    # The reduction frames the refused asset too, and repairs the block around it.
+    @test all(isnan, view(V, 3, :))
+    @test all(isnan, view(V, :, 3))
+    @test all(isfinite, view(V, 1:2, 1:2))
+end
+@testset "An empty cell inside a complete block is refused by name" begin
+    # Every pair shares an observation and no observation carries all three assets, so the
+    # per-asset diagonals are finite and the triple is empty: the block is the whole tensor.
+    X = [1.0 2.0 NaN; 3.0 4.0 NaN; 5.0 NaN 7.0; 7.0 NaN 9.0; NaN 6.0 4.0; NaN 1.0 8.0]
+    cvg = CoveragePolicy()
+    sk_only = PortfolioOptimisers.coverage_divide([1.0], [1], false, nothing)
+    @test isfinite(only(sk_only))
+    @test_throws PortfolioOptimisers.IsNonFiniteError coskewness(Coskewness(; cvg = cvg), X)
+    # The same law on a covariance frame: an empty pair among fully admitted assets reaches the
+    # named refusal rather than LAPACK, which is what a complete diagonal used to short-circuit.
+    Xp = [1.0 NaN 3.0; NaN 2.0 5.0; 3.0 NaN 7.0; NaN 4.0 9.0]
+    sigma = cov(Covariance(; cvg = cvg), Xp)
+    @test all(isfinite, LinearAlgebra.diag(sigma))
+    @test isnan(sigma[1, 2])
+    @test_throws PortfolioOptimisers.IsNonFiniteError PortfolioOptimisers.matrix_processing_block!(MatrixProcessing(),
+                                                                                                   copy(sigma),
+                                                                                                   Xp)
+    # A matrix with no finite diagonal carries no block, so it is the plain repair's and meets
+    # the refusal its caller already met rather than the block rule's.
+    @test_throws ArgumentError PortfolioOptimisers.matrix_processing_block!(MatrixProcessing(),
+                                                                            fill(NaN, 2, 2),
+                                                                            zeros(4, 2))
+    @test all(isnan,
+              PortfolioOptimisers.matrix_processing_block!(nothing, fill(NaN, 2, 2),
+                                                           zeros(4, 2)))
+end
+@testset "The Investable Mask reads every order the carrier holds" begin
+    X = randn(StableRNGs.StableRNG(123), 60, 3) ./ 100
+    X[1:30, 3] .= NaN
+    amsk = trues(size(X)...)
+    amsk[1:30, 3] .= false
+    pnl = coverage_panel(amsk)
+    cvg = CoveragePolicy()
+    lo = EmpiricalPrior(; me = SimpleExpectedReturns(; cvg = cvg),
+                        ce = Covariance(; cvg = cvg), fill_limit = 1)
+    # A policy on the low order alone: the higher orders reduce to the Coverage Universe, the
+    # mask narrows back to it, and the fit says so once.
+    mixed = @test_logs (:warn,) match_mode = :any prior(HighOrderPriorEstimator(; pe = lo),
+                                                        X, nothing, pnl)
+    @test PortfolioOptimisers.investable_mask(mixed) == BitVector([1, 1, 0])
+    @test all(isnan, view(mixed.sk, 3, :))
+    # The matched configuration narrows nothing and says nothing.
+    matched = @test_logs prior(HighOrderPriorEstimator(; pe = lo,
+                                                       ske = Coskewness(; cvg = cvg),
+                                                       kte = Cokurtosis(; cvg = cvg)), X,
+                               nothing, pnl)
+    @test isnothing(PortfolioOptimisers.investable_mask(matched))
+    @test all(isfinite, matched.sk)
+    @test all(isfinite, matched.kt)
+    # The reduction the optimiser takes at its entry runs on the narrowed universe.
+    @test all(isfinite, PortfolioOptimisers.port_opt_view(mixed, [1, 2]).sk)
+end
+@testset "The online form of the third and fourth order is a buffer refit" begin
+    X = randn(StableRNGs.StableRNG(97), 40, 3) ./ 100
+    X[1:12, 3] .= NaN
+    cvg = CoveragePolicy()
+    ske = PortfolioOptimisers.update_online_estimator(Online(Coskewness(; cvg = cvg)))
+    for t in axes(X, 1)
+        ske = partial_fit!(ske, view(X, t, :))
+    end
+    sk_o, V_o = coskewness(ske)
+    sk_b, V_b = coskewness(Coskewness(; cvg = cvg), X)
+    @test isequal(sk_o, sk_b)
+    @test isequal(V_o, V_b)
+    kte = PortfolioOptimisers.update_online_estimator(Online(Cokurtosis(; cvg = cvg)))
+    kte = partial_fit!(kte, X)
+    @test isequal(cokurtosis(kte), cokurtosis(Cokurtosis(; cvg = cvg), X))
+    # The cap is the memory knob of the carry buffer, so a capped wrapper reads its last rows.
+    capped = PortfolioOptimisers.update_online_estimator(Online(Coskewness(; cvg = cvg);
+                                                                max_history = 10))
+    capped = partial_fit!(capped, X)
+    @test isequal(first(coskewness(capped)),
+                  first(coskewness(Coskewness(; cvg = cvg), X[(end - 9):end, :])))
+end
+@testset "A policy prints only where it is set" begin
+    @test PortfolioOptimisers.show_fields(Coskewness()) == (:me, :mp, :alg, :w, :cache)
+    @test PortfolioOptimisers.show_fields(Cokurtosis()) == (:me, :mp, :alg, :w, :cache)
+    @test PortfolioOptimisers.show_fields(Coskewness(; cvg = CoveragePolicy())) ==
+          (:me, :mp, :alg, :w, :cvg, :cache)
+    @test PortfolioOptimisers.show_fields(Cokurtosis(; cvg = CoveragePolicy())) ==
+          (:me, :mp, :alg, :w, :cvg, :cache)
 end
