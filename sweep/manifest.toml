@@ -62,13 +62,20 @@
 "src/02_Tools.jl" = { map = 1, units = 69, algorithm = 49, swept = true }
 "src/03_InputData/01_AssetPanel.jl" = { map = 2, units = 33, swept = false }
 "src/03_InputData/02_AssetPanelBuilder.jl" = { map = 2, units = 22, swept = false }
-"src/03_InputData/03_Preprocessing.jl" = { map = 2, units = 49, algorithm = 22, swept = false }
-"src/03_InputData/04_CrossSectionalTransforms.jl" = { map = 2, units = 29, swept = false }
-"src/03_InputData/05_FeatureSelector.jl" = { map = 2, units = 13, swept = false }
-"src/03_InputData/06_PanelDataFrame.jl" = { map = 2, units = 8, swept = false }
-"src/03_InputData/07_ListingSpan.jl" = { map = 2, units = 4, swept = false }
+"src/03_InputData/03_ListingSpan.jl" = { map = 2, units = 4, swept = false }
+"src/03_InputData/04_Preprocessing.jl" = { map = 2, units = 9, algorithm = 1, swept = false }
+"src/03_InputData/05_CarrierViews.jl" = { map = 2, units = 4, algorithm = 4, swept = false }
+"src/03_InputData/06_PricesResult.jl" = { map = 2, units = 3, algorithm = 1, swept = false }
+"src/03_InputData/07_PriceIngestion.jl" = { map = 2, units = 12, swept = false }
 "src/03_InputData/08_PriceGapFill.jl" = { map = 2, units = 7, swept = false }
-"src/03_InputData/09_PriceIngestion.jl" = { map = 2, units = 12, swept = false }
+"src/03_InputData/09_PriceFilters.jl" = { map = 2, units = 4, algorithm = 2, swept = false }
+"src/03_InputData/10_ReturnsResult.jl" = { map = 2, units = 8, algorithm = 7, swept = false }
+"src/03_InputData/11_PricesToReturns.jl" = { map = 2, units = 8, algorithm = 5, swept = false }
+"src/03_InputData/12_TrainTestSplit.jl" = { map = 2, units = 7, algorithm = 5, swept = false }
+"src/03_InputData/13_AssetSelection.jl" = { map = 2, units = 6, algorithm = 3, swept = false }
+"src/03_InputData/14_CrossSectionalTransforms.jl" = { map = 2, units = 29, swept = false }
+"src/03_InputData/15_FeatureSelector.jl" = { map = 2, units = 13, swept = false }
+"src/03_InputData/16_PanelDataFrame.jl" = { map = 2, units = 8, swept = false }
 "src/04_PosdefMatrix.jl" = { map = 2, units = 4, algorithm = 2, swept = true }
 "src/05_Denoise.jl" = { map = 2, units = 10, algorithm = 7, swept = true }
 "src/06_Detone.jl" = { map = 2, units = 4, algorithm = 2, swept = true }

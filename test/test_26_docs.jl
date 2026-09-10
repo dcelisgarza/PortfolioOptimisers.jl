@@ -733,7 +733,7 @@ in the sense of `STANDARDS.md`.
     # Julia strips the indentation of a `"""` block, so a section heading sits at column 0.
     # The count, not the flag, is the primitive: one string block can document several
     # methods, separated by horizontal rules, and then carries one heading per method that
-    # holds the section. `port_opt_view` in `src/03_InputData/03_Preprocessing.jl` is such a
+    # holds the section. `port_opt_view` in `src/03_InputData/10_ReturnsResult.jl` is such a
     # block.
     count_section(text, name) = count(==(string("# ", name)), rstrip.(split(text, '\n')))
     has_section(text, name) = count_section(text, name) > 0
@@ -924,7 +924,7 @@ in the sense of `STANDARDS.md`.
          lowers it as its file migrates, and the check retires when it reaches zero.
 
     Both numbers count SECTION HEADINGS and not docstrings that carry one. `port_opt_view` in
-    `src/03_InputData/03_Preprocessing.jl` documents four methods under one string block and
+    `src/03_InputData/10_ReturnsResult.jl` documents four methods under one string block and
     carries the heading twice, so a docstring count would read 298 and would not fall when the
     first of those two headings moved.
 

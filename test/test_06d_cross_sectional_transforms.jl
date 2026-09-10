@@ -1,5 +1,5 @@
 #=
-Check `src/03_InputData/04_CrossSectionalTransforms.jl` against the rules its docstrings
+Check `src/03_InputData/14_CrossSectionalTransforms.jl` against the rules its docstrings
 state, and against the reference implementation the map of issue #643 ports. Issue #716.
 
 THREE FACTS SHAPE THE PROBES.
@@ -29,7 +29,7 @@ using Statistics, Distributions
 # --- the second derivation ---------------------------------------------------------------
 #
 # Written one observation at a time from the definitions in the docstrings. It shares no code
-# with `src/03_InputData/04_CrossSectionalTransforms.jl`.
+# with `src/03_InputData/14_CrossSectionalTransforms.jl`.
 
 function naive_masks(x, wrow)
     fin = isfinite.(x)

@@ -15,7 +15,7 @@ prior(pe::AbstractPriorEstimator, X::MatNum, F::Option{<:MatNum} = nothing; dims
 ```
 
 The carrier method is written once, in the same file. It reads `rd.X` and `rd.F` off the
-[`ReturnsResult`](../../src/03_InputData/03_Preprocessing.jl) and calls the returns-matrix method. A
+[`ReturnsResult`](../../src/03_InputData/10_ReturnsResult.jl) and calls the returns-matrix method. A
 wrapping prior holds no carrier: it is itself inside that method, so it reaches the estimator it
 nests through the matrices alone.
 

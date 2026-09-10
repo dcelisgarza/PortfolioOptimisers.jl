@@ -198,10 +198,44 @@ carries one branch per key of `PREFERENCE_KEYS`."""
 # definitions sit over seventeen keys, because the key holds no line.
 
 [[exemption]]
-path = "src/03_InputData/03_Preprocessing.jl"
+path = "src/03_InputData/10_ReturnsResult.jl"
 definition = "ReturnsResult"
 metric = "arg"
 rationale = "keyword-constructor-arity"
+
+# The split of `03_Preprocessing.jl` into the price-to-returns run. Each of these three definitions
+# moved byte-for-byte, and each now drives the maximum of a smaller file rather than sitting under
+# the row that grandfathered it. ADR 0074's entry test reads the new file as an addition, so the
+# five keys below say what the dead row said.
+[[exemption]]
+path = "src/03_InputData/10_ReturnsResult.jl"
+definition = "ReturnsResult"
+metric = "cyc"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/03_InputData/10_ReturnsResult.jl"
+definition = "ReturnsResult"
+metric = "cog"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/03_InputData/10_ReturnsResult.jl"
+definition = "port_opt_view"
+metric = "cog"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/03_InputData/11_PricesToReturns.jl"
+definition = "prices_to_returns"
+metric = "cyc"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/03_InputData/11_PricesToReturns.jl"
+definition = "prices_to_returns"
+metric = "arg"
+rationale = "a-definition-a-file-split-moved-unchanged"
 
 [[exemption]]
 path = "src/08_Moments/35_GerberIQCovariance.jl"

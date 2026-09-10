@@ -91,3 +91,14 @@ changes neither that decision nor the file's content.
 - **Move `04_SyntheticAssetPanel.jl` under `test/`.** Refused. It is exported public API and the
   deep-dive example it was built for cannot reach a fixture under `test/`. Issue #656 measured
   this.
+
+## Amendment (2026-09-10)
+
+The numbering this ADR gave the directory is superseded by
+[ADR 0134](0134-the-input-data-directory-reads-in-pipeline-order-and-the-preprocessing-file-splits-along-it.md),
+which renumbers `src/03_InputData/` so that its names read in the order a caller's data moves through
+it, and splits `03_Preprocessing.jl` into eight files along the same line. The decision this ADR
+records — that the input data is one subject and gets one directory, numbered rather than
+alphabetical, with one sweep map — stands, and ADR 0134 rests on it. What changes is which number
+each file carries: `03_Preprocessing.jl` no longer exists, and the table above names paths that are
+history.
