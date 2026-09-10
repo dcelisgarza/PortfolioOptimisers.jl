@@ -635,7 +635,7 @@ UniverseSets
    cfkey ┼ String: "ncf"
   ucfkey ┼ String: "ucf"
    nikey ┼ String: "ni"
-    dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"], "group1" => ["A", "B"])
+    dict ┴ Dict{String, Vector{String}}: Dict("group1" => ["A", "B"], "nx" => ["A", "B", "C"])
 ```
 
 # Related
@@ -2196,11 +2196,11 @@ julia> sets = UniverseSets(; xkey = \"nx\",
 
 julia> res = parse_equation(\"group1 + 2C == 1\")
 ParsingResult
-  vars ┼ Vector{String}: ["C", "group1"]
-  coef ┼ Vector{Float64}: [2.0, 1.0]
+  vars ┼ Vector{String}: ["group1", "C"]
+  coef ┼ Vector{Float64}: [1.0, 2.0]
     op ┼ String: "=="
    rhs ┼ Float64: 1.0
-   eqn ┴ SubString{String}: "2.0*C + group1 == 1.0"
+   eqn ┴ SubString{String}: "group1 + 2.0*C == 1.0"
 
 julia> replace_group_by_assets(res, sets)
 ParsingResult

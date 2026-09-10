@@ -251,7 +251,7 @@ AugmentedBlackLittermanPrior
                │    cfkey ┼ String: "ncf"
                │   ucfkey ┼ String: "ucf"
                │    nikey ┼ String: "ni"
-               │     dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"], "nf" => ["F1", "F2"])
+               │     dict ┴ Dict{String, Vector{String}}: Dict("nf" => ["F1", "F2"], "nx" => ["A", "B", "C"])
   a_views_conf ┼ nothing
   f_views_conf ┼ nothing
              w ┼ nothing

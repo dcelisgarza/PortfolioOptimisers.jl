@@ -34,11 +34,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: julia-actions/setup-julia@latest
         with:
-          # Pinned to the newest version `Project.toml` declares, not to `"1"`. A doctest
-          # records the output of one Julia, and 1.13 rehashes `Dict`, so a page built by a
-          # version the package does not claim reports a diff that is the version's and not
-          # the library's.
-          version: "1.12"
+          version: "1"
       - name: Use Julia cache
         uses: julia-actions/cache@v3
       - name: Instantiate environment with development version of the package
@@ -64,11 +60,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: julia-actions/setup-julia@latest
         with:
-          # Pinned to the newest version `Project.toml` declares, not to `"1"`. A doctest
-          # records the output of one Julia, and 1.13 rehashes `Dict`, so a page built by a
-          # version the package does not claim reports a diff that is the version's and not
-          # the library's.
-          version: "1.12"
+          version: "1"
       - name: Use Julia cache
         uses: julia-actions/cache@v3
       - name: Instantiate environment with development version of the package

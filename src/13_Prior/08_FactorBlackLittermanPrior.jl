@@ -141,7 +141,7 @@ FactorBlackLittermanPrior
              │    cfkey ┼ String: "ncf"
              │   ucfkey ┼ String: "ucf"
              │    nikey ┼ String: "ni"
-             │     dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"], "nf" => ["F1", "F2"])
+             │     dict ┴ Dict{String, Vector{String}}: Dict("nf" => ["F1", "F2"], "nx" => ["A", "B", "C"])
   views_conf ┼ nothing
            w ┼ nothing
           rf ┼ Float64: 0.0
