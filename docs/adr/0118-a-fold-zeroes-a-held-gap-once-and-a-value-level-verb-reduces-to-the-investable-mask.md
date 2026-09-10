@@ -55,6 +55,21 @@ also refused, on this ticket, a finiteness check on a hot path when the caller c
 upstream: a scan is paid only where the library itself makes the gapped value and the caller cannot
 reach it first, and it is paid once there.
 
+Three measurements taken on this ticket, after available-case admission landed, redraw the fill's
+half of the answer. **The matrix-wide denominator is blind to the case it was written for**: the
+share is the count of filled entries over the count of entries of the whole returns matrix, the
+reference's denominator, so one asset of a hundred whose column is seven-tenths invented is seven
+thousandths of the matrix, beneath any limit a caller would set. **The limit and the coverage floor
+are the same number**: `admits` reads coverage as an asset's own observation count over the number
+of observations folded, and the fill counts that column's non-finite entries over the same
+denominator, so the two are complements, and a limit that did not know it would fire on nearly
+every fold of an available-case walk-forward. And **the fill reaches further than the tail**: a
+census of the readers of `pr.X` found that 48 of the 54 concrete risk measures read the sample
+rather than a moment alone, and that three consumers outside the measure layer read the invented
+cells too — the dendrogram, which recomputes its correlation from the returns matrix and not from
+`pr.sigma`; the entropy-pooling view resolvers, which read the matrix column by column; and the
+meta-optimisers, which build the outer problem's returns from it.
+
 ## Decision
 
 ### A fold reduces its test window to the Investable Mask, then zeroes a Held Gap once
@@ -126,12 +141,16 @@ computed them from the rows it saw. Every consumer, the JuMP model, the meta-opt
 value-level door among them, then reads finite investable columns. The fill is paid once, on the
 estimator's own pass.
 
-Under `strict = false` the prior warns when the filled fraction exceeds `fill_limit`, a **field of
-`EmpiricalPrior`** holding an `Option{<:Real}` in `(0, 1]`, default `nothing`. The fraction is the
-count of filled entries over the count of entries of the returns matrix, the reference's
-denominator. The warning names the assets, the count, the limit it was measured against and the
-consequence for a scenario-based measure. Under `strict = true` any fill refuses, whatever the
-fraction.
+Under `strict = false` the prior warns when the filled share exceeds `fill_limit`, a **field of
+`EmpiricalPrior`** holding an `Option{<:Real}` in `(0, 1]`, default `nothing`. Under `strict = true`
+any fill refuses, whatever the share.
+
+**The share is per asset**: the worst investable column's own count of filled entries over the
+number of observations. The matrix-wide share, the reference's denominator, is reported in the
+message and trips nothing. It scales with the universe, so the column the notice exists to catch
+disappears inside it — one asset of a hundred whose column is seven-tenths invented is seven
+thousandths of the matrix, under any limit a caller would set. A per-column denominator means one
+number with one meaning in a panel of ten assets and in a panel of a thousand.
 
 The limit is a field rather than a global because the decision it governs is a property of **one
 fit**. A caller who wants two priors in one program to fill at two different shares says so on the
@@ -139,12 +158,6 @@ two estimators; dynamic scope could not express that, because it colours whateve
 block rather than the estimator that fills. This is the shape `strict` already takes in this ADR,
 and the shape the library gives every other piece of configuration: the value is inspectable on the
 estimator and it prints under `show`.
-
-`nothing` is the default, and it means that **no** share passes in silence: an investable asset is
-asked to cover every observation, so a caller who has not weighed the trade is told that it
-happened. `0` is therefore not a value the field accepts — `nothing` already spells that answer, and
-a second spelling of one answer is a defect waiting to be found. The upper end is closed: `1`
-accepts the whole matrix.
 
 `EmpiricalPrior` is the only estimator that carries the field, and it is the only one eligible. A
 prior is eligible when it holds a mask-aware moment estimator **directly** and puts the caller's own
@@ -154,6 +167,79 @@ paid once, at the `EmpiricalPrior` at the bottom of the chain, and the field rid
 `factory`. `CrossSectionalFactorPrior` holds a `ce` directly, but it estimates the covariance of
 standardised idiosyncratic residuals, carries its own investability guard, and synthesises its
 scenarios, so it never reaches the verb.
+
+### `fill_limit` and `min_coverage` are one number
+
+`admits` reads an asset's coverage share as its own observation count over the number of
+observations folded, and the fill counts that column's non-finite entries over the same denominator.
+So `filled_share == 1 - coverage_share` identically, and the admission test `share >= min_coverage`
+**is** the test `filled_share <= 1 - min_coverage`. Two spellings of one number. A `fill_limit` that
+ignored that would fire on nearly every fold of an available-case walk-forward, naming the caller
+for doing precisely what they configured — which is the failure the old global's 5% default had, in
+a new spelling.
+
+`nothing` therefore derives. Where any arm of the fitting estimator carries a
+[`CoveragePolicy`](0117-a-prior-reduces-to-the-coverage-universe-and-a-plain-moment-estimator-refuses-a-non-finite-sample.md),
+`nothing` means `1 - maximum(min_coverage)` over the arms that state a floor, and it never fires:
+every admitted column satisfies it by construction. The **maximum** is the binding floor because
+admission is the conjunction of the arms — the Investable Mask needs `mu` and the diagonal of
+`sigma` finite — and `coverage_admission` reads the per-asset count off the diagonal, the same
+number for both arms. A floor stated on **either** arm therefore bounds every investable column
+whatever the other arm does, so a mixed configuration needs no rule of its own.
+
+Where **no** arm states a floor, `nothing` keeps its original meaning and names every fill. The
+exponentially weighted family is mask-aware without a policy: it gates on `min_obs`, a *count*
+whose default is about six observations, which says nothing about the share of a thousand-row
+window. A caller who set no floor has weighed no trade, and is told that the fill happened.
+
+An explicit `fill_limit` overrides the derivation and must be **tighter** than admission. A value
+above `1 - min_coverage` is refused, because it is dead by construction: nothing that reaches the
+fill could trip it, and a knob that cannot fire is worse than no knob. What an explicit value buys
+is the one configuration the derivation cannot express — admit broadly and be told anyway.
+`min_coverage = 0.3` with `fill_limit = 0.5` admits a column seven-tenths invented and names it
+past half.
+
+`0` is not a value the field accepts — `nothing` already spells that answer, and a second spelling
+of one answer is a defect waiting to be found. The upper end is closed: `1` accepts the whole
+matrix.
+
+`min_coverage` keeps its default of `0`, which derives a limit of `1`, so a policy taken bare
+admits a one-observation column and fills it in silence. That is what `0` asks for. The notice fires
+on a floor the caller stated and the fit violated, never on a floor the caller declined to state,
+and `CoveragePolicy`'s docstring says so where the default is written.
+
+### The notice names every consumer of a filled column, not the scenario measure alone
+
+The fill is paid once so that every consumer reads a finite investable column, and every consumer
+therefore reads the invented cells. The message names four consequences, one per consumer that a
+census of `pr.X`'s readers found, because a caller who is told only about the tail will not look for
+the other three:
+
+- **A scenario-based measure understates the asset's risk.** The cost is exact rather than
+  qualitative, and the invented zeros are not the reason a reader might expect. They do not enter
+  the tail; they inflate the denominator. A measure at level `alpha` reads the worst
+  `ceil(alpha * T)` values, and for an admitted column of coverage `c` those are all observed
+  returns whenever the asset has that many losses, so the measure reads the observed sample's
+  `alpha / c` level. At `c = 0.3` a 5% CVaR is a 16.7% CVaR.
+- **A hierarchical optimiser may branch the asset alone and then overweight it.** `clusterise`
+  recomputes the correlation from the returns matrix rather than from `pr.sigma`, so the fill
+  reaches the dendrogram independently of the covariance the estimator answered. An invented column
+  has depressed variance and attenuated correlation, which reads as idiosyncrasy, and an
+  inverse-variance allocation over that branch then buys more of it. This is the one consequence
+  that does not merely understate a risk; it moves capital.
+- **An entropy-pooling view on the asset is calibrated on the filled column.** The view resolvers
+  read `pr.X` column by column to turn a stated view into a target, so the target is computed from
+  the invented cells.
+- **A meta-optimiser carries the fill into the outer problem.** The outer returns matrix is built
+  from the inner Sub-Portfolios' net returns over `pr.X`, so the invented cells reach a level the
+  caller never handed a returns matrix to.
+
+No consumer reduces, recomputes or scans for this. The rule of this ADR holds — a check is paid
+where the library makes the gapped value and the caller cannot reach it first, and the fill is that
+one place. The invented cells are recoverable exactly wherever the caller's own returns are in hand,
+as the non-finite entries of that matrix intersected with the Investable Mask, because the fill
+copies and never mutates what the caller passed; the clustering, optimiser and meta-optimiser doors
+all hold it. Nothing is stored on the carrier, which would be a field with no reader.
 
 ### A drawn plot keeps the frame, and a computed plot reduces
 
@@ -182,6 +268,14 @@ answer, and an `ArgumentError` under `strict`; a per-asset answer has the full l
 `0` at the dead asset. A second testset drives one fold with a delisting inside its test window and
 asserts a finite series and one warning.
 
+Two further testsets pin the fill. The first pins what a scenario measure reads: for an admitted
+column of coverage `c` whose asset carries at least `ceil(alpha * T)` losses, the measure at level
+`alpha` over the filled matrix equals the measure at level `alpha / c` over that column's observed
+rows, exactly. The second pins the notice: no policy and `fill_limit = nothing` names every fill; a
+policy and `fill_limit = nothing` names none, on every fold of a walk-forward with listings; an
+explicit `fill_limit` above `1 - min_coverage` refuses at the fit; and `strict = true` refuses any
+fill under either.
+
 ### The refused options
 
 | Option | Why it was refused |
@@ -201,14 +295,21 @@ asserts a finite series and one warning.
 | The fill is silent, or it warns on any fill | Silent leaves the caller with the docstring alone; any fill warns on most folds of a walk-forward over a panel with listings. |
 | Every prior plot reduces, or every prior plot draws the frame | One rule loses the blank row that shows a dead asset, the other fails the plots that compute on the matrix. |
 | A hand-written list of measures in the tripwire | A new measure is forgotten in the list, which is the failure the tripwire exists to catch. |
+| A second, scenario-only Investable Mask | An asset moment-investable and scenario-non-investable widens ADR 0115's contract and makes every scenario consumer reduce by a second mask. One coverage floor already expresses the same admission. |
+| Each scenario measure carries a per-asset valid-row denominator | The refusal this ADR already makes for a finiteness check in every kernel, now at 48 of 54 measures. |
+| The fill writes the asset's own `mu` rather than zero | The column's mean would agree with the reported `mu`, at the cost of two conventions for one gap: the fit would invent a return on an observation where the fold invents cash. |
+| The carrier records which cells the fill invented | A field with no reader. Every consumer was left unchanged, and the cells are recoverable exactly as the non-finite entries of the caller's own matrix intersected with the Investable Mask, which every door that could act on them holds. |
+| `fill_limit` is deleted, leaving `min_coverage` as the only share | The exponentially weighted family — the family this fill was written for — carries no policy and gates on a count, so it would lose its only share. |
+| The derived limit is capped below one, so a mostly-invented column always names | A second number, and a hidden constant rather than a field the caller can read off the estimator. |
+| `min_coverage` takes a non-zero default | Any choice is arbitrary, because the honest floor depends on the window length and the measure, and it makes a bare `CoveragePolicy()` mean something the caller did not type. |
 
 ## Consequences
 
 - Three build tickets on map
   [#667](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/667): the fold's filter, the
   value-level doors and the census test in one; the plots in a second, blocked by the first; the
-  fill and its scoped config in a third, blocked by the two moment build tickets. All three block
-  the closing verification.
+  fill in a third, blocked by the two moment build tickets. All three block the closing
+  verification.
 - The map's closing walk-forward can score: a fold whose test window holds a delisting yields a
   finite series and one warning, and the search scores a number, not a `NaN`. What a search does
   with a `NaN` score from a failed fold is the cross-validation decision of the map.
@@ -219,5 +320,17 @@ asserts a finite series and one warning.
   mask-aware estimator. The docstrings of the family state it, and `EmpiricalPrior`'s `fill_limit`
   is where a caller loosens the notice. It is tight by default: every fill is named until the caller
   says how much of the trade to accept.
+- A scenario-based measure over an admitted column of coverage `c` reads the observed sample's
+  `alpha / c` level, so at `c = 0.3` a 5% CVaR is a 16.7% CVaR. The docstrings of the family state
+  the identity rather than the adjective.
+- Turning on a `CoveragePolicy` does not turn on a warning. The floor the caller states is the share
+  the fill accepts in silence, so an available-case walk-forward names nothing while it does what it
+  was configured to do, and names a column the moment a caller's own coverage algorithm admits one
+  thinner than the floor it was given.
+- A caller who wants to admit broadly and be told anyway states `fill_limit` explicitly, tighter
+  than `1 - min_coverage`. A looser value refuses, because it could never fire.
+- The dendrogram, the entropy-pooling view resolvers and the meta-optimisers read the invented cells
+  and are unchanged. The notice is what says so, and a repair to any of them is a later decision
+  with the census in hand.
 - `CONTEXT.md` gains the **Held Gap** entry, and the **Precomputed-returns contract** entry states
   the finiteness rule.
