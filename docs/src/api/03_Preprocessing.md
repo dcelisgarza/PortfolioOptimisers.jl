@@ -90,6 +90,10 @@ and
 PriceIngestion
 price_ingestion
 PortfolioOptimisers.unify_gaps
+PortfolioOptimisers.series_names
+PortfolioOptimisers.assert_disjoint_series_names
+PortfolioOptimisers.assert_unreserved_series_names
+PortfolioOptimisers.assert_distinct_series_names
 PortfolioOptimisers.assert_span_shape
 PortfolioOptimisers.returns_universe_masks
 PortfolioOptimisers.compress_all_true

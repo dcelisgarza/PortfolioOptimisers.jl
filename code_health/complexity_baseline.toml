@@ -28,13 +28,13 @@ commit = "97e398ef74"
 "src/02_Tools.jl" = { cyc = 45, cog = 96, arg = 6, cyc_sum = 238, cog_sum = 233, arg_sum = 262, macros = ["@propagatable"] }
 "src/03_InputData/01_AssetPanel.jl" = { cyc = 7, cog = 9, arg = 6, cyc_sum = 90, cog_sum = 53, arg_sum = 89, macros = [] }
 "src/03_InputData/02_AssetPanelBuilder.jl" = { cyc = 7, cog = 10, arg = 6, cyc_sum = 67, cog_sum = 55, arg_sum = 56, macros = [] }
-"src/03_InputData/03_Preprocessing.jl" = { cyc = 18, cog = 25, arg = 13, cyc_sum = 160, cog_sum = 156, arg_sum = 148, macros = [] }
+"src/03_InputData/03_Preprocessing.jl" = { cyc = 18, cog = 25, arg = 13, cyc_sum = 157, cog_sum = 152, arg_sum = 148, macros = [] }
 "src/03_InputData/04_CrossSectionalTransforms.jl" = { cyc = 6, cog = 11, arg = 8, cyc_sum = 98, cog_sum = 99, arg_sum = 75, macros = [] }
 "src/03_InputData/05_FeatureSelector.jl" = { cyc = 10, cog = 10, arg = 3, cyc_sum = 54, cog_sum = 45, arg_sum = 19, macros = [] }
 "src/03_InputData/06_PanelDataFrame.jl" = { cyc = 7, cog = 9, arg = 7, cyc_sum = 37, cog_sum = 35, arg_sum = 47, macros = [] }
 "src/03_InputData/07_ListingSpan.jl" = { cyc = 5, cog = 8, arg = 3, cyc_sum = 21, cog_sum = 15, arg_sum = 20, macros = [] }
 "src/03_InputData/08_PriceGapFill.jl" = { cyc = 4, cog = 6, arg = 5, cyc_sum = 22, cog_sum = 18, arg_sum = 23, macros = [] }
-"src/03_InputData/09_PriceIngestion.jl" = { cyc = 8, cog = 11, arg = 4, cyc_sum = 32, cog_sum = 28, arg_sum = 25, macros = [] }
+"src/03_InputData/09_PriceIngestion.jl" = { cyc = 8, cog = 11, arg = 4, cyc_sum = 33, cog_sum = 21, arg_sum = 27, macros = [] }
 "src/04_PosdefMatrix.jl" = { cyc = 5, cog = 4, arg = 2, cyc_sum = 10, cog_sum = 5, arg_sum = 4, macros = [] }
 "src/05_Denoise.jl" = { cyc = 4, cog = 6, arg = 7, cyc_sum = 18, cog_sum = 11, arg_sum = 30, macros = [] }
 "src/06_Detone.jl" = { cyc = 3, cog = 2, arg = 2, cyc_sum = 8, cog_sum = 3, arg_sum = 8, macros = [] }

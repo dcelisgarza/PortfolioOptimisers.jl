@@ -29,13 +29,13 @@ commit = "fda13accfd"
 "src/02_Tools.jl" = { code = 808, doc = 2044, comment = 46, blank = 867, total = 3765 }
 "src/03_InputData/01_AssetPanel.jl" = { code = 373, doc = 680, comment = 0, blank = 330, total = 1383 }
 "src/03_InputData/02_AssetPanelBuilder.jl" = { code = 281, doc = 608, comment = 0, blank = 270, total = 1159 }
-"src/03_InputData/03_Preprocessing.jl" = { code = 711, doc = 1413, comment = 24, blank = 596, total = 2744 }
+"src/03_InputData/03_Preprocessing.jl" = { code = 707, doc = 1414, comment = 30, blank = 596, total = 2747 }
 "src/03_InputData/04_CrossSectionalTransforms.jl" = { code = 464, doc = 708, comment = 0, blank = 334, total = 1506 }
 "src/03_InputData/05_FeatureSelector.jl" = { code = 186, doc = 278, comment = 0, blank = 143, total = 607 }
 "src/03_InputData/06_PanelDataFrame.jl" = { code = 140, doc = 220, comment = 0, blank = 100, total = 460 }
 "src/03_InputData/07_ListingSpan.jl" = { code = 77, doc = 132, comment = 0, blank = 63, total = 272 }
 "src/03_InputData/08_PriceGapFill.jl" = { code = 95, doc = 169, comment = 0, blank = 79, total = 343 }
-"src/03_InputData/09_PriceIngestion.jl" = { code = 133, doc = 239, comment = 3, blank = 104, total = 479 }
+"src/03_InputData/09_PriceIngestion.jl" = { code = 147, doc = 310, comment = 3, blank = 147, total = 607 }
 "src/04_PosdefMatrix.jl" = { code = 44, doc = 155, comment = 0, blank = 73, total = 272 }
 "src/05_Denoise.jl" = { code = 132, doc = 535, comment = 34, blank = 196, total = 897 }
 "src/06_Detone.jl" = { code = 46, doc = 188, comment = 0, blank = 81, total = 315 }

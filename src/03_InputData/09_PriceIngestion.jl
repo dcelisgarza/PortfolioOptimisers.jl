@@ -126,13 +126,14 @@ The layer spells an absent price `NaN`, which is the library's one spelling for 
 
 # Algorithm
 
- 1. Unify the absent-price convention of every series with [`unify_gaps`](@ref), so that a gap means one thing from here on.
- 2. Join the factor and the benchmark series onto the asset clock under `join_method`. An outer join adds the rows one series has and another does not, padding them as gaps.
- 3. Collapse the joined series to a lower frequency when `collapse_args` is non-empty, which renumbers every observation.
- 4. Split the joined series back into their asset, factor and benchmark blocks, all now on one clock.
- 5. Align the implied volatilities to that clock, and carry `ivpa` through: an implied volatility is a volatility rather than a price, so it is carried, never converted.
- 6. Read the **Listing Span** off the asset block with [`listing_span`](@ref), unless the caller declared one, in which case theirs is taken outright.
- 7. Return the [`PricesResult`](@ref) carrying all of it.
+ 1. Check that the asset, factor and benchmark series can still be named after the join with [`assert_distinct_series_names`](@ref). The join renames a name two tables share, so a block would otherwise be taken apart into another block's column.
+ 2. Unify the absent-price convention of every series with [`unify_gaps`](@ref), so that a gap means one thing from here on.
+ 3. Join the factor and the benchmark series onto the asset clock under `join_method`. An outer join adds the rows one series has and another does not, padding them as gaps.
+ 4. Collapse the joined series to a lower frequency when `collapse_args` is non-empty, which renumbers every observation.
+ 5. Split the joined series back into their asset, factor and benchmark blocks, all now on one clock.
+ 6. Align the implied volatilities to that clock, and carry `ivpa` through: an implied volatility is a volatility rather than a price, so it is carried, never converted.
+ 7. Read the **Listing Span** off the asset block with [`listing_span`](@ref), unless the caller declared one, in which case theirs is taken outright.
+ 8. Return the [`PricesResult`](@ref) carrying all of it.
 
 # Arguments
 
@@ -148,6 +149,7 @@ The layer spells an absent price `NaN`, which is the library's one spelling for 
 # Validation
 
   - `!isempty(X)`. Raises an [`IsEmptyError`](@ref).
+  - The asset, factor and benchmark column names are pairwise disjoint, and none of them is `timestamp`. Raises a [`ConflictingArgumentError`](@ref) naming the offending columns.
   - A declared `span` is `size(values(X))` after the join and the collapse. Raises a `DimensionMismatch`.
   - The emitted clock is a subset of `iv`'s timestamps, when `iv` is given. Raises an [`IsEmptyError`](@ref).
 
@@ -192,6 +194,7 @@ function price_ingestion(est::PriceIngestion, X::TimeSeries.TimeArray;
                          pnl::Option{<:AssetPanel} = nothing)::PricesResult
     @argcheck(!isempty(X),
               IsEmptyError("`X` cannot be empty: the ingestion layer states a universe from a price panel"))
+    assert_distinct_series_names(X, F, B)
     nx = TimeSeries.colnames(X)
     M = unify_gaps(X)
     if !isnothing(F)
@@ -319,6 +322,161 @@ end
 function assert_span_shape(span::AbstractMatrix{Bool}, nobs::Integer, na::Integer)::Nothing
     @argcheck(size(span) == (nobs, na),
               DimensionMismatch("a Listing Span states which assets are listed at each observation of the price clock, so it is the shape of the asset prices; got size(span) = $(size(span)) and $nobs × $na prices"))
+    return nothing
+end
+"""
+    series_names(A::Nothing) -> Vector{Symbol}
+    series_names(A::TimeSeries.TimeArray) -> Vector{Symbol}
+
+Name the columns of one optional price table, and name none when the caller passed none.
+
+A series the caller omitted contributes no column name, so it contributes an empty list rather than an `isnothing` branch at every site that reads one.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `A` is `nothing`: return an empty name list.
+ 2. `A` is a table: return its column names.
+
+# Arguments
+
+  - `A`: One price table, or `nothing`.
+
+# Returns
+
+  - `n::Vector{Symbol}`: The table's column names, empty when there is no table.
+
+# Related
+
+  - [`assert_distinct_series_names`](@ref)
+  - [`price_ingestion`](@ref)
+  - [`prices_to_returns`](@ref)
+"""
+function series_names(::Nothing)
+    return Symbol[]
+end
+function series_names(A::TimeSeries.TimeArray)
+    return TimeSeries.colnames(A)
+end
+"""
+    assert_disjoint_series_names(a::AbstractVector{Symbol}, b::AbstractVector{Symbol}, na::String, nb::String) -> nothing
+
+Refuse a column name that two of the price tables both carry.
+
+A column name is what says which series a column came from: the asset, factor and benchmark tables are merged onto one clock, and the blocks are taken apart by name afterwards. `TimeSeries.merge` renames the second of two columns that share a name, appending `_1`, so a shared name silently makes one block take the other's column, and the minted name belongs to no block at all. A shared name is also not the conversion's to resolve — `X`'s `AAPL` and `F`'s `AAPL` are different series, and keeping either one is worse than refusing both.
+
+# Arguments
+
+  - `a`: Column names of the first table.
+  - `b`: Column names of the second table.
+  - `na`: How the caller spells the first table.
+  - `nb`: How the caller spells the second table.
+
+# Validation
+
+  - `isdisjoint(a, b)`. Raises a [`ConflictingArgumentError`](@ref) naming the shared columns.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`assert_distinct_series_names`](@ref)
+  - [`assert_unreserved_series_names`](@ref)
+  - [`series_names`](@ref)
+  - [`ConflictingArgumentError`](@ref)
+"""
+function assert_disjoint_series_names(a::AbstractVector{Symbol}, b::AbstractVector{Symbol},
+                                      na::String, nb::String)::Nothing
+    shared = intersect(a, b)
+    @argcheck(isempty(shared),
+              ConflictingArgumentError("the asset, factor and benchmark series are joined onto one clock and a column name is what says which series a column came from, so `$na` and `$nb` cannot share one; both carry $(shared). Rename the colliding columns before the call."))
+    return nothing
+end
+"""
+    assert_unreserved_series_names(n::AbstractVector{Symbol}, nn::String) -> nothing
+
+Refuse a series named after the observation clock.
+
+The conversion writes the clock into a column named `timestamp`, and a series of the same name takes that column's place: the clock keeps the name and the series is renamed `timestamp_1`, so the block the series belongs to reads the dates as prices. The name is the layer's, and a caller holding a series of that name renames it.
+
+# Arguments
+
+  - `n`: Column names of one table.
+  - `nn`: How the caller spells that table.
+
+# Validation
+
+  - `:timestamp ∉ n`. Raises a [`ConflictingArgumentError`](@ref).
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`assert_distinct_series_names`](@ref)
+  - [`assert_disjoint_series_names`](@ref)
+  - [`ConflictingArgumentError`](@ref)
+"""
+function assert_unreserved_series_names(n::AbstractVector{Symbol}, nn::String)::Nothing
+    @argcheck(:timestamp ∉ n,
+              ConflictingArgumentError("the conversion writes the observation clock into a column named `timestamp`, so a series cannot carry that name; `$nn` does. Rename it before the call."))
+    return nothing
+end
+"""
+    assert_distinct_series_names(X::TimeSeries.TimeArray, F::Option{<:TimeSeries.TimeArray} = nothing, B::Option{<:TimeSeries.TimeArray} = nothing) -> nothing
+
+Check that every price series reaching the layer can still be named after the join.
+
+This is the door's check, and both doors take it: [`price_ingestion`](@ref) before it merges, and [`prices_to_returns`](@ref) before it does. What it buys is that every later piece may split the merged table by name — a name belongs to exactly one of the asset, factor and benchmark blocks, and none of them is the clock's.
+
+Two series of one table cannot be checked here. Every `TimeSeries.TimeArray` constructor runs `TimeSeries.replace_dupes!` over its column names, so a table's own duplicates are renamed before the table exists and no duplicate reaches this function.
+
+# Algorithm
+
+ 1. Read the three name lists, an absent table naming none, with [`series_names`](@ref).
+ 2. Refuse a name shared by two of them with [`assert_disjoint_series_names`](@ref), over all three pairs.
+ 3. Refuse the clock's own name in any of them with [`assert_unreserved_series_names`](@ref).
+
+# Arguments
+
+  - `X`: Asset prices, `observations × assets`.
+  - `F`: Optional factor prices.
+  - `B`: Optional benchmark prices.
+
+# Validation
+
+  - The asset, factor and benchmark names are pairwise disjoint. Raises a [`ConflictingArgumentError`](@ref) naming the shared columns.
+  - None of them is `timestamp`. Raises a [`ConflictingArgumentError`](@ref).
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`assert_disjoint_series_names`](@ref)
+  - [`assert_unreserved_series_names`](@ref)
+  - [`series_names`](@ref)
+  - [`price_ingestion`](@ref)
+  - [`prices_to_returns`](@ref)
+  - [`ConflictingArgumentError`](@ref)
+"""
+function assert_distinct_series_names(X::TimeSeries.TimeArray,
+                                      F::Option{<:TimeSeries.TimeArray} = nothing,
+                                      B::Option{<:TimeSeries.TimeArray} = nothing)::Nothing
+    nx = TimeSeries.colnames(X)
+    nf = series_names(F)
+    nb = series_names(B)
+    assert_disjoint_series_names(nx, nf, "X", "F")
+    assert_disjoint_series_names(nx, nb, "X", "B")
+    assert_disjoint_series_names(nf, nb, "F", "B")
+    assert_unreserved_series_names(nx, "X")
+    assert_unreserved_series_names(nf, "F")
+    assert_unreserved_series_names(nb, "B")
     return nothing
 end
 """

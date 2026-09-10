@@ -140,6 +140,82 @@ rd59 = prices_to_returns(ptr59, price_ingestion(PriceIngestion(), X59))
     end
 end
 
+# Issue #990. A column name says which series a column came from, and both doors refuse a
+# name that cannot do that job any more. The refusal is one function,
+# `assert_distinct_series_names`, called by `price_ingestion` before it merges and by
+# `prices_to_returns` before it does.
+@testset "A shared column name is refused at both doors" begin
+    one59(name) = TimeArray(collect(ts59), reshape(fill(10.0, T59), T59, 1), [name])
+    cae = PortfolioOptimisers.ConflictingArgumentError
+
+    # `b` is an asset name, so this factor table collides with the asset table.
+    Fb = TimeArray(collect(ts59),
+                   50.0 .+ cumsum(randn(StableRNG(9732), T59, 2) ./ 10; dims = 1),
+                   ["f", "b"])
+    Bc = one59("c")            # `c` is an asset name too
+    Fg, Bg = one59("g"), one59("g")    # the factor and the benchmark collide with each other
+    Ff = one59("f")            # no collision with anything
+
+    # What the collision did before the refusal, asserted rather than recalled: `merge`
+    # renames the SECOND of two columns that share a name, so `M[colnames(F)]` reads `X`'s
+    # column and the factor block silently carried an asset's prices.
+    M = TimeSeries.merge(X59, Fb; method = :outer)
+    @test TimeSeries.colnames(M) == [:a, :b, :c, :d, :f, :b_1]
+    @test isequal(values(M[TimeSeries.colnames(Fb)])[:, 2], values(X59[:b]))
+
+    # All three pairs, at the ingestion door.
+    @test_throws cae price_ingestion(PriceIngestion(), X59; F = Fb)
+    @test_throws cae price_ingestion(PriceIngestion(), X59; B = Bc)
+    @test_throws cae price_ingestion(PriceIngestion(), X59; F = Fg, B = Bg)
+
+    # And at the conversion's own door, which is the form issue #990 reported.
+    @test_throws cae prices_to_returns(X59, Fb)
+    @test_throws cae prices_to_returns(X59; B = Bc)
+    @test_throws cae prices_to_returns(X59, Fg; B = Bg)
+
+    # The error names the shared column, because a caller has to know which one to rename.
+    err = try
+        price_ingestion(PriceIngestion(), X59; F = Fb)
+    catch e
+        e
+    end
+    @test occursin("[:b]", err.msg)
+    @test occursin("`X`", err.msg)
+    @test occursin("`F`", err.msg)
+
+    # The clock's own name is the layer's. A series carrying it takes the place of the column
+    # the `DataFrames.DataFrame` conversion writes, and the block holding it reads dates as
+    # prices.
+    Xts = TimeArray(collect(ts59), P59, ["timestamp", "b", "c", "d"])
+    @test_throws cae price_ingestion(PriceIngestion(), Xts)
+    @test_throws cae prices_to_returns(Xts)
+    @test_throws cae PortfolioOptimisers.assert_distinct_series_names(X59,
+                                                                      one59("timestamp"))
+    @test_throws cae PortfolioOptimisers.assert_distinct_series_names(X59, nothing,
+                                                                      one59("timestamp"))
+
+    # A name list is read off a table, and an absent table names nothing.
+    @test PortfolioOptimisers.series_names(nothing) == Symbol[]
+    @test PortfolioOptimisers.series_names(X59) == Symbol.(nx59)
+    @test isnothing(PortfolioOptimisers.assert_distinct_series_names(X59, Ff, one59("bmk")))
+    @test isnothing(PortfolioOptimisers.assert_distinct_series_names(X59))
+
+    # A table's own duplicates cannot reach the door: every `TimeArray` constructor renames
+    # them, so the refusal has nothing left to say about them.
+    @test TimeSeries.colnames(TimeArray(collect(ts59), P59, ["a", "a", "a", "a"])) ==
+          [:a, :a_1, :a_2, :a_3]
+
+    # The names the refusal guarantees are what lets the conversion name its blocks outright.
+    # The clock is the `timestamp` column, typed, and never a `Vector{Any}` of interleaved
+    # dates and prices.
+    rd = prices_to_returns(X59, Ff; B = one59("bmk"))
+    @test isa(rd.ts, Vector{Date})
+    @test rd.nx == nx59
+    @test rd.nf == ["f"]
+    @test rd.nb == ["bmk"]
+    @test size(rd.X) == (T59 - 1, N59)
+end
+
 @testset "The layer emits one carrier, and it always carries a panel" begin
     pr = price_ingestion(PriceIngestion(), X59)
     rd = prices_to_returns(ptr59, pr)

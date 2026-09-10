@@ -27,10 +27,11 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         Px = TimeArray(dfx; timestamp = :date)
 
         dfy = DataFrame(Fx, [:fx1, :fx2, :fx3, :fx4, :fx5])
-        # Named apart from the asset table's gap column on purpose. The conversion splits
-        # the merged names by `intersect`, so a name shared by `X` and `F` lands in both
-        # `nx` and `nf` and the renamed duplicate the merge minted lands in neither. Issue
-        # #990; the released thresholds hid it by deleting both columns.
+        # Named apart from the asset table's gap column on purpose, and now refused outright
+        # if it were not: a name shared by `X` and `F` cannot say which series a column came
+        # from, so both doors raise a `ConflictingArgumentError`. Issue #990; the released
+        # thresholds hid it by deleting both columns, and
+        # `test_59_ingestion_layer.jl` pins the refusal.
         dfy.all_missing_f = fill(NaN, nrow(dfy))
         dfy[!, :date] = (today() - Day(100)):Day(1):today()
         Py = TimeArray(dfy; timestamp = :date)
