@@ -10,7 +10,7 @@ An asset is in the Coverage Universe when its return is finite and the panel's a
 
 The all-covered case returns `nothing` rather than a mask of every `true`. That sentinel skips both the slice and the expansion, exactly as the `nothing` of [`investable_mask`](@ref) skips the optimiser's two halves.
 
-The rule has one cost, and no docstring may hide it. **One** non-finite return, or **one** inactive row, inside the window puts the asset outside the Coverage Universe for that fit. A caller with a holiday imputes it in [`prices_to_returns`](@ref), or reaches for a mask-aware estimator, which takes the whole window and emits its own frame.
+The rule has one cost, and no docstring may hide it. **One** non-finite return, or **one** inactive row, inside the window puts the asset outside the Coverage Universe for that fit. A caller with a holiday fills it at the price level with [`PriceGapFill`](@ref), or reaches for a mask-aware estimator, which takes the whole window and emits its own frame.
 
 The two scans are **independent**, and only the asset axes must agree. A prior that reweights observations works on the axis its nested prior answered, and a nested prior may drop rows, so `X` and the panel can carry different observation counts and no row of one pairs with a row of the other. Pairing them by position would read the wrong date, and pairing them by the tail would assume a warm-up that no contract states. Reading each over its own rows assumes nothing. It is conservative where the two axes differ: an asset that the panel reports inactive at a row the sample no longer holds is outside the Coverage Universe of that fit.
 

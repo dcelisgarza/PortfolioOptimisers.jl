@@ -110,7 +110,7 @@ Price-level data stores absent observations either as `missing` or as `NaN` (the
 # Related
 
   - [`MissingDataFilter`](@ref)
-  - [`Imputer`](@ref)
+  - [`PriceGapFill`](@ref)
 """
 function is_missing_value(x)::Bool
     return ismissing(x) || (isa(x, Number) && isnan(x))

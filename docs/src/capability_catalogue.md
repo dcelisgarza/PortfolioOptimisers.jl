@@ -38,7 +38,41 @@ Preprocessing estimator converting price-level data into returns-level data. [`P
 ```
 
 - Preprocessing estimator dropping assets and observations with excessive missing data from price-level data. [`MissingDataFilter`](@ref) and [`MissingDataFilterResult`](@ref)
-- Preprocessing estimator imputing missing price observations from per-asset statistics fitted on the training window. [`Imputer`](@ref) and [`ImputerResult`](@ref)
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Price gap conventions
+
+```@raw html
+</summary>
+```
+
+- Fills the price gaps inside an asset's listing with a stated convention, and touches nothing outside it. [`PriceGapFill`](@ref) and [`PriceGapFillResult`](@ref)
+- States that a price did not move across a gap, so the last priced observation is held forward. [`CarriedPrice`](@ref)
+
+```@raw html
+</details>
+```
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Gap Return conventions
+
+```@raw html
+</summary>
+```
+
+- Books a Held Gap's whole move on the observation that ends it, shortening the gap to `k`. [`CatchUpGapReturn`](@ref)
+
+```@raw html
+</details>
+```
 
 ```@raw html
 </details>
@@ -82,6 +116,44 @@ Selection rules
 </details>
 ```
 
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+The universe a price panel states
+
+```@raw html
+</summary>
+```
+
+A gap's *position* in a price column says which universe it implies: a leading run is an asset not yet listed, a trailing run is a delisting, and an interior gap is a suspension on an asset that is still listed. [`listing_span`](@ref) reads that rule off bare prices and [`universe_masks`](@ref) projects it onto the returns clock, giving the two masks an [`AssetPanel`](@ref) carries; a caller's own listing calendar enters at the same point and replaces the derived answer outright.
+
+- Derive the Listing Span of every asset column of a price panel by the Span Rule. [`listing_span`](@ref) and [`universe_masks`](@ref)
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+The ingestion layer
+
+```@raw html
+</summary>
+```
+
+[`PriceIngestion`](@ref) assembles raw price series into the carrier the conversion reads, running once on the whole panel rather than as a `Pipeline` step, because unification, the join and the collapse each move the observation clock — and because the Span Rule needs the whole panel, which a step, seeing only a window, cannot give it. The carrier it emits holds the Listing Span, and [`PricesToReturns`](@ref) projects that onto the returns clock and hands the [`ReturnsResult`](@ref) an [`AssetPanel`](@ref) stating the universe: always, a gapless table included, so a returns carrier holding no panel is one built outside the layer.
+
+- Estimator assembling raw price series into the span-carrying price carrier the ingestion layer converts. [`PriceIngestion`](@ref) and [`price_ingestion`](@ref)
+
+```@raw html
+</details>
+```
+
+```@raw html
+</details>
+```
+
 - Cut price- or returns-level data into a training window (the head) and a held-out test window (the tail). [`train_test_split`](@ref), [`TrainTestSplit`](@ref), and [`TrainTestSplitResult`](@ref)
 - Return a `ReturnsResult` appropriate for benchmark-tracking optimisations. [`returns_result_picker`](@ref)
 
@@ -90,7 +162,7 @@ Selection rules
 <summary>
 ```
 
-Build the [`AssetPanel`](@ref) a carrier holds, from the raw, blank-carrying form of each Panel Field. [`asset_panel`](@ref), [`AssetPanel`](@ref), [`panel_field`](@ref), [`panel_feature_matrix`](@ref), [`feature_matrix`](@ref), [`feature_labels`](@ref), and [`panel_input`](@ref)
+Build the [`AssetPanel`](@ref) a carrier holds, from the raw, blank-carrying form of each Panel Field. [`asset_panel`](@ref), [`AssetPanel`](@ref), [`panel_field`](@ref), [`panel_feature_matrix`](@ref), [`panel_dataframe`](@ref), [`feature_matrix`](@ref), [`feature_labels`](@ref), and [`panel_input`](@ref)
 
 ```@raw html
 </summary>
@@ -836,6 +908,106 @@ A Return Forecast Estimator maps Descriptor Scores and a fitted factor-model blo
 - The Descriptors forecast the idiosyncratic return itself. [`IdiosyncraticReturnUnit`](@ref)
 - The Descriptors forecast the idiosyncratic return divided by the idiosyncratic volatility. [`IdiosyncraticSharpeUnit`](@ref)
 
+### Forecast evaluation
+
+[`forecast_evaluation`](@ref) pairs a Return Forecast with the forward target it is answerable for, out of sample, and answers a Result every statistic of the evaluation is then a verb over. The pairing takes bare matrices as readily as a fitted Return Forecast Result, so a forecast the library did not produce is scored on the same terms as one it did.
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Pair a Return Forecast with the forward target it is answerable for, out of sample. [`forecast_evaluation`](@ref)
+
+```@raw html
+</summary>
+```
+
+- The out-of-sample pairing of a Return Forecast with what happened next. [`ForecastEvaluationResult`](@ref)
+- Return the history of a Return Forecast Estimator, refitting the member if it computes none. [`forecast_history`](@ref)
+
+```@raw html
+</details>
+```
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+The statistics of an evaluation, each a verb over its Result.
+
+```@raw html
+</summary>
+```
+
+- Return the information coefficients of a Return Forecast, one row per evaluation date. [`forecast_ic`](@ref)
+- Return the summary of the two information coefficient series of an evaluation, named. [`forecast_ic_summary`](@ref)
+- Return the share of the universe an evaluation scored, one entry per evaluation date. [`forecast_coverage`](@ref)
+- Score the long-short portfolio a Return Forecast states on its own. [`forecast_portfolio`](@ref)
+- Score the top-minus-bottom spread of a Return Forecast, one entry per quantile. [`forecast_quantile_spread`](@ref)
+- Return the contemporaneous correlation of a Return Forecast against every factor exposure, one row per evaluation date. [`forecast_factor_correlation`](@ref)
+- Score whether the magnitude of a Return Forecast is right, and not only its ordering. [`forecast_calibration`](@ref)
+
+```@raw html
+</details>
+```
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+The same statistics against a grid of forward windows, every row on one date set.
+
+```@raw html
+</summary>
+```
+
+- Score a Return Forecast against cumulative forward windows, one row per holding period. [`forecast_holding_period`](@ref)
+- Score a Return Forecast against disjoint forward windows, one row per period out. [`forecast_decay`](@ref)
+
+```@raw html
+</details>
+```
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+The headline table, one entry per forecast, which is also the comparison.
+
+```@raw html
+</summary>
+```
+
+- Summarise one or more Return Forecast evaluations as a [`ForecastSummaryResult`](@ref). [`forecast_evaluation_summary`](@ref)
+- The headline statistics of one or more Return Forecast evaluations, one entry per forecast. [`ForecastSummaryResult`](@ref)
+
+```@raw html
+</details>
+```
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+The quantity the forecast is scored against.
+
+```@raw html
+</summary>
+```
+
+- Scores a Return Forecast against the forward idiosyncratic return. [`IdiosyncraticTarget`](@ref)
+- Scores a Return Forecast against the forward asset return. [`AssetReturnTarget`](@ref)
+- Scores a Return Forecast against the forward mean of a named numeric Panel Field. [`PanelFieldTarget`](@ref)
+
+```@raw html
+</details>
+```
+
 ## Moment estimation
 
 ### Expected returns
@@ -904,6 +1076,7 @@ Targets: all algorithms can have any of the following targets
 - Computes the expected returns as the per-asset median of the asset returns. [`MedianExpectedReturns`](@ref)
 - Returns a caller-supplied value for each asset instead of estimating one from the data. [`CustomValueExpectedReturns`](@ref)
 - Expected returns estimator that restricts computation to a rolling or indexed observation window. [`WindowedExpectedReturns`](@ref)
+- Estimates expected returns by an exponentially weighted recursion that freezes on a holiday and resets on an inactive period. [`ExpWeightedExpectedReturns`](@ref)
 
 ### Variance and standard deviation
 
@@ -1090,6 +1263,24 @@ Covariance estimator based on implied volatility scaling. [`ImpliedVolatility`](
 <summary>
 ```
 
+Exponentially weighted covariance and variance
+
+```@raw html
+</summary>
+```
+
+- Estimates a covariance matrix by an exponentially weighted recursion that freezes on a holiday and resets on an inactive period. [`ExpWeightedCovariance`](@ref)
+- Estimates per-asset variance by an exponentially weighted recursion that freezes on a holiday and resets on an inactive period. [`ExpWeightedVariance`](@ref)
+
+```@raw html
+</details>
+```
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
 Regime-adjusted covariance and variance
 
 ```@raw html
@@ -1239,6 +1430,35 @@ Two verbs fold, and ADR 0107 records what each promises. [`partial_fit!`](@ref) 
 
 - Folds observations into an estimator's partial-fit state, and returns the estimator. [`partial_fit!`](@ref)
 - Folds observations into a copy of an estimator's partial-fit state, and returns the estimator that carries the copy. [`partial_fit`](@ref)
+
+An estimator whose statistic has no exact update keeps the observations it has seen instead, and its read-out runs the batch verb over them. [`Online`](@ref) is the configuration that gives it that buffer, and it is transient: it resolves once at warm-up, before the first fold, and no wrapper survives into the run. Its `max_history` caps the buffer, which bounds memory and changes what a consumer reading the observations answers; a statistic that folds exactly is unaffected and stays fitted over every observation folded so far.
+
+- Declares that an estimator takes the online step from a buffer of the observations it has seen. [`Online`](@ref)
+
+### Coverage policy
+
+A plain moment estimator fits on the Coverage Universe of its window: the assets whose return is finite and whose Asset Panel active mask is `true` at every row of it. That rule is all-or-nothing per asset, and over an expanding window it can never admit an asset that lists after the first row. A [`CoveragePolicy`](@ref) in the estimator's `cvg` field replaces it, per estimator and by choice, with available-case estimation: every cell of the answer is fitted on the observations at which every asset of that cell is finite and active, each cell carries its own denominator, and an asset reaches the answer where its coverage share clears `min_coverage`. It is `nothing` by default, and that arm is the reduce-and-expand path unchanged.
+
+What happens to a delisted asset is the policy's `alg`, one member per rule, and a caller whose rule is none of the three subtypes the family and writes its two verbs.
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Fits each cell of a moment on the observations that cell has, instead of on the Coverage Universe. [`CoveragePolicy`](@ref)
+
+```@raw html
+</summary>
+```
+
+- Keeps a delisted asset's history, and drops the asset from the frame the moment it goes inactive. [`DecayCoverage`](@ref)
+- Throws a delisted asset's history away, so that a relisting starts the asset cold. [`ResetCoverage`](@ref)
+- Holds a delisted asset in the frame for a stated number of observations, then drops it. [`ExpireCoverage`](@ref)
+
+```@raw html
+</details>
+```
 
 ## Distance matrices
 
@@ -2187,6 +2407,24 @@ Scalings of the mean set inside the Orthogonal Subspace
 ```
 
 ```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Rules that size the covariance radius from the sample and the span, in place of a stated number
+
+```@raw html
+</summary>
+```
+
+- Sizes the compact radius as the upper confidence bound on the idiosyncratic variance, so the penalty is a quantile rather than a stated magnitude. [`ResidualInflation`](@ref)
+- Sizes the compact radius so the penalty is a stated fraction of the nominal variance at a reference portfolio, giving the caller a unit instead of a bare number. [`VarianceFraction`](@ref)
+
+```@raw html
+</details>
+```
+
+```@raw html
 </details>
 ```
 
@@ -2214,10 +2452,11 @@ The turnover is defined as the element-wise absolute difference between the vect
 
 ## Fees
 
-Fees are a non-negligible aspect of active investing. As such `PortfolioOptimiser.jl` has the ability to account for them in all optimisations but the naive ones. They can also be used to adjust expected returns calculations via [`calc_fees`](@ref) and [`calc_asset_fees`](@ref).
+Fees are a non-negligible aspect of active investing. As such `PortfolioOptimiser.jl` has the ability to account for them in all optimisations but the naive ones. They can also be used to adjust expected returns calculations via [`calc_fees`](@ref) and [`calc_asset_fees`](@ref). The proportional and turnover rates are charged on every period, and the two fixed amounts one time for the whole holding period, so [`calc_total_fees`](@ref) and [`calc_total_asset_fees`](@ref) report the cost of a stated horizon.
 
 - Resolve the name-keyed fee fields of a [`FeesEstimator`](@ref) against a universe, giving a [`Fees`](@ref) of plain per-asset vectors. [`fees_constraints`](@ref)
 - Compute the fixed portfolio fees for assets that have been allocated. [`calc_fixed_fees`](@ref) and [`calc_asset_fixed_fees`](@ref)
+- Charge the whole cost of holding a portfolio for `T` periods. [`calc_total_fees`](@ref) and [`calc_total_asset_fees`](@ref)
 
 ```@raw html
 <details class="cap-group" style="margin-left: 2em">
@@ -2240,13 +2479,16 @@ Names the per-asset fee rates, for [`fees_constraints`](@ref) to align to a univ
 </details>
 ```
 
-- Spreads the one-off terms of a fee, the turnover charge and the two fixed charges, over a holding period. [`AmortisedFees`](@ref)
+- Spreads the one-off terms of a fee, the two fixed charges `fl` and `fs`, evenly over a holding period. [`AmortisedFees`](@ref)
+- Charges the one-off terms of a fee, the two fixed charges `fl` and `fs`, on the first observation of a return series. [`FirstObservationFees`](@ref)
 
 ## Portfolio returns and drawdowns
 
-Various risk measures and analyses require the computation of simple and cumulative portfolio returns and drawdowns both in aggregate and per-asset. These are computed by [`calc_net_returns`](@ref), [`calc_net_asset_returns`](@ref), [`cumulative_returns`](@ref), [`drawdowns`](@ref).
+Various risk measures and analyses require the computation of simple and cumulative portfolio returns and drawdowns both in aggregate and per-asset. These are computed by [`calc_net_returns`](@ref), [`calc_net_asset_returns`](@ref), [`cumulative_returns`](@ref), [`drawdowns`](@ref). [`calc_turnover`](@ref) reads the trading a weight path costs, which is the value-level reading of the quantity [`Turnover`](@ref) bounds.
 
 A window may instead be scored on the weights a fund holds, which grow at their own asset returns while no trade is placed. The series is then the wealth ratio of the drifted holdings.
+
+A fold's realised series may also charge the two fixed fee terms on a clock of its own. The scheme states it in its `fa` field, which overrides the clock the fee itself carries and reaches the fit not at all.
 
 - Grows each position at its own asset return and holds no trade in between, so the weights drift and the series is the wealth ratio of the drifted holdings. [`SelfFinancingDrift`](@ref)
 
@@ -4351,6 +4593,33 @@ Factor model summary and factor forecasts
 - Plot the cumulative return of every factor, one series per factor. [`plot_factor_cumulative_returns`](@ref)
 - Plot the forecast correlation of the factor returns as a heatmap. [`plot_factor_forecast_correlation`](@ref)
 - Plot the forecast volatility of every factor return as a horizontal bar chart, ordered from the smallest. [`plot_factor_forecast_volatilities`](@ref)
+
+```@raw html
+</details>
+```
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Forecast evaluation
+
+```@raw html
+</summary>
+```
+
+- Plot the running sum of both information coefficients of a Return Forecast, one series each. [`plot_forecast_cumulative_ic`](@ref)
+- Plot the running mean of both information coefficients of a Return Forecast over a window. [`plot_forecast_rolling_ic`](@ref)
+- Plot the cumulative return of the books a Return Forecast states on its own, one series each. [`plot_forecast_cumulative_returns`](@ref)
+- Plot the cumulative top-minus-bottom spread of a Return Forecast, one series per quantile. [`plot_forecast_quantile_returns`](@ref)
+- Plot the calibration curve of a Return Forecast against the slope fitted through it. [`plot_forecast_calibration`](@ref)
+- Plot both mean information coefficients of a Return Forecast against the holding period. [`plot_forecast_ic_by_holding_period`](@ref)
+- Plot the annualised return and the Sharpe ratio of both books against the holding period. [`plot_forecast_portfolio_by_holding_period`](@ref)
+- Plot both mean information coefficients of a Return Forecast against the forward window. [`plot_forecast_ic_decay`](@ref)
+- Plot the annualised return and the Sharpe ratio of both books against the forward window. [`plot_forecast_portfolio_decay`](@ref)
+- Plot the contemporaneous correlation of a Return Forecast with every factor exposure. [`plot_forecast_factor_correlation`](@ref)
+- Plot a [`ForecastSummaryResult`](@ref) as a grouped bar chart, one series per forecast. [`plot_forecast_evaluation_summary`](@ref)
 
 ```@raw html
 </details>

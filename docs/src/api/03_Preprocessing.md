@@ -318,8 +318,6 @@ is_missing_value
 PricesToReturns
 MissingDataFilter
 MissingDataFilterResult
-Imputer
-ImputerResult
 ```
 
 ## Train/test splitting

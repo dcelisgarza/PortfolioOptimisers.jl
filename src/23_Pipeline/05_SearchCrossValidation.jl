@@ -53,9 +53,9 @@ cv_data_eltype(pr::AbstractPricesResult) = eltype(TimeSeries.values(pr.X))
 """
     is_pipeline_raw_path(key::AbstractString) -> Bool
 
-Return `true` when `key` is a raw property path rooted at the `steps` field of a [`Pipeline`](@ref) — `"steps[1]"`, `"steps[2].stat"`.
+Return `true` when `key` is a raw property path rooted at the `steps` field of a [`Pipeline`](@ref) — `"steps[1]"`, `"steps[2].fill"`.
 
-The predicate the `AbstractString` arm of [`pipeline_lens`](@ref) uses to separate a *raw property path* from a *typo* when the leading segment misses the step-name table. It names the one root a path may address instead of rejecting one shape. A `Pipeline` holds two fields, `names` and `steps`, and only `steps` holds the estimators a grid tunes, so `"names[1]"` is refused with `"imputer"`. An admitted key falls through to [`parse_lens`](@ref).
+The predicate the `AbstractString` arm of [`pipeline_lens`](@ref) uses to separate a *raw property path* from a *typo* when the leading segment misses the step-name table. It names the one root a path may address instead of rejecting one shape. A `Pipeline` holds two fields, `names` and `steps`, and only `steps` holds the estimators a grid tunes, so `"names[1]"` is refused with `"gapfill"`. An admitted key falls through to [`parse_lens`](@ref).
 
 The `Symbol` arm tests for a dot as well, because a symbol key is not run through `Meta.parse`: an index in a symbol is a character in a property name, not a lens path.
 
@@ -73,9 +73,9 @@ end
 
 Resolve a tuning key into an Accessors.jl lens on a [`Pipeline`](@ref).
 
-A leading step name resolves to the step's position (name → index → property path): `"impute.stat"` targets the `stat` field of the step named `"impute"`, and a bare step name (`"impute"`, `:impute`) or an integer position targets the whole step — swapping entire estimators as grid values needs no extra syntax. A key whose leading segment is not a step name falls through to [`parse_lens`](@ref) only when it is rooted at `steps`, so raw property paths (`"steps[2].stat"`, `"steps[2]"`) and prebuilt lenses keep working.
+A leading step name resolves to the step's position (name → index → property path): `"gap_fill.fill"` targets the `fill` field of the step named `"gap_fill"`, and a bare step name (`"gap_fill"`, `:gap_fill`) or an integer position targets the whole step — swapping entire estimators as grid values needs no extra syntax. A key whose leading segment is not a step name falls through to [`parse_lens`](@ref) only when it is rooted at `steps`, so raw property paths (`"steps[2].fill"`, `"steps[2]"`) and prebuilt lenses keep working.
 
-A key that misses the step-name table and is not a path rooted at `steps` (see [`is_pipeline_raw_path`](@ref)) is rejected instead — `"imputer"` is a typo, not a path, and `"names[1]"` addresses the step-name table, so reinterpreting either as a property access on the `Pipeline` struct tunes nothing at best and writes into a real field at worst. The `Symbol` arm fails closed on the same rule, and tests for a dot as well, because a symbol key never reaches `Meta.parse`.
+A key that misses the step-name table and is not a path rooted at `steps` (see [`is_pipeline_raw_path`](@ref)) is rejected instead — `"gapfill"` is a typo, not a path, and `"names[1]"` addresses the step-name table, so reinterpreting either as a property access on the `Pipeline` struct tunes nothing at best and writes into a real field at worst. The `Symbol` arm fails closed on the same rule, and tests for a dot as well, because a symbol key never reaches `Meta.parse`.
 
 # Arguments
 

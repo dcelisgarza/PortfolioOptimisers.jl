@@ -295,8 +295,8 @@ end
         mdf = fit_preprocessing(MissingDataFilter(; row_thr = 0.2), pr)
         pf = apply_preprocessing(mdf, pr)
         @test size(pf.span) == size(values(pf.X))
-        imp = fit_preprocessing(Imputer(), pr)
-        @test apply_preprocessing(imp, pr).span === pr.span
+        pgf = fit_preprocessing(PriceGapFill(), pr)
+        @test apply_preprocessing(pgf, pr).span === pr.span
     end
 
     @testset "the estimation mask is a snapshot, not a view over the returns" begin

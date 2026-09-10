@@ -68,7 +68,7 @@
 "src/03_InputData/06_PricesResult.jl" = { map = 2, units = 3, algorithm = 1, swept = false }
 "src/03_InputData/07_PriceIngestion.jl" = { map = 2, units = 12, swept = false }
 "src/03_InputData/08_PriceGapFill.jl" = { map = 2, units = 7, swept = false }
-"src/03_InputData/09_PriceFilters.jl" = { map = 2, units = 4, algorithm = 2, swept = false }
+"src/03_InputData/09_PriceFilters.jl" = { map = 2, units = 2, algorithm = 2, swept = false }
 "src/03_InputData/10_ReturnsResult.jl" = { map = 2, units = 8, algorithm = 7, swept = false }
 "src/03_InputData/11_PricesToReturns.jl" = { map = 2, units = 8, algorithm = 5, swept = false }
 "src/03_InputData/12_TrainTestSplit.jl" = { map = 2, units = 7, algorithm = 5, swept = false }

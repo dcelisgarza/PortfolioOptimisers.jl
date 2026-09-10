@@ -215,15 +215,18 @@
         @test rederived.last[2] < rederived.first[2]
     end
 
-    @testset "Imputer" begin
+    @testset "PriceGapFill" begin
+        # Map #955, ADR 0130. The fill role holds one estimator, and it is bounded by the
+        # Listing Span, so the carrier states one — `test_06g` owns the conventions, the
+        # bound and the replay; what is asserted here is the step's place in a pipeline.
         X, ts = make_prices()
         vals = copy(values(X))
         vals[2, 1] = NaN
         Xm = TimeArray(ts, vals, string.("A", 1:4))
-        pr = PricesResult(; X = Xm)
+        pr = PricesResult(; X = Xm, span = trues(size(vals)))
 
-        imp = Imputer()
-        res = PortfolioOptimisers.fit_preprocessing(imp, pr)
+        pgf = PriceGapFill(; fill = MedianValue())
+        res = PortfolioOptimisers.fit_preprocessing(pgf, pr)
         @test res.nx == [:A1, :A2, :A3, :A4]
         train_med = median([x for x in vals[:, 1] if !isnan(x)])
         @test res.v[1] == train_med
@@ -238,13 +241,16 @@
         tvals = copy(values(Xt)) .+ 50.0
         tvals[5, 1] = NaN
         Xtm = TimeArray(ts, tvals, string.("A", 1:4))
-        pv_test = PortfolioOptimisers.apply_preprocessing(res, PricesResult(; X = Xtm))
+        pv_test = PortfolioOptimisers.apply_preprocessing(res,
+                                                          PricesResult(; X = Xtm,
+                                                                       span = trues(size(tvals))))
         test_med = median([x for x in tvals[:, 1] if !isnan(x)])
         @test values(pv_test.X)[5, 1] == train_med
         @test values(pv_test.X)[5, 1] != test_med
 
-        # the statistic is configurable
-        res_mean = PortfolioOptimisers.fit_preprocessing(Imputer(; stat = MeanValue()), pr)
+        # the convention is configurable
+        res_mean = PortfolioOptimisers.fit_preprocessing(PriceGapFill(; fill = MeanValue()),
+                                                         pr)
         train_mean = mean([x for x in vals[:, 1] if !isnan(x)])
         @test res_mean.v[1] ≈ train_mean
 
@@ -252,15 +258,16 @@
         vals_empty = copy(values(X))
         vals_empty[:, 2] .= NaN
         Xe = TimeArray(ts, vals_empty, string.("A", 1:4))
-        res_e = PortfolioOptimisers.fit_preprocessing(imp, PricesResult(; X = Xe))
+        pr_e = PricesResult(; X = Xe, span = trues(size(vals_empty)))
+        res_e = PortfolioOptimisers.fit_preprocessing(pgf, pr_e)
         @test res_e.nx == [:A1, :A3, :A4]
-        pv_e = PortfolioOptimisers.apply_preprocessing(res_e, PricesResult(; X = Xe))
+        pv_e = PortfolioOptimisers.apply_preprocessing(res_e, pr_e)
         @test all(isnan, values(pv_e.X)[:, 2])
 
         # run_step reads and writes :prices
         ctx = PortfolioOptimisers.PipelineContext(; prices = pr)
-        fitted, ctx2 = PortfolioOptimisers.run_step(imp, ctx)
-        @test fitted isa ImputerResult
+        fitted, ctx2 = PortfolioOptimisers.run_step(pgf, ctx)
+        @test fitted isa PriceGapFillResult
         @test !any(isnan, values(ctx2.prices.X))
     end
 

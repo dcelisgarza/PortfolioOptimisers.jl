@@ -354,7 +354,7 @@ struct UnimplementedSelector <: PortfolioOptimisers.AbstractAssetSelector end
         @test PortfolioOptimisers.pipe_reads(ZeroVarianceFilter()) == (:returns,)
 
         pipe = Pipeline(;
-                        steps = (MissingDataFilter(), Imputer(), PricesToReturns(),
+                        steps = (MissingDataFilter(), PriceGapFill(), PricesToReturns(),
                                  ZeroVarianceFilter(), EmpiricalPrior(), EqualWeighted()))
         res = fit(pipe, pr)
         @test res.ctx.returns.nx == ["A", "B", "D", "E", "F"]

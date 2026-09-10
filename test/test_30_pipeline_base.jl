@@ -159,7 +159,7 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         # slots filled by the pipeline input are not "written", so the canonical
         # prices-level ordering is unaffected
         @test Pipeline(;
-                       steps = (MissingDataFilter(), Imputer(), PricesToReturns(),
+                       steps = (MissingDataFilter(), PriceGapFill(), PricesToReturns(),
                                 EmpiricalPrior(), EqualWeighted())) isa Pipeline
 
         # writing a derived slot invalidates nothing

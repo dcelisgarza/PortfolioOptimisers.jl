@@ -52,10 +52,10 @@ end
 
         # repeated slots are suffixed in order; explicit names pass through
         pipe = Pipeline(;
-                        steps = (MissingDataFilter(), "impute" => Imputer(),
+                        steps = (MissingDataFilter(), "gap_fill" => PriceGapFill(),
                                  PricesToReturns()))
-        @test pipe.names == ("prices_1", "impute", "returns")
-        pipe = Pipeline(; steps = (MissingDataFilter(), Imputer()))
+        @test pipe.names == ("prices_1", "gap_fill", "returns")
+        pipe = Pipeline(; steps = (MissingDataFilter(), PriceGapFill()))
         @test pipe.names == ("prices_1", "prices_2")
 
         # steps cannot be empty
@@ -63,7 +63,7 @@ end
 
         # duplicate names are rejected
         @test_throws ArgumentError Pipeline(;
-                                            steps = ("a" => Imputer(),
+                                            steps = ("a" => PriceGapFill(),
                                                      "a" => MissingDataFilter()))
 
         # non-steppable estimators are rejected at construction
@@ -98,7 +98,7 @@ end
         X = make_prices()
         pr = PricesResult(; X = X)
         pipe = Pipeline(;
-                        steps = (MissingDataFilter(; col_thr = 0.5), Imputer(),
+                        steps = (MissingDataFilter(; col_thr = 0.5), PriceGapFill(),
                                  PricesToReturns(), EmpiricalPrior(),
                                  HierarchicalRiskParity()))
         res = fit(pipe, pr)

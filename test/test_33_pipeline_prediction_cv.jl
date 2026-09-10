@@ -100,14 +100,16 @@ end
         X = make_prices()
         vals = copy(values(X))
         vals[1:50, 2] .= NaN     # A2: 62.5% missing in the train window -> dropped
-        vals[10, 3] = NaN        # A3: sparse missing -> imputed
+        vals[10, 3] = NaN        # A3: sparse missing -> filled
         Xm = TimeArray(timestamp(X), vals, string.("A", 1:5))
-        pr = PricesResult(; X = Xm)
+        # The fill is bounded by the Listing Span, so the carrier states one: here a
+        # caller's declaration that every asset is listed throughout (ADR 0129, ADR 0130).
+        pr = PricesResult(; X = Xm, span = trues(size(vals)))
 
         pipe = Pipeline(;
                         steps = ("filter" => MissingDataFilter(; col_thr = 0.5),
-                                 "impute" => Imputer(), PricesToReturns(), EmpiricalPrior(),
-                                 EqualWeighted()))
+                                 "gap_fill" => PriceGapFill(), PricesToReturns(),
+                                 EmpiricalPrior(), EqualWeighted()))
         train_idx, test_idx = 1:80, 81:120
         res = fit(pipe, PortfolioOptimisers.port_opt_view(pr, train_idx))
 
@@ -120,7 +122,7 @@ end
         # manual replay of the fitted steps on the test window
         pv = PortfolioOptimisers.port_opt_view(pr, test_idx)
         pv = PortfolioOptimisers.apply_preprocessing(res["filter"], pv)
-        pv = PortfolioOptimisers.apply_preprocessing(res["impute"], pv)
+        pv = PortfolioOptimisers.apply_preprocessing(res["gap_fill"], pv)
         rd_test = PortfolioOptimisers.apply_preprocessing(PricesToReturns(), pv)
         pred_manual = PortfolioOptimisers.predict(res.ctx.opt, rd_test)
         @test pred.rd.X == pred_manual.rd.X
@@ -128,8 +130,11 @@ end
         # the T -> T-1 contraction: k price rows produce k-1 return rows
         @test size(pred.rd.X, 1) == length(test_idx) - 1
 
-        # the test window is subset to the *train* universe even when clean
-        pr_clean = PricesResult(; X = X)
+        # the test window is subset to the *train* universe even when clean. It states the
+        # same calendar as the gapped one: a pipeline fitted on a span-stating carrier emits
+        # an Asset Panel, and `assert_universe_aligned` refuses a test window that states
+        # none, because the two did not come from one ingestion.
+        pr_clean = PricesResult(; X = X, span = trues(size(values(X))))
         pred_clean = PortfolioOptimisers.predict(res, pr_clean, test_idx)
         @test size(pred_clean.rd.X, 2) == 1  # net portfolio returns column
         rd_clean = PortfolioOptimisers.apply_fitted_steps(res.results,
@@ -237,7 +242,7 @@ end
         nf = length(sp.train_idx)
         @test nf == 2
         ew, iv = EqualWeighted(), InverseVolatility()
-        prep = (MissingDataFilter(), Imputer(), PricesToReturns(), EmpiricalPrior())
+        prep = (MissingDataFilter(), PriceGapFill(), PricesToReturns(), EmpiricalPrior())
         static_pipe(opt) = Pipeline(; steps = (prep..., opt))
         function manual(opt, i)
             res = fit(static_pipe(opt),
@@ -313,7 +318,7 @@ end
 
         @testset "the fold's computed slots reach the fold's optimiser" begin
             hrp = HierarchicalRiskParity()
-            capped = (MissingDataFilter(), Imputer(), PricesToReturns(),
+            capped = (MissingDataFilter(), PriceGapFill(), PricesToReturns(),
                       WeightBoundsEstimator(; lb = nothing, ub = 0.3))
             p = cross_val_predict(Pipeline(;
                                            steps = (capped..., TimeDependent([hrp, hrp]))),

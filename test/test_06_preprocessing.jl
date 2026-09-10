@@ -333,8 +333,11 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
             pm = apply_preprocessing(mdf, pr3)
             @test string.(TimeSeries.colnames(pm.X)) == ["A", "C"]
             @test panel_feature_matrix(pm.pnl)[2] == Z3[:, [1, 3], :]
-            # Imputer changes no shape, so Z passes through untouched.
-            pim = apply_preprocessing(fit_preprocessing(Imputer(), pr3), pr3)
+            # A fill changes no shape, so Z passes through untouched. The carrier states
+            # a span, which is what bounds the fill (ADR 0130).
+            pr3s = PricesResult(; X = Px, pnl = matrix_panel(nz, Z3),
+                                span = trues(size(Pv)))
+            pim = apply_preprocessing(fit_preprocessing(PriceGapFill(), pr3s), pr3s)
             @test panel_feature_matrix(pim.pnl)[2] == Z3
             @test panel_feature_matrix(pim.pnl)[1] == nz
 
@@ -475,7 +478,11 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
                                                        pr)
     end
 
-    @testset "Imputer fits on the training window and never refits" begin
+    @testset "PriceGapFill fits on the training window and never refits" begin
+        # Map #955, ADR 0130. `missing` is the other spelling of an absent price, and the
+        # fill accepts it through `is_missing_value` exactly as `NaN`; `test_06g` drives the
+        # conventions and the bound on `NaN`, so what is pinned here is the `missing` path
+        # and the fit/apply replay across a train/test split.
         ts = collect(Date(2020, 1, 1):Day(1):Date(2020, 1, 6))
         # `a` is never observed, `b` is observed everywhere, and `c` is observed in the
         # training window alone.
@@ -485,11 +492,13 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
                                        missing 7.0 missing
                                        missing 9.0 missing
                                        missing 11.0 missing]
-        pr = PricesResult(; X = TimeArray(ts, vals, [:a, :b, :c]))
+        # A caller's own listing calendar says every asset is listed throughout, which is
+        # ADR 0129's route to a fill bounded by nothing but the panel itself.
+        pr = PricesResult(; X = TimeArray(ts, vals, [:a, :b, :c]), span = trues(6, 3))
         tr = PortfolioOptimisers.port_opt_view(pr, ts[1:3], :)
         te = PortfolioOptimisers.port_opt_view(pr, ts[4:6], :)
 
-        res = fit_preprocessing(Imputer(), tr)
+        res = fit_preprocessing(PriceGapFill(; fill = MedianValue()), tr)
         # An asset with no observed price in the training window gets no fill value, so it
         # takes no entry in the result and is left untouched at apply time.
         @test string.(res.nx) == ["b", "c"]
@@ -507,9 +516,10 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         # narrowed universe still applies.
         narrow = PricesResult(;
                               X = TimeArray(ts[4:6],
-                                            Union{Float64, Missing}[7.0, missing, 11.0],
-                                            [:b]))
-        @test values(apply_preprocessing(res, narrow).X) == [7.0, 3.0, 11.0]
+                                            reshape(Union{Float64, Missing}[7.0, missing,
+                                                                            11.0], 3, 1),
+                                            [:b]), span = trues(3, 1))
+        @test vec(values(apply_preprocessing(res, narrow).X)) == [7.0, 3.0, 11.0]
     end
 
     @testset "the missing-data path on both axes" begin

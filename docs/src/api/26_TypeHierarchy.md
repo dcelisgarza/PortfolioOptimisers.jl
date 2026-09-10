@@ -48,8 +48,12 @@ its docstring.
 │   ├── [`CokurtosisPartialFitState`](@ref)\
 │   ├── [`CoskewnessPartialFitState`](@ref)\
 │   ├── [`CovarianceState`](@ref)\
+│   ├── [`ExpWeightedCovarianceState`](@ref)\
+│   ├── [`ExpWeightedExpectedReturnsState`](@ref)\
+│   ├── [`ExpWeightedVarianceState`](@ref)\
 │   ├── [`RegimeAdjustedCovarianceState`](@ref)\
 │   ├── [`RegimeAdjustedVarianceState`](@ref)\
+│   ├── [`SampleBufferState`](@ref)\
 │   ├── [`SimpleExpectedReturnsState`](@ref)\
 │   └── [`SimpleVarianceState`](@ref)\
 ├── [`AbstractPhylogenyResult`](@ref)\
@@ -64,8 +68,8 @@ its docstring.
 │   └── [`PredictionResult`](@ref)\
 ├── [`AbstractPreprocessingResult`](@ref)\
 │   ├── [`AbstractPricesPreprocessingResult`](@ref)\
-│   │   ├── [`ImputerResult`](@ref)\
-│   │   └── [`MissingDataFilterResult`](@ref)\
+│   │   ├── [`MissingDataFilterResult`](@ref)\
+│   │   └── [`PriceGapFillResult`](@ref)\
 │   └── [`AbstractReturnsPreprocessingResult`](@ref)\
 │       └── [`AssetSelectorResult`](@ref)\
 ├── [`AbstractPricesResult`](@ref)\
@@ -124,6 +128,8 @@ its docstring.
 ├── [`FactorAttributionResult`](@ref)\
 ├── [`FactorSummaryResult`](@ref)\
 ├── [`Fees`](@ref)\
+├── [`ForecastEvaluationResult`](@ref)\
+├── [`ForecastSummaryResult`](@ref)\
 ├── [`HeldWeightsResult`](@ref)\
 ├── [`NearOptimalSetup`](@ref)\
 ├── [`OptimisationModelResult`](@ref)\
@@ -319,6 +325,7 @@ its docstring.
 │   │   ├── [`ExcessExpectedReturns`](@ref)\
 │   │   └── [`ShrunkExpectedReturns`](@ref)\
 │   ├── [`CustomValueExpectedReturns`](@ref)\
+│   ├── [`ExpWeightedExpectedReturns`](@ref)\
 │   ├── [`MedianExpectedReturns`](@ref)\
 │   ├── [`SimpleExpectedReturns`](@ref)\
 │   ├── [`StandardDeviationExpectedReturns`](@ref)\
@@ -389,8 +396,8 @@ its docstring.
 │   └── [`Posdef`](@ref)\
 ├── [`AbstractPreprocessingEstimator`](@ref)\
 │   ├── [`AbstractPricesPreprocessingEstimator`](@ref)\
-│   │   ├── [`Imputer`](@ref)\
-│   │   └── [`MissingDataFilter`](@ref)\
+│   │   ├── [`MissingDataFilter`](@ref)\
+│   │   └── [`PriceGapFill`](@ref)\
 │   ├── [`AbstractReturnsPreprocessingEstimator`](@ref)\
 │   │   └── [`AbstractAssetSelector`](@ref)\
 │   │       ├── [`CompleteAssetSelector`](@ref)\
@@ -454,6 +461,7 @@ its docstring.
 ├── [`CoskewnessEstimator`](@ref)\
 │   ├── [`Coskewness`](@ref)\
 │   └── [`WindowedCoskewness`](@ref)\
+├── [`CoveragePolicy`](@ref)\
 ├── [`CrossValidationEstimator`](@ref)\
 │   ├── [`NonOptimisationCrossValidationEstimator`](@ref)\
 │   │   ├── [`NonOptimisationNonSequentialCrossValidationEstimator`](@ref)\
@@ -503,8 +511,10 @@ its docstring.
 │   ├── [`MaximumReturn`](@ref)\
 │   ├── [`MaximumUtility`](@ref)\
 │   └── [`MinimumRisk`](@ref)\
+├── [`Online`](@ref)\
 ├── [`OptimisationCrossValidation`](@ref)\
 ├── [`PipelineStep`](@ref)\
+├── [`PriceIngestion`](@ref)\
 ├── [`RegimeAdjustedMethod`](@ref)\
 │   ├── [`FirstMomentRegimeAdjusted`](@ref)\
 │   ├── [`LogRegimeAdjusted`](@ref)\
@@ -570,8 +580,15 @@ its docstring.
 ├── [`AbstractCollapseAlgorithm`](@ref)\
 │   ├── [`MeanCollapse`](@ref)\
 │   └── [`MedianCollapse`](@ref)\
+├── [`AbstractCompactRadiusAlgorithm`](@ref)\
+│   ├── [`ResidualInflation`](@ref)\
+│   └── [`VarianceFraction`](@ref)\
 ├── [`AbstractConstraintSpace`](@ref)\
 │   └── [`FactorSpace`](@ref)\
+├── [`AbstractCoverageAlgorithm`](@ref)\
+│   ├── [`DecayCoverage`](@ref)\
+│   ├── [`ExpireCoverage`](@ref)\
+│   └── [`ResetCoverage`](@ref)\
 ├── [`AbstractCrossSectionalWeightsAlgorithm`](@ref)\
 │   ├── [`BlendedInverseVarianceWeights`](@ref)\
 │   └── [`MarketCapWeights`](@ref)\
@@ -626,10 +643,17 @@ its docstring.
 │   ├── [`LastObservation`](@ref)\
 │   └── [`StackObservations`](@ref)\
 ├── [`AbstractFeeAmortisation`](@ref)\
-│   └── [`AmortisedFees`](@ref)\
+│   ├── [`AmortisedFees`](@ref)\
+│   └── [`FirstObservationFees`](@ref)\
+├── [`AbstractForecastTarget`](@ref)\
+│   ├── [`AssetReturnTarget`](@ref)\
+│   ├── [`IdiosyncraticTarget`](@ref)\
+│   └── [`PanelFieldTarget`](@ref)\
 ├── [`AbstractForecastUnit`](@ref)\
 │   ├── [`IdiosyncraticReturnUnit`](@ref)\
 │   └── [`IdiosyncraticSharpeUnit`](@ref)\
+├── [`AbstractGapReturnAlgorithm`](@ref)\
+│   └── [`CatchUpGapReturn`](@ref)\
 ├── [`AbstractMatrixProcessingAlgorithm`](@ref)\
 │   └── [`InverseMatrixSparsificationAlgorithm`](@ref)\
 │       └── [`LoGo`](@ref)\
@@ -871,6 +895,7 @@ its docstring.
 
 [`AbstractCovarianceEstimator`](@ref)\
 ├── [`AbstractVarianceEstimator`](@ref)\
+│   ├── [`ExpWeightedVariance`](@ref)\
 │   ├── [`RegimeAdjustedExpWeightedVariance`](@ref)\
 │   ├── [`SimpleVariance`](@ref)\
 │   └── [`WindowedVariance`](@ref)\
@@ -883,6 +908,7 @@ its docstring.
 ├── [`CorrelationCovariance`](@ref)\
 ├── [`Covariance`](@ref)\
 ├── [`DistanceCovariance`](@ref)\
+├── [`ExpWeightedCovariance`](@ref)\
 ├── [`GeneralCovariance`](@ref)\
 ├── [`ImpliedVolatility`](@ref)\
 ├── [`LowerTailDependenceCovariance`](@ref)\
