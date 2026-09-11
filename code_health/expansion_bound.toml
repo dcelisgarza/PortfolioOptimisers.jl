@@ -3,13 +3,13 @@
 # beyond what the parser already sees at the call. ADR 0072.
 
 [provenance]
-julia = "1.12.7"
+julia = "1.13.0"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "ee6bf56011"
+commit = "4edabeefe2"
 
 [macro]
-"@define_pretty_show" = { cyc = 27, cog = 43, arg = 2 }
+"@define_pretty_show" = { cyc = 26, cog = 40, arg = 2 }
 "@forward_properties" = { cyc = 15, cog = 29, arg = 2 }
 "@pipe_delegates" = { cyc = 1, cog = 1, arg = 3 }
 "@pipe_route_rkb" = { cyc = 1, cog = 0, arg = 3 }

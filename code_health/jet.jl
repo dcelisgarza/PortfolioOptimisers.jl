@@ -53,14 +53,14 @@ const FILTER = "AnyFrameModule"
 """
     assert_environment()
 
-JET 0.12.1 needs Julia 1.12 and degrades silently: on an unsupported version it loads
+JET 0.12.1 needs Julia 1.12 or 1.13 and degrades silently: on an unsupported version it loads
 `JETEmpty.jl`, whose stubs warn on load and throw on call. A gate that stops measuring without
 failing is worse than no gate, so `JET_AVAILABLE` is asserted before anything is measured.
 """
 function assert_environment()
     if !(JET.JET_AVAILABLE)
         error("JET.JET_AVAILABLE is false. JET loaded its empty stubs, so nothing would be\n" *
-              "measured and the gate would report zero. Julia is $(VERSION); JET 0.12.1 needs 1.12.")
+              "measured and the gate would report zero. Julia is $(VERSION); JET 0.12.1 needs 1.12 or 1.13.")
     end
     return nothing
 end
