@@ -1,6 +1,6 @@
 #=
 A gapped point-in-time panel driven through a `Pipeline` and through a walk-forward fold,
-issue #958 of map #955.
+issue #958 of map #955, on a fixture the ingestion layer builds, issue #981.
 
 Map #667 built the whole downstream contract for a gapped panel -- the Coverage Universe, the
 Investable Mask, the Held Gap, the reduce-and-expand identity -- and closed without ever
@@ -30,12 +30,21 @@ It records two answers, and the second is the one that costs.
     now by declaring an all-listed calendar on the carrier -- ADR 0129's route, and
     bit-identical to the estimator that went -- and `PriceGapFill` reproduces it: it makes the
     fold run by inventing prices for assets that were not listed. The declaration is also the
-    active mask, so asking for the unbounded fill *replaces* the honest panel a caller hands
-    in beside it, and the defence that used to keep the invention out of the weights is gone
-    with it: a delisted asset takes a quarter of the book with a panel and without one alike.
-    Under the carrier's own Listing Span, which is what `price_ingestion` states, the same
-    step invents nothing and both dead names hold exactly zero. The bound is the whole
-    difference, and both halves are asserted below.
+    active mask, so asking for the unbounded fill *replaces* the panel the layer derives from
+    the same table, and the defence that used to keep the invention out of the weights is gone
+    with it: a delisted asset takes a quarter of the book. Under the carrier's own Listing
+    Span, which is what `price_ingestion` states, the same step invents nothing and both dead
+    names hold exactly zero. The bound is the whole difference, and both halves are asserted
+    below.
+
+The fixture is a **price table** carrying all three span cases, and the layer builds the
+returns carrier from it: `price_ingestion` reads the Span Rule, `prices_to_returns` projects
+it, and the two universe masks come back derived. That is the second clause of map #955's
+destination, and it is asserted rather than assumed: the masks the layer states equal the ones
+map #667's tests wrote by hand, cell for cell, the returns are the moves the prices were built
+from, and every fold's book is the one the hand-built carrier gives. The hand-built masks
+survive only as that oracle. `test_57_point_in_time_universe.jl` keeps its independent panel on
+purpose, so the downstream contract is never checked against a fixture the layer wrote.
 
 The panel-wide-versus-per-window question the map settled at charting is verified here rather
 than re-decided: deriving the active mask once over the whole panel gives every fold the same
@@ -52,31 +61,39 @@ slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
                              "tol_gap_rel" => 1e-12, "tol_feas" => 1e-12,
                              "tol_infeas_abs" => 1e-12, "tol_infeas_rel" => 1e-12))
 
-# The fixture: all three span cases at once, hand-built exactly as map #667's own tests build
-# theirs. `a` and `b` are priced throughout, so no window's universe is ever empty.
+# The fixture: `T58` moves drawn once, cumulated into `T58 + 1` prices, and all three span
+# cases punched into the PRICES. A return consumes the earlier price of its pair, so a run of
+# `k` gapped prices leaves `k + 1` returns non-finite: c's 30 missing prices are 30 missing
+# returns and no more only because its inception emits no Held Gap (ADR 0131), and e's 10
+# missing prices are the 11 returns that read one of them. `a` and `b` are priced throughout,
+# so no window's universe is ever empty.
 T58, N58 = 120, 5
 nx58 = ["a", "b", "c", "d", "e"]
-X58 = randn(StableRNG(958), T58, N58) ./ 100 .+ 0.0005
-X58[1:30, 3] .= NaN            # c lists at observation 31: a LEADING run of gaps
-X58[91:120, 4] .= NaN          # d delists at observation 91: a TRAILING run of gaps
-X58[55:65, 5] .= NaN           # e is suspended and lists again: an INTERIOR gap
+R58 = randn(StableRNG(958), T58, N58) ./ 100 .+ 0.0005
+P58 = vcat(fill(100.0, 1, N58), 100 .* cumprod(1 .+ R58; dims = 1))
+P58[1:30, 3] .= NaN            # c lists at price 31: a LEADING run of gaps
+P58[92:end, 4] .= NaN          # d's last price is 91: a TRAILING run of gaps
+P58[56:65, 5] .= NaN           # e is unpriced and prices again: an INTERIOR gap
+Pta58 = TimeArray(Date(2020, 1, 1) .+ Day.(0:T58), P58, nx58)
 
-# The span rule the map settled: a leading run and a trailing run are inactive, an interior
-# one is a Held Gap on an asset that is still listed. The estimation mask is the active mask
-# intersected with finiteness.
+# The layer builds both carriers. `pr58` states the Listing Span the Span Rule read off the
+# prices, and `rd58` carries the panel the conversion projected from it.
+pr58 = price_ingestion(PriceIngestion(), Pta58)
+rd58 = prices_to_returns(pr58)
+X58 = rd58.X
+
+# The oracle: the masks exactly as map #667's own tests write them by hand. A leading run and
+# a trailing run are inactive, an interior one is a Held Gap on an asset that is still listed,
+# and the estimation mask is the active mask intersected with finiteness.
 amsk58 = trues(T58, N58)
 amsk58[1:30, 3] .= false
 amsk58[91:120, 4] .= false
-emsk58 = amsk58 .& isfinite.(X58)
+emsk58 = copy(amsk58)
+emsk58[55:65, 5] .= false
 
 function panel58(a, e)
-    return AssetPanel(;
-                      pf = [NumericPanelField(; name = "mcap",
-                                              vals = ones(size(a, 1), size(a, 2)))],
-                      amsk = a, emsk = e)
+    return AssetPanel(; amsk = a, emsk = e)
 end
-
-rd58 = ReturnsResult(; nx = nx58, X = X58, pnl = panel58(amsk58, emsk58))
 
 mr58 = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
 hrp58 = HierarchicalRiskParity(; opt = HierarchicalOptimiser())
@@ -87,6 +104,37 @@ pipe_hier58 = Pipeline(; steps = (EmpiricalPrior(), hrp58))
 # observation 60, which is inside e's suspension -- the case the map asked for by name.
 iwf58 = IndexWalkForward(60, 20)
 cv58 = split(iwf58, rd58)
+
+@testset "The layer states the panel map #667 wrote by hand, issue #981" begin
+    # The derived masks equal the hand-built ones, cell for cell, on all three span cases.
+    @test size(rd58.pnl.amsk) == size(rd58.pnl.emsk) == (T58, N58)
+    @test Matrix(rd58.pnl.amsk) == amsk58
+    @test Matrix(rd58.pnl.emsk) == emsk58
+    @test isa(rd58.pnl.amsk, PortfolioOptimisers.ListingSpan)
+    # The gaps land on the returns where the hand-built fixture put them.
+    @test findall(!isfinite, view(X58, :, 3)) == collect(1:30)
+    @test findall(!isfinite, view(X58, :, 4)) == collect(91:T58)
+    @test findall(!isfinite, view(X58, :, 5)) == collect(55:65)
+    @test all(isfinite, view(X58, :, 1)) && all(isfinite, view(X58, :, 2))
+    # The returns are the moves the prices were cumulated from, wherever a return exists.
+    @test isapprox(X58[emsk58], R58[emsk58]; rtol = 1e-12)
+    @test isfinite.(X58) == emsk58
+
+    # And the book is the one the hand-built carrier gives, fold for fold, through both
+    # optimiser families. The hand-built carrier here is exactly what this file held before
+    # the layer existed.
+    rd_hand = ReturnsResult(; nx = nx58, X = ifelse.(emsk58, R58, NaN),
+                            pnl = panel58(amsk58, emsk58))
+    for est in (mr58, hrp58)
+        @test isapprox(optimise(est, rd58).w, optimise(est, rd_hand).w; rtol = 1e-8)
+        for tr in cv58.train_idx
+            @test isapprox(optimise(est, PortfolioOptimisers.pipeline_data_view(rd58, tr)).w,
+                           optimise(est,
+                                    PortfolioOptimisers.pipeline_data_view(rd_hand, tr)).w;
+                           rtol = 1e-8)
+        end
+    end
+end
 
 @testset "A gapped panel through a Pipeline and a fold: the returns level" begin
     # The folds are the ones the file's prose describes.
@@ -132,9 +180,7 @@ cv58 = split(iwf58, rd58)
                                                                                      tr,
                                                                                      1:N58))
             @test cm == covered[k]
-            w = optimise(mr58,
-                         ReturnsResult(; nx = nx58, X = X58[tr, :],
-                                       pnl = panel58(amsk58[tr, :], emsk58[tr, :]))).w
+            w = optimise(mr58, PortfolioOptimisers.pipeline_data_view(rd58, tr)).w
             # Outside the Coverage Universe the weight is exactly zero, and inside it is not.
             @test all(iszero, view(w, .!cm))
             @test all(!iszero, view(w, cm))
@@ -145,9 +191,7 @@ cv58 = split(iwf58, rd58)
         # Fold 2 trains on 21:80, where d is live, and tests on 81:100, where d delists at
         # observation 91. The fold holds d and d has no return, so the pair is a Held Gap.
         tr, te = cv58.train_idx[2], cv58.test_idx[2]
-        res = optimise(mr58,
-                       ReturnsResult(; nx = nx58, X = X58[tr, :],
-                                     pnl = panel58(amsk58[tr, :], emsk58[tr, :])))
+        res = optimise(mr58, PortfolioOptimisers.pipeline_data_view(rd58, tr))
         @test !iszero(res.w[4])
         @test @test_logs (:warn,) match_mode=:any predict(res, rd58, te) isa Any
         # The pair contributes zero rather than poisoning the series.
@@ -162,9 +206,7 @@ cv58 = split(iwf58, rd58)
         # silent: fold 1 holds no e, and fold 3 holds no d.
         for k in (1, 3)
             trk, tek = cv58.train_idx[k], cv58.test_idx[k]
-            resk = optimise(mr58,
-                            ReturnsResult(; nx = nx58, X = X58[trk, :],
-                                          pnl = panel58(amsk58[trk, :], emsk58[trk, :])))
+            resk = optimise(mr58, PortfolioOptimisers.pipeline_data_view(rd58, trk))
             @test predict(resk, rd58, tek; strict = true) isa Any
         end
     end
@@ -203,15 +245,15 @@ function span_amsk58(Xw)
 end
 
 @testset "The active mask is derived once over the panel, and that leaks nothing" begin
-    # The rule reproduces the hand-built mask when it reads the whole panel.
-    @test span_amsk58(X58) == amsk58
+    # The rule reproduces the layer's mask when it reads the whole panel.
+    @test span_amsk58(X58) == Matrix(rd58.pnl.amsk)
 
     for (k, tr) in enumerate(cv58.train_idx)
         Xtr = X58[tr, :]
         apw, epw = amsk58[tr, :], emsk58[tr, :]
         aw = span_amsk58(Xtr)
         ew = aw .& isfinite.(Xtr)
-        rd_pw = ReturnsResult(; nx = nx58, X = Xtr, pnl = panel58(apw, epw))
+        rd_pw = PortfolioOptimisers.pipeline_data_view(rd58, tr)
         rd_win = ReturnsResult(; nx = nx58, X = Xtr, pnl = panel58(aw, ew))
         # Fold 1's window ends inside e's suspension, so the two masks genuinely disagree
         # there: panel-wide says e is still listed, per-window reads a delisting.
@@ -241,25 +283,8 @@ end
     end
 end
 
-# The price level. The same three span cases, cumulated per column on that column's own
-# finite returns so that a gap never poisons the rest of the column, then punched back in.
-P58 = Matrix{Float64}(undef, T58 + 1, N58)
-for j in 1:N58
-    P58[1, j] = 100.0
-    for t in 1:T58
-        P58[t + 1, j] = P58[t, j] * (1 + (isfinite(X58[t, j]) ? X58[t, j] : 0.0))
-    end
-end
-P58[1:31, 3] .= NaN
-P58[92:end, 4] .= NaN
-P58[56:66, 5] .= NaN
-Pta58 = TimeArray(Date(2020, 1, 1) .+ Day.(0:T58), P58, nx58)
-
-amskP58 = trues(T58 + 1, N58)
-amskP58[1:31, 3] .= false
-amskP58[92:end, 4] .= false
-pnlP58 = panel58(amskP58, amskP58 .& isfinite.(P58))
-
+# The price level: the same carrier the layer built, driven through a pipeline whose first
+# step is the conversion, so every fold is cut on the price clock.
 pipe_price58 = Pipeline(; steps = (PricesToReturns(), EmpiricalPrior(), mr58))
 # The unbounded fill, said the way ADR 0130 leaves open: a caller's declared calendar saying
 # every asset is listed at every observation, which bounds the fill by nothing at all. The
@@ -269,6 +294,7 @@ pipe_fix58 = Pipeline(;
                       steps = (MissingDataFilter(), PriceGapFill(; fill = MedianValue()),
                                PricesToReturns(), EmpiricalPrior(), mr58))
 all_listed58 = trues(T58 + 1, N58)
+pr_all58 = price_ingestion(PriceIngestion(; span = all_listed58), Pta58)
 
 @testset "The price level carries a gapped panel" begin
     @testset "prices_to_returns deletes nothing, in every window" begin
@@ -289,10 +315,10 @@ all_listed58 = trues(T58 + 1, N58)
         end
     end
 
-    @testset "the walk-forward runs, with a panel and without one" begin
+    @testset "the walk-forward runs, on the layer's carrier and on a bare one" begin
         # The universe no longer moves between the train and the test window, so the fit/apply
         # contract at `src/23_Pipeline/03_Pipeline.jl:794` has nothing to catch.
-        for pr in (PricesResult(; X = Pta58, pnl = pnlP58), PricesResult(; X = Pta58))
+        for pr in (pr58, PricesResult(; X = Pta58))
             @test length(cross_val_predict(pipe_price58, pr, iwf58).pred) == 3
         end
     end
@@ -300,36 +326,30 @@ all_listed58 = trues(T58 + 1, N58)
     @testset "the unbounded fill runs, and the declaration that buys it costs the panel" begin
         # An all-listed calendar is what the released remedy amounted to: it bounds the fill
         # by nothing, so every gap is filled and every fold runs.
-        pr_p = PricesResult(; X = Pta58, pnl = pnlP58, span = all_listed58)
-        pr_n = PricesResult(; X = Pta58, span = all_listed58)
-        pp = cross_val_predict(pipe_fix58, pr_p, iwf58)
-        pn = cross_val_predict(pipe_fix58, pr_n, iwf58)
-        @test length(pp.pred) == length(pn.pred) == 3
+        pp = cross_val_predict(pipe_fix58, pr_all58, iwf58)
+        @test length(pp.pred) == 3
 
-        # It fills them by inventing a price. `c` is unlisted until observation 31 and gets
-        # its median training price, so it carries a return over a span in which it did not
+        # It fills them by inventing a price. `c` is unlisted until price 31 and gets its
+        # median training price, so it carries a return over a span in which it did not
         # trade.
-        res = fit(pipe_fix58, pr_p)
+        res = fit(pipe_fix58, pr_all58)
         @test size(res.ctx.returns.X) == (T58, N58)
         @test all(isfinite, res.ctx.returns.X)
         jc = findfirst(==("c"), res.ctx.returns.nx)
-        @test all(iszero, view(res.ctx.returns.X, 1:30, jc))
+        @test all(iszero, view(res.ctx.returns.X, 1:29, jc))
 
         # Issue #989, and the reason the estimator that used to do this had to go. The only
         # way to ask for an unbounded fill is to declare that every asset is listed at every
         # observation -- and that declaration IS the active mask (ADR 0129, ADR 0132), so it
-        # replaces the honest panel the caller also handed in. The defence the caller was
-        # relying on is the very thing the request threw away: the two runs are identical.
+        # replaces the panel the layer derives from the very same table. The defence the
+        # caller was relying on is the very thing the request threw away.
         @test all(res.ctx.returns.pnl.amsk)
-        for k in 1:3
-            @test pp.pred[k].res.w == pn.pred[k].res.w
-        end
+        @test count(Matrix(rd58.pnl.amsk)) == T58 * N58 - 60
         # So the fabricated prices are indistinguishable from real ones and the optimiser
-        # buys them, panel or no panel -- a delisted asset takes a quarter of the book.
+        # buys them -- a delisted asset takes a quarter of the book.
         @test !iszero(pp.pred[1].res.w[3])
         @test !iszero(pp.pred[2].res.w[3])
         @test pp.pred[3].res.w[4] > 0.2
-        @test pn.pred[3].res.w[4] > 0.2
     end
 
     @testset "the filled listing boundary is a fabricated return, issue #964" begin
@@ -337,15 +357,15 @@ all_listed58 = trues(T58 + 1, N58)
         # so the first real observation shows up as a jump. That jump lands on `c`'s first
         # ACTIVE row, where the panel says the asset is live and the return is finite -- so
         # neither mask filters it, and a window opening there admits `c` carrying it.
-        res = fit(pipe_fix58, PricesResult(; X = Pta58, pnl = pnlP58, span = all_listed58))
+        res = fit(pipe_fix58, pr_all58)
         rr = res.ctx.returns
         jc = findfirst(==("c"), rr.nx)
         # The all-listed declaration is the active mask, so `c` reads as live from the first
         # observation and no mask filters anything.
         @test findfirst(view(rr.pnl.amsk, :, jc)) == 1
-        t0 = 31                                # c's first genuinely priced observation
+        t0 = 30                                # the return that reads c's first real price
         @test rr.pnl.emsk[t0, jc]
-        @test rr.X[t0, jc] < -0.1              # c listed at ~100.8, filled at ~115.9
+        @test rr.X[t0, jc] < -0.1              # c listed at ~105.6, filled at ~122.4
 
         w = t0:(t0 + 59)
         rdw = ReturnsResult(; nx = rr.nx, X = rr.X[w, :],
@@ -362,20 +382,21 @@ all_listed58 = trues(T58 + 1, N58)
         @test iszero(ref[jc])
 
         # Issue #989. The fabrication is the *calendar's*, not the step's: bound the same
-        # step by the Listing Span the price panel itself states, and `c`'s leading run is
-        # outside its listing, so nothing is written there and no boundary jump exists.
+        # step by the Listing Span the layer read off the price panel, and `c`'s leading run
+        # is outside its listing, so nothing is written there and no boundary jump exists.
         # Only `e`'s suspension, a Held Gap inside a listing, is filled.
-        bounded = fit(Pipeline(;
-                               steps = (MissingDataFilter(),
-                                        PriceGapFill(; fill = MedianValue()),
-                                        PricesToReturns(), EmpiricalPrior(), mr58)),
-                      PricesResult(; X = Pta58, pnl = pnlP58, span = listing_span(P58)))
+        bounded = fit(pipe_fix58, pr58)
         rb = bounded.ctx.returns
-        @test all(!isfinite, view(rb.X, 1:31, jc))
+        @test all(!isfinite, view(rb.X, 1:30, jc))
         je = findfirst(==("e"), rb.nx)
-        @test all(isfinite, view(rb.X, 55:66, je))
+        @test all(isfinite, view(rb.X, 55:65, je))
         jd = findfirst(==("d"), rb.nx)
         @test all(!isfinite, view(rb.X, 91:T58, jd))
+        # And the bounded fold holds exactly zero on both dead names, where the unbounded
+        # one put a quarter of the book on one of them.
+        pb = cross_val_predict(pipe_fix58, pr58, iwf58)
+        @test iszero(pb.pred[1].res.w[jc]) && iszero(pb.pred[2].res.w[jc])
+        @test iszero(pb.pred[3].res.w[jd])
     end
 end
 
@@ -386,7 +407,7 @@ end
     pipe_carry58 = Pipeline(; steps = (PricesToReturns(), EmpiricalPrior(), mr58))
 
     @testset "nothing is deleted, and the gap stays where it is" begin
-        got = prices_to_returns(PricesResult(; X = Pta58, pnl = pnlP58))
+        got = prices_to_returns(pr58)
         # The whole clock and the whole universe survive.
         @test got.nx == nx58
         @test size(got.X) == (T58, N58)
@@ -394,22 +415,22 @@ end
         # and the two ungapped assets are untouched.
         @test all(isfinite, view(got.X, :, 1))
         @test all(isfinite, view(got.X, :, 2))
-        @test findall(!isfinite, view(got.X, :, 3)) == collect(1:31)
+        @test findall(!isfinite, view(got.X, :, 3)) == collect(1:30)
         @test findall(!isfinite, view(got.X, :, 4)) == collect(91:T58)
-        @test findall(!isfinite, view(got.X, :, 5)) == collect(55:66)
+        @test findall(!isfinite, view(got.X, :, 5)) == collect(55:65)
         # The panel is carried and sliced to the returns.
         @test size(got.pnl.amsk) == size(got.pnl.emsk) == size(got.X)
     end
 
     @testset "the walk-forward runs, and the panel changes nothing" begin
         # `assert_universe_aligned` has nothing to catch: every window keeps every asset.
-        pp = cross_val_predict(pipe_carry58, PricesResult(; X = Pta58, pnl = pnlP58), iwf58)
+        pp = cross_val_predict(pipe_carry58, pr58, iwf58)
         pn = cross_val_predict(pipe_carry58, PricesResult(; X = Pta58), iwf58)
         @test length(pp.pred) == length(pn.pred) == 3
         for k in 1:3
             # Carrying the gap removes the look-ahead at the source, so the mask has nothing
             # left to defend against and the two runs agree exactly. Under an unbounded fill
-            # they do not: there a delisted asset takes 0.247 of the book without a panel.
+            # they do not: there a delisted asset takes a quarter of the book.
             @test pp.pred[k].res.w == pn.pred[k].res.w
         end
         # An asset the fold cannot estimate holds exactly zero, with or without the panel.
@@ -421,8 +442,8 @@ end
         # There is no flag, so `pipe_carry58` and `pipe_price58` are the same programme, and
         # a gapless table is unaffected by any of it.
         @test :nan_to_missing ∉ fieldnames(PricesToReturns)
-        pc = cross_val_predict(pipe_carry58, PricesResult(; X = Pta58), iwf58)
-        pp = cross_val_predict(pipe_price58, PricesResult(; X = Pta58), iwf58)
+        pc = cross_val_predict(pipe_carry58, pr58, iwf58)
+        pp = cross_val_predict(pipe_price58, pr58, iwf58)
         for k in 1:3
             @test pc.pred[k].res.w == pp.pred[k].res.w
         end

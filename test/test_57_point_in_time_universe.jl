@@ -23,6 +23,14 @@ answer, and is where the cross-language numbers live.
 
 The panel comes from the generator of map #643 ticket #656 (`test06c_setup.jl`) rather than a
 second one written here, as #677 asks.
+
+This file keeps that hand-built panel deliberately, issue #981. Map #955's ingestion layer
+derives both universe masks from a price table, and `test_58_gapped_panel_pipeline.jl` moved
+onto it and asserts that the layer states the panel #667 wrote by hand. A fixture the code
+under test built proves less about the downstream contract than one built independently of it,
+so this closing verification stays on the generator's panel, whose masks are written by the
+generator and not read off a price. It is the one point-in-time fixture in the suite the layer
+never touches.
 =#
 include(joinpath(@__DIR__, "test06c_setup.jl"))
 using Clarabel, Statistics, Dates

@@ -9,6 +9,10 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, StatsBase, Statistic
 # The oracle is the same estimator on the sample with the non-covered columns removed by
 # hand, entry for entry. That is what catches a leak of the gap into the other assets, which
 # `GerberIQCovariance` had before this seam existed.
+#
+# The masks below stay hand-built, issue #981. They are unit fixtures of the mask consumers,
+# and they probe states the Span Rule never emits: an active mask that is `false` at one
+# interior row of a finitely-priced asset, and an estimation mask that is `false` everywhere.
 
 const PO = PortfolioOptimisers
 
