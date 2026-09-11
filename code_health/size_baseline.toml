@@ -6,7 +6,7 @@
 [provenance]
 julia = "1.13.0"
 julia_syntax = "1.0.2"
-commit = "f3e6153ec2"
+commit = "483d19ebf1"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt.jl" = { code = 2881, doc = 0, comment = 211, blank = 47, total = 3139 }
@@ -227,7 +227,7 @@ commit = "f3e6153ec2"
 "src/19_RiskMeasures/27_ExpectedRisk.jl" = { code = 273, doc = 458, comment = 40, blank = 207, total = 978 }
 "src/19_RiskMeasures/28_RiskMeasureTools.jl" = { code = 84, doc = 95, comment = 0, blank = 51, total = 230 }
 "src/20_Optimisation/01_Base_Optimisation.jl" = { code = 906, doc = 1675, comment = 22, blank = 827, total = 3430 }
-"src/20_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl" = { code = 623, doc = 1141, comment = 39, blank = 456, total = 2259 }
+"src/20_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl" = { code = 626, doc = 1142, comment = 39, blank = 456, total = 2263 }
 "src/20_Optimisation/02_CrossValidation/02_KFold.jl" = { code = 85, doc = 125, comment = 0, blank = 49, total = 259 }
 "src/20_Optimisation/02_CrossValidation/03_Combinatorial.jl" = { code = 255, doc = 303, comment = 7, blank = 123, total = 688 }
 "src/20_Optimisation/02_CrossValidation/04_WalkForward.jl" = { code = 362, doc = 528, comment = 0, blank = 191, total = 1081 }
