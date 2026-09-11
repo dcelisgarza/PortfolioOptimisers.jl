@@ -317,6 +317,57 @@ assets is what keeps the JuMP families cheap.
         end
     end
 
+    @testset "A failed step leaves the previous weights where they were (#1021)" begin
+        # The reference's online loop skips `set_params(previous_weights = …)` on a failed
+        # step. Here the online arm advances `prev` by the same rule as the batch arm, so a
+        # failed step threads nothing and the step after it reads the last threadable one.
+        ok = WeightBounds(; lb = zeros(N), ub = ones(N))
+        bad = WeightBounds(; lb = fill(0.5, N), ub = ones(N))
+        sets = UniverseSets(; dict = Dict("nx" => nx))
+        tnw = fill(inv(N), N)
+        n = n_splits(online_cv, rd)
+        @test n >= 3
+        sched(k) = TimeDependent([i == k ? bad : ok for i in 1:n])
+        function mk(k; fb = nothing)
+            return MeanRisk(;
+                            opt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv,
+                                                tn = Turnover(; w = tnw, val = 0.5),
+                                                wb = sched(k), sets = sets), fb = fb)
+        end
+        threaded(p) = p.res.jr.pa.tn.w
+        sfd = SelfFinancingDrift()
+        online_d = IndexWalkForward(w, t; purged_size = p, ff = OnlineStep(), wd = sfd,
+                                    pws = DriftedWeights())
+        batch_d = IndexWalkForward(w, t; purged_size = p, expand_train = true, wd = sfd,
+                                   pws = DriftedWeights())
+        for (cvo, cvb) in ((online_cv, batch_cv), (online_d, batch_d))
+            o = cross_val_predict(mk(2), rd, cvo)
+            b = cross_val_predict(mk(2), rd, cvb)
+            @test isa(o.pred[2].res.retcode, OptimisationFailure)
+            @test all(isnan, o.pred[2].res.w)
+            @test isa(o.pred[3].res.retcode, OptimisationSuccess)
+            # The online step reads what the batch fold reads, to the batch identity's
+            # tolerance: fold 1's target with no source, fold 2's held book with one.
+            @test isapprox(threaded(o.pred[3]), threaded(b.pred[3]); atol = 1e-5)
+            @test isapprox(o.pred[3].res.w, b.pred[3].res.w; atol = 1e-5)
+        end
+        o = cross_val_predict(mk(2), rd, online_cv)
+        @test threaded(o.pred[3]) == o.pred[1].res.w
+        od = cross_val_predict(mk(2), rd, online_d)
+        @test od.pred[2].hw.w0 == od.pred[1].hw.w
+        @test threaded(od.pred[3]) == od.pred[2].hw.w
+        # The hold-only fallback rescues the step, online as in batch.
+        of = cross_val_predict(mk(2; fb = PreviousWeights()), rd, online_cv)
+        @test isa(of.pred[2].res.retcode, OptimisationSuccess)
+        @test of.pred[2].res.w == of.pred[1].res.w
+        @test threaded(of.pred[3]) == of.pred[1].res.w
+        # A failure at step 1 threads nothing, so step 2 reads the estimator's own `w`.
+        o1 = cross_val_predict(mk(1), rd, online_d)
+        @test isa(o1.pred[1].res.retcode, OptimisationFailure)
+        @test all(isnan, o1.pred[1].hw.w)
+        @test threaded(o1.pred[2]) == tnw
+    end
+
     @testset "The read-out entry: a hand-stepped estimator equals the cold one" begin
         cvr = split(online_cv, rd)
         for i in (1, 3)

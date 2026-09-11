@@ -261,8 +261,8 @@ function cross_val_predict(pipe::Pipeline, data::Prices_RR,
                             ) do fold
         res = StatsAPI.fit(fold.est, pipeline_data_view(fold.rd, fold.train))
         return [StatsAPI.predict(res, fold.rd, group; wd = wd, hwd = hwd, fa = fa,
-                                 store_weight_path = store_weight_path, strict = strict)
-                for group in fold.test]
+                                 store_weight_path = store_weight_path, strict = strict,
+                                 w_prev = fold.w_prev) for group in fold.test]
     end
     return PopulationPredictionResult(; pred = sort_predictions!(cv_res, predictions))
 end
@@ -294,7 +294,8 @@ function pipeline_path_fit_and_predict(pipe::Pipeline, data::Prices_RR, folds, p
                             pws = pws) do fold
         res = StatsAPI.fit(fold.est, pipeline_data_view(fold.rd, fold.train))
         return StatsAPI.predict(res, fold.rd, fold.test; wd = wd, hwd = hwd, fa = fa,
-                                store_weight_path = store_weight_path, strict = strict)
+                                store_weight_path = store_weight_path, strict = strict,
+                                w_prev = fold.w_prev)
     end
     return MultiPeriodPredictionResult(; pred = sort_predictions!(test_idx, predictions),
                                        id = path_id)
@@ -396,7 +397,8 @@ function cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::CVER = KFold();
                             test_idx = test_idx, cv = cv, pws = pws) do fold
         res = StatsAPI.fit(fold.est, pipeline_data_view(fold.rd, fold.train))
         return StatsAPI.predict(res, fold.rd, fold.test; wd = wd, hwd = hwd, fa = fa,
-                                store_weight_path = store_weight_path, strict = strict)
+                                store_weight_path = store_weight_path, strict = strict,
+                                w_prev = fold.w_prev)
     end
     return MultiPeriodPredictionResult(; pred = predictions, id = id)
 end

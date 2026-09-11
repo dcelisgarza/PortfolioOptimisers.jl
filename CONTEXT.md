@@ -632,10 +632,12 @@ The movement of a fold's held weights away from its target weights, because each
 
 **Previous-Weights Source**
 Which weights of the previous fold the Fold Loop threads to the next: its target weights, or its drifted weights after its last observation. It changes what `Turnover`, `TurnoverEstimator`, `WeightsTracking`, `TurnoverRiskMeasure` and the turnover fee measure, and it changes nothing else. It is a field of the two walk-forwards alone, because a scheme whose folds carry no history has no previous fold to read.
+The previous fold is the last one whose weights the source can thread, not always the fold before: a fold whose solve failed has `NaN` target weights, so the target read skips it and reads the last solved fold, while a source reads its Held Weights, which are finite because a failed fold holds. ADR 0145.
 *Avoid*: Turnover, which measures the trade a source implies and does not choose the source.
 
 **Held Weights**
-The record a fold keeps of what the portfolio actually held: the asset returns it was scored over, the weights after its last observation, and the Weight Drift form that produced them. The weight path itself is rebuilt from that record on demand, and stored only when the scheme's `store_weight_path` asks for it.
+The record a fold keeps of what the portfolio actually held: the asset returns it was scored over, the weights its drift started from, the weights after its last observation, and the Weight Drift form that produced them. The weight path itself is rebuilt from that record on demand, and stored only when the scheme's `store_weight_path` asks for it.
+The start weights are the fold's target on a solved fold and the previous weights it was handed on a failed one: a fold that could not rebalance holds what it held, so its record is finite while its target and its series stay `NaN`. A failed fold with nothing to hold records `NaN` and drifts nothing. ADR 0145.
 *Avoid*: using it for the target weights. Those are the decision, and they live on the optimisation result.
 
 **Held Gap**

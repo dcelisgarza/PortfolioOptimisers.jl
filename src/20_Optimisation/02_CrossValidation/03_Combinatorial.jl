@@ -643,7 +643,7 @@ function fit_and_predict(opt::OptE_TD, rd::ReturnsResult, cv::CombCVER; cols = :
         return fit_and_predict(fold.est, fold.rd; train_idx = fold.train,
                                test_idx = fold.test, cols = cols, wd = wd, hwd = hwd,
                                fa = fa, store_weight_path = store_weight_path,
-                               strict = strict)
+                               strict = strict, w_prev = fold.w_prev)
     end
     return PopulationPredictionResult(; pred = sort_predictions!(cv_res, predictions))
 end

@@ -1355,10 +1355,11 @@ Where:
 # Algorithm
 
  1. On a `nothing` `wd`, delegate to [`calc_net_returns(w::VecNum, X::MatNum, args...)`](@ref), which charges the fee and reads no drift.
- 2. On an [`AbstractWeightDrift`](@ref), compute the position values with [`drift_position_values`](@ref) and the wealth with [`drift_wealth`](@ref).
- 3. Check the wealth with [`assert_positive_wealth`](@ref).
- 4. Read the wealth as a return series with [`drift_returns`](@ref), and subtract the one fee scalar from every observation.
- 5. On a population, run steps 2 to 4 for each member. Fill a ruined member's series with `NaN`, warn once naming every member that fell, and raise when every member fell.
+ 2. On an [`AbstractWeightDrift`](@ref), give a `NaN` series when `w` is not finite: a failed solve has no weights to drift, and its series is `NaN` as the undrifted one is, with no fee charged.
+ 3. Otherwise compute the position values with [`drift_position_values`](@ref) and the wealth with [`drift_wealth`](@ref).
+ 4. Check the wealth with [`assert_positive_wealth`](@ref).
+ 5. Read the wealth as a return series with [`drift_returns`](@ref), and subtract the one fee scalar from every observation.
+ 6. On a population, run steps 2 to 5 for each member. A non-finite member's series is `NaN` and the member is not ruined. Fill a ruined member's series with `NaN`, warn once naming every member that fell, and raise when every member fell.
 
 # Arguments
 
@@ -1371,7 +1372,7 @@ Where:
 
 # Validation
 
-  - The wealth of every observation is positive, else a [`NonPositiveWealthError`](@ref) is raised. On a population, the raise happens only when no member survives.
+  - The wealth of every observation is positive, else a [`NonPositiveWealthError`](@ref) is raised. On a population, the raise happens only when no member survives. A non-finite `w` is not checked: it is a failed solve, and its series is `NaN`.
 
 # Returns
 
@@ -1404,6 +1405,10 @@ function calc_net_returns(w::VecVecNum, X::MatNum, fees, wd::AbstractWeightDrift
     ret = Vector{Vector{Tr}}(undef, length(w))
     ruined = Int[]
     for (i, wi) in pairs(w)
+        if !all(isfinite, wi)
+            ret[i] = fill(convert(Tr, NaN), size(X, 1))
+            continue
+        end
         P = drift_position_values(wd, wi, X)
         V = drift_wealth(P, wi)
         if isnothing(non_positive_wealth_index(V))
@@ -1423,6 +1428,9 @@ function calc_net_returns(w::VecVecNum, X::MatNum, fees, wd::AbstractWeightDrift
 end
 function calc_net_returns(w::VecNum, X::MatNum, fees, wd::AbstractWeightDrift,
                           obs = nothing)
+    if !all(isfinite, w)
+        return fill(convert(promote_type(eltype(X), eltype(w)), NaN), size(X, 1))
+    end
     P = drift_position_values(wd, w, X)
     V = drift_wealth(P, w)
     assert_positive_wealth(V, obs)
@@ -1824,7 +1832,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Records what a fold actually held, so a reader can recover the weight path of that fold.
 
-The record is present on a [`PredictionResult`](@ref) only when a drift ran, and a reader dispatches on its absence rather than testing for it. It stores the asset returns the fold was scored over, the weights held after the last observation, and the Weight Drift that produced them. It stores the weight path itself only when the scheme's `store_weight_path` is `true`; otherwise [`weight_path`](@ref) rebuilds the path from the three stored members on demand.
+The record is present on a [`PredictionResult`](@ref) only when a drift ran, and a reader dispatches on its absence rather than testing for it. It stores the asset returns the fold was scored over, the weights the drift started from, the weights held after the last observation, and the Weight Drift that produced them. It stores the weight path itself only when the scheme's `store_weight_path` is `true`; otherwise [`weight_path`](@ref) rebuilds the path from the stored members on demand.
+
+`w0` is the first row of the path. On a solved fold it is the fold's target weights; on a failed fold under a drift it is the previous weights the fold was handed, because a fold that could not rebalance holds what it held. The record carries it so a rebuild never reads the fold's `res.w`, which is `NaN` on a failed fold.
 
 `wd` records the form that **ran**, not the setting that asked for it. A rebuild that guesses the form is a second answer rather than a rebuild, so the form travels with the numbers it made.
 
@@ -1839,6 +1849,7 @@ $(DocStringExtensions.FIELDS)
     HeldWeightsResult(;
         X::MatNum,
         U::Option{<:MatNum_VecMatNum},
+        w0::VecNum_VecVecNum,
         w::VecNum_VecVecNum,
         wd::AbstractWeightDrift
     ) -> HeldWeightsResult
@@ -1849,7 +1860,7 @@ Keywords correspond to the struct's fields.
 
   - `!isempty(X)`.
   - A stored `U` has the size of `X`, one matrix per member under a population.
-  - `w` has one entry per column of `X`, one vector per member under a population.
+  - `w0` and `w` each have one entry per column of `X`, one vector per member under a population, and `w0` has the shape of `w`.
 
 # Related
 
@@ -1869,6 +1880,10 @@ Keywords correspond to the struct's fields.
     """
     U
     """
+    Weights the drift started from: the first row of the path.
+    """
+    w0
+    """
     $(field_dict[:hw_w])
     """
     w
@@ -1877,15 +1892,18 @@ Keywords correspond to the struct's fields.
     """
     wd
     function HeldWeightsResult(X::MatNum, U::Option{<:MatNum_VecMatNum},
-                               w::VecNum_VecVecNum, wd::AbstractWeightDrift)
+                               w0::VecNum_VecVecNum, w::VecNum_VecVecNum,
+                               wd::AbstractWeightDrift)
         assert_nonempty(X, :X)
         assert_held_weights_shape(U, X, w)
-        return new{typeof(X), typeof(U), typeof(w), typeof(wd)}(X, U, w, wd)
+        assert_held_weights_shape(nothing, X, w0)
+        assert_held_start_shape(w0, w)
+        return new{typeof(X), typeof(U), typeof(w0), typeof(w), typeof(wd)}(X, U, w0, w, wd)
     end
 end
-function HeldWeightsResult(; X::MatNum, U::Option{<:MatNum_VecMatNum}, w::VecNum_VecVecNum,
-                           wd::AbstractWeightDrift)::HeldWeightsResult
-    return HeldWeightsResult(X, U, w, wd)
+function HeldWeightsResult(; X::MatNum, U::Option{<:MatNum_VecMatNum}, w0::VecNum_VecVecNum,
+                           w::VecNum_VecVecNum, wd::AbstractWeightDrift)::HeldWeightsResult
+    return HeldWeightsResult(X, U, w0, w, wd)
 end
 """
     assert_held_weights_shape(U::Nothing, X::MatNum, w::VecNum)
@@ -1943,14 +1961,48 @@ function assert_held_weights_shape(U::VecMatNum, X::MatNum, w::VecVecNum)::Nothi
     return nothing
 end
 """
+    assert_held_start_shape(w0::VecNum, w::VecNum)
+    assert_held_start_shape(w0::VecVecNum, w::VecVecNum)
+
+Check that the start weights of a [`HeldWeightsResult`](@ref) have the shape of its held weights.
+
+A single weight vector starts from a single vector, and a population starts from one vector per member. A pair that mixes the two reaches no method and raises a `MethodError`, which names both shapes.
+
+# Algorithm
+
+ 1. Under a single weight vector, nothing further: [`assert_held_weights_shape`](@ref) already checked each against the columns of `X`.
+ 2. Under a population, check that `w0` has one vector per member of `w`.
+
+# Arguments
+
+  - `w0`: Weights the drift started from.
+  - `w`: Held weights after the last observation.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`HeldWeightsResult`](@ref)
+  - [`assert_held_weights_shape`](@ref)
+"""
+function assert_held_start_shape(::VecNum, ::VecNum)::Nothing
+    return nothing
+end
+function assert_held_start_shape(w0::VecVecNum, w::VecVecNum)::Nothing
+    @argcheck(length(w0) == length(w),
+              DimensionMismatch("`length(w0) == length(w)` must hold.\nlength(w0) => $(length(w0))\nlength(w) => $(length(w))"))
+    return nothing
+end
+"""
     weight_path(hw::Nothing, w::VecNum, X::MatNum)
     weight_path(hw::Nothing, w::VecVecNum, X::MatNum)
-    weight_path(hw::HeldWeightsResult, w::VecNum, args...)
-    weight_path(hw::HeldWeightsResult, w::VecVecNum, args...)
+    weight_path(hw::HeldWeightsResult, w::VecNum_VecVecNum, args...)
 
 Read the weight path of a fold, from the record the fold carries.
 
-A fold that carries no record held its target weights on every one of its observations, so its path is the constant path of `w`. A fold that carries one gives the stored path when `store_weight_path` asked for it, and rebuilds the path from the record's own asset returns and Weight Drift when it did not. The rebuild is bit-identical to the store, because the record carries the form that ran.
+A fold that carries no record held its target weights on every one of its observations, so its path is the constant path of `w`. A fold that carries one gives the stored path when `store_weight_path` asked for it, and rebuilds the path from the record's own start weights, asset returns and Weight Drift when it did not. The rebuild is bit-identical to the store, because the record carries the form that ran and the weights it started from.
 
 # Algorithm
 
@@ -1960,7 +2012,7 @@ A fold that carries no record held its target weights on every one of its observ
 # Arguments
 
   - `hw`: Held-weights record of the fold, or `nothing`.
-  - `w`: Target weights of the fold, which are the first row of the path.
+  - `w`: Target weights of the fold, which are the first row of the path when there is no record. A record carries its own start weights `w0`, so a record ignores this argument: on a failed fold the target is `NaN` and the path is not.
   - `X`: Asset returns of the fold. A record carries its own, so a record ignores this argument.
 
 # Returns
@@ -1980,11 +2032,8 @@ end
 function weight_path(::Nothing, w::VecVecNum, X::MatNum)
     return [repeat(transpose(wi), size(X, 1)) for wi in w]
 end
-function weight_path(hw::HeldWeightsResult, w::VecNum, args...)
-    return rebuild_weight_path(hw.U, hw.wd, w, hw.X)
-end
-function weight_path(hw::HeldWeightsResult, w::VecVecNum, args...)
-    return rebuild_weight_path(hw.U, hw.wd, w, hw.X)
+function weight_path(hw::HeldWeightsResult, ::VecNum_VecVecNum, args...)
+    return rebuild_weight_path(hw.U, hw.wd, hw.w0, hw.X)
 end
 """
     rebuild_weight_path(U::MatNum_VecMatNum, wd::AbstractWeightDrift, w::VecNum_VecVecNum, X::MatNum)
@@ -1998,14 +2047,14 @@ The stored path is read by dispatch on `U`, so [`weight_path`](@ref) tests nothi
 # Algorithm
 
  1. On a stored `U`, return it.
- 2. On `nothing` under a single weight vector, run the drift over `X` and give its path.
- 3. On `nothing` under a population, run the drift member by member, and fill a member whose wealth is not positive with `NaN`. That is what the store holds for such a member, so the rebuild stays bit-identical to it. [`held_weights_result`](@ref) already raised on a population every member of which is ruined, so no record reaching this verb holds one.
+ 2. On `nothing` under a single weight vector, run the drift over `X` and give its path. A non-finite start vector, which is a failed fold with nothing to hold, gives a `NaN` path, as the store would.
+ 3. On `nothing` under a population, run the drift member by member, and fill a member whose wealth is not positive, or whose start vector is not finite, with `NaN`. That is what the store holds for such a member, so the rebuild stays bit-identical to it. [`held_weights_result`](@ref) already raised on a population every member of which is ruined, so no record reaching this verb holds one.
 
 # Arguments
 
   - `U`: Stored weight path, or `nothing`.
   - `wd`: Weight drift that made the record.
-  - `w`: Target weights of the fold.
+  - `w`: Weights the drift started from, `w0` of the record.
   - `X`: Asset returns of the fold.
 
 # Returns
@@ -2022,12 +2071,19 @@ function rebuild_weight_path(U::MatNum_VecMatNum, ::AbstractWeightDrift, ::VecNu
     return U
 end
 function rebuild_weight_path(::Nothing, wd::AbstractWeightDrift, w::VecNum, X::MatNum)
+    if !all(isfinite, w)
+        return fill(convert(promote_type(eltype(X), eltype(w)), NaN), size(X))
+    end
     return weight_path(wd, w, X)
 end
 function rebuild_weight_path(::Nothing, wd::AbstractWeightDrift, w::VecVecNum, X::MatNum)
     Tw = promote_type(eltype(X), eltype(first(w)))
     Us = Vector{Matrix{Tw}}(undef, length(w))
     for (i, wi) in pairs(w)
+        if !all(isfinite, wi)
+            Us[i] = fill(convert(Tw, NaN), size(X))
+            continue
+        end
         P = drift_position_values(wd, wi, X)
         V = drift_wealth(P, wi)
         Us[i] = if isnothing(non_positive_wealth_index(V))
@@ -2079,6 +2135,74 @@ function held_weights_drift(::Nothing, pws::AbstractPreviousWeightsSource)
     return pws.wd
 end
 """
+    nan_held_member(X::MatNum, store_weight_path::Bool, ::Type{Tw})
+
+The `NaN` held weights and, under the flag, the `NaN` weight path of a member that drifted nothing.
+
+A member that failed with nothing to hold, or whose drifted wealth is not positive, records `NaN` at every asset and every observation. The two builders of a [`HeldWeightsResult`](@ref) read this one place for that shape, so the store and the rebuild stay bit-identical.
+
+# Arguments
+
+  - `X`: Asset returns of the fold.
+  - `store_weight_path`: If `true`, give the `NaN` path as well; else `nothing` in its place.
+  - `Tw`: Element type of the record.
+
+# Returns
+
+  - `(w, U)`: The `NaN` held weights, and the `NaN` path or `nothing`.
+
+# Related
+
+  - [`held_weights_member`](@ref)
+  - [`held_weights_result`](@ref)
+"""
+function nan_held_member(X::MatNum, store_weight_path::Bool, ::Type{Tw}) where {Tw}
+    return fill(convert(Tw, NaN), size(X, 2)),
+           store_weight_path ? fill(convert(Tw, NaN), size(X)) : nothing
+end
+"""
+    held_weights_member(wd::AbstractWeightDrift, wi::VecNum, X::MatNum, store_weight_path::Bool, ::Type{Tw})
+
+Drift one member of a population, and say whether the drift ruined it.
+
+# Algorithm
+
+ 1. A non-finite start vector drifts nothing: give [`nan_held_member`](@ref)'s shape and `false`, because a failure is not a ruin.
+ 2. Otherwise drift it. A wealth that is not positive gives the same shape and `true`.
+ 3. A surviving member gives its held weights, its path under the flag, and `false`.
+
+# Arguments
+
+  - `wd`: Weight drift that runs.
+  - `wi`: Start weights of the member.
+  - `X`: Asset returns of the fold.
+  - `store_weight_path`: If `true`, give the path as well; else `nothing` in its place.
+  - `Tw`: Element type of the record.
+
+# Returns
+
+  - `(w, U, ruined)`: The held weights, the path or `nothing`, and whether the member is ruined.
+
+# Related
+
+  - [`held_weights_result`](@ref)
+  - [`nan_held_member`](@ref)
+  - [`non_positive_wealth_index`](@ref)
+"""
+function held_weights_member(wd::AbstractWeightDrift, wi::VecNum, X::MatNum,
+                             store_weight_path::Bool, ::Type{Tw}) where {Tw}
+    if !all(isfinite, wi)
+        return nan_held_member(X, store_weight_path, Tw)..., false
+    end
+    P = drift_position_values(wd, wi, X)
+    V = drift_wealth(P, wi)
+    if !isnothing(non_positive_wealth_index(V))
+        return nan_held_member(X, store_weight_path, Tw)..., true
+    end
+    return drifted_held_weights(P, V),
+           store_weight_path ? drifted_weight_path(P, V, wi) : nothing, false
+end
+"""
     held_weights_result(wd::Nothing, w::VecNum_VecVecNum, X::MatNum, store_weight_path::Bool, obs = nothing)
     held_weights_result(wd::AbstractWeightDrift, w::VecNum, X::MatNum, store_weight_path::Bool, obs = nothing)
     held_weights_result(wd::AbstractWeightDrift, w::VecVecNum, X::MatNum, store_weight_path::Bool, obs = nothing)
@@ -2087,16 +2211,18 @@ Build the [`HeldWeightsResult`](@ref) of a fold, and name the members the drift 
 
 The verb runs the drift once and reads three things off that one pass: the weights held after the last observation, the weight path when the caller asked for it, and the members whose wealth is not positive. A single weight vector is a population of one, so a ruined single vector raises rather than reporting a ruined member.
 
+A non-finite start vector is a fold, or a member, that failed with no previous weights to hold, and it is not ruined: nothing drifts, the record carries `NaN`, and the member keeps the failure code its own optimisation gave it. [`held_start_weights`](@ref) is what hands a failed fold its previous weights instead, when it has any.
+
 # Algorithm
 
  1. With no drift, give `(nothing, nothing)`. The fold held its target weights, so there is nothing to record.
- 2. Over one weight vector, drift it, check the wealth with [`assert_positive_wealth`](@ref), and record the held weights and, under the flag, the path.
- 3. Over a population, drift each member. A ruined member records `NaN` and is named in the second value. Raise when no member survives.
+ 2. Over one weight vector, drift it, check the wealth with [`assert_positive_wealth`](@ref), and record the held weights and, under the flag, the path. A non-finite vector drifts nothing and records `NaN`.
+ 3. Over a population, drift each member. A ruined member records `NaN` and is named in the second value; a non-finite member records `NaN` and is not named. Raise when every member is ruined.
 
 # Arguments
 
   - `wd`: Weight drift that runs, from [`held_weights_drift`](@ref), or `nothing`.
-  - `w`: Target weights of the fold.
+  - `w`: Weights the drift starts from, `w0` of the record: the fold's target weights, or the previous weights a failed fold holds.
   - `X`: Asset returns of the fold.
   - `store_weight_path`: If `true`, store the weight path on the record.
   - `obs`: Observation labels the wealth message names, see [`assert_positive_wealth`](@ref).
@@ -2119,11 +2245,15 @@ function held_weights_result(::Nothing, ::VecNum_VecVecNum, ::MatNum, ::Bool, ar
 end
 function held_weights_result(wd::AbstractWeightDrift, w::VecNum, X::MatNum,
                              store_weight_path::Bool, obs = nothing)
+    if !all(isfinite, w)
+        (wn, U) = nan_held_member(X, store_weight_path, promote_type(eltype(X), eltype(w)))
+        return HeldWeightsResult(X, U, w, wn, wd), nothing
+    end
     P = drift_position_values(wd, w, X)
     V = drift_wealth(P, w)
     assert_positive_wealth(V, obs)
     U = store_weight_path ? drifted_weight_path(P, V, w) : nothing
-    return HeldWeightsResult(X, U, drifted_held_weights(P, V), wd), nothing
+    return HeldWeightsResult(X, U, w, drifted_held_weights(P, V), wd), nothing
 end
 function held_weights_result(wd::AbstractWeightDrift, w::VecVecNum, X::MatNum,
                              store_weight_path::Bool, obs = nothing)
@@ -2132,19 +2262,12 @@ function held_weights_result(wd::AbstractWeightDrift, w::VecVecNum, X::MatNum,
     Us = Vector{Matrix{Tw}}(undef, length(w))
     ruined = Int[]
     for (i, wi) in pairs(w)
-        P = drift_position_values(wd, wi, X)
-        V = drift_wealth(P, wi)
-        if isnothing(non_positive_wealth_index(V))
-            ws[i] = drifted_held_weights(P, V)
-            if store_weight_path
-                Us[i] = drifted_weight_path(P, V, wi)
-            end
-        else
+        (ws[i], Ui, dead) = held_weights_member(wd, wi, X, store_weight_path, Tw)
+        if dead
             push!(ruined, i)
-            ws[i] = fill(convert(Tw, NaN), size(X, 2))
-            if store_weight_path
-                Us[i] = fill(convert(Tw, NaN), size(X))
-            end
+        end
+        if !isnothing(Ui)
+            Us[i] = Ui
         end
     end
     if length(ruined) == length(w)
@@ -2152,7 +2275,7 @@ function held_weights_result(wd::AbstractWeightDrift, w::VecVecNum, X::MatNum,
                                             first(w)), obs, first(ruined))
     end
     U = store_weight_path ? Us : nothing
-    return HeldWeightsResult(X, U, ws, wd), ruined
+    return HeldWeightsResult(X, U, w, ws, wd), ruined
 end
 """
     drift_observations(ts::Nothing, test_idx)
@@ -2256,6 +2379,7 @@ end
 function expand_held_weights(imsk::BitVector, hw::HeldWeightsResult)
     return HeldWeightsResult(; X = expand_investable_columns(imsk, hw.X),
                              U = expand_held_member(imsk, hw.U),
+                             w0 = expand_held_member(imsk, hw.w0),
                              w = expand_held_member(imsk, hw.w), wd = hw.wd)
 end
 """

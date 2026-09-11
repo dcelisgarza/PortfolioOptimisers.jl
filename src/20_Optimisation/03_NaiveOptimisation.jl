@@ -11,6 +11,7 @@ Naive optimisers compute portfolio weights directly from statistical properties 
   - [`InverseVolatility`](@ref)
   - [`EqualWeighted`](@ref)
   - [`RandomWeighted`](@ref)
+  - [`PreviousWeights`](@ref)
 """
 abstract type NaiveOptimisationEstimator <: NonFiniteAllocationOptimisationEstimator end
 """
@@ -888,4 +889,175 @@ function optimise(rw::RandomWeighted{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, N
     return _optimise(rw, rd; dims = dims, kwargs...)
 end
 
-export NaiveOptimisationResult, InverseVolatility, EqualWeighted, RandomWeighted
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Holds the weights it was handed, and solves nothing.
+
+The hold-only head. Its weights are the previous fold's, threaded into `w` by the fold loop through [`factory`](@ref) exactly as they reach a [`TurnoverEstimator`](@ref), and it returns them verbatim on the full asset universe: no prior, no Coverage Universe, no weight bounds, so a hold is never rewritten. Its one use is as the fallback `fb` of an optimiser inside a walk-forward — the reference's `fallback = "previous_weights"` — where a failed solve then holds the book instead of writing `NaN` weights and losing the fold; a weight on an asset that left the panel is still held, and its returns are zeroed as a Held Gap. It is also a primary: `PreviousWeights(; w = w)` is a walk-forward that holds `w` on every fold. It refuses nothing at construction and fails at solve time when `w` is `nothing`, which is what fold 1 of a walk-forward, and a fold-less `optimise` with no `w`, hand it.
+
+`needs_previous_weights` is `true`, so an optimiser that carries it as a fallback runs sequentially, and the loop threads the previous weights into it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    PreviousWeights(; w::Option{<:VecNum} = nothing, fb::TDO_Option{<:OptE_Opt} = nothing) -> PreviousWeights
+
+Keywords correspond to the struct's fields. `fb` may hold a [`TimeDependent`](@ref) per-fold schedule.
+
+## Validation
+
+  - `w`: `all(isfinite, w)`, else a `DomainError` is raised.
+  - `fb` schedules: `bind !== :nearest`.
+
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `fb`: Recursively updated via [`factory`](@ref).
+
+# Examples
+
+```jldoctest
+julia> PreviousWeights()
+PreviousWeights
+   w ┼ nothing
+  fb ┴ nothing
+```
+
+# Related
+
+  - [`optimise`](@ref)
+  - [`factory(pw::PreviousWeights, w::VecNum)`](@ref)
+  - [`NaiveOptimisationResult`](@ref)
+  - [`NaiveOptimisationEstimator`](@ref)
+  - [`needs_previous_weights`](@ref)
+  - [`TurnoverEstimator`](@ref): Receives the previous weights through the same [`factory`](@ref) pass.
+  - [`fold_loop`](@ref): Threads the previous fold's weights into `w`.
+"""
+@propagatable @concrete struct PreviousWeights <: NaiveOptimisationEstimator
+    """
+    Weights to hold, or `nothing` before the fold loop threads any.
+    """
+    w
+    """
+    $(field_dict[:fb])
+    """
+    @fprop fb
+    function PreviousWeights(w::Option{<:VecNum}, fb::TDO_Option{<:OptE_Opt})
+        assert_no_nearest_bind_optimiser_schedule(fb, :fb, :PreviousWeights)
+        if !isnothing(w)
+            assert_finite(w, :w)
+        end
+        assert_time_dependent_substitution(PreviousWeights, (; w, fb),
+                                           naive_optimiser_td_defaults())
+        return new{typeof(w), typeof(fb)}(w, fb)
+    end
+end
+function PreviousWeights(; w::Option{<:VecNum} = nothing,
+                         fb::TDO_Option{<:OptE_Opt} = nothing)::PreviousWeights
+    return PreviousWeights(w, fb)
+end
+function needs_previous_weights(::PreviousWeights)
+    return true
+end
+"""
+    factory(pw::PreviousWeights, w::VecNum) -> PreviousWeights
+
+Thread the previous fold's weights into the hold-only head, and on into its fallback.
+
+# Arguments
+
+  - `pw`: The head.
+  - `w`: The weights the fold loop threads.
+
+# Returns
+
+  - `PreviousWeights`: The head holding `w`, with `fb` propagated through [`factory`](@ref).
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.factory(PreviousWeights(), [0.25, 0.75])
+PreviousWeights
+   w ┼ Vector{Float64}: [0.25, 0.75]
+  fb ┴ nothing
+```
+
+# Related
+
+  - [`PreviousWeights`](@ref)
+  - [`factory`](@ref)
+  - [`fold_loop`](@ref)
+"""
+function factory(pw::PreviousWeights, w::VecNum)::PreviousWeights
+    return PreviousWeights(; w = w, fb = factory(pw.fb, w))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the held weights as a result, or a failure when there are none.
+
+Internal dispatch called by [`optimise`](@ref). The head reads nothing off `rd` but its width: the weights are returned verbatim, on the universe they were threaded on, with `imsk = nothing` and no weight bounds. A head whose `w` is `nothing` answers an [`OptimisationFailure`](@ref) naming the missing weights, so a fallback chain that reaches it walks on, and its weights are a `NaN` vector of the carrier's width — what every failed solve carries, so a fold reads the failure as it reads any other — or `nothing` when the carrier has no returns to take a width from.
+
+# Algorithm
+
+ 1. With `w` set, give a [`NaiveOptimisationResult`](@ref) carrying `w` and an [`OptimisationSuccess`](@ref).
+ 2. With `w` unset, give one carrying an [`OptimisationFailure`](@ref) and `NaN` weights, one per column of `rd.X`, or `nothing` when `rd.X` is `nothing`.
+
+# Related
+
+  - [`PreviousWeights`](@ref)
+  - [`optimise`](@ref)
+  - [`_optimise`](@ref)
+"""
+function _optimise(pw::PreviousWeights, rd::ReturnsResult = ReturnsResult(); kwargs...)
+    pw = reset_time_dependent_estimator(pw)
+    (retcode, w) = if isnothing(pw.w)
+        (OptimisationFailure(;
+                             res = "`PreviousWeights` holds no weights: `w` is `nothing`. The fold loop threads the previous fold's weights into it from fold 2 on, so fold 1 of a walk-forward, and a fold-less `optimise`, must set `w` themselves."),
+         failed_hold_weights(rd.X))
+    else
+        (OptimisationSuccess(), pw.w)
+    end
+    return NaiveOptimisationResult(; pr = rd, wb = nothing, retcode = retcode, w = w,
+                                   fb = nothing)
+end
+"""
+    failed_hold_weights(X::Nothing)
+    failed_hold_weights(X::MatNum)
+
+The weights a [`PreviousWeights`](@ref) with nothing to hold answers: `NaN` at every asset of the carrier, or `nothing` when the carrier has no returns to take a width from.
+
+# Related
+
+  - [`PreviousWeights`](@ref)
+  - [`_optimise(pw::PreviousWeights, rd::ReturnsResult = ReturnsResult(); kwargs...)`](@ref)
+"""
+function failed_hold_weights(::Nothing)
+    return nothing
+end
+function failed_hold_weights(X::MatNum)
+    return fill(convert(eltype(X), NaN), size(X, 2))
+end
+"""
+    optimise(pw::PreviousWeights{<:Any, Nothing}, rd::ReturnsResult = ReturnsResult();
+             kwargs...) -> NaiveOptimisationResult
+
+Hold the weights the head carries.
+
+# Arguments
+
+  - `pw`: The hold-only head.
+  - $(arg_dict[:rd]) Read for nothing, and recorded on the result as `pr`.
+  - `kwargs`: Additional keyword arguments, ignored.
+"""
+function optimise(pw::PreviousWeights{<:Any, Nothing}, rd::ReturnsResult = ReturnsResult();
+                  kwargs...)::NaiveOptimisationResult
+    return _optimise(pw, rd; kwargs...)
+end
+export NaiveOptimisationResult, InverseVolatility, EqualWeighted, RandomWeighted,
+       PreviousWeights

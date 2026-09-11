@@ -23,6 +23,12 @@ RandomWeighted
 _optimise(rw::RandomWeighted, rd::ReturnsResult)
 optimise(rw::RandomWeighted{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
                   rd::ReturnsResult; dims::Int = 1, kwargs...)
+PreviousWeights
+factory(pw::PreviousWeights, w::VecNum)
+_optimise(pw::PreviousWeights, rd::ReturnsResult = ReturnsResult(); kwargs...)
+failed_hold_weights
+optimise(pw::PreviousWeights{<:Any, Nothing}, rd::ReturnsResult = ReturnsResult();
+             kwargs...)
 ```
 
 ## References

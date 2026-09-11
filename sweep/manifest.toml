@@ -228,7 +228,7 @@
 "src/14_UncertaintySets/10_CompactRadiusRules.jl" = { map = 7, units = 6, swept = false }
 "src/15_Turnover.jl" = { map = 8, units = 15, algorithm = 8, swept = true }
 "src/16_Fees.jl" = { map = 8, units = 35, algorithm = 24, swept = false }
-"src/17_NetReturnsDrawdowns.jl" = { map = 8, units = 45, algorithm = 9, swept = false }
+"src/17_NetReturnsDrawdowns.jl" = { map = 8, units = 48, algorithm = 11, swept = false }
 "src/18_Tracking.jl" = { map = 8, units = 14, algorithm = 4, swept = true }
 "src/19_RiskMeasures/01_Base_RiskMeasures.jl" = { map = 9, units = 89, swept = false }
 "src/19_RiskMeasures/02_Variance.jl" = { map = 9, units = 24, swept = false }
@@ -260,7 +260,7 @@
 "src/19_RiskMeasures/27_ExpectedRisk.jl" = { map = 9, units = 22, swept = false }
 "src/19_RiskMeasures/28_RiskMeasureTools.jl" = { map = 9, units = 7, swept = false }
 "src/20_Optimisation/01_Base_Optimisation.jl" = { map = 10, units = 120, swept = false }
-"src/20_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl" = { map = 12, units = 62, swept = false }
+"src/20_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl" = { map = 12, units = 67, swept = false }
 "src/20_Optimisation/02_CrossValidation/02_KFold.jl" = { map = 12, units = 4, swept = false }
 "src/20_Optimisation/02_CrossValidation/03_Combinatorial.jl" = { map = 12, units = 12, swept = false }
 "src/20_Optimisation/02_CrossValidation/04_WalkForward.jl" = { map = 12, units = 25, swept = false }
@@ -272,7 +272,7 @@
 "src/20_Optimisation/02_CrossValidation/10_GridSearchCrossValidation.jl" = { map = 12, units = 3, swept = false }
 "src/20_Optimisation/02_CrossValidation/11_RandomisedSearchCrossValidation.jl" = { map = 12, units = 2, swept = false }
 "src/20_Optimisation/02_CrossValidation/12_OnlineFoldLoop.jl" = { map = 12, units = 4, swept = false }
-"src/20_Optimisation/03_NaiveOptimisation.jl" = { map = 10, units = 19, swept = false }
+"src/20_Optimisation/03_NaiveOptimisation.jl" = { map = 10, units = 24, swept = false }
 "src/20_Optimisation/04_Base_ClusteringOptimisation.jl" = { map = 10, units = 16, swept = false }
 "src/20_Optimisation/05_HierarchicalRiskParity.jl" = { map = 10, units = 9, swept = false }
 "src/20_Optimisation/06_SchurComplementHierarchicalRiskParity.jl" = { map = 10, units = 23, swept = false }

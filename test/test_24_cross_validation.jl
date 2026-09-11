@@ -1578,21 +1578,31 @@
             X24 = [0.01 0.02; -0.01 0.03]
             w24 = [0.5, 0.5]
             U24 = [0.5 0.5; 0.4 0.6]
-            @test isa(HeldWeightsResult(; X = X24, U = nothing, w = w24, wd = sfd),
-                      HeldWeightsResult)
-            @test isa(HeldWeightsResult(; X = X24, U = U24, w = w24, wd = sfd),
-                      HeldWeightsResult)
-            @test isa(HeldWeightsResult(; X = X24, U = [U24, U24], w = [w24, w24],
+            @test isa(HeldWeightsResult(; X = X24, U = nothing, w0 = w24, w = w24,
                                         wd = sfd), HeldWeightsResult)
+            @test isa(HeldWeightsResult(; X = X24, U = U24, w0 = w24, w = w24, wd = sfd),
+                      HeldWeightsResult)
+            @test isa(HeldWeightsResult(; X = X24, U = [U24, U24], w0 = [w24, w24],
+                                        w = [w24, w24], wd = sfd), HeldWeightsResult)
             @test_throws DimensionMismatch HeldWeightsResult(; X = X24, U = nothing,
-                                                             w = [0.5], wd = sfd)
+                                                             w0 = w24, w = [0.5], wd = sfd)
             @test_throws DimensionMismatch HeldWeightsResult(; X = X24, U = U24[1:1, :],
-                                                             w = w24, wd = sfd)
+                                                             w0 = w24, w = w24, wd = sfd)
             @test_throws DimensionMismatch HeldWeightsResult(; X = X24, U = [U24],
+                                                             w0 = [w24, w24],
                                                              w = [w24, w24], wd = sfd)
             @test_throws IsEmptyError HeldWeightsResult(; X = Matrix{Float64}(undef, 0, 0),
-                                                        U = nothing, w = Float64[],
-                                                        wd = sfd)
+                                                        U = nothing, w0 = Float64[],
+                                                        w = Float64[], wd = sfd)
+            # The start weights have the shape of the held weights: one vector per column
+            # of `X`, and one per member under a population.
+            @test_throws DimensionMismatch HeldWeightsResult(; X = X24, U = nothing,
+                                                             w0 = [0.5], w = w24, wd = sfd)
+            @test_throws DimensionMismatch HeldWeightsResult(; X = X24, U = nothing,
+                                                             w0 = [w24], w = [w24, w24],
+                                                             wd = sfd)
+            @test_throws MethodError HeldWeightsResult(; X = X24, U = nothing, w0 = w24,
+                                                       w = [w24, w24], wd = sfd)
         end
         @testset "weight_path reads a record, or gives the constant path" begin
             X24 = [0.01 0.02; -0.01 0.03]
@@ -1608,6 +1618,10 @@
             @test PO.weight_path(hw24, w24) == hws24.U
             @test PO.weight_path(hw24, w24) == PO.weight_path(sfd, w24, X24)
             @test hw24.w == PO.held_weights(sfd, w24, X24)
+            # A record rebuilds from the start weights it carries, never from the target a
+            # reader passes: on a failed fold the target is `NaN` and the path is not.
+            @test hw24.w0 === w24
+            @test PO.weight_path(hw24, fill(NaN, 2)) == PO.weight_path(sfd, w24, X24)
             @test PO.held_weights_result(nothing, w24, X24, true) == (nothing, nothing)
             (hwp24, _) = PO.held_weights_result(sfd, [w24, w24], X24, true)
             @test PO.weight_path(hwp24, [w24, w24]) === hwp24.U
@@ -1891,6 +1905,169 @@
                 e
             end
             @test occursin("row 2 of the window", err_win.msg)
+        end
+    end
+    @testset "A failed fold holds (#1021)" begin
+        # The reference's online loop leaves its previous weights where they were on a failed
+        # step, so the next step reads the last successful ones; its batch loop threads the
+        # failed step's `NaN`. Here both arms thread the last threadable fold, a failed fold
+        # under a drift holds the weights it was handed, and `PreviousWeights` is the
+        # reference's `fallback = "previous_weights"`.
+        PO = PortfolioOptimisers
+        N = size(rd.X, 2)
+        ok = WeightBounds(; lb = zeros(N), ub = ones(N))
+        # `N` assets at a floor of one half cannot sum to one: the fold is infeasible.
+        bad = WeightBounds(; lb = fill(0.5, N), ub = ones(N))
+        sets = UniverseSets(; dict = Dict("nx" => rd.nx))
+        tn = TurnoverEstimator(; val = 0.05, w = fill(inv(N), N))
+        sfd = SelfFinancingDrift()
+        dw = DriftedWeights()
+        cv = IndexWalkForward(250, 250)
+        cvd = IndexWalkForward(250, 250; wd = sfd, pws = dw)
+        cvw = IndexWalkForward(250, 250; wd = sfd, store_weight_path = true)
+        n = n_splits(cv, rd)
+        @test n >= 3
+        sched(k) = TimeDependent([i in k ? bad : ok for i in 1:n])
+        function mk(k; fb = nothing)
+            return MeanRisk(;
+                            opt = JuMPOptimiser(; slv = slv, tn = tn, wb = sched(k),
+                                                sets = sets), fb = fb)
+        end
+        threaded(p) = p.res.jr.pa.tn.w
+        @testset "batch, no drift: the fold after a failure reads the last solved fold" begin
+            res = cross_val_predict(mk(2), rd, cv)
+            p1, p2, p3 = res.pred[1], res.pred[2], res.pred[3]
+            @test isa(p1.res.retcode, OptimisationSuccess)
+            @test isa(p2.res.retcode, OptimisationFailure)
+            @test all(isnan, p2.res.w)
+            @test all(isnan, p2.rd.X)
+            @test isnothing(p2.hw)
+            # Fold 3 solved, and was charged turnover against fold 1's weights, not `NaN`.
+            @test isa(p3.res.retcode, OptimisationSuccess)
+            @test threaded(p3) == p1.res.w
+            # Two failures in a row still read fold 1.
+            res2 = cross_val_predict(mk((2, 3)), rd, cv)
+            @test all(p -> isa(p.res.retcode, OptimisationFailure), res2.pred[2:3])
+            if n >= 4
+                @test threaded(res2.pred[4]) == res2.pred[1].res.w
+            end
+            # A failure at fold 1 threads nothing: fold 2 reads the estimator's own `w`.
+            res1 = cross_val_predict(mk(1), rd, cv)
+            @test isa(res1.pred[1].res.retcode, OptimisationFailure)
+            @test threaded(res1.pred[2]) == tn.w
+            @test threaded(res1.pred[3]) == res1.pred[2].res.w
+        end
+        @testset "under a source, a failed fold drifts the held book and is read" begin
+            res = cross_val_predict(mk(2), rd, cvd)
+            p1, p2, p3 = res.pred[1], res.pred[2], res.pred[3]
+            @test isa(p2.res.retcode, OptimisationFailure)
+            @test all(isnan, p2.res.w)
+            @test all(isnan, p2.rd.X)
+            # The drift started from the weights fold 1 held, and ran through fold 2's
+            # window: the record is finite, and it is what the source threads.
+            @test p2.hw.w0 == p1.hw.w
+            @test all(isfinite, p2.hw.w)
+            @test p2.hw.w == PO.held_weights(sfd, p1.hw.w, p2.hw.X)
+            @test PO.threads_weights(dw, p2)
+            @test !PO.threads_weights(nothing, p2)
+            @test threaded(p3) == p2.hw.w
+            # The path rebuilds from the start weights, so a reader of the failed fold gets
+            # the fund's book, not `NaN`.
+            @test PO.weight_path(p2.hw, p2.res.w) == PO.weight_path(sfd, p1.hw.w, p2.hw.X)
+            @test all(isfinite, PO.calc_net_asset_returns(p2))
+            # Fold 1 failing has nothing to hold: a `NaN` record, no throw, and the next
+            # fold reads the estimator's own `w`.
+            res1 = cross_val_predict(mk(1), rd, cvd)
+            @test all(isnan, res1.pred[1].hw.w0)
+            @test all(isnan, res1.pred[1].hw.w)
+            @test !PO.threads_weights(dw, res1.pred[1])
+            @test threaded(res1.pred[2]) == tn.w
+        end
+        @testset "under a drift alone, a failed fold holds the last target" begin
+            res = cross_val_predict(mk(2), rd, cvw)
+            p1, p2, p3 = res.pred[1], res.pred[2], res.pred[3]
+            @test isa(p2.res.retcode, OptimisationFailure)
+            @test p2.hw.w0 == p1.res.w
+            @test all(isfinite, p2.hw.U)
+            @test p2.hw.w == PO.held_weights(sfd, p1.res.w, p2.hw.X)
+            # No source, so the target read skips the failed fold and reads fold 1, and the
+            # solve is the one the undrifted run made: a drift moves no target.
+            @test threaded(p3) == p1.res.w
+            @test p3.res.w == cross_val_predict(mk(2), rd, cv).pred[3].res.w
+        end
+        @testset "PreviousWeights is the reference's previous-weights fallback" begin
+            @test PO.needs_previous_weights(PreviousWeights())
+            @test PO.needs_previous_weights(mk(()))
+            @test PO.needs_previous_weights(MeanRisk(; opt = JuMPOptimiser(; slv = slv),
+                                                     fb = PreviousWeights()))
+            # A hold-only head returns its weights verbatim, and fails with none.
+            @test optimise(PreviousWeights(; w = [0.25, 0.75])).w == [0.25, 0.75]
+            @test optimise(PreviousWeights(; w = [0.25, 0.75]), rd).w == [0.25, 0.75]
+            none = optimise(PreviousWeights())
+            @test isa(none.retcode, OptimisationFailure)
+            @test occursin("`w` is `nothing`", none.retcode.res)
+            @test isnothing(none.w)
+            @test_throws DomainError PreviousWeights(; w = [NaN, 1.0])
+            # The factory fills the slot and recurses into the fallback.
+            pw = PO.factory(PreviousWeights(; fb = PreviousWeights()), [0.25, 0.75])
+            @test pw.w == [0.25, 0.75]
+            @test pw.fb.w == [0.25, 0.75]
+            # Its online step is the identity.
+            @test PO.partial_fit!(pw, rd) === pw
+            # As a fallback in a walk-forward, the failed fold holds the threaded weights and
+            # becomes a success, so the fold after it reads it.
+            res = cross_val_predict(mk(2; fb = PreviousWeights()), rd, cvd)
+            p1, p2, p3 = res.pred[1], res.pred[2], res.pred[3]
+            @test isa(p2.res.retcode, OptimisationSuccess)
+            @test isa(p2.res, NaiveOptimisationResult)
+            @test p2.res.w == p1.hw.w
+            @test all(isfinite, p2.rd.X)
+            @test PO.threads_weights(nothing, p2)
+            @test threaded(p3) == p2.hw.w
+            # With no drift the target read threads fold 1's target through the hold.
+            resn = cross_val_predict(mk(2; fb = PreviousWeights()), rd, cv)
+            @test resn.pred[2].res.w == resn.pred[1].res.w
+            @test threaded(resn.pred[3]) == resn.pred[1].res.w
+            # Fold 1 has nothing to hold, so the fallback fails too and the fold is `NaN`,
+            # on the carrier's width, as any failed solve is.
+            res1 = cross_val_predict(mk(1; fb = PreviousWeights()), rd, cvd)
+            @test isa(res1.pred[1].res.retcode, OptimisationFailure)
+            @test isa(res1.pred[1].res, NaiveOptimisationResult)
+            @test length(res1.pred[1].res.w) == N && all(isnan, res1.pred[1].res.w)
+            @test all(isnan, res1.pred[1].hw.w)
+            @test threaded(res1.pred[2]) == tn.w
+        end
+        @testset "held_start_weights, member by member" begin
+            ok_rc = OptimisationSuccess()
+            bad_rc = OptimisationFailure()
+            w = [0.5, 0.5]
+            wn = [NaN, NaN]
+            wp = [0.3, 0.7]
+            @test PO.held_start_weights(ok_rc, w, wp) === w
+            @test PO.held_start_weights(ok_rc, w, nothing) === w
+            @test PO.held_start_weights(bad_rc, wn, wp) === wp
+            @test PO.held_start_weights(bad_rc, wn, nothing) === wn
+            rcs = PO.OptimisationReturnCode[ok_rc, bad_rc]
+            @test isequal(PO.held_start_weights(rcs, [w, wn], nothing), [w, wn])
+            @test PO.held_start_weights(rcs, [w, wn], wp) == [w, wp]
+            @test PO.held_start_weights(rcs, [w, wn], [wp, w]) == [w, w]
+            @test_throws DimensionMismatch PO.held_start_weights(rcs, [w, wn], [wp])
+            # A non-finite start drifts nothing and is not ruined, alone or as a member.
+            X24 = [0.01 0.02; -0.01 0.03]
+            (hw, ruined) = PO.held_weights_result(sfd, wn, X24, true)
+            @test isnothing(ruined)
+            @test all(isnan, hw.w) && all(isnan, hw.U) && hw.w0 === wn
+            (hwl, _) = PO.held_weights_result(sfd, wn, X24, false)
+            @test all(isnan, PO.weight_path(hwl, wn))
+            (hwp, ruinedp) = PO.held_weights_result(sfd, [w, wn], X24, true)
+            @test isempty(ruinedp)
+            @test all(isfinite, hwp.w[1]) && all(isnan, hwp.w[2])
+            (hwpl, _) = PO.held_weights_result(sfd, [w, wn], X24, false)
+            @test isequal(PO.weight_path(hwpl, [w, wn]), hwp.U)
+            # And the drifted series of a `NaN` vector is `NaN`, not a raise.
+            @test all(isnan, PO.calc_net_returns(wn, X24, nothing, sfd))
+            @test all(isnan, PO.calc_net_returns([w, wn], X24, nothing, sfd)[2])
+            @test all(isfinite, PO.calc_net_returns([w, wn], X24, nothing, sfd)[1])
         end
     end
 end

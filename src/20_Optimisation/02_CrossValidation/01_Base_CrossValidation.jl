@@ -672,6 +672,8 @@ Read the weights a fold threads into the fold that follows it.
 
 This is the one seam of the Previous-Weights Source. The first fold of a run has no fold behind it, so it threads nothing whatever the source is. A later fold threads the target weights of the previous fold by default, and the weights that fold **held** after its last observation when the source asks for them.
 
+`prev` is the last fold whose weights this seam can thread, not always the fold before: the sequential loops advance it only when [`threads_weights`](@ref) holds of a fold, so a fold whose solve failed is skipped over by the target read and the fold before it is read instead. The weights this seam gives are therefore finite whenever it gives any.
+
 # Algorithm
 
  1. With no previous fold, give `nothing`.
@@ -681,7 +683,7 @@ This is the one seam of the Previous-Weights Source. The first fold of a run has
 # Arguments
 
   - `pws`: Previous-weights source of the scheme, or `nothing`.
-  - `prev`: Prediction result of the previous fold, or `nothing`.
+  - `prev`: Prediction result of the last threadable fold, or `nothing`.
 
 # Returns
 
@@ -691,6 +693,7 @@ This is the one seam of the Previous-Weights Source. The first fold of a run has
 
   - [`AbstractPreviousWeightsSource`](@ref)
   - [`DriftedWeights`](@ref)
+  - [`threads_weights`](@ref)
   - [`fold_loop`](@ref)
   - [`HeldWeightsResult`](@ref)
 """
@@ -702,6 +705,75 @@ function previous_weights(::Nothing, prev::PredictionResult)
 end
 function previous_weights(::AbstractPreviousWeightsSource, prev::PredictionResult)
     return prev.hw.w
+end
+"""
+    threads_weights(pws::Nothing, pred::PredictionResult)
+    threads_weights(pws::AbstractPreviousWeightsSource, pred::PredictionResult)
+
+Say whether a fold's prediction carries weights the next fold can be handed.
+
+The other half of the Previous-Weights Source seam: [`previous_weights`](@ref) reads the weights, and this verb says whether the fold has any to read. The sequential loops, [`run_folds`](@ref) and [`online_folds`](@ref), advance the fold they hand on only when it holds, so a failed fold is never the one read and the last threadable fold is read instead — the reference's online loop, which leaves its previous weights where they were on a failed step. What is read decides what is tested: the target weights are finite exactly when every member's return code is an [`OptimisationSuccess`](@ref), and the held weights are finite when the drift ran, which after [`held_start_weights`](@ref) it does on a failed fold too, so a source advances past a failed fold that held its book and stops only at one with nothing to hold.
+
+# Algorithm
+
+ 1. With no source, hold when the fold's return code is a success, every member's under a population.
+ 2. With a source, hold when the fold's held weights are all finite, every member's under a population.
+
+# Arguments
+
+  - `pws`: Previous-weights source of the scheme, or `nothing`.
+  - `pred`: Prediction result of the fold.
+
+# Returns
+
+  - `Bool`: Whether the fold's weights can be threaded.
+
+# Related
+
+  - [`previous_weights`](@ref)
+  - [`held_start_weights`](@ref)
+  - [`run_folds`](@ref)
+  - [`online_folds`](@ref)
+  - [`PreviousWeights`](@ref): The fallback that turns a failed fold into a threadable one.
+"""
+function threads_weights(::Nothing, pred::PredictionResult)
+    return fold_solved(pred.res.retcode)
+end
+function threads_weights(::AbstractPreviousWeightsSource, pred::PredictionResult)
+    return all(w -> all(isfinite, w), held_weight_members(pred.hw.w))
+end
+"""
+    fold_solved(retcode::OptimisationReturnCode)
+    fold_solved(retcode::VecOptRetCode)
+
+Say whether a fold's return code, or every member's under a population, is an [`OptimisationSuccess`](@ref).
+
+# Related
+
+  - [`threads_weights`](@ref)
+  - [`OptimisationSuccess`](@ref)
+"""
+function fold_solved(retcode::OptimisationReturnCode)
+    return isa(retcode, OptimisationSuccess)
+end
+function fold_solved(retcode::VecOptRetCode)
+    return all(fold_solved, retcode)
+end
+"""
+    held_weight_members(w::VecNum)
+    held_weight_members(w::VecVecNum)
+
+Iterate the held weights of a fold one member at a time: a single vector is a population of one.
+
+# Related
+
+  - [`threads_weights`](@ref)
+"""
+function held_weight_members(w::VecNum)
+    return (w,)
+end
+function held_weight_members(w::VecVecNum)
+    return w
 end
 """
     VecPredRes = AbstractVector{<:PredictionResult}
@@ -1457,6 +1529,66 @@ function reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsR
                                    B = B, ts = rd.ts, iv = iv, ivpa = ivpa)
 end
 """
+    held_start_weights(retcode::OptimisationSuccess, w::VecNum, w_prev)
+    held_start_weights(retcode::OptimisationFailure, w::VecNum, w_prev::Nothing)
+    held_start_weights(retcode::OptimisationFailure, w::VecNum, w_prev::VecNum)
+    held_start_weights(retcode::VecOptRetCode, w::VecVecNum, w_prev::Nothing)
+    held_start_weights(retcode::VecOptRetCode, w::VecVecNum, w_prev::VecNum)
+    held_start_weights(retcode::VecOptRetCode, w::VecVecNum, w_prev::VecVecNum)
+
+Name the weights a fold's drift starts from: its own on a solved fold, the previous weights on a failed one.
+
+A fold that could not rebalance holds what it held, so under a Weight Drift or a Previous-Weights Source a failed fold drifts the weights it was handed rather than its `NaN` target. The choice is by return code, read per member under a population, and the previous weights are one vector for every member or one per member. A failed fold with no previous weights keeps its `NaN` weights, and [`held_weights_result`](@ref) records `NaN` for it without drifting.
+
+# Algorithm
+
+ 1. On an [`OptimisationSuccess`](@ref), give `w`.
+ 2. On an [`OptimisationFailure`](@ref) over one vector, give `w_prev`, or `w` when there is none.
+ 3. Over a population, give, for each member, its own vector on a success and the previous weights on a failure: the one vector when `w_prev` is one, its own entry when `w_prev` is one per member.
+
+# Arguments
+
+  - `retcode`: Return code of the fold, or one per member of the population.
+  - `w`: Target weights of the fold, on the universe the fold is scored on.
+  - `w_prev`: Previous weights the fold was handed, on the same universe, or `nothing`.
+
+# Validation
+
+  - A per-member `w_prev` has one entry per member of `w`, else a `DimensionMismatch` is raised.
+
+# Returns
+
+  - `VecNum_VecVecNum`: The start weights, `w0` of the fold's [`HeldWeightsResult`](@ref).
+
+# Related
+
+  - [`held_weights_result`](@ref)
+  - [`HeldWeightsResult`](@ref)
+  - [`previous_weights`](@ref)
+  - [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref)
+"""
+function held_start_weights(::OptimisationSuccess, w::VecNum, ::Any)
+    return w
+end
+function held_start_weights(::OptimisationFailure, w::VecNum, ::Nothing)
+    return w
+end
+function held_start_weights(::OptimisationFailure, ::VecNum, w_prev::VecNum)
+    return w_prev
+end
+function held_start_weights(::VecOptRetCode, w::VecVecNum, ::Nothing)
+    return w
+end
+function held_start_weights(retcode::VecOptRetCode, w::VecVecNum, w_prev::VecNum)
+    return held_start_weights(retcode, w, fill(w_prev, length(w)))
+end
+function held_start_weights(retcode::VecOptRetCode, w::VecVecNum, w_prev::VecVecNum)
+    @argcheck(length(w_prev) == length(w),
+              DimensionMismatch("`length(w_prev) == length(w)` must hold.\nlength(w_prev) => $(length(w_prev))\nlength(w) => $(length(w))"))
+    return [isa(rc, OptimisationSuccess) ? wi : wp
+            for (rc, wi, wp) in zip(retcode, w, w_prev)]
+end
+"""
     predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)
     predict(res, rd, test_idx, cols = :)
     predict(res, rd, test_idxs::VecVecInt, cols = :)
@@ -1505,6 +1637,16 @@ it. The identity a fold's series satisfies, with the fee taken over the whole we
 returns[t] == sum_i w_i * (isfinite(X[t, i]) ? X[t, i] : 0) - fee
 ```
 
+## A failed fold holds
+
+A fold whose solve failed carries `NaN` weights, and its series is `NaN`: no fee is charged and
+the identity above holds of `NaN`. Under a drift the fold still held something, and
+[`held_start_weights`](@ref) says what: the previous weights it was handed through `w_prev`, member
+by member under a population, so the Held Weights record drifts them through the window and the
+next fold reads the book the fund carried. With no `w_prev` — fold 1, or a scheme whose folds are
+not a timeline — the record is `NaN` and nothing throws. `res.w` and `rd.X` stay `NaN` either way,
+so a scorer still sees the failure.
+
 # Arguments
 
   - `res::NonFiniteAllocationOptimisationResult`: Fitted optimisation result.
@@ -1516,6 +1658,7 @@ returns[t] == sum_i w_i * (isfinite(X[t, i]) ? X[t, i] : 0) - fee
 
   - `fa::Option{<:AbstractFeeAmortisation} = nothing`: The clock the series charges the two fixed fee terms on, or `nothing` to inherit the clock the fee itself states.
   - `strict::Bool = false`: Whether a Held Gap raises an `ArgumentError` rather than warning.
+  - `w_prev::Option{<:VecNum_VecVecNum} = nothing`: The previous weights the fold was handed, which a failed fold holds under a drift, or `nothing`.
 
 # Returns
 
@@ -1529,12 +1672,14 @@ returns[t] == sum_i w_i * (isfinite(X[t, i]) ? X[t, i] : 0) - fee
   - [`MultiPeriodPredictionResult`](@ref)
   - [`extract_fees`](@ref)
   - [`override_fee_amortisation`](@ref)
+  - [`held_start_weights`](@ref)
 """
 function StatsAPI.predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult;
                           wd::Option{<:AbstractWeightDrift} = nothing,
                           hwd::Option{<:AbstractWeightDrift} = wd,
                           fa::Option{<:AbstractFeeAmortisation} = nothing,
-                          store_weight_path::Bool = false, strict::Bool = false)
+                          store_weight_path::Bool = false, strict::Bool = false,
+                          w_prev::Option{<:VecNum_VecVecNum} = nothing)
     # The window is viewed at the Investable Mask first, so the column of an asset the fit
     # found non-investable is never read, and the Held Gaps of the reduced window are
     # zeroed once, before the series is formed and before a drift compounds on it. The
@@ -1549,7 +1694,8 @@ function StatsAPI.predict(res::NonFiniteAllocationOptimisationResult, rd::Return
     fees = override_fee_amortisation(fees, fa)
     Xf = filter_held_gaps(w, rdv.X, strict; nx = rdv.nx)
     X = calc_net_returns(w, Xf, fees, wd, rdv.ts)
-    (hw, ruined) = held_weights_result(hwd, w, Xf, store_weight_path, rdv.ts)
+    w0 = held_start_weights(res.retcode, w, investable_weights_view(imsk, w_prev))
+    (hw, ruined) = held_weights_result(hwd, w0, Xf, store_weight_path, rdv.ts)
     warn_ruined_members(wd, ruined, length(res.w))
     res = mark_ruined_members(res, ruined)
     rdv = reconstruct_rd(res, rdv, X, hw, w)
@@ -1585,7 +1731,8 @@ function StatsAPI.predict(res::NonFiniteAllocationOptimisationResult, rd::Return
                           wd::Option{<:AbstractWeightDrift} = nothing,
                           hwd::Option{<:AbstractWeightDrift} = wd,
                           fa::Option{<:AbstractFeeAmortisation} = nothing,
-                          store_weight_path::Bool = false, strict::Bool = false)
+                          store_weight_path::Bool = false, strict::Bool = false,
+                          w_prev::Option{<:VecNum_VecVecNum} = nothing)
     rdi = port_opt_view(rd, test_idx, cols)
     fees = extract_fees(res, nothing)
     # The mask view and the Held Gap filter, in that order — see the whole-sample method.
@@ -1595,7 +1742,8 @@ function StatsAPI.predict(res::NonFiniteAllocationOptimisationResult, rd::Return
     obs = drift_observations(rdi.ts, test_idx)
     Xf = filter_held_gaps(w, rdi.X, strict; nx = rdi.nx)
     X = calc_net_returns(w, Xf, fees, wd, obs)
-    (hw, ruined) = held_weights_result(hwd, w, Xf, store_weight_path, obs)
+    w0 = held_start_weights(res.retcode, w, investable_weights_view(imsk, w_prev))
+    (hw, ruined) = held_weights_result(hwd, w0, Xf, store_weight_path, obs)
     warn_ruined_members(wd, ruined, length(res.w))
     res = mark_ruined_members(res, ruined)
     rdi = reconstruct_rd(res, rdi, X, hw, w)
@@ -1649,9 +1797,11 @@ function fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::Returns
                          wd::Option{<:AbstractWeightDrift} = nothing,
                          hwd::Option{<:AbstractWeightDrift} = wd,
                          fa::Option{<:AbstractFeeAmortisation} = nothing,
-                         store_weight_path::Bool = false, strict::Bool = false, kwargs...)
+                         store_weight_path::Bool = false, strict::Bool = false,
+                         w_prev::Option{<:VecNum_VecVecNum} = nothing, kwargs...)
     return StatsAPI.predict(res, rd, test_idx, cols; wd = wd, hwd = hwd, fa = fa,
-                            store_weight_path = store_weight_path, strict = strict)
+                            store_weight_path = store_weight_path, strict = strict,
+                            w_prev = w_prev)
 end
 """
     sort_predictions!(res::VecVecInt, predictions::VecPredRes) -> VecPredRes
@@ -1756,13 +1906,16 @@ function parallel_folds(fit_fold, n::Integer, ex::FLoops.Transducers.Executor,
     return predictions
 end
 """
-    run_folds(fit_fold, n::Integer, ::Type{ElT} = PredictionResult)
+    run_folds(fit_fold, n::Integer, ::Type{ElT} = PredictionResult; pws = nothing)
 
-Run `n` cross-validation folds in order, filling
-`predictions[i] = fit_fold(i, predictions[i - 1])` for `i in 1:n`, and emit
-[`cv_sequential_info`](@ref). Fold 1 takes `nothing`, because it has no fold behind it. The
-caller uses the previous fold to thread its weights into fold `i`. `ElT` is the per-fold
-result element type.
+Run `n` cross-validation folds in order, filling `predictions[i] = fit_fold(i, prev)` for
+`i in 1:n`, and emit [`cv_sequential_info`](@ref). `prev` is the last fold whose weights the
+next fold can be handed: fold 1 takes `nothing`, because it has no fold behind it, and after
+fold `i` the loop advances `prev` to `predictions[i]` only when [`threads_weights`](@ref)
+holds of it, so a fold whose solve failed is skipped over and the fold before it is read
+instead. The caller uses `prev` to thread its weights into fold `i`. `ElT` is the per-fold
+result element type, and `pws` is the scheme's Previous-Weights Source, which decides what
+[`threads_weights`](@ref) tests.
 
 This is the sequential loop, and it does that one job. [`fold_loop`](@ref) is the only site
 that calls it, and it calls it only when the folds are a timeline *and* the estimator needs
@@ -1776,17 +1929,37 @@ its sibling [`parallel_folds`](@ref) owns the other case.
 
   - [`parallel_folds`](@ref)
   - [`fold_loop`](@ref)
+  - [`threads_weights`](@ref)
   - [`cv_sequential_info`](@ref)
   - [`folds_are_time_ordered`](@ref)
   - [`fit_and_predict`](@ref)
 """
-function run_folds(fit_fold, n::Integer, ::Type{ElT} = PredictionResult) where {ElT}
+function run_folds(fit_fold, n::Integer, ::Type{ElT} = PredictionResult;
+                   pws = nothing) where {ElT}
     @info(cv_sequential_info())
     predictions = Vector{ElT}(undef, n)
+    prev = nothing
     for i in 1:n
-        predictions[i] = fit_fold(i, i > 1 ? predictions[i - 1] : nothing)
+        predictions[i] = fit_fold(i, prev)
+        prev = advance_previous_fold(pws, prev, predictions[i])
     end
     return predictions
+end
+"""
+    advance_previous_fold(pws, prev, pred::PredictionResult)
+
+Give the fold the next fold is handed: `pred` when [`threads_weights`](@ref) holds of it, `prev` otherwise.
+
+One line shared by [`run_folds`](@ref) and [`online_folds`](@ref), so the two sequential loops advance by the same rule.
+
+# Related
+
+  - [`threads_weights`](@ref)
+  - [`run_folds`](@ref)
+  - [`online_folds`](@ref)
+"""
+function advance_previous_fold(pws, prev, pred::PredictionResult)
+    return threads_weights(pws, pred) ? pred : prev
 end
 """
     assert_unshuffled_folds(cv, train_idx)
@@ -1824,7 +1997,9 @@ One fold of a cross-validation scheme, as [`fold_loop`](@ref) hands it to its ca
 The record is the fold loop's whole hand-off. `est` and `rd` are already resolved: the
 asset view is taken, every [`TimeDependent`](@ref) schedule is swapped for its fold-`i`
 value, and the previous fold's weights are threaded in. `train` and `test` are this fold's
-own windows, so a callback never indexes `train_idx`/`test_idx` itself.
+own windows, so a callback never indexes `train_idx`/`test_idx` itself. `w_prev` is the
+weights that were threaded, handed over a second time so a fold whose solve fails can hold
+them: [`held_start_weights`](@ref) reads it inside `predict`.
 
 `train === nothing` says *the estimator holds its window*. The online arm of the loop,
 [`online_folds`](@ref), hands its callback a `Fold` of that shape: `est` has already folded
@@ -1847,7 +2022,7 @@ $(DocStringExtensions.FIELDS)
   - [`TimeDependentContext`](@ref)
   - [`fit_and_predict`](@ref)
 """
-struct Fold{T1, T2, T3, T4, T5, T6}
+struct Fold{T1, T2, T3, T4, T5, T6, T7}
     """
     Index of the fold within the scheme's `split` enumeration (1-based).
     """
@@ -1872,6 +2047,10 @@ struct Fold{T1, T2, T3, T4, T5, T6}
     The fold's test indices.
     """
     test::T6
+    """
+    The previous weights threaded into `est`, or `nothing` when there are none.
+    """
+    w_prev::T7
 end
 """
     folds_are_time_ordered(cv)
@@ -2038,7 +2217,7 @@ function fold_loop(fit_fold, est, n::Integer, ex::FLoops.Transducers.Executor,
         if !isnothing(w_prev) && prev_w_flag
             esti = factory(esti, w_prev)
         end
-        return fit_fold(Fold(i, n, esti, rdi, train, test_idx[i]))
+        return fit_fold(Fold(i, n, esti, rdi, train, test_idx[i], w_prev))
     end
     function fold(i, prev)
         (esti, rdi) = isnothing(fold_view) ? (est, rd) : fold_view(i)
@@ -2051,9 +2230,9 @@ function fold_loop(fit_fold, est, n::Integer, ex::FLoops.Transducers.Executor,
     # amendments.
     return if !isnothing(fold_fit(cv))
         online_folds(resolve, est, n, ElT; rd = rd, train_idx = train_idx,
-                     fold_view = fold_view)
+                     fold_view = fold_view, pws = pws)
     elseif folds_are_time_ordered(cv) && prev_w_flag
-        run_folds(fold, n, ElT)
+        run_folds(fold, n, ElT; pws = pws)
     else
         parallel_folds(i -> fold(i, nothing), n, ex, ElT)
     end
@@ -2071,7 +2250,7 @@ function fit_and_predict(opt::OptE_Opt_TD, rd::ReturnsResult, cv::NonSeqCVER; co
         return fit_and_predict(fold.est, fold.rd; train_idx = fold.train,
                                test_idx = fold.test, cols = cols, wd = wd, hwd = hwd,
                                fa = fa, store_weight_path = store_weight_path,
-                               strict = strict)
+                               strict = strict, w_prev = fold.w_prev)
     end
     return MultiPeriodPredictionResult(; pred = predictions, id = id)
 end

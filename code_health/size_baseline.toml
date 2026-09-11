@@ -227,7 +227,7 @@ commit = "57d1e77285"
 "src/19_RiskMeasures/27_ExpectedRisk.jl" = { code = 273, doc = 458, comment = 40, blank = 207, total = 978 }
 "src/19_RiskMeasures/28_RiskMeasureTools.jl" = { code = 84, doc = 95, comment = 0, blank = 51, total = 230 }
 "src/20_Optimisation/01_Base_Optimisation.jl" = { code = 904, doc = 1658, comment = 22, blank = 820, total = 3404 }
-"src/20_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl" = { code = 578, doc = 1021, comment = 38, blank = 414, total = 2051 }
+"src/20_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl" = { code = 623, doc = 1141, comment = 39, blank = 456, total = 2259 }
 "src/20_Optimisation/02_CrossValidation/02_KFold.jl" = { code = 85, doc = 125, comment = 0, blank = 49, total = 259 }
 "src/20_Optimisation/02_CrossValidation/03_Combinatorial.jl" = { code = 255, doc = 303, comment = 7, blank = 123, total = 688 }
 "src/20_Optimisation/02_CrossValidation/04_WalkForward.jl" = { code = 343, doc = 446, comment = 0, blank = 162, total = 951 }

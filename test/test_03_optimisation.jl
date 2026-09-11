@@ -407,3 +407,41 @@ end
                                                                                        mr];
                                                                                       default = mr)))
 end
+@testset "PreviousWeights holds the weights it was handed (#1021)" begin
+    using PortfolioOptimisers, Test, StableRNGs
+    PO = PortfolioOptimisers
+    rd = ReturnsResult(; nx = ["A", "B", "C"], X = randn(StableRNG(3), 10, 3))
+    # Verbatim, on the full universe, with no bounds and no mask.
+    pw = PreviousWeights(; w = [0.6, 0.3, 0.1])
+    res = optimise(pw, rd)
+    @test isa(res, NaiveOptimisationResult)
+    @test isa(res.retcode, OptimisationSuccess)
+    @test res.w === pw.w
+    @test isnothing(res.imsk) && isnothing(res.wb) && res.pr === rd
+    # The fold-less entry and the read-out entry answer the same.
+    @test optimise(pw).w === pw.w
+    @test PO.optimise(PO.partial_fit!(pw, rd)).w === pw.w
+    # No weights is a failure that names the field, so a chain walks on.
+    none = optimise(PreviousWeights())
+    @test isa(none.retcode, OptimisationFailure)
+    @test occursin("`w` is `nothing`", none.retcode.res)
+    @test isnothing(none.w)
+    # With a carrier the failure carries `NaN` at every asset, as any failed solve does.
+    none_rd = optimise(PreviousWeights(), rd)
+    @test isa(none_rd.retcode, OptimisationFailure)
+    @test length(none_rd.w) == 3 && all(isnan, none_rd.w)
+    # A chain that reaches the leaf holds; one that reaches an empty leaf fails through.
+    slv = Solver(; name = :none, solver = nothing)
+    @test PO.needs_previous_weights(PreviousWeights())
+    @test PO.needs_previous_weights(EqualWeighted(; fb = PreviousWeights()))
+    @test !PO.needs_previous_weights(EqualWeighted())
+    # The factory fills `w` and recurses into `fb`; a non-vector leaves the leaf as it is.
+    filled = PO.factory(PreviousWeights(; fb = PreviousWeights()), [0.2, 0.8])
+    @test filled.w == [0.2, 0.8] && filled.fb.w == [0.2, 0.8]
+    @test PO.factory(PreviousWeights(), [[0.2, 0.8], [0.5, 0.5]]) == PreviousWeights()
+    @test_throws DomainError PreviousWeights(; w = [0.5, Inf])
+    @test_throws ArgumentError PreviousWeights(;
+                                               fb = TimeDependent([EqualWeighted()],
+                                                                  :nearest))
+    @test PreviousWeights(; fb = TimeDependent([EqualWeighted()])) isa PreviousWeights
+end

@@ -219,6 +219,7 @@ end
     partial_fit!(opt::Union{<:HierarchicalRiskParity, <:HierarchicalEqualRiskContribution, <:SchurComplementHierarchicalRiskParity}, rd::ReturnsResult)
     partial_fit!(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser, <:InverseVolatility, <:NestedClustered, <:Stacking, <:SubsetResampling}, rd::ReturnsResult)
     partial_fit!(opt::Union{<:EqualWeighted, <:RandomWeighted}, rd::ReturnsResult)
+    partial_fit!(opt::PreviousWeights, rd::ReturnsResult)
     partial_fit!(opt::FiniteAllocationOptimisationEstimator, rd::ReturnsResult)
     partial_fit!(td::TD_OptE_Opt, rd::ReturnsResult)
 
@@ -226,7 +227,7 @@ Folds observations into an optimiser, without solving.
 
 The optimiser's online step, decided by [#867](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/867): two verbs and one forward. This verb folds and returns the estimator; `optimise(opt)` with no returns reads the state out and solves once. The step forwards the observations to the **prior alone**, through [`fold_prior`](@ref), and records the rest of the carrier in a [`ReturnsBufferState`](@ref) so the read-out can rebuild the carrier the batch path reads. Everything above the prior — the clustering estimator, the constraint estimators, every uncertainty set, a meta-optimiser's inner optimisers — is untouched by the step and fitted by the read-out exactly as batch fits it.
 
-The arity mirrors the batch verb: `optimise(opt, rd)` takes a carrier, so the step takes one, holding one observation or a block of them, and unpacks it on the way down to the prior's own arity. A JuMP head forwards to the [`JuMPOptimiser`](@ref) it holds and a hierarchical head to its [`HierarchicalOptimiser`](@ref); the bundle is the host of the prior and the context. The three meta-optimisers and [`InverseVolatility`](@ref) hold their prior directly and are their own host. [`EqualWeighted`](@ref) and [`RandomWeighted`](@ref) hold no prior but read the observations — each derives the Coverage Universe of its own window — so they are the bottom of their chain and their context keeps the rows itself.
+The arity mirrors the batch verb: `optimise(opt, rd)` takes a carrier, so the step takes one, holding one observation or a block of them, and unpacks it on the way down to the prior's own arity. A JuMP head forwards to the [`JuMPOptimiser`](@ref) it holds and a hierarchical head to its [`HierarchicalOptimiser`](@ref); the bundle is the host of the prior and the context. The three meta-optimisers and [`InverseVolatility`](@ref) hold their prior directly and are their own host. [`EqualWeighted`](@ref) and [`RandomWeighted`](@ref) hold no prior but read the observations — each derives the Coverage Universe of its own window — so they are the bottom of their chain and their context keeps the rows itself. [`PreviousWeights`](@ref) reads nothing at all, so its step is the identity and it carries no context.
 
 Two families are refused by name. A finite allocation converts a weight vector and prices into share counts and reads no returns window, so it has no online step and needs none: `optimise(da, w, p)` is its whole verb. A [`TimeDependent`](@ref) schedule of optimisers has no step of its own, because a schedule swaps the optimiser that carries the state and no loop resolves a schedule before stepping: a schedule reaches stateless fields only, and the fold loop's online arm refuses one at warm-up ([`assert_online_entry`](@ref)).
 
@@ -273,6 +274,9 @@ function partial_fit!(opt::Union{<:EqualWeighted, <:RandomWeighted}, rd::Returns
     return rebuild_estimator(opt,
                              (;
                               cache = fold_context(opt.cache, rd, max_history, true, true)))
+end
+function partial_fit!(opt::PreviousWeights, ::ReturnsResult)
+    return opt
 end
 function partial_fit!(opt::FiniteAllocationOptimisationEstimator, ::ReturnsResult)
     return throw(ArgumentError("a `$(typeof(opt))` has no online step: a finite allocation converts a weight vector and prices into share counts and reads no returns window, so there is nothing to fold. Take the step on the optimiser that produces the weights, and allocate its read-out with `optimise(da, w, p)`."))

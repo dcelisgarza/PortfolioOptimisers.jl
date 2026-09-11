@@ -98,6 +98,10 @@ up with the grid and a reader sees which fold failed. When no column is finite t
 `IsNonFiniteError`. The population sorts place a member whose measure is non-finite last whatever
 `rev` is, and a quantile is taken over the finite members.
 
+What a failed fold hands the fold after it — the last solved fold's weights, or the book it held
+under a drift — and the hold-only fallback that turns a failed fold into a solved one are
+[ADR 0145](0145-a-failed-fold-holds-the-loop-threads-the-last-threadable-fold-and-previousweights-is-the-hold-only-fallback.md)'s. The rule here is unchanged by it: a failed fold's score is `NaN`.
+
 ### A random asset subset is drawn from the Coverage Universe of its window
 
 `MultipleRandomised` draws each path's window first, then draws `subset_size` assets from the

@@ -37,14 +37,16 @@ function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::Retu
                          cols = :, wd::Option{<:AbstractWeightDrift} = nothing,
                          hwd::Option{<:AbstractWeightDrift} = wd,
                          fa::Option{<:AbstractFeeAmortisation} = nothing,
-                         store_weight_path::Bool = false, strict::Bool = false)
+                         store_weight_path::Bool = false, strict::Bool = false,
+                         w_prev::Option{<:VecNum_VecVecNum} = nothing)
     if !isa(cols, Colon)
         opt = port_opt_view(opt, cols, rd.X)
     end
     #! Add ability to do callbacks
     res = fit_fold_result(opt, rd, train_idx, cols)
     return StatsAPI.predict(res, rd, test_idx, cols; wd = wd, hwd = hwd, fa = fa,
-                            store_weight_path = store_weight_path, strict = strict)
+                            store_weight_path = store_weight_path, strict = strict,
+                            w_prev = w_prev)
 end
 """
     cv_online_info()
@@ -69,7 +71,7 @@ function cv_online_info()
     return "Running cross-validation online because the scheme declares a Fold Fit (fold_fit(cv) == OnlineStep()). The loop warms one estimator up on the first training window, folds each fold's new observations into it, and reads it out where a refit would have run, so the folds run in order and the estimator is threaded from fold to fold. To refit every fold from its training window, and to run the folds in parallel where the optimiser allows it, leave the scheme's `ff` unset."
 end
 """
-    online_folds(fit_fold, est, n::Integer, ::Type{ElT}; rd, train_idx, fold_view)
+    online_folds(fit_fold, est, n::Integer, ::Type{ElT}; rd, train_idx, fold_view, pws)
 
 Run `n` folds of a walk-forward by the online step, threading one estimator from fold to
 fold, and emit [`cv_online_info`](@ref).
@@ -102,9 +104,10 @@ The identity the arm keeps is the seam's: the run reaches the weights of the bat
 walk-forward fold for fold, to the tolerance of the moment layer and of the solver, and the
 carrier the read-out rebuilds is exactly the batch fold's training window.
 
-`fit_fold` takes `(i, prev, est, rd, train)`: the fold index, the previous fold's prediction
-or `nothing`, the estimator to resolve, the carrier, and the training window, which is
-`nothing` here. `ElT` is the per-fold result element type, positional for the reason given in
+`fit_fold` takes `(i, prev, est, rd, train)`: the fold index, the last threadable fold's
+prediction or `nothing` — advanced by [`threads_weights`](@ref) exactly as [`run_folds`](@ref)
+advances it, so a failed step leaves the previous weights where they were — the estimator to
+resolve, the carrier, and the training window, which is `nothing` here. `ElT` is the per-fold result element type, positional for the reason given in
 [`parallel_folds`](@ref).
 
 # Arguments
@@ -115,6 +118,7 @@ or `nothing`, the estimator to resolve, the carrier, and the training window, wh
   - `rd`: The carrier.
   - `train_idx`: The training windows of every fold, in split order.
   - `fold_view`: The asset view of a multiple-randomised path, or `nothing`.
+  - `pws`: The scheme's Previous-Weights Source, or `nothing`; decides what [`threads_weights`](@ref) tests.
 
 # Validation
 
@@ -136,7 +140,7 @@ or `nothing`, the estimator to resolve, the carrier, and the training window, wh
   - [`OnlineStep`](@ref)
 """
 function online_folds(fit_fold, est, n::Integer, ::Type{ElT}; rd, train_idx,
-                      fold_view = nothing) where {ElT}
+                      fold_view = nothing, pws = nothing) where {ElT}
     @info(cv_online_info())
     assert_online_entry(est)
     (est, rd) = isnothing(fold_view) ? (est, rd) : fold_view(1)
@@ -144,13 +148,15 @@ function online_folds(fit_fold, est, n::Integer, ::Type{ElT}; rd, train_idx,
     est = partial_fit!(est, port_opt_view(rd, train_idx[1], :))
     last_end = last(train_idx[1])
     predictions = Vector{ElT}(undef, n)
+    prev = nothing
     for i in 1:n
         stop = last(train_idx[i])
         if stop > last_end
             est = partial_fit!(est, port_opt_view(rd, (last_end + 1):stop, :))
             last_end = stop
         end
-        predictions[i] = fit_fold(i, i > 1 ? predictions[i - 1] : nothing, est, rd, nothing)
+        predictions[i] = fit_fold(i, prev, est, rd, nothing)
+        prev = advance_previous_fold(pws, prev, predictions[i])
     end
     return predictions
 end
