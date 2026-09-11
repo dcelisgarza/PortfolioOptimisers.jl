@@ -2381,7 +2381,9 @@ library takes it as an argument and asks the caller to remove the residual block
     With a zero systematic covariance the closed form collapses to the population cokurtosis
     of an independent residual set: `E[e_i^4]` on the four-equal pattern, `E[e_i^2] E[e_k^2]`
     on the two-pair pattern, and zero elsewhere. That makes the check exact rather than
-    statistical.
+    statistical. Exact up to rounding: the source takes the fourth moment as `(x^2)^2` and
+    the oracle as `x^4`, which agree to an ulp, not to a bit, so the comparison is a tight
+    `isapprox` and not an `==` (#1008).
     =#
     e2 = vec(mean_(Er .^ 2; dims = 1))
     e4 = vec(mean_(Er .^ 4; dims = 1))
@@ -2396,7 +2398,7 @@ library takes it as an argument and asks the caller to remove the residual block
             0.0
         end
     end
-    @test PO.cokurtosis_residuals(zeros(N, N), Er, me) == Pop
+    @test isapprox(PO.cokurtosis_residuals(zeros(N, N), Er, me), Pop, rtol = 1e-14)
 
     #=
     The docstring used to say that every pattern with a lone index is zero. It is not: only
