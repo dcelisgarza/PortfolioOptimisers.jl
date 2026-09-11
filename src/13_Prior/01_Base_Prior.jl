@@ -130,12 +130,15 @@ Low order prior estimator using both asset and factor returns.
 
 This is the third of the three source shapes. A member **admits asset returns and admits factor returns optionally**: its `prior` method declares the factor argument as `F::Option{<:MatNum} = nothing` and reads it when it is supplied. The shape therefore says nothing about whether the result carries a regression: use [`assert_prior_regression`](@ref) to establish that.
 
+Nor does the shape say whether the fit *reads* factor returns, and [`needs_factor_returns`](@ref) answers that three ways. A member that requires them answers `true`, a member that never reads them answers `false`, and this shape answers `nothing` by default: *the type does not say; take what the fold is given*, which is what its batch verb does. Every member of this shape the library ships embeds another prior and hands `F` to it, so each defines the recursion and answers the leaf's value. A caller's own subtype that embeds a prior should define the same recursion; one that reads `F` itself may leave the default.
+
 # Related
 
   - [`AbstractLowOrderPriorEstimator`](@ref)
   - [`AbstractLowOrderPriorEstimator_A`](@ref)
   - [`AbstractLowOrderPriorEstimator_F`](@ref)
   - [`assert_prior_regression`](@ref)
+  - [`needs_factor_returns`](@ref)
   - [`prior`](@ref)
 """
 abstract type AbstractLowOrderPriorEstimator_AF <: AbstractLowOrderPriorEstimator end
@@ -240,12 +243,13 @@ abstract type AbstractHighOrderPriorEstimator_F <: AbstractHighOrderPriorEstimat
 
 Groups the two families that **require** factor returns, one per order.
 
-`AbstractHiLoOrderPriorEstimator_F` is the one test for *this estimator cannot run without factor returns*, taken across both orders at once. [`prior`](@ref) dispatches its [`ReturnsResult`](@ref) method on every prior estimator, so it needs that test as a value rather than as a signature: it raises a named error when `rd.F` is `nothing` and the estimator is a member, in place of the `MethodError` the estimator's own signature would raise one call later.
+`AbstractHiLoOrderPriorEstimator_F` is the type-level half of the test for *this estimator cannot run without factor returns*, taken across both orders at once: a member answers `true` to [`needs_factor_returns`](@ref). The doors that check for a missing factor matrix ask the predicate rather than this union, because a factor leaf may sit under a host whose own factor argument is optional, and the predicate walks the tree where an `isa` test reads the host alone.
 
 # Related
 
   - [`AbstractLowOrderPriorEstimator_F`](@ref)
   - [`AbstractHighOrderPriorEstimator_F`](@ref)
+  - [`needs_factor_returns`](@ref)
   - [`prior`](@ref)
   - [`ReturnsResult`](@ref)
 """
@@ -362,7 +366,7 @@ This method is the entry point every caller uses, and it is written once here. W
 # Algorithm
 
  1. Check that `rd` carries asset returns, so that the estimator is not handed a `nothing` for `X`.
- 2. When `pe` requires factor returns — when it is a member of [`AbstractHiLoOrderPriorEstimator_F`](@ref) — check that `rd` carries them. The check is made here so that the caller reads a named error against `rd.F` rather than a `MethodError` against the estimator's own signature one call later.
+ 2. When `pe` requires factor returns — when [`needs_factor_returns`](@ref) answers `true`, which walks the tree to a factor leaf under an optional-argument host — check that `rd` carries them. The check is made here so that the caller reads a named error against `rd.F` rather than a `MethodError` against the leaf's own signature one call later.
  3. Call the estimator's returns-matrix method with `rd.X`, `rd.F` and `rd.pnl`, forwarding `rd.iv` and `rd.ivpa` as keyword arguments alongside `kwargs`, and return the prior result it produces.
 
 The Asset Panel travels as the third positional argument for the same reason `rd.F` travels as the second: a wrapping prior holds no carrier, so it can compose an estimator that is fitted on a panel only if the panel reaches its own returns-matrix method. Every returns-matrix method takes the argument, every wrapping prior forwards it unchanged to the estimator it nests over the assets, and an estimator that reads no panel ignores it.
@@ -376,7 +380,7 @@ The Asset Panel travels as the third positional argument for the same reason `rd
 # Validation
 
   - `!isnothing(rd.X)`.
-  - `!isnothing(rd.F)`, when `pe` is a member of [`AbstractHiLoOrderPriorEstimator_F`](@ref).
+  - `!isnothing(rd.F)`, when `needs_factor_returns(pe) === true`.
 
 # Returns
 
@@ -385,7 +389,7 @@ The Asset Panel travels as the third positional argument for the same reason `rd
 # Related
 
   - [`AbstractPriorEstimator`](@ref)
-  - [`AbstractHiLoOrderPriorEstimator_F`](@ref)
+  - [`needs_factor_returns`](@ref)
   - [`ReturnsResult`](@ref)
   - [`AbstractPriorResult`](@ref)
   - [`LowOrderPrior`](@ref)
@@ -393,10 +397,7 @@ The Asset Panel travels as the third positional argument for the same reason `rd
 """
 function prior(pe::AbstractPriorEstimator, rd::ReturnsResult; kwargs...)
     @argcheck(!isnothing(rd.X), IsNothingError)
-    if isa(pe, AbstractHiLoOrderPriorEstimator_F)
-        @argcheck(!isnothing(rd.F),
-                  IsNothingError("this is a factor prior; it needs factor returns. ReturnsResult.F is nothing — populate F (e.g. via prices_to_returns on factor prices)."))
-    end
+    assert_factor_returns(pe, rd.F)
     return prior(pe, rd.X, rd.F, rd.pnl; iv = rd.iv, ivpa = rd.ivpa, kwargs...)
 end
 """

@@ -11,6 +11,12 @@ are the inner estimators' own folded read-outs, bit for bit — because a regres
 The two caps are two different knobs and each has its own testset: `max_scenarios` cuts the
 scenarios and leaves the moments over every observation, in batch and online alike, and has
 no batch equal to assert; `Online`'s `max_history` windows the whole fit and therefore does.
+
+Issue #1013 (deciding #1009) put the factor rows **inside** the one buffer and made
+`needs_factor_returns` answer from the estimator tree, so the factor testsets at the foot of
+the file pin the three answers against the batch verb over the same arguments, and the batch
+defect the shallow `isa` door hid: a factor leaf under an optional-argument host met a
+`MethodError` at the leaf instead of the named refusal.
 =#
 using PortfolioOptimisers, Statistics, LinearAlgebra, StatsBase
 # A matrix processing algorithm of a caller's own, which is handed the whole sample. It must
@@ -42,6 +48,27 @@ end
 function Statistics.cor(ce::ImmutableCovProbe)
     return LinearAlgebra.Symmetric(Statistics.cor(PortfolioOptimisers.sample_buffer(ce.cache)))
 end
+# A caller's own optional-argument prior that **reads** `F` when it is given and leaves
+# `needs_factor_returns` at the `_AF` default, `nothing`: the fold must take what it is
+# given, exactly as the batch verb does. It embeds nothing, so it defines no recursion.
+struct OptionalFactorProbe{T} <: PortfolioOptimisers.AbstractLowOrderPriorEstimator_AF
+    cache::T
+end
+function OptionalFactorProbe(; cache = nothing)
+    return OptionalFactorProbe(cache)
+end
+function PortfolioOptimisers.prior(::OptionalFactorProbe, X::PortfolioOptimisers.MatNum,
+                                   F::Union{Nothing, <:PortfolioOptimisers.MatNum} = nothing,
+                                   ::Union{Nothing, <:PortfolioOptimisers.AssetPanel} = nothing;
+                                   dims::Int = 1, kwargs...)
+    # The mean is shifted by the factor mean when `F` is given, so the two fits differ and
+    # the test can tell which arity the read-out ran.
+    mu = vec(Statistics.mean(X; dims = 1))
+    if !isnothing(F)
+        mu = mu .+ Statistics.mean(F)
+    end
+    return LowOrderPrior(; X = X, mu = mu, sigma = Statistics.cov(X))
+end
 @testset "Prior partial fit: fold and carry, refit from a buffer" begin
     using Test, PortfolioOptimisers, Statistics, StableRNGs, StatsBase, LinearAlgebra
     pe = PortfolioOptimisers
@@ -49,6 +76,8 @@ end
     X = randn(rng, 80, 6) ./ 100
     F = randn(rng, 80, 3) ./ 100
     fold(est, rows) = foldl(partial_fit!, eachrow(rows); init = est)
+    fold_pair(est, rows, frows) = foldl((e, (x, f)) -> partial_fit!(e, x, f),
+                                        zip(eachrow(rows), eachrow(frows)); init = est)
 
     @testset "The identity: a fold and a read-out answer the batch fit" begin
         for est in (EmpiricalPrior(), EmpiricalPrior(; horizon = 21))
@@ -197,9 +226,10 @@ end
             @test isapprox(prior(o).mu, prior(est, X).mu; rtol = 1e-10)
             @test isapprox(prior(o).sigma, prior(est, X).sigma; rtol = 1e-10)
         end
-        # A prior whose batch verb needs a factor matrix seeds the paired buffer instead.
+        # A prior whose batch verb needs a factor matrix seeds the same buffer, and the
+        # factor rows ride inside it (#1013).
         f = pe.update_online_estimator(pe.Online(FactorPrior()))
-        @test isa(pe.partial_fit_cache(f), pe.FactorSampleBufferState)
+        @test isa(pe.partial_fit_cache(f), pe.SampleBufferState)
         for i in axes(X, 1)
             f = partial_fit!(f, view(X, i, :), view(F, i, :))
         end
@@ -207,6 +237,20 @@ end
         @test isapprox(prior(f).mu, b.mu; rtol = 1e-10)
         @test isapprox(prior(f).sigma, b.sigma; rtol = 1e-10)
         @test prior(f).X == b.X
+        @test pe.factor_buffer(pe.partial_fit_cache(f)) == F
+        # The five `_F` priors, folded as a block, over the one buffer.
+        fv = BlackLittermanViews(; P = [1.0 0 0], Q = [0.01])
+        av = BlackLittermanViews(; P = [1.0 zeros(1, 5)], Q = [0.01])
+        for est in (FactorPrior(), BayesianBlackLittermanPrior(; views = fv),
+                    FactorBlackLittermanPrior(; views = fv),
+                    AugmentedBlackLittermanPrior(; a_views = av, f_views = fv),
+                    HighOrderFactorPriorEstimator())
+            @test pe.needs_factor_returns(est) === true
+            o = prior(partial_fit!(pe.update_online_estimator(pe.Online(est)), X, F))
+            b = prior(est, X, F)
+            @test isapprox(o.mu, b.mu; rtol = 1e-10)
+            @test isapprox(o.sigma, b.sigma; rtol = 1e-10)
+        end
     end
 
     @testset "A forwarding host folds through, and owns no buffer" begin
@@ -312,44 +356,147 @@ end
         @test isnothing(pe.obs_weights_view(m, 1:10))
     end
 
-    @testset "The paired buffer's interface" begin
-        s = pe.FactorSampleBufferState()
+    @testset "The factor rows ride in the one buffer" begin
+        s = pe.SampleBufferState()
         for i in 1:20
             s = partial_fit!(s, view(X, i, :), view(F, i, :))
         end
-        @test pe.sample_buffer(s.X) == X[1:20, :]
-        @test pe.sample_buffer(s.F) == F[1:20, :]
-        t = pe.FactorSampleBufferState()
-        t = partial_fit!(t, view(X, 21:80, :), view(F, 21:80, :))
+        @test pe.sample_buffer(s) == X[1:20, :]
+        @test pe.factor_buffer(s) == F[1:20, :]
+        t = partial_fit!(pe.SampleBufferState(), view(X, 21:80, :), view(F, 21:80, :))
         m = pe.merge_states(s, t)
-        @test pe.sample_buffer(m.X) == X
-        @test pe.sample_buffer(m.F) == F
+        @test pe.sample_buffer(m) == X
+        @test pe.factor_buffer(m) == F
         c = copy(m)
-        @test c.X.X !== m.X.X
-        # The selection indexes assets, so the factor half passes through untouched.
+        @test c.F !== m.F && c.F == m.F
+        # The selection indexes assets, so the factor rows pass through untouched and are
+        # copied rather than shared.
         v = pe.port_opt_view(m, [1, 3])
-        @test pe.sample_buffer(v.X) == X[:, [1, 3]]
-        @test pe.sample_buffer(v.F) == F
-        # Halves that fall out of step are refused, and different widths are not.
-        @test_throws DimensionMismatch pe.FactorSampleBufferState(; X = s.X, F = t.F)
-        @test_throws ArgumentError pe.FactorSampleBufferState(;
-                                                              X = pe.SampleBufferState(;
-                                                                                       max_history = 5),
-                                                              F = pe.SampleBufferState())
-        @test_throws ArgumentError pe.assert_factor_sample_buffer(EmpiricalPrior())
-        # The block arm through an estimator, beside the observation arm above.
-        blk = partial_fit!(pe.update_online_estimator(pe.Online(FactorPrior())), X, F)
-        @test pe.sample_buffer(pe.partial_fit_cache(blk).X) == X
-        @test pe.sample_buffer(pe.partial_fit_cache(blk).F) == F
-        # A mask describes assets, so the pair carries it into the returns half and leaves
-        # the factor half the rows alone (#999's contract, applied to the pair).
+        @test pe.sample_buffer(v) == X[:, [1, 3]]
+        @test pe.factor_buffer(v) == F
+        @test v.F !== m.F
+        # A cap windows the factor rows with the rest, on the fold and on the merge.
+        w = partial_fit!(pe.SampleBufferState(; max_history = 10), X, F)
+        @test pe.factor_buffer(w) == F[71:80, :]
+        wm = pe.merge_states(partial_fit!(pe.SampleBufferState(; max_history = 10),
+                                          view(X, 1:8, :), view(F, 1:8, :)),
+                             partial_fit!(pe.SampleBufferState(; max_history = 10),
+                                          view(X, 9:16, :), view(F, 9:16, :)))
+        @test pe.factor_buffer(wm) == F[7:16, :]
+        # A factor block whose rows are not the block's, and one whose width moves.
+        @test_throws DimensionMismatch partial_fit!(pe.SampleBufferState(), X,
+                                                    view(F, 1:79, :))
+        @test_throws DimensionMismatch partial_fit!(s, view(X, 21, :), view(F, 21, 1:2))
+        @test_throws DimensionMismatch pe.SampleBufferState(; n = 2, X = zeros(2, 3),
+                                                            F = zeros(3, 2))
+        # The mixture, refused both ways on the fold and on the merge; an empty buffer
+        # records nothing and reseeds.
+        @test_throws ArgumentError partial_fit!(s, view(X, 21, :))
+        x_only = partial_fit!(pe.SampleBufferState(), view(X, 1:5, :))
+        @test_throws ArgumentError partial_fit!(x_only, view(X, 6, :), view(F, 6, :))
+        @test_throws ArgumentError pe.merge_states(s, x_only)
+        with_width = pe.SampleBufferState(; X = zeros(0, 6), F = zeros(0, 3))
+        @test isnothing(partial_fit!(with_width, view(X, 1, :)).F)
+        @test pe.factor_buffer(partial_fit!(pe.SampleBufferState(; X = zeros(0, 6)),
+                                            view(X, 2, :), view(F, 2, :))) == F[2:2, :]
+        # The block arm through an estimator, beside the observation arm above, and a mask
+        # rides beside the rows while the factor rows take no mask (#999's contract).
         amsk = trues(size(X))
         amsk[1:10, 2] .= false
         msk = partial_fit!(pe.update_online_estimator(pe.Online(FactorPrior())), X, F;
                            active_mask = amsk)
         st = pe.partial_fit_cache(msk)
-        @test pe.sample_buffer_kwargs(st.X).active_mask == amsk
-        @test isempty(pe.sample_buffer_kwargs(st.F))
+        @test pe.sample_buffer(st) == X
+        @test pe.factor_buffer(st) == F
+        @test pe.sample_buffer_kwargs(st).active_mask == amsk
+        # `show` renders the backing beside the rest.
+        @test occursin("F", sprint(show, st))
+    end
+
+    @testset "The tree answers, and the fold mirrors the batch verb's arity" begin
+        ep_f = EntropyPoolingPrior(; pe = FactorPrior())
+        @test pe.needs_factor_returns(ep_f) === true
+        @test pe.needs_factor_returns(EntropyPoolingPrior()) === false
+        @test pe.needs_factor_returns(EmpiricalPrior()) === false
+        @test pe.needs_factor_returns(OptionalFactorProbe()) === nothing
+        @test pe.needs_factor_returns(pe.Online(ep_f)) === true
+        views = BlackLittermanViews(; P = [1.0 zeros(1, 5)], Q = [0.01])
+        @test pe.needs_factor_returns(BlackLittermanPrior(; pe = FactorPrior(),
+                                                          views = views)) === true
+        @test pe.needs_factor_returns(HighOrderPriorEstimator(; pe = ep_f)) === true
+        @test pe.needs_factor_returns(MeucciEntropyPoolingPrior(; pe = FactorPrior())) ===
+              true
+        # Opinion pooling: any `true` wins, all `false` is `false`, else `nothing`.
+        @test pe.needs_factor_returns(OpinionPoolingPrior(; pes = [EntropyPoolingPrior()],
+                                                          pe2 = ep_f)) === true
+        @test pe.needs_factor_returns(OpinionPoolingPrior(; pes = [EntropyPoolingPrior()])) ===
+              false
+        @test pe.needs_factor_returns(OpinionPoolingPrior(; pes = [EntropyPoolingPrior()],
+                                                          pe1 = OptionalFactorProbe())) ===
+              nothing
+        # `true`: a factor leaf under an optional-argument host records `F`, and the
+        # online fit equals the batch fit over the same arguments.
+        o = pe.update_online_estimator(pe.Online(ep_f))
+        for i in axes(X, 1)
+            o = partial_fit!(o, view(X, i, :), view(F, i, :))
+        end
+        b = prior(ep_f, X, F)
+        @test isapprox(prior(o).mu, b.mu; rtol = 1e-8)
+        @test isapprox(prior(o).sigma, b.sigma; rtol = 1e-8)
+        @test pe.factor_buffer(pe.partial_fit_cache(o)) == F
+        # `true` and `x` alone: refused by name before any row is appended.
+        o = pe.update_online_estimator(pe.Online(ep_f))
+        @test_throws pe.IsNothingError partial_fit!(o, view(X, 1, :))
+        @test_throws pe.IsNothingError partial_fit!(o, X)
+        @test iszero(pe.partial_fit_cache(o).n)
+        # `false`: a tree that never reads `F` drops it, records no factor rows, and equals
+        # the fit without it.
+        o = pe.update_online_estimator(pe.Online(EntropyPoolingPrior()))
+        for i in axes(X, 1)
+            o = partial_fit!(o, view(X, i, :), view(F, i, :))
+        end
+        @test isnothing(pe.partial_fit_cache(o).F)
+        @test isapprox(prior(o).mu, prior(EntropyPoolingPrior(), X).mu; rtol = 1e-10)
+        # The carry route takes and drops it too, mirroring `prior(EmpiricalPrior(), X, F)`.
+        c = fold_pair(EmpiricalPrior(), X, F)
+        @test isnothing(pe.partial_fit_cache(c).buf.F)
+        @test prior(c).sigma == prior(fold(EmpiricalPrior(), X)).sigma
+        # And a forwarding host hands `F` down its tree.
+        h = HighOrderPriorEstimator(; pe = pe.Online(ep_f))
+        h = partial_fit!(pe.update_online_estimator(h), X, F)
+        @test isapprox(prior(h).kt, prior(HighOrderPriorEstimator(; pe = ep_f), X, F).kt;
+                       rtol = 1e-8)
+        # `nothing`: a caller's `_AF` with no method takes what it is given, both ways,
+        # and equals its batch verb over the same arguments.
+        with_f = fold_pair(pe.update_online_estimator(pe.Online(OptionalFactorProbe())), X,
+                           F)
+        without = fold(pe.update_online_estimator(pe.Online(OptionalFactorProbe())), X)
+        @test isapprox(prior(with_f).mu, prior(OptionalFactorProbe(), X, F).mu;
+                       rtol = 1e-12)
+        @test isapprox(prior(without).mu, prior(OptionalFactorProbe(), X).mu; rtol = 1e-12)
+        @test !isapprox(prior(with_f).mu, prior(without).mu; rtol = 1e-3)
+        # The mixture through a prior, both ways, refused by name.
+        @test_throws ArgumentError partial_fit!(with_f, view(X, 1, :))
+        @test_throws ArgumentError partial_fit!(without, view(X, 1, :), view(F, 1, :))
+    end
+
+    @testset "The batch doors refuse a factor leaf under an optional host by name" begin
+        ep_f = EntropyPoolingPrior(; pe = FactorPrior())
+        nx = string.("A", 1:6)
+        rd = ReturnsResult(; nx = nx, X = X)
+        # Before #1013 the shallow `isa` test passed this through to the leaf's
+        # `MethodError`.
+        @test_throws pe.IsNothingError prior(ep_f, rd)
+        @test_throws pe.IsNothingError prior(HighOrderPriorEstimator(; pe = ep_f), rd)
+        for uc in (NormalUncertaintySet(; pe = ep_f), DeltaUncertaintySet(; pe = ep_f))
+            @test_throws pe.IsNothingError pe.ucs(uc, rd)
+            @test_throws pe.IsNothingError pe.mu_ucs(uc, rd)
+            @test_throws pe.IsNothingError pe.sigma_ucs(uc, rd)
+        end
+        # And with `F` present every door fits.
+        rdf = ReturnsResult(; nx = nx, X = X, nf = string.("F", 1:3), F = F)
+        @test isapprox(prior(ep_f, rdf).mu, prior(ep_f, X, F).mu; rtol = 1e-10)
+        @test !isnothing(pe.mu_ucs(NormalUncertaintySet(; pe = ep_f), rdf))
     end
 
     @testset "A read-out hands out no accumulator" begin

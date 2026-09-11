@@ -1,12 +1,11 @@
 """
     returns_buffer(state::SampleBufferState)
     returns_buffer(state::PriorCarryState)
-    returns_buffer(state::FactorSampleBufferState)
     returns_buffer(state::AbstractPartialFitState)
 
 Reads the buffer of asset returns out of the state a prior carries.
 
-Three states carry rows at the prior layer, and each keeps them in a different place: a [`SampleBufferState`](@ref) is the rows, a [`PriorCarryState`](@ref) holds them in `buf`, and a [`FactorSampleBufferState`](@ref) holds them in its returns half. The optimiser's read-out reads the returns through this verb rather than through the state's fields, so a fourth state with rows of its own adds one method here and nothing else. A state that carries no rows — an exact-fold state of the moment layer, which a prior never holds — is refused by name.
+Two states carry rows at the prior layer, and each keeps them in a different place: a [`SampleBufferState`](@ref) is the rows, and a [`PriorCarryState`](@ref) holds them in `buf`. The optimiser's read-out reads the returns through this verb rather than through the state's fields, so a third state with rows of its own adds one method here and nothing else. The buffer returned carries the factor rows too, where the prior's tree reads them, so the read-out takes `F` off it through [`factor_buffer`](@ref) when the fold context holds no factor column of its own. A state that carries no rows — an exact-fold state of the moment layer, which a prior never holds — is refused by name.
 
 # Arguments
 
@@ -18,14 +17,14 @@ Three states carry rows at the prior layer, and each keeps them in a different p
 
 # Returns
 
-  - `buffer::SampleBufferState`: The rows, and the masks folded beside them.
+  - `buffer::SampleBufferState`: The rows, the masks folded beside them, and the factor rows where the prior records them.
 
 # Related
 
   - [`prior_returns_buffer`](@ref)
   - [`SampleBufferState`](@ref)
   - [`PriorCarryState`](@ref)
-  - [`FactorSampleBufferState`](@ref)
+  - [`factor_buffer`](@ref)
 """
 function returns_buffer(state::SampleBufferState)
     return state
@@ -33,11 +32,8 @@ end
 function returns_buffer(state::PriorCarryState)
     return state.buf
 end
-function returns_buffer(state::FactorSampleBufferState)
-    return state.X
-end
 function returns_buffer(state::AbstractPartialFitState)
-    return throw(ArgumentError("a `$(typeof(state))` carries no rows, so an optimiser cannot rebuild the returns it folded from it. The read-out reads the observations from the prior's own buffer, which a `SampleBufferState`, a `PriorCarryState` or a `FactorSampleBufferState` holds."))
+    return throw(ArgumentError("a `$(typeof(state))` carries no rows, so an optimiser cannot rebuild the returns it folded from it. The read-out reads the observations from the prior's own buffer, which a `SampleBufferState` or a `PriorCarryState` holds."))
 end
 """
     prior_returns_buffer(pe::AbstractPriorEstimator)
@@ -120,7 +116,7 @@ end
 
 Forwards the observations of a carrier to the prior, in the prior's own arity.
 
-The one forward the optimiser's step makes, and the rule for every optimiser: **an optimiser forwards the observation to its prior and to nothing else**, and everything it holds beside the prior takes its ordinary batch fit at read-out, from the reconstituted fold context. The carrier is unpacked on the way down exactly as [`prior`](@ref) unpacks it in batch — a prior that requires factor returns receives `X` and `F`, every other receives `X` — and the active mask of a time-varying panel rides as the keyword the prior's step takes.
+The one forward the optimiser's step makes, and the rule for every optimiser: **an optimiser forwards the observation to its prior and to nothing else**, and everything it holds beside the prior takes its ordinary batch fit at read-out, from the reconstituted fold context. The carrier is unpacked on the way down exactly as [`prior`](@ref) unpacks it in batch — `rd.X` and `rd.F` verbatim, with a missing `rd.F` refused by name at this door when the prior's tree requires one, through [`needs_factor_returns`](@ref) — and the active mask of a time-varying panel rides as the keyword the prior's step takes. What the prior does with `F` is the prior's own decision: its tree records it, drops it, or takes what it is given, exactly as its batch verb does.
 
 Two refusals. A prior that is already a [`AbstractPriorResult`](@ref) has no state to fold into: it is batch configuration, and an optimiser holding one runs `optimise(opt, rd)`. A [`TimeDependent`](@ref) on the prior is refused because a schedule swaps the estimator that carries the state, and a member that never saw the folded rows cannot be handed them; a fold loop resolves the schedule before it steps (see [#870](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/870)).
 
@@ -132,7 +128,7 @@ Two refusals. A prior that is already a [`AbstractPriorResult`](@ref) has no sta
 # Validation
 
   - `rd.X` is not `nothing`. An `IsNothingError` is thrown otherwise.
-  - `rd.F` is not `nothing` when `pe` requires factor returns. An `IsNothingError` is thrown otherwise.
+  - `rd.F` is not `nothing` when `needs_factor_returns(pe) === true`. An `IsNothingError` is thrown otherwise.
   - Everything [`step_active_mask`](@ref) refuses.
 
 # Returns
@@ -143,19 +139,15 @@ Two refusals. A prior that is already a [`AbstractPriorResult`](@ref) has no sta
 
   - [`partial_fit!`](@ref)
   - [`step_active_mask`](@ref)
+  - [`needs_factor_returns`](@ref)
   - [`prior`](@ref)
 """
 function fold_prior(pe::AbstractPriorEstimator, rd::ReturnsResult)
     @argcheck(!isnothing(rd.X), IsNothingError("rd.X cannot be nothing"))
+    assert_factor_returns(pe, rd.F)
     amsk = step_active_mask(rd)
     kw = isnothing(amsk) ? (;) : (; active_mask = amsk)
-    if isa(pe, AbstractHiLoOrderPriorEstimator_F)
-        @argcheck(!isnothing(rd.F),
-                  IsNothingError("this is a factor prior; it needs factor returns. ReturnsResult.F is nothing — populate F (e.g. via prices_to_returns on factor prices)."))
-        return partial_fit!(pe, rd.X, rd.F; kw...)
-    else
-        return partial_fit!(pe, rd.X; kw...)
-    end
+    return partial_fit!(pe, rd.X, rd.F; kw...)
 end
 function fold_prior(pe::AbstractPriorResult, ::ReturnsResult)
     return throw(ArgumentError("`pe` holds a fitted `$(typeof(pe))`, which has no state to fold an observation into: a prior result is batch configuration. Hand the optimiser the prior estimator to take the online step, or run `optimise(opt, rd)`."))
@@ -174,6 +166,7 @@ Folds the observations of a carrier into the fold context a host keeps, seeding 
   - `rd`: The carrier of the observations.
   - `max_history`: The cap the context takes when it is seeded, which is the cap of the buffer that holds the returns so the two stay in step.
   - `own_returns`: Whether the context keeps the returns itself, which is `true` for a head that holds no prior.
+  - `own_factors`: Whether the context keeps the factor column itself, which is `true` for a head that holds no prior and for a host whose prior's tree never reads it.
 
 # Returns
 
@@ -185,9 +178,9 @@ Folds the observations of a carrier into the fold context a host keeps, seeding 
   - [`partial_fit!`](@ref)
 """
 function fold_context(cache::Option{<:ReturnsBufferState}, rd::ReturnsResult,
-                      max_history::Option{<:Integer}, own_returns::Bool)
+                      max_history::Option{<:Integer}, own_returns::Bool, own_factors::Bool)
     state = isnothing(cache) ? ReturnsBufferState(; max_history = max_history) : cache
-    return partial_fit!(state, rd; own_returns = own_returns)
+    return partial_fit!(state, rd; own_returns = own_returns, own_factors = own_factors)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -195,6 +188,8 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 The step of a host that holds a prior and a fold context: forward to the prior, then record the context.
 
 The prior is folded first, because the context takes its cap from the buffer the prior seeds — a wrapper's `max_history` windows the prior's fit, and the context must drop the same rows at the same step so the read-out's carrier lines up with the prior's rows.
+
+`F` is owned once. The context keeps the factor column only when the prior's tree **never reads** it — when [`needs_factor_returns`](@ref) answers `false` — because otherwise the prior's own buffer records it and the read-out reads it back through [`prior_returns_buffer`](@ref), as it reads the returns. A tree that requires it, or one that takes what it is given, therefore holds `F` in one place.
 
 # Arguments
 
@@ -210,11 +205,13 @@ The prior is folded first, because the context takes its cap from the buffer the
   - [`fold_prior`](@ref)
   - [`fold_context`](@ref)
   - [`prior_returns_buffer`](@ref)
+  - [`needs_factor_returns`](@ref)
 """
 function fold_returns(host, rd::ReturnsResult)
     pe = fold_prior(host.pe, rd)
     rows = prior_returns_buffer(pe)
-    cache = fold_context(host.cache, rd, rows.max_history, false)
+    own_factors = needs_factor_returns(pe) === false
+    cache = fold_context(host.cache, rd, rows.max_history, false, own_factors)
     return rebuild_estimator(host, (; pe = pe, cache = cache))
 end
 """
@@ -274,7 +271,8 @@ function partial_fit!(opt::Union{<:EqualWeighted, <:RandomWeighted}, rd::Returns
     @argcheck(!isnothing(rd.X), IsNothingError("rd.X cannot be nothing"))
     max_history = isnothing(opt.cache) ? nothing : opt.cache.max_history
     return rebuild_estimator(opt,
-                             (; cache = fold_context(opt.cache, rd, max_history, true)))
+                             (;
+                              cache = fold_context(opt.cache, rd, max_history, true, true)))
 end
 function partial_fit!(opt::FiniteAllocationOptimisationEstimator, ::ReturnsResult)
     return throw(ArgumentError("a `$(typeof(opt))` has no online step: a finite allocation converts a weight vector and prices into share counts and reads no returns window, so there is nothing to fold. Take the step on the optimiser that produces the weights, and allocate its read-out with `optimise(da, w, p)`."))
@@ -378,7 +376,7 @@ end
 
 Rebuilds the [`ReturnsResult`](@ref) of the observations an optimiser has folded.
 
-The reconstitution verb of the read-out, on the optimiser: the rows come from the prior's buffer — or from the head's own, where it holds no prior — and every other column and the pinned context come from the [`ReturnsBufferState`](@ref) the host keeps. The result is a fresh carrier, equal field by field to the one a batch fit over the same observations would have read.
+The reconstitution verb of the read-out, on the optimiser: the rows come from the prior's buffer — or from the head's own, where it holds no prior — and every other column and the pinned context come from the [`ReturnsBufferState`](@ref) the host keeps. The factor column comes from whichever of the two owns it: the context where the prior's tree never reads it, and the prior's buffer otherwise. The result is a fresh carrier, equal field by field to the one a batch fit over the same observations would have read.
 
 # Arguments
 

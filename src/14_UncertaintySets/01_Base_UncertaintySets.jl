@@ -445,7 +445,7 @@ The method unpacks the container and forwards to the matrix method, so an estima
 # Algorithm
 
  1. Check that `rd.X` is not `nothing`, and raise otherwise.
- 2. When `uc.pe` is an [`AbstractHiLoOrderPriorEstimator_F`](@ref), check that `rd.F` is not `nothing`, and raise otherwise. A factor prior reads the factor returns, and no other prior does.
+ 2. When `uc.pe`'s estimator tree requires factor returns — when [`needs_factor_returns`](@ref) answers `true` — check that `rd.F` is not `nothing`, and raise otherwise. A factor leaf reads the factor returns, wherever it sits in the tree, and no other prior does.
  3. Forward to `ucs(uc, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs...)`, giving the pair of fitted sets. The implied volatility fields travel with the returns, because a prior that reads them takes them by keyword.
 
 # Arguments
@@ -457,7 +457,7 @@ The method unpacks the container and forwards to the matrix method, so an estima
 # Validation
 
   - `!isnothing(rd.X)`, raising an `IsNothingError`.
-  - If `uc.pe` is an [`AbstractHiLoOrderPriorEstimator_F`](@ref): `!isnothing(rd.F)`, raising an `IsNothingError`.
+  - If `needs_factor_returns(uc.pe) === true`: `!isnothing(rd.F)`, raising an `IsNothingError`.
 
 # Returns
 
@@ -472,10 +472,7 @@ The method unpacks the container and forwards to the matrix method, so an estima
 """
 function ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; kwargs...)
     @argcheck(!isnothing(rd.X), IsNothingError)
-    if isa(uc.pe, AbstractHiLoOrderPriorEstimator_F)
-        @argcheck(!isnothing(rd.F),
-                  IsNothingError("this is a factor prior; it needs factor returns. ReturnsResult.F is nothing — populate F (e.g. via prices_to_returns on factor prices)."))
-    end
+    assert_factor_returns(uc.pe, rd.F)
     return ucs(uc, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs...)
 end
 """
@@ -488,7 +485,7 @@ The method unpacks the container and forwards to the matrix method. A caller tha
 # Algorithm
 
  1. Check that `rd.X` is not `nothing`, and raise otherwise.
- 2. When `uc.pe` is an [`AbstractHiLoOrderPriorEstimator_F`](@ref), check that `rd.F` is not `nothing`, and raise otherwise. A factor prior reads the factor returns, and no other prior does.
+ 2. When `uc.pe`'s estimator tree requires factor returns — when [`needs_factor_returns`](@ref) answers `true` — check that `rd.F` is not `nothing`, and raise otherwise. A factor leaf reads the factor returns, wherever it sits in the tree, and no other prior does.
  3. Forward to `mu_ucs(uc, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs...)`, giving the fitted mean set. The implied volatility fields travel with the returns, because a prior that reads them takes them by keyword.
 
 # Arguments
@@ -500,7 +497,7 @@ The method unpacks the container and forwards to the matrix method. A caller tha
 # Validation
 
   - `!isnothing(rd.X)`, raising an `IsNothingError`.
-  - If `uc.pe` is an [`AbstractHiLoOrderPriorEstimator_F`](@ref): `!isnothing(rd.F)`, raising an `IsNothingError`.
+  - If `needs_factor_returns(uc.pe) === true`: `!isnothing(rd.F)`, raising an `IsNothingError`.
 
 # Returns
 
@@ -515,10 +512,7 @@ The method unpacks the container and forwards to the matrix method. A caller tha
 """
 function mu_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; kwargs...)
     @argcheck(!isnothing(rd.X), IsNothingError)
-    if isa(uc.pe, AbstractHiLoOrderPriorEstimator_F)
-        @argcheck(!isnothing(rd.F),
-                  IsNothingError("this is a factor prior; it needs factor returns. ReturnsResult.F is nothing — populate F (e.g. via prices_to_returns on factor prices)."))
-    end
+    assert_factor_returns(uc.pe, rd.F)
     return mu_ucs(uc, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs...)
 end
 """
@@ -531,7 +525,7 @@ The method unpacks the container and forwards to the matrix method. An estimator
 # Algorithm
 
  1. Check that `rd.X` is not `nothing`, and raise otherwise.
- 2. When `uc.pe` is an [`AbstractHiLoOrderPriorEstimator_F`](@ref), check that `rd.F` is not `nothing`, and raise otherwise. A factor prior reads the factor returns, and no other prior does.
+ 2. When `uc.pe`'s estimator tree requires factor returns — when [`needs_factor_returns`](@ref) answers `true` — check that `rd.F` is not `nothing`, and raise otherwise. A factor leaf reads the factor returns, wherever it sits in the tree, and no other prior does.
  3. Forward to `sigma_ucs(uc, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs...)`, giving the fitted covariance set. The implied volatility fields travel with the returns, because a prior that reads them takes them by keyword.
 
 # Arguments
@@ -543,7 +537,7 @@ The method unpacks the container and forwards to the matrix method. An estimator
 # Validation
 
   - `!isnothing(rd.X)`, raising an `IsNothingError`.
-  - If `uc.pe` is an [`AbstractHiLoOrderPriorEstimator_F`](@ref): `!isnothing(rd.F)`, raising an `IsNothingError`.
+  - If `needs_factor_returns(uc.pe) === true`: `!isnothing(rd.F)`, raising an `IsNothingError`.
 
 # Returns
 
@@ -558,10 +552,7 @@ The method unpacks the container and forwards to the matrix method. An estimator
 """
 function sigma_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; kwargs...)
     @argcheck(!isnothing(rd.X), IsNothingError)
-    if isa(uc.pe, AbstractHiLoOrderPriorEstimator_F)
-        @argcheck(!isnothing(rd.F),
-                  IsNothingError("this is a factor prior; it needs factor returns. ReturnsResult.F is nothing — populate F (e.g. via prices_to_returns on factor prices)."))
-    end
+    assert_factor_returns(uc.pe, rd.F)
     return sigma_ucs(uc, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs...)
 end
 """

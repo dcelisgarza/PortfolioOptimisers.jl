@@ -57,9 +57,8 @@
 "src/01_Base/12_NormError.jl" = { map = 1, units = 8, algorithm = 2, swept = true }
 "src/01_Base/13_KappaLog.jl" = { map = 1, units = 1, algorithm = 0, swept = true }
 "src/01_Base/14_PartialFit.jl" = { map = 1, units = 10, swept = false }
-"src/01_Base/15_Online.jl" = { map = 1, units = 36, swept = false }
+"src/01_Base/15_Online.jl" = { map = 1, units = 39, swept = false }
 "src/01_Base/16_CoveragePolicy.jl" = { map = 1, units = 24, swept = false }
-"src/01_Base/17_FactorSampleBuffer.jl" = { map = 1, units = 8, swept = false }
 "src/02_Tools.jl" = { map = 1, units = 69, algorithm = 49, swept = true }
 "src/03_InputData/01_AssetPanel.jl" = { map = 2, units = 33, swept = false }
 "src/03_InputData/02_AssetPanelBuilder.jl" = { map = 2, units = 22, swept = false }
@@ -216,7 +215,7 @@
 "src/13_Prior/15_AssetPanelEstimators.jl" = { map = 6, units = 11, swept = false }
 "src/13_Prior/16_Base_CrossSectionalFactorPrior.jl" = { map = 6, units = 30, swept = false }
 "src/13_Prior/17_CrossSectionalFactorPrior.jl" = { map = 6, units = 4, swept = false }
-"src/13_Prior/18_PriorPartialFit.jl" = { map = 6, units = 18, swept = false }
+"src/13_Prior/18_PriorPartialFit.jl" = { map = 6, units = 22, swept = false }
 "src/14_UncertaintySets/01_Base_UncertaintySets.jl" = { map = 7, units = 42, algorithm = 11, swept = true }
 "src/14_UncertaintySets/02_DeltaUncertaintySets.jl" = { map = 7, units = 6, algorithm = 5, swept = true }
 "src/14_UncertaintySets/03_NormalUncertaintySets.jl" = { map = 7, units = 25, algorithm = 24, swept = true }

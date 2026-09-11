@@ -5,7 +5,7 @@ Carries the fold context an optimiser keeps beside its prior, so that a read-out
 
 The state of the optimiser's online step, decided by [#867](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/867). An optimiser forwards each observation to its prior and to nothing else, and a read-out runs the ordinary batch path over a `ReturnsResult` rebuilt from the state — because every meta-optimiser hands its inner optimisers a view of the caller's carrier, and every [`UniverseSets`](@ref) constraint resolves by asset name, so a read-out that handed the batch path a bare matrix would hand it an empty panel and no names.
 
-The returns are **owned once**, by the prior at the bottom of the chain, which carries them in its own state; this state holds them only where no prior sits beneath the optimiser — [`EqualWeighted`](@ref) and [`RandomWeighted`](@ref), which read the observations and hold no prior. Everything else the carrier holds and the prior does not is here: the factor and benchmark columns as buffers of their own, the timestamps, and the context that is pinned by the first step and checked at every step after it — the asset, factor and benchmark names, and a static [`AssetPanel`](@ref). A time-varying panel is not pinned: its masks ride with the observations they explain into the returns buffer, and the read-out rebuilds the panel from them.
+The returns are **owned once**, by the prior at the bottom of the chain, which carries them in its own state; this state holds them only where no prior sits beneath the optimiser — [`EqualWeighted`](@ref) and [`RandomWeighted`](@ref), which read the observations and hold no prior. The factor column is owned once on the same terms: the prior's buffer records it wherever the prior's estimator tree reads it, and this state keeps it only where the tree never does — [`needs_factor_returns`](@ref) answering `false` — or where no prior sits beneath. Everything else the carrier holds and the prior does not is here: the benchmark column as a buffer of its own, the timestamps, and the context that is pinned by the first step and checked at every step after it — the asset, factor and benchmark names, and a static [`AssetPanel`](@ref). A time-varying panel is not pinned: its masks ride with the observations they explain into the returns buffer, and the read-out rebuilds the panel from them.
 
 Every column buffer is a [`SampleBufferState`](@ref), so the orientation, the cap, the merge, the copy and the asset slice are inherited per column, and `max_history` is one cap over every column. A single-column benchmark is held as a plain vector, as the timestamps are, because a vector benchmark is not indexed by asset and a slice leaves it alone.
 
@@ -64,7 +64,7 @@ When [`port_opt_view`](@ref) is called on this type, its fields are subset to th
     """
     nf
     """
-    Buffer of the factor returns, `observations × factors`, or `nothing` when the carrier holds none.
+    Buffer of the factor returns, `observations × factors`. `nothing` when the carrier holds none, and when the prior beneath the optimiser records them in its own buffer, which is every prior whose tree reads them.
     """
     F
     """
@@ -319,19 +319,20 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Folds the observations of a [`ReturnsResult`](@ref) into a [`ReturnsBufferState`](@ref).
 
-The state's own step: it pins the context on the first observation, checks it on every later one, and appends each column the carrier holds to the buffer of that column. The returns are appended only when the state owns them, which [`own_returns`](@ref) decides once per host; a state whose prior carries the rows appends nothing for `X` and nothing for the masks, because both travel to the prior. The panel is either pinned, when it is static, or left to the returns buffer, when it is time-varying.
+The state's own step: it pins the context on the first observation, checks it on every later one, and appends each column the carrier holds to the buffer of that column. The returns are appended only when the state owns them, which `own_returns` decides once per host; a state whose prior carries the rows appends nothing for `X` and nothing for the masks, because both travel to the prior. The factor column is appended only when the state owns it, which `own_factors` decides once per host from the prior's tree: a prior that reads `F` records it in its own buffer, whose first-append rule then refuses a column that comes and goes, so this state neither keeps it nor checks its presence. The panel is either pinned, when it is static, or left to the returns buffer, when it is time-varying.
 
 # Algorithm
 
- 1. On the first observation, pin `nx`, `nf`, `nb` and a static `pnl`. On every other, refuse a carrier whose pinned context differs, and one that adds or drops a column.
+ 1. On the first observation, pin `nx`, `nf`, `nb` and a static `pnl`. On every other, refuse a carrier whose pinned context differs, and one that adds or drops a column the state owns.
  2. Append `X` where the state owns the rows, with the active mask of a time-varying panel.
- 3. Append `F`, `B` and `ts` where the carrier holds them.
+ 3. Append `F` where the state owns the factor column, and `B` and `ts` where the carrier holds them.
 
 # Arguments
 
   - `state`: The state to fold into.
   - `rd`: The carrier holding one or more observations, `observations × assets`.
   - `own_returns`: Whether this state keeps the returns, which is `true` for a head that holds no prior and `false` otherwise.
+  - `own_factors`: Whether this state keeps the factor column, which is `true` for a head that holds no prior and for a host whose prior's tree never reads it, and `false` otherwise.
 
 # Validation
 
@@ -350,7 +351,7 @@ The state's own step: it pins the context on the first observation, checks it on
   - [`fold_column`](@ref)
 """
 function partial_fit!(state::ReturnsBufferState, rd::ReturnsResult;
-                      own_returns::Bool = false)
+                      own_returns::Bool = false, own_factors::Bool = true)
     @argcheck(!isnothing(rd.X), IsNothingError("rd.X cannot be nothing"))
     n = context_count(state)
     static = isnothing(rd.pnl) || panel_is_static(rd.pnl)
@@ -364,7 +365,9 @@ function partial_fit!(state::ReturnsBufferState, rd::ReturnsResult;
         assert_pinned_context(state.nf, rd.nf, :nf)
         assert_pinned_context(state.nb, rd.nb, :nb)
         assert_pinned_context(state.pnl, pnl, :pnl)
-        assert_column_presence(state.F, rd.F, n, :F)
+        if own_factors
+            assert_column_presence(state.F, rd.F, n, :F)
+        end
         assert_column_presence(state.B, rd.B, n, :B)
         assert_column_presence(state.ts, rd.ts, n, :ts)
     end
@@ -374,9 +377,8 @@ function partial_fit!(state::ReturnsBufferState, rd::ReturnsResult;
     else
         state.X
     end
-    return ReturnsBufferState(; nx = state.nx, X = X, nf = state.nf,
-                              F = fold_column(state.F, rd.F, state.max_history),
-                              nb = state.nb,
+    F = own_factors ? fold_column(state.F, rd.F, state.max_history) : state.F
+    return ReturnsBufferState(; nx = state.nx, X = X, nf = state.nf, F = F, nb = state.nb,
                               B = fold_column(state.B, rd.B, state.max_history),
                               ts = fold_column(state.ts, rd.ts, state.max_history),
                               pnl = state.pnl, max_history = state.max_history)
@@ -415,7 +417,7 @@ end
 
 Rebuilds the [`ReturnsResult`](@ref) the observations folded so far describe.
 
-The reconstitution verb of the optimiser's read-out. `rows` is the buffer that holds the returns — the prior's, or the state's own when the head holds no prior — and the state holds every other column and the pinned context. Every array is **materialised**, not viewed: a buffer's backing matrix is written and reallocated by the next fold, and a carrier holding a view of it would change under its holder.
+The reconstitution verb of the optimiser's read-out. `rows` is the buffer that holds the returns — the prior's, or the state's own when the head holds no prior — and the state holds every other column and the pinned context. The factor column comes from the state where it owns one, and from `rows` otherwise, through [`factor_buffer`](@ref): a prior whose tree reads `F` records it beside its rows, so the two are owned once and read from where they live. Every array is **materialised**, not viewed: a buffer's backing matrix is written and reallocated by the next fold, and a carrier holding a view of it would change under its holder.
 
 The panel comes from one of two places. A static panel was pinned by the first step and is returned as it was given. A time-varying panel was never held: its active mask rode into the returns buffer, and it is rebuilt here with the estimation mask equal to the active one, because the estimation mask does not travel the step (see [`partial_fit!`](@ref) on an optimiser).
 
@@ -439,6 +441,7 @@ The panel comes from one of two places. A static panel was pinned by the first s
   - [`ReturnsResult`](@ref)
   - [`sample_buffer`](@ref)
   - [`sample_buffer_kwargs`](@ref)
+  - [`factor_buffer`](@ref)
 """
 function returns_result(state::ReturnsBufferState, rows::SampleBufferState)
     n = context_count(state)
@@ -453,20 +456,22 @@ function returns_result(state::ReturnsBufferState, rows::SampleBufferState)
     else
         state.pnl
     end
-    return ReturnsResult(; nx = state.nx, X = X, nf = state.nf, F = column_matrix(state.F),
-                         nb = state.nb, B = column_matrix(state.B),
-                         ts = column_matrix(state.ts), pnl = pnl)
+    F = isnothing(state.F) ? column_matrix(factor_buffer(rows)) : column_matrix(state.F)
+    return ReturnsResult(; nx = state.nx, X = X, nf = state.nf, F = F, nb = state.nb,
+                         B = column_matrix(state.B), ts = column_matrix(state.ts),
+                         pnl = pnl)
 end
 """
     column_matrix(buffer::Nothing)
     column_matrix(buffer::SampleBufferState)
+    column_matrix(buffer::AbstractMatrix)
     column_matrix(buffer::AbstractVector)
 
-Materialises one column of a [`ReturnsBufferState`](@ref) for the carrier a read-out rebuilds.
+Materialises one column of a [`ReturnsBufferState`](@ref), or the factor rows a prior's buffer holds, for the carrier a read-out rebuilds.
 
 # Arguments
 
-  - `buffer`: The column's buffer, or `nothing`.
+  - `buffer`: The column's buffer, the valid region of the prior's factor rows, or `nothing`.
 
 # Returns
 
@@ -482,6 +487,9 @@ function column_matrix(::Nothing)
 end
 function column_matrix(buffer::SampleBufferState)
     return Matrix(sample_buffer(buffer))
+end
+function column_matrix(buffer::AbstractMatrix)
+    return Matrix(buffer)
 end
 function column_matrix(buffer::AbstractVector)
     return copy(buffer)
@@ -588,7 +596,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Slices a [`ReturnsBufferState`](@ref) to the selected assets.
 
-The asset axis runs through `nx`, `X`, a matrix benchmark and its names, and the panel; the factors, the timestamps and a single-column benchmark are not indexed by asset and are copied unchanged, for the reason [`FactorSampleBufferState`](@ref) copies its factor half — a later fold on the viewed estimator must not write through into the estimator the view was taken from.
+The asset axis runs through `nx`, `X`, a matrix benchmark and its names, and the panel; the factors, the timestamps and a single-column benchmark are not indexed by asset and are copied unchanged, for the reason [`port_opt_view`](@ref) on a [`SampleBufferState`](@ref) copies its factor rows — a later fold on the viewed estimator must not write through into the estimator the view was taken from.
 
 # Arguments
 

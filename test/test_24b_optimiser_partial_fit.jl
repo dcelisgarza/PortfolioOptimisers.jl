@@ -103,10 +103,14 @@ assets is what keeps the JuMP families cheap.
             rb = optimise(opt, b)
             # A solver reads the folded moments through its own tolerance, so the JuMP
             # families agree to a solver's precision and the rest to the moments' own.
+            # `RiskBudgeting` is the knife edge of the family: two solves of the same
+            # programme differ by 1.3e-5 in one weight on Julia 1.13 whatever Clarabel
+            # tolerance is set, so it takes the width it measures.
             solved = isa(opt, po.JuMPOptimisationEstimator) ||
                      isa(opt, NestedClustered) ||
                      isa(opt, SubsetResampling)
-            @test isapprox(ro.w, rb.w; atol = solved ? 1e-5 : 1e-10)
+            atol = isa(opt, RiskBudgeting) ? 5e-5 : (solved ? 1e-5 : 1e-10)
+            @test isapprox(ro.w, rb.w; atol = atol)
         end
         # A block warm-up followed by single steps reaches the same weights.
         o = partial_fit!(MeanRisk(; opt = jopt), rows(rd, 1:50))
@@ -128,6 +132,30 @@ assets is what keeps the JuMP families cheap.
             o = step(po.update_online_estimator(InverseVolatility(; pe = online)), rdf, t)
             @test isapprox(optimise(o).w, optimise(opt, b).w; rtol = 1e-8)
         end
+        # `F` is owned once (#1013): a prior whose tree reads it records it in its own
+        # buffer and the context keeps none, while a tree that never reads it leaves the
+        # column to the context. The read-out's carrier is the same either way.
+        ep_f = EntropyPoolingPrior(; pe = FactorPrior())
+        o = step(po.update_online_estimator(InverseVolatility(; pe = po.Online(ep_f))), rdf,
+                 t)
+        @test isnothing(o.cache.F)
+        @test po.factor_buffer(po.prior_returns_buffer(o.pe)) == F[1:t, :]
+        @test same_fields(po.returns_result(o), b)
+        e = step(po.update_online_estimator(InverseVolatility(;
+                                                              pe = po.Online(EntropyPoolingPrior()))),
+                 rdf, t)
+        @test !isnothing(e.cache.F)
+        @test isnothing(po.factor_buffer(po.prior_returns_buffer(e.pe)))
+        @test same_fields(po.returns_result(e), b)
+        # A factor leaf under an optional-argument host, through a JuMP optimiser on a
+        # walk-forward with `rd.F` present, against batch.
+        mr(pe) = MeanRisk(; opt = JuMPOptimiser(; pe = pe, slv = slv))
+        o = step(po.update_online_estimator(mr(po.Online(ep_f))), rdf, t)
+        @test isapprox(optimise(o).w, optimise(mr(ep_f), b).w; atol = 1e-5)
+        # And the same tree with `rd.F` absent is refused by name at the step, not at the
+        # leaf.
+        @test_throws po.IsNothingError partial_fit!(po.update_online_estimator(mr(po.Online(ep_f))),
+                                                    rows(rd, 1:1))
         # A wrapper two levels down is resolved through the optimiser's warm-up: the host
         # holds a wrapping prior, which holds another, which holds the wrapper.
         nested(pe) = HighOrderPriorEstimator(;

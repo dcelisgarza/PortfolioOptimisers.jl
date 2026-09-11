@@ -23,9 +23,8 @@ commit = "3bf8e27c4e"
 "src/01_Base/12_NormError.jl" = { cyc = 2, cog = 2, arg = 4, cyc_sum = 28, cog_sum = 6, arg_sum = 52, macros = [] }
 "src/01_Base/13_KappaLog.jl" = { cyc = 1, cog = 0, arg = 2, cyc_sum = 1, cog_sum = 0, arg_sum = 2, macros = [] }
 "src/01_Base/14_PartialFit.jl" = { cyc = 4, cog = 4, arg = 6, cyc_sum = 17, cog_sum = 8, arg_sum = 26, macros = [] }
-"src/01_Base/15_Online.jl" = { cyc = 7, cog = 7, arg = 5, cyc_sum = 48, cog_sum = 32, arg_sum = 46, macros = [] }
+"src/01_Base/15_Online.jl" = { cyc = 6, cog = 6, arg = 6, cyc_sum = 86, cog_sum = 47, arg_sum = 112, macros = [] }
 "src/01_Base/16_CoveragePolicy.jl" = { cyc = 8, cog = 15, arg = 5, cyc_sum = 54, cog_sum = 53, arg_sum = 55, macros = [] }
-"src/01_Base/17_FactorSampleBuffer.jl" = { cyc = 4, cog = 5, arg = 6, cyc_sum = 13, cog_sum = 12, arg_sum = 22, macros = [] }
 "src/02_Tools.jl" = { cyc = 45, cog = 96, arg = 6, cyc_sum = 238, cog_sum = 233, arg_sum = 262, macros = ["@propagatable"] }
 "src/03_InputData/01_AssetPanel.jl" = { cyc = 7, cog = 9, arg = 6, cyc_sum = 90, cog_sum = 53, arg_sum = 89, macros = [] }
 "src/03_InputData/02_AssetPanelBuilder.jl" = { cyc = 7, cog = 10, arg = 6, cyc_sum = 67, cog_sum = 55, arg_sum = 56, macros = [] }
@@ -43,7 +42,7 @@ commit = "3bf8e27c4e"
 "src/03_InputData/14_CrossSectionalTransforms.jl" = { cyc = 6, cog = 11, arg = 8, cyc_sum = 98, cog_sum = 99, arg_sum = 75, macros = [] }
 "src/03_InputData/15_FeatureSelector.jl" = { cyc = 10, cog = 10, arg = 3, cyc_sum = 56, cog_sum = 50, arg_sum = 19, macros = [] }
 "src/03_InputData/16_PanelDataFrame.jl" = { cyc = 7, cog = 9, arg = 7, cyc_sum = 37, cog_sum = 35, arg_sum = 47, macros = [] }
-"src/03_InputData/17_ReturnsBufferState.jl" = { cyc = 9, cog = 11, arg = 4, cyc_sum = 59, cog_sum = 53, arg_sum = 40, macros = [] }
+"src/03_InputData/17_ReturnsBufferState.jl" = { cyc = 9, cog = 15, arg = 4, cyc_sum = 63, cog_sum = 59, arg_sum = 42, macros = [] }
 "src/04_PosdefMatrix.jl" = { cyc = 5, cog = 4, arg = 2, cyc_sum = 10, cog_sum = 5, arg_sum = 4, macros = [] }
 "src/05_Denoise.jl" = { cyc = 4, cog = 6, arg = 7, cyc_sum = 18, cog_sum = 11, arg_sum = 30, macros = [] }
 "src/06_Detone.jl" = { cyc = 3, cog = 2, arg = 2, cyc_sum = 8, cog_sum = 3, arg_sum = 8, macros = [] }
@@ -182,7 +181,7 @@ commit = "3bf8e27c4e"
 "src/13_Prior/15_AssetPanelEstimators.jl" = { cyc = 3, cog = 4, arg = 4, cyc_sum = 21, cog_sum = 8, arg_sum = 21, macros = ["@propagatable"] }
 "src/13_Prior/16_Base_CrossSectionalFactorPrior.jl" = { cyc = 10, cog = 14, arg = 8, cyc_sum = 95, cog_sum = 81, arg_sum = 88, macros = [] }
 "src/13_Prior/17_CrossSectionalFactorPrior.jl" = { cyc = 5, cog = 8, arg = 19, cyc_sum = 12, cog_sum = 11, arg_sum = 35, macros = ["@propagatable"] }
-"src/13_Prior/18_PriorPartialFit.jl" = { cyc = 2, cog = 2, arg = 4, cyc_sum = 31, cog_sum = 22, arg_sum = 73, macros = [] }
+"src/13_Prior/18_PriorPartialFit.jl" = { cyc = 3, cog = 3, arg = 6, cyc_sum = 49, cog_sum = 36, arg_sum = 96, macros = [] }
 "src/14_UncertaintySets/01_Base_UncertaintySets.jl" = { cyc = 3, cog = 3, arg = 7, cyc_sum = 52, cog_sum = 27, arg_sum = 84, macros = [] }
 "src/14_UncertaintySets/02_DeltaUncertaintySets.jl" = { cyc = 1, cog = 1, arg = 5, cyc_sum = 7, cog_sum = 1, arg_sum = 22, macros = [] }
 "src/14_UncertaintySets/03_NormalUncertaintySets.jl" = { cyc = 3, cog = 3, arg = 9, cyc_sum = 29, cog_sum = 5, arg_sum = 117, macros = [] }
@@ -293,7 +292,7 @@ commit = "3bf8e27c4e"
 "src/20_Optimisation/22_DiscreteFiniteAllocation.jl" = { cyc = 5, cog = 7, arg = 11, cyc_sum = 26, cog_sum = 20, arg_sum = 61, macros = [] }
 "src/20_Optimisation/23_GreedyFiniteAllocation.jl" = { cyc = 9, cog = 14, arg = 7, cyc_sum = 23, cog_sum = 20, arg_sum = 38, macros = [] }
 "src/20_Optimisation/24_RiskMeasureCompatibility.jl" = { cyc = 2, cog = 2, arg = 2, cyc_sum = 15, cog_sum = 6, arg_sum = 15, macros = [] }
-"src/20_Optimisation/25_OnlineOptimisation.jl" = { cyc = 3, cog = 4, arg = 4, cyc_sum = 47, cog_sum = 24, arg_sum = 57, macros = [] }
+"src/20_Optimisation/25_OnlineOptimisation.jl" = { cyc = 3, cog = 2, arg = 5, cyc_sum = 45, cog_sum = 22, arg_sum = 57, macros = [] }
 "src/21_ExpectedReturns.jl" = { cyc = 6, cog = 10, arg = 9, cyc_sum = 53, cog_sum = 42, arg_sum = 118, macros = ["@propagatable"] }
 "src/21_FactorAttribution.jl" = { cyc = 3, cog = 6, arg = 6, cyc_sum = 59, cog_sum = 16, arg_sum = 72, macros = [] }
 "src/21_FactorAttributionRealised.jl" = { cyc = 4, cog = 5, arg = 9, cyc_sum = 85, cog_sum = 29, arg_sum = 177, macros = [] }

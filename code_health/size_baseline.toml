@@ -26,7 +26,6 @@ commit = "3bf8e27c4e"
 "src/01_Base/14_PartialFit.jl" = { code = 69, doc = 222, comment = 2, blank = 127, total = 420 }
 "src/01_Base/15_Online.jl" = { code = 340, doc = 674, comment = 5, blank = 341, total = 1360 }
 "src/01_Base/16_CoveragePolicy.jl" = { code = 198, doc = 406, comment = 0, blank = 195, total = 799 }
-"src/01_Base/17_FactorSampleBuffer.jl" = { code = 55, doc = 152, comment = 2, blank = 83, total = 292 }
 "src/02_Tools.jl" = { code = 808, doc = 2044, comment = 46, blank = 867, total = 3765 }
 "src/03_InputData/01_AssetPanel.jl" = { code = 373, doc = 680, comment = 0, blank = 330, total = 1383 }
 "src/03_InputData/02_AssetPanelBuilder.jl" = { code = 281, doc = 608, comment = 0, blank = 270, total = 1159 }

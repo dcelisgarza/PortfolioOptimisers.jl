@@ -43,10 +43,12 @@ call.
 Issue #867 §3 specified one `ReturnsBufferState` holding every per-observation column of the carrier,
 carried by `EmpiricalPrior` as pass-through columns it never reads. #968 landed before that
 correction and built the prior's states without it — a `PriorCarryState` holding the rows, a
-`SampleBufferState` for a refit, a `FactorSampleBufferState` for a prior whose batch verb requires
-`F` — and the prior's step keeps the arity of its batch verb, `partial_fit!(pe, x)` or
-`partial_fit!(pe, x, f)`, with no slot for a benchmark or a timestamp. So the pass-through columns
-have no home at the prior layer, and the state #867 named has to live somewhere else.
+`SampleBufferState` for a refit, and at first a `FactorSampleBufferState` for a prior whose batch
+verb requires `F`, which [#1013](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1013)
+folded back into the one buffer — and the prior's step keeps the arity of its batch verb,
+`partial_fit!(pe, x, f = nothing)`, with no slot for a benchmark or a timestamp. So the
+pass-through columns have no home at the prior layer, and the state #867 named has to live
+somewhere else.
 
 ## Decision
 
@@ -54,9 +56,12 @@ have no home at the prior layer, and the state #867 named has to live somewhere 
 
 `partial_fit!(opt, rd)` folds the observations of a carrier and returns the estimator; it solves
 nothing. `optimise(opt)` with no returns reads the state out and solves once. The step **forwards
-the observations to the prior alone**, in the prior's own arity — `X` and `F` to a prior that
-requires factor returns, `X` to every other, and the active mask of a time-varying Asset Panel as
-the keyword the prior's step takes — and to nothing else. Every optimiser has a `pe`, the three
+the observations to the prior alone**, in the prior's own arity — `X` and `F` verbatim, with a
+missing `F` refused by name at the door when the prior's estimator tree requires one, and the
+active mask of a time-varying Asset Panel as the keyword the prior's step takes — and to nothing
+else. What the prior does with `F` is its tree's decision, not the optimiser's: the tree records
+it, drops it, or takes what it is given, exactly as its batch verb does
+([ADR 0136](0136-a-prior-folds-and-carries-the-buffer-is-owned-once-and-a-cap-is-either-a-scenario-cap-or-a-window.md)). Every optimiser has a `pe`, the three
 meta-optimisers included, so one named forward per family reaches the whole library and the rule
 for every optimiser added later is stated once: **an optimiser forwards the observation to its
 prior and to nothing else, and everything it holds beside the prior takes its ordinary batch fit at
@@ -96,14 +101,20 @@ read-out.
 The state #867 named is a `ReturnsBufferState`, and it lives in a `cache` field on the eight hosts
 that hold a prior or read the observations directly: `JuMPOptimiser`, `HierarchicalOptimiser`,
 `InverseVolatility`, `NestedClustered`, `Stacking`, `SubsetResampling`, `EqualWeighted` and
-`RandomWeighted`. It carries what the prior does not: the factor and benchmark columns as
-`SampleBufferState`s of their own, a single-column benchmark and the timestamps as plain vectors,
-and the context pinned by the first step and checked at every step after it — `nx`, `nf`, `nb` and
-a static Asset Panel. The returns stay **owned once, by the prior**; the context reads them out of
+`RandomWeighted`. It carries what the prior does not: the benchmark column as a
+`SampleBufferState` of its own, a single-column benchmark and the timestamps as plain vectors,
+the factor column as a `SampleBufferState` **only when the prior's tree never reads it**, and the
+context pinned by the first step and checked at every step after it — `nx`, `nf`, `nb` and a
+static Asset Panel. The returns stay **owned once, by the prior**; the context reads them out of
 the prior's own buffer through `prior_returns_buffer`, which walks a wrapping prior down to the
-prior that holds the rows. Only `EqualWeighted` and `RandomWeighted`, which hold no prior but
-derive the Coverage Universe of their own window, keep the rows in their context, because with no
-prior beneath them they are the bottom of the chain and ADR 0136's rule is unbent.
+prior that holds the rows. `F` is owned once on the same terms: a prior whose tree reads it —
+`needs_factor_returns` answering `true` or `nothing` — records it inside its own Sample Buffer
+beside the rows, and the read-out reads it back through that buffer's `factor_buffer`; only where
+the tree answers `false` does the context keep the column, because the prior then holds nothing
+to read it from. Only `EqualWeighted` and `RandomWeighted`, which hold no prior but derive the
+Coverage Universe of their own window, keep the rows and the factor column in their context,
+because with no prior beneath them they are the bottom of the chain and ADR 0136's rule is
+unbent.
 
 The context takes its cap from the prior's buffer, so a wrapper's `max_history` windows the whole
 carrier and the read-out's rows line up with the prior's. `Online` therefore wraps the **prior**,
@@ -181,7 +192,8 @@ reference line for line and correct today for every non-frontier optimiser.
 - `iv`, a time-varying Panel Field and a narrowed estimation mask do not travel the step, and each
   is refused by name. Carrying any of them is a decision for a later ticket of map #861, and the
   refusals mark where it lands.
-- A factor prior under `Online` holds `F` twice: once in its own pair of buffers, once in the
-  context, so that the read-out's `rd′.F` comes from one place whatever prior sits beneath it. The
-  duplicate is a matrix of factors, not of assets, and it is the price of one uniform
-  reconstitution.
+- `F` is held once. A factor prior under `Online` records it in its own buffer and the context
+  keeps none; a prior that never reads it leaves the column to the context. The read-out's `rd′.F`
+  therefore comes from whichever of the two owns it, and `returns_result` reads the prior's buffer
+  when the context holds no factor column. #1013 replaced the duplicate this bullet used to
+  record.
