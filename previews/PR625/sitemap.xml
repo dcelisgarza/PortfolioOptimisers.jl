@@ -604,6 +604,12 @@
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/20_Optimisation/02_CrossValidation/12_OnlineFoldLoop/</loc>
   </url>
   <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/20_Optimisation/02_CrossValidation/13_CovarianceForecastEvaluation/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/20_Optimisation/02_CrossValidation/14_CovarianceForecastSummary/</loc>
+  </url>
+  <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/20_Optimisation/03_NaiveOptimisation/</loc>
   </url>
   <url>
