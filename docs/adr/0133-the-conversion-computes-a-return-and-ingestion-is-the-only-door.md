@@ -99,7 +99,7 @@ prices_to_returns(pr::PricesResult;
 | --- | --- | --- |
 | `F`, `B`, `iv`, `ivpa`, `pnl`, `span` | fields of `PricesResult` | they already are |
 | `join_method`, `collapse_args` | `PriceIngestion` | they move the observation clock (ADR 0129) |
-| `map_func` | an elementwise `Pipeline` step | ADR 0129 assigned it there |
+| `map_func` | nobody — deleted | nothing outside a test used it, and ADR 0129 mints no value-only step |
 | `nan_to_missing` | nobody — deleted | absence has one spelling, fixed at the door |
 | `impute_method` | `PriceGapFill` | ADR 0130 fixed the layer's one fill |
 | `missing_col_percent`, `missing_row_percent` | `MissingDataFilter` | its docstring already claims them |

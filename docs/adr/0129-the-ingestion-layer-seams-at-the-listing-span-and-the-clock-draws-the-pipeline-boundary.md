@@ -136,8 +136,11 @@ Unification of the two absent-price conventions defines what counts as a gap, so
 span rule. The factor and benchmark join adds rows under an outer join. A frequency collapse
 renumbers every observation. All three therefore run in `PriceIngestion`, an estimator that is not
 a `Pipeline` step and that runs once on the whole panel, emitting the span-carrying price carrier.
-The elementwise map leaves the clock and the gap pattern intact and is an ordinary `:prices →
-:prices` step.
+
+The rule's other side is a transform that touches values only. It leaves the clock and the gap
+pattern intact, so it is expressible as an ordinary `:prices → :prices` step, and the layer mints
+**no such step**. The rule says where one would go if the library wanted one; it does not say the
+library wants one. See *The value-only side of the rule mints nothing* below.
 
 The rule is forced by the fold mechanics rather than chosen. It is also why nothing is lost by
 placing the clock-movers outside: a clock-changing hyperparameter changes the test set, so it is
@@ -186,17 +189,48 @@ sliceable: the span, both masks and every field follow `port_opt_view` in step w
 with no carrier and no conversion in sight — the library's bare-arrays-first hierarchy, and the
 surface [#961](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/961) builds against.
 
-`PriceIngestion` is an **estimator that is not a step**. `ElementwiseMap` and `PricesToReturns` are
-**stateless steps**: they carry conventions rather than learned state, so `fit_preprocessing`
-returns the estimator itself.
+`PriceIngestion` is an **estimator that is not a step**. `PricesToReturns` is a **stateless step**:
+it carries conventions rather than learned state, so `fit_preprocessing` returns the estimator
+itself.
+
+### The value-only side of the rule mints nothing
+
+A price-level transform that touches values only is a step by the rule above, and the layer mints
+none. The conversion's `map_func` keyword, which
+[ADR 0133](0133-the-conversion-computes-a-return-and-ingestion-is-the-only-door.md) removes, is
+therefore removed outright rather than rehomed.
+
+Three measurements settle it, taken on
+[#1001](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1001):
+
+- **Nothing outside a test ever used it.** `map_func`'s only call sites in the repository were two
+  assertions in `test/test_06_preprocessing.jl` — a scale and a shift. No example, no user-guide
+  page and no `src/` caller.
+- **A step buys nothing the fold mechanics could not already give.** Such a step is stateless, so
+  applying it per window and mapping the table once before the door produce identical numbers. What
+  a step would buy is provenance in the `PipelineResult` and searchability over the function — and
+  this ADR already accepts the opposite trade for the join and the collapse, which the caller's
+  script records rather than the result.
+- **The one scalar price transform with a meaning is already served.** `PricesToReturns` takes
+  `ret_method = :log`, so log returns need no logarithm applied to prices.
+
+A transform that reads a date or a second series — a currency conversion, a deflation — is not
+elementwise and would not be served by an elementwise step in any case. A caller expresses either
+kind by mapping the table they hold before the door, in one line.
+
+The rule stays whole: if a concrete value-only transform appears that the library should own, this
+ADR already says it is a `:prices → :prices` step. Minting the family before there is a member
+would cost an estimator, its export, its Capability Catalogue entry, its API-page entry, its sweep
+row and five baselines, and buy nothing.
 
 ## Consequences
 
-The ten requirements the layer must serve each have one named owner. Conversion, mask emission and
-the panel are `PricesToReturns`; unification, the join and the collapse are `PriceIngestion`; the
-active mask is `listing_span` and the estimation mask `universe_masks`; the elementwise map is
-`ElementwiseMap`; implied volatilities are carriage plus clock alignment; the split is
-`TrainTestSplit`, which the layer does not own.
+The ten requirements the layer must serve each have one named owner or a stated reason for having
+none. Conversion, mask emission and the panel are `PricesToReturns`; unification, the join and the
+collapse are `PriceIngestion`; the active mask is `listing_span` and the estimation mask
+`universe_masks`; implied volatilities are carriage plus clock alignment; the split is
+`TrainTestSplit`, which the layer does not own; and the elementwise map is owned by nothing, which
+*The value-only side of the rule mints nothing* states and argues.
 
 `CONTEXT.md` mints **Listing Span** and **Span Rule**, and amends **Asset Panel** — its
 point-in-time shape is now stated by the two masks, with Panel Fields as optional payload rather

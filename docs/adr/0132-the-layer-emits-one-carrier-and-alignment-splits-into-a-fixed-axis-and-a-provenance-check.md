@@ -105,7 +105,7 @@ fixes the projection as `[first + 1, last]`.
 
 `emsk` is materialised once, at emission, from the returns the conversion produced. It is a
 **snapshot of what ingestion observed**, not a view over whatever `X` later holds. A returns-level
-step that touches values — an `ElementwiseMap` — therefore does not move it.
+step that touches values — a `CrossSectionalWinsoriser`, say — therefore does not move it.
 
 The alternative, a lazy `emsk` reading `amsk[t, i] & isfinite(X[t, i])` on every access, keeps the
 defining equation true at every instant and costs `O(assets)`. It was rejected on two counts. It
@@ -169,8 +169,8 @@ unchanged in return type and in step contract; `PIPELINE_DATA_SLOTS`, `pipe_read
 stay as ADR 0129 left them; and no new data currency, family or abstract type is minted.
 
 `listing_span` and `universe_masks` remain free verbs over bare arrays. `PriceIngestion` remains an
-estimator that is not a step. `ElementwiseMap` and `PricesToReturns` remain stateless steps. The
-answer moves none of them.
+estimator that is not a step. `PricesToReturns` remains a stateless step. The answer moves none of
+them.
 
 `AssetPanel`'s masks gain a third representation alongside a dense mask and `nothing`: an
 `O(assets)` projected span for `amsk`, and an `O(1)` all-true type for both masks of a gapless

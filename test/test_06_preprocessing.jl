@@ -425,10 +425,10 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         @test rm.X[:, 2] ≈ [45 / 50 - 1, 54 / 45 - 1]
 
         # An elementwise map is not a keyword of the conversion: it changes a price rather
-        # than the arithmetic that turns two prices into a return, so ADR 0129 gives it a
-        # `:prices -> :prices` step of its own. Until that step is built (#1001), a caller
-        # maps the table they hold. A common scale factor leaves a return unchanged; a
-        # shift does not.
+        # than the arithmetic that turns two prices into a return. ADR 0129 mints no step
+        # for it either (#1001): nothing outside this file ever used it, and a caller maps
+        # the table they hold before the door in one line. A common scale factor leaves a
+        # return unchanged; a shift does not.
         @test prices_to_returns(map((t, v) -> (t, 2 .* v), P)).X ≈ simple
         @test prices_to_returns(map((t, v) -> (t, v .+ 100.0), P)).X ≈
               [210/200-1 145/150-1; 221/210-1 154/145-1]
