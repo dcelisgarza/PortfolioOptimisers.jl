@@ -109,8 +109,9 @@ optimiser's read-out under the online arm, and is fog on the map.
 **The Result keeps its diagnostics per step and its forecasts on request.**
 `CovarianceForecastEvaluationResult` holds `dates`, `test_idx`, `horizon`, `target`, `n_valid`,
 `mahalanobis_ratio`, `diagonal_ratio`, `qlike`, `frobenius`, `standardised_return`,
-`portfolio_qlike`, `w`, and `sigma::Option{<:AbstractVector}`, which is `nothing` unless
-`store_forecasts = true` keeps every `Σ̂_t`. This is the opposite of map #931's lazy ruling, for
+`portfolio_qlike`, `w`, and `sigma` and `location`, both `Option{<:AbstractVector}` and `nothing`
+unless `store_forecasts = true` keeps every `Σ̂_t` and the `c_t` it was centred on — a re-projection
+needs both. This is the opposite of map #931's lazy ruling, for
 the reason fact 4 gives, and the shape of the reference, so its numbers are an oracle. The
 per-step kernel is exported as the level-1 verb `covariance_forecast_step(Σ̂, Z, c, w, target)`
 on bare arrays, so a caller holding forecasts of their own builds the same Result by hand.
@@ -121,7 +122,7 @@ side-by-side and the column names are one set (the shape [#941](https://github.c
 `covariance_forecast_compare(a, b; lags = h − 1)` answers a Diebold–Mariano–West `z` and `p` on
 the per-step loss difference for each loss, with a Newey–West variance at `h − 1` lags, and refuses
 two evaluations whose dates or horizon differ. `covariance_forecast_portfolio(cfer, rd, w)`
-re-projects stored forecasts on a new `w` and refuses `sigma === nothing` by name.
+re-projects stored forecasts and locations on a new `w` and refuses `sigma === nothing` by name.
 
 **The identity.** Under `OnlineStep()` with an exact seam and the batch warm-up, the `M` rows of
 every per-step column equal the batch expanding walk-forward's rows — bit for bit for
