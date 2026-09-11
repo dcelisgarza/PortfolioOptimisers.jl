@@ -80,6 +80,20 @@ interface, so swapping one in is a one-line change. The common alternatives:
     scenarios to satisfy views on any moment (deep dives:
     [Entropy Pooling](../examples/2_moments_priors/07_Entropy_Pooling.md),
     [Opinion Pooling](../examples/2_moments_priors/08_Opinion_Pooling.md)).
+  - [`CrossSectionalFactorPrior`](@ref) — moments from a factor model fitted *across* the assets
+    rather than through time: at each date it regresses that date's returns on the assets' lagged
+    per-asset exposures, so it needs no factor return series of its own and admits a universe
+    whose membership changes.
+
+A cross-sectional fit asks more of the caller than the others. It reads no `F`; it reads an
+[`AssetPanel`](@ref) of per-asset **Panel Fields** — a market capitalisation, a book equity, an
+industry label — carried on the returns result as `rd.pnl`, and the caller names the
+**Descriptors** and **Exposure Estimators** that turn those fields into factors, one Pair per
+factor. The deep dive is
+[Cross-sectional factor model, end to end](../examples/7_putting_it_together/05_Cross_Sectional_Factor_Model.md),
+and
+[Cross-sectional factor model through a Pipeline](../examples/7_putting_it_together/06_Cross_Sectional_Factor_Pipeline.md)
+reaches the same weights through a [`Pipeline`](@ref).
 
 The covariance estimator inside a prior is itself swappable (shrinkage, denoising, Gerber, …);
 see [Covariance Estimation](../examples/2_moments_priors/02_Covariance_Estimation.md). Any moment
