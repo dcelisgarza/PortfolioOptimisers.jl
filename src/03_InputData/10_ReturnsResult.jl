@@ -275,10 +275,8 @@ This is the [`port_opt_view`](@ref) method for [`ReturnsResult`](@ref) — the V
  2. View the asset returns as `view(rd.X, :, i)`. Axis 2 is the assets, and every observation is kept.
  3. When `B` is a matrix, it holds one column per asset: view `nb` at `i`, and view `B` as `view(rd.B, :, i)`. Otherwise — a single shared benchmark, or none at all — `nb` and `B` both pass through untouched.
  4. View the implied volatilities as `view(rd.iv, :, i)`, and the adjustment `ivpa` at `i`.
- 5. Read `sq` from [`features_are_assets`](@ref) on `nz` and `nx`. When `sq` is `true`, view `nz` at `i` as well, because the feature axis is the asset axis.
- 6. View the Asset Panel with [`panel_carrier_view`](@ref) at `i` on the asset axis, handing it the asset names. The observation index is a `Colon`, so a time-varying panel keeps every observation.
- 7. View the [`AssetPanel`](@ref) `pnl` at `i` on the asset axis, which slices every Panel Field's values and both universe masks. A Panel Field's label axis is not touched: it addresses the features, which an asset view does not reach.
- 8. Rebuild the [`ReturnsResult`](@ref). The factor names `nf`, the factor returns `F` and the timestamps `ts` pass through untouched, because none of the three has an asset axis.
+ 5. View the [`AssetPanel`](@ref) `pnl` with [`panel_carrier_view`](@ref) at `i` on the asset axis, handing it the asset names `rd.nx`. The observation index is a `Colon`, so a time-varying panel keeps every observation. The view slices every Panel Field's values and both universe masks on the asset axis, and a tensor Panel Field whose labels *are* the asset names ([`features_are_assets`](@ref)) on its label axis as well; every other field's label axis addresses features, which an asset view does not reach.
+ 6. Rebuild the [`ReturnsResult`](@ref). The factor names `nf`, the factor returns `F` and the timestamps `ts` pass through untouched, because none of the three has an asset axis.
 
 Each field that is `nothing` stays `nothing`. No step copies data.
 
@@ -352,10 +350,8 @@ Return a view of the `ReturnsResult` object for assets at indices `j`, observati
  3. View the factor names `nf` at `k`, unless `k` is a `Colon`, in which case `nf` passes through. View the factor returns as `view(rd.F, i, k)`.
  4. When `B` is a matrix, it holds one column per asset: view `nb` at `j`, and view `B` as `view(rd.B, i, j)`. When `B` is a vector, it is a single shared benchmark: view it as `view(rd.B, i)`, and carry `nb` through.
  5. View the timestamps `ts` at `i`, the implied volatilities as `view(rd.iv, i, j)`, and the adjustment `ivpa` at `j`.
- 6. Read `sq` from [`features_are_assets`](@ref) on `nz` and `nx`. When `sq` is `true`, view `nz` at `j` as well.
- 7. View the Asset Panel with [`panel_carrier_view`](@ref) at the observations `i` and the assets `j`, handing it the asset names. A static panel has no observation axis and ignores `i`, which is the same asymmetry `ivpa` has on the asset axis.
- 8. View the [`AssetPanel`](@ref) `pnl` at the observations `i` and the assets `j`, which slices both axes of every Panel Field and of both universe masks.
- 9. Rebuild the [`ReturnsResult`](@ref).
+ 6. View the [`AssetPanel`](@ref) `pnl` with [`panel_carrier_view`](@ref) at the observations `i` and the assets `j`, handing it the asset names `rd.nx`, which slices both axes of every Panel Field and of both universe masks, and the label axis of a tensor Panel Field whose labels *are* the asset names ([`features_are_assets`](@ref)). A static panel has no observation axis and ignores `i`, which is the same asymmetry `ivpa` has on the asset axis.
+ 7. Rebuild the [`ReturnsResult`](@ref).
 
 Each field that is `nothing` stays `nothing`. No step copies data.
 

@@ -21,9 +21,8 @@ This estimator is the library's **only** missing-data filter: [`prices_to_return
  2. Count the missing assets of each row over those columns alone, and keep the rows whose count does not exceed `row_thr` of the column total.
  3. Rebuild `X` from the kept rows and the kept columns.
  4. Subselect the implied volatilities on the kept columns, and `ivpa` with them when it is a vector. The implied volatility series keeps every row, because its own clock is not the one that was filtered.
- 5. Read `sq` from [`features_are_assets`](@ref), and view `nz` at the kept columns when `sq` is `true`.
- 6. View the Asset Panel with [`panel_carrier_view`](@ref) at the kept rows and the kept columns, handing it the asset names.
- 7. Rebuild the [`PricesResult`](@ref). The factor series `F` and the benchmark series `B` pass through untouched.
+ 5. View the Asset Panel with [`panel_carrier_view`](@ref) at the kept rows and the kept columns, handing it the asset names so that a tensor Panel Field whose labels *are* the asset names ([`features_are_assets`](@ref)) is cut on its label axis too.
+ 6. Rebuild the [`PricesResult`](@ref). The factor series `F` and the benchmark series `B` pass through untouched.
 
 The two thresholds count opposite axes: `col_thr` counts the missing rows of a column and drops columns, and `row_thr` counts the missing columns of a row and drops rows.
 

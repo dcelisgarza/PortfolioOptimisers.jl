@@ -197,10 +197,9 @@ The method that Julia selects is the algorithm. The timestamp methods do the wor
      2. Index `F` by the timestamps `i` alone. `j` is an asset index, and the factors are a separate axis, so every factor column is kept.
      3. Index `B` by the timestamps `i`. Keep its columns `j` when `B` holds one column per asset, and keep its single column otherwise. The test is `B`'s own width, because a shared benchmark has one column to give whatever `j` asks for.
      4. Index `iv` by the timestamps `i` and the asset columns `j`, and view `ivpa` at `j`.
-     5. Read `sq` from [`features_are_assets`](@ref) on `nz` and the asset names of `X`. When `sq` is `true`, view `nz` at `j` as well.
-     6. Recover the rows of a time-varying Asset Panel with [`feature_row_indices`](@ref), and view the panel at those rows and the assets `j` with [`panel_carrier_view`](@ref), handing it the asset names so that a square tensor Panel Field is cut on its label axis too.
-     7. View the Listing Span at the surviving timestamps and the assets `j` with [`span_carrier_view`](@ref).
-     8. Rebuild the [`PricesResult`](@ref).
+     5. Recover the rows of a time-varying Asset Panel with [`feature_row_indices`](@ref), and view the panel at those rows and the assets `j` with [`panel_carrier_view`](@ref), handing it the asset names so that a tensor Panel Field whose labels *are* the asset names ([`features_are_assets`](@ref)) is cut on its label axis too.
+     6. View the Listing Span at the surviving timestamps and the assets `j` with [`span_carrier_view`](@ref).
+     7. Rebuild the [`PricesResult`](@ref).
 
  4. `i` and `j` are integer indices, ranges or `Colon`s: read the timestamps `TimeSeries.timestamp(pr.X)[i]`, and call step 2 or step 3 with them. This is the method a caller reaches with `port_opt_view(pr, 2:3)`.
 
