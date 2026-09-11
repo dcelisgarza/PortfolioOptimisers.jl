@@ -724,28 +724,35 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         @test all(isfinite, view(wide.X, :, 1))
         @test findall(!isfinite, view(wide.X, :, 2)) == [1, 2, 5]
 
-        # And the cost of that, which the deletion used to hide: an OUTER join is symmetric,
-        # so a benchmark or factor series whose history is longer than the asset slice
-        # expands the observation clock to the UNION rather than onto the asset clock. The
-        # padding is real data absence and is carried like any other gap.
+        # ADR 0135: the asset table states the clock. A benchmark or factor series whose
+        # history is longer than the asset slice is cut to the asset clock under the default
+        # join, so "the benchmark on my asset clock" is what a caller gets by not asking.
         Xa = TimeArray(ts6,
                        [10.0 30.0; 11.0 31.0; 12.0 32.0
                         13.0 33.0; 14.0 34.0; 15.0 35.0], [:A, :C])
         tsb = collect(Date(2019, 12, 25):Day(1):Date(2020, 1, 6))
         Bb = TimeArray(tsb, collect(200.0:(200.0 + length(tsb) - 1)), ["BM"])
-        wideb = prices_to_returns(price_ingestion(PriceIngestion(), Xa; B = Bb))
-        @test size(wideb.X, 1) == length(tsb) - 1
-        @test count(!isfinite, wideb.X) == 2 * (length(tsb) - length(ts6))
-        @test all(isfinite, wideb.B)
-
-        # A caller who means "the benchmark on my asset clock" says so, by slicing it or by
-        # asking for an inner join. Both give the asset clock back, gapless.
-        for got in (prices_to_returns(price_ingestion(PriceIngestion(), Xa; B = Bb[ts6])),
+        for got in (prices_to_returns(price_ingestion(PriceIngestion(), Xa; B = Bb)),
+                    prices_to_returns(price_ingestion(PriceIngestion(), Xa; B = Bb[ts6])),
                     prices_to_returns(price_ingestion(PriceIngestion(; join_method = :inner), Xa;
                                                       B = Bb)))
             @test size(got.X) == (5, 2)
             @test all(isfinite, got.X)
+            @test all(isfinite, got.B)
+            @test got.ts == collect(ts6)[2:end]
         end
+
+        # The union stays reachable, and it is what the OUTER join is: symmetric, so a
+        # longer benchmark expands the observation clock and pads the ASSETS at the
+        # observations only it has. The padding is real data absence, carried like any
+        # other gap, and the layer names it.
+        wideb = @test_logs (:warn, r"`X` at 7 of 13 observations") prices_to_returns(price_ingestion(PriceIngestion(;
+                                                                                                                    join_method = :outer),
+                                                                                                     Xa;
+                                                                                                     B = Bb))
+        @test size(wideb.X, 1) == length(tsb) - 1
+        @test count(!isfinite, wideb.X) == 2 * (length(tsb) - length(ts6))
+        @test all(isfinite, wideb.B)
     end
     @testset "the Gap Return family writes only the cells a gap left non-finite" begin
         # One complete column, and one carrying all three gap positions at once: an inception

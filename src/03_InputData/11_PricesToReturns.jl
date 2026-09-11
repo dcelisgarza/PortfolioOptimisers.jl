@@ -358,7 +358,7 @@ A benchmark ``B`` is converted by the same rule and **carried alongside** the as
  3. Convert the prices to returns with `TimeSeries.percentchange` under `ret_method` and `padding`. This is the step that applies the formula above. It computes both branches through logarithms — the log return is ``\\ln P_{t,i} - \\ln P_{t-1,i}``, and the simple return is `expm1` of it — so the two agree with the closed forms above to floating point rather than to the last bit. When `padding` is `true` the first observation is kept and its return is `NaN`, so the returns keep the length of the price clock. **A gap carried here does not spread.** The formula reads two prices, so a run of `k` gapped prices makes exactly the `k + 1` returns that read one of them non-finite, and every later return of that column is computed from two observed prices and is finite. A gap is confined to its own column for the same reason: no asset's return reads another's price.
  4. Resolve the cells the conversion left non-finite with [`apply_gap_return`](@ref), under `gap_return_alg`. `nothing` is the default rule, and its method returns the table untouched, so the arithmetic step 3 produced is bit-identical. An algorithm may write only a non-finite cell inside a column's Listing Span that has an earlier observed price, which is what freezes every return computed from two observed prices, and it reports an `@info` when it finds no such cell.
  5. Name the three blocks. Step 1 refused every name two of the tables shared and the clock's own name `timestamp`, so the asset names `nx`, the factor names `nf` and the benchmark names `nb` are the lists read off the three tables, and `ts` is the `timestamp` column the `DataFrames.DataFrame` conversion wrote. Each is the typed vector its table held, rather than whatever is left once the other groups have taken what they recognise.
- 6. Index the implied volatilities `pr.iv` by `ts`, then check them and `pr.ivpa` against the asset count. The returns clock is the price clock less the observation `padding` costs, so a carrier the layer built covers it.
+ 6. Spell the implied volatilities' absences with [`unify_gaps`](@ref) and index `pr.iv` by `ts`, then check them and `pr.ivpa` against the asset count. The returns clock is the price clock less the observation `padding` costs, so a carrier the layer built covers it, and an absent implied volatility is carried as `NaN` for the estimator that reads it to exclude.
  7. Subselect the [`AssetPanel`](@ref). Recover the surviving rows with [`feature_row_indices`](@ref) and view the panel with [`port_opt_view`](@ref), handing it the asset names so that a square tensor Panel Field is cut on its label axis too. The conversion removes no column, so the asset axis reaches the panel whole and the subselection that bites is the observation one: a time-varying panel is cut to the surviving observations and matched back into the price timestamps.
  8. State the universe. Cut `pr.span` to the asset axis with [`span_carrier_view`](@ref), and hand it and the converted returns to [`returns_universe_masks`](@ref), which projects it onto the returns clock and intersects it with finiteness. A carrier that states no span states no universe, and the conversion emits no panel. [`attach_universe_masks`](@ref) puts the pair onto the Asset Panel, keeping whatever Panel Fields it already carried, and mints one with no field when the carrier held none.
  9. Build the asset, factor and benchmark matrices from the columns of each group. The asset group is always present, because the conversion removes no column; a factor or benchmark group given no column is `nothing`.
@@ -379,7 +379,7 @@ A benchmark ``B`` is converted by the same rule and **carried alongside** the as
   - Every price reaching step 3 is positive. `TimeSeries.percentchange` takes a logarithm on both branches, so a negative price raises a `DomainError` from inside it, on the simple branch as well.
   - The asset, factor and benchmark column names are pairwise disjoint, and none of them is `timestamp`. Raises a [`ConflictingArgumentError`](@ref) naming the offending columns.
   - If `pr.F` or `pr.B` is not `nothing`, its timestamps equal the asset timestamps. Raises a [`ConflictingArgumentError`](@ref) naming [`price_ingestion`](@ref), which is what puts two series on one clock.
-  - If `pr.iv` is not `nothing`, the returns timestamps are a subset of `TimeSeries.timestamp(pr.iv)`, then `iv = values(iv[ts])`, `!isempty(iv)`, `all(x -> x >= 0, iv)`, `all(x -> isfinite(x), iv)`, and `size(iv) == size(X)`.
+  - If `pr.iv` is not `nothing`, the returns timestamps are a subset of `TimeSeries.timestamp(pr.iv)`, then `iv = values(unify_gaps(iv)[ts])`, `!isempty(iv)`, every value is non-negative where it is present (an absent one is `NaN`; see [`assert_nonneg_where_present`](@ref)), and `size(iv) == size(X)`.
   - If `pr.span` is not `nothing`, `size(pr.span) == size(values(pr.X))`. Raises a `DimensionMismatch`.
   - `pr.ivpa` is validated in that same branch, so it is checked only when `pr.iv` is given: `all(x -> x > 0, ivpa)`, `all(x -> isfinite(x), ivpa)`, and, if a vector, `length(ivpa) == size(iv, 2)`. The bound is strict — a zero adjustment is rejected.
 
@@ -472,8 +472,9 @@ function prices_to_returns(pr::PricesResult; ret_method::Symbol = :simple,
     if !isnothing(iv)
         @argcheck(issubset(ts, TimeSeries.timestamp(iv)),
                   ArgumentError("ts must be a subset of the timestamps in iv"))
-        iv = values(iv[ts])
-        assert_nonempty_nonneg_finite_val(iv, :iv)
+        iv = values(unify_gaps(iv)[ts])
+        @argcheck(!isempty(iv), IsEmptyError)
+        assert_nonneg_where_present(iv, :iv)
         assert_nonempty_gt0_finite_val(ivpa, :ivpa)
         @argcheck(size(iv) == (DataFrames.DataAPI.nrow(X), N), DimensionMismatch)
         if isa(ivpa, VecNum)

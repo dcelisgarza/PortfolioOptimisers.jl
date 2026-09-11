@@ -94,24 +94,71 @@ rd59 = prices_to_returns(ptr59, price_ingestion(PriceIngestion(), X59))
     end
 
     @testset "the join and the collapse move the clock, so they run here" begin
-        # A factor priced on every second day: an outer join adds the asset rows it lacks and
-        # pads them, and the emitted carrier has one clock for both blocks.
+        # A factor priced on every second day. ADR 0135: the asset table states the clock,
+        # so the default join keeps every asset observation and pads the factor at the
+        # twenty it is silent at, and the layer names the padding.
         F = TimeArray(collect(ts59)[1:2:end], reshape(P59[1:2:end, 1], :, 1), ["f"])
-        prj = price_ingestion(PriceIngestion(), X59; F = F)
+        prj = @test_logs (:warn, r"`F` at 20 of 40 observations, in every column \(f\)") price_ingestion(PriceIngestion(),
+                                                                                                         X59;
+                                                                                                         F = F)
         @test TimeSeries.timestamp(prj.X) == TimeSeries.timestamp(prj.F)
+        @test TimeSeries.timestamp(prj.X) == collect(ts59)
         @test size(values(prj.X)) == (T59, N59)
         @test size(prj.span) == (T59, N59)
         # Half the factor rows are gaps the join padded, and the asset span is unchanged.
         @test count(!isfinite, values(prj.F)) == T59 - length(1:2:T59)
         @test Matrix(prj.span) == Matrix(pr.span)
+        # `strict` refuses with the same report.
+        err = try
+            price_ingestion(PriceIngestion(; strict = true), X59; F = F)
+        catch e
+            e
+        end
+        @test isa(err, ArgumentError)
+        @test occursin("`F` at 20 of 40 observations", err.msg)
 
         # A shared benchmark joins on the same clock, and it is one column whatever the
-        # asset count is.
+        # asset count is. It covers the asset clock, so it pads nothing and reports nothing:
+        # the factor is the only line.
         B = TimeArray(collect(ts59), reshape(P59[:, 1], :, 1), ["bm"])
-        prb = price_ingestion(PriceIngestion(), X59; F = F, B = B)
+        prb = @test_logs (:warn,
+                          r"universe: `F` at 20 of 40 observations, in every column \(f\)\. Under") price_ingestion(PriceIngestion(),
+                                                                                                                    X59;
+                                                                                                                    F = F,
+                                                                                                                    B = B)
         @test TimeSeries.timestamp(prb.B) == TimeSeries.timestamp(prb.X)
         @test size(values(prb.B), 2) == 1
         @test Matrix(prb.span) == Matrix(pr.span)
+        @test all(isfinite, values(prb.B))
+        # A covariate on the asset clock pads nothing, warns nothing, and passes `strict`.
+        prq = @test_logs price_ingestion(PriceIngestion(; strict = true), X59; B = B)
+        @test all(isfinite, values(prq.B))
+
+        # `:outer` and `:inner` stay reachable. The union pads the ASSET table too, at the
+        # observations only a covariate has, and the report names it — the Span Rule reads
+        # those rows as listings and delistings, which is why it is not the default.
+        tsl = collect(Date(2019, 12, 22):Day(1):(Date(2020, 1, 1) + Day(T59 - 1)))
+        Bl = TimeArray(tsl, reshape(collect(200.0:(200.0 + length(tsl) - 1)), :, 1), ["bm"])
+        pro = @test_logs (:warn,
+                          r"`X` at 10 of 50 observations, in every column \(a, b, c, d\)") price_ingestion(PriceIngestion(;
+                                                                                                                          join_method = :outer),
+                                                                                                           X59;
+                                                                                                           B = Bl)
+        @test TimeSeries.timestamp(pro.X) == tsl
+        @test count(!isfinite, values(pro.X)) == count(!isfinite, P59) + 10 * N59
+        @test all(isfinite, values(pro.B))
+        @test_throws ArgumentError price_ingestion(PriceIngestion(; join_method = :outer,
+                                                                  strict = true), X59;
+                                                   B = Bl)
+        # The intersection drops the covariate's extra rows, pads nothing and reports
+        # nothing.
+        pri = @test_logs price_ingestion(PriceIngestion(; join_method = :inner,
+                                                        strict = true), X59; B = Bl)
+        @test TimeSeries.timestamp(pri.X) == collect(ts59)
+        # And the default, `:left`, gives the same clock with the benchmark cut to it.
+        prl = @test_logs price_ingestion(PriceIngestion(; strict = true), X59; B = Bl)
+        @test TimeSeries.timestamp(prl.X) == collect(ts59)
+        @test values(prl.B) == values(pri.B)
 
         # A weekly collapse renumbers every observation, and the span is derived after it.
         prc = price_ingestion(PriceIngestion(; collapse_args = (Dates.week, first, last)),
@@ -122,14 +169,126 @@ rd59 = prices_to_returns(ptr59, price_ingestion(PriceIngestion(), X59))
 
     @testset "implied volatilities are carried and clock-aligned, never converted" begin
         iv = TimeArray(collect(ts59), fill(0.2, T59, N59), nx59)
-        pri = price_ingestion(PriceIngestion(), X59; iv = iv, ivpa = 1.5)
+        pri = @test_logs price_ingestion(PriceIngestion(; strict = true), X59; iv = iv,
+                                         ivpa = 1.5)
         @test TimeSeries.timestamp(pri.iv) == TimeSeries.timestamp(pri.X)
         @test all(values(pri.iv) .== 0.2)
         @test pri.ivpa == 1.5
-        # The emitted clock must be a subset of the implied volatilities' own.
+        # ADR 0135: an implied volatility series is a carried series like the factors and
+        # the benchmark. Silent at an observation of the emitted clock, it is padded `NaN`
+        # there and the padding is named, rather than the ingestion being refused.
         ivs = iv[collect(ts59)[1:(T59 - 1)]]
-        @test_throws PortfolioOptimisers.IsEmptyError price_ingestion(PriceIngestion(), X59;
-                                                                      iv = ivs)
+        prs = @test_logs (:warn,
+                          r"`iv` at 1 of 40 observations, in every column \(a, b, c, d\)") price_ingestion(PriceIngestion(),
+                                                                                                           X59;
+                                                                                                           iv = ivs)
+        @test TimeSeries.timestamp(prs.iv) == collect(ts59)
+        @test all(isnan, values(prs.iv)[T59, :])
+        @test all(values(prs.iv)[1:(T59 - 1), :] .== 0.2)
+        @test_throws ArgumentError price_ingestion(PriceIngestion(; strict = true), X59;
+                                                   iv = ivs)
+        # An implied volatility on a wider clock than the assets' is cut to theirs, and
+        # that is not padding.
+        ivw = TimeArray(collect(Date(2019, 12, 25):Day(1):(Date(2020, 1, 1) + Day(T59 - 1))),
+                        fill(0.2, T59 + 7, N59), nx59)
+        prw = @test_logs price_ingestion(PriceIngestion(; strict = true), X59; iv = ivw)
+        @test TimeSeries.timestamp(prw.iv) == collect(ts59)
+        @test all(values(prw.iv) .== 0.2)
+    end
+
+    @testset "ADR 0135's measured refusal stops firing" begin
+        # A five-day panel, a five-day implied volatility on its clock, and a fifteen-day
+        # benchmark. Under a symmetric join the benchmark moved the clock out from under
+        # the implied volatilities, and the ingestion refused with `10 of the 15 emitted
+        # observations are absent from iv`. Nothing is wrong with the data.
+        ts5 = Date(2020, 1, 1):Day(1):Date(2020, 1, 5)
+        X5 = TimeArray(ts5, [100.0 50.0; 101 51; 102 52; 103 53; 104 54], ["A", "B"])
+        iv5 = TimeArray(ts5, fill(0.2, 5, 2), ["A", "B"])
+        ts15 = Date(2019, 12, 27):Day(1):Date(2020, 1, 10)
+        B15 = TimeArray(ts15, collect(200.0:214.0), ["BM"])
+        pr5 = @test_logs price_ingestion(PriceIngestion(; strict = true), X5; iv = iv5,
+                                         B = B15)
+        @test size(values(pr5.X)) == (5, 2)
+        @test TimeSeries.timestamp(pr5.X) == collect(ts5)
+        @test all(isfinite, values(pr5.X))
+        @test all(isfinite, values(pr5.B))
+        @test all(values(pr5.iv) .== 0.2)
+        # The invariant the default path gains: the emitted clock is the asset table's.
+        @test TimeSeries.timestamp(pr5.X) == TimeSeries.timestamp(X5)
+        rd5 = prices_to_returns(pr5)
+        @test size(rd5.X) == (4, 2)
+        @test all(isfinite, rd5.X)
+        @test all(isfinite, rd5.B)
+    end
+
+    @testset "the value type is derived from the series, and a type that cannot spell an absence is refused by name" begin
+        ts5 = Date(2020, 1, 1):Day(1):Date(2020, 1, 5)
+        P5 = [100 50; 101 51; 102 52; 103 53; 104 54]
+        F5 = TimeArray(ts5, reshape(collect(1.0:5.0), :, 1), ["f"])
+
+        # A `Float32` panel stays `Float32`, and so does its span-carrying conversion.
+        X32 = TimeArray(ts5, Float32.(P5), ["A", "B"])
+        pr32 = price_ingestion(PriceIngestion(), X32)
+        @test eltype(values(pr32.X)) === Float32
+        @test values(pr32.X) == values(X32)
+        @test eltype(prices_to_returns(pr32).X) === Float32
+
+        # `Float32` beside `Float64` promotes and joins, where `TimeSeries.merge` alone
+        # raises a `MethodError` on the two value types.
+        @test_throws MethodError TimeSeries.merge(X32, F5; method = :left)
+        prm = price_ingestion(PriceIngestion(), X32; F = F5)
+        @test eltype(values(prm.X)) === Float64
+        @test eltype(values(prm.F)) === Float64
+        @test values(prm.X) == Float64.(P5)
+
+        # An integer panel takes the floating-point type that represents it, derived from
+        # the division a return performs rather than named.
+        Xi = TimeArray(ts5, P5, ["A", "B"])
+        pri = price_ingestion(PriceIngestion(), Xi)
+        @test eltype(values(pri.X)) === typeof(one(Int) / one(Int))
+        @test values(pri.X) == P5
+        @test PortfolioOptimisers.absence_type(Int) === Float64
+        @test PortfolioOptimisers.absence_type(Float32) === Float32
+        @test PortfolioOptimisers.absence_type(BigInt) === BigFloat
+        @test PortfolioOptimisers.absence_type(Rational{Int}) === Rational{Int}
+
+        # A `Rational` panel with no gap is carried as it is: nothing is absent, so nothing
+        # is spelled. One holding a gap is refused by name, and so is one a join must pad.
+        Xr = TimeArray(ts5, Rational{Int}.(P5), ["A", "B"])
+        prr = price_ingestion(PriceIngestion(), Xr)
+        @test eltype(values(prr.X)) === Rational{Int}
+        Prm = Matrix{Union{Missing, Rational{Int}}}(Rational{Int}.(P5))
+        Prm[1, 2] = missing
+        Xrm = TimeArray(ts5, Prm, ["A", "B"])
+        err = try
+            price_ingestion(PriceIngestion(), Xrm)
+        catch e
+            e
+        end
+        @test isa(err, DomainError)
+        @test err.val === Rational{Int}
+        @test occursin("cannot carry one", err.msg)
+        Fr = TimeArray(ts5[1:3], Rational{Int}.(reshape(1:3, :, 1)), ["f"])
+        @test_throws DomainError price_ingestion(PriceIngestion(), Xr; F = Fr)
+        # An inner join pads nothing, so it asks for no absence.
+        @test eltype(values(price_ingestion(PriceIngestion(; join_method = :inner), Xr;
+                                            F = Fr).X)) === Rational{Int}
+
+        # The single-argument `unify_gaps` derives the same target from the series alone,
+        # which is what a carrier built by hand gets at the conversion.
+        @test PortfolioOptimisers.unify_gaps(X32) === X32
+        @test eltype(values(PortfolioOptimisers.unify_gaps(Xi))) === Float64
+        Pm = Matrix{Union{Missing, Int}}(P5)
+        Pm[2, 1] = missing
+        um = PortfolioOptimisers.unify_gaps(TimeArray(ts5, Pm, ["A", "B"]))
+        @test eltype(values(um)) === Float64
+        @test isnan(values(um)[2, 1])
+        @test values(um)[1, 1] == 100.0
+        @test_throws DomainError PortfolioOptimisers.absent_value(Rational{Int})
+        @test_throws DomainError PortfolioOptimisers.absent_value(Int)
+        @test isnan(PortfolioOptimisers.absent_value(Float32))
+        @test PortfolioOptimisers.series_value_type(nothing) === Union{}
+        @test PortfolioOptimisers.series_value_type(Xrm) === Rational{Int}
     end
 
     @testset "a PricesResult is re-ingested through the same verb" begin
@@ -571,4 +730,92 @@ end
     # clock, and the conversion refuses rather than padding: only the door pads.
     short = PricesResult(; X = X59, iv = iv59[collect(ts59)[1:(T59 - 2)]])
     @test_throws ArgumentError prices_to_returns(short)
+end
+
+# Map #955, ADR 0135, issue #1002. An absence is carried on every axis the layer touches: an
+# implied volatility the source is silent on is padded `NaN` at the door, both carriers admit
+# one, and the estimator that reads the series is what excludes the asset — #995 built that
+# narrowing on the keyword path, and this is the carried path reaching it.
+@testset "an absent implied volatility is carried to the estimator that excludes it" begin
+    using Statistics
+    Tg, Ng = 12, 3
+    tsg = Date(2020, 1, 1):Day(1):(Date(2020, 1, 1) + Day(Tg - 1))
+    nxg = ["A", "B", "C"]
+    Xg = TimeArray(collect(tsg), 100.0 .+ cumsum(randn(StableRNG(1002), Tg, Ng); dims = 1),
+                   nxg)
+    ivfull = fill(0.2, Tg, Ng)
+
+    # `C`'s implied volatility starts three days after the assets. The source spells that
+    # as three `NaN` cells on the full clock — a gap the source states rather than an
+    # observation the layer pads, so nothing is reported — and the returns carrier holds
+    # the two that survive the conversion.
+    ivc = TimeArray(collect(tsg)[4:end], ivfull[4:end, 3:3], nxg[3:3])
+    ivab = TimeArray(collect(tsg), ivfull[:, 1:2], nxg[1:2])
+    ivr = TimeSeries.merge(ivab, ivc; method = :left)
+    @test findall(isnan, values(ivr)[:, 3]) == [1, 2, 3]
+    prg = @test_logs price_ingestion(PriceIngestion(; strict = true), Xg; iv = ivr,
+                                     ivpa = 1.2)
+    @test TimeSeries.timestamp(prg.iv) == collect(tsg)
+    @test findall(isnan, values(prg.iv)[:, 3]) == [1, 2, 3]
+    @test all(isfinite, values(prg.iv)[:, 1:2])
+    rdg = prices_to_returns(prg)
+    @test size(rdg.iv) == (Tg - 1, Ng)
+    @test findall(isnan, rdg.iv[:, 3]) == [1, 2]
+    @test rdg.ivpa == 1.2
+
+    # The estimator narrows its Coverage Universe to the columns whose implied
+    # volatilities are complete: `C` takes the `NaN` row and column an absent return takes,
+    # and the surviving block is the fit on `A` and `B` alone.
+    ce = ImpliedVolatility(; alg = ImpliedVolatilityPremium())
+    for f in (cov, cor)
+        m = f(ce, rdg.X, rdg.pnl; iv = rdg.iv, ivpa = rdg.ivpa)
+        @test all(isnan, view(m, 3, :))
+        @test all(isnan, view(m, :, 3))
+        @test all(isfinite, view(m, 1:2, 1:2))
+        @test view(m, 1:2, 1:2) == f(ce, rdg.X[:, 1:2]; iv = rdg.iv[:, 1:2], ivpa = 1.2)
+    end
+    # And the same carrier reaches a prior, which is the path a Pipeline takes.
+    pr = prior(EmpiricalPrior(; ce = ce), rdg)
+    @test all(isnan, view(pr.sigma, 3, :))
+    @test all(isfinite, view(pr.sigma, 1:2, 1:2))
+
+    # A complete implied-volatility surface pads nothing and fits every column, so the
+    # carried path and the hand-built path agree entry for entry.
+    prf = @test_logs price_ingestion(PriceIngestion(; strict = true), Xg;
+                                     iv = TimeArray(collect(tsg), ivfull, nxg), ivpa = 1.2)
+    rdf = prices_to_returns(prf)
+    @test all(isfinite, cov(ce, rdf.X, rdf.pnl; iv = rdf.iv, ivpa = rdf.ivpa))
+
+    # The carriers' guard is non-negative WHERE A VALUE IS PRESENT. A `NaN` is an absence
+    # and passes; so does a `missing`, the spelling a hand-built carrier may hold, which
+    # the conversion unifies to `NaN` before any reader sees it; a negative value is
+    # refused by both carriers, and an infinite one is a present value and passes.
+    ivneg = copy(ivfull)
+    ivneg[5, 2] = -0.1
+    @test_throws DomainError PricesResult(; X = Xg,
+                                          iv = TimeArray(collect(tsg), ivneg, nxg))
+    @test_throws DomainError ReturnsResult(; nx = nxg, X = rdg.X, ts = rdg.ts,
+                                           iv = ivneg[2:end, :], ivpa = 1.2)
+    ivm = Matrix{Union{Missing, Float64}}(ivfull)
+    ivm[6, 1] = missing
+    prmis = PricesResult(; X = Xg, iv = TimeArray(collect(tsg), ivm, nxg), ivpa = 1.2)
+    rdm = prices_to_returns(prmis)
+    @test eltype(rdm.iv) === Float64
+    @test findall(isnan, rdm.iv[:, 1]) == [5]
+    ivmn = copy(ivm)
+    ivmn[7, 3] = -1.0
+    @test_throws DomainError PricesResult(; X = Xg, iv = TimeArray(collect(tsg), ivmn, nxg))
+    ivinf = copy(ivfull)
+    ivinf[5, 2] = Inf
+    @test isa(PricesResult(; X = Xg, iv = TimeArray(collect(tsg), ivinf, nxg)),
+              PricesResult)
+    @test_throws DomainError PortfolioOptimisers.assert_nonneg_where_present([-1.0, NaN],
+                                                                             :iv)
+    @test isnothing(PortfolioOptimisers.assert_nonneg_where_present([missing, NaN, 0.0,
+                                                                     Inf], :iv))
+    # An empty surface is still refused, before the sign is read.
+    @test_throws PortfolioOptimisers.IsEmptyError ReturnsResult(; nx = nxg, X = rdg.X,
+                                                                ts = rdg.ts,
+                                                                iv = zeros(0, Ng),
+                                                                ivpa = 1.2)
 end

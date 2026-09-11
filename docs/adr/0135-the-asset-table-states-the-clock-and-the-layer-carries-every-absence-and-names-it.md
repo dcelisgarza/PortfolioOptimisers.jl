@@ -77,12 +77,30 @@ A type that cannot carry the layer's absence — a `Rational` panel that holds a
 name. The library must stay open to number types it has never seen, and one absence it cannot spell
 is a refusal, not a reason to close the layer to the rest.
 
+The build settled the spelling. The target is `typeof(oneunit(T) / one(T))` of the promoted type,
+because a return divides one price by another, so that division is the widening the conversion
+applies anyway: `Float32` answers itself, `Int` answers `Float64`, `BigInt` answers `BigFloat`, and a
+`Rational` answers itself. Whether the target can hold an absence is asked only at the moment one
+is written — a `missing` unified, or a join that pads — through `absent_value`, which is
+`convert(T, NaN)` behind a refusal by name; so a `Rational` panel with no gap and no covariate is
+carried as it is, and one holding a gap, or joined under `:left` or `:outer`, is refused. The
+implied volatilities derive their own target from their own type rather than promoting with the
+prices, because they are never laid in the price table. The census exemption that forgave the
+`Float64(` spelling is deleted with the spelling.
+
 ### An absence is carried on every axis the layer touches
 
 The implied volatilities are a carried series like the factors and the benchmark: `unify_gaps` gives
 them the one spelling, the join aligns them to the emitted clock, and a silent `iv` pads `NaN`. The
 requirement that `iv` cover the emitted clock is dropped, and `PricesResult`'s guard on `iv` becomes
 non-negative where a value is present.
+
+The guard relaxes on the returns carrier and inside the conversion too, not on the price carrier
+alone, because a padded implied volatility that the price carrier admits and the conversion or
+`ReturnsResult` then refuses is the same refusal one step later. The conversion unifies `pr.iv`
+before it indexes it, so a `missing` a hand-built carrier holds reaches the returns carrier as
+`NaN`; and the guard reads any array rather than a numeric one, so a `missing` is validated as an
+absence instead of passing unvalidated, which is what the second measurement found.
 
 The estimator that reads them defends itself, where the carrier no longer does.
 `Statistics.cov(ce::ImpliedVolatility, …)` and its `cor` twin intersect the coverage mask with the
@@ -103,6 +121,14 @@ and the shape `PriceGapFill` reports with
 A carried absence is invisible where a refused one was not, and the axes it lands on carry no
 universe. A caller running a walk-forward sets `strict` and is then certain no covariate was
 invented.
+
+What the report counts is an observation of the emitted clock at which a series is silent — one
+the join or the alignment padded — and not a `NaN` the source itself spelled, which is the
+source's own statement and is carried as any gap is. The report reads the joined clock before the
+collapse renumbers it, because the join is what padded; it names the asset table too, since an
+outer join pads the assets at the observations only a covariate has, which the **Span Rule** then
+reads as listings and delistings; and an inner join, which drops rather than pads, reports
+nothing.
 
 ### The span is a stated value, and the Span Rule is the only derivation
 
@@ -133,7 +159,10 @@ steps, which is also the only place the layer's pieces are visible.
 
 - **The measured refusal stops firing.** The same five-day panel, five-day `iv` and fifteen-day
   benchmark returns `(5, 2)` on exactly `timestamp(X)`, with no non-finite cell and the benchmark
-  aligned.
+  aligned. Built by [#1002](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1002),
+  which asserts it, and asserts that the examples and the user guide are unaffected: every site
+  that hands the layer a factor table slices the assets and the factors to the same 253 rows, so
+  `:left` and `:outer` agree there and nothing is padded.
 
 - **The emitted clock gains an invariant on the default path.** `timestamp(pr.X) == timestamp(X)`
   unless `collapse_args` is non-empty, so a caller declaring their own listing calendar can size it

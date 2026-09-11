@@ -12,6 +12,39 @@ All concrete types representing price-level data should be subtypes of `Abstract
 """
 abstract type AbstractPricesResult <: AbstractResult end
 """
+    assert_nonneg_where_present(val::AbstractArray, sym::Union{Symbol, <:AbstractString} = :val) -> nothing
+
+Refuse a negative value, and let an absence through.
+
+The ingestion layer carries an absent implied volatility as `NaN`, exactly as it carries an absent price, and the carriers admit one: the estimator that reads the series narrows its Coverage Universe to the columns whose values are complete, so an absence excludes the asset from the fit rather than failing it. What the carrier still refuses is a *present* value that is not a volatility, and a `missing` — the other spelling of absence a hand-built carrier may hold — is an absence here too, because the conversion unifies it before any reader sees it.
+
+# Arguments
+
+  - `val`: The array to check.
+  - `sym`: Symbolic name used in the error message.
+
+# Validation
+
+  - Every element is `missing`, `NaN`, or non-negative. A breach raises a `DomainError`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`PricesResult`](@ref)
+  - [`ReturnsResult`](@ref)
+  - [`prices_to_returns`](@ref)
+  - [`price_ingestion`](@ref)
+  - [`assert_nonneg`](@ref)
+"""
+function assert_nonneg_where_present(val::AbstractArray, sym::Sym_Str = :val)::Nothing
+    @argcheck(all(x -> ismissing(x) || isnan(x) || zero(x) <= x, val),
+              DomainError("all(x -> ismissing(x) || isnan(x) || 0 <= x, $sym) must hold: an absent value is carried, and a present one is non-negative. Got\ncount(x -> !ismissing(x) && !isnan(x) && x < 0, $sym) => $(count(x -> !ismissing(x) && !isnan(x) && x < zero(x), val))"))
+    return nothing
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 A container for aligned, time-indexed price-level data.
@@ -45,7 +78,7 @@ Keywords correspond to the struct's fields.
   - `!isempty(X)`.
   - If `F` is not `nothing`: `!isempty(F)`.
   - If `B` is not `nothing`: `!isempty(B)`, and `size(values(B), 2) in (1, size(values(X), 2))`.
-  - If `iv` is not `nothing`: `!isempty(iv)`, `all(x -> x >= 0, values(iv))`, `all(x -> isfinite(x), values(iv))`, and `size(values(iv), 2) == size(values(X), 2)`.
+  - If `iv` is not `nothing`: `!isempty(iv)`, every value is non-negative where it is present (an absent one is `NaN`, or `missing` on a carrier built by hand; see [`assert_nonneg_where_present`](@ref)), and `size(values(iv), 2) == size(values(X), 2)`.
   - If `ivpa` is not `nothing`: `all(x -> x > 0, ivpa)`, `all(x -> isfinite(x), ivpa)`; if a vector, `length(ivpa) == size(values(X), 2)`.
   - `pnl`'s asset axis is `size(values(X), 2)`, and its observation axis is `size(values(X), 1)` when it is time-varying. See [`check_asset_panel`](@ref).
   - If `span` is not `nothing`: `size(span) == size(values(X))`. Raises a `DimensionMismatch`.
@@ -87,7 +120,7 @@ julia> size(values(pr.X))
     """
     B
     """
-    Optional implied volatility data (observations × assets).
+    Optional implied volatility data (observations × assets). An absent value is carried as `NaN`, and the estimator that reads the series excludes the asset from its fit.
     """
     iv
     """
@@ -115,7 +148,8 @@ julia> size(values(pr.X))
             @argcheck(size(values(B), 2) in (1, size(values(X), 2)), DimensionMismatch)
         end
         if !isnothing(iv)
-            assert_nonempty_nonneg_finite_val(values(iv), :iv)
+            @argcheck(!isempty(iv), IsEmptyError)
+            assert_nonneg_where_present(values(iv), :iv)
             @argcheck(size(values(iv), 2) == size(values(X), 2), DimensionMismatch)
         end
         if !isnothing(ivpa)

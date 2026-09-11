@@ -64,12 +64,11 @@
     A site the rule owns and another ticket ships. Each entry maps a file to the fragment
     of the one line the census forgives there, and the census asserts that the fragment is
     still found, so the entry reds the build when its ticket lands and it is not removed.
-
-      - `src/03_InputData/07_PriceIngestion.jl`: `unify_gaps` names `Float64` as the
-        unification target of a price panel. ADR 0135 rules that the layer derives the
-        target from the series, and issue #988 is the build that ships it.
+    The dictionary is empty: the last entry, `unify_gaps` naming `Float64` as the
+    unification target of a price panel, was shipped by issue #1002 under ADR 0135, which
+    derives the target from the series.
     =#
-    EXEMPT = Dict("src/03_InputData/07_PriceIngestion.jl" => "Float64(x) for x in v")
+    EXEMPT = Dict{String, String}()
 
     coerced = String[]
     rounded = String[]

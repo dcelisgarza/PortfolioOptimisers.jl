@@ -88,10 +88,31 @@ that was never listed. See
 and
 `docs/adr/0132-the-layer-emits-one-carrier-and-alignment-splits-into-a-fixed-axis-and-a-provenance-check.md`.
 
+**The asset table states the clock.** Under the default `join_method = :left` the factor,
+benchmark and implied-volatility series are aligned to the asset clock and padded `NaN` where they
+are silent, so `timestamp(pr.X) == timestamp(X)` unless `collapse_args` is non-empty; `:outer` and
+`:inner` stay reachable. What the join padded is named — which table, how many observations, which
+columns — warning by default and refusing under `strict`. The value type the carrier holds is
+derived from the series rather than named: a `Float32` panel stays `Float32`, `Float32` beside
+`Float64` joins in `Float64`, an integer panel takes the floating-point type the return arithmetic
+gives it, and a type that cannot spell an absence is refused by name at the first gap it would have
+to spell. An absent implied volatility is carried like an absent price, and
+[`ImpliedVolatility`](@ref) narrows its Coverage Universe to the columns whose implied
+volatilities are complete. See
+`docs/adr/0135-the-asset-table-states-the-clock-and-the-layer-carries-every-absence-and-names-it.md`.
+
 ```@docs
 PriceIngestion
 price_ingestion
 PortfolioOptimisers.unify_gaps
+PortfolioOptimisers.series_value_type
+PortfolioOptimisers.absence_type
+PortfolioOptimisers.absent_value
+PortfolioOptimisers.assert_pad_spellable
+PortfolioOptimisers.align_series
+PortfolioOptimisers.padded_observations
+PortfolioOptimisers.padding_report_line
+PortfolioOptimisers.assert_join_padding
 PortfolioOptimisers.series_names
 PortfolioOptimisers.assert_disjoint_series_names
 PortfolioOptimisers.assert_unreserved_series_names
@@ -295,6 +316,7 @@ PortfolioOptimisers.cross_sectional_cell_stats
 ```@docs
 AbstractPricesResult
 PricesResult
+PortfolioOptimisers.assert_nonneg_where_present
 port_opt_view(pr::PricesResult, ::Colon, ::Colon)
 ```
 

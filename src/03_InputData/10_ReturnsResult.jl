@@ -108,7 +108,7 @@ Keywords correspond to the struct's fields.
   - If `X` and `B` are not `nothing`: if `B` is a vector, `size(X, 1) == size(B, 1)`; if `B` is a matrix, `size(X) == size(B)`.
   - If `ts` is not `nothing`, `!isempty(ts)`, `allunique(ts)`, and `length(ts) == size(X, 1)`. Uniqueness is required because `ts` *keys* the observation axis rather than merely labelling it: [`feature_row_indices`](@ref) recovers a subset's rows by matching its surviving timestamps back into this clock, and a repeated timestamp would resolve to the first occurrence and pair an asset with another period's features.
   - If `ts` and `B` are not `nothing`: `length(ts) == size(B, 1)`.
-  - If `iv` is not `nothing`, `!isempty(iv)`, `all(x -> x >= 0, iv)`, `all(x -> isfinite(x), iv)`, and `size(iv) == size(X)`.
+  - If `iv` is not `nothing`, `!isempty(iv)`, every value is non-negative where it is present (an absent one is `NaN`; see [`assert_nonneg_where_present`](@ref)), and `size(iv) == size(X)`.
   - `ivpa` is validated in that same branch, so it is checked only when `iv` is given: `all(x -> x > 0, ivpa)`, `all(x -> isfinite(x), ivpa)`, and, if a vector, `length(ivpa) == size(iv, 2)`. The bound is strict — a zero adjustment is rejected. An `ivpa` passed without an `iv` reaches no check, because it has no implied volatility to adjust.
   - `pnl`'s asset axis is `length(nx)`, and its observation axis is `size(X, 1)` when it is time-varying. See [`check_asset_panel`](@ref).
 
@@ -233,7 +233,8 @@ ReturnsResult
             end
         end
         if !isnothing(iv)
-            assert_nonempty_nonneg_finite_val(iv, :iv)
+            @argcheck(!isempty(iv), IsEmptyError)
+            assert_nonneg_where_present(iv, :iv)
             assert_nonempty_gt0_finite_val(ivpa, :ivpa)
             @argcheck(size(iv) == size(X),
                       DimensionMismatch("implied volatilities (iv) must match asset returns (X) in size, got size(iv) = $(size(iv)) and size(X) = $(size(X))"))

@@ -66,8 +66,8 @@
 "src/03_InputData/03_ListingSpan.jl" = { map = 2, units = 4, swept = false }
 "src/03_InputData/04_Preprocessing.jl" = { map = 2, units = 9, algorithm = 1, swept = false }
 "src/03_InputData/05_CarrierViews.jl" = { map = 2, units = 4, algorithm = 4, swept = false }
-"src/03_InputData/06_PricesResult.jl" = { map = 2, units = 3, algorithm = 1, swept = false }
-"src/03_InputData/07_PriceIngestion.jl" = { map = 2, units = 13, swept = false }
+"src/03_InputData/06_PricesResult.jl" = { map = 2, units = 4, algorithm = 1, swept = false }
+"src/03_InputData/07_PriceIngestion.jl" = { map = 2, units = 21, swept = false }
 "src/03_InputData/08_PriceGapFill.jl" = { map = 2, units = 7, swept = false }
 "src/03_InputData/09_PriceFilters.jl" = { map = 2, units = 2, algorithm = 2, swept = false }
 "src/03_InputData/10_ReturnsResult.jl" = { map = 2, units = 8, algorithm = 7, swept = false }

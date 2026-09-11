@@ -1,37 +1,338 @@
 """
-    unify_gaps(A::TimeSeries.TimeArray) -> TimeSeries.TimeArray
+    series_value_type(A::Nothing) -> Type{Union{}}
+    series_value_type(A::TimeSeries.TimeArray) -> Type
 
-Spell every absent price of one series the one way the ingestion layer carries.
+Read the value type of one optional price series, without the `Missing` a wide table may carry.
 
-A source spells an absent price either way — an outer join of ragged per-asset histories pads with `NaN`, a wide table built from a tidy one leaves `missing` — and the layer unifies them as `NaN`, which no deletion step reads. This is what defines a gap for every later piece, so it runs before the Span Rule and before the join.
+The ingestion layer derives its unification target from the series it is handed rather than naming one, and this is what each series contributes to that derivation: the type of its values, with the absence convention stripped, because an absence is spelled by the target and not by the source. A series the caller omitted contributes `Union{}`, which is the identity of `promote_type`, so an absent table is not a branch at the site that promotes.
 
 # Algorithm
 
- 1. A series whose values are already floating point carries its gaps as `NaN`. Return it untouched.
- 2. Otherwise rebuild it, mapping `missing` to `NaN` and converting every other entry to `Float64`.
+The method that Julia selects is the algorithm.
+
+ 1. `A` is `nothing`: return `Union{}`.
+ 2. `A` is a table: return the element type of its values with `Missing` removed.
+
+# Arguments
+
+  - `A`: One price series, or `nothing`.
+
+# Returns
+
+  - `T::Type`: The value type, `Union{}` for no series.
+
+# Related
+
+  - [`absence_type`](@ref)
+  - [`unify_gaps`](@ref)
+  - [`price_ingestion`](@ref)
+"""
+function series_value_type(::Nothing)
+    return Union{}
+end
+function series_value_type(A::TimeSeries.TimeArray)
+    return Base.nonmissingtype(eltype(values(A)))
+end
+"""
+    absence_type(::Type{T}) -> Type
+
+Derive the type the ingestion layer carries a series of value type `T` in.
+
+The layer spells an absent price `NaN`, so the type it carries a series in must be able to hold one, and that type is read off the arithmetic rather than named: a return divides one price by another, so `oneunit(T) / one(T)` is the widening the conversion applies to every price anyway, and its type is the widest the layer needs. A floating-point type is its own answer, so a `Float32` panel stays `Float32`; an integer panel takes the floating-point type that represents it; a number type the library has never seen takes whatever its own division returns. Whether that type can hold an absence is not decided here, because a series with no gap and no padding never spells one: [`absent_value`](@ref) refuses by name at the moment an absence is written.
+
+# Arguments
+
+  - `T`: The value type of a series, as [`series_value_type`](@ref) reads it.
+
+# Returns
+
+  - `S::Type`: `typeof(oneunit(T) / one(T))`.
+
+# Related
+
+  - [`series_value_type`](@ref)
+  - [`absent_value`](@ref)
+  - [`unify_gaps`](@ref)
+  - [`price_ingestion`](@ref)
+"""
+function absence_type(::Type{T}) where {T}
+    return typeof(oneunit(T) / one(T))
+end
+"""
+    absent_value(::Type{T}) -> T
+
+The one spelling of an absent value in type `T`, or a refusal by name when `T` cannot carry one.
+
+The layer has one spelling for absence, `NaN`, and a type that cannot represent it cannot state a gap. A `Rational` panel holding a gap, or an integer panel joined onto a longer clock, is refused here rather than by an `InexactError` from inside a conversion, and the refusal names the type and what the caller can do. The library stays open to number types it has never seen: any type whose `convert` from `NaN` answers a value `isnan` recognises carries an absence, and only a type that cannot is refused.
+
+# Arguments
+
+  - `T`: The type an absence must be spelled in.
+
+# Validation
+
+  - `convert(T, NaN)` succeeds and `isnan` of it holds. Otherwise raises a `DomainError` naming `T`.
+
+# Returns
+
+  - `x::T`: The absence, `convert(T, NaN)`.
+
+# Related
+
+  - [`absence_type`](@ref)
+  - [`unify_gaps`](@ref)
+  - [`align_series`](@ref)
+  - [`price_ingestion`](@ref)
+"""
+function absent_value(::Type{T}) where {T}
+    x = try
+        convert(T, NaN)
+    catch
+        nothing
+    end
+    @argcheck(!isnothing(x) && isnan(x),
+              DomainError(T,
+                          "the ingestion layer spells an absent price `NaN`, and `$T` cannot carry one, so a gap or a padded observation cannot be stated in it. Hand the layer a panel whose value type carries an absence, or fill every gap and align every series before the call."))
+    return x
+end
+"""
+    unify_gaps(A::TimeSeries.TimeArray) -> TimeSeries.TimeArray
+    unify_gaps(A::TimeSeries.TimeArray, ::Type{T}) -> TimeSeries.TimeArray
+
+Spell every absent price of one series the one way the ingestion layer carries, in the value type `T`.
+
+A source spells an absent price either way — an outer join of ragged per-asset histories pads with `NaN`, a wide table built from a tidy one leaves `missing` — and the layer unifies them as `NaN`, which no deletion step reads. This is what defines a gap for every later piece, so it runs before the Span Rule and before the join.
+
+The target type is derived, never named. The one-argument form reads it off the series alone with [`absence_type`](@ref), which is what a carrier built by hand gets at the conversion; [`price_ingestion`](@ref) promotes the asset, factor and benchmark series to one type first, because the join lays them in one table, and hands that type to the two-argument form.
+
+# Algorithm
+
+ 1. A series whose values are already of type `T` carries its gaps as `NaN`. Return it untouched.
+ 2. A series holding `missing` is rebuilt, mapping `missing` to [`absent_value`](@ref)`(T)` and converting every other entry to `T`. This is the one place a `missing` becomes an absence, so a type that cannot carry one is refused here, by name.
+ 3. Any other series is converted to `T` entry by entry. Nothing is absent, so nothing is spelled, and a type that could not spell one is not asked to.
 
 # Arguments
 
   - `A`: One price series.
+  - `T`: The value type to carry it in. Defaults to `absence_type(series_value_type(A))`.
 
 # Returns
 
-  - `A′::TimeSeries.TimeArray`: The same series, with every absent price spelled `NaN`.
+  - `A′::TimeSeries.TimeArray`: The same series in type `T`, with every absent price spelled `NaN`.
 
 # Related
 
   - [`PriceIngestion`](@ref)
   - [`price_ingestion`](@ref)
+  - [`series_value_type`](@ref)
+  - [`absence_type`](@ref)
+  - [`absent_value`](@ref)
   - [`listing_span`](@ref)
 """
 function unify_gaps(A::TimeSeries.TimeArray)
+    return unify_gaps(A, absence_type(series_value_type(A)))
+end
+function unify_gaps(A::TimeSeries.TimeArray, ::Type{T}) where {T}
     v = values(A)
-    if isa(v, AbstractArray{<:AbstractFloat})
+    if eltype(v) === T
         return A
     end
-    return TimeSeries.TimeArray(TimeSeries.timestamp(A),
-                                [ismissing(x) ? NaN : Float64(x) for x in v],
-                                TimeSeries.colnames(A))
+    w = if Missing <: eltype(v)
+        nan = absent_value(T)
+        [ismissing(x) ? nan : convert(T, x) for x in v]
+    else
+        map(Base.Fix1(convert, T), v)
+    end
+    return TimeSeries.TimeArray(TimeSeries.timestamp(A), w, TimeSeries.colnames(A))
+end
+"""
+    assert_pad_spellable(::Type{T}, method::Symbol) -> nothing
+
+Refuse by name, before a join that pads, a value type that cannot spell the pad.
+
+`TimeSeries.merge` pads with `NaN` converted to the table's value type, which is [`absent_value`](@ref)`(T)` to the bit, so a type that cannot carry an absence would be refused from inside it by an `InexactError` that names nothing. Asking first is what makes it a refusal by name. An inner join drops an observation rather than padding it, so it spells no absence and asks for none.
+
+# Algorithm
+
+ 1. `method` is `:inner`: return.
+ 2. Otherwise ask [`absent_value`](@ref)`(T)`, which refuses by name.
+
+# Arguments
+
+  - `T`: The value type of the table being joined, the layer's unification target.
+  - `method`: The join, as `TimeSeries.merge` takes it.
+
+# Validation
+
+  - `T` carries an absence when `method` pads. Raises a `DomainError` naming `T`, from [`absent_value`](@ref).
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`absent_value`](@ref)
+  - [`absence_type`](@ref)
+  - [`price_ingestion`](@ref)
+"""
+function assert_pad_spellable(::Type{T}, method::Symbol) where {T}
+    if method != :inner
+        absent_value(T)
+    end
+    return nothing
+end
+"""
+    align_series(A::TimeSeries.TimeArray{T}, ts::AbstractVector) -> TimeSeries.TimeArray
+
+Put one carried series on the clock the ingestion layer emits, padding the observations it is silent at.
+
+The implied volatilities are carried beside the assets rather than joined into their table, because they are named after the assets and a join would rename them. They are aligned the way a left join aligns a factor: the emitted clock is authoritative, an observation the series states is taken, and one it does not is an absence the layer carries.
+
+# Algorithm
+
+ 1. Fill a table of `length(ts)` rows and the series' columns with [`absent_value`](@ref) of its type.
+ 2. Write each row of the series whose timestamp is in `ts` at that timestamp's row.
+
+# Arguments
+
+  - `A`: The series to align, in a type `T` that carries an absence.
+  - `ts`: The emitted clock.
+
+# Returns
+
+  - `A′::TimeSeries.TimeArray`: The series on `ts`, `NaN` where it was silent.
+
+# Related
+
+  - [`absent_value`](@ref)
+  - [`padded_observations`](@ref)
+  - [`price_ingestion`](@ref)
+"""
+function align_series(A::TimeSeries.TimeArray{T}, ts::AbstractVector) where {T}
+    v = values(A)
+    out = fill(absent_value(T)::T, length(ts), size(v, 2))
+    for (r, k) in pairs(indexin(ts, TimeSeries.timestamp(A)))
+        if !isnothing(k)
+            out[r, :] .= view(v, k, :)
+        end
+    end
+    return TimeSeries.TimeArray(ts, out, TimeSeries.colnames(A))
+end
+"""
+    padded_observations(A::Nothing, ts::AbstractVector) -> Int
+    padded_observations(A::TimeSeries.TimeArray, ts::AbstractVector) -> Int
+
+Count the observations of the emitted clock at which one series is silent.
+
+Each of those is an observation the join or the alignment padded, and a padded observation is an absence the layer carries and names. A series the caller omitted is silent nowhere.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `A` is `nothing`: `0`.
+ 2. `A` is a table: the number of timestamps in `ts` absent from `A`'s.
+
+# Arguments
+
+  - `A`: One price series, or `nothing`.
+  - `ts`: The clock the layer emitted.
+
+# Returns
+
+  - `n::Int`: The number of padded observations.
+
+# Related
+
+  - [`padding_report_line`](@ref)
+  - [`assert_join_padding`](@ref)
+  - [`align_series`](@ref)
+"""
+function padded_observations(::Nothing, ::AbstractVector)
+    return 0
+end
+function padded_observations(A::TimeSeries.TimeArray, ts::AbstractVector)
+    return count(!in(Set(TimeSeries.timestamp(A))), ts)
+end
+"""
+    padding_report_line(name::String, A::Option{<:TimeSeries.TimeArray}, ts::AbstractVector) -> Option{String}
+
+Write the line of the padding report that one series owes, or `nothing` when the layer padded it nowhere.
+
+# Algorithm
+
+ 1. Count the padded observations with [`padded_observations`](@ref).
+ 2. None: return `nothing`.
+ 3. Otherwise name the table, the count against the clock's length, and every column, because a series silent at an observation is silent in all of its columns.
+
+# Arguments
+
+  - `name`: How the caller spells the series, `"X"`, `"F"`, `"B"` or `"iv"`.
+  - `A`: The series, or `nothing`.
+  - `ts`: The clock the layer emitted.
+
+# Returns
+
+  - `line::Option{String}`: The report line, or `nothing`.
+
+# Related
+
+  - [`padded_observations`](@ref)
+  - [`assert_join_padding`](@ref)
+"""
+function padding_report_line(::String, ::Nothing, ::AbstractVector)
+    return nothing
+end
+function padding_report_line(name::String, A::TimeSeries.TimeArray, ts::AbstractVector)
+    n = padded_observations(A, ts)
+    if iszero(n)
+        return nothing
+    end
+    return "`$name` at $n of $(length(ts)) observations, in every column ($(join(TimeSeries.colnames(A), ", ")))"
+end
+"""
+    assert_join_padding(lines::AbstractVector, strict::Bool) -> nothing
+
+Name what the join and the alignment padded, warning by default and refusing under `strict`.
+
+A carried absence is invisible where a refused one was not, and the factor, benchmark and implied-volatility axes carry no universe that would name it later. So the layer names it here, through [`strict_diagnostic`](@ref), which is the shape a Held Gap and a [`PriceGapFill`](@ref) report with. A caller running a walk-forward sets `strict` and is then certain no covariate was padded.
+
+# Algorithm
+
+ 1. Drop the `nothing` entries. None left: nothing was padded, return.
+ 2. Otherwise join the lines into one report naming the join in force and the two others, and hand it to [`strict_diagnostic`](@ref).
+
+# Arguments
+
+  - `lines`: The report lines [`padding_report_line`](@ref) wrote, `nothing` entries included.
+  - `strict`: If `true`, throws an `ArgumentError`; if `false`, issues a warning.
+
+# Validation
+
+  - Nothing was padded. Raises an `ArgumentError` under `strict`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`padding_report_line`](@ref)
+  - [`strict_diagnostic`](@ref)
+  - [`PriceIngestion`](@ref)
+  - [`price_ingestion`](@ref)
+"""
+function assert_join_padding(lines::AbstractVector, strict::Bool)::Nothing
+    kept = String[l for l in lines if !isnothing(l)]
+    if isempty(kept)
+        return nothing
+    end
+    strict_diagnostic("the ingestion layer padded the series the join and the alignment found silent on the emitted clock, and a padded observation is an absence carried as `NaN` on an axis that states no universe: " *
+                      join(kept, "; ") *
+                      ". Under `join_method = :left` the asset table states the clock; `:outer` takes the union and `:inner` the intersection, and a caller who wants no padding aligns the series before the call.",
+                      strict)
+    return nothing
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -44,6 +345,8 @@ Running outside the `Pipeline` is also what lets the **Span Rule** read the whol
 
 The carrier it emits holds the derived **Listing Span** in its `span` field, so the conversion can project it onto the returns clock and hand the returns carrier an [`AssetPanel`](@ref) stating the universe. A caller holding their own listing calendar passes it as `span` and replaces the Span Rule's answer outright.
 
+**The asset table states the clock.** It states the universe, so it states the clock, and the factor, benchmark and implied-volatility series are aligned to it under the default `join_method = :left`, padded where they are silent. The layer names what it padded — which table, how many observations, which columns — warning by default and refusing under `strict`, because a carried absence is invisible where a refused one was not and those axes carry no universe that would name it later. Each field states something about the sources the layer cannot derive: which clock is authoritative, what frequency an analysis wants, which listing calendar the caller holds, and whether a padded covariate is acceptable.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -51,9 +354,10 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     PriceIngestion(;
-        join_method::Symbol = :outer,
+        join_method::Symbol = :left,
         collapse_args::Tuple = (),
         span::Option{<:AbstractMatrix{Bool}} = nothing,
+        strict::Bool = false,
     ) -> PriceIngestion
 
 Keywords correspond to the struct's fields.
@@ -87,7 +391,7 @@ julia> Matrix(pr.span)
 """
 @concrete struct PriceIngestion <: AbstractEstimator
     """
-    How the asset, factor and benchmark series are joined onto one clock (`:outer`, `:inner`, etc.).
+    How the factor and benchmark series are joined onto the asset clock, as `TimeSeries.merge` takes it. `:left` keeps the asset clock and pads the others where they are silent; `:outer` takes the union of the clocks, padding every table; `:inner` takes their intersection, padding none.
     """
     join_method
     """
@@ -98,16 +402,20 @@ julia> Matrix(pr.span)
     Optional listing statement of the caller's own, `price observations × assets`, replacing the **Span Rule**'s answer outright. A listing calendar, or a constituency that leaves and rejoins, is any `AbstractMatrix{Bool}`. `nothing` derives the span from the gaps.
     """
     span
+    """
+    Whether a padded observation refuses the ingestion. `false` names what the join and the alignment padded in a warning; `true` raises an `ArgumentError` carrying the same report.
+    """
+    strict
     function PriceIngestion(join_method::Symbol, collapse_args::Tuple,
-                            span::Option{<:AbstractMatrix{Bool}})
-        return new{typeof(join_method), typeof(collapse_args), typeof(span)}(join_method,
-                                                                             collapse_args,
-                                                                             span)
+                            span::Option{<:AbstractMatrix{Bool}}, strict::Bool)
+        return new{typeof(join_method), typeof(collapse_args), typeof(span),
+                   typeof(strict)}(join_method, collapse_args, span, strict)
     end
 end
-function PriceIngestion(; join_method::Symbol = :outer, collapse_args::Tuple = (),
-                        span::Option{<:AbstractMatrix{Bool}} = nothing)::PriceIngestion
-    return PriceIngestion(join_method, collapse_args, span)
+function PriceIngestion(; join_method::Symbol = :left, collapse_args::Tuple = (),
+                        span::Option{<:AbstractMatrix{Bool}} = nothing,
+                        strict::Bool = false)::PriceIngestion
+    return PriceIngestion(join_method, collapse_args, span, strict)
 end
 """
     price_ingestion(est::PriceIngestion, X::TimeSeries.TimeArray;
@@ -122,19 +430,25 @@ Assemble raw price series into the span-carrying price carrier.
 
 The three clock-moving steps run here rather than in a [`Pipeline`](@ref), and the **Span Rule** reads the whole panel once they have. What the caller gets back is an ordinary [`PricesResult`](@ref) whose `span` field states which assets are listed at each observation, ready for [`PricesToReturns`](@ref) to project onto the returns clock.
 
-The layer spells an absent price `NaN`, which is the library's one spelling for absence, and the conversion carries it into the returns rather than deleting the observation or the asset that holds one.
+The layer spells an absent price `NaN`, which is the library's one spelling for absence, and the conversion carries it into the returns rather than deleting the observation or the asset that holds one. An absence is carried on every axis the layer touches: a factor, benchmark or implied-volatility series silent at an observation of the emitted clock is padded there, and the padding is named — warned by default, refused under `strict` — because those axes carry no universe that would name it later.
+
+The value type the carrier holds is derived from the series rather than named. The asset, factor and benchmark types are promoted to one, because the join lays them in one table, and that type is widened only as the return arithmetic would widen it: a `Float32` panel stays `Float32`, `Float32` beside `Float64` joins in `Float64`, and an integer panel takes the floating-point type that represents it. A type that cannot spell an absence is refused by name at the first gap or padded observation it would have to spell.
 
 # Algorithm
 
  1. Check that the asset, factor and benchmark series can still be named after the join with [`assert_distinct_series_names`](@ref). The join renames a name two tables share, so a block would otherwise be taken apart into another block's column.
- 2. Unify the absent-price convention of every series with [`unify_gaps`](@ref), so that a gap means one thing from here on.
- 3. Join the factor and the benchmark series onto the asset clock under `join_method`. An outer join adds the rows one series has and another does not, padding them as gaps.
- 4. Collapse the joined series to a lower frequency when `collapse_args` is non-empty, which renumbers every observation.
- 5. Split the joined series back into their asset, factor and benchmark blocks, all now on one clock.
- 6. Align the implied volatilities to that clock, and carry `ivpa` through: an implied volatility is a volatility rather than a price, so it is carried, never converted.
- 7. Put a caller's [`AssetPanel`](@ref) on the emitted clock with [`project_panel_clock`](@ref). A caller states a Panel Field on the clock of the table they hold, and the collapse is the only step here that renumbers it, so this is where it is projected: the aggregated period takes the values of the row at its representative timestamp, which is last-observation semantics and matches [`LastObservation`](@ref). A static panel has no observation axis and is carried through untouched.
- 8. Read the **Listing Span** off the asset block with [`listing_span`](@ref), unless the caller declared one, in which case theirs is taken outright.
- 9. Return the [`PricesResult`](@ref) carrying all of it.
+ 2. Derive the unification target: promote the value types the three price tables contribute through [`series_value_type`](@ref), and widen the result with [`absence_type`](@ref). Unify the absent-price convention of every series in that type with [`unify_gaps`](@ref), so that a gap means one thing from here on.
+ 3. Join the factor and the benchmark series onto the asset clock under `join_method`. A left join keeps the asset clock and pads the others where they are silent; an outer join adds the rows one series has and another does not, padding every table; an inner join keeps the rows every table has. A join that pads asks [`assert_pad_spellable`](@ref) first, which refuses by name a type that cannot spell the pad.
+ 4. Write the padding report for the asset, factor and benchmark tables against the joined clock with [`padding_report_line`](@ref), before the collapse renumbers it.
+ 5. Collapse the joined series to a lower frequency when `collapse_args` is non-empty, which renumbers every observation.
+ 6. Split the joined series back into their asset, factor and benchmark blocks, all now on one clock.
+ 7. Align the implied volatilities to that clock with [`align_series`](@ref), in the type [`absence_type`](@ref) derives from their own, padding the observations they are silent at; write their report line; and carry `ivpa` through. An implied volatility is a volatility rather than a price, so it is carried, never converted.
+ 8. Name what was padded with [`assert_join_padding`](@ref), which warns, or refuses under `strict`.
+ 9. Put a caller's [`AssetPanel`](@ref) on the emitted clock with [`project_panel_clock`](@ref). A caller states a Panel Field on the clock of the table they hold, and the collapse is the only step here that renumbers it, so this is where it is projected: the aggregated period takes the values of the row at its representative timestamp, which is last-observation semantics and matches [`LastObservation`](@ref). A static panel has no observation axis and is carried through untouched.
+10. Read the **Listing Span** off the asset block with [`listing_span`](@ref), unless the caller declared one, in which case theirs is taken outright.
+11. Return the [`PricesResult`](@ref) carrying all of it.
+
+The emitted clock is the asset table's under the default join, so `timestamp(pr.X) == timestamp(X)` unless `collapse_args` is non-empty, and a caller declaring their own listing calendar can size it against the table they hold.
 
 # Arguments
 
@@ -142,7 +456,7 @@ The layer spells an absent price `NaN`, which is the library's one spelling for 
   - `X`: Asset prices, `observations × assets`.
   - `F`: Optional factor prices.
   - `B`: Optional benchmark prices, one column or one per asset.
-  - `iv`: Optional implied volatilities, one column per asset.
+  - `iv`: Optional implied volatilities, one column per asset, on any clock: aligned to the emitted one and padded `NaN` where silent.
   - `ivpa`: Optional implied volatility adjustment.
   - `pnl`: Optional [`AssetPanel`](@ref) of Panel Fields the caller already holds.
   - `pr`: A [`PricesResult`](@ref), for the second form, whose series are re-ingested.
@@ -152,7 +466,8 @@ The layer spells an absent price `NaN`, which is the library's one spelling for 
   - `!isempty(X)`. Raises an [`IsEmptyError`](@ref).
   - The asset, factor and benchmark column names are pairwise disjoint, and none of them is `timestamp`. Raises a [`ConflictingArgumentError`](@ref) naming the offending columns.
   - A declared `span` is `size(values(X))` after the join and the collapse. Raises a `DimensionMismatch`.
-  - The emitted clock is a subset of `iv`'s timestamps, when `iv` is given. Raises an [`IsEmptyError`](@ref).
+  - The value type carries an absence, wherever one must be spelled. Raises a `DomainError` naming the type, from [`absent_value`](@ref).
+  - Nothing was padded, under `strict`. Raises an `ArgumentError` carrying the padding report, from [`assert_join_padding`](@ref); a warning otherwise.
 
 # Returns
 
@@ -186,6 +501,12 @@ julia> Matrix(pr.span)
   - [`PricesToReturns`](@ref)
   - [`listing_span`](@ref)
   - [`unify_gaps`](@ref)
+  - [`series_value_type`](@ref)
+  - [`absence_type`](@ref)
+  - [`assert_pad_spellable`](@ref)
+  - [`align_series`](@ref)
+  - [`padding_report_line`](@ref)
+  - [`assert_join_padding`](@ref)
   - [`project_panel_clock`](@ref)
   - [`LastObservation`](@ref)
 """
@@ -199,27 +520,41 @@ function price_ingestion(est::PriceIngestion, X::TimeSeries.TimeArray;
               IsEmptyError("`X` cannot be empty: the ingestion layer states a universe from a price panel"))
     assert_distinct_series_names(X, F, B)
     nx = TimeSeries.colnames(X)
-    M = unify_gaps(X)
+    #! The three price tables are laid in one table by the join, so they take one value
+    #! type, and it is the one the return arithmetic would widen them to: derived from the
+    #! series, never named.
+    T = absence_type(promote_type(series_value_type(X), series_value_type(F),
+                                  series_value_type(B)))
+    M = unify_gaps(X, T)
     if !isnothing(F)
-        M = TimeSeries.merge(M, unify_gaps(F); method = est.join_method)
+        assert_pad_spellable(T, est.join_method)
+        M = TimeSeries.merge(M, unify_gaps(F, T); method = est.join_method)
     end
     if !isnothing(B)
-        M = TimeSeries.merge(M, unify_gaps(B); method = est.join_method)
+        assert_pad_spellable(T, est.join_method)
+        M = TimeSeries.merge(M, unify_gaps(B, T); method = est.join_method)
     end
+    #! The report reads the joined clock before the collapse renumbers it, because the
+    #! join is what padded, and it names the asset table too: an outer join pads it with
+    #! observations a covariate's length invented, which the Span Rule then reads.
+    tsj = TimeSeries.timestamp(M)
+    lines = Option{String}[padding_report_line("X", X, tsj),
+                           padding_report_line("F", F, tsj),
+                           padding_report_line("B", B, tsj)]
     if !isempty(est.collapse_args)
         M = TimeSeries.collapse(M, est.collapse_args...)
     end
     Xa = M[nx]
     Fa = isnothing(F) ? nothing : M[TimeSeries.colnames(F)]
     Ba = isnothing(B) ? nothing : M[TimeSeries.colnames(B)]
+    ts = TimeSeries.timestamp(Xa)
     iva = if isnothing(iv)
         nothing
     else
-        ts = TimeSeries.timestamp(Xa)
-        @argcheck(issubset(ts, TimeSeries.timestamp(iv)),
-                  IsEmptyError("the implied volatilities are carried on the clock the ingestion emits, so that clock is a subset of theirs; $(length(setdiff(ts, TimeSeries.timestamp(iv)))) of the $(length(ts)) emitted observations are absent from iv"))
-        iv[ts]
+        push!(lines, padding_report_line("iv", iv, ts))
+        align_series(unify_gaps(iv, absence_type(series_value_type(iv))), ts)
     end
+    assert_join_padding(lines, est.strict)
     #! The collapse is the one step here that renumbers an observation, and a Panel Field is
     #! stated on the clock of the table the caller holds, so the projection is owed here
     #! rather than by the conversion: after the door, the carrier states one clock and
