@@ -9,7 +9,10 @@ finite_candidate_index
 AbstractSearchCrossValidationResult
 AbstractSearchCrossValidationAlgorithm
 SearchCrossValidationResult
-fit_and_score
+assert_search_entry
+pin_draw
+score_rows
+write_candidate_scores!
 parse_lens
 assert_search_grid_cap
 _expr_to_lens

@@ -517,7 +517,7 @@ $(DocStringExtensions.FIELDS)
   - [`AbstractSearchCrossValidationResult`](@ref)
   - [`GridSearchCrossValidation`](@ref)
   - [`RandomisedSearchCrossValidation`](@ref)
-  - [`fit_and_score`](@ref)
+  - [`search_cross_validation`](@ref)
 """
 @concrete struct SearchCrossValidationResult <: AbstractSearchCrossValidationResult
     """
@@ -565,83 +565,147 @@ function SearchCrossValidationResult(; opt::AbstractEstimator, test_scores::MatN
                                        idx)
 end
 """
-    fit_and_score(opt::NonFiniteAllocationOptimisationEstimator,
-                  scv::AbstractSearchCrossValidationEstimator,
-                  cv::CrossValidationResult,
-                  rd::ReturnsResult,
-                  i::Integer)
+    assert_search_entry(est, cv)
 
-Fit a portfolio optimisation estimator on the training half of split `i`, score it on that split, and return the scores for a search cross-validation routine.
+Refuse an estimator that is not the configuration alone at the door of a search, once, before any candidate is built.
 
-The split is read from an **already computed** [`CrossValidationResult`](@ref), so the search splits `rd` once and scores every parameter set against the same folds. The method that takes a [`MultipleRandomisedResult`](@ref) also reads that split's asset subset and passes it as `cols`.
+A search scores every candidate through the one fold loop, and a lens is applied before that loop's warm-up, so a cold estimator seeds one state per candidate and nothing is shared or reset. A warm one is refused by name here rather than inside the candidate loop, where the workers of `gscv.ex` would raise it up to once per candidate. Under every Fold Fit the walk is [`online_entry_state`](@ref), because a search tunes the configuration alone whatever the scheme does with it; under an [`OnlineStep`](@ref) it is the whole [`assert_online_entry`](@ref), so a schedule on a stateful field is refused at the door too.
 
 # Arguments
 
-  - `opt`: Portfolio optimisation estimator to fit.
-  - `scv`: Search cross-validation estimator. It carries the risk measure `r`, the `train_score` switch, and the `kwargs` forwarded to [`expected_risk`](@ref).
-  - `cv`: Cross-validation result holding the train and test indices of every split.
-  - `rd`: Returns result containing asset returns data.
-  - `i`: Index of the split to fit and score.
+  - `est`: The estimator the search tunes.
+  - `cv`: The scheme the search scores over.
 
-# Returns
+# Validation
 
-  - `test_score::Number`: Test score of split `i`.
-  - `train_score::Option{<:Number}`: Train score of split `i`, or `nothing` when `scv.train_score` is `false`.
-
-# Details
-
-  - Fits the estimator on the training indices of split `i` and predicts on its test indices.
-  - Computes the risk of the test prediction, and of the training fit when `scv.train_score` is `true`.
-  - Negates both when [`bigger_is_better`](@ref) is `false` for `scv.r`, so a higher score is always better whatever measure `r` is. A [`CrossValidationSearchScorer`](@ref) relies on that orientation.
+  - No `cache` in the tree of `est` holds a state. An `ArgumentError` naming the field is thrown otherwise.
+  - Under an [`OnlineStep`](@ref), everything [`assert_online_entry`](@ref) refuses.
 
 # Related
 
-  - [`SearchCrossValidationResult`](@ref)
-  - [`CrossValidationSearchScorer`](@ref)
+  - [`search_cross_validation`](@ref)
+  - [`online_entry_state`](@ref)
+  - [`assert_online_entry`](@ref)
+  - [`fold_fit`](@ref)
+"""
+function assert_search_entry(est, cv)
+    if !isnothing(fold_fit(cv))
+        assert_online_entry(est)
+    else
+        path = online_entry_state(est)
+        @argcheck(isnothing(path),
+                  ArgumentError("`$(typeof(est).name.name)` enters `search_cross_validation` carrying a partial-fit state at `$(path)`, and a search tunes the configuration alone: every candidate is built from it through the grid's lenses and scored through the fold loop, which reads its argument as configuration, so the state would reach no fold. Hand the search the estimator with every `cache` at `nothing`."))
+    end
+    return nothing
+end
+"""
+    pin_draw(cv::MultipleRandomised)
+    pin_draw(cv)
+
+Fix the folds a search scores every candidate over.
+
+A search splits its data once and scores every candidate against the same folds, so a scheme whose `split` draws from a random stream must draw the same folds for every candidate. A [`MultipleRandomised`](@ref) with no `seed` draws from its `rng` afresh at every `split`, and the fold loop splits once per candidate, so this draws one seed from that `rng` and returns the scheme with it set: every candidate's `split` then resolves the same stream, and so does the search's own `split` for the row layout. A seeded scheme, and every other scheme, is returned as it is, because its `split` is already a function of the data alone.
+
+# Arguments
+
+  - `cv`: The search's scheme.
+
+# Returns
+
+  - `cv`: The scheme, with a `seed` set when its `split` would otherwise draw afresh.
+
+# Related
+
+  - [`search_cross_validation`](@ref)
+  - [`MultipleRandomised`](@ref)
+  - [`resolve_rng`](@ref)
+"""
+function pin_draw(cv::MultipleRandomised)
+    return isnothing(cv.seed) ? Accessors.@set(cv.seed = rand(cv.rng, UInt32)) : cv
+end
+function pin_draw(cv)
+    return cv
+end
+"""
+    score_rows(cvr::CrossValidationResult)
+    score_rows(cvr::MultipleRandomisedResult)
+
+The rows of a search's score matrix that a candidate's predictions fill, in the order the fold loop returns them.
+
+The score matrix is indexed by `split`: row `j` is the `j`-th fold the scheme enumerates, and a reader lines the rows up with `split`'s enumeration. A contiguous scheme returns one [`MultiPeriodPredictionResult`](@ref) whose predictions are in that order, so its rows are every row in order. A [`MultipleRandomised`](@ref) returns one `MultiPeriodPredictionResult` per path, each sorted by the start of its test window through [`sort_predictions!`](@ref), so its rows are one vector per path: the split rows of that path, in the order the path's predictions come back. [`write_candidate_scores!`](@ref) zips a candidate's predictions against these rows, so the matrix keeps `split`'s order under either shape.
+
+# Arguments
+
+  - `cvr`: The split the search scores over.
+
+# Returns
+
+  - `rows`: The row indices, one range for a contiguous scheme, or one vector of indices per path for a multiple-randomised one.
+
+# Related
+
+  - [`write_candidate_scores!`](@ref)
+  - [`search_cross_validation`](@ref)
+  - [`sort_predictions!`](@ref)
+  - [`MultipleRandomisedResult`](@ref)
+"""
+function score_rows(cvr::CrossValidationResult)
+    return eachindex(cvr.test_idx)
+end
+function score_rows(cvr::MultipleRandomisedResult)
+    return map(unique(cvr.path_ids)) do k
+        rows = findall(==(k), cvr.path_ids)
+        return rows[sortperm(cvr.test_idx[rows]; by = first)]
+    end
+end
+"""
+    write_candidate_scores!(test_scores::MatNum, train_scores::Option{<:MatNum}, i::Integer,
+                            predictions::MultiPeriodPredictionResult, rows, r, sgn, kwargs)
+    write_candidate_scores!(test_scores::MatNum, train_scores::Option{<:MatNum}, i::Integer,
+                            predictions::PopulationPredictionResult, rows, r, sgn, kwargs)
+
+Write the per-fold scores of candidate `i` into column `i` of a search's score matrices.
+
+The candidate's predictions are what [`fit_and_predict`](@ref) returned over the search's scheme, one per fold, and `rows` is [`score_rows`](@ref) of that scheme's split, so prediction and row are zipped and the column reads in `split`'s order. A population is one series per path, and each path is written against its own rows. Each fold's test score is [`expected_risk`](@ref) of the fold's prediction, and its train score, written only when `train_scores` is a matrix, is the risk of the fold's fitted result over its own sample. Both are multiplied by `sgn`, `1` when [`bigger_is_better`](@ref) holds for `r` and `-1` otherwise, so a higher score is always better whatever measure `r` is, which is the orientation a [`CrossValidationSearchScorer`](@ref) relies on. A fold that failed scores `NaN`, and [`finite_candidate_index`](@ref) keeps that column from the scorer.
+
+# Arguments
+
+  - `test_scores`: The `folds × candidates` test score matrix.
+  - `train_scores`: The train score matrix of the same shape, or `nothing` when the search records none.
+  - `i`: The candidate's column.
+  - `predictions`: The candidate's predictions over the scheme.
+  - `rows`: The rows the predictions fill, from [`score_rows`](@ref).
+  - `r`: The risk measure the search scores with.
+  - `sgn`: The sign that orients `r` so that higher is better.
+  - `kwargs`: The keyword arguments forwarded to [`expected_risk`](@ref).
+
+# Related
+
+  - [`score_rows`](@ref)
+  - [`search_cross_validation`](@ref)
   - [`expected_risk`](@ref)
   - [`bigger_is_better`](@ref)
-  - [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref)
-  - [`NonFiniteAllocationOptimisationEstimator`](@ref)
+  - [`finite_candidate_index`](@ref)
 """
-function fit_and_score(opt::NonFiniteAllocationOptimisationEstimator,
-                       scv::Union{<:GridSearchCrossValidation{<:Any, <:Any},
-                                  <:RandomisedSearchCrossValidation{<:Any, <:Any}},
-                       cv::CrossValidationResult, rd::ReturnsResult, i::Integer)
-    (; wd, pws, fa, store_weight_path, strict) = fold_evaluation(scv.cv)
-    hwd = held_weights_drift(wd, pws)
-    prediction = fit_and_predict(opt, rd; train_idx = cv.train_idx[i],
-                                 test_idx = cv.test_idx[i], wd = wd, hwd = hwd, fa = fa,
-                                 store_weight_path = store_weight_path, strict = strict)
-    r = scv.r
-    sign = ifelse(bigger_is_better(r), 1, -1)
-    test_score = sign * expected_risk(scv.r, prediction; scv.kwargs...)
-    train_score = if scv.train_score
-        sign * expected_risk(scv.r, prediction.res; scv.kwargs...)
-    else
-        nothing
+function write_candidate_scores!(test_scores::MatNum, train_scores::Option{<:MatNum},
+                                 i::Integer, predictions::MultiPeriodPredictionResult, rows,
+                                 r, sgn, kwargs)
+    for (j, p) in zip(rows, predictions.pred)
+        test_scores[j, i] = sgn * expected_risk(r, p; kwargs...)
+        if !isnothing(train_scores)
+            train_scores[j, i] = sgn * expected_risk(r, p.res; kwargs...)
+        end
     end
-    return test_score, train_score
+    return nothing
 end
-function fit_and_score(opt::NonFiniteAllocationOptimisationEstimator,
-                       scv::Union{<:GridSearchCrossValidation{<:Any, <:MultipleRandomised},
-                                  <:RandomisedSearchCrossValidation{<:Any,
-                                                                    <:MultipleRandomised}},
-                       cv::MultipleRandomisedResult, rd::ReturnsResult, i::Integer)
-    (; wd, pws, fa, store_weight_path, strict) = fold_evaluation(scv.cv)
-    hwd = held_weights_drift(wd, pws)
-    prediction = fit_and_predict(opt, rd; train_idx = cv.train_idx[i],
-                                 test_idx = cv.test_idx[i], cols = cv.asset_idx[i], wd = wd,
-                                 hwd = hwd, fa = fa, store_weight_path = store_weight_path,
-                                 strict = strict)
-    r = scv.r
-    sign = ifelse(bigger_is_better(r), 1, -1)
-    test_score = sign * expected_risk(scv.r, prediction; scv.kwargs...)
-    train_score = if scv.train_score
-        sign * expected_risk(scv.r, prediction.res; scv.kwargs...)
-    else
-        nothing
+function write_candidate_scores!(test_scores::MatNum, train_scores::Option{<:MatNum},
+                                 i::Integer, predictions::PopulationPredictionResult, rows,
+                                 r, sgn, kwargs)
+    for (path, path_rows) in zip(predictions.pred, rows)
+        write_candidate_scores!(test_scores, train_scores, i, path, path_rows, r, sgn,
+                                kwargs)
     end
-    return test_score, train_score
+    return nothing
 end
 """
     _expr_to_lens(ex::Symbol)

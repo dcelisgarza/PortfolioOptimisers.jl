@@ -1242,8 +1242,8 @@
     end
     @testset "Grid/Randomised search cv with a MultipleRandomised scheme" begin
         # The search scheme resamples asset subsets (each fold optimises the sub-universe
-        # via cols = asset_idx). Exercise the MultipleRandomised fit_and_score branch on a
-        # plain optimiser for both grid and randomised search.
+        # via cols = asset_idx). Exercise the MultipleRandomised route of the search's
+        # fold loop on a plain optimiser for both grid and randomised search.
         est = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
         r = ConditionalValueatRisk()
         mr_cv = MultipleRandomised(IndexWalkForward(127, 171); subset_size = 5,

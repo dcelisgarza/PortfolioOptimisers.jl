@@ -268,7 +268,7 @@
 "src/20_Optimisation/02_CrossValidation/06_Validation.jl" = { map = 12, units = 1, swept = false }
 "src/20_Optimisation/02_CrossValidation/07_Scoring.jl" = { map = 12, units = 6, swept = false }
 "src/20_Optimisation/02_CrossValidation/08_OptimisationCrossValidation.jl" = { map = 12, units = 2, swept = false }
-"src/20_Optimisation/02_CrossValidation/09_Base_SearchCrossValidation.jl" = { map = 12, units = 16, swept = false }
+"src/20_Optimisation/02_CrossValidation/09_Base_SearchCrossValidation.jl" = { map = 12, units = 19, swept = false }
 "src/20_Optimisation/02_CrossValidation/10_GridSearchCrossValidation.jl" = { map = 12, units = 3, swept = false }
 "src/20_Optimisation/02_CrossValidation/11_RandomisedSearchCrossValidation.jl" = { map = 12, units = 2, swept = false }
 "src/20_Optimisation/02_CrossValidation/12_OnlineFoldLoop.jl" = { map = 12, units = 4, swept = false }
@@ -336,7 +336,7 @@
 "src/23_Pipeline/02_StepExecution.jl" = { map = 12, units = 14, swept = false }
 "src/23_Pipeline/03_Pipeline.jl" = { map = 12, units = 27, swept = false }
 "src/23_Pipeline/04_PredictionCV.jl" = { map = 12, units = 15, swept = false }
-"src/23_Pipeline/05_SearchCrossValidation.jl" = { map = 12, units = 9, swept = false }
+"src/23_Pipeline/05_SearchCrossValidation.jl" = { map = 12, units = 8, swept = false }
 "src/24_Plotting.jl" = { map = 13, units = 78, swept = false }
 "src/25_Aliases.jl" = { map = 1, units = 132, algorithm = 0, swept = true }
 "src/PortfolioOptimisers.jl" = { map = 1, units = 1, algorithm = 0, swept = true }

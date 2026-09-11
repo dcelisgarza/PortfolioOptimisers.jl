@@ -165,7 +165,7 @@ end
 
 Refuse a scheme that declares a Fold Fit at an entry point that does not take the online step yet.
 
-The search scores every fold of a contiguous scheme independently, and the Pipeline decides what a fold with no training window means to its `fit`; neither reaches the online arm of [`fold_loop`](@ref) today, and each is its own ticket. Until it lands, a scheme carrying an [`OnlineStep`](@ref) is refused at the door by name rather than run as a refit in silence, because a caller who declared the step would otherwise read a batch answer as an online one.
+The Pipeline's doors are the ones left: what a fold with no training window means to a `Pipeline`'s `fit` is decided, and its build is its own ticket, so no Pipeline route reaches the online arm of [`fold_loop`](@ref) today. Until it lands, a scheme carrying an [`OnlineStep`](@ref) is refused at those doors by name rather than run as a refit in silence, because a caller who declared the step would otherwise read a batch answer as an online one. The optimiser's search no longer calls this: it scores every candidate through the one fold loop, so a Fold Fit reaches it as it reaches every other entry point.
 
 # Arguments
 

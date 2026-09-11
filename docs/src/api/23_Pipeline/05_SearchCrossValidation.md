@@ -8,10 +8,6 @@ search_cross_validation(pipe::Pipeline,
                                  gscv::GridSearchCrossValidation{<:Any,
                                                                  <:CombinatorialCrossValidation},
                                  data::Prices_RR)
-fit_and_score(pipe::Pipeline,
-                       scv::Union{<:GridSearchCrossValidation{<:Any, <:Any},
-                                  <:RandomisedSearchCrossValidation{<:Any, <:Any}},
-                       cv::CrossValidationResult, rd::Prices_RR, i::Integer)
 pipeline_lens
 is_pipeline_raw_path
 pipeline_lens_val_grid

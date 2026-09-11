@@ -149,6 +149,16 @@ ADR 0120 forbids, and neither reference regime does it.
   matrix must stay in `split`'s enumeration order. And the online identity holds against the
   materialised carrier at the tolerances ADR 0137 measured — `1e-5` through a solver, `1e-10`
   without, `5e-5` for `RiskBudgeting`.
+- Three facts the build ([#1020](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1020))
+  met. A `MultipleRandomised` with no `seed` draws from its `rng` afresh at every `split`, and
+  the loop splits once per candidate, so the search pins one seed off that `rng` before the
+  grid (`pin_draw`) and every candidate scores the same folds, as the released search did by
+  splitting once. The `Pipeline`'s search handed its scorer the raw matrix, so a candidate that
+  failed a fold could win there, against ADR 0120; it now goes through `finite_candidate_index`
+  like the optimiser's. And `expected_risk(r, res)` with the result's own prior paired the
+  weights, expanded to the caller's universe, with a prior reduced to the Investable Mask, so a
+  train score over a point-in-time window threw; the weights are now viewed at the result's mask
+  when no prior is passed.
 - One finding outside this decision: `previous_weights` hands the next fold `prev.res.w` or
   `prev.hw.w` verbatim, so after a failed fold the sequential arm threads a `NaN` vector into a
   `Turnover` term, where the reference keeps the last successful weights. That is the fold loop's,

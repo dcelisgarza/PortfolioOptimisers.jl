@@ -3378,7 +3378,7 @@ Compute the expected risk for an [`OptimisationResult`](@ref).
 
 Extracts `w` from `res` and delegates to the weight-based [`expected_risk`](@ref). `fees` takes precedence over `res.fees` if both are provided.
 
-When `pr::Pr_RR` is `nothing`, [`extract_pr`](@ref) takes the prior result from the `pr` property of `res` before delegating.
+When `pr::Pr_RR` is `nothing`, [`extract_pr`](@ref) takes the prior result from the `pr` property of `res` before delegating. That prior is on the universe the fit solved on, ADR 0115's rule, while `res.w` is expanded back to the caller's universe, so the weights are viewed at the result's Investable Mask ([`result_investable_mask`](@ref)) before they meet it; a result with no mask views nothing. A caller's own `pr` is taken as given, on the universe of `res.w`.
 
 `r` is one measure or a vector of them; a vector is scalarised by `sca`, defaulting to [`SumScalariser`](@ref). The measure is **not** read from `res`, so a result that carries its own `r` and `sca` reports the figure it optimised only when the caller passes them back, as `expected_risk(res.r, res; sca = res.sca)`.
 
@@ -3390,6 +3390,7 @@ The prior-taking method forwards the carrier whole, so a caller's **own** measur
   - [`OptimisationResult`](@ref)
   - [`BaseRM_VecBaseRM`](@ref)
   - [`resolve_risk_inputs`](@ref)
+  - [`result_investable_mask`](@ref)
 """
 function expected_risk(r::BaseRM_VecBaseRM, res::OptimisationResult, X::MatNum,
                        fees::Option{<:Fees} = nothing; kwargs...)
@@ -3404,8 +3405,11 @@ function expected_risk(r::BaseRM_VecBaseRM, res::OptimisationResult,
     # each carrier: a prior result resolves the measure, a `ReturnsResult` only unwraps `X`.
     # Unwrapping here dropped the prior fallback, so `expected_risk(Variance(), res)` — the
     # call this docstring asks callers to make — hit the kernel with an unstated `sigma`.
-    fees = extract_fees(res, fees)
-    return expected_risk(r, res.w, extract_pr(res, pr), fees; kwargs...)
+    # The result's own prior is on the investable universe and its weights are expanded
+    # back to the caller's, so with no `pr` the two meet at the mask; the fees already sit
+    # on the investable universe beside the prior. A caller's `pr` is on the weights' own.
+    w = isnothing(pr) ? investable_weights_view(result_investable_mask(res), res.w) : res.w
+    return expected_risk(r, w, extract_pr(res, pr), extract_fees(res, fees); kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

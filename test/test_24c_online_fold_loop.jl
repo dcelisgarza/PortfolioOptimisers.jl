@@ -388,17 +388,18 @@ assets is what keeps the JuMP families cheap.
         @test_throws ArgumentError po.fit_and_predict(mr, rd; test_idx = cvr.test_idx[1])
     end
 
-    @testset "The search and the Pipeline refuse a Fold Fit by name, until their own tickets" begin
+    @testset "The Pipeline refuses a Fold Fit by name, until its own ticket" begin
+        # The search took the loop in #1020, so its door no longer refuses; the Pipeline's
+        # doors do, until #1022.
         pgrid = ["opt.l1" => range(; start = 0.0005, stop = 0.001, length = 2)]
-        @test_throws ArgumentError search_cross_validation(MeanRisk(;
-                                                                    opt = JuMPOptimiser(;
-                                                                                        pe = EmpiricalPrior(),
-                                                                                        slv = slv,
-                                                                                        l1 = 0.0005)),
-                                                           GridSearchCrossValidation(pgrid;
-                                                                                     cv = online_cv,
-                                                                                     r = Variance()),
-                                                           rd)
+        @test isa(search_cross_validation(MeanRisk(;
+                                                   opt = JuMPOptimiser(;
+                                                                       pe = EmpiricalPrior(),
+                                                                       slv = slv,
+                                                                       l1 = 0.0005)),
+                                          GridSearchCrossValidation(pgrid; cv = online_cv,
+                                                                    r = ConditionalValueatRisk()),
+                                          rd), SearchCrossValidationResult)
         pipe = Pipeline(; steps = (EmpiricalPrior(), EqualWeighted()))
         @test_throws ArgumentError cross_val_predict(pipe, rd, online_cv)
         @test_throws ArgumentError cross_val_predict(pipe, rd,
