@@ -1281,7 +1281,9 @@ const CATALOGUE = [Section("Core abstractions",
                                        label = "Combinatorial [`CombinatorialCrossValidation`](@ref) returns a [`CombinatorialCrossValidationResult`](@ref)"),
                                    Group(Cap(:WalkForwardEstimator, :WalkForwardResult;
                                              label = "Walk forward [`WalkForwardEstimator`](@ref) return a [`WalkForwardResult`](@ref)"),
-                                         [Cap(:IndexWalkForward, :DateWalkForward)]),
+                                         [Cap(:IndexWalkForward, :DateWalkForward),
+                                          Cap(:OnlineStep;
+                                              label = "Fold Fit [`OnlineStep`](@ref) fits each fold by the online step, threading one estimator from fold to fold")]),
                                    Cap(:MultipleRandomised, :MultipleRandomisedResult;
                                        label = "Multiple randomised [`MultipleRandomised`](@ref) returns a [`MultipleRandomisedResult`](@ref)")]),
                             Prose("A scheme reads a fold under an evaluation convention. [`SelfFinancingDrift`](@ref) reads a fold's series on the weights the fund holds rather than the weights the optimiser chose, and the fold then carries a [`HeldWeightsResult`](@ref). A walk-forward may also thread those held weights into the fold that follows it."),

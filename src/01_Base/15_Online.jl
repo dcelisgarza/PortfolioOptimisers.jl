@@ -1433,6 +1433,65 @@ function update_online_estimator(::Nothing)
     return nothing
 end
 """
+    estimator_fields(x)
+
+Field names of `x` whose *type* is an estimator — the candidate set [`online_entry_state`](@ref) walks.
+
+Whether a field holds an estimator is decidable from `fieldtype` alone, because a `@concrete` host records the value's type in the field's type parameter, so the tuple is computed once per host type by a generated function, exactly as [`online_candidate_fields`](@ref) is. A field holding a vector of estimators, a result or a schedule is not a candidate: a vector is a batch configuration the step never folds into, a result carries no state field, and a schedule's entries are resolved per fold.
+
+# Related
+
+  - [`online_entry_state`](@ref)
+  - [`online_candidate_fields`](@ref)
+"""
+@generated function estimator_fields(::T) where {T}
+    fns = Tuple(f
+                for f in fieldnames(T)
+                if typeintersect(fieldtype(T, f),
+                                 Union{<:AbstractEstimator,
+                                       <:StatsBase.CovarianceEstimator}) !== Union{})
+    return :($fns)
+end
+"""
+    online_entry_state(est)
+    online_entry_state(::TimeDependent)
+
+Name the first field of an estimator tree that carries a partial-fit state, or answer `nothing`.
+
+The predicate behind the fold loop's cold start: the online arm of [`fold_loop`](@ref) reads its argument as the configuration alone, so an estimator that enters it holding a state is refused by name, and this is the walk that finds the state. It answers `"cache"` when `est` holds one, and otherwise descends into every estimator-valued field ([`estimator_fields`](@ref)) and prefixes the field's name to what it finds there, so the answer is the path from the root — `"opt.pe.me.cache"` for a mean estimator's state under a JuMP head. A [`TimeDependent`](@ref) schedule answers `nothing`, because its entries are batch configuration resolved per fold and the loop threads no state through them, and so does anything that is not an estimator.
+
+# Arguments
+
+  - `est`: The estimator, or any value a field holds.
+
+# Returns
+
+  - `path::Option{<:String}`: The dotted path of the first state found, or `nothing`.
+
+# Related
+
+  - [`estimator_fields`](@ref)
+  - [`update_online_estimator`](@ref)
+  - [`partial_fit_cache`](@ref)
+  - [`AbstractPartialFitState`](@ref)
+"""
+function online_entry_state(est::Union{<:AbstractEstimator,
+                                       <:StatsBase.CovarianceEstimator})
+    if hasfield(typeof(est), :cache) && !isnothing(getfield(est, :cache))
+        return "cache"
+    end
+    for f in estimator_fields(est)
+        path = online_entry_state(getfield(est, f))
+        if !isnothing(path)
+            return string(f, ".", path)
+        end
+    end
+    return nothing
+end
+function online_entry_state(::Any)
+    return nothing
+end
+"""
     supports_partial_fit(est) -> Bool
 
 Answers whether [`partial_fit!`](@ref) on this estimator folds rather than refuses.

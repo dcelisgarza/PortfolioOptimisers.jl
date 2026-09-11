@@ -42,9 +42,13 @@ Five facts shaped the decision.
    its field's value every fold; a state is threaded *through* that value. The comment on #870 that
    [#967](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/967) left measured it: a
    callable schedule returning a stepped estimator hands back the state as it stood when the closure
-   was built. The step already refuses a schedule on `pe` and on a head's `opt` (ADR 0137), but its
-   messages promise that "a fold loop resolves the schedule before it steps" — a promise that cannot
-   be kept for a field that carries a state, because the resolved value never saw the earlier rows.
+   was built. The step already refuses a schedule on `pe` and a schedule of optimisers at the root
+   (ADR 0137), but its messages promise that "a fold loop resolves the schedule before it steps" —
+   a promise that cannot be kept for a field that carries a state, because the resolved value never
+   saw the earlier rows. A JuMP or hierarchical head's `opt` cannot hold a schedule at all: its
+   bound is the bundle type, so a schedule there is refused at construction, and `pe` and the root
+   are the only stateful slots a schedule reaches. (The build, #969, measured this; the decision
+   comment named the head's `opt` as a third.)
 5. **The reference's online loop is a function, not a scheme.** It takes the walk-forward's own
    keywords, builds an expanding walk-forward inside, clones the estimator so every run starts cold,
    folds the delta rows between folds, threads the previous weights, and returns the same result as
@@ -90,8 +94,8 @@ it. A resume — a state that leaves a result and re-enters a loop — is its ow
 with an explicit entry.
 
 **A schedule reaches stateless fields only.** Under the online arm, a `TimeDependent` on a field
-that carries a state — `pe`, or a JuMP or hierarchical head's `opt` — is refused at warm-up, before
-the first fold. A schedule on any other field composes with no rule, because the schedule writes
+that carries a state — a host's `pe`, or the optimiser itself — is refused at warm-up, before the
+first fold. A schedule on any other field composes with no rule, because the schedule writes
 the per-fold copy and the state threads through the unresolved estimator, so the two never touch
 one slot. The composition that works is the one #967 pinned: an `Online` inside an estimator that
 holds schedules, and a host with a wrapper in one field and a schedule in another.
@@ -173,6 +177,12 @@ on the map, and neither is built.
   restructure its inner loop for a stepping candidate; it dispatches on `fold_fit(gscv.cv)`
   through a function barrier rather than on a new scheme type. The Pipeline is
   [#872](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/872)'s.
-- The build is [#969](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/969). The
-  resume, and the schedule-swap extension, are fog on the map until their own tickets.
+- The build is [#969](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/969): the
+  family and the switch in `04_WalkForward.jl`, the arm and the read-out in
+  `02_CrossValidation/12_OnlineFoldLoop.jl`, the entry refusals in `25_OnlineOptimisation.jl`,
+  and the state walk in `01_Base/15_Online.jl`. The search and the Pipeline refuse a Fold Fit by
+  name at their doors until [#871](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/871)
+  and [#872](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/872) build the step
+  there, so a caller who declared it never reads a batch answer as an online one. The resume, and
+  the schedule-swap extension, are fog on the map until their own tickets.
 - `CONTEXT.md` gains **Fold Fit**.

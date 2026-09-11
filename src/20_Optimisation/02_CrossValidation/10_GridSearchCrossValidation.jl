@@ -89,6 +89,7 @@ Performs grid search cross-validation for portfolio optimisation estimators. Ite
 """
 function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
                                  gscv::GridSearchCrossValidation, rd::ReturnsResult)
+    assert_batch_fold_fit(gscv.cv, "`search_cross_validation`", "#871")
     p = gscv.p
     lens_grid, val_grid = lens_val_grid(p)
     cv = split(gscv.cv, rd)

@@ -279,6 +279,8 @@ PortfolioOptimisers.online_candidate_fields
 PortfolioOptimisers.online_fields
 PortfolioOptimisers.online_state_seed(::Union{<:PortfolioOptimisers.AbstractEstimator, <:StatsBase.CovarianceEstimator}, ::PortfolioOptimisers.Option{<:Integer})
 PortfolioOptimisers.update_online_estimator
+PortfolioOptimisers.estimator_fields
+PortfolioOptimisers.online_entry_state
 ```
 
 ## The coverage policy

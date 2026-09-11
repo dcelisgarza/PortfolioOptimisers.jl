@@ -13,6 +13,9 @@ PortfolioOptimisers.partial_fit!(opt::PortfolioOptimisers.JuMPOptimisationEstima
 PortfolioOptimisers.online_state_seed(::Union{<:EqualWeighted, <:RandomWeighted}, max_history::PortfolioOptimisers.Option{<:Integer})
 PortfolioOptimisers.update_online_member
 PortfolioOptimisers.update_online_estimator(opt::PortfolioOptimisers.JuMPOptimisationEstimator)
+PortfolioOptimisers.assert_stateless_schedule
+PortfolioOptimisers.assert_stateless_prior
+PortfolioOptimisers.assert_online_entry
 PortfolioOptimisers.returns_result(host::Union{<:JuMPOptimiser, <:HierarchicalOptimiser, <:InverseVolatility, <:NestedClustered, <:Stacking, <:SubsetResampling})
 PortfolioOptimisers.readout_without_state
 PortfolioOptimisers.online_readout

@@ -118,7 +118,7 @@ Forwards the observations of a carrier to the prior, in the prior's own arity.
 
 The one forward the optimiser's step makes, and the rule for every optimiser: **an optimiser forwards the observation to its prior and to nothing else**, and everything it holds beside the prior takes its ordinary batch fit at read-out, from the reconstituted fold context. The carrier is unpacked on the way down exactly as [`prior`](@ref) unpacks it in batch — `rd.X` and `rd.F` verbatim, with a missing `rd.F` refused by name at this door when the prior's tree requires one, through [`needs_factor_returns`](@ref) — and the active mask of a time-varying panel rides as the keyword the prior's step takes. What the prior does with `F` is the prior's own decision: its tree records it, drops it, or takes what it is given, exactly as its batch verb does.
 
-Two refusals. A prior that is already a [`AbstractPriorResult`](@ref) has no state to fold into: it is batch configuration, and an optimiser holding one runs `optimise(opt, rd)`. A [`TimeDependent`](@ref) on the prior is refused because a schedule swaps the estimator that carries the state, and a member that never saw the folded rows cannot be handed them; a fold loop resolves the schedule before it steps (see [#870](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/870)).
+Two refusals. A prior that is already a [`AbstractPriorResult`](@ref) has no state to fold into: it is batch configuration, and an optimiser holding one runs `optimise(opt, rd)`. A [`TimeDependent`](@ref) on the prior is refused because a schedule swaps the estimator that carries the state, and a member that never saw the folded rows cannot be handed them. No loop resolves a schedule before stepping: a schedule reaches stateless fields only, and the fold loop's online arm refuses one on the prior at warm-up ([`assert_online_entry`](@ref), ADR 0140).
 
 # Arguments
 
@@ -153,7 +153,7 @@ function fold_prior(pe::AbstractPriorResult, ::ReturnsResult)
     return throw(ArgumentError("`pe` holds a fitted `$(typeof(pe))`, which has no state to fold an observation into: a prior result is batch configuration. Hand the optimiser the prior estimator to take the online step, or run `optimise(opt, rd)`."))
 end
 function fold_prior(pe::TimeDependent, ::ReturnsResult)
-    return throw(ArgumentError("`pe` holds a `TimeDependent` schedule of priors, and the online step cannot fold into a schedule: it swaps the estimator that carries the state, and a member that never saw the folded rows cannot be handed them. Resolve the schedule to one prior before stepping, which is what a fold loop does before it steps (#870)."))
+    return throw(ArgumentError("`pe` holds a `TimeDependent` schedule of priors, and the online step cannot fold into a schedule: it swaps the estimator that carries the state, and a member that never saw the folded rows cannot be handed them. No loop resolves a schedule before stepping — a schedule reaches stateless fields only. Hold one prior in `pe`, and schedule a field that carries no state."))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -228,7 +228,7 @@ The optimiser's online step, decided by [#867](https://github.com/dcelisgarza/Po
 
 The arity mirrors the batch verb: `optimise(opt, rd)` takes a carrier, so the step takes one, holding one observation or a block of them, and unpacks it on the way down to the prior's own arity. A JuMP head forwards to the [`JuMPOptimiser`](@ref) it holds and a hierarchical head to its [`HierarchicalOptimiser`](@ref); the bundle is the host of the prior and the context. The three meta-optimisers and [`InverseVolatility`](@ref) hold their prior directly and are their own host. [`EqualWeighted`](@ref) and [`RandomWeighted`](@ref) hold no prior but read the observations — each derives the Coverage Universe of its own window — so they are the bottom of their chain and their context keeps the rows itself.
 
-Two families are refused by name. A finite allocation converts a weight vector and prices into share counts and reads no returns window, so it has no online step and needs none: `optimise(da, w, p)` is its whole verb. A [`TimeDependent`](@ref) schedule of optimisers is resolved by a fold loop before the loop steps, and a bare step has no fold to resolve it with.
+Two families are refused by name. A finite allocation converts a weight vector and prices into share counts and reads no returns window, so it has no online step and needs none: `optimise(da, w, p)` is its whole verb. A [`TimeDependent`](@ref) schedule of optimisers has no step of its own, because a schedule swaps the optimiser that carries the state and no loop resolves a schedule before stepping: a schedule reaches stateless fields only, and the fold loop's online arm refuses one at warm-up ([`assert_online_entry`](@ref)).
 
 The identity the step keeps is the seam's: after `t` observations, `optimise(opt)` equals `optimise(opt, rd[1:t])` — exactly for the carrier the read-out rebuilds, and to the moment layer's own tolerance for the weights.
 
@@ -278,7 +278,7 @@ function partial_fit!(opt::FiniteAllocationOptimisationEstimator, ::ReturnsResul
     return throw(ArgumentError("a `$(typeof(opt))` has no online step: a finite allocation converts a weight vector and prices into share counts and reads no returns window, so there is nothing to fold. Take the step on the optimiser that produces the weights, and allocate its read-out with `optimise(da, w, p)`."))
 end
 function partial_fit!(::TD_OptE_Opt, ::ReturnsResult)
-    return throw(ArgumentError("a `TimeDependent` schedule of optimisers has no online step of its own: a fold loop resolves the schedule to the fold's optimiser before it steps, and a bare step has no fold to resolve it with. Resolve it with `reset_time_dependent_estimator`, or step inside a fold loop."))
+    return throw(ArgumentError("a `TimeDependent` schedule of optimisers has no online step: a schedule swaps the optimiser that carries the state, and no loop resolves a schedule before stepping — a schedule reaches stateless fields only. Step one optimiser, and schedule a field that carries no state."))
 end
 """
     online_state_seed(opt::Union{<:EqualWeighted, <:RandomWeighted}, max_history)
@@ -367,6 +367,98 @@ function update_online_estimator(opt::Union{<:JuMPOptimiser, <:HierarchicalOptim
                                             <:InverseVolatility, <:NestedClustered,
                                             <:Stacking, <:SubsetResampling})
     return rebuild_estimator(opt, (; pe = update_online_member(opt.pe)))
+end
+"""
+    assert_stateless_schedule(opt::JuMPOptimisationEstimator)
+    assert_stateless_schedule(opt::Union{<:HierarchicalRiskParity, <:HierarchicalEqualRiskContribution, <:SchurComplementHierarchicalRiskParity})
+    assert_stateless_schedule(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser, <:InverseVolatility, <:NestedClustered, <:Stacking, <:SubsetResampling})
+    assert_stateless_schedule(opt)
+
+Refuse a [`TimeDependent`](@ref) schedule on a field that carries a state, by name.
+
+A schedule replaces its field's value every fold, and a state is threaded *through* that value, so the two write one slot with opposite intentions and the schedule wins: the value it hands a fold never saw the rows folded before it. The one such field a schedule can reach is a host's `pe`, whose bound admits one; a JuMP or hierarchical head's `opt` holds the bundle and its bound refuses a schedule at construction, so the heads only recurse. The walk is the one [`update_online_estimator`](@ref) makes, and a schedule on any other field — a meta-optimiser's inner optimisers included, which the read-out refits from the buffer — composes with no rule, because it writes the per-fold copy while the state threads through the unresolved estimator. ADR 0140 records the decision; carrying a state across a swap is a possible future extension and is not built.
+
+# Related
+
+  - [`assert_online_entry`](@ref)
+  - [`update_online_estimator`](@ref)
+  - [`TimeDependent`](@ref)
+"""
+function assert_stateless_schedule(opt::JuMPOptimisationEstimator)
+    return assert_stateless_schedule(opt.opt)
+end
+function assert_stateless_schedule(opt::Union{<:HierarchicalRiskParity,
+                                              <:HierarchicalEqualRiskContribution,
+                                              <:SchurComplementHierarchicalRiskParity})
+    return assert_stateless_schedule(opt.opt)
+end
+function assert_stateless_schedule(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser,
+                                              <:InverseVolatility, <:NestedClustered,
+                                              <:Stacking, <:SubsetResampling})
+    return assert_stateless_prior(opt.pe, opt)
+end
+function assert_stateless_schedule(::Any)
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Refuse a host's prior when it is a [`TimeDependent`](@ref), and pass anything else.
+
+# Arguments
+
+  - `pe`: The host's prior.
+  - `host`: The host, for the message.
+
+# Related
+
+  - [`assert_stateless_schedule`](@ref)
+"""
+function assert_stateless_prior(::TimeDependent, host)
+    return throw(ArgumentError("`$(typeof(host).name.name).pe` holds a `TimeDependent` schedule, and the online arm of the fold loop cannot step it: `pe` carries the partial-fit state the loop threads from fold to fold, and a schedule replaces that value every fold, so the prior a fold is handed never saw the rows folded before it. A schedule reaches stateless fields only. Hold one prior in `pe`, and schedule a field that carries no state, or refit every fold with `ff = nothing`."))
+end
+function assert_stateless_prior(::Any, ::Any)
+    return nothing
+end
+"""
+    assert_online_entry(est::TimeDependent)
+    assert_online_entry(est)
+
+Refuse an estimator that is not the configuration alone at the entry of the fold loop's online arm.
+
+Three refusals, all before any solve. A [`TimeDependent`](@ref) schedule of optimisers at the root, because the loop threads one estimator and a schedule is a different one per fold. A schedule on a host's `pe`, the one stateful field whose bound admits one, through [`assert_stateless_schedule`](@ref). And a partial-fit state anywhere in the tree, through [`online_entry_state`](@ref): **the loop starts cold**. The batch loop already reads its argument as configuration alone — [`factory`](@ref) carries a state and `prior(pe, X)` never reads it — and so does this one. A reset was costed at one "empty, keep the cap" verb per state type, and folding the warm-up on top of what the estimator holds double-counts rows in silence; both were rejected in ADR 0140. A resume, a state that leaves a result and re-enters a loop, is its own ticket with an explicit entry.
+
+# Arguments
+
+  - `est`: The estimator handed to the loop.
+
+# Validation
+
+  - `est` is not a `TimeDependent`. An `ArgumentError` is thrown otherwise.
+  - No `pe` on the route the step takes holds a `TimeDependent`. An `ArgumentError` is thrown otherwise.
+  - No `cache` in the tree of `est` holds a state. An `ArgumentError` naming the field is thrown otherwise.
+
+# Related
+
+  - [`online_folds`](@ref)
+  - [`assert_stateless_schedule`](@ref)
+  - [`online_entry_state`](@ref)
+  - [`OnlineStep`](@ref)
+"""
+function online_entry_state(::TimeDependent)
+    # A schedule's entries are batch configuration, resolved per fold; the loop threads no
+    # state through them, so a state one of them carries is not a state at entry.
+    return nothing
+end
+function assert_online_entry(::TimeDependent)
+    return throw(ArgumentError("the online arm of the fold loop takes one estimator and threads it from fold to fold, and a `TimeDependent` schedule of optimisers is a different one per fold, so it has no state to thread. A schedule reaches stateless fields only. Step one optimiser, and schedule a field that carries no state, or refit every fold with `ff = nothing`."))
+end
+function assert_online_entry(est)
+    assert_stateless_schedule(est)
+    path = online_entry_state(est)
+    @argcheck(isnothing(path),
+              ArgumentError("`$(typeof(est).name.name)` enters the online arm of the fold loop carrying a partial-fit state at `$(path)`, and the loop starts cold: its argument is the configuration alone, and the warm-up folds the first training window into an estimator that has folded nothing. Hand the loop the estimator with every `cache` at `nothing`, or read the stepped estimator out by hand with `fit_and_predict(opt, rd; test_idx)`."))
+    return nothing
 end
 """
     returns_result(host::Union{<:JuMPOptimiser, <:HierarchicalOptimiser, <:InverseVolatility, <:NestedClustered, <:Stacking, <:SubsetResampling})

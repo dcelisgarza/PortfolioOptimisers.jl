@@ -286,6 +286,7 @@ The input is split into contiguous observation windows by `gscv.cv` (price-level
 function search_cross_validation(pipe::Pipeline, gscv::GridSearchCrossValidation,
                                  data::Prices_RR)
     assert_no_holdout(pipe)
+    assert_batch_fold_fit(gscv.cv, "A `Pipeline`'s `search_cross_validation`", "#872")
     lens_grid, val_grid = pipeline_lens_val_grid(pipe, gscv.p)
     cv = split(gscv.cv, data)
     N = length(val_grid)

@@ -33,6 +33,22 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Refuse a [`Pipeline`](@ref) at the entry of the fold loop's online arm, by name.
+
+What a [`Fold`](@ref) with no training window means to a `Pipeline`'s `fit` is [#872](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/872)'s decision, so a pipeline does not take the online step yet. The three pipeline doors refuse a Fold Fit before they split the data, through [`assert_batch_fold_fit`](@ref); this method is the type-level backstop at the arm itself, so no route through [`online_folds`](@ref) warms a pipeline up.
+
+# Related
+
+  - [`assert_online_entry`](@ref)
+  - [`assert_batch_fold_fit`](@ref)
+  - [`online_folds`](@ref)
+"""
+function assert_online_entry(::Pipeline)
+    return throw(ArgumentError("a `Pipeline` does not take the online step yet (#872): what a fold with no training window means to its `fit` is not decided. Leave the scheme's `ff` unset."))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Return `true` if any step of the [`Pipeline`](@ref) carries time-dependent constraints: a [`TimeDependent`](@ref) schedule standing in for the optimisation step, an optimisation step whose fields hold schedules, or a nested pipeline containing either.
 
 # Related
@@ -300,6 +316,7 @@ Each resampled path is an inner walk-forward over a random asset subset; the sub
 function cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::MultipleRandomised;
                            ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(), kwargs...)
     assert_no_holdout(pipe)
+    assert_batch_fold_fit(cv, "A `Pipeline`'s `cross_val_predict`", "#872")
     cv_res = split(cv, data)
     (; train_idx, test_idx, asset_idx, path_ids) = cv_res
     assert_unshuffled_folds(cv, train_idx)
@@ -367,6 +384,7 @@ function cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::CVER = KFold();
                            ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                            id = nothing)
     assert_no_holdout(pipe)
+    assert_batch_fold_fit(cv, "A `Pipeline`'s `cross_val_predict`", "#872")
     cv_res = split(cv, data)
     (; train_idx, test_idx) = cv_res
     assert_unshuffled_folds(cv, train_idx)

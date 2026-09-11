@@ -609,11 +609,11 @@ function Base.split(mrcv::MultipleRandomised, rd::Prices_RR)
                                     asset_idx = asset_indices, path_ids = path_ids)
 end
 """
-    path_fit_and_predict(opt, rd, train_idx, test_idx, cols; ex, id)
+    path_fit_and_predict(opt, rd, train_idx, test_idx, cols; ex, id, cv)
 
 Fit and predict along a sequence of (train, test, asset) triples, respecting sequential constraints.
 
-The path runs through [`fold_loop`](@ref), which takes each fold's asset-subset view of `(opt, rd)` and resolves the fold's time-dependent entries. The path runs sequentially when the optimiser needs the previous fold's weights, and in parallel over `ex` otherwise. A time-dependent optimiser alone does not force sequential execution, because its per-fold values are known upfront.
+The path runs through [`fold_loop`](@ref), which takes each fold's asset-subset view of `(opt, rd)` and resolves the fold's time-dependent entries. The path runs sequentially when the optimiser needs the previous fold's weights, and in parallel over `ex` otherwise. A time-dependent optimiser alone does not force sequential execution, because its per-fold values are known upfront. `cv` is the scheme the path belongs to, handed on so the loop reads its Fold Fit ([`fold_fit`](@ref)): under an [`OnlineStep`](@ref) the path's estimator is sliced to the subset once and threaded through the path's folds.
 
 # Arguments
 
@@ -624,6 +624,7 @@ The path runs through [`fold_loop`](@ref), which takes each fold's asset-subset 
   - `cols`: Sequence of asset column indices for each fold.
   - `ex::FLoops.Transducers.Executor`: Executor for parallel processing.
   - `id`: Optional path identifier.
+  - `cv`: The scheme the path belongs to, or `nothing`.
 
 # Returns
 
@@ -643,7 +644,8 @@ function path_fit_and_predict(opt::OptE_TD, rd::ReturnsResult, train_idx, test_i
                               hwd::Option{<:AbstractWeightDrift} = wd,
                               fa::Option{<:AbstractFeeAmortisation} = nothing,
                               pws::Option{<:AbstractPreviousWeightsSource} = nothing,
-                              store_weight_path::Bool = false, strict::Bool = false)
+                              store_weight_path::Bool = false, strict::Bool = false,
+                              cv = nothing)
     # `i` is the fold's position in the path's split enumeration — no ordering is imposed
     # on time-dependent entries (predictions are sorted for reporting only, after the
     # loop); the user keys entries off ctx.train_idx[ctx.i] / ctx.test_idx[ctx.i].
@@ -653,7 +655,7 @@ function path_fit_and_predict(opt::OptE_TD, rd::ReturnsResult, train_idx, test_i
     end
     predictions = fold_loop(opt, length(train_idx), ex; rd = rd, train_idx = train_idx,
                             test_idx = test_idx, path_id = id, fold_view = asset_view,
-                            pws = pws) do fold
+                            pws = pws, cv = cv) do fold
         return fit_and_predict(fold.est, fold.rd; train_idx = fold.train,
                                test_idx = fold.test, wd = wd, hwd = hwd, fa = fa,
                                store_weight_path = store_weight_path, strict = strict)
@@ -681,7 +683,8 @@ function fit_and_predict(opt::OptE_TD, rd::ReturnsResult, cv::MRCVR;
         asset = map(x -> x[3], vals)
         return path_fit_and_predict(opt, rd, train, test, asset; ex = ex, id = i, wd = wd,
                                     hwd = hwd, fa = fa, pws = pws,
-                                    store_weight_path = store_weight_path, strict = strict)
+                                    store_weight_path = store_weight_path, strict = strict,
+                                    cv = cv)
     end
     return PopulationPredictionResult(; pred = predictions)
 end
@@ -706,5 +709,26 @@ The scheme carries no switch of its own. Each of its paths is an inner walk-forw
 """
 function fold_evaluation(cv::MultipleRandomised)
     return fold_evaluation(cv.cv)
+end
+"""
+    fold_fit(cv::MultipleRandomised)
+
+Read the Fold Fit of a [`MultipleRandomised`](@ref).
+
+The scheme carries no switch of its own. Each of its paths is an inner walk-forward, so it inherits the Fold Fit from the scheme in its `cv` field, as it inherits its evaluation switches. Under an [`OnlineStep`](@ref) each path slices the estimator to its asset subset once and threads it through the path's folds.
+
+# Returns
+
+  - `ff::Option{<:AbstractFoldFit}`: The inner walk-forward's Fold Fit.
+
+# Related
+
+  - [`fold_fit`](@ref)
+  - [`fold_evaluation`](@ref)
+  - [`MultipleRandomised`](@ref)
+  - [`path_fit_and_predict`](@ref)
+"""
+function fold_fit(cv::MultipleRandomised)
+    return fold_fit(cv.cv)
 end
 export MultipleRandomised, MultipleRandomisedResult

@@ -1608,7 +1608,7 @@ end
 """
     fit_and_predict(opt, rd::ReturnsResult, cv::NonSeqCVER; cols, ex, id) -> MultiPeriodPredictionResult
     fit_and_predict(opt, rd::ReturnsResult, cv::CombCVER; cols, ex) -> PopulationPredictionResult
-    fit_and_predict(opt, rd::ReturnsResult; train_idx, test_idx, cols) -> PredictionResult
+    fit_and_predict(opt, rd::ReturnsResult; train_idx = nothing, test_idx, cols) -> PredictionResult
     fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult; test_idx, cols) -> PredictionResult
 
 Fit an optimisation estimator on training data and predict on test data using cross-validation.
@@ -1616,13 +1616,15 @@ Fit an optimisation estimator on training data and predict on test data using cr
 The three-argument method (`opt`, `rd`, `cv`) performs full cross-validated prediction over all folds of `cv`.
 The two-argument methods operate on a single pre-defined train/test split or on a pre-existing result.
 
+The estimator form takes `train_idx = nothing` to mean *the estimator holds its window*: it reads the estimator out through `optimise(opt)` instead of fitting it over `port_opt_view(rd, train_idx, cols)`, and predicts over `test_idx` as before. That is the read-out of the online arm of [`fold_loop`](@ref), and it is also a public entry for a hand-stepped estimator — one warmed up with [`update_online_estimator`](@ref) and folded with [`partial_fit!`](@ref) — so `fit_and_predict(opt, rd; test_idx)` on a stepped estimator equals `fit_and_predict(opt, rd; train_idx, test_idx)` on the cold one over the same rows. The two arms are [`fit_fold_result`](@ref)'s, and the method lives beside them.
+
 # Arguments
 
   - `opt`: Optimisation estimator or an existing optimisation result.
   - `rd::ReturnsResult`: Returns data.
   - `cv::NonSeqCVER`: Non-sequential cross-validation estimator (e.g. [`KFold`](@ref) or [`CombinatorialCrossValidation`](@ref)).
   - `cv::CombCVER`: Combinatorial cross-validation estimator or result ([`CombinatorialCrossValidation`](@ref)).
-  - `train_idx::VecInt`: Training indices.
+  - `train_idx::Option{<:VecInt}`: Training indices, or `nothing` to read a stepped estimator out.
   - `test_idx`: Test indices (vector or vector of vectors).
   - `cols`: Column selector (default `:` for all assets).
 
@@ -1638,6 +1640,7 @@ The two-argument methods operate on a single pre-defined train/test split or on 
 
   - [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref)
   - [`optimise`](@ref)
+  - [`fit_fold_result`](@ref)
   - [`KFold`](@ref)
   - [`CombinatorialCrossValidation`](@ref)
 """
@@ -1647,21 +1650,6 @@ function fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::Returns
                          hwd::Option{<:AbstractWeightDrift} = wd,
                          fa::Option{<:AbstractFeeAmortisation} = nothing,
                          store_weight_path::Bool = false, strict::Bool = false, kwargs...)
-    return StatsAPI.predict(res, rd, test_idx, cols; wd = wd, hwd = hwd, fa = fa,
-                            store_weight_path = store_weight_path, strict = strict)
-end
-function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::ReturnsResult;
-                         train_idx::VecInt, test_idx::VecInt_VecVecInt, cols = :,
-                         wd::Option{<:AbstractWeightDrift} = nothing,
-                         hwd::Option{<:AbstractWeightDrift} = wd,
-                         fa::Option{<:AbstractFeeAmortisation} = nothing,
-                         store_weight_path::Bool = false, strict::Bool = false)
-    rd_train = port_opt_view(rd, train_idx, cols)
-    if !isa(cols, Colon)
-        opt = port_opt_view(opt, cols, rd.X)
-    end
-    #! Add ability to do callbacks
-    res = optimise(opt, rd_train)
     return StatsAPI.predict(res, rd, test_idx, cols; wd = wd, hwd = hwd, fa = fa,
                             store_weight_path = store_weight_path, strict = strict)
 end
@@ -1838,6 +1826,13 @@ asset view is taken, every [`TimeDependent`](@ref) schedule is swapped for its f
 value, and the previous fold's weights are threaded in. `train` and `test` are this fold's
 own windows, so a callback never indexes `train_idx`/`test_idx` itself.
 
+`train === nothing` says *the estimator holds its window*. The online arm of the loop,
+[`online_folds`](@ref), hands its callback a `Fold` of that shape: `est` has already folded
+every row of the fold's training window through [`partial_fit!`](@ref), so a callback reads
+it out — `optimise(est)` with no returns — rather than fitting it over rows the record does
+not carry. [`fit_and_predict`](@ref) takes `train_idx = nothing` for exactly that, so every
+entry point's callback is unchanged across the two arms.
+
 The type is immutable and every field is concretely typed at the construction site, so the
 record costs nothing at run time. [`fold_loop`](@ref) is the only site that builds one,
 which is why there is no keyword constructor.
@@ -1870,7 +1865,7 @@ struct Fold{T1, T2, T3, T4, T5, T6}
     """
     rd::T4
     """
-    The fold's training indices.
+    The fold's training indices, or `nothing` when the estimator holds its window.
     """
     train::T5
     """
@@ -1937,6 +1932,24 @@ function fold_evaluation(::Any)
             strict = false)
 end
 """
+    fold_fit(cv)
+
+Read the Fold Fit of a cross-validation scheme: how [`fold_loop`](@ref) fits each fold.
+
+`nothing` means a refit from the fold's training window, which is the released behaviour and what every scheme answers unless it states otherwise. A walk-forward carries the switch in its `ff` field and answers it through a method of its own; a [`MultipleRandomised`](@ref) forwards to the walk-forward it wraps; a split result, a k-fold, a combinatorial scheme and a call site that holds no scheme reach this fallback. An [`OnlineStep`](@ref) sends the loop down its online arm.
+
+The method is per type and takes the scheme itself, so inference reads the answer from the type of `cv`, exactly as [`fold_evaluation`](@ref) and [`folds_are_time_ordered`](@ref) do, and the arm that cannot run is eliminated.
+
+# Related
+
+  - [`AbstractFoldFit`](@ref)
+  - [`OnlineStep`](@ref)
+  - [`fold_evaluation`](@ref)
+  - [`folds_are_time_ordered`](@ref)
+  - [`fold_loop`](@ref)
+"""
+fold_fit(::Any) = nothing
+"""
     fold_loop(fit_fold, est, n::Integer, ex::FLoops.Transducers.Executor,
               ::Type{ElT} = PredictionResult; rd, train_idx, test_idx,
               path_id = nothing, cv = nothing, fold_view = nothing)
@@ -1962,21 +1975,27 @@ The callback takes the one [`Fold`](@ref) record, so a call site names what it r
 
 [`assert_time_dependent_fold_count`](@ref) runs once, before the loop.
 
-This is also the one site that decides how the folds run. A run is sequential only when two
+This is also the one site that decides how the folds run, and it has three arms. The
+online arm, [`online_folds`](@ref), is taken first, when the scheme declares a Fold Fit
+([`fold_fit`](@ref)): the loop then warms one estimator up on the first training window,
+folds each fold's new rows into it, and hands the callback a [`Fold`](@ref) whose `train` is
+`nothing` — steps 2 and 3 run on a per-fold copy of the threaded estimator, so a schedule and
+the previous weights still reach the fold. Otherwise a run is sequential only when two
 facts hold at once: the fold enumeration of `cv` is a timeline
 ([`folds_are_time_ordered`](@ref)), *and* `est` needs the previous fold's weights
 ([`needs_previous_weights`](@ref)). The conjunction routes through [`run_folds`](@ref).
 Every other case routes through [`parallel_folds`](@ref), because a fold with no fold behind
 it, or a fold whose estimator reads no previous weights, is independent of the other folds.
-Neither loop re-decides.
+No loop re-decides.
 
-`cv` is the scheme, and the loop reads its two per-type predicates rather than a
-value a call site computes. Both are decided by the *types* of `cv` and `est`, so inference
+`cv` is the scheme, and the loop reads its three per-type predicates rather than a
+value a call site computes. All are decided by the *types* of `cv` and `est`, so inference
 folds the conjunction and eliminates the arm that cannot run. A `Bool` keyword cannot do
 this: its value survives only by constant propagation, which one call hop loses, and the
 sequential arm is then inferred even where it can never run — see the amendments of ADR
-0067. The two path-level sites enumerate an inner walk-forward and hold no scheme, so they
-omit `cv`; `folds_are_time_ordered(nothing)` answers `true`.
+0067. The two path-level sites enumerate an inner walk-forward; the optimiser's passes the
+[`MultipleRandomised`](@ref) it runs, which forwards its Fold Fit, and the Pipeline's holds no
+scheme and omits `cv`; `folds_are_time_ordered(nothing)` answers `true`.
 
 `ElT` is the per-fold result element type: a single
 [`PredictionResult`](@ref) for a time-ordered scheme, a `Vector{PredictionResult}` for the
@@ -1986,9 +2005,11 @@ multi-path combinatorial scheme. It is positional for the reason given in
 # Related
 
   - [`Fold`](@ref)
+  - [`online_folds`](@ref)
   - [`run_folds`](@ref)
   - [`parallel_folds`](@ref)
   - [`assert_unshuffled_folds`](@ref)
+  - [`fold_fit`](@ref)
   - [`folds_are_time_ordered`](@ref)
   - [`fit_and_predict`](@ref)
   - [`cross_val_predict`](@ref)
@@ -2002,9 +2023,10 @@ function fold_loop(fit_fold, est, n::Integer, ex::FLoops.Transducers.Executor,
         assert_time_dependent_fold_count(est, n)
     end
     prev_w_flag = needs_previous_weights(est)
-    function fold(i, prev)
+    # The per-fold copy. `esti` is the fold's estimator before resolution: the configuration
+    # in the batch arms, the threaded estimator in the online arm.
+    function resolve(i, prev, esti, rdi, train)
         w_prev = previous_weights(pws, prev)
-        (esti, rdi) = isnothing(fold_view) ? (est, rd) : fold_view(i)
         # Resolve time-dependent entries first, so a freshly swapped-in per-fold entry also
         # receives the previous weights from the factory pass below.
         if td_flag
@@ -2016,14 +2038,21 @@ function fold_loop(fit_fold, est, n::Integer, ex::FLoops.Transducers.Executor,
         if !isnothing(w_prev) && prev_w_flag
             esti = factory(esti, w_prev)
         end
-        return fit_fold(Fold(i, n, esti, rdi, train_idx[i], test_idx[i]))
+        return fit_fold(Fold(i, n, esti, rdi, train, test_idx[i]))
     end
-    # Both halves are per-type methods over the concretely-typed `cv` and `est`, so
-    # inference decides the conjunction from types alone and eliminates the arm that
-    # cannot run. A `Bool` keyword would leave the `run_folds` arm inferred, and its
+    function fold(i, prev)
+        (esti, rdi) = isnothing(fold_view) ? (est, rd) : fold_view(i)
+        return resolve(i, prev, esti, rdi, train_idx[i])
+    end
+    # All three predicates are per-type methods over the concretely-typed `cv` and `est`,
+    # so inference decides the route from types alone and eliminates the arms that cannot
+    # run. A `Bool` keyword would leave the `run_folds` arm inferred, and its
     # abstractly-typed `predictions[i - 1]` is a runtime dispatch. See the ADR 0067
     # amendments.
-    return if folds_are_time_ordered(cv) && prev_w_flag
+    return if !isnothing(fold_fit(cv))
+        online_folds(resolve, est, n, ElT; rd = rd, train_idx = train_idx,
+                     fold_view = fold_view)
+    elseif folds_are_time_ordered(cv) && prev_w_flag
         run_folds(fold, n, ElT)
     else
         parallel_folds(i -> fold(i, nothing), n, ex, ElT)

@@ -57,7 +57,7 @@
 "src/01_Base/12_NormError.jl" = { map = 1, units = 8, algorithm = 2, swept = true }
 "src/01_Base/13_KappaLog.jl" = { map = 1, units = 1, algorithm = 0, swept = true }
 "src/01_Base/14_PartialFit.jl" = { map = 1, units = 10, swept = false }
-"src/01_Base/15_Online.jl" = { map = 1, units = 39, swept = false }
+"src/01_Base/15_Online.jl" = { map = 1, units = 41, swept = false }
 "src/01_Base/16_CoveragePolicy.jl" = { map = 1, units = 24, swept = false }
 "src/02_Tools.jl" = { map = 1, units = 69, algorithm = 49, swept = true }
 "src/03_InputData/01_AssetPanel.jl" = { map = 2, units = 33, swept = false }
@@ -260,17 +260,18 @@
 "src/19_RiskMeasures/27_ExpectedRisk.jl" = { map = 9, units = 22, swept = false }
 "src/19_RiskMeasures/28_RiskMeasureTools.jl" = { map = 9, units = 7, swept = false }
 "src/20_Optimisation/01_Base_Optimisation.jl" = { map = 10, units = 120, swept = false }
-"src/20_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl" = { map = 12, units = 61, swept = false }
+"src/20_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl" = { map = 12, units = 62, swept = false }
 "src/20_Optimisation/02_CrossValidation/02_KFold.jl" = { map = 12, units = 4, swept = false }
 "src/20_Optimisation/02_CrossValidation/03_Combinatorial.jl" = { map = 12, units = 12, swept = false }
-"src/20_Optimisation/02_CrossValidation/04_WalkForward.jl" = { map = 12, units = 20, swept = false }
-"src/20_Optimisation/02_CrossValidation/05_MultipleRandomised.jl" = { map = 12, units = 20, swept = false }
+"src/20_Optimisation/02_CrossValidation/04_WalkForward.jl" = { map = 12, units = 25, swept = false }
+"src/20_Optimisation/02_CrossValidation/05_MultipleRandomised.jl" = { map = 12, units = 21, swept = false }
 "src/20_Optimisation/02_CrossValidation/06_Validation.jl" = { map = 12, units = 1, swept = false }
 "src/20_Optimisation/02_CrossValidation/07_Scoring.jl" = { map = 12, units = 6, swept = false }
 "src/20_Optimisation/02_CrossValidation/08_OptimisationCrossValidation.jl" = { map = 12, units = 2, swept = false }
 "src/20_Optimisation/02_CrossValidation/09_Base_SearchCrossValidation.jl" = { map = 12, units = 16, swept = false }
 "src/20_Optimisation/02_CrossValidation/10_GridSearchCrossValidation.jl" = { map = 12, units = 3, swept = false }
 "src/20_Optimisation/02_CrossValidation/11_RandomisedSearchCrossValidation.jl" = { map = 12, units = 2, swept = false }
+"src/20_Optimisation/02_CrossValidation/12_OnlineFoldLoop.jl" = { map = 12, units = 4, swept = false }
 "src/20_Optimisation/03_NaiveOptimisation.jl" = { map = 10, units = 19, swept = false }
 "src/20_Optimisation/04_Base_ClusteringOptimisation.jl" = { map = 10, units = 16, swept = false }
 "src/20_Optimisation/05_HierarchicalRiskParity.jl" = { map = 10, units = 9, swept = false }
@@ -326,7 +327,7 @@
 "src/20_Optimisation/22_DiscreteFiniteAllocation.jl" = { map = 10, units = 6, swept = false }
 "src/20_Optimisation/23_GreedyFiniteAllocation.jl" = { map = 10, units = 6, swept = false }
 "src/20_Optimisation/24_RiskMeasureCompatibility.jl" = { map = 10, units = 3, swept = false }
-"src/20_Optimisation/25_OnlineOptimisation.jl" = { map = 10, units = 15, swept = false }
+"src/20_Optimisation/25_OnlineOptimisation.jl" = { map = 10, units = 18, swept = false }
 "src/21_ExpectedReturns.jl" = { map = 8, units = 21, algorithm = 5, swept = true }
 "src/21_FactorAttribution.jl" = { map = 8, units = 28, swept = false }
 "src/21_FactorAttributionRealised.jl" = { map = 8, units = 38, swept = false }
@@ -334,7 +335,7 @@
 "src/23_Pipeline/01_Base_Pipeline.jl" = { map = 12, units = 19, swept = false }
 "src/23_Pipeline/02_StepExecution.jl" = { map = 12, units = 14, swept = false }
 "src/23_Pipeline/03_Pipeline.jl" = { map = 12, units = 27, swept = false }
-"src/23_Pipeline/04_PredictionCV.jl" = { map = 12, units = 14, swept = false }
+"src/23_Pipeline/04_PredictionCV.jl" = { map = 12, units = 15, swept = false }
 "src/23_Pipeline/05_SearchCrossValidation.jl" = { map = 12, units = 9, swept = false }
 "src/24_Plotting.jl" = { map = 13, units = 78, swept = false }
 "src/25_Aliases.jl" = { map = 1, units = 132, algorithm = 0, swept = true }
