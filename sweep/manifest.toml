@@ -77,6 +77,7 @@
 "src/03_InputData/14_CrossSectionalTransforms.jl" = { map = 2, units = 29, swept = false }
 "src/03_InputData/15_FeatureSelector.jl" = { map = 2, units = 13, swept = false }
 "src/03_InputData/16_PanelDataFrame.jl" = { map = 2, units = 8, swept = false }
+"src/03_InputData/17_ReturnsBufferState.jl" = { map = 2, units = 17, swept = false }
 "src/04_PosdefMatrix.jl" = { map = 2, units = 4, algorithm = 2, swept = true }
 "src/05_Denoise.jl" = { map = 2, units = 10, algorithm = 7, swept = true }
 "src/06_Detone.jl" = { map = 2, units = 4, algorithm = 2, swept = true }
@@ -215,7 +216,7 @@
 "src/13_Prior/15_AssetPanelEstimators.jl" = { map = 6, units = 11, swept = false }
 "src/13_Prior/16_Base_CrossSectionalFactorPrior.jl" = { map = 6, units = 30, swept = false }
 "src/13_Prior/17_CrossSectionalFactorPrior.jl" = { map = 6, units = 4, swept = false }
-"src/13_Prior/18_PriorPartialFit.jl" = { map = 6, units = 17, swept = false }
+"src/13_Prior/18_PriorPartialFit.jl" = { map = 6, units = 18, swept = false }
 "src/14_UncertaintySets/01_Base_UncertaintySets.jl" = { map = 7, units = 42, algorithm = 11, swept = true }
 "src/14_UncertaintySets/02_DeltaUncertaintySets.jl" = { map = 7, units = 6, algorithm = 5, swept = true }
 "src/14_UncertaintySets/03_NormalUncertaintySets.jl" = { map = 7, units = 25, algorithm = 24, swept = true }
@@ -326,6 +327,7 @@
 "src/20_Optimisation/22_DiscreteFiniteAllocation.jl" = { map = 10, units = 6, swept = false }
 "src/20_Optimisation/23_GreedyFiniteAllocation.jl" = { map = 10, units = 6, swept = false }
 "src/20_Optimisation/24_RiskMeasureCompatibility.jl" = { map = 10, units = 3, swept = false }
+"src/20_Optimisation/25_OnlineOptimisation.jl" = { map = 10, units = 15, swept = false }
 "src/21_ExpectedReturns.jl" = { map = 8, units = 21, algorithm = 5, swept = true }
 "src/21_FactorAttribution.jl" = { map = 8, units = 28, swept = false }
 "src/21_FactorAttributionRealised.jl" = { map = 8, units = 38, swept = false }

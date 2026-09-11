@@ -11,7 +11,7 @@ port_opt_view(frc::FactorRiskContribution, i, X::MatNum, args...)
 set_factor_risk_contribution_constraints!(model::JuMP.Model, re::RegE_Reg, rd::ReturnsResult, pr::Option{<:AbstractPriorResult}, flag::Bool, wi::Option{<:VecNum})
 optimise(frc::FactorRiskContribution{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                               <:Any, <:Any, Nothing},
-                  rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
+                  rd::ReturnsResult; dims::Int = 1,
                   str_names::Bool = false, save::Bool = true, kwargs...)
 ```
 

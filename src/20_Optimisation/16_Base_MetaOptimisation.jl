@@ -636,8 +636,12 @@ function rebuild_asset_panel(rd::ReturnsResult, predictions::VecMPredRes,
     ps = [fold_asset_panel(rd.pnl, rd.nx, fold_weight_matrix(predictions, u, f, na),
                            anchor)
           for (f, anchor) in enumerate(fold_feature_anchors(rd, pred1))]
-    pf = [panel_field_stack(concrete_typed_array_if_abstract([p.pf[k] for p in ps]))
-          for k in eachindex(ps[1].pf)]
+    #! A panel with no Panel Field is the ingestion layer's shape, and an untyped
+    #! comprehension over no field answers a `Vector{Any}` the panel's constructor refuses,
+    #! so the comprehension is typed: it answers the same vector empty or full.
+    pf = AbstractPanelField[panel_field_stack(concrete_typed_array_if_abstract([p.pf[k]
+                                                                                for p in ps]))
+                            for k in eachindex(ps[1].pf)]
     nobs = sum(p -> size(p.amsk, 1), ps)
     return AssetPanel(; pf = pf, amsk = trues(nobs, size(ps[1].amsk, 2)),
                       emsk = trues(nobs, size(ps[1].amsk, 2)))

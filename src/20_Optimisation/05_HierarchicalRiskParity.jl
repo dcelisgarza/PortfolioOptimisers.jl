@@ -520,7 +520,7 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
 end
 """
     optimise(hrp::HierarchicalRiskParity{<:Any, <:Any, <:Any, <:Nothing},
-             rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...) -> HierarchicalRiskParityResult
+             rd::ReturnsResult; dims::Int = 1, kwargs...) -> HierarchicalRiskParityResult
 
 Run the Hierarchical Risk Parity portfolio optimisation.
 
@@ -541,7 +541,7 @@ Unlike [`HierarchicalEqualRiskContribution`](@ref) and [`NestedClustered`](@ref)
   - [`HierarchicalRiskParityResult`](@ref)
 """
 function optimise(hrp::HierarchicalRiskParity{<:Any, <:Any, <:Any, <:Nothing},
-                  rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
+                  rd::ReturnsResult; dims::Int = 1, kwargs...)
     return _optimise(hrp, rd; dims = dims, kwargs...)
 end
 

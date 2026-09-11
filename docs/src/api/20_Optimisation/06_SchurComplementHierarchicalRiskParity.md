@@ -23,7 +23,7 @@ SchurComplementHierarchicalRiskParity
 needs_previous_weights(opt::SchurComplementHierarchicalRiskParity)
 port_opt_view(sh::SchurComplementHierarchicalRiskParity, i, X::MatNum, args...)
 optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any, Nothing},
-                  rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
+                  rd::ReturnsResult; dims::Int = 1, kwargs...)
 ```
 
 ## References

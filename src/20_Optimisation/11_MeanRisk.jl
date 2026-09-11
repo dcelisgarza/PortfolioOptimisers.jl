@@ -784,7 +784,7 @@ function _optimise(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int 
 end
 """
     optimise(mr::MeanRisk{<:Any, <:Any, <:Any, <:Any, Nothing},
-             rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
+             rd::ReturnsResult; dims::Int = 1,
              str_names::Bool = false, save::Bool = true, kwargs...) -> MeanRiskResult
 
 Run the Mean-Risk portfolio optimisation.
@@ -803,9 +803,8 @@ Run the Mean-Risk portfolio optimisation.
   - [`MeanRisk`](@ref)
   - [`MeanRiskResult`](@ref)
 """
-function optimise(mr::MeanRisk{<:Any, <:Any, <:Any, <:Any, Nothing},
-                  rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
-                  str_names::Bool = false, save::Bool = true, kwargs...)
+function optimise(mr::MeanRisk{<:Any, <:Any, <:Any, <:Any, Nothing}, rd::ReturnsResult;
+                  dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
     return _optimise(mr, rd; dims = dims, str_names = str_names, save = save, kwargs...)
 end
 

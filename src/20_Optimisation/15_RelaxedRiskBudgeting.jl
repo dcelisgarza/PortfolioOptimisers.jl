@@ -596,7 +596,7 @@ function _optimise(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult(
 end
 """
     optimise(rrb::RelaxedRiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing},
-             rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
+             rd::ReturnsResult; dims::Int = 1,
              str_names::Bool = false, save::Bool = true, kwargs...) -> RelaxedRiskBudgetingResult
 
 Run the Relaxed Risk Budgeting portfolio optimisation.
@@ -616,8 +616,8 @@ Run the Relaxed Risk Budgeting portfolio optimisation.
   - [`RelaxedRiskBudgetingResult`](@ref)
 """
 function optimise(rrb::RelaxedRiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing},
-                  rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
-                  str_names::Bool = false, save::Bool = true, kwargs...)
+                  rd::ReturnsResult; dims::Int = 1, str_names::Bool = false,
+                  save::Bool = true, kwargs...)
     return _optimise(rrb, rd; dims = dims, str_names = str_names, save = save, kwargs...)
 end
 

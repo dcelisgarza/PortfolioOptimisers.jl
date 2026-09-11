@@ -210,7 +210,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     Stacking(;
-        pe::TD{<:PrE_Pr} = EmpiricalPrior(),
+        pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(),
         wb::TD_Option{<:WbE_Wb} = nothing,
         fees::TD_Option{<:FeesE_Fees} = nothing,
         sets::TD_Option{<:UniverseSets} = nothing,
@@ -222,7 +222,8 @@ $(DocStringExtensions.FIELDS)
         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
         fb::TDO_Option{<:OptE_Opt} = nothing,
         brt::Bool = false,
-        strict::Bool = false
+        strict::Bool = false,
+        cache::Option{<:ReturnsBufferState} = nothing
     ) -> Stacking
 
 Keywords correspond to the struct's fields.
@@ -354,13 +355,17 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
     $(field_dict[:strict_opt])
     """
     strict
-    function Stacking(pe::TD{<:PrE_Pr}, wb::TD_Option{<:WbE_Wb},
+    """
+    $(field_dict[:cache_opt])
+    """
+    @fprop cache
+    function Stacking(pe::Onl{<:TD{<:PrE_Pr}}, wb::TD_Option{<:WbE_Wb},
                       fees::TD_Option{<:FeesE_Fees}, sets::TD_Option{<:UniverseSets},
                       scale::TD_Option{<:VecNum},
                       opti::Union{<:VecOptE_Opt_TD, <:TD_VecOptE_Opt}, opto::OptE_TD,
                       cv::Option{<:OptimisationCrossValidation}, wf::TD{<:WeightFinaliser},
                       ex::FLoops.Transducers.Executor, fb::TDO_Option{<:OptE_Opt},
-                      brt::Bool, strict::Bool)
+                      brt::Bool, strict::Bool, cache::Option{<:ReturnsBufferState})
         if isa(opti, TimeDependent)
             @argcheck(opti.bind !== :nearest,
                       ArgumentError("opti of Stacking cannot hold a `bind = :nearest` schedule at the field level: Stacking's inner cross-validation is entered per candidate (`cross_val_predict(opti[k], …)`), so the fold loop is handed the elements, never the field — and a per-fold candidate vector would change the number and identity of the returns-proxy columns opto sees. Schedule individual elements instead (`opti = [static, TimeDependent(…, :nearest; default = …)]`), or use `bind = :outermost` to vary the whole vector with the fold loop that reaches the Stacking."))
@@ -395,12 +400,15 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
                                             ex, fb, brt, strict), stacking_td_defaults())
         return new{typeof(pe), typeof(wb), typeof(fees), typeof(sets), typeof(scale),
                    typeof(opti), typeof(opto), typeof(cv), typeof(wf), typeof(ex),
-                   typeof(fb), typeof(brt), typeof(strict)}(pe, wb, fees, sets, scale, opti,
-                                                            opto, cv, wf, ex, fb, brt,
-                                                            strict)
+                   typeof(fb), typeof(brt), typeof(strict), typeof(cache)}(pe, wb, fees,
+                                                                           sets, scale,
+                                                                           opti, opto, cv,
+                                                                           wf, ex, fb, brt,
+                                                                           strict, cache)
     end
 end
-function Stacking(; pe::TD{<:PrE_Pr} = EmpiricalPrior(), wb::TD_Option{<:WbE_Wb} = nothing,
+function Stacking(; pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(),
+                  wb::TD_Option{<:WbE_Wb} = nothing,
                   fees::TD_Option{<:FeesE_Fees} = nothing,
                   sets::TD_Option{<:UniverseSets} = nothing,
                   scale::TD_Option{<:VecNum} = nothing,
@@ -409,9 +417,10 @@ function Stacking(; pe::TD{<:PrE_Pr} = EmpiricalPrior(), wb::TD_Option{<:WbE_Wb}
                   wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
                   ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                   fb::TDO_Option{<:OptE_Opt} = nothing, brt::Bool = false,
-                  strict::Bool = false)::Stacking
+                  strict::Bool = false,
+                  cache::Option{<:ReturnsBufferState} = nothing)::Stacking
     return Stacking(pe, wb, fees, sets, scale, narrow_optimiser_vector(opti), opto, cv, wf,
-                    ex, fb, brt, strict)
+                    ex, fb, brt, strict, cache)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -554,7 +563,8 @@ function port_opt_view(st::Stacking, i, X::MatNum, args...)::Stacking
     opto = port_opt_view(st.opto, i, X)
     return Stacking(; pe = pe, wb = wb, fees = fees, sets = sets, scale = st.scale,
                     opti = opti, opto = opto, cv = st.cv, wf = st.wf, ex = st.ex,
-                    fb = st.fb, brt = st.brt, strict = st.strict)
+                    fb = st.fb, brt = st.brt, strict = st.strict,
+                    cache = port_opt_view(st.cache, i))
 end
 function non_investable_universe(st::Stacking, ni::VecStr)::Stacking
     return rebuild_estimator(st, (; sets = non_investable_sets(st.sets, ni)))

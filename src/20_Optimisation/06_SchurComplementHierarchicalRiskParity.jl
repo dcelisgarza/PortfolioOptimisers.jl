@@ -1114,7 +1114,7 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVe
 end
 """
     optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any, Nothing},
-             rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...) -> SchurComplementHierarchicalRiskParityResult
+             rd::ReturnsResult; dims::Int = 1, kwargs...) -> SchurComplementHierarchicalRiskParityResult
 
 Run the Schur Complement Hierarchical Risk Parity portfolio optimisation.
 
@@ -1135,7 +1135,7 @@ Unlike [`HierarchicalEqualRiskContribution`](@ref) and [`NestedClustered`](@ref)
   - [`SchurComplementHierarchicalRiskParityResult`](@ref)
 """
 function optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any, Nothing},
-                  rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
+                  rd::ReturnsResult; dims::Int = 1, kwargs...)
     return _optimise(sh, rd; dims = dims, kwargs...)
 end
 

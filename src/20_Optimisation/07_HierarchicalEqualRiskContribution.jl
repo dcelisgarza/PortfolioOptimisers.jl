@@ -806,7 +806,7 @@ end
     optimise(hec::HierarchicalEqualRiskContribution{
                      <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, Nothing
                  },
-            rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
+            rd::ReturnsResult; dims::Int = 1,
             branchorder::Symbol = :optimal, kwargs...) -> HierarchicalEqualRiskContributionResult
 
 Run the Hierarchical Equal Risk Contribution portfolio optimisation.
@@ -825,9 +825,8 @@ Run the Hierarchical Equal Risk Contribution portfolio optimisation.
   - [`HierarchicalEqualRiskContributionResult`](@ref)
 """
 function optimise(hec::HierarchicalEqualRiskContribution{<:Any, <:Any, <:Any, <:Any, <:Any,
-                                                         <:Any, Nothing},
-                  rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
-                  branchorder::Symbol = :optimal, kwargs...)
+                                                         <:Any, Nothing}, rd::ReturnsResult;
+                  dims::Int = 1, branchorder::Symbol = :optimal, kwargs...)
     return _optimise(hec, rd; dims = dims, branchorder = branchorder, kwargs...)
 end
 

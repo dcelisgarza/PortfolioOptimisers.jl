@@ -623,3 +623,29 @@ function online_state_seed(::Union{<:FactorPrior, <:BayesianBlackLittermanPrior,
     return FactorSampleBufferState(; X = SampleBufferState(; max_history = max_history),
                                    F = SampleBufferState(; max_history = max_history))
 end
+"""
+    update_online_estimator(pe::Union{<:HighOrderPriorEstimator, <:BlackLittermanPrior})
+
+Resolves the [`Online`](@ref) declarations under the prior a wrapping prior embeds, at warm-up.
+
+A wrapping prior hands its embedded prior across a boundary of its own, so it writes the recursion the generic method does not: `HighOrderPriorEstimator(; pe = EmpiricalPrior(; ce = Online(…)))` is resolved through this method, where the generic scan of the host's own fields would find no wrapper and leave the one two levels down unseeded. The co-moments of a [`HighOrderPriorEstimator`](@ref) are scanned by the generic method as they always were.
+
+# Arguments
+
+  - `pe`: The wrapping prior.
+
+# Returns
+
+  - `pe`: The prior, with every wrapper under its embedded prior resolved.
+
+# Related
+
+  - [`update_online_estimator`](@ref)
+  - [`Online`](@ref)
+"""
+function update_online_estimator(pe::Union{<:HighOrderPriorEstimator,
+                                           <:BlackLittermanPrior})
+    fns = online_fields(pe)
+    repl = NamedTuple{fns}(map(f -> update_online_estimator(getfield(pe, f)), fns))
+    return rebuild_estimator(pe, merge(repl, (; pe = update_online_estimator(pe.pe))))
+end

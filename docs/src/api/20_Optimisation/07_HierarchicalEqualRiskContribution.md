@@ -12,7 +12,7 @@ herc_unitary_risks_i!
 herc_unitary_risks_o!
 herc_risk
 optimise(hec::HierarchicalEqualRiskContribution{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
-                  rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
+                  rd::ReturnsResult; dims::Int = 1,
                   branchorder::Symbol = :optimal, kwargs...)
 ```
 

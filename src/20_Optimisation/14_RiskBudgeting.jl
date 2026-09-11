@@ -888,7 +888,7 @@ function _optimise(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult(); dims:
 end
 """
     optimise(rb::RiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing},
-             rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
+             rd::ReturnsResult; dims::Int = 1,
              str_names::Bool = false, save::Bool = true, kwargs...) -> RiskBudgetingResult
 
 Run the Risk Budgeting portfolio optimisation.
@@ -907,9 +907,8 @@ Run the Risk Budgeting portfolio optimisation.
   - [`RiskBudgeting`](@ref)
   - [`RiskBudgetingResult`](@ref)
 """
-function optimise(rb::RiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing},
-                  rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
-                  str_names::Bool = false, save::Bool = true, kwargs...)
+function optimise(rb::RiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing}, rd::ReturnsResult;
+                  dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
     return _optimise(rb, rd; dims = dims, str_names = str_names, save = save, kwargs...)
 end
 

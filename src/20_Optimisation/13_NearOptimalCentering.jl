@@ -1384,7 +1384,7 @@ end
     optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                       <:Any, <:Any, <:Any, <:Any, <:Any, Nothing
                   },
-             rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
+             rd::ReturnsResult; dims::Int = 1,
              str_names::Bool = false, save::Bool = true, kwargs...) -> NearOptimalCenteringResult
 
 Run the Near Optimal Centering portfolio optimisation.
@@ -1405,8 +1405,8 @@ Run the Near Optimal Centering portfolio optimisation.
 """
 function optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                             <:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
-                  rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
-                  str_names::Bool = false, save::Bool = true, kwargs...)
+                  rd::ReturnsResult; dims::Int = 1, str_names::Bool = false,
+                  save::Bool = true, kwargs...)
     return _optimise(noc, rd; dims = dims, str_names = str_names, save = save, kwargs...)
 end
 

@@ -14,7 +14,7 @@ InverseVolatility
 assert_external_optimiser(opt::InverseVolatility)
 _optimise(iv::InverseVolatility, rd::ReturnsResult)
 optimise(iv::InverseVolatility{<:Any, <:Any, <:Any, <:Any, Nothing},
-                  rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
+                  rd::ReturnsResult; dims::Int = 1, kwargs...)
 EqualWeighted
 _optimise(ew::EqualWeighted, rd::ReturnsResult)
 optimise(ew::EqualWeighted{<:Any, <:Any, <:Any, Nothing},

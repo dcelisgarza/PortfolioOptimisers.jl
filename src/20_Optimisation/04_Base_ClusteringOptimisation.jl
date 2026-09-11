@@ -391,7 +391,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     HierarchicalOptimiser(;
-        pe::TD{<:PrE_Pr} = EmpiricalPrior(),
+        pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(),
         cle::TD{<:HClE_HCl} = ClustersEstimator(),
         slv::Option{<:Slv_VecSlv} = nothing,
         wb::TD_Option{<:WbE_Wb} = WeightBounds(),
@@ -400,7 +400,8 @@ $(DocStringExtensions.FIELDS)
         wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
         brt::Bool = false,
         x_src::Symbol = :prior,
-        strict::Bool = false
+        strict::Bool = false,
+        cache::Option{<:ReturnsBufferState} = nothing
     ) -> HierarchicalOptimiser
 
 Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or [`TD`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value; a cross-validation fold loop resolves it per fold, and a fold-less `optimise` runs with the field at its static default. The problem definition — the prior estimator, clustering estimator, weight finaliser and asset sets as much as the bounds and fees — may therefore vary over folds; execution control (`slv`, `brt`, `x_src`, `strict`) stays static.
@@ -548,12 +549,16 @@ HierarchicalOptimiser
     $(field_dict[:strict_opt])
     """
     strict
-    function HierarchicalOptimiser(pe::TD{<:PrE_Pr}, cle::TD{<:HClE_HCl},
+    """
+    $(field_dict[:cache_opt])
+    """
+    @fprop @vprop cache
+    function HierarchicalOptimiser(pe::Onl{<:TD{<:PrE_Pr}}, cle::TD{<:HClE_HCl},
                                    slv::Option{<:Slv_VecSlv}, wb::TD_Option{<:WbE_Wb},
                                    fees::TD_Option{<:FeesE_Fees},
                                    sets::TD_Option{<:UniverseSets},
                                    wf::TD{<:WeightFinaliser}, brt::Bool, x_src::Symbol,
-                                   strict::Bool)
+                                   strict::Bool, cache::Option{<:ReturnsBufferState})
         assert_source_selector(x_src, :x_src)
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
@@ -562,19 +567,12 @@ HierarchicalOptimiser
                                            (; pe, cle, slv, wb, fees, sets, wf, brt, x_src,
                                             strict), hierarchical_optimiser_td_defaults())
         return new{typeof(pe), typeof(cle), typeof(slv), typeof(wb), typeof(fees),
-                   typeof(sets), typeof(wf), typeof(brt), typeof(x_src), typeof(strict)}(pe,
-                                                                                         cle,
-                                                                                         slv,
-                                                                                         wb,
-                                                                                         fees,
-                                                                                         sets,
-                                                                                         wf,
-                                                                                         brt,
-                                                                                         x_src,
-                                                                                         strict)
+                   typeof(sets), typeof(wf), typeof(brt), typeof(x_src), typeof(strict),
+                   typeof(cache)}(pe, cle, slv, wb, fees, sets, wf, brt, x_src, strict,
+                                  cache)
     end
 end
-function HierarchicalOptimiser(; pe::TD{<:PrE_Pr} = EmpiricalPrior(),
+function HierarchicalOptimiser(; pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(),
                                cle::TD{<:HClE_HCl} = ClustersEstimator(),
                                slv::Option{<:Slv_VecSlv} = nothing,
                                wb::TD_Option{<:WbE_Wb} = WeightBounds(),
@@ -582,8 +580,10 @@ function HierarchicalOptimiser(; pe::TD{<:PrE_Pr} = EmpiricalPrior(),
                                sets::TD_Option{<:UniverseSets} = nothing,
                                wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
                                brt::Bool = false, x_src::Symbol = :prior,
-                               strict::Bool = false)::HierarchicalOptimiser
-    return HierarchicalOptimiser(pe, cle, slv, wb, fees, sets, wf, brt, x_src, strict)
+                               strict::Bool = false,
+                               cache::Option{<:ReturnsBufferState} = nothing)::HierarchicalOptimiser
+    return HierarchicalOptimiser(pe, cle, slv, wb, fees, sets, wf, brt, x_src, strict,
+                                 cache)
 end
 function non_investable_universe(opt::HierarchicalOptimiser, ni::VecStr)
     return rebuild_estimator(opt, (; sets = non_investable_sets(opt.sets, ni)))

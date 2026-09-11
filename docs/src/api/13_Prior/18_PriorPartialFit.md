@@ -23,5 +23,6 @@ PortfolioOptimisers.partial_fit!(pe::HighOrderPriorEstimator, X::PortfolioOptimi
 prior(pe::HighOrderPriorEstimator; kwargs...)
 PortfolioOptimisers.partial_fit!(pe::BlackLittermanPrior, X::PortfolioOptimisers.VecNum_MatNum; kwargs...)
 prior(pe::BlackLittermanPrior; strict::Bool = false, kwargs...)
+PortfolioOptimisers.update_online_estimator(pe::Union{<:HighOrderPriorEstimator, <:BlackLittermanPrior})
 PortfolioOptimisers.online_state_seed(::Union{<:FactorPrior, <:BayesianBlackLittermanPrior, <:FactorBlackLittermanPrior, <:AugmentedBlackLittermanPrior, <:HighOrderFactorPriorEstimator}, ::PortfolioOptimisers.Option{<:Integer})
 ```

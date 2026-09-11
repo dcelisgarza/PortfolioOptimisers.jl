@@ -171,7 +171,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     SubsetResampling(;
-        pe::TD{<:PrE_Pr} = EmpiricalPrior(),
+        pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(),
         wb::TD_Option{<:WbE_Wb} = nothing,
         fees::TD_Option{<:FeesE_Fees} = nothing,
         sets::TD_Option{<:UniverseSets} = nothing,
@@ -185,7 +185,8 @@ $(DocStringExtensions.FIELDS)
         seed::Option{<:Integer} = nothing,
         fb::TDO_Option{<:OptE_Opt} = nothing,
         brt::Bool = false,
-        strict::Bool = false
+        strict::Bool = false,
+        cache::Option{<:ReturnsBufferState} = nothing
     ) -> SubsetResampling
 
 Keywords correspond to the struct's fields.
@@ -327,14 +328,19 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
     $(field_dict[:strict_opt])
     """
     strict
-    function SubsetResampling(pe::TD{<:PrE_Pr}, wb::TD_Option{<:WbE_Wb},
+    """
+    $(field_dict[:cache_opt])
+    """
+    @fprop cache
+    function SubsetResampling(pe::Onl{<:TD{<:PrE_Pr}}, wb::TD_Option{<:WbE_Wb},
                               fees::TD_Option{<:FeesE_Fees},
                               sets::TD_Option{<:UniverseSets}, opt::OptE_TD,
                               wf::TD{<:WeightFinaliser}, ex::FLoops.Transducers.Executor,
                               subset_size::TD{<:SubsetSizeE},
                               n_subsets::TD{<:NumberSubsetsE}, max_comb::Integer,
                               rng::Random.AbstractRNG, seed::Option{<:Integer},
-                              fb::TDO_Option{<:OptE_Opt}, brt::Bool, strict::Bool)
+                              fb::TDO_Option{<:OptE_Opt}, brt::Bool, strict::Bool,
+                              cache::Option{<:ReturnsBufferState})
         assert_no_nearest_bind_optimiser_schedule(opt, :opt, :SubsetResampling)
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :SubsetResampling)
         assert_internal_optimiser(opt)
@@ -360,11 +366,12 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
         return new{typeof(pe), typeof(wb), typeof(fees), typeof(sets), typeof(opt),
                    typeof(wf), typeof(ex), typeof(subset_size), typeof(n_subsets),
                    typeof(max_comb), typeof(rng), typeof(seed), typeof(fb), typeof(brt),
-                   typeof(strict)}(pe, wb, fees, sets, opt, wf, ex, subset_size, n_subsets,
-                                   max_comb, rng, seed, fb, brt, strict)
+                   typeof(strict), typeof(cache)}(pe, wb, fees, sets, opt, wf, ex,
+                                                  subset_size, n_subsets, max_comb, rng,
+                                                  seed, fb, brt, strict, cache)
     end
 end
-function SubsetResampling(; pe::TD{<:PrE_Pr} = EmpiricalPrior(),
+function SubsetResampling(; pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(),
                           wb::TD_Option{<:WbE_Wb} = nothing,
                           fees::TD_Option{<:FeesE_Fees} = nothing,
                           sets::TD_Option{<:UniverseSets} = nothing, opt::OptE_TD,
@@ -376,9 +383,10 @@ function SubsetResampling(; pe::TD{<:PrE_Pr} = EmpiricalPrior(),
                           rng::Random.AbstractRNG = Random.default_rng(),
                           seed::Option{<:Integer} = nothing,
                           fb::TDO_Option{<:OptE_Opt} = nothing, brt::Bool = false,
-                          strict::Bool = false)::SubsetResampling
+                          strict::Bool = false,
+                          cache::Option{<:ReturnsBufferState} = nothing)::SubsetResampling
     return SubsetResampling(pe, wb, fees, sets, opt, wf, ex, subset_size, n_subsets,
-                            max_comb, rng, seed, fb, brt, strict)
+                            max_comb, rng, seed, fb, brt, strict, cache)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -479,7 +487,8 @@ function port_opt_view(sr::SubsetResampling, i, X::MatNum, args...)::SubsetResam
     return SubsetResampling(; pe = pe, wb = wb, fees = fees, sets = sets, opt = opt,
                             wf = sr.wf, ex = sr.ex, subset_size = sr.subset_size,
                             n_subsets = sr.n_subsets, max_comb = sr.max_comb, rng = sr.rng,
-                            seed = sr.seed, fb = sr.fb, brt = sr.brt, strict = sr.strict)
+                            seed = sr.seed, fb = sr.fb, brt = sr.brt, strict = sr.strict,
+                            cache = port_opt_view(sr.cache, i))
 end
 function non_investable_universe(sr::SubsetResampling, ni::VecStr)::SubsetResampling
     return rebuild_estimator(sr, (; sets = non_investable_sets(sr.sets, ni)))
@@ -654,9 +663,8 @@ Run the Subset Resampling portfolio optimisation.
 """
 function optimise(sr::SubsetResampling{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
-                  rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
-                  branchorder::Symbol = :optimal, str_names::Bool = false,
-                  save::Bool = true, kwargs...)
+                  rd::ReturnsResult; dims::Int = 1, branchorder::Symbol = :optimal,
+                  str_names::Bool = false, save::Bool = true, kwargs...)
     return _optimise(sr, rd; dims = dims, branchorder = branchorder, str_names = str_names,
                      save = save, kwargs...)
 end

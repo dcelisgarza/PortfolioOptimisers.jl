@@ -26,7 +26,7 @@ _set_risk_budgeting_constraints!(model::JuMP.Model, rb::RiskBudgeting, w::VecJuM
 set_risk_budgeting_constraints!
 set_rb_mip_w!
 optimise(rb::RiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing},
-                  rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
+                  rd::ReturnsResult; dims::Int = 1,
                   str_names::Bool = false, save::Bool = true, kwargs...)
 ```
 

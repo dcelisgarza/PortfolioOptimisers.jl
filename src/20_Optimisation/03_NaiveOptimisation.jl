@@ -244,14 +244,15 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     InverseVolatility(;
-        pe::TD{<:PrE_Pr} = EmpiricalPrior(),
+        pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(),
         wb::TD_Option{<:WbE_Wb} = WeightBounds(),
         sets::TD_Option{<:UniverseSets} = nothing,
         wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
         fb::TDO_Option{<:OptE_Opt} = nothing,
         sq::Bool = false,
         brt::Bool = false,
-        strict::Bool = false
+        strict::Bool = false,
+        cache::Option{<:ReturnsBufferState} = nothing
     ) -> InverseVolatility
 
 Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value: the prior estimator, weight bounds, asset sets, weight finaliser and fallback are problem definition, so a cross-validation fold loop resolves them per fold, and a fold-less `optimise` runs with each at its static default. `sq`, `brt` and `strict` are execution control and stay static.
@@ -361,10 +362,14 @@ InverseVolatility
     $(field_dict[:strict_opt])
     """
     strict
-    function InverseVolatility(pe::TD{<:PrE_Pr}, wb::TD_Option{<:WbE_Wb},
+    """
+    $(field_dict[:cache_opt])
+    """
+    @fprop @vprop cache
+    function InverseVolatility(pe::Onl{<:TD{<:PrE_Pr}}, wb::TD_Option{<:WbE_Wb},
                                sets::TD_Option{<:UniverseSets}, wf::TD{<:WeightFinaliser},
                                fb::TDO_Option{<:OptE_Opt}, sq::Bool, brt::Bool,
-                               strict::Bool)
+                               strict::Bool, cache::Option{<:ReturnsBufferState})
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :InverseVolatility)
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets),
@@ -375,16 +380,18 @@ InverseVolatility
                                            merge(naive_optimiser_td_defaults(),
                                                  (; pe = EmpiricalPrior())))
         return new{typeof(pe), typeof(wb), typeof(sets), typeof(wf), typeof(fb), typeof(sq),
-                   typeof(brt), typeof(strict)}(pe, wb, sets, wf, fb, sq, brt, strict)
+                   typeof(brt), typeof(strict), typeof(cache)}(pe, wb, sets, wf, fb, sq,
+                                                               brt, strict, cache)
     end
 end
-function InverseVolatility(; pe::TD{<:PrE_Pr} = EmpiricalPrior(),
+function InverseVolatility(; pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(),
                            wb::TD_Option{<:WbE_Wb} = WeightBounds(),
                            sets::TD_Option{<:UniverseSets} = nothing,
                            wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
                            fb::TDO_Option{<:OptE_Opt} = nothing, sq::Bool = false,
-                           brt::Bool = false, strict::Bool = false)::InverseVolatility
-    return InverseVolatility(pe, wb, sets, wf, fb, sq, brt, strict)
+                           brt::Bool = false, strict::Bool = false,
+                           cache::Option{<:ReturnsBufferState} = nothing)::InverseVolatility
+    return InverseVolatility(pe, wb, sets, wf, fb, sq, brt, strict, cache)
 end
 function non_investable_universe(iv::InverseVolatility, ni::VecStr)::InverseVolatility
     return rebuild_estimator(iv, (; sets = non_investable_sets(iv.sets, ni)))
@@ -451,7 +458,7 @@ function _optimise(iv::InverseVolatility, rd::ReturnsResult = ReturnsResult();
 end
 """
     optimise(iv::InverseVolatility{<:Any, <:Any, <:Any, <:Any, Nothing},
-             rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...) -> NaiveOptimisationResult
+             rd::ReturnsResult; dims::Int = 1, kwargs...) -> NaiveOptimisationResult
 
 Run the inverse volatility portfolio optimisation.
 
@@ -463,8 +470,7 @@ Run the inverse volatility portfolio optimisation.
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
 """
 function optimise(iv::InverseVolatility{<:Any, <:Any, <:Any, <:Any, Nothing},
-                  rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
-                  kwargs...)::NaiveOptimisationResult
+                  rd::ReturnsResult; dims::Int = 1, kwargs...)::NaiveOptimisationResult
     return _optimise(iv, rd; dims = dims, kwargs...)
 end
 """
@@ -502,7 +508,8 @@ $(DocStringExtensions.FIELDS)
         sets::TD_Option{<:UniverseSets} = nothing,
         wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
         fb::TDO_Option{<:OptE_Opt} = nothing,
-        strict::Bool = false
+        strict::Bool = false,
+        cache::Option{<:ReturnsBufferState} = nothing
     ) -> EqualWeighted
 
 Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value: the weight bounds, asset sets, weight finaliser and fallback are problem definition, so a cross-validation fold loop resolves them per fold, and a fold-less `optimise` runs with each at its static default. `strict` is execution control and stays static.
@@ -571,9 +578,13 @@ EqualWeighted
     $(field_dict[:strict_opt])
     """
     strict
+    """
+    $(field_dict[:cache_rows])
+    """
+    @fprop @vprop cache
     function EqualWeighted(wb::TD_Option{<:WbE_Wb}, sets::TD_Option{<:UniverseSets},
                            wf::TD{<:WeightFinaliser}, fb::TDO_Option{<:OptE_Opt},
-                           strict::Bool)
+                           strict::Bool, cache::Option{<:ReturnsBufferState})
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :EqualWeighted)
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets),
@@ -581,18 +592,16 @@ EqualWeighted
         end
         assert_time_dependent_substitution(EqualWeighted, (; wb, sets, wf, fb, strict),
                                            naive_optimiser_td_defaults())
-        return new{typeof(wb), typeof(sets), typeof(wf), typeof(fb), typeof(strict)}(wb,
-                                                                                     sets,
-                                                                                     wf, fb,
-                                                                                     strict)
+        return new{typeof(wb), typeof(sets), typeof(wf), typeof(fb), typeof(strict),
+                   typeof(cache)}(wb, sets, wf, fb, strict, cache)
     end
 end
 function EqualWeighted(; wb::TD_Option{<:WbE_Wb} = WeightBounds(),
                        sets::TD_Option{<:UniverseSets} = nothing,
                        wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
-                       fb::TDO_Option{<:OptE_Opt} = nothing,
-                       strict::Bool = false)::EqualWeighted
-    return EqualWeighted(wb, sets, wf, fb, strict)
+                       fb::TDO_Option{<:OptE_Opt} = nothing, strict::Bool = false,
+                       cache::Option{<:ReturnsBufferState} = nothing)::EqualWeighted
+    return EqualWeighted(wb, sets, wf, fb, strict, cache)
 end
 function non_investable_universe(ew::EqualWeighted, ni::VecStr)::EqualWeighted
     return rebuild_estimator(ew, (; sets = non_investable_sets(ew.sets, ni)))
@@ -686,7 +695,8 @@ $(DocStringExtensions.FIELDS)
         sets::TD_Option{<:UniverseSets} = nothing,
         wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
         fb::TDO_Option{<:OptE_Opt} = nothing,
-        strict::Bool = false
+        strict::Bool = false,
+        cache::Option{<:ReturnsBufferState} = nothing
     ) -> RandomWeighted
 
 Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value: the weight bounds, asset sets, weight finaliser and fallback are problem definition, so a cross-validation fold loop resolves them per fold, and a fold-less `optimise` runs with each at its static default (`nothing` for `wb`, `sets` and `fb`). `rng`, `seed` and `strict` are execution control and stay static.
@@ -770,10 +780,15 @@ RandomWeighted
     $(field_dict[:strict_opt])
     """
     strict
+    """
+    $(field_dict[:cache_rows])
+    """
+    @fprop @vprop cache
     function RandomWeighted(alpha::Num_VecNum, rng::Random.AbstractRNG,
                             seed::Option{<:Integer}, wb::TD_Option{<:WbE_Wb},
                             sets::TD_Option{<:UniverseSets}, wf::TD{<:WeightFinaliser},
-                            fb::TDO_Option{<:OptE_Opt}, strict::Bool)
+                            fb::TDO_Option{<:OptE_Opt}, strict::Bool,
+                            cache::Option{<:ReturnsBufferState})
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :RandomWeighted)
         assert_nonempty_gt0_finite_val(alpha, :alpha)
         if isa(wb, WeightBoundsEstimator)
@@ -784,8 +799,9 @@ RandomWeighted
                                            (; alpha, rng, seed, wb, sets, wf, fb, strict),
                                            (; wf = IterativeWeightFinaliser()))
         return new{typeof(alpha), typeof(rng), typeof(seed), typeof(wb), typeof(sets),
-                   typeof(wf), typeof(fb), typeof(strict)}(alpha, rng, seed, wb, sets, wf,
-                                                           fb, strict)
+                   typeof(wf), typeof(fb), typeof(strict), typeof(cache)}(alpha, rng, seed,
+                                                                          wb, sets, wf, fb,
+                                                                          strict, cache)
     end
 end
 function RandomWeighted(; alpha::Num_VecNum = 1,
@@ -794,9 +810,9 @@ function RandomWeighted(; alpha::Num_VecNum = 1,
                         wb::TD_Option{<:WbE_Wb} = nothing,
                         sets::TD_Option{<:UniverseSets} = nothing,
                         wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
-                        fb::TDO_Option{<:OptE_Opt} = nothing,
-                        strict::Bool = false)::RandomWeighted
-    return RandomWeighted(alpha, rng, seed, wb, sets, wf, fb, strict)
+                        fb::TDO_Option{<:OptE_Opt} = nothing, strict::Bool = false,
+                        cache::Option{<:ReturnsBufferState} = nothing)::RandomWeighted
+    return RandomWeighted(alpha, rng, seed, wb, sets, wf, fb, strict, cache)
 end
 function non_investable_universe(rw::RandomWeighted, ni::VecStr)::RandomWeighted
     return rebuild_estimator(rw, (; sets = non_investable_sets(rw.sets, ni)))

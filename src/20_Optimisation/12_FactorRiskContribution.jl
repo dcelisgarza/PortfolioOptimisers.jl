@@ -424,7 +424,7 @@ end
     optimise(frc::FactorRiskContribution{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                       <:Any, <:Any, Nothing
                   },
-             rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
+             rd::ReturnsResult; dims::Int = 1,
              str_names::Bool = false, save::Bool = true, kwargs...) -> FactorRiskContributionResult
 
 Run the Factor Risk Contribution portfolio optimisation.
@@ -444,9 +444,8 @@ Run the Factor Risk Contribution portfolio optimisation.
   - [`FactorRiskContributionResult`](@ref)
 """
 function optimise(frc::FactorRiskContribution{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                              <:Any, <:Any, Nothing},
-                  rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
-                  str_names::Bool = false, save::Bool = true, kwargs...)
+                                              <:Any, <:Any, Nothing}, rd::ReturnsResult;
+                  dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
     return _optimise(frc, rd; dims = dims, str_names = str_names, save = save, kwargs...)
 end
 

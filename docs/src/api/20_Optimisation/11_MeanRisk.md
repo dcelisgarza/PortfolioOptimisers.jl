@@ -18,7 +18,7 @@ unresolved_risk_frontier
 risk_frontier_owners
 compute_risk_ubs
 optimise(mr::MeanRisk{<:Any, <:Any, <:Any, <:Any, Nothing},
-                  rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
+                  rd::ReturnsResult; dims::Int = 1,
                   str_names::Bool = false, save::Bool = true, kwargs...)
 ```
 

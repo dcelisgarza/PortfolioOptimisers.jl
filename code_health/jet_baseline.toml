@@ -49,6 +49,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/03_InputData/14_CrossSectionalTransforms.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/15_FeatureSelector.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/16_PanelDataFrame.jl" = { raw = 4, reviewed = 4 }
+"src/03_InputData/17_ReturnsBufferState.jl" = { raw = 0, reviewed = 0 }
 "src/04_PosdefMatrix.jl" = { raw = 14, reviewed = 14 }
 "src/05_Denoise.jl" = { raw = 1, reviewed = 1 }
 "src/06_Detone.jl" = { raw = 0, reviewed = 0 }
@@ -298,6 +299,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/20_Optimisation/22_DiscreteFiniteAllocation.jl" = { raw = 2, reviewed = 2 }
 "src/20_Optimisation/23_GreedyFiniteAllocation.jl" = { raw = 0, reviewed = 0 }
 "src/20_Optimisation/24_RiskMeasureCompatibility.jl" = { raw = 0, reviewed = 0 }
+"src/20_Optimisation/25_OnlineOptimisation.jl" = { raw = 0, reviewed = 0 }
 "src/21_ExpectedReturns.jl" = { raw = 1, reviewed = 1 }
 "src/21_FactorAttribution.jl" = { raw = 0, reviewed = 0 }
 "src/21_FactorAttributionRealised.jl" = { raw = 0, reviewed = 0 }
@@ -350,6 +352,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/03_InputData/14_CrossSectionalTransforms.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/15_FeatureSelector.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/16_PanelDataFrame.jl" = { raw = 0, reviewed = 0 }
+"src/03_InputData/17_ReturnsBufferState.jl" = { raw = 0, reviewed = 0 }
 "src/04_PosdefMatrix.jl" = { raw = 0, reviewed = 0 }
 "src/05_Denoise.jl" = { raw = 0, reviewed = 0 }
 "src/06_Detone.jl" = { raw = 0, reviewed = 0 }
@@ -599,6 +602,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/20_Optimisation/22_DiscreteFiniteAllocation.jl" = { raw = 0, reviewed = 0 }
 "src/20_Optimisation/23_GreedyFiniteAllocation.jl" = { raw = 0, reviewed = 0 }
 "src/20_Optimisation/24_RiskMeasureCompatibility.jl" = { raw = 0, reviewed = 0 }
+"src/20_Optimisation/25_OnlineOptimisation.jl" = { raw = 0, reviewed = 0 }
 "src/21_ExpectedReturns.jl" = { raw = 0, reviewed = 0 }
 "src/21_FactorAttribution.jl" = { raw = 0, reviewed = 0 }
 "src/21_FactorAttributionRealised.jl" = { raw = 0, reviewed = 0 }

@@ -3306,8 +3306,11 @@ end
 function collapse_asset_panel(pnl::AssetPanel, wi::MatNum, nx::Option{<:VecStr})
     W = synthetic_asset_weights(wi)
     syn = ["_$(k)" for k in 1:size(W, 2)]
-    return AssetPanel(; pf = [collapse_panel_field(f, W, nx, syn) for f in pnl.pf],
-                      amsk = collapse_panel_mask(pnl.amsk, W),
+    #! A panel with no Panel Field is the ingestion layer's shape. An untyped comprehension
+    #! over an empty vector answers a `Vector{Any}`, which the panel's constructor refuses,
+    #! so the comprehension is typed: it answers the same vector empty or full.
+    pf = AbstractPanelField[collapse_panel_field(f, W, nx, syn) for f in pnl.pf]
+    return AssetPanel(; pf = pf, amsk = collapse_panel_mask(pnl.amsk, W),
                       emsk = collapse_panel_mask(pnl.emsk, W))
 end
 """
