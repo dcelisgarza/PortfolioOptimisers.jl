@@ -287,3 +287,17 @@ are untouched. ADR 0030 is untouched.
 three reachable combinations at the optimiser level: both halves (sequential, and fold 2 reads
 fold 1), the previous-weights half alone over a `KFold` (parallel, silent, no history), and the
 timeline half alone (parallel, silent).
+
+## Amendment (2026-09-11)
+
+Issue #871. The seven loops this ADR folded into `fold_loop` were not all of them. The search's
+`search_cross_validation`, for the optimiser and for the `Pipeline`, ran an eighth: per candidate
+it looped over the folds and refitted each one from its training window through `fit_and_score`,
+building no `TimeDependentContext` and threading no previous weights. The search was outside the
+seam, so a walk-forward search scored a walk-forward it did not declare, and it could not take the
+online arm ADR 0140 added.
+
+[ADR 0141](0141-a-search-scores-every-candidate-through-the-one-fold-loop-online-and-batch-alike.md)
+puts it inside: a search scores every candidate through `fit_and_predict(opt_i, rd, cv; ex =
+SequentialEx())`, and the `fit_and_score` families are deleted. Every cross-validation entry
+point, the searches included, now goes through the one loop.
