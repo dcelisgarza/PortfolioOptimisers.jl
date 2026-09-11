@@ -43,9 +43,13 @@ X = TimeArray(CSV.File(joinpath(@__DIR__, "../examples/SP500.csv.gz")); timestam
 rd = prices_to_returns(X)
 
 #=
-When you also pass factor and benchmark price series, `prices_to_returns` aligns them on matching
-timestamps and carries the factor returns `F` and benchmark `iv` through on the same
-[`ReturnsResult`](@ref) — everything downstream then has the data it needs.
+That one call is the layer's own path: `prices_to_returns(X)` on a bare price table is
+`prices_to_returns(price_ingestion(PriceIngestion(), X))`. Write the two steps when you hold
+more than one table — [`price_ingestion`](@ref) takes factor and benchmark price series as `F`
+and `B`, aligns them onto the asset clock, and the conversion carries the factor returns `F` and
+the benchmark returns `B` through on the same [`ReturnsResult`](@ref), so everything downstream
+has the data it needs. [The point-in-time universe](08_Point_in_Time_Universe.md) takes a gapped
+table through that path to a walk-forward.
 
 ## 2. Returns to a prior
 

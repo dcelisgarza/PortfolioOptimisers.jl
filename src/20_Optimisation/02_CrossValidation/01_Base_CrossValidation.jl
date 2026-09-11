@@ -1547,7 +1547,7 @@ function StatsAPI.predict(res::NonFiniteAllocationOptimisationResult, rd::Return
     # `fees.fa` here and reaches nothing the result carries, so `res.fees` still states
     # what the optimiser priced. A `nothing` `fa` inherits and rebuilds no fee.
     fees = override_fee_amortisation(fees, fa)
-    Xf = filter_held_gaps(w, rdv.X, strict)
+    Xf = filter_held_gaps(w, rdv.X, strict; nx = rdv.nx)
     X = calc_net_returns(w, Xf, fees, wd, rdv.ts)
     (hw, ruined) = held_weights_result(hwd, w, Xf, store_weight_path, rdv.ts)
     warn_ruined_members(wd, ruined, length(res.w))
@@ -1593,7 +1593,7 @@ function StatsAPI.predict(res::NonFiniteAllocationOptimisationResult, rd::Return
     w, rdi, fees = investable_fold_view(imsk, res.w, rdi, fees)
     fees = override_fee_amortisation(fees, fa)
     obs = drift_observations(rdi.ts, test_idx)
-    Xf = filter_held_gaps(w, rdi.X, strict)
+    Xf = filter_held_gaps(w, rdi.X, strict; nx = rdi.nx)
     X = calc_net_returns(w, Xf, fees, wd, obs)
     (hw, ruined) = held_weights_result(hwd, w, Xf, store_weight_path, obs)
     warn_ruined_members(wd, ruined, length(res.w))

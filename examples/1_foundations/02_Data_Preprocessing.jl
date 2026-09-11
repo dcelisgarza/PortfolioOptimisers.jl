@@ -215,6 +215,10 @@ The ingestion layer is the single entry point for cleaning price data:
     [`MissingDataFilter`](@ref) deletes what is too sparse to trust, and it is the only thing that
     deletes anything. Both are fitted on a training window and replayed, because a universe chosen
     with hindsight is a look-ahead.
+
+[The point-in-time universe](../../user_guide/08_Point_in_Time_Universe.md) takes a gapped table
+through this layer to a walk-forward, and shows where a fitted fill sits in a [`Pipeline`](@ref)
+over the price carrier.
 =#
 
 #=

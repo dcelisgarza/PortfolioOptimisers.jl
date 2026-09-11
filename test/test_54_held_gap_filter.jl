@@ -84,6 +84,17 @@ w_held = [0.3, 0.2, 0.1, 0.3, 0.1]
     @test Yg == Yf
     # Under `strict` it refuses instead.
     @test_throws ArgumentError PO.filter_held_gaps([0.5, 0.3, 0.2], Y, true)
+    # A fold filters the window viewed at the Investable Mask, so a column index of it is a
+    # reduced one that names nothing to the caller: given the view's names, the message names
+    # the assets, and with none it reports the columns it was handed.
+    @test_logs (:warn, r"Assets \[\"b\", \"c\"\] carry") PO.filter_held_gaps([0.5, 0.3,
+                                                                              0.2], Y,
+                                                                             false;
+                                                                             nx = ["a", "b",
+                                                                                   "c"])
+    @test occursin("Assets [2, 3] carry", PO.held_gap_msg([(2, 2), (3, 3)]))
+    @test occursin("Assets [\"b\", \"c\"] carry",
+                   PO.held_gap_msg([(2, 2), (3, 3)], ["a", "b", "c"]))
     # The pairs themselves, so the message cannot drift from what it counted.
     @test PO.held_gap_pairs([0.5, 0.3, 0.2], Y) == [(2, 2), (3, 3)]
     @test PO.held_gap_pairs([0.5, 0.0, 0.5], Y) == [(3, 3)]
@@ -323,8 +334,11 @@ never read, and the delisting is a Held Gap that is zeroed once and named once.
     res = optimise(MeanRisk(; opt = JuMPOptimiser(; pe = prn, slv = slv)), rd)
     @test PO.result_investable_mask(res) == imsk
 
-    pred = @test_logs (:warn, r"Assets \[4\] carry a non-finite return") predict(res, rdd,
-                                                                                 test_idx)
+    # The window is viewed at the Investable Mask, so asset 5 is column 4 of it; the message
+    # names the asset rather than reporting that column.
+    pred = @test_logs (:warn, r"Assets \[\"e\"\] carry a non-finite return") predict(res,
+                                                                                     rdd,
+                                                                                     test_idx)
     # The series is finite, and it is the identity ADR 0118 pins, with the dead column never
     # read and every gap of the reduced window contributing zero.
     @test all(isfinite, pred.rd.X)

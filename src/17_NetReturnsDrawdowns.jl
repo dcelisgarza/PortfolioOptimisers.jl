@@ -439,7 +439,8 @@ function held_gap_pairs(W::MatNum, X::MatNum)
             for t in axes(X, 1) if !iszero(W[t, i]) && !isfinite(X[t, i])]
 end
 """
-    filter_held_gaps(w::Union{<:VecNum, <:VecVecNum, <:MatNum}, X::MatNum, strict::Bool)
+    filter_held_gaps(w::Union{<:VecNum, <:VecVecNum, <:MatNum}, X::MatNum, strict::Bool;
+                     nx::Option{<:VecStr} = nothing)
 
 Return the window with every non-finite entry replaced by zero, and name the Held Gaps.
 
@@ -452,14 +453,17 @@ The funnel [`calc_net_returns`](@ref) stays the plain product. A scan there is p
 # Algorithm
 
  1. Return `X` itself when every entry of `X` is finite.
- 2. Otherwise find the Held Gaps with [`held_gap_pairs`](@ref) and report them through [`strict_diagnostic`](@ref).
+ 2. Otherwise find the Held Gaps with [`held_gap_pairs`](@ref) and report them through [`strict_diagnostic`](@ref), naming the assets by `nx` when it is given.
  3. Return a copy of `X` with every non-finite entry replaced by zero.
+
+A fold hands this verb the window **viewed at the Investable Mask**, so a column index of `X` is a reduced one and names nothing to the caller. The fold therefore passes the view's `nx`, and the message names the asset rather than a position the caller cannot look up.
 
 # Arguments
 
   - `w`: Portfolio weights, a population of them, or a weight path (observations × assets).
   - `X`: Asset returns, `observations × assets`.
   - `strict`: Whether a non-finite return at a held pair raises rather than warns.
+  - `nx`: Optional asset names of the columns of `X`. When given, the message names the held assets by them; otherwise it reports their column indices.
 
 # Validation
 
@@ -477,26 +481,27 @@ The funnel [`calc_net_returns`](@ref) stays the plain product. A scan there is p
   - [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref)
 """
 function filter_held_gaps(w::Union{<:VecNum, <:VecVecNum, <:MatNum}, X::MatNum,
-                          strict::Bool)
+                          strict::Bool; nx::Option{<:VecStr} = nothing)
     if all(isfinite, X)
         return X
     end
     held = held_gap_pairs(w, X)
     if !isempty(held)
-        strict_diagnostic(held_gap_msg(held), strict)
+        strict_diagnostic(held_gap_msg(held, nx), strict)
     end
     return map(x -> isfinite(x) ? x : zero(x), X)
 end
 """
-    held_gap_msg(held::AbstractVector{<:Tuple{Integer, Integer}})
+    held_gap_msg(held::AbstractVector{<:Tuple{Integer, Integer}}, nx::Option{<:VecStr} = nothing)
 
 Write the message a Held Gap raises.
 
-The message names the assets, the count of pairs and the first observation, so a caller can find the delisting that made them, and it states the consequence: the pair contributes zero and the missing weight sits in cash.
+The message names the assets, the count of pairs and the first observation, so a caller can find the delisting that made them, and it states the consequence: the pair contributes zero and the missing weight sits in cash. The assets are named by `nx` when it is given, because the window a fold filters is viewed at the Investable Mask and a column index of it is a reduced one; with no names the column indices are reported.
 
 # Arguments
 
   - `held`: The `(observation, asset)` pairs [`held_gap_pairs`](@ref) found.
+  - `nx`: Optional asset names of the window's columns.
 
 # Returns
 
@@ -508,8 +513,10 @@ The message names the assets, the count of pairs and the first observation, so a
   - [`held_gap_pairs`](@ref)
   - [`strict_diagnostic`](@ref)
 """
-function held_gap_msg(held::AbstractVector{<:Tuple{Integer, Integer}})
-    assets = unique(last.(held))
+function held_gap_msg(held::AbstractVector{<:Tuple{Integer, Integer}},
+                      nx::Option{<:VecStr} = nothing)
+    cols = unique(last.(held))
+    assets = isnothing(nx) ? cols : nx[cols]
     return "a portfolio cannot earn a return an asset did not have. Assets $(assets) carry a non-finite return at $(length(held)) held (observation, asset) pair(s), the first at observation $(first(held)[1]). Those pairs contribute zero, so the weight of a missing asset sits in cash on that observation and the series understates the portfolio by whatever it would have earned. Pass `strict = true` to refuse instead, zero the weights over the observations the asset is inactive, or pass a weight history."
 end
 """

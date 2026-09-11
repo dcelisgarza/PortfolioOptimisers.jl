@@ -34,9 +34,10 @@ The guide mirrors that spine, one page per stage:
   - [Choosing a strategy](07_Choosing_a_Strategy.md) — a decision framework for picking tools by
     compute budget, rebalance frequency, risk appetite, and capital. Worked end-to-end profiles
     live in [putting it together](../examples/7_putting_it_together/01_Profile_Retail_Daily.md).
-  - [The point-in-time universe](08_Point_in_Time_Universe.md) — what the library does when an
-    asset lists, delists, or is suspended inside your sample: which layers handle a gap, and
-    which refuse one by name.
+  - [The point-in-time universe](08_Point_in_Time_Universe.md) — a gapped price table taken
+    through the ingestion layer to a walk-forward: what the library does when an asset lists,
+    delists, or is suspended inside your sample, which layers handle a gap, and which refuse one
+    by name.
 
 ## Reading the API
 
