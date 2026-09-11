@@ -22,6 +22,7 @@ calibration_series_matrix
 calibration_series_dispersion
 CalibrationContext
 effective_sample_size
+stated_sample_size
 ScenarioCount
 RateSignificance
 EntropyBudget

@@ -109,9 +109,15 @@ only resample what is carried — and the docstring says so.
 `EmpiricalPrior` sets `ens` to the number of observations its moments were fitted over when
 `max_scenarios` cuts, in batch and at the folded read-out alike; without a cap `ens` stays
 `nothing`, which every reader takes as `size(pr.X, 1)`. `effective_sample_size(pr, w)` gains the
-middle arm — a Kish count from the rule's weights, else `pr.ens`, else the shape — and the four
-bare `size(pr.X, 1)` count reads route through it. Under entropy pooling the rule's `w` is `pr.w`,
-so the Kish arm is taken and no released number moves; the normal set already reads `pr.ens`.
+middle arm — a Kish count from the rule's weights, else the `ens` the result states **beside no
+`w`**, else the shape — and the four bare `size(pr.X, 1)` count reads route through it. The
+middle arm is narrower than "else `pr.ens`" for one reason: `ens` is bound to `w` as a diagnostic
+of it, and an entropy-pooling prior writes `exp(entropy(w))` there. The three rate rules read the
+raw row count by design and ignore the weights they are handed, so they take the verb with no
+weights, and a reader that ignores a weighting must ignore its diagnostic too; the only `ens` a
+result states with no `w` is the one a cap writes. Under entropy pooling, therefore, a rule that
+reads the weights takes the Kish arm as before and a rule that reads the rows still reads the
+rows, so no released number moves; the normal set already reads `pr.ens`.
 
 The `@set` guard that binds `ens` to `w` stays right: a caller who patches a weighting onto a
 capped result must restate `ens`, and a new weighting does have a new effective count.
@@ -158,8 +164,13 @@ After `t` steps of `partial_fit!(opt, rd)`:
 ## Consequences
 
 - Four estimator families gain an `Option` on `pe`, one prior-result arm each, and one refusal
-  each on the returns-data arm; the three-argument routing gains a `Nothing` method. Nothing
-  released moves, because the default is unchanged and `nothing` is opt-in.
+  each on the returns-data arm, written once in `ucs_prior`. The returns-data arm of each family
+  fits the set's own `pe` and hands the result to the prior-result arm of the same set with its
+  `pe` set to `nothing`, so the two routes share one body per shape. Which argument the
+  three-argument routing, `ucs_risk_measure` and the Pipeline's uncertainty step hand an
+  estimator is decided by one per-type predicate, `reads_prior_result`, which the prior-reading
+  root and the four `{Nothing}` families answer `true`. Nothing released moves, because the
+  default is unchanged and `nothing` is opt-in.
 - `EmpiricalPrior` writes `ens` under a cap, `effective_sample_size` reads it, and four bare
   count reads route through that verb. Every path without a cap is bit-identical; entropy pooling
   is untouched; a capped fit, which is `dev`-only, prices `t`.

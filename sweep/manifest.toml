@@ -198,7 +198,7 @@
 "src/12_ConstraintGeneration/07_ThresholdConstraintGeneration.jl" = { map = 5, units = 10, algorithm = 3, swept = true }
 "src/12_ConstraintGeneration/08_ExposureConstraintGeneration.jl" = { map = 5, units = 14, algorithm = 4, swept = true }
 "src/12_ConstraintGeneration/09_CrossSectionalFactorAxis.jl" = { map = 5, units = 4, swept = false }
-"src/13_Prior/01_Base_Prior.jl" = { map = 6, units = 51, algorithm = 21, swept = true }
+"src/13_Prior/01_Base_Prior.jl" = { map = 6, units = 52, algorithm = 21, swept = true }
 "src/13_Prior/02_EmpiricalPrior.jl" = { map = 6, units = 6, algorithm = 1, swept = true }
 "src/13_Prior/03_FactorPrior.jl" = { map = 6, units = 7, algorithm = 3, swept = true }
 "src/13_Prior/04_HighOrderPrior.jl" = { map = 6, units = 13, algorithm = 8, swept = true }
@@ -216,12 +216,12 @@
 "src/13_Prior/16_Base_CrossSectionalFactorPrior.jl" = { map = 6, units = 30, swept = false }
 "src/13_Prior/17_CrossSectionalFactorPrior.jl" = { map = 6, units = 4, swept = false }
 "src/13_Prior/18_PriorPartialFit.jl" = { map = 6, units = 22, swept = false }
-"src/14_UncertaintySets/01_Base_UncertaintySets.jl" = { map = 7, units = 42, algorithm = 11, swept = true }
+"src/14_UncertaintySets/01_Base_UncertaintySets.jl" = { map = 7, units = 44, algorithm = 11, swept = true }
 "src/14_UncertaintySets/02_DeltaUncertaintySets.jl" = { map = 7, units = 6, algorithm = 5, swept = true }
-"src/14_UncertaintySets/03_NormalUncertaintySets.jl" = { map = 7, units = 25, algorithm = 24, swept = true }
-"src/14_UncertaintySets/04_BootstrapUncertaintySets.jl" = { map = 7, units = 19, algorithm = 13, swept = true }
+"src/14_UncertaintySets/03_NormalUncertaintySets.jl" = { map = 7, units = 26, algorithm = 25, swept = true }
+"src/14_UncertaintySets/04_BootstrapUncertaintySets.jl" = { map = 7, units = 20, algorithm = 14, swept = true }
 "src/14_UncertaintySets/05_L1UncertaintySets.jl" = { map = 7, units = 14, algorithm = 7, swept = true }
-"src/14_UncertaintySets/06_CalibrationRules.jl" = { map = 7, units = 56, swept = false }
+"src/14_UncertaintySets/06_CalibrationRules.jl" = { map = 7, units = 57, swept = false }
 "src/14_UncertaintySets/07_CompactUncertaintySets.jl" = { map = 7, units = 4, swept = false }
 "src/14_UncertaintySets/08_NormBallUncertaintySets.jl" = { map = 7, units = 11, swept = false }
 "src/14_UncertaintySets/09_OrthogonalUncertaintySets.jl" = { map = 7, units = 16, swept = false }

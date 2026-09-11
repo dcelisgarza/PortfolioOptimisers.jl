@@ -1443,3 +1443,84 @@ end
     @test ScenarioCount(15).n == 15
     @test EntropyBudget(-1.3).target == -1.3
 end
+
+@testset "Calibration rules: a Scenario Cap states its count in `ens`, and the count readers take it (#1015)" begin
+    # ADR 0138. `EmpiricalPrior(; max_scenarios = w)` fits the moments over every observation
+    # and carries the last `w` rows, so a count read off the shape would price `w`
+    # observations for moments fitted over `t`. The result states `t` in `ens` exactly when
+    # the cap cuts, and `effective_sample_size` reads it before the shape.
+    X1015 = randn(StableRNG(1015), 1250, 5) ./ 100
+    pu = prior(EmpiricalPrior(), X1015)
+    pc = prior(EmpiricalPrior(; max_scenarios = 250), X1015)
+    ctx = CalibrationContext()
+
+    @testset "The cap states the count, in batch and after t folds, and only when it cuts" begin
+        @test isnothing(pu.ens)
+        @test pc.ens == 1250
+        @test size(pc.X, 1) == 250
+        # A cap at or above the number of observations cuts nothing and states nothing.
+        @test isnothing(prior(EmpiricalPrior(; max_scenarios = 1250), X1015).ens)
+        @test isnothing(prior(EmpiricalPrior(; max_scenarios = 5000), X1015).ens)
+        # The folded read-out states the same count off the same rows.
+        o = EmpiricalPrior(; max_scenarios = 250)
+        for i in 1:1250
+            o = partial_fit!(o, X1015[i, :])
+        end
+        pf = prior(o)
+        @test pf.ens == 1250
+        @test size(pf.X, 1) == 250
+        @test pf.mu ≈ pc.mu
+        # The horizon arm states it too.
+        @test prior(EmpiricalPrior(; horizon = 21, max_scenarios = 250), X1015).ens == 1250
+        @test isnothing(prior(EmpiricalPrior(; horizon = 21), X1015).ens)
+        # The verb itself: `nothing` when nothing is cut.
+        @test isnothing(PO.scenario_ens(nothing, X1015))
+        @test isnothing(PO.scenario_ens(1250, X1015))
+        @test PO.scenario_ens(1249, X1015) == 1250
+    end
+
+    @testset "The count readers price t, not the rows carried" begin
+        # The one verb, and its three arms in order.
+        @test PO.effective_sample_size(pu, nothing) == 1250
+        @test PO.effective_sample_size(pc, nothing) == 1250
+        @test PO.effective_sample_size(pc, StatsBase.pweights(ones(250))) == 250
+        # `ScenarioCount` and the two rate rules read the count behind the moments.
+        @test ScenarioCount(; n = 25)(:alpha, pc, nothing, nothing, ctx) == 25 / 1250
+        @test RateSignificance()(:alpha, pc, nothing, nothing, ctx) ==
+              RateSignificance()(:alpha, pu, nothing, nothing, ctx)
+        @test RateRadius()(:k, pc, nothing, nothing, ctx) ==
+              RateRadius()(:k, pu, nothing, nothing, ctx)
+        actx = CalibrationContext(; alpha = 0.05)
+        @test EntropyBudget(; target = -10.0)(:kappa, pc, nothing, nothing, actx) ==
+              EntropyBudget(; target = -10.0)(:kappa, pu, nothing, nothing, actx)
+        @test PO.compact_radius_sample_size(pc) == 1250
+        # The normal set's `T` reads `ens`, so its box over the capped prior is the box
+        # over the uncapped one: the ellipsoid is not `√5 ≈ 2.24` times too wide.
+        ue = NormalUncertaintySet(; pe = nothing)
+        @test PO.choose_scaling_parameter(ue, pc) == 1250
+        @test mu_ucs(ue, pc).ub == mu_ucs(ue, pu).ub
+        # The bootstrap can resample nothing but the rows carried, so it reads the cap.
+        ab = ARCHUncertaintySet(; pe = nothing, seed = 3, n_sim = 20)
+        @test mu_ucs(ab, pc).ub != mu_ucs(ab, pu).ub
+    end
+
+    @testset "An `ens` bound to a weighting is a diagnostic of it, and is not the stated count" begin
+        # An entropy-pooling prior writes `exp(entropy(w))` beside `w`. A rule handed the
+        # weights reads Kish's count of them, as before; a rule that reads the raw row
+        # count still does, because a diagnostic of weights it ignores is not a count it
+        # reads. Neither released number moves.
+        w = StatsBase.pweights(vcat(fill(0.5, 60), fill(1.5, 60)))
+        pw = LowOrderPrior(; X = pu.X[1:120, :], mu = pu.mu, sigma = pu.sigma, w = w,
+                           ens = exp(StatsBase.entropy(w / sum(w))))
+        kish = sum(w)^2 / sum(abs2, w)
+        @test PO.effective_sample_size(pw, pw.w) == kish
+        @test PO.effective_sample_size(pw, nothing) == 120
+        @test ScenarioCount(; n = 25)(:alpha, pw, pw.w, nothing, ctx) == 25 / kish
+        @test RateSignificance()(:alpha, pw, pw.w, nothing, ctx) ==
+              RateSignificance()(:alpha, pu, nothing, nothing, ctx) * sqrt(1250 / 120)
+        @test PO.compact_radius_sample_size(pw) == kish
+        # The normal set reads `pr.ens` as it always did.
+        @test PO.choose_scaling_parameter(NormalUncertaintySet(; pe = nothing), pw) ==
+              pw.ens
+    end
+end

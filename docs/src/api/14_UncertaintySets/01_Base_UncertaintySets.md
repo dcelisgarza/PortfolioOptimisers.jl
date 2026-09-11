@@ -16,13 +16,13 @@ ucs(uc::Option{<:Tuple{<:Option{<:AbstractUncertaintySetResult},
              kwargs...)
 ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; kwargs...)
 ucs(ue::AbstractPriorUncertaintySetEstimator, ::AbstractPriorResult; kwargs...)
-ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult, ::AbstractPriorResult; kwargs...)
+ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult, pr::AbstractPriorResult; kwargs...)
 mu_ucs(uc::Option{<:AbstractUncertaintySetResult}, args...; kwargs...)
 mu_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; kwargs...)
-mu_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult, ::AbstractPriorResult; kwargs...)
+mu_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult, pr::AbstractPriorResult; kwargs...)
 sigma_ucs(uc::Option{<:AbstractUncertaintySetResult}, args...; kwargs...)
 sigma_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; kwargs...)
-sigma_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult, ::AbstractPriorResult; kwargs...)
+sigma_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult, pr::AbstractPriorResult; kwargs...)
 AbstractUncertaintySetEstimator
 AbstractPriorUncertaintySetEstimator
 AbstractUncertaintySetAlgorithm

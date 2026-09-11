@@ -12,7 +12,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     DeltaUncertaintySet(;
-        pe::AbstractLowOrderPriorEstimator = EmpiricalPrior(),
+        pe::Option{<:AbstractLowOrderPriorEstimator} = EmpiricalPrior(),
         dmu::Number = 0.1,
         dsigma::Number = 0.1
     ) -> DeltaUncertaintySet
@@ -69,7 +69,7 @@ DeltaUncertaintySet
 """
 @concrete struct DeltaUncertaintySet <: AbstractUncertaintySetEstimator
     """
-    $(field_dict[:pe])
+    $(field_dict[:pe_ucs])
     """
     pe
     """
@@ -80,14 +80,15 @@ DeltaUncertaintySet
     $(field_dict[:dsigma])
     """
     dsigma
-    function DeltaUncertaintySet(pe::AbstractLowOrderPriorEstimator, dmu::Number,
+    function DeltaUncertaintySet(pe::Option{<:AbstractLowOrderPriorEstimator}, dmu::Number,
                                  dsigma::Number)
         @argcheck(dmu >= 0.0, DomainError(dmu, "dmu must be >= 0"))
         @argcheck(dsigma >= 0.0, DomainError(dsigma, "dsigma must be >= 0"))
         return new{typeof(pe), typeof(dmu), typeof(dsigma)}(pe, dmu, dsigma)
     end
 end
-function DeltaUncertaintySet(; pe::AbstractLowOrderPriorEstimator = EmpiricalPrior(),
+function DeltaUncertaintySet(;
+                             pe::Option{<:AbstractLowOrderPriorEstimator} = EmpiricalPrior(),
                              dmu::Number = 0.1, dsigma::Number = 0.1)::DeltaUncertaintySet
     return DeltaUncertaintySet(pe, dmu, dsigma)
 end
@@ -203,13 +204,19 @@ function sigma_delta_box_set(pr, dsigma::Number)
     return BoxUncertaintySet(; lb = pr.sigma - d_sigma, ub = pr.sigma + d_sigma,
                              val = pr.sigma)
 end
+# A DeltaUncertaintySet with no prior of its own reads the prior result it is handed
+# (see [`reads_prior_result`](@ref)).
+function reads_prior_result(::DeltaUncertaintySet{Nothing})::Bool
+    return true
+end
 """
     ucs(ue::DeltaUncertaintySet, X::MatNum,
         F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+    ucs(ue::DeltaUncertaintySet{Nothing}, pr::AbstractPriorResult; rd = nothing, kwargs...)
 
-Constructs box uncertainty sets for mean and covariance statistics using delta bounds from a prior estimator.
+Constructs box uncertainty sets for mean and covariance statistics using delta bounds, from the set's own prior fitted on returns data or from a prior result the set is handed.
 
-It fits the prior once and hands the one fit to both builders, where [`mu_ucs`](@ref) and [`sigma_ucs`](@ref) fit it once each, so the single-axis pair costs two prior fits for the same two sets. The three verbs agree on their common axes to the last bit, because they call the same two builders on an identically fitted prior.
+The two methods are the two routes of ADR 0138 and share one tail. The returns-data method fits `ue.pe` once through [`ucs_prior`](@ref) and hands the result to the prior-result method of the same set with its `pe` set to `nothing`, so both routes build the two boxes from one `pr` by the same two calls. The prior-result method is defined only for a set whose `pe` is `nothing`, because a set with a prior of its own is calibrated on that prior and on nothing else; a set with no prior of its own is calibrated on the `pr` it is handed, which inside an optimiser is the prior the optimiser is solving on. The single-axis verbs [`mu_ucs`](@ref) and [`sigma_ucs`](@ref) fit the prior once each on the returns-data route, so the single-axis pair costs two prior fits for the same two sets. The three verbs agree on their common axes to the last bit, because they call the same two builders on an identically fitted prior.
 
 # Mathematical definition
 
@@ -241,17 +248,21 @@ Where:
 
 # Algorithm
 
- 1. Fit the prior with `prior(ue.pe, X, F; dims = dims, kwargs...)`, giving `pr`, which carries the mean `pr.mu` and the covariance `pr.sigma` both builders read.
+The returns-data method runs step 1 and forwards; the prior-result method runs steps 2 to 4 on the `pr` it is handed.
+
+ 1. Fit the prior with [`ucs_prior`](@ref) on `ue.pe`, `X` and `F`, giving `pr`, and forward to the prior-result method of the set with `pe = nothing`. A `pe` of `nothing` is refused there by name.
  2. Call [`mu_delta_box_set`](@ref) on `pr` and `ue.dmu`, giving the mean-axis box. It writes a width, so the model halves the difference of its bounds.
  3. Call [`sigma_delta_box_set`](@ref) on `pr` and `ue.dsigma`, giving the covariance-axis box. It writes absolute bounds, both of which bind.
  4. Return the two boxes as a tuple, the mean axis first.
 
 # Arguments
 
-  - `ue`: Delta uncertainty set estimator. Provides delta bounds and prior estimator.
+  - `ue`: Delta uncertainty set estimator. Provides delta bounds and, on the returns-data route, the prior estimator.
   - `X`: Data matrix (e.g., returns).
   - `F`: Optional factor matrix. Used by the prior estimator.
   - $(arg_dict[:dims])
+  - `pr`: Fitted prior result the set is calibrated on. `pr.mu` and `pr.sigma` are read.
+  - `rd`: Returns result the three-argument form passes beside the prior. Not read.
   - `kwargs...`: Additional keyword arguments passed to the prior estimator.
 
 # Returns
@@ -265,21 +276,27 @@ Where:
   - [`BoxUncertaintySet`](@ref)
   - [`mu_delta_box_set`](@ref)
   - [`sigma_delta_box_set`](@ref)
+  - [`ucs_prior`](@ref)
   - [`mu_ucs`](@ref): the mean axis alone, which fits its own prior.
   - [`sigma_ucs`](@ref): the covariance axis alone, which fits its own prior.
 """
 function ucs(ue::DeltaUncertaintySet, X::MatNum, F::Option{<:MatNum} = nothing;
              dims::Int = 1, kwargs...)
-    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
+    pr = ucs_prior(ue.pe, X, F; dims = dims, kwargs...)
+    return ucs(Accessors.@set(ue.pe = nothing), pr)
+end
+function ucs(ue::DeltaUncertaintySet{Nothing}, pr::AbstractPriorResult; rd = nothing,
+             kwargs...)
     return mu_delta_box_set(pr, ue.dmu), sigma_delta_box_set(pr, ue.dsigma)
 end
 """
     mu_ucs(ue::DeltaUncertaintySet, X::MatNum,
            F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+    mu_ucs(ue::DeltaUncertaintySet{Nothing}, pr::AbstractPriorResult; rd = nothing, kwargs...)
 
-Constructs a box uncertainty set for expected returns (mean) using delta bounds from a prior estimator.
+Constructs a box uncertainty set for expected returns (mean) using delta bounds, from the set's own prior fitted on returns data or from a prior result the set is handed.
 
-It fits its own prior, so it reaches the same set as the first element of [`ucs`](@ref) at the cost of a second fit. `ue.dsigma` is not read on this path.
+The two methods are the two routes of ADR 0138 and share one tail, as [`ucs`](@ref) states. On the returns-data route it fits its own prior, so it reaches the same set as the first element of [`ucs`](@ref) at the cost of a second fit. `ue.dsigma` is not read on this path.
 
 # Mathematical definition
 
@@ -299,15 +316,17 @@ Where:
 
 # Algorithm
 
- 1. Fit the prior with `prior(ue.pe, X, F; dims = dims, kwargs...)`, giving `pr`, whose `pr.mu` is the only quantity this path reads.
- 2. Call [`mu_delta_box_set`](@ref) on `pr` and `ue.dmu`, giving the mean-axis box, and return it.
+ 1. On the returns-data route, fit the prior with [`ucs_prior`](@ref) on `ue.pe`, `X` and `F`, giving `pr`, and forward to the prior-result method of the set with `pe = nothing`.
+ 2. Call [`mu_delta_box_set`](@ref) on `pr` and `ue.dmu`, giving the mean-axis box, and return it. `pr.mu` is the only quantity this path reads.
 
 # Arguments
 
-  - `ue`: Delta uncertainty set estimator. Provides delta bounds and prior estimator.
+  - `ue`: Delta uncertainty set estimator. Provides delta bounds and, on the returns-data route, the prior estimator.
   - `X`: Data matrix (e.g., returns).
   - `F`: Optional factor matrix. Used by the prior estimator (default: `nothing`).
   - $(arg_dict[:dims])
+  - `pr`: Fitted prior result the set is calibrated on. Only `pr.mu` is read.
+  - `rd`: Returns result the three-argument form passes beside the prior. Not read.
   - `kwargs...`: Additional keyword arguments passed to the prior estimator.
 
 # Returns
@@ -319,21 +338,27 @@ Where:
   - [`DeltaUncertaintySet`](@ref)
   - [`BoxUncertaintySet`](@ref)
   - [`mu_delta_box_set`](@ref): the builder this method forwards to, and the owner of the width convention.
+  - [`ucs_prior`](@ref)
   - [`ucs`](@ref): both axes on one prior fit.
   - [`sigma_ucs`](@ref)
 """
 function mu_ucs(ue::DeltaUncertaintySet, X::MatNum, F::Option{<:MatNum} = nothing;
                 dims::Int = 1, kwargs...)
-    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
+    pr = ucs_prior(ue.pe, X, F; dims = dims, kwargs...)
+    return mu_ucs(Accessors.@set(ue.pe = nothing), pr)
+end
+function mu_ucs(ue::DeltaUncertaintySet{Nothing}, pr::AbstractPriorResult; rd = nothing,
+                kwargs...)
     return mu_delta_box_set(pr, ue.dmu)
 end
 """
     sigma_ucs(ue::DeltaUncertaintySet, X::MatNum,
               F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+    sigma_ucs(ue::DeltaUncertaintySet{Nothing}, pr::AbstractPriorResult; rd = nothing, kwargs...)
 
-Constructs a box uncertainty set for covariance using delta bounds from a prior estimator.
+Constructs a box uncertainty set for covariance using delta bounds, from the set's own prior fitted on returns data or from a prior result the set is handed.
 
-It fits its own prior, so it reaches the same set as the second element of [`ucs`](@ref) at the cost of a second fit. `ue.dmu` is not read on this path.
+The two methods are the two routes of ADR 0138 and share one tail, as [`ucs`](@ref) states. On the returns-data route it fits its own prior, so it reaches the same set as the second element of [`ucs`](@ref) at the cost of a second fit. `ue.dmu` is not read on this path.
 
 # Mathematical definition
 
@@ -353,15 +378,17 @@ Where:
 
 # Algorithm
 
- 1. Fit the prior with `prior(ue.pe, X, F; dims = dims, kwargs...)`, giving `pr`, whose `pr.sigma` is the only quantity this path reads.
- 2. Call [`sigma_delta_box_set`](@ref) on `pr` and `ue.dsigma`, giving the covariance-axis box, and return it.
+ 1. On the returns-data route, fit the prior with [`ucs_prior`](@ref) on `ue.pe`, `X` and `F`, giving `pr`, and forward to the prior-result method of the set with `pe = nothing`.
+ 2. Call [`sigma_delta_box_set`](@ref) on `pr` and `ue.dsigma`, giving the covariance-axis box, and return it. `pr.sigma` is the only quantity this path reads.
 
 # Arguments
 
-  - `ue`: Delta uncertainty set estimator. Provides delta bounds and prior estimator.
+  - `ue`: Delta uncertainty set estimator. Provides delta bounds and, on the returns-data route, the prior estimator.
   - `X`: Data matrix (e.g., returns).
   - `F`: Optional factor matrix. Used by the prior estimator (default: `nothing`).
   - $(arg_dict[:dims])
+  - `pr`: Fitted prior result the set is calibrated on. Only `pr.sigma` is read.
+  - `rd`: Returns result the three-argument form passes beside the prior. Not read.
   - `kwargs...`: Additional keyword arguments passed to the prior estimator.
 
 # Returns
@@ -373,12 +400,17 @@ Where:
   - [`DeltaUncertaintySet`](@ref)
   - [`BoxUncertaintySet`](@ref)
   - [`sigma_delta_box_set`](@ref): the builder this method forwards to, and the owner of the absolute-bound convention and of the positive-semidefiniteness note.
+  - [`ucs_prior`](@ref)
   - [`ucs`](@ref): both axes on one prior fit.
   - [`mu_ucs`](@ref)
 """
 function sigma_ucs(ue::DeltaUncertaintySet, X::MatNum, F::Option{<:MatNum} = nothing;
                    dims::Int = 1, kwargs...)
-    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
+    pr = ucs_prior(ue.pe, X, F; dims = dims, kwargs...)
+    return sigma_ucs(Accessors.@set(ue.pe = nothing), pr)
+end
+function sigma_ucs(ue::DeltaUncertaintySet{Nothing}, pr::AbstractPriorResult; rd = nothing,
+                   kwargs...)
     return sigma_delta_box_set(pr, ue.dsigma)
 end
 

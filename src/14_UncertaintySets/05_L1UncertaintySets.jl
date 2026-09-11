@@ -560,7 +560,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     CharacteristicUncertaintySet(;
-        pe::AbstractLowOrderPriorEstimator = EmpiricalPrior(),
+        pe::Option{<:AbstractLowOrderPriorEstimator} = EmpiricalPrior(),
         alg::AbstractUncertaintySetAlgorithm = L1UncertaintySetAlgorithm()
     ) -> CharacteristicUncertaintySet
 
@@ -603,14 +603,14 @@ L1UncertaintySet
 """
 @concrete struct CharacteristicUncertaintySet <: AbstractUncertaintySetEstimator
     """
-    $(field_dict[:pe])
+    $(field_dict[:pe_ucs])
     """
     pe
     """
     `alg`: Shape algorithm — [`L1UncertaintySetAlgorithm`](@ref) or [`SignedL1UncertaintySetAlgorithm`](@ref).
     """
     alg
-    function CharacteristicUncertaintySet(pe::AbstractLowOrderPriorEstimator,
+    function CharacteristicUncertaintySet(pe::Option{<:AbstractLowOrderPriorEstimator},
                                           alg::AbstractUncertaintySetAlgorithm)
         @argcheck(isa(alg,
                       Union{<:L1UncertaintySetAlgorithm, <:SignedL1UncertaintySetAlgorithm}),
@@ -619,7 +619,7 @@ L1UncertaintySet
     end
 end
 function CharacteristicUncertaintySet(;
-                                      pe::AbstractLowOrderPriorEstimator = EmpiricalPrior(),
+                                      pe::Option{<:AbstractLowOrderPriorEstimator} = EmpiricalPrior(),
                                       alg::AbstractUncertaintySetAlgorithm = L1UncertaintySetAlgorithm())::CharacteristicUncertaintySet
     return CharacteristicUncertaintySet(pe, alg)
 end
@@ -932,16 +932,19 @@ end
 """
     mu_ucs(ue::CharacteristicUncertaintySet, X::MatNum,
            F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+    mu_ucs(ue::CharacteristicUncertaintySet{Nothing}, pr::AbstractPriorResult; rd = nothing, kwargs...)
 
-Construct an ``\\ell_1`` uncertainty set on the characteristic vector.
+Construct an ``\\ell_1`` uncertainty set on the characteristic vector, from the set's own prior fitted on returns data or from a prior result the set is handed.
+
+The two signatures are the two routes of ADR 0138 and share one tail. The returns-data method fits `ue.pe` once through [`ucs_prior`](@ref), which refuses a `pe` of `nothing` by name, and hands the result to the prior-result method of the same set with its `pe` set to `nothing`, which is where the two shapes are dispatched. The prior-result method is defined only for a set whose `pe` is `nothing`: inside an optimiser `pr` is the prior the optimiser is solving on, so the characteristic vector the radius is calibrated on is the objective's own `mu`.
 
 The calibration runs on the ranking, and the set is returned in the universe's own order: `mu` and `sd` carry one entry per asset in the order the prior produced them, which is the order the optimiser indexes and the order [`port_opt_view`](@ref) slices. Only the ladders see the sorted vector, and a ladder needs no asset identity. The set carries ``\\hat{\\boldsymbol{\\mu}}`` in its `mu` field, so the consumer bounds the characteristic vector the radius was calibrated on. See ADR 0050.
 
 # Algorithm
 
-The two methods share the first four steps and differ in the fifth.
+The returns-data method runs step 1 and forwards; the two prior-result methods share steps 2 to 4 and differ in the fifth.
 
- 1. Fit `ue.pe` on `X` and `F`, giving the prior `pr`.
+ 1. Fit the prior with [`ucs_prior`](@ref) on `ue.pe`, `X` and `F`, giving `pr`, and forward to the prior-result method of the set with `pe = nothing`.
  2. Read `alg = ue.alg`, the shape algorithm.
  3. When `alg.scaled`, take `sd = sqrt.(diag(pr.sigma))`, the per-asset scaling; otherwise take `nothing`.
  4. Take `idx = sortperm(pr.mu; rev = true)`, the ranking that sorts the characteristic non-increasing, and apply it to `pr.mu` and to `sd`.
@@ -957,6 +960,8 @@ For a [`SignedL1UncertaintySetAlgorithm`](@ref) step 5 resolves two radii agains
   - `X`: Data matrix (e.g. returns).
   - `F`: Optional factor matrix. Used by the prior estimator.
   - $(arg_dict[:dims])
+  - `pr`: Fitted prior result the set is calibrated on. `pr.mu` is read, and `pr.sigma` when `alg.scaled`.
+  - `rd`: Returns result the three-argument form passes beside the prior. Not read.
   - `kwargs...`: Additional keyword arguments passed to the prior estimator.
 
 # Returns
@@ -985,24 +990,29 @@ SignedL1UncertaintySet
   - [`L1UncertaintySet`](@ref)
   - [`SignedL1UncertaintySet`](@ref)
   - [`l1_resolve_eps`](@ref)
+  - [`ucs_prior`](@ref)
   - [`port_opt_view`](@ref)
 
 # References
 
   - $(ref_dict[:quintile])
 """
-function mu_ucs(ue::CharacteristicUncertaintySet{<:Any, <:L1UncertaintySetAlgorithm},
-                X::MatNum, F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
-    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
+function mu_ucs(ue::CharacteristicUncertaintySet, X::MatNum, F::Option{<:MatNum} = nothing;
+                dims::Int = 1, kwargs...)
+    pr = ucs_prior(ue.pe, X, F; dims = dims, kwargs...)
+    return mu_ucs(Accessors.@set(ue.pe = nothing), pr)
+end
+function mu_ucs(ue::CharacteristicUncertaintySet{Nothing, <:L1UncertaintySetAlgorithm},
+                pr::AbstractPriorResult; rd = nothing, kwargs...)
     alg = ue.alg
     sd = alg.scaled ? sqrt.(LinearAlgebra.diag(pr.sigma)) : nothing
     idx = sortperm(pr.mu; rev = true)
     eps = l1_resolve_eps(alg.method, pr.mu[idx], alg.scaled ? sd[idx] : nothing, alg.paired)
     return L1UncertaintySet(; eps = eps, sd = sd, mu = pr.mu)
 end
-function mu_ucs(ue::CharacteristicUncertaintySet{<:Any, <:SignedL1UncertaintySetAlgorithm},
-                X::MatNum, F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
-    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
+function mu_ucs(ue::CharacteristicUncertaintySet{Nothing,
+                                                 <:SignedL1UncertaintySetAlgorithm},
+                pr::AbstractPriorResult; rd = nothing, kwargs...)
     alg = ue.alg
     sd = alg.scaled ? sqrt.(LinearAlgebra.diag(pr.sigma)) : nothing
     idx = sortperm(pr.mu; rev = true)
@@ -1018,16 +1028,19 @@ end
 """
     ucs(ue::CharacteristicUncertaintySet, X::MatNum, F::Option{<:MatNum} = nothing; kwargs...)
     sigma_ucs(ue::CharacteristicUncertaintySet, X::MatNum, F::Option{<:MatNum} = nothing; kwargs...)
+    ucs(ue::CharacteristicUncertaintySet{Nothing}, pr::AbstractPriorResult; kwargs...)
+    sigma_ucs(ue::CharacteristicUncertaintySet{Nothing}, pr::AbstractPriorResult; kwargs...)
 
 Always throw. [`CharacteristicUncertaintySet`](@ref) is mean-only.
 
-Both methods are refusals rather than procedures, so neither carries an `# Algorithm` section. They take the same `(X, F)` signature as the rest of the family rather than a catch-all, so that the [`ReturnsResult`](@ref) forwarders in the base reach them without ambiguity.
+All four methods are refusals rather than procedures, so none carries an `# Algorithm` section. The returns-data pair takes the same `(X, F)` signature as the rest of the family rather than a catch-all, so that the [`ReturnsResult`](@ref) forwarders in the base reach them without ambiguity, and the prior-result pair takes the signature of the prior-result arm of ADR 0138, so that the three-argument routing of a set with no prior of its own reaches the same refusal.
 
 # Arguments
 
   - `ue`: Characteristic uncertainty set estimator.
   - `X`: Data matrix (e.g. returns).
   - `F`: Optional factor matrix.
+  - `pr`: Fitted prior result (ignored).
   - `kwargs...`: Additional keyword arguments (ignored).
 
 # Validation
@@ -1057,6 +1070,18 @@ end
 function sigma_ucs(::CharacteristicUncertaintySet, ::MatNum, ::Option{<:MatNum} = nothing;
                    kwargs...)
     return throw(ArgumentError("CharacteristicUncertaintySet is mean-only: the l1 set bounds a characteristic vector, and no covariance analogue is defined for it. Use NormalUncertaintySet, DeltaUncertaintySet or ARCHUncertaintySet for a covariance uncertainty set."))
+end
+function ucs(::CharacteristicUncertaintySet{Nothing}, ::AbstractPriorResult; kwargs...)
+    return throw(ArgumentError("CharacteristicUncertaintySet is mean-only: it bounds a characteristic vector and has no covariance analogue, so it cannot produce the (mu, sigma) pair `ucs` returns. Use `mu_ucs` for the mean set, and NormalUncertaintySet, DeltaUncertaintySet or ARCHUncertaintySet for a covariance set."))
+end
+function sigma_ucs(::CharacteristicUncertaintySet{Nothing}, ::AbstractPriorResult;
+                   kwargs...)
+    return throw(ArgumentError("CharacteristicUncertaintySet is mean-only: the l1 set bounds a characteristic vector, and no covariance analogue is defined for it. Use NormalUncertaintySet, DeltaUncertaintySet or ARCHUncertaintySet for a covariance uncertainty set."))
+end
+# A CharacteristicUncertaintySet with no prior of its own reads the prior result it is handed
+# (see [`reads_prior_result`](@ref)).
+function reads_prior_result(::CharacteristicUncertaintySet{Nothing})::Bool
+    return true
 end
 
 export ActiveAssetsUncertaintyAlgorithm, L1UncertaintySet, SignedL1UncertaintySet,

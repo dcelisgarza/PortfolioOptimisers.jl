@@ -6,11 +6,11 @@
 [provenance]
 julia = "1.13.0"
 julia_syntax = "1.0.2"
-commit = "4edabeefe2"
+commit = "57d1e77285"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt.jl" = { code = 2881, doc = 0, comment = 211, blank = 47, total = 3139 }
-"src/01_Base/01_DocstringDictionaries.jl" = { code = 1124, doc = 113, comment = 123, blank = 43, total = 1403 }
+"src/01_Base/01_DocstringDictionaries.jl" = { code = 1126, doc = 113, comment = 123, blank = 43, total = 1405 }
 "src/01_Base/02_TypeRoots.jl" = { code = 18, doc = 241, comment = 0, blank = 115, total = 374 }
 "src/01_Base/03_PrettyShow.jl" = { code = 117, doc = 138, comment = 0, blank = 76, total = 331 }
 "src/01_Base/04_ScopedConfig.jl" = { code = 163, doc = 492, comment = 2, blank = 214, total = 871 }
@@ -165,7 +165,7 @@ commit = "4edabeefe2"
 "src/12_ConstraintGeneration/07_ThresholdConstraintGeneration.jl" = { code = 50, doc = 274, comment = 0, blank = 126, total = 450 }
 "src/12_ConstraintGeneration/08_ExposureConstraintGeneration.jl" = { code = 107, doc = 335, comment = 0, blank = 169, total = 611 }
 "src/12_ConstraintGeneration/09_CrossSectionalFactorAxis.jl" = { code = 55, doc = 79, comment = 0, blank = 41, total = 175 }
-"src/13_Prior/01_Base_Prior.jl" = { code = 488, doc = 1264, comment = 61, blank = 547, total = 2360 }
+"src/13_Prior/01_Base_Prior.jl" = { code = 495, doc = 1281, comment = 61, blank = 556, total = 2393 }
 "src/13_Prior/02_EmpiricalPrior.jl" = { code = 84, doc = 271, comment = 14, blank = 108, total = 477 }
 "src/13_Prior/03_FactorPrior.jl" = { code = 81, doc = 285, comment = 26, blank = 100, total = 492 }
 "src/13_Prior/04_HighOrderPrior.jl" = { code = 248, doc = 497, comment = 9, blank = 230, total = 984 }
@@ -182,23 +182,23 @@ commit = "4edabeefe2"
 "src/13_Prior/15_AssetPanelEstimators.jl" = { code = 93, doc = 346, comment = 14, blank = 163, total = 616 }
 "src/13_Prior/16_Base_CrossSectionalFactorPrior.jl" = { code = 395, doc = 559, comment = 0, blank = 290, total = 1244 }
 "src/13_Prior/17_CrossSectionalFactorPrior.jl" = { code = 182, doc = 194, comment = 23, blank = 48, total = 447 }
-"src/13_Prior/18_PriorPartialFit.jl" = { code = 213, doc = 419, comment = 20, blank = 213, total = 865 }
-"src/14_UncertaintySets/01_Base_UncertaintySets.jl" = { code = 254, doc = 916, comment = 5, blank = 435, total = 1610 }
-"src/14_UncertaintySets/02_DeltaUncertaintySets.jl" = { code = 42, doc = 250, comment = 0, blank = 93, total = 385 }
-"src/14_UncertaintySets/03_NormalUncertaintySets.jl" = { code = 293, doc = 966, comment = 0, blank = 347, total = 1606 }
-"src/14_UncertaintySets/04_BootstrapUncertaintySets.jl" = { code = 261, doc = 676, comment = 0, blank = 240, total = 1177 }
-"src/14_UncertaintySets/05_L1UncertaintySets.jl" = { code = 235, doc = 576, comment = 5, blank = 248, total = 1064 }
-"src/14_UncertaintySets/06_CalibrationRules.jl" = { code = 482, doc = 1467, comment = 31, blank = 660, total = 2640 }
+"src/13_Prior/18_PriorPartialFit.jl" = { code = 216, doc = 421, comment = 20, blank = 214, total = 871 }
+"src/14_UncertaintySets/01_Base_UncertaintySets.jl" = { code = 270, doc = 960, comment = 5, blank = 455, total = 1690 }
+"src/14_UncertaintySets/02_DeltaUncertaintySets.jl" = { code = 58, doc = 263, comment = 2, blank = 94, total = 417 }
+"src/14_UncertaintySets/03_NormalUncertaintySets.jl" = { code = 298, doc = 978, comment = 2, blank = 374, total = 1652 }
+"src/14_UncertaintySets/04_BootstrapUncertaintySets.jl" = { code = 273, doc = 699, comment = 2, blank = 261, total = 1235 }
+"src/14_UncertaintySets/05_L1UncertaintySets.jl" = { code = 249, doc = 584, comment = 7, blank = 249, total = 1089 }
+"src/14_UncertaintySets/06_CalibrationRules.jl" = { code = 492, doc = 1491, comment = 31, blank = 671, total = 2685 }
 "src/14_UncertaintySets/07_CompactUncertaintySets.jl" = { code = 53, doc = 123, comment = 0, blank = 49, total = 225 }
 "src/14_UncertaintySets/08_NormBallUncertaintySets.jl" = { code = 116, doc = 311, comment = 5, blank = 134, total = 566 }
 "src/14_UncertaintySets/09_OrthogonalUncertaintySets.jl" = { code = 160, doc = 377, comment = 9, blank = 166, total = 712 }
-"src/14_UncertaintySets/10_CompactRadiusRules.jl" = { code = 95, doc = 207, comment = 8, blank = 83, total = 393 }
+"src/14_UncertaintySets/10_CompactRadiusRules.jl" = { code = 94, doc = 207, comment = 8, blank = 83, total = 392 }
 "src/15_Turnover.jl" = { code = 82, doc = 459, comment = 5, blank = 185, total = 731 }
 "src/16_Fees.jl" = { code = 390, doc = 1208, comment = 4, blank = 485, total = 2087 }
 "src/17_NetReturnsDrawdowns.jl" = { code = 455, doc = 1266, comment = 15, blank = 567, total = 2303 }
 "src/18_Tracking.jl" = { code = 70, doc = 451, comment = 0, blank = 178, total = 699 }
 "src/19_RiskMeasures/01_Base_RiskMeasures.jl" = { code = 416, doc = 1286, comment = 12, blank = 606, total = 2320 }
-"src/19_RiskMeasures/02_Variance.jl" = { code = 248, doc = 691, comment = 16, blank = 255, total = 1210 }
+"src/19_RiskMeasures/02_Variance.jl" = { code = 247, doc = 694, comment = 16, blank = 255, total = 1212 }
 "src/19_RiskMeasures/03_MomentRiskMeasures.jl" = { code = 293, doc = 916, comment = 5, blank = 353, total = 1567 }
 "src/19_RiskMeasures/04_Kurtosis.jl" = { code = 160, doc = 219, comment = 3, blank = 78, total = 460 }
 "src/19_RiskMeasures/05_NegativeSkewness.jl" = { code = 88, doc = 135, comment = 3, blank = 48, total = 274 }
@@ -299,7 +299,7 @@ commit = "4edabeefe2"
 "src/21_FactorAttributionRealised.jl" = { code = 448, doc = 634, comment = 0, blank = 315, total = 1397 }
 "src/22_Preselection.jl" = { code = 311, doc = 766, comment = 0, blank = 370, total = 1447 }
 "src/23_Pipeline/01_Base_Pipeline.jl" = { code = 154, doc = 348, comment = 0, blank = 152, total = 654 }
-"src/23_Pipeline/02_StepExecution.jl" = { code = 208, doc = 197, comment = 2, blank = 103, total = 510 }
+"src/23_Pipeline/02_StepExecution.jl" = { code = 197, doc = 201, comment = 2, blank = 106, total = 506 }
 "src/23_Pipeline/03_Pipeline.jl" = { code = 428, doc = 405, comment = 6, blank = 219, total = 1058 }
 "src/23_Pipeline/04_PredictionCV.jl" = { code = 175, doc = 132, comment = 15, blank = 63, total = 385 }
 "src/23_Pipeline/05_SearchCrossValidation.jl" = { code = 213, doc = 121, comment = 18, blank = 60, total = 412 }

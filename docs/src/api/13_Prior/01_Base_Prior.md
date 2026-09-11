@@ -40,6 +40,7 @@ scenario_fill
 held_non_investable
 investable_weights_view
 PortfolioOptimisers.scenario_window
+PortfolioOptimisers.scenario_ens
 PortfolioOptimisers.scenario_fill_report
 PortfolioOptimisers.scenario_fill_remember!
 ```

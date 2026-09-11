@@ -635,9 +635,11 @@ end
 """
     effective_sample_size(pr::AbstractPriorResult, w::Option{<:ObsWeights})
 
-Return the number of observations the record of `pr` carries, weighted by `w`.
+Return the number of observations behind the moments of `pr`, weighted by `w`.
 
-This is the count a calibration rule divides by, so the four rules that read a record read one definition of it. Without weights it is the row count of `pr.X`. With weights it is Kish's effective sample size, which is the number of equally weighted observations that carries the information the weighted sample carries.
+This is the count a calibration rule divides by, so the rules that read a count read one definition of it. Three sources are read in order, and the first that answers wins. With weights it is Kish's effective sample size, which is the number of equally weighted observations that carries the information the weighted sample carries. Without weights it is the count the result **states** in `ens`, when it states one and carries no weighting of its own: a Scenario Cap states the number of observations its moments were fitted over there, because the rows the result carries are then fewer than the observations behind its moments, and a count read off the shape would price every rule by `t / w` (ADR 0138). Otherwise it is the row count of `pr.X`, which is then the sample.
+
+An `ens` beside a `w` is not read by this arm. `ens` is bound to `w` as a diagnostic of it — an entropy-pooling prior writes `exp(entropy(w))` there — so a reader that reads no weights reads no diagnostic of them either, and a rule that reads the raw row count under such a prior still does. The only `ens` a result states with no `w` is the one a cap writes.
 
 The weights are read through [`get_observation_weights`](@ref), so the whole of the [`ObsWeights`](@ref) union that a rule's own `w` field admits is served here. A [`DynamicAbstractWeights`](@ref) that states no method for a column of the sample raises [`ObservationWeightsError`](@ref), which names the two signatures to write, rather than a bare `MethodError` off `sum`.
 
@@ -645,8 +647,9 @@ The weights are read through [`get_observation_weights`](@ref), so the whole of 
 
 ```math
 T_{e} = \\begin{cases}
-T & \\textrm{if } w \\textrm{ is } \\texttt{nothing}\\\\
-\\dfrac{\\left(\\sum\\limits_{t=1}^{T} w_{t}\\right)^{2}}{\\sum\\limits_{t=1}^{T} w_{t}^{2}} & \\textrm{otherwise}
+\\dfrac{\\left(\\sum\\limits_{t=1}^{T} w_{t}\\right)^{2}}{\\sum\\limits_{t=1}^{T} w_{t}^{2}} & \\textrm{if } w \\textrm{ is given}\\\\
+T_{\\mathrm{ens}} & \\textrm{if } w \\textrm{ is } \\texttt{nothing} \\textrm{ and the result states } T_{\\mathrm{ens}} \\textrm{ beside no weighting}\\\\
+T & \\textrm{otherwise}
 \\end{cases}\\,.
 ```
 
@@ -655,6 +658,13 @@ Where:
   - $(math_dict[:T])
   - $(math_dict[:cal_T_e])
   - $(math_dict[:w_t_obs])
+  - ``T_{\\mathrm{ens}}``: The effective sample size the result states in `ens`.
+
+# Algorithm
+
+ 1. Resolve `w` against the first column of `pr.X` through [`get_observation_weights`](@ref), giving `ws`.
+ 2. When `ws` is not `nothing`, return Kish's count of it.
+ 3. Otherwise return [`stated_sample_size`](@ref) of the result's own `w`, `ens` and `X`: `pr.ens` when it is stated beside no `pr.w`, else `size(pr.X, 1)`.
 
 # Arguments
 
@@ -672,6 +682,7 @@ Where:
 # Related
 
   - [`get_observation_weights`](@ref)
+  - [`stated_sample_size`](@ref)
   - [`ObsWeights`](@ref)
   - [`ScenarioCount`](@ref)
   - [`ConcentrationRadius`](@ref)
@@ -680,7 +691,41 @@ Where:
 """
 function effective_sample_size(pr::AbstractPriorResult, w::Option{<:ObsWeights})
     ws = get_observation_weights(w, view(pr.X, :, 1))
-    return isnothing(ws) ? size(pr.X, 1) : sum(ws)^2 / sum(abs2, ws)
+    return if isnothing(ws)
+        stated_sample_size(pr.w, pr.ens, pr.X)
+    else
+        sum(ws)^2 / sum(abs2, ws)
+    end
+end
+"""
+    stated_sample_size(::Nothing, ens::Number, X::MatNum)
+    stated_sample_size(w, ens, X::MatNum)
+
+Return the count a Prior Result states in `ens` beside no weighting, and the row count of `X` otherwise.
+
+The unweighted arm of [`effective_sample_size`](@ref), by dispatch on the result's own `w` and `ens`. A result that carries no `w` and states an `ens` is one a Scenario Cap wrote, and the count is the observations its moments were fitted over (ADR 0138). An `ens` beside a `w` is a diagnostic of that weighting, which an unweighted read does not take, and a result that states no `ens` carries its sample in `X`.
+
+# Arguments
+
+  - `w`: The result's own observation weights, or `nothing`.
+  - `ens`: The count the result states, or `nothing`.
+  - `X`: The returns matrix the result carries, `observations × assets`.
+
+# Returns
+
+  - `T::Number`: `ens` when it is stated beside no `w`, `size(X, 1)` otherwise.
+
+# Related
+
+  - [`effective_sample_size`](@ref)
+  - [`scenario_ens`](@ref)
+  - [`LowOrderPrior`](@ref)
+"""
+function stated_sample_size(::Nothing, ens::Number, ::MatNum)
+    return ens
+end
+function stated_sample_size(::Any, ::Any, X::MatNum)
+    return size(X, 1)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -782,7 +827,7 @@ Computes a significance level that shrinks with the square root of the sample le
 
 The tail probability is `c / sqrt(T)`, so the tail's expected count is `c * sqrt(T)`. It grows with the sample, but more slowly than the sample does, which is the rate at which a sample mean's own error falls. A longer sample therefore buys a further tail rather than only a fuller one, and [`ScenarioCount`](@ref) is the rule that buys neither.
 
-The rule reads the raw row count, and not the effective sample size that [`ScenarioCount`](@ref) reads. The rate is a statement about the length of the record, whereas a scenario count is a statement about the observations the tail holds.
+The rule reads the raw row count, and not the effective sample size that [`ScenarioCount`](@ref) reads. The rate is a statement about the length of the record, whereas a scenario count is a statement about the observations the tail holds. The length of the record is the count the result states in `ens` when a Scenario Cap carries fewer rows than it fitted over, and the row count otherwise, which is [`effective_sample_size`](@ref) with no weights (ADR 0138).
 
 The rule carries no range check of its own, on the same terms as [`ScenarioCount`](@ref).
 
@@ -846,7 +891,7 @@ Where:
   - `alg`: The rule.
   - `key`: Name of the slot that is being resolved. The rate is the same for every key.
   - `pr`: Prior result the sample length is read off.
-  - `w`: Effective observation weights. This rule reads the raw row count, so it ignores them.
+  - `w`: Effective observation weights. This rule reads the raw row count, so it ignores them; under a Scenario Cap the count is the one the result states in `ens`.
   - `slv`: Effective solver. This rule needs none.
   - `ctx`: The site's [`CalibrationContext`](@ref). This rule reads no field of it.
 
@@ -861,7 +906,7 @@ Where:
 """
 function (alg::RateSignificance)(::Symbol, pr::AbstractPriorResult, ::Any, ::Any,
                                  ::CalibrationContext)
-    return alg.c / sqrt(size(pr.X, 1))
+    return alg.c / sqrt(effective_sample_size(pr, nothing))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -943,7 +988,7 @@ Where:
 
 # Algorithm
 
- 1. Read the sample length `T` off `pr.X`.
+ 1. Read the sample length `T` with [`effective_sample_size`](@ref) and no weights: the count a Scenario Cap states, else the row count of `pr.X`.
  2. Form the argument `u = inv(ctx.alpha * T)`, and its plain logarithm `l = log(u)`.
  3. Form the band `(lo_b, hi_b)` as the ordered pair of `l` and `(u - inv(u)) / 2`, which are the values the Kaniadakis logarithm reaches at the two ends of ``\\kappa \\in (0,\\, 1)``. `# Validation` states the refusal this band carries.
  4. Normalise the target as `target = alg.target / l`. The normalised coefficient rises once from `1`, so one comparison carries both signs of `l` and the sweep needs no sign branch.
@@ -956,7 +1001,7 @@ Where:
   - `alg`: The rule.
   - `key`: Name of the slot that is being resolved. The budget is the same for every key.
   - `pr`: Prior result the sample length is read off.
-  - `w`: Effective observation weights. This rule reads the raw row count, so it ignores them.
+  - `w`: Effective observation weights. This rule reads the raw row count, so it ignores them; under a Scenario Cap the count is the one the result states in `ens`.
   - `slv`: Effective solver. This rule needs none, because the inversion is a scalar one.
   - `ctx`: The site's [`CalibrationContext`](@ref). `ctx.alpha` is the sibling significance level, and it must hold a number.
 
@@ -980,7 +1025,7 @@ function (alg::EntropyBudget)(::Symbol, pr::AbstractPriorResult, ::Any, ::Any,
                               ctx::CalibrationContext)
     @argcheck(!isnothing(ctx.alpha),
               IsNothingError("`CalibrationContext.alpha` is `nothing`, so `EntropyBudget` cannot form `inv(alpha * T)`. The sibling `alpha` reaches the rule in the context the slot owner builds, after it resolves `alpha`. State `alpha` in the context to run the rule outside a measure."))
-    T = size(pr.X, 1)
+    T = effective_sample_size(pr, nothing)
     u = inv(ctx.alpha * T)
     l = log(u)
     lo_b, hi_b = minmax(l, (u - inv(u)) / 2)
@@ -1932,7 +1977,7 @@ Computes an ambiguity radius that shrinks with the square root of the sample len
 
 The radius is `c / sqrt(T)`. The rate is the part of the form to trust, and the coefficient is the part to calibrate: a cross-validation over `c` is the honest route to a radius, and this is the shape a grid moves over.
 
-The rule reads the raw row count, and not the effective sample size that [`ConcentrationRadius`](@ref) reads. The rate is a statement about the length of the record, on the same terms as [`RateSignificance`](@ref).
+The rule reads the raw row count, and not the effective sample size that [`ConcentrationRadius`](@ref) reads. The rate is a statement about the length of the record, on the same terms as [`RateSignificance`](@ref), and the length of the record is read the same way: the count a Scenario Cap states in `ens`, else the row count, which is [`effective_sample_size`](@ref) with no weights (ADR 0138).
 
 `c` carries the units of the returns, because the rate itself is dimensionless.
 
@@ -2000,7 +2045,7 @@ Where:
   - `alg`: The rule.
   - `key`: Name of the slot that is being resolved. The rate is the same for every key.
   - `pr`: Prior result the sample length is read off.
-  - `w`: Effective observation weights. This rule reads the raw row count, so it ignores them.
+  - `w`: Effective observation weights. This rule reads the raw row count, so it ignores them; under a Scenario Cap the count is the one the result states in `ens`.
   - `slv`: Effective solver. This rule needs none.
   - `ctx`: The site's [`CalibrationContext`](@ref). This rule reads no field of it.
 
@@ -2017,7 +2062,7 @@ Where:
 """
 function (alg::RateRadius)(::Symbol, pr::AbstractPriorResult, ::Any, ::Any,
                            ::CalibrationContext)
-    return alg.c / sqrt(size(pr.X, 1))
+    return alg.c / sqrt(effective_sample_size(pr, nothing))
 end
 """
 $(DocStringExtensions.TYPEDEF)

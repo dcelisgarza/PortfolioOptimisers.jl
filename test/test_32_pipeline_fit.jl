@@ -268,6 +268,28 @@ end
             res_pipe = fit(Pipeline(; steps = (EmpiricalPrior(), ps776)), rd)
             @test res_pipe.ctx.uncertainty.mu.val == res_pipe.ctx.prior.mu
             @test res_pipe.ctx.uncertainty.sigma.val == res_pipe.ctx.prior.sigma
+
+            # Issue #1015, ADR 0138. A returns-data estimator with `pe = nothing` reads the
+            # prior slot on the same terms, decided by `reads_prior_result` rather than by
+            # the root it subtypes.
+            ue1015 = DeltaUncertaintySet(; pe = nothing)
+            @test PortfolioOptimisers.reads_prior_result(ue1015)
+            res1015, ctx1015 = PortfolioOptimisers.run_uncertainty_step(ue1015, :mu, ctx776)
+            @test res1015.val === pr776.mu
+            @test ctx1015.uncertainty.mu.val === pr776.mu
+            @test PortfolioOptimisers.run_uncertainty_step(ue1015, :mu, ctx_prior_only)[1].val ==
+                  pr776.mu
+            @test_throws PortfolioOptimisers.IsNothingError PortfolioOptimisers.run_uncertainty_step(ue1015,
+                                                                                                     :both,
+                                                                                                     ctx_no_prior)
+            # The same set with its own prior still reads the returns slot.
+            @test PortfolioOptimisers.run_uncertainty_step(DeltaUncertaintySet(), :mu,
+                                                           ctx_no_prior)[1].val == pr776.mu
+            ps1015 = PipelineStep(; est = ue1015, reads = (:prior,), writes = :uncertainty,
+                                  target = :both)
+            res_pipe = fit(Pipeline(; steps = (EmpiricalPrior(), ps1015)), rd)
+            @test res_pipe.ctx.uncertainty.mu.val === res_pipe.ctx.prior.mu
+            @test res_pipe.ctx.uncertainty.sigma.val === res_pipe.ctx.prior.sigma
         end
 
         # unroutable targets fail loudly

@@ -373,9 +373,11 @@ Refuses a missing factor matrix at a door whose prior's tree requires one.
 
 The one refusal the five doors share — the prior's [`ReturnsResult`](@ref) method, the optimiser's step, and the three uncertainty-set doors — written once so that its message and its test cannot drift apart. The test is [`needs_factor_returns`](@ref) answering `true`, which walks the estimator tree, so a factor leaf nested under a host whose own factor argument is optional is refused here by name rather than by the leaf's `MethodError` one call later.
 
+A `pe` of `nothing` is an uncertainty set with no prior of its own (ADR 0138). It reads no factor matrix, so nothing is checked here; the returns-data form it is on its way to refuses it by name through [`ucs_prior`](@ref).
+
 # Arguments
 
-  - `pe`: The prior estimator the door hands the matrix to.
+  - `pe`: The prior estimator the door hands the matrix to, or `nothing`.
   - `F`: The factor matrix the carrier holds, or the factor observation a fold is given, or `nothing`.
 
 # Validation
@@ -391,6 +393,7 @@ The one refusal the five doors share — the prior's [`ReturnsResult`](@ref) met
   - [`needs_factor_returns`](@ref)
   - [`prior`](@ref)
   - [`ReturnsResult`](@ref)
+  - [`ucs_prior`](@ref)
 """
 function assert_factor_returns(pe::Union{<:AbstractPriorEstimator, <:Online},
                                F::Option{<:VecNum_MatNum})::Nothing
@@ -398,6 +401,9 @@ function assert_factor_returns(pe::Union{<:AbstractPriorEstimator, <:Online},
         @argcheck(!isnothing(F),
                   IsNothingError("this is a factor prior; it needs factor returns. ReturnsResult.F is nothing — populate F (e.g. via prices_to_returns on factor prices)."))
     end
+    return nothing
+end
+function assert_factor_returns(::Nothing, ::Option{<:VecNum_MatNum})::Nothing
     return nothing
 end
 """
@@ -644,7 +650,7 @@ Reads an [`EmpiricalPrior`](@ref) out of its fold, with no data matrix.
 
 `mu` comes off `pe.me`, `sigma` comes off `pe.ce`, and `X` is the matrix the carry state already holds; the rows are read, never refitted. The horizon arm then takes the same four steps of the batch method — scale by `pe.horizon`, exponentiate, build the covariance on the ``\\hat{\\mu}_i + 1`` factors, subtract the one — through [`horizon_moments!`](@ref), which is the one place that algebra lives.
 
-`pe.max_scenarios` cuts the rows the Result carries, exactly as it does in batch, and the fill runs over the window that cut leaves. The fill's notice is narrowed by the carry state's named-asset set, so a walk-forward names an asset at the step it lists and not at every step afterwards.
+`pe.max_scenarios` cuts the rows the Result carries, exactly as it does in batch, and the fill runs over the window that cut leaves. When the cap cuts, the Result states the number of observations folded in `ens`, through [`scenario_ens`](@ref), so a count reader prices `t` and not the `w` rows carried, exactly as in batch (ADR 0138). The fill's notice is narrowed by the carry state's named-asset set, so a walk-forward names an asset at the step it lists and not at every step afterwards.
 
 No [`AssetPanel`](@ref) is read. A panel is fold context rather than sample, and the Coverage Universe of this read-out agrees with a batch fit's **by construction**, because [`coverage_mask`](@ref) is a pure function of the rows and the carry state holds exactly the rows a batch fit would have seen.
 
@@ -655,7 +661,7 @@ No [`AssetPanel`](@ref) is read. A panel is fold context rather than sample, and
  3. Read `mu` and `sigma` through [`read_member`](@ref), which refits a member that did not fold over the carried rows.
  4. Under the horizon arm, apply [`horizon_moments!`](@ref).
  5. Cut the carried rows to `pe.max_scenarios` with [`scenario_window`](@ref), and materialise them, because the buffer's own storage moves under the next fold.
- 6. Fill and return a [`LowOrderPrior`](@ref).
+ 6. Fill and return a [`LowOrderPrior`](@ref), with the `ens` of [`scenario_ens`](@ref) read off the rows before the cut.
 
 # Arguments
 
@@ -693,7 +699,7 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing, <:Any, <:Any,
     Xs = Matrix(scenario_window(pe.max_scenarios, X))
     return LowOrderPrior(;
                          X = scenario_fill(Xs, mu, sigma, strict, fill_limit, state.named),
-                         mu = mu, sigma = sigma)
+                         mu = mu, sigma = sigma, ens = scenario_ens(pe.max_scenarios, X))
 end
 function prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any, <:Any,
                                   <:Option{<:PriorCarryState}}; strict::Bool = false,
@@ -710,7 +716,7 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any, <:Any,
     Xs = Matrix(scenario_window(pe.max_scenarios, X))
     return LowOrderPrior(;
                          X = scenario_fill(Xs, mu, sigma, strict, fill_limit, state.named),
-                         mu = mu, sigma = sigma)
+                         mu = mu, sigma = sigma, ens = scenario_ens(pe.max_scenarios, X))
 end
 """
     partial_fit!(pe::HighOrderPriorEstimator, X, F = nothing; kwargs...)

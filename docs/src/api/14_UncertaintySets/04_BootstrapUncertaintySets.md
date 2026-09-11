@@ -5,33 +5,26 @@ StationaryBootstrap
 CircularBootstrap
 MovingBootstrap
 ARCHUncertaintySet
-ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
-                                    <:Any, <:Any, <:Any}, X::MatNum,
+ucs(ue::ARCHUncertaintySet, X::MatNum,
              F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
-ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:EllipsoidalUncertaintySetAlgorithm, <:Any, <:Any,
-                                    <:Any, <:Any, <:Any}, X::MatNum,
-             F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
-mu_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
-                                       <:Any, <:Any, <:Any}, X::MatNum,
-                F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
-mu_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:EllipsoidalUncertaintySetAlgorithm, <:Any,
-                                       <:Any, <:Any, <:Any, <:Any}, X::MatNum,
-                F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
-sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
-                                       <:Any, <:Any, <:Any}, X::MatNum,
-                F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
-sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:EllipsoidalUncertaintySetAlgorithm, <:Any,
-                                          <:Any, <:Any, <:Any, <:Any}, X::MatNum,
-                   F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
-ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:NormBallUncertaintySetAlgorithm, <:Any,
-                               <:Any, <:Any, <:Any, <:Any}, X::MatNum,
-        F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
-mu_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:NormBallUncertaintySetAlgorithm, <:Any,
-                                  <:Any, <:Any, <:Any, <:Any}, X::MatNum,
-           F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
-sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:NormBallUncertaintySetAlgorithm,
-                                     <:Any, <:Any, <:Any, <:Any, <:Any}, X::MatNum,
-              F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
+                                    <:Any, <:Any, <:Any}, pr::AbstractPriorResult; rd = nothing, kwargs...)
+ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any, <:EllipsoidalUncertaintySetAlgorithm, <:Any, <:Any,
+                                    <:Any, <:Any, <:Any}, pr::AbstractPriorResult; rd = nothing, kwargs...)
+mu_ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
+                                       <:Any, <:Any, <:Any}, pr::AbstractPriorResult; rd = nothing, kwargs...)
+mu_ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any, <:EllipsoidalUncertaintySetAlgorithm, <:Any,
+                                       <:Any, <:Any, <:Any, <:Any}, pr::AbstractPriorResult; rd = nothing, kwargs...)
+sigma_ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
+                                       <:Any, <:Any, <:Any}, pr::AbstractPriorResult; rd = nothing, kwargs...)
+sigma_ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any, <:EllipsoidalUncertaintySetAlgorithm, <:Any,
+                                          <:Any, <:Any, <:Any, <:Any}, pr::AbstractPriorResult; rd = nothing, kwargs...)
+ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any, <:NormBallUncertaintySetAlgorithm, <:Any,
+                               <:Any, <:Any, <:Any, <:Any}, pr::AbstractPriorResult; rd = nothing, kwargs...)
+mu_ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any, <:NormBallUncertaintySetAlgorithm, <:Any,
+                                  <:Any, <:Any, <:Any, <:Any}, pr::AbstractPriorResult; rd = nothing, kwargs...)
+sigma_ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any, <:NormBallUncertaintySetAlgorithm,
+                                     <:Any, <:Any, <:Any, <:Any, <:Any}, pr::AbstractPriorResult; rd = nothing, kwargs...)
 BootstrapUncertaintySetEstimator
 ARCHBootstrapSet
 bootstrap_indices

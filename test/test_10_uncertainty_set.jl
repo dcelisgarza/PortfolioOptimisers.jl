@@ -854,8 +854,13 @@ end
             alg = EllipsoidalUncertaintySetAlgorithm(;
                                                      method = ChiSqKUncertaintyAlgorithm())
             ue = NormalUncertaintySet(; alg = alg, seed = 11, n_sim = 500)
+            # The shape is dispatched on the prior-result arm (#1015): the returns-data
+            # arm is one method per verb, and hands the fitted prior to the arm of the
+            # same set without its prior.
+            ue0 = NormalUncertaintySet(; pe = nothing, alg = alg, seed = 11, n_sim = 500)
             for f in (ucs, mu_ucs, sigma_ucs)
-                ms = methods(f, (typeof(ue), Matrix{Float64}))
+                @test length(methods(f, (typeof(ue), Matrix{Float64}))) == 1
+                ms = methods(f, (typeof(ue0), typeof(prior(EmpiricalPrior(), Xd))))
                 @test length(ms) == 1
                 # The one method that answers is the generic ellipsoidal fallback, not
                 # a specialisation on the radius algorithm.
@@ -944,7 +949,8 @@ end
             Xd = randn(rng, 400, N) * 0.01
             ue = NormalUncertaintySet(; alg = BoxUncertaintySetAlgorithm(), q = 0.05,
                                       n_sim = 4_000, seed = 1)
-            pr_b, Tb, sigma_mu, q = PortfolioOptimisers.normal_box_preamble(ue, Xd)
+            pr_b = prior(ue.pe, Xd)
+            Tb, sigma_mu, q = PortfolioOptimisers.normal_box_preamble(ue, pr_b)
             @test q == ue.q * 0.5
             @test Tb == size(Xd, 1)
             mset, sset = ucs(ue, Xd)
@@ -1986,6 +1992,156 @@ end
             @test_throws ArgumentError mu_ucs(bare, rd776, pr776)
             @test_throws ArgumentError sigma_ucs(bare, rd776, pr776)
             @test_throws ArgumentError ucs(bare, rd776, pr776)
+        end
+    end
+    @testset "A set with no prior of its own is calibrated on the prior result it is handed (#1015)" begin
+        # ADR 0138. The four returns-data families widen `pe` to an `Option`, and `nothing`
+        # means the set reads the prior result it is handed, which is the contract the
+        # orthogonal set already has. The default stays `EmpiricalPrior()`.
+        rng1015 = StableRNG(1015)
+        X1015 = randn(rng1015, 200, 4)
+        rd1015 = ReturnsResult(; X = X1015, nx = string.("A", 1:4))
+        pr1015 = prior(EmpiricalPrior(), X1015)
+        # A second prior, so a probe can tell which one a fit saw.
+        pr1015b = prior(EmpiricalPrior(), X1015 .+ 1)
+        # Two sets are the same set when every field is, recursively. `==` on a struct is
+        # identity, so the comparison is written out.
+        feq(a, b) = typeof(a) == typeof(b) && all(fieldnames(typeof(a))) do f
+        x, y = getfield(a, f), getfield(b, f)
+        if isa(x, PortfolioOptimisers.AbstractUncertaintySetResult)
+            feq(x, y)
+        else
+            isequal(x, y)
+        end
+    end
+        feq(a::Tuple, b::Tuple) = length(a) == length(b) && all(map(feq, a, b))
+        ell = EllipsoidalUncertaintySetAlgorithm()
+        nb = NormBallUncertaintySetAlgorithm()
+        pairs = (("delta", DeltaUncertaintySet(), DeltaUncertaintySet(; pe = nothing)),
+                 ("normal box", NormalUncertaintySet(; seed = 3, n_sim = 100),
+                  NormalUncertaintySet(; pe = nothing, seed = 3, n_sim = 100)),
+                 ("normal ellipsoid",
+                  NormalUncertaintySet(; seed = 3, n_sim = 100, alg = ell),
+                  NormalUncertaintySet(; pe = nothing, seed = 3, n_sim = 100, alg = ell)),
+                 ("normal norm ball",
+                  NormalUncertaintySet(; seed = 3, n_sim = 100, alg = nb),
+                  NormalUncertaintySet(; pe = nothing, seed = 3, n_sim = 100, alg = nb)),
+                 ("bootstrap box", ARCHUncertaintySet(; seed = 3, n_sim = 50),
+                  ARCHUncertaintySet(; pe = nothing, seed = 3, n_sim = 50)),
+                 ("bootstrap ellipsoid",
+                  ARCHUncertaintySet(; seed = 3, n_sim = 50, alg = ell),
+                  ARCHUncertaintySet(; pe = nothing, seed = 3, n_sim = 50, alg = ell)),
+                 ("bootstrap norm ball",
+                  ARCHUncertaintySet(; seed = 3, n_sim = 50, alg = nb),
+                  ARCHUncertaintySet(; pe = nothing, seed = 3, n_sim = 50, alg = nb)))
+
+        @testset "The default is unchanged, and `nothing` is opt-in" begin
+            for ue in (DeltaUncertaintySet(), NormalUncertaintySet(), ARCHUncertaintySet(),
+                       CharacteristicUncertaintySet())
+                @test isa(ue.pe, EmpiricalPrior)
+                @test !PortfolioOptimisers.reads_prior_result(ue)
+            end
+            for ue in
+                (DeltaUncertaintySet(; pe = nothing), NormalUncertaintySet(; pe = nothing),
+                 ARCHUncertaintySet(; pe = nothing),
+                 CharacteristicUncertaintySet(; pe = nothing))
+                @test isnothing(ue.pe)
+                @test PortfolioOptimisers.reads_prior_result(ue)
+            end
+            # A built set and an empty slot read nothing, so a slot that holds either can be
+            # asked without a test of its own.
+            @test !PortfolioOptimisers.reads_prior_result(mu_ucs(DeltaUncertaintySet(),
+                                                                 X1015))
+            @test !PortfolioOptimisers.reads_prior_result(nothing)
+        end
+
+        @testset "The two routes reach one set, bit for bit, on every shape" begin
+            for (name, own, none) in pairs
+                # The set with its own `pe` fits it and hands the result to the arm the
+                # prior-less set uses, so the two are the same body over the same `pr`.
+                @test feq(ucs(own, X1015), ucs(none, pr1015))
+                @test feq(mu_ucs(own, X1015), mu_ucs(none, pr1015))
+                @test feq(sigma_ucs(own, X1015), sigma_ucs(none, pr1015))
+                # The three-argument form routes each to the argument it reads.
+                @test feq(ucs(none, rd1015, pr1015), ucs(none, pr1015))
+                @test feq(ucs(own, rd1015, pr1015), ucs(own, X1015))
+                @test feq(mu_ucs(none, rd1015, pr1015), mu_ucs(none, pr1015))
+                @test feq(sigma_ucs(none, rd1015, pr1015), sigma_ucs(none, pr1015))
+                # A prior-less set reads the prior it is handed, and a different prior gives
+                # a different set; the set with its own `pe` drops it.
+                @test !feq(mu_ucs(none, rd1015, pr1015b), mu_ucs(none, rd1015, pr1015))
+                @test feq(mu_ucs(own, rd1015, pr1015b), mu_ucs(own, rd1015, pr1015))
+                # The centre is the prior's own.
+                @test mu_ucs(none, pr1015).val === pr1015.mu
+            end
+            c_own = CharacteristicUncertaintySet()
+            c_none = CharacteristicUncertaintySet(; pe = nothing)
+            @test feq(mu_ucs(c_own, X1015), mu_ucs(c_none, pr1015))
+            @test feq(mu_ucs(c_none, rd1015, pr1015), mu_ucs(c_none, pr1015))
+            @test !feq(mu_ucs(c_none, pr1015b), mu_ucs(c_none, pr1015))
+            s_none = CharacteristicUncertaintySet(; pe = nothing,
+                                                  alg = SignedL1UncertaintySetAlgorithm())
+            @test feq(mu_ucs(CharacteristicUncertaintySet(;
+                                                          alg = SignedL1UncertaintySetAlgorithm()),
+                             X1015), mu_ucs(s_none, pr1015))
+            # The mean-only family refuses the pair and the covariance half on both routes.
+            @test_throws ArgumentError ucs(c_none, pr1015)
+            @test_throws ArgumentError sigma_ucs(c_none, pr1015)
+            @test_throws ArgumentError ucs(c_none, rd1015, pr1015)
+            @test_throws ArgumentError sigma_ucs(c_none, rd1015, pr1015)
+        end
+
+        @testset "The returns-data form refuses a set with no prior, by name" begin
+            for ue in
+                (DeltaUncertaintySet(; pe = nothing), NormalUncertaintySet(; pe = nothing),
+                 NormalUncertaintySet(; pe = nothing, alg = ell),
+                 ARCHUncertaintySet(; pe = nothing),
+                 ARCHUncertaintySet(; pe = nothing, alg = nb))
+                for verb in (ucs, mu_ucs, sigma_ucs)
+                    err = try
+                        verb(ue, X1015)
+                        nothing
+                    catch e
+                        e
+                    end
+                    @test isa(err, ArgumentError)
+                    @test occursin("pe = nothing", err.msg)
+                    @test occursin("ucs(ue, pr)", err.msg)
+                    # The `ReturnsResult` door reaches the same refusal: a `nothing` prior
+                    # reads no factor matrix, so the factor check passes it through.
+                    @test_throws ArgumentError verb(ue, rd1015)
+                end
+            end
+            @test_throws ArgumentError mu_ucs(CharacteristicUncertaintySet(; pe = nothing),
+                                              X1015)
+            # A set with its own `pe` handed a prior result has no method: `nothing` says one
+            # thing, and so does a prior of its own.
+            @test_throws MethodError ucs(DeltaUncertaintySet(), pr1015)
+            @test_throws MethodError mu_ucs(NormalUncertaintySet(), pr1015)
+        end
+
+        @testset "ucs_risk_measure passes a prior-less set through" begin
+            r = UncertaintySetVariance(; ucs = NormalUncertaintySet(; pe = nothing))
+            @test PortfolioOptimisers.ucs_risk_measure(r, rd1015) === r
+            ro = UncertaintySetVariance(; ucs = NormalUncertaintySet(; seed = 1))
+            @test isa(PortfolioOptimisers.ucs_risk_measure(ro, rd1015).ucs,
+                      PortfolioOptimisers.AbstractUncertaintySetResult)
+            # A built set and an empty slot still pass through.
+            rb = UncertaintySetVariance(; ucs = sigma_ucs(ro.ucs, X1015))
+            @test PortfolioOptimisers.ucs_risk_measure(rb, rd1015).ucs === rb.ucs
+            rn = UncertaintySetVariance(; ucs = nothing)
+            @test isnothing(PortfolioOptimisers.ucs_risk_measure(rn, rd1015).ucs)
+        end
+
+        @testset "A prior-less set reads a prior of any shape" begin
+            # A high-order prior forwards `mu`, `sigma`, `X` and `ens` to its embedded
+            # low-order result, so the set reads it as it reads the low-order one.
+            hpr = prior(HighOrderPriorEstimator(), X1015)
+            @test feq(ucs(NormalUncertaintySet(; pe = nothing, seed = 2, n_sim = 100), hpr),
+                      ucs(NormalUncertaintySet(; pe = nothing, seed = 2, n_sim = 100),
+                          hpr.pr))
+            @test feq(mu_ucs(DeltaUncertaintySet(; pe = nothing), hpr),
+                      mu_ucs(DeltaUncertaintySet(; pe = nothing), hpr.pr))
         end
     end
 end

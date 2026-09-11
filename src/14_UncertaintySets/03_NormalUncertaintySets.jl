@@ -12,7 +12,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     NormalUncertaintySet(;
-        pe::AbstractLowOrderPriorEstimator = EmpiricalPrior(),
+        pe::Option{<:AbstractLowOrderPriorEstimator} = EmpiricalPrior(),
         alg::AbstractUncertaintySetAlgorithm = BoxUncertaintySetAlgorithm(),
         n_sim::Integer = 3_000,
         q::Number = 0.05,
@@ -85,7 +85,7 @@ NormalUncertaintySet
 """
 @concrete struct NormalUncertaintySet <: AbstractUncertaintySetEstimator
     """
-    $(field_dict[:pe])
+    $(field_dict[:pe_ucs])
     """
     pe
     """
@@ -120,7 +120,7 @@ NormalUncertaintySet
     $(field_dict[:kwargs])
     """
     kwargs
-    function NormalUncertaintySet(pe::AbstractLowOrderPriorEstimator,
+    function NormalUncertaintySet(pe::Option{<:AbstractLowOrderPriorEstimator},
                                   alg::AbstractUncertaintySetAlgorithm, n_sim::Integer,
                                   q::Number, rng::Random.AbstractRNG,
                                   seed::Option{<:Integer}, ens::Option{<:Number},
@@ -135,7 +135,8 @@ NormalUncertaintySet
                                                                            ens, pdm, kwargs)
     end
 end
-function NormalUncertaintySet(; pe::AbstractLowOrderPriorEstimator = EmpiricalPrior(),
+function NormalUncertaintySet(;
+                              pe::Option{<:AbstractLowOrderPriorEstimator} = EmpiricalPrior(),
                               alg::AbstractUncertaintySetAlgorithm = BoxUncertaintySetAlgorithm(),
                               n_sim::Integer = 3_000, q::Number = 0.05,
                               rng::Random.AbstractRNG = Random.default_rng(),
@@ -233,7 +234,7 @@ end
 
 Return ``T``, the effective number of observations that divides the covariance to give the asymptotic covariance of the mean.
 
-Three sources are read in order, and the first that is not `nothing` wins: the estimator's own `ens`, the prior's `ens`, and the row count of the prior's returns matrix. The first two exist because a weighted or a shrunk prior carries fewer effective observations than it has rows. Every set the file builds is scaled by ``T``, and the width of a set scales as ``T^{-1/2}``, so a prior that reports fewer effective scenarios than it has rows widens the set. Quartering ``T`` doubles the width of the mean box.
+Three sources are read in order, and the first that is not `nothing` wins: the estimator's own `ens`, the prior's `ens`, and the row count of the prior's returns matrix. The first two exist because a weighted or a shrunk prior carries fewer effective observations than it has rows, and because a prior under a Scenario Cap carries fewer rows than the observations its moments were fitted over, which it states in `ens` (ADR 0138). Every set the file builds is scaled by ``T``, and the width of a set scales as ``T^{-1/2}``, so a prior that reports fewer effective scenarios than it has rows widens the set. Quartering ``T`` doubles the width of the mean box.
 
 # Algorithm
 
@@ -255,7 +256,7 @@ Three sources are read in order, and the first that is not `nothing` wins: the e
   - [`NormalUncertaintySet`](@ref)
   - [`mu_asymptotic_cov`](@ref)
 """
-function choose_scaling_parameter(ue::NormalUncertaintySet, pr::LowOrderPrior)
+function choose_scaling_parameter(ue::NormalUncertaintySet, pr::AbstractPriorResult)
     return if !isnothing(ue.ens)
         ue.ens
     elseif !isnothing(pr.ens)
@@ -475,7 +476,7 @@ Draws `ue.n_sim` Wishart matrices with `T` degrees of freedom and scale `sigma_m
   - [`mu_normal_box_set`](@ref)
   - [`box_quantile_bounds`](@ref)
 """
-function sigma_normal_box_set(ue::NormalUncertaintySet, pr::LowOrderPrior, T::Number,
+function sigma_normal_box_set(ue::NormalUncertaintySet, pr::AbstractPriorResult, T::Number,
                               sigma_mu::MatNum, q::Number)
     sigma = pr.sigma
     rng = resolve_rng(ue.rng, ue.seed)
@@ -487,32 +488,27 @@ function sigma_normal_box_set(ue::NormalUncertaintySet, pr::LowOrderPrior, T::Nu
     return BoxUncertaintySet(; lb = sigma_l, ub = sigma_u, val = sigma)
 end
 """
-    normal_box_preamble(ue::NormalUncertaintySet, X::MatNum,
-                        F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+    normal_box_preamble(ue::NormalUncertaintySet, pr::AbstractPriorResult)
 
 Shared preamble of the three box entry points of a [`NormalUncertaintySet`](@ref).
 
-Fits the prior, resolves the scaling parameter, and derives the two quantities both box sets are built from. [`ucs`](@ref), [`mu_ucs`](@ref) and [`sigma_ucs`](@ref) all start here, so the prior call and the scaling choice are written once instead of three times. **The returned `q` is halved, and the ellipsoidal route halves nothing.** A box bounds each entry on both sides, so half of the significance level goes into each tail. An ellipsoid cuts only the upper tail of a distance that cannot be negative, so one cut at the ``1 - q`` quantile already covers ``1 - q``.
+Resolves the scaling parameter and derives the two quantities both box sets are built from, off the prior result the set is calibrated on. [`ucs`](@ref), [`mu_ucs`](@ref) and [`sigma_ucs`](@ref) all start here, so the scaling choice is written once instead of three times. **The returned `q` is halved, and the ellipsoidal route halves nothing.** A box bounds each entry on both sides, so half of the significance level goes into each tail. An ellipsoid cuts only the upper tail of a distance that cannot be negative, so one cut at the ``1 - q`` quantile already covers ``1 - q``.
 
 # Algorithm
 
- 1. Fit the prior with `prior(ue.pe, X, F; dims = dims, kwargs...)`, giving `pr`.
- 2. Resolve the scaling parameter with [`choose_scaling_parameter`](@ref), giving `T`.
- 3. Build the mean asymptotic covariance with [`mu_asymptotic_cov`](@ref), giving `sigma_mu`.
- 4. Halve `ue.q`, giving `q`, the significance level of one tail.
- 5. Return `pr`, `T`, `sigma_mu` and `q` as a tuple.
+ 1. Resolve the scaling parameter with [`choose_scaling_parameter`](@ref), giving `T`.
+ 2. Build the mean asymptotic covariance with [`mu_asymptotic_cov`](@ref), giving `sigma_mu`.
+ 3. Halve `ue.q`, giving `q`, the significance level of one tail.
+ 4. Return `T`, `sigma_mu` and `q` as a tuple.
 
 # Arguments
 
   - `ue`: Normal uncertainty set estimator.
-  - `X`: Data matrix.
-  - `F`: Optional factor matrix. Used by the prior estimator.
-  - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the prior estimator.
+  - `pr`: Fitted prior result the set is calibrated on.
 
 # Returns
 
-  - `(pr, T, sigma_mu, q)`: Prior result, scaling parameter, mean asymptotic covariance, and half significance level.
+  - `(T, sigma_mu, q)`: Scaling parameter, mean asymptotic covariance, and half significance level.
 
 # Related
 
@@ -522,11 +518,9 @@ Fits the prior, resolves the scaling parameter, and derives the two quantities b
   - [`mu_normal_box_set`](@ref)
   - [`sigma_normal_box_set`](@ref)
 """
-function normal_box_preamble(ue::NormalUncertaintySet, X::MatNum,
-                             F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
-    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
+function normal_box_preamble(ue::NormalUncertaintySet, pr::AbstractPriorResult)
     T = choose_scaling_parameter(ue, pr)
-    return pr, T, mu_asymptotic_cov(ue.pdm, pr.sigma, T), ue.q * 0.5
+    return T, mu_asymptotic_cov(ue.pdm, pr.sigma, T), ue.q * 0.5
 end
 """
     normal_mu_error_sample(ue::NormalUncertaintySet, rng::Random.AbstractRNG, mu::VecNum,
@@ -608,12 +602,77 @@ function normal_sigma_error_sample(ue::NormalUncertaintySet, rng::Random.Abstrac
     end
     return transpose(reshape(X_sigma, N^2, :))
 end
+# A NormalUncertaintySet with no prior of its own reads the prior result it is handed
+# (see [`reads_prior_result`](@ref)).
+function reads_prior_result(::NormalUncertaintySet{Nothing})::Bool
+    return true
+end
 """
-    ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any, <:Any},
-        X::MatNum,
+    ucs(ue::NormalUncertaintySet, X::MatNum,
         F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+    mu_ucs(ue::NormalUncertaintySet, X::MatNum,
+           F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+    sigma_ucs(ue::NormalUncertaintySet, X::MatNum,
+              F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+
+Fits a [`NormalUncertaintySet`](@ref) from returns data, by fitting the set's own prior and calibrating the set on the result.
+
+These are the returns-data arms of the three verbs, and they are one method each whatever shape the set builds, because the shape is decided one call later. Each fits `ue.pe` once through [`ucs_prior`](@ref), which refuses a `pe` of `nothing` by name, and hands the result to the prior-result arm of the same verb on the same set with its `pe` set to `nothing`, which is where the box, the ellipsoid and the norm ball are dispatched (ADR 0138). A set with a prior of its own is therefore calibrated on that prior fitted on the returns it is handed, and on nothing else; the two routes share one body per shape, so a set reached through `ucs(ue, X)` and one reached through `ucs(ue′, prior(ue.pe, X))` with `ue′` the same set without its prior are the same set to the last bit.
+
+# Algorithm
+
+ 1. Fit the prior with [`ucs_prior`](@ref) on `ue.pe`, `X` and `F`, giving `pr`.
+ 2. Forward to the prior-result arm of the verb on the set with `pe = nothing`, which builds the set of the shape `ue.alg` names from `pr`.
+
+# Arguments
+
+  - `ue`: Normal uncertainty set estimator.
+  - `X`: Data matrix.
+  - `F`: Optional factor matrix. Used by the prior estimator.
+  - $(arg_dict[:dims])
+  - `kwargs...`: Additional keyword arguments passed to the prior estimator.
+
+# Validation
+
+  - `ue.pe` is not `nothing`. An `ArgumentError` naming the prior-result form is thrown otherwise.
+
+# Returns
+
+  - `mu_ucs::AbstractUncertaintySetResult`: Expected returns uncertainty set, from `mu_ucs`.
+  - `sigma_ucs::AbstractUncertaintySetResult`: Covariance uncertainty set, from `sigma_ucs`.
+  - `(mu_ucs, sigma_ucs)`: Both, from `ucs`.
+
+# Related
+
+  - [`NormalUncertaintySet`](@ref)
+  - [`ucs_prior`](@ref)
+  - [`reads_prior_result`](@ref)
+  - [`BoxUncertaintySetAlgorithm`](@ref)
+  - [`EllipsoidalUncertaintySetAlgorithm`](@ref)
+  - [`NormBallUncertaintySetAlgorithm`](@ref)
+"""
+function ucs(ue::NormalUncertaintySet, X::MatNum, F::Option{<:MatNum} = nothing;
+             dims::Int = 1, kwargs...)
+    pr = ucs_prior(ue.pe, X, F; dims = dims, kwargs...)
+    return ucs(Accessors.@set(ue.pe = nothing), pr)
+end
+function mu_ucs(ue::NormalUncertaintySet, X::MatNum, F::Option{<:MatNum} = nothing;
+                dims::Int = 1, kwargs...)
+    pr = ucs_prior(ue.pe, X, F; dims = dims, kwargs...)
+    return mu_ucs(Accessors.@set(ue.pe = nothing), pr)
+end
+function sigma_ucs(ue::NormalUncertaintySet, X::MatNum, F::Option{<:MatNum} = nothing;
+                   dims::Int = 1, kwargs...)
+    pr = ucs_prior(ue.pe, X, F; dims = dims, kwargs...)
+    return sigma_ucs(Accessors.@set(ue.pe = nothing), pr)
+end
+"""
+    ucs(ue::NormalUncertaintySet{Nothing, <:BoxUncertaintySetAlgorithm, <:Any, <:Any, <:Any},
+        pr::AbstractPriorResult; rd = nothing, kwargs...)
 
 Constructs box uncertainty sets for mean and covariance statistics under the assumption of normally distributed returns.
+
+This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing` (ADR 0138). Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
 
 # Mathematical definition
 
@@ -648,18 +707,17 @@ Where:
 
 # Algorithm
 
- 1. Run [`normal_box_preamble`](@ref), giving `pr`, `T`, `sigma_mu` and the halved `q`.
+ 1. Run [`normal_box_preamble`](@ref) on the prior result `pr` the set is calibrated on, giving `T`, `sigma_mu` and the halved `q`.
  2. Build the mean set with [`mu_normal_box_set`](@ref) from `pr.mu`, `sigma_mu` and `q`.
  3. Build the covariance set with [`sigma_normal_box_set`](@ref) from `ue`, `pr`, `T`, `sigma_mu` and `q`.
  4. Return the two sets as a tuple, mean first.
 
 # Arguments
 
-  - `ue`: Normal uncertainty set estimator.
-  - `X`: Data matrix.
-  - `F`: Optional factor matrix. Used by the prior estimator.
-  - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the prior estimator.
+  - `ue`: Normal uncertainty set estimator with no prior of its own.
+  - `pr`: Fitted prior result the set is calibrated on.
+  - `rd`: Returns result the three-argument form passes beside the prior. Not read.
+  - `kwargs...`: Additional keyword arguments (ignored).
 
 # Returns
 
@@ -674,19 +732,20 @@ Where:
   - [`mu_ucs`](@ref)
   - [`sigma_ucs`](@ref)
 """
-function ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
-                                      <:Any}, X::MatNum, F::Option{<:MatNum} = nothing;
-             dims::Int = 1, kwargs...)
-    pr, T, sigma_mu, q = normal_box_preamble(ue, X, F; dims = dims, kwargs...)
+function ucs(ue::NormalUncertaintySet{Nothing, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
+                                      <:Any}, pr::AbstractPriorResult; rd = nothing,
+             kwargs...)
+    T, sigma_mu, q = normal_box_preamble(ue, pr)
     return mu_normal_box_set(pr.mu, sigma_mu, q),
            sigma_normal_box_set(ue, pr, T, sigma_mu, q)
 end
 """
-    mu_ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any, <:Any},
-           X::MatNum,
-           F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+    mu_ucs(ue::NormalUncertaintySet{Nothing, <:BoxUncertaintySetAlgorithm, <:Any, <:Any, <:Any},
+           pr::AbstractPriorResult; rd = nothing, kwargs...)
 
 Constructs a box uncertainty set for expected returns under the assumption of normally distributed returns.
+
+This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing` (ADR 0138). Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
 
 # Mathematical definition
 
@@ -707,16 +766,15 @@ Where:
 
 # Algorithm
 
- 1. Run [`normal_box_preamble`](@ref), giving `pr`, `sigma_mu` and the halved `q`. The scaling parameter is dropped, because only the covariance set reads it.
+ 1. Run [`normal_box_preamble`](@ref) on the prior result `pr` the set is calibrated on, giving `sigma_mu` and the halved `q`. The scaling parameter is dropped, because only the covariance set reads it.
  2. Build and return the mean set with [`mu_normal_box_set`](@ref) from `pr.mu`, `sigma_mu` and `q`.
 
 # Arguments
 
-  - `ue`: Normal uncertainty set estimator.
-  - `X`: Data matrix.
-  - `F`: Optional factor matrix. Used by the prior estimator.
-  - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the prior estimator.
+  - `ue`: Normal uncertainty set estimator with no prior of its own.
+  - `pr`: Fitted prior result the set is calibrated on.
+  - `rd`: Returns result the three-argument form passes beside the prior. Not read.
+  - `kwargs...`: Additional keyword arguments (ignored).
 
 # Returns
 
@@ -730,18 +788,19 @@ Where:
   - [`ucs`](@ref)
   - [`sigma_ucs`](@ref)
 """
-function mu_ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
-                                         <:Any}, X::MatNum, F::Option{<:MatNum} = nothing;
-                dims::Int = 1, kwargs...)
-    pr, _, sigma_mu, q = normal_box_preamble(ue, X, F; dims = dims, kwargs...)
+function mu_ucs(ue::NormalUncertaintySet{Nothing, <:BoxUncertaintySetAlgorithm, <:Any,
+                                         <:Any, <:Any}, pr::AbstractPriorResult;
+                rd = nothing, kwargs...)
+    _, sigma_mu, q = normal_box_preamble(ue, pr)
     return mu_normal_box_set(pr.mu, sigma_mu, q)
 end
 """
-    sigma_ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any, <:Any},
-              X::MatNum,
-              F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+    sigma_ucs(ue::NormalUncertaintySet{Nothing, <:BoxUncertaintySetAlgorithm, <:Any, <:Any, <:Any},
+              pr::AbstractPriorResult; rd = nothing, kwargs...)
 
 Constructs a box uncertainty set for covariance under the assumption of normally distributed returns.
+
+This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing` (ADR 0138). Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
 
 # Mathematical definition
 
@@ -764,16 +823,15 @@ Where:
 
 # Algorithm
 
- 1. Run [`normal_box_preamble`](@ref), giving `pr`, `T`, `sigma_mu` and the halved `q`.
+ 1. Run [`normal_box_preamble`](@ref) on the prior result `pr` the set is calibrated on, giving `T`, `sigma_mu` and the halved `q`.
  2. Build and return the covariance set with [`sigma_normal_box_set`](@ref) from `ue`, `pr`, `T`, `sigma_mu` and `q`.
 
 # Arguments
 
-  - `ue`: Normal uncertainty set estimator.
-  - `X`: Data matrix.
-  - `F`: Optional factor matrix. Used by the prior estimator.
-  - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the prior estimator.
+  - `ue`: Normal uncertainty set estimator with no prior of its own.
+  - `pr`: Fitted prior result the set is calibrated on.
+  - `rd`: Returns result the three-argument form passes beside the prior. Not read.
+  - `kwargs...`: Additional keyword arguments (ignored).
 
 # Returns
 
@@ -787,20 +845,21 @@ Where:
   - [`ucs`](@ref)
   - [`mu_ucs`](@ref)
 """
-function sigma_ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any,
-                                            <:Any, <:Any}, X::MatNum,
-                   F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
-    pr, T, sigma_mu, q = normal_box_preamble(ue, X, F; dims = dims, kwargs...)
+function sigma_ucs(ue::NormalUncertaintySet{Nothing, <:BoxUncertaintySetAlgorithm, <:Any,
+                                            <:Any, <:Any}, pr::AbstractPriorResult;
+                   rd = nothing, kwargs...)
+    T, sigma_mu, q = normal_box_preamble(ue, pr)
     return sigma_normal_box_set(ue, pr, T, sigma_mu, q)
 end
 """
-    ucs(ue::NormalUncertaintySet{<:Any,
+    ucs(ue::NormalUncertaintySet{Nothing,
                                  <:EllipsoidalUncertaintySetAlgorithm{<:NormalKUncertaintyAlgorithm, <:Any},
                                  <:Any, <:Any, <:Any},
-        X::MatNum,
-        F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+        pr::AbstractPriorResult; rd = nothing, kwargs...)
 
 Constructs ellipsoidal uncertainty sets for expected returns and covariance statistics under the assumption of normally distributed returns.
+
+This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing` (ADR 0138). Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
 
 **The two samples are estimation errors, not levels.** [`k_ucs`](@ref) measures a Mahalanobis distance against the shape matrix, so step 5 draws from the sampling law of the estimator, ``\\mathcal{N}(\\hat{\\boldsymbol{\\mu}}, \\hat{\\mathbf{\\Sigma}}/T)``, and centres the draws on ``\\hat{\\boldsymbol{\\mu}}``. A draw from ``\\mathcal{N}(\\hat{\\boldsymbol{\\mu}}, \\hat{\\mathbf{\\Sigma}})`` in its place multiplies every deviation, and therefore the radius, by ``\\sqrt{T}``. Step 6 is on the matching scale for the same reason: the variance of an entry of a ``\\mathrm{Wishart}(T, \\hat{\\mathbf{\\Sigma}}/T)`` draw is the matching diagonal entry of ``\\mathbf{\\Sigma}_{\\mathbf{\\Sigma}}``.
 
@@ -846,7 +905,7 @@ Where:
 
 # Algorithm
 
- 1. Fit the prior with `prior(ue.pe, X, F; dims = dims, kwargs...)`, giving `pr`, and read `mu`, `sigma` and `N = size(pr.X, 2)` from it. The asset count comes from the prior's own returns matrix, so a prior that changes the asset count is followed.
+ 1. Take the prior result `pr` the set is calibrated on, and read `mu`, `sigma` and `N = size(pr.X, 2)` from it. The asset count comes from the prior's own returns matrix, so a prior that changes the asset count is followed.
  2. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref).
  3. Build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
  4. Resolve the random number generator from `ue.rng` and `ue.seed` with [`resolve_rng`](@ref).
@@ -859,11 +918,10 @@ Where:
 
 # Arguments
 
-  - `ue`: Normal uncertainty set estimator.
-  - `X`: Data matrix.
-  - `F`: Optional factor matrix. Used by the prior estimator.
-  - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the prior estimator.
+  - `ue`: Normal uncertainty set estimator with no prior of its own.
+  - `pr`: Fitted prior result the set is calibrated on.
+  - `rd`: Returns result the three-argument form passes beside the prior. Not read.
+  - `kwargs...`: Additional keyword arguments (ignored).
 
 # Returns
 
@@ -879,12 +937,11 @@ Where:
   - [`mu_ucs`](@ref)
   - [`sigma_ucs`](@ref)
 """
-function ucs(ue::NormalUncertaintySet{<:Any,
+function ucs(ue::NormalUncertaintySet{Nothing,
                                       <:EllipsoidalUncertaintySetAlgorithm{<:NormalKUncertaintyAlgorithm,
                                                                            <:Any}, <:Any,
-                                      <:Any, <:Any}, X::MatNum,
-             F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
-    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
+                                      <:Any, <:Any}, pr::AbstractPriorResult; rd = nothing,
+             kwargs...)
     (; mu, sigma) = pr
     N = size(pr.X, 2)
     T = choose_scaling_parameter(ue, pr)
@@ -899,11 +956,12 @@ function ucs(ue::NormalUncertaintySet{<:Any,
                            SigmaUncertaintySetClass(), pr.sigma)
 end
 """
-    ucs(ue::NormalUncertaintySet{<:Any, <:EllipsoidalUncertaintySetAlgorithm{<:Any, <:Any},
-                                 <:Any, <:Any, <:Any}, X::MatNum,
-        F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+    ucs(ue::NormalUncertaintySet{Nothing, <:EllipsoidalUncertaintySetAlgorithm{<:Any, <:Any},
+                                 <:Any, <:Any, <:Any}, pr::AbstractPriorResult; rd = nothing, kwargs...)
 
 Constructs ellipsoidal uncertainty sets for expected returns and covariance statistics under the assumption of normally distributed returns, using a generic ellipsoidal algorithm.
+
+This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing` (ADR 0138). Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
 
 **This route runs no simulation, so it serves every radius algorithm that reads no sample.** That is [`ChiSqKUncertaintyAlgorithm`](@ref), [`GeneralKUncertaintyAlgorithm`](@ref), and a plain number. Its sibling on [`NormalKUncertaintyAlgorithm`](@ref) draws the sample that the empirical radius needs. The two routes build the same shapes, so they differ only in the radius.
 
@@ -932,7 +990,7 @@ The radius of each ellipsoid is the one [`k_ucs`](@ref) returns for `ue.alg.meth
 
 # Algorithm
 
- 1. Fit the prior with `prior(ue.pe, X, F; dims = dims, kwargs...)`, giving `pr`, and read `sigma = pr.sigma`.
+ 1. Take the prior result `pr` the set is calibrated on, and read `sigma = pr.sigma`.
  2. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref).
  3. Build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
  4. Build the covariance shape `sigma_sigma` with [`sigma_asymptotic_cov`](@ref).
@@ -942,11 +1000,10 @@ The radius of each ellipsoid is the one [`k_ucs`](@ref) returns for `ue.alg.meth
 
 # Arguments
 
-  - `ue`: Normal uncertainty set estimator.
-  - `X`: Data matrix.
-  - `F`: Optional factor matrix. Used by the prior estimator.
-  - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the prior estimator.
+  - `ue`: Normal uncertainty set estimator with no prior of its own.
+  - `pr`: Fitted prior result the set is calibrated on.
+  - `rd`: Returns result the three-argument form passes beside the prior. Not read.
+  - `kwargs...`: Additional keyword arguments (ignored).
 
 # Returns
 
@@ -962,11 +1019,10 @@ The radius of each ellipsoid is the one [`k_ucs`](@ref) returns for `ue.alg.meth
   - [`mu_ucs`](@ref)
   - [`sigma_ucs`](@ref)
 """
-function ucs(ue::NormalUncertaintySet{<:Any,
+function ucs(ue::NormalUncertaintySet{Nothing,
                                       <:EllipsoidalUncertaintySetAlgorithm{<:Any, <:Any},
-                                      <:Any, <:Any, <:Any}, X::MatNum,
-             F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
-    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
+                                      <:Any, <:Any, <:Any}, pr::AbstractPriorResult;
+             rd = nothing, kwargs...)
     sigma = pr.sigma
     T = choose_scaling_parameter(ue, pr)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
@@ -977,13 +1033,14 @@ function ucs(ue::NormalUncertaintySet{<:Any,
                            SigmaUncertaintySetClass(), pr.sigma)
 end
 """
-    mu_ucs(ue::NormalUncertaintySet{<:Any,
+    mu_ucs(ue::NormalUncertaintySet{Nothing,
                                     <:EllipsoidalUncertaintySetAlgorithm{<:NormalKUncertaintyAlgorithm, <:Any},
                                     <:Any, <:Any, <:Any},
-           X::MatNum,
-           F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+           pr::AbstractPriorResult; rd = nothing, kwargs...)
 
 Constructs an ellipsoidal uncertainty set for expected returns under the assumption of normally distributed returns, using a normal scaling algorithm.
+
+This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing` (ADR 0138). Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
 
 **The sample is the estimation error, not the level.** [`k_ucs`](@ref) measures a Mahalanobis distance against the shape matrix, so step 4 draws from the sampling law of the estimator, ``\\mathcal{N}(\\hat{\\boldsymbol{\\mu}}, \\hat{\\mathbf{\\Sigma}}/T)``, and centres the draws on ``\\hat{\\boldsymbol{\\mu}}``. A draw from ``\\mathcal{N}(\\hat{\\boldsymbol{\\mu}}, \\hat{\\mathbf{\\Sigma}})`` in its place multiplies every deviation, and therefore the radius, by ``\\sqrt{T}``.
 
@@ -1004,7 +1061,7 @@ Where:
 
 # Algorithm
 
- 1. Fit the prior with `prior(ue.pe, X, F; dims = dims, kwargs...)`, giving `pr`, and read `mu` and `sigma` from it.
+ 1. Take the prior result `pr` the set is calibrated on, and read `mu` and `sigma` from it.
  2. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref).
  3. Build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
  4. Resolve the random number generator with [`resolve_rng`](@ref), and draw the sample with [`normal_mu_error_sample`](@ref), giving `X_mu`, one estimation error per row.
@@ -1012,11 +1069,10 @@ Where:
 
 # Arguments
 
-  - `ue`: Normal uncertainty set estimator.
-  - `X`: Data matrix.
-  - `F`: Optional factor matrix. Used by the prior estimator.
-  - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the prior estimator.
+  - `ue`: Normal uncertainty set estimator with no prior of its own.
+  - `pr`: Fitted prior result the set is calibrated on.
+  - `rd`: Returns result the three-argument form passes beside the prior. Not read.
+  - `kwargs...`: Additional keyword arguments (ignored).
 
 # Returns
 
@@ -1030,12 +1086,11 @@ Where:
   - [`k_ucs`](@ref)
   - [`sigma_ucs`](@ref)
 """
-function mu_ucs(ue::NormalUncertaintySet{<:Any,
+function mu_ucs(ue::NormalUncertaintySet{Nothing,
                                          <:EllipsoidalUncertaintySetAlgorithm{<:NormalKUncertaintyAlgorithm,
                                                                               <:Any}, <:Any,
-                                         <:Any, <:Any}, X::MatNum,
-                F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
-    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
+                                         <:Any, <:Any}, pr::AbstractPriorResult;
+                rd = nothing, kwargs...)
     (; mu, sigma) = pr
     T = choose_scaling_parameter(ue, pr)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
@@ -1045,12 +1100,13 @@ function mu_ucs(ue::NormalUncertaintySet{<:Any,
                            MuUncertaintySetClass(), pr.mu)
 end
 """
-    mu_ucs(ue::NormalUncertaintySet{<:Any, <:EllipsoidalUncertaintySetAlgorithm{<:Any, <:Any},
+    mu_ucs(ue::NormalUncertaintySet{Nothing, <:EllipsoidalUncertaintySetAlgorithm{<:Any, <:Any},
                                     <:Any, <:Any, <:Any},
-           X::MatNum,
-           F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+           pr::AbstractPriorResult; rd = nothing, kwargs...)
 
 Constructs an ellipsoidal uncertainty set for expected returns under the assumption of normally distributed returns, using a generic ellipsoidal algorithm.
+
+This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing` (ADR 0138). Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
 
 The shape matrix is ``\\hat{\\mathbf{\\Sigma}} / T`` of Equation 11.24. This method runs no simulation, so it serves every radius algorithm that reads none, which is [`ChiSqKUncertaintyAlgorithm`](@ref), [`GeneralKUncertaintyAlgorithm`](@ref) and a plain number. Its sibling on [`NormalKUncertaintyAlgorithm`](@ref) draws the sample that the empirical radius needs, and builds the same shape.
 
@@ -1073,18 +1129,17 @@ The significance level reaches [`k_ucs`](@ref) undivided, because an ellipsoid c
 
 # Algorithm
 
- 1. Fit the prior with `prior(ue.pe, X, F; dims = dims, kwargs...)`, giving `pr`, and read `sigma = pr.sigma`.
+ 1. Take the prior result `pr` the set is calibrated on, and read `sigma = pr.sigma`.
  2. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref).
  3. Build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
  4. Fit and return the ellipsoid with [`ellipsoidal_set`](@ref) on `sigma_mu`, passing `nothing` in place of a sample and `pr.mu` as the centre.
 
 # Arguments
 
-  - `ue`: Normal uncertainty set estimator.
-  - `X`: Data matrix.
-  - `F`: Optional factor matrix. Used by the prior estimator.
-  - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the prior estimator.
+  - `ue`: Normal uncertainty set estimator with no prior of its own.
+  - `pr`: Fitted prior result the set is calibrated on.
+  - `rd`: Returns result the three-argument form passes beside the prior. Not read.
+  - `kwargs...`: Additional keyword arguments (ignored).
 
 # Returns
 
@@ -1098,11 +1153,10 @@ The significance level reaches [`k_ucs`](@ref) undivided, because an ellipsoid c
   - [`k_ucs`](@ref)
   - [`sigma_ucs`](@ref)
 """
-function mu_ucs(ue::NormalUncertaintySet{<:Any,
+function mu_ucs(ue::NormalUncertaintySet{Nothing,
                                          <:EllipsoidalUncertaintySetAlgorithm{<:Any, <:Any},
-                                         <:Any, <:Any, <:Any}, X::MatNum,
-                F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
-    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
+                                         <:Any, <:Any, <:Any}, pr::AbstractPriorResult;
+                rd = nothing, kwargs...)
     sigma = pr.sigma
     T = choose_scaling_parameter(ue, pr)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
@@ -1110,13 +1164,14 @@ function mu_ucs(ue::NormalUncertaintySet{<:Any,
                            MuUncertaintySetClass(), pr.mu)
 end
 """
-    sigma_ucs(ue::NormalUncertaintySet{<:Any,
+    sigma_ucs(ue::NormalUncertaintySet{Nothing,
                                        <:EllipsoidalUncertaintySetAlgorithm{<:NormalKUncertaintyAlgorithm, <:Any},
                                        <:Any, <:Any, <:Any},
-              X::MatNum,
-              F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+              pr::AbstractPriorResult; rd = nothing, kwargs...)
 
 Constructs an ellipsoidal uncertainty set for covariance under the assumption of normally distributed returns, using a normal scaling algorithm.
+
+This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing` (ADR 0138). Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
 
 **The sample is the estimation error, not the level.** The draws of step 4 are subtracted from ``\\hat{\\mathbf{\\Sigma}}``, and the variance of an entry of a ``\\mathrm{Wishart}(T, \\hat{\\mathbf{\\Sigma}}/T)`` draw is the matching diagonal entry of ``\\mathbf{\\Sigma}_{\\mathbf{\\Sigma}}``, so the sample and the shape it is measured against are on one scale. `N` is read from `size(pr.X, 2)`, the same source [`ucs`](@ref) reads it from, so a prior that changes the asset count moves both, and the two shape matrices are equal.
 
@@ -1142,7 +1197,7 @@ Where:
 
 # Algorithm
 
- 1. Fit the prior with `prior(ue.pe, X, F; dims = dims, kwargs...)`, giving `pr`, and read `sigma = pr.sigma` and `N = size(pr.X, 2)`.
+ 1. Take the prior result `pr` the set is calibrated on, and read `sigma = pr.sigma` and `N = size(pr.X, 2)`.
  2. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref).
  3. Build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
  4. Resolve the random number generator with [`resolve_rng`](@ref), and draw the sample with [`normal_sigma_error_sample`](@ref), giving `X_sigma`, one vectorised estimation error per row.
@@ -1151,11 +1206,10 @@ Where:
 
 # Arguments
 
-  - `ue`: Normal uncertainty set estimator.
-  - `X`: Data matrix.
-  - `F`: Optional factor matrix. Used by the prior estimator.
-  - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the prior estimator.
+  - `ue`: Normal uncertainty set estimator with no prior of its own.
+  - `pr`: Fitted prior result the set is calibrated on.
+  - `rd`: Returns result the three-argument form passes beside the prior. Not read.
+  - `kwargs...`: Additional keyword arguments (ignored).
 
 # Returns
 
@@ -1169,12 +1223,11 @@ Where:
   - [`k_ucs`](@ref)
   - [`mu_ucs`](@ref)
 """
-function sigma_ucs(ue::NormalUncertaintySet{<:Any,
+function sigma_ucs(ue::NormalUncertaintySet{Nothing,
                                             <:EllipsoidalUncertaintySetAlgorithm{<:NormalKUncertaintyAlgorithm,
                                                                                  <:Any},
-                                            <:Any, <:Any, <:Any}, X::MatNum,
-                   F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
-    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
+                                            <:Any, <:Any, <:Any}, pr::AbstractPriorResult;
+                   rd = nothing, kwargs...)
     sigma = pr.sigma
     N = size(pr.X, 2)
     T = choose_scaling_parameter(ue, pr)
@@ -1186,12 +1239,13 @@ function sigma_ucs(ue::NormalUncertaintySet{<:Any,
                            SigmaUncertaintySetClass(), pr.sigma)
 end
 """
-    sigma_ucs(ue::NormalUncertaintySet{<:Any,
+    sigma_ucs(ue::NormalUncertaintySet{Nothing,
                                        <:EllipsoidalUncertaintySetAlgorithm{<:Any, <:Any},
-                                       <:Any, <:Any, <:Any}, X::MatNum,
-              F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+                                       <:Any, <:Any, <:Any}, pr::AbstractPriorResult; rd = nothing, kwargs...)
 
 Constructs an ellipsoidal uncertainty set for covariance under the assumption of normally distributed returns, using a generic ellipsoidal algorithm.
+
+This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing` (ADR 0138). Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
 
 **This route runs no simulation, so it serves every radius algorithm that reads no sample.** That is [`ChiSqKUncertaintyAlgorithm`](@ref), [`GeneralKUncertaintyAlgorithm`](@ref), and a plain number. Its sibling on [`NormalKUncertaintyAlgorithm`](@ref) draws the sample that the empirical radius needs. The two routes build the same shapes, so they differ only in the radius.
 
@@ -1217,7 +1271,7 @@ The significance level reaches [`k_ucs`](@ref) undivided, because an ellipsoid c
 
 # Algorithm
 
- 1. Fit the prior with `prior(ue.pe, X, F; dims = dims, kwargs...)`, giving `pr`, and read `sigma = pr.sigma`.
+ 1. Take the prior result `pr` the set is calibrated on, and read `sigma = pr.sigma`.
  2. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref).
  3. Build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
  4. Build the covariance shape `sigma_sigma` with [`sigma_asymptotic_cov`](@ref).
@@ -1225,11 +1279,10 @@ The significance level reaches [`k_ucs`](@ref) undivided, because an ellipsoid c
 
 # Arguments
 
-  - `ue`: Normal uncertainty set estimator.
-  - `X`: Data matrix.
-  - `F`: Optional factor matrix. Used by the prior estimator.
-  - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the prior estimator.
+  - `ue`: Normal uncertainty set estimator with no prior of its own.
+  - `pr`: Fitted prior result the set is calibrated on.
+  - `rd`: Returns result the three-argument form passes beside the prior. Not read.
+  - `kwargs...`: Additional keyword arguments (ignored).
 
 # Returns
 
@@ -1243,12 +1296,11 @@ The significance level reaches [`k_ucs`](@ref) undivided, because an ellipsoid c
   - [`k_ucs`](@ref)
   - [`mu_ucs`](@ref)
 """
-function sigma_ucs(ue::NormalUncertaintySet{<:Any,
+function sigma_ucs(ue::NormalUncertaintySet{Nothing,
                                             <:EllipsoidalUncertaintySetAlgorithm{<:Any,
                                                                                  <:Any},
-                                            <:Any, <:Any, <:Any}, X::MatNum,
-                   F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
-    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
+                                            <:Any, <:Any, <:Any}, pr::AbstractPriorResult;
+                   rd = nothing, kwargs...)
     sigma = pr.sigma
     T = choose_scaling_parameter(ue, pr)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
@@ -1258,18 +1310,19 @@ function sigma_ucs(ue::NormalUncertaintySet{<:Any,
 end
 
 """
-    ucs(ue::NormalUncertaintySet{<:Any,
+    ucs(ue::NormalUncertaintySet{Nothing,
                                  <:NormBallUncertaintySetAlgorithm{<:NormalKUncertaintyAlgorithm, <:Any, <:Any},
-                                 <:Any, <:Any, <:Any}, X::MatNum,
-        F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+                                 <:Any, <:Any, <:Any}, pr::AbstractPriorResult; rd = nothing, kwargs...)
 
 Constructs norm-ball uncertainty sets for expected returns and covariance statistics under the assumption of normally distributed returns, using a normal scaling algorithm.
+
+This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing` (ADR 0138). Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
 
 The two sets are the two ellipsoids of the sibling route with their shape matrices factorised, so they name the same region and reach the same weights. The gain is on the consumer's side: a [`NormBallUncertaintySet`](@ref) carries the factor, so neither builder factorises anything at solve time. This route draws the sample the empirical radius reads, off one generator, so its Wishart draws follow its normal draws.
 
 # Algorithm
 
- 1. Fit the prior with `prior(ue.pe, X, F; dims = dims, kwargs...)`, giving `pr`, and read `mu`, `sigma` and `N = size(pr.X, 2)`.
+ 1. Take the prior result `pr` the set is calibrated on, and read `mu`, `sigma` and `N = size(pr.X, 2)`.
  2. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref), and build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
  3. Resolve one generator with [`resolve_rng`](@ref), and draw the two samples with [`normal_mu_error_sample`](@ref) and [`normal_sigma_error_sample`](@ref), mean first.
  4. Build the covariance shape `sigma_sigma` with [`sigma_asymptotic_cov`](@ref).
@@ -1277,11 +1330,10 @@ The two sets are the two ellipsoids of the sibling route with their shape matric
 
 # Arguments
 
-  - `ue`: Normal uncertainty set estimator.
-  - `X`: Data matrix.
-  - `F`: Optional factor matrix. Used by the prior estimator.
-  - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the prior estimator.
+  - `ue`: Normal uncertainty set estimator with no prior of its own.
+  - `pr`: Fitted prior result the set is calibrated on.
+  - `rd`: Returns result the three-argument form passes beside the prior. Not read.
+  - `kwargs...`: Additional keyword arguments (ignored).
 
 # Returns
 
@@ -1303,12 +1355,11 @@ The two sets are the two ellipsoids of the sibling route with their shape matric
   - $(ref_dict[:cajas2025]) Equations 11.16, 11.17 and 11.24.
   - $(ref_dict[:bentalnemirovski1998]) Section 3, Equation 14.
 """
-function ucs(ue::NormalUncertaintySet{<:Any,
+function ucs(ue::NormalUncertaintySet{Nothing,
                                       <:NormBallUncertaintySetAlgorithm{<:NormalKUncertaintyAlgorithm,
                                                                         <:Any, <:Any},
-                                      <:Any, <:Any, <:Any}, X::MatNum,
-             F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
-    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
+                                      <:Any, <:Any, <:Any}, pr::AbstractPriorResult;
+             rd = nothing, kwargs...)
     (; mu, sigma) = pr
     N = size(pr.X, 2)
     T = choose_scaling_parameter(ue, pr)
@@ -1322,28 +1373,28 @@ function ucs(ue::NormalUncertaintySet{<:Any,
                          pr.sigma)
 end
 """
-    ucs(ue::NormalUncertaintySet{<:Any, <:NormBallUncertaintySetAlgorithm{<:Any, <:Any, <:Any},
-                                 <:Any, <:Any, <:Any}, X::MatNum,
-        F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+    ucs(ue::NormalUncertaintySet{Nothing, <:NormBallUncertaintySetAlgorithm{<:Any, <:Any, <:Any},
+                                 <:Any, <:Any, <:Any}, pr::AbstractPriorResult; rd = nothing, kwargs...)
 
 Constructs norm-ball uncertainty sets for expected returns and covariance statistics under the assumption of normally distributed returns, using a generic radius algorithm.
+
+This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing` (ADR 0138). Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
 
 **This route runs no simulation, so it serves every radius algorithm that reads no sample.** That is [`ChiSqKUncertaintyAlgorithm`](@ref), [`GeneralKUncertaintyAlgorithm`](@ref), and a plain number. Its sibling on [`NormalKUncertaintyAlgorithm`](@ref) draws the sample that the empirical radius needs. The two routes build the same maps, so they differ only in the radius.
 
 # Algorithm
 
- 1. Fit the prior with `prior(ue.pe, X, F; dims = dims, kwargs...)`, giving `pr`, and read `sigma = pr.sigma`.
+ 1. Take the prior result `pr` the set is calibrated on, and read `sigma = pr.sigma`.
  2. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref), and build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
  3. Build the covariance shape `sigma_sigma` with [`sigma_asymptotic_cov`](@ref).
  4. Assemble the two sets with [`norm_ball_set`](@ref), passing `nothing` in place of a sample, and return them as a tuple, mean first.
 
 # Arguments
 
-  - `ue`: Normal uncertainty set estimator.
-  - `X`: Data matrix.
-  - `F`: Optional factor matrix. Used by the prior estimator.
-  - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the prior estimator.
+  - `ue`: Normal uncertainty set estimator with no prior of its own.
+  - `pr`: Fitted prior result the set is calibrated on.
+  - `rd`: Returns result the three-argument form passes beside the prior. Not read.
+  - `kwargs...`: Additional keyword arguments (ignored).
 
 # Returns
 
@@ -1365,12 +1416,11 @@ Constructs norm-ball uncertainty sets for expected returns and covariance statis
   - $(ref_dict[:cajas2025]) Equations 11.16, 11.17 and 11.24.
   - $(ref_dict[:goldfarbiyengar2003]) Section 5.
 """
-function ucs(ue::NormalUncertaintySet{<:Any,
+function ucs(ue::NormalUncertaintySet{Nothing,
                                       <:NormBallUncertaintySetAlgorithm{<:Any, <:Any,
                                                                         <:Any}, <:Any,
-                                      <:Any, <:Any}, X::MatNum,
-             F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
-    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
+                                      <:Any, <:Any}, pr::AbstractPriorResult; rd = nothing,
+             kwargs...)
     sigma = pr.sigma
     T = choose_scaling_parameter(ue, pr)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
@@ -1380,29 +1430,29 @@ function ucs(ue::NormalUncertaintySet{<:Any,
                          pr.sigma)
 end
 """
-    mu_ucs(ue::NormalUncertaintySet{<:Any,
+    mu_ucs(ue::NormalUncertaintySet{Nothing,
                                     <:NormBallUncertaintySetAlgorithm{<:NormalKUncertaintyAlgorithm, <:Any, <:Any},
-                                    <:Any, <:Any, <:Any}, X::MatNum,
-           F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+                                    <:Any, <:Any, <:Any}, pr::AbstractPriorResult; rd = nothing, kwargs...)
 
 Constructs a norm-ball uncertainty set for expected returns under the assumption of normally distributed returns, using a normal scaling algorithm.
+
+This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing` (ADR 0138). Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
 
 The map is the factor of ``\\hat{\\mathbf{\\Sigma}} / T``, so the set is the mean ellipsoid of the sibling route with its shape factorised. This method draws its normal sample off a generator that nothing has advanced, which is the same stream position [`ucs`](@ref) draws its own mean sample from, so the two radii agree under one seed.
 
 # Algorithm
 
- 1. Fit the prior with `prior(ue.pe, X, F; dims = dims, kwargs...)`, giving `pr`, and read `mu` and `sigma`.
+ 1. Take the prior result `pr` the set is calibrated on, and read `mu` and `sigma`.
  2. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref), and build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
  3. Resolve the generator with [`resolve_rng`](@ref), and draw the sample with [`normal_mu_error_sample`](@ref).
  4. Assemble and return the set with [`norm_ball_set`](@ref), with `pr.mu` as the centre.
 
 # Arguments
 
-  - `ue`: Normal uncertainty set estimator.
-  - `X`: Data matrix.
-  - `F`: Optional factor matrix. Used by the prior estimator.
-  - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the prior estimator.
+  - `ue`: Normal uncertainty set estimator with no prior of its own.
+  - `pr`: Fitted prior result the set is calibrated on.
+  - `rd`: Returns result the three-argument form passes beside the prior. Not read.
+  - `kwargs...`: Additional keyword arguments (ignored).
 
 # Returns
 
@@ -1422,12 +1472,11 @@ The map is the factor of ``\\hat{\\mathbf{\\Sigma}} / T``, so the set is the mea
   - $(ref_dict[:cajas2025]) Equation 11.24.
   - $(ref_dict[:bentalnemirovski1998]) Section 3, Equation 14.
 """
-function mu_ucs(ue::NormalUncertaintySet{<:Any,
+function mu_ucs(ue::NormalUncertaintySet{Nothing,
                                          <:NormBallUncertaintySetAlgorithm{<:NormalKUncertaintyAlgorithm,
                                                                            <:Any, <:Any},
-                                         <:Any, <:Any, <:Any}, X::MatNum,
-                F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
-    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
+                                         <:Any, <:Any, <:Any}, pr::AbstractPriorResult;
+                rd = nothing, kwargs...)
     (; mu, sigma) = pr
     T = choose_scaling_parameter(ue, pr)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
@@ -1436,27 +1485,27 @@ function mu_ucs(ue::NormalUncertaintySet{<:Any,
     return norm_ball_set(ue.alg, ue.q, X_mu, sigma_mu, MuUncertaintySetClass(), pr.mu)
 end
 """
-    mu_ucs(ue::NormalUncertaintySet{<:Any, <:NormBallUncertaintySetAlgorithm{<:Any, <:Any, <:Any},
-                                    <:Any, <:Any, <:Any}, X::MatNum,
-           F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+    mu_ucs(ue::NormalUncertaintySet{Nothing, <:NormBallUncertaintySetAlgorithm{<:Any, <:Any, <:Any},
+                                    <:Any, <:Any, <:Any}, pr::AbstractPriorResult; rd = nothing, kwargs...)
 
 Constructs a norm-ball uncertainty set for expected returns under the assumption of normally distributed returns, using a generic radius algorithm.
+
+This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing` (ADR 0138). Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
 
 **This route runs no simulation, so it serves every radius algorithm that reads no sample.** That is [`ChiSqKUncertaintyAlgorithm`](@ref), [`GeneralKUncertaintyAlgorithm`](@ref), and a plain number. Its sibling on [`NormalKUncertaintyAlgorithm`](@ref) draws the sample that the empirical radius needs, and builds the same map.
 
 # Algorithm
 
- 1. Fit the prior with `prior(ue.pe, X, F; dims = dims, kwargs...)`, giving `pr`, and read `sigma = pr.sigma`.
+ 1. Take the prior result `pr` the set is calibrated on, and read `sigma = pr.sigma`.
  2. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref), and build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
  3. Assemble and return the set with [`norm_ball_set`](@ref), passing `nothing` in place of a sample and `pr.mu` as the centre.
 
 # Arguments
 
-  - `ue`: Normal uncertainty set estimator.
-  - `X`: Data matrix.
-  - `F`: Optional factor matrix. Used by the prior estimator.
-  - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the prior estimator.
+  - `ue`: Normal uncertainty set estimator with no prior of its own.
+  - `pr`: Fitted prior result the set is calibrated on.
+  - `rd`: Returns result the three-argument form passes beside the prior. Not read.
+  - `kwargs...`: Additional keyword arguments (ignored).
 
 # Returns
 
@@ -1476,30 +1525,30 @@ Constructs a norm-ball uncertainty set for expected returns under the assumption
   - $(ref_dict[:cajas2025]) Equation 11.24.
   - $(ref_dict[:goldfarbiyengar2003]) Section 5.
 """
-function mu_ucs(ue::NormalUncertaintySet{<:Any,
+function mu_ucs(ue::NormalUncertaintySet{Nothing,
                                          <:NormBallUncertaintySetAlgorithm{<:Any, <:Any,
                                                                            <:Any}, <:Any,
-                                         <:Any, <:Any}, X::MatNum,
-                F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
-    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
+                                         <:Any, <:Any}, pr::AbstractPriorResult;
+                rd = nothing, kwargs...)
     sigma = pr.sigma
     T = choose_scaling_parameter(ue, pr)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
     return norm_ball_set(ue.alg, ue.q, nothing, sigma_mu, MuUncertaintySetClass(), pr.mu)
 end
 """
-    sigma_ucs(ue::NormalUncertaintySet{<:Any,
+    sigma_ucs(ue::NormalUncertaintySet{Nothing,
                                        <:NormBallUncertaintySetAlgorithm{<:NormalKUncertaintyAlgorithm, <:Any, <:Any},
-                                       <:Any, <:Any, <:Any}, X::MatNum,
-              F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+                                       <:Any, <:Any, <:Any}, pr::AbstractPriorResult; rd = nothing, kwargs...)
 
 Constructs a norm-ball uncertainty set for covariance under the assumption of normally distributed returns, using a normal scaling algorithm.
+
+This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing` (ADR 0138). Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
 
 The map is the factor of the vectorised covariance's asymptotic covariance, so the set is the covariance ellipsoid of the sibling route with its shape factorised. **The radius is not the one [`ucs`](@ref) fits, under the same seed**, because this method draws its Wishart matrices off a generator that nothing has advanced while [`ucs`](@ref) draws its mean sample first. Both radii are valid fits of the same quantity.
 
 # Algorithm
 
- 1. Fit the prior with `prior(ue.pe, X, F; dims = dims, kwargs...)`, giving `pr`, and read `sigma = pr.sigma` and `N = size(pr.X, 2)`.
+ 1. Take the prior result `pr` the set is calibrated on, and read `sigma = pr.sigma` and `N = size(pr.X, 2)`.
  2. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref), and build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
  3. Resolve the generator with [`resolve_rng`](@ref), and draw the sample with [`normal_sigma_error_sample`](@ref).
  4. Build the covariance shape `sigma_sigma` with [`sigma_asymptotic_cov`](@ref).
@@ -1507,11 +1556,10 @@ The map is the factor of the vectorised covariance's asymptotic covariance, so t
 
 # Arguments
 
-  - `ue`: Normal uncertainty set estimator.
-  - `X`: Data matrix.
-  - `F`: Optional factor matrix. Used by the prior estimator.
-  - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the prior estimator.
+  - `ue`: Normal uncertainty set estimator with no prior of its own.
+  - `pr`: Fitted prior result the set is calibrated on.
+  - `rd`: Returns result the three-argument form passes beside the prior. Not read.
+  - `kwargs...`: Additional keyword arguments (ignored).
 
 # Returns
 
@@ -1531,12 +1579,11 @@ The map is the factor of the vectorised covariance's asymptotic covariance, so t
   - $(ref_dict[:cajas2025]) Equations 11.17 and 11.24.
   - $(ref_dict[:bentalnemirovski1998]) Section 3, Equation 14.
 """
-function sigma_ucs(ue::NormalUncertaintySet{<:Any,
+function sigma_ucs(ue::NormalUncertaintySet{Nothing,
                                             <:NormBallUncertaintySetAlgorithm{<:NormalKUncertaintyAlgorithm,
                                                                               <:Any, <:Any},
-                                            <:Any, <:Any, <:Any}, X::MatNum,
-                   F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
-    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
+                                            <:Any, <:Any, <:Any}, pr::AbstractPriorResult;
+                   rd = nothing, kwargs...)
     sigma = pr.sigma
     N = size(pr.X, 2)
     T = choose_scaling_parameter(ue, pr)
@@ -1548,28 +1595,28 @@ function sigma_ucs(ue::NormalUncertaintySet{<:Any,
                          pr.sigma)
 end
 """
-    sigma_ucs(ue::NormalUncertaintySet{<:Any, <:NormBallUncertaintySetAlgorithm{<:Any, <:Any, <:Any},
-                                       <:Any, <:Any, <:Any}, X::MatNum,
-              F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+    sigma_ucs(ue::NormalUncertaintySet{Nothing, <:NormBallUncertaintySetAlgorithm{<:Any, <:Any, <:Any},
+                                       <:Any, <:Any, <:Any}, pr::AbstractPriorResult; rd = nothing, kwargs...)
 
 Constructs a norm-ball uncertainty set for covariance under the assumption of normally distributed returns, using a generic radius algorithm.
+
+This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing` (ADR 0138). Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
 
 **This route runs no simulation, so it serves every radius algorithm that reads no sample.** That is [`ChiSqKUncertaintyAlgorithm`](@ref), [`GeneralKUncertaintyAlgorithm`](@ref), and a plain number. Its sibling on [`NormalKUncertaintyAlgorithm`](@ref) draws the sample that the empirical radius needs, and builds the same map.
 
 # Algorithm
 
- 1. Fit the prior with `prior(ue.pe, X, F; dims = dims, kwargs...)`, giving `pr`, and read `sigma = pr.sigma`.
+ 1. Take the prior result `pr` the set is calibrated on, and read `sigma = pr.sigma`.
  2. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref), and build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
  3. Build the covariance shape `sigma_sigma` with [`sigma_asymptotic_cov`](@ref).
  4. Assemble and return the set with [`norm_ball_set`](@ref), passing `nothing` in place of a sample and `pr.sigma` as the centre.
 
 # Arguments
 
-  - `ue`: Normal uncertainty set estimator.
-  - `X`: Data matrix.
-  - `F`: Optional factor matrix. Used by the prior estimator.
-  - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the prior estimator.
+  - `ue`: Normal uncertainty set estimator with no prior of its own.
+  - `pr`: Fitted prior result the set is calibrated on.
+  - `rd`: Returns result the three-argument form passes beside the prior. Not read.
+  - `kwargs...`: Additional keyword arguments (ignored).
 
 # Returns
 
@@ -1589,12 +1636,11 @@ Constructs a norm-ball uncertainty set for covariance under the assumption of no
   - $(ref_dict[:cajas2025]) Equations 11.17 and 11.24.
   - $(ref_dict[:goldfarbiyengar2003]) Section 5.
 """
-function sigma_ucs(ue::NormalUncertaintySet{<:Any,
+function sigma_ucs(ue::NormalUncertaintySet{Nothing,
                                             <:NormBallUncertaintySetAlgorithm{<:Any, <:Any,
                                                                               <:Any}, <:Any,
-                                            <:Any, <:Any}, X::MatNum,
-                   F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
-    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
+                                            <:Any, <:Any}, pr::AbstractPriorResult;
+                   rd = nothing, kwargs...)
     sigma = pr.sigma
     T = choose_scaling_parameter(ue, pr)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)

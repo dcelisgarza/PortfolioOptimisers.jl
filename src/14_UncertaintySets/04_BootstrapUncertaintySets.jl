@@ -241,7 +241,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     ARCHUncertaintySet(;
-        pe::AbstractLowOrderPriorEstimator = EmpiricalPrior(),
+        pe::Option{<:AbstractLowOrderPriorEstimator} = EmpiricalPrior(),
         ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
         me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
         alg::AbstractUncertaintySetAlgorithm = BoxUncertaintySetAlgorithm(),
@@ -334,7 +334,7 @@ ARCHUncertaintySet
 """
 @concrete struct ARCHUncertaintySet <: BootstrapUncertaintySetEstimator
     """
-    $(field_dict[:pe])
+    $(field_dict[:pe_ucs])
     """
     pe
     """
@@ -377,7 +377,7 @@ ARCHUncertaintySet
     $(field_dict[:kwargs])
     """
     kwargs
-    function ARCHUncertaintySet(pe::AbstractLowOrderPriorEstimator,
+    function ARCHUncertaintySet(pe::Option{<:AbstractLowOrderPriorEstimator},
                                 ce::StatsBase.CovarianceEstimator,
                                 me::AbstractExpectedReturnsEstimator,
                                 alg::AbstractUncertaintySetAlgorithm, n_sim::Integer,
@@ -395,7 +395,8 @@ ARCHUncertaintySet
                                                       rng, seed, bootstrap, kwargs)
     end
 end
-function ARCHUncertaintySet(; pe::AbstractLowOrderPriorEstimator = EmpiricalPrior(),
+function ARCHUncertaintySet(;
+                            pe::Option{<:AbstractLowOrderPriorEstimator} = EmpiricalPrior(),
                             ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
                             me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                             alg::AbstractUncertaintySetAlgorithm = BoxUncertaintySetAlgorithm(),
@@ -538,12 +539,77 @@ function sigma_bootstrap_generator(ue::ARCHUncertaintySet, X::MatNum; kwargs...)
     end
     return sigmas
 end
+# A ARCHUncertaintySet with no prior of its own reads the prior result it is handed
+# (see [`reads_prior_result`](@ref)).
+function reads_prior_result(::ARCHUncertaintySet{Nothing})::Bool
+    return true
+end
 """
-    ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
-                               <:Any, <:Any, <:Any}, X::MatNum,
+    ucs(ue::ARCHUncertaintySet, X::MatNum,
         F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+    mu_ucs(ue::ARCHUncertaintySet, X::MatNum,
+           F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+    sigma_ucs(ue::ARCHUncertaintySet, X::MatNum,
+              F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+
+Fits an [`ARCHUncertaintySet`](@ref) from returns data, by fitting the set's own prior and calibrating the set on the result.
+
+These are the returns-data arms of the three verbs, and they are one method each whatever shape the set builds, because the shape is decided one call later. Each fits `ue.pe` once through [`ucs_prior`](@ref), which refuses a `pe` of `nothing` by name, and hands the result to the prior-result arm of the same verb on the same set with its `pe` set to `nothing`, which is where the box, the ellipsoid and the norm ball are dispatched (ADR 0138). The resample is drawn from the `X` that prior result carries, as it always was, so a set with a prior of its own is calibrated on that prior fitted on the returns it is handed, and on nothing else. The keyword arguments travel to both the prior fit and the resample estimators, as before.
+
+# Algorithm
+
+ 1. Fit the prior with [`ucs_prior`](@ref) on `ue.pe`, `X` and `F`, giving `pr`.
+ 2. Forward to the prior-result arm of the verb on the set with `pe = nothing`, which builds the set of the shape `ue.alg` names from `pr`.
+
+# Arguments
+
+  - `ue`: ARCH uncertainty set estimator.
+  - `X`: Data matrix.
+  - `F`: Optional factor matrix. Used by the prior estimator.
+  - $(arg_dict[:dims])
+  - `kwargs...`: Additional keyword arguments passed to the prior estimator, `ue.me` and `ue.ce`.
+
+# Validation
+
+  - `ue.pe` is not `nothing`. An `ArgumentError` naming the prior-result form is thrown otherwise.
+
+# Returns
+
+  - `mu_ucs::AbstractUncertaintySetResult`: Expected returns uncertainty set, from `mu_ucs`.
+  - `sigma_ucs::AbstractUncertaintySetResult`: Covariance uncertainty set, from `sigma_ucs`.
+  - `(mu_ucs, sigma_ucs)`: Both, from `ucs`.
+
+# Related
+
+  - [`ARCHUncertaintySet`](@ref)
+  - [`ucs_prior`](@ref)
+  - [`reads_prior_result`](@ref)
+  - [`BoxUncertaintySetAlgorithm`](@ref)
+  - [`EllipsoidalUncertaintySetAlgorithm`](@ref)
+  - [`NormBallUncertaintySetAlgorithm`](@ref)
+"""
+function ucs(ue::ARCHUncertaintySet, X::MatNum, F::Option{<:MatNum} = nothing;
+             dims::Int = 1, kwargs...)
+    pr = ucs_prior(ue.pe, X, F; dims = dims, kwargs...)
+    return ucs(Accessors.@set(ue.pe = nothing), pr; kwargs...)
+end
+function mu_ucs(ue::ARCHUncertaintySet, X::MatNum, F::Option{<:MatNum} = nothing;
+                dims::Int = 1, kwargs...)
+    pr = ucs_prior(ue.pe, X, F; dims = dims, kwargs...)
+    return mu_ucs(Accessors.@set(ue.pe = nothing), pr; kwargs...)
+end
+function sigma_ucs(ue::ARCHUncertaintySet, X::MatNum, F::Option{<:MatNum} = nothing;
+                   dims::Int = 1, kwargs...)
+    pr = ucs_prior(ue.pe, X, F; dims = dims, kwargs...)
+    return sigma_ucs(Accessors.@set(ue.pe = nothing), pr; kwargs...)
+end
+"""
+    ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
+                               <:Any, <:Any, <:Any}, pr::AbstractPriorResult; rd = nothing, kwargs...)
 
 Constructs box uncertainty sets for expected returns and covariance statistics using bootstrap resampling for time series data.
+
+This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing` (ADR 0138). Inside an optimiser `pr` is the prior the optimiser is solving on, so the centre is the objective's own and the resample is drawn from the rows that prior carries; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
 
 Both sets come from one pass over one index stream, so the mean and the covariance of a given simulation are read from the same resample. With `ue.seed` set, this method and the pair [`mu_ucs`](@ref) and [`sigma_ucs`](@ref) return the same bounds bit for bit, because [`resolve_rng`](@ref) restarts each call at the same place and all three walk one index stream. With `ue.seed` unset they do not: over 200 resamples of a 252-by-5 sample the mean lower bound moved by 5.31e-4 against a set width of 9.53e-3. So a caller who splits one [`ucs`](@ref) call into two calls to save work keeps the answer only while a seed is set.
 
@@ -574,7 +640,7 @@ Where:
 
 # Algorithm
 
- 1. Fit `ue.pe` on `X` and `F`, giving the prior `pr`. Its `pr.mu` and `pr.sigma` become the centre `val` of the two sets, and `pr.X` replaces `X` for the resampling.
+ 1. Take the prior result `pr` the set is calibrated on. Its `pr.mu` and `pr.sigma` become the centre `val` of the two sets, and `pr.X` is the matrix resampled, so under a Scenario Cap the carried rows are resampled.
  2. Draw the resampled statistics with [`bootstrap_generator`](@ref), giving `mus` and `sigmas` from one index stream.
  3. Halve `ue.q`, giving the tail mass `q` that each side of a bound takes.
  4. Read the element-wise quantiles of `mus` with `vec_quantile_bounds`, giving `mu_l` and `mu_u`.
@@ -584,10 +650,9 @@ Where:
 # Arguments
 
   - `ue`: ARCH uncertainty set estimator. `ue.pe` fits the centre `val` of both sets, and `ue.me` and `ue.ce` fit the bounds on the resamples, so the two need not agree.
-  - `X`: Data matrix to be resampled.
-  - `F`: Optional factor matrix. Used by the prior estimator.
-  - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the prior estimator.
+  - `pr`: Fitted prior result the set is calibrated on. `pr.X` is resampled.
+  - `rd`: Returns result the three-argument form passes beside the prior. Not read.
+  - `kwargs...`: Additional keyword arguments passed to `ue.me` and `ue.ce`.
 
 # Returns
 
@@ -602,10 +667,9 @@ Where:
   - [`mu_bootstrap_generator`](@ref)
   - [`sigma_bootstrap_generator`](@ref)
 """
-function ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:BoxUncertaintySetAlgorithm,
-                                    <:Any, <:Any, <:Any, <:Any, <:Any}, X::MatNum,
-             F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
-    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
+function ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any, <:BoxUncertaintySetAlgorithm,
+                                    <:Any, <:Any, <:Any, <:Any, <:Any},
+             pr::AbstractPriorResult; rd = nothing, kwargs...)
     X = pr.X
     N = size(X, 2)
     mus, sigmas = bootstrap_generator(ue, X; kwargs...)
@@ -617,11 +681,12 @@ function ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:BoxUncertaintySetAlgo
            BoxUncertaintySet(; lb = sigma_l, ub = sigma_u, val = pr.sigma)
 end
 """
-    mu_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
-                                  <:Any, <:Any, <:Any}, X::MatNum,
-           F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+    mu_ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
+                                  <:Any, <:Any, <:Any}, pr::AbstractPriorResult; rd = nothing, kwargs...)
 
 Constructs a box uncertainty set for expected returns using bootstrap resampling for time series data.
+
+This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing` (ADR 0138). Inside an optimiser `pr` is the prior the optimiser is solving on, so the centre is the objective's own and the resample is drawn from the rows that prior carries; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
 
 The method walks its own index stream. With `ue.seed` set it returns the same bounds as the mean half of [`ucs`](@ref), bit for bit, because [`resolve_rng`](@ref) restarts each call at the same place. With `ue.seed` unset it does not: over 200 resamples of a 252-by-5 sample the lower bound moved by 5.31e-4 against a set width of 9.53e-3.
 
@@ -643,7 +708,7 @@ Where:
 
 # Algorithm
 
- 1. Fit `ue.pe` on `X` and `F`, giving the prior `pr`. Its `pr.mu` becomes the centre `val`, and `pr.X` replaces `X` for the resampling.
+ 1. Take the prior result `pr` the set is calibrated on. Its `pr.mu` becomes the centre `val`, and `pr.X` is the matrix resampled, so under a Scenario Cap the carried rows are resampled.
  2. Draw the resampled means with [`mu_bootstrap_generator`](@ref), giving `mus`. No covariance is fitted here, so `ue.ce` is not read.
  3. Halve `ue.q`, giving the tail mass `q` that each side of a bound takes.
  4. Read the element-wise quantiles of `mus` with `vec_quantile_bounds`, giving `mu_l` and `mu_u`.
@@ -652,10 +717,9 @@ Where:
 # Arguments
 
   - `ue`: ARCH uncertainty set estimator. `ue.pe` fits the centre `val`, and `ue.me` fits the bounds on the resamples, so the two need not agree.
-  - `X`: Data matrix to be resampled.
-  - `F`: Optional factor matrix. Used by the prior estimator.
-  - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the prior estimator.
+  - `pr`: Fitted prior result the set is calibrated on. `pr.X` is resampled.
+  - `rd`: Returns result the three-argument form passes beside the prior. Not read.
+  - `kwargs...`: Additional keyword arguments passed to `ue.me`.
 
 # Returns
 
@@ -669,10 +733,9 @@ Where:
   - [`mu_bootstrap_generator`](@ref)
   - [`sigma_bootstrap_generator`](@ref)
 """
-function mu_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:BoxUncertaintySetAlgorithm,
-                                       <:Any, <:Any, <:Any, <:Any, <:Any}, X::MatNum,
-                F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
-    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
+function mu_ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any, <:BoxUncertaintySetAlgorithm,
+                                       <:Any, <:Any, <:Any, <:Any, <:Any},
+                pr::AbstractPriorResult; rd = nothing, kwargs...)
     X = pr.X
     mus = mu_bootstrap_generator(ue, X; kwargs...)
     q = ue.q * 0.5
@@ -680,11 +743,12 @@ function mu_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:BoxUncertaintySetA
     return BoxUncertaintySet(; lb = mu_l, ub = mu_u, val = pr.mu)
 end
 """
-    sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
-                                     <:Any, <:Any, <:Any}, X::MatNum,
-              F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+    sigma_ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
+                                     <:Any, <:Any, <:Any}, pr::AbstractPriorResult; rd = nothing, kwargs...)
 
 Constructs a box uncertainty set for covariance using bootstrap resampling for time series data.
+
+This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing` (ADR 0138). Inside an optimiser `pr` is the prior the optimiser is solving on, so the centre is the objective's own and the resample is drawn from the rows that prior carries; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
 
 The method walks its own index stream. With `ue.seed` set it returns the same bounds as the covariance half of [`ucs`](@ref), bit for bit, because [`resolve_rng`](@ref) restarts each call at the same place. With `ue.seed` unset it does not: over 200 resamples of a 252-by-5 sample the lower bound moved by 2.12e-5.
 
@@ -706,7 +770,7 @@ Where:
 
 # Algorithm
 
- 1. Fit `ue.pe` on `X` and `F`, giving the prior `pr`. Its `pr.sigma` becomes the centre `val`, and `pr.X` replaces `X` for the resampling.
+ 1. Take the prior result `pr` the set is calibrated on. Its `pr.sigma` becomes the centre `val`, and `pr.X` is the matrix resampled, so under a Scenario Cap the carried rows are resampled.
  2. Draw the resampled covariances with [`sigma_bootstrap_generator`](@ref), giving `sigmas`. No mean is fitted here, so `ue.me` is not read.
  3. Halve `ue.q`, giving the tail mass `q` that each side of a bound takes.
  4. Read the element-wise quantiles of `sigmas` with `box_quantile_bounds`, giving `sigma_l` and `sigma_u`.
@@ -715,10 +779,9 @@ Where:
 # Arguments
 
   - `ue`: ARCH uncertainty set estimator. `ue.pe` fits the centre `val`, and `ue.ce` fits the bounds on the resamples, so the two need not agree.
-  - `X`: Data matrix to be resampled.
-  - `F`: Optional factor matrix. Used by the prior estimator.
-  - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the prior estimator.
+  - `pr`: Fitted prior result the set is calibrated on. `pr.X` is resampled.
+  - `rd`: Returns result the three-argument form passes beside the prior. Not read.
+  - `kwargs...`: Additional keyword arguments passed to `ue.ce`.
 
 # Returns
 
@@ -732,10 +795,10 @@ Where:
   - [`mu_bootstrap_generator`](@ref)
   - [`sigma_bootstrap_generator`](@ref)
 """
-function sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:BoxUncertaintySetAlgorithm,
-                                          <:Any, <:Any, <:Any, <:Any, <:Any}, X::MatNum,
-                   F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
-    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
+function sigma_ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any,
+                                          <:BoxUncertaintySetAlgorithm, <:Any, <:Any, <:Any,
+                                          <:Any, <:Any}, pr::AbstractPriorResult;
+                   rd = nothing, kwargs...)
     X = pr.X
     N = size(X, 2)
     sigmas = sigma_bootstrap_generator(ue, X; kwargs...)
@@ -745,11 +808,12 @@ function sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:BoxUncertaintyS
     return BoxUncertaintySet(; lb = sigma_l, ub = sigma_u, val = pr.sigma)
 end
 """
-    ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:EllipsoidalUncertaintySetAlgorithm, <:Any, <:Any,
-                               <:Any, <:Any, <:Any}, X::MatNum,
-        F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+    ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any, <:EllipsoidalUncertaintySetAlgorithm, <:Any, <:Any,
+                               <:Any, <:Any, <:Any}, pr::AbstractPriorResult; rd = nothing, kwargs...)
 
 Constructs ellipsoidal uncertainty sets for expected returns and covariance statistics using bootstrap resampling for time series data.
+
+This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing` (ADR 0138). Inside an optimiser `pr` is the prior the optimiser is solving on, so the centre is the objective's own and the resample is drawn from the rows that prior carries; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
 
 Both sets come from one pass over one index stream. The shape matrices are the empirical covariances of the bootstrap deviations, fitted with `ue.ce`, so `ue.ce` fits the covariance axis twice: once inside every resample and once over the deviations of those resampled covariances. The mean axis reads it once, over the mean deviations alone. With `ue.seed` set, this method and the pair [`mu_ucs`](@ref) and [`sigma_ucs`](@ref) agree; with `ue.seed` unset they do not.
 
@@ -790,7 +854,7 @@ Where:
 
 # Algorithm
 
- 1. Fit `ue.pe` on `X` and `F`, giving the prior `pr`. Its `pr.mu` and `pr.sigma` become the centres of the two sets, and `pr.X` replaces `X` for the resampling.
+ 1. Take the prior result `pr` the set is calibrated on. Its `pr.mu` and `pr.sigma` become the centres of the two sets, and `pr.X` is the matrix resampled, so under a Scenario Cap the carried rows are resampled.
  2. Draw the resampled statistics with [`bootstrap_generator`](@ref), giving `mus` and `sigmas` from one index stream.
  3. Subtract `pr.mu` from each column of `mus`, and the vectorised `pr.sigma` from each slice of `sigmas`, giving the deviation matrices `X_mu` and `X_sigma`. Transpose both, so a row is one simulation.
  4. Fit `ue.ce` on `X_mu`, giving the shape matrix `sigma_mu`. This is the second reading of `ue.ce` on the covariance axis and the only one on the mean axis, so the shape matrices are empirical and no asymptotic formula enters.
@@ -800,10 +864,9 @@ Where:
 # Arguments
 
   - `ue`: ARCH uncertainty set estimator. `ue.ce` fits both the covariance of every resample and the shape matrix over the deviations, so it enters the covariance axis twice and the mean axis once. `ue.pe` fits the centres, and `ue.me` and `ue.ce` fit the spread, so the two need not agree.
-  - `X`: Data matrix to be resampled.
-  - `F`: Optional factor matrix. Used by the prior estimator.
-  - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the prior estimator.
+  - `pr`: Fitted prior result the set is calibrated on. `pr.X` is resampled.
+  - `rd`: Returns result the three-argument form passes beside the prior. Not read.
+  - `kwargs...`: Additional keyword arguments passed to `ue.me` and `ue.ce`.
 
 # Returns
 
@@ -818,11 +881,10 @@ Where:
   - [`mu_bootstrap_generator`](@ref)
   - [`sigma_bootstrap_generator`](@ref)
 """
-function ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any,
+function ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any,
                                     <:EllipsoidalUncertaintySetAlgorithm, <:Any, <:Any,
-                                    <:Any, <:Any, <:Any}, X::MatNum,
-             F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
-    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
+                                    <:Any, <:Any, <:Any}, pr::AbstractPriorResult;
+             rd = nothing, kwargs...)
     X = pr.X
     N = size(X, 2)
     mus, sigmas = bootstrap_generator(ue, X; kwargs...)
@@ -842,11 +904,12 @@ function ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any,
                            SigmaUncertaintySetClass(), pr.sigma)
 end
 """
-    mu_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:EllipsoidalUncertaintySetAlgorithm, <:Any, <:Any,
-                                  <:Any, <:Any, <:Any}, X::MatNum,
-           F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+    mu_ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any, <:EllipsoidalUncertaintySetAlgorithm, <:Any, <:Any,
+                                  <:Any, <:Any, <:Any}, pr::AbstractPriorResult; rd = nothing, kwargs...)
 
 Constructs an ellipsoidal uncertainty set for expected returns using bootstrap resampling for time series data.
+
+This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing` (ADR 0138). Inside an optimiser `pr` is the prior the optimiser is solving on, so the centre is the objective's own and the resample is drawn from the rows that prior carries; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
 
 The shape matrix is the empirical covariance of the bootstrap mean deviations, fitted with `ue.ce`, so `ue.ce` enters this axis once even though no covariance is fitted inside a resample. With `ue.seed` set the method returns the same set as the mean half of [`ucs`](@ref); with `ue.seed` unset it does not.
 
@@ -868,7 +931,7 @@ Where:
 
 # Algorithm
 
- 1. Fit `ue.pe` on `X` and `F`, giving the prior `pr`. Its `pr.mu` becomes the centre, and `pr.X` replaces `X` for the resampling.
+ 1. Take the prior result `pr` the set is calibrated on. Its `pr.mu` becomes the centre, and `pr.X` is the matrix resampled, so under a Scenario Cap the carried rows are resampled.
  2. Draw the resampled means with [`mu_bootstrap_generator`](@ref), giving `mus`.
  3. Subtract `pr.mu` from each column of `mus`, giving the deviation matrix `X_mu`. Transpose it, so a row is one simulation.
  4. Fit `ue.ce` on `X_mu`, giving the shape matrix `sigma_mu`. The shape is empirical and no asymptotic formula enters.
@@ -877,10 +940,9 @@ Where:
 # Arguments
 
   - `ue`: ARCH uncertainty set estimator. `ue.me` fits the mean of every resample, and `ue.ce` fits the shape matrix over the deviations.
-  - `X`: Data matrix to be resampled.
-  - `F`: Optional factor matrix. Used by the prior estimator.
-  - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the prior estimator.
+  - `pr`: Fitted prior result the set is calibrated on. `pr.X` is resampled.
+  - `rd`: Returns result the three-argument form passes beside the prior. Not read.
+  - `kwargs...`: Additional keyword arguments passed to `ue.me`.
 
 # Returns
 
@@ -894,11 +956,10 @@ Where:
   - [`mu_bootstrap_generator`](@ref)
   - [`sigma_bootstrap_generator`](@ref)
 """
-function mu_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any,
+function mu_ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any,
                                        <:EllipsoidalUncertaintySetAlgorithm, <:Any, <:Any,
-                                       <:Any, <:Any, <:Any}, X::MatNum,
-                F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
-    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
+                                       <:Any, <:Any, <:Any}, pr::AbstractPriorResult;
+                rd = nothing, kwargs...)
     X = pr.X
     N = size(X, 2)
     mus = mu_bootstrap_generator(ue, X; kwargs...)
@@ -912,11 +973,12 @@ function mu_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any,
                            MuUncertaintySetClass(), pr.mu)
 end
 """
-    sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:EllipsoidalUncertaintySetAlgorithm, <:Any, <:Any,
-                                     <:Any, <:Any, <:Any}, X::MatNum,
-              F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+    sigma_ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any, <:EllipsoidalUncertaintySetAlgorithm, <:Any, <:Any,
+                                     <:Any, <:Any, <:Any}, pr::AbstractPriorResult; rd = nothing, kwargs...)
 
 Constructs an ellipsoidal uncertainty set for covariance using bootstrap resampling for time series data.
+
+This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing` (ADR 0138). Inside an optimiser `pr` is the prior the optimiser is solving on, so the centre is the objective's own and the resample is drawn from the rows that prior carries; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
 
 The shape matrix is the empirical covariance of the bootstrap covariance deviations, fitted with `ue.ce`, so `ue.ce` enters this axis twice: once inside every resample and once over the deviations. Turning off its bias correction moves the resampled covariances by 0.397% over 252 observations and the shape matrix by 1.784% over 100 resamples. With `ue.seed` set the method returns the same set as the covariance half of [`ucs`](@ref); with `ue.seed` unset it does not.
 
@@ -938,7 +1000,7 @@ Where:
 
 # Algorithm
 
- 1. Fit `ue.pe` on `X` and `F`, giving the prior `pr`. Its `pr.sigma` becomes the centre, and `pr.X` replaces `X` for the resampling.
+ 1. Take the prior result `pr` the set is calibrated on. Its `pr.sigma` becomes the centre, and `pr.X` is the matrix resampled, so under a Scenario Cap the carried rows are resampled.
  2. Draw the resampled covariances with [`sigma_bootstrap_generator`](@ref), giving `sigmas`. This is the first reading of `ue.ce`.
  3. Subtract the vectorised `pr.sigma` from each slice of `sigmas`, giving the deviation matrix `X_sigma`. Transpose it, so a row is one simulation.
  4. Fit `ue.ce` on `X_sigma`, giving the shape matrix `sigma_sigma`. This is the second reading of `ue.ce`, and the shape is empirical rather than asymptotic.
@@ -947,10 +1009,9 @@ Where:
 # Arguments
 
   - `ue`: ARCH uncertainty set estimator. `ue.ce` fits both the covariance of every resample and the shape matrix over the deviations, so it enters this axis twice.
-  - `X`: Data matrix to be resampled.
-  - `F`: Optional factor matrix. Used by the prior estimator.
-  - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the prior estimator.
+  - `pr`: Fitted prior result the set is calibrated on. `pr.X` is resampled.
+  - `rd`: Returns result the three-argument form passes beside the prior. Not read.
+  - `kwargs...`: Additional keyword arguments passed to `ue.ce`.
 
 # Returns
 
@@ -964,11 +1025,10 @@ Where:
   - [`mu_bootstrap_generator`](@ref)
   - [`sigma_bootstrap_generator`](@ref)
 """
-function sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any,
+function sigma_ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any,
                                           <:EllipsoidalUncertaintySetAlgorithm, <:Any,
-                                          <:Any, <:Any, <:Any, <:Any}, X::MatNum,
-                   F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
-    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
+                                          <:Any, <:Any, <:Any, <:Any},
+                   pr::AbstractPriorResult; rd = nothing, kwargs...)
     X = pr.X
     N = size(X, 2)
     sigmas = sigma_bootstrap_generator(ue, X; kwargs...)
@@ -983,11 +1043,12 @@ function sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any,
 end
 
 """
-    ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:NormBallUncertaintySetAlgorithm, <:Any,
-                               <:Any, <:Any, <:Any, <:Any}, X::MatNum,
-        F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+    ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any, <:NormBallUncertaintySetAlgorithm, <:Any,
+                               <:Any, <:Any, <:Any, <:Any}, pr::AbstractPriorResult; rd = nothing, kwargs...)
 
 Constructs norm-ball uncertainty sets for expected returns and covariance statistics using bootstrap resampling for time series data.
+
+This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing` (ADR 0138). Inside an optimiser `pr` is the prior the optimiser is solving on, so the centre is the objective's own and the resample is drawn from the rows that prior carries; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
 
 **The bootstrap deviations are the geometry map, so this route builds no shape matrix.** The ellipsoidal sibling fits `ue.ce` on the deviations, which on the covariance axis is an ``N^{2} \\times N^{2}`` matrix of rank at most ``\\min(M - 1, N(N+1)/2)``, so it is rank deficient at every sample size and the default matrix processing repairs it. The map [`norm_ball_deviation_factor`](@ref) builds carries the same second moment exactly, at the rank the sample has, and `ue.ce` takes no part in it. `ue.ce` still fits the covariance of every resample, so it enters this axis once rather than twice. On the mean axis the map is of full rank once `ue.n_sim` exceeds ``N``, so the two shapes agree and the two sets reach the same weights.
 
@@ -1008,7 +1069,7 @@ Where:
 
 # Algorithm
 
- 1. Fit the prior with `prior(ue.pe, X, F; dims = dims, kwargs...)`, giving `pr`, and read `X = pr.X` and `N = size(X, 2)`.
+ 1. Take the prior result `pr` the set is calibrated on, and read `X = pr.X`, the matrix resampled, and `N = size(X, 2)`.
  2. Refit both statistics on every resample with [`bootstrap_generator`](@ref), giving `mus` and `sigmas` from one index stream.
  3. Subtract `pr.mu` from every resampled mean and `pr.sigma` from every resampled covariance, giving `X_mu` and `X_sigma`, one deviation per column.
  4. Assemble the two sets with [`norm_ball_deviation_set`](@ref) on the transposed deviations, and return them as a tuple, mean first.
@@ -1016,10 +1077,9 @@ Where:
 # Arguments
 
   - `ue`: ARCH uncertainty set estimator.
-  - `X`: Data matrix.
-  - `F`: Optional factor matrix. Used by the prior estimator.
-  - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the prior estimator, `ue.me` and `ue.ce`.
+  - `pr`: Fitted prior result the set is calibrated on. `pr.X` is resampled.
+  - `rd`: Returns result the three-argument form passes beside the prior. Not read.
+  - `kwargs...`: Additional keyword arguments passed to `ue.me` and `ue.ce`.
 
 # Returns
 
@@ -1041,10 +1101,10 @@ Where:
   - $(ref_dict[:bentalnemirovski1998]) Section 3, Equation 14.
   - $(ref_dict[:goldfarbiyengar2003]) Section 5.
 """
-function ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:NormBallUncertaintySetAlgorithm,
-                                    <:Any, <:Any, <:Any, <:Any, <:Any}, X::MatNum,
-             F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
-    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
+function ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any,
+                                    <:NormBallUncertaintySetAlgorithm, <:Any, <:Any, <:Any,
+                                    <:Any, <:Any}, pr::AbstractPriorResult; rd = nothing,
+             kwargs...)
     X = pr.X
     N = size(X, 2)
     mus, sigmas = bootstrap_generator(ue, X; kwargs...)
@@ -1060,17 +1120,18 @@ function ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:NormBallUncertaintySe
                                    SigmaUncertaintySetClass(), pr.sigma)
 end
 """
-    mu_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:NormBallUncertaintySetAlgorithm, <:Any,
-                                  <:Any, <:Any, <:Any, <:Any}, X::MatNum,
-           F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+    mu_ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any, <:NormBallUncertaintySetAlgorithm, <:Any,
+                                  <:Any, <:Any, <:Any, <:Any}, pr::AbstractPriorResult; rd = nothing, kwargs...)
 
 Constructs a norm-ball uncertainty set for expected returns using bootstrap resampling for time series data.
+
+This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing` (ADR 0138). Inside an optimiser `pr` is the prior the optimiser is solving on, so the centre is the objective's own and the resample is drawn from the rows that prior carries; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
 
 **The bootstrap deviations are the geometry map, so this route builds no shape matrix**, and `ue.ce` takes no part on this axis at all: the ellipsoidal sibling fits it on the mean deviations, and the map carries the same second moment without it. With `ue.seed` set the method sees the same resamples as the mean half of [`ucs`](@ref); with `ue.seed` unset it does not.
 
 # Algorithm
 
- 1. Fit the prior with `prior(ue.pe, X, F; dims = dims, kwargs...)`, giving `pr`, and read `X = pr.X` and `N = size(X, 2)`.
+ 1. Take the prior result `pr` the set is calibrated on, and read `X = pr.X`, the matrix resampled, and `N = size(X, 2)`.
  2. Refit the mean on every resample with [`mu_bootstrap_generator`](@ref), giving `mus`.
  3. Subtract `pr.mu` from every resampled mean, giving `X_mu`, one deviation per column.
  4. Assemble and return the set with [`norm_ball_deviation_set`](@ref) on the transposed deviations, with `pr.mu` as the centre.
@@ -1078,10 +1139,9 @@ Constructs a norm-ball uncertainty set for expected returns using bootstrap resa
 # Arguments
 
   - `ue`: ARCH uncertainty set estimator.
-  - `X`: Data matrix.
-  - `F`: Optional factor matrix. Used by the prior estimator.
-  - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the prior estimator and `ue.me`.
+  - `pr`: Fitted prior result the set is calibrated on. `pr.X` is resampled.
+  - `rd`: Returns result the three-argument form passes beside the prior. Not read.
+  - `kwargs...`: Additional keyword arguments passed to `ue.me`.
 
 # Returns
 
@@ -1101,11 +1161,10 @@ Constructs a norm-ball uncertainty set for expected returns using bootstrap resa
   - $(ref_dict[:bentalnemirovski1998]) Section 3, Equation 14.
   - $(ref_dict[:goldfarbiyengar2003]) Section 5.
 """
-function mu_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any,
+function mu_ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any,
                                        <:NormBallUncertaintySetAlgorithm, <:Any, <:Any,
-                                       <:Any, <:Any, <:Any}, X::MatNum,
-                F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
-    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
+                                       <:Any, <:Any, <:Any}, pr::AbstractPriorResult;
+                rd = nothing, kwargs...)
     X = pr.X
     N = size(X, 2)
     mus = mu_bootstrap_generator(ue, X; kwargs...)
@@ -1117,17 +1176,18 @@ function mu_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any,
                                    pr.mu)
 end
 """
-    sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:NormBallUncertaintySetAlgorithm,
-                                     <:Any, <:Any, <:Any, <:Any, <:Any}, X::MatNum,
-              F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+    sigma_ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any, <:NormBallUncertaintySetAlgorithm,
+                                     <:Any, <:Any, <:Any, <:Any, <:Any}, pr::AbstractPriorResult; rd = nothing, kwargs...)
 
 Constructs a norm-ball uncertainty set for covariance using bootstrap resampling for time series data.
+
+This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing` (ADR 0138). Inside an optimiser `pr` is the prior the optimiser is solving on, so the centre is the objective's own and the resample is drawn from the rows that prior carries; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
 
 **This is the one route of the library that bounds a covariance without a matrix of side ``N^{2}``.** The ellipsoidal sibling fits `ue.ce` on the ``M \\times N^{2}`` deviations, and its shape is rank deficient at **every** sample size, because a vectorised symmetric matrix spans only ``N(N+1)/2`` coordinates; the default matrix processing then repairs it into a matrix the sample never named, and the chi-squared radius reads ``N^{2}`` degrees of freedom where the errors have ``N(N+1)/2``. The map [`norm_ball_deviation_factor`](@ref) builds is the deviations themselves, scaled, so it carries the sample second moment exactly at rank ``\\min(M - 1, N(N+1)/2)``, and [`k_norm_ball`](@ref) reads that rank rather than the side of a shape.
 
 # Algorithm
 
- 1. Fit the prior with `prior(ue.pe, X, F; dims = dims, kwargs...)`, giving `pr`, and read `X = pr.X` and `N = size(X, 2)`.
+ 1. Take the prior result `pr` the set is calibrated on, and read `X = pr.X`, the matrix resampled, and `N = size(X, 2)`.
  2. Refit the covariance on every resample with [`sigma_bootstrap_generator`](@ref), giving `sigmas`.
  3. Subtract `pr.sigma` from every resampled covariance and vectorise, giving `X_sigma`, one deviation per column.
  4. Assemble and return the set with [`norm_ball_deviation_set`](@ref) on the transposed deviations, with `pr.sigma` as the centre.
@@ -1135,10 +1195,9 @@ Constructs a norm-ball uncertainty set for covariance using bootstrap resampling
 # Arguments
 
   - `ue`: ARCH uncertainty set estimator.
-  - `X`: Data matrix.
-  - `F`: Optional factor matrix. Used by the prior estimator.
-  - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the prior estimator and `ue.ce`.
+  - `pr`: Fitted prior result the set is calibrated on. `pr.X` is resampled.
+  - `rd`: Returns result the three-argument form passes beside the prior. Not read.
+  - `kwargs...`: Additional keyword arguments passed to `ue.ce`.
 
 # Returns
 
@@ -1158,11 +1217,10 @@ Constructs a norm-ball uncertainty set for covariance using bootstrap resampling
   - $(ref_dict[:bentalnemirovski1998]) Section 3, Equation 14.
   - $(ref_dict[:goldfarbiyengar2003]) Section 5.
 """
-function sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any,
+function sigma_ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any,
                                           <:NormBallUncertaintySetAlgorithm, <:Any, <:Any,
-                                          <:Any, <:Any, <:Any}, X::MatNum,
-                   F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
-    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
+                                          <:Any, <:Any, <:Any}, pr::AbstractPriorResult;
+                   rd = nothing, kwargs...)
     X = pr.X
     N = size(X, 2)
     sigmas = sigma_bootstrap_generator(ue, X; kwargs...)

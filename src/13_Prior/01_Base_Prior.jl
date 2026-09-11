@@ -1241,7 +1241,7 @@ LowOrderPrior
     """
     w
     """
-    $(field_dict[:ens])
+    $(field_dict[:ens_prior])
     """
     ens
     """
@@ -1737,6 +1737,39 @@ end
 function scenario_window(max_scenarios::Integer, X::MatNum)
     t = size(X, 1)
     return max_scenarios >= t ? X : view(X, (t - max_scenarios + 1):t, :)
+end
+"""
+    scenario_ens(::Nothing, X::MatNum)
+    scenario_ens(max_scenarios::Integer, X::MatNum)
+
+State the number of observations the moments of a capped Prior Result were fitted over, or `nothing` when the cap cuts nothing.
+
+The count a Scenario Cap owes its readers (ADR 0138). [`scenario_window`](@ref) cuts the rows the result carries and leaves `mu` and `sigma` fitted over every observation, so a consumer that prices a sample size off `size(pr.X, 1)` — an uncertainty set's `T`, a calibration rule's count — would read `w` rows for moments fitted over `t`, and mis-price every count by `t / w`. The result therefore states `t` in `ens` exactly when the cap cuts, and every count reader takes `ens` before the shape. When the cap does not cut, or there is no cap, the rows carried *are* the observations fitted over, and `ens` stays `nothing`, so a fit without a cap is bit-identical to what it was.
+
+It is the same verb in batch and at the folded read-out, as [`scenario_window`](@ref) is, and the two agree by construction: both read the same `t` off the same matrix.
+
+# Arguments
+
+  - `max_scenarios`: The number of observations carried, or `nothing`.
+  - `X`: Asset returns the moments were fitted over, `observations × assets`, **before** the cut.
+
+# Returns
+
+  - `ens::Option{<:Integer}`: `size(X, 1)` when `max_scenarios` cuts it, `nothing` otherwise.
+
+# Related
+
+  - [`scenario_window`](@ref)
+  - [`EmpiricalPrior`](@ref)
+  - [`LowOrderPrior`](@ref)
+  - [`effective_sample_size`](@ref)
+"""
+function scenario_ens(::Nothing, ::MatNum)
+    return nothing
+end
+function scenario_ens(max_scenarios::Integer, X::MatNum)
+    t = size(X, 1)
+    return max_scenarios >= t ? nothing : t
 end
 """
     scenario_fill_report(filled, ::Nothing)

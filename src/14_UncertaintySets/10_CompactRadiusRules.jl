@@ -39,7 +39,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Effective sample size behind a prior result, Kish's when the result carries observation weights.
 
-A weighted estimate carries the information of `sum(w)^2 / sum(w .^ 2)` equally weighted observations rather than of `size(pr.X, 1)` rows, and a rule that prices estimation error reads the former. This is the reading [`ConcentrationRadius`](@ref) already takes for the same reason.
+A weighted estimate carries the information of `sum(w)^2 / sum(w .^ 2)` equally weighted observations rather than of `size(pr.X, 1)` rows, and a rule that prices estimation error reads the former. This is the reading [`ConcentrationRadius`](@ref) already takes for the same reason, and it is [`effective_sample_size`](@ref) on the result's own weights, so a Scenario Cap's stated count is read here too (ADR 0138).
 
 # Arguments
 
@@ -47,7 +47,7 @@ A weighted estimate carries the information of `sum(w)^2 / sum(w .^ 2)` equally 
 
 # Returns
 
-  - `T::Number`: Kish's effective sample size when `pr.w` is set, and the raw row count otherwise.
+  - `T::Number`: Kish's effective sample size when `pr.w` is set, the count `pr.ens` states otherwise, and the raw row count when neither is set.
 
 # Related
 
@@ -55,8 +55,7 @@ A weighted estimate carries the information of `sum(w)^2 / sum(w .^ 2)` equally 
   - [`effective_sample_size`](@ref)
 """
 function compact_radius_sample_size(pr::AbstractPriorResult)
-    w = pr.w
-    return isnothing(w) ? size(pr.X, 1) : sum(w)^2 / sum(abs2, w)
+    return effective_sample_size(pr, pr.w)
 end
 """
 $(DocStringExtensions.TYPEDEF)

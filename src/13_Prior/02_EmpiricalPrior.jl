@@ -309,7 +309,7 @@ This method takes the **arithmetic** moments of `X` directly. It applies no log 
 
 # The scenario cap
 
-`pe.max_scenarios` cuts the returns matrix the result carries down to its last `max_scenarios` rows, through [`scenario_window`](@ref), and leaves `mu` and `sigma` fitted over every observation. The cut is taken **before** the fill, so the share the fill measures is the share of the window a consumer actually reads. A `max_scenarios` of `nothing`, the default, carries every row, and a cap at or above the number of observations is a `view` that copies nothing.
+`pe.max_scenarios` cuts the returns matrix the result carries down to its last `max_scenarios` rows, through [`scenario_window`](@ref), and leaves `mu` and `sigma` fitted over every observation. The cut is taken **before** the fill, so the share the fill measures is the share of the window a consumer actually reads. A `max_scenarios` of `nothing`, the default, carries every row, and a cap at or above the number of observations is a `view` that copies nothing. When the cap cuts, the result states the number of observations the moments were fitted over in `ens`, through [`scenario_ens`](@ref), so a consumer that prices a sample size reads that count and not the rows carried (ADR 0138); otherwise `ens` stays `nothing`.
 
 # The scenario fill
 
@@ -363,7 +363,7 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing, <:Any}, X::MatNum,
     # investable and its column still carries the gap. The fill is paid once, here, because
     # every consumer of the result reads that column (see [`scenario_fill`](@ref)).
     return LowOrderPrior(; X = scenario_fill(Xs, mu, sigma, strict, fill_limit), mu = mu,
-                         sigma = sigma)
+                         sigma = sigma, ens = scenario_ens(pe.max_scenarios, X))
 end
 """
     prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any}, X::MatNum,
@@ -413,11 +413,11 @@ The order of steps 5 to 7 is **not free**. Step 6 reads the `mu` that step 5 lef
  5. Overwrite `mu` with the exponential of the first closed form. This is the arithmetic mean **plus one**, because the subtraction is still to come.
  6. Overwrite `sigma` with the second closed form, whose ``\\hat{\\mu}_i + 1`` factors are the `mu` of step 5.
  7. Subtract one from `mu`, giving ``\\hat{\\boldsymbol{\\mu}}``.
- 8. Return a [`LowOrderPrior`](@ref) carrying the arithmetic `X` of step 1 under [`scenario_fill`](@ref), `mu` and `sigma`.
+ 8. Return a [`LowOrderPrior`](@ref) carrying the arithmetic `X` of step 1 under [`scenario_fill`](@ref), `mu`, `sigma`, and the `ens` of [`scenario_ens`](@ref).
 
 # The scenario cap
 
-`pe.max_scenarios` cuts the returns matrix the result carries down to its last `max_scenarios` rows, through [`scenario_window`](@ref), and leaves `mu` and `sigma` fitted over every observation. The cut is taken **before** the fill, so the share the fill measures is the share of the window a consumer actually reads. A `max_scenarios` of `nothing`, the default, carries every row, and a cap at or above the number of observations is a `view` that copies nothing.
+`pe.max_scenarios` cuts the returns matrix the result carries down to its last `max_scenarios` rows, through [`scenario_window`](@ref), and leaves `mu` and `sigma` fitted over every observation. The cut is taken **before** the fill, so the share the fill measures is the share of the window a consumer actually reads. A `max_scenarios` of `nothing`, the default, carries every row, and a cap at or above the number of observations is a `view` that copies nothing. When the cap cuts, the result states the number of observations the moments were fitted over in `ens`, through [`scenario_ens`](@ref), so a consumer that prices a sample size reads that count and not the rows carried (ADR 0138); otherwise `ens` stays `nothing`.
 
 # The scenario fill
 
@@ -465,7 +465,7 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any}, X::MatNum,
     # The fill is on the arithmetic `X` the caller handed in, and it is taken after step 7,
     # because the Investable Mask is read off the arithmetic moments the result carries.
     return LowOrderPrior(; X = scenario_fill(Xs, mu, sigma, strict, fill_limit), mu = mu,
-                         sigma = sigma)
+                         sigma = sigma, ens = scenario_ens(pe.max_scenarios, X))
 end
 
 function factor_residual_config(::EmpiricalPrior)

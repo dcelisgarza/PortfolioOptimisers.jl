@@ -323,4 +323,102 @@ assets is what keeps the JuMP families cheap.
         @test !(:cache in po.show_fields(EqualWeighted()))
         @test :cache in fieldnames(EqualWeighted)
     end
+    @testset "An uncertainty set on the seam: own `pe` refits from the buffer, `pe = nothing` reads the folded prior (#1015)" begin
+        # ADR 0138. No set takes a step. A set with its own `pe` is refitted over the
+        # reconstituted carrier at the read-out, bit-identical to batch because the carrier
+        # is; a set with `pe = nothing` is calibrated on the prior the optimiser is solving
+        # on, so it folds by composition through the one prior.
+        t = 80
+        b = rows(rd, 1:t)
+        feq(a, b) = typeof(a) == typeof(b) && all(fieldnames(typeof(a))) do f
+        x, y = getfield(a, f), getfield(b, f)
+        isa(x, po.AbstractUncertaintySetResult) ? feq(x, y) : isequal(x, y)
+    end
+        feq(a::Tuple, b::Tuple) = length(a) == length(b) && all(map(feq, a, b))
+        mk(pe, um, us) = MeanRisk(;
+                                  opt = JuMPOptimiser(; pe = pe, slv = slv,
+                                                      ret = ArithmeticReturn(; ucs = um)),
+                                  r = UncertaintySetVariance(; ucs = us))
+        own_m, own_s = DeltaUncertaintySet(), NormalUncertaintySet(; seed = 11,
+                                                                   n_sim = 200)
+        non_m = DeltaUncertaintySet(; pe = nothing)
+        non_s = NormalUncertaintySet(; pe = nothing, seed = 11, n_sim = 200)
+        own = mk(EmpiricalPrior(), own_m, own_s)
+        non = mk(EmpiricalPrior(), non_m, non_s)
+
+        @testset "Through the optimiser, the two configurations agree under an empirical prior" begin
+            # The set's own `pe` is the optimiser's prior, so the two fits are one fit.
+            @test isapprox(optimise(own, b).w, optimise(non, b).w; rtol = 1e-5)
+            # Under a factor prior they part: the prior-less set is centred on the factor
+            # prior's `mu`, the own-`pe` set on the empirical one, which is ADR 0050's
+            # example 11 without the hand-arranged `me`.
+            bf = rows(rdf, 1:t)
+            fpr = optimise(mk(FactorPrior(), non_m, non_s), bf).pr
+            @test mu_ucs(non_m, bf, fpr).val === fpr.mu
+            @test mu_ucs(own_m, bf, fpr).val == prior(EmpiricalPrior(), bf).mu
+            # An intercept regression reproduces the mean, so the two priors part on the
+            # covariance, which is what the variance set is calibrated on.
+            @test sigma_ucs(non_s, bf, fpr).val === fpr.sigma
+            @test !isapprox(fpr.sigma, prior(EmpiricalPrior(), bf).sigma)
+        end
+
+        @testset "After t steps, an own-pe set through the read-out is the batch set, bit for bit" begin
+            o = step(own, rd, t)
+            @test isapprox(optimise(o).w, optimise(own, b).w; atol = 1e-5)
+            # The read-out reconstitutes the carrier the set is fitted on, and the carrier
+            # is the batch carrier field by field, so the set is the batch set — the seeded
+            # bootstrap included, because `resolve_rng` restarts a private stream per fit.
+            rdp = po.returns_result(o)
+            # The batch carrier `b` is a view of `X`, and the reconstituted one is a
+            # `Matrix` of the same numbers; BLAS sums the two in different orders by an
+            # ulp, so the bit-for-bit identity is pinned against the materialised carrier
+            # and the view to a tolerance far below any solver's.
+            bm = ReturnsResult(; nx = nx, X = X[1:t, :], ts = ts[1:t])
+            @test rdp.X == bm.X == b.X
+            @test feq(ucs(own_s, rdp), ucs(own_s, bm))
+            @test feq(ucs(own_m, rdp), ucs(own_m, bm))
+            arch = ARCHUncertaintySet(; seed = 5, n_sim = 30)
+            @test feq(ucs(arch, rdp), ucs(arch, bm))
+            @test feq(mu_ucs(CharacteristicUncertaintySet(), rdp),
+                      mu_ucs(CharacteristicUncertaintySet(), bm))
+            @test isapprox(ucs(own_s, rdp)[2].ub, ucs(own_s, b)[2].ub; rtol = 1e-12)
+            @test isapprox(ucs(arch, rdp)[1].ub, ucs(arch, b)[1].ub; rtol = 1e-12)
+        end
+
+        @testset "After t steps, a prior-less set reads the folded prior, to the moment tolerance" begin
+            o = step(non, rd, t)
+            ro = optimise(o)
+            rb = optimise(non, b)
+            @test isapprox(ro.w, rb.w; atol = 1e-5)
+            # The prior the set is calibrated on is the folded one, which equals the batch
+            # one to the moments' own tolerance.
+            @test isapprox(ro.pr.mu, rb.pr.mu; rtol = 1e-10)
+            @test isapprox(ro.pr.sigma, rb.pr.sigma; rtol = 1e-10)
+            so, sb = ucs(non_s, ro.pr), ucs(non_s, rb.pr)
+            @test isapprox(so[1].ub, sb[1].ub; rtol = 1e-8)
+            @test isapprox(so[2].lb, sb[2].lb; rtol = 1e-8)
+            @test isapprox(so[2].ub, sb[2].ub; rtol = 1e-8)
+            @test so[1].val === ro.pr.mu
+            mo, mb = mu_ucs(non_m, ro.pr), mu_ucs(non_m, rb.pr)
+            @test isapprox(mo.ub, mb.ub; rtol = 1e-10)
+        end
+
+        @testset "Under a Scenario Cap both routes read ens = t" begin
+            w = 30
+            cap = mk(EmpiricalPrior(; max_scenarios = w), non_m, non_s)
+            rb = optimise(cap, b)
+            @test rb.pr.ens == t
+            @test size(rb.pr.X, 1) == w
+            ro = optimise(step(cap, rd, t))
+            @test ro.pr.ens == t
+            @test size(ro.pr.X, 1) == w
+            # The normal set's `T` is the count behind the moments, so the capped set is the
+            # uncapped set over the same observations.
+            @test po.choose_scaling_parameter(non_s, ro.pr) == t
+            unc = optimise(non, b).pr
+            @test isapprox(ucs(non_s, rb.pr)[1].ub, ucs(non_s, unc)[1].ub; rtol = 1e-10)
+            @test isapprox(ucs(non_s, ro.pr)[1].ub, ucs(non_s, unc)[1].ub; rtol = 1e-8)
+            @test isapprox(ro.w, rb.w; atol = 1e-5)
+        end
+    end
 end
