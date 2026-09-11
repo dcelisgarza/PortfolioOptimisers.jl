@@ -153,12 +153,43 @@ family that states no floor — the exponentially weighted one, which gates on a
 `nothing` keeps its meaning and names every fill, and an explicit `fill_limit` tighter than
 admission. In both, a long run repeats one notice per step, which is what the named-asset set stops.
 
-### A factor prior pairs two buffers
+### A factor matrix rides in the one buffer, and the estimator tree says whether it is read
 
-A prior that takes a factor matrix beside the returns buffers both, in a state holding one Sample
-Buffer for `X` and one for `F`. Every buffer operation is inherited from the single buffer and the
-two widths are checked independently. A wrapper's cap applies to both halves, because it windows the
-fit. The `AssetPanel` is not buffered: it is fold context, not sample.
+Whether a fit reads a factor matrix is a fact of the estimator **tree**, not of the host's type. No
+prior whose factor argument is optional reads it: `BlackLittermanPrior`, `HighOrderPriorEstimator`,
+`EntropyPoolingPrior`, `MeucciEntropyPoolingPrior` and `OpinionPoolingPrior` hand `F` to the prior
+they embed, `EmpiricalPrior` declares it and never reads it, and the cross-sectional prior builds its
+own factors off the panel. Only the five members that declare `F::MatNum` read it. So a "half-empty
+factor buffer" has no case that reads it, and the seam asks the tree instead
+([#1009](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1009)).
+
+`needs_factor_returns(pe)` answers by source shape, three ways: a member that requires factor
+returns answers `true`, a member that never reads them answers `false`, and a member whose factor
+argument is optional answers `nothing` — *the type does not say; take what the fold is given*, which
+is what its batch verb does. Each of the library's optional-argument members recurses into the prior
+it embeds, so it answers the leaf's value. A caller's own optional-argument subtype with no method
+behaves as its batch verb does.
+
+The factor observations ride **inside** the one Sample Buffer, as an optional backing beside the
+masks that share its rows, its offset and its cap; whether the buffer records them is fixed by the
+first append, and a mixture is refused in both directions, as it is for the masks. There is no
+second buffer type: a refit reads `prior(pe, X, F)` off one state when the state holds factor rows
+and `prior(pe, X)` otherwise, and the contemporaneity of the `t`-th rows is structural rather than
+asserted.
+
+The fold mirrors the batch verb's arity, `partial_fit!(pe, x, f = nothing)`, and the tree's answer
+decides what the fold does with `f`: `true` and no `f` is refused by name with the door's own
+refusal, before any row is appended; `false` drops `f`, as the batch verb drops it; `nothing`
+records it when it is given. The same answer replaces the shallow `isa` test at the five doors that
+check for a missing factor matrix — the prior's `ReturnsResult` door, the optimiser's step, and the
+three uncertainty-set doors — which also closes a batch defect: a factor leaf nested under an
+optional-argument host met a `MethodError` at the leaf rather than the named refusal written for
+it.
+
+`F` is owned once. The optimiser's Fold Context keeps the factor column only when the prior's tree
+answers `false`; otherwise the prior's buffer holds it and the read-out reads it back through the
+prior, as it reads the returns. A wrapper's cap applies to the factor rows as to the rest, because
+it windows the fit. The `AssetPanel` is not buffered: it is fold context, not sample.
 
 ## Considered options
 
@@ -183,11 +214,16 @@ member carries its own copy of `X`.
 
 - `EmpiricalPrior` gains `cache` and `max_scenarios`. `show_fields` renders the cap only where it is
   set, so no doctest moves.
-- Two state types join `SampleBufferState`: the carry state, and the factor pair.
+- One state type joins `SampleBufferState`: the carry state. The factor rows ride inside the
+  Sample Buffer as an optional backing, and `needs_factor_returns` is a per-type predicate of the
+  prior family, recursive through an embedded prior.
 - `PortfolioOptimisersCovariance` gains `partial_fit!`, a one-argument `cov` and one named refusal.
   Without them the default `EmpiricalPrior()` does not fold.
 - A capped fold-and-carry prior equals no batch fit. That divergence is documented, never tested,
   and it is the one hole in the map's batch-parity oracle.
 - The build is [#968](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/968), whose
   specification this ADR and the resolution of
-  [#704](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/704) carry together.
+  [#704](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/704) carry together. #968
+  built the factor rows as a second state type, a pair of buffers; the section above replaces
+  that on the ruling of [#1009](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1009),
+  and its build folds the pair into the one buffer.
