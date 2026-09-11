@@ -2,7 +2,7 @@
 
 ```@docs
 FactorRiskContributionResult
-factory(res::FactorRiskContributionResult, fb::Option{<:OptE_Opt})
+factory(res::FactorRiskContributionResult, fb::Option{<:OptE_Opt_FbChain})
 factor_risk_contribution_td_defaults
 Base.getproperty(r::FactorRiskContributionResult, sym::Symbol)
 FactorRiskContribution

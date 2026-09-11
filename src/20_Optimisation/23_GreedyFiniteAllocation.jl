@@ -18,7 +18,7 @@ $(DocStringExtensions.FIELDS)
         w::VecNum,
         cash::Number,
         fees::Number,
-        fb::Option{<:OptE_Opt}
+        fb::Option{<:FOptE_FOpt_FbChain}
     ) -> GreedyAllocationResult
 
 Keywords correspond to the struct's fields.
@@ -59,19 +59,19 @@ Keywords correspond to the struct's fields.
     """
     fees
     """
-    $(field_dict[:fb])
+    $(field_dict[:fb_res])
     """
     fb
     function GreedyAllocationResult(retcode::OptimisationReturnCode, shares::VecNum,
                                     cost::VecNum, w::VecNum, cash::Number, fees::Number,
-                                    fb::Option{<:OptE_Opt})
+                                    fb::Option{<:FOptE_FOpt_FbChain})
         return new{typeof(retcode), typeof(shares), typeof(cost), typeof(w), typeof(cash),
                    typeof(fees), typeof(fb)}(retcode, shares, cost, w, cash, fees, fb)
     end
 end
 function GreedyAllocationResult(; retcode::OptimisationReturnCode, shares::VecNum,
                                 cost::VecNum, w::VecNum, cash::Number, fees::Number,
-                                fb::Option{<:OptE_Opt})::GreedyAllocationResult
+                                fb::Option{<:FOptE_FOpt_FbChain})::GreedyAllocationResult
     return GreedyAllocationResult(retcode, shares, cost, w, cash, fees, fb)
 end
 """

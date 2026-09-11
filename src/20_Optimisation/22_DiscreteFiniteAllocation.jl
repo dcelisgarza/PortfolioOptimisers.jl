@@ -22,7 +22,7 @@ $(DocStringExtensions.FIELDS)
         fees::Number,
         s_model::Option{<:JuMP.Model},
         l_model::Option{<:JuMP.Model},
-        fb::Option{<:OptE_Opt}
+        fb::Option{<:FOptE_FOpt_FbChain}
     ) -> DiscreteAllocationResult
 
 Keywords correspond to the struct's fields.
@@ -79,7 +79,7 @@ Keywords correspond to the struct's fields.
     """
     l_model
     """
-    $(field_dict[:fb])
+    $(field_dict[:fb_res])
     """
     fb
     function DiscreteAllocationResult(retcode::OptimisationReturnCode,
@@ -87,7 +87,8 @@ Keywords correspond to the struct's fields.
                                       l_retcode::Option{<:OptimisationReturnCode},
                                       shares::VecNum, cost::VecNum, w::VecNum, cash::Number,
                                       fees::Number, s_model::Option{<:JuMP.Model},
-                                      l_model::Option{<:JuMP.Model}, fb::Option{<:OptE_Opt})
+                                      l_model::Option{<:JuMP.Model},
+                                      fb::Option{<:FOptE_FOpt_FbChain})
         return new{typeof(retcode), typeof(s_retcode), typeof(l_retcode), typeof(shares),
                    typeof(cost), typeof(w), typeof(cash), typeof(fees), typeof(s_model),
                    typeof(l_model), typeof(fb)}(retcode, s_retcode, l_retcode, shares, cost,
@@ -100,7 +101,7 @@ function DiscreteAllocationResult(; retcode::OptimisationReturnCode,
                                   shares::VecNum, cost::VecNum, w::VecNum, cash::Number,
                                   fees::Number, s_model::Option{<:JuMP.Model},
                                   l_model::Option{<:JuMP.Model},
-                                  fb::Option{<:OptE_Opt})::DiscreteAllocationResult
+                                  fb::Option{<:FOptE_FOpt_FbChain})::DiscreteAllocationResult
     return DiscreteAllocationResult(retcode, s_retcode, l_retcode, shares, cost, w, cash,
                                     fees, s_model, l_model, fb)
 end
@@ -515,10 +516,12 @@ function finite_sub_allocation(w::VecNum, p::VecNum, cash::Number, bgt::Number,
     else
         OptimisationFailure(; res = res.trials)
     end
-    xv = JuMP.value.(x)
-    # A fee larger than the cash makes the budget constraint infeasible, and an infeasible
-    # model holds no solution, so its values are not finite. `res` carries the failure, and
-    # the book is read as empty rather than raising on the conversion to `Int`.
+    # A solver that never ran (no optimiser attached, or `optimize!` threw) holds no values,
+    # and reading them raises `OptimizeNotCalled`; `has_values` is false there. A fee larger
+    # than the cash makes the budget constraint infeasible, and an infeasible model holds no
+    # solution, so its values are not finite. Either way `res` carries the failure, and the
+    # book is read as empty rather than raising, so the fallback chain can walk on.
+    xv = JuMP.has_values(model) ? JuMP.value.(x) : fill(NaN, N)
     shares = all(isfinite, xv) ? round.(Int, xv) : zeros(Int, N)
     cost = shares .* p
     aw = if any(!iszero, cost)

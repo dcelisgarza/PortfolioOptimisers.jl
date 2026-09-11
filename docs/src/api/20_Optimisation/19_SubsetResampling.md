@@ -3,7 +3,7 @@
 ```@docs
 BaseSubsetResamplingOptimisationEstimator
 SubsetResamplingResult
-factory(sr::SubsetResamplingResult, fb::Option{<:OptE_Opt})
+factory(sr::SubsetResamplingResult, fb::Option{<:OptE_Opt_FbChain})
 SubsetResampling
 needs_previous_weights(opt::SubsetResampling)
 is_time_dependent(opt::SubsetResampling)

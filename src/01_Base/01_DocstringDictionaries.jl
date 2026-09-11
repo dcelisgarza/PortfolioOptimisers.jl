@@ -535,6 +535,7 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :sol => "`sol`: Optimisation solution.",#
                                  :imsk => "`imsk`: The Investable Mask the optimisation reduced on: `true` at every asset whose prior moments were finite. It is `nothing` when every asset was investable, and that sentinel is what skips both the reduction and the expansion. [`investable_mask`](@ref) derives it once from the full-universe prior result, and the result carries it, because the reduced prior can no longer yield it.",#
                                  :fb => "`fb`: Fallback result or estimator.",#
+                                 :fb_res => "`fb`: The fallback chain that answered this result: the `(estimator, result)` pair of every attempt [`optimise`](@ref) made before this one, in the order they ran, or `nothing` when the estimator it was asked of answered (see [`FbChain`](@ref)).",#
                                  # Optimiser fields.
                                  :opt_jmp => "`opt`: `JuMP` optimiser configuration.",#
                                  :r_opt => "`r`: Risk measure or vector of risk measures.",#

@@ -433,3 +433,24 @@ end
                                                                             imsk = falses(4))
     end
 end
+@testset "A finite allocation records the fallback chain that answered it (#1024)" begin
+    using PortfolioOptimisers, Test
+    PO = PortfolioOptimisers
+    fai = FiniteAllocationInput(; w = [0.6, 0.4], prices = [10.0, 20.0], cash = 1000.0)
+    # A solver-less discrete allocation fails, and the greedy default answers: the answer
+    # carries the `(estimator, result)` pair of the failure.
+    da = DiscreteAllocation(; slv = Solver(; name = :none, solver = nothing))
+    res = optimise(da, fai)
+    @test isa(res, GreedyAllocationResult)
+    @test isa(res.retcode, OptimisationSuccess)
+    @test isa(res.fb, PO.FbChain)
+    @test length(res.fb) == 1
+    @test res.fb[1][1] === da
+    @test isa(res.fb[1][2], DiscreteAllocationResult)
+    @test isa(res.fb[1][2].retcode, OptimisationFailure)
+    @test isnothing(res.fb[1][2].fb)
+    # A finite result's `fb` admits a finite fallback estimator, which is what the finite
+    # rebuild takes; it was bound to the continuous alias before.
+    @test PO.factory(res, GreedyAllocation()).fb == GreedyAllocation()
+    @test isnothing(PO.factory(res, nothing).fb)
+end

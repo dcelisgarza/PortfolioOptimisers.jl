@@ -300,7 +300,7 @@ Property access delegates to the embedded [`JuMPOptimisationResult`](@ref); unkn
         jr::JuMPOptimisationResult,
         prb::Union{ProcessedAssetRiskBudgetingAttributes,
                    ProcessedFactorRiskBudgetingAttributes},
-        fb::Option{<:OptE_Opt}
+        fb::Option{<:OptE_Opt_FbChain}
     ) -> RelaxedRiskBudgetingResult
 
 Keywords correspond to the struct's fields.
@@ -322,20 +322,20 @@ Keywords correspond to the struct's fields.
     """
     prb
     """
-    $(field_dict[:fb])
+    $(field_dict[:fb_res])
     """
     fb
     function RelaxedRiskBudgetingResult(jr::JuMPOptimisationResult,
                                         prb::Union{ProcessedAssetRiskBudgetingAttributes,
                                                    ProcessedFactorRiskBudgetingAttributes},
-                                        fb::Option{<:OptE_Opt})
+                                        fb::Option{<:OptE_Opt_FbChain})
         return new{typeof(jr), typeof(prb), typeof(fb)}(jr, prb, fb)
     end
 end
 function RelaxedRiskBudgetingResult(; jr::JuMPOptimisationResult,
                                     prb::Union{ProcessedAssetRiskBudgetingAttributes,
                                                ProcessedFactorRiskBudgetingAttributes},
-                                    fb::Option{<:OptE_Opt})::RelaxedRiskBudgetingResult
+                                    fb::Option{<:OptE_Opt_FbChain})::RelaxedRiskBudgetingResult
     return RelaxedRiskBudgetingResult(jr, prb, fb)
 end
 """

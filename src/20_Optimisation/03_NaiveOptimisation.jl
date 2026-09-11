@@ -142,7 +142,7 @@ $(DocStringExtensions.FIELDS)
     NaiveOptimisationResult(;
         pr::Option{<:Pr_RR},
         wb::Option{<:WeightBounds}, retcode::OptimisationReturnCode, w::Option{<:VecNum},
-        imsk::Option{<:BitVector} = nothing, fb::Option{<:OptE_Opt}
+        imsk::Option{<:BitVector} = nothing, fb::Option{<:OptE_Opt_FbChain}
     ) -> NaiveOptimisationResult
 
 Keywords correspond to the struct's fields. The keyword constructor expands `w` onto the full asset universe through [`expand_investable_weights`](@ref), which is the one door [`_optimise`](@ref) exits through. The positional constructor never expands.
@@ -192,12 +192,13 @@ NaiveOptimisationResult
     """
     imsk
     """
-    $(field_dict[:fb])
+    $(field_dict[:fb_res])
     """
     fb
     function NaiveOptimisationResult(pr::Option{<:Pr_RR}, wb::Option{<:WeightBounds},
                                      retcode::OptimisationReturnCode, w::Option{<:VecNum},
-                                     imsk::Option{<:BitVector}, fb::Option{<:OptE_Opt})
+                                     imsk::Option{<:BitVector},
+                                     fb::Option{<:OptE_Opt_FbChain})
         return new{typeof(pr), typeof(wb), typeof(retcode), typeof(w), typeof(imsk),
                    typeof(fb)}(pr, wb, retcode, w, imsk, fb)
     end
@@ -205,7 +206,7 @@ end
 function NaiveOptimisationResult(; pr::Option{<:Pr_RR}, wb::Option{<:WeightBounds},
                                  retcode::OptimisationReturnCode, w::Option{<:VecNum},
                                  imsk::Option{<:BitVector} = nothing,
-                                 fb::Option{<:OptE_Opt})::NaiveOptimisationResult
+                                 fb::Option{<:OptE_Opt_FbChain})::NaiveOptimisationResult
     return NaiveOptimisationResult(pr, wb, retcode, expand_investable_weights(imsk, w),
                                    imsk, fb)
 end

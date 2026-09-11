@@ -2,7 +2,7 @@
 
 ```@docs
 NestedClusteredResult
-factory(res::NestedClusteredResult, fb::Option{<:OptE_Opt})
+factory(res::NestedClusteredResult, fb::Option{<:OptE_Opt_FbChain})
 NestedClustered
 nested_clustered_td_defaults
 factory(nco::NestedClustered, w::AbstractVector)

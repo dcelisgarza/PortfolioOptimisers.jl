@@ -52,6 +52,18 @@ Matches either a [`FiniteAllocationOptimisationEstimator`](@ref) or a [`FiniteAl
 const FOptE_FOpt = Union{<:FiniteAllocationOptimisationEstimator,
                          <:FiniteAllocationOptimisationResult}
 """
+    const FOptE_FOpt_FbChain = Union{<:FOptE_FOpt, <:FbChain}
+
+Alias for what the `fb` field of a finite allocation result admits: a fallback finite allocation estimator or precomputed result ([`FOptE_FOpt`](@ref)), or the fallback chain that answered the result ([`FbChain`](@ref)).
+
+# Related
+
+  - [`FOptE_FOpt`](@ref)
+  - [`FbChain`](@ref)
+  - [`FiniteAllocationOptimisationResult`](@ref)
+"""
+const FOptE_FOpt_FbChain = Union{<:FOptE_FOpt, <:FbChain}
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Problem data fed to a finite allocation optimiser.
@@ -246,18 +258,18 @@ function allocation_horizon(res::NonFiniteAllocationOptimisationResult,
     return horizon
 end
 """
-    factory(res::FiniteAllocationOptimisationResult, fb::Option{<:FOptE_FOpt})
+    factory(res::FiniteAllocationOptimisationResult, fb::Option{<:FOptE_FOpt_FbChain})
 
-Rebuild a finite allocation result with an updated fallback optimiser `fb`.
+Rebuild a finite allocation result with an updated fallback record `fb`.
 
-Like the continuous-result generic, every finite allocation result carries `fb` as its last field, so the rebuild copies all fields unchanged except the trailing `fb`. Concrete result types may override this method when rebuilding requires more than swapping `fb`.
+Like the continuous-result generic, every finite allocation result carries `fb` as its last field, so the rebuild copies all fields unchanged except the trailing `fb`. Concrete result types may override this method when rebuilding requires more than swapping `fb`. [`optimise`](@ref) is the one caller, and it hands in the [`FbChain`](@ref) it walked.
 
 # Related
 
-  - [`FOptE_FOpt`](@ref)
+  - [`FOptE_FOpt_FbChain`](@ref)
   - [`FiniteAllocationOptimisationResult`](@ref)
 """
-function factory(res::FiniteAllocationOptimisationResult, fb::Option{<:FOptE_FOpt})
+function factory(res::FiniteAllocationOptimisationResult, fb::Option{<:FOptE_FOpt_FbChain})
     flds = ntuple(i -> getfield(res, i), Val(fieldcount(typeof(res))))
     return (typeof(res).name.wrapper)(Base.front(flds)..., fb)
 end

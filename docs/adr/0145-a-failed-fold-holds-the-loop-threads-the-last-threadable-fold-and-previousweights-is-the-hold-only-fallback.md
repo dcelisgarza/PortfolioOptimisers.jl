@@ -154,8 +154,9 @@ the weight bounds** was rejected because a hold that is rewritten is no longer a
 - A walk-forward with a failed fold and a previous-weights term now runs to the end where it
   threw; the folds after the failure read the last solved fold's weights, or the held book under
   a source. No released number moves for a run with no failed fold.
-- The `fb` record on a result is `nothing` after a chain walks, for every fallback: `optimise`
-  hands `factory(res, fb)` a vector of `(estimator, result)` pairs, and every result type bounds
-  `fb` to `Option{<:OptE_Opt}`, so the generic identity factory runs. Found while testing the
-  leaf; it is pre-existing and filed as
-  [#1024](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1024).
+- The `fb` record on a result was `nothing` after a chain walked, for every fallback: `optimise`
+  hands `factory(res, fb)` a vector of `(estimator, result)` pairs, and every result type bound
+  `fb` to `Option{<:OptE_Opt}`, so the generic identity factory ran. Found while testing the
+  leaf; it was pre-existing, filed as
+  [#1024](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1024), and fixed there by
+  widening the bound to `Option{<:OptE_Opt_FbChain}` (ADR 0011, amendment of 2026-09-11).

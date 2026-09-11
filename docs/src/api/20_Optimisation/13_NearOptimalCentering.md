@@ -5,7 +5,7 @@ NearOptimalCenteringAlgorithm
 ConstrainedNearOptimalCentering
 UnconstrainedNearOptimalCentering
 NearOptimalCenteringResult
-factory(res::NearOptimalCenteringResult, fb::Option{<:OptE_Opt})
+factory(res::NearOptimalCenteringResult, fb::Option{<:OptE_Opt_FbChain})
 Base.getproperty(r::NearOptimalCenteringResult, sym::Symbol)
 NearOptimalSetup
 NearOptimalCentering

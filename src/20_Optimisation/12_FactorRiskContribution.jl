@@ -13,7 +13,7 @@ Property access delegates to the embedded [`JuMPOptimisationResult`](@ref); unkn
 
     FactorRiskContributionResult(;
         jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM, rr::AbstractLoadingsRegressionResult,
-        frc_plr::Option{<:AbstractPhylogenyConstraintResult}, fb::Option{<:OptE_Opt}
+        frc_plr::Option{<:AbstractPhylogenyConstraintResult}, fb::Option{<:OptE_Opt_FbChain}
     ) -> FactorRiskContributionResult
 
 Keywords correspond to the struct's fields.
@@ -42,13 +42,13 @@ Keywords correspond to the struct's fields.
     """
     frc_plr
     """
-    $(field_dict[:fb])
+    $(field_dict[:fb_res])
     """
     fb
     function FactorRiskContributionResult(jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM,
                                           rr::AbstractLoadingsRegressionResult,
                                           frc_plr::Option{<:AbstractPhylogenyConstraintResult},
-                                          fb::Option{<:OptE_Opt})
+                                          fb::Option{<:OptE_Opt_FbChain})
         return new{typeof(jr), typeof(r), typeof(rr), typeof(frc_plr), typeof(fb)}(jr, r,
                                                                                    rr,
                                                                                    frc_plr,
@@ -58,7 +58,7 @@ end
 function FactorRiskContributionResult(; jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM,
                                       rr::AbstractLoadingsRegressionResult,
                                       frc_plr::Option{<:AbstractPhylogenyConstraintResult},
-                                      fb::Option{<:OptE_Opt})::FactorRiskContributionResult
+                                      fb::Option{<:OptE_Opt_FbChain})::FactorRiskContributionResult
     return FactorRiskContributionResult(jr, r, rr, frc_plr, fb)
 end
 """

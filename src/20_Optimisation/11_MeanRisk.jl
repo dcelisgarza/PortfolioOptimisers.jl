@@ -12,7 +12,7 @@ Property access delegates to the embedded [`JuMPOptimisationResult`](@ref): the 
 # Constructors
 
     MeanRiskResult(;
-        jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM, fb::Option{<:OptE_Opt}
+        jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM, fb::Option{<:OptE_Opt_FbChain}
     ) -> MeanRiskResult
 
 Keywords correspond to the struct's fields.
@@ -33,16 +33,16 @@ Keywords correspond to the struct's fields.
     """
     r
     """
-    $(field_dict[:fb])
+    $(field_dict[:fb_res])
     """
     fb
     function MeanRiskResult(jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM,
-                            fb::Option{<:OptE_Opt})
+                            fb::Option{<:OptE_Opt_FbChain})
         return new{typeof(jr), typeof(r), typeof(fb)}(jr, r, fb)
     end
 end
 function MeanRiskResult(; jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM,
-                        fb::Option{<:OptE_Opt})::MeanRiskResult
+                        fb::Option{<:OptE_Opt_FbChain})::MeanRiskResult
     return MeanRiskResult(jr, r, fb)
 end
 """

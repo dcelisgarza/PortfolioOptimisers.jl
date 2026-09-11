@@ -41,7 +41,7 @@ $(DocStringExtensions.FIELDS)
         retcode::OptRetCode_VecOptRetCode,
         w::VecNum_VecVecNum,
         imsk::Option{<:BitVector} = nothing,
-        fb::Option{<:OptE_Opt}
+        fb::Option{<:OptE_Opt_FbChain}
     ) -> SubsetResamplingResult
 
 Keywords correspond to the struct's fields. The keyword constructor expands `w` onto the full asset universe through [`expand_investable_weights`](@ref), which is the one door [`_optimise`](@ref) exits through. The positional constructor never expands, so [`set_retcode`](@ref) and [`factory`](@ref) rebuild without a second pass.
@@ -91,7 +91,7 @@ Keywords correspond to the struct's fields. The keyword constructor expands `w` 
     """
     imsk
     """
-    $(field_dict[:fb])
+    $(field_dict[:fb_res])
     """
     fb
     function SubsetResamplingResult(pr::Option{<:AbstractPriorResult},
@@ -99,7 +99,7 @@ Keywords correspond to the struct's fields. The keyword constructor expands `w` 
                                     ress::AbstractVector{<:NonFiniteAllocationOptimisationResult},
                                     idx::MatNum, retcode::OptRetCode_VecOptRetCode,
                                     w::VecNum_VecVecNum, imsk::Option{<:BitVector},
-                                    fb::Option{<:OptE_Opt})
+                                    fb::Option{<:OptE_Opt_FbChain})
         return new{typeof(pr), typeof(wb), typeof(fees), typeof(ress), typeof(idx),
                    typeof(retcode), typeof(w), typeof(imsk), typeof(fb)}(pr, wb, fees, ress,
                                                                          idx, retcode, w,
@@ -111,7 +111,7 @@ function SubsetResamplingResult(; pr::Option{<:AbstractPriorResult},
                                 ress::AbstractVector{<:NonFiniteAllocationOptimisationResult},
                                 idx::MatNum, retcode::OptRetCode_VecOptRetCode,
                                 w::VecNum_VecVecNum, imsk::Option{<:BitVector} = nothing,
-                                fb::Option{<:OptE_Opt})::SubsetResamplingResult
+                                fb::Option{<:OptE_Opt_FbChain})::SubsetResamplingResult
     return SubsetResamplingResult(pr, wb, fees, ress, idx, retcode,
                                   expand_investable_weights(imsk, w), imsk, fb)
 end
@@ -151,7 +151,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Rebuild a [`SubsetResamplingResult`](@ref) with an updated fallback optimiser `fb`.
 """
-function factory(sr::SubsetResamplingResult, fb::Option{<:OptE_Opt})
+function factory(sr::SubsetResamplingResult, fb::Option{<:OptE_Opt_FbChain})
     # The positional constructor, because `sr.w` is already on the full asset universe: the
     # keyword one expands, and a second pass over an expanded vector is a length error.
     return SubsetResamplingResult(sr.pr, sr.wb, sr.fees, sr.ress, sr.idx, sr.retcode, sr.w,

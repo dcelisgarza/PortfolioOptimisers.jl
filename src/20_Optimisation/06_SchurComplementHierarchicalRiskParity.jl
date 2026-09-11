@@ -44,7 +44,7 @@ It carries **no scalariser**, because it carries no vector of measures to combin
         retcode::OptimisationReturnCode,
         w::Option{<:VecNum},
         imsk::Option{<:BitVector} = nothing,
-        fb::Option{<:OptE_Opt}
+        fb::Option{<:OptE_Opt_FbChain}
     ) -> SchurComplementHierarchicalRiskParityResult
 
 Keywords correspond to the struct's fields.
@@ -94,7 +94,7 @@ The keyword constructor is the one door `_optimise` exits through, so it is wher
     """
     imsk
     """
-    $(field_dict[:fb])
+    $(field_dict[:fb_res])
     """
     fb
     function SchurComplementHierarchicalRiskParityResult(pr::Option{<:AbstractPriorResult},
@@ -105,7 +105,7 @@ The keyword constructor is the one door `_optimise` exits through, so it is wher
                                                          retcode::OptimisationReturnCode,
                                                          w::Option{<:VecNum},
                                                          imsk::Option{<:BitVector},
-                                                         fb::Option{<:OptE_Opt})
+                                                         fb::Option{<:OptE_Opt_FbChain})
         return new{typeof(pr), typeof(wb), typeof(clr), typeof(r), typeof(gamma),
                    typeof(retcode), typeof(w), typeof(imsk), typeof(fb)}(pr, wb, clr, r,
                                                                          gamma, retcode, w,
@@ -120,7 +120,7 @@ function SchurComplementHierarchicalRiskParityResult(; pr::Option{<:AbstractPrio
                                                      retcode::OptimisationReturnCode,
                                                      w::Option{<:VecNum},
                                                      imsk::Option{<:BitVector} = nothing,
-                                                     fb::Option{<:OptE_Opt})::SchurComplementHierarchicalRiskParityResult
+                                                     fb::Option{<:OptE_Opt_FbChain})::SchurComplementHierarchicalRiskParityResult
     return SchurComplementHierarchicalRiskParityResult(pr, wb, clr, r, gamma, retcode,
                                                        expand_investable_weights(imsk, w),
                                                        imsk, fb)

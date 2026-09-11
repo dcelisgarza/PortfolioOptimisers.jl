@@ -2,7 +2,7 @@
 
 ```@docs
 RiskBudgetingResult
-factory(res::RiskBudgetingResult, fb::Option{<:OptE_Opt})
+factory(res::RiskBudgetingResult, fb::Option{<:OptE_Opt_FbChain})
 risk_budgeting_td_defaults
 Base.getproperty(r::RiskBudgetingResult, sym::Symbol)
 ProcessedRiskBudgetingAttributes

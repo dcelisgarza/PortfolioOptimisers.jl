@@ -22,7 +22,7 @@ $(DocStringExtensions.FIELDS)
         retcode::OptRetCode_VecOptRetCode,
         w::VecNum_VecVecNum,
         imsk::Option{<:BitVector} = nothing,
-        fb::Option{<:OptE_Opt}
+        fb::Option{<:OptE_Opt_FbChain}
     ) -> NestedClusteredResult
 
 Keywords correspond to the struct's fields.
@@ -85,7 +85,7 @@ The keyword constructor is the one door `_optimise` exits through, so it is wher
     """
     imsk
     """
-    $(field_dict[:fb])
+    $(field_dict[:fb_res])
     """
     fb
     function NestedClusteredResult(pr::Option{<:AbstractPriorResult},
@@ -95,7 +95,8 @@ The keyword constructor is the one door `_optimise` exits through, so it is wher
                                    reso::OptimisationResult,
                                    cv::Option{<:OptimisationCrossValidation},
                                    retcode::OptRetCode_VecOptRetCode, w::VecNum_VecVecNum,
-                                   imsk::Option{<:BitVector}, fb::Option{<:OptE_Opt})
+                                   imsk::Option{<:BitVector},
+                                   fb::Option{<:OptE_Opt_FbChain})
         return new{typeof(pr), typeof(clr), typeof(wb), typeof(fees), typeof(resi),
                    typeof(reso), typeof(cv), typeof(retcode), typeof(w), typeof(imsk),
                    typeof(fb)}(pr, clr, wb, fees, resi, reso, cv, retcode, w, imsk, fb)
@@ -109,7 +110,7 @@ function NestedClusteredResult(; pr::Option{<:AbstractPriorResult},
                                cv::Option{<:OptimisationCrossValidation},
                                retcode::OptRetCode_VecOptRetCode, w::VecNum_VecVecNum,
                                imsk::Option{<:BitVector} = nothing,
-                               fb::Option{<:OptE_Opt})::NestedClusteredResult
+                               fb::Option{<:OptE_Opt_FbChain})::NestedClusteredResult
     return NestedClusteredResult(pr, clr, wb, fees, resi, reso, cv, retcode,
                                  expand_investable_weights(imsk, w), imsk, fb)
 end

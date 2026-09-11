@@ -39,7 +39,7 @@ $(DocStringExtensions.FIELDS)
         retcode::OptRetCode_VecOptRetCode,
         w::VecNum_VecVecNum,
         imsk::Option{<:BitVector} = nothing,
-        fb::Option{<:OptE_Opt}
+        fb::Option{<:OptE_Opt_FbChain}
     ) -> StackingResult
 
 Keywords correspond to the struct's fields. The keyword constructor expands `w` onto the full asset universe through [`expand_investable_weights`](@ref), which is the one door [`_optimise`](@ref) exits through. The positional constructor never expands, so [`set_retcode`](@ref) and [`factory`](@ref) rebuild without a second pass.
@@ -94,7 +94,7 @@ Keywords correspond to the struct's fields. The keyword constructor expands `w` 
     """
     imsk
     """
-    $(field_dict[:fb])
+    $(field_dict[:fb_res])
     """
     fb
     function StackingResult(pr::Option{<:AbstractPriorResult}, wb::Option{<:WeightBounds},
@@ -103,7 +103,7 @@ Keywords correspond to the struct's fields. The keyword constructor expands `w` 
                             reso::OptimisationResult,
                             cv::Option{<:OptimisationCrossValidation},
                             retcode::OptRetCode_VecOptRetCode, w::VecNum_VecVecNum,
-                            imsk::Option{<:BitVector}, fb::Option{<:OptE_Opt})
+                            imsk::Option{<:BitVector}, fb::Option{<:OptE_Opt_FbChain})
         return new{typeof(pr), typeof(wb), typeof(fees), typeof(resi), typeof(reso),
                    typeof(cv), typeof(retcode), typeof(w), typeof(imsk), typeof(fb)}(pr, wb,
                                                                                      fees,
@@ -122,7 +122,7 @@ function StackingResult(; pr::Option{<:AbstractPriorResult}, wb::Option{<:Weight
                         reso::OptimisationResult, cv::Option{<:OptimisationCrossValidation},
                         retcode::OptRetCode_VecOptRetCode, w::VecNum_VecVecNum,
                         imsk::Option{<:BitVector} = nothing,
-                        fb::Option{<:OptE_Opt})::StackingResult
+                        fb::Option{<:OptE_Opt_FbChain})::StackingResult
     return StackingResult(pr, wb, fees, resi, reso, cv, retcode,
                           expand_investable_weights(imsk, w), imsk, fb)
 end

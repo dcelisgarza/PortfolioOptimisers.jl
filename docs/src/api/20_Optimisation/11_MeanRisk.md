@@ -3,7 +3,7 @@
 ```@docs
 MeanRiskResult
 mean_risk_td_defaults
-factory(res::MeanRiskResult, fb::Option{<:OptE_Opt})
+factory(res::MeanRiskResult, fb::Option{<:OptE_Opt_FbChain})
 Base.getproperty(r::MeanRiskResult, sym::Symbol)
 MeanRisk
 needs_previous_weights(opt::MeanRisk)

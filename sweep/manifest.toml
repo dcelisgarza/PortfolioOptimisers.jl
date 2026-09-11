@@ -259,7 +259,7 @@
 "src/19_RiskMeasures/26_AdjustRiskContributions.jl" = { map = 9, units = 6, swept = false }
 "src/19_RiskMeasures/27_ExpectedRisk.jl" = { map = 9, units = 22, swept = false }
 "src/19_RiskMeasures/28_RiskMeasureTools.jl" = { map = 9, units = 7, swept = false }
-"src/20_Optimisation/01_Base_Optimisation.jl" = { map = 10, units = 120, swept = false }
+"src/20_Optimisation/01_Base_Optimisation.jl" = { map = 10, units = 122, swept = false }
 "src/20_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl" = { map = 12, units = 67, swept = false }
 "src/20_Optimisation/02_CrossValidation/02_KFold.jl" = { map = 12, units = 4, swept = false }
 "src/20_Optimisation/02_CrossValidation/03_Combinatorial.jl" = { map = 12, units = 12, swept = false }
@@ -323,7 +323,7 @@
 "src/20_Optimisation/20_RiskMeasureConstraints/19_PowerNormXatRiskConstraints.jl" = { map = 11, units = 4, swept = false }
 "src/20_Optimisation/20_RiskMeasureConstraints/20_VarianceSkewKurtosisConstraints.jl" = { map = 11, units = 1, swept = false }
 "src/20_Optimisation/20_RiskMeasureConstraints/21_GenericValueatRiskRangeConstraints.jl" = { map = 11, units = 1, swept = false }
-"src/20_Optimisation/21_Base_FiniteAllocation.jl" = { map = 10, units = 13, swept = false }
+"src/20_Optimisation/21_Base_FiniteAllocation.jl" = { map = 10, units = 14, swept = false }
 "src/20_Optimisation/22_DiscreteFiniteAllocation.jl" = { map = 10, units = 6, swept = false }
 "src/20_Optimisation/23_GreedyFiniteAllocation.jl" = { map = 10, units = 6, swept = false }
 "src/20_Optimisation/24_RiskMeasureCompatibility.jl" = { map = 10, units = 3, swept = false }

@@ -2,7 +2,7 @@
 
 ```@docs
 GreedyAllocationResult
-factory(res::GreedyAllocationResult, fb::Option{<:FOptE_FOpt})
+factory(res::GreedyAllocationResult, fb::Option{<:FOptE_FOpt_FbChain})
 GreedyAllocation
 roundmult
 finite_sub_allocation!

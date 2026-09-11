@@ -445,3 +445,44 @@ end
                                                                   :nearest))
     @test PreviousWeights(; fb = TimeDependent([EqualWeighted()])) isa PreviousWeights
 end
+@testset "A result records the fallback chain that answered it (#1024)" begin
+    using PortfolioOptimisers, Test, StableRNGs
+    PO = PortfolioOptimisers
+    rd = ReturnsResult(; nx = ["A", "B", "C"], X = randn(StableRNG(3), 10, 3))
+    # Two failures before the answer: the chain holds both, in the order they ran, and
+    # each failure carries no chain of its own.
+    chain = PreviousWeights(; fb = PreviousWeights(; fb = EqualWeighted()))
+    res = optimise(chain, rd)
+    @test isa(res, NaiveOptimisationResult)
+    @test isa(res.retcode, OptimisationSuccess)
+    @test isa(res.fb, PO.FbChain)
+    @test length(res.fb) == 2
+    @test res.fb[1][1] === chain
+    @test res.fb[2][1] === chain.fb
+    @test all(isa(p[2], NaiveOptimisationResult) for p in res.fb)
+    @test all(isa(p[2].retcode, OptimisationFailure) for p in res.fb)
+    @test all(isnothing(p[2].fb) for p in res.fb)
+    # The answer of a fallback-less estimator carries `nothing`.
+    @test isnothing(optimise(EqualWeighted(), rd).fb)
+    # A JuMP failure enters the chain like any other.
+    slv = Solver(; name = :none, solver = nothing)
+    mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv), fb = EqualWeighted())
+    mr_res = optimise(mr, rd)
+    @test isa(mr_res, NaiveOptimisationResult)
+    @test length(mr_res.fb) == 1
+    @test mr_res.fb[1][1] === mr
+    @test isa(mr_res.fb[1][2], MeanRiskResult)
+    @test isa(mr_res.fb[1][2].retcode, OptimisationFailure)
+    # When every attempt fails, the last failure carries the ones before it.
+    res = optimise(PreviousWeights(; fb = PreviousWeights()), rd)
+    @test isa(res.retcode, OptimisationFailure)
+    @test length(res.fb) == 1
+    @test isa(res.fb[1][2].retcode, OptimisationFailure)
+    # The rebuild admits the chain and the estimator alike, and `set_retcode` carries the
+    # chain over.
+    @test isnothing(PO.factory(res, nothing).fb)
+    @test PO.factory(res, EqualWeighted()).fb == EqualWeighted()
+    failed_mr = PO.factory(mr_res.fb[1][2], mr_res.fb)
+    @test failed_mr.fb === mr_res.fb
+    @test PO.set_retcode(failed_mr, OptimisationSuccess()).fb === mr_res.fb
+end

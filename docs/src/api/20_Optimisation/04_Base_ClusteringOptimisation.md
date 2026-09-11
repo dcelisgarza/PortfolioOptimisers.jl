@@ -8,9 +8,9 @@ HierarchicalOptimisationResult
 HierarchicalResult
 assert_clustering_universe
 HierarchicalRiskParityResult
-factory(res::HierarchicalRiskParityResult, fb::Option{<:OptE_Opt})
+factory(res::HierarchicalRiskParityResult, fb::Option{<:OptE_Opt_FbChain})
 HierarchicalEqualRiskContributionResult
-factory(res::HierarchicalEqualRiskContributionResult, fb::Option{<:OptE_Opt})
+factory(res::HierarchicalEqualRiskContributionResult, fb::Option{<:OptE_Opt_FbChain})
 HierarchicalOptimiser
 hierarchical_optimiser_td_defaults
 needs_previous_weights(opt::HierarchicalOptimiser)

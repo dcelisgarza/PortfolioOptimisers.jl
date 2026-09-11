@@ -111,7 +111,7 @@ Property access delegates to the embedded [`JuMPOptimisationResult`](@ref): the 
     """
     noc_retcode
     """
-    $(field_dict[:fb])
+    $(field_dict[:fb_res])
     """
     fb
     function NearOptimalCenteringResult(jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM,
@@ -119,7 +119,7 @@ Property access delegates to the embedded [`JuMPOptimisationResult`](@ref): the 
                                         w_opt_retcode::OptRetCode_VecOptRetCode,
                                         w_max_retcode::OptimisationReturnCode,
                                         noc_retcode::OptRetCode_VecOptRetCode,
-                                        fb::Option{<:OptE_Opt})
+                                        fb::Option{<:OptE_Opt_FbChain})
         return new{typeof(jr), typeof(r), typeof(w_min_retcode), typeof(w_opt_retcode),
                    typeof(w_max_retcode), typeof(noc_retcode), typeof(fb)}(jr, r,
                                                                            w_min_retcode,
@@ -133,7 +133,7 @@ function NearOptimalCenteringResult(; jr::JuMPOptimisationResult, r::BaseRM_VecB
                                     w_opt_retcode::OptRetCode_VecOptRetCode,
                                     w_max_retcode::OptimisationReturnCode,
                                     noc_retcode::OptRetCode_VecOptRetCode,
-                                    fb::Option{<:OptE_Opt})::NearOptimalCenteringResult
+                                    fb::Option{<:OptE_Opt_FbChain})::NearOptimalCenteringResult
     return NearOptimalCenteringResult(jr, r, w_min_retcode, w_opt_retcode, w_max_retcode,
                                       noc_retcode, fb)
 end

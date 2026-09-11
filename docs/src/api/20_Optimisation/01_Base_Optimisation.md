@@ -106,11 +106,13 @@ expand_investable_weights
 assert_internal_optimiser(::NonFiniteAllocationOptimisationResult)
 assert_external_optimiser(::NonFiniteAllocationOptimisationResult)
 assert_special_nco_requirements
-factory(res::NonFiniteAllocationOptimisationResult, fb::Option{<:OptE_Opt})
+factory(res::NonFiniteAllocationOptimisationResult, fb::Option{<:OptE_Opt_FbChain})
 factory(opt::OptE_Opt, ::Any)
 assert_no_nearest_bind_optimiser_schedule(x, field::Symbol, host::Symbol)
 entitled
 OptE_Opt
+FbChain
+OptE_Opt_FbChain
 VecOptE_Opt
 VecOpt
 VecOptE

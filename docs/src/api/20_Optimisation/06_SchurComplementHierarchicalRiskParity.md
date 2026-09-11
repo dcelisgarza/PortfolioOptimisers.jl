@@ -17,7 +17,7 @@ schur_complement_weights(pr::AbstractPriorResult, items::VecVecInt, wb::WeightBo
 VecScP
 ScP_VecScP
 SchurComplementHierarchicalRiskParityResult
-factory(res::SchurComplementHierarchicalRiskParityResult, fb::Option{<:OptE_Opt})
+factory(res::SchurComplementHierarchicalRiskParityResult, fb::Option{<:OptE_Opt_FbChain})
 schur_complement_hrp_td_defaults
 SchurComplementHierarchicalRiskParity
 needs_previous_weights(opt::SchurComplementHierarchicalRiskParity)

@@ -9,7 +9,7 @@ assert_internal_optimiser(::NaiveOptimisationEstimator)
 assert_external_optimiser(::NaiveOptimisationEstimator)
 naive_optimiser_td_defaults
 NaiveOptimisationResult
-factory(res::NaiveOptimisationResult, fb::Option{<:OptE_Opt})
+factory(res::NaiveOptimisationResult, fb::Option{<:OptE_Opt_FbChain})
 InverseVolatility
 assert_external_optimiser(opt::InverseVolatility)
 _optimise(iv::InverseVolatility, rd::ReturnsResult)

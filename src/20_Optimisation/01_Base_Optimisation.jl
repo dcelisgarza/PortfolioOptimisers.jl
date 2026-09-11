@@ -522,18 +522,44 @@ Matches either a [`NonFiniteAllocationOptimisationEstimator`](@ref) (specifying 
 const OptE_Opt = Union{<:NonFiniteAllocationOptimisationEstimator,
                        <:NonFiniteAllocationOptimisationResult}
 """
-    factory(res::NonFiniteAllocationOptimisationResult, fb::Option{<:OptE_Opt})
+    const FbChain = AbstractVector{<:Tuple{<:OptimisationEstimator, <:OptimisationResult}}
 
-Rebuild a continuous optimisation result with an updated fallback optimiser `fb`.
+Alias for a fallback chain: the `(estimator, result)` pair of every attempt that failed before the result that carries it, in the order the attempts ran.
 
-Every optimisation result carries `fb` as its last field, so the generic rebuild copies all fields unchanged except the trailing `fb`. Concrete result types may override this method when rebuilding requires more than swapping `fb`.
+[`optimise`](@ref) pushes one pair each time an attempt fails and its estimator names a fallback, and hands the vector to `factory(res, fb)` once an attempt succeeds or the chain runs out. A result whose `fb` is a chain was therefore answered by a fallback: `fb[1][1]` is the estimator that was asked first, and `fb[end][2]` is the last failure before the answer. A result whose `fb` is `nothing` was answered by the estimator it was asked of.
+
+# Related
+
+  - [`OptE_Opt_FbChain`](@ref)
+  - [`FOptE_FOpt_FbChain`](@ref)
+  - [`optimise`](@ref)
+"""
+const FbChain = AbstractVector{<:Tuple{<:OptimisationEstimator, <:OptimisationResult}}
+"""
+    const OptE_Opt_FbChain = Union{<:OptE_Opt, <:FbChain}
+
+Alias for what the `fb` field of a continuous optimisation result admits: a fallback estimator or precomputed result ([`OptE_Opt`](@ref)), or the fallback chain that answered the result ([`FbChain`](@ref)).
 
 # Related
 
   - [`OptE_Opt`](@ref)
+  - [`FbChain`](@ref)
   - [`NonFiniteAllocationOptimisationResult`](@ref)
 """
-function factory(res::NonFiniteAllocationOptimisationResult, fb::Option{<:OptE_Opt})
+const OptE_Opt_FbChain = Union{<:OptE_Opt, <:FbChain}
+"""
+    factory(res::NonFiniteAllocationOptimisationResult, fb::Option{<:OptE_Opt_FbChain})
+
+Rebuild a continuous optimisation result with an updated fallback record `fb`.
+
+Every optimisation result carries `fb` as its last field, so the generic rebuild copies all fields unchanged except the trailing `fb`. Concrete result types may override this method when rebuilding requires more than swapping `fb`. [`optimise`](@ref) is the one caller, and it hands in the [`FbChain`](@ref) it walked.
+
+# Related
+
+  - [`OptE_Opt_FbChain`](@ref)
+  - [`NonFiniteAllocationOptimisationResult`](@ref)
+"""
+function factory(res::NonFiniteAllocationOptimisationResult, fb::Option{<:OptE_Opt_FbChain})
     flds = ntuple(i -> getfield(res, i), Val(fieldcount(typeof(res))))
     return (typeof(res).name.wrapper)(Base.front(flds)..., fb)
 end
@@ -2896,7 +2922,7 @@ function _optimise end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-High level optimisation function that wraps around estimator-specific optimisation functions. This takes care of fallback methods if the primary optimisation fails. It returns the first successful optimisation result but stores all fallback results in the `fb` field of the result.
+High level optimisation function that wraps around estimator-specific optimisation functions. This takes care of fallback methods if the primary optimisation fails. It returns the first successful optimisation result, or the last failure when every fallback fails, and stores the `(estimator, result)` pair of every failed attempt in the `fb` field of that result, in the order they ran (see [`FbChain`](@ref)). When no fallback was needed, `fb` is `nothing`.
 
 This is a fold-less entry point, so time-dependent schedules are inert here: the estimator is reset to its fold-less values (see [`reset_time_dependent_estimator`](@ref)) before the solve — in particular a scheduled fallback resets to its `default`, or to `nothing` (no fallback) when it has none, *before* the fallback chain is walked. Inside a fold loop this reset is a no-op, because the loop resolves every schedule before optimising.
 
