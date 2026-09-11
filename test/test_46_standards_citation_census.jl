@@ -227,7 +227,11 @@
                               "a suffix quoted alone in `CONTEXT.md` § Prior; real " *
                               "only inside `AbstractLowOrderPriorEstimator_A`",
                           "_F" => "the same, for `AbstractLowOrderPriorEstimator_F`",
-                          "_AF" => "the same, for `AbstractLowOrderPriorEstimator_AF`")
+                          "_AF" => "the same, for `AbstractLowOrderPriorEstimator_AF`",
+                          "refit_last" =>
+                              "a keyword of the reference's online runner, cited by " *
+                              "`CONTEXT.md` § Resume as the exit the library does not " *
+                              "port")
 
     #=
     A path that names an artefact CI builds and never commits, so no tracked file can
