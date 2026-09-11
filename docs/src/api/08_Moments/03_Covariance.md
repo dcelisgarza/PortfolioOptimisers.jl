@@ -9,7 +9,6 @@ GeneralCovariance
 show_fields(::GeneralCovariance)
 cov(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
 cor(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
-cor(ce::Union{<:GeneralCovariance, <:Covariance})
 ```
 
 ## [Covariance](@id api-covariance)
@@ -37,6 +36,7 @@ partial_fit!(ce::GeneralCovariance, x::VecNum)
 partial_fit!(ce::Covariance{<:Any, <:Any, <:FullMoment}, x::VecNum)
 partial_fit!(ce::Covariance, ::VecNum_MatNum; kwargs...)
 cov(ce::Union{<:GeneralCovariance, <:Covariance{<:Any, <:Any, <:FullMoment}}, state::CovarianceState)
+cor(ce::Union{<:GeneralCovariance, <:Covariance{<:Any, <:Any, <:FullMoment}}, state::CovarianceState)
 merge_states(a::CovarianceState, b::CovarianceState)
 Base.copy(x::CovarianceState)
 port_opt_view(x::CovarianceState, i, args...)

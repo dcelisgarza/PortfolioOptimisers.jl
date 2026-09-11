@@ -566,7 +566,7 @@ The `cvg` field of the estimator is passed as the third argument, so the arm is 
   - [`CoveragePolicy`](@ref)
   - [`Covariance`](@ref)
   - [`coverage_mean`](@ref)
-  - [`coverage_semi_moment`](@ref)
+  - [`coverage_valid_block`](@ref)
 """
 function coverage_covariance end
 """

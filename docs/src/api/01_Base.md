@@ -311,6 +311,7 @@ PortfolioOptimisers.coverage_admission
 PortfolioOptimisers.coverage_divide
 PortfolioOptimisers.coverage_frame
 PortfolioOptimisers.coverage_refuse!
+PortfolioOptimisers.coverage_refuse_comoment!
 ```
 
 ## Iteration and indexing

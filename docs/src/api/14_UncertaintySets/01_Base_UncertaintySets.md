@@ -16,6 +16,8 @@ ucs(uc::Option{<:Tuple{<:Option{<:AbstractUncertaintySetResult},
              kwargs...)
 ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; kwargs...)
 ucs(ue::AbstractPriorUncertaintySetEstimator, ::AbstractPriorResult; kwargs...)
+reads_prior_result
+ucs_prior
 ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult, pr::AbstractPriorResult; kwargs...)
 mu_ucs(uc::Option{<:AbstractUncertaintySetResult}, args...; kwargs...)
 mu_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; kwargs...)

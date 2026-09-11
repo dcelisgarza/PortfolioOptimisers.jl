@@ -19,6 +19,7 @@ AbstractMatrixProcessingAlgorithm
 MatrixProcessing
 matrix_processing!
 matrix_processing_block!
+PortfolioOptimisers.assert_finite_block
 matrix_processing_step!
 PortfolioOptimisers.assert_shape_only_matrix_processing
 matrix_processing
