@@ -781,8 +781,12 @@ end
 
     # A complete implied-volatility surface pads nothing and fits every column, so the
     # carried path and the hand-built path agree entry for entry.
-    prf = @test_logs price_ingestion(PriceIngestion(; strict = true), Xg;
-                                     iv = TimeArray(collect(tsg), ivfull, nxg), ivpa = 1.2)
+    # The surface is built outside the `@test_logs`, whose log must hold the ingestion's
+    # records alone: a `TimeArray` built from string column names warns a deprecation on
+    # a current TimeSeries, and that warning is the constructor's, not the layer's.
+    ivfulla = TimeArray(collect(tsg), ivfull, nxg)
+    prf = @test_logs price_ingestion(PriceIngestion(; strict = true), Xg; iv = ivfulla,
+                                     ivpa = 1.2)
     rdf = prices_to_returns(prf)
     @test all(isfinite, cov(ce, rdf.X, rdf.pnl; iv = rdf.iv, ivpa = rdf.ivpa))
 

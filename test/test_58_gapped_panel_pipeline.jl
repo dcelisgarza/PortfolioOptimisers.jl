@@ -125,13 +125,16 @@ cv58 = split(iwf58, rd58)
     # the layer existed.
     rd_hand = ReturnsResult(; nx = nx58, X = ifelse.(emsk58, R58, NaN),
                             pnl = panel58(amsk58, emsk58))
-    for est in (mr58, hrp58)
-        @test isapprox(optimise(est, rd58).w, optimise(est, rd_hand).w; rtol = 1e-8)
+    # The two carriers agree to `1e-12`, and the hierarchical book is arithmetic on them,
+    # so it agrees as tightly; the conic solve amplifies that perturbation to about `2e-8`
+    # in its weights, so the JuMP book takes the tolerance a solved vector is compared at.
+    for (est, rtol) in ((mr58, 1e-5), (hrp58, 1e-8))
+        @test isapprox(optimise(est, rd58).w, optimise(est, rd_hand).w; rtol = rtol)
         for tr in cv58.train_idx
             @test isapprox(optimise(est, PortfolioOptimisers.pipeline_data_view(rd58, tr)).w,
                            optimise(est,
                                     PortfolioOptimisers.pipeline_data_view(rd_hand, tr)).w;
-                           rtol = 1e-8)
+                           rtol = rtol)
         end
     end
 end
