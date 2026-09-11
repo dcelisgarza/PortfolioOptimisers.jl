@@ -227,6 +227,8 @@ commit = "8610300"
 "src/20_Optimisation/02_CrossValidation/10_GridSearchCrossValidation.jl" = { lines = 73, misses = 2 }
 "src/20_Optimisation/02_CrossValidation/11_RandomisedSearchCrossValidation.jl" = { lines = 16, misses = 0 }
 "src/20_Optimisation/02_CrossValidation/12_OnlineFoldLoop.jl" = { lines = 30, misses = 0 }
+"src/20_Optimisation/02_CrossValidation/13_CovarianceForecastEvaluation.jl" = { lines = 166, misses = 0 }
+"src/20_Optimisation/02_CrossValidation/14_CovarianceForecastSummary.jl" = { lines = 105, misses = 0 }
 "src/20_Optimisation/03_NaiveOptimisation.jl" = { lines = 99, misses = 0 }
 "src/20_Optimisation/04_Base_ClusteringOptimisation.jl" = { lines = 56, misses = 0 }
 "src/20_Optimisation/05_HierarchicalRiskParity.jl" = { lines = 101, misses = 2 }

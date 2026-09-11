@@ -10,7 +10,7 @@ commit = "483d19ebf1"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt.jl" = { code = 2881, doc = 0, comment = 211, blank = 47, total = 3139 }
-"src/01_Base/01_DocstringDictionaries.jl" = { code = 1128, doc = 113, comment = 123, blank = 43, total = 1407 }
+"src/01_Base/01_DocstringDictionaries.jl" = { code = 1132, doc = 113, comment = 125, blank = 43, total = 1413 }
 "src/01_Base/02_TypeRoots.jl" = { code = 18, doc = 241, comment = 0, blank = 115, total = 374 }
 "src/01_Base/03_PrettyShow.jl" = { code = 117, doc = 138, comment = 0, blank = 76, total = 331 }
 "src/01_Base/04_ScopedConfig.jl" = { code = 163, doc = 492, comment = 2, blank = 214, total = 871 }
@@ -239,6 +239,8 @@ commit = "483d19ebf1"
 "src/20_Optimisation/02_CrossValidation/10_GridSearchCrossValidation.jl" = { code = 102, doc = 64, comment = 9, blank = 28, total = 203 }
 "src/20_Optimisation/02_CrossValidation/11_RandomisedSearchCrossValidation.jl" = { code = 34, doc = 39, comment = 0, blank = 18, total = 91 }
 "src/20_Optimisation/02_CrossValidation/12_OnlineFoldLoop.jl" = { code = 52, doc = 102, comment = 1, blank = 32, total = 187 }
+"src/20_Optimisation/02_CrossValidation/13_CovarianceForecastEvaluation.jl" = { code = 305, doc = 424, comment = 3, blank = 151, total = 883 }
+"src/20_Optimisation/02_CrossValidation/14_CovarianceForecastSummary.jl" = { code = 168, doc = 263, comment = 0, blank = 69, total = 500 }
 "src/20_Optimisation/03_NaiveOptimisation.jl" = { code = 307, doc = 557, comment = 22, blank = 178, total = 1064 }
 "src/20_Optimisation/04_Base_ClusteringOptimisation.jl" = { code = 197, doc = 395, comment = 4, blank = 113, total = 709 }
 "src/20_Optimisation/05_HierarchicalRiskParity.jl" = { code = 180, doc = 262, comment = 34, blank = 74, total = 550 }

@@ -1049,6 +1049,12 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        :Sigma_hat => "``\\hat{\\mathbf{\\Sigma}}``: Estimated covariance matrix.",#
                        :Sigma_hat_ii => "``\\hat{\\mathbf{\\Sigma}}_{ii}``: ``i``-th diagonal entry of ``\\hat{\\mathbf{\\Sigma}}``.",#
                        :Sigma_hat_ij => "``\\hat{\\mathbf{\\Sigma}}_{ij}``: Estimated covariance between assets ``i`` and ``j``.",#
+                       # The covariance forecast evaluation. A forecast is formed at a step
+                       # and judged on the returns that follow it.
+                       :Sigma_hat_t => "``\\hat{\\mathbf{\\Sigma}}_t``: Covariance forecast formed at step ``t``.",#
+                       :S_t_realised => "``\\mathbf{S}_t``: Realised covariance of step ``t``, formed from the centred returns that follow it.",#
+                       :h_step => "``h``: Horizon of a step, the number of observations the forecast is judged on.",#
+                       :M_steps => "``M``: Steps of the walk-forward, the number of forecasts a run scores.",#
                        :c_weight_bias => "``c``: Bias correction of the weighted denominator. It is fixed by the **type** of the weights, never by the estimator: `corrected = false` gives ``c = 0`` for every type, and `corrected = true` gives ``c = 1`` for `StatsBase.FrequencyWeights`, ``c = \\sum_t w_t^2 / \\sum_t w_t`` for `StatsBase.AnalyticWeights` and ``c = \\sum_t w_t / T`` for `StatsBase.ProbabilityWeights`.",#
                        # Shrinkage of the sample expected returns.
                        :mu_hat_shrink => "``\\hat{\\boldsymbol{\\mu}}``: ``N \\times 1`` vector of sample expected returns, whose ``i``-th entry is ``\\hat{\\mu}_i``.",#

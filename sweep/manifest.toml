@@ -272,6 +272,8 @@
 "src/20_Optimisation/02_CrossValidation/10_GridSearchCrossValidation.jl" = { map = 12, units = 3, swept = false }
 "src/20_Optimisation/02_CrossValidation/11_RandomisedSearchCrossValidation.jl" = { map = 12, units = 2, swept = false }
 "src/20_Optimisation/02_CrossValidation/12_OnlineFoldLoop.jl" = { map = 12, units = 4, swept = false }
+"src/20_Optimisation/02_CrossValidation/13_CovarianceForecastEvaluation.jl" = { map = 12, units = 19, swept = false }
+"src/20_Optimisation/02_CrossValidation/14_CovarianceForecastSummary.jl" = { map = 12, units = 6, swept = false }
 "src/20_Optimisation/03_NaiveOptimisation.jl" = { map = 10, units = 24, swept = false }
 "src/20_Optimisation/04_Base_ClusteringOptimisation.jl" = { map = 10, units = 16, swept = false }
 "src/20_Optimisation/05_HierarchicalRiskParity.jl" = { map = 10, units = 9, swept = false }
