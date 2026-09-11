@@ -192,6 +192,15 @@ The unit a Return Forecast Estimator's descriptors forecast in: the idiosyncrati
 **Forecast Calibration**
 The out-of-sample scale of a Return Forecast: the slope of a weighted zero-intercept regression of the realised forward target on the forecast, pooled over every scorable pair of an evaluation, together with the curve of that relation over quantile bins of the forecast. A slope of `1` says the forecast is already in the units of the target, a slope above `1` that its magnitude is too small, and one below `1` that it is too large. It is the one reading of a forecast that is not invariant to a rescaling of it, so it is what an optimiser that reads the forecast as a mean depends on.
 *Avoid*: Calibration Rule and Calibration Slot (§3.9), which compute the number a slot of an uncertainty set would otherwise state; the calibration of a fitted factor model, which is the standard deviation of its standardised idiosyncratic returns and is measured in sample; and a Return Forecast Estimator's own calibration coefficient, which puts a member's predictions into return units at fit time rather than measuring whether they landed there.
+The calibration of a covariance forecast is a Covariance Forecast Evaluation, which asks whether the realised return has unit scale under the forecast rather than whether a forecast's scale is right.
+
+**Covariance Forecast Evaluation**
+The out-of-sample calibration of a covariance forecast: at each step of a walk-forward the forecast the estimator makes before the step is compared with the Realised Target of the observations in the step, centred on the location the forecast is about, and read as three ratios whose target is one — over every direction, per asset, and along a test portfolio — and as two losses that only compare two forecasts. Its online form is the walk-forward's Fold Fit, not a scheme of its own: the estimator is stepped instead of refitted, and the evaluation reads the same numbers.
+*Avoid*: a forecast evaluation, which scores a Return Forecast against a forward return; Forecast Calibration, which is that evaluation's scale; and the calibration of a fitted factor model, which is measured in sample.
+
+**Realised Target**
+What a step's observations are turned into before they meet a covariance forecast: the realised covariance, which sums the outer products of the centred rows and is the default, or the horizon return, which sums the rows first and takes one outer product. The two coincide over a step of one observation. Under either, an observation a step lacks contributes to neither the target nor its count, so the forecast is compared cell by cell against the count of rows both assets share.
+*Avoid*: the forward target of a Return Forecast evaluation (`AbstractForecastTarget`), which is a return over a horizon ahead of the forecast; the `PortfolioTarget` of the regime-adjusted covariance, which is a direction a regime is measured along; and Routing Target, which names where a Pipeline Context slot is delivered inside the optimisation step.
 
 ### 3.2 Covariance & Variance (Moments)
 
