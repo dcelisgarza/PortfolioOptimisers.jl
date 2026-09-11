@@ -605,6 +605,10 @@ The one loop every cross-validation entry point runs. Per fold it resolves the e
 **Fold**
 The record the Fold Loop hands its callback: the fold's index and count, its already-resolved estimator, its already-viewed data, and its own training and test index vectors.
 
+**Fold Fit**
+How the Fold Loop fits each fold of a walk-forward: by a refit from the fold's training window, which is the default, or by the online step, `OnlineStep`, under which the loop warms up once on the first training window and then folds each fold's new observations into one estimator threaded from fold to fold, reading it out where a refit would have run. It is a switch of the two walk-forwards alone, beside the Weight Drift and the Previous-Weights Source, because only a timeline has a previous fold to thread a state from. An online run is expanding by construction, so the switch derives the expanding window; a window is the estimator's to declare, through the `Online` wrapper's cap, never the loop's. The loop starts cold, and a Time-Dependent Input may not reach a field that carries a Partial Fit State. ADR 0140.
+*Avoid*: an online *scheme*; the enumeration of folds is the walk-forward's and does not change, only the fit of each fold does. And the `Online` wrapper, which declares a Sample Buffer on one estimator, not how a loop runs.
+
 **Weight Drift**
 The movement of a fold's held weights away from its target weights, because each position grows at its own return under the self-financing recursion. Unset, a fold reports `X * w` on every observation, which is the reading the optimiser maximises.
 *Avoid*: using it for the distance a `TrackingError` or a `TurnoverRiskMeasure` bounds. That is a divergence between two portfolios; this is the movement of one portfolio's own weights.
