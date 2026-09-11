@@ -1532,19 +1532,20 @@ end
     held_start_weights(retcode::OptimisationSuccess, w::VecNum, w_prev)
     held_start_weights(retcode::OptimisationFailure, w::VecNum, w_prev::Nothing)
     held_start_weights(retcode::OptimisationFailure, w::VecNum, w_prev::VecNum)
+    held_start_weights(retcode::OptimisationReturnCode, w::VecVecNum, w_prev)
     held_start_weights(retcode::VecOptRetCode, w::VecVecNum, w_prev::Nothing)
     held_start_weights(retcode::VecOptRetCode, w::VecVecNum, w_prev::VecNum)
     held_start_weights(retcode::VecOptRetCode, w::VecVecNum, w_prev::VecVecNum)
 
 Name the weights a fold's drift starts from: its own on a solved fold, the previous weights on a failed one.
 
-A fold that could not rebalance holds what it held, so under a Weight Drift or a Previous-Weights Source a failed fold drifts the weights it was handed rather than its `NaN` target. The choice is by return code, read per member under a population, and the previous weights are one vector for every member or one per member. A failed fold with no previous weights keeps its `NaN` weights, and [`held_weights_result`](@ref) records `NaN` for it without drifting.
+A fold that could not rebalance holds what it held, so under a Weight Drift or a Previous-Weights Source a failed fold drifts the weights it was handed rather than its `NaN` target. The choice is by return code, read per member under a population, and the previous weights are one vector for every member or one per member. A population solved under one return code — a frontier the one [`JuMPOptimisationResult`](@ref) carries — reads that code for every member. A failed fold with no previous weights keeps its `NaN` weights, and [`held_weights_result`](@ref) records `NaN` for it without drifting.
 
 # Algorithm
 
  1. On an [`OptimisationSuccess`](@ref), give `w`.
  2. On an [`OptimisationFailure`](@ref) over one vector, give `w_prev`, or `w` when there is none.
- 3. Over a population, give, for each member, its own vector on a success and the previous weights on a failure: the one vector when `w_prev` is one, its own entry when `w_prev` is one per member.
+ 3. Over a population, give, for each member, its own vector on a success and the previous weights on a failure: the one vector when `w_prev` is one, its own entry when `w_prev` is one per member. One return code over a population is that code for every member.
 
 # Arguments
 
@@ -1575,6 +1576,9 @@ function held_start_weights(::OptimisationFailure, w::VecNum, ::Nothing)
 end
 function held_start_weights(::OptimisationFailure, ::VecNum, w_prev::VecNum)
     return w_prev
+end
+function held_start_weights(retcode::OptimisationReturnCode, w::VecVecNum, w_prev)
+    return held_start_weights(fill(retcode, length(w)), w, w_prev)
 end
 function held_start_weights(::VecOptRetCode, w::VecVecNum, ::Nothing)
     return w

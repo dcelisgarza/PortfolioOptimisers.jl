@@ -2052,6 +2052,15 @@
             @test PO.held_start_weights(rcs, [w, wn], wp) == [w, wp]
             @test PO.held_start_weights(rcs, [w, wn], [wp, w]) == [w, w]
             @test_throws DimensionMismatch PO.held_start_weights(rcs, [w, wn], [wp])
+            # One return code over a population, a frontier's, is that code for every
+            # member: a solved frontier starts from its own weights, a failed one from the
+            # previous weights, the one vector or one per member.
+            @test isequal(PO.held_start_weights(ok_rc, [w, wn], nothing), [w, wn])
+            @test PO.held_start_weights(ok_rc, [w, w], wp) == [w, w]
+            @test isequal(PO.held_start_weights(bad_rc, [wn, wn], nothing), [wn, wn])
+            @test PO.held_start_weights(bad_rc, [wn, wn], wp) == [wp, wp]
+            @test PO.held_start_weights(bad_rc, [wn, wn], [wp, w]) == [wp, w]
+            @test_throws DimensionMismatch PO.held_start_weights(bad_rc, [wn, wn], [wp])
             # A non-finite start drifts nothing and is not ruined, alone or as a member.
             X24 = [0.01 0.02; -0.01 0.03]
             (hw, ruined) = PO.held_weights_result(sfd, wn, X24, true)
