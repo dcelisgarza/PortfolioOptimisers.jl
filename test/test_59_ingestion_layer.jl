@@ -805,14 +805,25 @@ end
     ivmn = copy(ivm)
     ivmn[7, 3] = -1.0
     @test_throws DomainError PricesResult(; X = Xg, iv = TimeArray(collect(tsg), ivmn, nxg))
+    # An infinity is neither a volatility nor the marker of an absence, so it is refused
+    # on the same rule as an infinite return, at every carrier that reads the surface.
     ivinf = copy(ivfull)
     ivinf[5, 2] = Inf
-    @test isa(PricesResult(; X = Xg, iv = TimeArray(collect(tsg), ivinf, nxg)),
-              PricesResult)
+    @test_throws DomainError PricesResult(; X = Xg,
+                                          iv = TimeArray(collect(tsg), ivinf, nxg))
+    @test_throws DomainError ReturnsResult(; nx = nxg, X = rdg.X, ts = rdg.ts,
+                                           iv = ivinf[2:end, :], ivpa = 1.2)
     @test_throws DomainError PortfolioOptimisers.assert_nonneg_where_present([-1.0, NaN],
                                                                              :iv)
+    @test_throws DomainError PortfolioOptimisers.assert_nonneg_where_present([Inf, NaN],
+                                                                             :iv)
+    @test_throws DomainError PortfolioOptimisers.assert_nonneg_where_present([-Inf, NaN],
+                                                                             :iv)
     @test isnothing(PortfolioOptimisers.assert_nonneg_where_present([missing, NaN, 0.0,
-                                                                     Inf], :iv))
+                                                                     1.0], :iv))
+    # A wrong-shaped surface reports its shape, before any value is read.
+    @test_throws DimensionMismatch ReturnsResult(; nx = nxg, X = rdg.X, ts = rdg.ts,
+                                                 iv = ivinf, ivpa = 1.2)
     # An empty surface is still refused, before the sign is read.
     @test_throws PortfolioOptimisers.IsEmptyError ReturnsResult(; nx = nxg, X = rdg.X,
                                                                 ts = rdg.ts,

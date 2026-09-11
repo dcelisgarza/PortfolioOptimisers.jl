@@ -80,10 +80,14 @@
 
         @test_throws IsEmptyError ReturnsResult(; ts = ts, nx = nx, X = X, nf = nf, F = F,
                                                 iv = Matrix{Float64}(undef, 0, 0))
+        @test_throws DimensionMismatch ReturnsResult(; ts = ts, nx = nx, X = X, nf = nf,
+                                                     F = F, iv = [Inf Inf])
+        @test_throws DimensionMismatch ReturnsResult(; ts = ts, nx = nx, X = X, nf = nf,
+                                                     F = F, iv = [0 -1])
         @test_throws DomainError ReturnsResult(; ts = ts, nx = nx, X = X, nf = nf, F = F,
-                                               iv = [Inf Inf])
+                                               iv = fill(Inf, 3, 4))
         @test_throws DomainError ReturnsResult(; ts = ts, nx = nx, X = X, nf = nf, F = F,
-                                               iv = [0 -1])
+                                               iv = [0 -1 0 0; 0 0 0 0; 0 0 0 0])
 
         @test_throws DomainError ReturnsResult(; ts = ts, nx = nx, X = X, nf = nf, F = F,
                                                iv = iv, ivpa = 0)

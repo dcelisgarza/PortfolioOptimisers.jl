@@ -379,7 +379,7 @@ A benchmark ``B`` is converted by the same rule and **carried alongside** the as
   - Every price reaching step 3 is positive. `TimeSeries.percentchange` takes a logarithm on both branches, so a negative price raises a `DomainError` from inside it, on the simple branch as well.
   - The asset, factor and benchmark column names are pairwise disjoint, and none of them is `timestamp`. Raises a [`ConflictingArgumentError`](@ref) naming the offending columns.
   - If `pr.F` or `pr.B` is not `nothing`, its timestamps equal the asset timestamps. Raises a [`ConflictingArgumentError`](@ref) naming [`price_ingestion`](@ref), which is what puts two series on one clock.
-  - If `pr.iv` is not `nothing`, the returns timestamps are a subset of `TimeSeries.timestamp(pr.iv)`, then `iv = values(unify_gaps(iv)[ts])`, `!isempty(iv)`, every value is non-negative where it is present (an absent one is `NaN`; see [`assert_nonneg_where_present`](@ref)), and `size(iv) == size(X)`.
+  - If `pr.iv` is not `nothing`, the returns timestamps are a subset of `TimeSeries.timestamp(pr.iv)`, then `iv = values(unify_gaps(iv)[ts])`, `!isempty(iv)`, `size(iv) == size(X)`, and every value is finite and non-negative where it is present (an absent one is `NaN`; see [`assert_nonneg_where_present`](@ref)).
   - If `pr.span` is not `nothing`, `size(pr.span) == size(values(pr.X))`. Raises a `DimensionMismatch`.
   - `pr.ivpa` is validated in that same branch, so it is checked only when `pr.iv` is given: `all(x -> x > 0, ivpa)`, `all(x -> isfinite(x), ivpa)`, and, if a vector, `length(ivpa) == size(iv, 2)`. The bound is strict — a zero adjustment is rejected.
 
@@ -474,9 +474,9 @@ function prices_to_returns(pr::PricesResult; ret_method::Symbol = :simple,
                   ArgumentError("ts must be a subset of the timestamps in iv"))
         iv = values(unify_gaps(iv)[ts])
         @argcheck(!isempty(iv), IsEmptyError)
+        @argcheck(size(iv) == (DataFrames.DataAPI.nrow(X), N), DimensionMismatch)
         assert_nonneg_where_present(iv, :iv)
         assert_nonempty_gt0_finite_val(ivpa, :ivpa)
-        @argcheck(size(iv) == (DataFrames.DataAPI.nrow(X), N), DimensionMismatch)
         if isa(ivpa, VecNum)
             @argcheck(length(ivpa) == size(iv, 2), DimensionMismatch)
         end
