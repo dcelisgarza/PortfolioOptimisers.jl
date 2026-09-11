@@ -1060,7 +1060,10 @@ function partial_fit!(est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEsti
     else
         partial_fit!(state, X; active_mask = active_mask, estimation_mask = estimation_mask)
     end
-    return Accessors.@reset est.cache = state
+    # `rebuild_estimator`, not `Accessors.@reset`: `@reset` rebuilds a struct by reading
+    # every *property*, and a host that declares forwarded properties has more properties
+    # than fields, so `@reset` refuses it outright. Every prior that buffers is such a host.
+    return rebuild_estimator(est, (; cache = state))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1192,6 +1195,20 @@ The set of fields whose constructor signatures use this alias is the single sour
 """
 const Online_Option{X} = Union{Nothing, <:Online, X}
 """
+    const Onl{X} = Union{<:Online, X}
+
+Alias for a **required** field that accepts a static estimator of type `X` or an [`Online`](@ref) declaration.
+
+The required-field twin of [`Online_Option`](@ref), exactly as [`TD`](@ref) is of [`TD_Option`](@ref): a field a host cannot do without takes this one, so a caller may still declare the online step there while a `nothing` is refused by the signature rather than by something further downstream.
+
+# Related
+
+  - [`Online`](@ref)
+  - [`Online_Option`](@ref)
+  - [`online_fields`](@ref)
+"""
+const Onl{X} = Union{<:Online, X}
+"""
     online_candidate_fields(x)
 
 Field names of `x` whose *type* admits an [`Online`](@ref) — the candidate set [`online_fields`](@ref) narrows by value.
@@ -1272,9 +1289,71 @@ end
 function update_online_estimator(::Nothing)
     return nothing
 end
+"""
+    supports_partial_fit(est) -> Bool
+
+Answers whether [`partial_fit!`](@ref) on this estimator folds rather than refuses.
+
+A host that carries the observations asks this of each of its members, and it is the whole of the mixed-host rule of ADR 0136: **a host folds every member that folds, and runs the batch verb over its own rows for every member that does not.** So a caller writes the estimator they would write in batch, needs no wrapper at the call site, and no member carries a second copy of the sample.
+
+The default is the buffering route: an estimator folds when it carries a [`SampleBufferState`](@ref), which [`Online`](@ref) is what seeds. A family with an exact fold of its own adds a method returning `true`, beside that fold and under the same type bound, minus the `cache` parameter — because an estimator of that family folds either way, exactly when its bound matches and by buffering when a wrapper seeded one. A configuration a family **refuses** — the `SemiMoment` arms, whose clip moves when the mean moves — therefore adds no method and falls back to the default, which is `true` exactly when a wrapper gave it somewhere to buffer.
+
+The predicate reads a type and a field, never a method table. Reading dispatch would classify a *refusal* as a fold, because a refusal is a method too, and those are precisely the members that must buffer instead.
+
+# Arguments
+
+  - `est`: The estimator to ask about.
+
+# Returns
+
+  - `folds::Bool`: `true` when [`partial_fit!`](@ref) folds this estimator.
+
+# Related
+
+  - [`partial_fit!`](@ref)
+  - [`SampleBufferState`](@ref)
+  - [`Online`](@ref)
+  - [`HighOrderPriorEstimator`](@ref)
+"""
+function supports_partial_fit(est::Union{<:AbstractEstimator,
+                                         <:StatsBase.CovarianceEstimator})
+    return hasfield(typeof(est), :cache) && isa(getfield(est, :cache), SampleBufferState)
+end
+function supports_partial_fit(::Nothing)
+    # A member a host does not hold folds vacuously: there is nothing to fold and nothing to
+    # refit, so the host's read-out skips it either way.
+    return true
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Builds the empty state an [`Online`](@ref) seeds into the estimator it wraps.
+
+One sample buffer answers every estimator whose batch verb reads one matrix, which is nearly all of them, so this is that buffer and the seeding needs no per-type knowledge. A family whose batch verb reads **two** matrices — a factor prior, whose `prior(pe, X, F)` regresses one on the other — writes a method of its own returning the paired state its refit reads, and nothing else about the wrapper changes.
+
+The hook takes the estimator rather than its type, so a family that sizes its seed from a field can read it.
+
+# Arguments
+
+  - `est`: The estimator the wrapper wraps, read for its type.
+  - `max_history`: The wrapper's cap, carried into the state.
+
+# Returns
+
+  - `state::AbstractPartialFitState`: The empty state to seed, carrying the cap and no observations.
+
+# Related
+
+  - [`Online`](@ref)
+  - [`SampleBufferState`](@ref)
+  - [`update_online_estimator`](@ref)
+"""
+function online_state_seed(::Union{<:AbstractEstimator, <:StatsBase.CovarianceEstimator},
+                           max_history::Option{<:Integer})
+    return SampleBufferState(; max_history = max_history)
+end
 function update_online_estimator(o::Online)
-    est = rebuild_estimator(o.est,
-                            (; cache = SampleBufferState(; max_history = o.max_history)))
+    est = rebuild_estimator(o.est, (; cache = online_state_seed(o.est, o.max_history)))
     return update_online_estimator(est)
 end
 

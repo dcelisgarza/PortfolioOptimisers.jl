@@ -917,4 +917,9 @@ function Base.copy(x::ExpWeightedCovarianceState)
                                       copy(x.obs_count), copy(x.active))
 end
 
+# An exponentially weighted recursion folds in every configuration (see
+# [`supports_partial_fit`](@ref)).
+function supports_partial_fit(::ExpWeightedCovariance)
+    return true
+end
 export ExpWeightedCovariance

@@ -9,6 +9,7 @@ GeneralCovariance
 show_fields(::GeneralCovariance)
 cov(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
 cor(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
+cor(ce::Union{<:GeneralCovariance, <:Covariance})
 ```
 
 ## [Covariance](@id api-covariance)

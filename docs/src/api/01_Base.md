@@ -231,6 +231,7 @@ PortfolioOptimisers.assert_mergeable_states
 PortfolioOptimisers.chan_merge
 PortfolioOptimisers.assert_partial_fit_state
 PortfolioOptimisers.partial_fit_cache
+PortfolioOptimisers.observation_count
 PortfolioOptimisers.obs_weights_view(::PortfolioOptimisers.AbstractPartialFitState, ::Any)
 ```
 
@@ -253,11 +254,29 @@ PortfolioOptimisers.partial_fit!(est::Union{<:PortfolioOptimisers.AbstractEstima
 PortfolioOptimisers.merge_states(a::PortfolioOptimisers.SampleBufferState, b::PortfolioOptimisers.SampleBufferState)
 Base.copy(x::PortfolioOptimisers.SampleBufferState)
 PortfolioOptimisers.port_opt_view(x::PortfolioOptimisers.SampleBufferState, i, args...)
+PortfolioOptimisers.supports_partial_fit
 Online
 PortfolioOptimisers.Online_Option
+PortfolioOptimisers.Onl
 PortfolioOptimisers.online_candidate_fields
 PortfolioOptimisers.online_fields
+PortfolioOptimisers.online_state_seed(::Union{<:PortfolioOptimisers.AbstractEstimator, <:StatsBase.CovarianceEstimator}, ::PortfolioOptimisers.Option{<:Integer})
 PortfolioOptimisers.update_online_estimator
+```
+
+### The paired buffer
+
+A family whose batch verb reads a returns matrix **and** a factor matrix has two sequences to keep, and one buffer cannot keep them. [`PortfolioOptimisers.FactorSampleBufferState`](@ref) is the pair, and every operation of the seam on it is the operation of its two halves.
+
+```@docs
+PortfolioOptimisers.FactorSampleBufferState
+PortfolioOptimisers.assert_factor_sample_buffer_state
+PortfolioOptimisers.assert_factor_sample_buffer
+PortfolioOptimisers.partial_fit!(state::PortfolioOptimisers.FactorSampleBufferState, x::PortfolioOptimisers.VecNum, f::PortfolioOptimisers.VecNum)
+PortfolioOptimisers.merge_states(a::PortfolioOptimisers.FactorSampleBufferState, b::PortfolioOptimisers.FactorSampleBufferState)
+Base.copy(x::PortfolioOptimisers.FactorSampleBufferState)
+PortfolioOptimisers.port_opt_view(x::PortfolioOptimisers.FactorSampleBufferState, i, args...)
+PortfolioOptimisers.partial_fit!(est::Union{<:PortfolioOptimisers.AbstractEstimator, <:StatsBase.CovarianceEstimator}, X::PortfolioOptimisers.VecNum_MatNum, F::PortfolioOptimisers.VecNum_MatNum; dims::Int = 1, active_mask = nothing, estimation_mask = nothing)
 ```
 
 ## The coverage policy

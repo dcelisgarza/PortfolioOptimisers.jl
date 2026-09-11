@@ -47,6 +47,7 @@ ep_normalise_tail_view
 ep_add_tail_view!
 ep_tail_views!
 add_ep_tail_view!
+PortfolioOptimisers.show_fields(::EntropyPoolingPrior)
 ```
 
 ## Estimator

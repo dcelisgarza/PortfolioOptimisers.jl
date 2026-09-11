@@ -1659,5 +1659,9 @@ function variance_series(ce::RegimeAdjustedExpWeightedVariance, X::MatNum,
                            kwargs...)
 end
 
+# Folds in every configuration; only its merge refuses (see [`supports_partial_fit`](@ref)).
+function supports_partial_fit(::RegimeAdjustedExpWeightedVariance)
+    return true
+end
 export LogRegimeAdjusted, FirstMomentRegimeAdjusted, RootMeanSquaredAdjusted,
        RegimeAdjustedExpWeightedVariance

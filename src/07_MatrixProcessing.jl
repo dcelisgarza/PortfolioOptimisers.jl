@@ -474,6 +474,174 @@ function matrix_processing_step!(::Val{:alg}, mp::MatrixProcessing, sigma::MatNu
     return matrix_processing_algorithm!(mp.alg, sigma, X; kwargs...)
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Refuses a matrix processing estimator whose steps cannot be run from the shape of the sample alone.
+
+Three of the four steps of [`MatrixProcessing`](@ref) never read the sample: `pdm` and `dt` read `sigma` alone, and `dn` reads `size(X)` and nothing else. The fourth, `alg`, is a seam a caller extends, and it is handed `X` whole, so nothing here can say what it reads. An incremental fit keeps a moment and a count rather than the observations, so it can answer the first three and cannot answer the fourth.
+
+The refusal is by name, and it names the two routes that do carry the observations: [`Online`](@ref), which buffers them for the estimator itself, and a prior that carries them for a member of its own.
+
+# Arguments
+
+  - `mp`: The matrix processing estimator whose steps are checked.
+
+# Validation
+
+  - `mp.alg` is `nothing`. An `ArgumentError` is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`matrix_processing!`](@ref)
+  - [`MatrixProcessing`](@ref)
+  - [`Online`](@ref)
+  - [`partial_fit!`](@ref)
+"""
+function assert_shape_only_matrix_processing(mp::MatrixProcessing)
+    @argcheck(isnothing(mp.alg),
+              ArgumentError("`$(typeof(mp.alg))` is a matrix processing algorithm of your own, and it is handed the whole sample, so an incremental fit that keeps a moment and a count cannot run it. Wrap the estimator in `Online`, which buffers the observations the algorithm reads, or host it in a prior that carries them."))
+    return nothing
+end
+"""
+    matrix_processing!(mp::MatrixProcessing, sigma::MatNum, T::Integer, N::Integer;
+                       kwargs...) -> MatNum
+
+Applies matrix processing to `sigma` in-place, from the **shape** of the sample rather than from the sample.
+
+The read-out arm of the pipeline, and the arm an incremental fit reaches: a fold keeps a moment and a count, so the observations the matrix arm reads no longer exist, while the one number that arm takes off them — the effective sample ratio `T / N` of the denoising step — is exactly the count the state carries. The substitution is therefore not an approximation, and [`observation_count`](@ref) is where `T` comes from.
+
+`alg` is the one step with no shape substitute, and [`assert_shape_only_matrix_processing`](@ref) refuses it by name before any step runs.
+
+# Algorithm
+
+ 1. Refuse an `mp` carrying a sample-reading `alg`.
+ 2. Run each step of `mp.order` in turn, through the shape methods of [`matrix_processing_step!`](@ref).
+
+# Arguments
+
+  - $(arg_dict[:mp])
+  - $(arg_dict[:sigrho])
+  - `T`: Number of observations the estimate was fitted over, `NaN` rows included.
+  - `N`: Number of assets.
+  - `kwargs...`: Additional keyword arguments passed to the steps.
+
+# Validation
+
+  - `mp.alg` is `nothing`. An `ArgumentError` is thrown otherwise.
+
+# Returns
+
+  - `sigma::MatNum`: The input matrix `sigma` is modified in-place.
+
+# Related
+
+  - [`matrix_processing!`](@ref)
+  - [`assert_shape_only_matrix_processing`](@ref)
+  - [`observation_count`](@ref)
+  - [`matrix_processing_step!`](@ref)
+"""
+function matrix_processing!(mp::MatrixProcessing, sigma::MatNum, T::Integer, N::Integer;
+                            kwargs...)
+    assert_shape_only_matrix_processing(mp)
+    for step in mp.order
+        matrix_processing_step!(Val(step), mp, sigma, T, N; kwargs...)
+    end
+    return sigma
+end
+"""
+    matrix_processing_step!(::Val{step}, mp::MatrixProcessing, sigma::MatNum, T::Integer,
+                            N::Integer; kwargs...) -> MatNum
+
+Applies a single named matrix processing step to `sigma` in-place, from the shape of the sample.
+
+The shape twin of the matrix methods of [`matrix_processing_step!`](@ref), one method per step, reached only through the shape arm of [`matrix_processing!`](@ref). `pdm` and `dt` read `sigma` alone, so they are the matrix methods verbatim; `dn` takes the ratio `T / N` it would otherwise read off `size(X)`; and `alg` is a no-op, because the arm refuses a non-`nothing` one before the loop starts.
+
+# Arguments
+
+  - `::Val{step}`: The processing step to apply, named by a symbol, as in the matrix methods.
+  - $(arg_dict[:mp])
+  - $(arg_dict[:sigrho])
+  - `T`: Number of observations the estimate was fitted over.
+  - `N`: Number of assets.
+  - `kwargs...`: Additional keyword arguments.
+
+# Returns
+
+  - `sigma::MatNum`: The input matrix `sigma` is modified in-place.
+
+# Related
+
+  - [`matrix_processing!`](@ref)
+  - [`matrix_processing_step!`](@ref)
+  - [`assert_shape_only_matrix_processing`](@ref)
+"""
+function matrix_processing_step!(::Val{:pdm}, mp::MatrixProcessing, sigma::MatNum,
+                                 ::Integer, ::Integer; kwargs...)
+    return posdef!(mp.pdm, sigma)
+end
+function matrix_processing_step!(::Val{:dn}, mp::MatrixProcessing, sigma::MatNum,
+                                 T::Integer, N::Integer; kwargs...)
+    return denoise!(mp.dn, sigma, T / N)
+end
+function matrix_processing_step!(::Val{:dt}, mp::MatrixProcessing, sigma::MatNum, ::Integer,
+                                 ::Integer; kwargs...)
+    return detone!(mp.dt, sigma)
+end
+function matrix_processing_step!(::Val{:alg}, mp::MatrixProcessing, sigma::MatNum,
+                                 ::Integer, ::Integer; kwargs...)
+    return matrix_processing_algorithm!(mp.alg, sigma)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Applies matrix processing to the finite block of `sigma`, from the shape of the sample rather than from the sample.
+
+The shape twin of [`matrix_processing_block!`](@ref), and the arm a read-out of an incremental fit takes. It is the matrix method's body with one substitution: where that one cuts the columns of `X` to the block, this one cuts the **count** of them, because the only thing the steps read off those columns is how many there are.
+
+A read-out reaches this arm rather than the plain one for the reason the [`AssetPanel`](@ref) methods do: an estimator fitted over a changing universe answers `NaN` for an asset outside the Coverage Universe, and a positive-definite repair over a frame carrying one meets a LAPACK refusal rather than a named error. A complete matrix has no frame, and the body then runs the plain arm over the whole of it, so nothing is paid where nothing is missing.
+
+# Algorithm
+
+ 1. Read the block mask off the diagonal of `sigma`.
+ 2. Run the plain arm where no asset is finite, and where every asset is.
+ 3. Otherwise refuse a block carrying a non-finite entry, process the block with the block's own asset count, and write it back.
+
+# Arguments
+
+  - $(arg_dict[:omp])
+  - $(arg_dict[:sigrho])
+  - `T`: Number of observations the estimate was fitted over.
+  - `N`: Number of assets the matrix describes.
+  - `kwargs...`: Additional keyword arguments passed to the steps.
+
+# Returns
+
+  - `sigma::MatNum`: The input matrix `sigma` is modified in-place.
+
+# Related
+
+  - [`matrix_processing_block!`](@ref)
+  - [`matrix_processing!`](@ref)
+  - [`assert_finite_block`](@ref)
+"""
+function matrix_processing_block!(mp::Option{<:AbstractMatrixProcessingEstimator},
+                                  sigma::MatNum, T::Integer, N::Integer; kwargs...)
+    blk = isfinite.(LinearAlgebra.diag(sigma))
+    if !any(blk) || all(blk)
+        matrix_processing!(mp, sigma, T, N; kwargs...)
+        return sigma
+    end
+    assert_finite_block(view(sigma, blk, blk))
+    block = sigma[blk, blk]
+    matrix_processing!(mp, block, T, count(blk); kwargs...)
+    sigma[blk, blk] = block
+    return sigma
+end
+"""
     matrix_processing(
         mp::Option{<:AbstractMatrixProcessingEstimator},
         sigma::MatNum,

@@ -101,7 +101,8 @@ $(DocStringExtensions.FIELDS)
         w::Option{<:VecNum} = nothing,
         rf::Number = 0.0,
         l::Option{<:Number} = nothing,
-        tau::Option{<:Number} = nothing
+        tau::Option{<:Number} = nothing,
+        cache::Option{<:AbstractPartialFitState} = nothing
     ) -> AugmentedBlackLittermanPrior
 
 Keywords correspond to the struct's fields.
@@ -260,6 +261,12 @@ AugmentedBlackLittermanPrior
            tau ┴ nothing
 ```
 
+## The incremental fit
+
+This prior has no exact incremental recursion, so it takes the online step by **refitting from a sample buffer**: [`Online`](@ref) seeds `cache`, [`partial_fit!`](@ref) appends each observation to it verbatim, and the one-argument [`prior`](@ref) runs this estimator's own batch verb over the rows the buffer kept. The answer is therefore exactly a batch fit over those rows, and a `max_history` on the wrapper windows the whole fit. ADR 0136 records the decision.
+
+`cache` travels the three propagation channels as every partial-fit state does: [`factory`](@ref) carries it unchanged, [`port_opt_view`](@ref) slices it to the selected assets, and [`obs_weights_view`](@ref) drops it, because no slice of a state exists on the observation axis. It is not rendered, because a running buffer is not the configuration a reader looks the type up for.
+
 # Related
 
   - [`AbstractLowOrderPriorEstimator_F`](@ref)
@@ -330,6 +337,10 @@ AugmentedBlackLittermanPrior
     $(field_dict[:tau])
     """
     tau
+    """
+    $(field_dict[:pfcache])
+    """
+    @fprop @vprop cache
     function AugmentedBlackLittermanPrior(a_pe::AbstractLowOrderPriorEstimator_A_AF,
                                           f_pe::AbstractLowOrderPriorEstimator_A_AF,
                                           mp::AbstractMatrixProcessingEstimator,
@@ -339,7 +350,8 @@ AugmentedBlackLittermanPrior
                                           a_views_conf::Option{<:Num_VecNum},
                                           f_views_conf::Option{<:Num_VecNum},
                                           w::Option{<:VecNum}, rf::Number,
-                                          l::Option{<:Number}, tau::Option{<:Number})
+                                          l::Option{<:Number}, tau::Option{<:Number},
+                                          cache::Option{<:AbstractPartialFitState})
         if !isnothing(w)
             @argcheck(!isempty(w), IsEmptyError("w cannot be empty"))
         end
@@ -350,19 +362,9 @@ AugmentedBlackLittermanPrior
         assert_bl(f_views, sets, f_views_conf, tau)
         return new{typeof(a_pe), typeof(f_pe), typeof(mp), typeof(re), typeof(a_views),
                    typeof(f_views), typeof(sets), typeof(a_views_conf),
-                   typeof(f_views_conf), typeof(w), typeof(rf), typeof(l), typeof(tau)}(a_pe,
-                                                                                        f_pe,
-                                                                                        mp,
-                                                                                        re,
-                                                                                        a_views,
-                                                                                        f_views,
-                                                                                        sets,
-                                                                                        a_views_conf,
-                                                                                        f_views_conf,
-                                                                                        w,
-                                                                                        rf,
-                                                                                        l,
-                                                                                        tau)
+                   typeof(f_views_conf), typeof(w), typeof(rf), typeof(l), typeof(tau),
+                   typeof(cache)}(a_pe, f_pe, mp, re, a_views, f_views, sets, a_views_conf,
+                                  f_views_conf, w, rf, l, tau, cache)
     end
 end
 function AugmentedBlackLittermanPrior(;
@@ -376,9 +378,35 @@ function AugmentedBlackLittermanPrior(;
                                       f_views_conf::Option{<:Num_VecNum} = nothing,
                                       w::Option{<:VecNum} = nothing, rf::Number = 0.0,
                                       l::Option{<:Number} = nothing,
-                                      tau::Option{<:Number} = nothing)::AugmentedBlackLittermanPrior
+                                      tau::Option{<:Number} = nothing,
+                                      cache::Option{<:AbstractPartialFitState} = nothing)::AugmentedBlackLittermanPrior
     return AugmentedBlackLittermanPrior(a_pe, f_pe, mp, re, a_views, f_views, sets,
-                                        a_views_conf, f_views_conf, w, rf, l, tau)
+                                        a_views_conf, f_views_conf, w, rf, l, tau, cache)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Renders every field of a [`AugmentedBlackLittermanPrior`](@ref) except `cache`.
+
+The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:AugmentedBlackLittermanPrior, true)` to render it. ADR 0105 records the decision.
+
+# Arguments
+
+  - `::AugmentedBlackLittermanPrior`: Prior estimator, read for its type alone.
+
+# Returns
+
+  - `fields::Tuple`: The field names to render, which is `(:a_pe, :f_pe, :mp, :re, :a_views, :f_views, :sets, :a_views_conf, :f_views_conf, :w, :rf, :l, :tau)`.
+
+# Related
+
+  - [`AugmentedBlackLittermanPrior`](@ref)
+  - [`show_fields`](@ref)
+  - [`set_show_nothing_fields!`](@ref)
+"""
+function show_fields(::AugmentedBlackLittermanPrior)
+    return (:a_pe, :f_pe, :mp, :re, :a_views, :f_views, :sets, :a_views_conf, :f_views_conf,
+            :w, :rf, :l, :tau)
 end
 # Expose `:me`, `:ce` from the asset prior `a_pe` and (renamed) `:f_me`, `:f_ce` from the
 # factor prior `f_pe` for transparent access (see [`@forward_properties`](@ref)).

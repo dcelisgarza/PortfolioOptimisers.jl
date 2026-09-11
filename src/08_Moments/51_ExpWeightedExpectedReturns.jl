@@ -620,4 +620,9 @@ function Base.copy(x::ExpWeightedExpectedReturnsState)
     return ExpWeightedExpectedReturnsState(copy(x.mu), copy(x.obs_count), copy(x.active))
 end
 
+# An exponentially weighted recursion folds in every configuration (see
+# [`supports_partial_fit`](@ref)).
+function supports_partial_fit(::ExpWeightedExpectedReturns)
+    return true
+end
 export ExpWeightedExpectedReturns

@@ -2390,5 +2390,9 @@ function variance_series(ce::RegimeAdjustedExpWeightedCovariance, X::MatNum,
                            kwargs...)
 end
 
+# Folds in every configuration; only its merge refuses (see [`supports_partial_fit`](@ref)).
+function supports_partial_fit(::RegimeAdjustedExpWeightedCovariance)
+    return true
+end
 export RegimeAdjustedTarget, MahalanobisTarget, DiagonalTarget, PortfolioTarget,
        RegimeAdjustedExpWeightedCovariance

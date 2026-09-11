@@ -1704,6 +1704,107 @@ function resolve_fill_limit(fill_limit::Real, floor::Real)
     return fill_limit
 end
 """
+    scenario_window(::Nothing, X::MatNum)
+    scenario_window(max_scenarios::Integer, X::MatNum)
+
+Cut the returns matrix a Prior Result carries down to the last `max_scenarios` observations.
+
+The Scenario Cap of ADR 0136, applied. A prior that carries `X` carries it for the scenario risk measures, and a caller who wants a long window of moments and a short window of scenarios says so with one field rather than with two fits. The cap therefore touches `X` alone: `mu` and `sigma` are already computed when this runs, over every observation the fit read, and nothing here can or does move them.
+
+It is deliberately the **same** verb in batch and online. A cap is a property of the result, not of the fold, so `prior(pe, X)` and the read-out of a folded `pe` cut the same rows off the same tail.
+
+A window at or above the number of observations is the matrix itself, and no copy is taken: the cut is a `view`, so a cap that does nothing costs nothing.
+
+# Arguments
+
+  - `max_scenarios`: The number of observations to carry, or `nothing` to carry every one.
+  - `X`: Asset returns, `observations × assets`.
+
+# Returns
+
+  - `X::MatNum`: The last `max_scenarios` rows of `X`, or `X` itself.
+
+# Related
+
+  - [`scenario_fill`](@ref)
+  - [`EmpiricalPrior`](@ref)
+  - [`LowOrderPrior`](@ref)
+"""
+function scenario_window(::Nothing, X::MatNum)
+    return X
+end
+function scenario_window(max_scenarios::Integer, X::MatNum)
+    t = size(X, 1)
+    return max_scenarios >= t ? X : view(X, (t - max_scenarios + 1):t, :)
+end
+"""
+    scenario_fill_report(filled, ::Nothing)
+    scenario_fill_report(filled, named::AbstractSet{<:Integer})
+
+Narrow the filled pairs a [`scenario_fill`](@ref) reports to the assets it has not named before.
+
+A batch fit calls [`scenario_fill`](@ref) once, so it reports everything it finds and keeps no memory: that is the `nothing` method. A walk-forward reading out at every step calls it once per step over a growing window, and every step would otherwise name the same assets again, so a caller who read the first notice learns to ignore the channel and misses the asset that lists at step 500.
+
+So a carry state holds the set of assets it has already named, and this verb narrows the report to the pairs of assets outside it. The set is the state's memory, and [`scenario_fill_remember!`](@ref) is what writes to it — only for a notice that actually fired, so an asset whose share was under the limit at one step is still named at the step where it goes over.
+
+# Arguments
+
+  - `filled`: The `(observation, asset)` pairs [`scenario_fill_pairs`](@ref) found.
+  - `named`: The assets already named, or `nothing` when nothing remembers.
+
+# Returns
+
+  - `report::AbstractVector{<:Tuple{Integer, Integer}}`: The pairs to name, which is `filled` itself when nothing remembers.
+
+# Related
+
+  - [`scenario_fill`](@ref)
+  - [`scenario_fill_remember!`](@ref)
+  - [`PriorCarryState`](@ref)
+"""
+function scenario_fill_report(filled::AbstractVector{<:Tuple{Integer, Integer}}, ::Nothing)
+    return filled
+end
+function scenario_fill_report(filled::AbstractVector{<:Tuple{Integer, Integer}},
+                              named::AbstractSet{<:Integer})
+    return filter(p -> last(p) ∉ named, filled)
+end
+"""
+    scenario_fill_remember!(::Nothing, report)
+    scenario_fill_remember!(named::AbstractSet{<:Integer}, report)
+
+Record the assets a [`scenario_fill`](@ref) has just named, so a later read-out does not name them again.
+
+The write side of [`scenario_fill_report`](@ref). It runs after the notice, not before it, so an asset is remembered exactly when a caller was told about it: under `strict` the notice throws and nothing is remembered, and under a limit the notice did not trip nothing is remembered either.
+
+The set is a field of a [`PriorCarryState`](@ref) and is written **in place**, because a read-out returns a Prior Result rather than the estimator, so there is no other channel by which the memory could survive the call.
+
+# Arguments
+
+  - `named`: The assets already named, or `nothing` when nothing remembers.
+  - `report`: The `(observation, asset)` pairs just named.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`scenario_fill`](@ref)
+  - [`scenario_fill_report`](@ref)
+  - [`PriorCarryState`](@ref)
+"""
+function scenario_fill_remember!(::Nothing, ::AbstractVector{<:Tuple{Integer, Integer}})
+    return nothing
+end
+function scenario_fill_remember!(named::AbstractSet{<:Integer},
+                                 report::AbstractVector{<:Tuple{Integer, Integer}})
+    for p in report
+        push!(named, last(p))
+    end
+    return nothing
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the returns matrix with the missing rows of every investable asset filled with zero, and say so above the fitting estimator's resolved `fill_limit`.
@@ -1722,8 +1823,13 @@ Two mask-aware families reach this verb. The exponentially weighted family carri
 
  1. Return `X` itself when every entry of `X` is finite, which is every fit over a complete window.
  2. Derive the Investable Mask from `mu` and the diagonal of `sigma`, as [`investable_mask`](@ref) does, and find the pairs to fill with [`scenario_fill_pairs`](@ref). Return `X` itself when there are none, which is a gap that belongs to a non-investable asset alone.
- 3. Count the pairs per asset, take the worst column's share of its own observations, and report through [`strict_diagnostic`](@ref) when `strict` holds, when `fill_limit` is `nothing`, or when that share exceeds `fill_limit`.
- 4. Return a copy of `X` with zero written at each of those pairs, and the `NaN` of every non-investable asset left where it is.
+ 3. Narrow the pairs to report with [`scenario_fill_report`](@ref), which drops the assets a carry state has already named and is the identity when nothing remembers. Under `strict` the narrowing is skipped, because `strict` refuses any fill and must not depend on how often the estimator has been read out.
+ 4. Count the reported pairs per asset, take the worst column's share of its own observations, and report through [`strict_diagnostic`](@ref) when `strict` holds, when `fill_limit` is `nothing`, or when that share exceeds `fill_limit`. Record the assets just named with [`scenario_fill_remember!`](@ref).
+ 5. Return a copy of `X` with zero written at each of the filled pairs — every one of them, not just the reported ones — and the `NaN` of every non-investable asset left where it is.
+
+# The notice fires once per asset, not once per step
+
+`named` is what separates the batch call from the online one. A batch fit passes `nothing`, reports every fill it finds, and remembers nothing. A read-out of a folded prior passes the set its [`PriorCarryState`](@ref) carries, so a walk-forward names an asset at the step it lists and stays quiet afterwards instead of emitting the same notice at every one of two thousand steps. The **fill itself is unchanged**: every filled pair is written at every call, whatever the set holds. Under `strict = true` the first fill still throws.
 
 # Arguments
 
@@ -1732,6 +1838,7 @@ Two mask-aware families reach this verb. The exponentially weighted family carri
   - `sigma`: The covariance the estimator answered, `NaN` on the diagonal at a non-investable asset.
   - `strict`: If `true`, any fill raises an `ArgumentError`; if `false`, a fill above the share warns.
   - `fill_limit`: The share of an investable column the fitting estimator accepts in silence, after [`resolve_fill_limit`](@ref), or `nothing` when it accepts none.
+  - `named`: The assets already named, written in place when a notice fires, or `nothing` when nothing remembers.
 
 # Validation
 
@@ -1745,6 +1852,9 @@ Two mask-aware families reach this verb. The exponentially weighted family carri
 
   - [`scenario_fill_pairs`](@ref)
   - [`scenario_fill_msg`](@ref)
+  - [`scenario_fill_report`](@ref)
+  - [`scenario_fill_remember!`](@ref)
+  - [`scenario_window`](@ref)
   - [`resolve_fill_limit`](@ref)
   - [`EmpiricalPrior`](@ref)
   - [`investable_mask`](@ref)
@@ -1752,7 +1862,8 @@ Two mask-aware families reach this verb. The exponentially weighted family carri
   - [`filter_held_gaps`](@ref)
 """
 function scenario_fill(X::MatNum, mu::VecNum, sigma::MatNum, strict::Bool,
-                       fill_limit::Option{<:Real})
+                       fill_limit::Option{<:Real},
+                       named::Option{<:AbstractSet{<:Integer}} = nothing)
     if all(isfinite, X)
         return X
     end
@@ -1761,15 +1872,23 @@ function scenario_fill(X::MatNum, mu::VecNum, sigma::MatNum, strict::Bool,
     if isempty(filled)
         return X
     end
-    counts = zeros(Int, size(X, 2))
-    for (_, i) in filled
-        counts[i] += 1
-    end
-    wi = argmax(counts)
-    worst = counts[wi] / size(X, 1)
-    frac = length(filled) / length(X)
-    if strict || isnothing(fill_limit) || worst > fill_limit
-        strict_diagnostic(scenario_fill_msg(filled, wi, worst, frac, fill_limit), strict)
+    # `strict` refuses **any** fill, so it never reads the memory: an asset a previous
+    # read-out named is still a fill, and silencing it here would make `strict` depend on
+    # how many times the estimator had been read out.
+    report = strict ? filled : scenario_fill_report(filled, named)
+    if !isempty(report)
+        counts = zeros(Int, size(X, 2))
+        for (_, i) in report
+            counts[i] += 1
+        end
+        wi = argmax(counts)
+        worst = counts[wi] / size(X, 1)
+        frac = length(filled) / length(X)
+        if strict || isnothing(fill_limit) || worst > fill_limit
+            strict_diagnostic(scenario_fill_msg(report, wi, worst, frac, fill_limit),
+                              strict)
+            scenario_fill_remember!(named, report)
+        end
     end
     Xf = copy(X)
     for (t, i) in filled

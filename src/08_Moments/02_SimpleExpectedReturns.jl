@@ -753,15 +753,18 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 `Nothing` method of the read-out arm of [`coverage_mean`](@ref). Every asset shares one count, so the whole answer is `NaN` before the first observation and the running mean afterwards.
 
+The running mean is **copied** rather than handed out. `partial_fit!` writes the Welford recursion into `state.mu` in place, so a read-out that returned the accumulator itself would hand the caller a vector that the next fold silently rewrites — and a prior that read its `mu` out and carried it into a Result would find the Result changed under it at the next observation. The [`CoveragePolicy`](@ref) method beside this one copies for the same reason, through [`coverage_frame`](@ref).
+
 # Related
 
   - [`coverage_mean`](@ref)
+  - [`coverage_frame`](@ref)
   - [`SimpleExpectedReturnsState`](@ref)
 """
 function coverage_mean(::SimpleExpectedReturns, ::Nothing,
                        state::SimpleExpectedReturnsState)
     return if state.n >= one(state.n)
-        state.mu
+        copy(state.mu)
     else
         fill(convert(eltype(state.mu), NaN), length(state.mu))
     end
@@ -789,5 +792,10 @@ function coverage_mean(::SimpleExpectedReturns, cvg::CoveragePolicy,
 end
 function Statistics.mean(me::SimpleExpectedReturns)
     return Statistics.mean(me, partial_fit_cache(me))
+end
+# Every configuration of this family folds: the recursion is Welford's and reads the
+# running mean alone (see [`supports_partial_fit`](@ref)).
+function supports_partial_fit(::SimpleExpectedReturns)
+    return true
 end
 export SimpleExpectedReturns, mean

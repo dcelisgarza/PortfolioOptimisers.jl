@@ -8,6 +8,8 @@ prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing}, X::MatNum,
 prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number}, X::MatNum,
       F::Option{<:MatNum} = nothing, pnl::Option{<:AssetPanel} = nothing;
       dims::Int = 1, kwargs...)
+PortfolioOptimisers.show_fields(pe::EmpiricalPrior)
+PortfolioOptimisers.horizon_moments!
 ```
 
 ## References

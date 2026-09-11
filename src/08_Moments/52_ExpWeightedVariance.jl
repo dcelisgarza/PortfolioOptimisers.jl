@@ -806,4 +806,9 @@ function Base.copy(x::ExpWeightedVarianceState)
                                     copy(x.active))
 end
 
+# An exponentially weighted recursion folds in every configuration (see
+# [`supports_partial_fit`](@ref)).
+function supports_partial_fit(::ExpWeightedVariance)
+    return true
+end
 export ExpWeightedVariance

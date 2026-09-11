@@ -381,10 +381,40 @@ A read-out verb called on the estimator alone reads the state out of the `cache`
   - [`partial_fit!`](@ref)
 """
 function partial_fit_cache(est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEstimator})
-    cache = est.cache
+    # An estimator with no `cache` field at all reads as one carrying nothing, so a family
+    # that never took the seam meets the same named refusal rather than a `FieldError`.
+    cache = hasfield(typeof(est), :cache) ? getfield(est, :cache) : nothing
     @argcheck(!isnothing(cache),
               ArgumentError("`$(typeof(est))` carries no partial-fit state, so there is nothing to read. Call `partial_fit!` on it first, or pass a state as the second argument."))
     return cache
 end
 
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Returns the number of observations an estimator has folded into its partial-fit state.
+
+Every state of the seam records the count of observations it has seen in its `n` field, whatever else it accumulates, because the count is what turns a running sum into a moment. This verb reads it, so a read-out that needs the sample size — and not the sample — asks the state rather than the matrix that is no longer there. [`Statistics.cov`](@ref) of a [`PortfolioOptimisersCovariance`](@ref) is the case that motivated it: its denoising step reads `size(X, 1)` alone, and the folded count is exactly that number, `NaN` rows included.
+
+# Arguments
+
+  - `est`: The estimator whose state carries the count.
+
+# Validation
+
+  - `est.cache` is not `nothing`. An `ArgumentError` is thrown otherwise.
+
+# Returns
+
+  - `n::Integer`: Number of observations folded so far.
+
+# Related
+
+  - [`partial_fit_cache`](@ref)
+  - [`partial_fit!`](@ref)
+  - [`AbstractPartialFitState`](@ref)
+"""
+function observation_count(est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEstimator})
+    return partial_fit_cache(est).n
+end
 export partial_fit!, partial_fit

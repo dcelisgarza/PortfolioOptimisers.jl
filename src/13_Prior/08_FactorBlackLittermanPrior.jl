@@ -24,7 +24,8 @@ $(DocStringExtensions.FIELDS)
         rf::Number = 0.0,
         l::Option{<:Number} = nothing,
         tau::Option{<:Number} = nothing,
-        rsd::Bool = true
+        rsd::Bool = true,
+        cache::Option{<:AbstractPartialFitState} = nothing
     ) -> FactorBlackLittermanPrior
 
 Keywords correspond to the struct's fields.
@@ -150,6 +151,12 @@ FactorBlackLittermanPrior
          rsd ┴ Bool: true
 ```
 
+## The incremental fit
+
+This prior has no exact incremental recursion, so it takes the online step by **refitting from a sample buffer**: [`Online`](@ref) seeds `cache`, [`partial_fit!`](@ref) appends each observation to it verbatim, and the one-argument [`prior`](@ref) runs this estimator's own batch verb over the rows the buffer kept. The answer is therefore exactly a batch fit over those rows, and a `max_history` on the wrapper windows the whole fit. ADR 0136 records the decision.
+
+`cache` travels the three propagation channels as every partial-fit state does: [`factory`](@ref) carries it unchanged, [`port_opt_view`](@ref) slices it to the selected assets, and [`obs_weights_view`](@ref) drops it, because no slice of a state exists on the observation axis. It is not rendered, because a running buffer is not the configuration a reader looks the type up for.
+
 # Related
 
   - [`AbstractLowOrderPriorEstimator_F`](@ref)
@@ -219,6 +226,10 @@ FactorBlackLittermanPrior
     $(field_dict[:rsd])
     """
     rsd
+    """
+    $(field_dict[:pfcache])
+    """
+    @fprop @vprop cache
     function FactorBlackLittermanPrior(pe::AbstractLowOrderPriorEstimator_A_AF,
                                        f_mp::AbstractMatrixProcessingEstimator,
                                        mp::AbstractMatrixProcessingEstimator,
@@ -227,12 +238,15 @@ FactorBlackLittermanPrior
                                        sets::Option{<:UniverseSets},
                                        views_conf::Option{<:Num_VecNum},
                                        w::Option{<:VecNum}, rf::Number, l::Option{<:Number},
-                                       tau::Option{<:Number}, rsd::Bool)
+                                       tau::Option{<:Number}, rsd::Bool,
+                                       cache::Option{<:AbstractPartialFitState})
         assert_bl(views, sets, views_conf, tau)
         return new{typeof(pe), typeof(f_mp), typeof(mp), typeof(re), typeof(ve),
                    typeof(views), typeof(sets), typeof(views_conf), typeof(w), typeof(rf),
-                   typeof(l), typeof(tau), typeof(rsd)}(pe, f_mp, mp, re, ve, views, sets,
-                                                        views_conf, w, rf, l, tau, rsd)
+                   typeof(l), typeof(tau), typeof(rsd), typeof(cache)}(pe, f_mp, mp, re, ve,
+                                                                       views, sets,
+                                                                       views_conf, w, rf, l,
+                                                                       tau, rsd, cache)
     end
 end
 function FactorBlackLittermanPrior(;
@@ -245,10 +259,34 @@ function FactorBlackLittermanPrior(;
                                    views_conf::Option{<:Num_VecNum} = nothing,
                                    w::Option{<:VecNum} = nothing, rf::Number = 0.0,
                                    l::Option{<:Number} = nothing,
-                                   tau::Option{<:Number} = nothing,
-                                   rsd::Bool = true)::FactorBlackLittermanPrior
+                                   tau::Option{<:Number} = nothing, rsd::Bool = true,
+                                   cache::Option{<:AbstractPartialFitState} = nothing)::FactorBlackLittermanPrior
     return FactorBlackLittermanPrior(pe, f_mp, mp, re, ve, views, sets, views_conf, w, rf,
-                                     l, tau, rsd)
+                                     l, tau, rsd, cache)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Renders every field of a [`FactorBlackLittermanPrior`](@ref) except `cache`.
+
+The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:FactorBlackLittermanPrior, true)` to render it. ADR 0105 records the decision.
+
+# Arguments
+
+  - `::FactorBlackLittermanPrior`: Prior estimator, read for its type alone.
+
+# Returns
+
+  - `fields::Tuple`: The field names to render, which is `(:pe, :f_mp, :mp, :re, :ve, :views, :sets, :views_conf, :w, :rf, :l, :tau, :rsd)`.
+
+# Related
+
+  - [`FactorBlackLittermanPrior`](@ref)
+  - [`show_fields`](@ref)
+  - [`set_show_nothing_fields!`](@ref)
+"""
+function show_fields(::FactorBlackLittermanPrior)
+    return (:pe, :f_mp, :mp, :re, :ve, :views, :sets, :views_conf, :w, :rf, :l, :tau, :rsd)
 end
 # Expose `:me` and `:ce` from the embedded prior estimator `pe` for transparent access
 # (see [`@forward_properties`](@ref)).

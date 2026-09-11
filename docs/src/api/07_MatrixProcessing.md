@@ -20,6 +20,7 @@ MatrixProcessing
 matrix_processing!
 matrix_processing_block!
 matrix_processing_step!
+PortfolioOptimisers.assert_shape_only_matrix_processing
 matrix_processing
 matrix_processing_algorithm!(::Nothing, sigma::MatNum, args...; kwargs...)
 matrix_processing_algorithm(::Nothing, sigma::MatNum, args...; kwargs...)

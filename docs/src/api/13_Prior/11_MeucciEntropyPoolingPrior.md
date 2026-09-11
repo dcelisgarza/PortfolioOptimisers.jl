@@ -12,6 +12,7 @@ ep_prior(alg::StagedEP, pe::MeucciEntropyPoolingPrior, X::MatNum, F::Option{<:Ma
 ep_prior(alg::H0_EntropyPooling, pe::MeucciEntropyPoolingPrior, X::MatNum,
          F::Option{<:MatNum}, pnl::Option{<:AssetPanel} = nothing; strict::Bool = false,
          kwargs...)
+PortfolioOptimisers.show_fields(::MeucciEntropyPoolingPrior)
 ```
 
 ## References

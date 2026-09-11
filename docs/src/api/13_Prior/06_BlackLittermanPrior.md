@@ -14,6 +14,8 @@ assert_bl_precomputed_universe
 vanilla_posteriors
 apply_rf
 remove_excl_views
+PortfolioOptimisers.assert_bl_views_axis
+PortfolioOptimisers.bl_posterior
 ```
 
 ## References

@@ -23,7 +23,8 @@ $(DocStringExtensions.FIELDS)
         sets::Option{<:UniverseSets} = nothing,
         views_conf::Option{<:Num_VecNum} = nothing,
         rf::Number = 0.0,
-        tau::Option{<:Number} = nothing
+        tau::Option{<:Number} = nothing,
+        cache::Option{<:AbstractPartialFitState} = nothing
     ) -> BayesianBlackLittermanPrior
 
 Keywords correspond to the struct's fields.
@@ -180,6 +181,12 @@ BayesianBlackLittermanPrior
          tau ┴ nothing
 ```
 
+## The incremental fit
+
+This prior has no exact incremental recursion, so it takes the online step by **refitting from a sample buffer**: [`Online`](@ref) seeds `cache`, [`partial_fit!`](@ref) appends each observation to it verbatim, and the one-argument [`prior`](@ref) runs this estimator's own batch verb over the rows the buffer kept. The answer is therefore exactly a batch fit over those rows, and a `max_history` on the wrapper windows the whole fit. ADR 0136 records the decision.
+
+`cache` travels the three propagation channels as every partial-fit state does: [`factory`](@ref) carries it unchanged, [`port_opt_view`](@ref) slices it to the selected assets, and [`obs_weights_view`](@ref) drops it, because no slice of a state exists on the observation axis. It is not rendered, because a running buffer is not the configuration a reader looks the type up for.
+
 # Related
 
   - [`AbstractLowOrderPriorEstimator_F`](@ref)
@@ -230,16 +237,24 @@ BayesianBlackLittermanPrior
     $(field_dict[:tau])
     """
     tau
+    """
+    $(field_dict[:pfcache])
+    """
+    @fprop @vprop cache
     function BayesianBlackLittermanPrior(pe::AbstractLowOrderPriorEstimator_F_AF,
                                          f_mp::AbstractMatrixProcessingEstimator,
                                          mp::AbstractMatrixProcessingEstimator,
                                          views::Lc_BLV, sets::Option{<:UniverseSets},
                                          views_conf::Option{<:Num_VecNum}, rf::Number,
-                                         tau::Option{<:Number})
+                                         tau::Option{<:Number},
+                                         cache::Option{<:AbstractPartialFitState})
         assert_bl(views, sets, views_conf, tau)
         return new{typeof(pe), typeof(f_mp), typeof(mp), typeof(views), typeof(sets),
-                   typeof(views_conf), typeof(rf), typeof(tau)}(pe, f_mp, mp, views, sets,
-                                                                views_conf, rf, tau)
+                   typeof(views_conf), typeof(rf), typeof(tau), typeof(cache)}(pe, f_mp, mp,
+                                                                               views, sets,
+                                                                               views_conf,
+                                                                               rf, tau,
+                                                                               cache)
     end
 end
 function BayesianBlackLittermanPrior(;
@@ -250,9 +265,34 @@ function BayesianBlackLittermanPrior(;
                                      mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                                      views::Lc_BLV, sets::Option{<:UniverseSets} = nothing,
                                      views_conf::Option{<:Num_VecNum} = nothing,
-                                     rf::Number = 0.0,
-                                     tau::Option{<:Number} = nothing)::BayesianBlackLittermanPrior
-    return BayesianBlackLittermanPrior(pe, f_mp, mp, views, sets, views_conf, rf, tau)
+                                     rf::Number = 0.0, tau::Option{<:Number} = nothing,
+                                     cache::Option{<:AbstractPartialFitState} = nothing)::BayesianBlackLittermanPrior
+    return BayesianBlackLittermanPrior(pe, f_mp, mp, views, sets, views_conf, rf, tau,
+                                       cache)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Renders every field of a [`BayesianBlackLittermanPrior`](@ref) except `cache`.
+
+The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:BayesianBlackLittermanPrior, true)` to render it. ADR 0105 records the decision.
+
+# Arguments
+
+  - `::BayesianBlackLittermanPrior`: Prior estimator, read for its type alone.
+
+# Returns
+
+  - `fields::Tuple`: The field names to render, which is `(:pe, :f_mp, :mp, :views, :sets, :views_conf, :rf, :tau)`.
+
+# Related
+
+  - [`BayesianBlackLittermanPrior`](@ref)
+  - [`show_fields`](@ref)
+  - [`set_show_nothing_fields!`](@ref)
+"""
+function show_fields(::BayesianBlackLittermanPrior)
+    return (:pe, :f_mp, :mp, :views, :sets, :views_conf, :rf, :tau)
 end
 # Expose `:me` and `:ce` from the embedded prior estimator `pe` for transparent access
 # (see [`@forward_properties`](@ref)).

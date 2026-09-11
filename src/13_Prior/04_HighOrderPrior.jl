@@ -600,7 +600,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     HighOrderPriorEstimator(;
-        pe::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(),
+        pe::Onl{<:AbstractLowOrderPriorEstimator_A_F_AF} = EmpiricalPrior(),
         kte::Option{<:CokurtosisEstimator} = Cokurtosis(;
             alg = FullMoment()
         ),
@@ -716,14 +716,14 @@ HighOrderPriorEstimator
     $(field_dict[:ske])
     """
     @fprop @vprop ske
-    function HighOrderPriorEstimator(pe::AbstractLowOrderPriorEstimator_A_F_AF,
+    function HighOrderPriorEstimator(pe::Onl{<:AbstractLowOrderPriorEstimator_A_F_AF},
                                      kte::Option{<:CokurtosisEstimator},
                                      ske::Option{<:CoskewnessEstimator})
         return new{typeof(pe), typeof(kte), typeof(ske)}(pe, kte, ske)
     end
 end
 function HighOrderPriorEstimator(;
-                                 pe::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(),
+                                 pe::Onl{<:AbstractLowOrderPriorEstimator_A_F_AF} = EmpiricalPrior(),
                                  kte::Option{<:CokurtosisEstimator} = Cokurtosis(;
                                                                                  alg = FullMoment()),
                                  ske::Option{<:CoskewnessEstimator} = Coskewness(;
@@ -810,10 +810,52 @@ function prior(pe::HighOrderPriorEstimator, X::MatNum, F::Option{<:MatNum} = not
     # expanded onto the full asset universe. `D2`, `L2` and `S2` are then sized from the full
     # width of `pr.X`, which is what the expanded tensors carry.
     kt = cokurtosis(pe.kte, X, pnl; kwargs...)
+    sk, V = coskewness(pe.ske, X, pnl; kwargs...)
+    return assemble_high_order_prior(pe, pr, kt, sk, V)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Assembles a [`HighOrderPrior`](@ref) from a low order result and the co-moments fitted beside it.
+
+The tail of every [`HighOrderPriorEstimator`](@ref) fit, written once: the batch method reaches it after running the two co-moment verbs over the caller's matrix, and the read-out of a folded estimator reaches it after reading the same two off their states. The duplication-elimination matrices a consumer needs depend on which co-moments are present and on nothing else, so the rule lives here rather than in each caller.
+
+`D2`, `L2` and `S2` are sized from the **full** width of `pr.X`, which is what the expanded tensors carry.
+
+# Algorithm
+
+ 1. Build `D2`, `L2` and `S2` where both co-moments are present, and `L2` and `S2` alone where only the cokurtosis is.
+ 2. Assemble the [`HighOrderPrior`](@ref), carrying `pe.ske.mp` where a coskewness tensor was fitted.
+ 3. Refuse a carrier whose blocks do not agree on the Coverage Universe, with [`assert_matched_coverage`](@ref).
+
+# Arguments
+
+  - `pe`: High order prior estimator.
+  - `pr`: The low order prior result the embedded estimator answered.
+  - `kt`: The square cokurtosis matrix, or `nothing`.
+  - `sk`: The coskewness tensor, or `nothing`.
+  - `V`: The coskewness view matrix, or `nothing`.
+
+# Validation
+
+  - Every block of the carrier agrees on the Coverage Universe. An error is thrown otherwise.
+
+# Returns
+
+  - `hop::HighOrderPrior`: The assembled result.
+
+# Related
+
+  - [`HighOrderPriorEstimator`](@ref)
+  - [`HighOrderPrior`](@ref)
+  - [`dup_elim_sum_matrices`](@ref)
+  - [`assert_matched_coverage`](@ref)
+"""
+function assemble_high_order_prior(pe::HighOrderPriorEstimator, pr::AbstractPriorResult,
+                                   kt::Option{<:MatNum}, sk::Option{<:MatNum}, V)
     D2 = nothing
     L2 = nothing
     S2 = nothing
-    sk, V = coskewness(pe.ske, X, pnl; kwargs...)
     if !isnothing(kt) && !isnothing(sk)
         D2, L2, S2 = dup_elim_sum_matrices(size(pr.X, 2))
     elseif !isnothing(kt) && isnothing(sk)

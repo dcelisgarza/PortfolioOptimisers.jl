@@ -1271,4 +1271,9 @@ end
 function Statistics.var(ve::SimpleVariance)
     return Statistics.var(ve, partial_fit_cache(ve))
 end
+# Every configuration of this family folds, for the reason [`SimpleExpectedReturns`](@ref)
+# does (see [`supports_partial_fit`](@ref)).
+function supports_partial_fit(::SimpleVariance)
+    return true
+end
 export SimpleVariance, var, std

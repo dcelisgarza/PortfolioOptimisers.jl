@@ -8,6 +8,7 @@ factor_residual_config
 assert_factor_residual_config
 prior(pe::FactorPrior, X::MatNum, F::MatNum, pnl::Option{<:AssetPanel} = nothing;
                dims::Int = 1, strict::Bool = false, kwargs...)
+PortfolioOptimisers.show_fields(::FactorPrior)
 ```
 
 ## References

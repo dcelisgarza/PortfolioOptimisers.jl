@@ -10,6 +10,7 @@ prior(pe::OpinionPoolingPrior, X::MatNum,
 OpinionPoolingAlgorithm
 robust_probabilities
 compute_pooling
+PortfolioOptimisers.show_fields(::OpinionPoolingPrior)
 ```
 
 ## References

@@ -16,7 +16,8 @@ $(DocStringExtensions.FIELDS)
         mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
         re::AbstractTimeSeriesRegressionEstimator = StepwiseRegression(),
         ve::AbstractVarianceEstimator = SimpleVariance(),
-        rsd::Bool = true
+        rsd::Bool = true,
+        cache::Option{<:AbstractPartialFitState} = nothing
     ) -> FactorPrior
 
 Keywords correspond to the struct's fields.
@@ -94,6 +95,12 @@ FactorPrior
   rsd ┴ Bool: true
 ```
 
+## The incremental fit
+
+This prior has no exact incremental recursion, so it takes the online step by **refitting from a sample buffer**: [`Online`](@ref) seeds `cache`, [`partial_fit!`](@ref) appends each observation to it verbatim, and the one-argument [`prior`](@ref) runs this estimator's own batch verb over the rows the buffer kept. The answer is therefore exactly a batch fit over those rows, and a `max_history` on the wrapper windows the whole fit. ADR 0136 records the decision.
+
+`cache` travels the three propagation channels as every partial-fit state does: [`factory`](@ref) carries it unchanged, [`port_opt_view`](@ref) slices it to the selected assets, and [`obs_weights_view`](@ref) drops it, because no slice of a state exists on the observation axis. It is not rendered, because a running buffer is not the configuration a reader looks the type up for.
+
 # Related
 
   - [`AbstractLowOrderPriorEstimator_F`](@ref)
@@ -134,21 +141,48 @@ FactorPrior
     $(field_dict[:rsd])
     """
     rsd
+    """
+    $(field_dict[:pfcache])
+    """
+    @fprop @vprop cache
     function FactorPrior(pe::AbstractLowOrderPriorEstimator_A_AF,
                          mp::AbstractMatrixProcessingEstimator,
                          re::AbstractTimeSeriesRegressionEstimator,
-                         ve::AbstractVarianceEstimator, rsd::Bool)
-        return new{typeof(pe), typeof(mp), typeof(re), typeof(ve), typeof(rsd)}(pe, mp, re,
-                                                                                ve, rsd)
+                         ve::AbstractVarianceEstimator, rsd::Bool,
+                         cache::Option{<:AbstractPartialFitState})
+        return new{typeof(pe), typeof(mp), typeof(re), typeof(ve), typeof(rsd),
+                   typeof(cache)}(pe, mp, re, ve, rsd, cache)
     end
 end
 function FactorPrior(; pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
                      mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                      re::AbstractTimeSeriesRegressionEstimator = StepwiseRegression(),
-                     ve::AbstractVarianceEstimator = SimpleVariance(),
-                     rsd::Bool = true)::FactorPrior
-    return FactorPrior(pe, mp, re, ve, rsd)
+                     ve::AbstractVarianceEstimator = SimpleVariance(), rsd::Bool = true,
+                     cache::Option{<:AbstractPartialFitState} = nothing)::FactorPrior
+    return FactorPrior(pe, mp, re, ve, rsd, cache)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Renders every field of a [`FactorPrior`](@ref) except `cache`.
+
+The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:FactorPrior, true)` to render it. ADR 0105 records the decision.
+
+# Arguments
+
+  - `::FactorPrior`: Prior estimator, read for its type alone.
+
+# Returns
+
+  - `fields::Tuple`: The field names to render, which is `(:pe, :mp, :re, :ve, :rsd)`.
+
+# Related
+
+  - [`FactorPrior`](@ref)
+  - [`show_fields`](@ref)
+  - [`set_show_nothing_fields!`](@ref)
+"""
+show_fields(::FactorPrior) = (:pe, :mp, :re, :ve, :rsd)
 # Expose `:me` and `:ce` from the embedded asset prior estimator `pe` for transparent access
 # (see [`@forward_properties`](@ref)).
 @forward_properties FactorPrior begin

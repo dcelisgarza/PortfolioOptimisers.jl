@@ -41,6 +41,12 @@ julia> PortfolioOptimisers.compute_pooling(MedianOpinionPooling(), [0.5, 0.5],
  0.375
 ```
 
+## The incremental fit
+
+This prior has no exact incremental recursion, so it takes the online step by **refitting from a sample buffer**: [`Online`](@ref) seeds `cache`, [`partial_fit!`](@ref) appends each observation to it verbatim, and the one-argument [`prior`](@ref) runs this estimator's own batch verb over the rows the buffer kept. The answer is therefore exactly a batch fit over those rows, and a `max_history` on the wrapper windows the whole fit. ADR 0136 records the decision.
+
+`cache` travels the three propagation channels as every partial-fit state does: [`factory`](@ref) carries it unchanged, [`port_opt_view`](@ref) slices it to the selected assets, and [`obs_weights_view`](@ref) drops it, because no slice of a state exists on the observation axis. It is not rendered, because a running buffer is not the configuration a reader looks the type up for.
+
 # Related
 
   - [`LinearOpinionPooling`](@ref)
@@ -150,7 +156,8 @@ $(DocStringExtensions.FIELDS)
         p::Option{<:Number} = nothing,
         w::Option{<:VecNum} = nothing,
         alg::OpinionPoolingAlgorithm = LinearOpinionPooling(),
-        ex::FLoops.Transducers.Executor = FLoops.Transducers.ThreadedEx()
+        ex::FLoops.Transducers.Executor = FLoops.Transducers.ThreadedEx(),
+        cache::Option{<:AbstractPartialFitState} = nothing
     ) -> OpinionPoolingPrior
 
 Keywords correspond to the struct's fields. All arguments are validated for type and value consistency.
@@ -270,12 +277,17 @@ OpinionPoolingPrior
     $(field_dict[:ex])
     """
     ex
+    """
+    $(field_dict[:pfcache])
+    """
+    @fprop @vprop cache
     function OpinionPoolingPrior(pes::VecEP,
                                  pe1::Option{<:AbstractLowOrderPriorEstimator_A_F_AF},
                                  pe2::AbstractLowOrderPriorEstimator_A_F_AF,
                                  p::Option{<:Number}, w::Option{<:VecNum},
                                  alg::OpinionPoolingAlgorithm,
-                                 ex::FLoops.Transducers.Executor)
+                                 ex::FLoops.Transducers.Executor,
+                                 cache::Option{<:AbstractPartialFitState})
         @argcheck(!isempty(pes), IsEmptyError("pes cannot be empty"))
         if !isnothing(p)
             @argcheck(p > zero(p), DomainError(p, "p must be > 0"))
@@ -290,7 +302,7 @@ OpinionPoolingPrior
                       DomainError("sum(w) ($(sum(w))) must be <= 1"))
         end
         return new{typeof(pes), typeof(pe1), typeof(pe2), typeof(p), typeof(w), typeof(alg),
-                   typeof(ex)}(pes, pe1, pe2, p, w, alg, ex)
+                   typeof(ex), typeof(cache)}(pes, pe1, pe2, p, w, alg, ex, cache)
     end
 end
 function OpinionPoolingPrior(; pes::VecEP,
@@ -298,9 +310,32 @@ function OpinionPoolingPrior(; pes::VecEP,
                              pe2::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(),
                              p::Option{<:Number} = nothing, w::Option{<:VecNum} = nothing,
                              alg::OpinionPoolingAlgorithm = LinearOpinionPooling(),
-                             ex::FLoops.Transducers.Executor = FLoops.Transducers.ThreadedEx())::OpinionPoolingPrior
-    return OpinionPoolingPrior(pes, pe1, pe2, p, w, alg, ex)
+                             ex::FLoops.Transducers.Executor = FLoops.Transducers.ThreadedEx(),
+                             cache::Option{<:AbstractPartialFitState} = nothing)::OpinionPoolingPrior
+    return OpinionPoolingPrior(pes, pe1, pe2, p, w, alg, ex, cache)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Renders every field of a [`OpinionPoolingPrior`](@ref) except `cache`.
+
+The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:OpinionPoolingPrior, true)` to render it. ADR 0105 records the decision.
+
+# Arguments
+
+  - `::OpinionPoolingPrior`: Prior estimator, read for its type alone.
+
+# Returns
+
+  - `fields::Tuple`: The field names to render, which is `(:pes, :pe1, :pe2, :p, :w, :alg, :ex)`.
+
+# Related
+
+  - [`OpinionPoolingPrior`](@ref)
+  - [`show_fields`](@ref)
+  - [`set_show_nothing_fields!`](@ref)
+"""
+show_fields(::OpinionPoolingPrior) = (:pes, :pe1, :pe2, :p, :w, :alg, :ex)
 """
     robust_probabilities(ow::VecNum, args...)
     robust_probabilities(ow::VecNum, pw::MatNum, p::Number)

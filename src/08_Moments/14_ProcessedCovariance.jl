@@ -71,9 +71,9 @@ PortfolioOptimisersCovariance
 function ProcessedCovariance(ce::StatsBase.CovarianceEstimator,
                              alg::Option{<:AbstractMatrixProcessingAlgorithm},
                              pdm::Option{<:AbstractPosdefEstimator})::PortfolioOptimisersCovariance
-    return PortfolioOptimisersCovariance(ce,
-                                         MatrixProcessing(; pdm = pdm, alg = alg,
-                                                          order = (:pdm, :alg)))
+    return PortfolioOptimisersCovariance(; ce = ce,
+                                         mp = MatrixProcessing(; pdm = pdm, alg = alg,
+                                                               order = (:pdm, :alg)))
 end
 function ProcessedCovariance(; ce::StatsBase.CovarianceEstimator = Covariance(),
                              alg::Option{<:AbstractMatrixProcessingAlgorithm} = nothing,

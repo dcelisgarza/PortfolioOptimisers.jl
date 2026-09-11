@@ -53,7 +53,8 @@ $(DocStringExtensions.FIELDS)
         dm_opt::Option{<:OptimEntropyPooling} = nothing,
         opt::NonCVaREP = OptimEntropyPooling(),
         w::Option{<:StatsBase.ProbabilityWeights} = nothing,
-        alg::AbstractEntropyPoolingAlgorithm = H1_EntropyPooling()
+        alg::AbstractEntropyPoolingAlgorithm = H1_EntropyPooling(),
+        cache::Option{<:AbstractPartialFitState} = nothing
     ) -> MeucciEntropyPoolingPrior
 
 Keywords correspond to the struct's fields.
@@ -149,6 +150,12 @@ MeucciEntropyPoolingPrior
           alg ┴ H1_EntropyPooling()
 ```
 
+## The incremental fit
+
+This prior has no exact incremental recursion, so it takes the online step by **refitting from a sample buffer**: [`Online`](@ref) seeds `cache`, [`partial_fit!`](@ref) appends each observation to it verbatim, and the one-argument [`prior`](@ref) runs this estimator's own batch verb over the rows the buffer kept. The answer is therefore exactly a batch fit over those rows, and a `max_history` on the wrapper windows the whole fit. ADR 0136 records the decision.
+
+`cache` travels the three propagation channels as every partial-fit state does: [`factory`](@ref) carries it unchanged, [`port_opt_view`](@ref) slices it to the selected assets, and [`obs_weights_view`](@ref) drops it, because no slice of a state exists on the observation axis. It is not rendered, because a running buffer is not the configuration a reader looks the type up for.
+
 # Related
 
   - [`AbstractLowOrderPriorEstimator_AF`](@ref)
@@ -233,6 +240,10 @@ MeucciEntropyPoolingPrior
     $(field_dict[:epalg])
     """
     alg
+    """
+    $(field_dict[:pfcache])
+    """
+    @fprop @vprop cache
     function MeucciEntropyPoolingPrior(pe::AbstractLowOrderPriorEstimator_A_F_AF,
                                        mu_views::Option{<:LinearConstraintEstimator},
                                        var_views::Option{<:VV_VecVV},
@@ -247,7 +258,8 @@ MeucciEntropyPoolingPrior
                                        dm_opt::Option{<:OptimEntropyPooling},
                                        opt::NonCVaREP,
                                        w::Option{<:StatsBase.ProbabilityWeights},
-                                       alg::AbstractEntropyPoolingAlgorithm)
+                                       alg::AbstractEntropyPoolingAlgorithm,
+                                       cache::Option{<:AbstractPartialFitState})
         if !isnothing(w)
             @argcheck(!isempty(w), IsEmptyError("w cannot be empty"))
             if ismutable(w.values)
@@ -272,15 +284,22 @@ MeucciEntropyPoolingPrior
         return new{typeof(pe), typeof(mu_views), typeof(var_views), typeof(cvar_views),
                    typeof(sigma_views), typeof(sk_views), typeof(kt_views),
                    typeof(cov_views), typeof(rho_views), typeof(sets), typeof(ds_opt),
-                   typeof(dm_opt), typeof(opt), typeof(w), typeof(alg)}(pe, mu_views,
-                                                                        var_views,
-                                                                        cvar_views,
-                                                                        sigma_views,
-                                                                        sk_views, kt_views,
-                                                                        cov_views,
-                                                                        rho_views, sets,
-                                                                        ds_opt, dm_opt, opt,
-                                                                        w, alg)
+                   typeof(dm_opt), typeof(opt), typeof(w), typeof(alg), typeof(cache)}(pe,
+                                                                                       mu_views,
+                                                                                       var_views,
+                                                                                       cvar_views,
+                                                                                       sigma_views,
+                                                                                       sk_views,
+                                                                                       kt_views,
+                                                                                       cov_views,
+                                                                                       rho_views,
+                                                                                       sets,
+                                                                                       ds_opt,
+                                                                                       dm_opt,
+                                                                                       opt,
+                                                                                       w,
+                                                                                       alg,
+                                                                                       cache)
     end
 end
 function MeucciEntropyPoolingPrior(;
@@ -298,10 +317,36 @@ function MeucciEntropyPoolingPrior(;
                                    dm_opt::Option{<:OptimEntropyPooling} = nothing,
                                    opt::NonCVaREP = OptimEntropyPooling(),
                                    w::Option{<:StatsBase.ProbabilityWeights} = nothing,
-                                   alg::AbstractEntropyPoolingAlgorithm = H1_EntropyPooling())::MeucciEntropyPoolingPrior
+                                   alg::AbstractEntropyPoolingAlgorithm = H1_EntropyPooling(),
+                                   cache::Option{<:AbstractPartialFitState} = nothing)::MeucciEntropyPoolingPrior
     return MeucciEntropyPoolingPrior(pe, mu_views, var_views, cvar_views, sigma_views,
                                      sk_views, kt_views, cov_views, rho_views, sets, ds_opt,
-                                     dm_opt, opt, w, alg)
+                                     dm_opt, opt, w, alg, cache)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Renders every field of a [`MeucciEntropyPoolingPrior`](@ref) except `cache`.
+
+The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:MeucciEntropyPoolingPrior, true)` to render it. ADR 0105 records the decision.
+
+# Arguments
+
+  - `::MeucciEntropyPoolingPrior`: Prior estimator, read for its type alone.
+
+# Returns
+
+  - `fields::Tuple`: The field names to render, which is `(:pe, :mu_views, :var_views, :cvar_views, :sigma_views, :sk_views, :kt_views, :cov_views, :rho_views, :sets, :ds_opt, :dm_opt, :opt, :w, :alg)`.
+
+# Related
+
+  - [`MeucciEntropyPoolingPrior`](@ref)
+  - [`show_fields`](@ref)
+  - [`set_show_nothing_fields!`](@ref)
+"""
+function show_fields(::MeucciEntropyPoolingPrior)
+    return (:pe, :mu_views, :var_views, :cvar_views, :sigma_views, :sk_views, :kt_views,
+            :cov_views, :rho_views, :sets, :ds_opt, :dm_opt, :opt, :w, :alg)
 end
 # Expose `:me` and `:ce` from the embedded prior estimator `pe` for transparent access
 # (see [`@forward_properties`](@ref)).

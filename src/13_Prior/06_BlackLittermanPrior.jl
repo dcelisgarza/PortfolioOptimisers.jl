@@ -12,7 +12,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     BlackLittermanPrior(;
-        pe::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(;
+        pe::Onl{<:AbstractLowOrderPriorEstimator_A_F_AF} = EmpiricalPrior(;
             me = EquilibriumExpectedReturns()
         ),
         mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
@@ -179,7 +179,7 @@ BlackLittermanPrior
     $(field_dict[:tau])
     """
     tau
-    function BlackLittermanPrior(pe::AbstractLowOrderPriorEstimator_A_F_AF,
+    function BlackLittermanPrior(pe::Onl{<:AbstractLowOrderPriorEstimator_A_F_AF},
                                  mp::AbstractMatrixProcessingEstimator, views::Lc_BLV,
                                  sets::Option{<:UniverseSets},
                                  views_conf::Option{<:Num_VecNum}, rf::Number,
@@ -190,8 +190,8 @@ BlackLittermanPrior
     end
 end
 function BlackLittermanPrior(;
-                             pe::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(;
-                                                                                        me = EquilibriumExpectedReturns()),
+                             pe::Onl{<:AbstractLowOrderPriorEstimator_A_F_AF} = EmpiricalPrior(;
+                                                                                               me = EquilibriumExpectedReturns()),
                              mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                              views::Lc_BLV, sets::Option{<:UniverseSets} = nothing,
                              views_conf::Option{<:Num_VecNum} = nothing, rf::Number = 0.0,
@@ -893,15 +893,79 @@ function prior(pe::BlackLittermanPrior, X::MatNum, F::Option{<:MatNum} = nothing
                pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, strict::Bool = false,
                kwargs...)
     X, F = dims_oriented(dims, X, F)
-    # The axis is checked only by the views that resolve names against it. A `BlackLittermanViews`
-    # result carries its own `P` and never touches `sets`, so demanding a universe for it would
-    # reject the legitimate precomputed-views configuration, which `assert_bl` deliberately permits
-    # to supply no `sets` at all.
+    assert_bl_views_axis(pe, X)
+    prior_model = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
+    return bl_posterior(pe, prior_model, strict; kwargs...)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Refuses a [`BlackLittermanPrior`](@ref) whose asset universe does not describe the returns matrix.
+
+The axis is checked only by the views that resolve names against it. A [`BlackLittermanViews`](@ref) result carries its own `P` and never touches `sets`, so demanding a universe for it would reject the legitimate precomputed-views configuration, which [`assert_bl`](@ref) deliberately permits to supply no `sets` at all.
+
+# Arguments
+
+  - `pe`: Black-Litterman prior estimator.
+  - `X`: Asset returns, `observations × assets`.
+
+# Validation
+
+  - `length(pe.sets.dict[pe.sets.xkey]) == size(X, 2)` where the views resolve names. A `DimensionMismatch` is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`BlackLittermanPrior`](@ref)
+  - [`assert_bl`](@ref)
+"""
+function assert_bl_views_axis(pe::BlackLittermanPrior, X::MatNum)
     if isa(pe.views, LinearConstraintEstimator)
         @argcheck(length(pe.sets.dict[pe.sets.xkey]) == size(X, 2),
                   DimensionMismatch("length(pe.sets.dict[pe.sets.xkey]) ($(length(pe.sets.dict[pe.sets.xkey]))) must match size(X, 2) ($(size(X, 2)))"))
     end
-    prior_model = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Blends the views of a [`BlackLittermanPrior`](@ref) into the result its embedded prior answered.
+
+Everything the estimator does after the embedded prior has answered, written once. The batch method reaches it with the result of a fit over the caller's matrix, and the read-out of a folded estimator reaches it with the result of the embedded prior's own fold. Nothing here reads a returns matrix that the result does not already carry — `T`, the axis and the matrix the processing runs over all come off `prior_model` — which is why the two routes are one body and cannot drift.
+
+# Algorithm
+
+ 1. Reduce to the investable columns with [`investable_views`](@ref), because a view is a dense linear form over the asset axis and one departed asset would poison `omega`.
+ 2. Assemble `P`, `Q`, `tau` and `omega` with [`bl_preroll`](@ref), whose `T` is the number of observations the result carries.
+ 3. Blend with [`bl_posteriors`](@ref), and apply `pe.rf` once, here, with [`apply_rf`](@ref).
+ 4. Process the reduced covariance, before the expansion, because a `NaN` frame has no factorisation.
+ 5. Expand both moments back onto the caller's universe with [`expand_moment`](@ref).
+ 6. Forward everything the embedded result carried, dropping `chol` alone, with [`forward_prior`](@ref).
+
+# Arguments
+
+  - `pe`: Black-Litterman prior estimator.
+  - `prior_model`: The result the embedded prior answered.
+  - `strict`: Whether an unresolved view raises rather than warns.
+  - `kwargs...`: Additional keyword arguments, forwarded to the matrix processing.
+
+# Returns
+
+  - `pr::AbstractPriorResult`: The embedded result with its two moments replaced by the posteriors.
+
+# Related
+
+  - [`BlackLittermanPrior`](@ref)
+  - [`bl_preroll`](@ref)
+  - [`bl_posteriors`](@ref)
+  - [`investable_views`](@ref)
+  - [`forward_prior`](@ref)
+"""
+function bl_posterior(pe::BlackLittermanPrior, prior_model::AbstractPriorResult,
+                      strict::Bool; kwargs...)
     # The reduction, once, at this estimator's entry. A view is a dense linear form over the
     # asset axis and `0 * NaN` is `NaN`, so a single departed asset poisons `omega` and with
     # it every entry of both posteriors — including under a view naming only live assets.
@@ -912,8 +976,8 @@ function prior(pe::BlackLittermanPrior, X::MatNum, F::Option{<:MatNum} = nothing
     vpr = investable_prior(imsk, prior_model)
     posterior_X, prior_mu, prior_sigma = vpr.X, vpr.mu, vpr.sigma
     ledger = String[]
-    blp = bl_preroll(pe.views, vsets, pe.views_conf, prior_sigma, pe.tau, size(X, 1),
-                     eltype(posterior_X), strict; ledger = ledger)
+    blp = bl_preroll(pe.views, vsets, pe.views_conf, prior_sigma, pe.tau,
+                     size(prior_model.X, 1), eltype(posterior_X), strict; ledger = ledger)
     # `nothing` is the view set a departure emptied, and the pair is then the prior's own.
     posterior_mu, posterior_sigma = bl_posteriors(blp, prior_mu, prior_sigma)
     # `pe.rf` is applied here and only here (see [`apply_rf`](@ref)): once, on the asset

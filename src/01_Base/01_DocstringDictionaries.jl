@@ -314,6 +314,7 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  # Prior estimators.
                                  :horizon => "`horizon`: Optional investment horizon for log-normalising returns. If `nothing`, returns are not adjusted.",#
                                  :fill_limit => "`fill_limit`: Share of an investable column's own observations a [`scenario_fill`](@ref) may write in silence, tested against the worst column. If `nothing`, [`resolve_fill_limit`](@ref) derives it at the fit as `1 - min_coverage` over the arms that state a coverage floor, which never fires; where no arm states one, no share passes in silence and every fill is named.",#
+                                 :max_scenarios => "`max_scenarios`: Optional cap on the number of observations the Prior Result carries as scenarios. `nothing` carries every observation the fit read. A cap truncates `X` to the **last** `max_scenarios` rows and leaves `mu` and `sigma` fitted over every observation, so it bounds the memory a scenario-based measure reads and changes no moment. It is the same knob in batch and online, because it is a property of the result rather than of the fold.",#
                                  :tau => "`tau`: Blending parameter controlling the weight given to the prior relative to the views.",#
                                  :views => "`views`: Views estimator or result.",#
                                  :views_conf => "`views_conf`: Views confidence estimator or result.",#

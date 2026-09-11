@@ -41,6 +41,12 @@ Column ``(i - 1)N + i`` is the one that holds ``\\varepsilon_i \\varepsilon_i`` 
 
   - `sk_err::SparseMatrixCSC`: `N × N²` residual coskewness matrix.
 
+## The incremental fit
+
+This prior has no exact incremental recursion, so it takes the online step by **refitting from a sample buffer**: [`Online`](@ref) seeds `cache`, [`partial_fit!`](@ref) appends each observation to it verbatim, and the one-argument [`prior`](@ref) runs this estimator's own batch verb over the rows the buffer kept. The answer is therefore exactly a batch fit over those rows, and a `max_history` on the wrapper windows the whole fit. ADR 0136 records the decision.
+
+`cache` travels the three propagation channels as every partial-fit state does: [`factory`](@ref) carries it unchanged, [`port_opt_view`](@ref) slices it to the selected assets, and [`obs_weights_view`](@ref) drops it, because no slice of a state exists on the observation axis. It is not rendered, because a running buffer is not the configuration a reader looks the type up for.
+
 # Related
 
   - [`cokurtosis_residuals`](@ref)
@@ -192,7 +198,8 @@ $(DocStringExtensions.FIELDS)
         kte::Option{<:CokurtosisEstimator} = Cokurtosis(; alg = FullMoment()),
         ske::Option{<:CoskewnessEstimator} = Coskewness(; alg = FullMoment()),
         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
-        rsd::Bool = true
+        rsd::Bool = true,
+        cache::Option{<:AbstractPartialFitState} = nothing
     ) -> HighOrderFactorPriorEstimator
 
 Keywords correspond to the struct's fields.
@@ -328,13 +335,17 @@ HighOrderFactorPriorEstimator
     $(field_dict[:rsd])
     """
     rsd
+    """
+    $(field_dict[:pfcache])
+    """
+    @fprop @vprop cache
     function HighOrderFactorPriorEstimator(pe::AbstractLowOrderPriorEstimator_F_AF,
                                            kte::Option{<:CokurtosisEstimator},
                                            ske::Option{<:CoskewnessEstimator},
-                                           ex::FLoops.Transducers.Executor, rsd::Bool)
-        return new{typeof(pe), typeof(kte), typeof(ske), typeof(ex), typeof(rsd)}(pe, kte,
-                                                                                  ske, ex,
-                                                                                  rsd)
+                                           ex::FLoops.Transducers.Executor, rsd::Bool,
+                                           cache::Option{<:AbstractPartialFitState})
+        return new{typeof(pe), typeof(kte), typeof(ske), typeof(ex), typeof(rsd),
+                   typeof(cache)}(pe, kte, ske, ex, rsd, cache)
     end
 end
 function HighOrderFactorPriorEstimator(;
@@ -344,9 +355,32 @@ function HighOrderFactorPriorEstimator(;
                                        ske::Option{<:CoskewnessEstimator} = Coskewness(;
                                                                                        alg = FullMoment()),
                                        ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
-                                       rsd::Bool = true)::HighOrderFactorPriorEstimator
-    return HighOrderFactorPriorEstimator(pe, kte, ske, ex, rsd)
+                                       rsd::Bool = true,
+                                       cache::Option{<:AbstractPartialFitState} = nothing)::HighOrderFactorPriorEstimator
+    return HighOrderFactorPriorEstimator(pe, kte, ske, ex, rsd, cache)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Renders every field of a [`HighOrderFactorPriorEstimator`](@ref) except `cache`.
+
+The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:HighOrderFactorPriorEstimator, true)` to render it. ADR 0105 records the decision.
+
+# Arguments
+
+  - `::HighOrderFactorPriorEstimator`: Prior estimator, read for its type alone.
+
+# Returns
+
+  - `fields::Tuple`: The field names to render, which is `(:pe, :kte, :ske, :ex, :rsd)`.
+
+# Related
+
+  - [`HighOrderFactorPriorEstimator`](@ref)
+  - [`show_fields`](@ref)
+  - [`set_show_nothing_fields!`](@ref)
+"""
+show_fields(::HighOrderFactorPriorEstimator) = (:pe, :kte, :ske, :ex, :rsd)
 # Expose `:me` and `:ce` from the embedded prior estimator `pe` for transparent access
 # (see [`@forward_properties`](@ref)).
 @forward_properties HighOrderFactorPriorEstimator begin

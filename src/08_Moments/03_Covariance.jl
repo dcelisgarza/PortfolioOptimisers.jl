@@ -1530,5 +1530,54 @@ end
 function Statistics.cov(ce::Union{<:GeneralCovariance, <:Covariance})
     return Statistics.cov(ce, partial_fit_cache(ce))
 end
+"""
+    Statistics.cor(ce::Union{<:GeneralCovariance,
+                             <:Covariance{<:Any, <:Any, <:FullMoment}},
+                   state::CovarianceState)
+    Statistics.cor(ce::Union{<:GeneralCovariance, <:Covariance})
 
+Reads a correlation matrix out of a folded covariance estimator.
+
+The correlation twin of the state read-out of `Statistics.cov`, and the same two steps the batch method takes: the folded covariance first, then [`coverage_correlation`](@ref), which is the one place the conversion lives. So a folded estimator answers `cor` for the same configurations it answers `cov`, and the composite [`PortfolioOptimisersCovariance`](@ref) can offer both.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - `state`: The state the estimator carries.
+
+# Validation
+
+  - `ce.cache` is not `nothing`, for the one-argument form. An `ArgumentError` is thrown otherwise.
+
+# Returns
+
+  - `rho::MatNum`: Correlation matrix of the observations the state was fitted on.
+
+# Related
+
+  - [`CovarianceState`](@ref)
+  - [`coverage_correlation`](@ref)
+  - [`partial_fit!`](@ref)
+"""
+function Statistics.cor(ce::Union{<:GeneralCovariance,
+                                  <:Covariance{<:Any, <:Any, <:FullMoment}},
+                        state::CovarianceState)
+    return coverage_correlation(Statistics.cor,
+                                coverage_covariance(ce, coverage_policy(ce), state))
+end
+function Statistics.cor(ce::Union{<:GeneralCovariance, <:Covariance})
+    return Statistics.cor(ce, partial_fit_cache(ce))
+end
+
+# `GeneralCovariance` folds in every configuration. `Covariance` folds under `FullMoment`
+# alone: the `SemiMoment` clip is taken against the sample mean, so a past observation's
+# membership of the clipped set flips when the mean moves, and that arm falls back to the
+# default, which buffers wherever a wrapper gave it a buffer (see
+# [`supports_partial_fit`](@ref)).
+function supports_partial_fit(::GeneralCovariance)
+    return true
+end
+function supports_partial_fit(::Covariance{<:Any, <:Any, <:FullMoment})
+    return true
+end
 export GeneralCovariance, Covariance, cov, cor

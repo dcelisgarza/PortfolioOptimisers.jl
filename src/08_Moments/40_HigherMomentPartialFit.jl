@@ -1061,3 +1061,14 @@ The buffer read-out arm of `cokurtosis`. An estimator wrapped in [`Online`](@ref
 function cokurtosis(kte::CokurtosisEstimator, state::SampleBufferState)
     return cokurtosis(kte, sample_buffer(state); sample_buffer_kwargs(state)...)
 end
+
+# A co-moment folds under `FullMoment` with no matrix processing on the way in. The
+# `SemiMoment` arm refuses, for the reason `Covariance` does, and a matrix-processing step
+# reads the whole sample; both fall back to the default, which buffers wherever a wrapper
+# gave them a buffer (see [`supports_partial_fit`](@ref)).
+function supports_partial_fit(::Coskewness{<:Any, <:Any, <:FullMoment, <:Any, Nothing})
+    return true
+end
+function supports_partial_fit(::Cokurtosis{<:Any, <:Any, <:FullMoment, <:Any, Nothing})
+    return true
+end
