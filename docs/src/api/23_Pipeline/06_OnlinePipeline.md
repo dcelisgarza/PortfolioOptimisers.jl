@@ -5,7 +5,7 @@ A [`Pipeline`](@ref) is a host of the online step (ADR 0142). [`partial_fit!`](@
 ## The verbs
 
 ```@docs
-partial_fit!(pipe::Pipeline, data::Prices_RR)
+partial_fit!(pipe::Pipeline{<:Any, <:Any, <:PortfolioOptimisers.Option{<:Union{<:PortfolioOptimisers.PipelineBufferState, <:PortfolioOptimisers.ReturnsBufferState}}}, data::Prices_RR)
 PortfolioOptimisers.fold_pipeline
 PortfolioOptimisers.fold_pipeline_owner
 fit(pipe::Pipeline)
@@ -28,6 +28,7 @@ PortfolioOptimisers.is_row_owner
 PortfolioOptimisers.pipeline_row_owner
 PortfolioOptimisers.online_entry_state(p::Pipeline)
 PortfolioOptimisers.pipeline_online_member
+PortfolioOptimisers.step_online_member
 PortfolioOptimisers.assert_online_entry(p::Pipeline)
 PortfolioOptimisers.assert_online_owner
 PortfolioOptimisers.assert_pipeline_door

@@ -861,9 +861,11 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
     end
     @testset "the conversion takes a carrier, and a bare table runs the layer" begin
         # Map #955, ADR 0133. A keyword survives on the conversion if and only if it changes
-        # the arithmetic of a return, so the estimator carries three fields and the verb
-        # takes three keywords beside the carrier it converts.
-        @test fieldnames(PricesToReturns) == (:ret_method, :padding, :gap_return_alg)
+        # the arithmetic of a return, so the estimator carries three such fields and the
+        # verb takes three keywords beside the carrier it converts. The fourth field is
+        # the partial-fit state ADR 0106 admits, which no keyword of the verb names.
+        @test fieldnames(PricesToReturns) ==
+              (:ret_method, :padding, :gap_return_alg, :cache)
         tsc = collect(Date(2020, 1, 1):Day(1):Date(2020, 1, 5))
         Xc = TimeArray(tsc, [10.0 30.0; 11.0 31.0; 12.0 32.0; 13.0 33.0; 14.0 34.0],
                        [:A, :B])

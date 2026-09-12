@@ -52,7 +52,7 @@ $(DocStringExtensions.FIELDS)
   - [`AbstractPartialFitState`](@ref)
   - [`Online`](@ref)
   - [`vcat_carrier_rows`](@ref)
-  - [`partial_fit!(pipe::Pipeline, data::Prices_RR)`](@ref)
+  - [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{<:PipelineBufferState, <:ReturnsBufferState}}}, data::Prices_RR)`](@ref)
 """
 @concrete struct PipelineBufferState <: AbstractPartialFitState
     """
@@ -166,7 +166,7 @@ Answers whether a data step is universe-only: it folds nothing, and at the read-
 # Related
 
   - [`AbstractAssetSelector`](@ref)
-  - [`partial_fit!(pipe::Pipeline, data::Prices_RR)`](@ref)
+  - [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{<:PipelineBufferState, <:ReturnsBufferState}}}, data::Prices_RR)`](@ref)
 """
 is_universe_step(::Any) = false
 is_universe_step(::AbstractAssetSelector) = true
@@ -192,7 +192,7 @@ The prior step owns the rows when there is one, because [`inject_context`](@ref)
 # Related
 
   - [`is_row_owner`](@ref)
-  - [`partial_fit!(pipe::Pipeline, data::Prices_RR)`](@ref)
+  - [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{<:PipelineBufferState, <:ReturnsBufferState}}}, data::Prices_RR)`](@ref)
 """
 function pipeline_row_owner(p::Pipeline)
     k = findfirst(step -> isa(step_estimator(step), AbstractPriorEstimator), p.steps)
@@ -556,7 +556,7 @@ function assert_pipeline_door(r::PipelineResume, cv)
     return nothing
 end
 """
-    partial_fit!(pipe::Pipeline, data::Prices_RR)
+    partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{<:PipelineBufferState, <:ReturnsBufferState}}}, data::Prices_RR)
 
 Folds a block of observations into a [`Pipeline`](@ref), without fitting.
 
@@ -589,18 +589,21 @@ The arity mirrors the batch verb: `fit(pipe, data)` takes a carrier of the pipel
   - [`PipelineBufferState`](@ref)
   - [`update_online_estimator(p::Pipeline)`](@ref)
 """
-function partial_fit!(pipe::Pipeline, data::Prices_RR)
+function partial_fit!(pipe::Pipeline{<:Any, <:Any,
+                                     <:Option{<:Union{<:PipelineBufferState,
+                                                      <:ReturnsBufferState}}},
+                      data::Prices_RR)
     return fold_pipeline(pipe, pipe.cache, data)
 end
 """
     fold_pipeline(pipe::Pipeline, cache::PipelineBufferState, data::Prices_RR)
     fold_pipeline(pipe::Pipeline, cache::Option{<:ReturnsBufferState}, data::Prices_RR)
 
-The two routes of [`partial_fit!(pipe::Pipeline, data::Prices_RR)`](@ref), chosen by dispatch on the state the Pipeline carries: an input-carrier buffer appends the block, and a Fold Context, or none, walks the steps.
+The two routes of [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{<:PipelineBufferState, <:ReturnsBufferState}}}, data::Prices_RR)`](@ref), chosen by dispatch on the state the Pipeline carries: an input-carrier buffer appends the block, and a Fold Context, or none, walks the steps.
 
 # Related
 
-  - [`partial_fit!(pipe::Pipeline, data::Prices_RR)`](@ref)
+  - [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{<:PipelineBufferState, <:ReturnsBufferState}}}, data::Prices_RR)`](@ref)
   - [`PipelineBufferState`](@ref)
   - [`ReturnsBufferState`](@ref)
 """
@@ -642,7 +645,7 @@ A prior owner is folded through [`fold_prior`](@ref), first, because the Pipelin
 
 # Related
 
-  - [`partial_fit!(pipe::Pipeline, data::Prices_RR)`](@ref)
+  - [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{<:PipelineBufferState, <:ReturnsBufferState}}}, data::Prices_RR)`](@ref)
   - [`fold_prior`](@ref)
   - [`fold_context`](@ref)
 """
@@ -685,7 +688,7 @@ Under `Online(pipe)` the read-out is `fit(pipe, buffer)`, the batch fit over the
 
 # Related
 
-  - [`partial_fit!(pipe::Pipeline, data::Prices_RR)`](@ref)
+  - [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{<:PipelineBufferState, <:ReturnsBufferState}}}, data::Prices_RR)`](@ref)
   - [`readout_data_step`](@ref)
   - [`returns_result`](@ref)
   - [`fit`](@ref)
