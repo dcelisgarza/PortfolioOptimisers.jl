@@ -35,9 +35,14 @@ $(DocStringExtensions.FIELDS)
     MissingDataFilter(;
         col_thr::Number = 1.0,
         row_thr::Number = 1.0,
+        cache::Option{<:AbstractPartialFitState} = nothing,
     ) -> MissingDataFilter
 
 Keywords correspond to the struct's fields.
+
+# Online form
+
+The column filter is universe-only, so a stepped filter counts the gaps of every block in `cache` through [`partial_fit_transform`](@ref), passes the rows through, and reads the [`MissingDataFilterResult`](@ref) of the whole history out through [`fit_preprocessing`](@ref) with no data; a [`Pipeline`](@ref) applies that universe as a view at its read-out. The row filter is row-local only at `row_thr = 1`, where it drops nothing: a lower threshold drops a row kept earlier when a column leaves the universe, so [`supports_partial_fit`](@ref) answers `false` for it and a Pipeline refuses it at warm-up by name.
 
 Both thresholds admit zero, which is the tightest policy the estimator can state: `col_thr = 0` keeps the assets with no gap at all, and `row_thr = 0` keeps the observations with no gap at all.
 
@@ -77,15 +82,20 @@ julia> res.nx
     Maximum allowed fraction `[0, 1]` of missing assets per observation row; rows above it are dropped from the window being transformed. `0` tolerates no gap at all, and keeps the observations at which every surviving asset is priced.
     """
     row_thr
-    function MissingDataFilter(col_thr::Number, row_thr::Number)
+    """
+    $(field_dict[:pfcache])
+    """
+    cache
+    function MissingDataFilter(col_thr::Number, row_thr::Number,
+                               cache::Option{<:AbstractPartialFitState})
         @argcheck(zero(col_thr) <= col_thr <= one(col_thr), DomainError)
         @argcheck(zero(row_thr) <= row_thr <= one(row_thr), DomainError)
-        return new{typeof(col_thr), typeof(row_thr)}(col_thr, row_thr)
+        return new{typeof(col_thr), typeof(row_thr), typeof(cache)}(col_thr, row_thr, cache)
     end
 end
-function MissingDataFilter(; col_thr::Number = 1.0,
-                           row_thr::Number = 1.0)::MissingDataFilter
-    return MissingDataFilter(col_thr, row_thr)
+function MissingDataFilter(; col_thr::Number = 1.0, row_thr::Number = 1.0,
+                           cache::Option{<:AbstractPartialFitState} = nothing)::MissingDataFilter
+    return MissingDataFilter(col_thr, row_thr, cache)
 end
 """
 $(DocStringExtensions.TYPEDEF)

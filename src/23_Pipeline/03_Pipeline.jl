@@ -201,7 +201,12 @@ discipline). Only ever called on the failing path.
   - [`Pipeline`](@ref)
 """
 function first_duplicate(xs)
-    seen = Set{eltype(xs)}()
+    if isempty(xs)
+        return nothing
+    end
+    #! `typeof(first(xs))`, not `eltype(xs)`: over an abstract `Tuple{Vararg{String}}` the
+    #! latter is inferred as `Union{}`, and JET reports the set's lookup.
+    seen = Set{typeof(first(xs))}()
     for x in xs
         if x in seen
             return x
@@ -227,7 +232,8 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    Pipeline(; steps::Union{<:Tuple, <:AbstractVector}) -> Pipeline
+    Pipeline(; steps::Union{<:Tuple, <:AbstractVector},
+               cache::Option{<:AbstractPartialFitState} = nothing) -> Pipeline
 
 Steps are given in execution order. Each element is either a step estimator or a `"name" => estimator` pair; unnamed steps are auto-named from the slot they write (`"prior"`), suffixed in order of appearance when a slot repeats (`"prices_1"`, `"prices_2"`).
 
@@ -239,6 +245,10 @@ Steps are given in execution order. Each element is either a step estimator or a
   - No step may write a slot that invalidates a slot an earlier step already wrote (see [`PIPELINE_INVALIDATES`](@ref)). A step that rewrites `:returns` after a prior, phylogeny, uncertainty, or constraint step would leave that result computed on a stale asset universe.
   - An optimisation step, if present, must be the last step (see [`assert_opt_last`](@ref)): it writes the terminal `:opt` slot, and no step may run after it.
   - Step names must be unique.
+
+# Online form
+
+A Pipeline is a host of the online step, decided by [ADR 0142](https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/main/docs/adr/0142-a-pipeline-is-a-host-its-steps-fold-or-defer-to-a-view-and-a-step-with-no-online-form-is-refused-unless-the-pipeline-declares-a-refit.md): [`partial_fit!`](@ref) walks the steps in order, folding each block of observations through them into the **row owner** — the prior step, else the optimiser step — and `fit(pipe)` with no data reads the fitted [`PipelineResult`](@ref) out. Every step before the owner belongs to one of three classes. A **row-local** step ([`PricesToReturns`](@ref), [`PriceGapFill`](@ref) with a [`CarriedPrice`](@ref), [`MissingDataFilter`](@ref) at `row_thr = 1`) folds and emits the transformed rows. A **universe-only** step (an [`AbstractAssetSelector`](@ref), and the column filter of a `MissingDataFilter`) folds nothing and is refitted at the read-out over the owner's rows, its universe applied as a view. A **window-valued** step, and any other step that writes a data slot, is refused at warm-up by name, and `Online(pipe)` is the declared refit that admits it. `cache` is the Fold Context the Pipeline keeps when a prior step owns the rows, or the input-carrier buffer `Online(pipe)` seeds; it is `nothing` until a step writes one. See [`partial_fit!(pipe::Pipeline, data::Prices_RR)`](@ref) and [`fit(pipe::Pipeline)`](@ref).
 
 # Examples
 
@@ -265,15 +275,21 @@ julia> pipe.names
     The step estimators, in execution order.
     """
     steps
-    function Pipeline(names::Tuple{Vararg{String}}, steps::Tuple)
+    """
+    $(field_dict[:pfcache])
+    """
+    cache
+    function Pipeline(names::Tuple{Vararg{String}}, steps::Tuple,
+                      cache::Option{<:AbstractPartialFitState} = nothing)
         @argcheck(!isempty(steps), IsEmptyError("steps cannot be empty"))
         @argcheck(length(names) == length(steps), DimensionMismatch)
         @argcheck(allunique(names),
                   ArgumentError("pipeline step names must be unique; the name $(repr(first_duplicate(names))) is repeated among the $(length(names)) steps"))
-        return new{typeof(names), typeof(steps)}(names, steps)
+        return new{typeof(names), typeof(steps), typeof(cache)}(names, steps, cache)
     end
 end
-function Pipeline(; steps::Union{<:Tuple, <:AbstractVector})::Pipeline
+function Pipeline(; steps::Union{<:Tuple, <:AbstractVector},
+                  cache::Option{<:AbstractPartialFitState} = nothing)::Pipeline
     @argcheck(!isempty(steps), IsEmptyError("steps cannot be empty"))
     ests = Vector{Any}(undef, length(steps))
     explicit = Vector{Union{Nothing, String}}(undef, length(steps))
@@ -322,7 +338,7 @@ function Pipeline(; steps::Union{<:Tuple, <:AbstractVector})::Pipeline
             string(s, '_', seen[s])
         end
     end
-    return Pipeline(Tuple(names), Tuple(ests))
+    return Pipeline(Tuple(names), Tuple(ests), cache)
 end
 pipe_writes(p::Pipeline) = pipe_writes(p.steps[end])
 pipe_reads(p::Pipeline) = pipe_reads(p.steps[1])
@@ -986,19 +1002,14 @@ function fit_and_predict(res::PipelineResult, data::AbstractReturnsResult;
                             store_weight_path = store_weight_path, strict = strict,
                             w_prev = w_prev)
 end
-function fit_and_predict(pipe::Pipeline, data::Prices_RR; train_idx::VecInt,
-                         test_idx::VecInt_VecVecInt, cols = :,
-                         wd::Option{<:AbstractWeightDrift} = nothing,
+function fit_and_predict(pipe::Pipeline, data::Prices_RR;
+                         train_idx::Option{<:VecInt} = nothing, test_idx::VecInt_VecVecInt,
+                         cols = :, wd::Option{<:AbstractWeightDrift} = nothing,
                          hwd::Option{<:AbstractWeightDrift} = wd,
                          fa::Option{<:AbstractFeeAmortisation} = nothing,
                          store_weight_path::Bool = false, strict::Bool = false,
                          w_prev::Option{<:VecNum_VecVecNum} = nothing)
-    data_train = pipeline_data_view(data, train_idx, cols)
-    #! Maybe we should define a port_opt_view for pipelines?
-    # if !isa(cols, Colon)
-    #     opt = port_opt_view(pipe, cols)
-    # end
-    res = StatsAPI.fit(pipe, data_train)
+    res = pipeline_fold_fit(pipe, data, train_idx, cols)
     return StatsAPI.predict(res, data, test_idx, cols; wd = wd, hwd = hwd, fa = fa,
                             store_weight_path = store_weight_path, strict = strict,
                             w_prev = w_prev)

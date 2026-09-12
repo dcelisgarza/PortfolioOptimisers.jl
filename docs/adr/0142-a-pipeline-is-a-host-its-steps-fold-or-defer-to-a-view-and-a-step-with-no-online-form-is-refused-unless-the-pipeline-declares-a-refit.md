@@ -95,14 +95,23 @@ then no host below it holds them. The Fold Context takes the owner's cap, as ADR
 **Each step before the row owner takes the step in the form its class allows.**
 
 - A **row-local** step folds. `PricesToReturns`, `PriceGapFill` and `MissingDataFilter` gain
-  `cache::Option{<:AbstractPartialFitState} = nothing` and a `partial_fit!` of their own, and read
-  out to today's Results. `PricesToReturns` keeps the last price row, and under `CatchUpGapReturn`
-  the last observed price per column, and emits the new return rows exactly; `PriceGapFill` keeps
-  the carry per column and emits the filled rows; `MissingDataFilter` keeps the missing count per
-  column and the row count, passes every row through, and defers its column filter to the
-  read-out. The state lives on the step, as ADR 0106 places every Partial Fit State, so a step's
-  online form is tested alone against its batch fit as every moment's is, and a caller's own
-  preprocessing estimator joins the host route by writing the same two methods.
+  `cache::Option{<:AbstractPartialFitState} = nothing` and an online form of their own, and read
+  out to today's Results. The form is one verb, `partial_fit_transform(step, block)`, which
+  folds the block and **emits** the block its transform gives it, because the two halves are
+  inseparable — the first return of a new block is computed from the last price row the step
+  kept, so a fold that returned the step alone could not hand the Pipeline the rows the owner
+  folds. `partial_fit!(step, block)` is that verb's first element, and the read-out is
+  `fit_preprocessing(step)` with no data. `PricesToReturns` keeps the last price row as a
+  one-row carrier, so the span, the panel and the implied volatilities of the row ride with it,
+  and under `CatchUpGapReturn` the last observed price of every series column — the assets, the
+  factors and the benchmark, which the conversion treats alike — and emits the new return rows
+  exactly; `PriceGapFill` keeps the carry per column and emits the filled rows;
+  `MissingDataFilter` keeps the missing count per column and the row count, passes every row
+  through, and defers its column filter to the read-out. The state lives on the step, as
+  ADR 0106 places every Partial Fit State, so a step's online form is tested alone against its
+  batch fit as every moment's is, and a caller's own preprocessing estimator joins the host route
+  by writing three methods: the transform, the data-less read-out, and `supports_partial_fit`
+  answering `true`.
 - A **universe-only** step folds nothing and defers. A selector's `partial_fit!` is the identity
   on the rows. At read-out the step's batch verb runs over the owner's carried rows, its Result is
   applied to `ctx.returns` as today (`apply_fitted_step`), and the *owner's state* is viewed to
@@ -111,12 +120,14 @@ then no host below it holds them. The Fold Context takes the owner's cap, as ADR
   steps is expressed as a view, never by re-slicing a state and never by freezing the selection.
   A selector re-ranks per step exactly as the batch loop re-fits it per fold.
 - A **window-valued** step, or any step that writes a Data Slot before the row owner and has no
-  online form — `PriceGapFill` with a statistic fill, `MissingDataFilter` with `row_thr < 1`, a
-  callable `PipelineStep` writing `:prices` or `:returns`, a caller's preprocessing estimator
-  without a `partial_fit!` — **is refused at warm-up by name**, and the message names both
-  routes: give the step a `partial_fit!`, or declare a refit with `Online(pipe)`. The predicate is
-  `supports_partial_fit`, reused by its readers' meaning, which reads a type and a field; the two
-  library configurations answer `false` by the fill's type and by `row_thr`.
+  online form — `PriceGapFill` with a statistic fill, `MissingDataFilter` with `row_thr < 1`,
+  `PricesToReturns` under a caller's own Gap Return algorithm, a callable `PipelineStep` writing
+  `:prices` or `:returns`, a nested `Pipeline` writing one, a caller's preprocessing estimator
+  without a transform — **is refused at warm-up by name**, and the message names both routes:
+  give the step a `partial_fit_transform`, or declare a refit with `Online(pipe)`. The predicate
+  is `supports_partial_fit`, reused by its readers' meaning, which reads a type and a field; the
+  library configurations answer `false` by the fill's type, by `row_thr`, and by the algorithm's
+  type.
 
 **`Online(pipe; max_history = w)` is the declared refit.** It seeds an input-carrier buffer into
 `pipe.cache`, folds no member, and reads out by `fit(pipe, buffer)`, so it is exact for every
@@ -133,6 +144,14 @@ owner's cap.
 
 A plain Pipeline handed a scheme with `ff = OnlineStep()` takes the host route with no wrapper; the
 refusal reaches the window-valued configurations and the unknown data-slot steps alone.
+`Online(pipe)` takes the two `cross_val_predict` doors, the contiguous and the multiple-randomised,
+and is not a search root: a search's lenses address the pipeline's steps, not a wrapper's.
+
+**The read-out restricts a price-level Result to the surviving assets.** The batch fit of
+`PriceGapFill` and `MissingDataFilter` is made over the columns an earlier column filter left, and
+the online form folds every input column, so `fit(pipe)` reads each such Result out restricted to
+the assets surviving the steps before it; the per-step Results then equal the batch fold's exactly,
+and a fitted pipeline replays on a test window as the batch one does.
 
 **The `PipelineContext` is not threaded.** The read-out is a fit, and the context is that fit's
 blackboard, built per read-out; the ticket's third question collapses.
@@ -152,9 +171,39 @@ blackboard, built per read-out; the ticket's third question collapses.
 - A `TrainTestSplit` and a finite allocation, as today: `assert_no_holdout` refuses the first at
   every cross-validation door, and the arm's type bound excludes the second.
 
-A nested Pipeline step recurses: its steps are steps, and a nested prior step is the outer's row
-owner. A callable or a constraint, uncertainty-set or phylogeny step writing a derived slot runs
-at read-out over the reconstituted context, holds no state and is refused nowhere.
+A nested Pipeline step writing a Data Slot before the row owner is refused at warm-up by name,
+pointing at flattening its steps and at `Online(pipe)`: the build did not recurse into one, because
+its rows would have to be emitted through a walk that stops at an owner two layers down, and the
+Pipeline's `fit` has no such door today. A callable or a constraint, uncertainty-set or phylogeny
+step writing a derived slot runs at read-out over the reconstituted context, holds no state and is
+refused nowhere. A callable reading `:prices` at read-out finds the slot empty and is refused by
+`require_slot`'s own message, because the price rows are not reconstituted — the owner holds
+returns.
+
+### What the build measured
+
+Four facts, found on the way and recorded here rather than left to be found again.
+
+1. **`PriceGapFill(CarriedPrice())` is row-local under the ingestion layer's span alone.** The batch
+   fit seeds every column's walk with the *last* observed training price and walks from the
+   window's first row, so a gap inside the span **before** a column's first observed price is
+   filled with a value that moves as the window grows. The ingestion layer's `listing_span` opens
+   at the first observed price, so no such cell exists on the layer's path; a caller-declared span
+   that opens earlier has them. The online form seeds a column first observed inside a block with
+   the block's last observed price, which is the batch fit's answer at that step and not at the
+   next. It is the one stated limit of the carried fill's exactness, and it is reachable only with
+   a caller's own span.
+2. **The prior's state must have an asset view for a re-selection to be expressed as one.** Every
+   library prior slices its state through `port_opt_view`; a caller's prior whose state has no
+   view reads out over the full universe, and the read-out refuses it by name, pointing at putting
+   the universe steps after the prior.
+3. **The Pipeline's multiple-randomised path never handed `fold_loop` its scheme**, so a Pipeline
+   under `MultipleRandomised(cv; ff = OnlineStep())` would have run the batch arm in silence had
+   the door not refused a Fold Fit. The path now passes the scheme, as the optimiser's does, and
+   the online arm runs per path over the path's asset view of the data.
+4. **The rows reach the owner as a `ReturnsResult` or not at all.** A prices pipeline whose
+   steps convert nothing before the owner is refused by name at the first step, where the batch
+   fit refuses it at `require_slot`.
 
 ### The identities the build pins
 
@@ -217,14 +266,19 @@ at read-out over the reconstituted context, holds no state and is refused nowher
   only where set. `fit(pipe, data)` is untouched. No released number moves: the route is reached
   only through a scheme's `ff = OnlineStep()`, which the doors refuse today.
 - The three Pipeline doors — `cross_val_predict`, its `MultipleRandomised` form and
-  `search_cross_validation` — drop `assert_batch_fold_fit`, and `assert_online_entry(::Pipeline)`
-  becomes the walk over the steps.
+  `search_cross_validation` — drop `assert_batch_fold_fit`, which is deleted with its last
+  caller, and `assert_online_entry(::Pipeline)` becomes the walk over the steps. The search door
+  refuses a warm pipeline once, before the grid, through `assert_search_entry`.
+- `Online` becomes a routable step: `pipe_writes` and `pipe_reads` forward to the wrapped
+  estimator, so `Online(EmpiricalPrior(); max_history = w)` is a prior step, and a fold-less
+  `fit(pipe, data)` refuses it by name because it has no warm-up to resolve it.
 - A capped owner (`EmpiricalPrior(; max_scenarios = w)`) makes a selector rank over `w` rows at
   read-out, which is the divergence the Scenario Cap already documents (ADR 0136); the Pipeline
   adds no rule.
 - `CONTEXT.md`: *Pipeline* states its online form, *Fold Context* names the Pipeline as a holder,
   and *Sample Buffer* names the input-carrier buffer `Online(pipe)` seeds.
-- The build is one ticket of map #861, blocked by nothing open; the Pipeline's search door lifts
-  its refusal in the same build, after
-  [#1020](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1020) lands the
-  optimiser's.
+- Built by [#1022](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1022) in
+  `src/03_InputData/18_PreprocessingPartialFit.jl` and `src/23_Pipeline/06_OnlinePipeline.jl`,
+  tested in `test/test_24f_pipeline_partial_fit.jl`; the Pipeline's search door lifted its
+  refusal in the same build, [#1020](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1020)
+  having landed the optimiser's.

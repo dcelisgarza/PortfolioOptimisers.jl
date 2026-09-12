@@ -275,7 +275,7 @@ The fixture is the online fold loop's, because the identities are structural.
         end
     end
 
-    @testset "8. The Pipeline's search takes the same route in batch, and its door refuses `ff`" begin
+    @testset "8. The Pipeline's search takes the same route in batch and online" begin
         pipe = Pipeline(; steps = (EmpiricalPrior(), mr))
         grid = ["steps[2].opt.l1" => [0.0002, 0.0005]]
         res = search_cross_validation(pipe, gs(batch_cv, grid; train_score = true), rd)
@@ -294,14 +294,11 @@ The fixture is the online fold loop's, because the identities are structural.
         pres = search_cross_validation(pipe, gs(mb, grid), rd)
         dres = search_cross_validation(mr, gs(mb, ["opt.l1" => grid[1][2]]), rd)
         @test isapprox(pres.test_scores, dres.test_scores; atol = 1e-8)
-        # The door refuses a Fold Fit by name, before the grid.
-        err = try
-            search_cross_validation(pipe, gs(online_cv, grid), rd)
-            nothing
-        catch e
-            e
-        end
-        @test isa(err, ArgumentError) && occursin("#872", err.msg)
+        # The door takes a Fold Fit since #1022, and picks the batch candidate; test_24f pins
+        # the Pipeline's identities.
+        ores = search_cross_validation(pipe, gs(online_cv, grid), rd)
+        @test isapprox(ores.test_scores, res.test_scores; atol = 1e-6)
+        @test ores.idx == res.idx
         # A failed candidate loses the Pipeline's search too (ADR 0120).
         bad = WeightBounds(; lb = fill(0.5, N), ub = ones(N))
         ok = WeightBounds(; lb = zeros(N), ub = ones(N))

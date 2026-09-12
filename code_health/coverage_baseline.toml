@@ -42,6 +42,7 @@ commit = "8610300"
 "src/03_InputData/15_FeatureSelector.jl" = { lines = 127, misses = 0 }
 "src/03_InputData/16_PanelDataFrame.jl" = { lines = 97, misses = 0 }
 "src/03_InputData/17_ReturnsBufferState.jl" = { lines = 93, misses = 0 }
+"src/03_InputData/18_PreprocessingPartialFit.jl" = { lines = 186, misses = 0 }
 "src/04_PosdefMatrix.jl" = { lines = 26, misses = 0 }
 "src/05_Denoise.jl" = { lines = 80, misses = 0 }
 "src/06_Detone.jl" = { lines = 30, misses = 0 }
@@ -294,6 +295,7 @@ commit = "8610300"
 "src/23_Pipeline/03_Pipeline.jl" = { lines = 277, misses = 24 }
 "src/23_Pipeline/04_PredictionCV.jl" = { lines = 96, misses = 19 }
 "src/23_Pipeline/05_SearchCrossValidation.jl" = { lines = 131, misses = 23 }
+"src/23_Pipeline/06_OnlinePipeline.jl" = { lines = 205, misses = 0 }
 "src/24_Plotting.jl" = { lines = 11, misses = 3 }
 "src/25_Aliases.jl" = { lines = 43, misses = 0 }
 "src/PortfolioOptimisers.jl" = { lines = 0, misses = 0 }

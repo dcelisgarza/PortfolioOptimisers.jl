@@ -34,7 +34,7 @@ commit = "f3e6153ec2"
 "src/03_InputData/06_PricesResult.jl" = { cyc = 7, cog = 7, arg = 7, cyc_sum = 26, cog_sum = 26, arg_sum = 19, macros = [] }
 "src/03_InputData/07_PriceIngestion.jl" = { cyc = 8, cog = 11, arg = 4, cyc_sum = 55, cog_sum = 33, arg_sum = 52, macros = [] }
 "src/03_InputData/08_PriceGapFill.jl" = { cyc = 4, cog = 6, arg = 5, cyc_sum = 23, cog_sum = 18, arg_sum = 24, macros = [] }
-"src/03_InputData/09_PriceFilters.jl" = { cyc = 3, cog = 5, arg = 2, cyc_sum = 6, cog_sum = 6, arg_sum = 2, macros = [] }
+"src/03_InputData/09_PriceFilters.jl" = { cyc = 3, cog = 5, arg = 3, cyc_sum = 6, cog_sum = 6, arg_sum = 3, macros = [] }
 "src/03_InputData/10_ReturnsResult.jl" = { cyc = 18, cog = 25, arg = 10, cyc_sum = 50, cog_sum = 60, arg_sum = 44, macros = [] }
 "src/03_InputData/11_PricesToReturns.jl" = { cyc = 9, cog = 15, arg = 4, cyc_sum = 34, cog_sum = 34, arg_sum = 28, macros = [] }
 "src/03_InputData/12_TrainTestSplit.jl" = { cyc = 6, cog = 6, arg = 4, cyc_sum = 16, cog_sum = 8, arg_sum = 16, macros = [] }
@@ -43,6 +43,7 @@ commit = "f3e6153ec2"
 "src/03_InputData/15_FeatureSelector.jl" = { cyc = 10, cog = 10, arg = 3, cyc_sum = 56, cog_sum = 50, arg_sum = 19, macros = [] }
 "src/03_InputData/16_PanelDataFrame.jl" = { cyc = 7, cog = 9, arg = 7, cyc_sum = 37, cog_sum = 35, arg_sum = 47, macros = [] }
 "src/03_InputData/17_ReturnsBufferState.jl" = { cyc = 9, cog = 15, arg = 4, cyc_sum = 63, cog_sum = 59, arg_sum = 42, macros = [] }
+"src/03_InputData/18_PreprocessingPartialFit.jl" = { cyc = 6, cog = 10, arg = 6, cyc_sum = 74, cog_sum = 69, arg_sum = 57, macros = [] }
 "src/04_PosdefMatrix.jl" = { cyc = 5, cog = 4, arg = 2, cyc_sum = 10, cog_sum = 5, arg_sum = 4, macros = [] }
 "src/05_Denoise.jl" = { cyc = 4, cog = 6, arg = 7, cyc_sum = 18, cog_sum = 11, arg_sum = 30, macros = [] }
 "src/06_Detone.jl" = { cyc = 3, cog = 2, arg = 2, cyc_sum = 8, cog_sum = 3, arg_sum = 8, macros = [] }
@@ -303,8 +304,9 @@ commit = "f3e6153ec2"
 "src/23_Pipeline/01_Base_Pipeline.jl" = { cyc = 3, cog = 2, arg = 7, cyc_sum = 46, cog_sum = 8, arg_sum = 51, macros = [] }
 "src/23_Pipeline/02_StepExecution.jl" = { cyc = 5, cog = 9, arg = 3, cyc_sum = 52, cog_sum = 28, arg_sum = 54, macros = [] }
 "src/23_Pipeline/03_Pipeline.jl" = { cyc = 11, cog = 16, arg = 11, cyc_sum = 122, cog_sum = 92, arg_sum = 120, macros = ["@forward_properties"] }
-"src/23_Pipeline/04_PredictionCV.jl" = { cyc = 4, cog = 5, arg = 11, cyc_sum = 39, cog_sum = 19, arg_sum = 58, macros = [] }
+"src/23_Pipeline/04_PredictionCV.jl" = { cyc = 4, cog = 5, arg = 12, cyc_sum = 40, cog_sum = 19, arg_sum = 67, macros = [] }
 "src/23_Pipeline/05_SearchCrossValidation.jl" = { cyc = 9, cog = 16, arg = 5, cyc_sum = 42, cog_sum = 44, arg_sum = 46, macros = [] }
+"src/23_Pipeline/06_OnlinePipeline.jl" = { cyc = 6, cog = 7, arg = 5, cyc_sum = 98, cog_sum = 59, arg_sum = 126, macros = [] }
 "src/24_Plotting.jl" = { cyc = 4, cog = 7, arg = 4, cyc_sum = 89, cog_sum = 20, arg_sum = 25, macros = [] }
 "src/25_Aliases.jl" = { cyc = 1, cog = 0, arg = 8, cyc_sum = 21, cog_sum = 0, arg_sum = 30, macros = [] }
 "src/PortfolioOptimisers.jl" = { cyc = 0, cog = 0, arg = 0, cyc_sum = 0, cog_sum = 0, arg_sum = 0, macros = [] }

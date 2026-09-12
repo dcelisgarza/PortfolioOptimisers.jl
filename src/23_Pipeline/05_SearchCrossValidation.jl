@@ -193,7 +193,7 @@ Tune a [`Pipeline`](@ref) by grid (or randomised) search cross-validation on pri
 
 The input is split into contiguous observation windows by `gscv.cv` (price-level splits keep stateful preprocessing inside the fold); for each candidate the lens grid is applied to the pipeline (keys resolved by [`pipeline_lens`](@ref), so step names, step positions, and raw property paths all address steps), and the candidate is scored through [`cross_val_predict`](@ref)`(pipe_i, data, gscv.cv; ex = SequentialEx())`, the one fold loop every cross-validation entry point runs. So the candidate runs the scheme it declared: every fold fits the whole workflow on its training window and scores it on its test window, a walk-forward threads the previous fold's weights through the scheme's `pws`, and a [`TimeDependent`](@ref) schedule resolves per fold against the fold's [`TimeDependentContext`](@ref), sized to the scheme's fold count and asserted per candidate, because a grid value may swap a whole schedule in or out. Lenses need no schedule-specific semantics: naming the step swaps the whole schedule as a grid value, and raw property paths address entries. Candidates run in parallel over `gscv.ex`, the folds inside one in sequence. One row per fold, in `split`'s order, through [`write_candidate_scores!`](@ref) and [`score_rows`](@ref); a scheme whose `split` draws at random is fixed once through [`pin_draw`](@ref). The scorer picks the winner among the candidates that finished every fold, through [`finite_candidate_index`](@ref), so a candidate that failed a fold never wins (ADR 0120). The randomised form samples the grid and delegates, exactly as for plain optimisers.
 
-A scheme that declares a Fold Fit is refused at the door by name through [`assert_batch_fold_fit`](@ref), until [#1022](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1022) builds the Pipeline's online step.
+A scheme that declares a Fold Fit runs every candidate through the Pipeline's online step (ADR 0142): each candidate is warmed up once and folded fold by fold through [`partial_fit!`](@ref), and read out through `fit(pipe)` where a refit would have run, so the search picks the candidate the batch search picks over the same steps. A warm pipeline is refused once, before the grid, through [`assert_search_entry`](@ref); the refit route `Online(pipe)` is not a search root, because the grid's lenses address the pipeline's steps and not a wrapper's.
 
 # Arguments
 
@@ -215,12 +215,12 @@ A scheme that declares a Fold Fit is refused at the door by name through [`asser
   - [`score_rows`](@ref)
   - [`pin_draw`](@ref)
   - [`finite_candidate_index`](@ref)
-  - [`assert_batch_fold_fit`](@ref)
+  - [`assert_search_entry`](@ref)
 """
 function search_cross_validation(pipe::Pipeline, gscv::GridSearchCrossValidation,
                                  data::Prices_RR)
     assert_no_holdout(pipe)
-    assert_batch_fold_fit(gscv.cv, "A `Pipeline`'s `search_cross_validation`", "#872")
+    assert_search_entry(pipe, gscv.cv)
     lens_grid, val_grid = pipeline_lens_val_grid(pipe, gscv.p)
     scheme = pin_draw(gscv.cv)
     cv = split(scheme, data)

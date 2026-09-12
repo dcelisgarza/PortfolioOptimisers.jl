@@ -160,28 +160,3 @@ function online_folds(fit_fold, est, n::Integer, ::Type{ElT}; rd, train_idx,
     end
     return predictions
 end
-"""
-    assert_batch_fold_fit(cv, site::AbstractString, issue::AbstractString)
-
-Refuse a scheme that declares a Fold Fit at an entry point that does not take the online step yet.
-
-The Pipeline's doors are the ones left: what a fold with no training window means to a `Pipeline`'s `fit` is decided, and its build is its own ticket, so no Pipeline route reaches the online arm of [`fold_loop`](@ref) today. Until it lands, a scheme carrying an [`OnlineStep`](@ref) is refused at those doors by name rather than run as a refit in silence, because a caller who declared the step would otherwise read a batch answer as an online one. The optimiser's search no longer calls this: it scores every candidate through the one fold loop, so a Fold Fit reaches it as it reaches every other entry point.
-
-# Arguments
-
-  - `cv`: The scheme.
-  - `site`: The entry point, as the message names it.
-  - `issue`: The ticket that builds the step there.
-
-# Related
-
-  - [`fold_fit`](@ref)
-  - [`OnlineStep`](@ref)
-  - [`search_cross_validation`](@ref)
-  - [`cross_val_predict`](@ref)
-"""
-function assert_batch_fold_fit(cv, site::AbstractString, issue::AbstractString)
-    @argcheck(isnothing(fold_fit(cv)),
-              ArgumentError("$(site) does not take the online step yet ($(issue)): the scheme declares `ff = $(nameof(typeof(fold_fit(cv))))()`, and this entry point refits every fold from its training window. Leave the scheme's `ff` unset here, or run the scheme through `fit_and_predict(opt, rd, cv)`."))
-    return nothing
-end

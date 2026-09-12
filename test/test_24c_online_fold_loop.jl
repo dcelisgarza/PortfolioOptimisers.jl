@@ -388,9 +388,9 @@ assets is what keeps the JuMP families cheap.
         @test_throws ArgumentError po.fit_and_predict(mr, rd; test_idx = cvr.test_idx[1])
     end
 
-    @testset "The Pipeline refuses a Fold Fit by name, until its own ticket" begin
-        # The search took the loop in #1020, so its door no longer refuses; the Pipeline's
-        # doors do, until #1022.
+    @testset "The search and the Pipeline take the loop at their doors" begin
+        # The search took the loop in #1020 and the Pipeline in #1022, so no door refuses a
+        # Fold Fit any more; the Pipeline's identities are pinned in test_24f.
         pgrid = ["opt.l1" => range(; start = 0.0005, stop = 0.001, length = 2)]
         @test isa(search_cross_validation(MeanRisk(;
                                                    opt = JuMPOptimiser(;
@@ -401,21 +401,17 @@ assets is what keeps the JuMP families cheap.
                                                                     r = ConditionalValueatRisk()),
                                           rd), SearchCrossValidationResult)
         pipe = Pipeline(; steps = (EmpiricalPrior(), EqualWeighted()))
-        @test_throws ArgumentError cross_val_predict(pipe, rd, online_cv)
-        @test_throws ArgumentError cross_val_predict(pipe, rd,
-                                                     MultipleRandomised(online_cv;
-                                                                        subset_size = 5,
-                                                                        seed = 1))
-        err = try
-            cross_val_predict(pipe, rd, online_cv)
-            nothing
-        catch e
-            e
-        end
-        @test isa(err, ArgumentError) && occursin("#872", err.msg)
-        # And the arm itself refuses a pipeline by name, should a route ever reach it.
-        @test_throws ArgumentError po.assert_online_entry(pipe)
-        # The batch twin runs at every one of those doors.
-        @test length(cross_val_predict(pipe, rd, batch_cv).pred) == n_splits(batch_cv, rd)
+        o = cross_val_predict(pipe, rd, online_cv)
+        b = cross_val_predict(pipe, rd, batch_cv)
+        @test length(o.pred) == length(b.pred) == n_splits(batch_cv, rd)
+        @test all(isapprox(x.res.w, y.res.w; atol = 1e-10)
+                  for (x, y) in zip(o.pred, b.pred))
+        @test isa(cross_val_predict(pipe, rd,
+                                    MultipleRandomised(online_cv; subset_size = 5,
+                                                       seed = 1)),
+                  PopulationPredictionResult)
+        # And the arm's entry walk refuses a pipeline carrying a state, by name.
+        warm = po.partial_fit!(pipe, rows(rd, 1:w))
+        @test_throws ArgumentError po.assert_online_entry(warm)
     end
 end

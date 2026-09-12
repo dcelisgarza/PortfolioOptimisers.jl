@@ -543,10 +543,15 @@ $(DocStringExtensions.FIELDS)
     PricesToReturns(;
         ret_method::Symbol = :simple,
         padding::Bool = false,
-        gap_return_alg::Option{<:AbstractGapReturnAlgorithm} = nothing
+        gap_return_alg::Option{<:AbstractGapReturnAlgorithm} = nothing,
+        cache::Option{<:AbstractPartialFitState} = nothing
     ) -> PricesToReturns
 
 Keywords correspond to the struct's fields.
+
+# Online form
+
+The conversion is stateless to a reader and row-local to a fold: a return reads two consecutive prices, so [`partial_fit_transform`](@ref) converts a block of prices exactly as the whole history would by keeping the last price row in `cache`, and under a [`CatchUpGapReturn`](@ref) the last observed price of every series column. [`fit_preprocessing`](@ref) with no data reads the estimator itself out, as the batch fit does. A caller's own Gap Return algorithm has no online form, and [`supports_partial_fit`](@ref) answers `false` for it.
 
 ## Validation
 
@@ -594,18 +599,23 @@ julia> rr.nx
     What the observations a price gap left non-finite carry. `nothing` is the arithmetic, and [`CatchUpGapReturn`](@ref) books the move across the gap on the observation that ends it. See [`AbstractGapReturnAlgorithm`](@ref).
     """
     gap_return_alg
+    """
+    $(field_dict[:pfcache])
+    """
+    cache
     function PricesToReturns(ret_method::Symbol, padding::Bool,
-                             gap_return_alg::Option{<:AbstractGapReturnAlgorithm})
+                             gap_return_alg::Option{<:AbstractGapReturnAlgorithm},
+                             cache::Option{<:AbstractPartialFitState})
         @argcheck(ret_method in (:simple, :log),
                   ArgumentError("ret_method must be :simple or :log, got :$ret_method"))
-        return new{typeof(ret_method), typeof(padding), typeof(gap_return_alg)}(ret_method,
-                                                                                padding,
-                                                                                gap_return_alg)
+        return new{typeof(ret_method), typeof(padding), typeof(gap_return_alg),
+                   typeof(cache)}(ret_method, padding, gap_return_alg, cache)
     end
 end
 function PricesToReturns(; ret_method::Symbol = :simple, padding::Bool = false,
-                         gap_return_alg::Option{<:AbstractGapReturnAlgorithm} = nothing)::PricesToReturns
-    return PricesToReturns(ret_method, padding, gap_return_alg)
+                         gap_return_alg::Option{<:AbstractGapReturnAlgorithm} = nothing,
+                         cache::Option{<:AbstractPartialFitState} = nothing)::PricesToReturns
+    return PricesToReturns(ret_method, padding, gap_return_alg, cache)
 end
 function prices_to_returns(ptr::PricesToReturns, pr::PricesResult)::ReturnsResult
     return prices_to_returns(pr; ret_method = ptr.ret_method, padding = ptr.padding,

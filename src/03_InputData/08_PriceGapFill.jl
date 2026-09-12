@@ -62,9 +62,14 @@ $(DocStringExtensions.FIELDS)
     PriceGapFill(;
         fill::Union{CarriedPrice, Num_VecToScaM} = CarriedPrice(),
         strict::Bool = false,
+        cache::Option{<:AbstractPartialFitState} = nothing,
     ) -> PriceGapFill
 
 Keywords correspond to the struct's fields.
+
+# Online form
+
+A `PriceGapFill` with a [`CarriedPrice`](@ref) fill takes the online step: [`partial_fit_transform`](@ref) fills a block of prices from the carried prices and advances them, and [`fit_preprocessing`](@ref) with no data reads the [`PriceGapFillResult`](@ref) of the whole history out of `cache`. A statistic fill has no online form, because a longer window re-prices every earlier gap; [`supports_partial_fit`](@ref) answers `false` for it, and a [`Pipeline`](@ref) refuses it at warm-up by name.
 
 # Examples
 
@@ -98,13 +103,19 @@ julia> res.v
     Whether a price carrier that states no Listing Span is refused (`true`) or warned about (`false`).
     """
     strict
-    function PriceGapFill(fill::Union{CarriedPrice, Num_VecToScaM}, strict::Bool)
-        return new{typeof(fill), typeof(strict)}(fill, strict)
+    """
+    $(field_dict[:pfcache])
+    """
+    cache
+    function PriceGapFill(fill::Union{CarriedPrice, Num_VecToScaM}, strict::Bool,
+                          cache::Option{<:AbstractPartialFitState})
+        return new{typeof(fill), typeof(strict), typeof(cache)}(fill, strict, cache)
     end
 end
 function PriceGapFill(; fill::Union{CarriedPrice, Num_VecToScaM} = CarriedPrice(),
-                      strict::Bool = false)::PriceGapFill
-    return PriceGapFill(fill, strict)
+                      strict::Bool = false,
+                      cache::Option{<:AbstractPartialFitState} = nothing)::PriceGapFill
+    return PriceGapFill(fill, strict, cache)
 end
 """
 $(DocStringExtensions.TYPEDEF)
