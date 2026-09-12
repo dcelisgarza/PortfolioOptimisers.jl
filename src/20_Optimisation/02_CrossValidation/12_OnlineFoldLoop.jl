@@ -71,7 +71,50 @@ function cv_online_info()
     return "Running cross-validation online because the scheme declares a Fold Fit (fold_fit(cv) == OnlineStep()). The loop warms one estimator up on the first training window, folds each fold's new observations into it, and reads it out where a refit would have run, so the folds run in order and the estimator is threaded from fold to fold. To refit every fold from its training window, and to run the folds in parallel where the optimiser allows it, leave the scheme's `ff` unset."
 end
 """
-    online_folds(fit_fold, est, n::Integer, ::Type{ElT}; rd, train_idx, fold_view, pws)
+    thread_online_folds!(predictions, fit_fold, est, folds, prev; rd, train_idx, last_end, pws)
+
+Fold and read out the folds `folds` of a walk-forward, threading `est` from one to the next.
+
+The per-fold body the online arm and the resumed arm of [`fold_loop`](@ref) share, written once so that a resume continues exactly the loop that started the run. For each fold `i` in `folds`, it folds the rows the training window has gained since the last fold, `(last_end + 1):last(train_idx[i])`, into `est` with [`partial_fit!`](@ref); hands the threaded estimator to `fit_fold(i, prev, est, rd, nothing)`, which makes the per-fold copy exactly as the batch arms do; stores the prediction at `predictions[i - first(folds) + 1]`; and advances `prev` by [`advance_previous_fold`](@ref).
+
+# Arguments
+
+  - `predictions`: The vector the predictions are written into, one slot per fold of `folds`.
+  - `fit_fold`: The per-fold resolution and callback [`fold_loop`](@ref) builds.
+  - `est`: The estimator, folded through `last_end`.
+  - `folds`: The fold indices to run, a contiguous range of the scheme's enumeration.
+  - `prev`: The last threadable fold's prediction before `first(folds)`, or `nothing`.
+  - `rd`: The carrier.
+  - `train_idx`: The training windows of every fold, in split order.
+  - `last_end`: The last row `est` has folded.
+  - `pws`: The scheme's Previous-Weights Source, or `nothing`.
+
+# Returns
+
+  - `est`: The estimator, folded through `last(train_idx[last(folds)])`.
+
+# Related
+
+  - [`online_folds`](@ref)
+  - [`Resume`](@ref)
+  - [`advance_previous_fold`](@ref)
+"""
+function thread_online_folds!(predictions, fit_fold, est, folds::AbstractUnitRange, prev;
+                              rd, train_idx, last_end::Integer, pws)
+    offset = first(folds) - 1
+    for i in folds
+        stop = last(train_idx[i])
+        if stop > last_end
+            est = partial_fit!(est, port_opt_view(rd, (last_end + 1):stop, :))
+            last_end = stop
+        end
+        predictions[i - offset] = fit_fold(i, prev, est, rd, nothing)
+        prev = advance_previous_fold(pws, prev, predictions[i - offset])
+    end
+    return est
+end
+"""
+    online_folds(fit_fold, est, n::Integer, ::Type{ElT}; rd, train_idx, test_idx, fold_view, pws)
 
 Run `n` folds of a walk-forward by the online step, threading one estimator from fold to
 fold, and emit [`cv_online_info`](@ref).
@@ -100,6 +143,10 @@ This is the third arm of [`fold_loop`](@ref), taken when the scheme declares a F
     with a [`Fold`](@ref) whose `train` is `nothing`.
  5. It stores the prediction and threads the estimator on.
 
+Steps 3 to 5 are [`thread_online_folds!`](@ref), which the resumed arm shares: a
+[`Resume`](@ref) in the estimator slot takes the method below, which skips the warm-up and
+the folds the Result holds and runs the same body from the fold after them.
+
 The identity the arm keeps is the seam's: the run reaches the weights of the batch expanding
 walk-forward fold for fold, to the tolerance of the moment layer and of the solver, and the
 carrier the read-out rebuilds is exactly the batch fold's training window.
@@ -117,6 +164,7 @@ resolve, the carrier, and the training window, which is `nothing` here. `ElT` is
   - `n`: The number of folds.
   - `rd`: The carrier.
   - `train_idx`: The training windows of every fold, in split order.
+  - `test_idx`: The test windows of every fold, in split order. Unread here; the resumed arm checks the last held fold against it.
   - `fold_view`: The asset view of a multiple-randomised path, or `nothing`.
   - `pws`: The scheme's Previous-Weights Source, or `nothing`; decides what [`threads_weights`](@ref) tests.
 
@@ -127,10 +175,12 @@ resolve, the carrier, and the training window, which is `nothing` here. `ElT` is
 # Returns
 
   - `predictions::Vector{ElT}`: One prediction per fold, in split order.
+  - `est`: The threaded estimator, folded through `last(train_idx[n])`, for the Result to carry (ADR 0144).
 
 # Related
 
   - [`fold_loop`](@ref)
+  - [`thread_online_folds!`](@ref)
   - [`run_folds`](@ref)
   - [`parallel_folds`](@ref)
   - [`assert_online_entry`](@ref)
@@ -138,25 +188,18 @@ resolve, the carrier, and the training window, which is `nothing` here. `ElT` is
   - [`partial_fit!`](@ref)
   - [`fit_and_predict`](@ref)
   - [`OnlineStep`](@ref)
+  - [`Resume`](@ref)
 """
 function online_folds(fit_fold, est, n::Integer, ::Type{ElT}; rd, train_idx,
-                      fold_view = nothing, pws = nothing) where {ElT}
+                      test_idx = nothing, fold_view = nothing, pws = nothing) where {ElT}
     @info(cv_online_info())
     assert_online_entry(est)
     (est, rd) = isnothing(fold_view) ? (est, rd) : fold_view(1)
     est = update_online_estimator(est)
     est = partial_fit!(est, port_opt_view(rd, train_idx[1], :))
-    last_end = last(train_idx[1])
     predictions = Vector{ElT}(undef, n)
-    prev = nothing
-    for i in 1:n
-        stop = last(train_idx[i])
-        if stop > last_end
-            est = partial_fit!(est, port_opt_view(rd, (last_end + 1):stop, :))
-            last_end = stop
-        end
-        predictions[i] = fit_fold(i, prev, est, rd, nothing)
-        prev = advance_previous_fold(pws, prev, predictions[i])
-    end
-    return predictions
+    est = thread_online_folds!(predictions, fit_fold, est, 1:n, nothing; rd = rd,
+                               train_idx = train_idx, last_end = last(train_idx[1]),
+                               pws = pws)
+    return predictions, est
 end

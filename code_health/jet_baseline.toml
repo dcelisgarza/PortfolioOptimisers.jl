@@ -247,6 +247,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/20_Optimisation/02_CrossValidation/12_OnlineFoldLoop.jl" = { raw = 0, reviewed = 0 }
 "src/20_Optimisation/02_CrossValidation/13_CovarianceForecastEvaluation.jl" = { raw = 0, reviewed = 0 }
 "src/20_Optimisation/02_CrossValidation/14_CovarianceForecastSummary.jl" = { raw = 0, reviewed = 0 }
+"src/20_Optimisation/02_CrossValidation/15_Resume.jl" = { raw = 0, reviewed = 0 }
 "src/20_Optimisation/03_NaiveOptimisation.jl" = { raw = 0, reviewed = 0 }
 "src/20_Optimisation/04_Base_ClusteringOptimisation.jl" = { raw = 0, reviewed = 0 }
 "src/20_Optimisation/05_HierarchicalRiskParity.jl" = { raw = 0, reviewed = 0 }
@@ -554,6 +555,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/20_Optimisation/02_CrossValidation/12_OnlineFoldLoop.jl" = { raw = 0, reviewed = 0 }
 "src/20_Optimisation/02_CrossValidation/13_CovarianceForecastEvaluation.jl" = { raw = 0, reviewed = 0 }
 "src/20_Optimisation/02_CrossValidation/14_CovarianceForecastSummary.jl" = { raw = 0, reviewed = 0 }
+"src/20_Optimisation/02_CrossValidation/15_Resume.jl" = { raw = 0, reviewed = 0 }
 "src/20_Optimisation/03_NaiveOptimisation.jl" = { raw = 0, reviewed = 0 }
 "src/20_Optimisation/04_Base_ClusteringOptimisation.jl" = { raw = 0, reviewed = 0 }
 "src/20_Optimisation/05_HierarchicalRiskParity.jl" = { raw = 0, reviewed = 0 }

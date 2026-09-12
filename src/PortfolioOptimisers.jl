@@ -295,6 +295,7 @@ include("20_Optimisation/02_CrossValidation/11_RandomisedSearchCrossValidation.j
 include("20_Optimisation/02_CrossValidation/12_OnlineFoldLoop.jl")
 include("20_Optimisation/02_CrossValidation/13_CovarianceForecastEvaluation.jl")
 include("20_Optimisation/02_CrossValidation/14_CovarianceForecastSummary.jl")
+include("20_Optimisation/02_CrossValidation/15_Resume.jl")
 include("20_Optimisation/03_NaiveOptimisation.jl")
 include("20_Optimisation/04_Base_ClusteringOptimisation.jl")
 include("20_Optimisation/05_HierarchicalRiskParity.jl")

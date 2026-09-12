@@ -948,14 +948,14 @@ function fit_and_predict(opt::OptE_TD, rd::ReturnsResult, cv::WFCVER; cols = :,
     assert_unshuffled_folds(cv, train_idx)
     (; wd, pws, fa, store_weight_path, strict) = fold_evaluation(cv)
     hwd = held_weights_drift(wd, pws)
-    predictions = fold_loop(opt, length(train_idx), ex; rd = rd, train_idx = train_idx,
-                            test_idx = test_idx, cv = cv, pws = pws) do fold
+    predictions, est = fold_loop(opt, length(train_idx), ex; rd = rd, train_idx = train_idx,
+                                 test_idx = test_idx, cv = cv, pws = pws) do fold
         return fit_and_predict(fold.est, fold.rd; train_idx = fold.train,
                                test_idx = fold.test, cols = cols, wd = wd, hwd = hwd,
                                fa = fa, store_weight_path = store_weight_path,
                                strict = strict, w_prev = fold.w_prev)
     end
-    return MultiPeriodPredictionResult(; pred = predictions, id = id)
+    return MultiPeriodPredictionResult(; pred = predictions, id = id, opt = est)
 end
 function fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
                          cv::WFCVER; ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),

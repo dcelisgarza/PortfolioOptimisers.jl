@@ -638,8 +638,9 @@ function fit_and_predict(opt::OptE_TD, rd::ReturnsResult, cv::CombCVER; cols = :
     # A fold is a train/test split and `i` is its position in the split enumeration —
     # no ordering is imposed on time-dependent entries; the user keys them off the
     # fold's indices (ctx.train_idx[ctx.i] / ctx.test_idx[ctx.i]).
-    predictions = fold_loop(opt, length(train_idx), ex, Vector{PredictionResult}; rd = rd,
-                            train_idx = train_idx, test_idx = test_idx, cv = cv) do fold
+    predictions, _ = fold_loop(opt, length(train_idx), ex, Vector{PredictionResult};
+                               rd = rd, train_idx = train_idx, test_idx = test_idx, cv = cv
+                               ) do fold
         return fit_and_predict(fold.est, fold.rd; train_idx = fold.train,
                                test_idx = fold.test, cols = cols, wd = wd, hwd = hwd,
                                fa = fa, store_weight_path = store_weight_path,

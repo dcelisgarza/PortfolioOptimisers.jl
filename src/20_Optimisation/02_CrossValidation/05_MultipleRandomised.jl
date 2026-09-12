@@ -653,16 +653,16 @@ function path_fit_and_predict(opt::OptE_TD, rd::ReturnsResult, train_idx, test_i
         rdi = port_opt_view(rd, cols[i])
         return (port_opt_view(opt, cols[i], rdi.X), rdi)
     end
-    predictions = fold_loop(opt, length(train_idx), ex; rd = rd, train_idx = train_idx,
-                            test_idx = test_idx, path_id = id, fold_view = asset_view,
-                            pws = pws, cv = cv) do fold
+    predictions, est = fold_loop(opt, length(train_idx), ex; rd = rd, train_idx = train_idx,
+                                 test_idx = test_idx, path_id = id, fold_view = asset_view,
+                                 pws = pws, cv = cv) do fold
         return fit_and_predict(fold.est, fold.rd; train_idx = fold.train,
                                test_idx = fold.test, wd = wd, hwd = hwd, fa = fa,
                                store_weight_path = store_weight_path, strict = strict,
                                w_prev = fold.w_prev)
     end
     return MultiPeriodPredictionResult(; pred = sort_predictions!(test_idx, predictions),
-                                       id = id)
+                                       id = id, opt = est)
 end
 function fit_and_predict(opt::OptE_TD, rd::ReturnsResult, cv::MRCVR;
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(), kwargs...)

@@ -449,6 +449,113 @@ function update_online_estimator(p::Pipeline)
     return Pipeline(p.names, map(update_online_step, p.steps), p.cache)
 end
 """
+    copy_states(p::Pipeline)
+
+Copies every partial-fit state a [`Pipeline`](@ref) carries — its own `cache`, and the states under every step through [`copy_step_states`](@ref) — and rebuilds the pipeline around the copies, for [`Resume`](@ref).
+
+# Related
+
+  - [`copy_states`](@ref)
+  - [`copy_step_states`](@ref)
+  - [`Resume`](@ref)
+"""
+function copy_states(p::Pipeline)
+    return Pipeline(p.names, map(copy_step_states, p.steps), copy_state(p.cache))
+end
+"""
+    copy_step_states(step)
+
+Copies the partial-fit states under one [`Pipeline`](@ref) step: a [`PipelineStep`](@ref) is rebuilt around its copied estimator, an estimator step is copied through [`copy_states`](@ref), and a callable or a result passes through.
+
+# Related
+
+  - [`copy_states(p::Pipeline)`](@ref)
+  - [`update_online_step`](@ref)
+"""
+copy_step_states(step) = step
+function copy_step_states(est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEstimator})
+    return copy_states(est)
+end
+function copy_step_states(ps::PipelineStep)
+    if isa(ps.est, Function)
+        return ps
+    end
+    return PipelineStep(copy_step_states(ps.est), ps.reads, ps.writes, ps.target)
+end
+"""
+    held_timestamps(p::Pipeline)
+
+The timestamps a stepped [`Pipeline`](@ref) holds, through the state its row owner keeps, or `nothing`.
+
+Three arms, by the state the pipeline carries. Under `Online(pipe)` the [`PipelineBufferState`](@ref) holds the input carrier itself, and its timestamps are the answer. A prior owner leaves the Pipeline its own [`ReturnsBufferState`](@ref), which holds them. An optimisation owner keeps its own Fold Context, and the pipeline holds none, so the owner answers ([`held_timestamps`](@ref)). At the price level a `PricesToReturns` step drops the first row, and the returns' timestamps are the prices' from the second row on, so the held span still equals its rows of the price carrier.
+
+# Related
+
+  - [`held_timestamps`](@ref)
+  - [`pipeline_held_timestamps`](@ref)
+  - [`Resume`](@ref)
+"""
+function held_timestamps(p::Pipeline)
+    return pipeline_held_timestamps(p, p.cache)
+end
+"""
+    pipeline_held_timestamps(p::Pipeline, cache::PipelineBufferState)
+    pipeline_held_timestamps(p::Pipeline, cache::ReturnsBufferState)
+    pipeline_held_timestamps(p::Pipeline, ::Nothing)
+
+The three arms of [`held_timestamps(p::Pipeline)`](@ref), chosen by dispatch on the state the pipeline carries: the input-carrier buffer's timestamps, the Fold Context's, or the optimisation owner's through [`pipeline_row_owner`](@ref).
+
+# Related
+
+  - [`held_timestamps(p::Pipeline)`](@ref)
+  - [`pipeline_row_owner`](@ref)
+"""
+function pipeline_held_timestamps(::Pipeline, cache::PipelineBufferState)
+    return isnothing(cache.data) ? nothing : carrier_timestamps(cache.data)
+end
+function pipeline_held_timestamps(::Pipeline, cache::ReturnsBufferState)
+    return cache.ts
+end
+function pipeline_held_timestamps(p::Pipeline, ::Nothing)
+    k = pipeline_row_owner(p)
+    return iszero(k) ? nothing : held_timestamps(step_estimator(p.steps[k]))
+end
+"""
+    PipelineResume = Resume{<:MultiPeriodPredictionResult{<:Any, <:Any, <:Any, <:Pipeline}}
+
+Alias for a [`Resume`](@ref) whose Result carries a [`Pipeline`](@ref): the declaration the pipeline doors take.
+
+# Related
+
+  - [`Resume`](@ref)
+  - [`cross_val_predict(r::PipelineResume, data::Prices_RR, cv::CVER)`](@ref)
+"""
+const PipelineResume = Resume{<:MultiPeriodPredictionResult{<:Any, <:Any, <:Any,
+                                                            <:Pipeline}}
+"""
+    cross_val_predict(r::PipelineResume, data::Prices_RR, cv::CVER; ex = FLoops.ThreadedEx(), id = nothing)
+
+Continue an online walk-forward over a [`Pipeline`](@ref) from its Result, over the full history extended.
+
+The pipeline door of [`Resume`](@ref): the scheme is checked ([`assert_resume_scheme`](@ref)), the holdout refused as the one-shot door refuses it, and the fold loop takes its resumed arm through [`pipeline_cross_val_predict`](@ref). A host route and an `Online(pipe)` refit route resume alike, because the entry reads the state off the pipeline generically (ADR 0142).
+
+# Related
+
+  - [`Resume`](@ref)
+  - [`cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::CVER)`](@ref)
+  - [`assert_pipeline_door`](@ref)
+"""
+function cross_val_predict(r::PipelineResume, data::Prices_RR, cv::CVER;
+                           ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
+                           id = nothing)
+    return pipeline_cross_val_predict(r, data, cv; ex = ex, id = id)
+end
+function assert_pipeline_door(r::PipelineResume, cv)
+    assert_no_holdout(r.res.opt)
+    assert_resume_scheme(cv)
+    return nothing
+end
+"""
     partial_fit!(pipe::Pipeline, data::Prices_RR)
 
 Folds a block of observations into a [`Pipeline`](@ref), without fitting.

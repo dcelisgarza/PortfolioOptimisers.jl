@@ -13,17 +13,20 @@
 #     return throw(ArgumentError("CombinatorialCrossValidation is unsupported for a price-starting pipeline: its recombined, non-contiguous test groups break the rolling/price-level preprocessing (e.g. PricesToReturns) that needs contiguous windows — the rolling-window rule. Run it on a returns-level pipeline instead (cross_val_predict on an AbstractReturnsResult), or use KFold / a walk-forward scheme at the price level."))
 # end
 """
-    const Pipeline_OnlPipe = Union{<:Pipeline, <:Online{<:Pipeline}}
+    const Pipeline_OnlPipe = Union{<:Pipeline, <:Online{<:Pipeline}, <:Resume{<:MultiPeriodPredictionResult{<:Any, <:Any, <:Any, <:Pipeline}}}
 
-Alias for what a Pipeline's cross-validation door threads through the fold loop: the [`Pipeline`](@ref) itself, taking the host route of [ADR 0142](https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/main/docs/adr/0142-a-pipeline-is-a-host-its-steps-fold-or-defer-to-a-view-and-a-step-with-no-online-form-is-refused-unless-the-pipeline-declares-a-refit.md), or `Online(pipe)`, the declared refit from an input-carrier buffer.
+Alias for what a Pipeline's cross-validation door threads through the fold loop: the [`Pipeline`](@ref) itself, taking the host route of [ADR 0142](https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/main/docs/adr/0142-a-pipeline-is-a-host-its-steps-fold-or-defer-to-a-view-and-a-step-with-no-online-form-is-refused-unless-the-pipeline-declares-a-refit.md), `Online(pipe)`, the declared refit from an input-carrier buffer, or `Resume(res)`, the continuation of an online run whose Result carries a pipeline (ADR 0144).
 
 # Related
 
   - [`Pipeline`](@ref)
   - [`Online`](@ref)
+  - [`Resume`](@ref)
   - [`PipelineBufferState`](@ref)
 """
-const Pipeline_OnlPipe = Union{<:Pipeline, <:Online{<:Pipeline}}
+const Pipeline_OnlPipe = Union{<:Pipeline, <:Online{<:Pipeline},
+                               <:Resume{<:MultiPeriodPredictionResult{<:Any, <:Any, <:Any,
+                                                                      <:Pipeline}}}
 #! Begin: TimeDependent schedules as pipeline optimisation steps.
 """
     pipeline_step_is_time_dependent(x)
@@ -253,9 +256,9 @@ function cross_val_predict(pipe::Pipeline, data::Prices_RR,
     assert_unshuffled_folds(cv, train_idx)
     (; wd, pws, fa, store_weight_path, strict) = fold_evaluation(cv)
     hwd = held_weights_drift(wd, pws)
-    predictions = fold_loop(pipe, length(train_idx), ex, Vector{PredictionResult};
-                            rd = data, train_idx = train_idx, test_idx = test_idx, cv = cv
-                            ) do fold
+    predictions, _ = fold_loop(pipe, length(train_idx), ex, Vector{PredictionResult};
+                               rd = data, train_idx = train_idx, test_idx = test_idx,
+                               cv = cv) do fold
         res = pipeline_fold_fit(fold.est, fold.rd, fold.train)
         return [StatsAPI.predict(res, fold.rd, group; wd = wd, hwd = hwd, fa = fa,
                                  store_weight_path = store_weight_path, strict = strict,
@@ -287,16 +290,16 @@ function pipeline_path_fit_and_predict(pipe::Pipeline_OnlPipe, data::Prices_RR, 
     train_idx = map(x -> x[1], folds)
     test_idx = map(x -> x[2], folds)
     asset_view(i) = (pipe, pipeline_asset_view(data, folds[i][3]))
-    predictions = fold_loop(pipe, length(folds), ex; rd = data, train_idx = train_idx,
-                            test_idx = test_idx, path_id = path_id, fold_view = asset_view,
-                            pws = pws, cv = cv) do fold
+    predictions, est = fold_loop(pipe, length(folds), ex; rd = data, train_idx = train_idx,
+                                 test_idx = test_idx, path_id = path_id,
+                                 fold_view = asset_view, pws = pws, cv = cv) do fold
         res = pipeline_fold_fit(fold.est, fold.rd, fold.train)
         return StatsAPI.predict(res, fold.rd, fold.test; wd = wd, hwd = hwd, fa = fa,
                                 store_weight_path = store_weight_path, strict = strict,
                                 w_prev = fold.w_prev)
     end
     return MultiPeriodPredictionResult(; pred = sort_predictions!(test_idx, predictions),
-                                       id = path_id)
+                                       id = path_id, opt = est)
 end
 """
     cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::MultipleRandomised; ex = FLoops.ThreadedEx(), kwargs...) -> PopulationPredictionResult
@@ -413,13 +416,14 @@ function pipeline_cross_val_predict(pipe::Pipeline_OnlPipe, data::Prices_RR, cv:
     #           ArgumentError("pipeline cross-validation requires non-combinatorial (VecInt) test indices, but got $(typeof(test_idx[1])); combinatorial schemes recombine non-contiguous test groups, which a fitted workflow cannot replay"))
     (; wd, pws, fa, store_weight_path, strict) = fold_evaluation(cv)
     hwd = held_weights_drift(wd, pws)
-    predictions = fold_loop(pipe, length(train_idx), ex; rd = data, train_idx = train_idx,
-                            test_idx = test_idx, cv = cv, pws = pws) do fold
+    predictions, est = fold_loop(pipe, length(train_idx), ex; rd = data,
+                                 train_idx = train_idx, test_idx = test_idx, cv = cv,
+                                 pws = pws) do fold
         res = pipeline_fold_fit(fold.est, fold.rd, fold.train)
         return StatsAPI.predict(res, fold.rd, fold.test; wd = wd, hwd = hwd, fa = fa,
                                 store_weight_path = store_weight_path, strict = strict,
                                 w_prev = fold.w_prev)
     end
-    return MultiPeriodPredictionResult(; pred = predictions, id = id)
+    return MultiPeriodPredictionResult(; pred = predictions, id = id, opt = est)
 end
 #! End: TimeDependent schedules as pipeline optimisation steps.

@@ -241,6 +241,7 @@ commit = "f3e6153ec2"
 "src/20_Optimisation/02_CrossValidation/12_OnlineFoldLoop.jl" = { cyc = 4, cog = 5, arg = 11, cyc_sum = 10, cog_sum = 6, arg_sum = 30, macros = [] }
 "src/20_Optimisation/02_CrossValidation/13_CovarianceForecastEvaluation.jl" = { cyc = 7, cog = 11, arg = 7, cyc_sum = 61, cog_sum = 32, arg_sum = 129, macros = [] }
 "src/20_Optimisation/02_CrossValidation/14_CovarianceForecastSummary.jl" = { cyc = 4, cog = 5, arg = 4, cyc_sum = 11, cog_sum = 9, arg_sum = 14, macros = [] }
+"src/20_Optimisation/02_CrossValidation/15_Resume.jl" = { cyc = 4, cog = 5, arg = 9, cyc_sum = 34, cog_sum = 16, arg_sum = 43, macros = [] }
 "src/20_Optimisation/03_NaiveOptimisation.jl" = { cyc = 3, cog = 3, arg = 9, cyc_sum = 50, cog_sum = 26, arg_sum = 57, macros = ["@propagatable"] }
 "src/20_Optimisation/04_Base_ClusteringOptimisation.jl" = { cyc = 3, cog = 2, arg = 11, cyc_sum = 29, cog_sum = 17, arg_sum = 46, macros = ["@forward_properties", "@propagatable"] }
 "src/20_Optimisation/05_HierarchicalRiskParity.jl" = { cyc = 4, cog = 3, arg = 9, cyc_sum = 23, cog_sum = 16, arg_sum = 31, macros = ["@pipe_delegates", "@pipe_route_sigma_ucs", "@propagatable"] }

@@ -73,14 +73,17 @@ again, so the chain continues; `vcat` on two Results stacks them for scoring.
 
 **`Resume(res)` is the entry**, a transient declaration in the estimator slot in the idiom of
 `Online` and `TimeDependent`: it resolves at the door to a **copy** of `res.opt`, to
-`res.pred[end]` for the previous and held weights, and to `length(res.pred)` as the folds to
-skip, and is gone before any verb below the loop meets it. `res` is never written, because
+`res.pred[end]` for the previous and held weights, and to the folds to skip, `n_old`, read off
+the state — the fold whose training window ends at the state's last held timestamp — and is
+gone before any verb below the loop meets it. The count is not `length(res.pred)`: a resumed
+Result holds the new folds only, so the chain `Resume(res2)` must skip every fold before it, and
+the timestamp names that fold where the count cannot. `res` is never written, because
 `partial_fit!` promises nothing about a kept estimator and every state answers `Base.copy`, so
 one Result resumes any number of times. The ordinary argument stays refused unchanged, and the
 fixed-result reading of the slot is untouched.
 
 **The carrier is the full history extended.** `split(cv, rd)` enumerates every fold as the
-one-shot run does; the first `length(res.pred)` are skipped; the resumed loop's first act is the
+one-shot run does; the first `n_old` are skipped; the resumed loop's first act is the
 ordinary delta `(last(train_idx[n_old]) + 1):last(train_idx[n_old + 1])`. No warm-up exists
 under a resume — the warm-up was fold 1's window, and fold 1 is skipped — so `purged_size <
 train_size` is untouched, a `DateWalkForward` anchors its periods on the whole `ts` for free, and
@@ -96,7 +99,9 @@ a schedule's `i` and `n` are the combined split's.
   `state.ts == rd.ts[(r - h + 1):r]` for `r = last(train_idx[n_old])` and `h` held. That is exact
   over the held span at `O(h)`, and it is the one check that pins a prefix — a row dropped or
   inserted before `r` moves `rd.ts[r]`, a changed scheme moves `r`, and a count check catches
-  neither under a cap and only the second without one. An index-only caller passes `ts = 1:T`.
+  neither under a cap and only the second without one. A `ReturnsResult` binds `ts` to a
+  vector of `Dates.AbstractTime`, so an index-only caller attaches a synthetic calendar,
+  `ts = Date(1) .+ Day.(0:(T - 1))`, rather than `1:T`.
 - **a partial last fold is terminal.** With `reduce_test = true` the old run's last fold is the
   first half of a full window of the longer run — the same training end, the same weights, too
   short a span — so skipping it loses rows and completing it needs a mid-window entry in `predict`
@@ -163,8 +168,8 @@ two Results overlap by a fold the caller must drop, and a naive `vcat` double-co
 
 ## Consequences
 
-- `MultiPeriodPredictionResult` gains a field; its `show` doctests move by one line; no released
-  number moves, because a batch run writes `nothing`.
+- `MultiPeriodPredictionResult` gains a field; no `show` doctest renders one, so none moves; no
+  released number moves, because a batch run writes `nothing`.
 - `fold_loop` gains a resumed arm beside the online one, sharing its per-fold body; `Resume`
   joins `Online` and `TimeDependent` as the third transient declaration, refused at every door
   that is not an online walk-forward. `Base.vcat` on two Results stacks them.

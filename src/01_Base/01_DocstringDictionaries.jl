@@ -656,6 +656,7 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :pred => "`pred`: Collection of fold predictions.",#
                                  :mrd => "`mrd`: Aggregated multi-period returns result.",#
                                  :id_pred => "`id`: Path or fold identifier.",#
+                                 :opt_pred => "`opt`: The estimator the online arm of the fold loop threaded, folded through the last training end, or `nothing` on a batch run. [`Resume`](@ref) re-enters the loop from it.",#
                                  # Allocation.
                                  :shares => "`shares`: Number of shares allocated per asset.",#
                                  :cost_alloc => "`cost`: Cost of the allocation.",#

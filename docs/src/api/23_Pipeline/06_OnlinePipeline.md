@@ -46,3 +46,14 @@ cross_val_predict(o::Online{<:Pipeline}, data::Prices_RR, cv::CVER)
 is_time_dependent(o::Online{<:Pipeline})
 PortfolioOptimisers.show_fields(p::Pipeline)
 ```
+
+## The resume
+
+```@docs
+PortfolioOptimisers.copy_states(p::Pipeline)
+PortfolioOptimisers.copy_step_states
+PortfolioOptimisers.held_timestamps(p::Pipeline)
+PortfolioOptimisers.pipeline_held_timestamps
+PortfolioOptimisers.PipelineResume
+cross_val_predict(r::PortfolioOptimisers.PipelineResume, data::Prices_RR, cv::CVER)
+```

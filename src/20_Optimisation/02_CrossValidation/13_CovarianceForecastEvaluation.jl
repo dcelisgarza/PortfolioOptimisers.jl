@@ -881,8 +881,8 @@ function covariance_forecast_evaluation(est::Union{<:AbstractCovarianceEstimator
     (; train_idx, test_idx) = cv_res
     assert_unshuffled_folds(cv, train_idx)
     n = length(train_idx)
-    steps = fold_loop(est, n, FLoops.SequentialEx(), NamedTuple; rd = rd,
-                      train_idx = train_idx, test_idx = test_idx, cv = cv) do fold
+    steps, _ = fold_loop(est, n, FLoops.SequentialEx(), NamedTuple; rd = rd,
+                         train_idx = train_idx, test_idx = test_idx, cv = cv) do fold
         sigma, c = forecast_moments(fold.est, fold.rd, fold.train)
         step = covariance_forecast_step(sigma, view(fold.rd.X, fold.test, :), c, w, target)
         return store_forecasts ? (; step..., sigma = sigma, location = c) : step

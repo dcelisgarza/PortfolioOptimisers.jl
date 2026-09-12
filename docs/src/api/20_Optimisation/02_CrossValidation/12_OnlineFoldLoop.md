@@ -5,5 +5,6 @@ A walk-forward that declares a Fold Fit of [`OnlineStep`](@ref) sends [`Portfoli
 ```@docs
 PortfolioOptimisers.fit_fold_result
 PortfolioOptimisers.cv_online_info
+PortfolioOptimisers.thread_online_folds!
 PortfolioOptimisers.online_folds
 ```

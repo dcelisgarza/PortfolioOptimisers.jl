@@ -1017,11 +1017,14 @@ A feature matrix is **not** among them. It is not carried through the folds at a
 
 $(DocStringExtensions.FIELDS)
 
+An online run's Result also carries the estimator the fold loop threaded, in `opt`, folded through the last training end `last(train_idx[end])` (ADR 0144). A batch run writes `nothing`. [`Resume`](@ref) hands the Result back to the loop over a longer history, and the loop continues from the fold after the last one held; a hand step, `partial_fit!(res.opt, rows)`, deploys the state from the last training end.
+
 # Constructors
 
     MultiPeriodPredictionResult(;
         pred::VecPredRes,
-        id::Any = nothing
+        id::Any = nothing,
+        opt::Option{<:AbstractEstimator} = nothing
     ) -> MultiPeriodPredictionResult
 
 Keywords correspond to the struct's fields. `pred` is required: the constructor stacks the folds' returns data into `mrd`, and the stack of no folds has no columns, no names, and no clock.
@@ -1037,6 +1040,7 @@ Keywords correspond to the struct's fields. `pred` is required: the constructor 
   - [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref)
   - [`sort_by_measure`](@ref)
   - [`PredictionReturnsResult`](@ref)
+  - [`Resume`](@ref)
 """
 @concrete struct MultiPeriodPredictionResult <: AbstractPredictionResult
     """
@@ -1051,7 +1055,12 @@ Keywords correspond to the struct's fields. `pred` is required: the constructor 
     $(field_dict[:id_pred])
     """
     id
-    function MultiPeriodPredictionResult(pred::VecPredRes, id::Any)
+    """
+    $(field_dict[:opt_pred])
+    """
+    opt
+    function MultiPeriodPredictionResult(pred::VecPredRes, id::Any,
+                                         opt::Option{<:AbstractEstimator})
         @argcheck(!isempty(pred), IsEmptyError("pred cannot be empty"))
         rd = getfield.(pred, :rd)
         nx = rd[1].nx
@@ -1067,12 +1076,12 @@ Keywords correspond to the struct's fields. `pred` is required: the constructor 
         ivpa = rd[end].ivpa
         mrd = PredictionReturnsResult(; nx = nx, X = X, nf = nf, F = F, nb = nb, B = B,
                                       ts = ts, iv = iv, ivpa = ivpa)
-        return new{typeof(pred), typeof(mrd), typeof(id)}(pred, mrd, id)
+        return new{typeof(pred), typeof(mrd), typeof(id), typeof(opt)}(pred, mrd, id, opt)
     end
 end
-function MultiPeriodPredictionResult(; pred::VecPredRes,
-                                     id::Any = nothing)::MultiPeriodPredictionResult
-    return MultiPeriodPredictionResult(pred, id)
+function MultiPeriodPredictionResult(; pred::VecPredRes, id::Any = nothing,
+                                     opt::Option{<:AbstractEstimator} = nothing)::MultiPeriodPredictionResult
+    return MultiPeriodPredictionResult(pred, id, opt)
 end
 """
     VecMPredRes = AbstractVector{<:MultiPeriodPredictionResult}
@@ -2185,10 +2194,18 @@ scheme and omits `cv`; `folds_are_time_ordered(nothing)` answers `true`.
 multi-path combinatorial scheme. It is positional for the reason given in
 [`parallel_folds`](@ref).
 
+# Returns
+
+  - `predictions::Vector{ElT}`: One result per fold, in split order — the new folds only under
+    a [`Resume`](@ref).
+  - `opt`: The estimator the online arm threaded, folded through the last training end, or
+    `nothing` from the batch arms. An online walk-forward's Result carries it (ADR 0144).
+
 # Related
 
   - [`Fold`](@ref)
   - [`online_folds`](@ref)
+  - [`Resume`](@ref)
   - [`run_folds`](@ref)
   - [`parallel_folds`](@ref)
   - [`assert_unshuffled_folds`](@ref)
@@ -2234,11 +2251,11 @@ function fold_loop(fit_fold, est, n::Integer, ex::FLoops.Transducers.Executor,
     # amendments.
     return if !isnothing(fold_fit(cv))
         online_folds(resolve, est, n, ElT; rd = rd, train_idx = train_idx,
-                     fold_view = fold_view, pws = pws)
+                     test_idx = test_idx, fold_view = fold_view, pws = pws)
     elseif folds_are_time_ordered(cv) && prev_w_flag
-        run_folds(fold, n, ElT; pws = pws)
+        (run_folds(fold, n, ElT; pws = pws), nothing)
     else
-        parallel_folds(i -> fold(i, nothing), n, ex, ElT)
+        (parallel_folds(i -> fold(i, nothing), n, ex, ElT), nothing)
     end
 end
 function fit_and_predict(opt::OptE_Opt_TD, rd::ReturnsResult, cv::NonSeqCVER; cols = :,
@@ -2249,8 +2266,8 @@ function fit_and_predict(opt::OptE_Opt_TD, rd::ReturnsResult, cv::NonSeqCVER; co
     assert_unshuffled_folds(cv, train_idx)
     (; wd, pws, fa, store_weight_path, strict) = fold_evaluation(cv)
     hwd = held_weights_drift(wd, pws)
-    predictions = fold_loop(opt, length(train_idx), ex; rd = rd, train_idx = train_idx,
-                            test_idx = test_idx, cv = cv, pws = pws) do fold
+    predictions, _ = fold_loop(opt, length(train_idx), ex; rd = rd, train_idx = train_idx,
+                               test_idx = test_idx, cv = cv, pws = pws) do fold
         return fit_and_predict(fold.est, fold.rd; train_idx = fold.train,
                                test_idx = fold.test, cols = cols, wd = wd, hwd = hwd,
                                fa = fa, store_weight_path = store_weight_path,

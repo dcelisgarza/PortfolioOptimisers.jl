@@ -511,6 +511,47 @@ function returns_result(opt::Union{<:HierarchicalRiskParity,
     return returns_result(opt.opt)
 end
 """
+    held_timestamps(host::Union{<:JuMPOptimiser, <:HierarchicalOptimiser, <:InverseVolatility, <:NestedClustered, <:Stacking, <:SubsetResampling, <:EqualWeighted, <:RandomWeighted})
+    held_timestamps(opt::JuMPOptimisationEstimator)
+    held_timestamps(opt::Union{<:HierarchicalRiskParity, <:HierarchicalEqualRiskContribution, <:SchurComplementHierarchicalRiskParity})
+    held_timestamps(::PreviousWeights)
+
+The timestamps an optimiser's Fold Context holds, or `nothing` when it holds none.
+
+The accessor [`Resume`](@ref)'s alignment check reads. The [`ReturnsBufferState`](@ref) keeps the timestamps of the observations folded, trimmed from the front under a cap, so under `Online(pe; max_history = w)` the last `w` survive. The arms mirror [`returns_result`](@ref)'s: a head forwards to the bundle it holds, and a host reads its own context. [`PreviousWeights`](@ref) reads nothing and keeps no context, so it holds no timestamps and a resume refuses it. A [`Pipeline`](@ref) host answers through the state its row owner keeps.
+
+# Arguments
+
+  - `opt`: The stepped optimiser.
+
+# Returns
+
+  - `ts::Option{<:AbstractVector}`: The held timestamps, in order, or `nothing`.
+
+# Related
+
+  - [`ReturnsBufferState`](@ref)
+  - [`returns_result`](@ref)
+  - [`resume_fold_count`](@ref)
+  - [`Resume`](@ref)
+"""
+function held_timestamps(host::Union{<:JuMPOptimiser, <:HierarchicalOptimiser,
+                                     <:InverseVolatility, <:NestedClustered, <:Stacking,
+                                     <:SubsetResampling, <:EqualWeighted, <:RandomWeighted})
+    return context_timestamps(host.cache)
+end
+function held_timestamps(opt::JuMPOptimisationEstimator)
+    return held_timestamps(opt.opt)
+end
+function held_timestamps(opt::Union{<:HierarchicalRiskParity,
+                                    <:HierarchicalEqualRiskContribution,
+                                    <:SchurComplementHierarchicalRiskParity})
+    return held_timestamps(opt.opt)
+end
+function held_timestamps(::PreviousWeights)
+    return nothing
+end
+"""
     online_readout(host::Union{<:JuMPOptimiser, <:HierarchicalOptimiser, <:InverseVolatility, <:NestedClustered, <:Stacking, <:SubsetResampling})
     online_readout(host::Union{<:EqualWeighted, <:RandomWeighted})
     online_readout(opt::JuMPOptimisationEstimator)

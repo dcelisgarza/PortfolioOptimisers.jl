@@ -17,6 +17,7 @@ PortfolioOptimisers.assert_stateless_schedule
 PortfolioOptimisers.assert_stateless_prior
 PortfolioOptimisers.assert_online_entry
 PortfolioOptimisers.returns_result(host::Union{<:JuMPOptimiser, <:HierarchicalOptimiser, <:InverseVolatility, <:NestedClustered, <:Stacking, <:SubsetResampling})
+PortfolioOptimisers.held_timestamps
 PortfolioOptimisers.readout_without_state
 PortfolioOptimisers.online_readout
 optimise(opt::PortfolioOptimisers.OptimisationEstimator; kwargs...)
