@@ -1,7 +1,7 @@
 include(joinpath(@__DIR__, "test12_setup.jl"))
 using Clustering, StableRNGs, LinearAlgebra
 
-# The two source kinds. Both are *estimators* -- `PhylogenyFeatures` holds no Result -- so
+# The two source kinds. Both are *estimators* -- `PhylogenyPanel` holds no Result -- so
 # both refit from whatever `X` they are handed. `PEX` is `NTE`'s graph materialised once, as
 # the reference the kernels are checked against.
 const NTE = NetworkEstimator(; sep = HopCount(; n = 2))
@@ -9,6 +9,15 @@ const CLE = ClustersEstimator()
 const PEX = Matrix{Float64}(phylogeny_matrix(NTE, rd.X).X)
 const NA = size(rd.X, 2)
 
+#=
+The producer's matrix, read back off the static panel it returns. `#804` moved the derived
+feature source onto the distance, so `asset_panel` is the verb and `"proximity"` is the field.
+=#
+function proxmat(ape, rdx, Xm)
+    return PortfolioOptimisers.panel_field(PortfolioOptimisers.asset_panel(ape, nothing,
+                                                                           rdx, Xm),
+                                           "proximity").vals
+end
 @testset "phylogeny_features: the two kernels" begin
     Zb = phylogeny_features(Proximity(; decay = NoDecay()), NTE, rd.X)
     Zg = phylogeny_features(Proximity(), NTE, rd.X)
@@ -86,9 +95,9 @@ end
 @testset "A clustering source is admitted, and what it costs" begin
     # `pl` is bound by `NwE_ClE`: both source kinds, both estimators. A precomputed result
     # of either kind is rejected by the type -- an Estimator does not hold a Result.
-    @test isa(PhylogenyFeatures(; pl = CLE), PhylogenyFeatures)
-    @test_throws TypeError PhylogenyFeatures(; pl = clusterise(ClustersEstimator(), rd.X))
-    @test_throws TypeError PhylogenyFeatures(; pl = PhylogenyResult(; X = PEX))
+    @test isa(PhylogenyPanel(; pl = CLE), PhylogenyPanel)
+    @test_throws TypeError PhylogenyPanel(; pl = clusterise(ClustersEstimator(), rd.X))
+    @test_throws TypeError PhylogenyPanel(; pl = PhylogenyResult(; X = PEX))
 
     # The cost of the partition source, which is why a graph is preferred: `P * transpose(P) - I` has row `i`
     # equal to the co-membership indicator of asset `i`, so the distance depends on nothing
@@ -103,11 +112,11 @@ end
     @test D[4, 5] == maximum(D)
 end
 
-@testset "PhylogenyFeatures constructs, validates and produces a square matrix" begin
-    ze = PhylogenyFeatures()
-    @test isa(ze, PortfolioOptimisers.AbstractFeatureMatrixEstimator)
-    @test isa(ze.pl, NetworkEstimator)
-    @test ze.alg == Proximity()
+@testset "PhylogenyPanel constructs, validates and produces a square matrix" begin
+    ape = PhylogenyPanel()
+    @test isa(ape, PortfolioOptimisers.AbstractAssetPanelEstimator)
+    @test isa(ape.pl, NetworkEstimator)
+    @test ape.alg == Proximity()
     @test isa(Proximity(), PortfolioOptimisers.AbstractPhylogenyFeatureAlgorithm)
     @test isa(Proximity(; decay = NoDecay()),
               PortfolioOptimisers.AbstractPhylogenyFeatureAlgorithm)
@@ -115,85 +124,75 @@ end
     # Both sources refit, so the universe always matches by construction -- there is no
     # stored matrix left that could describe a different one.
     for alg in (Proximity(; decay = NoDecay()), Proximity()), pl in (NTE, CLE)
-        pr = prior(FeaturePrior(; ze = PhylogenyFeatures(; pl = pl, alg = alg)), rd)
-        @test size(pr.Z) == (NA, NA)              # the only producer whose axes coincide
-        @test pr.Z == phylogeny_features(alg, pl, rd.X)
+        Z = proxmat(PhylogenyPanel(; pl = pl, alg = alg), rd, rd.X)
+        @test size(Z) == (NA, NA)              # the only producer whose axes coincide
+        @test Z == phylogeny_features(alg, pl, rd.X)
     end
 
-    # Squareness is a property of the matrix, not a claim on the carrier: the other producers
-    # are rectangular and the carrier says nothing about either case.
-    @test size(prior(FeaturePrior(; pe = FactorPrior(), ze = RegressionFeatures()), rd).Z,
-               2) != NA
-    @test size(prior(FeaturePrior(; ze = rand(StableRNG(987654321), NA, 3)), rd).Z) ==
-          (NA, 3)
+    # Squareness is derived from the labels, not declared: the other producer is rectangular
+    # and nothing records either case.
+    prf = prior(FactorPrior(), rd)
+    lf = PortfolioOptimisers.panel_field(PortfolioOptimisers.asset_panel(RegressionPanel(),
+                                                                         prf, rd, rd.X),
+                                         "loadings")
+    @test size(lf.vals, 2) != NA
+    @test !PortfolioOptimisers.features_are_assets(lf, rd.nx)
 end
 
 @testset "A subproblem measures its own neighbourhood, by refitting" begin
     i = [1, 4, 7, 11, 15]
     de = FeatureDistance()
 
-    # The carrier slices the asset axis only, square matrix or not: a derived `Z` carries no
-    # squareness flag, because there is nothing here a producer could not recompute.
-    for pl in (NTE, CLE)
-        pr = prior(FeaturePrior(; ze = PhylogenyFeatures(; pl = pl)), rd)
-        prv = PortfolioOptimisers.port_opt_view(pr, i)
-        @test size(prv.Z) == (length(i), NA)
-        @test prv.Z == pr.Z[i, :]
-    end
-
-    # The semantics survive the flag, reached by the better route. A subproblem is measured
-    # on its own neighbourhood structure — "related to asset k, for k in this subproblem" —
-    # because the producer **refits** on the subproblem's universe rather than having a
-    # matrix describing a larger one cut down. `distance` therefore still does not commute
-    # with the subselection, which was the whole content of the deleted flag.
-    pen = FeaturePrior(; ze = PhylogenyFeatures(; pl = NTE))
-    prs = prior(pen, rd)
+    # A subproblem is measured on its own neighbourhood structure — "related to asset k, for
+    # k in this subproblem" — because the producer **refits** on the subproblem's universe
+    # rather than having a matrix describing a larger one cut down. `distance` therefore does
+    # not commute with the subselection, which was the whole content of the deleted flag.
     rdv = ReturnsResult(; nx = rd.nx[i], X = rd.X[:, i])
-    Zr = prior(PortfolioOptimisers.port_opt_view(pen, i), rdv).Z
+    Zfull = proxmat(PhylogenyPanel(; pl = NTE), rd, rd.X)
+    Zr = proxmat(PhylogenyPanel(; pl = NTE), rdv, rdv.X)
     @test size(Zr) == (length(i), length(i))
-    @test distance(de, Zr) != distance(de, prs.Z)[i, i]
+    @test distance(de, Zr) != distance(de, Zfull)[i, i]
 
-    # A rectangular producer is the contrast: its feature axis is not the asset axis, so a
+    # A rectangular producer is the contrast: its trailing axis is not the asset axis, so a
     # view keeps every row's feature vector intact and the distance does commute.
-    prf = prior(FeaturePrior(; pe = FactorPrior(), ze = RegressionFeatures()), rd)
-    @test distance(de, PortfolioOptimisers.port_opt_view(prf, i).Z) ==
-          distance(de, prf.Z)[i, i]
+    prf = prior(FactorPrior(), rd)
+    L(pr) = PortfolioOptimisers.panel_field(PortfolioOptimisers.asset_panel(RegressionPanel(),
+                                                                            pr, nothing,
+                                                                            pr.X),
+                                            "loadings").vals
+    @test distance(de, L(PortfolioOptimisers.port_opt_view(prf, i))) ==
+          distance(de, L(prf))[i, i]
 end
 
-@testset "Every producer is configuration, so a view passes it through" begin
-    # No producer embeds data any more: `PhylogenyFeatures` holds an estimator, so a view has
-    # nothing to slice and the source refits on the viewed returns instead. That is what
-    # makes `feature_estimator_view`'s delegation to `port_opt_view` a no-op for every
-    # producer in the family.
+@testset "A producer is configuration, so a view passes it through" begin
+    # A producer embeds no data: `PhylogenyPanel` holds an estimator, so a view has nothing to
+    # slice and the source refits on the viewed returns instead. That is why the `ape` slot
+    # carries no view tag at all.
     i = [2, 5, 9, 13]
     for pl in (NTE, CLE)
-        pen = FeaturePrior(; ze = PhylogenyFeatures(; pl = pl))
-        @test PortfolioOptimisers.port_opt_view(pen, i).ze.pl === pl
+        de = FeatureDistance(; ape = PhylogenyPanel(; pl = pl))
+        @test PortfolioOptimisers.port_opt_view(de, i).ape.pl === pl
     end
-    @test PortfolioOptimisers.port_opt_view(FeaturePrior(; ze = RegressionFeatures()), i).ze ==
-          RegressionFeatures()
+    @test PortfolioOptimisers.port_opt_view(FeatureDistance(; ape = RegressionPanel()),
+                                            i).ape == RegressionPanel()
 
-    # The viewed producer refits on the viewed universe, which is the whole point: the
-    # feature matrix a subproblem sees describes the subproblem's assets.
+    # The producer refits on the viewed universe, which is the whole point: the Feature
+    # Matrix a subproblem sees describes the subproblem's assets.
     rdv = ReturnsResult(; nx = rd.nx[i], X = rd.X[:, i])
-    pen = FeaturePrior(; ze = PhylogenyFeatures(; pl = NTE))
-    Zv = prior(PortfolioOptimisers.port_opt_view(pen, i), rdv).Z
+    Zv = proxmat(PhylogenyPanel(; pl = NTE), rdv, rdv.X)
     @test size(Zv) == (length(i), length(i))
     @test Zv == phylogeny_features(Proximity(), NTE, rd.X[:, i])
 end
 
 @testset "A square feature matrix drives an optimisation end to end" begin
-    mk(ze) = HierarchicalRiskParity(;
-                                    opt = HierarchicalOptimiser(;
-                                                                pe = FeaturePrior(;
-                                                                                  ze = ze),
-                                                                cle = ClustersEstimator(;
-                                                                                        de = FeatureDistance()),
-                                                                z_src = :prior))
-    wb = optimise(mk(PhylogenyFeatures(; pl = NTE, alg = Proximity(; decay = NoDecay()))),
-                  rd).w
-    wg = optimise(mk(PhylogenyFeatures(; pl = NTE, alg = Proximity())), rd).w
-    wc = optimise(mk(PhylogenyFeatures(; pl = CLE)), rd).w
+    mk(ape) = HierarchicalRiskParity(;
+                                     opt = HierarchicalOptimiser(;
+                                                                 cle = ClustersEstimator(;
+                                                                                         de = FeatureDistance(;
+                                                                                                              ape = ape))))
+    wb = optimise(mk(PhylogenyPanel(; pl = NTE, alg = Proximity(; decay = NoDecay()))), rd).w
+    wg = optimise(mk(PhylogenyPanel(; pl = NTE, alg = Proximity())), rd).w
+    wc = optimise(mk(PhylogenyPanel(; pl = CLE)), rd).w
 
     for w in (wb, wg, wc)
         @test length(w) == NA
@@ -216,8 +215,9 @@ end
     # independent of it. The merge order and the weights differ, but the coarse cuts do not
     # — they agree at k = 2 and k = 3 and only diverge from k = 4 on. Recorded rather than
     # asserted away: it is what an endogenous source buys, and what it does not.
-    pr = prior(FeaturePrior(; ze = PhylogenyFeatures(; pl = NTE)), rd)
-    hf = Clustering.hclust(distance(FeatureDistance(), pr.Z); linkage = :ward)
+    hf = Clustering.hclust(distance(FeatureDistance(),
+                                    proxmat(PhylogenyPanel(; pl = NTE), rd, rd.X));
+                           linkage = :ward)
     @test hf.merges != hc.merges
     @test Clustering.cutree(hf; k = 3) == Clustering.cutree(hc; k = 3)
     @test Clustering.cutree(hf; k = 4) != Clustering.cutree(hc; k = 4)
@@ -226,23 +226,27 @@ end
     # returns, so there is no exogenous square route left in the family. A partition source
     # is endogenous too, and coarser: it recodes a clustering of the same returns, so it
     # agrees with the correlation hierarchy at the cut that defined it.
-    prc = prior(FeaturePrior(; ze = PhylogenyFeatures(; pl = CLE)), rd)
-    hxc = Clustering.hclust(distance(FeatureDistance(), prc.Z); linkage = :ward)
-    @test size(prc.Z) == (NA, NA)
-    @test length(unique(prc.Z)) == 2
+    Zc = proxmat(PhylogenyPanel(; pl = CLE), rd, rd.X)
+    hxc = Clustering.hclust(distance(FeatureDistance(), Zc); linkage = :ward)
+    @test size(Zc) == (NA, NA)
+    @test length(unique(Zc)) == 2
 end
 
 @testset "The recursion hazard fails loudly rather than looping" begin
-    # A `FeatureDistance` inside the source's own `de` runs inside `prior(pe, X, F; …)`,
-    # before `pr.Z` exists, so there is no feature matrix to find and none to recurse into.
-    ze = PhylogenyFeatures(; pl = NetworkEstimator(; de = FeatureDistance()))
-    @test_throws PortfolioOptimisers.IsNothingError prior(FeaturePrior(; ze = ze), rd)
+    # A `FeatureDistance` inside the source's own `de` is handed a bare returns matrix, with
+    # no carrier and no producer of its own, so there is no panel to find and none to recurse
+    # into. It fails loudly rather than looping.
+    ape = PhylogenyPanel(; pl = NetworkEstimator(; de = FeatureDistance()))
+    @test_throws PortfolioOptimisers.IsNothingError PortfolioOptimisers.asset_panel(ape,
+                                                                                    nothing,
+                                                                                    rd,
+                                                                                    rd.X)
     res = @test_throws PortfolioOptimisers.IsNothingError phylogeny_features(Proximity(;
                                                                                        decay = NoDecay()),
                                                                              NetworkEstimator(;
                                                                                               de = FeatureDistance()),
                                                                              rd.X)
-    @test occursin("FeatureDistance requires a feature matrix", res.value.msg)
+    @test occursin("Asset Panel", res.value.msg)
 end
 
 # The separation family. Like the decay family it lives in `11_Phylogeny/01_Base_Phylogeny.jl`
@@ -331,6 +335,22 @@ end
     @test all(≈(exp(-0.8)), es[2:end] ./ es[1:(end - 1)])
     @test !all(≈(rs[2] / rs[1]), rs[2:end] ./ rs[1:(end - 1)])
     @test rs[end] > es[end]                       # heavier tail
+
+    # `power` is a fall-off dial on the shipped spelling `(1 + d)^-p`: raising it lowers the
+    # score at every `d > 0` and moves `f(0) = 1` not at all. The rejected spelling
+    # `(1 + d^p)^-1` is what `ReciprocalDecay`'s docstring contrasts it with, and the
+    # contrast is that the rejected one pivots at `d = 1` and reverses direction across it.
+    for d in (0.25, 0.5, 1.0, 2.0, 4.0)
+        @test separation_decay(ReciprocalDecay(; power = 3.0), d, 9) <
+              separation_decay(ReciprocalDecay(; power = 1.0), d, 9)
+    end
+    @test separation_decay(ReciprocalDecay(; power = 3.0), 0, 9) ==
+          separation_decay(ReciprocalDecay(; power = 1.0), 0, 9) ==
+          1
+    alt_recip(d, p) = inv(1 + d^p)
+    @test alt_recip(1.0, 3.0) == alt_recip(1.0, 1.0) == 0.5
+    @test alt_recip(0.5, 3.0) > alt_recip(0.5, 1.0)
+    @test alt_recip(2.0, 3.0) < alt_recip(2.0, 1.0)
 
     # Field validation, on the members that carry a parameter.
     @test_throws DomainError ExponentialDecay(; rate = 0)
@@ -713,8 +733,7 @@ end
         @test all(isfinite, Z)
         @test all(>(0), diag(Z))                  # the diagonal is the top of the scale
         @test maximum(Z) == first(diag(Z))
-        pr = prior(FeaturePrior(; ze = PhylogenyFeatures(; pl = pl, alg = alg)), rd)
-        @test pr.Z == Z
+        @test proxmat(PhylogenyPanel(; pl = pl, alg = alg), rd, rd.X) == Z
     end
 
     # `dmax = nothing` reaches the whole connected component, so a flat decay over a graph

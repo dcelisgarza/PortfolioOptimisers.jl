@@ -379,12 +379,12 @@ Resolve a **Deferred Quantity** in [`ThirdCentralMoment`](@ref)'s `mu` slot agai
   - [`resolve_deferred_quantities`](@ref)
   - [`resolve_slot`](@ref)
 """
-function resolve_deferred_quantities(r::ThirdCentralMoment, pr::AbstractPriorResult)
+function resolve_deferred_quantities(r::ThirdCentralMoment, pr::AbstractPriorResult,
+                                     ::Any = nothing)
     if !isa(r.mu, DeferredQuantity)
         return r
     end
-    return ThirdCentralMoment(; settings = r.settings, w = r.w,
-                              mu = resolve_slot(r.mu, :mu, pr))
+    return rebuild_with_slots(r, (; mu = resolve_slot(r.mu, :mu, pr)))
 end
 # Deferrable slots — see `deferred_slots`.
 deferred_slots(r::ThirdCentralMoment) = (; mu = r.mu)

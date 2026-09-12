@@ -42,6 +42,14 @@ abstract type CustomExpectedReturnsValueAlgorithm <: AbstractCustomValue end
     const CER_Func_Num_VecNum = Union{<:CustomExpectedReturnsValueAlgorithm,<:Func_Num_VecNum}
 
 Alias for supported types for the `val` field in [`CustomValueExpectedReturns`](@ref).
+
+The group exists because the three shapes are a single field's contract, not three fields. The bound is written once here, so the field, the keyword constructor and the three `mean` methods cannot drift apart on what `val` may be.
+
+# Related
+
+  - [`CustomExpectedReturnsValueAlgorithm`](@ref): A callable the caller subtypes, which the estimator calls as `val(X; dims = dims, kwargs...)`.
+  - [`Func_Num_VecNum`](@ref): The scalar, the per-asset vector and the plain `Function`, which this alias widens with the algorithm supertype.
+  - [`CustomValueExpectedReturns`](@ref): The estimator whose `val` field carries this bound.
 """
 const CER_Func_Num_VecNum = Union{<:CustomExpectedReturnsValueAlgorithm, <:Func_Num_VecNum}
 """
@@ -49,7 +57,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Returns a caller-supplied value for each asset instead of estimating one from the data.
 
-`val` holds a scalar, a per-asset vector, or a callable that the estimator calls with the data matrix.
+`val` holds a scalar, a per-asset vector, or a callable that the estimator calls with the data matrix. The type of `val` selects the branch that [`mean(me::CustomValueExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref) takes, and any other type is rejected by the `CER_Func_Num_VecNum` bound of the field.
+
+The constructor checks only that a vector is not empty, because the number of assets is not known until the data arrive. The length of a stored vector, and the shape and the length of what a callable returns, are checked at the point of use by [`assert_custom_expected_returns_val`](@ref).
 
 # Fields
 
@@ -120,6 +130,20 @@ Where:
   - ``v_j``: ``j``-th element of the custom value `me.val` (broadcast from a scalar, taken directly from a vector, or evaluated from a callable).
   - $(math_dict[:N])
 
+# Algorithm
+
+ 1. Check `dims`.
+
+ 2. Read the asset count `_ncols` from `X` and `dims`, as the size of the dimension that `dims` does not name.
+
+ 3. Take the branch that the type of `me.val` selects.
+
+      + `me.val::Number`: Fill a vector of length `_ncols` with `me.val`.
+      + `me.val::VecNum`: Check the stored `me.val` against `_ncols` with [`assert_custom_expected_returns_val`](@ref), and take it unchanged.
+      + `me.val::Function` or `me.val::CustomExpectedReturnsValueAlgorithm`: Call `me.val(X; dims = dims, kwargs...)`, giving `val`, and check `val` against `_ncols` with [`assert_custom_expected_returns_val`](@ref).
+
+ 4. On the first two branches, insert the reduced dimension with `insertdims`. The callable branch returns `val` unchanged, and inserts no dimension.
+
 # Arguments
 
   - `me`: Custom value expected returns estimator.
@@ -164,17 +188,12 @@ Both the vector field of [`CustomValueExpectedReturns`](@ref) and the value retu
 
 # Validation
 
-  - `isa(val, VecNum)`.
-  - `length(val) == N`.
+  - `isa(val, VecNum)`, or an `ArgumentError` is thrown. A scalar, a function and a matrix all fail here, and the message names `val_sym` and the type it was given.
+  - `length(val) == N`, or a `DimensionMismatch` is thrown. The message names `val_sym`, the length it was given, and `N`.
 
 # Returns
 
   - `nothing`.
-
-# Details
-
-  - Throws `ArgumentError` if `val` is not a vector of numbers.
-  - Throws `DimensionMismatch` if the length of `val` does not match the number of assets.
 
 # Related
 
@@ -214,6 +233,53 @@ function Statistics.mean(me::CustomValueExpectedReturns{<:Union{<:Function,
     val = me.val(X; dims = dims, kwargs...)
     assert_custom_expected_returns_val(val, _ncols, "val(X; dims = $dims, kwargs...)")
     return val
+end
+"""
+    port_opt_view(
+        me::CustomValueExpectedReturns{<:VecNum},
+        i,
+        args...
+    ) -> CustomValueExpectedReturns
+
+[`port_opt_view`](@ref) method for the per-asset vector shape of
+[`CustomValueExpectedReturns`](@ref): slices `val` to the selected assets.
+
+`val` is the one field of the estimator, and it sits on the asset axis in this shape alone. A
+scalar is universe-independent, and a callable receives the already-reduced matrix and answers one
+value per column of it, so both keep the identity method of
+[`AbstractExpectedReturnsEstimator`](@ref). A stored vector is one entry per asset of the universe
+the caller wrote it against, so a reduction that left it whole would carry the full universe into a
+narrower sample, and [`mean(me::CustomValueExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
+would throw a `DimensionMismatch` against the sample it was handed.
+
+The bound of `val` is a union of the three shapes, so this declaration is a method on the shape
+that is on the asset axis rather than an [`@vprop`](@ref) tag on the field, which would slice all
+three. ADR 0115 records the decision.
+
+# Algorithm
+
+ 1. Return a new estimator whose `val` is `view(me.val, i)`.
+
+# Arguments
+
+  - `me::CustomValueExpectedReturns{<:VecNum}`: The estimator whose `val` is one entry per asset.
+  - `i`: Asset index or mask to select.
+  - `args...`: Threaded tail, unused.
+
+# Returns
+
+  - `me::CustomValueExpectedReturns`: A new estimator whose `val` is restricted to the selected
+    assets.
+
+# Related
+
+  - [`CustomValueExpectedReturns`](@ref)
+  - [`port_opt_view`](@ref)
+  - [`investable_reduction`](@ref)
+"""
+function port_opt_view(me::CustomValueExpectedReturns{<:VecNum}, i,
+                       args...)::CustomValueExpectedReturns
+    return CustomValueExpectedReturns(; val = view(me.val, i))
 end
 
 export CustomValueExpectedReturns

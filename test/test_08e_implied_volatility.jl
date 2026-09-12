@@ -18,6 +18,22 @@ The three defects, each of which a testset below now pins:
      documented `Sigma = diag(sigma) rho diag(sigma)` needs `cor2cov!`. The returned
      "covariance" carried a unit diagonal whatever the implied volatilities were.
 
+A FOURTH repair gave `realised_vol` a per-block estimator through `obs_weights_view`, so a
+weighted variance estimator no longer meets a window with the whole sample's weights.
+
+Sweeping the file (#465) found a fifth hole and closed it. `cov` and `cor` compared `iv`
+with nothing, and `implied_vol` takes its row count from `X`, so an `iv` with MORE rows
+than `X` sampled windows counted forward from the start of `iv` and answered a covariance
+built from the wrong rows, silently. `size(X) == size(iv)` is now checked in both methods,
+right after `dims_oriented`.
+
+A SIXTH repair (#504) took the round trip out of `cor`. It scaled the base correlation to a
+covariance with the predicted volatilities and scaled it straight back, which a correlation
+cannot feel -- except in the last place, and except when a predicted volatility is zero,
+where the rescaling divides zero by zero and answers `NaN`. `cor` normalises the base
+correlation instead. It still runs the volatility model, and still discards it, because
+`cor` must refuse every configuration `cov` refuses.
+
 Three kinds of check run here, and the first two are what catch a drift no invariant sees:
 
   - REFERENCE VALUES, as the rest of the covariance family does it: nine configurations
@@ -65,10 +81,13 @@ end
     using Test, PortfolioOptimisers, DataFrames, TimeSeries, CSV, StableRNGs, StatsBase,
           Statistics, LinearAlgebra
 
-    rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
-                                     timestamp = :Date)[(end - 252):end],
-                           TimeArray(CSV.File(joinpath(@__DIR__, "./assets/Factors.csv.gz"));
-                                     timestamp = :Date)[(end - 252):end])
+    rd = prices_to_returns(price_ingestion(PriceIngestion(),
+                                           TimeArray(CSV.File(joinpath(@__DIR__,
+                                                                       "./assets/SP500.csv.gz"));
+                                                     timestamp = :Date)[(end - 252):end];
+                                           F = TimeArray(CSV.File(joinpath(@__DIR__,
+                                                                           "./assets/Factors.csv.gz"));
+                                                         timestamp = :Date)[(end - 252):end]))
     X = rd.X
     T, N = size(X)
 
@@ -185,7 +204,7 @@ end
             # Sigma = diag(sigma) rho diag(sigma).
             @test isapprox(sigma, Diagonal(sd) * rho * Diagonal(sd))
             # A correlation does not depend on the volatilities that scale it.
-            @test isapprox(cor(ce, X; iv = iv, kwargs...), rho)
+            @test cor(ce, X; iv = iv, kwargs...) == rho
         end
     end
 
@@ -238,6 +257,28 @@ end
         @test_throws ArgumentError cov(ImpliedVolatility(;
                                                          alg = ImpliedVolatilityPremium()),
                                        X; iv = iv)
+        #=
+        A factor that is not finite and strictly positive divides the last implied
+        volatility into something that is not a volatility, and `cor2cov!` hides it. A
+        NEGATIVE SCALAR cancels: `cor2cov!` writes `C[i,j] *= s[i] * s[j]` and
+        `C[j,j] = s[j]^2`, so `-1.2` returned exactly the matrix `1.2` returns. A NEGATIVE
+        ENTRY of a vector flips the sign of every covariance between that asset and the
+        others, keeps its variance, and leaves the matrix positive definite, so
+        `matrix_processing!` found nothing to repair and the optimiser was handed an asset
+        whose correlations all pointed the wrong way. A `NaN` was refused, but only by
+        accident, and by `NearestCorrelationMatrix`, which named neither `ivpa` nor the
+        estimator. The reference implementation refuses all three at the fit.
+        =#
+        cep = ImpliedVolatility(; alg = ImpliedVolatilityPremium())
+        ivpam = copy(ivpav)
+        ivpam[1] = -ivpam[1]
+        for bad in (-1.2, zero(eltype(ivpav)), NaN, Inf, ivpam)
+            @test_throws DomainError cov(cep, X; iv = iv, ivpa = bad)
+            # `cor` refuses what `cov` refuses, though its answer cannot move.
+            @test_throws DomainError cor(cep, X; iv = iv, ivpa = bad)
+        end
+        # The positive factor the bad ones were derived from still answers.
+        @test all(isfinite, cov(cep, X; iv = iv, ivpa = ivpav))
         # The implied volatility series itself is mandatory.
         @test_throws UndefKeywordError cov(ImpliedVolatility(), X)
         # A custom variance estimator that carries observation weights and implements no
@@ -362,7 +403,285 @@ end
             # The weights change the answer, so they are not being quietly dropped.
             @test !isapprox(sigma, base)
             # The correlation is untouched by the volatility model either way.
-            @test isapprox(cor(ce, X; iv = iv), cor(Covariance(), X))
+            @test cor(ce, X; iv = iv) == cor(Covariance(), X)
         end
+    end
+
+    #=
+    ------------------------------------------------------------------ sweep #465
+
+    The four testsets below were added when this file was swept. Each pins a claim that
+    a docstring in `src/08_Moments/24_ImpliedVolatility.jl` now makes, so a reader who
+    doubts the prose can run the number instead.
+    =#
+
+    @testset "The documented identities hold to the tolerance they are stated at" begin
+        rho = cor(Covariance(), X)
+        for (alg, kwargs) in [(ImpliedVolatilityRegression(), (;)),
+                              (ImpliedVolatilityPremium(), (; ivpa = 1.2))]
+            ce = ImpliedVolatility(; alg = alg)
+            sigma = cov(ce, X; iv = iv, kwargs...)
+            sd = PortfolioOptimisers.predict_realised_vols(alg, iv / sqrt(ce.af), X,
+                                                           get(kwargs, :ivpa, nothing))
+            # `cov`'s `# Mathematical definition`. Measured at 1.1e-19 for the regression
+            # route and 5.4e-20 for the premium route, against entries of order 1e-4.
+            @test maximum(abs, sigma - Diagonal(sd) * rho * Diagonal(sd)) <= 1e-18
+            #=
+            `cor`'s step 5. The base correlation is normalised and nothing else, so the
+            answer is BIT-EXACT. It was not while `cor` scaled `rho` by the predicted
+            volatilities and rescaled it back: that round trip moved 38 of the 400 entries
+            by half an eps under the regression route, and by a quarter of one under the
+            premium route (#504).
+            =#
+            rhoc = cor(ce, X; iv = iv, kwargs...)
+            @test diag(rhoc) == ones(N)
+            @test rhoc == rho
+        end
+    end
+
+    @testset "cov and cor refuse an iv that is not shaped like X" begin
+        ce = ImpliedVolatility()
+        #=
+        A LONGER `iv` used to pass silently and answer a covariance built from the wrong
+        rows. `implied_vol` is handed the row count of `X`, so with more rows in `iv` it
+        sampled windows offset from the START of `iv` rather than counted back from its
+        end, and `size(rv) == size(iv)` still held. A shorter `iv` raised a raw
+        `BoundsError` from inside `implied_vol`. Neither reaches the estimator now.
+        =#
+        iv_long = vcat(iv, iv[1:48, :])
+        @test size(iv_long, 1) != T
+        @test_throws DimensionMismatch cov(ce, X; iv = iv_long)
+        @test_throws DimensionMismatch cor(ce, X; iv = iv_long)
+        @test_throws DimensionMismatch cov(ce, X; iv = iv[1:200, :])
+        @test_throws DimensionMismatch cor(ce, X; iv = iv[1:200, :])
+        # A narrower `iv` reached the argcheck inside the regression branch. It is refused
+        # before the base correlation is computed now.
+        @test_throws DimensionMismatch cov(ce, X; iv = iv[:, 1:10])
+        @test_throws DimensionMismatch cor(ce, X; iv = iv[:, 1:10])
+        # The premium branch reads no window at all, so nothing there ever raised.
+        cep = ImpliedVolatility(; alg = ImpliedVolatilityPremium())
+        @test_throws DimensionMismatch cov(cep, X; iv = iv_long, ivpa = 1.2)
+        @test_throws DimensionMismatch cor(cep, X; iv = iv_long, ivpa = 1.2)
+        # The guard runs AFTER `dims_oriented`, so a bad `dims` still answers `DomainError`.
+        @test_throws DomainError cov(ce, X; dims = 3, iv = iv_long)
+        # Both matrices are oriented before they are compared, so a transposed pair passes
+        # and gives the same answer.
+        @test isapprox(cov(ce, transpose(X); dims = 2, iv = transpose(iv)),
+                       cov(ce, X; iv = iv))
+    end
+
+    @testset "factory reaches the algorithm's variance estimator" begin
+        #=
+        Issue #505. `alg` carried no propagation tag and `ImpliedVolatilityRegression` was
+        not `@propagatable`, so `factory` weighted the base correlation estimator and left
+        `alg.ve` unweighted. One estimator answered a weighted correlation and an
+        unweighted realised volatility, silently.
+
+        Both tags are in place now, so one `factory` call reaches every estimator the type
+        holds.
+        =#
+        f = PortfolioOptimisers.factory(ImpliedVolatility(), aw)
+        @test !isnothing(f.ce.ce.w)
+        @test f.alg.ve.w === aw
+        @test f.alg.ve.me.w === aw
+        # The tag names one field, so everything else the algorithm holds is rebuilt as it
+        # stood.
+        @test f.alg.ws == ImpliedVolatility().alg.ws
+        @test f.alg.re isa LinearModel
+        # The algorithm answers the same weighted estimator on its own.
+        @test PortfolioOptimisers.factory(ImpliedVolatilityRegression(), aw).ve.w === aw
+        # `factory` writes the incoming value over a hand-set one, as it does on every
+        # `@wprop` field.
+        uw = AnalyticWeights(fill(inv(length(aw)), length(aw)))
+        g = PortfolioOptimisers.factory(ImpliedVolatility(;
+                                                          alg = ImpliedVolatilityRegression(;
+                                                                                            ve = SimpleVariance(;
+                                                                                                                w = uw))),
+                                        aw)
+        @test g.alg.ve.w === aw
+        # `ImpliedVolatilityPremium` holds no estimator, so it comes back unchanged.
+        p = ImpliedVolatility(; alg = ImpliedVolatilityPremium())
+        @test PortfolioOptimisers.factory(p, aw).alg === p.alg
+        # A `factory` call that carries no weights leaves every estimator alone.
+        @test PortfolioOptimisers.factory(ImpliedVolatility(), nothing).alg.ve.w === nothing
+    end
+
+    @testset "the base estimator receives the oriented iv" begin
+        #=
+        `cov` and `cor` forward `iv` to `ce.ce`. Every shipped estimator absorbs it into
+        its own `kwargs...` and ignores it; a nested `ImpliedVolatility` reads it, which is
+        the reason the keyword is forwarded rather than dropped.
+        =#
+        nested = ImpliedVolatility(;
+                                   ce = ImpliedVolatility(;
+                                                          alg = ImpliedVolatilityRegression(;
+                                                                                            ws = 30)))
+        sigma = cov(nested, X; iv = iv)
+        @test size(sigma) == (N, N)
+        @test isposdef(sigma)
+        # The inner estimator answers a correlation, so only the outer scaling reaches the
+        # diagonal.
+        @test isapprox(sqrt.(diag(sigma)),
+                       PortfolioOptimisers.predict_realised_vols(nested.alg,
+                                                                 iv / sqrt(nested.af), X,
+                                                                 nothing))
+        # `implied_vol` answers a view, as its `# Algorithm` step 2 says.
+        v = PortfolioOptimisers.implied_vol(iv, 20)
+        @test v isa SubArray
+        @test parent(v) === iv
+    end
+
+    #=
+    -------------------------------------------------------------------- fix #504
+    =#
+
+    @testset "cor discards the predicted volatilities, and does not cancel them" begin
+        #=
+        `cor` runs the volatility model and throws the answer away. A correlation is scale
+        free, so the prediction cannot move the answer, and `cor` used to spend it on a
+        `cor2cov!`/`cov2cor!` round trip that bought nothing.
+
+        The round trip was not free. It moved 38 of the 400 entries by half an eps, and it
+        was not safe: a predicted volatility of ZERO makes `cov2cor!` divide zero by zero,
+        so one asset whose last implied volatility is zero turned a whole row and column
+        into `NaN` and `matrix_processing!` raised on it. `cor` now normalises the base
+        correlation and nothing else, so no volatility reaches the answer at all.
+        =#
+        base = cor(Covariance(), X)
+        cep = ImpliedVolatility(; alg = ImpliedVolatilityPremium())
+        # The answer does not move with the volatilities, at ANY scale, and is bit-exact.
+        for ivpa in (1.2, 1.7, ivpav, 1e-6, 1e6)
+            @test cor(cep, X; iv = iv, ivpa = ivpa) == base
+        end
+        for ws in (20, 25, 30)
+            @test cor(ImpliedVolatility(; alg = ImpliedVolatilityRegression(; ws = ws)), X;
+                      iv = iv) == base
+        end
+        #=
+        A zero implied volatility. `cov` cannot answer it: the covariance it builds is
+        singular, and the posdef step forms a correlation from a zero diagonal entry. `cor`
+        can, because that covariance is never built.
+        =#
+        iv0 = copy(iv)
+        iv0[end, 3] = 0
+        @test_throws ArgumentError cov(cep, X; iv = iv0, ivpa = 1.2)
+        @test cor(cep, X; iv = iv0, ivpa = 1.2) == base
+        #=
+        The model still runs, which is why the discarded call is kept rather than deleted.
+        `cor` refuses every configuration `cov` refuses, and raises the same type.
+        =#
+        @test_throws ArgumentError cor(cep, X; iv = iv)
+        @test_throws ArgumentError cov(cep, X; iv = iv)
+        few = ImpliedVolatility(; alg = ImpliedVolatilityRegression(; ws = 100))
+        @test_throws DomainError cor(few, X; iv = iv)
+        @test_throws DomainError cov(few, X; iv = iv)
+    end
+
+    @testset "the Coverage Universe of the fit reads the implied volatilities too" begin
+        #=
+        Issue #995, under ADR 0135. The layer carries an absent implied volatility as a
+        padded `NaN`, exactly as it carries an absent return, and `PricesResult`'s guard on
+        `iv` relaxed to non-negative WHERE A VALUE IS PRESENT. So the carrier is no longer
+        the thing that keeps a non-finite implied volatility out of the arithmetic, and the
+        estimator that reads one becomes it.
+
+        What a `NaN` did if it got through, before this narrowing existed. Every one of
+        these is a wrong number rather than an error, which is why the assertions below are
+        on the EXPANDED moment and not only on the mask:
+
+          - `cor2cov!(sigma, iv)` writes a `NaN` row AND column into the covariance, and
+            `matrix_processing!` then sees a matrix it cannot repair.
+          - `predict_realised_vols(::ImpliedVolatilityPremium, ...)` reads ONLY the last
+            row, so a `NaN` there poisons that asset's volatility and a `NaN` anywhere else
+            is ignored entirely.
+          - `predict_realised_vols(::ImpliedVolatilityRegression, ...)` takes `log.(iv)` on
+            a strided subsample; `fit` returns `NaN` coefficients rather than throwing.
+
+        The two algorithms therefore read DIFFERENT parts of `iv`, and the loop below plants
+        the absence at four rows -- the first, two the regression's stride lands on either
+        side of, and the last -- so that a mask derived from ANY absent cell excludes the
+        column under both.
+        =#
+        cep = ImpliedVolatility(; alg = ImpliedVolatilityPremium())
+        creg = ImpliedVolatility()
+        keep = [i != 3 for i in 1:N]
+
+        # A complete surface narrows nothing, and takes the `nothing` sentinel.
+        @test isnothing(PortfolioOptimisers.coverage_mask(X, iv, nothing))
+
+        for row in (1, 7, 8, T), bad in (NaN, Inf, -Inf)
+            ivg = copy(iv)
+            ivg[row, 3] = bad
+            @test PortfolioOptimisers.coverage_mask(X, ivg, nothing) == BitVector(keep)
+            for (ce, kw) in ((cep, (; ivpa = 1.2)), (cep, (; ivpa = ivpav)), (creg, (;)))
+                for f in (cov, cor)
+                    m = f(ce, X, nothing; iv = ivg, kw...)
+                    # The absent column takes a `NaN` row and column, as an absent return
+                    # does, and every other entry is finite.
+                    @test all(isnan, view(m, 3, :))
+                    @test all(isnan, view(m, :, 3))
+                    @test all(isfinite, view(m, keep, keep))
+                    # The surviving block is the fit run on those columns alone.
+                    kwc = if haskey(kw, :ivpa) && isa(kw.ivpa, AbstractVector)
+                        (; ivpa = kw.ivpa[keep])
+                    else
+                        kw
+                    end
+                    @test view(m, keep, keep) ==
+                          f(ce, X[:, keep]; iv = ivg[:, keep], kwc...)
+                end
+            end
+        end
+
+        #=
+        The narrowing INTERSECTS the mask it is handed rather than replacing it. A gapped
+        return, an inactive row of the Asset Panel and an absent implied volatility each
+        remove their own column, and the estimator fits on what all three leave.
+        =#
+        Xg = copy(X)
+        Xg[4, 1] = NaN
+        ivg = copy(iv)
+        ivg[9, 2] = NaN
+        amsk = trues(T, N)
+        amsk[11, 3] = false
+        pnl = AssetPanel(; pf = [NumericPanelField(; name = "mcap", vals = ones(T, N))],
+                         amsk = amsk, emsk = amsk)
+        keep3 = [i > 3 for i in 1:N]
+        @test PortfolioOptimisers.coverage_mask(Xg, ivg, pnl) == BitVector(keep3)
+        # The returns alone would have kept assets 2 and 3.
+        @test PortfolioOptimisers.coverage_mask(Xg, pnl) ==
+              BitVector([i != 1 && i != 3 for i in 1:N])
+
+        sigma = cov(cep, Xg, pnl; iv = ivg, ivpa = 1.2)
+        @test all(isnan, view(sigma, 1:3, :))
+        @test all(isnan, view(sigma, :, 1:3))
+        @test view(sigma, keep3, keep3) ==
+              cov(cep, Xg[:, keep3]; iv = ivg[:, keep3], ivpa = 1.2)
+
+        #=
+        `dims = 2` takes the same path through `dims_oriented`, so it must answer the same
+        mask and the same moment. A moment is assets x assets whichever way the sample was
+        handed in, so the two answers are compared entry for entry.
+        =#
+        @test PortfolioOptimisers.coverage_mask(transpose(Xg), transpose(ivg), pnl;
+                                                dims = 2) == BitVector(keep3)
+        for f in (cov, cor)
+            @test isequal(f(cep, transpose(Xg), pnl; dims = 2, iv = transpose(ivg),
+                            ivpa = 1.2), f(cep, Xg, pnl; iv = ivg, ivpa = 1.2))
+        end
+
+        #=
+        An empty Coverage Universe is refused by name. The message must reach the implied
+        volatilities: the tail `coverage_sentinel` writes by default names the returns and
+        the Asset Panel alone, and would send the caller looking in the wrong place.
+        =#
+        err = try
+            PortfolioOptimisers.coverage_mask(X, fill(NaN, T, N), nothing)
+        catch e
+            e
+        end
+        @test isa(err, IsEmptyError)
+        @test occursin("implied volatility", err.msg)
+        @test_throws IsEmptyError cov(cep, X, nothing; iv = fill(NaN, T, N), ivpa = 1.2)
     end
 end

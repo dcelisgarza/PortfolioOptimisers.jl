@@ -29,7 +29,14 @@ OrderedWeightsArrayFormulation
 ExactOrderedWeightsArray
 ApproxOrderedWeightsArray
 OrderedWeightsArray
+OWA_RevFunc
+OWA_CalOccupant
+factory(x::OrderedWeightsArray, pr::AbstractPriorResult, args...; kwargs...)
 OrderedWeightsArrayRange
+factory(x::OrderedWeightsArrayRange, pr::AbstractPriorResult, args...; kwargs...)
+resolve_deferred_quantities(x::ComposedFunction{typeof(reverse),
+                                                <:AbstractOrderedWeightsArrayFunction},
+                            pr::AbstractPriorResult)
 OWAJuMP
 owa_l_moment_crm
 owa_l_moment_crm_sumsq_obj

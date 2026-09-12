@@ -3,7 +3,7 @@
 ```@docs
 MeanRiskResult
 mean_risk_td_defaults
-factory(res::MeanRiskResult, fb::Option{<:OptE_Opt})
+factory(res::MeanRiskResult, fb::Option{<:OptE_Opt_FbChain})
 Base.getproperty(r::MeanRiskResult, sym::Symbol)
 MeanRisk
 needs_previous_weights(opt::MeanRisk)
@@ -18,7 +18,7 @@ unresolved_risk_frontier
 risk_frontier_owners
 compute_risk_ubs
 optimise(mr::MeanRisk{<:Any, <:Any, <:Any, <:Any, Nothing},
-                  rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
+                  rd::ReturnsResult; dims::Int = 1,
                   str_names::Bool = false, save::Bool = true, kwargs...)
 ```
 

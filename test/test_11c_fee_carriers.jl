@@ -1,0 +1,568 @@
+@testset "Fee liquidation carriers" begin
+    using PortfolioOptimisers, Test
+
+    # ADR 0121 gives `Fees` and `FeesEstimator` two liquidation carriers, `lq` and `flq`.
+    # They price the positions an optimisation is forced to sell when an asset leaves the
+    # Investable Mask, so they live on the **complement** of that mask while the five older
+    # per-asset fields live on the mask itself.
+    #
+    # This file pins the two types against each other. The estimator must carry the same two
+    # fields as its result counterpart, resolve them by the same route `tn` takes, and reach
+    # a `Fees` a caller could have written by hand.
+
+    @testset "The estimator carries the same two fields as its result" begin
+        fn_r = fieldnames(Fees)
+        fn_e = fieldnames(FeesEstimator)
+        for f in (:lq, :flq)
+            @test f in fn_r
+            @test f in fn_e
+        end
+        # Both types order the carriers after the five per-asset fields and before the
+        # clock, so a reader of one reads the other.
+        @test findfirst(==(:lq), fn_r) == findfirst(==(:fs), fn_r) + 1
+        @test findfirst(==(:flq), fn_r) == findfirst(==(:lq), fn_r) + 1
+        @test findfirst(==(:lq), fn_e) == findfirst(==(:fs), fn_e) + 1
+        @test findfirst(==(:flq), fn_e) == findfirst(==(:lq), fn_e) + 1
+        # The result keeps its clock and its `isapprox` keywords last on both types.
+        @test fn_r[(end - 1):end] == (:fa, :kwargs)
+        @test fn_e[(end - 1):end] == (:fa, :kwargs)
+    end
+
+    @testset "Both default to nothing, so a caller that states none is unchanged" begin
+        @test isnothing(Fees().lq)
+        @test isnothing(Fees().flq)
+        @test isnothing(FeesEstimator().lq)
+        @test isnothing(FeesEstimator().flq)
+        # The keyword constructor forwards positionally, so the two orders must agree.
+        @test Fees(; tn = Turnover(; w = [0.1, 0.2], val = 0.01), l = 0.002).lq === nothing
+    end
+
+    @testset "The estimator resolves its carriers exactly as it resolves `tn`" begin
+        nx = ["a", "b", "c", "d"]
+        sets = UniverseSets(; dict = Dict("nx" => nx))
+        w = [0.25, 0.25, 0.25, 0.25]
+
+        fest = FeesEstimator(;
+                             tn = TurnoverEstimator(; w = w, val = Dict("a" => 0.001),
+                                                    dval = 0.002),
+                             lq = TurnoverEstimator(; w = w, val = Dict("c" => 0.010),
+                                                    dval = 0.003),
+                             flq = TurnoverEstimator(; w = w, val = Dict("c" => 5.0),
+                                                     dval = 1.0))
+        fees = fees_constraints(fest, sets)
+
+        @test isa(fees, Fees)
+        # A name-keyed rate with a default resolves to a full-length vector, the same route
+        # `tn` takes, so the carriers are `Turnover` results after the door.
+        @test isa(fees.lq, Turnover)
+        @test isa(fees.flq, Turnover)
+        @test fees.lq.val == [0.003, 0.003, 0.010, 0.003]
+        @test fees.flq.val == [1.0, 1.0, 5.0, 1.0]
+        @test fees.lq.w == w
+        @test fees.flq.w == w
+        # And it reaches exactly the `Fees` a caller could have written by hand.
+        byhand = Fees(; tn = Turnover(; w = w, val = [0.001, 0.002, 0.002, 0.002]),
+                      lq = Turnover(; w = w, val = [0.003, 0.003, 0.010, 0.003]),
+                      flq = Turnover(; w = w, val = [1.0, 1.0, 5.0, 1.0]))
+        @test fees.lq.val == byhand.lq.val
+        @test fees.flq.val == byhand.flq.val
+        @test fees.tn.val == byhand.tn.val
+
+        # A carrier the caller leaves out stays out.
+        @test isnothing(fees_constraints(FeesEstimator(; l = 0.001), sets).lq)
+        @test isnothing(fees_constraints(FeesEstimator(; l = 0.001), sets).flq)
+    end
+
+    @testset "Either carrier alone asks for the previous weights" begin
+        w = [0.25, 0.25, 0.25, 0.25]
+        # A carrier prices a trade against a reference vector, so it needs the fold's
+        # previous weights exactly as `tn` does, and `needs_previous_weights` reads all
+        # three carriers rather than `tn` alone.
+        @test PortfolioOptimisers.needs_previous_weights(Fees(;
+                                                              lq = Turnover(; w = w,
+                                                                            val = 0.01)))
+        @test PortfolioOptimisers.needs_previous_weights(Fees(;
+                                                              flq = Turnover(; w = w,
+                                                                             val = 5.0)))
+        @test !PortfolioOptimisers.needs_previous_weights(Fees(; l = 0.001))
+        # A `fixed` carrier pins its own reference weights, so it asks for none.
+        @test !PortfolioOptimisers.needs_previous_weights(Fees(;
+                                                               lq = Turnover(; w = w,
+                                                                             val = 0.01,
+                                                                             fixed = true)))
+    end
+
+    @testset "`factory` threads the previous weights into both carriers" begin
+        w = [0.25, 0.25, 0.25, 0.25]
+        pw = [0.4, 0.3, 0.2, 0.1]
+        # Both carriers are `@fprop`, so the fold's previous weights reach them beside
+        # `tn.w`.
+        fees = Fees(; tn = Turnover(; w = w, val = 0.001),
+                    lq = Turnover(; w = w, val = 0.010), flq = Turnover(; w = w, val = 5.0))
+        f = factory(fees, pw)
+        @test f.tn.w == pw
+        @test f.lq.w == pw
+        @test f.flq.w == pw
+    end
+
+    @testset "The view splits the two axes at the mask and its complement" begin
+        # This is what replaces a dedicated door verb. `port_opt_view` is handed the
+        # **unreduced** returns matrix, so it derives the complement from `size(X, 2)` and
+        # the indices it was given. Asset 3 of four leaves the universe.
+        X = rand(7, 4)
+        i = [1, 2, 4]
+        w = [0.1, 0.2, 0.3, 0.4]
+        fees = Fees(; tn = Turnover(; w = w, val = [0.001, 0.002, 0.010, 0.003]),
+                    l = [0.01, 0.02, 0.03, 0.04], s = [0.05, 0.06, 0.07, 0.08],
+                    fl = [1.0, 2.0, 3.0, 4.0], fs = [5.0, 6.0, 7.0, 8.0],
+                    lq = Turnover(; w = w, val = [0.001, 0.002, 0.010, 0.003]),
+                    flq = Turnover(; w = w, val = [9.0, 10.0, 11.0, 12.0]))
+        v = PortfolioOptimisers.port_opt_view(fees, i, X)
+
+        # The five per-asset fields keep the assets the portfolio holds.
+        @test collect(v.l) == [0.01, 0.02, 0.04]
+        @test collect(v.s) == [0.05, 0.06, 0.08]
+        @test collect(v.fl) == [1.0, 2.0, 4.0]
+        @test collect(v.fs) == [5.0, 6.0, 8.0]
+        @test collect(v.tn.w) == [0.1, 0.2, 0.4]
+        @test collect(v.tn.val) == [0.001, 0.002, 0.003]
+
+        # The two carriers keep the asset that left, and nothing else.
+        @test collect(v.lq.w) == [0.3]
+        @test collect(v.lq.val) == [0.010]
+        @test collect(v.flq.w) == [0.3]
+        @test collect(v.flq.val) == [11.0]
+
+        # The clock and the tolerance ride through untouched.
+        @test v.kwargs == fees.kwargs
+        @test v.fa === fees.fa
+
+        # Every asset investable means nothing exited, so both carriers go. A `Turnover`
+        # refuses an empty `w`, so `nothing` is the answer the type asks for as well as the
+        # answer the rule asks for.
+        vall = PortfolioOptimisers.port_opt_view(fees, [1, 2, 3, 4], X)
+        @test isnothing(vall.lq)
+        @test isnothing(vall.flq)
+        @test collect(vall.l) == fees.l
+
+        # The estimator takes the same two axes.
+        fest = FeesEstimator(; tn = TurnoverEstimator(; w = w, val = 0.001),
+                             l = [0.01, 0.02, 0.03, 0.04],
+                             lq = TurnoverEstimator(; w = w, val = 0.010),
+                             flq = TurnoverEstimator(; w = w, val = 5.0))
+        ve = PortfolioOptimisers.port_opt_view(fest, i, X)
+        @test collect(ve.l) == [0.01, 0.02, 0.04]
+        @test collect(ve.tn.w) == [0.1, 0.2, 0.4]
+        @test collect(ve.lq.w) == [0.3]
+        @test collect(ve.flq.w) == [0.3]
+        @test ve.dl === fest.dl
+        @test ve.kwargs == fest.kwargs
+    end
+
+    @testset "A caller that hands no matrix leaves the carriers alone" begin
+        # Without the unreduced matrix there is no complement to derive, so the fallback
+        # slices the five per-asset fields and passes the carriers through. They already sit
+        # on their own axis, so that is the correct answer rather than a degraded one.
+        w = [0.1, 0.2, 0.3, 0.4]
+        fees = Fees(; l = [0.01, 0.02, 0.03, 0.04],
+                    lq = Turnover(; w = w, val = [0.001, 0.002, 0.010, 0.003]))
+        v = PortfolioOptimisers.port_opt_view(fees, [1, 2, 4])
+        @test collect(v.l) == [0.01, 0.02, 0.04]
+        @test collect(v.lq.w) == w
+    end
+
+    @testset "An Investable Mask drives the split, end to end" begin
+        using StableRNGs, LinearAlgebra, Clarabel
+
+        # The point of the two carriers, in the setting they exist for. Asset 3 delists
+        # part way through the window, so its column carries `NaN`. Nothing is poked into
+        # the prior by hand: the prior fits the full universe, cannot estimate that asset,
+        # and marks it, so the mask **derives itself** from the data. `investable_reduction`
+        # then takes the door, and the five per-asset fields must come out on the mask with
+        # the two carriers on its complement — no verb of their own, and no mask stored.
+        rng = StableRNG(987654321)
+        T, N = 200, 5
+        Xf = randn(rng, T, N) ./ 100 .+ 0.0005
+        k = 3
+        keep = [1, 2, 4, 5]
+        Xf[120:end, k] .= NaN          # the delisting
+        nx = ["a", "b", "c", "d", "e"]
+        rd = ReturnsResult(; nx = nx, X = Xf)
+        slv = Solver(; name = :cl, solver = Clarabel.Optimizer,
+                     check_sol = (; allow_local = true, allow_almost = true),
+                     settings = Dict("verbose" => false, "max_step_fraction" => 0.75))
+
+        prn = prior(EmpiricalPrior(), rd)
+        imsk = PortfolioOptimisers.investable_mask(prn)
+        @test imsk == BitVector([1, 1, 0, 1, 1])
+
+        w = [0.2, 0.2, 0.2, 0.2, 0.2]
+        lval = [0.01, 0.02, 0.03, 0.04, 0.05]
+        qval = [0.001, 0.002, 0.010, 0.003, 0.004]
+        fval = [1.0, 2.0, 3.0, 4.0, 5.0]
+
+        # Stated over the FULL universe, because the caller does not know which asset will
+        # leave. The door is what selects.
+        fees = Fees(; tn = Turnover(; w = w, val = qval), l = lval,
+                    lq = Turnover(; w = w, val = qval), flq = Turnover(; w = w, val = fval))
+        opt = JuMPOptimiser(; pe = prn, fees = fees, slv = slv)
+        _, _, opt_v, _ = PortfolioOptimisers.investable_reduction(prn, opt, rd)
+
+        # The holding fees keep the four investable assets.
+        @test collect(opt_v.fees.l) == lval[keep]
+        @test collect(opt_v.fees.tn.w) == w[keep]
+        @test collect(opt_v.fees.tn.val) == qval[keep]
+
+        # The liquidation carriers keep the one asset that left, and its rate is the rate
+        # the caller stated for it.
+        @test collect(opt_v.fees.lq.w) == [w[k]]
+        @test collect(opt_v.fees.lq.val) == [qval[k]]
+        @test collect(opt_v.fees.flq.w) == [w[k]]
+        @test collect(opt_v.fees.flq.val) == [fval[k]]
+
+        # The two axes partition the universe: nothing is counted twice, nothing is lost.
+        @test length(opt_v.fees.l) + length(opt_v.fees.lq.w) == N
+
+        # The natural setting: solve the problem. The optimisation reduces at its entry,
+        # solves on the four surviving assets, and expands the weights back to the full
+        # universe with a zero at the asset that delisted. The fees it actually used are on
+        # its processed attributes, and they carry the two axes.
+        res = optimise(MeanRisk(;
+                                opt = JuMPOptimiser(; pe = prn, fees = fees,
+                                                    wb = WeightBounds(; lb = 0, ub = 1),
+                                                    bgt = 1, slv = slv)), rd)
+        @test length(res.w) == N
+        @test iszero(res.w[k])
+        @test isapprox(sum(res.w), 1; atol = 1e-8)
+        @test res.jr.pa.imsk == imsk
+        used = res.jr.pa.fees
+        @test length(used.l) == length(keep)
+        @test collect(used.l) == lval[keep]
+        @test collect(used.lq.w) == [w[k]]
+        @test collect(used.lq.val) == [qval[k]]
+        @test collect(used.flq.val) == [fval[k]]
+
+        # A window with no delisting derives no mask, so the door is a no-op and the fees
+        # are the ones the caller stated, carriers included.
+        rdf = ReturnsResult(; nx = nx, X = randn(StableRNG(11), T, N) ./ 100 .+ 0.0005)
+        prf = prior(EmpiricalPrior(), rdf)
+        @test isnothing(PortfolioOptimisers.investable_mask(prf))
+        opt_full = JuMPOptimiser(; pe = prf, fees = fees, slv = slv)
+        _, _, opt_fv, _ = PortfolioOptimisers.investable_reduction(prf, opt_full, rdf)
+        @test opt_fv.fees.lq === fees.lq
+        @test opt_fv.fees.flq === fees.flq
+
+        # Parity: the same mask, driven through the estimator, reaches the same two axes.
+        sets = UniverseSets(; dict = Dict("nx" => nx))
+        fest = FeesEstimator(; tn = TurnoverEstimator(; w = w, val = Dict(zip(nx, qval))),
+                             l = Dict(zip(nx, lval)),
+                             lq = TurnoverEstimator(; w = w, val = Dict(zip(nx, qval))),
+                             flq = TurnoverEstimator(; w = w, val = Dict(zip(nx, fval))))
+        opte = JuMPOptimiser(; pe = prn, fees = fest, sets = sets, slv = slv)
+        _, _, opte_v, _ = PortfolioOptimisers.investable_reduction(prn, opte, rd)
+
+        # The estimator's carriers land on the same complement as the result's.
+        @test collect(opte_v.fees.lq.w) == collect(opt_v.fees.lq.w)
+        @test collect(opte_v.fees.flq.w) == collect(opt_v.fees.flq.w)
+        @test collect(opte_v.fees.tn.w) == collect(opt_v.fees.tn.w)
+        # **The resolution order (#911).** A `Fees` is already resolved, so the view is the
+        # whole story for it, and every assertion above passes. A `FeesEstimator` is not,
+        # and resolving one *after* the door could never work for a name-keyed carrier: the
+        # departed asset's name is no longer in the universe, so `strict` refused a name
+        # that was correct when the caller stated it, and the carrier's `w` already sat on
+        # the complement while `sets` sat on the mask, so the two lengths could not agree.
+        #
+        # Every family now resolves on the **full** `sets` before the door and hands the
+        # resolved `Fees` to `investable_fees_view`, which is the split asserted below.
+        # Resolving on the FULL sets first, then viewing, reaches exactly the two axes the
+        # hand-written `Fees` reached.
+        resolved_first = fees_constraints(fest, sets)
+        split_after = PortfolioOptimisers.port_opt_view(resolved_first, keep, prn.X)
+        @test collect(split_after.l) == lval[keep]
+        @test collect(split_after.lq.w) == [w[k]]
+        @test collect(split_after.lq.val) == [qval[k]]
+        @test collect(split_after.flq.val) == [fval[k]]
+        @test collect(split_after.lq.w) == collect(opt_v.fees.lq.w)
+        @test collect(split_after.lq.val) == collect(opt_v.fees.lq.val)
+    end
+
+    @testset "Both axes are charged, and the row sums reproduce the series" begin
+        atol = 1e-14
+        # The invariant the two axes exist to preserve. Every fixture here sets **both**
+        # carriers, because a fixture that left `flq` unset would pass whether or not the
+        # one-off liquidation is charged at all — which is exactly how an unwired carrier
+        # slipped through before.
+        #
+        # A liquidated asset earns no return, so its column of the matrix holds the charge
+        # alone. The per period part lands on every observation and the one-off part at the
+        # index the clock names, which is the same two steps the investable axis takes. That
+        # is what keeps one clock across both axes.
+        #
+        # The split is **one** matrix on the caller's universe, and the Investable Mask is
+        # what says which columns each axis owns: the five per asset fields were sliced to
+        # `imsk` at the door and the two carriers to its complement. Here asset 4 is the one
+        # that left, so its column of `X4` is zero, as `expand_investable_columns` leaves it.
+        X3 = [0.010 -0.020 0.030
+              -0.015 0.025 0.012
+              0.020 0.010 -0.008
+              -0.005 -0.030 0.018
+              0.008 0.014 0.006]
+        w3 = [0.4, -0.3, 0.9]
+        imsk = BitVector([true, true, true, false])
+        X4 = hcat(X3, zeros(5))
+        w4 = vcat(w3, 0.0)
+        mkf = fa -> Fees(; tn = Turnover(; w = fill(0.25, 3), val = [0.001, 0.002, 0.003]),
+                         fl = [1.0, 0.0, 2.0], lq = Turnover(; w = [0.25], val = [0.010]),
+                         flq = Turnover(; w = [0.25], val = [5.0]), fa = fa)
+        tot = p -> sum(p[1]) + sum(p[2])
+
+        for fa in (nothing, FirstObservationFees(), AmortisedFees())
+            fees = mkf(fa)
+
+            # The split sums to the scalar, on both halves of the clock. Before the
+            # carriers were charged, the periodic gap here was the exit itself.
+            @test isapprox(tot(PortfolioOptimisers.calc_asset_periodic_fees(w3, fees)),
+                           PortfolioOptimisers.calc_periodic_fees(w3, fees); atol = atol)
+            @test isapprox(tot(PortfolioOptimisers.calc_asset_one_off_fees(w3, fees)),
+                           PortfolioOptimisers.calc_one_off_fees(w3, fees); atol = atol)
+
+            # And the one matrix reproduces the portfolio series, under every clock —
+            # including the one that lands the fixed charge on a single observation.
+            R = calc_net_asset_returns(w4, X4, fees, imsk)
+            @test size(R) == (5, 4)
+            @test isapprox(vec(sum(R; dims = 2)), calc_net_returns(w3, X3, fees);
+                           atol = atol)
+        end
+
+        # The clock actually moves the charge, so the loop above is not vacuous: a spreading
+        # clock puts the fixed exit on every observation, the default puts it on the first.
+        Cfirst = calc_net_asset_returns(w4, X4, mkf(FirstObservationFees()), imsk)[:, 4]
+        Cspread = calc_net_asset_returns(w4, X4, mkf(AmortisedFees()), imsk)[:, 4]
+        @test Cfirst[1] != Cfirst[2]
+        @test isapprox(Cspread[1], Cspread[2]; atol = atol)
+        # Either way the whole fixed exit is paid exactly once over the series.
+        @test isapprox(sum(Cfirst), sum(Cspread); atol = atol)
+        # `5.0` fixed, plus `0.010 * 0.25` per period over five observations.
+        @test isapprox(-sum(Cfirst), 5.0 + 5 * 0.010 * 0.25; atol = atol)
+        # The exit is charged in its **own** column and nowhere else, so no investable asset
+        # is billed for it. This is the property the pro rata spreading would have broken.
+        @test isapprox(calc_net_asset_returns(w4, X4, mkf(nothing), imsk)[:, 1:3],
+                       calc_net_asset_returns(w3, X3,
+                                              Fees(;
+                                                   tn = Turnover(; w = fill(0.25, 3),
+                                                                 val = [0.001, 0.002,
+                                                                        0.003]),
+                                                   fl = [1.0, 0.0, 2.0])); atol = atol)
+
+        # With no carrier the mask is not needed, and the matrix spans the caller's universe
+        # whether or not an asset left.
+        nofees = Fees(; tn = Turnover(; w = fill(0.25, 3), val = [0.001, 0.002, 0.003]))
+        A0 = calc_net_asset_returns(w3, X3, nofees)
+        @test size(A0) == (5, 3)
+        @test isapprox(vec(sum(A0; dims = 2)), calc_net_returns(w3, X3, nofees);
+                       atol = atol)
+
+        # A carrier with no mask has nowhere to land, and saying so is the only honest
+        # answer: dropping it would understate the return and spreading it would bill an
+        # asset that did not leave.
+        @test_throws ArgumentError calc_net_asset_returns(w3, X3, mkf(nothing))
+        # A mask that does not span the matrix is refused by width, naming both.
+        @test_throws DimensionMismatch calc_net_asset_returns(w3, X3, mkf(nothing), imsk)
+    end
+
+    @testset "One carrier set without the other is charged, on every clock" begin
+        # `lq` and `flq` are set independently. A step gated on the wrong vector would drop
+        # the charge in silence, and under `AmortisedFees` the two terms were added
+        # elementwise, which raised on the empty one.
+        atol = 1e-14
+        X3 = [0.010 -0.020 0.030
+              -0.015 0.025 0.012
+              0.020 0.010 -0.008]
+        w3 = [0.4, -0.3, 0.9]
+        imsk = BitVector([true, true, true, false])
+        X4 = hcat(X3, zeros(3))
+        w4 = vcat(w3, 0.0)
+        onlylq = fa -> Fees(; l = 0.001, lq = Turnover(; w = [0.25], val = [0.010]),
+                            fa = fa)
+        onlyflq = fa -> Fees(; l = 0.001, flq = Turnover(; w = [0.25], val = [5.0]),
+                             fa = fa)
+        for fa in (nothing, FirstObservationFees(), AmortisedFees())
+            for mk in (onlylq, onlyflq)
+                fees = mk(fa)
+                R = calc_net_asset_returns(w4, X4, fees, imsk)
+                @test isapprox(vec(sum(R; dims = 2)), calc_net_returns(w3, X3, fees);
+                               atol = atol)
+                # The exit column carries the whole charge, and it is not zero: a dropped
+                # charge would leave this column empty and still sum correctly against a
+                # series that had also dropped it.
+                @test !isapprox(sum(view(R, :, 4)), 0.0; atol = atol)
+            end
+        end
+        # `lq` is a per period rate over three observations; `flq` is paid once.
+        @test isapprox(-sum(calc_net_asset_returns(w4, X4, onlylq(nothing), imsk)[:, 4]),
+                       3 * 0.010 * 0.25; atol = atol)
+        @test isapprox(-sum(calc_net_asset_returns(w4, X4, onlyflq(nothing), imsk)[:, 4]),
+                       5.0; atol = atol)
+    end
+
+    @testset "The amortisation override carries both carriers" begin
+        # `override_fee_amortisation` rebuilds a `Fees` field by field, so it is the one
+        # site that silently drops a field the type gains.
+        w = [0.25, 0.25]
+        fees = Fees(; l = 0.001, lq = Turnover(; w = w, val = 0.010),
+                    flq = Turnover(; w = w, val = 5.0))
+        o = PortfolioOptimisers.override_fee_amortisation(fees, AmortisedFees())
+        @test o.lq === fees.lq
+        @test o.flq === fees.flq
+        @test isa(o.fa, AmortisedFees)
+    end
+
+    @testset "An all-investable window strips both carriers in every family" begin
+        using StableRNGs
+
+        # A caller states the carriers over the FULL universe, because they cannot know
+        # which asset will delist. A window in which every asset is investable derives no
+        # mask, so the door short-circuits and the carriers never meet a complement to be
+        # sliced to. Left alone they survive at full width and are charged in full, for
+        # assets that never left. `strip_liquidation_carriers` closes that, and this pins
+        # it in every family that resolves a fee, not the JuMP prelude alone.
+        rng = StableRNG(987654321)
+        nx = ["a", "b", "c", "d", "e"]
+        X_all = randn(rng, 200, 5) ./ 100 .+ 0.0005
+        X_del = copy(X_all)
+        X_del[120:end, 3] .= NaN          # `c` delists, so the mask derives itself
+        rd_all = ReturnsResult(; nx = nx, X = X_all)
+        rd_del = ReturnsResult(; nx = nx, X = X_del)
+        sets = UniverseSets(; dict = Dict("nx" => nx))
+        fees = Fees(; l = 0.001, lq = Turnover(; w = fill(0.2, 5), val = 0.01),
+                    flq = Turnover(; w = fill(0.2, 5), val = 5.0))
+
+        # A stated `nothing` fee under a derived mask satisfies both the `nothing` fee
+        # method and the `BitVector` mask method. Without a third method naming that pair
+        # the call is ambiguous, so every family below fails on a delisting window that
+        # states no fee at all.
+        @test isnothing(PortfolioOptimisers.strip_liquidation_carriers(nothing,
+                                                                       BitVector([1, 0, 1])))
+
+        hopt = HierarchicalOptimiser(; pe = EmpiricalPrior(), sets = sets, fees = fees)
+        inner = HierarchicalRiskParity()
+        fams = ["HierarchicalRiskParity" => HierarchicalRiskParity(; opt = hopt),
+                "HierarchicalEqualRiskContribution" =>
+                    HierarchicalEqualRiskContribution(; opt = hopt),
+                "NestedClustered" =>
+                    NestedClustered(; pe = EmpiricalPrior(), sets = sets, fees = fees,
+                                    opti = inner, opto = inner),
+                "Stacking" => Stacking(; pe = EmpiricalPrior(), sets = sets, fees = fees,
+                                       opti = [inner], opto = inner),
+                "SubsetResampling" =>
+                    SubsetResampling(; pe = EmpiricalPrior(), sets = sets, fees = fees,
+                                     opt = inner, subset_size = 3, n_subsets = 4)]
+        @testset "$name" for (name, est) in fams
+            # Nothing exited, so nothing is owed, and the five older fields are untouched.
+            fees_all = optimise(est, rd_all).fees
+            @test isnothing(fees_all.lq)
+            @test isnothing(fees_all.flq)
+            @test fees_all.l == fees.l
+
+            # One asset left, so both carriers land on its axis alone. The hierarchical
+            # families reached this only once their own view stopped dropping the returns
+            # matrix on the way into `opt`, which is what derives the complement.
+            fees_del = optimise(est, rd_del).fees
+            @test collect(fees_del.lq.w) == [0.2]
+            @test collect(fees_del.flq.w) == [0.2]
+            # A scalar rate is not on either axis, so the view leaves it alone.
+            @test fees_del.lq.val == 0.01
+            @test fees_del.flq.val == 5.0
+        end
+    end
+
+    @testset "A name-keyed fee resolves over the caller's own universe" begin
+        using StableRNGs
+
+        # A caller names their constraints over the universe they were given. An asset that
+        # delists is not a typo, and they cannot know in advance which one it will be, so
+        # `strict` must not refuse the name. Resolving before the door is what makes that
+        # true, and it is the only order in which a name-keyed **carrier** resolves at all:
+        # after the door its `w` sits on the complement while `sets` sits on the mask.
+        rng = StableRNG(987654321)
+        nx = ["a", "b", "c", "d", "e"]
+        X_all = randn(rng, 200, 5) ./ 100 .+ 0.0005
+        X_del = copy(X_all)
+        X_del[120:end, 3] .= NaN          # `c` delists
+        rd_all = ReturnsResult(; nx = nx, X = X_all)
+        rd_del = ReturnsResult(; nx = nx, X = X_del)
+        sets = UniverseSets(; dict = Dict("nx" => nx))
+
+        # `c`'s own rate on every axis: a holding fee, and both carriers.
+        fest = FeesEstimator(; l = Dict("a" => 0.002, "c" => 0.001),
+                             lq = TurnoverEstimator(; w = fill(0.2, 5),
+                                                    val = Dict("c" => 0.01)),
+                             flq = TurnoverEstimator(; w = fill(0.2, 5),
+                                                     val = Dict("c" => 5.0)))
+        hopt = HierarchicalOptimiser(; pe = EmpiricalPrior(), sets = sets, fees = fest,
+                                     strict = true)
+        inner = HierarchicalRiskParity()
+        fams = ["HierarchicalRiskParity" => HierarchicalRiskParity(; opt = hopt),
+                "HierarchicalEqualRiskContribution" =>
+                    HierarchicalEqualRiskContribution(; opt = hopt),
+                "NestedClustered" =>
+                    NestedClustered(; pe = EmpiricalPrior(), sets = sets, fees = fest,
+                                    opti = inner, opto = inner, strict = true),
+                "Stacking" => Stacking(; pe = EmpiricalPrior(), sets = sets, fees = fest,
+                                       opti = [inner], opto = inner, strict = true),
+                "SubsetResampling" =>
+                    SubsetResampling(; pe = EmpiricalPrior(), sets = sets, fees = fest,
+                                     opt = inner, subset_size = 3, n_subsets = 4,
+                                     strict = true)]
+        @testset "$name" for (name, est) in fams
+            # `strict = true` no longer refuses `c`, and the carrier lands on `c`'s own
+            # axis carrying `c`'s own rate.
+            fees_del = optimise(est, rd_del).fees
+            @test collect(fees_del.l) == [0.002, 0.0, 0.0, 0.0]
+            @test collect(fees_del.lq.val) == [0.01]
+            @test collect(fees_del.flq.val) == [5.0]
+
+            # Nothing exited, so `c` keeps its holding fee in place and owes no exit.
+            fees_all = optimise(est, rd_all).fees
+            @test collect(fees_all.l) == [0.002, 0.0, 0.001, 0.0, 0.0]
+            @test isnothing(fees_all.lq)
+            @test isnothing(fees_all.flq)
+        end
+
+        # `strict` still does the job it exists for. `zz` is in no universe, mask or no
+        # mask, so it is a typo and is refused — and the message counts the caller's own
+        # five assets, not the four the door left.
+        typo = HierarchicalOptimiser(; pe = EmpiricalPrior(), sets = sets,
+                                     fees = FeesEstimator(; l = Dict("zz" => 0.001)),
+                                     strict = true)
+        @test_throws ArgumentError optimise(HierarchicalRiskParity(; opt = typo), rd_del)
+    end
+
+    @testset "A cluster-level risk figure prices no forced exit" begin
+        using StableRNGs
+
+        # A forced exit is charged once, against the full-universe weight vector the fit
+        # rebuilds, so it rides on the result alone. The exiting asset is in no cluster,
+        # its column being `NaN`, so no intra- or inter-cluster risk may carry its charge.
+        # Stating the carriers therefore cannot move a single weight.
+        rng = StableRNG(987654321)
+        nx = ["a", "b", "c", "d", "e"]
+        X = randn(rng, 200, 5) ./ 100 .+ 0.0005
+        X[120:end, 3] .= NaN
+        rd = ReturnsResult(; nx = nx, X = X)
+        sets = UniverseSets(; dict = Dict("nx" => nx))
+        plain = Fees(; l = 0.001)
+        carried = Fees(; l = 0.001, lq = Turnover(; w = fill(0.2, 5), val = 0.01),
+                       flq = Turnover(; w = fill(0.2, 5), val = 5.0))
+        opt_p = HierarchicalOptimiser(; pe = EmpiricalPrior(), sets = sets, fees = plain)
+        opt_c = HierarchicalOptimiser(; pe = EmpiricalPrior(), sets = sets, fees = carried)
+
+        @test optimise(HierarchicalRiskParity(; opt = opt_p), rd).w ==
+              optimise(HierarchicalRiskParity(; opt = opt_c), rd).w
+        @test optimise(HierarchicalEqualRiskContribution(; opt = opt_p), rd).w ==
+              optimise(HierarchicalEqualRiskContribution(; opt = opt_c), rd).w
+
+        # The charge is not lost, it is deferred: the result carries it on the complement.
+        @test optimise(HierarchicalRiskParity(; opt = opt_c), rd).fees.lq.val == 0.01
+    end
+end

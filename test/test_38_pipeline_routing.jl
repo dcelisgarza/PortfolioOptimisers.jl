@@ -134,8 +134,8 @@
         `:mu_ucs` and `:sigma_ucs` name no field: they carry the validation the seam would
         otherwise lose. Both fail closed rather than dropping a computed set.
         =#
-        mu_ucs = MuEllipsoidalUncertaintySet()
-        sigma_ucs = SigmaEllipsoidalUncertaintySet()
+        mu_ucs = MuUncertaintySetClass()
+        sigma_ucs = SigmaUncertaintySetClass()
         # Only an ArithmeticReturn can carry a bound on expected returns.
         @test PO.pipe_route(jo(), Val(:mu_ucs), mu_ucs).ret.ucs === mu_ucs
         @test_throws ArgumentError PO.pipe_route(JuMPOptimiser(; slv = slv,

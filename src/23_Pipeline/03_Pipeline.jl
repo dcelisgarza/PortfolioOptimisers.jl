@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Validate that a [`TrainTestSplit`](@ref) appears only as the first step of a [`Pipeline`](@ref), and never inside a nested one.
 
-The holdout exists to keep the test window away from every fitted step. A stateful step fitted *before* the split — a [`MissingDataFilter`](@ref) choosing the universe, an [`Imputer`](@ref) computing fill values — would have read the held-out rows, so its fitted state leaks test data into the training workflow. Position one is the only place that cannot happen, and a nested pipeline is never step one of itself.
+The holdout exists to keep the test window away from every fitted step. A stateful step fitted *before* the split — a [`MissingDataFilter`](@ref) choosing the universe, a [`PriceGapFill`](@ref) computing fill values — would have read the held-out rows, so its fitted state leaks test data into the training workflow. Position one is the only place that cannot happen, and a nested pipeline is never step one of itself.
 
 ## Validation
 
@@ -201,7 +201,12 @@ discipline). Only ever called on the failing path.
   - [`Pipeline`](@ref)
 """
 function first_duplicate(xs)
-    seen = Set{eltype(xs)}()
+    if isempty(xs)
+        return nothing
+    end
+    #! `typeof(first(xs))`, not `eltype(xs)`: over an abstract `Tuple{Vararg{String}}` the
+    #! latter is inferred as `Union{}`, and JET reports the set's lookup.
+    seen = Set{typeof(first(xs))}()
     for x in xs
         if x in seen
             return x
@@ -227,7 +232,8 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    Pipeline(; steps::Union{<:Tuple, <:AbstractVector}) -> Pipeline
+    Pipeline(; steps::Union{<:Tuple, <:AbstractVector},
+               cache::Option{<:AbstractPartialFitState} = nothing) -> Pipeline
 
 Steps are given in execution order. Each element is either a step estimator or a `"name" => estimator` pair; unnamed steps are auto-named from the slot they write (`"prior"`), suffixed in order of appearance when a slot repeats (`"prices_1"`, `"prices_2"`).
 
@@ -239,6 +245,10 @@ Steps are given in execution order. Each element is either a step estimator or a
   - No step may write a slot that invalidates a slot an earlier step already wrote (see [`PIPELINE_INVALIDATES`](@ref)). A step that rewrites `:returns` after a prior, phylogeny, uncertainty, or constraint step would leave that result computed on a stale asset universe.
   - An optimisation step, if present, must be the last step (see [`assert_opt_last`](@ref)): it writes the terminal `:opt` slot, and no step may run after it.
   - Step names must be unique.
+
+# Online form
+
+A Pipeline is a host of the online step, decided by [ADR 0142](https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/main/docs/adr/0142-a-pipeline-is-a-host-its-steps-fold-or-defer-to-a-view-and-a-step-with-no-online-form-is-refused-unless-the-pipeline-declares-a-refit.md): [`partial_fit!`](@ref) walks the steps in order, folding each block of observations through them into the **row owner** — the prior step, else the optimiser step — and `fit(pipe)` with no data reads the fitted [`PipelineResult`](@ref) out. Every step before the owner belongs to one of three classes. A **row-local** step ([`PricesToReturns`](@ref), [`PriceGapFill`](@ref) with a [`CarriedPrice`](@ref), [`MissingDataFilter`](@ref) at `row_thr = 1`) folds and emits the transformed rows. A **universe-only** step (an [`AbstractAssetSelector`](@ref), and the column filter of a `MissingDataFilter`) folds nothing and is refitted at the read-out over the owner's rows, its universe applied as a view. A **window-valued** step, and any other step that writes a data slot, is refused at warm-up by name, and `Online(pipe)` is the declared refit that admits it. `cache` is the Fold Context the Pipeline keeps when a prior step owns the rows, or the input-carrier buffer `Online(pipe)` seeds; it is `nothing` until a step writes one. See [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{<:PipelineBufferState, <:ReturnsBufferState}}}, data::Prices_RR)`](@ref) and [`fit(pipe::Pipeline)`](@ref).
 
 # Examples
 
@@ -265,15 +275,21 @@ julia> pipe.names
     The step estimators, in execution order.
     """
     steps
-    function Pipeline(names::Tuple{Vararg{String}}, steps::Tuple)
+    """
+    $(field_dict[:pfcache])
+    """
+    cache
+    function Pipeline(names::Tuple{Vararg{String}}, steps::Tuple,
+                      cache::Option{<:AbstractPartialFitState} = nothing)
         @argcheck(!isempty(steps), IsEmptyError("steps cannot be empty"))
         @argcheck(length(names) == length(steps), DimensionMismatch)
         @argcheck(allunique(names),
                   ArgumentError("pipeline step names must be unique; the name $(repr(first_duplicate(names))) is repeated among the $(length(names)) steps"))
-        return new{typeof(names), typeof(steps)}(names, steps)
+        return new{typeof(names), typeof(steps), typeof(cache)}(names, steps, cache)
     end
 end
-function Pipeline(; steps::Union{<:Tuple, <:AbstractVector})::Pipeline
+function Pipeline(; steps::Union{<:Tuple, <:AbstractVector},
+                  cache::Option{<:AbstractPartialFitState} = nothing)::Pipeline
     @argcheck(!isempty(steps), IsEmptyError("steps cannot be empty"))
     ests = Vector{Any}(undef, length(steps))
     explicit = Vector{Union{Nothing, String}}(undef, length(steps))
@@ -322,7 +338,7 @@ function Pipeline(; steps::Union{<:Tuple, <:AbstractVector})::Pipeline
             string(s, '_', seen[s])
         end
     end
-    return Pipeline(Tuple(names), Tuple(ests))
+    return Pipeline(Tuple(names), Tuple(ests), cache)
 end
 pipe_writes(p::Pipeline) = pipe_writes(p.steps[end])
 pipe_reads(p::Pipeline) = pipe_reads(p.steps[1])
@@ -765,16 +781,25 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Assert that replaying a pipeline's fitted steps on a test window reproduces the training asset universe.
+Assert that a test window came from the same ingestion as the training window.
 
-The terminal weights are indexed by the *training* universe, so a test window whose transformed returns carry a different asset set (or a different asset order) would silently misalign weights and returns. This is the failure the fit/apply contract exists to prevent, so it is reported as an error naming both universes rather than surfacing as a dimension mismatch inside the risk calculation.
+This is a **provenance** check. The terminal weights are indexed by the *training* universe, so a test window carrying a different asset set — or the same set described by a different universe statement — would silently misalign weights and returns, and it is reported here by name rather than surfacing as a dimension mismatch inside the risk calculation.
 
-The usual cause is relying on [`PricesToReturns`](@ref) alone to define the universe: it is stateless, and the underlying [`prices_to_returns`](@ref) drops assets that are entirely missing in the window being converted, which differs between train and test. Pin the universe with a [`MissingDataFilter`](@ref) step, and fill the remaining gaps with an [`Imputer`](@ref) step, before converting.
+It reads two things. `nx` equality answers the asset axis, and [`check_asset_panel`](@ref) binds an [`AssetPanel`](@ref)'s asset axis to its carrier's at construction, so `nx` equality compares the panel's axis transitively and no separate assertion is owed. Panel-presence parity answers where the universe was stated: a window with a panel and a fitted context without one, or the reverse, did not come from one ingestion.
+
+The alignment guarantee it once carried alone has since split, and both halves are now held elsewhere. **The axis half is structural.** The ingestion layer fixes the asset axis before the split and [`port_opt_view`](@ref) slices it, so every window of every fold carries every asset, reduce-and-expand always expands onto a fixed axis, and no policy of the layer's own drops a row or a column. **The semantic half was never this check's**: an asset present in both windows and non-investable in one is a **Held Gap**, which `filter_held_gaps` reads off the weights and the returns under the strictness policy.
+
+What is left is the population that can still break the invariant, and its message names both: a carrier built outside the layer, and a third-party step that changes the asset set. On the layer's path neither can arise, so no remedy is prescribed here.
 
 # Arguments
 
   - `res`: The fitted [`PipelineResult`](@ref).
   - `rd`: The transformed test-window returns.
+
+# Validation
+
+  - `rd.nx == train.nx`. Raises an `ArgumentError`.
+  - The window and the fitted context either both carry an [`AssetPanel`](@ref) or neither does. Raises an `ArgumentError`.
 
 # Returns
 
@@ -783,8 +808,9 @@ The usual cause is relying on [`PricesToReturns`](@ref) alone to define the univ
 # Related
 
   - [`predict(res::PipelineResult, data::AbstractPricesResult, window)`](@ref)
-  - [`MissingDataFilter`](@ref)
-  - [`Imputer`](@ref)
+  - [`PriceIngestion`](@ref)
+  - [`price_ingestion`](@ref)
+  - [`AssetPanel`](@ref)
 """
 function assert_universe_aligned(res::PipelineResult, rd::AbstractReturnsResult)::Nothing
     train = res.ctx.returns
@@ -792,7 +818,9 @@ function assert_universe_aligned(res::PipelineResult, rd::AbstractReturnsResult)
         return nothing
     end
     @argcheck(rd.nx == train.nx,
-              ArgumentError("the pipeline's fitted steps produced a test-window universe $(rd.nx) that differs from the training universe $(train.nx), so the weights and the test returns would not be aligned. PricesToReturns is stateless and drops assets that are entirely missing in the window it converts; pin the universe with a MissingDataFilter step (and an Imputer step to fill the remaining gaps) before converting to returns."))
+              ArgumentError("the pipeline's fitted steps produced a test-window universe $(rd.nx) that differs from the training universe $(train.nx), so the weights and the test returns would not be aligned. The ingestion layer fixes the asset axis before the split, so this reaches two situations only: a returns carrier built outside it, and a step of your own that changes the asset set. Build the carrier with price_ingestion(PriceIngestion(), X)."))
+    @argcheck(isnothing(rd.pnl) == isnothing(train.pnl),
+              ArgumentError("the pipeline's fitted steps produced a test window that $(isnothing(rd.pnl) ? "states no universe" : "states a universe") while the training window $(isnothing(train.pnl) ? "states none" : "states one"), so the two did not come from one ingestion. A returns carrier the ingestion layer built always carries an Asset Panel, so pnl === nothing on one of them says that one was built outside it."))
     return nothing
 end
 """
@@ -911,7 +939,12 @@ A vector of index vectors predicts on each window in turn and returns one result
   - [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref)
 """
 function StatsAPI.predict(res::PipelineResult, data::AbstractPricesResult,
-                          test_idx = Colon(), cols = Colon())
+                          test_idx = Colon(), cols = Colon();
+                          wd::Option{<:AbstractWeightDrift} = nothing,
+                          hwd::Option{<:AbstractWeightDrift} = wd,
+                          fa::Option{<:AbstractFeeAmortisation} = nothing,
+                          store_weight_path::Bool = false, strict::Bool = false,
+                          w_prev::Option{<:VecNum_VecVecNum} = nothing)
     opt = res.ctx.opt
     @argcheck(!isnothing(opt),
               IsNothingError("the pipeline produced no optimisation result; add a terminal optimisation step before predicting"))
@@ -920,14 +953,22 @@ function StatsAPI.predict(res::PipelineResult, data::AbstractPricesResult,
     @argcheck(isa(rd, AbstractReturnsResult),
               ArgumentError("the pipeline's fitted steps do not convert price-level data to returns; predicting on a $(Base.typename(typeof(data)).wrapper) requires a PricesToReturns step"))
     assert_universe_aligned(res, rd)
-    return StatsAPI.predict(opt, rd)
+    return StatsAPI.predict(opt, rd; wd = wd, hwd = hwd, fa = fa,
+                            store_weight_path = store_weight_path, strict = strict,
+                            w_prev = w_prev)
 end
 function StatsAPI.predict(res::PipelineResult, data::AbstractPricesResult,
-                          test_idxs::VecVecInt, cols = Colon())
-    return [StatsAPI.predict(res, data, test_idx, cols) for test_idx in test_idxs]
+                          test_idxs::VecVecInt, cols = Colon(); kwargs...)
+    return [StatsAPI.predict(res, data, test_idx, cols; kwargs...)
+            for test_idx in test_idxs]
 end
 function StatsAPI.predict(res::PipelineResult, data::AbstractReturnsResult,
-                          test_idx = Colon(), cols = Colon())
+                          test_idx = Colon(), cols = Colon();
+                          wd::Option{<:AbstractWeightDrift} = nothing,
+                          hwd::Option{<:AbstractWeightDrift} = wd,
+                          fa::Option{<:AbstractFeeAmortisation} = nothing,
+                          store_weight_path::Bool = false, strict::Bool = false,
+                          w_prev::Option{<:VecNum_VecVecNum} = nothing)
     opt = res.ctx.opt
     @argcheck(!isnothing(opt),
               IsNothingError("the pipeline produced no optimisation result; add a terminal optimisation step before predicting"))
@@ -938,28 +979,40 @@ function StatsAPI.predict(res::PipelineResult, data::AbstractReturnsResult,
     end
     rd = apply_fitted_steps(res.results, rd)
     assert_universe_aligned(res, rd)
-    return StatsAPI.predict(opt, rd)
+    return StatsAPI.predict(opt, rd; wd = wd, hwd = hwd, fa = fa,
+                            store_weight_path = store_weight_path, strict = strict,
+                            w_prev = w_prev)
 end
 function StatsAPI.predict(res::PipelineResult, data::AbstractReturnsResult,
-                          test_idxs::VecVecInt, cols = Colon())
-    return [StatsAPI.predict(res, data, test_idx, cols) for test_idx in test_idxs]
+                          test_idxs::VecVecInt, cols = Colon(); kwargs...)
+    return [StatsAPI.predict(res, data, test_idx, cols; kwargs...)
+            for test_idx in test_idxs]
 end
 function fit_and_predict(res::PipelineResult, data::AbstractReturnsResult;
-                         test_idx::VecInt_VecVecInt, cols = :, kwargs...)
+                         test_idx::VecInt_VecVecInt, cols = :,
+                         wd::Option{<:AbstractWeightDrift} = nothing,
+                         hwd::Option{<:AbstractWeightDrift} = wd,
+                         fa::Option{<:AbstractFeeAmortisation} = nothing,
+                         store_weight_path::Bool = false, strict::Bool = false,
+                         w_prev::Option{<:VecNum_VecVecNum} = nothing, kwargs...)
     opt = res.ctx.opt
     @argcheck(!isnothing(opt),
               IsNothingError("the pipeline produced no optimisation result; add a terminal optimisation step before predicting"))
-    return StatsAPI.predict(res, data, test_idx, cols)
+    return StatsAPI.predict(res, data, test_idx, cols; wd = wd, hwd = hwd, fa = fa,
+                            store_weight_path = store_weight_path, strict = strict,
+                            w_prev = w_prev)
 end
-function fit_and_predict(pipe::Pipeline, data::Prices_RR; train_idx::VecInt,
-                         test_idx::VecInt_VecVecInt, cols = :)
-    data_train = pipeline_data_view(data, train_idx, cols)
-    #! Maybe we should define a port_opt_view for pipelines?
-    # if !isa(cols, Colon)
-    #     opt = port_opt_view(pipe, cols)
-    # end
-    res = StatsAPI.fit(pipe, data_train)
-    return StatsAPI.predict(res, data, test_idx, cols)
+function fit_and_predict(pipe::Pipeline, data::Prices_RR;
+                         train_idx::Option{<:VecInt} = nothing, test_idx::VecInt_VecVecInt,
+                         cols = :, wd::Option{<:AbstractWeightDrift} = nothing,
+                         hwd::Option{<:AbstractWeightDrift} = wd,
+                         fa::Option{<:AbstractFeeAmortisation} = nothing,
+                         store_weight_path::Bool = false, strict::Bool = false,
+                         w_prev::Option{<:VecNum_VecVecNum} = nothing)
+    res = pipeline_fold_fit(pipe, data, train_idx, cols)
+    return StatsAPI.predict(res, data, test_idx, cols; wd = wd, hwd = hwd, fa = fa,
+                            store_weight_path = store_weight_path, strict = strict,
+                            w_prev = w_prev)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

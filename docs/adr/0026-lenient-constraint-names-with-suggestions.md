@@ -114,7 +114,8 @@ the `JuMPResult` constructor's solve-failure warning
 ([10_JuMPModelOptimisation.jl](../../src/10_JuMPModelOptimisation.jl)) interpolated the whole
 `trials` dictionary into the log — every solver name, the solver *settings*, and full caught
 exception objects, unbounded in size. It now routes through a fourth shared builder,
-`failed_solve_msg` ([01_Base.jl](../../src/01_Base.jl), beside the other three): one bounded line
+`failed_solve_msg` ([01_Base/06_Messages.jl](../../src/01_Base/06_Messages.jl), beside the other
+three): one bounded line
 per failed solver stage (solver name, stage, first line of the error truncated to 200 characters so
 a JuMP termination status stays visible), solver names sorted for deterministic logs, and
 `:settings` entries never printed. The raw exceptions and settings remain available on

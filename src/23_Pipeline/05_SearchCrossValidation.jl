@@ -15,8 +15,7 @@ Return the observation-window view of price- or returns-level data used by pipel
 # Related
 
   - [`port_opt_view`](@ref)
-  - [`port_opt_view`](@ref)
-  - [`fit_and_score`](@ref)
+  - [`cross_val_predict`](@ref)
 """
 pipeline_data_view(pr::AbstractPricesResult, idx, idx2 = :) = port_opt_view(pr, idx, idx2)
 pipeline_data_view(rd::AbstractReturnsResult, idx, idx2 = :) = port_opt_view(rd, idx, idx2)
@@ -51,30 +50,31 @@ Return the element type search-CV score matrices use for the given data level.
 cv_data_eltype(rd::AbstractReturnsResult) = eltype(rd.X)
 cv_data_eltype(pr::AbstractPricesResult) = eltype(TimeSeries.values(pr.X))
 """
-    has_lens_structure(key::AbstractString) -> Bool
+    is_pipeline_raw_path(key::AbstractString) -> Bool
 
-Return `true` when `key` carries lens structure — a dotted path (`"impute.stat"`) or an index (`"steps[1]"`).
+Return `true` when `key` is a raw property path rooted at the `steps` field of a [`Pipeline`](@ref) — `"steps[1]"`, `"steps[2].fill"`.
 
-The predicate the `AbstractString` arm of [`pipeline_lens`](@ref) uses to separate a *typo* from a *raw property path* when the leading segment misses the step-name table. A key with no structure at all is a bare identifier, which can only have been meant as a step name; a structured key is the documented raw-path form and falls through to [`parse_lens`](@ref).
+The predicate the `AbstractString` arm of [`pipeline_lens`](@ref) uses to separate a *raw property path* from a *typo* when the leading segment misses the step-name table. It names the one root a path may address instead of rejecting one shape. A `Pipeline` holds two fields, `names` and `steps`, and only `steps` holds the estimators a grid tunes, so `"names[1]"` is refused with `"gapfill"`. An admitted key falls through to [`parse_lens`](@ref).
 
-The `Symbol` arm tests for a dot alone, and that is not the same asymmetry the guard exists to remove: a string key is run through `Meta.parse`, where `steps[1]` is an index, while a symbol key is not, so an index in a symbol is a character in a property name.
+The `Symbol` arm tests for a dot as well, because a symbol key is not run through `Meta.parse`: an index in a symbol is a character in a property name, not a lens path.
 
 # Related
 
   - [`pipeline_lens`](@ref)
   - [`parse_lens`](@ref)
 """
-function has_lens_structure(key::AbstractString)
-    return occursin('.', key) || occursin('[', key)
+function is_pipeline_raw_path(key::AbstractString)
+    i = findfirst(c -> c == '.' || c == '[', key)
+    return !isnothing(i) && SubString(key, firstindex(key), prevind(key, i)) == "steps"
 end
 """
     pipeline_lens(pipe::Pipeline, key) -> lens
 
 Resolve a tuning key into an Accessors.jl lens on a [`Pipeline`](@ref).
 
-A leading step name resolves to the step's position (name → index → property path): `"impute.stat"` targets the `stat` field of the step named `"impute"`, and a bare step name (`"impute"`, `:impute`) or an integer position targets the whole step — swapping entire estimators as grid values needs no extra syntax. Keys whose leading segment is not a step name fall through to [`parse_lens`](@ref), so raw property paths (`"steps[2].stat"`, `"steps[2]"`) and prebuilt lenses keep working.
+A leading step name resolves to the step's position (name → index → property path): `"gap_fill.fill"` targets the `fill` field of the step named `"gap_fill"`, and a bare step name (`"gap_fill"`, `:gap_fill`) or an integer position targets the whole step — swapping entire estimators as grid values needs no extra syntax. A key whose leading segment is not a step name falls through to [`parse_lens`](@ref) only when it is rooted at `steps`, so raw property paths (`"steps[2].fill"`, `"steps[2]"`) and prebuilt lenses keep working.
 
-A key that misses the step-name table and carries no lens structure at all (see [`has_lens_structure`](@ref)) is rejected instead — `"imputer"` is a typo, not a path, and reinterpreting it as a property access on the `Pipeline` struct tunes nothing at best and writes into a real field (`names`, `steps`) at worst. The `Symbol` arm fails closed on the same rule, reading a dot alone as the structure, because a symbol key never reaches `Meta.parse`.
+A key that misses the step-name table and is not a path rooted at `steps` (see [`is_pipeline_raw_path`](@ref)) is rejected instead — `"gapfill"` is a typo, not a path, and `"names[1]"` addresses the step-name table, so reinterpreting either as a property access on the `Pipeline` struct tunes nothing at best and writes into a real field at worst. The `Symbol` arm fails closed on the same rule, and tests for a dot as well, because a symbol key never reaches `Meta.parse`.
 
 # Arguments
 
@@ -95,13 +95,14 @@ function pipeline_lens(pipe::Pipeline, key::AbstractString)
     parts = split(key, '.'; limit = 2)
     i = findfirst(==(parts[1]), pipe.names)
     if isnothing(i)
-        # A structureless key that misses the step-name table is a typo, not a lens path —
-        # fail closed rather than silently reinterpreting it as a property access on the
-        # pipeline struct, where a name colliding with a real field (`names`, `steps`) is
-        # written into on every fold. Structured keys still fall through to `parse_lens`,
+        # A key that misses the step-name table is a lens path only when it is rooted at
+        # `steps`, the one `Pipeline` field that holds tunable estimators — fail closed on
+        # every other root rather than silently reinterpreting the key as a property access
+        # on the pipeline struct, where a path into the step-name table (`"names[1]"`) is
+        # written into on every fold. An admitted path still falls through to `parse_lens`,
         # which is structurally capped. Mirrors the `Symbol` arm below.
-        @argcheck(has_lens_structure(key),
-                  ArgumentError("`$(key)` is not a step name among the $(length(pipe.names)) named pipeline steps" *
+        @argcheck(is_pipeline_raw_path(key),
+                  ArgumentError("`$(key)` is not a step name among the $(length(pipe.names)) named pipeline steps, nor a property path rooted at `steps`" *
                                 did_you_mean(key, pipe.names)))
         return parse_lens(key)
     end
@@ -112,14 +113,14 @@ function pipeline_lens(pipe::Pipeline, key::Symbol)
     ks = string(key)
     i = findfirst(==(ks), pipe.names)
     if isnothing(i)
-        # A bare (undotted) symbol that misses the step-name table is a typo, not a
-        # lens path — fail closed rather than silently reinterpreting it as a property
-        # access on the pipeline struct. Genuinely dotted symbols still fall through to
-        # `parse_lens`, which is structurally capped. The test is a dot rather than
-        # `has_lens_structure` because a `Symbol` is never run through `Meta.parse`: an
+        # A symbol that misses the step-name table is a lens path only when it is dotted
+        # and rooted at `steps` — fail closed rather than silently reinterpreting it as a
+        # property access on the pipeline struct. An admitted symbol still falls through to
+        # `parse_lens`, which is structurally capped. The dot is tested here and not in
+        # `is_pipeline_raw_path` because a `Symbol` is never run through `Meta.parse`: an
         # index in one is a character in a property name, not a lens path.
-        @argcheck(occursin('.', ks),
-                  ArgumentError("`$(key)` is not a step name among the $(length(pipe.names)) named pipeline steps" *
+        @argcheck(occursin('.', ks) && is_pipeline_raw_path(ks),
+                  ArgumentError("`$(key)` is not a step name among the $(length(pipe.names)) named pipeline steps, nor a property path rooted at `steps`" *
                                 did_you_mean(ks, pipe.names)))
         return parse_lens(key)
     end
@@ -185,77 +186,14 @@ function pipeline_lens_val_grid(pipe::Pipeline,
     return lenses, vals
 end
 """
-    fit_and_score(pipe::Pipeline,
-                       scv::Union{<:GridSearchCrossValidation{<:Any, <:Any},
-                                  <:RandomisedSearchCrossValidation{<:Any, <:Any}},
-                       cv::CrossValidationResult, rd::Prices_RR, i::Integer)
-
-Fit a [`Pipeline`](@ref) on the training window and score it on the test window for search cross-validation.
-
-The whole workflow is fitted per fold: stateful preprocessing (universe, imputation parameters) is learned on the training window only, and [`predict`](@ref) replays it on the test window before the score is computed — no test information leaks into the preprocessing, which is the point of the pipeline (ADR 0028).
-
-# Arguments
-
-  - `pipe`: The pipeline candidate.
-  - `scv`: The search cross-validation estimator carrying the risk measure, options, and train-score flag.
-  - `data`: Price- or returns-level input data.
-  - `train_idx`: Observation indices of the training window.
-  - `test_idx`: Observation indices of the test window.
-
-# Returns
-
-  - `(test_score, train_score)`: Signed scores; `train_score` is `nothing` unless requested.
-
-# Related
-
-  - [`search_cross_validation`](@ref)
-  - [`expected_risk`](@ref)
-  - [`predict(res::PipelineResult, data::AbstractPricesResult, window)`](@ref)
-"""
-function fit_and_score(pipe::Pipeline,
-                       scv::Union{<:GridSearchCrossValidation{<:Any, <:Any},
-                                  <:RandomisedSearchCrossValidation{<:Any, <:Any}},
-                       cv::CrossValidationResult, rd::Prices_RR, i::Integer)
-    assert_no_holdout(pipe)
-    prediction = fit_and_predict(pipe, rd; train_idx = cv.train_idx[i],
-                                 test_idx = cv.test_idx[i])
-    r = scv.r
-    sign = ifelse(bigger_is_better(r), 1, -1)
-    test_score = sign * expected_risk(r, prediction; scv.kwargs...)
-    train_score = if scv.train_score
-        sign * expected_risk(r, prediction.res; scv.kwargs...)
-    else
-        nothing
-    end
-    return test_score, train_score
-end
-function fit_and_score(pipe::Pipeline,
-                       scv::Union{<:GridSearchCrossValidation{<:Any, <:MultipleRandomised},
-                                  <:RandomisedSearchCrossValidation{<:Any,
-                                                                    <:MultipleRandomised}},
-                       cv::MultipleRandomisedResult, rd::Prices_RR, i::Integer)
-    assert_no_holdout(pipe)
-    prediction = fit_and_predict(pipe, rd; train_idx = cv.train_idx[i],
-                                 test_idx = cv.test_idx[i], cols = cv.asset_idx[i])
-    r = scv.r
-    sign = ifelse(bigger_is_better(r), 1, -1)
-    test_score = sign * expected_risk(scv.r, prediction; scv.kwargs...)
-    train_score = if scv.train_score
-        sign * expected_risk(scv.r, prediction.res; scv.kwargs...)
-    else
-        nothing
-    end
-    return test_score, train_score
-end
-"""
     search_cross_validation(pipe::Pipeline, gscv::GridSearchCrossValidation, data::Prices_RR)
     search_cross_validation(pipe::Pipeline, rscv::RandomisedSearchCrossValidation, data::Prices_RR)
 
 Tune a [`Pipeline`](@ref) by grid (or randomised) search cross-validation on price- or returns-level input data.
 
-The input is split into contiguous observation windows by `gscv.cv` (price-level splits keep stateful preprocessing inside the fold); for each candidate the lens grid is applied to the pipeline (keys resolved by [`pipeline_lens`](@ref), so step names, step positions, and raw property paths all address steps), the whole workflow is fitted on the training window and scored on the test window via [`fit_and_score`](@ref), and the scorer picks the winner. The randomised form samples the grid and delegates, exactly as for plain optimisers.
+The input is split into contiguous observation windows by `gscv.cv` (price-level splits keep stateful preprocessing inside the fold); for each candidate the lens grid is applied to the pipeline (keys resolved by [`pipeline_lens`](@ref), so step names, step positions, and raw property paths all address steps), and the candidate is scored through [`cross_val_predict`](@ref)`(pipe_i, data, gscv.cv; ex = SequentialEx())`, the one fold loop every cross-validation entry point runs. So the candidate runs the scheme it declared: every fold fits the whole workflow on its training window and scores it on its test window, a walk-forward threads the previous fold's weights through the scheme's `pws`, and a [`TimeDependent`](@ref) schedule resolves per fold against the fold's [`TimeDependentContext`](@ref), sized to the scheme's fold count and asserted per candidate, because a grid value may swap a whole schedule in or out. Lenses need no schedule-specific semantics: naming the step swaps the whole schedule as a grid value, and raw property paths address entries. Candidates run in parallel over `gscv.ex`, the folds inside one in sequence. One row per fold, in `split`'s order, through [`write_candidate_scores!`](@ref) and [`score_rows`](@ref); a scheme whose `split` draws at random is fixed once through [`pin_draw`](@ref). The scorer picks the winner among the candidates that finished every fold, through [`finite_candidate_index`](@ref), so a candidate that failed a fold never wins (ADR 0120). The randomised form samples the grid and delegates, exactly as for plain optimisers.
 
-[`TimeDependent`](@ref) schedules resolve against the *tuning* folds: when a candidate is time-dependent, its schedules are sized to the tuning scheme's fold count (asserted per candidate — a grid value may swap a whole schedule in or out), and tuning fold `j` swaps in entry `j` via the pipeline-level [`update_time_dependent_estimator`](@ref) before [`fit_and_score`](@ref) runs. Lenses need no schedule-specific semantics: naming the step swaps the whole schedule as a grid value, and raw property paths address entries.
+A scheme that declares a Fold Fit runs every candidate through the Pipeline's online step (ADR 0142): each candidate is warmed up once and folded fold by fold through [`partial_fit!`](@ref), and read out through `fit(pipe)` where a refit would have run, so the search picks the candidate the batch search picks over the same steps. A warm pipeline is refused once, before the grid, through [`assert_search_entry`](@ref); the refit route `Online(pipe)` is not a search root, because the grid's lenses address the pipeline's steps and not a wrapper's.
 
 # Arguments
 
@@ -272,15 +210,25 @@ The input is split into contiguous observation windows by `gscv.cv` (price-level
   - [`GridSearchCrossValidation`](@ref)
   - [`RandomisedSearchCrossValidation`](@ref)
   - [`pipeline_lens`](@ref)
-  - [`fit_and_score`](@ref)
+  - [`cross_val_predict`](@ref)
+  - [`write_candidate_scores!`](@ref)
+  - [`score_rows`](@ref)
+  - [`pin_draw`](@ref)
+  - [`finite_candidate_index`](@ref)
+  - [`assert_search_entry`](@ref)
 """
 function search_cross_validation(pipe::Pipeline, gscv::GridSearchCrossValidation,
                                  data::Prices_RR)
     assert_no_holdout(pipe)
+    assert_search_entry(pipe, gscv.cv)
     lens_grid, val_grid = pipeline_lens_val_grid(pipe, gscv.p)
-    cv = split(gscv.cv, data)
+    scheme = pin_draw(gscv.cv)
+    cv = split(scheme, data)
+    rows = score_rows(cv)
     N = length(val_grid)
     M = length(cv.train_idx)
+    r = gscv.r
+    sgn = ifelse(bigger_is_better(r), 1, -1)
     test_scores = Matrix{cv_data_eltype(data)}(undef, M, N)
     train_scores = if gscv.train_score
         Matrix{cv_data_eltype(data)}(undef, M, N)
@@ -294,29 +242,15 @@ function search_cross_validation(pipe::Pipeline, gscv::GridSearchCrossValidation
             for (lens, val) in zip(lenses, vals)
                 pipei = Accessors.set(pipei, lens, val)
             end
-            local td_flag = is_time_dependent(pipei)
-            if td_flag
-                assert_time_dependent_fold_count(pipei, M)
-            end
-            for j in eachindex(cv.train_idx)
-                local pipej = pipei
-                if td_flag
-                    pipej = update_time_dependent_estimator(pipei,
-                                                            TimeDependentContext(; i = j,
-                                                                                 n = M,
-                                                                                 rd = data,
-                                                                                 train_idx = cv.train_idx,
-                                                                                 test_idx = cv.test_idx))
-                end
-                test_score, train_score = fit_and_score(pipej, gscv, cv, data, j)
-                test_scores[j, i] = test_score
-                if gscv.train_score
-                    train_scores[j, i] = train_score
-                end
-            end
+            # Candidates run in parallel over `gscv.ex`; the folds inside one run in
+            # sequence, through the same loop every other entry point runs.
+            local predictions = cross_val_predict(pipei, data, scheme;
+                                                  ex = FLoops.SequentialEx())
+            write_candidate_scores!(test_scores, train_scores, i, predictions, rows, r, sgn,
+                                    gscv.kwargs)
         end
     end
-    opt_idx = gscv.scorer(test_scores)
+    opt_idx = finite_candidate_index(gscv.scorer, test_scores)
     opt_lens = lens_grid[opt_idx]
     opt_vals = val_grid[opt_idx]
     for (lens, val) in zip(opt_lens, opt_vals)
@@ -331,7 +265,7 @@ end
 
 Grid search cross-validation of a [`Pipeline`](@ref) over a [`CombinatorialCrossValidation`](@ref) scheme.
 
-Combinatorial recombines its disjoint test groups into full-length backtest **paths**, so — like the plain-optimiser combinatorial method — scoring is per-path, not per-split: scoring a split in isolation would mix groups belonging to different paths. For each candidate the whole workflow runs through [`cross_val_predict`](@ref) (splits fitted, groups recombined by [`sort_predictions!`](@ref) into a [`PopulationPredictionResult`](@ref)), and [`expected_risk`](@ref) yields one score per path; the score matrix is therefore `n_paths × n_candidates` and the scorer selects across candidates as usual.
+Combinatorial recombines its disjoint test groups into full-length backtest **paths**, so — like the plain-optimiser combinatorial method — scoring is per-path, not per-split: scoring a split in isolation would mix groups belonging to different paths. For each candidate the whole workflow runs through [`cross_val_predict`](@ref) (splits fitted, groups recombined by [`sort_predictions!`](@ref) into a [`PopulationPredictionResult`](@ref)), and [`expected_risk`](@ref) yields one score per path; the score matrix is therefore `n_paths × n_candidates` and the scorer selects across candidates as usual, through [`finite_candidate_index`](@ref), so a candidate that failed a path never wins (ADR 0120).
 
 `train_scores` (only when `gscv.train_score`) keeps every per-fold in-sample score: a `Vector` of `n_paths` matrices, one per path, each `folds_in_path × n_candidates` (test scores stay one-per-path because a path's out-of-sample returns pool into one series, while its folds train on distinct in-sample windows).
 
@@ -381,7 +315,7 @@ function search_cross_validation(pipe::Pipeline,
             end
         end
     end
-    opt_idx = gscv.scorer(test_scores)
+    opt_idx = finite_candidate_index(gscv.scorer, test_scores)
     for (lens, val) in zip(lens_grid[opt_idx], val_grid[opt_idx])
         pipe = Accessors.set(pipe, lens, val)
     end

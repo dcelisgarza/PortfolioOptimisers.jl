@@ -1,0 +1,447 @@
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Estimates a point-in-time cross-sectional factor model from an Asset Panel, and lifts it onto the assets.
+
+The estimator reads per-asset Panel Fields, builds a Factor Exposure from each one, regresses every observation's returns on the **lagged** exposures across the assets, and returns the asset moments beside a [`CrossSectionalFactorModel`](@ref) block. It is the cross-sectional counterpart of [`FactorPrior`](@ref), which regresses each asset's returns on a factor-return series over time.
+
+The window a fit needs is **cumulative**, and a caller who sizes one must add up three warm-ups rather than take the longest. The Descriptors warm up first, and their longest warm-up fixes the first observation of the factor-return history; `lag` takes one more. `pe` then warms up over that history, and `ve` over the idiosyncratic returns beside it. A window that clears the Descriptors alone can still leave `pe` too little to state a factor covariance from, and the fit refuses by name when it does. This bites hardest in **cross-validation**, because a fold hands the estimator only its own rows, so the Descriptors restart in every fold and a rolling train window never grows to absorb the warm-up. Size the train window against the sum, not against the Descriptors.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    CrossSectionalFactorPrior(; factors::Dict_VecPair,
+                              neutralise::Option{<:Dict_VecPair} = nothing,
+                              families::Option{<:Dict_VecPair} = nothing,
+                              cre::AbstractCrossSectionalRegressionEstimator = CrossSectionalLinearRegression(),
+                              wa::AbstractCrossSectionalWeightsAlgorithm = MarketCapWeights(),
+                              pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
+                              ve::AbstractCovarianceEstimator = RegimeAdjustedExpWeightedVariance(),
+                              ce::StatsBase.CovarianceEstimator = ExpWeightedCovariance(; centred = true),
+                              f_mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
+                              mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
+                              th::Real = 0.0, bp::Real = 1.0,
+                              mcap::AbstractString = "market_cap",
+                              bw::AbstractString = "benchmark_weights", lag::Integer = 1,
+                              minra::Option{<:Integer} = nothing,
+                              rfe::Option{<:AbstractReturnForecastEstimator} = nothing,
+                              lambda::Real = 1.0, c::Real = 1.0)
+
+## Validation
+
+  - `factors` is not empty and repeats no factor name.
+  - `neutralise` and `families` repeat no key.
+  - `th` lies in `[0, 1]`.
+  - `bp` is finite and `>= 0`.
+  - `lag` is `> 0`.
+  - `minra`, when it is stated, is `> 0`.
+  - `lambda` and `c` lie in `[0, 1]`.
+
+# Examples
+
+```jldoctest
+julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], lag = 2).lag
+2
+```
+
+# Related
+
+  - [`AbstractLowOrderPriorEstimator_A`](@ref)
+  - [`prior`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+  - [`FactorPrior`](@ref)
+  - [`AssetPanel`](@ref)
+  - [`factor_exposure`](@ref)
+  - [`cross_sectional_regression`](@ref)
+  - [`factor_family_basis`](@ref)
+  - [`neutralise_exposures!`](@ref)
+  - [`AbstractReturnForecastEstimator`](@ref)
+"""
+@propagatable @concrete struct CrossSectionalFactorPrior <: AbstractLowOrderPriorEstimator_A
+    """
+    Pairs of `factor name => Exposure Estimator`, in the order they take on the factor axis. A one-hot member contributes one factor per level of its categorical Panel Field, so a Pair is not always one factor.
+    """
+    factors
+    """
+    Neutralisation, as Pairs of `key => targets` run in order, or `nothing`. A key names a factor or a Factor Family, and so does each target.
+    """
+    neutralise
+    """
+    Constrained Factor Families, as Pairs of `family label => dropped member`, or `nothing`. A `nothing` right lets [`factor_family_basis`](@ref) choose the member to drop.
+    """
+    families
+    """
+    Cross-Sectional Regression Estimator of the fit, and of the Neutralisation.
+    """
+    @fprop cre
+    """
+    Weight policy of the cross-sectional fit. Its `p` is the power the regression weights raise the market capitalisation to.
+    """
+    @fprop wa
+    """
+    $(field_dict[:pe]) It is fitted on the **reduced** factor-return series, so a constrained Factor Family gives it a full-rank covariance.
+    """
+    @fprop pe
+    """
+    $(field_dict[:ve]) [`variance_series`](@ref) on it gives the idiosyncratic variance history, whose last row is the idiosyncratic risk of the latest observation.
+    """
+    @fprop @vprop ve
+    """
+    $(field_dict[:ce]) It estimates the covariance of the standardised idiosyncratic returns, and it is read only when `th` is positive. [`gap_fill_value`](@ref) on it decides what an inactive asset's cell is worth: the default answers `NaN`, so the estimator is handed the gap and the panel's active mask, and a plain moment estimator takes a zero in its place.
+    """
+    @fprop @vprop ce
+    """
+    $(field_dict[:f_mp]) It processes the factor covariance `pe` answered, which is a different matrix from the asset one `mp` processes: it lives on the factor axis, it is estimated from the factor-return series, and a Factor Family that sheds a member can leave it singular. [`cross_sectional_lift`](@ref) takes its Cholesky factor for the low-rank square root, so a factor covariance that is not positive definite fails there rather than in the asset block.
+    """
+    @fprop f_mp
+    """
+    $(field_dict[:mp])
+    """
+    @fprop mp
+    """
+    Idiosyncratic correlation threshold. A value of zero leaves the idiosyncratic covariance diagonal, and a positive value keeps every correlation above it and zeroes the rest, so the block becomes a matrix.
+    """
+    th
+    """
+    Power the benchmark weights raise the market capitalisation to. A value of zero gives every asset of the estimation universe the same benchmark weight, and reads no market capitalisation.
+    """
+    bp
+    """
+    Name of the numeric Panel Field holding the market capitalisation.
+    """
+    mcap
+    """
+    Name of the numeric Panel Field the prior writes its benchmark weights onto, and the one every Exposure Estimator reads them from.
+    """
+    bw
+    """
+    Number of observations by which the exposures lag the returns.
+    """
+    lag
+    """
+    Smallest eligible asset count an observation may carry, or `nothing` for `max(2K, 30)` over the reduced factor count `K`.
+    """
+    minra
+    """
+    Return Forecast Estimator whose forecast enters `mu`, or `nothing`. It is fitted on the coverage universe, after the factor model, and its forecast is split against the latest Factor Exposures into the part they span and the part they do not.
+    """
+    @fprop rfe
+    """
+    Shrinkage of the expected factor returns towards the spanned part of the Return Forecast, in `[0, 1]`. A value of one keeps the fitted factor mean, and a value of zero takes the spanned forecast alone. With no Return Forecast Estimator the spanned part is zero, so the value shrinks the factor mean towards zero.
+    """
+    lambda
+    """
+    Confidence in the orthogonal part of the Return Forecast, in `[0, 1]`. It scales the part of the forecast the factors do not span, which the block carries in `b`. A value of zero discards it.
+    """
+    c
+    function CrossSectionalFactorPrior(factors::AbstractVector{<:Pair},
+                                       neutralise::Option{<:AbstractVector{<:Pair}},
+                                       families::Option{<:AbstractVector{<:Pair}},
+                                       cre::AbstractCrossSectionalRegressionEstimator,
+                                       wa::AbstractCrossSectionalWeightsAlgorithm,
+                                       pe::AbstractLowOrderPriorEstimator_A_AF,
+                                       ve::AbstractCovarianceEstimator,
+                                       ce::StatsBase.CovarianceEstimator,
+                                       f_mp::AbstractMatrixProcessingEstimator,
+                                       mp::AbstractMatrixProcessingEstimator, th::Real,
+                                       bp::Real, mcap::AbstractString, bw::AbstractString,
+                                       lag::Integer, minra::Option{<:Integer},
+                                       rfe::Option{<:AbstractReturnForecastEstimator},
+                                       lambda::Real, c::Real)
+        assert_closed_unit_interval(th, :th)
+        assert_finite(bp, :bp)
+        assert_nonneg(bp, :bp)
+        assert_panel_terms(mcap, :mcap)
+        assert_panel_terms(bw, :bw)
+        assert_gt0(lag, :lag)
+        if !isnothing(minra)
+            assert_gt0(minra, :minra)
+        end
+        assert_closed_unit_interval(lambda, :lambda)
+        assert_closed_unit_interval(c, :c)
+        return new{typeof(factors), typeof(neutralise), typeof(families), typeof(cre),
+                   typeof(wa), typeof(pe), typeof(ve), typeof(ce), typeof(f_mp), typeof(mp),
+                   typeof(th), typeof(bp), typeof(mcap), typeof(bw), typeof(lag),
+                   typeof(minra), typeof(rfe), typeof(lambda), typeof(c)}(factors,
+                                                                          neutralise,
+                                                                          families, cre, wa,
+                                                                          pe, ve, ce, f_mp,
+                                                                          mp, th, bp, mcap,
+                                                                          bw, lag, minra,
+                                                                          rfe, lambda, c)
+    end
+end
+function CrossSectionalFactorPrior(; factors::Dict_VecPair,
+                                   neutralise::Option{<:Dict_VecPair} = nothing,
+                                   families::Option{<:Dict_VecPair} = nothing,
+                                   cre::AbstractCrossSectionalRegressionEstimator = CrossSectionalLinearRegression(),
+                                   wa::AbstractCrossSectionalWeightsAlgorithm = MarketCapWeights(),
+                                   pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
+                                   ve::AbstractCovarianceEstimator = RegimeAdjustedExpWeightedVariance(),
+                                   ce::StatsBase.CovarianceEstimator = ExpWeightedCovariance(;
+                                                                                             centred = true),
+                                   f_mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
+                                   mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
+                                   th::Real = 0.0, bp::Real = 1.0,
+                                   mcap::AbstractString = "market_cap",
+                                   bw::AbstractString = "benchmark_weights",
+                                   lag::Integer = 1, minra::Option{<:Integer} = nothing,
+                                   rfe::Option{<:AbstractReturnForecastEstimator} = nothing,
+                                   lambda::Real = 1.0,
+                                   c::Real = 1.0)::CrossSectionalFactorPrior
+    return CrossSectionalFactorPrior(cross_sectional_prior_pairs(factors, :factors),
+                                     cross_sectional_prior_option(neutralise, :neutralise),
+                                     cross_sectional_prior_option(families, :families), cre,
+                                     wa, pe, ve, ce, f_mp, mp, th, bp, mcap, bw, lag, minra,
+                                     rfe, lambda, c)
+end
+"""
+    cross_sectional_prior_option(x::Nothing, sym::Sym_Str) -> nothing
+    cross_sectional_prior_option(x::Dict_VecPair, sym::Sym_Str) -> Vector{<:Pair}
+
+Collect an optional list-valued argument of a [`CrossSectionalFactorPrior`](@ref).
+
+The Neutralisation and the constrained Factor Families are each absent or a list, so the absent case is a method rather than a test.
+
+# Arguments
+
+  - `x`: The Pairs, the dictionary, or `nothing`.
+  - `sym`: Name of the field, for the messages.
+
+# Validation
+
+  - The rules of [`cross_sectional_prior_pairs`](@ref).
+
+# Returns
+
+  - `pr::Option{<:Vector{<:Pair}}`: The collected Pairs, or `nothing`.
+
+# Related
+
+  - [`cross_sectional_prior_pairs`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+"""
+function cross_sectional_prior_option(::Nothing, ::Sym_Str)
+    return nothing
+end
+function cross_sectional_prior_option(x::Dict_VecPair, sym::Sym_Str)
+    return cross_sectional_prior_pairs(x, sym)
+end
+"""
+    prior(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum} = nothing,
+          pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, iv::Option{<:MatNum} = nothing,
+          ivpa::Option{<:Num_VecNum} = nothing, kwargs...) -> LowOrderPrior
+
+Fit a cross-sectional factor model on an Asset Panel, and return the asset prior it lifts.
+
+This is the returns-matrix method every prior estimator implements, and it holds the fit. The panel arrives as the third positional argument, so a wrapping prior composes this estimator by forwarding the panel it was handed. The carrier method below unwraps a [`ReturnsResult`](@ref) onto it.
+
+# Algorithm
+
+ 1. Orient `X` and `F` by `dims`, rebuild the carrier the Descriptors read from `X`, `F`, `pnl`, `iv` and `ivpa`, and take the two universe masks off `pnl` with [`cross_sectional_panel_masks`](@ref).
+ 2. Build the benchmark weights with [`cross_sectional_cap_weights`](@ref), over the assets of the estimation universe whose return is finite, and write them onto a copy of the Asset Panel with [`cross_sectional_benchmark_carrier`](@ref).
+ 3. Build every Factor Exposure with [`cross_sectional_exposure_history`](@ref), in dependency order, giving `Ms`, `nf` and `fam`.
+ 4. Drop the leading observations the Descriptors warm up over, with [`cross_sectional_warmup`](@ref).
+ 5. Neutralise the exposures with [`cross_sectional_neutralise!`](@ref), under the benchmark weights and the prior's own regression estimator.
+ 6. Build the Factor Family Basis with [`cross_sectional_family_basis`](@ref), and reduce the exposures through it.
+ 7. Lag the reduced exposures and the market capitalisation by `pe.lag`, and take the eligibility mask of the fit with [`cross_sectional_eligible`](@ref).
+ 8. Regress each observation's returns on its lagged reduced exposures, through [`cs_weights_initial`](@ref), [`needs_second_pass`](@ref) and [`cs_weights_refine`](@ref).
+ 9. Take the idiosyncratic variance history with [`variance_series`](@ref), standardise the idiosyncratic returns by it with [`cross_sectional_standardised_residuals`](@ref), and take the latest idiosyncratic covariance with [`cross_sectional_idiosyncratic_covariance`](@ref).
+10. Fit `pe.pe` on the reduced factor returns, refuse a non-finite factor moment with [`assert_cross_sectional_factor_moments`](@ref), and process the factor covariance in place under `pe.f_mp`, which is the factor axis's own matrix processing estimator and not the asset one.
+11. Fit the Return Forecast with [`cross_sectional_return_forecast`](@ref), on the **whole** carrier, so that a Descriptor of the forecast warms up over every observation the panel has, and blend its spanned part into the factor mean with [`cross_sectional_forecast_mu`](@ref). The block carries the orthogonal part in `b`, and the Result in `rf`.
+12. Expand the blended factor moments onto the raw factor axis with [`cross_sectional_expand`](@ref), so `fpr` states the distribution of the factors the caller named.
+13. Rebuild the asset return scenarios with [`cross_sectional_scenarios`](@ref).
+14. Lift the reduced factor distribution onto the investable assets with [`cross_sectional_lift`](@ref), and add `b` to the expected return it answers.
+
+# Arguments
+
+  - `pe`: Cross-Sectional Factor Prior estimator.
+  - $(arg_dict[:X])
+  - $(arg_dict[:F]) It is not read by the fit: this estimator builds its own factors out of the panel. It travels only so that the rebuilt carrier states what the caller held.
+  - $(arg_dict[:pnl_prior]) This estimator reads it, and refuses without it.
+  - `dims`: Dimension along which the observations lie.
+  - `iv`: Implied volatilities, written onto the rebuilt carrier.
+  - `ivpa`: Implied-volatility risk-premium adjustment, written onto the rebuilt carrier.
+  - `kwargs...`: Additional keyword arguments passed to the verbs of the algorithm.
+
+# Validation
+
+  - `pnl` is not `nothing`. Raises an [`IsNothingError`](@ref).
+  - The Asset Panel is time-varying. Raises an `ArgumentError`.
+  - The history is longer than the exposure lag. Raises an `ArgumentError`.
+  - At least two observations are left after the Descriptor warm-up and the exposure lag, because a covariance of one observation is not a number. Raises an `ArgumentError`.
+  - Every fitted observation carries at least `minra` eligible assets. Raises an `ArgumentError`.
+  - The factor prior states a finite factor mean and a finite factor covariance. Raises an [`IsNonFiniteError`](@ref).
+  - At least one asset is investable at the latest observation. Raises an [`IsEmptyError`](@ref).
+  - The rules of every verb the algorithm names.
+
+# Returns
+
+  - `pr::LowOrderPrior`: The prior on the **full** asset universe. `mu` and the diagonal of `sigma` are `NaN` at an asset the estimator states no moment for, `rr` is a [`CrossSectionalFactorModel`](@ref), and `fpr` is the factor prior on the raw factor axis.
+
+# Related
+
+  - [`CrossSectionalFactorPrior`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+  - [`LowOrderPrior`](@ref)
+  - [`investable_mask`](@ref)
+  - [`cross_sectional_lift`](@ref)
+  - [`cross_sectional_return_forecast`](@ref)
+  - [`cross_sectional_forecast_mu`](@ref)
+"""
+function prior(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum} = nothing,
+               pnl::Option{<:AssetPanel} = nothing; dims::Int = 1,
+               iv::Option{<:MatNum} = nothing, ivpa::Option{<:Num_VecNum} = nothing,
+               kwargs...)
+    X, F = dims_oriented(dims, X, F)
+    @argcheck(!isnothing(pnl),
+              IsNothingError("a Cross-Sectional Factor Prior reads its Factor Exposures off an Asset Panel, and the panel is nothing. Call prior(pe, rd) with a ReturnsResult whose `pnl` is the one asset_panel returns, or hand the panel to this method as its third positional argument."))
+    # Every Descriptor of the fit reads its Panel Fields off a carrier, so the carrier is
+    # rebuilt here rather than demanded from the caller: the panel is the one field of it a
+    # wrapping prior can forward, and no verb of the fit reads `nx`, `ts`, `nb` or `B`.
+    #
+    # A carrier that holds returns holds names for them, and neither a matrix nor a panel
+    # states any, so the names are the column numbers. They are read nowhere. Their length
+    # is: it is the asset axis `check_asset_panel` binds the panel to, which is the check
+    # this rebuild is worth making.
+    rd = ReturnsResult(; nx = string.(1:size(X, 2)), X = X,
+                       nf = isnothing(F) ? nothing : string.(1:size(F, 2)), F = F, iv = iv,
+                       ivpa = ivpa, pnl = pnl)
+    amsk, emsk = cross_sectional_panel_masks(pnl)
+    mcap = if cross_sectional_needs_market_cap(pe.bp, pe.wa)
+        panel_field_values(rd, pe.mcap)
+    else
+        nothing
+    end
+    bmsk = isfinite.(X) .& emsk
+    cross_sectional_cap_finite!(bmsk, mcap)
+    BW = cross_sectional_cap_weights(pe.bp, mcap, bmsk)
+    (; Ms, nf, fam) = cross_sectional_exposure_history(pe.factors,
+                                                       cross_sectional_benchmark_carrier(rd,
+                                                                                         pe.bw,
+                                                                                         BW))
+    rw = (cross_sectional_warmup(X, Ms, emsk) + 1):size(X, 1)
+    Msw = Ms[rw, :, :]
+    Xw = X[rw, :]
+    bww = BW[rw, :]
+    mcw = cross_sectional_rows(mcap, rw)
+    cross_sectional_neutralise!(pe.neutralise, Msw, pe.cre, bww, nf, fam)
+    fb = cross_sectional_family_basis(pe.families, Msw, bww, nf, fam)
+    @argcheck(length(rw) > pe.lag,
+              ArgumentError("the exposures lag the returns by lag = $(pe.lag), so a fit needs more than $(pe.lag) observations after the Descriptor warm-up, and $(length(rw)) are left. Give more observations, shorten the warm-up of the Descriptors, or lower lag."))
+    @argcheck(length(rw) - pe.lag >= 2,
+              ArgumentError("the factor prior states a covariance of the factor returns, and a covariance of one observation is not a number, so a fit needs at least two observations after the Descriptor warm-up and the exposure lag of $(pe.lag), and $(length(rw) - pe.lag) is left. Give more observations, or shorten the warm-up of the Descriptors."))
+    r = (pe.lag + 1):length(rw)
+    Zl = fb.Ms[r .- pe.lag, :, :]
+    Xr = Xw[r, :]
+    amr = amsk[rw[r], :]
+    bwr = bww[r, :]
+    msk = cross_sectional_eligible(Xr, Zl, emsk[rw[r], :])
+    mcl = cross_sectional_rows(mcw, r .- pe.lag)
+    cross_sectional_cap_finite!(msk, mcl)
+    assert_cross_sectional_coverage(msk, if isnothing(pe.minra)
+                                        max(2 * size(Zl, 3), 30)
+                                    else
+                                        pe.minra
+                                    end)
+    W = cs_weights_initial(pe.wa, mcl, msk)
+    csr = cross_sectional_regression(pe.cre, Zl, Xr, W)
+    if needs_second_pass(pe.wa)
+        W = cs_weights_refine(pe.wa, W, csr.eps, pe.ve, msk)
+        csr = cross_sectional_regression(pe.cre, Zl, Xr, W)
+    end
+    vs = variance_series(pe.ve, csr.eps; dims = 1)
+    S = cross_sectional_standardised_residuals(csr.eps, vs, amr)
+    esigma = cross_sectional_idiosyncratic_covariance(pe.th, pe.ce, pe.mp.pdm, S,
+                                                      vs[end, :], amr)
+    f_pr = prior(pe.pe, csr.f)
+    assert_cross_sectional_factor_moments(f_pr.mu, f_pr.sigma, length(r))
+    # The factor covariance takes its own estimator for the reason the asset one takes
+    # `pe.mp`: they are different matrices. This one is estimated from the factor-return
+    # series over a factor axis a constrained Family has already reduced, and
+    # `cross_sectional_lift` factorises it for the low-rank square root, so a covariance
+    # that is merely positive SEMI-definite -- a short warm-up, a collinear Family -- raises
+    # a `PosDefException` out of the Cholesky rather than answering. The default `pdm` is a
+    # no-op on a matrix that is already positive definite, so a healthy fit is untouched,
+    # and `f_pr` is local to this method: nothing outside it holds the matrix.
+    matrix_processing!(pe.f_mp, f_pr.sigma, csr.f; kwargs...)
+    fnow = cross_sectional_basis_now(fb.fcb, r)
+    L = fb.Ms[r[end], :, :]
+    Msr = Msw[r, :, :]
+    Tb = promote_type(real(eltype(L)), real(eltype(f_pr.mu)))
+    csfm = CrossSectionalFactorModel(; M = Msr[end, :, :],
+                                     L = cross_sectional_reduced_loadings(fnow, L),
+                                     b = zeros(Tb, size(X, 2)), csr = csr, Ms = Msr,
+                                     vs = vs, esigma = esigma, rw = W, bw = bwr, nf = nf,
+                                     fam = fam, fcb = fnow, lag = pe.lag)
+    (; rr, g) = cross_sectional_return_forecast(pe.rfe, rd, csfm, pe.cre, pe.c)
+    f_mu = cross_sectional_forecast_mu(pe.lambda, f_pr.mu, g)
+    ex = cross_sectional_expand(fb.fcb, r, pe.lag, csr.f, f_mu, f_pr.sigma)
+    ev = vs[end, :]
+    idx = cross_sectional_investable(amr[end, :], L, ev)
+    @argcheck(!isempty(idx),
+              IsEmptyError("no asset is investable at the latest observation: every asset is either inactive, or carries a non-finite idiosyncratic variance or Factor Exposure. Give more observations, or widen the active mask of the Asset Panel."))
+    Xs = cross_sectional_scenarios(f_pr.X, L, S, ev)
+    lift = cross_sectional_lift(pe.mp, L, f_mu, f_pr.sigma, esigma, idx, Xs; kwargs...)
+    fpr = LowOrderPrior(; X = ex.f, mu = ex.mu, sigma = ex.sigma, w = f_pr.w,
+                        ens = f_pr.ens, kld = f_pr.kld, ow = f_pr.ow)
+    return LowOrderPrior(; X = Xs, o_X = Xr, mu = lift.mu + rr.b, sigma = lift.sigma,
+                         chol = lift.chol, w = f_pr.w, ens = f_pr.ens, kld = f_pr.kld,
+                         ow = f_pr.ow, rr = rr, fpr = fpr)
+end
+"""
+    prior(pe::CrossSectionalFactorPrior, rd::ReturnsResult; kwargs...) -> LowOrderPrior
+
+Fit a Cross-Sectional Factor Prior from a carrier.
+
+The method unwraps the carrier onto the returns-matrix method above, which holds the fit. It is written here rather than taken from [`prior(pe::AbstractPriorEstimator, rd::ReturnsResult)`](@ref) so that a carrier with no Asset Panel is refused against `rd.pnl`, in the words of the carrier the caller built.
+
+# Algorithm
+
+ 1. Check that `rd` carries asset returns.
+ 2. Call the returns-matrix method with `rd.X`, `rd.F` and `rd.pnl`, forwarding `rd.iv` and `rd.ivpa` as keyword arguments alongside `kwargs`.
+
+# Arguments
+
+  - `pe`: Cross-Sectional Factor Prior estimator.
+  - $(arg_dict[:rd]) It must carry asset returns in `rd.X` and a time-varying Asset Panel in `rd.pnl`.
+  - `kwargs...`: Additional keyword arguments passed to the returns-matrix method.
+
+# Validation
+
+  - `rd.X` is not `nothing`. Raises an [`IsNothingError`](@ref).
+  - `rd.pnl` is not `nothing`. Raises an [`IsNothingError`](@ref).
+  - The rules of the returns-matrix method.
+
+# Returns
+
+  - `pr::LowOrderPrior`: The prior the returns-matrix method fitted.
+
+# Related
+
+  - [`CrossSectionalFactorPrior`](@ref)
+  - [`prior`](@ref)
+  - [`ReturnsResult`](@ref)
+"""
+function prior(pe::CrossSectionalFactorPrior, rd::ReturnsResult; kwargs...)
+    @argcheck(!isnothing(rd.X),
+              IsNothingError("a Cross-Sectional Factor Prior regresses asset returns on their Factor Exposures, and rd.X is nothing"))
+    @argcheck(!isnothing(rd.pnl),
+              IsNothingError("a Cross-Sectional Factor Prior reads its Factor Exposures off an Asset Panel, and rd.pnl is nothing. Build the carrier with the `pnl` that asset_panel returns."))
+    return prior(pe, rd.X, rd.F, rd.pnl; iv = rd.iv, ivpa = rd.ivpa, kwargs...)
+end
+function factor_residual_config(::CrossSectionalFactorPrior)
+    # The declaration names a variance estimator that a consumer re-runs on the
+    # reconstruction error to rebuild the residual block and subtract it (see
+    # [`factor_residual_config`](@ref)). This estimator's block is not that quantity: it is
+    # the last row of an idiosyncratic variance history, and under a positive `th` it is a
+    # full matrix. The block it added is on the result, at `rr.esigma`, so a consumer reads
+    # it there rather than rebuilding it. An explicit `nothing` would say that no block was
+    # added, which is false, so the method refuses instead.
+    return throw(ArgumentError("a Cross-Sectional Factor Prior states no residual declaration. The block it adds is the idiosyncratic covariance it measured, which the result carries at `rr.esigma`; it is not `var(ve, X - posterior_X)`, so a consumer that rebuilds the block from a variance estimator would subtract a different matrix."))
+end
+
+export CrossSectionalFactorPrior

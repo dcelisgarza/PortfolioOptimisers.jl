@@ -19,6 +19,12 @@ factory(me::AbstractExpectedReturnsEstimator, args...; kwargs...)
 port_opt_view(alg::AbstractExpectedReturnsAlgorithm, ::Any, args...)
 factory(alg::AbstractExpectedReturnsAlgorithm, args...; kwargs...)
 cov(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)
+cov(ce::AbstractCovarianceEstimator, state::SampleBufferState)
+cor(ce::AbstractCovarianceEstimator, state::SampleBufferState)
+var(ve::AbstractVarianceEstimator, state::SampleBufferState)
+std(ve::AbstractVarianceEstimator, state::SampleBufferState)
+mean(me::AbstractExpectedReturnsEstimator, state::SampleBufferState)
+gap_fill_value(::StatsBase.CovarianceEstimator)
 densify
 robust_cov
 robust_cor
@@ -26,6 +32,7 @@ compat_cov
 compat_cor
 moment_window_and_weights
 windowed_preamble
+weighted_centre
 demean_returns
 ```
 
@@ -57,4 +64,6 @@ Moments other than the expected return can be estimated using the entire spectru
 ```@docs
 FullMoment
 SemiMoment
+coverage_comoment_deviations
+coverage_comoment_block
 ```

@@ -24,6 +24,8 @@ Result type for [`SubsetResampling`](@ref).
 
 `ress` and `idx` are aligned: `ress[m]` is the optimisation of the subset whose asset indices are `idx[:, m]`, and `w` is the average of those results embedded back into the full universe.
 
+`idx` indexes the universe the subsets were drawn from, which is the **reduced** universe when `imsk` is not `nothing`, as `pr`, `wb` and `fees` are. `w` alone is on the full asset universe.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -38,16 +40,18 @@ $(DocStringExtensions.FIELDS)
         idx::MatNum,
         retcode::OptRetCode_VecOptRetCode,
         w::VecNum_VecVecNum,
-        fb::Option{<:OptE_Opt}
+        imsk::Option{<:BitVector} = nothing,
+        fb::Option{<:OptE_Opt_FbChain}
     ) -> SubsetResamplingResult
 
-Keywords correspond to the struct's fields.
+Keywords correspond to the struct's fields. The keyword constructor expands `w` onto the full asset universe through [`expand_investable_weights`](@ref), which is the one door [`_optimise`](@ref) exits through. The positional constructor never expands, so [`set_retcode`](@ref) and [`factory`](@ref) rebuild without a second pass.
 
 # Related
 
   - [`SubsetResampling`](@ref)
   - [`NonFiniteAllocationOptimisationResult`](@ref)
   - [`subset_resampling_finaliser`](@ref)
+  - [`expand_investable_weights`](@ref)
 
 # References
 
@@ -71,7 +75,7 @@ Keywords correspond to the struct's fields.
     """
     ress
     """
-    Asset indices of each subset, one **column** per subset, so `size(idx) == (subset_size, n_subsets)`.
+    Asset indices of each subset, one **column** per subset, so `size(idx) == (subset_size, n_subsets)`. They index the reduced universe when `imsk` is not `nothing`.
     """
     idx
     """
@@ -83,35 +87,75 @@ Keywords correspond to the struct's fields.
     """
     w
     """
-    $(field_dict[:fb])
+    $(field_dict[:imsk])
+    """
+    imsk
+    """
+    $(field_dict[:fb_res])
     """
     fb
     function SubsetResamplingResult(pr::Option{<:AbstractPriorResult},
                                     wb::Option{<:WeightBounds}, fees::Option{<:Fees},
                                     ress::AbstractVector{<:NonFiniteAllocationOptimisationResult},
                                     idx::MatNum, retcode::OptRetCode_VecOptRetCode,
-                                    w::VecNum_VecVecNum, fb::Option{<:OptE_Opt})
+                                    w::VecNum_VecVecNum, imsk::Option{<:BitVector},
+                                    fb::Option{<:OptE_Opt_FbChain})
         return new{typeof(pr), typeof(wb), typeof(fees), typeof(ress), typeof(idx),
-                   typeof(retcode), typeof(w), typeof(fb)}(pr, wb, fees, ress, idx, retcode,
-                                                           w, fb)
+                   typeof(retcode), typeof(w), typeof(imsk), typeof(fb)}(pr, wb, fees, ress,
+                                                                         idx, retcode, w,
+                                                                         imsk, fb)
     end
 end
 function SubsetResamplingResult(; pr::Option{<:AbstractPriorResult},
                                 wb::Option{<:WeightBounds}, fees::Option{<:Fees},
                                 ress::AbstractVector{<:NonFiniteAllocationOptimisationResult},
                                 idx::MatNum, retcode::OptRetCode_VecOptRetCode,
-                                w::VecNum_VecVecNum,
-                                fb::Option{<:OptE_Opt})::SubsetResamplingResult
-    return SubsetResamplingResult(pr, wb, fees, ress, idx, retcode, w, fb)
+                                w::VecNum_VecVecNum, imsk::Option{<:BitVector} = nothing,
+                                fb::Option{<:OptE_Opt_FbChain})::SubsetResamplingResult
+    return SubsetResamplingResult(pr, wb, fees, ress, idx, retcode,
+                                  expand_investable_weights(imsk, w), imsk, fb)
+end
+# The subset-resampling family carries the mask on the result itself, so the fold reads it
+# directly.
+function result_investable_mask(res::SubsetResamplingResult)
+    return res.imsk
+end
+"""
+    set_retcode(res::SubsetResamplingResult, retcode::OptRetCode_VecOptRetCode)
+
+Rebuild a [`SubsetResamplingResult`](@ref) with a different return code.
+
+The result carries one return code per member of the population, so a member is dropped by failing its own entry. Every other member of the record is carried over unchanged.
+
+# Arguments
+
+  - `res`: Result to rebuild.
+  - `retcode`: Return code, or one per member of the population.
+
+# Returns
+
+  - [`SubsetResamplingResult`](@ref): The result, with the new return code.
+
+# Related
+
+  - [`set_retcode`](@ref)
+  - [`mark_ruined_members`](@ref)
+  - [`SubsetResamplingResult`](@ref)
+"""
+function set_retcode(res::SubsetResamplingResult, retcode::OptRetCode_VecOptRetCode)
+    return SubsetResamplingResult(res.pr, res.wb, res.fees, res.ress, res.idx, retcode,
+                                  res.w, res.imsk, res.fb)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Rebuild a [`SubsetResamplingResult`](@ref) with an updated fallback optimiser `fb`.
 """
-function factory(sr::SubsetResamplingResult, fb::Option{<:OptE_Opt})
-    return SubsetResamplingResult(; pr = sr.pr, wb = sr.wb, fees = sr.fees, ress = sr.ress,
-                                  idx = sr.idx, retcode = sr.retcode, w = sr.w, fb = fb)
+function factory(sr::SubsetResamplingResult, fb::Option{<:OptE_Opt_FbChain})
+    # The positional constructor, because `sr.w` is already on the full asset universe: the
+    # keyword one expands, and a second pass over an expanded vector is a length error.
+    return SubsetResamplingResult(sr.pr, sr.wb, sr.fees, sr.ress, sr.idx, sr.retcode, sr.w,
+                                  sr.imsk, fb)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -127,7 +171,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     SubsetResampling(;
-        pe::TD{<:PrE_Pr} = EmpiricalPrior(),
+        pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(),
         wb::TD_Option{<:WbE_Wb} = nothing,
         fees::TD_Option{<:FeesE_Fees} = nothing,
         sets::TD_Option{<:UniverseSets} = nothing,
@@ -141,7 +185,8 @@ $(DocStringExtensions.FIELDS)
         seed::Option{<:Integer} = nothing,
         fb::TDO_Option{<:OptE_Opt} = nothing,
         brt::Bool = false,
-        strict::Bool = false
+        strict::Bool = false,
+        cache::Option{<:ReturnsBufferState} = nothing
     ) -> SubsetResampling
 
 Keywords correspond to the struct's fields.
@@ -283,14 +328,19 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
     $(field_dict[:strict_opt])
     """
     strict
-    function SubsetResampling(pe::TD{<:PrE_Pr}, wb::TD_Option{<:WbE_Wb},
+    """
+    $(field_dict[:cache_opt])
+    """
+    @fprop cache
+    function SubsetResampling(pe::Onl{<:TD{<:PrE_Pr}}, wb::TD_Option{<:WbE_Wb},
                               fees::TD_Option{<:FeesE_Fees},
                               sets::TD_Option{<:UniverseSets}, opt::OptE_TD,
                               wf::TD{<:WeightFinaliser}, ex::FLoops.Transducers.Executor,
                               subset_size::TD{<:SubsetSizeE},
                               n_subsets::TD{<:NumberSubsetsE}, max_comb::Integer,
                               rng::Random.AbstractRNG, seed::Option{<:Integer},
-                              fb::TDO_Option{<:OptE_Opt}, brt::Bool, strict::Bool)
+                              fb::TDO_Option{<:OptE_Opt}, brt::Bool, strict::Bool,
+                              cache::Option{<:ReturnsBufferState})
         assert_no_nearest_bind_optimiser_schedule(opt, :opt, :SubsetResampling)
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :SubsetResampling)
         assert_internal_optimiser(opt)
@@ -316,11 +366,12 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
         return new{typeof(pe), typeof(wb), typeof(fees), typeof(sets), typeof(opt),
                    typeof(wf), typeof(ex), typeof(subset_size), typeof(n_subsets),
                    typeof(max_comb), typeof(rng), typeof(seed), typeof(fb), typeof(brt),
-                   typeof(strict)}(pe, wb, fees, sets, opt, wf, ex, subset_size, n_subsets,
-                                   max_comb, rng, seed, fb, brt, strict)
+                   typeof(strict), typeof(cache)}(pe, wb, fees, sets, opt, wf, ex,
+                                                  subset_size, n_subsets, max_comb, rng,
+                                                  seed, fb, brt, strict, cache)
     end
 end
-function SubsetResampling(; pe::TD{<:PrE_Pr} = EmpiricalPrior(),
+function SubsetResampling(; pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(),
                           wb::TD_Option{<:WbE_Wb} = nothing,
                           fees::TD_Option{<:FeesE_Fees} = nothing,
                           sets::TD_Option{<:UniverseSets} = nothing, opt::OptE_TD,
@@ -332,9 +383,10 @@ function SubsetResampling(; pe::TD{<:PrE_Pr} = EmpiricalPrior(),
                           rng::Random.AbstractRNG = Random.default_rng(),
                           seed::Option{<:Integer} = nothing,
                           fb::TDO_Option{<:OptE_Opt} = nothing, brt::Bool = false,
-                          strict::Bool = false)::SubsetResampling
+                          strict::Bool = false,
+                          cache::Option{<:ReturnsBufferState} = nothing)::SubsetResampling
     return SubsetResampling(pe, wb, fees, sets, opt, wf, ex, subset_size, n_subsets,
-                            max_comb, rng, seed, fb, brt, strict)
+                            max_comb, rng, seed, fb, brt, strict, cache)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -429,13 +481,17 @@ function port_opt_view(sr::SubsetResampling, i, X::MatNum, args...)::SubsetResam
     X = isa(sr.pe, AbstractPriorResult) ? sr.pe.X : X
     pe = port_opt_view(sr.pe, i)
     wb = port_opt_view(sr.wb, i)
-    fees = port_opt_view(sr.fees, i)
+    fees = port_opt_view(sr.fees, i, X)
     sets = port_opt_view(sr.sets, i)
     opt = port_opt_view(sr.opt, i, X)
     return SubsetResampling(; pe = pe, wb = wb, fees = fees, sets = sets, opt = opt,
                             wf = sr.wf, ex = sr.ex, subset_size = sr.subset_size,
                             n_subsets = sr.n_subsets, max_comb = sr.max_comb, rng = sr.rng,
-                            seed = sr.seed, fb = sr.fb, brt = sr.brt, strict = sr.strict)
+                            seed = sr.seed, fb = sr.fb, brt = sr.brt, strict = sr.strict,
+                            cache = port_opt_view(sr.cache, i))
+end
+function non_investable_universe(sr::SubsetResampling, ni::VecStr)::SubsetResampling
+    return rebuild_estimator(sr, (; sets = non_investable_sets(sr.sets, ni)))
 end
 """
     subset_resampling_retcode(ress::VecOpt, retcode::OptimisationReturnCode)
@@ -535,6 +591,20 @@ function _optimise(sr::SubsetResampling, rd::ReturnsResult; dims::Int = 1,
     sr = reset_time_dependent_estimator(sr)
     rd = returns_result_picker(rd, sr.brt)
     pr = prior(sr.pe, rd; dims = dims)
+    # Resolve the fee on the caller's own universe, before the door below narrows `sets`.
+    # A name stated over that universe must not be refused because the data delisted the
+    # asset, and a carrier keyed by name cannot resolve at all once its `w` sits on the
+    # complement while `sets` sits on the mask. `investable_fees_view` then places the
+    # resolved fee on the axes the mask leaves.
+    imsk = investable_mask(pr)
+    fees = investable_fees_view(fees_constraints(sr.fees, sr.sets; datatype = eltype(pr.X),
+                                                 strict = sr.strict), imsk, pr.X)
+    # The prior fits on the coverage universe and returns a result on the full asset
+    # universe, where an asset it could not estimate carries `NaN`. Reduce once, here,
+    # before the sample: `N` is then the count of investable assets, so every subset is
+    # drawn from the investable universe alone and no subset can hold a dead asset.
+    # `SubsetResamplingResult` expands the averaged weights back.
+    _, pr, sr, rd = investable_reduction(imsk, pr, sr, rd)
     X = pr.X
     N = size(X, 2)
     (; subset_size, n_subsets, max_comb, rng, seed) = sr
@@ -545,7 +615,6 @@ function _optimise(sr::SubsetResampling, rd::ReturnsResult; dims::Int = 1,
               "n_subsets = $n_subsets must not be greater than `binomial(assets, subset_size) = n_comb => binomial($N, $subset_size) = $n_comb`.")
     asset_idx = sample_unique_assets(N, subset_size, n_subsets; max_comb = max_comb,
                                      rng = rng, seed = seed)
-    fees = fees_constraints(sr.fees, sr.sets; datatype = eltype(X), strict = sr.strict)
     opt = sr.opt
     ress = Vector{NonFiniteAllocationOptimisationResult}(undef, n_subsets)
     FLoops.@floop sr.ex for i in 1:n_subsets
@@ -560,7 +629,8 @@ function _optimise(sr::SubsetResampling, rd::ReturnsResult; dims::Int = 1,
     retcode, w = subset_resampling_finaliser(N, n_subsets, asset_idx, wb, sr.wf, ress,
                                              ress[1].w)
     return SubsetResamplingResult(; pr = pr, wb = wb, fees = fees, ress = ress,
-                                  idx = asset_idx, retcode = retcode, w = w, fb = nothing)
+                                  idx = asset_idx, retcode = retcode, w = w, imsk = imsk,
+                                  fb = nothing)
 end
 """
     optimise(sr::SubsetResampling{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
@@ -581,6 +651,10 @@ Run the Subset Resampling portfolio optimisation.
   - `save`: Passed to the internal optimiser. Whether to save the JuMP model in the optimisation result.
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
 
+# Validation
+
+  - No field in the tree of `sr` holds an [`Online`](@ref). An `ArgumentError` naming the field is thrown otherwise, through [`assert_batch_entry`](@ref): a plain `optimise` is a batch fit, and a wrapper resolves only at the warm-up of the fold loop's online arm.
+
 # Returns
 
   - `res::SubsetResamplingResult`: The averaged portfolio. `retcode` is an [`OptimisationFailure`](@ref) when any subset failed, or when the weight finalisation did.
@@ -593,9 +667,9 @@ Run the Subset Resampling portfolio optimisation.
 """
 function optimise(sr::SubsetResampling{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
-                  rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
-                  branchorder::Symbol = :optimal, str_names::Bool = false,
-                  save::Bool = true, kwargs...)
+                  rd::ReturnsResult; dims::Int = 1, branchorder::Symbol = :optimal,
+                  str_names::Bool = false, save::Bool = true, kwargs...)
+    assert_batch_entry(sr, "`optimise`")
     return _optimise(sr, rd; dims = dims, branchorder = branchorder, str_names = str_names,
                      save = save, kwargs...)
 end

@@ -19,10 +19,14 @@ Augmented prior moments (stacking asset and factor priors):
 
 ```math
 \\begin{align}
-\\boldsymbol{\\mu}_{aug} &= \\begin{pmatrix}\\boldsymbol{\\mu}_a \\\\ \\boldsymbol{\\mu}_f\\end{pmatrix}\\,, \\\\
+\\boldsymbol{\\mu}_{aug} &= \\begin{pmatrix}\\boldsymbol{\\mu}_a \\\\ \\boldsymbol{\\mu}_f\\end{pmatrix}
+\\quad\\text{or}\\quad
+\\lambda\\begin{pmatrix}\\boldsymbol{\\Sigma}_a \\\\ \\boldsymbol{\\Sigma}_f\\mathbf{M}^{\\intercal}\\end{pmatrix}\\boldsymbol{w} + \\begin{pmatrix}\\boldsymbol{b} \\\\ \\mathbf{0}\\end{pmatrix} + r_{f}\\,, \\\\
 \\boldsymbol{\\Sigma}_{aug} &= \\begin{pmatrix}\\boldsymbol{\\Sigma}_a & \\mathbf{M}\\boldsymbol{\\Sigma}_f \\\\ \\boldsymbol{\\Sigma}_f\\mathbf{M}^{\\intercal} & \\boldsymbol{\\Sigma}_f\\end{pmatrix}\\,.
 \\end{align}
 ```
+
+The left prior mean is the stacked pair of wrapped means, and it is what `pe.l === nothing` uses. The right one is the equilibrium alternative `pe.l` selects, and it carries two corrections the wrapped pair does not need: the asset-side intercept ``\\boldsymbol{b}``, and the risk-free rate. Both are levels the wrapped means already contain, and both must be in ``\\boldsymbol{\\mu}_{aug}`` rather than added afterwards, because the update blends this mean against ``\\boldsymbol{q}_{aug}`` by forming the residual ``\\boldsymbol{q}_{aug} - \\mathbf{P}_{aug}\\boldsymbol{\\mu}_{aug}``.
 
 The off-diagonal blocks are the cross-covariance the factor model implies, ``\\mathrm{cov}(\\mathbf{X}, \\mathbf{F}) = \\mathbf{M}\\boldsymbol{\\Sigma}_f``. They are built from the **factor** covariance and not from the asset one, so they carry factor variance alone while the leading block carries factor *and* residual variance. That asymmetry is what opens the gap described in the second warning below.
 
@@ -45,11 +49,11 @@ Black-Litterman posterior on the augmented space, by the ordinary master equatio
 \\end{align}
 ```
 
-The two halves are then read off by truncation, and the asset half alone gains the intercept and the risk-free rate:
+The two halves are then read off by truncation, and nothing else. The intercept and the risk-free rate are in ``\\boldsymbol{\\mu}_{aug}`` above, where the views are blended against them:
 
 ```math
 \\begin{align}
-\\hat{\\boldsymbol{\\mu}} &= \\left(\\boldsymbol{\\mu}_{post}\\right)_{1:N} + \\boldsymbol{b} + r_{f}\\,, \\quad
+\\hat{\\boldsymbol{\\mu}} &= \\left(\\boldsymbol{\\mu}_{post}\\right)_{1:N}\\,, \\quad
 \\hat{\\mathbf{\\Sigma}} = \\left(\\boldsymbol{\\Sigma}_{post}\\right)_{1:N,\\,1:N}\\,, \\\\
 \\hat{\\boldsymbol{\\mu}}_f &= \\left(\\boldsymbol{\\mu}_{post}\\right)_{N+1:N+K}\\,, \\quad
 \\hat{\\mathbf{\\Sigma}}_f = \\left(\\boldsymbol{\\Sigma}_{post}\\right)_{N+1:N+K,\\,N+1:N+K}\\,.
@@ -58,18 +62,25 @@ The two halves are then read off by truncation, and the asset half alone gains t
 
 Where:
 
+  - ``T``, ``N``, ``K``: The number of observations, of assets, and of factors.
   - ``\\mathbf{X}``: ``T \\times N`` asset returns matrix.
   - ``\\mathbf{F}``: ``T \\times K`` factor returns matrix.
   - ``\\mathbf{M}``: ``N \\times K`` factor loadings (regression coefficients), `pr.rr.M`.
   - ``\\boldsymbol{b}``: ``N \\times 1`` regression intercept vector, `pr.rr.b`.
-  - ``\\boldsymbol{\\mu}_a``, ``\\boldsymbol{\\Sigma}_a``: Asset prior mean and covariance, from `a_pe`.
-  - ``\\boldsymbol{\\mu}_f``, ``\\boldsymbol{\\Sigma}_f``: Factor prior mean and covariance, from `f_pe`.
-  - ``\\boldsymbol{\\mu}_{aug}``, ``\\boldsymbol{\\Sigma}_{aug}``: Augmented (joint asset-factor) prior moments.
-  - ``\\boldsymbol{\\mu}_{post}``, ``\\boldsymbol{\\Sigma}_{post}``: Augmented posterior moments.
-  - ``\\tau``: Scaling parameter for the prior uncertainty.
+  - ``\\boldsymbol{\\mu}_a``, ``\\boldsymbol{\\Sigma}_a``: ``N \\times 1`` and ``N \\times N`` asset prior mean and covariance, from `a_pe`.
+  - ``\\boldsymbol{\\mu}_f``, ``\\boldsymbol{\\Sigma}_f``: ``K \\times 1`` and ``K \\times K`` factor prior mean and covariance, from `f_pe`.
+  - ``\\boldsymbol{\\mu}_{aug}``, ``\\boldsymbol{\\Sigma}_{aug}``: Augmented (joint asset-factor) prior moments, of length and order ``N + K``.
+  - ``\\boldsymbol{\\mu}_{post}``, ``\\boldsymbol{\\Sigma}_{post}``: Augmented posterior moments, of the same shape.
+  - ``\\tau``: Scaling parameter for the prior uncertainty, `1/T` by default.
   - ``\\mathbf{P}``, ``\\boldsymbol{q}``, ``\\boldsymbol{\\Omega}``: Asset views matrix, returns vector and uncertainty matrix, over the asset axis.
   - ``\\mathbf{P}_f``, ``\\boldsymbol{q}_f``, ``\\boldsymbol{\\Omega}_f``: The same three over the factor axis.
-  - ``r_{f}``: Risk-free rate, added once by [`apply_rf`](@ref).
+  - ``\\mathbf{P}_{aug}``, ``\\boldsymbol{q}_{aug}``, ``\\boldsymbol{\\Omega}_{aug}``: The same three stacked over the augmented axis, the asset rows above the factor rows.
+  - ``\\hat{\\boldsymbol{\\mu}}``, ``\\hat{\\mathbf{\\Sigma}}``: ``N \\times 1`` and ``N \\times N`` posterior asset moments, `pr.mu` and `pr.sigma`.
+  - ``\\hat{\\boldsymbol{\\mu}}_f``, ``\\hat{\\mathbf{\\Sigma}}_f``: ``K \\times 1`` and ``K \\times K`` posterior factor moments, `pr.fpr.mu` and `pr.fpr.sigma`.
+  - ``\\lambda``, ``\\boldsymbol{w}``: The risk-aversion coefficient `pe.l` and the equilibrium weights `pe.w`, read by [`equilibrium_mu`](@ref) and only where `pe.l` is set.
+  - ``r_{f}``: Risk-free rate, added once by [`apply_rf`](@ref) to the equilibrium mean. It is absent where `pe.l` is `nothing`, because the wrapped means are total returns already.
+
+Every block above is measured on a ``250 \\times 5`` sample over three factors with two asset views and two factor views. The off-diagonal blocks of ``\\boldsymbol{\\Sigma}_{aug}`` are ``\\mathbf{M}\\boldsymbol{\\Sigma}_f`` and its transpose to `0.0`, and that product is the empirical ``\\mathrm{cov}(\\mathbf{X}, \\mathbf{F})`` to `7.6e-19` against a scale of `5.3e-4`. The block-diagonal stack and the truncation agree with a hand computation to `0.0` on ``\\hat{\\boldsymbol{\\mu}}``, ``\\hat{\\boldsymbol{\\mu}}_f`` and ``\\hat{\\mathbf{\\Sigma}}_f``.
 
 # Fields
 
@@ -81,7 +92,7 @@ $(DocStringExtensions.FIELDS)
         a_pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
         f_pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
         mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
-        re::AbstractRegressionEstimator = StepwiseRegression(),
+        re::AbstractTimeSeriesRegressionEstimator = StepwiseRegression(),
         a_views::Lc_BLV,
         f_views::Lc_BLV,
         sets::Option{<:UniverseSets} = nothing,
@@ -90,7 +101,8 @@ $(DocStringExtensions.FIELDS)
         w::Option{<:VecNum} = nothing,
         rf::Number = 0.0,
         l::Option{<:Number} = nothing,
-        tau::Option{<:Number} = nothing
+        tau::Option{<:Number} = nothing,
+        cache::Option{<:AbstractPartialFitState} = nothing
     ) -> AugmentedBlackLittermanPrior
 
 Keywords correspond to the struct's fields.
@@ -105,23 +117,27 @@ This estimator **merges two** priors rather than forwarding one along its own ax
 
 !!! warning
 
-    The returned `mu` and `sigma` are the augmented posterior, but `w` is the **asset prior's** observation weighting, forwarded unchanged (and `fpr.w` is the factor prior's). Black-Litterman produces no observation-level posterior, so there is no Black-Litterman-consistent alternative to forward — and dropping `w` would substitute the unweighted empirical distribution, which is further from the caller's intent than the weights they computed. A caller reading `pr.w`, `pr.ens`, `pr.kld` or `pr.ow` is therefore reading a property of the asset prior, not of the posterior.
+    The returned `mu` and `sigma` are the augmented posterior, but `w` is the **asset prior's** observation weighting, forwarded unchanged (and `fpr.w` is the factor prior's). Black-Litterman produces no observation-level posterior, so there is no Black-Litterman-consistent alternative to forward — and dropping `w` would substitute the unweighted empirical distribution, which is further from the caller's intent than the weights they computed. A caller reading `pr.w`, `pr.ens`, `pr.kld` or `pr.ow` is therefore reading a property of the asset prior, not of the posterior. Measured: `pr.w`, `pr.ens`, `pr.kld` and `pr.ow` are the identical objects the asset prior carried, and `pr.fpr.w` the identical object the factor prior carried.
 
 !!! warning
 
-    `pr.mu != pr.rr.M * pr.fpr.mu + pr.rr.b`, even though **both** blocks are posterior. The gap is opened by the update, and its cause is **idiosyncratic variance**. (Give `a_pe` and `f_pe` the same observation weighting and the two *priors* do satisfy the identity to machine precision, because least squares with an intercept reproduces the mean. Weighting them differently — two independently pooled priors, say — breaks it before the update as well, so that case carries both causes at once.)
+    `pr.mu != pr.rr.M * pr.fpr.mu + pr.rr.b`, even though **both** blocks are posterior. Two independent causes open the gap, and both are properties of the update. The intercept is **not** one of them: it enters the prior stack, and the update is affine in that stack, so it reaches both sides of the identity together.
 
-    The augmented covariance stacks the full asset covariance `sigma_a` — factor *and* residual variance — against a cross-covariance `M * sigma_f` that is pure factor. The Black-Litterman update therefore moves the asset half by `tau * sigma_a * P'(…)` and the factor half by `tau * sigma_f * M' * P'(…)`, and for the two to stay related by `M` it would need `sigma_a == M * sigma_f * M'`. That holds only when the factor model is exact. The gap scales with the residual variance and closes to machine precision when there is none; both view sets contribute, so muting either one does not remove it.
+    **Idiosyncratic variance, on every branch.** The augmented covariance stacks the full asset covariance `sigma_a` — factor *and* residual variance — against a cross-covariance `M * sigma_f` that is pure factor. The update therefore moves the asset half by `tau * sigma_a * P'(…)` and the factor half by `tau * sigma_f * M' * P'(…)`, and for the two to stay related by `M` it would need `sigma_a == M * sigma_f * M'`. That holds only when the factor model is exact. This part scales with the residual variance, and both view sets contribute to it.
 
-    Measured on a `250 × 5` sample over three factors: the gap is `3.6e-4` on returns built with a residual, and `1.4e-15` on returns built as an exact factor model with the same loadings, views and seed.
+    **A non-zero `rf`, on the `l` branch alone.** [`apply_rf`](@ref) puts the rate on the whole equilibrium stack, so the asset half gains `rf` and the factor half gains `rf` too. The identity carries the factor half through the loadings, which turns that `rf` into `rf * s` for the row sums `s` of `M`, so the two sides agree only where an asset's loadings sum to one. The gap this opens is `rf * (1 - s)`, exactly. It is zero at the default `rf = 0.0`, and where `pe.l` is `nothing` the field is never read.
 
-    [`FactorBlackLittermanPrior`](@ref) and [`BayesianBlackLittermanPrior`](@ref) satisfy the identity exactly, because they update the factor distribution alone and *project* it onto the assets rather than updating an asset block alongside it. [`BlackLittermanPrior`](@ref) breaks it for the opposite reason — it takes asset views only and never computes a posterior factor distribution at all.
+    Measured on a `250 × 5` sample over three factors with two asset views and two factor views, at the default `rf = 0.0` unless stated. On returns built as an exact factor model whose intercept is `[0.001, -0.002, 0.0015, 0.0005, 0.0]` the gap is `1.8e-15` at `l = nothing` and `2.3e-15` at `l = 2.0`; on the same returns with a zero intercept it is `3.2e-15` and `3.7e-15`, so the intercept does not reach it. On returns built with a residual and a fitted intercept of `2.4e-4` it is `1.2e-4` and `1.4e-4`. At `l = 2.0` and `rf = 0.03` the exact returns give `1.8e-2`, which is `rf * (1 - s)` to `1e-13`.
+
+    The two *priors* satisfy the identity before the update only when both means are the plain sample mean, because least squares with an intercept zeroes the **unweighted** residual mean — measured at `1.7e-18`. One shared *non-uniform* weighting is not enough: the same weighting on both priors gives `1.1e-4`, because the weighted residual mean is not zero, and two different weightings give `1.3e-3`. On an exact factor model a shared non-uniform weighting does satisfy it, at `4.8e-18`, because there is no residual to weight.
+
+    [`FactorBlackLittermanPrior`](@ref) and [`BayesianBlackLittermanPrior`](@ref) satisfy the identity exactly, because they update the factor distribution alone and *project* it onto the assets rather than updating an asset block alongside it. [`BlackLittermanPrior`](@ref) breaks it for the opposite reason — it takes asset views only and never computes a posterior factor distribution at all, so `pr.fpr` is `nothing` and the right-hand side cannot be formed.
 
 ## One sets, two axes
 
-This is the only estimator whose views land on **both** distributions, and the two axes it needs are the two [`UniverseSets`](@ref) declares: `a_views` resolves against `sets.dict[sets.xkey]`, `f_views` against `sets.dict[sets.fkey]`. Before the axis was declared this took two separate sets objects, and the factor-flavoured one had to be exempted from [`port_opt_view`](@ref) **by hand** — a missing annotation was all that stood between a view and a factor universe sliced by asset indices. With one dual-axis object the exemption is a property of the data: the field is `@vprop`, the slice moves the asset entries and the factor entries come back untouched.
+This is the only estimator whose views land on **both** distributions, and the two axes it needs are the two [`UniverseSets`](@ref) declares: `a_views` resolves against `sets.dict[sets.xkey]`, `f_views` against `sets.dict[sets.tfkey]`. Before the axis was declared this took two separate sets objects, and the factor-flavoured one had to be exempted from [`port_opt_view`](@ref) **by hand** — a missing annotation was all that stood between a view and a factor universe sliced by asset indices. With one dual-axis object the exemption is a property of the data: the field is `@vprop`, the slice moves the asset entries and the factor entries come back untouched.
 
-Each axis is required only by the views that resolve names against it. A [`BlackLittermanViews`](@ref) result carries its own `P` and needs no universe at all, so asset-views-only and factor-views-only mandates are both expressible with a single `sets` — and a pair of precomputed view sets needs none.
+Each axis is required only by the views that resolve names against it. A [`BlackLittermanViews`](@ref) result carries its own `P` and needs no universe at all, so asset-views-only and factor-views-only mandates are both expressible with a single `sets` — and a pair of precomputed view sets needs none. Measured over four mandates on one fixture: named views on both axes, named asset views against precomputed factor views, precomputed asset views against named factor views, and a precomputed pair. All four run, and the precomputed pair with no `sets` reproduces the same pair supplied with `sets` to `0.0`. [`port_opt_view`](@ref) over the selection `[1, 3, 5]` of five assets leaves `sets.dict[sets.tfkey]` at its full three factors while `sets.dict[sets.xkey]` and `w` both fall to three entries.
 
 ## Validation
 
@@ -165,45 +181,49 @@ julia> AugmentedBlackLittermanPrior(;
                                                                                \"F2 == 0.02\"]))
 AugmentedBlackLittermanPrior
           a_pe ┼ EmpiricalPrior
-               │        ce ┼ PortfolioOptimisersCovariance
-               │           │   ce ┼ Covariance
-               │           │      │    me ┼ SimpleExpectedReturns
-               │           │      │       │   w ┴ nothing
-               │           │      │    ce ┼ GeneralCovariance
-               │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-               │           │      │       │    w ┴ nothing
-               │           │      │   alg ┴ FullMoment()
-               │           │   mp ┼ MatrixProcessing
-               │           │      │     pdm ┼ Posdef
-               │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-               │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-               │           │      │      dn ┼ nothing
-               │           │      │      dt ┼ nothing
-               │           │      │     alg ┼ nothing
-               │           │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-               │        me ┼ SimpleExpectedReturns
-               │           │   w ┴ nothing
-               │   horizon ┴ nothing
+               │           ce ┼ PortfolioOptimisersCovariance
+               │              │   ce ┼ Covariance
+               │              │      │    me ┼ SimpleExpectedReturns
+               │              │      │       │   w ┴ nothing
+               │              │      │    ce ┼ GeneralCovariance
+               │              │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+               │              │      │       │    w ┴ nothing
+               │              │      │   alg ┼ FullMoment()
+               │              │      │     w ┴ nothing
+               │              │   mp ┼ MatrixProcessing
+               │              │      │     pdm ┼ Posdef
+               │              │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+               │              │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+               │              │      │      dn ┼ nothing
+               │              │      │      dt ┼ nothing
+               │              │      │     alg ┼ nothing
+               │              │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+               │           me ┼ SimpleExpectedReturns
+               │              │   w ┴ nothing
+               │      horizon ┼ nothing
+               │   fill_limit ┴ nothing
           f_pe ┼ EmpiricalPrior
-               │        ce ┼ PortfolioOptimisersCovariance
-               │           │   ce ┼ Covariance
-               │           │      │    me ┼ SimpleExpectedReturns
-               │           │      │       │   w ┴ nothing
-               │           │      │    ce ┼ GeneralCovariance
-               │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-               │           │      │       │    w ┴ nothing
-               │           │      │   alg ┴ FullMoment()
-               │           │   mp ┼ MatrixProcessing
-               │           │      │     pdm ┼ Posdef
-               │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-               │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-               │           │      │      dn ┼ nothing
-               │           │      │      dt ┼ nothing
-               │           │      │     alg ┼ nothing
-               │           │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-               │        me ┼ SimpleExpectedReturns
-               │           │   w ┴ nothing
-               │   horizon ┴ nothing
+               │           ce ┼ PortfolioOptimisersCovariance
+               │              │   ce ┼ Covariance
+               │              │      │    me ┼ SimpleExpectedReturns
+               │              │      │       │   w ┴ nothing
+               │              │      │    ce ┼ GeneralCovariance
+               │              │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+               │              │      │       │    w ┴ nothing
+               │              │      │   alg ┼ FullMoment()
+               │              │      │     w ┴ nothing
+               │              │   mp ┼ MatrixProcessing
+               │              │      │     pdm ┼ Posdef
+               │              │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+               │              │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+               │              │      │      dn ┼ nothing
+               │              │      │      dt ┼ nothing
+               │              │      │     alg ┼ nothing
+               │              │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+               │           me ┼ SimpleExpectedReturns
+               │              │   w ┴ nothing
+               │      horizon ┼ nothing
+               │   fill_limit ┴ nothing
             mp ┼ MatrixProcessing
                │     pdm ┼ Posdef
                │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
@@ -225,12 +245,14 @@ AugmentedBlackLittermanPrior
                │   val ┼ Vector{String}: ["F1 == 0.01", "F2 == 0.02"]
                │   key ┴ nothing
           sets ┼ UniverseSets
-               │    xkey ┼ String: "nx"
-               │   uxkey ┼ String: "ux"
-               │    fkey ┼ String: "nf"
-               │   ufkey ┼ String: "uf"
-               │    zkey ┼ String: "nz"
-               │    dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"], "nf" => ["F1", "F2"])
+               │     xkey ┼ String: "nx"
+               │    uxkey ┼ String: "ux"
+               │    tfkey ┼ String: "nf"
+               │   utfkey ┼ String: "uf"
+               │    cfkey ┼ String: "ncf"
+               │   ucfkey ┼ String: "ucf"
+               │    nikey ┼ String: "ni"
+               │     dict ┴ Dict{String, Vector{String}}: Dict("nf" => ["F1", "F2"], "nx" => ["A", "B", "C"])
   a_views_conf ┼ nothing
   f_views_conf ┼ nothing
              w ┼ nothing
@@ -238,6 +260,12 @@ AugmentedBlackLittermanPrior
              l ┼ nothing
            tau ┴ nothing
 ```
+
+## The incremental fit
+
+This prior has no exact incremental recursion, so it takes the online step by **refitting from a sample buffer**: [`Online`](@ref) seeds `cache`, [`partial_fit!`](@ref) appends each observation to it verbatim, and the one-argument [`prior`](@ref) runs this estimator's own batch verb over the rows the buffer kept. The answer is therefore exactly a batch fit over those rows, and a `max_history` on the wrapper windows the whole fit. ADR 0136 records the decision.
+
+`cache` travels the three propagation channels as every partial-fit state does: [`factory`](@ref) carries it unchanged, [`port_opt_view`](@ref) slices it to the selected assets, and [`obs_weights_view`](@ref) drops it, because no slice of a state exists on the observation axis. It is not rendered, because a running buffer is not the configuration a reader looks the type up for.
 
 # Related
 
@@ -309,15 +337,21 @@ AugmentedBlackLittermanPrior
     $(field_dict[:tau])
     """
     tau
+    """
+    $(field_dict[:pfcache])
+    """
+    @fprop @vprop cache
     function AugmentedBlackLittermanPrior(a_pe::AbstractLowOrderPriorEstimator_A_AF,
                                           f_pe::AbstractLowOrderPriorEstimator_A_AF,
                                           mp::AbstractMatrixProcessingEstimator,
-                                          re::AbstractRegressionEstimator, a_views::Lc_BLV,
-                                          f_views::Lc_BLV, sets::Option{<:UniverseSets},
+                                          re::AbstractTimeSeriesRegressionEstimator,
+                                          a_views::Lc_BLV, f_views::Lc_BLV,
+                                          sets::Option{<:UniverseSets},
                                           a_views_conf::Option{<:Num_VecNum},
                                           f_views_conf::Option{<:Num_VecNum},
                                           w::Option{<:VecNum}, rf::Number,
-                                          l::Option{<:Number}, tau::Option{<:Number})
+                                          l::Option{<:Number}, tau::Option{<:Number},
+                                          cache::Option{<:AbstractPartialFitState})
         if !isnothing(w)
             @argcheck(!isempty(w), IsEmptyError("w cannot be empty"))
         end
@@ -328,35 +362,51 @@ AugmentedBlackLittermanPrior
         assert_bl(f_views, sets, f_views_conf, tau)
         return new{typeof(a_pe), typeof(f_pe), typeof(mp), typeof(re), typeof(a_views),
                    typeof(f_views), typeof(sets), typeof(a_views_conf),
-                   typeof(f_views_conf), typeof(w), typeof(rf), typeof(l), typeof(tau)}(a_pe,
-                                                                                        f_pe,
-                                                                                        mp,
-                                                                                        re,
-                                                                                        a_views,
-                                                                                        f_views,
-                                                                                        sets,
-                                                                                        a_views_conf,
-                                                                                        f_views_conf,
-                                                                                        w,
-                                                                                        rf,
-                                                                                        l,
-                                                                                        tau)
+                   typeof(f_views_conf), typeof(w), typeof(rf), typeof(l), typeof(tau),
+                   typeof(cache)}(a_pe, f_pe, mp, re, a_views, f_views, sets, a_views_conf,
+                                  f_views_conf, w, rf, l, tau, cache)
     end
 end
 function AugmentedBlackLittermanPrior(;
                                       a_pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
                                       f_pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
                                       mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
-                                      re::AbstractRegressionEstimator = StepwiseRegression(),
+                                      re::AbstractTimeSeriesRegressionEstimator = StepwiseRegression(),
                                       a_views::Lc_BLV, f_views::Lc_BLV,
                                       sets::Option{<:UniverseSets} = nothing,
                                       a_views_conf::Option{<:Num_VecNum} = nothing,
                                       f_views_conf::Option{<:Num_VecNum} = nothing,
                                       w::Option{<:VecNum} = nothing, rf::Number = 0.0,
                                       l::Option{<:Number} = nothing,
-                                      tau::Option{<:Number} = nothing)::AugmentedBlackLittermanPrior
+                                      tau::Option{<:Number} = nothing,
+                                      cache::Option{<:AbstractPartialFitState} = nothing)::AugmentedBlackLittermanPrior
     return AugmentedBlackLittermanPrior(a_pe, f_pe, mp, re, a_views, f_views, sets,
-                                        a_views_conf, f_views_conf, w, rf, l, tau)
+                                        a_views_conf, f_views_conf, w, rf, l, tau, cache)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Renders every field of a [`AugmentedBlackLittermanPrior`](@ref) except `cache`.
+
+The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:AugmentedBlackLittermanPrior, true)` to render it. ADR 0105 records the decision.
+
+# Arguments
+
+  - `::AugmentedBlackLittermanPrior`: Prior estimator, read for its type alone.
+
+# Returns
+
+  - `fields::Tuple`: The field names to render, which is `(:a_pe, :f_pe, :mp, :re, :a_views, :f_views, :sets, :a_views_conf, :f_views_conf, :w, :rf, :l, :tau)`.
+
+# Related
+
+  - [`AugmentedBlackLittermanPrior`](@ref)
+  - [`show_fields`](@ref)
+  - [`set_show_nothing_fields!`](@ref)
+"""
+function show_fields(::AugmentedBlackLittermanPrior)
+    return (:a_pe, :f_pe, :mp, :re, :a_views, :f_views, :sets, :a_views_conf, :f_views_conf,
+            :w, :rf, :l, :tau)
 end
 # Expose `:me`, `:ce` from the asset prior `a_pe` and (renamed) `:f_me`, `:f_ce` from the
 # factor prior `f_pe` for transparent access (see [`@forward_properties`](@ref)).
@@ -366,18 +416,22 @@ end
     alias(f_ce, f_pe.ce)
 end
 """
-    prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 1,
+    prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum,
+          pnl::Option{<:AssetPanel} = nothing; dims::Int = 1,
           strict::Bool = false, kwargs...)
 
 Compute augmented Black-Litterman prior moments for asset returns.
 
 `prior` estimates the mean and covariance of asset returns using the augmented Black-Litterman model, combining asset and factor prior estimators, matrix post-processing, regression and variance estimators, asset and factor views over one dual-axis universe sets, view confidences, weights, risk-free rate, leverage, and a blending parameter `tau`. This method supports both direct and constraint-based views, flexible confidence specification, and matrix processing, and incorporates joint asset-factor Bayesian updating for posterior inference.
 
+When `pe.tau` is `nothing` the blending parameter is `1/T`, where `T` is the number of observations of the oriented `X`. The mean handed to the update is a **total** return, and both halves are reported on that scale. `pe.rf` reaches the update on the `pe.l` branch alone, where it converts the equilibrium risk premium, and it goes on the whole stack. Writing ``\\mathbf{G}`` for the augmented update gain and ``\\mathbf{1}`` for the vector of ones, the answer therefore moves against the same estimator at `rf = 0` by `rf * (I - G P_aug) * 1`, read on each half. On a `250 × 5` sample over three factors with two views on each axis the asset half moves by `[0.306, 0.500, 0.289, 0.169, 0.266]` per unit of `rf` and the factor half by `[0.390, 0.453, 0.991]`, both matching that closed form to `1e-16` and linear between `rf = 0.03` and `rf = 0.06`. Where `pe.l` is `nothing` the field is never read, and two fits differing only in `rf` agree to `0.0` on both halves.
+
 # Arguments
 
   - `pe`: Augmented Black-Litterman prior estimator.
   - `X`: Asset returns matrix (observations × assets).
   - `F`: Factor matrix (observations × factors).
+  - $(arg_dict[:pnl_prior]) It reaches `pe.a_pe`, the prior over the assets. `pe.f_pe` is fitted on the factors, whose axis no panel describes, so the panel does not reach it.
   - $(arg_dict[:dims])
   - `strict`: If `true`, enforce strict validation of views and sets. Default is `false`.
   - `kwargs...`: Additional keyword arguments passed to underlying estimators and matrix processing.
@@ -386,27 +440,33 @@ Compute augmented Black-Litterman prior moments for asset returns.
 
   - `dims in (1, 2)`.
   - If `pe.a_views` is a [`LinearConstraintEstimator`](@ref), `length(pe.sets.dict[pe.sets.xkey]) == size(X, 2)`.
-  - If `pe.f_views` is a [`LinearConstraintEstimator`](@ref), `haskey(pe.sets.dict, pe.sets.fkey)` and `length(pe.sets.dict[pe.sets.fkey]) == size(F, 2)`, both via [`factor_universe`](@ref).
+  - If `pe.f_views` is a [`LinearConstraintEstimator`](@ref), `haskey(pe.sets.dict, pe.sets.tfkey)` and `length(pe.sets.dict[pe.sets.tfkey]) == size(F, 2)`, both via [`factor_universe`](@ref).
 
 `pe.w` has no named check. When `pe.l` is set, a `pe.w` whose length is not `size(X, 2)` raises a bare `DimensionMismatch` from the multiplication inside [`equilibrium_mu`](@ref). When `pe.l` is `nothing`, `pe.w` is never read.
 
 # Returns
 
-  - `pr::LowOrderPrior`: Result object containing asset returns, posterior mean vector, posterior covariance matrix, regression result, and factor prior details.
+  - `pr::LowOrderPrior`: Result object carrying the reconstructed asset returns, the asset half of the augmented posterior as `mu` and `sigma`, the asset prior's observation weighting and diagnostics, its feature matrix, the regression result, and a factor block `fpr` holding the **factor half** of the same posterior. `chol` is `nothing` on both blocks.
 
-# Details
+# Algorithm
 
-  - If `dims == 2`, `X` and `F` are transposed to ensure assets/factors are in columns.
-  - Asset and factor priors are computed using the embedded prior estimators `pe.a_pe` and `pe.f_pe`.
-  - Factor regression is performed using the regression estimator `pe.re`.
-  - Asset and factor views are extracted using [`black_litterman_views`](@ref), which returns the view matrices and view returns vectors. The asset views resolve at `pe.sets.xkey` and the factor views **at `pe.sets.fkey`**, out of the one dual-axis sets.
-  - `tau` defaults to `1/T` if not specified, where `T` is the number of observations.
-  - View uncertainty matrices for assets and factors are computed using `calc_omega`.
-  - The augmented prior mean and covariance are constructed by combining asset and factor priors and regression loadings. The mean handed to the update is an **excess** return. If `pe.l` is specified it is the equilibrium mean [`equilibrium_mu`](@ref) computes, which is a risk premium already. Otherwise it is the stacked wrapped means less `pe.rf`, by [`remove_rf`](@ref).
-  - The augmented Black-Litterman posterior mean and covariance are computed using `vanilla_posteriors`.
-  - Matrix processing is applied to the augmented posterior covariance.
-  - The final asset posterior mean and covariance are extracted from the augmented results and adjusted for regression intercepts. `pe.rf` is added back to the asset mean once, by [`apply_rf`](@ref).
-  - The factor block is the **factor half** of the same augmented posterior, so both halves are posterior. It takes no intercept and no risk-free adjustment (the intercept is the regression's, hence asset-only) and no second matrix processing pass, since the augmented covariance was processed as a whole and a principal submatrix of it is already processed.
+ 1. Orient `X` and `F` with [`dims_oriented`](@ref), to `observations × assets` and `observations × factors`.
+ 2. When `pe.a_views` resolves names, check that the declared asset axis is as long as `X` is wide.
+ 3. When `pe.f_views` resolves names, check the declared factor axis against the width of `F` with [`factor_universe`](@ref). Each axis is checked only by the views that resolve names against it, so a pair of precomputed [`BlackLittermanViews`](@ref) needs no `sets` at all.
+ 4. Fit `pe.a_pe` on `X`, giving `a_prior`.
+ 5. Derive the Investable Mask and the reduced asset view universe with [`investable_views`](@ref), refuse a precomputed asset view matrix over a gapped universe with [`assert_bl_precomputed_universe`](@ref), and view `a_prior` at the mask with [`investable_prior`](@ref). `N` is the reduced asset count from here on.
+ 6. Fit `pe.f_pe` on `F`, giving `f_prior`.
+ 7. Regress the reduced `X` — [`reduce_columns`](@ref) at the mask — on `F` with [`factor_reconstruction`](@ref) under `pe.re`, giving `rr` and the reconstructed returns `posterior_X`, both on the reduced asset axis.
+ 8. Assemble the asset views with [`bl_preroll`](@ref) at the default `:xkey`, over the reduced asset prior covariance, and the factor views at `:tfkey`, over the factor prior covariance. Either half can be emptied, and [`bl_view_block`](@ref) then gives that half no row rather than collapsing the stack — the joint posterior is still conditioned by whatever the other half kept. Only the asset half can be emptied by a *departure*: a factor axis holds no asset name. When **both** halves empty there is nothing left to condition on, and step 12 takes the joint prior.
+ 9. Build ``\\boldsymbol{\\Sigma}_{aug}``, whose off-diagonal blocks are the model-implied cross-covariance ``\\mathbf{M}\\boldsymbol{\\Sigma}_f`` and its transpose.
+10. Stack ``\\mathbf{P}_{aug}`` block-diagonally, ``\\boldsymbol{q}_{aug}`` and ``\\boldsymbol{\\Omega}_{aug}`` to match, the asset rows above the factor rows.
+11. Put the stacked prior mean on the total-return scale the views are written on, giving `aug_prior_mu`. When `pe.l` is `nothing` this is the stacked wrapped means, which are on that scale already. When `pe.l` is set it is the equilibrium mean of [`equilibrium_mu`](@ref), a bare risk premium, over `pe.w` sliced to the reduced axis by [`investable_weights_view`](@ref), plus `pe.rf` by [`apply_rf`](@ref) and plus `rr.b` on the asset half.
+12. Run the master equations with [`vanilla_posteriors`](@ref) over the augmented space, giving the augmented posterior pair. When **neither** half stated a surviving view the stack has nothing to condition on, and [`bl_posteriors`](@ref) hands back the joint prior instead: an empty ``\\mathbf{P}_{aug}`` run through the master equations would add ``\\tau\\boldsymbol{\\Sigma}_{aug}`` and widen the joint covariance on the strength of views that are not there.
+13. Process the augmented posterior covariance in place with [`matrix_processing!`](@ref), under `pe.mp` and the two return matrices side by side.
+14. Truncate the asset half from `1:N`. Nothing is added to it: the intercept and the rate went into the prior mean at step 11, and the update is affine in that mean.
+15. Truncate the factor half from `N+1:N+K`, and forward the factor block with [`forward_prior`](@ref), dropping `chol`. The half takes no intercept, because the intercept is the regression's and hence asset-only, no rate, because the stack reached the update carrying the one it needed, and no second processing pass, because a principal submatrix of a processed matrix is already processed. It is not expanded: the reduction never touched the factor axis.
+16. Announce the departures once with [`announce_bl_departures`](@ref).
+17. Build the carrier directly, taking `w`, its diagnostics and `Z` from `a_prior`, and writing every asset-axis block back onto the full universe on the way: the moment pair with [`expand_moment`](@ref), the reconstruction with [`expand_columns`](@ref) and the regression with [`expand_regression`](@ref).
 
 # Related
 
@@ -416,11 +476,11 @@ Compute augmented Black-Litterman prior moments for asset returns.
   - [`calc_omega`](@ref)
   - [`vanilla_posteriors`](@ref)
   - [`apply_rf`](@ref)
-  - [`remove_rf`](@ref)
   - [`equilibrium_mu`](@ref)
 """
-function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 1,
-               strict::Bool = false, kwargs...)
+function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum,
+               pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, strict::Bool = false,
+               kwargs...)
     X, F = dims_oriented(dims, X, F)
     # Each axis is checked only by the views that resolve names against it. A
     # `BlackLittermanViews` result carries its own `P` and never touches `sets`, so demanding a
@@ -433,29 +493,55 @@ function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int
     if isa(pe.f_views, LinearConstraintEstimator)
         # The factor views land on the *factor* distribution, so they resolve against the
         # declared factor axis — not against `xkey`, which names the assets `a_views` uses.
-        factor_universe(pe.sets, size(F, 2),
+        factor_universe(pe.sets, pe.sets.tfkey, size(F, 2),
                         "AugmentedBlackLittermanPrior, whose `f_views` are written in factor names",
                         "F")
     end
     # Asset prior.
-    a_prior = prior(pe.a_pe, X; strict = strict, kwargs...)
-    a_prior_mu, a_prior_sigma = a_prior.mu, a_prior.sigma
+    a_prior = prior(pe.a_pe, X, nothing, pnl; strict = strict, kwargs...)
+    # The reduction, once, at this estimator's entry. The asset views are a dense linear form
+    # over the asset axis and `0 * NaN` is `NaN`, so a departed asset poisons `a_omega`, the
+    # whole stacked system, and both truncated posteriors — including under views naming only
+    # live assets. See [`investable_views`](@ref). The mask comes from the *asset prior*, not
+    # from `X`, because a column can be quoted throughout the window and still be
+    # unestimable, and it is the prior's verdict the next layer will re-derive.
+    imsk, vsets, ni = investable_views(a_prior, pe.sets)
+    assert_bl_precomputed_universe(pe.sets, a_prior)
+    vapr = investable_prior(imsk, a_prior)
+    a_prior_mu, a_prior_sigma = vapr.mu, vapr.sigma
     # Factor prior.
     f_prior = prior(pe.f_pe, F; strict = strict)
     f_prior_mu, f_prior_sigma = f_prior.mu, f_prior.sigma
     # Black litterman on the factors. Only the reconstruction is shared with `FactorPrior`:
-    # the asset moments here come out of the augmented system, not out of a lift.
-    rr, posterior_X = factor_reconstruction(pe.re, X, F)
+    # the asset moments here come out of the augmented system, not out of a lift. It runs on
+    # the reduced returns, so `M` and `b` land on the same axis as `a_prior_sigma`.
+    rr, posterior_X = factor_reconstruction(pe.re, reduce_columns(X, imsk), F)
     (; b, M) = rr
     dt = eltype(posterior_X)
     T = size(X, 1)
-    # One sets, two axes: the asset views take the default `:xkey`, the factor views `:fkey`.
-    (; P, Q, tau, omega) = bl_preroll(pe.a_views, pe.sets, pe.a_views_conf, a_prior_sigma,
-                                      pe.tau, T, dt, strict)
-    a_omega = omega
-    f_result = bl_preroll(pe.f_views, pe.sets, pe.f_views_conf, f_prior_sigma, pe.tau, T,
-                          dt, strict, :fkey)
-    f_P, f_Q, f_omega = f_result.P, f_result.Q, f_result.omega
+    N = size(a_prior_sigma, 1)
+    ledger = String[]
+    # One sets, two axes: the asset views take the default `:xkey`, the factor views `:tfkey`.
+    # Only the asset half can be emptied by a departure — a factor axis carries no asset
+    # name, so `counterpart_axis_names` answers empty for `:tfkey` — and when it is, the half
+    # contributes no row rather than collapsing the stack: the *joint* posterior is still
+    # conditioned by the factor views the departure never touched. See [`bl_view_block`](@ref).
+    a_result = bl_preroll(pe.a_views, vsets, pe.a_views_conf, a_prior_sigma, pe.tau, T, dt,
+                          strict; ledger = ledger)
+    P, Q, a_omega = bl_view_block(a_result, N, dt)
+    f_result = bl_preroll(pe.f_views, vsets, pe.f_views_conf, f_prior_sigma, pe.tau, T, dt,
+                          strict, :tfkey)
+    f_P, f_Q, f_omega = bl_view_block(f_result, size(f_prior_sigma, 1), dt)
+    # Neither half kept a row, which is the one case the stack has nothing to condition on.
+    # It is read twice below -- once by the master equations and once by the announcement --
+    # and stating it once keeps the two readings from drifting apart.
+    viewless = isnothing(a_result) && isnothing(f_result)
+    # Both halves resolve the same blending parameter from the same `pe.tau` and the same
+    # `T`, so reading it off either result gives the same number — but either result can now
+    # be `nothing`, and there is no half left to read it from when both are. `bl_preroll`
+    # states the rule and this restates it, which is the one place in the family it is
+    # written twice.
+    tau = isnothing(pe.tau) ? inv(T) : pe.tau
     aug_prior_sigma = hcat(vcat(a_prior_sigma, f_prior_sigma * transpose(M)),
                            vcat(M * f_prior_sigma, f_prior_sigma))
     aug_P = hcat(vcat(P, zeros(size(f_P, 1), size(P, 2))),
@@ -467,34 +553,58 @@ function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int
     # weights `pe.w`. The expression and its equal-weight fallback belong to
     # [`equilibrium_mu`](@ref).
     #
-    # Both branches must leave an *excess* return, because that is the scale the view returns
-    # in `aug_Q` are written on, and the scale [`apply_rf`](@ref) undoes at the end. The
-    # equilibrium mean is one already — it is the risk premium reverse optimisation implies.
-    # The two wrapped means are total returns, so [`remove_rf`](@ref) takes the rate off the
-    # stack first.
-    aug_prior_excess_mu = if !isnothing(pe.l)
-        equilibrium_mu(pe.l, vcat(a_prior_sigma, f_prior_sigma * transpose(M)), pe.w)
+    # Both branches must leave the stack on the scale this estimator *returns*: a total
+    # return, with the regression intercept in the asset half. That is the scale the view
+    # returns in `aug_Q` are written on, so it is the scale the view residual
+    # `aug_Q - aug_P * mu` must be formed on, and a level missing from the prior mean is a
+    # level the views are blended against wrongly (ADR 0063, amended).
+    #
+    # The two wrapped means are on it already. Least squares with an intercept zeroes the
+    # residual mean, so the mean of `X` *is* `M * f_prior_mu + b`: the asset half carries the
+    # intercept, and both halves are total returns.
+    #
+    # The equilibrium mean is not. It is a bare risk premium, so this branch adds the two
+    # levels it lacks: `pe.rf` through [`apply_rf`](@ref), and the asset-side intercept `b`.
+    # The factor half takes the rate and no intercept, because the intercept is the
+    # regression's and hence asset-only.
+    #
+    # `pe.w` is per-asset configuration written against the caller's full universe, so it is
+    # sliced to the axis the stack now sits on. Without that it meets a narrower stack and
+    # the product raises a bare `DimensionMismatch` that names no asset.
+    aug_prior_mu = if !isnothing(pe.l)
+        apply_rf(pe.rf,
+                 equilibrium_mu(pe.l, vcat(a_prior_sigma, f_prior_sigma * transpose(M)),
+                                investable_weights_view(imsk, pe.w))) .+
+        vcat(b, zeros(dt, size(F, 2)))
     else
-        remove_rf(pe.rf, vcat(a_prior_mu, f_prior_mu))
+        vcat(a_prior_mu, f_prior_mu)
     end
-    aug_posterior_mu, aug_posterior_sigma = vanilla_posteriors(tau, aug_prior_excess_mu,
-                                                               aug_prior_sigma, aug_omega,
-                                                               aug_P, aug_Q)
+    # An empty half contributes no row and the stack is still conditioned by the other one,
+    # which is why each half takes an empty block rather than collapsing to its prior. Both
+    # halves empty is the case that has nothing left: `aug_P` is then `0 × (N + K)`, and
+    # running the master equations over it would add the estimation-error term
+    # `tau * aug_prior_sigma` and widen the joint covariance on the strength of views that
+    # are not there. The joint posterior of a stack with no view is the joint prior.
+    aug_posterior_mu, aug_posterior_sigma = if viewless
+        bl_posteriors(nothing, aug_prior_mu, aug_prior_sigma)
+    else
+        vanilla_posteriors(tau, aug_prior_mu, aug_prior_sigma, aug_omega, aug_P, aug_Q)
+    end
     matrix_processing!(pe.mp, aug_posterior_sigma, hcat(posterior_X, F))
-    # `pe.rf` goes back on here and only here (see [`apply_rf`](@ref)): once, on the asset
-    # expected returns this estimator returns, and on the same rows [`remove_rf`](@ref) took
-    # it off. The two moves are therefore exact inverses on the asset half. The factor half
-    # below keeps the excess scale the augmented update ran on.
-    posterior_mu = apply_rf(pe.rf, aug_posterior_mu[1:size(X, 2)] + b)
-    posterior_sigma = aug_posterior_sigma[1:size(X, 2), 1:size(X, 2)]
+    # Nothing is added here. `aug_prior_mu` reached the update on the scale this estimator
+    # returns, and the update is affine in it, so the asset half comes off that scale with
+    # the intercept and the rate already in it. Truncation is the whole of the step.
+    posterior_mu = aug_posterior_mu[1:N]
+    posterior_sigma = aug_posterior_sigma[1:N, 1:N]
     # The augmented system is jointly posterior over `[assets; factors]`, so truncating it to
     # the asset half discards a factor half that *is* the posterior factor distribution. The
-    # factor block reports that half rather than `f_prior`'s prior moments. No `rf` shift back
-    # and no `b`: the intercept is the regression's, hence asset-only, and the update returns
-    # the factor half on the excess scale it ran on, which is where the rate belongs. No second
+    # factor block reports that half rather than `f_prior`'s prior moments. It is truncated and
+    # nothing else: no `b`, because the intercept is the regression's and hence asset-only, and
+    # no rate, because the stack reached the update on the total-return scale and comes off it
+    # on the same one. The factor half is therefore on the scale `f_prior` supplied. No second
     # `matrix_processing!` either — `aug_posterior_sigma` was processed as a whole above, and a
     # principal submatrix of the result is already processed.
-    f_idx = (size(X, 2) + 1):length(aug_posterior_mu)
+    f_idx = (N + 1):length(aug_posterior_mu)
     # `chol` is the factor block's only drop: the posterior covariance supersedes the one
     # `f_prior.chol` factorises. The views do not touch the observation axis, so `f_prior`'s own
     # `w` and its diagnostics forward untouched (ADR 0046).
@@ -515,10 +625,19 @@ function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int
     # `posterior_sigma` supersedes the covariance `a_prior.chol` factorises. This site merges
     # two priors rather than forwarding one along its own axis, so it builds the carrier
     # directly instead of going through [`forward_prior`](@ref).
-    return LowOrderPrior(; X = posterior_X, o_X = X, mu = posterior_mu,
-                         sigma = posterior_sigma, w = a_prior.w, ens = a_prior.ens,
-                         kld = a_prior.kld, ow = a_prior.ow, rr = rr, fpr = fpr,
-                         Z = a_prior.Z)
+    announce_bl_departures(ni, ledger, viewless)
+    # The expansion, onto the caller's own universe. The moment pair goes back through
+    # [`expand_moment`](@ref), the reconstruction through [`expand_columns`](@ref) and the
+    # regression through [`expand_regression`](@ref), so a prior result again lives on the
+    # FULL asset axis with a `NaN` in `mu` and on the diagonal of `sigma` for an asset that
+    # is not investable, and the next layer derives the same mask this one did. `o_X` is the
+    # caller's own `X` and was never reduced. There is no `chol` here to drop: the augmented
+    # system produces the asset moments whole and this carrier never held one.
+    return LowOrderPrior(; X = expand_columns(posterior_X, imsk), o_X = X,
+                         mu = expand_moment(posterior_mu, imsk, 1),
+                         sigma = expand_moment(posterior_sigma, imsk), w = a_prior.w,
+                         ens = a_prior.ens, kld = a_prior.kld, ow = a_prior.ow,
+                         rr = expand_regression(rr, imsk), fpr = fpr)
 end
 
 function factor_residual_config(::AugmentedBlackLittermanPrior)

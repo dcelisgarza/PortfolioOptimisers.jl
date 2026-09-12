@@ -1,7 +1,6 @@
 # Base Cross Validation
 
 ```@docs
-CrossValidationEstimator
 CrossValidationResult
 Base.split(res::CrossValidationResult, args...)
 CrossValidationAlgorithm
@@ -42,9 +41,24 @@ VecPredRes_MultiPredRes
 cv_sequential_info
 parallel_folds
 run_folds
+advance_previous_fold
 Fold
+folds_are_time_ordered
+fold_evaluation
+fold_fit
+investable_fold_view
+previous_weights
+threads_weights
+fold_solved
+held_weight_members
+held_start_weights
+collapse_benchmark(B::Nothing, w::VecNum_VecVecNum, hw)
+ruined_retcodes
+mark_ruined_members
+warn_ruined_members
 fold_loop
 assert_unshuffled_folds
 cv_nobs
+cv_live_assets
 cv_timestamps
 ```

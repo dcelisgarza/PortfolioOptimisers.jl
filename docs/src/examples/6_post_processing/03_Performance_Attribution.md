@@ -1,5 +1,4 @@
 The source files can be found in [examples/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../../examples/6_post_processing/03_Performance_Attribution.jl"
 ```
@@ -17,12 +16,12 @@ Where the [plotting and reporting](02_Plotting_and_Reporting.md) page is a visua
 is the *quantitative* companion: the raw functions that return the numbers and series behind the
 plots, so you can tabulate, compare, and attribute.
 
-- [`cumulative_returns`](@ref) — the equity curve, simple (sum) or compounded (product).
-- [`drawdowns`](@ref) — the peak-to-trough path, from which max drawdown, average drawdown,
+  - [`cumulative_returns`](@ref) — the equity curve, simple (sum) or compounded (product).
+  - [`drawdowns`](@ref) — the peak-to-trough path, from which max drawdown, average drawdown,
     and the Ulcer index follow.
-- [`calc_net_returns`](@ref) and [`calc_fees`](@ref) — realised returns and cost drag after
+  - [`calc_net_returns`](@ref) and [`calc_fees`](@ref) — realised returns and cost drag after
     fees, so you can attribute how much performance the trading costs consumed.
-- [`risk_contribution`](@ref) — where the portfolio's risk comes from, by asset.
+  - [`risk_contribution`](@ref) — where the portfolio's risk comes from, by asset.
 
 !!! tip "When to reach for this"
     Reach for these after you have chosen a portfolio, to understand and compare candidates on
@@ -76,9 +75,9 @@ port_ret = [name => rd.X * w for (name, w) in books]
 [`cumulative_returns`](@ref) turns a return series into a wealth path. Its `compound` flag picks
 the convention:
 
-- `compound = false` (the default) sums the returns: `cumsum(X)` — the *absolute* cumulative
+  - `compound = false` (the default) sums the returns: `cumsum(X)` — the *absolute* cumulative
     return, additive and easy to reason about for short horizons.
-- `compound = true` multiplies them: `cumprod(1 .+ X)` — the *relative* (geometric) wealth
+  - `compound = true` multiplies them: `cumprod(1 .+ X)` — the *relative* (geometric) wealth
     multiple, which is what an investor actually realises through reinvestment.
 
 The dedicated [`absolute_cumulative_returns`](@ref) and [`relative_cumulative_returns`](@ref)
@@ -138,20 +137,25 @@ pretty_table(DataFrame(scorecard);
 ## 5. Cost attribution: gross vs net returns
 
 A book that looks good gross can be mediocre net of trading costs. [`calc_net_returns`](@ref)
-applies a [`Fees`](@ref) schedule to the realised returns; [`calc_fees`](@ref) reports the cost
-of holding the weights for a *single* period.
+applies a [`Fees`](@ref) schedule to the realised returns; [`calc_fees`](@ref) reports that cost
+as a **pair**, the charge every observation carries beside the one-off charge the first observation
+carries alone, and [`calc_total_fees`](@ref) contracts the pair to the cost of a whole holding
+period.
 
-The important subtlety is the time base: `calc_net_returns(w, X, fees)` deducts the fee on
-**every row** of `X` — it models paying the rebalancing cost *each period*. So with 252 daily
-observations a per-period fee of `l` accumulates to roughly `252 · l` over the year before
-compounding. We therefore use a modest per-rebalance fee of 5 bps (`l = 0.0005`), which is about
-a 12–13% annualised cost, and compare gross and net compounded wealth.
+The important subtlety is the time base. `l`, `s` and `tn` are rates per period, so
+`calc_net_returns(w, X, fees)` deducts them on **every row** of `X`: it models paying the
+rebalancing cost *each period*. With 252 daily observations a per-period fee of `l` therefore
+accumulates to roughly `252 · l` over the year before compounding. `fl` and `fs` are different:
+they are currency amounts charged one time for the whole holding period, and `fees.fa` decides
+where on the series that one charge lands. We use a modest per-rebalance fee of 5 bps
+(`l = 0.0005`), which is about a 12–13% annualised cost, and compare gross and net compounded
+wealth.
 
 ````@example 03_Performance_Attribution
 fees = Fees(; l = 0.0005)
 gross_ret = rd.X * w_ratio
 net_ret = calc_net_returns(w_ratio, rd.X, fees)
-single_period_fee = calc_fees(w_ratio, fees)
+single_period_fee, _ = calc_fees(w_ratio, size(rd.X, 1), fees)
 
 pretty_table(DataFrame(;
                        quantity = ["Gross compounded wealth (×)",
@@ -161,7 +165,7 @@ pretty_table(DataFrame(;
                        value = [round(cumulative_returns(gross_ret, true)[end]; digits = 4),
                                 round(cumulative_returns(net_ret, true)[end]; digits = 4),
                                 round(single_period_fee; digits = 5),
-                                round(252 * single_period_fee; digits = 4)]);
+                                round(calc_total_fees(w_ratio, 252, fees); digits = 4)]);
              title = "Fee drag on the maximum-ratio book (5 bps per rebalance)")
 ````
 
@@ -207,11 +211,11 @@ current()
 After the optimiser runs, the post-processing toolkit answers "how did this book actually
 behave?" without any re-optimisation:
 
-- [`cumulative_returns`](@ref) (simple/compounded) is the equity curve;
+  - [`cumulative_returns`](@ref) (simple/compounded) is the equity curve;
     [`drawdowns`](@ref) gives the loss path and the max-drawdown / Ulcer statistics.
-- [`calc_net_returns`](@ref) and [`calc_fees`](@ref) attribute the cost drag, separating gross
+  - [`calc_net_returns`](@ref) and [`calc_fees`](@ref) attribute the cost drag, separating gross
     from net performance.
-- [`risk_contribution`](@ref) shows where the risk lives, which weight alone hides.
+  - [`risk_contribution`](@ref) shows where the risk lives, which weight alone hides.
 
 Every one of these takes a plain weight vector, so the same diagnostics report on optimiser
 output, a benchmark, or any externally-supplied portfolio.

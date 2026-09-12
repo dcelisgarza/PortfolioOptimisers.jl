@@ -101,16 +101,21 @@ $(DocStringExtensions.FIELDS)
         wb::Option{<:WeightBounds},
         fees::Option{<:Fees},
         retcode::OptimisationReturnCode,
-        w::Option{<:VecNum}
+        w::Option{<:VecNum},
+        imsk::Option{<:BitVector} = nothing
     ) -> HierarchicalResult
 
 Keywords correspond to the struct's fields.
+
+The keyword constructor is the one door a hierarchical `_optimise` exits through, so it is where the solved weights expand back onto the full asset universe, through [`expand_investable_weights`](@ref). The positional constructor never expands: every retcode rebuild goes through it, and a second pass would expand twice.
 
 # Related
 
   - [`BaseHierarchicalOptimisationResult`](@ref)
   - [`HierarchicalRiskParityResult`](@ref)
   - [`HierarchicalEqualRiskContributionResult`](@ref)
+  - [`investable_reduction`](@ref)
+  - [`expand_investable_weights`](@ref)
 """
 @concrete struct HierarchicalResult <: BaseHierarchicalOptimisationResult
     """
@@ -137,20 +142,66 @@ Keywords correspond to the struct's fields.
     $(field_dict[:pw])
     """
     w
+    """
+    $(field_dict[:imsk])
+    """
+    imsk
     function HierarchicalResult(pr::Option{<:AbstractPriorResult},
                                 clr::Option{<:AbstractClusteringResult},
                                 wb::Option{<:WeightBounds}, fees::Option{<:Fees},
-                                retcode::OptimisationReturnCode, w::Option{<:VecNum})
+                                retcode::OptimisationReturnCode, w::Option{<:VecNum},
+                                imsk::Option{<:BitVector})
         return new{typeof(pr), typeof(clr), typeof(wb), typeof(fees), typeof(retcode),
-                   typeof(w)}(pr, clr, wb, fees, retcode, w)
+                   typeof(w), typeof(imsk)}(pr, clr, wb, fees, retcode, w, imsk)
     end
 end
 function HierarchicalResult(; pr::Option{<:AbstractPriorResult},
                             clr::Option{<:AbstractClusteringResult},
                             wb::Option{<:WeightBounds}, fees::Option{<:Fees},
-                            retcode::OptimisationReturnCode,
-                            w::Option{<:VecNum})::HierarchicalResult
-    return HierarchicalResult(pr, clr, wb, fees, retcode, w)
+                            retcode::OptimisationReturnCode, w::Option{<:VecNum},
+                            imsk::Option{<:BitVector} = nothing)::HierarchicalResult
+    return HierarchicalResult(pr, clr, wb, fees, retcode,
+                              expand_investable_weights(imsk, w), imsk)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Assert that a clustering covers exactly the universe the optimisation is about to allocate over.
+
+[`clusterise`](@ref) returns a fitted [`AbstractClusteringResult`](@ref) unchanged, so a caller who states one instead of an estimator states the leaf order as well. Nothing slices that order. Under an Investable Mask, or inside a subset or a nested view, the universe below the call is narrower than the one the caller clustered, and the leaf order would index the wrong columns. The weights would still come back, and they would be wrong, so the mismatch is refused where it is first visible.
+
+A fixed clustering under a changing universe is stated as a [`ClustersEstimator`](@ref), which refits per window and always matches.
+
+# Algorithm
+
+ 1. Read one cluster label per asset with [`assignments`](@ref).
+ 2. Throw a `DimensionMismatch` when their count is not `N`.
+
+# Arguments
+
+  - `clr`: Clustering result, fitted or just built.
+  - `N`: Number of assets the optimisation runs on, after the reduction.
+
+# Validation
+
+  - The clustering must carry one label per asset of the reduced universe.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`clusterise`](@ref)
+  - [`Clusters`](@ref)
+  - [`ClustersEstimator`](@ref)
+  - [`investable_reduction`](@ref)
+"""
+function assert_clustering_universe(clr::AbstractClusteringResult, N::Integer)::Nothing
+    Nc = length(assignments(clr))
+    @argcheck(Nc == N,
+              DimensionMismatch("the clustering covers $(Nc) assets, but the optimisation runs on $(N). A fitted clustering result is used exactly as stated, so it must be stated over the universe the optimisation runs on. State a `ClustersEstimator` instead when the universe changes."))
+    return nothing
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -171,7 +222,7 @@ $(DocStringExtensions.FIELDS)
         hr::HierarchicalResult,
         r::BaseRM_VecBaseRM,
         sca::Scalariser,
-        fb::Option{<:OptE_Opt}
+        fb::Option{<:OptE_Opt_FbChain}
     ) -> HierarchicalRiskParityResult
 
 Keywords correspond to the struct's fields.
@@ -197,17 +248,17 @@ Keywords correspond to the struct's fields.
     """
     sca
     """
-    $(field_dict[:fb])
+    $(field_dict[:fb_res])
     """
     fb
     function HierarchicalRiskParityResult(hr::HierarchicalResult, r::BaseRM_VecBaseRM,
-                                          sca::Scalariser, fb::Option{<:OptE_Opt})
+                                          sca::Scalariser, fb::Option{<:OptE_Opt_FbChain})
         return new{typeof(hr), typeof(r), typeof(sca), typeof(fb)}(hr, r, sca, fb)
     end
 end
 function HierarchicalRiskParityResult(; hr::HierarchicalResult, r::BaseRM_VecBaseRM,
                                       sca::Scalariser,
-                                      fb::Option{<:OptE_Opt})::HierarchicalRiskParityResult
+                                      fb::Option{<:OptE_Opt_FbChain})::HierarchicalRiskParityResult
     return HierarchicalRiskParityResult(hr, r, sca, fb)
 end
 # Unique fields resolve directly; every other property forwards into the embedded core, so
@@ -240,7 +291,7 @@ $(DocStringExtensions.FIELDS)
         ro::BaseRM_VecBaseRM,
         scai::Scalariser,
         scao::Scalariser,
-        fb::Option{<:OptE_Opt}
+        fb::Option{<:OptE_Opt_FbChain}
     ) -> HierarchicalEqualRiskContributionResult
 
 Keywords correspond to the struct's fields.
@@ -274,14 +325,14 @@ Keywords correspond to the struct's fields.
     """
     scao
     """
-    $(field_dict[:fb])
+    $(field_dict[:fb_res])
     """
     fb
     function HierarchicalEqualRiskContributionResult(hr::HierarchicalResult,
                                                      ri::BaseRM_VecBaseRM,
                                                      ro::BaseRM_VecBaseRM, scai::Scalariser,
                                                      scao::Scalariser,
-                                                     fb::Option{<:OptE_Opt})
+                                                     fb::Option{<:OptE_Opt_FbChain})
         return new{typeof(hr), typeof(ri), typeof(ro), typeof(scai), typeof(scao),
                    typeof(fb)}(hr, ri, ro, scai, scao, fb)
     end
@@ -289,11 +340,42 @@ end
 function HierarchicalEqualRiskContributionResult(; hr::HierarchicalResult,
                                                  ri::BaseRM_VecBaseRM, ro::BaseRM_VecBaseRM,
                                                  scai::Scalariser, scao::Scalariser,
-                                                 fb::Option{<:OptE_Opt})::HierarchicalEqualRiskContributionResult
+                                                 fb::Option{<:OptE_Opt_FbChain})::HierarchicalEqualRiskContributionResult
     return HierarchicalEqualRiskContributionResult(hr, ri, ro, scai, scao, fb)
 end
 @forward_properties HierarchicalEqualRiskContributionResult begin
     forward(hr)
+end
+"""
+    result_investable_mask(res::HierarchicalResult)
+    result_investable_mask(res::HierarchicalRiskParityResult)
+    result_investable_mask(res::HierarchicalEqualRiskContributionResult)
+
+Read the Investable Mask a hierarchical result reduced on.
+
+The core carries the mask as `imsk`, and the two leaves carry the core as `hr`. A leaf answers through the core rather than through its forwarded `res.imsk`, because the verb dispatches on the type and a forwarded property is invisible to it: without these methods the leaf falls back to `nothing`, the fold keeps the full weights, and a per-asset fee the result carries reduced is charged against them (#892).
+
+# Arguments
+
+  - `res`: A hierarchical result, or one of its two leaves.
+
+# Returns
+
+  - `imsk::Option{BitVector}`: The Investable Mask, or `nothing` when the optimisation reduced on nothing.
+
+# Related
+
+  - [`result_investable_mask`](@ref)
+  - [`HierarchicalResult`](@ref)
+  - [`HierarchicalRiskParityResult`](@ref)
+  - [`HierarchicalEqualRiskContributionResult`](@ref)
+"""
+function result_investable_mask(res::HierarchicalResult)
+    return res.imsk
+end
+function result_investable_mask(res::Union{<:HierarchicalRiskParityResult,
+                                           <:HierarchicalEqualRiskContributionResult})
+    return result_investable_mask(res.hr)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -309,7 +391,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     HierarchicalOptimiser(;
-        pe::TD{<:PrE_Pr} = EmpiricalPrior(),
+        pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(),
         cle::TD{<:HClE_HCl} = ClustersEstimator(),
         slv::Option{<:Slv_VecSlv} = nothing,
         wb::TD_Option{<:WbE_Wb} = WeightBounds(),
@@ -318,16 +400,15 @@ $(DocStringExtensions.FIELDS)
         wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
         brt::Bool = false,
         x_src::Symbol = :prior,
-        z_src::Symbol = :data,
-        strict::Bool = false
+        strict::Bool = false,
+        cache::Option{<:ReturnsBufferState} = nothing
     ) -> HierarchicalOptimiser
 
-Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or [`TD`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value; a cross-validation fold loop resolves it per fold, and a fold-less `optimise` runs with the field at its static default. The problem definition — the prior estimator, clustering estimator, weight finaliser and asset sets as much as the bounds and fees — may therefore vary over folds; execution control (`slv`, `brt`, `x_src`, `z_src`, `strict`) stays static.
+Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or [`TD`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value; a cross-validation fold loop resolves it per fold, and a fold-less `optimise` runs with the field at its static default. The problem definition — the prior estimator, clustering estimator, weight finaliser and asset sets as much as the bounds and fees — may therefore vary over folds; execution control (`slv`, `brt`, `x_src`, `strict`) stays static.
 
 ## Validation
 
   - `x_src in (:prior, :data)`.
-  - `z_src in (:prior, :data)`.
   - If `wb` is a [`WeightBoundsEstimator`](@ref): `!isnothing(sets)`.
   - If any field holds a [`TimeDependent`](@ref): every vector entry is test-substituted through this constructor so type compatibility errors surface immediately.
 
@@ -352,25 +433,27 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
 julia> HierarchicalOptimiser()
 HierarchicalOptimiser
       pe ┼ EmpiricalPrior
-         │        ce ┼ PortfolioOptimisersCovariance
-         │           │   ce ┼ Covariance
-         │           │      │    me ┼ SimpleExpectedReturns
-         │           │      │       │   w ┴ nothing
-         │           │      │    ce ┼ GeneralCovariance
-         │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-         │           │      │       │    w ┴ nothing
-         │           │      │   alg ┴ FullMoment()
-         │           │   mp ┼ MatrixProcessing
-         │           │      │     pdm ┼ Posdef
-         │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-         │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-         │           │      │      dn ┼ nothing
-         │           │      │      dt ┼ nothing
-         │           │      │     alg ┼ nothing
-         │           │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-         │        me ┼ SimpleExpectedReturns
-         │           │   w ┴ nothing
-         │   horizon ┴ nothing
+         │           ce ┼ PortfolioOptimisersCovariance
+         │              │   ce ┼ Covariance
+         │              │      │    me ┼ SimpleExpectedReturns
+         │              │      │       │   w ┴ nothing
+         │              │      │    ce ┼ GeneralCovariance
+         │              │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+         │              │      │       │    w ┴ nothing
+         │              │      │   alg ┼ FullMoment()
+         │              │      │     w ┴ nothing
+         │              │   mp ┼ MatrixProcessing
+         │              │      │     pdm ┼ Posdef
+         │              │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+         │              │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+         │              │      │      dn ┼ nothing
+         │              │      │      dt ┼ nothing
+         │              │      │     alg ┼ nothing
+         │              │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+         │           me ┼ SimpleExpectedReturns
+         │              │   w ┴ nothing
+         │      horizon ┼ nothing
+         │   fill_limit ┴ nothing
      cle ┼ ClustersEstimator
          │    ce ┼ PortfolioOptimisersCovariance
          │       │   ce ┼ Covariance
@@ -379,7 +462,8 @@ HierarchicalOptimiser
          │       │      │    ce ┼ GeneralCovariance
          │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
          │       │      │       │    w ┴ nothing
-         │       │      │   alg ┴ FullMoment()
+         │       │      │   alg ┼ FullMoment()
+         │       │      │     w ┴ nothing
          │       │   mp ┼ MatrixProcessing
          │       │      │     pdm ┼ Posdef
          │       │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
@@ -412,7 +496,6 @@ HierarchicalOptimiser
          │   iter ┴ Int64: 100
      brt ┼ Bool: false
    x_src ┼ Symbol: :prior
-   z_src ┼ Symbol: :data
   strict ┴ Bool: false
 ```
 
@@ -463,35 +546,33 @@ HierarchicalOptimiser
     """
     x_src
     """
-    $(field_dict[:z_src])
-    """
-    z_src
-    """
     $(field_dict[:strict_opt])
     """
     strict
-    function HierarchicalOptimiser(pe::TD{<:PrE_Pr}, cle::TD{<:HClE_HCl},
+    """
+    $(field_dict[:cache_opt])
+    """
+    @fprop @vprop cache
+    function HierarchicalOptimiser(pe::Onl{<:TD{<:PrE_Pr}}, cle::TD{<:HClE_HCl},
                                    slv::Option{<:Slv_VecSlv}, wb::TD_Option{<:WbE_Wb},
                                    fees::TD_Option{<:FeesE_Fees},
                                    sets::TD_Option{<:UniverseSets},
                                    wf::TD{<:WeightFinaliser}, brt::Bool, x_src::Symbol,
-                                   z_src::Symbol, strict::Bool)
+                                   strict::Bool, cache::Option{<:ReturnsBufferState})
         assert_source_selector(x_src, :x_src)
-        assert_source_selector(z_src, :z_src)
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
         end
         assert_time_dependent_substitution(HierarchicalOptimiser,
                                            (; pe, cle, slv, wb, fees, sets, wf, brt, x_src,
-                                            z_src, strict),
-                                           hierarchical_optimiser_td_defaults())
+                                            strict), hierarchical_optimiser_td_defaults())
         return new{typeof(pe), typeof(cle), typeof(slv), typeof(wb), typeof(fees),
-                   typeof(sets), typeof(wf), typeof(brt), typeof(x_src), typeof(z_src),
-                   typeof(strict)}(pe, cle, slv, wb, fees, sets, wf, brt, x_src, z_src,
-                                   strict)
+                   typeof(sets), typeof(wf), typeof(brt), typeof(x_src), typeof(strict),
+                   typeof(cache)}(pe, cle, slv, wb, fees, sets, wf, brt, x_src, strict,
+                                  cache)
     end
 end
-function HierarchicalOptimiser(; pe::TD{<:PrE_Pr} = EmpiricalPrior(),
+function HierarchicalOptimiser(; pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(),
                                cle::TD{<:HClE_HCl} = ClustersEstimator(),
                                slv::Option{<:Slv_VecSlv} = nothing,
                                wb::TD_Option{<:WbE_Wb} = WeightBounds(),
@@ -499,10 +580,13 @@ function HierarchicalOptimiser(; pe::TD{<:PrE_Pr} = EmpiricalPrior(),
                                sets::TD_Option{<:UniverseSets} = nothing,
                                wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
                                brt::Bool = false, x_src::Symbol = :prior,
-                               z_src::Symbol = :data,
-                               strict::Bool = false)::HierarchicalOptimiser
-    return HierarchicalOptimiser(pe, cle, slv, wb, fees, sets, wf, brt, x_src, z_src,
-                                 strict)
+                               strict::Bool = false,
+                               cache::Option{<:ReturnsBufferState} = nothing)::HierarchicalOptimiser
+    return HierarchicalOptimiser(pe, cle, slv, wb, fees, sets, wf, brt, x_src, strict,
+                                 cache)
+end
+function non_investable_universe(opt::HierarchicalOptimiser, ni::VecStr)
+    return rebuild_estimator(opt, (; sets = non_investable_sets(opt.sets, ni)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

@@ -6,7 +6,7 @@
     stated and gated nowhere, and six abstract types gained an export across the feature
     matrix, prior, constraint generation, asset sets and similarity work before anyone
     counted: `AbstractFeatureMatrixEstimator`, `AbstractPhylogenyFeatureAlgorithm`,
-    `AbstractConstraintSpace`, `AbstractFeatureValue`, `AbstractSimilarityMatrixAlgorithm`
+    `AbstractConstraintSpace`, `AbstractSimilarityMatrixAlgorithm`
     and `AbstractNonNegativeSimilarityMatrixAlgorithm`. The exported abstract surface
     almost doubled, from seven names to thirteen, over five separate pieces of work.
 
@@ -78,11 +78,10 @@
     The last three are the time-dependent callable family, whose classification is stated in
     the type tree rather than in the export list.
     =#
-    for n in (:AbstractFeatureMatrixEstimator, :AbstractPhylogenyFeatureAlgorithm,
-              :AbstractConstraintSpace, :AbstractFeatureValue,
-              :AbstractSimilarityMatrixAlgorithm, :AbstractNonNegativeSimilarityMatrixAlgorithm,
-              :TimeDependentCallable, :TimeDependentConstraintCallable,
-              :TimeDependentOptimiserCallable)
+    for n in (:AbstractAssetPanelEstimator, :AbstractPhylogenyFeatureAlgorithm,
+              :AbstractConstraintSpace, :AbstractSimilarityMatrixAlgorithm,
+              :AbstractNonNegativeSimilarityMatrixAlgorithm, :TimeDependentCallable,
+              :TimeDependentConstraintCallable, :TimeDependentOptimiserCallable)
         @test is_abstract(n)
         @test !Base.isexported(PortfolioOptimisers, n)
         @test n ∉ names(PortfolioOptimisers)

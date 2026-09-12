@@ -1,5 +1,4 @@
 The source files can be found in [examples/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../../examples/3_optimisers/11_Clustering_Optimisers.jl"
 ```
@@ -15,12 +14,12 @@ they are robust to estimation error and require no numerical solver for variance
 
 `PortfolioOptimisers` ships three members of this family:
 
-- [`HierarchicalRiskParity`](@ref) (HRP) — recursive bisection of the dendrogram, splitting
+  - [`HierarchicalRiskParity`](@ref) (HRP) — recursive bisection of the dendrogram, splitting
     risk between each pair of sub-clusters.
-- [`HierarchicalEqualRiskContribution`](@ref) (HERC) — equalises risk contributions both
+  - [`HierarchicalEqualRiskContribution`](@ref) (HERC) — equalises risk contributions both
     *within* each cluster (inner) and *across* clusters (outer), with independent risk
     measures and scalarisers for each level.
-- [`SchurComplementHierarchicalRiskParity`](@ref) (SCHRP) — augments each sub-cluster's
+  - [`SchurComplementHierarchicalRiskParity`](@ref) (SCHRP) — augments each sub-cluster's
     covariance with a Schur-complement correction, interpolating between HRP (`gamma = 0`)
     and a Markowitz-like allocation as `gamma → 1`.
 

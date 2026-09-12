@@ -4,10 +4,11 @@ using PortfolioOptimisers, Test, Clustering, TimeSeries, Dates, StableRNGs, Stat
 const PO = PortfolioOptimisers
 
 #=
-This file owns the collapse of a feature matrix onto the synthetic assets a meta-optimiser
-builds for its outer problem. Before it, `NestedClustered` and `Stacking` dropped `Z` and
-an outer `FeatureDistance` threw; now the outer problem is measured on features aggregated
-from its members'.
+This file owns the collapse of an `AssetPanel` onto the synthetic assets a meta-optimiser
+builds for its outer problem. Before it, `NestedClustered` and `Stacking` dropped the feature
+data and an outer `FeatureDistance` threw; now the outer problem is measured on features
+aggregated from its members'. `#807` made the collapse act one Panel Field at a time and
+return a panel, so a selector written for the inner problem resolves on the outer one.
 
 The failure mode is the same quiet one the rest of the feature suite guards: a wrong
 collapse still produces a finite, symmetric, plausible distance matrix over `k` synthetic
@@ -28,21 +29,35 @@ function record!(de::RecordingDistance, Z)
     end
     return nothing
 end
-function PO.distance(de::RecordingDistance, ce, X; Z = nothing, kwargs...)
-    record!(de, Z)
-    return PO.distance(de.de, ce, X; Z = Z, kwargs...)
+function PO.distance(de::RecordingDistance, ce, X; pr = nothing, rd = nothing, kwargs...)
+    record!(de, feature_matrix(de.de, pr, rd, X))
+    return PO.distance(de.de, ce, X; pr = pr, rd = rd, kwargs...)
 end
-function PO.cor_and_dist(de::RecordingDistance, ce, X; Z = nothing, kwargs...)
-    record!(de, Z)
-    return PO.cor_and_dist(de.de, ce, X; Z = Z, kwargs...)
+function PO.cor_and_dist(de::RecordingDistance, ce, X; pr = nothing, rd = nothing,
+                         kwargs...)
+    record!(de, feature_matrix(de.de, pr, rd, X))
+    return PO.cor_and_dist(de.de, ce, X; pr = pr, rd = rd, kwargs...)
 end
 PO.distance(de::RecordingDistance, Z; kwargs...) = PO.distance(de.de, Z; kwargs...)
 function PO.cor_and_dist(de::RecordingDistance, Z; kwargs...)
     return PO.cor_and_dist(de.de, Z; kwargs...)
 end
 
+include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
+#=
+The collapse is a fact about the panel now, so the arithmetic assertions below drive it
+through a one-field panel: a tensor field whose labels are the asset names is the square
+case, and one whose labels are anything else is the rectangular one.
+=#
+function sqpanel(labels, vals)
+    return asset_panel([TensorPanelInput(; name = "prox", axis = "asset", labels = labels,
+                                         vals = vals)])
+end
+function rectpanel(labels, vals)
+    return asset_panel([TensorPanelInput(; name = "beta", axis = "factor", labels = labels,
+                                         vals = vals)])
+end
 @testset "Collapsing the feature matrix onto synthetic assets" begin
-    collapse = PO.collapse_feature_matrix
     saw = PO.synthetic_asset_weights
     features_are_assets = PO.features_are_assets
     seq = PO.FLoops.SequentialEx()
@@ -78,6 +93,16 @@ end
     # Z3[t, i, j] names its own position, so a mis-indexed observation axis shows up in the
     # values and not merely in the shape.
     Z3 = reshape(Float64.(1:(T * N * K)), T, N, K) ./ 1000
+    # The collapse of a bare matrix, driven through the panel that holds it.
+    function collapse(Z, sq::Bool, W)
+        pnl = if sq
+            sqpanel(nx, Z)
+        else
+            rectpanel([string("c", k) for k in axes(Z, ndims(Z))], Z)
+        end
+        c = PO.collapse_asset_panel(pnl, W, sq ? nx : nothing)
+        return PO.panel_field(c, sq ? "prox" : "beta").vals
+    end
 
     # Long-only weights that sum to one per synthetic asset, and a leveraged/shorting set
     # whose columns do not -- the case an un-normalised collapse inflates.
@@ -88,7 +113,7 @@ end
     Wlev[1, 2] = -4.0
 
     @testset "The three collapse shapes" begin
-        # Rectangular: only the asset axis contracts, so the feature axis survives intact.
+        # Rectangular: only the asset axis contracts, so the label axis survives intact.
         Cr = collapse(Zr, false, Wl)
         @test size(Cr) == (k, K)
         @test Cr ≈ transpose(saw(Wl)) * Zr
@@ -96,16 +121,20 @@ end
         # the identity here -- which is what makes the leveraged case below the real test.
         @test Cr ≈ transpose(Wl) * Zr
 
-        # Square: two-sided, so the feature axis lands on the synthetic universe too.
+        # Square: two-sided, so the label axis lands on the synthetic universe too.
         Cs = collapse(Zsq, true, Wl)
         @test size(Cs) == (k, k)
         @test Cs ≈ transpose(Cs)
         @test Cs ≈ transpose(saw(Wl)) * Zsq * saw(Wl)
-        # The square case is *detected* by the names, not re-derived from the shape, and
-        # naming the collapsed feature axis after the synthetic assets is what keeps the
-        # predicate true one level up.
-        @test features_are_assets(["_$i" for i in 1:k], ["_$i" for i in 1:k])
-        @test !features_are_assets(nf, ["_$i" for i in 1:k])
+        # The square case is *derived* from the labels, not re-declared, and renaming them
+        # after the synthetic assets is what keeps the predicate true one level up.
+        csq = PO.collapse_asset_panel(sqpanel(nx, Zsq), Wl, nx)
+        fsq = PO.panel_field(csq, "prox")
+        @test fsq.labels == ["_$i" for i in 1:k]
+        @test isnothing(fsq.groups)
+        @test features_are_assets(fsq, ["_$i" for i in 1:k])
+        crect = PO.collapse_asset_panel(rectpanel(nf, Zr), Wl, nx)
+        @test !features_are_assets(PO.panel_field(crect, "beta"), ["_$i" for i in 1:k])
 
         # Time-varying: the same arithmetic per observation, observation axis leading.
         C3 = collapse(Z3, false, Wl)
@@ -119,20 +148,43 @@ end
         @test size(C3s) == (T, k, k)
         @test all(t -> C3s[t, :, :] ≈ Cs, 1:T)
 
-        # The vector arity collapses onto a single synthetic asset. It takes no `sq`
-        # argument at all: the second contraction of the square case needs every synthetic
-        # asset's weights at once, and only one vector exists inside a fold.
-        w = Wlev[:, 1]
-        @test collapse(Zr, w) ≈ transpose(Zr) * saw(w)
-        @test length(collapse(Zr, w)) == K
-        @test size(collapse(Z3, w)) == (T, K)
-        @test all(t -> collapse(Z3, w)[t, :] ≈ transpose(Z3[t, :, :]) * saw(w), 1:T)
-        # A square source therefore keeps the *real* assets as its feature axis here.
-        @test length(collapse(Zsq, w)) == N
+        # A numeric Panel Field stays numeric, and contracts on its one axis.
+        num = asset_panel([NumericPanelInput(; name = "mcap", vals = Zr[:, 1])])
+        cnum = PO.collapse_asset_panel(num, Wl, nx)
+        @test isa(PO.panel_field(cnum, "mcap"), NumericPanelField)
+        @test PO.panel_field(cnum, "mcap").vals ≈ transpose(saw(Wl)) * Zr[:, 1]
 
-        # An absent feature matrix stays absent at both arities.
-        @test isnothing(collapse(nothing, false, Wl))
-        @test isnothing(collapse(nothing, w))
+        # A categorical Panel Field becomes a tensor field of membership fractions: the
+        # convex combination of its one-hot block, which is the share of the synthetic
+        # asset's weight in each level.
+        lvl = ["Fin", "Tech"]
+        codes = [1, 2, 1, 2, 1, 2, 1, 2]
+        cat = asset_panel([CategoricalPanelInput(; name = "sector", vals = lvl[codes])])
+        ccat = PO.collapse_asset_panel(cat, Wl, nx)
+        fcat = PO.panel_field(ccat, "sector")
+        @test isa(fcat, TensorPanelField)
+        @test fcat.axis == "level"
+        @test fcat.labels == lvl
+        @test size(fcat.vals) == (k, 2)
+        @test all(isapprox(sum(fcat.vals[i, :]), 1) for i in 1:k)
+        # The value columns of the collapsed panel's Feature Matrix equal the collapse of
+        # the original panel's, which is what lets a selector resolve unchanged.
+        onehot = Float64[codes[i] == l for i in 1:N, l in 1:2]
+        @test fcat.vals ≈ transpose(saw(Wl)) * onehot
+        # A selector written for the inner problem resolves on the outer panel.
+        @test PO.panel_feature_names(ccat) == ["sector=Fin", "sector=Tech"]
+
+        # A mask collapses as the support of its convex combination.
+        msk = trues(N, 1)
+        pm = asset_panel([NumericPanelInput(; name = "a", vals = Zr[:, 1])])
+        @test isnothing(PO.collapse_panel_mask(nothing, saw(Wl)))
+        Wz = copy(Wl)
+        Wz[:, 2] .= 0
+        m = trues(2, N)
+        @test PO.collapse_panel_mask(m, saw(Wz)) == [true false true; true false true]
+
+        # An absent panel stays absent.
+        @test isnothing(PO.collapse_asset_panel(nothing, Wl, nx))
     end
 
     @testset "The collapse is convex, not an un-normalised sum" begin
@@ -176,7 +228,6 @@ end
         Cz = collapse(Zr, false, Wz)
         @test all(iszero, Cz[2, :])
         @test Cz[[1, 3], :] ≈ collapse(Zr, false, Wl)[[1, 3], :]
-        @test all(iszero, collapse(Zr, zeros(N)))
 
         # It then lands on the zero-feature-vector convention the kernel already
         # implements: a finite distance matrix rather than a `NaN` one.
@@ -193,38 +244,39 @@ end
     end
 
     rd_r = ReturnsResult(; nx = nx, X = X, nf = nf, F = F, ts = ts,
-                         nz = ["z$i" for i in 1:K], Z = Zr)
-    rd_sq = ReturnsResult(; nx = nx, X = X, nf = nf, F = F, ts = ts, nz = nx, Z = Zsq)
-    rd_3d = ReturnsResult(; nx = nx, X = X, nf = nf, F = F, ts = ts, nz = nf, Z = Z3)
+                         pnl = matrix_panel(["z$i" for i in 1:K], Zr))
+    rd_sq = ReturnsResult(; nx = nx, X = X, nf = nf, F = F, ts = ts, pnl = sqpanel(nx, Zsq))
+    rd_3d = ReturnsResult(; nx = nx, X = X, nf = nf, F = F, ts = ts,
+                          pnl = matrix_panel(nf, Z3))
 
     @testset "prepare_outer_rd collapses, and its arity break is loud" begin
         wi = Wlev
-        nb, B, iv, ivpa, nz, Z, Xb = PO.prepare_outer_rd(rd_r, wi)
-        @test nz == rd_r.nz
-        @test Z ≈ collapse(Zr, false, wi)
+        nb, B, iv, ivpa, pnl, Xb = PO.prepare_outer_rd(rd_r, wi)
+        @test PO.panel_feature_names(pnl) == panel_feature_matrix(rd_r.pnl)[1]
+        @test panel_feature_matrix(pnl)[2] ≈ collapse(Zr, false, wi)
         @test size(Xb) == (T, k)
 
-        # The square carrier renames its feature axis after the synthetic assets, which is
-        # what keeps `features_are_assets` true for the result built from it.
-        _, _, _, _, nz_s, Z_s, _ = PO.prepare_outer_rd(rd_sq, wi)
-        @test nz_s == ["_$i" for i in 1:k]
-        @test features_are_assets(nz_s, ["_$i" for i in 1:k])
-        @test Z_s ≈ collapse(Zsq, true, wi)
+        # The square carrier renames its label axis after the synthetic assets, which is
+        # what keeps the square case true for the result built from it.
+        _, _, _, _, pnl_s, _ = PO.prepare_outer_rd(rd_sq, wi)
+        fs = PO.panel_field(pnl_s, "prox")
+        @test fs.labels == ["_$i" for i in 1:k]
+        @test features_are_assets(fs, ["_$i" for i in 1:k])
+        @test fs.vals ≈ collapse(Zsq, true, wi)
 
-        _, _, _, _, nz_3, Z_3, _ = PO.prepare_outer_rd(rd_3d, wi)
-        @test nz_3 == nf
-        @test size(Z_3) == (T, k, K)
+        _, _, _, _, pnl_3, _ = PO.prepare_outer_rd(rd_3d, wi)
+        @test PO.panel_feature_names(pnl_3) == nf
+        @test size(panel_feature_matrix(pnl_3)[2]) == (T, k, K)
 
         #=
         `predict_outer_returns` is a documented overload point, so extending the tuple is a
-        deliberate break. `nz`/`Z` are returned *before* `X` precisely so the break bites:
-        Julia's destructuring discards trailing values without complaint, so appending them
+        deliberate break. `pnl` is returned *before* `X` precisely so the break bites:
+        Julia's destructuring discards trailing values without complaint, so appending it
         would have let a stale overload keep building a feature-less result in silence.
         =#
         stale_nb, stale_B, stale_iv, stale_ivpa, stale_X = PO.prepare_outer_rd(rd_r, wi)
-        @test stale_X === nz
+        @test isa(stale_X, AssetPanel)
         @test !isa(stale_X, AbstractMatrix)
-        @test_throws MethodError stale_X[1] = 1.0
     end
 
     @testset "The outer problem is measured on collapsed features" begin
@@ -373,8 +425,8 @@ end
         for t in 1:T
             Z3sq[t, :, :] = Zsq .* (1 + t / T)
         end
-        rd_3dsq = ReturnsResult(; nx = nx, X = X, nf = nf, F = F, ts = ts, nz = nx,
-                                Z = Z3sq)
+        rd_3dsq = ReturnsResult(; nx = nx, X = X, nf = nf, F = F, ts = ts,
+                                pnl = sqpanel(nx, Z3sq))
         r3 = RecordingDistance(FeatureDistance())
         nco3 = NestedClustered(; cle = ClustersEstimator(; de = FeatureDistance()),
                                opti = plain_hrp(),
@@ -422,16 +474,15 @@ end
                 Ws = [PO.fold_weight_matrix(predictions, u, f, N)
                       for f in eachindex(test_idx)]
                 rdo = PO.rebuild_returns_result(rd, predictions, u)
-                @test size(rdo.Z, 1) == size(rdo.X, 1) == T
-                @test size(rdo.Z, 2) == length(rdo.nx)
-                @test PO.features_are_assets(rdo.nz, rdo.nx) == sq
+                @test size(panel_feature_matrix(rdo.pnl)[2], 1) == size(rdo.X, 1) == T
+                @test size(panel_feature_matrix(rdo.pnl)[2], 2) == length(rdo.nx)
+                @test any(f -> PO.features_are_assets(f, rdo.nx), rdo.pnl.pf) == sq
                 r = 0
                 for (f, rows) in enumerate(test_idx)
-                    _, _, _, _, nz_e, Z_e, _ = PO.prepare_outer_rd(PO.port_opt_view(rd,
-                                                                                    rows,
-                                                                                    :),
-                                                                   Ws[f])
-                    blk = rdo.Z[(r + 1):(r + length(rows)), :, :]
+                    _, _, _, _, pnl_e, _ = PO.prepare_outer_rd(PO.port_opt_view(rd, rows,
+                                                                                :), Ws[f])
+                    nz_e, Z_e = panel_feature_matrix(pnl_e)
+                    blk = panel_feature_matrix(rdo.pnl)[2][(r + 1):(r + length(rows)), :, :]
                     # A static source has no observation axis of its own, so the non-`cv`
                     # result is the fold's constant; a time-varying one already carries one.
                     expected = if ndims(Z_e) == 3
@@ -440,7 +491,7 @@ end
                         permutedims(repeat(Z_e, 1, 1, length(rows)), (3, 1, 2))
                     end
                     @test blk ≈ expected
-                    @test rdo.nz == nz_e
+                    @test panel_feature_matrix(rdo.pnl)[1] == nz_e
                     r += length(rows)
                 end
             end
@@ -468,11 +519,11 @@ end
         rdo = PO.rebuild_returns_result(rd_3d, predictions, PO.FullUniverse())
         # The folds cover fewer rows than the clock has, which is the point: a cumulative
         # count would have started at row 1 and run out before the last fold.
-        @test size(rdo.Z, 1) == sum(length, test_idx) < T
+        @test size(panel_feature_matrix(rdo.pnl)[2], 1) == sum(length, test_idx) < T
         r = 0
         for (f, rows) in enumerate(test_idx)
-            @test rdo.Z[(r + 1):(r + length(rows)), :, :] ≈
-                  PO.collapse_feature_matrix(Z3[rows, :, :], false, Ws[f])
+            @test panel_feature_matrix(rdo.pnl)[2][(r + 1):(r + length(rows)), :, :] ≈
+                  collapse(Z3[rows, :, :], false, Ws[f])
             r += length(rows)
         end
     end
@@ -488,7 +539,8 @@ end
         cv = KFold(; n = 3)
         herc() = HierarchicalEqualRiskContribution(;
                                                    opt = HierarchicalOptimiser(; slv = slv))
-        rd_3d_nots = ReturnsResult(; nx = nx, X = X, nf = nf, F = F, nz = nf, Z = Z3)
+        rd_3d_nots = ReturnsResult(; nx = nx, X = X, nf = nf, F = F,
+                                   pnl = matrix_panel(nf, Z3))
         preds = [PO.cross_val_predict(o, rd_3d_nots, cv; ex = seq)
                  for o in (plain_hrp(), herc())]
         e = try
@@ -502,10 +554,11 @@ end
         # The requirement is scoped to the shape that needs it: a static feature matrix has
         # no observation axis to align, so it runs on fold sizes alone and never asks.
         rd_r_nots = ReturnsResult(; nx = nx, X = X, nf = nf, F = F,
-                                  nz = ["z$i" for i in 1:K], Z = Zr)
+                                  pnl = matrix_panel(["z$i" for i in 1:K], Zr))
         preds_r = [PO.cross_val_predict(o, rd_r_nots, cv; ex = seq)
                    for o in (plain_hrp(), herc())]
-        @test size(PO.rebuild_returns_result(rd_r_nots, preds_r, PO.FullUniverse()).Z) ==
+        @test size(panel_feature_matrix(PO.rebuild_returns_result(rd_r_nots, preds_r,
+                                                                  PO.FullUniverse()).pnl)[2]) ==
               (T, 2, K)
 
         # Recovering by time is only sound on a uniquely-keyed axis, so `ReturnsResult`
@@ -552,7 +605,7 @@ end
         @test :Z ∉ fieldnames(PredictionReturnsResult)
         @test :nz ∉ fieldnames(PredictionReturnsResult)
         @test_throws MethodError PredictionReturnsResult(; nx = ["_1"], X = Xf,
-                                                         nz = ["a", "b"], Z = Zf)
+                                                         pnl = matrix_panel(["a", "b"], Zf))
         # Nothing is lost: the seam reaches every fold's weights and rows through `pred`.
         pred = PO.cross_val_predict(plain_hrp(), rd_3d, KFold(; n = 3); ex = seq)
         @test length(pred.pred) == 3

@@ -16,10 +16,12 @@ route_sigma_ucs
 @pipe_route_rkb
 OptimisationAlgorithm
 OptimisationResult
+result_investable_mask
 NonFiniteAllocationOptimisationResult
 OptimisationReturnCode
 VecOptRetCode
 OptRetCode_VecOptRetCode
+set_retcode
 OptimisationModelResult
 OptimisationSuccess
 OptimisationFailure
@@ -34,7 +36,8 @@ JuMPWeightFinaliser
 _optimise
 optimise(opt::OptimisationResult, args...; kwargs...)
 optimise(opt::OptimisationEstimator, args...; kwargs...)
-calc_net_returns(res::OptimisationResult, X::MatNum, fees::Option{<:Fees} = nothing)
+calc_net_returns(res::OptimisationResult, X::MatNum, fees::Option{<:Fees} = nothing,
+                 wd::Option{<:AbstractWeightDrift} = nothing, obs = nothing)
 assert_special_nco_requirements(::OptE_Opt)
 assert_special_nco_requirements(opt::VecOptE_Opt)
 needs_previous_weights(::Option{<:Union{<:AbstractEstimator, <:AbstractAlgorithm,
@@ -97,19 +100,30 @@ opt_weight_bounds
 finalise_weight_bounds
 port_opt_view(opt::AbstractOptimisationEstimator, ::Any, args...)
 port_opt_view(res::NonFiniteAllocationOptimisationResult, ::Colon, args...)
+investable_reduction(pr::AbstractPriorResult, opt::AbstractOptimisationEstimator, rd::ReturnsResult)
+coverage_reduction(opt::AbstractOptimisationEstimator, rd::ReturnsResult)
+expand_investable_weights
 assert_internal_optimiser(::NonFiniteAllocationOptimisationResult)
 assert_external_optimiser(::NonFiniteAllocationOptimisationResult)
 assert_special_nco_requirements
-factory(res::NonFiniteAllocationOptimisationResult, fb::Option{<:OptE_Opt})
+factory(res::NonFiniteAllocationOptimisationResult, fb::Option{<:OptE_Opt_FbChain})
 factory(opt::OptE_Opt, ::Any)
 assert_no_nearest_bind_optimiser_schedule(x, field::Symbol, host::Symbol)
 entitled
 OptE_Opt
+FbChain
+OptE_Opt_FbChain
 VecOptE_Opt
 VecOpt
 VecOptE
 extract_fees
 extract_pr
 synthetic_asset_weights
-collapse_feature_matrix
+collapse_asset_panel
+PortfolioOptimisers.collapse_panel_field
+PortfolioOptimisers.collapse_panel_numeric
+PortfolioOptimisers.collapse_panel_tensor
+PortfolioOptimisers.collapse_panel_mask
+PortfolioOptimisers.collapse_categorical_mask
+non_investable_universe
 ```

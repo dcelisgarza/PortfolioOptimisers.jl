@@ -1,5 +1,4 @@
 The source files can be found in [user_guide/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/user_guide/).
-
 ```@meta
 EditURL = "../../../user_guide/07_Choosing_a_Strategy.jl"
 ```

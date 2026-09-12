@@ -50,6 +50,21 @@
     font-weight: 500;
 }
 
+/* Every type name is a code span, because that is what makes its `@ref` a
+ * docstring reference. The tree is already monospace, and the theme's own code
+ * style adds a background, a padding and a font size that break the rows apart,
+ * so the span is flattened back to plain text here. `color: inherit` keeps a
+ * linked name in the link colour, and `white-space: inherit` keeps the `nowrap`
+ * above, which is what holds the box-drawing prefixes in line. */
+.content .type-tree code {
+    background-color: transparent;
+    color: inherit;
+    font-family: inherit;
+    font-size: inherit;
+    padding: 0;
+    white-space: inherit;
+}
+
 /* --------------------------------------------------------------------------
  * CAPABILITY CATALOGUE
  *

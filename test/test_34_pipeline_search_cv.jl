@@ -26,12 +26,13 @@
 
     @testset "pipeline_lens addressing" begin
         pipe = Pipeline(;
-                        steps = ("filter" => MissingDataFilter(), "impute" => Imputer(),
-                                 PricesToReturns(), EmpiricalPrior(), EqualWeighted()))
+                        steps = ("filter" => MissingDataFilter(),
+                                 "gap_fill" => PriceGapFill(), PricesToReturns(),
+                                 EmpiricalPrior(), EqualWeighted()))
 
         # bare step name / symbol / integer address the whole step
-        l_name = PortfolioOptimisers.pipeline_lens(pipe, "impute")
-        l_sym = PortfolioOptimisers.pipeline_lens(pipe, :impute)
+        l_name = PortfolioOptimisers.pipeline_lens(pipe, "gap_fill")
+        l_sym = PortfolioOptimisers.pipeline_lens(pipe, :gap_fill)
         l_int = PortfolioOptimisers.pipeline_lens(pipe, 2)
         @test l_name(pipe) === pipe.steps[2]
         @test l_sym(pipe) === pipe.steps[2]
@@ -62,27 +63,47 @@
 
         # a structureless symbol that is not a step name fails closed rather than
         # silently becoming a property access on the pipeline struct
-        @test_throws ArgumentError PortfolioOptimisers.pipeline_lens(pipe, :impute_typo)
-        # genuinely dotted symbols still fall through to parse_lens (no fail-closed throw)
+        @test_throws ArgumentError PortfolioOptimisers.pipeline_lens(pipe, :gap_fill_typo)
+        # a dotted symbol rooted at `steps` still falls through to parse_lens
         @test PortfolioOptimisers.pipeline_lens(pipe, Symbol("steps[1].col_thr")) isa
               Accessors.PropertyLens
+        # a dotted symbol rooted anywhere else is refused: the root is allowlisted, so the
+        # step-name table cannot be addressed
+        @test_throws ArgumentError PortfolioOptimisers.pipeline_lens(pipe,
+                                                                     Symbol("names.x"))
+        @test_throws ArgumentError PortfolioOptimisers.pipeline_lens(pipe,
+                                                                     Symbol("names[1].x"))
         # the String arm applies the same rule as its Symbol twin: a structureless key that
         # misses the step-name table is a typo, not a property access on the Pipeline
-        @test_throws ArgumentError PortfolioOptimisers.pipeline_lens(pipe, "impute_typo")
+        @test_throws ArgumentError PortfolioOptimisers.pipeline_lens(pipe, "gap_fill_typo")
         # including one that collides with a real Pipeline field, which used to be written
         # into on every fold
         @test_throws ArgumentError PortfolioOptimisers.pipeline_lens(pipe, "steps")
         @test_throws ArgumentError PortfolioOptimisers.pipeline_lens(pipe, "names")
+        # a structured key is not enough: only a path rooted at `steps` is a lens path, so
+        # a path into the step-name table is refused rather than written on every fold
+        @test_throws ArgumentError PortfolioOptimisers.pipeline_lens(pipe, "names[1]")
+        @test_throws ArgumentError PortfolioOptimisers.pipeline_lens(pipe, "names.x")
+        @test_throws ArgumentError PortfolioOptimisers.pipeline_lens(pipe, "stepsy[1]")
+        # and the refusal names the rule
+        rerr = try
+            PortfolioOptimisers.pipeline_lens(pipe, "names[1]")
+            nothing
+        catch e
+            e
+        end
+        @test rerr isa ArgumentError
+        @test occursin("nor a property path rooted at `steps`", rerr.msg)
         # and the message names the typo and suggests the step
         serr = try
-            PortfolioOptimisers.pipeline_lens(pipe, "imputer")
+            PortfolioOptimisers.pipeline_lens(pipe, "gapfill")
             nothing
         catch e
             e
         end
         @test serr isa ArgumentError
         @test occursin("is not a step name", serr.msg)
-        @test occursin("did you mean `impute`", serr.msg)
+        @test occursin("did you mean `gap_fill`", serr.msg)
     end
 
     @testset "name-addressed == index-addressed" begin
@@ -111,18 +132,19 @@
         vals[7, 4] = NaN
         pr = PricesResult(; X = TimeArray(timestamp(X), vals, string.("A", 1:5)))
         pipe = Pipeline(;
-                        steps = ("impute" => Imputer(), PricesToReturns(), EmpiricalPrior(),
-                                 EqualWeighted()))
+                        steps = ("gap_fill" => PriceGapFill(), PricesToReturns(),
+                                 EmpiricalPrior(), EqualWeighted()))
         r = ConditionalValueatRisk()
         cv = IndexWalkForward(60, 20)
 
         # tune the imputation statistic jointly with the workflow
-        p = ["impute" => [Imputer(; stat = MeanValue()), Imputer(; stat = MedianValue())]]
+        p = ["gap_fill" =>
+                 [PriceGapFill(; fill = MeanValue()), PriceGapFill(; fill = MedianValue())]]
         res = search_cross_validation(pipe, GridSearchCrossValidation(p; cv = cv, r = r),
                                       pr)
         @test res.opt isa Pipeline
         @test size(res.test_scores, 2) == 2
-        @test res.opt.steps[1] isa Imputer
+        @test res.opt.steps[1] isa PriceGapFill
         @test 1 <= res.idx <= 2
 
         # the tuned pipeline fits end to end
@@ -148,9 +170,9 @@
     end
 
     @testset "leakage: full-sample preprocessing picks a different winner" begin
-        # Construct data where the train and test windows disagree about which
-        # imputation statistic is best. Fitting inside the fold must use train
-        # statistics only; the point is that a pipeline never leaks test data.
+        # Construct data where the train and test windows disagree about which fill
+        # statistic is best. Fitting inside the fold must use train statistics only; the
+        # point is that a pipeline never leaks test data.
         rng = StableRNG(2024)
         T, N = 120, 4
         base = 100 .+ cumsum(randn(rng, T, N) / 20; dims = 1)
@@ -160,24 +182,28 @@
         vals = copy(values(X))
         vals[5, 1] = NaN
         vals[65, 2] = NaN
-        pr = PricesResult(; X = TimeArray(timestamp(X), vals, string.("A", 1:N)))
+        # Both gaps are interior, so the Span Rule bounds every column by the whole clock
+        # and the fill reaches them; the fill is bounded by the span, so one is stated.
+        pr = PricesResult(; X = TimeArray(timestamp(X), vals, string.("A", 1:N)),
+                          span = listing_span(vals))
 
         pipe = Pipeline(;
-                        steps = ("impute" => Imputer(), PricesToReturns(), EmpiricalPrior(),
-                                 EqualWeighted()))
+                        steps = ("gap_fill" => PriceGapFill(), PricesToReturns(),
+                                 EmpiricalPrior(), EqualWeighted()))
         r = ConditionalValueatRisk()
         cv = IndexWalkForward(70, 25)
-        p = ["impute" => [Imputer(; stat = MeanValue()), Imputer(; stat = MedianValue())]]
+        p = ["gap_fill" =>
+                 [PriceGapFill(; fill = MeanValue()), PriceGapFill(; fill = MedianValue())]]
 
         res = search_cross_validation(pipe, GridSearchCrossValidation(p; cv = cv, r = r),
                                       pr)
         # the fitted-per-fold scores are finite and the winner is one of the two candidates
         @test all(isfinite, res.test_scores)
-        @test res.opt.steps[1] isa Imputer
+        @test res.opt.steps[1] isa PriceGapFill
         @test res.idx in (1, 2)
 
-        # fold-fitted imputation uses train statistics only: refit the winning
-        # candidate on the first train window and confirm the fill came from train
+        # a fold-fitted fill uses train statistics only: refit the winning candidate on
+        # the first train window and confirm the fill value came from train
         cvres = split(cv, pr)
         train_idx = cvres.train_idx[1]
         winner = res.opt.steps[1]
@@ -187,7 +213,7 @@
                                                                                          :))
         train_vals = values(PortfolioOptimisers.port_opt_view(pr, train_idx, :).X)[:, 1]
         obs = [x for x in train_vals if !isnan(x)]
-        expected = winner.stat isa MeanValue ? mean(obs) : median(obs)
+        expected = winner.fill isa MeanValue ? mean(obs) : median(obs)
         j = findfirst(==(:A1), fitted.nx)
         @test fitted.v[j] ≈ expected
     end
@@ -221,12 +247,13 @@
         vals[7, 4] = NaN
         pr = PricesResult(; X = TimeArray(timestamp(X), vals, string.("A", 1:5)))
         pipe = Pipeline(;
-                        steps = ("impute" => Imputer(), PricesToReturns(), EmpiricalPrior(),
-                                 EqualWeighted()))
+                        steps = ("gap_fill" => PriceGapFill(), PricesToReturns(),
+                                 EmpiricalPrior(), EqualWeighted()))
         r = ConditionalValueatRisk()
         mr = MultipleRandomised(IndexWalkForward(60, 20); subset_size = 3, n_subsets = 2,
                                 seed = 42)
-        p = ["impute" => [Imputer(; stat = MeanValue()), Imputer(; stat = MedianValue())]]
+        p = ["gap_fill" =>
+                 [PriceGapFill(; fill = MeanValue()), PriceGapFill(; fill = MedianValue())]]
 
         # the price level must not be rejected (the old rolling-window rule blocked this)
         res = search_cross_validation(pipe, GridSearchCrossValidation(p; cv = mr, r = r),
@@ -236,7 +263,7 @@
         @test size(res.test_scores, 2) == 2
         @test size(res.test_scores, 1) == length(cv.train_idx)
         @test all(isfinite, res.test_scores)
-        @test res.opt.steps[1] isa Imputer
+        @test res.opt.steps[1] isa PriceGapFill
         @test res.idx in (1, 2)
 
         # the tuned pipeline fits end to end
@@ -292,10 +319,10 @@
         X = make_prices()
         pr = PricesResult(; X = X)
         pipe_pr = Pipeline(;
-                           steps = ("impute" => Imputer(), PricesToReturns(),
+                           steps = ("gap_fill" => PriceGapFill(), PricesToReturns(),
                                     EmpiricalPrior(), EqualWeighted()))
-        p_pr = ["impute" =>
-                    [Imputer(; stat = MeanValue()), Imputer(; stat = MedianValue())]]
+        p_pr = ["gap_fill" => [PriceGapFill(; fill = MeanValue()),
+                               PriceGapFill(; fill = MedianValue())]]
         res_pr = search_cross_validation(pipe_pr,
                                          GridSearchCrossValidation(p_pr; cv = ccv, r = r),
                                          pr)

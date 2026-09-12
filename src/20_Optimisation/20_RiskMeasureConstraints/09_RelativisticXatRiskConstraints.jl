@@ -4,7 +4,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Add Relativistic Value-at-Risk, RLVaR range, or Relativistic Drawdown-at-Risk constraints to
 `model`.
 
-Each overload uses power cone constraints (`PowerCone`) to encode the Tsallis entropy-based
+Each overload uses power cone constraints (`PowerCone`) to encode the Kaniadakis entropy-based
 risk measure parameterised by `kappa`. Auxiliary variables `t`, `z`, `omega`, `psi`,
 `theta`, and `epsilon` are introduced. The range variant encodes both a lower-tail and
 upper-tail relativistic expression.
@@ -15,8 +15,7 @@ Relativistic Value-at-Risk (Damian et al. 2023):
 
 ```math
 \\begin{align}
-\\mathrm{RLVaR}_{\\alpha,\\kappa}(\\boldsymbol{w}) &= t + c_{\\kappa}(\\alpha)\\, z + \\sum_{t=1}^T (\\psi_t + \\theta_t)\\,, \\\\
-c_{\\kappa}(\\alpha) &= \\frac{(\\alpha T)^\\kappa - (\\alpha T)^{-\\kappa}}{2\\kappa}\\,.
+\\mathrm{RLVaR}_{\\alpha,\\kappa}(\\boldsymbol{w}) &= t + \\ln_{\\kappa}\\!\\left(\\frac{1}{\\alpha T}\\right) z + \\sum_{t=1}^T (\\psi_t + \\theta_t)\\,.
 \\end{align}
 ```
 
@@ -24,11 +23,17 @@ Where:
 
   - ``\\mathrm{RLVaR}_{\\alpha,\\kappa}(\\boldsymbol{w})``: Relativistic Value-at-Risk.
   - ``t``, ``z``, ``\\psi_t``, ``\\theta_t``: Dual variables for the power cone programme.
-  - ``c_\\kappa(\\alpha)``: Relativistic scaling coefficient.
+  - $(math_dict[:ln_kappa])
   - $(math_dict[:alpha_rm])
+  - $(math_dict[:T])
   - ``\\kappa``: Relativistic parameter.
 
 encoded via power cones ``\\mathcal{K}_{1/(1+\\kappa)}`` and ``\\mathcal{K}_{1/(1-\\kappa)}``.
+
+For observation-weighted samples the weight vector is normalised to ``\\boldsymbol{w}`` with
+``\\sum_{t=1}^T w_t = 1``. The Kaniadakis logarithm keeps the argument
+``\\frac{1}{\\alpha T}``, and the sum ``\\sum_{t=1}^T (\\psi_t + \\theta_t)`` becomes
+``T \\sum_{t=1}^T w_t (\\psi_t + \\theta_t)``.
 
 # Arguments
 
@@ -96,6 +101,7 @@ series and this function writes the cones once.
 
   - [`risk_series`](@ref)
   - [`set_risk_bounds_and_expression!`](@ref)
+  - [`kappa_log`](@ref)
 """
 function set_relativistic_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
                                             opt::RiskJuMPOptimisationEstimator,
@@ -126,14 +132,12 @@ function set_relativistic_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMe
     state_set!(model, prefix, keys.epsilon, i, epsilon)
     wi = nothing_scalar_array_selector(r.w, pr.w)
     wi = get_observation_weights(wi, pr.X)
+    lnk = kappa_log(inv(alpha * T), kappa)
     risk = if isnothing(wi)
-        iat = inv(alpha * T)
-        lnk = (iat^kappa - iat^(-kappa)) * ik2
         JuMP.@expression(model, t + lnk * z + sum(psi + theta))
     else
-        iat = inv(alpha * sum(wi))
-        lnk = (iat^kappa - iat^(-kappa)) * ik2
-        JuMP.@expression(model, t + lnk * z + LinearAlgebra.dot(wi, psi + theta))
+        wi /= sum(wi)
+        JuMP.@expression(model, t + lnk * z + T * LinearAlgebra.dot(wi, psi + theta))
     end
     state_set!(model, prefix, keys.risk, i, risk)
     pcone_a, pcone_b, exceedance = JuMP.@constraints(model,

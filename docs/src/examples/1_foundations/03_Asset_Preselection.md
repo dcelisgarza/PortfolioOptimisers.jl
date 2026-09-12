@@ -1,5 +1,4 @@
 The source files can be found in [examples/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../../examples/1_foundations/03_Asset_Preselection.jl"
 ```
@@ -17,10 +16,10 @@ They know nothing about pipelines; a [`Pipeline`](@ref) drives them through
 [`fit_preprocessing`](@ref) and [`apply_preprocessing`](@ref) exactly as it drives a prior
 estimator through [`prior`](@ref). Three families:
 
-- [`CompleteAssetSelector`](@ref) — drop any asset column holding a `missing` or `NaN`.
-- [`ScoreSelector`](@ref) — score every asset with a risk measure, keep what a rule admits.
+  - [`CompleteAssetSelector`](@ref) — drop any asset column holding a `missing` or `NaN`.
+  - [`ScoreSelector`](@ref) — score every asset with a risk measure, keep what a rule admits.
     [`ZeroVarianceFilter`](@ref) is the named special case.
-- [`RedundancySelector`](@ref) — discard assets that duplicate information others carry.
+  - [`RedundancySelector`](@ref) — discard assets that duplicate information others carry.
 
 The idea that makes all of this safe is that **the universe a selector chooses on the
 training window is its fitted state**. Applying the fitted result to an unseen window
@@ -441,24 +440,24 @@ plot!(; xlabel = "|correlation| threshold", ylabel = "assets kept",
 
 ## Summary
 
-- Asset selectors are returns-level preprocessing estimators. The universe chosen on the
+  - Asset selectors are returns-level preprocessing estimators. The universe chosen on the
     training window is **fitted state**, replayed on unseen windows — that is what keeps
     selection out of the look-ahead-bias family.
-- [`ScoreSelector`](@ref) scores each asset with any risk measure whose
+  - [`ScoreSelector`](@ref) scores each asset with any risk measure whose
     [`supports_precomputed_returns`](@ref) is `true`, and [`bigger_is_better`](@ref) orients
     `best`/`worst` so you never pass a direction flag. [`Variance`](@ref) is not scoreable;
     use `SCM()`.
-- [`ThresholdRule`](@ref) is literal and ignores orientation; [`RankRule`](@ref) and
+  - [`ThresholdRule`](@ref) is literal and ignores orientation; [`RankRule`](@ref) and
     [`QuantileRule`](@ref) are ordinal and take counts (or fractions) **from each end**, so
     "drop the worst 5" needs no knowledge of `n`.
-- Ties are excluded, never split. `RankRule(; best = k)` may return fewer than `k` assets,
+  - Ties are excluded, never split. `RankRule(; best = k)` may return fewer than `k` assets,
     and two identical columns leave no survivor.
-- [`PairwiseCorrelation`](@ref) guarantees no surviving pair exceeds the threshold;
+  - [`PairwiseCorrelation`](@ref) guarantees no surviving pair exceeds the threshold;
     [`CorrelationComponents`](@ref) reads correlation transitively and reduces harder. They
     give different answers on the same input, by design.
-- A step that rewrites `:returns` after a prior, phylogeny, uncertainty, or constraint step
+  - A step that rewrites `:returns` after a prior, phylogeny, uncertainty, or constraint step
     is rejected at construction — the stale-universe bug is unrepresentable.
-- Selection thresholds and counts are hyperparameters. Tune them with
+  - Selection thresholds and counts are hyperparameters. Tune them with
     [`search_cross_validation`](@ref), never on the full sample.
 
 ---

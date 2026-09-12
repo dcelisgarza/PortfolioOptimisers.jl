@@ -29,8 +29,9 @@ like the base model.
 
 !!! note "Factor data required"
     These variants need factor returns, so the [`ReturnsResult`](@ref) must be built with a
-    factor block via `prices_to_returns(X, F)`. Factor views and factor sets refer to the
-    factor names in `rd.nf`.
+    factor block, which the ingestion layer assembles:
+    `prices_to_returns(price_ingestion(PriceIngestion(), X; F = F))`. Factor views and
+    factor sets refer to the factor names in `rd.nf`.
 =#
 
 using PortfolioOptimisers, PrettyTables, DataFrames
@@ -54,7 +55,7 @@ end;
 ## 1. Data, sets, and the equilibrium baseline
 
 We load the S&P 500 slice **with** its factor block, then declare **one** `UniverseSets` that all
-three variants read. It names both axes — assets under `xkey`, factors under `fkey`, each in the
+three variants read. It names both axes — assets under `xkey`, factors under `tfkey`, each in the
 column order of `rd.X` and `rd.F` — plus a couple of asset groups for the augmented asset views.
 Every factor-view estimator here resolves its names on the *declared* factor axis, so one object
 covers a factor-only mandate, an asset-only mandate, and the augmented model that writes both.
@@ -66,7 +67,7 @@ using CSV, TimeSeries
 
 X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
 F = TimeArray(CSV.File(joinpath(@__DIR__, "..", "Factors.csv.gz")); timestamp = :Date)[(end - 252):end]
-rd = prices_to_returns(X, F)
+rd = prices_to_returns(price_ingestion(PriceIngestion(), X; F = F))
 
 universe_sets = UniverseSets(;
                              dict = Dict("nx" => rd.nx, "nf" => rd.nf,
@@ -87,7 +88,7 @@ pretty_table(DataFrame(; factor = rd.nf); title = "Factor names (rd.nf)")
 
 [`BayesianBlackLittermanPrior`](@ref) takes a [`FactorPrior`](@ref) as its base estimator and
 accepts views written in **factor space**, resolved against the declared factor axis
-`sets.dict[sets.fkey]`. It is the Bayesian formulation: the factor prior supplies the structure,
+`sets.dict[sets.tfkey]`. It is the Bayesian formulation: the factor prior supplies the structure,
 the views update the factor means, and the result is mapped back to an asset-space posterior.
 
 Our factor views: momentum earns 5 bps/day, and quality underperforms low-volatility by 3
@@ -106,7 +107,7 @@ pr_bayes = prior(BayesianBlackLittermanPrior(; pe = FactorPrior(; pe = Empirical
 
 [`FactorBlackLittermanPrior`](@ref) also takes factor views, but propagates them to the assets
 through the factor regression rather than a factor prior. Its views resolve against the
-**declared factor axis**, `sets.dict[sets.fkey]`: the names must be looked up on the axis they
+**declared time-series factor axis**, `sets.dict[sets.tfkey]`: the names must be looked up on the axis they
 were written in, and the asset axis is what a view over a subset of assets slices. Two knobs
 matter:
 
@@ -149,7 +150,7 @@ call and a factor call you do not want to choose between.
 
 It is the one estimator that reads **both** declared axes, and it reads them out of the same
 `universe_sets` every variant above used: `a_views` resolve against `sets.dict[sets.xkey]` — so
-the `tech` group is in scope — and `f_views` against `sets.dict[sets.fkey]`.
+the `tech` group is in scope — and `f_views` against `sets.dict[sets.tfkey]`.
 =#
 
 asset_views = LinearConstraintEstimator(; val = ["AAPL == 0.0008", "tech == 0.0006"])

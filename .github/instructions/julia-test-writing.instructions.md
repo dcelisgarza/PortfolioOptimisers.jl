@@ -1,12 +1,12 @@
 ---
-applyTo: "test/test-*.jl"
+applyTo: "test/test_*.jl"
 ---
 
 # Test Writing Guidelines for PortfolioOptimisers.jl
 
 ## Test File Structure
 
-- All test files must be named `test-*.jl` and placed in the `test/` directory.
+- All test files must be named `test_*.jl` and placed in the `test/` directory.
 - Tests are auto-discovered and run by the test harness in `test/runtests.jl`.
 - Each test file should focus on testing a specific module or feature.
 
@@ -107,9 +107,9 @@ For result types that pass through unchanged (i.e., `f(::AbstractResult, args...
 end
 ```
 
-## Testing `factory` and `moment_view`
+## Testing `factory` and `port_opt_view`
 
-When an estimator implements `factory` (for observation weights) or `moment_view` (for slicing), test both:
+When an estimator implements `factory` (for observation weights) or `port_opt_view` (for slicing), test both:
 
 ```julia
 @testset "factory propagates weights" begin
@@ -120,9 +120,9 @@ When an estimator implements `factory` (for observation weights) or `moment_view
     @test ce_w.ce.w == w
 end
 
-@testset "moment_view slices correctly" begin
+@testset "port_opt_view slices correctly" begin
     ce = Covariance()
-    ce_v = moment_view(ce, 1:3)
+    ce_v = port_opt_view(ce, 1:3)
     @test ce_v isa Covariance
 end
 ```
@@ -131,7 +131,7 @@ end
 
 When adding new functionality:
 
- 1. Create a new test file `test-<feature>.jl` or add to existing test file.
+ 1. Create a new test file `test_<feature>.jl` or add to existing test file.
  2. Use `@safetestset` for top-level organisation.
  3. Test both success and failure cases.
  4. Verify all validation logic works correctly.

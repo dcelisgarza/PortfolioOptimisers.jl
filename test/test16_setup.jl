@@ -3,10 +3,13 @@
 # included by each split file. See ADR 0003.
 using Test, PortfolioOptimisers, DataFrames, CSV, TimeSeries, Clarabel, StatsBase, JuMP,
       Pajarito, HiGHS
-rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
-                                 timestamp = :Date)[(end - 252):end],
-                       TimeArray(CSV.File(joinpath(@__DIR__, "./assets/Factors.csv.gz"));
-                                 timestamp = :Date)[(end - 252):end])
+rd = prices_to_returns(price_ingestion(PriceIngestion(),
+                                       TimeArray(CSV.File(joinpath(@__DIR__,
+                                                                   "./assets/SP500.csv.gz"));
+                                                 timestamp = :Date)[(end - 252):end];
+                                       F = TimeArray(CSV.File(joinpath(@__DIR__,
+                                                                       "./assets/Factors.csv.gz"));
+                                                     timestamp = :Date)[(end - 252):end]))
 slv = [Solver(; name = :clarabel6, solver = Clarabel.Optimizer,
               check_sol = (; allow_local = true, allow_almost = true),
               settings = Dict("verbose" => false, "max_step_fraction" => 0.75)),

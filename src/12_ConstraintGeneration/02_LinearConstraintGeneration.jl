@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Holds the coefficient matrix `A` and the right-hand side vector `B` of one half of a linear constraint block.
 
-The half is an inequality or an equality according to the field of [`LinearConstraint`](@ref) that carries it, `ineq` or `eq`. The constructor checks that neither `A` nor `B` is empty, and that `size(A, 1) == length(B)`. The form is ``\\mathbf{A} \\boldsymbol{x} \\leq \\boldsymbol{B}``, so a pair with more bounds than rows, or more rows than bounds, is satisfied by no `x`.
+The half is an inequality or an equality according to the field of [`LinearConstraint`](@ref) that carries it, `ineq` or `eq`, and [`LinearConstraint`](@ref) states the form of each half. One row of `A` and the entry of `B` beside it are one constraint, so a pair holding more bounds than rows, or more rows than bounds, is satisfied by no value of the constrained variable.
 
 # Fields
 
@@ -67,7 +67,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Holds the inequality half and the equality half of a linear constraint block.
 
-Each half is a [`PartialLinearConstraint`](@ref), and either one may be absent.
+Each half is a [`PartialLinearConstraint`](@ref), and either one may be absent. The optimiser writes every row scaled and homogenised, as `sc * (A * w - k * B) <= 0` for the inequality half and `== 0` for the equality half, where `sc` is the constraint scale and `k` is the homogenisation scalar of a ratio objective. The returned solution is de-homogenised, so it satisfies the form below whatever the objective is.
 
 # Mathematical definition
 
@@ -85,8 +85,12 @@ Where:
   - $(math_dict[:ineq])
   - $(math_dict[:eq])
   - $(math_dict[:x])
+  - ``\\boldsymbol{a}^\\intercal``: One row of a coefficient matrix.
+  - ``b``: The entry of a response vector beside that row.
 
-The model asserts `sc * (A * w - k * B) <= 0` for the inequality half and `== 0` for the equality half, where `sc` is the constraint scale and `k` is the homogenisation scalar of a ratio objective. The solution is de-homogenised before it is returned, so the returned weights satisfy the form above whatever the objective is.
+One row and the entry beside it are one constraint. The row runs over the entries of ``\\boldsymbol{x}``, in the order of the universe the constraint is written against.
+
+The inequality half is defined in the ``\\leq`` sense, so the sense a row is written in fixes the half that holds it. The row ``\\boldsymbol{a}^\\intercal \\boldsymbol{x} = b`` is an equality and belongs to the ``\\text{eq}`` half. The row ``\\boldsymbol{a}^\\intercal \\boldsymbol{x} \\leq b`` belongs to the ``\\text{ineq}`` half as it stands. The row ``\\boldsymbol{a}^\\intercal \\boldsymbol{x} \\geq b`` is the same constraint as ``-\\boldsymbol{a}^\\intercal \\boldsymbol{x} \\leq -b``, so it belongs to the ``\\text{ineq}`` half with both sides negated.
 
 # Fields
 
@@ -104,6 +108,13 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - $(val_dict[:eqineq])
+
+## View parameters
+
+`LinearConstraint` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
+
+  - The method reads the index and drops it. Both halves are carried through unchanged, and `A` is never sliced along the asset axis.
+  - A row is written over the whole universe it was assembled against, so slicing `A` would change what the row asserts. [`port_opt_view`](@ref) states why the identity is the behaviour this slot needs.
 
 # Examples
 
@@ -126,6 +137,8 @@ LinearConstraint
 
   - [`PartialLinearConstraint`](@ref)
   - [`LinearConstraintEstimator`](@ref)
+  - [`merge_linear_constraints`](@ref)
+  - [`port_opt_view`](@ref)
 
 # References
 
@@ -152,25 +165,27 @@ function LinearConstraint(; ineq::Option{<:PartialLinearConstraint} = nothing,
     return LinearConstraint(ineq, eq)
 end
 """
-$(DocStringExtensions.TYPEDEF)
+    const VecLc = AbstractVector{<:LinearConstraint}
 
-Alias for an abstract vector of [`LinearConstraint`](@ref) elements.
+Every abstract vector whose elements are [`LinearConstraint`](@ref)s. The group exists so that one method signature accepts a whole block of assembled constraints, which is what a caller holds after several constraint steps have each produced one.
 
 # Related
 
   - [`LinearConstraint`](@ref)
   - [`Lc_VecLc`](@ref)
+  - [`merge_linear_constraints`](@ref)
 """
 const VecLc = AbstractVector{<:LinearConstraint}
 """
     const Lc_VecLc = Union{<:LinearConstraint, <:VecLc}
 
-Alias for a union of a single [`LinearConstraint`](@ref) or a vector of them.
+One assembled [`LinearConstraint`](@ref), or a vector of them. The group exists because a caller that ran one constraint step and a caller that ran several reach the same slot, so every method that reads that slot must accept both arities.
 
 # Related
 
   - [`LinearConstraint`](@ref)
   - [`VecLc`](@ref)
+  - [`linear_constraints`](@ref)
 """
 const Lc_VecLc = Union{<:LinearConstraint, <:VecLc}
 # Flattened constraint matrices as virtual properties: `:A_ineq`, `:B_ineq`, `:A_eq`,
@@ -188,9 +203,21 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Concatenate the rows of the same half of several [`PartialLinearConstraint`](@ref)s, skipping the absent ones.
 
+# Algorithm
+
+ 1. Collect the entries of `ps` that are not `nothing`, giving `kept`.
+ 2. Return `nothing` when `kept` is empty, because the half is absent from every input.
+ 3. Read the row width of the first entry of `kept`, giving `N`, and check every other entry against it.
+ 4. Stack the `A` matrices of `kept` in input order, and stack their `B` vectors the same way.
+ 5. Return the [`PartialLinearConstraint`](@ref) built from the two stacks.
+
 # Arguments
 
   - `ps`: The halves to concatenate, each a [`PartialLinearConstraint`](@ref) or `nothing`.
+
+# Validation
+
+  - Every kept half is written over the same number of variables, `size(p.A, 2) == N`. A `DimensionMismatch` is thrown otherwise.
 
 # Returns
 
@@ -220,6 +247,13 @@ Combine several [`LinearConstraint`](@ref)s into the single one that holds all t
 A `LinearConstraint` is a block of rows, and applying two blocks is the same as applying the block that stacks them — the inequality halves concatenate, the equality halves concatenate, and an absent half contributes nothing. This is exactly what generation already does when it is handed several estimators at once: [`centrality_constraints`](@ref) over a vector of [`CentralityConstraint`](@ref)s appends every row into one result rather than returning one result per estimator.
 
 That equivalence is what this function exists to preserve. A caller that computes its constraints separately — a [`Pipeline`](@ref) running one step per estimator — can merge them here and reach the optimiser with the value it would have had from the vector form.
+
+# Algorithm
+
+ 1. Return the one element unchanged when `lcs` holds a single constraint.
+ 2. Merge the `ineq` half of every element with [`merge_partial_linear_constraints`](@ref), giving the inequality half of the result.
+ 3. Merge the `eq` half of every element the same way, giving the equality half.
+ 4. Return the [`LinearConstraint`](@ref) built from the two halves.
 
 # Arguments
 
@@ -272,12 +306,13 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all equation parsing result types.
 
-All concrete and/or abstract types representing parsing results should be subtypes of `AbstractParsingResult`.
+All concrete and/or abstract types representing parsing results should be subtypes of `AbstractParsingResult`. Every member carries one parsed equation in canonical form — the variable names, their coefficients, the comparison operator and the right-hand side — so that the stages after [`parse_equation`](@ref) read one shape whatever the equation was written in.
 
 # Related
 
   - [`ParsingResult`](@ref)
   - [`RhoParsingResult`](@ref)
+  - [`parse_equation`](@ref)
 """
 abstract type AbstractParsingResult <: AbstractConstraintResult end
 """
@@ -307,11 +342,25 @@ Positional arguments correspond to the struct's fields. There is no keyword cons
 
   - `length(vars) == length(coef)`.
 
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.ParsingResult([\"w_A\", \"w_B\"], [1.0, 2.0], \"<=\", 1.0,
+                                         \"w_A + 2.0*w_B <= 1.0\")
+ParsingResult
+  vars ┼ Vector{String}: [\"w_A\", \"w_B\"]
+  coef ┼ Vector{Float64}: [1.0, 2.0]
+    op ┼ String: \"<=\"
+   rhs ┼ Float64: 1.0
+   eqn ┴ String: \"w_A + 2.0*w_B <= 1.0\"
+```
+
 # Related
 
   - [`AbstractParsingResult`](@ref)
   - [`parse_equation`](@ref)
   - [`RhoParsingResult`](@ref)
+  - [`get_linear_constraints`](@ref)
 """
 @concrete struct ParsingResult <: AbstractParsingResult
     """
@@ -345,25 +394,28 @@ Positional arguments correspond to the struct's fields. There is no keyword cons
     end
 end
 """
-$(DocStringExtensions.TYPEDEF)
+    const VecPR = AbstractVector{<:ParsingResult}
 
-Alias for an abstract vector of [`ParsingResult`](@ref) elements.
+Every abstract vector whose elements are [`ParsingResult`](@ref)s. The group exists because [`parse_equation`](@ref) answers a vector of equations with a vector of results, and every stage after it is broadcast over that vector.
 
 # Related
 
   - [`ParsingResult`](@ref)
   - [`PR_VecPR`](@ref)
+  - [`parse_equation`](@ref)
 """
 const VecPR = AbstractVector{<:ParsingResult}
 """
     const PR_VecPR = Union{<:ParsingResult, <:VecPR}
 
-Alias for a union of a single [`ParsingResult`](@ref) or a vector of them.
+One [`ParsingResult`](@ref), or a vector of them. The group exists because an equation may be written singly or in a list, and every stage after [`parse_equation`](@ref) carries whichever arity it was given through to [`get_linear_constraints`](@ref).
 
 # Related
 
   - [`ParsingResult`](@ref)
   - [`VecPR`](@ref)
+  - [`replace_group_by_assets`](@ref)
+  - [`get_linear_constraints`](@ref)
 """
 const PR_VecPR = Union{<:ParsingResult, <:VecPR}
 """
@@ -373,10 +425,14 @@ Collect the `dict` keys that start with `prefix`, as the candidate pool of a [`s
 
 A missing partition key is reported by the *group* that asked for it, so the whole key set is the wrong pool: the nearest neighbour of `nx_sector` in `Dict("ux_sector" => …)` is `ux_sector`, the very key under validation, and the caller would be told to rename the one thing that is correct. Narrowing the pool to the prefix the missing key must carry leaves only keys that could genuinely have been meant.
 
+# Algorithm
+
+ 1. Return the keys of `dict` that start with `prefix`, as strings, in the order `dict` iterates in.
+
 # Arguments
 
   - `dict`: The [`UniverseSets`](@ref) dictionary being validated.
-  - `prefix`: The axis prefix the missing key must carry, `xkey` or `fkey`.
+  - `prefix`: The axis prefix the missing key must carry, `xkey`, `tfkey` or `cfkey`.
 
 # Returns
 
@@ -398,10 +454,14 @@ Collect the `dict` keys that no axis in `claimed` has taken, as the candidate po
 
 The counterpart of [`prefixed_sets_keys`](@ref) for the one key with no prefix of its own. The asset universe is whichever key holds the asset names, so it cannot be found by a prefix; what *can* be ruled out is every key another declared axis already speaks for. Without that, a dict carrying only a feature axis answers a mistyped `xkey` with the feature key, which is a different axis and never the right fix.
 
+# Algorithm
+
+ 1. Return the keys of `dict` that start with no entry of `claimed`, as strings, in the order `dict` iterates in.
+
 # Arguments
 
   - `dict`: The [`UniverseSets`](@ref) dictionary being validated.
-  - `claimed`: The other declared axis prefixes, `uxkey`, `fkey`, `ufkey` and `zkey`.
+  - `claimed`: The other declared axis prefixes, `uxkey`, `tfkey`, `utfkey`, `cfkey` and `ucfkey`.
 
 # Returns
 
@@ -418,23 +478,108 @@ function unclaimed_sets_keys(dict::AbstractDict, claimed)
                   for k in keys(dict) if !any(p -> startswith(string(k), p), claimed)]
 end
 """
+    assert_factor_partition(dict::AbstractDict, k::AbstractString, fkey::AbstractString,
+                            axis::AbstractString) -> Nothing
+
+Assert that the factor partition `k` names a declared factor axis `fkey`, and that the two agree on how many factors there are.
+
+[`UniverseSets`](@ref) carries **two** factor axes, and both obey this one rule, so the rule is written once and called twice. `axis` names the axis in both messages — a caller who declared the time-series axis and wrote a cross-sectional partition is told which of the two is missing, which the key value alone does not say.
+
+# Arguments
+
+  - `dict`: The [`UniverseSets`](@ref) dictionary being validated.
+  - `k`: The `fkey`-prefixed key under validation.
+  - `fkey`: The factor axis key the prefix belongs to, `tfkey` or `cfkey`.
+  - `axis`: Names the axis in both diagnostic messages, for example `"time-series factor"`.
+
+# Validation
+
+  - `haskey(dict, fkey)`. A `KeyError` naming `axis` is thrown otherwise.
+  - `length(dict[k]) == length(dict[fkey])`. A `DimensionMismatch` naming `axis` is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`UniverseSets`](@ref)
+  - [`assert_factor_unique_group`](@ref)
+"""
+function assert_factor_partition(dict::AbstractDict, k::AbstractString,
+                                 fkey::AbstractString, axis::AbstractString)::Nothing
+    @argcheck(haskey(dict, fkey),
+              KeyError("$fkey (the $axis universe), required by the $axis partition $k. A `$fkey`-prefixed key declares a partition of the $axis axis, so the axis itself must be declared: add `$fkey => <factor names>` to `dict`, or rename `$k` if it was never meant to be a $axis partition."))
+    @argcheck(length(dict[k]) == length(dict[fkey]),
+              DimensionMismatch("the $axis partition `$k` and the $axis universe `$fkey` disagree on how many factors there are. Got\nlength(dict[$k]) => $(length(dict[k]))\nlength(dict[$fkey]) => $(length(dict[fkey]))"))
+    return nothing
+end
+"""
+    assert_factor_unique_group(dict::AbstractDict, k::AbstractString, fkey::AbstractString,
+                               ufkey::AbstractString, axis::AbstractString) -> Nothing
+
+Assert that the unique-entry factor group `k` names a declared factor axis `fkey`, that the partition it draws its entries from exists, and that the partition has the length of the axis.
+
+The sibling of [`assert_factor_partition`](@ref), and written for the same reason: [`UniverseSets`](@ref) carries two factor axes and both obey this one rule, so the rule is written once and called twice.
+
+# Arguments
+
+  - `dict`: The [`UniverseSets`](@ref) dictionary being validated.
+  - `k`: The `ufkey`-prefixed key under validation.
+  - `fkey`: The factor axis key the group summarises, `tfkey` or `cfkey`.
+  - `ufkey`: The unique-entry prefix `k` carries, `utfkey` or `ucfkey`.
+  - `axis`: Names the axis in every diagnostic message, for example `"cross-sectional factor"`.
+
+# Validation
+
+  - `haskey(dict, fkey)`. A `KeyError` naming `axis` is thrown otherwise.
+  - `haskey(dict, fkey * chopprefix(k, ufkey))`. A `KeyError` carrying a spelling suggestion is thrown otherwise.
+  - `length(dict[fkey * chopprefix(k, ufkey)]) == length(dict[fkey])`. A `DimensionMismatch` is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`UniverseSets`](@ref)
+  - [`assert_factor_partition`](@ref)
+  - [`prefixed_sets_keys`](@ref)
+"""
+function assert_factor_unique_group(dict::AbstractDict, k::AbstractString,
+                                    fkey::AbstractString, ufkey::AbstractString,
+                                    axis::AbstractString)::Nothing
+    @argcheck(haskey(dict, fkey),
+              KeyError("$fkey (the $axis universe), required by the unique-entry $axis group $k. A `$ufkey`-prefixed key summarises a partition of the $axis axis, so the axis itself must be declared: add `$fkey => <factor names>` to `dict`, or rename `$k` if it was never meant to be a $axis group."))
+    tmp_key = fkey * chopprefix(k, ufkey)
+    @argcheck(haskey(dict, tmp_key),
+              KeyError("$tmp_key (the $axis partition), required by the unique-entry $axis group $k. Every `$ufkey`-prefixed group names the `$fkey`-prefixed partition it draws its entries from: correct the spelling$(suggest_declared_key(tmp_key, prefixed_sets_keys(dict, fkey))), or add `$tmp_key => <one group per factor>` to `dict`."))
+    @argcheck(length(dict[tmp_key]) == length(dict[fkey]),
+              DimensionMismatch("the $axis partition `$tmp_key`, required by the unique-entry $axis group `$k`, and the $axis universe `$fkey` disagree on how many factors there are. Got\nlength(dict[$tmp_key]) => $(length(dict[tmp_key]))\nlength(dict[$fkey]) => $(length(dict[fkey]))"))
+    return nothing
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Declares the universes a portfolio problem is written against, and any groupings or partitions of them.
 
 Constraint generation and the estimator routines read it to expand group references, to map a group name to its member list, and to validate membership.
 
-It **declares every axis it carries**: `xkey`/`uxkey` for assets, `fkey`/`ufkey` for factors, and `zkey` for features. Assets are the *primary* axis — `haskey(dict, xkey)` is required, and it is the axis a view slices. The factor and feature axes are **optional**: requiring either would invalidate every sets object built for a problem with no factor model or no feature program, so a consumer that needs one and does not find it throws at the point of need rather than at construction.
+It **declares every axis it carries**: `xkey`/`uxkey` for assets, `tfkey`/`utfkey` for time-series factors, `cfkey`/`ucfkey` for cross-sectional factors, and `nikey` for the Non-Investable Axis. Assets are the *primary* axis — `haskey(dict, xkey)` is required, and it is the axis a view slices. The factor axes are **optional**: requiring either would invalidate every sets object built for a problem with no factor model, so a consumer that needs one and does not find it throws at the point of need rather than at construction.
+
+There are **two factor axes** because the two factor families name different things. A time-series regression fits one loading vector per asset over the observations, so its factors are the columns of `rd.F` and a caller copies `rd.nf` into the dict under `tfkey`. A cross-sectional regression fits one loading vector per observation across the assets, so its factors are the exposures the fit was built from, and they exist only inside the fitted block. One axis carrying both would make a single key mean two different lists on one problem. A consumer never chooses between them by hand: [`factor_axis_key`](@ref) reads the key off the loadings result it already holds.
 
 If a key in `dict` starts with the same value as `xkey`, it means that the corresponding group must have the same length as the asset universe, `dict[xkey]`. This is useful for defining partitions of the asset universe, for example when using [`asset_sets_matrix`](@ref) with [`NestedClustered`](@ref).
 
 If a key in `dict` starts with the same value as `uxkey`, it identifies a unique-entry group variant. The corresponding `xkey`-prefixed group must exist in `dict` with the same length as the asset universe, and is used to match each asset to a unique entry from the `uxkey`-prefixed group. This enables constraint generation using unique entries even in [`NestedClustered`](@ref) optimisations.
 
-The `fkey`/`ufkey` prefixes mean the same thing on the factor axis, but they buy something different. On the asset side the conventions serve *views*; factors are never sliced by an asset index, so on the factor side they buy length validation at construction and one shared mental model.
+The `tfkey`/`utfkey` prefixes mean the same thing on the time-series factor axis, and `cfkey`/`ucfkey` mean the same thing again on the cross-sectional one. They buy something different from the asset pair. On the asset side the conventions serve *views*; factors are never sliced by an asset index, so on either factor side they buy length validation at construction and one shared mental model. The two factor axes are validated alike, and neither is validated against the other: a problem may declare one, both, or neither.
 
-`zkey` has **no prefix convention at all**, and that asymmetry is the point. `xkey` and `fkey` each have a unique-entry sibling because each names an axis that *partitions are written over*; nothing is written over the feature axis. A graded feature program's taxonomy keys are `xkey`-prefixed and asset-length, and its column nodes are named directly out of the flat list `dict[zkey]`. So `zkey` carries exactly one rule — `allunique(dict[zkey])`, so [`ReturnsResult`](@ref)'s own uniqueness check cannot be reached with a duplicate — and no length rule whatever.
+A taxonomy reaches the Asset Panel through [`panel_input`](@ref), which reads one `xkey`-prefixed key as one Panel Field. The panel names its own columns, so no key declares a feature axis.
 
-A key matching none of the four prefixes is a plain group: expanded by name and **axis-blind**, which is why a factor group needs no machinery of its own.
+`nikey` declares the **Non-Investable Axis**: the names the Investable Mask left out, which is the axis a forced liquidation is priced on. It is unlike the other six in three ways, and each is deliberate. It is **minted, not authored** — a door writes it after it reduces an optimiser to the Investable Mask, so a caller who states one by hand is overwritten there; authoring one is still the way to resolve a liquidation rate outside a door. It is **dropped by every view**, so a sets that carries it was reduced by exactly one door for exactly one problem, and a cluster of a nested optimisation can never inherit its parent's departures and charge them again. And it is **bare** — no prefixed partition and no unique-entry twin — because its entries are unique by construction, and a plain group already reaches it.
+
+A key matching none of the seven prefixes is a plain group: expanded by name and **axis-blind**, which is why a factor group needs no machinery of its own, and why a group resolves on the Non-Investable Axis with no `nikey`-prefixed machinery at all.
 
 # Fields
 
@@ -445,9 +590,11 @@ $(DocStringExtensions.FIELDS)
     UniverseSets(;
         xkey::AbstractString = "nx",
         uxkey::AbstractString = "ux",
-        fkey::AbstractString = "nf",
-        ufkey::AbstractString = "uf",
-        zkey::AbstractString = "nz",
+        tfkey::AbstractString = "nf",
+        utfkey::AbstractString = "uf",
+        cfkey::AbstractString = "ncf",
+        ucfkey::AbstractString = "ucf",
+        nikey::AbstractString = "ni",
         dict::AbstractDict{<:AbstractString, <:Any}
     ) -> UniverseSets
 
@@ -457,24 +604,38 @@ Keywords correspond to the struct's fields.
 
   - `!isempty(dict)`.
   - `haskey(dict, xkey)`.
-  - No two of `xkey`, `uxkey`, `fkey`, `ufkey`, `zkey` may be a prefix of one another (20 ordered checks, which also rules out any two being equal).
-  - If `haskey(dict, zkey)`, `allunique(dict[zkey])`.
+  - No two of `xkey`, `uxkey`, `tfkey`, `utfkey`, `cfkey`, `ucfkey`, `nikey` may be a prefix of one another (42 ordered checks, which also rules out any two being equal).
   - If a key in `dict` starts with the same value as `xkey`, `length(dict[k]) == length(dict[xkey])`.
   - If a key in `dict` starts with the same value as `uxkey`, there must be a corresponding key in `dict` where the `uxkey` prefix is replaced by the `xkey` prefix, and its length must equal `length(dict[xkey])`.
-  - If a key in `dict` starts with the same value as `fkey`, `haskey(dict, fkey)` and `length(dict[k]) == length(dict[fkey])`.
-  - If a key in `dict` starts with the same value as `ufkey`, there must be a corresponding key in `dict` where the `ufkey` prefix is replaced by the `fkey` prefix, and its length must equal `length(dict[fkey])`.
+  - If a key in `dict` starts with the same value as `tfkey`, `haskey(dict, tfkey)` and `length(dict[k]) == length(dict[tfkey])`.
+  - If a key in `dict` starts with the same value as `utfkey`, there must be a corresponding key in `dict` where the `utfkey` prefix is replaced by the `tfkey` prefix, and its length must equal `length(dict[tfkey])`.
+  - If a key in `dict` starts with the same value as `cfkey`, `haskey(dict, cfkey)` and `length(dict[k]) == length(dict[cfkey])`.
+  - If a key in `dict` starts with the same value as `ucfkey`, there must be a corresponding key in `dict` where the `ucfkey` prefix is replaced by the `cfkey` prefix, and its length must equal `length(dict[cfkey])`.
+  - If `dict` carries `nikey`, its entries are unique, and none of them is also in `dict[xkey]`. An asset is investable or it is not, and a name on both axes would be priced twice — once as a holding and once as a forced exit.
+
+## View parameters
+
+`UniverseSets` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
+
+  - The method reads the asset index alone. It drops every further positional argument, because no axis but the asset axis is sliced.
+  - Every `xkey`-prefixed entry of `dict` is sliced to the selected assets, and every `uxkey`-prefixed entry is rebuilt from the sliced partition it names.
+  - The `tfkey`-, `utfkey`-, `cfkey`- and `ucfkey`-prefixed entries, and every plain group, are carried through unchanged. [`port_opt_view`](@ref) states why each axis is exempt.
+  - The `nikey` entry is **dropped**, because only a door mints one. The key itself is matched exactly rather than by prefix, so a plain group whose name merely starts with it survives.
+  - The seven key prefixes are carried through unchanged, so the viewed value declares the same axes as the original.
 
 # Examples
 
 ```jldoctest
 julia> UniverseSets(; xkey = \"nx\", dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"], \"group1\" => [\"A\", \"B\"]))
 UniverseSets
-   xkey ┼ String: "nx"
-  uxkey ┼ String: "ux"
-   fkey ┼ String: "nf"
-  ufkey ┼ String: "uf"
-   zkey ┼ String: "nz"
-   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"], "group1" => ["A", "B"])
+    xkey ┼ String: "nx"
+   uxkey ┼ String: "ux"
+   tfkey ┼ String: "nf"
+  utfkey ┼ String: "uf"
+   cfkey ┼ String: "ncf"
+  ucfkey ┼ String: "ucf"
+   nikey ┼ String: "ni"
+    dict ┴ Dict{String, Vector{String}}: Dict("group1" => ["A", "B"], "nx" => ["A", "B", "C"])
 ```
 
 # Related
@@ -482,8 +643,12 @@ UniverseSets
   - [`replace_group_by_assets`](@ref)
   - [`estimator_to_val`](@ref)
   - [`linear_constraints`](@ref)
+  - [`factor_axis_key`](@ref)
   - [`factor_universe`](@ref)
-  - [`feature_universe`](@ref)
+  - [`panel_input`](@ref)
+  - [`prefixed_sets_keys`](@ref)
+  - [`unclaimed_sets_keys`](@ref)
+  - [`port_opt_view`](@ref)
 """
 @concrete struct UniverseSets <: AbstractEstimator
     """
@@ -495,39 +660,52 @@ UniverseSets
     """
     uxkey
     """
-    $(field_dict[:us_fkey])
+    $(field_dict[:us_tfkey])
     """
-    fkey
+    tfkey
     """
-    $(field_dict[:us_ufkey])
+    $(field_dict[:us_utfkey])
     """
-    ufkey
+    utfkey
     """
-    $(field_dict[:us_zkey])
+    $(field_dict[:us_cfkey])
     """
-    zkey
+    cfkey
+    """
+    $(field_dict[:us_ucfkey])
+    """
+    ucfkey
+    """
+    $(field_dict[:us_nikey])
+    """
+    nikey
     """
     $(field_dict[:dict])
     """
     dict
-    function UniverseSets(xkey::AbstractString, uxkey::AbstractString, fkey::AbstractString,
-                          ufkey::AbstractString, zkey::AbstractString,
+    function UniverseSets(xkey::AbstractString, uxkey::AbstractString,
+                          tfkey::AbstractString, utfkey::AbstractString,
+                          cfkey::AbstractString, ucfkey::AbstractString,
+                          nikey::AbstractString,
                           dict::AbstractDict{<:AbstractString, <:Any})::UniverseSets
         @argcheck(!isempty(dict), IsEmptyError)
         @argcheck(haskey(dict, xkey),
-                  KeyError("$xkey (the asset universe), required by UniverseSets. The asset axis is the one mandatory axis: correct the spelling$(suggest_declared_key(xkey, unclaimed_sets_keys(dict, (uxkey, fkey, ufkey, zkey)))), pass `xkey = <the key you wrote>`, or add `$xkey => <asset names>` to `dict`."))
-        knames = ("xkey", "uxkey", "fkey", "ufkey", "zkey")
-        kvals = (xkey, uxkey, fkey, ufkey, zkey)
+                  KeyError("$xkey (the asset universe), required by UniverseSets. The asset axis is the one mandatory axis: correct the spelling$(suggest_declared_key(xkey, unclaimed_sets_keys(dict, (uxkey, tfkey, utfkey, cfkey, ucfkey, nikey)))), pass `xkey = <the key you wrote>`, or add `$xkey => <asset names>` to `dict`."))
+        knames = ("xkey", "uxkey", "tfkey", "utfkey", "cfkey", "ucfkey", "nikey")
+        kvals = (xkey, uxkey, tfkey, utfkey, cfkey, ucfkey, nikey)
         for i in eachindex(kvals), j in eachindex(kvals)
             i == j && continue
             @argcheck(!startswith(kvals[i], kvals[j]),
                       ArgumentError("$(knames[i]) ($(kvals[i])) must not start with $(knames[j]) ($(kvals[j]))"))
         end
-        if haskey(dict, zkey)
-            @argcheck(allunique(dict[zkey]),
-                      ArgumentError("the declared feature axis `$zkey` must not repeat a node, because a duplicate would silently merge two columns and would be rejected by `ReturnsResult`'s own `nz` uniqueness check anyway"))
+        if haskey(dict, nikey)
+            ni = dict[nikey]
+            @argcheck(allunique(ni),
+                      ArgumentError("the non-investable axis `$nikey` names an asset twice. A departure happens once, so a repeated name would price one forced exit more than once: deduplicate `dict[$nikey]`."))
+            @argcheck(isdisjoint(ni, dict[xkey]),
+                      ArgumentError("$(length(intersect(ni, dict[xkey]))) name(s) are on both the asset universe `$xkey` and the non-investable axis `$nikey`. An asset is investable or it is not, and a name on both would be priced twice, once as a holding and once as a forced exit: remove it from whichever axis it does not belong to."))
         end
-        for k in setdiff(keys(dict), (xkey, fkey, zkey))
+        for k in setdiff(keys(dict), (xkey, tfkey, cfkey, nikey))
             if startswith(k, xkey)
                 @argcheck(length(dict[k]) == length(dict[xkey]),
                           DimensionMismatch("the asset partition `$k` and the asset universe `$xkey` disagree on how many assets there are. Got\nlength(dict[$k]) => $(length(dict[k]))\nlength(dict[$xkey]) => $(length(dict[xkey]))"))
@@ -537,146 +715,519 @@ UniverseSets
                           KeyError("$tmp_key (the asset partition), required by the unique-entry asset group $k. Every `$uxkey`-prefixed group names the `$xkey`-prefixed partition it draws its entries from: correct the spelling$(suggest_declared_key(tmp_key, prefixed_sets_keys(dict, xkey))), or add `$tmp_key => <one group per asset>` to `dict`."))
                 @argcheck(length(dict[tmp_key]) == length(dict[xkey]),
                           DimensionMismatch("the asset partition `$tmp_key`, required by the unique-entry asset group `$k`, and the asset universe `$xkey` disagree on how many assets there are. Got\nlength(dict[$tmp_key]) => $(length(dict[tmp_key]))\nlength(dict[$xkey]) => $(length(dict[xkey]))"))
-            elseif startswith(k, fkey)
-                @argcheck(haskey(dict, fkey),
-                          KeyError("$fkey (the factor universe), required by the factor partition $k. A `$fkey`-prefixed key declares a partition of the factor axis, so the axis itself must be declared: add `$fkey => <factor names>` to `dict`, or rename `$k` if it was never meant to be a factor partition."))
-                @argcheck(length(dict[k]) == length(dict[fkey]),
-                          DimensionMismatch("the factor partition `$k` and the factor universe `$fkey` disagree on how many factors there are. Got\nlength(dict[$k]) => $(length(dict[k]))\nlength(dict[$fkey]) => $(length(dict[fkey]))"))
-            elseif startswith(k, ufkey)
-                @argcheck(haskey(dict, fkey),
-                          KeyError("$fkey (the factor universe), required by the unique-entry factor group $k. A `$ufkey`-prefixed key summarises a partition of the factor axis, so the axis itself must be declared: add `$fkey => <factor names>` to `dict`, or rename `$k` if it was never meant to be a factor group."))
-                tmp_key = fkey * chopprefix(k, ufkey)
-                @argcheck(haskey(dict, tmp_key),
-                          KeyError("$tmp_key (the factor partition), required by the unique-entry factor group $k. Every `$ufkey`-prefixed group names the `$fkey`-prefixed partition it draws its entries from: correct the spelling$(suggest_declared_key(tmp_key, prefixed_sets_keys(dict, fkey))), or add `$tmp_key => <one group per factor>` to `dict`."))
-                @argcheck(length(dict[tmp_key]) == length(dict[fkey]),
-                          DimensionMismatch("the factor partition `$tmp_key`, required by the unique-entry factor group `$k`, and the factor universe `$fkey` disagree on how many factors there are. Got\nlength(dict[$tmp_key]) => $(length(dict[tmp_key]))\nlength(dict[$fkey]) => $(length(dict[fkey]))"))
+            elseif startswith(k, tfkey)
+                assert_factor_partition(dict, k, tfkey, "time-series factor")
+            elseif startswith(k, utfkey)
+                assert_factor_unique_group(dict, k, tfkey, utfkey, "time-series factor")
+            elseif startswith(k, cfkey)
+                assert_factor_partition(dict, k, cfkey, "cross-sectional factor")
+            elseif startswith(k, ucfkey)
+                assert_factor_unique_group(dict, k, cfkey, ucfkey, "cross-sectional factor")
             end
         end
-        return new{typeof(xkey), typeof(uxkey), typeof(fkey), typeof(ufkey), typeof(zkey),
-                   typeof(dict)}(xkey, uxkey, fkey, ufkey, zkey, dict)
+        return new{typeof(xkey), typeof(uxkey), typeof(tfkey), typeof(utfkey),
+                   typeof(cfkey), typeof(ucfkey), typeof(nikey), typeof(dict)}(xkey, uxkey,
+                                                                               tfkey,
+                                                                               utfkey,
+                                                                               cfkey,
+                                                                               ucfkey,
+                                                                               nikey, dict)
     end
 end
 function UniverseSets(; xkey::AbstractString = "nx", uxkey::AbstractString = "ux",
-                      fkey::AbstractString = "nf", ufkey::AbstractString = "uf",
-                      zkey::AbstractString = "nz",
+                      tfkey::AbstractString = "nf", utfkey::AbstractString = "uf",
+                      cfkey::AbstractString = "ncf", ucfkey::AbstractString = "ucf",
+                      nikey::AbstractString = "ni",
                       dict::AbstractDict{<:AbstractString, <:Any})::UniverseSets
-    return UniverseSets(xkey, uxkey, fkey, ufkey, zkey, dict)
+    return UniverseSets(xkey, uxkey, tfkey, utfkey, cfkey, ucfkey, nikey, dict)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return a view of a [`UniverseSets`](@ref) restricted to the assets at index `i`.
 
-Slices all `xkey`-prefixed groups by `i`, and derives unique-entry `uxkey`-prefixed groups from the corresponding sliced `xkey` group.
+The asset axis is the only axis this view slices, and the other three are exempt for two different reasons. **Both** factor axes are exempt because an asset index has no meaning on either, and they are treated alike: a `cfkey`-prefixed entry comes back bit-identical exactly as a `tfkey`-prefixed one does. Declaring an axis is what makes the exemption a property of the *data*: before the declaration, a factor-flavoured sets sitting in a `@vprop` field was sliced by asset indices and failed with a length mismatch, and the only defence was omitting the annotation by hand, field by field. There is deliberately **no factor-index arity** either. `port_opt_view(rd, i, j, k)` can slice `rd.nf`, but no internal caller passes a non-colon `k`, so a user who slices factors updates their sets themselves.
 
-# The factor axis is left alone
+# Algorithm
 
-`fkey`- and `ufkey`-prefixed entries come back **bit-identical**: an asset index has no meaning on the factor axis. Declaring the axis is what makes that exemption a property of the *data* — before it, a factor-flavoured sets sitting in a `@vprop` field was sliced by asset indices and failed with a length mismatch, and the only defence was omitting the annotation by hand, per field.
+ 1. Read `xkey` and `uxkey` from `sets`, and open an empty dictionary `dict` of the type `sets.dict` has.
+ 2. For an entry of `sets.dict` whose key starts with `xkey`, take `view(v, i)`, the group restricted to the selected assets.
+ 3. For an entry whose key starts with `uxkey`, take the unique entries of the `xkey`-prefixed partition it names, restricted to `i`. The unique-entry group is therefore derived from the sliced partition and never from the original one.
+ 4. Skip the `nikey` entry, matched **exactly**. Only a door mints the Non-Investable Axis, so a view never carries one: a cluster of a nested optimisation would otherwise inherit its parent's departures and charge every one of them again, once per cluster. The match is exact rather than by prefix so that a plain group whose name merely starts with `nikey` — `"nikkei225"` under the default `"ni"` — is not silently dropped with it.
+ 5. Carry every other entry through unchanged, into the same `dict`. The `tfkey`-, `utfkey`-, `cfkey`- and `ucfkey`-prefixed entries, and every plain group, come back bit-identical.
+ 6. Return the [`UniverseSets`](@ref) built from `dict` and the eight unchanged key prefixes, which revalidates the prefix grammar over the viewed universe.
 
-There is deliberately **no factor-index arity**. `port_opt_view(rd, i, j, k)` can slice `rd.nf`, but no internal caller passes a non-colon `k`; a user who slices factors updates their sets themselves.
+# Arguments
 
-# The feature axis is left alone too, for a different reason
+  - `sets`: The [`UniverseSets`](@ref) to view.
+  - `i`: The asset index selection.
+  - `args...`: Additional positional arguments (ignored).
 
-`zkey`'s entry also comes back bit-identical, but not because an asset index is meaningless on it — some of its nodes *are* assets. It is left alone because the axis is **declared** rather than derived: the caller wrote the node list down, so it is the program's coordinate system and not a summary of the current universe. That is what makes `size(Z, 2)` **fold-invariant** for a graded [`asset_sets_features`](@ref) program — exactly the opposite of the group-name-key path, where the viewed producer rebuilds the axis from the viewed taxonomy and a group with no members left simply disappears.
+# Returns
 
-The consequence is accepted and documented rather than filtered: an asset node whose asset the view dropped survives as an **all-zero column**.
+  - `sets::UniverseSets`: A new [`UniverseSets`](@ref) over the selected assets, declaring the same seven key prefixes as the original.
 
 # Related
 
   - [`UniverseSets`](@ref)
-  - [`asset_sets_features`](@ref)
+  - [`port_opt_view`](@ref)
 """
 function port_opt_view(sets::UniverseSets, i, args...)::UniverseSets
     xkey = sets.xkey
     uxkey = sets.uxkey
+    nikey = sets.nikey
     dict = typeof(sets.dict)()
     for (k, v) in sets.dict
         if startswith(k, xkey)
             v = view(v, i)
         elseif startswith(k, uxkey)
             v = unique(view(sets.dict[xkey * chopprefix(k, uxkey)], i))
+        elseif k == nikey
+            continue
         end
         push!(dict, k => v)
     end
-    return UniverseSets(; xkey = xkey, uxkey = uxkey, fkey = sets.fkey, ufkey = sets.ufkey,
-                        zkey = sets.zkey, dict = dict)
+    return UniverseSets(; xkey = xkey, uxkey = uxkey, tfkey = sets.tfkey,
+                        utfkey = sets.utfkey, cfkey = sets.cfkey, ucfkey = sets.ucfkey,
+                        nikey = nikey, dict = dict)
 end
 """
-    factor_universe(sets::UniverseSets, K::Integer, need::AbstractString,
-                    source::AbstractString) -> VecStr
+    non_investable_sets(sets::Nothing, ni) -> Nothing
+    non_investable_sets(sets::UniverseSets, ni::VecStr) -> UniverseSets
 
-Read the **declared** factor universe, `sets.dict[sets.fkey]`, checking that it exists and that it agrees with `source` — the `observations × factors` matrix whose `K` columns it must name — on how many factors there are.
+Mint the Non-Investable Axis on `sets`: declare `ni`, the names the Investable Mask left out, under `sets.nikey`.
 
-The factor axis is optional on [`UniverseSets`](@ref) but is not optional for a consumer written against it, so the failure has to be diagnosed at the point of need. Both messages name `sets.fkey` and the matrix, because the two are what a caller has to reconcile: a user arriving from the pre-declaration shape put the factor names under `xkey` and would otherwise be told about an *asset* universe they never wrote in.
+This is the **only** way the axis comes to exist. A door calls it after it has reduced an optimiser to the Investable Mask, so a [`UniverseSets`](@ref) that carries the axis was reduced by exactly one door, for exactly one problem, and [`port_opt_view`](@ref) drops it rather than pass it to a sub-problem that did not earn it.
 
-`need` names the consumer ("a `FactorSpace` constraint"), `source` the matrix (`"rr.M"`, `"F"`) — so one helper serves every consumer of the axis without any of them re-encoding the checks.
+A caller may still declare the axis by hand, and outside a door that is the only way to resolve a forced-liquidation rate — [`fees_constraints`](@ref) called directly, with no optimisation around it. Inside a door the mask is the truth, so a hand-authored entry is **overwritten** here rather than merged: the two can only disagree, and the mask is the one derived from the data.
+
+An empty `ni` returns `sets` untouched. Nothing left the universe, so nothing is owed, and declaring an empty axis would make [`fees_constraints`](@ref) resolve a carrier that prices no position.
+
+# Algorithm
+
+ 1. Return `sets` unchanged when `ni` is empty.
+ 2. Otherwise copy `sets.dict`, write `ni` under `sets.nikey`, and rebuild the [`UniverseSets`](@ref) from it and the seven unchanged key prefixes, which revalidates uniqueness and disjointness over the minted axis.
+
+# Arguments
+
+  - `sets`: The [`UniverseSets`](@ref) to mint the axis on, or `nothing`.
+  - `ni`: The names the Investable Mask left out, in the order the complement of the mask visits them.
+
+# Returns
+
+  - `sets`: The [`UniverseSets`](@ref) carrying the Non-Investable Axis, or `nothing`.
 
 # Related
 
   - [`UniverseSets`](@ref)
+  - [`port_opt_view`](@ref)
+  - [`investable_reduction`](@ref)
+  - [`coverage_reduction`](@ref)
+  - [`fees_constraints`](@ref)
+"""
+function non_investable_sets(::Nothing, ::Any)
+    return nothing
+end
+function non_investable_sets(sets::UniverseSets, ni::VecStr)::UniverseSets
+    if isempty(ni)
+        return sets
+    end
+    dict = copy(sets.dict)
+    dict[sets.nikey] = ni
+    return UniverseSets(; xkey = sets.xkey, uxkey = sets.uxkey, tfkey = sets.tfkey,
+                        utfkey = sets.utfkey, cfkey = sets.cfkey, ucfkey = sets.ucfkey,
+                        nikey = sets.nikey, dict = dict)
+end
+"""
+    non_investable_names(nx::Nothing, imsk::BitVector) -> VecStr
+    non_investable_names(nx::VecStr, imsk::BitVector) -> VecStr
+
+Read the names the Investable Mask leaves out, in the order the complement of the mask visits them.
+
+The order is the whole point. A forced-liquidation carrier is sliced to the complement of the mask by index, and the rate that prices it is resolved against these names by position, so the two must walk the complement the same way. Both do: this indexes `nx` with `.!imsk`, which is ascending, and [`port_opt_view`](@ref)`(::Fees, i, X)` takes the complement of `i` over the width of `X`, which is ascending too.
+
+Unnamed returns data answers an empty vector rather than throwing. Names are what the axis is made of, so a problem with no names has no Non-Investable Axis to mint — and no name-keyed constraint to resolve against one either.
+
+It lives here, beside [`non_investable_sets`](@ref), rather than beside the optimisation door that first needed it, because a wrapping prior mints the axis at its own entry too and loads seven directories earlier. The vocabulary of the Non-Investable Axis is therefore one file, and no layer reaches it by a back reference.
+
+# Arguments
+
+  - `nx`: The asset names of the *unreduced* returns data, or `nothing`.
+  - $(arg_dict[:imsk])
+
+# Returns
+
+  - `ni::VecStr`: The names the mask leaves out, or an empty vector.
+
+# Related
+
+  - [`investable_mask`](@ref)
+  - [`non_investable_sets`](@ref)
+  - [`non_investable_universe`](@ref)
+  - [`investable_reduction`](@ref)
+  - [`announce_non_investable`](@ref)
+"""
+function non_investable_names(::Nothing, ::BitVector)::VecStr
+    return String[]
+end
+function non_investable_names(nx::VecStr, imsk::BitVector)::VecStr
+    return nx[.!imsk]
+end
+"""
+    record_non_investable_drop!(ledger::Nothing, what::AbstractString) -> Nothing
+    record_non_investable_drop!(ledger::AbstractVector, what::AbstractString) -> Nothing
+
+Record, for the door to report, one thing a departure cost.
+
+A departed name is dropped where it is met — a view row here, a group member there — and each of those places is far from the door that derived the mask and knows the departure happened *as an event*. Reporting at the site would say the same thing once per row per window of a walk-forward, which is what ADR 0125 refused. Reporting nothing leaves a caller who wrote three views and got one fitted with no way to learn it. So the site writes what it dropped into a **ledger**, and the door reads the ledger once and says both things together, through [`announce_non_investable`](@ref).
+
+A `nothing` ledger is the no-collection path, and it is the default everywhere: a caller who assembles constraints outside a door has no door to report to, and pays nothing for the ledger it does not keep. The branch is dispatch rather than a condition, as it is throughout the reduction machinery.
+
+`what` is a noun phrase naming the casualty, not a sentence: the door joins them into one message and supplies the verb.
+
+# Arguments
+
+  - `ledger`: The door's ledger, or `nothing` when nobody is collecting.
+  - `what`: A noun phrase naming what was dropped, for example ``"the view row `a + c == 0.05`"``.
+
+# Returns
+
+  - `nothing`. A vector ledger is appended to in place.
+
+# Related
+
+  - [`announce_non_investable`](@ref)
+  - [`get_linear_constraints`](@ref)
+  - [`replace_group_by_assets`](@ref)
+  - [`counterpart_axis_names`](@ref)
+"""
+function record_non_investable_drop!(::Nothing, ::AbstractString)::Nothing
+    return nothing
+end
+function record_non_investable_drop!(ledger::AbstractVector, what::AbstractString)::Nothing
+    push!(ledger, what)
+    return nothing
+end
+"""
+    record_group_shed!(ledger::Option{<:AbstractVector}, group::AbstractString,
+                       shed::Integer, kept::Integer, eqn::AbstractString) -> Nothing
+
+Record what a group shed to a departure, for the door to report through [`announce_non_investable`](@ref).
+
+A group that loses some of its members still describes the rest, so its row survives at a coefficient spread over the survivors; a group that loses **all** of them describes nothing, and its row goes with it. The two are different news to a caller, so they are phrased differently, and this is the one place either sentence is written. [`replace_group_by_assets`](@ref) is the only caller, at each of its four expansion branches.
+
+Counts, not names: the departed assets are named once by the door, and repeating them per group would make the message longer than what it reports.
+
+A shed of nothing records nothing, so the all-investable path costs one comparison.
+
+# Arguments
+
+  - `ledger`: The door's ledger, or `nothing` when nobody is collecting.
+  - `group`: The group name as the caller wrote it, or the pair `"(a, b)"` for a correlation view.
+  - `shed`: How many members the group lost.
+  - `kept`: How many members survived.
+  - `eqn`: The row the group appears in, as the caller wrote it.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`record_non_investable_drop!`](@ref)
+  - [`replace_group_by_assets`](@ref)
+  - [`shed_departed_members`](@ref)
+  - [`announce_non_investable`](@ref)
+"""
+function record_group_shed!(ledger::Option{<:AbstractVector}, group::AbstractString,
+                            shed::Integer, kept::Integer, eqn::AbstractString)::Nothing
+    if iszero(shed)
+        return nothing
+    end
+    what = if iszero(kept)
+        "the row `$(eqn)`, whose group `$(group)` lost every member"
+    else
+        "$(shed) departed member(s) of the group `$(group)` in the row `$(eqn)`"
+    end
+    return record_non_investable_drop!(ledger, what)
+end
+"""
+    announce_non_investable(ni::VecStr, drops::VecStr = String[],
+                            process::AbstractString = "optimisation",
+                            consequence::AbstractString = "…";
+                            warn::Bool = false) -> Nothing
+
+Announce, once per door, the assets that left the investable universe and what their leaving cost.
+
+The door is the only place that knows a departure happened *as an event* rather than as a shape. Downstream, a departed asset is simply absent: a bound stated for it resolves on the Non-Investable Axis and is skipped, a view row naming it is dropped whole. Reporting each of those where it happens would say the same thing once per row per window of a walk-forward, so each site writes its casualty into a ledger with [`record_non_investable_drop!`](@ref) and the door says everything once, here.
+
+`process` names the work the departure is excluded from, because more than one kind of door mints the axis: an optimisation reduces at its entry, and a wrapping prior reduces at its own before it builds a view. Hard-coding `"optimisation"` made the message wrong for the second. `consequence` states what a departure means to *this* door — a forced-liquidation carrier is priced by an optimisation and by nothing else — and both are ordinary defaults, so the optimisation door reads as it always did.
+
+It is `@info` by default, not a warning and not a [`strict_diagnostic`](@ref). Nothing is wrong: the data moved, and the work is proceeding correctly over what is left. Making it raise under `strict` would put back the refusal this whole path exists to remove. `warn` raises it to `@warn` for the one case that is not routine — a departure that took the **last** of something the caller asked for, such as the final view of a view set, because handing back the unconditioned answer changes the result and the caller has no other way to learn it.
+
+An empty `ni` says nothing at all, which is the all-investable path and the unnamed-data path alike. An empty `drops` says who left and stops there, which is the door that has not yet resolved anything over them.
+
+# Arguments
+
+  - `ni`: The names the Investable Mask left out.
+  - `drops`: The ledger of casualties, as [`record_non_investable_drop!`](@ref) filled it.
+  - `process`: Noun phrase naming the work, for example `"optimisation"` or `"entropy pooling fit"`.
+  - `consequence`: Sentence stating what a departure means to this door.
+  - `warn`: Raise the message to `@warn`, for a departure that changed the model rather than trimming it.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`non_investable_names`](@ref)
+  - [`record_non_investable_drop!`](@ref)
+  - [`investable_reduction`](@ref)
+  - [`coverage_reduction`](@ref)
+"""
+function announce_non_investable(ni::VecStr, drops::VecStr = String[],
+                                 process::AbstractString = "optimisation",
+                                 consequence::AbstractString = "A constraint, bound or rate stated for one of them is dropped, and a forced-liquidation carrier is priced over them.";
+                                 warn::Bool = false)::Nothing
+    if isempty(ni)
+        return nothing
+    end
+    msg = "$(length(ni)) asset(s) left the investable universe and are excluded from this $(process): $(ni). $(consequence)"
+    if !isempty(drops)
+        msg *= " Dropped over them: $(join(drops, "; "))."
+    end
+    if warn
+        @warn(msg)
+    else
+        @info(msg)
+    end
+    return nothing
+end
+"""
+    factor_universe(sets::UniverseSets, key::AbstractString, K::Integer,
+                    need::AbstractString, source::AbstractString) -> VecStr
+
+Read the **declared** factor universe `sets.dict[key]`, checking that it exists and that it agrees with `source` — the `observations × factors` matrix whose `K` columns it must name — on how many factors there are.
+
+A factor axis is optional on [`UniverseSets`](@ref) but is not optional for a consumer written against it, so the failure has to be diagnosed at the point of need. Both messages name `key` and the matrix, because the two are what a caller has to reconcile: a user arriving from the pre-declaration shape put the factor names under `xkey` and would otherwise be told about an *asset* universe they never wrote in.
+
+`key` is stated rather than read off `sets`, because [`UniverseSets`](@ref) declares **two** factor axes and this helper cannot tell which one a caller means. A caller that holds a loadings result reads the key from it with [`factor_axis_key`](@ref); a caller written against the returns data's own `F` states `sets.tfkey`, the axis those columns live on.
+
+One helper therefore serves every consumer of either axis, and none of them re-encodes the checks.
+
+# Arguments
+
+  - `sets`: The [`UniverseSets`](@ref) whose factor axis is read.
+  - `key`: The factor axis key to read, `sets.tfkey` or `sets.cfkey`.
+  - `K`: The number of columns of `source`, which the declared axis must name.
+  - `need`: Names the consumer in both diagnostic messages, for example `"a FactorSpace constraint"`.
+  - `source`: Names the matrix in both diagnostic messages, for example `"rr.M"` or `"F"`.
+
+# Validation
+
+  - `haskey(sets.dict, key)`. A `KeyError` naming `need` is thrown otherwise.
+  - `length(sets.dict[key]) == K`. A `DimensionMismatch` naming `source` is thrown otherwise.
+
+# Returns
+
+  - `nf::VecStr`: The declared factor names, in the column order of `source`.
+
+# Related
+
+  - [`UniverseSets`](@ref)
+  - [`factor_axis_key`](@ref)
   - [`constraint_space_basis`](@ref)
   - [`FactorBlackLittermanPrior`](@ref)
 """
-function factor_universe(sets::UniverseSets, K::Integer, need::AbstractString,
-                         source::AbstractString)
-    fkey = sets.fkey
-    @argcheck(haskey(sets.dict, fkey),
-              KeyError("$fkey (the factor universe), required by $need. The factor axis is optional on UniverseSets; it is not optional here: add `sets.fkey => <factor names>` to `sets.dict`, in the column order of `$source`."))
-    nf = sets.dict[fkey]
+function factor_universe(sets::UniverseSets, key::AbstractString, K::Integer,
+                         need::AbstractString, source::AbstractString)
+    @argcheck(haskey(sets.dict, key),
+              KeyError("$key (the factor universe), required by $need. A factor axis is optional on UniverseSets; it is not optional here: add `$key => <factor names>` to `sets.dict`, in the column order of `$source`."))
+    nf = sets.dict[key]
     @argcheck(length(nf) == K,
-              DimensionMismatch("`$source` and the declared factor axis disagree on how many factors there are. Got\nsize($source, 2) => $K\nlength(sets.dict[$fkey]) => $(length(nf))"))
+              DimensionMismatch("`$source` and the declared factor axis disagree on how many factors there are. Got\nsize($source, 2) => $K\nlength(sets.dict[$key]) => $(length(nf))"))
     return nf
 end
 """
-    feature_universe(sets::UniverseSets, need::AbstractString) -> VecStr
+    factor_axis_key(sets::UniverseSets, rr::Regression) -> AbstractString
+    factor_axis_key(sets::UniverseSets, rr::CrossSectionalFactorModel) -> AbstractString
+    factor_axis_key(sets::UniverseSets,
+                    re::AbstractTimeSeriesRegressionEstimator) -> AbstractString
 
-Read the **declared** feature axis, `sets.dict[sets.zkey]`, checking that it exists.
+Return the [`UniverseSets`](@ref) key naming the factor axis that `rr`'s loadings are written on.
 
-The sibling of [`factor_universe`](@ref), written the same way and for the same reason: the axis is optional on [`UniverseSets`](@ref) but is not optional for a consumer written against it, so the failure is diagnosed at the point of need, by one shared helper whose message names the key and says what to add.
+[`UniverseSets`](@ref) declares two factor axes, so a consumer that resolves factor names has to say which one it means. It never says so by hand. The key follows the block that carries `M`: a [`Regression`](@ref) is fitted per asset over the observations, so its columns are the columns of `rd.F` and it answers `sets.tfkey`; a [`CrossSectionalFactorModel`](@ref) is fitted per observation across the assets, so its columns are the exposures the fit was built from and it answers `sets.cfkey`. A caller therefore cannot name the wrong axis, and no consumer gains a field to state it in.
 
-# Existence, and nothing to reconcile
+The third method serves a consumer that holds an unfitted specification rather than a result. Only the time-series family names a specification here, because [`RegE_Reg`](@ref) admits an [`AbstractTimeSeriesRegressionEstimator`](@ref) and no other estimator, and every result that family fits is a [`Regression`](@ref). The three methods therefore cover [`RegE_Reg`](@ref) exactly.
 
-The one deliberate difference from [`factor_universe`](@ref) is that there is no arity to check. `factor_universe` reconciles the declared axis against the column count of a matrix that already exists — `rr.M`, `F` — and a mismatch there means the names and the columns describe different universes. The feature axis has no such matrix, because it **defines** the width: [`asset_sets_features`](@ref) allocates `assets × length(nz)` from this list. So existence and a good message is the whole job.
+There is deliberately **no fallback on [`AbstractLoadingsRegressionResult`](@ref)**. A future member of the root would silently inherit whichever axis the fallback named, and half the time that is the wrong list of names with the right length — a constraint written against it would still solve and would constrain the wrong factors. A missing method is a `MethodError` that names the type.
 
-`need` names the consumer, as in [`factor_universe`](@ref).
+# Arguments
+
+  - `sets`: The [`UniverseSets`](@ref) whose factor axis key is read.
+  - `rr` / `re`: The loadings result, or the specification whose verb produces one.
+
+# Returns
+
+  - `key::AbstractString`: `sets.tfkey` for the time-series family, `sets.cfkey` for the cross-sectional one.
 
 # Related
 
   - [`UniverseSets`](@ref)
   - [`factor_universe`](@ref)
-  - [`asset_sets_features`](@ref)
-  - [`asset_sets_feature_names`](@ref)
+  - [`Regression`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+  - [`constraint_space_basis`](@ref)
+  - [`risk_budget_universe_key`](@ref)
 """
-function feature_universe(sets::UniverseSets, need::AbstractString)
-    zkey = sets.zkey
-    @argcheck(haskey(sets.dict, zkey),
-              KeyError("$zkey (the declared feature axis), required by $need. The feature axis is optional on UniverseSets; it is not optional here: add `sets.zkey => <feature node names>` to `sets.dict`, in the column order the feature matrix is to have."))
-    return sets.dict[zkey]
+function factor_axis_key(sets::UniverseSets, ::Regression)
+    return sets.tfkey
+end
+function factor_axis_key(sets::UniverseSets, ::CrossSectionalFactorModel)
+    return sets.cfkey
+end
+function factor_axis_key(sets::UniverseSets, ::AbstractTimeSeriesRegressionEstimator)
+    return sets.tfkey
+end
+"""
+    counterpart_axis_names(sets::UniverseSets, nxkey::AbstractString) -> VecStr
+
+Return the asset axis that `nxkey` is the counterpart of, or an empty vector when it has none.
+
+[`UniverseSets`](@ref) declares two axes over assets: the investable universe under `xkey`, and the Non-Investable Axis under `nikey`, which a door mints from the complement of the Investable Mask. A name-keyed estimator resolves against one of them, and a name it does not find there may still be a perfectly good name on the other — a bound stated for an asset that has since left, or a forced-liquidation rate stated for one that stayed. [`name_to_val!`](@ref) needs that list to tell such a name from a typo, and this is where the pairing is written down.
+
+The relation is symmetric and covers only these two. A factor axis names factors, so no asset name is ever a departed factor and the answer is empty; a caller-supplied `key` naming some other list is treated the same way.
+
+An axis that `sets` does not declare answers empty, which is the common case: a problem in which every asset is investable carries no `nikey` entry at all.
+
+# Arguments
+
+  - `sets`: The [`UniverseSets`](@ref) whose axes are read.
+  - `nxkey`: The key of the axis being resolved against.
+
+# Returns
+
+  - `other::VecStr`: The counterpart axis, or an empty vector.
+
+# Related
+
+  - [`UniverseSets`](@ref)
+  - [`name_to_val!`](@ref)
+  - [`estimator_to_val`](@ref)
+  - [`non_investable_sets`](@ref)
+"""
+function counterpart_axis_names(sets::UniverseSets, nxkey::AbstractString)::VecStr
+    key = if nxkey == sets.xkey
+        sets.nikey
+    elseif nxkey == sets.nikey
+        sets.xkey
+    else
+        return String[]
+    end
+    return get(sets.dict, key, String[])
+end
+"""
+    shed_departed_members(members::AbstractVector, other::VecStr,
+                          ledger::Option{<:AbstractVector}, group::AbstractString,
+                          eqn::AbstractString) -> AbstractVector
+    shed_departed_members(members1::AbstractVector, members2::AbstractVector,
+                          other::VecStr, ledger::Option{<:AbstractVector},
+                          group::AbstractString, eqn::AbstractString) -> Tuple
+
+Strike from a group's member list the names that sit on the counterpart axis, and tell the door's ledger what went.
+
+A group is a **description the data resolves**, not a term the caller chose: `"tech"` means the technology assets of this problem, and when one of them delists the description still names the rest. [`replace_group_by_assets`](@ref) therefore sheds the departed members *before* it spreads the group's coefficient, so a Black–Litterman mean divides by the surviving count and an entropy pooling sum runs over the survivors — the row still computes what its right-hand side asserts. Striking a member afterwards would leave `k - 1` legs of `c/k` against an unchanged target. ADR 0125 states the rule and the reason it differs from a written-out name, which takes its row with it.
+
+A group that loses **every** member keeps the first of them rather than answering empty, because a group that describes nobody *is* a row naming a departed asset, and saying so is what makes it drop by the counterpart rule one door later — whole, and in silence. Answering empty would leave a row with no variable in it, which is what a caller writing `1 == 0.004` produces, and that one still has to be diagnosed.
+
+The second method is the **pair** form, for a correlation view written over two groups. The two lists are walked together, and a position is kept only when *both* of its names survived: a pair is one correlation, so a pair that has lost either side has nothing left to measure, and shedding jointly is also what keeps the two lists the same length, which [`replace_group_by_assets`](@ref) has already checked. The all-lost case keeps the first pair, on the same reasoning.
+
+An empty `other` is the all-investable path, and both methods then return their arguments untouched and record nothing, so a problem with no departure pays one comparison and no allocation.
+
+The recording lives here rather than at the four call sites so that [`replace_group_by_assets`](@ref) spends one line per branch on the whole of it. The four branches are otherwise identical, and four copies of the shed, the record and the all-lost fallback is where they would drift.
+
+# Arguments
+
+  - `members` / `members1`, `members2`: The group's member names, as `sets.dict` holds them.
+  - `other`: The counterpart axis, read with [`counterpart_axis_names`](@ref). Usually the Non-Investable Axis.
+  - `ledger`: The door's ledger, or `nothing` when nobody is collecting.
+  - `group`: The group name as the caller wrote it, for the ledger.
+  - `eqn`: The row the group appears in, for the ledger.
+
+# Returns
+
+  - `members::AbstractVector`: The members that are not on `other`, in their original order, or the first departed member when none survived.
+  - `(members1, members2)::Tuple`: The pair form, restricted to the positions both lists survived, or the first pair when none did.
+
+# Related
+
+  - [`replace_group_by_assets`](@ref)
+  - [`record_group_shed!`](@ref)
+  - [`counterpart_axis_names`](@ref)
+  - [`non_investable_sets`](@ref)
+  - [`UniverseSets`](@ref)
+"""
+function shed_departed_members(members::AbstractVector, other::VecStr,
+                               ledger::Option{<:AbstractVector}, group::AbstractString,
+                               eqn::AbstractString)
+    if isempty(other)
+        return members
+    end
+    kept = filter(!in(other), members)
+    record_group_shed!(ledger, group, length(members) - length(kept), length(kept), eqn)
+    return isempty(kept) ? members[1:1] : kept
+end
+function shed_departed_members(members1::AbstractVector, members2::AbstractVector,
+                               other::VecStr, ledger::Option{<:AbstractVector},
+                               group::AbstractString, eqn::AbstractString)
+    if isempty(other)
+        return members1, members2
+    end
+    keep = [m1 ∉ other && m2 ∉ other for (m1, m2) in zip(members1, members2)]
+    record_group_shed!(ledger, group, count(!, keep), count(keep), eqn)
+    return if any(keep)
+        members1[keep], members2[keep]
+    else
+        members1[1:1], members2[1:1]
+    end
 end
 """
     name_to_val!(nx::VecStr, sdict::AbstractDict, key::Any, val::Number,
-                 arr::VecNum, strict::Bool, nxkey::AbstractString)
+                 arr::VecNum, strict::Bool, nxkey::AbstractString,
+                 other::VecStr = String[])
 
 Set values in a vector for the asset or the group of assets that `key` names.
 
-`name_to_val!` resolves `key` through [`resolve_axis_name`](@ref) — an asset name resolves to itself, a group name expands to its members — maps the result to indices in the asset universe `nx`, and sets the corresponding entries of `arr` to `val`. If `key` names neither, the function either throws an error or issues a warning, depending on the `strict` flag.
+`name_to_val!` resolves `key` through [`resolve_axis_name`](@ref) — an asset name resolves to itself, a group name expands to its members — maps the result to indices in the asset universe `nx`, and sets the corresponding entries of `arr` to `val`. If `key` names neither, the function either throws an error or issues a warning, depending on the `strict` flag. Every diagnostic message names the *size* of the universe and never the universe itself or the input value dictionary, because each is routed through a shared message builder in `01_Base/06_Messages.jl`.
+
+`other` is the **counterpart axis**: the asset names that this call is not resolving against, but that the same [`UniverseSets`](@ref) declares. A name found there is **skipped in silence**, under `strict` or not, and that is the whole of what `strict` gives up. `strict` exists to catch a caller's typo, and a name on the counterpart axis is the opposite of a typo: it was a correct name over the universe the caller was given, and the data moved it. A caller cannot know in advance which asset a prior will fail to estimate, so refusing them — or even warning, once per constraint, per window of a walk-forward — reports something no one can act on. The departure itself is announced once, by the door that derived the mask.
+
+The two asset axes are counterparts of each other, and the relation is symmetric. Resolving on the asset universe, `other` is the Non-Investable Axis, so a bound stated for an asset that left is dropped. Resolving on the Non-Investable Axis — which is how a forced-liquidation rate is priced — `other` is the asset universe, so a liquidation rate stated for an asset that stayed is dropped by the same rule. A factor axis has no counterpart, and `other` is then empty.
+
+# Algorithm
+
+ 1. Resolve `key` through [`resolve_axis_name`](@ref), giving `members`. An asset name resolves to itself, and a group name expands to a copy of its member list. An asset name takes precedence over a group name of the same spelling.
+ 2. Return in silence when `members` is `nothing` and `key` names an entry of `other`, because the name is on the counterpart axis: it is known-good, and this axis has no entry to write it into.
+ 3. Report through [`strict_diagnostic`](@ref) and return when `members` is `nothing`, because `key` names neither an asset nor a group. The suggestion pool is widened from `nx` to `nx` together with the keys of `sdict`, because a missing name may be a mistyped asset or a mistyped group.
+ 4. Map `members` to positions in `nx` with [`axis_name_indices`](@ref), giving `idx`. Members that miss the universe are dropped. Those on `other` are struck from the report by the same rule as step 2, and any that remain are reported once through [`strict_diagnostic`](@ref) — so a group whose departed members are all accounted for is silent, and one holding a genuine typo still names it.
+ 5. Set the entries of `arr` at `idx` to `val`.
 
 # Arguments
 
   - `nx`: Vector of asset names.
-  - `sdict`: Dictionary mapping group names to vectors of asset names.
+  - `sdict`: Dictionary mapping group names to vectors of asset names. It is never modified, because [`resolve_axis_name`](@ref) returns a copy of the member list.
   - `key`: Name of the asset or the group of assets to set values for.
   - `val`: The value to assign.
   - `arr`: The array to be modified in-place.
   - `strict`: If `true`, throws an error if `key` resolves to nothing; if `false`, issues a warning.
   - `nxkey`: Name of the asset-universe key in `sets.dict` (e.g. `"nx"`), used only to name the universe in the diagnostic message — see [`unknown_variable_msg`](@ref) / [`missing_group_assets_msg`](@ref).
+  - `other`: The counterpart asset axis, whose names are skipped in silence rather than reported.
 
-# Details
+# Validation
 
-  - An asset name takes precedence over a group name of the same spelling.
-  - Members that miss the universe are dropped and reported once, through [`strict_diagnostic`](@ref).
-  - `sdict` is never modified: [`resolve_axis_name`](@ref) returns a copy of the member list.
-  - Diagnostic messages name only the universe *size* (never the full universe or the input value dictionary), routed through the shared builders in `01_Base.jl`.
+  - `key` names an asset of `nx`, a group of `sdict`, or an entry of `other`. An `ArgumentError` is thrown when `strict` is `true`, and a warning is issued otherwise.
+  - Every member of a resolved group names an entry of `nx` or of `other`. A member that misses both is dropped, and the drop raises when `strict` is `true` and issues a warning otherwise.
 
 # Returns
 
@@ -693,9 +1244,16 @@ Set values in a vector for the asset or the group of assets that `key` names.
   - [`missing_group_assets_msg`](@ref)
 """
 function name_to_val!(nx::VecStr, sdict::AbstractDict, key::Any, val::Number, arr::VecNum,
-                      strict::Bool, nxkey::AbstractString)::Nothing
+                      strict::Bool, nxkey::AbstractString,
+                      other::VecStr = String[])::Nothing
     members = resolve_axis_name(key, nx, sdict)
     if isnothing(members)
+        # A name on the counterpart axis is known-good, not a typo: it was correct over the
+        # universe the caller was given, and the data moved it to the other axis. Silent
+        # under `strict` too — the door that derived the mask announces the departure once.
+        if any(isequal(key), other)
+            return nothing
+        end
         # A missing key may be a mistyped asset *or* a mistyped group/set name, so widen the
         # suggestion pool beyond the raw universe to include the group/set keys.
         return strict_diagnostic(unknown_variable_msg(key, nx, nxkey;
@@ -704,8 +1262,16 @@ function name_to_val!(nx::VecStr, sdict::AbstractDict, key::Any, val::Number, ar
                                  strict)
     end
     idx = axis_name_indices(members, nx,
-                            m -> strict_diagnostic(missing_group_assets_msg(key, m, nx,
-                                                                            nxkey), strict))
+                            function (m)
+                                m = filter(x -> !any(isequal(x), other), m)
+                                return if isempty(m)
+                                    nothing
+                                else
+                                    strict_diagnostic(missing_group_assets_msg(key, m, nx,
+                                                                               nxkey),
+                                                      strict)
+                                end
+                            end)
     arr[idx] .= val
     return nothing
 end
@@ -723,6 +1289,19 @@ Return value for assets or groups, based on a mapping and asset sets.
 
 The function creates the vector and sets the values for assets or groups as specified by `dict`, using the asset universe and groupings in `sets`. If a key in `dict` is not found in the asset sets, the function either throws an error or issues a warning, depending on the `strict` flag.
 
+!!! warning
+
+    If the same asset is found in subsequent iterations, its value will be overwritten in favour of the most recent one. To ensure determinism, use an [`OrderedDict`](https://juliacollections.github.io/OrderedCollections.jl/stable/#OrderedDicts) or a vector of pairs.
+
+# Algorithm
+
+ 1. Take `val` as the fill value, or `zero(datatype)` when `val` is `nothing`.
+ 2. Take `key` as the universe key `nxkey`, or `sets.xkey` when `key` is `nothing`, and read the universe `nx` from `sets.dict` under it.
+ 3. Allocate `arr`, one entry per name of `nx`, filled with the value of step 1.
+ 4. Read the counterpart axis with [`counterpart_axis_names`](@ref), the other of the two asset axes [`UniverseSets`](@ref) declares.
+ 5. For each `(key, val)` pair of `dict`, in the order `dict` iterates in, write `val` into `arr` through [`name_to_val!`](@ref). A key that names an asset writes one entry, a key that names a group writes one entry per member, a key that names the counterpart axis is skipped in silence, and a key that names none of them is reported through the `strict` flag.
+ 6. Return `arr`.
+
 # Arguments
 
   - `dict`: A dictionary, vector of pairs, or single pair mapping asset or group names to values.
@@ -732,22 +1311,13 @@ The function creates the vector and sets the values for assets or groups as spec
   - `datatype`: Element type of the value the array is filled with when `val` is `nothing`.
   - `strict`: If `true`, throws an error if a key in `dict` is not found in the asset sets; if `false`, issues a warning.
 
-# Details
+# Validation
 
-  - Iterates over the (key, value) pairs in `dict`.
-
-!!! warning
-
-    If the same asset is found in subsequent iterations, its value will be overwritten in favour of the most recent one. To ensure determinism, use an [`OrderedDict`](https://juliacollections.github.io/OrderedCollections.jl/stable/#OrderedDicts) or a vector of pairs.
-
-  - If a key in `dict` matches an asset in the universe, the corresponding entry in `arr` is set to the specified value.
-  - If a key matches a group in `sets`, all assets in the group are set to the specified value using [`name_to_val!`](@ref).
-  - If a key is not found and `strict` is `true`, an `ArgumentError` is thrown; otherwise, a warning is issued.
-  - The array is allocated by this method and filled in-place, one key at a time.
+  - A key of `dict` that names neither an asset, nor a group, nor an entry of the counterpart axis raises an `ArgumentError` when `strict` is `true`. A warning is issued otherwise.
 
 # Returns
 
-  - `arr::VecNum`: Value array.
+  - `arr::VecNum`: Value array, one entry per name of the universe.
 
 # Related
 
@@ -762,9 +1332,10 @@ function estimator_to_val(dict::MultiEstValType, sets::UniverseSets,
     val = ifelse(isnothing(val), zero(datatype), val)
     nxkey = ifelse(isnothing(key), sets.xkey, key)
     nx = sets.dict[nxkey]
+    other = counterpart_axis_names(sets, nxkey)
     arr = fill(val, length(nx))
     for (key, val) in dict
-        name_to_val!(nx, sets.dict, key, val, arr, strict, nxkey)
+        name_to_val!(nx, sets.dict, key, val, arr, strict, nxkey, other)
     end
     return arr
 end
@@ -777,7 +1348,8 @@ function estimator_to_val(dict::PairStrNum, sets::UniverseSets,
     nx = sets.dict[nxkey]
     arr = fill(val, length(nx))
     key, val = dict
-    name_to_val!(nx, sets.dict, key, val, arr, strict, nxkey)
+    name_to_val!(nx, sets.dict, key, val, arr, strict, nxkey,
+                 counterpart_axis_names(sets, nxkey))
     return arr
 end
 """
@@ -786,6 +1358,10 @@ end
 Fallback no-op for value mapping in asset/group estimators.
 
 This method returns the input value `val` as-is, without modification or mapping. It serves as a fallback for cases where the input is already a numeric value, a vector of numeric values, or `nothing`, and no further processing is required.
+
+# Algorithm
+
+ 1. Return `val`. The method reads none of its other arguments and none of its keywords.
 
 # Arguments
 
@@ -813,6 +1389,12 @@ end
 Return a numeric vector for asset/group estimators, validating length against asset universe.
 
 This method checks that the input vector `val` matches the length of the asset universe in `sets`, and returns it unchanged if valid. It is used as a fast path for workflows where the value vector is already constructed and requires only defensive validation.
+
+# Algorithm
+
+ 1. Take `key` as the universe key, or `sets.xkey` when `key` is `nothing`, and read the universe from `sets.dict` under it.
+ 2. Check `val` against the length of that universe.
+ 3. Return `val`.
 
 # Arguments
 
@@ -848,7 +1430,13 @@ end
 
 Return a numeric matrix for asset/group estimators, validating length against asset universe.
 
-This method checks that size of `dims` of the input matrix `val` matches the length of the asset universe in `sets`, and returns it unchanged if valid. It is used as a fast path for workflows where the value vector is already constructed and requires only defensive validation.
+This method checks that size of `dims` of the input matrix `val` matches the length of the asset universe in `sets`, and returns it unchanged if valid. It is used as a fast path for workflows where the value matrix is already constructed and requires only defensive validation.
+
+# Algorithm
+
+ 1. Take `key` as the universe key, or `sets.xkey` when `key` is `nothing`, and read the universe from `sets.dict` under it.
+ 2. Check the size of `val` along `dims` against the length of that universe.
+ 3. Return `val`.
 
 # Arguments
 
@@ -865,7 +1453,7 @@ This method checks that size of `dims` of the input matrix `val` matches the len
 
 # Returns
 
-  - `val::VecNum`: The input vector, unchanged.
+  - `val::MatNum`: The input matrix, unchanged.
 
 # Related
 
@@ -884,7 +1472,22 @@ $(DocStringExtensions.TYPEDEF)
 
 Fills every entry of a value vector with `1/N`, where `N` is the number of assets in the universe.
 
-The same value is produced whatever slot the algorithm sits in. `lb = UniformValues()` floors every weight at the equal-weight level and `ub = UniformValues()` caps every weight there; neither slot is a special case in [`estimator_to_val`](@ref).
+The same value is produced whatever slot the algorithm sits in. `lb = UniformValues()` floors every weight at the equal-weight level and `ub = UniformValues()` caps every weight there. Neither slot is a special case in [`estimator_to_val`](@ref).
+
+# Mathematical definition
+
+```math
+\\begin{align}
+v_i &= \\frac{1}{N}\\,, \\quad i = 1,\\, \\ldots,\\, N\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``v_i``: Entry ``i`` of the value vector.
+  - $(math_dict[:N])
+
+The entries sum to one, so the vector is the equal-weight portfolio whenever the slot it fills is a set of weights.
 
 # Examples
 
@@ -897,17 +1500,39 @@ StepRangeLen(0.3333333333333333, 0.0, 3)
 
 # Related
 
+  - [`VectorAbstractEstimatorValueAlgorithm`](@ref)
   - [`AbstractEstimatorValueAlgorithm`](@ref)
   - [`WeightBoundsEstimator`](@ref)
   - [`WeightBounds`](@ref)
 """
-struct UniformValues <: AbstractEstimatorValueAlgorithm end
+struct UniformValues <: VectorAbstractEstimatorValueAlgorithm end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
+    estimator_to_val(::UniformValues, sets::UniverseSets, ::Any = nothing,
+                     key::Option{<:AbstractString} = nothing;
+                     datatype::DataType = Float64, kwargs...)
 
 Return a uniform value vector for all assets in the universe defined by `sets`.
 
-Each entry equals ``1/N`` where ``N`` is the number of assets.
+[`UniformValues`](@ref) states the closed form the entries take. The value is a range rather than a vector, so no array is allocated.
+
+# Algorithm
+
+ 1. Take `key` as the universe key, or `sets.xkey` when `key` is `nothing`, and read the universe from `sets.dict` under it, giving its length `N`.
+ 2. Compute `iN`, the reciprocal of `N` in `datatype`.
+ 3. Return the range of length `N` whose start and stop are both `iN`.
+
+# Arguments
+
+  - `::UniformValues`: The algorithm that selects this method.
+  - `sets`: The [`UniverseSets`](@ref) whose universe gives `N`.
+  - `::Any`: Fill value for API consistency (ignored).
+  - `key`: (Optional) Key in the [`UniverseSets`](@ref) naming the universe the value is written over. When provided, takes precedence over `sets.xkey`.
+  - `datatype`: Element type of the returned range.
+  - `kwargs...`: Additional keyword arguments (ignored).
+
+# Returns
+
+  - `val::StepRangeLen`: A range of length `N`, each entry the reciprocal of `N`.
 
 # Related
 
@@ -932,6 +1557,12 @@ end
 Enumerated table of the functions permitted in equation parsing, mapping each allowed name directly to its function object. Evaluating constraint/view strings crosses a trust boundary (config files, spreadsheets, UI), so the parser must be able to call *only* these 16 mathematical functions. Using an explicit `Symbol => Function` table — rather than resolving a name against `Base` with `getfield(Base, fname)` — bounds that capability to exactly this table: a name absent from the keys fails closed with a `Meta.ParseError`, and the set of callable functions cannot drift from the set of allowed names, because they are the same list. See `docs/adr/0025-enumerated-parser-allowlist.md`.
 
 The `prior(...)` marker is deliberately absent from this table: it names assets/groups (not numbers) and is expanded structurally by [`eval_numeric_functions`](@ref)/[`replace_group_by_assets`](@ref), never evaluated numerically.
+
+# Related
+
+  - [`eval_numeric_functions`](@ref)
+  - [`parse_equation`](@ref)
+  - [`replace_group_by_assets`](@ref)
 """
 const allowed_functions = Dict{Symbol, Function}(:+ => +, :- => -, :* => *, :/ => /,
                                                  :^ => ^, :sqrt => sqrt, :cbrt => cbrt,
@@ -950,19 +1581,24 @@ When an allowlisted function is actually evaluated (all its arguments are numeri
 
 Only the functions enumerated in [`allowed_functions`](@ref) may be evaluated; any other call head fails closed with a `Meta.ParseError`. The `prior(...)` marker is handled structurally (see [`replace_group_by_assets`](@ref)) and throws a `Meta.ParseError` if given purely numeric arguments.
 
+# Algorithm
+
+ 1. Fold every argument of `expr` first, by applying this function to each, when `expr` is an `Expr`. A node whose head is not `:call` is rebuilt from its folded arguments and returned.
+ 2. Rebuild a `:call` node whose head is `prior` from its folded arguments, and return it. The marker names assets or groups, so it is never folded to a number.
+ 3. Look the head of any other `:call` node up in [`allowed_functions`](@ref), giving `f`. A head that the table does not hold raises.
+ 4. Rebuild the call and return it when any folded argument is not a `Number`, so a nonlinear subexpression keeps its own literals untouched.
+ 5. Coerce every folded argument to `datatype`, apply `f` to them, and return the value that comes back.
+ 6. Return the value `Inf` when `expr` is the symbol `:Inf`. Return `expr` itself in every other case, so a number stands and a variable name survives as a symbol.
+
 # Arguments
 
   - `expr`: The Julia expression to evaluate. Can be a `Number`, `Symbol`, or `Expr`.
   - `datatype`: Float type into which numeric arguments are coerced before an allowlisted function is evaluated.
 
-# Details
+# Validation
 
-  - `expr`:
-
-      + `Number`: It is returned as-is.
-      + `:Inf`: Returns `Inf`.
-      + `Expr`: Representing a function call whose arguments are all numeric, the allowlisted function is evaluated (on arguments coerced to `datatype`) and replaced with its result.
-      + Otherwise, the function recurses into sub-expressions, returning a new expression with numeric parts evaluated.
+  - The head of a `:call` node is a key of [`allowed_functions`](@ref), or the `prior` marker. A `Meta.ParseError` naming the head is thrown otherwise.
+  - `prior(...)` carries at least one argument that is not a number. A `Meta.ParseError` is thrown otherwise.
 
 # Returns
 
@@ -972,6 +1608,8 @@ Only the functions enumerated in [`allowed_functions`](@ref) may be evaluated; a
 
   - [`_collect_terms`](@ref)
   - [`_parse_equation`](@ref)
+  - [`allowed_functions`](@ref)
+  - [`replace_group_by_assets`](@ref)
 """
 function eval_numeric_functions(expr, datatype::DataType = Float64)
     return if isa(expr, Expr)
@@ -1009,35 +1647,37 @@ function eval_numeric_functions(expr, datatype::DataType = Float64)
     end
 end
 """
-    _collect_terms(expr::Union{Symbol, Expr, <:Number})
+    _collect_terms(expr::Union{Symbol, Expr, <:Number}, datatype::DataType = Float64)
 
 Expand and collect all terms from a Julia expression representing a linear constraint equation.
 
 `_collect_terms` takes a Julia expression (such as the left-hand side of a constraint equation), recursively traverses its structure, and returns a vector of `(coefficient, variable)` pairs. It supports numeric constants, variables, and arithmetic operations (`+`, `-`, `*`, `/`), and is used to canonicalise linear constraint equations for further processing.
 
+The starting coefficient is `one(datatype)`, so every coefficient the walk builds is of that type. The caller asked for the numeric domain the optimiser works in, and the coefficients belong to it as much as the right-hand side does.
+
+# Algorithm
+
+ 1. Open an empty vector `terms`.
+ 2. Walk `expr` with [`collect_terms!`](@ref), from the starting coefficient `one(datatype)`. The walk appends one pair to `terms` per term it reaches: a constant as `(coefficient, nothing)`, and anything else as `(coefficient, name)`.
+ 3. Return `terms`.
+
 # Arguments
 
   - `expr`: The Julia expression to expand.
-
-# Details
-
-  - Calls [`collect_terms!`](@ref) internally with an initial coefficient of `1.0` and an empty vector.
-  - Numeric constants are collected as `(coefficient, nothing)`.
-  - Variables are collected as `(coefficient, variable_name)`.
-  - Arithmetic expressions are recursively expanded and collected.
+  - `datatype`: Numeric type of the coefficients the walk builds.
 
 # Returns
 
-  - `terms::Vector{Tuple{Float64, Option{<:String}}}`: A vector of `(coefficient, variable)` pairs, where `variable` is a string for variable terms or `nothing` for constant terms.
+  - `terms::Vector{Tuple{datatype, Option{<:String}}}`: A vector of `(coefficient, variable)` pairs, where `variable` is a string for variable terms or `nothing` for constant terms.
 
 # Related
 
   - [`collect_terms!`](@ref)
   - [`_parse_equation`](@ref)
 """
-function _collect_terms(expr)
+function _collect_terms(expr, datatype::DataType = Float64)
     terms = []
-    collect_terms!(expr, 1.0, terms)
+    collect_terms!(expr, one(datatype), terms)
     return terms
 end
 """
@@ -1047,27 +1687,21 @@ Recursively collect and expand terms from a Julia expression for linear constrai
 
 `collect_terms!` traverses a Julia expression tree representing a linear equation, expanding and collecting all terms into a vector of `(coefficient, variable)` pairs. It handles numeric constants, variables, and arithmetic operations (`+`, `-`, `*`, `/`), supporting canonicalisation of linear constraint equations for further processing.
 
+# Algorithm
+
+ 1. Append `(coeff * expr, nothing)` when `expr` is a `Number`, so a constant carries the coefficient and no variable.
+ 2. Append `(coeff, string(expr))` when `expr` is a `Symbol`, so a bare variable carries the coefficient it arrived with.
+ 3. For a multiplication `a * b`, recurse into the side that is not a number, with `coeff` multiplied by the side that is. A product of two non-numeric sides is opaque, so append it whole as `(coeff, string(expr))`.
+ 4. For a division `a / b`, recurse into `a` with `coeff` divided by `b`, when `b` is a number. A division by a denominator that is not a number is opaque, so append it whole.
+ 5. For an addition, recurse into every argument with `coeff` unchanged.
+ 6. For a subtraction, recurse into every argument but the last with `coeff`, and into the last with `-coeff`. A unary minus holds no argument but the last, so this negates its one operand.
+ 7. Append any other expression whole, as `(coeff, string(expr))`. This is what makes a term such as `sqrt(x)` opaque: it becomes one variable named by its own text, and the row builder resolves that text against the universe like any other name.
+
 # Arguments
 
   - `expr`: The Julia expression to traverse.
   - `coeff`: The current numeric coefficient to apply.
-  - `terms`: A vector to which `(coefficient, variable)` pairs are appended in-place. Each pair is of the form `(Float64, Option{<:String})`, where `Nothing` indicates a constant term.
-
-# Details
-
-  - `expr`:
-
-      + `Number`: Appends `(coeff * oftype(coeff, expr), nothing)` to `terms`.
-
-      + `Symbol`: Appends `(coeff, string(expr))` to `terms`.
-
-      + `Expr`:
-
-          * For multiplication (`*`), distributes the coefficient to the numeric part.
-          * For division (`/`), divides the coefficient by the numeric denominator.
-          * For addition (`+`), recursively collects terms from all arguments.
-          * For subtraction (`-`), recursively collects terms from all arguments except the last, which is negated.
-          * For all other expressions, treats as a variable and appends as `(coeff, string(expr))`.
+  - `terms`: A vector to which `(coefficient, variable)` pairs are appended in-place. Each pair is of the form `(typeof(coeff), Option{<:String})`, where `Nothing` indicates a constant term.
 
 # Returns
 
@@ -1127,16 +1761,16 @@ Format a single term in a linear constraint equation as a string.
 
 `format_term` takes a coefficient and a variable name and returns a string representation suitable for display in a canonicalised linear constraint equation. Handles special cases for coefficients of `1` and `-1` to avoid redundant notation.
 
+# Algorithm
+
+ 1. Return the variable name alone when `coeff` is one.
+ 2. Return the variable name behind a minus sign when `coeff` is minus one.
+ 3. Return the coefficient, a `*`, and the variable name, in every other case.
+
 # Arguments
 
   - `coeff`: Numeric coefficient for the variable.
   - `var`: Variable name as a string.
-
-# Details
-
-  - If `coeff == 1`, returns `"\$var"` (no explicit coefficient).
-  - If `coeff == -1`, returns `"-\$(var)"` (no explicit coefficient).
-  - Otherwise, returns `"\$(coeff)*\$(var)"`.
 
 # Returns
 
@@ -1161,22 +1795,25 @@ end
 
 Internal utility for error handling during equation parsing.
 
-`rethrow_parse_error` is used to detect and handle incomplete or invalid expressions encountered while parsing constraint equations. It is called on both sides of an equation during parsing to ensure that the expressions are valid and complete. If an incomplete expression is detected, a `Meta.ParseError` is thrown; otherwise, the function returns `nothing`.
+`rethrow_parse_error` is used to detect and handle incomplete or invalid expressions encountered while parsing constraint equations. It is called on both sides of an equation during parsing to ensure that the expressions are valid and complete. If an incomplete expression is detected, a `Meta.ParseError` is thrown; otherwise, the function returns `nothing`. The parser fails closed on an empty side rather than assuming zero, because a silently assumed zero is a constraint the author never wrote. A caller who means zero writes it.
+
+# Algorithm
+
+The method that Julia selects is the algorithm, and one method answers each shape a parsed side can take.
+
+ 1. `expr` is `Nothing`, which is what an empty side gives: raise, and name `side` in the message.
+ 2. `expr` is an `Expr`: raise when its head is `:incomplete`, and return `nothing` otherwise.
+ 3. `expr` is anything else, a number or a symbol among them: return `nothing`.
 
 # Arguments
 
   - `expr`: The parsed Julia expression to check. Can be an `Expr`, `Nothing`, or any other type.
   - `side`: Symbol indicating which side of the equation is being checked (`:lhs` or `:rhs`). Used for error messages.
 
-# Details
-
-  - If `expr` is `Nothing` (the side is empty, e.g. a truncated equation string), a `Meta.ParseError` is thrown — the parser fails closed rather than assuming zero, because a silently-assumed zero constraint is one the author never wrote. Callers who mean zero must write it explicitly.
-  - If `expr` is an incomplete expression (`expr.head == :incomplete`), a `Meta.ParseError` is thrown with a descriptive message.
-  - For all other cases, the function returns `nothing` and does not modify the input.
-
 # Validation
 
-  - Throws a `Meta.ParseError` if the expression is empty or incomplete.
+  - `expr` is not `Nothing`. A `Meta.ParseError` naming `side` is thrown otherwise.
+  - `expr.head != :incomplete`. A `Meta.ParseError` naming `side` and the expression is thrown otherwise.
 
 # Returns
 
@@ -1208,6 +1845,16 @@ Parse and canonicalise a linear constraint equation from Julia expressions.
 
 `_parse_equation` takes the left-hand side (`lhs`) and right-hand side (`rhs`) of a constraint equation, both as Julia expressions, and a comparison operator string (`opstr`). It evaluates numeric functions, moves all terms to the left-hand side, collects coefficients and variables, and returns a [`ParsingResult`](@ref) with the canonicalised equation.
 
+# Algorithm
+
+ 1. Fold the constant subexpressions of both sides with [`eval_numeric_functions`](@ref), giving `lexpr` and `rexpr`, and check each with [`rethrow_parse_error`](@ref).
+ 2. Build `diff_expr`, the expression `lexpr - (rexpr)`. This moves every term of the equation to the left-hand side.
+ 3. Walk `diff_expr` with [`_collect_terms`](@ref), giving `terms`, one `(coefficient, variable)` pair per term.
+ 4. Accumulate `terms` into `varmap`, which holds the summed coefficient of each variable name, and into `constant`, the sum of the coefficients that carry no variable.
+ 5. Read `variables` and `coefficients` off `varmap`, and take `rhs_val` as the negated `constant`. This moves the constant to the right-hand side.
+ 6. Render each pair with [`format_term`](@ref), join the renderings with `+`, and fold `+ -` into `-`, giving the canonical string `formatted`.
+ 7. Return the [`ParsingResult`](@ref) built from `variables`, `coefficients`, `opstr`, `rhs_val` and `formatted`.
+
 # Arguments
 
   - `lhs`: Left-hand side of the equation as a Julia expression.
@@ -1215,23 +1862,17 @@ Parse and canonicalise a linear constraint equation from Julia expressions.
   - `rhs`: Right-hand side of the equation as a Julia expression.
   - `datatype`: Numeric type for coefficients and right-hand side.
 
-# Details
-
-  - Recursively evaluates numeric functions and constants (e.g., `Inf`) on both sides.
-  - Moves all terms to the left-hand side (`lhs - rhs == 0`).
-  - Collects and sums like terms, separating variables and constants.
-  - Moves the constant term to the right-hand side, variables to the left.
-  - Formats the simplified equation as a string.
-  - Returns a [`ParsingResult`](@ref) containing variable names, coefficients, operator, right-hand side value, and formatted equation.
-
 # Returns
 
-  - `res::ParsingResult`: Structured result with canonicalised variables, coefficients, operator, right-hand side, and formatted equation.
+  - `res::ParsingResult`: Structured result with canonicalised variables, coefficients, operator, right-hand side, and formatted equation. The order of `vars` is the order the variable map iterates in, and it is not the order the equation was written in.
 
 # Related
 
   - [`ParsingResult`](@ref)
   - [`parse_equation`](@ref)
+  - [`eval_numeric_functions`](@ref)
+  - [`_collect_terms`](@ref)
+  - [`format_term`](@ref)
 """
 function _parse_equation(lhs, opstr::AbstractString, rhs,
                          datatype::DataType = Float64)::ParsingResult
@@ -1245,16 +1886,16 @@ function _parse_equation(lhs, opstr::AbstractString, rhs,
     diff_expr = :($lexpr - ($rexpr))
 
     # 5. Expand and collect like terms
-    terms = _collect_terms(diff_expr)
+    terms = _collect_terms(diff_expr, datatype)
 
     # 6. Separate variables and constant
-    varmap = Dict{String, Float64}()
+    varmap = Dict{String, datatype}()
     constant::datatype = 0.0
     for (coeff, var) in terms
         if isnothing(var)
             constant += coeff
         else
-            varmap[var] = get(varmap, var, 0.0) + coeff
+            varmap[var] = get(varmap, var, zero(datatype)) + coeff
         end
     end
 
@@ -1278,6 +1919,20 @@ end
 
 Parse a linear constraint equation from a string into a structured [`ParsingResult`](@ref).
 
+An equation string crosses a trust boundary, so both entry shapes carry a limit from `EQUATION_LIMITS[]` before any recursive walk runs. The string form is capped on length before `Meta.parse` runs, and no length applies to the pre-built `Expr` form. Both forms are then capped on the depth of the expression tree, so one number bounds the recursion whichever shape the input takes. `docs/adr/0027-cap-equation-parser-recursion.md` owns both limits.
+
+# Algorithm
+
+The method that Julia selects is the algorithm, and one method answers each shape of `eqn`.
+
+ 1. `eqn` is a vector: apply this function to each element, and return the vector of results.
+ 2. `eqn` is a string: check its length against `EQUATION_LIMITS[].max_length`, and refuse the pattern `++`.
+ 3. Find the first operator of `ops1` that occurs in the string, giving `opstr`, and split the string on it into `lhs` and `rhs`.
+ 4. Parse both parts with `Meta.parse`, giving `lexpr` and `rexpr`, check each with [`rethrow_parse_error`](@ref), and check the depth of each against `EQUATION_LIMITS[].max_depth` with [`_expr_depth_exceeds`](@ref).
+ 5. `eqn` is an `Expr`: check its depth against `EQUATION_LIMITS[].max_depth` with [`_expr_depth_exceeds`](@ref), and refuse a `++` pattern with [`has_invalid_plus`](@ref).
+ 6. Check that the head of the expression is a call and is exactly one operator of `ops2`, giving `opstr`, and read `lhs` and `rhs` off the arguments of the call.
+ 7. Hand `opstr` and the two sides to [`_parse_equation`](@ref), which canonicalises them and builds the [`ParsingResult`](@ref).
+
 # Arguments
 
   - `eqn`: The equation string to parse.
@@ -1298,34 +1953,12 @@ Parse a linear constraint equation from a string into a structured [`ParsingResu
 
 # Validation
 
-  - The equation must contain exactly one valid comparison operator from `ops1`.
-  - Both sides of the equation must be valid Julia expressions.
-
-# Details
-
-  - If `eqn::AbstractVector`, the function is applied element-wise.
-
-  - The function first checks for invalid operator patterns (e.g., `"++"`).
-
-  - It searches for the first occurrence of a valid comparison operator from `ops1` in the equation string. Errors if there are more than one or none.
-
-  - The equation is split into left- and right-hand sides using the detected operator.
-
-  - If `eqn::AbstractString`:
-
-      + Both sides are parsed into Julia expressions using `Meta.parse`.
-
-  - If `eqn::Expr`:
-
-      + Expression is ready as is.
-
-  - Numeric functions and constants (e.g., `Inf`) are recursively evaluated.
-
-  - All terms are moved to the left-hand side and collected, separating coefficients and variables.
-
-  - The constant term is moved to the right-hand side, and the equation is formatted for display.
-
-  - The result is returned as a [`ParsingResult`](@ref) containing the collected information.
+  - `length(eqn) <= EQUATION_LIMITS[].max_length`, for the string form. A `Meta.ParseError` naming both lengths is thrown otherwise.
+  - The expression tree of `eqn` is no deeper than `EQUATION_LIMITS[].max_depth`, for both forms. The string form is checked after `Meta.parse`, on each side of the operator. A `Meta.ParseError` naming the limit is thrown otherwise.
+  - `eqn` holds no `++` pattern.
+  - `eqn` holds exactly one comparison operator, from `ops1` for the string form and from `ops2` for the `Expr` form.
+  - The head of the `Expr` form is a call.
+  - Neither side of the equation is empty or incomplete, which [`rethrow_parse_error`](@ref) checks.
 
 # Returns
 
@@ -1352,12 +1985,18 @@ ParsingResult
 # Related
 
   - [`ParsingResult`](@ref)
+  - [`_parse_equation`](@ref)
+  - [`rethrow_parse_error`](@ref)
+  - [`has_invalid_plus`](@ref)
+  - [`_expr_depth_exceeds`](@ref)
+  - [`replace_group_by_assets`](@ref)
 """
 function parse_equation(eqn::AbstractString; ops1::Tuple = ("==", "<=", ">="),
                         datatype::DataType = Float64, kwargs...)::ParsingResult
-    # Trust boundary: cap the untrusted string length before `Meta.parse` and the
-    # recursive expression walks, so a deeply nested string cannot exhaust the stack.
-    # Bounding the length bounds the achievable AST depth of the string form.
+    # Trust boundary: cap the untrusted string length before `Meta.parse`, so a deeply
+    # nested string cannot exhaust the stack. The length bounds the achievable AST depth
+    # at about half the character count, which is looser than `max_depth`, so the parsed
+    # tree meets the depth cap directly, as the `Expr` form does.
     lim = EQUATION_LIMITS[]
     @argcheck(length(eqn) <= lim.max_length,
               Meta.ParseError("Equation string is too long ($(length(eqn)) > $(lim.max_length) characters)."))
@@ -1377,6 +2016,10 @@ function parse_equation(eqn::AbstractString; ops1::Tuple = ("==", "<=", ">="),
     rethrow_parse_error(lexpr, :lhs)
     rexpr = Meta.parse(rhs)
     rethrow_parse_error(rexpr, :rhs)
+    # 3. Hold the parsed tree to the depth cap, before the recursive walks below run.
+    @argcheck(!(_expr_depth_exceeds(lexpr, lim.max_depth) ||
+                _expr_depth_exceeds(rexpr, lim.max_depth)),
+              Meta.ParseError("Equation expression is too deeply nested (exceeds depth $(lim.max_depth))."))
     return _parse_equation(lexpr, opstr, rexpr, datatype)
 end
 """
@@ -1384,7 +2027,13 @@ end
 
 Check whether a Julia expression contains an invalid `+` operator in a constraint context.
 
-Internal helper used during linear constraint parsing to detect unsupported `+` operator usage in constraint expressions.
+Internal helper used during linear constraint parsing to detect unsupported `+` operator usage in constraint expressions. It is the `Expr` counterpart of the `++` check the string form of [`parse_equation`](@ref) runs on the raw text.
+
+# Algorithm
+
+ 1. Return `false` when `expr` is not a call, because only a call can carry the head this function refuses.
+ 2. Return `true` when the head of the call is the `++` operator.
+ 3. Apply this function to every argument of the call that is itself an expression, and return `true` when any of them does.
 
 # Arguments
 
@@ -1393,6 +2042,11 @@ Internal helper used during linear constraint parsing to detect unsupported `+` 
 # Returns
 
   - `Bool`: `true` if the expression contains an invalid `+`, `false` otherwise.
+
+# Related
+
+  - [`parse_equation`](@ref)
+  - [`_expr_depth_exceeds`](@ref)
 """
 function has_invalid_plus(expr)::Bool
     if !(isa(expr, Expr) && expr.head == :call)
@@ -1414,15 +2068,33 @@ Return `true` if the expression tree `x` is deeper than `limit`.
 Guards the `Expr` form of [`parse_equation`](@ref) against a deeply nested AST that no
 string length cap covers. The check itself recurses at most `limit + 1` frames deep and
 short-circuits the moment the limit is breached, so it cannot exhaust the stack it protects.
+`docs/adr/0027-cap-equation-parser-recursion.md` owns the limit this function is called with.
+
+# Algorithm
+
+ 1. Return `true` when `limit` is negative, because the walk has already gone one level past the cap.
+ 2. Return `false` when `x` is not an expression, because a leaf adds no depth.
+ 3. Apply this function to every argument of `x`, with `limit` lowered by one, and return `true` when any of them does. The scan stops at the first argument that answers `true`.
+
+# Arguments
+
+  - `x`: The expression tree to measure.
+  - `limit`: The greatest depth the tree may have.
+
+# Returns
+
+  - `Bool`: `true` when the tree is deeper than `limit`, `false` otherwise.
+
+# Related
+
+  - [`parse_equation`](@ref)
+  - [`has_invalid_plus`](@ref)
 """
 function _expr_depth_exceeds(x, limit::Integer)::Bool
     if limit < 0
         return true
     end
-    if !(isa(x, Expr))
-        return false
-    end
-    return any(_expr_depth_exceeds(a, limit - 1) for a in x.args)
+    return isa(x, Expr) && any(_expr_depth_exceeds(a, limit - 1) for a in x.args)
 end
 function parse_equation(expr::Expr; ops2::Tuple = (:call, :(==), :(<=), :(>=)),
                         datatype::DataType = Float64, kwargs...)::ParsingResult
@@ -1451,36 +2123,66 @@ function parse_equation(eqn::VecStr_Expr; ops1::Tuple = ("==", "<=", ">="),
     return parse_equation.(eqn; ops1 = ops1, ops2 = ops2, datatype = datatype)
 end
 """
-    replace_group_by_assets(res::PR_VecPR,
-                            sets::UniverseSets; bl_flag::Bool = false, ep_flag::Bool = false,
-                            rho_flag::Bool = false)
-
-If `res` is a vector of [`ParsingResult`](@ref) objects, this function will be applied to each element of the vector.
+    replace_group_by_assets(res::PR_VecPR, sets::UniverseSets, bl_flag::Bool = false,
+                            ep_flag::Bool = false, rho_flag::Bool = false)
 
 Expand group or special variable references in a [`ParsingResult`](@ref) to their corresponding asset names.
 
-This function takes a [`ParsingResult`](@ref) containing variable names (which may include group names, `prior(...)` expressions, or correlation views like `(A, B)`), and replaces these with the actual asset names from the provided [`UniverseSets`](@ref). It supports Black-Litterman-style group expansion, entropy pooling prior views, and correlation view parsing for advanced constraint generation.
+This function takes a [`ParsingResult`](@ref) containing variable names (which may include group names, `prior(...)` expressions, or correlation views like `(A, B)`), and replaces these with the actual asset names from the provided [`UniverseSets`](@ref). It supports Black-Litterman-style group expansion, entropy pooling prior views, and correlation view parsing for advanced constraint generation. When `res` is a vector of [`ParsingResult`](@ref) objects, the function is applied to each element of the vector.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+c\\, g &\\to \\sum_{j=1}^{k} c\\, m_j\\,, \\\\
+c\\, g &\\to \\sum_{j=1}^{k} \\frac{c}{k}\\, m_j\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``g``: A group name written in the equation.
+  - ``m_j``: The ``j``-th member of the group ``g``.
+  - ``k``: The number of members of the group ``g``.
+  - ``c``: The coefficient the group name carries.
+
+The two lines are different operations. The first repeats the coefficient on every member, so the expanded row constrains the **sum** over the group. The second divides the coefficient by the member count, so the expanded row constrains the **mean** over the group. A group of one member is the only case in which the two agree.
+
+# Algorithm
+
+ 1. Copy `res.vars` and `res.coef` into `variables_new` and `coeffs_new`, and open the empty accumulators `variables_tmp`, `coeffs_tmp` and `idx_rm`.
+ 2. For each variable name of `res.vars`, match it against the prior pattern `prior(...)` and against the correlation pattern `(a, b)`. The four combinations of the two matches select steps 3 to 6.
+ 3. A name matching neither pattern, with `rho_flag` false, is a plain name. Look it up in `sets.dict`, and leave it where it stands when the dictionary does not hold it, because a name that is not a group is already the name of one column. A group name sheds its departed members with [`shed_departed_members`](@ref), then expands to what survived, each member carrying the coefficient the mathematics above gives over the **surviving** count, and the index of the group joins `idx_rm`. A group that shed every member expands to nothing and its index joins `idx_rm` all the same.
+ 4. A name matching the correlation pattern expands to one entry naming the two member lists, and that entry carries the coefficient of the view unchanged. A correlation view is one row over a pair of universes, so no coefficient is spread over members. The two lists shed jointly, so a pair survives only when both of its names did.
+ 5. A name matching the prior pattern expands the name inside `prior(...)` exactly as step 3 does, and wraps each member back in `prior(...)`.
+ 6. A name matching both patterns expands as step 4 does, and wraps each of the two member lists in `prior(...)`.
+ 7. Return `res` unchanged when nothing was struck, so an equation written in asset names costs no allocation.
+ 8. Delete the entries at `idx_rm` from `variables_new` and `coeffs_new`, append the two accumulators to them, and render the expanded equation string.
+ 9. Return the [`ParsingResult`](@ref) built from the new names and coefficients, together with the operator and the right-hand side of `res`, which the expansion leaves untouched.
 
 # Arguments
 
   - `res`: A [`ParsingResult`](@ref) object containing variables and coefficients to be expanded.
   - `sets`: A [`UniverseSets`](@ref) object specifying the asset universe and groupings.
-  - `bl_flag`: If `true`, enables Black-Litterman-style group expansion.
+  - `bl_flag`: Selects which of the two expansions above runs. `false` takes the first, which constrains the sum over the group. `true` takes the second, the Black-Litterman-style expansion, which constrains the mean.
   - `ep_flag`: If `true`, enables expansion of `prior(...)` expressions for entropy pooling.
   - `rho_flag`: If `true`, enables expansion of correlation views `(A, B)` for entropy pooling.
+  - `ledger`: The door's ledger of departure casualties, or `nothing` when nobody is collecting. A shed group is recorded into it through [`record_group_shed!`](@ref).
 
 # Validation
 
+The three flags are not independent, and five guards hold the grammar they describe.
+
   - `bl_flag` can only be `true` if both `ep_flag` and `rho_flag` are `false`.
   - `rho_flag` can only be `true` if `ep_flag` is also `true`.
+  - The pattern `(a, b)` can only be used when `ep_flag` and `rho_flag` are both `true`.
+  - The pattern `prior(a)` can only be used when `ep_flag` is `true`.
+  - The pattern `prior(a, b)` can only be used when `rho_flag` is `true`.
 
-# Details
+Two further guards hold the shape of a correlation view.
 
-  - Group names in `res.vars` are replaced by the corresponding asset names from `sets.dict`.
-  - If `bl_flag` is `true`, coefficients for group references are divided equally among the assets in the group.
-  - If `ep_flag` is `true`, expands `prior(asset)` or `prior(group)` expressions for entropy pooling.
-  - If `rho_flag` is `true`, expands correlation view expressions `(A, B)` or `prior(A, B)` for entropy pooling, mapping them to asset pairs.
-  - If a variable or group is not found in `sets.dict`, it is skipped.
+  - A correlation view is written `(a, b)`, and a correlation view prior is written `prior(a, b)`.
+  - Both sides of a correlation view name a group that `sets.dict` holds, and the two groups have the same number of members. A view whose two sides are both absent from `sets.dict` is skipped instead of raised on.
 
 # Returns
 
@@ -1494,11 +2196,11 @@ julia> sets = UniverseSets(; xkey = \"nx\",
 
 julia> res = parse_equation(\"group1 + 2C == 1\")
 ParsingResult
-  vars ┼ Vector{String}: ["C", "group1"]
-  coef ┼ Vector{Float64}: [2.0, 1.0]
+  vars ┼ Vector{String}: ["group1", "C"]
+  coef ┼ Vector{Float64}: [1.0, 2.0]
     op ┼ String: "=="
    rhs ┼ Float64: 1.0
-   eqn ┴ SubString{String}: "2.0*C + group1 == 1.0"
+   eqn ┴ SubString{String}: "group1 + 2.0*C == 1.0"
 
 julia> replace_group_by_assets(res, sets)
 ParsingResult
@@ -1506,7 +2208,7 @@ ParsingResult
   coef ┼ Vector{Float64}: [2.0, 1.0, 1.0]
     op ┼ String: "=="
    rhs ┼ Float64: 1.0
-   eqn ┴ String: "2.0*C + 1.0*A + 1.0*B == 1.0"
+   eqn ┴ String: "2.0*C + A + B == 1.0"
 ```
 
 # Related
@@ -1514,14 +2216,25 @@ ParsingResult
   - [`UniverseSets`](@ref)
   - [`ParsingResult`](@ref)
   - [`parse_equation`](@ref)
+  - [`get_linear_constraints`](@ref)
+  - [`linear_constraints`](@ref)
+  - [`shed_departed_members`](@ref)
+  - [`record_group_shed!`](@ref)
 """
 function replace_group_by_assets(res::ParsingResult, sets::UniverseSets,
                                  bl_flag::Bool = false, ep_flag::Bool = false,
-                                 rho_flag::Bool = false)::ParsingResult
+                                 rho_flag::Bool = false;
+                                 ledger::Option{<:AbstractVector} = nothing)::ParsingResult
     @argcheck(!(bl_flag && (rho_flag || ep_flag)),
               ArgumentError("bl_flag can only be true if ep_flag and rho_flag are false. Got\nbl_flag => $(bl_flag)\nep_flag => $(ep_flag)\nrho_flag => $(rho_flag)."))
     @argcheck(!(rho_flag && !ep_flag),
               ArgumentError("rho_flag can only be true if ep_flag is also true. Got\nrho_flag => $rho_flag\nep_flag => $ep_flag"))
+    # A group is a description the data resolves, so it sheds the members that left the
+    # Investable Mask *before* the coefficient is spread: the mean then divides by the
+    # surviving count, and the row still computes what its right-hand side asserts. A name
+    # written out in the equation is the caller pointing at one asset, and that one takes
+    # its row with it, one door later. See ADR 0125.
+    other = counterpart_axis_names(sets, sets.xkey)
     variables, coeffs = res.vars, res.coef
     variables_new = copy(variables)
     coeffs_new = copy(coeffs)
@@ -1539,10 +2252,11 @@ function replace_group_by_assets(res::ParsingResult, sets::UniverseSets,
                 if isnothing(asset)
                     continue
                 end
+                asset = shed_departed_members(asset, other, ledger, v, res.eqn)
+                push!(idx_rm, i)
                 c = !bl_flag ? coeffs[i] : coeffs[i] / length(asset)
                 append!(variables_tmp, asset)
                 append!(coeffs_tmp, Iterators.repeated(c, length(asset)))
-                push!(idx_rm, i)
             else
                 @argcheck(ep_flag && rho_flag,
                           ArgumentError("The pattern '(a, b)' can only be used for rho_views (rho_flag is true) in entropy pooling (ep_flag is true). Got\nep_flag => $(ep_flag)\nrho_flag => $(rho_flag)."))
@@ -1558,9 +2272,12 @@ function replace_group_by_assets(res::ParsingResult, sets::UniverseSets,
                 @argcheck(!isnothing(asset1), IsNothingError)
                 @argcheck(!isnothing(asset2), IsNothingError)
                 @argcheck(length(asset1) == length(asset2), DimensionMismatch)
+                asset1, asset2 = shed_departed_members(asset1, asset2, other, ledger,
+                                                       "($(n.captures[1]), $(n.captures[2]))",
+                                                       res.eqn)
+                push!(idx_rm, i)
                 push!(variables_tmp, "([$(join(asset1, ", "))], [$(join(asset2, ", "))])")
                 push!(coeffs_tmp, coeffs[i])
-                push!(idx_rm, i)
             end
         else
             @argcheck(ep_flag,
@@ -1571,10 +2288,11 @@ function replace_group_by_assets(res::ParsingResult, sets::UniverseSets,
                 if isnothing(asset)
                     continue
                 end
+                asset = shed_departed_members(asset, other, ledger, v[7:(end - 1)], res.eqn)
+                push!(idx_rm, i)
                 c = !bl_flag ? coeffs[i] : coeffs[i] / length(asset)
                 append!(variables_tmp, ["prior($a)" for a in asset])
                 append!(coeffs_tmp, Iterators.repeated(c, length(asset)))
-                push!(idx_rm, i)
             else
                 @argcheck(rho_flag,
                           ArgumentError("The pattern 'prior(a, b)' can only be used for rho_views (rho_flag is true) in entropy pooling (ep_flag is true). Got\nep_flag => $(ep_flag)\nrho_flag => $(rho_flag)."))
@@ -1590,36 +2308,58 @@ function replace_group_by_assets(res::ParsingResult, sets::UniverseSets,
                 @argcheck(!isnothing(asset1), IsNothingError)
                 @argcheck(!isnothing(asset2), IsNothingError)
                 @argcheck(length(asset1) == length(asset2), DimensionMismatch)
+                asset1, asset2 = shed_departed_members(asset1, asset2, other, ledger,
+                                                       "prior($(n.captures[1]), $(n.captures[2]))",
+                                                       res.eqn)
+                push!(idx_rm, i)
                 push!(variables_tmp,
                       "prior([$(join(asset1, ", "))], [$(join(asset2, ", "))])")
                 push!(coeffs_tmp, coeffs[i])
-                push!(idx_rm, i)
             end
         end
     end
-    if isempty(variables_tmp)
+    # `idx_rm`, not `variables_tmp`: a group that sheds its every member expands to nothing
+    # and leaves the second accumulator empty, and returning `res` there would put the
+    # group name back into a row that no longer names anything.
+    if isempty(idx_rm)
         return res
     end
     deleteat!(variables_new, idx_rm)
     deleteat!(coeffs_new, idx_rm)
     append!(variables_new, variables_tmp)
     append!(coeffs_new, coeffs_tmp)
-    eqn = replace(join(string.(coeffs_new) .* "*" .* variables_new, " + "), "+ -" => "-",
+    # Render through the same `format_term` the unexpanded string uses, so one constraint
+    # prints one way whether or not a group expanded.
+    eqn = replace(join(format_term.(coeffs_new, variables_new), " + "), "+ -" => "-",
                   "  " => " ")
     return ParsingResult(variables_new, coeffs_new, res.op, res.rhs,
                          "$(eqn) $(res.op) $(res.rhs)")
 end
-function replace_group_by_assets(res::VecPR, sets::UniverseSets, args...)
-    return replace_group_by_assets.(res, sets, args...)
+function replace_group_by_assets(res::VecPR, sets::UniverseSets, args...; kwargs...)
+    return [replace_group_by_assets(resi, sets, args...; kwargs...) for resi in res]
 end
 """
     universe_axis(sets::UniverseSets, key::AbstractString) -> String
 
-Name of the axis the universe stored under `key` belongs to, read off the key itself: `"factor"` for anything carrying the `fkey` prefix, `"asset"` otherwise. It exists only so [`unknown_variable_msg`](@ref) and [`empty_row_msg`](@ref) can name the axis the user wrote in.
+Name of the axis the universe stored under `key` belongs to, read off the key itself: `"factor"` for anything carrying the `tfkey` prefix, `"asset"` otherwise. It exists only so [`unknown_variable_msg`](@ref) and [`empty_row_msg`](@ref) can name the axis the user wrote in.
 
-The **key** is the evidence, for both callers, and the reason is that both resolve names against `sets.dict[key]` and nothing else: whatever axis that universe belongs to is the axis a failed lookup failed on. [`get_black_litterman_views`](@ref) takes the key from the estimator that owns the views, and [`get_linear_constraints`](@ref) from the constraint space — [`FactorSpace`](@ref) resolving at `sets.fkey`. Reading it off the *re-basis* instead would be a second encoding of the same fact, and a worse one: a wrapped estimator carrying its own `key` overrides the space's, so a re-based row can legitimately resolve against a universe the loadings are not written in, and the message must name the universe that was searched.
+The **key** is the evidence, for both callers, and the reason is that both resolve names against `sets.dict[key]` and nothing else: whatever axis that universe belongs to is the axis a failed lookup failed on. [`get_black_litterman_views`](@ref) takes the key from the estimator that owns the views, and [`get_linear_constraints`](@ref) from the constraint space — [`FactorSpace`](@ref) resolving at `sets.tfkey`. Reading it off the *re-basis* instead would be a second encoding of the same fact, and a worse one: a wrapped estimator carrying its own `key` overrides the space's, so a re-based row can legitimately resolve against a universe the loadings are not written in, and the message must name the universe that was searched.
 
 The **prefix** rather than equality is what makes a factor group key (`"nf_sector"`) resolve as the factor axis too, and the disjoint-prefix rule [`UniverseSets`](@ref) enforces at construction is what makes that unambiguous.
+
+# Algorithm
+
+ 1. Return `"factor"` when `key` starts with `sets.tfkey`.
+ 2. Return `"asset"` in every other case.
+
+# Arguments
+
+  - `sets`: The [`UniverseSets`](@ref) whose `tfkey` names the factor axis.
+  - `key`: The key the names were resolved against.
+
+# Returns
+
+  - `axis::String`: `"factor"` or `"asset"`, the word a diagnostic message uses to name the axis.
 
 # Related
 
@@ -1628,12 +2368,28 @@ The **prefix** rather than equality is what makes a factor group key (`"nf_secto
   - [`UniverseSets`](@ref)
 """
 function universe_axis(sets::UniverseSets, key::AbstractString)::String
-    return ifelse(startswith(key, sets.fkey), "factor", "asset")
+    return ifelse(startswith(key, sets.tfkey), "factor", "asset")
 end
 """
     constraint_row_length(rr, nx::VecStr) -> Int
 
 Length of the assembled constraint row. Without a re-basis this is the size of the universe the names resolve against; with one it is the number of *assets* the loadings project onto, because the projection is applied while the row is assembled and what leaves is an ordinary asset-space row.
+
+# Algorithm
+
+The method that Julia selects is the algorithm, and the re-basis selects it.
+
+ 1. `rr` is `nothing`: return the length of `nx`, the universe the names resolve against.
+ 2. `rr` is a regression result: return the number of rows of `rr.M`, which is the number of assets the loadings project onto.
+
+# Arguments
+
+  - `rr`: Loadings to re-base through, or `nothing` for an ordinary asset-space row.
+  - `nx`: The universe the names resolve against.
+
+# Returns
+
+  - `N::Int`: The number of entries one assembled row has.
 
 # Related
 
@@ -1643,62 +2399,110 @@ Length of the assembled constraint row. Without a re-basis this is the size of t
 function constraint_row_length(::Nothing, nx::VecStr)::Int
     return length(nx)
 end
-function constraint_row_length(rr::AbstractRegressionResult, ::VecStr)::Int
+function constraint_row_length(rr::AbstractLoadingsRegressionResult, ::VecStr)::Int
     return size(rr.M, 1)
 end
 """
-    constraint_row_term(rr, Ai, c)
+    constraint_row_term(::Nothing, Ai, c)
+    constraint_row_term(rr::AbstractLoadingsRegressionResult, Ai, c)
 
 Contribution of one matched variable to a constraint row.
 
-Without a re-basis this is the indicator `Ai` scaled by the coefficient `c`. With one it is the corresponding columns of the loadings, summed and scaled — which is the identity
-
-```math
-\\boldsymbol{a}^\\intercal \\boldsymbol{w}_f = \\boldsymbol{a}^\\intercal \\mathbf{M}^\\intercal \\boldsymbol{w}_a = (\\mathbf{M} \\boldsymbol{a})^\\intercal \\boldsymbol{w}_a
-```
-
-applied one term at a time. The columns are **summed** rather than indexed by `findfirst`, so a factor universe carrying a duplicated name contributes every column bearing it, matching how the asset path treats a duplicated asset name.
+Without a re-basis the contribution is the indicator `Ai` scaled by the coefficient `c`. With one it is the columns of the loadings that `Ai` selects, summed and scaled. The columns are **summed** rather than indexed by `findfirst`, so a factor universe carrying a duplicated name contributes every column bearing it, matching how the asset path treats a duplicated asset name.
 
 `rr.M` is used, never `rr.L`: `M`'s columns are the named original factors, and a constraint must be *written* in names a user can put in an equation. Risk decomposition wants `L` and is right to; see ADR 0047.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\boldsymbol{a}^\\intercal \\boldsymbol{w}_f &= \\boldsymbol{a}^\\intercal \\mathbf{M}^\\intercal \\boldsymbol{w}_a = (\\mathbf{M} \\boldsymbol{a})^\\intercal \\boldsymbol{w}_a\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{a}``: A constraint row written in factor names.
+  - ``\\boldsymbol{w}_f``: The factor weights that row is written against.
+  - ``\\boldsymbol{w}_a``: The asset weights the optimiser holds.
+  - ``\\mathbf{M}``: The factor loadings, one column per named factor and one row per asset.
+
+The identity is what lets a row written in factor names bind asset weights with no change of variables: the re-based row is an ordinary asset-space row over ``\\boldsymbol{w}_a``.
+
+# Algorithm
+
+The method that Julia selects is the algorithm, and the re-basis selects it.
+
+ 1. `rr` is `nothing`: return `Ai` scaled by `c`, one entry per name of the universe.
+ 2. `rr` is a regression result: sum the columns of `rr.M` that `Ai` selects, scale the sum by `c`, and return it. The value is asset-length whatever the row was written in.
+
+# Arguments
+
+  - `rr`: Loadings to re-base through, or `nothing` for an ordinary asset-space row.
+  - `Ai`: The indicator of the matched name over the universe the names resolve against.
+  - `c`: The coefficient the matched name carries.
+
+# Returns
+
+  - The contribution of this term to the row, of the length [`constraint_row_length`](@ref) gives.
 
 # Related
 
   - [`get_linear_constraints`](@ref)
   - [`ExposureConstraintEstimator`](@ref)
+  - [`constraint_row_length`](@ref)
 """
 function constraint_row_term(::Nothing, Ai, c)
     return Ai * c
 end
-function constraint_row_term(rr::AbstractRegressionResult, Ai, c)
+function constraint_row_term(rr::AbstractLoadingsRegressionResult, Ai, c)
     return vec(sum(view(rr.M, :, Ai); dims = 2)) * c
 end
 """
     get_linear_constraints(lcs::PR_VecPR, sets::UniverseSets,
                            key::Option{<:AbstractString} = nothing;
                            datatype::DataType = Float64, strict::Bool = false,
-                           rr::Option{<:AbstractRegressionResult} = nothing)
+                           rr::Option{<:AbstractLoadingsRegressionResult} = nothing)
 
 Convert parsed linear constraint equations into a `LinearConstraint` object.
 
 `get_linear_constraints` takes one or more [`ParsingResult`](@ref) objects (as produced by [`parse_equation`](@ref)), expands variable names using the provided [`UniverseSets`](@ref), and assembles the corresponding constraint matrices and right-hand side vectors. The result is a [`LinearConstraint`](@ref) object containing both equality and inequality constraints, suitable for use in portfolio optimisation routines.
 
+A row takes one of two shapes. Without `rr` it runs over the universe the names resolve against. With `rr` it runs over the assets, because the loadings re-base each term as the row is assembled and what leaves the function is an ordinary asset-space row.
+
+**A row is the unit of a drop.** A row is a joint statement over several names with one right-hand side, so a name this function cannot resolve takes the whole row with it rather than only its own term: `a + c == 0.05` assembled without `c` would fit `a == 0.05`, a different and stronger claim than the caller wrote. What the name's failure was decides only whether the drop is *reported*. A name on the **counterpart axis** — read with [`counterpart_axis_names`](@ref), and in practice the Non-Investable Axis a door minted — is dropped in silence under both settings of `strict`, because it was a correct name over the universe the caller was handed and the data moved it; the departure is announced once, by the door. A name on neither axis is a typo, and is reported exactly as before. ADR 0125 states the rule.
+
+# Algorithm
+
+ 1. Take `k` as `key`, or `sets.xkey` when `key` is `nothing`, read the universe `nx` from `sets.dict` under it, name the axis with [`universe_axis`](@ref), and read the counterpart axis with [`counterpart_axis_names`](@ref).
+ 2. Take `N`, the row length, from [`constraint_row_length`](@ref), and allocate the working row `At` of that length.
+ 3. Zero `At` for each parsing result, and start that result not dropped.
+ 4. Build the indicator of each variable name of the result over `nx`. A name that matches no entry marks the row dropped, and is reported through [`strict_diagnostic`](@ref) unless it names the counterpart axis. Every name of the row is still visited, so a row carrying two typos names both.
+ 5. Add the contribution [`constraint_row_term`](@ref) gives for the name and its coefficient to `At`. With `rr` the contribution arrives already projected, so `At` is asset-length while it is accumulated.
+ 6. Move to the next result when the row was marked dropped.
+ 7. Report the row through [`strict_diagnostic`](@ref) and drop it when `At` is still zero. Every name resolved to get here, so the message says the row was annihilated — by the loadings under `rr`, by its own cancelling coefficients otherwise, or by there being no name in it at all — and never that a name was mistyped.
+ 8. Read the sign and the inequality flag of the operator from [`comparison_sign_ineq_flag`](@ref), and scale the row and its right-hand side by the sign. That negates a `>=` row, so both senses of an inequality are written in the `<=` sense, which is the convention [`LinearConstraint`](@ref) states.
+ 9. Append the row to the inequality accumulator when the flag is `true`, and to the equality accumulator when it is `false`.
+10. Reshape each accumulator that holds a row into a matrix of `N` columns, and build the [`PartialLinearConstraint`](@ref) of that half.
+11. Return the [`LinearConstraint`](@ref) holding the halves that were built, or `nothing` when neither half holds a row.
+
 # Arguments
 
   - `lcs`: A single [`ParsingResult`](@ref) or a vector of such objects, representing parsed constraint equations.
   - `sets`: A [`UniverseSets`](@ref) object specifying the universes and groupings.
-  - `key`: Key naming the universe the variables resolve against. Defaults to `sets.xkey`; a re-based constraint passes `sets.fkey`.
+  - `key`: Key naming the universe the variables resolve against. Defaults to `sets.xkey`; a re-based constraint passes `sets.tfkey`.
   - `datatype`: Numeric type for coefficients and right-hand side.
   - `strict`: If `true`, throws an error if a variable or group is not found in `sets`; if `false`, issues a warning.
   - `rr`: Loadings to re-base through, or `nothing` for an ordinary asset-space constraint. See [`ExposureConstraintEstimator`](@ref) — callers do not pass this directly.
+  - `ledger`: The door's ledger of departure casualties, or `nothing` when nobody is collecting. A row dropped for a name on the counterpart axis is recorded into it through [`record_non_investable_drop!`](@ref).
 
-# Details
+# Validation
 
-  - For each constraint, variable names are matched to the universe stored under `key` in `sets`.
-  - Coefficient vectors are assembled for each constraint, with entries corresponding to the order of assets in `sets`.
-  - When `rr` is supplied, each matched term is projected through `rr.M` as it is accumulated, so the assembled row is asset-length and what the function returns is an ordinary asset-space [`LinearConstraint`](@ref).
-  - Constraints are separated into equality (`==`) and inequality (`<=`, `>=`) types.
-  - The function validates that all constraints reference valid assets or groups, using `@argcheck` for defensive programming.
-  - Returns `nothing` if no valid constraints are found after processing.
+  - `lcs` is non-empty, when it is a vector.
+  - A variable name that matches no entry of the universe and none of the counterpart axis raises when `strict` is `true`, and issues a warning otherwise. The row is dropped either way.
+  - A variable name on the counterpart axis drops its row in silence, under both settings of `strict`.
+  - A row whose terms all fall away raises when `strict` is `true`, and issues a warning otherwise. The row is dropped either way.
+  - Each `op` is one of `"=="`, `"<="` or `">="`, which [`comparison_sign_ineq_flag`](@ref) enforces.
 
 # Returns
 
@@ -1711,11 +2515,17 @@ Convert parsed linear constraint equations into a `LinearConstraint` object.
   - [`parse_equation`](@ref)
   - [`replace_group_by_assets`](@ref)
   - [`constraint_row_term`](@ref)
+  - [`constraint_row_length`](@ref)
+  - [`universe_axis`](@ref)
+  - [`comparison_sign_ineq_flag`](@ref)
+  - [`counterpart_axis_names`](@ref)
+  - [`shed_departed_members`](@ref)
 """
 function get_linear_constraints(lcs::PR_VecPR, sets::UniverseSets,
                                 key::Option{<:AbstractString} = nothing;
                                 datatype::DataType = Float64, strict::Bool = false,
-                                rr::Option{<:AbstractRegressionResult} = nothing)
+                                rr::Option{<:AbstractLoadingsRegressionResult} = nothing,
+                                ledger::Option{<:AbstractVector} = nothing)
     if isa(lcs, AbstractVector)
         @argcheck(!isempty(lcs), IsEmptyError)
     end
@@ -1726,27 +2536,44 @@ function get_linear_constraints(lcs::PR_VecPR, sets::UniverseSets,
     k = ifelse(isnothing(key), sets.xkey, key)
     nx = sets.dict[k]
     axis = universe_axis(sets, k)
+    other = counterpart_axis_names(sets, k)
     N = constraint_row_length(rr, nx)
     At = Vector{datatype}(undef, N)
     for lc in lcs
         fill!(At, zero(eltype(At)))
-        matched = false
+        dropped = false
         for (v, c) in zip(lc.vars, lc.coef)
             Ai = (nx .== v)
             if !any(isone, Ai)
-                msg = unknown_variable_msg(v, nx, k; axis = axis)
-                strict_diagnostic(msg, strict)
+                # A view is a **row**: `a + c == 0.05` fitted without `c` asserts
+                # `a == 0.05`, which is a different and stronger claim than the caller
+                # wrote. So the row goes whole, whatever the name's failure was. A name on
+                # the counterpart axis goes in silence — it was correct over the universe
+                # the caller was handed, and the data moved it — and a name on neither axis
+                # is still a typo and is still reported. See ADR 0125.
+                if v ∉ other
+                    msg = unknown_variable_msg(v, nx, k; axis = axis,
+                                               consequence = "row dropped")
+                    strict_diagnostic(msg, strict)
+                elseif !dropped
+                    # Once per row, not once per departed name in it: the row is the unit
+                    # that went, and `ni` already names every asset that left.
+                    record_non_investable_drop!(ledger, "the row `$(lc.eqn)`")
+                end
+                dropped = true
                 continue
             end
-            matched = true
-            At += constraint_row_term(rr, Ai, c)
+            At .+= constraint_row_term(rr, Ai, c)
+        end
+        if dropped
+            continue
         end
         if !any(!iszero, At)
-            # Two distinct failures land here once a re-basis is possible: the names missed the
-            # universe (`matched === false`, the pre-existing diagnosis), or they hit it and the
-            # loadings annihilated them. Reporting the first for the second would send a user
-            # hunting for a typo that is not there.
-            msg = if matched && !isnothing(rr)
+            # Every name of the row resolved — one that did not took the row with it above —
+            # so what is left here is a row that resolved and still summed to zero: the
+            # loadings annihilated it, or its own coefficients cancelled. Reporting a typo
+            # for either would send a user hunting for one that is not there.
+            msg = if !isnothing(rr)
                 empty_projected_row_msg(lc.eqn, nx, k, N)
             else
                 empty_row_msg(lc.eqn, nx, k; axis = axis)
@@ -1754,8 +2581,7 @@ function get_linear_constraints(lcs::PR_VecPR, sets::UniverseSets,
             strict_diagnostic(msg, strict)
             continue
         end
-        d = ifelse(lc.op == ">=", -1, 1)
-        flag = d == -1 || lc.op == "<="
+        d, flag = comparison_sign_ineq_flag(lc.op)
         A = At .* d
         B = lc.rhs * d
         if flag
@@ -1863,55 +2689,63 @@ end
 """
     const LcE_Lc = Union{<:LinearConstraintEstimator, <:LinearConstraint}
 
-Alias for a union of linear constraint estimator and linear constraint types.
+An unparsed [`LinearConstraintEstimator`](@ref), or an assembled [`LinearConstraint`](@ref). The group exists because a constraint slot accepts both: [`linear_constraints`](@ref) parses the first and passes the second through untouched, so a caller may hand over equations or a block it built earlier.
 
 # Related
 
   - [`LinearConstraintEstimator`](@ref)
   - [`LinearConstraint`](@ref)
+  - [`linear_constraints`](@ref)
 """
 const LcE_Lc = Union{<:LinearConstraintEstimator, <:LinearConstraint}
 """
-$(DocStringExtensions.TYPEDEF)
+    const VecLcE_Lc = AbstractVector{<:LcE_Lc}
 
-Alias for an abstract vector of [`LcE_Lc`](@ref) elements.
+Every abstract vector whose elements are [`LcE_Lc`](@ref)s. The group exists so that one slot may hold a mixed list of equations still to parse and constraints already assembled.
 
 # Related
 
   - [`LcE_Lc`](@ref)
+  - [`LcE_Lc_VecLcE_Lc`](@ref)
+  - [`linear_constraints`](@ref)
 """
 const VecLcE_Lc = AbstractVector{<:LcE_Lc}
 """
-$(DocStringExtensions.TYPEDEF)
+    const VecLcE = AbstractVector{<:LinearConstraintEstimator}
 
-Alias for an abstract vector of [`LinearConstraintEstimator`](@ref) elements.
+Every abstract vector whose elements are [`LinearConstraintEstimator`](@ref)s. The group is narrower than [`VecLcE_Lc`](@ref) on purpose: every element still has to be parsed, so [`linear_constraints`](@ref) is broadcast over it and answers one constraint per element.
 
 # Related
 
   - [`LinearConstraintEstimator`](@ref)
   - [`LcE_VecLcE`](@ref)
+  - [`VecLcE_Lc`](@ref)
+  - [`linear_constraints`](@ref)
 """
 const VecLcE = AbstractVector{<:LinearConstraintEstimator}
 """
     const LcE_Lc_VecLcE_Lc = Union{<:LcE_Lc, <:VecLcE_Lc}
 
-Alias for a union of [`LcE_Lc`](@ref) or a vector of them.
+One [`LcE_Lc`](@ref), or a vector of them. The group is the widest linear-constraint slot the library declares: it names every shape a user may write into such a field, so it is what the type bound of that field is written against.
 
 # Related
 
   - [`LcE_Lc`](@ref)
   - [`VecLcE_Lc`](@ref)
+  - [`linear_constraints`](@ref)
 """
 const LcE_Lc_VecLcE_Lc = Union{<:LcE_Lc, <:VecLcE_Lc}
 """
     const LcE_VecLcE = Union{<:LinearConstraintEstimator, <:VecLcE}
 
-Alias for a union of a single [`LinearConstraintEstimator`](@ref) or a vector of them.
+One [`LinearConstraintEstimator`](@ref), or a vector of them. The group excludes an assembled [`LinearConstraint`](@ref), so a method that dispatches on it knows that every element still carries equations to parse.
 
 # Related
 
   - [`LinearConstraintEstimator`](@ref)
   - [`VecLcE`](@ref)
+  - [`LcE_Lc`](@ref)
+  - [`linear_constraints`](@ref)
 """
 const LcE_VecLcE = Union{<:LinearConstraintEstimator, <:VecLcE}
 """
@@ -1923,6 +2757,10 @@ No-op fallback for returning an existing `LinearConstraint` object, `nothing`, o
 This method is used to pass through an already constructed [`LinearConstraint`](@ref) object or `nothing` without modification. It enables composability and uniform interface handling in constraint generation workflows, allowing functions to accept either raw equations or pre-built constraint objects.
 
 The vector arity is narrowed to a `nothing` universe on purpose. A vector needs no [`UniverseSets`](@ref) precisely because every element is already assembled, and that is the shape a [`Pipeline`](@ref) hands an optimiser when more than one constraint step ran; with a real `UniverseSets` the broader vector methods take over and map this one over the elements.
+
+# Algorithm
+
+ 1. Return `lcs`. Neither method reads its further positional arguments or its keywords.
 
 # Arguments
 
@@ -1953,6 +2791,20 @@ The identity is deliberate, and it is **not** the claim that a full-universe row
 
 A constraint reaching a meta-optimiser through an [`ExposureConstraintEstimator`](@ref) is a different case and is handled: its `A` is factor-width and is re-projected against the viewed prior's loadings, so the view it needs is of the *basis*, not of the row.
 
+# Algorithm
+
+ 1. Return `lc`. The method reads neither the index nor the tail that follows it.
+
+# Arguments
+
+  - `lc`: The precomputed [`LinearConstraint`](@ref).
+  - `::Any`: The asset index selection (ignored).
+  - `args...`: Additional positional arguments (ignored).
+
+# Returns
+
+  - `lc::LinearConstraint`: The input, unchanged.
+
 # Related
 
   - [`port_opt_view`](@ref)
@@ -1961,6 +2813,67 @@ A constraint reaching a meta-optimiser through an [`ExposureConstraintEstimator`
 """
 function port_opt_view(lc::LinearConstraint, ::Any, args...)::LinearConstraint
     return lc
+end
+"""
+    assert_investable_constraint_width(lcs::Nothing, N::Integer, slot::AbstractString)
+    assert_investable_constraint_width(lc::LinearConstraint, N::Integer,
+                                       slot::AbstractString)
+    assert_investable_constraint_width(lcs::VecLc, N::Integer, slot::AbstractString)
+
+Refuse a **precomputed** [`LinearConstraint`](@ref) whose rows are wider than the investable universe, and say why.
+
+A name-keyed estimator survives a reduction to the Investable Mask: it resolves against the [`UniverseSets`](@ref) the door hands it, and a name that left resolves on the Non-Investable Axis instead of being refused. A precomputed constraint cannot. Its `A` is a matrix, and position is the only link between a column and an asset, so there is no name to re-resolve and no honest way to narrow it — dropping a column silently changes what `Ax ≤ B` means, and [`port_opt_view`](@ref)`(::LinearConstraint, i)` is deliberately the identity for that reason.
+
+So the row survives the door at its original width and meets a shorter weight vector. Left alone that surfaces inside the model as a bare `DimensionMismatch` between two numbers, with nothing to connect either to the asset that delisted. This says it once, at the seam, in terms of what the caller did and what they can do instead.
+
+The repair is always the same: state the constraint as a [`LinearConstraintEstimator`](@ref). A name-keyed constraint is re-resolved over whatever universe the door leaves, which is the whole point of stating it by name.
+
+# Algorithm
+
+ 1. Return when there is nothing to check: a `nothing` slot, or a `nothing` half of a [`LinearConstraint`](@ref).
+ 2. Otherwise compare `size(A, 2)` of each half against `N` and throw a `DimensionMismatch` naming the slot, the two widths and the repair when they disagree.
+
+# Arguments
+
+  - `lcs`: The resolved constraint, a vector of them, or `nothing`.
+  - `N`: The number of investable assets the optimisation runs over.
+  - `slot`: Names the field the constraint came from in the message, for example `"lcse"`.
+
+# Validation
+
+  - Every half of every precomputed constraint has one column per investable asset.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`LinearConstraint`](@ref)
+  - [`LinearConstraintEstimator`](@ref)
+  - [`port_opt_view`](@ref)
+  - [`non_investable_sets`](@ref)
+"""
+function assert_investable_constraint_width(::Nothing, ::Integer, ::AbstractString)::Nothing
+    return nothing
+end
+function assert_investable_constraint_width(lc::LinearConstraint, N::Integer,
+                                            slot::AbstractString)::Nothing
+    for half in (lc.ineq, lc.eq)
+        if isnothing(half)
+            continue
+        end
+        @argcheck(size(half.A, 2) == N,
+                  DimensionMismatch("the precomputed linear constraint in `$slot` is written over $(size(half.A, 2)) assets, but this optimisation runs over $N. An asset left the investable universe, and a precomputed constraint cannot follow it: its `A` is bound to its columns by position, so no column can be dropped without changing what the constraint means. State it as a LinearConstraintEstimator, which is resolved by name against whatever universe the door leaves."))
+    end
+    return nothing
+end
+function assert_investable_constraint_width(lcs::VecLc, N::Integer,
+                                            slot::AbstractString)::Nothing
+    for lc in lcs
+        assert_investable_constraint_width(lc, N, slot)
+    end
+    return nothing
 end
 function linear_constraints(lcs::AbstractVector{<:LinearConstraint}, ::Nothing, args...;
                             kwargs...)::AbstractVector{<:LinearConstraint}
@@ -1977,6 +2890,15 @@ Parse and convert one or more linear constraint equations into a [`LinearConstra
 
 This function parses one or more constraint equations (as strings, expressions, or vectors thereof), replaces group or asset references using the provided [`UniverseSets`](@ref), and constructs the corresponding constraint matrices. The result is a [`LinearConstraint`](@ref) object containing both equality and inequality constraints, suitable for use in portfolio optimisation routines.
 
+# Algorithm
+
+This method is the whole pipeline, and each step names the stage that owns it.
+
+ 1. Parse `eqn` with [`parse_equation`](@ref), giving `lcs`, one [`ParsingResult`](@ref) per equation. Each result carries the equation in canonical form.
+ 2. Expand every group name of `lcs` into its members with [`replace_group_by_assets`](@ref), giving results written in names of the universe. `bl_flag` selects which of the two expansions runs.
+ 3. Assemble the coefficient matrices and the right-hand sides from `lcs` with [`get_linear_constraints`](@ref), which resolves each name against the universe `key` names and separates the equality rows from the inequality rows.
+ 4. Return what [`get_linear_constraints`](@ref) gives: a [`LinearConstraint`](@ref), or `nothing` when no row survived.
+
 # Arguments
 
   - `eqn`: A single constraint equation (as `AbstractString` or `Expr`), or a vector of such equations.
@@ -1986,14 +2908,12 @@ This function parses one or more constraint equations (as strings, expressions, 
   - `datatype`: Numeric type for coefficients and right-hand side.
   - `strict`: If `true`, throws an error if a variable or group is not found in `sets`; if `false`, issues a warning.
   - `bl_flag`: If `true`, enables Black-Litterman-style group expansion.
+  - `key`: Key naming the universe the variables resolve against. Defaults to `sets.xkey`.
+  - `rr`: Loadings to re-base through, or `nothing` for an ordinary asset-space constraint.
 
-# Details
+# Validation
 
-  - Each equation is parsed using [`parse_equation`](@ref), supporting both string and expression input.
-  - Asset and group references in the equations are expanded using [`replace_group_by_assets`](@ref) and the provided `sets`.
-  - The function separates equality and inequality constraints, assembling the corresponding matrices and right-hand side vectors.
-  - Input validation is performed using `@argcheck` to ensure non-empty and consistent constraints.
-  - Returns `nothing` if no valid constraints are found after parsing and expansion.
+  - Every stage validates its own input: [`parse_equation`](@ref) the equation text, [`replace_group_by_assets`](@ref) the flag grammar, and [`get_linear_constraints`](@ref) the names against the universe.
 
 # Returns
 
@@ -2029,55 +2949,69 @@ function linear_constraints(eqn::EqnType, sets::UniverseSets,
                             ops2::Tuple = (:call, :(==), :(<=), :(>=)),
                             datatype::DataType = Float64, strict::Bool = false,
                             bl_flag::Bool = false,
-                            rr::Option{<:AbstractRegressionResult} = nothing)::Option{<:LinearConstraint}
+                            rr::Option{<:AbstractLoadingsRegressionResult} = nothing)::Option{<:LinearConstraint}
     lcs = parse_equation(eqn; ops1 = ops1, ops2 = ops2, datatype = datatype)
     lcs = replace_group_by_assets(lcs, sets, bl_flag)
     return get_linear_constraints(lcs, sets, key; datatype = datatype, strict = strict,
                                   rr = rr)
 end
-function linear_constraints(lcs::LinearConstraintEstimator{<:AbstractEstimatorValueAlgorithm},
-                            sets::UniverseSets, key::Option{<:AbstractString} = nothing;
-                            datatype::DataType = Float64, strict::Bool = false,
-                            args...)::Option{<:LinearConstraint}
-    return estimator_to_val(lcs.val, sets,
-                            !hasproperty(lcs.val, :default) ? nothing : lcs.val.default,
-                            key; datatype = datatype, strict = strict)
-end
 """
-    linear_constraints(lcs::LcE_VecLcE,
-                       sets::UniverseSets; datatype::DataType = Float64, strict::Bool = false,
-                       bl_flag::Bool = false)
+    linear_constraints(lcs::LinearConstraintEstimator, sets::UniverseSets;
+                       datatype::DataType = Float64, strict::Bool = false,
+                       bl_flag::Bool = false,
+                       rr::Option{<:AbstractLoadingsRegressionResult} = nothing,
+                       rd::Option{<:ReturnsResult} = nothing)
+    linear_constraints(lcs::VecLcE, sets::UniverseSets;
+                       datatype::DataType = Float64, strict::Bool = false,
+                       bl_flag::Bool = false,
+                       rr::Option{<:AbstractLoadingsRegressionResult} = nothing,
+                       rd::Option{<:ReturnsResult} = nothing)
 
-If `lcs` is a vector of [`LinearConstraintEstimator`](@ref) objects, this function is broadcast over the vector.
+Parse the equations a [`LinearConstraintEstimator`](@ref) carries, against the universe key that estimator names.
 
-This method is a wrapper calling:
+The method reads `val` and `key` off the estimator and hands both to the equation method, which gives one uniform interface for a single constraint estimator and for a vector of them. A vector is answered element by element, and the result is a vector of the same length.
 
-    linear_constraints(lcs.val, sets, lcs.key; datatype = datatype, strict = strict, bl_flag = bl_flag)
+`rr` is accepted so that a caller holding loadings — [`processed_jump_optimiser_attributes`](@ref) does — can pass them uniformly to whatever sits in `lcse`, without inspecting its type first. A bare [`LinearConstraintEstimator`](@ref) **drops** them: the asset frame is the absence of a re-basis, and an estimator that quietly re-based itself because loadings happened to be available would make the space depend on the prior rather than on what the user wrote. A re-basis is asked for by wrapping in an [`ExposureConstraintEstimator`](@ref) and by nothing else. `rd` rides along for the same reason and is dropped for a stronger one: only a space can ask for a refit, and a bare estimator has no space.
 
-It is used for type stability and to provide a uniform interface for processing constraint estimators, as well as simplifying the use of multiple estimators simultaneously.
+# Algorithm
 
-# The loadings are accepted and dropped
+ 1. Read `val` and `key` off `lcs`.
+ 2. Drop `rr` and `rd`, for the reason the paragraph above gives.
+ 3. Return the [`LinearConstraint`](@ref) that the equation method builds from `val`, `sets` and `key`.
+ 4. Apply steps 1 to 3 to each element, and return the vector of results, when `lcs` is a vector. `rr` and `rd` reach every element, and every element drops them.
 
-`rr` is accepted so that a caller holding loadings — [`processed_jump_optimiser_attributes`](@ref) does — can pass them uniformly to whatever sits in `lcse`, without inspecting its type first. A bare [`LinearConstraintEstimator`](@ref) **drops** them: the asset frame is the absence of a re-basis, and an estimator that quietly re-based itself because loadings happened to be available would make the space depend on the prior rather than on what the user wrote. A re-basis is asked for by wrapping in an [`ExposureConstraintEstimator`](@ref) and by nothing else.
+# Arguments
 
-`rd` rides along for the same reason and is dropped for a stronger one: only a space can ask for a refit, and a bare estimator has no space.
+  - `lcs`: The [`LinearConstraintEstimator`](@ref) to parse, or a vector of them.
+  - `sets`: A [`UniverseSets`](@ref) object specifying the asset universe and groupings.
+  - `datatype`: Numeric type for coefficients and right-hand side.
+  - `strict`: If `true`, throws an error if a variable or group is not found in `sets`; if `false`, issues a warning.
+  - `bl_flag`: If `true`, enables Black-Litterman-style group expansion.
+  - `rr`: Accepted and dropped. A bare estimator never re-bases.
+  - `rd`: Accepted and dropped. A bare estimator never asks for a refit.
+
+# Returns
+
+  - `lcs::Option{<:LinearConstraint}`: The assembled constraint, or `nothing` when no row survived. A vector input gives one such value per element.
 
 # Related
 
   - [`linear_constraints`](@ref)
   - [`ExposureConstraintEstimator`](@ref)
+  - [`LinearConstraintEstimator`](@ref)
+  - [`UniverseSets`](@ref)
 """
 function linear_constraints(lcs::LinearConstraintEstimator, sets::UniverseSets;
                             datatype::DataType = Float64, strict::Bool = false,
                             bl_flag::Bool = false,
-                            rr::Option{<:AbstractRegressionResult} = nothing,
+                            rr::Option{<:AbstractLoadingsRegressionResult} = nothing,
                             rd::Option{<:ReturnsResult} = nothing)::Option{<:LinearConstraint}
     return linear_constraints(lcs.val, sets, lcs.key; datatype = datatype, strict = strict,
                               bl_flag = bl_flag)
 end
 function linear_constraints(lcs::VecLcE, sets::UniverseSets; datatype::DataType = Float64,
                             strict::Bool = false, bl_flag::Bool = false,
-                            rr::Option{<:AbstractRegressionResult} = nothing,
+                            rr::Option{<:AbstractLoadingsRegressionResult} = nothing,
                             rd::Option{<:ReturnsResult} = nothing)
     return [linear_constraints(lc, sets; datatype = datatype, strict = strict,
                                bl_flag = bl_flag, rr = rr, rd = rd) for lc in lcs]

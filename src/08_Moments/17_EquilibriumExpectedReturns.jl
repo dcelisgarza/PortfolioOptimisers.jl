@@ -5,6 +5,10 @@ Computes the expected excess returns that a set of equilibrium weights implies, 
 
 It holds a covariance estimator, the equilibrium weights and the risk aversion parameter. The Black-Litterman members use the same expression to build their prior mean.
 
+`l` is the risk aversion of the representative investor. It is the ``\\lambda`` of the equation below, which Black and Litterman write ``\\delta``. It is a caller-supplied number and it is not estimated from the data. A larger `l` scales every equilibrium return up, and a `l` of zero gives a zero mean.
+
+`w` is the weight vector the market is assumed to hold, which is a market-capitalisation vector or a benchmark vector. It is caller-supplied for the same reason: the data hold returns, not holdings. If `w` is `nothing`, the equal-weight vector of the right length is used, and the length is read from the covariance matrix rather than from `X`.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -48,7 +52,8 @@ EquilibriumExpectedReturns
      │      │    ce ┼ GeneralCovariance
      │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
      │      │       │    w ┴ nothing
-     │      │   alg ┴ FullMoment()
+     │      │   alg ┼ FullMoment()
+     │      │     w ┴ nothing
      │   mp ┼ MatrixProcessing
      │      │     pdm ┼ Posdef
      │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
@@ -108,7 +113,7 @@ Compute equilibrium expected returns from a risk aversion parameter, a covarianc
 
 `equilibrium_mu` is the **single owner** of the ``\\lambda \\mathbf{\\Sigma} \\boldsymbol{w}`` expression and of its equal-weight fallback. [`EquilibriumExpectedReturns`](@ref), [`FactorBlackLittermanPrior`](@ref) and [`AugmentedBlackLittermanPrior`](@ref) all reach it, so the fallback and the length check are stated once.
 
-The result is an **excess** return. Reverse optimisation implies a risk premium, so no risk-free rate is in it and none is taken off it. This is why the Black-Litterman members apply [`remove_rf`](@ref) only on the branch where they do *not* call this function.
+The result is an **excess** return. Reverse optimisation implies a risk premium, so no risk-free rate is in it. This is why the Black-Litterman members apply [`apply_rf`](@ref) to the result of this function, and only on the branch where they call it: a mean taken from a wrapped prior estimator is a total return already and needs no conversion.
 
 `sigma` is a covariance **block**, not necessarily a square covariance matrix. Its columns are the assets the weights are written over, so `size(sigma, 2)` is the length `w` must have. A square covariance gives the plain equilibrium returns. A rectangular block gives the equilibrium returns of the rows it spans, which is how the factor Black-Litterman members build a prior mean over factors from asset weights.
 
@@ -125,6 +130,12 @@ Where:
   - ``\\lambda``: Risk aversion parameter.
   - ``\\mathbf{\\Sigma}``: ``M \\times N`` covariance block.
   - ``\\boldsymbol{w}``: ``N \\times 1`` equilibrium portfolio weights.
+
+# Algorithm
+
+ 1. When `w` is `nothing`, read the asset count `N` from `size(sigma, 2)`, and build the equal-weight vector `fill(inv(N), N)`.
+ 2. When `w` is a vector, check that `length(w)` equals `size(sigma, 2)`.
+ 3. Apply the expression above to `l`, `sigma` and the weights of step 1 or step 2, giving `mu`.
 
 # Arguments
 
@@ -160,7 +171,9 @@ end
 
 Compute equilibrium expected returns from a covariance estimator, weights, and risk aversion.
 
-This method computes equilibrium expected returns as `λ * Σ * w`, where `λ` is the risk aversion parameter, `Σ` is the covariance matrix, and `w` are the equilibrium weights. If `w` is not provided in the estimator, equal weights are used. The expression and the fallback belong to [`equilibrium_mu`](@ref).
+This method computes equilibrium expected returns as `λ * Σ * w`, where `λ` is the risk aversion parameter `me.l`, `Σ` is the covariance matrix that `me.ce` estimates from `X`, and `w` are the equilibrium weights `me.w`. If `me.w` is `nothing`, equal weights are used. The expression and the fallback belong to [`equilibrium_mu`](@ref).
+
+The result is an **excess** return. Reverse optimisation implies a risk premium, so no risk-free rate is in it and none is taken off it.
 
 # Mathematical definition
 
@@ -176,6 +189,11 @@ Where:
   - ``\\hat{\\mathbf{\\Sigma}}``: `N × N` covariance matrix estimated from the data.
   - ``\\boldsymbol{w}``: `N × 1` equilibrium portfolio weights (equal weights if not provided).
 
+# Algorithm
+
+ 1. Estimate the covariance matrix of `X` with `me.ce`, giving `sigma`.
+ 2. Pass `me.l`, `sigma` and `me.w` to [`equilibrium_mu`](@ref), which selects the equal-weight fallback when `me.w` is `nothing`, and which gives `mu`.
+
 # Arguments
 
   - `me`: Equilibrium expected returns estimator.
@@ -183,14 +201,13 @@ Where:
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the covariance estimator.
 
+# Validation
+
+  - $(val_dict[:dims]) The check is not made by this method: the covariance estimator `me.ce` is what raises the `DomainError`.
+
 # Returns
 
-  - `mu::VecNum`: Equilibrium expected returns, a vector of length `N`. Unlike the other expected returns estimators, this method returns a plain vector for both values of `dims`, because [`equilibrium_mu`](@ref) reduces the covariance block against the weights.
-
-# Details
-
-  - The result is an **excess** return. Reverse optimisation implies a risk premium, so no risk-free rate is in it and none is taken off it.
-  - `dims` reaches the covariance estimator only. The covariance matrix is `N × N` either way, so it does not change the shape of the result.
+  - `mu::VecNum`: Equilibrium expected returns, a vector of length `N`. Unlike the other expected returns estimators, this method returns a plain vector for both values of `dims`, because [`equilibrium_mu`](@ref) reduces the covariance block against the weights. `dims` reaches the covariance estimator only, and the covariance matrix is `N × N` for both values, so `dims` does not change the shape of the result.
 
 # Related
 

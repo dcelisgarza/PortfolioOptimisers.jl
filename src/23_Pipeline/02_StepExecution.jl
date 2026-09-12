@@ -142,6 +142,40 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Read the slot an uncertainty-set step fits from, as the arguments its verb takes.
+
+An estimator that reads a prior result — [`reads_prior_result`](@ref) answers `true` — is fitted from the `prior` slot, and never touches the returns; every other estimator is fitted from the `returns` slot, whose `X` and `F` its verb takes. The required slot is checked here, so a missing one is refused by name before any fit. The predicate reads the type, so the branch folds.
+
+# Arguments
+
+  - `ue`: The uncertainty-set estimator.
+  - `ctx`: The pipeline context.
+
+# Validation
+
+  - The slot the estimator reads is filled, through [`require_slot`](@ref).
+
+# Returns
+
+  - `src::Tuple`: `(ctx.prior,)` for a prior-reading estimator, `(ctx.returns.X, ctx.returns.F)` otherwise.
+
+# Related
+
+  - [`run_uncertainty_step`](@ref)
+  - [`reads_prior_result`](@ref)
+  - [`require_slot`](@ref)
+"""
+function uncertainty_step_source(ue::AbstractUncertaintySetEstimator, ctx::PipelineContext)
+    if reads_prior_result(ue)
+        require_slot(ctx, :prior, ue)
+        return (ctx.prior,)
+    end
+    require_slot(ctx, :returns, ue)
+    return (ctx.returns.X, ctx.returns.F)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Execute an uncertainty-set step pinned to a target and merge its result into the `uncertainty` slot.
 
 The target comes from the [`PipelineStep`](@ref) wrapper:
@@ -152,11 +186,13 @@ The target comes from the [`PipelineStep`](@ref) wrapper:
 
 A narrowed step fills its half of the [`PipelineUncertaintySets`](@ref) pair and leaves the other untouched, so separate `:mu` and `:sigma` steps compose. Every populated half must reach the optimiser: each becomes its own [routing target](@ref PIPELINE_ROUTING_TARGETS) — `:mu_ucs` and `:sigma_ucs` — and neither is [optional](@ref PIPELINE_OPTIONAL_TARGETS), so a set that cannot be routed is rejected rather than dropped and `:both` requires an optimiser with an [`ArithmeticReturn`](@ref) *and* an [`UncertaintySetVariance`](@ref) risk measure.
 
+Which slot the step reads is decided by [`reads_prior_result`](@ref). An estimator with a prior of its own is fitted from the `returns` slot. One that reads a prior result — an [`AbstractPriorUncertaintySetEstimator`](@ref), or a returns-data estimator with `pe = nothing` (ADR 0138) — is fitted from the `prior` slot instead, so a prior step must come earlier; the returns are not read at all, so a pipeline that writes `:prior` from a precomputed result needs no `:returns` slot for such a step.
+
 # Arguments
 
   - `ue`: The uncertainty-set estimator.
   - `target`: `:mu`, `:sigma`, or `:both`; anything else throws an `ArgumentError`.
-  - `ctx`: The pipeline context; requires the `returns` slot.
+  - `ctx`: The pipeline context; requires the `returns` slot, or the `prior` slot for an estimator that reads a prior result.
 
 # Returns
 
@@ -167,22 +203,25 @@ A narrowed step fills its half of the [`PipelineUncertaintySets`](@ref) pair and
   - [`run_step`](@ref)
   - [`PipelineStep`](@ref)
   - [`PipelineUncertaintySets`](@ref)
+  - [`uncertainty_step_source`](@ref)
+  - [`reads_prior_result`](@ref)
+  - [`AbstractPriorUncertaintySetEstimator`](@ref)
   - [`ucs`](@ref)
 """
 function run_uncertainty_step(ue::AbstractUncertaintySetEstimator, target::Option{Symbol},
                               ctx::PipelineContext)
     @argcheck(target in PIPELINE_STEP_TARGETS,
               ArgumentError("the PipelineStep target of a $(typeof(ue)) step must be :mu, :sigma, or :both, got $(repr(target))"))
-    require_slot(ctx, :returns, ue)
+    src = uncertainty_step_source(ue, ctx)
     cur = ctx.uncertainty
     res, pair = if target == :mu
-        r = mu_ucs(ue, ctx.returns.X, ctx.returns.F)
+        r = mu_ucs(ue, src...)
         r, PipelineUncertaintySets(; mu = r, sigma = isnothing(cur) ? nothing : cur.sigma)
     elseif target == :sigma
-        r = sigma_ucs(ue, ctx.returns.X, ctx.returns.F)
+        r = sigma_ucs(ue, src...)
         r, PipelineUncertaintySets(; mu = isnothing(cur) ? nothing : cur.mu, sigma = r)
     else
-        mu_set, sigma_set = ucs(ue, ctx.returns.X, ctx.returns.F)
+        mu_set, sigma_set = ucs(ue, src...)
         p = PipelineUncertaintySets(; mu = mu_set, sigma = sigma_set)
         p, p
     end
@@ -193,7 +232,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Build the [`UniverseSets`](@ref) a constraint-generation step needs from the universe names of the context's `returns` slot.
 
-Every axis the returns declare is declared here: `nx` always, and `nf` whenever the returns carry factors. The factor axis is what an [`ExposureConstraintEstimator`](@ref) step resolves its names against, and taking it from `rd.nf` is what makes it agree with the loadings by construction — the columns of `rr.M` are the factors the regression was fitted on, which are the columns of `rd.F`.
+Every axis the returns declare is declared here: `nx` always, and `nf` whenever the returns carry factors. `nf` is the default `tfkey`, the **time-series** factor axis, and that is the right axis because the returns carry `F` and nothing else: a cross-sectional model's factors are the exposures its own fit was built from, and no returns result carries them. An [`ExposureConstraintEstimator`](@ref) step resolves its names against this axis, and taking it from `rd.nf` is what makes it agree with the loadings by construction — the columns of `rr.M` are the factors the regression was fitted on, which are the columns of `rd.F`. A step whose loadings are a [`CrossSectionalFactorModel`](@ref) therefore finds no `cfkey` entry here and says so through [`factor_universe`](@ref); such a mandate needs sets a caller supplies.
 
 Constraint estimators referencing groups beyond the plain universe names cannot be satisfied by this minimal set; precompute their result instead, or wrap a callable in a [`PipelineStep`](@ref) that supplies richer sets.
 

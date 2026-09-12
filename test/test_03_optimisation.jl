@@ -407,3 +407,82 @@ end
                                                                                        mr];
                                                                                       default = mr)))
 end
+@testset "PreviousWeights holds the weights it was handed (#1021)" begin
+    using PortfolioOptimisers, Test, StableRNGs
+    PO = PortfolioOptimisers
+    rd = ReturnsResult(; nx = ["A", "B", "C"], X = randn(StableRNG(3), 10, 3))
+    # Verbatim, on the full universe, with no bounds and no mask.
+    pw = PreviousWeights(; w = [0.6, 0.3, 0.1])
+    res = optimise(pw, rd)
+    @test isa(res, NaiveOptimisationResult)
+    @test isa(res.retcode, OptimisationSuccess)
+    @test res.w === pw.w
+    @test isnothing(res.imsk) && isnothing(res.wb) && res.pr === rd
+    # The fold-less entry and the read-out entry answer the same.
+    @test optimise(pw).w === pw.w
+    @test PO.optimise(PO.partial_fit!(pw, rd)).w === pw.w
+    # No weights is a failure that names the field, so a chain walks on.
+    none = optimise(PreviousWeights())
+    @test isa(none.retcode, OptimisationFailure)
+    @test occursin("`w` is `nothing`", none.retcode.res)
+    @test isnothing(none.w)
+    # With a carrier the failure carries `NaN` at every asset, as any failed solve does.
+    none_rd = optimise(PreviousWeights(), rd)
+    @test isa(none_rd.retcode, OptimisationFailure)
+    @test length(none_rd.w) == 3 && all(isnan, none_rd.w)
+    # A chain that reaches the leaf holds; one that reaches an empty leaf fails through.
+    slv = Solver(; name = :none, solver = nothing)
+    @test PO.needs_previous_weights(PreviousWeights())
+    @test PO.needs_previous_weights(EqualWeighted(; fb = PreviousWeights()))
+    @test !PO.needs_previous_weights(EqualWeighted())
+    # The factory fills `w` and recurses into `fb`; a non-vector leaves the leaf as it is.
+    filled = PO.factory(PreviousWeights(; fb = PreviousWeights()), [0.2, 0.8])
+    @test filled.w == [0.2, 0.8] && filled.fb.w == [0.2, 0.8]
+    @test PO.factory(PreviousWeights(), [[0.2, 0.8], [0.5, 0.5]]) == PreviousWeights()
+    @test_throws DomainError PreviousWeights(; w = [0.5, Inf])
+    @test_throws ArgumentError PreviousWeights(;
+                                               fb = TimeDependent([EqualWeighted()],
+                                                                  :nearest))
+    @test PreviousWeights(; fb = TimeDependent([EqualWeighted()])) isa PreviousWeights
+end
+@testset "A result records the fallback chain that answered it (#1024)" begin
+    using PortfolioOptimisers, Test, StableRNGs
+    PO = PortfolioOptimisers
+    rd = ReturnsResult(; nx = ["A", "B", "C"], X = randn(StableRNG(3), 10, 3))
+    # Two failures before the answer: the chain holds both, in the order they ran, and
+    # each failure carries no chain of its own.
+    chain = PreviousWeights(; fb = PreviousWeights(; fb = EqualWeighted()))
+    res = optimise(chain, rd)
+    @test isa(res, NaiveOptimisationResult)
+    @test isa(res.retcode, OptimisationSuccess)
+    @test isa(res.fb, PO.FbChain)
+    @test length(res.fb) == 2
+    @test res.fb[1][1] === chain
+    @test res.fb[2][1] === chain.fb
+    @test all(isa(p[2], NaiveOptimisationResult) for p in res.fb)
+    @test all(isa(p[2].retcode, OptimisationFailure) for p in res.fb)
+    @test all(isnothing(p[2].fb) for p in res.fb)
+    # The answer of a fallback-less estimator carries `nothing`.
+    @test isnothing(optimise(EqualWeighted(), rd).fb)
+    # A JuMP failure enters the chain like any other.
+    slv = Solver(; name = :none, solver = nothing)
+    mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv), fb = EqualWeighted())
+    mr_res = optimise(mr, rd)
+    @test isa(mr_res, NaiveOptimisationResult)
+    @test length(mr_res.fb) == 1
+    @test mr_res.fb[1][1] === mr
+    @test isa(mr_res.fb[1][2], MeanRiskResult)
+    @test isa(mr_res.fb[1][2].retcode, OptimisationFailure)
+    # When every attempt fails, the last failure carries the ones before it.
+    res = optimise(PreviousWeights(; fb = PreviousWeights()), rd)
+    @test isa(res.retcode, OptimisationFailure)
+    @test length(res.fb) == 1
+    @test isa(res.fb[1][2].retcode, OptimisationFailure)
+    # The rebuild admits the chain and the estimator alike, and `set_retcode` carries the
+    # chain over.
+    @test isnothing(PO.factory(res, nothing).fb)
+    @test PO.factory(res, EqualWeighted()).fb == EqualWeighted()
+    failed_mr = PO.factory(mr_res.fb[1][2], mr_res.fb)
+    @test failed_mr.fb === mr_res.fb
+    @test PO.set_retcode(failed_mr, OptimisationSuccess()).fb === mr_res.fb
+end

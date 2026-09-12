@@ -1,5 +1,4 @@
 The source files can be found in [examples/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../../examples/4_constraints_costs/03_Cardinality_and_Threshold.jl"
 ```
@@ -161,7 +160,6 @@ println("  active names in group2: ",
 ## 4. Set-level: `scard`, `slt`, `sst` with `smtx`
 
 Here the constraints act on the **sum of the weights in each set**.
-
 - `smtx` maps assets to sets.
 - `scard` limits the number of active sets.
 - `slt`/`sst` threshold the set-level sums.
@@ -198,7 +196,6 @@ pretty_table(DataFrame(:Set => ["cluster 1", "cluster 2", "cluster 3"],
 ## 5. Group-of-sets: `sgcarde`, `sglt`, `sgst` with `sgmtx`
 
 Now the constraints are defined over groups of sets, not directly over assets.
-
 - `sgmtx` maps assets to set groups.
 - `sgcarde` constrains cardinality over those groups.
 - `sglt`/`sgst` threshold grouped set exposures.

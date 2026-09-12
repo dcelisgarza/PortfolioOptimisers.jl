@@ -17,17 +17,25 @@ MaxValStepwiseRegressionCriterion
 MinMaxValStepwiseRegressionCriterion
 Regression
 regression(re::Regression, args...)
-regression(re::AbstractRegressionEstimator, rd::ReturnsResult)
+regression(re::AbstractTimeSeriesRegressionEstimator, rd::ReturnsResult)
 AbstractRegressionEstimator
+AbstractTimeSeriesRegressionEstimator
+AbstractCrossSectionalRegressionEstimator
 AbstractRegressionResult
+AbstractLoadingsRegressionResult
+AbstractCrossSectionalRegressionResult
+AbstractFactorFamilyBasis
 RegE_Reg
 AbstractRegressionAlgorithm
 AbstractStepwiseRegressionAlgorithm
 AbstractStepwiseRegressionCriterion
 AbstractRegressionTarget
 port_opt_view(re::Regression, i, args...)
+set_idiosyncratic_covariance(re::Regression, esigma::Option{<:VecNum_MatNum})
+has_family_rebasis(rr::AbstractLoadingsRegressionResult)
 default_regression_criterion_variant
 regression_criterion_func
+regression_polarity
 regression_threshold
 ```
 

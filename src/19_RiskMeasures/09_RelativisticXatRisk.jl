@@ -48,15 +48,12 @@ function RRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, kappa::Number = 0
                         theta[1:T]
                         epsilon[1:T]
                     end)
+    ln_k = kappa_log(inv(alpha * T), kappa)
     if isnothing(w)
-        invat = inv(alpha * T)
-        ln_k = (invat^kappa - invat^(-kappa)) * ik2
         JuMP.@expression(model, risk, t + ln_k * z + sum(psi + theta))
     else
-        sw = sum(w)
-        invat = inv(alpha * sw)
-        ln_k = (invat^kappa - invat^(-kappa)) * ik2
-        JuMP.@expression(model, risk, t + ln_k * z + LinearAlgebra.dot(w, psi + theta))
+        wi = w / sum(w)
+        JuMP.@expression(model, risk, t + ln_k * z + T * LinearAlgebra.dot(wi, psi + theta))
     end
     JuMP.@constraints(model,
                       begin
@@ -79,24 +76,27 @@ function RRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, kappa::Number = 0
                             nu[1:T]
                             tau[1:T]
                         end)
-        if isnothing(w)
-            JuMP.@constraints(model, begin
-                                  sum(z) - 1 == 0
-                                  sum(nu - tau) * ik2 - ln_k <= 0
-                              end)
-            JuMP.@expression(model, risk, -LinearAlgebra.dot(z, x))
-        else
-            JuMP.@constraints(model, begin
-                                  LinearAlgebra.dot(w, z) - 1 == 0
-                                  LinearAlgebra.dot(w, nu - tau) * ik2 - ln_k <= 0
-                              end)
-            JuMP.@expression(model, risk, -LinearAlgebra.dot(w .* z, x))
-        end
-        JuMP.@constraints(model,
-                          begin
-                              [i = 1:T], [nu[i], 1, z[i]] in JuMP.MOI.PowerCone(iopk)
-                              [i = 1:T], [z[i], 1, tau[i]] in JuMP.MOI.PowerCone(omk)
+        JuMP.@constraints(model, begin
+                              sum(z) - 1 == 0
+                              sum(nu - tau) * ik2 - ln_k <= 0
                           end)
+        JuMP.@expression(model, risk, -LinearAlgebra.dot(z, x))
+        if isnothing(w)
+            JuMP.@constraints(model,
+                              begin
+                                  [i = 1:T], [nu[i], 1, z[i]] in JuMP.MOI.PowerCone(iopk)
+                                  [i = 1:T], [z[i], 1, tau[i]] in JuMP.MOI.PowerCone(omk)
+                              end)
+        else
+            wi = w / sum(w)
+            JuMP.@constraints(model,
+                              begin
+                                  [i = 1:T],
+                                  [nu[i], wi[i] * T, z[i]] in JuMP.MOI.PowerCone(iopk)
+                                  [i = 1:T],
+                                  [z[i], wi[i] * T, tau[i]] in JuMP.MOI.PowerCone(omk)
+                              end)
+        end
         JuMP.@objective(model, Max, risk)
         if optimise_JuMP_model!(model, slv).success
             JuMP.objective_value(model)
@@ -110,15 +110,15 @@ $(DocStringExtensions.TYPEDEF)
 
 Represents the Relativistic Value-at-Risk (RLVaR) risk measure.
 
-`RelativisticValueatRisk` is a coherent risk measure generalising EVaR via the Tsallis (``\\kappa``-deformed) entropy. It is parametrised by a deformation parameter ``\\kappa \\in (0, 1)`` and reduces to EVaR in the limit ``\\kappa \\to 0``. It is solved via a conic programme.
+`RelativisticValueatRisk` is a coherent risk measure generalising EVaR via the Kaniadakis (``\\kappa``-deformed) entropy. It is parametrised by a deformation parameter ``\\kappa \\in (0, 1)`` and reduces to EVaR in the limit ``\\kappa \\to 0``. It is solved via a conic programme. It is the Kaniadakis counterpart of the Kullback-Leibler ambiguity ball that [`EntropicValueatRisk`](@ref) reads as a risk measure.
 
 # Mathematical definition
 
-Define the ``\\kappa``-logarithm ``\\ell_\\kappa(u) = \\frac{u^\\kappa - u^{-\\kappa}}{2\\kappa}``. The RLVaR is:
+The RLVaR is:
 
 ```math
 \\begin{align}
-\\mathrm{RLVaR}_{\\alpha,\\kappa}(\\boldsymbol{x}) &= \\underset{t,\\, z}{\\min} \\Bigl\\{ t + \\ell_\\kappa\\!\\left(\\tfrac{1}{\\alpha T}\\right) z + \\sum_{i=1}^{T} (\\psi_i + \\theta_i) \\;:\\; z \\geq 0 \\Bigr\\}\\,.
+\\mathrm{RLVaR}_{\\alpha,\\kappa}(\\boldsymbol{x}) &= \\underset{t,\\, z}{\\min} \\Bigl\\{ t + \\ln_{\\kappa}\\!\\left(\\tfrac{1}{\\alpha T}\\right) z + \\sum_{i=1}^{T} (\\psi_i + \\theta_i) \\;:\\; z \\geq 0 \\Bigr\\}\\,.
 \\end{align}
 ```
 
@@ -128,8 +128,8 @@ Where:
   - $(math_dict[:xret])
   - $(math_dict[:alpha_rm])
   - $(math_dict[:T])
-  - ``\\kappa \\in (0,1)``: Tsallis deformation parameter.
-  - ``\\ell_\\kappa(u) = \\frac{u^\\kappa - u^{-\\kappa}}{2\\kappa}``: ``\\kappa``-logarithm.
+  - $(math_dict[:kappa_rm])
+  - $(math_dict[:ln_kappa])
   - ``t``, ``z``, ``\\psi_i``, ``\\theta_i``, ``\\epsilon_i``, ``\\omega_i``: Conic optimisation variables.
 
 subject to the power-cone constraints:
@@ -146,7 +146,26 @@ Where:
 
   - ``\\mathcal{K}_{\\mathrm{pow}}(p) = \\{(a,b,c) : a^p b^{1-p} \\geq |c|,\\, a \\geq 0,\\, b \\geq 0\\}``: Power cone.
 
-For observation-weighted samples with weight vector ``\\boldsymbol{w}``, the ``\\kappa``-logarithm argument ``\\frac{1}{\\alpha T}`` becomes ``\\frac{1}{\\alpha \\sum_{t=1}^{T} w_t}`` and the sum ``\\sum_{i=1}^{T} (\\psi_i + \\theta_i)`` becomes ``\\sum_{i=1}^{T} w_i (\\psi_i + \\theta_i)``.
+For observation-weighted samples the weight vector is normalised to ``\\boldsymbol{w}`` with ``\\sum_{t=1}^{T} w_t = 1``. The Kaniadakis logarithm keeps the argument ``\\frac{1}{\\alpha T}``, and the sum ``\\sum_{i=1}^{T} (\\psi_i + \\theta_i)`` becomes ``T \\sum_{i=1}^{T} w_i (\\psi_i + \\theta_i)``. The Kaniadakis logarithm has no multiplication-to-addition property, so the normalisation ``\\alpha T`` cannot absorb the weights the way it does for [`EntropicValueatRisk`](@ref).
+
+The dual of that programme is the worst expected loss over a Kaniadakis ball about the sample distribution:
+
+```math
+\\begin{align}
+\\mathrm{RLVaR}_{\\alpha,\\kappa}(\\boldsymbol{x}) &= \\underset{Q \\in \\mathcal{Q}_{\\kappa}(\\alpha)}{\\sup} \\mathbb{E}_{Q}[L]\\,, \\\\
+\\mathcal{Q}_{\\kappa}(\\alpha) &= \\left\\{ Q : \\sum_{t=1}^{T} q_t \\ln_{\\kappa}\\!\\left(\\frac{q_t}{p_t T}\\right) \\leq \\ln_{\\kappa}\\!\\left(\\frac{1}{\\alpha T}\\right) \\right\\}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathcal{Q}_{\\kappa}(\\alpha)``: Kaniadakis ambiguity ball of radius ``\\ln_{\\kappa}\\!\\left(\\frac{1}{\\alpha T}\\right)``.
+  - $(math_dict[:amb_Q])
+  - $(math_dict[:amb_P])
+  - $(math_dict[:amb_EQ_L])
+  - $(math_dict[:amb_L_t])
+
+The left side takes the place the Kullback-Leibler divergence holds for [`EntropicValueatRisk`](@ref). With equal observation weights ``p_t = 1/T`` it is the negated Kaniadakis entropy of ``Q``. Because ``\\ln_{\\kappa}`` has no multiplication-to-addition property, the sample size ``T`` stays inside both sides, and neither side separates into a term in ``T`` and a term in ``\\alpha``. The Kullback-Leibler ball at radius ``-\\ln(\\alpha)`` is recovered in the limit ``\\kappa \\to 0``.
 
 # Fields
 
@@ -157,8 +176,8 @@ $(DocStringExtensions.FIELDS)
     RelativisticValueatRisk(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
         slv::Option{<:Slv_VecSlv} = nothing,
-        alpha::Number = 0.05,
-        kappa::Number = 0.3,
+        alpha::Num_SigCal = 0.05,
+        kappa::Num_DefCal = 0.3,
         w::Option{<:ObsWeights} = nothing
     ) -> RelativisticValueatRisk
 
@@ -166,8 +185,8 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `0 < alpha < 1`.
-  - `0 < kappa < 1`.
+  - If `alpha` is a number: `0 < alpha < 1`.
+  - If `kappa` is a number: `0 < kappa < 1`.
   - If `slv` is a `VecSlv`: `!isempty(slv)`.
   - If `w` is not `nothing`: `!isempty(w)`.
 
@@ -203,6 +222,7 @@ RelativisticValueatRisk
   - [`EntropicValueatRisk`](@ref)
   - [`RelativisticValueatRiskRange`](@ref)
   - [`RelativisticDrawdownatRisk`](@ref)
+  - [`kappa_log`](@ref)
 
 # References
 
@@ -230,8 +250,8 @@ RelativisticValueatRisk
     """
     @pprop w
     function RelativisticValueatRisk(settings::RiskMeasureSettings,
-                                     slv::Option{<:Slv_VecSlv}, alpha::Number,
-                                     kappa::Number, w::Option{<:ObsWeights})
+                                     slv::Option{<:Slv_VecSlv}, alpha::Num_SigCal,
+                                     kappa::Num_DefCal, w::Option{<:ObsWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
@@ -246,11 +266,43 @@ RelativisticValueatRisk
     end
 end
 function RelativisticValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                 slv::Option{<:Slv_VecSlv} = nothing, alpha::Number = 0.05,
-                                 kappa::Number = 0.3,
+                                 slv::Option{<:Slv_VecSlv} = nothing,
+                                 alpha::Num_SigCal = 0.05, kappa::Num_DefCal = 0.3,
                                  w::Option{<:ObsWeights} = nothing)::RelativisticValueatRisk
     return RelativisticValueatRisk(settings, slv, alpha, kappa, w)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve the significance level `alpha` and the deformation parameter `kappa` of a [`RelativisticValueatRisk`](@ref) against prior result `pr`.
+
+`alpha` and `kappa` are a **travelling pair**: [`EntropyBudget`](@ref) reads the significance level of its sibling slot. So `alpha` resolves first, and the number it produced is stated in the [`CalibrationContext`](@ref) of the `kappa` slot before that slot is resolved. A stated number, a plain function and a rule that reads no sibling all ignore the field, so the order costs nothing where no rule reads a sibling.
+
+The series this measure prices travels in the same context. It is the returns, which is the default [`calibration_series`](@ref) states, so this site names what the default context already holds. It is written all the same, for the reason every site writes it: the marker belongs to the measure, and no rule carries one of its own to be corrected.
+
+The solver is settled once, as `sel(x.slv, slv)`, and handed to both rules, so a rule may call [`RRM`](@ref) itself. The rebuild goes through [`rebuild_with_slots`](@ref), whose positional call runs the inner constructor and re-runs both range checks on the calibrated numbers.
+
+# Related
+
+  - [`RelativisticValueatRisk`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+  - [`CalibrationContext`](@ref)
+  - [`calibration_series`](@ref)
+  - [`EntropyBudget`](@ref)
+"""
+function resolve_deferred_quantities(x::RelativisticValueatRisk, pr::AbstractPriorResult,
+                                     slv = nothing)
+    ws = sel(x.w, pr.w)
+    sv = sel(x.slv, slv)
+    s = calibration_series(x)
+    alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, sv)
+    kappa = resolve_calibration_slot(x.kappa, :kappa, pr, ws, sv,
+                                     CalibrationContext(; alpha = alpha, series = s))
+    return rebuild_with_slots(x, (; alpha = alpha, kappa = kappa))
+end
+# Calibration slots — see `calibration_slots`. The two travel together, and the resolution
+# above is what orders them.
+calibration_slots(x::RelativisticValueatRisk) = (; alpha = x.alpha, kappa = x.kappa)
 function (r::RelativisticValueatRisk)(x::VecNum)
     return RRM(x, r.slv, r.alpha, r.kappa, r.w)
 end
@@ -278,6 +330,8 @@ Where:
 
 $(math_dict[:negated_upper_tail])
 
+Each term is the worst expected loss over its own Kaniadakis ball about the sample distribution, one deformed by ``\\kappa_a`` at level ``\\alpha`` and one deformed by ``\\kappa_b`` at level ``\\beta``. [`RelativisticValueatRisk`](@ref) states the ball.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -287,10 +341,10 @@ $(DocStringExtensions.FIELDS)
     RelativisticValueatRiskRange(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
         slv::Option{<:Slv_VecSlv} = nothing,
-        alpha::Number = 0.05,
-        kappa_a::Number = 0.3,
-        beta::Number = 0.05,
-        kappa_b::Number = 0.3,
+        alpha::Num_SigCal = 0.05,
+        kappa_a::Num_DefCal = 0.3,
+        beta::Num_SigCal = alpha,
+        kappa_b::Num_DefCal = kappa_a,
         w::Option{<:ObsWeights} = nothing
     ) -> RelativisticValueatRiskRange
 
@@ -298,8 +352,8 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `0 < alpha < 1`, `0 < kappa_a < 1`.
-  - `0 < beta < 1`, `0 < kappa_b < 1`.
+  - Each of `alpha` and `kappa_a` that is a number: `0 < val < 1`.
+  - Each of `beta` and `kappa_b` that is a number: `0 < val < 1`.
   - If `slv` is a `VecSlv`: `!isempty(slv)`.
   - If `w` is not `nothing`: `!isempty(w)`.
 
@@ -371,9 +425,9 @@ RelativisticValueatRiskRange
     """
     @pprop w
     function RelativisticValueatRiskRange(settings::RiskMeasureSettings,
-                                          slv::Option{<:Slv_VecSlv}, alpha::Number,
-                                          kappa_a::Number, beta::Number, kappa_b::Number,
-                                          w::Option{<:ObsWeights})
+                                          slv::Option{<:Slv_VecSlv}, alpha::Num_SigCal,
+                                          kappa_a::Num_DefCal, beta::Num_SigCal,
+                                          kappa_b::Num_DefCal, w::Option{<:ObsWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
@@ -390,10 +444,49 @@ end
 function RelativisticValueatRiskRange(;
                                       settings::RiskMeasureSettings = RiskMeasureSettings(),
                                       slv::Option{<:Slv_VecSlv} = nothing,
-                                      alpha::Number = 0.05, kappa_a::Number = 0.3,
-                                      beta::Number = 0.05, kappa_b::Number = 0.3,
+                                      alpha::Num_SigCal = 0.05, kappa_a::Num_DefCal = 0.3,
+                                      beta::Num_SigCal = alpha,
+                                      kappa_b::Num_DefCal = kappa_a,
                                       w::Option{<:ObsWeights} = nothing)::RelativisticValueatRiskRange
     return RelativisticValueatRiskRange(settings, slv, alpha, kappa_a, beta, kappa_b, w)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve the two significance levels and the two deformation parameters of a [`RelativisticValueatRiskRange`](@ref) against prior result `pr`.
+
+Each end carries a **travelling pair** of its own: `kappa_a` reads `alpha` and `kappa_b` reads `beta`. The gain-side pair defaults to the loss-side pair, `beta` to `alpha` and `kappa_b` to `kappa_a`, so a pair stated on the loss side alone reaches both ends. The resolution runs the pair of the loss side and then the pair of the gain side, and neither side reads the other's number. That is the pairing [`range_tails`](@ref) builds and the functor evaluates.
+
+The four slots carry four different bounds, so a rule of the wrong end or the wrong family is refused at construction. The solver is settled once and handed to all four rules.
+
+Both ends price one series, which is the returns, so the same marker stands in the context of both `kappa` slots. The series is a property of the measure and not of an end, where the significance level is a property of the end.
+
+# Related
+
+  - [`RelativisticValueatRiskRange`](@ref)
+  - [`RelativisticValueatRisk`](@ref)
+  - [`CalibrationContext`](@ref)
+  - [`calibration_series`](@ref)
+  - [`EntropyBudget`](@ref)
+"""
+function resolve_deferred_quantities(x::RelativisticValueatRiskRange,
+                                     pr::AbstractPriorResult, slv = nothing)
+    ws = sel(x.w, pr.w)
+    sv = sel(x.slv, slv)
+    s = calibration_series(x)
+    alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, sv)
+    kappa_a = resolve_calibration_slot(x.kappa_a, :kappa_a, pr, ws, sv,
+                                       CalibrationContext(; alpha = alpha, series = s))
+    beta = resolve_calibration_slot(x.beta, :beta, pr, ws, sv)
+    kappa_b = resolve_calibration_slot(x.kappa_b, :kappa_b, pr, ws, sv,
+                                       CalibrationContext(; alpha = beta, series = s))
+    return rebuild_with_slots(x,
+                              (; alpha = alpha, kappa_a = kappa_a, beta = beta,
+                               kappa_b = kappa_b))
+end
+# Calibration slots — see `calibration_slots`. One travelling pair per tail.
+function calibration_slots(x::RelativisticValueatRiskRange)
+    return (; alpha = x.alpha, kappa_a = x.kappa_a, beta = x.beta, kappa_b = x.kappa_b)
 end
 # Tail decomposition — see `range_tails`. Each tail carries its own deformation parameter:
 # `kappa_a` shapes the loss side, `kappa_b` the gain side. The functor below is the
@@ -445,8 +538,10 @@ Where:
 
   - ``\\mathrm{RLDaR}_{\\alpha,\\kappa}(\\boldsymbol{x})``: Relativistic Drawdown-at-Risk.
   - $(math_dict[:alpha_rm])
-  - ``\\kappa \\in (0,1)``: Tsallis deformation parameter.
+  - $(math_dict[:kappa_rm])
   - ``\\boldsymbol{d}(\\boldsymbol{x})``: Absolute drawdown series vector ``T \\times 1``.
+
+So the RLDaR is the worst expected drawdown over a Kaniadakis ball about the sample distribution of ``\\boldsymbol{d}(\\boldsymbol{x})``. [`RelativisticValueatRisk`](@ref) states the ball.
 
 # Fields
 
@@ -457,8 +552,8 @@ $(DocStringExtensions.FIELDS)
     RelativisticDrawdownatRisk(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
         slv::Option{<:Slv_VecSlv} = nothing,
-        alpha::Number = 0.05,
-        kappa::Number = 0.3,
+        alpha::Num_SigCal = 0.05,
+        kappa::Num_DefCal = 0.3,
         w::Option{<:ObsWeights} = nothing
     ) -> RelativisticDrawdownatRisk
 
@@ -466,8 +561,8 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `0 < alpha < 1`.
-  - `0 < kappa < 1`.
+  - If `alpha` is a number: `0 < alpha < 1`.
+  - If `kappa` is a number: `0 < kappa < 1`.
   - If `slv` is a `VecSlv`: `!isempty(slv)`.
   - If `w` is not `nothing`: `!isempty(w)`.
 
@@ -531,8 +626,8 @@ RelativisticDrawdownatRisk
     """
     @pprop w
     function RelativisticDrawdownatRisk(settings::RiskMeasureSettings,
-                                        slv::Option{<:Slv_VecSlv}, alpha::Number,
-                                        kappa::Number, w::Option{<:ObsWeights})
+                                        slv::Option{<:Slv_VecSlv}, alpha::Num_SigCal,
+                                        kappa::Num_DefCal, w::Option{<:ObsWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
@@ -548,10 +643,43 @@ RelativisticDrawdownatRisk
 end
 function RelativisticDrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                     slv::Option{<:Slv_VecSlv} = nothing,
-                                    alpha::Number = 0.05, kappa::Number = 0.3,
+                                    alpha::Num_SigCal = 0.05, kappa::Num_DefCal = 0.3,
                                     w::Option{<:ObsWeights} = nothing)::RelativisticDrawdownatRisk
     return RelativisticDrawdownatRisk(settings, slv, alpha, kappa, w)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve the significance level `alpha` and the deformation parameter `kappa` of a [`RelativisticDrawdownatRisk`](@ref) against prior result `pr`.
+
+It carries the reading of [`resolve_deferred_quantities`](@ref) on the value-at-risk twin unchanged: `alpha` resolves first and reaches the `kappa` slot in its [`CalibrationContext`](@ref). The drawdown series has one entry per row of the sample, so a rule reads the same sample size here as it does there.
+
+**The series does not carry over, and the context is what says so.** This measure prices the absolute drawdown series of the portfolio, so [`calibration_series`](@ref) states [`AbsoluteDrawdownSeries`](@ref) and the marker travels beside `alpha`. A rule that reads the shape of a series then reads the drawdown series of each column of the sample, in place of the columns themselves, and the `alpha` it reads is the level of that same drawdown series. The key `:kappa` names this slot and the twin's slot alike, so nothing else could have told the rule which quantity it stands in front of.
+
+# Related
+
+  - [`RelativisticDrawdownatRisk`](@ref)
+  - [`RelativisticValueatRisk`](@ref)
+  - [`AbsoluteDrawdownSeries`](@ref)
+  - [`CalibrationContext`](@ref)
+  - [`calibration_series`](@ref)
+  - [`calibration_slots`](@ref)
+"""
+function resolve_deferred_quantities(x::RelativisticDrawdownatRisk, pr::AbstractPriorResult,
+                                     slv = nothing)
+    ws = sel(x.w, pr.w)
+    sv = sel(x.slv, slv)
+    s = calibration_series(x)
+    alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, sv)
+    kappa = resolve_calibration_slot(x.kappa, :kappa, pr, ws, sv,
+                                     CalibrationContext(; alpha = alpha, series = s))
+    return rebuild_with_slots(x, (; alpha = alpha, kappa = kappa))
+end
+# Calibration slots — see `calibration_slots`.
+calibration_slots(x::RelativisticDrawdownatRisk) = (; alpha = x.alpha, kappa = x.kappa)
+# Calibration series — see `calibration_series`. The measure prices the drawdown series of
+# the portfolio, so a rule reads the drawdown series of each column and not the columns.
+calibration_series(::RelativisticDrawdownatRisk) = AbsoluteDrawdownSeries()
 function (r::RelativisticDrawdownatRisk)(x::VecNum)
     dd = absolute_drawdown_vec(x)
     return RRM(dd, r.slv, r.alpha, r.kappa, r.w)
@@ -592,8 +720,10 @@ Where:
 
   - ``\\mathrm{RRDDaR}_{\\alpha,\\kappa}(\\boldsymbol{x})``: Relative Relativistic Drawdown-at-Risk.
   - $(math_dict[:alpha_rm])
-  - ``\\kappa \\in (0,1)``: Tsallis deformation parameter.
+  - $(math_dict[:kappa_rm])
   - ``\\boldsymbol{rd}(\\boldsymbol{x})``: Relative drawdown series vector ``T \\times 1``.
+
+So the Relative RLDaR is the worst expected relative drawdown over a Kaniadakis ball about the sample distribution of ``\\boldsymbol{rd}(\\boldsymbol{x})``. [`RelativisticValueatRisk`](@ref) states the ball.
 
 # Fields
 
@@ -604,8 +734,8 @@ $(DocStringExtensions.FIELDS)
     RelativeRelativisticDrawdownatRisk(;
         settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
         slv::Option{<:Slv_VecSlv} = nothing,
-        alpha::Number = 0.05,
-        kappa::Number = 0.3,
+        alpha::Num_SigCal = 0.05,
+        kappa::Num_DefCal = 0.3,
         w::Option{<:ObsWeights} = nothing
     ) -> RelativeRelativisticDrawdownatRisk
 
@@ -613,8 +743,8 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `0 < alpha < 1`.
-  - `0 < kappa < 1`.
+  - If `alpha` is a number: `0 < alpha < 1`.
+  - If `kappa` is a number: `0 < kappa < 1`.
   - If `slv` is a `VecSlv`: `!isempty(slv)`.
   - If `w` is not `nothing`: `!isempty(w)`.
 
@@ -675,8 +805,9 @@ RelativeRelativisticDrawdownatRisk
     """
     @pprop w
     function RelativeRelativisticDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
-                                                slv::Option{<:Slv_VecSlv}, alpha::Number,
-                                                kappa::Number, w::Option{<:ObsWeights})
+                                                slv::Option{<:Slv_VecSlv},
+                                                alpha::Num_SigCal, kappa::Num_DefCal,
+                                                w::Option{<:ObsWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
@@ -693,10 +824,46 @@ end
 function RelativeRelativisticDrawdownatRisk(;
                                             settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
                                             slv::Option{<:Slv_VecSlv} = nothing,
-                                            alpha::Number = 0.05, kappa::Number = 0.3,
+                                            alpha::Num_SigCal = 0.05,
+                                            kappa::Num_DefCal = 0.3,
                                             w::Option{<:ObsWeights} = nothing)::RelativeRelativisticDrawdownatRisk
     return RelativeRelativisticDrawdownatRisk(settings, slv, alpha, kappa, w)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve the significance level `alpha` and the deformation parameter `kappa` of a [`RelativeRelativisticDrawdownatRisk`](@ref) against prior result `pr`.
+
+The measure is a hierarchical one, so it reaches no `JuMP` model and the [`factory`](@ref) route is its only resolution. The travelling pair is resolved in the order the absolute twin states.
+
+The series is the twin's reading in its own units: this measure compounds the path, so [`calibration_series`](@ref) states [`RelativeDrawdownSeries`](@ref) and the context carries it. The two markers name two different series of the same column, and a rule that reads the shape of a series answers differently on each.
+
+# Related
+
+  - [`RelativeRelativisticDrawdownatRisk`](@ref)
+  - [`RelativisticDrawdownatRisk`](@ref)
+  - [`RelativeDrawdownSeries`](@ref)
+  - [`CalibrationContext`](@ref)
+  - [`calibration_series`](@ref)
+  - [`calibration_slots`](@ref)
+"""
+function resolve_deferred_quantities(x::RelativeRelativisticDrawdownatRisk,
+                                     pr::AbstractPriorResult, slv = nothing)
+    ws = sel(x.w, pr.w)
+    sv = sel(x.slv, slv)
+    s = calibration_series(x)
+    alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, sv)
+    kappa = resolve_calibration_slot(x.kappa, :kappa, pr, ws, sv,
+                                     CalibrationContext(; alpha = alpha, series = s))
+    return rebuild_with_slots(x, (; alpha = alpha, kappa = kappa))
+end
+# Calibration slots — see `calibration_slots`.
+function calibration_slots(x::RelativeRelativisticDrawdownatRisk)
+    return (; alpha = x.alpha, kappa = x.kappa)
+end
+# Calibration series — see `calibration_series`. The path compounds here, where the absolute
+# twin sums it, so the two measures name two different series of one column.
+calibration_series(::RelativeRelativisticDrawdownatRisk) = RelativeDrawdownSeries()
 function (r::RelativeRelativisticDrawdownatRisk)(x::VecNum)
     dd = relative_drawdown_vec(x)
     return RRM(dd, r.slv, r.alpha, r.kappa, r.w)

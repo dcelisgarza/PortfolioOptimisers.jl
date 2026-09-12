@@ -71,6 +71,44 @@ For financial data, the leading principal components often represent market-wide
 
 Detoned matrices may not be suitable for non-clustering optimisations because it can make the matrix non-positive definite. However, they can be quite effective for clustering optimsations.
 
+# Mathematical definition
+
+The ``n`` largest eigenmodes are subtracted, and the remainder is rescaled to unit diagonal:
+
+```math
+\\begin{align}
+\\mathbf{C} &= \\mathbf{X} - \\sum_{k=N-n+1}^{N} \\lambda_k \\boldsymbol{v}_k \\boldsymbol{v}_k^\\intercal\\,, \\\\
+\\tilde{X}_{ij} &= \\frac{C_{ij}}{\\sqrt{C_{ii} C_{jj}}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathbf{C}``: Remainder after the market modes are subtracted.
+  - ``\\tilde{\\mathbf{X}}``: Detoned matrix.
+  - ``\\mathbf{X}``: Original correlation or covariance matrix.
+  - ``\\lambda_k``: ``k``-th largest eigenvalue of ``\\mathbf{X}``.
+  - ``\\boldsymbol{v}_k``: ``k``-th largest eigenvector of ``\\mathbf{X}``.
+  - ``n``: Number of eigenmodes (market modes) to remove.
+  - $(math_dict[:N])
+
+Subtracting a set of eigenmodes takes the diagonal of ``\\mathbf{C}`` below one, so the rescaling is not cosmetic: it changes every entry. The subtraction can also take an eigenvalue of ``\\mathbf{C}`` below zero, which is the reason a detoned matrix may not be positive definite.
+
+# Algorithm
+
+The steps that [`detone!`](@ref) runs under this estimator.
+
+ 1. Read `dt.n` into `n`, and check that `0 < n <= size(X, 2)`.
+ 2. Decrement `n` by one. `n` counts the modes to remove, and steps 5 and 6 slice `(end - n):end`, which is a window of the original `dt.n` columns. So `dt.n = 1` removes the single largest component, which is the market mode.
+ 3. Read the diagonal of `X` into `s`. When any entry of `s` is not one, `X` is a covariance matrix: replace `s` with its square roots and convert `X` to a correlation matrix with `StatsBase.cov2cor!`. The test is `any(!isone, s)`, so it is the value of the diagonal that decides, never the type of `X`.
+ 4. Eigendecompose `X`, giving the ascending eigenvalues `vals` and the eigenvectors `vecs`.
+ 5. Take the trailing block of `vals`, which holds the `dt.n` largest eigenvalues.
+ 6. Take the matching trailing columns of `vecs`.
+ 7. Subtract `vecs * vals * transpose(vecs)` from `X`, giving the remainder ``\\mathbf{C}``.
+ 8. Rescale the remainder to unit diagonal with `StatsBase.cov2cor`.
+ 9. Repair the rescaled matrix with [`posdef!`](@ref), under `dt.pdm`.
+10. When step 3 converted a covariance matrix, convert `X` back with `StatsBase.cor2cov!`. The standard deviations are the ones read in step 3, so the original diagonal returns exactly.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -134,42 +172,6 @@ In-place removal of the top `n` principal components (market modes) from a covar
 
 For matrices without unit diagonal, the function converts them into correlation matrices i.e. matrices with unit diagonal, applies the algorithm, and rescales them back.
 
-# Mathematical definition
-
-The ``n`` largest eigenmodes are subtracted, and the remainder is rescaled to unit diagonal:
-
-```math
-\\begin{align}
-\\mathbf{C} &= \\mathbf{X} - \\sum_{k=N-n+1}^{N} \\lambda_k \\boldsymbol{v}_k \\boldsymbol{v}_k^\\intercal\\,, \\\\
-\\tilde{X}_{ij} &= \\frac{C_{ij}}{\\sqrt{C_{ii} C_{jj}}}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\mathbf{C}``: Remainder after the market modes are subtracted.
-  - ``\\tilde{\\mathbf{X}}``: Detoned matrix.
-  - ``\\mathbf{X}``: Original correlation or covariance matrix.
-  - ``\\lambda_k``: ``k``-th largest eigenvalue of ``\\mathbf{X}``.
-  - ``\\boldsymbol{v}_k``: ``k``-th largest eigenvector of ``\\mathbf{X}``.
-  - ``n``: Number of eigenmodes (market modes) to remove.
-  - $(math_dict[:N])
-
-The rescaling is not cosmetic. Subtracting the market modes takes the diagonal of ``\\mathbf{C}`` well below one, so the rescaling changes every entry. On a 24x8 standard normal sample with `n = 1`, ``C_{11} = 0.8615`` and ``C_{12} = -0.2479``, against ``\\tilde{X}_{11} = 1`` and ``\\tilde{X}_{12} = -0.2671``; the largest entrywise gap is `0.5664`.
-
-# Algorithm
-
- 1. Read `dt.n` into `n`, and check that `0 < n <= size(X, 2)`.
- 2. Decrement `n` by one. `n` counts the modes to remove, and steps 5 and 6 slice `(end - n):end`, which is a window of the original `dt.n` columns. So `dt.n = 1` removes the single largest component, which is the market mode.
- 3. Read the diagonal of `X` into `s`. When any entry of `s` is not one, `X` is a covariance matrix: replace `s` with its square roots and convert `X` to a correlation matrix with `StatsBase.cov2cor!`. The test is `any(!isone, s)`, so it is the value of the diagonal that decides, never the type of `X`.
- 4. Eigendecompose `X`, giving the ascending eigenvalues `vals` and the eigenvectors `vecs`.
- 5. Take the trailing block of `vals`, which holds the `dt.n` largest eigenvalues.
- 6. Take the matching trailing columns of `vecs`.
- 7. Subtract `vecs * vals * transpose(vecs)` from `X`, giving the remainder ``\\mathbf{C}``.
- 8. Rescale the remainder to unit diagonal with `StatsBase.cov2cor`. The subtraction takes the diagonal below one, so this step changes every entry.
- 9. Repair the rescaled matrix with [`posdef!`](@ref), under `dt.pdm`.
-10. When step 3 converted a covariance matrix, convert `X` back with `StatsBase.cor2cov!`. The standard deviations are the ones read in step 3, so the original diagonal returns exactly.
-
 # Arguments
 
   - $(arg_dict[:odt])
@@ -186,18 +188,6 @@ The rescaling is not cosmetic. Subtracting the market modes takes the diagonal o
 # Returns
 
   - `X::MatNum`: The input matrix `X` is modified in-place.
-
-# Details
-
-  - Asserts the number of elements to remove is within the valid range.
-  - If `X` is not a correlation matrix, it is converted to one before applying the algorithm.
-  - Performs an eigenvector decomposition of `X`.
-  - Removes the top `n` principal components (market modes) from the eigenvalues and eigenvectors of `X`.
-  - Reconstructs the correlation matrix `X` in-place from the modified eigenvalues `vals` and eigenvectors `vecs`.
-  - Rescales the remainder back to unit diagonal.
-  - Applies the positive definite projection in `dt.pdm` to `X` via [`posdef!`](@ref).
-  - If `X` was not originally a correlation matrix, it is converted back.
-  - Returns `X`.
 
 # Examples
 
@@ -228,7 +218,7 @@ julia> detone!(Detone(), X)
 # Related
 
   - [`detone`](@ref)
-  - [`Detone`](@ref)
+  - [`Detone`](@ref): the closed form this function applies, and the steps it runs.
   - [`MatNum`](@ref)
   - [`Option`](@ref)
   - [`Posdef`](@ref)

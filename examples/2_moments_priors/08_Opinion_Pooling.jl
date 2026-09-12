@@ -174,7 +174,7 @@ pr_robust = prior(OpinionPoolingPrior(; pes = [opinion_a, opinion_b, opinion_c],
 ```
 
 A caveat from dogfooding this page: on this S&P 500 slice the robust adjustment moved the
-posterior *mean and covariance* only at the level of numerical noise (``\\sim 10^{-14}``),
+posterior *mean and covariance* only at the level of numerical noise (``\sim 10^{-14}``),
 even with a deliberately extreme fourth opinion. The KL discount reshapes the pooled *scenario
 probabilities*, but with all opinions sharing the same return scenarios that barely propagates
 into the first two moments here. Treat `p` as a lever that matters when opinions are

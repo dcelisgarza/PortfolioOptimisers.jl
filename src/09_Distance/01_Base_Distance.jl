@@ -50,8 +50,8 @@ The halving keeps the result in ``[0,\\,1]`` over the whole signed range of the 
 
 Where:
 
-  - ``d_{i,\\,j}``: Pairwise distance between assets ``i`` and ``j``.
-  - ``\\rho_{i,\\,j}``: Pairwise correlation coefficient between assets ``i`` and ``j``.
+  - $(math_dict[:d_ij_dist])
+  - $(math_dict[:rho_ij])
 
 The clamp is a numerical guard and nothing more. ``(1 - \\rho_{i,\\,j}) / 2`` already lies in ``[0,\\,1]`` for every ``\\lvert\\rho_{i,\\,j}\\rvert \\leq 1``, so it binds only on a correlation that a shrinking, denoising or repairing estimator pushed a hair outside ``[-1,\\,1]``. Contrast [`CorrelationDistance`](@ref), where the same clamp binds on ordinary data.
 
@@ -87,12 +87,10 @@ Reading the magnitude discards the sign, so two assets that move together and tw
 
 Where:
 
-  - ``d_{i,\\,j}``: Pairwise distance between assets ``i`` and ``j``.
-  - ``\\rho_{i,\\,j}``: Pairwise correlation coefficient between assets ``i`` and ``j``.
+  - $(math_dict[:d_ij_dist])
+  - $(math_dict[:rho_ij])
 
 The clamp is a numerical guard and nothing more, as in [`SimpleDistance`](@ref): ``1 - \\lvert\\rho_{i,\\,j}\\rvert`` already lies in ``[0,\\,1]`` for every ``\\lvert\\rho_{i,\\,j}\\rvert \\leq 1``.
-
-The magnitude comes from [`_absguard`](@ref), which is an **allocation guard and not a branch in the mathematics**. A matrix with no negative entry is returned as the same object, and `abs.` of such a matrix equals it entry for entry, so both routes give the identical result for every input, `-0.0` included. A non-negative codependence measure therefore reaches this algorithm unchanged, and pays no allocation for the guard.
 
 # Related
 
@@ -102,6 +100,7 @@ The magnitude comes from [`_absguard`](@ref), which is an **allocation guard and
   - [`CorrelationDistance`](@ref)
   - [`distance`](@ref)
   - [`cor_and_dist`](@ref)
+  - [`_absguard`](@ref): supplies the magnitude. It is an allocation guard and not a branch in the mathematics, so a non-negative codependence measure reaches this algorithm unchanged and pays no allocation for it.
 
 # References
 
@@ -126,14 +125,12 @@ The range is ``[0,\\,\\infty)`` rather than ``[0,\\,1]``, so the distance grows 
 
 Where:
 
-  - ``d_{i,\\,j}``: Pairwise distance between assets ``i`` and ``j``.
-  - ``\\rho_{i,\\,j}``: Pairwise correlation coefficient between assets ``i`` and ``j``.
+  - $(math_dict[:d_ij_dist])
+  - $(math_dict[:rho_ij])
 
 The floor at zero is not cosmetic. A covariance estimator that shrinks, denoises or repairs a matrix can return ``\\lvert\\rho_{i,\\,j}\\rvert`` a hair above one, and ``-\\log`` of that is *negative* — unlike the square-root algorithms, which already clamp before taking the root. A negative distance inverts the ordering it is meant to express and is unsound under the shortest-path routines that consume it.
 
-Perfectly uncorrelated assets remain infinitely far apart: ``\\rho_{i,\\,j} = 0`` gives ``d_{i,\\,j} = \\infty``, which is a meaningful value here and is left alone. It is also the entry that the two bounded similarity members cannot take, so [`assert_similarity_domain`](@ref) refuses this algorithm under [`MaximumDistanceSimilarity`](@ref) on the PMFG path.
-
-The magnitude comes from [`_absguard`](@ref), as in [`SimpleAbsoluteDistance`](@ref). It is an allocation guard and not a branch in the mathematics: a matrix with no negative entry is returned as the same object, and the result is identical to taking `abs.` unconditionally.
+Perfectly uncorrelated assets remain infinitely far apart: ``\\rho_{i,\\,j} = 0`` gives ``d_{i,\\,j} = \\infty``, which is a meaningful value here and is left alone.
 
 # Related
 
@@ -141,9 +138,10 @@ The magnitude comes from [`_absguard`](@ref), as in [`SimpleAbsoluteDistance`](@
   - [`AbstractDistanceEstimator`](@ref)
   - [`LowerTailDependenceCovariance`](@ref)
   - [`CanonicalDistance`](@ref)
-  - [`assert_similarity_domain`](@ref)
+  - [`assert_similarity_domain`](@ref): refuses this algorithm under [`MaximumDistanceSimilarity`](@ref) on the PMFG path, because an infinite entry is the one the two bounded similarity members cannot take.
   - [`distance`](@ref)
   - [`cor_and_dist`](@ref)
+  - [`_absguard`](@ref): supplies the magnitude, as it does for [`SimpleAbsoluteDistance`](@ref). It is an allocation guard and not a branch in the mathematics.
 
 # References
 
@@ -168,14 +166,14 @@ This is [`SimpleAbsoluteDistance`](@ref) with the absolute value dropped, and it
 
 Where:
 
-  - ``d_{i,\\,j}``: Pairwise distance between assets ``i`` and ``j``.
-  - ``\\rho_{i,\\,j}``: Pairwise correlation coefficient between assets ``i`` and ``j``.
+  - $(math_dict[:d_ij_dist])
+  - $(math_dict[:rho_ij])
 
 !!! warning "The clamp binds on a negative correlation"
 
     This is the one algorithm in the family whose clamp is not a numerical guard. Without the halving, ``1 - \\rho_{i,\\,j}`` runs over ``[0,\\,2]`` on a signed correlation, so the clamp truncates every negative entry to a distance of exactly `1`.
 
-    At ``\\rho_{i,\\,j} = -0.9311319132604445`` the algorithm returns `1.0` where ``\\sqrt{1 - \\rho_{i,\\,j}}`` is `1.3896517237280874`. The truncation is not monotone: ``\\rho_{i,\\,j} = -0.1`` and ``\\rho_{i,\\,j} = -1`` are both reported as `1`, so the ordering the distance is meant to express is lost across the whole negative half.
+    The truncation is not monotone: ``\\rho_{i,\\,j} = -0.1`` and ``\\rho_{i,\\,j} = -1`` are both reported as ``1``, where ``\\sqrt{1 - \\rho_{i,\\,j}}`` separates them as ``\\sqrt{1.1}`` and ``\\sqrt{2}``. The ordering the distance is meant to express is lost across the whole negative half.
 
     The intended domain has no negative entry. Give a signed correlation to [`SimpleDistance`](@ref), which halves and therefore never saturates, or to [`SimpleAbsoluteDistance`](@ref), which reads the magnitude.
 
@@ -225,7 +223,7 @@ Where:
   - ``H(X_{i})``: Marginal Shannon entropy of asset ``i``, estimated from a histogram whose bin count comes from `bins`.
   - ``I(X_{i};X_{j})``: Mutual information between assets ``i`` and ``j``.
 
-Equation 6.25 of the source normalises by ``\\max(H(X_{i}),\\, H(X_{j}))`` instead. This algorithm divides by the joint entropy, which keeps the result a metric on ``[0,\\,1]``. See [`variation_info`](@ref), which computes it.
+Equation 6.25 of the source normalises by ``\\max(H(X_{i}),\\, H(X_{j}))`` instead. This algorithm divides by the joint entropy, which keeps the result a metric on ``[0,\\,1]``.
 
 # Algorithm
 

@@ -328,3 +328,22 @@ mechanism for a question that no longer concerns a refusal.
 precondition was justified by `LogDistance` mapping an exactly zero correlation to `Inf`, and that
 arithmetic holds. Reproducing it needs a noise matrix: `Denoise()` on the shipped `SP500` fixture
 produces **no** exact zero.
+
+## Amendment (2026-09-01): the four call sites live in four files
+
+`src/11_Phylogeny/04_DBHT.jl` held eight concepts in 2294 lines, and
+`src/11_Phylogeny/06_Phylogeny.jl` held twelve in 3626. Each is now one file per concept. The four
+call sites this ADR names, and the check it names, moved with them. No name, no signature and no
+docstring changed.
+
+- `src/11_Phylogeny/07_PMFG.jl` — `PMFG_T2s` and `assert_pmfg_weights`.
+- `src/11_Phylogeny/10_BubbleTree.jl` — `DirectHb`, `BubbleCluster8s` and `BubbleMember`.
+- `src/11_Phylogeny/12_DBHTClustering.jl` — `DBHTs`.
+- `src/11_Phylogeny/13_LoGo.jl` — `logo!`, `LoGo` and `J_LoGo`.
+- `src/11_Phylogeny/19_NetworkGraph.jl` — `calc_adjacency`.
+- `src/11_Phylogeny/21_PhylogenyClustering.jl` — the `clusterise` of a `NetworkClustersEstimator`.
+
+The three line references under *Consequences* — `04_DBHT.jl:942-948`, `:1084-1086` and
+`:1022-1024` — name `DirectHb`, `BubbleMember` and `BubbleCluster8s`. Read them in
+`10_BubbleTree.jl`. The decision is unchanged: the non-negativity bound sits on the field, so a
+similarity that can go negative fails at construction.

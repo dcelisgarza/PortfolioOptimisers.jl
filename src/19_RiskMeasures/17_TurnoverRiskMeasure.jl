@@ -50,6 +50,8 @@ Computes the Turnover risk of a portfolio weight vector `w`.
 
   - `w::VecNum`: New portfolio weights vector.
 
+The penalty carries no [`Fees`](@ref) of its own, so fee amortisation cannot reach it. It re-evaluates ``\\lVert \\boldsymbol{w}_0 - \\boldsymbol{w} \\rVert_1`` fresh every fold, against whichever reference weights [`factory`](@ref) supplies.
+
 ## View parameters
 
 When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:

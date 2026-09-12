@@ -1,6 +1,6 @@
 # Base
 
-[`01_Base.jl`](https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/main/src/01_Base.jl) implements the most basal symbols used in `PortfolioOptimisers.jl`.
+[`src/01_Base/`](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/src/01_Base) implements the most basal symbols used in `PortfolioOptimisers.jl`. One file per concept: the docstring dictionaries, the type roots, the pretty-show macro, the `ScopedConfig` holders, the load-time preferences, the message builders, the error hierarchy, the type aliases, the observation weights, the `assert_*` family, `VecScalar`, the `NormError` family, the Kaniadakis logarithm, the partial-fit state seam and the sample buffer the online step folds into.
 
 ```@docs
 PortfolioOptimisers
@@ -14,11 +14,12 @@ PortfolioOptimisers
 AbstractEstimator
 AbstractAlgorithm
 AbstractResult
+CrossValidationEstimator
 ```
 
 ## Configuration
 
-Package-level configuration values (pretty-printing collapse, fuzzy-suggestion distance, equation-parser resource caps) are held in thread-safe [`ScopedConfig`](@ref) holders: a `set_*!` setter swaps the global default atomically, a `with_*` helper overrides it for the dynamic extent of a call (task-scoped, automatically restored), and per-project defaults can be seeded at load time via Preferences.jl.
+Package-level configuration values (pretty-printing collapse, fuzzy-suggestion distance, equation-parser resource caps, the scenario-fill share) are held in thread-safe [`ScopedConfig`](@ref) holders: a `set_*!` setter swaps the global default atomically, a `with_*` helper overrides it for the dynamic extent of a call (task-scoped, automatically restored), and per-project defaults can be seeded at load time via Preferences.jl.
 
 ```@docs
 ScopedConfig
@@ -26,27 +27,35 @@ Base.getindex(cfg::ScopedConfig)
 set_default!
 with_config
 apply_preferences!
+apply_show_preferences!
 PortfolioOptimisers.__init__
 PREFERENCE_KEYS
 PREFERENCE_DISTANCES
 RESOURCE_LIMITS
 ResourceLimits
 assert_resource_cap
+assert_ep_grid_size
 set_resource_limits!
 with_resource_limits
 ```
 
 ## Pretty printing
 
-`PortfolioOptimisers.jl`'s types tend to contain quite a lot of information, these functions enable pretty printing so they are easier to interpret.
+`PortfolioOptimisers.jl`'s types tend to contain quite a lot of information, these functions enable pretty printing so they are easier to interpret. A field that holds `nothing` is hidden by default and shown in this documentation; [`set_show_nothing_fields!`](@ref) is the switch, and [`show_fields`](@ref) is the hook a type overloads to hide a field of its own choice.
 
 ```@docs
 @define_pretty_show
+show_fields
+pretty_show_fields
 has_pretty_show_method
 set_compact_show!
 with_compact_show
 COMPACT_SHOW
 compact_show_budget
+ShowNothingFields
+SHOW_NOTHING_FIELDS
+set_show_nothing_fields!
+with_show_nothing_fields
 pretty_show_vector_summary
 pretty_show_vector_element
 pretty_show_vector_body
@@ -61,6 +70,7 @@ DynamicAbstractWeights
 AbstractCustomValue
 VecScalar
 AbstractEstimatorValueAlgorithm
+VectorAbstractEstimatorValueAlgorithm
 get_observation_weights
 NormError
 L2Norm
@@ -70,6 +80,7 @@ LpNorm
 LInfNorm
 norm_error
 norm_factor
+kappa_log
 resolve_rng
 ```
 
@@ -90,6 +101,7 @@ strict_diagnostic
 missing_group_assets_msg
 empty_row_msg
 empty_projected_row_msg
+zero_centrality_msg
 gross_budget_bounds_msg
 failed_solve_msg
 relaxed_preferences_msg
@@ -115,6 +127,7 @@ IsNonFiniteError
 PropertyPathError
 ConflictingArgumentError
 ObservationWeightsError
+NonPositiveWealthError
 ```
 
 ## Assertions
@@ -131,8 +144,10 @@ assert_nonempty_gt0_finite_val
 assert_nonempty_finite_val
 assert_matrix_issquare
 assert_unit_interval
+assert_closed_unit_interval
 assert_all_finite
 assert_source_selector
+assert_returns_result_dims
 ```
 
 ## Base type aliases
@@ -200,6 +215,105 @@ field_dict
 math_dict
 err_name_dict
 ref_dict
+```
+
+## Partial fit
+
+An incremental fit folds one observation into an estimate without reading the sample again. [`partial_fit!`](@ref) is the verb each family writes, [`partial_fit`](@ref) is the value form that folds a copy of the state, its running quantities live in a [`AbstractPartialFitState`](@ref), and [`merge_states`](@ref) combines the states of two disjoint blocks of observations into the state of the concatenated block.
+
+```@docs
+partial_fit!
+partial_fit
+partial_fit(est::Union{<:PortfolioOptimisers.AbstractEstimator, <:StatsBase.CovarianceEstimator}, args...; kwargs...)
+PortfolioOptimisers.AbstractPartialFitState
+PortfolioOptimisers.merge_states
+PortfolioOptimisers.assert_mergeable_states
+PortfolioOptimisers.chan_merge
+PortfolioOptimisers.assert_partial_fit_state
+PortfolioOptimisers.partial_fit_cache
+PortfolioOptimisers.observation_count
+PortfolioOptimisers.obs_weights_view(::PortfolioOptimisers.AbstractPartialFitState, ::Any)
+```
+
+## The online step
+
+An estimator with no exact incremental fold keeps the observations it has seen in a [`PortfolioOptimisers.SampleBufferState`](@ref), and [`Online`](@ref) is the configuration that seeds one. The wrapper is transient: [`PortfolioOptimisers.update_online_estimator`](@ref) resolves it at warm-up, so no wrapper survives into the run. The buffer carries the per-observation masks of a [`CoveragePolicy`](@ref) and the factor observations of a factor prior beside its rows, each fixed by the first append, so one buffer serves every estimator that refits.
+
+```@docs
+PortfolioOptimisers.SampleBufferState
+PortfolioOptimisers.assert_sample_buffer_state
+PortfolioOptimisers.assert_buffer_mask_shape
+PortfolioOptimisers.assert_buffer_factor_shape
+PortfolioOptimisers.buffer_rows_view
+PortfolioOptimisers.sample_buffer
+PortfolioOptimisers.sample_buffer_kwargs
+PortfolioOptimisers.factor_buffer
+PortfolioOptimisers.assert_sample_buffer(est::Union{<:PortfolioOptimisers.AbstractEstimator, <:StatsBase.CovarianceEstimator})
+PortfolioOptimisers.assert_sample_buffer(::PortfolioOptimisers.Online)
+PortfolioOptimisers.sample_buffer_seed
+PortfolioOptimisers.fold_buffer
+PortfolioOptimisers.partial_fit!(state::PortfolioOptimisers.SampleBufferState, X::PortfolioOptimisers.MatNum, F::PortfolioOptimisers.Option{<:PortfolioOptimisers.MatNum} = nothing; dims::Int = 1)
+PortfolioOptimisers.assert_buffer_factor_width
+PortfolioOptimisers.assert_buffer_presence_agreement
+PortfolioOptimisers.reset_empty_buffer
+PortfolioOptimisers.seed_sample_buffer
+PortfolioOptimisers.seed_buffer_array
+PortfolioOptimisers.copy_buffer_rows!
+PortfolioOptimisers.reserve_sample_buffer
+PortfolioOptimisers.compact_buffer_array
+PortfolioOptimisers.partial_fit!(state::PortfolioOptimisers.SampleBufferState, x::PortfolioOptimisers.VecNum, f::PortfolioOptimisers.Option{<:PortfolioOptimisers.VecNum} = nothing)
+PortfolioOptimisers.observation_row
+PortfolioOptimisers.merge_states(a::PortfolioOptimisers.SampleBufferState, b::PortfolioOptimisers.SampleBufferState)
+PortfolioOptimisers.merge_buffer_array
+PortfolioOptimisers.trim_merged_array
+Base.copy(x::PortfolioOptimisers.SampleBufferState)
+PortfolioOptimisers.copy_buffer_array
+PortfolioOptimisers.port_opt_view(x::PortfolioOptimisers.SampleBufferState, i, args...)
+PortfolioOptimisers.slice_buffer_mask
+PortfolioOptimisers.partial_fit!(est::Union{<:PortfolioOptimisers.AbstractEstimator, <:StatsBase.CovarianceEstimator}, X::PortfolioOptimisers.VecNum_MatNum; dims::Int = 1)
+PortfolioOptimisers.supports_partial_fit
+Online
+PortfolioOptimisers.Online_Option
+PortfolioOptimisers.Onl
+PortfolioOptimisers.online_candidate_fields
+PortfolioOptimisers.online_fields
+PortfolioOptimisers.online_state_seed(::Union{<:PortfolioOptimisers.AbstractEstimator, <:StatsBase.CovarianceEstimator}, ::PortfolioOptimisers.Option{<:Integer})
+PortfolioOptimisers.update_online_estimator
+PortfolioOptimisers.estimator_fields
+PortfolioOptimisers.online_entry_state
+PortfolioOptimisers.online_wrapper_path
+PortfolioOptimisers.assert_batch_entry
+```
+
+## The coverage policy
+
+A moment estimator that carries a [`CoveragePolicy`](@ref) fits each cell of its answer on the observations that cell has, instead of reducing its window to the Coverage Universe. The rule for a delisted asset is an [`PortfolioOptimisers.AbstractCoverageAlgorithm`](@ref), whose two verbs are [`PortfolioOptimisers.fold_inactive!`](@ref) at fold time and [`PortfolioOptimisers.admits`](@ref) at read-out, and the per-cell denominators live in a [`PortfolioOptimisers.CoverageCounts`](@ref) the partial-fit state carries.
+
+```@docs
+CoveragePolicy
+PortfolioOptimisers.AbstractCoverageAlgorithm
+DecayCoverage
+ResetCoverage
+ExpireCoverage
+PortfolioOptimisers.fold_inactive!
+PortfolioOptimisers.fold_inactive!(::Union{<:DecayCoverage, <:ExpireCoverage}, state::PortfolioOptimisers.AbstractPartialFitState, ::AbstractVector{<:Bool})
+PortfolioOptimisers.admits
+PortfolioOptimisers.admits(::Union{<:DecayCoverage, <:ResetCoverage}, share::Real, active::Bool, ::Integer, min_coverage::Real)
+PortfolioOptimisers.admits(alg::ExpireCoverage, share::Real, active::Bool, stale::Integer, min_coverage::Real)
+PortfolioOptimisers.CoverageCounts
+PortfolioOptimisers.coverage_counts_seed
+Base.copy(x::PortfolioOptimisers.CoverageCounts)
+PortfolioOptimisers.coverage_counts_view
+PortfolioOptimisers.coverage_valid
+PortfolioOptimisers.coverage_valid_block
+PortfolioOptimisers.coverage_step!
+PortfolioOptimisers.coverage_merge_stale
+PortfolioOptimisers.coverage_reset!
+PortfolioOptimisers.coverage_admission
+PortfolioOptimisers.coverage_divide
+PortfolioOptimisers.coverage_frame
+PortfolioOptimisers.coverage_refuse!
+PortfolioOptimisers.coverage_refuse_comoment!
 ```
 
 ## Iteration and indexing

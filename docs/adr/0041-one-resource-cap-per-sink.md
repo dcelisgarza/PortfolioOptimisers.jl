@@ -10,9 +10,10 @@ A recurring class of config→allocation weakness runs through the library: an u
 integer (config file, tuning grid, UI) whose own constructor bounds it only from *below*, so an
 absurd value — a stray extra digit, a mis-scaled sweep — is accepted and the process is killed by
 the OOM killer rather than told what went wrong. The seventh security pass introduced
-[`RESOURCE_LIMITS`](../../src/01_Base.jl) (a [`ScopedConfig`](../../src/01_Base.jl) holding a
+[`RESOURCE_LIMITS`](../../src/01_Base/04_ScopedConfig.jl) (a
+[`ScopedConfig`](../../src/01_Base/04_ScopedConfig.jl) holding a
 `ResourceLimits`) with two such caps — `max_samples` (Monte-Carlo draws `n_sim`) and `max_subsets`
-(resampled subsets `n_subsets`) — enforced by [`assert_resource_cap`](../../src/01_Base.jl), which
+(resampled subsets `n_subsets`) — enforced by [`assert_resource_cap`](../../src/01_Base/10_Assertions.jl), which
 fails closed with a typed `DomainError` naming both the rejected field and the knob that raises it.
 This mirrored [ADR 0027](0027-cap-equation-parser-recursion.md) but was never itself recorded.
 
@@ -165,3 +166,40 @@ from. It names the keys it reports and nothing else — the same info-leak-safe 
 The fail-closed behaviour for an *invalid* value is unchanged, and the docstrings that described it
 were corrected: they claimed the load "fails closed rather than silently running with a weaker cap",
 which covered invalid values alone and read as a promise about weak caps in general.
+
+## Amendment (2026-09-01) — a seventh cap for the tail-view grid
+
+The eleventh security pass (`docs/reports/security-review-20260901-035650.html`, finding 3) found a
+sink of this class that the mechanism never reached. `ResourceLimits` therefore holds **seven** caps:
+`max_ep_grid` joins the six above, with the same naming rule and the same no-reuse rule.
+`GridEntropicValueatRiskView` carries the sink on `main`, so the released library ships it uncapped,
+and `GridRelativisticValueatRiskView` is its twin, added on this branch.
+
+`max_ep_grid` (default `10_000`) bounds `K`, the number of grid points of
+`GridEntropicValueatRiskView` and `GridRelativisticValueatRiskView`. Each grid point is one binary
+variable of the mixed-integer program an upper-bound or equality view builds, and one dense row over
+the `T` posterior probabilities: `add_ep_tail_view!` writes `y = @variable(model, [1:K], binary)` and
+`K` rows beside it. The constructors bounded `K` from below and for parity alone —
+`K >= 1 && isodd(K)` — so `GridRelativisticValueatRiskView(; K = 10_000_001)` was accepted and one
+view in a config file asked the solver for ten million binaries. The entropy-pooling view surface is
+caller-authored, which is what makes `K` untrusted.
+
+The sink is mixed-integer, which is neither of the two shapes the decision above distinguishes: it is
+linear in `K` in memory, at `K · T` coefficients, and a branch-and-bound tree over `K` binaries in
+compute. The ceiling is therefore set against the *solve*, not against the allocation, and sits an
+order of magnitude below the `100_000` the plain compute sinks carry, against a shipped `K = 11`.
+
+One cap covers both view types, and that is not the reuse the decision forbids: they are one sink
+reached by two entry points — the same `y` block through the same `add_ep_tail_view!` — as `max_bins`
+already covers `MutualInfoCovariance` and `VariationInfoDistance`.
+
+The check goes in the inner constructor of both views, and that is the whole of it.
+`ep_add_grid_tail_view!` drops the grid points whose row is not finite, so the `K` the model sees is
+never above the `K` the constructor passed; no second check can see a larger value. Both
+constructors already stated the parity rule, so the two lines became one `assert_ep_grid_size`
+beside the `assert_*` family: one rule, one site, one message.
+
+Behaviour-changing, not API-breaking. `ResourceLimits`'s positional constructor takes seven arguments
+now; the keyword constructor, which the decision above already made the recommended path, is
+unaffected. The `"max_ep_grid"` preference key raises the ceiling for a whole project, and it is
+announced at load like every other widened guard.

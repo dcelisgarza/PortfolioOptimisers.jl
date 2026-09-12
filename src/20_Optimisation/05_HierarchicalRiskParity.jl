@@ -89,25 +89,27 @@ julia> HierarchicalRiskParity()
 HierarchicalRiskParity
   opt ┼ HierarchicalOptimiser
       │       pe ┼ EmpiricalPrior
-      │          │        ce ┼ PortfolioOptimisersCovariance
-      │          │           │   ce ┼ Covariance
-      │          │           │      │    me ┼ SimpleExpectedReturns
-      │          │           │      │       │   w ┴ nothing
-      │          │           │      │    ce ┼ GeneralCovariance
-      │          │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │          │           │      │       │    w ┴ nothing
-      │          │           │      │   alg ┴ FullMoment()
-      │          │           │   mp ┼ MatrixProcessing
-      │          │           │      │     pdm ┼ Posdef
-      │          │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │          │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │          │           │      │      dn ┼ nothing
-      │          │           │      │      dt ┼ nothing
-      │          │           │      │     alg ┼ nothing
-      │          │           │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-      │          │        me ┼ SimpleExpectedReturns
-      │          │           │   w ┴ nothing
-      │          │   horizon ┴ nothing
+      │          │           ce ┼ PortfolioOptimisersCovariance
+      │          │              │   ce ┼ Covariance
+      │          │              │      │    me ┼ SimpleExpectedReturns
+      │          │              │      │       │   w ┴ nothing
+      │          │              │      │    ce ┼ GeneralCovariance
+      │          │              │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │          │              │      │       │    w ┴ nothing
+      │          │              │      │   alg ┼ FullMoment()
+      │          │              │      │     w ┴ nothing
+      │          │              │   mp ┼ MatrixProcessing
+      │          │              │      │     pdm ┼ Posdef
+      │          │              │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │          │              │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │          │              │      │      dn ┼ nothing
+      │          │              │      │      dt ┼ nothing
+      │          │              │      │     alg ┼ nothing
+      │          │              │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+      │          │           me ┼ SimpleExpectedReturns
+      │          │              │   w ┴ nothing
+      │          │      horizon ┼ nothing
+      │          │   fill_limit ┴ nothing
       │      cle ┼ ClustersEstimator
       │          │    ce ┼ PortfolioOptimisersCovariance
       │          │       │   ce ┼ Covariance
@@ -116,7 +118,8 @@ HierarchicalRiskParity
       │          │       │      │    ce ┼ GeneralCovariance
       │          │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
       │          │       │      │       │    w ┴ nothing
-      │          │       │      │   alg ┴ FullMoment()
+      │          │       │      │   alg ┼ FullMoment()
+      │          │       │      │     w ┴ nothing
       │          │       │   mp ┼ MatrixProcessing
       │          │       │      │     pdm ┼ Posdef
       │          │       │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
@@ -149,7 +152,6 @@ HierarchicalRiskParity
       │          │   iter ┴ Int64: 100
       │      brt ┼ Bool: false
       │    x_src ┼ Symbol: :prior
-      │    z_src ┼ Symbol: :data
       │   strict ┴ Bool: false
     r ┼ Variance
       │   settings ┼ RiskMeasureSettings
@@ -253,8 +255,12 @@ function port_opt_view(hrp::HierarchicalRiskParity, i, X::MatNum,
                        args...)::HierarchicalRiskParity
     X = isa(hrp.opt.pe, AbstractPriorResult) ? hrp.opt.pe.X : X
     r = port_opt_view(hrp.r, i, X)
-    opt = port_opt_view(hrp.opt, i)
+    opt = port_opt_view(hrp.opt, i, X)
     return HierarchicalRiskParity(; r = r, opt = opt, sca = hrp.sca, fb = hrp.fb)
+end
+function non_investable_universe(hrp::HierarchicalRiskParity,
+                                 ni::VecStr)::HierarchicalRiskParity
+    return rebuild_estimator(hrp, (; opt = non_investable_universe(hrp.opt, ni)))
 end
 """
     split_factor_weight_constraints(alpha::Number, wb::WeightBounds, w::VecNum,
@@ -323,16 +329,34 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
     hrp = reset_time_dependent_estimator(hrp)
     rd = returns_result_picker(rd, hrp.opt.brt)
     pr = prior(hrp.opt.pe, rd; dims = dims)
+    # Resolve the fee on the caller's own universe, before the door below narrows `sets`.
+    # A name stated over that universe must not be refused because the data delisted the
+    # asset, and a carrier keyed by name cannot resolve at all once its `w` sits on the
+    # complement while `sets` sits on the mask. `investable_fees_view` then places the
+    # resolved fee on the axes the mask leaves.
+    imsk = investable_mask(pr)
+    fees = investable_fees_view(fees_constraints(hrp.opt.fees, hrp.opt.sets;
+                                                 strict = hrp.opt.strict,
+                                                 datatype = eltype(pr.X)), imsk, pr.X)
+    # A forced exit is charged once, against the full-universe weight vector the fit
+    # rebuilds, so it rides on the result alone. No sub-problem below holds that vector —
+    # the exiting asset is in no cluster, its column being `NaN` — so none prices an exit.
+    cfees = strip_liquidation_carriers(fees, nothing)
+    # The prior fits on the coverage universe and returns a result on the full asset
+    # universe, where an asset it could not estimate carries `NaN`. Reduce once, here:
+    # the distance the clustering is built from never sees a `NaN`, and the cluster count
+    # is chosen on the investable universe. The weights are expanded back in
+    # `HierarchicalResult`.
+    _, pr, hrp, rd = investable_reduction(imsk, pr, hrp, rd)
     X = pr.X
     # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
     # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).
     clr = clusterise(hrp.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa, dims = dims,
-                     x_src = hrp.opt.x_src, z_src = hrp.opt.z_src)
+                     x_src = hrp.opt.x_src)
+    assert_clustering_universe(clr, size(X, 2))
     r = factory(hrp.r, pr, hrp.opt.slv)
     wu = Matrix{eltype(X)}(undef, size(X, 2), 2)
-    fees = fees_constraints(hrp.opt.fees, hrp.opt.sets; strict = hrp.opt.strict,
-                            datatype = eltype(X))
-    rku = unitary_expected_risks(r, X, fees)
+    rku = unitary_expected_risks(r, X, cfees)
     wb = weight_bounds_constraints(hrp.opt.wb, hrp.opt.sets; N = size(X, 2),
                                    strict = hrp.opt.strict, datatype = eltype(X))
     w = ones(eltype(X), size(X, 2))
@@ -349,8 +373,8 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
             wu[lc, 1] ./= sum(view(wu, lc, 1))
             wu[rc, 2] .= inv.(view(rku, rc))
             wu[rc, 2] ./= sum(view(wu, rc, 2))
-            lrisk = expected_risk(r, view(wu, :, 1), X, fees)
-            rrisk = expected_risk(r, view(wu, :, 2), X, fees)
+            lrisk = expected_risk(r, view(wu, :, 1), X, cfees)
+            rrisk = expected_risk(r, view(wu, :, 2), X, cfees)
             # Allocate weight to clusters.
             alpha = one(lrisk) - lrisk / (lrisk + rrisk)
             alpha = split_factor_weight_constraints(alpha, wb, w, lc, rc)
@@ -363,8 +387,9 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
     return HierarchicalRiskParityResult(;
                                         hr = HierarchicalResult(; pr = pr, clr = clr,
                                                                 wb = wb, fees = fees,
-                                                                retcode = retcode, w = w),
-                                        r = r, sca = hrp.sca, fb = nothing)
+                                                                retcode = retcode, w = w,
+                                                                imsk = imsk), r = r,
+                                        sca = hrp.sca, fb = nothing)
 end
 """
     hrp_scalarised_risk(sca::Scalariser, wu::MatNum, wk::VecNum, rku::VecNum,
@@ -436,17 +461,35 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
     hrp = reset_time_dependent_estimator(hrp)
     rd = returns_result_picker(rd, hrp.opt.brt)
     pr = prior(hrp.opt.pe, rd; dims = dims)
+    # Resolve the fee on the caller's own universe, before the door below narrows `sets`.
+    # A name stated over that universe must not be refused because the data delisted the
+    # asset, and a carrier keyed by name cannot resolve at all once its `w` sits on the
+    # complement while `sets` sits on the mask. `investable_fees_view` then places the
+    # resolved fee on the axes the mask leaves.
+    imsk = investable_mask(pr)
+    fees = investable_fees_view(fees_constraints(hrp.opt.fees, hrp.opt.sets;
+                                                 strict = hrp.opt.strict,
+                                                 datatype = eltype(pr.X)), imsk, pr.X)
+    # A forced exit is charged once, against the full-universe weight vector the fit
+    # rebuilds, so it rides on the result alone. No sub-problem below holds that vector —
+    # the exiting asset is in no cluster, its column being `NaN` — so none prices an exit.
+    cfees = strip_liquidation_carriers(fees, nothing)
+    # The prior fits on the coverage universe and returns a result on the full asset
+    # universe, where an asset it could not estimate carries `NaN`. Reduce once, here:
+    # the distance the clustering is built from never sees a `NaN`, and the cluster count
+    # is chosen on the investable universe. The weights are expanded back in
+    # `HierarchicalResult`.
+    _, pr, hrp, rd = investable_reduction(imsk, pr, hrp, rd)
     X = pr.X
     # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
     # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).
     clr = clusterise(hrp.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa, dims = dims,
-                     x_src = hrp.opt.x_src, z_src = hrp.opt.z_src)
+                     x_src = hrp.opt.x_src)
+    assert_clustering_universe(clr, size(X, 2))
     r = factory(hrp.r, pr, hrp.opt.slv)
     wu = Matrix{eltype(X)}(undef, size(X, 2), 2)
     wk = zeros(eltype(X), size(X, 2))
     rku = Vector{eltype(X)}(undef, size(X, 2))
-    fees = fees_constraints(hrp.opt.fees, hrp.opt.sets; strict = hrp.opt.strict,
-                            datatype = eltype(X))
     wb = weight_bounds_constraints(hrp.opt.wb, hrp.opt.sets; N = size(X, 2),
                                    strict = hrp.opt.strict, datatype = eltype(X))
     w = ones(eltype(X), size(X, 2))
@@ -458,7 +501,7 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
         for i in 1:2:length(items)
             lc = items[i]
             rc = items[i + 1]
-            lrisk, rrisk = hrp_scalarised_risk(hrp.sca, wu, wk, rku, lc, rc, r, X, fees)
+            lrisk, rrisk = hrp_scalarised_risk(hrp.sca, wu, wk, rku, lc, rc, r, X, cfees)
             # Allocate weight to clusters.
             alpha = one(lrisk) - lrisk / (lrisk + rrisk)
             alpha = split_factor_weight_constraints(alpha, wb, w, lc, rc)
@@ -471,12 +514,13 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
     return HierarchicalRiskParityResult(;
                                         hr = HierarchicalResult(; pr = pr, clr = clr,
                                                                 wb = wb, fees = fees,
-                                                                retcode = retcode, w = w),
-                                        r = r, sca = hrp.sca, fb = nothing)
+                                                                retcode = retcode, w = w,
+                                                                imsk = imsk), r = r,
+                                        sca = hrp.sca, fb = nothing)
 end
 """
     optimise(hrp::HierarchicalRiskParity{<:Any, <:Any, <:Any, <:Nothing},
-             rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...) -> HierarchicalRiskParityResult
+             rd::ReturnsResult; dims::Int = 1, kwargs...) -> HierarchicalRiskParityResult
 
 Run the Hierarchical Risk Parity portfolio optimisation.
 
@@ -491,13 +535,18 @@ Run the Hierarchical Risk Parity portfolio optimisation.
 
 Unlike [`HierarchicalEqualRiskContribution`](@ref) and [`NestedClustered`](@ref), this optimiser accepts no `branchorder` keyword. Recursive bisection allocates by splitting the dendrogram's leaf permutation, so that permutation is the algorithm's input rather than a presentation detail, and the clusterisation always runs with the optimal ordering. A `branchorder` passed here is absorbed by `kwargs` and ignored. See ADR 0055.
 
+# Validation
+
+  - No field in the tree of `hrp` holds an [`Online`](@ref). An `ArgumentError` naming the field is thrown otherwise, through [`assert_batch_entry`](@ref): a plain `optimise` is a batch fit, and a wrapper resolves only at the warm-up of the fold loop's online arm.
+
 # Related
 
   - [`HierarchicalRiskParity`](@ref)
   - [`HierarchicalRiskParityResult`](@ref)
 """
 function optimise(hrp::HierarchicalRiskParity{<:Any, <:Any, <:Any, <:Nothing},
-                  rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
+                  rd::ReturnsResult; dims::Int = 1, kwargs...)
+    assert_batch_entry(hrp, "`optimise`")
     return _optimise(hrp, rd; dims = dims, kwargs...)
 end
 

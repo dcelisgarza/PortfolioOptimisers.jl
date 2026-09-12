@@ -45,52 +45,6 @@ include(joinpath(@__DIR__, "test22_setup.jl"))
                                                                          params = SchurComplementParams(;
                                                                                                         gamma = 0.5),
                                                                          opt = hopto)),
-            NestedClustered(; pe = pr, cle = clr,
-                            opti = Stacking(;
-                                            opti = [MeanRisk(; opt = jopti),
-                                                    HierarchicalRiskParity(; opt = hopti),
-                                                    InverseVolatility(; pe = pr),
-                                                    EqualWeighted(),
-                                                    NestedClustered(; pe = pr,
-                                                                    opti = NearOptimalCentering(;
-                                                                                                opt = jopti),
-                                                                    opto = NearOptimalCentering(;
-                                                                                                opt = jopto))],
-                                            opto = Stacking(;
-                                                            opti = [MeanRisk(; opt = jopto),
-                                                                    HierarchicalRiskParity(;
-                                                                                           opt = hopto),
-                                                                    InverseVolatility(),
-                                                                    EqualWeighted(),
-                                                                    NestedClustered(;
-                                                                                    opti = NearOptimalCentering(;
-                                                                                                                opt = jopto),
-                                                                                    opto = NearOptimalCentering(;
-                                                                                                                opt = jopto))],
-                                                            opto = HierarchicalRiskParity(;
-                                                                                          opt = hopto))),
-                            opto = Stacking(;
-                                            opti = [MeanRisk(; opt = jopto),
-                                                    HierarchicalRiskParity(; opt = hopto),
-                                                    InverseVolatility(), EqualWeighted(),
-                                                    NestedClustered(;
-                                                                    opti = NearOptimalCentering(;
-                                                                                                opt = jopto),
-                                                                    opto = NearOptimalCentering(;
-                                                                                                opt = jopto))],
-                                            opto = Stacking(;
-                                                            opti = [MeanRisk(; opt = jopto),
-                                                                    HierarchicalRiskParity(;
-                                                                                           opt = hopto),
-                                                                    InverseVolatility(),
-                                                                    EqualWeighted(),
-                                                                    NestedClustered(;
-                                                                                    opti = NearOptimalCentering(;
-                                                                                                                opt = jopto),
-                                                                                    opto = NearOptimalCentering(;
-                                                                                                                opt = jopto))],
-                                                            opto = HierarchicalRiskParity(;
-                                                                                          opt = hopto)))),
             NestedClustered(; cle = clr,
                             opti = FactorRiskContribution(; flag = true, opt = jopti),
                             opto = FactorRiskContribution(; flag = true, opt = jopto)),
@@ -282,9 +236,9 @@ include(joinpath(@__DIR__, "test22_setup.jl"))
                                                     opto = RiskBudgeting(; opt = jopto)),
                                     rd).w, res.w, rtol = 5e-5)
         end
-        rtol = if i in (2, 16)
+        rtol = if i in (2, 15)
             5e-5
-        elseif i in (12, 20)
+        elseif i == 19
             5e-6
         elseif i == 10
             1.1

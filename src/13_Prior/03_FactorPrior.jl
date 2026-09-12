@@ -14,9 +14,10 @@ $(DocStringExtensions.FIELDS)
     FactorPrior(;
         pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
         mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
-        re::AbstractRegressionEstimator = StepwiseRegression(),
+        re::AbstractTimeSeriesRegressionEstimator = StepwiseRegression(),
         ve::AbstractVarianceEstimator = SimpleVariance(),
-        rsd::Bool = true
+        rsd::Bool = true,
+        cache::Option{<:AbstractPartialFitState} = nothing
     ) -> FactorPrior
 
 Keywords correspond to the struct's fields.
@@ -44,7 +45,6 @@ This estimator **lifts** a factor-axis prior onto the asset axis, reconstructing
   - `mu` and `sigma` are that block projected through the loadings, so the returned carrier is **internally consistent**: `mu == rr.M * fpr.mu + rr.b` holds by construction. `sigma` optionally gains a residual correction when `rsd` is `true`.
   - `chol` is not forwarded but **rebuilt on the asset axis**, as `M * cholesky(fpr.sigma).L` widened by the residual block when `rsd` is `true`, so it stays in sync with the `sigma` it factorises.
   - `w` is the factor prior's, and is over the right axis: this estimator wraps only a factor prior, and `posterior_X` has exactly `F`'s rows, so it is the only weighting in existence. Its `ens`, `kld` and `ow` travel with it.
-  - No `Z` is carried: the only wrapped prior is fit on factors, so its feature matrix would be factors × features and would not describe the asset axis. The drop is a *relocation* rather than a destruction — the factor prior is forwarded whole, so a feature matrix it carried is still reachable at `pr.fpr.Z`, which is where a factor-axis one belongs. For an asset-axis one, wrap this estimator from the *outside*: `FeaturePrior(; pe = FactorPrior(…), ze = RegressionFeatures())` reads the loadings back off the result.
 
 # Examples
 
@@ -52,25 +52,27 @@ This estimator **lifts** a factor-axis prior onto the asset axis, reconstructing
 julia> FactorPrior()
 FactorPrior
    pe ┼ EmpiricalPrior
-      │        ce ┼ PortfolioOptimisersCovariance
-      │           │   ce ┼ Covariance
-      │           │      │    me ┼ SimpleExpectedReturns
-      │           │      │       │   w ┴ nothing
-      │           │      │    ce ┼ GeneralCovariance
-      │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │           │      │       │    w ┴ nothing
-      │           │      │   alg ┴ FullMoment()
-      │           │   mp ┼ MatrixProcessing
-      │           │      │     pdm ┼ Posdef
-      │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │           │      │      dn ┼ nothing
-      │           │      │      dt ┼ nothing
-      │           │      │     alg ┼ nothing
-      │           │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-      │        me ┼ SimpleExpectedReturns
-      │           │   w ┴ nothing
-      │   horizon ┴ nothing
+      │           ce ┼ PortfolioOptimisersCovariance
+      │              │   ce ┼ Covariance
+      │              │      │    me ┼ SimpleExpectedReturns
+      │              │      │       │   w ┴ nothing
+      │              │      │    ce ┼ GeneralCovariance
+      │              │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │              │      │       │    w ┴ nothing
+      │              │      │   alg ┼ FullMoment()
+      │              │      │     w ┴ nothing
+      │              │   mp ┼ MatrixProcessing
+      │              │      │     pdm ┼ Posdef
+      │              │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │              │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │              │      │      dn ┼ nothing
+      │              │      │      dt ┼ nothing
+      │              │      │     alg ┼ nothing
+      │              │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+      │           me ┼ SimpleExpectedReturns
+      │              │   w ┴ nothing
+      │      horizon ┼ nothing
+      │   fill_limit ┴ nothing
    mp ┼ MatrixProcessing
       │     pdm ┼ Posdef
       │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
@@ -93,12 +95,18 @@ FactorPrior
   rsd ┴ Bool: true
 ```
 
+## The incremental fit
+
+This prior has no exact incremental recursion, so it takes the online step by **refitting from a sample buffer**: [`Online`](@ref) seeds `cache`, [`partial_fit!`](@ref) appends each observation to it verbatim, and the one-argument [`prior`](@ref) runs this estimator's own batch verb over the rows the buffer kept. The answer is therefore exactly a batch fit over those rows, and a `max_history` on the wrapper windows the whole fit. ADR 0136 records the decision.
+
+`cache` travels the three propagation channels as every partial-fit state does: [`factory`](@ref) carries it unchanged, [`port_opt_view`](@ref) slices it to the selected assets, and [`obs_weights_view`](@ref) drops it, because no slice of a state exists on the observation axis. It is not rendered, because a running buffer is not the configuration a reader looks the type up for.
+
 # Related
 
   - [`AbstractLowOrderPriorEstimator_F`](@ref)
   - [`AbstractLowOrderPriorEstimator_A_AF`](@ref)
   - [`AbstractMatrixProcessingEstimator`](@ref)
-  - [`AbstractRegressionEstimator`](@ref)
+  - [`AbstractTimeSeriesRegressionEstimator`](@ref)
   - [`AbstractVarianceEstimator`](@ref)
   - [`EmpiricalPrior`](@ref)
   - [`StepwiseRegression`](@ref)
@@ -133,35 +141,67 @@ FactorPrior
     $(field_dict[:rsd])
     """
     rsd
+    """
+    $(field_dict[:pfcache])
+    """
+    @fprop @vprop cache
     function FactorPrior(pe::AbstractLowOrderPriorEstimator_A_AF,
                          mp::AbstractMatrixProcessingEstimator,
-                         re::AbstractRegressionEstimator, ve::AbstractVarianceEstimator,
-                         rsd::Bool)
-        return new{typeof(pe), typeof(mp), typeof(re), typeof(ve), typeof(rsd)}(pe, mp, re,
-                                                                                ve, rsd)
+                         re::AbstractTimeSeriesRegressionEstimator,
+                         ve::AbstractVarianceEstimator, rsd::Bool,
+                         cache::Option{<:AbstractPartialFitState})
+        return new{typeof(pe), typeof(mp), typeof(re), typeof(ve), typeof(rsd),
+                   typeof(cache)}(pe, mp, re, ve, rsd, cache)
     end
 end
 function FactorPrior(; pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
                      mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
-                     re::AbstractRegressionEstimator = StepwiseRegression(),
-                     ve::AbstractVarianceEstimator = SimpleVariance(),
-                     rsd::Bool = true)::FactorPrior
-    return FactorPrior(pe, mp, re, ve, rsd)
+                     re::AbstractTimeSeriesRegressionEstimator = StepwiseRegression(),
+                     ve::AbstractVarianceEstimator = SimpleVariance(), rsd::Bool = true,
+                     cache::Option{<:AbstractPartialFitState} = nothing)::FactorPrior
+    return FactorPrior(pe, mp, re, ve, rsd, cache)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Renders every field of a [`FactorPrior`](@ref) except `cache`.
+
+The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:FactorPrior, true)` to render it. ADR 0105 records the decision.
+
+# Arguments
+
+  - `::FactorPrior`: Prior estimator, read for its type alone.
+
+# Returns
+
+  - `fields::Tuple`: The field names to render, which is `(:pe, :mp, :re, :ve, :rsd)`.
+
+# Related
+
+  - [`FactorPrior`](@ref)
+  - [`show_fields`](@ref)
+  - [`set_show_nothing_fields!`](@ref)
+"""
+show_fields(::FactorPrior) = (:pe, :mp, :re, :ve, :rsd)
 # Expose `:me` and `:ce` from the embedded asset prior estimator `pe` for transparent access
 # (see [`@forward_properties`](@ref)).
 @forward_properties FactorPrior begin
     forward(pe, me, ce)
 end
 """
-    factor_reconstruction(re::AbstractRegressionEstimator, X::MatNum,
-                          F::MatNum) -> Tuple{AbstractRegressionResult, MatNum}
+    factor_reconstruction(re::AbstractTimeSeriesRegressionEstimator, X::MatNum,
+                          F::MatNum) -> Tuple{AbstractLoadingsRegressionResult, MatNum}
 
 Fit the loadings and rebuild the asset returns from the factor returns.
 
 This is the first half of the factor lift, and the only half every factor-axis estimator shares. It fits `re` on `(X, F)` and returns the regression result together with the *posterior returns matrix* `F * transpose(M) .+ transpose(b)` — the reconstruction that [`FactorPrior`](@ref), [`FactorBlackLittermanPrior`](@ref) and [`AugmentedBlackLittermanPrior`](@ref) each write into `LowOrderPrior.X`.
 
 The second half — projecting the factor moments through the loadings — is [`factor_lift`](@ref). The two are separate because [`FactorBlackLittermanPrior`](@ref) needs the reconstruction before it has the moments to project: its views land on the factor distribution, so the factor moments only exist after the Black-Litterman update.
+
+# Algorithm
+
+ 1. Fit `re` on `(X, F)` with [`regression`](@ref), giving `rr`. It carries the ``N \\times K`` loadings `rr.M` and the ``N \\times 1`` intercepts `rr.b`.
+ 2. Rebuild the asset returns as `F * transpose(rr.M) .+ transpose(rr.b)`, giving `posterior_X`, which has `F`'s rows and `X`'s columns.
 
 # Arguments
 
@@ -171,7 +211,7 @@ The second half — projecting the factor moments through the loadings — is [`
 
 # Returns
 
-  - `rr::AbstractRegressionResult`: Regression result carrying the loadings `M` and intercepts `b`.
+  - `rr::AbstractLoadingsRegressionResult`: Regression result carrying the loadings `M` and intercepts `b`.
   - `posterior_X::MatNum`: Reconstructed asset returns, `observations × assets`.
 
 # Related
@@ -181,13 +221,14 @@ The second half — projecting the factor moments through the loadings — is [`
   - [`FactorPrior`](@ref)
   - [`LowOrderPrior`](@ref)
 """
-function factor_reconstruction(re::AbstractRegressionEstimator, X::MatNum, F::MatNum)
+function factor_reconstruction(re::AbstractTimeSeriesRegressionEstimator, X::MatNum,
+                               F::MatNum)
     rr = regression(re, X, F)
     return rr, F * transpose(rr.M) .+ transpose(rr.b)
 end
 """
     factor_lift(mp::AbstractMatrixProcessingEstimator, ve::AbstractVarianceEstimator,
-                rsd::Bool, rr::AbstractRegressionResult, f_mu::VecNum, f_sigma::MatNum,
+                rsd::Bool, rr::AbstractLoadingsRegressionResult, f_mu::VecNum, f_sigma::MatNum,
                 X::MatNum, posterior_X::MatNum; kwargs...) -> NamedTuple
 
 Project factor moments onto the asset axis through the regression loadings.
@@ -215,7 +256,21 @@ Where:
   - ``\\mathbf{\\Sigma}_f``: ``K \\times K`` factor covariance matrix, `f_sigma`.
   - ``\\mathbf{\\Sigma}_\\varepsilon``: ``N \\times N`` diagonal matrix of residual variances, present only when `rsd` is `true`.
 
-The returned `chol` is the ``N \\times (K + N)`` matrix ``[\\mathbf{B} \\mathbf{L}_f \\quad \\mathbf{\\Sigma}_\\varepsilon^{1/2}]`` transposed, where ``\\mathbf{L}_f`` is the lower Cholesky factor of ``\\mathbf{\\Sigma}_f``. It therefore satisfies ``\\mathtt{chol}^\\intercal \\mathtt{chol} = \\hat{\\mathbf{\\Sigma}}`` before matrix processing.
+The returned `chol` is the transpose of ``[\\mathbf{B} \\mathbf{L}_f \\quad \\mathbf{\\Sigma}_\\varepsilon^{1/2}]``, where ``\\mathbf{L}_f`` is the lower Cholesky factor of ``\\mathbf{\\Sigma}_f``. It is therefore ``(K + N) \\times N`` when `rsd` is `true`, and ``K \\times N`` when `rsd` is `false`, the residual block being absent from `chol` and from ``\\hat{\\mathbf{\\Sigma}}`` alike.
+
+``\\mathtt{chol}^\\intercal \\mathtt{chol} = \\hat{\\mathbf{\\Sigma}}`` holds **before** matrix processing, and that qualifier is load-bearing. `chol` is built from the `f_sigma` the caller passed, so step 4 of the algorithm rewrites `sigma` without rewriting `chol`. Under an `mp` that leaves the projected covariance where it found it — which the default [`MatrixProcessing`](@ref) does, its `pdm` being a no-op on a matrix that is already positive semi-definite — the two agree and the identity holds on the returned pair. Under an `mp` that denoises or detones, `sigma` moves and `chol` stays behind, so the identity holds against the unprocessed covariance alone. A consumer that needs a factor of the returned `sigma` must refactorise it.
+
+# Algorithm
+
+ 1. Read the loadings `M` and the intercepts `b` off `rr`.
+ 2. Project the factor mean through the loadings, giving `posterior_mu`.
+ 3. Project the factor covariance through the loadings, giving `posterior_sigma`, the systematic block.
+ 4. Process `posterior_sigma` in place with [`matrix_processing!`](@ref), under `mp` and `posterior_X`.
+ 5. Carry the lower Cholesky factor of `f_sigma` through the loadings, giving `posterior_csigma`. This reads the `f_sigma` the caller passed, which step 4 does not touch.
+ 6. When `rsd` is `true`, take the reconstruction error `err = X - posterior_X`, and read `esigma`, the column variances of `err` under `ve`. Size the residual block as `err_sigma`, the diagonal matrix of those variances. When `rsd` is `false`, `esigma` is `nothing`.
+ 7. Still under `rsd`, add `err_sigma` to `posterior_sigma` and re-condition the sum with [`posdef!`](@ref), under `mp.pdm`. This is the body's only explicit [`posdef!`](@ref) call. `mp.pdm` also reaches `posterior_sigma` inside step 4, whenever `:pdm` is a member of `mp.order`.
+ 8. Still under `rsd`, widen `posterior_csigma` with `sqrt.(err_sigma)`, so the block that step 7 added to the covariance enters the factor as well.
+ 9. Reshape `posterior_csigma` to `length(posterior_mu)` columns, transpose it into `chol`, and return the four quantities.
 
 # Arguments
 
@@ -231,33 +286,37 @@ The returned `chol` is the ``N \\times (K + N)`` matrix ``[\\mathbf{B} \\mathbf{
 
 # Returns
 
-  - `(; mu, sigma, chol)::NamedTuple`: Asset expected returns, asset covariance, and the Cholesky-like factor whose trailing block is the residual standard deviations when `rsd` is `true`.
+  - `(; mu, sigma, chol, esigma)::NamedTuple`: Asset expected returns, asset covariance, the Cholesky-like factor whose trailing block is the residual standard deviations when `rsd` is `true`, and the residual variances themselves. `esigma` is `nothing` when `rsd` is `false`, because no residual block was added. A caller writes it onto the `esigma` field of the loadings result it returns, so that a consumer that needs the idiosyncratic variances reads them off the block instead of recomputing them from the reconstruction error.
 
 # Related
 
   - [`factor_reconstruction`](@ref)
   - [`factor_residual_config`](@ref)
+  - [`Regression`](@ref)
   - [`FactorPrior`](@ref)
   - [`FactorBlackLittermanPrior`](@ref)
   - [`LowOrderPrior`](@ref)
 """
 function factor_lift(mp::AbstractMatrixProcessingEstimator, ve::AbstractVarianceEstimator,
-                     rsd::Bool, rr::AbstractRegressionResult, f_mu::VecNum, f_sigma::MatNum,
-                     X::MatNum, posterior_X::MatNum; kwargs...)
+                     rsd::Bool, rr::AbstractLoadingsRegressionResult, f_mu::VecNum,
+                     f_sigma::MatNum, X::MatNum, posterior_X::MatNum; kwargs...)
     (; b, M) = rr
     posterior_mu = M * f_mu + b
     posterior_sigma = M * f_sigma * transpose(M)
     matrix_processing!(mp, posterior_sigma, posterior_X; kwargs...)
     posterior_csigma = M * LinearAlgebra.cholesky(f_sigma).L
+    esigma = nothing
     if rsd
         err = X - posterior_X
-        err_sigma = LinearAlgebra.diagm(vec(Statistics.var(ve, err; dims = 1)))
+        esigma = vec(Statistics.var(ve, err; dims = 1))
+        err_sigma = LinearAlgebra.diagm(esigma)
         posterior_sigma .+= err_sigma
         posdef!(mp.pdm, posterior_sigma)
         posterior_csigma = hcat(posterior_csigma, sqrt.(err_sigma))
     end
     return (; mu = posterior_mu, sigma = posterior_sigma,
-            chol = transpose(reshape(posterior_csigma, length(posterior_mu), :)))
+            chol = transpose(reshape(posterior_csigma, length(posterior_mu), :)),
+            esigma = esigma)
 end
 """
     factor_residual_config(pe::AbstractPriorEstimator) -> Option{<:NamedTuple}
@@ -326,8 +385,8 @@ function assert_factor_residual_config(pe::AbstractPriorEstimator, cfg)::Nothing
     return nothing
 end
 """
-    prior(pe::FactorPrior, X::MatNum, F::MatNum; dims::Int = 1, strict::Bool = false,
-          kwargs...)
+    prior(pe::FactorPrior, X::MatNum, F::MatNum, pnl::Option{<:AssetPanel} = nothing;
+          dims::Int = 1, strict::Bool = false, kwargs...)
 
 Compute factor-based prior moments for asset returns using a factor model.
 
@@ -354,11 +413,21 @@ Where:
 
 The factor moments ``\\hat{\\boldsymbol{f}}`` and ``\\mathbf{\\Sigma}_f`` come from `pe.pe` fit on `F`, and the loadings from `pe.re` fit on `(X, F)`. The two equations are [`factor_lift`](@ref).
 
+# Algorithm
+
+ 1. Orient `X` and `F` with [`dims_oriented`](@ref), to `observations × assets` and `observations × factors`.
+ 2. Fit the wrapped prior `pe.pe` on `F`, giving `f_prior`, the factor-axis prior result. `strict` reaches it, because `pe.pe` admits [`BlackLittermanPrior`](@ref) and [`EntropyPoolingPrior`](@ref), which resolve view names against a universe.
+ 3. Fit the loadings and rebuild the asset returns with [`factor_reconstruction`](@ref), giving `rr` and `posterior_X`.
+ 4. Project `f_prior.mu` and `f_prior.sigma` through `rr` with [`factor_lift`](@ref), giving `mu`, `sigma`, `chol` and `esigma`.
+ 5. Write `esigma` onto the `esigma` field of `rr`. Under `pe.rsd = true` the field holds the residual variances the lift measured, and under `pe.rsd = false` it holds `nothing`, because the lift added no residual block.
+ 6. Assemble a [`LowOrderPrior`](@ref) over `posterior_X`, with the oriented `X` under `o_X`, the three lifted moments, the factor prior's `w`, `ens`, `kld` and `ow`, the regression result under `rr`, and `f_prior` itself under `fpr`. No `Z` is carried; the composition note of [`FactorPrior`](@ref) says why.
+
 # Arguments
 
   - `pe`: Factor prior estimator.
   - `X`: Asset returns matrix (observations × assets).
   - `F`: Factor returns matrix (observations × factors).
+  - $(arg_dict[:pnl_prior]) The prior this estimator nests is fitted on the factors, whose axis no panel describes, so the panel stops here.
   - $(arg_dict[:dims])
   - $(arg_dict[:strict])
   - `kwargs...`: Additional keyword arguments passed to matrix processing and estimators.
@@ -380,19 +449,29 @@ The factor moments ``\\hat{\\boldsymbol{f}}`` and ``\\mathbf{\\Sigma}_f`` come f
   - [`factor_lift`](@ref)
   - [`prior`](@ref)
 """
-function prior(pe::FactorPrior, X::MatNum, F::MatNum; dims::Int = 1, strict::Bool = false,
-               kwargs...)
+function prior(pe::FactorPrior, X::MatNum, F::MatNum, pnl::Option{<:AssetPanel} = nothing;
+               dims::Int = 1, strict::Bool = false, kwargs...)
     X, F = dims_oriented(dims, X, F)
+    # The regression is a per-asset fit, so it takes the Coverage Universe before it runs
+    # rather than a frame after it: a stepwise search over a gapped column has no answer, and
+    # `chol` is the factorisation of the block, not of the frame. Every block the result
+    # carries is expanded at the end, the regression result included, because a Prior Result
+    # has no mask field and every block it carries lives on the full asset universe.
+    cmsk, Xc = coverage_reduction(X, pnl; dims = 1)
     # `strict` reaches the wrapped prior: `pe.pe` admits `BlackLittermanPrior` and
     # `EntropyPoolingPrior`, both of which resolve view names against a universe and honour it.
     f_prior = prior(pe.pe, F; strict = strict)
-    rr, posterior_X = factor_reconstruction(pe.re, X, F)
-    (; mu, sigma, chol) = factor_lift(pe.mp, pe.ve, pe.rsd, rr, f_prior.mu, f_prior.sigma,
-                                      X, posterior_X; kwargs...)
-    # No `Z` is forwarded: `f_prior` is fit on the factors, so its feature matrix would be
-    # factors × features and would not describe the asset axis. To attach features here, wrap
-    # this estimator — `FeaturePrior(; pe = FactorPrior(…), ze = RegressionFeatures())` reads
-    # the loadings back off the result.
+    rr, posterior_X = factor_reconstruction(pe.re, Xc, F)
+    (; mu, sigma, chol, esigma) = factor_lift(pe.mp, pe.ve, pe.rsd, rr, f_prior.mu,
+                                              f_prior.sigma, Xc, posterior_X; kwargs...)
+    # The lift already measured the residual variances, so the block carries them instead of
+    # making every consumer recompute them from the reconstruction error. Under `rsd = false`
+    # the lift added no residual block and `esigma` is `nothing`, which is what the field then
+    # holds.
+    rr = set_idiosyncratic_covariance(rr, esigma)
+    # No panel travels on a prior result at all: a Feature Matrix is derived from the Asset
+    # Panel on the data carrier, or built by a producer on the distance that reads the
+    # loadings back off this result.
     #
     # The factor block *is* the prior that was fit on the factors: it needs no reconstruction,
     # because nothing here modifies the factor distribution — the asset moments are its
@@ -403,9 +482,11 @@ function prior(pe::FactorPrior, X::MatNum, F::MatNum; dims::Int = 1, strict::Boo
     # existence and it is over the right observation axis. Its `ens`/`kld`/`ow` travel with it
     # — a weighting with no provenance cannot be interrogated (ADR 0046), and `ens` is what
     # sizes every uncertainty set built on this result.
-    return LowOrderPrior(; X = posterior_X, o_X = X, mu = mu, sigma = sigma, chol = chol,
-                         w = f_prior.w, ens = f_prior.ens, kld = f_prior.kld,
-                         ow = f_prior.ow, rr = rr, fpr = f_prior)
+    return LowOrderPrior(; X = expand_columns(posterior_X, cmsk), o_X = X,
+                         mu = expand_vector(mu, cmsk), sigma = expand_moment(sigma, cmsk),
+                         chol = expand_columns(chol, cmsk), w = f_prior.w,
+                         ens = f_prior.ens, kld = f_prior.kld, ow = f_prior.ow,
+                         rr = expand_regression(rr, cmsk), fpr = f_prior)
 end
 
 export FactorPrior

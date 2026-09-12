@@ -127,3 +127,19 @@ Refresh Artifact, per [ADR 0075](0075-a-run-that-trips-publishes-the-refresh-art
   filter and is not exposed.
 - The `code_health/` scripts are formatted by `FormatCheck.yml` and by the pre-commit hook, like
   every other `.jl` file in the repository.
+
+## Amendment (2026-09-11)
+
+The pin is **Julia 1.13.0**. The test, docs and format workflows float on `"1"` and reached 1.13.0
+on 2026-09-10, and the gate followed: `code_health/Manifest.toml` was re-resolved under 1.13.0, so
+its `julia_version` now reads `1.13.0`, and every baseline's `[provenance]` records the same. JET
+stays at 0.12.1, which supports Julia 1.12 and 1.13, and CodeComplexity and JuliaSyntax stay at
+their recorded versions, so the analysers under the numbers did not move.
+
+The four generated baselines were refreshed under 1.13.0 in the commit that moved the Manifest, as
+this ADR requires. The coverage baseline's provenance line was moved by hand: its `julia` field
+names the process that runs `coverage.jl`, not the process that produced the `lcov.info`, and no
+number in it is measured locally.
+
+`ReusableTest.yml`'s coverage job and `Sweep.yml` read the pin the same way the two gate workflows
+do, so the move reaches all five workflows through the one Manifest line, and no YAML changed.

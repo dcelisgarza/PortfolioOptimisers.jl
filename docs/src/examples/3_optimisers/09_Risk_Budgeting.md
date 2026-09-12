@@ -1,5 +1,4 @@
 The source files can be found in [examples/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../../examples/3_optimisers/09_Risk_Budgeting.jl"
 ```
@@ -174,7 +173,7 @@ factor prior so we should use use a [`EmpiricalPrior`](@ref).
 
 ````@example 09_Risk_Budgeting
 F = TimeArray(CSV.File(joinpath(@__DIR__, "..", "Factors.csv.gz")); timestamp = :Date)[(end - 252):end]
-rdf = prices_to_returns(X, F)
+rdf = prices_to_returns(price_ingestion(PriceIngestion(), X; F = F))
 prf = prior(EmpiricalPrior(), rdf)
 optf = JuMPOptimiser(; pe = prf, slv = slv)
 Nf = length(rdf.nf)
@@ -212,11 +211,11 @@ plot_factor_risk_contribution(rfk, res_frb, rdf)
 
 Risk budgeting targets a *distribution of risk* rather than a return/risk trade-off:
 
-- [`AssetRiskBudgeting`](@ref) spreads risk across assets — equal budgets give the ERC
+  - [`AssetRiskBudgeting`](@ref) spreads risk across assets — equal budgets give the ERC
     portfolio, arbitrary budgets express convictions about where risk should sit.
-- [`RelaxedRiskBudgeting`](@ref) is the cheaper convex alternative; verify the realised
+  - [`RelaxedRiskBudgeting`](@ref) is the cheaper convex alternative; verify the realised
     contributions, as the relaxation need not reproduce exact risk parity.
-- [`FactorRiskBudgeting`](@ref) budgets risk across factors instead of assets, at the cost
+  - [`FactorRiskBudgeting`](@ref) budgets risk across factors instead of assets, at the cost
     of needing the returns data at optimise time.
 
 ---

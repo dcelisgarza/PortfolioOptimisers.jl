@@ -26,6 +26,8 @@ get_linear_constraints(lcs::PR_VecPR, sets::UniverseSets,
                                 rr::Option{<:AbstractRegressionResult} = nothing)
 prefixed_sets_keys
 unclaimed_sets_keys
+assert_factor_partition
+assert_factor_unique_group
 universe_axis
 constraint_row_length
 constraint_row_term
@@ -42,8 +44,16 @@ has_invalid_plus
 port_opt_view(sets::UniverseSets, i, args...)
 port_opt_view(lc::LinearConstraint, ::Any, args...)
 factor_universe
-feature_universe
+factor_axis_key
 _expr_depth_exceeds
+assert_investable_constraint_width
+non_investable_sets
+non_investable_names
+record_non_investable_drop!
+record_group_shed!
+announce_non_investable
+counterpart_axis_names
+shed_departed_members
 ```
 
 ## References

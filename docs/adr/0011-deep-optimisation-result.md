@@ -230,3 +230,22 @@ the existing `pa` fall-through and no JuMP result type needed a `sca` field.
 - Three abstract branches now exist where a caller might have written
   `res isa RiskJuMPOptimisationResult` to mean "any JuMP result". That predicate must become
   `res isa RJR_NRJR`.
+
+## Amendment (2026-09-11)
+
+The `fb` field of every result was bound to `Option{<:OptE_Opt}`, a fallback estimator or
+precomputed result, while `optimise` hands `factory(res, fb)` the chain it walked: a
+`Vector{Tuple{OptimisationEstimator, OptimisationResult}}` holding the `(estimator, result)`
+pair of every failed attempt. No result admitted the chain, so dispatch fell to the identity
+`factory` in `src/02_Tools.jl` and `res.fb` was `nothing` after any fallback answered
+([#1024](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1024)).
+
+The bound is widened rather than the promise dropped. `FbChain` names the chain, and every
+result's `fb` is bound to `Option{<:OptE_Opt_FbChain}` (`Union{<:OptE_Opt, <:FbChain}`). The
+two generic `factory` methods and the `SubsetResamplingResult` override take the same bound, so
+the fb-last rebuild is unchanged and now reaches the chain. The finite allocation results were
+bound to the continuous alias while their generic `factory` took `Option{<:FOptE_FOpt}`, so a
+finite fallback estimator could never be written either; they are bound to
+`Option{<:FOptE_FOpt_FbChain}` instead. A result's `fb` is therefore `nothing` when the
+estimator it was asked of answered, and the chain when a fallback did; `fb[1][1]` is the
+estimator that was asked first.

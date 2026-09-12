@@ -118,7 +118,14 @@ end
 
 Compute the distance-of-distances matrix from a covariance estimator and data matrix.
 
-This method first computes a base distance matrix using [`Distance`](@ref) with the specified power and algorithm, then applies the provided metric to compute a second-level distance matrix.
+# Algorithm
+
+ 1. Build a base [`Distance`](@ref) carrying `de.power` and `de.alg`, and call [`distance`](@ref) on it with `ce`, `X`, `dims` and `kwargs`, giving the base distance matrix `D`.
+ 2. Apply `de.metric` to `D` with `Distances.pairwise`, forwarding the estimator's own `de.args` and `de.kwargs`, giving the distance-of-distances matrix.
+
+An `alg` of [`CanonicalDistance`](@ref) redirects inside step 1, by the type of `ce`, so the algorithm that produces `D` is chosen before the metric is applied. [`distance`](@ref) carries the redirect table.
+
+`Distances.pairwise` treats a **column** of `D` as one observation. The call passes `dims = 2` itself, before the splat of `de.kwargs`, so a `dims` in `de.kwargs` overrides it. Which axis is read does not change the answer here, because a base distance matrix is symmetric. It matters only when `de.args` supplies a second matrix of a different shape.
 
 # Arguments
 
@@ -126,7 +133,7 @@ This method first computes a base distance matrix using [`Distance`](@ref) with 
   - `ce`: Covariance estimator.
   - `X`: Data matrix (observations × assets).
   - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the base distance computation.
+  - `kwargs...`: Additional keyword arguments passed to the base distance computation of step 1. They never reach `Distances.pairwise`, which is served by the `kwargs` **field** of `de`.
 
 # Returns
 
@@ -141,21 +148,28 @@ This method first computes a base distance matrix using [`Distance`](@ref) with 
 function distance(de::DistanceDistance, ce::StatsBase.CovarianceEstimator, X::MatNum;
                   dims::Int = 1, kwargs...)
     D = distance(Distance(; power = de.power, alg = de.alg), ce, X; dims = dims, kwargs...)
-    return Distances.pairwise(de.metric, D, de.args...; de.kwargs...)
+    return Distances.pairwise(de.metric, D, de.args...; dims = 2, de.kwargs...)
 end
 """
     distance(de::DistanceDistance, rho::MatNum, args...; kwargs...)
 
 Compute the distance-of-distances matrix from a correlation or covariance matrix.
 
-This method first computes a base distance matrix using [`Distance`](@ref) with the specified power and algorithm, then applies the provided metric to compute a second-level distance matrix.
+# Algorithm
+
+ 1. Build a base [`Distance`](@ref) carrying `de.power` and `de.alg`, and call [`distance`](@ref) on it with `rho`, `args` and `kwargs`, giving the base distance matrix `D`.
+ 2. Apply `de.metric` to `D` with `Distances.pairwise`, forwarding the estimator's own `de.args` and `de.kwargs`, giving the distance-of-distances matrix.
+
+An `alg` of [`CanonicalDistance`](@ref) takes one step before step 1, and rebuilds itself with [`SimpleDistance`](@ref). There is no covariance estimator on this route, so the redirect table cannot select a row and its fallback is taken.
+
+`Distances.pairwise` reads the columns of `D`, as it does on the covariance-estimator route above. The call passes `dims = 2` itself, and a `dims` in `de.kwargs` overrides it.
 
 # Arguments
 
   - `de`: Distance-of-distances estimator.
   - `rho`: Correlation or covariance matrix.
-  - `args...`: Additional arguments (ignored).
-  - `kwargs...`: Additional keyword arguments passed to the base distance computation.
+  - `args...`: Additional arguments. They are forwarded to the base distance of step 1, which ignores them. They are **not** the `args` field of `de`, which is what reaches `Distances.pairwise`.
+  - `kwargs...`: Additional keyword arguments passed to the base distance computation of step 1. They never reach `Distances.pairwise`, which is served by the `kwargs` **field** of `de`.
 
 # Returns
 
@@ -169,7 +183,7 @@ This method first computes a base distance matrix using [`Distance`](@ref) with 
 """
 function distance(de::DistanceDistance, rho::MatNum, args...; kwargs...)
     D = distance(Distance(; power = de.power, alg = de.alg), rho, args...; kwargs...)
-    return Distances.pairwise(de.metric, D, de.args...; de.kwargs...)
+    return Distances.pairwise(de.metric, D, de.args...; dims = 2, de.kwargs...)
 end
 """
     cor_and_dist(de::DistanceDistance, ce::StatsBase.CovarianceEstimator, X::MatNum;
@@ -177,7 +191,13 @@ end
 
 Compute both the correlation matrix and the distance-of-distances matrix from a covariance estimator and data matrix.
 
-This method first computes the correlation and base distance matrices using [`Distance`](@ref), then applies the provided metric to the base distance matrix.
+# Algorithm
+
+ 1. Build a base [`Distance`](@ref) carrying `de.power` and `de.alg`, and call [`cor_and_dist`](@ref) on it with `ce`, `X`, `dims` and `kwargs`, giving the correlation matrix `rho` and the base distance matrix `D` from one pass. This is the pass that the [`distance`](@ref) sibling cannot share.
+ 2. Apply `de.metric` to `D` with `Distances.pairwise`, forwarding the estimator's own `de.args` and `de.kwargs`, giving the distance-of-distances matrix.
+ 3. Return `rho` unchanged beside that matrix. The metric is applied to the distance matrix alone, so the correlation this method returns is the base estimator's own.
+
+The second element is the matrix that [`distance`](@ref) returns for the same `de`, `ce` and `X`, so a caller that needs both quantities pays for one correlation rather than two.
 
 # Arguments
 
@@ -185,7 +205,7 @@ This method first computes the correlation and base distance matrices using [`Di
   - `ce`: Covariance estimator.
   - `X`: Data matrix (observations × assets).
   - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the base distance computation.
+  - `kwargs...`: Additional keyword arguments passed to the base distance computation of step 1. They never reach `Distances.pairwise`, which is served by the `kwargs` **field** of `de`.
 
 # Returns
 
@@ -201,7 +221,7 @@ function cor_and_dist(de::DistanceDistance, ce::StatsBase.CovarianceEstimator, X
                       dims::Int = 1, kwargs...)
     rho, D = cor_and_dist(Distance(; power = de.power, alg = de.alg), ce, X; dims = dims,
                           kwargs...)
-    return rho, Distances.pairwise(de.metric, D, de.args...; de.kwargs...)
+    return rho, Distances.pairwise(de.metric, D, de.args...; dims = 2, de.kwargs...)
 end
 
 export DistanceDistance

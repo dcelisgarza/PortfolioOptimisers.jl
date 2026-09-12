@@ -1,5 +1,4 @@
 The source files can be found in [examples/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../../examples/7_putting_it_together/02_Profile_Desk_Monthly.jl"
 ```
@@ -13,13 +12,13 @@ afford real compute and real analysis, and turnover matters far less. The edge h
 
 The reasoning, following the [strategy decision framework](../../user_guide/07_Choosing_a_Strategy.md):
 
-- **Compute is abundant, decisions are rare** — a monthly cadence justifies a richer prior and a
+  - **Compute is abundant, decisions are rare** — a monthly cadence justifies a richer prior and a
     full frontier sweep.
-- **The desk has a view** — it encodes a house thesis with an [`EntropyPoolingPrior`](@ref)
+  - **The desk has a view** — it encodes a house thesis with an [`EntropyPoolingPrior`](@ref)
     rather than taking the sample moments at face value.
-- **Explore, then choose** — instead of one objective, it traces the efficient frontier and
+  - **Explore, then choose** — instead of one objective, it traces the efficient frontier and
     selects the risk-adjusted (tangency) book.
-- **Budget is substantial** — an exact [`DiscreteAllocation`](@ref) is affordable.
+  - **Budget is substantial** — an exact [`DiscreteAllocation`](@ref) is affordable.
 
 !!! tip "When to reach for this"
     This is the template for a research-driven, lower-frequency book: invest the compute in a

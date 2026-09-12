@@ -1,5 +1,4 @@
 The source files can be found in [examples/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../../examples/2_moments_priors/04_Factor_Priors.jl"
 ```
@@ -65,7 +64,7 @@ F = TimeArray(CSV.File(joinpath(@__DIR__, "..", "Factors.csv.gz")); timestamp = 
 pretty_table(F[(end - 5):end]; formatters = [tsfmt])
 
 # Compute the returns
-rd = prices_to_returns(X, F)
+rd = prices_to_returns(price_ingestion(PriceIngestion(), X; F = F))
 ````
 
 ## 2. Prior statistics

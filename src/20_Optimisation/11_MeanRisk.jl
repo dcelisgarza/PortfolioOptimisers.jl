@@ -12,7 +12,7 @@ Property access delegates to the embedded [`JuMPOptimisationResult`](@ref): the 
 # Constructors
 
     MeanRiskResult(;
-        jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM, fb::Option{<:OptE_Opt}
+        jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM, fb::Option{<:OptE_Opt_FbChain}
     ) -> MeanRiskResult
 
 Keywords correspond to the struct's fields.
@@ -33,17 +33,42 @@ Keywords correspond to the struct's fields.
     """
     r
     """
-    $(field_dict[:fb])
+    $(field_dict[:fb_res])
     """
     fb
     function MeanRiskResult(jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM,
-                            fb::Option{<:OptE_Opt})
+                            fb::Option{<:OptE_Opt_FbChain})
         return new{typeof(jr), typeof(r), typeof(fb)}(jr, r, fb)
     end
 end
 function MeanRiskResult(; jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM,
-                        fb::Option{<:OptE_Opt})::MeanRiskResult
+                        fb::Option{<:OptE_Opt_FbChain})::MeanRiskResult
     return MeanRiskResult(jr, r, fb)
+end
+"""
+    set_retcode(res::MeanRiskResult, retcode::OptRetCode_VecOptRetCode)
+
+Rebuild a [`MeanRiskResult`](@ref) with a different return code.
+
+`retcode` is not a field of this result and resolves through the [`JuMPOptimisationResult`](@ref) it embeds, so the rebuild rebuilds `jr` and carries every other member over unchanged.
+
+# Arguments
+
+  - `res`: Result to rebuild.
+  - `retcode`: Return code, or one per member of the population.
+
+# Returns
+
+  - [`MeanRiskResult`](@ref): The result, with the new return code.
+
+# Related
+
+  - [`set_retcode`](@ref)
+  - [`mark_ruined_members`](@ref)
+  - [`MeanRiskResult`](@ref)
+"""
+function set_retcode(res::MeanRiskResult, retcode::OptRetCode_VecOptRetCode)
+    return MeanRiskResult(set_retcode(res.jr, retcode), res.r, res.fb)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -118,25 +143,27 @@ julia> MeanRisk(; opt = JuMPOptimiser(; slv = Solver(; solver = nothing)))
 MeanRisk
   opt ┼ JuMPOptimiser
       │        pe ┼ EmpiricalPrior
-      │           │        ce ┼ PortfolioOptimisersCovariance
-      │           │           │   ce ┼ Covariance
-      │           │           │      │    me ┼ SimpleExpectedReturns
-      │           │           │      │       │   w ┴ nothing
-      │           │           │      │    ce ┼ GeneralCovariance
-      │           │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │           │           │      │       │    w ┴ nothing
-      │           │           │      │   alg ┴ FullMoment()
-      │           │           │   mp ┼ MatrixProcessing
-      │           │           │      │     pdm ┼ Posdef
-      │           │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │           │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │           │           │      │      dn ┼ nothing
-      │           │           │      │      dt ┼ nothing
-      │           │           │      │     alg ┼ nothing
-      │           │           │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-      │           │        me ┼ SimpleExpectedReturns
-      │           │           │   w ┴ nothing
-      │           │   horizon ┴ nothing
+      │           │           ce ┼ PortfolioOptimisersCovariance
+      │           │              │   ce ┼ Covariance
+      │           │              │      │    me ┼ SimpleExpectedReturns
+      │           │              │      │       │   w ┴ nothing
+      │           │              │      │    ce ┼ GeneralCovariance
+      │           │              │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │           │              │      │       │    w ┴ nothing
+      │           │              │      │   alg ┼ FullMoment()
+      │           │              │      │     w ┴ nothing
+      │           │              │   mp ┼ MatrixProcessing
+      │           │              │      │     pdm ┼ Posdef
+      │           │              │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │           │              │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │           │              │      │      dn ┼ nothing
+      │           │              │      │      dt ┼ nothing
+      │           │              │      │     alg ┼ nothing
+      │           │              │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+      │           │           me ┼ SimpleExpectedReturns
+      │           │              │   w ┴ nothing
+      │           │      horizon ┼ nothing
+      │           │   fill_limit ┴ nothing
       │       slv ┼ Solver
       │           │          name ┼ String: ""
       │           │        solver ┼ nothing
@@ -189,11 +216,10 @@ MeanRisk
       │     linfc ┼ nothing
       │        l1 ┼ nothing
       │        l2 ┼ nothing
-      │      linf ┼ nothing
       │        lp ┼ nothing
+      │      linf ┼ nothing
       │       brt ┼ Bool: false
       │     x_src ┼ Symbol: :prior
-      │     z_src ┼ Symbol: :data
       │    strict ┴ Bool: false
     r ┼ Variance
       │   settings ┼ RiskMeasureSettings
@@ -733,9 +759,15 @@ function _optimise(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int 
                    str_names::Bool = false, save::Bool = true, kwargs...)
     mr = reset_time_dependent_estimator(mr)
     attrs = processed_jump_optimiser_attributes(mr.opt, rd; dims = dims, kwargs...)
+    # The bundle reduced what it carries. The head carries the rest — an initial weight
+    # vector, a risk measure holding per-asset data, tracking, a custom term — and hands
+    # them to `assemble_jump_model!` itself, so it takes the same view of itself and of
+    # `rd`. Both are unchanged when every asset is investable.
+    mr, rd = investable_view(mr, rd, attrs.pr, attrs.imsk)
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, mr.opt.sc, mr.opt.so)
+    set_model_observations!(model, size(attrs.pr.X, 1))
     set_maximum_ratio_factor_variables!(model, mr.obj)
     set_w!(model, attrs.pr.X, mr.wi)
     set_weight_constraints!(model, attrs.wb, mr.opt)
@@ -752,7 +784,7 @@ function _optimise(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int 
 end
 """
     optimise(mr::MeanRisk{<:Any, <:Any, <:Any, <:Any, Nothing},
-             rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
+             rd::ReturnsResult; dims::Int = 1,
              str_names::Bool = false, save::Bool = true, kwargs...) -> MeanRiskResult
 
 Run the Mean-Risk portfolio optimisation.
@@ -766,14 +798,18 @@ Run the Mean-Risk portfolio optimisation.
   - `save`: Whether to save the JuMP model in the optimisation result.
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
 
+# Validation
+
+  - No field in the tree of `mr` holds an [`Online`](@ref). An `ArgumentError` naming the field is thrown otherwise, through [`assert_batch_entry`](@ref): a plain `optimise` is a batch fit, and a wrapper resolves only at the warm-up of the fold loop's online arm.
+
 # Related
 
   - [`MeanRisk`](@ref)
   - [`MeanRiskResult`](@ref)
 """
-function optimise(mr::MeanRisk{<:Any, <:Any, <:Any, <:Any, Nothing},
-                  rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
-                  str_names::Bool = false, save::Bool = true, kwargs...)
+function optimise(mr::MeanRisk{<:Any, <:Any, <:Any, <:Any, Nothing}, rd::ReturnsResult;
+                  dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
+    assert_batch_entry(mr, "`optimise`")
     return _optimise(mr, rd; dims = dims, str_names = str_names, save = save, kwargs...)
 end
 

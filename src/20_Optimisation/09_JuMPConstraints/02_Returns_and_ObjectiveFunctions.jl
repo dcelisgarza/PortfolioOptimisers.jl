@@ -193,7 +193,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - If `ucs` is an `EllipsoidalUncertaintySet`: must be parameterised by `MuEllipsoidalUncertaintySet`.
+  - If `ucs` is an `EllipsoidalUncertaintySet` or a `NormBallUncertaintySet`: must be parameterised by `MuUncertaintySetClass`.
   - If `mu` is a number: `isfinite(mu)`.
   - If `mu` is a vector: `!isempty(mu)` and `all(isfinite, mu)`.
 
@@ -230,9 +230,13 @@ Keywords correspond to the struct's fields.
                               mu::Option{<:ArithRetMu})
         if isa(ucs, EllipsoidalUncertaintySet)
             @argcheck(isa(ucs,
-                          EllipsoidalUncertaintySet{<:Any, <:Any,
-                                                    <:MuEllipsoidalUncertaintySet}),
-                      ArgumentError("ucs must be parameterised by MuEllipsoidalUncertaintySet, got $(typeof(ucs))"))
+                          EllipsoidalUncertaintySet{<:Any, <:Any, <:MuUncertaintySetClass}),
+                      ArgumentError("ucs must be parameterised by MuUncertaintySetClass, got $(typeof(ucs))"))
+        elseif isa(ucs, NormBallUncertaintySet)
+            @argcheck(isa(ucs,
+                          NormBallUncertaintySet{<:Any, <:Any, <:Any,
+                                                 <:MuUncertaintySetClass}),
+                      ArgumentError("ucs must be parameterised by MuUncertaintySetClass, got $(typeof(ucs))"))
         end
         if isa(mu, VecNum)
             @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
@@ -263,12 +267,12 @@ Every `JuMP` path reaches this through [`factory`](@ref), which [`processed_jump
   - [`resolve_deferred_quantities`](@ref)
   - [`resolve_slot`](@ref)
 """
-function resolve_deferred_quantities(rt::ArithmeticReturn, pr::AbstractPriorResult)
+function resolve_deferred_quantities(rt::ArithmeticReturn, pr::AbstractPriorResult,
+                                     ::Any = nothing)
     if !isa(rt.mu, DeferredQuantity)
         return rt
     end
-    return ArithmeticReturn(; settings = rt.settings, ucs = rt.ucs,
-                            mu = resolve_slot(rt.mu, :mu, pr))
+    return rebuild_with_slots(rt, (; mu = resolve_slot(rt.mu, :mu, pr)))
 end
 # Deferrable slots — see `deferred_slots`. `ucs` holds an Estimator by design, not a Deferred
 # Quantity, so it is not declared here. The declaration is what carries this slot into the
@@ -776,6 +780,29 @@ The return form fails whenever the portfolio's expected return cannot exceed ``r
 risk form takes over there, and wherever a term raises a cone the return form cannot carry.
 [`set_max_ratio_return_constraints!`](@ref) states the exact test.
 
+## The scale floor
+
+Homogenisation carries a degenerate ray. Every constraint the model writes in ``\\boldsymbol{y}``
+is homogeneous — ``\\mathbf{A}\\boldsymbol{y} - k \\boldsymbol{b} \\leq \\boldsymbol{0}``, the
+budget, the weight bounds — so all of them hold at ``\\boldsymbol{y} = \\boldsymbol{0}``,
+``k = 0``, and only the normalisation keeps the solver off that point. The return form's
+normalisation is an equality on a non-zero right-hand side, so it excludes the ray outright.
+The risk form's is an inequality, and it does not: when no feasible portfolio's return
+expression can beat ``r_f`` — which a mean uncertainty set of a large enough radius
+guarantees — the objective ``\\mathrm{ret} - r_f k`` is non-positive along every ray, its
+supremum is zero at the origin, and the solver answers with ``k`` at the size of its own
+feasibility tolerance. Each constraint then holds to about that tolerance rather than on its
+own terms, and the recovered ``\\boldsymbol{w} = \\boldsymbol{y} / k`` can break the bound the
+caller wrote while the result still reports success.
+
+``k \\geq k_{\\min}`` closes the ray, and [`set_maximum_ratio_scale_floor!`](@ref) writes it
+on the risk form — the branch that needs it. The floor binds **only** on a model that has no
+tangency portfolio to find, because a feasible ray with a positive ratio is scaled by the
+normalisation alone; so a `k` that comes back at the floor is the signal that the objective
+never rose above zero, and the weights beside it maximise the return expression at that
+scale rather than the ratio. `kmin` is caller-visible for that reason, and a `kmin` the
+caller names is written on either branch.
+
 The ratio is taken at the **aggregate** level: its numerator is the model's single `ret`
 expression, whatever number of terms built it. `rf` is therefore a single rate on that
 aggregate, and a term that is not in return units belongs out of the numerator through
@@ -787,13 +814,15 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    MaximumRatio(; rf::Number = 0.0, ohf::Option{<:Number} = nothing) -> MaximumRatio
+    MaximumRatio(; rf::Number = 0.0, ohf::Option{<:Number} = nothing,
+                 kmin::Option{<:Number} = nothing) -> MaximumRatio
 
 Keywords correspond to the struct's fields.
 
 ## Validation
 
   - If `ohf` is provided: `ohf > 0`.
+  - If `kmin` is provided: `kmin > 0`.
 
 # Related
 
@@ -803,6 +832,7 @@ Keywords correspond to the struct's fields.
   - [`ObjectiveFunction`](@ref)
   - [`set_max_ratio_return_constraints!`](@ref)
   - [`set_maximum_ratio_normalisation!`](@ref)
+  - [`set_maximum_ratio_scale_floor!`](@ref)
 
 # References
 
@@ -820,15 +850,23 @@ Keywords correspond to the struct's fields.
     $(field_dict[:ohf])
     """
     ohf
-    function MaximumRatio(rf::Number, ohf::Option{<:Number})
+    """
+    $(field_dict[:kmin])
+    """
+    kmin
+    function MaximumRatio(rf::Number, ohf::Option{<:Number}, kmin::Option{<:Number})
         if !isnothing(ohf)
             @argcheck(ohf > zero(ohf), DomainError(ohf, "ohf must be > 0"))
         end
-        return new{typeof(rf), typeof(ohf)}(rf, ohf)
+        if !isnothing(kmin)
+            @argcheck(kmin > zero(kmin), DomainError(kmin, "kmin must be > 0"))
+        end
+        return new{typeof(rf), typeof(ohf), typeof(kmin)}(rf, ohf, kmin)
     end
 end
-function MaximumRatio(; rf::Number = 0.0, ohf::Option{<:Number} = nothing)
-    return MaximumRatio(rf, ohf)
+function MaximumRatio(; rf::Number = 0.0, ohf::Option{<:Number} = nothing,
+                      kmin::Option{<:Number} = nothing)
+    return MaximumRatio(rf, ohf, kmin)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1125,6 +1163,7 @@ carried centre. The change is numerical, not semantic — any `ohf > 0` recovers
 
   - [`set_maximum_ratio_factor_variables!`](@ref)
   - [`set_max_ratio_return_constraints!`](@ref)
+  - [`set_maximum_ratio_scale_floor!`](@ref)
 """
 function set_maximum_ratio_normalisation!(model::JuMP.Model, obj::MaximumRatio,
                                           mu::Option{<:Num_VecNum}, pr::AbstractPriorResult)
@@ -1136,6 +1175,88 @@ function set_maximum_ratio_normalisation!(model::JuMP.Model, obj::MaximumRatio,
         obj.ohf
     end
     JuMP.@expression(model, ohf, ohf)
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Close the ratio problem's degenerate ray by tightening `k`'s own lower bound to ``k_{\\min}``.
+
+Every constraint the homogenised model writes is homogeneous in ``(\\boldsymbol{y}, k)``, so
+each of them holds at the origin. [`MaximumRatio`](@ref) states what that costs. This closes
+that ray.
+
+The floor is written as a **variable bound** — [`set_maximum_ratio_factor_variables!`](@ref)
+already declares `k >= 0`, and this tightens that same bound rather than adding a row. A row
+would carry a dual and change the interior point the solver lands on even where it cannot
+bind, and a `MaximumRatio` answer feeds allocators and stacked optimisers that are pinned far
+tighter than that perturbation.
+
+**Only the risk form gets the derived floor**, for the same reason. The return form's
+normalisation is an equality on a non-zero right-hand side, so under finite weight bounds it
+excludes the ray already and a floor there is inert by construction — and inert is not free.
+A `kmin` the caller names is written on either branch, because a caller who asks for a floor
+is asking for this bound.
+
+Sized from the resolved aggregate characteristic when `obj.kmin` is `nothing`:
+
+```math
+k_{\\min} = \\frac{10^{-4}\\,\\mathrm{ohf}}{\\max\\left(\\mathrm{ohf},\\, \\max_i \\mu_i - r_f\\right)}\\,.
+```
+
+``\\mathrm{ohf} / (\\max_i \\mu_i - r_f)`` is the return form's own floor: no long-only fully
+invested portfolio earns more than its best asset, so no such model can pin `k` below it. The
+risk form's scale is ``\\mathrm{ohf}^{1/d} / R(\\boldsymbol{w})`` for a risk measure
+homogeneous of degree ``d``, which that expression does not bound — measured over the risk
+measures the library ships, it lands between one eighth and seventeen times it.
+
+The ``10^{-4}`` is the margin, and three measurements fix it. It has to sit **below** the
+smallest scale a well-posed model pins, which is `MaximumDrawdown`'s; **above** the
+feasibility tolerance the collapsed ray answers on, or the recovered
+``\\boldsymbol{w} = \\boldsymbol{y} / k`` still carries a useless residual; and below the
+point where a slack bound spoils the conditioning of the widest model that reaches here —
+`ExactOrderedWeightsArray` under a [`LogarithmicReturn`](@ref) stops converging at
+``10^{-3}`` though its own scale is three orders above the bound. ``10^{-4}`` is the value
+that clears all three. It buys the middle one the least: the recovered weights meet a bound
+to about ``10^{-5}`` rather than to ``10^{-7}``, against the breach of the bound outright
+that the collapsed ray returned.
+
+The denominator's ``\\max`` keeps a universe whose characteristic is smaller than `ohf` from
+lifting the floor above ``10^{-4}``.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `obj::MaximumRatio`: The ratio objective, whose `kmin` overrides the size above.
+  - `mu`: The resolved aggregate characteristic, or `nothing`.
+  - `pr`: Prior result, the fallback when `mu` is `nothing`.
+  - `risk_form::Bool`: Whether the caller registered `sr_risk`. `false` is the return form,
+    which takes a floor only when the caller named one.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`MaximumRatio`](@ref)
+  - [`set_maximum_ratio_normalisation!`](@ref)
+  - [`set_max_ratio_return_constraints!`](@ref)
+"""
+function set_maximum_ratio_scale_floor!(model::JuMP.Model, obj::MaximumRatio,
+                                        mu::Option{<:Num_VecNum}, pr::AbstractPriorResult,
+                                        risk_form::Bool)
+    if !risk_form && isnothing(obj.kmin)
+        return nothing
+    end
+    ohf = shared_get(model, :ohf)
+    kmin = if isnothing(obj.kmin)
+        mu = isnothing(mu) ? pr.mu : mu
+        1e-4 * ohf / max(ohf, maximum(mu) - obj.rf)
+    else
+        obj.kmin
+    end
+    JuMP.set_lower_bound(get_k(model), kmin)
     return nothing
 end
 """
@@ -1313,6 +1434,7 @@ feasible point at `rf = 0`.
 
   - [`MaximumRatio`](@ref)
   - [`set_maximum_ratio_normalisation!`](@ref)
+  - [`set_maximum_ratio_scale_floor!`](@ref)
 """
 function set_max_ratio_return_constraints!(::JuMP.Model, ::ObjectiveFunction, args...)
     return nothing
@@ -1329,12 +1451,14 @@ function set_max_ratio_return_constraints!(model::JuMP.Model, obj::MaximumRatio,
     ohf = shared_get(model, :ohf)
     ret = get_ret(model)
     rf = obj.rf
-    if any(robust) || isnothing(mu) || all(x -> x <= rf, mu)
+    risk_form = any(robust) || isnothing(mu) || all(x -> x <= rf, mu)
+    if risk_form
         risk = get_risk(model)
         JuMP.@constraint(model, sr_risk, sc * (risk - ohf) <= 0)
     else
         JuMP.@constraint(model, sr_ret, sc * (ret - rf * k - ohf) == 0)
     end
+    set_maximum_ratio_scale_floor!(model, obj, mu, pr, risk_form)
     return nothing
 end
 """
@@ -1370,6 +1494,12 @@ Subtract the fees expression from one term's return expression.
 
 Does nothing when the term's `settings.fee` is `false`, or when no fees are registered.
 
+The model carries two fee expressions. `:fees` holds the per period terms `l`, `s` and `tn`, and it
+enters the return unchanged. `:one_time_fees` holds the two fixed terms, which are charged one time
+for the whole holding period, so it enters divided by `:T`, the observation count of the fit.
+An expected return is a per period number, so the one-off cost is always spread here, whatever
+clock the fee's `horizon` names for a realised series.
+
 The charge stays **inside** each builder, so with *k* terms the multiplier on the fee is
 ``\\sum_{i:\\,\\mathrm{fee}} s_i``. That multiplier is deliberately unconstrained: a blend of
 two terms at `scale = 0.5` charges the fee once, and two terms at `scale = 1` charge it
@@ -1391,10 +1521,17 @@ twice.
   - [`set_return_constraints!`](@ref)
 """
 function add_fees_to_ret!(model::JuMP.Model, ret, fee::Bool)
-    if !fee || !shared_has(model, :fees)
+    if !fee
         return nothing
     end
-    JuMP.add_to_expression!(ret, -shared_get(model, :fees))
+    if shared_has(model, :fees)
+        JuMP.add_to_expression!(ret, -shared_get(model, :fees))
+    end
+    # An expected return is a per period number, so a fee charged one time for the whole
+    # holding period enters it divided by the observation count of the fit.
+    if shared_has(model, :one_time_fees)
+        JuMP.add_to_expression!(ret, -shared_get(model, :one_time_fees) / get_T(model))
+    end
     return nothing
 end
 """
@@ -1488,7 +1625,11 @@ function set_return_constraints!(model::JuMP.Model, pret::VecJRE, obj::Objective
                                  pr::AbstractPriorResult; kwargs...)
     @argcheck(!isempty(pret), IsEmptyError("`ret` cannot be an empty vector"))
     assert_no_return_objective_compatibility(pret, obj)
-    mus = Vector{Any}(undef, length(pret))
+    # A term's resolved characteristic is what its own builder returns, and the three shapes
+    # are the whole domain: a per-asset vector, the scalar `dot_scalar` folds against `w`,
+    # and `nothing` from a term that holds no characteristic at all — a `LogarithmicReturn`
+    # or a `NoReturn`. `aggregate_return_characteristic` reads all three.
+    mus = Vector{Option{Num_VecNum}}(undef, length(pret))
     robust = Vector{Bool}(undef, length(pret))
     for (i, pret_i) in enumerate(pret)
         mus[i], robust[i] = set_return_constraints!(model, i, pret_i, pr; kwargs...)
@@ -1732,6 +1873,82 @@ function set_ucs_return_constraints!(model::JuMP.Model, i, ucs::SignedL1Uncertai
     add_market_impact_cost!(model, ret, settings.mic)
     return ret, mu, false
 end
+"""
+    set_ucs_return_constraints!(model, i, ucs::NormBallUncertaintySet, mu, settings)
+
+Build one term's norm-ball-robust return expression.
+
+Introduces one cone on ``\\mathbf{L}^{\\intercal}\\boldsymbol{w}``, the cone the dual norm
+order names, so the ellipsoid's Cholesky factor is replaced by the set's own map and nothing
+is factorised. A map with no column raises no cone and leaves the nominal return, and the term
+is then not reported as `robust`. The method is defined on the mean tag alone, and the
+[`ArithmeticReturn`](@ref) constructor refuses a set that carries the covariance tag.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\hat{r}(\\boldsymbol{w}) &= \\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - \\kappa \\lVert \\mathbf{L}^{\\intercal}\\boldsymbol{w} \\rVert_{q}\\,, \\quad \\frac{1}{p} + \\frac{1}{q} = 1\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\hat{r}(\\boldsymbol{w})``: Worst-case expected return.
+  - $(math_dict[:mu_er])
+  - $(math_dict[:w_port])
+  - ``\\kappa``: Norm-ball radius.
+  - ``\\mathbf{L}``: Geometry map of the set, ``N \\times r``.
+  - ``p``, ``q``: Norm order of the set and its dual.
+
+# JuMP formulation
+
+## Variables
+
+  - `w`: portfolio weights, read from the model.
+
+## Expressions
+
+  - `x_nbucs_w_i`: ``\\mathbf{L}^{\\intercal}\\boldsymbol{w}``, registered only when ``\\mathbf{L}`` has a column.
+  - `ret_i`: ``\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - \\kappa t``, with ``t`` the epigraph [`norm_ball_dual_norm_epigraph!`](@ref) registers, or ``\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w}`` when ``\\mathbf{L}`` has no column.
+
+Where:
+
+  - $(math_dict[:mu_er])
+  - $(math_dict[:w_port])
+  - ``\\kappa``, ``\\mathbf{L}``: Radius and geometry map of the set.
+  - ``t``: Epigraph of ``\\lVert \\mathbf{L}^{\\intercal}\\boldsymbol{w} \\rVert_{q}``.
+
+# Related
+
+  - [`set_ucs_return_constraints!`](@ref)
+  - [`norm_ball_dual_norm_epigraph!`](@ref)
+  - [`NormBallUncertaintySet`](@ref)
+  - [`EllipsoidalUncertaintySet`](@ref)
+"""
+function set_ucs_return_constraints!(model::JuMP.Model, i,
+                                     ucs::NormBallUncertaintySet{<:Any, <:Any, <:Any,
+                                                                 <:MuUncertaintySetClass},
+                                     mu::Num_VecNum, settings::JuMPReturnsSettings)
+    w = get_w(model)
+    mu = something(ucs.val, mu)
+    L = ucs.L
+    # A map with no column spans nothing, so the worst case is the nominal return and no
+    # cone is needed.
+    robust = size(L, 2) > zero(Int)
+    ret = if robust
+        x_nbucs_w = state_set!(model, Symbol(""), :x_nbucs_w_, i,
+                               JuMP.@expression(model, transpose(L) * w))
+        t_nbucs = norm_ball_dual_norm_epigraph!(model, Symbol(""), i, x_nbucs_w, ucs.p)
+        JuMP.@expression(model, dot_scalar(mu, w) - ucs.kappa * t_nbucs)
+    else
+        JuMP.@expression(model, dot_scalar(mu, w))
+    end
+    ret = state_set!(model, Symbol(""), :ret_, i, ret)
+    add_fees_to_ret!(model, ret, settings.fee)
+    add_market_impact_cost!(model, ret, settings.mic)
+    return ret, mu, robust
+end
 function set_return_constraints!(model::JuMP.Model, i,
                                  pret::ArithmeticReturn{<:Any, <:UcSE_UcS, <:Any},
                                  pr::AbstractPriorResult; rd::ReturnsResult, kwargs...)
@@ -1739,8 +1956,11 @@ function set_return_constraints!(model::JuMP.Model, i,
     # The set is a neighbourhood of the quantity it was calibrated on, so it names the
     # centre. The term's own field and then the prior are the fallbacks (ADR 0050).
     fb = ifelse(isnothing(pret.mu), pr.mu, pret.mu)
-    ret, mu, robust = set_ucs_return_constraints!(model, i, mu_ucs(pret.ucs, rd; kwargs...),
-                                                  fb, settings)
+    # The prior travels beside the returns, because an `AbstractPriorUncertaintySetEstimator`
+    # is fitted from the optimisation's own prior result rather than from returns data. An
+    # estimator that carries its own `pe` drops it (see [`mu_ucs`](@ref)).
+    uc = mu_ucs(pret.ucs, rd, pr; kwargs...)
+    ret, mu, robust = set_ucs_return_constraints!(model, i, uc, fb, settings)
     set_return_bounds!(model, i, ret, settings.lb)
     set_return_expression!(model, i, ret, settings.scale, settings.rte)
     return mu, robust

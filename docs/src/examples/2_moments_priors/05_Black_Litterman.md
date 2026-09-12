@@ -1,5 +1,4 @@
 The source files can be found in [examples/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../../examples/2_moments_priors/05_Black_Litterman.jl"
 ```
@@ -67,7 +66,7 @@ rd = prices_to_returns(X)
 
 Black–Litterman does not start from the sample mean. Its baseline is the
 [`EquilibriumExpectedReturns`](@ref) vector — the returns *implied* by the market via reverse
-optimisation (``\\boldsymbol{\\pi} = \\lambda \\mathbf{\\Sigma} \\boldsymbol{w}_{mkt}``). This
+optimisation (``\boldsymbol{\pi} = \lambda \mathbf{\Sigma} \boldsymbol{w}_{mkt}``). This
 matters because the raw sample mean over a single year is noisy and often negative, whereas the
 equilibrium prior is a smoother, economically-motivated anchor that the views then nudge.
 
@@ -110,9 +109,9 @@ sets = UniverseSets(;
 
 Views are plain strings, and Black–Litterman understands three shapes:
 
-- **Absolute** — `"AAPL == 0.0008"`: Apple returns 8 bps a day.
-- **Relative** — `"MSFT - AMD == 0.0005"`: Microsoft beats AMD by 5 bps.
-- **Group** — `"tech == 0.0006"`: the tech group averages 6 bps.
+  - **Absolute** — `"AAPL == 0.0008"`: Apple returns 8 bps a day.
+  - **Relative** — `"MSFT - AMD == 0.0005"`: Microsoft beats AMD by 5 bps.
+  - **Group** — `"tech == 0.0006"`: the tech group averages 6 bps.
 
 We build one posterior per view type and compare the resulting expected returns against the
 equilibrium prior. A key property to notice: BL views are *soft*. The posterior does not

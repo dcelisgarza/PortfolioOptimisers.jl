@@ -127,11 +127,14 @@ end
 
 @testset "Linear weight constraints" begin
     ivpa = rand(StableRNG(123))
-    rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
-                                     timestamp = :Date)[(end - 252):end];
-                           B = TimeArray(CSV.File(joinpath(@__DIR__,
-                                                           "./assets/SP500_idx.csv.gz"));
-                                         timestamp = :Date), iv = iv, ivpa = ivpa)
+    rd = prices_to_returns(price_ingestion(PriceIngestion(),
+                                           TimeArray(CSV.File(joinpath(@__DIR__,
+                                                                       "./assets/SP500.csv.gz"));
+                                                     timestamp = :Date)[(end - 252):end];
+                                           B = TimeArray(CSV.File(joinpath(@__DIR__,
+                                                                           "./assets/SP500_idx.csv.gz"));
+                                                         timestamp = :Date)[(end - 252):end],
+                                           iv = iv, ivpa = ivpa))
     pr = prior(HighOrderPriorEstimator(), rd)
 
     sets.dict["group4"] = ["AMD", "BAC"]
@@ -379,14 +382,18 @@ end
     mr = MeanRisk(; r = r, obj = MinimumRisk(), opt = opt)
     @test PortfolioOptimisers.needs_previous_weights(mr)
     res = optimise(mr)
+    # Issue #898: `fl` and `fs` are charged one time for the whole holding period, so the
+    # model spreads them over the observation count of the fit rather than charging them on
+    # every observation. They are therefore far cheaper in the objective than they were, and
+    # the weights move. `l`, `s` and `tn` are rates per period and are unmoved.
     @test isapprox(res.w,
-                   [-0.049849956175178456, 0.05299448616838142, -0.22771293882094312,
-                    -0.08176557902583757, 0.033689114572132625, -0.005373211789678957, -0.0,
-                    0.35475349716097293, 0.2908544599359326, 0.05579460357877945,
-                    0.053431396866726384, 0.22107385221763304, 0.04052699357314736,
-                    0.46868406888646474, -0.3137232044821237, -0.24996091041399768,
-                    -0.05636967458501815, 0.1482804333363026, 0.10768140179418678,
-                    0.1569911672021177], rtol = 1e-6)
+                   [-0.14021467114901873, -1.124100812432971e-15, -0.06814223560516632,
+                    -0.09131558361362645, 0.03328882375317216, -0.041400329116944974,
+                    0.2263712054785502, 0.46533328306137817, 0.1613861309416557,
+                    0.15955356843976962, 0.09025250139090284, 0.12287003103552531,
+                    0.05656618512825149, 0.3215859736001421, -0.40475593011275934,
+                    -0.18994480253295423, -0.06422644786952993, 0.11570138780597933,
+                    0.06200775858093685, 0.18508315078373733], rtol = 1e-6)
 
     opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1,
                         wb = WeightBounds(; lb = -1, ub = 1),
@@ -423,11 +430,15 @@ end
     fees = FeesEstimator(; fl = ["JNJ" => 1])
     opt = JuMPOptimiser(; pe = pr, slv = mip_slv, bgt = 1, fees = fees, sets = sets)
     res = optimise(MeanRisk(; r = r, obj = MinimumRisk(), opt = opt))
-    @test isapprox(res.w[findfirst(x -> x == "JNJ", rd.nx)], 0)
+    # Issue #898: a fixed fee of one currency unit used to be charged on every observation,
+    # which priced `JNJ` out. It is charged one time now, spread over the observation count
+    # of the fit, so it no longer does.
+    @test !isapprox(res.w[findfirst(x -> x == "JNJ", rd.nx)], 0)
     @test isapprox(res.w,
-                   [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -0.0, 0.0, 0.0, 0.10628880639076618,
-                    0.37971339847731767, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0996419548234818,
-                    0.21860531676987255, 0.1957505235385615], rtol = 1e-6)
+                   [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.38725498830197425, 0.0, 0.0,
+                    0.055674643687933394, 0.07176313645022615, 0.0, 0.0, 0.0, 0.0, 0.0,
+                    0.09485063813452817, 0.12791171181961808, 0.2625448816057193],
+                   rtol = 1e-6)
 end
 
 @testset "Variance risk contribution" begin

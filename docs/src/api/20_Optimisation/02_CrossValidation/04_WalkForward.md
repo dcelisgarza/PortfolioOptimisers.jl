@@ -4,6 +4,8 @@
 WalkForwardEstimator
 WalkForwardResult
 WFCVER
+PortfolioOptimisers.AbstractFoldFit
+OnlineStep
 DateAdjusterEstimator
 DatesUnionPeriod
 DateAdjType
@@ -19,6 +21,8 @@ n_splits
 n_splits(dwf::DateWalkForward{<:Integer}, rd::ReturnsResult)
 n_splits(dwf::DateWalkForward{<:Any}, rd::ReturnsResult)
 IntPeriodDateRange
+PortfolioOptimisers.resolve_expand_train
+PortfolioOptimisers.assert_fold_fit_expands
 ```
 
 ## References

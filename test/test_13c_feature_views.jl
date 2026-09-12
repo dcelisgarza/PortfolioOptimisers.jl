@@ -10,8 +10,9 @@ over the wrong universe. Asserting that nothing threw would pass on exactly that
 every test below asserts on the *value* of the matrix that reached the kernel.
 
 `RecordingDistance` is the instrument. It wraps a real `FeatureDistance` and records the
-`Z` handed to it through the routed three-argument methods, so a test can compare that
-matrix against the slice it should be, rather than inferring it from a weight vector.
+Feature Matrix the routed three-argument methods derive, so a test can compare that matrix
+against the slice it should be, rather than inferring it from a weight vector. The two
+carriers reach it as `pr` and `rd`, and it derives the matrix the same way the kernel does.
 It is deliberately mutable and passes through `port_opt_view` unchanged (the universal
 estimator fallback), so one recorder accumulates every fold and every cluster of a run.
 =#
@@ -27,13 +28,14 @@ function record!(de::RecordingDistance, Z)
     end
     return nothing
 end
-function PO.distance(de::RecordingDistance, ce, X; Z = nothing, kwargs...)
-    record!(de, Z)
-    return PO.distance(de.de, ce, X; Z = Z, kwargs...)
+function PO.distance(de::RecordingDistance, ce, X; pr = nothing, rd = nothing, kwargs...)
+    record!(de, feature_matrix(de.de, pr, rd, X))
+    return PO.distance(de.de, ce, X; pr = pr, rd = rd, kwargs...)
 end
-function PO.cor_and_dist(de::RecordingDistance, ce, X; Z = nothing, kwargs...)
-    record!(de, Z)
-    return PO.cor_and_dist(de.de, ce, X; Z = Z, kwargs...)
+function PO.cor_and_dist(de::RecordingDistance, ce, X; pr = nothing, rd = nothing,
+                         kwargs...)
+    record!(de, feature_matrix(de.de, pr, rd, X))
+    return PO.cor_and_dist(de.de, ce, X; pr = pr, rd = rd, kwargs...)
 end
 PO.distance(de::RecordingDistance, Z; kwargs...) = PO.distance(de.de, Z; kwargs...)
 function PO.cor_and_dist(de::RecordingDistance, Z; kwargs...)
@@ -44,6 +46,13 @@ end
 # library ships no such type on purpose -- the tripwire exists so one cannot exist quietly.
 struct UnviewableReturnsResult <: PO.AbstractReturnsResult end
 
+include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
+# A square block is one tensor Panel Field whose labels are the asset names, which is
+# what makes `features_are_assets` true and the view cut both axes.
+function sqpanel(labels, vals)
+    return asset_panel([TensorPanelInput(; name = "prox", axis = "asset", labels = labels,
+                                         vals = vals)])
+end
 @testset "Feature matrix under views, folds, meta-optimisers and Pipeline" begin
     # `port_opt_view` is internal, and so is the sequential executor the recorder needs:
     # `push!` under the default `ThreadedEx` would be a race in the test, not in the library.
@@ -82,13 +91,14 @@ struct UnviewableReturnsResult <: PO.AbstractReturnsResult end
     # the values and not only in the shape.
     Z3 = reshape(Float64.(1:(T * N * K)), T, N, K) ./ 1000
 
-    rd_sq = ReturnsResult(; nx = nx, X = X, nf = nf, F = F, ts = ts, nz = nx, Z = Zsq)
+    rd_sq = ReturnsResult(; nx = nx, X = X, nf = nf, F = F, ts = ts, pnl = sqpanel(nx, Zsq))
     # The same numbers, but the names no longer claim the features are the assets. This is
     # the *only* difference between `rd_sq` and `rd_rect`, which is what makes the pair a
     # controlled experiment on the feature-axis slice.
     rd_rect = ReturnsResult(; nx = nx, X = X, nf = nf, F = F, ts = ts,
-                            nz = ["z$i" for i in 1:N], Z = Zsq)
-    rd_3d = ReturnsResult(; nx = nx, X = X, nf = nf, F = F, ts = ts, nz = nf, Z = Z3)
+                            pnl = matrix_panel(["z$i" for i in 1:N], Zsq))
+    rd_3d = ReturnsResult(; nx = nx, X = X, nf = nf, F = F, ts = ts,
+                          pnl = matrix_panel(nf, Z3))
 
     @testset "NestedClustered slices both axes of a square feature matrix" begin
         # The inner optimiser runs per cluster on a column subset. When the features are
@@ -113,8 +123,8 @@ struct UnviewableReturnsResult <: PO.AbstractReturnsResult end
         # The outer problem is the full universe, so both runs cluster identically: the
         # divergence below is caused by the feature-axis slice and by nothing else.
         @test assignments(res_re.clr) == idx
-        @test ro_sq.seen[1] === Zsq
-        @test ro_re.seen[1] === Zsq
+        @test ro_sq.seen[1] == Zsq
+        @test ro_re.seen[1] == Zsq
 
         # Correct: both axes move with the cluster.
         @test [size(z) for z in ri_sq.seen] == [(length(cl), length(cl)) for cl in cls]
@@ -189,7 +199,7 @@ struct UnviewableReturnsResult <: PO.AbstractReturnsResult end
                       opto = plain_hrp(), ex = seq)
         res = optimise(st, rd_sq)
         @test length(ri.seen) == 1
-        @test ri.seen[1] === Zsq
+        @test ri.seen[1] == Zsq
         @test isapprox(sum(res.w), 1)
 
         #=
@@ -235,14 +245,15 @@ struct UnviewableReturnsResult <: PO.AbstractReturnsResult end
 
             rs = RecordingDistance(FeatureDistance())
             cross_val_predict(HierarchicalRiskParity(; opt = hopt(rs)), rd_sq, cv; ex = seq)
-            @test all(z === Zsq for z in rs.seen)
+            @test all(z == Zsq for z in rs.seen)
         end
 
         # `train_test_split` is a pair of `port_opt_view`s, so the same rule holds there.
         tr, te = train_test_split(rd_3d; train_size = 150)
-        @test tr.Z == Z3[1:size(tr.X, 1), :, :]
-        @test te.Z == Z3[(T - size(te.X, 1) + 1):T, :, :]
-        @test size(tr.Z, 1) + size(te.Z, 1) == T
+        @test panel_feature_matrix(tr.pnl)[2] == Z3[1:size(tr.X, 1), :, :]
+        @test panel_feature_matrix(te.pnl)[2] == Z3[(T - size(te.X, 1) + 1):T, :, :]
+        @test size(panel_feature_matrix(tr.pnl)[2], 1) +
+              size(panel_feature_matrix(te.pnl)[2], 1) == T
     end
 
     @testset "MultipleRandomised splits observations and assets together" begin
@@ -276,7 +287,7 @@ struct UnviewableReturnsResult <: PO.AbstractReturnsResult end
 
         # Price-level cross-validation: each fold converts its own window, losing the row
         # the percentage change consumes -- and `Z` must lose exactly that row too.
-        prc = PricesResult(; X = TimeArray(tsp, Pv, nx), nz = nf, Z = Z3p)
+        prc = PricesResult(; X = TimeArray(tsp, Pv, nx), pnl = matrix_panel(nf, Z3p))
         ri = RecordingDistance(FeatureDistance())
         pipe = Pipeline(;
                         steps = (PricesToReturns(),
@@ -293,7 +304,7 @@ struct UnviewableReturnsResult <: PO.AbstractReturnsResult end
         # price level, and a square carrier must lose that asset on both axes.
         Pm = copy(Pv)
         Pm[:, 3] .= NaN
-        prm = PricesResult(; X = TimeArray(tsp, Pm, nx), nz = nx, Z = Zsqp)
+        prm = PricesResult(; X = TimeArray(tsp, Pm, nx), pnl = sqpanel(nx, Zsqp))
         keep = [1, 2, 4, 5, 6, 7, 8]
         rf = RecordingDistance(FeatureDistance())
         pipe_f = Pipeline(;
@@ -301,21 +312,23 @@ struct UnviewableReturnsResult <: PO.AbstractReturnsResult end
                                    HierarchicalRiskParity(; opt = hopt(rf))))
         res_f = fit(pipe_f, prm)
         @test res_f.ctx.returns.nx == nx[keep]
-        @test res_f.ctx.returns.Z == Zsqp[keep, keep]
+        @test panel_feature_matrix(res_f.ctx.returns.pnl)[2] == Zsqp[keep, keep]
         @test rf.seen[1] == Zsqp[keep, keep]
 
-        # A clustering step in the pipeline reaches the same bridge, so it is routed too.
+        # A clustering step in the pipeline reaches the same bridge, so it is routed too. It
+        # carries the same filter: the conversion deletes no asset (ADR 0133), so the drop
+        # that gives this pipeline its seven-asset universe is the filter's.
         rc = RecordingDistance(FeatureDistance())
         pipe_c = Pipeline(;
-                          steps = (PricesToReturns(), ClustersEstimator(; de = rc),
-                                   plain_hrp()))
+                          steps = (MissingDataFilter(; col_thr = 0.5), PricesToReturns(),
+                                   ClustersEstimator(; de = rc), plain_hrp()))
         fit(pipe_c, prm)
         @test length(rc.seen) == 1
         @test rc.seen[1] == Zsqp[keep, keep]
 
         # Search cross-validation at price level draws assets *and* windows rows, through
         # `pipeline_asset_view`/`pipeline_data_view` rather than the returns-level arities.
-        prs = PricesResult(; X = TimeArray(tsp, Pv, nx), nz = nx, Z = Zsqp)
+        prs = PricesResult(; X = TimeArray(tsp, Pv, nx), pnl = sqpanel(nx, Zsqp))
         rg = RecordingDistance(FeatureDistance())
         mrs = MultipleRandomised(IndexWalkForward(60, 20); subset_size = 3, n_subsets = 2,
                                  seed = 42)
@@ -333,198 +346,78 @@ struct UnviewableReturnsResult <: PO.AbstractReturnsResult end
         @test all(any(z == Zsqp[c, c] for c in unique(ss.asset_idx)) for z in rg.seen)
     end
 
-    @testset "The two carriers under a view: :data slices, :prior refits" begin
-        fpe = FeaturePrior(; pe = FactorPrior(), ze = RegressionFeatures())
-        pr_z = prior(fpe, rd_sq)
-        # The carriers hold genuinely different matrices, so a test cannot pass by picking
-        # the wrong one: the data carrier is the square block matrix, the prior carrier the
-        # rectangular factor loadings.
-        @test size(rd_sq.Z) == (N, N)
-        @test size(pr_z.Z) == (N, K)
-
-        function run_nco(z_src)
-            ri, ro = RecordingDistance(FeatureDistance()),
-                     RecordingDistance(FeatureDistance())
-            nco = NestedClustered(; pe = fpe, cle = ClustersEstimator(; de = ro),
-                                  z_src = z_src,
-                                  opti = HierarchicalRiskParity(;
-                                                                opt = HierarchicalOptimiser(;
-                                                                                            pe = fpe,
-                                                                                            cle = ClustersEstimator(;
-                                                                                                                    de = ri),
-                                                                                            slv = slv,
-                                                                                            z_src = z_src)),
-                                  opto = plain_hrp(), ex = seq)
-            res = optimise(nco, rd_sq)
-            idx = assignments(res.clr)
-            return res, ri, ro, [findall(==(i), idx) for i in 1:(res.clr.k)]
-        end
-        res_d, ri_d, ro_d, cls_d = run_nco(:data)
-        res_p, ri_p, ro_p, cls_p = run_nco(:prior)
-
-        # The selector picks between two populated carriers at the outer level.
-        @test ro_d.seen[1] === rd_sq.Z
-        @test ro_p.seen[1] == pr_z.Z
-        @test assignments(res_d.clr) != assignments(res_p.clr)
-
-        # `:data` slices the carried matrix -- both axes, because it is square.
-        @test [size(z) for z in ri_d.seen] == [(length(cl), length(cl)) for cl in cls_d]
-        @test all(ri_d.seen[i] == rd_sq.Z[cls_d[i], cls_d[i]] for i in eachindex(cls_d))
-
-        # `:prior` does not slice anything: the cluster's prior is refit on the cluster's
-        # own returns, so the matrix that reaches the kernel is a fresh estimate whose
-        # feature axis is still the full factor set.
-        @test [size(z) for z in ri_p.seen] == [(length(cl), K) for cl in cls_p]
-        @test all(ri_p.seen[i] == prior(fpe, port_opt_view(rd_sq, cls_p[i])).Z
-                  for i in eachindex(cls_p))
-
-        # A `LowOrderPrior` view slices its own carrier on the asset axis and never on the
-        # feature axis -- a square derived `Z` included, since the producer that built it
-        # refits rather than being cut down.
-        i = [1, 3, 5]
-        @test port_opt_view(pr_z, i).Z == pr_z.Z[i, :]
-        pr_sq = LowOrderPrior(; X = pr_z.X, mu = pr_z.mu, sigma = pr_z.sigma, Z = Zsq)
-        @test port_opt_view(pr_sq, i).Z == Zsq[i, :]
-    end
-
-    @testset "A square feature producer refits inside a real fold" begin
+    @testset "The carrier's panel slices, and a producer refits" begin
         #=
-        No producer embeds data: `PhylogenyFeatures` holds an *estimator*, so every fold and
-        every cluster refits the graph on its own universe. What only a fold can prove is
-        that the refit actually reaches through the optimiser's own view and `FeaturePrior`
-        to the producer, so a cluster's feature matrix is square over the cluster rather
-        than over the universe it came from.
+        Two routes, two behaviours, and the difference is the whole content of `#804`. A
+        panel on the *carrier* is data, so a view slices it. A producer on the *distance* is
+        configuration, so a view passes it through and the cluster refits it on the
+        cluster's own returns. Nothing on either route is a stale slice of a larger matrix.
         =#
         rd_plain = ReturnsResult(; nx = nx, X = X, nf = nf, F = F, ts = ts)
-        PEX = phylogeny_matrix(NetworkEstimator(; alg = KruskalTree()), rd_plain).X
-        @test issymmetric(PEX) && all(iszero, diag(PEX))
-        fpe_cle = FeaturePrior(; ze = PhylogenyFeatures(; pl = ClustersEstimator()))
-        fpe_conf = FeaturePrior(;
-                                ze = PhylogenyFeatures(;
-                                                       pl = NetworkEstimator(;
-                                                                             alg = KruskalTree())))
 
-        mk_nco(fpe, ri, ro) = NestedClustered(; pe = fpe,
-                                              cle = ClustersEstimator(; de = ro),
-                                              z_src = :prior,
-                                              opti = HierarchicalRiskParity(;
-                                                                            opt = HierarchicalOptimiser(;
-                                                                                                        pe = fpe,
-                                                                                                        cle = ClustersEstimator(;
-                                                                                                                                de = ri),
-                                                                                                        slv = slv,
-                                                                                                        z_src = :prior)),
-                                              opto = plain_hrp(), ex = seq)
-
-        # A clustering source refits per cluster too, and its matrix is square over the
-        # cluster -- the shape that would have been wrong had anything been carried through.
-        ric = RecordingDistance(FeatureDistance())
-        resc = optimise(mk_nco(fpe_cle, ric, RecordingDistance(FeatureDistance())),
-                        rd_plain)
-        idxc = assignments(resc.clr)
-        clsc = [findall(==(i), idxc) for i in 1:(resc.clr.k)]
-        @test [size(z) for z in ric.seen] == [(length(cl), length(cl)) for cl in clsc]
-
-        # The network source refits per cluster as well.
-        ri = RecordingDistance(FeatureDistance())
-        ro = RecordingDistance(FeatureDistance())
-        res = optimise(mk_nco(fpe_conf, ri, ro), rd_plain)
-        idx = assignments(res.clr)
-        cls = [findall(==(i), idx) for i in 1:(res.clr.k)]
-
-        @test ro.seen[1] == prior(fpe_conf, rd_plain).Z
-        @test [size(z) for z in ri.seen] == [(length(cl), length(cl)) for cl in cls]
-        # The reference is the producer viewed the same way the fold views it -- a refit.
-        @test all(ri.seen[i] ==
-                  prior(port_opt_view(fpe_conf, cls[i]), port_opt_view(rd_plain, cls[i])).Z
-                  for i in eachindex(cls))
-        @test isapprox(sum(res.w), 1)
-
-        # A literal matrix in the `ze` slot is the other data-carrying shape, and slices on
-        # its asset axis only: its columns are features and stay whole.
-        Zlit = abs.(randn(StableRNG(2468), N, 4))
-        fpe_lit = FeaturePrior(; ze = Zlit)
-        rl = RecordingDistance(FeatureDistance())
-        nco_lit = NestedClustered(; pe = fpe_lit,
-                                  cle = ClustersEstimator(; de = FeatureDistance()),
-                                  z_src = :prior,
+        function run_nco(de_i, de_o, rdx)
+            nco = NestedClustered(; pe = FactorPrior(),
+                                  cle = ClustersEstimator(; de = de_o),
                                   opti = HierarchicalRiskParity(;
                                                                 opt = HierarchicalOptimiser(;
-                                                                                            pe = fpe_lit,
+                                                                                            pe = FactorPrior(),
                                                                                             cle = ClustersEstimator(;
-                                                                                                                    de = rl),
-                                                                                            slv = slv,
-                                                                                            z_src = :prior)),
+                                                                                                                    de = de_i),
+                                                                                            slv = slv)),
                                   opto = plain_hrp(), ex = seq)
-        res_lit = optimise(nco_lit, rd_plain)
-        idx_lit = assignments(res_lit.clr)
-        cls_lit = [findall(==(i), idx_lit) for i in 1:(res_lit.clr.k)]
-        @test [size(z) for z in rl.seen] == [(length(cl), 4) for cl in cls_lit]
-        @test all(rl.seen[i] == Zlit[cls_lit[i], :] for i in eachindex(cls_lit))
-
-        # A *time-varying* literal cannot survive an observation fold: folds slice
-        # observations before the prior is fit and never touch the estimator, so its
-        # leading axis stops matching. The documented answer is "use a producer", and the
-        # failure is a construction error rather than a silent misalignment.
-        fpe_3d = FeaturePrior(; ze = abs.(randn(StableRNG(1357), T, N, 2)))
-        @test_throws DimensionMismatch cross_val_predict(HierarchicalRiskParity(;
-                                                                                opt = HierarchicalOptimiser(;
-                                                                                                            pe = fpe_3d,
-                                                                                                            cle = ClustersEstimator(;
-                                                                                                                                    de = FeatureDistance()),
-                                                                                                            slv = slv,
-                                                                                                            z_src = :prior)),
-                                                         rd_plain, KFold(; n = 3); ex = seq)
-
-        # The same chain under a resampling scheme that draws assets and windows rows.
-        ri = RecordingDistance(FeatureDistance())
-        cv = MultipleRandomised(IndexWalkForward(80, 40); rng = StableRNG(11), seed = 7,
-                                n_subsets = 2, subset_size = 5)
-        mk_hrp(fpe, de) = HierarchicalRiskParity(;
-                                                 opt = HierarchicalOptimiser(; pe = fpe,
-                                                                             cle = ClustersEstimator(;
-                                                                                                     de = de),
-                                                                             slv = slv,
-                                                                             z_src = :prior))
-        cross_val_predict(mk_hrp(fpe_conf, ri), rd_plain, cv; ex = seq)
-        sp = split(cv, rd_plain)
-        @test length(ri.seen) == length(sp.train_idx)
-        @test all(size(z) == (cv.subset_size, cv.subset_size) for z in ri.seen)
-        @test all(ri.seen[i] == prior(port_opt_view(fpe_conf, sp.asset_idx[i]),
-                    port_opt_view(rd_plain, sp.train_idx[i], sp.asset_idx[i])).Z
-                  for i in eachindex(sp.train_idx))
-    end
-
-    @testset "The port_opt_view tripwires still report accurately" begin
-        # A mistyped call must name the call shape rather than be reported as an
-        # unimplemented subtype -- `ReturnsResult` does implement `port_opt_view`.
-        e = try
-            port_opt_view(rd_sq, 1, 2, 3, 4)
-        catch err
-            err
+            res = optimise(nco, rdx)
+            idx = assignments(res.clr)
+            return res, [findall(==(i), idx) for i in 1:(res.clr.k)]
         end
-        @test isa(e, ArgumentError)
-        @test occursin("does not accept this call shape", e.msg)
-        @test occursin("4 positional index argument(s)", e.msg)
 
-        e = try
-            port_opt_view(rd_sq, [1, 2]; assets = [1, 2])
-        catch err
-            err
-        end
-        @test isa(e, ArgumentError)
-        @test occursin("keyword argument(s) assets", e.msg)
-        @test occursin("`factors` is the third positional index", e.msg)
+        # The carrier route: the square panel is sliced on both axes, per cluster.
+        ri_d, ro_d = RecordingDistance(FeatureDistance()),
+                     RecordingDistance(FeatureDistance())
+        res_d, cls_d = run_nco(ri_d, ro_d, rd_sq)
+        @test ro_d.seen[1] == Zsq
+        @test [size(z) for z in ri_d.seen] == [(length(cl), length(cl)) for cl in cls_d]
+        @test all(ri_d.seen[i] == Zsq[cls_d[i], cls_d[i]] for i in eachindex(cls_d))
 
-        # An `AbstractReturnsResult` subtype with no method is a missing implementation,
-        # not a leaf value to hand back unsubselected.
-        e = try
-            port_opt_view(UnviewableReturnsResult(), [1, 2])
-        catch err
-            err
-        end
-        @test isa(e, ArgumentError)
-        @test occursin("does not implement port_opt_view", e.msg)
-        @test occursin("silently train on the unsubselected universe", e.msg)
+        # The producer route: a regression producer refits per cluster, so the matrix that
+        # reaches the kernel is a fresh estimate whose trailing axis is still the full
+        # factor set.
+        ape = RegressionPanel()
+        ri_p, ro_p = RecordingDistance(FeatureDistance(; ape = ape)),
+                     RecordingDistance(FeatureDistance(; ape = ape))
+        res_p, cls_p = run_nco(ri_p, ro_p, rd_plain)
+        @test [size(z) for z in ri_p.seen] == [(length(cl), K) for cl in cls_p]
+        @test all(ri_p.seen[i] == PO.panel_field(PO.asset_panel(ape,
+                                            prior(FactorPrior(),
+                                                  port_opt_view(rd_plain, cls_p[i])),
+                                            nothing, X[:, cls_p[i]]), "loadings").vals
+                  for i in eachindex(cls_p))
+        @test isapprox(sum(res_p.w), 1)
+
+        # A square *producer* refits per cluster too, and its matrix is square over the
+        # cluster -- the shape that would have been wrong had anything been carried through.
+        apeq = PhylogenyPanel(; pl = ClustersEstimator())
+        ric = RecordingDistance(FeatureDistance(; ape = apeq))
+        resc, clsc = run_nco(ric, RecordingDistance(FeatureDistance(; ape = apeq)),
+                             rd_plain)
+        @test [size(z) for z in ric.seen] == [(length(cl), length(cl)) for cl in clsc]
+
+        # The network source refits per cluster as well, and its outer matrix is the whole
+        # universe's.
+        apen = PhylogenyPanel(; pl = NetworkEstimator(; alg = KruskalTree()))
+        rin = RecordingDistance(FeatureDistance(; ape = apen))
+        ron = RecordingDistance(FeatureDistance(; ape = apen))
+        resn, clsn = run_nco(rin, ron, rd_plain)
+        @test ron.seen[1] ==
+              phylogeny_features(Proximity(), NetworkEstimator(; alg = KruskalTree()), X)
+        @test [size(z) for z in rin.seen] == [(length(cl), length(cl)) for cl in clsn]
+        @test all(rin.seen[i] ==
+                  phylogeny_features(Proximity(), NetworkEstimator(; alg = KruskalTree()),
+                                     X[:, clsn[i]]) for i in eachindex(clsn))
+        @test isapprox(sum(resn.w), 1)
+
+        # The producer itself is never viewed: it is configuration, so the slot survives the
+        # round trip through `port_opt_view` unchanged.
+        de = FeatureDistance(; ape = apen)
+        @test port_opt_view(de, [1, 3, 5]).ape === apen
     end
 end

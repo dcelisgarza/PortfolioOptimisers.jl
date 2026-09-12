@@ -109,25 +109,27 @@ julia> HierarchicalEqualRiskContribution()
 HierarchicalEqualRiskContribution
    opt ┼ HierarchicalOptimiser
        │       pe ┼ EmpiricalPrior
-       │          │        ce ┼ PortfolioOptimisersCovariance
-       │          │           │   ce ┼ Covariance
-       │          │           │      │    me ┼ SimpleExpectedReturns
-       │          │           │      │       │   w ┴ nothing
-       │          │           │      │    ce ┼ GeneralCovariance
-       │          │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-       │          │           │      │       │    w ┴ nothing
-       │          │           │      │   alg ┴ FullMoment()
-       │          │           │   mp ┼ MatrixProcessing
-       │          │           │      │     pdm ┼ Posdef
-       │          │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-       │          │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-       │          │           │      │      dn ┼ nothing
-       │          │           │      │      dt ┼ nothing
-       │          │           │      │     alg ┼ nothing
-       │          │           │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-       │          │        me ┼ SimpleExpectedReturns
-       │          │           │   w ┴ nothing
-       │          │   horizon ┴ nothing
+       │          │           ce ┼ PortfolioOptimisersCovariance
+       │          │              │   ce ┼ Covariance
+       │          │              │      │    me ┼ SimpleExpectedReturns
+       │          │              │      │       │   w ┴ nothing
+       │          │              │      │    ce ┼ GeneralCovariance
+       │          │              │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+       │          │              │      │       │    w ┴ nothing
+       │          │              │      │   alg ┼ FullMoment()
+       │          │              │      │     w ┴ nothing
+       │          │              │   mp ┼ MatrixProcessing
+       │          │              │      │     pdm ┼ Posdef
+       │          │              │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+       │          │              │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+       │          │              │      │      dn ┼ nothing
+       │          │              │      │      dt ┼ nothing
+       │          │              │      │     alg ┼ nothing
+       │          │              │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+       │          │           me ┼ SimpleExpectedReturns
+       │          │              │   w ┴ nothing
+       │          │      horizon ┼ nothing
+       │          │   fill_limit ┴ nothing
        │      cle ┼ ClustersEstimator
        │          │    ce ┼ PortfolioOptimisersCovariance
        │          │       │   ce ┼ Covariance
@@ -136,7 +138,8 @@ HierarchicalEqualRiskContribution
        │          │       │      │    ce ┼ GeneralCovariance
        │          │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
        │          │       │      │       │    w ┴ nothing
-       │          │       │      │   alg ┴ FullMoment()
+       │          │       │      │   alg ┼ FullMoment()
+       │          │       │      │     w ┴ nothing
        │          │       │   mp ┼ MatrixProcessing
        │          │       │      │     pdm ┼ Posdef
        │          │       │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
@@ -169,7 +172,6 @@ HierarchicalEqualRiskContribution
        │          │   iter ┴ Int64: 100
        │      brt ┼ Bool: false
        │    x_src ┼ Symbol: :prior
-       │    z_src ┼ Symbol: :data
        │   strict ┴ Bool: false
     ri ┼ Variance
        │   settings ┼ RiskMeasureSettings
@@ -322,9 +324,12 @@ function port_opt_view(hec::HierarchicalEqualRiskContribution, i, X::MatNum,
         ri = port_opt_view(ri, i, X)
         ro = port_opt_view(ro, i, X)
     end
-    opt = port_opt_view(hec.opt, i)
+    opt = port_opt_view(hec.opt, i, X)
     return HierarchicalEqualRiskContribution(; ri = ri, ro = ro, opt = opt, scai = hec.scai,
                                              scao = hec.scao, ex = hec.ex, fb = hec.fb)
+end
+function non_investable_universe(hec::HierarchicalEqualRiskContribution, ni::VecStr)
+    return rebuild_estimator(hec, (; opt = non_investable_universe(hec.opt, ni)))
 end
 """
     herc_scalarised_risk_o!(sca::Scalariser, wk::VecNum, roku::VecNum_MatNum,
@@ -474,7 +479,7 @@ function herc_scalarised_risk_i!(sca::Union{MaxScalariser, MinScalariser}, wk::V
 end
 """
     herc_risk(hec::HierarchicalEqualRiskContribution, pr::AbstractPriorResult,
-              cls::VecVecInt) -> Tuple
+              cls::VecVecInt, fees::Option{<:Fees}) -> Tuple
 
 Compute the intra-cluster weights and the per-cluster outer risks that HERC allocates with.
 
@@ -483,10 +488,11 @@ Compute the intra-cluster weights and the per-cluster outer risks that HERC allo
   - `hec`: The optimiser. Its `ri`/`ro` arity and its executor `ex` select the method.
   - `pr`: Prior result. Its `X` is the return matrix and its moments resolve the measures.
   - `cls`: Asset indices of each cluster, one entry per cluster.
+  - `fees`: Resolved fees, or `nothing`. The caller resolves them on its own universe and strips both liquidation carriers first, because a cluster-level risk figure prices no forced exit: the exiting asset is in no cluster, its column being `NaN`.
 
 # Returns
 
-  - `(w, rkcl, fees, ri, ro)::Tuple`: The intra-cluster weights over the whole universe, each cluster's outer risk, the resolved fees, and the two resolved risk measures.
+  - `(w, rkcl, ri, ro)::Tuple`: The intra-cluster weights over the whole universe, each cluster's outer risk, and the two resolved risk measures.
 
 # Details
 
@@ -504,11 +510,9 @@ Compute the intra-cluster weights and the per-cluster outer risks that HERC allo
 function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationRiskMeasure,
                                                           <:OptimisationRiskMeasure, <:Any,
                                                           <:Any, <:FLoops.SequentialEx},
-                   pr::AbstractPriorResult, cls::VecVecInt)
+                   pr::AbstractPriorResult, cls::VecVecInt, fees::Option{<:Fees})
     X = pr.X
     ri = factory(hec.ri, pr, hec.opt.slv)
-    fees = fees_constraints(hec.opt.fees, hec.opt.sets; strict = hec.opt.strict,
-                            datatype = eltype(X))
     riku = unitary_expected_risks(ri, X, fees)
     if hec.ri === hec.ro
         ro = ri
@@ -531,17 +535,15 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationR
             rkbo[cl] .= zero(eltype(X))
         end
     end
-    return w, rkcl, fees, ri, ro
+    return w, rkcl, ri, ro
 end
 function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationRiskMeasure,
                                                           <:OptimisationRiskMeasure, <:Any,
                                                           <:Any,
                                                           <:FLoops.Transducers.Executor},
-                   pr::AbstractPriorResult, cls::VecVecInt)
+                   pr::AbstractPriorResult, cls::VecVecInt, fees::Option{<:Fees})
     X = pr.X
     ri = factory(hec.ri, pr, hec.opt.slv)
-    fees = fees_constraints(hec.opt.fees, hec.opt.sets; strict = hec.opt.strict,
-                            datatype = eltype(X))
     riku = unitary_expected_risks(ri, X, fees)
     if hec.ri === hec.ro
         ro = ri
@@ -564,12 +566,12 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationR
             rkcl[i] = expected_risk(ro_i, view(rkbo, :, i), X, fees)
         end
     end
-    return w, rkcl, fees, ri, ro
+    return w, rkcl, ri, ro
 end
 function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:VecOptRM, <:VecOptRM,
                                                           <:Any, <:Any,
                                                           <:FLoops.SequentialEx},
-                   pr::AbstractPriorResult, cls::VecVecInt)
+                   pr::AbstractPriorResult, cls::VecVecInt, fees::Option{<:Fees})
     X = pr.X
     ri = factory(hec.ri, pr, hec.opt.slv)
     if hec.ri === hec.ro
@@ -583,8 +585,6 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:VecOptRM, <:V
     w = Vector{eltype(X)}(undef, size(X, 2))
     wk = zeros(eltype(X), size(X, 2))
     rkbo = zeros(eltype(X), size(X, 2))
-    fees = fees_constraints(hec.opt.fees, hec.opt.sets; strict = hec.opt.strict,
-                            datatype = eltype(X))
     let
         rku_i, ro_i = rku, ro
         FLoops.@floop hec.ex for (i, cl) in pairs(cls)
@@ -593,12 +593,12 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:VecOptRM, <:V
             rkbo[cl] .= zero(eltype(X))
         end
     end
-    return w, rkcl, fees, ri, ro
+    return w, rkcl, ri, ro
 end
 function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:VecOptRM, <:VecOptRM,
                                                           <:Any, <:Any,
                                                           <:FLoops.Transducers.Executor},
-                   pr::AbstractPriorResult, cls::VecVecInt)
+                   pr::AbstractPriorResult, cls::VecVecInt, fees::Option{<:Fees})
     X = pr.X
     ri = factory(hec.ri, pr, hec.opt.slv)
     if hec.ri === hec.ro
@@ -612,8 +612,6 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:VecOptRM, <:V
     rku = Matrix{eltype(X)}(undef, size(X, 2), Nc)
     wk = zeros(eltype(X), size(X, 2), Nc)
     rkbo = zeros(eltype(X), size(X, 2), Nc)
-    fees = fees_constraints(hec.opt.fees, hec.opt.sets; strict = hec.opt.strict,
-                            datatype = eltype(X))
     let
         ro_i = ro
         FLoops.@floop hec.ex for (i, cl) in pairs(cls)
@@ -623,16 +621,14 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:VecOptRM, <:V
                                               view(rkbo, :, i), cl, ro_i, X, fees)
         end
     end
-    return w, rkcl, fees, ri, ro
+    return w, rkcl, ri, ro
 end
 function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationRiskMeasure,
                                                           <:VecOptRM, <:Any, <:Any,
                                                           <:FLoops.SequentialEx},
-                   pr::AbstractPriorResult, cls::VecVecInt)
+                   pr::AbstractPriorResult, cls::VecVecInt, fees::Option{<:Fees})
     X = pr.X
     ri = factory(hec.ri, pr, hec.opt.slv)
-    fees = fees_constraints(hec.opt.fees, hec.opt.sets; strict = hec.opt.strict,
-                            datatype = eltype(X))
     riku = unitary_expected_risks(ri, X, fees)
     ro = factory(hec.ro, pr, hec.opt.slv)
     rkcl = Vector{eltype(X)}(undef, length(cls))
@@ -646,16 +642,14 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationR
         rkcl[i] = herc_scalarised_risk_o!(hec.scao, wk, roku, rkbo, cl, ro, X, fees)
         rkbo[cl] .= zero(eltype(X))
     end
-    return w, rkcl, fees, ri, ro
+    return w, rkcl, ri, ro
 end
 function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationRiskMeasure,
                                                           <:VecOptRM, <:Any, <:Any,
                                                           <:FLoops.Transducers.Executor},
-                   pr::AbstractPriorResult, cls::VecVecInt)
+                   pr::AbstractPriorResult, cls::VecVecInt, fees::Option{<:Fees})
     X = pr.X
     ri = factory(hec.ri, pr, hec.opt.slv)
-    fees = fees_constraints(hec.opt.fees, hec.opt.sets; strict = hec.opt.strict,
-                            datatype = eltype(X))
     riku = unitary_expected_risks(ri, X, fees)
     ro = factory(hec.ro, pr, hec.opt.slv)
     Nc = length(cls)
@@ -670,17 +664,15 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationR
         rkcl[i] = herc_scalarised_risk_o!(hec.scao, view(wk, :, i), view(roku, :, i),
                                           view(rkbo, :, i), cl, ro, X, fees)
     end
-    return w, rkcl, fees, ri, ro
+    return w, rkcl, ri, ro
 end
 function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:VecOptRM,
                                                           <:OptimisationRiskMeasure, <:Any,
                                                           <:Any, <:FLoops.SequentialEx},
-                   pr::AbstractPriorResult, cls::VecVecInt)
+                   pr::AbstractPriorResult, cls::VecVecInt, fees::Option{<:Fees})
     X = pr.X
     ri = factory(hec.ri, pr, hec.opt.slv)
     ro = factory(hec.ro, pr, hec.opt.slv)
-    fees = fees_constraints(hec.opt.fees, hec.opt.sets; strict = hec.opt.strict,
-                            datatype = eltype(X))
     roku = unitary_expected_risks(ro, X, fees)
     rkcl = Vector{eltype(X)}(undef, length(cls))
     w = Vector{eltype(X)}(undef, size(X, 2))
@@ -694,18 +686,16 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:VecOptRM,
         rkcl[i] = expected_risk(ro, rkbo, X, fees)
         rkbo[cl] .= zero(eltype(X))
     end
-    return w, rkcl, fees, ri, ro
+    return w, rkcl, ri, ro
 end
 function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:VecOptRM,
                                                           <:OptimisationRiskMeasure, <:Any,
                                                           <:Any,
                                                           <:FLoops.Transducers.Executor},
-                   pr::AbstractPriorResult, cls::VecVecInt)
+                   pr::AbstractPriorResult, cls::VecVecInt, fees::Option{<:Fees})
     X = pr.X
     ri = factory(hec.ri, pr, hec.opt.slv)
     ro = factory(hec.ro, pr, hec.opt.slv)
-    fees = fees_constraints(hec.opt.fees, hec.opt.sets; strict = hec.opt.strict,
-                            datatype = eltype(X))
     roku = unitary_expected_risks(ro, X, fees)
     Nc = length(cls)
     rkcl = Vector{eltype(X)}(undef, Nc)
@@ -720,7 +710,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:VecOptRM,
         rkbo[cl, i] ./= sum(view(rkbo, cl, i))
         rkcl[i] = expected_risk(ro, view(rkbo, :, i), X, fees)
     end
-    return w, rkcl, fees, ri, ro
+    return w, rkcl, ri, ro
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -740,13 +730,32 @@ function _optimise(hec::HierarchicalEqualRiskContribution,
     hec = reset_time_dependent_estimator(hec)
     rd = returns_result_picker(rd, hec.opt.brt)
     pr = prior(hec.opt.pe, rd; dims = dims)
+    # Resolve the fee on the caller's own universe, before the door below narrows `sets`.
+    # A name stated over that universe must not be refused because the data delisted the
+    # asset, and a carrier keyed by name cannot resolve at all once its `w` sits on the
+    # complement while `sets` sits on the mask. `investable_fees_view` then places the
+    # resolved fee on the axes the mask leaves.
+    imsk = investable_mask(pr)
+    fees = investable_fees_view(fees_constraints(hec.opt.fees, hec.opt.sets;
+                                                 strict = hec.opt.strict,
+                                                 datatype = eltype(pr.X)), imsk, pr.X)
+    # A forced exit is charged once, against the full-universe weight vector the fit
+    # rebuilds, so it rides on the result alone. No sub-problem below holds that vector —
+    # the exiting asset is in no cluster, its column being `NaN` — so none prices an exit.
+    cfees = strip_liquidation_carriers(fees, nothing)
+    # The prior fits on the coverage universe and returns a result on the full asset
+    # universe, where an asset it could not estimate carries `NaN`. Reduce once, here:
+    # the distance the clustering is built from never sees a `NaN`, and the cluster count
+    # is chosen on the investable universe. The weights are expanded back in
+    # `HierarchicalResult`.
+    _, pr, hec, rd = investable_reduction(imsk, pr, hec, rd)
     X = pr.X
     clr = clusterise(hec.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa, dims = dims,
-                     branchorder = branchorder, x_src = hec.opt.x_src,
-                     z_src = hec.opt.z_src)
+                     branchorder = branchorder, x_src = hec.opt.x_src)
+    assert_clustering_universe(clr, size(X, 2))
     idx = assignments(clr)
     cls = [findall(x -> x == i, idx) for i in 1:(clr.k)]
-    w, rkcl, fees, ri, ro = herc_risk(hec, pr, cls)
+    w, rkcl, ri, ro = herc_risk(hec, pr, cls, cfees)
     nd = to_tree(clr.res)[2]
     hs = [i.height for i in nd]
     nd = nd[sortperm(hs; rev = true)]
@@ -788,15 +797,16 @@ function _optimise(hec::HierarchicalEqualRiskContribution,
                                                                            wb = wb,
                                                                            fees = fees,
                                                                            retcode = retcode,
-                                                                           w = w), ri = ri,
-                                                   ro = ro, scai = hec.scai,
+                                                                           w = w,
+                                                                           imsk = imsk),
+                                                   ri = ri, ro = ro, scai = hec.scai,
                                                    scao = hec.scao, fb = nothing)
 end
 """
     optimise(hec::HierarchicalEqualRiskContribution{
                      <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, Nothing
                  },
-            rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
+            rd::ReturnsResult; dims::Int = 1,
             branchorder::Symbol = :optimal, kwargs...) -> HierarchicalEqualRiskContributionResult
 
 Run the Hierarchical Equal Risk Contribution portfolio optimisation.
@@ -809,15 +819,19 @@ Run the Hierarchical Equal Risk Contribution portfolio optimisation.
   - `branchorder`: The branch order to use for the clusterisation, this optimisation can use non-optimal branch orders, which make the clustering faster but the dendrogram won't be as nice.
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
 
+# Validation
+
+  - No field in the tree of `hec` holds an [`Online`](@ref). An `ArgumentError` naming the field is thrown otherwise, through [`assert_batch_entry`](@ref): a plain `optimise` is a batch fit, and a wrapper resolves only at the warm-up of the fold loop's online arm.
+
 # Related
 
   - [`HierarchicalEqualRiskContribution`](@ref)
   - [`HierarchicalEqualRiskContributionResult`](@ref)
 """
 function optimise(hec::HierarchicalEqualRiskContribution{<:Any, <:Any, <:Any, <:Any, <:Any,
-                                                         <:Any, Nothing},
-                  rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
-                  branchorder::Symbol = :optimal, kwargs...)
+                                                         <:Any, Nothing}, rd::ReturnsResult;
+                  dims::Int = 1, branchorder::Symbol = :optimal, kwargs...)
+    assert_batch_entry(hec, "`optimise`")
     return _optimise(hec, rd; dims = dims, branchorder = branchorder, kwargs...)
 end
 

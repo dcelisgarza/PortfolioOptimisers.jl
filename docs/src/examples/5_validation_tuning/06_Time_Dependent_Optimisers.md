@@ -1,5 +1,4 @@
 The source files can be found in [examples/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../../examples/5_validation_tuning/06_Time_Dependent_Optimisers.jl"
 ```
@@ -513,7 +512,7 @@ than reconstructed after it; `ran` confirms `:turbulent` folds took the defensiv
 ## 10. Summary
 
 | Position | Spelling | `:nearest`? | Fold-less |
-| --- | --- | --- | --- |
+|---|---|---|---|
 | The optimiser itself | `cross_val_predict(TimeDependent([opt₁, …, optₙ]; default = d), rd, cv)` | — (it is handed to the loop directly) | runs `default`, or throws [`TimeDependentDefaultError`](@ref) without one |
 | Fallback `fb` | `MeanRisk(; fb = TimeDependent([…]))`, entries may be `nothing` | rejected | `default` if given, else *no fallback* |
 | `NestedClustered.opti` | field-level schedule | legal (inner CV consumes the field); needs `default` + `cv` | per-cluster leg runs `default` |

@@ -151,7 +151,7 @@ The Blanchet, Chen and Zhou identity holds **only** for `SOCRiskExpr`, which pen
 `norm(w, 2)`. `SquaredSOCRiskExpr`, `QuadRiskExpr` and `RSOCRiskExpr` penalise `norm(w, 2)^2`, where
 a radius is the wrong quantity. `L2Regularisation` stores `alg` beside `val`, so its inner
 constructor refuses the pairing through an `assert_` method in the style of
-[`src/01_Base.jl`](../../src/01_Base.jl)'s family: a permissive fallback plus a refusing method, so
+[`src/01_Base/10_Assertions.jl`](../../src/01_Base/10_Assertions.jl)'s family: a permissive fallback plus a refusing method, so
 **a new formulation adds a method rather than editing a hardcoded check**. A plain `Number` in `val`
 stays legal with every formulation.
 
@@ -200,3 +200,71 @@ rule that needs the whole Prior does not fit it without a change.
 - **A `TD_` wrapper holding a calibration rule is unresolved.** `JuMPOptimiser.l1` and `.linf` are
     bounded `TD_Option`, so such a slot has two deferral channels and ADR 0030 considered only one.
     Nothing has checked what the code does today.
+
+## Amendment (2026-08-28) — from [#586](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/586)
+
+Map [#580](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/580) built the rest of this
+mechanism, and three statements above are now out of date. ADR 0095 records the shape that shipped.
+
+**The re-parenting has not shipped.** `AbstractUncertaintyKAlgorithm` and
+`AbstractUncertaintyEpsAlgorithm` still subtype `AbstractAlgorithm` directly.
+`AbstractCalibrationAlgorithm` lives in
+[`src/19_RiskMeasures/01_Base_RiskMeasures.jl`](../../src/19_RiskMeasures/01_Base_RiskMeasures.jl),
+beside `resolve_slot` and the mechanism that reads it, and re-parenting the two families needs the
+root in [`src/01_Base/02_TypeRoots.jl`](../../src/01_Base/02_TypeRoots.jl) first. So "the abstract hierarchy breaks" describes
+a break that has not happened, and `Num_UcSK` and `Num_UcSEps` are unrelated to the calibration
+bounds today.
+
+**A slot names its quantity, and the alias is named for it.** `AmbiguityRadiusValue` and
+`AmbiguityTailWeightValue` are not the spellings that shipped. A slot is bounded by `Num_AmbRadCal`
+or `Num_AmbTwtCal`, each pairing `Number` with one rule family and a plain `Function`. The two
+quantities keep the two separate bounds this ADR insisted on, for the reason it gives: `r` is the
+radius and `l` is a tail weight.
+
+**`kappa` has a rule.** `EntropyBudget` computes the Kaniadakis deformation parameter that spends a
+stated entropy budget. The tail weight still has none, so that half of the observation stands.
+
+## Amendment (2026-08-29) — from ADR 0097
+
+**The `lpc` field was widened by accident, and nothing resolved it.** This decision widened
+`LpRegularisation.val` for the penalty reading of the `lp` field. The same type also serves
+as a norm *constraint* through `JuMPOptimiser.lpc`, so that field inherited a bound naming a
+rule family that has no reading in it, and `set_weight_norm_p_constraints!` read `val` raw. An
+ambiguity-radius rule placed in `lpc` therefore reached a JuMP expression unresolved.
+ADR 0097 closes it: the field refuses a radius rule at construction, and a ceiling rule in it
+resolves.
+
+**The three norm ceilings are not radius slots.** `l2c`, `lpc` and `linfc` are spelled beside
+`l1` and `linf` and are read against the same norms, so the twelve-slot table above reads as
+though it had passed over them. It did not. A radius is the coefficient of a norm penalty and
+a ceiling is a bound on that norm, and neither shipped rule of this decision computes a
+ceiling. ADR 0097 gives the ceiling its own family, role and bound, on the shape ADR 0095
+records.
+
+## Amendment (2026-08-29) — from issue #613
+
+**The tail weight has a rule.** `TailTermParity` computes the Esfahani-Kuhn tail weight that
+prices the tail term of the loss at a stated multiple of its mean term. The observation above
+that "no rule ships for the tail weight" and that "inventing one would be a guess" was right
+about a preference and wrong about a unit: `l` is dimensionless and is not scale-free in the
+sample, so one stated number is a different trade-off at every sampling frequency. The rule
+carries the sample's own units, and the preference stays in the caller's `ratio`.
+
+**A second pair travels in the `CalibrationContext`.** The rule reads the significance level
+of its own slot, because its tail-term scale is a CVaR at that level. `alpha` and `l`
+therefore travel together on the shape `alpha` and `kappa` already use, and the three sites
+that resolve an `l` slot resolve the level first and state it in the context.
+
+## Amendment (2026-09-01) — the calibration family has its own file
+
+**`AbstractCalibrationAlgorithm` moved.** It lives in
+[`src/14_UncertaintySets/06_CalibrationRules.jl`](../../src/14_UncertaintySets/06_CalibrationRules.jl),
+with the whole Calibration Rule and Role family beside it. The amendment of 2026-08-28 states
+that the root lives in `src/19_RiskMeasures/01_Base_RiskMeasures.jl` beside `resolve_slot`, and
+that statement is now out of date. The move is structural: no type, no bound and no verb
+changed, and the file loads before the risk measures, as it did when it sat inside them.
+
+**The re-parenting still has not shipped.** `AbstractUncertaintyKAlgorithm` and
+`AbstractUncertaintyEpsAlgorithm` still subtype `AbstractAlgorithm` directly. The move puts the
+calibration root in the same directory as the two families, so a later re-parenting no longer
+needs the root in `src/01_Base.jl` first.

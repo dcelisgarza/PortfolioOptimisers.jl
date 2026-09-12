@@ -111,7 +111,7 @@ Property access delegates to the embedded [`JuMPOptimisationResult`](@ref): the 
     """
     noc_retcode
     """
-    $(field_dict[:fb])
+    $(field_dict[:fb_res])
     """
     fb
     function NearOptimalCenteringResult(jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM,
@@ -119,7 +119,7 @@ Property access delegates to the embedded [`JuMPOptimisationResult`](@ref): the 
                                         w_opt_retcode::OptRetCode_VecOptRetCode,
                                         w_max_retcode::OptimisationReturnCode,
                                         noc_retcode::OptRetCode_VecOptRetCode,
-                                        fb::Option{<:OptE_Opt})
+                                        fb::Option{<:OptE_Opt_FbChain})
         return new{typeof(jr), typeof(r), typeof(w_min_retcode), typeof(w_opt_retcode),
                    typeof(w_max_retcode), typeof(noc_retcode), typeof(fb)}(jr, r,
                                                                            w_min_retcode,
@@ -133,9 +133,36 @@ function NearOptimalCenteringResult(; jr::JuMPOptimisationResult, r::BaseRM_VecB
                                     w_opt_retcode::OptRetCode_VecOptRetCode,
                                     w_max_retcode::OptimisationReturnCode,
                                     noc_retcode::OptRetCode_VecOptRetCode,
-                                    fb::Option{<:OptE_Opt})::NearOptimalCenteringResult
+                                    fb::Option{<:OptE_Opt_FbChain})::NearOptimalCenteringResult
     return NearOptimalCenteringResult(jr, r, w_min_retcode, w_opt_retcode, w_max_retcode,
                                       noc_retcode, fb)
+end
+"""
+    set_retcode(res::NearOptimalCenteringResult, retcode::OptRetCode_VecOptRetCode)
+
+Rebuild a [`NearOptimalCenteringResult`](@ref) with a different return code.
+
+The population's return code is the one the embedded [`JuMPOptimisationResult`](@ref) carries, because `retcode` is not a field of this result and resolves through `jr`. So the rebuild rebuilds `jr`, and the three return codes this result names of its own are carried over unchanged.
+
+# Arguments
+
+  - `res`: Result to rebuild.
+  - `retcode`: Return code, or one per member of the population.
+
+# Returns
+
+  - [`NearOptimalCenteringResult`](@ref): The result, with the new return code.
+
+# Related
+
+  - [`set_retcode`](@ref)
+  - [`mark_ruined_members`](@ref)
+  - [`NearOptimalCenteringResult`](@ref)
+"""
+function set_retcode(res::NearOptimalCenteringResult, retcode::OptRetCode_VecOptRetCode)
+    return NearOptimalCenteringResult(set_retcode(res.jr, retcode), res.r,
+                                      res.w_min_retcode, res.w_opt_retcode,
+                                      res.w_max_retcode, res.noc_retcode, res.fb)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -647,6 +674,10 @@ function near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResu
     unconstrained = isa(noc.alg, UnconstrainedNearOptimalCentering)
     r = ucs_risk_measure(noc.r, rd)
     attrs = processed_jump_optimiser_attributes(noc.opt, rd; dims = dims, kwargs...)
+    # The corner solves below run the head's own `opt`, `r` and anchor weights against
+    # `rd`, so the head is reduced before any of them, and before the optimiser is
+    # repackaged from the bundle. `_optimise` takes the same view of its own locals.
+    noc, rd = investable_view(noc, rd, attrs.pr, attrs.imsk)
     opt = jump_optimiser_from_attributes(noc.opt, attrs)
     # The per-term corner solves need the same unbounded pair the max-return corner uses, so
     # the pair is built whenever a return term declares a frontier bound, even when both
@@ -1321,9 +1352,15 @@ function _optimise(noc::NearOptimalCentering, rd::ReturnsResult = ReturnsResult(
     noc = reset_time_dependent_estimator(noc)
     setup = near_optimal_centering_setup(noc, rd; dims = dims, kwargs...)
     (; w_opt, r, opt, attrs, w_min_retcode, w_opt_retcode, w_max_retcode) = setup
+    # The setup reduced its own locals. These are this method's, and they reach
+    # `assemble_near_optimal_centering_model!` directly.
+    noc, rd = investable_view(noc, rd, attrs.pr, attrs.imsk)
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, opt.sc, opt.so)
+    # Both variants fit on the prior's returns matrix. `rd` defaults to an empty
+    # `ReturnsResult` on this path, so the prior is the only matrix that is always there.
+    set_model_observations!(model, size(opt.pe.X, 1))
     set_maximum_ratio_factor_variables!(model, MinimumRisk())
     set_w!(model, opt.pe.X, w_opt)
     set_weight_constraints!(model, opt.wb, opt)
@@ -1347,7 +1384,7 @@ end
     optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                       <:Any, <:Any, <:Any, <:Any, <:Any, Nothing
                   },
-             rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
+             rd::ReturnsResult; dims::Int = 1,
              str_names::Bool = false, save::Bool = true, kwargs...) -> NearOptimalCenteringResult
 
 Run the Near Optimal Centering portfolio optimisation.
@@ -1361,6 +1398,10 @@ Run the Near Optimal Centering portfolio optimisation.
   - `save`: Whether to save the JuMP model in the optimisation result.
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
 
+# Validation
+
+  - No field in the tree of `noc` holds an [`Online`](@ref). An `ArgumentError` naming the field is thrown otherwise, through [`assert_batch_entry`](@ref): a plain `optimise` is a batch fit, and a wrapper resolves only at the warm-up of the fold loop's online arm.
+
 # Related
 
   - [`NearOptimalCentering`](@ref)
@@ -1368,8 +1409,9 @@ Run the Near Optimal Centering portfolio optimisation.
 """
 function optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                             <:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
-                  rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
-                  str_names::Bool = false, save::Bool = true, kwargs...)
+                  rd::ReturnsResult; dims::Int = 1, str_names::Bool = false,
+                  save::Bool = true, kwargs...)
+    assert_batch_entry(noc, "`optimise`")
     return _optimise(noc, rd; dims = dims, str_names = str_names, save = save, kwargs...)
 end
 

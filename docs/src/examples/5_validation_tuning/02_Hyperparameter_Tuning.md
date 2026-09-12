@@ -1,5 +1,4 @@
 The source files can be found in [examples/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../../examples/5_validation_tuning/02_Hyperparameter_Tuning.jl"
 ```
@@ -75,8 +74,13 @@ The parameter tuning uses a scoring function, a scoring metric (a risk measure),
 
 ````@example 02_Hyperparameter_Tuning
 opt = JuMPOptimiser(; slv = slv)
+# The searches below tune an L2 regularisation coefficient. That coefficient is the `val`
+# field of an [`L2Regularisation`](@ref), and the `l2` field of [`JuMPOptimiser`](@ref)
+# holds the estimator rather than the number, so the first inner optimiser carries one and
+# the lens reaches through it.
+optl2 = JuMPOptimiser(; slv = slv, l2 = L2Regularisation())
 r = MeanReturnRiskRatio(; rk = LowOrderMoment(; alg = SecondMoment()))
-st = Stacking(; opti = [MeanRisk(; opt = opt), RiskBudgeting(; opt = opt)],
+st = Stacking(; opti = [MeanRisk(; opt = optl2), RiskBudgeting(; opt = opt)],
               opto = MeanRisk(; opt = opt))
 ````
 
@@ -95,9 +99,9 @@ Here we will search three grids, the final score will reflect the best performin
 ````@example 02_Hyperparameter_Tuning
 p = concrete_typed_array([["opti[2].opt.l1" =>
                                range(; start = 0.0005, stop = 0.0008, length = 3),
-                           "opti[1].opt.l2" =>
+                           "opti[1].opt.l2.val" =>
                                range(; start = 0.0004, stop = 0.0007, length = 3)],
-                          ["opti[1].opt.l2" =>
+                          ["opti[1].opt.l2.val" =>
                                range(; start = 0.0004, stop = 0.0007, length = 3)],
                           ["opti[2].opt.l1" =>
                                range(; start = 0.0009, stop = 0.0012, length = 3)],
@@ -172,8 +176,8 @@ Now let's sample from a combination of the predefined parameter space and a dist
 
 ````@example 02_Hyperparameter_Tuning
 p = [["opti[2].opt.l1" => range(; start = 0.0005, stop = 0.0008, length = 3),
-      "opti[1].opt.l2" => LogUniform(0.0003, 0.1)],
-     ["opti[1].opt.l2" => LogUniform(0.001, 0.1)],
+      "opti[1].opt.l2.val" => LogUniform(0.0003, 0.1)],
+     ["opti[1].opt.l2.val" => LogUniform(0.001, 0.1)],
      ["opti[2].opt.l1" => range(; start = 0.0009, stop = 0.0012, length = 3)],
      ["opti[2]" => [MeanRisk(; opt = opt, obj = MaximumUtility()),
                     MeanRisk(; opt = opt, obj = MaximumRatio())]]]

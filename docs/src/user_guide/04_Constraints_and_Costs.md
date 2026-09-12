@@ -1,5 +1,4 @@
 The source files can be found in [user_guide/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/user_guide/).
-
 ```@meta
 EditURL = "../../../user_guide/04_Constraints_and_Costs.jl"
 ```
@@ -82,8 +81,9 @@ Real mandates are often written in **factor** names rather than tickers — "at 
 the loadings matrix a factor model already computes.
 
 Wrap a [`LinearConstraintEstimator`](@ref) in an [`ExposureConstraintEstimator`](@ref) and declare
-the space with [`FactorSpace`](@ref); the names resolve against the factor axis a
-[`UniverseSets`](@ref) declares under `fkey` (default `"nf"`), and the rows are projected through
+the space with [`FactorSpace`](@ref); the names resolve against the factor axis the loadings name,
+which for a time-series regression is the one a [`UniverseSets`](@ref) declares under `tfkey`
+(default `"nf"`), and the rows are projected through
 the loadings while the constraint is generated. What the optimiser receives is an ordinary
 asset-space constraint, so this composes with everything else on this page.
 
@@ -98,7 +98,7 @@ precedence and when a pinned basis goes stale.
 ````@example 04_Constraints_and_Costs
 Fac = TimeArray(CSV.File(joinpath(@__DIR__, "../examples/Factors.csv.gz"));
                 timestamp = :Date)[(end - 252):end]
-rd_f = prices_to_returns(X, Fac)
+rd_f = prices_to_returns(price_ingestion(PriceIngestion(), X; F = Fac))
 sets_f = UniverseSets(; dict = Dict("nx" => rd_f.nx, "nf" => rd_f.nf))
 
 res_fac = optimise(MeanRisk(; obj = MinimumRisk(),
@@ -170,9 +170,9 @@ When a mandate needs something no built-in keyword covers — a continuous per-a
 like a factor score, or a relationship between weights that isn't a plain linear bound — two
 [`JuMPOptimiser`](@ref) extension points let you write straight against the JuMP model:
 
-- `cobj` takes a [`CustomJuMPObjective`](@ref) — implement [`add_custom_objective_term!`](@ref)
+  - `cobj` takes a [`CustomJuMPObjective`](@ref) — implement [`add_custom_objective_term!`](@ref)
     to price a preference, contributing the term with [`add_to_objective_penalty!`](@ref).
-- `ccnt` takes a [`CustomJuMPConstraint`](@ref) — implement [`add_custom_constraint!`](@ref) to
+  - `ccnt` takes a [`CustomJuMPConstraint`](@ref) — implement [`add_custom_constraint!`](@ref) to
     add a constraint to the model.
 
 Each keyword takes a single estimator or a vector of them, and each hook dispatches on the

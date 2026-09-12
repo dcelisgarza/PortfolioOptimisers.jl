@@ -3,7 +3,7 @@
 ```@docs
 LowOrderPrior
 HighOrderPrior
-prior(pr::AbstractPriorEstimator, rd::ReturnsResult; kwargs...)
+prior(pe::AbstractPriorEstimator, rd::ReturnsResult; kwargs...)
 prior(pr::AbstractPriorResult, args...; kwargs...)
 assert_prior_regression
 prior_regression_remedy
@@ -29,5 +29,18 @@ PrE_Pr
 port_opt_view(pr::Union{Nothing, AbstractPriorEstimator}, ::Any, args...)
 port_opt_view(pr::LowOrderPrior, rd, args...)
 port_opt_view(pr::HighOrderPrior, rd, args...)
-feature_matrix_picker
+investable_mask
+investable_views
+investable_prior
+investable_universe_names
+scenario_fill_pairs
+scenario_fill_msg
+resolve_fill_limit
+scenario_fill
+held_non_investable
+investable_weights_view
+PortfolioOptimisers.scenario_window
+PortfolioOptimisers.scenario_ens
+PortfolioOptimisers.scenario_fill_report
+PortfolioOptimisers.scenario_fill_remember!
 ```

@@ -40,7 +40,8 @@ CorrelationCovariance
      │    ce ┼ GeneralCovariance
      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
      │       │    w ┴ nothing
-     │   alg ┴ FullMoment()
+     │   alg ┼ FullMoment()
+     │     w ┴ nothing
 ```
 
 # Related
@@ -71,10 +72,17 @@ Compute the correlation matrix using the underlying estimator.
 
 This method delegates to `Statistics.cor(ce.ce, X; dims = dims, kwargs...)`, returning the correlation matrix as the "covariance". This is useful when a correlation matrix is required in a context that accepts a covariance estimator.
 
+# Algorithm
+
+ 1. Call `Statistics.cor(ce.ce, X; dims = dims, kwargs...)` and return its result.
+
+The returned matrix carries a unit diagonal, so a caller that reads the diagonal for a variance
+reads ones, not variances.
+
 # Arguments
 
   - `ce`: Correlation covariance estimator.
-  - `X`: Data matrix of asset returns (observations × assets).
+  - $(arg_dict[:X])
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the underlying estimator.
 
@@ -91,6 +99,29 @@ function Statistics.cov(ce::CorrelationCovariance, X::MatNum; dims::Int = 1, kwa
     return Statistics.cor(ce.ce, X; dims = dims, kwargs...)
 end
 """
+    gap_fill_value(ce::CorrelationCovariance) -> Number
+
+Answer what `ce.ce` answers, because the estimator forwards the sample and its keywords untouched.
+
+This estimator reads no cell of the sample itself: it calls the correlation verb of `ce.ce` and answers what comes back. A gap is therefore the inner estimator's to keep or to lose.
+
+# Arguments
+
+  - `ce`: Correlation covariance estimator.
+
+# Returns
+
+  - `fv::Number`: [`gap_fill_value`](@ref) of `ce.ce`.
+
+# Related
+
+  - [`CorrelationCovariance`](@ref)
+  - [`gap_fill_value`](@ref)
+"""
+function gap_fill_value(ce::CorrelationCovariance)
+    return gap_fill_value(ce.ce)
+end
+"""
     Statistics.cor(ce::CorrelationCovariance, X::MatNum; dims::Int = 1,
                    kwargs...)
 
@@ -98,10 +129,16 @@ Compute the correlation matrix using the underlying estimator.
 
 This method delegates to `Statistics.cor(ce.ce, X; dims = dims, kwargs...)`.
 
+# Algorithm
+
+ 1. Call `Statistics.cor(ce.ce, X; dims = dims, kwargs...)` and return its result.
+
+`cov` and `cor` on a [`CorrelationCovariance`](@ref) return the same matrix.
+
 # Arguments
 
   - `ce`: Correlation covariance estimator.
-  - `X`: Data matrix of asset returns (observations × assets).
+  - $(arg_dict[:X])
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the underlying estimator.
 

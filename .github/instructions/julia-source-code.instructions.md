@@ -23,7 +23,7 @@ These three abstract hierarchies form the backbone of the library. Understanding
 - **Results** (`<: AbstractResult`):
   - Returned by functions that consume estimators when the output is complex enough to warrant its own type (e.g., contains multiple arrays, metadata).
   - Can themselves be passed as inputs to further computations — functions must dispatch on both estimator and result types where this makes sense.
-  - Example: `LowOrderPrior`, `ClustersResult`, `OptimisationResult`.
+  - Example: `LowOrderPrior`, `Clusters`, `OptimisationResult`.
 
 ## Type Definitions
 
@@ -44,12 +44,12 @@ These three abstract hierarchies form the backbone of the library. Understanding
 
 ## Capability Catalogue (required for every new public-facing addition)
 
-Every concrete estimator, algorithm, and exported function is listed in the **Capability Catalogue** — the user-facing inventory of what the package can do (see ADR 0040).
+Every concrete type on the Choice Surface, and every exported function, is listed in the **Capability Catalogue** — the user-facing inventory of what the package can do (see ADR 0040).
 
-**When you add a new estimator, algorithm, or exported function, you must also place it in `docs/capability_catalogue.jl`.** This is not optional bookkeeping: it is enforced by `test/test_26_docs.jl`, which fails if any concrete leaf subtype of `AbstractEstimator` or `AbstractAlgorithm` is absent, and CI runs that test on every PR touching `src/`.
+**When you add a new type or exported function, you must also place it in `docs/capability_catalogue.jl`.** This is not optional bookkeeping: it is enforced by `test/test_26_docs.jl`, which fails if any name on the Choice Surface is absent, and CI runs that test on every PR touching `src/`. A concrete type the package declares is on the surface when it is a leaf subtype of `AbstractEstimator`, of `AbstractAlgorithm` or of `AbstractCovarianceEstimator`, or when it is an export under its own name; a Result and an error are subtracted. `choice_surface_names` in `docs/generate_capability_catalogue.jl` states that rule once.
 
-- **New estimator or algorithm** — add a `Cap(:YourType)` to the group it belongs to. Pick the group by the *job it does*, not the file it lives in.
-- **New estimator or algorithm the library constructs for itself** — a marker or other internal type no caller ever writes is not a choice, so list it in `NOT_A_CHOICE` with the reason `:internal` instead of cataloguing it. It keeps its docstring and its API page.
+- **New type on the choice surface** — add a `Cap(:YourType)` to the group it belongs to. Pick the group by the *job it does*, not the file it lives in.
+- **New type the library constructs for itself** — a marker or other internal type no caller ever writes is not a choice, so list it in `NOT_A_CHOICE` with the reason `:internal` instead of cataloguing it. It keeps its docstring and its API page.
 - **New exported function** — either add a `Cap`, mention it in a section's `Prose` (a prose `@ref` counts as catalogued), or, if it is genuinely not a user-facing capability, list it in `NOT_A_FEATURE` with a reason: `:alias`, `:base_overload`, `:trait`, or `:internal`.
 - **Do not write a description.** Each entry's one-line description is taken from the first sentence of its docstring at build time, so there is exactly one description of every type in the repo. Pass `label` only where the docstring genuinely reads worse in a bullet (for example when a group's children would all repeat the same prefix).
 - **Removing an export or a type?** Also remove its `NOT_A_FEATURE` or `NOT_A_CHOICE` entry — both checks run in both directions and a stale exemption fails too.
@@ -102,7 +102,7 @@ end
   function foo(x::Option{<:VecNum} = nothing) ...
   ```
 
-- **Common type aliases** defined in `01_Base.jl` — always prefer them over writing out the full union/abstract type:
+- **Common type aliases** defined in `src/01_Base/08_TypeAliases.jl` — always prefer them over writing out the full union/abstract type:
 
   | Alias | Meaning |
   | --- | --- |
@@ -115,6 +115,48 @@ end
   | `ObsWeights` | `StatsBase.AbstractWeights` |
   | `Option{T}` | `Union{Nothing, T}` |
 
+## Numeric types come from the data
+
+A numeric type is **derived**, never **coerced**. Read it off the arguments with `eltype`,
+`typeof`, `real` and `promote_type`, and let the arithmetic widen it. The library must stay open to
+number types it has never seen — an automatic-differentiation dual, a unit-carrying quantity, an
+arbitrary-precision float — because each one arrives through a caller's array and never through a
+change here. Every forced type closes the library to one of them.
+
+```julia
+Tf = eltype(X)                                  # the element type of one argument
+Tf = promote_type(real(eltype(X)), typeof(p))   # the element type of several
+Tf = typeof(one(Ts) / one(Ts))                  # the type one operation lands in
+```
+
+**Do not wrap a derived type in `float`.** `float(Int)` is `Float64`, so one integer argument
+inside a `promote_type` widens the whole computation to `Float64` and a `Float32` caller silently
+loses its precision. The wrapper also decides for a number type the library has never seen: a
+`Rational` argument becomes inexact, and a number type another package defines is converted to
+whatever `float` says rather than to what the arithmetic says. `nextfloat` and `prevfloat` are
+different verbs. They step a value and coerce nothing, so this rule does not reach them.
+
+**Derive from the operation when the operation widens.** A mean, a variance, a correlation and a
+regression coefficient all divide, and a division of two integers lands in a float. Take the type
+from the division rather than from the arguments, as `cross_sectional_regression` in
+[`src/08_Moments/38_CrossSectionalRegression.jl`](../../src/08_Moments/38_CrossSectionalRegression.jl)
+does. The result is wider than `float`, not narrower: an integer panel still regresses in
+`Float64`, a `Float32` panel stays in `Float32`, and an exact type stays exact.
+
+**A concrete type is admitted only when the code really needs that type**, and then only when no
+method converts internally. An index is the usual case.
+
+- An index from a floating-point value takes the in-function conversion: `ceil(Int, x)`,
+  `floor(Int, x)`, `round(Int, x)` and their siblings. Never `Int(ceil(x))`, which rounds in one
+  type and then converts in another.
+- An index or a count from integer arithmetic keeps `eltype`, and divides with `÷` rather than
+  with `/` followed by a conversion.
+
+**Keep a signature as wide as the body allows.** Prefer `VecNum`, `MatNum`, `ArrNum` and
+`<:Number` over a narrower bound, so a caller may bring a number type from another package. Narrow
+to `<:Real` only where the body needs an order, and to a concrete type only where the body needs
+that exact representation.
+
 ## Union Type Aliases and Dispatch Groups
 
 When multiple abstract subtypes share a common interface, define a `const` union alias and dispatch on it:
@@ -124,19 +166,13 @@ const AbstractLowOrderPriorEstimator_A_AF = Union{<:AbstractLowOrderPriorEstimat
                                                   <:AbstractLowOrderPriorEstimator_AF}
 ```
 
-This avoids duplicating method definitions. Always document the alias with a docstring explaining which types it groups and why.
+This avoids duplicating method definitions. A union alias is a **dispatch alias**, and its docstring states what the alias groups and why the group exists. Which sections that docstring carries is stated by [`julia-docstrings.instructions.md`](julia-docstrings.instructions.md) § *Section Structure for Aliases*, which is the Authority for it.
 
-## Docstring Documentation Dictionaries
+## Docstrings
 
-Four dictionaries in `01_Base.jl` provide standardised descriptions for arguments, fields, returns, and validation. **Always interpolate from these dictionaries** in docstrings instead of writing ad-hoc descriptions. This ensures consistency across the entire library.
+[`julia-docstrings.instructions.md`](julia-docstrings.instructions.md) is the Authority for every docstring rule. It states which sections each kind of unit carries, what each section holds, the dictionaries in `src/01_Base/01_DocstringDictionaries.jl` that a description interpolates from, the mathematical notation, and the `jldoctest` blocks. Read it before you write a docstring, and change a docstring rule there and nowhere else.
 
-- `arg_dict` — argument descriptions (e.g., `$(arg_dict[:ce])`).
-- `field_dict` — field descriptions, derived from `arg_dict` by stripping the parameter name prefix (e.g., `"$(field_dict[:ce])"`).
-- `val_dict` — validation rules (e.g., `$(val_dict[:oow])`).
-- `ret_dict` — return value descriptions (e.g., `$(ret_dict[:sigma])`).
-- `math_dict` — LaTeX mathematical notation descriptions (e.g., `$(math_dict[:tgt])`).
-
-If a parameter, field, or return value does not yet have an entry, add it to the appropriate dictionary in `01_Base.jl` before writing the docstring.
+An **alias** is the case to check first. Its docstring carries a different set of sections from the unit it names, the set differs by kind of alias, and `test/test_26_docs.jl` reds the file over a section outside that set. See § *Section Structure for Aliases*.
 
 ## Immutability and `Accessors.jl`
 
@@ -188,7 +224,7 @@ If a parameter, field, or return value does not yet have an entry, add it to the
 
 ## Code Organization
 
-- **File naming**: Source files are prefixed numerically to indicate load order (e.g., `01_Base.jl`).
+- **File naming**: Source files are prefixed numerically to indicate load order (e.g., `src/01_Base/01_DocstringDictionaries.jl`).
 - **Module structure**: Each submodule focuses on a specific domain (moments, risk, priors, etc.).
 - **Type hierarchy**: Subtype the appropriate abstract type (`AbstractEstimator`, `AbstractAlgorithm`, `AbstractResult`).
 - **Exports**: Every source file ends with an `export` line listing all public symbols it defines. Do not export internal helpers.
@@ -199,7 +235,7 @@ If a parameter, field, or return value does not yet have an entry, add it to the
 - Accept other estimators/algorithms as parameters when appropriate.
 - Return result types that encapsulate outcomes for easy chaining.
 - Implement `factory(estimator, w::ObsWeights)` to propagate observation weights through composed estimators.
-- Implement `moment_view(estimator, i)` / `prior_view(estimator, i)` to support windowed or cross-validated slicing.
+- Implement `port_opt_view(estimator, i)` and `obs_weights_view(estimator, i)` to support windowed or cross-validated slicing.
 
 ## Error Handling
 
@@ -210,15 +246,3 @@ If a parameter, field, or return value does not yet have an entry, add it to the
   - `IsNonFiniteError` for non-finite numbers.
   - `DimensionMismatch` for size mismatches.
   - `DomainError` for out-of-range values.
-
-## Related Types References
-
-- Always include a `# Related` section in docstrings.
-- Link to abstract parent types, related estimators, algorithms, and result types.
-- Use the `[@ref]` syntax: ``[`TypeName`](@ref)``.
-
-## Examples in Docstrings
-
-- Use `jldoctest` blocks for testable examples when feasible.
-- Provide simple, clear examples that demonstrate basic usage.
-- For complex features, provide multiple examples showing different use cases.

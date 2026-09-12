@@ -334,7 +334,7 @@ The [`PipelineContext`](@ref) slots each written slot invalidates, derived from 
 
 Writing a [data slot](@ref PIPELINE_DATA_SLOTS) makes every slot *derived* from that data stale: a prior, phylogeny, uncertainty set, or constraint result computed on one asset universe does not match a later, different one. [`Pipeline`](@ref) rejects such an ordering at construction rather than letting a stale, asset-misdimensioned result reach [`inject_context`](@ref).
 
-The derivation: only a data slot invalidates, and it invalidates every slot after it in [`PIPELINE_SLOTS`](@ref) *except* the terminal `:opt`. `:opt` is the workflow's output — nothing derives from it, so a stale `:opt` is never read by a later step; it is excluded from the invalidatable set by construction. A slot filled by the pipeline *input* rather than by a step is not "written", so the usual `MissingDataFilter → Imputer → PricesToReturns → …` ordering is unaffected, and a non-data write (`prior`, `phylogeny`, `uncertainty`, `constraints`, `opt`) invalidates nothing.
+The derivation: only a data slot invalidates, and it invalidates every slot after it in [`PIPELINE_SLOTS`](@ref) *except* the terminal `:opt`. `:opt` is the workflow's output — nothing derives from it, so a stale `:opt` is never read by a later step; it is excluded from the invalidatable set by construction. A slot filled by the pipeline *input* rather than by a step is not "written", so the usual `MissingDataFilter → PriceGapFill → PricesToReturns → …` ordering is unaffected, and a non-data write (`prior`, `phylogeny`, `uncertainty`, `constraints`, `opt`) invalidates nothing.
 
 # Related
 

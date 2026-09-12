@@ -3,7 +3,7 @@
 ```@docs
 BaseStackingOptimisationEstimator
 StackingResult
-factory(res::StackingResult, fb::Option{<:OptE_Opt})
+factory(res::StackingResult, fb::Option{<:OptE_Opt_FbChain})
 stacking_td_defaults
 Stacking
 needs_previous_weights(opt::Stacking)

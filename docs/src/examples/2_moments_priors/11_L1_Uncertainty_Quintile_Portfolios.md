@@ -1,5 +1,4 @@
 The source files can be found in [examples/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../../examples/2_moments_priors/11_L1_Uncertainty_Quintile_Portfolios.jl"
 ```
@@ -18,7 +17,7 @@ true characteristic lies somewhere in an ℓ1 ball around your estimate. The bal
 is the *only* dial, and it decides how many assets you hold:
 
 | radius | portfolio | active assets |
-| :-- | :-- | :-- |
+|:--|:--|:--|
 | `ε → 0` | trust the estimate completely | 1 (the single best asset) |
 | `ε` moderate | quintile portfolio | ~20% |
 | `ε` large | give up on the estimate | all of them, equally weighted (1/N) |
@@ -79,9 +78,9 @@ N = size(rd.X, 2)
 
 Three pieces do the work:
 
-- [`ArithmeticReturn`](@ref) with a `ucs` — makes the return *worst-case* rather than nominal.
-- [`MaximumReturn`](@ref) — the objective. There is no risk term in this problem at all.
-- [`NoRisk`](@ref) — says so explicitly.
+  - [`ArithmeticReturn`](@ref) with a `ucs` — makes the return *worst-case* rather than nominal.
+  - [`MaximumReturn`](@ref) — the objective. There is no risk term in this problem at all.
+  - [`NoRisk`](@ref) — says so explicitly.
 
 That last one deserves a word. `MeanRisk` requires a risk measure, so without `NoRisk` the
 default [`Variance`](@ref) would be built and then thrown away by the objective — dragging
@@ -412,12 +411,12 @@ price, and neither term could express it alone.
 
 Two things to keep in mind when a model carries several terms:
 
-- **`scale` is a weight, not a normalisation.** The terms are summed as written, so two
+  - **`scale` is a weight, not a normalisation.** The terms are summed as written, so two
     terms are not averaged unless you halve both. Fees follow the same arithmetic: a term
     charges them only if its `fee` flag says so, so two flagged terms at `scale = 1` subtract
     the fees twice. That is a statement about the configuration, not a defect — set `fee` and
     `mic` to `false` on any term that is not in return units.
-- **`rte = false` covers two different wants.** A term that is not in return units has no
+  - **`rte = false` covers two different wants.** A term that is not in return units has no
     business in a sum of returns; and a term that *is* in return units, like the floor above,
     may still be wanted as a bound alone. The flag says only "this term does not enter the
     objective" — its `lb` binds either way.
@@ -529,22 +528,22 @@ does.
 
 ## 13. Takeaways
 
-- The quintile and 1/N portfolios are **exact solutions** of a robust optimisation problem,
+  - The quintile and 1/N portfolios are **exact solutions** of a robust optimisation problem,
     not heuristics. `ε` is the only dial and it decides how many assets you hold.
-- This library has **no quintile optimiser** on purpose. It is
+  - This library has **no quintile optimiser** on purpose. It is
     `MeanRisk(; r = NoRisk(), obj = MaximumReturn())` over an ℓ1 `ucs`, so it composes with
     every constraint you already know (ADR 0032).
-- Do not tune `ε`. It has no scale. Use [`ActiveAssetsUncertaintyAlgorithm`](@ref) and say
+  - Do not tune `ε`. It has no scale. Use [`ActiveAssetsUncertaintyAlgorithm`](@ref) and say
     how many assets you want — but treat it as a calibration, not a guarantee.
-- `scaled = true` swaps equal weighting for inverse-volatility weighting by changing only
+  - `scaled = true` swaps equal weighting for inverse-volatility weighting by changing only
     the *geometry of the ball*.
-- Budgets **bound** realised exposure rather than pinning it; `xbgt` pins them, at the price
+  - Budgets **bound** realised exposure rather than pinning it; `xbgt` pins them, at the price
     of a MILP.
-- The characteristic need not be a return — [`ArithmeticReturn`](@ref)'s `mu` slot ranks on
+  - The characteristic need not be a return — [`ArithmeticReturn`](@ref)'s `mu` slot ranks on
     whatever you put in it, including the estimator that computes it. Put it on the **term**,
     never in the outer prior, whose `μ` every mean-centred risk measure reads. Mind the
     direction: the objective maximises, so negate any characteristic where smaller is better.
-- `ret` takes **several terms**, summed with weights (ADR 0052). A term with `rte = false`
+  - `ret` takes **several terms**, summed with weights (ADR 0052). A term with `rte = false`
     stays out of the objective and keeps its own `lb`, which is how you price what a floor on
     one quantity costs in another.
 

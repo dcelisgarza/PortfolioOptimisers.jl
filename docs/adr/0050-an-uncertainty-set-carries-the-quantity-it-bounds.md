@@ -116,3 +116,13 @@ uses one. That is the whole argument for the field.
   the Prior is the fallback. Rewritten in the same change.
 - This is a fix to the **single**-characteristic case. It is a prerequisite for multiplicity
   ([#265](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/265)), not part of it.
+
+## Amendment (2026-09-11)
+
+[ADR 0138](0138-an-uncertainty-set-with-no-prior-of-its-own-is-calibrated-on-the-prior-result-it-is-handed-and-a-scenario-cap-states-its-count.md)
+gives the four returns-data estimators an opt-in `pe = nothing`, under which the set is calibrated
+on the prior result it is handed — inside an optimiser, the prior the optimiser is solving on. For
+such a set "the carried quantity wins" and "the set is centred on the objective's own prior" are
+the same statement, so the two fits this ADR found independent agree by construction, with no
+side effect on the other consumers of `pr.mu`, which is what example 11 had to arrange by hand.
+The default `pe = EmpiricalPrior()` is unchanged, and so is the precedence this ADR fixed.

@@ -6,7 +6,7 @@ status: accepted
 
 ## Context
 
-[`DynamicAbstractWeights`](../../src/01_Base.jl) is an extension point: a user subtypes it and
+[`DynamicAbstractWeights`](../../src/01_Base/02_TypeRoots.jl) is an extension point: a user subtypes it and
 implements `get_observation_weights` for the input shapes they care about — a `VecNum` arity and a
 `MatNum` arity, both documented on the abstract type. The library ships **no concrete subtype and no
 test** exercising one, so the contract lived entirely in prose.
@@ -84,7 +84,7 @@ Three corollaries follow:
    only ever sees a concrete vector or a deliberate `nothing`. `cov(::GeneralCovariance, …)` is
    fixed to do this, matching `cor`.
 3. **The error carries the guidance**, since a user hitting it is by definition mid-way through
-   implementing an extension point: [`ObservationWeightsError`](../../src/01_Base.jl) (a
+   implementing an extension point: [`ObservationWeightsError`](../../src/01_Base/07_Errors.jl) (a
    `PortfolioOptimisersError`, following `TimeDependentDefaultError`) names the offending type, the
    shape it was handed, and both method signatures to write.
 

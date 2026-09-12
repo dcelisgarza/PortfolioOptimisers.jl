@@ -143,3 +143,85 @@ once, none of the members writes `pe.l *`, and `vanilla_posteriors` declares no 
 
 - ADR 0046 governs what a prior *forwards*. This ADR governs the arithmetic a prior applies to
   its own posterior; the two do not overlap.
+
+## Amendment (2026-08-27)
+
+**The update runs on the scale the views are written on, so a level the prior mean lacks is
+added before the blend and never after it.** This reverses the direction of the decision above
+for the two members that can build an equilibrium mean, and it closes issue #570.
+
+### Why the original direction was wrong
+
+A Black-Litterman update blends the prior mean against the view returns by forming the residual
+`q - P \mu`. The caller writes those view returns about the assets and factors as the data
+reports them, so `q` is a total return, and `\mu` must be on the same scale when the residual is
+formed. Converting `\mu` to an excess scale, blending, and converting back does not undo itself,
+because the update is affine and not a translation: a shift of `-r_f` on the whole stack reaches
+the asset half as `-(I - GP)r_f \mathbf{1}`, not as `-r_f \mathbf{1}`. The decision above
+recorded that non-cancellation as a property to document. It is better read as evidence that the
+conversion sat on the wrong side of the blend.
+
+The same argument applies to the regression intercept, and there it was doing visible damage.
+`AugmentedBlackLittermanPrior` added `rr.b` to the asset half *after* the update, on both
+branches. On the `l === nothing` branch the prior asset mean is the mean of `X`, and least
+squares with an intercept forces `mean(X) = M \mu_f + b`, so the intercept was in that mean
+already. The estimator counted it twice, and the returned `mu` sat `b` above the mean the
+augmented system produced — the same order as the expected returns themselves on daily data.
+Issue #570 carries the reproduction. The published reference has the same asymmetry: its
+equilibrium branch builds a premium by reverse optimisation and then adds the loadings constant,
+which is right, and its historical branch adds the constant to a mean that already contains it.
+
+### Decision
+
+**Every prior mean reaches `vanilla_posteriors` as a total return, on the axis it lives on, and
+nothing is added to the answer afterwards.**
+
+- A mean taken from a wrapped prior estimator is one already, and reaches the update untouched.
+  `remove_rf` loses its last caller and is deleted.
+- An equilibrium mean is a bare risk premium, so the branch that builds one adds what it lacks
+  before the update: `pe.rf` through `apply_rf`, and, in `AugmentedBlackLittermanPrior`, the
+  asset-side intercept `rr.b`.
+- `apply_rf` stays the single site that reads the field. `BlackLittermanPrior` and
+  `BayesianBlackLittermanPrior` have no equilibrium branch and so have nothing to convert. They
+  keep adding the rate to the posterior asset mean, last, where the field is a plain shift of
+  the answer.
+
+### Consequences
+
+**`rf` no longer reaches the answer on the default branch of the two factor members.** With
+`l === nothing`, `FactorBlackLittermanPrior` and `AugmentedBlackLittermanPrior` read the field
+nowhere: their prior mean is the wrapped one, which needs no conversion, and there is no
+posterior-side add. Two fits differing only in `rf` now agree bit for bit. This is a deliberate
+narrowing of what the field does, and it is the honest consequence of the field naming a
+conversion rather than a shift. Widening it again — by giving those two a posterior-side add
+like their siblings' — is a separate decision, and it would reintroduce a rate the views were
+not blended against.
+
+**This changes numbers at the default `rf = 0.0`,** which the ADR above did not.
+
+- `AugmentedBlackLittermanPrior` with `l === nothing` drops the duplicate intercept, so its
+  `mu` moves by `rr.b`. On the shipped `AugmentedBlackLitterman` fixture that is `1.6e-3`
+  against a largest mean of `2.8e-3`.
+- `AugmentedBlackLittermanPrior` with `l` set carries the intercept through the blend as
+  `(I - GP)b` rather than adding it whole afterwards, so its `mu` moves by `7.0e-4` on the same
+  fixture against a largest mean of `2.0e-3`.
+- No covariance moves. The update's covariance path does not read the prior mean, and both
+  columns of the fixture match to `0.0` after the change.
+- `FactorBlackLittermanPrior` moves only for a non-zero `rf`.
+
+**It departs from the published reference on `mu`.** `test/assets/AugmentedBlackLitterman.csv.gz`
+is that reference, and the library matched it bit for bit before this amendment. The golden test
+keeps it: it still checks `sigma` against it exactly, states the `l === nothing` departure as the
+exact vector `reference - rr.b`, and pins the `l` departure as one measured number. A synthetic
+exact factor model, where the identity below is analytic, carries the proof of the mechanism.
+
+**The identity `mu == rr.M * fpr.mu + rr.b` gains a branch and loses a cause.** The
+`AugmentedBlackLittermanPrior` warning named two causes for the gap. The intercept cause is
+gone on both branches, and idiosyncratic variance is the only one left. On an exact factor
+model, where the augmented prior stack satisfies the identity and the update is affine, it now
+holds to machine precision whatever the intercept and whatever `l`.
+
+### Related
+
+- Issue #570 reported the double-counted intercept, and sweep ticket #536 documented it before
+  this amendment reversed it.

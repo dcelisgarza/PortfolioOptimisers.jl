@@ -1,0 +1,37 @@
+# [Cross-Sectional Regression Diagnostics](@id api-cross-sectional-regression-diagnostics)
+
+## Functions
+
+```@docs
+cs_estimation_mask_weights
+cs_gram
+cs_gram_from_weights
+cs_gram_inverse_diagonal
+cs_gram_slice!
+cs_inverse_diagonal!
+cs_regression_data
+cs_regression_lag
+cs_lagged_rows
+cs_reduce_regression
+exposure_vif
+cs_masked_vif
+exposure_condition_number
+cs_masked_condition_number
+cs_diagnostic_mask_weights
+cs_regression_t_stats
+cs_row_is_finite
+cs_weighted_rss
+cs_t_stat_row!
+cs_resolved_gram
+cs_regression_t_stat_exceedance_rate
+cs_regression_score_parts
+cs_score_observation!
+cs_systematic_return
+cs_weighted_score_sums
+cs_estimation_weights_only
+cs_regression_r2
+cs_regression_adjusted_r2
+cs_regression_aic
+cs_regression_bic
+cs_diagnostic_factor_names
+```

@@ -1,5 +1,4 @@
 The source files can be found in [examples/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../../examples/3_optimisers/13_Meta_Optimisers.jl"
 ```
@@ -14,11 +13,11 @@ want different rules for different parts of the universe).
 
 `PortfolioOptimisers` provides three, all sharing the same inner/outer composition idea:
 
-- [`NestedClustered`](@ref) (NCO) — cluster the assets, run an **inner** optimiser inside
+  - [`NestedClustered`](@ref) (NCO) — cluster the assets, run an **inner** optimiser inside
     each cluster, then an **outer** optimiser across the cluster aggregates.
-- [`Stacking`](@ref) — run several inner optimisers on the **full** universe, then stack
+  - [`Stacking`](@ref) — run several inner optimisers on the **full** universe, then stack
     their portfolios together with an outer optimiser (an ensemble).
-- [`SubsetResampling`](@ref) — repeatedly optimise on random **subsets** of the assets and
+  - [`SubsetResampling`](@ref) — repeatedly optimise on random **subsets** of the assets and
     average the resampled weights, à la bagging.
 
 Because the inner and outer slots accept *any* optimisation estimator (including other

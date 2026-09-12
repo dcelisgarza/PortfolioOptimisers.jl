@@ -678,3 +678,30 @@ methods on `AbstractSeparationAlgorithm`:
 `separation_quantile` gains the separation as its first argument, since it is the population's
 sentinel test that it needed. Both predicates are unexported, like `assert_separation_decay` and
 like every graph builder in this family; the api pages document them under their qualified names.
+
+## Amendment (2026-09-01): the construction chain has one file per link
+
+`src/11_Phylogeny/06_Phylogeny.jl` held twelve concepts in 3626 lines. It is now twelve files, one
+per concept, and this ADR's names moved with them. No name, no signature and no docstring changed;
+only the file that declares them did.
+
+- `14_Centrality.jl` — `AbstractCentralityAlgorithm`, the eight members, `TopologyOnly` and
+  `calc_centrality`.
+- `15_CentralityPolarity.jl` — `AbstractCentralityPolarity`, `DistancePolarity`,
+  `SimilarityPolarity` and `centrality_polarity`.
+- `16_MinimumSpanningTree.jl` — `AbstractTreeType`, `Tree_SimMat`, `KruskalTree`, `BoruvkaTree`,
+  `PrimTree` and `calc_mst`.
+- `17_NetworkEstimator.jl` — `NetworkEstimator`, `NetworkClustersEstimator` and the three unions.
+- `18_CentralityEstimator.jl` — `CentralityEstimator`.
+- `19_NetworkGraph.jl` — `graph_weight_matrix`, `calc_weighted_adjacency_graph`,
+  `calc_weighted_adjacency`, `calc_adjacency` and `calc_distance_weighted_graph`.
+- `20_Separation.jl` — `separation_graph`, `separation_matrix`, `separation_budget`,
+  `separation_quantile`, `HopCountQuantile`, `PathLengthQuantile` and `resolve_separation`.
+- `21_PhylogenyClustering.jl` — `_clusterise`, the two `clusterise` methods and `HClE_HCl`.
+- `22_PhylogenyMatrix.jl` — `_phylogeny_matrix` and `phylogeny_matrix`.
+- `23_CentralityQueries.jl` — `centrality_graph`, `centrality_vector` and `average_centrality`.
+- `24_AssetPhylogeny.jl` — `asset_phylogeny`.
+
+`PhylogenyResult` stays in `06_Phylogeny.jl`. The construction chain this ADR describes is
+`19_NetworkGraph.jl`, and the decision is unchanged: the network is built at exactly one site, and
+neither branch is re-weighted.

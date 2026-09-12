@@ -1,14 +1,17 @@
-# Cited academic hosts are intermittently slow from CI runners — ijcai.org tripped the default
-# timeout twice in one run while answering in under a second from a developer machine. Retry
-# before failing the build, so a slow host cannot turn the branch red on its own.
+# Cited academic hosts are intermittently slow from CI runners. Retry five times before failing
+# the build, so a slow host cannot turn the branch red on its own. ijcai.org outran even this
+# and is excluded below.
 timeout = 45
-max_retries = 3
+max_retries = 5
 retry_wait_time = 2
 
 # A host that throttles an automated client answers 429 or 503. juliastats.org answered 503
-# to one run and 200 to the sibling run of the same commit. Accept the two throttle codes, so
-# a momentary refusal cannot turn the branch red. A dead link answers 404, which stays fatal.
-accept = ["200..=299", "429", "503"]
+# to one run and 200 to the sibling run of the same commit. A live site behind a content
+# delivery network answers 502 or 504 while its origin is unreachable.
+# www.contributor-covenant.org answered 502 to four links of one run and 200 to a developer
+# machine minutes later. Accept the four transient codes, so a momentary refusal cannot turn
+# the branch red. A dead link answers 404, which stays fatal.
+accept = ["200..=299", "429", "502", "503", "504"]
 
 exclude = [
   "@ref",
@@ -17,8 +20,25 @@ exclude = [
   "^https://doi.org/FIXME$",
   "^https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable$",
   "zenodo.org/badge/DOI/FIXME$",
+  # An ADR records the source path as it stood at the decision. `src/03_Preprocessing.jl` moved
+  # into `src/03_InputData/` under ADR 0104, and `src/13_Prior/15_FeaturePrior.jl` was deleted by
+  # issue #810. The amendment of ADR 0042 states that the link of its Context section is retained
+  # as it was written, so the two paths stay in ADRs 0042, 0046 and 0047 and are excluded here.
+  # Every other file link of every other ADR stays checked.
+  "^file:.*/src/03_Preprocessing\\.jl$",
+  "^file:.*/src/13_Prior/15_FeaturePrior\\.jl$",
+  # `src/01_Base/` is a directory on `dev` and a single `src/01_Base.jl` on `main`, which is the
+  # last release. The link of `docs/src/api/01_Base.md` answers 404 until the next release, in the
+  # same way as a release tag that does not exist yet, one line above.
+  "^https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/src/01_Base$",
   # ACM resolves 10.1145 DOIs to dl.acm.org, which answers 403 to automated clients.
-  "^https://doi.org/10.1145/"
+  "^https://doi.org/10.1145/",
+  # www.ijcai.org answers in 0.8 seconds from a developer machine and does not answer the CI
+  # runner at all: it timed out at 45 seconds under five retries in three of six runs. More
+  # time does not reach a host the runner cannot reach, so the timeout above is not the
+  # remedy. The two citations that carry the link name the authors, the title, the venue and
+  # the year beside it, so a reader loses nothing.
+  "^https://www.ijcai.org/"
 ]
 
 exclude_path = [

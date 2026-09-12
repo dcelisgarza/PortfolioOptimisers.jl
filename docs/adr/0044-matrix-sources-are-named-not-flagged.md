@@ -66,7 +66,8 @@ rename.
 folds and the raw data on others would produce a weight path no single problem definition explains.
 
 **The Symbol is validated.** A `Bool` could not be wrong; a `Symbol` can. `assert_source_selector`
-in [`01_Base.jl`](../../src/01_Base.jl) enforces `src in (:prior, :data)` and is called from all
+in [`01_Base/10_Assertions.jl`](../../src/01_Base/10_Assertions.jl)
+enforces `src in (:prior, :data)` and is called from all
 three inner constructors, so a typo throws where it was written rather than silently selecting the
 other carrier. The bridge is validated too, via a single `returns_matrix_picker(pr, rd, x_src)` that
 replaces the eight copies of the ternary — the direct `clusterise(cle, pr; x_src = …)` entry points

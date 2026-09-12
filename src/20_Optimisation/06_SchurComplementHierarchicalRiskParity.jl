@@ -43,16 +43,21 @@ It carries **no scalariser**, because it carries no vector of measures to combin
         gamma::Union{<:Number, <:VecNum},
         retcode::OptimisationReturnCode,
         w::Option{<:VecNum},
-        fb::Option{<:OptE_Opt}
+        imsk::Option{<:BitVector} = nothing,
+        fb::Option{<:OptE_Opt_FbChain}
     ) -> SchurComplementHierarchicalRiskParityResult
 
 Keywords correspond to the struct's fields.
+
+The keyword constructor is the one door `_optimise` exits through, so it is where the solved weights expand back onto the full asset universe, through [`expand_investable_weights`](@ref). The positional constructor never expands, because a rebuild goes through it and a second pass would expand twice.
 
 # Related
 
   - [`SchurComplementHierarchicalRiskParity`](@ref)
   - [`HierarchicalOptimisationResult`](@ref)
   - [`NonFiniteAllocationOptimisationResult`](@ref)
+  - [`investable_reduction`](@ref)
+  - [`expand_investable_weights`](@ref)
 """
 @concrete struct SchurComplementHierarchicalRiskParityResult <:
                  HierarchicalOptimisationResult
@@ -85,7 +90,11 @@ Keywords correspond to the struct's fields.
     """
     w
     """
-    $(field_dict[:fb])
+    $(field_dict[:imsk])
+    """
+    imsk
+    """
+    $(field_dict[:fb_res])
     """
     fb
     function SchurComplementHierarchicalRiskParityResult(pr::Option{<:AbstractPriorResult},
@@ -95,10 +104,12 @@ Keywords correspond to the struct's fields.
                                                          gamma::Union{<:Number, <:VecNum},
                                                          retcode::OptimisationReturnCode,
                                                          w::Option{<:VecNum},
-                                                         fb::Option{<:OptE_Opt})
+                                                         imsk::Option{<:BitVector},
+                                                         fb::Option{<:OptE_Opt_FbChain})
         return new{typeof(pr), typeof(wb), typeof(clr), typeof(r), typeof(gamma),
-                   typeof(retcode), typeof(w), typeof(fb)}(pr, wb, clr, r, gamma, retcode,
-                                                           w, fb)
+                   typeof(retcode), typeof(w), typeof(imsk), typeof(fb)}(pr, wb, clr, r,
+                                                                         gamma, retcode, w,
+                                                                         imsk, fb)
     end
 end
 function SchurComplementHierarchicalRiskParityResult(; pr::Option{<:AbstractPriorResult},
@@ -108,9 +119,15 @@ function SchurComplementHierarchicalRiskParityResult(; pr::Option{<:AbstractPrio
                                                      gamma::Union{<:Number, <:VecNum},
                                                      retcode::OptimisationReturnCode,
                                                      w::Option{<:VecNum},
-                                                     fb::Option{<:OptE_Opt})::SchurComplementHierarchicalRiskParityResult
-    return SchurComplementHierarchicalRiskParityResult(pr, wb, clr, r, gamma, retcode, w,
-                                                       fb)
+                                                     imsk::Option{<:BitVector} = nothing,
+                                                     fb::Option{<:OptE_Opt_FbChain})::SchurComplementHierarchicalRiskParityResult
+    return SchurComplementHierarchicalRiskParityResult(pr, wb, clr, r, gamma, retcode,
+                                                       expand_investable_weights(imsk, w),
+                                                       imsk, fb)
+end
+# The Schur family carries the mask on the result itself, so the fold reads it directly.
+function result_investable_mask(res::SchurComplementHierarchicalRiskParityResult)
+    return res.imsk
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -443,25 +460,27 @@ julia> SchurComplementHierarchicalRiskParity()
 SchurComplementHierarchicalRiskParity
      opt ┼ HierarchicalOptimiser
          │       pe ┼ EmpiricalPrior
-         │          │        ce ┼ PortfolioOptimisersCovariance
-         │          │           │   ce ┼ Covariance
-         │          │           │      │    me ┼ SimpleExpectedReturns
-         │          │           │      │       │   w ┴ nothing
-         │          │           │      │    ce ┼ GeneralCovariance
-         │          │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-         │          │           │      │       │    w ┴ nothing
-         │          │           │      │   alg ┴ FullMoment()
-         │          │           │   mp ┼ MatrixProcessing
-         │          │           │      │     pdm ┼ Posdef
-         │          │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-         │          │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-         │          │           │      │      dn ┼ nothing
-         │          │           │      │      dt ┼ nothing
-         │          │           │      │     alg ┼ nothing
-         │          │           │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-         │          │        me ┼ SimpleExpectedReturns
-         │          │           │   w ┴ nothing
-         │          │   horizon ┴ nothing
+         │          │           ce ┼ PortfolioOptimisersCovariance
+         │          │              │   ce ┼ Covariance
+         │          │              │      │    me ┼ SimpleExpectedReturns
+         │          │              │      │       │   w ┴ nothing
+         │          │              │      │    ce ┼ GeneralCovariance
+         │          │              │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+         │          │              │      │       │    w ┴ nothing
+         │          │              │      │   alg ┼ FullMoment()
+         │          │              │      │     w ┴ nothing
+         │          │              │   mp ┼ MatrixProcessing
+         │          │              │      │     pdm ┼ Posdef
+         │          │              │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+         │          │              │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+         │          │              │      │      dn ┼ nothing
+         │          │              │      │      dt ┼ nothing
+         │          │              │      │     alg ┼ nothing
+         │          │              │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+         │          │           me ┼ SimpleExpectedReturns
+         │          │              │   w ┴ nothing
+         │          │      horizon ┼ nothing
+         │          │   fill_limit ┴ nothing
          │      cle ┼ ClustersEstimator
          │          │    ce ┼ PortfolioOptimisersCovariance
          │          │       │   ce ┼ Covariance
@@ -470,7 +489,8 @@ SchurComplementHierarchicalRiskParity
          │          │       │      │    ce ┼ GeneralCovariance
          │          │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
          │          │       │      │       │    w ┴ nothing
-         │          │       │      │   alg ┴ FullMoment()
+         │          │       │      │   alg ┼ FullMoment()
+         │          │       │      │     w ┴ nothing
          │          │       │   mp ┼ MatrixProcessing
          │          │       │      │     pdm ┼ Posdef
          │          │       │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
@@ -503,7 +523,6 @@ SchurComplementHierarchicalRiskParity
          │          │   iter ┴ Int64: 100
          │      brt ┼ Bool: false
          │    x_src ┼ Symbol: :prior
-         │    z_src ┼ Symbol: :data
          │   strict ┴ Bool: false
   params ┼ SchurComplementParams
          │       r ┼ Variance
@@ -612,9 +631,12 @@ Return a view of [`SchurComplementHierarchicalRiskParity`](@ref) `sh` sliced to 
 function port_opt_view(sh::SchurComplementHierarchicalRiskParity, i, X::MatNum,
                        args...)::SchurComplementHierarchicalRiskParity
     X = isa(sh.opt.pe, AbstractPriorResult) ? sh.opt.pe.X : X
-    opt = port_opt_view(sh.opt, i)
+    opt = port_opt_view(sh.opt, i, X)
     params = port_opt_view(sh.params, i, X)
     return SchurComplementHierarchicalRiskParity(; opt = opt, params = params, fb = sh.fb)
+end
+function non_investable_universe(sh::SchurComplementHierarchicalRiskParity, ni::VecStr)
+    return rebuild_estimator(sh, (; opt = non_investable_universe(sh.opt, ni)))
 end
 """
     symmetric_step_up_matrix(n1::Integer, n2::Integer) -> AbstractMatrix
@@ -1018,11 +1040,18 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
     sh = reset_time_dependent_estimator(sh)
     rd = returns_result_picker(rd, sh.opt.brt)
     pr = prior(sh.opt.pe, rd; dims = dims)
+    # The prior fits on the coverage universe and returns a result on the full asset
+    # universe, where an asset it could not estimate carries `NaN`. Reduce once, here: the
+    # augmented matrix the Schur complement builds is finite, and the leaf permutation
+    # indexes the investable universe. The weights are expanded back in
+    # `SchurComplementHierarchicalRiskParityResult`.
+    imsk, pr, sh, rd = investable_reduction(pr, sh, rd)
     X = pr.X
     # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
     # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).
     clr = clusterise(sh.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa, dims = dims,
-                     x_src = sh.opt.x_src, z_src = sh.opt.z_src)
+                     x_src = sh.opt.x_src)
+    assert_clustering_universe(clr, size(X, 2))
     items = [clr.res.order]
     wb = weight_bounds_constraints(sh.opt.wb, sh.opt.sets; N = size(X, 2),
                                    strict = sh.opt.strict, datatype = eltype(X))
@@ -1031,7 +1060,7 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
     retcode, w = finalise_weight_bounds(sh.opt.wf, wb, w)
     return SchurComplementHierarchicalRiskParityResult(; pr = pr, wb = wb, clr = clr, r = r,
                                                        gamma = gamma, retcode = retcode,
-                                                       w = w, fb = nothing)
+                                                       w = w, imsk = imsk, fb = nothing)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1051,11 +1080,18 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVe
     sh = reset_time_dependent_estimator(sh)
     rd = returns_result_picker(rd, sh.opt.brt)
     pr = prior(sh.opt.pe, rd; dims = dims)
+    # The prior fits on the coverage universe and returns a result on the full asset
+    # universe, where an asset it could not estimate carries `NaN`. Reduce once, here: the
+    # augmented matrix the Schur complement builds is finite, and the leaf permutation
+    # indexes the investable universe. The weights are expanded back in
+    # `SchurComplementHierarchicalRiskParityResult`.
+    imsk, pr, sh, rd = investable_reduction(pr, sh, rd)
     X = pr.X
     # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
     # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).
     clr = clusterise(sh.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa, dims = dims,
-                     x_src = sh.opt.x_src, z_src = sh.opt.z_src)
+                     x_src = sh.opt.x_src)
+    assert_clustering_universe(clr, size(X, 2))
     items = [clr.res.order]
     wb = weight_bounds_constraints(sh.opt.wb, sh.opt.sets; N = size(X, 2),
                                    strict = sh.opt.strict, datatype = eltype(X))
@@ -1074,11 +1110,11 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVe
     return SchurComplementHierarchicalRiskParityResult(; pr = pr, wb = wb, clr = clr,
                                                        r = [rs...], gamma = gammas,
                                                        retcode = retcode, w = w,
-                                                       fb = nothing)
+                                                       imsk = imsk, fb = nothing)
 end
 """
     optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any, Nothing},
-             rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...) -> SchurComplementHierarchicalRiskParityResult
+             rd::ReturnsResult; dims::Int = 1, kwargs...) -> SchurComplementHierarchicalRiskParityResult
 
 Run the Schur Complement Hierarchical Risk Parity portfolio optimisation.
 
@@ -1093,13 +1129,18 @@ Run the Schur Complement Hierarchical Risk Parity portfolio optimisation.
 
 Unlike [`HierarchicalEqualRiskContribution`](@ref) and [`NestedClustered`](@ref), this optimiser accepts no `branchorder` keyword. Recursive bisection allocates by splitting the dendrogram's leaf permutation, so that permutation is the algorithm's input rather than a presentation detail, and the clusterisation always runs with the optimal ordering. A `branchorder` passed here is absorbed by `kwargs` and ignored. See ADR 0055.
 
+# Validation
+
+  - No field in the tree of `sh` holds an [`Online`](@ref). An `ArgumentError` naming the field is thrown otherwise, through [`assert_batch_entry`](@ref): a plain `optimise` is a batch fit, and a wrapper resolves only at the warm-up of the fold loop's online arm.
+
 # Related
 
   - [`SchurComplementHierarchicalRiskParity`](@ref)
   - [`SchurComplementHierarchicalRiskParityResult`](@ref)
 """
 function optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any, Nothing},
-                  rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
+                  rd::ReturnsResult; dims::Int = 1, kwargs...)
+    assert_batch_entry(sh, "`optimise`")
     return _optimise(sh, rd; dims = dims, kwargs...)
 end
 

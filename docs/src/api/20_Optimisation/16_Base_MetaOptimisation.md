@@ -14,9 +14,10 @@ prepare_outer_rd
 assert_fold_alignment
 fold_row_indices
 fold_weight_matrix
-fold_feature_matrix
+fold_asset_panel
 fold_feature_anchors
-rebuild_feature_matrix
+panel_field_stack(fs::AbstractVector{<:NumericPanelField})
+rebuild_asset_panel
 rebuild_returns_result
 sub_portfolio_predictions
 predict_outer_returns

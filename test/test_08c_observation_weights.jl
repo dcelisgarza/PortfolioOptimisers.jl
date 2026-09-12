@@ -272,6 +272,7 @@ pass `pr.X`, which is the documented `MatNum` arity.
         model = PO.JuMP.Model()
         PO.JuMP.set_string_names_on_creation(model, false)
         PO.set_model_scales!(model, mr.opt.sc, mr.opt.so)
+        PO.set_model_observations!(model, size(attrs.pr.X, 1))
         PO.set_maximum_ratio_factor_variables!(model, mr.obj)
         PO.set_w!(model, attrs.pr.X, mr.wi)
         PO.set_weight_constraints!(model, attrs.wb, mr.opt)

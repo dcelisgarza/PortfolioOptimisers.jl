@@ -38,10 +38,11 @@ $(DocStringExtensions.FIELDS)
         cv::Option{<:OptimisationCrossValidation},
         retcode::OptRetCode_VecOptRetCode,
         w::VecNum_VecVecNum,
-        fb::Option{<:OptE_Opt}
+        imsk::Option{<:BitVector} = nothing,
+        fb::Option{<:OptE_Opt_FbChain}
     ) -> StackingResult
 
-Keywords correspond to the struct's fields.
+Keywords correspond to the struct's fields. The keyword constructor expands `w` onto the full asset universe through [`expand_investable_weights`](@ref), which is the one door [`_optimise`](@ref) exits through. The positional constructor never expands, so [`set_retcode`](@ref) and [`factory`](@ref) rebuild without a second pass.
 
 # Related
 
@@ -49,6 +50,7 @@ Keywords correspond to the struct's fields.
   - [`NonFiniteAllocationOptimisationResult`](@ref)
   - [`NestedClusteredResult`](@ref)
   - [`combination_weights`](@ref)
+  - [`expand_investable_weights`](@ref)
 
 # References
 
@@ -88,7 +90,11 @@ Keywords correspond to the struct's fields.
     """
     w
     """
-    $(field_dict[:fb])
+    $(field_dict[:imsk])
+    """
+    imsk
+    """
+    $(field_dict[:fb_res])
     """
     fb
     function StackingResult(pr::Option{<:AbstractPriorResult}, wb::Option{<:WeightBounds},
@@ -97,11 +103,17 @@ Keywords correspond to the struct's fields.
                             reso::OptimisationResult,
                             cv::Option{<:OptimisationCrossValidation},
                             retcode::OptRetCode_VecOptRetCode, w::VecNum_VecVecNum,
-                            fb::Option{<:OptE_Opt})
+                            imsk::Option{<:BitVector}, fb::Option{<:OptE_Opt_FbChain})
         return new{typeof(pr), typeof(wb), typeof(fees), typeof(resi), typeof(reso),
-                   typeof(cv), typeof(retcode), typeof(w), typeof(fb)}(pr, wb, fees, resi,
-                                                                       reso, cv, retcode, w,
-                                                                       fb)
+                   typeof(cv), typeof(retcode), typeof(w), typeof(imsk), typeof(fb)}(pr, wb,
+                                                                                     fees,
+                                                                                     resi,
+                                                                                     reso,
+                                                                                     cv,
+                                                                                     retcode,
+                                                                                     w,
+                                                                                     imsk,
+                                                                                     fb)
     end
 end
 function StackingResult(; pr::Option{<:AbstractPriorResult}, wb::Option{<:WeightBounds},
@@ -109,8 +121,40 @@ function StackingResult(; pr::Option{<:AbstractPriorResult}, wb::Option{<:Weight
                         resi::AbstractVector{<:NonFiniteAllocationOptimisationResult},
                         reso::OptimisationResult, cv::Option{<:OptimisationCrossValidation},
                         retcode::OptRetCode_VecOptRetCode, w::VecNum_VecVecNum,
-                        fb::Option{<:OptE_Opt})::StackingResult
-    return StackingResult(pr, wb, fees, resi, reso, cv, retcode, w, fb)
+                        imsk::Option{<:BitVector} = nothing,
+                        fb::Option{<:OptE_Opt_FbChain})::StackingResult
+    return StackingResult(pr, wb, fees, resi, reso, cv, retcode,
+                          expand_investable_weights(imsk, w), imsk, fb)
+end
+# The stacking family carries the mask on the result itself, so the fold reads it directly.
+function result_investable_mask(res::StackingResult)
+    return res.imsk
+end
+"""
+    set_retcode(res::StackingResult, retcode::OptRetCode_VecOptRetCode)
+
+Rebuild a [`StackingResult`](@ref) with a different return code.
+
+The result carries one return code per member of the population, so a member is dropped by failing its own entry. Every other member of the record is carried over unchanged.
+
+# Arguments
+
+  - `res`: Result to rebuild.
+  - `retcode`: Return code, or one per member of the population.
+
+# Returns
+
+  - [`StackingResult`](@ref): The result, with the new return code.
+
+# Related
+
+  - [`set_retcode`](@ref)
+  - [`mark_ruined_members`](@ref)
+  - [`StackingResult`](@ref)
+"""
+function set_retcode(res::StackingResult, retcode::OptRetCode_VecOptRetCode)
+    return StackingResult(res.pr, res.wb, res.fees, res.resi, res.reso, res.cv, retcode,
+                          res.w, res.imsk, res.fb)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -166,7 +210,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     Stacking(;
-        pe::TD{<:PrE_Pr} = EmpiricalPrior(),
+        pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(),
         wb::TD_Option{<:WbE_Wb} = nothing,
         fees::TD_Option{<:FeesE_Fees} = nothing,
         sets::TD_Option{<:UniverseSets} = nothing,
@@ -178,7 +222,8 @@ $(DocStringExtensions.FIELDS)
         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
         fb::TDO_Option{<:OptE_Opt} = nothing,
         brt::Bool = false,
-        strict::Bool = false
+        strict::Bool = false,
+        cache::Option{<:ReturnsBufferState} = nothing
     ) -> Stacking
 
 Keywords correspond to the struct's fields.
@@ -310,13 +355,17 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
     $(field_dict[:strict_opt])
     """
     strict
-    function Stacking(pe::TD{<:PrE_Pr}, wb::TD_Option{<:WbE_Wb},
+    """
+    $(field_dict[:cache_opt])
+    """
+    @fprop cache
+    function Stacking(pe::Onl{<:TD{<:PrE_Pr}}, wb::TD_Option{<:WbE_Wb},
                       fees::TD_Option{<:FeesE_Fees}, sets::TD_Option{<:UniverseSets},
                       scale::TD_Option{<:VecNum},
                       opti::Union{<:VecOptE_Opt_TD, <:TD_VecOptE_Opt}, opto::OptE_TD,
                       cv::Option{<:OptimisationCrossValidation}, wf::TD{<:WeightFinaliser},
                       ex::FLoops.Transducers.Executor, fb::TDO_Option{<:OptE_Opt},
-                      brt::Bool, strict::Bool)
+                      brt::Bool, strict::Bool, cache::Option{<:ReturnsBufferState})
         if isa(opti, TimeDependent)
             @argcheck(opti.bind !== :nearest,
                       ArgumentError("opti of Stacking cannot hold a `bind = :nearest` schedule at the field level: Stacking's inner cross-validation is entered per candidate (`cross_val_predict(opti[k], …)`), so the fold loop is handed the elements, never the field — and a per-fold candidate vector would change the number and identity of the returns-proxy columns opto sees. Schedule individual elements instead (`opti = [static, TimeDependent(…, :nearest; default = …)]`), or use `bind = :outermost` to vary the whole vector with the fold loop that reaches the Stacking."))
@@ -351,12 +400,15 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
                                             ex, fb, brt, strict), stacking_td_defaults())
         return new{typeof(pe), typeof(wb), typeof(fees), typeof(sets), typeof(scale),
                    typeof(opti), typeof(opto), typeof(cv), typeof(wf), typeof(ex),
-                   typeof(fb), typeof(brt), typeof(strict)}(pe, wb, fees, sets, scale, opti,
-                                                            opto, cv, wf, ex, fb, brt,
-                                                            strict)
+                   typeof(fb), typeof(brt), typeof(strict), typeof(cache)}(pe, wb, fees,
+                                                                           sets, scale,
+                                                                           opti, opto, cv,
+                                                                           wf, ex, fb, brt,
+                                                                           strict, cache)
     end
 end
-function Stacking(; pe::TD{<:PrE_Pr} = EmpiricalPrior(), wb::TD_Option{<:WbE_Wb} = nothing,
+function Stacking(; pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(),
+                  wb::TD_Option{<:WbE_Wb} = nothing,
                   fees::TD_Option{<:FeesE_Fees} = nothing,
                   sets::TD_Option{<:UniverseSets} = nothing,
                   scale::TD_Option{<:VecNum} = nothing,
@@ -365,9 +417,10 @@ function Stacking(; pe::TD{<:PrE_Pr} = EmpiricalPrior(), wb::TD_Option{<:WbE_Wb}
                   wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
                   ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                   fb::TDO_Option{<:OptE_Opt} = nothing, brt::Bool = false,
-                  strict::Bool = false)::Stacking
+                  strict::Bool = false,
+                  cache::Option{<:ReturnsBufferState} = nothing)::Stacking
     return Stacking(pe, wb, fees, sets, scale, narrow_optimiser_vector(opti), opto, cv, wf,
-                    ex, fb, brt, strict)
+                    ex, fb, brt, strict, cache)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -504,13 +557,17 @@ function port_opt_view(st::Stacking, i, X::MatNum, args...)::Stacking
     X = isa(st.pe, AbstractPriorResult) ? st.pe.X : X
     pe = port_opt_view(st.pe, i)
     wb = port_opt_view(st.wb, i)
-    fees = port_opt_view(st.fees, i)
+    fees = port_opt_view(st.fees, i, X)
     sets = port_opt_view(st.sets, i)
     opti = port_opt_view(st.opti, i, X)
     opto = port_opt_view(st.opto, i, X)
     return Stacking(; pe = pe, wb = wb, fees = fees, sets = sets, scale = st.scale,
                     opti = opti, opto = opto, cv = st.cv, wf = st.wf, ex = st.ex,
-                    fb = st.fb, brt = st.brt, strict = st.strict)
+                    fb = st.fb, brt = st.brt, strict = st.strict,
+                    cache = port_opt_view(st.cache, i))
+end
+function non_investable_universe(st::Stacking, ni::VecStr)::Stacking
+    return rebuild_estimator(st, (; sets = non_investable_sets(st.sets, ni)))
 end
 function _optimise(st::Stacking, rd::ReturnsResult; dims::Int = 1,
                    branchorder::Symbol = :optimal, str_names::Bool = false,
@@ -518,8 +575,25 @@ function _optimise(st::Stacking, rd::ReturnsResult; dims::Int = 1,
     st = reset_time_dependent_estimator(st)
     rd = returns_result_picker(rd, st.brt)
     pr = prior(st.pe, rd; dims = dims)
+    # Resolve the fee on the caller's own universe, before the door below narrows `sets`.
+    # A name stated over that universe must not be refused because the data delisted the
+    # asset, and a carrier keyed by name cannot resolve at all once its `w` sits on the
+    # complement while `sets` sits on the mask. `investable_fees_view` then places the
+    # resolved fee on the axes the mask leaves.
+    imsk = investable_mask(pr)
+    fees = investable_fees_view(fees_constraints(st.fees, st.sets; datatype = eltype(pr.X),
+                                                 strict = st.strict), imsk, pr.X)
+    # A forced exit is charged once, against the full-universe weight vector the fit
+    # rebuilds, so it rides on the result alone. No sub-problem below holds that vector —
+    # the exiting asset is in no cluster, its column being `NaN` — so none prices an exit.
+    cfees = strip_liquidation_carriers(fees, nothing)
+    # The prior fits on the coverage universe and returns a result on the full asset
+    # universe, where an asset it could not estimate carries `NaN`. Reduce once, here,
+    # before the candidate solves: every candidate then sees the investable universe alone,
+    # and each composes its own mask inside its own solve. `StackingResult` expands the
+    # combined weights back.
+    _, pr, st, rd = investable_reduction(imsk, pr, st, rd)
     X = pr.X
-    fees = fees_constraints(st.fees, st.sets; datatype = eltype(X), strict = st.strict)
     opti = st.opti
     Ni = length(opti)
     wi = zeros(eltype(X), size(X, 2), Ni)
@@ -533,7 +607,7 @@ function _optimise(st::Stacking, rd::ReturnsResult; dims::Int = 1,
         wi[:, i] = res.w
         resi[i] = res
     end
-    rdo = predict_outer_returns(st.cv, st, FullUniverse(), rd, pr, fees, wi, resi)
+    rdo = predict_outer_returns(st.cv, st, FullUniverse(), rd, pr, cfees, wi, resi)
     reso = optimise(st.opto, rdo; dims = dims, branchorder = branchorder,
                     str_names = str_names, save = save, kwargs...)
     wb = weight_bounds_constraints(st.wb, st.sets; N = size(X, 2), strict = st.strict,
@@ -541,7 +615,7 @@ function _optimise(st::Stacking, rd::ReturnsResult; dims::Int = 1,
     retcode, w = outer_optimisation_finaliser(wb, st.wf, resi, reso.retcode,
                                               combination_weights(st.scale, reso.w), wi)
     return StackingResult(; pr = pr, wb = wb, fees = fees, resi = resi, reso = reso,
-                          cv = st.cv, retcode = retcode, w = w, fb = nothing)
+                          cv = st.cv, retcode = retcode, w = w, imsk = imsk, fb = nothing)
 end
 """
     optimise(st::Stacking{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
@@ -562,6 +636,10 @@ Run the Stacking portfolio optimisation.
   - `save`: Passed to the inner and outer optimisers. Whether to save the JuMP model in the optimisation result.
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
 
+# Validation
+
+  - No field in the tree of `st` holds an [`Online`](@ref). An `ArgumentError` naming the field is thrown otherwise, through [`assert_batch_entry`](@ref): a plain `optimise` is a batch fit, and a wrapper resolves only at the warm-up of the fold loop's online arm.
+
 # Returns
 
   - `res::StackingResult`: The combined portfolio. `retcode` is an [`OptimisationFailure`](@ref) when any inner optimisation, the outer optimisation, or the weight finalisation failed.
@@ -576,6 +654,7 @@ function optimise(st::Stacking{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, 
                                <:Any, <:Any, Nothing}, rd::ReturnsResult; dims::Int = 1,
                   branchorder::Symbol = :optimal, str_names::Bool = false,
                   save::Bool = true, kwargs...)
+    assert_batch_entry(st, "`optimise`")
     return _optimise(st, rd; dims = dims, branchorder = branchorder, str_names = str_names,
                      save = save, kwargs...)
 end

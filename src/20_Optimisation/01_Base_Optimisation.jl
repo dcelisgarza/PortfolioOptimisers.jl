@@ -1,22 +1,4 @@
 """
-$(DocStringExtensions.TYPEDEF)
-
-Abstract supertype for all portfolio optimisation estimators.
-
-All optimisers and optimisation components should subtype `AbstractOptimisationEstimator` to participate in the optimisation dispatch system.
-
-# Interfaces
-
-`AbstractOptimisationEstimator` declares no method of its own. It carries the default [`port_opt_view`](@ref), which returns the estimator unchanged, and it splits into two halves. Subtype [`BaseOptimisationEstimator`](@ref) for a configuration an optimiser holds, and [`OptimisationEstimator`](@ref) for an estimator [`optimise`](@ref) runs.
-
-# Related
-
-  - [`BaseOptimisationEstimator`](@ref)
-  - [`OptimisationEstimator`](@ref)
-  - [`NonFiniteAllocationOptimisationEstimator`](@ref)
-"""
-abstract type AbstractOptimisationEstimator <: AbstractEstimator end
-"""
     const VecOptE = AbstractVector{<:AbstractOptimisationEstimator}
 
 Alias for a vector of portfolio optimisation estimators.
@@ -57,60 +39,9 @@ A subtype gains the time-dependent host methods from this supertype: [`is_time_d
   - [`OptimisationEstimator`](@ref)
 """
 abstract type BaseOptimisationEstimator <: AbstractOptimisationEstimator end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Abstract supertype for portfolio optimisation estimators that produce portfolio weights.
-
-Subtype `OptimisationEstimator` to implement concrete portfolio optimisers. All optimisers that can be invoked with `optimise` should subtype this.
-
-# Interfaces
-
-In order to implement a new optimiser that works seamlessly with the library, subtype `OptimisationEstimator`, give it an `fb` field, and implement the following method:
-
-## `_optimise`
-
-  - `_optimise(opt::MyOptimiser, rd::ReturnsResult, args...; kwargs...) -> OptimisationResult`: Solves the problem `opt` states over the data in `rd`, and returns the optimiser's own result type.
-
-### Arguments
-
-  - `opt`: The concrete subtype instance.
-  - `rd`: Returns data.
-  - `args...`, `kwargs...`: Forwarded from [`optimise`](@ref).
-
-### Returns
-
-  - `res::OptimisationResult`: The result, whose `retcode` decides whether [`optimise`](@ref) walks on to the fallback.
-
-## The `fb` field
-
-[`optimise`](@ref) reads `opt.fb` to walk the fallback chain, so every subtype carries one. It holds the next optimiser to try, or `nothing` to end the chain.
-
-# Related
-
-  - [`NonFiniteAllocationOptimisationEstimator`](@ref)
-  - [`AbstractOptimisationEstimator`](@ref)
-"""
-abstract type OptimisationEstimator <: AbstractOptimisationEstimator end
 function reset_time_dependent_estimator(opt::OptimisationEstimator)
     return opt
 end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Abstract supertype for portfolio optimisation estimators that produce continuous (non-integer) portfolio weights.
-
-# Interfaces
-
-`NonFiniteAllocationOptimisationEstimator` adds no method to [`OptimisationEstimator`](@ref). It marks the optimisers whose weights are continuous, which is what admits them to the cross-validation and meta-optimisation entry points (see [`OptE_Opt`](@ref)).
-
-# Related
-
-  - [`OptimisationEstimator`](@ref)
-  - [`NaiveOptimisationEstimator`](@ref)
-  - [`ClusteringOptimisationEstimator`](@ref)
-"""
-abstract type NonFiniteAllocationOptimisationEstimator <: OptimisationEstimator end
 """
     pipe_route(x, ::Val{target}, v)
 
@@ -366,6 +297,32 @@ function reset_time_dependent_estimator(opt::OptimisationResult)
     return opt
 end
 """
+    result_investable_mask(res::OptimisationResult) -> Option{BitVector}
+
+Read the Investable Mask an optimisation result reduced on.
+
+ADR 0115 reduces every optimisation to the Investable Mask at its entry and expands the solved weights back to the caller's universe, so the result's own `w` is on the **full** universe and the mask is the record of which assets the optimisation traded. A fold reads that record to view its test window before it scores the weights, which is ADR 0120's first decision.
+
+The mask is read through this verb rather than off a field, because the families carry it in different places: a JuMP result holds it on its processed attribute bundle, a hierarchical leaf holds it on the core it wraps, and a family that derives no mask answers `nothing`. **A family that gains a mask must add its own method here**, and so must a leaf that forwards its properties into a core, because the verb dispatches on the type and a forwarded `res.imsk` never reaches it. `test/test_54_held_gap_filter.jl` censuses the concrete results and fails when one carries a mask this verb cannot read, as a field or as a forwarded property, so the omission cannot be silent.
+
+# Arguments
+
+  - `res::OptimisationResult`: Fitted optimisation result.
+
+# Returns
+
+  - `imsk::Option{BitVector}`: The Investable Mask, or `nothing` when the optimisation reduced on nothing.
+
+# Related
+
+  - [`investable_mask`](@ref)
+  - [`investable_reduction`](@ref)
+  - [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref)
+"""
+function result_investable_mask(::OptimisationResult)
+    return nothing
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for continuous (non-integer allocation) optimisation results.
@@ -500,6 +457,38 @@ Alias for either a single optimisation return code or a vector of return codes.
   - [`VecOptRetCode`](@ref)
 """
 const OptRetCode_VecOptRetCode = Union{<:OptimisationReturnCode, <:VecOptRetCode}
+
+"""
+    set_retcode(res::NonFiniteAllocationOptimisationResult, retcode::OptRetCode_VecOptRetCode)
+
+Rebuild an optimisation result with a different return code, and every other member unchanged.
+
+A cross-validation fold that drifts a population's weights drops the members whose wealth is not positive, and it drops them by failing their entry of the result's return code. A result is an immutable record, so the drop rebuilds it. The rebuild is a per-type method that writes the constructor name once, rather than a reflection pass over the field list.
+
+Only a result that can carry a population of weight vectors needs a method here, because only such a result can hold one return code per member. A result that reaches the fallback raises, and the message names the type that is missing its method.
+
+# Arguments
+
+  - `res`: Optimisation result to rebuild.
+  - `retcode`: Return code, or one per member of the population.
+
+# Validation
+
+  - The type of `res` declares a method of its own, else an `ArgumentError` is raised.
+
+# Returns
+
+  - `NonFiniteAllocationOptimisationResult`: The result, with the new return code.
+
+# Related
+
+  - [`mark_ruined_members`](@ref)
+  - [`OptRetCode_VecOptRetCode`](@ref)
+  - [`OptimisationFailure`](@ref)
+"""
+function set_retcode(res::NonFiniteAllocationOptimisationResult, ::OptRetCode_VecOptRetCode)
+    return throw(ArgumentError("`set_retcode` has no method for `$(Base.typename(typeof(res)).wrapper)`, so a ruined population member of it cannot be dropped. A result that carries one return code per member needs a method of `set_retcode` that rebuilds it."))
+end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -533,18 +522,44 @@ Matches either a [`NonFiniteAllocationOptimisationEstimator`](@ref) (specifying 
 const OptE_Opt = Union{<:NonFiniteAllocationOptimisationEstimator,
                        <:NonFiniteAllocationOptimisationResult}
 """
-    factory(res::NonFiniteAllocationOptimisationResult, fb::Option{<:OptE_Opt})
+    const FbChain = AbstractVector{<:Tuple{<:OptimisationEstimator, <:OptimisationResult}}
 
-Rebuild a continuous optimisation result with an updated fallback optimiser `fb`.
+Alias for a fallback chain: the `(estimator, result)` pair of every attempt that failed before the result that carries it, in the order the attempts ran.
 
-Every optimisation result carries `fb` as its last field, so the generic rebuild copies all fields unchanged except the trailing `fb`. Concrete result types may override this method when rebuilding requires more than swapping `fb`.
+[`optimise`](@ref) pushes one pair each time an attempt fails and its estimator names a fallback, and hands the vector to `factory(res, fb)` once an attempt succeeds or the chain runs out. A result whose `fb` is a chain was therefore answered by a fallback: `fb[1][1]` is the estimator that was asked first, and `fb[end][2]` is the last failure before the answer. A result whose `fb` is `nothing` was answered by the estimator it was asked of.
+
+# Related
+
+  - [`OptE_Opt_FbChain`](@ref)
+  - [`FOptE_FOpt_FbChain`](@ref)
+  - [`optimise`](@ref)
+"""
+const FbChain = AbstractVector{<:Tuple{<:OptimisationEstimator, <:OptimisationResult}}
+"""
+    const OptE_Opt_FbChain = Union{<:OptE_Opt, <:FbChain}
+
+Alias for what the `fb` field of a continuous optimisation result admits: a fallback estimator or precomputed result ([`OptE_Opt`](@ref)), or the fallback chain that answered the result ([`FbChain`](@ref)).
 
 # Related
 
   - [`OptE_Opt`](@ref)
+  - [`FbChain`](@ref)
   - [`NonFiniteAllocationOptimisationResult`](@ref)
 """
-function factory(res::NonFiniteAllocationOptimisationResult, fb::Option{<:OptE_Opt})
+const OptE_Opt_FbChain = Union{<:OptE_Opt, <:FbChain}
+"""
+    factory(res::NonFiniteAllocationOptimisationResult, fb::Option{<:OptE_Opt_FbChain})
+
+Rebuild a continuous optimisation result with an updated fallback record `fb`.
+
+Every optimisation result carries `fb` as its last field, so the generic rebuild copies all fields unchanged except the trailing `fb`. Concrete result types may override this method when rebuilding requires more than swapping `fb`. [`optimise`](@ref) is the one caller, and it hands in the [`FbChain`](@ref) it walked.
+
+# Related
+
+  - [`OptE_Opt_FbChain`](@ref)
+  - [`NonFiniteAllocationOptimisationResult`](@ref)
+"""
+function factory(res::NonFiniteAllocationOptimisationResult, fb::Option{<:OptE_Opt_FbChain})
     flds = ntuple(i -> getfield(res, i), Val(fieldcount(typeof(res))))
     return (typeof(res).name.wrapper)(Base.front(flds)..., fb)
 end
@@ -817,6 +832,8 @@ The fold-less value is the field's static default, unless `default` overrides it
 
 A vector whose entries are all optimisers or precomputed results ([`OptE_Opt`](@ref)) is stored as a `Vector{OptE_Opt}`, so a *mixed* schedule — fold `i` optimising or predicting depending on what entry `i` is — is admissible in an optimiser-valued field on its element type alone (see [`TD_OptE_Opt`](@ref)) rather than falling out to a `Vector{Any}` the field cannot accept.
 
+A schedule and an [`Online`](@ref) do not wrap each other, and the reason is when each resolves: a wrapper resolves **once**, at warm-up, because the sample buffer it seeds is threaded from step to step, while a schedule resolves **per fold**, because its value is that fold's. So neither `val`, nor a vector entry of `val`, nor `default` may be an `Online` — a wrapper reached through one of them would be resolved at no fold at all, or re-seeded at every fold, throwing the buffer away. They do compose the other way round: an estimator an `Online` wraps may hold schedules of its own, which resolve per fold after the seeding, and one host may hold a wrapper in one field and a schedule in another.
+
 Schedules do not nest: neither `val`, nor a vector entry of `val`, nor `default` may be a `TimeDependent`. Entry `i` is fold `i`'s *complete* field value, and the fold-less value is by definition outside every fold loop, so nesting has no meaning. An estimator swapped in by a schedule may itself carry schedules — those resolve against the same fold context after the swap — but they live in *its* fields, not inside this wrapper.
 
 **Recovering which entry a fold ran** needs no stored provenance, because a vector schedule is keyed by the fold index and nothing else. Entry `i` runs at fold `i` of the consuming scheme's `split` enumeration ([`time_dependent_value`](@ref) indexes `val[ctx.i]`), so `val[i]` *is* fold `i`'s value — the same index you keyed the schedule by. Under the time-ordered schemes (walk-forward, unshuffled [`KFold`](@ref), [`Pipeline`](@ref)) fold `i` is also the `i`-th entry of the returned [`MultiPeriodPredictionResult`](@ref); under schemes that regroup for reporting ([`MultipleRandomised`](@ref) sorts by test index, combinatorial recombines each split's test groups into paths) the prediction order no longer tracks the fold order, so re-run `split(cv, rd)` and read the fold→path map off its `path_ids` — it is keyed by the very enumeration index the schedule was, so entry `k` still governs enumeration fold `k`. A **callable** schedule computes its value rather than selecting an entry, so there is no index to recover: what it returned is knowable only by re-running it on the fold's [`TimeDependentContext`](@ref), or by having it record its own choice. Recording is a logging concern the caller owns, and the [`TimeDependentCallable`](@ref) struct interface is its natural home — a functor can stash the regime it picked per fold in a field of its own.
@@ -835,9 +852,9 @@ $(DocStringExtensions.FIELDS)
 
 ## Validation
 
-  - If `val` is a vector: `!isempty(val)`, and no entry is a `TimeDependent`.
-  - `val` is not a `TimeDependent`.
-  - `default` is not a `TimeDependent`.
+  - If `val` is a vector: `!isempty(val)`, and no entry is a `TimeDependent` or an [`Online`](@ref).
+  - `val` is not a `TimeDependent` or an [`Online`](@ref).
+  - `default` is not a `TimeDependent` or an [`Online`](@ref).
   - `bind in (:outermost, :nearest)`.
 
 # Examples
@@ -883,12 +900,16 @@ struct TimeDependent{T1, T2} <: AbstractEstimator
             @argcheck(!isempty(val), IsEmptyError("val cannot be empty"))
             @argcheck(!any(x -> isa(x, TimeDependent), val),
                       ArgumentError("no entry of val may be a TimeDependent: entry i is fold i's complete field value, so schedules do not nest. To vary parts of a vector-valued field, assemble the fold's vector in a callable: TimeDependent(ctx -> [dynamic(ctx), static])."))
+            @argcheck(!any(x -> isa(x, Online), val),
+                      ArgumentError("no entry of val may be an Online: a schedule resolves once per fold, and an `Online` resolves once at warm-up, before the fold loop runs. A wrapper reached through an entry would therefore either be resolved at no fold at all, or re-seeded at every one, throwing away the buffer the step threads. Wrap the estimator that holds the schedule instead, or wrap each entry's own inner estimator."))
             if !(eltype(val) <: OptE_Opt) && all(x -> isa(x, OptE_Opt), val)
                 val = convert(Vector{OptE_Opt}, val)
             end
         end
         @argcheck(!isa(default, TimeDependent),
                   ArgumentError("default cannot be a TimeDependent: it is the field's value outside every fold loop, where a schedule is undefined."))
+        @argcheck(!isa(default, Online),
+                  ArgumentError("default cannot be an Online: it is the field's value outside every fold loop, and an `Online` is resolved at warm-up rather than per fold, so a wrapper there is resolved at no fold at all. Wrap the estimator that holds the schedule instead."))
         @argcheck(bind in (:outermost, :nearest),
                   ArgumentError("bind must be :outermost or :nearest, got :$bind"))
         return new{typeof(val), typeof(default)}(val, bind, default)
@@ -896,6 +917,9 @@ struct TimeDependent{T1, T2} <: AbstractEstimator
 end
 function TimeDependent(::TimeDependent, args...; kwargs...)
     return throw(ArgumentError("val cannot be a TimeDependent: schedules do not nest. An estimator swapped in by a schedule may carry schedules of its own — they resolve against the same fold context after the swap — but they belong in its fields, not inside this wrapper."))
+end
+function Online(::TimeDependent, args...; kwargs...)
+    return throw(ArgumentError("est cannot be a TimeDependent: a schedule is not one estimator, so there is nothing for a buffer to belong to. The two wrappers resolve at different times and neither wraps the other — an `Online` resolves once at warm-up, because the buffer it seeds is threaded from step to step, and a schedule resolves once per fold, because its value is the fold's. They compose in the other order: an estimator an `Online` wraps may hold schedules of its own, which resolve per fold after the seeding, and one host may hold a wrapper in one field and a schedule in another."))
 end
 function TimeDependent(;
                        val::Union{<:AbstractVector, <:Base.Callable,
@@ -2638,6 +2662,206 @@ function port_opt_view(::NonFiniteAllocationOptimisationResult, ::Any, args...)
     return throw(ArgumentError("a precomputed optimisation result cannot be viewed to an asset subset: its weights were solved over the full universe and a sub-portfolio of them has no defined meaning. A TimeDependent schedule holding precomputed results is therefore incompatible with asset-subsampling cross-validation (e.g. MultipleRandomised); use estimator entries there instead."))
 end
 """
+    non_investable_universe(opt::AbstractOptimisationEstimator, ni::VecStr)
+    non_investable_universe(opt, ni::VecStr)
+
+Mint the Non-Investable Axis on the [`UniverseSets`](@ref) an optimisation estimator carries.
+
+A door calls this **after** it has viewed the estimator, and it is the only caller. Minting before the view would not survive it: [`port_opt_view`](@ref)`(::UniverseSets, i)` drops the axis, precisely so that a cluster of a nested optimisation cannot inherit its parent's departures and charge every one of them again. So the door reads the departed names off the *unreduced* returns data, takes the view, and declares the axis on what comes back.
+
+The generic method returns `opt` untouched, and it is the right answer for every estimator that carries no sets: there is no axis to declare one on. A head that owns a `sets` field writes one method beside its own [`port_opt_view`](@ref), and a head that reaches one through a nested optimiser forwards to that optimiser's method. Both are one line, and they are written per type rather than derived by reflection for the reason [`port_opt_view`](@ref) is: a field's meaning is the type's to state.
+
+# Arguments
+
+  - `opt`: The optimisation estimator, already reduced to the Investable Mask.
+  - `ni`: The names the mask left out, from [`non_investable_names`](@ref).
+
+# Returns
+
+  - `opt`: The estimator, carrying the Non-Investable Axis where it carries a [`UniverseSets`](@ref).
+
+# Related
+
+  - [`non_investable_sets`](@ref)
+  - [`non_investable_names`](@ref)
+  - [`investable_reduction`](@ref)
+  - [`coverage_reduction`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+function non_investable_universe(opt, ::VecStr)
+    return opt
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Derive the Investable Mask of a fitted prior, and reduce the prior, the optimiser and the returns data to the assets it keeps.
+
+A Prior Estimator fits on the coverage universe and hands back a result on the full asset universe, in which an asset it could not estimate carries `NaN` in `mu` and on the diagonal of `sigma`. Nothing downstream of the fit can solve over such an asset, so the reduction happens once, at the optimiser's entry, and every constraint the caller stated over the full universe is sliced by the same index.
+
+Every optimisation family reduces through this one verb, which is why it is bound to [`AbstractOptimisationEstimator`](@ref) and lives here rather than beside the JuMP prelude: the hierarchical, naive and meta files load before that prelude and reach it without a back reference. A meta-optimiser composes two masks, its own at its entry and each inner head's inside its own solve, and both expand.
+
+Three methods, and the branch is dispatch rather than a condition. The first derives the mask; the `nothing` method is the all-investable path and returns its arguments untouched; the `BitVector` method takes the three views. A universe with nothing to exclude therefore costs one pass over two vectors and no allocation.
+
+The optimiser is viewed at `pr.X`, the *unreduced* returns matrix, because [`port_opt_view`](@ref) slices a tracking estimator against it by the same asset index. The prior is reduced after, so the matrix the view reads is still the full one.
+
+The mask rides as a `BitVector` because the expansion needs the length of the full universe and nothing else carries it once the prior is reduced. The three views take `findall(imsk)` instead, which is the integer index every other caller of [`port_opt_view`](@ref) passes.
+
+# Algorithm
+
+ 1. Derive the Investable Mask from the fitted prior with [`investable_mask`](@ref).
+ 2. Return the mask, the prior, the optimiser and the returns data unchanged when the mask is `nothing`.
+ 3. Otherwise read the departed names off the *unreduced* `rd.nx` with [`non_investable_names`](@ref), and announce them once with [`announce_non_investable`](@ref).
+ 4. Take a [`port_opt_view`](@ref) of each of the three at `findall(imsk)`.
+ 5. Declare the Non-Investable Axis on the viewed optimiser with [`non_investable_universe`](@ref), and return it beside the mask and the other two views. The axis is declared after the view because the view drops one, so a name-keyed constraint stated for a departed asset resolves here and nowhere deeper.
+
+# Arguments
+
+  - $(arg_dict[:pr])
+  - `opt::AbstractOptimisationEstimator`: The optimisation estimator, holding every constraint estimator the caller stated over the full universe.
+  - $(arg_dict[:rd])
+
+# Returns
+
+  - `(imsk, pr, opt, rd)`: The Investable Mask and the three reduced to it, or `nothing` and the three unchanged.
+
+# Related
+
+  - [`investable_mask`](@ref)
+  - [`expand_investable_weights`](@ref)
+  - [`port_opt_view`](@ref)
+  - [`non_investable_names`](@ref)
+  - [`non_investable_universe`](@ref)
+  - [`announce_non_investable`](@ref)
+"""
+function investable_reduction(pr::AbstractPriorResult, opt::AbstractOptimisationEstimator,
+                              rd::ReturnsResult)
+    return investable_reduction(investable_mask(pr), pr, opt, rd)
+end
+function investable_reduction(::Nothing, pr::AbstractPriorResult,
+                              opt::AbstractOptimisationEstimator, rd::ReturnsResult)
+    return nothing, pr, opt, rd
+end
+function investable_reduction(imsk::BitVector, pr::AbstractPriorResult,
+                              opt::AbstractOptimisationEstimator, rd::ReturnsResult)
+    idx = findall(imsk)
+    # Read the departed names before the view, declare them after it: the view drops the
+    # Non-Investable Axis, so this door is the one place a name-keyed constraint stated
+    # for an asset that left can still be resolved.
+    ni = non_investable_names(rd.nx, imsk)
+    announce_non_investable(ni)
+    return imsk, port_opt_view(pr, idx),
+           non_investable_universe(port_opt_view(opt, idx, pr.X), ni),
+           port_opt_view(rd, idx)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Derive the Coverage Universe of a window, and reduce a prior-free optimiser and its returns data to the assets it keeps.
+
+This is the twin of [`investable_reduction`](@ref) for a head that fits no prior. No Prior Result exists to derive an Investable Mask from, so the head derives the Coverage Universe of its own window instead, through the verb the priors use: an asset is kept when its return is finite and the active mask of the [`AssetPanel`](@ref) is `true` at every row of the window. A stale finite price during an inactive spell is therefore outside the mask, and the asset weights nothing.
+
+The two masks are the same object downstream. The head carries the Coverage Universe as the `imsk` of its result, and the result's keyword constructor expands the weights through [`expand_investable_weights`](@ref), as every other family's does, so every optimisation result of the library carries a mask and a reader has one idiom.
+
+Three methods, and the branch is dispatch rather than a condition, as it is in [`investable_reduction`](@ref). The first derives the mask; the `nothing` method is the all-covered path and returns its arguments untouched; the `BitVector` method takes the two views. The optimiser is viewed at `rd.X`, the *unreduced* returns matrix, because [`port_opt_view`](@ref) slices an estimator against it by the same asset index.
+
+An all-dead window throws an `IsEmptyError` where the mask is derived, so the refusal is [`coverage_mask`](@ref)'s and every prior-free head has it for free.
+
+# Algorithm
+
+ 1. Derive the Coverage Universe of `rd.X` and `rd.pnl` with [`coverage_mask`](@ref).
+ 2. Return the mask, the optimiser and the returns data unchanged when the mask is `nothing`.
+ 3. Otherwise read the departed names with [`non_investable_names`](@ref), announce them once with [`announce_non_investable`](@ref), take a [`port_opt_view`](@ref) of each of the two at `findall(cmsk)`, and declare the Non-Investable Axis on the viewed optimiser with [`non_investable_universe`](@ref).
+
+# Arguments
+
+  - `opt::AbstractOptimisationEstimator`: The optimisation estimator, holding every constraint estimator the caller stated over the full universe.
+  - $(arg_dict[:rd])
+  - $(arg_dict[:dims])
+
+# Validation
+
+  - $(val_dict[:dims])
+  - At least one asset must be in the Coverage Universe.
+
+# Returns
+
+  - `(cmsk, opt, rd)`: The Coverage Universe and the two reduced to it, or `nothing` and the two unchanged.
+
+# Related
+
+  - [`coverage_mask`](@ref)
+  - [`investable_reduction`](@ref)
+  - [`expand_investable_weights`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+function coverage_reduction(opt::AbstractOptimisationEstimator, rd::ReturnsResult;
+                            dims::Int = 1)
+    return coverage_reduction(coverage_mask(rd.X, rd.pnl; dims = dims), opt, rd)
+end
+function coverage_reduction(::Nothing, opt::AbstractOptimisationEstimator,
+                            rd::ReturnsResult)
+    return nothing, opt, rd
+end
+function coverage_reduction(cmsk::BitVector, opt::AbstractOptimisationEstimator,
+                            rd::ReturnsResult)
+    idx = findall(cmsk)
+    # A door is a door: the Coverage Universe and the Investable Mask are the same object
+    # downstream, so a prior-free head declares the Non-Investable Axis exactly as a
+    # prior-fitting one does, and a departure behaves the same in every family.
+    ni = non_investable_names(rd.nx, cmsk)
+    announce_non_investable(ni)
+    return cmsk, non_investable_universe(port_opt_view(opt, idx, rd.X), ni),
+           port_opt_view(rd, idx)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Expand a solved weight vector from the investable subset back onto the full asset universe.
+
+The optimiser solves over the assets the Investable Mask keeps, so its weight vector is shorter than the universe the caller stated. This puts each solved weight back at its own asset and writes a zero everywhere else, which is what a non-investable asset holds: the optimiser could not trade it.
+
+A failed solve carries `NaN` at every solved position. The expansion keeps that distinction — `NaN` where the optimiser tried and failed, zero where it never could — rather than flattening both to zero.
+
+The `nothing` mask returns the weights unchanged, so nothing is copied when every asset is investable, and a `nothing` weight vector stays `nothing`, which is what a naive head records when its finaliser gave up. The vector-of-vectors method serves the efficient-frontier route, where one weight vector is recorded per sweep point. [`JuMPOptimisationSolution`](@ref) carries its own methods beside the JuMP prelude, and they delegate to the plain weight vector here, so one length check and one message serve every family.
+
+The **keyword** constructor of each optimisation result is the caller, and every family builds its result through it. The positional constructor never expands, because every return-code rebuild goes through it and a second pass would expand twice.
+
+# Arguments
+
+  - $(arg_dict[:imsk])
+  - `w`: The weights the optimisation solved over the investable universe: one weight vector, or a vector of them on the efficient-frontier route.
+
+# Validation
+
+  - The solved weight vector must hold one weight per investable asset.
+
+# Returns
+
+  - `w`: The weights, or the vector of them, on the full asset universe.
+
+# Related
+
+  - [`investable_mask`](@ref)
+  - [`investable_reduction`](@ref)
+  - [`set_retcode`](@ref)
+"""
+function expand_investable_weights(::Nothing, w::Option{<:VecNum_VecVecNum})
+    return w
+end
+function expand_investable_weights(::BitVector, ::Nothing)
+    return nothing
+end
+function expand_investable_weights(imsk::BitVector, w::VecNum)
+    @argcheck(count(imsk) == length(w),
+              DimensionMismatch("the investable mask keeps $(count(imsk)) of $(length(imsk)) assets, but the solution holds $(length(w)) weights; the mask and the weights must come from the same optimisation"))
+    wf = zeros(eltype(w), length(imsk))
+    wf[imsk] = w
+    return wf
+end
+function expand_investable_weights(imsk::BitVector, w::VecVecNum)
+    return [expand_investable_weights(imsk, wi) for wi in w]
+end
+"""
     optimise(opt::OptimisationEstimator, args...; kwargs...) -> OptimisationResult
     optimise(opt::OptimisationResult, args...; kwargs...) -> OptimisationResult
 
@@ -2698,17 +2922,24 @@ function _optimise end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-High level optimisation function that wraps around estimator-specific optimisation functions. This takes care of fallback methods if the primary optimisation fails. It returns the first successful optimisation result but stores all fallback results in the `fb` field of the result.
+High level optimisation function that wraps around estimator-specific optimisation functions. This takes care of fallback methods if the primary optimisation fails. It returns the first successful optimisation result, or the last failure when every fallback fails, and stores the `(estimator, result)` pair of every failed attempt in the `fb` field of that result, in the order they ran (see [`FbChain`](@ref)). When no fallback was needed, `fb` is `nothing`.
 
 This is a fold-less entry point, so time-dependent schedules are inert here: the estimator is reset to its fold-less values (see [`reset_time_dependent_estimator`](@ref)) before the solve — in particular a scheduled fallback resets to its `default`, or to `nothing` (no fallback) when it has none, *before* the fallback chain is walked. Inside a fold loop this reset is a no-op, because the loop resolves every schedule before optimising.
+
+It is a batch fit, so an [`Online`](@ref) anywhere in the estimator's tree is refused by name through [`assert_batch_entry`](@ref) before any solve: the wrapper resolves only at the warm-up of the fold loop's online arm, and a plain `optimise` runs none. The read-out of a stepped estimator, `optimise(opt)`, never meets this refusal, because the warm-up that seeded its buffer replaced the wrapper.
 
 # Arguments
 
   - `opt::OptimisationEstimator`: The optimisation estimator to use.
   - $(arg_dict[:optargs])
   - $(arg_dict[:optkwargs])
+
+# Validation
+
+  - No field in the tree of `opt` holds an [`Online`](@ref). An `ArgumentError` naming the field is thrown otherwise.
 """
 function optimise(opt::OptimisationEstimator, args...; kwargs...)
+    assert_batch_entry(opt, "`optimise`")
     fb = Tuple{OptimisationEstimator, OptimisationResult}[]
     current_opt = reset_time_dependent_estimator(opt)
     res = nothing
@@ -2797,29 +3028,35 @@ function extract_fees(res::OptimisationResult, fees::Option{<:Fees} = nothing)
     return fees
 end
 """
-    calc_net_returns(res::OptimisationResult, X::MatNum, fees = nothing)
-    calc_net_returns(res::OptimisationResult, pr::Pr_RR, fees = nothing)
+    calc_net_returns(res::OptimisationResult, X::MatNum, fees = nothing, wd = nothing, obs = nothing)
+    calc_net_returns(res::OptimisationResult, pr::Pr_RR, fees = nothing, wd = nothing, obs = nothing)
 
 Compute net returns for a [`OptimisationResult`](@ref).
 
-`fees` takes precedence over `res.fees` if both are provided. Delegates to [`calc_net_returns(w, X, fees)`](@ref).
+`fees` takes precedence over `res.fees` if both are provided. Delegates to [`calc_net_returns(w, X, fees, wd, obs)`](@ref).
 
 When `pr::Pr_RR` is passed, extracts `X` from `pr.X` and delegates.
+
+`wd` is the Weight Drift the window is read under. `nothing` reads the window at the constant weights `res.w`, which is the library's original behaviour. A [`SelfFinancingDrift`](@ref) reads it as the wealth ratio of the drifted holdings, and `obs` then names the observations of the message a non-positive wealth raises.
 
 # Related
 
   - [`calc_net_returns`](@ref)
   - [`OptimisationResult`](@ref)
   - [`Pr_RR`](@ref)
+  - [`AbstractWeightDrift`](@ref)
+  - [`SelfFinancingDrift`](@ref)
 """
 function calc_net_returns(res::OptimisationResult, X::MatNum,
-                          fees::Option{<:Fees} = nothing)
+                          fees::Option{<:Fees} = nothing,
+                          wd::Option{<:AbstractWeightDrift} = nothing, obs = nothing)
     fees = extract_fees(res, fees)
-    return calc_net_returns(res.w, X, fees)
+    return calc_net_returns(res.w, X, fees, wd, obs)
 end
 function calc_net_returns(res::OptimisationResult, pr::Pr_RR,
-                          fees::Option{<:Fees} = nothing)
-    return calc_net_returns(res, pr.X, fees)
+                          fees::Option{<:Fees} = nothing,
+                          wd::Option{<:AbstractWeightDrift} = nothing, obs = nothing)
+    return calc_net_returns(res, pr.X, fees, wd, obs)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -2854,81 +3091,260 @@ function synthetic_asset_weights(w::MatNum)
     return w ./ map(x -> iszero(x) ? one(x) : x, s)
 end
 """
-    collapse_feature_matrix(Z::Nothing, sq::Bool, wi::MatNum)
-    collapse_feature_matrix(Z::MatNum, sq::Bool, wi::MatNum)
-    collapse_feature_matrix(Z::Arr3Num, sq::Bool, wi::MatNum)
-    collapse_feature_matrix(Z::Nothing, w::VecNum)
-    collapse_feature_matrix(Z::MatNum, w::VecNum)
-    collapse_feature_matrix(Z::Arr3Num, w::VecNum)
+    collapse_panel_numeric(A::AbstractVector, W::MatNum) -> Vector
+    collapse_panel_numeric(A::AbstractMatrix, W::MatNum) -> Matrix
 
-Aggregate a feature matrix onto the synthetic assets a meta-optimiser builds for its outer problem.
+Collapse one numeric Panel Field array onto the synthetic assets, as a convex combination.
 
-A meta-optimiser's outer problem allocates across *synthetic* assets — [`NestedClustered`](@ref)'s clusters, [`Stacking`](@ref)'s inner portfolios — each of which is a weighted combination of the real ones. Every quantity the outer [`ReturnsResult`](@ref) carries has to be re-expressed on that universe, and a feature matrix is no exception: without this collapse the outer optimiser has no feature matrix at all, so a [`FeatureDistance`](@ref) there throws rather than clustering the synthetic universe.
+`W` is the normalised weight matrix [`synthetic_asset_weights`](@ref) returns, `assets × synthetic assets`. A static array is one value per asset and a time-varying one is `observations × assets`, so the asset axis is the only one contracted in both.
 
-Features are treated as **intensive**, exactly as `iv` and `ivpa` are: the collapse is a convex combination, obtained by pushing the inner weights through [`synthetic_asset_weights`](@ref) first. An un-normalised weighted sum would scale each synthetic asset's feature vector by its gross exposure `sⱼ = Σᵢ|wᵢⱼ|`, inflating it under leverage or shorting. Under the default [`AngularDist`](@ref) the normalisation is a mathematical no-op for a rectangular feature matrix — scaling one row of the result leaves every cosine unchanged — but it is *not* one in the square case, where the two-sided product rescales feature columns as well, and it is what keeps the collapse bounded for any `sⱼ > 0`. An extensive feature (a market capitalisation, a headcount) wanting a weighted *sum* is not supported: the divisor depends on the inner solve, so a caller cannot pre-scale their way to one.
+# Algorithm
 
-## The two weight shapes
+The method that Julia selects is the algorithm. A vector contracts as `transpose(W) * A`, and a matrix as `A * W`.
 
-  - A weight **matrix** `wi` (assets × synthetic assets) collapses the whole universe at once. When `sq` is `true` the feature axis *is* the asset axis ([`features_are_assets`](@ref)), so it is contracted too and the result is again square on the synthetic universe.
-  - A weight **vector** `w` collapses onto a *single* synthetic asset, which is all [`reconstruct_rd`](@ref) has in scope within a cross-validation fold. It takes no `sq` argument, and that absence is the statement: the second contraction of the square case needs every synthetic asset's weights simultaneously, and contracting the feature axis with the one vector available would collapse it to a single number per synthetic asset — a feature space in which every asset is trivially identical. A square feature matrix therefore keeps the real assets as its feature axis through the fold path, reading as "this synthetic asset's weighted-average neighbourhood".
+# Arguments
+
+  - `A`: The values, `assets` or `observations × assets`.
+  - `W`: Normalised inner weights, assets × synthetic assets.
+
+# Returns
+
+  - The collapsed values, `synthetic assets` or `observations × synthetic assets`.
+
+# Related
+
+  - [`collapse_asset_panel`](@ref)
+  - [`synthetic_asset_weights`](@ref)
+  - [`NumericPanelField`](@ref)
+"""
+function collapse_panel_numeric(A::AbstractVector, W::MatNum)
+    return transpose(W) * A
+end
+function collapse_panel_numeric(A::AbstractMatrix, W::MatNum)
+    return A * W
+end
+"""
+    collapse_panel_tensor(A::AbstractMatrix, W::MatNum, sq::Bool) -> Matrix
+    collapse_panel_tensor(A::AbstractArray{<:Any, 3}, W::MatNum, sq::Bool) -> Array
+
+Collapse one tensor Panel Field array onto the synthetic assets, as a convex combination.
+
+A tensor array is `assets × labels` when static and `observations × assets × labels` when time-varying. The asset axis is always contracted. When `sq` is `true` the label axis **is** the asset axis ([`features_are_assets`](@ref)), so it is contracted too and the result is square again on the synthetic universe.
+
+# Algorithm
+
+The method that Julia selects is the algorithm. A matrix contracts as `transpose(W) * A`, and again as `* W` when `sq`. A three-dimensional array does the same one observation at a time, into a preallocated result.
+
+# Arguments
+
+  - `A`: The values.
+  - `W`: Normalised inner weights, assets × synthetic assets.
+  - `sq`: Whether the label axis is the asset axis.
+
+# Returns
+
+  - The collapsed values, with the asset axis, and the label axis under `sq`, replaced by the synthetic assets.
+
+# Related
+
+  - [`collapse_asset_panel`](@ref)
+  - [`synthetic_asset_weights`](@ref)
+  - [`features_are_assets`](@ref)
+  - [`TensorPanelField`](@ref)
+"""
+function collapse_panel_tensor(A::AbstractMatrix, W::MatNum, sq::Bool)
+    C = transpose(W) * A
+    return sq ? C * W : C
+end
+function collapse_panel_tensor(A::AbstractArray{<:Any, 3}, W::MatNum, sq::Bool)
+    k = size(W, 2)
+    nl = sq ? k : size(A, 3)
+    C = Array{promote_type(eltype(A), eltype(W))}(undef, size(A, 1), k, nl)
+    @inbounds for t in axes(A, 1)
+        Ct = transpose(W) * view(A, t, :, :)
+        C[t, :, :] = sq ? Ct * W : Ct
+    end
+    return C
+end
+"""
+    collapse_panel_mask(m::Nothing, W::MatNum) -> nothing
+    collapse_panel_mask(m::AbstractVector{Bool}, W::MatNum) -> BitVector
+    collapse_panel_mask(m::AbstractMatrix{Bool}, W::MatNum) -> BitMatrix
+
+Collapse one mask onto the synthetic assets, as the support of its convex combination.
+
+A synthetic asset is observed, active or in estimation at an observation when **any** member carrying weight is. So one kernel serves the values and the masks, the mask stays `Bool` by type, and the subset invariant between the estimation mask and the active mask survives with no second check.
+
+# Algorithm
+
+The method that Julia selects is the algorithm. `nothing` stays `nothing`; otherwise the mask collapses through [`collapse_panel_numeric`](@ref) and the result is compared against zero.
+
+# Arguments
+
+  - `m`: The mask, or `nothing`.
+  - `W`: Normalised inner weights, assets × synthetic assets.
+
+# Returns
+
+  - The collapsed mask, or `nothing`.
+
+# Related
+
+  - [`collapse_asset_panel`](@ref)
+  - [`synthetic_asset_weights`](@ref)
+  - [`AssetPanel`](@ref)
+"""
+function collapse_panel_mask(::Nothing, ::MatNum)
+    return nothing
+end
+function collapse_panel_mask(m::AbstractArray{Bool}, W::MatNum)
+    return collapse_panel_numeric(m, W) .> 0
+end
+"""
+    collapse_panel_field(f::NumericPanelField, W, nx, syn) -> NumericPanelField
+    collapse_panel_field(f::CategoricalPanelField, W, nx, syn) -> TensorPanelField
+    collapse_panel_field(f::TensorPanelField, W, nx, syn) -> TensorPanelField
+
+Collapse one Panel Field onto the synthetic assets a meta-optimiser builds.
+
+The collapse acts **one field at a time** and returns a field, so the collapsed panel is a panel like any other and a selector written for the inner problem resolves on it unchanged.
+
+  - A numeric field stays numeric.
+  - A tensor field stays a tensor field of the same name and labels, one label at a time. When its labels are the asset names the contraction is two-sided, its labels are renamed after the synthetic assets and its groups are dropped, so the square case holds one level up.
+  - A categorical field becomes a **tensor field of membership fractions**: the same name, the axis `"level"`, the levels as labels, and the convex combination of its one-hot block as values. A one-hot column of the Feature Matrix is a `0`/`1` feature, so its convex combination is the share of the synthetic asset's weight in that level, and the collapsed panel's Feature Matrix equals the collapse of the original panel's. A convex combination of integer codes would mean nothing, and a majority level would lose the fractions and need a tie rule.
+
+# Algorithm
+
+The method that Julia selects is the algorithm. Each kind contracts its own values and its own observed mask, through [`collapse_panel_numeric`](@ref), [`collapse_panel_tensor`](@ref) and [`collapse_panel_mask`](@ref).
+
+# Arguments
+
+  - `f`: The Panel Field.
+  - `W`: Normalised inner weights, assets × synthetic assets.
+  - `nx`: The carrier's asset names, or `nothing`. Read for the square case alone.
+  - `syn`: The synthetic asset names.
+
+# Returns
+
+  - The collapsed Panel Field.
+
+# Related
+
+  - [`collapse_asset_panel`](@ref)
+  - [`features_are_assets`](@ref)
+  - [`panel_onehot`](@ref)
+  - [`AbstractPanelField`](@ref)
+"""
+function collapse_panel_field(f::NumericPanelField, W::MatNum, ::Any, ::Any)
+    return NumericPanelField(; name = f.name, vals = collapse_panel_numeric(f.vals, W),
+                             omsk = collapse_panel_mask(f.omsk, W))
+end
+function collapse_panel_field(f::CategoricalPanelField, W::MatNum, ::Any, ::Any)
+    return TensorPanelField(; name = f.name, axis = "level", labels = f.levels,
+                            vals = collapse_panel_tensor(panel_onehot(f), W, false),
+                            omsk = collapse_categorical_mask(f.omsk, W, length(f.levels)))
+end
+function collapse_panel_field(f::TensorPanelField, W::MatNum, nx::Option{<:VecStr},
+                              syn::VecStr)
+    sq = features_are_assets(f, nx)
+    return TensorPanelField(; name = f.name, axis = f.axis, labels = sq ? syn : f.labels,
+                            groups = sq ? nothing : f.groups,
+                            vals = collapse_panel_tensor(f.vals, W, sq),
+                            omsk = if isnothing(f.omsk)
+                                nothing
+                            else
+                                collapse_panel_tensor(f.omsk, W, sq) .> 0
+                            end)
+end
+"""
+    collapse_categorical_mask(m::Nothing, W::MatNum, nl::Integer) -> nothing
+    collapse_categorical_mask(m::AbstractVector{Bool}, W::MatNum, nl::Integer) -> BitMatrix
+    collapse_categorical_mask(m::AbstractMatrix{Bool}, W::MatNum, nl::Integer) -> BitArray
+
+Collapse a categorical Panel Field's observed mask onto the tensor field its collapse returns.
+
+The collapsed field carries one label per level, so its mask needs the level axis the categorical mask does not have. The asset mask is collapsed once and then repeated across the levels: a cell was observed or not for the whole label, never per level.
+
+# Algorithm
+
+The method that Julia selects is the algorithm. `nothing` stays `nothing`; otherwise the asset mask collapses through [`collapse_panel_mask`](@ref) and is repeated over `nl` levels.
+
+# Arguments
+
+  - `m`: The categorical field's observed mask, or `nothing`.
+  - `W`: Normalised inner weights, assets × synthetic assets.
+  - `nl`: Number of levels.
+
+# Returns
+
+  - The collapsed mask over the level axis, or `nothing`.
+
+# Related
+
+  - [`collapse_panel_field`](@ref)
+  - [`collapse_panel_mask`](@ref)
+  - [`CategoricalPanelField`](@ref)
+"""
+function collapse_categorical_mask(::Nothing, ::MatNum, ::Integer)
+    return nothing
+end
+function collapse_categorical_mask(m::AbstractVector{Bool}, W::MatNum, nl::Integer)
+    return repeat(collapse_panel_mask(m, W), 1, nl)
+end
+function collapse_categorical_mask(m::AbstractMatrix{Bool}, W::MatNum, nl::Integer)
+    return repeat(collapse_panel_mask(m, W), 1, 1, nl)
+end
+"""
+    collapse_asset_panel(pnl::Nothing, wi::MatNum, nx) -> nothing
+    collapse_asset_panel(pnl::AssetPanel, wi::MatNum, nx::Option{<:VecStr}) -> AssetPanel
+
+Aggregate an [`AssetPanel`](@ref) onto the synthetic assets a meta-optimiser builds for its outer problem.
+
+A meta-optimiser's outer problem allocates across *synthetic* assets — [`NestedClustered`](@ref)'s clusters, [`Stacking`](@ref)'s inner portfolios — each of which is a weighted combination of the real ones. Every quantity the outer [`ReturnsResult`](@ref) carries has to be re-expressed on that universe, and the panel is no exception: without this collapse the outer optimiser has no panel at all, so a [`FeatureDistance`](@ref) there throws rather than clustering the synthetic universe.
+
+Features are treated as **intensive**, exactly as `iv` and `ivpa` are: the collapse is a convex combination, obtained by pushing the inner weights through [`synthetic_asset_weights`](@ref) first. An un-normalised weighted sum would scale each synthetic asset's feature vector by its gross exposure `sⱼ = Σᵢ|wᵢⱼ|`, inflating it under leverage or shorting. Under the default [`AngularDist`](@ref) the normalisation is a mathematical no-op for a rectangular field — scaling one row of the result leaves every cosine unchanged — but it is *not* one in the square case, where the two-sided product rescales the label axis as well, and it is what keeps the collapse bounded for any `sⱼ > 0`. An extensive feature (a market capitalisation, a headcount) wanting a weighted *sum* is not supported: the divisor depends on the inner solve, so a caller cannot pre-scale their way to one.
 
 ## Degenerate synthetic assets
 
 A synthetic asset whose weights are entirely zero has `sⱼ = 0`; [`synthetic_asset_weights`](@ref) leaves the column alone rather than dividing, so the collapse gives that asset a **zero feature vector** instead of throwing. It then lands on the zero-feature-vector convention the distance kernel already implements, matching the zero returns column, `iv` and `ivpa` the same degenerate weights already produce.
 
+# Algorithm
+
+ 1. Return `nothing` when the carrier holds no panel.
+ 2. Normalise the inner weights with [`synthetic_asset_weights`](@ref).
+ 3. Collapse every Panel Field with [`collapse_panel_field`](@ref).
+ 4. Collapse both universe masks with [`collapse_panel_mask`](@ref), which keeps them `nothing` for a static panel.
+
 # Arguments
 
-  - `Z`: Feature matrix, static (assets × features) or time-varying (observations × assets × features).
-  - `sq`: Whether the feature axis is the asset axis, from [`features_are_assets`](@ref).
+  - `pnl`: The Asset Panel, or `nothing`.
   - `wi`: Inner weights, assets × synthetic assets.
-  - `w`: Inner weights for a single synthetic asset, assets × 1.
+  - `nx`: The carrier's asset names, or `nothing`. Read for the square case alone.
 
 # Returns
 
-  - `nothing` when `Z` is `nothing`.
-  - Matrix arity: `synthetic assets × features`, or `synthetic assets × synthetic assets` when `sq`; `observations × …` with the same trailing axes for a time-varying `Z`.
-  - Vector arity: a `features`-length vector for a static `Z`, an `observations × features` matrix for a time-varying one.
+  - `pnl::Option{AssetPanel}`: The Asset Panel on the synthetic universe, or `nothing`.
 
 # Related
 
   - [`synthetic_asset_weights`](@ref)
+  - [`collapse_panel_field`](@ref)
   - [`features_are_assets`](@ref)
   - [`prepare_outer_rd`](@ref)
-  - [`reconstruct_rd`](@ref)
   - [`FeatureDistance`](@ref)
 """
-function collapse_feature_matrix(::Nothing, ::Bool, ::MatNum)
+function collapse_asset_panel(::Nothing, ::MatNum, ::Any)
     return nothing
 end
-function collapse_feature_matrix(Z::MatNum, sq::Bool, wi::MatNum)
-    wi = synthetic_asset_weights(wi)
-    Zc = transpose(wi) * Z
-    return sq ? Zc * wi : Zc
-end
-function collapse_feature_matrix(Z::Arr3Num, sq::Bool, wi::MatNum)
-    wi = synthetic_asset_weights(wi)
-    k = size(wi, 2)
-    nf = sq ? k : size(Z, 3)
-    Zc = Array{promote_type(eltype(Z), eltype(wi))}(undef, size(Z, 1), k, nf)
-    @inbounds for t in axes(Z, 1)
-        Zt = transpose(wi) * view(Z, t, :, :)
-        Zc[t, :, :] = sq ? Zt * wi : Zt
-    end
-    return Zc
-end
-function collapse_feature_matrix(::Nothing, ::VecNum)
-    return nothing
-end
-function collapse_feature_matrix(Z::MatNum, w::VecNum)
-    return transpose(Z) * synthetic_asset_weights(w)
-end
-function collapse_feature_matrix(Z::Arr3Num, w::VecNum)
-    w = synthetic_asset_weights(w)
-    Zc = Matrix{promote_type(eltype(Z), eltype(w))}(undef, size(Z, 1), size(Z, 3))
-    @inbounds for t in axes(Z, 1)
-        Zc[t, :] = transpose(view(Z, t, :, :)) * w
-    end
-    return Zc
+function collapse_asset_panel(pnl::AssetPanel, wi::MatNum, nx::Option{<:VecStr})
+    W = synthetic_asset_weights(wi)
+    syn = ["_$(k)" for k in 1:size(W, 2)]
+    #! A panel with no Panel Field is the ingestion layer's shape. An untyped comprehension
+    #! over an empty vector answers a `Vector{Any}`, which the panel's constructor refuses,
+    #! so the comprehension is typed: it answers the same vector empty or full.
+    pf = AbstractPanelField[collapse_panel_field(f, W, nx, syn) for f in pnl.pf]
+    return AssetPanel(; pf = pf, amsk = collapse_panel_mask(pnl.amsk, W),
+                      emsk = collapse_panel_mask(pnl.emsk, W))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -2969,7 +3385,7 @@ Compute the expected risk for an [`OptimisationResult`](@ref).
 
 Extracts `w` from `res` and delegates to the weight-based [`expected_risk`](@ref). `fees` takes precedence over `res.fees` if both are provided.
 
-When `pr::Pr_RR` is `nothing`, [`extract_pr`](@ref) takes the prior result from the `pr` property of `res` before delegating.
+When `pr::Pr_RR` is `nothing`, [`extract_pr`](@ref) takes the prior result from the `pr` property of `res` before delegating. That prior is on the universe the fit solved on, ADR 0115's rule, while `res.w` is expanded back to the caller's universe, so the weights are viewed at the result's Investable Mask ([`result_investable_mask`](@ref)) before they meet it; a result with no mask views nothing. A caller's own `pr` is taken as given, on the universe of `res.w`.
 
 `r` is one measure or a vector of them; a vector is scalarised by `sca`, defaulting to [`SumScalariser`](@ref). The measure is **not** read from `res`, so a result that carries its own `r` and `sca` reports the figure it optimised only when the caller passes them back, as `expected_risk(res.r, res; sca = res.sca)`.
 
@@ -2981,6 +3397,7 @@ The prior-taking method forwards the carrier whole, so a caller's **own** measur
   - [`OptimisationResult`](@ref)
   - [`BaseRM_VecBaseRM`](@ref)
   - [`resolve_risk_inputs`](@ref)
+  - [`result_investable_mask`](@ref)
 """
 function expected_risk(r::BaseRM_VecBaseRM, res::OptimisationResult, X::MatNum,
                        fees::Option{<:Fees} = nothing; kwargs...)
@@ -2995,8 +3412,11 @@ function expected_risk(r::BaseRM_VecBaseRM, res::OptimisationResult,
     # each carrier: a prior result resolves the measure, a `ReturnsResult` only unwraps `X`.
     # Unwrapping here dropped the prior fallback, so `expected_risk(Variance(), res)` — the
     # call this docstring asks callers to make — hit the kernel with an unstated `sigma`.
-    fees = extract_fees(res, fees)
-    return expected_risk(r, res.w, extract_pr(res, pr), fees; kwargs...)
+    # The result's own prior is on the investable universe and its weights are expanded
+    # back to the caller's, so with no `pr` the two meet at the mask; the fees already sit
+    # on the investable universe beside the prior. A caller's `pr` is on the weights' own.
+    w = isnothing(pr) ? investable_weights_view(result_investable_mask(res), res.w) : res.w
+    return expected_risk(r, w, extract_pr(res, pr), extract_fees(res, fees); kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

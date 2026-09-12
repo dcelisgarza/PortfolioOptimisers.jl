@@ -14,6 +14,28 @@
 Convenience constructor. Returns a [`PortfolioOptimisersCovariance`](@ref) configured to apply
 positive definite projection then denoising, in that order, via [`MatrixProcessing`](@ref).
 
+[`denoise!`](@ref) in `src/05_Denoise.jl` states the mathematics of the denoising step, and
+[`posdef!`](@ref) in `src/04_PosdefMatrix.jl` that of the projection.
+
+# Algorithm
+
+ 1. Build a [`MatrixProcessing`](@ref) from `pdm` and `dn`, with `order = (:pdm, :dn)`.
+ 2. Return a [`PortfolioOptimisersCovariance`](@ref) carrying `ce` and that estimator.
+
+`order` is what fixes the composition: `Statistics.cov` runs `ce` first, then projects the matrix
+onto the positive definite cone, and denoises last. A caller who needs the reverse order builds the
+[`MatrixProcessing`](@ref) itself.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - $(arg_dict[:dn])
+  - $(arg_dict[:opdm])
+
+# Returns
+
+  - `ce::PortfolioOptimisersCovariance`: Composite estimator that denoises the matrix `ce` computes.
+
 # Examples
 
 ```jldoctest
@@ -25,7 +47,8 @@ PortfolioOptimisersCovariance
      │    ce ┼ GeneralCovariance
      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
      │       │    w ┴ nothing
-     │   alg ┴ FullMoment()
+     │   alg ┼ FullMoment()
+     │     w ┴ nothing
   mp ┼ MatrixProcessing
      │     pdm ┼ Posdef
      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton

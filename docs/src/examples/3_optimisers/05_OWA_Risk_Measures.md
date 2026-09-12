@@ -1,5 +1,4 @@
 The source files can be found in [examples/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../../examples/3_optimisers/05_OWA_Risk_Measures.jl"
 ```
@@ -134,13 +133,13 @@ pretty_table(DataFrame(hcat(rd.nx, [r.w for r in results]...),
 Even though all portfolios minimise risk, the allocations differ substantially because each
 measure emphasises a different aspect of the distribution:
 
-- **GMD** penalises pairwise spread — it concentrates into correlated low-volatility names.
-- **CVaR** focuses on the worst 5 % of days and ignores moderate losses.
-- **TailGini** also looks at the tail but responds to its *shape* (Gini spread within the
+  - **GMD** penalises pairwise spread — it concentrates into correlated low-volatility names.
+  - **CVaR** focuses on the worst 5 % of days and ignores moderate losses.
+  - **TailGini** also looks at the tail but responds to its *shape* (Gini spread within the
     tail), not only its level.
-- **WorstRealisation** and **Range** are extreme: the solver pushes all weight into
+  - **WorstRealisation** and **Range** are extreme: the solver pushes all weight into
     whatever reduces a single day or the full span.
-- **L-moment CRM** distributes attention over many higher-order distributional moments at
+  - **L-moment CRM** distributes attention over many higher-order distributional moments at
     once.
 
 ````@example 05_OWA_Risk_Measures
@@ -233,13 +232,13 @@ plot_stacked_bar_composition(lcrm_results, rd)
 OWA risk measures offer a linear-programme-compatible family that spans the full
 spectrum from worst-realisation to distributional dispersion:
 
-- **Closed-form vectors** (`owa_gmd`, `owa_tg`, `owa_cvar`, …) plug directly into
+  - **Closed-form vectors** (`owa_gmd`, `owa_tg`, `owa_cvar`, …) plug directly into
     [`OrderedWeightsArray`](@ref) with no solver required for weight construction.
-- **Default approximate formulation** (`ApproxOrderedWeightsArray`) scales to realistic
+  - **Default approximate formulation** (`ApproxOrderedWeightsArray`) scales to realistic
     universes without any code changes.
-- **L-moment CRM** with `NormalisedConstantRelativeRiskAversion` and `g` gives a
+  - **L-moment CRM** with `NormalisedConstantRelativeRiskAversion` and `g` gives a
     continuously tunable risk-aversion dial.
-- **Range variants** (`OrderedWeightsArrayRange`) track two-sided tail exposure.
+  - **Range variants** (`OrderedWeightsArrayRange`) track two-sided tail exposure.
 
 ---
 

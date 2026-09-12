@@ -61,7 +61,7 @@ rd = prices_to_returns(X)
 
 Black–Litterman does not start from the sample mean. Its baseline is the
 [`EquilibriumExpectedReturns`](@ref) vector — the returns *implied* by the market via reverse
-optimisation (``\\boldsymbol{\\pi} = \\lambda \\mathbf{\\Sigma} \\boldsymbol{w}_{mkt}``). This
+optimisation (``\boldsymbol{\pi} = \lambda \mathbf{\Sigma} \boldsymbol{w}_{mkt}``). This
 matters because the raw sample mean over a single year is noisy and often negative, whereas the
 equilibrium prior is a smoother, economically-motivated anchor that the views then nudge.
 

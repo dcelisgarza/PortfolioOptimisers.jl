@@ -29,7 +29,11 @@ end
     @test PortfolioOptimisers.robust_cov(PlainCov(), X; scale = 2.0) ≈ sigma
     # Genuine errors propagate instead of being masked by a kwarg-less retry.
     @test_throws DomainError PortfolioOptimisers.robust_cov(ThrowingCov(), X)
-    # Estimators without a `cor` method fall back to cov2cor(robust_cov(...)).
+    # `StatsBase` gives every `CovarianceEstimator` a slurping
+    # `cor(ce, X::AbstractMatrix; kwargs...)`, so this estimator answers `cor` through that
+    # generic and the extra keyword rides to its own `cov`. A correlation is scale free, so
+    # the scaled covariance still gives the plain correlation. This is NOT the
+    # covariance-to-correlation fallback, which `test_08f_base_moments_kernels.jl` drives.
     @test PortfolioOptimisers.robust_cor(KwargsCov(), X; scale = 2.0) ≈ Statistics.cor(X)
     @test_throws DomainError PortfolioOptimisers.robust_cor(ThrowingCov(), X)
     # StatsBase's generic `cor(ce, X, w; kwargs...)` wrapper slurps kwargs (so it passes

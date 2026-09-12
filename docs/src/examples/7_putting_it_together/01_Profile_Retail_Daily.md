@@ -1,5 +1,4 @@
 The source files can be found in [examples/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../../examples/7_putting_it_together/01_Profile_Retail_Daily.jl"
 ```
@@ -13,12 +12,12 @@ constraints are compute, trading cost, and capital, not sophistication.
 
 The reasoning, following the [strategy decision framework](../../user_guide/07_Choosing_a_Strategy.md):
 
-- **Compute is cheap but frequent** — rebalancing every day rules out heavy optimisations; a
+  - **Compute is cheap but frequent** — rebalancing every day rules out heavy optimisations; a
     single convex solve is right.
-- **Trading is the enemy** — daily turnover compounds costs, so we cap turnover and charge fees
+  - **Trading is the enemy** — daily turnover compounds costs, so we cap turnover and charge fees
     explicitly, letting the optimiser trade only when it is worth it.
-- **The account is small** — discretisation matters, so finite allocation is not an afterthought.
-- **Robustness over edge** — a tight weight cap buys diversification and stability.
+  - **The account is small** — discretisation matters, so finite allocation is not an afterthought.
+  - **Robustness over edge** — a tight weight cap buys diversification and stability.
 
 !!! tip "When to reach for this"
     This is the template for any cost- and capital-constrained, high-frequency book: keep the

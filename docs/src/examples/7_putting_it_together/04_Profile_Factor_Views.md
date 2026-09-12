@@ -1,5 +1,4 @@
 The source files can be found in [examples/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../../examples/7_putting_it_together/04_Profile_Factor_Views.jl"
 ```
@@ -20,11 +19,11 @@ page builds up variant by variant, assembled here end-to-end as a reusable book:
 
 The reasoning, following the [strategy decision framework](../../user_guide/07_Choosing_a_Strategy.md):
 
-- **The edge is a factor call, not a stock call** — the desk has a view on *factor premia*, so it
+  - **The edge is a factor call, not a stock call** — the desk has a view on *factor premia*, so it
     encodes it where it belongs and propagates it through the factor regression.
-- **A raw factor tilt is dangerous** — momentum and value concentrate, so the book is wrapped in
+  - **A raw factor tilt is dangerous** — momentum and value concentrate, so the book is wrapped in
     per-asset and per-sector caps that make the tilt expressible but bounded.
-- **Risk-adjusted, then allocated** — it takes the tangency ([`MaximumRatio`](@ref)) book on the
+  - **Risk-adjusted, then allocated** — it takes the tangency ([`MaximumRatio`](@ref)) book on the
     posterior and turns it into whole shares with an exact MIP allocation.
 
 !!! tip "When to reach for this"
@@ -57,7 +56,7 @@ earns 3 bps/day.
 ````@example 04_Profile_Factor_Views
 X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
 F = TimeArray(CSV.File(joinpath(@__DIR__, "..", "Factors.csv.gz")); timestamp = :Date)[(end - 252):end]
-rd = prices_to_returns(X, F)
+rd = prices_to_returns(price_ingestion(PriceIngestion(), X; F = F))
 prices = vec(values(X)[end, :])
 
 asset_sets = UniverseSets(;
@@ -65,7 +64,7 @@ asset_sets = UniverseSets(;
                                       "energy" => ["CVX", "XOM", "RRC"],
                                       "healthcare" => ["JNJ", "LLY", "MRK", "PFE", "UNH"]))
 # `FactorBlackLittermanPrior` reads the *declared* factor axis, so the sets it takes names
-# both: assets under `xkey`, factors under `fkey`, in the column order of `rd.F`.
+# both: assets under `xkey`, factors under `tfkey`, in the column order of `rd.F`.
 factor_sets = UniverseSets(; dict = Dict("nx" => rd.nx, "nf" => rd.nf))
 tau = 1 / size(rd.X, 1)
 

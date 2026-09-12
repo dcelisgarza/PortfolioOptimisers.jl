@@ -1,5 +1,4 @@
 The source files can be found in [examples/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../../examples/4_constraints_costs/02_Linear_Group_Constraints.jl"
 ```
@@ -154,10 +153,10 @@ pretty_table(DataFrame("Sector" => sectors,
 
 Two common constraints are *not* convex and so cannot be solved by Clarabel alone:
 
-- **Thresholds** ([`ThresholdEstimator`](@ref), the `lt` / `st` keywords) — "if you hold a
+  - **Thresholds** ([`ThresholdEstimator`](@ref), the `lt` / `st` keywords) — "if you hold a
     name at all, hold at least x" — are semi-continuous (a weight is either zero or above the
     floor).
-- **Cardinality** (`card`, `gcarde`) — "hold at most k names" — is combinatorial.
+  - **Cardinality** (`card`, `gcarde`) — "hold at most k names" — is combinatorial.
 
 Both require a mixed-integer-capable solver (e.g. [Pajarito](https://github.com/jump-dev/Pajarito.jl)
 with Clarabel as the continuous solver and [HiGHS](https://github.com/jump-dev/HiGHS.jl) for the

@@ -154,6 +154,7 @@ fan_out_slot
 deferred_derived_quantity
 resolve_slot
 deferred_slots
+resolve_calibration_slots(x, pr::AbstractPriorResult)
 resolve_deferred_quantities(x, pr::AbstractPriorResult)
 resolve_deferred_child
 rebuild_with_slots

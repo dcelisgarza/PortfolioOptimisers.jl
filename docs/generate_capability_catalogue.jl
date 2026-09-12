@@ -290,9 +290,119 @@ For the same types arranged by subtyping rather than by capability, see the
 """
 
 """
+    declared_leaves(T, acc = Set{Type}()) -> Set{Type}
+
+Every concrete leaf under `T` that `PortfolioOptimisers` itself declares.
+
+A leaf is a non-abstract type with no subtypes. Note `!isabstracttype` rather
+than `isconcretetype`: nearly every struct here is `@concrete`, so the bare name
+is a `UnionAll` and `isconcretetype` is false for every one of them.
+
+The `parentmodule` filter matters in `test/test_26_docs.jl`, which shares this
+rule. The runner gives each test file its own module, but not its own process,
+so an estimator that another file declares stays in the worker and `subtypes`
+finds it here. The catalogue is about the shipped universe, so a leaf from
+another module is not one of its members. Which files share a worker changes
+from run to run, so without this filter the test is a scheduling flake.
+"""
+function declared_leaves(T, acc = Set{Type}())
+    subs = subtypes(T)
+    if isempty(subs)
+        if !isabstracttype(T) && parentmodule(T) === PortfolioOptimisers
+            push!(acc, T)
+        end
+    else
+        foreach(S -> declared_leaves(S, acc), subs)
+    end
+    return acc
+end
+
+"""
+    declared_descendants(T, acc = Set{Type}()) -> Set{Type}
+
+Every concrete type under `T`, at any depth, that `PortfolioOptimisers` declares.
+
+Unlike [`declared_leaves`](@ref) this keeps an inner concrete type as well, so a
+family is subtracted whole.
+"""
+function declared_descendants(T, acc = Set{Type}())
+    if !isabstracttype(T) && parentmodule(T) === PortfolioOptimisers
+        push!(acc, T)
+    end
+    foreach(S -> declared_descendants(S, acc), subtypes(T))
+    return acc
+end
+
+"""
+    exported_concrete_types() -> Set{Type}
+
+Every concrete type `PortfolioOptimisers` exports under its own name.
+
+An alias binding is skipped, because its `nameof` is the canonical type it
+points at: `HRP` and `HierarchicalRiskParity` are one capability, and the
+catalogue entry belongs to the long form. The alias table in the risk-measure
+guide is where a reader looks an acronym up.
+"""
+function exported_concrete_types()
+    acc = Set{Type}()
+    for n in names(PortfolioOptimisers)
+        if !Base.isexported(PortfolioOptimisers, n) || contains(string(n), "#")
+            continue
+        end
+        v = getfield(PortfolioOptimisers, n)
+        if !(v isa Type)
+            continue
+        end
+        T = v isa UnionAll ? Base.unwrap_unionall(v) : v
+        if !(T isa DataType) || isabstracttype(T)
+            continue
+        end
+        if parentmodule(T) !== PortfolioOptimisers || nameof(T) != n
+            continue
+        end
+        push!(acc, T)
+    end
+    return acc
+end
+
+"""
+    choice_surface_names() -> Set{Symbol}
+
+The names the catalogue must reach, before `NOT_A_CHOICE` is subtracted.
+
+This is the Choice Surface of `CONTEXT.md` § 1 in code, and it is the one
+statement of the coverage rule: `test/test_26_docs.jl` calls this function too.
+A concrete type that `PortfolioOptimisers` declares is on the surface when
+either rule holds:
+
+  - it is a leaf subtype of `AbstractEstimator`, of `AbstractAlgorithm` or of
+    `AbstractCovarianceEstimator`, exported or not; or
+  - the package exports it under its own name.
+
+Two families are then subtracted, because a caller receives them and never
+chooses them: an `AbstractResult`, which includes an `OptimisationReturnCode`,
+and a `PortfolioOptimisersError`.
+
+The roots alone left a hole, which is issue #636: a family that takes none of
+them is required by nothing, so the catalogue held it by the author's attention
+alone. `AbstractCovarianceEstimator` is a root here for that reason. It descends
+from `StatsBase.CovarianceEstimator` rather than from `AbstractEstimator`, so
+the two original roots reached no member of it, exported or not.
+"""
+function choice_surface_names()
+    required = union(declared_leaves(PortfolioOptimisers.AbstractEstimator),
+                     declared_leaves(PortfolioOptimisers.AbstractAlgorithm),
+                     declared_leaves(PortfolioOptimisers.AbstractCovarianceEstimator),
+                     exported_concrete_types())
+    setdiff!(required, declared_descendants(PortfolioOptimisers.AbstractResult),
+             declared_descendants(PortfolioOptimisers.PortfolioOptimisersError))
+    return Set(nameof.(collect(required)))
+end
+
+"""
     assert_complete()
 
-Refuse to render a catalogue that is missing an estimator or algorithm.
+Refuse to render a catalogue that is missing a choice.
 
 A type listed in `NOT_A_CHOICE` is exempt: the library constructs it for itself,
 so it is not a capability a reader can reach for.
@@ -303,15 +413,6 @@ worse than a red test: a page that quietly omits a capability *looks* complete,
 which is precisely the defect this page was built to end.
 """
 function assert_complete()
-    function leaf_types(T, acc = Set{Type}())
-        subs = subtypes(T)
-        if isempty(subs)
-            !isabstracttype(T) && push!(acc, T)
-        else
-            foreach(S -> leaf_types(S, acc), subs)
-        end
-        return acc
-    end
     catalogued = Set{Symbol}()
     scan_text(t::AbstractString) =
         for m in eachmatch(r"\[`([^`]+)`\]\(@ref\)", t)
@@ -326,13 +427,12 @@ function assert_complete()
                       foreach(scan, n.children))
     foreach(scan, CATALOGUE)
 
-    required = Set(nameof.(collect(union(leaf_types(PortfolioOptimisers.AbstractEstimator),
-                                         leaf_types(PortfolioOptimisers.AbstractAlgorithm)))))
+    required = choice_surface_names()
     setdiff!(required, keys(NOT_A_CHOICE))
     missed = sort(collect(setdiff(required, catalogued)))
     if !isempty(missed)
-        error("""capability_catalogue: $(length(missed)) estimator(s)/algorithm(s) are not
-                 catalogued, so the page would be rendered incomplete. Add each to
+        error("""capability_catalogue: $(length(missed)) choice(s) are not catalogued, so the
+                 page would be rendered incomplete. Add each to
                  `docs/capability_catalogue.jl`, or list it in `NOT_A_CHOICE` with a
                  reason:\n  $(join(missed, "\n  "))""")
     end

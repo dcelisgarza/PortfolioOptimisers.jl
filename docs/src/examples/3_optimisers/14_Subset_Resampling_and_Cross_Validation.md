@@ -1,5 +1,4 @@
 The source files can be found in [examples/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../../examples/3_optimisers/14_Subset_Resampling_and_Cross_Validation.jl"
 ```
@@ -9,9 +8,9 @@ EditURL = "../../../../examples/3_optimisers/14_Subset_Resampling_and_Cross_Vali
 This example deepens the basic meta-optimiser walkthrough by focusing on two practical
 questions:
 
-- how stable are the out-of-sample predictions produced by a plain optimiser versus a
+  - how stable are the out-of-sample predictions produced by a plain optimiser versus a
     meta-optimiser when we evaluate them with cross validation?
-- what does the efficient frontier look like when the optimiser is a meta-optimiser that
+  - what does the efficient frontier look like when the optimiser is a meta-optimiser that
     resamples the universe before averaging the result?
 
 We use [`MeanRisk`](@ref) as the benchmark and [`SubsetResampling`](@ref) as the meta-
@@ -273,12 +272,12 @@ docstring carries that warning; ADR 0051 records why the design warns rather tha
 
 Meta-optimisers help when a single fit feels too brittle.
 
-- [`cross_val_predict`](@ref) shows how the benchmark and the bagged optimiser behave
+  - [`cross_val_predict`](@ref) shows how the benchmark and the bagged optimiser behave
     under repeated out-of-sample evaluation.
-- [`SubsetResampling`](@ref) smooths allocations by averaging many subset solves.
-- Frontier sweeps still work on the meta-optimiser, so you can compare its trade-off
+  - [`SubsetResampling`](@ref) smooths allocations by averaging many subset solves.
+  - Frontier sweeps still work on the meta-optimiser, so you can compare its trade-off
     curve against the plain optimiser instead of choosing only one portfolio.
-- A prior-derived slot can hold the **estimator** rather than the value, so it refits with
+  - A prior-derived slot can hold the **estimator** rather than the value, so it refits with
     every subset and every fold instead of pinning one full-sample answer.
 
 ---

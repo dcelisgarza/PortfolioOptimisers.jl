@@ -406,13 +406,14 @@ Resolve a **Deferred Quantity** in [`Variance`](@ref)'s `sigma` slot against pri
   - [`resolve_deferred_quantities`](@ref)
   - [`fit_deferred_quantity`](@ref)
 """
-function resolve_deferred_quantities(r::Variance, pr::AbstractPriorResult)
+function resolve_deferred_quantities(r::Variance, pr::AbstractPriorResult, ::Any = nothing)
     if !isa(r.sigma, DeferredQuantity)
         return r
     end
     fitted = fit_deferred_quantity(r.sigma, pr)
-    return Variance(; settings = r.settings, sigma = deferred_quantity(fitted, :sigma),
-                    chol = deferred_derived_quantity(fitted, :chol), rc = r.rc, alg = r.alg)
+    return rebuild_with_slots(r,
+                              (; sigma = deferred_quantity(fitted, :sigma),
+                               chol = deferred_derived_quantity(fitted, :chol)))
 end
 # Deferrable slots — see `deferred_slots`. `chol` is derived and never defers on its own.
 deferred_slots(r::Variance) = (; sigma = r.sigma)
@@ -608,14 +609,15 @@ Resolve a **Deferred Quantity** in [`StandardDeviation`](@ref)'s `sigma` slot ag
   - [`resolve_deferred_quantities`](@ref)
   - [`fit_deferred_quantity`](@ref)
 """
-function resolve_deferred_quantities(r::StandardDeviation, pr::AbstractPriorResult)
+function resolve_deferred_quantities(r::StandardDeviation, pr::AbstractPriorResult,
+                                     ::Any = nothing)
     if !isa(r.sigma, DeferredQuantity)
         return r
     end
     fitted = fit_deferred_quantity(r.sigma, pr)
-    return StandardDeviation(; settings = r.settings,
-                             sigma = deferred_quantity(fitted, :sigma),
-                             chol = deferred_derived_quantity(fitted, :chol))
+    return rebuild_with_slots(r,
+                              (; sigma = deferred_quantity(fitted, :sigma),
+                               chol = deferred_derived_quantity(fitted, :chol)))
 end
 # Deferrable slots — see `deferred_slots`.
 deferred_slots(r::StandardDeviation) = (; sigma = r.sigma)
@@ -800,25 +802,27 @@ UncertaintySetVariance
            │     rke ┴ Bool: true
        ucs ┼ NormalUncertaintySet
            │       pe ┼ EmpiricalPrior
-           │          │        ce ┼ PortfolioOptimisersCovariance
-           │          │           │   ce ┼ Covariance
-           │          │           │      │    me ┼ SimpleExpectedReturns
-           │          │           │      │       │   w ┴ nothing
-           │          │           │      │    ce ┼ GeneralCovariance
-           │          │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-           │          │           │      │       │    w ┴ nothing
-           │          │           │      │   alg ┴ FullMoment()
-           │          │           │   mp ┼ MatrixProcessing
-           │          │           │      │     pdm ┼ Posdef
-           │          │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-           │          │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-           │          │           │      │      dn ┼ nothing
-           │          │           │      │      dt ┼ nothing
-           │          │           │      │     alg ┼ nothing
-           │          │           │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-           │          │        me ┼ SimpleExpectedReturns
-           │          │           │   w ┴ nothing
-           │          │   horizon ┴ nothing
+           │          │           ce ┼ PortfolioOptimisersCovariance
+           │          │              │   ce ┼ Covariance
+           │          │              │      │    me ┼ SimpleExpectedReturns
+           │          │              │      │       │   w ┴ nothing
+           │          │              │      │    ce ┼ GeneralCovariance
+           │          │              │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+           │          │              │      │       │    w ┴ nothing
+           │          │              │      │   alg ┼ FullMoment()
+           │          │              │      │     w ┴ nothing
+           │          │              │   mp ┼ MatrixProcessing
+           │          │              │      │     pdm ┼ Posdef
+           │          │              │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+           │          │              │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+           │          │              │      │      dn ┼ nothing
+           │          │              │      │      dt ┼ nothing
+           │          │              │      │     alg ┼ nothing
+           │          │              │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+           │          │           me ┼ SimpleExpectedReturns
+           │          │              │   w ┴ nothing
+           │          │      horizon ┼ nothing
+           │          │   fill_limit ┴ nothing
            │      alg ┼ BoxUncertaintySetAlgorithm()
            │    n_sim ┼ Int64: 3000
            │        q ┼ Float64: 0.05
@@ -888,12 +892,12 @@ Resolve a **Deferred Quantity** in [`UncertaintySetVariance`](@ref)'s `sigma` sl
   - [`resolve_deferred_quantities`](@ref)
   - [`resolve_slot`](@ref)
 """
-function resolve_deferred_quantities(r::UncertaintySetVariance, pr::AbstractPriorResult)
+function resolve_deferred_quantities(r::UncertaintySetVariance, pr::AbstractPriorResult,
+                                     ::Any = nothing)
     if !isa(r.sigma, DeferredQuantity)
         return r
     end
-    return UncertaintySetVariance(; settings = r.settings, ucs = r.ucs,
-                                  sigma = resolve_slot(r.sigma, :sigma, pr))
+    return rebuild_with_slots(r, (; sigma = resolve_slot(r.sigma, :sigma, pr)))
 end
 # Deferrable slots — see `deferred_slots`. `ucs` holds an Estimator by design, not a
 # Deferred Quantity, so it is not declared here.
@@ -929,7 +933,14 @@ for a [`BoxUncertaintySet`](@ref) it evaluates `tr(Au * ub) - tr(Al * lb)` at th
 `Au = max.(W, 0)`, `Al = max.(-W, 0)` with `W = w * w'`; for an
 [`EllipsoidalUncertaintySet`](@ref) it evaluates `tr(sigma * W) + k * norm(G * vec(W))`
 with `G` the upper Cholesky factor of the set's shape matrix (the `E = 0` evaluation of
-the model expression, an upper bound on its optimum).
+the model expression, an upper bound on its optimum); for a
+[`CompactCovarianceUncertaintySet`](@ref) it evaluates `w' * sigma * w` plus `kappa` times
+the squared norm of the least-squares residual of `C .* w` against the set's basis. The
+compact evaluation solves the same inner problem the model variable `z_cucs` solves, so it
+is that expression's optimum and not a bound on it. For a covariance
+[`NormBallUncertaintySet`](@ref) it evaluates `tr(sigma * W) + kappa * norm(L' * vec(W), q)`
+with `q` the dual norm order of the set (again the `E = 0` evaluation, an upper bound on the
+model expression's optimum), and a map with no column pays nothing.
 
 The [`UncertaintySetVariance`](@ref) functor dispatches here when its `ucs` field is a
 fitted result, keeping scalar risk evaluation consistent with the risk expression the
@@ -950,6 +961,7 @@ optimiser sees.
   - [`UncertaintySetVariance`](@ref)
   - [`BoxUncertaintySet`](@ref)
   - [`EllipsoidalUncertaintySet`](@ref)
+  - [`CompactCovarianceUncertaintySet`](@ref)
 """
 function ucs_variance(ucs::BoxUncertaintySet, ::Any, w::VecNum)
     W = w * transpose(w)
@@ -962,6 +974,27 @@ function ucs_variance(ucs::EllipsoidalUncertaintySet, sigma::MatNum, w::VecNum)
     sigma = something(ucs.val, sigma)
     G = LinearAlgebra.cholesky(ucs.sigma).U
     return LinearAlgebra.tr(sigma * W) + ucs.k * LinearAlgebra.norm(G * vec(W))
+end
+function ucs_variance(ucs::CompactCovarianceUncertaintySet, sigma::MatNum, w::VecNum)
+    # The set names its own centre; `sigma` is the fallback (ADR 0050).
+    sigma = something(ucs.val, sigma)
+    Cw = ucs.C .* w
+    Q = ucs.Q
+    # The left division is the least-squares solve the model's `z_cucs` performs, so it
+    # projects onto the span of `Q` whether or not the columns of `Q` are orthonormal.
+    res = size(Q, 2) > zero(Int) ? Cw - Q * (Q \ Cw) : Cw
+    return LinearAlgebra.dot(w, sigma, w) + ucs.kappa * sum(abs2, res)
+end
+function ucs_variance(ucs::NormBallUncertaintySet{<:Any, <:Any, <:Any,
+                                                  <:SigmaUncertaintySetClass},
+                      sigma::MatNum, w::VecNum)
+    W = w * transpose(w)
+    # The set names its own centre; `sigma` is the fallback (ADR 0050).
+    sigma = something(ucs.val, sigma)
+    # `norm` of an empty vector is zero under every order, so a map with no column pays
+    # nothing without a branch.
+    penalty = LinearAlgebra.norm(transpose(ucs.L) * vec(W), dual_norm_order(ucs.p))
+    return LinearAlgebra.tr(sigma * W) + ucs.kappa * penalty
 end
 """
     _no_bounds_risk_measure(r, flag)
@@ -1126,6 +1159,13 @@ Resolve the uncertainty set of an [`UncertaintySetVariance`](@ref) risk measure 
 fitted [`AbstractUncertaintySetResult`](@ref) using the returns data. Other risk measures
 are returned unchanged; vectors of risk measures are resolved element-wise.
 
+A risk measure whose slot holds an estimator that reads a prior result — one for which
+[`reads_prior_result`](@ref) answers `true`: an [`AbstractPriorUncertaintySetEstimator`](@ref),
+or a returns-data estimator with `pe = nothing` (ADR 0138) — is returned unchanged too. Such
+an estimator is calibrated on the optimisation's own prior result, and this pre-fit runs before
+any prior exists, so the estimator travels to the builder and each corner solve fits it there
+against the prior that solve was handed.
+
 Used by [`near_optimal_centering_setup`](@ref) so that the barrier risk targets, the
 sub-problem solves, and the NOC model all share the same fitted uncertainty set (fitted
 results pass through [`sigma_ucs`](@ref) unchanged). With a fitted set the
@@ -1137,10 +1177,19 @@ expression.
 
   - [`UncertaintySetVariance`](@ref)
   - [`sigma_ucs`](@ref)
+  - [`reads_prior_result`](@ref)
   - [`near_optimal_centering_setup`](@ref)
 """
 function ucs_risk_measure(r::UncertaintySetVariance, rd::ReturnsResult)
-    return Accessors.@set r.ucs = sigma_ucs(r.ucs, rd)
+    # The pre-fit runs before any prior exists. An estimator that is calibrated on the
+    # optimisation's own prior result has nothing to fit here, so it passes through unchanged
+    # and each corner solve fits it inside its own builder, from the prior that solve was
+    # handed. The predicate reads the type, so the branch folds.
+    return if reads_prior_result(r.ucs)
+        r
+    else
+        Accessors.@set r.ucs = sigma_ucs(r.ucs, rd)
+    end
 end
 function ucs_risk_measure(r::Any, ::ReturnsResult)
     return r

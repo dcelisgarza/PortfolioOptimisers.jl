@@ -17,7 +17,7 @@ PlCE_PlC
 VecPlC
 PlC_VecPlC
 VecPlCE_PlC
-PlCE_PhC_VecPlCE_PlC
+PlCE_PlC_VecPlCE_PlC
 MatNum_PhRMatNum
 Lc_CC_VecCC
 _validate_length_integer_phylogeny_constraint_B

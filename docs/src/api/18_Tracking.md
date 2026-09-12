@@ -20,6 +20,7 @@ Tr_VecTr
 VariableTracking
 tracking_benchmark
 factory(tr::WeightsTracking, w::VecNum)
+needs_previous_weights(tr::TrackingError)
 narrow_optimiser_vector
 ```
 

@@ -24,27 +24,32 @@ end;
 
 Price data usually arrives from an API and must be converted to returns.
 [`prices_to_returns`](@ref) handles asset, factor, and benchmark prices (plus implied
-volatilities and volatility premiums), validates that the series are consistent, and can impute
-missing prices ([Impute.jl](https://github.com/invenia/Impute.jl)) and collapse to lower
-frequencies ([TimeSeries.jl](https://github.com/JuliaStats/TimeSeries.jl)). Given a single
-`TimeArray` of prices it returns a [`ReturnsResult`](@ref) holding the asset names `nx` and the
-return matrix `X`.
+volatilities and volatility premiums), validates that the series are consistent, and can collapse
+to lower frequencies ([TimeSeries.jl](https://github.com/JuliaStats/TimeSeries.jl)). Given a
+single `TimeArray` of prices it returns a [`ReturnsResult`](@ref) holding the asset names `nx` and
+the return matrix `X`.
 
 Real price tables are rarely clean — newly listed or delisted names leave leading/trailing gaps,
-halts and stale quotes leave flat stretches, and exchanges keep different holiday calendars. The
-`missing_col_percent` / `missing_row_percent` filters and `impute_method` handle all of it in this
-one call, *before* differencing prices into returns; the
-[Data preprocessing and imputation](../examples/1_foundations/02_Data_Preprocessing.md) example is
-the deep dive.
+halts and stale quotes leave flat stretches, and exchanges keep different holiday calendars.
+[`price_ingestion`](@ref) reads each asset's **Listing Span** off the panel and the conversion
+**carries** every gap into the returns, handing back an [`AssetPanel`](@ref) that says which
+assets are estimable when; filling a gap is [`PriceGapFill`](@ref)'s and deleting one is
+[`MissingDataFilter`](@ref)'s. The
+[Data preprocessing and the ingestion layer](../examples/1_foundations/02_Data_Preprocessing.md)
+example is the deep dive.
 =#
 
 X = TimeArray(CSV.File(joinpath(@__DIR__, "../examples/SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
 rd = prices_to_returns(X)
 
 #=
-When you also pass factor and benchmark price series, `prices_to_returns` aligns them on matching
-timestamps and carries the factor returns `F` and benchmark `iv` through on the same
-[`ReturnsResult`](@ref) — everything downstream then has the data it needs.
+That one call is the layer's own path: `prices_to_returns(X)` on a bare price table is
+`prices_to_returns(price_ingestion(PriceIngestion(), X))`. Write the two steps when you hold
+more than one table — [`price_ingestion`](@ref) takes factor and benchmark price series as `F`
+and `B`, aligns them onto the asset clock, and the conversion carries the factor returns `F` and
+the benchmark returns `B` through on the same [`ReturnsResult`](@ref), so everything downstream
+has the data it needs. [The point-in-time universe](08_Point_in_Time_Universe.md) takes a gapped
+table through that path to a walk-forward.
 
 ## 2. Returns to a prior
 
@@ -75,6 +80,20 @@ interface, so swapping one in is a one-line change. The common alternatives:
     scenarios to satisfy views on any moment (deep dives:
     [Entropy Pooling](../examples/2_moments_priors/07_Entropy_Pooling.md),
     [Opinion Pooling](../examples/2_moments_priors/08_Opinion_Pooling.md)).
+  - [`CrossSectionalFactorPrior`](@ref) — moments from a factor model fitted *across* the assets
+    rather than through time: at each date it regresses that date's returns on the assets' lagged
+    per-asset exposures, so it needs no factor return series of its own and admits a universe
+    whose membership changes.
+
+A cross-sectional fit asks more of the caller than the others. It reads no `F`; it reads an
+[`AssetPanel`](@ref) of per-asset **Panel Fields** — a market capitalisation, a book equity, an
+industry label — carried on the returns result as `rd.pnl`, and the caller names the
+**Descriptors** and **Exposure Estimators** that turn those fields into factors, one Pair per
+factor. The deep dive is
+[Cross-sectional factor model, end to end](../examples/7_putting_it_together/05_Cross_Sectional_Factor_Model.md),
+and
+[Cross-sectional factor model through a Pipeline](../examples/7_putting_it_together/06_Cross_Sectional_Factor_Pipeline.md)
+reaches the same weights through a [`Pipeline`](@ref).
 
 The covariance estimator inside a prior is itself swappable (shrinkage, denoising, Gerber, …);
 see [Covariance Estimation](../examples/2_moments_priors/02_Covariance_Estimation.md). Any moment
