@@ -100,6 +100,43 @@ using Statistics
         @test_throws DimensionMismatch PO.merge_states(sa, sn)
     end
 
+    @testset "The plain arms take the active mask, and a folded frame is repaired on its block (#874)" begin
+        # A fold loop hands every member a host folds the Asset Panel's active mask. A plain
+        # co-moment carries no per-cell count for it to gate, so it accepts the keyword and
+        # ignores it, as the plain first order does; refusing it refused the host.
+        amsk = trues(size(X))
+        @test cokurtosis(partial_fit!(Cokurtosis(), X; active_mask = amsk)) ==
+              cokurtosis(partial_fit!(Cokurtosis(), X))
+        @test first(coskewness(partial_fit!(Coskewness(), X; active_mask = amsk))) ==
+              first(coskewness(partial_fit!(Coskewness(), X)))
+        ske_m, kte_m, ske_v, kte_v = Coskewness(), Cokurtosis(), Coskewness(), Cokurtosis()
+        for i in axes(X, 1)
+            ske_m = partial_fit!(ske_m, X[i, :]; active_mask = view(amsk, i, :))
+            kte_m = partial_fit!(kte_m, X[i, :]; active_mask = view(amsk, i, :))
+            ske_v = partial_fit!(ske_v, X[i, :])
+            kte_v = partial_fit!(kte_v, X[i, :])
+        end
+        @test first(coskewness(ske_m)) == first(coskewness(ske_v))
+        @test cokurtosis(kte_m) == cokurtosis(kte_v)
+        # A plain fold over a changing universe answers `NaN` at every cell naming an
+        # asset outside the Coverage Universe. The read-out repairs the finite block and
+        # leaves the frame, at both orders, rather than handing the frame to LAPACK: the
+        # block is the batch verb over the covered columns alone.
+        Xg = copy(X)
+        Xg[1:5, 2] .= NaN
+        keep = [1, 3]
+        ckurt = cokurtosis(partial_fit!(Cokurtosis(), Xg))
+        blk = isfinite.(LinearAlgebra.diag(ckurt))
+        pairs = vec([i in keep && j in keep for i in 1:N, j in 1:N])
+        @test blk == pairs
+        @test all(isnan, ckurt[.!blk, :]) && all(isnan, ckurt[:, .!blk])
+        @test isapprox(ckurt[blk, blk], cokurtosis(Cokurtosis(), Xg[:, keep]); atol = 1e-13)
+        cskew, V = coskewness(partial_fit!(Coskewness(), Xg))
+        cskew_b, V_b = coskewness(Coskewness(), Xg[:, keep])
+        @test isapprox(V[keep, keep], V_b; atol = 1e-14)
+        @test all(isnan, V[2, :]) && all(isnan, V[:, 2])
+    end
+
     @testset "The SemiMoment arm refuses" begin
         for est in (Coskewness(; alg = SemiMoment()), Cokurtosis(; alg = SemiMoment()))
             err = try

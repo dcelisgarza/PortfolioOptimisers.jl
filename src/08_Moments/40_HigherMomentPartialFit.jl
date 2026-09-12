@@ -501,6 +501,7 @@ The method builds a new state rather than writing into the arrays of the old one
   - `ske`: Coskewness estimator with a [`FullMoment`](@ref) moment algorithm.
   - `X`: Block of observations (observations × assets).
   - $(arg_dict[:dims])
+  - `active_mask`: The active mask of the Asset Panel, of the shape of `X`, or `nothing`. Accepted and ignored, on the rule the plain first order states: a plain state carries no per-cell count for the mask to gate, and its universe is the Coverage Universe the read-out already reduces to. A fold loop passes it to every member a host folds, so refusing the keyword would refuse the host.
 
 # Validation
 
@@ -542,7 +543,8 @@ true
 """
 function partial_fit!(ske::Coskewness{<:Any, <:Any, <:FullMoment, <:Any, Nothing,
                                       <:Option{<:CoskewnessPartialFitState}}, X::MatNum;
-                      dims::Int = 1)
+                      dims::Int = 1,
+                      active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing)
     assert_partial_fittable(ske.me, ske.w, "Coskewness")
     X = dims_oriented(dims, X)
     n, mu, M2, M3, _ = comoment_block(X)
@@ -569,6 +571,7 @@ The single-observation arm of the [`partial_fit!`](@ref) interface. The entries 
 
   - `ske`: Coskewness estimator with a [`FullMoment`](@ref) moment algorithm.
   - `x`: One observation, whose entries are the assets.
+  - `active_mask`: The active mask of the Asset Panel at this observation, one entry per asset, or `nothing`. Accepted and ignored, as the block method does.
 
 # Returns
 
@@ -580,7 +583,8 @@ The single-observation arm of the [`partial_fit!`](@ref) interface. The entries 
   - [`partial_fit!`](@ref)
 """
 function partial_fit!(ske::Coskewness{<:Any, <:Any, <:FullMoment, <:Any, Nothing,
-                                      <:Option{<:CoskewnessPartialFitState}}, x::VecNum)
+                                      <:Option{<:CoskewnessPartialFitState}}, x::VecNum;
+                      active_mask::Option{<:AbstractVector{<:Bool}} = nothing)
     return partial_fit!(ske, reshape(x, 1, length(x)))
 end
 """
@@ -661,6 +665,7 @@ The companion of the [`Coskewness`](@ref) method, carried one order further. The
   - `kte`: Cokurtosis estimator with a [`FullMoment`](@ref) moment algorithm.
   - `X`: Block of observations (observations × assets).
   - $(arg_dict[:dims])
+  - `active_mask`: The active mask of the Asset Panel, of the shape of `X`, or `nothing`. Accepted and ignored, on the rule the plain first order states: a plain state carries no per-cell count for the mask to gate, and its universe is the Coverage Universe the read-out already reduces to. A fold loop passes it to every member a host folds, so refusing the keyword would refuse the host.
 
 # Validation
 
@@ -700,7 +705,8 @@ true
 """
 function partial_fit!(kte::Cokurtosis{<:Any, <:Any, <:FullMoment, <:Any, Nothing,
                                       <:Option{<:CokurtosisPartialFitState}}, X::MatNum;
-                      dims::Int = 1)
+                      dims::Int = 1,
+                      active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing)
     assert_partial_fittable(kte.me, kte.w, "Cokurtosis")
     X = dims_oriented(dims, X)
     n, mu, M2, M3, z = comoment_block(X)
@@ -727,6 +733,7 @@ The single-observation arm of the [`partial_fit!`](@ref) interface. The entries 
 
   - `kte`: Cokurtosis estimator with a [`FullMoment`](@ref) moment algorithm.
   - `x`: One observation, whose entries are the assets.
+  - `active_mask`: The active mask of the Asset Panel at this observation, one entry per asset, or `nothing`. Accepted and ignored, as the block method does.
 
 # Returns
 
@@ -738,7 +745,8 @@ The single-observation arm of the [`partial_fit!`](@ref) interface. The entries 
   - [`partial_fit!`](@ref)
 """
 function partial_fit!(kte::Cokurtosis{<:Any, <:Any, <:FullMoment, <:Any, Nothing,
-                                      <:Option{<:CokurtosisPartialFitState}}, x::VecNum)
+                                      <:Option{<:CokurtosisPartialFitState}}, x::VecNum;
+                      active_mask::Option{<:AbstractVector{<:Bool}} = nothing)
     return partial_fit!(kte, reshape(x, 1, length(x)))
 end
 """
@@ -919,7 +927,7 @@ Only the shape of that sample survives a partial fit, so the matrix processing e
 
  1. Refuse a configuration the state no longer matches, with [`assert_partial_fittable`](@ref). [`factory`](@ref) carries the state and replaces `w`, so an estimator that says weighted may hold a state fitted unweighted. The state stays on the estimator, so a caller who restores `w = nothing` reads it again.
  2. Divide the fourth accumulator by the observation count, giving the cokurtosis matrix.
- 3. Process it in place with [`matrix_processing!`](@ref), under `kte.mp` and the shape of the fitted sample.
+ 3. Process it in place through [`matrix_processing_block!`](@ref), under `kte.mp` and the shape of the fitted sample. It is the block arm rather than the plain one for the reason the low order's read-out takes it: a plain fold over a changing universe answers `NaN` for an asset outside the Coverage Universe at every pair naming it, and a positive-definite repair over that frame meets a LAPACK refusal rather than a named error. The block arm repairs the finite block and leaves the frame for [`investable_mask`](@ref) to read, which is what the batch verb's reduce-and-expand leaves it too; a complete matrix runs the plain arm over the whole of it.
 
 # Arguments
 
@@ -939,14 +947,14 @@ Only the shape of that sample survives a partial fit, so the matrix processing e
   - [`Cokurtosis`](@ref)
   - [`CokurtosisPartialFitState`](@ref)
   - [`partial_fit!`](@ref)
-  - [`matrix_processing!`](@ref)
+  - [`matrix_processing_block!`](@ref)
 """
 function cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:FullMoment},
                     state::CokurtosisPartialFitState)
     assert_partial_fittable(kte.me, kte.w, "Cokurtosis")
     ckurt = state.M4 ./ state.n
     shape = SparseArrays.spzeros(eltype(ckurt), state.n, length(state.mu))
-    matrix_processing!(kte.mp, ckurt, shape)
+    matrix_processing_block!(kte.mp, ckurt, shape)
     return ckurt
 end
 """
