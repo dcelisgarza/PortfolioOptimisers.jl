@@ -610,6 +610,9 @@
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/20_Optimisation/02_CrossValidation/14_CovarianceForecastSummary/</loc>
   </url>
   <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/20_Optimisation/02_CrossValidation/15_Resume/</loc>
+  </url>
+  <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/20_Optimisation/03_NaiveOptimisation/</loc>
   </url>
   <url>
@@ -799,6 +802,9 @@
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/23_Pipeline/05_SearchCrossValidation/</loc>
   </url>
   <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/23_Pipeline/06_OnlinePipeline/</loc>
+  </url>
+  <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/24_Plotting/</loc>
   </url>
   <url>
@@ -970,6 +976,9 @@
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/5_validation_tuning/08_Weight_Drift_and_Held_Weights/</loc>
   </url>
   <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/5_validation_tuning/09_Online_Walk_Forward/</loc>
+  </url>
+  <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/6_post_processing/01_Finite_Allocation/</loc>
   </url>
   <url>
@@ -1025,5 +1034,8 @@
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/user_guide/08_Point_in_Time_Universe/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/user_guide/09_Online_Walk_Forward/</loc>
   </url>
 </urlset>
