@@ -1471,6 +1471,7 @@ The predicate behind the fold loop's cold start: the online arm of [`fold_loop`]
 # Related
 
   - [`estimator_fields`](@ref)
+  - [`online_wrapper_path`](@ref)
   - [`update_online_estimator`](@ref)
   - [`partial_fit_cache`](@ref)
   - [`AbstractPartialFitState`](@ref)
@@ -1489,6 +1490,79 @@ function online_entry_state(est::Union{<:AbstractEstimator,
     return nothing
 end
 function online_entry_state(::Any)
+    return nothing
+end
+"""
+    online_wrapper_path(est)
+    online_wrapper_path(::Online)
+    online_wrapper_path(::TimeDependent)
+
+Name the first field of an estimator tree that holds an [`Online`](@ref) declaration, or answer `nothing`.
+
+The predicate behind [`assert_batch_entry`](@ref): a wrapper is resolved once, at the warm-up of the fold loop's online arm ([`update_online_estimator`](@ref)), and nothing else resolves it, so a batch fit that reaches one meets the method table at `prior(pe, X)` rather than a refusal. The walk is [`online_entry_state`](@ref)'s: it descends into every estimator-valued field ([`estimator_fields`](@ref)) and prefixes the field's name to what it finds there, so the answer is the path from the root — `"pe"` for a wrapped prior on a naive optimiser, `"opt.pe"` for one under a JuMP head. A field holding a wrapper answers its own name and is not entered, because a wrapper below it is the warm-up's to resolve under it; a wrapper at the root answers `""`, the empty path. A [`TimeDependent`](@ref) schedule answers `nothing`, because a wrapper among its entries is refused at its construction, and so does anything that is not an estimator.
+
+# Arguments
+
+  - `est`: The estimator, or any value a field holds.
+
+# Returns
+
+  - `path::Option{<:String}`: The dotted path of the first wrapper found, `""` when `est` is itself one, or `nothing`.
+
+# Related
+
+  - [`assert_batch_entry`](@ref)
+  - [`online_entry_state`](@ref)
+  - [`estimator_fields`](@ref)
+  - [`update_online_estimator`](@ref)
+"""
+function online_wrapper_path(est::Union{<:AbstractEstimator,
+                                        <:StatsBase.CovarianceEstimator})
+    for f in estimator_fields(est)
+        v = getfield(est, f)
+        if isa(v, Online)
+            return string(f)
+        end
+        path = online_wrapper_path(v)
+        if !isnothing(path)
+            return string(f, ".", path)
+        end
+    end
+    return nothing
+end
+function online_wrapper_path(::Online)
+    return ""
+end
+function online_wrapper_path(::Any)
+    return nothing
+end
+"""
+    assert_batch_entry(est, door::AbstractString)
+
+Refuse an estimator holding an [`Online`](@ref) at the door of a batch fit, by name.
+
+A wrapper is a declaration the online arm of the fold loop resolves at its warm-up, and a batch fit — a plain [`optimise`](@ref), or a fold of a scheme that declares no Fold Fit — runs no warm-up, so the wrapper would reach `prior(pe, X)` unresolved and meet a `MethodError` naming the whole type. The refusal names the dotted path [`online_wrapper_path`](@ref) finds and the two exits: an [`OnlineStep`](@ref) on a walk-forward, or the estimator unwrapped. A root that is itself a wrapper is refused by the door that admits one — [`covariance_forecast_evaluation`](@ref), and the Pipeline's — so this reads the path alone.
+
+# Arguments
+
+  - `est`: The estimator handed to the door.
+  - `door`: The door's name, as the message reads it.
+
+# Validation
+
+  - No field in the tree of `est` holds an [`Online`](@ref). An `ArgumentError` naming the field is thrown otherwise.
+
+# Related
+
+  - [`online_wrapper_path`](@ref)
+  - [`assert_online_entry`](@ref)
+  - [`optimise`](@ref)
+  - [`fold_loop`](@ref)
+"""
+function assert_batch_entry(est, door::AbstractString)
+    path = online_wrapper_path(est)
+    @argcheck(isnothing(path),
+              ArgumentError("`$(typeof(est).name.name)` enters $(door) holding an `Online` at `$(path)`, and a batch fit cannot resolve it: `Online` declares the sample buffer the fold loop's online arm seeds at its warm-up and folds the wrapped estimator's rows into, and nothing else seeds one, so the wrapper would reach the batch verb unresolved. Declare `ff = OnlineStep()` on a walk-forward and run the estimator through it, or set `$(path)` to the estimator it wraps and let the batch fit refit it from its rows."))
     return nothing
 end
 """

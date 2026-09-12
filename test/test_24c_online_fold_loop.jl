@@ -285,6 +285,64 @@ assets is what keeps the JuMP families cheap.
                        weights(cross_val_predict(mr, rd, batch_cv)); atol = 1e-5)
     end
 
+    @testset "A wrapper at a batch door is refused by name, not by the method table (#1033)" begin
+        function refusal(f)
+            try
+                f()
+                nothing
+            catch e
+                e
+            end
+        end
+        ope = po.Online(EmpiricalPrior())
+        iv = InverseVolatility(; pe = ope)
+        jmr = MeanRisk(; opt = JuMPOptimiser(; pe = ope, slv = slv))
+        hrp = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = ope))
+        nco = NestedClustered(; opti = iv, opto = InverseVolatility())
+        # The walk names the path from the root, `""` for a wrapper itself, and nothing
+        # for a wrapper-free tree, a schedule, and what is not an estimator.
+        @test po.online_wrapper_path(iv) == "pe"
+        @test po.online_wrapper_path(jmr) == "opt.pe"
+        @test po.online_wrapper_path(hrp) == "opt.pe"
+        @test po.online_wrapper_path(nco) == "opti.pe"
+        @test po.online_wrapper_path(ope) == ""
+        @test isnothing(po.online_wrapper_path(mr))
+        @test isnothing(po.online_wrapper_path(nothing))
+        @test isnothing(po.online_wrapper_path(TimeDependent([EmpiricalPrior()];
+                                                             default = EmpiricalPrior())))
+        # The plain `optimise`, on a naive host, a JuMP head, a hierarchical head, and a
+        # meta-optimiser: the path and both exits are in the message.
+        for (opt, path) in
+            ((iv, "`pe`"), (jmr, "`opt.pe`"), (hrp, "`opt.pe`"), (nco, "`opti.pe`"))
+            err = refusal(() -> optimise(opt, rd))
+            @test isa(err, ArgumentError)
+            @test occursin("enters `optimise`", err.msg)
+            @test occursin(path, err.msg)
+            @test occursin("ff = OnlineStep()", err.msg)
+        end
+        # A fallback chain takes the generic door, and the walk reaches the chain's head.
+        err = refusal(() -> optimise(MeanRisk(; opt = JuMPOptimiser(; pe = ope, slv = slv),
+                                              fb = InverseVolatility()), rd))
+        @test isa(err, ArgumentError) && occursin("`opt.pe`", err.msg)
+        # The fold loop's batch arms, once at the door: a walk-forward with no Fold Fit,
+        # and a combinatorial scheme.
+        for cv in (batch_cv, CombinatorialCrossValidation(; n_folds = 4, n_test_folds = 2))
+            err = refusal(() -> cross_val_predict(iv, rd, cv))
+            @test isa(err, ArgumentError)
+            @test occursin("declares no Fold Fit", err.msg) && occursin("`pe`", err.msg)
+        end
+        # The online arm resolves the same estimators, and reads them out through
+        # `optimise(opt)` without meeting the door.
+        res = cross_val_predict(iv, rd, online_cv)
+        @test isa(optimise(res.opt), po.OptimisationResult)
+        @test isa(cross_val_predict(jmr, rd, online_cv), MultiPeriodPredictionResult)
+        # A schedule on `pe` with plain entries passes the batch door.
+        @test isa(optimise(InverseVolatility(;
+                                             pe = TimeDependent([EmpiricalPrior()];
+                                                                default = EmpiricalPrior())),
+                           rd), po.OptimisationResult)
+    end
+
     @testset "Ordering: the online arm runs in order and says so" begin
         # A `MeanRisk` needs no previous weights, so its batch run takes the parallel arm
         # and says nothing; the online run emits `cv_online_info` and never the sequential

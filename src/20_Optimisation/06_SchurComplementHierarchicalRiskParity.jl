@@ -1129,6 +1129,10 @@ Run the Schur Complement Hierarchical Risk Parity portfolio optimisation.
 
 Unlike [`HierarchicalEqualRiskContribution`](@ref) and [`NestedClustered`](@ref), this optimiser accepts no `branchorder` keyword. Recursive bisection allocates by splitting the dendrogram's leaf permutation, so that permutation is the algorithm's input rather than a presentation detail, and the clusterisation always runs with the optimal ordering. A `branchorder` passed here is absorbed by `kwargs` and ignored. See ADR 0055.
 
+# Validation
+
+  - No field in the tree of `sh` holds an [`Online`](@ref). An `ArgumentError` naming the field is thrown otherwise, through [`assert_batch_entry`](@ref): a plain `optimise` is a batch fit, and a wrapper resolves only at the warm-up of the fold loop's online arm.
+
 # Related
 
   - [`SchurComplementHierarchicalRiskParity`](@ref)
@@ -1136,6 +1140,7 @@ Unlike [`HierarchicalEqualRiskContribution`](@ref) and [`NestedClustered`](@ref)
 """
 function optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any, Nothing},
                   rd::ReturnsResult; dims::Int = 1, kwargs...)
+    assert_batch_entry(sh, "`optimise`")
     return _optimise(sh, rd; dims = dims, kwargs...)
 end
 

@@ -470,9 +470,14 @@ Run the inverse volatility portfolio optimisation.
   - $(arg_dict[:rd]) If `isa(iv.pe, AbstractPriorResult)`, `rd` is not necessary.
   - `dims`: The dimension along which observations advance in time.
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
+
+# Validation
+
+  - No field in the tree of `iv` holds an [`Online`](@ref). An `ArgumentError` naming the field is thrown otherwise, through [`assert_batch_entry`](@ref): a plain `optimise` is a batch fit, and a wrapper resolves only at the warm-up of the fold loop's online arm.
 """
 function optimise(iv::InverseVolatility{<:Any, <:Any, <:Any, <:Any, Nothing},
                   rd::ReturnsResult; dims::Int = 1, kwargs...)::NaiveOptimisationResult
+    assert_batch_entry(iv, "`optimise`")
     return _optimise(iv, rd; dims = dims, kwargs...)
 end
 """

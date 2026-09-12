@@ -610,6 +610,10 @@ Run the Relaxed Risk Budgeting portfolio optimisation.
   - `save`: Whether to save the JuMP model in the optimisation result.
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
 
+# Validation
+
+  - No field in the tree of `rrb` holds an [`Online`](@ref). An `ArgumentError` naming the field is thrown otherwise, through [`assert_batch_entry`](@ref): a plain `optimise` is a batch fit, and a wrapper resolves only at the warm-up of the fold loop's online arm.
+
 # Related
 
   - [`RelaxedRiskBudgeting`](@ref)
@@ -618,6 +622,7 @@ Run the Relaxed Risk Budgeting portfolio optimisation.
 function optimise(rrb::RelaxedRiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing},
                   rd::ReturnsResult; dims::Int = 1, str_names::Bool = false,
                   save::Bool = true, kwargs...)
+    assert_batch_entry(rrb, "`optimise`")
     return _optimise(rrb, rd; dims = dims, str_names = str_names, save = save, kwargs...)
 end
 

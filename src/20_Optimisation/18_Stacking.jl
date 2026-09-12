@@ -636,6 +636,10 @@ Run the Stacking portfolio optimisation.
   - `save`: Passed to the inner and outer optimisers. Whether to save the JuMP model in the optimisation result.
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
 
+# Validation
+
+  - No field in the tree of `st` holds an [`Online`](@ref). An `ArgumentError` naming the field is thrown otherwise, through [`assert_batch_entry`](@ref): a plain `optimise` is a batch fit, and a wrapper resolves only at the warm-up of the fold loop's online arm.
+
 # Returns
 
   - `res::StackingResult`: The combined portfolio. `retcode` is an [`OptimisationFailure`](@ref) when any inner optimisation, the outer optimisation, or the weight finalisation failed.
@@ -650,6 +654,7 @@ function optimise(st::Stacking{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, 
                                <:Any, <:Any, Nothing}, rd::ReturnsResult; dims::Int = 1,
                   branchorder::Symbol = :optimal, str_names::Bool = false,
                   save::Bool = true, kwargs...)
+    assert_batch_entry(st, "`optimise`")
     return _optimise(st, rd; dims = dims, branchorder = branchorder, str_names = str_names,
                      save = save, kwargs...)
 end

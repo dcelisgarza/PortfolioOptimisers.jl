@@ -2926,13 +2926,20 @@ High level optimisation function that wraps around estimator-specific optimisati
 
 This is a fold-less entry point, so time-dependent schedules are inert here: the estimator is reset to its fold-less values (see [`reset_time_dependent_estimator`](@ref)) before the solve — in particular a scheduled fallback resets to its `default`, or to `nothing` (no fallback) when it has none, *before* the fallback chain is walked. Inside a fold loop this reset is a no-op, because the loop resolves every schedule before optimising.
 
+It is a batch fit, so an [`Online`](@ref) anywhere in the estimator's tree is refused by name through [`assert_batch_entry`](@ref) before any solve: the wrapper resolves only at the warm-up of the fold loop's online arm, and a plain `optimise` runs none. The read-out of a stepped estimator, `optimise(opt)`, never meets this refusal, because the warm-up that seeded its buffer replaced the wrapper.
+
 # Arguments
 
   - `opt::OptimisationEstimator`: The optimisation estimator to use.
   - $(arg_dict[:optargs])
   - $(arg_dict[:optkwargs])
+
+# Validation
+
+  - No field in the tree of `opt` holds an [`Online`](@ref). An `ArgumentError` naming the field is thrown otherwise.
 """
 function optimise(opt::OptimisationEstimator, args...; kwargs...)
+    assert_batch_entry(opt, "`optimise`")
     fb = Tuple{OptimisationEstimator, OptimisationResult}[]
     current_opt = reset_time_dependent_estimator(opt)
     res = nothing

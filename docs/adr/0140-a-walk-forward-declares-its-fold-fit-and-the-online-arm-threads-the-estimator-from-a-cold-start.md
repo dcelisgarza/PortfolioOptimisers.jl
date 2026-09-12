@@ -93,6 +93,22 @@ the reading the batch loop already has — `factory` carries a state and `prior(
 it. A resume — a state that leaves a result and re-enters a loop — is its own ticket on the map,
 with an explicit entry.
 
+**A batch door refuses an unresolved wrapper by name, and `prior` stays clear of it.** An `Online`
+is a declaration the online arm's warm-up resolves, and nothing else does, so a wrapped prior
+handed to a plain `optimise(opt, rd)`, or to a scheme with no Fold Fit, met the method table at
+`prior(pe, X)` — a `MethodError` naming the whole type, which says nothing about the cause or the
+exits ([#1033](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1033)). The refusal
+lives at the doors: one predicate, `online_wrapper_path`, walks the estimator-typed fields as the
+state walk does and answers the dotted path, and `assert_batch_entry` throws with that path and
+the two exits, `ff = OnlineStep()` on a walk-forward or the field unwrapped. It runs once at the
+top of `fold_loop` when the scheme declares no Fold Fit — before the folds, so the workers of `ex`
+never raise it per fold — and at every data-taking `optimise(opt, rd)` door whose tree can hold a
+wrapper, the generic fallback-chain door included. An `Online` arm on `prior` was the one-method
+alternative and is the runner-up: it would name the type alone, not the field, and #967 keeps the
+wrapper off that verb — a wrapper resolves once at warm-up and is gone. A root that is itself a
+wrapper is already refused by the door that admits one, the covariance forecast evaluation's and
+the Pipeline's, so the predicate reads the fields and the root's own door names the root.
+
 **A schedule reaches stateless fields only.** Under the online arm, a `TimeDependent` on a field
 that carries a state — a host's `pe`, or the optimiser itself — is refused at warm-up, before the
 first fold. A schedule on any other field composes with no rule, because the schedule writes
@@ -185,4 +201,9 @@ on the map, and neither is built.
   and [#872](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/872) build the step
   there, so a caller who declared it never reads a batch answer as an online one. The resume, and
   the schedule-swap extension, are fog on the map until their own tickets.
+- The batch doors gain one refusal ([#1033](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1033)):
+  `online_wrapper_path` and `assert_batch_entry` in `01_Base/15_Online.jl`, called once from
+  `fold_loop`'s batch arms and from the twelve `optimise(opt, rd)` doors of the hosts that hold a
+  prior. The walk is type-decided and folds to `nothing` on a wrapper-free tree, so a batch fit
+  pays nothing it can measure.
 - `CONTEXT.md` gains **Fold Fit**.

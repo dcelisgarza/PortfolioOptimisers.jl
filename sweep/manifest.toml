@@ -57,7 +57,7 @@
 "src/01_Base/12_NormError.jl" = { map = 1, units = 8, algorithm = 2, swept = true }
 "src/01_Base/13_KappaLog.jl" = { map = 1, units = 1, algorithm = 0, swept = true }
 "src/01_Base/14_PartialFit.jl" = { map = 1, units = 10, swept = false }
-"src/01_Base/15_Online.jl" = { map = 1, units = 41, swept = false }
+"src/01_Base/15_Online.jl" = { map = 1, units = 43, swept = false }
 "src/01_Base/16_CoveragePolicy.jl" = { map = 1, units = 24, swept = false }
 "src/02_Tools.jl" = { map = 1, units = 69, algorithm = 49, swept = true }
 "src/03_InputData/01_AssetPanel.jl" = { map = 2, units = 33, swept = false }

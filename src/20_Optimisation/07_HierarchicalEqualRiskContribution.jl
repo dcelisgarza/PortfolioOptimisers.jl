@@ -819,6 +819,10 @@ Run the Hierarchical Equal Risk Contribution portfolio optimisation.
   - `branchorder`: The branch order to use for the clusterisation, this optimisation can use non-optimal branch orders, which make the clustering faster but the dendrogram won't be as nice.
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
 
+# Validation
+
+  - No field in the tree of `hec` holds an [`Online`](@ref). An `ArgumentError` naming the field is thrown otherwise, through [`assert_batch_entry`](@ref): a plain `optimise` is a batch fit, and a wrapper resolves only at the warm-up of the fold loop's online arm.
+
 # Related
 
   - [`HierarchicalEqualRiskContribution`](@ref)
@@ -827,6 +831,7 @@ Run the Hierarchical Equal Risk Contribution portfolio optimisation.
 function optimise(hec::HierarchicalEqualRiskContribution{<:Any, <:Any, <:Any, <:Any, <:Any,
                                                          <:Any, Nothing}, rd::ReturnsResult;
                   dims::Int = 1, branchorder::Symbol = :optimal, kwargs...)
+    assert_batch_entry(hec, "`optimise`")
     return _optimise(hec, rd; dims = dims, branchorder = branchorder, kwargs...)
 end
 

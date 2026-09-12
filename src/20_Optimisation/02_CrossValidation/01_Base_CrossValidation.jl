@@ -2165,7 +2165,11 @@ does four steps.
 The callback takes the one [`Fold`](@ref) record, so a call site names what it reads
 (`fold.est`, `fold.train`) instead of relying on the position of an argument.
 
-[`assert_time_dependent_fold_count`](@ref) runs once, before the loop.
+[`assert_time_dependent_fold_count`](@ref) runs once, before the loop, and so does
+[`assert_batch_entry`](@ref) when the scheme declares no Fold Fit: the batch arms refit
+every fold from its training window and run no warm-up, so an [`Online`](@ref) anywhere
+in `est` would reach `prior(pe, X)` unresolved, and it is refused by name instead — once,
+here, rather than up to once per fold on the workers of `ex`.
 
 This is also the one site that decides how the folds run, and it has three arms. The
 online arm, [`online_folds`](@ref), is taken first, when the scheme declares a Fold Fit
@@ -2221,6 +2225,9 @@ function fold_loop(fit_fold, est, n::Integer, ex::FLoops.Transducers.Executor,
     td_flag = is_time_dependent(est)
     if td_flag
         assert_time_dependent_fold_count(est, n)
+    end
+    if isnothing(fold_fit(cv))
+        assert_batch_entry(est, "the fold loop under a scheme that declares no Fold Fit")
     end
     prev_w_flag = needs_previous_weights(est)
     # The per-fold copy. `esti` is the fold's estimator before resolution: the configuration

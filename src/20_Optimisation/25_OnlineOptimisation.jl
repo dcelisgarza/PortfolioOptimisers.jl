@@ -454,6 +454,10 @@ function online_entry_state(::TimeDependent)
     # state through them, so a state one of them carries is not a state at entry.
     return nothing
 end
+function online_wrapper_path(::TimeDependent)
+    # A wrapper among a schedule's entries, or as its default, is refused at construction.
+    return nothing
+end
 function assert_online_entry(::TimeDependent)
     return throw(ArgumentError("the online arm of the fold loop takes one estimator and threads it from fold to fold, and a `TimeDependent` schedule of optimisers is a different one per fold, so it has no state to thread. A schedule reaches stateless fields only. Step one optimiser, and schedule a field that carries no state, or refit every fold with `ff = nothing`."))
 end

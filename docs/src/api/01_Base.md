@@ -281,6 +281,8 @@ PortfolioOptimisers.online_state_seed(::Union{<:PortfolioOptimisers.AbstractEsti
 PortfolioOptimisers.update_online_estimator
 PortfolioOptimisers.estimator_fields
 PortfolioOptimisers.online_entry_state
+PortfolioOptimisers.online_wrapper_path
+PortfolioOptimisers.assert_batch_entry
 ```
 
 ## The coverage policy
