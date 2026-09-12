@@ -301,6 +301,9 @@ Under `OnlineStep` the fold axis is sequential whatever executor the search is h
 because fold `i` reads the state fold `i - 1` left; the candidate axis is the one that gains
 from threads, and `GridSearchCrossValidation`'s `ex` stays on it.
 
+`RandomisedSearchCrossValidation` is also compatible with `OnlineStep` as it wraps an instance
+of `GridSearchCrossValidation` and samples from the search space.
+
 ## 7. A run resumes from its Result
 
 An online run's [`MultiPeriodPredictionResult`](@ref) carries the estimator the loop
