@@ -23,7 +23,7 @@ Because every struct is immutable, runtime values are propagated down a composed
 
 ## Preprocessing
 
-- Convert `TimeSeries.TimeArray` price data to returns. [`prices_to_returns`](@ref) and [`ReturnsResult`](@ref)
+- Compute returns from the price carrier, and nothing else. [`prices_to_returns`](@ref) and [`ReturnsResult`](@ref)
 - A container for aligned, time-indexed price-level data. [`PricesResult`](@ref)
 
 ```@raw html
@@ -3440,6 +3440,7 @@ These return a [`NaiveOptimisationResult`](@ref).
 - Allocates each asset a weight inversely proportional to its volatility, or to its variance when `sq = true`. [`InverseVolatility`](@ref)
 - Allocates the same weight to every asset in the universe. [`EqualWeighted`](@ref)
 - Draws portfolio weights at random from a Dirichlet distribution with concentration parameter `alpha`. [`RandomWeighted`](@ref)
+- Holds the weights it was handed, and solves nothing. [`PreviousWeights`](@ref)
 
 #### Naive optimisation features
 
@@ -4319,6 +4320,8 @@ Walk forward [`WalkForwardEstimator`](@ref) return a [`WalkForwardResult`](@ref)
 ```
 
 - Implements index-based walk-forward cross-validation for time series, supporting purging and flexible train/test windowing. [`IndexWalkForward`](@ref) and [`DateWalkForward`](@ref)
+- Fold Fit [`OnlineStep`](@ref) fits each fold by the online step, threading one estimator from fold to fold
+- Resume [`Resume`](@ref) continues an online walk-forward from its Result over the full history extended, and `vcat` stacks the two Results
 
 ```@raw html
 </details>
@@ -4372,6 +4375,67 @@ Scoring a parameter set [`CrossValidationSearchScorer`](@ref)
 
 - Wraps a cross-validation scheme and an optional scorer to form a complete optimisation cross-validation pipeline. [`OptimisationCrossValidation`](@ref)
 - Abstract supertype for estimators that determine the number of random subsets to draw. [`NumberSubsetsEstimator`](@ref) and [`SubsetSizeEstimator`](@ref)
+
+### Covariance forecast evaluation
+
+[`covariance_forecast_evaluation`](@ref) judges a covariance estimator's, or a prior's, forecast on the returns realised after it, step by step over a walk-forward, in batch when the scheme refits and online when it declares a Fold Fit. The test rows are centred on the location the forecast is about, read off the estimator, and the diagnostics are kept per step so the summary, the comparison and the re-projection are verbs over one Result.
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+Evaluate a covariance forecast out of sample over a walk-forward, in batch or online. [`covariance_forecast_evaluation`](@ref)
+
+```@raw html
+</summary>
+```
+
+- The per-step diagnostics of a covariance forecast over a walk-forward, and its forecasts on request. [`CovarianceForecastEvaluationResult`](@ref)
+- The per-step kernel on bare arrays [`covariance_forecast_step`](@ref), for a forecast the library did not produce
+
+```@raw html
+</details>
+```
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+The quantity the forecast is judged against.
+
+```@raw html
+</summary>
+```
+
+- Judges a covariance forecast against the realised covariance of the returns that follow it. [`RealisedCovariance`](@ref)
+- Judges a covariance forecast against the outer product of the return earned over the horizon. [`HorizonReturn`](@ref)
+
+```@raw html
+</details>
+```
+
+```@raw html
+<details class="cap-group" style="margin-left: 2em">
+<summary>
+```
+
+The verbs above the Result.
+
+```@raw html
+</summary>
+```
+
+- Summarise one or more covariance forecast evaluations, one entry per evaluation. [`covariance_forecast_summary`](@ref)
+- The headline statistics of one or more covariance forecast evaluations, one entry per evaluation. [`CovarianceForecastSummaryResult`](@ref)
+- Test whether two covariance forecasts differ in expected loss, per loss. [`covariance_forecast_compare`](@ref)
+- The Diebold–Mariano–West comparison of two covariance forecasts, one row per loss. [`CovarianceForecastComparisonResult`](@ref)
+- Re-project the stored forecasts of an evaluation on a new test portfolio. [`covariance_forecast_portfolio`](@ref)
+
+```@raw html
+</details>
+```
 
 ## [Pipeline](@id catalogue-pipeline)
 

@@ -51,8 +51,14 @@ its docstring.
 │   ├── [`ExpWeightedCovarianceState`](@ref)\
 │   ├── [`ExpWeightedExpectedReturnsState`](@ref)\
 │   ├── [`ExpWeightedVarianceState`](@ref)\
+│   ├── [`MissingDataFilterState`](@ref)\
+│   ├── [`PipelineBufferState`](@ref)\
+│   ├── [`PriceGapFillState`](@ref)\
+│   ├── [`PricesToReturnsState`](@ref)\
+│   ├── [`PriorCarryState`](@ref)\
 │   ├── [`RegimeAdjustedCovarianceState`](@ref)\
 │   ├── [`RegimeAdjustedVarianceState`](@ref)\
+│   ├── [`ReturnsBufferState`](@ref)\
 │   ├── [`SampleBufferState`](@ref)\
 │   ├── [`SimpleExpectedReturnsState`](@ref)\
 │   └── [`SimpleVarianceState`](@ref)\
@@ -114,6 +120,9 @@ its docstring.
 ├── [`BlackLittermanViews`](@ref)\
 ├── [`CalibrationContext`](@ref)\
 ├── [`ClusterNode`](@ref)\
+├── [`CovarianceForecastComparisonResult`](@ref)\
+├── [`CovarianceForecastEvaluationResult`](@ref)\
+├── [`CovarianceForecastSummaryResult`](@ref)\
 ├── [`CrossValidationResult`](@ref)\
 │   ├── [`NonOptimisationCrossValidationResult`](@ref)\
 │   │   ├── [`NonOptimisationNonSequentialCrossValidationResult`](@ref)\
@@ -370,6 +379,7 @@ its docstring.
 │           └── [`NaiveOptimisationEstimator`](@ref)\
 │               ├── [`EqualWeighted`](@ref)\
 │               ├── [`InverseVolatility`](@ref)\
+│               ├── [`PreviousWeights`](@ref)\
 │               └── [`RandomWeighted`](@ref)\
 ├── [`AbstractOrderedWeightsArrayEstimator`](@ref)\
 │   ├── [`NormalisedConstantRelativeRiskAversion`](@ref)\
@@ -645,6 +655,8 @@ its docstring.
 ├── [`AbstractFeeAmortisation`](@ref)\
 │   ├── [`AmortisedFees`](@ref)\
 │   └── [`FirstObservationFees`](@ref)\
+├── [`AbstractFoldFit`](@ref)\
+│   └── [`OnlineStep`](@ref)\
 ├── [`AbstractForecastTarget`](@ref)\
 │   ├── [`AssetReturnTarget`](@ref)\
 │   ├── [`IdiosyncraticTarget`](@ref)\
@@ -725,6 +737,9 @@ its docstring.
 │   └── [`PreorderTreeByID`](@ref)\
 ├── [`AbstractPreviousWeightsSource`](@ref)\
 │   └── [`DriftedWeights`](@ref)\
+├── [`AbstractRealisedTarget`](@ref)\
+│   ├── [`HorizonReturn`](@ref)\
+│   └── [`RealisedCovariance`](@ref)\
 ├── [`AbstractRedundancyAlgorithm`](@ref)\
 │   ├── [`ClusterGroups`](@ref)\
 │   ├── [`CorrelationComponents`](@ref)\

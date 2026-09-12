@@ -38,6 +38,13 @@ The guide mirrors that spine, one page per stage:
   - [Choosing a strategy](07_Choosing_a_Strategy.md) — a decision framework for picking tools by
     compute budget, rebalance frequency, risk appetite, and capital. Worked end-to-end profiles
     live in [putting it together](../examples/7_putting_it_together/01_Profile_Retail_Daily.md).
+  - [The point-in-time universe](08_Point_in_Time_Universe.md) — a gapped price table taken
+    through the ingestion layer to a walk-forward: what the library does when an asset lists,
+    delists, or is suspended inside your sample, which layers handle a gap, and which refuse one
+    by name.
+  - [The online walk-forward](09_Online_Walk_Forward.md) — one estimator stepped fold by fold
+    instead of refitted: the one keyword that declares it, the identity with the batch run, the
+    wrapper for a member with no exact fold, the gain measured honestly, and the resume.
 
 ## Reading the API
 

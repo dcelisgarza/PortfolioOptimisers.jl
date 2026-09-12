@@ -55,19 +55,23 @@ res_base = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
 ## 2. Fees erase returns
 
 The starkest way to see why fees matter: take the unconstrained maximum-ratio book and look at
-its gross return against its return *net* of a proportional fee. [`calc_fees`](@ref) computes the
-cost of holding a weight vector, and [`calc_net_returns`](@ref) deducts it from the gross
-returns. A flat 0.2% long fee on this book costs about as much per day as the strategy earns —
-the net edge nearly vanishes.
+its gross return against its return *net* of a proportional fee. [`calc_fees`](@ref) reports the
+cost of holding a weight vector as a **pair**: the charge every observation carries, and the
+one-off charge the first observation carries alone. [`calc_net_returns`](@ref) deducts both from
+the gross returns. `l`, `s` and `tn` are rates per period, so a fee built from them alone has a
+zero one-off half; `fl` and `fs` are the terms that fill it. A flat 0.2% long fee on this book
+costs about as much per day as the strategy earns — the net edge nearly vanishes.
 
 ````@example 06_Fees_and_Net_Returns
 fee = Fees(; l = 0.002)
-gross_daily = sum(rd.X * res_base.w) / size(rd.X, 1)
-net_daily = sum(calc_net_returns(res_base.w, rd.X, fee)) / size(rd.X, 1)
-fee_cost = calc_fees(res_base.w, fee)
+T_obs = size(rd.X, 1)
+gross_daily = sum(rd.X * res_base.w) / T_obs
+net_daily = sum(calc_net_returns(res_base.w, rd.X, fee)) / T_obs
+fee_cost, fee_one_off = calc_fees(res_base.w, T_obs, fee)
 
-pretty_table(DataFrame("Quantity" => ["Gross daily return", "Fee cost", "Net daily return"],
-                       "Value" => [gross_daily, fee_cost, net_daily]);
+pretty_table(DataFrame("Quantity" => ["Gross daily return", "Fee cost, every day",
+                                      "Fee cost, one time", "Net daily return"],
+                       "Value" => [gross_daily, fee_cost, fee_one_off, net_daily]);
              formatters = [resfmt],
              title = "A 0.2% long fee against this book's daily edge")
 ````

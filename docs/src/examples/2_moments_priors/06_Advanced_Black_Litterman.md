@@ -33,8 +33,9 @@ like the base model.
 
 !!! note "Factor data required"
     These variants need factor returns, so the [`ReturnsResult`](@ref) must be built with a
-    factor block via `prices_to_returns(X, F)`. Factor views and factor sets refer to the
-    factor names in `rd.nf`.
+    factor block, which the ingestion layer assembles:
+    `prices_to_returns(price_ingestion(PriceIngestion(), X; F = F))`. Factor views and
+    factor sets refer to the factor names in `rd.nf`.
 
 ````@example 06_Advanced_Black_Litterman
 using PortfolioOptimisers, PrettyTables, DataFrames
@@ -71,7 +72,7 @@ using CSV, TimeSeries
 
 X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
 F = TimeArray(CSV.File(joinpath(@__DIR__, "..", "Factors.csv.gz")); timestamp = :Date)[(end - 252):end]
-rd = prices_to_returns(X, F)
+rd = prices_to_returns(price_ingestion(PriceIngestion(), X; F = F))
 
 universe_sets = UniverseSets(;
                              dict = Dict("nx" => rd.nx, "nf" => rd.nf,

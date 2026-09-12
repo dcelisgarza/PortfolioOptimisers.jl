@@ -137,20 +137,25 @@ pretty_table(DataFrame(scorecard);
 ## 5. Cost attribution: gross vs net returns
 
 A book that looks good gross can be mediocre net of trading costs. [`calc_net_returns`](@ref)
-applies a [`Fees`](@ref) schedule to the realised returns; [`calc_fees`](@ref) reports the cost
-of holding the weights for a *single* period.
+applies a [`Fees`](@ref) schedule to the realised returns; [`calc_fees`](@ref) reports that cost
+as a **pair**, the charge every observation carries beside the one-off charge the first observation
+carries alone, and [`calc_total_fees`](@ref) contracts the pair to the cost of a whole holding
+period.
 
-The important subtlety is the time base: `calc_net_returns(w, X, fees)` deducts the fee on
-**every row** of `X` — it models paying the rebalancing cost *each period*. So with 252 daily
-observations a per-period fee of `l` accumulates to roughly `252 · l` over the year before
-compounding. We therefore use a modest per-rebalance fee of 5 bps (`l = 0.0005`), which is about
-a 12–13% annualised cost, and compare gross and net compounded wealth.
+The important subtlety is the time base. `l`, `s` and `tn` are rates per period, so
+`calc_net_returns(w, X, fees)` deducts them on **every row** of `X`: it models paying the
+rebalancing cost *each period*. With 252 daily observations a per-period fee of `l` therefore
+accumulates to roughly `252 · l` over the year before compounding. `fl` and `fs` are different:
+they are currency amounts charged one time for the whole holding period, and `fees.fa` decides
+where on the series that one charge lands. We use a modest per-rebalance fee of 5 bps
+(`l = 0.0005`), which is about a 12–13% annualised cost, and compare gross and net compounded
+wealth.
 
 ````@example 03_Performance_Attribution
 fees = Fees(; l = 0.0005)
 gross_ret = rd.X * w_ratio
 net_ret = calc_net_returns(w_ratio, rd.X, fees)
-single_period_fee = calc_fees(w_ratio, fees)
+single_period_fee, _ = calc_fees(w_ratio, size(rd.X, 1), fees)
 
 pretty_table(DataFrame(;
                        quantity = ["Gross compounded wealth (×)",
@@ -160,7 +165,7 @@ pretty_table(DataFrame(;
                        value = [round(cumulative_returns(gross_ret, true)[end]; digits = 4),
                                 round(cumulative_returns(net_ret, true)[end]; digits = 4),
                                 round(single_period_fee; digits = 5),
-                                round(252 * single_period_fee; digits = 4)]);
+                                round(calc_total_fees(w_ratio, 252, fees); digits = 4)]);
              title = "Fee drag on the maximum-ratio book (5 bps per rebalance)")
 ````
 

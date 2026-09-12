@@ -143,7 +143,7 @@ pred = predict(res, pr, test_window)
 ```
 
 It runs. It produces a number. And that number is **not out-of-sample** — the pipeline's
-missing-data filter chose its universe using the test rows, and its imputer computed fill
+missing-data filter chose its universe using the test rows, and its price fill computed its
 values from them. The call shape is identical to the honest one; only the data the fit saw
 differs. Nothing warns you.
 
@@ -159,8 +159,8 @@ Note the auto-generated step name: `"split"`.
 
 ````@example 05_Train_Test_Split
 pipe = Pipeline(;
-                steps = (TrainTestSplit(; test_size = 0.2), MissingDataFilter(), Imputer(),
-                         PricesToReturns(), EmpiricalPrior(),
+                steps = (TrainTestSplit(; test_size = 0.2), MissingDataFilter(),
+                         PriceGapFill(), PricesToReturns(), EmpiricalPrior(),
                          MeanRisk(; r = Variance(),
                                   opt = JuMPOptimiser(; slv = slv, pe = EmpiricalPrior()))))
 pipe.names
@@ -185,8 +185,8 @@ DataFrame(;
 
 A `TrainTestSplit` **must be the first step**. This is not tidiness — it is the entire safety
 argument. A [`MissingDataFilter`](@ref) fitted before the split would choose the asset universe
-using the held-out rows; an [`Imputer`](@ref) fitted before it would compute its fill values
-from them. Their fitted state would carry test information into the training workflow, which is
+using the held-out rows; a [`PriceGapFill`](@ref) fitted before it would compute its fill
+values from them. Their fitted state would carry test information into the training workflow, which is
 exactly the leak the split exists to prevent.
 
 So the constructor refuses, rather than letting you find out from a suspiciously good backtest.
@@ -194,8 +194,9 @@ So the constructor refuses, rather than letting you find out from a suspiciously
 ````@example 05_Train_Test_Split
 try
     Pipeline(;
-             steps = (MissingDataFilter(), Imputer(), TrainTestSplit(; test_size = 0.2),
-                      PricesToReturns(), EqualWeighted()))
+             steps = (MissingDataFilter(), PriceGapFill(),
+                      TrainTestSplit(; test_size = 0.2), PricesToReturns(),
+                      EqualWeighted()))
 catch e
     println(e.msg)
 end
@@ -294,7 +295,7 @@ the split was providing.
 
 ````@example 05_Train_Test_Split
 pipe_cv = Pipeline(;
-                   steps = (MissingDataFilter(), Imputer(), PricesToReturns(),
+                   steps = (MissingDataFilter(), PriceGapFill(), PricesToReturns(),
                             EmpiricalPrior(),
                             MeanRisk(; r = Variance(),
                                      opt = JuMPOptimiser(; slv = slv,

@@ -56,7 +56,7 @@ earns 3 bps/day.
 ````@example 04_Profile_Factor_Views
 X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
 F = TimeArray(CSV.File(joinpath(@__DIR__, "..", "Factors.csv.gz")); timestamp = :Date)[(end - 252):end]
-rd = prices_to_returns(X, F)
+rd = prices_to_returns(price_ingestion(PriceIngestion(), X; F = F))
 prices = vec(values(X)[end, :])
 
 asset_sets = UniverseSets(;

@@ -98,7 +98,7 @@ precedence and when a pinned basis goes stale.
 ````@example 04_Constraints_and_Costs
 Fac = TimeArray(CSV.File(joinpath(@__DIR__, "../examples/Factors.csv.gz"));
                 timestamp = :Date)[(end - 252):end]
-rd_f = prices_to_returns(X, Fac)
+rd_f = prices_to_returns(price_ingestion(PriceIngestion(), X; F = Fac))
 sets_f = UniverseSets(; dict = Dict("nx" => rd_f.nx, "nf" => rd_f.nf))
 
 res_fac = optimise(MeanRisk(; obj = MinimumRisk(),

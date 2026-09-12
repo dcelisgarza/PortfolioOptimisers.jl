@@ -276,60 +276,58 @@ println("largest executed trade, source on  = $(round(maximum(exe_on) * 100, dig
 
 ## 5. The one-off cost and its clock
 
-A turnover charge is paid once, on the trade. The library's fee terms are subtracted from *every*
-observation of a return series, so a turnover charge stated per rebalance is charged once per day
-over the whole holding period unless something spreads it.
+`l`, `s` and `tn` are rates per period. Each of them charges one time on every observation of a
+return series, at the frequency of the returns. `fl` and `fs` are different: they are currency
+amounts charged one time for the *whole* holding period, so something must decide where on the
+series that one charge lands.
 
-[`AmortisedFees`](@ref) is what spreads it. It is the `fa` field of [`Fees`](@ref) and
-[`FeesEstimator`](@ref), it reaches `tn`, `fl` and `fs`, and it never touches `l` or `s`, which are
-rates per period already. A bare `AmortisedFees()` divides by the fold's own length; a stated
-`horizon` overrides the fold.
+That decision is the `fa` field of [`Fees`](@ref) and [`FeesEstimator`](@ref), and it has two
+settings. `nothing` charges the two fixed amounts on the **first** observation, which is the day
+the position is opened. [`AmortisedFees`](@ref) spreads them **evenly** over the observations
+instead. It reaches `fl` and `fs` alone, and it carries no number: every site that charges a fee
+knows the observation count it charges over and hands it in.
+
+The two clocks charge the same total. They differ in the drawdown, because one pays the whole cost
+on the first day and the other pays a share of it on every day.
 
 This is a third switch, and it is orthogonal to the other two: a caller can drift without
 amortising and amortise without drifting.
 
 ````@example 08_Weight_Drift_and_Held_Weights
-fee_tn = Turnover(; w = fill(1 / N, N), val = 0.005)
-fees_full = Fees(; tn = fee_tn)
-fees_amortised = Fees(; tn = fee_tn, fa = AmortisedFees())
+w_eq = fill(1 / N, N)
+fee_first = Fees(; l = 0.0002, fl = 0.001)
+fee_spread = Fees(; l = 0.0002, fl = 0.001, fa = AmortisedFees())
 
-pred_fee_full = cross_val_predict(MeanRisk(;
-                                           opt = JuMPOptimiser(; slv = slv,
-                                                               fees = fees_full)), rd,
-                                  wf_trade)
-pred_fee_amrt = cross_val_predict(MeanRisk(;
-                                           opt = JuMPOptimiser(; slv = slv,
-                                                               fees = fees_amortised)), rd,
-                                  wf_trade)
+gross = rd.X * w_eq
+net_first = calc_net_returns(w_eq, rd.X, fee_first)
+net_spread = calc_net_returns(w_eq, rd.X, fee_spread)
 
-fee_df = DataFrame(:quantity => ["cumulative return", "mean return"],
-                   Symbol("charged every day") =>
-                       [prod(1 .+ pred_fee_full.mrd.X) - 1, mean(pred_fee_full.mrd.X)],
-                   Symbol("spread over the fold") =>
-                       [prod(1 .+ pred_fee_amrt.mrd.X) - 1, mean(pred_fee_amrt.mrd.X)])
+fee_df = DataFrame(:quantity => ["charged in total", "charged on observation 1",
+                                 "charged on observation 2", "cumulative return"],
+                   Symbol("on the first observation") =>
+                       [sum(gross) - sum(net_first), gross[1] - net_first[1],
+                        gross[2] - net_first[2], prod(1 .+ net_first) - 1],
+                   Symbol("spread over the series") =>
+                       [sum(gross) - sum(net_spread), gross[1] - net_spread[1],
+                        gross[2] - net_spread[2], prod(1 .+ net_spread) - 1])
 pretty_table(fee_df; formatters = [numfmt])
 ````
 
-A 0.5% turnover charge repeated on every one of a fold's observations is not a 0.5% turnover
-charge, and the first column is what that mistake costs. The second column charges the same trade
-once and lets the fold carry it.
-
-The per-observation charge itself is the clearest statement of the ratio, and it is the fold's own
-length.
+The first row is the same under both clocks, and it is the number
+[`calc_total_fees`](@ref) reports: the rate charged on every one of the `T` observations, plus the
+fixed amount charged one time.
 
 ````@example 08_Weight_Drift_and_Held_Weights
-fold_len = size(pred_fee_amrt.pred[1].hw.X, 1)
-println("fold length = $(fold_len) observations")
-println("charge per observation, in full = $(round(calc_fees(pred_fee_full.res[1].w, fees_full), sigdigits = 5))")
-println("charge per observation, spread  = $(round(calc_fees(pred_fee_amrt.res[1].w, Fees(; tn = fee_tn, fa = AmortisedFees(; horizon = fold_len))), sigdigits = 5))")
+println("observations = $(size(rd.X, 1))")
+println("total, by clock  = $(round(calc_total_fees(w_eq, size(rd.X, 1), fee_first), sigdigits = 8)) and $(round(calc_total_fees(w_eq, size(rd.X, 1), fee_spread), sigdigits = 8))")
 ````
 
-!!! warning "The fee's clock reaches the score, not the fit"
-    `fa` is read where a fee is *charged against a return series*. The JuMP model builds its own fee
-    expressions from `tn`, `fl` and `fs` directly, so the objective of the fit charges the one-off
-    terms in full whatever `fa` says. On this run the two fee settings above give bit-identical
-    weights and two very different reported series. If the fit's own trade-off matters to you,
-    state the rate you want the optimiser to see.
+!!! note "The fit reads the same clock, and its expected return always spreads"
+    The JuMP model carries the per period terms and the one-off terms in two expressions of its
+    own, and it lays the second onto its net return series on the clock `fa` names, exactly as the
+    value-level verbs do. Its *expected return* is a per period number, so the one-off terms always
+    enter it spread over the observation count of the fit, whatever the clock says for a realised
+    series.
 
 ## 6. What to take away
 
@@ -345,9 +343,9 @@ println("charge per observation, spread  = $(round(calc_fees(pred_fee_amrt.res[1
     nothing there. The path is rebuilt from the record unless `store_weight_path` asked for it, and
     the rebuild is bit-identical.
   - The weights carried forward are one step beyond the last row of the path, not the last row.
-  - The fee's clock is a third switch. A one-off charge left unamortised is charged on every
-    observation of the fold, and on a long fold that is the difference between a strategy and a
-    wreck.
+  - The fee's clock is a third switch, and it reaches the two fixed charges alone. `l`, `s` and
+    `tn` are rates per period and are charged on every observation whatever the clock says. The
+    two clocks charge the same total and give a different drawdown.
 
 ---
 

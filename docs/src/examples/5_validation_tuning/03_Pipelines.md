@@ -81,7 +81,12 @@ vals[1:(end ÷ 2), 3] .= NaN    ## JNJ: missing for the first half of the sample
 vals[10, 1] = NaN              ## AAPL: an isolated gap
 vals[25, 5] = NaN              ## XOM: an isolated gap
 Xm = TimeArray(timestamp(X), vals, colnames(X))
-pr = PricesResult(; X = Xm)
+# The Span Rule reads a listing calendar off the prices themselves: a leading run of gaps is
+# an asset not yet listed, a trailing run is a delisting, and an interior gap is a Held Gap
+# on an asset that is still listed. [`price_ingestion`](@ref) states one for you; here we
+# read it directly, because the carrier is hand-built.
+span = listing_span(vals)
+pr = PricesResult(; X = Xm, span = span)
 
 # How much is missing, per asset?
 miss = DataFrame(; asset = string.(colnames(Xm)),
@@ -141,17 +146,17 @@ res["filter"].nx
 Raise the threshold and JNJ survives — the universe is a hyperparameter, and in §4 we will
 tune it rather than guess it.
 
-!!! warning "Pin the universe before converting to returns"
+!!! note "The conversion chooses no universe"
 
-    [`PricesToReturns`](@ref) is *stateless*, and the underlying [`prices_to_returns`](@ref)
-    silently drops assets that are entirely missing in the window it converts. A training
-    window in which an asset has no history at all therefore produces fewer assets than a
-    clean test window, and the fitted weights would not line up with the test returns.
+    [`PricesToReturns`](@ref) is *stateless*: it computes a return and nothing else, deleting
+    no observation and no asset (ADR 0133). A gap therefore reaches the returns instead of
+    taking its observation row with it, so a training window and a test window can never
+    disagree about the universe because of the conversion.
 
-    Any pipeline you intend to `predict` or cross-validate with should pin the universe with
-    a [`MissingDataFilter`](@ref) step and fill the remaining gaps with an [`Imputer`](@ref)
-    step *before* converting. If you forget, [`predict`](@ref) refuses to guess and reports
-    the two universes it found.
+    Choosing a universe is a **Universe Policy**, and a policy is fitted: that is what a
+    [`MissingDataFilter`](@ref) step is for, and why it belongs *before* the conversion. Use
+    it when you want an asset gone; use a [`PriceGapFill`](@ref) step when you want a gap
+    inside a listing to take a price convention instead.
 
 ````@example 03_Pipelines
 res_lax = fit(Pipeline(;
@@ -160,40 +165,49 @@ res_lax = fit(Pipeline(;
 res_lax["filter"].nx
 ````
 
-### 2.3 Imputation parameters are fitted state
+### 2.3 Fill values are fitted state
 
-[`Imputer`](@ref) fills gaps with a per-asset statistic computed on the training window. The
-fill values are fitted state: a test window is filled with *training* statistics, never with
-its own. This is the leakage-prevention exemplar.
+[`PriceGapFill`](@ref) states the price convention a **Held Gap** takes — a gap *inside* an
+asset's listing. Its fill values are fitted state: a test window is filled with *training*
+values, never with its own. This is the leakage-prevention exemplar.
 
-To see why that matters, fit the same imputer on two different windows and compare what it
-learns.
+The step is bounded by the Listing Span, which is why the carrier states one. JNJ's missing
+first half is a leading run, so it lies outside JNJ's listing and no price is written there:
+the fill cannot invent a history an asset never had. AAPL's and XOM's isolated gaps are Held
+Gaps, and those it fills.
+
+To see why the fitted state matters, fit the same step on two different windows and compare
+what it learns. [`CarriedPrice`](@ref), the default, states the **Held Price** convention: the
+gap takes the last price actually printed, which conserves wealth across the gap.
 
 ````@example 03_Pipelines
-pipe_imp = Pipeline(; steps = ("impute" => Imputer(), PricesToReturns(), EmpiricalPrior()))
+pipe_imp = Pipeline(;
+                    steps = ("gap_fill" => PriceGapFill(), PricesToReturns(),
+                             EmpiricalPrior()))
 
-res_train = fit(pipe_imp, PricesResult(; X = Xm[1:500]))
-res_test = fit(pipe_imp, PricesResult(; X = Xm[501:end]))
+res_train = fit(pipe_imp, PricesResult(; X = Xm[1:500], span = span[1:500, :]))
+res_test = fit(pipe_imp, PricesResult(; X = Xm[501:end], span = span[501:end, :]))
 
-j = findfirst(==(:AAPL), res_train["impute"].nx)
-k = findfirst(==(:AAPL), res_test["impute"].nx)
+j = findfirst(==(:AAPL), res_train["gap_fill"].nx)
+k = findfirst(==(:AAPL), res_test["gap_fill"].nx)
 fills = DataFrame(; window = ["train (1:500)", "test (501:end)"],
-                  aapl_fill = [res_train["impute"].v[j], res_test["impute"].v[k]])
+                  aapl_fill = [res_train["gap_fill"].v[j], res_test["gap_fill"].v[k]])
 pretty_table(fills)
 ````
 
 The two windows disagree — AAPL's price level is very different across them. A pipeline
 fitted on the training window carries the *train* number, and
-[`predict`](@ref) replays exactly that number on the test window. Had we imputed on the full
-sample before splitting, the fill would have been contaminated by the test period, and every
-subsequent "out-of-sample" score would be optimistic.
+[`predict`](@ref) replays exactly that number on the test window. Had we fitted the fill on
+the full sample before splitting, it would have been contaminated by the test period, and
+every subsequent "out-of-sample" score would be optimistic.
 
-The statistic itself is configurable — `Imputer(; stat = MeanValue())` versus
-`MedianValue()` — and is another hyperparameter to tune in §4.
+The convention itself is configurable — `PriceGapFill(; fill = MeanValue())` versus
+`MedianValue()`, each of which states one constant for every gap of a column rather than
+carrying the last printed price — and is another hyperparameter to tune in §4.
 
 ## 3. The full workflow
 
-Now the whole chain from the ADR: prices → filter → impute → returns → prior → phylogeny
+Now the whole chain from the ADR: prices → filter → fill → returns → prior → phylogeny
 constraints → weight bounds → [`MeanRisk`](@ref).
 
 Two things make this work without any plumbing:
@@ -214,7 +228,7 @@ Two things make this work without any plumbing:
 ````@example 03_Pipelines
 pipe = Pipeline(;
                 steps = ("filter" => MissingDataFilter(; col_thr = 0.4),
-                         "impute" => Imputer(), PricesToReturns(), EmpiricalPrior(),
+                         "gap_fill" => PriceGapFill(), PricesToReturns(), EmpiricalPrior(),
                          SemiDefinitePhylogenyEstimator(),
                          "wb" => WeightBoundsEstimator(; lb = nothing, ub = 0.4),
                          MeanRisk(; opt = JuMPOptimiser(; slv = slv))))
@@ -233,13 +247,13 @@ maximum(res.w) <= 0.4 + 1e-8
 
 ### 3.1 Predicting on an unseen window
 
-[`predict`](@ref) replays the fitted preprocessing on a test window — universe subset, then
-train-fitted imputation, then the returns conversion — and hands the result to the ordinary
+[`predict`](@ref) replays the fitted preprocessing on a test window — universe subset, then the
+train-fitted fill, then the returns conversion — and hands the result to the ordinary
 weights-level prediction machinery. Scorers and risk measures carry over untouched.
 
 ````@example 03_Pipelines
 T = size(values(Xm), 1)
-res_train = fit(pipe, PricesResult(; X = Xm[1:800]))
+res_train = fit(pipe, PricesResult(; X = Xm[1:800], span = span[1:800, :]))
 pred = PortfolioOptimisers.predict(res_train, pr, 801:T)
 expected_risk(ConditionalValueatRisk(), pred)
 ````
@@ -255,17 +269,18 @@ during preprocessing.
 Lens keys address steps three ways:
 
   - by **name** with a trailing property path — `"filter.col_thr"`;
-  - by **name** alone (or by integer position), which swaps the whole step — `"impute"`;
+  - by **name** alone (or by integer position), which swaps the whole step — `"gap_fill"`;
   - by **raw property path**, exactly as for plain optimisers — `"steps[1].col_thr"`.
 
 ````@example 03_Pipelines
 pipe = Pipeline(;
                 steps = ("filter" => MissingDataFilter(; col_thr = 0.4),
-                         "impute" => Imputer(), PricesToReturns(), EmpiricalPrior(),
+                         "gap_fill" => PriceGapFill(), PricesToReturns(), EmpiricalPrior(),
                          "opt" => MeanRisk(; opt = JuMPOptimiser(; slv = slv))))
 
 p = ["filter.col_thr" => [0.4, 0.9],
-     "impute" => [Imputer(; stat = MeanValue()), Imputer(; stat = MedianValue())]]
+     "gap_fill" =>
+         [PriceGapFill(; fill = MeanValue()), PriceGapFill(; fill = MedianValue())]]
 
 gscv = GridSearchCrossValidation(p; cv = IndexWalkForward(500, 250),
                                  r = ConditionalValueatRisk())
@@ -274,7 +289,7 @@ tuned = search_cross_validation(pipe, gscv, pr)
 # Mean test score per candidate (bigger is better after the sign convention).
 scores = DataFrame(; candidate = 1:length(tuned.val_grid),
                    col_thr = [v[1] for v in tuned.val_grid],
-                   imputer = [string(nameof(typeof(v[2].stat))) for v in tuned.val_grid],
+                   gap_fill = [string(nameof(typeof(v[2].fill))) for v in tuned.val_grid],
                    mean_score = vec(mean(tuned.test_scores; dims = 1)))
 pretty_table(scores)
 ````
@@ -282,7 +297,7 @@ pretty_table(scores)
 `tuned.opt` is the winning *pipeline*, ready to fit on the full sample.
 
 ````@example 03_Pipelines
-tuned.idx, tuned.opt.steps[1].col_thr, nameof(typeof(tuned.opt.steps[2].stat))
+tuned.idx, tuned.opt.steps[1].col_thr, nameof(typeof(tuned.opt.steps[2].fill))
 
 final = fit(tuned.opt, pr)
 pretty_table(DataFrame(; asset = final.ctx.returns.nx, weight = final.w);
@@ -296,7 +311,7 @@ value. Here we search over the *prior estimator* itself rather than one of its f
 
 ````@example 03_Pipelines
 pipe_struct = Pipeline(;
-                       steps = (MissingDataFilter(; col_thr = 0.4), Imputer(),
+                       steps = (MissingDataFilter(; col_thr = 0.4), PriceGapFill(),
                                 PricesToReturns(), "prior" => EmpiricalPrior(),
                                 EqualWeighted()))
 p_struct = ["prior" => [EmpiricalPrior(),
