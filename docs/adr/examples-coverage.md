@@ -91,6 +91,7 @@ Mark a topic covered (✅) only when all of the following hold:
 | ✅ | Time-dependent constraints — in-field `TimeDependent` schedules vs callables vs static under every CV scheme, `TimeDependentContext`, `PreviousWeightsFunction`, entry-substitution/fold-count validation, inertness outside fold loops (ADR 0030) | `examples/5_validation_tuning/04_Time_Dependent_Constraints.jl` |
 | ✅ | Train/test splitting — `train_test_split` (keyword and estimator forms), `TrainTestSplit`/`TTS` as the first pipeline step, sizing by count vs fraction, complement and embargo, the leakage argument for the first-position rule, `fit_predict` on the held-out window, pass-through replay on fresh data, holdout-excludes-CV (ADR 0031) | `examples/5_validation_tuning/05_Train_Test_Split.jl` |
 | ✅ | Weight drift and held weights — `wd`/`SelfFinancingDrift` and `pws`/`DriftedWeights` as two independent switches on a walk-forward, `HeldWeightsResult` and the weight path, the turnover cap that binds the decision or the trade, `AmortisedFees` as the one-off charge's clock (ADR 0110) | `examples/5_validation_tuning/08_Weight_Drift_and_Held_Weights.jl` |
+| ✅ | The online walk-forward — `ff = OnlineStep()` as the Fold Fit, the identity with the batch expanding run fold for fold over a moving universe, `partial_fit!`/`optimise(opt)` by hand, `Online` as the wrapper for a member with no exact fold and `max_history` as the rolling window, the search through the one loop, `Resume`, the moment seam's accuracy on a level against the textbook formula, and the gain measured by prior family and by head (ADRs 0136–0144) | `examples/5_validation_tuning/09_Online_Walk_Forward.jl` |
 
 ## 6. Post-processing
 
@@ -118,3 +119,4 @@ Mark a topic covered (✅) only when all of the following hold:
 | ✅ | Drawdown as a risk measure vs as a post-optimisation diagnostic | `user_guide/03_Risk_Measures.jl` §3 + `user_guide/02_Optimisers.jl` §2 |
 | ✅ | The full Black-Litterman family and how the Bayesian, Factor, and Augmented variants differ from the base form | `user_guide/01_Data_and_Priors.jl` §3 |
 | ✅ | Windowed and regime-adjusted moment estimators — motivation and trade-offs vs full-sample estimators | `user_guide/01_Data_and_Priors.jl` §3 |
+| ✅ | The online walk-forward — the one keyword, the identity with the batch run, the `Online` wrapper and the rolling window, the gain measured honestly, and the resume | `user_guide/09_Online_Walk_Forward.jl` |
