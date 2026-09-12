@@ -177,7 +177,7 @@ distance estimator goes into an ordinary [`ClustersEstimator`](@ref) through its
 
 rd = ReturnsResult(; nx = rd0.nx, X = rd0.X, ts = rd0.ts, pnl = pnl)
 
-onc = OptimalNumberClusters(; alg = 7)
+onc = OptimalNumberClusters(;)
 cle_cor = ClustersEstimator(; onc = onc)
 cle_fea = ClustersEstimator(; de = FeatureDistance(), onc = onc)
 
@@ -185,9 +185,9 @@ clr_cor = clusterise(cle_cor, rd)
 clr_fea = clusterise(cle_fea, rd)
 
 pretty_table(DataFrame("Asset" => rd.nx, "Sector" => [sector[a] for a in rd.nx],
-                       "Correlation cut" => cutree(clr_cor.res; k = 4),
-                       "Feature cut" => cutree(clr_fea.res; k = 4));
-             title = "Four-way cuts, correlation against classification")
+                       "Correlation cut" => assignments(clr_cor),
+                       "Feature cut" => assignments(clr_fea));
+             title = "Cluster assignments according to correlation and feature distance")
 
 #=
 On this universe the two agree exactly at four clusters and diverge as the cut goes finer. That
@@ -203,7 +203,11 @@ agreement = DataFrame("k" => 2:10,
                                                 for k in 2:10])
 pretty_table(agreement; title = "How far the two hierarchies agree, cut by cut")
 
-plot_dendrogram(clr_fea, rd.nx)
+# Plot the clusters for the feature distance clustering.
+plot_clusters(clr_fea, rd.nx)
+
+# Plot the clusters for the correlation clustering.
+plot_clusters(clr_cor, rd.nx)
 
 #=
 Feeding both hierarchies to [`HierarchicalRiskParity`](@ref) shows the allocation moving.
