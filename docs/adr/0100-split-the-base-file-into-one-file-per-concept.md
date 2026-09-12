@@ -72,7 +72,7 @@ the file it replaced.
 - `src/PortfolioOptimisers.jl` includes the thirteen files in place of the one.
 - The `export` list splits three ways: the error names to `07_Errors.jl`, `VecScalar` to
   `11_VecScalar.jl`, and the five norm types to `12_NormError.jl`.
-- `sweep/manifest.toml` takes thirteen rows at `map = 1`, `swept = true`, whose units sum to the
+- `code_health/sweep_manifest.toml` takes thirteen rows at `map = 1`, `swept = true`, whose units sum to the
   139 the old row carried. The sweep of #439 read this text and it did not change.
 - The complexity, JET and coverage baselines take thirteen rows each. The coverage rows split
   the 423 lines of the lcov of run 33485210033 by line range, and every one of them enters

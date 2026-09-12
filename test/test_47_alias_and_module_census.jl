@@ -113,12 +113,12 @@ end
         @test length(factories) == FACTORY_TOTAL
 
         #= The same two counts are the record in three places: here, in the file's
-        `sweep/manifest.toml` row, and in ADR 0086. The manifest row is the one of the
+        `code_health/sweep_manifest.toml` row, and in ADR 0086. The manifest row is the one of the
         three a test can read, so this ties the pair to it. Without the tie, an alias
         added to one kind and dropped from the other leaves both this file and the sweep
         census green while the two records disagree. `docs/adr/` is outside the citation
         census's scope, so the ADR stays a prose copy. =#
-        manifest = TOML.parsefile(joinpath(ROOT, "sweep", "manifest.toml"))["file"]
+        manifest = TOML.parsefile(joinpath(ROOT, "code_health", "sweep_manifest.toml"))["file"]
         @test ACRONYM_TOTAL + FACTORY_TOTAL == manifest["src/25_Aliases.jl"]["units"]
 
         # A third kind would be a dispatch alias, which ADR 0086 permits in any file. It
@@ -434,7 +434,7 @@ end
         if !isempty(missing_from_module)
             @warn """$(length(missing_from_module)) file(s) under `src/` are not `include`d by
                      `src/PortfolioOptimisers.jl`. Such a file is dead: its declarations never
-                     run, and its `sweep/manifest.toml` row keeps
+                     run, and its `code_health/sweep_manifest.toml` row keeps
                      `test_45_sweep_census.jl` green. Add an `include` in declaration
                      order:\n  $(join(missing_from_module, "\n  "))"""
         end

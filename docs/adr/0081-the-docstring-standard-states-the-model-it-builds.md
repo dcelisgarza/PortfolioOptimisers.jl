@@ -128,7 +128,7 @@ register rows under no documented definition at all.
 
 **`# Algorithm` gets a per-file floor.** This decision's own exemption is a *selector tag*, and no
 parser rule defines one, so a presence rule cannot be written without first defining a selector tag
-mechanically. A row marked `swept = true` in `sweep/manifest.toml` therefore carries one more key,
+mechanically. A row marked `swept = true` in `code_health/sweep_manifest.toml` therefore carries one more key,
 `algorithm = N`, and the measured count of the file's `# Algorithm` sections may not fall below it.
 It is a floor and not an equality, because an equality would red an *improvement*: adding the
 section to an existing unit adds no unit, so the row's `units` count would not move and the only

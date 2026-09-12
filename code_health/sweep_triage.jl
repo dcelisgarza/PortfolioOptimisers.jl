@@ -6,7 +6,7 @@
 #     julia --project=code_health code_health/sweep_triage.jl --fetch
 #     julia --project=code_health code_health/sweep_triage.jl --fetch --file src/26_New.jl
 #
-# It reconciles `sweep/manifest.toml` against the tracker, finds every file whose row still reads
+# It reconciles `code_health/sweep_manifest.toml` against the tracker, finds every file whose row still reads
 # `swept = false` under a CLOSED child map of #404, and writes a plan: the maps to reopen and the
 # sub-issues to open. **It opens nothing, it reopens nothing and it writes no row.** The tracker is
 # read and written by `code_health/sweep_issues.sh`, so every decision this job makes lives here,
@@ -211,7 +211,7 @@ job passes an empty set, so its trigger is exactly what ADR 0084 decided.
 function candidates(rows, maps, coverage, existing, forced = Set{String}())
     for path in sort(collect(forced))
         if !(haskey(rows, path))
-            error("`$path` has no row in `sweep/manifest.toml`. Add the row first: " *
+            error("`$path` has no row in `code_health/sweep_manifest.toml`. Add the row first: " *
                   "`test/test_45_sweep_census.jl` prints the line to paste.")
         elseif rows[path]["swept"]
             error("`$path` reads `swept = true`, so it is already swept and there is " *
@@ -283,7 +283,7 @@ restated compactly, the sentence that the committed files are the authority, and
 at #404 without copying a rule.
 
 **Every field is generated**, so the job needs no judgement: the path, `map` and `units` from
-`sweep/manifest.toml`, and `lines` and `misses` from `code_health/coverage_baseline.toml`. The
+`code_health/sweep_manifest.toml`, and `lines` and `misses` from `code_health/coverage_baseline.toml`. The
 `ROUTING` block is constant, so it needs none either.
 
 **Nothing here is ever machine-read.** The safeguard reads the title, and every other fact a later
@@ -308,7 +308,7 @@ function body_of(c::Candidate, commit::AbstractString)
     println(io, "1. Its documentation states the mathematics.")
     println(io, "2. Its code agrees with that statement, checked with real numbers.")
     println(io, "3. Its lines are covered, or exempted with a reason.\n")
-    println(io, "Take the numbers from `sweep/manifest.toml` and ",
+    println(io, "Take the numbers from `code_health/sweep_manifest.toml` and ",
             "`code_health/coverage_baseline.toml`, not from this table.\n")
     println(io, "## Notes\n")
     println(io, "Every rule for this effort lives on #", UMBRELLA,
@@ -328,7 +328,7 @@ One title file and one body file per sub-issue to open, plus two tab-separated f
 reads and nothing more.
 
   - `plan.tsv` — one row per issue, as `stem<TAB>path<TAB>parent issue`. It is not called
-    `manifest.tsv`, as `triage.jl`'s is, because `sweep/manifest.toml` already owns that noun here.
+    `manifest.tsv`, as `triage.jl`'s is, because `code_health/sweep_manifest.toml` already owns that noun here.
   - `reopen.tsv` — the issues to reopen, one number per line, **each of them closed**. `gh issue reopen` fails on an issue that is already open, so an open map and an open umbrella are left out
     rather than reopened defensively. A `--file` candidate under an open map therefore contributes
     no line at all, and its plan row stands alone.
@@ -437,7 +437,7 @@ The tracker's state is the only required input: without it no file can be a cand
 absent dump would make every run vacuously empty rather than loud. It arrives either as `--maps`,
 which is what the weekly job passes, or as `--fetch`, which reads it from the tracker directly.
 
-`--file` is repeatable, and each path is taken exactly as `sweep/manifest.toml` spells it. A path
+`--file` is repeatable, and each path is taken exactly as `code_health/sweep_manifest.toml` spells it. A path
 that has no row, or whose row reads `swept = true`, throws in `candidates` rather than here, so the
 message can name the manifest and the census that prints the missing line.
 """

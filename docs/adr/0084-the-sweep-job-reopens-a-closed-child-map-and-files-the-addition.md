@@ -63,7 +63,7 @@ after its child map finished, and **the first run is the only run that sees the 
 
 `test/test_45_sweep_census.jl` keeps failing a file that has no row. A pull request stays red until
 the author pastes the row, so the row always arrives by hand and the job never finds one to write.
-The job therefore keeps `contents: read`, and **ADR 0073 is not amended**: `sweep/manifest.toml`
+The job therefore keeps `contents: read`, and **ADR 0073 is not amended**: `code_health/sweep_manifest.toml`
 keeps its hand-set `map` and `swept` beside its measured `units`.
 
 ### The deciding half is `code_health/sweep_triage.jl`
@@ -84,7 +84,7 @@ already hold and a drifted second copy would silently stop suppressing a duplica
 
 The job must know whether a child map is **open**, and only the tracker holds that, so the dump is
 needed whatever else is committed. The thirteen are picked out of it by the title `Child map <n>:
-<name>`, and each name is checked against `sweep/manifest.toml`. A committed table of thirteen issue
+<name>`, and each name is checked against `code_health/sweep_manifest.toml`. A committed table of thirteen issue
 numbers would buy nothing and could go stale in silence.
 
 The manifest and the tracker must agree before one issue is planned. A child map with no issue, a
@@ -106,7 +106,7 @@ it attaches each new issue through the sub-issues endpoint. `CodeHealth.yml` run
 ### The sub-issue mirrors the child map, one file wide
 
 Its title names the path. Every field of its body is generated, so the job needs no judgement: the
-path, `map` and `units` from `sweep/manifest.toml`, and `lines` and `misses` from
+path, `map` and `units` from `code_health/sweep_manifest.toml`, and `lines` and `misses` from
 `code_health/coverage_baseline.toml`. **The body is never machine-read.** The safeguard reads the
 title, and every other fact a later run needs comes from a committed file or from the tracker's own
 metadata.

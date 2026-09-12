@@ -89,7 +89,7 @@ Create or extend a `test/test_*.jl` file following [`.github/instructions/julia-
 
 ## Step 9 — Wire the file into the sweep
 
-If the addition creates a new file under `src/`, give it a row in [`sweep/manifest.toml`](../../sweep/manifest.toml) and open its sweep ticket in the same change. [`CLAUDE.md`](../../CLAUDE.md) § *Functionality you add* owns the four steps, and `test/test_45_sweep_census.jl` holds them.
+If the addition creates a new file under `src/`, give it a row in [`code_health/sweep_manifest.toml`](../../code_health/sweep_manifest.toml) and open its sweep ticket in the same change. [`CLAUDE.md`](../../CLAUDE.md) § *Functionality you add* owns the four steps, and `test/test_45_sweep_census.jl` holds them.
 
 ## Step 10 — Final checks
 

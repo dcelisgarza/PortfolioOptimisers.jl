@@ -520,7 +520,7 @@ not two.
 
     extensions = get(TOML.parsefile(joinpath(ROOT, "Project.toml")), "extensions",
                      Dict{String, Any}())
-    rows = TOML.parsefile(joinpath(ROOT, "sweep", "manifest.toml"))["file"]
+    rows = TOML.parsefile(joinpath(ROOT, "code_health", "sweep_manifest.toml"))["file"]
     ext_rows = sort([f for f in keys(rows) if startswith(f, "ext/")])
 
     # Julia loads an extension from `ext/<Name>.jl`, or from `ext/<Name>/` when it needs
@@ -587,7 +587,7 @@ not two.
 
         if !isempty(unloadable)
             @warn """$(length(unloadable)) extension(s) marked `swept = true` in
-                     `sweep/manifest.toml` cannot be loaded in this environment, so nothing
+                     `code_health/sweep_manifest.toml` cannot be loaded in this environment, so nothing
                      here can see them. Add each trigger package to `test/Project.toml`:
                      \n  $(join(sort(unloadable), "\n  "))"""
         end
@@ -679,7 +679,7 @@ in the sense of `STANDARDS.md`.
     using Test, TOML
 
     ROOT = normpath(joinpath(@__DIR__, ".."))
-    rows = TOML.parsefile(joinpath(ROOT, "sweep", "manifest.toml"))["file"]
+    rows = TOML.parsefile(joinpath(ROOT, "code_health", "sweep_manifest.toml"))["file"]
     swept = sort([f for (f, r) in rows if r["swept"]])
 
     # The same instrument `test_45_sweep_census.jl` counts units with: one parse per file,
@@ -856,7 +856,7 @@ in the sense of `STANDARDS.md`.
         end
         if !isempty(offenders)
             @warn """$(length(offenders)) docstring(s) in a file marked `swept = true` in
-                     `sweep/manifest.toml` document a function that builds part of a
+                     `code_health/sweep_manifest.toml` document a function that builds part of a
                      `JuMP.Model` and carry neither the `# JuMP formulation` section nor a
                      subsection the body's macros demand. `@variable` owes `## Variables`,
                      `@expression` owes `## Expressions`, `@constraint` owes
@@ -873,7 +873,7 @@ in the sense of `STANDARDS.md`.
         no_key = filter(f -> !haskey(rows[f], "algorithm"), swept)
         if !isempty(no_key)
             @warn """$(length(no_key)) row(s) marked `swept = true` in
-                     `sweep/manifest.toml` carry no `algorithm` key. A swept row records the
+                     `code_health/sweep_manifest.toml` carry no `algorithm` key. A swept row records the
                      count of its docstrings that carry a `# Algorithm` section, and the
                      count may not fall afterwards:\n  $(join(no_key, "\n  "))"""
         end
@@ -891,7 +891,7 @@ in the sense of `STANDARDS.md`.
         @test isempty(fallen)
         if !isempty(fallen)
             println("Files whose count of `# Algorithm` sections has fallen below the ",
-                    "count their `sweep/manifest.toml` row records. Restore the section, ",
+                    "count their `code_health/sweep_manifest.toml` row records. Restore the section, ",
                     "or lower the count deliberately in the same commit that removes it:")
             for (f, was, now) in fallen
                 row = rows[f]
@@ -946,7 +946,7 @@ in the sense of `STANDARDS.md`.
             end
             if !isempty(offenders)
                 @warn """$(length(offenders)) file(s) marked `swept = true` in
-                         `sweep/manifest.toml` carry a `# Details` section. The section is
+                         `code_health/sweep_manifest.toml` carry a `# Details` section. The section is
                          abolished: move each fact by its subject, under
                          `## What each section holds` in
                          `.github/instructions/julia-docstrings.instructions.md`. The columns
@@ -957,7 +957,7 @@ in the sense of `STANDARDS.md`.
         end
 
         @testset "the library-wide # Details count does not rise" begin
-            # `sweep/manifest.toml` carries one row per file under `src/` and `ext/`, and
+            # `code_health/sweep_manifest.toml` carries one row per file under `src/` and `ext/`, and
             # `test_45_sweep_census.jl` reds when a file has no row. So its keys are the
             # scope of this count, already gated, and no second file walk is needed.
             per = Tuple{String, Int}[]
@@ -1066,7 +1066,7 @@ in the sense of `STANDARDS.md`.
             return found
         end
 
-        # `sweep/manifest.toml` holds one row per file under `src/` and `ext/`, and
+        # `code_health/sweep_manifest.toml` holds one row per file under `src/` and `ext/`, and
         # `test_45_sweep_census.jl` reds when a file has no row. So its keys are the scope,
         # already gated, and one walk serves all three checks.
         measured = Dict(f => scan_aliases(joinpath(ROOT, f))
@@ -1101,7 +1101,7 @@ in the sense of `STANDARDS.md`.
             end
             if !isempty(offenders)
                 @warn """$(length(offenders)) dispatch alias(es) in a file marked
-                         `swept = true` in `sweep/manifest.toml` carry no `# Related`
+                         `swept = true` in `code_health/sweep_manifest.toml` carry no `# Related`
                          section. The section lists what the alias groups, one bullet per
                          member, and the summary paragraph states why the group
                          exists:\n  $(join(offenders, "\n  "))"""
@@ -1249,7 +1249,7 @@ in the sense of `STANDARDS.md`.
             end
             if !isempty(offenders)
                 @warn """$(length(offenders)) `Where:` bullet(s) in a file marked
-                         `swept = true` in `sweep/manifest.toml` write out a `math_dict`
+                         `swept = true` in `code_health/sweep_manifest.toml` write out a `math_dict`
                          value instead of interpolating it. Replace the bullet with
                          `\$(math_dict[:key])`, under `Notation is fixed by symbol and by
                          family` in

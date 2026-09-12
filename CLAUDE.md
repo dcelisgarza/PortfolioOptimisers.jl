@@ -39,7 +39,7 @@ finished first, then adds its own change to the current text.
 
 Three files are shared by every sweep ticket, so this rule bites hardest there:
 
-- `sweep/manifest.toml` — one row per source file.
+- `code_health/sweep_manifest.toml` — one row per source file.
 - `src/01_Base/01_DocstringDictionaries.jl` — `arg_dict`, `math_dict` and their siblings.
 - `test/test_26_docs.jl` — the library-wide ratchets, `DETAILS_TOTAL`, `NO_RELATED_TOTAL` and
   `MATH_COPY_TOTAL`.
@@ -127,7 +127,7 @@ before you merge so you lower the number that is current.
 
 ## Functionality you add
 
-Every file under `src/` and `ext/` carries a row in [`sweep/manifest.toml`](sweep/manifest.toml)
+Every file under `src/` and `ext/` carries a row in [`code_health/sweep_manifest.toml`](code_health/sweep_manifest.toml)
 naming the child map of the systematic audit that owns it. `test/test_45_sweep_census.jl` reds the
 build when a file carries no row, and when a file's unit count leaves its row.
 

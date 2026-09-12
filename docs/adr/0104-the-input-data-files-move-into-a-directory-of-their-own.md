@@ -48,7 +48,7 @@ optimisation starts from belongs here, and takes the next number.
 ### What follows the move
 
 - `src/PortfolioOptimisers.jl` includes the four files at their new paths, in the same order.
-- The four rows of `sweep/manifest.toml` keep `map = 2`, their units and their `swept` state.
+- The four rows of `code_health/sweep_manifest.toml` keep `map = 2`, their units and their `swept` state.
   The directory uses exactly one map, which is the state `CodeHealth.candidate_maps` reads.
 - The four rows of `complexity_baseline.toml`, `coverage_baseline.toml`, `size_baseline.toml`
   and the twelve rows of `jet_baseline.toml` keep every number. A refresh would have written
@@ -72,7 +72,7 @@ No numeric prefix appears twice at the top level of `src/` any more. A reader wh
 `src/03_InputData/` reads the load order off the names.
 
 A reader who knows an old path finds nothing at it. Every reference under `src/`, `ext/`,
-`test/`, `code_health/` and `sweep/` moves with the files. The historical measurement dumps under
+`test/` and `code_health/` moves with the files. The historical measurement dumps under
 `docs/reports/` keep the old paths: they record what was measured on the day they were written.
 
 `synthetic_asset_panel` stays in `src/`, where issue #656 put it. It is exported public API, it

@@ -4,7 +4,7 @@
 #
 # This generator is a toy fixture for one acceptance test, not library functionality, so
 # it lives here rather than under `src/`. It has no Documenter-facing docstrings: nothing
-# under `docs/` references it, and `sweep/manifest.toml` carries no row for this file.
+# under `docs/` references it, and `code_health/sweep_manifest.toml` carries no row for this file.
 using Random, Statistics, Distributions, Dates, StatsBase
 
 # Observations per year the annualised parameters below are divided by. The panel's clock

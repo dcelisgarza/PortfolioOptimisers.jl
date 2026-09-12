@@ -89,7 +89,7 @@ later of the two.
 ### What follows the split
 
 - `src/PortfolioOptimisers.jl` includes sixteen files where it included nine, in the order above.
-- **`sweep/manifest.toml` partitions exactly.** The eight new rows carry 9, 4, 3, 4, 8, 8, 7 and 6
+- **`code_health/sweep_manifest.toml` partitions exactly.** The eight new rows carry 9, 4, 3, 4, 8, 8, 7 and 6
   units, which sum to the dead row's 49. They carry `map = 2` and `swept = false`, which is the state
   the dead row was in. Each one also carries the `# Algorithm` count of its own file, so the floor
   the dead row held at 22 is carried rather than dropped; the eight sum to 28.

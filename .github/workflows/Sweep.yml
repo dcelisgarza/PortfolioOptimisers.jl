@@ -1,6 +1,6 @@
 name: Sweep
 
-# The scheduled job of ADR 0084. It reconciles `sweep/manifest.toml` against the tracker, reopens
+# The scheduled job of ADR 0084. It reconciles `code_health/sweep_manifest.toml` against the tracker, reopens
 # the child map of #404 that a late addition joined, and opens one sub-issue per such file under
 # the `sweep` label.
 #
@@ -48,7 +48,7 @@ jobs:
     if: github.repository == 'dcelisgarza/PortfolioOptimisers.jl'
     runs-on: ubuntu-latest
     steps:
-      # The job reads `dev`, because `dev` is where an addition lands and where `sweep/manifest.toml`
+      # The job reads `dev`, because `dev` is where an addition lands and where `code_health/sweep_manifest.toml`
       # is current. The workflow file itself must reach `main` for the schedule to fire at all,
       # which is GitHub's rule and not a choice here.
       #

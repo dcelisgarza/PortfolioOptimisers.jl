@@ -59,7 +59,7 @@ commit that owes it.
 | `NN.title`, `NN.body` | the text of each sub-issue |
 | `summary.md` | the same plan as a table |
 
-Read `NN.body` before the apply. Every field of it is generated from `sweep/manifest.toml` and
+Read `NN.body` before the apply. Every field of it is generated from `code_health/sweep_manifest.toml` and
 `code_health/coverage_baseline.toml`, so a wrong number there is a wrong number in a committed
 file, not a wrong number in the plan.
 

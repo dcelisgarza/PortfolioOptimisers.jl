@@ -21,7 +21,7 @@ is worse than no answer. Other forms:
 | `sweep_check.jl` | the files that differ from `origin/dev`, plus the untracked ones |
 | `sweep_check.jl --base <ref>` | the same, against a ref you name |
 | `sweep_check.jl --file <path>` | one path, whatever the diff says |
-| `sweep_check.jl --all` | every file in `sweep/manifest.toml`, as a survey |
+| `sweep_check.jl --all` | every file in `code_health/sweep_manifest.toml`, as a survey |
 | `sweep_check.jl --fetch` | any of the above, plus the child map and the sub-issue |
 
 It measures and writes nothing. A `[fail]` line exits the run non-zero. A `[note]` line is a duty
@@ -37,7 +37,7 @@ the missing sub-issue is a failure.
 They are `CLAUDE.md` § *Functionality you add*, and ADR 0084 is the decision behind steps 3 and 4.
 
 1. **The manifest row.** Every tracked `.jl` file under `src/` and `ext/` carries one row in
-   `sweep/manifest.toml`. A new file needs a new row with `swept = false`. A file that gained a
+   `code_health/sweep_manifest.toml`. A new file needs a new row with `swept = false`. A file that gained a
    documented unit needs its `units` corrected. `test/test_45_sweep_census.jl` reds the build on
    both.
 2. **Coverage.** A new file enters with every line covered, or with a named Coverage Exemption in
@@ -49,7 +49,7 @@ Steps 3 and 4 write to the tracker. The `sweep-file-issues` skill does them.
 
 ## What each failure means
 
-**`no row in sweep/manifest.toml`.** Paste the line the check printed, and choose `map` yourself.
+**`no row in code_health/sweep_manifest.toml`.** Paste the line the check printed, and choose `map` yourself.
 **`map` is not derivable from a path.** Each of the nine subdirectories of `src/` and `ext/` uses
 exactly one child map, and there the check names it outright. The top level of `src/` holds files
 across five maps, and the numeric prefix does not rescue the lookup: the blocks are not contiguous.

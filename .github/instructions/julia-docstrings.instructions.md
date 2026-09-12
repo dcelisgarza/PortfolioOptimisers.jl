@@ -22,7 +22,7 @@ To read a complete docstring, open a Unit that [Reference docstrings](#reference
 
 Five words are used precisely in this file.
 
-- **Unit** — one documented name: a module, a type, a function, a macro or a constant. [`sweep/manifest.toml`](../../sweep/manifest.toml) records the unit count of every file under `src/` and `ext/`, and `test/test_45_sweep_census.jl` fails when a file's count leaves its row.
+- **Unit** — one documented name: a module, a type, a function, a macro or a constant. [`code_health/sweep_manifest.toml`](../../code_health/sweep_manifest.toml) records the unit count of every file under `src/` and `ext/`, and `test/test_45_sweep_census.jl` fails when a file's count leaves its row.
 - **Family** — a leaf abstract supertype, together with the concrete types that subtype it. Leaf-most means that no abstract type subtypes it, so a generic root such as `RiskMeasure` or `AbstractResult` is not a Family: its members span many files and share no notation. Most families sit inside one file, so a rule about a Family is local to one sweep ticket. [Notation is fixed by symbol and by family](#notation-is-fixed-by-symbol-and-by-family) is such a rule.
 - **Reference docstring** — a docstring that the [Reference docstrings](#reference-docstrings) table names. Its file is marked `swept = true` in the sweep manifest, so a Gate holds it. Read one in place of a worked example.
 - **Capability Catalogue** — the user-facing inventory of everything the package offers, built by [`docs/capability_catalogue.jl`](../../docs/capability_catalogue.jl) under ADR 0040. It extracts the first sentence of a type's summary paragraph verbatim.
@@ -36,7 +36,7 @@ Five words are used precisely in this file.
 - Include code examples where applicable.
 - **All public types, functions, and macros must have docstrings.**
 - **Scope**: `src/**/*.jl`, `ext/**/*.jl` and `docs/**/*.md`. A package extension in `ext/` is documented on the same terms as `src/`.
-- **An extension documents the names it declares itself, and nothing else.** An extension implements a seam that `src/` declares, and the declaration carries the docstring, the `# References` section and the API-page entry. So a method of a function declared in `src/` gets no docstring of its own in `ext/`, and the extension's own module, constants, types and macros each get one. Write a citation in the `src/` declaration, where the API page that renders it carries the bibliography block; an extension needs neither an API page nor a bibliography block of its own. `test/test_26_docs.jl` gates this per file, through the `swept` flag in [`sweep/manifest.toml`](../../sweep/manifest.toml).
+- **An extension documents the names it declares itself, and nothing else.** An extension implements a seam that `src/` declares, and the declaration carries the docstring, the `# References` section and the API-page entry. So a method of a function declared in `src/` gets no docstring of its own in `ext/`, and the extension's own module, constants, types and macros each get one. Write a citation in the `src/` declaration, where the API page that renders it carries the bibliography block; an extension needs neither an API page nor a bibliography block of its own. `test/test_26_docs.jl` gates this per file, through the `swept` flag in [`code_health/sweep_manifest.toml`](../../code_health/sweep_manifest.toml).
 
 ## The summary sentence (load-bearing — read this before writing a type docstring)
 
@@ -176,7 +176,7 @@ A mis-filed step goes to `# Algorithm`, an argument contract to `# Arguments`, t
 
 The Capability Catalogue extracts the **first sentence only** of the summary paragraph, so a later sentence of that paragraph is a safe home for a trap that applies to the whole unit.
 
-`test/test_26_docs.jl` gates the abolition twice. A file marked `swept = true` in [`sweep/manifest.toml`](../../sweep/manifest.toml) carries **zero** `# Details` sections, and the library-wide count of the section **may not rise**. The second check retires when that count reaches zero. [ADR 0085](../../docs/adr/0085-the-docstring-standard-is-rules-and-pointers.md) records the decision.
+`test/test_26_docs.jl` gates the abolition twice. A file marked `swept = true` in [`code_health/sweep_manifest.toml`](../../code_health/sweep_manifest.toml) carries **zero** `# Details` sections, and the library-wide count of the section **may not rise**. The second check retires when that count reaches zero. [ADR 0085](../../docs/adr/0085-the-docstring-standard-is-rules-and-pointers.md) records the decision.
 
 ---
 
@@ -507,7 +507,7 @@ The Capability Catalogue lists an alias in `NOT_A_FEATURE` with the reason `:ali
 `test/test_26_docs.jl` gates the rule with three checks, in the shape [ADR 0086](../../docs/adr/0086-an-alias-docstring-links-its-canonical-unit-and-restates-nothing.md) records.
 
  1. **Library-wide, absolute.** No alias carries a section outside its kind's row of the table above. A new breach is the only way this check can red.
- 2. **A swept file, presence.** A dispatch alias in a file marked `swept = true` in [`sweep/manifest.toml`](../../sweep/manifest.toml) carries `# Related`.
+ 2. **A swept file, presence.** A dispatch alias in a file marked `swept = true` in [`code_health/sweep_manifest.toml`](../../code_health/sweep_manifest.toml) carries `# Related`.
  3. **Library-wide, a ratchet.** The count of dispatch aliases carrying no `# Related` may not rise. The check retires when that count reaches zero.
 
 Check 2 reads the `swept` flag because it demands a section, and a presence demand may not red a file that no child map of issue #404 has swept. Check 1 forbids a section instead, so it needs no flag.
@@ -689,7 +689,7 @@ A new description is a **new** key. Editing a value already in `math_dict` moves
 
 **One quantity takes one key.** The converse of the rule above. Two keys that define one quantity are drift inside the table that exists to stop drift, and the docstrings that read them state one thing in two spellings. `:w_t_moment`, `:w_t_obsweight` and `:cal_w_i` each defined the observation weight, under ``w_t``, ``w_{t}`` and ``w_{i}``, and as "observation ``t``" against "period ``i``". They are one key, `:w_t_obs`. A new key states a quantity the table does not already carry; a new *description* of a quantity it does carry is a change to the key that owns it, under the rule above.
 
-**Gate.** Two checks in `test/test_26_docs.jl`, one for each direction. The first reds when a `Where:` bullet copies a `math_dict` value instead of interpolating it. It matches the whole bullet against the whole value, so it fires on a copy and never on a glyph that two families share. A file marked `swept = true` in [`sweep/manifest.toml`](../../sweep/manifest.toml) carries no such copy, and the library-wide count may not rise. The copies that remain migrate file by file, inside each file's own sweep ticket of issue #404.
+**Gate.** Two checks in `test/test_26_docs.jl`, one for each direction. The first reds when a `Where:` bullet copies a `math_dict` value instead of interpolating it. It matches the whole bullet against the whole value, so it fires on a copy and never on a glyph that two families share. A file marked `swept = true` in [`code_health/sweep_manifest.toml`](../../code_health/sweep_manifest.toml) carries no such copy, and the library-wide count may not rise. The copies that remain migrate file by file, inside each file's own sweep ticket of issue #404.
 
 The second reads the table itself, and reds when two keys open with one definition head — the noun phrase before the first punctuation mark and the first function word. A head that several keys share is recorded in that testset with the reason the keys are not one, so a new key may not restate a definition the table already carries. A head is a coarse instrument: two keys worded differently do not match, and the per-file sweep ticket reads that pair by hand.
 
@@ -829,7 +829,7 @@ Where:
 
 ## Reference docstrings
 
-Read a real docstring, not a copy of one. Each row names a Unit whose file is marked `swept = true` in [`sweep/manifest.toml`](../../sweep/manifest.toml), so a Gate holds the target and the pointer cannot drift.
+Read a real docstring, not a copy of one. Each row names a Unit whose file is marked `swept = true` in [`code_health/sweep_manifest.toml`](../../code_health/sweep_manifest.toml), so a Gate holds the target and the pointer cannot drift.
 
 | Kind | Unit | File |
 | --- | --- | --- |

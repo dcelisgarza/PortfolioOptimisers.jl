@@ -425,7 +425,7 @@ end
     source_files(; root = REPO_ROOT) -> Vector{String}
 
 Every tracked `.jl` file under the measured roots, as a path relative to `root`. This is ADR 0074's
-expected row set for `sweep/manifest.toml`, and `test/test_45_sweep_census.jl` compares it against
+expected row set for `code_health/sweep_manifest.toml`, and `test/test_45_sweep_census.jl` compares it against
 the rows the manifest holds. It is also the default `files` list of all four gates.
 """
 function source_files(; root = REPO_ROOT)
@@ -450,7 +450,7 @@ end
 
 The file's count of documented units: a docstring that attaches to a binding, counted from the
 source text by parsing with `Meta.parseall` and counting the `Core.@doc` macrocalls at any depth.
-It is the `units` key of a `sweep/manifest.toml` row.
+It is the `units` key of a `code_health/sweep_manifest.toml` row.
 
 **This is the one definition.** `test/test_45_sweep_census.jl` states what a unit is and why, and
 `code_health/sweep_check.jl` measures the same number before the commit. Both call this function,
@@ -473,7 +473,7 @@ end
 """
     row_line(f, m, u, s; algorithm) -> String
 
-The `sweep/manifest.toml` line a person pastes back. A swept row also carries the `algorithm` key
+The `code_health/sweep_manifest.toml` line a person pastes back. A swept row also carries the `algorithm` key
 that `test/test_26_docs.jl` ratchets, so the printer takes it: a line pasted without that key would
 delete the ratchet's floor, and the deletion would read as a correction. An unswept row has no such
 key, and a file that has no row at all is never swept.
@@ -528,7 +528,7 @@ const SWEEP_PLAN_DIR = joinpath(DIR, "_sweep")
 """
 The sweep manifest of ADR 0074: one row per file under the measured roots.
 """
-const MANIFEST_PATH = joinpath(REPO_ROOT, "sweep", "manifest.toml")
+const MANIFEST_PATH = joinpath(REPO_ROOT, "code_health", "sweep_manifest.toml")
 
 """
 The coverage baseline of ADR 0082, which both sweep jobs read for a file's coverage row.

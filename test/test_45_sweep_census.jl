@@ -81,7 +81,7 @@ end
     =#
 
     root = normpath(joinpath(@__DIR__, ".."))
-    manifest_path = joinpath(root, "sweep", "manifest.toml")
+    manifest_path = joinpath(root, "code_health", "sweep_manifest.toml")
 
     manifest = TOML.parsefile(manifest_path)
     rows = manifest["file"]
@@ -135,7 +135,7 @@ end
     missing_rows = sort(collect(setdiff(expected, keys(rows))))
     @test isempty(missing_rows)
     if !isempty(missing_rows)
-        println("Files under `src/` or `ext/` with no row in `sweep/manifest.toml`. Join ",
+        println("Files under `src/` or `ext/` with no row in `code_health/sweep_manifest.toml`. Join ",
                 "each one to a child map of #404, reopen that map if it is closed, then ",
                 "add its row:")
         for f in missing_rows
@@ -160,7 +160,7 @@ end
     dead_rows = sort(collect(setdiff(keys(rows), expected)))
     @test isempty(dead_rows)
     if !isempty(dead_rows)
-        println("Rows in `sweep/manifest.toml` that name no tracked file. A deletion drops ",
+        println("Rows in `code_health/sweep_manifest.toml` that name no tracked file. A deletion drops ",
                 "the row. A rename moves it, and the file keeps its `swept` flag:")
         for f in dead_rows
             println("  ", f)
@@ -178,7 +178,7 @@ end
 
     @test isempty(drifted)
     if !isempty(drifted)
-        println("Files whose documented-unit count no longer matches `sweep/manifest.toml`.",
+        println("Files whose documented-unit count no longer matches `code_health/sweep_manifest.toml`.",
                 " Join the addition to the file's child map of #404, reopen that map if it ",
                 "is closed, then record the new count:")
         for (f, was, now) in drifted

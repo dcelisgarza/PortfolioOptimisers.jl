@@ -101,7 +101,7 @@ runs no steps and registers no row.
     at its allowance after the three fixes above, so the check carries no allow-list and a new
     breach is the only way it can red.
  2. **A swept file, presence.** A dispatch alias in a file marked `swept = true` in
-    `sweep/manifest.toml` carries `# Related`.
+    `code_health/sweep_manifest.toml` carries `# Related`.
  3. **Library-wide, a ratchet.** The count of dispatch aliases carrying no `# Related` may not
     rise. It stands at 22 and the check retires at zero.
 

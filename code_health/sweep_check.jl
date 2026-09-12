@@ -233,7 +233,7 @@ function check_file(path, rows, map_names, coverage, entry, tracker, exempted, s
         end
         push!(fs,
               Finding(:fail,
-                      "no row in `sweep/manifest.toml`. Paste this one, and pick `map`:",
+                      "no row in `code_health/sweep_manifest.toml`. Paste this one, and pick `map`:",
                       detail))
         # Everything below reads the row, so there is nothing more to say about this file until it
         # has one. Saying it anyway would bury the one thing the reader must do first.
@@ -483,7 +483,7 @@ function main(args)
     elseif !(isempty(gone))
         scope = filter(f -> !(f in gone), scope)
         println("Deleted, so not measured: ", join(gone, ", "), ".")
-        println("A deleted file owes its row removed from `sweep/manifest.toml` and from the complexity, coverage, expansion, JET and size baselines.\n")
+        println("A deleted file owes its row removed from `code_health/sweep_manifest.toml` and from the complexity, coverage, expansion, JET and size baselines.\n")
     end
 
     println("The sweep conformance check. ", length(scope), " file(s) in scope, against ",
@@ -510,7 +510,7 @@ function main(args)
         return 0
     end
     println(failures, " duty(ies) unmet. The four steps, from `CLAUDE.md`:\n")
-    println("  1. Add or correct the file's row in `sweep/manifest.toml`, `swept = false`.")
+    println("  1. Add or correct the file's row in `code_health/sweep_manifest.toml`, `swept = false`.")
     println("  2. Cover every line of a new file, or give it a Coverage Exemption (ADR 0082).")
     println("  3. Reopen the child map that owns the file, and reopen #", UMBRELLA, ".")
     println("  4. Open one sub-issue of that child map for the addition.")
