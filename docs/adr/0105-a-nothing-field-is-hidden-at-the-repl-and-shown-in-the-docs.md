@@ -42,10 +42,19 @@ moves.
 | The type's own choice | a `show_fields(obj::T)` overload | the global switch |
 | The global switch | `SHOW_NOTHING_FIELDS[].default` | nothing |
 
-`show_fields(obj)` returns every declared field by default. A type that always hides a field,
-whatever the field holds, overloads it and returns the others. The overload holds under the
-global `true` of the docs, so the `cache` field of #700 and #701 stays out of every rendered
-docstring, which is the whole point.
+`show_fields(obj)` returns every declared field by default. A type that hides a field overloads
+it and returns the others. The overload receives the instance, so it hides in one of two ways,
+and both hold under the global `true` of the docs:
+
+- **Whatever the field holds.** The `cache` field of #700 and #701 is running detail, not
+  configuration, so it stays out of every rendered docstring, which is the whole point.
+- **By what the field holds.** A later opt-in field — the `cvg` of a Coverage Policy on the
+  moment estimators, the `max_scenarios` of `EmpiricalPrior` — is hidden while it is `nothing`
+  and rendered once the caller sets it. An opt-in the caller has not taken is not part of the
+  configuration they chose, so an estimator whose `cvg` is `nothing` renders exactly as it did
+  before the field existed. This is what lets a field join a type without moving the rendered
+  docstring of every site that shows it, and it is the reason the overload takes the instance
+  rather than the type.
 
 A per-name `true` entry renders every declared field of that type, and so overrides the
 overload. A per-name `false` entry hides the `nothing` fields of that type, whatever the global
@@ -79,8 +88,11 @@ closed at load, as every other preference value does.
 - Two expectations in `test/test_48_base_contracts.jl` moved: the `n ┴ nothing` line of the probe
   is hidden under the shipped default, and the `┴` marker moved to `dt`. Every other test file
   compares no rendered `nothing` line.
-- A field that a type never wants shown goes through a `show_fields` overload, not through the
-  configuration. Issues #700 and #701 use it for `cache`.
+- A field that a type never wants shown, or wants shown only when it is set, goes through a
+  `show_fields` overload, not through the configuration. Issues #700 and #701 use it for
+  `cache`, and #977 uses it for the `cvg` of a Coverage Policy.
+- A rendered docstring therefore shows every field the caller can have set, and not every field
+  the type declares. The per-name `true` entry is the way to see the latter.
 - `apply_preferences!` hands the two new keys to `apply_show_preferences!`, so its own branch
   count does not rise.
 
@@ -93,5 +105,7 @@ closed at load, as every other preference value does.
   think of.
 - **Key the per-name entry on a `Type`.** Refused. TOML carries no types, so the preference
   channel could not carry the entry.
-- **Hide a `nothing` field in the docs too.** Refused. A rendered docstring is the reference, and
-  a reader who looks up a type must see every field it has.
+- **Hide a `nothing` field in the docs too.** Refused for the global switch. A rendered docstring
+  is the reference, and a reader who looks up a type must see every field the configuration they
+  chose can carry. The per-type overload hides an opt-in that was not taken, which is the one
+  case where a `nothing` says nothing about the configuration.

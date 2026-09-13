@@ -2084,10 +2084,19 @@ state that is normalised by a running variance carries that variance with it.
 Fold the second block into the first with [`partial_fit!`](@ref) instead. A sequential fit is
 exact, and it is the route this family gives.
 
+# Algorithm
+
+ 1. Refuse the pair with [`assert_mergeable_states`](@ref), which names a type mismatch and an asset-count mismatch first, as the [`AbstractPartialFitState`](@ref) interface asks of every family.
+ 2. Throw an `ArgumentError` naming the reason this family does not merge.
+
 # Arguments
 
   - `a`: The first state.
   - `b`: The second state.
+
+# Validation
+
+  - `a` and `b` pass [`assert_mergeable_states`](@ref).
 
 # Returns
 
@@ -2097,9 +2106,11 @@ exact, and it is the route this family gives.
 
   - [`RegimeAdjustedCovarianceState`](@ref)
   - [`merge_states`](@ref)
+  - [`assert_mergeable_states`](@ref)
   - [`partial_fit!(ce::RegimeAdjustedExpWeightedCovariance, X::MatNum; dims::Int = 1, estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)`](@ref)
 """
 function merge_states(a::RegimeAdjustedCovarianceState, b::RegimeAdjustedCovarianceState)
+    assert_mergeable_states(a, b)
     return throw(ArgumentError("a `RegimeAdjustedCovarianceState` pair does not merge, because a block fitted from a cold start is not what the same block contributes after another one. The regime statistic scores each observation against the state that stands before it, and it is gated by the running observation count. Fold the second block into the first with `partial_fit!` instead."))
 end
 """

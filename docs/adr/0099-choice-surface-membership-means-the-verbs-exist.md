@@ -106,8 +106,10 @@ censuses drifting apart.
   `VERB_EXEMPT` is empty; a future leaf that cannot yet answer is named there once, with a
   reason and an issue, rather than left to crash.
 - The hand-written skip in `test_08d_dims_guard.jl` is deleted. That file now names no leaf,
-  and it takes its pairings from the predicate. Its census count is unchanged at 41 pairings,
-  because the predicate admits exactly the leaves the skip admitted.
+  and it takes its pairings from the predicate. Its census count was unchanged at 41 pairings
+  on the day the skip was deleted, because the predicate admits exactly the leaves the skip
+  admitted; the predicate has since admitted the two regime-adjusted leaves (#637) and the three
+  plain exponentially weighted ones (#854), and the count at the head is 50.
 - A new leaf that declares no verb reds the build on the day it lands, rather than on the day a
   caller runs it.
 - A leaf that takes the Correlation Rescale without a `ve` field reds the build, rather than

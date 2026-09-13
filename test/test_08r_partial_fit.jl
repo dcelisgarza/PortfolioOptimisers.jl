@@ -173,6 +173,12 @@ state its estimator no longer matches.
         @test_throws ArgumentError partial_fit!(Covariance(;
                                                            ce = PortfolioOptimisersCovariance()),
                                                 X[1, :])
+        # The value form on a type with no `cache` field: an estimator with no fold of its
+        # own, and a host that folds through the states of its members. The generic method
+        # can copy neither, so it refuses by name rather than reaching a `FieldError`, and it
+        # does not forward to `partial_fit!`, which would fold the kept host's states in place.
+        @test_throws ArgumentError partial_fit(MedianExpectedReturns(), X)
+        @test_throws ArgumentError partial_fit(HighOrderPriorEstimator(), X)
         # The one-argument read-out reached before the first fold.
         @test_throws ArgumentError mean(SimpleExpectedReturns())
         @test_throws ArgumentError var(SimpleVariance())

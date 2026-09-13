@@ -189,6 +189,10 @@ end
 
         # The two blocks do not add, and the refusal says so.
         @test_throws ArgumentError PO.merge_states(original, copy(original))
+        # The generic refusals run first, as they do for the variance twin: a pair over
+        # different numbers of assets is a `DimensionMismatch`, not this family's refusal.
+        narrow = partial_fit!(RegimeAdjustedExpWeightedCovariance(; kwargs...), X[:, 1:2])
+        @test_throws DimensionMismatch PO.merge_states(original, narrow.cache)
     end
 
     # An estimator that was given no observation carries no state, so the read is refused.
