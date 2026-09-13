@@ -108,7 +108,7 @@ include(joinpath(@__DIR__, "test12_setup.jl"))
           var_view_ceiling(rd.X[:, 1], var_tgt)
     @test isapprox(pr.w,
                    prior(EntropyPoolingPrior(; sets = sets, opt = jopt,
-                                             var_views = ValueatRiskView(;
+                                             var_views = ValueatRiskView(; alpha = 0.075,
                                                                          views = var_views)),
                          rd).w, rtol = 1e-6)
 
