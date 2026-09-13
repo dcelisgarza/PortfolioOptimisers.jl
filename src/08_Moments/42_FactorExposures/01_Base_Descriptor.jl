@@ -79,8 +79,8 @@ This is the one route from a Panel Field's name to its values, and every Descrip
 
 # Algorithm
 
- 1. Look the Panel Field up by name through [`panel_field`](@ref), and copy its values into a floating point matrix.
- 2. When the Panel Field carries an observed-mask column, write `NaN` into every cell whose mask entry is zero.
+ 1. Look the Panel Field up by name through [`panel_field`](@ref), and copy its values into a matrix whose element type is the one a division of the field's values lands in, which is the type that carries a `NaN`: an integer field reads in `Float64`, a `Float32` field in `Float32`.
+ 2. When the Panel Field carries an observed mask, write `NaN` into every cell whose mask entry is `false`.
  3. For a vector of `name => coefficient` pairs, read each named field the same way, and return the sum of the fields, each multiplied by its coefficient. A `NaN` in any term is a `NaN` in the sum.
 
 # Arguments
@@ -137,7 +137,7 @@ function panel_field_values(rd::ReturnsResult, name::AbstractString)::Matrix{<:R
               ArgumentError("a Descriptor reads one number per observation and asset, so the Panel Field \"$name\" must be a NumericPanelField, got a $(nameof(typeof(f)))"))
     @argcheck(ndims(f.vals) == 2,
               DimensionMismatch("a Descriptor reads one number per observation and asset, so the Panel Field \"$name\" must be time-varying; this Asset Panel is static"))
-    Tf = eltype(f.vals)
+    Tf = typeof(one(eltype(f.vals)) / one(eltype(f.vals)))
     V = Matrix{Tf}(f.vals)
     omsk = f.omsk
     if !isnothing(omsk)

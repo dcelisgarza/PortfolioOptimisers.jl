@@ -60,8 +60,8 @@
 "src/01_Base/15_Online.jl" = { map = 1, units = 43, swept = false }
 "src/01_Base/16_CoveragePolicy.jl" = { map = 1, units = 24, swept = false }
 "src/02_Tools.jl" = { map = 1, units = 69, algorithm = 49, swept = true }
-"src/03_InputData/01_AssetPanel.jl" = { map = 2, units = 33, swept = false }
-"src/03_InputData/02_AssetPanelBuilder.jl" = { map = 2, units = 22, swept = false }
+"src/03_InputData/01_AssetPanel.jl" = { map = 2, units = 34, swept = false }
+"src/03_InputData/02_AssetPanelBuilder.jl" = { map = 2, units = 23, swept = false }
 "src/03_InputData/03_ListingSpan.jl" = { map = 2, units = 4, swept = false }
 "src/03_InputData/04_Preprocessing.jl" = { map = 2, units = 9, algorithm = 1, swept = false }
 "src/03_InputData/05_CarrierViews.jl" = { map = 2, units = 4, algorithm = 4, swept = false }
@@ -73,7 +73,7 @@
 "src/03_InputData/11_PricesToReturns.jl" = { map = 2, units = 9, algorithm = 5, swept = false }
 "src/03_InputData/12_TrainTestSplit.jl" = { map = 2, units = 7, algorithm = 5, swept = false }
 "src/03_InputData/13_AssetSelection.jl" = { map = 2, units = 6, algorithm = 3, swept = false }
-"src/03_InputData/14_CrossSectionalTransforms.jl" = { map = 2, units = 29, swept = false }
+"src/03_InputData/14_CrossSectionalTransforms.jl" = { map = 2, units = 30, swept = false }
 "src/03_InputData/15_FeatureSelector.jl" = { map = 2, units = 13, swept = false }
 "src/03_InputData/16_PanelDataFrame.jl" = { map = 2, units = 8, swept = false }
 "src/03_InputData/17_ReturnsBufferState.jl" = { map = 2, units = 17, swept = false }

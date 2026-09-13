@@ -1430,14 +1430,24 @@ end
     cross_sectional_groups(B::AbstractArray{<:Real, 3}) -> Matrix{Int}
     cross_sectional_groups(pnl::AssetPanel, name::AbstractString) -> Matrix{Int}
 
-Derive the group labels of a cross-sectional transform from a one-hot block of a Panel Field.
+Derive the group labels of a cross-sectional transform from a one-hot block, or from a categorical Panel Field of an Asset Panel.
 
-A categorical Panel Field claims one column of the feature axis per level, and an asset carries a one in the column of the level it belongs to. This turns that block into the `observations × assets` label matrix [`cross_sectional_transform`](@ref) takes, and it labels an asset whose row sets no level with [`CS_MISSING_GROUP`](@ref).
+Both forms return the `observations × assets` label matrix [`cross_sectional_transform`](@ref) takes, where a label is the position of a level in the level order and [`CS_MISSING_GROUP`](@ref) marks an asset with no level.
+
+In the one-hot form, an asset carries a one in the column of the level it belongs to, and an asset whose row sets no level has no group. In the panel form, the codes of a [`CategoricalPanelField`](@ref) are the labels, and a cell its fill policy wrote (`omsk` is `false`) has no group: the fill resolved a blank so that the carrier holds no blank, and a fill value is not a membership, so the read undoes it, as [`OneHotExposure`](@ref) and [`panel_field_values`](@ref) do for the same cell.
 
 # Algorithm
 
+One-hot form:
+
  1. Label every asset [`CS_MISSING_GROUP`](@ref).
  2. Walk the levels of each asset, and label the asset with the first level it sets.
+
+Panel form:
+
+ 1. Look the Panel Field up with [`panel_field`](@ref), and check its kind and its shape.
+ 2. Copy its codes.
+ 3. Write [`CS_MISSING_GROUP`](@ref) into every cell whose observed mask is `false`, when the field carries one.
 
 # Arguments
 
@@ -1448,10 +1458,11 @@ A categorical Panel Field claims one column of the feature axis per level, and a
 # Validation
 
   - The named Panel Field is a [`CategoricalPanelField`](@ref). Raises an `ArgumentError`.
+  - The named Panel Field is time-varying. Raises a `DimensionMismatch`.
 
 # Returns
 
-  - `groups::Matrix{Int}`: Group label matrix `observations × assets`. A label is the position of the level in the Panel Field's own level order, and [`CS_MISSING_GROUP`](@ref) marks an asset that sets none.
+  - `groups::Matrix{Int}`: Group label matrix `observations × assets`. A label is the position of the level in the Panel Field's own level order, and [`CS_MISSING_GROUP`](@ref) marks an asset that sets none, or whose level was written by a fill policy.
 
 # Examples
 
@@ -1479,6 +1490,8 @@ julia> cross_sectional_groups(B)
   - [`AssetPanel`](@ref)
   - [`CategoricalPanelField`](@ref)
   - [`panel_field`](@ref)
+  - [`OneHotExposure`](@ref)
+  - [`panel_field_values`](@ref)
 """
 function cross_sectional_groups(B::AbstractArray{<:Real, 3})::Matrix{Int}
     G = fill(CS_MISSING_GROUP, size(B, 1), size(B, 2))
@@ -1498,7 +1511,44 @@ function cross_sectional_groups(pnl::AssetPanel, name::AbstractString)::Matrix{I
               ArgumentError("a group label is the code of a categorical Panel Field, so \"$name\" must be a CategoricalPanelField, got a $(nameof(typeof(f)))"))
     @argcheck(ndims(f.codes) == 2,
               DimensionMismatch("a group label is read per observation and asset, so the Panel Field \"$name\" must be time-varying; this Asset Panel is static"))
-    return Matrix{Int}(f.codes)
+    G = Matrix{Int}(f.codes)
+    cross_sectional_groups_observed!(G, f.omsk)
+    return G
+end
+"""
+    cross_sectional_groups_observed!(G::AbstractMatrix{Int}, omsk::Nothing) -> nothing
+    cross_sectional_groups_observed!(G::AbstractMatrix{Int}, omsk::AbstractMatrix{Bool}) -> nothing
+
+Write [`CS_MISSING_GROUP`](@ref) into every group label whose cell a fill policy wrote, in place.
+
+A categorical Panel Field with no observed mask carried no blank, so there is nothing to undo and the method over `nothing` returns at once.
+
+# Arguments
+
+  - `G`: Group label matrix `observations × assets`, the copied codes of the Panel Field.
+  - `omsk`: The Panel Field's observed mask, or `nothing`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`cross_sectional_groups`](@ref)
+  - [`CS_MISSING_GROUP`](@ref)
+  - [`CategoricalPanelField`](@ref)
+"""
+function cross_sectional_groups_observed!(::AbstractMatrix{Int}, ::Nothing)::Nothing
+    return nothing
+end
+function cross_sectional_groups_observed!(G::AbstractMatrix{Int},
+                                          omsk::AbstractMatrix{Bool})::Nothing
+    for k in CartesianIndices(G)
+        if !omsk[k]
+            G[k] = CS_MISSING_GROUP
+        end
+    end
+    return nothing
 end
 
 export CrossSectionalWinsoriser, CrossSectionalTanhShrinker, CrossSectionalStandardiser,

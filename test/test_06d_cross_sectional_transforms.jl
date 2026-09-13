@@ -574,6 +574,20 @@ end
     @test cross_sectional_groups(pnl, "sector") == [1 2 1; 2 1 1]
     @test_throws ArgumentError cross_sectional_groups(pnl, "size")
     @test_throws KeyError cross_sectional_groups(pnl, "country")
+    # A cell a fill policy wrote is not a membership: it reads as CS_MISSING_GROUP, which is
+    # what OneHotExposure and panel_field_values answer for the same cell.
+    filled = asset_panel([CategoricalPanelInput(; name = "sector",
+                                                vals = ["a" "b" missing; missing "a" "a"],
+                                                alg = ForwardPanelFill(; val = "b"))];
+                         amsk = trues(2, 3), emsk = trues(2, 3))
+    @test cross_sectional_groups(filled, "sector") ==
+          [1 2 PortfolioOptimisers.CS_MISSING_GROUP;
+           PortfolioOptimisers.CS_MISSING_GROUP 1 1]
+    # A field that admits no blank carries no mask, and its codes are the labels whole.
+    whole = asset_panel([CategoricalPanelInput(; name = "sector",
+                                               vals = ["a" "b" "b"; "b" "a" "a"])];
+                        amsk = trues(2, 3), emsk = trues(2, 3))
+    @test cross_sectional_groups(whole, "sector") == [1 2 2; 2 1 1]
     # The verb reads one label per observation and asset, so a static panel has none.
     stat = AssetPanel(;
                       pf = [CategoricalPanelField(; name = "sector", levels = ["a", "b"],

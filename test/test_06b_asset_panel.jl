@@ -236,6 +236,23 @@ end
     @test PortfolioOptimisers.panel_feature_names(sqv) == ["prox=B", "prox=C"]
     @test PortfolioOptimisers.panel_field(sqv, "prox").vals == Zt[1:2, 2:3, 2:3]
 
+    # The groups belong to the labels, so the square case cuts them by the same index (#807
+    # decision 1, ADR 0102), and a field without groups keeps its `nothing`.
+    @test isnothing(PortfolioOptimisers.panel_field(sqv, "prox").groups)
+    sqg = asset_panel([TensorPanelInput(; name = "prox", axis = "asset", labels = nx,
+                                        groups = ["g1", "g2", "g2"], vals = Zt)])
+    sqgv = PortfolioOptimisers.port_opt_view(sqg, 1:2, [3, 1], nx)
+    @test PortfolioOptimisers.panel_field(sqgv, "prox").labels == ["C", "A"]
+    @test PortfolioOptimisers.panel_field(sqgv, "prox").groups == ["g2", "g1"]
+    @test PortfolioOptimisers.panel_field(sqgv, "prox").vals == Zt[1:2, [3, 1], [3, 1]]
+    # Outside the square case the groups travel whole with the labels.
+    rectg = asset_panel([TensorPanelInput(; name = "beta", axis = "factor",
+                                          labels = ["f1", "f2", "f3"],
+                                          groups = ["s", "s", "m"], vals = Zt)])
+    @test PortfolioOptimisers.panel_field(PortfolioOptimisers.port_opt_view(rectg, 1:2, 2:3,
+                                                                            nx), "beta").groups ==
+          ["s", "s", "m"]
+
     # A label vector that is not the asset names leaves the label axis whole.
     rect = asset_panel([TensorPanelInput(; name = "beta", axis = "factor",
                                          labels = ["f1", "f2", "f3"], vals = Zt)])
@@ -258,8 +275,34 @@ end
 @testset "Fill policies" begin
     @test PortfolioOptimisers.is_panel_blank(missing)
     @test PortfolioOptimisers.is_panel_blank(NaN)
+    @test PortfolioOptimisers.is_panel_blank(nothing)
     @test !PortfolioOptimisers.is_panel_blank(1.0)
     @test !PortfolioOptimisers.is_panel_blank("a")
+    # A source with an explicit null writes `nothing`, and the build resolves it like a
+    # `missing`; the field's type is read off the cells it keeps.
+    pnull = asset_panel([NumericPanelInput(; name = "a",
+                                           vals = Union{Nothing, Float64}[1.0, nothing],
+                                           alg = ConstantPanelFill(; val = -1.0)),
+                         CategoricalPanelInput(; name = "s", vals = Any["x", nothing],
+                                               alg = ConstantPanelFill(; val = "x"))])
+    @test PortfolioOptimisers.panel_field(pnull, "a").vals == [1.0, -1.0]
+    @test eltype(PortfolioOptimisers.panel_field(pnull, "a").vals) === Float64
+    @test PortfolioOptimisers.panel_field(pnull, "a").omsk == [true, false]
+    @test PortfolioOptimisers.panel_field(pnull, "s").codes == [1, 1]
+    @test PortfolioOptimisers.panel_field(pnull, "s").omsk == [true, false]
+    @test_throws ArgumentError asset_panel([NumericPanelInput(; name = "a",
+                                                              vals = Any[1.0, nothing])])
+    # A categorical input is filled with a label, so a policy whose val is the numeric
+    # default is refused at construction rather than minting a level named "0.0".
+    @test_throws ArgumentError CategoricalPanelInput(; name = "s", vals = ["a", missing],
+                                                     alg = ForwardPanelFill())
+    @test_throws ArgumentError CategoricalPanelInput(; name = "s", vals = ["a", missing],
+                                                     alg = ConstantPanelFill())
+    @test_throws ArgumentError CategoricalPanelInput(; name = "s", vals = ["a", missing],
+                                                     alg = BackwardPanelFill(; val = 1))
+    @test isa(CategoricalPanelInput(; name = "s", vals = ["a", missing],
+                                    alg = ForwardPanelFill(; val = "a")),
+              CategoricalPanelInput)
 
     @test ConstantPanelFill().val == 0.0
     @test ForwardPanelFill().lim === nothing
@@ -618,4 +661,54 @@ end
     @test onehot == [1 0; 0 1; 1 0]
     @test eltype(PortfolioOptimisers.panel_onehot(PortfolioOptimisers.panel_field(p32, "s");
                                                   datatype = Float32)) === Float32
+
+    # A directional fill keeps the column's own type where it writes nothing, and widens
+    # to the fill value's type only where it wrote it.
+    pfwd = asset_panel([NumericPanelInput(; name = "a", vals = Float32[1 2; 3 4],
+                                          alg = ForwardPanelFill()),
+                        NumericPanelInput(; name = "b", vals = [1 2; 3 4],
+                                          alg = BackwardPanelFill())]; amsk = trues(2, 2))
+    @test eltype(PortfolioOptimisers.panel_field(pfwd, "a").vals) === Float32
+    @test eltype(PortfolioOptimisers.panel_field(pfwd, "b").vals) === Int
+    pgap = asset_panel([NumericPanelInput(; name = "a",
+                                          vals = Union{Missing, Float32}[1 missing; 3 4],
+                                          alg = ForwardPanelFill(; val = 0.0f0)),
+                        NumericPanelInput(; name = "b",
+                                          vals = Union{Missing, Float32}[1 missing; 3 4],
+                                          alg = ForwardPanelFill())]; amsk = trues(2, 2))
+    @test eltype(PortfolioOptimisers.panel_field(pgap, "a").vals) === Float32
+    @test eltype(PortfolioOptimisers.panel_field(pgap, "b").vals) === Float64
+end
+
+@testset "An estimation mask that is not given is the active mask" begin
+    # An all-true default would break the subset rule at the first inactive cell, so a
+    # build that states the active mask alone gets that mask as its estimation mask.
+    amsk = [true true; true false; true true]
+    pnl = asset_panel([NumericPanelInput(; name = "m", vals = ones(3, 2))]; amsk = amsk)
+    @test pnl.amsk == amsk
+    @test pnl.emsk == amsk
+    # The estimation mask alone widens the active mask to all-true, which contains it.
+    emsk = [true false; true false; false true]
+    pe = asset_panel([NumericPanelInput(; name = "m", vals = ones(3, 2))]; emsk = emsk)
+    @test pe.amsk == trues(3, 2)
+    @test pe.emsk == emsk
+    # Both given, both kept, and the subset rule still holds them apart.
+    pb = asset_panel([NumericPanelInput(; name = "m", vals = ones(3, 2))]; amsk = amsk,
+                     emsk = emsk .& amsk)
+    @test pb.emsk == emsk .& amsk
+    @test_throws ArgumentError asset_panel([NumericPanelInput(; name = "m",
+                                                              vals = ones(3, 2))];
+                                           amsk = amsk, emsk = trues(3, 2))
+end
+
+@testset "The lazy lift checks its bounds on every axis" begin
+    R = PortfolioOptimisers.RepeatedLeading([1.0, 2.0], 3)
+    @test size(R) == (3, 2)
+    @test R[3, 2] == 2.0
+    @test_throws BoundsError R[4, 1]
+    @test_throws BoundsError R[0, 1]
+    @test_throws BoundsError R[1, 3]
+    M = PortfolioOptimisers.RepeatedLeading([1 2; 3 4], 2)
+    @test M[2, 2, 1] == 3
+    @test_throws BoundsError M[3, 1, 1]
 end

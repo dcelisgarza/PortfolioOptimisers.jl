@@ -50,8 +50,8 @@
     end
     @test !isempty(files)
 
-    # A coercion of a type or a value into a float.
-    COERCE = r"(?<![\w.])float\("
+    # A coercion of a type or a value into a float, spelled as a call or as a broadcast.
+    COERCE = r"(?<![\w.])float\.?\("
     # An index rounded in one type and converted in another, which `ceil(Int, x)` and its
     # siblings do in one step and in one type.
     ROUND_THEN_CONVERT = r"\b(?:Int|Int8|Int16|Int32|Int64|Int128|UInt|UInt8|UInt16|UInt32|UInt64|UInt128)\(\s*(?:ceil|floor|round|trunc)\("

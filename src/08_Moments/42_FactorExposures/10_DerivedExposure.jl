@@ -116,6 +116,7 @@ Compute the Factor Exposure derived from the Factor Exposure of another factor.
  1. Read the benchmark weights and the group labels off the carrier.
  2. Apply `f` to the source exposure, and check that it kept the shape.
  3. Apply the outlier slot and then the scoring slot.
+ 4. Write `NaN` into every cell where the active mask is `false`, with [`exposure_active_fill!`](@ref), so the verb's convention holds whatever `f` returned there.
 
 # Arguments
 
@@ -170,7 +171,9 @@ function factor_exposure(xe::DerivedExposure, rd::ReturnsResult, xs::MatNum)::Ma
               DimensionMismatch("f maps one Factor Exposure to another, so it must return a matrix of the size it was given, got $(size(D0)) from size(xs) = $(size(xs))"))
     Tf = promote_type(eltype(D0), eltype(xs))
     D = exposure_transform(xe.outlier, convert(Matrix{Tf}, D0), w, groups)
-    return exposure_transform(xe.scoring, D, w, groups)
+    D = exposure_transform(xe.scoring, D, w, groups)
+    exposure_active_fill!(D, rd.pnl)
+    return D
 end
 
 export DerivedExposure

@@ -497,6 +497,7 @@ function Base.size(R::RepeatedLeading)
 end
 Base.@propagate_inbounds function Base.getindex(R::RepeatedLeading, i::Integer,
                                                 j::Integer...)
+    @boundscheck checkbounds(R, i, j...)
     return R.parent[j...]
 end
 function Base.IndexStyle(::Type{<:RepeatedLeading})
@@ -1014,7 +1015,7 @@ Return a view of one Panel Field over the observations `i` and the assets `j`.
 
 A static Panel Field has no observation axis, so its caller passes a `Colon` for `i`.
 
-**The square case is derived here, by name.** A tensor Panel Field whose labels are the carrier's asset names ([`features_are_assets`](@ref)) is sliced on its label axis by the same asset index, together with its labels; its groups are dropped, because a group of the full factor axis says nothing about a cut asset axis. Every other field's trailing axis addresses features, and an asset view does not reach it.
+**The square case is derived here, by name.** A tensor Panel Field whose labels are the carrier's asset names ([`features_are_assets`](@ref)) is sliced on its label axis by the same asset index, together with its labels and its groups: a group belongs to one label, so the labels that survive keep theirs. Every other field's trailing axis addresses features, and an asset view does not reach it.
 
 # Algorithm
 
@@ -1052,9 +1053,39 @@ function panel_field_view(f::TensorPanelField, i, j, nx::Option{<:VecStr})
     k = sq ? j : Colon()
     return TensorPanelField(; name = f.name, axis = f.axis,
                             labels = sq ? f.labels[j] : f.labels,
-                            groups = sq || isnothing(f.groups) ? nothing : f.groups,
+                            groups = panel_groups_view(f.groups, j, sq),
                             vals = panel_tensor_view(f.vals, i, j, k),
                             omsk = panel_tensor_view(f.omsk, i, j, k))
+end
+"""
+    panel_groups_view(::Nothing, j, sq::Bool) -> nothing
+    panel_groups_view(groups::VecStr, j, sq::Bool) -> VecStr
+
+Return the groups of a tensor Panel Field under an asset view.
+
+A group belongs to one label, so in the square case the groups are cut by the same asset index as the labels, and otherwise they are returned whole. A field with no groups answers `nothing`.
+
+# Arguments
+
+  - `groups`: The groups of the tensor Panel Field, or `nothing`.
+  - `j`: Asset index.
+  - `sq`: Whether the field is in the square case, from [`features_are_assets`](@ref).
+
+# Returns
+
+  - The groups of the viewed field, or `nothing`.
+
+# Related
+
+  - [`panel_field_view`](@ref)
+  - [`features_are_assets`](@ref)
+  - [`TensorPanelField`](@ref)
+"""
+function panel_groups_view(::Nothing, ::Any, ::Bool)
+    return nothing
+end
+function panel_groups_view(groups::VecStr, j, sq::Bool)
+    return sq ? groups[j] : groups
 end
 """
     features_are_assets(f::TensorPanelField, nx::Option{<:VecStr}) -> Bool

@@ -290,7 +290,7 @@ A side takes four forms, and the method Julia selects is the reading:
   - [`panel_field_values`](@ref)
 """
 function ew_ratio_values(rd::ReturnsResult, ::Nothing)::Matrix{<:Real}
-    return abs.(float.(rd.X))
+    return abs.(rd.X)
 end
 function ew_ratio_values(rd::ReturnsResult, x::AbstractString)::Matrix{<:Real}
     return panel_field_values(rd, x)

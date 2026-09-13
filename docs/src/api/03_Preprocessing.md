@@ -289,6 +289,7 @@ PortfolioOptimisers.panel_field_observed_labels
 PortfolioOptimisers.panel_field_stack!
 PortfolioOptimisers.panel_field_stack_observed!
 PortfolioOptimisers.panel_field_view
+PortfolioOptimisers.panel_groups_view
 PortfolioOptimisers.panel_field_keys
 PortfolioOptimisers.panel_value_columns!
 PortfolioOptimisers.panel_key_column!
@@ -319,6 +320,7 @@ PortfolioOptimisers.assert_feature_selector
 PortfolioOptimisers.assert_selector_entry
 PortfolioOptimisers.assert_panel_fill
 PortfolioOptimisers.assert_panel_input
+PortfolioOptimisers.assert_categorical_fill
 PortfolioOptimisers.assert_panel_input_fill
 PortfolioOptimisers.assert_panel_finite
 ```
@@ -355,6 +357,7 @@ PortfolioOptimisers.CS_MAD_CONSISTENCY
 PortfolioOptimisers.assert_cross_sectional_matrix
 PortfolioOptimisers.assert_cross_sectional_weights
 PortfolioOptimisers.assert_cross_sectional_groups
+PortfolioOptimisers.cross_sectional_groups_observed!
 PortfolioOptimisers.cross_sectional_estimation_mask
 PortfolioOptimisers.cross_sectional_indices
 PortfolioOptimisers.cross_sectional_weight_type

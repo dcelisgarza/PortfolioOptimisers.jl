@@ -71,8 +71,10 @@ are all gone.
 
 ### The Asset Panel is a vector of fields and two masks
 
-`AssetPanel(pf, amsk, emsk)`. `pf` is a non-empty vector of fields with unique names, all of one
-shape class and one size. `amsk` is the active mask, `emsk` the estimation mask, each
+`AssetPanel(pf, amsk, emsk)`. `pf` is a vector of fields with unique names, all of one shape
+class and one size. It may be empty when both masks are given: a panel of masks alone states a
+universe with no Panel Field, which is what the ingestion layer emits from a Listing Span
+(ADR 0132, issue #973), and the masks then fix the two axes. `amsk` is the active mask, `emsk` the estimation mask, each
 `observations × assets`. `panel_field(pnl, name)` looks a field up by name and returns it.
 
 A tuple of fields was rejected. The lookup dispatches once per field, which costs nothing that

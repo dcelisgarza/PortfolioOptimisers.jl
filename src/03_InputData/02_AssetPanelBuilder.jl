@@ -286,11 +286,11 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return whether one raw cell of a Panel Field is blank.
 
-A raw Panel Field carries its blanks in whichever of the two conventions its source used, and both mean the same thing here: `missing`, and a floating-point `NaN`.
+A raw Panel Field carries its blanks in whichever of the three conventions its source used, and all three mean the same thing here: `missing`, which a tabular source writes; `nothing`, which a source parsed from a document with an explicit null writes; and a floating-point `NaN`.
 
 # Algorithm
 
- 1. Return `true` when the cell is `missing`.
+ 1. Return `true` when the cell is `missing` or `nothing`.
  2. Return `true` when the cell is a `Number` and `isnan` of it.
  3. Return `false` otherwise.
 
@@ -308,7 +308,7 @@ A raw Panel Field carries its blanks in whichever of the two conventions its sou
   - [`AbstractPanelFillAlgorithm`](@ref)
 """
 function is_panel_blank(x)::Bool
-    return ismissing(x) || (isa(x, Number) && isnan(x))
+    return ismissing(x) || isnothing(x) || (isa(x, Number) && isnan(x))
 end
 """
     panel_fill(alg::NoPanelFill, v::AbstractVector, name::AbstractString) -> Vector
@@ -384,16 +384,17 @@ The one body behind [`ForwardPanelFill`](@ref) and [`BackwardPanelFill`](@ref): 
 
 # Returns
 
-  - `filled::Vector`: The same length as `v`, and free of blanks.
+  - `filled::Vector`: The same length as `v`, and free of blanks. Its element type is the union of the raw column's and `val`'s, so [`panel_value_eltype`](@ref) narrows it by the cells it holds: a column that carried no blank keeps its own type, and `val` widens it only where it was written.
 
 # Related
 
   - [`ForwardPanelFill`](@ref)
   - [`BackwardPanelFill`](@ref)
   - [`panel_fill`](@ref)
+  - [`panel_value_eltype`](@ref)
 """
 function panel_directional_fill(v::AbstractVector, val, lim::Option{<:Integer}, order)
-    out = Vector{typeof(val)}(undef, length(v))
+    out = Vector{Union{eltype(v), typeof(val)}}(undef, length(v))
     carry = nothing
     run = 0
     for i in order
@@ -417,11 +418,23 @@ Supertype of the raw, blank-carrying forms one Panel Field enters [`asset_panel`
 
 All concrete types holding one Panel Field's raw values, its metadata and its fill policy should subtype `AbstractPanelFieldInput`.
 
-An input is **not** a carrier and never becomes one. It holds the blanks, and [`asset_panel`](@ref) resolves them on the way into `Z`; nothing downstream ever sees an unresolved panel. This is why the blank-carrying form is a plain argument to the builder rather than a preprocessing estimator: an estimator fitted inside a fold would need a carrier for the unfilled panel, and the all-finite rule on `Z` gives it none.
+An input is **not** a carrier and never becomes one. It holds the blanks, and [`asset_panel`](@ref) resolves them on the way into the Panel Field it builds; nothing downstream ever sees an unresolved panel. This is why the blank-carrying form is a plain argument to the builder rather than a preprocessing estimator: an estimator fitted inside a fold would need a carrier for the unfilled panel, and the finiteness rule on every Panel Field gives it none.
 
 # Interfaces
 
 In order to implement a new concrete type that works seamlessly with the library, subtype `AbstractPanelFieldInput` and implement the following methods:
+
+## `panel_input_is_static`
+
+  - `panel_input_is_static(inp::AbstractPanelFieldInput) -> Bool`: Whether the raw values carry no observation axis.
+
+### Arguments
+
+  - `inp`: The concrete subtype instance.
+
+### Returns
+
+  - `static::Bool`: `true` when the input is static.
 
 ## `panel_resolve`
 
@@ -434,35 +447,21 @@ In order to implement a new concrete type that works seamlessly with the library
 ### Returns
 
   - `vals::AbstractArray`: The resolved values, in the raw input's own shape.
-  - `obs::AbstractArray{Bool}`: Whether each raw cell was observed. Its trailing axes number `panel_field_observables` of the Panel Field's kind.
+  - `obs::AbstractArray{Bool}`: Whether each raw cell was observed, the same shape as `vals`.
 
-## `panel_input_kind`
+## `panel_input_field`
 
-  - `panel_input_kind(inp::AbstractPanelFieldInput, vals::AbstractArray) -> AbstractPanelFieldKind`: The kind the input builds, read from the resolved values where the input left the metadata to be derived.
+  - `panel_input_field(inp::AbstractPanelFieldInput, vals::AbstractArray, obs::BitArray) -> AbstractPanelField`: Build the Panel Field from the resolved values, with `obs` as its observed mask unless the fill policy is [`NoPanelFill`](@ref), which admits no blank and so records no mask.
 
 ### Arguments
 
   - `inp`: The concrete subtype instance.
   - `vals`: The resolved values, as [`panel_resolve`](@ref) returned them.
+  - `obs`: The observed cells, as [`panel_resolve`](@ref) returned them.
 
 ### Returns
 
-  - `kind::AbstractPanelFieldKind`: The Panel Field's kind.
-
-## `panel_write!`
-
-  - `panel_write!(Z::AbstractArray, kind::AbstractPanelFieldKind, vals::AbstractArray, cols::VecInt) -> nothing`: Write the resolved values into the value columns of `Z`.
-
-### Arguments
-
-  - `Z`: The feature matrix under construction, `observations × assets × features`.
-  - `kind`: The Panel Field's kind.
-  - `vals`: The resolved values.
-  - `cols`: The columns of `Z` the kind claims, in its own column order.
-
-### Returns
-
-  - `nothing`.
+  - `f::AbstractPanelField`: The Panel Field.
 
 # Related
 
@@ -470,8 +469,47 @@ In order to implement a new concrete type that works seamlessly with the library
   - [`CategoricalPanelInput`](@ref)
   - [`TensorPanelInput`](@ref)
   - [`asset_panel`](@ref)
+  - [`panel_input_is_static`](@ref)
+  - [`panel_resolve`](@ref)
+  - [`panel_input_field`](@ref)
+  - [`AbstractPanelField`](@ref)
 """
 abstract type AbstractPanelFieldInput <: AbstractEstimator end
+"""
+    assert_categorical_fill(alg::NoPanelFill, name::AbstractString) -> nothing
+    assert_categorical_fill(alg::AbstractPanelFillAlgorithm, name::AbstractString) -> nothing
+
+Check that the fill policy of a categorical input writes a label.
+
+Every fill policy but [`NoPanelFill`](@ref) carries a `val`, and the three default it to `0.0`, which is the right default for a number and a wrong one for a label: a categorical input that met it would gain a level named `"0.0"`, in silence when its levels are derived. So a categorical input refuses a `val` that is not an `AbstractString`.
+
+# Arguments
+
+  - `alg`: The fill policy.
+  - `name`: The Panel Field's name, displayed in the error message.
+
+# Validation
+
+  - `alg.val isa AbstractString`, for a policy that carries one. Raises an `ArgumentError`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`CategoricalPanelInput`](@ref)
+  - [`AbstractPanelFillAlgorithm`](@ref)
+"""
+function assert_categorical_fill(::NoPanelFill, ::AbstractString)::Nothing
+    return nothing
+end
+function assert_categorical_fill(alg::AbstractPanelFillAlgorithm,
+                                 name::AbstractString)::Nothing
+    @argcheck(isa(alg.val, AbstractString),
+              ArgumentError("the categorical Panel Field \"$name\" is filled with a label, so the val of its $(nameof(typeof(alg))) must be a string, got $(alg.val)::$(typeof(alg.val)). Every fill policy defaults val to 0.0, which is a number; name the level to fill with."))
+    return nothing
+end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -520,7 +558,7 @@ NumericPanelInput
     """
     name
     """
-    Raw values, blanks included: `assets` when static, `observations × assets` when time-varying. A blank is a `missing` or a `NaN`.
+    Raw values, blanks included: `assets` when static, `observations × assets` when time-varying. A blank is a `missing`, a `nothing` or a `NaN`.
     """
     vals
     """
@@ -562,6 +600,7 @@ Keywords correspond to the struct's fields.
   - `!isempty(name)`.
   - `!isempty(vals)`.
   - If `levels` is not `nothing`, it passes [`assert_panel_labels`](@ref).
+  - A fill policy that carries a `val` carries a string. See [`assert_categorical_fill`](@ref).
 
 # Examples
 
@@ -581,6 +620,7 @@ CategoricalPanelInput
   - [`NumericPanelInput`](@ref)
   - [`TensorPanelInput`](@ref)
   - [`asset_panel`](@ref)
+  - [`assert_categorical_fill`](@ref)
   - [`Option`](@ref)
   - [`VecStr`](@ref)
 """
@@ -590,7 +630,7 @@ CategoricalPanelInput
     """
     name
     """
-    Raw labels, blanks included: `assets` when static, `observations × assets` when time-varying. A blank is a `missing`.
+    Raw labels, blanks included: `assets` when static, `observations × assets` when time-varying. A blank is a `missing` or a `nothing`.
     """
     vals
     """
@@ -608,6 +648,7 @@ CategoricalPanelInput
         if !isnothing(levels)
             assert_panel_labels(levels, :levels)
         end
+        assert_categorical_fill(alg, name)
         return new{typeof(name), typeof(vals), typeof(levels), typeof(alg)}(name, vals,
                                                                             levels, alg)
     end
@@ -675,7 +716,7 @@ TensorPanelInput
     """
     name
     """
-    Raw values, blanks included: `assets × labels` when static, `observations × assets × labels` when time-varying. A blank is a `missing` or a `NaN`.
+    Raw values, blanks included: `assets × labels` when static, `observations × assets × labels` when time-varying. A blank is a `missing`, a `nothing` or a `NaN`.
     """
     vals
     """
@@ -1068,13 +1109,13 @@ An input set that is static throughout, with no mask, builds a **static panel**.
  3. Read the observation count the build takes, with [`panel_build_observations`](@ref).
  4. Resolve every input with [`panel_resolve`](@ref), which fills its blanks and records the observed cells, and build its Panel Field with [`panel_input_field`](@ref). Lift a static Panel Field of a time-varying build with [`panel_field_lift`](@ref).
  5. Return the panel with no mask when the build is static.
- 6. Otherwise fill in all-`true` masks for the ones that were not given, and return the panel. The [`AssetPanel`](@ref) constructor checks that every Panel Field shares one shape.
+ 6. Otherwise fill in the masks that were not given, and return the panel. A missing active mask is all-`true`. A missing estimation mask is the active mask, because the estimation mask is a subset of the active mask and the only subset that needs no further information is the whole of it; an all-`true` default would break the subset rule at the first inactive cell. The [`AssetPanel`](@ref) constructor checks that every Panel Field shares one shape.
 
 # Arguments
 
   - `inputs`: The raw Panel Fields, in the order their columns are derived in.
   - `amsk`: The active mask (observations × assets), or `nothing` for all-`true`.
-  - `emsk`: The estimation mask (observations × assets), or `nothing` for all-`true`.
+  - `emsk`: The estimation mask (observations × assets), or `nothing` for the active mask.
 
 # Validation
 
@@ -1131,8 +1172,8 @@ function asset_panel(inputs::AbstractVector{<:AbstractPanelFieldInput};
         return AssetPanel(; pf = pf)
     end
     N = panel_field_axes(pf[1])[end]
-    return AssetPanel(; pf = pf, amsk = isnothing(amsk) ? trues(T, N) : amsk,
-                      emsk = isnothing(emsk) ? trues(T, N) : emsk)
+    amsk = isnothing(amsk) ? trues(T, N) : amsk
+    return AssetPanel(; pf = pf, amsk = amsk, emsk = isnothing(emsk) ? amsk : emsk)
 end
 """
 $(DocStringExtensions.TYPEDEF)

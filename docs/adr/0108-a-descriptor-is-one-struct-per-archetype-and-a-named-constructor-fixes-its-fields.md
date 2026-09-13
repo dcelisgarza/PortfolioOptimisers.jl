@@ -70,15 +70,28 @@ archetypes, where the sign is a field rather than two structs:
 | `RollingLogReturn` | `window`, `skip`, `sign`, `exponentiate` | `RollingMomentum` and `Reversal` |
 | `RollingMax` | `window` | `MaxReturn` |
 
-The exponentially weighted beta family follows in
-[#719](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/719).
+[#719](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/719) added the
+exponentially weighted beta family and the residual volatility, where the reference's four beta
+classes are three archetypes because the residual volatility is a volatility over a residual, and
+the downside variant of the residual is again the `FullMoment` / `SemiMoment` slot:
+
+| Archetype | Fields | Reference classes it covers |
+| --- | --- | --- |
+| `EWBeta` | `mcap`, `decay`, `min_obs`, `agg_obs`, `group`, `min_group_size`, `bounds`, `min_val` | `EWMarketBeta` |
+| `EWMacroSensitivity` | `mcap`, `decay`, `min_obs`, `agg_obs`, `min_val` | `EWMacroSensitivity` |
+| `EWDownsideBeta` | `mcap`, `decay`, `min_obs`, `mar`, `min_val` | `EWDownsideBeta` |
+| `EWResidualVolatility` | `mcap`, `ce`, `beta_decay`, `alg`, `mar`, `min_val` | `EWResidualVolatility` and `EWResidualDownsideVolatility` |
+
+Four of the archetypes above are their own reference class (`DaysToCover`, `EWVolatility`,
+`EWMacroSensitivity`, `EWDownsideBeta`) and carry no named constructor beside the archetype; each
+takes `half_life` as a constructor keyword.
 
 An exponentially weighted archetype states a `decay` and a `min_obs`, as
 `RegimeAdjustedExpWeightedVariance` spells them, and every named constructor takes a `half_life`
-instead and converts it. Two archetypes carry no named constructor of their own, because their
-reference class is the archetype: a named constructor there would be a second keyword method of
-one function, which Julia cannot dispatch. Each takes `half_life` as a keyword that fixes the
-defaults of the fields it converts to.
+instead and converts it. An archetype whose reference class is the archetype carries no named constructor of its own: a
+named constructor there would be a second keyword method of one function, which Julia cannot
+dispatch. Each takes `half_life` as a keyword that fixes the defaults of the fields it converts
+to.
 
 A numerator or a denominator is one Panel Field name, or a vector of `name => coefficient` pairs
 read as their sum. That is how a gross profit, `sales - cost of revenue`, or a total capital,

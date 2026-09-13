@@ -348,7 +348,7 @@ end
 function descriptor(de::ChangeToScale, rd::ReturnsResult)::Matrix{<:Real}
     V = panel_field_values(rd, de.field)
     S = panel_field_values(rd, de.scale)
-    Tf = eltype(V)
+    Tf = promote_type(eltype(V), eltype(S))
     D = fill(Tf(NaN), size(V))
     lag = de.lag
     for i in axes(V, 2), t in (lag + 1):size(V, 1)
@@ -360,7 +360,7 @@ end
 function descriptor(de::ChangeInIntensity, rd::ReturnsResult)::Matrix{<:Real}
     V = panel_field_values(rd, de.field)
     S = panel_field_values(rd, de.scale)
-    Tf = eltype(V)
+    Tf = promote_type(eltype(V), eltype(S))
     D = fill(Tf(NaN), size(V))
     lag = de.lag
     for i in axes(V, 2), t in (lag + 1):size(V, 1)

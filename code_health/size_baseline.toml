@@ -27,8 +27,8 @@ commit = "483d19ebf1"
 "src/01_Base/15_Online.jl" = { code = 427, doc = 803, comment = 5, blank = 401, total = 1636 }
 "src/01_Base/16_CoveragePolicy.jl" = { code = 216, doc = 428, comment = 0, blank = 206, total = 850 }
 "src/02_Tools.jl" = { code = 808, doc = 2044, comment = 46, blank = 867, total = 3765 }
-"src/03_InputData/01_AssetPanel.jl" = { code = 428, doc = 770, comment = 3, blank = 373, total = 1574 }
-"src/03_InputData/02_AssetPanelBuilder.jl" = { code = 281, doc = 609, comment = 0, blank = 270, total = 1160 }
+"src/03_InputData/01_AssetPanel.jl" = { code = 435, doc = 786, comment = 3, blank = 381, total = 1605 }
+"src/03_InputData/02_AssetPanelBuilder.jl" = { code = 291, doc = 630, comment = 0, blank = 280, total = 1201 }
 "src/03_InputData/03_ListingSpan.jl" = { code = 77, doc = 132, comment = 0, blank = 63, total = 272 }
 "src/03_InputData/04_Preprocessing.jl" = { code = 17, doc = 104, comment = 0, blank = 55, total = 176 }
 "src/03_InputData/05_CarrierViews.jl" = { code = 35, doc = 88, comment = 0, blank = 50, total = 173 }
@@ -40,7 +40,7 @@ commit = "483d19ebf1"
 "src/03_InputData/11_PricesToReturns.jl" = { code = 161, doc = 319, comment = 12, blank = 128, total = 620 }
 "src/03_InputData/12_TrainTestSplit.jl" = { code = 72, doc = 154, comment = 0, blank = 78, total = 304 }
 "src/03_InputData/13_AssetSelection.jl" = { code = 39, doc = 119, comment = 0, blank = 66, total = 224 }
-"src/03_InputData/14_CrossSectionalTransforms.jl" = { code = 464, doc = 708, comment = 0, blank = 334, total = 1506 }
+"src/03_InputData/14_CrossSectionalTransforms.jl" = { code = 478, doc = 732, comment = 0, blank = 346, total = 1556 }
 "src/03_InputData/15_FeatureSelector.jl" = { code = 191, doc = 282, comment = 0, blank = 143, total = 616 }
 "src/03_InputData/16_PanelDataFrame.jl" = { code = 140, doc = 219, comment = 0, blank = 100, total = 459 }
 "src/03_InputData/17_ReturnsBufferState.jl" = { code = 214, doc = 280, comment = 3, blank = 135, total = 632 }
@@ -85,7 +85,7 @@ commit = "483d19ebf1"
 "src/08_Moments/34_CustomValueExpectedReturns.jl" = { code = 49, doc = 161, comment = 0, blank = 75, total = 285 }
 "src/08_Moments/35_GerberIQCovariance.jl" = { code = 532, doc = 1431, comment = 0, blank = 545, total = 2508 }
 "src/08_Moments/36_RegimeAdjustedExpWeightedVariance.jl" = { code = 397, doc = 909, comment = 3, blank = 358, total = 1667 }
-"src/08_Moments/37_RegimeAdjustedExpWeightedCovariance.jl" = { code = 628, doc = 1254, comment = 1, blank = 515, total = 2398 }
+"src/08_Moments/37_RegimeAdjustedExpWeightedCovariance.jl" = { code = 629, doc = 1260, comment = 1, blank = 519, total = 2409 }
 "src/08_Moments/38_CrossSectionalRegression.jl" = { code = 198, doc = 504, comment = 6, blank = 210, total = 918 }
 "src/08_Moments/39_CrossSectionalWeights.jl" = { code = 138, doc = 366, comment = 0, blank = 166, total = 670 }
 "src/08_Moments/40_HigherMomentPartialFit.jl" = { code = 173, doc = 588, comment = 4, blank = 309, total = 1074 }

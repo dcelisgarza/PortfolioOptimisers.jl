@@ -268,6 +268,14 @@ end
         @test factor_exposure(xs2, rd, xs) ≈
               cross_sectional_transform(ct, xs .^ 2; w = ones(2, 2))
     end
+    @testset "An inactive cell is NaN whatever f returns there" begin
+        amsk = [true false; true true]
+        rdm = exposure_hand_panel(["a" => [1.0 2.0; 3.0 4.0]]; bw = ones(2, 2), amsk = amsk)
+        xe = DerivedExposure(; source = "size", f = x -> zero(x), scoring = nothing)
+        L = factor_exposure(xe, rdm, [1.0 NaN; 3.0 4.0])
+        @test isnan(L[1, 2])
+        @test L[[1, 2, 4]] == [0.0, 0.0, 0.0]
+    end
     @testset "The two-argument method refuses, naming the source" begin
         xe = DerivedExposure(; source = "size", f = abs2)
         @test_throws ArgumentError factor_exposure(xe, rd)

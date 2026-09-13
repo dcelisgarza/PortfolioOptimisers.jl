@@ -192,6 +192,30 @@ end
     @test_throws ArgumentError descriptor(Passthrough(; field = "sector"), rdc)
     # A field that cannot blank carries no observed-mask column, and reads back whole.
     @test PortfolioOptimisers.panel_field_values(rdc, "mcap") == ones(2, 2)
+    # The read lands in the type a division of the field lands in, which is the one that
+    # carries a NaN: an exact integer field reads in Float64, a Float32 field stays Float32,
+    # and every archetype that reads it can then write NaN on an inactive or blank cell.
+    ami = [true true; true false]
+    pint = asset_panel([NumericPanelInput(; name = "shares", vals = [10 20; 30 40]),
+                        NumericPanelInput(; name = "gap",
+                                          vals = Union{Missing, Int}[10 missing; 30 40],
+                                          alg = ConstantPanelFill(; val = 0)),
+                        NumericPanelInput(; name = "f32", vals = Float32[1 2; 3 4])];
+                       amsk = ami, emsk = ami)
+    rdi = ReturnsResult(; nx = ["A1", "A2"], X = zeros(2, 2), pnl = pint)
+    Vi = PortfolioOptimisers.panel_field_values(rdi, "shares")
+    @test eltype(Vi) === Float64
+    @test Vi == [10.0 20.0; 30.0 40.0]
+    Vg = PortfolioOptimisers.panel_field_values(rdi, "gap")
+    @test isnan(Vg[1, 2])
+    @test eltype(PortfolioOptimisers.panel_field_values(rdi, "f32")) === Float32
+    Dp = descriptor(Passthrough(; field = "shares"), rdi)
+    @test isnan(Dp[2, 2])
+    @test Dp[1, :] == [10.0, 20.0]
+    Dl = descriptor(PanelFieldLog(; field = "shares"), rdi)
+    @test Dl[1, 1] ≈ log(10)
+    @test isnan(Dl[2, 2])
+    @test eltype(descriptor(Passthrough(; field = "f32"), rdi)) === Float32
 
     D = [1.0 2.0 3.0; 4.0 5.0 6.0; 7.0 8.0 9.0]
     @test isnothing(PortfolioOptimisers.descriptor_active_fill!(D, rd.pnl))
