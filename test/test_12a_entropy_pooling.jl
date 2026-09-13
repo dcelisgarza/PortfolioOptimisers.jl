@@ -104,7 +104,7 @@ include(joinpath(@__DIR__, "test12_setup.jl"))
     # of `0.05` on either side, which reads one of the two observations that bracket the target.
     # See issues #573, #695 and #697.
     @test var_view_floor(rd.X[:, 1], var_tgt) <=
-          ValueatRisk(; w = pr.w)(rd.X[:, 1]) <=
+          ValueatRisk(; alpha = 0.075, w = pr.w)(rd.X[:, 1]) <=
           var_view_ceiling(rd.X[:, 1], var_tgt)
     @test isapprox(pr.w,
                    prior(EntropyPoolingPrior(; sets = sets, opt = jopt,
