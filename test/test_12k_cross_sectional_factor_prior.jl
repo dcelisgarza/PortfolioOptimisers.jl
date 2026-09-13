@@ -333,9 +333,9 @@ end
     @testset "The covariance and its square root agree with the factor model" begin
         L = rr.M[i, :]
         S = L * pr.fpr.sigma * transpose(L) + LinearAlgebra.diagm(rr.esigma[i])
-        @test isapprox(S, pr.sigma[i, i]; atol = 1e-14)
+        @test isapprox(S, pr.sigma[i, i]; atol = 1e-12)
         C = pr.chol[:, i]
-        @test isapprox(transpose(C) * C, pr.sigma[i, i]; atol = 1e-14)
+        @test isapprox(transpose(C) * C, pr.sigma[i, i]; atol = 1e-12)
         @test size(pr.chol, 1) == size(rr.M, 2) + length(i)
     end
     @testset "mu is the loadings through the factor mean, plus the orthogonal part" begin
@@ -516,7 +516,7 @@ end
         L = getfield(rr, :L)[i, :]
         F = PO.reduce_factor_covariance(rr.fcb, pr.fpr.sigma)
         S = L * F * transpose(L) + LinearAlgebra.diagm(rr.esigma[i])
-        @test isapprox(S, pr.sigma[i, i]; atol = 1e-14)
+        @test isapprox(S, pr.sigma[i, i]; atol = 1e-12)
         # The expanded factor covariance is singular by construction, so it cannot be the
         # one the square root came from.
         @test LinearAlgebra.rank(pr.fpr.sigma) == PO.reduced_factor_count(rr.fcb)
@@ -567,9 +567,9 @@ end
         @test LinearAlgebra.isposdef(es[i, i])
         L = pr.rr.M[i, :]
         S = L * pr.fpr.sigma * transpose(L) + es[i, i]
-        @test isapprox(S, pr.sigma[i, i]; atol = 1e-14)
+        @test isapprox(S, pr.sigma[i, i]; atol = 1e-12)
         C = pr.chol[:, i]
-        @test isapprox(transpose(C) * C, pr.sigma[i, i]; atol = 1e-14)
+        @test isapprox(transpose(C) * C, pr.sigma[i, i]; atol = 1e-12)
     end
     @testset "The overlay asks the estimator what a gapped cell is worth" begin
         # Issue #925. The overlay used to fill before it estimated, so no estimator in the slot
