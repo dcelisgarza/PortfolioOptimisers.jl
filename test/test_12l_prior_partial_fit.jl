@@ -558,4 +558,33 @@ end
         @test_throws ArgumentError prior(EntropyPoolingPrior())
         @test_throws ArgumentError cov(PortfolioOptimisersCovariance())
     end
+
+    # Issue #1055: the `Online` docstring named `EmpiricalPrior(; ce = Online(…))`, which the
+    # `ce` bound refuses. Only a `pe` slot admits a wrapper, because the prior owns the rows
+    # once, at the bottom of its chain; a wrapper two levels down is what the wrapping
+    # priors' own `update_online_estimator` method exists to seed.
+    @testset "A wrapper lives in a `pe` slot, never in a moment slot" begin
+        @test_throws TypeError EmpiricalPrior(;
+                                              ce = pe.Online(PortfolioOptimisersCovariance()))
+        @test_throws TypeError EmpiricalPrior(; me = pe.Online(SimpleExpectedReturns()))
+        @test_throws TypeError HighOrderPriorEstimator(; ske = pe.Online(Coskewness()))
+        @test_throws TypeError HighOrderPriorEstimator(; kte = pe.Online(Cokurtosis()))
+        views = pe.BlackLittermanViews(; P = [1.0 zeros(1, 5)], Q = [0.01])
+        h = HighOrderPriorEstimator(;
+                                    pe = BlackLittermanPrior(;
+                                                             pe = pe.Online(EmpiricalPrior()),
+                                                             views = views))
+        # The host's own fields hold no wrapper, so the generic scan finds none: the seeding
+        # is the wrapping prior's recursion into `pe.pe`.
+        @test pe.online_candidate_fields(h) == ()
+        @test pe.online_fields(h.pe) == (:pe,)
+        s = pe.update_online_estimator(h)
+        @test s.pe.pe.cache isa pe.SampleBufferState
+        o = prior(fold(s, X))
+        b = prior(HighOrderPriorEstimator(;
+                                          pe = BlackLittermanPrior(; pe = EmpiricalPrior(),
+                                                                   views = views)), X)
+        @test isapprox(o.mu, b.mu; rtol = 1e-10)
+        @test isapprox(o.sigma, b.sigma; rtol = 1e-10)
+    end
 end

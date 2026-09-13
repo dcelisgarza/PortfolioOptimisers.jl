@@ -848,7 +848,7 @@ end
 
 Resolves the [`Online`](@ref) declarations under the prior a wrapping prior embeds, at warm-up.
 
-A wrapping prior hands its embedded prior across a boundary of its own, so it writes the recursion the generic method does not: `HighOrderPriorEstimator(; pe = EmpiricalPrior(; ce = Online(…)))` is resolved through this method, where the generic scan of the host's own fields would find no wrapper and leave the one two levels down unseeded. The co-moments of a [`HighOrderPriorEstimator`](@ref) are scanned by the generic method as they always were.
+A wrapping prior hands its embedded prior across a boundary of its own, so it writes the recursion the generic method does not: `HighOrderPriorEstimator(; pe = BlackLittermanPrior(; pe = Online(EmpiricalPrior()), …))` is resolved through this method, where the generic scan of the host's own fields would find no wrapper — `pe` holds a plain prior — and leave the one two levels down unseeded. A wrapper stored in the host's own `pe`, `HighOrderPriorEstimator(; pe = Online(EmpiricalPrior()))`, is seeded the same way, because the recursion meets it at the first level. The co-moments of a [`HighOrderPriorEstimator`](@ref) are scanned by the generic method as they always were.
 
 # Arguments
 
