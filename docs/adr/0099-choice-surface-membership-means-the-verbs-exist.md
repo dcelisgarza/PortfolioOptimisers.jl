@@ -77,19 +77,20 @@ The fallback reads `ce.ve`, and no type bound states that field. The census hold
 precondition instead: every leaf that takes the Correlation Rescale owns `cor` and carries a
 `ve` field. Four leaves take it today.
 
-### One exemption, and it is the subject of the gate
+### The exemption mechanism, empty since #637
 
-`VERB_EXEMPT` in `moment_family_setup.jl` names the two leaves, and
-[issue #637](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/637) carries the
-missing mathematics. The census also asserts that each exempt name **still fails**, so an
-exemption that has been paid reds the build rather than standing as a decision. This is the
-shape [ADR 0082](0082-the-coverage-terminal-condition-is-a-per-file-ratchet-and-a-named-exemption.md)
+`VERB_EXEMPT` in `moment_family_setup.jl` is a named exemption: a leaf listed there carries a
+reason and an issue, and the census asserts that it **still fails**, so an exemption that has
+been paid reds the build rather than standing as a decision. This is the shape
+[ADR 0082](0082-the-coverage-terminal-condition-is-a-per-file-ratchet-and-a-named-exemption.md)
 gave the Coverage Exemption: a named exemption with a reason, not a silent skip.
 
-The mathematics is not invented here. The docstrings state an update, a correlation and a
-rescale; they do not state the mean estimate, the initialisation, the bias correction, the HAC
-treatment, or how each of the three targets computes its statistic. Those are the maintainer's
-decisions, and there is no reference in the repository to check the numbers against.
+The set named two leaves when this ADR was written, `RegimeAdjustedExpWeightedCovariance` and
+`RegimeAdjustedExpWeightedVariance`, and
+[issue #637](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/637) carried the
+mathematics the docstrings did not state: the mean estimate, the initialisation, the bias
+correction, the HAC treatment, and how each of the three targets computes its statistic. `#637`
+closed on 2026-09-06 (`a003ca910b`), and `VERB_EXEMPT` has been `()` since.
 
 ### The split lives once
 
@@ -101,8 +102,9 @@ censuses drifting apart.
 
 ## Consequences
 
-- The promise is measured. 27 concrete leaves over three families, 25 of which answer their
-  verbs, and the two that do not are named once, with a reason and an issue.
+- The promise is measured. 30 concrete leaves over three families answer their verbs today, and
+  `VERB_EXEMPT` is empty; a future leaf that cannot yet answer is named there once, with a
+  reason and an issue, rather than left to crash.
 - The hand-written skip in `test_08d_dims_guard.jl` is deleted. That file now names no leaf,
   and it takes its pairings from the predicate. Its census count is unchanged at 41 pairings,
   because the predicate admits exactly the leaves the skip admitted.
@@ -110,8 +112,6 @@ censuses drifting apart.
   caller runs it.
 - A leaf that takes the Correlation Rescale without a `ve` field reds the build, rather than
   raising a `FieldError` from inside the library.
-- The two crashes stay crashes until #637 lands. The census does not repair them; it makes them
-  impossible to acquire again.
 
 ## Scope
 

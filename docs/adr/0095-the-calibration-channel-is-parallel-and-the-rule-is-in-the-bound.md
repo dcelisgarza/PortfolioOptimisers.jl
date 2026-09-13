@@ -424,12 +424,12 @@ second channel for what the host already varies.
 - **`resolve_deferred_quantities` is no longer only about Deferred Quantities.** The name is now
   narrower than the method, and a reader who takes it literally will miss the calibration resolution
   beside it. ADR 0051 carries the amendment.
-- **The root did not move under `src/01_Base.jl`, and the two uncertainty families were not
-  re-parented.** `AbstractCalibrationAlgorithm` lives in
+- **The root did not move under `src/01_Base/02_TypeRoots.jl`, and the two uncertainty families
+  were not re-parented.** `AbstractCalibrationAlgorithm` lives in
   `src/14_UncertaintySets/06_CalibrationRules.jl`, so ADR 0070's re-parenting of
   `AbstractUncertaintyKAlgorithm` and `AbstractUncertaintyEpsAlgorithm` has not shipped: both
   still subtype `AbstractAlgorithm` directly. Re-parenting them needs the root in
-  `src/01_Base.jl` first.
+  `src/01_Base/02_TypeRoots.jl` first.
 - **A field bound is enforced on the keyword route only.** `ConcreteStructs.@concrete` emits a
   positional constructor that is strictly broader than the hand-written inner one, so a positional
   call bypasses every bound this decision rests on. That hole reaches every `@concrete` type in the
