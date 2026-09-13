@@ -94,10 +94,11 @@ include(joinpath(@__DIR__, "test12_setup.jl"))
 
     var_views = LinearConstraintEstimator(; val = "AAPL == 0.03264496113282452")
     pr = prior(EntropyPoolingPrior(; sets = sets,
-                                   var_views = ValueatRiskView(; views = var_views)), rd)
+                                   var_views = ValueatRiskView(; alpha = 0.075,
+                                                               views = var_views)), rd)
     var_tgt = 0.03264496113282452
     # The view is a constraint on the posterior tail mass, so that mass is what the solve meets.
-    @test isapprox(sum(pr.w[i] for i in axes(rd.X, 1) if rd.X[i, 1] <= -var_tgt), 0.05,
+    @test isapprox(sum(pr.w[i] for i in axes(rd.X, 1) if rd.X[i, 1] <= -var_tgt), 0.075,
                    rtol = 1e-6)
     # The reported value at risk is a sample order statistic, and the mass lands within `1e-8`
     # of `0.05` on either side, which reads one of the two observations that bracket the target.
