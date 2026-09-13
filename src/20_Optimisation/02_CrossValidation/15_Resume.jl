@@ -6,7 +6,7 @@ Copies every partial-fit state an estimator tree carries, and returns the tree r
 
 The walk of [`online_entry_state`](@ref) with a rebuild in place of a report: it copies `est`'s own `cache` when it holds a state, descends into every estimator-valued field ([`estimator_fields`](@ref)), and rebuilds each host whose fields moved through [`rebuild_estimator`](@ref). A host nothing under changed is returned as it is. A [`TimeDependent`](@ref) schedule is returned unchanged, because its entries are batch configuration resolved per fold and the loop threads no state through them, and so is anything that is not an estimator.
 
-[`Resume`](@ref) calls it once at entry, so the Result it holds is never written: [`partial_fit!`](@ref) promises nothing about a kept estimator, a buffer appends into its backing array, and every state answers `Base.copy`.
+Two callers take it. [`Resume`](@ref) calls it once at entry, so the Result it holds is never written: [`partial_fit!`](@ref) promises nothing about a kept estimator, a buffer appends into its backing array, and every state answers `Base.copy`. The generic method of [`partial_fit`](@ref) calls it before every fold, so the value form holds the same promise on a host that folds through the states of its members — a [`HighOrderPriorEstimator`](@ref), a hierarchical optimiser — as on a leaf that carries its own `cache`.
 
 # Arguments
 
@@ -19,6 +19,7 @@ The walk of [`online_entry_state`](@ref) with a rebuild in place of a report: it
 # Related
 
   - [`Resume`](@ref)
+  - [`partial_fit`](@ref)
   - [`online_entry_state`](@ref)
   - [`estimator_fields`](@ref)
   - [`rebuild_estimator`](@ref)

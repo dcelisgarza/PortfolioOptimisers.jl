@@ -56,10 +56,17 @@ it made before.
 - A family whose fold builds a fresh state leaves the kept estimator valid by accident, and no
   caller may rely on that.
 
-**`partial_fit` is one generic method on the seam, and it has value semantics.** It copies the
-state, and calls `partial_fit!` on the estimator that holds the copy. This is the pair
-`matrix_processing` and `matrix_processing!` make. The estimator handed over is untouched, so the
-no-contamination reason of #308 holds for this verb. A family writes no method for it.
+**`partial_fit` is one generic method on the seam, and it has value semantics.** It copies every
+state the estimator tree carries, through the `copy_states` walk `Resume` takes at entry, and
+calls `partial_fit!` on the tree rebuilt around the copies. This is the pair `matrix_processing`
+and `matrix_processing!` make. The estimator handed over is untouched, so the no-contamination
+reason of #308 holds for this verb. A family writes no method for it, and neither does a host
+that holds no `cache` of its own and folds through the states of its members — a
+`HighOrderPriorEstimator`, a `BlackLittermanPrior`, a hierarchical optimiser over `opt.pe` — because
+the walk copies the members' states where a copy of the host's `cache` alone would have left
+them shared with the kept host (#1053). A method per forwarding host was the alternative, one
+copy-and-rebuild each and a census to keep them honest; the walk is one method for every host,
+the ones written and the ones not yet.
 
 **The higher-moment family is the one exception, and it overrides `partial_fit`.** Its fold builds
 a fresh state in either verb, so the generic copy buys nothing and costs a copy of `M4`, which is

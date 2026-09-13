@@ -67,30 +67,29 @@ A family that overrides this verb implements the two methods the family already 
 
 # Returns
 
-  - `est`: A new estimator, whose `cache` field carries the state after the last observation.
+  - `est`: A new estimator, whose states carry the fold after the last observation.
 
 # Related
 
   - [`AbstractPartialFitState`](@ref)
   - [`partial_fit!`](@ref)
+  - [`copy_states`](@ref)
   - [`merge_states`](@ref)
 """
 function partial_fit end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Generic method of [`partial_fit`](@ref). Copies the state the estimator carries, and folds the observations into the copy.
+Generic method of [`partial_fit`](@ref). Copies every state the estimator tree carries, and folds the observations into the copies.
 
-Every family of the seam reaches this method, because the copy and the fold are the same two steps whatever the state holds. The copy is one state per call, which is the order of the update itself for every second-order family.
+Every family of the seam reaches this method, because the copy and the fold are the same two steps whatever the state holds. The copy is [`copy_states`](@ref), the walk [`Resume`](@ref) takes at entry: it copies the estimator's own `cache` when it holds a state, descends into every estimator-valued field, and rebuilds each host whose fields moved. So a host that holds no `cache` field of its own and folds through the states of its **members** — a [`HighOrderPriorEstimator`](@ref) folds its `pe`, `ske` and `kte`, a hierarchical optimiser folds its `opt.pe` — is served by the same method as a leaf, and the kept host's states are as untouched as a leaf's. The cost is one copy per state the tree carries, which is the order of the update itself for every second-order family.
 
-The copy protects the one state this method can see, which is the estimator's own `cache` field. A host that holds no `cache` field of its own and folds through the states of its members — a [`HighOrderPriorEstimator`](@ref) folds its `pe`, `ske` and `kte` — is refused by name, because forwarding it to [`partial_fit!`](@ref) would fold the kept estimator's states in place and break the promise this verb exists to make. Such a host owes a `partial_fit` method of its own, and issue #1053 carries the decision between a method per host and one generic copy of the state tree.
+An estimator with no incremental fit of its own carries no state, so the walk returns it as it is, and [`partial_fit!`](@ref) gives the refusal that names the wrapper.
 
 # Algorithm
 
- 1. Refuse an estimator whose type has no `cache` field.
- 2. Return `partial_fit!(est, args...)` unchanged when `est.cache` holds `nothing`. There is no state to protect, and the fold seeds one of its own.
- 3. Otherwise rebind `est.cache` to `copy(est.cache)` with `Accessors.@reset`.
- 4. Fold the observations into the copy with [`partial_fit!`](@ref), and return the estimator it gives.
+ 1. Rebuild the estimator tree around a copy of every state it carries, with [`copy_states`](@ref). A tree that carries none is returned as it is, because there is no state to protect and the fold seeds one of its own.
+ 2. Fold the observations into the copies with [`partial_fit!`](@ref), and return the estimator it gives.
 
 # Arguments
 
@@ -98,29 +97,20 @@ The copy protects the one state this method can see, which is the estimator's ow
   - `args...`: The observations, forwarded to [`partial_fit!`](@ref).
   - `kwargs...`: Additional keyword arguments, forwarded to [`partial_fit!`](@ref).
 
-# Validation
-
-  - `typeof(est)` has a `cache` field. An `ArgumentError` is thrown otherwise.
-
 # Returns
 
-  - `est`: A new estimator, whose `cache` field carries the state after the last observation.
+  - `est`: A new estimator, whose states carry the fold after the last observation.
 
 # Related
 
   - [`partial_fit`](@ref)
   - [`partial_fit!`](@ref)
+  - [`copy_states`](@ref)
   - [`AbstractPartialFitState`](@ref)
 """
 function partial_fit(est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEstimator},
                      args...; kwargs...)
-    @argcheck(hasfield(typeof(est), :cache),
-              ArgumentError("`$(typeof(est))` has no `cache` field, so the generic `partial_fit` has no state to copy before the fold. An estimator with no incremental fit of its own is wrapped in `Online` first. A host that folds through the states of its members owes a `partial_fit` method of its own; `partial_fit!` folds those states in place."))
-    cache = est.cache
-    if !isnothing(cache)
-        est = Accessors.@reset est.cache = copy(cache)
-    end
-    return partial_fit!(est, args...; kwargs...)
+    return partial_fit!(copy_states(est), args...; kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

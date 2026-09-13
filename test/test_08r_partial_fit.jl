@@ -13,7 +13,7 @@ leaves a kept estimator alone, every state copies without aliasing, and a read-o
 state its estimator no longer matches.
 =#
 @testset "Partial fit: Welford states for the second-order sample estimators" begin
-    using Test, PortfolioOptimisers, Statistics, StableRNGs, StatsBase, LinearAlgebra
+    using Test, PortfolioOptimisers, Statistics, StableRNGs, StatsBase, LinearAlgebra, Dates
     pe = PortfolioOptimisers
     rng = StableRNG(987654321)
     X = randn(rng, 50, 4)
@@ -173,12 +173,9 @@ state its estimator no longer matches.
         @test_throws ArgumentError partial_fit!(Covariance(;
                                                            ce = PortfolioOptimisersCovariance()),
                                                 X[1, :])
-        # The value form on a type with no `cache` field: an estimator with no fold of its
-        # own, and a host that folds through the states of its members. The generic method
-        # can copy neither, so it refuses by name rather than reaching a `FieldError`, and it
-        # does not forward to `partial_fit!`, which would fold the kept host's states in place.
+        # The value form on an estimator with no fold of its own: the state walk finds
+        # nothing to copy, and `partial_fit!` gives the refusal that names the wrapper.
         @test_throws ArgumentError partial_fit(MedianExpectedReturns(), X)
-        @test_throws ArgumentError partial_fit(HighOrderPriorEstimator(), X)
         # The one-argument read-out reached before the first fold.
         @test_throws ArgumentError mean(SimpleExpectedReturns())
         @test_throws ArgumentError var(SimpleVariance())
@@ -278,6 +275,48 @@ state its estimator no longer matches.
         # A cold estimator has no state to copy, and the fold seeds one of its own.
         cold = partial_fit(SimpleVariance(), X)
         @test isapprox(var(cold), var(fold(SimpleVariance(), X)); rtol = 1e-13)
+    end
+
+    @testset "The value form folds a copy of every member state" begin
+        # A host with no `cache` of its own folds through the states of its members, and the
+        # generic method copies the whole tree before the fold, so the kept host reads what
+        # it read before the call. Issue #1053.
+        rd = ReturnsResult(; nx = ["a", "b", "c", "d"], X = X,
+                           ts = Date(2020, 1, 1) .+ Day.(0:49))
+        head = ReturnsResult(; nx = rd.nx, X = X[1:30, :], ts = rd.ts[1:30])
+        tail = ReturnsResult(; nx = rd.nx, X = X[31:50, :], ts = rd.ts[31:50])
+        # A prior that folds `pe`, `ske` and `kte`.
+        warm = partial_fit!(HighOrderPriorEstimator(), head)
+        kept = prior(warm)
+        fitted = partial_fit(warm, tail)
+        @test prior(warm).mu == kept.mu
+        @test prior(warm).sigma == kept.sigma
+        @test size(prior(warm).X, 1) == 30
+        @test warm.pe.cache !== fitted.pe.cache
+        @test size(prior(fitted).X, 1) == 50
+        full = prior(partial_fit!(HighOrderPriorEstimator(), rd))
+        @test isapprox(prior(fitted).mu, full.mu; rtol = 1e-13)
+        @test isapprox(prior(fitted).kt, full.kt; rtol = 1e-13)
+        # Two folds from one warm host do not contaminate each other.
+        twin = partial_fit(warm, tail)
+        @test twin.pe.cache !== fitted.pe.cache
+        @test size(prior(warm).X, 1) == 30
+        # A wrapping prior that folds its embedded prior alone, two levels down.
+        bl = BlackLittermanPrior(; pe = EmpiricalPrior(),
+                                 views = LinearConstraintEstimator(; val = ["a == 0.0001"]),
+                                 sets = UniverseSets(; dict = Dict("nx" => rd.nx)))
+        warm = partial_fit!(HighOrderPriorEstimator(; pe = bl), head)
+        fitted = partial_fit(warm, tail)
+        @test size(prior(warm).X, 1) == 30
+        @test size(prior(fitted).X, 1) == 50
+        @test warm.pe.pe.cache !== fitted.pe.pe.cache
+        # A hierarchical optimiser folds `opt.pe` and its own fold context under `opt.cache`.
+        warm = partial_fit!(HierarchicalRiskParity(), head)
+        fitted = partial_fit(warm, tail)
+        @test warm.opt.cache !== fitted.opt.cache
+        @test warm.opt.pe.cache !== fitted.opt.pe.cache
+        @test size(prior(warm.opt.pe).X, 1) == 30
+        @test size(prior(fitted.opt.pe).X, 1) == 50
     end
 
     @testset "Every state copies without aliasing" begin
