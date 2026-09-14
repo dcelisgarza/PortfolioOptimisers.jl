@@ -211,7 +211,9 @@ different samples is not a comparison.
 The fix is to cut both forecasts to the sample they share. Because the Result carries the
 forecast and the target as plain matrices, that is a read and a blank rather than a re-fit: the
 **bare** method of [`forecast_evaluation`](@ref) takes the two matrices directly, which is the
-bottom of the `bare arrays → Result → Estimator` hierarchy the whole family is built on.
+bottom of the `bare arrays → Result → Estimator` hierarchy the whole family is built on. The
+Result also carries the estimation mask the pairing read off the panel, and the bare method
+takes it as `umsk`, so the re-pairing scores the same universe and its coverage divides by it.
 =#
 
 first_scorable(h) = findfirst(t -> any(isfinite, view(h, t, :)), axes(h, 1))
@@ -224,10 +226,12 @@ function align(h)
             for t in axes(h, 1), i in axes(h, 2)]
 end
 
-fe_signal = forecast_evaluation(align(raw_signal.alpha), y; horizon = horizon, lag = lag,
-                                step = step, min_count = min_count, ppy = ppy)
-fe_trait = forecast_evaluation(align(raw_trait.alpha), y; horizon = horizon, lag = lag,
-                               step = step, min_count = min_count, ppy = ppy)
+fe_signal = forecast_evaluation(align(raw_signal.alpha), y; umsk = raw_signal.umsk,
+                                horizon = horizon, lag = lag, step = step,
+                                min_count = min_count, ppy = ppy)
+fe_trait = forecast_evaluation(align(raw_trait.alpha), y; umsk = raw_trait.umsk,
+                               horizon = horizon, lag = lag, step = step,
+                               min_count = min_count, ppy = ppy)
 
 pretty_table(DataFrame("Common first row" => start,
                        "Evaluation dates" => length(fe_signal.dates),
@@ -455,6 +459,13 @@ The last question is whether the forecast is telling the optimiser something the
 already knows. [`forecast_factor_correlation`](@ref) answers the contemporaneous correlation
 between the forecast and each factor exposure, one column per factor, so a forecast that is
 really a size bet reads a large number in the size column.
+
+The statistic looks nowhere forward, so it is read on **every observation** of the forecast
+rather than on the evaluation grid: the grid keeps the forward windows of the coefficient from
+overlapping, and a same-date correlation has no window. The signal composite therefore scores on
+every row from `start`; the trait regression carries a forecast on its grid only, so its column
+is `NaN` between two refits and the mean below reads the rows it was fitted on. A caller who
+wants the correlations beside the coefficients of the same dates passes `dates = fe.dates`.
 =#
 
 fc_signal = forecast_factor_correlation(fe_signal, csfm)

@@ -857,6 +857,16 @@
         @test [s[:label] for s in p_fc.series_list] == ["1", "2", "3"]
         @test all(isequal.(p_fc.series_list[2][:y],
                            forecast_factor_correlation(fe_fp, Ms_fp)[:, 2]))
+        # The figure draws every observation by default, and the evaluation grid when the
+        # caller names it: the x-axis is the row set, the y-axis its answer (#1071).
+        @test p_fc.series_list[2][:x] == collect(axes(fe_fp.alpha, 1))
+        p_fcg = plot_forecast_factor_correlation(fe_fp, Ms_fp; dates = fe_fp.dates)
+        @test p_fcg.series_list[2][:x] == fe_fp.dates
+        @test all(isequal.(p_fcg.series_list[2][:y],
+                           forecast_factor_correlation(fe_fp, Ms_fp; dates = fe_fp.dates)[:,
+                                                                                          2]))
+        @test plot_forecast_factor_correlation(fe_fp, csfm_fp; dates = fe_fp.dates).series_list[1][:x] ==
+              fe_fp.dates
         @test plot_forecast_factor_correlation(fe_fp, Ms_fp; rank = true)[1][:title] ==
               "Forecast Factor Correlation (Spearman)"
         # The block arity labels its series off the block's own factor names.

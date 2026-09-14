@@ -298,7 +298,9 @@ end
 
     @testset "The forecast history and the forward target are the pairing" begin
         fe = forecast_evaluation(rf, rd, csfm; horizon = 2, lag = 1)
-        @test fe.alpha === rf.hist
+        # The history is written onto the estimation universe at the pairing (#1074).
+        @test isequal(fe.alpha, PO.forecast_evaluation_mask(rf.hist, rd.pnl.emsk[rows, :]))
+        @test fe.umsk == rd.pnl.emsk[rows, :]
         @test isequal(fe.y, PO.forward_mean_returns(csfm.csr.eps, 2, 1))
         @test fe.step == 2
         @test size(fe.alpha) == (fx.Tb, fx.N)
@@ -307,7 +309,8 @@ end
     @testset "The two layers agree on the same pair" begin
         fe = forecast_evaluation(rf, rd, csfm; horizon = 2, lag = 1, step = 1, ppy = 252)
         bare = forecast_evaluation(rf.hist, PO.forward_mean_returns(csfm.csr.eps, 2, 1);
-                                   horizon = 2, lag = 1, step = 1, ppy = 252)
+                                   umsk = rd.pnl.emsk[rows, :], horizon = 2, lag = 1,
+                                   step = 1, ppy = 252)
         @test fe.dates == bare.dates
         @test isequal(fe.alpha, bare.alpha)
         @test isequal(fe.y, bare.y)
@@ -1220,35 +1223,40 @@ end
     PO = PortfolioOptimisers
     fe = forecast_evaluation(FC_ALPHA, PO.forward_mean_returns(FC_ALPHA, 1, 1))
     c = forecast_factor_correlation(fe, FC_B)
+    # The statistic is contemporaneous, so the verb reads every observation of the
+    # forecast, not the evaluation grid: the last row has no forward target and is off
+    # `fe.dates`, and it is scored here all the same. Issue #1071.
+    T = size(FC_ALPHA, 1)
 
     @testset "A pure multiple of an exposure correlates one with it and zero with an orthogonal one" begin
-        @test size(c) == (length(fe.dates), 2)
-        @test c[:, 1] ≈ ones(length(fe.dates))
-        @test c[:, 2] ≈ zeros(length(fe.dates)) atol = 1e-12
+        @test length(fe.dates) < T
+        @test size(c) == (T, 2)
+        @test c[:, 1] ≈ ones(T)
+        @test c[:, 2] ≈ zeros(T) atol = 1e-12
     end
 
     @testset "The rank form agrees where the design is rank-orthogonal too" begin
         cr = forecast_factor_correlation(fe, FC_B; rank = true)
-        @test cr[:, 1] ≈ ones(length(fe.dates))
-        @test cr[:, 2] ≈ zeros(length(fe.dates)) atol = 1e-12
+        @test cr[:, 1] ≈ ones(T)
+        @test cr[:, 2] ≈ zeros(T) atol = 1e-12
     end
 
-    @testset "Each entry is the cross-sectional helper applied to the pairing" begin
+    @testset "Each entry is the cross-sectional helper applied to the observation" begin
         cr = forecast_factor_correlation(fe, FC_B; rank = true)
         u = ones(size(FC_ALPHA, 2))
-        for k in 1:2, (j, t) in enumerate(fe.dates)
+        for k in 1:2, t in 1:T
             a = view(fe.alpha, t, :)
             b = view(FC_B, t, :, k)
-            @test c[j, k] == PO.cs_weighted_correlation(a, b, u; min_count = fe.min_count)
-            @test cr[j, k] == PO.cs_spearman_correlation(a, b; min_count = fe.min_count)
+            @test c[t, k] == PO.cs_weighted_correlation(a, b, u; min_count = fe.min_count)
+            @test cr[t, k] == PO.cs_spearman_correlation(a, b; min_count = fe.min_count)
         end
     end
 
     @testset "A weighting moves the weighted form and leaves the rank one" begin
         cw = forecast_factor_correlation(fe, FC_B, FC_W)
         # A perfect linear relation is weight invariant, and an orthogonal one is not.
-        @test cw[:, 1] ≈ ones(length(fe.dates))
-        @test !isapprox(cw[:, 2], zeros(length(fe.dates)); atol = 1e-12)
+        @test cw[:, 1] ≈ ones(T)
+        @test !isapprox(cw[:, 2], zeros(T); atol = 1e-12)
         @test isequal(forecast_factor_correlation(fe, FC_B, FC_W; rank = true),
                       forecast_factor_correlation(fe, FC_B; rank = true))
     end
@@ -1259,9 +1267,27 @@ end
         gap[2, 4] = NaN
         fg = forecast_evaluation(gap, PO.forward_mean_returns(gap, 1, 1); min_count = 2)
         cg = forecast_factor_correlation(fg, FC_B; min_count = 3)
-        j = findfirst(==(2), fg.dates)
-        @test all(isnan, cg[j, :])
-        @test all(isfinite, forecast_factor_correlation(fg, FC_B; min_count = 2)[j, :])
+        @test all(isnan, cg[2, :])
+        @test all(isfinite, forecast_factor_correlation(fg, FC_B; min_count = 2)[2, :])
+    end
+
+    @testset "The evaluation grid is opt-in, and any row set is read the same way" begin
+        # `dates = fe.dates` is the row subset of the whole-axis answer, entry for entry,
+        # so a caller who wants the correlations beside the coefficients of the same dates
+        # has them; and a row set of their own is read on the same terms.
+        @test isequal(forecast_factor_correlation(fe, FC_B; dates = fe.dates),
+                      c[fe.dates, :])
+        @test isequal(forecast_factor_correlation(fe, FC_B; dates = 1:T), c)
+        @test isequal(forecast_factor_correlation(fe, FC_B; dates = [T, 1]), c[[T, 1], :])
+        @test isequal(forecast_factor_correlation(fe, FC_B, FC_W; dates = fe.dates,
+                                                  rank = true),
+                      forecast_factor_correlation(fe, FC_B; rank = true)[fe.dates, :])
+    end
+
+    @testset "An empty row set and a row off the axis are refused" begin
+        @test_throws PO.IsEmptyError forecast_factor_correlation(fe, FC_B; dates = Int[])
+        @test_throws DomainError forecast_factor_correlation(fe, FC_B; dates = [1, T + 1])
+        @test_throws DomainError forecast_factor_correlation(fe, FC_B; dates = 0:T)
     end
 end
 
@@ -1276,7 +1302,16 @@ end
     @testset "The exposure history is the block's own, unlagged" begin
         @test isequal(forecast_factor_correlation(fb, csfm),
                       forecast_factor_correlation(fb, PO.cs_diagnostic_exposures(csfm)))
-        @test size(forecast_factor_correlation(fb, csfm), 2) == length(csfm.nf)
+        @test size(forecast_factor_correlation(fb, csfm)) ==
+              (size(fb.alpha, 1), length(csfm.nf))
+    end
+
+    @testset "The row set passes through to the bare method" begin
+        @test isequal(forecast_factor_correlation(fb, csfm; dates = fb.dates),
+                      forecast_factor_correlation(fb, PO.cs_diagnostic_exposures(csfm);
+                                                  dates = fb.dates))
+        @test isequal(forecast_factor_correlation(fb, csfm; dates = fb.dates),
+                      forecast_factor_correlation(fb, csfm)[fb.dates, :])
     end
 
     @testset "A weighting moves the weighted form and leaves the rank one" begin
@@ -1399,6 +1434,183 @@ end
         @test sc.hit_rate ≈ [1.0, 0.0]
         @test all(isnan, sc.ic_ir)
         @test all(isnan, sc.t_stat)
+    end
+end
+
+# The reference implementation's factor diagnostics on the planted fixture of the testset
+# below, run on 2026-09-14 through its own `_compute_factor_correlation_diagnostics` and
+# `_correlation_stats` over the fixture's exported forecast history, exposure history and
+# estimation mask, with equal weights, Pearson and `min_count = 3`. The style factor's
+# column, and its five-figure summary. Issues #1071 and #1074.
+const FC_REF_COUNT = 52
+const FC_REF_STYLE = [0.9874127453938115, 0.9870981609818839, 0.9865119263442621,
+                      0.9921459947686977, 0.9915404370359904, 0.9912131795260033,
+                      0.9917956248307396, 0.9885403249092338, 0.9959730507424697,
+                      0.9882258345887717, 0.9884379212434494, 0.9884548481476073,
+                      0.9884646748783673, 0.9852190219604461, 0.9901001320352284,
+                      0.9800736981924713, 0.9813372828078473, 0.9812620555718751,
+                      0.9810661512449548, 0.9806037177644529, 0.9774016331244408,
+                      0.9804536126708862, 0.9806921820687978, 0.9780612297890581,
+                      0.9766512225743983, 0.981351648031914, 0.9796165970862136,
+                      0.9810342619366895, 0.9807490363096569, 0.9811884221947792,
+                      0.9810726555341553, 0.9808378426058264, 0.9811471882269012,
+                      0.9812827692837984, 0.9816927433790472, 0.9822828091727407,
+                      0.9817288190852552, 0.9806598237162722, 0.9818546753077076,
+                      0.9818547174170653, 0.9819585143062083, 0.9820684711165474,
+                      0.9818545709323333, 0.982065434202447, 0.981810669952924,
+                      0.982400091394535, 0.9822964949272698, 0.982548482602381,
+                      0.9826176358134895, 0.982818893768118, 0.982554103550104,
+                      0.983025494100696]
+const FC_REF_SUMMARY = (; mean = 0.9835597986375235, std = 0.004192196953212379,
+                        ir = 234.61679153309947, t_stat = 1691.8457439148713,
+                        hit_rate = 1.0)
+
+@testset "A contemporaneous statistic is read on every observation, as the reference reads it" begin
+    PO = PortfolioOptimisers
+    # Issue #1071. The reference implementation correlates the forecast against every
+    # exposure over the whole forecast history and summarises it over that count; it has no
+    # evaluation grid for a statistic that looks nowhere forward. The port read `fe.dates`
+    # only, so under `step = horizon` it saw `1 / horizon` of the observations and its
+    # t-statistic was smaller by the root of that ratio. The planted fixture carries a
+    # signal, `FixedWeightedReturnForecast` writes a forecast on every row, and
+    # `horizon = 5` makes the two grids far apart.
+    px = evaluation_fixture(; planted = true)
+    fw = FixedWeightedReturnForecast(; scores = px.scores, scale = 1.0,
+                                     weights = [0.4, 0.6])
+    fe = forecast_evaluation(fw, px.rd, px.csfm; horizon = 5, lag = 1)
+    c = forecast_factor_correlation(fe, px.csfm)
+    cg = forecast_factor_correlation(fe, px.csfm; dates = fe.dates)
+    s = exposure_ic_summary(c)
+    sg = exposure_ic_summary(cg)
+
+    @testset "The whole axis carries every finite pairing, and the grid a fraction of it" begin
+        @test fe.step == 5
+        @test size(c, 1) == size(fe.alpha, 1)
+        @test size(cg, 1) == length(fe.dates)
+        @test count(isfinite, view(c, :, 1)) == FC_REF_COUNT
+        @test count(isfinite, view(cg, :, 1)) == length(fe.dates)
+        @test count(isfinite, view(c, :, 1)) > 4 * count(isfinite, view(cg, :, 1))
+    end
+
+    @testset "The mean barely moves and the evidence for it does" begin
+        @test isapprox(s.mean_ic[1], sg.mean_ic[1]; atol = 0.01)
+        @test s.t_stat[1] > 2 * sg.t_stat[1]
+    end
+
+    @testset "The reference implementation's factor diagnostics are reproduced" begin
+        # The default of the verb is parity: the same kernel over the same axis answers
+        # the reference's column to the last bit, and the shared summary kernel its four
+        # figures. The one figure the port reads on its own terms is the hit rate, which
+        # counts a `NaN` row as a miss where the reference drops it from the denominator;
+        # ADR 0149 rules that a date the forecast could not rank is a miss, and this
+        # fixture scores every row, so the two agree here and the assertion says why.
+        # The reference masks the forecast by the estimation mask before it correlates,
+        # and the pairing writes the forecast onto that mask once (#1074); the fixture
+        # carries one active asset off the mask, so the pins would miss by up to `0.098`
+        # in a cell were either side to read it.
+        @test c[:, 1] ≈ FC_REF_STYLE rtol = 1e-12
+        @test s.mean_ic[1] ≈ FC_REF_SUMMARY.mean rtol = 1e-12
+        @test s.std_ic[1] ≈ FC_REF_SUMMARY.std rtol = 1e-12
+        @test s.ic_ir[1] ≈ FC_REF_SUMMARY.ir rtol = 1e-12
+        @test s.t_stat[1] ≈ FC_REF_SUMMARY.t_stat rtol = 1e-12
+        @test s.hit_rate[1] == FC_REF_SUMMARY.hit_rate
+        @test count(isfinite, view(c, :, 1)) == size(c, 1)
+    end
+
+    @testset "A member refit along the grid carries no correlation off it" begin
+        # `forecast_history` writes such a member's forecast on its refit grid only, which
+        # is anchored at the block's first row and strides by `step` through its last, so
+        # the whole axis answers `NaN` on every row the member was never asked for and a
+        # correlation on every row it was. `fe.dates` is the scorable subset of that grid:
+        # it stops where the forward target does, and the last written row lies past it,
+        # so the whole axis scores one row the grid never sees.
+        tgt = TargetReturnForecast(; scores = px.scores, horizon = 2, lag = 1,
+                                   calibrate = false)
+        ft = forecast_evaluation(tgt, px.rd, px.csfm; horizon = 2, lag = 1)
+        ct = forecast_factor_correlation(ft, px.csfm)
+        T = size(ft.alpha, 1)
+        written = [any(isfinite, view(ft.alpha, t, :)) for t in 1:T]
+        @test findall(written) == collect(1:ft.step:T)
+        @test ft.dates ⊆ findall(written)
+        @test last(findall(written)) > last(ft.dates)
+        @test all(isnan, view(ct, .!written, :))
+        @test findall(isfinite, view(ct, :, 1)) == findall(written)
+        # The grid reads the style column finite on every date, and the whole axis reads
+        # the same entries there.
+        cg = forecast_factor_correlation(ft, px.csfm; dates = ft.dates)
+        @test all(isfinite, view(cg, :, 1))
+        @test isequal(cg, ct[ft.dates, :])
+    end
+end
+
+@testset "The forecast is written onto the estimation universe at the pairing" begin
+    PO = PortfolioOptimisers
+    # Issue #1074. The reference implementation masks the forecast by the estimation mask
+    # before every statistic; the pairing does it once, so every verb above it inherits
+    # the universe from `fe.alpha` and none carries a mask of its own.
+    y = PO.forward_mean_returns(FC_ALPHA, 1, 1)
+    m = trues(size(FC_ALPHA))
+    m[2, 3] = false
+    m[4, 1] = false
+
+    @testset "The bare method writes the forecast onto the universe it is given" begin
+        # A mask that admits every asset, the default, hands the history back as it is.
+        fe = forecast_evaluation(FC_ALPHA, y)
+        @test fe.alpha === FC_ALPHA
+        @test PO.forecast_evaluation_mask(FC_ALPHA, trues(size(FC_ALPHA))) === FC_ALPHA
+        fm = forecast_evaluation(FC_ALPHA, y; umsk = m)
+        @test isnan(fm.alpha[2, 3])
+        @test isnan(fm.alpha[4, 1])
+        @test count(isnan, fm.alpha) == 2
+        @test all(t -> all(i -> !m[t, i] || fm.alpha[t, i] == FC_ALPHA[t, i],
+                           axes(FC_ALPHA, 2)), axes(FC_ALPHA, 1))
+        @test fm.y === y
+        # A mask that empties a row leaves the target alone and the row unscorable.
+        me = copy(m)
+        me[1, :] .= false
+        @test first(forecast_evaluation(FC_ALPHA, y; umsk = me).dates) == 2
+        @test isequal(forecast_evaluation(FC_ALPHA, y; umsk = me).y, y)
+        # The caller's history is not written to.
+        @test !any(isnan, FC_ALPHA)
+    end
+
+    @testset "A mask off the forecast's axis is refused" begin
+        @test_throws DimensionMismatch PO.forecast_evaluation_mask(FC_ALPHA, m[1:3, :])
+        @test_throws DimensionMismatch PO.forecast_evaluation_mask(FC_ALPHA, m[:, 1:3])
+    end
+
+    @testset "The carrier-and-block methods read the mask off the Asset Panel" begin
+        px = evaluation_fixture(; planted = true)
+        rd, csfm = px.rd, px.csfm
+        emsk = rd.pnl.emsk[px.rows, :]
+        amsk = rd.pnl.amsk[px.rows, :]
+        off = [i for i in axes(emsk, 2) if all(view(amsk, :, i)) && !any(view(emsk, :, i))]
+        # The synthetic panel clears the estimation mask for a few assets over the whole
+        # panel, so the fixture carries at least one active asset the forecast is written
+        # for and the estimate never reads.
+        @test !isempty(off)
+        fw = FixedWeightedReturnForecast(; scores = px.scores, scale = 1.0,
+                                         weights = [0.4, 0.6])
+        fe = forecast_evaluation(fw, rd, csfm; horizon = 5, lag = 1)
+        @test all(t -> all(i -> emsk[t, i] || isnan(fe.alpha[t, i]), axes(fe.alpha, 2)),
+                  axes(fe.alpha, 1))
+        @test any(isfinite, view(PO.forecast_history(fw, rd, csfm; step = 5), :, off[1]))
+        @test all(isnan, view(fe.alpha, :, off[1]))
+        # The Estimator method is the bare method handed the cut mask, entry for entry,
+        # and the Result method the same.
+        hist = PO.forecast_history(fw, rd, csfm; step = 5)
+        fb = forecast_evaluation(hist, fe.y; umsk = emsk, horizon = 5, lag = 1)
+        @test isequal(fb.alpha, fe.alpha)
+        @test fb.dates == fe.dates
+        fr = forecast_evaluation(return_forecast(fw, rd, csfm), rd, csfm; horizon = 5,
+                                 lag = 1)
+        @test isequal(fr.alpha, fe.alpha)
+        # Every statistic inherits the universe: the coefficient of the masked pairing is
+        # the coefficient of the bare pairing with the mask, and differs from the one
+        # without.
+        @test isequal(forecast_ic(fe), forecast_ic(fb))
+        @test !isequal(forecast_ic(fe),
+                       forecast_ic(forecast_evaluation(hist, fe.y; horizon = 5, lag = 1)))
     end
 end
 

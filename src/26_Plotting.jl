@@ -3205,6 +3205,7 @@ function plot_forecast_portfolio_decay end
         B::Arr3Num,
         w::Option{<:MatNum} = nothing;
         nf::Option{<:AbstractVector} = nothing,
+        dates::AbstractVector{<:Integer} = axes(fe.alpha, 1),
         rank::Bool = false,
         min_count::Integer = fe.min_count,
         kwargs...
@@ -3219,7 +3220,7 @@ function plot_forecast_portfolio_decay end
 
 Plot the contemporaneous correlation of a Return Forecast with every factor exposure.
 
-The figure draws what [`forecast_factor_correlation`](@ref) returns and computes nothing of its own, one series per factor. Nothing here is forward looking: the correlation is taken on the date the forecast is stated, so the figure says what the forecast **is**, not what it earned. A series that sits near one is a forecast that restates an exposure the risk model already holds, and the return it earns is that factor's return under another name.
+The figure draws what [`forecast_factor_correlation`](@ref) returns and computes nothing of its own, one series per factor, on the rows `dates` names. Nothing here is forward looking: the correlation is taken on the date the forecast is stated, so the figure says what the forecast **is**, not what it earned, and it is drawn on every observation by default rather than on the evaluation grid; `dates = fe.dates` draws the grid. A series that sits near one is a forecast that restates an exposure the risk model already holds, and the return it earns is that factor's return under another name.
 
 A neutralised forecast does not read zero here. The cross-sectional fit that neutralises it carries no intercept, so its residual is orthogonal to its target in the uncentred sense and keeps a correlation with it.
 
@@ -3232,6 +3233,7 @@ The figure takes the evaluation and not the block, for the reason [`plot_forecas
   - `w`: Cross-sectional weight history `observations × assets`, on the axis of the forecast, or `nothing` for equal weights.
   - `csfm`: A cross-sectional factor model block, whose exposure history and weight history are read.
   - `nf`: Factor names of the answer's axis. `nothing` reads them off the block, and falls back to the position of the factor.
+  - `dates`: Row indices of `fe.alpha` the correlation is read and drawn on. The default is every observation; `fe.dates` reads the evaluation grid.
   - `rank`: Take the rank correlation when `true`, and the weighted correlation otherwise.
   - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history the block is read with.
   - `min_count`: Least number of assets a cross-section needs before a correlation of it is reported.

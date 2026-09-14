@@ -80,6 +80,22 @@ statistic this moves is the hit rate of the coefficients, which counts against e
 a silenced date as a miss; that convention is `exposure_ic_factor_summary`'s, which the coefficient
 summary shares with map #643's exposure summary so the two never diverge.
 
+### The forecast is written onto the universe at the pairing
+
+The reference masks the forecast by the panel's estimation mask before every statistic. A member
+of this family standardises its Descriptors over the estimation universe but writes a score for
+every asset whose fields are finite, so an active asset the estimate never reads carried a finite
+forecast and entered every statistic here and none there; on the planted fixture of `test_08x`
+that is one asset per row, and it moves a factor correlation by up to `0.098` in a cell. The rule
+is applied **once**, on the universe the Result already carries: the bare `forecast_evaluation`
+writes `NaN` into `alpha` off `umsk` through `forecast_evaluation_mask` and finds the dates on the
+masked forecast, so every verb above the pairing reads `fe.alpha` and inherits the universe from
+it, and no verb carries a mask of its own. The coverage is the one verb that reads `umsk` itself,
+as its denominator. A mask that admits every asset — the bare method's default — hands the
+history back as it is, so the pairing carries a caller's matrix rather than a copy; any other mask
+answers a copy, and the caller's history is not written to. Issue #1074 measured the divergence,
+and this paragraph is its ruling.
+
 ### A member that publishes no history is refit along the evaluation grid
 
 `forecast_history` fits the member once and reads its own Result: a `hist` that is given is
@@ -127,6 +143,24 @@ pair of every evaluation date; the intercept is refused rather than fitted, beca
 cross-sectional mean of the target is what the factor model is for. The curve and the pooled
 moments read every pair alike; the weights reach the slope alone. There is no cross-sectional
 count to threshold, so the verb takes no `min_count`.
+
+### A contemporaneous statistic is read on every observation, and the grid is opt-in
+
+`forecast_factor_correlation` correlates the cross-section of the forecast against the
+cross-section of each exposure **at the same observation**. Nothing in it looks forward, so it has
+no window to mature and nothing to keep disjoint: every observation at which the forecast and an
+exposure are both written is a sample of it, and the evaluation grid — which exists to keep the
+coefficient's forward windows from overlapping — has no meaning for it. The verb therefore reads
+the whole observation axis of `fe.alpha` by default, which is what the reference reads, and it is
+bit-exact with the reference's kernel and summary on that axis (`test_08x` pins it). A caller who
+wants the correlations beside the coefficients of the same dates passes `dates = fe.dates`, and
+any other row set is read on the same terms; the row set is a value, not a flag, so the grid is
+one spelling of it rather than a second shape. The rows are not filtered: a member that is refit
+along the grid carries `NaN` off it, the whole axis answers `NaN` on every row it was never asked
+for, and because `exposure_ic_summary`'s hit rate counts such a row as a miss, that member is
+summarised at `dates = fe.dates`. Under the default `step = horizon` the grid holds `1 / horizon`
+of the observations, so the old reading carried a t-statistic smaller by the root of that ratio
+for the same forecast; issue #1071 measured it and this section is its ruling.
 
 ### A forward-window table is read on the common dates of its whole grid
 
@@ -201,16 +235,19 @@ a hand-written blank through the bare method. The map named it as a fresh effort
 [#1073](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1073) seeds it.
 
 The review that wrote this ADR found three places where the code at the head read less than the
-reference and the tickets did not say so. One is paid: `forecast_coverage` divided by every asset
-on the panel rather than by the estimation mask's count at the date
+reference and the tickets did not say so, and all three are paid. `forecast_coverage` divided by
+every asset on the panel rather than by the estimation mask's count at the date
 ([#1070](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1070)), and the Result now
-carries the universe, as the decision above states. Two are the maintainer's to rule on, and this
-ADR is rewritten in place when they are: `forecast_factor_correlation` reads the evaluation dates only, where a contemporaneous statistic
-can read every observation
-([#1071](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1071)); and the reference's
-two comparison overlays — several forecasts' cumulative coefficient and cumulative book return on
-one axis — have no vector method
-([#1072](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1072)).
+carries the universe, as the decision above states. `forecast_factor_correlation` read the
+evaluation dates only, where a contemporaneous statistic can read every observation
+([#1071](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1071)), and it now reads
+them all, as the decision above states; its parity run against the reference measured a fourth
+place, the forecast entering every statistic off the estimation mask
+([#1074](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1074)), and the pairing now
+writes the forecast onto the universe. The reference's two comparison overlays — several
+forecasts' cumulative coefficient and cumulative book return on one axis — had no vector method
+([#1072](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1072)), and its own commit
+paid it.
 
 A Neutralisation does not decorrelate a forecast from its target, because both Neutralisation
 sites fit a cross-sectional regression with no intercept; that is

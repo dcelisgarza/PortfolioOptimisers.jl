@@ -289,6 +289,10 @@ Producing `alpha` can cost a rolling refit, so the Result stores it rather than 
 
 `umsk` is the estimation mask of the Asset Panel, cut to the block's rows, and it is what [`forecast_coverage`](@ref) divides by. It is carried on the Result because the coverage is read at the Result layer, where no carrier is in hand, and because every consumer of the evaluation — the summary, the window tables, the plots — must read the same universe. On a point-in-time panel it is what keeps an asset that has not listed yet, or has delisted, out of the denominator: a late lister is not a lost Descriptor. The bare method of [`forecast_evaluation`](@ref) takes it as a keyword and defaults it to every asset.
 
+# The forecast is written on the universe
+
+`alpha` carries `NaN` wherever `umsk` is `false`, because [`forecast_evaluation`](@ref) writes it there once, through [`forecast_evaluation_mask`](@ref), before the dates are found. A member standardises its Descriptors over the estimation universe, so a score for an asset outside it is standardised against a population the asset does not belong to, and no statistic of the evaluation reads one: the coefficients, the books, the calibration and the factor correlations inherit the universe from `alpha` rather than applying the mask of their own, and the coverage reads the mask itself as its denominator. The reference implementation masks the forecast by the estimation mask before every statistic, and this is the one place the port does it.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -320,7 +324,7 @@ keyword constructor, and the type validates nothing of its own.
     """
     y
     """
-    Universe mask `observations × assets`, on the same axis as `alpha`: `true` where the asset is in the estimation universe of the observation. It is the denominator of [`forecast_coverage`](@ref).
+    Universe mask `observations × assets`, on the same axis as `alpha`: `true` where the asset is in the estimation universe of the observation. It is the denominator of [`forecast_coverage`](@ref), and `alpha` is `NaN` wherever it is `false`.
     """
     umsk
     """
@@ -425,20 +429,21 @@ end
 
 Pair a Return Forecast with the forward target it is answerable for, out of sample.
 
-This is the bottom of the evaluation hierarchy. The bare method takes the two matrices and computes nothing but the evaluation dates, so every statistic above it is testable without a fit, and a caller scores a forecast the library did not produce; it takes the universe as a keyword, and defaults it to every asset. The Result method reads the forecast history off a fitted member and builds the target from the carrier and the block, so a caller who holds a Result writes one call. The Estimator method asks [`forecast_history`](@ref) for the history instead, which refits a member that publishes none, so every member the family ships is evaluable through it.
+This is the bottom of the evaluation hierarchy. The bare method takes the two matrices and computes nothing but the evaluation dates, so every statistic above it is testable without a fit, and a caller scores a forecast the library did not produce; it takes the universe as a keyword, defaults it to every asset, and writes the forecast onto it. The Result method reads the forecast history off a fitted member and builds the target from the carrier and the block, so a caller who holds a Result writes one call. The Estimator method asks [`forecast_history`](@ref) for the history instead, which refits a member that publishes none, so every member the family ships is evaluable through it.
 
 # Algorithm
 
  1. For the Result method, read `hist` through [`forecast_evaluation_history`](@ref), which refuses a member that carries none. For the Estimator method, build the history through [`forecast_history`](@ref) at the evaluation's own `step`, so a refit lands on every date the evaluation scores.
  2. For both, build the target history through [`forecast_target_history`](@ref) and take its forward mean with [`forward_mean_returns`](@ref), and cut the estimation mask of the Asset Panel to the block's rows, in [`forecast_evaluation_pairing`](@ref).
- 3. Find the evaluation dates with [`forecast_evaluation_dates`](@ref).
- 4. Collect the pair, the universe, the dates and the parameters into a [`ForecastEvaluationResult`](@ref).
+ 3. Write the forecast onto the universe with [`forecast_evaluation_mask`](@ref), so an asset off the estimation mask of an observation carries `NaN` there.
+ 4. Find the evaluation dates with [`forecast_evaluation_dates`](@ref), on the masked forecast.
+ 5. Collect the pair, the universe, the dates and the parameters into a [`ForecastEvaluationResult`](@ref).
 
 # Arguments
 
   - `alpha`: Return Forecast history `observations × assets`, in return units.
   - `y`: Forward target `observations × assets`, on the same axis as `alpha`. The bare method takes it already matured, and records `horizon` and `lag` as the parameters that matured it.
-  - `umsk`: Universe mask `observations × assets`, on the same axis as `alpha`, `true` where the asset is in the estimation universe of the observation. It is the denominator of [`forecast_coverage`](@ref). The bare method takes it, and defaults it to every asset; the two others read it off the Asset Panel's estimation mask, cut to the block's rows.
+  - `umsk`: Universe mask `observations × assets`, on the same axis as `alpha`, `true` where the asset is in the estimation universe of the observation. It is the denominator of [`forecast_coverage`](@ref), and the forecast is written `NaN` off it, so no statistic reads an asset outside the universe. The bare method takes it, and defaults it to every asset; the two others read it off the Asset Panel's estimation mask, cut to the block's rows.
   - `rfr`: A fitted Return Forecast Result.
   - `rfe`: A Return Forecast Estimator.
   - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl`.
@@ -455,7 +460,7 @@ This is the bottom of the evaluation hierarchy. The bare method takes the two ma
   - `!isempty(alpha)`. Raises an [`IsEmptyError`](@ref).
   - `size(alpha) == size(y)` and `size(alpha) == size(umsk)`. Raise a `DimensionMismatch`.
   - `horizon >= 1`, `lag >= 0`, `step >= 1`, `min_count >= 1` and `ppy > 0`. Raise a `DomainError`.
-  - The rules of [`forecast_evaluation_dates`](@ref).
+  - The rules of [`forecast_evaluation_mask`](@ref) and of [`forecast_evaluation_dates`](@ref).
   - For the Result method, the rules of [`forecast_evaluation_history`](@ref) and of [`forecast_evaluation_pairing`](@ref).
   - For the Estimator method, the rules of [`forecast_history`](@ref) and of [`forecast_evaluation_pairing`](@ref).
 
@@ -484,6 +489,7 @@ julia> fe.dates
   - [`ForecastEvaluationResult`](@ref)
   - [`forecast_evaluation_dates`](@ref)
   - [`forecast_evaluation_history`](@ref)
+  - [`forecast_evaluation_mask`](@ref)
   - [`forecast_evaluation_pairing`](@ref)
   - [`forecast_history`](@ref)
   - [`forecast_target_history`](@ref)
@@ -505,9 +511,60 @@ function forecast_evaluation(alpha::MatNum, y::MatNum;
     @argcheck(step >= one(step), DomainError(step, "step must be >= 1"))
     @argcheck(min_count >= one(min_count), DomainError(min_count, "min_count must be >= 1"))
     @argcheck(ppy > zero(ppy), DomainError(ppy, "ppy must be positive"))
-    dates = forecast_evaluation_dates(alpha, y, step)
-    return ForecastEvaluationResult(alpha, y, umsk, dates, target, horizon, lag, step,
+    am = forecast_evaluation_mask(alpha, umsk)
+    dates = forecast_evaluation_dates(am, y, step)
+    return ForecastEvaluationResult(am, y, umsk, dates, target, horizon, lag, step,
                                     min_count, ppy)
+end
+"""
+    forecast_evaluation_mask(alpha::MatNum, umsk::AbstractMatrix{Bool}) -> MatNum
+
+Write a Return Forecast history onto the universe of the evaluation.
+
+The evaluation scores an asset at an observation only when the asset is in the estimation universe there, and it applies that rule once, at the pairing, by writing `NaN` into the forecast off the mask: every verb above the pairing reads `fe.alpha` and inherits the universe from it, so none carries a mask of its own. A mask that admits every asset — the bare method's default — hands the history back as it is, so the pairing carries a caller's matrix rather than a copy of it; any other mask answers a copy, and the caller's history is not written to.
+
+# Arguments
+
+  - `alpha`: Return Forecast history `observations × assets`.
+  - `umsk`: Universe mask `observations × assets`, `true` where the asset is in the estimation universe of the observation.
+
+# Validation
+
+  - `size(umsk) == size(alpha)`. Raises a `DimensionMismatch`.
+
+# Returns
+
+  - `alpha::MatNum`: The history itself when the mask admits every asset, and otherwise a copy of it with `NaN` wherever the mask is `false`.
+
+# Examples
+
+```jldoctest
+julia> alpha = [1.0 2.0; 3.0 4.0];
+
+julia> PortfolioOptimisers.forecast_evaluation_mask(alpha, trues(2, 2)) === alpha
+true
+
+julia> PortfolioOptimisers.forecast_evaluation_mask(alpha, [true false; true true])
+2×2 Matrix{Float64}:
+ 1.0  NaN
+ 3.0    4.0
+```
+
+# Related
+
+  - [`forecast_evaluation`](@ref)
+  - [`forecast_evaluation_pairing`](@ref)
+  - [`ForecastEvaluationResult`](@ref)
+  - [`return_forecast_weights`](@ref)
+"""
+function forecast_evaluation_mask(alpha::MatNum, umsk::AbstractMatrix{Bool})::MatNum
+    @argcheck(size(umsk, 1) == size(alpha, 1) && size(umsk, 2) == size(alpha, 2),
+              DimensionMismatch("umsk ($(size(umsk, 1))×$(size(umsk, 2))) must match alpha ($(size(alpha, 1))×$(size(alpha, 2)))"))
+    if all(umsk)
+        return alpha
+    end
+    return [umsk[t, i] ? alpha[t, i] : convert(eltype(alpha), NaN)
+            for t in axes(alpha, 1), i in axes(alpha, 2)]
 end
 function forecast_evaluation(rfr::AbstractReturnForecastResult, rd::ReturnsResult,
                              csfm::CrossSectionalFactorModel;

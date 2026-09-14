@@ -3175,12 +3175,13 @@ function PortfolioOptimisers.plot_forecast_factor_correlation(fe::PortfolioOptim
                                                               B::Arr3Num,
                                                               w::Option{<:MatNum} = nothing;
                                                               nf::Option{<:AbstractVector} = nothing,
+                                                              dates::AbstractVector{<:Integer} = axes(fe.alpha,
+                                                                                                      1),
                                                               rank::Bool = false,
                                                               min_count::Integer = fe.min_count,
                                                               kwargs...)
-    dates::AbstractVector{<:Integer} = fe.dates
-    c = PortfolioOptimisers.forecast_factor_correlation(fe, B, w; rank = rank,
-                                                        min_count = min_count)
+    c = PortfolioOptimisers.forecast_factor_correlation(fe, B, w; dates = dates,
+                                                        rank = rank, min_count = min_count)
     labels = isnothing(nf) ? string.(1:size(c, 2)) : string.(nf)
     method = rank ? "Spearman" : "Pearson"
     return forecast_plot_series(dates, c, labels, "Forecast Factor Correlation ($method)",

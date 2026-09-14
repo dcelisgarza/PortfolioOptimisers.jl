@@ -16,6 +16,7 @@ ForecastEvaluationResult
 forecast_target_history
 forecast_evaluation_history
 forecast_evaluation_dates
+forecast_evaluation_mask
 forecast_evaluation_pairing
 forecast_evaluation
 ```
