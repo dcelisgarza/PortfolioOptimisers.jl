@@ -909,7 +909,8 @@ The two parameters cut the same axis and are measured in the same scaled units. 
 """
 function gerber_iq_assert_c_d(c::Number, kind::BasicGerberIQ)
     @argcheck(c <= kind.d,
-              DomainError("c must be <= kind.d, got c = $c, kind.d = $(kind.d)"))
+              DomainError(c,
+                          "`c` is $c, and `kind.d` is $(kind.d). The centre band is inside the boundary, so `c <= kind.d` must hold."))
     return nothing
 end
 """
@@ -1653,17 +1654,33 @@ Asserts that all `c <= kind.d**`, where `c` is the small movement threshold and 
   - $(ref_dict[:gerber2025squeezing])
 """
 function gerber_iq_assert_c_d(c::Number, kind::PartialGerberIQ)
-    @argcheck(c <= kind.dcp, DomainError("c ($c) must be <= kind.dcp ($(kind.dcp))"))
-    @argcheck(c <= kind.dcn, DomainError("c ($c) must be <= kind.dcn ($(kind.dcn))"))
-    @argcheck(c <= kind.ddp, DomainError("c ($c) must be <= kind.ddp ($(kind.ddp))"))
-    @argcheck(c <= kind.ddn, DomainError("c ($c) must be <= kind.ddn ($(kind.ddn))"))
+    @argcheck(c <= kind.dcp,
+              DomainError(c,
+                          "`c` is $c, and `kind.dcp` is $(kind.dcp). The centre band is inside the boundary, so `c <= kind.dcp` must hold."))
+    @argcheck(c <= kind.dcn,
+              DomainError(c,
+                          "`c` is $c, and `kind.dcn` is $(kind.dcn). The centre band is inside the boundary, so `c <= kind.dcn` must hold."))
+    @argcheck(c <= kind.ddp,
+              DomainError(c,
+                          "`c` is $c, and `kind.ddp` is $(kind.ddp). The centre band is inside the boundary, so `c <= kind.ddp` must hold."))
+    @argcheck(c <= kind.ddn,
+              DomainError(c,
+                          "`c` is $c, and `kind.ddn` is $(kind.ddn). The centre band is inside the boundary, so `c <= kind.ddn` must hold."))
     return nothing
 end
 function gerber_iq_assert_c_d(c::Number, kind::FullGerberIQ)
-    @argcheck(c <= kind.dp1, DomainError("c ($c) must be <= kind.dp1 ($(kind.dp1))"))
-    @argcheck(c <= kind.dp2, DomainError("c ($c) must be <= kind.dp2 ($(kind.dp2))"))
-    @argcheck(c <= kind.dn1, DomainError("c ($c) must be <= kind.dn1 ($(kind.dn1))"))
-    @argcheck(c <= kind.dn2, DomainError("c ($c) must be <= kind.dn2 ($(kind.dn2))"))
+    @argcheck(c <= kind.dp1,
+              DomainError(c,
+                          "`c` is $c, and `kind.dp1` is $(kind.dp1). The centre band is inside the boundary, so `c <= kind.dp1` must hold."))
+    @argcheck(c <= kind.dp2,
+              DomainError(c,
+                          "`c` is $c, and `kind.dp2` is $(kind.dp2). The centre band is inside the boundary, so `c <= kind.dp2` must hold."))
+    @argcheck(c <= kind.dn1,
+              DomainError(c,
+                          "`c` is $c, and `kind.dn1` is $(kind.dn1). The centre band is inside the boundary, so `c <= kind.dn1` must hold."))
+    @argcheck(c <= kind.dn2,
+              DomainError(c,
+                          "`c` is $c, and `kind.dn2` is $(kind.dn2). The centre band is inside the boundary, so `c <= kind.dn2` must hold."))
     return nothing
 end
 """

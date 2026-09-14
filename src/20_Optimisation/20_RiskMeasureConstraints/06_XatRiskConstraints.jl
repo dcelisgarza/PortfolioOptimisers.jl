@@ -127,7 +127,9 @@ function set_mip_quantile_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMe
                                             pr::AbstractPriorResult, series, T::Int,
                                             b::Number, s::Number, keys::NamedTuple;
                                             prefix::Symbol = Symbol(""))
-    @argcheck(b > s, DomainError("b ($b) must be greater than s ($s)"))
+    @argcheck(b > s,
+              DomainError((b, s),
+                          "`b` is $b and `s` is $s. The big-M constant `b` relaxes a bound the slack `s` tightens, so `b > s` must hold."))
     sc = get_constraint_scale(model)
     risk, z = JuMP.@variables(model, begin
                                   ()

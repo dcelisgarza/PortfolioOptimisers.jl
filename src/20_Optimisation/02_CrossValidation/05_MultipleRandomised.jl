@@ -360,7 +360,9 @@ function sample_unique_assets(N::Integer, k::Integer, n_subsets::Integer;
                               seed::Option{<:Integer} = nothing)
     assert_nonempty_nonneg_finite_val(N, :N)
     assert_nonempty_nonneg_finite_val(k, :k)
-    @argcheck(k <= N, DomainError("k ($k) must be less than or equal to N ($N)"))
+    @argcheck(k <= N,
+              DomainError((k, N),
+                          "`k` is $k and `N` is $N. A subset draws `k` assets from a universe of `N`, so `k <= N` must hold."))
     assert_nonempty_finite_val(n_subsets, :n_subsets)
     n_comb = binomial(N, k)
     @argcheck(n_subsets <= n_comb,

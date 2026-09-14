@@ -192,7 +192,7 @@ An **alias** is the case to check first. Its docstring carries a different set o
 
     ```julia
     @argcheck !isempty(v) IsEmptyError("v cannot be empty")
-    @argcheck all(isfinite, v) DomainError("v must be finite")
+    @argcheck all(isfinite, v) DomainError(v, "`v` holds a non-finite entry, and the estimator reads every entry, so state a finite vector.")
     @argcheck size(A, 1) == size(B, 1) DimensionMismatch("A and B must have same rows")
     ```
 
@@ -200,10 +200,39 @@ An **alias** is the case to check first. Its docstring carries a different set o
 
   - Empty checks: `@argcheck !isempty(x) IsEmptyError(...)`
   - Nothing checks: `@argcheck !isnothing(x) IsNothingError(...)`
-  - Finite checks: `@argcheck all(isfinite, x) DomainError(...)`
+  - Finite checks: `@argcheck all(isfinite, x) DomainError(x, ...)`
   - Dimension checks: `@argcheck size(A) == size(B) DimensionMismatch(...)`
 
 - **Prefer shared helpers over inline `@argcheck`** — see constructor section above.
+
+### A `DomainError` carries the value and a message
+
+A `DomainError` is raised in one shape: `DomainError(value, message)`. The `value` is the
+quantity that is out of range, so a caller who catches the error reads it off `.val`; a relation
+between two quantities carries the pair as a tuple. The `message` names the field the caller
+wrote, the value it holds, what the code does with it, and the range it must lie in, so the
+caller can act on the message alone.
+
+```julia
+@argcheck(fraction <= one(fraction),
+          DomainError(fraction,
+                      "`EffectiveAssetFloor.fraction` is $fraction, and a fraction of the universe is at most one. The rule multiplies it by the asset count to get the floor, so a fraction above one names a floor above the universe. State a value in `(0, 1]`."))
+```
+
+Two other spellings raise the same type and are refused:
+
+- `DomainError("sentence")` puts the sentence in `.val` and leaves `.msg` empty, so `showerror`
+  prints `DomainError with <sentence>:` and then nothing, and a caller who reads `.val` gets a
+  string where a number was promised.
+- A bare `DomainError` type makes `ArgCheck` write the message from the source expression, so
+  the caller reads `one(fraction)` and `fraction <= one(fraction) must hold` where a field name
+  and a range were owed.
+
+A guard that fits one of the `assert_*` verbs of `src/01_Base/10_Assertions.jl` — `assert_gt0`,
+`assert_nonneg`, `assert_finite`, `assert_unit_interval`, `assert_closed_unit_interval` and
+their composites — is routed through that verb rather than written inline, because the verb
+already carries the shape and names the symbol the caller passed.
+`test/test_63_domain_error_shape_census.jl` gates the rule over `src/` and `ext/`.
 
 ## Multiple Dispatch
 

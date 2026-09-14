@@ -784,9 +784,9 @@ Pagerank
     """
     epsilon
     function Pagerank(n::Integer, alpha::Number, epsilon::Number)
-        @argcheck(0 < n, DomainError)
+        assert_gt0(n, :n)
         assert_unit_interval(alpha, :alpha)
-        @argcheck(zero(epsilon) < epsilon, DomainError)
+        assert_gt0(epsilon, :epsilon)
         return new{typeof(n), typeof(alpha), typeof(epsilon)}(n, alpha, epsilon)
     end
 end

@@ -183,7 +183,7 @@ SemiDefinitePhylogenyEstimator
     p
     function SemiDefinitePhylogenyEstimator(pl::NwE_ClE,
                                             p::Number)::SemiDefinitePhylogenyEstimator
-        @argcheck(p >= zero(p), DomainError("`p` must be non-negative:\np => $p"))
+        assert_nonneg(p, :p)
         return new{typeof(pl), typeof(p)}(pl, p)
     end
 end
@@ -351,7 +351,8 @@ The fallback method takes every other argument list and checks nothing, so a clu
 """
 function _validate_length_integer_phylogeny_constraint_B(alg::Integer, B::VecNum)::Nothing
     @argcheck(length(B) <= alg,
-              DomainError("`length(B) <= alg`:\nlength(B) => $(length(B))\nalg => $(alg)"))
+              DomainError((length(B), alg),
+                          "`B` holds $(length(B)) entries, and `alg` fixes $alg clusters. Each entry of `B` bounds one cluster, so `length(B) <= alg` must hold."))
     return nothing
 end
 function _validate_length_integer_phylogeny_constraint_B(args...)::Nothing
@@ -389,7 +390,8 @@ Only the [`ClustersEstimator`](@ref) method checks anything. Every other argumen
 function validate_length_integer_phylogeny_constraint_B(cle::ClustersEstimator, B::VecNum)
     if !isnothing(cle.onc.max_k)
         @argcheck(length(B) <= cle.onc.max_k,
-                  DomainError("`length(B) <= cle.onc.max_k`:\nlength(B) => $(length(B))\ncle.onc.max_k => $(cle.onc.max_k)"))
+                  DomainError((length(B), cle.onc.max_k),
+                              "`B` holds $(length(B)) entries, and `cle.onc.max_k` caps the clustering at $(cle.onc.max_k) clusters. Each entry of `B` bounds one cluster, so `length(B) <= cle.onc.max_k` must hold."))
     end
     _validate_length_integer_phylogeny_constraint_B(cle.onc.alg, B)
     return nothing

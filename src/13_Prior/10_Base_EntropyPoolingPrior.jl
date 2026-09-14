@@ -2714,7 +2714,8 @@ function ep_var_views!(var_views::LinearConstraintEstimator, epc::AbstractDict,
     @argcheck(!(!isnothing(lcs.eq) && any(x -> x < zero(eltype(x)), lcs.A_eq .* lcs.B_eq) ||
                 !isnothing(lcs.ineq) &&
                 any(x -> x < zero(eltype(x)), lcs.A_ineq .* lcs.B_ineq)),
-              DomainError("var_views cannot be negative.\n$var_views"))
+              DomainError(var_views,
+                          "A `var_view` states a loss magnitude, so its target is non-negative, and one of these is negative:\n$var_views"))
     for p in (:ineq, :eq)
         if isnothing(getproperty(lcs, p))
             continue
@@ -2725,7 +2726,8 @@ function ep_var_views!(var_views::LinearConstraintEstimator, epc::AbstractDict,
             j = .!iszero.(A[i, :])
             idx = findall(x -> x <= -abs(B[i]), view(X, :, j))
             @argcheck(!isempty(idx),
-                      DomainError("View $(i) = $(var_views[i].eqn) is too extreme, the maximum viable for asset $(findfirst(x -> x == true, j)) is $(-minimum(X[:,j])). Please lower it or use a different prior with fatter tails."))
+                      DomainError(abs(B[i]),
+                                  "View $(i) = $(var_views[i].eqn) is too extreme, the maximum viable for asset $(findfirst(x -> x == true, j)) is $(-minimum(X[:,j])). Please lower it or use a different prior with fatter tails."))
             #! An `:ineq` row reaches here normalised to `A * p <= B`, and the parser accepts
             #! `>=` alone, so `B[i]` is the negated target and never positive. A zero target
             #! must therefore take the same sign as a positive one; `>=` here read it as a

@@ -111,7 +111,9 @@ Keywords correspond to the struct's fields.
             @argcheck(isfinite(ub), IsNonFiniteError("ub must be finite, got $ub"))
         end
         if !lb_flag && !ub_flag
-            @argcheck(lb <= ub, DomainError("lb must be <= ub, got lb = $lb, ub = $ub"))
+            @argcheck(lb <= ub,
+                      DomainError((lb, ub),
+                                  "`BudgetRange.lb` is $lb and `ub` is $ub. A lower budget is at most its upper budget, so `lb <= ub` must hold."))
         end
         return new{typeof(lb), typeof(ub)}(lb, ub)
     end

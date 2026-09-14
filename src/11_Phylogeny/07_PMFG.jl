@@ -92,9 +92,11 @@ function PMFG_T2s(W::MatNum, nargout::Integer = 3)
     # Split in two, because `0 <= NaN` is `false`: one check would report a `NaN` as a
     # negative weight and send the caller looking for the wrong thing.
     @argcheck(!any(isnan, W),
-              DomainError("!any(isnan, W) must hold. Got\ncount(isnan, W) => $(count(isnan, W))."))
+              DomainError(W,
+                          "!any(isnan, W) must hold. Got\ncount(isnan, W) => $(count(isnan, W))."))
     @argcheck(all(x -> zero(x) <= x, W),
-              DomainError("all(x -> x >= 0, W) must hold. Got\nminimum(W) => $(minimum(W))."))
+              DomainError(W,
+                          "all(x -> x >= 0, W) must hold. Got\nminimum(W) => $(minimum(W))."))
     A = SparseArrays.spzeros(Int, N, N)  # Initialize adjacency matrix
     in_v = zeros(Int, N)    # Initialize list of inserted vertices
     tri = zeros(Int, 2 * N - 4, 3)  # Initialize list of triangles

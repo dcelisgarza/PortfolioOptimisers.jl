@@ -88,8 +88,8 @@ julia> res.nx
     cache
     function MissingDataFilter(col_thr::Number, row_thr::Number,
                                cache::Option{<:AbstractPartialFitState})
-        @argcheck(zero(col_thr) <= col_thr <= one(col_thr), DomainError)
-        @argcheck(zero(row_thr) <= row_thr <= one(row_thr), DomainError)
+        assert_closed_unit_interval(col_thr, :col_thr)
+        assert_closed_unit_interval(row_thr, :row_thr)
         return new{typeof(col_thr), typeof(row_thr), typeof(cache)}(col_thr, row_thr, cache)
     end
 end

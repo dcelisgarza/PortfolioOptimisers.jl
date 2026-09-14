@@ -481,7 +481,8 @@ function ep_cvar_views_setup(cvar_views::CVV_VecCVV, pr::AbstractPriorResult,
         @argcheck(!any(x -> x != 1, count(!iszero, lcs.A_eq; dims = 2)),
                   ArgumentError("Cannot mix multiple assets in a single cvar_view.\n$(views)"))
         @argcheck(!any(x -> x < zero(eltype(x)), lcs.A_eq .* lcs.B_eq),
-                  DomainError("cvar_views cannot be negative.\n$(views)"))
+                  DomainError(views,
+                              "A `cvar_view` states a loss magnitude, so its target is non-negative, and one of these is negative:\n$(views)"))
         if !isa(views, AbstractVector)
             views = [views]
         end

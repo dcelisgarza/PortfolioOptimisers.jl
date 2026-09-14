@@ -343,8 +343,7 @@ ShrunkDenoise
     """
     alpha
     function ShrunkDenoise(alpha::Number)
-        @argcheck(zero(alpha) <= alpha <= one(alpha),
-                  DomainError("0 <= alpha <= 1 must hold. Got\nalpha => $alpha"))
+        assert_closed_unit_interval(alpha, :alpha)
         return new{typeof(alpha)}(alpha)
     end
 end
@@ -458,8 +457,12 @@ Denoise
     function Denoise(pdm::Option{<:AbstractPosdefEstimator}, alg::AbstractDenoiseAlgorithm,
                      args::Tuple, kwargs::NamedTuple, kernel, m::Integer,
                      n::Integer)::Denoise
-        @argcheck(1 < m, DomainError)
-        @argcheck(1 < n, DomainError)
+        @argcheck(1 < m,
+                  DomainError(m,
+                              "`Denoise.m` is $m, and the average shifted histogram smooths over `m` adjacent histograms, so it needs more than one. State an integer greater than `1`."))
+        @argcheck(1 < n,
+                  DomainError(n,
+                              "`Denoise.n` is $n, and the average shifted histogram evaluates the eigenvalue density at `n` points, so it needs more than one. State an integer greater than `1`."))
         return new{typeof(pdm), typeof(alg), typeof(args), typeof(kwargs), typeof(kernel),
                    typeof(m), typeof(n)}(pdm, alg, args, kwargs, kernel, m, n)
     end

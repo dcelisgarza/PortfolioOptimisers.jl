@@ -243,7 +243,7 @@ GeneralExponentialSimilarity
     power
     function GeneralExponentialSimilarity(coef::Number, power::Number)
         assert_nonempty_gt0_finite_val(coef, :coef)
-        @argcheck(zero(power) < power, DomainError)
+        assert_gt0(power, :power)
         return new{typeof(coef), typeof(power)}(coef, power)
     end
 end

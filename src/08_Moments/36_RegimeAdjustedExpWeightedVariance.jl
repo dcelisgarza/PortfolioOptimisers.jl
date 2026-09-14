@@ -484,7 +484,8 @@ julia> ce.min_obs
         assert_nonempty_gt0_finite_val(regime_min_obs, :regime_min_obs)
         if !isnothing(regime_lohi_mult)
             @argcheck(zero(regime_lohi_mult[1]) < regime_lohi_mult[1] < regime_lohi_mult[2],
-                      DomainError)
+                      DomainError(regime_lohi_mult,
+                                  "`RegimeAdjustedExpWeightedVariance.regime_lohi_mult` is $regime_lohi_mult, and it clamps the regime multiplier to `(lo, hi)`, so the pair must satisfy `0 < lo < hi`. State such a pair, or `nothing` for no clamp."))
         end
         if !isnothing(hac_lags)
             assert_nonempty_gt0_finite_val(hac_lags, :hac_lags)

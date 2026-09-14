@@ -42,7 +42,8 @@ The ingestion layer carries an absent implied volatility as `NaN`, exactly as it
 """
 function assert_nonneg_where_present(val::AbstractArray, sym::Sym_Str = :val)::Nothing
     @argcheck(all(x -> ismissing(x) || isnan(x) || (isfinite(x) && zero(x) <= x), val),
-              DomainError("all(x -> ismissing(x) || isnan(x) || (isfinite(x) && 0 <= x), $sym) must hold: an absent value is carried, and a present one is finite and non-negative. Got\ncount(x -> !ismissing(x) && !isnan(x) && !(isfinite(x) && 0 <= x), $sym) => $(count(x -> !ismissing(x) && !isnan(x) && !(isfinite(x) && zero(x) <= x), val))"))
+              DomainError(val,
+                          "all(x -> ismissing(x) || isnan(x) || (isfinite(x) && 0 <= x), $sym) must hold: an absent value is carried, and a present one is finite and non-negative. Got\ncount(x -> !ismissing(x) && !isnan(x) && !(isfinite(x) && 0 <= x), $sym) => $(count(x -> !ismissing(x) && !isnan(x) && !(isfinite(x) && zero(x) <= x), val))"))
     return nothing
 end
 """

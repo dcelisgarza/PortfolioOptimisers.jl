@@ -203,7 +203,9 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::TrackingRiskMeasure{<:Any, <:Any, <:LpNorm},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; prefix::Symbol = Symbol(""), kwargs...)
-    @argcheck(r.alg.p > 1, DomainError)
+    @argcheck(r.alg.p > 1,
+              DomainError(r.alg.p,
+                          "`LpNorm.p` is $(r.alg.p), and the tracking risk is the `p`-norm of the deviation, which the model states with a power cone of exponent `1 / p`, so `1 < p` must hold. State a value greater than `1`."))
     sc = get_constraint_scale(model)
     k = get_k(model)
     X = pr.X

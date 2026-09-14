@@ -224,7 +224,9 @@ EvenMoment
     """
     alg
     function EvenMoment(p::Integer, ddof::Integer, alg::AbstractMomentAlgorithm)
-        @argcheck(p >= 2, DomainError)
+        @argcheck(p >= 2,
+                  DomainError(p,
+                              "`EvenMoment.p` is $p, and the measure raises the centred returns to the power `p`, so it needs at least the second order. State an integer greater than or equal to `2`."))
         assert_nonempty_nonneg_finite_val(ddof, :ddof)
         return new{typeof(p), typeof(ddof), typeof(alg)}(p, ddof, alg)
     end

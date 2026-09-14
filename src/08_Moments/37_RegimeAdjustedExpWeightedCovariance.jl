@@ -363,7 +363,8 @@ true
         assert_nonempty_gt0_finite_val(regime_min_obs, :regime_min_obs)
         if !isnothing(regime_lohi_mult)
             @argcheck(zero(regime_lohi_mult[1]) < regime_lohi_mult[1] < regime_lohi_mult[2],
-                      DomainError)
+                      DomainError(regime_lohi_mult,
+                                  "`RegimeAdjustedExpWeightedCovariance.regime_lohi_mult` is $regime_lohi_mult, and it clamps the regime multiplier to `(lo, hi)`, so the pair must satisfy `0 < lo < hi`. State such a pair, or `nothing` for no clamp."))
         end
         if !isnothing(hac_lags)
             assert_nonempty_gt0_finite_val(hac_lags, :hac_lags)
@@ -1353,8 +1354,8 @@ function assert_regime_target(target::PortfolioTarget, N::Integer)
     W = isa(w, AbstractMatrix) ? w : permutedims(w)
     @argcheck(size(W, 2) == N,
               DimensionMismatch("`regime_target.w` names $(size(W, 2)) assets, and `X` holds $N"))
-    @argcheck(all(x -> x >= zero(x), W), DomainError)
-    @argcheck(all(x -> x > zero(x), vec(sum(W; dims = 2))), DomainError)
+    assert_nonneg(W, "regime_target.w")
+    assert_gt0(vec(sum(W; dims = 2)), "sum(regime_target.w; dims = 2)")
 
     return nothing
 end

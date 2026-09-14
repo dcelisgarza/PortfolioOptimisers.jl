@@ -75,9 +75,11 @@ julia> PortfolioOptimisers.block_vec_pq(A, 2, 2)
 function block_vec_pq(A::MatNum, p::Integer, q::Integer)
     mp, nq = size(A)
     @argcheck(mod(mp, p) == 0,
-              DomainError("size(A, 1) = $mp must be an integer multiple of p = $p"))
+              DomainError((mp, p),
+                          "`size(A, 1)` is $mp and `p` is $p. The rows split into blocks of `p`, so `size(A, 1)` must be an integer multiple of `p`."))
     @argcheck(mod(nq, q) == 0,
-              DomainError("size(A, 2) = $nq must be an integer multiple of q = $q"))
+              DomainError((nq, q),
+                          "`size(A, 2)` is $nq and `q` is $q. The columns split into blocks of `q`, so `size(A, 2)` must be an integer multiple of `q`."))
     m = mp ÷ p
     n = nq ÷ q
     A_vec = Matrix{eltype(A)}(undef, m * n, p * q)
@@ -492,7 +494,7 @@ julia> S
   - $(ref_dict[:cajas2025]) Appendix A.2, Equations A.25 to A.27.
 """
 function dup_elim_sum_matrices(n::Int)
-    @argcheck(n > 0, DomainError("n = $n must be a positive integer"))
+    assert_gt0(n, :n)
     m = div(n * (n + 1), 2)
     nsq = n^2
     v1 = zeros(Int, nsq)

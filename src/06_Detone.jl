@@ -158,7 +158,7 @@ Detone
     """
     n
     function Detone(pdm::Option{<:AbstractPosdefEstimator}, n::Integer)
-        @argcheck(zero(n) < n, DomainError)
+        assert_gt0(n, :n)
         return new{typeof(pdm), typeof(n)}(pdm, n)
     end
 end
@@ -234,7 +234,8 @@ end
 function detone!(dt::Detone, X::MatNum)
     n = dt.n
     @argcheck(zero(n) < n <= size(X, 2),
-              DomainError("0 < n <= size(X, 2) must hold. Got\nn => $n\nsize(X, 2) => $(size(X, 2))."))
+              DomainError(n,
+                          "`Detone.n` is $n, and `X` holds $(size(X, 2)) assets. The detoner removes the `n` leading principal components, so `n` is at most the number of assets. State a value in `1:$(size(X, 2))`."))
     n -= 1
     s = LinearAlgebra.diag(X)
     iscov = any(!isone, s)

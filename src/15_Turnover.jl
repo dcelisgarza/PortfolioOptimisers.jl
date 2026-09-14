@@ -89,7 +89,7 @@ TurnoverEstimator
             # they are uncapped. `dval = nothing` fills zero, which freezes them instead,
             # so an infinity is the only spelling of an uncapped default and is admitted
             # here where a named cap is not.
-            @argcheck(zero(dval) <= dval, DomainError)
+            assert_nonneg(dval, :dval)
         end
         return new{typeof(w), typeof(val), typeof(dval), typeof(fixed)}(w, val, dval, fixed)
     end

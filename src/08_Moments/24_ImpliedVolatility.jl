@@ -135,7 +135,9 @@ ImpliedVolatilityRegression
     re
     function ImpliedVolatilityRegression(ve::AbstractVarianceEstimator, ws::Number,
                                          re::AbstractRegressionTarget)
-        @argcheck(2 < ws, DomainError)
+        @argcheck(2 < ws,
+                  DomainError(ws,
+                              "`ImpliedVolatilityRegression.ws` is $ws, and the regression needs more than two windows, so the window size is at least `3`. State an integer greater than `2`."))
         return new{typeof(ve), typeof(ws), typeof(re)}(ve, ws, re)
     end
 end
@@ -282,7 +284,7 @@ ImpliedVolatility
     function ImpliedVolatility(ce::StatsBase.CovarianceEstimator,
                                mp::AbstractMatrixProcessingEstimator,
                                alg::ImpliedVolatilityAlgorithm, af::Number)
-        @argcheck(zero(af) < af, DomainError)
+        assert_gt0(af, :af)
         return new{typeof(ce), typeof(mp), typeof(alg), typeof(af)}(ce, mp, alg, af)
     end
 end
@@ -649,7 +651,9 @@ function predict_realised_vols(alg::ImpliedVolatilityRegression, iv::MatNum, X::
                                ::Any)
     T, N = size(X)
     chunk = div(T, alg.ws)
-    @argcheck(2 < chunk, DomainError)
+    @argcheck(2 < chunk,
+              DomainError(chunk,
+                          "`X` holds $T observations, and `ImpliedVolatilityRegression.ws` is $(alg.ws), which gives $chunk windows. The regression needs more than two, so state a shorter window or supply more observations."))
     rv = realised_vol(alg.ve, X, alg.ws, chunk, T, N)
     iv = implied_vol(iv, alg.ws, chunk, T, N)
     @argcheck(size(rv) == size(iv), DimensionMismatch)

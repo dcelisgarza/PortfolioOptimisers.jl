@@ -260,18 +260,19 @@ struct UnresolvedDecay <: PO.GerberIQDecayEstimator end
         # a weight that switches a region off and one that keeps its full value both pass.
         @test BasicGerberIQ(; n = 0.0).n == 0.0
         @test BasicGerberIQ(; n = 1.0).n == 1.0
-        # Past either end the raise names the field the caller wrote and the value it holds.
+        # Past either end the raise carries the value in `.val` and names the field the
+        # caller wrote in `.msg`.
         @test raised_message(() -> BasicGerberIQ(; n = -0.1)) ==
-              "DomainError with 0 <= n <= 1 must hold. Got\nn => -0.1:\n"
+              "DomainError with -0.1:\n0 <= n <= 1 must hold. Got\nn => -0.1"
         # The guard reaches every weight of each template. Each derived default is built from
         # weights of a lower index, so a weight set past the upper end raises on its own row.
         for i in 1:10
             @test raised_message(() -> PartialGerberIQ(; Dict(Symbol("n$i") => 2.0)...)) ==
-                  "DomainError with 0 <= n$i <= 1 must hold. Got\nn$i => 2.0:\n"
+                  "DomainError with 2.0:\n0 <= n$i <= 1 must hold. Got\nn$i => 2.0"
         end
         for i in 1:21
             @test raised_message(() -> FullGerberIQ(; Dict(Symbol("n$i") => 2.0)...)) ==
-                  "DomainError with 0 <= n$i <= 1 must hold. Got\nn$i => 2.0:\n"
+                  "DomainError with 2.0:\n0 <= n$i <= 1 must hold. Got\nn$i => 2.0"
         end
     end
 
@@ -281,9 +282,10 @@ struct UnresolvedDecay <: PO.GerberIQDecayEstimator end
         @test isnothing(PO.gerber_iq_assert_c_d(0.5, PartialGerberIQ(; dcp = 0.5)))
         @test isnothing(PO.gerber_iq_assert_c_d(0.5, FullGerberIQ(; dp1 = 0.5)))
 
-        # Past it the raise names the boundary that failed, and both values.
+        # Past it the raise carries `c` in `.val`, and names the boundary that failed and
+        # both values in `.msg`.
         @test raised_message(() -> PO.gerber_iq_assert_c_d(0.6, BasicGerberIQ(; d = 0.5))) ==
-              "DomainError with c must be <= kind.d, got c = 0.6, kind.d = 0.5:\n"
+              "DomainError with 0.6:\n`c` is 0.6, and `kind.d` is 0.5. The centre band is inside the boundary, so `c <= kind.d` must hold."
         # Each boundary of the two multi-boundary templates is checked on its own, so raise
         # each one in turn by keeping the others clear of `c`.
         for (f, kind) in
@@ -292,7 +294,7 @@ struct UnresolvedDecay <: PO.GerberIQDecayEstimator end
              ("ddp", PartialGerberIQ(; dcp = 3.0, dcn = 3.0, ddp = 1.0, ddn = 3.0)),
              ("ddn", PartialGerberIQ(; dcp = 3.0, dcn = 3.0, ddp = 3.0, ddn = 1.0)))
             @test raised_message(() -> PO.gerber_iq_assert_c_d(2.0, kind)) ==
-                  "DomainError with c (2.0) must be <= kind.$f (1.0):\n"
+                  "DomainError with 2.0:\n`c` is 2.0, and `kind.$f` is 1.0. The centre band is inside the boundary, so `c <= kind.$f` must hold."
         end
         # `FullGerberIQ` sorts each pair of boundaries, so `dp2 <= dp1` and `dn2 <= dn1`
         # always hold and only the inner one of each pair can raise.
@@ -300,7 +302,7 @@ struct UnresolvedDecay <: PO.GerberIQDecayEstimator end
             (("dp2", FullGerberIQ(; dp1 = 3.0, dp2 = 1.0, dn1 = 3.0, dn2 = 3.0)),
              ("dn2", FullGerberIQ(; dp1 = 3.0, dp2 = 3.0, dn1 = 3.0, dn2 = 1.0)))
             @test raised_message(() -> PO.gerber_iq_assert_c_d(2.0, kind)) ==
-                  "DomainError with c (2.0) must be <= kind.$f (1.0):\n"
+                  "DomainError with 2.0:\n`c` is 2.0, and `kind.$f` is 1.0. The centre band is inside the boundary, so `c <= kind.$f` must hold."
         end
         # The estimator runs the guard, so a wrong pair never reaches the kernel.
         @test_throws DomainError GerberIQCovariance(; c = 3.0,

@@ -1187,8 +1187,9 @@ This function approximates the tail Gini risk measure by integrating over a rang
 function owa_tg(T::Integer; alpha_i::Number = 1e-4, alpha::Number = 0.05,
                 a_sim::Integer = 100)
     @argcheck(zero(alpha) < alpha_i < alpha < one(alpha),
-              DomainError("0 < alpha_i < alpha < 1 must hold. Got\nalpha_i => $alpha_i\nalpha => $alpha"))
-    @argcheck(zero(a_sim) < a_sim, DomainError)
+              DomainError((alpha_i, alpha),
+                          "`alpha_i` is $alpha_i and `alpha` is $alpha. The tail Gini integrates the CVaR from the inner level `alpha_i` to the outer level `alpha`, so `0 < alpha_i < alpha < 1` must hold."))
+    assert_gt0(a_sim, :a_sim)
     alphas = range(alpha_i, alpha; length = a_sim)
     n = length(alphas)
     w = Vector{typeof(alpha)}(undef, n)
@@ -1268,11 +1269,12 @@ OrderedWeightsArrayTailGini
         # fold time, against the number the rule returned.
         if isa(alpha, Number)
             @argcheck(0 < alpha_i < alpha < 1,
-                      DomainError("0 < alpha_i < alpha < 1 must hold. Got\nalpha_i => $alpha_i\nalpha => $alpha"))
+                      DomainError((alpha_i, alpha),
+                                  "`alpha_i` is $alpha_i and `alpha` is $alpha. The tail Gini integrates the CVaR from the inner level `alpha_i` to the outer level `alpha`, so `0 < alpha_i < alpha < 1` must hold."))
         else
             assert_unit_interval(alpha_i, :alpha_i)
         end
-        @argcheck(0 < a_sim, DomainError("a_sim must be positive. Got\n a_sim => $a_sim"))
+        assert_gt0(a_sim, :a_sim)
         return new{typeof(alpha_i), typeof(alpha), typeof(a_sim)}(alpha_i, alpha, a_sim)
     end
 end
@@ -1595,18 +1597,20 @@ OrderedWeightsArrayTailGiniRange
         # is checked on its own here and the pair is checked at fold time.
         if isa(alpha, Number)
             @argcheck(0 < alpha_i < alpha < 1,
-                      DomainError("0 < alpha_i < alpha < 1 must hold. Got\nalpha_i => $alpha_i\nalpha => $alpha"))
+                      DomainError((alpha_i, alpha),
+                                  "`alpha_i` is $alpha_i and `alpha` is $alpha. The tail Gini integrates the CVaR from the inner level `alpha_i` to the outer level `alpha`, so `0 < alpha_i < alpha < 1` must hold."))
         else
             assert_unit_interval(alpha_i, :alpha_i)
         end
-        @argcheck(0 < a_sim, DomainError("a_sim must be positive. Got\n a_sim => $a_sim"))
+        assert_gt0(a_sim, :a_sim)
         if isa(beta, Number)
             @argcheck(0 < beta_i < beta < 1,
-                      DomainError("0 < beta_i < beta < 1 must hold. Got\nbeta_i => $beta_i\nbeta => $beta"))
+                      DomainError((beta_i, beta),
+                                  "`beta_i` is $beta_i and `beta` is $beta. The upper tail Gini integrates the CVaR from the inner level `beta_i` to the outer level `beta`, so `0 < beta_i < beta < 1` must hold."))
         else
             assert_unit_interval(beta_i, :beta_i)
         end
-        @argcheck(0 < b_sim, DomainError("b_sim must be positive. Got\n b_sim => $b_sim"))
+        assert_gt0(b_sim, :b_sim)
         return new{typeof(alpha_i), typeof(alpha), typeof(a_sim), typeof(beta_i),
                    typeof(beta), typeof(b_sim)}(alpha_i, alpha, a_sim, beta_i, beta, b_sim)
     end
@@ -1748,7 +1752,9 @@ Where:
 function owa_l_moment_crm(T::Integer,
                           method::AbstractOrderedWeightsArrayEstimator = NormalisedConstantRelativeRiskAversion();
                           k::Integer = 2)
-    @argcheck(2 <= k, DomainError)
+    @argcheck(2 <= k,
+              DomainError(k,
+                          "`k` is $k, and the L-moment risk measure spans the orders `2:k`, so it needs at least the second. State an integer greater than or equal to `2`."))
     weights = Matrix{typeof(inv(T * k))}(undef, T, length(2:k))
     for i in 2:k
         wi = (-1)^i * owa_l_moment(T, i)
@@ -1813,7 +1819,9 @@ LinearMoment
     """
     k
     function LinearMoment(method::AbstractOrderedWeightsArrayEstimator, k::Integer)
-        @argcheck(2 <= k, DomainError)
+        @argcheck(2 <= k,
+                  DomainError(k,
+                              "`LinearMoment.k` is $k, and the L-moment risk measure spans the orders `2:k`, so it needs at least the second. State an integer greater than or equal to `2`."))
         return new{typeof(method), typeof(k)}(method, k)
     end
 end

@@ -670,7 +670,8 @@ The augmentation subtracts a term shaped by the **other** half, so the result ha
 """
 function symmetric_step_up_matrix(n1::Integer, n2::Integer)
     @argcheck(abs(n1 - n2) <= 1,
-              DomainError("n1 ($n1) and n2 ($n2) must differ by at most 1"))
+              DomainError((n1, n2),
+                          "`n1` is $n1 and `n2` is $n2. A bisection produces halves that differ by at most one, so `abs(n1 - n2) <= 1` must hold."))
 
     if n1 == n2
         return LinearAlgebra.I(n1)

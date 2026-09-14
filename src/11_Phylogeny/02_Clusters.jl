@@ -215,7 +215,9 @@ Keywords correspond to the struct's fields.
             @argcheck(!isempty(P), IsEmptyError)
             @argcheck(size(S) == size(P), DimensionMismatch)
         end
-        @argcheck(one(k) <= k, DomainError)
+        @argcheck(one(k) <= k,
+                  DomainError(k,
+                              "`Clusters.k` is $k, and a clustering holds at least one cluster. State an integer greater than or equal to `1`."))
         return new{typeof(res), typeof(S), typeof(D), typeof(P), typeof(k)}(res, S, D, P, k)
     end
 end
@@ -545,10 +547,14 @@ OptimalNumberClusters
     @fprop alg
     function OptimalNumberClusters(max_k::Option{<:Integer}, alg::Int_ONC)
         if !isnothing(max_k)
-            @argcheck(one(max_k) <= max_k, DomainError)
+            @argcheck(one(max_k) <= max_k,
+                      DomainError(max_k,
+                                  "`OptimalNumberClusters.max_k` is $max_k, and the search needs at least one cluster to choose from. State an integer greater than or equal to `1`, or `nothing` for the default cap."))
         end
         if isa(alg, Integer)
-            @argcheck(one(alg) <= alg, DomainError)
+            @argcheck(one(alg) <= alg,
+                      DomainError(alg,
+                                  "`OptimalNumberClusters.alg` is $alg, and an integer here fixes the number of clusters, so it is at least `1`. State an integer greater than or equal to `1`, or an algorithm that chooses it."))
         end
         return new{typeof(max_k), typeof(alg)}(max_k, alg)
     end

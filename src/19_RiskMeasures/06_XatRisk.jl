@@ -213,7 +213,9 @@ MIPValueatRisk
             assert_nonempty_gt0_finite_val(s, :s)
         end
         if bflag && sflag
-            @argcheck(b > s, DomainError("b must be greater than s, got b = $b, s = $s"))
+            @argcheck(b > s,
+                      DomainError((b, s),
+                                  "`b` is $b and `s` is $s. The big-M constant `b` relaxes a bound the slack `s` tightens, so `b > s` must hold."))
         end
         return new{typeof(b), typeof(s)}(b, s)
     end
@@ -979,7 +981,9 @@ DrawdownatRisk
             assert_nonempty_gt0_finite_val(s, :s)
         end
         if bflag && sflag
-            @argcheck(b > s, DomainError("b must be greater than s, got b = $b, s = $s"))
+            @argcheck(b > s,
+                      DomainError((b, s),
+                                  "`b` is $b and `s` is $s. The big-M constant `b` relaxes a bound the slack `s` tightens, so `b > s` must hold."))
         end
         return new{typeof(settings), typeof(alpha), typeof(w), typeof(b), typeof(s)}(settings,
                                                                                      alpha,

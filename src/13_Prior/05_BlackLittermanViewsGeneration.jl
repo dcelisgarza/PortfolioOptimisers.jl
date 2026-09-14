@@ -397,7 +397,8 @@ function assert_bl_views_conf(views_conf::VecNum, val::EqnType)::Nothing
                   DimensionMismatch("views_conf must have length 1 for a single view, got $(length(views_conf))"))
     end
     @argcheck(all(x -> zero(x) < x < one(x), views_conf),
-              DomainError("all views_conf values must be in (0, 1), got $views_conf"))
+              DomainError(views_conf,
+                          "`views_conf` holds $(count(x -> !(zero(x) < x < one(x)), views_conf)) entries outside `(0, 1)`. A view confidence scales the view uncertainty by `1 / v - 1`, so every entry must lie in `(0, 1)`."))
     return nothing
 end
 function assert_bl_views_conf(views_conf::Num_VecNum,
@@ -419,7 +420,8 @@ function assert_bl_views_conf(views_conf::Num_VecNum, views::BlackLittermanViews
     # is then negative, and the estimator answers from a view uncertainty matrix that is not a
     # covariance. The equation-shaped view routes above already refuse the same input.
     @argcheck(all(x -> zero(x) < x < one(x), views_conf),
-              DomainError("all views_conf values must be in (0, 1), got $views_conf"))
+              DomainError(views_conf,
+                          "`views_conf` holds $(count(x -> !(zero(x) < x < one(x)), views_conf)) entries outside `(0, 1)`. A view confidence scales the view uncertainty by `1 / v - 1`, so every entry must lie in `(0, 1)`."))
     return nothing
 end
 

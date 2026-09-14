@@ -95,27 +95,30 @@ The method Julia selects on the type of `val` is the algorithm. Each method chec
 """
 function assert_finite(val::AbstractDict, sym::Sym_Str = :val)::Nothing
     @argcheck(all(isfinite, values(val)),
-              DomainError("all(isfinite, values($sym)) must hold. Got\nall(isfinite, values($sym)) => $(all(isfinite, values(val)))"))
+              DomainError(val,
+                          "all(isfinite, values($sym)) must hold. Got\ncount(!isfinite, values($sym)) => $(count(!isfinite, values(val)))"))
     return nothing
 end
 function assert_finite(val::VecPair, sym::Sym_Str = :val)::Nothing
     @argcheck(all(isfinite, getindex.(val, 2)),
-              DomainError("all(isfinite, getindex.($sym, 2)) must hold. Got\nall(isfinite, getindex.($sym, 2)) => $(all(isfinite, getindex.(val, 2)))"))
+              DomainError(val,
+                          "all(isfinite, getindex.($sym, 2)) must hold. Got\ncount(!isfinite, getindex.($sym, 2)) => $(count(!isfinite, getindex.(val, 2)))"))
     return nothing
 end
 function assert_finite(val::ArrNum, sym::Sym_Str = :val)::Nothing
     @argcheck(all(isfinite, val),
-              DomainError("all(isfinite, $sym) must hold. Got\nall(isfinite, $sym) => $(all(isfinite, val))"))
+              DomainError(val,
+                          "all(isfinite, $sym) must hold. Got\ncount(!isfinite, $sym) => $(count(!isfinite, val))"))
     return nothing
 end
 function assert_finite(val::Pair, sym::Sym_Str = :val)::Nothing
     @argcheck(isfinite(val[2]),
-              DomainError("isfinite($sym[2]) must hold. Got\nisfinite($sym[2]) => $(isfinite(val[2]))"))
+              DomainError(val[2], "isfinite($sym[2]) must hold. Got\n$sym[2] => $(val[2])"))
     return nothing
 end
 function assert_finite(val::Number, sym::Sym_Str = :val)::Nothing
     @argcheck(isfinite(val),
-              DomainError("isfinite($sym) must hold. Got\nisfinite($sym) => $(isfinite(val))"))
+              DomainError(val, "isfinite($sym) must hold. Got\n$sym => $val"))
     return nothing
 end
 """
@@ -290,26 +293,29 @@ The method Julia selects on the type of `val` is the algorithm. Each method chec
 """
 function assert_nonneg(val::AbstractDict, sym::Sym_Str = :val)::Nothing
     @argcheck(all(x -> zero(x) <= x, values(val)),
-              DomainError("all(x -> 0 <= x, values($sym)) must hold. Got\nall(x -> 0 <= x, values($sym)) => $(all(x -> zero(x) <= x, values(val)))"))
+              DomainError(val,
+                          "all(x -> 0 <= x, values($sym)) must hold. Got\ncount(x -> !(0 <= x), values($sym)) => $(count(x -> !(zero(x) <= x), values(val)))"))
     return nothing
 end
 function assert_nonneg(val::VecPair, sym::Sym_Str = :val)::Nothing
     @argcheck(all(x -> zero(x[2]) <= x[2], val),
-              DomainError("all(x -> 0 <= x[2], $sym) must hold. Got\nall(x -> 0 <= x[2], $sym) => $(all(x -> zero(x[2]) <= x[2], val))"))
+              DomainError(val,
+                          "all(x -> 0 <= x[2], $sym) must hold. Got\ncount(x -> !(0 <= x[2]), $sym) => $(count(x -> !(zero(x[2]) <= x[2]), val))"))
     return nothing
 end
 function assert_nonneg(val::ArrNum, sym::Sym_Str = :val)::Nothing
     @argcheck(all(x -> zero(x) <= x, val),
-              DomainError("all(x -> 0 <= x, $sym) must hold. Got\nall(x -> 0 <= x, $sym) => $(all(x -> zero(x) <= x, val))"))
+              DomainError(val,
+                          "all(x -> 0 <= x, $sym) must hold. Got\ncount(x -> !(0 <= x), $sym) => $(count(x -> !(zero(x) <= x), val))"))
     return nothing
 end
 function assert_nonneg(val::Pair, sym::Sym_Str = :val)::Nothing
     @argcheck(zero(val[2]) <= val[2],
-              DomainError("0 <= $sym[2] must hold. Got\n$sym[2] => $(val[2])"))
+              DomainError(val[2], "0 <= $sym[2] must hold. Got\n$sym[2] => $(val[2])"))
     return nothing
 end
 function assert_nonneg(val::Number, sym::Sym_Str = :val)::Nothing
-    @argcheck(zero(val) <= val, DomainError("0 <= $sym must hold. Got\n$sym => $(val)"))
+    @argcheck(zero(val) <= val, DomainError(val, "0 <= $sym must hold. Got\n$sym => $val"))
     return nothing
 end
 """
@@ -349,26 +355,29 @@ The method Julia selects on the type of `val` is the algorithm. Each method chec
 """
 function assert_gt0(val::AbstractDict, sym::Sym_Str = :val)::Nothing
     @argcheck(all(x -> zero(x) < x, values(val)),
-              DomainError("all(x -> 0 < x, values($sym)) must hold. Got\nall(x -> 0 < x, values($sym)) => $(all(x -> zero(x) < x, values(val)))"))
+              DomainError(val,
+                          "all(x -> 0 < x, values($sym)) must hold. Got\ncount(x -> !(0 < x), values($sym)) => $(count(x -> !(zero(x) < x), values(val)))"))
     return nothing
 end
 function assert_gt0(val::VecPair, sym::Sym_Str = :val)::Nothing
     @argcheck(all(x -> zero(x[2]) < x[2], val),
-              DomainError("all(x -> 0 < x[2], $sym) must hold. Got\nall(x -> 0 < x[2], $sym) => $(all(x -> zero(x[2]) < x[2], val))"))
+              DomainError(val,
+                          "all(x -> 0 < x[2], $sym) must hold. Got\ncount(x -> !(0 < x[2]), $sym) => $(count(x -> !(zero(x[2]) < x[2]), val))"))
     return nothing
 end
 function assert_gt0(val::ArrNum, sym::Sym_Str = :val)::Nothing
     @argcheck(all(x -> zero(x) < x, val),
-              DomainError("all(x -> 0 < x, $sym) must hold. Got\nall(x -> 0 < x, $sym) => $(all(x -> zero(x) < x, val))"))
+              DomainError(val,
+                          "all(x -> 0 < x, $sym) must hold. Got\ncount(x -> !(0 < x), $sym) => $(count(x -> !(zero(x) < x), val))"))
     return nothing
 end
 function assert_gt0(val::Pair, sym::Sym_Str = :val)::Nothing
     @argcheck(zero(val[2]) < val[2],
-              DomainError("0 < $sym[2] must hold. Got\n$sym[2] => $(val[2])"))
+              DomainError(val[2], "0 < $sym[2] must hold. Got\n$sym[2] => $(val[2])"))
     return nothing
 end
 function assert_gt0(val::Number, sym::Sym_Str = :val)::Nothing
-    @argcheck(zero(val) < val, DomainError("0 < $sym must hold. Got\n$sym => $(val)"))
+    @argcheck(zero(val) < val, DomainError(val, "0 < $sym must hold. Got\n$sym => $val"))
     return nothing
 end
 """
@@ -402,7 +411,7 @@ A value of any other type selects the `args...` method, which checks nothing. Th
 """
 function assert_unit_interval(val::Number, sym::Sym_Str = :val)::Nothing
     @argcheck(zero(val) < val < one(val),
-              DomainError("0 < $sym < 1 must hold. Got\n$sym => $(val)"))
+              DomainError(val, "0 < $sym < 1 must hold. Got\n$sym => $val"))
     return nothing
 end
 function assert_unit_interval(args...)::Nothing
@@ -440,7 +449,7 @@ A value of any other type selects the `args...` method, which checks nothing, on
 """
 function assert_closed_unit_interval(val::Number, sym::Sym_Str = :val)::Nothing
     @argcheck(zero(val) <= val <= one(val),
-              DomainError("0 <= $sym <= 1 must hold. Got\n$sym => $(val)"))
+              DomainError(val, "0 <= $sym <= 1 must hold. Got\n$sym => $val"))
     return nothing
 end
 function assert_closed_unit_interval(args...)::Nothing

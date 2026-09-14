@@ -145,7 +145,9 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                          pr::AbstractPriorResult,
                                          tr::TrackingError{<:Any, <:Any, <:LpNorm}, args...;
                                          kwargs...)
-    @argcheck(tr.alg.p > 1, DomainError)
+    @argcheck(tr.alg.p > 1,
+              DomainError(tr.alg.p,
+                          "`LpNorm.p` is $(tr.alg.p), and the tracking error is the `p`-norm of the deviation, which the model states with a power cone of exponent `1 / p`, so `1 < p` must hold. State a value greater than `1`."))
     X = pr.X
     k = get_k(model)
     sc = get_constraint_scale(model)

@@ -48,19 +48,23 @@ true
   - [`WeightBoundsEstimator`](@ref)
 """
 function validate_bounds(lb::Number, ub::Number)::Nothing
-    @argcheck(lb <= ub, DomainError("lb ($lb) must be <= ub ($ub)"))
+    @argcheck(lb <= ub,
+              DomainError((lb, ub),
+                          "`lb` is $lb and `ub` is $ub. A lower bound is at most its upper bound, so `lb <= ub` must hold."))
     return nothing
 end
 function validate_bounds(lb::VecNum, ub::Number)::Nothing
     @argcheck(!isempty(lb), IsEmptyError("lb cannot be empty"))
     @argcheck(all(x -> x <= ub, lb),
-              DomainError("all entries of lb must be <= ub ($ub), got lb = $lb"))
+              DomainError(lb,
+                          "`ub` is $ub, and `lb` holds $(count(x -> !(x <= ub), lb)) entries above it. A lower bound is at most its upper bound, so every entry of `lb` must satisfy `lb <= ub`."))
     return nothing
 end
 function validate_bounds(lb::Number, ub::VecNum)::Nothing
     @argcheck(!isempty(ub), IsEmptyError("ub cannot be empty"))
     @argcheck(all(x -> lb <= x, ub),
-              DomainError("all entries of ub must be >= lb ($lb), got ub = $ub"))
+              DomainError(ub,
+                          "`lb` is $lb, and `ub` holds $(count(x -> !(lb <= x), ub)) entries below it. A lower bound is at most its upper bound, so every entry of `ub` must satisfy `lb <= ub`."))
     return nothing
 end
 function validate_bounds(lb::VecNum, ub::VecNum)::Nothing
@@ -69,7 +73,8 @@ function validate_bounds(lb::VecNum, ub::VecNum)::Nothing
     @argcheck(length(lb) == length(ub),
               DimensionMismatch("lb ($(length(lb))) and ub ($(length(ub))) must have the same length"))
     @argcheck(all(map((x, y) -> x <= y, lb, ub)),
-              DomainError("all entries of lb must be <= corresponding entries of ub"))
+              DomainError((lb, ub),
+                          "`lb` and `ub` disagree at $(count(map((x, y) -> !(x <= y), lb, ub))) entries. A lower bound is at most its upper bound, so `lb[i] <= ub[i]` must hold at every `i`."))
     return nothing
 end
 function validate_bounds(lb::VecNum, ::Any)::Nothing
@@ -283,7 +288,9 @@ WeightBoundsEstimator
             validate_bounds(lb, ub)
         end
         if !isnothing(dlb) && !isnothing(dub)
-            @argcheck(dlb <= dub, DomainError("dlb ($dlb) must be <= dub ($dub)"))
+            @argcheck(dlb <= dub,
+                      DomainError((dlb, dub),
+                                  "`dlb` is $dlb and `dub` is $dub. A default lower bound is at most its default upper bound, so `dlb <= dub` must hold."))
         end
         return new{typeof(lb), typeof(ub), typeof(dlb), typeof(dub)}(lb, ub, dlb, dub)
     end

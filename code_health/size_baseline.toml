@@ -83,9 +83,9 @@ commit = "483d19ebf1"
 "src/08_Moments/32_WindowedCokurtosis.jl" = { code = 25, doc = 0, comment = 0, blank = 0, total = 25 }
 "src/08_Moments/33_MedianExpectedReturns.jl" = { code = 28, doc = 102, comment = 0, blank = 48, total = 178 }
 "src/08_Moments/34_CustomValueExpectedReturns.jl" = { code = 49, doc = 161, comment = 0, blank = 75, total = 285 }
-"src/08_Moments/35_GerberIQCovariance.jl" = { code = 532, doc = 1431, comment = 0, blank = 545, total = 2508 }
+"src/08_Moments/35_GerberIQCovariance.jl" = { code = 549, doc = 1431, comment = 0, blank = 545, total = 2525 }
 "src/08_Moments/36_RegimeAdjustedExpWeightedVariance.jl" = { code = 397, doc = 909, comment = 3, blank = 358, total = 1667 }
-"src/08_Moments/37_RegimeAdjustedExpWeightedCovariance.jl" = { code = 629, doc = 1260, comment = 1, blank = 519, total = 2409 }
+"src/08_Moments/37_RegimeAdjustedExpWeightedCovariance.jl" = { code = 630, doc = 1260, comment = 4, blank = 519, total = 2413 }
 "src/08_Moments/38_CrossSectionalRegression.jl" = { code = 198, doc = 504, comment = 6, blank = 210, total = 918 }
 "src/08_Moments/39_CrossSectionalWeights.jl" = { code = 138, doc = 366, comment = 0, blank = 166, total = 670 }
 "src/08_Moments/40_HigherMomentPartialFit.jl" = { code = 173, doc = 588, comment = 4, blank = 309, total = 1074 }
@@ -175,7 +175,7 @@ commit = "483d19ebf1"
 "src/13_Prior/07_BayesianBlackLittermanPrior.jl" = { code = 90, doc = 301, comment = 64, blank = 71, total = 526 }
 "src/13_Prior/08_FactorBlackLittermanPrior.jl" = { code = 100, doc = 278, comment = 76, blank = 65, total = 519 }
 "src/13_Prior/09_AugmentedBlackLittermanPrior.jl" = { code = 135, doc = 333, comment = 102, blank = 80, total = 650 }
-"src/13_Prior/10_Base_EntropyPoolingPrior.jl" = { code = 1053, doc = 2442, comment = 108, blank = 943, total = 4546 }
+"src/13_Prior/10_Base_EntropyPoolingPrior.jl" = { code = 1055, doc = 2442, comment = 108, blank = 943, total = 4548 }
 "src/13_Prior/11_MeucciEntropyPoolingPrior.jl" = { code = 350, doc = 503, comment = 85, blank = 159, total = 1097 }
 "src/13_Prior/12_EntropyPoolingPrior.jl" = { code = 1185, doc = 1879, comment = 95, blank = 688, total = 3847 }
 "src/13_Prior/13_OpinionPoolingPrior.jl" = { code = 100, doc = 341, comment = 21, blank = 129, total = 591 }
@@ -207,7 +207,7 @@ commit = "483d19ebf1"
 "src/19_RiskMeasures/07_ConditionalXatRisk.jl" = { code = 384, doc = 653, comment = 25, blank = 242, total = 1304 }
 "src/19_RiskMeasures/08_EntropicXatRisk.jl" = { code = 158, doc = 322, comment = 7, blank = 124, total = 611 }
 "src/19_RiskMeasures/09_RelativisticXatRisk.jl" = { code = 284, doc = 428, comment = 13, blank = 154, total = 879 }
-"src/19_RiskMeasures/10_OWARiskMeasures.jl" = { code = 550, doc = 1231, comment = 41, blank = 522, total = 2344 }
+"src/19_RiskMeasures/10_OWARiskMeasures.jl" = { code = 558, doc = 1231, comment = 41, blank = 522, total = 2352 }
 "src/19_RiskMeasures/11_AverageDrawdown.jl" = { code = 41, doc = 153, comment = 1, blank = 72, total = 267 }
 "src/19_RiskMeasures/12_UlcerIndex.jl" = { code = 30, doc = 117, comment = 1, blank = 56, total = 204 }
 "src/19_RiskMeasures/13_MaximumDrawdown.jl" = { code = 31, doc = 115, comment = 1, blank = 56, total = 203 }

@@ -514,9 +514,11 @@ end
         e
     end
     @test derr isa DomainError
-    # The guard builds `DomainError(text)`, so the text is the `val` field, not the `msg`.
-    @test derr.msg == ""
-    @test occursin("all(x -> 0 < x, values(n_sim)) must hold", derr.val)
+    # The guard builds `DomainError(val, text)`, so the container is `.val` and the text
+    # names the symbol and counts the entries that failed.
+    @test derr.val == Dict(:a => 0.0)
+    @test occursin("all(x -> 0 < x, values(n_sim)) must hold", derr.msg)
+    @test occursin("count(x -> !(0 < x), values(n_sim)) => 1", derr.msg)
     perr = try
         pe.assert_gt0(:a => 0.0, :alpha)
         nothing
@@ -524,7 +526,8 @@ end
         e
     end
     @test perr isa DomainError
-    @test occursin("0 < alpha[2] must hold", perr.val)
+    @test perr.val == 0.0
+    @test occursin("0 < alpha[2] must hold", perr.msg)
     # The composed guards take a value of any of the five shapes, and their varargs method
     # accepts everything else without a check, which is how an absent value passes through.
     @test isnothing(pe.assert_nonempty_gt0_finite_val([1.0, 2.0]))
@@ -561,7 +564,9 @@ end
         e
     end
     @test err isa DomainError
-    @test occursin("all(isfinite, iv) must hold", err.val)
+    @test err.val == [0.2 0.3; Inf 0.31]
+    @test occursin("all(isfinite, iv) must hold", err.msg)
+    @test occursin("count(!isfinite, iv) => 1", err.msg)
     err = try
         pe.assert_nonempty_nonneg_finite_val([0.2 0.3; NaN 0.31], :iv)
         nothing
@@ -569,7 +574,8 @@ end
         e
     end
     @test err isa DomainError
-    @test occursin("all(isfinite, iv) must hold", err.val)
+    @test isequal(err.val, [0.2 0.3; NaN 0.31])
+    @test occursin("all(isfinite, iv) must hold", err.msg)
     # `assert_all_finite` checks the same predicate over an array; it differs in the error
     # type it raises and in reporting where the breach is without quoting the data.
     @test isnothing(pe.assert_all_finite([1.0 2.0; 3.0 4.0]))
@@ -603,9 +609,14 @@ end
     end
     @test oerr isa DomainError
     @test cerr isa DomainError
-    # The guards build `DomainError(text)`, so the text is the `val` field, not the `msg`.
-    @test oerr.val == "0 < alpha < 1 must hold. Got\nalpha => 1.0"
-    @test cerr.val == "0 <= n7 <= 1 must hold. Got\nn7 => 1.5"
+    # The guards build `DomainError(val, text)`, so the number is `.val` and the text is
+    # `.msg`, and `showerror` prints one after the other.
+    @test oerr.val == 1.0
+    @test oerr.msg == "0 < alpha < 1 must hold. Got\nalpha => 1.0"
+    @test cerr.val == 1.5
+    @test cerr.msg == "0 <= n7 <= 1 must hold. Got\nn7 => 1.5"
+    @test sprint(showerror, oerr) ==
+          "DomainError with 1.0:\n0 < alpha < 1 must hold. Got\nalpha => 1.0"
     # Both carry the varargs method that checks nothing, which is how a slot holding a
     # Calibration Rule passes a guard written for a number.
     rule = ScenarioCount(; n = 5)

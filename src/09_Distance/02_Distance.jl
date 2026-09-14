@@ -110,7 +110,9 @@ Distance
     alg
     function Distance(power::Option{<:Integer}, alg::AbstractDistanceAlgorithm)
         if !isnothing(power)
-            @argcheck(one(power) <= power, DomainError)
+            @argcheck(one(power) <= power,
+                      DomainError(power,
+                                  "`Distance.power` is $power, and the distance is raised to it, so it is at least `1`. State an integer in `1:typemax(Int)`, or `nothing` for the plain distance."))
         end
         return new{typeof(power), typeof(alg)}(power, alg)
     end

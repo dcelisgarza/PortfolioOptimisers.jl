@@ -299,7 +299,8 @@ OpinionPoolingPrior
             @argcheck(all(x -> zero(x) <= x <= one(x), w),
                       DomainError(w, "every entry of w must be in [0, 1]"))
             @argcheck(sum(w) <= one(eltype(w)),
-                      DomainError("sum(w) ($(sum(w))) must be <= 1"))
+                      DomainError(sum(w),
+                                  "`OpinionPoolingPrior.w` sums to $(sum(w)), and the weights of the pooled priors leave the remainder to the uniform prior, so they sum to at most one. State weights with `sum(w) <= 1`."))
         end
         return new{typeof(pes), typeof(pe1), typeof(pe2), typeof(p), typeof(w), typeof(alg),
                    typeof(ex), typeof(cache)}(pes, pe1, pe2, p, w, alg, ex, cache)

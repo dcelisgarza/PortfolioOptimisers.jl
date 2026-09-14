@@ -603,7 +603,9 @@ Keywords correspond to the struct's fields.
     val
     function LpRegularisation(p::Number, val::Num_AmbRadNormCeilCal)
         @argcheck(isfinite(p), IsNonFiniteError)
-        @argcheck(p > one(p), DomainError)
+        @argcheck(p > one(p),
+                  DomainError(p,
+                              "`LpRegularisation.p` is $p, and the penalty is the `p`-norm of the weights, which the model states with a power cone of exponent `1 / p`, so `1 < p` must hold. State a finite value greater than `1`."))
         assert_nonempty_gt0_finite_val(val, :val)
         return new{typeof(p), typeof(val)}(p, val)
     end

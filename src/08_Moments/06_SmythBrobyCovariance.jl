@@ -668,7 +668,9 @@ SmythBrobyCovariance
         assert_nonempty_nonneg_finite_val(c2, :c2)
         assert_nonempty_nonneg_finite_val(c3, :c3)
         assert_nonneg(n, :n)
-        @argcheck(c2 < c3, DomainError("c2 must be less than c3, got c2 = $c2, c3 = $c3"))
+        @argcheck(c2 < c3,
+                  DomainError((c2, c3),
+                              "`SmythBrobyCovariance.c2` is $c2 and `c3` is $c3. `c2` is the inner threshold and `c3` the outer, so the pair must satisfy `c2 < c3`."))
         return new{typeof(ve), typeof(me), typeof(pdm), typeof(c1), typeof(c2), typeof(c3),
                    typeof(n), typeof(alg), typeof(ex)}(ve, me, pdm, c1, c2, c3, n, alg, ex)
     end
