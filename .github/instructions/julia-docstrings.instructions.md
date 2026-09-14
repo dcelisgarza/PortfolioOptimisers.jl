@@ -151,7 +151,7 @@ A docstring has one home for each kind of fact. Put a sentence where its **subje
 | `# Mathematical definition` | the closed form that defines the unit, and a consequence of that form | an identifier from the body, an order of operations, or a choice the implementation made |
 | `# Algorithm` | the numbered steps the body runs, each naming the quantity it produces | a closed form restated as a step |
 | `# JuMP formulation` | the model the code builds: the variables, expressions and rows it registers, the objective it sets, and the relaxation when the encoding is not exact | an entry the body does not register |
-| `# Interfaces` | on an abstract type, the methods a concrete subtype must implement, one subsection per method | a method the family does not dispatch on |
+| `# Interfaces` | on an abstract type, the methods a concrete subtype must implement, one subsection per method; a `## \`verb\`` heading names a function the package defines, and a `- \`verb(args...) -> Ret\`` bullet names that verb and only types that exist, with a `My`-prefixed name as the placeholder for the reader's own subtype (`test/test_61_interfaces_section_census.jl`) | a method the family does not dispatch on, or a name the package no longer defines |
 | `# Fields` | one description per field, written where the field is declared | a fact about the type as a whole |
 | `# Constructors` | the signature, `## Validation`, and the propagation subsections | a rule the constructor does not enforce |
 | `# Arguments` | the contract of each argument | the shape of the result |

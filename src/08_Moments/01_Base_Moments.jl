@@ -171,8 +171,8 @@ In order to implement a new covariance estimator which will work seamlessly with
 
   - `Statistics.var(ve::AbstractVarianceEstimator, X::MatNum; kwargs...) -> ArrNum`: Variance estimation.
   - `Statistics.std(ve::AbstractVarianceEstimator, X::MatNum; kwargs...) -> ArrNum`: Standard deviation estimation.
-  - `Statistics.var(ve::AbstractVarianceEstimator, X::VecNum; kwargs...) -> Num`: Variance estimation.
-  - `Statistics.std(ve::AbstractVarianceEstimator, X::VecNum; kwargs...) -> Num`: Standard deviation estimation.
+  - `Statistics.var(ve::AbstractVarianceEstimator, X::VecNum; kwargs...) -> Number`: Variance estimation.
+  - `Statistics.std(ve::AbstractVarianceEstimator, X::VecNum; kwargs...) -> Number`: Standard deviation estimation.
 
 ### Arguments
 
