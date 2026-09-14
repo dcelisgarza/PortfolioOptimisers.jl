@@ -248,12 +248,14 @@ Where:
 
 # Algorithm
 
-The returns-data method runs step 1 and forwards; the prior-result method runs steps 2 to 4 on the `pr` it is handed.
+The returns-data method runs step 1 and forwards; the prior-result method runs steps 2 to 6 on the `pr` it is handed.
 
  1. Fit the prior with [`ucs_prior`](@ref) on `ue.pe`, `X` and `F`, giving `pr`, and forward to the prior-result method of the set with `pe = nothing`. A `pe` of `nothing` is refused there by name.
- 2. Call [`mu_delta_box_set`](@ref) on `pr` and `ue.dmu`, giving the mean-axis box. It writes a width, so the model halves the difference of its bounds.
- 3. Call [`sigma_delta_box_set`](@ref) on `pr` and `ue.dsigma`, giving the covariance-axis box. It writes absolute bounds, both of which bind.
- 4. Return the two boxes as a tuple, the mean axis first.
+ 2. Reduce the prior result to the Investable Mask with [`investable_ucs_reduction`](@ref). Inside an optimiser the result arrives already reduced and the step is a passthrough; standalone, on a prior fitted on a point-in-time Asset Panel, it takes the view the optimiser would have taken.
+ 3. Call [`mu_delta_box_set`](@ref) on `pr` and `ue.dmu`, giving the mean-axis box. It writes a width, so the model halves the difference of its bounds.
+ 4. Call [`sigma_delta_box_set`](@ref) on `pr` and `ue.dsigma`, giving the covariance-axis box. It writes absolute bounds, both of which bind.
+ 5. Return the two boxes as a tuple, the mean axis first.
+ 6. Before the two sets leave, write both back onto the full universe with [`expand_investable_ucs`](@ref), so a set fitted standalone is over the same assets the prior is, and a view of it at the mask recovers the reduced fit.
 
 # Arguments
 
@@ -287,7 +289,10 @@ function ucs(ue::DeltaUncertaintySet, X::MatNum, F::Option{<:MatNum} = nothing;
 end
 function ucs(ue::DeltaUncertaintySet{Nothing}, pr::AbstractPriorResult; rd = nothing,
              kwargs...)
-    return mu_delta_box_set(pr, ue.dmu), sigma_delta_box_set(pr, ue.dsigma)
+    imsk, prr, _ = investable_ucs_reduction(pr, rd)
+    mu_set, sigma_set = mu_delta_box_set(prr, ue.dmu), sigma_delta_box_set(prr, ue.dsigma)
+    return expand_investable_ucs(mu_set, imsk, pr),
+           expand_investable_ucs(sigma_set, imsk, pr)
 end
 """
     mu_ucs(ue::DeltaUncertaintySet, X::MatNum,
@@ -317,7 +322,9 @@ Where:
 # Algorithm
 
  1. On the returns-data route, fit the prior with [`ucs_prior`](@ref) on `ue.pe`, `X` and `F`, giving `pr`, and forward to the prior-result method of the set with `pe = nothing`.
- 2. Call [`mu_delta_box_set`](@ref) on `pr` and `ue.dmu`, giving the mean-axis box, and return it. `pr.mu` is the only quantity this path reads.
+ 2. Reduce the prior result to the Investable Mask with [`investable_ucs_reduction`](@ref). Inside an optimiser the result arrives already reduced and the step is a passthrough; standalone, on a prior fitted on a point-in-time Asset Panel, it takes the view the optimiser would have taken.
+ 3. Call [`mu_delta_box_set`](@ref) on `pr` and `ue.dmu`, giving the mean-axis box, and return it. `pr.mu` is the only quantity this path reads.
+ 4. Before the set leaves, write it back onto the full universe with [`expand_investable_ucs`](@ref), so a set fitted standalone is over the same assets the prior is, and a view of it at the mask recovers the reduced fit.
 
 # Arguments
 
@@ -349,7 +356,9 @@ function mu_ucs(ue::DeltaUncertaintySet, X::MatNum, F::Option{<:MatNum} = nothin
 end
 function mu_ucs(ue::DeltaUncertaintySet{Nothing}, pr::AbstractPriorResult; rd = nothing,
                 kwargs...)
-    return mu_delta_box_set(pr, ue.dmu)
+    imsk, prr, _ = investable_ucs_reduction(pr, rd)
+    set = mu_delta_box_set(prr, ue.dmu)
+    return expand_investable_ucs(set, imsk, pr)
 end
 """
     sigma_ucs(ue::DeltaUncertaintySet, X::MatNum,
@@ -379,7 +388,9 @@ Where:
 # Algorithm
 
  1. On the returns-data route, fit the prior with [`ucs_prior`](@ref) on `ue.pe`, `X` and `F`, giving `pr`, and forward to the prior-result method of the set with `pe = nothing`.
- 2. Call [`sigma_delta_box_set`](@ref) on `pr` and `ue.dsigma`, giving the covariance-axis box, and return it. `pr.sigma` is the only quantity this path reads.
+ 2. Reduce the prior result to the Investable Mask with [`investable_ucs_reduction`](@ref). Inside an optimiser the result arrives already reduced and the step is a passthrough; standalone, on a prior fitted on a point-in-time Asset Panel, it takes the view the optimiser would have taken.
+ 3. Call [`sigma_delta_box_set`](@ref) on `pr` and `ue.dsigma`, giving the covariance-axis box, and return it. `pr.sigma` is the only quantity this path reads.
+ 4. Before the set leaves, write it back onto the full universe with [`expand_investable_ucs`](@ref), so a set fitted standalone is over the same assets the prior is, and a view of it at the mask recovers the reduced fit.
 
 # Arguments
 
@@ -411,7 +422,9 @@ function sigma_ucs(ue::DeltaUncertaintySet, X::MatNum, F::Option{<:MatNum} = not
 end
 function sigma_ucs(ue::DeltaUncertaintySet{Nothing}, pr::AbstractPriorResult; rd = nothing,
                    kwargs...)
-    return sigma_delta_box_set(pr, ue.dsigma)
+    imsk, prr, _ = investable_ucs_reduction(pr, rd)
+    set = sigma_delta_box_set(prr, ue.dsigma)
+    return expand_investable_ucs(set, imsk, pr)
 end
 
 export DeltaUncertaintySet

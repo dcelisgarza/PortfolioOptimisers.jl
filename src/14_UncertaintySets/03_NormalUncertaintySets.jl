@@ -707,10 +707,12 @@ Where:
 
 # Algorithm
 
- 1. Run [`normal_box_preamble`](@ref) on the prior result `pr` the set is calibrated on, giving `T`, `sigma_mu` and the halved `q`.
- 2. Build the mean set with [`mu_normal_box_set`](@ref) from `pr.mu`, `sigma_mu` and `q`.
- 3. Build the covariance set with [`sigma_normal_box_set`](@ref) from `ue`, `pr`, `T`, `sigma_mu` and `q`.
- 4. Return the two sets as a tuple, mean first.
+ 1. Reduce the prior result to the Investable Mask with [`investable_ucs_reduction`](@ref). Inside an optimiser the result arrives already reduced and the step is a passthrough; standalone, on a prior fitted on a point-in-time Asset Panel, it takes the view the optimiser would have taken.
+ 2. Run [`normal_box_preamble`](@ref) on the prior result `pr` the set is calibrated on, giving `T`, `sigma_mu` and the halved `q`.
+ 3. Build the mean set with [`mu_normal_box_set`](@ref) from `pr.mu`, `sigma_mu` and `q`.
+ 4. Build the covariance set with [`sigma_normal_box_set`](@ref) from `ue`, `pr`, `T`, `sigma_mu` and `q`.
+ 5. Return the two sets as a tuple, mean first.
+ 6. Before the two sets leave, write both back onto the full universe with [`expand_investable_ucs`](@ref), so a set fitted standalone is over the same assets the prior is, and a view of it at the mask recovers the reduced fit.
 
 # Arguments
 
@@ -735,9 +737,12 @@ Where:
 function ucs(ue::NormalUncertaintySet{Nothing, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
                                       <:Any}, pr::AbstractPriorResult; rd = nothing,
              kwargs...)
-    T, sigma_mu, q = normal_box_preamble(ue, pr)
-    return mu_normal_box_set(pr.mu, sigma_mu, q),
-           sigma_normal_box_set(ue, pr, T, sigma_mu, q)
+    imsk, prr, _ = investable_ucs_reduction(pr, rd)
+    T, sigma_mu, q = normal_box_preamble(ue, prr)
+    mu_set, sigma_set = mu_normal_box_set(prr.mu, sigma_mu, q),
+                        sigma_normal_box_set(ue, prr, T, sigma_mu, q)
+    return expand_investable_ucs(mu_set, imsk, pr),
+           expand_investable_ucs(sigma_set, imsk, pr)
 end
 """
     mu_ucs(ue::NormalUncertaintySet{Nothing, <:BoxUncertaintySetAlgorithm, <:Any, <:Any, <:Any},
@@ -766,8 +771,10 @@ Where:
 
 # Algorithm
 
- 1. Run [`normal_box_preamble`](@ref) on the prior result `pr` the set is calibrated on, giving `sigma_mu` and the halved `q`. The scaling parameter is dropped, because only the covariance set reads it.
- 2. Build and return the mean set with [`mu_normal_box_set`](@ref) from `pr.mu`, `sigma_mu` and `q`.
+ 1. Reduce the prior result to the Investable Mask with [`investable_ucs_reduction`](@ref). Inside an optimiser the result arrives already reduced and the step is a passthrough; standalone, on a prior fitted on a point-in-time Asset Panel, it takes the view the optimiser would have taken.
+ 2. Run [`normal_box_preamble`](@ref) on the prior result `pr` the set is calibrated on, giving `sigma_mu` and the halved `q`. The scaling parameter is dropped, because only the covariance set reads it.
+ 3. Build and return the mean set with [`mu_normal_box_set`](@ref) from `pr.mu`, `sigma_mu` and `q`.
+ 4. Before the set leaves, write it back onto the full universe with [`expand_investable_ucs`](@ref), so a set fitted standalone is over the same assets the prior is, and a view of it at the mask recovers the reduced fit.
 
 # Arguments
 
@@ -791,8 +798,10 @@ Where:
 function mu_ucs(ue::NormalUncertaintySet{Nothing, <:BoxUncertaintySetAlgorithm, <:Any,
                                          <:Any, <:Any}, pr::AbstractPriorResult;
                 rd = nothing, kwargs...)
-    _, sigma_mu, q = normal_box_preamble(ue, pr)
-    return mu_normal_box_set(pr.mu, sigma_mu, q)
+    imsk, prr, _ = investable_ucs_reduction(pr, rd)
+    _, sigma_mu, q = normal_box_preamble(ue, prr)
+    set = mu_normal_box_set(prr.mu, sigma_mu, q)
+    return expand_investable_ucs(set, imsk, pr)
 end
 """
     sigma_ucs(ue::NormalUncertaintySet{Nothing, <:BoxUncertaintySetAlgorithm, <:Any, <:Any, <:Any},
@@ -823,8 +832,10 @@ Where:
 
 # Algorithm
 
- 1. Run [`normal_box_preamble`](@ref) on the prior result `pr` the set is calibrated on, giving `T`, `sigma_mu` and the halved `q`.
- 2. Build and return the covariance set with [`sigma_normal_box_set`](@ref) from `ue`, `pr`, `T`, `sigma_mu` and `q`.
+ 1. Reduce the prior result to the Investable Mask with [`investable_ucs_reduction`](@ref). Inside an optimiser the result arrives already reduced and the step is a passthrough; standalone, on a prior fitted on a point-in-time Asset Panel, it takes the view the optimiser would have taken.
+ 2. Run [`normal_box_preamble`](@ref) on the prior result `pr` the set is calibrated on, giving `T`, `sigma_mu` and the halved `q`.
+ 3. Build and return the covariance set with [`sigma_normal_box_set`](@ref) from `ue`, `pr`, `T`, `sigma_mu` and `q`.
+ 4. Before the set leaves, write it back onto the full universe with [`expand_investable_ucs`](@ref), so a set fitted standalone is over the same assets the prior is, and a view of it at the mask recovers the reduced fit.
 
 # Arguments
 
@@ -848,8 +859,10 @@ Where:
 function sigma_ucs(ue::NormalUncertaintySet{Nothing, <:BoxUncertaintySetAlgorithm, <:Any,
                                             <:Any, <:Any}, pr::AbstractPriorResult;
                    rd = nothing, kwargs...)
-    T, sigma_mu, q = normal_box_preamble(ue, pr)
-    return sigma_normal_box_set(ue, pr, T, sigma_mu, q)
+    imsk, prr, _ = investable_ucs_reduction(pr, rd)
+    T, sigma_mu, q = normal_box_preamble(ue, prr)
+    set = sigma_normal_box_set(ue, prr, T, sigma_mu, q)
+    return expand_investable_ucs(set, imsk, pr)
 end
 """
     ucs(ue::NormalUncertaintySet{Nothing,
@@ -905,16 +918,18 @@ Where:
 
 # Algorithm
 
- 1. Take the prior result `pr` the set is calibrated on, and read `mu`, `sigma` and `N = size(pr.X, 2)` from it. The asset count comes from the prior's own returns matrix, so a prior that changes the asset count is followed.
- 2. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref).
- 3. Build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
- 4. Resolve the random number generator from `ue.rng` and `ue.seed` with [`resolve_rng`](@ref).
- 5. Draw the mean sample with [`normal_mu_error_sample`](@ref), giving `X_mu`, one mean estimation error per row.
- 6. Draw the covariance sample with [`normal_sigma_error_sample`](@ref), giving `X_sigma`, one vectorised covariance estimation error per row.
- 7. Build the covariance shape `sigma_sigma` with [`sigma_asymptotic_cov`](@ref).
- 8. Fit the mean ellipsoid with [`ellipsoidal_set`](@ref) on `X_mu` and `sigma_mu`, with `pr.mu` as the centre.
- 9. Fit the covariance ellipsoid the same way on `X_sigma` and `sigma_sigma`, with `pr.sigma` as the centre.
-10. Return the two sets as a tuple, mean first.
+ 1. Reduce the prior result to the Investable Mask with [`investable_ucs_reduction`](@ref). Inside an optimiser the result arrives already reduced and the step is a passthrough; standalone, on a prior fitted on a point-in-time Asset Panel, it takes the view the optimiser would have taken.
+ 2. Take the prior result `pr` the set is calibrated on, and read `mu`, `sigma` and `N = size(pr.X, 2)` from it. The asset count comes from the prior's own returns matrix, so a prior that changes the asset count is followed.
+ 3. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref).
+ 4. Build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
+ 5. Resolve the random number generator from `ue.rng` and `ue.seed` with [`resolve_rng`](@ref).
+ 6. Draw the mean sample with [`normal_mu_error_sample`](@ref), giving `X_mu`, one mean estimation error per row.
+ 7. Draw the covariance sample with [`normal_sigma_error_sample`](@ref), giving `X_sigma`, one vectorised covariance estimation error per row.
+ 8. Build the covariance shape `sigma_sigma` with [`sigma_asymptotic_cov`](@ref).
+ 9. Fit the mean ellipsoid with [`ellipsoidal_set`](@ref) on `X_mu` and `sigma_mu`, with `pr.mu` as the centre.
+10. Fit the covariance ellipsoid the same way on `X_sigma` and `sigma_sigma`, with `pr.sigma` as the centre.
+11. Return the two sets as a tuple, mean first.
+12. Before the two sets leave, write both back onto the full universe with [`expand_investable_ucs`](@ref), so a set fitted standalone is over the same assets the prior is, and a view of it at the mask recovers the reduced fit.
 
 # Arguments
 
@@ -942,18 +957,21 @@ function ucs(ue::NormalUncertaintySet{Nothing,
                                                                            <:Any}, <:Any,
                                       <:Any, <:Any}, pr::AbstractPriorResult; rd = nothing,
              kwargs...)
-    (; mu, sigma) = pr
-    N = size(pr.X, 2)
-    T = choose_scaling_parameter(ue, pr)
+    imsk, prr, _ = investable_ucs_reduction(pr, rd)
+    (; mu, sigma) = prr
+    N = size(prr.X, 2)
+    T = choose_scaling_parameter(ue, prr)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
     rng = resolve_rng(ue.rng, ue.seed)
     X_mu = normal_mu_error_sample(ue, rng, mu, sigma_mu)
     X_sigma = normal_sigma_error_sample(ue, rng, sigma, sigma_mu, T, N)
     sigma_sigma = sigma_asymptotic_cov(ue.pdm, sigma_mu, sigma, T)
-    return ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, X_mu, sigma_mu,
-                           MuUncertaintySetClass(), pr.mu),
-           ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, X_sigma, sigma_sigma,
-                           SigmaUncertaintySetClass(), pr.sigma)
+    mu_set, sigma_set = ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, X_mu,
+                                        sigma_mu, MuUncertaintySetClass(), prr.mu),
+                        ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, X_sigma,
+                                        sigma_sigma, SigmaUncertaintySetClass(), prr.sigma)
+    return expand_investable_ucs(mu_set, imsk, pr),
+           expand_investable_ucs(sigma_set, imsk, pr)
 end
 """
     ucs(ue::NormalUncertaintySet{Nothing, <:EllipsoidalUncertaintySetAlgorithm{<:Any, <:Any},
@@ -990,13 +1008,15 @@ The radius of each ellipsoid is the one [`k_ucs`](@ref) returns for `ue.alg.meth
 
 # Algorithm
 
- 1. Take the prior result `pr` the set is calibrated on, and read `sigma = pr.sigma`.
- 2. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref).
- 3. Build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
- 4. Build the covariance shape `sigma_sigma` with [`sigma_asymptotic_cov`](@ref).
- 5. Fit the mean ellipsoid with [`ellipsoidal_set`](@ref) on `sigma_mu`, passing `nothing` in place of a sample and `pr.mu` as the centre.
- 6. Fit the covariance ellipsoid the same way on `sigma_sigma`, with `pr.sigma` as the centre.
- 7. Return the two sets as a tuple, mean first.
+ 1. Reduce the prior result to the Investable Mask with [`investable_ucs_reduction`](@ref). Inside an optimiser the result arrives already reduced and the step is a passthrough; standalone, on a prior fitted on a point-in-time Asset Panel, it takes the view the optimiser would have taken.
+ 2. Take the prior result `pr` the set is calibrated on, and read `sigma = pr.sigma`.
+ 3. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref).
+ 4. Build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
+ 5. Build the covariance shape `sigma_sigma` with [`sigma_asymptotic_cov`](@ref).
+ 6. Fit the mean ellipsoid with [`ellipsoidal_set`](@ref) on `sigma_mu`, passing `nothing` in place of a sample and `pr.mu` as the centre.
+ 7. Fit the covariance ellipsoid the same way on `sigma_sigma`, with `pr.sigma` as the centre.
+ 8. Return the two sets as a tuple, mean first.
+ 9. Before the two sets leave, write both back onto the full universe with [`expand_investable_ucs`](@ref), so a set fitted standalone is over the same assets the prior is, and a view of it at the mask recovers the reduced fit.
 
 # Arguments
 
@@ -1023,14 +1043,17 @@ function ucs(ue::NormalUncertaintySet{Nothing,
                                       <:EllipsoidalUncertaintySetAlgorithm{<:Any, <:Any},
                                       <:Any, <:Any, <:Any}, pr::AbstractPriorResult;
              rd = nothing, kwargs...)
-    sigma = pr.sigma
-    T = choose_scaling_parameter(ue, pr)
+    imsk, prr, _ = investable_ucs_reduction(pr, rd)
+    sigma = prr.sigma
+    T = choose_scaling_parameter(ue, prr)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
     sigma_sigma = sigma_asymptotic_cov(ue.pdm, sigma_mu, sigma, T)
-    return ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, nothing, sigma_mu,
-                           MuUncertaintySetClass(), pr.mu),
-           ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, nothing, sigma_sigma,
-                           SigmaUncertaintySetClass(), pr.sigma)
+    mu_set, sigma_set = ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, nothing,
+                                        sigma_mu, MuUncertaintySetClass(), prr.mu),
+                        ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, nothing,
+                                        sigma_sigma, SigmaUncertaintySetClass(), prr.sigma)
+    return expand_investable_ucs(mu_set, imsk, pr),
+           expand_investable_ucs(sigma_set, imsk, pr)
 end
 """
     mu_ucs(ue::NormalUncertaintySet{Nothing,
@@ -1061,11 +1084,13 @@ Where:
 
 # Algorithm
 
- 1. Take the prior result `pr` the set is calibrated on, and read `mu` and `sigma` from it.
- 2. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref).
- 3. Build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
- 4. Resolve the random number generator with [`resolve_rng`](@ref), and draw the sample with [`normal_mu_error_sample`](@ref), giving `X_mu`, one estimation error per row.
- 5. Fit and return the ellipsoid with [`ellipsoidal_set`](@ref) on `X_mu` and `sigma_mu`, with `pr.mu` as the centre.
+ 1. Reduce the prior result to the Investable Mask with [`investable_ucs_reduction`](@ref). Inside an optimiser the result arrives already reduced and the step is a passthrough; standalone, on a prior fitted on a point-in-time Asset Panel, it takes the view the optimiser would have taken.
+ 2. Take the prior result `pr` the set is calibrated on, and read `mu` and `sigma` from it.
+ 3. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref).
+ 4. Build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
+ 5. Resolve the random number generator with [`resolve_rng`](@ref), and draw the sample with [`normal_mu_error_sample`](@ref), giving `X_mu`, one estimation error per row.
+ 6. Fit and return the ellipsoid with [`ellipsoidal_set`](@ref) on `X_mu` and `sigma_mu`, with `pr.mu` as the centre.
+ 7. Before the set leaves, write it back onto the full universe with [`expand_investable_ucs`](@ref), so a set fitted standalone is over the same assets the prior is, and a view of it at the mask recovers the reduced fit.
 
 # Arguments
 
@@ -1091,13 +1116,15 @@ function mu_ucs(ue::NormalUncertaintySet{Nothing,
                                                                               <:Any}, <:Any,
                                          <:Any, <:Any}, pr::AbstractPriorResult;
                 rd = nothing, kwargs...)
-    (; mu, sigma) = pr
-    T = choose_scaling_parameter(ue, pr)
+    imsk, prr, _ = investable_ucs_reduction(pr, rd)
+    (; mu, sigma) = prr
+    T = choose_scaling_parameter(ue, prr)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
     rng = resolve_rng(ue.rng, ue.seed)
     X_mu = normal_mu_error_sample(ue, rng, mu, sigma_mu)
-    return ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, X_mu, sigma_mu,
-                           MuUncertaintySetClass(), pr.mu)
+    set = ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, X_mu, sigma_mu,
+                          MuUncertaintySetClass(), prr.mu)
+    return expand_investable_ucs(set, imsk, pr)
 end
 """
     mu_ucs(ue::NormalUncertaintySet{Nothing, <:EllipsoidalUncertaintySetAlgorithm{<:Any, <:Any},
@@ -1129,10 +1156,12 @@ The significance level reaches [`k_ucs`](@ref) undivided, because an ellipsoid c
 
 # Algorithm
 
- 1. Take the prior result `pr` the set is calibrated on, and read `sigma = pr.sigma`.
- 2. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref).
- 3. Build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
- 4. Fit and return the ellipsoid with [`ellipsoidal_set`](@ref) on `sigma_mu`, passing `nothing` in place of a sample and `pr.mu` as the centre.
+ 1. Reduce the prior result to the Investable Mask with [`investable_ucs_reduction`](@ref). Inside an optimiser the result arrives already reduced and the step is a passthrough; standalone, on a prior fitted on a point-in-time Asset Panel, it takes the view the optimiser would have taken.
+ 2. Take the prior result `pr` the set is calibrated on, and read `sigma = pr.sigma`.
+ 3. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref).
+ 4. Build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
+ 5. Fit and return the ellipsoid with [`ellipsoidal_set`](@ref) on `sigma_mu`, passing `nothing` in place of a sample and `pr.mu` as the centre.
+ 6. Before the set leaves, write it back onto the full universe with [`expand_investable_ucs`](@ref), so a set fitted standalone is over the same assets the prior is, and a view of it at the mask recovers the reduced fit.
 
 # Arguments
 
@@ -1157,11 +1186,13 @@ function mu_ucs(ue::NormalUncertaintySet{Nothing,
                                          <:EllipsoidalUncertaintySetAlgorithm{<:Any, <:Any},
                                          <:Any, <:Any, <:Any}, pr::AbstractPriorResult;
                 rd = nothing, kwargs...)
-    sigma = pr.sigma
-    T = choose_scaling_parameter(ue, pr)
+    imsk, prr, _ = investable_ucs_reduction(pr, rd)
+    sigma = prr.sigma
+    T = choose_scaling_parameter(ue, prr)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
-    return ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, nothing, sigma_mu,
-                           MuUncertaintySetClass(), pr.mu)
+    set = ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, nothing, sigma_mu,
+                          MuUncertaintySetClass(), prr.mu)
+    return expand_investable_ucs(set, imsk, pr)
 end
 """
     sigma_ucs(ue::NormalUncertaintySet{Nothing,
@@ -1197,12 +1228,14 @@ Where:
 
 # Algorithm
 
- 1. Take the prior result `pr` the set is calibrated on, and read `sigma = pr.sigma` and `N = size(pr.X, 2)`.
- 2. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref).
- 3. Build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
- 4. Resolve the random number generator with [`resolve_rng`](@ref), and draw the sample with [`normal_sigma_error_sample`](@ref), giving `X_sigma`, one vectorised estimation error per row.
- 5. Build the covariance shape `sigma_sigma` with [`sigma_asymptotic_cov`](@ref).
- 6. Fit and return the ellipsoid with [`ellipsoidal_set`](@ref) on `X_sigma` and `sigma_sigma`, with `pr.sigma` as the centre.
+ 1. Reduce the prior result to the Investable Mask with [`investable_ucs_reduction`](@ref). Inside an optimiser the result arrives already reduced and the step is a passthrough; standalone, on a prior fitted on a point-in-time Asset Panel, it takes the view the optimiser would have taken.
+ 2. Take the prior result `pr` the set is calibrated on, and read `sigma = pr.sigma` and `N = size(pr.X, 2)`.
+ 3. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref).
+ 4. Build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
+ 5. Resolve the random number generator with [`resolve_rng`](@ref), and draw the sample with [`normal_sigma_error_sample`](@ref), giving `X_sigma`, one vectorised estimation error per row.
+ 6. Build the covariance shape `sigma_sigma` with [`sigma_asymptotic_cov`](@ref).
+ 7. Fit and return the ellipsoid with [`ellipsoidal_set`](@ref) on `X_sigma` and `sigma_sigma`, with `pr.sigma` as the centre.
+ 8. Before the set leaves, write it back onto the full universe with [`expand_investable_ucs`](@ref), so a set fitted standalone is over the same assets the prior is, and a view of it at the mask recovers the reduced fit.
 
 # Arguments
 
@@ -1228,15 +1261,17 @@ function sigma_ucs(ue::NormalUncertaintySet{Nothing,
                                                                                  <:Any},
                                             <:Any, <:Any, <:Any}, pr::AbstractPriorResult;
                    rd = nothing, kwargs...)
-    sigma = pr.sigma
-    N = size(pr.X, 2)
-    T = choose_scaling_parameter(ue, pr)
+    imsk, prr, _ = investable_ucs_reduction(pr, rd)
+    sigma = prr.sigma
+    N = size(prr.X, 2)
+    T = choose_scaling_parameter(ue, prr)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
     rng = resolve_rng(ue.rng, ue.seed)
     X_sigma = normal_sigma_error_sample(ue, rng, sigma, sigma_mu, T, N)
     sigma_sigma = sigma_asymptotic_cov(ue.pdm, sigma_mu, sigma, T)
-    return ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, X_sigma, sigma_sigma,
-                           SigmaUncertaintySetClass(), pr.sigma)
+    set = ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, X_sigma, sigma_sigma,
+                          SigmaUncertaintySetClass(), prr.sigma)
+    return expand_investable_ucs(set, imsk, pr)
 end
 """
     sigma_ucs(ue::NormalUncertaintySet{Nothing,
@@ -1271,11 +1306,13 @@ The significance level reaches [`k_ucs`](@ref) undivided, because an ellipsoid c
 
 # Algorithm
 
- 1. Take the prior result `pr` the set is calibrated on, and read `sigma = pr.sigma`.
- 2. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref).
- 3. Build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
- 4. Build the covariance shape `sigma_sigma` with [`sigma_asymptotic_cov`](@ref).
- 5. Fit and return the ellipsoid with [`ellipsoidal_set`](@ref) on `sigma_sigma`, passing `nothing` in place of a sample and `pr.sigma` as the centre.
+ 1. Reduce the prior result to the Investable Mask with [`investable_ucs_reduction`](@ref). Inside an optimiser the result arrives already reduced and the step is a passthrough; standalone, on a prior fitted on a point-in-time Asset Panel, it takes the view the optimiser would have taken.
+ 2. Take the prior result `pr` the set is calibrated on, and read `sigma = pr.sigma`.
+ 3. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref).
+ 4. Build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
+ 5. Build the covariance shape `sigma_sigma` with [`sigma_asymptotic_cov`](@ref).
+ 6. Fit and return the ellipsoid with [`ellipsoidal_set`](@ref) on `sigma_sigma`, passing `nothing` in place of a sample and `pr.sigma` as the centre.
+ 7. Before the set leaves, write it back onto the full universe with [`expand_investable_ucs`](@ref), so a set fitted standalone is over the same assets the prior is, and a view of it at the mask recovers the reduced fit.
 
 # Arguments
 
@@ -1301,12 +1338,14 @@ function sigma_ucs(ue::NormalUncertaintySet{Nothing,
                                                                                  <:Any},
                                             <:Any, <:Any, <:Any}, pr::AbstractPriorResult;
                    rd = nothing, kwargs...)
-    sigma = pr.sigma
-    T = choose_scaling_parameter(ue, pr)
+    imsk, prr, _ = investable_ucs_reduction(pr, rd)
+    sigma = prr.sigma
+    T = choose_scaling_parameter(ue, prr)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
     sigma_sigma = sigma_asymptotic_cov(ue.pdm, sigma_mu, sigma, T)
-    return ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, nothing, sigma_sigma,
-                           SigmaUncertaintySetClass(), pr.sigma)
+    set = ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, nothing, sigma_sigma,
+                          SigmaUncertaintySetClass(), prr.sigma)
+    return expand_investable_ucs(set, imsk, pr)
 end
 
 """
@@ -1322,11 +1361,13 @@ The two sets are the two ellipsoids of the sibling route with their shape matric
 
 # Algorithm
 
- 1. Take the prior result `pr` the set is calibrated on, and read `mu`, `sigma` and `N = size(pr.X, 2)`.
- 2. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref), and build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
- 3. Resolve one generator with [`resolve_rng`](@ref), and draw the two samples with [`normal_mu_error_sample`](@ref) and [`normal_sigma_error_sample`](@ref), mean first.
- 4. Build the covariance shape `sigma_sigma` with [`sigma_asymptotic_cov`](@ref).
- 5. Assemble the two sets with [`norm_ball_set`](@ref), on the mean shape and on the covariance shape, and return them as a tuple, mean first.
+ 1. Reduce the prior result to the Investable Mask with [`investable_ucs_reduction`](@ref). Inside an optimiser the result arrives already reduced and the step is a passthrough; standalone, on a prior fitted on a point-in-time Asset Panel, it takes the view the optimiser would have taken.
+ 2. Take the prior result `pr` the set is calibrated on, and read `mu`, `sigma` and `N = size(pr.X, 2)`.
+ 3. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref), and build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
+ 4. Resolve one generator with [`resolve_rng`](@ref), and draw the two samples with [`normal_mu_error_sample`](@ref) and [`normal_sigma_error_sample`](@ref), mean first.
+ 5. Build the covariance shape `sigma_sigma` with [`sigma_asymptotic_cov`](@ref).
+ 6. Assemble the two sets with [`norm_ball_set`](@ref), on the mean shape and on the covariance shape, and return them as a tuple, mean first.
+ 7. Before the two sets leave, write both back onto the full universe with [`expand_investable_ucs`](@ref), so a set fitted standalone is over the same assets the prior is, and a view of it at the mask recovers the reduced fit.
 
 # Arguments
 
@@ -1360,17 +1401,21 @@ function ucs(ue::NormalUncertaintySet{Nothing,
                                                                         <:Any, <:Any},
                                       <:Any, <:Any, <:Any}, pr::AbstractPriorResult;
              rd = nothing, kwargs...)
-    (; mu, sigma) = pr
-    N = size(pr.X, 2)
-    T = choose_scaling_parameter(ue, pr)
+    imsk, prr, _ = investable_ucs_reduction(pr, rd)
+    (; mu, sigma) = prr
+    N = size(prr.X, 2)
+    T = choose_scaling_parameter(ue, prr)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
     rng = resolve_rng(ue.rng, ue.seed)
     X_mu = normal_mu_error_sample(ue, rng, mu, sigma_mu)
     X_sigma = normal_sigma_error_sample(ue, rng, sigma, sigma_mu, T, N)
     sigma_sigma = sigma_asymptotic_cov(ue.pdm, sigma_mu, sigma, T)
-    return norm_ball_set(ue.alg, ue.q, X_mu, sigma_mu, MuUncertaintySetClass(), pr.mu),
-           norm_ball_set(ue.alg, ue.q, X_sigma, sigma_sigma, SigmaUncertaintySetClass(),
-                         pr.sigma)
+    mu_set, sigma_set = norm_ball_set(ue.alg, ue.q, X_mu, sigma_mu, MuUncertaintySetClass(),
+                                      prr.mu),
+                        norm_ball_set(ue.alg, ue.q, X_sigma, sigma_sigma,
+                                      SigmaUncertaintySetClass(), prr.sigma)
+    return expand_investable_ucs(mu_set, imsk, pr),
+           expand_investable_ucs(sigma_set, imsk, pr)
 end
 """
     ucs(ue::NormalUncertaintySet{Nothing, <:NormBallUncertaintySetAlgorithm{<:Any, <:Any, <:Any},
@@ -1384,10 +1429,12 @@ This is the prior-result arm of the verb, defined for a set whose `pe` is `nothi
 
 # Algorithm
 
- 1. Take the prior result `pr` the set is calibrated on, and read `sigma = pr.sigma`.
- 2. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref), and build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
- 3. Build the covariance shape `sigma_sigma` with [`sigma_asymptotic_cov`](@ref).
- 4. Assemble the two sets with [`norm_ball_set`](@ref), passing `nothing` in place of a sample, and return them as a tuple, mean first.
+ 1. Reduce the prior result to the Investable Mask with [`investable_ucs_reduction`](@ref). Inside an optimiser the result arrives already reduced and the step is a passthrough; standalone, on a prior fitted on a point-in-time Asset Panel, it takes the view the optimiser would have taken.
+ 2. Take the prior result `pr` the set is calibrated on, and read `sigma = pr.sigma`.
+ 3. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref), and build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
+ 4. Build the covariance shape `sigma_sigma` with [`sigma_asymptotic_cov`](@ref).
+ 5. Assemble the two sets with [`norm_ball_set`](@ref), passing `nothing` in place of a sample, and return them as a tuple, mean first.
+ 6. Before the two sets leave, write both back onto the full universe with [`expand_investable_ucs`](@ref), so a set fitted standalone is over the same assets the prior is, and a view of it at the mask recovers the reduced fit.
 
 # Arguments
 
@@ -1421,13 +1468,17 @@ function ucs(ue::NormalUncertaintySet{Nothing,
                                                                         <:Any}, <:Any,
                                       <:Any, <:Any}, pr::AbstractPriorResult; rd = nothing,
              kwargs...)
-    sigma = pr.sigma
-    T = choose_scaling_parameter(ue, pr)
+    imsk, prr, _ = investable_ucs_reduction(pr, rd)
+    sigma = prr.sigma
+    T = choose_scaling_parameter(ue, prr)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
     sigma_sigma = sigma_asymptotic_cov(ue.pdm, sigma_mu, sigma, T)
-    return norm_ball_set(ue.alg, ue.q, nothing, sigma_mu, MuUncertaintySetClass(), pr.mu),
-           norm_ball_set(ue.alg, ue.q, nothing, sigma_sigma, SigmaUncertaintySetClass(),
-                         pr.sigma)
+    mu_set, sigma_set = norm_ball_set(ue.alg, ue.q, nothing, sigma_mu,
+                                      MuUncertaintySetClass(), prr.mu),
+                        norm_ball_set(ue.alg, ue.q, nothing, sigma_sigma,
+                                      SigmaUncertaintySetClass(), prr.sigma)
+    return expand_investable_ucs(mu_set, imsk, pr),
+           expand_investable_ucs(sigma_set, imsk, pr)
 end
 """
     mu_ucs(ue::NormalUncertaintySet{Nothing,
@@ -1442,10 +1493,12 @@ The map is the factor of ``\\hat{\\mathbf{\\Sigma}} / T``, so the set is the mea
 
 # Algorithm
 
- 1. Take the prior result `pr` the set is calibrated on, and read `mu` and `sigma`.
- 2. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref), and build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
- 3. Resolve the generator with [`resolve_rng`](@ref), and draw the sample with [`normal_mu_error_sample`](@ref).
- 4. Assemble and return the set with [`norm_ball_set`](@ref), with `pr.mu` as the centre.
+ 1. Reduce the prior result to the Investable Mask with [`investable_ucs_reduction`](@ref). Inside an optimiser the result arrives already reduced and the step is a passthrough; standalone, on a prior fitted on a point-in-time Asset Panel, it takes the view the optimiser would have taken.
+ 2. Take the prior result `pr` the set is calibrated on, and read `mu` and `sigma`.
+ 3. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref), and build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
+ 4. Resolve the generator with [`resolve_rng`](@ref), and draw the sample with [`normal_mu_error_sample`](@ref).
+ 5. Assemble and return the set with [`norm_ball_set`](@ref), with `pr.mu` as the centre.
+ 6. Before the set leaves, write it back onto the full universe with [`expand_investable_ucs`](@ref), so a set fitted standalone is over the same assets the prior is, and a view of it at the mask recovers the reduced fit.
 
 # Arguments
 
@@ -1477,12 +1530,14 @@ function mu_ucs(ue::NormalUncertaintySet{Nothing,
                                                                            <:Any, <:Any},
                                          <:Any, <:Any, <:Any}, pr::AbstractPriorResult;
                 rd = nothing, kwargs...)
-    (; mu, sigma) = pr
-    T = choose_scaling_parameter(ue, pr)
+    imsk, prr, _ = investable_ucs_reduction(pr, rd)
+    (; mu, sigma) = prr
+    T = choose_scaling_parameter(ue, prr)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
     rng = resolve_rng(ue.rng, ue.seed)
     X_mu = normal_mu_error_sample(ue, rng, mu, sigma_mu)
-    return norm_ball_set(ue.alg, ue.q, X_mu, sigma_mu, MuUncertaintySetClass(), pr.mu)
+    set = norm_ball_set(ue.alg, ue.q, X_mu, sigma_mu, MuUncertaintySetClass(), prr.mu)
+    return expand_investable_ucs(set, imsk, pr)
 end
 """
     mu_ucs(ue::NormalUncertaintySet{Nothing, <:NormBallUncertaintySetAlgorithm{<:Any, <:Any, <:Any},
@@ -1496,9 +1551,11 @@ This is the prior-result arm of the verb, defined for a set whose `pe` is `nothi
 
 # Algorithm
 
- 1. Take the prior result `pr` the set is calibrated on, and read `sigma = pr.sigma`.
- 2. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref), and build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
- 3. Assemble and return the set with [`norm_ball_set`](@ref), passing `nothing` in place of a sample and `pr.mu` as the centre.
+ 1. Reduce the prior result to the Investable Mask with [`investable_ucs_reduction`](@ref). Inside an optimiser the result arrives already reduced and the step is a passthrough; standalone, on a prior fitted on a point-in-time Asset Panel, it takes the view the optimiser would have taken.
+ 2. Take the prior result `pr` the set is calibrated on, and read `sigma = pr.sigma`.
+ 3. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref), and build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
+ 4. Assemble and return the set with [`norm_ball_set`](@ref), passing `nothing` in place of a sample and `pr.mu` as the centre.
+ 5. Before the set leaves, write it back onto the full universe with [`expand_investable_ucs`](@ref), so a set fitted standalone is over the same assets the prior is, and a view of it at the mask recovers the reduced fit.
 
 # Arguments
 
@@ -1530,10 +1587,12 @@ function mu_ucs(ue::NormalUncertaintySet{Nothing,
                                                                            <:Any}, <:Any,
                                          <:Any, <:Any}, pr::AbstractPriorResult;
                 rd = nothing, kwargs...)
-    sigma = pr.sigma
-    T = choose_scaling_parameter(ue, pr)
+    imsk, prr, _ = investable_ucs_reduction(pr, rd)
+    sigma = prr.sigma
+    T = choose_scaling_parameter(ue, prr)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
-    return norm_ball_set(ue.alg, ue.q, nothing, sigma_mu, MuUncertaintySetClass(), pr.mu)
+    set = norm_ball_set(ue.alg, ue.q, nothing, sigma_mu, MuUncertaintySetClass(), prr.mu)
+    return expand_investable_ucs(set, imsk, pr)
 end
 """
     sigma_ucs(ue::NormalUncertaintySet{Nothing,
@@ -1548,11 +1607,13 @@ The map is the factor of the vectorised covariance's asymptotic covariance, so t
 
 # Algorithm
 
- 1. Take the prior result `pr` the set is calibrated on, and read `sigma = pr.sigma` and `N = size(pr.X, 2)`.
- 2. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref), and build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
- 3. Resolve the generator with [`resolve_rng`](@ref), and draw the sample with [`normal_sigma_error_sample`](@ref).
- 4. Build the covariance shape `sigma_sigma` with [`sigma_asymptotic_cov`](@ref).
- 5. Assemble and return the set with [`norm_ball_set`](@ref), with `pr.sigma` as the centre.
+ 1. Reduce the prior result to the Investable Mask with [`investable_ucs_reduction`](@ref). Inside an optimiser the result arrives already reduced and the step is a passthrough; standalone, on a prior fitted on a point-in-time Asset Panel, it takes the view the optimiser would have taken.
+ 2. Take the prior result `pr` the set is calibrated on, and read `sigma = pr.sigma` and `N = size(pr.X, 2)`.
+ 3. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref), and build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
+ 4. Resolve the generator with [`resolve_rng`](@ref), and draw the sample with [`normal_sigma_error_sample`](@ref).
+ 5. Build the covariance shape `sigma_sigma` with [`sigma_asymptotic_cov`](@ref).
+ 6. Assemble and return the set with [`norm_ball_set`](@ref), with `pr.sigma` as the centre.
+ 7. Before the set leaves, write it back onto the full universe with [`expand_investable_ucs`](@ref), so a set fitted standalone is over the same assets the prior is, and a view of it at the mask recovers the reduced fit.
 
 # Arguments
 
@@ -1584,15 +1645,17 @@ function sigma_ucs(ue::NormalUncertaintySet{Nothing,
                                                                               <:Any, <:Any},
                                             <:Any, <:Any, <:Any}, pr::AbstractPriorResult;
                    rd = nothing, kwargs...)
-    sigma = pr.sigma
-    N = size(pr.X, 2)
-    T = choose_scaling_parameter(ue, pr)
+    imsk, prr, _ = investable_ucs_reduction(pr, rd)
+    sigma = prr.sigma
+    N = size(prr.X, 2)
+    T = choose_scaling_parameter(ue, prr)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
     rng = resolve_rng(ue.rng, ue.seed)
     X_sigma = normal_sigma_error_sample(ue, rng, sigma, sigma_mu, T, N)
     sigma_sigma = sigma_asymptotic_cov(ue.pdm, sigma_mu, sigma, T)
-    return norm_ball_set(ue.alg, ue.q, X_sigma, sigma_sigma, SigmaUncertaintySetClass(),
-                         pr.sigma)
+    set = norm_ball_set(ue.alg, ue.q, X_sigma, sigma_sigma, SigmaUncertaintySetClass(),
+                        prr.sigma)
+    return expand_investable_ucs(set, imsk, pr)
 end
 """
     sigma_ucs(ue::NormalUncertaintySet{Nothing, <:NormBallUncertaintySetAlgorithm{<:Any, <:Any, <:Any},
@@ -1606,10 +1669,12 @@ This is the prior-result arm of the verb, defined for a set whose `pe` is `nothi
 
 # Algorithm
 
- 1. Take the prior result `pr` the set is calibrated on, and read `sigma = pr.sigma`.
- 2. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref), and build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
- 3. Build the covariance shape `sigma_sigma` with [`sigma_asymptotic_cov`](@ref).
- 4. Assemble and return the set with [`norm_ball_set`](@ref), passing `nothing` in place of a sample and `pr.sigma` as the centre.
+ 1. Reduce the prior result to the Investable Mask with [`investable_ucs_reduction`](@ref). Inside an optimiser the result arrives already reduced and the step is a passthrough; standalone, on a prior fitted on a point-in-time Asset Panel, it takes the view the optimiser would have taken.
+ 2. Take the prior result `pr` the set is calibrated on, and read `sigma = pr.sigma`.
+ 3. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref), and build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
+ 4. Build the covariance shape `sigma_sigma` with [`sigma_asymptotic_cov`](@ref).
+ 5. Assemble and return the set with [`norm_ball_set`](@ref), passing `nothing` in place of a sample and `pr.sigma` as the centre.
+ 6. Before the set leaves, write it back onto the full universe with [`expand_investable_ucs`](@ref), so a set fitted standalone is over the same assets the prior is, and a view of it at the mask recovers the reduced fit.
 
 # Arguments
 
@@ -1641,12 +1706,14 @@ function sigma_ucs(ue::NormalUncertaintySet{Nothing,
                                                                               <:Any}, <:Any,
                                             <:Any, <:Any}, pr::AbstractPriorResult;
                    rd = nothing, kwargs...)
-    sigma = pr.sigma
-    T = choose_scaling_parameter(ue, pr)
+    imsk, prr, _ = investable_ucs_reduction(pr, rd)
+    sigma = prr.sigma
+    T = choose_scaling_parameter(ue, prr)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
     sigma_sigma = sigma_asymptotic_cov(ue.pdm, sigma_mu, sigma, T)
-    return norm_ball_set(ue.alg, ue.q, nothing, sigma_sigma, SigmaUncertaintySetClass(),
-                         pr.sigma)
+    set = norm_ball_set(ue.alg, ue.q, nothing, sigma_sigma, SigmaUncertaintySetClass(),
+                        prr.sigma)
+    return expand_investable_ucs(set, imsk, pr)
 end
 
 export NormalUncertaintySet

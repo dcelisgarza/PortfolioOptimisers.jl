@@ -107,8 +107,12 @@ ball's map moves nothing on that asset, a zero row of the compact basis is dropp
 without moving the span and leaves the sliced basis orthonormal, and a zero metric entry states
 nothing — and carries the full `pr.mu` or `pr.sigma` as `val`, `NaN` frame and all, because
 [ADR 0050](0050-an-uncertainty-set-carries-the-quantity-it-bounds.md) says a set carries the
-quantity it was calibrated on and that quantity lives on the full universe. A set that bounds a
-moment element-wise carries the moment's own `NaN` frame instead.
+quantity it was calibrated on and that quantity lives on the full universe. A box carries the
+moment's own `NaN` frame instead, because a bound on `mu` lives where `mu` lives; an ellipsoid's
+shape matrix is zero outside the mask, because the same set converts into a norm ball whose map
+must be finite. The three returns-data families under `pe = nothing` take the same shape, and
+their returns route reaches it through the tail the two routes share
+([#1063](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1063)).
 
 The gain is the pre-built route. A set fitted standalone on the full universe passes through
 `port_opt_view(opt, idx, pr.X)` at the optimiser's entry, so the same weights are reached whether

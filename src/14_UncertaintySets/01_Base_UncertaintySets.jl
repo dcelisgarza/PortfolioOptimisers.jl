@@ -1006,6 +1006,40 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Write a vector [`BoxUncertaintySet`](@ref) fitted on the Investable Mask back onto the full asset universe.
+
+The expansion is the inverse of [`port_opt_view`](@ref): the view slices the two bounds and the centre by the asset index and touches nothing else, so a frame written outside the mask is dropped without a trace and the view recovers the fitted set. The frame is `NaN`, the moment's own: a bound on `mu` is in the units of `mu` and lives where `mu` lives, and outside the mask the prior states `NaN` for it. The centre is the full `pr.mu`.
+
+# Algorithm
+
+ 1. Write `set.lb` and `set.ub` at the rows the mask keeps into two `NaN` frames of `length(imsk)` entries, through [`expand_vector`](@ref).
+ 2. Build a [`BoxUncertaintySet`](@ref) from the two, with `pr.mu` as `val`.
+
+# Arguments
+
+  - `set`: Vector box uncertainty set fitted on the reduced prior.
+  - `imsk`: The Investable Mask of the full prior.
+  - $(arg_dict[:pr])
+
+# Returns
+
+  - `set::BoxUncertaintySet`: The set on the full asset universe.
+
+# Related
+
+  - [`BoxUncertaintySet`](@ref)
+  - [`expand_vector`](@ref)
+  - [`investable_ucs_reduction`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+function expand_investable_ucs(set::BoxUncertaintySet{<:VecNum, <:VecNum}, imsk::BitVector,
+                               pr::AbstractPriorResult)::BoxUncertaintySet
+    return BoxUncertaintySet(; lb = expand_vector(set.lb, imsk),
+                             ub = expand_vector(set.ub, imsk), val = pr.mu)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Return a view of a matrix [`BoxUncertaintySet`](@ref) restricted to the asset indices `i`.
 
 The method takes the covariance axis, where each bound is an `N × N` matrix, so the asset index applies to both dimensions of each bound.
@@ -1035,6 +1069,40 @@ function port_opt_view(risk_ucs::BoxUncertaintySet{<:MatNum, <:MatNum}, i,
                        args...)::BoxUncertaintySet
     return BoxUncertaintySet(; lb = view(risk_ucs.lb, i, i), ub = view(risk_ucs.ub, i, i),
                              val = nothing_scalar_array_view(risk_ucs.val, i))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Write a matrix [`BoxUncertaintySet`](@ref) fitted on the Investable Mask back onto the full asset universe.
+
+The expansion is the inverse of [`port_opt_view`](@ref): the view slices the two bounds on both axes and the centre by the asset index, so a frame written outside the mask is dropped without a trace and the view recovers the fitted set. The frame is `NaN`, the moment's own: a bound on `sigma` lives where `sigma` lives, and outside the mask the prior states `NaN` for its row and column. The centre is the full `pr.sigma`.
+
+# Algorithm
+
+ 1. Write `set.lb` and `set.ub` at `(imsk, imsk)` into two `NaN` frames of `length(imsk)` rows and columns, through the covariance method of [`expand_moment`](@ref).
+ 2. Build a [`BoxUncertaintySet`](@ref) from the two, with `pr.sigma` as `val`.
+
+# Arguments
+
+  - `set`: Matrix box uncertainty set fitted on the reduced prior.
+  - `imsk`: The Investable Mask of the full prior.
+  - $(arg_dict[:pr])
+
+# Returns
+
+  - `set::BoxUncertaintySet`: The set on the full asset universe.
+
+# Related
+
+  - [`BoxUncertaintySet`](@ref)
+  - [`expand_moment`](@ref)
+  - [`investable_ucs_reduction`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+function expand_investable_ucs(set::BoxUncertaintySet{<:MatNum, <:MatNum}, imsk::BitVector,
+                               pr::AbstractPriorResult)::BoxUncertaintySet
+    return BoxUncertaintySet(; lb = expand_moment(set.lb, imsk),
+                             ub = expand_moment(set.ub, imsk), val = pr.sigma)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1583,6 +1651,48 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Write a covariance [`EllipsoidalUncertaintySet`](@ref) fitted on the Investable Mask back onto the full asset universe.
+
+The expansion is the inverse of [`port_opt_view`](@ref): the view slices the shape matrix at the fourth-moment index of the selected assets and the centre at the plain one, so a zero block written outside the mask is dropped without a trace and the view recovers the fitted set. The frame is zero and not `NaN`, because the shape matrix is geometry: the same set converts into a [`NormBallUncertaintySet`](@ref) whose map must be finite, and a zero row of that map moves nothing on an asset the prior could not estimate. The centre is the full `pr.sigma`.
+
+# Algorithm
+
+ 1. Take the positions the investable pairs occupy in the vectorised covariance with [`coverage_pair_index`](@ref), which orders them as [`fourth_moment_index_generator`](@ref) does.
+ 2. Allocate a zero frame of `length(imsk)^2` rows and columns, and write `set.sigma` at those positions on both axes.
+ 3. Build an [`EllipsoidalUncertaintySet`](@ref) from it, carrying `k` and `class` through unchanged and `pr.sigma` as `val`.
+
+# Arguments
+
+  - `set`: Covariance ellipsoidal uncertainty set fitted on the reduced prior.
+  - `imsk`: The Investable Mask of the full prior.
+  - $(arg_dict[:pr])
+
+# Returns
+
+  - `set::EllipsoidalUncertaintySet`: The set on the full asset universe.
+
+# Related
+
+  - [`EllipsoidalUncertaintySet`](@ref)
+  - [`SigmaUncertaintySetClass`](@ref)
+  - [`coverage_pair_index`](@ref)
+  - [`investable_ucs_reduction`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+function expand_investable_ucs(set::EllipsoidalUncertaintySet{<:MatNum, <:Any,
+                                                              <:SigmaUncertaintySetClass},
+                               imsk::BitVector,
+                               pr::AbstractPriorResult)::EllipsoidalUncertaintySet
+    idx = coverage_pair_index(imsk)
+    N2 = length(imsk)^2
+    sigma = zeros(eltype(set.sigma), N2, N2)
+    sigma[idx, idx] = set.sigma
+    return EllipsoidalUncertaintySet(; sigma = sigma, k = set.k, class = set.class,
+                                     val = pr.sigma)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Return a view of a mean [`EllipsoidalUncertaintySet`](@ref) restricted to assets at index `i`.
 
 The set bounds a characteristic vector, so its shape matrix and its centre both live on the ``N`` axis and one index serves both.
@@ -1615,6 +1725,45 @@ function port_opt_view(risk_ucs::EllipsoidalUncertaintySet{<:MatNum, <:Any,
     return EllipsoidalUncertaintySet(; sigma = view(risk_ucs.sigma, i, i), k = risk_ucs.k,
                                      class = risk_ucs.class,
                                      val = nothing_scalar_array_view(risk_ucs.val, i))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Write a mean [`EllipsoidalUncertaintySet`](@ref) fitted on the Investable Mask back onto the full asset universe.
+
+The expansion is the inverse of [`port_opt_view`](@ref): the view slices the shape matrix on both axes and the centre by the asset index, so a zero row and column written outside the mask are dropped without a trace and the view recovers the fitted set. The frame is zero and not `NaN`, because the shape matrix is geometry: the same set converts into a [`NormBallUncertaintySet`](@ref) whose map must be finite, and a zero row of that map moves nothing on an asset the prior could not estimate. The centre is the full `pr.mu`.
+
+# Algorithm
+
+ 1. Allocate a zero frame of `length(imsk)` rows and columns, and write `set.sigma` at `(imsk, imsk)`.
+ 2. Build an [`EllipsoidalUncertaintySet`](@ref) from it, carrying `k` and `class` through unchanged and `pr.mu` as `val`.
+
+# Arguments
+
+  - `set`: Mean ellipsoidal uncertainty set fitted on the reduced prior.
+  - `imsk`: The Investable Mask of the full prior.
+  - $(arg_dict[:pr])
+
+# Returns
+
+  - `set::EllipsoidalUncertaintySet`: The set on the full asset universe.
+
+# Related
+
+  - [`EllipsoidalUncertaintySet`](@ref)
+  - [`MuUncertaintySetClass`](@ref)
+  - [`investable_ucs_reduction`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+function expand_investable_ucs(set::EllipsoidalUncertaintySet{<:MatNum, <:Any,
+                                                              <:MuUncertaintySetClass},
+                               imsk::BitVector,
+                               pr::AbstractPriorResult)::EllipsoidalUncertaintySet
+    N = length(imsk)
+    sigma = zeros(eltype(set.sigma), N, N)
+    sigma[imsk, imsk] = set.sigma
+    return EllipsoidalUncertaintySet(; sigma = sigma, k = set.k, class = set.class,
+                                     val = pr.mu)
 end
 """
     box_quantile_bounds(::Type{TE}, get_ij, N::Integer, q::Number, kwargs) where {TE}

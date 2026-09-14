@@ -46,6 +46,10 @@ port_opt_view(risk_ucs::BoxUncertaintySet{<:VecNum, <:VecNum}, i, args...)
 port_opt_view(risk_ucs::BoxUncertaintySet{<:MatNum, <:MatNum}, i, args...)
 port_opt_view(risk_ucs::EllipsoidalUncertaintySet{<:MatNum, <:Any, <:SigmaUncertaintySetClass}, i, args...)
 port_opt_view(risk_ucs::EllipsoidalUncertaintySet{<:MatNum, <:Any, <:MuUncertaintySetClass}, i, args...)
+expand_investable_ucs(set::BoxUncertaintySet{<:VecNum, <:VecNum}, imsk::BitVector, pr::AbstractPriorResult)
+expand_investable_ucs(set::BoxUncertaintySet{<:MatNum, <:MatNum}, imsk::BitVector, pr::AbstractPriorResult)
+expand_investable_ucs(set::EllipsoidalUncertaintySet{<:MatNum, <:Any, <:SigmaUncertaintySetClass}, imsk::BitVector, pr::AbstractPriorResult)
+expand_investable_ucs(set::EllipsoidalUncertaintySet{<:MatNum, <:Any, <:MuUncertaintySetClass}, imsk::BitVector, pr::AbstractPriorResult)
 vec_quantile_bounds
 ellipsoidal_set
 box_quantile_bounds

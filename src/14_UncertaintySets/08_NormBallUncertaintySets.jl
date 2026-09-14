@@ -352,6 +352,46 @@ function port_opt_view(risk_ucs::NormBallUncertaintySet{<:Any, <:MatNum, <:Any,
     return NormBallUncertaintySet(; kappa = risk_ucs.kappa, L = view(risk_ucs.L, i, :),
                                   p = risk_ucs.p, class = risk_ucs.class, val = val)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Write a covariance [`NormBallUncertaintySet`](@ref) fitted on the Investable Mask back onto the full asset universe.
+
+The expansion is the inverse of [`port_opt_view`](@ref): the view slices the map at the fourth-moment index of the selected assets and the centre at the plain one, so a zero row written outside the mask is dropped without a trace and the view recovers the fitted set. A zero row states that the set moves nothing on a pair the prior could not estimate, and the map must be finite, so the frame is zero and not `NaN`. The centre is the full `pr.sigma`.
+
+# Algorithm
+
+ 1. Take the positions the investable pairs occupy in the vectorised covariance with [`coverage_pair_index`](@ref), which orders them as [`fourth_moment_index_generator`](@ref) does.
+ 2. Allocate a zero frame of `length(imsk)^2` rows and `size(set.L, 2)` columns, and write `set.L` at those rows.
+ 3. Build a [`NormBallUncertaintySet`](@ref) from it, carrying `kappa`, `p` and `class` through unchanged and `pr.sigma` as `val`.
+
+# Arguments
+
+  - `set`: Covariance norm-ball uncertainty set fitted on the reduced prior.
+  - `imsk`: The Investable Mask of the full prior.
+  - $(arg_dict[:pr])
+
+# Returns
+
+  - `set::NormBallUncertaintySet`: The set on the full asset universe.
+
+# Related
+
+  - [`NormBallUncertaintySet`](@ref)
+  - [`SigmaUncertaintySetClass`](@ref)
+  - [`coverage_pair_index`](@ref)
+  - [`investable_ucs_reduction`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+function expand_investable_ucs(set::NormBallUncertaintySet{<:Any, <:MatNum, <:Any,
+                                                           <:SigmaUncertaintySetClass},
+                               imsk::BitVector,
+                               pr::AbstractPriorResult)::NormBallUncertaintySet
+    L = zeros(eltype(set.L), length(imsk)^2, size(set.L, 2))
+    L[coverage_pair_index(imsk), :] = set.L
+    return NormBallUncertaintySet(; kappa = set.kappa, L = L, p = set.p, class = set.class,
+                                  val = pr.sigma)
+end
 
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

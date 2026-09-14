@@ -13,6 +13,7 @@ norm_ball_deviation_set
 port_opt_view(risk_ucs::NormBallUncertaintySet{<:Any, <:MatNum, <:Any, <:MuUncertaintySetClass}, i, args...)
 expand_investable_ucs(set::NormBallUncertaintySet{<:Any, <:MatNum, <:Any, <:MuUncertaintySetClass}, imsk::BitVector, pr::AbstractPriorResult)
 port_opt_view(risk_ucs::NormBallUncertaintySet{<:Any, <:MatNum, <:Any, <:SigmaUncertaintySetClass}, i, args...)
+expand_investable_ucs(set::NormBallUncertaintySet{<:Any, <:MatNum, <:Any, <:SigmaUncertaintySetClass}, imsk::BitVector, pr::AbstractPriorResult)
 ```
 
 ## References
