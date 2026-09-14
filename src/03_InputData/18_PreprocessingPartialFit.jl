@@ -426,7 +426,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-The state a [`PriceGapFill`](@ref) with a [`CarriedPrice`](@ref) keeps between two blocks: the last observed price of every asset, which is the carry the next block's gaps take and the seed the fitted result replays.
+The state a [`PriceGapFill`](@ref) with a [`CarriedPrice`](@ref) keeps between two blocks: the last observed price of every asset, which is the carry the next block's gaps take and the seed the fitted result replays, and the timestamp the last block ended on, which the fitted result records as the end of its training window.
 
 # Fields
 
@@ -434,7 +434,7 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    PriceGapFillState(; nx::AbstractVector{Symbol}, v::AbstractVector)
+    PriceGapFillState(; nx::AbstractVector{Symbol}, v::AbstractVector, te)
 
 # Related
 
@@ -451,19 +451,24 @@ $(DocStringExtensions.FIELDS)
     The last observed price per asset, `missing` where none has been observed.
     """
     v
+    """
+    The last timestamp of the last block folded. A carried price precedes every observation of the next block, so the block's gaps are filled from it; the fitted result records it as the end of its training window.
+    """
+    te
 end
-function PriceGapFillState(; nx::AbstractVector{Symbol},
-                           v::AbstractVector)::PriceGapFillState
+function PriceGapFillState(; nx::AbstractVector{Symbol}, v::AbstractVector,
+                           te)::PriceGapFillState
     @argcheck(length(nx) == length(v), DimensionMismatch)
-    return PriceGapFillState(nx, v)
+    return PriceGapFillState(nx, v, te)
 end
 function Base.copy(x::PriceGapFillState)
-    return PriceGapFillState(copy(x.nx), copy(x.v))
+    return PriceGapFillState(copy(x.nx), copy(x.v), x.te)
 end
 function merge_states(a::PriceGapFillState, b::PriceGapFillState)
     assert_pinned_carrier(a.nx, b.nx, :nx)
     return PriceGapFillState(; nx = a.nx,
-                             v = [ismissing(y) ? x : y for (x, y) in zip(a.v, b.v)])
+                             v = [ismissing(y) ? x : y for (x, y) in zip(a.v, b.v)],
+                             te = b.te)
 end
 """
     partial_fit_transform(est::PriceGapFill, pr::PricesResult) -> (est′, pr′)
@@ -473,9 +478,9 @@ Fills the gaps of a block of prices as the fit over the whole history would, and
 # Algorithm
 
  1. Resolve the Listing Span bounding the fill with [`gap_fill_span`](@ref), as the batch replay does.
- 2. Seed each column's walk. An asset observed in an earlier block is seeded with the carried price. One first observed in this block is seeded with its last observed price of the block, which is what the batch fit of [`PriceGapFill`](@ref) seeds a window with. One observed nowhere yet is left alone.
- 3. Walk each seeded column with [`gap_fill_column!`](@ref) under the step's convention.
- 4. Advance the carry to each column's last observed price of the block.
+ 2. Seed each column's walk. An asset observed in an earlier block is seeded with the carried price, which precedes every observation of this block. One not observed in an earlier block has no seed, so a gap that opens its column stays a gap until the block's own first price, as the batch replay of [`PriceGapFill`](@ref) leaves it on the training window: a price later in the block is not a seed for a gap before it. One observed nowhere yet is left alone.
+ 3. Walk each column with [`gap_fill_column!`](@ref) under the step's convention, the seed applying from the first observation after the state's end.
+ 4. Advance the carry to each column's last observed price of the block, and the end to the block's last timestamp.
 
 The convention must be [`CarriedPrice`](@ref); a statistic fill re-prices every earlier gap when the window grows and has no online form, which [`supports_partial_fit`](@ref) states and the Pipeline refuses at warm-up.
 
@@ -498,31 +503,36 @@ function partial_fit_transform(est::PriceGapFill, pr::PricesResult)
         state.v
     end
     span = gap_fill_span(carrier_listing_span(pr), vals, est.strict)
+    ts = TimeSeries.timestamp(pr.X)
+    #! A carried price is written only after the rows it was read from, as the batch replay
+    #! writes its seed only after the training window. With no state nothing precedes the
+    #! block, so no seed is written; with one, the block follows the state's end.
+    t0 = isnothing(state) ? size(vals, 1) + 1 : searchsortedlast(ts, state.te) + 1
     vnew = copy(v)
     for j in axes(vals, 2)
         t = findlast(x -> !is_missing_value(x), view(vals, :, j))
-        seed = if !ismissing(v[j])
-            v[j]
-        elseif !isnothing(t)
-            vals[t, j]
-        else
+        if ismissing(v[j]) && isnothing(t)
             continue
         end
         if !isnothing(t)
             vnew[j] = vals[t, j]
         end
-        gap_fill_column!(est.fill, vals, span, j, seed)
+        #! A column the state has not priced has no seed. The walk is handed the block's
+        #! last price with a start past the block's end, so no row reads it: the column's
+        #! gaps fill from the block's own earlier prices alone.
+        seed, tj = ismissing(v[j]) ? (vals[t, j], size(vals, 1) + 1) : (v[j], t0)
+        gap_fill_column!(est.fill, vals, span, j, seed, tj)
     end
-    X = TimeSeries.TimeArray(TimeSeries.timestamp(pr.X), vals, TimeSeries.colnames(pr.X))
+    X = TimeSeries.TimeArray(ts, vals, TimeSeries.colnames(pr.X))
     out = PricesResult(; X = X, F = pr.F, B = pr.B, iv = pr.iv, ivpa = pr.ivpa,
                        pnl = pr.pnl, span = pr.span)
-    return rebuild_estimator(est, (; cache = PriceGapFillState(; nx = names, v = vnew))),
-           out
+    cache = PriceGapFillState(; nx = names, v = vnew, te = last(ts))
+    return rebuild_estimator(est, (; cache = cache)), out
 end
 """
     fit_preprocessing(est::PriceGapFill)
 
-Reads a stepped [`PriceGapFill`](@ref) out as the [`PriceGapFillResult`](@ref) the batch fit over the same rows gives: the assets observed so far, each with its last observed price.
+Reads a stepped [`PriceGapFill`](@ref) out as the [`PriceGapFillResult`](@ref) the batch fit over the same rows gives: the assets observed so far, each with its last observed price, and the last timestamp folded as the end of the training window.
 
 # Related
 
@@ -533,7 +543,7 @@ function fit_preprocessing(est::PriceGapFill)
     state = partial_fit_cache(est)
     keep = findall(!ismissing, state.v)
     v = identity.([state.v[j] for j in keep])
-    return PriceGapFillResult(state.nx[keep], v, est.fill, est.strict)
+    return PriceGapFillResult(state.nx[keep], v, state.te, est.fill, est.strict)
 end
 function supports_partial_fit(est::PriceGapFill)
     return isa(est.fill, CarriedPrice)

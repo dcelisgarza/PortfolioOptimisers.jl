@@ -146,6 +146,32 @@ what keeps the JuMP families cheap.
         @test isequal(values(online.X), values(apply_preprocessing(bres, pr).X))
         @test fit_preprocessing(est).nx == bres.nx
         @test fit_preprocessing(est).v == bres.v
+        @test fit_preprocessing(est).te == bres.te == ts[end]
+        # Issue #1068: the online form takes the batch rule. A first block that opens inside
+        # an asset's suspension has no price before its leading gap, so the gap is not filled
+        # from a price later in the block; a block that follows one is filled from the carried
+        # price, which precedes it. A1's gap is row 70, so a history opened at row 70 is the
+        # case, and rows 69:70 seed the carry for the same history opened one row earlier.
+        late = [70:75, 76:100]
+        est_l, online_l = online_rows(PriceGapFill(), pr, late)
+        bres_l = fit_preprocessing(PriceGapFill(), rows(pr, 70:100))
+        @test isnan(values(online_l.X)[1, 1])
+        @test isequal(values(online_l.X),
+                      values(apply_preprocessing(bres_l, rows(pr, 70:100)).X))
+        @test fit_preprocessing(est_l).te == bres_l.te == ts[100]
+        est_s, online_s = online_rows(PriceGapFill(), pr, [69:69, 70:75, 76:94])
+        @test values(online_s.X)[2, 1] == P[69, 1]
+        @test isequal(values(online_s.X),
+                      values(apply_preprocessing(fit_preprocessing(PriceGapFill(),
+                                                                   rows(pr, 69:94)),
+                                                 rows(pr, 69:94)).X))
+        # A block that opens inside A4's gap at rows 95:97 takes the carried price, which the
+        # batch read-out replays as its seed on the same window.
+        blk = po.partial_fit_transform(est_s, rows(pr, 95:120))[2]
+        @test values(blk.X)[1:3, 4] == fill(P[94, 4], 3)
+        @test isequal(values(blk.X),
+                      values(apply_preprocessing(fit_preprocessing(est_s),
+                                                 rows(pr, 95:120)).X))
         for col_thr in (0.0, 0.05, 0.5)
             est, online = online_rows(MissingDataFilter(; col_thr = col_thr), pr, uneven)
             @test isequal(values(online.X), values(pr.X))
@@ -159,9 +185,10 @@ what keeps the JuMP families cheap.
                             rows(pr, 71:160))
         m = po.merge_states(a.cache, b.cache)
         @test isequal(m.anchor, po.partial_fit!(a, rows(pr, 71:160)).cache.anchor)
-        @test isequal(po.merge_states(po.partial_fit!(PriceGapFill(), rows(pr, 1:70)).cache,
-                                      po.partial_fit!(PriceGapFill(), rows(pr, 71:160)).cache).v,
-                      po.partial_fit!(PriceGapFill(), pr).cache.v)
+        gm = po.merge_states(po.partial_fit!(PriceGapFill(), rows(pr, 1:70)).cache,
+                             po.partial_fit!(PriceGapFill(), rows(pr, 71:160)).cache)
+        @test isequal(gm.v, po.partial_fit!(PriceGapFill(), pr).cache.v)
+        @test gm.te == ts[end]
         # The two window-valued configurations and a caller's algorithm answer `false`.
         @test !po.supports_partial_fit(PriceGapFill(; fill = MeanValue()))
         @test !po.supports_partial_fit(MissingDataFilter(; row_thr = 0.5))

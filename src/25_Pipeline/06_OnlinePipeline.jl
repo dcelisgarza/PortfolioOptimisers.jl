@@ -802,7 +802,7 @@ function readout_data_step(est::PriceGapFill, rd0::ReturnsResult,
     res = fit_preprocessing(est)
     cur = rd0.nx[idx]
     keep = findall(n -> string(n) in cur, res.nx)
-    return PriceGapFillResult(res.nx[keep], res.v[keep], res.fill, res.strict), idx
+    return PriceGapFillResult(res.nx[keep], res.v[keep], res.te, res.fill, res.strict), idx
 end
 function readout_data_step(est::MissingDataFilter, rd0::ReturnsResult,
                            idx::AbstractVector{<:Integer})

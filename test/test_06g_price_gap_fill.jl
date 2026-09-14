@@ -123,35 +123,123 @@ end
     # caller's listing calendar enters — saying the asset is listed throughout it.
     res = fit_preprocessing(PriceGapFill(), pgf_970_carrier(X[1:3, :]))
     @test res.v[1] == 102.0
+    # The result records where the training window ended, which is what tells a replay
+    # whether the seed precedes the window it is written onto.
+    @test res.te == Date(2020, 1, 3)
     tail = copy(X[4:8, :])
     # A deliberately different in-window price: were the fill reading the window rather than the
     # seed, the two gapped observations would take 120.0 and not 102.0.
     @test tail[3, 1] == 120.0
     span = trues(size(tail))
     @test PortfolioOptimisers.gap_fill_span(span, tail, false) === span
-    PortfolioOptimisers.gap_fill_column!(res.fill, tail, span, 1, res.v[1])
+    # Every observation of the tail follows the training window, so the seed applies from
+    # its first row.
+    PortfolioOptimisers.gap_fill_column!(res.fill, tail, span, 1, res.v[1], 1)
     @test tail[1:2, 1] == [102.0, 102.0]
     @test tail[3:5, 1] == X[6:8, 1]
     # Once the window observes a price of its own, the convention tracks it: a later gap fills
     # from the most recent observed price rather than from the seed.
     later = [NaN, 130.0, NaN, 140.0, NaN]
     PortfolioOptimisers.gap_fill_column!(CarriedPrice(), reshape(later, 5, 1), trues(5, 1),
-                                         1, 102.0)
+                                         1, 102.0, 1)
     @test later == [102.0, 130.0, 130.0, 140.0, 140.0]
     # A reduction carries nothing, so every gap of the column takes the one fitted value.
     flat = [NaN, 130.0, NaN, 140.0, NaN]
     PortfolioOptimisers.gap_fill_column!(MedianValue(), reshape(flat, 5, 1), trues(5, 1), 1,
-                                         111.0)
+                                         111.0, 1)
     @test flat == [111.0, 130.0, 111.0, 140.0, 111.0]
     # The bound is read before the price, so a stated span that excludes an observation keeps the
     # fill out of it whatever the convention says.
     bounded = [NaN, NaN, 130.0, NaN, NaN]
     span_b = reshape(Bool[0, 1, 1, 1, 0], 5, 1)
     PortfolioOptimisers.gap_fill_column!(CarriedPrice(), reshape(bounded, 5, 1), span_b, 1,
-                                         102.0)
+                                         102.0, 1)
     @test isnan(bounded[1])
     @test isnan(bounded[5])
     @test bounded[2:4] == [102.0, 130.0, 130.0]
+end
+@testset "The seed is written only after the training window (#1068)" begin
+    # Issue #1068. The seed is the last observed training price, so on a window that follows
+    # the training window it precedes every row it is written onto. On the training window
+    # itself, which a Pipeline transforms with the step it just fitted, it is a price from the
+    # window's end, and a gap that opens the window inside an asset's suspension must not take
+    # it: the first return the conversion would compute is a move the market never printed,
+    # computed with a price observations in the future.
+    ts = Date(2020, 1, 1):Day(1):Date(2020, 1, 12)
+    P = [100.0 NaN 50.0 10.0; 101.0 NaN 51.0 10.1; 102.0 NaN 52.0 10.2; 103.0 20.0 53.0 10.3
+         NaN 20.5 54.0 10.4; NaN 21.0 55.0 10.5; 106.0 21.5 56.0 10.6; 107.0 22.0 57.0 10.7
+         108.0 22.5 58.0 10.8; 109.0 23.0 NaN 10.9; 110.0 23.5 NaN 11.0;
+         111.0 24.0 NaN 11.1]
+    pr = price_ingestion(PriceIngestion(), TimeArray(collect(ts), P, ["A", "B", "C", "D"]))
+    # A training window that opens inside A's suspension: the span is `true` there and the
+    # price is `NaN`.
+    w = PortfolioOptimisers.port_opt_view(pr, 5:12)
+    @test all(Matrix(w.span)[1:2, 1])
+    @test all(isnan, values(w.X)[1:2, 1])
+    res = fit_preprocessing(PriceGapFill(), w)
+    a = findfirst(==(:A), res.nx)
+    @test res.v[a] == 111.0
+    @test res.te == Date(2020, 1, 12)
+    # On the training window the two leading cells stay a Held Gap: no price precedes them.
+    # Every later cell of the column is observed, and the other columns are untouched.
+    Xw = values(apply_preprocessing(res, w).X)
+    @test all(isnan, Xw[1:2, 1])
+    @test Xw[3:8, 1] == P[7:12, 1]
+    @test isequal(Xw[:, 2:4], P[5:12, 2:4])
+    # The returns the conversion computes for A then start at its first observed price, and
+    # the -4.5 % move from 111 to 106 the seed manufactured is not among them.
+    rd = prices_to_returns(PricesToReturns(), apply_preprocessing(res, w))
+    ra = Matrix(rd.X)[:, 1]
+    @test all(isnan, ra[1:2])
+    @test ra[3] ≈ 107.0 / 106.0 - 1
+    @test !any(x -> isfinite(x) && x ≈ 106.0 / 111.0 - 1, ra)
+    # A window that follows the training window is seeded exactly as ADR 0130 describes: its
+    # leading in-span gap takes the last training price.
+    head = fit_preprocessing(PriceGapFill(), PortfolioOptimisers.port_opt_view(pr, 1:4))
+    @test head.te == Date(2020, 1, 4)
+    @test head.v[findfirst(==(:A), head.nx)] == 103.0
+    Xt = values(apply_preprocessing(head, w).X)
+    @test Xt[1:2, 1] == [103.0, 103.0]
+    @test Xt[3:8, 1] == P[7:12, 1]
+    # A window that overlaps the training window interpolates: the rows at or before its end
+    # are not seeded, and the rows after it are. Fitted on 1:5, applied to 4:8, the gap at row
+    # 5 (at the training end) stays, and the gap at row 6 (after it) takes the seed.
+    mid = fit_preprocessing(PriceGapFill(), PortfolioOptimisers.port_opt_view(pr, 1:5))
+    @test mid.te == Date(2020, 1, 5)
+    @test mid.v[findfirst(==(:A), mid.nx)] == 103.0
+    ov = PortfolioOptimisers.port_opt_view(pr, 5:8)
+    Xo = values(apply_preprocessing(mid, ov).X)
+    @test isnan(Xo[1, 1])
+    @test Xo[2, 1] == 103.0
+    @test Xo[3:4, 1] == P[7:8, 1]
+    # A gap the window's own earlier price precedes fills from that price whether or not the
+    # seed applies: fitted and applied on 1:12, A's suspension takes 103 and C's trailing run
+    # is outside the span and untouched.
+    full = fit_preprocessing(PriceGapFill(), pr)
+    Xf = values(apply_preprocessing(full, pr).X)
+    @test Xf[5:6, 1] == [103.0, 103.0]
+    @test all(isnan, Xf[10:12, 3])
+    # The reduction arm is unaffected: replaying a fitted statistic on the window it was
+    # fitted on is the meaning of fitted state, so the leading in-span gap takes the median.
+    resm = fit_preprocessing(PriceGapFill(; fill = MedianValue()), w)
+    Xm = values(apply_preprocessing(resm, w).X)
+    @test Xm[1:2, 1] == fill(resm.v[findfirst(==(:A), resm.nx)], 2)
+    # The walk itself: before `t0` a gap no observed price precedes stays a gap, from `t0` on
+    # the seed is the carry, and an observed price replaces it either side of `t0`.
+    col = [NaN, NaN, 130.0, NaN, NaN, NaN]
+    PortfolioOptimisers.gap_fill_column!(CarriedPrice(), reshape(col, 6, 1), trues(6, 1), 1,
+                                         102.0, 5)
+    @test all(isnan, col[1:2])
+    @test col[3:6] == [130.0, 130.0, 130.0, 130.0]
+    col2 = [NaN, NaN, NaN, NaN, 130.0, NaN]
+    PortfolioOptimisers.gap_fill_column!(CarriedPrice(), reshape(col2, 6, 1), trues(6, 1),
+                                         1, 102.0, 3)
+    @test all(isnan, col2[1:2])
+    @test col2[3:6] == [102.0, 102.0, 130.0, 130.0]
+    col3 = [NaN, NaN, NaN]
+    PortfolioOptimisers.gap_fill_column!(CarriedPrice(), reshape(col3, 3, 1), trues(3, 1),
+                                         1, 102.0, 4)
+    @test all(isnan, col3)
 end
 @testset "A carrier that states no Listing Span fills nothing, and refuses under strict" begin
     X = pgf_970_prices()

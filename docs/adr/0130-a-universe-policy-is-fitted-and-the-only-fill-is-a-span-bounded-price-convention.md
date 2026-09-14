@@ -180,13 +180,32 @@ estimator's own and `fit_preprocessing` takes no keywords: the strictness policy
 through a field or not at all.
 
 One result type serves both conventions, as `AssetSelectorResult` serves the whole selector family:
-`PriceGapFillResult` holds `nx` and one value per asset. Under `CarriedPrice` that value is the last
-observed **training** price, which seeds a carry-forward when a window opens inside a gap; under a
-reduction it is the reduced scalar. `apply_preprocessing` then runs the convention forward through
-the window, seeded by the fitted value and bounded by the span. The result carries `fill` and
-`strict` too, and neither is a copy for the reader's benefit: the fitted object is what runs on an
-unseen window, so it is where the convention `apply_preprocessing` dispatches on has to live, and
-where the refusal has to be read from.
+`PriceGapFillResult` holds `nx`, one value per asset, and `te`, the last timestamp of the training
+window. Under `CarriedPrice` the value is the last observed **training** price, which seeds a
+carry-forward when a window opens inside a gap; under a reduction it is the reduced scalar.
+`apply_preprocessing` then runs the convention forward through the window, seeded by the fitted
+value and bounded by the span. The result carries `fill` and `strict` too, and neither is a copy
+for the reader's benefit: the fitted object is what runs on an unseen window, so it is where the
+convention `apply_preprocessing` dispatches on has to live, and where the refusal has to be read
+from.
+
+The seed is written only onto an observation after `te`. It is a price from the end of the
+training window, so on a window that follows the fit it precedes every row it is written onto,
+and the carry-forward it seeds reads no future. On the training window itself — which a `Pipeline`
+transforms with the step it just fitted before the prior is fitted — it is a price from the
+window's end, and a window that opens inside an asset's suspension would take it onto its leading
+rows: the first return the conversion computes is then a move from a price observations in the
+future to the first observed one, which the market never printed. So `gap_fill_column!` under
+`CarriedPrice` starts its walk with nothing to write, takes the seed as its carry only when the
+walk reaches the first observation after `te` without having met an observed price, and takes an
+observed price as its carry wherever it meets one. On the training window every row is at or
+before `te`, so a gap that opens the window stays a Held Gap under ADR 0131's reading, a return
+needs two consecutive prices; on a window after the fit every row is after `te` and the seed
+applies as above; on an overlapping window the rule interpolates. The reduction arm reads `te` by
+nothing: replaying a fitted statistic on the window it was fitted on is the accepted meaning of
+fitted state. The online form takes the same rule (ADR 0142): a block folded after a state is
+seeded with the carried price, which precedes it, and a column the state has not priced has no
+seed, so a gap that opens the first block is not filled from a price later in the block.
 
 The span the fill is bounded by is asked of the carrier rather than derived by the step, so the two
 never disagree. That question is one verb, and under ADR 0133 every carrier the ingestion layer

@@ -184,15 +184,15 @@ returns.
 
 Four facts, found on the way and recorded here rather than left to be found again.
 
-1. **`PriceGapFill(CarriedPrice())` is row-local under the ingestion layer's span alone.** The batch
-   fit seeds every column's walk with the *last* observed training price and walks from the
-   window's first row, so a gap inside the span **before** a column's first observed price is
-   filled with a value that moves as the window grows. The ingestion layer's `listing_span` opens
-   at the first observed price, so no such cell exists on the layer's path; a caller-declared span
-   that opens earlier has them. The online form seeds a column first observed inside a block with
-   the block's last observed price, which is the batch fit's answer at that step and not at the
-   next. It is the one stated limit of the carried fill's exactness, and it is reachable only with
-   a caller's own span.
+1. **`PriceGapFill(CarriedPrice())` is row-local under any span.** The batch fit records the last
+   observed training price per column and the training window's last timestamp, and the replay
+   writes the seed only onto an observation after that timestamp (ADR 0130 § *Names*, issue
+   #1068). A gap inside the span **before** a column's first observed price is therefore not
+   filled on the training window, whatever the window's length, and it is filled on a later window
+   from a price that precedes it. The online form takes the same rule: a column the state has not
+   priced has no seed, so a gap that opens its first block stays a gap, and a block folded after a
+   state is seeded with the carried price. The two agree at every step, on the ingestion layer's
+   span and on a caller-declared one alike.
 2. **The prior's state must have an asset view for a re-selection to be expressed as one.** Every
    library prior slices its state through `port_opt_view`; a caller's prior whose state has no
    view reads out over the full universe, and the read-out refuses it by name, pointing at putting
