@@ -100,7 +100,13 @@ using Statistics
         ref_mean_ic = [0.057142857142857204, 0.2392857142857143, -0.23571428571428568]
         ref_std_ic = [0.733695466730492, 0.4584006929917067, 0.23843513154179433]
         ref_ic_ir = [0.07788361756887816, 0.5220012053734906, -0.9885887377002087]
+        # The reference's exposure summary reads `nanmean(ic > 0)`, and the comparison turns
+        # a `NaN` into `false` before the mean sees it, so it counts the one silenced date of
+        # nine as a miss: 5/9, 7/9, 1/9. Its evaluation summary drops a `NaN`, as every
+        # summary of this library does, so the port reads the eight dates that carried a
+        # coefficient and this is a deliberate divergence, not a missed one (2026-09-14).
         ref_hit_rate = [0.5555555555555556, 0.7777777777777778, 0.1111111111111111]
+        port_hit_rate = [0.625, 0.875, 0.125]
         ref_stability = [ -0.5461756157848291 0.13772753623689454 NaN NaN;
                          -0.4619931721037595 0.7008326890567194 NaN NaN;
                          -0.8047640404112031 NaN NaN NaN;
@@ -134,7 +140,10 @@ using Statistics
         @test exposure_agrees(s.mean_ic, ref_mean_ic)
         @test exposure_agrees(s.std_ic, ref_std_ic)
         @test exposure_agrees(s.ic_ir, ref_ic_ir)
-        @test exposure_agrees(s.hit_rate, ref_hit_rate)
+        @test exposure_agrees(s.hit_rate, port_hit_rate)
+        @test count(isfinite, exposure_ic(csfm3)[:, 1]) == 8
+        @test size(exposure_ic(csfm3), 1) == 9
+        @test exposure_agrees(port_hit_rate .* (8 / 9), ref_hit_rate)
         @test exposure_agrees(exposure_stability(csfm; step = 2), ref_stability)
         @test exposure_agrees(exposure_dispersion(csfm), ref_dispersion)
         # The reference's summary reads the regression weights for the universe of the

@@ -3,7 +3,7 @@
 
 Return the fraction of the finite entries of a series that are positive.
 
-The denominator is the number of finite entries rather than the length of the series, so the hit rate is read against the same observations as the mean and the volatility that sit beside it. That is the convention this file holds, and it differs from [`exposure_ic_summary`](@ref), which counts a `NaN` as a miss: there the four figures are computed on the whole series, and here the summary of a portfolio is computed on the series with its gaps dropped, so a hit rate over the full length would disagree with the ratio printed next to it.
+The denominator is the number of finite entries rather than the length of the series, so the hit rate is read against the same observations as the mean and the volatility that sit beside it. It is the convention every summary of the library holds: [`exposure_ic_summary`](@ref) reads its hit rate on the same terms, and a `NaN` is an observation at which nothing was measured rather than a miss.
 
 # Arguments
 

@@ -722,22 +722,22 @@ end
         @test_throws DomainError forecast_ic(fe; min_count = 0)
     end
 
-    @testset "The hit rate counts a NaN as a miss, and the t-statistic drops it" begin
-        # The library's convention, which `exposure_ic_factor_summary` already holds: the
-        # hit rate is read against every date and the other four against the dates that
-        # carried a score. The reference divides its hit rate by the finite count instead, so
-        # it would report 1/2 where this reports 1/4.
+    @testset "Every figure of the summary, the hit rate included, drops a NaN" begin
+        # A `NaN` coefficient is a date at which nothing was measured, not a miss, so the hit
+        # rate is read against the dates that carried a score, as the mean, the ratio and the
+        # t-statistic beside it are, and as the reference reads it. Until 2026-09-14 the hit
+        # rate alone counted every date and reported 1/4 here.
         ic = forecast_ic(fe)
         s = forecast_ic_summary(ic)
         v = filter(isfinite, ic[:, 1])
         @test length(v) == 2
         @test count(>(0), v) == 1
-        @test s.spearman.hit_rate == 1 / 4
-        @test s.spearman.hit_rate == count(>(0), v) / length(fe.dates)
+        @test s.spearman.hit_rate == 1 / 2
+        @test s.spearman.hit_rate == count(>(0), v) / length(v)
         @test s.spearman.t_stat ≈ s.spearman.ic_ir * sqrt(2)
     end
 
-    @testset "A threshold no date reaches gives no score and a hit rate of zero" begin
+    @testset "A threshold no date reaches gives no score, and no hit rate" begin
         none = forecast_ic(fe; min_count = 5)
         @test all(isnan, none)
         s = forecast_ic_summary(none)
@@ -745,7 +745,7 @@ end
         @test isnan(s.spearman.std_ic)
         @test isnan(s.spearman.ic_ir)
         @test isnan(s.spearman.t_stat)
-        @test s.spearman.hit_rate == 0
+        @test isnan(s.spearman.hit_rate)
     end
 end
 
@@ -2445,24 +2445,27 @@ end
     end
 end
 
-@testset "The two hit-rate denominators are kept apart and both are reported" begin
+@testset "Every hit rate of a summary counts against the dates that scored" begin
     PO = PortfolioOptimisers
-    # A threshold no cross-section reaches silences every coefficient, so the coefficient
-    # hit rate reads zero against every date while the book, which is computed on the dates
-    # that scored, has no date left at all. The two denominators are what makes those two
-    # answers different, and they sit in one Result.
+    # A date under the threshold carries no coefficient and no book, and both hit rates read
+    # it as a date at which nothing was measured, so the five hit rates of one Result sit over
+    # the same sample as the means beside them. Until 2026-09-14 the coefficient hit rate
+    # alone counted every date, so it read 2/3 here against the book's 1.
     y = PO.forward_mean_returns(IC_ALPHA, 1, 1)
     fe = forecast_evaluation(IC_ALPHA, y; min_count = size(IC_ALPHA, 2) + 1)
     gap = ic_gap_fixture()
     thin = forecast_evaluation(gap, PO.forward_mean_returns(gap, 1, 1); min_count = 3)
     fs = forecast_evaluation_summary(thin)
 
-    @testset "The coefficient hit rate counts a silenced date as a miss" begin
+    @testset "The coefficient hit rate counts against the dates that scored" begin
         # The middle date carries two assets, under the threshold of three, so it takes no
         # coefficient. Two of three dates score, and both score positive.
-        @test fs.spearman_hit_rate[1] ≈ 2 / 3
-        @test fs.pearson_hit_rate[1] ≈ 2 / 3
         @test count(isfinite, forecast_ic(thin)[:, 1]) == 2
+        @test fs.spearman_hit_rate[1] ≈ 1.0
+        @test fs.pearson_hit_rate[1] ≈ 1.0
+        # The silenced date is the coverage's to report, once.
+        @test fs.min_coverage[1] < 1
+        @test fs.min_n_scored[1] == 2
     end
 
     @testset "The book hit rate counts against the dates that traded" begin
@@ -2472,12 +2475,15 @@ end
         @test fs.zscore_hit_rate[1] ≈ 1.0
     end
 
-    @testset "The two denominators disagree, which is why the columns are named apart" begin
-        @test fs.spearman_hit_rate[1] != fs.rank_hit_rate[1]
+    @testset "The one denominator is the two kernels' shared convention" begin
+        @test fs.spearman_hit_rate[1] == fs.rank_hit_rate[1]
         @test fs.spearman_hit_rate[1] ==
               PO.exposure_ic_factor_summary(forecast_ic(thin), 1).hit_rate
         @test fs.rank_hit_rate[1] ==
               PO.forecast_hit_rate(forecast_portfolio(thin; kind = :rank).ret)
+        # A series with no finite entry has no hit rate under either kernel.
+        @test isnan(PO.exposure_ic_factor_summary(forecast_ic(fe), 1).hit_rate)
+        @test isnan(PO.forecast_hit_rate(forecast_ic(fe)[:, 1]))
     end
 
     @testset "A sample no date can score is refused by the portfolio verb" begin

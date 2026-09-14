@@ -75,10 +75,11 @@ An observation is scorable when some asset carries a finite forecast and a finit
 The first and the last such observation bound the evaluation, the dates run between them in
 strides of `step`, and a stride of the horizon (the default) gives forward windows that do not
 overlap. An unscorable observation inside the bounds is **kept**, with `NaN` statistics, so that
-`step` means the same thing everywhere in the sample. The reference drops such a date. The one
-statistic this moves is the hit rate of the coefficients, which counts against every date and reads
-a silenced date as a miss; that convention is `exposure_ic_factor_summary`'s, which the coefficient
-summary shares with map #643's exposure summary so the two never diverge.
+`step` means the same thing everywhere in the sample. The reference drops such a date, and no
+statistic reads the difference: every summary of a per-date series — the coefficients through
+`exposure_ic_factor_summary`, the books and spreads through `forecast_hit_rate` — reads a `NaN`
+date as one at which nothing was measured, so the kept date is in no denominator, and how often a
+date was silenced is the coverage's question.
 
 ### The forecast is written onto the universe at the pairing
 
@@ -156,11 +157,12 @@ bit-exact with the reference's kernel and summary on that axis (`test_08x` pins 
 wants the correlations beside the coefficients of the same dates passes `dates = fe.dates`, and
 any other row set is read on the same terms; the row set is a value, not a flag, so the grid is
 one spelling of it rather than a second shape. The rows are not filtered: a member that is refit
-along the grid carries `NaN` off it, the whole axis answers `NaN` on every row it was never asked
-for, and because `exposure_ic_summary`'s hit rate counts such a row as a miss, that member is
-summarised at `dates = fe.dates`. Under the default `step = horizon` the grid holds `1 / horizon`
-of the observations, so the old reading carried a t-statistic smaller by the root of that ratio
-for the same forecast; issue #1071 measured it and this section is its ruling.
+along the grid carries `NaN` off it, and the whole axis answers `NaN` on every row it was never
+asked for, which every figure of the summary reads as an unmeasured row rather than a miss, so
+the whole-axis summary of such a member is the summary of the rows it wrote. Under the default
+`step = horizon` the grid holds `1 / horizon` of the observations, so the old reading carried a
+t-statistic smaller by the root of that ratio for the same forecast; issue #1071 measured it and
+this section is its ruling.
 
 ### A forward-window table is read on the common dates of its whole grid
 
@@ -186,11 +188,22 @@ table and a row of a summary read on the same terms. Three parts of an evaluatio
 **not** columns, each because its axis is not the forecast: the drawdown family (of the compressed
 path), the forward-window tables (axis: the window) and the factor correlations (axis: the factor).
 
-The five hit rates of the summary are taken against **two denominators**, kept apart and named
-apart: the coefficient hit rates count against every date, because a date the forecast could not
-rank is a miss; the book and spread hit rates count against the dates that scored, because a date
-that traded nothing is not a loss. Unifying them would edit `exposure_ic_factor_summary`, which
-is the released surface of map #643.
+The five hit rates of the summary are taken against **one denominator**, the dates that scored.
+Until 2026-09-14 the coefficient hit rates counted against every date, on the reading that a date
+the forecast could not rank is a miss, and the book and spread hit rates against the dates that
+scored, and the two were kept apart and named apart because `exposure_ic_factor_summary` was
+thought to be released surface of map #643. It is not on `main`, and the reading was the odd one
+out: it disagreed with the mean, the ratio and the t-statistic printed beside it (over the finite
+dates), with `forecast_hit_rate`, with every pairwise kernel of the library, which reads a `NaN`
+as unobserved, and with the reference's evaluation `_hit_rate`, which drops it (its exposure
+summary counts the `NaN` as a miss, through a `nanmean` of `ic > 0` whose comparison has already
+turned the `NaN` into a `false`, and map #643's oracle in `test_08s` records that as a deliberate
+divergence now); and once the coverage
+divides by the universe (#1070) and the forecast is masked onto it (#1074), the silenced date is
+already reported by the coverage, so a hit rate that counted it too counted the same silence
+twice. `exposure_ic_factor_summary` now drops a `NaN` from its hit rate, so the five figures of
+every summary of the library sit over the same sample, and the caveat that a refit member's
+whole-axis factor correlation had to be summarised on its grid is gone with it.
 
 ### Every figure takes the Result, never the block
 

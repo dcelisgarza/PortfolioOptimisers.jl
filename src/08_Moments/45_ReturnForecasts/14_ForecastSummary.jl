@@ -334,14 +334,9 @@ The headline statistics of one or more Return Forecast evaluations, one entry pe
 
 A single evaluation is the **length-1** case of this Result and a comparison is the length-2 case, so no second class ships. The reference implementation exports two, an evaluation and a comparison, and the comparison exists only to set the first one's columns side by side — which a columnar Result already is.
 
-# The two hit-rate denominators
+# One hit-rate denominator
 
-The five hit rates this Result carries are **not** taken against the same denominator, and the difference is deliberate rather than an oversight.
-
-  - `spearman_hit_rate` and `pearson_hit_rate` come from [`exposure_ic_factor_summary`](@ref), which counts a positive coefficient against **every** evaluation date. A date whose cross-section fell under `min_count` carries no coefficient, and that is a date the forecast failed to rank, so it counts as a miss.
-  - `rank_hit_rate`, `zscore_hit_rate` and the optional `spread_hit_rate` come from [`forecast_hit_rate`](@ref), which counts against the dates that **scored**. A date with no portfolio return traded nothing, so it is not a loss and must not be read as one, and the denominator is then the one the annualised mean beside it was taken over.
-
-The two conventions live in different verbs, one of which is shared with the cross-sectional exposure diagnostics, so this Result names its columns apart and states the denominator of each rather than moving either.
+The five hit rates this Result carries are taken against the dates that **scored**, and none against every evaluation date. `spearman_hit_rate` and `pearson_hit_rate` come from [`exposure_ic_factor_summary`](@ref), and `rank_hit_rate`, `zscore_hit_rate` and the optional `spread_hit_rate` from [`forecast_hit_rate`](@ref); both read a date that carries no figure as a date at which nothing was measured, so every hit rate sits over the same sample as the mean printed beside it. A date whose cross-section fell under `min_count` carries no coefficient, and how often that happened is the coverage's question, which `mean_coverage`, `min_coverage`, `mean_n_scored` and `min_n_scored` answer; folding it into the hit rate as well would count the same silence twice.
 
 # The five columns that can be absent
 

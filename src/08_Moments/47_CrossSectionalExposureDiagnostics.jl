@@ -601,7 +601,7 @@ end
 
 Return the summary of an information coefficient series, one entry per factor.
 
-The mean states the average score, the standard deviation states how much the score moves, their ratio states the score per unit of movement, the t-statistic states whether the mean is far enough from zero to believe over the observations that carried a score, and the hit rate states how often the score was positive. The hit rate counts an observation whose score is `NaN` as a miss, so it is read against every observation while the other four are read against the observations that carried a score.
+The mean states the average score, the standard deviation states how much the score moves, their ratio states the score per unit of movement, the t-statistic states whether the mean is far enough from zero to believe over the observations that carried a score, and the hit rate states how often the score was positive. All five are read against the observations that carried a score: an observation whose score is `NaN` is one at which nothing was measured, not a miss, so it is in no denominator here, as it is in none of the library's other summaries. Whether a series was silenced often is a separate question, and the coverage of the series answers it. The reference implementation's exposure summary counts such an observation as a miss, because it takes the mean of `ic > 0` and the comparison has already turned the `NaN` into a `false`; its evaluation summary drops it, and this library takes that reading in both.
 
 # Mathematical definition
 
@@ -612,7 +612,7 @@ The mean states the average score, the standard deviation states how much the sc
 \\qquad
 t_{k} = \\mathrm{IR}_{k} \\sqrt{\\left| \\mathcal{T}_{k} \\right|}
 \\qquad
-\\mathrm{hit}_{k} = \\frac{1}{T} \\sum_{t=1}^{T} \\mathbb{1}\\left[\\mathrm{IC}_{tk} > 0\\right]
+\\mathrm{hit}_{k} = \\frac{1}{|\\mathcal{T}_{k}|} \\sum_{t \\in \\mathcal{T}_{k}} \\mathbb{1}\\left[\\mathrm{IC}_{tk} > 0\\right]
 ```
 
 Where:
@@ -620,7 +620,6 @@ Where:
   - ``\\mathrm{IC}_{tk}``: Information coefficient of factor ``k`` at observation ``t``.
   - ``\\mathcal{T}_{k}``: The observations at which it is finite.
   - ``s_{k}``: Its standard deviation over ``\\mathcal{T}_{k}``, with one degree of freedom removed.
-  - $(math_dict[:T])
 
 # Arguments
 
@@ -670,7 +669,7 @@ end
 
 Return the four summary numbers of one factor's information coefficient series.
 
-The mean and the standard deviation read the observations at which the coefficient is defined, and the hit rate reads every observation, so an observation with no coefficient counts as a miss. The ratio has no answer where either of its two terms has none, and none where the standard deviation is zero. The t-statistic scales the ratio by the root of the number of observations that carried a coefficient, so it says whether the mean is far enough from zero to believe over the evidence there was; it inherits the ratio's absence.
+The mean, the standard deviation and the hit rate read the observations at which the coefficient is defined, so an observation with no coefficient is in no denominator and the three agree on their sample; a series with no defined observation has no hit rate. The ratio has no answer where either of its two terms has none, and none where the standard deviation is zero. The t-statistic scales the ratio by the root of the number of observations that carried a coefficient, so it says whether the mean is far enough from zero to believe over the evidence there was; it inherits the ratio's absence.
 
 It is the kernel of every summary of a per-observation correlation series, so [`forecast_ic_summary`](@ref) reads it too, and a coefficient of a factor exposure and a coefficient of a Return Forecast are summarised on the same terms.
 
@@ -699,8 +698,8 @@ function exposure_ic_factor_summary(ic::MatNum, k::Integer)
         if isfinite(v)
             n += 1
             s += Tf(v)
+            h += v > 0
         end
-        h += v > 0
     end
     m = n > 0 ? s / n : Tf(NaN)
     q = zero(Tf)
@@ -714,7 +713,7 @@ function exposure_ic_factor_summary(ic::MatNum, k::Integer)
     sd = n > 1 ? sqrt(q / (n - 1)) : Tf(NaN)
     ir = isfinite(m) && isfinite(sd) && sd > zero(Tf) ? m / sd : Tf(NaN)
     return (; mean_ic = m, std_ic = sd, ic_ir = ir, t_stat = ir * sqrt(Tf(n)),
-            hit_rate = Tf(h) / Tf(P))
+            hit_rate = n > 0 ? Tf(h) / Tf(n) : Tf(NaN))
 end
 function exposure_ic_summary(csfm::CrossSectionalFactorModel; horizon::Integer = 1,
                              rank::Bool = true, reduced::Bool = false)

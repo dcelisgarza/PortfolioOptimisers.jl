@@ -335,11 +335,12 @@ gross every date — a rank book rebuilt from scratch at each cross-section is a
 object by construction, and `mean_turnover` is there so a caller can see the cost before an
 optimiser with a turnover constraint sees it.
 
-!!! note "Two hit rates, two denominators"
+!!! note "Every hit rate counts against the dates that scored"
     The hit rate in this table counts against the dates the book **scored**, because a date the
-    book could not trade is not a loss. The hit rate in §3's table counts against **every**
-    evaluation date, because a date the forecast could not rank is a miss. The summary Result of
-    §7 names the two columns apart and states each denominator rather than reconciling them.
+    book could not trade is not a loss, and the hit rate in §3's table counts against the dates
+    that carried a coefficient, for the same reason: a date the forecast could not rank is a
+    date at which nothing was measured, and how often that happened is what the coverage of §3
+    reports. Every hit rate therefore sits over the same sample as the mean printed beside it.
 
 [`forecast_quantile_spread`](@ref) asks the same question with a blunter instrument: buy the top
 fraction of the cross-section, sell the bottom, and see what the difference earned. It is the
