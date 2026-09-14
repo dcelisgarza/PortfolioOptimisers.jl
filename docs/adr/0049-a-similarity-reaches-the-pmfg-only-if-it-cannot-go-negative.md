@@ -347,3 +347,20 @@ The three line references under *Consequences* — `04_DBHT.jl:942-948`, `:1084-
 `:1022-1024` — name `DirectHb`, `BubbleMember` and `BubbleCluster8s`. Read them in
 `10_BubbleTree.jl`. The decision is unchanged: the non-negativity bound sits on the field, so a
 similarity that can go negative fails at construction.
+
+## Amendment (2026-09-14): the back half of the pipeline is a test seam, and the unsafe aggregation has a test at its own step
+
+Everything `DBHTs` runs after `CliqHierarchyTree2s` — `BubbleHierarchy`, `DirectHb`,
+`BubbleCluster8s`, `BubbleMember`, `LinkageFunction`, `DendroConstruct`, `build_link_and_dendro`,
+`HierarchyConstruct4s` and `turn_into_Hclust_merges` — reads matrices alone and nothing it reads
+is a PMFG in particular. Each is an internal seam: unexported, single-purpose, documented, and
+driven directly from a hand-built bubble structure in `test/test_13f_dbht_seam.jl`, where every
+expected answer is derived by hand beside the assertion. The public entry point does not move, and
+no signature changes.
+
+The `BubbleMember` case is the one this ADR names. With `phi`'s denominator a total weight, two
+edges flipped negative make the fraction `(-0.2) / (-0.1) = 2`, and the vertex is given to the
+bubble it is repelled from; an exact cancellation makes `0 / 0`, and `argmax` selects the `NaN`.
+Both are pinned as the mechanism, not guarded, because the guard is upstream and stays there:
+`PMFG_T2s` refuses the input before `Rpm` exists, and the same file pins that refusal on the
+smallest matrix it accepts. #1037 records the gap and the change.
