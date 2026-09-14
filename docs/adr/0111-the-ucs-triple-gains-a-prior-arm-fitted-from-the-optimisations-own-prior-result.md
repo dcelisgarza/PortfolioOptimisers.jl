@@ -60,28 +60,42 @@ sigma_ucs(ue::AbstractPriorUncertaintySetEstimator, pr::AbstractPriorResult; kwa
 A member carries no `pe`, because there is nothing for it to fit: its inputs are on the result it is
 handed.
 
-The triple gains a **three-argument form**, and each verb has three methods of it. The returns-data
-base drops the prior and forwards to the two-argument returns method. The new root drops the returns
-and forwards to the two-argument prior method. A built set, or an empty slot, passes through — the
+The triple gains a **three-argument form**, `ucs(uc, rd, pr)` and its two siblings, and one
+per-type predicate, `reads_prior_result(uc)`, decides which argument the form hands on. An
+estimator that answers `false` — every estimator that carries its own `pe` — has the prior dropped
+and is forwarded to the two-argument returns method. An estimator that answers `true` is forwarded
+to the two-argument prior method, and the returns travel beside it as an `rd` keyword the prior
+method defaults to `nothing`, so a rule that needs an optimiser can run one
+([ADR 0127](0127-the-compact-covariance-radius-is-sized-in-family-not-through-the-calibration-channel.md)).
+The new root answers `true` by its type. A built set, or an empty slot, passes through — the
 existing passthrough already takes `args...`, so it answers the new form with no new method. Both
 JuMP builders pass the prior they hold as one more positional argument, so one call site serves
-every estimator and the dispatch decides which argument is read.
+every estimator and the predicate decides which argument is read.
 
-The prior is *dropped* on the first row rather than checked. An estimator that carries its own `pe`
-fits it on the returns it is handed, so the optimisation's own prior is not an input of that fit and
-passing it changes no number.
+The prior is *dropped* where the predicate answers `false` rather than checked. An estimator that
+carries its own `pe` fits it on the returns it is handed, so the optimisation's own prior is not an
+input of that fit and passing it changes no number.
+
+The three-argument form was first written as three methods per verb, one on each of the two roots
+and the passthrough, and the two consumers below dispatched on the new root the same way.
+[ADR 0138](0138-an-uncertainty-set-with-no-prior-of-its-own-is-calibrated-on-the-prior-result-it-is-handed-and-a-scenario-cap-states-its-count.md)
+replaced that dispatch with the predicate, because the four returns-data families gained a
+`pe = nothing` mode that reads the prior result too, and a mode of a type is not a type a method
+can be written on. The three consumers ask the predicate and agree; the root's members declare
+nothing, because the root's own method of the predicate answers for them.
 
 ### The three other fit sites
 
-**The near-optimal-centering pre-fit passes the new root through unchanged.** A
-`ucs_risk_measure` method on `UncertaintySetVariance{<:Any, <:AbstractPriorUncertaintySetEstimator,
-<:Any}` returns the risk measure as it stands. The pre-fit runs before any prior exists, so there is
+**The near-optimal-centering pre-fit passes the new root through unchanged.** `ucs_risk_measure`
+on an `UncertaintySetVariance` asks `reads_prior_result(r.ucs)` and returns the risk measure as it
+stands when the answer is `true`. The pre-fit runs before any prior exists, so there is
 nothing to fit there; the estimator travels to the builder, and each corner solve fits it against
 the prior that solve was handed. That is one fit per corner rather than one shared fit, and it is
 the correct answer rather than a compromise: each corner solves on its own prior.
 
-**The Pipeline gains one `run_uncertainty_step` method for the new root.** It serves the same three
-targets — `:mu`, `:sigma` and `:both` — and requires the `:prior` slot instead of `:returns`. A
+**The Pipeline's `run_uncertainty_step` reads the `:prior` slot for the new root.** The step asks
+the same predicate through `uncertainty_step_source`, serves the same three targets — `:mu`,
+`:sigma` and `:both` — and requires the `:prior` slot instead of `:returns`. A
 prior step must therefore come earlier. The returns are not read at all, so a pipeline that writes
 `:prior` from a precomputed result needs no returns for this step.
 
@@ -123,15 +137,16 @@ the same reason.
 
 | Option | How the set would reach the prior | Why it was not taken |
 | --- | --- | --- |
-| **A prior arm on the triple** | Both builders pass `pr` beside `rd`; dispatch picks the argument. | Taken. |
+| **A prior arm on the triple** | Both builders pass `pr` beside `rd`; a per-type predicate picks the argument. | Taken. |
 | **`factory(rt, pr)`** | Resolve the slot to a fitted set inside `factory`, which already visits the return term with the prior in hand. | `factory` runs on the return term but on **no risk measure** on the JuMP route, so the covariance side would need a new call anyway. The reference fits its estimator inside the problem build and hands it the fitted result, which is the builder site rather than a preprocessing step. |
 | **A Calibration Rule** | Put the set in the `ucs` slot as a rule resolved against the prior. | A Calibration Rule returns one number. It cannot read a factor model or build a set. |
 | **A Deferred Quantity** | Refit the set from `pr.original_X` at resolution. | A Deferred Quantity refits from the returns, which is the input the orthogonal set does not read. The `ucs` slot holds an Estimator, not a Deferred Quantity, and the comment at that slot says so. |
 
 ## Consequences
 
-- A member of the new root inherits the three-argument methods and needs no method of the
-  returns-data interface. No consumer reaches that interface through this root.
+- A member of the new root inherits the three-argument form through the root's `true` answer to
+  `reads_prior_result`, and needs no method of the returns-data interface. No consumer reaches that
+  interface through this root.
 - Both builders now pass one more positional argument. Every existing estimator drops it, so no
   number in the library moves.
 - A `Regression` widens from three fields to four. All source and test construction sites are

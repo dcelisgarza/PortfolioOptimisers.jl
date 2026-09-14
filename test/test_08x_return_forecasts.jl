@@ -76,6 +76,25 @@ end
                                  amsk = [true true; true false],
                                  emsk = [true false; true false])
         @test PO.return_forecast_weights(rd) == [1.0 0.0; 1.0 0.0]
+        @test eltype(PO.return_forecast_weights(rd)) === Float64
+        # The mask is read in the number type of the returns, so a `Float32` carrier is
+        # weighed in `Float32` and its Descriptor scores stay there.
+        a32 = Float32[1 2 3; 4 5 6; 7 8 9; 2 1 3]
+        pnl32 = asset_panel([NumericPanelInput(; name = "a", vals = a32,
+                                               alg = ForwardPanelFill())];
+                            amsk = trues(4, 3), emsk = [true true false; trues(3, 3)])
+        rd32 = ReturnsResult(; nx = ["A1", "A2", "A3"], X = zeros(Float32, 4, 3),
+                             pnl = pnl32)
+        w32 = PO.return_forecast_weights(rd32)
+        @test eltype(w32) === Float32
+        @test w32 == Float32[1 1 0; 1 1 1; 1 1 1; 1 1 1]
+        csfm32 = CrossSectionalFactorModel(; M = reshape(ones(Float32, 3), 3, 1),
+                                           b = zeros(Float32, 3))
+        ds32 = DescriptorScores(; descriptors = [Passthrough(; field = "a")],
+                                outlier = nothing,
+                                scoring = CrossSectionalStandardiser(; min_group_size = 2,
+                                                                     atol = 1.0f-6))
+        @test eltype(descriptor_scores(ds32, rd32, csfm32).S) === Float32
         spnl = asset_panel([NumericPanelInput(; name = "a", vals = [1.0, 2.0])])
         srd = ReturnsResult(; nx = ["A1", "A2"], X = zeros(2, 2), pnl = spnl)
         @test_throws PO.IsNothingError PO.return_forecast_weights(srd)

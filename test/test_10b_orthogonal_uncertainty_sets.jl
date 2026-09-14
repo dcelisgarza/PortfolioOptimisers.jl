@@ -15,6 +15,8 @@ subspace in plain Julia by a different route -- a pseudo-inverse projector rathe
 singular value decomposition and an eigendecomposition -- so no testset here compares the
 file against itself.
 =#
+# The synthetic point-in-time Asset Panel of the last testset.
+include(joinpath(@__DIR__, "test06c_setup.jl"))
 @testset "Orthogonal uncertainty sets" begin
     using PortfolioOptimisers, Test, StableRNGs, Random, Clarabel, Statistics,
           LinearAlgebra, Distributions
@@ -807,5 +809,74 @@ file against itself.
             @test v.kappa === s.kappa
             @test length(v.C) == 4
         end
+    end
+
+    #=
+    Every testset above hands the estimator a block built by hand over a universe that is
+    fully investable. A `CrossSectionalFactorPrior` fitted on a point-in-time Asset Panel is
+    not: it writes `NaN` on the loadings of every asset outside its Investable Mask (ADR
+    0117), and the optimiser's builders hand this fit the prior reduced to that mask. The
+    standalone fit that ADR 0111 offers meets the full prior, so it must refuse the `NaN`
+    rows by name rather than hand them to LAPACK.
+    =#
+    @testset "A point-in-time prior is refused whole, and fits reduced" begin
+        PO = PortfolioOptimisers
+        # This panel and factor set leave two assets outside the Investable Mask at the
+        # latest observation, which is the case this testset is about; the assertion below
+        # guards the fixture.
+        rdp = synthetic_asset_panel(; n_assets = 40, n_observations = 200, n_industries = 3,
+                                    rng = StableRNG(725_001)).rd
+        pe = CrossSectionalFactorPrior(;
+                                       factors = ["market" => ConstantExposure(),
+                                                  "industry" =>
+                                                      OneHotExposure(; field = "industry",
+                                                                     family = "industry"),
+                                                  "size" => CompositeExposure(;
+                                                                              descriptors = [LogMarketCap()],
+                                                                              family = "style"),
+                                                  "value" => CompositeExposure(;
+                                                                               descriptors = [BookToPrice()],
+                                                                               family = "style")])
+        prp = prior(pe, rdp)
+        msk = PO.investable_mask(prp)
+        @test !isnothing(msk)
+        @test count(msk) < length(msk)
+        nnf = count(i -> !all(isfinite, view(prp.rr.L, i, :)), axes(prp.rr.L, 1))
+        @test nnf > 0
+        ue = OrthogonalUncertaintySet()
+        for f in (ucs, mu_ucs, sigma_ucs)
+            err = try
+                f(ue, prp)
+                nothing
+            catch e
+                e
+            end
+            @test isa(err, PO.IsNonFiniteError)
+            @test occursin("$(nnf) of the $(length(msk)) assets", sprint(showerror, err))
+            @test occursin("investable_mask", sprint(showerror, err))
+        end
+        # The reduced prior is what an optimiser hands the fit, and it fits.
+        prr = PO.port_opt_view(prp, findall(msk))
+        mu_set, sigma_set = ucs(ue, prr)
+        @test size(mu_set.L, 1) == count(msk)
+        @test size(sigma_set.Q, 1) == count(msk)
+        @test all(isfinite, mu_set.L)
+        @test all(isfinite, sigma_set.C)
+        @test mu_set.val === prr.mu
+        # Through the JuMP route the same estimator fits on the reduced prior: the compact
+        # block carries one coefficient per column of the reduced span, and no weight lands
+        # outside the Investable Mask.
+        slvp = Solver(; name = :clarabel777q, solver = Clarabel.Optimizer,
+                      check_sol = (; allow_local = true, allow_almost = true),
+                      settings = Dict("verbose" => false))
+        opt = JuMPOptimiser(; pe = prp, slv = slvp, bgt = 1.0,
+                            wb = WeightBounds(; lb = 0.0, ub = 1.0),
+                            ret = ArithmeticReturn(; ucs = ue))
+        res = optimise(MeanRisk(; r = UncertaintySetVariance(; ucs = ue),
+                                obj = MinimumRisk(), opt = opt), rdp)
+        @test isa(res.retcode, PO.OptimisationSuccess)
+        @test isapprox(sum(res.w), 1.0; rtol = 1e-6)
+        @test all(i -> msk[i] || abs(res.w[i]) <= 1e-8, eachindex(res.w))
+        @test length(res.model[:z_cucs1]) == size(sigma_set.Q, 2)
     end
 end

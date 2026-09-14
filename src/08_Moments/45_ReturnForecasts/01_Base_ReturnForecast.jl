@@ -131,7 +131,7 @@ function forecast_return_units(::IdiosyncraticSharpeUnit, F::MatNum, vs::MatNum)
     return F .* sqrt.(vs)
 end
 """
-    return_forecast_weights(rd::ReturnsResult) -> Matrix{Float64}
+    return_forecast_weights(rd::ReturnsResult) -> MatNum
 
 Return the cross-sectional weights the transforms of a Return Forecast are weighted by.
 
@@ -148,7 +148,7 @@ The weights are the estimation mask of the Asset Panel read as numbers, so an as
 
 # Returns
 
-  - `w::Matrix{Float64}`: The cross-sectional weights, `observations × assets`, one where the asset enters the estimate and zero where it does not.
+  - `w::MatNum`: The cross-sectional weights, `observations × assets`, one where the asset enters the estimate and zero where it does not, in the number type of `rd.X`.
 
 # Related
 
@@ -157,12 +157,15 @@ The weights are the estimation mask of the Asset Panel read as numbers, so an as
   - [`AssetPanel`](@ref)
   - [`cross_sectional_transform`](@ref)
 """
-function return_forecast_weights(rd::ReturnsResult)::Matrix{Float64}
+function return_forecast_weights(rd::ReturnsResult)::MatNum
     pnl = descriptor_asset_panel(rd)
     emsk = pnl.emsk
     @argcheck(!isnothing(emsk),
               IsNothingError("a Return Forecast scores its Descriptors over the estimation universe of each observation, and this Asset Panel is static, so it carries no estimation mask"))
-    return Float64.(emsk)
+    # The mask is read in the number type of the returns it weighs, so a `Float32` carrier
+    # is not widened by its own weights.
+    T = real(eltype(rd.X))
+    return T.(emsk)
 end
 """
     return_forecast_history_rows(A::Nothing) -> Nothing

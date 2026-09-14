@@ -393,7 +393,7 @@ Weighted factor span of the prior's loadings block, the geometry both sets are b
 # Algorithm
 
  1. Refuse when `pr.rr` is `nothing`. The set reads the loadings off the prior result, and a prior that fitted no factor model carries none.
- 2. Read the effective loadings `rr.L`, which reads back as `rr.M` when no Factor Family was re-based, so a re-based model is already reduced to a full-rank basis here.
+ 2. Read the effective loadings `rr.L`, which reads back as `rr.M` when no Factor Family was re-based, so a re-based model is already reduced to a full-rank basis here. Refuse a row that is not finite: a prior fitted on a point-in-time Asset Panel carries `NaN` loadings for every asset outside its Investable Mask, and a singular value decomposition of such a row is not a span but a LAPACK error. The optimiser's builders never meet one, because they hand this fit the prior reduced to the Investable Mask; a caller fitting the set alone reduces the prior first, and the message says how.
  3. Read the cross-sectional weights through [`orthogonality_weights`](@ref) and take their element-wise square root, or leave a `nothing`.
  4. Scale the rows of the loadings by that square root, take a thin `LinearAlgebra.svd`, and count the singular values above `maximum(size) * eps * s[1]`, the tolerance `LinearAlgebra.rank` applies. Keep that many left singular vectors.
 
@@ -407,6 +407,7 @@ Step 4 counts the rank after the family re-basis of step 2, because the selected
 # Validation
 
   - `!isnothing(pr.rr)`, else an `IsNothingError` naming the field and the estimator that returned no block.
+  - `all(isfinite, rr.L)`, else an [`IsNonFiniteError`](@ref) counting the assets whose loadings are not finite and naming the reduction that removes them, `PortfolioOptimisers.port_opt_view(pr, findall(PortfolioOptimisers.investable_mask(pr)))`.
 
 # Returns
 
@@ -425,6 +426,9 @@ function orthogonal_factor_span(ue::OrthogonalUncertaintySet, pr::AbstractPriorR
     @argcheck(!isnothing(rr),
               IsNothingError("`$(nameof(typeof(ue)))` reads the factor loadings off `pr.rr`, and the prior it was handed carries none, so there is no factor span to take the orthogonal complement of.\nFit the optimisation on a prior that returns a loadings block, such as `FactorPrior` or `CrossSectionalFactorPrior`.\nGot\npr => $(nameof(typeof(pr)))\nrr => nothing"))
     B = rr.L
+    nnf = count(i -> !all(isfinite, view(B, i, :)), axes(B, 1))
+    @argcheck(iszero(nnf),
+              IsNonFiniteError("`$(nameof(typeof(ue)))` takes the span of the factor loadings, and $(nnf) of the $(size(B, 1)) assets of `pr.rr` carry a loading that is not finite, so the span is not defined over them. A prior fitted on a point-in-time Asset Panel writes `NaN` on every asset outside its Investable Mask.\nReduce the prior to its Investable Mask first, `PortfolioOptimisers.port_opt_view(pr, findall(PortfolioOptimisers.investable_mask(pr)))`, which is what an optimiser hands this fit.\nGot\npr => $(nameof(typeof(pr)))\nrr => $(nameof(typeof(rr)))\nassets with a non-finite loading => $(nnf)"))
     w = orthogonality_weights(ue.metric, rr)
     w_sqrt = isnothing(w) ? nothing : sqrt.(w)
     Bw = isnothing(w_sqrt) ? B : w_sqrt .* B
