@@ -47,6 +47,7 @@ folds_are_time_ordered
 fold_evaluation
 fold_fit
 investable_fold_view
+fold_fees
 previous_weights
 threads_weights
 fold_solved

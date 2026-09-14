@@ -9,7 +9,7 @@ julia_syntax = "1.0.2"
 commit = "483d19ebf1"
 
 [file]
-"ext/PortfolioOptimisersPlotsExt.jl" = { code = 2888, doc = 0, comment = 216, blank = 47, total = 3151 }
+"ext/PortfolioOptimisersPlotsExt.jl" = { code = 2889, doc = 0, comment = 216, blank = 47, total = 3152 }
 "src/01_Base/01_DocstringDictionaries.jl" = { code = 1134, doc = 113, comment = 125, blank = 43, total = 1415 }
 "src/01_Base/02_TypeRoots.jl" = { code = 18, doc = 241, comment = 0, blank = 115, total = 374 }
 "src/01_Base/03_PrettyShow.jl" = { code = 117, doc = 138, comment = 0, blank = 76, total = 331 }
@@ -228,7 +228,7 @@ commit = "483d19ebf1"
 "src/19_RiskMeasures/28_ExpectedRisk.jl" = { code = 273, doc = 458, comment = 40, blank = 207, total = 978 }
 "src/19_RiskMeasures/29_RiskMeasureTools.jl" = { code = 84, doc = 95, comment = 0, blank = 51, total = 230 }
 "src/20_Optimisation/01_Base_Optimisation.jl" = { code = 907, doc = 1679, comment = 25, blank = 830, total = 3441 }
-"src/20_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl" = { code = 639, doc = 1180, comment = 44, blank = 469, total = 2332 }
+"src/20_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl" = { code = 645, doc = 1201, comment = 44, blank = 478, total = 2368 }
 "src/20_Optimisation/02_CrossValidation/02_KFold.jl" = { code = 85, doc = 125, comment = 0, blank = 49, total = 259 }
 "src/20_Optimisation/02_CrossValidation/03_Combinatorial.jl" = { code = 255, doc = 303, comment = 7, blank = 123, total = 688 }
 "src/20_Optimisation/02_CrossValidation/04_WalkForward.jl" = { code = 362, doc = 528, comment = 0, blank = 191, total = 1081 }

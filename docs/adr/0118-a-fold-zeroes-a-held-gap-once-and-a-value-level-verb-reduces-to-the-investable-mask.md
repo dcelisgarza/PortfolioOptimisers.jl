@@ -77,7 +77,9 @@ meta-optimisers, which build the outer problem's returns from it.
 A fold's test window holds two kinds of gap, and the fold takes them in order. The first is the
 column of an asset the fit found non-investable, whose weight is `0` by ADR 0115. In `predict`,
 before anything reads the window, the fold views the test window and the weights at `res.imsk`,
-so that column is never read, and the fees are viewed with them. The Investable Mask is the one
+so that column is never read. The fees are not viewed: the result carries them on the universe it
+solved on, ADR 0115's rule, so a second view would index a per-asset rate by positions of the full
+universe, which is what #892 fixed. The Investable Mask is the one
 record of which assets the fold traded, and this is the rule of ADR 0115 carried to the window the
 weights are scored on. A result whose `imsk` is `nothing` views nothing.
 

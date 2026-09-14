@@ -12,7 +12,7 @@ import PortfolioOptimisers: ArrNum, VecNum, MatNum, Arr3Num, Option, VecNum_VecV
                             relevant_assets, extract_fees, OptimisationResult,
                             finite_magnitudes, finite_symmetric_clim, finite_columns,
                             investable_plot_view, result_investable_mask,
-                            investable_weights_view, fold_factor_returns
+                            investable_weights_view, fold_factor_returns, fold_fees
 
 ## plot_portfolio_cumulative_returns
 function PortfolioOptimisers.plot_portfolio_cumulative_returns(net_ret::VecNum_VecVecNum;
@@ -387,7 +387,8 @@ function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.BaseR
     w = investable_weights_view(imsk, pred.res.w)
     X = investable_weights_view(imsk, pred.hw.X)
     nx = isnothing(pred.rd.nx) ? (1:length(w)) : pred.rd.nx
-    return PortfolioOptimisers.plot_risk_contribution(r, w, X, extract_fees(pred.res, fees);
+    return PortfolioOptimisers.plot_risk_contribution(r, w, X,
+                                                      fold_fees(pred.res, fees, pred.hw.X);
                                                       nx = nx, kwargs...)
 end
 function PortfolioOptimisers.plot_risk_contribution(::PortfolioOptimisers.BaseRM_VecBaseRM,
@@ -421,7 +422,7 @@ function PortfolioOptimisers.plot_factor_risk_contribution(r::PortfolioOptimiser
     imsk = result_investable_mask(pred.res)
     w = investable_weights_view(imsk, pred.res.w)
     X = investable_weights_view(imsk, pred.hw.X)
-    fees = extract_fees(pred.res, fees)
+    fees = fold_fees(pred.res, fees, pred.hw.X)
     return PortfolioOptimisers.plot_factor_risk_contribution(r, w, X, fees;
                                                              rd = fold_factor_returns(imsk,
                                                                                       rd,

@@ -433,6 +433,34 @@ end
     @test isapprox(frc, factor_risk_contribution(r, predfk); rtol = 1e-4)
     @test isapprox(factor_risk_contribution(r, predf; rd = rdf),
                    factor_risk_contribution(r, predfk; rd = rdfk); rtol = 1e-4)
+    # A caller's own `fees` is stated on the caller's universe, as a caller's `rd` is, and
+    # the three consumers view it at the result's mask through `fold_fees`. A per-asset rate
+    # on the full universe therefore charges the live assets at their own rates, exactly as
+    # the same rate stated on the hand-reduced universe does; unviewed it met the reduced
+    # weights with a `BoundsError`.
+    lrate = [0.001, 0.002, 0.010, 0.003, 0.004]
+    fees_c = Fees(; l = lrate)
+    fees_ck = Fees(; l = lrate[keep])
+    narc = calc_net_asset_returns(pred, fees_c)
+    @test all(iszero, view(narc, :, k))
+    @test isapprox(narc[:, keep], calc_net_asset_returns(predk, fees_ck); atol = 1e-6)
+    @test isapprox(risk_contribution(r, pred, fees_c)[keep],
+                   risk_contribution(r, predk, fees_ck); rtol = 1e-4)
+    @test isapprox(factor_risk_contribution(r, predf, fees_c),
+                   factor_risk_contribution(r, predfk, fees_ck); rtol = 1e-4)
+    # A caller's carrier on the full universe lands on the complement, where the exit is,
+    # and nowhere else: the dead asset's column holds the exit charge alone, and a fold whose
+    # result reduced nothing strips the carrier rather than liquidating the whole book.
+    fees_lq = Fees(; lq = Turnover(; w = fill(0.2, N), val = lrate))
+    narq = calc_net_asset_returns(pred, fees_lq)
+    @test all(==(-0.2 * lrate[k]), view(narq, :, k))
+    @test isapprox(narq[:, keep], calc_net_asset_returns(predk, Fees()); atol = 1e-6)
+    res_full = optimise(MeanRisk(; opt = JuMPOptimiser(; pe = pr, slv = slv)), rd)
+    pred_full = predict(res_full, rd, test_idx; wd = SelfFinancingDrift())
+    @test isnothing(PO.result_investable_mask(res_full))
+    @test isapprox(calc_net_asset_returns(pred_full, fees_lq),
+                   calc_net_asset_returns(pred_full); atol = 1e-12)
+    @test isnothing(PO.fold_fees(res_full, fees_lq, pred_full.hw.X).lq)
 end
 
 @testset "The fold charges the fees the result carries, and views them no second time" begin

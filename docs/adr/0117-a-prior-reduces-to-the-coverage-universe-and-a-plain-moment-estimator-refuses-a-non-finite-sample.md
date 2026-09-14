@@ -263,7 +263,12 @@ for a covariance.
 - Under the exponentially weighted family a young asset is investable while its early scenario
   rows are `NaN`. The reference zero-fills those rows and warns. What the library does with them
   is the measures decision of the map.
-- `prices_to_returns` drops every row that still holds a missing entry, so a gapped panel reaches
-  the moments only through a hand-built `ReturnsResult` today.
-- `cov`, `cor` and `std` overflow the stack on every variance estimator, `SimpleVariance` included.
-  That is a defect of the fallback chain, filed separately, and not of this decision.
+- `prices_to_returns` dropped every row that still held a missing entry when this was decided, so
+  a gapped panel reached the moments only through a hand-built `ReturnsResult`. Map
+  [#955](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/955) replaced that path: the
+  ingestion layer carries every gap into the returns and states the universe on the Asset Panel.
+- `cov`, `cor` and `std` overflowed the stack on every variance estimator, `SimpleVariance`
+  included: the abstract `cov` fallback called `cor`, and a variance estimator with no `cor` of its
+  own fell to the generic `cor`, which called `cov` again. A defect of the fallback chain and not of
+  this decision; `c42ec32d12` gave `AbstractVarianceEstimator` a `cov` and a `cor` that throw a
+  `MethodError` naming the verb, and a `std` that resolves from `var` alone.

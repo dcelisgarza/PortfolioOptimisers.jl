@@ -844,7 +844,7 @@ A fold that carries no Held Weights record raises. `pred.rd.X` is the **portfoli
 # Arguments
 
   - `pred`: Single-fold prediction result.
-  - `fees`: Fees that take precedence over the result's own.
+  - `fees`: A caller's [`Fees`](@ref) on the caller's universe, which takes precedence over the result's own and is viewed at the result's Investable Mask through [`fold_fees`](@ref).
   - `args...`: Additional arguments (ignored by the refusing method).
 
 # Validation
@@ -861,6 +861,7 @@ A fold that carries no Held Weights record raises. `pred.rd.X` is the **portfoli
   - [`HeldWeightsResult`](@ref)
   - [`weight_path`](@ref)
   - [`PredictionResult`](@ref)
+  - [`fold_fees`](@ref)
 """
 function calc_net_asset_returns(pred::PredictionResult{<:Any, <:Any, <:HeldWeightsResult},
                                 fees::Option{<:Fees} = nothing)
@@ -870,7 +871,7 @@ function calc_net_asset_returns(pred::PredictionResult{<:Any, <:Any, <:HeldWeigh
     # reduced axes. The mask is what reunites them: it says which columns the five per asset
     # fields were priced on and which columns the two liquidation carriers were priced on.
     return calc_net_asset_returns(weight_path(hw, pred.res.w), hw.X,
-                                  extract_fees(pred.res, fees),
+                                  fold_fees(pred.res, fees, hw.X),
                                   result_investable_mask(pred.res))
 end
 function calc_net_asset_returns(::PredictionResult{<:Any, <:Any, Nothing}, args...)
@@ -894,7 +895,7 @@ A fold that carries no Held Weights record raises, because `pred.rd.X` is the po
 
   - `r::BaseRM_VecBaseRM`: Risk measure to differentiate, or a vector of them.
   - `pred`: Single-fold prediction result.
-  - `fees`: Fees that take precedence over the result's own.
+  - `fees`: A caller's [`Fees`](@ref) on the caller's universe, which takes precedence over the result's own and is viewed at the result's Investable Mask through [`fold_fees`](@ref).
   - `args...`: Additional arguments (ignored by the refusing method).
 
 # Validation
@@ -913,6 +914,7 @@ A fold that carries no Held Weights record raises, because `pred.rd.X` is the po
   - [`PredictionResult`](@ref)
   - [`expand_held_weights`](@ref)
   - [`investable_weights_view`](@ref)
+  - [`fold_fees`](@ref)
 """
 function risk_contribution(r::BaseRM_VecBaseRM,
                            pred::PredictionResult{<:Any, <:Any, <:HeldWeightsResult},
@@ -923,7 +925,7 @@ function risk_contribution(r::BaseRM_VecBaseRM,
     imsk = result_investable_mask(pred.res)
     rc = risk_contribution(r, investable_weights_view(imsk, pred.res.w),
                            investable_weights_view(imsk, pred.hw.X),
-                           extract_fees(pred.res, fees); kwargs...)
+                           fold_fees(pred.res, fees, pred.hw.X); kwargs...)
     return expand_investable_weights(imsk, rc)
 end
 function risk_contribution(::BaseRM_VecBaseRM, ::PredictionResult{<:Any, <:Any, Nothing},
@@ -946,7 +948,7 @@ The first-order caveat of the [`risk_contribution`](@ref) method above holds her
 
   - `r::BaseRM_VecBaseRM`: Risk measure to decompose, or a vector of them.
   - `pred`: Single-fold prediction result.
-  - `fees`: Fees that take precedence over the result's own.
+  - `fees`: A caller's [`Fees`](@ref) on the caller's universe, which takes precedence over the result's own and is viewed at the result's Investable Mask through [`fold_fees`](@ref).
   - `args...`: Additional arguments (ignored by the refusing method).
 
 # Keyword Arguments
@@ -968,6 +970,7 @@ The first-order caveat of the [`risk_contribution`](@ref) method above holds her
   - [`HeldWeightsResult`](@ref)
   - [`PredictionResult`](@ref)
   - [`fold_factor_returns`](@ref)
+  - [`fold_fees`](@ref)
 """
 function factor_risk_contribution(r::BaseRM_VecBaseRM,
                                   pred::PredictionResult{<:Any, <:Any, <:HeldWeightsResult},
@@ -978,7 +981,7 @@ function factor_risk_contribution(r::BaseRM_VecBaseRM,
     imsk = result_investable_mask(pred.res)
     return factor_risk_contribution(r, investable_weights_view(imsk, pred.res.w),
                                     investable_weights_view(imsk, pred.hw.X),
-                                    extract_fees(pred.res, fees);
+                                    fold_fees(pred.res, fees, pred.hw.X);
                                     rd = fold_factor_returns(imsk, rd, pred), kwargs...)
 end
 """
@@ -1499,6 +1502,39 @@ end
 function investable_fold_view(imsk::BitVector, w::VecNum_VecVecNum, rd::ReturnsResult,
                               fees::Option{<:Fees})
     return investable_weights_view(imsk, w), port_opt_view(rd, findall(imsk)), fees
+end
+"""
+    fold_fees(res::OptimisationResult, fees::Nothing, X::MatNum)
+    fold_fees(res::OptimisationResult, fees::Fees, X::MatNum)
+
+Resolve the fee a fold-taking consumer charges: the result's own, or a caller's viewed at the result's Investable Mask.
+
+The three fold-taking consumers — [`calc_net_asset_returns`](@ref), [`risk_contribution`](@ref) and [`factor_risk_contribution`](@ref) on a [`PredictionResult`](@ref) — take an optional `fees` so a caller can score a stored fold under a fee of their own (ADR 0122). The two fees they can meet live on different universes. The result's own fee was reduced at the fit's door, so its five per-asset fields sit on the investable axis and its two liquidation carriers on the complement, and [`investable_fold_view`](@ref) hands it through unviewed. A caller's fee is stated on the caller's universe, as a caller's `rd` is, so it takes the same door a fee takes at the fit: [`investable_fees_view`](@ref) slices the per-asset fields to the mask and the carriers to its complement, deriving the complement from the width of the expanded record `X`, and strips the carriers when the mask is `nothing`, because nothing left.
+
+The split is by dispatch on `fees`. A `nothing` reads the result's fee through [`extract_fees`](@ref); a `Fees` is the caller's and is viewed. Without the view a per-asset rate stated on the full universe met the reduced weights with a `BoundsError`, and a full-universe carrier was charged as though every position had been liquidated.
+
+# Arguments
+
+  - `res::OptimisationResult`: The fold's optimisation result, carrying the mask and its own fee.
+  - `fees`: A caller's [`Fees`](@ref) on the caller's universe, or `nothing` to charge the result's own.
+  - `X`: The fold's expanded record, `observations × assets` on the caller's universe. Only its width is read.
+
+# Returns
+
+  - `fees::Option{<:Fees}`: The fee on the two axes the result's mask leaves, or `nothing`.
+
+# Related
+
+  - [`extract_fees`](@ref)
+  - [`investable_fees_view`](@ref)
+  - [`investable_fold_view`](@ref)
+  - [`result_investable_mask`](@ref)
+"""
+function fold_fees(res::OptimisationResult, ::Nothing, ::MatNum)
+    return extract_fees(res, nothing)
+end
+function fold_fees(res::OptimisationResult, fees::Fees, X::MatNum)
+    return investable_fees_view(fees, result_investable_mask(res), X)
 end
 """
     reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult, X, hw = nothing, w = res.w)

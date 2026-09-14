@@ -82,18 +82,22 @@ count the charging site knows. The model states the same rule, and always spread
 terms into an expected return, which answers for the fixed terms the open question of
 [#815](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/815).
 
-### One verb at the fit sites resolves on the full universe and splits by the mask
+### The fit sites resolve the fee on the full universe, then view it by the mask
 
-`investable_fees(fees, sets, imsk; datatype, strict)` resolves a `FeesEstimator` against the
-**full** `sets`, views `tn`, `l`, `s`, `fl` and `fs` at `findall(imsk)`, views the two carriers at
-`findall(.!imsk)`, and returns the carriers as `nothing` when `imsk` is `nothing`, because nothing
-exits. Every `fees_constraints` call at a fit site becomes this call, and each family binds its
-fees and its sets **before** the door, because the door's view has sliced them by then. A `Fees`
-method with no sets serves the value-level door of
-[ADR 0118](0118-a-fold-zeroes-a-held-gap-once-and-a-value-level-verb-reduces-to-the-investable-mask.md).
-A carrier whose length is not the mask's is refused with a `DimensionMismatch` naming both
-lengths. Resolution on the full universe is what lets a name-keyed rate for a departed asset
-resolve, so the `strict` refusal goes.
+Every fit site resolves its `FeesEstimator` **before** the door, through the `fees_constraints`
+call it already made, against the **full** `sets` the caller stated, and hands the resolved `Fees`
+to `investable_fees_view(fees, imsk, X)`. That verb takes `port_opt_view(fees, findall(imsk), X)`,
+which is the one two-axis view `Fees` writes by hand: `tn`, `l`, `s`, `fl` and `fs` at the mask, and
+the two carriers at its complement, derived from the width of the *unreduced* `X`. When `imsk` is
+`nothing` it hands the fee to `strip_liquidation_carriers` instead, which drops both carriers
+because nothing exits, so the all-investable path allocates nothing. The build refused the verb
+this decision first named, `investable_fees(fees, sets, imsk; …)`: the resolution and the view were
+already two verbs the library owned, and a third that fused them would have been a copy. The
+value-level door of
+[ADR 0118](0118-a-fold-zeroes-a-held-gap-once-and-a-value-level-verb-reduces-to-the-investable-mask.md)
+takes the same `port_opt_view` at the prior's unreduced `X`. A carrier whose length is not the
+universe's is refused with a `DimensionMismatch` naming both lengths. Resolution on the full
+universe is what lets a name-keyed rate for a departed asset resolve, so the `strict` refusal goes.
 
 The reduced `Fees` therefore carries two axes: the investable one for the five per-asset fields,
 and the complement for the two carriers. The fold reads it as the result carries it and views it
@@ -124,8 +128,8 @@ one time on the complement.
 
 ### The per-asset split is one matrix, and the mask says which columns each axis owns
 
-`calc_asset_fees` returns two vectors, the split on the investable axis and the charge per
-liquidated asset. The separation exists so each charge reaches the right place, and it ends
+`calc_asset_fees` returns a pair of pairs, `((periodic, periodic_exit), (one_off, one_off_exit))`:
+on each clock, the split on the investable axis and the charge per liquidated asset. The separation exists so each charge reaches the right place, and it ends
 there: `calc_net_asset_returns` returns **one** matrix, on the caller's own universe, whose row
 sums are the net return series.
 
@@ -184,7 +188,9 @@ are zero for the exit, so nothing else is owed.
 - `Fees` and `FeesEstimator` gain two fields, so every constructor call that spells the positional
   form changes, and the docstrings of both, of `Turnover`, of `calc_fees`, of `calc_asset_fees`,
   of `calc_net_asset_returns` and of `predict` state the rule.
-- Fourteen fit sites change one call and gain one binding. The finite allocation input learns the
-  mask.
+- The seven fit sites that resolve a fee — the shared JuMP prelude, the two `HierarchicalRiskParity`
+  methods, `HierarchicalEqualRiskContribution`, `NestedClustered`, `Stacking` and
+  `SubsetResampling` — hoist their `fees_constraints` call above the door and gain one
+  `investable_fees_view` binding. The finite allocation input learns the mask.
 - Reporting a per-fold turnover that includes the liquidation, as the reference does, is not
   decided here: the library reports no per-fold turnover today, so there is no reader to be wrong.
