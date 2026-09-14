@@ -18,7 +18,7 @@ Where:
   - ``\\boldsymbol{x}``: Portfolio weight vector.
   - ``\\boldsymbol{1}_n``: Column vector of ones of length ``n``.
 
-Two assets that are not related contribute nothing, and a pair contributes nothing when either weight is zero. Measured over the minimum spanning tree of the last 253 observations of the 20-asset sample in `test/assets/SP500.csv.gz` at a two-hop budget and equal weights, the code and the formula agree exactly.
+Two assets that are not related contribute nothing, and a pair contributes nothing when either weight is zero.
 
 # Algorithm
 

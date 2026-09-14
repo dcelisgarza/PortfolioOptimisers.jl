@@ -9,7 +9,7 @@ This function is a core step in the DBHT (Direct Bubble Hierarchical Tree) and L
 
 # The TMFG approximates the PMFG, and is not it
 
-The planar maximally filtered graph is the exact solution of the weighted maximal planar graph problem, which is costly. The triangulation this function builds is the cheap greedy approximation to it, so the name of the function is the problem and the algorithm is the approximation. Both are maximal planar graphs, so both carry exactly ``3N - 6`` edges against the ``N - 1`` of a minimum spanning tree: measured over a 20-asset sample, the graph holds `54` edges.
+The planar maximally filtered graph is the exact solution of the weighted maximal planar graph problem, which is costly. The triangulation this function builds is the cheap greedy approximation to it, so the name of the function is the problem and the algorithm is the approximation. Both are maximal planar graphs, so both carry exactly ``3N - 6`` edges against the ``N - 1`` of a minimum spanning tree.
 
 # Mathematical definition
 

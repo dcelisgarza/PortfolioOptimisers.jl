@@ -157,9 +157,9 @@ end
 
 Return the lag-one autocorrelation of every factor return series.
 
-The answer is the Pearson correlation of the pair `(f[1:end - 1, k], f[2:end, k])`, each half centred on **its own** mean. That is the reference implementation's definition, and it is not `StatsBase.autocor`, which centres both halves on the mean of the whole series and divides by the sum of squares of the whole series. The two agree in the limit and differ on a short series, so a caller who wants the other definition calls `StatsBase.autocor` on the factor return history itself.
+The answer is the Pearson correlation of the pair `(f[1:end - 1, k], f[2:end, k])`, each half centred on **its own** mean. It is not `StatsBase.autocor`, which centres both halves on the mean of the whole series and divides by the sum of squares of the whole series. The two agree in the limit and differ on a short series, so a caller who wants the other definition calls `StatsBase.autocor` on the factor return history itself.
 
-A series with an absent entry reads `NaN`, because the mean of the half that holds it is absent. This too is what the reference implementation answers.
+A series with an absent entry reads `NaN`, because the mean of the half that holds it is absent.
 
 # Mathematical definition
 
@@ -256,7 +256,7 @@ end
 
 Return the position each raw factor takes on the reduced factor axis.
 
-The regression group answers on the reduced axis and the summary answers on the raw one, so the two are joined **by name**, as the reference implementation joins them. A raw factor the re-basis dropped takes the position `0`, which is what makes its Gram columns read `NaN`.
+The regression group answers on the reduced axis and the summary answers on the raw one, so the two are joined **by name**. A raw factor the re-basis dropped takes the position `0`, which is what makes its Gram columns read `NaN`.
 
 A block that carries no re-basis needs no join, and the two axes are then the same axis.
 
@@ -388,7 +388,7 @@ end
 
 Return the cross-sectional variance of one factor exposure at one observation.
 
-The variance is taken over the finite exposures of the observation and it is not corrected, which is the reference implementation's convention for the test that finds a constant exposure.
+The variance is taken over the finite exposures of the observation and it is not corrected.
 
 # Arguments
 
@@ -433,7 +433,7 @@ end
 
 Return which factor exposures never vary across the cross-section.
 
-A constant exposure is the global intercept and the constant column of a one-hot family. Its cross-section has no spread, so its stability coefficient is not defined and the summary writes `1` in its place: an exposure that never moves is perfectly stable. That patch is the reference implementation's, and it lives in the summary rather than in [`exposure_stability`](@ref), which answers the `NaN` the correlation earns.
+A constant exposure is the global intercept and the constant column of a one-hot family. Its cross-section has no spread, so its stability coefficient is not defined and the summary writes `1` in its place: an exposure that never moves is perfectly stable. The patch lives in the summary rather than in [`exposure_stability`](@ref), which answers the `NaN` the correlation earns.
 
 # Arguments
 
@@ -462,7 +462,7 @@ function factor_summary_constant_exposures(Ms::Arr3Num)
             end
         end
         # A factor with no finite cross-section anywhere leaves `m` at `-Inf`, and it is
-        # not constant: the reference's `NaN < 1e-12` is false there too.
+        # not constant.
         c[k] = m > -Inf && m < 1e-12
     end
     return c
@@ -514,7 +514,7 @@ Return the two exposure columns of a factor model summary, on the raw factor axi
 
 The columns are the median exposure stability and the average coverage. Both read the unlagged exposure history, as the whole exposure group does. A block that carries no exposure history has neither, and the absent case is the dispatch rather than a branch.
 
-The two columns read **different** weight histories, which is what the reference implementation does: the stability reads the history `weighting` names, and the coverage reads the one `coverage_weighting` names.
+The two columns read **different** weight histories: the stability reads the history `weighting` names, and the coverage reads the one `coverage_weighting` names.
 
 # Arguments
 
@@ -637,7 +637,7 @@ end
 
 Summarise every factor of a cross-sectional factor model as a [`FactorSummaryResult`](@ref).
 
-The summary is the top of the diagnostic hierarchy. It calls one level-2 verb of the regression group and one of the exposure group per column, and it aggregates each series over the observations. It computes no statistic of its own but the factor return statistics and the two aggregates that the reference implementation defines only inside its own summary: the median of the stability, and the patch that reads a constant exposure as perfectly stable.
+The summary is the top of the diagnostic hierarchy. It calls one level-2 verb of the regression group and one of the exposure group per column, and it aggregates each series over the observations. It computes no statistic of its own but the factor return statistics and two aggregates: the median of the stability, and the patch that reads a constant exposure as perfectly stable.
 
 The answer is on the **raw** factor axis. The regression group answers on the reduced axis of the family re-basis, and the summary joins the two by name.
 
@@ -657,7 +657,7 @@ The answer is on the **raw** factor axis. The regression group answers on the re
   - `threshold`: Absolute t-statistic the exceedance rate counts against.
   - `step`: Number of observations between the two cross-sections the stability reads.
   - `weighting`: The [`AbstractOrthogonalityMetric`](@ref) whose weight history the stability reads.
-  - `coverage_weighting`: The [`AbstractOrthogonalityMetric`](@ref) whose positive weights are the universe of the coverage. Its default of [`RegressionWeightMetric`](@ref) is the estimation universe of the fit, which is the universe the reference implementation reads.
+  - `coverage_weighting`: The [`AbstractOrthogonalityMetric`](@ref) whose positive weights are the universe of the coverage. Its default of [`RegressionWeightMetric`](@ref) is the estimation universe of the fit.
 
 # Validation
 

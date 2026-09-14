@@ -132,7 +132,7 @@ Clusters the distance matrix once per candidate count, scores the results, and r
 
 [`valid_k_clusters`](@ref) has no counterpart here. It rejects a count the dendrogram cannot be cut at, and a flat partition has no dendrogram, so the argmax is taken as it stands.
 
-The dispersion under [`SecondOrderDifference`](@ref) is also a different quantity from the hierarchical branch's: it is `onc.alg.alg` applied to the k-means **per-point costs**, not to within-cluster pairwise distances. That vector has one entry per asset whatever the cut, so a cut never reduces a one-value vector here. The two rise and fall in opposite directions, and they select different counts. On the 20-asset sample `randn(StableRNG(987654321), 200, 20)`, with columns `2` and `4` tied to columns `1` and `3` by `0.02` noise, the hierarchical dispersions run `11.27, 26.04, 47.89, 112.96, 114.11` over the counts `2` to `6` and select `3`, while the k-means per-point costs over the same counts run `6.58, 2.83, 2.57, 2.17, 2.06` and select `2`.
+The dispersion under [`SecondOrderDifference`](@ref) is also a different quantity from the hierarchical branch's: it is `onc.alg.alg` applied to the k-means **per-point costs**, not to within-cluster pairwise distances. That vector has one entry per asset whatever the cut, so a cut never reduces a one-value vector here. The two rise and fall in opposite directions, and they select different counts.
 
 # Algorithm
 

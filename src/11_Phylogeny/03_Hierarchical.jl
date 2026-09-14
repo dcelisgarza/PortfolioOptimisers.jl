@@ -370,7 +370,7 @@ Cuts the tree at `k`, then walks the `k - 1` tallest nodes. Each non-leaf node a
 
 # Only a tie in the heights makes the answer `false`
 
-When every height is distinct, the `k - 1` tallest nodes **are** the merges that the cut removes, so each of them carries a whole cluster below one of its children and the answer is `true`. Two merges of equal height break that correspondence, because `nodes` is ordered by `sortperm` and the cut is not, so the walk can reach a node the cut left standing. Measured over 160 dendrograms with distinct heights — 40 universes of 16 assets under each of the four linkages — no `k` from `1` to `6` was ever rejected; on an eight-leaf balanced tree whose four lowest merges tie and whose two middle merges tie, `3`, `5`, `6` and `7` are all rejected.
+When every height is distinct, the `k - 1` tallest nodes **are** the merges that the cut removes, so each of them carries a whole cluster below one of its children and the answer is `true`. Two merges of equal height break that correspondence, because `nodes` is ordered by `sortperm` and the cut is not, so the walk can reach a node the cut left standing. A dendrogram with distinct heights rejects no `k`; a tree with tied merges rejects every `k` whose cut falls inside a tie.
 
 `k = 1` is always valid: the walk of step 3 is then empty.
 

@@ -108,7 +108,7 @@ Where:
   - ``t_g``, ``u_h``: Sizes of the ``g``-th group of tied ``x`` values and the ``h``-th group of tied ``y`` values.
   - $(math_dict[:T])
 
-Without ties, ``n_x = n_y = 0`` and ``\\hat{\\tau}^b`` reduces to ``\\tau_a = (C - D) / \\binom{T}{2}``, which is equation 6.3 of the source. **The two differ when ties are present**: on `[1.0 1.0; 2.0 1.0; 2.0 3.0; 4.0 4.0; 5.0 2.0]` (one tied pair in each series), ``\\tau_a`` is `0.4` and this method returns `0.4444444444444444`.
+Without ties, ``n_x = n_y = 0`` and ``\\hat{\\tau}^b`` reduces to ``\\tau_a = (C - D) / \\binom{T}{2}``, which is equation 6.3 of the source. **The two differ when ties are present**, because the tie counts shrink the denominator.
 
 # Algorithm
 

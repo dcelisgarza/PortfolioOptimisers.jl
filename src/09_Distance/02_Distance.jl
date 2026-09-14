@@ -52,7 +52,7 @@ The clamp is inert for the first two algorithms at every ``p``: ``s(1 - \\rho_{i
 
     The field is one field, and the reader must not assume one meaning. For a correlation-based algorithm it raises the **correlation**, inside the transform. For [`VariationInfoDistance`](@ref) there is no correlation to raise, so it raises the **distance** the algorithm returns. So ``_{g}d^{\\mathrm{S}}`` at ``p = 2`` is *not* ``\\left(d^{\\mathrm{S}}\\right)^{2}``, while ``_{g}d^{\\mathrm{VI}}`` at ``p = 2`` *is* ``\\left(d^{\\mathrm{VI}}\\right)^{2}``.
 
-The source carries the four base formulas alone. Section 6.2 of the reference below ends at the tail dissimilarity, so the ``p`` generalisation and the scaling ``s`` are this library's own extension of it.
+Section 6.2 of [cajas2025](@cite) carries the four base formulas alone and ends at the tail dissimilarity, so the ``p`` generalisation and the scaling ``s`` are this library's own extension of it.
 
 # Fields
 

@@ -93,7 +93,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Judges a covariance forecast against the outer product of the return earned over the horizon.
 
-This is the reference implementation's member, and the ``h``-day holder's question: the return summed over the step is what a book held for the whole horizon earns, and its outer product is a rank-one proxy of ``h\\, \\mathbf{\\Sigma}_t``. Under a Gaussian null the step's Mahalanobis ratio has variance ``2 / N``, whatever ``h``, so it is the noisier member at every horizon above one.
+This is the ``h``-day holder's question: the return summed over the step is what a book held for the whole horizon earns, and its outer product is a rank-one proxy of ``h\\, \\mathbf{\\Sigma}_t``. Under a Gaussian null the step's Mahalanobis ratio has variance ``2 / N``, whatever ``h``, so it is the noisier member at every horizon above one.
 
 # Mathematical definition
 
@@ -562,7 +562,7 @@ end
 
 Resolve the test portfolios of a step over its active subset.
 
-`nothing` is inverse volatility recomputed from the step's forecast, ``w_i \\propto 1 / \\sqrt{(\\hat{\\mathbf{\\Sigma}}_t)_{ii}}`` over the active assets, the reference implementation's default and the one that stops the most volatile asset dominating the reading. A vector is one static portfolio and a vector of vectors several; each is cut to the active subset and renormalised to sum to one there, as the reference does, so a delisted asset's weight is spread over the assets that remain. No guard is placed on a subset whose weights sum to zero: the portfolio is then not a portfolio, and its ratio is not a number.
+`nothing` is inverse volatility recomputed from the step's forecast, ``w_i \\propto 1 / \\sqrt{(\\hat{\\mathbf{\\Sigma}}_t)_{ii}}`` over the active assets, which stops the most volatile asset dominating the reading. A vector is one static portfolio and a vector of vectors several; each is cut to the active subset and renormalised to sum to one there, so a delisted asset's weight is spread over the assets that remain. No guard is placed on a subset whose weights sum to zero: the portfolio is then not a portfolio, and its ratio is not a number.
 
 # Arguments
 

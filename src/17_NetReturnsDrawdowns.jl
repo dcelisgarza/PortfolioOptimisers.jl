@@ -1516,7 +1516,7 @@ Compute simple or compounded cumulative returns along a specified dimension.
 
 `cumulative_returns` computes the cumulative returns for an array of asset or portfolio returns. By default, it computes simple cumulative returns using `cumsum`. If `compound` is `true`, it computes compounded cumulative returns using `cumprod(one(eltype(X)) .+ X)`.
 
-**The Precomputed-returns contract: the series the caller hands this verb must be finite.** It takes no finiteness check, because every internal caller hands it the output of [`calc_net_returns`](@ref) and a scan on a long series would be paid by all of them. One non-finite entry poisons every entry after it, because both accumulations carry it forward. A caller who holds a gapped series drops the gaps first with `x[isfinite.(x)]`, which is the reference implementation's own drop-per-column answer, and a caller who holds a gapped panel scores it through [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref) instead.
+**The Precomputed-returns contract: the series the caller hands this verb must be finite.** It takes no finiteness check, because every internal caller hands it the output of [`calc_net_returns`](@ref) and a scan on a long series would be paid by all of them. One non-finite entry poisons every entry after it, because both accumulations carry it forward. A caller who holds a gapped series drops the gaps first with `x[isfinite.(x)]`, and a caller who holds a gapped panel scores it through [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref) instead.
 
 # Mathematical definition
 

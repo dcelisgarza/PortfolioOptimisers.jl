@@ -169,7 +169,7 @@ Sparsifies the inverse covariance matrix on the cliques of an information filter
 
 # What is sparse is the precision, not the covariance
 
-[`J_LoGo`](@ref) sums the inverse of each clique block and subtracts the inverse of each separator block, and the matrix that comes out is **exactly zero** wherever the network carries no edge. Measured over a 20-asset sample, the triangulated maximally filtered graph holds `54` edges — the `3n - 6` of a maximal planar graph — and the largest absolute entry of the precision matrix away from those edges is `0.0`.
+[`J_LoGo`](@ref) sums the inverse of each clique block and subtracts the inverse of each separator block, and the matrix that comes out is **exactly zero** wherever the network carries no edge.
 
 `sigma` is then replaced by the inverse of that precision matrix, so what the caller receives is dense. The filtering is a statement about which pairs are conditionally independent given the rest, and it survives only in the precision.
 

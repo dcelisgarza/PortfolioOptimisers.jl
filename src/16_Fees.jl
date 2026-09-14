@@ -341,13 +341,11 @@ The two families compute one definition. [`calc_asset_fees`](@ref) splits over t
 
 [`set_non_fixed_fees!`](@ref) writes the proportional terms against the model's `lw` and `sw` variables rather than against ``\\boldsymbol{w}``, and it writes no fixed term at all — a fixed fee needs a binary and is emitted by the MIP builder instead.
 
-Under a [`PartsBoundWeights`](@ref) head those variables only *bound* the parts of ``\\boldsymbol{w}``, so the model's fee is an upper bound on this definition.
+Under a [`PartsBoundWeights`](@ref) head those variables only *bound* the parts of ``\\boldsymbol{w}``, so the model's fee is an upper bound on this definition: the budget pins `sum(lw)` and `sum(sw)` whether or not a short position is held, so the model charges both sides in full.
 
-The sample that measures the gap is the last 201 rows of the first five columns of `test/assets/SP500.csv.gz`, turned into 200 returns. It is solved with [`MeanRisk`](@ref) over a [`Variance`](@ref), under `lb = -1`, `ub = 1`, `bgt = 1`, `sbgt = 1`, `l = 0.002` and `s = 0.003`. The model reported `0.007` and the functor `0.003282488224724545`, a gap of `0.0037`. The budget pins `sum(lw)` to `2` and `sum(sw)` to `sbgt`, whether or not a short position is held, so the model charges both sides in full.
+Setting `xbgt = true` on the [`JuMPOptimiser`](@ref) pins the decomposition, and the model's fee then agrees with this definition. It writes binaries, so the same problem then needs a mixed-integer conic solver rather than a conic one.
 
-Setting `xbgt = true` on the [`JuMPOptimiser`](@ref) pins the decomposition. It writes binaries, so the same problem then needs a mixed-integer conic solver rather than a conic one. On that sample the model reported `0.0069999999999999975` and the functor `0.006999999999999652`, a difference of `3.5e-16`.
-
-A long-only model needs no pinning. With `lb = 0`, `bgt = 1` and `l = 0.002` as the only fee, the model and the functor both reported `0.002`, and the difference was exactly zero.
+A long-only model needs no pinning, because it holds no short side to bound.
 
 ## Fee amortisation
 

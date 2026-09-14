@@ -80,8 +80,6 @@ The universe is checked with them, because two forecasts over different universe
 
 The evaluation `dates` are not checked here either. Two evaluations that answer one question on two grids are still one question, and [`forecast_evaluation_align`](@ref) is what puts them on one grid; the summary asks for the grid as well, through [`forecast_summary_assert_comparable`](@ref).
 
-The reference implementation checks none of this.
-
 # Arguments
 
   - `fes`: The evaluations to compare, at least one.
@@ -131,7 +129,7 @@ end
 
 Refuse a set of evaluations whose rows would not mean the same thing, naming the field that differs.
 
-Two evaluations are comparable where they answer one question, which [`forecast_summary_assert_same_question`](@ref) checks, and where they answer it on one sample: a row taken over eighty-seven dates beside a row taken over seventy-four compares nothing, so the evaluation `dates` must agree as well. A set that answers one question on two grids is refused here, and [`forecast_evaluation_align`](@ref) is what puts it on one.
+Two evaluations are comparable where they answer one question, which [`forecast_summary_assert_same_question`](@ref) checks, and where they answer it on one sample: two rows taken over different dates compare nothing, so the evaluation `dates` must agree as well. A set that answers one question on two grids is refused here, and [`forecast_evaluation_align`](@ref) is what puts it on one.
 
 # Arguments
 
@@ -440,7 +438,7 @@ The headline statistics of one or more Return Forecast evaluations, one entry pe
 
 # One class, and no comparison class beside it
 
-A single evaluation is the **length-1** case of this Result and a comparison is the length-2 case, so no second class ships. The reference implementation exports two, an evaluation and a comparison, and the comparison exists only to set the first one's columns side by side — which a columnar Result already is.
+A single evaluation is the **length-1** case of this Result and a comparison is the length-2 case, so no second class ships: a comparison only sets the columns of several evaluations side by side, which a columnar Result already does.
 
 # One hit-rate denominator
 
@@ -659,7 +657,7 @@ Summarise one or more Return Forecast evaluations as a [`ForecastSummaryResult`]
 
 This is the top of the evaluation hierarchy, and it is also the comparison. It calls one level-2 verb per block and computes no statistic of its own beyond collecting each block onto the forecast axis, which is how [`factor_model_summary`](@ref) is built. A single evaluation is the length-1 case and has the same type and the same columns as a comparison of four, so a caller who starts with one member and later wants a table of four changes the argument and nothing else.
 
-The vector method **refuses evaluations that are not comparable**, naming the field that differs, because a table invites a comparison its rows would not support. The reference implementation checks none of this. Two members that answer one question on two grids — the ordinary case, because a member that is refit warms up and a member that publishes its history does not — are refused on `dates` unless `align = true`, which puts them on the grid they share through [`forecast_evaluation_align`](@ref) before anything is read.
+The vector method **refuses evaluations that are not comparable**, naming the field that differs, because a table invites a comparison its rows would not support. Two members that answer one question on two grids — the ordinary case, because a member that is refit warms up and a member that publishes its history does not — are refused on `dates` unless `align = true`, which puts them on the grid they share through [`forecast_evaluation_align`](@ref) before anything is read.
 
 A weighting reaches the summary the way it reaches every other block-aware statistic of this map: as a bare weight history positionally, or as the cross-sectional factor model whose [`AbstractOrthogonalityMetric`](@ref) resolves one. The Result carries no block, so the metric cannot be read off it.
 

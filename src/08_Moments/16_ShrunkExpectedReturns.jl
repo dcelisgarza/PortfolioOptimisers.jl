@@ -711,7 +711,7 @@ Where:
 Two consequences of the form separate this intensity from the James-Stein one.
 
   - The quadratic form is non-negative whenever ``\\hat{\\mathbf{\\Sigma}}`` is positive semidefinite, so ``\\alpha`` then lies in ``(0, 1]``. This is the only one of the three algorithms whose coefficient is a convex weight without a clamp, and it returns the target exactly when the quadratic form is zero. A covariance estimator that returns an indefinite matrix breaks the bound.
-  - The quadratic form uses the inverse of the covariance matrix that `me.ce` returns. Equation 3.44 of [cajas2025](@cite) states the same intensity over the bias-corrected matrix ``\\bar{\\mathbf{\\Sigma}} = \\frac{T-1}{T-N-1} \\hat{\\mathbf{\\Sigma}}``, and its own reference implementation uses ``\\hat{\\mathbf{\\Sigma}}``, as this method does. The correction raises ``\\alpha``.
+  - The quadratic form uses the inverse of the covariance matrix that `me.ce` returns. Equation 3.44 of [cajas2025](@cite) states the same intensity over the bias-corrected matrix ``\\bar{\\mathbf{\\Sigma}} = \\frac{T-1}{T-N-1} \\hat{\\mathbf{\\Sigma}}``; this method uses ``\\hat{\\mathbf{\\Sigma}}``. The correction raises ``\\alpha``.
 
 # Algorithm
 

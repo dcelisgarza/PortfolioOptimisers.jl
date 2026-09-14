@@ -604,7 +604,7 @@ Compute the Black-Litterman posterior mean and covariance for asset returns.
 
 The kernel carries no risk-free rate. Each Black-Litterman prior estimator adds its own `rf` once, through [`apply_rf`](@ref), which owns the site each member adds it at.
 
-The two equations below are the **inverse-free** form of the master equations. They are algebraically the same object as the form stated on [`prior`](@ref): the covariance term is the Woodbury expansion of ``\\left[(\\tau\\mathbf{\\Sigma})^{-1} + \\mathbf{P}^\\intercal\\mathbf{\\Omega}^{-1}\\mathbf{P}\\right]^{-1}``, and the two agree to `2.2e-19` on the mean and `1.4e-20` on the covariance for a ``200 \\times 6`` sample with three views. This form is used because it inverts one ``K \\times K`` matrix rather than three ``N \\times N`` ones.
+The two equations below are the **inverse-free** form of the master equations. They are algebraically the same object as the form stated on [`prior`](@ref): the covariance term is the Woodbury expansion of ``\\left[(\\tau\\mathbf{\\Sigma})^{-1} + \\mathbf{P}^\\intercal\\mathbf{\\Omega}^{-1}\\mathbf{P}\\right]^{-1}``. This form is used because it inverts one ``K \\times K`` matrix rather than three ``N \\times N`` ones.
 
 # Mathematical definition
 

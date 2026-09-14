@@ -97,7 +97,7 @@ Where:
   - ``\\mathbf{B}_{k}``: Pairs joined by at least one walk of length exactly ``k``.
   - ``\\mathbf{B}_{1,\\,l}``: Pairs joined by at least one walk of length at most ``l``.
 
-The code accumulates `sum(A^i for i in 0:n)`, clamps to `0` or `1`, and subtracts the identity, which is the same selection written once rather than shell by shell. Measured over the minimum spanning tree of the last 253 observations of the 20-asset sample in `test/assets/SP500.csv.gz`, the two agree entry for entry at `n = 1, 2, 3, 4` — a maximum absolute difference of `0`, over `19`, `48`, `84` and `115` related pairs.
+The code accumulates `sum(A^i for i in 0:n)`, clamps to `0` or `1`, and subtracts the identity, which is the same selection written once rather than shell by shell.
 
 # The result is `Int` under either separation
 

@@ -198,7 +198,7 @@ Where:
   - ``\\boldsymbol{C}_n``: Centrality score vector from [`centrality_vector`](@ref).
   - ``\\boldsymbol{x}``: Portfolio weight vector.
 
-There is no normalisation and no absolute value, so the average carries the units of the score. A [`DegreeCentrality`](@ref) score is divided by ``n - 1`` before it arrives here. Measured over the minimum spanning tree of the last 253 observations of the 20-asset sample in `test/assets/SP500.csv.gz` at equal weights, the code and the formula agree exactly.
+There is no normalisation and no absolute value, so the average carries the units of the score. A [`DegreeCentrality`](@ref) score is divided by ``n - 1`` before it arrives here.
 
 # Algorithm
 

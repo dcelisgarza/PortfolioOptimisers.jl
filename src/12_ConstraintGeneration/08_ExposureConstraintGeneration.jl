@@ -481,7 +481,7 @@ Re-base one wrapped shape. Dispatches on what [`ExposureConstraintEstimator`](@r
 
 # Algorithm
 
-The two single-shape methods reach the same row by two routes. The estimator route builds the row term by term, and the precomputed route projects a finished row. Measured on one mandate written both ways, the rows agree.
+The two single-shape methods reach the same row by two routes. The estimator route builds the row term by term, and the precomputed route projects a finished row.
 
  1. For a [`LinearConstraintEstimator`](@ref), pick the key: `lce.key` when the wrapped estimator states one, and `key` otherwise.
  2. Call [`linear_constraints`](@ref) on `lce.val` against that key, with `basis` passed as `rr`. [`constraint_row_term`](@ref) then sums the selected columns of `basis.M` for each named term, which is the projection done one term at a time.

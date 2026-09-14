@@ -120,7 +120,7 @@ end
 
 Return the count and the three central moments of one cross-section of standardised idiosyncratic returns.
 
-The calibration, the excess kurtosis and the skewness are each a function of these four numbers alone, so the two passes over the cross-section are made once and read three times. An entry that is not finite enters neither the count nor a moment, which is the rule the reference implementation applies.
+The calibration, the excess kurtosis and the skewness are each a function of these four numbers alone, so the two passes over the cross-section are made once and read three times. An entry that is not finite enters neither the count nor a moment.
 
 # Mathematical definition
 
@@ -573,7 +573,7 @@ Return the rank correlation of the predicted idiosyncratic volatility against th
 
 Dividing the realised move by the volatility the fit predicted should remove the level of that prediction. So a well calibrated fit leaves a series near `0`: how large an asset's standardised move was should not depend on how volatile the fit said the asset would be. A series that stays positive is a fit that under-predicts the volatile assets, and one that stays negative is a fit that over-predicts them.
 
-The target divides the absolute return of observation ``t + 1`` by the volatility predicted at observation ``t``, and not by the volatility predicted at observation ``t + 1``. Both quantities are written ``z_{t+1}`` in the literature, and they differ wherever the prediction moved between the two observations. This verb reproduces the reference implementation, which divides by the volatility of observation ``t``.
+The target divides the absolute return of observation ``t + 1`` by the volatility predicted at observation ``t``, and not by the volatility predicted at observation ``t + 1``. Both quantities are written ``z_{t+1}`` in the literature, and they differ wherever the prediction moved between the two observations.
 
 Read it beside [`idio_vol_ic`](@ref). A fit that ranks well and leaves no residual dependence carries a high information coefficient and a dependence near `0`.
 

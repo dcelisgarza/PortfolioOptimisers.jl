@@ -712,7 +712,7 @@ end
 
 Say whether a fold's prediction carries weights the next fold can be handed.
 
-The other half of the Previous-Weights Source seam: [`previous_weights`](@ref) reads the weights, and this verb says whether the fold has any to read. The sequential loops, [`run_folds`](@ref) and [`online_folds`](@ref), advance the fold they hand on only when it holds, so a failed fold is never the one read and the last threadable fold is read instead — the reference's online loop, which leaves its previous weights where they were on a failed step. What is read decides what is tested: the target weights are finite exactly when every member's return code is an [`OptimisationSuccess`](@ref), and the held weights are finite when the drift ran, which after [`held_start_weights`](@ref) it does on a failed fold too, so a source advances past a failed fold that held its book and stops only at one with nothing to hold.
+The other half of the Previous-Weights Source seam: [`previous_weights`](@ref) reads the weights, and this verb says whether the fold has any to read. The sequential loops, [`run_folds`](@ref) and [`online_folds`](@ref), advance the fold they hand on only when it holds, so a failed fold is never the one read and the last threadable fold is read instead. What is read decides what is tested: the target weights are finite exactly when every member's return code is an [`OptimisationSuccess`](@ref), and the held weights are finite when the drift ran, which after [`held_start_weights`](@ref) it does on a failed fold too, so a source advances past a failed fold that held its book and stops only at one with nothing to hold.
 
 # Algorithm
 

@@ -380,7 +380,7 @@ end
 
 Fits one asset in the reduced basis and maps its coefficients back to the original factors.
 
-The reduced-space intercept is discarded and rebuilt from the response mean, so a fit and its recovery agree only while `mu` is the mean under the weights that fit used. Matched, the two paths predict the same values to `4.4e-16` on a 200×5 sample, weighted and unweighted alike; standardise with an unweighted mean and fit with weights, and the same sample parts by `2.1e-3`.
+The reduced-space intercept is discarded and rebuilt from the response mean, so a fit and its recovery agree only while `mu` is the mean under the weights that fit used. Matched, the two paths predict the same values, weighted and unweighted alike; standardise with an unweighted mean and fit with weights, and they part.
 
 # Mathematical definition
 

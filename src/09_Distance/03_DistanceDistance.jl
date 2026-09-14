@@ -59,7 +59,7 @@ DistanceDistance
 
 !!! warning "The default metric leaves the unit interval"
 
-    The Euclidean norm of two columns of a bounded distance matrix is not itself bounded by `1`. On a 6-asset sample two thirds of the off-diagonal entries exceeded `1`, and the largest was `1.3946164799008962`.
+    The Euclidean norm of two columns of a bounded distance matrix is not itself bounded by `1`.
 
     [`ComplementSimilarity`](@ref) is therefore out of domain against this estimator's own default, and [`assert_similarity_domain`](@ref) refuses the pair on the PMFG path. Use [`ExponentialSimilarity`](@ref) or [`GeneralExponentialSimilarity`](@ref), which have no domain.
 

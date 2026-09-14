@@ -541,7 +541,7 @@ end
 
 Shrinks a factor set from full, removing the factor whose reduced model scores best.
 
-`value[j]` is the score of the model that **omits** `j`, so the reading of "best" is the same as the forward direction's and not its inverse: under a minimised criterion the code removes the factor of **lowest** value, and under a maximised one the factor of **highest**. On a 200×5 sample whose response is built from factors 1 and 3, the five reduced-model `:aic` scores were `[487.92, -372.72, 82.79, -369.15, -372.44]` against a full-model score of `-371.52`; the code removed factor 2, the lowest, and kept factor 1, the highest and the strongest signal in the response.
+`value[j]` is the score of the model that **omits** `j`, so the reading of "best" is the same as the forward direction's and not its inverse: under a minimised criterion the code removes the factor of **lowest** value, and under a maximised one the factor of **highest**.
 
 # Algorithm
 

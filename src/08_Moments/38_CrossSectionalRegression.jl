@@ -20,7 +20,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Solves the full-rank design directly and pseudo-inverts a rank-deficient one.
 
-This is the default of [`CrossSectionalLinearRegression`](@ref), and it is the reference implementation's behaviour. It never throws on a dependent factor set: a square design that `\\` would refuse reaches the pseudo-inverse instead, and a non-square one reaches the same minimum-norm answer through either route. The rank test is what it costs, because the design is factorised twice whenever it passes.
+This is the default of [`CrossSectionalLinearRegression`](@ref). It never throws on a dependent factor set: a square design that `\\` would refuse reaches the pseudo-inverse instead, and a non-square one reaches the same minimum-norm answer through either route. The rank test is what it costs, because the design is factorised twice whenever it passes.
 
 # Examples
 

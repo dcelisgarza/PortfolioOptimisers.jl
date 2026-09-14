@@ -172,7 +172,7 @@ end
 
 Summarise one or more covariance forecast evaluations, one entry per evaluation.
 
-The verb over [`CovarianceForecastEvaluationResult`](@ref): the mean, median and tail percentiles of the two calibration ratios with the Gaussian band on each mean, the bias statistic of the test portfolios with its cross-portfolio percentiles, the mean of each loss, and the exceedance rate of the Mahalanobis statistic at each level. The single-Result method is the length-1 case. The mean of a ratio is a ratio of sums, weighted by each step's degrees of freedom under the evaluation's target ([`target_dof`](@ref)), so a date walk-forward whose folds differ in length weights each by its length; under an index walk-forward it is the plain mean, which is what the reference implementation reports.
+The verb over [`CovarianceForecastEvaluationResult`](@ref): the mean, median and tail percentiles of the two calibration ratios with the Gaussian band on each mean, the bias statistic of the test portfolios with its cross-portfolio percentiles, the mean of each loss, and the exceedance rate of the Mahalanobis statistic at each level. The single-Result method is the length-1 case. The mean of a ratio is a ratio of sums, weighted by each step's degrees of freedom under the evaluation's target ([`target_dof`](@ref)), so a date walk-forward whose folds differ in length weights each by its length; under an index walk-forward it is the plain mean.
 
 # Algorithm
 

@@ -291,7 +291,7 @@ Producing `alpha` can cost a rolling refit, so the Result stores it rather than 
 
 # The forecast is written on the universe
 
-`alpha` carries `NaN` wherever `umsk` is `false`, because [`forecast_evaluation`](@ref) writes it there once, through [`forecast_evaluation_mask`](@ref), before the dates are found. A member standardises its Descriptors over the estimation universe, so a score for an asset outside it is standardised against a population the asset does not belong to, and no statistic of the evaluation reads one: the coefficients, the books, the calibration and the factor correlations inherit the universe from `alpha` rather than applying the mask of their own, and the coverage reads the mask itself as its denominator. The reference implementation masks the forecast by the estimation mask before every statistic, and this is the one place the port does it.
+`alpha` carries `NaN` wherever `umsk` is `false`, because [`forecast_evaluation`](@ref) writes it there once, through [`forecast_evaluation_mask`](@ref), before the dates are found. A member standardises its Descriptors over the estimation universe, so a score for an asset outside it is standardised against a population the asset does not belong to, and no statistic of the evaluation reads one: the coefficients, the books, the calibration and the factor correlations inherit the universe from `alpha` rather than applying the mask of their own, and the coverage reads the mask itself as its denominator.
 
 # Fields
 

@@ -601,7 +601,7 @@ end
 
 Return the summary of an information coefficient series, one entry per factor.
 
-The mean states the average score, the standard deviation states how much the score moves, their ratio states the score per unit of movement, the t-statistic states whether the mean is far enough from zero to believe over the observations that carried a score, and the hit rate states how often the score was positive. All five are read against the observations that carried a score: an observation whose score is `NaN` is one at which nothing was measured, not a miss, so it is in no denominator here, as it is in none of the library's other summaries. Whether a series was silenced often is a separate question, and the coverage of the series answers it. The reference implementation's exposure summary counts such an observation as a miss, because it takes the mean of `ic > 0` and the comparison has already turned the `NaN` into a `false`; its evaluation summary drops it, and this library takes that reading in both.
+The mean states the average score, the standard deviation states how much the score moves, their ratio states the score per unit of movement, the t-statistic states whether the mean is far enough from zero to believe over the observations that carried a score, and the hit rate states how often the score was positive. All five are read against the observations that carried a score: an observation whose score is `NaN` is one at which nothing was measured, not a miss, so it is in no denominator here, as it is in none of the library's other summaries. Whether a series was silenced often is a separate question, and the coverage of the series answers it.
 
 # Mathematical definition
 

@@ -37,7 +37,7 @@ The views are applied to the **factors** and reach the assets through the regres
   - The factor block `fpr` carries the **posterior** factor moments — `mu_hat` and the inverse of the posterior precision — processed by `f_mp`. Its `chol` is dropped for the same reason; its `w` and that weighting's diagnostics forward untouched, because the views do not touch the observation axis.
   - Everything else forwards: `X` is the wrapped prior's unchanged, so `w`, `ens`, `kld`, `ow` and `Z` all still describe the axis they were computed over, and `rr` is a regression over data the views do not modify.
 
-Because both blocks are posterior, the returned carrier is **internally consistent**: `mu == rr.M * fpr.mu + rr.b + rf` holds, and at the default `rf = 0.0` that is the plain identity. Measured on a `250 × 5` sample over three factors with two factor views, the two sides agree to `1.1e-17` at `rf = 0.0` and to `1.4e-17` at `rf = 0.03`. [`FactorBlackLittermanPrior`](@ref) satisfies it too, for the same reason, and exactly. The other two members do not — see the warnings on [`BlackLittermanPrior`](@ref) and [`AugmentedBlackLittermanPrior`](@ref).
+Because both blocks are posterior, the returned carrier is **internally consistent**: `mu == rr.M * fpr.mu + rr.b + rf` holds, and at the default `rf = 0.0` that is the plain identity. [`FactorBlackLittermanPrior`](@ref) satisfies it too, for the same reason. The other two members do not — see the warnings on [`BlackLittermanPrior`](@ref) and [`AugmentedBlackLittermanPrior`](@ref).
 
 !!! warning
 
@@ -363,7 +363,7 @@ Where:
 
 Two consequences are caller-facing. ``\\mathbf{P}`` is over the factor axis, so it has ``K`` columns and not ``N`` — the classic asset-axis master equation cannot be evaluated with this estimator's own quantities at all. And ``\\hat{\\boldsymbol{\\mu}}_{BBL}`` is ``\\mathbf{M}\\bar{\\boldsymbol{\\Pi}}_f + \\boldsymbol{b}`` by construction, which is the identity the *Composition* section above states.
 
-Both are measured. Over a ``250 \\times 5`` sample on three factors with two factor views, the four forms above agree with a hand computation to `0.0` on ``\\bar{\\boldsymbol{\\Pi}}_f``, `2.1e-22` on ``\\bar{\\mathbf{\\Sigma}}_f``, `2.6e-18` on ``\\hat{\\boldsymbol{\\mu}}_{BBL}`` and `8.1e-19` on ``\\hat{\\mathbf{\\Sigma}}_{BBL}``, and the identity holds to `1.1e-17` at `rf = 0.0` and `1.4e-17` at `rf = 0.03`. The width of ``\\mathbf{P}`` is enforced rather than assumed: a precomputed [`BlackLittermanViews`](@ref) whose `P` is five columns wide, against a three-factor prior, raises a `DimensionMismatch` out of [`bl_preroll`](@ref) reporting `size(P, 2) => 5` against `size(prior_sigma, 1) => 3`. Views written in asset names raise an `IsNothingError` instead, because no name resolves against the factor universe.
+The width of ``\\mathbf{P}`` is enforced rather than assumed: a precomputed [`BlackLittermanViews`](@ref) whose `P` is five columns wide, against a three-factor prior, raises a `DimensionMismatch` out of [`bl_preroll`](@ref) reporting `size(P, 2) => 5` against `size(prior_sigma, 1) => 3`. Views written in asset names raise an `IsNothingError` instead, because no name resolves against the factor universe.
 
 # Algorithm
 

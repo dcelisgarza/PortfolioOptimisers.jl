@@ -85,7 +85,7 @@ Draws blocks of fixed length `block_size` that wrap past the end of the series, 
 
 A block starts anywhere in `1:T` and runs `block_size` indices forward, each taken by `mod1`, so the series is read as a circle. The wrap is what buys the equal coverage: over 20000 index vectors at `T = 100` and `block_size = 5` every observation is drawn between 0.985 and 1.015 of the average, against a ramp down to 0.192 under [`MovingBootstrap`](@ref).
 
-**A `block_size` of `T` or more collapses the set to a point.** The first block already fills the whole index vector, so every resample is a cyclic shift of the series, and a cyclic shift is a permutation. The mean and the covariance do not change under a permutation of the rows, so every resample returns the same statistics. Measured over 50 resamples of a 252-by-5 sample at `block_size = T + 1`, the spread of the bootstrap means is 1.3e-18 and the box width is 1.7e-18. Nothing raises: the ellipsoidal route builds a shape matrix of order 1e-37 and a finite radius, which is an empty set rather than an error.
+**A `block_size` of `T` or more collapses the set to a point.** The first block already fills the whole index vector, so every resample is a cyclic shift of the series, and a cyclic shift is a permutation. The mean and the covariance do not change under a permutation of the rows, so every resample returns the same statistics, and the box width and the ellipsoidal shape matrix are both zero to rounding. Nothing raises: a zero-width set is an empty set rather than an error.
 
 # Related
 
@@ -105,7 +105,7 @@ Draws blocks of fixed length `block_size` that never wrap, so a resample holds n
 
 A block starts in `1:(T - block_size + 1)` and runs `block_size` indices forward, so the last index of a block never passes `T`. This is the one scheme of the three that guards `block_size`, and it is the one that needs a guard: the start range is empty as soon as `block_size` exceeds `T`, and the raise turns an `ArgumentError` about an empty range into a `DomainError` that names `block_size` and `T`. The two schemes that wrap take every index through `mod1`, which cannot leave `1:T`, so neither can build an out-of-range index and neither needs a guard.
 
-**The price of the missing wrap is uneven coverage.** Observation `j` of the first `block_size` observations lies inside only `j` of the start positions, so it is drawn about `j / block_size` as often as an observation of the middle, and the last `block_size` observations mirror the ramp. Measured over 20000 index vectors at `T = 100` and `block_size = 5`, the first five observations are drawn at 0.192, 0.392, 0.594, 0.791 and 0.987 of the middle rate, and the last five at 1.007, 0.806, 0.605, 0.403 and 0.202. So the first and the last observations carry about one fifth of the weight of a middle one at this block size, and about `1 / block_size` of it in general. Prefer [`CircularBootstrap`](@ref) when that asymmetry is not wanted.
+**The price of the missing wrap is uneven coverage.** Observation `j` of the first `block_size` observations lies inside only `j` of the start positions, so it is drawn about `j / block_size` as often as an observation of the middle, and the last `block_size` observations mirror the ramp. So the first and the last observations carry about `1 / block_size` of the weight of a middle one. Prefer [`CircularBootstrap`](@ref) when that asymmetry is not wanted.
 
 # Related
 
@@ -228,7 +228,7 @@ Fits a box or an ellipsoidal uncertainty set from the spread of the statistics o
 
 It is the bootstrapping method of Equation 11.18 of the source, and it assumes no law for the returns. The `bootstrap` field picks one of the three block bootstraps, each of which the library implements itself in [`bootstrap_indices`](@ref) and cites its own paper for.
 
-**The name carries no volatility model.** The method was ported from Riskfolio-Lib, which draws its resamples through the `bootstrap` sub-package of the Python `arch` package. That package is named for the volatility models it also ships, and its bootstrap sub-package fits none of them. This type fits none either: it refits `me` and `ce` on each resample and reads the spread of the refits, so no docstring in this file states a conditional variance recursion.
+**The name carries no volatility model.** It is inherited from the block-bootstrap routines of a volatility-modelling package, and this type fits no such model: it refits `me` and `ce` on each resample and reads the spread of the refits, so no docstring in this file states a conditional variance recursion.
 
 **The centre and the spread come from different estimators, and nothing reconciles them.** The centre `val` is the point estimate `pe` fits, while the bounds come from refitting `me` and `ce` on the resamples. So a box need not contain its own centre when the two disagree. With `pe = EmpiricalPrior()` and `me = MedianExpectedReturns()` over 250 resamples of a 252-by-5 sample at `block_size = 3` and `seed = 987654321`, one asset's `val` of -0.000934 sits above its `ub` of -0.001007. A consumer of the mean axis reads only `val` and the half-width `(ub - lb) / 2`, so the asymmetry is discarded and the set is centred on the prior's estimate with the bootstrap's width; a consumer of the covariance axis reads both bounds and never `val`.
 

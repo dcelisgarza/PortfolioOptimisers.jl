@@ -442,14 +442,13 @@ Where:
 
     This is the mean **logarithmic** return, not the geometric mean net return
     ``\\prod_t (1 + \\boldsymbol{x}_t^\\intercal \\boldsymbol{w})^{1/T} - 1``. The two are one
-    ``\\exp(\\cdot) - 1`` apart, so they order portfolios alike but carry different units. On a
-    200-observation sample the term reports **0.0019487260** where the geometric mean is
-    **0.0019506260**. `settings.lb` and [`MaximumRatio`](@ref)'s `rf` are therefore stated in
-    log units. Apply `exp(r) - 1` to read the value as a net return.
+    ``\\exp(\\cdot) - 1`` apart, so they order portfolios alike but carry different units.
+    `settings.lb` and [`MaximumRatio`](@ref)'s `rf` are therefore stated in log units.
+    Apply `exp(r) - 1` to read the value as a net return.
 
-The cone is a relaxation that a maximising objective closes: on that sample the model's own
-`:ret` is **0.0019487202** against the value-level **0.0019487260**, a gap of **5.8e-9**.
-[`expected_return`](@ref) computes the same quantity in closed form.
+The cone is a relaxation that a maximising objective closes, so the model's own `:ret` sits
+within solver tolerance of the value-level figure. [`expected_return`](@ref) computes the
+same quantity in closed form.
 
 # Fields
 

@@ -575,7 +575,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Applies a square-root transformation to bound values before enforcing them.
 
-The conversion is `sqrt(ub)`. The caller writes the bound against the **measure**, and the model enforces it against the square root of that quantity, so a bound on a variance becomes a bound on a standard deviation. Used when the risk expression is in standard-deviation units but the user-supplied bound is in variance units (e.g. kurtosis and negative-skewness SOC formulations). This is also the transformation the default [`Variance`](@ref) formulation takes, so a `Variance` frontier is evenly spaced in **standard-deviation** units: on a 250x5 sample a five-point sweep gave standard deviations `0.004539514, 0.005969048, 0.007398587, 0.008828127, 0.010257666`, evenly spaced to `4.1e-9`, whose squares are the variances `2.0607e-5, 3.5630e-5, 5.4739e-5, 7.7936e-5, 1.0522e-4`, which are **not** evenly spaced.
+The conversion is `sqrt(ub)`. The caller writes the bound against the **measure**, and the model enforces it against the square root of that quantity, so a bound on a variance becomes a bound on a standard deviation. Used when the risk expression is in standard-deviation units but the user-supplied bound is in variance units (e.g. kurtosis and negative-skewness SOC formulations). This is also the transformation the default [`Variance`](@ref) formulation takes, so a `Variance` frontier is evenly spaced in **standard-deviation** units, and its variances are **not** evenly spaced.
 
 # Related
 
@@ -761,7 +761,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Weights a risk measure inside an aggregate, and bounds its risk expression from above.
 
-This is the settings type of every measure the optimiser minimises. `ub` is the maximum level of risk the solution may reach, the ``\\bar{\\phi}`` of Equation 8.10 of the reference below; sweeping it is how the book builds an efficient frontier, which is what a [`Frontier`](@ref) in that slot does. `scale` weights the measure against its siblings when several are given, and `rke` decides whether it reaches the aggregate at all.
+This is the settings type of every measure the optimiser minimises. `ub` is the maximum level of risk the solution may reach, the ``\\bar{\\phi}`` of Equation 8.10 of [cajas2025](@cite); sweeping it is how the book builds an efficient frontier, which is what a [`Frontier`](@ref) in that slot does. `scale` weights the measure against its siblings when several are given, and `rke` decides whether it reaches the aggregate at all.
 
 # Fields
 
@@ -945,7 +945,7 @@ Every strategy below is a **weighted** aggregation, and it reads its weights fro
 
 ## Two of the three model forms are exact only while the objective pushes
 
-[`SumScalariser`](@ref) builds an expression, so the model agrees with the value level whatever the objective is. The other two build a **variable** bounded below by the aggregation, and a minimising objective is what pulls it down onto the aggregation. Under [`MaximumReturn`](@ref) nothing pulls, so `model[:risk]` reports an upper bound: on a 250x5 sample [`MaxScalariser`](@ref) reported `0.0782482` against a true `0.0380465`, and [`LogSumExpScalariser`](@ref) at `gamma = 100` reported `0.0612520` against a true `0.0440182`.
+[`SumScalariser`](@ref) builds an expression, so the model agrees with the value level whatever the objective is. The other two build a **variable** bounded below by the aggregation, and a minimising objective is what pulls it down onto the aggregation. Under [`MaximumReturn`](@ref) nothing pulls, so `model[:risk]` reports an upper bound rather than the aggregation; read the exact figure back with [`expected_risk`](@ref).
 
 The bound the model **enforces** is unaffected. An `ub` on the aggregate constrains the variable, and the variable stands above the aggregation, so the aggregation satisfies the bound too. It is the reported figure that stands above it, and reading the aggregate back from [`expected_risk`](@ref) gives the exact one.
 
@@ -1024,7 +1024,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Adds the scaled risk measures together.
 
-This is the default everywhere a `sca` keyword appears, and the only strategy whose model form is an expression rather than a variable with constraints: [`scalarise_risk_expression!`](@ref) sums `risk_vec` into one affine or quadratic expression, so it is also the only one that takes a quadratic risk expression without a reformulation. On a 250x5 sample the model and [`expected_risk`](@ref) agreed to `3.6e-9` relative.
+This is the default everywhere a `sca` keyword appears, and the only strategy whose model form is an expression rather than a variable with constraints: [`scalarise_risk_expression!`](@ref) sums `risk_vec` into one affine or quadratic expression, so it is also the only one that takes a quadratic risk expression without a reformulation.
 
 # Mathematical definition
 
@@ -1062,7 +1062,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Reports the largest of the scaled risk measures, so the aggregate is the worst of them.
 
-The model form is a free variable held above every entry of `risk_vec`, which the objective then pushes down onto the largest. Under a minimum-risk objective on a 250x5 sample the model and [`expected_risk`](@ref) agreed to `2.1e-7` relative; under a maximum-return objective on the same sample the model reported `0.0782482` against a true `0.0380465`, which is the shared caveat in [`Scalariser`](@ref). In clustering optimisations each cluster's risk is computed separately, so there is no coherence in which measure wins between clusters.
+The model form is a free variable held above every entry of `risk_vec`, which the objective then pushes down onto the largest. Under a minimum-risk objective the model agrees with [`expected_risk`](@ref); under a maximum-return objective it reports an upper bound instead, which is the shared caveat in [`Scalariser`](@ref). In clustering optimisations each cluster's risk is computed separately, so there is no coherence in which measure wins between clusters.
 
 # Mathematical definition
 
@@ -1086,7 +1086,7 @@ Where:
 $(val_dict[:relax])
 
   - The bounded quantity is `risk`, the free variable [`scalarise_risk_expression!`](@ref) creates for this strategy. The row `risk_ms` holds it at or **above** every entry of `risk_vec`, so `model[:risk]` stands above the maximum rather than on it.
-  - The bound is tight while the objective pulls `risk` down, which a minimum-risk objective does. Under [`MaximumReturn`](@ref) nothing pulls: on a 250x5 sample the model reported `0.0782482` against a true `0.0380465`.
+  - The bound is tight while the objective pulls `risk` down, which a minimum-risk objective does. Under [`MaximumReturn`](@ref) nothing pulls, and `model[:risk]` is then an upper bound.
   - An `ub` on the aggregate is unaffected. It constrains `risk`, and the aggregation stands below `risk`, so the aggregation meets the bound too. Read the exact figure back with [`expected_risk`](@ref).
 
 # Related
@@ -1170,7 +1170,7 @@ The aggregate is never below the maximum and never more than ``\\log N / \\gamma
 \\end{align}
 ```
 
-So a large ``\\gamma`` gives the maximum. On the scaled values `[0.1, 0.2, 0.05]`, ``\\gamma = 100`` returns `0.20000046` against a maximum of `0.2`, inside the bound ``\\log 3 / 100 = 0.010986``. In a model at ``\\gamma = 100`` under a minimum-risk objective the model and [`expected_risk`](@ref) agreed to `4.1e-9` relative, and under a maximum-return objective the model reported `0.0612520` against a true `0.0440182` — the shared caveat in [`Scalariser`](@ref).
+So a large ``\\gamma`` gives the maximum. Under a minimum-risk objective the model agrees with [`expected_risk`](@ref) to within that bound, and under a maximum-return objective it reports an upper bound instead — the shared caveat in [`Scalariser`](@ref).
 
 !!! warning
 
@@ -1189,7 +1189,7 @@ In clustering optimisations each cluster's risk is computed separately, so there
 $(val_dict[:relax])
 
   - The bounded quantity is `risk`, the free variable [`scalarise_risk_expression!`](@ref) creates for this strategy. The rows `u_risk_lse` and `risk_lse` state the exponential-cone form of the log-sum-exp, which holds `model[:risk]` at or **above** the smoothed maximum.
-  - The bound is tight while the objective pulls `risk` down, which a minimum-risk objective does. Under [`MaximumReturn`](@ref) nothing pulls: on a 250x5 sample at ``\\gamma = 100`` the model reported `0.0612520` against a true `0.0440182`.
+  - The bound is tight while the objective pulls `risk` down, which a minimum-risk objective does. Under [`MaximumReturn`](@ref) nothing pulls, and `model[:risk]` is then an upper bound.
   - An `ub` on the aggregate is unaffected, on the terms [`MaxScalariser`](@ref) states. Read the exact figure back with [`expected_risk`](@ref).
 
 # Fields

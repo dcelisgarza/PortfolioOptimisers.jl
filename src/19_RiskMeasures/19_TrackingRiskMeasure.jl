@@ -33,7 +33,7 @@ Where:
   - ``\\rho``: The risk measure in `r`.
   - ``\\varepsilon``: The tolerance in `err`.
 
-Both bind at `err`. On a 250x5 sample against an equal-weight benchmark, `err = 0.001` with a [`StandardDeviation`](@ref) realised `0.0009999999999770668` in independent mode and `0.0009999999992528616` in dependent mode, measured through the matching [`RiskTrackingRiskMeasure`](@ref); a [`Variance`](@ref) at `err = 1e-6` realised `1.000000041719058e-6`.
+Both bind at `err`, and the realised value can be read back through the matching [`RiskTrackingRiskMeasure`](@ref).
 
 !!! warning
 

@@ -470,7 +470,7 @@ Where:
   - ``\\mathbf{1}_n``: Column vector of ones of length ``n``.
   - $(math_dict[:n_network])
 
-`Graphs.jl` **normalises** that vector by default, so what this type returns is ``\\mathbf{D}_n / (n - 1)`` and not ``\\mathbf{D}_n``. Measured over the minimum spanning tree of the last 253 observations of the 20-asset sample in `test/assets/SP500.csv.gz`, the first six entries of ``\\mathbf{D}_n`` are `[3, 2, 1, 1, 2, 3]` and the returned scores are `[0.1579, 0.1053, 0.0526, 0.0526, 0.1053, 0.1579]`, a maximum absolute difference of `4.7368421052631575`. `kwargs = (; normalize = false)` recovers ``\\mathbf{D}_n`` exactly.
+`Graphs.jl` **normalises** that vector by default, so what this type returns is ``\\mathbf{D}_n / (n - 1)`` and not ``\\mathbf{D}_n``. `kwargs = (; normalize = false)` recovers ``\\mathbf{D}_n`` exactly.
 
 The factor is the whole difference, and it re-ranks nothing. [`average_centrality`](@ref) is linear in the score vector, so a constant scale moves the average by that same constant.
 
@@ -559,7 +559,7 @@ Where:
   - $(math_dict[:lambda_max_network])
   - ``\\mathbf{q}_{\\mathrm{max}}``: Eigenvector of ``\\lambda_{\\mathrm{max}}``.
 
-The right-hand side is ``\\mathbf{q}_{\\mathrm{max}}`` itself, so the score is the leading eigenvector under whatever normalisation the eigensolver applies. `Graphs.jl` returns it with unit 2-norm, and takes the absolute value of every entry — the leading eigenvector of a non-negative matrix shares one sign, by the Perron-Frobenius theorem, so that changes no ordering. Measured over the triangulated maximally filtered graph of the last 253 observations of the 20-asset sample in `test/assets/SP500.csv.gz`, weighted by the similarities that selected its edges, the returned vector matches the formula above to within `1.0e-15`, has 2-norm `1.0` and runs from `0.07199` to `0.40756`. The residual is quoted as a bound rather than as a decimal because the eigensolver moves by about `6.0e-16` between calls on one graph.
+The right-hand side is ``\\mathbf{q}_{\\mathrm{max}}`` itself, so the score is the leading eigenvector under whatever normalisation the eigensolver applies. `Graphs.jl` returns it with unit 2-norm, and takes the absolute value of every entry — the leading eigenvector of a non-negative matrix shares one sign, by the Perron-Frobenius theorem, so that changes no ordering. The returned vector matches the formula above to eigensolver precision, which moves by a few ulps between calls on one graph.
 
 Declares [`SimilarityPolarity`](@ref) — the only member that declares it — unless `ov` overrides it: it is the leading eigenvector of the adjacency matrix itself, so a stronger link must contribute a larger entry. It therefore reads weights on the similarity branch alone. A tree is selected by minimising a distance and carries no similarity, so this algorithm runs unweighted there rather than being handed the wrong quantity. Set `ov` to [`TopologyOnly`](@ref) to withdraw the declaration and read the topology alone.
 
@@ -645,7 +645,7 @@ The series converges to the resolvent only for ``\\alpha < 1 / \\lambda_{\\mathr
 
 # `alpha` must be below the reciprocal of the largest eigenvalue
 
-Above the bound the linear solve still returns a vector, and the vector is not a centrality: measured over the minimum spanning tree of the last 253 observations of the 20-asset sample in `test/assets/SP500.csv.gz`, ``\\lambda_{\\mathrm{max}} = 2.57344493899609`` and the bound is `0.388584183343788`. At `alpha = 0.3` every score is positive, between `0.10752` and `0.46421`. At `alpha = 0.5` the scores run `-0.55627` to `0.19624`, eleven of the twenty are negative, and a negative centrality has no reading.
+Above the bound the linear solve still returns a vector, and the vector is not a centrality: some of its scores turn negative, and a negative centrality has no reading.
 
 **The constructor cannot check this.** ``\\lambda_{\\mathrm{max}}`` is a property of the graph, and the graph is built later by [`centrality_graph`](@ref), so the validation is `alpha > 0` and the bound is the caller's to respect. A dense network raises ``\\lambda_{\\mathrm{max}}`` and lowers the bound, so a value that held on a tree can fail on a triangulated maximally filtered graph over the same assets: over those same 20 assets the filtered graph has ``\\lambda_{\\mathrm{max}} = 6.174911353215694``, a bound of `0.16194564468998124`, and the default `alpha = 0.3` is outside it.
 
@@ -704,7 +704,7 @@ Scores each asset by the stationary distribution of a damped random walk over th
 
 `Pagerank` computes the [PageRank](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.pagerank-Union%7BTuple%7BAbstractGraph%7BU%7D%7D,%20Tuple%7BU%7D,%20Tuple%7BAbstractGraph%7BU%7D,%20Any%7D,%20Tuple%7BAbstractGraph%7BU%7D,%20Any,%20Integer%7D,%20Tuple%7BAbstractGraph%7BU%7D,%20Any,%20Integer,%20Any%7D%7D%20where%20U%3C:Integer) of nodes in a graph, measuring the importance of nodes based on the structure of incoming links. The algorithm is controlled by the damping factor `alpha`, number of iterations `n`, and convergence tolerance `epsilon`.
 
-Declares no polarity and runs on the plain graph: `Graphs.pagerank` walks `outdegree` and `inneighbors` alone and never reads an edge weight. Measured over a 20-asset triangulated maximally filtered graph, the weighted and the plain graph give the identical vector, to `0.0`. Like [`DegreeCentrality`](@ref) it therefore keeps the estimator's `sep` live, reading the separation closure rather than the structure.
+Declares no polarity and runs on the plain graph: `Graphs.pagerank` walks `outdegree` and `inneighbors` alone and never reads an edge weight, so the weighted and the plain graph give the identical vector. Like [`DegreeCentrality`](@ref) it therefore keeps the estimator's `sep` live, reading the separation closure rather than the structure.
 
 It carries no `ov` field, and [`TopologyOnly`](@ref) is not applicable to it: the topology alone is what it already reads, so there is no declaration to withdraw. `Pagerank(; ov = TopologyOnly())` is a `MethodError`.
 

@@ -285,7 +285,7 @@ The selected ``c`` is the **left end** of the triple, not its centre. That is th
 
 # The measure decides what "dispersion" means, and the default is not the source's
 
-The source takes ``W_{c}`` as the **mean** of a cluster's pairwise distances, which is `alg = MeanValue()`. The default `alg = StandardisedValue()` divides that mean by the corrected standard deviation of the same distances, which is a different statistic and selects a different ``c``: on the 400x40 sample `randn(StableRNG(987654321), 400, 40)` the two answer **6 and 4**.
+The source takes ``W_{c}`` as the **mean** of a cluster's pairwise distances, which is `alg = MeanValue()`. The default `alg = StandardisedValue()` divides that mean by the corrected standard deviation of the same distances, which is a different statistic and selects a different ``c``.
 
 !!! note
 

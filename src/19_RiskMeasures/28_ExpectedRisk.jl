@@ -488,9 +488,7 @@ kernels call it for each half at every evaluation, and a scan on a long series w
 by all of them. A tail measure on a gapped series answers a **finite wrong number** rather
 than a `NaN`: `partialsort` orders a `NaN` after every real, so a CVaR reads its order
 statistic off the finite prefix and divides by the poisoned length. A caller who holds a
-gapped series drops the gaps first with `x[isfinite.(x)]`, which reproduces the reference
-implementation's drop-per-column answer exactly, for every kernel but its unbiased
-semi-variance, whose Bessel correction reads the full length. A caller who holds a gapped
+gapped series drops the gaps first with `x[isfinite.(x)]`. A caller who holds a gapped
 panel scores it through
 [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref) instead,
 which filters the Held Gaps once.
