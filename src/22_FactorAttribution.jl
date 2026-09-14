@@ -1062,7 +1062,7 @@ The verb reads the weights and the factor model block, and returns one [`FactorA
   - `w`: Portfolio weights.
   - `W`: Portfolio weight history, `observations × assets`.
   - `pr`: Prior result carrying the factor model block.
-  - `res`: Optimisation result whose weights and prior the verb extracts.
+  - `res`: Optimisation result whose weights, prior and fees the verb reads through [`result_investable_view`](@ref). The result's own prior is on the universe the fit solved, ADR 0115's rule, and its weights are on the caller's, so the two meet on the result's investable universe, a caller's `pr` or `rd` is viewed at the same mask, and the attribution's asset axis spans the investable assets alone.
   - `X`: Asset returns, `observations × assets`.
   - `rd`: Returns result carrying the asset returns.
   - `ret`: Net portfolio return series.
@@ -1096,6 +1096,7 @@ The verb reads the weights and the factor model block, and returns one [`FactorA
 
   - [`FactorAttributionResult`](@ref)
   - [`factor_risk_contribution`](@ref)
+  - [`result_investable_view`](@ref)
   - [`plot_attribution_vol_contrib`](@ref)
   - [`plot_attribution_mu_contrib`](@ref)
   - [`plot_attribution_exposure`](@ref)
@@ -1158,7 +1159,8 @@ function factor_attribution(w::VecNum, pr::AbstractPriorResult; assets::Bool = f
 end
 function factor_attribution(res::OptimisationResult, pr::Option{<:Pr_RR} = nothing;
                             kwargs...)::FactorAttributionResult
-    return factor_attribution(res.w, extract_pr(res, pr); kwargs...)
+    _, w, pr = result_investable_view(res, pr)
+    return factor_attribution(w, pr; kwargs...)
 end
 """
     predicted_attribution_assets(assets::Bool, w, mdl::NamedTuple, Fb, sigma_p, sc)

@@ -1369,7 +1369,7 @@ The five other methods reduce to the `ret::VecNum` method, which runs the steps.
   - $(arg_dict[:X])
   - `fees`: Optional transaction fees.
   - `rd`: [`ReturnsResult`](@ref) carrying the asset returns.
-  - `res`: An [`OptimisationResult`](@ref), whose fees are extracted with [`extract_fees`](@ref).
+  - `res`: An [`OptimisationResult`](@ref), whose weights and fees meet the caller's `rd` on the result's investable universe through [`result_investable_view`](@ref).
   - $(arg_dict[:ps_ppy])
   - $(arg_dict[:ps_alpha])
   - $(arg_dict[:ps_compound])
@@ -1438,7 +1438,8 @@ function performance_summary(w::ArrNum, rd::ReturnsResult, fees::Option{<:Fees} 
 end
 function performance_summary(res::OptimisationResult, rd::ReturnsResult;
                              kwargs...)::PerformanceSummaryResult
-    return performance_summary(res.w, rd.X, extract_fees(res, nothing); kwargs...)
+    _, w, X, fees = result_investable_view(res, rd.X)
+    return performance_summary(w, X, fees; kwargs...)
 end
 function performance_summary(pred::PredictionResult; kwargs...)::PerformanceSummaryResult
     rd = pred.rd

@@ -237,7 +237,7 @@
 "src/14_UncertaintySets/09_OrthogonalUncertaintySets.jl" = { map = 7, units = 16, swept = false }
 "src/14_UncertaintySets/10_CompactRadiusRules.jl" = { map = 7, units = 6, swept = false }
 "src/15_Turnover.jl" = { map = 8, units = 15, algorithm = 8, swept = true, bindings = ["TnE_Tn", "TnE_Tn_VecTnE_Tn", "Tn_VecTn", "Turnover", "TurnoverEstimator", "VecTn", "VecTnE_Tn", "factory", "factory", "factory", "needs_previous_weights", "port_opt_view", "turnover_constraints", "turnover_constraints", "turnover_constraints"] }
-"src/16_Fees.jl" = { map = 8, units = 37, algorithm = 24, swept = false }
+"src/16_Fees.jl" = { map = 8, units = 38, algorithm = 24, swept = false }
 "src/17_NetReturnsDrawdowns.jl" = { map = 8, units = 48, algorithm = 11, swept = false }
 "src/18_Tracking.jl" = { map = 8, units = 14, algorithm = 4, swept = true, bindings = ["AbstractTracking", "AbstractTrackingAlgorithm", "DependentVariableTracking", "IndependentVariableTracking", "ReturnsTracking", "Tr_VecTr", "TrackingError", "VariableTracking", "VecTr", "WeightsTracking", "factory", "needs_previous_weights", "tracking_benchmark", "tracking_benchmark"] }
 "src/19_RiskMeasures/01_Base_RiskMeasures.jl" = { map = 9, units = 89, swept = false }
@@ -269,7 +269,7 @@
 "src/19_RiskMeasures/27_AdjustRiskContributions.jl" = { map = 9, units = 6, swept = false }
 "src/19_RiskMeasures/28_ExpectedRisk.jl" = { map = 9, units = 22, swept = false }
 "src/19_RiskMeasures/29_RiskMeasureTools.jl" = { map = 9, units = 7, swept = false }
-"src/20_Optimisation/01_Base_Optimisation.jl" = { map = 10, units = 122, swept = false }
+"src/20_Optimisation/01_Base_Optimisation.jl" = { map = 10, units = 125, swept = false }
 "src/20_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl" = { map = 12, units = 69, swept = false }
 "src/20_Optimisation/02_CrossValidation/02_KFold.jl" = { map = 12, units = 4, swept = false }
 "src/20_Optimisation/02_CrossValidation/03_Combinatorial.jl" = { map = 12, units = 12, swept = false }

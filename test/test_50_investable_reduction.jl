@@ -1602,3 +1602,100 @@ end
     @test occursin("still summed to zero, so it constrains nothing; row dropped", msg)
     @test !occursin("matched no", msg)
 end
+
+@testset "A result-taking consumer pairs the three the result carries on two universes (#884)" begin
+    PO = PortfolioOptimisers
+    # A result carries `w` on the caller's universe, and `pr` and `fees` on the one the fit
+    # solved. `result_investable_view` is the one place the three are paired, and every
+    # result-taking arity reads through it. The oracle is the hand-reduced problem, scored
+    # by the bare-array verbs over the four live assets.
+    fees = Fees(; l = fill(0.001, N), s = fill(0.002, N))
+    feesk = Fees(; l = fill(0.001, length(keep)), s = fill(0.002, length(keep)))
+    res = optimise(MeanRisk(; opt = JuMPOptimiser(; pe = prn, slv = slv, fees = fees)), rd)
+    imsk = BitVector([1, 1, 0, 1, 1])
+    @test PO.result_investable_mask(res) == imsk
+    @test res.fees.imsk == imsk
+    wk = res.w[keep]
+    cvar = ConditionalValueatRisk()
+
+    @testset "The verb answers on the investable universe" begin
+        m, w, prv, fv, nxv = PO.result_investable_view(res, nothing, nothing, nx)
+        @test m == imsk
+        @test collect(w) == wk
+        @test prv === res.pr
+        @test fv === res.fees
+        @test collect(nxv) == nx[keep]
+        # A caller's carrier is on the caller's universe, and is viewed at the mask: a
+        # prior and a returns result through their own `port_opt_view`, a matrix by its
+        # columns.
+        _, _, prc, _, _ = PO.result_investable_view(res, prn)
+        @test collect(prc.mu) == prk.mu
+        @test size(prc.X) == (T, length(keep))
+        _, _, rdc, _, _ = PO.result_investable_view(res, rd)
+        @test collect(rdc.nx) == nx[keep]
+        @test size(rdc.X) == (T, length(keep))
+        _, _, Xc, _, _ = PO.result_investable_view(res, X)
+        @test Xc == X[:, keep]
+        # The result's own prior handed back is taken as it is, by identity.
+        _, _, own, _, _ = PO.result_investable_view(res, res.pr)
+        @test own === res.pr
+        # A caller's fee takes the door a fee takes at the fit, with the mask's own width,
+        # and comes back marked; the result's own is taken as it is.
+        _, _, _, fc, _ = PO.result_investable_view(res, nothing, fees)
+        @test fc.imsk == imsk
+        @test collect(fc.l) == feesk.l
+        @test collect(fc.s) == feesk.s
+        @test PO.investable_fees_view(fees, imsk, N).l ==
+              PO.investable_fees_view(fees, imsk, X).l
+        # A result that reduced on nothing returns the three unchanged.
+        resf = optimise(MeanRisk(; opt = JuMPOptimiser(; pe = pr, slv = slv, fees = fees)),
+                        rd)
+        m0, w0, pr0, f0, nx0 = PO.result_investable_view(resf, nothing, nothing, nx)
+        @test isnothing(m0)
+        @test w0 === resf.w
+        @test pr0 === resf.pr
+        @test f0 === resf.fees
+        @test nx0 === nx
+        # A caller's carrier on a result with no mask is taken as it is, and a caller's fee
+        # loses its carriers under the `nothing` mask, as it does at the fit's door.
+        @test PO.result_investable_view(resf, prn)[3] === prn
+        lqf = Fees(; l = fill(0.001, N), lq = Turnover(; w = fill(0.2, N), val = 0.01))
+        @test isnothing(PO.result_investable_view(resf, nothing, lqf)[4].lq)
+    end
+
+    @testset "The two-axis split from a width is the split from a matrix" begin
+        lqf = Fees(; l = fill(0.001, N), lq = Turnover(; w = fill(0.2, N), val = 0.01))
+        a = PO.two_axis_fees_view(lqf, keep, N)
+        b = PO.port_opt_view(lqf, keep, X)
+        @test collect(a.l) == collect(b.l)
+        @test collect(a.lq.w) == collect(b.lq.w) == [0.2]
+        @test isnothing(a.imsk)
+        # A full index leaves no complement, so the carriers go.
+        @test isnothing(PO.two_axis_fees_view(lqf, 1:N, N).lq)
+    end
+
+    @testset "expected_risk, calc_net_returns and performance_summary reach the oracle" begin
+        oracle = expected_risk(cvar, wk, prk, feesk)
+        @test expected_risk(cvar, res) ≈ oracle
+        @test expected_risk(cvar, res, prn) ≈ oracle
+        @test expected_risk(cvar, res, rd) ≈ oracle
+        @test expected_risk(cvar, res, X) ≈ oracle
+        @test expected_risk(cvar, res, res.pr) ≈ oracle
+        @test expected_risk(cvar, res, prn, fees) ≈ oracle
+        @test expected_risk(cvar, res, nothing, fees) ≈ oracle
+        @test expected_risk(cvar, res, X, fees) ≈ oracle
+        ret = calc_net_returns(wk, X[:, keep], feesk)
+        @test calc_net_returns(res, res.pr) ≈ ret
+        @test calc_net_returns(res, prn) ≈ ret
+        @test calc_net_returns(res, rd) ≈ ret
+        @test calc_net_returns(res, X) ≈ ret
+        @test calc_net_returns(res, X, fees) ≈ ret
+        @test performance_summary(res, rd).ann_return ≈
+              performance_summary(wk, X[:, keep], feesk).ann_return
+    end
+
+    @testset "A caller's fee reduced on another mask is refused at the verb too" begin
+        other = PO.investable_fees_view(fees, BitVector([0, 1, 1, 1, 1]), N)
+        @test_throws ArgumentError PO.result_investable_view(res, nothing, other)
+    end
+end

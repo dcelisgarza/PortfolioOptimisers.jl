@@ -270,6 +270,40 @@ first under `rev = true`, so a blank bar would take the top slot from a live ass
 and `maximum(abs, A)` are both `NaN`, and `ceil(Int, NaN)` raises. A frame that keeps the gap must
 therefore reduce over the finite entries wherever it ranks or scales.
 
+### A result-taking consumer pairs the three a result carries through one verb
+
+A result carries three things on two universes. ADR 0115 expands the solved weights back, so
+`res.w` is on the caller's universe, while `res.pr` is the prior of the universe the fit solved
+and `res.fees` was reduced at the same door, its five per-asset fields to the mask and its two
+carriers to the complement. A consumer that read two of the three separately paired a full vector
+with a reduced one, and
+[#884](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/884) measured the class: a
+per-asset fee indexed at a full-length mask raised a `BoundsError`, a reduced returns matrix
+against a full weight vector a `DimensionMismatch`, and `plot_mu(res, rd)` drew four bars under
+`["a", "b", "c", "d"]` with the fourth bar asset `e`. Twenty-seven extension sites and five source
+sites each made the pairing on their own, and each in its own way.
+
+`result_investable_view(res, pr, fees, nx)` is the one place the pairing is made, and it answers on
+the **investable** universe of the result, which is the universe its own prior and fee are already
+on. The weights are viewed at the mask. The result's own prior and fee are taken as they are, and
+so is the result's own prior when a caller hands it back, recognised by identity and never by
+width. A caller's carrier — a prior, a `ReturnsResult` or a matrix — is on the caller's universe
+and is viewed at `findall(imsk)` through the `port_opt_view` its owner writes, the rule
+`fold_factor_returns` applies to a caller's `rd` on a fold. A caller's fee takes
+`investable_fees_view`, the rule `fold_fees` applies on a fold, and the door gained a width arm for
+it, because a result holds no full-width matrix and the mask's own length is that width. Every
+result-taking arity of `expected_risk`, `calc_net_returns`, `factor_attribution`,
+`performance_summary` and the plotting extension reads the three through the verb.
+
+A drawn plot of a result therefore draws the investable universe alone, each bar under its own
+name: the frame the section above keeps for a caller's prior cannot be kept for a prior that is
+already reduced, and a lift would invent a `NaN` row the fit never held. The names are the
+caller's viewed at the mask, or, with none, each investable asset's index in the universe the
+result was fitted on. `plot_asset_cumulative_returns` on a result drops the two liquidation
+carriers before it draws, because a liquidated asset has no column on the investable universe for
+its exit charge to land in; the portfolio figure charges it. A `factor_attribution` of a result
+spans the investable assets on its asset axis for the same reason.
+
 ### The tripwire is a census test by reflection
 
 One test walks the concrete subtypes of `AbstractBaseRiskMeasure`. For every measure with a

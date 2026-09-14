@@ -1291,13 +1291,16 @@ function factor_attribution(w::VecNum, pr::AbstractPriorResult, rd::ReturnsResul
 end
 function factor_attribution(res::OptimisationResult, pr::Option{<:Pr_RR}, rd::ReturnsResult;
                             kwargs...)::FactorAttributionResult
-    return factor_attribution(res.w, extract_pr(res, pr), rd.X, extract_fees(res, nothing);
-                              kwargs...)
+    # The caller's `rd` is on the universe of `res.w`, as a caller's `pr` is, so its
+    # matrix takes the same view the prior and the weights take.
+    imsk, w, pr, fees = result_investable_view(res, pr)
+    return factor_attribution(w, pr, investable_weights_view(imsk, rd.X), fees; kwargs...)
 end
 function factor_attribution(res::OptimisationResult, pr::Option{<:Pr_RR}, rd::ReturnsResult,
                             window::Integer; kwargs...)
-    return factor_attribution(res.w, extract_pr(res, pr), rd.X, extract_fees(res, nothing),
-                              window; kwargs...)
+    imsk, w, pr, fees = result_investable_view(res, pr)
+    return factor_attribution(w, pr, investable_weights_view(imsk, rd.X), fees, window;
+                              kwargs...)
 end
 function factor_attribution(W::MatNum, pr::AbstractPriorResult, ret::VecNum;
                             kwargs...)::FactorAttributionResult

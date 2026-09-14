@@ -118,6 +118,9 @@ VecOpt
 VecOptE
 extract_fees
 extract_pr
+result_investable_carrier
+result_investable_fees
+result_investable_view
 synthetic_asset_weights
 collapse_asset_panel
 PortfolioOptimisers.collapse_panel_field

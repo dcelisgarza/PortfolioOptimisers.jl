@@ -27,6 +27,7 @@ calc_total_fees
 calc_total_asset_fees
 override_fee_amortisation
 needs_previous_weights(fe::FeesE_Fees)
+two_axis_fees_view
 port_opt_view(fees::Fees, i, X::MatNum, args...)
 strip_liquidation_carriers
 investable_fees_view

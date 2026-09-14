@@ -12,7 +12,30 @@ import PortfolioOptimisers: ArrNum, VecNum, MatNum, Arr3Num, Option, VecNum_VecV
                             relevant_assets, extract_fees, OptimisationResult,
                             finite_magnitudes, finite_symmetric_clim, finite_columns,
                             investable_plot_view, result_investable_mask,
-                            investable_weights_view, fold_factor_returns, fold_fees
+                            investable_weights_view, fold_factor_returns, fold_fees,
+                            result_investable_view, strip_liquidation_carriers
+
+# A result carries its weights on the caller's universe and its prior and fee on the one
+# the fit solved (ADR 0115), so every result arity below reads the three through
+# `result_investable_view`, which pairs them on the result's investable universe (#884).
+# A drawn figure of a result therefore draws that universe alone: the frame ADR 0118 keeps
+# for a caller's prior cannot be kept for a prior that is already reduced, so each bar
+# carries its own name instead. The names are the caller's, viewed at the result's
+# Investable Mask, or, with none, each investable asset's index in the universe the
+# result was fitted on.
+function result_axis_names(imsk::Option{<:BitVector}, pr, nx::Option{<:AbstractVector})
+    return if !isnothing(nx)
+        nx
+    elseif isnothing(imsk)
+        1:size(pr.X, 2)
+    else
+        findall(imsk)
+    end
+end
+function result_prior_view(res::OptimisationResult, nx::Option{<:AbstractVector} = nothing)
+    imsk, _, pr, _, nx = result_investable_view(res, nothing, nothing, nx)
+    return pr, result_axis_names(imsk, pr, nx)
+end
 
 ## plot_portfolio_cumulative_returns
 function PortfolioOptimisers.plot_portfolio_cumulative_returns(net_ret::VecNum_VecVecNum;
@@ -65,9 +88,8 @@ function PortfolioOptimisers.plot_portfolio_cumulative_returns(res::Optimisation
                                                                fees::Option{<:Fees} = nothing,
                                                                compound::Bool = false,
                                                                kwargs...)
-    pr = extract_pr(res, pr)
-    fees = extract_fees(res, fees)
-    return PortfolioOptimisers.plot_portfolio_cumulative_returns(res.w, pr, fees;
+    _, w, pr, fees = result_investable_view(res, pr, fees)
+    return PortfolioOptimisers.plot_portfolio_cumulative_returns(w, pr, fees;
                                                                  compound = compound,
                                                                  kwargs...)
 end
@@ -75,9 +97,8 @@ function PortfolioOptimisers.plot_portfolio_cumulative_returns(res::Optimisation
                                                                fees::Option{<:Fees} = nothing,
                                                                compound::Bool = false,
                                                                kwargs...)
-    pr = extract_pr(res, nothing)
-    fees = extract_fees(res, fees)
-    return PortfolioOptimisers.plot_portfolio_cumulative_returns(res.w, pr, fees;
+    _, w, pr, fees = result_investable_view(res, nothing, fees)
+    return PortfolioOptimisers.plot_portfolio_cumulative_returns(w, pr, fees;
                                                                  compound = compound,
                                                                  kwargs...)
 end
@@ -157,9 +178,16 @@ function PortfolioOptimisers.plot_asset_cumulative_returns(res::OptimisationResu
                                                            compound::Bool = false,
                                                            N::Option{<:Integer} = nothing,
                                                            kwargs...)
-    pr = extract_pr(res, pr)
-    fees = extract_fees(res, fees)
-    return PortfolioOptimisers.plot_asset_cumulative_returns(res.w, pr, fees;
+    imsk, w, pr, fees = result_investable_view(res, pr, fees)
+    # The per-asset matrix is on the investable universe, where a liquidated asset has no
+    # column for its exit charge to land in, so the two carriers are dropped: the asset
+    # that left is not drawn, and neither is its charge. The portfolio figure charges it.
+    return PortfolioOptimisers.plot_asset_cumulative_returns(w, pr,
+                                                             strip_liquidation_carriers(fees,
+                                                                                        nothing);
+                                                             nx = result_axis_names(imsk,
+                                                                                    pr,
+                                                                                    nothing),
                                                              compound = compound, N = N,
                                                              kwargs...)
 end
@@ -168,9 +196,13 @@ function PortfolioOptimisers.plot_asset_cumulative_returns(res::OptimisationResu
                                                            compound::Bool = false,
                                                            N::Option{<:Integer} = nothing,
                                                            kwargs...)
-    pr = extract_pr(res, nothing)
-    fees = extract_fees(res, fees)
-    return PortfolioOptimisers.plot_asset_cumulative_returns(res.w, pr, fees;
+    imsk, w, pr, fees = result_investable_view(res, nothing, fees)
+    return PortfolioOptimisers.plot_asset_cumulative_returns(w, pr,
+                                                             strip_liquidation_carriers(fees,
+                                                                                        nothing);
+                                                             nx = result_axis_names(imsk,
+                                                                                    pr,
+                                                                                    nothing),
                                                              compound = compound, N = N,
                                                              kwargs...)
 end
@@ -353,8 +385,8 @@ function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.BaseR
                                                     N::Option{<:Number} = nothing,
                                                     sca::Scalariser = SumScalariser(),
                                                     kwargs...)
-    fees = extract_fees(res, nothing)
-    return PortfolioOptimisers.plot_risk_contribution(r, res.w, rd, fees; delta = delta,
+    _, w, rd, fees = result_investable_view(res, rd)
+    return PortfolioOptimisers.plot_risk_contribution(r, w, rd, fees; delta = delta,
                                                       marginal = marginal,
                                                       percentage = percentage, N = N,
                                                       sca = sca, kwargs...)
@@ -369,8 +401,8 @@ function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.BaseR
                                                     N::Option{<:Number} = nothing,
                                                     sca::Scalariser = SumScalariser(),
                                                     kwargs...)
-    fees = extract_fees(res, nothing)
-    return PortfolioOptimisers.plot_risk_contribution(r, res.w, pr.X, fees; nx = nx,
+    _, w, pr, fees, nx = result_investable_view(res, pr, nothing, nx)
+    return PortfolioOptimisers.plot_risk_contribution(r, w, pr.X, fees; nx = nx,
                                                       delta = delta, marginal = marginal,
                                                       percentage = percentage, N = N,
                                                       sca = sca, kwargs...)
@@ -405,8 +437,8 @@ function PortfolioOptimisers.plot_factor_risk_contribution(r::PortfolioOptimiser
                                                            N::Option{<:Number} = nothing,
                                                            sca::Scalariser = SumScalariser(),
                                                            kwargs...)
-    fees = extract_fees(res, nothing)
-    return PortfolioOptimisers.plot_factor_risk_contribution(r, res.w, rd.X, fees; re = re,
+    _, w, rd, fees = result_investable_view(res, rd)
+    return PortfolioOptimisers.plot_factor_risk_contribution(r, w, rd.X, fees; re = re,
                                                              rd = rd, delta = delta, N = N,
                                                              sca = sca, kwargs...)
 end
@@ -463,15 +495,9 @@ end
 function PortfolioOptimisers.plot_network(pl::NwE_ClE_Cl, res::OptimisationResult;
                                           rd::Option{<:Pr_RR} = nothing,
                                           nx::AbstractVector = 1:length(res.w), kwargs...)
-    # A result carries the prior of the universe it *solved*, which ADR 0115 reduced, while
-    # its weights and the caller's names are on the full universe the solution expanded
-    # onto. The two axes are therefore paired here and not in the prior arity, whose mask is
-    # already `nothing`. Issue #884 carries the same pairing to every other result arity,
-    # and to the fees, which ride the weights' axis.
-    pr = extract_pr(res, rd)
-    imsk = isnothing(rd) ? PortfolioOptimisers.result_investable_mask(res) : nothing
-    w = isnothing(imsk) ? res.w : PortfolioOptimisers.investable_weights_view(imsk, res.w)
-    nx = isnothing(imsk) ? nx : nx[imsk]
+    # The prior arity's own door sees a viewed prior, whose mask is already `nothing`, so
+    # the pairing of the result's two universes happens here.
+    _, w, pr, _, nx = result_investable_view(res, rd, nothing, nx)
     return PortfolioOptimisers.plot_network(pl, pr, w; nx = nx, kwargs...)
 end
 ## plot_dendrogram
@@ -621,10 +647,10 @@ function PortfolioOptimisers.plot_drawdowns(res::OptimisationResult, rd::Returns
                                             slv::Option{<:Slv_VecSlv} = nothing,
                                             compound::Bool = false, alpha::Number = 0.05,
                                             kappa::Number = 0.3, rw = nothing, kwargs...)
-    fees = extract_fees(res, nothing)
-    return PortfolioOptimisers.plot_drawdowns(res.w, rd, fees; slv = slv,
-                                              compound = compound, alpha = alpha,
-                                              kappa = kappa, rw = rw, kwargs...)
+    _, w, rd, fees = result_investable_view(res, rd)
+    return PortfolioOptimisers.plot_drawdowns(w, rd, fees; slv = slv, compound = compound,
+                                              alpha = alpha, kappa = kappa, rw = rw,
+                                              kwargs...)
 end
 function PortfolioOptimisers.plot_drawdowns(pred::PredictionResult;
                                             slv::Option{<:Slv_VecSlv} = nothing,
@@ -680,11 +706,10 @@ function PortfolioOptimisers.plot_measures(res_vec::AbstractVector{<:Optimisatio
                                            slv::Option{<:Slv_VecSlv} = nothing,
                                            fees::Option{<:Fees} = nothing,
                                            factory::Bool = true, kwargs...)
-    pr = ifelse(isnothing(pr), nothing, pr)
-    slv = ifelse(isnothing(slv), nothing, slv)
-    pr = extract_pr.(res_vec, pr)
-    fees = extract_fees.(res_vec, fees)
-    w = getproperty.(res_vec, :w)
+    views = [result_investable_view(res, pr, fees) for res in res_vec]
+    w = getindex.(views, 2)
+    pr = getindex.(views, 3)
+    fees = getindex.(views, 4)
     # Each axis becomes one measure **per result**, so the broadcasts below zip correctly.
     # `Ref` is what makes that safe: a single measure is not iterable and broadcasts as a
     # scalar, but a **vector** of measures is, so without `Ref` it would zip elementwise
@@ -771,8 +796,8 @@ function PortfolioOptimisers.plot_histogram(res::OptimisationResult, rd::Returns
                                             alpha::Number = 0.05, kappa::Number = 0.3,
                                             rw = nothing, points::Integer = 0,
                                             reference::Bool = true, kwargs...)
-    fees = extract_fees(res, nothing)
-    return PortfolioOptimisers.plot_histogram(res.w, rd.X, fees; slv = slv, alpha = alpha,
+    _, w, rd, fees = result_investable_view(res, rd)
+    return PortfolioOptimisers.plot_histogram(w, rd.X, fees; slv = slv, alpha = alpha,
                                               kappa = kappa, rw = rw, points = points,
                                               reference = reference, kwargs...)
 end
@@ -843,17 +868,21 @@ function PortfolioOptimisers.plot_correlation(pr::PortfolioOptimisers.AbstractPr
 end
 function PortfolioOptimisers.plot_correlation(res::OptimisationResult, rd::ReturnsResult;
                                               kwargs...)
-    return PortfolioOptimisers.plot_correlation(extract_pr(res), rd; kwargs...)
+    pr, nx = result_prior_view(res, rd.nx)
+    return PortfolioOptimisers.plot_correlation(pr, nx; kwargs...)
 end
 function PortfolioOptimisers.plot_correlation(res::OptimisationResult; kwargs...)
-    return PortfolioOptimisers.plot_correlation(extract_pr(res); kwargs...)
+    pr, nx = result_prior_view(res)
+    return PortfolioOptimisers.plot_correlation(pr, nx; kwargs...)
 end
 function PortfolioOptimisers.plot_correlation(pred::PredictionResult, rd::ReturnsResult;
                                               kwargs...)
-    return PortfolioOptimisers.plot_correlation(extract_pr(pred.res), rd; kwargs...)
+    pr, nx = result_prior_view(pred.res, rd.nx)
+    return PortfolioOptimisers.plot_correlation(pr, nx; kwargs...)
 end
 function PortfolioOptimisers.plot_correlation(pred::PredictionResult; kwargs...)
-    return PortfolioOptimisers.plot_correlation(extract_pr(pred.res); kwargs...)
+    pr, nx = result_prior_view(pred.res)
+    return PortfolioOptimisers.plot_correlation(pr, nx; kwargs...)
 end
 ## plot_mu
 function PortfolioOptimisers.plot_mu(pr::PortfolioOptimisers.AbstractPriorResult,
@@ -869,19 +898,23 @@ function PortfolioOptimisers.plot_mu(pr::PortfolioOptimisers.AbstractPriorResult
 end
 function PortfolioOptimisers.plot_mu(res::OptimisationResult; N::Option{<:Number} = nothing,
                                      kwargs...)
-    return PortfolioOptimisers.plot_mu(extract_pr(res); N = N, kwargs...)
+    pr, nx = result_prior_view(res)
+    return PortfolioOptimisers.plot_mu(pr, nx; N = N, kwargs...)
 end
 function PortfolioOptimisers.plot_mu(res::OptimisationResult, rd::ReturnsResult;
                                      N::Option{<:Number} = nothing, kwargs...)
-    return PortfolioOptimisers.plot_mu(extract_pr(res), rd; N = N, kwargs...)
+    pr, nx = result_prior_view(res, rd.nx)
+    return PortfolioOptimisers.plot_mu(pr, nx; N = N, kwargs...)
 end
 function PortfolioOptimisers.plot_mu(pred::PredictionResult; N::Option{<:Number} = nothing,
                                      kwargs...)
-    return PortfolioOptimisers.plot_mu(extract_pr(pred.res); N = N, kwargs...)
+    pr, nx = result_prior_view(pred.res)
+    return PortfolioOptimisers.plot_mu(pr, nx; N = N, kwargs...)
 end
 function PortfolioOptimisers.plot_mu(pred::PredictionResult, rd::ReturnsResult;
                                      N::Option{<:Number} = nothing, kwargs...)
-    return PortfolioOptimisers.plot_mu(extract_pr(pred.res), rd; N = N, kwargs...)
+    pr, nx = result_prior_view(pred.res, rd.nx)
+    return PortfolioOptimisers.plot_mu(pr, nx; N = N, kwargs...)
 end
 ## plot_sigma
 function PortfolioOptimisers.plot_sigma(pr::PortfolioOptimisers.AbstractPriorResult,
@@ -897,19 +930,23 @@ function PortfolioOptimisers.plot_sigma(pr::PortfolioOptimisers.AbstractPriorRes
 end
 function PortfolioOptimisers.plot_sigma(res::OptimisationResult, rd::ReturnsResult;
                                         N::Option{<:Number} = nothing, kwargs...)
-    return PortfolioOptimisers.plot_sigma(extract_pr(res), rd; N = N, kwargs...)
+    pr, nx = result_prior_view(res, rd.nx)
+    return PortfolioOptimisers.plot_sigma(pr, nx; N = N, kwargs...)
 end
 function PortfolioOptimisers.plot_sigma(res::OptimisationResult;
                                         N::Option{<:Number} = nothing, kwargs...)
-    return PortfolioOptimisers.plot_sigma(extract_pr(res); N = N, kwargs...)
+    pr, nx = result_prior_view(res)
+    return PortfolioOptimisers.plot_sigma(pr, nx; N = N, kwargs...)
 end
 function PortfolioOptimisers.plot_sigma(pred::PredictionResult;
                                         N::Option{<:Number} = nothing, kwargs...)
-    return PortfolioOptimisers.plot_sigma(extract_pr(pred.res); N = N, kwargs...)
+    pr, nx = result_prior_view(pred.res)
+    return PortfolioOptimisers.plot_sigma(pr, nx; N = N, kwargs...)
 end
 function PortfolioOptimisers.plot_sigma(pred::PredictionResult, rd::ReturnsResult;
                                         N::Option{<:Number} = nothing, kwargs...)
-    return PortfolioOptimisers.plot_sigma(extract_pr(pred.res), rd; N = N, kwargs...)
+    pr, nx = result_prior_view(pred.res, rd.nx)
+    return PortfolioOptimisers.plot_sigma(pr, nx; N = N, kwargs...)
 end
 ## plot_factor_loadings
 # The factor-space entry points all guard through `assert_prior_regression`: `rr` and `fpr`
@@ -942,17 +979,21 @@ function PortfolioOptimisers.plot_factor_loadings(pr::PortfolioOptimisers.Abstra
 end
 function PortfolioOptimisers.plot_factor_loadings(res::OptimisationResult,
                                                   rd::ReturnsResult; kwargs...)
-    return PortfolioOptimisers.plot_factor_loadings(extract_pr(res), rd; kwargs...)
+    pr, nx = result_prior_view(res, rd.nx)
+    return PortfolioOptimisers.plot_factor_loadings(pr, nx, rd.nf; kwargs...)
 end
 function PortfolioOptimisers.plot_factor_loadings(res::OptimisationResult; kwargs...)
-    return PortfolioOptimisers.plot_factor_loadings(extract_pr(res); kwargs...)
+    pr, nx = result_prior_view(res)
+    return PortfolioOptimisers.plot_factor_loadings(pr, nx; kwargs...)
 end
 function PortfolioOptimisers.plot_factor_loadings(pred::PredictionResult, rd::ReturnsResult;
                                                   kwargs...)
-    return PortfolioOptimisers.plot_factor_loadings(extract_pr(pred.res), rd; kwargs...)
+    pr, nx = result_prior_view(pred.res, rd.nx)
+    return PortfolioOptimisers.plot_factor_loadings(pr, nx, rd.nf; kwargs...)
 end
 function PortfolioOptimisers.plot_factor_loadings(pred::PredictionResult; kwargs...)
-    return PortfolioOptimisers.plot_factor_loadings(extract_pr(pred.res); kwargs...)
+    pr, nx = result_prior_view(pred.res)
+    return PortfolioOptimisers.plot_factor_loadings(pr, nx; kwargs...)
 end
 ## plot_factor_sigma
 const NO_FACTOR_SIGMA_LEAD = "`plot_factor_sigma` draws the factor covariance `fpr.sigma`. $NO_FACTOR_BLOCK_HINT Pass the factor covariance directly as `plot_factor_sigma(f_sigma, nf)` if you hold it."
@@ -971,17 +1012,21 @@ function PortfolioOptimisers.plot_factor_sigma(pr::PortfolioOptimisers.AbstractP
 end
 function PortfolioOptimisers.plot_factor_sigma(res::OptimisationResult, rd::ReturnsResult;
                                                kwargs...)
-    return PortfolioOptimisers.plot_factor_sigma(extract_pr(res), rd; kwargs...)
+    pr, = result_prior_view(res)
+    return PortfolioOptimisers.plot_factor_sigma(pr, rd; kwargs...)
 end
 function PortfolioOptimisers.plot_factor_sigma(res::OptimisationResult; kwargs...)
-    return PortfolioOptimisers.plot_factor_sigma(extract_pr(res); kwargs...)
+    pr, = result_prior_view(res)
+    return PortfolioOptimisers.plot_factor_sigma(pr; kwargs...)
 end
 function PortfolioOptimisers.plot_factor_sigma(pred::PredictionResult, rd::ReturnsResult;
                                                kwargs...)
-    return PortfolioOptimisers.plot_factor_sigma(extract_pr(pred.res), rd; kwargs...)
+    pr, = result_prior_view(pred.res)
+    return PortfolioOptimisers.plot_factor_sigma(pr, rd; kwargs...)
 end
 function PortfolioOptimisers.plot_factor_sigma(pred::PredictionResult; kwargs...)
-    return PortfolioOptimisers.plot_factor_sigma(extract_pr(pred.res); kwargs...)
+    pr, = result_prior_view(pred.res)
+    return PortfolioOptimisers.plot_factor_sigma(pr; kwargs...)
 end
 ## plot_eigenspectrum
 function PortfolioOptimisers.plot_eigenspectrum(pr::PortfolioOptimisers.AbstractPriorResult;
@@ -1000,23 +1045,23 @@ function PortfolioOptimisers.plot_eigenspectrum(pr::PortfolioOptimisers.Abstract
 end
 function PortfolioOptimisers.plot_eigenspectrum(res::OptimisationResult;
                                                 reference::Bool = true, kwargs...)
-    return PortfolioOptimisers.plot_eigenspectrum(extract_pr(res); reference = reference,
-                                                  kwargs...)
+    pr, = result_prior_view(res)
+    return PortfolioOptimisers.plot_eigenspectrum(pr; reference = reference, kwargs...)
 end
 function PortfolioOptimisers.plot_eigenspectrum(res::OptimisationResult, rd::ReturnsResult;
                                                 reference::Bool = true, kwargs...)
-    return PortfolioOptimisers.plot_eigenspectrum(extract_pr(res), rd;
-                                                  reference = reference, kwargs...)
+    pr, = result_prior_view(res)
+    return PortfolioOptimisers.plot_eigenspectrum(pr, rd; reference = reference, kwargs...)
 end
 function PortfolioOptimisers.plot_eigenspectrum(pred::PredictionResult;
                                                 reference::Bool = true, kwargs...)
-    return PortfolioOptimisers.plot_eigenspectrum(extract_pr(pred.res);
-                                                  reference = reference, kwargs...)
+    pr, = result_prior_view(pred.res)
+    return PortfolioOptimisers.plot_eigenspectrum(pr; reference = reference, kwargs...)
 end
 function PortfolioOptimisers.plot_eigenspectrum(pred::PredictionResult, rd::ReturnsResult;
                                                 reference::Bool = true, kwargs...)
-    return PortfolioOptimisers.plot_eigenspectrum(extract_pr(pred.res), rd;
-                                                  reference = reference, kwargs...)
+    pr, = result_prior_view(pred.res)
+    return PortfolioOptimisers.plot_eigenspectrum(pr, rd; reference = reference, kwargs...)
 end
 ## plot_rolling_measure
 function PortfolioOptimisers.plot_rolling_measure(r::PortfolioOptimisers.BaseRM_VecBaseRM,
@@ -1031,8 +1076,8 @@ function PortfolioOptimisers.plot_rolling_measure(r::PortfolioOptimisers.BaseRM_
                                                   res::OptimisationResult,
                                                   rd::ReturnsResult; rolling::Integer = 0,
                                                   kwargs...)
-    fees = extract_fees(res, nothing)
-    return PortfolioOptimisers.plot_rolling_measure(r, res.w, rd, fees; rolling = rolling,
+    _, w, rd, fees = result_investable_view(res, rd)
+    return PortfolioOptimisers.plot_rolling_measure(r, w, rd, fees; rolling = rolling,
                                                     kwargs...)
 end
 function PortfolioOptimisers.plot_rolling_measure(r::PortfolioOptimisers.BaseRM_VecBaseRM,
@@ -1075,19 +1120,23 @@ function PortfolioOptimisers.plot_prior(pr::PortfolioOptimisers.AbstractPriorRes
 end
 function PortfolioOptimisers.plot_prior(res::OptimisationResult;
                                         N::Option{<:Number} = nothing, kwargs...)
-    return PortfolioOptimisers.plot_prior(extract_pr(res); N = N, kwargs...)
+    pr, nx = result_prior_view(res)
+    return PortfolioOptimisers.plot_prior(pr, nx; N = N, kwargs...)
 end
 function PortfolioOptimisers.plot_prior(res::OptimisationResult, rd::ReturnsResult;
                                         N::Option{<:Number} = nothing, kwargs...)
-    return PortfolioOptimisers.plot_prior(extract_pr(res), rd; N = N, kwargs...)
+    pr, nx = result_prior_view(res, rd.nx)
+    return PortfolioOptimisers.plot_prior(pr, nx; N = N, kwargs...)
 end
 function PortfolioOptimisers.plot_prior(pred::PredictionResult;
                                         N::Option{<:Number} = nothing, kwargs...)
-    return PortfolioOptimisers.plot_prior(extract_pr(pred.res); N = N, kwargs...)
+    pr, nx = result_prior_view(pred.res)
+    return PortfolioOptimisers.plot_prior(pr, nx; N = N, kwargs...)
 end
 function PortfolioOptimisers.plot_prior(pred::PredictionResult, rd::ReturnsResult;
                                         N::Option{<:Number} = nothing, kwargs...)
-    return PortfolioOptimisers.plot_prior(extract_pr(pred.res), rd; N = N, kwargs...)
+    pr, nx = result_prior_view(pred.res, rd.nx)
+    return PortfolioOptimisers.plot_prior(pr, nx; N = N, kwargs...)
 end
 ## plot_factor_mu
 const NO_FACTOR_MU_LEAD = "`plot_factor_mu` draws the factor expected returns `fpr.mu`. $NO_FACTOR_BLOCK_HINT Pass the factor expected returns directly as `plot_factor_mu(f_mu, nf)` if you hold them."
@@ -1107,19 +1156,23 @@ function PortfolioOptimisers.plot_factor_mu(pr::PortfolioOptimisers.AbstractPrio
 end
 function PortfolioOptimisers.plot_factor_mu(res::OptimisationResult;
                                             N::Option{<:Number} = nothing, kwargs...)
-    return PortfolioOptimisers.plot_factor_mu(extract_pr(res); N = N, kwargs...)
+    pr, = result_prior_view(res)
+    return PortfolioOptimisers.plot_factor_mu(pr; N = N, kwargs...)
 end
 function PortfolioOptimisers.plot_factor_mu(res::OptimisationResult, rd::ReturnsResult;
                                             N::Option{<:Number} = nothing, kwargs...)
-    return PortfolioOptimisers.plot_factor_mu(extract_pr(res), rd; N = N, kwargs...)
+    pr, = result_prior_view(res)
+    return PortfolioOptimisers.plot_factor_mu(pr, rd; N = N, kwargs...)
 end
 function PortfolioOptimisers.plot_factor_mu(pred::PredictionResult;
                                             N::Option{<:Number} = nothing, kwargs...)
-    return PortfolioOptimisers.plot_factor_mu(extract_pr(pred.res); N = N, kwargs...)
+    pr, = result_prior_view(pred.res)
+    return PortfolioOptimisers.plot_factor_mu(pr; N = N, kwargs...)
 end
 function PortfolioOptimisers.plot_factor_mu(pred::PredictionResult, rd::ReturnsResult;
                                             N::Option{<:Number} = nothing, kwargs...)
-    return PortfolioOptimisers.plot_factor_mu(extract_pr(pred.res), rd; N = N, kwargs...)
+    pr, = result_prior_view(pred.res)
+    return PortfolioOptimisers.plot_factor_mu(pr, rd; N = N, kwargs...)
 end
 ## plot_benchmark
 function PortfolioOptimisers.plot_benchmark(w::ArrNum, rd::ReturnsResult,
@@ -1135,9 +1188,8 @@ function PortfolioOptimisers.plot_benchmark(w::ArrNum, rd::ReturnsResult,
 end
 function PortfolioOptimisers.plot_benchmark(res::OptimisationResult, rd::ReturnsResult;
                                             compound::Bool = false, kwargs...)
-    fees = extract_fees(res, nothing)
-    return PortfolioOptimisers.plot_benchmark(res.w, rd, fees; compound = compound,
-                                              kwargs...)
+    _, w, rd, fees = result_investable_view(res, rd)
+    return PortfolioOptimisers.plot_benchmark(w, rd, fees; compound = compound, kwargs...)
 end
 function PortfolioOptimisers.plot_benchmark(pred::PredictionResult; compound::Bool = false,
                                             kwargs...)
@@ -1170,34 +1222,34 @@ function PortfolioOptimisers.plot_coskewness(pr::HighOrderPrior, rd::ReturnsResu
     return PortfolioOptimisers.plot_coskewness(pr.sk, nx; kwargs...)
 end
 function PortfolioOptimisers.plot_coskewness(res::OptimisationResult; kwargs...)
-    pr = extract_pr(res)
+    pr, nx = result_prior_view(res)
     if !(isa(pr, HighOrderPrior))
         throw(ArgumentError("`$(nameof(typeof(res)))` prior is not a `HighOrderPrior`; no coskewness available"))
     end
-    return PortfolioOptimisers.plot_coskewness(pr; kwargs...)
+    return PortfolioOptimisers.plot_coskewness(pr, nx; kwargs...)
 end
 function PortfolioOptimisers.plot_coskewness(res::OptimisationResult, rd::ReturnsResult;
                                              kwargs...)
-    pr = extract_pr(res)
+    pr, nx = result_prior_view(res, rd.nx)
     if !(isa(pr, HighOrderPrior))
         throw(ArgumentError("`$(nameof(typeof(res)))` prior is not a `HighOrderPrior`; no coskewness available"))
     end
-    return PortfolioOptimisers.plot_coskewness(pr, rd; kwargs...)
+    return PortfolioOptimisers.plot_coskewness(pr, nx; kwargs...)
 end
 function PortfolioOptimisers.plot_coskewness(pred::PredictionResult; kwargs...)
-    pr = extract_pr(pred.res)
+    pr, nx = result_prior_view(pred.res)
     if !(isa(pr, HighOrderPrior))
         throw(ArgumentError("`$(nameof(typeof(pred.res)))` prior is not a `HighOrderPrior`; no coskewness available"))
     end
-    return PortfolioOptimisers.plot_coskewness(pr; kwargs...)
+    return PortfolioOptimisers.plot_coskewness(pr, nx; kwargs...)
 end
 function PortfolioOptimisers.plot_coskewness(pred::PredictionResult, rd::ReturnsResult;
                                              kwargs...)
-    pr = extract_pr(pred.res)
+    pr, nx = result_prior_view(pred.res, rd.nx)
     if !(isa(pr, HighOrderPrior))
         throw(ArgumentError("`$(nameof(typeof(pred.res)))` prior is not a `HighOrderPrior`; no coskewness available"))
     end
-    return PortfolioOptimisers.plot_coskewness(pr, rd; kwargs...)
+    return PortfolioOptimisers.plot_coskewness(pr, nx; kwargs...)
 end
 ## plot_cokurtosis
 function PortfolioOptimisers.plot_cokurtosis(pr::HighOrderPrior,
@@ -1227,35 +1279,35 @@ function PortfolioOptimisers.plot_cokurtosis(pr::HighOrderPrior, rd::ReturnsResu
 end
 function PortfolioOptimisers.plot_cokurtosis(res::OptimisationResult;
                                              reference::Bool = true, kwargs...)
-    pr = extract_pr(res)
+    pr, nx = result_prior_view(res)
     if !(isa(pr, HighOrderPrior))
         throw(ArgumentError("`$(nameof(typeof(res)))` prior is not a `HighOrderPrior`; no cokurtosis available"))
     end
-    return PortfolioOptimisers.plot_cokurtosis(pr; reference = reference, kwargs...)
+    return PortfolioOptimisers.plot_cokurtosis(pr, nx; reference = reference, kwargs...)
 end
 function PortfolioOptimisers.plot_cokurtosis(res::OptimisationResult, rd::ReturnsResult;
                                              reference::Bool = true, kwargs...)
-    pr = extract_pr(res)
+    pr, nx = result_prior_view(res, rd.nx)
     if !(isa(pr, HighOrderPrior))
         throw(ArgumentError("`$(nameof(typeof(res)))` prior is not a `HighOrderPrior`; no cokurtosis available"))
     end
-    return PortfolioOptimisers.plot_cokurtosis(pr, rd; reference = reference, kwargs...)
+    return PortfolioOptimisers.plot_cokurtosis(pr, nx; reference = reference, kwargs...)
 end
 function PortfolioOptimisers.plot_cokurtosis(pred::PredictionResult; reference::Bool = true,
                                              kwargs...)
-    pr = extract_pr(pred.res)
+    pr, nx = result_prior_view(pred.res)
     if !(isa(pr, HighOrderPrior))
         throw(ArgumentError("`$(nameof(typeof(pred.res)))` prior is not a `HighOrderPrior`; no cokurtosis available"))
     end
-    return PortfolioOptimisers.plot_cokurtosis(pr; reference = reference, kwargs...)
+    return PortfolioOptimisers.plot_cokurtosis(pr, nx; reference = reference, kwargs...)
 end
 function PortfolioOptimisers.plot_cokurtosis(pred::PredictionResult, rd::ReturnsResult;
                                              reference::Bool = true, kwargs...)
-    pr = extract_pr(pred.res)
+    pr, nx = result_prior_view(pred.res, rd.nx)
     if !(isa(pr, HighOrderPrior))
         throw(ArgumentError("`$(nameof(typeof(pred.res)))` prior is not a `HighOrderPrior`; no cokurtosis available"))
     end
-    return PortfolioOptimisers.plot_cokurtosis(pr, rd; reference = reference, kwargs...)
+    return PortfolioOptimisers.plot_cokurtosis(pr, nx; reference = reference, kwargs...)
 end
 ## ────────────────────────────────────────────────────────────────────────────
 ## Risk contribution
@@ -1955,17 +2007,21 @@ function PortfolioOptimisers.plot_portfolio_dashboard(res::OptimisationResult, r
                                                       kappa::Number = 0.3, rw = nothing,
                                                       sca::Scalariser = SumScalariser(),
                                                       kwargs...)
-    fees = extract_fees(res, nothing)
-    w = res.w
+    _, w, rd, fees, nx = result_investable_view(res, rd, nothing, nx)
     if isa(rd, ReturnsResult)
-        nx = rd.nx
-        ts = rd.ts
+        nx = isnothing(rd.nx) ? nx : rd.nx
+        ts = isnothing(rd.ts) ? ts : rd.ts
     end
     p1 = PortfolioOptimisers.plot_composition(w, nx; N = N)
     p2 = PortfolioOptimisers.plot_portfolio_cumulative_returns(w, rd.X, fees; ts = ts,
                                                                compound = compound)
-    p3 = PortfolioOptimisers.plot_risk_contribution(r, w, rd.X, fees; nx = nx, N = N,
-                                                    delta = delta, marginal = marginal,
+    # The carrier is handed whole where it is a prior, so a measure with an unstated slot,
+    # the default `Variance()` among them, resolves it there; a returns result carries no
+    # moment to resolve against and is unwrapped to its matrix.
+    p3 = PortfolioOptimisers.plot_risk_contribution(r, w,
+                                                    isa(rd, ReturnsResult) ? rd.X : rd,
+                                                    fees; nx = nx, N = N, delta = delta,
+                                                    marginal = marginal,
                                                     percentage = percentage, sca = sca)
     p4 = PortfolioOptimisers.plot_drawdowns(w, rd.X, fees; slv = slv, ts = ts,
                                             compound = compound, alpha = alpha,
@@ -2026,13 +2082,17 @@ function PortfolioOptimisers.plot_efficient_frontier(res_vec::AbstractVector{<:O
     xr = expected_risk(x, w, pr, fees)
     yr = expected_risk(y, w, pr, fees)
     cr = expected_risk(c, w, pr, fees)
+    return efficient_frontier_plot(xr, yr, cr, measure_label(x), measure_label(y),
+                                   measure_label(c); min_risk = min_risk,
+                                   max_score = max_score, kwargs...)
+end
+function efficient_frontier_plot(xr::VecNum, yr::VecNum, cr::VecNum, xname::AbstractString,
+                                 yname::AbstractString, cname::AbstractString;
+                                 min_risk::Bool = true, max_score::Bool = true, kwargs...)
     order = sortperm(xr)
     xr_s = xr[order]
     yr_s = yr[order]
     cr_s = cr[order]
-    xname = measure_label(x)
-    yname = measure_label(y)
-    cname = measure_label(c)
     plt = plot(xr_s, yr_s; zcolor = cr_s, line_z = cr_s, title = "Efficient Frontier",
                xlabel = xname, ylabel = yname, colorbar_title = cname, label = nothing,
                linewidth = 2, markershape = :circle, markersize = 4, kwargs...)
@@ -2049,9 +2109,35 @@ function PortfolioOptimisers.plot_efficient_frontier(res_vec::AbstractVector{<:O
     return plt
 end
 function PortfolioOptimisers.plot_efficient_frontier(res_vec::AbstractVector{<:OptimisationResult},
-                                                     rd::ReturnsResult; kwargs...)
-    return PortfolioOptimisers.plot_efficient_frontier(res_vec, extract_pr(first(res_vec));
-                                                       kwargs...)
+                                                     ::ReturnsResult;
+                                                     x::PortfolioOptimisers.BaseRM_VecBaseRM = Variance(),
+                                                     y::PortfolioOptimisers.BaseRM_VecBaseRM = ExpectedReturn(),
+                                                     c::PortfolioOptimisers.BaseRM_VecBaseRM = ExpectedReturnRiskRatio(;
+                                                                                                                       rk = x,
+                                                                                                                       rt = ArithmeticReturn(),
+                                                                                                                       rf = 0),
+                                                     slv::Option{<:Slv_VecSlv} = nothing,
+                                                     fees::Option{<:Fees} = nothing,
+                                                     min_risk::Bool = true,
+                                                     max_score::Bool = true,
+                                                     factory::Bool = true, kwargs...)
+    # Each result carries its own prior, on its own investable universe, so each point is
+    # scored against the three the result carries, as `plot_measures` scores a vector of
+    # results. The returns result is the tag that asks for the results' own priors.
+    views = [result_investable_view(res, nothing, fees) for res in res_vec]
+    w = getindex.(views, 2)
+    pr = getindex.(views, 3)
+    fees = getindex.(views, 4)
+    n = length(res_vec)
+    function per_result(m)
+        return factory ? PortfolioOptimisers.factory.(Ref(m), pr, Ref(slv)) : fill(m, n)
+    end
+    xr = expected_risk.(per_result(x), w, pr, fees)
+    yr = expected_risk.(per_result(y), w, pr, fees)
+    cr = expected_risk.(per_result(c), w, pr, fees)
+    return efficient_frontier_plot(xr, yr, cr, measure_label(x), measure_label(y),
+                                   measure_label(c); min_risk = min_risk,
+                                   max_score = max_score, kwargs...)
 end
 function PortfolioOptimisers.plot_efficient_frontier(w::VecVecNum, pr::Pr_RR;
                                                      x::PortfolioOptimisers.BaseRM_VecBaseRM = Variance(),
@@ -2073,43 +2159,25 @@ function PortfolioOptimisers.plot_efficient_frontier(w::VecVecNum, pr::Pr_RR;
     xr = expected_risk(x, w, pr, fees)
     yr = expected_risk(y, w, pr, fees)
     cr = expected_risk(c, w, pr, fees)
-    order = sortperm(xr)
-    xr_s = xr[order]
-    yr_s = yr[order]
-    cr_s = cr[order]
-    xname = measure_label(x)
-    yname = measure_label(y)
-    cname = measure_label(c)
-    plt = plot(xr_s, yr_s; zcolor = cr_s, line_z = cr_s, title = "Efficient Frontier",
-               xlabel = xname, ylabel = yname, colorbar_title = cname, label = nothing,
-               linewidth = 2, markershape = :circle, markersize = 4, kwargs...)
-    if min_risk
-        i = argmin(xr_s)
-        scatter!(plt, [xr_s[i]], [yr_s[i]]; label = "Min Risk", markershape = :star5,
-                 markersize = 12, color = :blue, legend = true)
-    end
-    if max_score
-        i = argmax(cr_s)
-        scatter!(plt, [xr_s[i]], [yr_s[i]]; label = "Max $(cname)", markershape = :star5,
-                 markersize = 12, color = :red, legend = true)
-    end
-    return plt
+    return efficient_frontier_plot(xr, yr, cr, measure_label(x), measure_label(y),
+                                   measure_label(c); min_risk = min_risk,
+                                   max_score = max_score, kwargs...)
 end
 function PortfolioOptimisers.plot_efficient_frontier(res::OptimisationResult, pr::Pr_RR;
                                                      fees::Option{<:Fees} = nothing,
                                                      kwargs...)
-    fees = extract_fees(res, fees)
-    w = res.w
-    if isa(w, VecVecNum)
-        return PortfolioOptimisers.plot_efficient_frontier(w, pr; fees = fees, kwargs...)
-    else
-        return PortfolioOptimisers.plot_efficient_frontier([res], pr; fees = fees,
-                                                           kwargs...)
-    end
+    _, w, pr, fees = result_investable_view(res, pr, fees)
+    return PortfolioOptimisers.plot_efficient_frontier(isa(w, VecVecNum) ? w : [w], pr;
+                                                       fees = fees, kwargs...)
 end
 function PortfolioOptimisers.plot_efficient_frontier(res::OptimisationResult,
-                                                     rd::ReturnsResult; kwargs...)
-    return PortfolioOptimisers.plot_efficient_frontier(res, extract_pr(res); kwargs...)
+                                                     ::ReturnsResult;
+                                                     fees::Option{<:Fees} = nothing,
+                                                     kwargs...)
+    # The returns result is the tag that asks for the result's own prior.
+    _, w, pr, fees = result_investable_view(res, nothing, fees)
+    return PortfolioOptimisers.plot_efficient_frontier(isa(w, VecVecNum) ? w : [w], pr;
+                                                       fees = fees, kwargs...)
 end
 ## ────────────────────────────────────────────────────────────────────────────
 ## Performance summary
@@ -2214,8 +2282,8 @@ end
 function PortfolioOptimisers.plot_rolling_drawdowns(res::OptimisationResult,
                                                     rd::ReturnsResult; rolling::Integer = 0,
                                                     compound::Bool = false, kwargs...)
-    fees = extract_fees(res, nothing)
-    return PortfolioOptimisers.plot_rolling_drawdowns(res.w, rd, fees; rolling = rolling,
+    _, w, rd, fees = result_investable_view(res, rd)
+    return PortfolioOptimisers.plot_rolling_drawdowns(w, rd, fees; rolling = rolling,
                                                       compound = compound, kwargs...)
 end
 function PortfolioOptimisers.plot_rolling_drawdowns(pred::PredictionResult;

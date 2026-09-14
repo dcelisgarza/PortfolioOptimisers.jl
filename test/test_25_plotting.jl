@@ -981,4 +981,85 @@
         @test is_plot(plot_network(ne_pv, res_pv))
         @test is_plot(plot_network(ne_pv, res_pv; rd = rd_pv))
     end
+
+    @testset "Every result arity pairs the result's two universes (#884)" begin
+        # The rest of the class the `plot_network` fix above named. A result carries `w` on
+        # the caller's universe, and `pr` and `fees` on the one the fit solved, so an arity
+        # that read two of the three separately raised, or drew four bars under five names.
+        # Every arity now reads the three through `result_investable_view`, and a drawn
+        # figure of a result draws the investable universe, each bar under its own name.
+        rng_ru = MersenneTwister(884)
+        T_ru, N_ru = 160, 5
+        X_ru = randn(rng_ru, T_ru, N_ru) ./ 100 .+ 0.0005
+        nx_ru = ["a", "b", "c", "d", "e"]
+        k_ru, keep_ru = 3, [1, 2, 4, 5]
+        rd_ru = ReturnsResult(; nx = nx_ru, X = X_ru)
+        pr_ru = prior(EmpiricalPrior(), rd_ru)
+        mu_ru = collect(pr_ru.mu)
+        sigma_ru = collect(pr_ru.sigma)
+        Xn_ru = collect(pr_ru.X)
+        mu_ru[k_ru] = NaN
+        sigma_ru[k_ru, :] .= NaN
+        sigma_ru[:, k_ru] .= NaN
+        Xn_ru[:, k_ru] .= NaN
+        prn_ru = LowOrderPrior(; X = Xn_ru, mu = mu_ru, sigma = sigma_ru)
+        fees_ru = Fees(; l = fill(0.001, N_ru))
+        res_ru = optimise(MeanRisk(;
+                                   opt = JuMPOptimiser(; pe = prn_ru, slv = slv,
+                                                       fees = fees_ru)), rd_ru)
+        @test PortfolioOptimisers.result_investable_mask(res_ru) ==
+              BitVector([1, 1, 0, 1, 1])
+        @test length(res_ru.fees.l) == length(keep_ru)
+        ticks_ru(p) = p[1][:xaxis][:ticks][2]
+        ys_ru(p) = p.series_list[1][:y]
+
+        # The two raising arities of each figure draw.
+        @test is_plot(plot_portfolio_cumulative_returns(res_ru))
+        @test is_plot(plot_portfolio_cumulative_returns(res_ru, prn_ru))
+        @test is_plot(plot_portfolio_cumulative_returns(res_ru, rd_ru))
+        @test is_plot(plot_asset_cumulative_returns(res_ru))
+        @test is_plot(plot_asset_cumulative_returns(res_ru, prn_ru))
+        @test is_plot(plot_asset_cumulative_returns(res_ru, rd_ru))
+        @test is_plot(plot_risk_contribution(r_cvr, res_ru, prn_ru))
+        @test is_plot(plot_risk_contribution(r_cvr, res_ru, rd_ru))
+        @test is_plot(plot_drawdowns(res_ru, rd_ru))
+        @test is_plot(plot_histogram(res_ru, rd_ru))
+        @test is_plot(plot_rolling_measure(r_cvr, res_ru, rd_ru))
+        @test is_plot(plot_rolling_drawdowns(res_ru, rd_ru))
+        @test is_plot(plot_measures([res_ru]))
+        @test is_plot(plot_measures([res_ru], prn_ru))
+        @test is_plot(plot_efficient_frontier(res_ru, rd_ru))
+        @test is_plot(plot_efficient_frontier(res_ru, prn_ru))
+        @test is_plot(plot_efficient_frontier([res_ru, res_ru], rd_ru))
+        @test is_plot(plot_portfolio_dashboard(res_ru, rd_ru; r = r_cvr))
+        @test is_plot(plot_portfolio_dashboard(res_ru, prn_ru))
+        @test is_plot(plot_correlation(res_ru, rd_ru))
+        @test is_plot(plot_eigenspectrum(res_ru, rd_ru))
+
+        # The portfolio series is the one the hand-reduced problem scores, under the
+        # reduced fee, and the caller's carrier gives the same series as the result's own.
+        ret_ru = calc_net_returns(res_ru.w[keep_ru], X_ru[:, keep_ru],
+                                  Fees(; l = fill(0.001, length(keep_ru))))
+        cum_ru = cumulative_returns(ret_ru, false)
+        @test ys_ru(plot_portfolio_cumulative_returns(res_ru)) ≈ cum_ru
+        @test ys_ru(plot_portfolio_cumulative_returns(res_ru, prn_ru)) ≈ cum_ru
+        @test ys_ru(plot_portfolio_cumulative_returns(res_ru, rd_ru)) ≈ cum_ru
+
+        # The mislabelling arities label each bar with its own asset: the caller's names
+        # viewed at the mask, or the asset's own index when the caller gives none.
+        @test ticks_ru(plot_mu(res_ru, rd_ru)) == nx_ru[keep_ru]
+        @test ticks_ru(plot_sigma(res_ru, rd_ru)) == nx_ru[keep_ru]
+        @test ticks_ru(plot_risk_contribution(r_cvr, res_ru, rd_ru)) == nx_ru[keep_ru]
+        @test ticks_ru(plot_risk_contribution(r_cvr, res_ru, prn_ru)) == keep_ru
+        @test ticks_ru(plot_mu(res_ru)) == string.(keep_ru)
+        # The bars are the reduced prior's own, under the reduced names.
+        @test isequal(ys_ru(plot_mu(res_ru, rd_ru)),
+                      ys_ru(plot_mu(pr_ru.mu[keep_ru], nx_ru[keep_ru])))
+        @test is_plot(plot_prior(res_ru, rd_ru))
+        @test size(plot_correlation(res_ru, rd_ru).series_list[1][:z]) ==
+              (length(keep_ru), length(keep_ru))
+        pred_ru = predict(res_ru, rd_ru, collect(130:T_ru))
+        @test ticks_ru(plot_mu(pred_ru, rd_ru)) == nx_ru[keep_ru]
+        @test is_plot(plot_sigma(pred_ru))
+    end
 end
