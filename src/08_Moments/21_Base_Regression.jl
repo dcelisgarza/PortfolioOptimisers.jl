@@ -232,6 +232,8 @@ Names the benchmark weights as the cross-sectional weight source.
 
 A block's `bw` field carries the benchmark weight of every asset at every observation, and a reader takes its latest row for an uncertainty set or its whole history for a diagnostic. A block fitted per asset over the observations carries no such field and refuses.
 
+**The metric needs every investable asset to have entered the latest fit.** An asset can be in the Investable Mask and outside the estimation universe of the latest cross-section: its return is finite, so the prior states a moment for it, and it is dropped from the fit, so its benchmark weight is zero there. A zero weight cannot be inverted into a metric, and an uncertainty set built on this metric refuses the block, as the reference implementation does. On a point-in-time Asset Panel whose latest cross-section does not cover the whole Investable Mask, use [`InverseIdiosyncraticVarianceMetric`](@ref) or [`IdentityMetric`](@ref), which read no weight history.
+
 # Examples
 
 ```jldoctest
@@ -252,6 +254,8 @@ $(DocStringExtensions.TYPEDEF)
 Names the regression weights as the cross-sectional weight source.
 
 A block's `rw` field carries the weight the Cross-Sectional Regression gave every asset at every observation, and a reader takes its latest row for an uncertainty set or its whole history for a diagnostic. A block fitted per asset over the observations carries no such field and refuses.
+
+**The metric needs every investable asset to have entered the latest fit.** An asset can be in the Investable Mask and outside the estimation universe of the latest cross-section: its return is finite, so the prior states a moment for it, and it is dropped from the fit, so its regression weight is zero there. A zero weight cannot be inverted into a metric, and an uncertainty set built on this metric refuses the block, as the reference implementation does. On a point-in-time Asset Panel whose latest cross-section does not cover the whole Investable Mask, use [`InverseIdiosyncraticVarianceMetric`](@ref) or [`IdentityMetric`](@ref), which read no weight history.
 
 # Examples
 

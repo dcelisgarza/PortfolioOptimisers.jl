@@ -276,6 +276,44 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Write a mean [`NormBallUncertaintySet`](@ref) fitted on the Investable Mask back onto the full asset universe.
+
+The expansion is the inverse of [`port_opt_view`](@ref): the view drops rows of the map and touches nothing else, so a zero row outside the mask is dropped without a trace and the view recovers the fitted set. A zero row states that the set moves nothing on an asset the prior could not estimate, and the centre is the full `pr.mu`, `NaN` frame and all, because the set is a neighbourhood of the prior it was calibrated on and that prior lives on the full universe.
+
+# Algorithm
+
+ 1. Allocate a zero frame of `length(imsk)` rows and `size(set.L, 2)` columns, and write `set.L` at the rows the mask keeps, giving `L`.
+ 2. Build a [`NormBallUncertaintySet`](@ref) from it, carrying `kappa`, `p` and `class` through unchanged and `pr.mu` as `val`.
+
+# Arguments
+
+  - `set`: Mean norm-ball uncertainty set fitted on the reduced prior.
+  - `imsk`: The Investable Mask of the full prior.
+  - $(arg_dict[:pr])
+
+# Returns
+
+  - `set::NormBallUncertaintySet`: The set on the full asset universe.
+
+# Related
+
+  - [`NormBallUncertaintySet`](@ref)
+  - [`MuUncertaintySetClass`](@ref)
+  - [`investable_ucs_reduction`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+function expand_investable_ucs(set::NormBallUncertaintySet{<:Any, <:MatNum, <:Any,
+                                                           <:MuUncertaintySetClass},
+                               imsk::BitVector,
+                               pr::AbstractPriorResult)::NormBallUncertaintySet
+    L = zeros(eltype(set.L), length(imsk), size(set.L, 2))
+    L[imsk, :] = set.L
+    return NormBallUncertaintySet(; kappa = set.kappa, L = L, p = set.p, class = set.class,
+                                  val = pr.mu)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Return a view of a covariance [`NormBallUncertaintySet`](@ref) restricted to assets at index `i`, mapping the map's row index through the fourth-moment index generator.
 
 The view is the projection of the set onto the cluster's coordinates, and not a refit. The set bounds a vectorised covariance, so its map lives on the ``N^{2}`` axis while its centre lives on the ``N`` axis, and the method applies two different indices, one to each field.

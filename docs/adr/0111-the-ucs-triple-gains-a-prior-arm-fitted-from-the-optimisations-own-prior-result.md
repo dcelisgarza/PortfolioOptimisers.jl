@@ -84,6 +84,41 @@ replaced that dispatch with the predicate, because the four returns-data familie
 can be written on. The three consumers ask the predicate and agree; the root's members declare
 nothing, because the root's own method of the predicate answers for them.
 
+### A standalone fit reduces to the Investable Mask and expands
+
+The prior arm offers a mode the reference lacks: `mu_ucs(ue, pr)` on a stored prior result builds
+the set with no returns and no optimiser. Inside an optimiser the result arrives reduced, because
+every family reduces once at its entry
+([ADR 0115](0115-every-optimisation-estimator-reduces-once-at-its-entry-and-its-result-carries-the-investable-mask.md)).
+Standalone it arrives whole, and a prior fitted on a point-in-time Asset Panel writes `NaN` on
+every asset outside its Investable Mask, in the moments and in every block the factor fit wrote.
+
+The prior arm therefore takes the shape
+[ADR 0117](0117-a-prior-reduces-to-the-coverage-universe-and-a-plain-moment-estimator-refuses-a-non-finite-sample.md)
+gives every prior result: **reduce, fit, expand.** `investable_ucs_reduction` derives the mask
+and takes the optimiser's own view of the prior result and of the returns beside it, the fit runs
+on that view, and `expand_investable_ucs` writes the built set back onto the full universe. On a
+result that arrived reduced the mask is `nothing`, and both verbs are passthroughs.
+
+What the expansion writes outside the mask is the set's own business, and each built set states it
+beside its `port_opt_view`, because the two are inverses: a view of the expanded set at the mask
+recovers the reduced fit. The orthogonal geometry writes **zero rows** — a zero row of the norm
+ball's map moves nothing on that asset, a zero row of the compact basis is dropped by the view
+without moving the span and leaves the sliced basis orthonormal, and a zero metric entry states
+nothing — and carries the full `pr.mu` or `pr.sigma` as `val`, `NaN` frame and all, because
+[ADR 0050](0050-an-uncertainty-set-carries-the-quantity-it-bounds.md) says a set carries the
+quantity it was calibrated on and that quantity lives on the full universe. A set that bounds a
+moment element-wise carries the moment's own `NaN` frame instead.
+
+The gain is the pre-built route. A set fitted standalone on the full universe passes through
+`port_opt_view(opt, idx, pr.X)` at the optimiser's entry, so the same weights are reached whether
+the caller hands the optimiser the estimator or the set it fitted itself. A set fitted on the
+reduced prior could not be handed back: its rows do not line up with the full universe.
+
+The refusal a non-finite loading raises inside `orthogonal_factor_span` stays, and now names a
+defect rather than a mode: every asset it counts is inside the mask, with a finite moment and a
+loadings row that is not.
+
 ### The three other fit sites
 
 **The near-optimal-centering pre-fit passes the new root through unchanged.** `ucs_risk_measure`

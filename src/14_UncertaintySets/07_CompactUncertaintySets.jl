@@ -192,6 +192,45 @@ function port_opt_view(risk_ucs::CompactCovarianceUncertaintySet, i,
                                            val = nothing_scalar_array_view(risk_ucs.val, i))
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Write a [`CompactCovarianceUncertaintySet`](@ref) fitted on the Investable Mask back onto the full asset universe.
+
+The expansion is the inverse of [`port_opt_view`](@ref): a zero row of the basis is dropped by the view without moving the span, and the sliced basis is already orthonormal, so [`orthonormalise_basis`](@ref) leaves its column space where it is and the view recovers the fitted set. The rows outside the mask carry a zero of `C` too, so the set states nothing about an asset the prior could not estimate, and the nominal covariance is the full `pr.sigma`, `NaN` frame and all, because the set is a neighbourhood of the prior it was calibrated on and that prior lives on the full universe.
+
+# Algorithm
+
+ 1. Allocate a zero frame of `length(imsk)` rows and `size(set.Q, 2)` columns, and write `set.Q` at the rows the mask keeps, giving `Q`.
+ 2. Allocate a zero vector of `length(imsk)` entries and write `set.C` at the same rows, giving `C`.
+ 3. Build a [`CompactCovarianceUncertaintySet`](@ref) from the two, carrying `kappa` through unchanged and `pr.sigma` as `val`.
+
+# Arguments
+
+  - `set`: Compact covariance uncertainty set fitted on the reduced prior.
+  - `imsk`: The Investable Mask of the full prior.
+  - $(arg_dict[:pr])
+
+# Returns
+
+  - `set::CompactCovarianceUncertaintySet`: The set on the full asset universe.
+
+# Related
+
+  - [`CompactCovarianceUncertaintySet`](@ref)
+  - [`investable_ucs_reduction`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+function expand_investable_ucs(set::CompactCovarianceUncertaintySet, imsk::BitVector,
+                               pr::AbstractPriorResult)::CompactCovarianceUncertaintySet
+    N = length(imsk)
+    Q = zeros(eltype(set.Q), N, size(set.Q, 2))
+    Q[imsk, :] = set.Q
+    C = zeros(eltype(set.C), N)
+    C[imsk] = set.C
+    return CompactCovarianceUncertaintySet(; kappa = set.kappa, C = C, Q = Q,
+                                           val = pr.sigma)
+end
+"""
     mu_ucs(uc::CompactCovarianceUncertaintySet, args...; kwargs...)
 
 Always throw. [`CompactCovarianceUncertaintySet`](@ref) is covariance-only.

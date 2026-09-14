@@ -146,7 +146,7 @@ Last row of a cross-sectional weight history, checked as a metric.
 # Validation
 
   - `!isempty(w)`, else an `IsEmptyError`.
-  - Every entry of the last row is finite and `> 0`, else a `DomainError`. A weight of zero excluded its asset from the fit, and an excluded asset gives the metric a singular direction.
+  - Every entry of the last row is finite and `> 0`, else a `DomainError`. A weight of zero excluded its asset from the fit, and an excluded asset gives the metric a singular direction. The case is not a point-in-time gap the Investable Mask removes: an asset can be investable, with a finite return and a stated moment, and still sit outside the estimation universe of the latest cross-section, so its weight is zero while its loadings and variance are finite. The refusal is the reference implementation's, and the two metrics that read no weight history, [`InverseIdiosyncraticVarianceMetric`](@ref) and [`IdentityMetric`](@ref), are the way round it.
 
 # Returns
 
@@ -167,7 +167,7 @@ function latest_orthogonality_weights(w::MatNum, name::Symbol,
     wl = view(w, size(w, 1), :)
     @argcheck(all(x -> isfinite(x) && x > zero(x), wl),
               DomainError(wl,
-                          "every weight of the latest observation of $(name) must be finite and > 0; a weight of 0 excluded its asset from the fit and leaves the metric singular"))
+                          "every weight of the latest observation of $(name) must be finite and > 0; a weight of 0 excluded its asset from the latest cross-sectional fit and leaves the metric singular. An investable asset can sit outside the estimation universe of that fit; use `InverseIdiosyncraticVarianceMetric` or `IdentityMetric`, which read no weight history"))
     return wl
 end
 """
@@ -393,7 +393,7 @@ Weighted factor span of the prior's loadings block, the geometry both sets are b
 # Algorithm
 
  1. Refuse when `pr.rr` is `nothing`. The set reads the loadings off the prior result, and a prior that fitted no factor model carries none.
- 2. Read the effective loadings `rr.L`, which reads back as `rr.M` when no Factor Family was re-based, so a re-based model is already reduced to a full-rank basis here. Refuse a row that is not finite: a prior fitted on a point-in-time Asset Panel carries `NaN` loadings for every asset outside its Investable Mask, and a singular value decomposition of such a row is not a span but a LAPACK error. The optimiser's builders never meet one, because they hand this fit the prior reduced to the Investable Mask; a caller fitting the set alone reduces the prior first, and the message says how.
+ 2. Read the effective loadings `rr.L`, which reads back as `rr.M` when no Factor Family was re-based, so a re-based model is already reduced to a full-rank basis here. Refuse a row that is not finite: a singular value decomposition of such a row is not a span but a LAPACK error. The fit never meets the `NaN` rows a point-in-time Asset Panel writes outside the Investable Mask, because the optimiser's builders hand it the prior reduced to that mask and the standalone verbs reduce to it first through [`investable_ucs_reduction`](@ref). A non-finite row that reaches here therefore sits on an asset the prior calls investable, whose `mu` and variance are finite while its loadings are not, and the message says so.
  3. Read the cross-sectional weights through [`orthogonality_weights`](@ref) and take their element-wise square root, or leave a `nothing`.
  4. Scale the rows of the loadings by that square root, take a thin `LinearAlgebra.svd`, and count the singular values above `maximum(size) * eps * s[1]`, the tolerance `LinearAlgebra.rank` applies. Keep that many left singular vectors.
 
@@ -407,7 +407,7 @@ Step 4 counts the rank after the family re-basis of step 2, because the selected
 # Validation
 
   - `!isnothing(pr.rr)`, else an `IsNothingError` naming the field and the estimator that returned no block.
-  - `all(isfinite, rr.L)`, else an [`IsNonFiniteError`](@ref) counting the assets whose loadings are not finite and naming the reduction that removes them, `PortfolioOptimisers.port_opt_view(pr, findall(PortfolioOptimisers.investable_mask(pr)))`.
+  - `all(isfinite, rr.L)`, else an [`IsNonFiniteError`](@ref) counting the assets whose loadings are not finite. Every such asset is inside the Investable Mask of `pr`, because the verbs that call this fit reduce to the mask first.
 
 # Returns
 
@@ -428,7 +428,7 @@ function orthogonal_factor_span(ue::OrthogonalUncertaintySet, pr::AbstractPriorR
     B = rr.L
     nnf = count(i -> !all(isfinite, view(B, i, :)), axes(B, 1))
     @argcheck(iszero(nnf),
-              IsNonFiniteError("`$(nameof(typeof(ue)))` takes the span of the factor loadings, and $(nnf) of the $(size(B, 1)) assets of `pr.rr` carry a loading that is not finite, so the span is not defined over them. A prior fitted on a point-in-time Asset Panel writes `NaN` on every asset outside its Investable Mask.\nReduce the prior to its Investable Mask first, `PortfolioOptimisers.port_opt_view(pr, findall(PortfolioOptimisers.investable_mask(pr)))`, which is what an optimiser hands this fit.\nGot\npr => $(nameof(typeof(pr)))\nrr => $(nameof(typeof(rr)))\nassets with a non-finite loading => $(nnf)"))
+              IsNonFiniteError("`$(nameof(typeof(ue)))` takes the span of the factor loadings, and $(nnf) of the $(size(B, 1)) assets of `pr.rr` carry a loading that is not finite, so the span is not defined over them. The fit reduces the prior to its Investable Mask first, so every such asset has a finite `mu` and variance and a loadings row that is not: the prior estimator wrote a moment for an asset it fitted no loadings on.\nCheck the loadings block of the prior, `pr.rr.L`, on those assets.\nGot\npr => $(nameof(typeof(pr)))\nrr => $(nameof(typeof(rr)))\nassets with a non-finite loading => $(nnf)"))
     w = orthogonality_weights(ue.metric, rr)
     w_sqrt = isnothing(w) ? nothing : sqrt.(w)
     Bw = isnothing(w_sqrt) ? B : w_sqrt .* B
@@ -550,8 +550,10 @@ Fits both uncertainty sets of an [`OrthogonalUncertaintySet`](@ref) from the pri
 
 # Algorithm
 
- 1. Take the weighted factor span once with [`orthogonal_factor_span`](@ref).
- 2. Build the mean set with [`orthogonal_mu_set`](@ref) and the covariance set with [`orthogonal_sigma_set`](@ref), both from that span.
+ 1. Reduce the prior result, and the returns data beside it, to the Investable Mask with [`investable_ucs_reduction`](@ref). Inside an optimiser the result arrives already reduced and the step is a passthrough; standalone, on a prior fitted on a point-in-time Asset Panel, it takes the view the optimiser would have taken.
+ 2. Take the weighted factor span once with [`orthogonal_factor_span`](@ref).
+ 3. Build the mean set with [`orthogonal_mu_set`](@ref) and the covariance set with [`orthogonal_sigma_set`](@ref), both from that span.
+ 4. Write each set back onto the full universe with [`expand_investable_ucs`](@ref), so a set fitted standalone is over the same assets the prior is, with a zero row on every asset outside the mask, and a view of it at the mask recovers the reduced fit.
 
 A caller that needs one axis alone calls [`mu_ucs`](@ref) or [`sigma_ucs`](@ref), which take the same span and build one set.
 
@@ -575,9 +577,11 @@ A caller that needs one axis alone calls [`mu_ucs`](@ref) or [`sigma_ucs`](@ref)
   - [`orthogonal_factor_span`](@ref)
 """
 function ucs(ue::OrthogonalUncertaintySet, pr::AbstractPriorResult; rd = nothing, kwargs...)
-    rr, w_sqrt, Q = orthogonal_factor_span(ue, pr)
-    return orthogonal_mu_set(ue, pr, rr, w_sqrt, Q),
-           orthogonal_sigma_set(ue, pr, rr, w_sqrt, Q, rd)
+    imsk, prr, rdr = investable_ucs_reduction(pr, rd)
+    rr, w_sqrt, Q = orthogonal_factor_span(ue, prr)
+    return expand_investable_ucs(orthogonal_mu_set(ue, prr, rr, w_sqrt, Q), imsk, pr),
+           expand_investable_ucs(orthogonal_sigma_set(ue, prr, rr, w_sqrt, Q, rdr), imsk,
+                                 pr)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -586,8 +590,10 @@ Fits the mean uncertainty set of an [`OrthogonalUncertaintySet`](@ref) from the 
 
 # Algorithm
 
- 1. Take the weighted factor span with [`orthogonal_factor_span`](@ref).
- 2. Build the mean set with [`orthogonal_mu_set`](@ref).
+ 1. Reduce the prior result to the Investable Mask with [`investable_ucs_reduction`](@ref), a passthrough on a result that arrived reduced.
+ 2. Take the weighted factor span with [`orthogonal_factor_span`](@ref).
+ 3. Build the mean set with [`orthogonal_mu_set`](@ref).
+ 4. Write it back onto the full universe with [`expand_investable_ucs`](@ref).
 
 # Arguments
 
@@ -606,8 +612,9 @@ Fits the mean uncertainty set of an [`OrthogonalUncertaintySet`](@ref) from the 
   - [`orthogonal_mu_set`](@ref)
 """
 function mu_ucs(ue::OrthogonalUncertaintySet, pr::AbstractPriorResult; kwargs...)
-    rr, w_sqrt, Q = orthogonal_factor_span(ue, pr)
-    return orthogonal_mu_set(ue, pr, rr, w_sqrt, Q)
+    imsk, prr, _ = investable_ucs_reduction(pr, nothing)
+    rr, w_sqrt, Q = orthogonal_factor_span(ue, prr)
+    return expand_investable_ucs(orthogonal_mu_set(ue, prr, rr, w_sqrt, Q), imsk, pr)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -616,8 +623,10 @@ Fits the covariance uncertainty set of an [`OrthogonalUncertaintySet`](@ref) fro
 
 # Algorithm
 
- 1. Take the weighted factor span with [`orthogonal_factor_span`](@ref).
- 2. Build the covariance set with [`orthogonal_sigma_set`](@ref).
+ 1. Reduce the prior result, and the returns data beside it, to the Investable Mask with [`investable_ucs_reduction`](@ref), a passthrough on a result that arrived reduced.
+ 2. Take the weighted factor span with [`orthogonal_factor_span`](@ref).
+ 3. Build the covariance set with [`orthogonal_sigma_set`](@ref).
+ 4. Write it back onto the full universe with [`expand_investable_ucs`](@ref).
 
 # Arguments
 
@@ -638,8 +647,10 @@ Fits the covariance uncertainty set of an [`OrthogonalUncertaintySet`](@ref) fro
 """
 function sigma_ucs(ue::OrthogonalUncertaintySet, pr::AbstractPriorResult; rd = nothing,
                    kwargs...)
-    rr, w_sqrt, Q = orthogonal_factor_span(ue, pr)
-    return orthogonal_sigma_set(ue, pr, rr, w_sqrt, Q, rd)
+    imsk, prr, rdr = investable_ucs_reduction(pr, rd)
+    rr, w_sqrt, Q = orthogonal_factor_span(ue, prr)
+    return expand_investable_ucs(orthogonal_sigma_set(ue, prr, rr, w_sqrt, Q, rdr), imsk,
+                                 pr)
 end
 
 """

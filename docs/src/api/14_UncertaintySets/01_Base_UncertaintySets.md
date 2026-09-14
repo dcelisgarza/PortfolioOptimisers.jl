@@ -40,6 +40,8 @@ AbstractUncertaintySetClass
 ucs_selector
 k_ucs
 port_opt_view(risk_ucs::Option{<:AbstractUncertaintySetEstimator}, ::Any, args...)
+investable_ucs_reduction
+expand_investable_ucs(set::AbstractUncertaintySetResult, ::Nothing, ::AbstractPriorResult)
 port_opt_view(risk_ucs::BoxUncertaintySet{<:VecNum, <:VecNum}, i, args...)
 port_opt_view(risk_ucs::BoxUncertaintySet{<:MatNum, <:MatNum}, i, args...)
 port_opt_view(risk_ucs::EllipsoidalUncertaintySet{<:MatNum, <:Any, <:SigmaUncertaintySetClass}, i, args...)

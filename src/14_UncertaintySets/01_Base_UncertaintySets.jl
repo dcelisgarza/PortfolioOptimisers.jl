@@ -441,6 +441,76 @@ function port_opt_view(risk_ucs::Option{<:AbstractUncertaintySetEstimator}, ::An
     return risk_ucs
 end
 """
+    investable_ucs_reduction(pr::AbstractPriorResult, rd) -> (imsk, pr, rd)
+    investable_ucs_reduction(::Nothing, pr::AbstractPriorResult, rd) -> (nothing, pr, rd)
+    investable_ucs_reduction(imsk::BitVector, pr::AbstractPriorResult, rd) -> (imsk, pr_view, rd_view)
+
+Reduce a prior result, and the returns data beside it, to the Investable Mask before a set is fitted on them standalone.
+
+A Prior Result lives on the full asset universe, and an asset outside its Investable Mask carries `NaN` in its moments and in every block a factor fit wrote, so a set fitted on the whole result meets a `NaN` where its arithmetic needs a number. Inside an optimiser the result arrives already reduced, because every optimisation family reduces once at its entry (ADR 0115), and the mask this verb derives is then `nothing`. Standalone, which ADR 0111 offers as a mode, the result arrives whole, and this verb takes the same view the optimiser takes, so the two routes fit the same set. [`expand_investable_ucs`](@ref) writes the fitted set back onto the full universe, and the pair is the reduce-and-expand shape ADR 0117 gives every prior result.
+
+Three methods, and the branch is dispatch rather than a condition, as it is in `investable_reduction`. The first derives the mask; the `nothing` method is the all-investable path and returns its arguments untouched; the `BitVector` method takes the two views.
+
+# Algorithm
+
+ 1. Derive the Investable Mask from the prior result with [`investable_mask`](@ref).
+ 2. Return `nothing` and the two arguments unchanged when the mask is `nothing`.
+ 3. Otherwise take a [`port_opt_view`](@ref) of the prior result at `findall(imsk)`, and of the returns data when it is not `nothing`, and return them beside the mask.
+
+# Arguments
+
+  - $(arg_dict[:pr])
+  - `rd`: Returns data the set is fitted beside, or `nothing`.
+
+# Returns
+
+  - `(imsk, pr, rd)`: The Investable Mask and the two reduced to it, or `nothing` and the two unchanged.
+
+# Related
+
+  - [`expand_investable_ucs`](@ref)
+  - [`investable_mask`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+function investable_ucs_reduction(pr::AbstractPriorResult, rd)
+    return investable_ucs_reduction(investable_mask(pr), pr, rd)
+end
+function investable_ucs_reduction(::Nothing, pr::AbstractPriorResult, rd)
+    return nothing, pr, rd
+end
+function investable_ucs_reduction(imsk::BitVector, pr::AbstractPriorResult, rd)
+    idx = findall(imsk)
+    return imsk, port_opt_view(pr, idx), isnothing(rd) ? nothing : port_opt_view(rd, idx)
+end
+"""
+    expand_investable_ucs(set::AbstractUncertaintySetResult, ::Nothing, pr::AbstractPriorResult) -> set
+
+Write a set fitted on the Investable Mask back onto the full asset universe.
+
+The `nothing` method is the all-investable path of [`investable_ucs_reduction`](@ref) and returns the set untouched, so a set fitted inside an optimiser, on a result that arrived reduced, pays nothing here. Each built set that a prior-result route produces adds its own `BitVector` method beside its [`port_opt_view`](@ref), because the expansion is the inverse of that view: it writes the set's asset-axis blocks into a zero frame of the full width, and carries the full `pr.mu` or `pr.sigma` as `val`, `NaN` frame and all. The two rows of a view then commute, `port_opt_view(expand_investable_ucs(set, imsk, pr), findall(imsk))` recovers `set`, which is what lets a set fitted standalone on a point-in-time prior be handed back to an optimiser on the full universe.
+
+The method is a passthrough, so it carries no `# Algorithm` section.
+
+# Arguments
+
+  - `set`: Fitted uncertainty set.
+  - `imsk`: The Investable Mask, or `nothing`.
+  - $(arg_dict[:pr])
+
+# Returns
+
+  - `set::AbstractUncertaintySetResult`: The set on the full asset universe.
+
+# Related
+
+  - [`investable_ucs_reduction`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+function expand_investable_ucs(set::AbstractUncertaintySetResult, ::Nothing,
+                               ::AbstractPriorResult)
+    return set
+end
+"""
     ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; kwargs...)
 
 Fits both uncertainty sets in one pass from an estimator and a [`ReturnsResult`](@ref).

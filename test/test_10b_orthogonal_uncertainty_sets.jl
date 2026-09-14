@@ -819,11 +819,11 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
     standalone fit that ADR 0111 offers meets the full prior, so it must refuse the `NaN`
     rows by name rather than hand them to LAPACK.
     =#
-    @testset "A point-in-time prior is refused whole, and fits reduced" begin
+    @testset "A point-in-time prior fits on its Investable Mask and answers the full universe" begin
         PO = PortfolioOptimisers
-        # This panel and factor set leave two assets outside the Investable Mask at the
-        # latest observation, which is the case this testset is about; the assertion below
-        # guards the fixture.
+        # This panel and factor set leave assets outside the Investable Mask at the latest
+        # observation, which is the case this testset is about; the assertion below guards
+        # the fixture.
         rdp = synthetic_asset_panel(; n_assets = 40, n_observations = 200, n_industries = 3,
                                     rng = StableRNG(725_001)).rd
         pe = CrossSectionalFactorPrior(;
@@ -841,42 +841,80 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
         msk = PO.investable_mask(prp)
         @test !isnothing(msk)
         @test count(msk) < length(msk)
-        nnf = count(i -> !all(isfinite, view(prp.rr.L, i, :)), axes(prp.rr.L, 1))
-        @test nnf > 0
+        @test count(i -> !all(isfinite, view(prp.rr.L, i, :)), axes(prp.rr.L, 1)) > 0
+        idx = findall(msk)
+        N = length(msk)
         ue = OrthogonalUncertaintySet()
-        for f in (ucs, mu_ucs, sigma_ucs)
-            err = try
-                f(ue, prp)
-                nothing
-            catch e
-                e
-            end
-            @test isa(err, PO.IsNonFiniteError)
-            @test occursin("$(nnf) of the $(length(msk)) assets", sprint(showerror, err))
-            @test occursin("investable_mask", sprint(showerror, err))
+        # The standalone fit reduces to the mask, fits, and expands: both sets are over the
+        # full universe, with a zero row on every asset outside the mask, and carry the
+        # prior's own moments as their centre, `NaN` frame and all.
+        mu_f, sg_f = ucs(ue, prp)
+        @test size(mu_f.L, 1) == N
+        @test size(sg_f.Q, 1) == N
+        @test length(sg_f.C) == N
+        @test all(iszero, view(mu_f.L, .!msk, :))
+        @test all(iszero, view(sg_f.Q, .!msk, :))
+        @test all(iszero, view(sg_f.C, .!msk))
+        @test all(isfinite, mu_f.L)
+        @test all(isfinite, sg_f.Q)
+        @test mu_f.val === prp.mu
+        @test sg_f.val === prp.sigma
+        @test !all(isfinite, mu_f.val)
+        @test mu_ucs(ue, prp).L == mu_f.L
+        @test sigma_ucs(ue, prp).Q == sg_f.Q
+        # The reduced prior is what an optimiser hands the fit, and the expanded set viewed
+        # at the mask is that fit: `L` and `C` row for row, the basis as a projector, because
+        # the view re-orthonormalises the slice through a pivoted QR that may permute or
+        # flip its columns, and the radii untouched.
+        prr = PO.port_opt_view(prp, idx)
+        mu_r, sg_r = ucs(ue, prr)
+        @test size(mu_r.L, 1) == count(msk)
+        mu_v = PO.port_opt_view(mu_f, idx)
+        sg_v = PO.port_opt_view(sg_f, idx)
+        @test mu_v.L == mu_r.L
+        @test mu_v.kappa == mu_r.kappa
+        @test mu_v.val == mu_r.val
+        @test sg_v.C == sg_r.C
+        @test sg_v.kappa == sg_r.kappa
+        @test sg_v.val == sg_r.val
+        @test size(sg_v.Q, 2) == size(sg_r.Q, 2)
+        @test isapprox(sg_v.Q * transpose(sg_v.Q), sg_r.Q * transpose(sg_r.Q); atol = 1e-12)
+        # A non-finite loading inside the mask is a defect of the prior, and the span still
+        # refuses it by name.
+        # The block is rebuilt from a fresh fit and poisoned in place: `Accessors.@set`
+        # materialises the `L => M` forward and the block's constructor refuses that.
+        pr_bad = prior(pe, rdp)
+        pr_bad.rr.M[idx[1], 1] = NaN
+        err = try
+            ucs(ue, pr_bad)
+            nothing
+        catch e
+            e
         end
-        # The reduced prior is what an optimiser hands the fit, and it fits.
-        prr = PO.port_opt_view(prp, findall(msk))
-        mu_set, sigma_set = ucs(ue, prr)
-        @test size(mu_set.L, 1) == count(msk)
-        @test size(sigma_set.Q, 1) == count(msk)
-        @test all(isfinite, mu_set.L)
-        @test all(isfinite, sigma_set.C)
-        @test mu_set.val === prr.mu
-        # Through the JuMP route the same estimator fits on the reduced prior: the compact
-        # block carries one coefficient per column of the reduced span, and no weight lands
-        # outside the Investable Mask.
+        @test isa(err, PO.IsNonFiniteError)
+        @test occursin("1 of the $(count(msk)) assets", sprint(showerror, err))
+        # The pre-built route: a set fitted standalone on the full universe is handed to an
+        # optimiser on that universe, which views it at the mask, and reaches the weights the
+        # estimator route reaches when it fits the same set on the reduced prior.
         slvp = Solver(; name = :clarabel777q, solver = Clarabel.Optimizer,
                       check_sol = (; allow_local = true, allow_almost = true),
                       settings = Dict("verbose" => false))
+        opt_built = JuMPOptimiser(; pe = prp, slv = slvp, bgt = 1.0,
+                                  wb = WeightBounds(; lb = 0.0, ub = 1.0),
+                                  ret = ArithmeticReturn(; ucs = mu_f))
+        res_built = optimise(MeanRisk(; r = UncertaintySetVariance(; ucs = sg_f),
+                                      obj = MinimumRisk(), opt = opt_built), rdp)
         opt = JuMPOptimiser(; pe = prp, slv = slvp, bgt = 1.0,
                             wb = WeightBounds(; lb = 0.0, ub = 1.0),
                             ret = ArithmeticReturn(; ucs = ue))
         res = optimise(MeanRisk(; r = UncertaintySetVariance(; ucs = ue),
                                 obj = MinimumRisk(), opt = opt), rdp)
         @test isa(res.retcode, PO.OptimisationSuccess)
+        @test isa(res_built.retcode, PO.OptimisationSuccess)
         @test isapprox(sum(res.w), 1.0; rtol = 1e-6)
         @test all(i -> msk[i] || abs(res.w[i]) <= 1e-8, eachindex(res.w))
-        @test length(res.model[:z_cucs1]) == size(sigma_set.Q, 2)
+        @test all(i -> msk[i] || abs(res_built.w[i]) <= 1e-8, eachindex(res_built.w))
+        @test isapprox(res_built.w, res.w; atol = 1e-6)
+        @test length(res.model[:z_cucs1]) == size(sg_r.Q, 2)
     end
 end
