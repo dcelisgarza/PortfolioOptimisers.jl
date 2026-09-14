@@ -563,8 +563,15 @@ function forecast_evaluation_mask(alpha::MatNum, umsk::AbstractMatrix{Bool})::Ma
     if all(umsk)
         return alpha
     end
-    return [umsk[t, i] ? alpha[t, i] : convert(eltype(alpha), NaN)
-            for t in axes(alpha, 1), i in axes(alpha, 2)]
+    # The copy is filled in a loop rather than built by a two-dimensional comprehension.
+    # A comprehension over two ranges is a `Base.Generator` whose iterator type JET cannot
+    # pin when the history arrives as a bare `MatNum`, and reading a field of that
+    # generator is what its analysis reports.
+    am = similar(alpha)
+    for i in axes(alpha, 2), t in axes(alpha, 1)
+        am[t, i] = umsk[t, i] ? alpha[t, i] : convert(eltype(alpha), NaN)
+    end
+    return am
 end
 function forecast_evaluation(rfr::AbstractReturnForecastResult, rd::ReturnsResult,
                              csfm::CrossSectionalFactorModel;
