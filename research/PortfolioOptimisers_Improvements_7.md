@@ -2,7 +2,7 @@
 
 ## 1. Executive summary
 
-This review was grounded in the current implementation and docs of the `dev` branch, especially the optimizer and risk stack in [src/17_Optimisation/05_JuMP/04_MeanRisk.jl](../src/17_Optimisation/05_JuMP/04_MeanRisk.jl), the uncertainty-set machinery in [src/11_UncertaintySets/03_NormalUncertaintySets.jl](../src/11_UncertaintySets/03_NormalUncertaintySets.jl), the Black-Litterman prior implementation in [src/10_Prior/05_BlackLitterman/02_BlackLittermanPrior.jl](../src/10_Prior/05_BlackLitterman/02_BlackLittermanPrior.jl), the risk-budgeting abstractions in [src/17_Optimisation/05_JuMP/07_RiskBudgeting.jl](../src/17_Optimisation/05_JuMP/07_RiskBudgeting.jl), and the time-dependent CV mechanics shown in [docs/src/examples/5_validation_tuning/04_Time_Dependent_Constraints.md](../docs/src/examples/5_validation_tuning/04_Time_Dependent_Constraints.md).
+This review was grounded in the current implementation and docs of the `dev` branch, especially the optimizer and risk stack in [src/17_Optimisation/05_JuMP/04_MeanRisk.jl](../src/17_Optimisation/05_JuMP/04_MeanRisk.jl), the uncertainty-set machinery in [src/11_UncertaintySets/03_NormalUncertaintySets.jl](../src/11_UncertaintySets/03_NormalUncertaintySets.jl), the Black-Litterman prior implementation in [src/10_Prior/05_BlackLitterman/02_BlackLittermanPrior.jl](../src/10_Prior/05_BlackLitterman/02_BlackLittermanPrior.jl), the risk-budgeting abstractions in [src/17_Optimisation/05_JuMP/07_RiskBudgeting.jl](../src/17_Optimisation/05_JuMP/07_RiskBudgeting.jl), and the time-dependent CV mechanics shown in [examples/5_validation_tuning/04_Time_Dependent_Constraints.jl](../examples/5_validation_tuning/04_Time_Dependent_Constraints.jl).
 
 The codebase is already unusually strong in a few directions:
 
@@ -48,7 +48,7 @@ The uncertainty set code in [src/11_UncertaintySets/03_NormalUncertaintySets.jl]
 
 ### 2.3 Risk budget and time-dependent dynamics
 
-The library already contains detailed risk-budgeting machinery in [src/17_Optimisation/05_JuMP/07_RiskBudgeting.jl](../src/17_Optimisation/05_JuMP/07_RiskBudgeting.jl), and it already supports time-dependent schedules in [docs/src/examples/5_validation_tuning/04_Time_Dependent_Constraints.md](../docs/src/examples/5_validation_tuning/04_Time_Dependent_Constraints.md). That is a particularly important signal: the package is already thinking in terms of dynamic, folded, rebalancing-aware optimization problems.
+The library already contains detailed risk-budgeting machinery in [src/17_Optimisation/05_JuMP/07_RiskBudgeting.jl](../src/17_Optimisation/05_JuMP/07_RiskBudgeting.jl), and it already supports time-dependent schedules in [examples/5_validation_tuning/04_Time_Dependent_Constraints.jl](../examples/5_validation_tuning/04_Time_Dependent_Constraints.jl). That is a particularly important signal: the package is already thinking in terms of dynamic, folded, rebalancing-aware optimization problems.
 
 This means the next leap is not a brand-new conceptual layer; it is a tighter integration of these ideas into a single multi-period, uncertainty-aware optimization workflow.
 
@@ -64,7 +64,7 @@ The library already has:
 
 - turnover constraints in [src/12_Turnover.jl](../src/12_Turnover.jl),
 - tracking/risk-budget machinery in [src/15_Tracking.jl](../src/15_Tracking.jl) and [src/17_Optimisation/05_JuMP/07_RiskBudgeting.jl](../src/17_Optimisation/05_JuMP/07_RiskBudgeting.jl),
-- time-dependent fold logic in [docs/src/examples/5_validation_tuning/04_Time_Dependent_Constraints.md](../docs/src/examples/5_validation_tuning/04_Time_Dependent_Constraints.md).
+- time-dependent fold logic in [examples/5_validation_tuning/04_Time_Dependent_Constraints.jl](../examples/5_validation_tuning/04_Time_Dependent_Constraints.jl).
 
 This is the most natural and highest-value extension.
 
@@ -1049,7 +1049,7 @@ res = optimise(BenchmarkRelativeRisk(; benchmark = b, active_risk_limit = 0.05),
 - [src/17_Optimisation/05_JuMP/07_RiskBudgeting.jl](../src/17_Optimisation/05_JuMP/07_RiskBudgeting.jl)
 - [src/12_Turnover.jl](../src/12_Turnover.jl)
 - [src/15_Tracking.jl](../src/15_Tracking.jl)
-- [docs/src/examples/5_validation_tuning/04_Time_Dependent_Constraints.md](../docs/src/examples/5_validation_tuning/04_Time_Dependent_Constraints.md)
+- [examples/5_validation_tuning/04_Time_Dependent_Constraints.jl](../examples/5_validation_tuning/04_Time_Dependent_Constraints.jl)
 
 ### Literature references
 
