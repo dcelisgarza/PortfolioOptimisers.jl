@@ -415,6 +415,33 @@ what keeps the JuMP families cheap.
         o = cross_val_predict(po.Online(rpipe; max_history = w), rd, capped)
         @test all(isapprox(po_.res.w, pb.res.w; atol = 1e-10)
                   for (pb, po_) in zip(b.pred, o.pred))
+        # A capped owner on returns input, behind a universe-only step alone, stays on the
+        # host route and equals the rolling batch walk-forward: the read-out refits the
+        # selector over the owner's capped rows (#1076).
+        sel = ScoreSelector(; score = MeanReturn(), rule = RankRule(; best = 4))
+        b = cross_val_predict(Pipeline(; steps = (sel, EmpiricalPrior(), hrp)), rd, rolling)
+        o = cross_val_predict(Pipeline(;
+                                       steps = (sel,
+                                                po.Online(EmpiricalPrior();
+                                                          max_history = w), hrp)), rd,
+                              capped)
+        @test all(isapprox(po_.res.w, pb.res.w; atol = 1e-10)
+                  for (pb, po_) in zip(b.pred, o.pred))
+        # #1076's fixture: asset 2 gapped over rows 5:40, so fold 2's window starts inside
+        # the gap. The rolling batch fit seeds no price the window did not see and the column
+        # filter drops asset 2; the refit route drops it too. A capped owner on the host route
+        # would have kept it, filled from row 4 at fold 1, and is refused below.
+        P2 = copy(P)
+        P2[5:40, 2] .= NaN
+        pr2 = price_ingestion(PriceIngestion(), TimeArray(ts, P2, nx))
+        gpipe = Pipeline(;
+                         steps = (PriceGapFill(), MissingDataFilter(; col_thr = 0.1),
+                                  PricesToReturns(), EmpiricalPrior(), hrp))
+        b = cross_val_predict(gpipe, pr2, rolling)
+        o = cross_val_predict(po.Online(gpipe; max_history = w), pr2, capped)
+        @test !("A2" in b.pred[2].rd.nx) && !("A2" in o.pred[2].rd.nx)
+        @test all(isapprox(po_.res.w, pb.res.w; atol = 1e-10)
+                  for (pb, po_) in zip(b.pred, o.pred))
         mro = MultipleRandomised(online_cv; subset_size = 3, seed = 7)
         b = cross_val_predict(rpipe, rd,
                               MultipleRandomised(batch_cv; subset_size = 3, seed = 7))
@@ -515,6 +542,39 @@ what keeps the JuMP families cheap.
                                                                                                        slv = slv))))),
                                               pr, online_cv))
         @test occursin("opt.opt.pe", msg)
+        # A capped owner behind a row-local step (#1076): each of the three steps by name, on
+        # a prior owner and on an optimisation owner's prior; the cap is read through
+        # `step_online_cap`, and an uncapped owner stays on the host route.
+        cpe = po.Online(EmpiricalPrior(); max_history = w)
+        for (steps, name) in ((PricesToReturns(),) => "PricesToReturns",
+                              (PriceGapFill(), PricesToReturns()) => "PriceGapFill",
+                              (MissingDataFilter(), PricesToReturns()) => "MissingDataFilter")
+            msg = refusal(() -> cross_val_predict(Pipeline(; steps = (steps..., cpe, hrp)),
+                                                  pr, online_cv))
+            @test occursin(name, msg) &&
+                  occursin("max_history = $(w)", msg) &&
+                  occursin("Online(pipe; max_history = $(w))", msg)
+        end
+        msg = refusal(() -> cross_val_predict(Pipeline(;
+                                                       steps = (prep...,
+                                                                MeanRisk(;
+                                                                         opt = JuMPOptimiser(;
+                                                                                             pe = cpe,
+                                                                                             slv = slv)))),
+                                              pr, online_cv))
+        @test occursin("max_history = $(w)", msg)
+        @test po.step_online_cap(hrp) === nothing
+        @test po.step_online_cap(po.Online(EmpiricalPrior())) === nothing
+        @test po.step_online_cap(cpe) == w
+        @test po.step_online_cap(PipelineStep(; est = cpe, reads = (:returns,),
+                                              writes = :prior)) == w
+        @test po.step_online_cap(HierarchicalRiskParity(;
+                                                        opt = HierarchicalOptimiser(;
+                                                                                    pe = cpe))) ==
+              w
+        @test po.step_online_cap(MeanRisk(; opt = JuMPOptimiser(; pe = cpe, slv = slv))) ==
+              w
+        @test po.step_online_cap(PortfolioOptimisersCovariance()) === nothing
         # An Online(pipe) under a batch scheme, and an Online step at a fold-less fit.
         hpipe = Pipeline(; steps = (prep..., EmpiricalPrior(), hrp))
         msg = refusal(() -> cross_val_predict(po.Online(hpipe), pr, batch_cv))

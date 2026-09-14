@@ -142,6 +142,26 @@ and its cap would be silently ignored. An `Online(pe)` inside an **unwrapped** P
 ordinary host-route case: the owner's window is the Pipeline's, and its Fold Context takes the
 owner's cap.
 
+**A capped owner behind a row-local step is refused on the host route.** The owner's window is
+counted in the owner's rows, and every row-local step folds a state that reaches across that
+window's front edge: `PricesToReturns` keeps the last price row, so the window's first return is
+computed from a price the window never held; `PriceGapFill(CarriedPrice())` keeps the last price
+it ever saw, so a gap at the window's front is filled from before the window, where the rolling
+batch fit under [#1068](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1068)'s rule
+seeds nothing; `MissingDataFilter` counts over every block folded. Measured on
+[#1076](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1076) with `test_24f`'s
+price fixture and asset 2 gapped over rows `5:40`, against
+`IndexWalkForward(w + p, t; purged_size = p)` with `w = 60`: fold 2's batch fit drops asset 2 (its
+window rows `21:40` are `NaN`) and the capped host route keeps it (rows `5:40` were filled from
+row 4 at fold 1); folds 3 and 4, with the gap outside the window and six assets on both sides,
+differ by `max |Δw|` of `6.2e-3` and `9.5e-4`, the one extra return `PricesToReturns` computes at
+the window's front. So the configuration equals no batch scheme, and `assert_online_entry` refuses
+it by name, reading the cap through `step_online_cap` and pointing at both spellings: the rolling
+window through a Pipeline is `Online(pipe; max_history = w)`, and the uncapped owner is the
+expanding one. A capped owner on returns input, or behind universe-only steps alone, stays on the
+host route, because the read-out refits a universe-only step over the owner's capped rows. The
+Scenario Cap is untouched: `max_scenarios` promises no window (ADR 0136).
+
 A plain Pipeline handed a scheme with `ff = OnlineStep()` takes the host route with no wrapper; the
 refusal reaches the window-valued configurations and the unknown data-slot steps alone.
 `Online(pipe)` takes the two `cross_val_predict` doors, the contiguous and the multiple-randomised,
@@ -168,6 +188,7 @@ blackboard, built per read-out; the ticket's third question collapses.
   runs online unchanged.
 - A window-valued step and an unknown data-slot step, as above.
 - An `Online` member below an `Online(pipe)`, as above.
+- A capped owner behind a row-local step, as above.
 - A `TrainTestSplit` and a finite allocation, as today: `assert_no_holdout` refuses the first at
   every cross-validation door, and the arm's type bound excludes the second.
 
@@ -219,8 +240,12 @@ Four facts, found on the way and recorded here rather than left to be found agai
    step after a prior step, equals `expand_train = true` fold for fold — the map's closing test,
    through the Pipeline.
 5. `Online(pipe; max_history = w)` equals the rolling batch walk-forward with warm-up
-   `w + purged_size`, and `Online(pipe)` equals the unwrapped host route.
-6. Every refusal, by message.
+   `w + purged_size`, and `Online(pipe)` equals the unwrapped host route. On the same fixture with
+   asset 2 gapped over rows `5:40`, the refit route drops asset 2 at fold 2 as the rolling batch
+   fit does, and a capped owner behind universe-only steps alone on returns input equals the
+   rolling batch walk-forward on the host route.
+6. Every refusal, by message, the capped owner behind each row-local step and on an optimisation
+   owner's prior included.
 7. The Pipeline's search door lifts its refusal and picks the batch candidate (ADR 0141's
    identity).
 
@@ -258,6 +283,17 @@ Four facts, found on the way and recorded here rather than left to be found agai
 8. **Fold through an unknown data-slot step as if row-local**, applying the warm-up's fitted
    object to the new rows. Rejected as silently wrong for a window-valued transform and as the
    freeze of option 3 in another place.
+9. **Window the row-local states with the owner's cap**, so that a capped owner behind a
+   row-local step reaches the rolling batch fit. Rejected because it cannot be exact: the fill and
+   the conversion write their rows at fold time, and the owner's buffer already holds them, so
+   dropping a carry older than the window later cannot un-fill a row the window's batch fit leaves
+   `NaN`, and the filter, which runs after the fill, counts the filled rows it was handed whatever
+   window its counts keep. Reaching the batch fit means re-running every step over the window's
+   raw input, which is the refit `Online(pipe; max_history = w)` already is.
+10. **Document the capped host route as its own configuration**, equal to no batch scheme, as
+    ADR 0136 documents the Scenario Cap. Rejected because `max_history` is the window ADR 0136
+    separates from the Scenario Cap by that promise, and a configuration that reads as a rolling
+    window and is not one would carve the promise out for the Pipeline alone.
 
 ## Consequences
 
@@ -275,6 +311,12 @@ Four facts, found on the way and recorded here rather than left to be found agai
 - A capped owner (`EmpiricalPrior(; max_scenarios = w)`) makes a selector rank over `w` rows at
   read-out, which is the divergence the Scenario Cap already documents (ADR 0136); the Pipeline
   adds no rule.
+- A windowed owner (`Online(pe; max_history = w)`) behind a row-local step is refused on the host
+  route ([#1076](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1076)), so the only
+  capped online Pipeline on price input is the refit `Online(pipe; max_history = w)`, whose
+  read-out is a batch fit over `w` rows at every fold. The refused configuration folded one block
+  into the owner's state at `O(1)` and was exact against nothing; the surviving one costs `O(w)`
+  and equals the rolling batch walk-forward.
 - `CONTEXT.md`: *Pipeline* states its online form, *Fold Context* names the Pipeline as a holder,
   and *Sample Buffer* names the input-carrier buffer `Online(pipe)` seeds.
 - Built by [#1022](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1022) in

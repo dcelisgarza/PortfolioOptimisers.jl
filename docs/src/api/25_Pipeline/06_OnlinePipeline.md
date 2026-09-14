@@ -29,6 +29,7 @@ PortfolioOptimisers.pipeline_row_owner
 PortfolioOptimisers.online_entry_state(p::Pipeline)
 PortfolioOptimisers.pipeline_online_member
 PortfolioOptimisers.step_online_member
+PortfolioOptimisers.step_online_cap
 PortfolioOptimisers.assert_online_entry(p::Pipeline)
 PortfolioOptimisers.assert_online_owner
 PortfolioOptimisers.assert_pipeline_door

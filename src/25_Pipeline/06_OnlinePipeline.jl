@@ -271,12 +271,36 @@ function step_online_member(est::Union{<:JuMPOptimisationEstimator,
     return isnothing(inner) ? nothing : string("opt.", inner)
 end
 """
+    step_online_cap(step)
+
+Reads the `max_history` of the first [`Online`](@ref) declaration one [`Pipeline`](@ref) step carries, walking the paths [`step_online_member`](@ref) names: the step's own wrapper, the first field of its estimator holding one, or the bundle a JuMP or hierarchical head holds. Answers `nothing` when the step carries no wrapper, or when its wrapper carries no cap.
+
+The read the host route's refusal of a capped owner runs: a cap on the owner is a window counted in the owner's rows, and a row-local step before it folds a state across that window's front edge.
+
+# Related
+
+  - [`step_online_member`](@ref)
+  - [`assert_online_entry(p::Pipeline)`](@ref)
+"""
+step_online_cap(::Any) = nothing
+step_online_cap(o::Online) = o.max_history
+step_online_cap(ps::PipelineStep) = step_online_cap(ps.est)
+function step_online_cap(est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEstimator})
+    fns = online_fields(est)
+    return isempty(fns) ? nothing : step_online_cap(getfield(est, fns[1]))
+end
+function step_online_cap(est::Union{<:JuMPOptimisationEstimator, <:HierarchicalRiskParity,
+                                    <:HierarchicalEqualRiskContribution,
+                                    <:SchurComplementHierarchicalRiskParity})
+    return step_online_cap(est.opt)
+end
+"""
     assert_online_entry(p::Pipeline)
     assert_online_entry(o::Online{<:Pipeline})
 
 Refuses a [`Pipeline`](@ref) that cannot take the online step, at the entry of the fold loop's online arm and before any fit, by name.
 
-The walk over the steps ADR 0142 decides. On the host route, five refusals. A state anywhere — the Pipeline's own `cache` or a step's — because the loop starts cold (ADR 0140). No row owner: a pipeline with neither a prior nor an optimisation step has nothing to fold into. A [`TimeDependent`](@ref) schedule as the row owner, which is the case only when no prior step precedes the optimisation step: a schedule swaps the estimator that carries the state; with a prior step before it, the schedule swaps a stateless step and composes. An optimisation step that owns the rows is held to [`assert_online_entry`](@ref)'s own refusals. And every data step before the owner must fold or defer: a **window-valued** configuration ([`PriceGapFill`](@ref) with a statistic fill, [`MissingDataFilter`](@ref) with `row_thr < 1`), a callable [`PipelineStep`](@ref) writing `:prices` or `:returns`, a nested `Pipeline`, and a caller's preprocessing estimator with no online form are refused, and the message names both routes: give the step a [`partial_fit_transform`](@ref), or declare a refit with `Online(pipe)`.
+The walk over the steps ADR 0142 decides. On the host route, six refusals. A state anywhere — the Pipeline's own `cache` or a step's — because the loop starts cold (ADR 0140). No row owner: a pipeline with neither a prior nor an optimisation step has nothing to fold into. A [`TimeDependent`](@ref) schedule as the row owner, which is the case only when no prior step precedes the optimisation step: a schedule swaps the estimator that carries the state; with a prior step before it, the schedule swaps a stateless step and composes. An optimisation step that owns the rows is held to [`assert_online_entry`](@ref)'s own refusals. And every data step before the owner must fold or defer: a **window-valued** configuration ([`PriceGapFill`](@ref) with a statistic fill, [`MissingDataFilter`](@ref) with `row_thr < 1`), a callable [`PipelineStep`](@ref) writing `:prices` or `:returns`, a nested `Pipeline`, and a caller's preprocessing estimator with no online form are refused, and the message names both routes: give the step a [`partial_fit_transform`](@ref), or declare a refit with `Online(pipe)`. And a **capped owner** — an [`Online`](@ref) on the owner's path carrying `max_history`, read through [`step_online_cap`](@ref) — is refused when a row-local step folds before it: the owner's window is counted in its own rows, and the step's carry reaches across the window's front edge, so the run equals no batch scheme. The rolling window through a Pipeline is `Online(pipe; max_history = w)`. A capped owner behind universe-only steps alone, or on returns input, stays on the host route, because the read-out refits a universe-only step over the owner's capped rows.
 
 On the refit route, two: a state anywhere, as above, and an [`Online`](@ref) member below the `Online(pipe)`, because no member folds under a refit and its cap would be silently ignored.
 
@@ -289,6 +313,7 @@ On the refit route, two: a state anywhere, as above, and an [`Online`](@ref) mem
   - [`online_folds`](@ref)
   - [`online_entry_state`](@ref)
   - [`pipeline_row_owner`](@ref)
+  - [`step_online_cap`](@ref)
   - [`supports_partial_fit`](@ref)
   - [`is_universe_step`](@ref)
 """
@@ -301,6 +326,7 @@ function assert_online_entry(p::Pipeline)
               ArgumentError("a `Pipeline` with neither a prior step nor an optimisation step has no row owner, so the online step has nothing to fold the observations into. Add a prior or an optimiser, or refit every fold with `ff = nothing`."))
     owner = step_estimator(p.steps[k])
     assert_online_owner(owner, p.names[k])
+    cap = step_online_cap(p.steps[k])
     for i in 1:(k - 1)
         step = p.steps[i]
         if !is_data_step(step)
@@ -313,6 +339,8 @@ function assert_online_entry(p::Pipeline)
                   ArgumentError("the `$(p.names[i])` step writes the `:$(pipe_writes(step))` slot before the row owner and is not a preprocessing estimator, so the online step cannot fold its rows: an unknown transform applied to one more row may change every earlier row. Give the step's estimator a `partial_fit_transform` and a data-less `fit_preprocessing`, or declare a refit with `Online(pipe)`."))
         @argcheck(supports_partial_fit(est) || is_universe_step(est),
                   ArgumentError("the `$(p.names[i])` step, a `$(typeof(est).name.name)`, has no online form in this configuration: refitting it over one more observation changes what it wrote at earlier ones, so no state folded at one step can be corrected at the next. Give it a `partial_fit_transform` and a data-less `fit_preprocessing` where an exact form exists, or declare a refit with `Online(pipe)`, whose buffer refits every step from the observations seen so far."))
+        @argcheck(isnothing(cap) || is_universe_step(est),
+                  ArgumentError("the `$(p.names[i])` step, a `$(typeof(est).name.name)`, folds a state that reaches across the front edge of the window the `$(p.names[k])` step declares with `max_history = $(cap)`: the owner's window is counted in its own rows, and the step's carry — the last price row, the carried price, the missing counts — reads observations the window has dropped, so the run equals no batch scheme. Cap the pipeline's window with `Online(pipe; max_history = $(cap))`, which refits every step over the window and equals the rolling batch walk-forward, or drop the cap, under which the host route equals the expanding one."))
     end
     return nothing
 end

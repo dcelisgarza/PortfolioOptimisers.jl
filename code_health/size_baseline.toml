@@ -305,10 +305,10 @@ commit = "483d19ebf1"
 "src/24_Preselection.jl" = { code = 311, doc = 766, comment = 0, blank = 370, total = 1447 }
 "src/25_Pipeline/01_Base_Pipeline.jl" = { code = 154, doc = 348, comment = 0, blank = 152, total = 654 }
 "src/25_Pipeline/02_StepExecution.jl" = { code = 197, doc = 201, comment = 2, blank = 106, total = 506 }
-"src/25_Pipeline/03_Pipeline.jl" = { code = 436, doc = 405, comment = 6, blank = 219, total = 1066 }
+"src/25_Pipeline/03_Pipeline.jl" = { code = 441, doc = 411, comment = 4, blank = 221, total = 1077 }
 "src/25_Pipeline/04_PredictionCV.jl" = { code = 182, doc = 141, comment = 15, blank = 67, total = 405 }
 "src/25_Pipeline/05_SearchCrossValidation.jl" = { code = 214, doc = 121, comment = 18, blank = 60, total = 413 }
-"src/25_Pipeline/06_OnlinePipeline.jl" = { code = 331, doc = 300, comment = 0, blank = 132, total = 763 }
+"src/25_Pipeline/06_OnlinePipeline.jl" = { code = 391, doc = 372, comment = 0, blank = 162, total = 925 }
 "src/26_Plotting.jl" = { code = 150, doc = 2251, comment = 111, blank = 794, total = 3306 }
 "src/27_Aliases.jl" = { code = 267, doc = 591, comment = 25, blank = 161, total = 1044 }
 "src/PortfolioOptimisers.jl" = { code = 334, doc = 3, comment = 29, blank = 5, total = 371 }
