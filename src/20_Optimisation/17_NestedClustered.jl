@@ -788,9 +788,12 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
     # universe, where an asset it could not estimate carries `NaN`. Reduce once, here, so
     # that no cluster holds a non-investable asset and every cluster slice below indexes
     # the reduced axis. The weights are expanded back in `NestedClusteredResult`.
-    _, pr, nco, rd = investable_reduction(imsk, pr, nco, rd)
+    # The reduced carrier takes a name of its own. `rd` is assigned twice above, and a
+    # variable that is reassigned and then captured by the fold's closure is boxed, which
+    # FLoops reports as a correctness and performance problem on every call.
+    _, pr, nco, rdr = investable_reduction(imsk, pr, nco, rd)
     X = pr.X
-    clr = clusterise(nco.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa, dims = dims,
+    clr = clusterise(nco.cle, pr; rd = rdr, iv = rdr.iv, ivpa = rdr.ivpa, dims = dims,
                      branchorder = branchorder, x_src = nco.x_src)
     assert_clustering_universe(clr, size(X, 2))
     idx = assignments(clr)
@@ -800,7 +803,7 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
     resi = Vector{NonFiniteAllocationOptimisationResult}(undef, clr.k)
     FLoops.@floop nco.ex for (i, cl) in pairs(cls)
         optic = port_opt_view(opti, cl, X)
-        rdc = port_opt_view(rd, cl)
+        rdc = port_opt_view(rdr, cl)
         res = optimise(optic, rdc; dims = dims, branchorder = branchorder,
                        str_names = str_names, save = save, kwargs...)
         #! Support efficient frontier?
@@ -809,7 +812,7 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
         wi[cl, i] = res.w
         resi[i] = res
     end
-    rdo = predict_outer_returns(nco.cv, nco, ClusterUniverse(cls), rd, pr, cfees, wi, resi)
+    rdo = predict_outer_returns(nco.cv, nco, ClusterUniverse(cls), rdr, pr, cfees, wi, resi)
     nco = _update_asset_sets(nco, rdo)
     reso = optimise(nco.opto, rdo; dims = dims, branchorder = branchorder,
                     str_names = str_names, save = save, kwargs...)

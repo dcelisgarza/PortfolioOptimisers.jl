@@ -102,7 +102,7 @@ end
 
 Turn a graph source into a square `assets × assets` feature matrix.
 
-The kernel behind [`PhylogenyPanel`](@ref). Every method returns a `Float64` matrix — not the `Int` or `BitMatrix` the phylogeny routines produce — so that [`AngularDist`](@ref) keeps its BLAS `gemm` path.
+The kernel behind [`PhylogenyPanel`](@ref). Every method returns a matrix in `eltype(X)`, the type of the returns it graded — not the `Int` or `BitMatrix` the phylogeny routines produce — so that [`AngularDist`](@ref) keeps its BLAS `gemm` path and a `Float32` history grades in `Float32`.
 
 # The source is always refit
 
@@ -311,11 +311,15 @@ end
 """
     regression_factor_names(rr::Regression{<:Any, Nothing, <:Any, <:Any},
                             rd::AbstractReturnsResult) -> Option{<:VecStr}
+    regression_factor_names(rr::CrossSectionalFactorModel, rd) -> Option{<:VecStr}
     regression_factor_names(rr, rd) -> nothing
 
 Read the factor names a [`RegressionPanel`](@ref) labels its loadings axis with, or `nothing`.
 
-The names are the carrier's `nf`, and they are read **only** where the loadings axis is the carrier's factor axis: a [`Regression`](@ref) whose `L` is unset, whose loadings are therefore the raw `M`, one column per factor the carrier holds. A reduced or re-based `L` has its own axis, and a [`CrossSectionalFactorModel`](@ref)'s factors are exposures that no data names, so both are labelled positionally by [`panel_axis_labels`](@ref).
+A name is read wherever one exists for the axis `pr.rr.L` spans, and the axis is labelled positionally by [`panel_axis_labels`](@ref) otherwise.
+
+  - A time-series [`Regression`](@ref) names no factor as data, so the names are the carrier's `nf`, read **only** where the loadings axis is the carrier's factor axis: a `Regression` whose `L` is unset, whose loadings are therefore the raw `M`, one column per factor the carrier holds. A reduced or re-based `L` has its own axis, which no data names.
+  - A [`CrossSectionalFactorModel`](@ref) names its own factors: the prior derives the raw axis from its Exposure Estimators and stores it as `nf` on the block, and [`cs_diagnostic_factor_names`](@ref) maps that list onto the reduced axis when the block carries a family re-basis, which is the axis `L` spans. So the names come off the block, and the data carrier is not read.
 
 # Algorithm
 
@@ -335,11 +339,16 @@ The method that Julia selects is the algorithm. The `Nothing` type parameter of 
   - [`RegressionPanel`](@ref)
   - [`panel_axis_labels`](@ref)
   - [`Regression`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+  - [`cs_diagnostic_factor_names`](@ref)
   - [`ReturnsResult`](@ref)
 """
 function regression_factor_names(::Regression{<:Any, Nothing, <:Any, <:Any},
                                  rd::AbstractReturnsResult)
     return rd.nf
+end
+function regression_factor_names(rr::CrossSectionalFactorModel, ::Any)
+    return cs_diagnostic_factor_names(rr)
 end
 function regression_factor_names(::Any, ::Any)
     return nothing
@@ -511,9 +520,9 @@ end
 
 Build the static [`AssetPanel`](@ref) a producer returns, at the point of use.
 
-Each method returns a panel holding **one** [`TensorPanelField`](@ref), because a loadings matrix and a proximity matrix are each one quantity with a labelled third axis. The trailing axis is labelled off the data carrier where a name exists there, and positionally otherwise; [`panel_axis_labels`](@ref) states the rule.
+Each method returns a panel holding **one** [`TensorPanelField`](@ref), because a loadings matrix and a proximity matrix are each one quantity with a labelled third axis. The trailing axis is labelled off the data carrier or the regression block where a name exists there, and positionally otherwise; [`panel_axis_labels`](@ref) and [`regression_factor_names`](@ref) state the rule.
 
-A producer runs on the subproblem's own prior and returns, so nothing views what it built and a fold refits it.
+A producer runs on the subproblem's own prior and returns, so nothing views what it built and a fold refits it. Standalone on a prior fitted on a point-in-time Asset Panel, a [`RegressionPanel`](@ref) reads the loadings on the prior's Investable Mask and answers the full universe, with a zero row and a false observed mask outside it, so the panel it builds can be handed back to an optimiser; [`expand_investable_loadings`](@ref) states the rule.
 
 # Algorithm
 
@@ -521,8 +530,11 @@ A [`RegressionPanel`](@ref) takes four steps:
 
  1. Check that a prior result reached the call, with [`assert_producer_prior`](@ref).
  2. Check that the prior carries a regression, with [`assert_prior_regression`](@ref).
- 3. Label the loadings axis with [`panel_axis_labels`](@ref), from [`regression_factor_names`](@ref).
- 4. Return the panel holding `pr.rr.L` as the field `"loadings"` on the axis `"factor"`.
+ 3. Reduce the prior to its Investable Mask through [`investable_mask`](@ref) and [`port_opt_view`](@ref), and read the loadings there. A prior fitted on a point-in-time Asset Panel writes `NaN` on the loadings of every asset outside its mask (ADR 0117), and a Panel Field admits no `NaN`. Inside an optimiser the prior arrives reduced and the view is the whole universe.
+ 4. Check that every loading on the mask is finite, and refuse otherwise: an asset the check counts has a finite moment and a loadings row that is not, which is a defect of the regression.
+ 5. Label the loadings axis with [`panel_axis_labels`](@ref), from [`regression_factor_names`](@ref).
+ 6. Expand the loadings back onto the full universe with [`expand_investable_loadings`](@ref): a zero row and a false observed mask outside the mask, as ADR 0111 writes every set fitted standalone on such a prior.
+ 7. Return the panel holding them as the field `"loadings"` on the axis `"factor"`.
 
 A [`PhylogenyPanel`](@ref) takes three steps:
 
@@ -540,6 +552,7 @@ A [`PhylogenyPanel`](@ref) takes three steps:
 # Validation
 
   - A [`RegressionPanel`](@ref) needs a prior result carrying a regression. Raises an [`IsNothingError`](@ref).
+  - A [`RegressionPanel`](@ref) needs every loading inside the prior's Investable Mask to be finite. Raises an [`IsNonFiniteError`](@ref) counting the assets whose loadings are not.
 
 # Returns
 
@@ -557,13 +570,64 @@ A [`PhylogenyPanel`](@ref) takes three steps:
 function asset_panel(ape::RegressionPanel, pr, rd, ::Any)
     assert_producer_prior(ape, pr)
     assert_prior_regression(pr, :pe)
-    L = pr.rr.L
+    imsk = investable_mask(pr)
+    prr = isnothing(imsk) ? pr : port_opt_view(pr, findall(imsk))
+    L = prr.rr.L
+    nnf = count(i -> !all(isfinite, view(L, i, :)), axes(L, 1))
+    @argcheck(iszero(nnf),
+              IsNonFiniteError("`RegressionPanel` reads the factor loadings `pr.rr.L` as a Panel Field, and $(nnf) of the $(size(L, 1)) assets inside the prior's Investable Mask carry a loading that is not finite, so the field cannot be built over them. An asset outside the mask is written as a zero row with a false observed mask and never reaches this check, so every asset it counts has a finite moment and a loadings row that is not: a defect of the regression, not of the universe.\nGot\npr => $(nameof(typeof(pr)))\nrr => $(nameof(typeof(pr.rr)))\nassets with a non-finite loading => $(nnf)"))
+    vals, omsk = expand_investable_loadings(L, imsk)
     return AssetPanel(;
                       pf = [TensorPanelField(; name = "loadings", axis = "factor",
-                                             labels = panel_axis_labels(regression_factor_names(pr.rr,
+                                             labels = panel_axis_labels(regression_factor_names(prr.rr,
                                                                                                 rd),
                                                                         size(L, 2)),
-                                             vals = L)])
+                                             vals = vals, omsk = omsk)])
+end
+"""
+    expand_investable_loadings(L::MatNum, imsk::Nothing) -> (L, nothing)
+    expand_investable_loadings(L::MatNum, imsk::BitVector) -> (vals, omsk)
+
+Write the loadings a [`RegressionPanel`](@ref) read on the Investable Mask back onto the full asset universe.
+
+A prior fitted on a point-in-time Asset Panel writes `NaN` on the loadings of every asset outside its Investable Mask (ADR 0117), and a Panel Field admits no `NaN`. The producer therefore reads the loadings on the mask and expands them here: an asset outside the mask takes a **zero row** and a **false observed mask**, which is the rule ADR 0111 gives every uncertainty set fitted standalone on such a prior, and the shape a Panel Field already has for a cell a fill policy wrote. A zero row is a zero feature vector, which [`AngularDist`](@ref) places at distance `1` from every asset that has loadings and `0` from every other asset that has none, and `"loadings" => :observed` selects the mask as a column. A view of the expanded field at the mask recovers the reduced loadings, so a panel built standalone can be handed to an optimiser on the full universe.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `imsk` is `nothing`, or every asset is investable: the loadings are the full universe's, and the field carries no mask.
+ 2. Otherwise allocate a zero frame in `eltype(L)` over every asset, write `L` on the mask's rows, and build the observed mask as `true` on those rows and `false` elsewhere.
+
+# Arguments
+
+  - `L`: The loadings on the Investable Mask, `investable assets × factors`.
+  - `imsk`: The prior's Investable Mask over every asset, or `nothing`.
+
+# Returns
+
+  - `vals::MatNum`: The loadings over every asset.
+  - `omsk::Option{<:AbstractMatrix{Bool}}`: The observed mask of the same shape, or `nothing` when every asset is investable.
+
+# Related
+
+  - [`RegressionPanel`](@ref)
+  - [`asset_panel`](@ref)
+  - [`investable_mask`](@ref)
+  - [`TensorPanelField`](@ref)
+"""
+function expand_investable_loadings(L::MatNum, ::Nothing)
+    return L, nothing
+end
+function expand_investable_loadings(L::MatNum, imsk::BitVector)
+    if all(imsk)
+        return L, nothing
+    end
+    vals = zeros(eltype(L), length(imsk), size(L, 2))
+    vals[imsk, :] = L
+    omsk = falses(size(vals))
+    omsk[imsk, :] .= true
+    return vals, omsk
 end
 function asset_panel(ape::PhylogenyPanel, ::Any, rd, X::MatNum)
     Zp = phylogeny_features(ape.alg, ape.pl, X)

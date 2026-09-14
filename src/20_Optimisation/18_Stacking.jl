@@ -592,14 +592,17 @@ function _optimise(st::Stacking, rd::ReturnsResult; dims::Int = 1,
     # before the candidate solves: every candidate then sees the investable universe alone,
     # and each composes its own mask inside its own solve. `StackingResult` expands the
     # combined weights back.
-    _, pr, st, rd = investable_reduction(imsk, pr, st, rd)
+    # The reduced carrier takes a name of its own: a variable that is reassigned and then
+    # captured by the fold's closure is boxed, which FLoops reports as a correctness and
+    # performance problem on every call.
+    _, pr, st, rdr = investable_reduction(imsk, pr, st, rd)
     X = pr.X
     opti = st.opti
     Ni = length(opti)
     wi = zeros(eltype(X), size(X, 2), Ni)
     resi = Vector{NonFiniteAllocationOptimisationResult}(undef, Ni)
     FLoops.@floop st.ex for (i, opt) in pairs(opti)
-        res = optimise(opt, rd; dims = dims, branchorder = branchorder,
+        res = optimise(opt, rdr; dims = dims, branchorder = branchorder,
                        str_names = str_names, save = save, kwargs...)
         #! Support efficient frontier?
         @argcheck(!isa(res.retcode, AbstractVector),
@@ -607,7 +610,7 @@ function _optimise(st::Stacking, rd::ReturnsResult; dims::Int = 1,
         wi[:, i] = res.w
         resi[i] = res
     end
-    rdo = predict_outer_returns(st.cv, st, FullUniverse(), rd, pr, cfees, wi, resi)
+    rdo = predict_outer_returns(st.cv, st, FullUniverse(), rdr, pr, cfees, wi, resi)
     reso = optimise(st.opto, rdo; dims = dims, branchorder = branchorder,
                     str_names = str_names, save = save, kwargs...)
     wb = weight_bounds_constraints(st.wb, st.sets; N = size(X, 2), strict = st.strict,

@@ -255,3 +255,32 @@ include(joinpath(@__DIR__, "test22_setup.jl"))
         @test success
     end
 end
+
+@testset "No meta-optimiser fold captures a boxed carrier" begin
+    #=
+    `NestedClustered` and `Stacking` assign `rd` twice before their `@floop` — the
+    benchmark-relative picker, then the investable reduction — and a variable that is
+    reassigned and then captured by the fold's closure is boxed. FLoops reports a boxed
+    capture as a correctness and performance problem, once per process, so a test file whose
+    earlier NCO call already fired it never sees it again, and example 16 does on every fresh
+    run. The reduced carrier therefore takes a name of its own, and this gate asks FLoops to
+    throw rather than warn on the two fold loops. `assistant` is process-wide, so the default
+    `:warn` is restored whatever happens.
+    =#
+    PortfolioOptimisers.FLoops.assistant(:error)
+    try
+        jopti = JuMPOptimiser(; pe = pr, slv = slv, sets = sets)
+        hopti = HierarchicalOptimiser(; pe = pr, slv = slv)
+        hopto = HierarchicalOptimiser(; slv = slv)
+        nco = NestedClustered(; cle = clr, opti = HierarchicalRiskParity(; opt = hopti),
+                              opto = HierarchicalRiskParity(; opt = hopto))
+        @test isa(optimise(nco, rd).retcode, OptimisationSuccess)
+        st = Stacking(;
+                      opti = [HierarchicalRiskParity(; opt = hopti),
+                              MeanRisk(; opt = jopti)],
+                      opto = HierarchicalRiskParity(; opt = hopto))
+        @test isa(optimise(st, rd).retcode, OptimisationSuccess)
+    finally
+        PortfolioOptimisers.FLoops.assistant(:warn)
+    end
+end

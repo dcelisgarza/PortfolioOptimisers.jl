@@ -136,8 +136,8 @@ Its inverse, `feature_matrix_panel(nz, Z)`, is gone: the collapse of
 a producer builds its tensor field directly, so a caller with a bare matrix authors one
 `TensorPanelField`, or one `NumericPanelField` per column.
 
-The three verbs live in `src/03_InputData/05_FeatureSelector.jl`, beside the panel rather than
-inside it. A Feature Selector is its own noun, and the panel's own file is at the size the code
+The three verbs live in `src/03_InputData/15_FeatureSelector.jl` (`05_` until ADR 0134
+renumbered the directory), beside the panel rather than inside it. A Feature Selector is its own noun, and the panel's own file is at the size the code
 health gate governs, so the split is what keeps a later addition to either concept cheap.
 
 The two verbs also stack the panel's own **field** order when `sel` is `nothing`, which is the
@@ -271,15 +271,33 @@ the tensor field is the type that fits. `RegressionPanel` returns `"loadings"` o
 factor was rejected: it cuts one quantity into parts and loses the fact that they belong
 together, where a tensor field can carry a Factor Family as `groups`.
 
-The labels come off the data carrier by dispatch and are positional otherwise: `rd.nx` for a
-proximity field; `rd.nf` for a loadings field whose result is a `Regression` with the raw `M`
-as its loadings; `"1"` to `"K"` for a reduced or re-based `L`, for a `CrossSectionalFactorModel`,
-and for a call that hands no data carrier. Neither regression result names its factors as data,
-so the carrier is the one place a name exists.
+The labels come off the result or the data carrier by dispatch and are positional otherwise:
+`rd.nx` for a proximity field; `rd.nf` for a loadings field whose result is a `Regression` with
+the raw `M` as its loadings; the block's own `nf`, mapped onto the re-based axis by
+`cs_diagnostic_factor_names` when the block carries a family re-basis, for a
+`CrossSectionalFactorModel`; and `"1"` to `"K"` for a reduced or re-based time-series `L` and
+for a call that hands no data carrier. A time-series regression names no factor as data, so the
+carrier is the one place a name exists for it; the cross-sectional block names its own factors
+(issue #724, which landed beside this decision), so the carrier is not read for it. The first
+text of this section labelled the cross-sectional block positionally, before the block carried
+`nf`; the second-round review of PR 625 read the name off the block.
 
 A produced panel never meets a view: the producer is configuration, and it refits on the
 subproblem's own prior and returns. So the square-case rule of the section below acts on a
 hand-supplied adjacency only.
+
+Standalone on a prior fitted on a point-in-time Asset Panel, whose loadings are `NaN` outside
+the Investable Mask (ADR 0117), `RegressionPanel` reads the loadings on the mask and answers the
+full universe: a zero row and a false observed mask on every asset outside it. That is the rule
+ADR 0111 gives every uncertainty set fitted standalone on such a prior
+([issue #1062](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1062)), and the
+shape a Panel Field already has for a cell a fill policy wrote, so a view of the field at the
+mask recovers the reduced loadings and the panel can be handed back to an optimiser. Inside an
+optimiser the prior arrives reduced and the expansion is the identity. A refusal was rejected
+for the reason #1062 rejected it on the sets: a result the optimiser can consume on the full
+universe is the shape every other result takes. A loading that is not finite inside the mask is
+still refused, because every asset that check counts has a finite moment and a loadings row
+that is not, which is a defect of the regression.
 
 ### A panel under an asset view, a fold and a meta-optimiser collapse
 
@@ -322,14 +340,17 @@ the cross-validated path is time-varying and the static-shape coupling above hol
 - **The `field_dict` entry `:nz_feat` loses both users and is deleted.**
 - **`feature_matrix`, `feature_labels` and `select_fields` are the one new surface.** Issue #805
   fixed their signatures, and the selector build of map #802 wrote them into
-  `src/03_InputData/05_FeatureSelector.jl`, which owes its rows in the sweep manifest and in the
+  `src/03_InputData/15_FeatureSelector.jl`, which owes its rows in the sweep manifest and in the
   size, complexity, coverage and JET baselines.
-- **The panel travels whole from the picker to the kernel.** `feature_matrix_picker` returns the
-  selected carrier's `AssetPanel` and its diagnostic, the eight forwarders pass it as the `pnl`
-  keyword, and preselection passes `rd.pnl`. So the values and the names cannot disagree about
-  which carrier supplied them, and `carrier_feature_names` has no reason to exist. The kernel's
-  raw-matrix entry point `distance(de, Z; dims)` measures the matrix it is handed and applies no
-  selector, because a bare matrix has no field index to resolve against.
+- **The panel travels whole to the kernel, and the kernel resolves it.** The eight forwarders
+  pass the two carriers as the `pr` and `rd` keywords, preselection passes `rd` alone, and
+  `asset_panel(de.ape, pr, rd, X)` resolves the panel at the kernel by dispatch, so the values
+  and the names cannot disagree about which carrier supplied them. The selector build first
+  routed the panel through `feature_matrix_picker` as a `pnl` keyword; the producer build
+  deleted the picker and `carrier_feature_names` with `z_src`, because there is one carrier to
+  pick from. The kernel's raw-matrix entry point `distance(de, Z; dims)` measures the matrix it
+  is handed and applies no selector, because a bare matrix has no field index to resolve
+  against.
 - **`panel_input` is one new exported verb, and the lazy lift is one new unexported array type.**
   The type owes its `size`, `getindex` and `show`, and its rows in the JET, coverage and size
   baselines. Issue #806 named it `RepeatedLeading`, and the build may rename it.

@@ -15,6 +15,9 @@ This file pins the four claims that decision rests on.
     otherwise.
  4. A producer is configuration: a view passes it through, and `factory` reaches into it.
 =#
+# The synthetic point-in-time Asset Panel of the cross-sectional testset.
+include(joinpath(@__DIR__, "test06c_setup.jl"))
+
 @testset "The `ape` slot admits a producer and refuses a literal" begin
     @test isnothing(FeatureDistance().ape)
     @test isa(RegressionPanel(), PortfolioOptimisers.AbstractAssetPanelEstimator)
@@ -90,6 +93,100 @@ end
     @test occursin("PhylogenyPanel", res.value.msg)
 end
 
+@testset "RegressionPanel on a cross-sectional prior: named off the block, expanded to the universe" begin
+    #=
+    ADR 0045's eighth amendment reads a name off the data carrier "where a name exists", and
+    its first text labelled a `CrossSectionalFactorModel` positionally as a block whose
+    factors "no data names". The block has carried `nf` since #724 landed beside that
+    decision, so the producer reads it, through the same verb the diagnostics label their
+    factor axis with, which maps the raw names onto the re-based axis under a family
+    re-basis. And a prior fitted on a point-in-time Asset Panel writes `NaN` on every asset
+    outside its Investable Mask (ADR 0117), which a Panel Field refuses; the producer reads
+    the loadings on the mask and answers the full universe with a zero row and a false
+    observed mask outside it, as #1062 ruled for every uncertainty set fitted standalone on
+    such a prior, so a view of the field at the mask recovers the reduced loadings. The
+    reduced prior is what an optimiser hands the producer, and the routed path solves with no
+    weight outside the mask.
+    =#
+    PO = PortfolioOptimisers
+    rdp = synthetic_asset_panel(; n_assets = 40, n_observations = 200, n_industries = 3,
+                                rng = StableRNG(725_001)).rd
+    factors = ["market" => ConstantExposure(),
+               "industry" => OneHotExposure(; field = "industry", family = "industry"),
+               "size" =>
+                   CompositeExposure(; descriptors = [LogMarketCap()], family = "style"),
+               "value" =>
+                   CompositeExposure(; descriptors = [BookToPrice()], family = "style")]
+    prp = prior(CrossSectionalFactorPrior(; factors = factors), rdp)
+    msk = PO.investable_mask(prp)
+    @test count(msk) < length(msk)
+    nnf = count(i -> !all(isfinite, view(prp.rr.L, i, :)), axes(prp.rr.L, 1))
+    @test nnf == length(msk) - count(msk)
+
+    # Standalone on the unreduced prior: the full universe, zero rows and a false observed
+    # mask outside the Investable Mask, the reduced loadings on it, and no `NaN` anywhere.
+    idx = findall(msk)
+    prr = PO.port_opt_view(prp, idx)
+    rdr = PO.port_opt_view(rdp, idx)
+    pf = PO.asset_panel(RegressionPanel(), prp, rdp, rdp.X)
+    ff = PO.panel_field(pf, "loadings")
+    @test size(ff.vals) == (length(msk), length(prp.rr.nf))
+    @test all(isfinite, ff.vals)
+    @test ff.vals[msk, :] == prr.rr.L
+    @test all(iszero, ff.vals[.!msk, :])
+    @test size(ff.omsk) == size(ff.vals)
+    @test all(ff.omsk[msk, :]) && !any(ff.omsk[.!msk, :])
+    @test ff.labels == prp.rr.nf
+    # The view at the mask recovers the reduced panel, and `:observed` is the mask as a column.
+    @test PO.panel_field(PO.port_opt_view(pf, idx), "loadings").vals == prr.rr.L
+    @test vec(feature_matrix(pf, ["loadings" => :observed])) == msk
+    # A zero row is a zero feature vector, so an excluded asset sits at distance one from
+    # every asset with loadings under the default metric.
+    D = distance(FeatureDistance(; ape = RegressionPanel()), nothing, rdp.X; pr = prp,
+                 rd = rdp)
+    @test all(isone, D[.!msk, msk])
+
+    # Reduced to the mask, the panel builds over the reduced universe with no mask, and the
+    # labels are the block's own raw factor names: no family re-basis, so `L` is `M` and the
+    # axis is `nf`.
+    f = PO.panel_field(PO.asset_panel(RegressionPanel(), prr, rdr, rdr.X), "loadings")
+    @test size(f.vals) == (count(msk), length(prr.rr.nf))
+    @test isnothing(f.omsk)
+    @test f.labels == prr.rr.nf
+    @test f.labels == PO.cs_diagnostic_factor_names(prr.rr)
+    @test f.labels[1] == "market"
+    @test any(startswith("industry="), f.labels)
+    # The carrier is not read for the names: the block carries them.
+    @test PO.panel_field(PO.asset_panel(RegressionPanel(), prr, nothing, rdr.X),
+                         "loadings").labels == f.labels
+
+    # Under a family re-basis `L` is narrower than `M`, and the labels follow the reduced
+    # axis: the dropped member of the constrained family is absent, and the rest keep their
+    # names.
+    prf = PO.port_opt_view(prior(CrossSectionalFactorPrior(; factors = factors,
+                                                           families = ["industry" =>
+                                                                           nothing]), rdp),
+                           idx)
+    @test !isnothing(prf.rr.fcb)
+    fb = PO.panel_field(PO.asset_panel(RegressionPanel(), prf, rdr, rdr.X), "loadings")
+    @test size(fb.vals, 2) == size(prf.rr.L, 2) < size(prf.rr.M, 2)
+    @test fb.labels == PO.cs_diagnostic_factor_names(prf.rr)
+    @test length(fb.labels) == size(prf.rr.L, 2)
+    @test fb.labels ⊆ prf.rr.nf
+
+    # The routed path: the optimiser reduces the prior before the kernel runs, so the
+    # producer never meets the unreduced block, and no weight lands outside the mask.
+    opt = HierarchicalOptimiser(; pe = CrossSectionalFactorPrior(; factors = factors),
+                                cle = ClustersEstimator(;
+                                                        de = FeatureDistance(;
+                                                                             ape = RegressionPanel())))
+    res = optimise(HierarchicalRiskParity(; opt = opt), rdp)
+    @test isa(res.retcode, OptimisationSuccess)
+    @test isapprox(sum(res.w), 1)
+    @test all(iszero, res.w[.!msk])
+    @test feature_labels(opt.cle.de, res.pr, rdr, rdr.X) ==
+          ["loadings" => n for n in prr.rr.nf]
+end
 @testset "PhylogenyPanel grades a graph, and its labels are the assets" begin
     rng = StableRNG(20260907)
     T, N = 90, 6

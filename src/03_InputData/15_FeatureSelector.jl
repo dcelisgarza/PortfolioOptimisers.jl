@@ -85,16 +85,17 @@ function panel_value_columns!(cols::AbstractVector{Tuple{Int, Int, Symbol}}, k::
 end
 """
     panel_selector_msg(name, pool::VecStr) -> String
+    panel_selector_msg(f::NumericPanelField, key, keys::VecStr) -> String
     panel_selector_msg(f::AbstractPanelField, key, keys::VecStr) -> String
 
 Build the diagnostic a Feature Selector entry that resolves against nothing carries.
 
-The two messages name the two namespaces an entry resolves in. The first is the panel's Panel Field names, the second one Panel Field's levels or labels. Each hands its own suggestion pool to [`did_you_mean`](@ref), so a misspelling is answered against the names it could have meant and not against every column of the panel.
+The messages name the two namespaces an entry resolves in. The first is the panel's Panel Field names, the second one Panel Field's levels or labels. Each hands its own suggestion pool to [`did_you_mean`](@ref), so a misspelling is answered against the names it could have meant and not against every column of the panel. A numeric Panel Field has no second namespace, so a key paired with it is answered by naming the two entry forms the field does take rather than by an empty pool.
 
 # Algorithm
 
  1. Name the entry that resolved against nothing, and the namespace it was resolved in.
- 2. Append the nearest match from the pool with [`did_you_mean`](@ref).
+ 2. Append the nearest match from the pool with [`did_you_mean`](@ref), where there is a pool.
 
 # Arguments
 
@@ -118,6 +119,9 @@ The two messages name the two namespaces an entry resolves in. The first is the 
 function panel_selector_msg(name, pool::VecStr)
     return "`sel` names `$(name)`, which is not a Panel Field of the Asset Panel. It holds $(length(pool)): $(join(pool, ", ")). Under `strict = false` the entry is dropped." *
            did_you_mean(string(name), filter(!=(string(name)), pool))
+end
+function panel_selector_msg(f::NumericPanelField, key, ::VecStr)
+    return "`sel` pairs the Panel Field \"$(f.name)\" with `$(key)`, but a numeric Panel Field contributes one column and has no levels or labels to pair with. Select it by its bare name, or pair it with `:observed` for its mask. Under `strict = false` the entry is dropped."
 end
 function panel_selector_msg(f::AbstractPanelField, key, keys::VecStr)
     what = isa(f, CategoricalPanelField) ? "level" : "label"
@@ -536,7 +540,7 @@ A static panel gives an `assets × features` matrix, and a time-varying one an `
 # Algorithm
 
  1. Resolve `sel` against the panel with [`select_fields`](@ref).
- 2. Derive the element type, as the promotion over the Panel Fields whose **value** columns were resolved. An observed-mask column is a `0`/`1` column that every type carries, so it contributes nothing, and neither does an indicator. A selection of mask columns alone stacks in `Float64`. See [`panel_value_eltype`](@ref).
+ 2. Derive the element type, as the promotion over the Panel Fields whose **value** columns were resolved. An observed-mask column is a `0`/`1` column that every type carries, so it contributes nothing, and neither does an indicator. A selection of mask and indicator columns alone stacks in the panel's own type, the promotion over every Panel Field's values, so a `Float32` panel's one-hot block is `Float32`; a panel with no numeric or tensor Panel Field at all stacks in `Float64`. See [`panel_value_eltype`](@ref).
  3. Allocate the matrix as zeros, over the panel's own observation and asset axes and the resolved column count.
  4. Write each column, with [`panel_field_value_column!`](@ref) or [`panel_field_observed_column!`](@ref).
 
@@ -567,7 +571,8 @@ function feature_matrix(pnl::AssetPanel, sel = nothing; strict::Bool = false)
     T = mapreduce(promote_type, cols; init = Union{}) do col
         return col[3] === :observed ? Union{} : panel_value_eltype(pnl.pf[col[1]])
     end
-    Z = zeros(T === Union{} ? Float64 : T, panel_axes(pnl)..., length(cols))
+    Z = zeros(T === Union{} ? panel_value_eltype(pnl.pf) : T, panel_axes(pnl)...,
+              length(cols))
     for (c, col) in pairs(cols)
         k, l, part = col
         zc = selectdim(Z, ndims(Z), c)

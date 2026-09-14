@@ -213,7 +213,7 @@
 "src/13_Prior/12_EntropyPoolingPrior.jl" = { map = 6, units = 54, algorithm = 25, swept = true }
 "src/13_Prior/13_OpinionPoolingPrior.jl" = { map = 6, units = 8, algorithm = 3, swept = true }
 "src/13_Prior/14_HighOrderFactorPriorEstimator.jl" = { map = 6, units = 5, algorithm = 3, swept = true }
-"src/13_Prior/15_AssetPanelEstimators.jl" = { map = 6, units = 11, swept = false }
+"src/13_Prior/15_AssetPanelEstimators.jl" = { map = 6, units = 12, swept = false }
 "src/13_Prior/16_Base_CrossSectionalFactorPrior.jl" = { map = 6, units = 30, swept = false }
 "src/13_Prior/17_CrossSectionalFactorPrior.jl" = { map = 6, units = 6, swept = false }
 "src/13_Prior/18_PriorPartialFit.jl" = { map = 6, units = 22, swept = false }

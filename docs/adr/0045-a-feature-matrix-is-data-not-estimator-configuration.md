@@ -834,13 +834,18 @@ over the subproblem's returns. One tensor field was chosen over one numeric fiel
 loadings matrix is one quantity with a labelled axis, the panel has a type for it, and it is the
 shape map #643's exposure history already takes.
 
-**The labels come off the data carrier by dispatch, and are positional otherwise.** A proximity
-field is labelled by `rd.nx`. A loadings field is labelled by `rd.nf` when the result is a
-`Regression` whose loadings are the raw `M`. Every other case is labelled `"1"` to `"K"`: a
-reduced or re-based `L`, a `CrossSectionalFactorModel` whose factors are exposures that no data
-names, and a call that hands a prior with no data carrier. Labels on the producer as
-configuration were rejected, because they restate what the carrier holds; positional labels
-everywhere were rejected, because they leave the factor axis unnamed where a name exists.
+**The labels come off the result or the data carrier by dispatch, and are positional
+otherwise.** A proximity field is labelled by `rd.nx`. A loadings field is labelled by `rd.nf`
+when the result is a `Regression` whose loadings are the raw `M`, and by the block's own `nf`,
+mapped onto the re-based axis by `cs_diagnostic_factor_names`, when the result is a
+`CrossSectionalFactorModel`, which names its factors as data since issue #724 landed beside this
+decision. Every other case is labelled `"1"` to `"K"`: a reduced or re-based time-series `L`,
+and a call that hands a prior with no data carrier. Labels on the producer as configuration were
+rejected, because they restate what the carrier or the block holds; positional labels everywhere
+were rejected, because they leave the factor axis unnamed where a name exists. The first text of
+this paragraph labelled the cross-sectional block positionally, as a block whose "factors are
+exposures that no data names"; the block carried `nf` from the same day, and the second-round
+review of PR 625 read it.
 
 **The carriers reach the kernel as two keywords.** Every consumer calls
 `cor_and_dist(de, ce, X; dims, kwargs...)`, and the keyword tail is open. The forwarders that
@@ -1150,8 +1155,9 @@ decision that removed each thing.
     positionally (the eighth amendment).
 - `FeatureDistance` holds `metric, alg, sim, ape, sel, strict`. The kernel's three-argument
     entry takes the two carriers as `pr` and `rd`, and calls `feature_matrix(de, pr, rd, X)`;
-    `feature_labels` is its sibling (the twelfth amendment). `measure_feature_distance` is the half
-    that runs after the selection, so a selector is applied once rather than twice.
+    `feature_labels` is its sibling (the twelfth amendment). The two-argument `distance` and
+    `cor_and_dist` on a bare matrix are the half that runs after the selection, so a selector
+    is applied once rather than twice.
 - `panel_input(sets, key)` and its vector form, and the lazy lift: `asset_panel` builds a
     time-varying panel when any input is time-varying or when the masks are given, and lifts each
     static input through `RepeatedLeading`, which stores the static array once (the tenth
@@ -1179,13 +1185,12 @@ decision that removed each thing.
 `UniverseSets` therefore declares two axis families rather than three, and its constructor takes
 six key arguments; the prefix-disjointness check drops from 42 ordered comparisons to 30.
 
-**One line the ninth amendment owes is paid here.** `sets` had to leave `FeatureDistance` with
-`feature_universe`, which this build deletes, so the estimator lost it now rather than in the
-selector build,
-[#811](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/811). `sel` keeps the
-name-or-integer form the sixth decision gave it until that build replaces it with the four-form
-grammar; a taxonomy block is already selected by its Panel Field's own column names, because the
-panel names them.
+**The ninth amendment's line was paid by the selector build, which landed first.**
+[#811](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/811) removed `sets` and the
+integer entry from `FeatureDistance` and gave `sel` the four-form grammar four hours before this
+build landed, so this build found the estimator already at `metric, alg, sim, sel, strict` and
+added `ape` alone. `feature_universe`, the reader `sets` was checked against, goes here with the
+graded program.
 
 **Two defects found and fixed on the way.**
 

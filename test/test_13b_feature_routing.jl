@@ -506,5 +506,34 @@ const PO = PortfolioOptimisers
             @test f.ape == de_sel.ape
             @test f.strict === de_sel.strict
         end
+        @testset "the stack's type is the panel's, whichever columns are selected" begin
+            # A `0`/`1` column carries no type of its own, so a selection of indicator or
+            # mask columns alone takes the panel's type, the promotion over every Panel
+            # Field's values, and not a literal `Float64`. Only a panel with no numeric or
+            # tensor Panel Field at all falls to `Float64`.
+            p32 = asset_panel([NumericPanelInput(; name = "mcap", vals = Float32[1, 2, 3]),
+                               CategoricalPanelInput(; name = "sector",
+                                                     vals = ["a", "b", "a"])])
+            @test eltype(feature_matrix(p32)) === Float32
+            @test eltype(feature_matrix(p32, ["sector"])) === Float32
+            @test eltype(feature_matrix(p32, ["mcap" => :observed])) === Float32
+            @test eltype(feature_matrix(p32, ["sector" => "a", "sector" => :observed])) ===
+                  Float32
+            pcat = asset_panel([CategoricalPanelInput(; name = "sector",
+                                                      vals = ["a", "b", "a"])])
+            @test eltype(feature_matrix(pcat)) === Float64
+            # An integer field stacks as it is: the type comes from the data.
+            pint = asset_panel([NumericPanelInput(; name = "n", vals = [1, 2, 3])])
+            @test eltype(feature_matrix(pint)) === Int
+        end
+        @testset "a numeric Panel Field paired with a key names the forms it takes" begin
+            # A numeric Panel Field has no levels or labels, so the diagnostic says so and
+            # names the bare name and `:observed`, rather than "not one of its 0 label(s)".
+            err = @test_throws ArgumentError feature_matrix(gpnl, ["mcap" => "nope"];
+                                                            strict = true)
+            @test occursin("numeric Panel Field", err.value.msg)
+            @test occursin(":observed", err.value.msg)
+            @test !occursin("0 label", err.value.msg)
+        end
     end
 end

@@ -13,5 +13,6 @@ PortfolioOptimisers.regression_factor_names
 RegressionPanel
 PhylogenyPanel
 asset_panel(ape::RegressionPanel, pr, rd, ::Any)
+PortfolioOptimisers.expand_investable_loadings
 PortfolioOptimisers.assert_producer_prior
 ```

@@ -248,7 +248,7 @@ commit = "483d19ebf1"
 "src/20_Optimisation/05_HierarchicalRiskParity.jl" = { code = 181, doc = 264, comment = 34, blank = 76, total = 555 }
 "src/20_Optimisation/06_SchurComplementHierarchicalRiskParity.jl" = { code = 370, doc = 554, comment = 32, blank = 193, total = 1149 }
 "src/20_Optimisation/07_HierarchicalEqualRiskContribution.jl" = { code = 400, doc = 330, comment = 18, blank = 90, total = 838 }
-"src/20_Optimisation/08_Base_JuMPOptimisation.jl" = { code = 552, doc = 999, comment = 57, blank = 447, total = 2055 }
+"src/20_Optimisation/08_Base_JuMPOptimisation.jl" = { code = 554, doc = 999, comment = 57, blank = 447, total = 2057 }
 "src/20_Optimisation/09_JuMPConstraints/01_MIPIndicators.jl" = { code = 331, doc = 534, comment = 20, blank = 211, total = 1096 }
 "src/20_Optimisation/09_JuMPConstraints/02_Returns_and_ObjectiveFunctions.jl" = { code = 647, doc = 1090, comment = 36, blank = 406, total = 2179 }
 "src/20_Optimisation/09_JuMPConstraints/03_BudgetConstraints.jl" = { code = 430, doc = 434, comment = 0, blank = 152, total = 1016 }

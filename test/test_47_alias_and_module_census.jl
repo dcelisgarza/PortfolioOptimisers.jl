@@ -482,23 +482,47 @@ end
         end
         sort_key(path) = Tuple(prefix_key.(splitpath(path)))
 
-        collisions = String[]
-        for top in (SRC, joinpath(ROOT, "ext"), joinpath(ROOT, "docs", "src", "api"))
-            for (root, dirs, files) in walkdir(top)
-                by_number = Dict{Int, Vector{String}}()
-                for entry in vcat(dirs, files)
-                    m = match(r"^(\d+)_", entry)
-                    m === nothing && continue
-                    push!(get!(by_number, parse(Int, m.captures[1]), String[]), entry)
-                end
-                for (number, entries) in by_number
-                    length(entries) > 1 || continue
-                    push!(collisions,
-                          string(relpath(root, ROOT), ": ", lpad(number, 2, '0'), "_ on ",
-                                 join(sort(entries), ", ")))
+        # One row per number claimed twice in one directory, over every tree in `tops`.
+        function prefix_collisions(tops, base)
+            collisions = String[]
+            for top in tops
+                for (root, dirs, files) in walkdir(top)
+                    by_number = Dict{Int, Vector{String}}()
+                    # A coverage run leaves `<file>.jl.<pid>.cov` beside every source file,
+                    # and each carries the source file's prefix. Only the sources and the
+                    # pages are numbered, so the census reads those two extensions and
+                    # every directory.
+                    for entry in vcat(dirs, filter(f -> endswith(f, r"\.(jl|md)$"), files))
+                        m = match(r"^(\d+)_", entry)
+                        m === nothing && continue
+                        push!(get!(by_number, parse(Int, m.captures[1]), String[]), entry)
+                    end
+                    for (number, entries) in by_number
+                        length(entries) > 1 || continue
+                        push!(collisions,
+                              string(relpath(root, base), ": ", lpad(number, 2, '0'),
+                                     "_ on ", join(sort(entries), ", ")))
+                    end
                 end
             end
+            return collisions
         end
+        # The census must not read a coverage artefact as a second claim on a prefix: at
+        # `f5b5138e45` it did, and `Test.yml` went red on every file `--code-coverage`
+        # touched while the same run was green locally.
+        mktempdir() do d
+            mkpath(joinpath(d, "src"))
+            touch(joinpath(d, "src", "01_A.jl"))
+            touch(joinpath(d, "src", "01_A.jl.4242.cov"))
+            touch(joinpath(d, "src", "01_A.jl.4243.cov"))
+            @test isempty(prefix_collisions((joinpath(d, "src"),), d))
+            touch(joinpath(d, "src", "01_B.jl"))
+            @test prefix_collisions((joinpath(d, "src"),), d) ==
+                  ["src: 01_ on 01_A.jl, 01_B.jl"]
+        end
+
+        collisions = prefix_collisions((SRC, joinpath(ROOT, "ext"),
+                                        joinpath(ROOT, "docs", "src", "api")), ROOT)
         if !isempty(collisions)
             @warn """$(length(collisions)) directory prefix collision(s). Two entries under one
                      number state no load order between them. Renumber the entries that follow
