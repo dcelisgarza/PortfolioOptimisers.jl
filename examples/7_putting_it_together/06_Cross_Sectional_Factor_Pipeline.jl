@@ -120,17 +120,18 @@ pretty_table(DataFrame("Carrier" => string(nameof(typeof(rd))),
 
 This is the deep dive's §5 book: a minimum-risk portfolio under both orthogonal sets and a factor
 mandate written in a factor name. Everything is a field of one [`JuMPOptimiser`](@ref).
+
+The universe the mandate is written against is read off the estimator with
+[`cross_sectional_factor_sets`](@ref), before any fit: it declares the factor axis the fit will
+produce, one-hot industry levels included, under the `ncf` key, and one plain group per Factor
+Family. The one-hot levels are read off the panel, so nothing here hand-types a list that a change
+of the panel's industry levels would leave stale.
 =#
 
 solver = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
                 check_sol = (; allow_local = true, allow_almost = true),
                 settings = Dict("verbose" => false))
-universe = UniverseSets(;
-                        dict = Dict("nx" => rd.nx,
-                                    "ncf" =>
-                                        ["market", "industry=Energy", "industry=Financials",
-                                         "industry=Health Care", "industry=Technology",
-                                         "size", "value", "earnings_yield", "liquidity"]))
+universe = cross_sectional_factor_sets(pe, rd)
 mandate = ExposureConstraintEstimator(;
                                       lce = LinearConstraintEstimator(;
                                                                       val = "size >= 0.10"),

@@ -134,4 +134,30 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
                                                                        ConstantExposure()],
                                                                   bare)
     end
+
+    @testset "Both verbs read the axis off the estimator, and both are exported" begin
+        # Issue #1059: a caller who writes a factor mandate in a pipeline step holds the
+        # estimator, not its Pairs, so the estimator method forwards `pe.factors`.
+        pe = CrossSectionalFactorPrior(; factors = factors)
+        # The names resolve unqualified, so the pipeline example can call them.
+        @test :cross_sectional_factor_axis in names(PortfolioOptimisers)
+        @test :cross_sectional_factor_sets in names(PortfolioOptimisers)
+        ax = cross_sectional_factor_axis(pe, rd)
+        @test ax == PO.cross_sectional_factor_axis(factors, rd)
+        @test ax.nf == ["market", "size", "industry=Real Estate", "industry=Software",
+                        "industry=Banks"]
+        sets = cross_sectional_factor_sets(pe, rd)
+        ref = PO.cross_sectional_factor_sets(factors, rd)
+        @test sets.dict == ref.dict
+        @test sets.cfkey == ref.cfkey
+        @test sets.dict[sets.cfkey] == ax.nf
+        # The `sets` argument is forwarded, so the estimator method widens too.
+        s0 = UniverseSets(; xkey = "assets",
+                          dict = Dict{String, Any}("assets" => rd.nx, "sector" => ["a"]))
+        s1 = cross_sectional_factor_sets(pe, rd, s0)
+        @test s1.dict == PO.cross_sectional_factor_sets(factors, rd, s0).dict
+        @test s1.xkey == "assets"
+        @test s1.dict["sector"] == ["a"]
+        @test s1.dict[s1.cfkey] == ax.nf
+    end
 end

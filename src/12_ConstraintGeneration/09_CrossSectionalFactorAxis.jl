@@ -223,3 +223,5 @@ function cross_sectional_sets_dict(::ReturnsResult, sets::UniverseSets)::Dict{St
     end
     return dict
 end
+
+export cross_sectional_factor_axis, cross_sectional_factor_sets

@@ -439,6 +439,70 @@ function prior(pe::CrossSectionalFactorPrior, rd::ReturnsResult; kwargs...)
               IsNothingError("a Cross-Sectional Factor Prior reads its Factor Exposures off an Asset Panel, and rd.pnl is nothing. Build the carrier with the `pnl` that asset_panel returns."))
     return prior(pe, rd.X, rd.F, rd.pnl; iv = rd.iv, ivpa = rd.ivpa, kwargs...)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the cross-sectional factor axis a [`CrossSectionalFactorPrior`](@ref) will produce, before any fit.
+
+The method forwards `pe.factors` to the Pairs method of [`cross_sectional_factor_axis`](@ref), so a caller who holds the estimator reads the axis off it rather than copying the Pairs. A one-hot member's levels are read off the Asset Panel `rd` carries, so the answer is fixed by the panel's field index and is the same in every fold.
+
+# Arguments
+
+  - `pe`: Cross-Sectional Factor Prior estimator.
+  - `rd`: Returns data carrying the Asset Panel the one-hot levels are read from.
+
+# Validation
+
+  - The rules of the Pairs method of [`cross_sectional_factor_axis`](@ref).
+
+# Returns
+
+  - `nf::Vector{String}`: The raw factor names, in column order.
+  - `fam::Vector{String}`: The Factor Family label of each name.
+
+# Related
+
+  - [`CrossSectionalFactorPrior`](@ref)
+  - [`cross_sectional_factor_axis`](@ref)
+  - [`cross_sectional_factor_sets`](@ref)
+"""
+function cross_sectional_factor_axis(pe::CrossSectionalFactorPrior, rd::ReturnsResult)
+    return cross_sectional_factor_axis(pe.factors, rd)
+end
+"""
+    cross_sectional_factor_sets(pe::CrossSectionalFactorPrior, rd::ReturnsResult,
+                                sets::Option{<:UniverseSets} = nothing) -> UniverseSets
+
+Declare the cross-sectional factor axis a [`CrossSectionalFactorPrior`](@ref) will produce, and its Factor Family groups, on a [`UniverseSets`](@ref).
+
+The method forwards `pe.factors` to the Pairs method of [`cross_sectional_factor_sets`](@ref). A caller who writes a [`FactorSpace`](@ref) mandate against the estimator — in a [`Pipeline`](@ref) step, or a fold of a cross-validation — declares the universe from the estimator it will fit, so the one-hot level list is never hand-typed.
+
+# Arguments
+
+  - `pe`: Cross-Sectional Factor Prior estimator.
+  - `rd`: Returns data carrying the Asset Panel the one-hot levels are read from, and the asset names a new sets declares.
+  - `sets`: A declared universe to widen. When it is `nothing`, a new one is built over `rd.nx` with the default key prefixes.
+
+# Validation
+
+  - The rules of the Pairs method of [`cross_sectional_factor_sets`](@ref).
+
+# Returns
+
+  - `sets::UniverseSets`: The declared universe, carrying the cross-sectional factor axis and one group per Factor Family.
+
+# Related
+
+  - [`CrossSectionalFactorPrior`](@ref)
+  - [`cross_sectional_factor_sets`](@ref)
+  - [`cross_sectional_factor_axis`](@ref)
+  - [`UniverseSets`](@ref)
+  - [`FactorSpace`](@ref)
+"""
+function cross_sectional_factor_sets(pe::CrossSectionalFactorPrior, rd::ReturnsResult,
+                                     sets::Option{<:UniverseSets} = nothing)::UniverseSets
+    return cross_sectional_factor_sets(pe.factors, rd, sets)
+end
 function factor_residual_config(::CrossSectionalFactorPrior)
     # The declaration names a variance estimator that a consumer re-runs on the
     # reconstruction error to rebuild the residual block and subtract it (see
