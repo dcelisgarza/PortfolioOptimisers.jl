@@ -97,6 +97,32 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
         @test !haskey(s0.dict, s0.cfkey)
     end
 
+    @testset "The verb refuses to replace a group or an axis the caller declared" begin
+        # A Factor Family label is a plain group name, so a caller's own group can share
+        # it. Replacing it in silence would re-point every constraint written against it.
+        s0 = UniverseSets(; dict = Dict{String, Any}("nx" => rd.nx, "style" => rd.nx[1:2]))
+        @test_throws ArgumentError PO.cross_sectional_factor_sets(factors, rd, s0)
+        msg = try
+            PO.cross_sectional_factor_sets(factors, rd, s0)
+            ""
+        catch e
+            sprint(showerror, e)
+        end
+        @test occursin("under style", msg)
+        @test s0.dict["style"] == rd.nx[1:2]
+        # The same holds for the axis itself under `cfkey`.
+        ax = PO.cross_sectional_factor_axis(factors, rd).nf
+        s2 = UniverseSets(; dict = Dict{String, Any}("nx" => rd.nx, "ncf" => reverse(ax)))
+        @test_throws ArgumentError PO.cross_sectional_factor_sets(factors, rd, s2)
+        # The same list is not a replacement, so it is accepted.
+        s3 = UniverseSets(;
+                          dict = Dict{String, Any}("nx" => rd.nx, "ncf" => ax,
+                                                   "style" => ["size"]))
+        s4 = PO.cross_sectional_factor_sets(factors, rd, s3)
+        @test s4.dict["ncf"] == ax
+        @test s4.dict["style"] == ["size"]
+    end
+
     @testset "A new sets needs the asset names" begin
         # The asset axis is the one mandatory axis of a `UniverseSets`, and `ReturnsResult`
         # refuses every carrier that holds data without `nx`, so an empty one is what

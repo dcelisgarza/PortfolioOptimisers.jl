@@ -440,5 +440,13 @@ end
                                            Array{Float32}(Zi), Float32.(Xi), Float32.(Wi))
         @test eltype(csr32.f) == Float32
         @test csr32.f ≈ [1.0f0; 2.0f0;;]
+        # The coefficient of determination follows the fit's type rather than the `NaN` it
+        # is filled with, and its mean does too.
+        r2 = cross_sectional_r2(csr32, Array{Float32}(Zi), Float32.(Xi), Float32.(Wi))
+        @test eltype(r2) == Float32
+        @test r2 ≈ ones(Float32, 2)
+        @test mean_cross_sectional_r2(csr32, Array{Float32}(Zi), Float32.(Xi),
+                                      Float32.(Wi)) isa Float32
+        @test eltype(cross_sectional_r2(csr, Zi, Xi, Wi)) == Float64
     end
 end

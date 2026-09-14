@@ -483,6 +483,34 @@ scenario mean.
                                                                  mu_views = views,
                                                                  w = wbad), rd)
     end
+    @testset "strict reaches the factor prior the estimator nests" begin
+        # The `pe` slot admits a view-taking prior, whose views name factors on an axis the
+        # caller declared. A name the axis lacks is a warning by default and a refusal under
+        # `strict`, and the flag must cross the estimator to get there, as it does in
+        # `FactorPrior`.
+        nf = PortfolioOptimisers.cross_sectional_factor_axis(csfp_factors(), rd).nf
+        fsets = UniverseSets(; dict = Dict("nx" => nf))
+        bad = LinearConstraintEstimator(; val = "zzz == 0.001")
+        pe_ep = CrossSectionalFactorPrior(; factors = csfp_factors(), minra = 5,
+                                          pe = EntropyPoolingPrior(; sets = fsets,
+                                                                   mu_views = bad))
+        logs, pw = Test.collect_test_logs(; min_level = Logging.Warn) do
+            prior(pe_ep, rd)
+        end
+        @test length(logs) == 1
+        @test isapprox(pw.fpr.mu, pr.fpr.mu; atol = 1e-12)
+        @test_throws ArgumentError prior(pe_ep, rd; strict = true)
+        @test_throws ArgumentError prior(pe_ep, rd.X, nothing, rd.pnl; strict = true)
+        # A view the axis carries is enforced on the factor prior under either setting.
+        good = LinearConstraintEstimator(; val = "$(nf[1]) == 0.001")
+        pe_ok = CrossSectionalFactorPrior(; factors = csfp_factors(), minra = 5,
+                                          pe = EntropyPoolingPrior(; sets = fsets,
+                                                                   mu_views = good))
+        for s in (false, true)
+            ps = prior(pe_ok, rd; strict = s)
+            @test isapprox(ps.fpr.mu[1], 0.001; rtol = 1e-5)
+        end
+    end
 end
 
 @testset "A constrained Factor Family re-bases the fit" begin
@@ -800,6 +828,23 @@ end
             @test iszero(pr.fpr.mu)
             @test iszero(pr.rr.b)
             @test iszero(view(pr.mu, i))
+        end
+        # A forecast that is not finite at one asset alone is a split, and that asset's
+        # orthogonal part is `NaN` whatever `c` is, because `0 * NaN` is `NaN`: the prior
+        # states no expected return for it, and it leaves the Investable Mask while its
+        # variance stays finite. The reference implementation answers the same.
+        mu1 = zeros(N)
+        mu1[i[1]] = NaN
+        mu1[i[2]] = 0.01
+        for c in (0.0, 1.0)
+            pr = prior(CrossSectionalFactorPrior(; factors = factors, lambda = 1.0, c = c,
+                                                 rfe = CustomValueReturnForecast(;
+                                                                                 mu = mu1)),
+                       rd)
+            @test isnan(pr.rr.b[i[1]])
+            @test isnan(pr.mu[i[1]])
+            @test isfinite(pr.sigma[i[1], i[1]])
+            @test length(csfp_investable(pr)) == length(i) - 1
         end
         # With no estimator the spanned part is zero, so `lambda` shrinks the factor mean.
         for lambda in (0.0, 0.25, 1.0)

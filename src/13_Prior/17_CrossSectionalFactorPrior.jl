@@ -134,7 +134,7 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
     """
     lambda
     """
-    Confidence in the orthogonal part of the Return Forecast, in `[0, 1]`. It scales the part of the forecast the factors do not span, which the block carries in `b`. A value of zero discards it.
+    Confidence in the orthogonal part of the Return Forecast, in `[0, 1]`. It scales the part of the forecast the factors do not span, which the block carries in `b`. A value of zero discards it where it is finite. An asset whose forecast is not finite carries `NaN` in `b` whatever `c` is, because `0 * NaN` is `NaN`, so the prior states no expected return for it and it leaves the Investable Mask; a forecast that is not finite at every asset is the zero split, and touches nothing.
     """
     c
     function CrossSectionalFactorPrior(factors::AbstractVector{<:Pair},
@@ -233,7 +233,8 @@ end
 """
     prior(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum} = nothing,
           pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, iv::Option{<:MatNum} = nothing,
-          ivpa::Option{<:Num_VecNum} = nothing, kwargs...) -> LowOrderPrior
+          ivpa::Option{<:Num_VecNum} = nothing, strict::Bool = false,
+          kwargs...) -> LowOrderPrior
 
 Fit a cross-sectional factor model on an Asset Panel, and return the asset prior it lifts.
 
@@ -250,7 +251,7 @@ This is the returns-matrix method every prior estimator implements, and it holds
  7. Lag the reduced exposures and the market capitalisation by `pe.lag`, and take the eligibility mask of the fit with [`cross_sectional_eligible`](@ref).
  8. Regress each observation's returns on its lagged reduced exposures, through [`cs_weights_initial`](@ref), [`needs_second_pass`](@ref) and [`cs_weights_refine`](@ref).
  9. Take the idiosyncratic variance history with [`variance_series`](@ref), standardise the idiosyncratic returns by it with [`cross_sectional_standardised_residuals`](@ref), and take the latest idiosyncratic covariance with [`cross_sectional_idiosyncratic_covariance`](@ref).
-10. Fit `pe.pe` on the reduced factor returns, refuse a non-finite factor moment with [`assert_cross_sectional_factor_moments`](@ref), and process the factor covariance in place under `pe.f_mp`, which is the factor axis's own matrix processing estimator and not the asset one.
+10. Fit `pe.pe` on the reduced factor returns, refuse a non-finite factor moment with [`assert_cross_sectional_factor_moments`](@ref), and process the factor covariance in place under `pe.f_mp`, which is the factor axis's own matrix processing estimator and not the asset one. `strict` reaches `pe.pe`, as it does in [`FactorPrior`](@ref), because the slot admits [`BlackLittermanPrior`](@ref) and [`EntropyPoolingPrior`](@ref), which resolve view names against a universe.
 11. Fit the Return Forecast with [`cross_sectional_return_forecast`](@ref), on the **whole** carrier, so that a Descriptor of the forecast warms up over every observation the panel has, and blend its spanned part into the factor mean with [`cross_sectional_forecast_mu`](@ref). The block carries the orthogonal part in `b`, and the Result in `rf`.
 12. Expand the blended factor moments onto the raw factor axis with [`cross_sectional_expand`](@ref), so `fpr` states the distribution of the factors the caller named.
 13. Rebuild the asset return scenarios with [`cross_sectional_scenarios`](@ref).
@@ -265,6 +266,7 @@ This is the returns-matrix method every prior estimator implements, and it holds
   - `dims`: Dimension along which the observations lie.
   - `iv`: Implied volatilities, written onto the rebuilt carrier.
   - `ivpa`: Implied-volatility risk-premium adjustment, written onto the rebuilt carrier.
+  - $(arg_dict[:strict]) It is forwarded to the nested factor prior `pe.pe`.
   - `kwargs...`: Additional keyword arguments passed to the verbs of the algorithm.
 
 # Validation
@@ -295,7 +297,7 @@ This is the returns-matrix method every prior estimator implements, and it holds
 function prior(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum} = nothing,
                pnl::Option{<:AssetPanel} = nothing; dims::Int = 1,
                iv::Option{<:MatNum} = nothing, ivpa::Option{<:Num_VecNum} = nothing,
-               kwargs...)
+               strict::Bool = false, kwargs...)
     X, F = dims_oriented(dims, X, F)
     @argcheck(!isnothing(pnl),
               IsNothingError("a Cross-Sectional Factor Prior reads its Factor Exposures off an Asset Panel, and the panel is nothing. Call prior(pe, rd) with a ReturnsResult whose `pnl` is the one asset_panel returns, or hand the panel to this method as its third positional argument."))
@@ -357,7 +359,11 @@ function prior(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum} = n
     S = cross_sectional_standardised_residuals(csr.eps, vs, amr)
     esigma = cross_sectional_idiosyncratic_covariance(pe.th, pe.ce, pe.mp.pdm, S,
                                                       vs[end, :], amr)
-    f_pr = prior(pe.pe, csr.f)
+    # `strict` reaches the nested factor prior for the reason it reaches `FactorPrior`'s:
+    # the slot admits `BlackLittermanPrior` and `EntropyPoolingPrior`, whose views name
+    # factors on an axis the caller declared, and a name the axis lacks is the caller's
+    # error to hear about under `strict`.
+    f_pr = prior(pe.pe, csr.f; strict = strict)
     assert_cross_sectional_factor_moments(f_pr.mu, f_pr.sigma, length(r))
     # The factor covariance takes its own estimator for the reason the asset one takes
     # `pe.mp`: they are different matrices. This one is estimated from the factor-return

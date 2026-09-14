@@ -586,7 +586,7 @@ The weight matrix `W` is an argument rather than a field, because a two-pass wei
  1. Take the eligibility mask through [`cross_sectional_design_mask`](@ref).
  2. For each observation `t`, gather the eligible assets, their weights `w`, their exposures `A` and their returns `y`, and record their count in `n`.
  3. When `cre.intercept` is `true`, take the weighted means `ybar` and `xbar` of `y` and of `A`, and subtract them. An observation with no eligible asset takes zero for both.
- 4. Take the factor returns of the observation through [`cross_sectional_coefficients`](@ref), and write them into the row `t` of `f`. An observation with no eligible asset takes zero factor returns under [`CrossSectionalLinearRegression`](@ref).
+ 4. Take the factor returns of the observation through [`cross_sectional_coefficients`](@ref), and write them into the row `t` of `f`. An observation with no eligible asset takes zero factor returns under [`CrossSectionalLinearRegression`](@ref), except under [`RankDeficiencyRefusal`](@ref), whose rank test reads an empty design as rank zero and refuses it by name.
  5. When `cre.intercept` is `true`, write `ybar - dot(f[t, :], xbar)` into the entry `t` of `b`.
  6. Subtract the systematic part, through [`cross_sectional_systematic`](@ref), from `X`, giving `eps`.
 
@@ -817,7 +817,7 @@ Where:
 
 # Returns
 
-  - `r2::VecNum`: Coefficient of determination of every observation, of length `observations`.
+  - `r2::VecNum`: Coefficient of determination of every observation, of length `observations`, in the type a division of the inputs lands in.
 
 # Examples
 
@@ -842,7 +842,11 @@ function cross_sectional_r2(csr::CrossSectionalRegression, Z::Arr3Num, X::MatNum
                             W::MatNum)::VecNum
     act = cross_sectional_design_mask(Z, X, W)
     Xh = StatsAPI.predict(csr, Z)
-    r2 = fill(NaN, size(X, 1))
+    # The ratio lands in the type a division of the inputs lands in, so a `Float32` fit
+    # answers a `Float32` ratio rather than one widened by a `Float64` `NaN`.
+    Ts = promote_type(real(eltype(Xh)), real(eltype(X)), real(eltype(W)))
+    Tf = typeof(one(Ts) / one(Ts))
+    r2 = fill(convert(Tf, NaN), size(X, 1))
     for t in axes(X, 1)
         idx = findall(view(act, t, :))
         w = view(W, t, idx)
