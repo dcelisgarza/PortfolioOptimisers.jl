@@ -226,10 +226,13 @@ function exp_weighted_pass!(f, est::ExpWeightedCovariance, X::MatNum, dims::Int,
     end
     N = size(X, setdiff((1, 2), (dims,))[1])
 
+    # An uncentred estimator seeds its location from the first observation it sees, so the
+    # location starts as `NaN`, in the type of `X` so that a `Float32` panel keeps a
+    # `Float32` state.
+    location = est.centred ? zeros(eltype(X), N) : fill(convert(eltype(X), NaN), N)
     cache = if isnothing(state)
-        ExpWeightedCovarianceState(zeros(eltype(X), N, N),
-                                   est.centred ? zeros(eltype(X), N) : fill(NaN, N),
-                                   zeros(Int, N), trues(N))
+        ExpWeightedCovarianceState(zeros(eltype(X), N, N), location, zeros(Int, N),
+                                   trues(N))
     else
         @argcheck(size(state.covariance, 1) == N,
                   DimensionMismatch("the state holds $(size(state.covariance, 1)) assets, and `X` holds $N"))

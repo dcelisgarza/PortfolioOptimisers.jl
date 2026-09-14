@@ -517,7 +517,8 @@ function weight_bounds_constraints_side(wb::VecNum, N::Integer = 0, args...)
     return wb
 end
 """
-    weight_bounds_constraints(wb::WeightBounds{<:Any, <:Any}, args...; N::Integer = 0, kwargs...)
+    weight_bounds_constraints(wb::WeightBounds{<:Any, <:Any}, args...; N::Integer = 0,
+                              datatype::DataType = Float64, kwargs...)
 
 Expand portfolio weight bounds constraints from a `WeightBounds` object to length `N`.
 
@@ -527,8 +528,8 @@ Expand portfolio weight bounds constraints from a `WeightBounds` object to lengt
 
 # Algorithm
 
- 1. Expand the lower side with `weight_bounds_constraints_side(wb.lb, N, -Inf)`, giving `lb`.
- 2. Expand the upper side with `weight_bounds_constraints_side(wb.ub, N, Inf)`, giving `ub`.
+ 1. Expand the lower side with `weight_bounds_constraints_side(wb.lb, N, -Inf)`, giving `lb`. The free bound is `-Inf` in `datatype`, so a side with no bound lands in the type of the data rather than in `Float64`.
+ 2. Expand the upper side with `weight_bounds_constraints_side(wb.ub, N, Inf)`, giving `ub`, with the free bound `Inf` in `datatype`.
  3. Build `WeightBounds(; lb = lb, ub = ub)`, which validates the expanded pair.
 
 # Arguments
@@ -536,6 +537,7 @@ Expand portfolio weight bounds constraints from a `WeightBounds` object to lengt
   - `wb`: [`WeightBounds`](@ref) object containing lower and upper bounds.
   - `args...`: Additional positional arguments (ignored).
   - `N`: Number of assets, the length of the expansion.
+  - `datatype`: Type of the free bound a side with no bound expands to.
   - `kwargs...`: Additional keyword arguments (ignored).
 
 # Validation
@@ -568,9 +570,12 @@ WeightBounds
   - [`WeightBoundsEstimator`](@ref)
 """
 function weight_bounds_constraints(wb::WeightBounds{<:Any, <:Any}, args...; N::Integer = 0,
-                                   kwargs...)::WeightBounds
-    return WeightBounds(; lb = weight_bounds_constraints_side(wb.lb, N, -Inf),
-                        ub = weight_bounds_constraints_side(wb.ub, N, Inf))
+                                   datatype::DataType = Float64, kwargs...)::WeightBounds
+    return WeightBounds(;
+                        lb = weight_bounds_constraints_side(wb.lb, N,
+                                                            convert(datatype, -Inf)),
+                        ub = weight_bounds_constraints_side(wb.ub, N,
+                                                            convert(datatype, Inf)))
 end
 """
     weight_bounds_constraints(wb::WeightBounds{<:VecNum, <:VecNum}, args...; N::Integer = 0,
@@ -623,7 +628,8 @@ function weight_bounds_constraints(wb::WeightBounds{<:VecNum, <:VecNum}, args...
     return wb
 end
 """
-    weight_bounds_constraints(wb::Nothing, args...; N::Integer = 0, kwargs...)
+    weight_bounds_constraints(wb::Nothing, args...; N::Integer = 0,
+                              datatype::DataType = Float64, kwargs...)
 
 Generate unconstrained portfolio weight bounds when no bounds are specified.
 
@@ -631,7 +637,7 @@ Generate unconstrained portfolio weight bounds when no bounds are specified.
 
 # Algorithm
 
- 1. Fill both sides to length `N`, `-Inf` on the lower side and `Inf` on the upper side.
+ 1. Fill both sides to length `N`, `-Inf` on the lower side and `Inf` on the upper side, both in `datatype`, so the free bounds land in the type of the data rather than in `Float64`.
  2. Build `WeightBounds(; lb = lb, ub = ub)`, which validates the pair.
 
 # Arguments
@@ -639,6 +645,7 @@ Generate unconstrained portfolio weight bounds when no bounds are specified.
   - `wb::Nothing`: Indicates no constraint for portfolio weights.
   - `args...`: Additional positional arguments (ignored).
   - `N::Integer`: Number of assets, the length of the two bound vectors.
+  - `datatype`: Type of the two free bounds.
   - `kwargs...`: Additional keyword arguments (ignored).
 
 # Validation
@@ -665,8 +672,9 @@ WeightBounds
   - [`weight_bounds_constraints_side`](@ref)
 """
 function weight_bounds_constraints(wb::Nothing, args...; N::Integer = 0,
-                                   kwargs...)::WeightBounds
-    return WeightBounds(; lb = fill(-Inf, N), ub = fill(Inf, N))
+                                   datatype::DataType = Float64, kwargs...)::WeightBounds
+    return WeightBounds(; lb = fill(convert(datatype, -Inf), N),
+                        ub = fill(convert(datatype, Inf), N))
 end
 
 export WeightBoundsEstimator, WeightBounds, weight_bounds_constraints

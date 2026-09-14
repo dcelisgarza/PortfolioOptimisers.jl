@@ -1797,7 +1797,9 @@ function process_model(model::JuMP.Model, ::OptimisationSuccess)
     return JuMPOptimisationSolution(; w = w)
 end
 function process_model(model::JuMP.Model, ::OptimisationFailure)
-    return JuMPOptimisationSolution(; w = fill(NaN, length(model[:w])))
+    return JuMPOptimisationSolution(;
+                                    w = fill(convert(JuMP.value_type(typeof(model)), NaN),
+                                             length(model[:w])))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

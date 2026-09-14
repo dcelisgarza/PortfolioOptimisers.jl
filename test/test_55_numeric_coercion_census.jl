@@ -29,6 +29,16 @@
     of that type states a constant rather than converting a derived one, so the pattern
     requires an identifier character after the parenthesis.
 
+    Issue #1061. Two more spellings of the same breach passed the two patterns above.
+    `NAMED_FLOAT_BROADCAST` reads the broadcast form of a named type, `Float64.(x)`,
+    which `NAMED_FLOAT` missed because the dot sits between the name and the
+    parenthesis. `FILL_LITERAL` reads a `NaN` or `Inf` literal filled into an array,
+    `fill(NaN, n)`: the literal is `Float64`, so the array is `Float64` whatever the data,
+    and the eight sites that stood in `src/` were each a breach with the data in hand — a
+    Welford state has `X`, a graph traversal has the connection matrix, a JuMP model has
+    its value type, and the free weight bounds take the `datatype` every caller already
+    passed. A constant filled in a derived type is spelled `fill(convert(T, NaN), n)`.
+
     What the census does not read is what carries no `(`: `zeros(Float64, n)` and its
     siblings name a concrete type for an allocation, and `convert(Float64, x)` names one
     for a conversion. Neither spelling stands in `src/` or `ext/` today. Add the pattern
@@ -59,6 +69,11 @@
     # were going to derive. The lookbehind lets a type parameter past, and the trailing
     # identifier character lets a literal past.
     NAMED_FLOAT = r"(?<![\w.{])(?:Float16|Float32|Float64|BigFloat|ComplexF16|ComplexF32|ComplexF64)\(\s*[A-Za-z_]"
+    # A concrete float type used as a broadcast converter, which decides the same thing
+    # for every element.
+    NAMED_FLOAT_BROADCAST = r"(?<![\w.{])(?:Float16|Float32|Float64|BigFloat|ComplexF16|ComplexF32|ComplexF64)\.\(\s*[A-Za-z_]"
+    # A float literal filled into an array, whose element type is then the literal's.
+    FILL_LITERAL = r"\bfill\(\s*-?(?:NaN|Inf)\b"
 
     #=
     A site the rule owns and another ticket ships. Each entry maps a file to the fragment
@@ -73,6 +88,8 @@
     coerced = String[]
     rounded = String[]
     named = String[]
+    broadcast = String[]
+    filled = String[]
     forgiven = String[]
     for f in files
         rel = relpath(f, ROOT)
@@ -91,6 +108,12 @@
                     push!(named, "$rel:$i: $(strip(line))")
                 end
             end
+            if occursin(NAMED_FLOAT_BROADCAST, line)
+                push!(broadcast, "$rel:$i: $(strip(line))")
+            end
+            if occursin(FILL_LITERAL, line)
+                push!(filled, "$rel:$i: $(strip(line))")
+            end
         end
     end
 
@@ -108,6 +131,17 @@
         @info "Sites that name a concrete float type as a converter:\n" * join(named, "\n")
     end
     @test isempty(named)
+
+    if !isempty(broadcast)
+        @info "Sites that name a concrete float type as a broadcast converter:\n" *
+              join(broadcast, "\n")
+    end
+    @test isempty(broadcast)
+
+    if !isempty(filled)
+        @info "Sites that fill an array with a float literal:\n" * join(filled, "\n")
+    end
+    @test isempty(filled)
 
     # Every exemption is still a site. One that is not has been shipped, and the entry that
     # forgives it must go with it.

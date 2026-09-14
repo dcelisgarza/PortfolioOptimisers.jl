@@ -1420,6 +1420,10 @@ function regime_adjusted_covariance_pass!(f, ce::RegimeAdjustedExpWeightedCovari
     N = size(X, setdiff((1, 2), (dims,))[1])
     assert_regime_target(ce.regime_target, N)
 
+    # An uncentred estimator seeds its location from the first observation it sees, so the
+    # location starts as `NaN`, in the type of `X` so that a `Float32` panel keeps a
+    # `Float32` state.
+    location = ce.centred ? zeros(eltype(X), N) : fill(convert(eltype(X), NaN), N)
     cache = if isnothing(state)
         separate = has_separate_cor_decay(ce)
         RegimeAdjustedCovarianceState(if isnothing(ce.hac_lags)
@@ -1431,9 +1435,8 @@ function regime_adjusted_covariance_pass!(f, ce::RegimeAdjustedExpWeightedCovari
                                       separate ? zeros(eltype(X), N, N) : nothing,
                                       separate ? zeros(Int, N, N) : nothing,
                                       zeros(eltype(X), N, N), zeros(eltype(X), N),
-                                      zeros(eltype(X), N),
-                                      ce.centred ? zeros(eltype(X), N) : fill(NaN, N),
-                                      zeros(Int, N), trues(N), nothing, 0)
+                                      zeros(eltype(X), N), location, zeros(Int, N),
+                                      trues(N), nothing, 0)
     else
         @argcheck(size(state.covariance, 1) == N,
                   DimensionMismatch("the state holds $(size(state.covariance, 1)) assets, and `X` holds $N"))

@@ -521,7 +521,11 @@ function finite_sub_allocation(w::VecNum, p::VecNum, cash::Number, bgt::Number,
     # than the cash makes the budget constraint infeasible, and an infeasible model holds no
     # solution, so its values are not finite. Either way `res` carries the failure, and the
     # book is read as empty rather than raising, so the fallback chain can walk on.
-    xv = JuMP.has_values(model) ? JuMP.value.(x) : fill(NaN, N)
+    xv = if JuMP.has_values(model)
+        JuMP.value.(x)
+    else
+        fill(convert(JuMP.value_type(typeof(model)), NaN), N)
+    end
     shares = all(isfinite, xv) ? round.(Int, xv) : zeros(Int, N)
     cost = shares .* p
     aw = if any(!iszero, cost)

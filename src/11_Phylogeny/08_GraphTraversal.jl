@@ -136,7 +136,7 @@ This function performs a breadth-first search (BFS) on a binary (directed or und
 
 # Returns
 
-  - `distance::VecNum`: `N × 1` vector of shortest path distances from the source to each vertex. `Inf` marks a vertex no path reaches. The source's own entry is **not** `0`; see the warning above.
+  - `distance::VecNum`: `N × 1` vector of shortest path distances from the source to each vertex, in the type a division of `CIJ`'s entries lands in. `Inf` marks a vertex no path reaches. The source's own entry is **not** `0`; see the warning above.
   - `branch::Vector{Int}`: `N × 1` vector of predecessor indices for each vertex in the BFS tree (`-1` for the source, `0` for an unreachable vertex).
 
 # Related
@@ -152,8 +152,12 @@ function breadth(CIJ::MatNum, source::Integer)
     black = 2
     # Initialise colours
     color = zeros(Int, N)
-    # Initialise distances
-    distance = fill(Inf, N)
+    # Initialise distances. A distance must hold `Inf` for a vertex no path reaches, so
+    # it lands in the type a division of the connection entries lands in: a `Bool` or an
+    # integer matrix takes the floating-point type that represents it, and a `Float32`
+    # one stays `Float32`.
+    Td = typeof(one(eltype(CIJ)) / one(eltype(CIJ)))
+    distance = fill(convert(Td, Inf), N)
     # Initialise branches
     branch = zeros(Int, N)
     # Start on vertex `source`
