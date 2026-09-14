@@ -590,6 +590,48 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         @test TimeSeries.timestamp(applied.X) == ts[[1, 3, 4, 5]]
         @test values(applied.X) == [1.0 10.0; 3.0 12.0; 4.0 13.0; 5.0 14.0]
 
+        # The carrier states one clock, so a dropped row leaves it for every series the
+        # carrier holds: the factor, benchmark and implied-volatility series are read at the
+        # surviving timestamps, as `port_opt_view` reads them, and the conversion — which
+        # refuses a covariate stating a clock the assets no longer do — runs. A per-asset
+        # benchmark follows the kept columns too; a shared one has nothing to follow.
+        F = TimeArray(ts, [1.0 2.0; 1.1 2.1; 1.2 2.2; 1.3 2.3; 1.4 2.4], [:f1, :f2])
+        B1 = TimeArray(ts, [5.0, 5.1, 5.2, 5.3, 5.4], [:bm])
+        B3 = TimeArray(ts,
+                       [5.0 6.0 7.0; 5.1 6.1 7.1; 5.2 6.2 7.2; 5.3 6.3 7.3; 5.4 6.4 7.4],
+                       [:ba, :bb, :bc])
+        iv = TimeArray(ts, fill(0.2, 5, 3), [:a, :b, :c])
+        prc = PricesResult(; X = pr.X, F = F, B = B1, iv = iv, ivpa = [1.0, 2.0, 3.0])
+        apc = apply_preprocessing(fit_preprocessing(MissingDataFilter(; col_thr = 0.5,
+                                                                      row_thr = 0.4), prc),
+                                  prc)
+        @test TimeSeries.timestamp(apc.F) == ts[[1, 3, 4, 5]]
+        @test values(apc.F) == values(F)[[1, 3, 4, 5], :]
+        @test TimeSeries.timestamp(apc.B) == ts[[1, 3, 4, 5]]
+        @test values(apc.B) == values(B1)[[1, 3, 4, 5]]
+        @test TimeSeries.timestamp(apc.iv) == ts[[1, 3, 4, 5]]
+        @test size(values(apc.iv)) == (4, 2)
+        @test apc.ivpa == [2.0, 3.0]
+        rdc = prices_to_returns(apc)
+        @test size(rdc.X) == (3, 2)
+        @test size(rdc.F) == (3, 2)
+        @test length(rdc.B) == 3
+        @test size(rdc.iv) == (3, 2)
+        prb = PricesResult(; X = pr.X, B = B3)
+        apb = apply_preprocessing(fit_preprocessing(MissingDataFilter(; col_thr = 0.5,
+                                                                      row_thr = 0.4), prb),
+                                  prb)
+        @test TimeSeries.colnames(apb.B) == [:bb, :bc]
+        @test values(apb.B) == values(B3)[[1, 3, 4, 5], 2:3]
+        @test size(prices_to_returns(apb).B) == (3, 2)
+        # ADR 0133's own composition of the dense matrix, on a carrier with a covariate:
+        # a filter at `row_thr = 0` and the conversion, one after the other.
+        dense = apply_preprocessing(fit_preprocessing(MissingDataFilter(; col_thr = 0.5,
+                                                                        row_thr = 0.0),
+                                                      prc), prc)
+        @test TimeSeries.timestamp(dense.X) == ts[[1, 3, 4, 5]]
+        @test size(apply_preprocessing(PricesToReturns(), dense).X) == (3, 2)
+
         # A universe that keeps nothing is refused rather than returned empty.
         allmissing = PricesResult(;
                                   X = TimeArray(ts,

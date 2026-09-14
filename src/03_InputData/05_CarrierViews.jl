@@ -152,7 +152,7 @@ The method that Julia selects is the algorithm.
   - `pnl`: The Asset Panel, or `nothing`.
   - `i`: Observation index.
   - `j`: Asset index.
-  - `sq`: Whether the Panel Fields are the assets.
+  - `nx`: The asset names, or `nothing`, handed to [`port_opt_view`](@ref) so that a tensor Panel Field whose labels *are* the asset names is cut on its label axis too.
 
 # Returns
 

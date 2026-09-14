@@ -30,6 +30,7 @@ needs_previous_weights(fe::FeesE_Fees)
 port_opt_view(fees::Fees, i, X::MatNum, args...)
 strip_liquidation_carriers
 investable_fees_view
+mark_fees
 lift_fees
 lift_fee_rate
 lift_turnover

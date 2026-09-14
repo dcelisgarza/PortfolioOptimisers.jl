@@ -96,6 +96,45 @@ function absent_value(::Type{T}) where {T}
     return x
 end
 """
+    assert_no_infinite_price(v::AbstractArray, names, ts) -> nothing
+
+Refuse an infinite value in a price series by name.
+
+The layer has one spelling for an absent price, `NaN`, and an infinity is not it: [`listing_span`](@ref) reads a non-finite cell as unpriced, so the **Span Rule** would leave an interior infinity inside the listing, while the conversion would read it as a price and compute a finite return from the pair it forms — a `-100 %` on the observation after it. A value that two pieces of the layer read differently is refused where the spelling is fixed, so that every later piece meets one definition of a gap.
+
+# Arguments
+
+  - `v`: The values of one series, `observations × columns`.
+  - `names`: The series' column names.
+  - `ts`: The series' timestamps.
+
+# Validation
+
+  - Every value is `missing`, `NaN`, or finite. Raises a `DomainError` naming the first offending column and observation.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`unify_gaps`](@ref)
+  - [`listing_span`](@ref)
+  - [`is_missing_value`](@ref)
+"""
+function assert_no_infinite_price(v::AbstractArray, names, ts)::Nothing
+    k = findfirst(x -> !ismissing(x) && !isnan(x) && !isfinite(x), v)
+    if isnothing(k)
+        return nothing
+    end
+    #! A one-column series may hold its values in a vector, so the column is read off the
+    #! Cartesian index where there is one and is the first column otherwise.
+    idx = Tuple(CartesianIndices(v)[k])
+    col = length(idx) == 1 ? 1 : idx[2]
+    return throw(DomainError(v[k],
+                             "an infinite value is neither a price nor the marker of an absence, and the ingestion layer spells an absent price `NaN`; got $(v[k]) in column `$(names[col])` at $(ts[idx[1]]). Spell the absence `NaN` or `missing`, or correct the price, before the call."))
+end
+"""
     unify_gaps(A::TimeSeries.TimeArray) -> TimeSeries.TimeArray
     unify_gaps(A::TimeSeries.TimeArray, ::Type{T}) -> TimeSeries.TimeArray
 
@@ -110,11 +149,16 @@ The target type is derived, never named. The one-argument form reads it off the 
  1. A series whose values are already of type `T` carries its gaps as `NaN`. Return it untouched.
  2. A series holding `missing` is rebuilt, mapping `missing` to [`absent_value`](@ref)`(T)` and converting every other entry to `T`. This is the one place a `missing` becomes an absence, so a type that cannot carry one is refused here, by name.
  3. Any other series is converted to `T` entry by entry. Nothing is absent, so nothing is spelled, and a type that could not spell one is not asked to.
+ 4. Refuse an infinite value by name, in every case. An infinity is neither a price nor the marker of an absence: the **Span Rule** reads a non-finite cell as unpriced while the conversion would read it as a price and compute a finite return from it, so the two would disagree about one cell.
 
 # Arguments
 
   - `A`: One price series.
   - `T`: The value type to carry it in. Defaults to `absence_type(series_value_type(A))`.
+
+# Validation
+
+  - Every value is `missing`, `NaN`, or finite. An infinity raises a `DomainError` naming the column and the observation.
 
 # Returns
 
@@ -134,6 +178,7 @@ function unify_gaps(A::TimeSeries.TimeArray)
 end
 function unify_gaps(A::TimeSeries.TimeArray, ::Type{T}) where {T}
     v = values(A)
+    assert_no_infinite_price(v, TimeSeries.colnames(A), TimeSeries.timestamp(A))
     if eltype(v) === T
         return A
     end
@@ -459,7 +504,7 @@ The emitted clock is the asset table's under the default join, so `timestamp(pr.
   - `iv`: Optional implied volatilities, one column per asset, on any clock: aligned to the emitted one and padded `NaN` where silent.
   - `ivpa`: Optional implied volatility adjustment.
   - `pnl`: Optional [`AssetPanel`](@ref) of Panel Fields the caller already holds.
-  - `pr`: A [`PricesResult`](@ref), for the second form, whose series are re-ingested.
+  - `pr`: A [`PricesResult`](@ref), for the second form, whose series are re-ingested. A span the carrier states is kept unless `est.span` overrides it; the Span Rule runs only where neither states one.
 
 # Validation
 
@@ -566,6 +611,13 @@ function price_ingestion(est::PriceIngestion, X::TimeSeries.TimeArray;
                         span = span)
 end
 function price_ingestion(est::PriceIngestion, pr::PricesResult)::PricesResult
+    #! A carrier's span is a declaration already made, and a declaration is never
+    #! second-guessed: the estimator's own `span` overrides it, and the Span Rule runs
+    #! only where neither states one. A declared span is on the clock the caller handed
+    #! in, so a collapse that moves the clock refuses it by shape at the carrier.
+    span = isnothing(est.span) ? pr.span : est.span
+    est = PriceIngestion(; join_method = est.join_method, collapse_args = est.collapse_args,
+                         span = span, strict = est.strict)
     return price_ingestion(est, pr.X; F = pr.F, B = pr.B, iv = pr.iv, ivpa = pr.ivpa,
                            pnl = pr.pnl)
 end
@@ -632,7 +684,7 @@ The method that Julia selects is the algorithm.
 
  1. `span` is `nothing`: return `nothing`, without matching any timestamp.
  2. `span` is a matrix: recover its rows with [`matched_row_indices`](@ref), and view it at those rows and the assets `j`.
- 3. `span` is a [`PortfolioOptimisers.ListingSpan`](@ref) and the recovered rows are the whole clock in order: subset the two bound vectors instead, so the two integers per asset survive the cut rather than being expanded into a view of booleans. Any other row selection can split an interval in half, which no interval can say, and falls back to step 2.
+ 3. `span` is a [`PortfolioOptimisers.ListingSpan`](@ref) and the recovered rows are a contiguous window in clock order — a fold's window, or the whole clock: shift the two bounds by the rows dropped in front and subset them at `j`, so the two integers per asset survive the cut rather than being expanded into a view of booleans. Any other row selection can split an interval in half, which no interval can say, and falls back to step 2.
 
 # Arguments
 
@@ -661,11 +713,15 @@ function span_carrier_view(span::AbstractMatrix{Bool}, ts_new, ts_old, j)
 end
 function span_carrier_view(span::ListingSpan, ts_new, ts_old, j)
     i = matched_row_indices(ts_new, ts_old)
-    #! A row selection that keeps the whole clock in order leaves every interval intact,
-    #! so the two integers per asset survive the cut. Any other selection can split one
-    #! in half, which no interval can say, and falls back to the ordinary view.
-    return if i == axes(span, 1)
-        ListingSpan(span.first[j], span.last[j], span.n)
+    #! A contiguous row window in clock order cuts every interval to an interval, so the
+    #! two integers per asset survive the cut: the bounds shift by the rows the window
+    #! dropped in front, and a bound that falls outside the window says the same thing
+    #! there as a bound at its edge. A fold's window is this case. Any other selection
+    #! can split an interval in half, which no interval can say, and falls back to the
+    #! ordinary view.
+    return if !isempty(i) && i == first(i):last(i)
+        o = first(i) - 1
+        ListingSpan(span.first[j] .- o, span.last[j] .- o, length(i))
     else
         view(span, i, j)
     end

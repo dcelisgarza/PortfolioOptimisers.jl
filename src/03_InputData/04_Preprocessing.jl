@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all preprocessing estimator types.
 
-Preprocessing estimators transform price or returns data (prices-to-returns conversion, missing-data filtering, imputation) under a fit/apply contract. Fitting one on training data with [`fit_preprocessing`](@ref) produces a result carrying any fitted state — imputation parameters, thresholds, and the selected asset universe — which [`apply_preprocessing`](@ref) then replays on unseen data so train and test windows are transformed consistently. Stateless preprocessing estimators carry no state, and applying them is equivalent to running them.
+Preprocessing estimators transform price or returns data (prices-to-returns conversion, missing-data filtering, a gap fill) under a fit/apply contract. Fitting one on training data with [`fit_preprocessing`](@ref) produces a result carrying any fitted state — a fill's seed, thresholds, and the selected asset universe — which [`apply_preprocessing`](@ref) then replays on unseen data so train and test windows are transformed consistently. Stateless preprocessing estimators carry no state, and applying them is equivalent to running them.
 
 They are ordinary estimators: they know nothing about pipelines. A `Pipeline` drives them through the same fit/apply verbs any other caller would use.
 
@@ -52,7 +52,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all preprocessing result types.
 
-Preprocessing results are produced by [`fit_preprocessing`](@ref) on training data. They carry the fitted state needed to apply the same transformation to unseen data — imputation parameters, thresholds, and the selected asset universe. Stateless preprocessing estimators produce results that carry only their configuration.
+Preprocessing results are produced by [`fit_preprocessing`](@ref) on training data. They carry the fitted state needed to apply the same transformation to unseen data — a fill's seed, thresholds, and the selected asset universe. Stateless preprocessing estimators produce results that carry only their configuration.
 
 All concrete preprocessing results should subtype one of the two data-level subtypes, [`AbstractPricesPreprocessingResult`](@ref) or [`AbstractReturnsPreprocessingResult`](@ref), so a caller can replay each fitted transformation at the data level it applies to.
 
@@ -91,7 +91,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return `true` when `x` counts as a missing observation in price-level data.
 
-Price-level data stores absent observations either as `missing` or as `NaN` (the two conventions [`prices_to_returns`](@ref) already unifies).
+Price-level data stores absent observations either as `missing` or as `NaN`, the two conventions [`unify_gaps`](@ref) spells as one at the ingestion door; this reads both because it stands at that door, on a carrier built by hand.
 
 # Algorithm
 
@@ -120,7 +120,7 @@ end
 
 Fit a preprocessing estimator on a data window and return the fitted object consumed by [`apply_preprocessing`](@ref).
 
-The fitted object carries whatever state the transformation needs to be replayed consistently on unseen data — imputation parameters, thresholds, and the selected asset universe. Stateless preprocessing estimators return themselves.
+The fitted object carries whatever state the transformation needs to be replayed consistently on unseen data — a fill's seed, thresholds, and the selected asset universe. Stateless preprocessing estimators return themselves.
 
 # Interfaces
 
@@ -152,7 +152,7 @@ end
 
 Transform a data window with a fitted preprocessing object.
 
-Applying the fitted object produced by [`fit_preprocessing`](@ref) on the training window to an unseen (test) window replays the *same* transformation — the same asset universe, the same imputation parameters — so train and test data stay consistent and no information flows from test to train.
+Applying the fitted object produced by [`fit_preprocessing`](@ref) on the training window to an unseen (test) window replays the *same* transformation — the same asset universe, the same fill seed — so train and test data stay consistent and no information flows from test to train.
 
 # Arguments
 

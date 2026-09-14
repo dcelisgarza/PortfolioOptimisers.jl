@@ -7,7 +7,7 @@ All concrete and/or types representing the result of returns calculations should
 
 ## The asset-selector contract
 
-[`select_assets`](@ref) and [`fit_preprocessing`](@ref) dispatch on this supertype, so any subtype reaching an [`AbstractAssetSelector`](@ref) must carry `nx` and an `observations × assets` matrix `X`, plus a [`port_opt_view`](@ref) that replays a selected universe. [`ClusterGroups`](@ref) widens that to `{nx, X, Z}`: it reads the feature matrix `Z` straight off the carrier, because preselection runs before any prior exists and no other source is reachable.
+[`select_assets`](@ref) and [`fit_preprocessing`](@ref) dispatch on this supertype, so any subtype reaching an [`AbstractAssetSelector`](@ref) must carry `nx` and an `observations × assets` matrix `X`, plus a [`port_opt_view`](@ref) that replays a selected universe. [`ClusterGroups`](@ref) widens that to `{nx, X, pnl}`: it reads the Feature Matrix off the carrier's [`AssetPanel`](@ref), because preselection runs before any prior exists and no other source is reachable.
 
 Widening the contract rather than the `Pr_RR` bridge is deliberate — that alias's concreteness is load-bearing at nine routing sites. The cost is that the contract is implicit: it is satisfied by [`ReturnsResult`](@ref) and enforced by nothing. [`PredictionReturnsResult`](@ref) subtypes this supertype, but its `X` is a *portfolio* return vector rather than an asset matrix — the asset axis is already collapsed away — so it satisfies neither the old contract nor the widened one, and every entry point refuses it loudly rather than measuring the wrong axis.
 
@@ -76,7 +76,7 @@ Stores the results of asset and factor returns calculations.
 
 It supports both asset and factor returns, as well as optional time series and implied volatility information, and is designed for downstream compatibility with optimisation and analysis routines.
 
-It also carries the optional feature matrix `Z` that [`FeatureDistance`](@ref) turns into a distance. `Z` is *data*, not configuration, which is why it is held here rather than on the estimator: the clustering stack is asset-subset-blind by construction, so an estimator-held feature matrix would survive a nested-clustered subproblem or a cross-validation fold unsliced, with its asset axis silently pointing at the full universe. `ReturnsResult` implements [`port_opt_view`](@ref), so a carried `Z` is subselected in step with `X`.
+It also carries the optional [`AssetPanel`](@ref) `pnl`: the two universe masks the ingestion layer states, and the Panel Fields that [`FeatureDistance`](@ref) turns into a distance. The panel is *data*, not configuration, which is why it is held here rather than on an estimator: the clustering stack is asset-subset-blind by construction, so an estimator-held Feature Matrix would survive a nested-clustered subproblem or a cross-validation fold unsliced, with its asset axis silently pointing at the full universe. `ReturnsResult` implements [`port_opt_view`](@ref), so a carried panel is subselected in step with `X`.
 
 # Fields
 

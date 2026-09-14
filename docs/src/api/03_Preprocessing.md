@@ -167,6 +167,7 @@ volatilities are complete. See
 PriceIngestion
 price_ingestion
 PortfolioOptimisers.unify_gaps
+PortfolioOptimisers.assert_no_infinite_price
 PortfolioOptimisers.series_value_type
 PortfolioOptimisers.absence_type
 PortfolioOptimisers.absent_value

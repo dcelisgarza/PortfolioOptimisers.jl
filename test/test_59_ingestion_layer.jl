@@ -296,6 +296,51 @@ rd59 = prices_to_returns(ptr59, price_ingestion(PriceIngestion(), X59))
         @test Matrix(pr2.span) == Matrix(pr.span)
         @test_throws PortfolioOptimisers.IsEmptyError price_ingestion(PriceIngestion(),
                                                                       X59[Date[]])
+        # A span the carrier states is a declaration already made, and a declaration is
+        # never second-guessed: re-ingesting keeps it, the estimator's own `span` overrides
+        # it, and the Span Rule runs only where neither states one.
+        cal = trues(T59, N59)
+        cal[1:8, 2] .= false
+        prc = price_ingestion(PriceIngestion(), PricesResult(; X = X59, span = cal))
+        @test prc.span === cal
+        own = trues(T59, N59)
+        pro = price_ingestion(PriceIngestion(; span = own),
+                              PricesResult(; X = X59, span = cal))
+        @test pro.span === own
+        # A declared span is on the clock the caller handed in, so a collapse that moves the
+        # clock refuses it by shape at the carrier rather than carrying it onto the wrong one.
+        @test_throws DimensionMismatch price_ingestion(PriceIngestion(;
+                                                                      collapse_args = (week,
+                                                                                       last)),
+                                                       PricesResult(; X = X59, span = cal))
+    end
+
+    @testset "an infinite price is refused by name at the door" begin
+        # The Span Rule reads a non-finite cell as unpriced and the conversion would read it
+        # as a price, computing a finite `-100 %` return from the pair it forms; the layer
+        # refuses the one value its pieces would read differently, where the spelling is fixed.
+        Pi = copy(P59)
+        Pi[25, 1] = Inf
+        Xi = TimeArray(collect(ts59), Pi, nx59)
+        @test_throws DomainError price_ingestion(PriceIngestion(), Xi)
+        @test_throws DomainError prices_to_returns(PricesResult(; X = Xi))
+        Pi[25, 1] = -Inf
+        @test_throws DomainError price_ingestion(PriceIngestion(),
+                                                 TimeArray(collect(ts59), Pi, nx59))
+        # A factor or benchmark series takes the same rule, and a one-column series too.
+        Bi = TimeArray(collect(ts59), [t == 3 ? Inf : 1.0 + t for t in 1:T59], ["bm"])
+        @test_throws DomainError price_ingestion(PriceIngestion(), X59; B = Bi)
+        err = try
+            price_ingestion(PriceIngestion(), Xi)
+        catch e
+            e
+        end
+        @test isa(err, DomainError)
+        @test occursin("column `a`", sprint(showerror, err))
+        @test occursin(string(ts59[25]), sprint(showerror, err))
+        # `NaN` and `missing` are the absences, and both pass.
+        @test isa(price_ingestion(PriceIngestion(), X59), PricesResult)
+        @test isa(price_ingestion(PriceIngestion(), Xm59), PricesResult)
     end
 end
 
@@ -435,14 +480,29 @@ end
         @test size(pv.span) == (20, N59)
         @test Matrix(pv.span) == Matrix(pr.span)[1:20, :]
         @test all(view(Matrix(pv.span), :, 3))
-        # A row cut can split an interval in half, which no interval can say, so the cut span
-        # is an ordinary view of booleans rather than a Listing Span.
-        @test !isa(pv.span, PortfolioOptimisers.ListingSpan)
-        # Keeping the whole clock in order leaves every interval intact, so the two integers
-        # per asset survive the cut.
+        # A contiguous window in clock order cuts every interval to an interval, so the two
+        # integers per asset survive the cut, and the conversion's active mask keeps the
+        # compression on a fold's window: ADR 0132's claim on the layer's own path.
+        @test isa(pv.span, PortfolioOptimisers.ListingSpan)
+        pv2 = PortfolioOptimisers.port_opt_view(pr, 10:30, [2, 4])
+        @test isa(pv2.span, PortfolioOptimisers.ListingSpan)
+        @test Matrix(pv2.span) == Matrix(pr.span)[10:30, [2, 4]]
+        @test isa(prices_to_returns(ptr59, pv2).pnl.amsk, PortfolioOptimisers.ListingSpan)
+        @test Matrix(prices_to_returns(ptr59, pv2).pnl.amsk) ==
+              Matrix(rd.pnl.amsk)[10:29, [2, 4]]
+        # A window that ends inside `d`'s suspension still reads `d` as listed there.
+        pv3 = PortfolioOptimisers.port_opt_view(pr, 15:19, 1:N59)
+        @test isa(pv3.span, PortfolioOptimisers.ListingSpan)
+        @test all(view(Matrix(pv3.span), :, 4))
+        # Keeping the whole clock in order is the same case.
         pw = PortfolioOptimisers.port_opt_view(pr, 1:T59, [1, 3])
         @test isa(pw.span, PortfolioOptimisers.ListingSpan)
         @test Matrix(pw.span) == Matrix(pr.span)[:, [1, 3]]
+        # A row cut that is not contiguous can split an interval in half, which no interval
+        # can say, so the cut span is an ordinary view of booleans.
+        pn = PortfolioOptimisers.port_opt_view(pr, [1, 3, 5, 20, 21], 1:N59)
+        @test !isa(pn.span, PortfolioOptimisers.ListingSpan)
+        @test Matrix(pn.span) == Matrix(pr.span)[[1, 3, 5, 20, 21], :]
 
         # A caller's own declaration is any matrix of booleans, and it slices the same way.
         own = trues(T59, N59)

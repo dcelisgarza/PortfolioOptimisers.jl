@@ -5,7 +5,7 @@ Preprocessing estimator dropping assets and observations with excessive missing 
 
 The *asset universe is fitted state*: the training window decides which assets survive (per-column missing fraction at most `col_thr`), and applying the fitted result to an unseen window subsets it to that same universe — so train weights and test returns always refer to the same assets. Observation (row) filtering is window-local: rows whose missing fraction across the surviving assets exceeds `row_thr` are dropped from whichever window is being transformed.
 
-This estimator is the library's **only** missing-data filter: [`prices_to_returns`](@ref) removes no observation and no asset, because deleting either is a **Universe Policy** and a policy is fitted on a training window and replayed by name, which a stateless conversion cannot do (ADR 0133). Only the asset series `X` (and the matching implied volatility columns, and the feature matrix, whose axes are parallel to `X`) participate; factor and benchmark series pass through unchanged.
+This estimator is the library's **only** missing-data filter: [`prices_to_returns`](@ref) removes no observation and no asset, because deleting either is a **Universe Policy** and a policy is fitted on a training window and replayed by name, which a stateless conversion cannot do (ADR 0133). Only the asset series `X` decides what survives; the implied volatility columns and the Asset Panel follow the assets, and every series the carrier holds is read at the observations that survive, because the carrier states one clock.
 
 # Algorithm
 
@@ -20,9 +20,9 @@ This estimator is the library's **only** missing-data filter: [`prices_to_return
  1. Find the columns of the window whose names are in the fitted universe, and check that one at least is present.
  2. Count the missing assets of each row over those columns alone, and keep the rows whose count does not exceed `row_thr` of the column total.
  3. Rebuild `X` from the kept rows and the kept columns.
- 4. Subselect the implied volatilities on the kept columns, and `ivpa` with them when it is a vector. The implied volatility series keeps every row, because its own clock is not the one that was filtered.
+ 4. Read the factor, benchmark and implied volatility series at the kept timestamps, as [`port_opt_view`](@ref) reads them. A dropped row leaves the carrier's clock, and the conversion refuses a covariate stating a clock the assets no longer do. Subselect the implied volatilities on the kept columns too, and `ivpa` with them when it is a vector; a benchmark with one column per asset follows the kept columns, and a single shared column does not.
  5. View the Asset Panel with [`panel_carrier_view`](@ref) at the kept rows and the kept columns, handing it the asset names so that a tensor Panel Field whose labels *are* the asset names ([`features_are_assets`](@ref)) is cut on its label axis too.
- 6. Rebuild the [`PricesResult`](@ref). The factor series `F` and the benchmark series `B` pass through untouched.
+ 6. Rebuild the [`PricesResult`](@ref).
 
 The two thresholds count opposite axes: `col_thr` counts the missing rows of a column and drops columns, and `row_thr` counts the missing columns of a row and drops rows.
 
@@ -139,22 +139,34 @@ function apply_preprocessing(res::MissingDataFilterResult, pr::PricesResult)::Pr
     vals = values(pr.X)[:, cols]
     rows = findall(vec(count(is_missing_value, vals; dims = 2)) .<=
                    length(cols) * res.row_thr)
-    X = TimeSeries.TimeArray(TimeSeries.timestamp(pr.X)[rows], vals[rows, :],
-                             TimeSeries.colnames(pr.X)[cols])
+    ts = TimeSeries.timestamp(pr.X)[rows]
+    X = TimeSeries.TimeArray(ts, vals[rows, :], TimeSeries.colnames(pr.X)[cols])
+    #! The carrier states one clock, and a dropped row leaves it: the factor, benchmark and
+    #! implied-volatility series are read at the surviving timestamps, as `port_opt_view`
+    #! reads them, or the conversion refuses a covariate stating a clock the assets no
+    #! longer do.
+    F = isnothing(pr.F) ? nothing : pr.F[ts]
+    #! A per-asset benchmark follows the assets that survived; a single shared column has
+    #! nothing to follow. The test is B's own width, as in `port_opt_view`.
+    B = if isnothing(pr.B)
+        nothing
+    elseif length(TimeSeries.colnames(pr.B)) == size(values(pr.X), 2)
+        pr.B[ts][TimeSeries.colnames(pr.B)[cols]]
+    else
+        pr.B[ts]
+    end
     iv, ivpa = if isnothing(pr.iv)
         nothing, pr.ivpa
     else
-        ivv = values(pr.iv)[:, cols]
-        ivm = TimeSeries.TimeArray(TimeSeries.timestamp(pr.iv), ivv,
+        ivt = pr.iv[ts]
+        ivm = TimeSeries.TimeArray(TimeSeries.timestamp(ivt), values(ivt)[:, cols],
                                    TimeSeries.colnames(pr.iv)[cols])
         ivm, isa(pr.ivpa, VecNum) ? pr.ivpa[cols] : pr.ivpa
     end
     pnl = panel_carrier_view(pr.pnl, rows, cols, string.(TimeSeries.colnames(pr.X)))
     #! The span is a fact about the instruments, so the surviving window's span is the
     #! carrier's viewed at the rows and columns that survived, never one re-derived.
-    span = span_carrier_view(pr.span, TimeSeries.timestamp(X), TimeSeries.timestamp(pr.X),
-                             cols)
-    return PricesResult(; X = X, F = pr.F, B = pr.B, iv = iv, ivpa = ivpa, pnl = pnl,
-                        span = span)
+    span = span_carrier_view(pr.span, ts, TimeSeries.timestamp(pr.X), cols)
+    return PricesResult(; X = X, F = F, B = B, iv = iv, ivpa = ivpa, pnl = pnl, span = span)
 end
 export MissingDataFilter, MissingDataFilterResult

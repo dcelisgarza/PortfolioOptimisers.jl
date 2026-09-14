@@ -55,7 +55,7 @@ A container for aligned, time-indexed price-level data.
 
 The asset price series `X` is the master clock: [`port_opt_view`](@ref) selects observation windows on `X` and aligns the other series to the selected timestamps.
 
-The feature matrix `Z` is the exception to that alignment. It is a plain array, not a `TimeArray` — `TimeSeries.jl` has no 3-dimensional `TimeArray`, and the static shape has no clock at all — so it cannot be aligned by timestamp, only indexed positionally. Its axes are therefore held *parallel* to `X`: the asset axis to `TimeSeries.colnames(X)`, and, for the time-varying shape, the observation axis to `TimeSeries.timestamp(X)` row for row. Every routine that drops an asset or an observation from `X` must drop it from `Z` in the same step, which is what [`port_opt_view`](@ref), [`MissingDataFilter`](@ref) and [`prices_to_returns`](@ref) do.
+The [`AssetPanel`](@ref) `pnl` and the **Listing Span** `span` are the exceptions to that alignment. Neither is a `TimeArray` — a Panel Field may be a 3-dimensional array, a static panel has no clock at all, and a span is two integers per asset — so they cannot be aligned by timestamp, only indexed positionally. Their axes are therefore held *parallel* to `X`: the asset axis to `TimeSeries.colnames(X)`, and, for the time-varying shape, the observation axis to `TimeSeries.timestamp(X)` row for row. Every routine that drops an asset or an observation from `X` must drop it from both in the same step, which is what [`port_opt_view`](@ref), [`MissingDataFilter`](@ref) and [`prices_to_returns`](@ref) do, through [`panel_carrier_view`](@ref) and [`span_carrier_view`](@ref).
 
 # Fields
 
@@ -105,8 +105,9 @@ julia> size(values(pr.X))
   - [`prices_to_returns`](@ref)
   - [`Option`](@ref)
   - [`Num_VecNum`](@ref)
-  - [`MatNum_Arr3Num`](@ref)
   - [`check_asset_panel`](@ref)
+  - [`AssetPanel`](@ref)
+  - [`PortfolioOptimisers.ListingSpan`](@ref)
 """
 @concrete struct PricesResult <: AbstractPricesResult
     """
